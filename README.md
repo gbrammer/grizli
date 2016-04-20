@@ -32,7 +32,7 @@ The easiest way to satisfy all of these dependencies is to work within the STScI
 git clone git@github.com:gbrammer/grizli.git
 
 ### Otherwise just use https
-git clone https://github.com:gbrammer/grizli.git
+git clone https://github.com/gbrammer/grizli.git
 
 ### Build and install
 cd grizli

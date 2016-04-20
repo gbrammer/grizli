@@ -170,7 +170,7 @@ class GrismFLT(object):
             conf_file = os.path.join(os.getenv('GRIZLI'), '/CONF/NIRISS.%s.conf' %(self.grism))
         
         if self.im_header0['INSTRUME'] == 'WFIRST':
-            conf_file = os.path.join(os.getenv('GRIZLI'), '/CONF/WFIRST.conf'
+            conf_file = os.path.join(os.getenv('GRIZLI'), '/CONF/WFIRST.conf')
         
         self.conf = grism.aXeConf(conf_file)
         
