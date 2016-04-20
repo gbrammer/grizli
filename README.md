@@ -4,7 +4,7 @@
 
 This early release of `grizli` is intended to demonstrate and demystify some general techniques for manipulating *HST* slitless spectroscopic observations, providing software kernels to address questions such as 
 
-> "How does the G141 grism disperse the spectrum of a star/galaxy at pixel position `(x,y)` in my F140W direct image?".  
+> "How does the WFC3/IR G141 grism disperse the spectrum of a star/galaxy at pixel position `(x,y)` in my F140W direct image?".  
 
 Much of the background related to this question in the context of the currently available software tools was discussed in a document by Brammer, Pirzkal and Ryan (2014), available [here](https://github.com/WFC3Grism/CodeDescription/).  Along with a detailed description of the format of the configuration files originally developed for the aXe software, we provided a compact [Python script](https://github.com/WFC3Grism/CodeDescription/blob/master/axe_disperse.py) to address exactly the question above and strip away all of the many layers of bookkeeping, file-IO, etc. in existing analysis pipelines such as aXe (Kummel et al. 2009) and "THREEDHST" (Brammer et al. 2012, Momcheva et al. 2015).  In fact, the relatively simple script serves as the fundamental kernel for the way `grizli` computes the grism dispersions.  
 
