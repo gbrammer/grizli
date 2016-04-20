@@ -162,15 +162,15 @@ class GrismFLT(object):
         
         ### xxx Only WFC3/IR for now
         if self.im_header0['INSTRUME'] == 'WFC3':
-            conf_file = os.path.join(os.getenv('GRIZLI'), '/CONF/%s.%s.V4.3.conf' %(self.grism, self.filter))
+            conf_file = os.path.join(os.getenv('GRIZLI'), 'CONF/%s.%s.V4.3.conf' %(self.grism, self.filter))
             if not os.path.exists(conf_file):
-                conf_file = os.path.join(os.getenv('GRIZLI'), '/CONF/%s.%s.V4.3.conf' %(self.grism, 'F140W'))
+                conf_file = os.path.join(os.getenv('GRIZLI'), 'CONF/%s.%s.V4.3.conf' %(self.grism, 'F140W'))
             
         if self.im_header0['INSTRUME'] == 'NIRISS':
-            conf_file = os.path.join(os.getenv('GRIZLI'), '/CONF/NIRISS.%s.conf' %(self.grism))
+            conf_file = os.path.join(os.getenv('GRIZLI'), 'CONF/NIRISS.%s.conf' %(self.grism))
         
         if self.im_header0['INSTRUME'] == 'WFIRST':
-            conf_file = os.path.join(os.getenv('GRIZLI'), '/CONF/WFIRST.conf')
+            conf_file = os.path.join(os.getenv('GRIZLI'), 'CONF/WFIRST.conf')
         
         self.conf = grism.aXeConf(conf_file)
         
