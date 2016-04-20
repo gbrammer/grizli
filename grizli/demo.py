@@ -25,7 +25,10 @@ def test_flt():
                             verbose=True, save_detection=False, wcs=None)
     
     ## Find object near (x,y) = (495, 749)
-    dr = np.sqrt((flt.catalog['xcentroid']-495)**2+(flt.catalog['ycentroid']-749)**2)
+    dr = np.sqrt((flt.catalog['xcentroid']-330)**2+(flt.catalog['ycentroid']-744)**2)
+    #dr = np.sqrt((flt.catalog['xcentroid']-495)**2+(flt.catalog['ycentroid']-749)**2)
+    dr = np.sqrt((flt.catalog['xcentroid']-712)**2+(flt.catalog['ycentroid']-52)**2)
+    
     ix = np.argmin(dr)
     id, x0, y0 = flt.catalog['id'][ix], flt.catalog['xcentroid'][ix]+1, flt.catalog['ycentroid'][ix]+1
     
@@ -39,21 +42,21 @@ def test_flt():
     ax = fig.add_subplot(111)
     ax.imshow(flt.im_data['SCI'], cmap='gray_r', vmin=-0.05, vmax=0.2, interpolation='Nearest', aspect='auto')
     ax.set_xlim(x0-10, x0+230)
-    ax.set_ylim(y0-20, y0+20)
+    ax.set_ylim(y0-10, y0+10)
     
-    ax.plot(x0+dx, y0+dy, color='red', linewidth=3, alpha=0.7)
+    ax.plot(x0+dx-1, y0+dy-1, color='red', linewidth=3, alpha=0.7)
     ## 0.1 micron tick marks along the trace as in the next figure
     xint = np.interp(np.arange(1,1.81,0.1), lam/1.e4, dx)
     yint = np.interp(np.arange(1,1.81,0.1), lam/1.e4, dy)
-    ax.scatter(x0+xint, y0+yint, marker='o', color='red', alpha=0.8)
+    ax.scatter(x0+xint-1, y0+yint-1, marker='o', color='red', alpha=0.8)
     ax.set_xlabel(r'$x$ (FLT)'); ax.set_ylabel(r'$y$ (FLT)')
     
     fig.tight_layout(pad=0.1)
     fig.savefig('grizli_demo_0.pdf')
     
     #########
-    ### Compute the model in the FLT frame around a particular object of the image
-    m = flt.compute_model(id=id, x=x0, y=y0, sh=[80,80], in_place=False).reshape(flt.sh_pad)
+    ### Compute the model in the FLT frame for a single object
+    model_id = flt.compute_model(id=id, x=x0, y=y0, sh=[80,80], in_place=False).reshape(flt.sh_pad)
     
     #########
     ### Spectrum cutout
@@ -62,6 +65,8 @@ def test_flt():
     # (mask bad pixel)
     beam.cutout_seg[(beam.thumb/beam.photflam > 100) | (beam.thumb < 0)] = 0
     beam.total_flux = np.sum(beam.thumb[beam.cutout_seg == beam.id])
+    
+    beam.contam = beam.get_cutout(flt.model-model_id)
     
     ## 1D optimal extraction (Horne 1986)
     xspec, yspec, yerr = beam.optimal_extract(beam.cutout_sci, bin=0)
@@ -111,11 +116,11 @@ def test_flt():
     ax.set_ylabel('Observed')
     
     ax = fig.add_subplot(gst[1,:])
-    ax.imshow(lmodel, vmin=-0.05, vmax=0.2, cmap=cmap, interpolation='Nearest', origin='lower', aspect='auto')
+    ax.imshow(lmodel+beam.contam, vmin=-0.05, vmax=0.2, cmap=cmap, interpolation='Nearest', origin='lower', aspect='auto')
     ax.set_ylabel('Model')
 
     ax = fig.add_subplot(gst[2,:])
-    ax.imshow(beam.cutout_sci-lmodel, vmin=-0.05, vmax=0.2, cmap=cmap, interpolation='Nearest', origin='lower', aspect='auto')
+    ax.imshow(beam.cutout_sci-lmodel-beam.contam, vmin=-0.05, vmax=0.2, cmap=cmap, interpolation='Nearest', origin='lower', aspect='auto')
     ax.set_ylabel('Resid.')
     
     for ax in fig.axes[-3:]:

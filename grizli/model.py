@@ -162,15 +162,15 @@ class GrismFLT(object):
         
         ### xxx Only WFC3/IR for now
         if self.im_header0['INSTRUME'] == 'WFC3':
-            conf_file = conf_file='/Users/brammer/3DHST/Spectra/Work/CONF/%s.%s.V4.3.conf' %(self.grism, self.filter)
+            conf_file = os.path.join(os.getenv('GRIZLI'), '/CONF/%s.%s.V4.3.conf' %(self.grism, self.filter))
             if not os.path.exists(conf_file):
-                conf_file = conf_file='/Users/brammer/3DHST/Spectra/Work/CONF/%s.%s.V4.3.conf' %(self.grism, 'F140W')
+                conf_file = os.path.join(os.getenv('GRIZLI'), '/CONF/%s.%s.V4.3.conf' %(self.grism, 'F140W'))
             
         if self.im_header0['INSTRUME'] == 'NIRISS':
-            conf_file = conf_file='/Users/brammer/3DHST/Spectra/Work/CONF/NIRISS.%s.conf' %(self.grism)
+            conf_file = os.path.join(os.getenv('GRIZLI'), '/CONF/NIRISS.%s.conf' %(self.grism))
         
         if self.im_header0['INSTRUME'] == 'WFIRST':
-            conf_file = conf_file='/Users/brammer/3DHST/Spectra/Work/CONF/WFIRST.conf'
+            conf_file = os.path.join(os.getenv('GRIZLI'), '/CONF/WFIRST.conf'
         
         self.conf = grism.aXeConf(conf_file)
         
@@ -899,6 +899,7 @@ class BeamCutout(object):
         self.cutout_seg = np.zeros(self.shg, dtype=np.float32)
         
         self.wave = (np.arange(self.shg[1])+1-self.cutout_dimensions[1])*(self.lam[1]-self.lam[0]) + self.lam[0]
+        self.contam = 0
         
         if GrismFLT is not None:
             self.thumb = self.get_flam_thumb(GrismFLT.flam)*1
@@ -1089,7 +1090,7 @@ class BeamCutout(object):
         ### OK data
         ok = (self.ivar.flatten() != 0) & (self.modelf > 0.03*self.modelf.max())
         
-        scif = self.cutout_sci.flatten()
+        scif = (self.cutout_sci - self.contam).flatten()
         ivarf = self.ivar.flatten()
         
         ### Model: (ax + b)*continuum + line

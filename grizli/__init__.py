@@ -16,8 +16,6 @@ if os.getenv('GRIZLI') is None:
     print """
 Warning: $GRIZLI system variable not set, `grizli`
 won't be able to find the aXe configuration files!
+(These assumed to be in $GRIZLI/CONF.)
     """
-else:
-    CONF_PATH = os.path.join(os.getenv('GRIZLI'), 'CONF')
-
 
