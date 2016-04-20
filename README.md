@@ -22,8 +22,8 @@ Eventually, `grizli` is intended to encourage general users to move away from si
 * [scikit-learn](http://scikit-learn.org/stable/install.html) - For the linear least squares solver in the emonstration line-fitting code.
 * [stwcs](http://stsdas.stsci.edu/stsci_python_epydoc/stwcs/index.html) - STScI packages for *HST*-specific WCS definitions.  This may be deprecated by [astropy.wcs](http://docs.astropy.org/en/stable/wcs/).
 * [drizzlepac](http://drizzlepac.stsci.edu/) - STScI drizzle/blot library
-* ([photutils](https://photutils.readthedocs.org/en/latest/)) - necessary if you want to create photometric catalogs and segmentation images directly within python
-* ([pysynphot](http://pysynphot.readthedocs.org/en/latest/)) - Not required, but can be useful for dealing with *HST* filters and sensitivies, as well as handling unit conversions for synthetic spectra
+* [(photutils)](https://photutils.readthedocs.org/en/latest/) - necessary if you want to create photometric catalogs and segmentation images directly within python
+* [(pysynphot)](http://pysynphot.readthedocs.org/en/latest/) - Not required, but can be useful for dealing with *HST* filters and sensitivies, as well as handling unit conversions for synthetic spectra
      
 The easiest way to satisfy all of these dependencies is to work within the STScI/Gemini "Ureka" Python distribution: http://ssb.stsci.edu/ureka/.  The current development release of `Grizli` has been tested in Python 2.7 within the "SSBX" Ureka distribution, available here: http://ssb.stsci.edu/ssb_software.shtml.
  
