@@ -58,4 +58,4 @@ tar xzvf WFC3.IR.G141.cal.V4.3.tar.gz
 ```
 
 ### Demo: working with WFC3/IR grism exposures (FLT) 
-
+Check out the [Grizly Demo](https://github.com/gbrammer/grizli/blob/master/docs/Grizli%20Demo.ipynb) IPython notebook or [demo.py](https://github.com/gbrammer/grizli/blob/master/docs/demo.py).
