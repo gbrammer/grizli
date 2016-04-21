@@ -6,8 +6,12 @@ def test_flt():
     """
     Disperse a direct FLT
     """
-    import matplotlib
+    import matplotlib as mpl
+    mpl.use('Agg')
+    
+    import matplotlib.pyplot as plt    
     import matplotlib.gridspec
+    import numpy as np
     
     import grizli
     
@@ -21,12 +25,13 @@ def test_flt():
     
     ## Make a catalog/segmetnation image from the direct FLT and make a full grism model
     ## for those detected objects
-    flt.photutils_detection(detect_thresh=2, grow_seg=5, gauss_fwhm=2., compute_beams=['A','B'],
+    flt.photutils_detection(detect_thresh=2, grow_seg=5, gauss_fwhm=2., 
+                            compute_beams=['A','B', 'C','D'],
                             verbose=True, save_detection=False, wcs=None)
     
     ## Find object near (x,y) = (495, 749)
-    dr = np.sqrt((flt.catalog['xcentroid']-330)**2+(flt.catalog['ycentroid']-744)**2)
-    #dr = np.sqrt((flt.catalog['xcentroid']-495)**2+(flt.catalog['ycentroid']-749)**2)
+    #dr = np.sqrt((flt.catalog['xcentroid']-330)**2+(flt.catalog['ycentroid']-744)**2)
+    dr = np.sqrt((flt.catalog['xcentroid']-495)**2+(flt.catalog['ycentroid']-749)**2)
     dr = np.sqrt((flt.catalog['xcentroid']-712)**2+(flt.catalog['ycentroid']-52)**2)
     
     ix = np.argmin(dr)
@@ -36,9 +41,10 @@ def test_flt():
     # x pixels from the center of the direct image
     dx = np.arange(220)
     # ytrace and wavelength at x=dx
-    dy, lam = self.conf.get_beam_trace(x=x0, y=y0, dx=dx, beam='A')
+    dy, lam = flt.conf.get_beam_trace(x=x0, y=y0, dx=dx, beam='A')
     
     fig = plt.figure(figsize=[5,1.5])
+    #fig = plt.Figure(figsize=[5,1.5])
     ax = fig.add_subplot(111)
     ax.imshow(flt.im_data['SCI'], cmap='gray_r', vmin=-0.05, vmax=0.2, interpolation='Nearest', aspect='auto')
     ax.set_xlim(x0-10, x0+230)
@@ -81,20 +87,21 @@ def test_flt():
     
     ### Make a figure
     fig = plt.figure(figsize=(8,4))
+    #fig = plt.Figure(figsize=(8,4))
     
     ## 1D plots
     gsb = matplotlib.gridspec.GridSpec(3,1)  
     
     ax = fig.add_subplot(gsb[-2:,:])
-    ax.errorbar(xspec/1.e4, yspec, yerr, linestyle='None', marker='o', markersize=3, color='black', alpha=0.5, label='Data (id=%d)' %(self.id))
+    ax.errorbar(xspec/1.e4, yspec, yerr, linestyle='None', marker='o', markersize=3, color='black', alpha=0.5, label='Data (id=%d)' %(beam.id))
     ax.plot(xspecm/1.e4, yspecm, color='red', linewidth=2, alpha=0.8, label=r'Flat $f_\lambda$ (%s)' %(beam.filter))
     ax.plot(xspecl/1.e4, yspecl, color='orange', linewidth=2, alpha=0.8, label='Cont+line (%.3f, %.2e)' %(l0/1.e4, lflux*1.e-17))
-    ax.legend(fontsize=9, loc='bottom center', scatterpoints=1)
+    ax.legend(fontsize=8, loc='lower center', scatterpoints=1)
     
     ax.set_xlabel(r'$\lambda$'); ax.set_ylabel('flux (e-/s)')
     
     ax = fig.add_subplot(gsb[-3,:])
-    ax.plot(line_centers/1.e4, chi2/mask.sum())
+    ax.plot(line_centers/1.e4, chi2/lmask.sum())
     ax.set_xticklabels([])
     ax.set_ylabel(r'$\chi^2/(\nu=%d)$' %(lmask.sum()))
     
@@ -109,7 +116,10 @@ def test_flt():
 
     ## 2D spectra
     gst = matplotlib.gridspec.GridSpec(3,1)  
-    cmap = 'viridis_r'
+    if 'viridis_r' in plt.colormaps():
+        cmap = 'viridis_r'
+    else:
+        cmap = 'cubehelix_r'
     
     ax = fig.add_subplot(gst[0,:])
     ax.imshow(beam.cutout_sci, vmin=-0.05, vmax=0.2, cmap=cmap, interpolation='Nearest', origin='lower', aspect='auto')

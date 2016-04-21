@@ -12,18 +12,18 @@ Eventually, `grizli` is intended to encourage general users to move away from si
  
 ### Installation and download
 
-`grizli` has the following Python dependencies:
+`grizli` has the following Python dependencies, with the software versions on the development machine (MacBook Pro 2013, Mac0S 10.10.5) as indicated:
     
-* Numpy
-* Scipy (scipy.ndimage)
-* (Matplotlib) - generally needed for making plots, though not much plotting yet in `grizli`
-* cython - Needed for compiling the C-accelerated functions in utils_c
-* [astropy](http://www.astropy.org/)
-* [scikit-learn](http://scikit-learn.org/stable/install.html) - For the linear least squares solver in the emonstration line-fitting code.
-* [stwcs](http://stsdas.stsci.edu/stsci_python_epydoc/stwcs/index.html) - STScI packages for *HST*-specific WCS definitions.  This may be deprecated by [astropy.wcs](http://docs.astropy.org/en/stable/wcs/).
-* [drizzlepac](http://drizzlepac.stsci.edu/) - STScI drizzle/blot library
-* [(photutils)](https://photutils.readthedocs.org/en/latest/) - necessary if you want to create photometric catalogs and segmentation images directly within python
-* [(pysynphot)](http://pysynphot.readthedocs.org/en/latest/) - Not required, but can be useful for dealing with *HST* filters and sensitivies, as well as handling unit conversions for synthetic spectra
+* Numpy (1.10.4)
+* Scipy (0.15.1) / (scipy.ndimage, 2.0)
+* (Matplotlib, 1.5.1) - generally needed for making plots, though not much plotting yet in `grizli`
+* cython (0.20.1) - Needed for compiling the C-accelerated functions in utils_c
+* [astropy](http://www.astropy.org/) (1.1.1)
+* [scikit-learn](http://scikit-learn.org/stable/install.html) (0.14.1) - For the linear least squares solver in the emonstration line-fitting code.
+* [stwcs](http://stsdas.stsci.edu/stsci_python_epydoc/stwcs/index.html) (1.2.3.dev49124) - STScI packages for *HST*-specific WCS definitions.  This may be deprecated by [astropy.wcs](http://docs.astropy.org/en/stable/wcs/).
+* [drizzlepac](http://drizzlepac.stsci.edu/) (2.1.3.dev49124) - STScI drizzle/blot library
+* [(photutils)](https://photutils.readthedocs.org/en/latest/) (0.2.1) - necessary if you want to create photometric catalogs and segmentation images directly within python
+* [(pysynphot)](http://pysynphot.readthedocs.org/en/latest/) (0.9.8.2.dev) - Not required, but can be useful for dealing with *HST* filters and sensitivies, as well as handling unit conversions for synthetic spectra
      
 The easiest way to satisfy all of these dependencies is to work within the STScI/Gemini "Ureka" Python distribution: http://ssb.stsci.edu/ureka/.  The current development release of `Grizli` has been tested in Python 2.7 within the "SSBX" Ureka distribution, available here: http://ssb.stsci.edu/ssb_software.shtml.
  
