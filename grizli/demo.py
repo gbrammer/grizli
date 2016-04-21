@@ -59,11 +59,7 @@ def test_flt():
     
     fig.tight_layout(pad=0.1)
     fig.savefig('grizli_demo_0.pdf')
-    
-    #########
-    ### Compute the model in the FLT frame for a single object
-    model_id = flt.compute_model(id=id, x=x0, y=y0, sh=[80,80], in_place=False).reshape(flt.sh_pad)
-    
+        
     #########
     ### Spectrum cutout
     beam = grizli.model.BeamCutout(id=id, x=x0, y=y0, cutout_dimensions=[18,18], conf=flt.conf, GrismFLT=flt)
@@ -72,6 +68,8 @@ def test_flt():
     beam.cutout_seg[(beam.thumb/beam.photflam > 100) | (beam.thumb < 0)] = 0
     beam.total_flux = np.sum(beam.thumb[beam.cutout_seg == beam.id])
     
+    ### Compute the model in the FLT frame for a single object
+    model_id = flt.compute_model(id=id, x=x0, y=y0, sh=[80,80], in_place=False).reshape(flt.sh_pad)
     beam.contam = beam.get_cutout(flt.model-model_id)
     
     ## 1D optimal extraction (Horne 1986)
