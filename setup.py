@@ -35,7 +35,7 @@ setup(
     download_url = "https://github.com/gbrammer/grizli/tarball/0.1.1",
     packages=['grizli'],
     # requires=['numpy', 'scipy', 'astropy', 'drizzlepac', 'stwcs'],
-    long_description=read('README.md'),
+    long_description=read('README.rst'),
     classifiers=[
         "Development Status :: 1 - Planning",
         'Intended Audience :: Science/Research',
