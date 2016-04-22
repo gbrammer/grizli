@@ -1,16 +1,24 @@
 from distutils.core import setup
 from distutils.extension import Extension
 
+import os
+import numpy
+
 try:
     from Cython.Build import cythonize
     USE_CYTHON = True
-    cext = '.pyx'
 except ImportError:
     USE_CYTHON = False
-    cext = '.c'
+
+if not os.path.exists('grizli/utils_c/interp.pyx'):
+    USE_CYTHON = False
     
-import os
-import numpy
+if USE_CYTHON:
+    cext = '.pyx'
+else:
+    cext = '.c'
+
+print 'C extension: %s' %(cext)
 
 extensions = [
     Extension("grizli/utils_c/interp", ["grizli/utils_c/interp"+cext],
@@ -36,13 +44,13 @@ def read(fname):
 
 setup(
     name = "grizli",
-    version = "0.1.0",
+    version = "0.1.1",
     author = "Gabriel Brammer",
     author_email = "gbrammer@gmail.com",
     description = "Grism redshift and line analysis software",
     license = "MIT",
     url = "https://github.com/gbrammer/grizli",
-    download_url = "https://github.com/gbrammer/grizli/tarball/0.1.0",
+    download_url = "https://github.com/gbrammer/grizli/tarball/0.1.1",
     packages=['grizli', 'grizli/utils_c'],
     # requires=['numpy', 'scipy', 'astropy', 'drizzlepac', 'stwcs'],
     # long_description=read('README.rst'),
