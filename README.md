@@ -40,7 +40,7 @@ python setup.py build
 python setup.py install
 ```
 
-`grizli` requires a system variable (`$GRIZLI`) set to point to a working directory where the grism trace configuration and any additional setup files will live.  For example, with the BASH shell in `${HOME}/.bashrc`:
+`grizli` requires a environment variable (`$GRIZLI`) set to point to a working directory where the grism trace configuration and any additional setup files will live.  For example, with the BASH shell in `${HOME}/.bashrc`:
 
 ```bash
 export GRIZLI="${HOME}/Grizli"
