@@ -32,8 +32,8 @@ setup(
     description = ("Grizli: Grism redshift and line analysis software"),
     license = "MIT",
     url = "http://github.com/gbrammer/grizli",
-    packages=['grizli', 'grizli/utils_c'],
-    requires=['numpy', 'scipy', 'astropy', 'drizzlepac', 'stwcs'],
+    packages=['grizli'],
+    # requires=['numpy', 'scipy', 'astropy', 'drizzlepac', 'stwcs'],
     long_description=read('README.md'),
     classifiers=[
         "Development Status :: 1 - Planning",
