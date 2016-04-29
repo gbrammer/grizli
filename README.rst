@@ -106,7 +106,7 @@ additional setup files will live. For example, with the BASH shell in
 and sensitivies. For *HST* WFC3/IR grism spectroscopy, these files can
 be downloaded here:
 http://www.stsci.edu/hst/wfc3/analysis/grism\_obs/wfc3-grism-resources.html.
-**Put the downloaded configuration files in ``${GRIZLI}/CONF``**, e.g.,
+**Put the downloaded configuration files in** ``${GRIZLI}/CONF``, e.g.,
 
 .. code:: bash
 
