@@ -78,7 +78,7 @@ http://ssb.stsci.edu/ureka/. The current development release of
 ``Grizli`` has been tested in Python 2.7 within the "SSBX" Ureka
 distribution, available here: http://ssb.stsci.edu/ssb\_software.shtml.
 
-**Installation update (Apr 29, 2016):** Grizli has been tested within the newly-released `"astroconda" <http://astroconda.readthedocs.io/en/latest/>`__ environment, which should now provide the easiest way to obtain and maintain all of the external dependencies.
+**Installation update (Apr 29, 2016):** ``grizli`` has been tested within the newly-released `"astroconda" <http://astroconda.readthedocs.io/en/latest/>`__ environment, which should now provide the easiest way to obtain and maintain all of the external dependencies.
 
 .. code:: bash
 
