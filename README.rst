@@ -1,7 +1,7 @@
 
 .. image:: docs/grizli_logo.png
 
-*Grism redshift & line* software for space-based slitless spectroscopy
+*Grism redshift & line* analysis software for space-based slitless spectroscopy
 ========================================================================================
 
 What is ``grizli``?
