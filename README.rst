@@ -32,9 +32,9 @@ et al. 2015 <http://adsabs.harvard.edu/abs/2015arXiv151002106M>`__). In
 fact, that relatively simple script serves as the low-level kernel for
 the way ``grizli`` computes the grism dispersion.
 
-Eventually, ``grizli`` is intended to encourage general users to move
+Eventually, ``grizli`` is intended to encourage and enable general users to move
 away from simple "data reduction" (e.g., extracting a 1D spectrum of a
-single object akin to standard slit spectroscopy) and toward enabling
+single object akin to standard slit spectroscopy) and toward
 more quantitative and comprehensive **modeling** and fitting of slitless
 spectroscopic observations, which typically involve overlapping spectra
 of hundreds or thousands of objects in exposures taken with one or more
@@ -120,7 +120,7 @@ http://www.stsci.edu/hst/wfc3/analysis/grism\_obs/wfc3-grism-resources.html.
     wget http://www.stsci.edu/ftp/cdbs/wfc3_aux/WFC3.IR.G141.cal.V4.3.tar.gz
     tar xzvf WFC3.IR.G141.cal.V4.3.tar.gz
 
-Demo: working with WFC3/IR grism exposures (FLT)
+Demo: working with WFC3/IR grism exposures
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Check out the `Grizly
