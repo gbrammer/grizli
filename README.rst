@@ -83,7 +83,7 @@ distribution, available here: http://ssb.stsci.edu/ssb\_software.shtml.
 
 **Installation update (Apr 29, 2016):** ``grizli`` has been tested within the newly-released `"astroconda" <http://astroconda.readthedocs.io/en/latest/>`__ environment (Mac OSX, Python 2.7), which should now provide the easiest way to obtain and maintain all of the external and STScI dependencies.
 
-**Note on ``ImportError: No module named disperse``:** This message appears if you try to `import grizli` in the same directory where you downloaded and compiled the code from the repository.  The error will disappear if you use a different working directory.
+**Note on ``ImportError: No module named disperse``:** This message appears if you try to ``import grizli`` in the same directory where you downloaded and compiled the code from the repository.  The error will disappear if you use a different working directory.
 
 .. code:: bash
 
