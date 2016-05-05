@@ -56,17 +56,22 @@ class GrismFLT(object):
         ...
         
     """
-    def __init__(self, flt_file='ico205lwq_flt.fits', sci_ext=('SCI',1), direct_image=None, refimage=None, segimage=None, refext=0, verbose=True, pad=100, shrink_segimage=True):
+    def __init__(self, flt_file='ico205lwq_flt.fits', sci_ext=('SCI',1), direct_image=None, refimage=None, segimage=None, refext=0, verbose=True, pad=100, shrink_segimage=True, force_grism=None):
         """
         Todo: pull out stored PyFITS objects to improve pickling
         """
         ### Read the FLT FITS File
         self.flt_file = flt_file
+        ### Simulation mode
+        if (flt_file is None) & (direct_image is not None):
+            self.flt_file = direct_image
+        
         self.sci_ext = sci_ext
         
         #self.wcs = pywcs.WCS(self.im['SCI',1].header)
         #self.im = pyfits.open(self.flt_file)
         self.pad = pad
+                    
         self.read_flt()
         self.flt_wcs = stwcs.wcsutil.HSTWCS(self.im, ext=tuple(sci_ext))
         
@@ -151,16 +156,17 @@ class GrismFLT(object):
         ### Read the configuration file.  
         ## xx generalize this to get the grism information from the FLT header
         #self.grism = self.im_header0['FILTER'].upper()
-        if self.im_header0['INSTRUME'].strip() == 'ACS':
-            for i in [1,2]:
-                if 'CLEAR' in self.im_header0['FILTER%d' %(i)]:
-                    continue
-                else:
-                    self.grism = self.im_header0['FILTER%d' %(i)]
-        else:
-            self.grism = self.im_header0['FILTER'].upper()
+        self.grism = force_grism
+        if self.grism is None:
+            if self.im_header0['INSTRUME'].strip() == 'ACS':
+                for i in [1,2]:
+                    if 'CLEAR' in self.im_header0['FILTER%d' %(i)]:
+                        continue
+                    else:
+                        self.grism = self.im_header0['FILTER%d' %(i)]
+            else:
+                self.grism = self.im_header0['FILTER'].upper()
         
-        ### xxx Only WFC3/IR for now
         if self.im_header0['INSTRUME'] == 'WFC3':
             conf_file = os.path.join(os.getenv('GRIZLI'), 'CONF/%s.%s.V4.3.conf' %(self.grism, self.filter))
             if not os.path.exists(conf_file):
@@ -172,10 +178,8 @@ class GrismFLT(object):
         if self.im_header0['INSTRUME'] == 'WFIRST':
             conf_file = os.path.join(os.getenv('GRIZLI'), 'CONF/WFIRST.conf')
         
-        self.conf = grism.aXeConf(conf_file)
-        
-        self.conf.get_beams()
-        
+        self.load_grism_config(conf_file)
+                
         #### Get dispersion PA, requires conf for tilt of 1st order
         self.get_dispersion_PA()
         
@@ -208,7 +212,7 @@ class GrismFLT(object):
             #         status = self.compute_model(x=xs, y=ys, sh=[25,25], beam='C')
             #         status = self.compute_model(x=xs, y=ys, sh=[25,25], beam='D')      
             #status = self.compute_model(x=507, y=507, sh=[100,100])
-    
+            
     def read_flt(self):
         ### Read extensions of the file, adding padding if necessary
         self.im = pyfits.open(self.flt_file)
@@ -234,7 +238,14 @@ class GrismFLT(object):
         self.im_data['SCI'][self.im_data['DQ'] > 0] = 0
         
         self.im_data_sci_background = False
-        
+    
+    def load_grism_config(self, conf_file):
+        """
+        Load an aXe configuration file
+        """
+        self.conf = grism.aXeConf(conf_file)
+        self.conf.get_beams()
+       
     def clean_for_mp(self):
         """
         zero out io.fits objects to make suitable for multiprocessing parallelization
@@ -557,15 +568,41 @@ class GrismFLT(object):
         
         #### Compute grism model for the detected segments 
         if compute_beams is not None:
-            for i in range(len(self.catalog)):
-                line = self.catalog[i]
-                for beam in compute_beams:
-                    if verbose:
-                        print no_newline + '%s: compute_model - id=%4d, beam=%s' %(self.refimage, line['id'], beam)
-                    
-                    self.compute_model(id=line['id'], x=line['xcentroid'], y=line['ycentroid'], sh=[20,20], beam=beam)
+            self.compute_full_model(compute_beams, mask=None)
+                        
+    def load_photutils_detection(self):
+        seg_file = self.refimage.replace('.fits', '.detect_seg.fits')
+        if not os.path.exists(seg_file):
+            print 'Segmentation image %s not found' %(segfile)
+            return False
         
+        self.seg = np.cast[np.float32](pyfits.open(seg_file)[0].data)
         
+        seg_cat = self.refimage.replace('.fits', '.detect.cat')
+        if not os.path.exists(seg_cat):
+            print 'Segmentation catalog %s not found' %(seg_cat)
+            return False
+        
+        self.catalog = Table.read(seg_cat, format='ascii.commented_header')
+    
+    def compute_full_model(self, compute_beams=['A','B'], mask=None, verbose=True):
+        """
+        Compute full grism model for objects in the catalog masked with 
+        the `mask` boolean array
+        """
+        if mask is not None:
+            cat_mask = self.catalog[mask]
+        else:
+            cat_mask = self.catalog
+            
+        for i in range(len(cat_mask)):
+            line = cat_mask[i]
+            for beam in compute_beams:
+                if verbose:
+                    print no_newline + '%s: compute_model - id=%4d, beam=%s' %(self.refimage, line['id'], beam)
+                
+                self.compute_model(id=line['id'], x=line['xcentroid'], y=line['ycentroid'], sh=[20,20], beam=beam)
+            
     def align_bright_objects(self, flux_limit=4.e-18, xspec=None, yspec=None, ds9=None, max_shift=10, cutout_dimensions=[14,14]):
         
         if self.seg_ids is None:
@@ -910,6 +947,7 @@ class BeamCutout(object):
             
             self.cutout_seg = self.get_flam_thumb(GrismFLT.seg, dtype=np.float32)
             self.total_flux = np.sum(self.thumb[self.cutout_seg == self.id])
+            self.clean_thumb()
             
             self.grism = GrismFLT.grism
             self.dispersion_PA = GrismFLT.dispersion_PA
@@ -917,8 +955,7 @@ class BeamCutout(object):
             self.photflam = GrismFLT.photflam
             self.pivot = GrismFLT.pivot
             
-            self.ivar = np.cast[np.float32](1/(self.cutout_err**2))
-            self.ivar[(self.cutout_err == 0) | (self.cutout_dq > 0)] = 0
+            self.compute_ivar(mask=True)
             
         # if direct_flam is not None:
         #     self.thumb = self.get_flam_thumb(direct_flam)
@@ -932,6 +969,19 @@ class BeamCutout(object):
         
         #if segm_flt is not None:
          #   self.cutout_seg = self.get_cutout(segm_flt)*1
+    
+    def clean_thumb(self):
+        """
+        zero out negative pixels in self.thumb
+        """
+        self.thumb[self.thumb < 0] = 0
+        self.total_flux = np.sum(self.thumb[self.cutout_seg == self.id])
+    
+    def compute_ivar(mask=True):
+        self.ivar = np.cast[np.float32](1/(self.cutout_err**2))
+        self.ivar[(self.cutout_err == 0)] = 0.
+        if mask:
+            self.ivar[(self.cutout_dq > 0)] = 0
             
     def init_dispersion(self, xoff=0, yoff=0):
         """
@@ -954,7 +1004,49 @@ class BeamCutout(object):
     def get_flam_thumb(self, flam_full, xoff=0, yoff=0, dtype=np.double):
         dim = self.cutout_dimensions
         return np.cast[dtype](flam_full[self.yc+yoff-dim[0]:self.yc+yoff+dim[0], self.xc+xoff-dim[1]:self.xc+xoff+dim[1]])
-
+    
+    def twod_axis_labels(self, wscale=1.e4, limits=None, mpl_axis=None):
+        """
+        Set x axis *tick labels* on a 2D spectrum to wavelength units
+        
+        Defaults to a wavelength scale of microns with wscale=1.e4
+        
+        Will automatically use the whole wavelength range defined by the spectrum.  To change,
+        specify `limits = [x0, x1, dx]` to interpolate self.wave between x0*wscale and x1*wscale.
+        """
+        xarr = np.arange(len(self.wave))
+        if limits:
+            xlam = np.arange(limits[0], limits[1], limits[2])
+            xpix = np.interp(xlam, self.wave/wscale, xarr)
+        else:
+            xlam = np.unique(np.cast[int](self.wave / 1.e4*10)/10.)
+            xpix = np.interp(xlam, self.wave/wscale, xarr)
+        
+        if mpl_axis is None:
+            pass
+            #return xpix, xlam
+        else:
+            mpl_axis.set_xticks(xpix)
+            mpl_axis.set_xticklabels(xlam)
+    
+    def twod_xlim(self, x0, x1=None, wscale=1.e4, mpl_axis=None):
+        """
+        Set x axis *limits* on a 2D spectrum to wavelength units
+        
+        defaults to a scale of microns with wscale=1.e4
+        
+        """
+        if isinstance(x0, list):
+            x0, x1 = x0[0], x0[1]
+        
+        xarr = np.arange(len(self.wave))
+        xpix = np.interp([x0,x1], self.wave/wscale, xarr)
+        
+        if mpl_axis:
+            mpl_axis.set_xlim(xpix)
+        else:
+            return xpix
+            
     def compute_model(self, flam_thumb, id=0, yspec=None, xspec=None, in_place=True):
         
         x0 = np.array([self.cutout_dimensions[0], self.cutout_dimensions[0]])

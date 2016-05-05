@@ -5,6 +5,8 @@ see model.py
    
 """
 
+__version__ = "0.1.1.dev" 
+
 import os
 
 import utils_c
