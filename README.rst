@@ -129,3 +129,5 @@ Check out the `Grizly
 Demo <https://github.com/gbrammer/grizli/blob/master/docs/Grizli%20Demo.ipynb>`__
 IPython notebook or
 `demo.py <https://github.com/gbrammer/grizli/blob/master/docs/demo.py>`__.
+
+**May 5, 2016:**  Another demo notebook for running basic simulations, for example for observation planning, can be found `here <https://github.com/gbrammer/grizli/blob/master/docs/Basic-Sim.ipynb>`__. 
