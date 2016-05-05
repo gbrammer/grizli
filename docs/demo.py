@@ -23,8 +23,8 @@ def test_flt():
     ### Initialize the GrismFLT object
     flt = grizli.model.GrismFLT(flt_file='ibhj34h8q_flt.fits', direct_image='ibhj34h6q_flt.fits', refimage=None, segimage=None, verbose=True, pad=0)
     
-    ## Make a catalog/segmetnation image from the direct FLT and make a full grism model
-    ## for those detected objects
+    ## Make a catalog/segmetnation image from the direct FLT and make a full
+    ## grism model for those detected objects
     flt.photutils_detection(detect_thresh=2, grow_seg=5, gauss_fwhm=2., 
                             compute_beams=['A','B', 'C','D'],
                             verbose=True, save_detection=False, wcs=None)
