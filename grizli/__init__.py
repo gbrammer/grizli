@@ -5,7 +5,8 @@ see model.py
    
 """
 
-__version__ = "0.1.1.dev" 
+#__version__ = "0.1.1.dev" 
+from version import __version__
 
 import os
 
