@@ -12,7 +12,7 @@ import astropy.io.fits as pyfits
 from astropy.table import Table
 import astropy.wcs as pywcs
 
-import stwcs
+#import stwcs
 
 ### Helper functions from a document written by Pirzkal, Brammer & Ryan 
 from . import grism
@@ -73,10 +73,14 @@ class GrismFLT(object):
         self.pad = pad
                     
         self.read_flt()
-        self.flt_wcs = stwcs.wcsutil.HSTWCS(self.im, ext=tuple(sci_ext))
+        #self.flt_wcs = stwcs.wcsutil.HSTWCS(self.im, ext=tuple(sci_ext))
+        self.flt_wcs = pywcs.WCS(self.im[tuple(sci_ext)].header)
         
         self.flt_wcs.naxis1 = self.im_header['NAXIS1']+2*self.pad
         self.flt_wcs.naxis2 = self.im_header['NAXIS2']+2*self.pad
+        self.flt_wcs._naxis1 = self.flt_wcs.naxis1
+        self.flt_wcs._naxis2 = self.flt_wcs.naxis2
+        
         self.flt_wcs.wcs.crpix[0] += self.pad
         self.flt_wcs.wcs.crpix[1] += self.pad
         
@@ -397,7 +401,7 @@ class GrismFLT(object):
         
         tolerance=-4
         xy = None
-        for wcs, wcsname in zip([self.flt_wcs, pywcs.WCS(self.im_header, relax=True)], ['HSTWCS', 'astropy.wcs']):
+        for wcs, wcsname in zip([self.flt_wcs, pywcs.WCS(self.im_header, relax=True)], ['astropy.wcs', 'HSTWCS']):
             if xy is not None:
                 break
             for i in range(4):    
@@ -460,7 +464,8 @@ class GrismFLT(object):
         im = self.segimage_im
         ext = 0
         
-        ref_wcs = stwcs.wcsutil.HSTWCS(im, ext=ext)
+        #ref_wcs = stwcs.wcsutil.HSTWCS(im, ext=ext)
+        ref_wcs = pywcs.WCS(im[ext].header)
         
         naxis = self.im_header['NAXIS1'], self.im_header['NAXIS2']
         xflt = [-self.pad*2, naxis[0]+self.pad*2, naxis[0]+self.pad*2, -self.pad*2]
@@ -594,14 +599,21 @@ class GrismFLT(object):
             cat_mask = self.catalog[mask]
         else:
             cat_mask = self.catalog
-            
+        
+        if 'xcentroid' in self.catalog.colnames:
+            xcol = 'xcentroid'
+            ycol = 'ycentroid'
+        else:
+            xcol = 'x_flt'
+            ycol = 'y_flt'
+                
         for i in range(len(cat_mask)):
             line = cat_mask[i]
             for beam in compute_beams:
                 if verbose:
                     print no_newline + '%s: compute_model - id=%4d, beam=%s' %(self.refimage, line['id'], beam)
                 
-                self.compute_model(id=line['id'], x=line['xcentroid'], y=line['ycentroid'], sh=[20,20], beam=beam)
+                self.compute_model(id=line['id'], x=line[xcol], y=line[ycol], sh=[20,20], beam=beam)
             
     def align_bright_objects(self, flux_limit=4.e-18, xspec=None, yspec=None, ds9=None, max_shift=10, cutout_dimensions=[14,14]):
         
@@ -688,7 +700,8 @@ class GrismFLT(object):
         h['CRVAL1'] = rd[0][1]
         h['CRVAL2'] = rd[1][1]
         self.im[tuple(self.sci_ext)].header = h
-        self.flt_wcs = stwcs.wcsutil.HSTWCS(self.im, ext=tuple(self.sci_ext))
+        #self.flt_wcs = stwcs.wcsutil.HSTWCS(self.im, ext=tuple(self.sci_ext))
+        self.flt_wcs = pywcs.WCS(self.im[self.sci_ext].header)
         
         self.flt_wcs.naxis1 = self.im[sci_ext].header['NAXIS1']+2*self.pad
         self.flt_wcs.naxis2 = self.im[sci_ext].header['NAXIS2']+2*self.pad
@@ -717,7 +730,7 @@ class GrismFLT(object):
         """
         Use AstroDrizzle to blot reference / segmentation images to the FLT frame
         """
-        import stwcs
+        #import stwcs
         import astropy.wcs
         from drizzlepac import astrodrizzle
         
@@ -737,7 +750,9 @@ class GrismFLT(object):
         # seg_ones = refdata
         
         #ref_wcs = astropy.wcs.WCS(refimage[refext].header)
-        ref_wcs = stwcs.wcsutil.HSTWCS(refimage, ext=refext)
+        #ref_wcs = stwcs.wcsutil.HSTWCS(refimage, ext=refext)
+        ref_wcs = pywcs.WCS(refimage[refext].header)
+        
         #flt_wcs = stwcs.wcsutil.HSTWCS(self.im, ext=('SCI',1))
         flt_wcs = self.flt_wcs
         
@@ -977,7 +992,7 @@ class BeamCutout(object):
         self.thumb[self.thumb < 0] = 0
         self.total_flux = np.sum(self.thumb[self.cutout_seg == self.id])
     
-    def compute_ivar(mask=True):
+    def compute_ivar(self, mask=True):
         self.ivar = np.cast[np.float32](1/(self.cutout_err**2))
         self.ivar[(self.cutout_err == 0)] = 0.
         if mask:
@@ -1079,7 +1094,7 @@ class BeamCutout(object):
         return data[sly, slx]
         
     def make_wcs_header(self, data=None):
-        import stwcs
+        #import stwcs
         h = pyfits.Header()
         h['CRPIX1'] = self.cutout_dimensions[1]#+0.5
         h['CRPIX2'] = self.cutout_dimensions[0]#+0.5
@@ -1095,7 +1110,9 @@ class BeamCutout(object):
             np.zeros(self.shg)
         
         data = hdul = pyfits.HDUList([pyfits.ImageHDU(data=data, header=h)])
-        wcs = stwcs.wcsutil.HSTWCS(hdul, ext=0)
+        #wcs = stwcs.wcsutil.HSTWCS(hdul, ext=0)
+        wcs = pywcs.WCS(hdul[0].header)
+        
         wcs.pscale = np.sqrt(wcs.wcs.cd[0,0]**2 + wcs.wcs.cd[1,0]**2)*3600.
         
         return hdul[0], wcs
