@@ -122,15 +122,18 @@ http://www.stsci.edu/hst/wfc3/analysis/grism\_obs/wfc3-grism-resources.html.
     wget http://www.stsci.edu/ftp/cdbs/wfc3_aux/WFC3.IR.G141.cal.V4.3.tar.gz
     tar xzvf WFC3.IR.G141.cal.V4.3.tar.gz
 
-Demo: working with WFC3/IR grism exposures
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Example demonstrations
+~~~~~~~~~~~~~~~~~~~~~~
 
-Check out the `Grizly
-Demo <https://github.com/gbrammer/grizli/blob/master/docs/Grizli%20Demo.ipynb>`__
-IPython notebook or
-`demo.py <https://github.com/gbrammer/grizli/blob/master/docs/demo.py>`__.
+The following are IPython/jupyter notebooks demonstrating various aspects of the code functionality.  They render statically in the GitHub pages or can be run locally after cloning and installing the software repository.
 
-**May 5, 2016:**  Another demo notebook for running basic simulations, for example for observation planning, can be found `here <https://github.com/gbrammer/grizli/blob/master/docs/Basic-Sim.ipynb>`__. 
+- `Grizly Demo <https://github.com/gbrammer/grizli/blob/master/docs/Grizli%20Demo.ipynb>`__: Simple interaction with WFC3/IR spectra
 
-**May 11, 2016:**  Added a new `multimission-simulation <https://github.com/gbrammer/grizli/blob/master/docs/multimission-simulation.ipynb>`__ notebook demonstrating more advanced simulation techniques using deep image mosaics as a reference direct image and also providing a comparison between dispersed spectra from WFC3/G141, *JWST*/NIRISS and *WFIRST*.
+- `Basic-Sim <https://github.com/gbrammer/grizli/blob/master/docs/Basic-Sim.ipynb>`__ (5.5.16): Basic simulations based on single WFC3/IR grism and direct exposures
+
+- `multimission-simulation <https://github.com/gbrammer/grizli/blob/master/docs/multimission-simulation.ipynb>`__ (5.11.16): 
+  
+  1. Demonstration of more advanced simulation techniques using deep image mosaics and external catalogs/segmentation images as reference.
+  2. Provide a comparison between dispersed spectra from WFC3/G141, *JWST*/NIRISS and *WFIRST*.
+ 
  
