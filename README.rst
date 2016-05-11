@@ -122,7 +122,7 @@ http://www.stsci.edu/hst/wfc3/analysis/grism\_obs/wfc3-grism-resources.html.
     wget http://www.stsci.edu/ftp/cdbs/wfc3_aux/WFC3.IR.G141.cal.V4.3.tar.gz
     tar xzvf WFC3.IR.G141.cal.V4.3.tar.gz
 
-Example demonstrations
+Working Examples
 ~~~~~~~~~~~~~~~~~~~~~~
 
 The following are IPython/jupyter notebooks demonstrating various aspects of the code functionality.  They render statically in the GitHub pages or can be run locally after cloning and installing the software repository.
