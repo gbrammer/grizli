@@ -131,3 +131,6 @@ IPython notebook or
 `demo.py <https://github.com/gbrammer/grizli/blob/master/docs/demo.py>`__.
 
 **May 5, 2016:**  Another demo notebook for running basic simulations, for example for observation planning, can be found `here <https://github.com/gbrammer/grizli/blob/master/docs/Basic-Sim.ipynb>`__. 
+
+**May 11, 2016:**  Added a new `multimission-simulation <https://github.com/gbrammer/grizli/blob/master/docs/multimission-simulation.ipynb>`__ notebook demonstrating more advanced simulation techniques using deep image mosaics as a reference direct image and also providing a comparison between dispersed spectra from WFC3/G141, *JWST*/NIRISS and *WFIRST*.
+ 
