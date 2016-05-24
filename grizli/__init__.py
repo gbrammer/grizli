@@ -10,6 +10,13 @@ from version import __version__
 
 import os
 
+## Will get ImportError: No module named disperse" if imported in the repo directory
+if os.path.exists('README.rst') & os.path.exists('LICENSE.txt'):
+    print """
+Warning: `import grizli` will fail if the working directory is the place 
+where the code repository was cloned and compiled!
+"""
+
 import utils_c
 import grism
 import model

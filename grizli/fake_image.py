@@ -55,6 +55,56 @@ def niriss_header(ra=53.1592277508136, dec=-27.782056346146, pa_aper=128.589,
     h['EXTVER'] = 1
         
     return h, wcs
+
+def nircam_header(ra=53.1592277508136, dec=-27.782056346146, pa_aper=128.589, 
+                  filter='F444W', grism='DFSR'):
+    """
+    NIRCAM, 0.0648"/pix, requires filter specification
+    """ 
+    naxis = 2048, 2048
+    crpix = 1024, 1024
+    
+    cd = np.array([[ -0.0648,  0], [0, 0.0648]])/3600.
+    rad = np.deg2rad(-pa_aper)
+    mat = np.zeros((2,2))
+    mat[0,:] = np.array([np.cos(rad),-np.sin(rad)])
+    mat[1,:] = np.array([np.sin(rad),np.cos(rad)])
+    cd_rot = np.dot(mat, cd)
+    
+    h = pyfits.Header()
+    
+    h['CRVAL1'] = ra
+    h['CRVAL2'] = dec
+    
+    h['WCSAXES'] = 2
+    h['CTYPE1'] = 'RA---TAN'
+    h['CTYPE2'] = 'DEC--TAN'
+    
+    for i in range(2):
+        h['NAXIS%d' %(i+1)] = naxis[i]
+        h['CRPIX%d' %(i+1)] = crpix[i]
+        h['CDELT%d' %(i+1)] = 1.0
+        for j in range(2):
+            h['CD%d_%d' %(i+1, j+1)] = cd_rot[i,j]
+    
+    ### Backgrounds
+    # http://www.stsci.edu/jwst/instruments/niriss/software-tools/wfss-simulations/niriss-wfss-cookbook.pdf
+    bg = {'F277W':0.30, 'F356W':0.90, 'F444W': 3.00, 'F322W2':1.25, 'F430M':0.65, 'F460M':0.86, 'F410M':0.5} # F410M is a hack, no number
+    
+    h['BACKGR'] = bg[filter], 'Total, e/s'
+    h['FILTER'] = filter
+    h['INSTRUME'] = 'NIRCam'
+    h['READN'] = 9, 'Rough, per pixel per 1 ks exposure' # e/pix/per
+    
+    if grism == 'DFSR':
+        h['GRISM'] = 'DFSR', 'Spectral trace along X'
+    else:
+        h['GRISM'] = 'DFSC', 'Spectral trace along Y'
+        
+    wcs = pywcs.WCS(h)
+    h['EXTVER'] = 1
+        
+    return h, wcs
     
 def wfc3ir_header(ra=53.1592277508136, dec=-27.782056346146, pa_aper=128.589, 
                   flt='ibhj34h6q_flt.fits', filter='G141'):
