@@ -525,9 +525,14 @@ class GrismFLT(object):
         
         n = len(self.catalog)
         for i in range(n):
-            ds9.set_region('circle %f %f 2' %(self.catalog['x_flt'][i],
+            try:
+                ds9.set_region('circle %f %f 2' %(self.catalog['x_flt'][i],
                                               self.catalog['y_flt'][i]))
-        
+            except:
+                ds9.set('regions', 'circle %f %f 5\n' %(
+                                              self.catalog['x_flt'][i],
+                                              self.catalog['y_flt'][i]))
+                                              
         if False:
             ok = catalog_table['MAG_AUTO'] < 23
     
@@ -1034,7 +1039,8 @@ class GrismFLT(object):
                     (self.model/self.im_data['ERR'] < sn_limit) &
                     (self.im_data['SCI'] != 0) & 
                     (self.im_data['SCI'] > -4*self.im_data['ERR']) &
-                    (self.im_data['SCI'] < 6*self.im_data['ERR']))
+                    (self.im_data['SCI'] < 6*self.im_data['ERR']) & 
+                    (self.im_data['ERR'] < 1000))
                       
             poly = models.Polynomial2D(degree=degree)
             fit = fitting.LinearLSQFitter()
@@ -1269,9 +1275,12 @@ class BeamCutout(object):
         h['CD1_1'] = self.lam[1]-self.lam[0]
         h['CD1_2'] = 0.
         
-        h['CRVAL2'] = self.dy[0]
+        h['CRVAL2'] = -self.dy[0]
         h['CD2_2'] = 1.
         h['CD2_1'] = -(self.dy[1]-self.dy[0])
+        
+        h['CTYPE1'] = 'WAVE'
+        h['CTYPE2'] = 'LINEAR'
         
         if data is None:
             np.zeros(self.shg)
