@@ -15,7 +15,7 @@ import astropy.wcs as pywcs
 #import stwcs
 
 ### Helper functions from a document written by Pirzkal, Brammer & Ryan 
-from . import grism
+from . import grismconf
 from .utils_c import disperse
 from .utils_c import interp
 
@@ -68,7 +68,210 @@ if False:
         obs = S.Observation(spec, bp)
         photflam[filter] = n/obs.countrate()
         
+class Disperser(object):
+    """
+    Object that contains information necessary for computing a dispersed
+    spectrum:
     
+    1) Direct image
+        a) Flux unit conversion of the direct image to F_lambda
+           - TBD: Images in different bands like a fluxcube??
+        b) coordinate origin (y,x) with respect to full-frame detector 
+           coordinates
+    2) Segmentation map (defaults to zero)
+    3) Configuration file (preloaded or filename)
+    """
+    def __init__(self, direct=np.zeros((1014,1014), dtype=np.float), 
+                       segmentation=None, 
+                       photflam=1.0, origin=(0,0),
+                       conf=['WFC3','F140W', 'G141']):
+        
+        self.origin = origin
+        self.photflam = photflam
+        
+        ### Direct image
+        self.flam = direct*photflam
+        self.sh = self.flam.shape
+        if self.flam.dtype is not np.float:
+            self.flam = np.cast[np.float](self.flam)
+        
+        ### Segmentation image, defaults to all zeros
+        if segmentation is None:
+            self.seg = np.zeros_like(self.flam, dtype=np.float32)
+        else:
+            self.seg = segmentation
+            if self.seg.dtype is not np.float32:
+                self.seg = np.cast[np.float32](self.seg)
+                
+        if isinstance(conf, list):
+            conf_f = grismconf.get_config_filename(conf[0], conf[1], conf[2])
+            self.conf = grismconf.load_grism_config(conf_f)
+        else:
+            self.conf = conf
+        
+        ### Initialize attributes
+        self.xc = self.yc = None
+        self.xoff = self.yoff = None
+        self.xcenter = self.ycenter = None
+        self.beam = None
+        
+        ### modelf is a flattened version of the FLT image
+        self.modelf = np.zeros(self.sh[0]*self.sh[1])
+        self.model = self.modelf.reshape(self.sh)
+        self.idx = np.arange(self.modelf.size).reshape(self.sh)
+        
+    def init_dispersion(self, x=None, y=None, xoff=0, yoff=0, 
+                        beam='A', verbose=False):
+        
+        """
+        Initialize parameters necessary to compute the dispersion. 
+        
+        The function is fast, but strip it out here so that you don't
+        have to call it repeatedly with `compute_model` if none of the
+        position parameters (x, y, xoff, yoff) change.
+        """
+        if x is None:
+            if self.xc is None:
+                x = self.sh[1]/2
+            else:
+                x = self.xc + self.xcenter
+                
+        if y is None:
+            if self.yc is None:
+                y = self.sh[0]/2
+            else:
+                y = self.yc + self.ycenter
+                
+        xc, yc = int(x), int(y)
+        xcenter = x - xc
+        ycenter = y - yc
+        
+        if ((self.xc == xc) & (self.yc == yc) & (xcenter == self.xcenter) &
+            (self.xoff == xoff) & (self.yoff == yoff) & (self.beam == beam)):
+            #print 'Nothing changed'
+            return True
+        else:
+            self.xc = xc
+            self.yc = yc
+            self.xcenter = xcenter
+            self.ycenter = ycenter
+            self.beam = beam
+            self.xoff = xoff
+            self.yoff = yoff
+            
+        ### Get dispersion parameters at the reference position
+        dx = self.conf.dxlam[beam]+xcenter-xoff
+        dy, lam = self.conf.get_beam_trace(x=x+self.origin[1]-xoff,
+                                           y=y+self.origin[0]-yoff,
+                                           dx=dx, beam=beam)
+        
+        dy += yoff
+        ### Integer trace
+        # 20 for handling int of small negative numbers    
+        dyc = np.cast[int](dy+20)-20+1 
+        
+        ### Account for pixel centering of the trace
+        yfrac = dy-np.floor(dy)
+        
+        ### Interpolate the sensitivity curve on the wavelength grid. 
+        ysens = lam*0
+        so = np.argsort(lam)
+        ysens[so] = interp.interp_conserve_c(lam[so],
+                                 self.conf.sens[beam]['WAVELENGTH'], 
+                                 self.conf.sens[beam]['SENSITIVITY'])
+        
+        ### Needs term of delta wavelength per pixel for flux densities
+        dl = np.abs(np.append(lam[1]-lam[0], np.diff(lam)))
+        ysens *= dl*1.e-17
+        
+                    
+        x0 = np.array([yc, xc])
+        slx = self.conf.dxlam[beam] + xc #+ 1
+        self.flat_index = self.idx[dyc + yc, slx]
+        
+        # Center pixel 
+        self.x0 = x0
+        # Pixels along the trace
+        self.dxpix = slx
+        # Trace offset in y
+        self.ytrace = dy
+        # Fractional pixel along ytrace
+        self.yfrac = yfrac
+        # wavelength along trace
+        self.lam = lam
+        # sort index for wavelength
+        self.lam_sort = so
+        # sensitivity along trace
+        self.sensitivity = ysens
+        
+        return True
+                
+    def compute_model(self, id=0, thumb=None, x=None, y=None, xoff=0, yoff=0, 
+                      cutout=[10,10], spectrum_1d=None, beam='A',
+                      in_place=True, outdata=None, verbose=False):
+        """
+        Compute a model spectrum, so simple!
+        
+        Compute a model in a box of size +/-`sh` around pixels `x` and `y` 
+        in the direct image.
+        
+        Only consider pixels in the segmentation image with value = `id`.
+        
+        If spectrum_1d = None, the default assumes flat flambda spectra, 
+        otherwise the template wave, flux_flam= spectrum_1d
+        
+        If `in place`, update the model in `self.model` and `self.modelf`, 
+        otherwise put the output in a clean array.  This latter might be slow
+        if the overhead of computing a large image array is high.
+        """
+        
+        #### Initialize the dispersion parameters
+        self.init_dispersion(x=x, y=y, xoff=xoff, yoff=yoff, beam=beam,
+                             verbose=False)
+        
+        ### Template (1D) spectrum interpolated onto the wavelength grid
+        if spectrum_1d is not None:
+            xspec, yspec = spectrum_1d
+            ysens_mod = self.sensitivity*0.
+            int_func = interp.interp_conserve_c
+            ysens_mod[self.lam_sort] = int_func(self.lam[self.lam_sort],
+                                                xspec, yspec)
+        else:
+            ysens_mod = 1.
+        
+        ### Output data, fastest is to compute in place but doesn't zero-out
+        ### previous result                    
+        if in_place:
+            outdata = self.modelf
+        else:
+            if outdata is None:
+                outdata = self.modelf*0
+                    
+        ### Optionally use a different direct image
+        if thumb is None:
+            thumb = self.flam
+        else:
+            if thumb.shape != self.sh:
+                print '`thumb` must have the same dimensions as the direct image! (%d,%d)' %(self.sh[0], self.sh[1])
+                return False
+        
+        status = disperse.disperse_grism_object(thumb, self.seg, id,
+                                 self.flat_index, self.yfrac,
+                                 self.sensitivity*ysens_mod,
+                                 outdata, self.x0, np.array(self.sh),
+                                 np.array(cutout), np.array(self.sh))
+        
+        # status = disperse.disperse_grism_object(thumb, self.seg, id, idxl,
+        #                                         yfrac, ysens, outdata,
+        #                                         x0, np.array(self.sh),
+        #                                         np.array(sh),
+        #                                         np.array(self.sh))
+                
+        if not in_place:
+            return outdata
+        else:
+            return True
+            
 class GrismFLT(object):
     """
     Scripts for simple modeling of individual grism FLT images
@@ -179,10 +382,10 @@ class GrismFLT(object):
         
         self.instrume = self.im_header0['INSTRUME']
         
-        self.conf_file = self.get_config_filename(self.instrume, self.filter,
-                                                  self.grism)
+        self.conf_file = grismconf.get_config_filename(self.instrume,
+                                                      self.filter, self.grism)
         
-        self.load_grism_config(self.conf_file)
+        self.conf = grismconf.load_grism_config(self.conf_file)
                 
         #### Get dispersion PA, requires conf for tilt of 1st order
         self.get_dispersion_PA()
@@ -245,44 +448,7 @@ class GrismFLT(object):
             filter = header['FILTER'].upper()
         
         return filter
-    
-    def get_config_filename(self, instrume='WFC3', filter='F140W',
-                            grism='G141'):
-        """
-        Generate a config filename based on the instrument, filter & grism
-        combination. 
-        
-        Config files assumed to be found in $GRIZLI environment variable
-        """   
-        if instrume == 'WFC3':
-            conf_file = os.path.join(os.getenv('GRIZLI'), 
-                                     'CONF/%s.%s.V4.3.conf' %(grism, filter))
-            
-            ## When direct + grism combination not found for WFC3 assume F140W
-            if not os.path.exists(conf_file):
-                conf_file = os.path.join(os.getenv('GRIZLI'),
-                                     'CONF/%s.%s.V4.3.conf' %(grism, 'F140W'))
-                  
-        if instrume == 'NIRISS':
-            conf_file = os.path.join(os.getenv('GRIZLI'),
-                                     'CONF/NIRISS.%s.conf' %(grism))
-        
-        if instrume == 'NIRCam':
-            conf_file = os.path.join(os.getenv('GRIZLI'),
-                'CONF/aXeSIM_NC_2016May/CONF/NIRCam_LWAR_%s.conf' %(grism))
-        
-        if instrume == 'WFIRST':
-            conf_file = os.path.join(os.getenv('GRIZLI'), 'CONF/WFIRST.conf')
-        
-        return conf_file
-        
-    def load_grism_config(self, conf_file):
-        """
-        Load parameters from an aXe configuration file
-        """
-        self.conf = grism.aXeConf(conf_file)
-        self.conf.get_beams()
-       
+                
     def clean_for_mp(self):
         """
         zero out io.fits objects to make suitable for multiprocessing

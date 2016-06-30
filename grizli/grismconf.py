@@ -4,6 +4,7 @@ Demonstrate aXe trace polynomials.
   v1.0 - October 14, 2014  (G. Brammer, N. Pirzkal, R. Ryan) 
 
 """
+import os
 import numpy as np
 
 class aXeConf():
@@ -245,4 +246,41 @@ class aXeConf():
         plt.title(self.conf_file)
         plt.tight_layout()
         plt.savefig('%s.pdf' %(self.conf_file))    
+
+def get_config_filename(instrume='WFC3', filter='F140W',
+                        grism='G141'):
+    """
+    Generate a config filename based on the instrument, filter & grism
+    combination. 
     
+    Config files assumed to be found in $GRIZLI environment variable
+    """   
+    if instrume == 'WFC3':
+        conf_file = os.path.join(os.getenv('GRIZLI'), 
+                                 'CONF/%s.%s.V4.3.conf' %(grism, filter))
+        
+        ## When direct + grism combination not found for WFC3 assume F140W
+        if not os.path.exists(conf_file):
+            conf_file = os.path.join(os.getenv('GRIZLI'),
+                                 'CONF/%s.%s.V4.3.conf' %(grism, 'F140W'))
+              
+    if instrume == 'NIRISS':
+        conf_file = os.path.join(os.getenv('GRIZLI'),
+                                 'CONF/NIRISS.%s.conf' %(grism))
+    
+    if instrume == 'NIRCam':
+        conf_file = os.path.join(os.getenv('GRIZLI'),
+            'CONF/aXeSIM_NC_2016May/CONF/NIRCam_LWAR_%s.conf' %(grism))
+    
+    if instrume == 'WFIRST':
+        conf_file = os.path.join(os.getenv('GRIZLI'), 'CONF/WFIRST.conf')
+    
+    return conf_file
+        
+def load_grism_config(conf_file):
+    """
+    Load parameters from an aXe configuration file
+    """
+    conf = aXeConf(conf_file)
+    conf.get_beams()
+    return conf
