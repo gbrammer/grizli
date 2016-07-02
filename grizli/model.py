@@ -67,37 +67,94 @@ if False:
         photplam[filter] = bp.pivot()
         obs = S.Observation(spec, bp)
         photflam[filter] = n/obs.countrate()
-        
-class Disperser(object):
-    """
-    Object that contains information necessary for computing a dispersed
-    spectrum:
-    
-    1) Direct image
-        a) Flux unit conversion of the direct image to F_lambda
-           - TBD: Images in different bands like a fluxcube??
-        b) coordinate origin (y,x) with respect to full-frame detector 
-           coordinates
-    2) Segmentation map (defaults to zero)
-    3) Configuration file (preloaded or filename)
-    """
-    def __init__(self, direct=np.zeros((1014,1014), dtype=np.float), 
-                       segmentation=None, 
-                       photflam=1.0, origin=(0,0),
+
+class GrismDisperser(object):
+    def __init__(self, id=0, direct=np.zeros((20,20), dtype=np.float), 
+                       segmentation=None, origin=[500, 500], pad=0, beam='A',
                        conf=['WFC3','F140W', 'G141']):
+        """Object for computing dispersed model spectra
         
+        Parameters
+        ----------
+        id: int
+            Only consider pixels in the segmentation image with value `id`.  
+            Default of zero to match the default empty segmentation image.
+        
+        direct: ndarray
+            Direct image cutout in f_lambda units (i.e., e-/s times PHOTFLAM).
+            Default is a trivial zeros array.
+        
+        segmentation: ndarray(float32) or None
+            Segmentation image.  If None, create a zeros array with the same 
+            shape as `direct`.
+        
+        origin: [int,int]
+            `origin` defines the lower left pixel index (y,x) of the `direct` 
+            cutout from a larger detector-frame image
+        
+        pad: int
+            Offset between origin = [0,0] and the true lower left pixel of the 
+            detector frame.  This can be nonzero for cases where one creates
+            a direct image that extends beyond the boundaries of the nominal
+            detector frame to model spectra at the edges.
+        
+        beam: str
+            Spectral order to compute.  Must be defined in `self.conf.beams`
+        
+        conf: [str,str,str] or `grismconf.aXeConf` object.
+            Pre-loaded aXe-format configuration file object or if list of 
+            strings determine the appropriate configuration filename with 
+            `grismconf.get_config_filename` and load it.
+            
+        Useful Attributes
+        -----------------
+        sh: 2-tuple
+            shape of the direct array
+        
+        sh_beam: 2-tuple
+            computed shape of the 2D spectrum
+        
+        seg: ndarray
+            segmentation array
+        
+        lam: array
+            wavelength along the trace
+
+        ytrace: array
+            y pixel center of the trace.  Has same dimensions as sh_beam[1]. 
+        
+        sensitivity: array
+            conversion factor from native e/s to f_lambda flux densities
+          
+        modelf, model: array, ndarray
+            2D model spectrum.  `model` is linked to `modelf` with "reshape", 
+            the later which is a flattened 1D array where the fast 
+            calculations are actually performed.
+        
+        model: ndarray
+            2D model spectrum linked to `modelf` with reshape.
+        
+        slx_parent, sly_parent: slices
+            slices defined relative to `origin` to match the location of the 
+            computed 2D spectrum.
+        """
+        
+        self.id = id
+        
+        ### lower left pixel of the `direct` array in native detector
+        ### coordinates
         self.origin = origin
-        self.photflam = photflam
+        self.pad = pad
         
         ### Direct image
-        self.flam = direct*photflam
-        self.sh = self.flam.shape
-        if self.flam.dtype is not np.float:
-            self.flam = np.cast[np.float](self.flam)
+        self.direct = direct
+        self.sh = self.direct.shape
+        if self.direct.dtype is not np.float:
+            self.direct = np.cast[np.float](self.direct)
         
         ### Segmentation image, defaults to all zeros
         if segmentation is None:
-            self.seg = np.zeros_like(self.flam, dtype=np.float32)
+            self.seg = np.zeros_like(self.direct, dtype=np.float32)
         else:
             self.seg = segmentation
             if self.seg.dtype is not np.float32:
@@ -110,168 +167,258 @@ class Disperser(object):
             self.conf = conf
         
         ### Initialize attributes
-        self.xc = self.yc = None
-        self.xoff = self.yoff = None
-        self.xcenter = self.ycenter = None
-        self.beam = None
+        self.xc = self.sh[1]/2+self.origin[1]
+        self.yc = self.sh[0]/2+self.origin[0]
+        self.beam = beam
         
-        ### modelf is a flattened version of the FLT image
-        self.modelf = np.zeros(self.sh[0]*self.sh[1])
-        self.model = self.modelf.reshape(self.sh)
-        self.idx = np.arange(self.modelf.size).reshape(self.sh)
-        
-    def init_dispersion(self, x=None, y=None, xoff=0, yoff=0, 
-                        beam='A', verbose=False):
-        
-        """
-        Initialize parameters necessary to compute the dispersion. 
-        
-        The function is fast, but strip it out here so that you don't
-        have to call it repeatedly with `compute_model` if none of the
-        position parameters (x, y, xoff, yoff) change.
-        """
-        if x is None:
-            if self.xc is None:
-                x = self.sh[1]/2
-            else:
-                x = self.xc + self.xcenter
-                
-        if y is None:
-            if self.yc is None:
-                y = self.sh[0]/2
-            else:
-                y = self.yc + self.ycenter
-                
-        xc, yc = int(x), int(y)
-        xcenter = x - xc
-        ycenter = y - yc
-        
-        if ((self.xc == xc) & (self.yc == yc) & (xcenter == self.xcenter) &
-            (self.xoff == xoff) & (self.yoff == yoff) & (self.beam == beam)):
-            #print 'Nothing changed'
-            return True
-        else:
-            self.xc = xc
-            self.yc = yc
-            self.xcenter = xcenter
-            self.ycenter = ycenter
-            self.beam = beam
-            self.xoff = xoff
-            self.yoff = yoff
-            
         ### Get dispersion parameters at the reference position
-        dx = self.conf.dxlam[beam]+xcenter-xoff
-        dy, lam = self.conf.get_beam_trace(x=x+self.origin[1]-xoff,
-                                           y=y+self.origin[0]-yoff,
-                                           dx=dx, beam=beam)
-        
-        dy += yoff
+        self.dx = self.conf.dxlam[self.beam] #+xcenter-xoff
+        self.ytrace_beam, self.lam_beam = self.conf.get_beam_trace(
+                                                         x=self.xc-self.pad,
+                                                         y=self.yc-self.pad,
+                                                         dx=self.dx,
+                                                         beam=self.beam)
+                
         ### Integer trace
         # 20 for handling int of small negative numbers    
-        dyc = np.cast[int](dy+20)-20+1 
+        dyc = np.cast[int](self.ytrace_beam+20)-20+1 
         
         ### Account for pixel centering of the trace
-        yfrac = dy-np.floor(dy)
+        self.yfrac_beam = self.ytrace_beam - np.floor(self.ytrace_beam)
         
         ### Interpolate the sensitivity curve on the wavelength grid. 
-        ysens = lam*0
-        so = np.argsort(lam)
-        ysens[so] = interp.interp_conserve_c(lam[so],
-                                 self.conf.sens[beam]['WAVELENGTH'], 
-                                 self.conf.sens[beam]['SENSITIVITY'])
+        ysens = self.lam_beam*0
+        so = np.argsort(self.lam_beam)
+        ysens[so] = interp.interp_conserve_c(self.lam_beam[so],
+                                 self.conf.sens[self.beam]['WAVELENGTH'], 
+                                 self.conf.sens[self.beam]['SENSITIVITY'])
+        self.lam_sort = so
         
         ### Needs term of delta wavelength per pixel for flux densities
-        dl = np.abs(np.append(lam[1]-lam[0], np.diff(lam)))
+        dl = np.abs(np.append(self.lam_beam[1] - self.lam_beam[0],
+                              np.diff(self.lam_beam)))
         ysens *= dl*1.e-17
+        self.sensitivity_beam = ysens
         
-                    
-        x0 = np.array([yc, xc])
-        slx = self.conf.dxlam[beam] + xc #+ 1
-        self.flat_index = self.idx[dyc + yc, slx]
+        ### Initialize the model arrays
+        self.NX = len(self.dx)
+        self.sh_beam = (self.sh[0], self.sh[1]+self.NX)
         
-        # Center pixel 
-        self.x0 = x0
-        # Pixels along the trace
-        self.dxpix = slx
-        # Trace offset in y
-        self.ytrace = dy
-        # Fractional pixel along ytrace
-        self.yfrac = yfrac
-        # wavelength along trace
-        self.lam = lam
-        # sort index for wavelength
-        self.lam_sort = so
-        # sensitivity along trace
+        self.modelf = np.zeros(np.product(self.sh_beam))
+        self.model = self.modelf.reshape(self.sh_beam)
+        self.idx = np.arange(self.modelf.size).reshape(self.sh_beam)
+        
+        ## Indices of the trace in the flattened array 
+        self.x0 = np.array(self.sh)/2
+        self.dxpix = self.dx - self.dx[0] + self.x0[1] #+ 1
+        self.flat_index = self.idx[dyc + self.x0[0], self.dxpix]
+        
+        ###### Trace, wavelength, sensitivity across entire 2D array
+        self.dxfull = np.arange(self.sh_beam[1], dtype=int) 
+        self.dxfull += self.dx[0]-self.x0[1]
+        
+        self.ytrace, self.lam = self.conf.get_beam_trace(x=self.xc,
+                         y=self.yc, dx=self.dxfull, beam=self.beam)
+        
+        ysens = self.lam*0
+        so = np.argsort(self.lam)
+        ysens[so] = interp.interp_conserve_c(self.lam[so],
+                                 self.conf.sens[self.beam]['WAVELENGTH'], 
+                                 self.conf.sens[self.beam]['SENSITIVITY'])
+        
         self.sensitivity = ysens
         
-        return True
+        ## Slices of the parent array based on the origin parameter
+        self.slx_parent = slice(self.origin[1] + self.dxfull[0] + self.x0[1],
+                            self.origin[1] + self.dxfull[-1] + self.x0[1]+1)
+        
+        self.sly_parent = slice(self.origin[0], self.origin[0] + self.sh[0])
+        
+        self.spectrum_1d = [None, None]
+        
+    def compute_model(self, id=None, thumb=None, spectrum_1d=None,
+                      in_place=True, outdata=None):
+        """Compute a model 2D grism spectrum
+
+        Parameters
+        ----------
+        id: int
+            Only consider pixels in the segmentation image (`self.seg`) with 
+            values equal to `id`.
+        
+        thumb: array with shape = `self.sh` or None
+            Optional direct image.  If `None` then use `self.direct`.
+        
+        spectrum_1d: [array, array] or None
+            Optional 1D template [wave, flux] to use for the 2D grism model.
+            If `None`, then implicitly assumes flat f_lambda spectrum.
                 
-    def compute_model(self, id=0, thumb=None, x=None, y=None, xoff=0, yoff=0, 
-                      cutout=[10,10], spectrum_1d=None, beam='A',
-                      in_place=True, outdata=None, verbose=False):
-        """
-        Compute a model spectrum, so simple!
-        
-        Compute a model in a box of size +/-`sh` around pixels `x` and `y` 
-        in the direct image.
-        
-        Only consider pixels in the segmentation image with value = `id`.
-        
-        If spectrum_1d = None, the default assumes flat flambda spectra, 
-        otherwise the template wave, flux_flam= spectrum_1d
-        
-        If `in place`, update the model in `self.model` and `self.modelf`, 
-        otherwise put the output in a clean array.  This latter might be slow
-        if the overhead of computing a large image array is high.
+        in_place: bool
+            If True, put the 2D model in `self.model` and `self.modelf`, 
+            otherwise put the output in a clean array or preformed `outdata`. 
+            
+        outdata: array with shape = `self.sh_beam`
+            Preformed array to which the 2D model is added, if `in_place` is
+            False.
+            
+        Returns
+        -------
+        model: ndarray
+            If `in_place` is False, returns the 2D model spectrum.  Otherwise
+            the result is stored in `self.model` and `self.modelf`.
         """
         
-        #### Initialize the dispersion parameters
-        self.init_dispersion(x=x, y=y, xoff=xoff, yoff=yoff, beam=beam,
-                             verbose=False)
-        
+        if id is None:
+            id = self.id
+        else:
+            self.id = id
+            
         ### Template (1D) spectrum interpolated onto the wavelength grid
         if spectrum_1d is not None:
+            self.spectrum_1d = spectrum_1d
             xspec, yspec = spectrum_1d
-            ysens_mod = self.sensitivity*0.
+            scale_spec = self.sensitivity_beam*0.
             int_func = interp.interp_conserve_c
-            ysens_mod[self.lam_sort] = int_func(self.lam[self.lam_sort],
+            scale_spec[self.lam_sort] = int_func(self.lam_beam[self.lam_sort],
                                                 xspec, yspec)
         else:
-            ysens_mod = 1.
-        
+            scale_spec = 1.
+            self.spectrum_1d = [None, None]
+            
         ### Output data, fastest is to compute in place but doesn't zero-out
         ### previous result                    
         if in_place:
+            self.modelf *= 0
             outdata = self.modelf
         else:
             if outdata is None:
                 outdata = self.modelf*0
-                    
+                
         ### Optionally use a different direct image
         if thumb is None:
-            thumb = self.flam
+            thumb = self.direct
         else:
             if thumb.shape != self.sh:
-                print '`thumb` must have the same dimensions as the direct image! (%d,%d)' %(self.sh[0], self.sh[1])
+                print """
+Error: `thumb` must have the same dimensions as the direct image! (%d,%d)      
+                """ %(self.sh[0], self.sh[1])
                 return False
-        
+
+        ### Now compute the dispersed spectrum using the C helper
         status = disperse.disperse_grism_object(thumb, self.seg, id,
-                                 self.flat_index, self.yfrac,
-                                 self.sensitivity*ysens_mod,
+                                 self.flat_index, self.yfrac_beam,
+                                 self.sensitivity_beam*scale_spec,
                                  outdata, self.x0, np.array(self.sh),
-                                 np.array(cutout), np.array(self.sh))
-        
-        # status = disperse.disperse_grism_object(thumb, self.seg, id, idxl,
-        #                                         yfrac, ysens, outdata,
-        #                                         x0, np.array(self.sh),
-        #                                         np.array(sh),
-        #                                         np.array(self.sh))
-                
+                                 self.x0, np.array(self.sh_beam))
+
         if not in_place:
             return outdata
         else:
             return True
+    
+    def optimal_extract(self, data, bin=0, ivar=1.):        
+        """Horne (1986) optimally-weighted 1D extraction
+        
+        Parameters
+        ----------
+        data: ndarray with shape == `self.sh_beam`
+            2D data to extract
+        
+        bin: int, optional
+            Simple boxcar averaging of the output 1D spectrum
+        
+        ivar: float or ndarray with shape == `self.sh_beam`
+            Inverse variance array or scalar float that multiplies the 
+            optimal weights
             
+        Returns
+        -------
+        wave, opt_flux, opt_rms: array-like
+            `wave` is the wavelength of 1D array
+            `opt_flux` is the optimally-weighted 1D extraction
+            `opt_rms` is the weighted uncertainty of the 1D extraction
+            
+            All are optionally binned in wavelength if `bin` > 1.
+        """
+        import scipy.ndimage as nd
+               
+        if not hasattr(self, 'optimal_profile'):
+            m = self.compute_model(id=self.id, in_place=False)
+            m = m.reshape(self.sh_beam)
+            m[m < 0] = 0
+            self.optimal_profile = m/m.sum(axis=0)
+        
+        if data.shape != self.sh_beam:
+            print """
+`data` (%d,%d) must have the same shape as the data array (%d,%d)
+            """ %(data.shape[0], data.shape[1], self.sh_beam[0], 
+                  self.sh_beam[1])
+            return False
+
+        if not isinstance(ivar, float):
+            if ivar.shape != self.sh_beam:
+                print """
+`ivar` (%d,%d) must have the same shape as the data array (%d,%d)
+                """ %(ivar.shape[0], ivar.shape[1], self.sh_beam[0], 
+                      self.sh_beam[1])
+                return False
+                
+        num = self.optimal_profile*data*ivar
+        den = self.optimal_profile**2*ivar
+        opt_flux = num.sum(axis=0)/den.sum(axis=0)
+        opt_var = 1./den.sum(axis=0)
+                
+        if bin > 0:
+            kern = np.ones(bin, dtype=float)/bin
+            opt_flux = nd.convolve(opt, kern)[bin/2::bin]
+            opt_var = nd.convolve(opt_var, kern**2)[bin/2::bin]
+            wave = self.lam[bin/2::bin]
+        else:
+            wave = self.lam
+                
+        opt_rms = np.sqrt(opt_var)
+        opt_rms[opt_var == 0] = 0
+        
+        return wave, opt_flux, opt_rms
+    
+    def add_to_full_image(self, data, full_array):
+        """Add spectrum cutout back to the full array
+        
+        Parameters
+        ----------
+        data: ndarray shape `self.sh_beam` (e.g., self.model)
+            Spectrum cutout
+        
+        full_array: ndarray
+            Full detector array, where the lower left pixel of `data` is given
+            by `origin`.
+        
+        `data` is *added* to `full_array` in place, so, for example, to 
+        subtract `self.model` from the full array, call the function with 
+        
+        >>> self.add_to_full_image(-self.model, full_array)
+         
+        """
+        
+        sh = full_array.shape
+        
+        xpix = np.arange(self.sh_beam[1])
+        xpix += self.origin[1] + self.dxfull[0] + self.x0[1]
+        
+        ypix = np.arange(self.sh_beam[0])
+        ypix += self.origin[0]
+        
+        okx = (xpix >= 0) & (xpix < sh[1])
+        oky = (ypix >= 0) & (ypix < sh[1])
+        
+        if (okx.sum() == 0) | (oky.sum() == 0):
+            return False
+        
+        sly = slice(ypix[oky].min(), ypix[oky].max()+1)
+        slx = slice(xpix[okx].min(), xpix[okx].max()+1)
+        full_array[sly, slx] += data[oky,:][:,okx]
+        return True
+         
 class GrismFLT(object):
     """
     Scripts for simple modeling of individual grism FLT images
@@ -286,6 +433,7 @@ class GrismFLT(object):
                  direct_image=None, refimage=None, segimage=None, refext=0,
                  verbose=True, pad=100, shrink_segimage=True,
                  force_grism=None):
+        
         ### Read the FLT FITS File
         self.flt_file = flt_file
         ### Simulation mode
@@ -423,6 +571,7 @@ class GrismFLT(object):
         
         self.im_data['DQ'] = self.unset_dq_bits(dq=self.im_data['DQ'],
                                                 okbits=32+64+512)
+        
         ### Negative pixels
         neg_pixels = self.im_data['SCI'] < -3*self.im_data['ERR']
         self.im_data['DQ'][neg_pixels] |= 1024
