@@ -16,6 +16,7 @@ import astropy.wcs as pywcs
 
 ### Helper functions from a document written by Pirzkal, Brammer & Ryan 
 from . import grismconf
+from . import utils
 from .utils_c import disperse
 from .utils_c import interp
 
@@ -418,7 +419,366 @@ Error: `thumb` must have the same dimensions as the direct image! (%d,%d)
         slx = slice(xpix[okx].min(), xpix[okx].max()+1)
         full_array[sly, slx] += data[oky,:][:,okx]
         return True
-         
+
+class ImageData(object):
+    """Container for image data with WCS, etc."""
+    def __init__(self, sci=np.zeros((1014,1014)), err=None, dq=None,
+                 header=None, photflam=1., origin=[0,0], 
+                 instrument='WFC3', filter='G141', hdulist=None, sci_ext=1):
+        """
+        Parameters
+        ----------
+        data: ndarray
+            Data for direct image
+        
+        header: astropy.io.fits.Header
+            Associated header with `data` that contains WCS information
+        
+        photflam: float
+            Multiplicative conversion factor to scale `data` to set units 
+            to f_lambda flux density.  If data is grism spectra, then use
+            photflam=1
+        
+        origin: [int,int]
+            Origin of lower left pixel in detector coordinates
+        """
+        
+        ### Easy way, get everything from an image HDU list
+        if isinstance(hdulist, pyfits.HDUList):
+            sci = np.cast[float](hdulist['SCI',sci_ext].data)
+            err = np.cast[float](hdulist['ERR',sci_ext].data)
+            dq = np.cast[int](hdulist['DQ',sci_ext].data)
+            origin = [0,0]
+            
+            header = hdulist['SCI',sci_ext].header.copy()
+            
+            h0 = hdulist[0].header
+            photflam = hdulist[0].header['PHOTFLAM']
+            instrument = hdulist[0].header['INSTRUME']
+            filter = utils.get_hst_filter(h0)
+            
+        self.sci_data = sci*photflam
+        self.photflam = photflam
+        self.sh = np.array(self.sci_data.shape)
+        self.pad = 0
+        self.origin = origin
+        
+        if err is None:
+            self.err_data = np.zeros_like(self.sci_data)
+        else:
+            self.err_data = err*photflam
+            if self.err_data.shape != tuple(self.sh):
+                raise ValueError ('err and sci arrays have different shapes!')
+        
+        if dq is None:
+            self.dq_data = np.zeros_like(self.sci_data, dtype=int)
+        else:
+            self.dq_data = dq
+            if self.dq_data.shape != tuple(self.sh):
+                raise ValueError ('err and dq arrays have different shapes!')
+        
+        ### Header-like parameters
+        self.filter = filter
+        self.instrument = instrument
+        self.header = header
+        
+        self.wcs = None
+        if self.header is not None:
+            self.get_wcs()
+        else:
+            self.header = pyfits.Header()
+            
+    def unset_dq(self):
+        """Flip OK data quality bits using utils.unset_dq_bits
+        
+        OK bits are defined as 
+        
+            okbits_instrument = {'WFC3': 32+64+512, # blob OK
+                                 'NIRISS': 0,
+                                 'WFIRST': 0,}
+        """
+                             
+        okbits_instrument = {'WFC3': 32+64+512, # blob OK
+                             'NIRISS': 0,
+                             'WFIRST': 0,}
+        
+        if self.instrument not in okbits_instrument:
+            okbits = 1
+        else:
+            okbits = okbits_instrument[self.instrument]
+                
+        self.dq_data = utils.unset_dq_bits(self.dq_data, okbits=okbits)
+    
+    def flag_negative(self, sigma=-3):
+        """Flag negative data values with dq=4
+        
+        Parameters
+        ----------
+        sigma: float
+            Threshold for setting bad data
+        
+        Returns
+        -------
+        n_negative: int
+            Number of flagged negative pixels
+            
+        If `self.err_data` is zeros, do nothing.
+        """
+        if self.err_data.max() == 0:
+            return 0
+        
+        bad = self.sci_data < sigma*self.err_data
+        self.dq_data[bad] |= 4
+        return bad.sum()
+        
+            
+    def get_wcs(self):
+        """Get WCS from header"""
+        self.wcs = pywcs.WCS(self.header)
+        if not hasattr(self.wcs, 'pscale'):
+            self.wcs.pscale = np.sqrt(self.wcs.wcs.cd[0,0]**2 +
+                                      self.wcs.wcs.cd[1,0]**2)*3600.
+    
+    def add_padding(self, pad=0):
+        """Pad the data array and update WCS keywords"""
+        
+        ### Update data array
+        new_sh = self.sh + 2*pad
+        for attr in ['sci_data', 'err_data', 'dq_data']:
+            #for data in [self.sci_data, self.err_data, self.dq_data]:
+            data = self.__getattribute__(attr)
+            new_data = np.zeros(new_sh, dtype=data.dtype)
+            new_data[pad:-pad, pad:-pad] += data
+            self.__setattr__(attr, new_data)
+            
+        # new_sci = np.zeros(new_sh, dtype=self.sci.dtype)
+        # new_sci[pad:-pad,pad:-pad] = self.sci
+        # self.sci = new_sci
+        
+        self.sh = new_sh
+        self.pad += pad
+        
+        ### Padded image dimensions
+        self.header['NAXIS1'] += 2*pad
+        self.header['NAXIS2'] += 2*pad
+        self.wcs.naxis1 = self.wcs._naxis1 = self.header['NAXIS1']
+        self.wcs.naxis2 = self.wcs._naxis2 = self.header['NAXIS2']
+
+        ### Add padding to WCS
+        self.header['CRPIX1'] += pad
+        self.header['CRPIX2'] += pad        
+        self.wcs.wcs.crpix[0] += pad
+        self.wcs.wcs.crpix[1] += pad
+        if self.wcs.sip is not None:
+            self.wcs.sip.crpix[0] += pad
+            self.wcs.sip.crpix[1] += pad           
+    
+    def shrink_large_hdu(self, hdu=None, extra=100, verbose=False):
+        """Shrink large image mosaic to speed up blotting
+        
+        Parameters
+        ----------
+        hdu: astropy.io.ImageHDU
+            Input reference HDU
+        
+        extra: int
+            Extra border to put around `self.sci_data` to ensure the reference
+            image is large enough to encompass the distorted image
+            
+        Returns
+        -------
+        new_hdu: astropy.io.ImageHDU
+            Image clipped to encompass `self.sci_data` + margin of `extra`
+            pixels.
+        
+        Make a cutout of the larger reference image around the desired FLT
+        image to make blotting faster for large reference images.
+        """
+        ref_wcs = pywcs.WCS(hdu.header)
+        
+        ### Borders of the flt frame
+        naxis = [self.header['NAXIS1'], self.header['NAXIS2']]
+        xflt = [-extra, naxis[0]+extra, naxis[0]+extra, -extra]
+        yflt = [-extra, -extra, naxis[1]+extra, naxis[1]+extra]
+                
+        raflt, deflt = self.wcs.all_pix2world(xflt, yflt, 0)
+        xref, yref = np.cast[int](ref_wcs.all_world2pix(raflt, deflt, 0))
+        ref_naxis = [hdu.header['NAXIS1'], hdu.header['NAXIS2']]
+        
+        ### Slices of the reference image
+        xmi = np.maximum(0, xref.min())
+        xma = np.minimum(ref_naxis[0], xref.max())
+        slx = slice(xmi, xma)
+        
+        ymi = np.maximum(0, yref.min())
+        yma = np.minimum(ref_naxis[1], yref.max())
+        sly = slice(ymi, yma)
+        
+        if ((xref.min() < 0) | (yref.min() < 0) | 
+            (xref.max() > ref_naxis[0]) | (yref.max() > ref_naxis[1])):
+            if verbose:
+                print ('Segmentation cutout: x=%s, y=%s [Out of range]' 
+                    %(slx, sly))
+            return hdu
+        else:
+            if verbose:
+                print 'Segmentation cutout: x=%s, y=%s' %(slx, sly)
+        
+        ### Sliced subimage
+        slice_wcs = ref_wcs.slice((sly, slx))
+        slice_header = hdu.header.copy()
+        hwcs = slice_wcs.to_header()
+
+        for k in hwcs.keys():
+           if not k.startswith('PC'):
+               slice_header[k] = hwcs[k]
+                
+        slice_data = hdu.data[sly, slx]*1
+        new_hdu = pyfits.ImageHDU(data=slice_data, header=slice_header)
+        
+        return new_hdu
+                    
+    def blot_from_hdu(self, hdu=None, segmentation=False, grow=3, 
+                      interp='poly5'):
+        """Blot a rectified reference image to detector frame
+        
+        Parameters
+        ----------
+        hdu: astropy.io.ImageHDU
+            HDU of the reference image
+        
+        segmentation: bool, False
+            If True, treat the reference image as a segmentation image and 
+            preserve the integer values in the blotting.
+        
+        grow: int, default=3
+            Number of pixels to dilate the segmentation regions
+            
+        interp: str
+            Form of interpolation to use when blotting float image pixels. 
+            Valid options::
+            "nearest", "linear", "poly3", "poly5" (default), "spline3", "sinc"
+                    
+        Returns
+        -------
+        blotted: ndarray
+            Blotted array with the same shape and WCS as `self.sci_data`.
+        """
+        
+        import astropy.wcs
+        from drizzlepac import astrodrizzle
+        
+        #ref = pyfits.open(refimage)
+        if hdu.data.dtype != np.float32:
+            hdu.data = np.cast[np.float32](hdu.data)
+        
+        refdata = hdu.data
+        if 'ORIENTAT' in hdu.header.keys():
+            hdu.header.remove('ORIENTAT')
+            
+        if segmentation:
+            seg_ones = np.cast[np.float32](refdata > 0)-1
+        
+        ref_wcs = pywcs.WCS(hdu.header)        
+        flt_wcs = self.wcs.copy()
+        
+        ### Fix some wcs attributes that might not be set correctly
+        for wcs in [ref_wcs, flt_wcs]:
+            if (not hasattr(wcs.wcs, 'cd')) & hasattr(wcs.wcs, 'pc'):
+                wcs.wcs.cd = wcs.wcs.pc
+                
+            if hasattr(wcs, 'idcscale'):
+                if wcs.idcscale is None:
+                    wcs.idcscale = np.sqrt(np.sum(wcs.wcs.cd[0,:]**2))*3600.
+            else:
+                wcs.idcscale = np.sqrt(np.sum(wcs.wcs.cd[0,:]**2))*3600.
+            
+            wcs.pscale = np.sqrt(wcs.wcs.cd[0,0]**2 +
+                                 wcs.wcs.cd[1,0]**2)*3600.
+        
+        if segmentation:
+            ### Handle segmentation images a bit differently to preserve
+            ### integers.
+            ### +1 here is a hack for some memory issues
+            blotted_seg = astrodrizzle.ablot.do_blot(refdata+0, ref_wcs,
+                                flt_wcs, 1, coeffs=True, interp='nearest',
+                                sinscl=1.0, stepsize=1, wcsmap=None)
+            
+            blotted_ones = astrodrizzle.ablot.do_blot(seg_ones+1, ref_wcs,
+                                flt_wcs, 1, coeffs=True, interp='nearest',
+                                sinscl=1.0, stepsize=1, wcsmap=None)
+            
+            blotted_ones[blotted_ones == 0] = 1
+            ratio = np.round(blotted_seg/blotted_ones)
+            seg = nd.maximum_filter(ratio, size=grow, mode='constant', cval=0)
+            ratio[ratio == 0] = seg[ratio == 0]
+            blotted = ratio
+            
+        else:
+            ### Floating point data
+            blotted = astrodrizzle.ablot.do_blot(refdata, ref_wcs, flt_wcs, 1,
+                                coeffs=True, interp=interp, sinscl=1.0,
+                                stepsize=10, wcsmap=None)
+        
+        return blotted
+    
+    def get_slice(self, origin=[500, 500], N=20):
+        """Return cutout version of `self`
+        
+        Parameters
+        ----------
+        origin: [int, int]
+            Lower left pixel of the slice to cut out
+        
+        N: int
+            Size of the (square) cutout, in pixels
+        
+        Returns
+        -------
+        slice_obj: ImageData
+            New `ImageData` object of the subregion
+        
+        slx, sly: 
+            Slice parameters of the parent array used to cut out the data
+        """
+        
+        ### Test dimensions
+        if (origin[0]-N < 0) | (origin[0]+N > self.sh[0]):
+            raise ValueError ('Out of range in y')
+        
+        if (origin[1]-N < 0) | (origin[1]+N > self.sh[1]):
+            raise ValueError ('Out of range in x')
+        
+        ### Sliced subimage
+        sly = slice(origin[0], origin[0]+N)
+        slx = slice(origin[1], origin[1]+N)
+        
+        slice_origin = [self.origin[i] + origin[i] for i in range(2)]
+        
+        slice_wcs = self.wcs.slice((sly, slx))
+        slice_wcs.naxis1 = slice_wcs._naxis1 = N
+        slice_wcs.naxis2 = slice_wcs._naxis2 = N
+        slice_header = self.header.copy()
+        slice_header['NAXIS1'] = slice_header['NAXIS2'] = N
+        
+        ### Sliced WCS keywords
+        hwcs = slice_wcs.to_header()
+        for k in hwcs.keys():
+            if not k.startswith('PC'):
+                slice_header[k] = hwcs[k]
+        
+        ### Generate new object        
+        slice_obj = ImageData(sci=self.sci_data[sly, slx]/self.photflam, 
+                        err=self.err_data[sly, slx]/self.photflam, 
+                        dq=self.dq_data[sly, slx], 
+                        header=slice_header, photflam=self.photflam,
+                        origin=slice_origin, instrument=self.instrument,
+                        filter=self.filter)
+        
+        slice_obj.pad = slice_obj.pad             
+        
+        return slice_obj, slx, sly
+        
 class GrismFLT(object):
     """
     Scripts for simple modeling of individual grism FLT images
