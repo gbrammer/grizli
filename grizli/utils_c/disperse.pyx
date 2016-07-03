@@ -83,6 +83,8 @@ def compute_segmentation_limits(np.ndarray[FTYPE_t, ndim=2] segm, int seg_id, np
     cdef int i, j, imin, imax, jmin, jmax, area
     cdef double inumer, jnumer, denom, wht_ij
     
+    area = 0.
+    
     imin = shd[0]
     imax = 0
     jmin = shd[1]
