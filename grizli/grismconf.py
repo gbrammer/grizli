@@ -4,11 +4,19 @@ Demonstrate aXe trace polynomials.
   v1.0 - October 14, 2014  (G. Brammer, N. Pirzkal, R. Ryan) 
 
 """
+import os
 import numpy as np
 
 class aXeConf():
     def __init__(self, conf_file='WFC3.IR.G141.V2.5.conf'):
+        """aXe configuratio file
         
+        Parameters
+        ----------
+        conf_file: str
+            Filename of the configuration file to read
+        
+        """
         if conf_file is not None:
             self.conf = self.read_conf_file(conf_file)
             self.conf_file = conf_file
@@ -26,8 +34,14 @@ class aXeConf():
                 self.yoff = 0.
             
     def read_conf_file(self, conf_file='WFC3.IR.G141.V2.5.conf'):
-        """
-        Read an aXe config file, convert floats and arrays
+        """Read an aXe config file, convert floats and arrays
+        
+        Parameters
+        ----------
+        conf_file: str
+            Filename of the configuration file to read.
+        
+        Parameters are stored in an OrderedDict in `self.conf`.
         """
         from collections import OrderedDict
     
@@ -54,8 +68,7 @@ class aXeConf():
         return conf
     
     def count_beam_orders(self):
-        """
-        Get the maximum polynomial order in DYDX or DLDP for each beam
+        """Get the maximum polynomial order in DYDX or DLDP for each beam
         """
         self.orders = {}
         for beam in ['A','B','C','D','E','F','G','H','I','J']:
@@ -69,8 +82,7 @@ class aXeConf():
             self.orders[beam] = order-1
 
     def get_beams(self):
-        """
-        Get beam parameters and sensitivity curves
+        """Get beam parameters and read sensitivity curves
         """
         import os
         import collections
@@ -97,18 +109,16 @@ class aXeConf():
                     self.sens[beam].add_column(Column(data=data, name=col))
                 
                 ### Scale BEAM F
-                if (beam == 'F') & ('G141' in self.conf_file): # & ('gbb' in self.conf_file):
+                if (beam == 'F') & ('G141' in self.conf_file): 
                     self.sens[beam]['SENSITIVITY'] *= 0.35
                     
                 # wave = np.cast[np.double](self.sens[beam]['WAVELENGTH'])
                 # sens = np.cast[np.double](self.sens[beam]['SENSITIVITY']
                 # self.sens[beam]['WAVELENGTH'] = np.cast[np.double](self.sens[beam]['WAVELENGTH'])
                 # self.sens[beam]['SENSITIVITY'] = )
-    
                 
     def field_dependent(self, xi, yi, coeffs):
-        """
-        aXe field-dependent coefficients
+        """aXe field-dependent coefficients
         """
         ## number of coefficients for a given polynomial order
         ## 1:1, 2:3, 3:6, 4:10, order:order*(order+1)/2
@@ -245,4 +255,41 @@ class aXeConf():
         plt.title(self.conf_file)
         plt.tight_layout()
         plt.savefig('%s.pdf' %(self.conf_file))    
+
+def get_config_filename(instrume='WFC3', filter='F140W',
+                        grism='G141'):
+    """
+    Generate a config filename based on the instrument, filter & grism
+    combination. 
     
+    Config files assumed to be found in $GRIZLI environment variable
+    """   
+    if instrume == 'WFC3':
+        conf_file = os.path.join(os.getenv('GRIZLI'), 
+                                 'CONF/%s.%s.V4.3.conf' %(grism, filter))
+        
+        ## When direct + grism combination not found for WFC3 assume F140W
+        if not os.path.exists(conf_file):
+            conf_file = os.path.join(os.getenv('GRIZLI'),
+                                 'CONF/%s.%s.V4.3.conf' %(grism, 'F140W'))
+              
+    if instrume == 'NIRISS':
+        conf_file = os.path.join(os.getenv('GRIZLI'),
+                                 'CONF/NIRISS.%s.conf' %(grism))
+    
+    if instrume == 'NIRCam':
+        conf_file = os.path.join(os.getenv('GRIZLI'),
+            'CONF/aXeSIM_NC_2016May/CONF/NIRCam_LWAR_%s.conf' %(grism))
+    
+    if instrume == 'WFIRST':
+        conf_file = os.path.join(os.getenv('GRIZLI'), 'CONF/WFIRST.conf')
+    
+    return conf_file
+        
+def load_grism_config(conf_file):
+    """
+    Load parameters from an aXe configuration file
+    """
+    conf = aXeConf(conf_file)
+    conf.get_beams()
+    return conf

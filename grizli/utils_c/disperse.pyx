@@ -24,7 +24,12 @@ cdef extern from "math.h":
 @cython.wraparound(False)
 @cython.embedsignature(True)
 def disperse_grism_object(np.ndarray[DTYPE_t, ndim=2] flam, np.ndarray[FTYPE_t, ndim=2] segm, int seg_id, np.ndarray[LINT_t, ndim=1] idxl, np.ndarray[DTYPE_t, ndim=1] yfrac, np.ndarray[DTYPE_t, ndim=1] ysens, np.ndarray[DTYPE_t, ndim=1] full, np.ndarray[LINT_t, ndim=1] x0, np.ndarray[LINT_t, ndim=1] shd, np.ndarray[LINT_t, ndim=1] sh_thumb, np.ndarray[LINT_t, ndim=1] shg):
-
+    """Compute a dispersed 2D spectrum
+    
+    Parameters
+    ----------
+    xxx
+    """
     cdef int i,j,k1,k2
     cdef unsigned int nk,nl,k,shx,shy
     cdef double fl_ij
@@ -54,7 +59,70 @@ def disperse_grism_object(np.ndarray[DTYPE_t, ndim=2] flam, np.ndarray[FTYPE_t, 
                     full[k2] += ysens[k]*fl_ij*(1-yfrac[k])
     
     return True
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.embedsignature(True)
+def compute_segmentation_limits(np.ndarray[FTYPE_t, ndim=2] segm, int seg_id, np.ndarray[DTYPE_t, ndim=2] flam, np.ndarray[LINT_t, ndim=1] shd):
+    """Find pixel limits of a segmentation region
     
+    Parameters
+    ----------
+    segm: ndarray (np.float32)
+        segmentation array
+    
+    seg_id: int
+        ID to test
+    
+    flam: ndarray (float)
+        Flux array to compute weighted centroid within segmentation region
+        
+    shd: [int, int]
+        Shape of segm
+    """
+    cdef int i, j, imin, imax, jmin, jmax, area
+    cdef double inumer, jnumer, denom, wht_ij
+    
+    area = 0
+    
+    imin = shd[0]
+    imax = 0
+    jmin = shd[1]
+    jmax = 0
+    
+    inumer = 0.
+    jnumer = 0.
+    denom = 0.
+    
+    for i in range(shd[0]):
+        for j in range(shd[1]):
+            if segm[i,j] != seg_id:
+                continue
+            
+            area += 1
+            wht_ij = flam[i,j]
+            inumer += i*wht_ij
+            jnumer += j*wht_ij
+            denom += wht_ij
+            
+            if i < imin:
+                imin = i
+            if i > imax:
+                imax = i
+            
+            if j < jmin: 
+                jmin = j
+            if j > jmax:
+                jmax = j
+    
+    ### No matched pixels
+    if denom == 0:
+        denom = -99
+        
+    return imin, imax, inumer/denom, jmin, jmax, jnumer/denom, area, denom
+            
+            
+            
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.embedsignature(True)

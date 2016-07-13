@@ -45,6 +45,8 @@ def niriss_header(ra=53.1592277508136, dec=-27.782056346146, pa_aper=128.589,
     h['FILTER'] = filter
     h['INSTRUME'] = 'NIRISS'
     h['READN'] = 6 , 'Rough, per pixel per 1 ks exposure' # e/pix/per
+    h['PHOTFLAM'] = 1.
+    h['PHOTPLAM'] = 1.
     
     if grism == 'GR150R':
         h['GRISM'] = 'GR150R', 'Spectral trace along X'
@@ -95,6 +97,8 @@ def nircam_header(ra=53.1592277508136, dec=-27.782056346146, pa_aper=128.589,
     h['FILTER'] = filter
     h['INSTRUME'] = 'NIRCam'
     h['READN'] = 9, 'Rough, per pixel per 1 ks exposure' # e/pix/per
+    h['PHOTFLAM'] = 1.
+    h['PHOTPLAM'] = 1.
     
     if grism == 'DFSR':
         h['GRISM'] = 'DFSR', 'Spectral trace along X'
@@ -131,21 +135,23 @@ def wfc3ir_header(ra=53.1592277508136, dec=-27.782056346146, pa_aper=128.589,
     mat[1,:] = np.array([np.sin(rad),np.cos(rad)])
     wcs.wcs.cd = np.dot(mat, wcs.wcs.cd)
     
-    head = wcs.to_header(relax=True)
+    h = wcs.to_header(relax=True)
     
     for i in [1,2]:
         for j in [1,2]:
-            head['CD%d_%d' %(i,j)] = head['PC%d_%d' %(i,j)]
-            head.remove('PC%d_%d' %(i,j))
+            h['CD%d_%d' %(i,j)] = h['PC%d_%d' %(i,j)]
+            h.remove('PC%d_%d' %(i,j))
     
-    head['BACKGR'] = 1.
-    head['FILTER'] = filter
-    head['INSTRUME'] = 'WFC3'
-    head['READN'] = im[0].header['READNSEA']
-    head['NAXIS1'] = head['NAXIS2'] = 1014
-    head['DETECTOR'] = 'IR'
+    h['BACKGR'] = 1.
+    h['FILTER'] = filter
+    h['INSTRUME'] = 'WFC3'
+    h['READN'] = im[0].header['READNSEA']
+    h['NAXIS1'] = h['NAXIS2'] = 1014
+    h['DETECTOR'] = 'IR'
+    h['PHOTFLAM'] = 1.
+    h['PHOTPLAM'] = 1.
     
-    return head, wcs
+    return h, wcs
 
 def wfirst_header(ra=53.1592277508136, dec=-27.782056346146, pa_aper=128.589, naxis=(4096,4096)):
     """
@@ -184,6 +190,8 @@ def wfirst_header(ra=53.1592277508136, dec=-27.782056346146, pa_aper=128.589, na
     h['FILTER'] = 'GRS', 'WFIRST grism'
     h['INSTRUME'] = 'WFIRST'
     h['READN'] = 17, 'SDT report Table 3-3' # e/pix/per
+    h['PHOTFLAM'] = 1.
+    h['PHOTPLAM'] = 1.
     
     wcs = pywcs.WCS(h)
     h['EXTVER'] = 1
