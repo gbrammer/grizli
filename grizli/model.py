@@ -483,16 +483,29 @@ class ImageData(object):
             sci = np.cast[float](hdulist['SCI',sci_extn].data)
             err = np.cast[np.float32](hdulist['ERR',sci_extn].data)
             dq = np.cast[np.int16](hdulist['DQ',sci_extn].data)
-            origin = [0,0]
+            
+            if 'ORIGINX' in hdulist['SCI', sci_extn].header:
+                h0 = hdulist['SCI', sci_extn].header
+                origin = [h0['ORIGINY'], h0['ORIGINX']]
+            else:
+                origin = [0,0]
+            
             self.sci_extn = sci_extn    
             self.parent_file = hdulist.filename()
             
             header = hdulist['SCI',sci_extn].header.copy()
             
-            h0 = hdulist[0].header
-            photflam = hdulist[0].header['PHOTFLAM']
-            instrument = hdulist[0].header['INSTRUME']
-            filter = utils.get_hst_filter(h0)
+            try:
+                h0 = hdulist[0].header
+                photflam = h0['PHOTFLAM']
+                instrument = h0['INSTRUME']
+                filter = utils.get_hst_filter(h0)
+            except:
+                h0 = hdulist['SCI', sci_extn].header
+                photflam = h0['PHOTFLAM']
+                instrument = h0['INSTRUME']
+                filter = utils.get_hst_filter(h0)
+            
             if filter.startswith('G'):
                 photflam = 1
         else:
@@ -890,7 +903,7 @@ class GrismFLT(object):
     """Scripts for modeling of individual grism FLT images"""
     def __init__(self, grism_file='', sci_extn=1, direct_file='',
                  pad=200, ref_file=None, ref_ext=0, seg_file=None,
-                 shrink_segimage=True, verbose=True):
+                 shrink_segimage=True, force_grism='G141', verbose=True):
         """Read FLT files and, optionally, reference/segmentation images.
         
         Parameters
@@ -949,6 +962,10 @@ class GrismFLT(object):
             up blotting and array copying.  This is most helpful for very 
             large input mosaics.
         
+        force_grism: str
+            Use this grism in "simulation mode" where only `direct_file` is
+            specified.
+            
         verbose: bool
             Print status messages to the terminal.
             
@@ -970,9 +987,11 @@ class GrismFLT(object):
             self.direct = None
         
         # ### Simulation mode, no grism exposure
-        # if (self.grism is None) & (self.direct is not None):
-        #     self.grism = ImageData(hdulist=direct_im, sci_extn=sci_extn)
-        
+        if (self.grism is None) & (self.direct is not None):
+            self.grism = ImageData(hdulist=direct_im, sci_extn=sci_extn)
+            self.grism_file = self.direct_file
+            self.grism.filter = force_grism
+            
         ### Grism exposure only, assumes will get reference from ref_file
         if (self.direct is None) & (self.grism is not None):
             self.direct = ImageData(hdulist=grism_im, sci_extn=sci_extn)
@@ -1062,7 +1081,7 @@ class GrismFLT(object):
             refh = ref_hdu.header
         
         if shrink_segimage:
-            ref_hdu = self.direct.shrink_large_hdu(ref_hdu, extra=pad,
+            ref_hdu = self.direct.shrink_large_hdu(ref_hdu, extra=self.pad,
                                                    verbose=True)
             
         if verbose:
@@ -1128,7 +1147,8 @@ class GrismFLT(object):
                 segh = seg_hdu.header
             
             if shrink_segimage:
-                seg_hdu = self.direct.shrink_large_hdu(seg_hdu, extra=pad,
+                seg_hdu = self.direct.shrink_large_hdu(seg_hdu, 
+                                                       extra=self.pad,
                                                        verbose=True)
                 
             if verbose:
@@ -1247,7 +1267,7 @@ class GrismFLT(object):
                 
                 ymin, ymax, y, xmin, xmax, x, area, segm_flux = out
                 if area == 0:
-                    print 'ID#%d not found in segmentation image' %(id)
+                    print 'ID %d not found in segmentation image' %(id)
                     return False
                 
                 ### Object won't disperse spectrum onto the grism image
@@ -1269,7 +1289,7 @@ class GrismFLT(object):
                     return True
                     
             ### Thumbnails
-            xc, yc = int(x), int(y)
+            xc, yc = int(np.round(x))+1, int(np.round(y))+1
             origin = [yc-size + self.direct.origin[0], 
                       xc-size + self.direct.origin[1]]
                       
@@ -1285,7 +1305,7 @@ class GrismFLT(object):
             test = disperse.compute_segmentation_limits(seg_thumb, id, thumb,
                                                         np.array(thumb.shape))
             if test[-2] == 0:
-                print 'ID#%d not found in segmentation image'
+                print 'ID %d not found in segmentation image' %(id)
                 return False
             
             ### Compute spectral orders ("beams")
@@ -1327,7 +1347,7 @@ class GrismFLT(object):
         return True
         
     def blot_catalog(self, input_catalog, columns=['id','ra','dec'], 
-                     ds9=None):
+                     sextractor=False, ds9=None):
         """Compute detector-frame coordinates of sky positions in a catalog.
         
         Parameters
@@ -1358,6 +1378,9 @@ class GrismFLT(object):
         """
         from astropy.table import Column
         
+        if sextractor:
+            columns = ['NUMBER', 'X_WORLD', 'Y_WORLD']
+            
         ### Detector coordinates.  N.B.: 1 indexed!
         xy = self.direct.wcs.all_world2pix(input_catalog[columns[1]], 
                                            input_catalog[columns[2]], 1,
@@ -1471,16 +1494,65 @@ class GrismFLT(object):
         
         self.catalog = cat
         self.seg = seg
+        
         return True
         
-class BeamCutout(object):
-    def __init__(self, flt, beam, conf=None):
-        #self.beam = copy.deepcopy(beam)
-        self.id = beam.id
+    def load_photutils_detection(self, seg_file=None, seg_cat=None, 
+                                 catalog_format='ascii.commented_header'):
+        """
+        Load segmentation image and catalog, either from photutils 
+        or SExtractor.  
         
+        If SExtractor, use `catalog_format='ascii.sextractor'`.
+        
+        """
+        root = self.direct_file.split('.fits')[0]
+        
+        if seg_file is None:
+            seg_file = root + '.detect_seg.fits'
+        
+        if not os.path.exists(seg_file):
+            print 'Segmentation image %s not found' %(segfile)
+            return False
+        
+        self.seg = np.cast[np.float32](pyfits.open(seg_file)[0].data)
+        
+        if seg_cat is None:
+            seg_cat = root + '.detect.cat'
+        
+        if not os.path.exists(seg_cat):
+            print 'Segmentation catalog %s not found' %(seg_cat)
+            return False
+        
+        self.catalog = Table.read(seg_cat, format=catalog_format)
+    
+class BeamCutout(object):
+    def __init__(self, flt=None, beam=None, conf=None, from_fits=None):
+        #self.beam = copy.deepcopy(beam)        
+        if from_fits is not None:
+            self.load_fits(from_fits, conf)
+        else:
+            self.init_from_input(flt, beam, conf)
+                    
+        ### bad pixels or problems with uncertainties
+        self.mask = ((self.grism.data['DQ'] > 0) | 
+                     (self.grism.data['ERR'] == 0) | 
+                     (self.grism.data['SCI'] == 0))
+                             
+        self.ivar = 1/self.grism.data['ERR']**2
+        self.ivar[self.mask] = 0
+                
+        #self.compute_model = self.beam.compute_model
+        self.model = self.beam.model
+        self.modelf = self.model.flatten()
+        
+    def init_from_input(self, flt, beam, conf):
+        """TBD
+        """
+        self.id = beam.id
         if conf is None:
             conf = grismconf.load_grism_config(flt.conf_file)
-        
+                    
         self.beam = GrismDisperser(id=beam.id, direct=beam.direct*1,
                            segmentation=beam.seg*1, origin=beam.origin,
                            pad=beam.pad, beam=beam.beam, conf=conf)
@@ -1497,42 +1569,65 @@ class BeamCutout(object):
         self.grism = flt.grism.get_slice(self.beam.slx_parent,
                                          self.beam.sly_parent)
         
-        ### bad pixels or problems with uncertainties
-        self.mask = ((self.grism.data['DQ'] > 0) | 
-                     (self.grism.data['ERR'] == 0) | 
-                     (self.grism.data['SCI'] == 0))
-                             
-        self.ivar = 1/self.grism.data['ERR']**2
-        self.ivar[self.mask] = 0
-        
         self.contam = flt.model[self.beam.sly_parent, self.beam.slx_parent]*1
         if self.beam.id in flt.object_dispersers:
             self.contam -= self.beam.model
         
-        self.compute_model = self.beam.compute_model
-        self.model = self.beam.model
-        self.modelf = self.model.flatten()
+    def load_fits(self, file, conf):
+        """TBD
+        """
+        hdu = pyfits.open(file)
         
-    def write_fits(self, root='beam_'):
+        self.direct = ImageData(hdulist=hdu, sci_extn=1)
+        self.grism  = ImageData(hdulist=hdu, sci_extn=2)
+        
+        self.contam = hdu['CONTAM'].data*1
+        self.model = hdu['MODEL'].data*1
+        
+        if ('REF',1) in hdu:
+            direct = hdu['REF', 1].data*1
+        else:
+            direct = hdu['SCI', 1].data*1
+        
+        h0 = hdu[0].header
+        
+        if conf is None:
+            conf_file = grismconf.get_config_filename(self.direct.instrument,
+                                                      self.direct.filter,
+                                                      self.grism.filter)
+        
+            conf = grismconf.load_grism_config(conf_file)
+        
+        self.beam = GrismDisperser(id=h0['ID'], direct=direct, 
+                                   segmentation=hdu['SEG'].data*1,
+                                   origin=self.direct.origin,
+                                   pad=h0['PAD'], beam=h0['BEAM'], 
+                                   conf=conf)
+        
+    
+    def write_fits(self, root='beam_', clobber=True):
         """TBD
         """
         h0 = pyfits.Header()
         h0['ID'] = self.beam.id, 'Object ID'
         h0['PAD'] = self.beam.pad, 'Padding of input image'
-
+        h0['BEAM'] = self.beam.beam, 'Grism order ("beam")'
+        
         hdu = pyfits.HDUList([pyfits.PrimaryHDU(header=h0)])
-        hdu.extend(self.direct.get_HDUList())
+        hdu.extend(self.direct.get_HDUList(extver=1))
         hdu.append(pyfits.ImageHDU(data=np.cast[np.int32](self.beam.seg), 
                                    header=hdu[-1].header, name='SEG'))
         
-        hdu.extend(self.grism.get_HDUList())
+        hdu.extend(self.grism.get_HDUList(extver=2))
         hdu.append(pyfits.ImageHDU(data=self.contam, header=hdu[-1].header,
                                    name='CONTAM'))
                                    
         hdu.append(pyfits.ImageHDU(data=self.model, header=hdu[-1].header,
                                    name='MODEL'))
         
-            
+        hdu.writeto('%s_%05d.%s.fits' %(root, self.beam.id, self.beam.beam),
+                    clobber=clobber)
+                            
     def twod_axis_labels(self, wscale=1.e4, limits=None, mpl_axis=None):
         """TBD
         Set x axis *tick labels* on a 2D spectrum to wavelength units
@@ -1575,61 +1670,80 @@ class BeamCutout(object):
         else:
             return xpix
     
-    def simple_line_fit(self, fwhm=5., grid=[1.12e4, 1.65e4, 1, 20]):
+    def simple_line_fit(self, fwhm=48., grid=[1.12e4, 1.65e4, 1, 4],
+                        fitter='lstsq', poly_order=3):
         """TBD
         Demo: fit continuum and an emission line over a wavelength grid
-        """
+        """        
+        ### Test fit
         import sklearn.linear_model
+        import numpy.linalg
         clf = sklearn.linear_model.LinearRegression()
                 
         ### Continuum
-        self.compute_model(self.direct, id=self.id)
-        ### OK data
-        ok = (~self.mask) & (self.ivar.flatten() != 0) & (self.modelf > 0.03*self.modelf.max())
+        self.beam.compute_model()
+        self.modelf = self.model.flatten()
         
-        scif = (self.cutout_sci - self.contam).flatten()
+        ### OK data where the 2D model has non-zero flux
+        ok_data = (~self.mask.flatten()) & (self.ivar.flatten() != 0)
+        ok_data &= (self.modelf > 0.03*self.modelf.max())
+        
+        ### Flat versions of sci/ivar arrays
+        scif = (self.grism.data['SCI'] - self.contam).flatten()
         ivarf = self.ivar.flatten()
+
+        ##### Model: (a_0 x**0 + ... a_i x**i)*continuum + line
+        yp, xp = np.indices(self.beam.sh_beam)
+        xpf = (xp.flatten() - self.beam.sh_beam[1]/2.)
+        xpf /= (self.beam.sh_beam[1]/2)
         
-        ### Model: (ax + b)*continuum + line
-        yp, xp = np.indices(self.shg)
-        xpf = (xp.flatten() - self.shg[1]/2.)/(self.shg[1]/2)
+        ### Polynomial arrays
+        A_list = [xpf**order*self.modelf for order in range(poly_order+1)]
+        A_list.append(self.modelf*1)
+        A = np.vstack(A_list).T
         
-        xpf = ((self.wave[:,None]*np.ones(self.shg[0]) - self.pivot)/1000.).T.flatten()
-        A = np.vstack([xpf*self.modelf*1, self.modelf*1, self.modelf*1]).T
-        
-        ### Fit lines
-        wave_array = np.arange(grid[0], grid[1], grid[2])
-        line_centers = wave_array[grid[3]/2::grid[3]]
+        ### Normalized Gaussians on a grid
+        waves = np.arange(grid[0], grid[1], grid[2])
+        line_centers = waves[grid[3]/2::grid[3]]
         
         rms = fwhm/2.35
-        gaussian_lines = 1/np.sqrt(2*np.pi*rms**2)*np.exp(-(line_centers[:,None]-wave_array)**2/2/rms**2)
+        gaussian_lines = np.exp(-(line_centers[:,None]-waves)**2/2/rms**2)
+        gaussian_lines /= np.sqrt(2*np.pi*rms**2)
         
         N = len(line_centers)
-        coeffs = np.zeros((N, 3))
+        coeffs = np.zeros((N, A.shape[1]))
         chi2 = np.zeros(N)
         chi2min = 1e30
         
         for i in range(N):
-            self.compute_model(self.thumb, id=self.id, xspec=wave_array, yspec=gaussian_lines[i,:])
-            A[:,2] = self.modelf
-            status = clf.fit(A[ok,:], scif[ok])
-            coeffs[i,:] = clf.coef_
-            
-            model = np.dot(A, clf.coef_)
-            chi2[i] = np.sum(((scif-model)**2*ivarf)[ok])
+            self.beam.compute_model(spectrum_1d=[waves, gaussian_lines[i,:]])
+                                                 
+            A[:,-1] = self.model.flatten()
+            if fitter == 'lstsq':
+                out = numpy.linalg.lstsq(A[ok_data,:], scif[ok_data])
+                lstsq_coeff, residuals, rank, s = out
+                coeffs[i,:] += lstsq_coeff
+                model = np.dot(A, lstsq_coeff)
+            else:
+                status = clf.fit(A[ok_data,:], scif[ok_data])
+                coeffs[i,:] = clf.coef_
+                model = np.dot(A, clf.coef_)
+
+            chi2[i] = np.sum(((scif-model)**2*ivarf)[ok_data])
             
             if chi2[i] < chi2min:
-                print no_newline + '%d, wave=%.1f, chi2=%.1f, line_flux=%.1f' %(i, line_centers[i], chi2[i], coeffs[i,2]*self.total_flux/1.e-17) 
                 chi2min = chi2[i]
-                
-        ### Best    
+        
+        #print chi2
         ix = np.argmin(chi2)
-        self.compute_model(self.thumb, id=self.id, xspec=wave_array, yspec=gaussian_lines[ix,:])
-        A[:,2] = self.modelf
+        self.beam.compute_model(spectrum_1d=[waves, gaussian_lines[ix,:]])
+        A[:,-1] = self.model.flatten()
         model = np.dot(A, coeffs[ix,:])
         
-        return line_centers, coeffs, chi2, ok, model.reshape(self.shg), line_centers[ix], coeffs[ix,2]*self.total_flux/1.e-17
-    
+        return (line_centers, coeffs, chi2, ok_data,
+                model.reshape(self.beam.sh_beam), line_centers[ix],
+                coeffs[ix,-1]*self.beam.total_flux/1.e-17)
+
 class OldGrismFLT(object):
     """
     Scripts for simple modeling of individual grism FLT images
@@ -2889,7 +3003,7 @@ class OldBeamCutout(object):
         
         return wave, opt, opt_rms
     
-    def simple_line_fit(self, fwhm=5., grid=[1.12e4, 1.65e4, 1, 20]):
+    def simple_line_fit(self, fwhm=48., grid=[1.12e4, 1.65e4, 1, 4]):
         """
         Demo: fit continuum and an emission line over a wavelength grid
         """
