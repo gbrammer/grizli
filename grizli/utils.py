@@ -120,7 +120,7 @@ def detect_with_photutils(sci, err=None, dq=None, seg=None, detect_thresh=2.,
         kernel.normalize()
     
         if verbose:
-            print '%s: photutils.detect_sources (detect_thresh=%.1f, grow_seg=%d, gauss_fwhm=%.1f)' %(root, detect_thresh, grow_seg, gauss_fwhm)
+            print '%s: photutils.detect_sources (detect_thresh=%.1f, grow_seg=%d, gauss_fwhm=%.1f, ZP=%.1f)' %(root, detect_thresh, grow_seg, gauss_fwhm, AB_zeropoint)
         
         ### Detect sources
         segm = detect_sources(sci*(~mask), threshold, npixels=npixels,
@@ -178,7 +178,7 @@ def detect_with_photutils(sci, err=None, dq=None, seg=None, detect_thresh=2.,
             print '%s: save %s, %s' %(root, seg_file, seg_cat)
         
         if wcs is not None:
-            header = wcs.to_header()
+            header = wcs.to_header(relax=True)
         else:
             header=None
             

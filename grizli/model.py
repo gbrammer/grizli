@@ -22,7 +22,7 @@ from .utils_c import disperse
 from .utils_c import interp
 
 ### Factors for converting HST countrates to Flamba flux densities
-photflam = {'F098M': 6.0501324882418389e-20, 
+photflam_list = {'F098M': 6.0501324882418389e-20, 
             'F105W': 3.038658152508547e-20, 
             'F110W': 1.5274130068787271e-20, 
             'F125W': 2.2483414275260141e-20, 
@@ -36,7 +36,7 @@ photflam = {'F098M': 6.0501324882418389e-20,
             'GRISM': 1.e-20}
  
 ### Filter pivot wavelengths
-photplam = {'F098M': 9864.722728110915, 
+photplam_list = {'F098M': 9864.722728110915, 
             'F105W': 10551.046906405772, 
             'F110W': 11534.45855553774, 
             'F125W': 12486.059785775655, 
@@ -57,19 +57,19 @@ if False:
     import pysynphot as S
     n = 1.e-20
     spec = S.FlatSpectrum(n, fluxunits='flam')
-    photflam = {}
-    photplam = {}
-    for filter in ['F098M', 'F105W', 'F110W', 'F125W', 'F140W', 'F160W']:
+    photflam_list = {}
+    photplam_list = {}
+    for filter in ['F098M', 'F105W', 'F110W', 'F125W', 'F140W', 'F160W', 'G102', 'G141']:
         bp = S.ObsBandpass('wfc3,ir,%s' %(filter.lower()))
-        photplam[filter] = bp.pivot()
+        photplam_list[filter] = bp.pivot()
         obs = S.Observation(spec, bp)
-        photflam[filter] = n/obs.countrate()
+        photflam_list[filter] = n/obs.countrate()
         
     for filter in ['F435W', 'F606W', 'F775W', 'F814W']:
         bp = S.ObsBandpass('acs,wfc1,%s' %(filter.lower()))
-        photplam[filter] = bp.pivot()
+        photplam_list[filter] = bp.pivot()
         obs = S.Observation(spec, bp)
-        photflam[filter] = n/obs.countrate()
+        photflam_list[filter] = n/obs.countrate()
 
 class GrismDisperser(object):
     def __init__(self, id=0, direct=np.zeros((20,20), dtype=np.float), 
@@ -406,6 +406,18 @@ Error: `thumb` must have the same dimensions as the direct image! (%d,%d)
         
         return wave, opt_flux, opt_rms
     
+    def contained_in_full_array(self, full_array):
+        """Check if subimage slice is fully contained within larger array
+        """
+        sh = full_array.shape
+        if (self.sly_parent.start < 0) | (self.slx_parent.start < 0):
+            return False
+        
+        if (self.sly_parent.stop >= sh[0]) | (self.slx_parent.stop >= sh[1]):
+            return False
+        
+        return True
+        
     def add_to_full_image(self, data, full_array):
         """Add spectrum cutout back to the full array
         
@@ -425,29 +437,65 @@ Error: `thumb` must have the same dimensions as the direct image! (%d,%d)
          
         """
         
-        sh = full_array.shape
+        if self.contained_in_full_array(full_array):
+            full_array[self.sly_parent, self.slx_parent] += data
+        else:    
+            sh = full_array.shape
         
-        xpix = np.arange(self.sh_beam[1])
-        xpix += self.origin[1] + self.dxfull[0] + self.x0[1]
+            xpix = np.arange(self.sh_beam[1])
+            xpix += self.origin[1] + self.dxfull[0] + self.x0[1]
         
-        ypix = np.arange(self.sh_beam[0])
-        ypix += self.origin[0]
+            ypix = np.arange(self.sh_beam[0])
+            ypix += self.origin[0]
         
-        okx = (xpix >= 0) & (xpix < sh[1])
-        oky = (ypix >= 0) & (ypix < sh[1])
+            okx = (xpix >= 0) & (xpix < sh[1])
+            oky = (ypix >= 0) & (ypix < sh[1])
         
-        if (okx.sum() == 0) | (oky.sum() == 0):
-            return False
+            if (okx.sum() == 0) | (oky.sum() == 0):
+                return False
         
-        sly = slice(ypix[oky].min(), ypix[oky].max()+1)
-        slx = slice(xpix[okx].min(), xpix[okx].max()+1)
-        full_array[sly, slx] += data[oky,:][:,okx]
-        return True
+            sly = slice(ypix[oky].min(), ypix[oky].max()+1)
+            slx = slice(xpix[okx].min(), xpix[okx].max()+1)
+            full_array[sly, slx] += data[oky,:][:,okx]
 
+        #print sly, self.sly_parent, slx, self.slx_parent
+        return True
+    
+    def cutout_from_full_image(self, full_array):
+        """Get beam-sized cutout from a full image
+        TBD
+        """
+        #print self.sly_parent, self.slx_parent, full_array.shape
+        
+        if self.contained_in_full_array(full_array):
+            data = full_array[self.sly_parent, self.slx_parent]
+        else:
+            sh = full_array.shape
+            ### 
+            xpix = np.arange(self.sh_beam[1])
+            xpix += self.origin[1] + self.dxfull[0] + self.x0[1]
+        
+            ypix = np.arange(self.sh_beam[0])
+            ypix += self.origin[0]
+        
+            okx = (xpix >= 0) & (xpix < sh[1])
+            oky = (ypix >= 0) & (ypix < sh[1])
+        
+            if (okx.sum() == 0) | (oky.sum() == 0):
+                return False
+        
+            sly = slice(ypix[oky].min(), ypix[oky].max()+1)
+            slx = slice(xpix[okx].min(), xpix[okx].max()+1)
+        
+            data = self.model*0.
+            data[oky,:][:,okx] += full_array[sly, slx]
+
+        return data
+        
 class ImageData(object):
     """Container for image data with WCS, etc."""
     def __init__(self, sci=np.zeros((1014,1014)), err=None, dq=None,
-                 header=None, photflam=1., origin=[0,0], pad=0,
+                 header=None, photflam=1., photplam=1., origin=[0,0], pad=0,
                  instrument='WFC3', filter='G141', hdulist=None, sci_extn=1):
         """
         Parameters
@@ -495,32 +543,56 @@ class ImageData(object):
             
             header = hdulist['SCI',sci_extn].header.copy()
             
-            try:
-                h0 = hdulist[0].header
-                photflam = h0['PHOTFLAM']
-                instrument = h0['INSTRUME']
-                filter = utils.get_hst_filter(h0)
-            except:
-                h0 = hdulist['SCI', sci_extn].header
-                photflam = h0['PHOTFLAM']
-                instrument = h0['INSTRUME']
-                filter = utils.get_hst_filter(h0)
+            status = False
+            for ext in [0, ('SCI',sci_extn)]:
+                h = hdulist[ext].header
+                if 'INSTRUME' in h:
+                    status = True
+                    break
             
+            if not status:
+                msg = ('Couldn\'t find \'INSTRUME\' keyword in the headers' + 
+                       ' of extensions 0 or (SCI,%d)' %(sci_extn))
+                raise KeyError (msg)
+            
+            instrument = h['INSTRUME']
+            filter = utils.get_hst_filter(h)
+            if 'PHOTFLAM' in h:
+                photflam = h['PHOTFLAM']
+            else:
+                photflam = photflam_list[filter]
+            
+            if 'PHOTPLAM' in h:
+                photplam = h['PHOTPLAM']
+            else:
+                photplam = photplam_list[filter]
+                        
             if filter.startswith('G'):
                 photflam = 1
+                
         else:
             self.parent_file = 'Unknown'
             self.sci_extn = None    
         
         self.is_slice = False
         
-        self.data = collections.OrderedDict()
-        self.data['SCI'] = sci*photflam
-        self.photflam = photflam
-        self.sh = np.array(self.data['SCI'].shape)
+        ### Array parameters
         self.pad = pad
         self.origin = origin
-                
+        
+        self.data = collections.OrderedDict()
+        self.data['SCI'] = sci*photflam
+
+        self.sh = np.array(self.data['SCI'].shape)
+        
+        ### Header-like parameters
+        self.filter = filter
+        self.instrument = instrument
+        self.header = header
+        
+        self.photflam = photflam
+        self.photplam = photplam
+          
         if err is None:
             self.data['ERR'] = np.zeros_like(self.data['SCI'])
         else:
@@ -537,14 +609,10 @@ class ImageData(object):
         
         self.ref_file = None
         self.ref_photflam = None
+        self.ref_photplam = None
         self.ref_filter = None
         self.data['REF'] = None
-        
-        ### Header-like parameters
-        self.filter = filter
-        self.instrument = instrument
-        self.header = header
-        
+                
         self.wcs = None
         if self.header is not None:
             self.get_wcs()
@@ -695,7 +763,7 @@ class ImageData(object):
         ### Sliced subimage
         slice_wcs = ref_wcs.slice((sly, slx))
         slice_header = hdu.header.copy()
-        hwcs = slice_wcs.to_header()
+        hwcs = slice_wcs.to_header(relax=True)
 
         for k in hwcs.keys():
            if not k.startswith('PC'):
@@ -835,7 +903,7 @@ class ImageData(object):
         slice_header['NAXIS2'] = NY
         
         ### Sliced WCS keywords
-        hwcs = slice_wcs.to_header()
+        hwcs = slice_wcs.to_header(relax=True)
         for k in hwcs.keys():
             if not k.startswith('PC'):
                 slice_header[k] = hwcs[k]
@@ -844,11 +912,14 @@ class ImageData(object):
         slice_obj = ImageData(sci=self.data['SCI'][sly, slx]/self.photflam, 
                               err=self.data['ERR'][sly, slx]/self.photflam, 
                               dq=self.data['DQ'][sly, slx]*1, 
-                              header=slice_header, photflam=self.photflam,
+                              header=slice_header, 
+                              photflam=self.photflam, photplam=self.photplam,
                               origin=slice_origin, instrument=self.instrument,
                               filter=self.filter)
         
         slice_obj.ref_photflam = self.ref_photflam
+        slice_obj.ref_photflam = self.ref_photplam
+
         if self.data['REF'] is not None:
             slice_obj.data['REF'] = self.data['REF'][sly, slx]*1
         else:
@@ -871,7 +942,10 @@ class ImageData(object):
         h['INSTRUME'] = (self.instrument, 
                          'identifier for instrument used to acquire data')
                          
-        h['PHOTFLAM'] = self.photflam, 'F_lambda conversion factor'
+        h['PHOTFLAM'] = (self.photflam,
+                         'inverse sensitivity, ergs/cm2/Ang/electron')
+                                        
+        h['PHOTPLAM'] = self.photplam, 'Pivot wavelength (Angstroms)'
         h['PARENT'] = self.parent_file, 'Parent filename'
         h['SCI_EXTN'] = self.sci_extn, 'EXTNAME of the science data'
         h['ISCUTOUT'] = self.is_slice, 'Arrays are sliced from larger image'
@@ -888,6 +962,7 @@ class ImageData(object):
         
         if self.data['REF'] is not None:
             h['PHOTFLAM'] = self.ref_photflam
+            h['PHOTPLAM'] = self.ref_photplam
             h['FILTER'] = self.ref_filter
             h['REF_FILE'] = self.ref_file
             
@@ -1093,8 +1168,13 @@ class GrismFLT(object):
         if 'PHOTFLAM' in refh:
             self.direct.ref_photflam = ref_hdu.header['PHOTFLAM']
         else:
-            self.direct.ref_photflam = photflam[refh['FILTER'].upper()]
-            
+            self.direct.ref_photflam = photflam_list[refh['FILTER'].upper()]
+        
+        if 'PHOTPLAM' in refh:
+            self.direct.ref_photplam = ref_hdu.header['PHOTPLAM']
+        else:
+            self.direct.ref_photplam = photplam_list[refh['FILTER'].upper()]
+        
         ## TBD: compute something like a cross-correlation offset
         ##      between blotted reference and the direct image itself
         self.direct.data['REF'] = np.cast[float](blotted_ref)
@@ -1187,7 +1267,7 @@ class GrismFLT(object):
         
     def compute_model_orders(self, id=0, x=588.28, y=40.54, size=10, mag=-1,
                       spectrum_1d=None, compute_size=False, store=True, 
-                      add=True):
+                      in_place=True, add=True):
         """Compute dispersed spectrum for a given object id
         
         Parameters
@@ -1230,39 +1310,43 @@ class GrismFLT(object):
             save memory, set to False and then the function just stores the
             input template spectrum (`spectrum_1d`) and the beams will have
             to be recomputed if necessary.
-        
-        add: bool
-            Add the computed spectra into `self.model`.  
+                    
+        in_place: bool
+            If True, add the computed spectral orders into `self.model`.  
+            Otherwise, make a clean array with only the orders of the given
+            object.
             
         Returns
         -------
-        status: bool
-            True if everything goes OK.  The computed spectral orders are
-            stored in place in `self.model`.
+        output: bool or array
+            If `in_place` is True, return status of True if everything goes
+            OK. The computed spectral orders are stored in place in
+            `self.model`.
             
             Returns False if the specified `id` is not found in the
-            segmentation array.
-        
-        """
-        ### Non-trivial model spectrum?    
-        # if xspec is None:
-        #     spectrum_1d = None
-        # else:
-        #     spectrum_1d = [xspec, yspec]
-               
+            segmentation array independent of `in_place`.
+            
+            If `in_place` is False, return a full array including the model 
+            for the single object.
+        """               
         if id in self.object_dispersers.keys():
             object_in_model = True
             beams = self.object_dispersers[id]
         else:
             object_in_model = False
             beams = None
+        
+        if self.direct.data['REF'] is None:
+            ext = 'SCI'
+        else:
+            ext = 'REF'
             
         ### Do we need to compute the dispersed beams?
         if not isinstance(beams, collections.OrderedDict):
             if compute_size:
                 ### Get the array indices of the segmentation region
                 out = disperse.compute_segmentation_limits(self.seg, id,
-                                         self.direct.data['SCI'],
+                                         self.direct.data[ext],
                                          self.direct.sh)
                 
                 ymin, ymax, y, xmin, xmax, x, area, segm_flux = out
@@ -1292,12 +1376,7 @@ class GrismFLT(object):
             xc, yc = int(np.round(x))+1, int(np.round(y))+1
             origin = [yc-size + self.direct.origin[0], 
                       xc-size + self.direct.origin[1]]
-                      
-            if self.direct.data['REF'] is None:
-                ext = 'SCI'
-            else:
-                ext = 'REF'
-                
+                                      
             thumb = self.direct.data[ext][yc-size:yc+size, xc-size:xc+size]
             seg_thumb = self.seg[yc-size:yc+size, xc-size:xc+size]
             
@@ -1331,21 +1410,70 @@ class GrismFLT(object):
                 ### Just save the model spectrum (or empty spectrum)
                 self.object_dispersers[id] = spectrum_1d
                         
-        ### Loop through orders and add to the master model array    
+        if in_place:
+            ### Update the internal model attribute
+            output = self.model
+        else:
+            ### Create a fresh array
+            output = np.zeros_like(self.model)
+                
+        ### Loop through orders and add to the full model array, in-place or
+        ### a separate image 
         for b in beams.keys():
             beam = beams[b]
             
             ### Subtract previously-added model
-            if object_in_model & add:
-                beam.add_to_full_image(-beam.model, self.model)
+            if object_in_model & in_place:
+                beam.add_to_full_image(-beam.model, output)
             
             ### Add in new model
             beam.compute_model(id=id, spectrum_1d=spectrum_1d)
-            if add:
-                beam.add_to_full_image(beam.model, self.model)
+            beam.add_to_full_image(beam.model, output)
         
-        return True
+        if in_place:
+            return True
+        else:
+            return output
+    
+    def compute_full_model(self, ids=None, mags=None):
+        if ids is None:
+            ids = np.unique(self.seg)[1:]
         
+        ### If `mags` array not specified, compute magnitudes within
+        ### segmentation regions.
+        if mags is None:
+            if self.direct.data['REF'] is None:
+                ext='SCI'
+                ### First term in zeropoints is zero because photflam 
+                ### already multiplied to science data, also for ref below.
+                ZP =  (0*np.log10(self.direct.photflam) - 21.10 -
+                          5*np.log10(self.direct.photplam) + 18.6921)
+                    
+            else:
+                ext='REF'
+                ZP =  (0*np.log10(self.direct.ref_photflam) - 21.10 -
+                          5*np.log10(self.direct.ref_photplam) + 18.6921)
+                                
+            mags = np.zeros(len(ids))
+            for i, id in enumerate(ids):
+                out = disperse.compute_segmentation_limits(self.seg, id,
+                                     self.direct.data[ext],
+                                     self.direct.sh)
+            
+                ymin, ymax, y, xmin, xmax, x, area, segm_flux = out
+                mags[i] = ZP - 2.5*np.log10(segm_flux)
+        else:
+            if np.isscalar(mags):
+                mags = [mags for i in range(len(ids))]
+            else:
+                if len(ids) != len(mags):
+                    raise ValueError ('`ids` and `mags` lists different sizes')
+        
+        ### Now compute mthe full model
+        for id_i, mag_i in zip(ids, mags):
+            self.compute_model_orders(id=id_i, compute_size=True, mag=mag_i, 
+                                      in_place=True)
+            
     def blot_catalog(self, input_catalog, columns=['id','ra','dec'], 
                      sextractor=False, ds9=None):
         """Compute detector-frame coordinates of sky positions in a catalog.
@@ -1424,7 +1552,7 @@ class GrismFLT(object):
     
     def photutils_detection(self, use_seg=False, data_ext='SCI',
                             detect_thresh=2., grow_seg=5, gauss_fwhm=2.,
-                            verbose=True, save_detection=False):
+                            verbose=True, save_detection=False, ZP=None):
         """Use photutils to detect objects and make segmentation map
         
         Parameters
@@ -1445,7 +1573,12 @@ class GrismFLT(object):
         
         save_detection: bool
             Save the detection images and catalogs
-                              
+        
+        ZP: float or None
+            AB magnitude zeropoint of the science array.  If `None` then, try
+            to compute based on PHOTFLAM and PHOTPLAM values and use zero if
+            that fails.
+            
         Returns
         ---------
         status: bool
@@ -1456,13 +1589,16 @@ class GrismFLT(object):
         segmentation array to `self.seg`.
         
         """
-        if ((self.direct.filter in photflam.keys()) & 
-            (self.direct.filter in photplam.keys())):
-            ### ABMAG_ZEROPOINT from http://www.stsci.edu/hst/wfc3/phot_zp_lbn
-            ZP =  (-2.5*np.log10(photflam[self.direct.filter]) - 21.10 -
-                      5*np.log10(photplam[self.direct.filter]) + 18.6921)
-        else:
-            ZP = 0.
+        if ZP is None:
+            if ((self.direct.filter in photflam_list.keys()) & 
+                (self.direct.filter in photplam_list.keys())):
+                ### ABMAG_ZEROPOINT from
+                ### http://www.stsci.edu/hst/wfc3/phot_zp_lbn
+                ZP =  (-2.5*np.log10(photflam_list[self.direct.filter]) -
+                       21.10 - 5*np.log10(photplam_list[self.direct.filter]) +
+                       18.6921)
+            else:
+                ZP = 0.
         
         if use_seg:
             seg = self.seg
@@ -1528,7 +1664,8 @@ class GrismFLT(object):
     
 class BeamCutout(object):
     def __init__(self, flt=None, beam=None, conf=None, from_fits=None):
-        #self.beam = copy.deepcopy(beam)        
+        """TBD
+        """
         if from_fits is not None:
             self.load_fits(from_fits, conf)
         else:
@@ -1697,8 +1834,10 @@ class BeamCutout(object):
         xpf = (xp.flatten() - self.beam.sh_beam[1]/2.)
         xpf /= (self.beam.sh_beam[1]/2)
         
-        ### Polynomial arrays
+        ### Polynomial continuum arrays
         A_list = [xpf**order*self.modelf for order in range(poly_order+1)]
+        
+        # Extra element for the computed line model
         A_list.append(self.modelf*1)
         A = np.vstack(A_list).T
         
@@ -1715,6 +1854,8 @@ class BeamCutout(object):
         chi2 = np.zeros(N)
         chi2min = 1e30
         
+        ### Loop through line models and fit for template coefficients
+        ### Compute chi-squared.
         for i in range(N):
             self.beam.compute_model(spectrum_1d=[waves, gaussian_lines[i,:]])
                                                  
@@ -1738,12 +1879,113 @@ class BeamCutout(object):
         ix = np.argmin(chi2)
         self.beam.compute_model(spectrum_1d=[waves, gaussian_lines[ix,:]])
         A[:,-1] = self.model.flatten()
-        model = np.dot(A, coeffs[ix,:])
+        best_coeffs = coeffs[ix,:]*1
+        best_model = np.dot(A, best_coeffs).reshape(self.beam.sh_beam)
         
-        return (line_centers, coeffs, chi2, ok_data,
-                model.reshape(self.beam.sh_beam), line_centers[ix],
-                coeffs[ix,-1]*self.beam.total_flux/1.e-17)
+        ### Continuum
+        best_coeffs_cont = best_coeffs*1
+        best_coeffs_cont[-1] = 0.
+        best_model_cont = np.dot(A, best_coeffs).reshape(self.beam.sh_beam)
 
+        best_line_center = line_centers[ix]
+        best_line_flux = coeffs[ix,-1]*self.beam.total_flux/1.e-17
+        
+        return (line_centers, coeffs, chi2, ok_data, 
+                best_model, best_model_cont,
+                best_line_center, best_line_flux)
+    
+    def show_simple_fit_results(self, fit_outputs):
+        """TBD
+        """
+        import matplotlib.gridspec
+        
+        line_centers, coeffs, chi2, ok_data, best_model, best_model_cont, best_line_center, best_line_flux = fit_outputs
+        
+        ### Full figure
+        fig = plt.figure(figsize=(10,5))
+        #fig = plt.Figure(figsize=(8,4))
+
+        ## 1D plots
+        gsb = matplotlib.gridspec.GridSpec(3,1)  
+        
+        xspec, yspec, yerr = self.beam.optimal_extract(self.grism.data['SCI'] 
+                                                        - self.contam,
+                                                        ivar = self.ivar)
+        
+        flat_model = self.beam.compute_model(in_place=False)
+        flat_model = flat_model.reshape(self.beam.sh_beam)
+        xspecm, yspecm, yerrm = self.beam.optimal_extract(flat_model)
+        
+        xspecl, yspecl, yerrl = self.beam.optimal_extract(best_model)
+        
+        ax = fig.add_subplot(gsb[-2:,:])
+        ax.errorbar(xspec/1.e4, yspec, yerr, linestyle='None', marker='o',
+                    markersize=3, color='black', alpha=0.5, 
+                    label='Data (id=%d)' %(self.beam.id))
+        
+        ax.plot(xspecm/1.e4, yspecm, color='red', linewidth=2, alpha=0.8,
+                label=r'Flat $f_\lambda$ (%s)' %(self.direct.filter))
+        
+        ax.plot(xspecl/1.e4, yspecl, color='orange', linewidth=2, alpha=0.8,
+                label='Cont+line (%.3f, %.2e)' %(best_line_center/1.e4, best_line_flux*1.e-17))
+
+        ax.legend(fontsize=8, loc='lower center', scatterpoints=1)
+
+        ax.set_xlabel(r'$\lambda$'); ax.set_ylabel('flux (e-/s)')
+
+        ax = fig.add_subplot(gsb[-3,:])
+        ax.plot(line_centers/1.e4, chi2/ok_data.sum())
+        ax.set_xticklabels([])
+        ax.set_ylabel(r'$\chi^2/(\nu=%d)$' %(ok_data.sum()))
+
+        xt = np.arange(1.,1.82,0.1)
+        for ax in fig.axes:
+            ax.set_xlim(1., 1.8)
+            ax.set_xticks(xt)
+
+        axt = ax.twiny()
+        axt.set_xlim(np.array(ax.get_xlim())*1.e4/6563.-1)
+        axt.set_xlabel(r'$z_\mathrm{H\alpha}$')
+
+        ## 2D spectra
+        gst = matplotlib.gridspec.GridSpec(3,1)  
+        if 'viridis_r' in plt.colormaps():
+            cmap = 'viridis_r'
+        else:
+            cmap = 'cubehelix_r'
+
+        ax = fig.add_subplot(gst[0,:])
+        ax.imshow(self.grism.data['SCI'], vmin=-0.05, vmax=0.2, cmap=cmap,
+                  interpolation='Nearest', origin='lower', aspect='auto')
+        ax.set_ylabel('Observed')
+        
+        ax = fig.add_subplot(gst[1,:])
+        ax.imshow(best_model+self.contam, vmin=-0.05, vmax=0.2, cmap=cmap,
+                  interpolation='Nearest', origin='lower', aspect='auto')
+        ax.set_ylabel('Model')
+
+        ax = fig.add_subplot(gst[2,:])
+        ax.imshow(self.grism.data['SCI']-best_model-self.contam, vmin=-0.05,
+                  vmax=0.2, cmap=cmap, interpolation='Nearest',
+                  origin='lower', aspect='auto')
+        ax.set_ylabel('Resid.')
+
+        for ax in fig.axes[-3:]:
+            self.twod_axis_labels(wscale=1.e4, limits=[1,1.81,0.1],
+                                  mpl_axis=ax)
+            self.twod_xlim([1,1.8], wscale=1.e4, mpl_axis=ax)
+            ax.set_yticklabels([])
+            # xi = np.interp(xt, beam.wave/1.e4, np.arange(beam.shg[1]))
+            # xl = np.interp([1,1.8], beam.wave/1.e4, np.arange(beam.shg[1]))
+            # ax.set_xlim(xl)
+            # ax.set_xticks(xi)
+            # ax.set_xticklabels([])
+
+        gsb.tight_layout(fig, pad=0.1,h_pad=0.01, rect=(0,0,0.5,1))
+        gst.tight_layout(fig, pad=0.1,h_pad=0.01, rect=(0.5,0.1,1,0.9))
+        
+        return fig
+        
 class OldGrismFLT(object):
     """
     Scripts for simple modeling of individual grism FLT images
@@ -1806,7 +2048,7 @@ class OldGrismFLT(object):
             self.refimage_im = pyfits.open(self.refimage)
             self.filter = self.get_filter(self.refimage_im[refext].header)
                                         
-            self.photflam = photflam[self.filter]
+            self.photflam = photflam_list[self.filter]
             self.flam = self.refimage_im[self.sci_ext].data*self.photflam
             
             ### Bad DQ bits
@@ -1826,7 +2068,7 @@ class OldGrismFLT(object):
                                         
             self.flam = self.get_blotted_reference(self.refimage_im,
                                                    segmentation=False)
-            self.photflam = photflam[self.filter]
+            self.photflam = photflam_list[self.filter]
             self.flam *= self.photflam
             self.dmask = np.ones(self.flam.shape, dtype=bool)
         
@@ -1841,7 +2083,7 @@ class OldGrismFLT(object):
                 
             self.process_segimage()
         
-        self.pivot = photplam[self.filter]
+        self.pivot = photplam_list[self.filter]
                         
         # This needed for the C dispersing function
         self.clip = np.cast[np.double](self.flam*self.dmask)
@@ -2219,7 +2461,7 @@ class OldGrismFLT(object):
             
         slice_wcs = ref_wcs.slice((sly, slx))
         slice_header = im[ext].header.copy()
-        hwcs = slice_wcs.to_header()
+        hwcs = slice_wcs.to_header(relax=True)
         #slice_header = hwcs
         for k in hwcs.keys():
            if not k.startswith('PC'):
@@ -2494,7 +2736,7 @@ class OldGrismFLT(object):
             if self.refimage_im:
                 self.flam = self.get_blotted_reference(self.refimage_im,
                                                        segmentation=False)
-                self.flam *= photflam[self.filter]
+                self.flam *= photflam_list[self.filter]
                 self.clip = np.cast[np.double](self.flam*self.dmask)
             
             if (self.segimage) & (self.segimage_im is None):
