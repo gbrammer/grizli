@@ -491,7 +491,49 @@ Error: `thumb` must have the same dimensions as the direct image! (%d,%d)
             data[oky,:][:,okx] += full_array[sly, slx]
 
         return data
+    
+    def twod_axis_labels(self, wscale=1.e4, limits=None, mpl_axis=None):
+        """TBD
+        Set x axis *tick labels* on a 2D spectrum to wavelength units
         
+        Defaults to a wavelength scale of microns with wscale=1.e4
+        
+        Will automatically use the whole wavelength range defined by the
+        spectrum. To change, specify `limits = [x0, x1, dx]` to interpolate
+        self.wave between x0*wscale and x1*wscale.
+        """
+        xarr = np.arange(len(self.lam))
+        if limits:
+            xlam = np.arange(limits[0], limits[1], limits[2])
+            xpix = np.interp(xlam, self.lam/wscale, xarr)
+        else:
+            xlam = np.unique(np.cast[int](self.lam / 1.e4*10)/10.)
+            xpix = np.interp(xlam, self.lam/wscale, xarr)
+        
+        if mpl_axis is None:
+            return xpix, xlam
+        else:
+            mpl_axis.set_xticks(xpix)
+            mpl_axis.set_xticklabels(xlam)
+    
+    def twod_xlim(self, x0, x1=None, wscale=1.e4, mpl_axis=None):
+        """TBD
+        Set x axis *limits* on a 2D spectrum to wavelength units
+        
+        defaults to a scale of microns with wscale=1.e4
+        
+        """
+        if isinstance(x0, list):
+            x0, x1 = x0[0], x0[1]
+        
+        xarr = np.arange(len(self.lam))
+        xpix = np.interp([x0,x1], self.lam/wscale, xarr)
+        
+        if mpl_axis:
+            mpl_axis.set_xlim(xpix)
+        else:
+            return xpix
+    
 class ImageData(object):
     """Container for image data with WCS, etc."""
     def __init__(self, sci=np.zeros((1014,1014)), err=None, dq=None,
@@ -1403,12 +1445,13 @@ class GrismFLT(object):
                     old_spectrum_1d = beams
                     b.compute_model(id=id, spectrum_1d=old_spectrum_1d)
             
-            if store:
-                ### Save the computed beams 
-                self.object_dispersers[id] = beams
-            else:
-                ### Just save the model spectrum (or empty spectrum)
-                self.object_dispersers[id] = spectrum_1d
+            if in_place:
+                if store:
+                    ### Save the computed beams 
+                    self.object_dispersers[id] = beams
+                else:
+                    ### Just save the model spectrum (or empty spectrum)
+                    self.object_dispersers[id] = spectrum_1d
                         
         if in_place:
             ### Update the internal model attribute
@@ -1435,7 +1478,13 @@ class GrismFLT(object):
         else:
             return output
     
+    def pop_object(self, id):
+        """TBD
+        """
+        
     def compute_full_model(self, ids=None, mags=None):
+        """TBD
+        """
         if ids is None:
             ids = np.unique(self.seg)[1:]
         
@@ -1765,48 +1814,6 @@ class BeamCutout(object):
         hdu.writeto('%s_%05d.%s.fits' %(root, self.beam.id, self.beam.beam),
                     clobber=clobber)
                             
-    def twod_axis_labels(self, wscale=1.e4, limits=None, mpl_axis=None):
-        """TBD
-        Set x axis *tick labels* on a 2D spectrum to wavelength units
-        
-        Defaults to a wavelength scale of microns with wscale=1.e4
-        
-        Will automatically use the whole wavelength range defined by the
-        spectrum. To change, specify `limits = [x0, x1, dx]` to interpolate
-        self.wave between x0*wscale and x1*wscale.
-        """
-        xarr = np.arange(len(self.beam.lam))
-        if limits:
-            xlam = np.arange(limits[0], limits[1], limits[2])
-            xpix = np.interp(xlam, self.beam.lam/wscale, xarr)
-        else:
-            xlam = np.unique(np.cast[int](self.beam.lam / 1.e4*10)/10.)
-            xpix = np.interp(xlam, self.beam.lam/wscale, xarr)
-        
-        if mpl_axis is None:
-            return xpix, xlam
-        else:
-            mpl_axis.set_xticks(xpix)
-            mpl_axis.set_xticklabels(xlam)
-    
-    def twod_xlim(self, x0, x1=None, wscale=1.e4, mpl_axis=None):
-        """TBD
-        Set x axis *limits* on a 2D spectrum to wavelength units
-        
-        defaults to a scale of microns with wscale=1.e4
-        
-        """
-        if isinstance(x0, list):
-            x0, x1 = x0[0], x0[1]
-        
-        xarr = np.arange(len(self.beam.lam))
-        xpix = np.interp([x0,x1], self.beam.lam/wscale, xarr)
-        
-        if mpl_axis:
-            mpl_axis.set_xlim(xpix)
-        else:
-            return xpix
-    
     def simple_line_fit(self, fwhm=48., grid=[1.12e4, 1.65e4, 1, 4],
                         fitter='lstsq', poly_order=3):
         """TBD
@@ -1885,7 +1892,8 @@ class BeamCutout(object):
         ### Continuum
         best_coeffs_cont = best_coeffs*1
         best_coeffs_cont[-1] = 0.
-        best_model_cont = np.dot(A, best_coeffs).reshape(self.beam.sh_beam)
+        best_model_cont = np.dot(A, best_coeffs_cont)
+        best_model_cont = best_model_cont.reshape(self.beam.sh_beam)
 
         best_line_center = line_centers[ix]
         best_line_flux = coeffs[ix,-1]*self.beam.total_flux/1.e-17
@@ -1971,16 +1979,16 @@ class BeamCutout(object):
         ax.set_ylabel('Resid.')
 
         for ax in fig.axes[-3:]:
-            self.twod_axis_labels(wscale=1.e4, limits=[1,1.81,0.1],
+            self.beam.twod_axis_labels(wscale=1.e4, limits=[1,1.81,0.1],
                                   mpl_axis=ax)
-            self.twod_xlim([1,1.8], wscale=1.e4, mpl_axis=ax)
+            self.beam.twod_xlim([1,1.8], wscale=1.e4, mpl_axis=ax)
             ax.set_yticklabels([])
-            # xi = np.interp(xt, beam.wave/1.e4, np.arange(beam.shg[1]))
-            # xl = np.interp([1,1.8], beam.wave/1.e4, np.arange(beam.shg[1]))
-            # ax.set_xlim(xl)
-            # ax.set_xticks(xi)
-            # ax.set_xticklabels([])
 
+        ax.set_xlabel(r'$\lambda$')
+        
+        for ax in fig.axes[-3:-1]:
+            ax.set_xticklabels([])
+            
         gsb.tight_layout(fig, pad=0.1,h_pad=0.01, rect=(0,0,0.5,1))
         gst.tight_layout(fig, pad=0.1,h_pad=0.01, rect=(0.5,0.1,1,0.9))
         
