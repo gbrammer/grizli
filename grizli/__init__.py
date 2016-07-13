@@ -18,7 +18,7 @@ where the code repository was cloned and compiled!
 """
 
 import utils_c
-import grism
+import grismconf
 import model
 #import multifit
 
