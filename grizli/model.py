@@ -838,12 +838,12 @@ class ImageData(object):
         if ((xref.min() < 0) | (yref.min() < 0) | 
             (xref.max() > ref_naxis[0]) | (yref.max() > ref_naxis[1])):
             if verbose:
-                print ('Segmentation cutout: x=%s, y=%s [Out of range]' 
+                print ('Image cutout: x=%s, y=%s [Out of range]' 
                     %(slx, sly))
             return hdu
         else:
             if verbose:
-                print 'Segmentation cutout: x=%s, y=%s' %(slx, sly)
+                print 'Image cutout: x=%s, y=%s' %(slx, sly)
         
         ### Sliced subimage
         slice_wcs = ref_wcs.slice((sly, slx))
@@ -1003,7 +1003,7 @@ class ImageData(object):
                               filter=self.filter)
         
         slice_obj.ref_photflam = self.ref_photflam
-        slice_obj.ref_photflam = self.ref_photplam
+        slice_obj.ref_photplam = self.ref_photplam
 
         if self.data['REF'] is not None:
             slice_obj.data['REF'] = self.data['REF'][sly, slx]*1
@@ -1208,6 +1208,8 @@ class GrismFLT(object):
         self.conf = grismconf.load_grism_config(self.conf_file)
         
         self.object_dispersers = collections.OrderedDict()
+        
+        self.get_dispersion_PA()
         
     def process_ref_file(self, ref_file, ref_ext=0, shrink_segimage=True,
                          verbose=True):
@@ -1464,6 +1466,7 @@ class GrismFLT(object):
                 
                 ## Enforce minimum size
                 size = np.maximum(size, 16)
+                size = np.maximum(size, 20)
                 ## Avoid problems at the array edges
                 size = np.min([size, int(x)-2, int(y)-2])
                 
@@ -1943,6 +1946,50 @@ class BeamCutout(object):
         `self.beam` is a `GrismDisperser` object.
         """
         self.beam.compute_model(*args, **kwargs)
+    
+    def get_wavelength_wcs(self, wavelength=1.3e4):
+        """TBD
+        """
+        wcs = self.grism.wcs.deepcopy()
+        
+        yp, xp = np.indices(self.beam.direct.shape)
+        n = (self.beam.direct*(self.beam.seg == self.beam.id))
+        n /= n.sum()
+        x0, y0 = np.sum(xp*n), np.sum(yp*n)
+        #x0 = y0 = self.beam.sh[0]/2 + 0.5
+        
+        #print 'centroid: %.3f %.3f %s %s' %(x0, y0, self.beam.direct.shape, self.beam.sh)
+        
+        xarr = np.arange(self.grism.sh[1])
+        dx = np.interp(wavelength, self.beam.lam, xarr)
+        dy = np.interp(wavelength, self.beam.lam, self.beam.ytrace)
+        
+        dl = np.interp(wavelength, self.beam.lam[1:], np.diff(self.beam.lam))
+        ysens = np.interp(wavelength, self.beam.lam, self.beam.sensitivity)
+                
+        #print wcs, wcs.sip.crpix
+        
+        for cr in [wcs.sip.crpix, wcs.wcs.crpix]:
+            cr[0] += dx + 1*(self.beam.sh[0]/2. - 0.5 - x0)
+            cr[0] += self.beam.dxfull[0] + 1. + 0.5
+            cr[1] += dy + 1*(self.beam.sh[0]/2. - 0.5 - y0)
+            #cr[0] += 0.5
+            
+        header = wcs.to_header(relax=True)
+        for key in header:
+            if key.startswith('PC'):
+                header.rename_keyword(key, key.replace('PC', 'CD'))
+        
+        header['LONPOLE'] = 180.
+        header['RADESYS'] = 'ICRS'
+        header['LTV1'] = (0.0, 'offset in X to subsection start')
+        header['LTV2'] = (0.0, 'offset in Y to subsection start')
+        header['LTM1_1'] = (1.0, 'reciprocal of sampling rate in X')
+        header['LTM2_2'] = (1.0, 'reciprocal of sampling rate in X')
+        header['INVSENS'] = (ysens, 'inverse sensitivity, 10**-17 erg/s/cm2')
+        header['DLDP'] = (dl, 'delta wavelength per pixel')
+        
+        return header, wcs
         
     def simple_line_fit(self, fwhm=48., grid=[1.12e4, 1.65e4, 1, 4],
                         fitter='lstsq', poly_order=3):
@@ -2139,10 +2186,16 @@ class BeamCutout(object):
         ax.plot(line_centers/1.e4, chi2/ok_data.sum())
         ax.set_xticklabels([])
         ax.set_ylabel(r'$\chi^2/(\nu=%d)$' %(ok_data.sum()))
-
-        xt = np.arange(1.,1.82,0.1)
+        
+        if self.grism.filter == 'G102':
+            xlim = [0.7, 1.25]
+        
+        if self.grism.filter == 'G141':
+            xlim = [1., 1.8]
+            
+        xt = np.arange(xlim[0],xlim[1],0.1)
         for ax in fig.axes:
-            ax.set_xlim(1., 1.8)
+            ax.set_xlim(xlim[0], xlim[1])
             ax.set_xticks(xt)
 
         axt = ax.twiny()
@@ -2173,9 +2226,10 @@ class BeamCutout(object):
         ax.set_ylabel('Resid.')
 
         for ax in fig.axes[-3:]:
-            self.beam.twod_axis_labels(wscale=1.e4, limits=[1,1.81,0.1],
-                                  mpl_axis=ax)
-            self.beam.twod_xlim([1,1.8], wscale=1.e4, mpl_axis=ax)
+            self.beam.twod_axis_labels(wscale=1.e4, 
+                                       limits=[xlim[0], xlim[1], 0.1],
+                                       mpl_axis=ax)
+            self.beam.twod_xlim(xlim, wscale=1.e4, mpl_axis=ax)
             ax.set_yticklabels([])
 
         ax.set_xlabel(r'$\lambda$')
@@ -2654,11 +2708,11 @@ class OldGrismFLT(object):
         if ((xref.min() < 0) | (yref.min() < 0) | 
             (xref.max() > ref_naxis[0]) | (yref.max() > ref_naxis[1])):
             
-            print ('%s / Segmentation cutout: x=%s, y=%s [Out of range]'
+            print ('%s / Image cutout: x=%s, y=%s [Out of range]'
                     %(self.flt_file, slx, sly))
             return False
         else:
-            print '%s / Segmentation cutout: x=%s, y=%s' %(self.flt_file, 
+            print '%s / Image cutout: x=%s, y=%s' %(self.flt_file, 
                                                            slx, sly)
             
         slice_wcs = ref_wcs.slice((sly, slx))
