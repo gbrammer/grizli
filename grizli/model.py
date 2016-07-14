@@ -463,7 +463,23 @@ Error: `thumb` must have the same dimensions as the direct image! (%d,%d)
     
     def cutout_from_full_image(self, full_array):
         """Get beam-sized cutout from a full image
-        TBD
+        
+        Parameters
+        ----------
+        full_array: ndarray
+            Array of the size of the parent array from which the cutout was 
+            extracted.  If possible, the function first tries the slices with
+            
+                `full_array[self.sly_parent, self.slx_parent]`
+            
+            and then computes smaller slices for cases where the beam spectrum
+            falls off the edge of the parent array.
+        
+        Returns
+        -------
+        cutout: ndarray 
+            Array with dimensions of `self.model`.
+        
         """
         #print self.sly_parent, self.slx_parent, full_array.shape
         
@@ -493,14 +509,25 @@ Error: `thumb` must have the same dimensions as the direct image! (%d,%d)
         return data
     
     def twod_axis_labels(self, wscale=1.e4, limits=None, mpl_axis=None):
-        """TBD
-        Set x axis *tick labels* on a 2D spectrum to wavelength units
+        """Set 2D wavelength (x) axis labels based on spectral parameters
+        Parameters
+        ----------
+        wscale: float
+            Scale factor to divide from the wavelength units.  The default 
+            value of 1.e4 results in wavelength ticks in microns.
         
-        Defaults to a wavelength scale of microns with wscale=1.e4
+        limits: None or list [x0, x1, dx]
+            Will automatically use the whole wavelength range defined by the
+            spectrum. To change, specify `limits = [x0, x1, dx]` to
+            interpolate self.wave between x0*wscale and x1*wscale.
+
+        mpl_axis: matplotlib.axes._subplots.AxesSubplot
+            Plotting axis to place the labels.  
         
-        Will automatically use the whole wavelength range defined by the
-        spectrum. To change, specify `limits = [x0, x1, dx]` to interpolate
-        self.wave between x0*wscale and x1*wscale.
+        Returns
+        -------
+        Nothing if `mpl_axis` is supplied else pixels and wavelengths of the 
+        tick marks.
         """
         xarr = np.arange(len(self.lam))
         if limits:
@@ -517,13 +544,29 @@ Error: `thumb` must have the same dimensions as the direct image! (%d,%d)
             mpl_axis.set_xticklabels(xlam)
     
     def twod_xlim(self, x0, x1=None, wscale=1.e4, mpl_axis=None):
-        """TBD
-        Set x axis *limits* on a 2D spectrum to wavelength units
+        """Set wavelength (x) axis limits on a 2D spectrum
         
-        defaults to a scale of microns with wscale=1.e4
+        Parameters
+        ----------
+        x0: float or list/tuple of floats
+            minimum or (min,max) of the plot limits
         
+        x1: float or None
+            max of the plot limits if x0 is a float
+            
+        wscale: float
+            Scale factor to divide from the wavelength units.  The default 
+            value of 1.e4 results in wavelength ticks in microns.
+
+        mpl_axis: matplotlib.axes._subplots.AxesSubplot
+            Plotting axis to place the labels.  
+
+        Returns
+        -------
+        Nothing if `mpl_axis` is supplied else pixels the desired wavelength 
+        limits.
         """
-        if isinstance(x0, list):
+        if isinstance(x0, list) | isinstance(x0, tuple):
             x0, x1 = x0[0], x0[1]
         
         xarr = np.arange(len(self.lam))
@@ -976,7 +1019,20 @@ class ImageData(object):
         return slice_obj#, slx, sly
     
     def get_HDUList(self, extver=1):
-        """TBD
+        """Convert attributes and data arrays to a `astropy.io.fits.HDUList`
+        
+        Parameters
+        ----------
+        extver: int, float, str
+            value to use for the 'EXTVER' header keyword.  For example, with 
+            extver=1, the science extension can be addressed with the index
+            `HDU['SCI',1]`.
+        
+        returns: astropy.io.fits.HDUList
+            HDUList with header keywords copied from `self.header` along with
+            keywords for additional attributes. Will have `ImageHDU`
+            extensions 'SCI', 'ERR', and 'DQ', as well as 'REF' if a reference
+            file had been supplied.
         """
         h = self.header.copy()
         h['EXTVER'] = extver #self.filter #extver
@@ -1481,9 +1537,25 @@ class GrismFLT(object):
     def pop_object(self, id):
         """TBD
         """
+        pass
         
     def compute_full_model(self, ids=None, mags=None):
-        """TBD
+        """Compute flat-spectrum model for multiple objects.
+        
+        Parameters
+        ----------
+        ids: None, list, or array
+            id numbers to compute in the model.  If None then take all ids 
+            from unique values in `self.seg`.
+        
+        mags: None, float, or list/array
+            magnitudes corresponding to list if `ids`.  If None, then compute
+            magnitudes based on the flux in segmentation regions and 
+            zeropoints determined from PHOTFLAM and PHOTPLAM.
+        
+        Returns
+        -------
+        Updated model stored in `self.model`.
         """
         if ids is None:
             ids = np.unique(self.seg)[1:]
@@ -1713,7 +1785,23 @@ class GrismFLT(object):
     
 class BeamCutout(object):
     def __init__(self, flt=None, beam=None, conf=None, from_fits=None):
-        """TBD
+        """Cutout spectral object from the full frame.
+        
+        Parameters
+        ----------
+        flt: GrismFLT
+            Parent FLT frame.
+        
+        beam: GrismDisperser
+            Object and spectral order to consider
+        
+        conf: grismconf.aXeConf
+            Pre-computed configuration file.  If not specified will regenerate
+            based on header parameters, which might be necessary for 
+            multiprocessing parallelization and pickling.
+        
+        from_fits: None or str
+            Optional FITS file containing the beam information
         """
         if from_fits is not None:
             self.load_fits(from_fits, conf)
@@ -1732,8 +1820,25 @@ class BeamCutout(object):
         self.model = self.beam.model
         self.modelf = self.model.flatten()
         
-    def init_from_input(self, flt, beam, conf):
-        """TBD
+    def init_from_input(self, flt, beam, conf=None):
+        """Initialize from data objects
+        
+        Parameters
+        ----------
+        flt: GrismFLT
+            Parent FLT frame.
+        
+        beam: GrismDisperser
+            Object and spectral order to consider
+        
+        conf: grismconf.aXeConf
+            Pre-computed configuration file.  If not specified will regenerate
+            based on header parameters, which might be necessary for 
+            multiprocessing parallelization and pickling.
+        
+        Returns
+        -------
+        Loads attributes to `self`.
         """
         self.id = beam.id
         if conf is None:
@@ -1759,9 +1864,18 @@ class BeamCutout(object):
         if self.beam.id in flt.object_dispersers:
             self.contam -= self.beam.model
         
-    def load_fits(self, file, conf):
-        """TBD
-        """
+    def load_fits(self, file, conf=None):
+        """Initialize from FITS file
+        
+        Parameters
+        ----------
+        file: str
+            FITS file to read (as output from `self.write_fits`).
+                
+        Returns
+        -------
+        Loads attributes to `self`.
+        """        
         hdu = pyfits.open(file)
         
         self.direct = ImageData(hdulist=hdu, sci_extn=1)
@@ -1792,7 +1906,16 @@ class BeamCutout(object):
         
     
     def write_fits(self, root='beam_', clobber=True):
-        """TBD
+        """Write attributes and data to FITS file
+        
+        Parameters
+        ----------
+        root: str
+            Output filename will be '{root}_{self.id}.{self.beam}.fits' with
+            `self.id` zero-padded with 5 digits.
+        
+        clobber: bool
+            Clobber/overwrite existing file.
         """
         h0 = pyfits.Header()
         h0['ID'] = self.beam.id, 'Object ID'
@@ -1814,10 +1937,68 @@ class BeamCutout(object):
         hdu.writeto('%s_%05d.%s.fits' %(root, self.beam.id, self.beam.beam),
                     clobber=clobber)
                             
+    def compute_model(self, *args, **kwargs):
+        """Link to `self.beam.compute_model`
+        
+        `self.beam` is a `GrismDisperser` object.
+        """
+        self.beam.compute_model(*args, **kwargs)
+        
     def simple_line_fit(self, fwhm=48., grid=[1.12e4, 1.65e4, 1, 4],
                         fitter='lstsq', poly_order=3):
-        """TBD
-        Demo: fit continuum and an emission line over a wavelength grid
+        """Function to fit a Gaussian emission line and a polynomial continuum
+        
+        Parameters
+        ----------
+        fwhm: float
+            FWHM of the emission line
+        
+        grid: [l0, l1, dl, skip]
+            The base wavelength array will be generated like 
+            
+            >>> wave = np.arange(l0, l1, dl) 
+            
+            and lines will be generated every `skip` wavelength grid points:
+            
+            >>> line_centers = wave[::skip]
+        
+        fitter: 'lstsq' or 'sklearn'
+            Least-squares fitting function for determining template
+            normalization coefficients.
+        
+        order: int (>= 0)
+            Polynomial order to use for the continuum
+        
+        Returns
+        -------
+        line_centers: length N array
+            emission line center positions
+        
+        coeffs: (N, M) array where M = (poly_order+1+1)
+            Normalization coefficients for the continuum and emission line
+            templates.
+            
+        chi2: array
+            Chi-squared evaluated at each line_centers[i]
+        
+        ok_data: ndarray
+            Boolean mask of pixels used for the Chi-squared calculation. 
+            Consists of non-masked DQ pixels, non-zero ERR pixels and pixels
+            where `self.model > 0.03*self.model.max()` for the flat-spectrum 
+            model.
+        
+        
+        best_model: ndarray
+            2D array with best-fit continuum + line model
+            
+        best_model_cont: ndarray
+            2D array with Best-fit continuum-only model.
+        
+        best_line_center: float
+            wavelength where chi2 is minimized.
+            
+        best_line_flux: float
+            Emission line flux where chi2 is minimized
         """        
         ### Test fit
         import sklearn.linear_model
@@ -1903,7 +2084,20 @@ class BeamCutout(object):
                 best_line_center, best_line_flux)
     
     def show_simple_fit_results(self, fit_outputs):
-        """TBD
+        """Make a plot based on results from `simple_line_fit`.
+        
+        Parameters
+        ----------
+        fit_outputs: tuple
+            returned data from `simple_line_fit`.  I.e., 
+            
+            >>> fit_outputs = BeamCutout.simple_line_fit()
+            >>> fig = BeamCutout.show_simple_fit_results(fit_outputs)
+        
+        Returns
+        -------
+        fig: matplotlib.figure.Figure
+            Figure object that can be optionally written to a hardcopy file.
         """
         import matplotlib.gridspec
         

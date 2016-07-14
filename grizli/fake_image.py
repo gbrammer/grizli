@@ -5,21 +5,94 @@ import numpy as np
 
 import astropy.io.fits as pyfits
 import astropy.wcs as pywcs
+
+def rotate_CD_matrix(cd, pa_aper):
+    """Rotate CD matrix
     
-def niriss_header(ra=53.1592277508136, dec=-27.782056346146, pa_aper=128.589, 
-                  filter='F150W', grism='GR150R'):
+    Parameters
+    ----------
+    cd: (2,2) array
+        CD matrix
+    
+    pa_aper: float
+        Position angle, in degrees E from N, of y axis of the detector
+    
+    Returns
+    -------
+    cd_rot: (2,2) array
+        Rotated CD matrix
+    
+    Comments
+    --------
+    `astropy.wcs.WCS.rotateCD` doesn't work for non-square pixels in that it
+    doesn't preserve the pixel scale!  The bug seems to come from the fact
+    that `rotateCD` assumes a transposed version of its own CD matrix.
+    
+    For example:
+    
+        >>> import astropy.wcs as pywcs
+        >>> 
+        >>> ## Nominal rectangular WFC3/IR pixel
+        >>> cd_wfc3 = np.array([[  2.35945978e-05,   2.62448998e-05],
+        >>>                     [  2.93050803e-05,  -2.09858771e-05]])
+        >>> 
+        >>> ## Square pixel
+        >>> cd_square = np.array([[0.1/3600., 0], [0, 0.1/3600.]])
+        >>> 
+        >>> for cd, label in zip([cd_wfc3, cd_square], ['WFC3/IR', 'Square']):
+        >>>     wcs = pywcs.WCS()
+        >>>     wcs.wcs.cd = cd
+        >>>     wcs.rotateCD(45.)
+        >>>     print '%s pixel: pre=%s, rot=%s' %(label,
+        >>>                         np.sqrt((cd**2).sum(axis=0))*3600, 
+        >>>                         np.sqrt((wcs.wcs.cd**2).sum(axis=0))*3600)
+        
+        WFC3/IR pixel:   pre=[ 0.1354  0.121 ], rot=[ 0.1282  0.1286]
+        Square  pixel: pre=[ 0.1  0.1], rot=[ 0.1  0.1]
+    
     """
-    NIRISS, 0.065"/pix, requires filter & grism specification
-    """ 
-    naxis = 2048, 2048
-    crpix = 1024, 1024
-    
-    cd = np.array([[ -0.0658,  0], [0, 0.0654]])/3600.
     rad = np.deg2rad(-pa_aper)
     mat = np.zeros((2,2))
     mat[0,:] = np.array([np.cos(rad),-np.sin(rad)])
     mat[1,:] = np.array([np.sin(rad),np.cos(rad)])
     cd_rot = np.dot(mat, cd)
+    return cd_rot
+        
+def niriss_header(ra=53.1592277508136, dec=-27.782056346146, pa_aper=128.589, 
+                  filter='F150W', grism='GR150R'):
+    """Make JWST/NIRISS image header
+    
+    Parameters
+    ----------
+    ra, dec: float, float
+        Coordinates of the center of the image
+    
+    pa_aper: float
+        Position angle of the y-axis of the detector
+    
+    filter: str
+        Blocking filter to use.
+    
+    grism: str
+        Grism to use
+    
+    Returns
+    --------
+    h: astropy.io.fits.Header
+        FITS header with appropriate keywords
+    
+    wcs: astropy.wcs.WCS
+        WCS specification (computed from keywords in `h`).
+    
+    Comments
+    --------
+    NIRISS: 0.065"/pix, requires filter & grism specification
+    """ 
+    naxis = 2048, 2048
+    crpix = 1024, 1024
+    
+    cd = np.array([[ -0.0658,  0], [0, 0.0654]])/3600.
+    cd_rot = rotate_CD_matrix(cd, pa_aper)
     
     h = pyfits.Header()
     
@@ -60,18 +133,39 @@ def niriss_header(ra=53.1592277508136, dec=-27.782056346146, pa_aper=128.589,
 
 def nircam_header(ra=53.1592277508136, dec=-27.782056346146, pa_aper=128.589, 
                   filter='F444W', grism='DFSR'):
-    """
+    """Make JWST/NIRCAM image header
+
+    Parameters
+    ----------
+    ra, dec: float, float
+      Coordinates of the center of the image
+
+    pa_aper: float
+      Position angle of the y-axis of the detector
+
+    filter: str
+      Blocking filter to use.
+
+    grism: str
+      Grism to use
+
+    Returns
+    --------
+    h: astropy.io.fits.Header
+      FITS header with appropriate keywords
+
+    wcs: astropy.wcs.WCS
+      WCS specification (computed from keywords in `h`).
+
+    Comments
+    --------
     NIRCAM, 0.0648"/pix, requires filter specification
     """ 
     naxis = 2048, 2048
     crpix = 1024, 1024
     
     cd = np.array([[ -0.0648,  0], [0, 0.0648]])/3600.
-    rad = np.deg2rad(-pa_aper)
-    mat = np.zeros((2,2))
-    mat[0,:] = np.array([np.cos(rad),-np.sin(rad)])
-    mat[1,:] = np.array([np.sin(rad),np.cos(rad)])
-    cd_rot = np.dot(mat, cd)
+    cd_rot = rotate_CD_matrix(cd, pa_aper)
     
     h = pyfits.Header()
     
@@ -112,7 +206,34 @@ def nircam_header(ra=53.1592277508136, dec=-27.782056346146, pa_aper=128.589,
     
 def wfc3ir_header(ra=53.1592277508136, dec=-27.782056346146, pa_aper=128.589, 
                   flt='ibhj34h6q_flt.fits', filter='G141'):
-    """
+    """Make HST/WFC3-IR image header
+    
+    Parameters
+    ----------
+    ra, dec: float, float
+        Coordinates of the center of the image
+    
+    pa_aper: float
+        Position angle of the y-axis of the detector
+    
+    flt: str
+        Filename of a WFC3/IR FLT file that will be used to provide the 
+        SIP geometric distortion keywords.
+        
+    filter: str
+        Grism/filter to use.
+    
+    Returns
+    --------
+    h: astropy.io.fits.Header
+        FITS header with appropriate keywords
+    
+    wcs: astropy.wcs.WCS
+        WCS specification (computed from keywords in `h`).
+    
+    Comments
+    --------
+    
     WFC3 IR, requires reference FLT file for the SIP header
     """
     import numpy as np
@@ -129,11 +250,8 @@ def wfc3ir_header(ra=53.1592277508136, dec=-27.782056346146, pa_aper=128.589,
     
     ### Rotate the CD matrix
     theta = im[1].header['PA_APER'] - pa_aper 
-    rad = np.deg2rad(theta)
-    mat = np.zeros((2,2))
-    mat[0,:] = np.array([np.cos(rad),-np.sin(rad)])
-    mat[1,:] = np.array([np.sin(rad),np.cos(rad)])
-    wcs.wcs.cd = np.dot(mat, wcs.wcs.cd)
+    cd_rot = rotate_CD_matrix(wcs.wcs.cd, theta)
+    wcs.wcs.cd = cd_rot
     
     h = wcs.to_header(relax=True)
     
@@ -154,21 +272,42 @@ def wfc3ir_header(ra=53.1592277508136, dec=-27.782056346146, pa_aper=128.589,
     return h, wcs
 
 def wfirst_header(ra=53.1592277508136, dec=-27.782056346146, pa_aper=128.589, naxis=(4096,4096)):
-    """
+    """Make WFIRST WFI header
+    
+    Parameters
+    ----------
+    ra, dec: float, float
+        Coordinates of the center of the image
+    
+    pa_aper: float
+        Position angle of the y-axis of the detector
+    
+    filter: str
+        Blocking filter to use.
+    
+    naxis: (int,int)
+        Image dimensions
+    
+    Returns
+    --------
+    h: astropy.io.fits.Header
+        FITS header with appropriate keywords
+    
+    wcs: astropy.wcs.WCS
+        WCS specification (computed from keywords in `h`).
+    
+    Comments
+    --------
     WFIRST GRS Grism
     
-    Current aXe config file has no field dependence, so field size can be anything you want
-      
+    Current aXe config file has no field dependence, so field size can be
+    anything you want in `naxis`.
     """
     #naxis = 2048, 2048
     crpix = naxis[0]/2, naxis[0]/2
     
     cd = np.array([[ -0.11,  0], [0, 0.11]])/3600.
-    rad = np.deg2rad(-pa_aper)
-    mat = np.zeros((2,2))
-    mat[0,:] = np.array([np.cos(rad),-np.sin(rad)])
-    mat[1,:] = np.array([np.sin(rad),np.cos(rad)])
-    cd_rot = np.dot(mat, cd)
+    cd_rot = rotate_CD_matrix(cd, pa_aper)
     
     h = pyfits.Header()
     
@@ -198,10 +337,40 @@ def wfirst_header(ra=53.1592277508136, dec=-27.782056346146, pa_aper=128.589, na
         
     return h, wcs
     
-def make_fake_image(header, output='direct.fits', background='auto', exptime=1.e4, nexp=10):
-    """
-    Use the header from NIRISS, WFC3/IR or WFIRST and make an 'FLT' image that 
-    `grizli` can read as a reference.
+def make_fake_image(header, output='direct.fits', background=None, exptime=1.e4, nexp=10):
+    """Use the header from NIRISS, WFC3/IR or WFIRST and make an 'FLT' image that `grizli` can read as a reference.
+    
+    Parameters
+    ----------
+    header: astropy.io.fits.Header
+        Header created by one of the generating functions, such as 
+        `niriss_header`.
+    
+    output: str
+        Filename of the output FITS file. Will have extensions 'SCI', 'ERR',
+        and 'DQ'. The 'ERR' extension is populated with a read-noise +
+        background error model using
+        
+            >>> var = nexp*header['READN'] + background*exptime
+        
+        The 'SCI' extension is filled with gaussian deviates with standard
+        deviation `sqrt(var)`.
+        
+        The 'DQ' extension is filled with (int) zeros.
+        
+    background: None or float
+        Background value to use for sky noise.  If None, then read from
+        `header['BACKGR']`.
+    
+    exptime: float
+        Exposure time to use for background sky noise.
+    
+    nexp: int
+        Number of exposures to use for read noise.
+    
+    Returns
+    -------
+    Nothing; outputs saved in `output` FITS file.
     """
     hdu = pyfits.HDUList()
     
@@ -218,7 +387,7 @@ def make_fake_image(header, output='direct.fits', background='auto', exptime=1.e
                                    data=np.zeros(np.array(naxis).T, 
                                    dtype=dtype), name=name))
                                    
-    if background == 'auto':
+    if background == None:
         background = header['BACKGR']
     
     header['BACKGR'] = background
