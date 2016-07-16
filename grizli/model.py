@@ -230,8 +230,13 @@ class GrismDisperser(object):
         ## Indices of the trace in the flattened array 
         self.x0 = np.array(self.sh)/2
         self.dxpix = self.dx - self.dx[0] + self.x0[1] #+ 1
-        self.flat_index = self.idx[dyc + self.x0[0], self.dxpix]
-        
+        try:
+            self.flat_index = self.idx[dyc + self.x0[0], self.dxpix]
+        except IndexError:
+            print 'Index Error', id, self.x0[0], self.xc, self.yc, self.beam, self.ytrace_beam.max(), self.ytrace_beam.min()
+            
+            raise IndexError
+            
         ###### Trace, wavelength, sensitivity across entire 2D array
         self.dxfull = np.arange(self.sh_beam[1], dtype=int) 
         self.dxfull += self.dx[0]-self.x0[1]
@@ -1461,12 +1466,17 @@ class GrismFLT(object):
                     (xmin == 0) | (xmax == self.direct.sh[1])):
                     return True
                     
-                size = int(np.ceil(np.max([x-xmin, xmax-x, y-ymin, ymax-y])))
+                try:
+                    size = int(np.ceil(np.max([x-xmin, xmax-x, 
+                                               y-ymin, ymax-y])))
+                except ValueError:
+                    return False
+                    
                 size += 4
                 
                 ## Enforce minimum size
                 size = np.maximum(size, 16)
-                size = np.maximum(size, 20)
+                size = np.maximum(size, 26)
                 ## Avoid problems at the array edges
                 size = np.min([size, int(x)-2, int(y)-2])
                 
@@ -1495,10 +1505,13 @@ class GrismFLT(object):
                 if mag > self.conf.conf['MMAG_EXTRACT_%s' %(beam)]:
                     continue
                     
-                b = GrismDisperser(id=id, direct=thumb,
+                try:
+                    b = GrismDisperser(id=id, direct=thumb,
                                    segmentation=seg_thumb, origin=origin,
                                    pad=self.pad, beam=beam, conf=self.conf)
-                                   
+                except:
+                    continue
+                
                 beams[beam] = b
                 if object_in_model:
                     old_spectrum_1d = beams
@@ -1947,33 +1960,59 @@ class BeamCutout(object):
         """
         self.beam.compute_model(*args, **kwargs)
     
-    def get_wavelength_wcs(self, wavelength=1.3e4):
+    def get_wavelength_wcs(self, wavelength=1.3e4, radec=None):
         """TBD
         """
         wcs = self.grism.wcs.deepcopy()
-        
-        yp, xp = np.indices(self.beam.direct.shape)
-        n = (self.beam.direct*(self.beam.seg == self.beam.id))
-        n /= n.sum()
-        x0, y0 = np.sum(xp*n), np.sum(yp*n)
-        #x0 = y0 = self.beam.sh[0]/2 + 0.5
-        
+                
+        if radec is not None:
+            ### Catalog WCS centroid
+            coords = self.direct.wcs.all_world2pix([radec[0]], [radec[1]], 0)
+            x0, y0 = coords[0][0], coords[1][0]                                            
+            #print 'Coords from RA/Dec: %.3f %.3f' %(xc, yc)
+        else:
+            ### Simple centroid
+            yp, xp = np.indices(self.beam.direct.shape)
+            n = (self.beam.direct*(self.beam.seg == self.beam.id))
+            n /= n.sum()
+            x0, y0 = np.sum(xp*n), np.sum(yp*n)
+            #x0 = y0 = self.beam.sh[0]/2 + 0.5
+            
         #print 'centroid: %.3f %.3f %s %s' %(x0, y0, self.beam.direct.shape, self.beam.sh)
         
-        xarr = np.arange(self.grism.sh[1])
-        dx = np.interp(wavelength, self.beam.lam, xarr)
-        dy = np.interp(wavelength, self.beam.lam, self.beam.ytrace)
+        old=False
+        if old:
+            xarr = np.arange(self.grism.sh[1])
+            dx = np.interp(wavelength, self.beam.lam, xarr)
+            dy = np.interp(wavelength, self.beam.lam, self.beam.ytrace)
+            dl = np.interp(wavelength, self.beam.lam[1:], np.diff(self.beam.lam))
+            ysens = np.interp(wavelength, self.beam.lam, self.beam.sensitivity)
+        else:
+            xarr = np.arange(self.beam.lam_beam.shape[0])
+            print xarr.shape, self.beam.sh_beam, self.beam.lam_beam.shape
         
-        dl = np.interp(wavelength, self.beam.lam[1:], np.diff(self.beam.lam))
-        ysens = np.interp(wavelength, self.beam.lam, self.beam.sensitivity)
+            dx = np.interp(wavelength, self.beam.lam_beam, xarr)
+            dy = np.interp(wavelength, self.beam.lam_beam, self.beam.ytrace_beam)
+            dl = np.interp(wavelength, self.beam.lam_beam[1:], np.diff(self.beam.lam_beam))
+            ysens = np.interp(wavelength, self.beam.lam_beam, self.beam.sensitivity_beam)
                 
         #print wcs, wcs.sip.crpix
         
         for cr in [wcs.sip.crpix, wcs.wcs.crpix]:
-            cr[0] += dx + 1*(self.beam.sh[0]/2. - 0.5 - x0)
-            cr[0] += self.beam.dxfull[0] + 1. + 0.5
-            cr[1] += dy + 1*(self.beam.sh[0]/2. - 0.5 - y0)
-            #cr[0] += 0.5
+            if old:
+                cr[0] += dx + 1*(self.beam.sh[0]/2. - 0.5 - x0)
+                cr[0] += self.beam.dxfull[0] + 1. + 0.5
+                cr[1] += dy + 1*(self.beam.sh[0]/2. - 0.5 - y0)
+                #cr[0] += 0.5
+                cr[1] -= 1.0
+            else:
+                cr[0] += dx + x0 #1*(x0 - self.beam.sh[0]/2.)
+                cr[0] += self.beam.dxfull[0] #cr[0] -= self.beam.dx[0]
+                #cr[0] += self.beam.dxfull[0] #+ 1. + 0.5
+                cr[1] += dy + y0 - self.beam.sh[0]/2 # 0.5 #1*(y0 - self.beam.sh[0]/2.)
+                
+                cr[0] += 1
+                cr[1] += 1
             
         header = wcs.to_header(relax=True)
         for key in header:
