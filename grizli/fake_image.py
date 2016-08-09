@@ -382,7 +382,8 @@ def make_fake_image(header, output='direct.fits', background=None, exptime=1.e4,
     
     naxis = (header['NAXIS1'], header['NAXIS2'])
     
-    for name, dtype in zip(['SCI', 'ERR', 'DQ'], [np.float32, np.float32, np.int32]):
+    for name, dtype in zip(['SCI', 'ERR', 'DQ'], 
+                           [np.float32, np.float32, np.int32]):
         hdu.append(pyfits.ImageHDU(header=header, 
                                    data=np.zeros(np.array(naxis).T, 
                                    dtype=dtype), name=name))
