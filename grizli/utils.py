@@ -1,10 +1,192 @@
 """General utilities"""
 import os
+import glob
+import collections
+
 import numpy as np
 
 # character to skip clearing line on STDOUT printing
 no_newline = '\x1b[1A\x1b[1M' 
 
+def get_flt_info(files=[]):
+    from astropy.io.fits import Header
+    from astropy.table import Table
+    
+    if not files:
+        files=glob.glob('*flt.fits')
+    
+    N = len(files)
+    columns = ['FILE', 'FILTER', 'TARGNAME', 'DATE-OBS', 'TIME-OBS', 'EXPSTART', 'EXPTIME', 'PA_V3', 'RA_TARG', 'DEC_TARG', 'POSTARG1', 'POSTARG2']
+    data = []
+    head = Header()
+    for i in range(N):
+        line = [files[i]]
+        h = Header().fromfile(files[i])
+        filt = get_hst_filter(h)
+        line.append(filt)
+        for key in columns[2:]:
+            line.append(h[key])
+        
+        data.append(line)
+    
+    tab = Table(rows=data, names=columns)
+    return tab
+
+def radec_to_targname(ra=0, dec=0, header=None):
+    """TBD
+    """
+    import astropy.coordinates 
+    import astropy.units as u
+    import re
+    
+    if header is not None:
+        if 'CRVAL1' in header:
+            ra, dec = header['CRVAL1'], header['CRVAL2']
+        else:
+            if 'RA_TARG' in header:
+                ra, dec = header['RA_TARG'], header['DEC_TARG']
+    
+    coo = astropy.coordinates.SkyCoord(ra=ra*u.deg, dec=dec*u.deg)
+    
+    cstr = re.split('[hmsd.]', coo.to_string('hmsdms'))
+    targname = ('J%s%s' %(''.join(cstr[0:3]), ''.join(cstr[4:7])))
+    targname = targname.replace(' ', '')
+    
+    return targname
+    
+def parse_flt_files(files=[], info=None, uniquename=False, 
+                    translate = {'AEGIS-':'aegis-', 
+                                 'COSMOS-':'cosmos-', 
+                                 'GNGRISM':'goodsn-', 
+                                 'GOODS-SOUTH-':'goodss-', 
+                                 'UDS-':'uds-'}):
+    """TBD
+    Read a files.info file and make ASN files for each visit/filter[/date].
+    """    
+    
+    if info is None:
+        if not files:
+            files=glob.glob('*flt.fits')
+    
+        if len(files) == 0:
+            return False
+        
+        info = get_flt_info(files)
+    else:
+        info = info.copy()
+        
+    for c in info.colnames:
+        if not c.islower(): 
+            info.rename_column(c, c.lower())
+
+    if 'expstart' not in info.colnames:
+        info['expstart'] = info['exptime']*0.
+
+    so = np.argsort(info['expstart'])
+    info = info[so]
+
+    pa_v3 = np.round(info['pa_v3']*10)/10
+    
+    target_list = []
+    for i in range(len(info)):
+        #### Replace ANY targets with JRhRmRs-DdDmDs
+        if info['targname'][i] == 'ANY':            
+            new_targname = radec_to_targname(ra=info['ra_targ'][i],
+                                             dec=info['dec_targ'][i])
+                                              
+            target_list.append(new_targname.lower())
+        else:
+            target_list.append(info['targname'][i])
+    
+    target_list = np.array(target_list)
+
+    info['progIDs'] = [file[1:4] for file in info['file']]
+
+    progIDs = np.unique(info['progIDs'])
+    visits = np.array([os.path.basename(file)[4:6] for file in info['file']])
+    dates = np.array([''.join(date.split('-')[1:]) for date in info['date-obs']])
+    
+    targets = np.unique(target_list)
+    
+    output_list = collections.OrderedDict()
+    filter_list = collections.OrderedDict()
+    
+    for filter in np.unique(info['filter']):
+        filter_list[filter] = collections.OrderedDict()
+        
+        angles = np.unique(pa_v3[(info['filter'] == filter)]) 
+        for angle in angles:
+            filter_list[filter][angle] = []
+            
+    for target in targets:
+        #### 3D-HST targname translations
+        target_use = target
+        for key in translate.keys():
+            target_use = target_use.replace(key, translate[key])
+            
+        ## pad i < 10 with zero
+        for key in translate.keys():
+            if translate[key] in target_use:
+                spl = target_use.split('-')
+                try:
+                    if (int(spl[-1]) < 10) & (len(spl[-1]) == 1):
+                        spl[-1] = '%02d' %(int(spl[-1]))
+                        target_use = '-'.join(spl)
+                except:
+                    pass
+
+        for filter in np.unique(info['filter'][(target_list == target)]):
+            angles = np.unique(pa_v3[(info['filter'] == filter) & 
+                              (target_list == target)])
+                                          
+            for angle in angles:
+                exposure_list = []
+                exposure_start = []
+                product='%s-%05.1f-%s' %(target_use, angle, filter)             
+
+                this_visits = np.unique(visits[(target_list == target) &
+                                               (info['filter'] == filter)])
+                                                  
+                for visit in this_visits:
+                    visit_list = []
+                    visit_start = []
+                    visit_product='%s-%s-%05.1f-%s' %(target_use, visit, 
+                                                      angle, filter)             
+                                            
+                    use = ((target_list == target) & 
+                           (info['filter'] == filter) & 
+                           (visits == visit) & (pa_v3 == angle))
+                           
+                    if use.sum() == 0:
+                        continue
+
+                    for tstart, file in zip(info['expstart'][use],
+                                            info['file'][use]):
+                                            
+                        f = file.split('.gz')[0]
+                        if f not in exposure_list:
+                            visit_list.append(f)
+                            visit_start.append(tstart)
+                    
+                    exposure_list = np.append(exposure_list, visit_list)
+                    exposure_start.extend(visit_start)
+                    
+                    filter_list[filter][angle].extend(visit_list)
+                    
+                    if uniquename:
+                        print product, len(visit_list)
+                        so = np.argsort(visit_start)
+                        exposure_list = np.array(visit_list)[so]
+                        output_list[visit_product.lower()] = visit_list
+                    
+                if not uniquename:
+                    print product, len(exposure_list)
+                    so = np.argsort(exposure_start)
+                    exposure_list = np.array(exposure_list)[so]
+                    output_list[product.lower()] = exposure_list
+    
+    return output_list, filter_list
+    
 def get_hst_filter(header):
     """Get simple filter name out of an HST image header.  
     
@@ -190,4 +372,81 @@ def detect_with_photutils(sci, err=None, dq=None, seg=None, detect_thresh=2.,
         catalog.write(seg_cat, format='ascii.commented_header')
     
     return catalog, seg
+    
+#
+def nmad(data):
+    """TBD
+    """
+    import astropy.stats
+    return 1.48*astropy.stats.median_absolute_deviation(data)
+    
+class SpectrumTemplate(object):
+    """TBD
+    """
+    def __init__(self, wave=None, flux=None, fwhm=None, velocity=False):
+        """TBD
+        """
+        self.wave = wave
+        self.flux = flux
+        
+        ### Gaussian
+        if (wave is not None) & (fwhm is not None):
+            rms = fwhm/2.35
+            if velocity:
+                rms *= wave/3.e5
+                
+            xgauss = np.arange(-5,5.01,0.1)*rms+wave
+            gaussian = np.exp(-(xgauss-wave)**2/2/rms**2)
+            gaussian /= np.sqrt(2*np.pi*rms**2)
+            
+            self.wave = xgauss
+            self.flux = gaussian
+    
+    def __add__(self, spectrum):
+        """TBD
+        """
+        new_wave = np.unique(np.append(self.wave, spectrum.wave))
+        new_wave.sort()
+        
+        new_flux = np.interp(new_wave, self.wave, self.flux)
+        new_flux += np.interp(new_wave, spectrum.wave, spectrum.flux)
+        return SpectrumTemplate(wave=new_wave, flux=new_flux)
+    
+    def __mul__(self, scalar):
+        return SpectrumTemplate(wave=self.wave, flux=self.flux*scalar)
+        
+    def zscale(self, z, scalar=1):
+        return SpectrumTemplate(wave=self.wave*(1+z),
+                                flux=self.flux*scalar/(1+z))
+
+def log_zgrid(zr=[0.7,3.4], dz=0.01):
+    """TBD
+    """
+    zgrid = np.exp(np.arange(np.log(1+zr[0]), np.log(1+zr[1]), dz))-1
+    return zgrid
+
+def zoom_zgrid(zgrid, chi2nu, threshold=0.01, factor=10, grow=7):
+    """TBD
+    """
+    import scipy.ndimage as nd
+    
+    mask = (chi2nu-chi2nu.min()) < threshold
+    if grow > 1:
+        mask_grow = nd.maximum_filter(mask*1, size=grow)
+        mask = mask_grow > 0
+        
+    if mask.sum() == 0:
+        return []
+    
+    idx = np.arange(zgrid.shape[0])
+    out_grid = []
+    for i in idx[mask]:
+        if i == idx[-1]:
+            continue
+            
+        out_grid = np.append(out_grid, np.linspace(zgrid[i], zgrid[i+1], factor+2)[1:-1])
+    
+    return out_grid
+    
+    
     
