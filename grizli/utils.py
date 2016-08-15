@@ -85,13 +85,14 @@ def parse_flt_files(files=[], info=None, uniquename=False,
     so = np.argsort(info['expstart'])
     info = info[so]
 
-    pa_v3 = np.round(info['pa_v3']*10)/10
+    #pa_v3 = np.round(info['pa_v3']*10)/10 % 360.
+    pa_v3 = np.round(info['pa_v3']) % 360.
     
     target_list = []
     for i in range(len(info)):
         #### Replace ANY targets with JRhRmRs-DdDmDs
         if info['targname'][i] == 'ANY':            
-            new_targname = radec_to_targname(ra=info['ra_targ'][i],
+            new_targname = 'par-'+radec_to_targname(ra=info['ra_targ'][i],
                                              dec=info['dec_targ'][i])
                                               
             target_list.append(new_targname.lower())
@@ -146,12 +147,17 @@ def parse_flt_files(files=[], info=None, uniquename=False,
 
                 this_visits = np.unique(visits[(target_list == target) &
                                                (info['filter'] == filter)])
-                                                  
+                
+                this_progs = []
                 for visit in this_visits:
+                    ix = (visits == visit) & (target_list == target) & (info['filter'] == filter)
+                    this_progs.append(info['progIDs'][ix][0])
+                
+                for visit, prog in zip(this_visits, this_progs):
                     visit_list = []
                     visit_start = []
-                    visit_product='%s-%s-%05.1f-%s' %(target_use, visit, 
-                                                      angle, filter)             
+                    visit_product='%s-%s-%s-%05.1f-%s' %(target_use, prog, 
+                                                 visit, angle, filter)             
                                             
                     use = ((target_list == target) & 
                            (info['filter'] == filter) & 
@@ -174,7 +180,7 @@ def parse_flt_files(files=[], info=None, uniquename=False,
                     filter_list[filter][angle].extend(visit_list)
                     
                     if uniquename:
-                        print product, len(visit_list)
+                        print visit_product, len(visit_list)
                         so = np.argsort(visit_start)
                         exposure_list = np.array(visit_list)[so]
                         output_list[visit_product.lower()] = visit_list
@@ -448,5 +454,53 @@ def zoom_zgrid(zgrid, chi2nu, threshold=0.01, factor=10, grow=7):
     
     return out_grid
     
+def make_wcsheader(ra=40.07293, dec=-1.6137748, size=2, pixscale=0.1, get_hdu=False, theta=0):
+    """TBD
+    
+    """
+    import astropy.io.fits as pyfits
+    import astropy.wcs as pywcs
+    
+    cdelt = pixscale/3600.
+    if isinstance(size, list):
+        npix = np.cast[int]([size[0]/pixscale, size[1]/pixscale])
+    else:
+        npix = np.cast[int]([size/pixscale, size/pixscale])
+        
+    hout = pyfits.Header()
+    hout['CRPIX1'] = npix[0]/2
+    hout['CRPIX2'] = npix[1]/2
+    hout['CRVAL1'] = ra
+    hout['CRVAL2'] = dec
+    hout['CD1_1'] = -cdelt
+    hout['CD1_2'] = hout['CD2_1'] = 0.
+    hout['CD2_2'] = cdelt
+    hout['NAXIS1'] = npix[0]
+    hout['NAXIS2'] = npix[1]
+    hout['CTYPE1'] = 'RA---TAN'
+    hout['CTYPE2'] = 'DEC--TAN'
+    
+    wcs_out = pywcs.WCS(hout)
+    
+    theta_rad = np.deg2rad(theta)
+    mat = np.array([[np.cos(theta_rad), -np.sin(theta_rad)], 
+                    [np.sin(theta_rad),  np.cos(theta_rad)]])
+
+    rot_cd = np.dot(mat, wcs_out.wcs.cd)
+    
+    for i in [0,1]:
+        for j in [0,1]:
+            hout['CD%d_%d' %(i+1, j+1)] = rot_cd[i,j]
+            wcs_out.wcs.cd[i,j] = rot_cd[i,j]
+                
+    cd = wcs_out.wcs.cd
+    wcs_out.pscale = np.sqrt((cd[0,:]**2).sum())*3600.
+        
+    if get_hdu:
+        hdu = pyfits.ImageHDU(header=hout, data=np.zeros((npix[1], npix[0]), dtype=np.float32))
+        return hdu
+    else:
+        return hout, wcs_out
+
     
     

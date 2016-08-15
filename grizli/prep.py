@@ -23,7 +23,6 @@ from drizzlepac.astrodrizzle import AstroDrizzle
 
 from stwcs import updatewcs
 
-
 from . import utils
 
 def go_all():
@@ -147,7 +146,7 @@ def clip_lists(input, output, clip=20):
     return in_arr, out_arr
 
 def match_lists(input, output, transform=None, scl=3600., simple=True,
-                outlier_threshold=5):
+                outlier_threshold=5, toler=5):
     """TBD
     
     Compute matched objects and transformation between two [x,y] lists.
@@ -189,7 +188,7 @@ def match_lists(input, output, transform=None, scl=3600., simple=True,
                                     origin=np.median(input, axis=0), 
                                     mag=(1.0, 1.0), rotation=(0.0, 0.0),
                                     ref_origin=np.median(input, axis=0), 
-                                    algorithm='tolerance', tolerance=5.0, 
+                                    algorithm='tolerance', tolerance=toler, 
                                     separation=0.5, nmatch=10, maxratio=10.0, 
                                     nreject=10)
                                     
@@ -234,7 +233,17 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
         cat = make_drz_catalog(root=root)
     else:
         cat = Table.read('%s.cat' %(root), format='ascii.commented_header')
-        
+    
+    ### Clip obviously distant files to speed up match
+    rd_cat = np.array([cat['X_WORLD'], cat['Y_WORLD']])
+    rd_cat_center = np.median(rd_cat, axis=1)
+    cosdec = np.array([np.cos(rd_cat_center[1]/180*np.pi),1])
+    dr_cat = np.sqrt(np.sum((rd_cat.T-rd_cat_center)**2*cosdec**2, axis=1))
+    
+    dr = np.sqrt(np.sum((rd_ref-rd_cat_center)**2*cosdec**2, axis=1))
+    
+    rd_ref = rd_ref[dr < 1.1*dr_cat.max(),:]
+    
     ok = (cat['MAG_AUTO'] > mag_limits[0]) & (cat['MAG_AUTO'] < mag_limits[1])
     if ok.sum() == 0:
         print '%s.cat: no objects found in magnitude range %s' %(root,
@@ -268,17 +277,35 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
         input, output = status
         #print np.sum(input) + np.sum(output)
         
-        res = match_lists(output, input, scl=1., simple=True,
-                          outlier_threshold=outlier_threshold)
-        
-        output_ix, input_ix, outliers, tf = res
-                                                         
+        toler=5
+        titer=0
+        while (titer < 3):
+            try:
+                res = match_lists(output, input, scl=1., simple=True,
+                          outlier_threshold=outlier_threshold, toler=toler)
+                output_ix, input_ix, outliers, tf = res
+                break
+            except:
+                toler += 5
+                titer += 1
+                
+        titer = 0 
+        while (len(input_ix)*1./len(input) < 0.1) & (titer < 3):
+            titer += 1
+            toler += 5
+            res = match_lists(output, input, scl=1., simple=True,
+                              outlier_threshold=outlier_threshold,
+                              toler=toler)
+            output_ix, input_ix, outliers, tf = res
+                                                      
         if outliers.sum() > 0:
             res2 = match_lists(output[output_ix][~outliers],
                               input[input_ix][~outliers], scl=1., simple=True,
-                              outlier_threshold=outlier_threshold)
+                              outlier_threshold=outlier_threshold,
+                              toler=toler)
             
             output_ix2, input_ix2, outliers2, tf = res2
+        
         if verbose:
             shift = tf.translation
             NGOOD = (~outliers).sum()
@@ -323,18 +350,19 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
         if interactive_status:
             plt.ion()
         
-        log_wcs(root, orig_wcs, out_shift, out_rot/np.pi*180, rms)
+        log_wcs(root, orig_wcs, out_shift, out_rot/np.pi*180, rms,
+                n=NGOOD, initialize=False)
             
     return orig_wcs, drz_wcs, out_shift, out_rot/np.pi*180
 
-def log_wcs(root, drz_wcs, shift, rot, rms=0., initialize=True):
+def log_wcs(root, drz_wcs, shift, rot, rms=0., n=-1, initialize=True):
     """TBD
     """
     if (not os.path.exists('%s_wcs.log' %(root))) | initialize:
         print 'Initialize %s_wcs.log' %(root)
         orig_hdul = pyfits.HDUList()
         fp = open('%s_wcs.log' %(root), 'w')
-        fp.write('# ext xshift yshift rot rms\n')
+        fp.write('# ext xshift yshift rot rms N\n')
         fp.write('# %s\n' %(root))
         count = 0
     else:
@@ -346,8 +374,8 @@ def log_wcs(root, drz_wcs, shift, rot, rms=0., initialize=True):
     orig_hdul.append(hdu)
     orig_hdul.writeto('%s_wcs.fits' %(root), clobber=True)
     
-    fp.write('%5d %13.4f %13.4f %13.4f %13.3f\n' %(count, shift[0], shift[1], 
-                                            rot, rms))
+    fp.write('%5d %13.4f %13.4f %13.4f %13.3f %4d\n' %(count, shift[0],
+                                                       shift[1], rot, rms, n))
     fp.close()
     
 def table_to_regions(table, output='ds9.reg'):
@@ -547,7 +575,9 @@ def get_radec_catalog(ra=0., dec=0., radius=3.):
     return radec, ref_catalog
     
 def process_direct_grism_visit(direct={}, grism={}, radec=None,
-                               align_tolerance=5, column_average=True):
+                               align_tolerance=5, 
+                               align_mag_limits = [14,23],
+                               column_average=True):
     """TBD
     
     align direct images of a single visit
@@ -561,7 +591,9 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
         output_list, filter_list = utils.parse_flt_files(info=info, uniquename=True)
         
         full_info = OrderedDict()
-        for key in output_list:
+        keys = output_list.keys()
+        keys.sort()
+        for key in keys:
             full_info[key] = {'product':str(key),
                               'files':list(output_list[key])}
         
@@ -642,8 +674,14 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
     ### Make catalog & segmentation image
     cat = make_drz_catalog(root=direct['product'], threshold=2)
     
-    result = align_drizzled_image(root=direct['product'], mag_limits=[14,23],
-                                  radec=radec, NITER=5, clip=20, log=True,
+    clip=20
+    logfile = '%s_wcs.log' %(direct['product'])
+    if os.path.exists(logfile):
+        os.remove(logfile)
+        
+    result = align_drizzled_image(root=direct['product'], 
+                                  mag_limits=align_mag_limits,
+                                  radec=radec, NITER=5, clip=clip, log=True,
                                   outlier_threshold=align_tolerance)
                                   
     orig_wcs, drz_wcs, out_shift, out_rot = result
@@ -685,7 +723,7 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
     table_to_regions(cat, '%s.cat.reg' %(direct['product']))
     
     ################# 
-    ##########  Direct image processing
+    ##########  Grism image processing
     #################
     
     if grism == {}:
@@ -694,6 +732,11 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
     ### Match grism WCS to the direct images
     match_direct_grism_wcs(direct=direct, grism=grism, get_fresh_flt=True,
                            run_drizzle=True)
+    
+    ### Make ASN
+    asn = asnutil.ASNTable(grism['files'], output=grism['product'])
+    asn.create()
+    asn.write()
     
     ### Subtract grism sky
     visit_grism_sky(grism=grism, apply=True, column_average=column_average, 
@@ -714,6 +757,8 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
     
     clean_drizzle(grism['product'])
     
+    return True
+
 def clean_drizzle(root):
     """TBD
     """
@@ -722,7 +767,54 @@ def clean_drizzle(root):
     mask = wht[0].data == 0
     sci[0].data[mask] = 0
     sci.flush()
-      
+
+def match_wcs_exact(direct={}, grism={}, check=[507, 507], toler=0.1):
+    """
+    For each grism exposure, check if there is a direct exposure
+    that matches the WCS to within `toler` pixels.  If so, copy that WCS 
+    directly.
+    """
+    direct_wcs = {}
+    direct_rd = {}
+    
+    grism_wcs = {}
+    grism_pix = {}
+    
+    for file in direct['files']:
+        im = pyfits.open(file)
+        direct_wcs[file] = pywcs.WCS(im[1].header, relax=True)
+        direct_rd[file] = direct_wcs[file].all_pix2world([check], 1)
+    
+    for file in grism['files']:
+        im = pyfits.open(file)
+        grism_wcs[file] = pywcs.WCS(im[1].header, relax=True)
+        print file
+        delta_min = 10
+        for d in direct['files']:
+            pix = grism_wcs[file].all_world2pix(direct_rd[d], 1)
+            dx = pix-np.array(check)
+            delta = np.sqrt(np.sum(dx**2))
+            print '  %s %s, %.3f' %(d, dx, delta)
+            if delta < delta_min:
+                delta_min = delta
+                delta_min_file = d
+        
+        ### Found a match, copy the header
+        if delta_min < toler:
+            im = pyfits.open(file, mode='update')
+            
+            wcs_header = direct_wcs[delta_min_file].to_header(relax=True)
+            for i in [1,2]: 
+                for j in [1,2]:
+                    wcs_header.rename_keyword('PC%d_%d' %(i,j), 
+                                              'CD%d_%d' %(i,j))
+            
+            for ext in ['SCI','ERR','DQ']:
+                for key in wcs_header:
+                    im[ext].header[key] = wcs_header[key]
+            
+            im.flush()
+            
 def match_direct_grism_wcs(direct={}, grism={}, get_fresh_flt=True, 
                            run_drizzle=True):
     """TBD
@@ -946,11 +1038,14 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True):
     fp.write('# file c1 %s\n' %(' '.join(['c%d' %(v+2) 
                                             for v in range(Nvary)])))
     
+    fp.write('# %s\n' %(grism['product']))
+    
     fp.write('# bg1: %s\n' %(bg_fixed[0]))
     for v in range(Nvary):
         fp.write('# bg%d: %s\n' %(v+2, bg_vary[v]))
     
     for j in range(Nexp):
+        file = grism['files'][j]
         line = '%s %9.4f' %(file, coeffs[0])           
         for v in range(Nvary):
             k = Nfix + j*Nvary + v
@@ -971,13 +1066,18 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True):
             flt[0].header['GSKYN'] = (Nfix+Nvary, 'Number of sky images')
             flt[0].header['GSKY001'] = (coeffs[0], 
                                         'Sky image %s (fixed)' %(bg_fixed[0]))
-                    
+            
+            flt[0].header['GSKY001F'] = (bg_fixed[0], 'Sky image (fixed)')
+            
             for v in range(Nvary):
                 k = Nfix + j*Nvary + v
                 #print coeffs[k]
                 flt[0].header['GSKY%03d' %(v+Nfix+1)] = (coeffs[k], 
                                      'Sky image %s (variable)' %(bg_vary[v]))
-            
+                #
+                flt[0].header['GSKY%03dF' %(v+Nfix+1)] = (bg_vary[v], 
+                                     'Sky image (variable)')
+                
             flt.flush()
     
     if not column_average:
