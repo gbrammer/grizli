@@ -202,7 +202,7 @@ class GrismDisperser(object):
         self.ytrace_beam, self.lam_beam = self.conf.get_beam_trace(
                                     x=(self.xc+xcenter-self.pad)/self.grow,
                                     y=(self.yc+ycenter-self.pad)/self.grow,
-                                    dx=(self.dx+xcenter)/self.grow,
+                                    dx=(self.dx+xcenter*0-0.5)/self.grow,
                                     beam=self.beam)
         
         self.ytrace_beam *= self.grow
@@ -256,7 +256,7 @@ class GrismDisperser(object):
         self.ytrace, self.lam = self.conf.get_beam_trace(
                                     x=(self.xc+xcenter-self.pad)/self.grow,
                                     y=(self.yc+ycenter-self.pad)/self.grow,
-                                    dx=(self.dxfull+xcenter)/self.grow,
+                                    dx=(self.dxfull+xcenter-0.5)/self.grow,
                                     beam=self.beam)
         
         self.ytrace *= self.grow
@@ -963,7 +963,7 @@ class ImageData(object):
             ### Handle segmentation images a bit differently to preserve
             ### integers.
             ### +1 here is a hack for some memory issues
-            blotted_seg = astrodrizzle.ablot.do_blot(refdata+0, ref_wcs,
+            blotted_seg = astrodrizzle.ablot.do_blot(refdata+0., ref_wcs,
                                 flt_wcs, 1, coeffs=True, interp='nearest',
                                 sinscl=1.0, stepsize=10, wcsmap=None)
             
@@ -1265,9 +1265,23 @@ class GrismFLT(object):
                               verbose=verbose)
         
         ### Blot segmentation image
+        # while os.path.exists('waitfile'):
+        #     #print 'Wait'
+        #     continue
+        # 
+        # fp = open('waitfile','w')
+        # fp.write('wait')
+        # fp.close()
+        
         self.process_seg_file(seg_file, shrink_segimage=shrink_segimage,
                               verbose=verbose)
-        
+                
+        # print '%s remove waitfile' %(grism_file)
+        # try:
+        #     os.remove('waitfile')
+        # except:
+        #     pass
+            
         ### Holder for the full grism model array
         self.model = np.zeros_like(self.direct.data['SCI'])
         
@@ -1409,12 +1423,14 @@ class GrismFLT(object):
                                                        extra=self.pad,
                                                        verbose=True)
                 
+            
             if verbose:
                 print '%s / blot segmentation %s' %(self.direct_file, seg_str)
             
             blotted_seg = self.grism.blot_from_hdu(hdu=seg_hdu,
                                           segmentation=True, grow=3)
             self.seg = blotted_seg
+                        
         else:
             self.seg = np.zeros(self.direct.sh, dtype=np.float32)
     
@@ -1576,9 +1592,13 @@ class GrismFLT(object):
             
             if xcat is not None:
                 xc, yc = int(np.round(xcat))+1, int(np.round(ycat))+1
+                xcenter = -(xcat-(xc-1))
+                ycenter = -(ycat-(yc-1))
             else:
                 xc, yc = int(np.round(x))+1, int(np.round(y))+1
-            
+                xcenter = -(x-(xc-1))
+                ycenter = -(y-(yc-1))
+                
             origin = [yc-size + self.direct.origin[0], 
                       xc-size + self.direct.origin[1]]
                                       
@@ -1606,7 +1626,7 @@ class GrismFLT(object):
                     continue
                     
                 try:
-                    b = GrismDisperser(id=id, direct=thumb,segmentation=seg_thumb, origin=origin,pad=self.pad, grow=self.grism.grow,beam=beam, conf=self.conf)
+                    b = GrismDisperser(id=id, direct=thumb, segmentation=seg_thumb, xcenter=xcenter, ycenter=ycenter, origin=origin, pad=self.pad, grow=self.grism.grow,beam=beam, conf=self.conf)
                 except:
                     continue
                 
@@ -1934,7 +1954,8 @@ class GrismFLT(object):
     
 class BeamCutout(object):
     def __init__(self, flt=None, beam=None, conf=None, 
-                 get_slice_header=True, from_fits=None):
+                 get_slice_header=True, fits_file=None,
+                 contam_sn_mask=[10,3]):
         """Cutout spectral object from the full frame.
         
         Parameters
@@ -1953,11 +1974,13 @@ class BeamCutout(object):
         get_slice_header: bool
             TBD
             
-        from_fits: None or str
+        fits_file: None or str
             Optional FITS file containing the beam information
+            
+        contam_sn_mask: TBD
         """
-        if from_fits is not None:
-            self.load_fits(from_fits, conf)
+        if fits_file is not None:
+            self.load_fits(fits_file, conf)
         else:
             self.init_from_input(flt, beam, conf, get_slice_header)
                     
@@ -1989,7 +2012,12 @@ class BeamCutout(object):
         resid = np.abs(self.scif - self.flat_flam)*np.sqrt(self.ivarf)
         bad_resid = (self.flat_flam < 0.05*self.flat_flam.max()) & (resid > 5)
         self.fit_mask *= ~bad_resid
-
+        
+        ### Mask very contaminated
+        contam_mask = ((self.contam*np.sqrt(self.ivar) > contam_sn_mask[0]) & 
+                      (self.model*np.sqrt(self.ivar) < contam_sn_mask[1]))
+        #self.fit_mask *= ~contam_mask.flatten()
+        self.contam_mask = ~nd.maximum_filter(contam_mask, size=5).flatten()
         self.poly_order = None
         #self.init_poly_coeffs(poly_order=1)
         
@@ -2022,7 +2050,8 @@ class BeamCutout(object):
         self.beam = GrismDisperser(id=beam.id, direct=beam.direct*1,
                            segmentation=beam.seg*1, origin=beam.origin,
                            pad=beam.pad, grow=beam.grow,
-                           beam=beam.beam, conf=conf)
+                           beam=beam.beam, conf=conf, xcenter=beam.xcenter,
+                           ycenter=beam.ycenter)
         
         self.beam.compute_model(spectrum_1d = beam.spectrum_1d)
         
@@ -2076,12 +2105,22 @@ class BeamCutout(object):
         
             conf = grismconf.load_grism_config(conf_file)
         
+        if 'GROW' in self.grism.header:
+            grow = self.grism.header['GROW']
+        else:
+            grow = 1
+            
         self.beam = GrismDisperser(id=h0['ID'], direct=direct, 
                                    segmentation=hdu['SEG'].data*1,
                                    origin=self.direct.origin,
-                                   pad=h0['PAD'], beam=h0['BEAM'], 
+                                   pad=h0['PAD'],
+                                   grow=grow, beam=h0['BEAM'], 
+                                   xcenter=h0['XCENTER'],
+                                   ycenter=h0['YCENTER'],
                                    conf=conf)
         
+        self.grism.parent_file = h0['GPARENT']
+        self.direct.parent_file = h0['DPARENT']
     
     def write_fits(self, root='beam_', clobber=True):
         """Write attributes and data to FITS file
@@ -2089,8 +2128,11 @@ class BeamCutout(object):
         Parameters
         ----------
         root: str
-            Output filename will be '{root}_{self.id}.{self.beam}.fits' with
-            `self.id` zero-padded with 5 digits.
+            Output filename will be 
+            
+               '{root}_{self.id}.{self.grism.filter}.{self.beam}.fits' 
+            
+            with `self.id` zero-padded with 5 digits.
         
         clobber: bool
             Clobber/overwrite existing file.
@@ -2099,6 +2141,16 @@ class BeamCutout(object):
         h0['ID'] = self.beam.id, 'Object ID'
         h0['PAD'] = self.beam.pad, 'Padding of input image'
         h0['BEAM'] = self.beam.beam, 'Grism order ("beam")'
+        h0['XCENTER'] = (self.beam.xcenter, 
+                         'Offset of centroid wrt thumb center')
+        h0['YCENTER'] = (self.beam.ycenter, 
+                         'Offset of centroid wrt thumb center')
+                         
+        h0['GPARENT'] = (self.grism.parent_file, 
+                         'Parent grism file')
+        
+        h0['DPARENT'] = (self.direct.parent_file, 
+                         'Parent direct file')
         
         hdu = pyfits.HDUList([pyfits.PrimaryHDU(header=h0)])
         hdu.extend(self.direct.get_HDUList(extver=1))
@@ -2112,9 +2164,14 @@ class BeamCutout(object):
         hdu.append(pyfits.ImageHDU(data=self.model, header=hdu[-1].header,
                                    name='MODEL'))
         
-        hdu.writeto('%s_%05d.%s.fits' %(root, self.beam.id, self.beam.beam),
-                    clobber=clobber)
-                            
+        outfile = '%s_%05d.%s.%s.fits' %(root, self.beam.id,
+                                         self.grism.filter.lower(),
+                                         self.beam.beam)
+                                         
+        hdu.writeto(outfile, clobber=clobber)
+        
+        return outfile
+        
     def compute_model(self, *args, **kwargs):
         """Link to `self.beam.compute_model`
         
@@ -2143,7 +2200,11 @@ class BeamCutout(object):
         for cr in [wcs.sip.crpix, wcs.wcs.crpix]:
                 cr[0] += dx + self.beam.sh[0]/2 + self.beam.dxfull[0]
                 cr[1] += dy 
-                
+        
+        ### Make SIP CRPIX match CRPIX
+        for i in [0,1]:
+            wcs.sip.crpix[i] = wcs.wcs.crpix[i]
+                    
         ### WCS header
         header = wcs.to_header(relax=True)
         for key in header:
