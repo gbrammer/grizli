@@ -145,14 +145,20 @@ def parse_flt_files(files=[], info=None, uniquename=False,
                 exposure_start = []
                 product='%s-%05.1f-%s' %(target_use, angle, filter)             
 
-                this_visits = np.unique(visits[(target_list == target) &
+                visit_match = np.unique(visits[(target_list == target) &
                                                (info['filter'] == filter)])
                 
                 this_progs = []
-                for visit in this_visits:
-                    ix = (visits == visit) & (target_list == target) & (info['filter'] == filter)
-                    this_progs.append(info['progIDs'][ix][0])
+                this_visits = []
                 
+                for visit in visit_match:
+                    ix = (visits == visit) & (target_list == target) & (info['filter'] == filter)
+                    #this_progs.append(info['progIDs'][ix][0])
+                    #print visit, ix.sum(), np.unique(info['progIDs'][ix])
+                    new_progs = list(np.unique(info['progIDs'][ix]))
+                    this_visits.extend([visit]*len(new_progs))
+                    this_progs.extend(new_progs)
+                    
                 for visit, prog in zip(this_visits, this_progs):
                     visit_list = []
                     visit_start = []
@@ -161,7 +167,8 @@ def parse_flt_files(files=[], info=None, uniquename=False,
                                             
                     use = ((target_list == target) & 
                            (info['filter'] == filter) & 
-                           (visits == visit) & (pa_v3 == angle))
+                           (visits == visit) & (pa_v3 == angle) &
+                           (info['progIDs'] == prog))
                            
                     if use.sum() == 0:
                         continue
@@ -453,7 +460,33 @@ def zoom_zgrid(zgrid, chi2nu, threshold=0.01, factor=10, grow=7):
         out_grid = np.append(out_grid, np.linspace(zgrid[i], zgrid[i+1], factor+2)[1:-1])
     
     return out_grid
+
+
+def make_spectrum_wcsheader(center_wave=1.4e4, dlam=40, NX=100, spatial_scale=1, NY=10):
+    import astropy.io.fits as pyfits
+    import astropy.wcs as pywcs
     
+    h = pyfits.ImageHDU(data=np.zeros((2*NY, 2*NX), dtype=np.float32))
+    
+    refh = h.header
+    refh['CRPIX1'] = NX+1
+    refh['CRPIX2'] = NY+1
+    refh['CRVAL1'] = center_wave
+    refh['CD1_1'] = dlam
+    refh['CD1_2'] = 0.
+    refh['CRVAL2'] = 0.
+    refh['CD2_2'] = spatial_scale
+    refh['CD2_1'] = 0.
+    refh['RADESYS'] = ''
+    
+    refh['CTYPE1'] = 'WAVE'
+    refh['CTYPE2'] = 'LINEAR'
+    
+    ref_wcs = pywcs.WCS(h.header)
+    ref_wcs.pscale = np.sqrt(ref_wcs.wcs.cd[0,0]**2 + ref_wcs.wcs.cd[1,0]**2)*3600.
+    
+    return refh, ref_wcs
+
 def make_wcsheader(ra=40.07293, dec=-1.6137748, size=2, pixscale=0.1, get_hdu=False, theta=0):
     """TBD
     
