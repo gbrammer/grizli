@@ -1258,28 +1258,9 @@ class GrismFLT(object):
             self.grism.unset_dq()
             nbad = self.grism.flag_negative(sigma=-3)
             self.grism.data['SCI'] *= (self.grism.data['DQ'] == 0)
-            
-        ### Blot reference image
-        self.process_ref_file(ref_file, ref_ext=ref_ext, 
-                              shrink_segimage=shrink_segimage,
-                              verbose=verbose)
-        
-        ### Blot segmentation image
-        # while os.path.exists('waitfile'):
-        #     #print 'Wait'
-        #     continue
-        # 
-        # fp = open('waitfile','w')
-        # fp.write('wait')
-        # fp.close()
-        
-        self.process_seg_file(seg_file, shrink_segimage=shrink_segimage,
-                              verbose=verbose)
                 
-        # print '%s remove waitfile' %(grism_file)
-        # try:
-        #     os.remove('waitfile')
-        # except:
+        ### Load data from saved model files, if available
+        # if os.path.exists('%s_model.fits' %(self.grism_file)):
         #     pass
             
         ### Holder for the full grism model array
@@ -1293,10 +1274,21 @@ class GrismFLT(object):
         self.conf = grismconf.load_grism_config(self.conf_file)
         
         self.object_dispersers = collections.OrderedDict()
+                    
+        ### Blot reference image
+        self.process_ref_file(ref_file, ref_ext=ref_ext, 
+                              shrink_segimage=shrink_segimage,
+                              verbose=verbose)
         
+        ### Blot segmentation image
+        self.process_seg_file(seg_file, shrink_segimage=shrink_segimage,
+                              verbose=verbose)
+        
+        ## End things
         self.get_dispersion_PA()
         
         self.catalog = None
+                            
         
     def process_ref_file(self, ref_file, ref_ext=0, shrink_segimage=True,
                          verbose=True):
@@ -1672,11 +1664,6 @@ class GrismFLT(object):
         else:
             return beams, output
     
-    def pop_object(self, id):
-        """TBD
-        """
-        pass
-        
     def compute_full_model(self, ids=None, mags=None, refine_maglim=22,
                            store=True, verbose=False):
         """Compute flat-spectrum model for multiple objects.
@@ -1701,19 +1688,7 @@ class GrismFLT(object):
         
         ### If `mags` array not specified, compute magnitudes within
         ### segmentation regions.
-        if mags is None:
-            # if self.direct.data['REF'] is None:
-            #     ext='SCI'
-            #     ### First term in zeropoints is zero because photflam 
-            #     ### already multiplied to science data, also for ref below.
-            #     ZP =  (0*np.log10(self.direct.photflam) - 21.10 -
-            #               5*np.log10(self.direct.photplam) + 18.6921)
-            #         
-            # else:
-            #     ext='REF'
-            #     ZP =  (0*np.log10(self.direct.ref_photflam) - 21.10 -
-            #               5*np.log10(self.direct.ref_photplam) + 18.6921)
-                                
+        if mags is None:                                
             mags = np.zeros(len(ids))
             for i, id in enumerate(ids):
                 out = disperse.compute_segmentation_limits(self.seg, id,
@@ -1736,34 +1711,18 @@ class GrismFLT(object):
                 
             self.compute_model_orders(id=id_i, compute_size=True, mag=mag_i, 
                                       in_place=True, store=store)
-            
-            # if mag_i < refine_maglim:
-            #     if id_i not in self.object_dispersers:
-            #         continue
-            #     
-            #     if 'A' not in self.object_dispersers[id_i]:
-            #         continue
-            #         
-            #     if verbose:
-            #         print 'refine model id=%d' %(id_i)
-            #     
-            #     try:
-            #         beam = BeamCutout(self, self.object_dispersers[id_i]['A'], 
-            #                       conf=self.conf)
-            #     except:
-            #         continue
-            #         
-            #     out = beam.fit_at_z(z=0., templates={}, fitter='lstsq',
-            #                         poly_order=5)
-            #     
-            #     A, coeffs, chi2, model_2d = out
-            #     sp = utils.SpectrumTemplate(wave=beam.beam.lam, 
-            #                                flux=np.dot(beam.y_poly.T, coeffs))
-            #     
-            #     self.compute_model_orders(id=id_i, compute_size=True,
-            #                               mag=mag_i, in_place=True, 
-            #                               spectrum_1d = [sp.wave, sp.flux])
-                
+    
+    def smooth_mask(self, gaussian_width=4, threshold=2.5):
+        """TBD
+        """
+        import scipy.ndimage as nd
+        
+        mask = self.grism['SCI'] != 0
+        resid = (self.grism['SCI'] - self.model)*mask
+        sm = nd.gaussian_filter(np.abs(resid), gaussian_width)
+        resid_mask = (np.abs(sm) > threshold*self.grism['ERR'])
+        self.grism.data['SCI'][resid_mask] = 0
+        
     def blot_catalog(self, input_catalog, columns=['id','ra','dec'], 
                      sextractor=False, ds9=None):
         """Compute detector-frame coordinates of sky positions in a catalog.
@@ -1952,6 +1911,122 @@ class GrismFLT(object):
         
         self.catalog = Table.read(seg_cat, format=catalog_format)
     
+    def save_model(self, clobber=True, verbose=True):
+        """Save model properties to FITS file
+        """
+        import cPickle as pickle
+        
+        root = self.grism_file.split('_flt.fits')[0]
+        
+        h = pyfits.Header()
+        h['GFILE'] = (self.grism_file, 'Grism exposure name')
+        h['GFILTER'] = (self.grism.filter, 'Grism spectral element')
+        h['INSTRUME'] = (self.grism.instrument, 'Instrument of grism file')
+        h['PAD'] = (self.pad, 'Image padding used')
+        h['DFILE'] = (self.direct_file, 'Direct exposure name')
+        h['DFILTER'] = (self.direct.filter, 'Grism spectral element')
+        h['REF_FILE'] = (self.ref_file, 'Reference image')
+        h['SEG_FILE'] = (self.seg_file, 'Segmentation image')
+        h['CONFFILE'] = (self.conf_file, 'Configuration file')
+        h['DISP_PA'] = (self.dispersion_PA, 'Dispersion position angle')
+        
+        h0 = pyfits.PrimaryHDU(header=h)
+        model = pyfits.ImageHDU(data=self.model, header=self.grism.header, 
+                                name='MODEL')
+                                
+        seg = pyfits.ImageHDU(data=self.seg, header=self.grism.header,
+                              name='SEG')
+
+        hdu = pyfits.HDUList([h0, model, seg])
+        
+        if 'REF' in self.direct.data:
+            ref_header = self.grism.header.copy()
+            ref_header['FILTER'] = self.direct.ref_filter
+            ref_header['PARENT'] = self.ref_file
+            ref_header['PHOTFLAM'] = self.direct.ref_photflam
+            ref_header['PHOTPLAM'] = self.direct.ref_photplam
+            
+            ref = pyfits.ImageHDU(data=self.direct['REF'],
+                                  header=ref_header, name='REFERENCE')
+        
+            hdu.append(ref)
+            
+        hdu.writeto('%s_model.fits' %(root), clobber=clobber,
+                    output_verify='fix')
+        
+        fp = open('%s_model.pkl' %(root), 'wb')
+        pickle.dump(self.object_dispersers, fp)
+        fp.close()
+        
+        if verbose:
+            print 'Saved %s_model.fits and %s_model.pkl' %(root, root)
+    
+    def save_full_pickle(self, verbose=True):
+        """Save entire `GrismFLT` object to a pickle
+        """
+        import cPickle as pickle
+        
+        root = self.grism_file.split('_flt.fits')[0]
+
+        hdu = pyfits.HDUList([pyfits.PrimaryHDU()])
+        for key in self.direct.data.keys():
+            hdu.append(pyfits.ImageHDU(data=self.direct.data[key],
+                                       header=self.direct.header, 
+                                       name='D'+key))
+        
+        for key in self.grism.data.keys():
+            hdu.append(pyfits.ImageHDU(data=self.grism.data[key],
+                                       header=self.grism.header, 
+                                       name='G'+key))
+        
+        hdu.append(pyfits.ImageHDU(data=self.seg,
+                                   header=self.grism.header, 
+                                   name='SEG'))
+        
+        hdu.append(pyfits.ImageHDU(data=self.model,
+                                   header=self.grism.header, 
+                                   name='MODEL'))
+        
+        
+        hdu.writeto('%s_GrismFLT.fits' %(root), clobber=True, 
+                    output_verify='fix')
+        
+        ## zero out large data objects
+        self.direct.data = self.grism.data = self.seg = self.model = None
+                                            
+        fp = open('%s_GrismFLT.pkl' %(root), 'wb')
+        pickle.dump(self, fp)
+        fp.close()
+    
+    def load_from_fits(self, save_file):
+        """Load saved data
+        
+        TBD
+        """
+        fits = pyfits.open(save_file)
+        self.seg = fits['SEG'].data
+        self.model = fits['MODEL'].data
+        self.direct.data = collections.OrderedDict()
+        self.grism.data = collections.OrderedDict()
+        
+        for ext in range(1,len(fits)):
+            key = fits[ext].header['EXTNAME'][1:]
+            
+            if fits[ext].header['EXTNAME'].startswith('D'):
+                if fits[ext].data is None:
+                    self.direct.data[key] = None
+                else:
+                    self.direct.data[key] = fits[ext].data*1
+            elif fits[ext].header['EXTNAME'].startswith('G'):
+                if fits[ext].data is None:
+                    self.grism.data[key] = None
+                else:
+                    self.grism.data[key] = fits[ext].data*1
+            else:
+                pass
+                
+        return True
+        
 class BeamCutout(object):
     def __init__(self, flt=None, beam=None, conf=None, 
                  get_slice_header=True, fits_file=None,
@@ -2221,6 +2296,33 @@ class BeamCutout(object):
         header['DLDP'] = (dl, 'delta wavelength per pixel')
         
         return header, wcs
+    
+    def get_2d_wcs(self, data=None):
+        """TBD
+        """
+        h = pyfits.Header()
+        h['CRPIX1'] = self.beam.sh_beam[0]/2 - self.beam.xcenter
+        h['CRPIX2'] = self.beam.sh_beam[0]/2 - self.beam.ycenter
+        h['CRVAL1'] = self.beam.lam_beam[0]        
+        h['CD1_1'] = self.beam.lam_beam[1] - self.beam.lam_beam[0]
+        h['CD1_2'] = 0.
+        
+        h['CRVAL2'] = -1*self.beam.ytrace_beam[0]
+        h['CD2_2'] = 1.
+        h['CD2_1'] = -(self.beam.ytrace_beam[1] - self.beam.ytrace_beam[0])
+        
+        h['CTYPE1'] = 'WAVE'
+        h['CTYPE2'] = 'LINEAR'
+        
+        if data is None:
+            data = np.zeros(self.beam.sh_beam, dtype=np.float32)
+        
+        hdu = pyfits.ImageHDU(data=data, header=h)
+        wcs = pywcs.WCS(hdu.header)
+        
+        wcs.pscale = np.sqrt(wcs.wcs.cd[0,0]**2 + wcs.wcs.cd[1,0]**2)*3600.
+        
+        return hdu, wcs
     
     def init_poly_coeffs(self, poly_order=1, fit_background=True):
         """TBD

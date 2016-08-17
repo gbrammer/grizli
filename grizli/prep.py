@@ -258,7 +258,7 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
     drz_wcs = pywcs.WCS(drz_im[0].header, relax=True)
     orig_wcs = drz_wcs.copy()
     
-    out_shift, out_rot = np.zeros(2), 0.
+    out_shift, out_rot, out_scale = np.zeros(2), 0., 1.
     
     for iter in range(NITER):
         xy = np.array(drz_wcs.all_world2pix(rd_ref, 0))
@@ -316,17 +316,19 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
         
         out_shift += tf.translation
         out_rot -= tf.rotation
+        out_scale *= tf.scale
         
         drz_wcs.wcs.crpix += tf.translation
         theta = -tf.rotation
         _mat = np.array([[np.cos(theta), -np.sin(theta)],
                          [np.sin(theta), np.cos(theta)]])
         
-        drz_wcs.wcs.cd = np.dot(drz_wcs.wcs.cd, _mat)
+        drz_wcs.wcs.cd = np.dot(drz_wcs.wcs.cd, _mat)/tf.scale
                 
     if log:
         tf_out = tf(output[output_ix][~outliers])
         dx = input[input_ix][~outliers] - tf_out
+        
         rms = utils.nmad(np.sqrt((dx**2).sum(axis=1)))
         
         interactive_status=plt.rcParams['interactive']
@@ -334,7 +336,7 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
 
         fig = plt.figure(figsize=[6.,6.])
         ax = fig.add_subplot(111)
-        ax.scatter(dx[:,0], dx[:,1], alpha=0.5)
+        ax.scatter(dx[:,0], dx[:,1], alpha=0.5, color='b')
         ax.scatter([0],[0], marker='+', color='red', s=40)
         ax.set_xlabel(r'$dx$'); ax.set_ylabel(r'$dy$')
         ax.set_title(root)
@@ -350,19 +352,19 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
         if interactive_status:
             plt.ion()
         
-        log_wcs(root, orig_wcs, out_shift, out_rot/np.pi*180, rms,
+        log_wcs(root, orig_wcs, out_shift, out_rot/np.pi*180, out_scale, rms,
                 n=NGOOD, initialize=False)
             
-    return orig_wcs, drz_wcs, out_shift, out_rot/np.pi*180
+    return orig_wcs, drz_wcs, out_shift, out_rot/np.pi*180, out_scale
 
-def log_wcs(root, drz_wcs, shift, rot, rms=0., n=-1, initialize=True):
+def log_wcs(root, drz_wcs, shift, rot, scale, rms=0., n=-1, initialize=True):
     """TBD
     """
     if (not os.path.exists('%s_wcs.log' %(root))) | initialize:
         print 'Initialize %s_wcs.log' %(root)
         orig_hdul = pyfits.HDUList()
         fp = open('%s_wcs.log' %(root), 'w')
-        fp.write('# ext xshift yshift rot rms N\n')
+        fp.write('# ext xshift yshift rot scale rms N\n')
         fp.write('# %s\n' %(root))
         count = 0
     else:
@@ -374,8 +376,9 @@ def log_wcs(root, drz_wcs, shift, rot, rms=0., n=-1, initialize=True):
     orig_hdul.append(hdu)
     orig_hdul.writeto('%s_wcs.fits' %(root), clobber=True)
     
-    fp.write('%5d %13.4f %13.4f %13.4f %13.3f %4d\n' %(count, shift[0],
-                                                       shift[1], rot, rms, n))
+    fp.write('%5d %13.4f %13.4f %13.4f %13.5f %13.3f %4d\n' %(count, shift[0],
+                                                       shift[1], rot, scale,
+                                                       rms, n))
     fp.close()
     
 def table_to_regions(table, output='ds9.reg'):
@@ -464,24 +467,37 @@ def tweak_flt(files=[], max_dist=0.4, threshold=3, verbose=True):
     wcs_ref = cats[0][1]
     return wcs_ref, d
 
-def make_drz_catalog(root='', threshold=2., verbose=True):
+def make_drz_catalog(root='', threshold=2., get_background=True, 
+                     verbose=True, extra_config={}):
     import sewpy
     
     im = pyfits.open('%s_drz_sci.fits' %(root))
     ZP = -2.5*np.log10(im[0].header['PHOTFNU'])+8.90
     
-    config = OrderedDict(DETECT_THRESH=threshold, DETECT_MINAREA=8,
+    config = OrderedDict(DETECT_THRESH=threshold, ANALYSIS_THRESH=threshold,
+              DETECT_MINAREA=6,
               PHOT_FLUXFRAC="0.5", 
               WEIGHT_TYPE="MAP_WEIGHT",
               WEIGHT_IMAGE="%s_drz_wht.fits" %(root),
               CHECKIMAGE_TYPE="SEGMENTATION",
               CHECKIMAGE_NAME='%s_seg.fits' %(root),
-              MAG_ZEROPOINT=ZP)
-            
+              MAG_ZEROPOINT=ZP, 
+              CLEAN="N", 
+              PHOT_APERTURES="6, 8.335, 16.337, 20",
+              BACK_SIZE=32)
+    
+    if get_background:
+        config['CHECKIMAGE_TYPE'] = 'SEGMENTATION,BACKGROUND'
+        config['CHECKIMAGE_NAME'] = '%s_seg.fits,%s_bkg.fits' %(root,root)
+    
+    for key in extra_config:
+        config[key] = extra_config[key]
+        
     sew = sewpy.SEW(params=["NUMBER", "X_IMAGE", "Y_IMAGE", "X_WORLD",
                     "Y_WORLD", "A_IMAGE", "B_IMAGE", "THETA_IMAGE", 
                     "MAG_AUTO", "MAGERR_AUTO", "FLUX_AUTO", "FLUXERR_AUTO",
-                    "FLUX_RADIUS", "FLAGS"],
+                    "FLUX_APER", "FLUXERR_APER",
+                    "FLUX_RADIUS", "BACKGROUND", "FLAGS"],
                     config=config)
     
     output = sew('%s_drz_sci.fits' %(root))
@@ -684,14 +700,14 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                                   radec=radec, NITER=5, clip=clip, log=True,
                                   outlier_threshold=align_tolerance)
                                   
-    orig_wcs, drz_wcs, out_shift, out_rot = result
+    orig_wcs, drz_wcs, out_shift, out_rot, out_scale = result
         
     ### Update direct FLT WCS
     for file in direct['files']:
         updatehdr.updatewcs_with_shift(file, 
                                   '%s_wcs.fits' %(direct['product']),
                                   xsh=out_shift[0], ysh=out_shift[1],
-                                  rot=out_rot, scale=1.,
+                                  rot=out_rot, scale=out_scale,
                                   wcsname=ref_catalog, force=True,
                                   reusename=True, verbose=True,
                                   sciext='SCI')
@@ -726,7 +742,7 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
     ##########  Grism image processing
     #################
     
-    if grism == {}:
+    if (grism == {}) | (grism is None) | (len(grism) == 0):
         return True
     
     ### Match grism WCS to the direct images
@@ -835,11 +851,16 @@ def match_direct_grism_wcs(direct={}, grism={}, get_fresh_flt=True,
     for ext in wcs_log['ext']:
         tmp_wcs = '/tmp/%s_tmpwcs.fits' %(direct['product'])
         wcs_hdu[ext].writeto(tmp_wcs, clobber=True)
+        if 'scale' in wcs_log.colnames:
+            scale = wcs_log['scale'][ext]
+        else:
+            scale = 1.
+            
         for file in grism['files']:
             updatehdr.updatewcs_with_shift(file, tmp_wcs,
                                       xsh=wcs_log['xshift'][ext],
                                       ysh=wcs_log['yshift'][ext],
-                                      rot=wcs_log['rot'][ext], scale=1.,
+                                      rot=wcs_log['rot'][ext], scale=scale,
                                       wcsname=ref_catalog, force=True,
                                       reusename=True, verbose=True,
                                       sciext='SCI')
@@ -878,7 +899,7 @@ def align_multiple_drizzled(mag_limits=[16,23]):
                                       radec=rd_ref,
                                       NITER=5, clip=20)
 
-        orig_wcs, drz_wcs, out_shift, out_rot = result
+        orig_wcs, drz_wcs, out_shift, out_rot, out_scale = result
         
         im = pyfits.open(drz_file)
         files = []
@@ -889,7 +910,7 @@ def align_multiple_drizzled(mag_limits=[16,23]):
         for file in files:
             updatehdr.updatewcs_with_shift(file, drz_files[0],
                                       xsh=out_shift[0], ysh=out_shift[1],
-                                      rot=out_rot, scale=1.,
+                                      rot=out_rot, scale=out_scale,
                                       wcsname=ref_catalog, force=True,
                                       reusename=True, verbose=True,
                                       sciext='SCI')
