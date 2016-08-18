@@ -142,6 +142,7 @@ def _loadFLT(grism_file, sci_extn, direct_file, pad, ref_file,
     #print grism_file, direct_file
     
     save_file = grism_file.replace('_flt.fits', '_GrismFLT.fits')
+    save_file = save_file.replace('_cmb.fits', '_GrismFLT.fits')
     if os.path.exists(save_file):
         print 'Load %s!' %(save_file)
         
@@ -253,6 +254,7 @@ class GroupFLT():
                     continue
                     
             save_file = file.replace('_flt.fits', '_GrismFLT.fits')
+            save_file = save_file.replace('_cmb.fits', '_GrismFLT.fits')
             print 'Save %s' %(save_file)
             self.FLTs[i].save_full_pickle()
             
@@ -591,14 +593,16 @@ class MultiBeam():
         # 'templates/EAZY_v1.0_lines/eazy_v1.0_sed6_nolines.dat',     
         # 'templates/cvd12_t11_solar_Chabrier.extend.dat',     
         # 'templates/dobos11/bc03_pr_ch_z02_ltau07.0_age09.2_av2.5.dat']
-
+        
+        ## Intermediate and very old
         templates = ['templates/EAZY_v1.0_lines/eazy_v1.0_sed3_nolines.dat',  
-                     'templates/cvd12_t11_solar_Chabrier.extend.dat']     
+                     'templates/cvd12_t11_solar_Chabrier.extend.skip10.dat']     
         
+        ## Post starburst
+        templates.append('templates/UltraVISTA/eazy_v1.1_sed9.dat')
+        
+        ## Very blue continuum
         templates.append('templates/YoungSB/erb2010_continuum.dat')
-        #templates = templates[-1:]
-        
-        #print 'XXX! templates', templates, '\n'
         
         # templates.extend(['templates/dobos11/SF0_0.emline.hiOIII.txt', 
         #                   'templates/dobos11/SF0_0.emline.loOIII.txt'])
@@ -1009,7 +1013,7 @@ class MultiBeam():
         fig.tight_layout(pad=0.1)
         return fig
     
-    def redshift_fit_twod_figure(self, fit):
+    def redshift_fit_twod_figure(self, fit, spatial_scale=1, dlam=46., NY=10):
         """Make figure of 2D spectrum
         TBD
         """        
@@ -1023,21 +1027,21 @@ class MultiBeam():
                 xmin = np.minimum(xmin, limits[g][0])
                 xmax = np.maximum(xmin, limits[g][1])
         
-        hdu_sci = drizzle_2d_spectrum(self.beams, ds9=None, NY=10,
-                                      spatial_scale=1, dlam=46., 
+        hdu_sci = drizzle_2d_spectrum(self.beams, ds9=None, NY=NY,
+                                      spatial_scale=spatial_scale, dlam=dlam, 
                                       kernel='point', pixfrac=0.6,
                                       wlimit=[xmin, xmax])
                                   
         ### Continuum model
         cont = self.reshape_flat(fit['model_cont'])        
-        hdu_con = drizzle_2d_spectrum(self.beams, data=cont, ds9=None, NY=10,
-                                      spatial_scale=1, dlam=46., 
+        hdu_con = drizzle_2d_spectrum(self.beams, data=cont, ds9=None, NY=NY,
+                                      spatial_scale=spatial_scale, dlam=dlam, 
                                       kernel='point', pixfrac=0.6,
                                       wlimit=[xmin, xmax])
         
         full = self.reshape_flat(fit['model_full'])        
-        hdu_full = drizzle_2d_spectrum(self.beams, data=full, ds9=None, NY=10,
-                                      spatial_scale=1, dlam=46., 
+        hdu_full = drizzle_2d_spectrum(self.beams, data=full, ds9=None, NY=NY,
+                                      spatial_scale=spatial_scale, dlam=dlam, 
                                       kernel='point', pixfrac=0.6,
                                       wlimit=[xmin, xmax])
         
@@ -1051,7 +1055,7 @@ class MultiBeam():
         show = [hdu_sci[1].data, hdu_full[1].data,
                 hdu_sci[1].data-hdu_con[1].data]
         
-        desc = [r'$Cleaned$', r'$Model$', r'$Residual$']
+        desc = [r'$Contam$'+'\n'+r'$Cleaned$', r'$Model$', r'$Line$'+'\n'+r'$Residual$']
         
         i=0
         for data_i, desc_i in zip(show, desc):
@@ -1072,7 +1076,16 @@ class MultiBeam():
         fig.axes[-1].set_xlabel(r'$\lambda$')
         
         fig.tight_layout(pad=0.2)
+
+        ## Label
+        label = 'ID=%6d, z=%.4f' %(self.beams[0].id, fit['zbest'])
+        fig.axes[-1].text(0.97, -0.27, label, ha='right', va='top',
+                          transform=fig.axes[-1].transAxes, fontsize=10)
         
+        label2 = ('%s' %(self.Ngrism)).replace('\'', '').replace('{', '').replace('}', '')
+        fig.axes[-1].text(0.03, -0.27, label2, ha='left', va='top',
+                          transform=fig.axes[-1].transAxes, fontsize=10)
+                
         hdu_sci.append(hdu_con[1])
         hdu_sci[-1].name = 'CONTINUUM'
         hdu_sci.append(hdu_full[1])
