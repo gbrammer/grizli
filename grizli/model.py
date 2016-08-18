@@ -1966,7 +1966,7 @@ class GrismFLT(object):
         """
         import cPickle as pickle
         
-        root = self.grism_file.split('_flt.fits')[0]
+        root = self.grism_file.split('_flt.fits')[0].split('_cmb.fits')[0]
 
         hdu = pyfits.HDUList([pyfits.PrimaryHDU()])
         for key in self.direct.data.keys():
