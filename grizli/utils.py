@@ -392,6 +392,69 @@ def nmad(data):
     """
     import astropy.stats
     return 1.48*astropy.stats.median_absolute_deviation(data)
+
+def get_line_wavelengths():
+    """TBD
+    """
+    line_wavelengths = {} ; line_ratios = {}
+    line_wavelengths['Ha'] = [6564.61]
+    line_ratios['Ha'] = [1.]
+    line_wavelengths['Hb'] = [4862.68]
+    line_ratios['Hb'] = [1.]
+    line_wavelengths['Hg'] = [4341.68]
+    line_ratios['Hg'] = [1.]
+    line_wavelengths['Hd'] = [4102.892]
+    line_ratios['Hd'] = [1.]
+    line_wavelengths['OIIIx'] = [4364.436]
+    line_ratios['OIIIx'] = [1.]
+    line_wavelengths['OIII'] = [5008.240, 4960.295]
+    line_ratios['OIII'] = [2.98, 1]
+    line_wavelengths['OIII+Hb'] = [5008.240, 4960.295, 4862.68]
+    line_ratios['OIII+Hb'] = [2.98, 1, 3.98/8.]
+    
+    line_wavelengths['OIII+Hb+Ha'] = [5008.240, 4960.295, 4862.68, 6564.61]
+    line_ratios['OIII+Hb+Ha'] = [2.98, 1, 3.98/10., 3.98/10.*2.86]
+
+    line_wavelengths['OIII+Hb+Ha+SII'] = [5008.240, 4960.295, 4862.68, 6564.61, 6718.29, 6732.67]
+    line_ratios['OIII+Hb+Ha+SII'] = [2.98, 1, 3.98/10., 3.98/10.*2.86*4, 3.98/10.*2.86/10.*4, 3.98/10.*2.86/10.*4]
+
+    line_wavelengths['OIII+OII'] = [5008.240, 4960.295, 3729.875]
+    line_ratios['OIII+OII'] = [2.98, 1, 3.98/4.]
+
+    line_wavelengths['OII'] = [3729.875]
+    line_ratios['OII'] = [1]
+    line_wavelengths['OI'] = [6302.046]
+    line_ratios['OI'] = [1]
+
+    line_wavelengths['NeIII'] = [3869]
+    line_ratios['NeIII'] = [1.]
+    line_wavelengths['NeV'] = [3346.8]
+    line_ratios['NeV'] = [1.]
+    line_wavelengths['NeVI'] = [3426.85]
+    line_ratios['NeVI'] = [1.]
+    line_wavelengths['SIII'] = [9068.6, 9530.6]
+    line_ratios['SIII'] = [1, 2.44]
+    line_wavelengths['HeII'] = [4687.5]
+    line_ratios['HeII'] = [1.]
+    line_wavelengths['HeI'] = [5877.2]
+    line_ratios['HeI'] = [1.]
+    line_wavelengths['HeIb'] = [3889.5]
+    line_ratios['HeIb'] = [1.]
+    
+    line_wavelengths['MgII'] = [2799.117]
+    line_ratios['MgII'] = [1.]
+    line_wavelengths['CIV'] = [1549.480]
+    line_ratios['CIV'] = [1.]
+    line_wavelengths['Lya'] = [1215.4]
+    line_ratios['Lya'] = [1.]
+
+    line_wavelengths['Ha+SII'] = [6564.61, 6718.29, 6732.67]
+    line_ratios['Ha+SII'] = [1., 1./10, 1./10]
+    
+    line_wavelengths['SII'] = [6718.29, 6732.67]
+    line_ratios['SII'] = [1., 1.]   
+    
+    return line_wavelengths, line_ratios 
     
 class SpectrumTemplate(object):
     """TBD
@@ -461,7 +524,24 @@ def zoom_zgrid(zgrid, chi2nu, threshold=0.01, factor=10, grow=7):
     
     return out_grid
 
-
+def get_wcs_pscale(wcs):
+    """Get correct pscale from `astropy.wcs.WCS` object
+    
+    Parameters
+    ----------
+    wcs : `astropy.wcs.WCS`
+        
+    Returns
+    -------
+    pscale : float
+        Pixel scale from `wcs.cd`
+        
+    """
+    from numpy import linalg
+    det = linalg.det(wcs.wcs.cd)
+    pscale = np.sqrt(np.abs(det))*3600.
+    return pscale
+    
 def make_spectrum_wcsheader(center_wave=1.4e4, dlam=40, NX=100, spatial_scale=1, NY=10):
     import astropy.io.fits as pyfits
     import astropy.wcs as pywcs

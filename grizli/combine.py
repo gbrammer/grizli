@@ -39,13 +39,14 @@ def combine_filter_combinations(root='udf', grow=2, ds9=None, verbose=True,
                             clobber=clobber)
 
 def combine_visit_combinations(grow=2, ds9=None, verbose=True,
-                               clobber=True, filters=['G102', 'G141']):
+                               clobber=True, pixfrac=0.5, kernel='point', 
+                               filters=['G102', 'G141'], skip=1):
     """TBD
     """
     files=glob.glob('i*flt.fits')
     output_list, filter_list = utils.parse_flt_files(files, uniquename=False)
     
-    for key in output_list.keys():
+    for key in output_list.keys()[::skip]:
         filter=key.split('-')[-1].upper()
         if filter not in filters:
             continue
@@ -57,15 +58,122 @@ def combine_visit_combinations(grow=2, ds9=None, verbose=True,
             
         combine_flt(files=output_list[key], output=output, 
                     grow=grow, ds9=ds9, verbose=verbose, 
-                    clobber=clobber)
+                    clobber=clobber, pixfrac=pixfrac, kernel=kernel)
+
+def get_shifts(files, ref_pixel=[507, 507]):
+    """
+    TBD
+    """
+    f0 = pyfits.open(files[0])
+    h0 = f0[0].header.copy()
+    h0['EXPTIME'] = 0.
+    
+    out_wcs = pywcs.WCS(f0[1].header, relax=True)
+    out_wcs.pscale = utils.get_wcs_pscale(out_wcs)
+    
+    ### Offsets
+    ra0, de0 = out_wcs.all_pix2world([ref_pixel[0]],[ref_pixel[1]],0)
+
+    x0 = np.zeros(len(files))
+    y0 = np.zeros(len(files))
+
+    for i, file in enumerate(files):
+        hx = pyfits.getheader(file, 0)
+        h0['EXPTIME'] += hx['EXPTIME']
+        h0['FILE%04d' %(i)] = file, 'Included file #%d' %(i)
+    
+        h = pyfits.getheader(file, 1)
+        flt_wcs = pywcs.WCS(h, relax=True)
+        x0[i], y0[i] = flt_wcs.all_world2pix(ra0, de0, 0)
+
+    return h0, x0-ref_pixel[0], y0-ref_pixel[1]
+
+def split_pixel_quadrant(dx, dy):
+    """
+    TBD
+    
+    Group offsets by the quadrant they put the central pixel in
+    """
+    xq = np.cast[int](np.round((dx - np.floor(dx))*2)) % 2
+    yq = np.cast[int](np.round((dy - np.floor(dy))*2)) % 2
+    
+    ### Test
+    if False:
+        xf = ((dx - np.floor(dx)))
+        yf = ((dy - np.floor(dy)))
+
+        colors = np.array([['r','g'],['b','k']])
+        plt.scatter(xf, yf, c=colors[xq, yq])
+    
+    index = np.arange(len(dx))
+    out = {}
+    for i in range(4):
+        match = xq+2*yq == i
+        if match.sum() > 0:
+            out[i] = index[match]
+    
+    return out
+
+def combine_figs():
+    """
+    Combine FIGS exposures split by offset pixel quadrant
+    """
+    from stsci.tools import asnutil
+    
+    #all_asn = glob.glob('figs-g*-g1*asn.fits')
+    all_asn = []
+    all_asn.extend(glob.glob('g[ns][0-9]*g102*asn.fits'))
+    all_asn.extend(glob.glob('gdn*g102*asn.fits'))
+    grism = 'g102'
+    
+    #all_asn = glob.glob('gn-z10*-g1*asn.fits')
+    #all_asn.extend(glob.glob('colfax-*g14*asn.fits'))
+    #all_asn = glob.glob('goodsn-*g14*asn.fits')
+    #grism = 'g141'
+    
+    roots = np.unique(['-'.join(asn.split('-')[:2]) for asn in all_asn])
+    for root in roots:
+        all_asn = glob.glob('%s*g1*asn.fits' %(root))
+        angles = np.unique([asn.split('-')[-2] for asn in all_asn])
+        for angle in angles:
+            asn_files = glob.glob('%s*-%s-g1*asn.fits' %(root, angle))
             
+            grism_files = [] 
+            for file in asn_files:
+                asn = asnutil.readASNTable(file)
+                grism_files.extend(['%s_flt.fits' %(flt) for flt in asn['order']])
+            
+            print '%s-%s %d' %(root, angle, len(grism_files))
+            combine_quadrants(files=grism_files, output='%s-%s-%s_cmb.fits' %(root, angle, grism))
+            
+def combine_quadrants(files=[], output='images_cmb.fits', pixfrac=0.5, 
+                 kernel='point'):
+    """TBD
+    """
+    h, dx, dy = get_shifts(files, ref_pixel=[507, 507])
+    out = split_pixel_quadrant(dx, dy)
+    for q in out:
+        print 'Quadrant %d, %d files' %(q, len(out[q]))
+        combine_flt(files=np.array(files)[out[q]],
+                    output=output.replace('_cmb.fits', '_q%d_cmb.fits' %(q)), 
+                    grow=1, pixfrac=pixfrac, kernel=kernel)
+                    
 def combine_flt(files=[], output='combined_flt.fits', grow=2,
-                add_padding=True, ds9=None,
+                add_padding=True, ds9=None, split_quadrants=False,
                 verbose=True, clobber=True, pixfrac=0.5, kernel='point'):
     """Drizzle distorted frames to an "interlaced" image
     TBD
     """
+    import numpy.linalg
+    from stsci.tools import asnutil
     
+    ###  `files` is an ASN filename, not  a list of exposures
+    if '_asn.fits' in files:
+        asn = asnutil.readASNTable(files)
+        files = ['%s_flt.fits' %(flt) for flt in asn['order']]
+        if output == 'combined_flt.fits':
+            output = '%s_cmb.fits' %(asn['output'])
+            
     if False:
         files=glob.glob('ibhj3*flt.fits')
         files.sort()
@@ -84,10 +192,12 @@ def combine_flt(files=[], output='combined_flt.fits', grow=2,
     f0 = pyfits.open(files[0])
     h0 = f0[0].header.copy()
     h0['EXPTIME'] = 0.
+    h0['NFILES'] = (len(files), 'Number of combined files')
     
     out_wcs = pywcs.WCS(f0[1].header, relax=True)
-    out_wcs.pscale = np.sqrt(out_wcs.wcs.cd[0,0]**2 +
-                             out_wcs.wcs.cd[1,0]**2)*3600.
+    out_wcs.pscale = utils.get_wcs_pscale(out_wcs)
+    # out_wcs.pscale = np.sqrt(out_wcs.wcs.cd[0,0]**2 +
+    #                          out_wcs.wcs.cd[1,0]**2)*3600.
     
     ### Compute maximum offset needed for padding
     if add_padding:
@@ -118,7 +228,6 @@ def combine_flt(files=[], output='combined_flt.fits', grow=2,
     else:
         pad = 0
         
-                                                                 
     inter_wcs = out_wcs.deepcopy()
     if grow > 1:
         inter_wcs.wcs.cd /= grow
@@ -180,9 +289,8 @@ def combine_flt(files=[], output='combined_flt.fits', grow=2,
         wht = np.cast[np.float32](wht)
 
         exp_wcs = pywcs.WCS(im[1].header, relax=True)
-        exp_wcs.pscale = np.sqrt(exp_wcs.wcs.cd[0,0]**2 +
-                                 exp_wcs.wcs.cd[1,0]**2)*3600.
-
+        exp_wcs.pscale = utils.get_wcs_pscale(exp_wcs)
+                                 
         #pf = 0.5
         # import drizzlepac.wcs_functions as dwcs
         # xx = out_wcs.deepcopy()
@@ -191,16 +299,17 @@ def combine_flt(files=[], output='combined_flt.fits', grow=2,
 
         astrodrizzle.adrizzle.do_driz(im['SCI'].data, exp_wcs, wht,
                                       inter_wcs, outsci, outwht, outctx,
-                                      1., 'cps', 1, wcslin_pscale=1.0,
+                                      1., 'cps', 1, 
+                                      wcslin_pscale=exp_wcs.pscale,
                                       uniqid=1,
                                       pixfrac=pixfrac, kernel=kernel, 
                                       fillval=0, stepsize=10,
-                                       wcsmap=SIP_WCSMap)   
+                                      wcsmap=SIP_WCSMap)   
 
         if ds9 is not None:
-            ds9.view(outsci/out_wcs.pscale**2, header=outh)
+            ds9.view(outsci, header=outh)
 
-    outsci /= out_wcs.pscale**2
+    #outsci /= out_wcs.pscale**2
     rms = 1/np.sqrt(outwht)
     mask = (outwht == 0) | (rms > 100)
     rms[mask] = 0

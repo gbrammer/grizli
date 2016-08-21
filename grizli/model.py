@@ -786,13 +786,18 @@ class ImageData(object):
         self.data['DQ'][bad] |= 4
         return bad.sum()
         
-            
     def get_wcs(self):
         """Get WCS from header"""
+        import numpy.linalg
+        
         self.wcs = pywcs.WCS(self.header, relax=True)
         if not hasattr(self.wcs, 'pscale'):
-            self.wcs.pscale = np.sqrt(self.wcs.wcs.cd[0,0]**2 +
-                                      self.wcs.wcs.cd[1,0]**2)*3600.
+            # self.wcs.pscale = np.sqrt(self.wcs.wcs.cd[0,0]**2 +
+            #                           self.wcs.wcs.cd[1,0]**2)*3600.
+            
+            ### From stwcs.distortion.utils
+            det = np.linalg.det(self.wcs.wcs.cd)
+            self.wcs.pscale = np.sqrt(np.abs(det))*3600.
             
             #print '%s, PSCALE: %.4f' %(self.parent_file, self.wcs.pscale)
             
@@ -2004,8 +2009,8 @@ class GrismFLT(object):
         TBD
         """
         fits = pyfits.open(save_file)
-        self.seg = fits['SEG'].data
-        self.model = fits['MODEL'].data
+        self.seg = fits['SEG'].data*1
+        self.model = fits['MODEL'].data*1
         self.direct.data = collections.OrderedDict()
         self.grism.data = collections.OrderedDict()
         
@@ -2324,6 +2329,22 @@ class BeamCutout(object):
         
         return hdu, wcs
     
+    def get_sky_center(self):
+        """Get WCS coordinates of the center of the direct image
+        
+        Returns
+        -------
+        ra, dec: float
+            Center coordinates in decimal degrees
+        """
+        pix_center = np.array([self.beam.sh][::-1])/2. 
+        pix_center -= np.array([self.beam.xcenter, self.beam.ycenter]) 
+        for i in range(2):
+            self.direct.wcs.sip.crpix[i] = self.direct.wcs.wcs.crpix[i]
+            
+        ra, dec = self.direct.wcs.all_pix2world(pix_center, 1)[0]
+        return ra, dec
+        
     def init_poly_coeffs(self, poly_order=1, fit_background=True):
         """TBD
         """
