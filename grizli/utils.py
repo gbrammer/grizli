@@ -423,6 +423,10 @@ def get_line_wavelengths():
 
     line_wavelengths['OII'] = [3729.875]
     line_ratios['OII'] = [1]
+    
+    line_wavelengths['OII+Ne'] = [3729.875, 3869]
+    line_ratios['OII+Ne'] = [1, 1./5]
+    
     line_wavelengths['OI'] = [6302.046]
     line_ratios['OI'] = [1]
 
@@ -450,6 +454,8 @@ def get_line_wavelengths():
 
     line_wavelengths['Ha+SII'] = [6564.61, 6718.29, 6732.67]
     line_ratios['Ha+SII'] = [1., 1./10, 1./10]
+    line_wavelengths['Ha+SII+SIII+He'] = [6564.61, 6718.29, 6732.67, 9068.6, 9530.6, 10830.]
+    line_ratios['Ha+SII+SIII+He'] = [1., 1./10, 1./10, 1./20, 2.44/20, 1./25.]
     
     line_wavelengths['SII'] = [6718.29, 6732.67]
     line_ratios['SII'] = [1., 1.]   

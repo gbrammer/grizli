@@ -1,5 +1,5 @@
 
-.. image:: docs/grizli_logo.png
+.. image:: examples/grizli_logo.png
 
 *Grism redshift & line* analysis software for space-based slitless spectroscopy
 ========================================================================================
@@ -127,11 +127,11 @@ Working Examples
 
 The following are IPython/jupyter notebooks demonstrating various aspects of the code functionality.  They render statically in the GitHub pages or can be run locally after cloning and installing the software repository.
 
-- `Grizly Demo <https://github.com/gbrammer/grizli/blob/master/docs/Grizli%20Demo.ipynb>`__: Simple interaction with WFC3/IR spectra
+- `Grizly Demo <https://github.com/gbrammer/grizli/blob/master/examples/Grizli%20Demo.ipynb>`__: Simple interaction with WFC3/IR spectra
 
-- `Basic-Sim <https://github.com/gbrammer/grizli/blob/master/docs/Basic-Sim.ipynb>`__ (5.5.16): Basic simulations based on single WFC3/IR grism and direct exposures
+- `Basic-Sim <https://github.com/gbrammer/grizli/blob/master/examples/Basic-Sim.ipynb>`__ (5.5.16): Basic simulations based on single WFC3/IR grism and direct exposures
 
-- `multimission-simulation <https://github.com/gbrammer/grizli/blob/master/docs/multimission-simulation.ipynb>`__ (5.11.16): 
+- `multimission-simulation <https://github.com/gbrammer/grizli/blob/master/examples/multimission-simulation.ipynb>`__ (5.11.16): 
   
   1. Demonstration of more advanced simulation techniques using deep image mosaics and external catalogs/segmentation images as reference.
   2. Provide a comparison between dispersed spectra from WFC3/G141, *JWST*/NIRISS and *WFIRST*.

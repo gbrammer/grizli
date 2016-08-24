@@ -139,7 +139,48 @@ class aXeConf():
     
         return a
     
-    def get_beam_trace(self, x=507, y=507, dx=0., beam='A'):
+    def evaluate_dp(self, dx_in, dydx):
+        """
+        Evalate arc length along the trace given trace polynomial coefficients
+        """
+        ## dp is the arc length along the trace
+        ## $\lambda = dldp_0 + dldp_1 dp + dldp_2 dp^2$ ...
+        order = len(dydx)+1
+        if order == 0:   ## dy=0
+            dp = dx_in                      
+        elif order == 1: ## constant dy/dx
+            dp = np.sqrt(1+dydx[1]**2)*(dx_in)
+        elif order == 2: ## quadratic trace
+            u0 = dydx[1]+2*dydx[2]*(0)
+            dp0 = (u0*np.sqrt(1+u0**2)+np.arcsinh(u0))/(4*dydx[2])
+            u = dydx[1]+2*dydx[2]*(dx_in)
+            dp = (u*np.sqrt(1+u**2)+np.arcsinh(u))/(4*dydx[2])-dp0
+        else:
+            ## high order shape, numerical integration along trace
+            ## (this can be slow)
+            xmin = np.minimum((dx_in).min(), 0)
+            xmax = np.maximum((dx_in).max(), 0)
+            xfull = np.arange(xmin, xmax)
+            dyfull = 0
+            for i in range(1, NORDER):
+                dyfull += i*dydx[i]*(xfull-0.5)**(i-1)
+            
+            ## Integrate from 0 to dx / -dx
+            dpfull = xfull*0.
+            lt0 = xfull <= 0
+            if lt0.sum() > 1:
+                dpfull[lt0] = np.cumsum(np.sqrt(1+dyfull[lt0][::-1]**2))[::-1]
+                dpfull[lt0] *= -1
+            #
+            gt0 = xfull >= 0
+            if gt0.sum() > 0:
+                dpfull[gt0] = np.cumsum(np.sqrt(1+dyfull[gt0]**2))
+              
+            dp = np.interp(dx_in, xfull, dpfull)
+        
+        return dp
+        
+    def get_beam_trace(self, x=507, y=507, dx=0., beam='A', fwcpos=None):
         """
         Get an aXe beam trace for an input reference pixel and 
         list of output x pixels dx
@@ -169,45 +210,87 @@ class aXeConf():
                 coeffs = self.conf['DLDP_%s_%d' %(beam, i)]
                 dldp[i] = self.field_dependent(xi, yi, coeffs)
         
-        ## dp is the arc length along the trace
-        ## $\lambda = dldp_0 + dldp_1 dp + dldp_2 dp^2$ ...
-        if self.conf['DYDX_ORDER_%s' %(beam)] == 0:   ## dy=0
-            dp = dx-xoff_beam                      
-        elif self.conf['DYDX_ORDER_%s' %(beam)] == 1: ## constant dy/dx
-            dp = np.sqrt(1+dydx[1]**2)*(dx-xoff_beam)
-        elif self.conf['DYDX_ORDER_%s' %(beam)] == 2: ## quadratic trace
-            u0 = dydx[1]+2*dydx[2]*(0)
-            dp0 = (u0*np.sqrt(1+u0**2)+np.arcsinh(u0))/(4*dydx[2])
-            u = dydx[1]+2*dydx[2]*(dx-xoff_beam)
-            dp = (u*np.sqrt(1+u**2)+np.arcsinh(u))/(4*dydx[2])-dp0
-        else:
-            ## high order shape, numerical integration along trace
-            ## (this can be slow)
-            xmin = np.minimum((dx-xoff_beam).min(), 0)
-            xmax = np.maximum((dx-xoff_beam).max(), 0)
-            xfull = np.arange(xmin, xmax)
-            dyfull = 0
-            for i in range(1, NORDER):
-                dyfull += i*dydx[i]*(xfull-0.5)**(i-1)
-            
-            ## Integrate from 0 to dx / -dx
-            dpfull = xfull*0.
-            lt0 = xfull <= 0
-            if lt0.sum() > 1:
-                dpfull[lt0] = np.cumsum(np.sqrt(1+dyfull[lt0][::-1]**2))[::-1]
-                dpfull[lt0] *= -1
-            #
-            gt0 = xfull >= 0
-            if gt0.sum() > 0:
-                dpfull[gt0] = np.cumsum(np.sqrt(1+dyfull[gt0]**2))
-              
-            dp = np.interp(dx-xoff_beam, xfull, dpfull)
+        dp = self.evaluate_dp(dx - xoff_beam, dydx)
+        # ## dp is the arc length along the trace
+        # ## $\lambda = dldp_0 + dldp_1 dp + dldp_2 dp^2$ ...
+        # if self.conf['DYDX_ORDER_%s' %(beam)] == 0:   ## dy=0
+        #     dp = dx-xoff_beam                      
+        # elif self.conf['DYDX_ORDER_%s' %(beam)] == 1: ## constant dy/dx
+        #     dp = np.sqrt(1+dydx[1]**2)*(dx-xoff_beam)
+        # elif self.conf['DYDX_ORDER_%s' %(beam)] == 2: ## quadratic trace
+        #     u0 = dydx[1]+2*dydx[2]*(0)
+        #     dp0 = (u0*np.sqrt(1+u0**2)+np.arcsinh(u0))/(4*dydx[2])
+        #     u = dydx[1]+2*dydx[2]*(dx-xoff_beam)
+        #     dp = (u*np.sqrt(1+u**2)+np.arcsinh(u))/(4*dydx[2])-dp0
+        # else:
+        #     ## high order shape, numerical integration along trace
+        #     ## (this can be slow)
+        #     xmin = np.minimum((dx-xoff_beam).min(), 0)
+        #     xmax = np.maximum((dx-xoff_beam).max(), 0)
+        #     xfull = np.arange(xmin, xmax)
+        #     dyfull = 0
+        #     for i in range(1, NORDER):
+        #         dyfull += i*dydx[i]*(xfull-0.5)**(i-1)
+        #     
+        #     ## Integrate from 0 to dx / -dx
+        #     dpfull = xfull*0.
+        #     lt0 = xfull <= 0
+        #     if lt0.sum() > 1:
+        #         dpfull[lt0] = np.cumsum(np.sqrt(1+dyfull[lt0][::-1]**2))[::-1]
+        #         dpfull[lt0] *= -1
+        #     #
+        #     gt0 = xfull >= 0
+        #     if gt0.sum() > 0:
+        #         dpfull[gt0] = np.cumsum(np.sqrt(1+dyfull[gt0]**2))
+        #       
+        #     dp = np.interp(dx-xoff_beam, xfull, dpfull)
         
         ## Evaluate dldp    
         lam = dp*0.
         for i in range(NORDER):
             lam += dldp[i]*dp**i
+        
+        ### NIRISS rotation?
+        if fwcpos is not None:
+            if 'FWCPOS_REF' not in self.conf.keys():
+                print 'Parameter fwcpos=%f supplied but no FWCPOS_REF in %s' %(self.conf_file)
+                return dy, lam
             
+            order = 'DYDX_ORDER_%s' %(beam)
+            if order != 2:
+                print 'ORDER=%d not supported for NIRISS rotation' %(order)
+                return dy, lam
+                
+            theta = (fwcpos - self.conf['FWCPOS_REF'])/180*np.pi
+            if theta == 0:
+                return dy, lam
+                
+            ### For the convention of swapping/inverting axes for GR150C
+            if apply_rot == 2:
+                theta = -theta
+            
+            ### Transformed trace coordinates
+            xp = (dx-xoff_beam)/np.cos(theta)
+            c = dydx
+            
+            beta = c[1]+2*c[2]*xp-1/np.tan(theta)
+            chi = c[0]+c[1]*xp+c[2]*xp**2
+            if theta < 0:
+                psi = (-beta+np.sqrt(beta**2-4*c[2]*chi))/2/c[2]/np.tan(theta)
+                delta = psi*np.tan(theta)
+                dy = xarr_i*np.tan(theta) + psi/np.cos(theta)
+            else:
+                psi = (-beta-np.sqrt(beta**2-4*c[2]*chi))/2/c[2]/np.tan(theta)
+                delta = psi*np.tan(theta)
+                dy = xarr_i*np.tan(theta) + psi/np.cos(theta)
+            
+            ### Evaluate wavelength at 'prime position along the trace
+            dp = self.evaluate_dp(xp+delta, dydx)
+            
+            lam = dp*0.
+            for i in range(NORDER):
+                lam += dldp[i]*dp**i
+                    
         return dy, lam
         
     def show_beams(self, beams=['E','D','C','B','A']):
