@@ -295,13 +295,28 @@ class GroupFLT():
         else:
             return True
             
-    def compute_full_model(self, fit_info, verbose=True, store=False, 
-                           cpu_count=0):
+    def compute_full_model(self, fit_info=None, verbose=True, store=False, 
+                           mag_limit=25, coeffs=[1.2, -0.5], cpu_count=0):
         """TBD
         """
         if cpu_count == 0:
             cpu_count = mp.cpu_count()
         
+        if fit_info is None:
+            bright = self.catalog['MAG_AUTO'] < mag_limit
+            ids = self.catalog['NUMBER'][bright]
+            mags = self.catalog['MAG_AUTO'][bright]
+
+            xspec = np.arange(0.6, 1.8, 0.05)-1
+
+            yspec = [xspec**o*coeffs[o] for o in range(len(coeffs))]
+            xspec = (xspec+1)*1.e4
+            yspec = np.sum(yspec, axis=0)
+
+            fit_info = collections.OrderedDict()
+            for id, mag in zip(ids, mags):
+                fit_info[id] = {'mag':mag, 'spec': [xspec, yspec]}
+            
         t0_pool = time.time()
         
         pool = mp.Pool(processes=cpu_count)
@@ -342,8 +357,8 @@ class GroupFLT():
             
         return out_beams
     
-    def refine_list(self, ids, mags, poly_order=1, ds9=None, verbose=True,
-                    max_coeff=2.5):
+    def refine_list(self, ids=[], mags=[], poly_order=2, mag_limits=[16,24], 
+                    max_coeff=5, ds9=None, verbose=True):
         """TBD
         
         bright = self.catalog['MAG_AUTO'] < 24
@@ -356,9 +371,20 @@ class GroupFLT():
         self.refine_list(ids, mags, ds9=ds9)
         
         """
+        if (len(ids) == 0) | (len(ids) != len(mags)):
+            bright = ((self.catalog['MAG_AUTO'] < mag_limits[1]) &
+                      (self.catalog['MAG_AUTO'] > mag_limits[0]))
+                      
+            ids = self.catalog['NUMBER'][bright]*1
+            mags = self.catalog['MAG_AUTO'][bright]*1
+            
+            so = np.argsort(mags)
+            ids, mags = ids[so], mags[so]
+            
         for id, mag in zip(ids, mags):
-            #print id, mag
-            self.refine(id, mag=mag, poly_order=poly_order, size=30, ds9=ds9, verbose=verbose, max_coeff=max_coeff)
+            self.refine(id, mag=mag, poly_order=poly_order,
+                        max_coeff=max_coeff, size=30, ds9=ds9,
+                        verbose=verbose)
             
     def refine(self, id, mag=-99, poly_order=1, size=30, ds9=None, verbose=True, max_coeff=2.5):
         """TBD
@@ -641,7 +667,8 @@ class MultiBeam():
          
         if line_complexes:
             #line_list = ['Ha+SII', 'OIII+Hb+Ha', 'OII']
-            line_list = ['Ha+SII', 'OIII+Hb', 'OII']
+            #line_list = ['Ha+SII', 'OIII+Hb', 'OII']
+            line_list = ['Ha+SII+SIII+He', 'OIII+Hb', 'OII+Ne']
         else:
             line_list = ['SIII', 'SII', 'Ha', 'OI', 'OIII', 'Hb', 'Hg', 'Hd', 'NeIII', 'OII']
             #line_list = ['Ha', 'SII']
@@ -682,7 +709,15 @@ class MultiBeam():
                     
         zgrid = utils.log_zgrid(zr, dz=dz[0])
         NZ = len(zgrid)
+
+        ## Polynomial fit
+        out = self.fit_at_z(z=0., templates={}, fitter='lstsq',
+                            poly_order=3,
+                            fit_background=fit_background)
         
+        A, coeffs, chi2_poly, model_2d = out
+        
+        ### Set up for template fit
         templates = self.load_templates(fwhm=fwhm)
         NTEMP = len(templates)
         
@@ -714,19 +749,34 @@ class MultiBeam():
             print 'First iteration: z_best=%.4f\n' %(zgrid[iz])
             
         # peaks
-        #import peakutils
-        #chi2nu = (chi2.min()-chi2)/self.DoF
-        #indexes = peakutils.indexes((chi2nu+0.01)*(chi2nu > -0.004), thres=0.003, min_dist=20)
-        #num_peaks = len(indexes)
-        # plt.plot(zgrid, (chi2-chi2.min())/ self.DoF)
-        # plt.scatter(zgrid[indexes], (chi2-chi2.min())[indexes]/ self.DoF, color='r')
+        import peakutils
+        # chi2nu = (chi2.min()-chi2)/self.DoF
+        # indexes = peakutils.indexes((chi2nu+delta_chi2_threshold)*(chi2nu > -delta_chi2_threshold), thres=0.3, min_dist=20)
         
-        delta_chi2 = (chi2.max()-chi2.min())/self.DoF
-        if delta_chi2 > delta_chi2_threshold:      
+        chi2_rev = (chi2_poly - chi2)/self.DoF
+        chi2_rev[chi2_rev < 0] = 0
+        indexes = peakutils.indexes(chi2_rev, thres=0.4, min_dist=10)
+        num_peaks = len(indexes)
         
-            zgrid_zoom = utils.zoom_zgrid(zgrid, chi2/self.DoF,
-                                          threshold=delta_chi2_threshold,
-                                          factor=dz[0]/dz[1])
+        if False:
+            plt.plot(zgrid, (chi2-chi2.min())/ self.DoF)
+            plt.scatter(zgrid[indexes], (chi2-chi2.min())[indexes]/ self.DoF, color='r')
+        
+        # delta_chi2 = (chi2.max()-chi2.min())/self.DoF
+        # if delta_chi2 > delta_chi2_threshold:      
+        if num_peaks > 0:
+            zgrid_zoom = []
+            for ix in indexes:
+                if (ix > 0) & (ix < len(chi2)-1):
+                    c = polyfit(zgrid[ix-1:ix+2], chi2[ix-1:ix+2], 2)
+                    zi = -c[1]/(2*c[0])
+                    chi_i = polyval(c, zi)
+                    zgrid_zoom.extend(np.arange(zi-2*dz[0], 
+                                      zi+2*dz[0]+dz[1]/10., dz[1]))
+                    
+            # zgrid_zoom = utils.zoom_zgrid(zgrid, chi2/self.DoF,
+            #                               threshold=delta_chi2_threshold,
+            #                               factor=dz[0]/dz[1])
             NZOOM = len(zgrid_zoom)
         
             chi2_zoom = np.zeros(NZOOM)
@@ -755,7 +805,13 @@ class MultiBeam():
         zgrid = zgrid[so]
         chi2 = chi2[so]
         coeffs=coeffs[so,:]
-        
+
+        if prior is not None:
+            interp_prior = np.interp(zgrid, prior[0], prior[1])
+            chi2 += interp_prior
+        else:
+            interp_prior = None
+            
         if verbose:
             print ' Zoom iteration: z_best=%.4f' %(zgrid[np.argmin(chi2)])
         
@@ -834,7 +890,9 @@ class MultiBeam():
         fit_data['fwhm'] = fwhm
         fit_data['zbest'] = zbest
         fit_data['chibest'] = chibest
+        fit_data['chi_poly'] = chi2_poly
         fit_data['zgrid'] = zgrid
+        fit_data['prior'] = interp_prior
         fit_data['A'] = A
         fit_data['coeffs'] = coeffs
         fit_data['chi2'] = chi2
@@ -870,6 +928,9 @@ class MultiBeam():
                     fit_data['zgrid']*0.+(c2min+delta)/self.DoF, 
                     color='%.2f' %(1-delta*1./10))
         
+        ax.plot(fit_data['zgrid'], (fit_data['chi2']*0+fit_data['chi_poly'])/self.DoF, color='b', linestyle='--', alpha=0.8)
+        
+        ax.set_xlim(fit_data['zgrid'].min(), fit_data['zgrid'].max())
         ax.grid()        
         ax.set_title(r'ID = %d, $z_\mathrm{grism}$=%.4f' %(self.beams[0].id, 
                                                fit_data['zbest']))
@@ -1063,7 +1124,8 @@ class MultiBeam():
         return fig, hdu_sci
         
     def run_full_diagnostics(self, pzfit={}, pspec2={}, pline={}, 
-                      force_line=['Ha', 'OIII', 'Hb'], GroupFLT=None):
+                      force_line=['Ha', 'OIII', 'Hb'], GroupFLT=None,
+                      prior=None):
         """TBD
         
         size=20, pixscale=0.1,
@@ -1110,6 +1172,7 @@ class MultiBeam():
         ### Redshift fit
         zfit_in = copy.copy(pzfit)
         zfit_in['fwhm'] = fwhm
+        zfit_in['prior'] = prior
         fit, fig = self.fit_redshift(**zfit_in)
         
         ### Make sure model attributes are set to the continuum model
@@ -1274,6 +1337,67 @@ class MultiBeam():
             plt.close(fig2)
             
         return fit, fig, fig2, hdu2, hdu_full
+    
+    def fit_trace_shift(self, split_groups=True, max_shift=5, tol=1.e-2):
+        """TBD
+        """
+        import scipy.optimize
+        
+        if split_groups:
+            roots = np.unique([b.grism.parent_file.split('_')[0] for b in self.beams])
+            indices = []
+            for root in roots:
+                idx = [i for i in range(self.N) if self.beams[i].grism.parent_file.startswith(root)]
+                indices.append(idx)
+            
+        else:
+            indices = [[i] for i in range(self.N)]
+        
+        shifts = np.zeros(len(indices))
+        bounds = np.array([[-max_shift,max_shift]]*len(indices))
+        
+        args = (self, indices, 0)
+        out = scipy.optimize.minimize(self.eval_trace_shift, shifts, bounds=bounds, args=args, method='Powell', tol=tol)
+        
+        self.eval_trace_shift(out.x, *args)
+        
+        ### Rest model profile for optimal extractions
+        for b in self.beams:
+            if hasattr(b.beam, 'optimal_profile'):
+                delattr(b.beam, 'optimal_profile')
+            
+        return out.x
+        
+    @staticmethod
+    def eval_trace_shift(shifts, self, indices, poly_order):
+        """TBD
+        """
+        for il, l in enumerate(indices):
+            for i in l:
+                self.beams[i].beam.add_ytrace_offset(shifts[il])
+                self.beams[i].compute_model()
+
+        self.flat_flam = np.hstack([b.model.flatten() for b in self.beams])
+        self.poly_order=-1
+        self.init_poly_coeffs(poly_order=poly_order)
+
+        self.fit_bg = False
+        A = self.A_poly*1
+        ok_temp = np.sum(A, axis=1) != 0  
+        out_coeffs = np.zeros(A.shape[0])
+
+        y = self.scif
+        out = np.linalg.lstsq(A.T,y)                         
+        lstsq_coeff, residuals, rank, s = out
+        coeffs = lstsq_coeff
+
+        out_coeffs = np.zeros(A.shape[0])
+        out_coeffs[ok_temp] = coeffs
+        modelf = np.dot(out_coeffs, A)
+        chi2 = np.sum(((self.scif - modelf)**2*self.ivarf)[self.fit_mask])
+
+        print shifts, chi2/self.DoF
+        return chi2/self.DoF
         
 def get_redshift_fit_defaults():
     """TBD

@@ -281,7 +281,43 @@ class GrismDisperser(object):
         self.sly_parent = slice(self.origin[0], self.origin[0] + self.sh[0])
         
         self.spectrum_1d =  None
+    
+    def add_ytrace_offset(self, yoffset):
+        """TBD
+        """
+        self.ytrace_beam, self.lam_beam = self.conf.get_beam_trace(
+                                x=(self.xc+self.xcenter-self.pad)/self.grow,
+                                y=(self.yc+self.ycenter-self.pad)/self.grow,
+                                dx=(self.dx+self.xcenter*0-0.5)/self.grow,
+                                beam=self.beam)
         
+        self.ytrace_beam *= self.grow
+        
+        self.ytrace_beam += yoffset
+        
+        ### Integer trace
+        # Add/subtract 20 for handling int of small negative numbers    
+        dyc = np.cast[int](self.ytrace_beam+20)-20+1 
+        
+        ### Account for pixel centering of the trace
+        self.yfrac_beam = self.ytrace_beam - np.floor(self.ytrace_beam)
+        
+        try:
+            self.flat_index = self.idx[dyc + self.x0[0], self.dxpix]
+        except IndexError:
+            #print 'Index Error', id, self.x0[0], self.xc, self.yc, self.beam, self.ytrace_beam.max(), self.ytrace_beam.min()
+            raise IndexError
+            
+        ###### Trace, wavelength, sensitivity across entire 2D array
+        self.ytrace, self.lam = self.conf.get_beam_trace(
+                                x=(self.xc+self.xcenter-self.pad)/self.grow,
+                                y=(self.yc+self.ycenter-self.pad)/self.grow,
+                                dx=(self.dxfull+self.xcenter-0.5)/self.grow,
+                                    beam=self.beam)
+        
+        self.ytrace *= self.grow
+        self.ytrace += yoffset
+                
     def compute_model(self, id=None, thumb=None, spectrum_1d=None,
                       in_place=True, outdata=None):
         """Compute a model 2D grism spectrum
@@ -796,8 +832,9 @@ class ImageData(object):
             #                           self.wcs.wcs.cd[1,0]**2)*3600.
             
             ### From stwcs.distortion.utils
-            det = np.linalg.det(self.wcs.wcs.cd)
-            self.wcs.pscale = np.sqrt(np.abs(det))*3600.
+            # det = np.linalg.det(self.wcs.wcs.cd)
+            # self.wcs.pscale = np.sqrt(np.abs(det))*3600.
+            self.wcs.pscale = utils.get_wcs_pscale(self.wcs)
             
             #print '%s, PSCALE: %.4f' %(self.parent_file, self.wcs.pscale)
             
@@ -961,9 +998,11 @@ class ImageData(object):
                 #wcs.idcscale = np.sqrt(np.sum(wcs.wcs.cd[0,:]**2))*3600.
                 wcs.idcscale = np.mean(np.sqrt(np.sum(wcs.wcs.cd**2, axis=0))*3600.) #np.sqrt(np.sum(wcs.wcs.cd[0,:]**2))*3600.
             
-            wcs.pscale = np.sqrt(wcs.wcs.cd[0,0]**2 +
-                                 wcs.wcs.cd[1,0]**2)*3600.
-        
+            # wcs.pscale = np.sqrt(wcs.wcs.cd[0,0]**2 +
+            #                      wcs.wcs.cd[1,0]**2)*3600.
+            # 
+            wcs.pscale = utils.get_wcs_pscale(wcs)
+            
         if segmentation:
             ### Handle segmentation images a bit differently to preserve
             ### integers.
@@ -2270,6 +2309,7 @@ class BeamCutout(object):
         ### Trace properties at desired wavelength
         dx = np.interp(wavelength, self.beam.lam_beam, xarr)
         dy = np.interp(wavelength, self.beam.lam_beam, self.beam.ytrace_beam)
+        
         dl = np.interp(wavelength, self.beam.lam_beam[1:],
                                    np.diff(self.beam.lam_beam))
                                    
@@ -2325,7 +2365,8 @@ class BeamCutout(object):
         hdu = pyfits.ImageHDU(data=data, header=h)
         wcs = pywcs.WCS(hdu.header)
         
-        wcs.pscale = np.sqrt(wcs.wcs.cd[0,0]**2 + wcs.wcs.cd[1,0]**2)*3600.
+        #wcs.pscale = np.sqrt(wcs.wcs.cd[0,0]**2 + wcs.wcs.cd[1,0]**2)*3600.
+        wcs.pscale = utils.get_wcs_pscale(wcs)
         
         return hdu, wcs
     
@@ -3844,9 +3885,10 @@ class OldGrismFLT(object):
             else:
                 wcs.idcscale = np.sqrt(np.sum(wcs.wcs.cd[0,:]**2))*3600.
             
-            wcs.pscale = np.sqrt(wcs.wcs.cd[0,0]**2 +
-                                 wcs.wcs.cd[1,0]**2)*3600.
-            
+            # wcs.pscale = np.sqrt(wcs.wcs.cd[0,0]**2 +
+            #                      wcs.wcs.cd[1,0]**2)*3600.
+            wcs.pscale = utils.get_wcs_pscale(wcs)
+                
             #print 'IDCSCALE: %.3f' %(wcs.idcscale)
             
         #print refimage.filename(), ref_wcs.idcscale, ref_wcs.wcs.cd, flt_wcs.idcscale, ref_wcs.orientat
@@ -4228,7 +4270,8 @@ class OldBeamCutout(object):
         #wcs = stwcs.wcsutil.HSTWCS(hdul, ext=0)
         wcs = pywcs.WCS(hdul[0].header)
         
-        wcs.pscale = np.sqrt(wcs.wcs.cd[0,0]**2 + wcs.wcs.cd[1,0]**2)*3600.
+        #wcs.pscale = np.sqrt(wcs.wcs.cd[0,0]**2 + wcs.wcs.cd[1,0]**2)*3600.
+        wcs.pscale = utils.get_wcs_pscale(wcs)
         
         return hdul[0], wcs
         
