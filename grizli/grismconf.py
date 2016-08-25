@@ -9,7 +9,7 @@ import numpy as np
 
 class aXeConf():
     def __init__(self, conf_file='WFC3.IR.G141.V2.5.conf'):
-        """aXe configuratio file
+        """aXe configuration file
         
         Parameters
         ----------
@@ -85,12 +85,12 @@ class aXeConf():
         """Get beam parameters and read sensitivity curves
         """
         import os
-        import collections
+        from collections import OrderedDict
         from astropy.table import Table, Column
         
-        self.dxlam = collections.OrderedDict()
-        self.nx = collections.OrderedDict()
-        self.sens = collections.OrderedDict()
+        self.dxlam = OrderedDict()
+        self.nx = OrderedDict()
+        self.sens = OrderedDict()
         self.beams = []
         
         for beam in self.orders:
@@ -210,7 +210,7 @@ class aXeConf():
                 coeffs = self.conf['DLDP_%s_%d' %(beam, i)]
                 dldp[i] = self.field_dependent(xi, yi, coeffs)
         
-        dp = self.evaluate_dp(dx - xoff_beam, dydx)
+        dp = self.evaluate_dp(dx-xoff_beam, dydx)
         # ## dp is the arc length along the trace
         # ## $\lambda = dldp_0 + dldp_1 dp + dldp_2 dp^2$ ...
         # if self.conf['DYDX_ORDER_%s' %(beam)] == 0:   ## dy=0

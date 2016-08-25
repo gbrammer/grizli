@@ -9,7 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # conda install shapely
-from shapely.geometry.polygon import Polygon
+# from shapely.geometry.polygon import Polygon
 
 import astropy.io.fits as pyfits
 import astropy.wcs as pywcs
@@ -26,7 +26,8 @@ from stwcs import updatewcs
 from . import utils
 
 def go_all():
-    
+    """TBD
+    """
     info = Table.read('files.info', format='ascii.commented_header')
         
     # files=glob.glob('../RAW/i*flt.fits')
@@ -382,6 +383,8 @@ def log_wcs(root, drz_wcs, shift, rot, scale, rms=0., n=-1, initialize=True):
     fp.close()
     
 def table_to_regions(table, output='ds9.reg'):
+    """TBD
+    """
     fp = open(output,'w')
     fp.write('fk5\n')
     
@@ -469,6 +472,8 @@ def tweak_flt(files=[], max_dist=0.4, threshold=3, verbose=True):
 
 def make_drz_catalog(root='', threshold=2., get_background=True, 
                      verbose=True, extra_config={}):
+    """TBD
+    """
     import sewpy
     
     im = pyfits.open('%s_drz_sci.fits' %(root))
@@ -598,51 +603,6 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
     
     align direct images of a single visit
     """    
-    if False:
-        info = Table.read('files.info', format='ascii.commented_header')
-        for col in info.colnames:
-            if not col.islower():
-                info.rename_column(col, col.lower())
-
-        output_list, filter_list = utils.parse_flt_files(info=info, uniquename=True)
-        
-        full_info = OrderedDict()
-        keys = output_list.keys()
-        keys.sort()
-        for key in keys:
-            full_info[key] = {'product':str(key),
-                              'files':list(output_list[key])}
-        
-        files = ['icou09fvq_flt.fits', 'icou09fyq_flt.fits', 'icou09gpq_flt.fits',
-               'icou09h3q_flt.fits']
-        key = product = 'j0800+4029-080.0-f140w'
-
-        files = ['icou10emq_flt.fits', 'icou10eqq_flt.fits', 'icou10euq_flt.fits',
-               'icou10frq_flt.fits']
-        key = product = 'j0800+4029-117.0-f140w'
-    
-        root = 'goodss-34'
-    
-        keys = []
-        for k in output_list.keys():
-            if k.startswith(root):
-                keys.append(k)
-    
-        key = product = keys[0]
-        files = output_list[key]
-        
-        direct = full_info[keys[0]]
-        grism = full_info[keys[1]]
-    
-        direct = full_info['macs0416.1-2403-247.0-f140w']
-        grism = full_info['macs0416.1-2403-247.0-g141']
-
-        direct = full_info['gs2-01-189.4-f105w']
-        grism = full_info['gs2-01-189.4-g102']
-
-        direct = full_info['gs2-02-189.4-f105w']
-        grism = full_info['gs2-02-189.4-g102']
-        
     ################# 
     ##########  Direct image processing
     #################
@@ -881,6 +841,8 @@ def match_direct_grism_wcs(direct={}, grism={}, get_fresh_flt=True,
                      resetbits=4096)        
         
 def align_multiple_drizzled(mag_limits=[16,23]):
+    """TBD
+    """
     drz_files = ['j0800+4029-080.0-f140w_drz_sci.fits', 
                  'j0800+4029-117.0-f140w_drz_sci.fits']
     
