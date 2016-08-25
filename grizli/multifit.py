@@ -1,6 +1,6 @@
 import os
 import time
-import collections
+from collections import OrderedDict
 import multiprocessing as mp
 
 import scipy.ndimage as nd
@@ -74,7 +74,7 @@ def test():
     fit_info = {3286: {'mag':-99, 'spec': None},
                 3279: {'mag':-99, 'spec': None}}
     
-    fit_info = collections.OrderedDict()
+    fit_info = OrderedDict()
     
     bright = self.catalog['MAG_AUTO'] < 25
     ids = self.catalog['NUMBER'][bright]
@@ -128,7 +128,9 @@ def test():
     
 def _loadFLT(grism_file, sci_extn, direct_file, pad, ref_file, 
                ref_ext, seg_file, verbose, catalog, ix):
-    """TBD
+    """Helper function for loading `.model.GrismFLT` objects with `multiprocessing`.
+    
+    TBD
     """
     import time
     import cPickle as pickle
@@ -188,6 +190,37 @@ class GroupFLT():
                  shrink_segimage=True, verbose=True, cpu_count=0,
                  catalog=''):
         """TBD
+        
+        Parameters
+        ----------
+        grism_files : list
+        
+        sci_extn : int
+        
+        direct_files : list
+        
+        pad : int
+        
+        group_name : str
+        
+        ref_file : `None` or str
+        
+        ref_ext : 0
+        
+        seg_file : `None` or str
+        
+        shrink_segimage : bool
+        
+        verbose : bool
+        
+        cpu_count : int
+        
+        catalog : str
+        
+        Attributes
+        ----------
+        TBD : type
+        
         """
         self.N = len(grism_files)
         if len(direct_files) != len(grism_files):
@@ -263,9 +296,8 @@ class GroupFLT():
             ### Reload initialized data
             self.FLTs[i].load_from_fits(save_file)
             
-            
     def extend(self, new, verbose=True):
-        """Add another GroupFLT instance to self
+        """Add another GroupFLT instance to `self`
         
         TBD
         """
@@ -277,7 +309,6 @@ class GroupFLT():
         if verbose:
             print 'Now we have %d FLTs' %(self.N)
             
-        
     def compute_single_model(self, id, mag=-99, size=None, store=False, spectrum_1d=None, get_beams=None, in_place=True):
         """TBD
         """
@@ -313,7 +344,7 @@ class GroupFLT():
             xspec = (xspec+1)*1.e4
             yspec = np.sum(yspec, axis=0)
 
-            fit_info = collections.OrderedDict()
+            fit_info = OrderedDict()
             for id, mag in zip(ids, mags):
                 fit_info[id] = {'mag':mag, 'spec': [xspec, yspec]}
             
@@ -420,9 +451,25 @@ class GroupFLT():
         #m2d = mb.reshape_flat(modelf)
         
 class MultiBeam():
-    """TBD
-    """     
     def __init__(self, beams, group_name='group', fcontam=0.):
+        """Tools for dealing with multiple `~.model.BeamCutout` instances 
+        
+        Parameters
+        ----------
+        beams : list
+            List of `~.model.BeamCutout` objects.
+        
+        group_name : type
+            Rootname to use for saved products
+            
+        fcontam : type
+            Factor to use to downweight contaminated pixels.
+        
+        Attributes
+        ----------
+        TBD : type
+        
+        """     
         self.N = len(beams)
         self.group_name = group_name
 
@@ -653,14 +700,13 @@ class MultiBeam():
         # templates.extend(['templates/dobos11/SF0_0.emline.hiOIII.txt', 
         #                   'templates/dobos11/SF0_0.emline.loOIII.txt'])
                                   
-        temp_list = collections.OrderedDict()
+        temp_list = OrderedDict()
         for temp in templates:
             data = np.loadtxt(os.getenv('GRIZLI') + '/' + temp, unpack=True)
             scl = np.interp(5500., data[0], data[1])
             name = os.path.basename(temp)
             temp_list[name] = utils.SpectrumTemplate(wave=data[0],
-                                                             flux=data[1]/scl)
-            #plt.plot(temp_list[-1].wave, temp_list[-1].flux, label=temp, alpha=0.5)
+                                                     flux=data[1]/scl)
         
         ### Emission lines:
         line_wavelengths, line_ratios = utils.get_line_wavelengths()
@@ -873,7 +919,7 @@ class MultiBeam():
         
         i0 = self.fit_bg*self.N + self.n_poly
         
-        line_flux = collections.OrderedDict()
+        line_flux = OrderedDict()
         fscl = self.beams[0].beam.total_flux/1.e-17
         for i, key in enumerate(templates.keys()):
             temp_i = templates[key].zscale(zbest, coeffs_full[i0+i])
@@ -885,7 +931,7 @@ class MultiBeam():
                                              line_flux_err[i0+i]*fscl])
                 
                         
-        fit_data = collections.OrderedDict()
+        fit_data = OrderedDict()
         fit_data['poly_order'] = poly_order
         fit_data['fwhm'] = fwhm
         fit_data['zbest'] = zbest
@@ -914,7 +960,8 @@ class MultiBeam():
         return fit_data, fig
     
     def show_redshift_fit(self, fit_data, plot_flambda=True):
-        
+        """TBD
+        """
         fig = plt.figure(figsize=[8,5])
         ax = fig.add_subplot(211)
         
@@ -1045,6 +1092,7 @@ class MultiBeam():
     def redshift_fit_twod_figure(self, fit, spatial_scale=1, dlam=46., NY=10,
                                  **kwargs):
         """Make figure of 2D spectrum
+        
         TBD
         """        
         ### xlimits        
@@ -1419,7 +1467,7 @@ def drizzle_2d_spectrum(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
     
     Parameters
     ----------
-    beams : list of `BeamCutout` objects
+    beams : list of `~.model.BeamCutout` objects
     
     data : None or list
         optionally, drizzle data specified in this list rather than the 
@@ -1440,7 +1488,7 @@ def drizzle_2d_spectrum(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
     pixfrac : float
         Drizzle PIXFRAC (for `kernel` = 'point')
 
-    kernel : {'square', 'point'}
+    kernel : str, ('square' or 'point')
         Drizzle kernel to use
     
     convert_to_flambda : bool, float
@@ -1456,7 +1504,7 @@ def drizzle_2d_spectrum(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
     
     Returns
     -------
-    hdu : `astropy.io.fits.HDUList`
+    hdu : `~astropy.io.fits.HDUList`
         FITS HDUList with the drizzled 2D spectrum and weight arrays
         
     """
@@ -1544,7 +1592,7 @@ def drizzle_to_wavelength(beams, ra=0., dec=0., wave=1.e4, size=5,
     
     Parameters
     ----------
-    beams : list of `model.BeamCutout` objects.
+    beams : list of `~.model.BeamCutout` objects.
     
     ra, dec, wave : float
         Sky coordinates and central wavelength
@@ -1558,10 +1606,10 @@ def drizzle_to_wavelength(beams, ra=0., dec=0., wave=1.e4, size=5,
     pixfrac : float
         Drizzle PIXFRAC (for `kernel` = 'point')
         
-    kernel : {'square', 'point'}
+    kernel : str, ('square' or 'point')
         Drizzle kernel to use
     
-    direct_extension : {'SCI', 'REF'}
+    direct_extension : str, ('SCI' or 'REF')
         Extension of `self.direct.data` do drizzle for the thumbnail
     
     fcontam: float
@@ -1573,7 +1621,7 @@ def drizzle_to_wavelength(beams, ra=0., dec=0., wave=1.e4, size=5,
     
     Returns
     -------
-    hdu : `astropy.io.fits.HDUList`
+    hdu : `~astropy.io.fits.HDUList`
         FITS HDUList with the drizzled thumbnail, line and continuum 
         cutouts.
     """

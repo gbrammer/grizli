@@ -1,7 +1,7 @@
 """General utilities"""
 import os
 import glob
-import collections
+from collections import OrderedDict
 
 import numpy as np
 
@@ -9,6 +9,8 @@ import numpy as np
 no_newline = '\x1b[1A\x1b[1M' 
 
 def get_flt_info(files=[]):
+    """TBD
+    """
     from astropy.io.fits import Header
     from astropy.table import Table
     
@@ -109,11 +111,11 @@ def parse_flt_files(files=[], info=None, uniquename=False,
     
     targets = np.unique(target_list)
     
-    output_list = collections.OrderedDict()
-    filter_list = collections.OrderedDict()
+    output_list = OrderedDict()
+    filter_list = OrderedDict()
     
     for filter in np.unique(info['filter']):
-        filter_list[filter] = collections.OrderedDict()
+        filter_list[filter] = OrderedDict()
         
         angles = np.unique(pa_v3[(info['filter'] == filter)]) 
         for angle in angles:
@@ -203,13 +205,17 @@ def parse_flt_files(files=[], info=None, uniquename=False,
 def get_hst_filter(header):
     """Get simple filter name out of an HST image header.  
     
-    Parameters
-    ----------
-    header: astropy.io.fits.Header
-        Image header with FILTER or FILTER1,FILTER2,...,FILTERN keywords
-    
     ACS has two keywords for the two filter wheels, so just return the 
     non-CLEAR filter.
+    
+    Parameters
+    ----------
+    header : `~astropy.io.fits.Header`
+        Image header with FILTER or FILTER1,FILTER2,...,FILTERN keywords
+    
+    Returns
+    -------
+    filter : str
     """
     if header['INSTRUME'].strip() == 'ACS':
         for i in [1,2]:
@@ -227,8 +233,26 @@ def unset_dq_bits(value, okbits=32+64+512, verbose=False):
     """
     Unset bit flags from a DQ array
     
+    For WFC3/IR, the following DQ bits can usually be unset: 
+    
     32, 64: these pixels usually seem OK
        512: blobs not relevant for grism exposures
+    
+    Parameters
+    ----------
+    value : int, `~numpy.ndarray`
+        Input DQ value
+    
+    okbits : int
+        Bits to unset
+        
+    verbose : bool
+        Print some information
+        
+    Returns
+    -------
+    new_value : int, `~numpy.ndarray`
+    
     """
     bin_bits = np.binary_repr(okbits)
     n = len(bin_bits)
@@ -250,38 +274,40 @@ def detect_with_photutils(sci, err=None, dq=None, seg=None, detect_thresh=2.,
                                           'ra_icrs_centroid': 'ra',
                                           'dec_icrs_centroid': 'dec'},
                         clobber=True, verbose=True):
-    """Use photutils to detect objects and make segmentation map
+    """Use `photutils <https://photutils.readthedocs.io/>`__ to detect objects and make segmentation map
     
     Parameters
     ----------
-    detect_thresh: float
-        Detection threshold, in sigma
+    sci : `~numpy.ndarray`
+        TBD
     
-    grow_seg: int
+    err, dq, seg : TBD
+    
+    detect_thresh : float
+        Detection threshold, in :math:`\sigma`
+    
+    grow_seg : int
         Number of pixels to grow around the perimeter of detected objects
         witha  maximum filter
     
-    gauss_fwhm: float
+    gauss_fwhm : float
         FWHM of Gaussian convolution kernel that smoothes the detection
         image.
     
-    verbose: bool
+    verbose : bool
         Print logging information to the terminal
     
-    save_detection: bool
+    save_detection : bool
         Save the detection images and catalogs
     
-    wcs: astropy.wcs.WCS
+    wcs : `~astropy.wcs.WCS`
         WCS object passed to `photutils.source_properties` used to compute
         sky coordinates of detected objects.
     
-    ToDo: abstract to general script with data/thresholds 
-          and just feed in image arrays
-          
     Returns
     ---------
-    catalog: astropy.table.Table
-        Object catalog with the default parametersobject to `catalog`.
+    catalog : `~astropy.table.Table`
+        Object catalog with the default parameters.
     """
     import scipy.ndimage as nd
     
@@ -388,7 +414,8 @@ def detect_with_photutils(sci, err=None, dq=None, seg=None, detect_thresh=2.,
     
 #
 def nmad(data):
-    """TBD
+    """Return normalized `~.astropy.stats.median_absolute_deviation`
+    
     """
     import astropy.stats
     return 1.48*astropy.stats.median_absolute_deviation(data)
@@ -495,9 +522,13 @@ class SpectrumTemplate(object):
         return SpectrumTemplate(wave=new_wave, flux=new_flux)
     
     def __mul__(self, scalar):
+        """TBD
+        """
         return SpectrumTemplate(wave=self.wave, flux=self.flux*scalar)
         
     def zscale(self, z, scalar=1):
+        """TBD
+        """
         return SpectrumTemplate(wave=self.wave*(1+z),
                                 flux=self.flux*scalar/(1+z))
 
@@ -531,11 +562,11 @@ def zoom_zgrid(zgrid, chi2nu, threshold=0.01, factor=10, grow=7):
     return out_grid
 
 def get_wcs_pscale(wcs):
-    """Get correct pscale from `astropy.wcs.WCS` object
+    """Get correct pscale from a `~astropy.wcs.WCS` object
     
     Parameters
     ----------
-    wcs : `astropy.wcs.WCS`
+    wcs : `~astropy.wcs.WCS`
         
     Returns
     -------
@@ -549,6 +580,8 @@ def get_wcs_pscale(wcs):
     return pscale
     
 def make_spectrum_wcsheader(center_wave=1.4e4, dlam=40, NX=100, spatial_scale=1, NY=10):
+    """TBD
+    """
     import astropy.io.fits as pyfits
     import astropy.wcs as pywcs
     

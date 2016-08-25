@@ -1,10 +1,6 @@
 """
-Model grism spectra in individual FLTs
-
-see model.py
-   
+Pipeline for flexible modeling and extration of slitless spectroscopy
 """
-
 #__version__ = "0.1.1.dev" 
 from version import __version__
 
@@ -17,11 +13,14 @@ Warning: `import grizli` will fail if the working directory is the place
 where the code repository was cloned and compiled!
 """
 
+# Module imports
 import utils_c
+import utils
 import grismconf
 import model
-#import multifit
+import multifit
 
+# Test that GRIZLI system variable is set
 if os.getenv('GRIZLI') is None:
     print """
 Warning: $GRIZLI system variable not set, `grizli`

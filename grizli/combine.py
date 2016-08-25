@@ -325,16 +325,16 @@ def combine_flt(files=[], output='combined_flt.fits', grow=2,
 #
 # Default mapping function based on PyWCS
 class SIP_WCSMap:
-    """Sample class to demonstrate how to define a coordinate transformation
-    
-    Comments (GBr)
-    --------------
-    Modified from `drizzlepac.wcs_functions.WCSMap` to use full SIP header in
-    the `forward` and `backward` methods. Use this class to drizzle
-    (`drizzlepac.astrodrizzle.do_driz(..., wcsmap=SIP_WCSMap)`) to an output
-    distorted WCS.
-    """
     def __init__(self,input,output,origin=1):
+        """Sample class to demonstrate how to define a coordinate transformation
+
+        Modified from `drizzlepac.wcs_functions.WCSMap` to use full SIP header
+        in the `forward` and `backward` methods. Use this class to drizzle to
+        an output distorted WCS, e.g., 
+            
+            >>> drizzlepac.astrodrizzle.do_driz(..., wcsmap=SIP_WCSMap)
+        """
+
         # Verify that we have valid WCS input objects
         self.checkWCS(input,'Input')
         self.checkWCS(output,'Output')
