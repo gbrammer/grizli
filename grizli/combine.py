@@ -10,7 +10,7 @@ import astropy.wcs as pywcs
 import astropy.io.fits as pyfits
 
 from . import utils
-from . import assoc
+#from . import assoc
 
 def consolodate_grism_lists(gs_direct):
     """TBD
