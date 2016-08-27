@@ -75,7 +75,8 @@ class GrismDisperser(object):
     def __init__(self, id=0, direct=np.zeros((20,20), dtype=np.float32), 
                        segmentation=None, origin=[500, 500], 
                        xcenter=0., ycenter=0., pad=0, grow=1, beam='A',
-                       conf=['WFC3','F140W', 'G141']):
+                       conf=['WFC3','F140W', 'G141'],
+                       fwcpos=None):
         """Object for computing dispersed model spectra
         
         Parameters
@@ -117,6 +118,9 @@ class GrismDisperser(object):
             Pre-loaded aXe-format configuration file object or if list of 
             strings determine the appropriate configuration filename with 
             `grismconf.get_config_filename` and load it.
+        
+        fwcpos : float
+            Rotation position of the NIRISS filter wheel
             
         Attributes
         ----------
@@ -167,6 +171,8 @@ class GrismDisperser(object):
         self.pad = pad
         self.grow = grow
         
+        self.fwcpos = fwcpos
+        
         ### Direct image
         self.direct = direct
         self.sh = self.direct.shape
@@ -207,7 +213,7 @@ class GrismDisperser(object):
                                     x=(self.xc+xcenter-self.pad)/self.grow,
                                     y=(self.yc+ycenter-self.pad)/self.grow,
                                     dx=(self.dx+xcenter*0-0.5)/self.grow,
-                                    beam=self.beam)
+                                    beam=self.beam, fwcpos=self.fwcpos)
         
         self.ytrace_beam *= self.grow
         
@@ -261,7 +267,7 @@ class GrismDisperser(object):
                                     x=(self.xc+xcenter-self.pad)/self.grow,
                                     y=(self.yc+ycenter-self.pad)/self.grow,
                                     dx=(self.dxfull+xcenter-0.5)/self.grow,
-                                    beam=self.beam)
+                                    beam=self.beam, fwcpos=self.fwcpos)
         
         self.ytrace *= self.grow
         
@@ -293,7 +299,7 @@ class GrismDisperser(object):
                                 x=(self.xc+self.xcenter-self.pad)/self.grow,
                                 y=(self.yc+self.ycenter-self.pad)/self.grow,
                                 dx=(self.dx+self.xcenter*0-0.5)/self.grow,
-                                beam=self.beam)
+                                beam=self.beam, fwcpos=self.fwcpos)
         
         self.ytrace_beam *= self.grow
         
@@ -317,7 +323,7 @@ class GrismDisperser(object):
                                 x=(self.xc+self.xcenter-self.pad)/self.grow,
                                 y=(self.yc+self.ycenter-self.pad)/self.grow,
                                 dx=(self.dxfull+self.xcenter-0.5)/self.grow,
-                                    beam=self.beam)
+                                beam=self.beam, fwcpos=self.fwcpos)
         
         self.ytrace *= self.grow
         self.ytrace += yoffset

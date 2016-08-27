@@ -10,9 +10,9 @@ Grism Background Subtraction
 Reference/API
 -------------
 
-.. automodapi:: grizlidev.prep
+.. automodapi:: grizli.prep
     :no-inheritance-diagram:
     :skip: AstroDrizzle
 
-.. automodapi:: grizlidev.combine
+.. automodapi:: grizli.combine
     :no-inheritance-diagram:

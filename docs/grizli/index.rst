@@ -2,18 +2,18 @@
 Reference/API
 =============
 
-.. automodapi:: grizlidev.utils
+.. automodapi:: grizli.utils
     :no-inheritance-diagram:
     :skip: OrderedDict
 
-.. automodapi:: grizlidev.grismconf
+.. automodapi:: grizli.grismconf
     :no-inheritance-diagram:
 
-.. automodapi:: grizlidev.model
+.. automodapi:: grizli.model
     :no-inheritance-diagram:
     :skip: Table, OrderedDict
     
-.. automodapi:: grizlidev.multifit
+.. automodapi:: grizli.multifit
     :no-inheritance-diagram:
     :skip: Table, OrderedDict
    

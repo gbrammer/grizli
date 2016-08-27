@@ -561,11 +561,11 @@ def get_wise_catalog(ra=165.86, dec=34.829694, radius=3):
     coo = coord.SkyCoord(ra*u.deg, dec*u.deg)
     
     table = Irsa.query_region(coo, catalog=all_wise, spatial="Cone",
-                              radius=radius*u.arcmin, get_query_payload=True)
+                              radius=radius*u.arcmin, get_query_payload=False)
     
     return table
 
-def get_radec_catalog(ra=0., dec=0., radius=3.):
+def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True):
     """TBD
     """
     try:
@@ -592,6 +592,21 @@ def get_radec_catalog(ra=0., dec=0., radius=3.):
             ref_catalog = 'WISE'
         except:
             print 'WISE query failed'
+    
+    #### WISP, check if a catalog already exists for a given rootname and use 
+    #### that if so.
+    cat_files = glob.glob('-f1'.join(product.split('-f1')[:-1]) + '-f*cat')
+    if len(cat_files) > 0:
+        cat = Table.read(cat_files[0], format='ascii.commented_header')
+        root = cat_files[0].split('.cat')[0]
+        cat['X_WORLD','Y_WORLD'].write('%s.radec' %(root),
+                                format='ascii.commented_header')
+        
+        radec = '%s.radec' %(root)
+        ref_catalog = 'VISIT'
+    
+    if verbose:
+        print '%s - Reference RADEC: %s [%s]' %(product, radec, ref_catalog)    
     
     return radec, ref_catalog
     
@@ -621,7 +636,15 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
     if radec is None:
         im = pyfits.open(direct['files'][0])
         radec, ref_catalog = get_radec_catalog(ra=im[0].header['RA_TARG'],
-                        dec=im[0].header['DEC_TARG'])        
+                        dec=im[0].header['DEC_TARG'], 
+                        product=direct['product'])
+        
+        if ref_catalog == 'VISIT':
+            align_mag_limits = [16,23]
+        elif ref_catalog == 'WISE':
+            align_mag_limits = [16,20]
+        elif ref_catalog == 'SDSS':
+            align_mag_limits = [16,21]
     else:
         ref_catalog = 'USER'
     
@@ -688,8 +711,13 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                      driz_separate=False, driz_sep_wcs=False, median=False, 
                      blot=False, driz_cr=False, driz_cr_corr=False) 
     else:
+        if 'par' in direct['product']:
+            pixfrac=1.0
+        else:
+            pixfrac=0.8
+        
         AstroDrizzle(direct['files'], output=direct['product'], clean=True, 
-                     final_pixfrac=0.8, context=False, resetbits=4096, 
+                     final_pixfrac=pixfrac, context=False, resetbits=4096, 
                      final_bits=576, driz_sep_bits=576, preserve=False, 
                      driz_cr_snr='8.0 5.0', driz_cr_scale = '2.5 0.7')
     
@@ -724,12 +752,18 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
     fp.writelines(['%s 0.0\n' %(f) for f in grism['files']])
     fp.close()
     
+    if 'par' in grism['product']:
+        pixfrac=1.0
+    else:
+        pixfrac=0.8
+        
     AstroDrizzle(grism['files'], output=grism['product'], clean=True,
                  context=False, preserve=False, skysub=True, skyfile=skyfile,
                  driz_separate=True, driz_sep_wcs=True, median=True, 
-                 blot=True, driz_cr=True, driz_cr_corr=False, 
-                 driz_combine=True, final_bits=576, coeffs=True, 
-                 resetbits=4096, final_pixfrac=0.8)        
+                 blot=True, driz_cr=True, driz_cr_corr=True, 
+                 driz_combine=True, driz_sep_bits=576, final_bits=576,
+                 coeffs=True, 
+                 resetbits=4096, final_pixfrac=pixfrac)        
     
     clean_drizzle(grism['product'])
     
@@ -836,7 +870,7 @@ def match_direct_grism_wcs(direct={}, grism={}, get_fresh_flt=True,
         AstroDrizzle(grism['files'], output=grism['product'], clean=True,
                      context=False, preserve=False, skysub=True,
                      driz_separate=True, driz_sep_wcs=True, median=True, 
-                     blot=True, driz_cr=True, driz_cr_corr=False, 
+                     blot=True, driz_cr=True, driz_cr_corr=True, 
                      driz_combine=True, final_bits=576, coeffs=True, 
                      resetbits=4096)        
         

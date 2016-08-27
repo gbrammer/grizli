@@ -20,6 +20,7 @@ Grizli
    grizli/prep.rst
    grizli/basic.rst
    grizli/index.rst
+   changelog
    
 .. warning::
     Grizli is under active development and significant changes may be 

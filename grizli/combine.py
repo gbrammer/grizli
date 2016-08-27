@@ -133,10 +133,10 @@ def combine_figs():
     
     roots = np.unique(['-'.join(asn.split('-')[:2]) for asn in all_asn])
     for root in roots:
-        all_asn = glob.glob('%s*g1*asn.fits' %(root))
+        all_asn = glob.glob('%s*%s*asn.fits' %(root, grism))
         angles = np.unique([asn.split('-')[-2] for asn in all_asn])
         for angle in angles:
-            asn_files = glob.glob('%s*-%s-g1*asn.fits' %(root, angle))
+            asn_files = glob.glob('%s*-%s-%s*asn.fits' %(root, angle, grism))
             
             grism_files = [] 
             for file in asn_files:
