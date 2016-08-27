@@ -1,5 +1,6 @@
 import os
 import time
+import glob
 from collections import OrderedDict
 import multiprocessing as mp
 
@@ -675,9 +676,31 @@ class MultiBeam():
         
         return A, out_coeffs, chi2, modelf
     
-    def load_templates(self, fwhm=400, line_complexes=True):
+    def load_templates(self, fwhm=400, line_complexes=True, stars=False):
         """TBD
         """
+        
+        if stars:
+            templates = glob.glob('%s/templates/Pickles_stars/ext/*dat' %(os.getenv('GRIZLI')))
+            # templates = []
+            # for t in 'obafgkmrw':
+            #     templates.extend( glob.glob('%s/templates/Pickles_stars/ext/uk%s*dat' %(os.getenv('GRIZLI'), t)))
+            # templates.extend(glob.glob('%s/templates/SPEX/spex-prism-M*txt' %(os.getenv('GRIZLI'))))
+            # templates.extend(glob.glob('%s/templates/SPEX/spex-prism-[LT]*txt' %(os.getenv('GRIZLI'))))
+            # 
+            # #templates = glob.glob('/Users/brammer/Downloads/templates/spex*txt')
+            # temp_list = OrderedDict()
+            # for temp in templates:
+            #     data = np.loadtxt(temp, unpack=True)
+            #     #data[0] *= 1.e4 # spex
+            #     scl = np.interp(5500., data[0], data[1])
+            #     name = os.path.basename(temp)
+            #     temp_list[name] = utils.SpectrumTemplate(wave=data[0],
+            #                                              flux=data[1]/scl)
+
+            temp_list = np.load('stars.npy')[0]
+            return temp_list
+            
         # templates = ['templates/EAZY_v1.0_lines/eazy_v1.0_sed1_nolines.dat',
         # 'templates/EAZY_v1.0_lines/eazy_v1.0_sed2_nolines.dat',  
         # 'templates/EAZY_v1.0_lines/eazy_v1.0_sed3_nolines.dat',     
@@ -734,6 +757,119 @@ class MultiBeam():
                                      
         return temp_list
     
+    def fit_stars(self, poly_order=1, fitter='nnls', fit_background=True, 
+                  verbose=True, make_figure=True,
+                  delta_chi2_threshold=0.004, zr=0, dz=0, fwhm=0, prior=None):
+        """TBD
+        """
+        
+        ## Polynomial fit
+        out = self.fit_at_z(z=0., templates={}, fitter='lstsq',
+                            poly_order=3,
+                            fit_background=fit_background)
+        
+        A, coeffs, chi2_poly, model_2d = out
+        
+        ### Star templates
+        templates = self.load_templates(fwhm=fwhm, stars=True)
+        NTEMP = len(templates)
+
+        key = templates.keys()[0]
+        temp_i = {key:templates[key]}
+        out = self.fit_at_z(z=0., templates=temp_i, fitter=fitter,
+                            poly_order=poly_order,
+                            fit_background=fit_background)
+                            
+        A, coeffs, chi2, model_2d = out
+        
+        chi2 = np.zeros(NTEMP)
+        coeffs = np.zeros((NTEMP, coeffs.shape[0]))
+        
+        chi2min = 1e30
+        iz = 0
+        best = key
+        for i, key in enumerate(templates):
+            temp_i = {key:templates[key]}
+            out = self.fit_at_z(z=0., templates=temp_i,
+                                fitter=fitter, poly_order=poly_order,
+                                fit_background=fit_background)
+            
+            A, coeffs[i,:], chi2[i], model_2d = out
+            if verbose:
+                if chi2[i] < chi2min:
+                    iz = i
+                    chi2min = chi2[i]
+                    best = key
+                    
+                print utils.no_newline + '  %s %9.1f (%s)' %(key, chi2[i], best)
+        
+        ## Best-fit
+        temp_i = {best:templates[best]}
+        out = self.fit_at_z(z=0., templates=temp_i,
+                            fitter=fitter, poly_order=poly_order,
+                            fit_background=fit_background)
+        
+        A, coeffs_full, chi2_best, model_full = out
+        
+        ## Continuum fit
+        mask = np.isfinite(coeffs_full)
+        for i, key in enumerate(templates.keys()):
+            if key.startswith('line'):
+                mask[self.N*self.fit_bg+self.n_poly+i] = False
+            
+        model_continuum = np.dot(coeffs_full*mask, A)
+        self.model_continuum = self.reshape_flat(model_continuum)
+        #model_continuum.reshape(self.beam.sh_beam)
+                
+        ### 1D spectrum
+        xspec = np.arange(0.7, 1.8, 0.05)-1
+        scale_coeffs = coeffs_full[self.N*self.fit_bg:  
+                                  self.N*self.fit_bg+self.n_poly]
+                                  
+        yspec = [xspec**o*scale_coeffs[o] for o in range(self.poly_order+1)]
+        model1d = utils.SpectrumTemplate((xspec+1)*1.e4, 
+                                         np.sum(yspec, axis=0))
+
+        cont1d = model1d*1
+        
+        i0 = self.fit_bg*self.N + self.n_poly
+        
+        line_flux = OrderedDict()
+        fscl = self.beams[0].beam.total_flux/1.e-17
+
+        temp_i = templates[best].zscale(0, coeffs_full[i0])
+        model1d += temp_i
+        cont1d += temp_i
+        
+        fit_data = OrderedDict()
+        fit_data['poly_order'] = poly_order
+        fit_data['fwhm'] = 0
+        fit_data['zbest'] = np.argmin(chi2)
+        fit_data['chibest'] = chi2_best
+        fit_data['chi_poly'] = chi2_poly
+        fit_data['zgrid'] = np.arange(NTEMP)
+        fit_data['prior'] = 1
+        fit_data['A'] = A
+        fit_data['coeffs'] = coeffs
+        fit_data['chi2'] = chi2
+        fit_data['model_full'] = model_full
+        fit_data['coeffs_full'] = coeffs_full
+        fit_data['line_flux'] = {}
+        #fit_data['templates_full'] = templates
+        fit_data['model_cont'] = model_continuum
+        fit_data['model1d'] = model1d
+        fit_data['cont1d'] = cont1d
+        
+        #return fit_data
+        
+        fig = None   
+        if make_figure:
+            fig = self.show_redshift_fit(fit_data)
+            #fig.savefig('fit.pdf')
+            
+        return fit_data, fig
+        
+        
     def fit_redshift(self, prior=None, poly_order=1, fwhm=1200,
                      make_figure=True, zr=None, dz=None, verbose=True,
                      fit_background=True, fitter='nnls', 
@@ -753,6 +889,13 @@ class MultiBeam():
         #     mb = grizlidev.multifit.MultiBeam(beams)
         #     self = mb
                     
+        if zr is 0:
+            stars = True
+            zr = [0, 0.01]
+            fitter='nnls'
+        else:
+            stars = False
+            
         zgrid = utils.log_zgrid(zr, dz=dz[0])
         NZ = len(zgrid)
 
@@ -764,7 +907,7 @@ class MultiBeam():
         A, coeffs, chi2_poly, model_2d = out
         
         ### Set up for template fit
-        templates = self.load_templates(fwhm=fwhm)
+        templates = self.load_templates(fwhm=fwhm, stars=stars)
         NTEMP = len(templates)
         
         out = self.fit_at_z(z=0., templates=templates, fitter=fitter,
@@ -810,7 +953,7 @@ class MultiBeam():
         
         # delta_chi2 = (chi2.max()-chi2.min())/self.DoF
         # if delta_chi2 > delta_chi2_threshold:      
-        if num_peaks > 0:
+        if (num_peaks > 0) & (not stars):
             zgrid_zoom = []
             for ix in indexes:
                 if (ix > 0) & (ix < len(chi2)-1):
@@ -862,7 +1005,9 @@ class MultiBeam():
             print ' Zoom iteration: z_best=%.4f' %(zgrid[np.argmin(chi2)])
         
         ### Best redshift
-        templates = self.load_templates(line_complexes=False, fwhm=fwhm)
+        if not stars:
+            templates = self.load_templates(line_complexes=False, fwhm=fwhm)
+        
         zbest = zgrid[np.argmin(chi2)]
         ix = np.argmin(chi2)
         chibest = chi2.min()
@@ -1124,7 +1269,9 @@ class MultiBeam():
                                       wlimit=[xmin, xmax])
         
         
-        vmax = 1.1*hdu_full[1].data.max()
+        vmax = np.maximum(1.1*np.percentile(hdu_full[1].data, 98), 0.04)
+        #print 'VMAX: %f\n\n' %vmax
+        
         sh = hdu_full[1].data.shape
         extent = [hdu_full[0].header['WMIN'], hdu_full[0].header['WMAX'],
                   0, sh[0]]
@@ -1221,7 +1368,10 @@ class MultiBeam():
         zfit_in = copy.copy(pzfit)
         zfit_in['fwhm'] = fwhm
         zfit_in['prior'] = prior
-        fit, fig = self.fit_redshift(**zfit_in)
+        if zfit_in['zr'] is 0:
+            fit, fig = self.fit_stars(**zfit_in)
+        else:
+            fit, fig = self.fit_redshift(**zfit_in)
         
         ### Make sure model attributes are set to the continuum model
         models = self.reshape_flat(fit['model_cont'])
@@ -1425,7 +1575,7 @@ class MultiBeam():
                 self.beams[i].beam.add_ytrace_offset(shifts[il])
                 self.beams[i].compute_model()
 
-        self.flat_flam = np.hstack([b.model.flatten() for b in self.beams])
+        self.flat_flam = np.hstack([b.beam.model.flatten() for b in self.beams])
         self.poly_order=-1
         self.init_poly_coeffs(poly_order=poly_order)
 

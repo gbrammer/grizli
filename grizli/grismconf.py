@@ -145,12 +145,13 @@ class aXeConf():
         """
         ## dp is the arc length along the trace
         ## $\lambda = dldp_0 + dldp_1 dp + dldp_2 dp^2$ ...
-        order = len(dydx)+1
-        if order == 0:   ## dy=0
+        
+        poly_order = len(dydx)-1
+        if poly_order == 0:   ## dy=0
             dp = dx_in                      
-        elif order == 1: ## constant dy/dx
+        elif poly_order == 1: ## constant dy/dx
             dp = np.sqrt(1+dydx[1]**2)*(dx_in)
-        elif order == 2: ## quadratic trace
+        elif poly_order == 2: ## quadratic trace
             u0 = dydx[1]+2*dydx[2]*(0)
             dp0 = (u0*np.sqrt(1+u0**2)+np.arcsinh(u0))/(4*dydx[2])
             u = dydx[1]+2*dydx[2]*(dx_in)
@@ -162,7 +163,7 @@ class aXeConf():
             xmax = np.maximum((dx_in).max(), 0)
             xfull = np.arange(xmin, xmax)
             dyfull = 0
-            for i in range(1, NORDER):
+            for i in range(1, poly_order):
                 dyfull += i*dydx[i]*(xfull-0.5)**(i-1)
             
             ## Integrate from 0 to dx / -dx
@@ -256,7 +257,7 @@ class aXeConf():
                 print 'Parameter fwcpos=%f supplied but no FWCPOS_REF in %s' %(self.conf_file)
                 return dy, lam
             
-            order = 'DYDX_ORDER_%s' %(beam)
+            order = self.conf['DYDX_ORDER_%s' %(beam)]
             if order != 2:
                 print 'ORDER=%d not supported for NIRISS rotation' %(order)
                 return dy, lam
@@ -266,23 +267,33 @@ class aXeConf():
                 return dy, lam
                 
             ### For the convention of swapping/inverting axes for GR150C
-            if apply_rot == 2:
+            if 'GR150C' in self.conf_file:
                 theta = -theta
             
-            ### Transformed trace coordinates
+            ### If theta is small, use a small angle approximation.  
+            ### Otherwise, 1./tan(theta) blows up and results in numerical 
+            ### noise.
             xp = (dx-xoff_beam)/np.cos(theta)
-            c = dydx
-            
-            beta = c[1]+2*c[2]*xp-1/np.tan(theta)
-            chi = c[0]+c[1]*xp+c[2]*xp**2
-            if theta < 0:
-                psi = (-beta+np.sqrt(beta**2-4*c[2]*chi))/2/c[2]/np.tan(theta)
-                delta = psi*np.tan(theta)
-                dy = xarr_i*np.tan(theta) + psi/np.cos(theta)
+            if (1-np.cos(theta) < 5.e-5):
+                #print 'Approximate!', xoff_beam, np.tan(theta)
+                dy = dy + (dx-xoff_beam)*np.tan(theta)
+                delta = 0.
             else:
-                psi = (-beta-np.sqrt(beta**2-4*c[2]*chi))/2/c[2]/np.tan(theta)
-                delta = psi*np.tan(theta)
-                dy = xarr_i*np.tan(theta) + psi/np.cos(theta)
+                ### Full transformed trace coordinates
+                c = dydx
+            
+                beta = c[1]+2*c[2]*xp-1/np.tan(theta)
+                chi = c[0]+c[1]*xp+c[2]*xp**2
+                if theta < 0:
+                    psi = (-beta+np.sqrt(beta**2-4*c[2]*chi))
+                    psi *= 1./2/c[2]/np.tan(theta)
+                    delta = psi*np.tan(theta)
+                    dy = dx*np.tan(theta) + psi/np.cos(theta)
+                else:
+                    psi = (-beta-np.sqrt(beta**2-4*c[2]*chi))
+                    psi *= 1./2/c[2]/np.tan(theta)
+                    delta = psi*np.tan(theta)
+                    dy = dx*np.tan(theta) + psi/np.cos(theta)
             
             ### Evaluate wavelength at 'prime position along the trace
             dp = self.evaluate_dp(xp+delta, dydx)
