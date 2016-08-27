@@ -1,0 +1,10 @@
+name: grizli
+
+dependencies:
+    - astropy
+    - astropy-helpers
+    - Cython
+    - matplotlib
+    - numpy
+    - scikit-image
+    - scipy

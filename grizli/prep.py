@@ -17,17 +17,12 @@ import astropy.units as u
 import astropy.coordinates as coord
 from astropy.table import Table
 
-from stsci.tools import asnutil
-from drizzlepac import updatehdr
-from drizzlepac.astrodrizzle import AstroDrizzle
-
-from stwcs import updatewcs
-
 from . import utils
 
 def go_all():
     """TBD
     """
+    from stsci.tools import asnutil
     info = Table.read('files.info', format='ascii.commented_header')
         
     # files=glob.glob('../RAW/i*flt.fits')
@@ -518,6 +513,7 @@ def make_drz_catalog(root='', threshold=2., get_background=True,
 def asn_to_dict(input_asn):
     """TBD
     """
+    from stsci.tools import asnutil
     # Already is a dict
     if instance(input_asn, dict):
         return input_asn
@@ -618,6 +614,11 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
     
     align direct images of a single visit
     """    
+    from stsci.tools import asnutil
+    from stwcs import updatewcs
+    from drizzlepac import updatehdr
+    from drizzlepac.astrodrizzle import AstroDrizzle
+    
     ################# 
     ##########  Direct image processing
     #################
@@ -829,6 +830,10 @@ def match_direct_grism_wcs(direct={}, grism={}, get_fresh_flt=True,
                            run_drizzle=True):
     """TBD
     """
+    from drizzlepac import updatehdr
+    from stwcs import updatewcs
+    from drizzlepac.astrodrizzle import AstroDrizzle
+    
     wcs_log = Table.read('%s_wcs.log' %(direct['product']),
                          format='ascii.commented_header')
                          
@@ -877,6 +882,10 @@ def match_direct_grism_wcs(direct={}, grism={}, get_fresh_flt=True,
 def align_multiple_drizzled(mag_limits=[16,23]):
     """TBD
     """
+    from stwcs import updatewcs
+    from drizzlepac import updatehdr
+    from drizzlepac.astrodrizzle import AstroDrizzle
+    
     drz_files = ['j0800+4029-080.0-f140w_drz_sci.fits', 
                  'j0800+4029-117.0-f140w_drz_sci.fits']
     
@@ -917,9 +926,9 @@ def align_multiple_drizzled(mag_limits=[16,23]):
 
         ### Second drizzle
         if len(files) > 1:
-            astrodrizzle.AstroDrizzle(files, output=root, clean=True, context=False, preserve=False, skysub=True, driz_separate=False, driz_sep_wcs=False, median=False, blot=False, driz_cr=False, driz_cr_corr=False, driz_combine=True, final_bits=576, coeffs=True, resetbits=0)        
+            AstroDrizzle(files, output=root, clean=True, context=False, preserve=False, skysub=True, driz_separate=False, driz_sep_wcs=False, median=False, blot=False, driz_cr=False, driz_cr_corr=False, driz_combine=True, final_bits=576, coeffs=True, resetbits=0)        
         else:
-            astrodrizzle.AstroDrizzle(files, output=root, clean=True, final_scale=None, final_pixfrac=1, context=False, final_bits=576, preserve=False, driz_separate=False, driz_sep_wcs=False, median=False, blot=False, driz_cr=False, driz_cr_corr=False, driz_combine=True) 
+            AstroDrizzle(files, output=root, clean=True, final_scale=None, final_pixfrac=1, context=False, final_bits=576, preserve=False, driz_separate=False, driz_sep_wcs=False, median=False, blot=False, driz_cr=False, driz_cr_corr=False, driz_combine=True) 
 
         cat = make_drz_catalog(root=root, threshold=2)
         
@@ -931,10 +940,10 @@ def align_multiple_drizzled(mag_limits=[16,23]):
                'icou10frq_flt.fits']
         
         all_files = list(np.append(files0, files1))
-        astrodrizzle.AstroDrizzle(all_files, output='total', clean=True, context=False, preserve=False, skysub=True, driz_separate=False, driz_sep_wcs=False, median=False, blot=False, driz_cr=False, driz_cr_corr=False, driz_combine=True, final_bits=576, coeffs=True, resetbits=0, final_rot=0)    
+        AstroDrizzle(all_files, output='total', clean=True, context=False, preserve=False, skysub=True, driz_separate=False, driz_sep_wcs=False, median=False, blot=False, driz_cr=False, driz_cr_corr=False, driz_combine=True, final_bits=576, coeffs=True, resetbits=0, final_rot=0)    
         
-        astrodrizzle.AstroDrizzle(files0, output='group0', clean=True, context=False, preserve=False, skysub=True, driz_separate=False, driz_sep_wcs=False, median=False, blot=False, driz_cr=False, driz_cr_corr=False, driz_combine=True, final_bits=576, coeffs=True, resetbits=0, final_refimage='total_drz_sci.fits')    
-        astrodrizzle.AstroDrizzle(files1, output='group1', clean=True, context=False, preserve=False, skysub=True, driz_separate=False, driz_sep_wcs=False, median=False, blot=False, driz_cr=False, driz_cr_corr=False, driz_combine=True, final_bits=576, coeffs=True, resetbits=0, final_refimage='total_drz_sci.fits')    
+        AstroDrizzle(files0, output='group0', clean=True, context=False, preserve=False, skysub=True, driz_separate=False, driz_sep_wcs=False, median=False, blot=False, driz_cr=False, driz_cr_corr=False, driz_combine=True, final_bits=576, coeffs=True, resetbits=0, final_refimage='total_drz_sci.fits')    
+        AstroDrizzle(files1, output='group1', clean=True, context=False, preserve=False, skysub=True, driz_separate=False, driz_sep_wcs=False, median=False, blot=False, driz_cr=False, driz_cr_corr=False, driz_combine=True, final_bits=576, coeffs=True, resetbits=0, final_refimage='total_drz_sci.fits')    
         
         im0 = pyfits.open('group0_drz_sci.fits')
         im1 = pyfits.open('group1_drz_sci.fits')

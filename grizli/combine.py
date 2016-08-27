@@ -9,8 +9,6 @@ import numpy as np
 import astropy.wcs as pywcs
 import astropy.io.fits as pyfits
 
-from drizzlepac import astrodrizzle
-
 from . import utils
 from . import assoc
 
@@ -166,6 +164,7 @@ def combine_flt(files=[], output='combined_flt.fits', grow=2,
     """
     import numpy.linalg
     from stsci.tools import asnutil
+    from drizzlepac import astrodrizzle
     
     ###  `files` is an ASN filename, not  a list of exposures
     if '_asn.fits' in files:
