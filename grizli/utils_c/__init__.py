@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # encoding: utf-8
 """
-Cython speedupts for Grizli functions
+Cython speedups for Grizli functions
 """
 
 import disperse
