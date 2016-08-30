@@ -219,11 +219,11 @@ def get_hst_filter(header):
     """
     if header['INSTRUME'].strip() == 'ACS':
         for i in [1,2]:
-            filter = header['FILTER%d' %(i)]
-            if 'CLEAR' in filter:
+            filter_i = header['FILTER%d' %(i)]
+            if 'CLEAR' in filter_i:
                 continue
             else:
-                filter = acsfilt
+                filter = filter_i
     else:
         filter = header['FILTER']
     

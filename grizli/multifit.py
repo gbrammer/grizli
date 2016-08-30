@@ -145,6 +145,7 @@ def _loadFLT(grism_file, sci_extn, direct_file, pad, ref_file,
     #print grism_file, direct_file
     
     save_file = grism_file.replace('_flt.fits', '_GrismFLT.fits')
+    save_file = save_file.replace('_flc.fits', '_GrismFLT.fits')
     save_file = save_file.replace('_cmb.fits', '_GrismFLT.fits')
     if os.path.exists(save_file):
         print 'Load %s!' %(save_file)
@@ -159,7 +160,7 @@ def _loadFLT(grism_file, sci_extn, direct_file, pad, ref_file,
         flt = model.GrismFLT(grism_file=grism_file, sci_extn=sci_extn,
                          direct_file=direct_file, pad=pad, 
                          ref_file=ref_file, ref_ext=ref_ext, 
-                         seg_file=seg_file, shrink_segimage=True, 
+                         seg_file=seg_file, shrink_segimage=False, 
                          verbose=verbose)
     
     if catalog is not None:
@@ -290,6 +291,7 @@ class GroupFLT():
                     continue
                     
             save_file = file.replace('_flt.fits', '_GrismFLT.fits')
+            save_file = save_file.replace('_flc.fits', '_GrismFLT.fits')
             save_file = save_file.replace('_cmb.fits', '_GrismFLT.fits')
             print 'Save %s' %(save_file)
             self.FLTs[i].save_full_pickle()
@@ -431,7 +433,7 @@ class GroupFLT():
         except:
             return False
             
-        xspec = np.arange(0.7, 1.8, 0.05)-1
+        xspec = np.arange(0.3, 1.8, 0.05)-1
         scale_coeffs = out_coeffs[mb.N*mb.fit_bg:mb.N*mb.fit_bg+mb.n_poly]
         yspec = [xspec**o*scale_coeffs[o] for o in range(mb.poly_order+1)]
         if np.abs(scale_coeffs).max() > max_coeff:
@@ -560,7 +562,7 @@ class MultiBeam():
         
         return out
                 
-    def init_poly_coeffs(self, poly_order=1):
+    def init_poly_coeffs(self, flat=None, poly_order=1):
         """TBD
         """
         ### Already done?
@@ -568,9 +570,11 @@ class MultiBeam():
             return None
         
         self.poly_order = poly_order
-                
+        if flat is None:
+            flat = self.flat_flam
+                    
         ### Polynomial continuum arrays        
-        self.A_poly = np.array([self.xpf**order*self.flat_flam 
+        self.A_poly = np.array([self.xpf**order*flat
                                       for order in range(poly_order+1)])
         
         self.n_poly = poly_order + 1
@@ -632,14 +636,14 @@ class MultiBeam():
             
             Ax = A[:, self.fit_mask][ok_temp,:].T
             ### Weight by ivar
-            Ax *= self.ivarf[self.fit_mask][:, np.newaxis]
+            Ax *= np.sqrt(self.ivarf[self.fit_mask][:, np.newaxis])
             
             #print 'xxx lstsq'
             #out = numpy.linalg.lstsq(Ax,y)
             if fitter == 'lstsq':
                 y = self.scif[self.fit_mask]
                 ### Weight by ivar
-                y *= self.ivarf[self.fit_mask]
+                y *= np.sqrt(self.ivarf[self.fit_mask])
 
                 out = np.linalg.lstsq(Ax,y)                         
                 lstsq_coeff, residuals, rank, s = out
@@ -649,22 +653,39 @@ class MultiBeam():
                 if fit_background:
                     off = 0.04
                     y = self.scif[self.fit_mask]+off
-                    y *= self.ivarf[self.fit_mask]
+                    y *= np.sqrt(self.ivarf[self.fit_mask])
 
                     coeffs, rnorm = scipy.optimize.nnls(Ax, y+off)
                     coeffs[:self.N] -= 0.04
                 else:
                     y = self.scif[self.fit_mask]
-                    y *= self.ivarf[self.fit_mask]
+                    y *= np.sqrt(self.ivarf[self.fit_mask])
                     
-                    coeffs, rnorm = scipy.optimize.nnls(Ax, y)                    
+                    coeffs, rnorm = scipy.optimize.nnls(Ax, y)  
+            
+            # if fitter == 'bounded':
+            #     if fit_background:
+            #         off = 0.04
+            #         y = self.scif[self.fit_mask]+off
+            #         y *= self.ivarf[self.fit_mask]
+            # 
+            #         coeffs, rnorm = scipy.optimize.nnls(Ax, y+off)
+            #         coeffs[:self.N] -= 0.04
+            #     else:
+            #         y = self.scif[self.fit_mask]
+            #         y *= np.sqrt(self.ivarf[self.fit_mask])
+            #         
+            #         coeffs, rnorm = scipy.optimize.nnls(Ax, y)  
+            #     
+            #     out = scipy.optimize.minimize(self.eval_trace_shift, shifts, bounds=bounds, args=args, method='Powell', tol=tol)
+                                  
         else:
             Ax = A[:, self.fit_mask][ok_temp,:].T
             y = self.scif[self.fit_mask]
             
             ### Wieght by ivar
-            Ax *= self.ivarf[self.fit_mask][:, np.newaxis]
-            y *= self.ivarf[self.fit_mask]
+            Ax *= np.sqrt(self.ivarf[self.fit_mask][:, np.newaxis])
+            y *= np.sqrt(self.ivarf[self.fit_mask])
             
             clf = sklearn.linear_model.LinearRegression()
             status = clf.fit(Ax, y)
@@ -681,7 +702,7 @@ class MultiBeam():
         """
         
         if stars:
-            templates = glob.glob('%s/templates/Pickles_stars/ext/*dat' %(os.getenv('GRIZLI')))
+            #templates = glob.glob('%s/templates/Pickles_stars/ext/*dat' %(os.getenv('GRIZLI')))
             # templates = []
             # for t in 'obafgkmrw':
             #     templates.extend( glob.glob('%s/templates/Pickles_stars/ext/uk%s*dat' %(os.getenv('GRIZLI'), t)))
@@ -689,15 +710,28 @@ class MultiBeam():
             # templates.extend(glob.glob('%s/templates/SPEX/spex-prism-[LT]*txt' %(os.getenv('GRIZLI'))))
             # 
             # #templates = glob.glob('/Users/brammer/Downloads/templates/spex*txt')
+            # templates = glob.glob('bpgs/*ascii')
+            # info = catIO.Table('bpgs/bpgs.info')
+            # type = np.array([t[:2] for t in info['type']])
+            # templates = []
+            # for t in 'OBAFGKM':
+            #     test = type == '-%s' %(t)
+            #     so = np.argsort(info['type'][test])
+            #     templates.extend(info['file'][test][so])
+            #             
             # temp_list = OrderedDict()
             # for temp in templates:
-            #     data = np.loadtxt(temp, unpack=True)
+            #     data = np.loadtxt('bpgs/'+temp, unpack=True)
             #     #data[0] *= 1.e4 # spex
             #     scl = np.interp(5500., data[0], data[1])
             #     name = os.path.basename(temp)
+            #     ix = info['file'] == temp
+            #     name='%5s %s' %(info['type'][ix][0][1:], temp.split('.as')[0])
             #     temp_list[name] = utils.SpectrumTemplate(wave=data[0],
             #                                              flux=data[1]/scl)
-
+            # 
+            # np.save('stars_bpgs.npy', [temp_list])
+            
             temp_list = np.load('stars.npy')[0]
             return temp_list
             
@@ -822,7 +856,7 @@ class MultiBeam():
         #model_continuum.reshape(self.beam.sh_beam)
                 
         ### 1D spectrum
-        xspec = np.arange(0.7, 1.8, 0.05)-1
+        xspec = np.arange(0.3, 1.8, 0.05)-1
         scale_coeffs = coeffs_full[self.N*self.fit_bg:  
                                   self.N*self.fit_bg+self.n_poly]
                                   
@@ -943,8 +977,11 @@ class MultiBeam():
         # indexes = peakutils.indexes((chi2nu+delta_chi2_threshold)*(chi2nu > -delta_chi2_threshold), thres=0.3, min_dist=20)
         
         chi2_rev = (chi2_poly - chi2)/self.DoF
+        if chi2_poly < chi2.min():
+            chi2_rev = (chi2.min() + 16 - chi2)/self.DoF
+
         chi2_rev[chi2_rev < 0] = 0
-        indexes = peakutils.indexes(chi2_rev, thres=0.4, min_dist=10)
+        indexes = peakutils.indexes(chi2_rev, thres=0.4, min_dist=8)
         num_peaks = len(indexes)
         
         if False:
@@ -1048,7 +1085,7 @@ class MultiBeam():
         #model_continuum.reshape(self.beam.sh_beam)
                 
         ### 1D spectrum
-        xspec = np.arange(0.7, 1.8, 0.05)-1
+        xspec = np.arange(0.3, 1.8, 0.05)-1
         scale_coeffs = coeffs_full[self.N*self.fit_bg:  
                                   self.N*self.fit_bg+self.n_poly]
                                   
@@ -1164,12 +1201,26 @@ class MultiBeam():
             mwave, mflux, merr = beam.beam.optimal_extract(line_fit[ib]-bg_i, 
                                                         ivar=ivar)
             
+            wave, fflux, ferr = beam.beam.optimal_extract(beam.flat_flam.reshape(beam.beam.sh_beam), ivar=ivar)
+                
+            # wave, flux, err = beam.beam.trace_extract(clean, 
+            #                                             ivar=ivar, r=10)
+            # 
+            # mwave, mflux, merr = beam.beam.trace_extract(line_fit[ib]-bg_i, 
+            #                                             ivar=ivar, r=10)
+            
             if plot_flambda:
                 ok = beam.beam.sensitivity > 0.1*beam.beam.sensitivity.max()
+                #wave = wave[ok]
+                #flux = (flux/beam.beam.sensitivity)[ok]
+                #err = (err/beam.beam.sensitivity)[ok]
+                #mflux = (mflux/beam.beam.sensitivity)[ok]
+                
                 wave = wave[ok]
-                flux = (flux/beam.beam.sensitivity)[ok]
-                err = (err/beam.beam.sensitivity)[ok]
-                mflux = (mflux/beam.beam.sensitivity)[ok]
+                flux  = (flux*beam.beam.total_flux/1.e-17/fflux)[ok]*beam.beam.scale
+                err   = (err*beam.beam.total_flux/1.e-17/fflux)[ok]
+                mflux = (mflux*beam.beam.total_flux/1.e-17/fflux)[ok]*beam.beam.scale
+                
                 ylabel = r'$f_\lambda$'
             else:
                 ylabel = 'flux (e-/s)'
@@ -1179,8 +1230,13 @@ class MultiBeam():
                 continue
                 
             try:
-                ymax = np.maximum(ymax, mflux[scl_region][10:-10].max())
-                ymin = np.minimum(ymin, mflux[scl_region][10:-10].min())
+                okerr = np.isfinite(err)
+                med_err = np.median(err[okerr])
+                
+                ymax = np.maximum(ymax, 
+                            (mflux[scl_region][2:-2] + med_err).max())
+                ymin = np.minimum(ymin, 
+                            (mflux[scl_region][2:-2] - med_err).min())
             except:
                 continue
                 
@@ -1188,10 +1244,16 @@ class MultiBeam():
             ax.plot(wave/1.e4, mflux, color='r', alpha=0.5, zorder=3)
             
             grism = beam.grism.filter
-            for grism in grisms:
-                wfull[grism] = np.append(wfull[grism], wave)
-                ffull[grism] = np.append(ffull[grism], flux)
-                efull[grism] = np.append(efull[grism], err)
+            #for grism in grisms:
+            wfull[grism] = np.append(wfull[grism], wave)
+            ffull[grism] = np.append(ffull[grism], flux)
+            efull[grism] = np.append(efull[grism], err)
+        
+        #
+        cp = {'G800L':(0.0, 0.4470588235294118, 0.6980392156862745),
+              'G102':(0.0, 0.6196078431372549, 0.45098039215686275),
+              'G141':(0.8352941176470589, 0.3686274509803922, 0.0),
+              'none':(0.8, 0.4745098039215686, 0.6549019607843137)}
         
         for grism in grisms:                        
             if self.Ngrism[grism] > 1:
@@ -1208,13 +1270,14 @@ class MultiBeam():
                 wbin = nd.convolve(wfull[grism][okb][so], kernel)[N/2::N]
                 vbin = nd.convolve(var[okb][so], kernel**2)[N/2::N]
                 ax.errorbar(wbin/1.e4, fbin, np.sqrt(vbin), alpha=0.8,
-                            linestyle='None', marker='.', color='k', zorder=2)
+                            linestyle='None', marker='.', color=cp[grism], zorder=2)
                 
         ax.set_ylim(ymin - 0.1*np.abs(ymax), 1.1*ymax)
         
         xmin, xmax = 1.e5, 0
-        limits = {'G102':[0.77, 1.18],
-                  'G141':[1.06, 1.73]}
+        limits = {'G800L':[0.545, 1.02],
+                   'G102':[0.77, 1.18],
+                   'G141':[1.06, 1.73]}
         
         for g in limits:
             if g in grisms:
@@ -1242,8 +1305,9 @@ class MultiBeam():
         """        
         ### xlimits        
         xmin, xmax = 1.e5, 0
-        limits = {'G102':[0.77, 1.18],
-                  'G141':[1.06, 1.73]}
+        limits = {'G800L':[0.545, 1.02],
+                   'G102':[0.77, 1.18],
+                   'G141':[1.06, 1.73]}
         
         for g in limits:
             if g in self.Ngrism:
@@ -1355,7 +1419,9 @@ class MultiBeam():
                 fwhm = 700
                 if 'G141' in self.Ngrism:
                     fwhm = 1200
-                                
+                if 'G800L' in self.Ngrism:
+                    fwhm = 1400
+   
         ### Auto generate delta-wavelength of 2D spectrum
         if 'dlam' in pspec2:
             dlam = pspec2['dlam']
@@ -1363,7 +1429,10 @@ class MultiBeam():
                 dlam = 25
                 if 'G141' in self.Ngrism:
                     dlam = 45
-                   
+                
+                if 'G800L' in self.Ngrism:
+                    dlam = 40
+                
         ### Redshift fit
         zfit_in = copy.copy(pzfit)
         zfit_in['fwhm'] = fwhm
@@ -1488,7 +1557,7 @@ class MultiBeam():
         label = '# id ra dec zbest '
         data = '%7d %.6f %.6f %.5f' %(self.id, ra, dec, fit['zbest'])
         
-        for grism in ['G102', 'G141']:
+        for grism in ['G800L', 'G102', 'G141']:
             label += ' N%s' %(grism)
             if grism in self.Ngrism:
                 data += ' %2d' %(self.Ngrism[grism])
@@ -1595,8 +1664,8 @@ class MultiBeam():
         chi2 = np.sum(((self.scif - modelf)**2*self.ivarf)[self.fit_mask])
 
         print shifts, chi2/self.DoF
-        return chi2/self.DoF
-        
+        return chi2/self.DoF    
+            
 def get_redshift_fit_defaults():
     """TBD
     """
@@ -1690,10 +1759,18 @@ def drizzle_2d_spectrum(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
         
         data_i = data[i]*1.
         if convert_to_flambda:
-            data_i *= convert_to_flambda/beam.beam.sensitivity
-            wht *= (beam.beam.sensitivity/convert_to_flambda)**2
-            wht[~np.isfinite(data_i)] = 0
-            data_i[~np.isfinite(data_i)] = 0
+            #data_i *= convert_to_flambda/beam.beam.sensitivity
+            #wht *= (beam.beam.sensitivity/convert_to_flambda)**2
+            
+            scl = convert_to_flambda*beam.beam.total_flux/1.e-17
+            scl *= 1./beam.flat_flam.reshape(beam.beam.sh_beam).sum(axis=0)
+            #scl = convert_to_flambda/beam.beam.sensitivity
+            
+            data_i *= scl
+            wht *= (1/scl)**2
+            
+            wht[~np.isfinite(data_i+scl)] = 0
+            data_i[~np.isfinite(data_i+scl)] = 0
         
         ###### Go drizzle
         

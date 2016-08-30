@@ -132,6 +132,7 @@ class aXeConf():
         xy = []
         for p in range(order):
             for px in range(p+1):
+                #print 'x**%d y**%d' %(p-px, px)
                 xy.append(xi**(p-px)*yi**(px))
     
         ## Evaluate the polynomial, allowing for N-dimensional inputs
@@ -147,6 +148,10 @@ class aXeConf():
         ## $\lambda = dldp_0 + dldp_1 dp + dldp_2 dp^2$ ...
         
         poly_order = len(dydx)-1
+        if (poly_order == 2):
+            if dydx[2] == 0:
+                poly_order = 1
+                
         if poly_order == 0:   ## dy=0
             dp = dx_in                      
         elif poly_order == 1: ## constant dy/dx
@@ -351,13 +356,17 @@ class aXeConf():
         plt.savefig('%s.pdf' %(self.conf_file))    
 
 def get_config_filename(instrume='WFC3', filter='F140W',
-                        grism='G141'):
+                        grism='G141', ext=1):
     """
     Generate a config filename based on the instrument, filter & grism
     combination. 
     
     Config files assumed to be found in $GRIZLI environment variable
     """   
+    if instrume == 'ACS':
+        conf_file = os.path.join(os.getenv('GRIZLI'), 
+                    'CONF/ACS.WFC.CHIP%d.Cycle13.5.conf' %({1:2,2:1}[ext]))
+                           
     if instrume == 'WFC3':
         conf_file = os.path.join(os.getenv('GRIZLI'), 
                                  'CONF/%s.%s.V4.3.conf' %(grism, filter))

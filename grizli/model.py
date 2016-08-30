@@ -33,7 +33,8 @@ photflam_list = {'F098M': 6.0501324882418389e-20,
             'F775W': 1.0088466875014488e-19, 
             'F814W': 7.0767633156044843e-20, 
             'VISTAH':1.9275637653833683e-20*0.95,
-            'GRISM': 1.e-20}
+            'GRISM': 1.e-20,
+            'G800L': 1.}
  
 ### Filter pivot wavelengths
 photplam_list = {'F098M': 9864.722728110915, 
@@ -47,7 +48,8 @@ photplam_list = {'F098M': 9864.722728110915,
             'F775W': 7693.297933335407,
             'F814W': 8058.784799323767,
             'VISTAH':1.6433e+04,
-            'GRISM': 1.6e4}
+            'GRISM': 1.6e4,
+            'G800L': 7.4737026e3}
 
 # character to skip clearing line on STDOUT printing
 no_newline = '\x1b[1A\x1b[1M' 
@@ -75,7 +77,7 @@ class GrismDisperser(object):
     def __init__(self, id=0, direct=np.zeros((20,20), dtype=np.float32), 
                        segmentation=None, origin=[500, 500], 
                        xcenter=0., ycenter=0., pad=0, grow=1, beam='A',
-                       conf=['WFC3','F140W', 'G141'],
+                       conf=['WFC3','F140W', 'G141'], scale=1.,
                        fwcpos=None):
         """Object for computing dispersed model spectra
         
@@ -118,6 +120,8 @@ class GrismDisperser(object):
             Pre-loaded aXe-format configuration file object or if list of 
             strings determine the appropriate configuration filename with 
             `grismconf.get_config_filename` and load it.
+        
+        scale : float TBD
         
         fwcpos : float
             Rotation position of the NIRISS filter wheel
@@ -172,6 +176,7 @@ class GrismDisperser(object):
         self.grow = grow
         
         self.fwcpos = fwcpos
+        self.scale = scale
         
         ### Direct image
         self.direct = direct
@@ -208,11 +213,16 @@ class GrismDisperser(object):
         self.dx = self.conf.dxlam[self.beam] #+ xcenter #-xoff
         if self.grow > 1:
             self.dx = np.arange(self.dx[0]*self.grow, self.dx[-1]*self.grow)
-            
+        
+        xoff = -0.5 # tested for WFC3/IR
+        #xoff = +3 # ACS?
+        xoff = 0.
+        
+        self.xoff = xoff
         self.ytrace_beam, self.lam_beam = self.conf.get_beam_trace(
                                     x=(self.xc+xcenter-self.pad)/self.grow,
                                     y=(self.yc+ycenter-self.pad)/self.grow,
-                                    dx=(self.dx+xcenter*0-0.5)/self.grow,
+                                    dx=(self.dx+xcenter*0+xoff)/self.grow,
                                     beam=self.beam, fwcpos=self.fwcpos)
         
         self.ytrace_beam *= self.grow
@@ -266,7 +276,7 @@ class GrismDisperser(object):
         self.ytrace, self.lam = self.conf.get_beam_trace(
                                     x=(self.xc+xcenter-self.pad)/self.grow,
                                     y=(self.yc+ycenter-self.pad)/self.grow,
-                                    dx=(self.dxfull+xcenter-0.5)/self.grow,
+                                    dx=(self.dxfull+xcenter+xoff)/self.grow,
                                     beam=self.beam, fwcpos=self.fwcpos)
         
         self.ytrace *= self.grow
@@ -282,6 +292,8 @@ class GrismDisperser(object):
         ysens *= 1.e-17*dl
         self.sensitivity = ysens
         
+        #print 'XXX wavelength: %s %s %s' %(self.lam[-5:], self.lam_beam[-5:], dl[-5:])
+        
         self.total_flux = self.direct[self.seg == self.id].sum()
         
         ## Slices of the parent array based on the origin parameter
@@ -295,10 +307,11 @@ class GrismDisperser(object):
     def add_ytrace_offset(self, yoffset):
         """TBD
         """
+        
         self.ytrace_beam, self.lam_beam = self.conf.get_beam_trace(
                                 x=(self.xc+self.xcenter-self.pad)/self.grow,
                                 y=(self.yc+self.ycenter-self.pad)/self.grow,
-                                dx=(self.dx+self.xcenter*0-0.5)/self.grow,
+                            dx=(self.dx+self.xcenter*0+self.xoff)/self.grow,
                                 beam=self.beam, fwcpos=self.fwcpos)
         
         self.ytrace_beam *= self.grow
@@ -322,14 +335,14 @@ class GrismDisperser(object):
         self.ytrace, self.lam = self.conf.get_beam_trace(
                                 x=(self.xc+self.xcenter-self.pad)/self.grow,
                                 y=(self.yc+self.ycenter-self.pad)/self.grow,
-                                dx=(self.dxfull+self.xcenter-0.5)/self.grow,
+                            dx=(self.dxfull+self.xcenter+self.xoff)/self.grow,
                                 beam=self.beam, fwcpos=self.fwcpos)
         
         self.ytrace *= self.grow
         self.ytrace += yoffset
                 
     def compute_model(self, id=None, thumb=None, spectrum_1d=None,
-                      in_place=True, outdata=None):
+                      in_place=True, outdata=None, scale=None):
         """Compute a model 2D grism spectrum
 
         Parameters
@@ -352,6 +365,8 @@ class GrismDisperser(object):
         outdata : `~numpy.array` with shape = `self.sh_beam`
             Preformed array to which the 2D model is added, if `in_place` is
             False.
+        
+        scale : float TBD
             
         Returns
         -------
@@ -369,14 +384,19 @@ class GrismDisperser(object):
         if in_place:
             self.spectrum_1d = spectrum_1d
         
+        if scale is None:
+            scale = self.scale
+        else:
+            self.scale = scale
+            
         if spectrum_1d is not None:
             xspec, yspec = spectrum_1d
             scale_spec = self.sensitivity_beam*0.
             int_func = interp.interp_conserve_c
             scale_spec[self.lam_sort] = int_func(self.lam_beam[self.lam_sort],
-                                                xspec, yspec)
+                                                xspec, yspec)*scale
         else:
-            scale_spec = 1.
+            scale_spec = scale
             
         ### Output data, fastest is to compute in place but doesn't zero-out
         ### previous result                    
@@ -474,6 +494,35 @@ Error: `thumb` must have the same dimensions as the direct image! (%d,%d)
         
         return wave, opt_flux, opt_rms
     
+    def trace_extract(self, data, r=0, bin=0, ivar=1.):
+        """TBD
+        """
+        dy = np.cast[int](np.round(self.ytrace))
+        aper = np.zeros_like(self.model)
+        y0 = self.sh_beam[0]/2
+        for d in range(-r, r+1):
+            for i in range(self.sh_beam[1]):
+                aper[y0+d+dy[i]-1,i] = 1
+        
+        var = 1./ivar
+        if not np.isscalar(ivar):
+            var[ivar == 0] = 0
+        
+        opt_flux = np.sum(data*aper, axis=0)
+        opt_var = np.sum(var*aper, axis=0)
+        
+        if bin > 1:
+            kern = np.ones(bin, dtype=float)/bin
+            opt_flux = nd.convolve(opt_flux, kern)[bin/2::bin]
+            opt_var = nd.convolve(opt_var, kern**2)[bin/2::bin]
+            wave = self.lam[bin/2::bin]
+        else:
+            wave = self.lam
+        
+        opt_rms = np.sqrt(opt_var)
+        
+        return wave, opt_flux, opt_rms
+        
     def contained_in_full_array(self, full_array):
         """Check if subimage slice is fully contained within larger array
         """
@@ -651,7 +700,7 @@ Error: `thumb` must have the same dimensions as the direct image! (%d,%d)
     
 class ImageData(object):
     """Container for image data with WCS, etc."""
-    def __init__(self, sci=np.zeros((1014,1014)), err=None, dq=None,
+    def __init__(self, sci=None, err=None, dq=None,
                  header=None, wcs=None, photflam=1., photplam=1.,
                  origin=[0,0], pad=0,
                  instrument='WFC3', filter='G141', hdulist=None, sci_extn=1):
@@ -731,6 +780,16 @@ class ImageData(object):
             else:
                 photplam = photplam_list[filter]
                         
+            if 'MDRIZSKY' in hdulist[('SCI',sci_extn)].header:
+                sci -= hdulist[('SCI',sci_extn)].header['MDRIZSKY']
+                
+            ### ACS bunit
+            exptime = 1.
+            if hdulist['SCI', sci_extn].header['BUNIT'] == 'ELECTRONS':
+                exptime = hdulist[0].header['EXPTIME']
+                sci /= exptime
+                err /= exptime
+                           
             if filter.startswith('G'):
                 photflam = 1
             
@@ -742,6 +801,9 @@ class ImageData(object):
                 self.grow = header['GROW']
             
         else:
+            if sci is None:
+                sci = np.zeros((1014,1014))
+                
             self.parent_file = 'Unknown'
             self.sci_extn = None    
             self.grow = 1
@@ -1275,19 +1337,34 @@ class GrismFLT(object):
         ----------
         TBD : TBD
         """
+        import stwcs.wcsutil
         
         ### Read files
         self.grism_file = grism_file
         if os.path.exists(grism_file):
             grism_im = pyfits.open(grism_file)
-            self.grism = ImageData(hdulist=grism_im, sci_extn=sci_extn)
+            
+            if grism_im[0].header['INSTRUME'] == 'ACS':
+                wcs = stwcs.wcsutil.HSTWCS(grism_im, ext=('SCI',sci_extn))
+            else:
+                wcs = None
+           
+            self.grism = ImageData(hdulist=grism_im, sci_extn=sci_extn,
+                                   wcs=wcs)
         else:
             self.grism = None
             
         self.direct_file = direct_file
         if os.path.exists(direct_file):
             direct_im = pyfits.open(direct_file)
-            self.direct = ImageData(hdulist=direct_im, sci_extn=sci_extn)
+            
+            if direct_im[0].header['INSTRUME'] == 'ACS':
+                wcs = stwcs.wcsutil.HSTWCS(direct_im, ext=('SCI',sci_extn))
+            else:
+                wcs = None
+                
+            self.direct = ImageData(hdulist=direct_im, sci_extn=sci_extn,
+                                    wcs=wcs)
         else:
             self.direct = None
         
@@ -1332,7 +1409,8 @@ class GrismFLT(object):
         ### Grism configuration
         self.conf_file = grismconf.get_config_filename(self.grism.instrument,
                                                        self.direct.filter,
-                                                       self.grism.filter)
+                                                       self.grism.filter,
+                                                       sci_extn)
         
         self.conf = grismconf.load_grism_config(self.conf_file)
         
@@ -1431,10 +1509,10 @@ class GrismFLT(object):
         self.direct.ref_filter = utils.get_hst_filter(refh)
         self.direct.ref_file = ref_str
         
-        self.ABZP =  (0*np.log10(self.direct.ref_photflam) - 21.10 -
+        self.direct.ABZP =  (0*np.log10(self.direct.ref_photflam) - 21.10 -
                       5*np.log10(self.direct.ref_photplam) + 18.6921)
         
-        self.thumb_extension = 'REF'
+        self.direct.thumb_extension = 'REF'
         
         #refh['FILTER'].upper()
         return True
@@ -1727,7 +1805,7 @@ class GrismFLT(object):
         else:
             return beams, output
     
-    def compute_full_model(self, ids=None, mags=None, refine_maglim=22,
+    def compute_full_model(self, ids=None, mags=None, mag_limit=22,
                            store=True, verbose=False):
         """Compute flat-spectrum model for multiple objects.
         
@@ -1752,14 +1830,22 @@ class GrismFLT(object):
         ### If `mags` array not specified, compute magnitudes within
         ### segmentation regions.
         if mags is None:                                
+            if verbose:
+                print 'Compute IDs/mags'
+            
             mags = np.zeros(len(ids))
             for i, id in enumerate(ids):
                 out = disperse.compute_segmentation_limits(self.seg, id,
-                                     self.direct.data[self.thumb_extension],
+                                self.direct.data[self.direct.thumb_extension],
                                      self.direct.sh)
             
                 ymin, ymax, y, xmin, xmax, x, area, segm_flux = out
-                mags[i] = self.ABZP - 2.5*np.log10(segm_flux)
+                mags[i] = self.direct.ABZP - 2.5*np.log10(segm_flux)
+            
+            ix = mags < mag_limit
+            ids = ids[ix]
+            mags = mags[ix]
+            
         else:
             if np.isscalar(mags):
                 mags = [mags for i in range(len(ids))]
@@ -2092,7 +2178,7 @@ class GrismFLT(object):
         
 class BeamCutout(object):
     def __init__(self, flt=None, beam=None, conf=None, 
-                 get_slice_header=True, fits_file=None,
+                 get_slice_header=True, fits_file=None, scale=1., 
                  contam_sn_mask=[10,3]):
         """Cutout spectral object from the full frame.
         
@@ -2135,7 +2221,9 @@ class BeamCutout(object):
                              
         self.ivar = 1/self.grism.data['ERR']**2
         self.ivar[self.mask] = 0
-                
+        
+        self.beam.scale = scale
+             
         #self.compute_model = self.beam.compute_model
         self.model = self.beam.model
         self.modelf = self.model.flatten()

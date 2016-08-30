@@ -62,15 +62,18 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
     if dq is not None:
         orig_file['DQ'] = dq
     
+    head = orig_file[0].header
+    
     ### Divide grism images by imaging flats
     ### G102 -> F105W, uc72113oi_pfl.fits
     ### G141 -> F140W, uc72113oi_pfl.fits
     flat, extra_msg = 1., ''
-    if orig_file[0].header['FILTER'] in ['G102', 'G141']:
+    filter = utils.get_hst_filter(head)
+    if filter in ['G102', 'G141']:
         flat_files = {'G102': 'uc72113oi_pfl.fits',
                       'G141': 'uc721143i_pfl.fits'}
                 
-        flat_file = flat_files[orig_file[0].header['FILTER']]
+        flat_file = flat_files[filter]
         extra_msg = ' / flat: %s' %(flat_file)
 
         flat_im = pyfits.open(os.path.join(os.getenv('iref'), flat_file))
@@ -87,8 +90,28 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
         
         # if apply_grism_skysub:
         #     if 'GSKY001' in orig_file:
-                
-    if extra_badpix: 
+    
+    if filter == 'G800L':
+        flat_files = {'G800L':'n6u12592j_pfl.fits'} # F814W
+        flat_file = flat_files[filter]
+        extra_msg = ' / flat: %s' %(flat_file)
+        
+        flat_im = pyfits.open(os.path.join(os.getenv('jref'), flat_file))
+        pfl_file = orig_file[0].header['PFLTFILE'].replace('jref$',
+                                                    os.getenv('jref'))
+        pfl_im = pyfits.open(pfl_file)
+        for ext in [1,2]:
+            flat = flat_im['SCI',ext].data
+            flat_dq = (flat < 0.2)
+            
+            grism_pfl = pfl_im['SCI',ext].data
+            
+            orig_file['DQ',ext].data |= 4*flat_dq
+            orig_file['SCI',ext].data *= grism_pfl/flat
+        
+        orig_file[0].header['NPOLFILE'] = 'jref$v971826jj_npl.fits' # F814W
+        
+    if (head['INSTRUME'] == 'WFC3') & extra_badpix: 
         bp = pyfits.open(os.path.join(os.getenv('iref'),
                                       'badpix_spars200_Nov9.fits'))    
         orig_file['DQ'].data |= bp[0].data
@@ -248,7 +271,8 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
     
     xy_drz = np.array([cat['X_IMAGE'][ok], cat['Y_IMAGE'][ok]]).T
     
-    drz_im = pyfits.open('%s_drz_sci.fits' %(root))
+    drz_file = glob.glob('%s_dr[zc]_sci.fits' %(root))[0]
+    drz_im = pyfits.open(drz_file)
     sh = drz_im[0].data.shape
     
     drz_wcs = pywcs.WCS(drz_im[0].header, relax=True)
@@ -471,14 +495,20 @@ def make_drz_catalog(root='', threshold=2., get_background=True,
     """
     import sewpy
     
-    im = pyfits.open('%s_drz_sci.fits' %(root))
-    ZP = -2.5*np.log10(im[0].header['PHOTFNU'])+8.90
+    drz_file = glob.glob('%s_dr[zc]_sci.fits' %(root))[0]
+    im = pyfits.open(drz_file)
     
+    if 'PHOTFNU' in im[0].header:
+        ZP = -2.5*np.log10(im[0].header['PHOTFNU'])+8.90
+    else:
+        ZP = (-2.5*np.log10(im[0].header['PHOTFLAM']) - 21.10 -
+                 5*np.log10(im[0].header['PHOTPLAM']) + 18.6921)
+        
     config = OrderedDict(DETECT_THRESH=threshold, ANALYSIS_THRESH=threshold,
               DETECT_MINAREA=6,
               PHOT_FLUXFRAC="0.5", 
               WEIGHT_TYPE="MAP_WEIGHT",
-              WEIGHT_IMAGE="%s_drz_wht.fits" %(root),
+              WEIGHT_IMAGE=drz_file.replace('_sci.fits', '_wht.fits'),
               CHECKIMAGE_TYPE="SEGMENTATION",
               CHECKIMAGE_NAME='%s_seg.fits' %(root),
               MAG_ZEROPOINT=ZP, 
@@ -500,7 +530,7 @@ def make_drz_catalog(root='', threshold=2., get_background=True,
                     "FLUX_RADIUS", "BACKGROUND", "FLAGS"],
                     config=config)
     
-    output = sew('%s_drz_sci.fits' %(root))
+    output = sew(drz_file)
     cat = output['table']
     cat.meta = config
     cat.write('%s.cat' %(root), format='ascii.commented_header')
@@ -627,6 +657,16 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
     for file in direct['files']:
         fresh_flt_file(file)
         updatewcs.updatewcs(file, verbose=False)
+    
+    ACS = '_flc' in direct['files'][0]
+    if ACS:
+        bits = 0
+        driz_cr_snr = '3.5 3.0'
+        driz_cr_scale = '1.2 0.7'
+    else:
+        bits = 576
+        driz_cr_snr = '8.0 5.0'
+        driz_cr_scale = '2.5 0.7'
         
     ### Make ASN
     asn = asnutil.ASNTable(direct['files'], output=direct['product'])
@@ -663,11 +703,11 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                      context=False, preserve=False, skysub=True,
                      driz_separate=True, driz_sep_wcs=True, median=True,
                      blot=True, driz_cr=True, driz_cr_corr=False,
-                     driz_combine=True, final_bits=576, coeffs=True)        
+                     driz_combine=True, final_bits=bits, coeffs=True)        
     else:
         AstroDrizzle(direct['files'], output=direct['product'], clean=True,
                      final_scale=None, final_pixfrac=1, context=False,
-                     final_bits=576, preserve=False, driz_separate=False,
+                     final_bits=bits, preserve=False, driz_separate=False,
                      driz_sep_wcs=False, median=False, blot=False, 
                      driz_cr=False, driz_cr_corr=False, driz_combine=True) 
     
@@ -707,8 +747,8 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
     if len(direct['files']) == 1:
         AstroDrizzle(direct['files'], output=direct['product'], clean=True,
                      final_pixfrac=0.8, context=False, resetbits=4096, 
-                     final_bits=576, driz_sep_bits=576, preserve=False, 
-                     driz_cr_snr='8.0 5.0', driz_cr_scale = '2.5 0.7', 
+                     final_bits=bits, driz_sep_bits=bits, preserve=False, 
+                     driz_cr_snr=driz_cr_snr, driz_cr_scale=driz_cr_scale, 
                      driz_separate=False, driz_sep_wcs=False, median=False, 
                      blot=False, driz_cr=False, driz_cr_corr=False) 
     else:
@@ -719,8 +759,8 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
         
         AstroDrizzle(direct['files'], output=direct['product'], clean=True, 
                      final_pixfrac=pixfrac, context=False, resetbits=4096, 
-                     final_bits=576, driz_sep_bits=576, preserve=False, 
-                     driz_cr_snr='8.0 5.0', driz_cr_scale = '2.5 0.7')
+                     final_bits=bits, driz_sep_bits=bits, preserve=False, 
+                     driz_cr_snr=driz_cr_snr, driz_cr_scale=driz_cr_scale)
     
     ### Make DRZ catalog again with updated DRZWCS
     clean_drizzle(direct['product'])
@@ -744,9 +784,14 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
     asn.write()
     
     ### Subtract grism sky
-    visit_grism_sky(grism=grism, apply=True, column_average=column_average, 
-                    verbose=True)
+    status = visit_grism_sky(grism=grism, apply=True,
+                          column_average=column_average, verbose=True, ext=1)
     
+    ### Run on second chip (also for UVIS/G280)
+    if ACS:
+        visit_grism_sky(grism=grism, apply=True,
+                        column_average=column_average, verbose=True, ext=2)
+        
     ### Redrizzle with new background subtraction
     skyfile = '/tmp/%s.skyfile' %(grism['product'])
     fp = open(skyfile,'w')
@@ -757,14 +802,13 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
         pixfrac=1.0
     else:
         pixfrac=0.8
-        
+            
     AstroDrizzle(grism['files'], output=grism['product'], clean=True,
                  context=False, preserve=False, skysub=True, skyfile=skyfile,
                  driz_separate=True, driz_sep_wcs=True, median=True, 
                  blot=True, driz_cr=True, driz_cr_corr=True, 
-                 driz_combine=True, driz_sep_bits=576, final_bits=576,
-                 coeffs=True, 
-                 resetbits=4096, final_pixfrac=pixfrac)        
+                 driz_combine=True, driz_sep_bits=bits, final_bits=bits,
+                 coeffs=True, resetbits=4096, final_pixfrac=pixfrac)        
     
     clean_drizzle(grism['product'])
     
@@ -773,8 +817,10 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
 def clean_drizzle(root):
     """TBD
     """
-    sci = pyfits.open('%s_drz_sci.fits' %(root), mode='update')
-    wht = pyfits.open('%s_drz_wht.fits' %(root))
+    drz_file = glob.glob('%s_dr[zc]_sci.fits' %(root))[0]
+    
+    sci = pyfits.open(drz_file, mode='update')
+    wht = pyfits.open(drz_file.replace('_sci.fits', '_wht.fits'))
     mask = wht[0].data == 0
     sci[0].data[mask] = 0
     sci.flush()
@@ -950,10 +996,12 @@ def align_multiple_drizzled(mag_limits=[16,23]):
         imt = pyfits.open('total_drz_sci.fits')
 
         
-def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True):
+def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext=1):
     """TBD
     
     Implementation of sky subtraction from ISR 2015-17
+    
+    Returns True if ACS
     """
     import numpy.ma
     import scipy.ndimage as nd
@@ -964,20 +1012,40 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True):
     im = pyfits.open(grism['files'][0])
     grism_element = utils.get_hst_filter(im[0].header)
     
+    flat = 1.
     if grism_element == 'G141':
         bg_fixed = ['zodi_G141_clean.fits']
         bg_vary = ['zodi_G141_clean.fits', 'excess_G141_clean.fits',
                    'G141_scattered_light.fits'][1:]
-    else:
+        ACS = False
+    elif grism_element == 'G102':
         bg_fixed = ['zodi_G102_clean.fits']
         bg_vary = ['excess_G102_clean.fits']
+        ACS = False
+    elif grism_element == 'G800L':
+        bg_fixed = ['ACS.WFC.CHIP%d.msky.1.smooth.fits' %({1:2,2:1}[ext])]
+        #bg_fixed = ['ACS.WFC.CHIP%d.msky.1.fits' %({1:2,2:1}[ext])]
+        bg_vary = []
+        ACS = True
+        
+        flat_files = {'G800L':'n6u12592j_pfl.fits'} # F814W
+        flat_file = flat_files[grism_element]        
+        flat_im = pyfits.open(os.path.join(os.getenv('jref'), flat_file))
+        flat = flat_im['SCI',ext].data.flatten()
     
+    if verbose:
+        print '%s: EXTVER=%d / %s / %s' %(grism['product'], ext, bg_fixed,
+                                       bg_vary)
+    if not ACS:
+        ext = 1
+        
     ### Read sky files    
     data_fixed = []
     for file in bg_fixed:
-        im = pyfits.open('%s/CONF/%s' %(os.getenv('GRIZLI'),
-                                        file))[0].data.flatten()
-        data_fixed.append(im)
+        im = pyfits.open('%s/CONF/%s' %(os.getenv('GRIZLI'), file))
+        sh = im[0].data.shape
+        data = im[0].data.flatten()/flat
+        data_fixed.append(data)
         
     data_vary = []
     for file in bg_vary:
@@ -985,10 +1053,10 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True):
                                         file))[0].data.flatten()
         data_vary.append(im)
     
-    yp, xp = np.indices((1014,1014))
+    yp, xp = np.indices(sh)
     
     ### Hard-coded (1014,1014) WFC3/IR images
-    Npix = 1014**2
+    Npix = sh[0]*sh[1]
     Nexp = len(grism['files'])
     Nfix = len(data_fixed)
     Nvary = len(data_vary)
@@ -999,19 +1067,29 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True):
     wht = data*0.    
     mask = data > -1
     medians = np.zeros(Nexp)
+    exptime = np.ones(Nexp)
     
     ### Build combined arrays
+    
     for i in range(Nexp):
         flt = pyfits.open(grism['files'][i])
-        dq_mask = flt['DQ'].data == 0
+        dq_mask = flt['DQ',ext].data == 0
         
         ## Data
-        data[i*Npix:(i+1)*Npix] = (flt['SCI'].data*dq_mask).flatten()
+        data[i*Npix:(i+1)*Npix] = (flt['SCI',ext].data*dq_mask).flatten()
         mask[i*Npix:(i+1)*Npix] &= dq_mask.flatten() #== 0
-        wht[i*Npix:(i+1)*Npix] = 1./(flt['ERR'].data**2*dq_mask).flatten()
+        wht[i*Npix:(i+1)*Npix] = 1./(flt['ERR',ext].data**2*dq_mask).flatten()
         wht[~np.isfinite(wht)] = 0.
-        medians[i] = np.median(flt['SCI'].data[dq_mask])
         
+        if ACS:
+            exptime[i] = flt[0].header['EXPTIME']
+            data[i*Npix:(i+1)*Npix] /= exptime[i]
+            wht[i*Npix:(i+1)*Npix] *= exptime[i]**2
+
+            medians[i] = np.median(flt['SCI',ext].data[dq_mask]/exptime[i])
+        else:
+            medians[i] = np.median(flt['SCI',ext].data[dq_mask])
+            
         ## Fixed arrays      
         for j in range(Nfix):
             for k in range(Nexp):
@@ -1027,12 +1105,11 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True):
             mask[i*Npix:(i+1)*Npix] &= np.isfinite(data_vary[j])
                 
     ### Initial coeffs based on image medians
-    coeffs = np.hstack((medians.min(), medians-medians.min()))
-    if Nvary > 1:
-        coeffs = np.hstack((coeffs, np.zeros(Nexp)))
+    coeffs = np.array([np.mean(medians)])
+    if Nvary > 0:
+        coeffs = np.hstack((coeffs, np.zeros(Nexp*Nvary)))
+        coeffs[1::Nvary] = medians-medians.min()
         
-    coeffs[1:] *= 0
-    coeffs[1::Nvary] = medians-medians.min()
     model = np.dot(A, coeffs)
     
     for iter in range(10):
@@ -1045,12 +1122,12 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True):
         
         if False:
             j = 1
-            mask_i = (obj_mask & mask)[j*Npix:(j+1)*Npix].reshape((1014,1014))
-            r_i = (data-model)[j*Npix:(j+1)*Npix].reshape((1014,1014))
+            mask_i = (obj_mask & mask)[j*Npix:(j+1)*Npix].reshape(sh)
+            r_i = (data-model)[j*Npix:(j+1)*Npix].reshape(sh)
             ds9.view(r_i * mask_i)
         
         if verbose:
-            print '%s > Iter: %d, masked: %d, %s' %(grism['product'], iter,
+            print '   %s > Iter: %d, masked: %d, %s' %(grism['product'], iter,
                                                 obj_mask.sum(), coeffs)
                                                 
         out = np.linalg.lstsq(A[mask & obj_mask,:], data[mask & obj_mask])
@@ -1060,7 +1137,7 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True):
     sky = np.dot(A, coeffs).reshape(Nexp, Npix)
         
     ## log file
-    fp = open('%s_sky_background.info' %(grism['product']), 'w')
+    fp = open('%s_%d_sky_background.info' %(grism['product'], ext), 'w')
     fp.write('# file c1 %s\n' %(' '.join(['c%d' %(v+2) 
                                             for v in range(Nvary)])))
     
@@ -1086,28 +1163,32 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True):
             file = grism['files'][j]
             
             flt = pyfits.open(file, mode='update')
-            flt['SCI',1].data -= sky[j,:].reshape((1014,1014))
+            flt['SCI',ext].data -= sky[j,:].reshape(sh)*exptime[j]
         
-            flt[0].header['GSKYCOL'] = (False, 'Subtract column average')
-            flt[0].header['GSKYN'] = (Nfix+Nvary, 'Number of sky images')
-            flt[0].header['GSKY001'] = (coeffs[0], 
+            flt[0].header['GSKYCOL%d' %(ext)] = (False, 
+                                                 'Subtract column average')
+            flt[0].header['GSKYN%d' %(ext)] = (Nfix+Nvary, 
+                                               'Number of sky images')
+            flt[0].header['GSKY%d01' %(ext)] = (coeffs[0], 
                                         'Sky image %s (fixed)' %(bg_fixed[0]))
             
-            flt[0].header['GSKY001F'] = (bg_fixed[0], 'Sky image (fixed)')
+            flt[0].header['GSKY%d01F' %(ext)] = (bg_fixed[0], 
+                                                  'Sky image (fixed)')
             
             for v in range(Nvary):
                 k = Nfix + j*Nvary + v
                 #print coeffs[k]
-                flt[0].header['GSKY%03d' %(v+Nfix+1)] = (coeffs[k], 
+                flt[0].header['GSKY%d%02d' %(ext, v+Nfix+1)] = (coeffs[k], 
                                      'Sky image %s (variable)' %(bg_vary[v]))
-                #
-                flt[0].header['GSKY%03dF' %(v+Nfix+1)] = (bg_vary[v], 
+                
+                flt[0].header['GSKY%d%02dF' %(ext, v+Nfix+1)] = (bg_vary[v], 
                                      'Sky image (variable)')
                 
             flt.flush()
     
-    if not column_average:
-        return True
+    ### Don't do `column_average` for ACS
+    if (not column_average) | ACS:
+        return ACS
         
     ######
     ### Now fit residual column average & make diagnostic plot
@@ -1178,3 +1259,4 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True):
     if interactive_status:
         plt.ion()
     
+    return False
