@@ -1,15 +1,15 @@
 """
 Demonstrate aXe trace polynomials.
-
-  v1.0 - October 14, 2014  (G. Brammer, N. Pirzkal, R. Ryan) 
-
+  
+Initial code taken from `(Brammer, Pirzkal, & Ryan 2014) <https://github.com/WFC3Grism/CodeDescription>`_, which contains a detailed 
+explanation how the grism configuration parameters and coefficients are defined and evaluated.
 """
 import os
 import numpy as np
 
 class aXeConf():
     def __init__(self, conf_file='WFC3.IR.G141.V2.5.conf'):
-        """aXe configuration file
+        """Read an aXe-compatible configuration file
         
         Parameters
         ----------
@@ -119,6 +119,23 @@ class aXeConf():
                 
     def field_dependent(self, xi, yi, coeffs):
         """aXe field-dependent coefficients
+        
+        See the `aXe manual <http://axe.stsci.edu/axe/manual/html/node7.html#SECTION00721200000000000000>`_ for a description of how the field-dependent coefficients are specified.
+        
+        Parameters
+        ----------
+        xi, yi : float or array-like
+            Coordinate to evaluate the field dependent coefficients, where
+            `xi = x-REFX` and `yi = y-REFY`.
+        
+        coeffs : array-like
+            Field-dependency coefficients
+        
+        Returns
+        -------
+        a : float or array-like
+            Evaluated field-dependent coefficients
+            
         """
         ## number of coefficients for a given polynomial order
         ## 1:1, 2:3, 3:6, 4:10, order:order*(order+1)/2
@@ -140,9 +157,36 @@ class aXeConf():
     
         return a
     
-    def evaluate_dp(self, dx_in, dydx):
-        """
-        Evalate arc length along the trace given trace polynomial coefficients
+    def evaluate_dp(self, dx, dydx):
+        """Evalate arc length along the trace given trace polynomial coefficients
+        
+        Parameters
+        ----------
+        dx : array-like
+            x pixel to evaluate
+        
+        dydx : array-like
+            Coefficients of the trace polynomial
+        
+        Returns
+        -------
+        dp : array-like
+            Arc length along the trace at position `dx`.
+            
+        For `dydx` polynomial orders 0, 1 or 2, integrate analytically.  
+        Higher orders must be integrated numerically.
+        
+        **Constant:** 
+            .. math:: dp = dx
+
+        **Linear:** 
+            .. math:: dp = \sqrt{1+\mathrm{DYDX}[1]}\cdot dx
+        
+        **Quadratic:** 
+            .. math:: u = \mathrm{DYDX}[1] + 2\ \mathrm{DYDX}[2]\cdot dx
+            
+            .. math:: dp = (u \sqrt{1+u^2} + \mathrm{arcsinh}\ u) / (4\cdot \mathrm{DYDX}[2])
+        
         """
         ## dp is the arc length along the trace
         ## $\lambda = dldp_0 + dldp_1 dp + dldp_2 dp^2$ ...
@@ -153,19 +197,19 @@ class aXeConf():
                 poly_order = 1
                 
         if poly_order == 0:   ## dy=0
-            dp = dx_in                      
+            dp = dx                      
         elif poly_order == 1: ## constant dy/dx
-            dp = np.sqrt(1+dydx[1]**2)*(dx_in)
+            dp = np.sqrt(1+dydx[1]**2)*(dx)
         elif poly_order == 2: ## quadratic trace
             u0 = dydx[1]+2*dydx[2]*(0)
             dp0 = (u0*np.sqrt(1+u0**2)+np.arcsinh(u0))/(4*dydx[2])
-            u = dydx[1]+2*dydx[2]*(dx_in)
+            u = dydx[1]+2*dydx[2]*(dx)
             dp = (u*np.sqrt(1+u**2)+np.arcsinh(u))/(4*dydx[2])-dp0
         else:
             ## high order shape, numerical integration along trace
             ## (this can be slow)
-            xmin = np.minimum((dx_in).min(), 0)
-            xmax = np.maximum((dx_in).max(), 0)
+            xmin = np.minimum((dx).min(), 0)
+            xmax = np.maximum((dx).max(), 0)
             xfull = np.arange(xmin, xmax)
             dyfull = 0
             for i in range(1, poly_order):
@@ -182,14 +226,40 @@ class aXeConf():
             if gt0.sum() > 0:
                 dpfull[gt0] = np.cumsum(np.sqrt(1+dyfull[gt0]**2))
               
-            dp = np.interp(dx_in, xfull, dpfull)
+            dp = np.interp(dx, xfull, dpfull)
         
         return dp
         
     def get_beam_trace(self, x=507, y=507, dx=0., beam='A', fwcpos=None):
-        """
-        Get an aXe beam trace for an input reference pixel and 
-        list of output x pixels dx
+        """Get an aXe beam trace for an input reference pixel and list of output x pixels `dx`
+        
+        Parameters
+        ----------
+        x, y : float or array-like
+            Evaluate trace definition at detector coordinates `x` and `y`.
+            
+        dx : float or array-like
+            Offset in x pixels from `(x,y)` where to compute trace offset and 
+            effective wavelength
+            
+        beam : str
+            Beam name (i.e., spectral order) to compute.  By aXe convention, 
+            `beam='A'` is the first order, 'B' is the zeroth order and 
+            additional beams are the higher positive and negative orders.
+            
+        fwcpos : None or float
+            For NIRISS, specify the filter wheel position to compute the 
+            trace rotation
+        
+        Returns
+        -------
+        dy : float or array-like
+            Center of the trace in y pixels offset from `(x,y)` evaluated at
+            `dx`.
+            
+        lam : float or array-like
+            Effective wavelength along the trace evaluated at `dx`.
+            
         """
         NORDER = self.orders[beam]+1
         
@@ -357,11 +427,48 @@ class aXeConf():
 
 def get_config_filename(instrume='WFC3', filter='F140W',
                         grism='G141', ext=1):
-    """
-    Generate a config filename based on the instrument, filter & grism
-    combination. 
+    """Generate a config filename based on the instrument, filter & grism combination. 
     
-    Config files assumed to be found in $GRIZLI environment variable
+    Config files assumed to be found the directory specified by the `$GRIZLI` 
+    environment variable, i.e., `${GRIZLI}/CONF`.
+        
+    Parameters
+    ----------
+    instrume : {'ACS', 'WFC3', 'NIRISS', 'NIRCam', 'WFIRST'}
+        Instrument used
+        
+    filter : str
+        Direct image filter.  This is only used for WFC3/IR, where the grism
+        configuration files have been determined for each direct+grism 
+        combination separately based on the filter wedge offsets of the 
+        filters.
+        
+    grism : str
+        Grism name.  Valid combinations are the following:
+            
+            ACS : G800L (assumed)
+            WFC3 : G102, G141
+            NIRISS : GR150R, GR150C
+            NIRCam : F322W2, F356W, F430M, F444W, F460M
+            WFIRST : (basic assumptions about the WFI grism)
+            
+    ext : int
+        For ACS/WFC, specifies the EXTVER of the chip to use.  Note that this 
+        is switched with respect to the ACS WFC3 `CHIPNAME` values such that
+        
+            EXTVER = 1 is extension 1 / (SCI,1) of the flt/flc files but 
+            corresponds to CHIPNAME = 2 and the ACS.WFC3.CHIP2 config files.
+
+            and 
+            
+            EXTVER = 2 is extension 4 / (SCI,2) of the flt/flc files but 
+            corresponds to CHIPNAME = 1 and the ACS.WFC3.CHIP1 config files.
+    
+    Returns
+    -------
+    conf_file : str
+        String path of the configuration file.
+            
     """   
     if instrume == 'ACS':
         conf_file = os.path.join(os.getenv('GRIZLI'), 
@@ -390,8 +497,18 @@ def get_config_filename(instrume='WFC3', filter='F140W',
     return conf_file
         
 def load_grism_config(conf_file):
-    """
-    Load parameters from an aXe configuration file
+    """Load parameters from an aXe configuration file
+    
+    Parameters
+    ----------
+    conf_file : str
+        Filename of the configuration file
+    
+    Returns
+    -------
+    conf : `~grizli.grismconf.aXeConf`
+        Configuration file object.  Runs `conf.get_beams()` to read the 
+        sensitivity curves.
     """
     conf = aXeConf(conf_file)
     conf.get_beams()
