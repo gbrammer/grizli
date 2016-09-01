@@ -1,2 +1,2 @@
 # Should be one commit behind latest
-__version__ = "0.1.1-67-gea28304"
+__version__ = "0.1.1-68-g15d15c6"
