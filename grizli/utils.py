@@ -9,7 +9,18 @@ import numpy as np
 no_newline = '\x1b[1A\x1b[1M' 
 
 def get_flt_info(files=[]):
-    """TBD
+    """Extract header information from a list of FLT files
+    
+    Parameters
+    -----------
+    files : list
+        List of exposure filenames.
+        
+    Returns
+    --------
+    tab : `~astropy.table.Table`
+        Table containing header keywords
+        
     """
     from astropy.io.fits import Header
     from astropy.table import Table
@@ -35,7 +46,29 @@ def get_flt_info(files=[]):
     return tab
 
 def radec_to_targname(ra=0, dec=0, header=None):
-    """TBD
+    """Turn decimal degree coordinates into a string
+    
+    Example:
+
+        >>> from grizli.utils import radec_to_targname
+        >>> print radec_to_targname(ra=10., dec=-10.)
+        j004000-100000
+    
+    Parameters
+    -----------
+    ra, dec : float
+        Sky coordinates in decimal degrees
+    
+    header : `~astropy.io.fits.Header` or None
+        Optional FITS header with CRVAL or RA/DEC_TARG keywords.  If 
+        specified, read `ra`/`dec` from CRVAL1/CRVAL2 or RA_TARG/DEC_TARG
+        keywords, whichever are available
+    
+    Returns
+    --------
+    targname : str
+        Target name like jHHMMSS[+-]DDMMSS.
+    
     """
     import astropy.coordinates 
     import astropy.units as u
@@ -51,7 +84,7 @@ def radec_to_targname(ra=0, dec=0, header=None):
     coo = astropy.coordinates.SkyCoord(ra=ra*u.deg, dec=dec*u.deg)
     
     cstr = re.split('[hmsd.]', coo.to_string('hmsdms'))
-    targname = ('J%s%s' %(''.join(cstr[0:3]), ''.join(cstr[4:7])))
+    targname = ('j%s%s' %(''.join(cstr[0:3]), ''.join(cstr[3:6])))
     targname = targname.replace(' ', '')
     
     return targname
@@ -62,8 +95,55 @@ def parse_flt_files(files=[], info=None, uniquename=False,
                                  'GNGRISM':'goodsn-', 
                                  'GOODS-SOUTH-':'goodss-', 
                                  'UDS-':'uds-'}):
-    """TBD
-    Read a files.info file and make ASN files for each visit/filter[/date].
+    """Read header information from a list of exposures and parse out groups based on filter/target/orientation.
+    
+    Parameters
+    -----------
+    files : list
+        List of exposure filenames.  If not specified, use *flt.fits.
+        
+    info : None or output from `~grizli.utils.get_flt_info`.
+    
+    uniquename : bool
+        If True, then split everything by program ID and visit name.  If 
+        False, then just group by targname/filter/pa_v3.
+        
+    translate : dict
+        Translation dictionary to modify TARGNAME keywords to some other 
+        value.  Used like:
+        
+            >>> targname = 'GOODS-SOUTH-10'
+            >>> translate = {'GOODS-SOUTH-': 'goodss-'}
+            >>> for k in translate:
+            >>>     targname = targname.replace(k, translate[k])
+            >>> print targname
+            goodss-10
+        
+    Returns
+    --------
+    output_list : dict
+        Dictionary split by target/filter/pa_v3. Keys are derived visit
+        product names and values are lists of exposure filenames corresponding
+        to that set. Keys are generated with the formats like:
+            
+            >>> targname = 'macs1149+2223'
+            >>> pa_v3 = 32.0
+            >>> filter = 'f140w'
+            >>> flt_filename = 'ica521naq_flt.fits'
+            >>> propstr = flt_filename[1:4]
+            >>> visit = flt_filename[4:6]
+            >>> # uniquename = False
+            >>> print '%s-%05.1f-%s' %(targname, pa_v3, filter)
+            macs1149.6+2223-032.0-f140w
+            >>> # uniquename = True
+            >>> print '%s-%3s-%2s-%05.1f-%s' %(targname, propstr, visit, 
+                                               pa_v3, filter)
+            macs1149.6+2223-ca5-21-032.0-f140w
+        
+    filter_list : dict
+        Nested dictionary split by filter and then PA_V3.  This shouldn't  
+        be used if exposures from completely disjoint pointings are stored
+        in the same working directory.
     """    
     
     if info is None:
@@ -206,16 +286,29 @@ def get_hst_filter(header):
     """Get simple filter name out of an HST image header.  
     
     ACS has two keywords for the two filter wheels, so just return the 
-    non-CLEAR filter.
+    non-CLEAR filter. For example, 
+    
+        >>> h = astropy.io.fits.Header()
+        >>> h['INSTRUME'] = 'ACS'
+        >>> h['FILTER1'] = 'CLEAR1L'
+        >>> h['FILTER2'] = 'F814W'
+        >>> from grizli.utils import get_hst_filter
+        >>> print get_hst_filter(h)
+        F814W
+        >>> h['FILTER1'] = 'G800L'
+        >>> h['FILTER2'] = 'CLEAR2L'
+        >>> print get_hst_filter(h)
+        G800L
     
     Parameters
-    ----------
+    -----------
     header : `~astropy.io.fits.Header`
         Image header with FILTER or FILTER1,FILTER2,...,FILTERN keywords
     
     Returns
-    -------
+    --------
     filter : str
+            
     """
     if header['INSTRUME'].strip() == 'ACS':
         for i in [1,2]:
@@ -414,16 +507,41 @@ def detect_with_photutils(sci, err=None, dq=None, seg=None, detect_thresh=2.,
     
 #
 def nmad(data):
-    """Return normalized `~.astropy.stats.median_absolute_deviation`
+    """Normalized NMAD=1.48 * `~.astropy.stats.median_absolute_deviation`
     
     """
     import astropy.stats
     return 1.48*astropy.stats.median_absolute_deviation(data)
 
 def get_line_wavelengths():
-    """TBD
+    """Get a dictionary of common emission line wavelengths and line ratios
+    
+    Returns
+    -------
+    line_wavelengths, line_ratios : dict
+        Keys are common to both dictionaries and are simple names for lines
+        and line complexes.  Values are lists of line wavelengths and line 
+        ratios.
+        
+            >>> from grizli.utils import get_line_wavelengths
+            >>> line_wavelengths, line_ratios = get_line_wavelengths()
+            >>> print line_wavelengths['Ha'], line_ratios['Ha']
+            [6564.61] [1.0]
+            >>> print line_wavelengths['OIII'], line_ratios['OIII']
+            [5008.24, 4960.295] [2.98, 1]
+        
+        Includes some additional combined line complexes useful for redshift
+        fits:
+        
+            >>> from grizli.utils import get_line_wavelengths
+            >>> line_wavelengths, line_ratios = get_line_wavelengths()
+            >>> key = 'Ha+SII+SIII+He'
+            >>> print line_wavelengths[key], '\\n', line_ratios[key]
+            [6564.61, 6718.29, 6732.67, 9068.6, 9530.6, 10830.0]
+            [1.0, 0.1, 0.1, 0.05, 0.122, 0.04]
+        
     """
-    line_wavelengths = {} ; line_ratios = {}
+    line_wavelengths = OrderedDict() ; line_ratios = OrderedDict()
     line_wavelengths['Ha'] = [6564.61]
     line_ratios['Ha'] = [1.]
     line_wavelengths['Hb'] = [4862.68]
@@ -490,29 +608,122 @@ def get_line_wavelengths():
     return line_wavelengths, line_ratios 
     
 class SpectrumTemplate(object):
-    """TBD
-    """
     def __init__(self, wave=None, flux=None, fwhm=None, velocity=False):
-        """TBD
+        """Container for template spectra.   
+                
+        Parameters
+        ----------
+        wave, fwhm : None or float or array-like
+            If both are float, then initialize with a Gaussian.  
+            
+        flux : None or array-like
+            Flux (density) array
+            
+        velocity : bool
+            `fwhm` is a velocity.
+            
+        Attributes
+        ----------
+        wave, flux : array-like
+            Passed from the input parameters or generated/modified later.
+        
+        Methods
+        -------
+        __add__, __mul__ : Addition and multiplication of templates.
+        
+        Examples
+        --------
+        
+            .. plot::
+                :include-source:
+
+                import matplotlib.pyplot as plt
+                from grizli.utils import SpectrumTemplate
+                
+                ha = SpectrumTemplate(wave=6563., fwhm=10)
+                plt.plot(ha.wave, ha.flux)
+                
+                ha_z = ha.zscale(0.1)
+                plt.plot(ha_z.wave, ha_z.flux, label='z=0.1')
+                
+                plt.legend()
+                plt.xlabel(r'$\lambda$')
+                
+                plt.show()
+            
         """
         self.wave = wave
         self.flux = flux
-        
-        ### Gaussian
+
         if (wave is not None) & (fwhm is not None):
-            rms = fwhm/2.35
-            if velocity:
-                rms *= wave/3.e5
-                
-            xgauss = np.arange(-5,5.01,0.1)*rms+wave
-            gaussian = np.exp(-(xgauss-wave)**2/2/rms**2)
-            gaussian /= np.sqrt(2*np.pi*rms**2)
+            self.make_gaussian(wave, fwhm, velocity=velocity)
             
-            self.wave = xgauss
-            self.flux = gaussian
+    def make_gaussian(self, wave, fwhm, max_sigma=5, step=0.1, 
+                      velocity=False):
+        """Make Gaussian template
+        
+        Parameters
+        ----------
+        wave, fwhm : None or float or array-like
+            Central wavelength and FWHM of the desired Gaussian
+            
+        velocity : bool
+            `fwhm` is a velocity.
+        
+        max_sigma, step : float
+            Generated wavelength array is
+                
+                >>> rms = fwhm/2.35
+                >>> xgauss = np.arange(-max_sigma, max_sigma, step)*rms+wave
+
+        Returns
+        -------
+        Stores `wave`, `flux` attributes.        
+        """
+        rms = fwhm/2.35
+        if velocity:
+            rms *= wave/3.e5
+            
+        xgauss = np.arange(-max_sigma, max_sigma, step)*rms+wave
+        gaussian = np.exp(-(xgauss-wave)**2/2/rms**2)
+        gaussian /= np.sqrt(2*np.pi*rms**2)
+        
+        self.wave = xgauss
+        self.flux = gaussian
+
+    def zscale(self, z, scalar=1):
+        """Redshift the template and multiply by a scalar.
+        
+        Parameters
+        ----------
+        z : float
+            Redshift to use.
+        
+        scalar : float
+            Multiplicative factor.  Additional factor of 1./(1+z) is implicit.
+        
+        Returns
+        -------
+        new_spectrum : `~grizli.utils.SpectrumTemplate`   
+            Redshifted and scaled spectrum.
+            
+        """
+        return SpectrumTemplate(wave=self.wave*(1+z),
+                                flux=self.flux*scalar/(1+z))
     
     def __add__(self, spectrum):
-        """TBD
+        """Add two templates together
+        
+        The new wavelength array is the union of both input spectra and each
+        input spectrum is linearly interpolated to the final grid.
+        
+        Parameters
+        ----------
+        spectrum : `~grizli.utils.SpectrumTemplate`
+        
+        Returns
+        -------
+        new_spectrum : `~grizli.utils.SpectrumTemplate`
         """
         new_wave = np.unique(np.append(self.wave, spectrum.wave))
         new_wave.sort()
@@ -522,44 +733,62 @@ class SpectrumTemplate(object):
         return SpectrumTemplate(wave=new_wave, flux=new_flux)
     
     def __mul__(self, scalar):
-        """TBD
+        """Multiply spectrum by a scalar value
+        
+        Parameters
+        ----------
+        scalar : float
+            Factor to multipy to `self.flux`.
+        
+        Returns
+        -------
+        new_spectrum : `~grizli.utils.SpectrumTemplate`    
         """
         return SpectrumTemplate(wave=self.wave, flux=self.flux*scalar)
         
-    def zscale(self, z, scalar=1):
-        """TBD
-        """
-        return SpectrumTemplate(wave=self.wave*(1+z),
-                                flux=self.flux*scalar/(1+z))
-
 def log_zgrid(zr=[0.7,3.4], dz=0.01):
-    """TBD
+    """Make a logarithmically spaced redshift grid
+    
+    Parameters
+    ----------
+    zr : [float, float]
+        Minimum and maximum of the desired grid
+    
+    dz : float
+        Step size, dz/(1+z)
+    
+    Returns
+    -------
+    zgrid : array-like
+        Redshift grid
+    
     """
     zgrid = np.exp(np.arange(np.log(1+zr[0]), np.log(1+zr[1]), dz))-1
     return zgrid
 
-def zoom_zgrid(zgrid, chi2nu, threshold=0.01, factor=10, grow=7):
-    """TBD
-    """
-    import scipy.ndimage as nd
-    
-    mask = (chi2nu-chi2nu.min()) < threshold
-    if grow > 1:
-        mask_grow = nd.maximum_filter(mask*1, size=grow)
-        mask = mask_grow > 0
-        
-    if mask.sum() == 0:
-        return []
-    
-    idx = np.arange(zgrid.shape[0])
-    out_grid = []
-    for i in idx[mask]:
-        if i == idx[-1]:
-            continue
-            
-        out_grid = np.append(out_grid, np.linspace(zgrid[i], zgrid[i+1], factor+2)[1:-1])
-    
-    return out_grid
+### Deprecated
+# def zoom_zgrid(zgrid, chi2nu, threshold=0.01, factor=10, grow=7):
+#     """TBD
+#     """
+#     import scipy.ndimage as nd
+#     
+#     mask = (chi2nu-chi2nu.min()) < threshold
+#     if grow > 1:
+#         mask_grow = nd.maximum_filter(mask*1, size=grow)
+#         mask = mask_grow > 0
+#         
+#     if mask.sum() == 0:
+#         return []
+#     
+#     idx = np.arange(zgrid.shape[0])
+#     out_grid = []
+#     for i in idx[mask]:
+#         if i == idx[-1]:
+#             continue
+#             
+#         out_grid = np.append(out_grid, np.linspace(zgrid[i], zgrid[i+1], factor+2)[1:-1])
+#     
+#     return out_grid
 
 def get_wcs_pscale(wcs):
     """Get correct pscale from a `~astropy.wcs.WCS` object
@@ -580,7 +809,45 @@ def get_wcs_pscale(wcs):
     return pscale
     
 def make_spectrum_wcsheader(center_wave=1.4e4, dlam=40, NX=100, spatial_scale=1, NY=10):
-    """TBD
+    """Make a WCS header for a 2D spectrum
+    
+    Parameters
+    ----------
+    center_wave : float
+        Wavelength of the central pixel, in Anstroms
+        
+    dlam : float
+        Delta-wavelength per (x) pixel
+        
+    NX, NY : int
+        Number of x & y pixels. Output will have shape `(2*NY, 2*NX)`.
+        
+    spatial_scale : float
+        Spatial scale of the output, in units of the input pixels
+    
+    Returns
+    -------
+    header : `~astropy.io.fits.Header`
+        Output WCS header
+    
+    wcs : `~astropy.wcs.WCS`
+        Output WCS
+    
+    Examples
+    --------
+        
+        >>> from grizli.utils import make_spectrum_wcsheader
+        >>> h, wcs = make_spectrum_wcsheader()
+        >>> print wcs
+        WCS Keywords
+        Number of WCS axes: 2
+        CTYPE : 'WAVE'  'LINEAR'  
+        CRVAL : 14000.0  0.0  
+        CRPIX : 101.0  11.0  
+        CD1_1 CD1_2  : 40.0  0.0  
+        CD2_1 CD2_2  : 0.0  1.0  
+        NAXIS    : 200 20
+
     """
     import astropy.io.fits as pyfits
     import astropy.wcs as pywcs
@@ -607,8 +874,70 @@ def make_spectrum_wcsheader(center_wave=1.4e4, dlam=40, NX=100, spatial_scale=1,
     return refh, ref_wcs
 
 def make_wcsheader(ra=40.07293, dec=-1.6137748, size=2, pixscale=0.1, get_hdu=False, theta=0):
-    """TBD
+    """Make a celestial WCS header
+        
+    Parameters
+    ----------
+    ra, dec : float
+        Celestial coordinates in decimal degrees
+        
+    size, pixscale : float
+        Size of the thumbnail, in arcsec, and pixel scale, in arcsec/pixel.
+        Output image will have dimensions `(npix,npix)`, where
+            
+            >>> npix = size/pixscale
+            
+    get_hdu : bool
+        Return a `~astropy.io.fits.ImageHDU` rather than header/wcs.
+        
+    theta : float
+        Position angle of the output thumbnail
     
+    Returns
+    -------
+    hdu : `~astropy.io.fits.ImageHDU` 
+        HDU with data filled with zeros if `get_hdu=True`.
+    
+    header, wcs : `~astropy.io.fits.Header`, `~astropy.wcs.WCS`
+        Header and WCS object if `get_hdu=False`.
+
+    Examples
+    --------
+    
+        >>> from grizli.utils import make_wcsheader
+        >>> h, wcs = make_wcsheader()
+        >>> print wcs
+        WCS Keywords
+        Number of WCS axes: 2
+        CTYPE : 'RA---TAN'  'DEC--TAN'  
+        CRVAL : 40.072929999999999  -1.6137748000000001  
+        CRPIX : 10.0  10.0  
+        CD1_1 CD1_2  : -2.7777777777777e-05  0.0  
+        CD2_1 CD2_2  : 0.0  2.7777777777777701e-05  
+        NAXIS    : 20 20
+        
+        >>> from grizli.utils import make_wcsheader
+        >>> hdu = make_wcsheader(get_hdu=True)
+        >>> print hdu.data.shape
+        (20, 20)
+        >>> print hdu.header.tostring
+        XTENSION= 'IMAGE   '           / Image extension                                
+        BITPIX  =                  -32 / array data type                                
+        NAXIS   =                    2 / number of array dimensions                     
+        PCOUNT  =                    0 / number of parameters                           
+        GCOUNT  =                    1 / number of groups                               
+        CRPIX1  =                   10                                                  
+        CRPIX2  =                   10                                                  
+        CRVAL1  =             40.07293                                                  
+        CRVAL2  =           -1.6137748                                                  
+        CD1_1   = -2.7777777777777E-05                                                  
+        CD1_2   =                  0.0                                                  
+        CD2_1   =                  0.0                                                  
+        CD2_2   = 2.77777777777777E-05                                                  
+        NAXIS1  =                   20                                                  
+        NAXIS2  =                   20                                                  
+        CTYPE1  = 'RA---TAN'                                                            
+        CTYPE2  = 'DEC--TAN'
     """
     import astropy.io.fits as pyfits
     import astropy.wcs as pywcs
