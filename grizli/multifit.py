@@ -160,7 +160,7 @@ def _loadFLT(grism_file, sci_extn, direct_file, pad, ref_file,
         flt = model.GrismFLT(grism_file=grism_file, sci_extn=sci_extn,
                          direct_file=direct_file, pad=pad, 
                          ref_file=ref_file, ref_ext=ref_ext, 
-                         seg_file=seg_file, shrink_segimage=False, 
+                         seg_file=seg_file, shrink_segimage=True, 
                          verbose=verbose)
     
     if catalog is not None:
@@ -527,7 +527,9 @@ class MultiBeam():
             i0 += self.Nflat[i]
         
         self.init_poly_coeffs(poly_order=1)
-    
+        
+        self.ra, self.dec = self.beams[0].get_sky_coords()
+        
     def write_beam_fits(self, verbose=True):
         """TBD
         """
@@ -907,7 +909,7 @@ class MultiBeam():
     def fit_redshift(self, prior=None, poly_order=1, fwhm=1200,
                      make_figure=True, zr=None, dz=None, verbose=True,
                      fit_background=True, fitter='nnls', 
-                     delta_chi2_threshold=0.004):
+                     delta_chi2_threshold=0.004, zoom=True):
         """TBD
         """
         from scipy import polyfit, polyval
@@ -990,7 +992,7 @@ class MultiBeam():
         
         # delta_chi2 = (chi2.max()-chi2.min())/self.DoF
         # if delta_chi2 > delta_chi2_threshold:      
-        if (num_peaks > 0) & (not stars):
+        if (num_peaks > 0) & (not stars) & zoom:
             zgrid_zoom = []
             for ix in indexes:
                 if (ix > 0) & (ix < len(chi2)-1):
@@ -1103,12 +1105,14 @@ class MultiBeam():
         
         line_flux = OrderedDict()
         fscl = self.beams[0].beam.total_flux/1.e-17
+        line1d = OrderedDict()
         for i, key in enumerate(templates.keys()):
             temp_i = templates[key].zscale(zbest, coeffs_full[i0+i])
             model1d += temp_i
             if not key.startswith('line'):
                 cont1d += temp_i
             else:
+                line1d[key.split()[1]] = temp_i
                 line_flux[key.split()[1]] = np.array([coeffs_full[i0+i]*fscl, 
                                              line_flux_err[i0+i]*fscl])
                 
@@ -1131,6 +1135,7 @@ class MultiBeam():
         fit_data['model_cont'] = model_continuum
         fit_data['model1d'] = model1d
         fit_data['cont1d'] = cont1d
+        fit_data['line1d'] = line1d
         
         #return fit_data
         
@@ -1381,10 +1386,115 @@ class MultiBeam():
         hdu_sci[-1].name = 'FULL'
         
         return fig, hdu_sci
+    
+    def drizzle_fit_lines(self, fit, pline, force_line=['Ha', 'OIII', 'Hb', 'OII'], save_fits=True, mask_lines=True):
+
+        line_wavelengths, line_ratios = utils.get_line_wavelengths()
+        hdu_full = []
+        saved_lines = []
+        for line in fit['line_flux']:
+            line_flux, line_err = fit['line_flux'][line]
+            if line_flux == 0:
+                continue
+
+            if (line_flux/line_err > 7) | (line in force_line):
+                print 'Drizzle line -> %s (%.2f %.2f)' %(line, line_flux,
+                                                         line_err)
+
+                line_wave_obs = line_wavelengths[line][0]*(1+fit['zbest'])
+                
+                if mask_lines:
+                    for beam in self.beams:
+                        cont = fit['cont1d']
+                        beam.compute_model(spectrum_1d=[cont.wave, cont.flux])
+                        
+                        beam.oivar = beam.ivar*1
+                        lam = beam.beam.lam_beam
+                        
+                        ### another idea, compute a model for the line itself
+                        ### and mask relatively "contaminated" pixels from 
+                        ### other lines
+                        lm = fit['line1d'][line]
+                        if ((lm.wave.max() < lam.min()) | 
+                            (lm.wave.min() > lam.max())):
+                            continue
+                        
+                        sp = [lm.wave, lm.flux]
+                        m = beam.compute_model(spectrum_1d=sp, 
+                                               in_place=False)
+                        lmodel = m.reshape(beam.beam.sh_beam)
+                        if lmodel.max() == 0:
+                            continue
+                            
+                        for l in fit['line1d']:
+                            lf, le = fit['line_flux'][l]
+                            if lf == 0:
+                                continue
+                                
+                            if l != line:
+                                lm = fit['line1d'][l]
+                                sp = [lm.wave, lm.flux]
+                                if ((lm.wave.max() < lam.min()) | 
+                                    (lm.wave.min() > lam.max())):
+                                    continue
+                                    
+                                m = beam.compute_model(spectrum_1d=sp, 
+                                                       in_place=False)
+                                lcontam = m.reshape(beam.beam.sh_beam)
+                                if lcontam.max() == 0:
+                                    #print beam.grism.parent_file, l
+                                    continue
+                                    
+                                beam.ivar[lcontam > 5*lmodel] *= 0
+
+                hdu = drizzle_to_wavelength(self.beams, ra=self.ra, 
+                                            dec=self.dec, wave=line_wave_obs,
+                                            **pline)
+                
+                if mask_lines:
+                    for beam in self.beams:
+                        beam.ivar = beam.oivar*1
+                        delattr(beam, 'oivar')
+                        
+                hdu[0].header['REDSHIFT'] = (fit['zbest'], 'Redshift used')
+                for e in [3,4,5,6]:
+                    hdu[e].header['EXTVER'] = line
+                    hdu[e].header['REDSHIFT'] = (fit['zbest'], 
+                                                 'Redshift used')
+                    hdu[e].header['RESTWAVE'] = (line_wavelengths[line][0], 
+                                                 'Line rest wavelength')
+
+                saved_lines.append(line)
+
+                if len(hdu_full) == 0:
+                    hdu_full = hdu
+                    hdu_full[0].header['NUMLINES'] = (1, 
+                                               "Number of lines in this file")
+                else:
+                    hdu_full.extend(hdu[3:])
+                    hdu_full[0].header['NUMLINES'] += 1 
+
+                li = hdu_full[0].header['NUMLINES']
+                hdu_full[0].header['LINE%03d' %(li)] = line
+                hdu_full[0].header['FLUX%03d' %(li)] = (line_flux, 
+                                                'Line flux, 1e-17 erg/s/cm2')
+                hdu_full[0].header['ERR%03d' %(li)] = (line_err, 
+                                        'Line flux err, 1e-17 erg/s/cm2')
+
+        if len(hdu_full) > 0:
+            hdu_full[0].header['HASLINES'] = (' '.join(saved_lines), 
+                                              'Lines in this file')
+
+            if save_fits:
+                hdu_full.writeto('%s_zfit_%05d.line.fits' %(self.group_name,
+                                                            self.id),
+                                 clobber=True, output_verify='fix')
+        
+        return hdu_full
         
     def run_full_diagnostics(self, pzfit={}, pspec2={}, pline={}, 
                       force_line=['Ha', 'OIII', 'Hb'], GroupFLT=None,
-                      prior=None):
+                      prior=None, zoom=True):
         """TBD
         
         size=20, pixscale=0.1,
@@ -1437,6 +1547,8 @@ class MultiBeam():
         zfit_in = copy.copy(pzfit)
         zfit_in['fwhm'] = fwhm
         zfit_in['prior'] = prior
+        zfit_in['zoom'] = zoom
+        
         if zfit_in['zr'] is 0:
             fit, fig = self.fit_stars(**zfit_in)
         else:
@@ -1467,76 +1579,57 @@ class MultiBeam():
                                           get_beams=None, in_place=True)
         
         ## 2D lines to drizzle
-        # for ib, b in enumerate(self.beams):
-        #     wcs = pywcs.WCS(b.direct.header, relax=True)
-        #     
-        #     
-        #     pix_center = np.array([b.beam.sh][::-1])/2. - np.array([b.beam.xcenter, b.beam.ycenter]) 
-        #     for i in range(2):
-        #         b.direct.wcs.sip.crpix[i] = b.direct.wcs.wcs.crpix[i]
+        hdu_full = self.drizzle_fit_lines(fit, pline, force_line=force_line, 
+                                     save_fits=True)
+        
+        # ra, dec = self.beams[0].get_sky_coords()
+        # 
+        # line_wavelengths, line_ratios = utils.get_line_wavelengths()
+        # hdu_full = []
+        # saved_lines = []
+        # for line in fit['line_flux']:
+        #     line_flux, line_err = fit['line_flux'][line]
+        #     if line_flux == 0:
+        #         continue
         #         
-        #     rd = b.direct.wcs.all_pix2world(pix_center, 1)
-        #     if ib == 0:
-        #         rd0 = rd*1.
-        #         cos = np.array([np.cos(rd[0][1]/180*np.pi), 1])
-        #     
-        #     dr = np.sqrt(np.sum((rd-rd0)**2*cos**2))*3600.
-        #     print rd[0], dr, b.direct.wcs.wcs.crpix, b.direct.wcs.sip.crpix
-        #     ds9.frame(22+ib)
-        #     ds9.view(b.direct['REF'], header=b.direct.header)
-        #     ds9.set('pan to %f %f fk5' %(rd[0][0], rd[0][1]))
+        #     if (line_flux/line_err > 7) | (line in force_line):
+        #         print 'Drizzle line -> %s (%.2f %.2f)' %(line, line_flux,
+        #                                                  line_err)
+        #                                                  
+        #         line_wave_obs = line_wavelengths[line][0]*(1+fit['zbest'])
+        #         
+        #         hdu = drizzle_to_wavelength(self.beams, ra=ra, dec=dec, 
+        #                                   wave=line_wave_obs, **pline)
+        #         
+        #         hdu[0].header['REDSHIFT'] = (fit['zbest'], 'Redshift used')
+        #         for e in [3,4,5]:
+        #             hdu[e].header['EXTVER'] = line
+        #             hdu[e].header['REDSHIFT'] = (fit['zbest'], 
+        #                                          'Redshift used')
+        #             hdu[e].header['RESTWAVE'] = (line_wavelengths[line][0], 
+        #                                          'Line rest wavelength')
+        #         
+        #         saved_lines.append(line)
+        #             
+        #         if len(hdu_full) == 0:
+        #             hdu_full = hdu
+        #             hdu_full[0].header['NUMLINES'] = (1, 
+        #                                        "Number of lines in this file")
+        #         else:
+        #             hdu_full.extend(hdu[3:])
+        #             hdu_full[0].header['NUMLINES'] += 1 
+        #         
+        #         li = hdu_full[0].header['NUMLINES']
+        #         hdu_full[0].header['LINE%03d' %(li)] = line
+        #         hdu_full[0].header['FLUX%03d' %(li)] = (line_flux, 
+        #                                         'Line flux, 1e-17 erg/s/cm2')
+        #         hdu_full[0].header['ERR%03d' %(li)] = (line_err, 
+        #                                 'Line flux err, 1e-17 erg/s/cm2')
         
-        ra, dec = self.beams[0].get_sky_center()
-        
-        line_wavelengths, line_ratios = utils.get_line_wavelengths()
-        hdu_full = []
-        saved_lines = []
-        for line in fit['line_flux']:
-            line_flux, line_err = fit['line_flux'][line]
-            if line_flux == 0:
-                continue
-                
-            if (line_flux/line_err > 7) | (line in force_line):
-                print 'Drizzle line -> %s (%.2f %.2f)' %(line, line_flux,
-                                                         line_err)
-                                                         
-                line_wave_obs = line_wavelengths[line][0]*(1+fit['zbest'])
-                
-                hdu = drizzle_to_wavelength(self.beams, ra=ra, dec=dec, 
-                                          wave=line_wave_obs, **pline)
-                
-                hdu[0].header['REDSHIFT'] = (fit['zbest'], 'Redshift used')
-                for e in [3,4,5]:
-                    hdu[e].header['EXTVER'] = line
-                    hdu[e].header['REDSHIFT'] = (fit['zbest'], 
-                                                 'Redshift used')
-                    hdu[e].header['RESTWAVE'] = (line_wavelengths[line][0], 
-                                                 'Line rest wavelength')
-                
-                saved_lines.append(line)
-                    
-                if len(hdu_full) == 0:
-                    hdu_full = hdu
-                    hdu_full[0].header['NUMLINES'] = (1, 
-                                               "Number of lines in this file")
-                else:
-                    hdu_full.extend(hdu[3:])
-                    hdu_full[0].header['NUMLINES'] += 1 
-                
-                li = hdu_full[0].header['NUMLINES']
-                hdu_full[0].header['LINE%03d' %(li)] = line
-                hdu_full[0].header['FLUX%03d' %(li)] = (line_flux, 
-                                                'Line flux, 1e-17 erg/s/cm2')
-                hdu_full[0].header['ERR%03d' %(li)] = (line_err, 
-                                        'Line flux err, 1e-17 erg/s/cm2')
-        
-        if len(hdu_full) > 0:
-            hdu_full[0].header['HASLINES'] = (' '.join(saved_lines), 
-                                              'Lines in this file')
-        
-            hdu_full.writeto('%s_zfit_%05d.line.fits' %(self.group_name,
-                                                        self.id),
-                             clobber=True, output_verify='fix')
+        # if len(hdu_full) > 0:        
+        #     hdu_full.writeto('%s_zfit_%05d.line.fits' %(self.group_name,
+        #                                                 self.id),
+        #                      clobber=True, output_verify='fix')
         
         fit['id'] = self.id
         fit['fit_bg'] = self.fit_bg
@@ -1555,7 +1648,8 @@ class MultiBeam():
         hdu2.writeto('%s_zfit_%05d.2D.fits' %(self.group_name, self.id), clobber=True, output_verify='fix')
         
         label = '# id ra dec zbest '
-        data = '%7d %.6f %.6f %.5f' %(self.id, ra, dec, fit['zbest'])
+        data = '%7d %.6f %.6f %.5f' %(self.id, self.ra, self.dec,
+                                      fit['zbest'])
         
         for grism in ['G800L', 'G102', 'G141']:
             label += ' N%s' %(grism)
@@ -1674,7 +1768,8 @@ def get_redshift_fit_defaults():
                  delta_chi2_threshold=0.004, fitter='nnls')
     
     pspec2_def = dict(dlam=0, spatial_scale=1, NY=20)
-    pline_def = dict(size=20, pixscale=0.1, pixfrac=0.2, kernel='square')
+    pline_def = dict(size=20, pixscale=0.1, pixfrac=0.2, kernel='square', 
+                     fcontam=0.05)
 
     return pzfit_def, pspec2_def, pline_def
                 
@@ -1872,6 +1967,10 @@ def drizzle_to_wavelength(beams, ra=0., dec=0., wave=1.e4, size=5,
     coutwht = np.zeros(sh, dtype=np.float32)
     coutctx = np.zeros(sh, dtype=np.int32)
 
+    xoutsci = np.zeros(sh, dtype=np.float32)
+    xoutwht = np.zeros(sh, dtype=np.float32)
+    xoutctx = np.zeros(sh, dtype=np.int32)
+
     doutsci = np.zeros(sh, dtype=np.float32)
     doutwht = np.zeros(sh, dtype=np.float32)
     doutctx = np.zeros(sh, dtype=np.int32)
@@ -1928,6 +2027,13 @@ def drizzle_to_wavelength(beams, ra=0., dec=0., wave=1.e4, size=5,
                          pixfrac=pixfrac, kernel=kernel, fillval=0, 
                          stepsize=10, wcsmap=None)
         
+        ### Contamination
+        adrizzle.do_driz(beam.contam, beam_wcs, wht, output_wcs, 
+                         xoutsci, xoutwht, xoutctx, 1., 'cps', 1, 
+                         wcslin_pscale=beam.grism.wcs.pscale, uniqid=1, 
+                         pixfrac=pixfrac, kernel=kernel, fillval=0, 
+                         stepsize=10, wcsmap=None)
+        
         ### Direct thumbnail
         if direct_extension == 'REF':
             thumb = beam.direct['REF']
@@ -1957,6 +2063,7 @@ def drizzle_to_wavelength(beams, ra=0., dec=0., wave=1.e4, size=5,
     outwht  *= (beams[0].grism.wcs.pscale/output_wcs.pscale)**4
     coutwht *= (beams[0].grism.wcs.pscale/output_wcs.pscale)**4
     doutwht *= (beams[0].direct.wcs.pscale/output_wcs.pscale)**4
+    xoutwht *= (beams[0].direct.wcs.pscale/output_wcs.pscale)**4
     
     ### Make output FITS products
     p = pyfits.PrimaryHDU()
@@ -1985,6 +2092,8 @@ def drizzle_to_wavelength(beams, ra=0., dec=0., wave=1.e4, size=5,
     
     grism_sci = pyfits.ImageHDU(data=outsci-coutsci, header=h, name='LINE')
     grism_cont = pyfits.ImageHDU(data=coutsci, header=h, name='CONTINUUM')
+    grism_contam = pyfits.ImageHDU(data=xoutsci, header=h, name='CONTAM')
     grism_wht = pyfits.ImageHDU(data=outwht, header=h, name='LINEWHT')
     
-    return pyfits.HDUList([p, thumb_sci, thumb_wht, grism_sci, grism_cont, grism_wht])
+    return pyfits.HDUList([p, thumb_sci, thumb_wht, grism_sci, grism_cont, 
+                           grism_contam, grism_wht])

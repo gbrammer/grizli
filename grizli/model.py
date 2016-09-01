@@ -215,8 +215,8 @@ class GrismDisperser(object):
             self.dx = np.arange(self.dx[0]*self.grow, self.dx[-1]*self.grow)
         
         xoff = -0.5 # tested for WFC3/IR
-        #xoff = +3 # ACS?
-        xoff = 0.
+        #xoff = 0. # suggested by ACS
+        #xoff = 0.5 # test
         
         self.xoff = xoff
         self.ytrace_beam, self.lam_beam = self.conf.get_beam_trace(
@@ -2483,7 +2483,7 @@ class BeamCutout(object):
         
         return hdu, wcs
     
-    def get_sky_center(self):
+    def get_sky_coords(self):
         """Get WCS coordinates of the center of the direct image
         
         Returns

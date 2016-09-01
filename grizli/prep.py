@@ -122,10 +122,68 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
         
     orig_file.writeto(local_file, clobber=True)
     
-def apply_persistence_mask(file, path_to_persist='../Persistence'):
+def apply_persistence_mask(flt_file, path='../Persistence', dq_value=1024,
+                           err_threshold=0.6, grow_mask=3, verbose=True):
     """TBD
     """
-    pass
+    import scipy.ndimage as nd
+    
+    flt = pyfits.open(flt_file, mode='update')
+    
+    pers_file = os.path.join(path,
+             os.path.basename(flt_file).replace('_flt.fits', '_persist.fits'))
+    
+    if not os.path.exists(pers_file):
+        if verbose:
+            print 'Persistence file %s not found' %(pers_file)
+        
+        #return 0
+    
+    pers = pyfits.open(pers_file)
+    
+    pers_mask = pers['SCI'].data > err_threshold*flt['ERR'].data
+    
+    if grow_mask > 0:
+        pers_mask = nd.maximum_filter(pers_mask*1, size=grow_mask)
+    else:
+        pers_mask = pers_mask * 1
+    
+    NPERS = pers_mask.sum()
+    if verbose:
+        print '%s: flagged %d pixels affected by persistence (pers/err=%0.2f)' %(pers_file, NPERS, err_threshold)
+    
+    if NPERS > 0:
+        flt['DQ'].data[pers_mask > 0] |= dq_value
+        flt.flush()
+
+def apply_saturated_mask(flt_file, dq_value=1024):
+    """TBD
+    
+    Saturated pixels have some pulldown in the opposite amplifier
+    """
+    import scipy.ndimage as nd
+    
+    flt = pyfits.open(flt_file, mode='update')
+    
+    sat = (((flt['DQ'].data & 256) > 0) & ((flt['DQ'].data & 4) == 0))
+    
+    ## Don't flag pixels in lower right corner
+    sat[:80,-80:] = False
+    
+    ## Flag only if a number of nearby pixels also saturated
+    kern = np.ones((3,3))
+    sat_grow = nd.convolve(sat*1, kern)
+    
+    sat_mask = (sat & (sat_grow > 2))[::-1,:]*1
+    
+    NSAT = sat_mask.sum()
+    if verbose:
+        print '%s: flagged %d pixels affected by saturation pulldown' %(flt_file, NSAT)
+    
+    if NSAT > 0:
+        flt['DQ'].data[sat_mask > 0] |= dq_value
+        flt.flush()
+    
 
 def clip_lists(input, output, clip=20):
     """TBD
@@ -1105,7 +1163,7 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
             mask[i*Npix:(i+1)*Npix] &= np.isfinite(data_vary[j])
                 
     ### Initial coeffs based on image medians
-    coeffs = np.array([np.mean(medians)])
+    coeffs = np.array([np.min(medians)])
     if Nvary > 0:
         coeffs = np.hstack((coeffs, np.zeros(Nexp*Nvary)))
         coeffs[1::Nvary] = medians-medians.min()

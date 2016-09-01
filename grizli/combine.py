@@ -1,166 +1,63 @@
 """
-Combine FLTs at the same orientation
+Scripts to combine FLT exposures at a single orientation / sub-pixel position
+to speed up the spectral processing.
 """
 import copy
 import glob
 
 import numpy as np
 
+import matplotlib.pyplot as plt
+
 import astropy.wcs as pywcs
 import astropy.io.fits as pyfits
 
 from . import utils
-#from . import assoc
 
-def consolodate_grism_lists(gs_direct):
-    """TBD
-    
-    Combine visits of same target at same angle
-    """
-    
-def combine_filter_combinations(root='udf', grow=2, ds9=None, verbose=True,
-                                clobber=True, filters=['G102', 'G141']):
-    """TBD
-    """
-    files=glob.glob('i*flt.fits')
-    output_list, filter_list = utils.parse_flt_files(files, uniquename=False)
-    
-    for filt in filter_list.keys():
-        if filt in filters:
-            for angle in filter_list[filt]:
-                output = '%s-%05.1f-%s_cmb.fits' %(root, angle, filt)
-                if verbose:
-                    print '\n -- Combine: %s -- \n' %(output)
-                    
-                combine_flt(files=filter_list[filt][angle], output=output, 
-                            grow=grow, ds9=ds9, verbose=verbose, 
-                            clobber=clobber)
-
-def combine_visit_combinations(grow=2, ds9=None, verbose=True,
-                               clobber=True, pixfrac=0.5, kernel='point', 
-                               filters=['G102', 'G141'], skip=1):
-    """TBD
-    """
-    files=glob.glob('i*flt.fits')
-    output_list, filter_list = utils.parse_flt_files(files, uniquename=False)
-    
-    for key in output_list.keys()[::skip]:
-        filter=key.split('-')[-1].upper()
-        if filter not in filters:
-            continue
+def combine_flt(files=[], output='exposures_cmb.fits', grow=1,
+                add_padding=True, pixfrac=0.5, kernel='point',
+                verbose=True, clobber=True, ds9=None):
+    """Drizzle distorted FLT frames to an "interlaced" image
         
-        output = '%s_cmb.fits' %(key)
-
-        if verbose:
-            print '\n -- Combine: %s -- \n' %(output)
-            
-        combine_flt(files=output_list[key], output=output, 
-                    grow=grow, ds9=ds9, verbose=verbose, 
-                    clobber=clobber, pixfrac=pixfrac, kernel=kernel)
-
-def get_shifts(files, ref_pixel=[507, 507]):
-    """
-    TBD
-    """
-    f0 = pyfits.open(files[0])
-    h0 = f0[0].header.copy()
-    h0['EXPTIME'] = 0.
+    Parameters
+    ----------
+    files : list of strings
+        Filenames of FLT files to combine
     
-    out_wcs = pywcs.WCS(f0[1].header, relax=True)
-    out_wcs.pscale = utils.get_wcs_pscale(out_wcs)
+    output : str
+        Output filename of the combined file.  Convention elsewhere is to use
+        an "_cmb.fits" extension to distinguish from "_flt.fits".
+        
+    grow : int
+        Factor by which to `grow` the FLT frames to interlaced outputs.  For 
+        example, `grow=2` results in 2x2 interlacing.
     
-    ### Offsets
-    ra0, de0 = out_wcs.all_pix2world([ref_pixel[0]],[ref_pixel[1]],0)
-
-    x0 = np.zeros(len(files))
-    y0 = np.zeros(len(files))
-
-    for i, file in enumerate(files):
-        hx = pyfits.getheader(file, 0)
-        h0['EXPTIME'] += hx['EXPTIME']
-        h0['FILE%04d' %(i)] = file, 'Included file #%d' %(i)
+    add_padding : True
+        Expand pixel grid to accommodate all dithered exposures.  WCS is 
+        preserved but "CRPIX" will change.
+        
+    pixfrac : float
+        Drizzle pixfrac (for kernels other than 'point')
     
-        h = pyfits.getheader(file, 1)
-        flt_wcs = pywcs.WCS(h, relax=True)
-        x0[i], y0[i] = flt_wcs.all_world2pix(ra0, de0, 0)
-
-    return h0, x0-ref_pixel[0], y0-ref_pixel[1]
-
-def split_pixel_quadrant(dx, dy):
-    """
-    TBD
+    kernel : {'point', 'square'}
+        Drizzle kernel. The 'point' kernel is effectively interlacing and is
+        best for preserving the noise properties of the final combined image.
+        However, can result in empty pixels given the camera distortions
+        depending on the dithering of the input exposures.
     
-    Group offsets by the quadrant they put the central pixel in
-    """
-    xq = np.cast[int](np.round((dx - np.floor(dx))*2)) % 2
-    yq = np.cast[int](np.round((dy - np.floor(dy))*2)) % 2
+    ds9 : `pyds9.DS9`
+        Display the progress of the script to a DS9 window.
+        
+    verbose : bool
+        Print logging information
+        
+    clobber : bool
+        Overwrite existing files
     
-    ### Test
-    if False:
-        xf = ((dx - np.floor(dx)))
-        yf = ((dy - np.floor(dy)))
-
-        colors = np.array([['r','g'],['b','k']])
-        plt.scatter(xf, yf, c=colors[xq, yq])
+    Returns
+    -------
+    Creates combined images
     
-    index = np.arange(len(dx))
-    out = {}
-    for i in range(4):
-        match = xq+2*yq == i
-        if match.sum() > 0:
-            out[i] = index[match]
-    
-    return out
-
-def combine_figs():
-    """
-    Combine FIGS exposures split by offset pixel quadrant
-    """
-    from stsci.tools import asnutil
-    
-    #all_asn = glob.glob('figs-g*-g1*asn.fits')
-    all_asn = []
-    all_asn.extend(glob.glob('g[ns][0-9]*g102*asn.fits'))
-    all_asn.extend(glob.glob('gdn*g102*asn.fits'))
-    grism = 'g102'
-    
-    #all_asn = glob.glob('gn-z10*-g1*asn.fits')
-    #all_asn.extend(glob.glob('colfax-*g14*asn.fits'))
-    #all_asn = glob.glob('goodsn-*g14*asn.fits')
-    #grism = 'g141'
-    
-    roots = np.unique(['-'.join(asn.split('-')[:2]) for asn in all_asn])
-    for root in roots:
-        all_asn = glob.glob('%s*%s*asn.fits' %(root, grism))
-        angles = np.unique([asn.split('-')[-2] for asn in all_asn])
-        for angle in angles:
-            asn_files = glob.glob('%s*-%s-%s*asn.fits' %(root, angle, grism))
-            
-            grism_files = [] 
-            for file in asn_files:
-                asn = asnutil.readASNTable(file)
-                grism_files.extend(['%s_flt.fits' %(flt) for flt in asn['order']])
-            
-            print '%s-%s %d' %(root, angle, len(grism_files))
-            combine_quadrants(files=grism_files, output='%s-%s-%s_cmb.fits' %(root, angle, grism))
-            
-def combine_quadrants(files=[], output='images_cmb.fits', pixfrac=0.5, 
-                 kernel='point'):
-    """TBD
-    """
-    h, dx, dy = get_shifts(files, ref_pixel=[507, 507])
-    out = split_pixel_quadrant(dx, dy)
-    for q in out:
-        print 'Quadrant %d, %d files' %(q, len(out[q]))
-        combine_flt(files=np.array(files)[out[q]],
-                    output=output.replace('_cmb.fits', '_q%d_cmb.fits' %(q)), 
-                    grow=1, pixfrac=pixfrac, kernel=kernel)
-                    
-def combine_flt(files=[], output='combined_flt.fits', grow=2,
-                add_padding=True, ds9=None, split_quadrants=False,
-                verbose=True, clobber=True, pixfrac=0.5, kernel='point'):
-    """Drizzle distorted frames to an "interlaced" image
-    TBD
     """
     import numpy.linalg
     from stsci.tools import asnutil
@@ -262,6 +159,7 @@ def combine_flt(files=[], output='combined_flt.fits', grow=2,
     
     outh['GROW'] = grow, 'Grow factor'
     outh['PAD'] = pad, 'Image padding'
+    outh['BUNIT'] = h['BUNIT']
     
     sh = (1014*grow + 2*pad, 1014*grow + 2*pad)
     outsci = np.zeros(sh, dtype=np.float32)
@@ -320,8 +218,280 @@ def combine_flt(files=[], output='combined_flt.fits', grow=2,
     hdu.append(pyfits.ImageHDU(data=mask*1024, header=outh, name='DQ'))
     
     pyfits.HDUList(hdu).writeto(output, clobber=clobber, output_verify='fix')
+                    
+def combine_visits_and_filters(grow=1, pixfrac=0.5, kernel='point', 
+                               filters=['G102', 'G141'], skip=None,
+                               split_visit=False, split_quadrants=True, 
+                               clobber=True, ds9=None, verbose=True):
+    """Make combined FLT files for all FLT files in the working directory separated by targname/visit/filter
     
-#
+    Parameters
+    ----------
+    grow : int
+        Factor by which to `grow` the FLT frames to interlaced outputs.  For 
+        example, `grow=2` results in 2x2 interlacing.
+    
+    split_visit : bool
+        If `True`, then separate by all TARGNAME/visit otherwise group by 
+        TARGNAME and combine visits.
+        
+    split_quadrants : bool
+        Split by 2x2 sub-pixel dither positions
+    
+    filters : list of strings
+        Only make products for exposures that use these filters
+        
+    pixfrac : float
+        Drizzle pixfrac (for kernels other than 'point')
+    
+    kernel : {'point', 'square'}
+        Drizzle kernel. The 'point' kernel is effectively interlacing and is
+        best for preserving the noise properties of the final combined image.
+        However, can result in empty pixels given the camera distortions
+        depending on the dithering of the input exposures.
+    
+    skip : `slice` or None
+        Slice of the overall list of visits to process a subset
+        
+    ds9 : `pyds9.DS9`
+        Display the progress of the script to a DS9 window.
+        
+    verbose : bool
+        Print logging information
+        
+    clobber : bool
+        Overwrite existing files
+    
+    Returns
+    -------
+    nothing but creates "cmb" combined files 
+    """
+    files=glob.glob('i*flt.fits')
+    output_list, xx = utils.parse_flt_files(files, uniquename=split_visit)
+    
+    if skip is None:
+        skip = slice(0,len(output_list))
+        
+    for key in output_list.keys()[skip]:
+        filter=key.split('-')[-1].upper()
+        if filter not in filters:
+            continue
+        
+        output = '%s_cmb.fits' %(key)
+
+        if verbose:
+            print '\n -- Combine: %s -- \n' %(output)
+            
+        if split_quadrants:
+            combine_quadrants(files=output_list[key], output=output,
+                              ref_pixel=[507,507], 
+                              pixfrac=pixfrac, kernel=kernel, clobber=clobber,
+                              ds9=ds9, verbose=verbose)
+        else:
+            combine_flt(files=output_list[key], output=output, 
+                    grow=grow, ds9=ds9, verbose=verbose, 
+                    clobber=clobber, pixfrac=pixfrac, kernel=kernel)
+
+def get_shifts(files, ref_pixel=[507, 507]):
+    """Compute relative pixel shifts based on header WCS
+    
+    Parameters
+    ----------
+    files : list of exposure filenames
+    
+    ref_pixel : [int, int] or [float, float]
+        Reference pixel for the computed shifts
+    
+    Returns
+    -------
+    h : `~astropy.io.fits.Header`
+        Header of the first exposure modified with the total exposure time
+        and filenames of the input files in the combination.
+    
+    xshift, yshift : array-like
+        Computed pixel shifts
+        
+    """
+    f0 = pyfits.open(files[0])
+    h0 = f0[0].header.copy()
+    h0['EXPTIME'] = 0.
+    
+    out_wcs = pywcs.WCS(f0[1].header, relax=True)
+    out_wcs.pscale = utils.get_wcs_pscale(out_wcs)
+    
+    ### Offsets
+    ra0, de0 = out_wcs.all_pix2world([ref_pixel[0]],[ref_pixel[1]],0)
+
+    x0 = np.zeros(len(files))
+    y0 = np.zeros(len(files))
+
+    for i, file in enumerate(files):
+        hx = pyfits.getheader(file, 0)
+        h0['EXPTIME'] += hx['EXPTIME']
+        h0['FILE%04d' %(i)] = file, 'Included file #%d' %(i)
+    
+        h = pyfits.getheader(file, 1)
+        flt_wcs = pywcs.WCS(h, relax=True)
+        x0[i], y0[i] = flt_wcs.all_world2pix(ra0, de0, 0)
+
+    return h0, x0-ref_pixel[0], y0-ref_pixel[1]
+
+def split_pixel_quadrant(dx, dy, figure='quadrants.png'):
+    """Group offsets by their sub-pixel quadrant
+    
+    Parameters
+    ----------
+    dx, dy : array-like
+        Pixel shifts of a list of exposures, for example output from 
+        `~grizli.combine.get_shifts`.
+    
+    figure : str
+        If not an empty string, save a diagnostic figure showing the 
+        derived sub-pixel quadrants.
+    
+        .. plot::
+            :include-source:
+
+            import matplotlib.pyplot as plt
+            import numpy as np
+            import grizli.combine
+
+            ### 3D-HST dither pattern
+            dx = np.array([0, 10, 6.5, -3.5])
+            dy = np.array([0, 3.5, 10, 6.5])
+            
+            ### This computes the quadrants and also generates the plot
+            quad = grizli.combine.split_pixel_quadrant(dx, dy)
+            print quad
+            # {0: array([0]), 1: array([2]), 2: array([1]), 3: array([3])}
+            plt.show()
+    
+    Returns
+    -------
+    quad : dict
+        Dictionary with keys of integers specifying each of 4 sub-pixel 
+        quadrants and entries of array indices based on the input `dx` and 
+        `dy` arrays.
+            
+    """
+    from matplotlib.ticker import MultipleLocator
+    
+    xq = np.cast[int](np.round((dx - np.floor(dx))*2)) % 2
+    yq = np.cast[int](np.round((dy - np.floor(dy))*2)) % 2
+    
+    ### Test, show sub-pixel centers in a figure
+    if figure:
+        xf = ((dx - np.floor(dx)))
+        yf = ((dy - np.floor(dy)))
+        
+        colors = np.array([['r','g'],['b','k']])
+        
+        fig = plt.figure(figsize=[6,6])
+        ax = fig.add_subplot(111)
+        
+        ax.scatter(xf, yf, c=colors[xq, yq], marker='o', alpha=0.8)
+        
+        box = np.array([-0.25, 0.25])
+        for i in range(2):
+            for j in range(2):
+                ax.fill_between(j*0.5 + box, i*0.5 + 0.25, i*0.5 - 0.25, 
+                                color=colors[j,i], alpha=0.05)
+                
+                ax.fill_between(j*0.5 + box+1, i*0.5 + 0.25+1, i*0.5 - 0.25+1, 
+                                color=colors[j,i], alpha=0.05)
+                
+                ax.fill_between(j*0.5 + box, i*0.5 + 0.25+1, i*0.5 - 0.25+1, 
+                                color=colors[j,i], alpha=0.05)
+                
+                ax.fill_between(j*0.5 + box+1, i*0.5 + 0.25, i*0.5 - 0.25, 
+                                color=colors[j,i], alpha=0.05)
+                
+        ax.set_xlabel(r'Sub-pixel $x$')
+        ax.set_ylabel(r'Sub-pixel $y$')
+        ax.set_xlim(-0.1, 1.1); ax.set_ylim(-0.1, 1.1)
+        majorLocator = MultipleLocator(0.25)
+        for axis in [ax.xaxis, ax.yaxis]:
+            axis.set_major_locator(majorLocator)
+        
+        ax.grid()
+        
+        if not plt.rcParams['interactive']:
+            fig.savefig(figure)
+            plt.close(fig)
+        
+    index = np.arange(len(dx))
+    out = {}
+    for i in range(4):
+        match = xq+2*yq == i
+        if match.sum() > 0:
+            out[i] = index[match]
+    
+    return out
+
+### Superceded by `combine_visits_and_filters`
+# def combine_figs():
+#     """
+#     Combine FIGS exposures split by offset pixel quadrant
+#     """
+#     from stsci.tools import asnutil
+#     
+#     #all_asn = glob.glob('figs-g*-g1*asn.fits')
+#     all_asn = []
+#     all_asn.extend(glob.glob('g[ns][0-9]*g102*asn.fits'))
+#     all_asn.extend(glob.glob('gdn*g102*asn.fits'))
+#     grism = 'g102'
+#     
+#     #all_asn = glob.glob('gn-z10*-g1*asn.fits')
+#     #all_asn.extend(glob.glob('colfax-*g14*asn.fits'))
+#     #all_asn = glob.glob('goodsn-*g14*asn.fits')
+#     #grism = 'g141'
+#     
+#     roots = np.unique(['-'.join(asn.split('-')[:2]) for asn in all_asn])
+#     for root in roots:
+#         all_asn = glob.glob('%s*%s*asn.fits' %(root, grism))
+#         angles = np.unique([asn.split('-')[-2] for asn in all_asn])
+#         for angle in angles:
+#             asn_files = glob.glob('%s*-%s-%s*asn.fits' %(root, angle, grism))
+#             
+#             grism_files = [] 
+#             for file in asn_files:
+#                 asn = asnutil.readASNTable(file)
+#                 grism_files.extend(['%s_flt.fits' %(flt) for flt in asn['order']])
+#             
+#             print '%s-%s %d' %(root, angle, len(grism_files))
+#             combine_quadrants(files=grism_files, output='%s-%s-%s_cmb.fits' %(root, angle, grism))
+            
+def combine_quadrants(files=[], output='images_cmb.fits', grow=1, 
+                 pixfrac=0.5, kernel='point', ref_pixel=[507,507],
+                 ds9=None, verbose=True, clobber=True):
+    """Wrapper to split a list of exposures based on their shift sub-pixel quadrants
+
+    Parameters are all passed directly to `~grizli.combine.combine_flt` but 
+    separated by shift quadrant with `~grizli.combine.get_shifts` and 
+    `~grizli.combine.split_pixel_quadrant`. 
+    
+    Parameters
+    ----------
+    files : list
+        List of exposure filenames
+    
+    output : str
+        Basename of the output file.  Must end in "_cmb.fits" because the 
+        actual output files are derived with the following:
+        
+        >>> quad_output = output.replace('_cmb.fits', '_q%d_cmb.fits' %(q))
+    """
+    h, dx, dy = get_shifts(files, ref_pixel=ref_pixel)
+    out = split_pixel_quadrant(dx, dy, 
+                               figure=output.replace('.fits', '_quad.png'))
+                               
+    for q in out:
+        print 'Quadrant %d, %d files' %(q, len(out[q]))
+        quad_output = output.replace('_cmb.fits', '_q%d_cmb.fits' %(q))
+        combine_flt(files=np.array(files)[out[q]], output=quad_output, 
+                    grow=grow, pixfrac=pixfrac, kernel=kernel, 
+                    ds9=ds9, verbose=verbose, clobber=clobber)    
+
 # Default mapping function based on PyWCS
 class SIP_WCSMap:
     def __init__(self,input,output,origin=1):
