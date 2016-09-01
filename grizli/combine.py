@@ -336,7 +336,7 @@ def get_shifts(files, ref_pixel=[507, 507]):
 
     return h0, x0-ref_pixel[0], y0-ref_pixel[1]
 
-def split_pixel_quadrant(dx, dy, figure='quadrants.png'):
+def split_pixel_quadrant(dx, dy, figure='quadrants.png', show=False):
     """Group offsets by their sub-pixel quadrant
     
     Parameters
@@ -361,11 +361,14 @@ def split_pixel_quadrant(dx, dy, figure='quadrants.png'):
             dy = np.array([0, 3.5, 10, 6.5])
             
             ### This computes the quadrants and also generates the plot
-            quad = grizli.combine.split_pixel_quadrant(dx, dy)
+            quad = grizli.combine.split_pixel_quadrant(dx, dy, show=True)
             print quad
             # {0: array([0]), 1: array([2]), 2: array([1]), 3: array([3])}
             plt.show()
     
+    show : bool
+        Don't close the generated figure (for online docs)
+        
     Returns
     -------
     quad : dict
@@ -416,8 +419,9 @@ def split_pixel_quadrant(dx, dy, figure='quadrants.png'):
         ax.grid()
         
         if not plt.rcParams['interactive']:
-            fig.savefig(figure)
-            plt.close(fig)
+            if not show:
+                fig.savefig(figure)
+                plt.close(fig)
         
     index = np.arange(len(dx))
     out = {}
