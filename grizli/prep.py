@@ -19,6 +19,50 @@ from astropy.table import Table
 
 from . import utils
 
+def check_status():
+    """Make sure all files and modules are in place and print some information if they're not
+    """
+    for ref_dir in ['iref']:
+        if not os.getenv(ref_dir):
+            print """
+No $%s set!  Make a directory and point to it in ~/.bashrc or ~/.cshrc.
+For example,
+
+  $ mkdir $GRIZLI/%s
+  $ export %s="${GRIZLI}/%s/" # put this in ~/.bashrc
+""" %(ref_dir, ref_dir, ref_dir, ref_dir)
+
+            raise IOError
+
+    ### WFC3
+    if not os.getenv('iref').endswith('/'):
+        print "Warning: $iref should end with a '/' character [%s]" %(os.getenv('iref'))
+        
+    test_file = 'iref$uc72113oi_pfl.fits'.replace('iref$', os.getenv('iref'))
+    if not os.path.exists(test_file):
+        print """
+HST calibrations not found in $iref [%s]
+
+To fetch them, run
+
+   >>> import grizli.utils
+   >>> grizli.utils.fetch_default_calibs()
+
+""" %(os.getenv('iref'))
+        raise IOError
+    
+    ### Sewpy
+    try:
+        import sewpy
+    except:
+        print """
+`sewpy` module needed for wrapping SExtractor within python.  
+Get it from https://github.com/megalut/sewpy.
+"""
+        raise ImportError
+        
+check_status()
+ 
 def go_all():
     """TBD
     """
@@ -42,7 +86,33 @@ def go_all():
         asn.write()
         
 def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_badpix=True, apply_grism_skysub=True):
-    """TBD
+    """Copy "fresh" unmodified version of a data file from some central location
+        
+    Parameters
+    ----------
+    preserve_dq : bool
+        Preserve DQ arrays of files if they exist in './'
+        
+    path : str
+        Path where to find the "fresh" files
+        
+    verbose : bool
+        Print information about what's being done
+        
+    extra_badpix : bool
+        Apply extra bad pixel mask.  Currently this is hard-coded to look for 
+        a file "badpix_spars200_Nov9.fits" in the directory specified by
+        the `$iref` environment variable.  The file can be downloaded from 
+        
+        https://github.com/gbrammer/wfc3/tree/master/data
+        
+    apply_grism_skysub : bool
+        xx nothing now xxx
+    
+    Returns
+    -------
+    Nothing, but copies the file from `path` to `./`.
+        
     """
     local_file = os.path.basename(file)
     if preserve_dq:
@@ -124,7 +194,37 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
     
 def apply_persistence_mask(flt_file, path='../Persistence', dq_value=1024,
                            err_threshold=0.6, grow_mask=3, verbose=True):
-    """TBD
+    """Make a mask for pixels flagged as being affected by persistence
+    
+    Persistence products can be downloaded from https://archive.stsci.edu/prepds/persist/search.php, specifically the 
+    "_persist.fits" files.
+        
+    Parameters
+    ----------
+    flt_file : str
+        Filename of the WFC3/IR FLT exposure 
+    
+    path : str
+        Path to look for the "persist.fits" file.  
+    
+    dq_value : int
+        DQ bit to flip for flagged pixels
+        
+    err_threshold : float
+        Threshold for defining affected pixels:
+        
+        flagged = persist > err_threshold*ERR
+        
+    grow_mask : int
+        Factor by which to dilate the persistence mask.
+        
+    verbose : bool
+        Print information to the terminal
+    
+    Returns
+    -------
+    Nothing, updates the DQ extension of `flt_file`.
+    
     """
     import scipy.ndimage as nd
     
@@ -157,9 +257,20 @@ def apply_persistence_mask(flt_file, path='../Persistence', dq_value=1024,
         flt.flush()
 
 def apply_saturated_mask(flt_file, dq_value=1024):
-    """TBD
+    """Saturated pixels have some pulldown in the opposite amplifier
     
-    Saturated pixels have some pulldown in the opposite amplifier
+    Parameters
+    ----------
+    flt_file : str
+        Filename of the FLT exposure
+    
+    dq_value : int
+        DQ bit to flip for affected pixels
+    
+    Returns
+    -------
+    Nothing, modifies DQ extension of `flt_file` in place.
+    
     """
     import scipy.ndimage as nd
     
@@ -240,26 +351,6 @@ def match_lists(input, output, transform=None, scl=3600., simple=True,
     if transform is None:
         transform = skimage.transform.SimilarityTransform
         
-    # for data, name in zip([input, output], ['input.xy', 'output.xy']):
-    #     n = data.shape[0]
-    #     t = Table()
-    #     t['x'] = data[:,0]
-    #     t['y'] = data[:,1]
-    #     t['id'] = np.arange(n, dtype=int)
-    #     t.write(name, format='ascii.no_header')
-    # 
-    # os.system('/usr/local/share/fitsh-0.9.1/src/grmatch --match-points --triangulation conformable -r output.xy -i input.xy --col-ref 1,2 -o matches --max-distance  %.6f' %(5./scl))
-    # 
-    # lines = open('matches').readlines()
-    # fp = open('matches','w')
-    # fp.write('# out_x out_y out in_x in_y in\n')
-    # fp.writelines(lines)
-    # fp.close()
-    # 
-    # m = Table.read('matches', format='ascii.commented_header')
-    # output_ix = m['out'].data
-    # input_ix = m['in'].data
-    
     #print 'xyxymatch'
     match = stsci.stimage.xyxymatch(input, output, 
                                     origin=np.median(input, axis=0), 
@@ -436,7 +527,7 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
     return orig_wcs, drz_wcs, out_shift, out_rot/np.pi*180, out_scale
 
 def log_wcs(root, drz_wcs, shift, rot, scale, rms=0., n=-1, initialize=True):
-    """TBD
+    """Save WCS offset information to a file
     """
     if (not os.path.exists('%s_wcs.log' %(root))) | initialize:
         print 'Initialize %s_wcs.log' %(root)
@@ -460,7 +551,7 @@ def log_wcs(root, drz_wcs, shift, rot, scale, rms=0., n=-1, initialize=True):
     fp.close()
     
 def table_to_regions(table, output='ds9.reg'):
-    """TBD
+    """Make a DS9 region file from a table object
     """
     fp = open(output,'w')
     fp.write('fk5\n')
@@ -476,80 +567,11 @@ def table_to_regions(table, output='ds9.reg'):
     fp.writelines(lines)
     fp.close()
     
-def tweak_flt(files=[], max_dist=0.4, threshold=3, verbose=True):
-    """TBD
-    
-    Refine shifts of FLT files
-    """
-    import scipy.spatial
-    # https://github.com/megalut/sewpy
-    import sewpy
-    
-    ### Make FLT catalogs
-    cats = []
-    for i, file in enumerate(files):
-        sew = sewpy.SEW(params=["X_IMAGE", "Y_IMAGE", "X_WORLD", "Y_WORLD",
-                                "FLUX_RADIUS(3)", "FLAGS"],
-                        config={"DETECT_THRESH":threshold, "DETECT_MINAREA":8,
-                                "PHOT_FLUXFRAC":"0.3, 0.5, 0.8",
-                                "WEIGHT_TYPE":"MAP_RMS",
-                                "WEIGHT_IMAGE":"rms.fits"})
-        
-        im = pyfits.open(file)
-        ok = im['DQ',1].data == 0
-        sci = im['SCI',1].data*ok - np.median(im['SCI',1].data[ok])
-        
-        pyfits.writeto('sci.fits', data=sci, header=im['SCI',1].header,
-                       clobber=True)
-        
-        pyfits.writeto('rms.fits', data=im['ERR',1].data,
-                       header=im['ERR'].header, clobber=True)
-        
-        output = sew('sci.fits')        
-        
-        wcs = pywcs.WCS(im['SCI',1].header, relax=True)
-        cats.append([output['table'], wcs])
-    
-    c0 = cats[0][0]
-    wcs_0 = cats[0][1]
-    xy_0 = np.array([c0['X_IMAGE'], c0['Y_IMAGE']]).T
-    tree = scipy.spatial.cKDTree(xy_0, 10)
-    
-    d = {}
-    for i in range(0, len(files)):
-        c_i, wcs_i = cats[i]
-        ## SExtractor doesn't do SIP WCS?
-        rd = np.array(wcs_i.all_pix2world(c_i['X_IMAGE'], c_i['Y_IMAGE'], 1))
-        xy = np.array(wcs_0.all_world2pix(rd.T, 1))
-        N = xy.shape[0]
-        dist, ix = np.zeros(N), np.zeros(N, dtype=int)
-        for j in range(N):
-            dist[j], ix[j] = tree.query(xy[j,:], k=1,
-                                        distance_upper_bound=np.inf)
-        
-        ok = dist < max_dist
-        if ok.sum() == 0:
-            d[files[i]] = [0.0, 0.0, 0.0, 1.0]
-            if verbose:
-                print files[i], '! no match'
-            
-            continue
-            
-        dr = xy - xy_0[ix,:] 
-        dx = np.median(dr[ok,:], axis=0)
-        rms = np.std(dr[ok,:], axis=0)/np.sqrt(ok.sum())
-
-        d[files[i]] = [dx[0], dx[1], 0.0, 1.0]
-        
-        if verbose:
-            print files[i], dx, rms, 'N=%d' %(ok.sum())
-    
-    wcs_ref = cats[0][1]
-    return wcs_ref, d
-
 def make_drz_catalog(root='', threshold=2., get_background=True, 
                      verbose=True, extra_config={}):
-    """TBD
+    """Make a SExtractor catalog from drizzle products
+    
+    TBD
     """
     import sewpy
     
@@ -599,7 +621,18 @@ def make_drz_catalog(root='', threshold=2., get_background=True,
     return cat
     
 def asn_to_dict(input_asn):
-    """TBD
+    """Convert an ASN file to a dictionary
+    
+    Parameters
+    ----------
+    input_asn : str
+        Filename of the ASN table
+    
+    Returns
+    -------
+    output : dict
+        Dictionary with keys 'product' and 'files'.
+        
     """
     from stsci.tools import asnutil
     # Already is a dict
@@ -619,7 +652,21 @@ def asn_to_dict(input_asn):
     return output
 
 def get_sdss_catalog(ra=165.86, dec=34.829694, radius=3):
-    """TBD
+    """Query for objects in the SDSS photometric catalog 
+    
+    Parameters
+    ----------
+    ra, dec : float
+        Center of the query region, decimal degrees
+    
+    radius : float
+        Radius of the query, in arcmin
+    
+    Returns
+    -------
+    table : `~astropy.table.Table`
+        Result of the query
+        
     """
     from astroquery.sdss import SDSS
     
@@ -635,9 +682,21 @@ def get_sdss_catalog(ra=165.86, dec=34.829694, radius=3):
     return table
     
 def get_wise_catalog(ra=165.86, dec=34.829694, radius=3):
-    """TBD
+    """Query for objects in the `AllWISE <http://wise2.ipac.caltech.edu/docs/release/allwise/>`_ source catalog 
     
-    ra, dec=165.86, 34.829694
+    Parameters
+    ----------
+    ra, dec : float
+        Center of the query region, decimal degrees
+    
+    radius : float
+        Radius of the query, in arcmin
+    
+    Returns
+    -------
+    table : `~astropy.table.Table`
+        Result of the query
+        
     """
     from astroquery.irsa import Irsa
     
@@ -650,14 +709,42 @@ def get_wise_catalog(ra=165.86, dec=34.829694, radius=3):
     return table
 
 def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True):
-    """TBD
+    """Decide what reference astrometric catalog to use
+    
+    First search SDSS, then WISE looking for nearby matches.  
+    
+    Parameters
+    ----------
+    ra, dec : float
+        Center of the query region, decimal degrees
+    
+    radius : float
+        Radius of the query, in arcmin
+    
+    product : str
+        Basename of the drizzled product. If a locally-created catalog with
+        filename that startswith `product` is found, use that one instead of
+        the external (low precision) catalogs so that you're matching
+        HST-to-HST astrometry.
+    
+    Returns
+    -------
+    radec : str
+        Filename of the RA/Dec list derived from the parent catalog
+    
+    ref_catalog : str, {'SDSS', 'WISE', 'VISIT'}
+        Provenance of the `radec` list.
+    
     """
     try:
         sdss = get_sdss_catalog(ra=ra, dec=dec, radius=radius)
     except:
         print 'SDSS query failed'
         sdss = []
-        
+    
+    if sdss is None:
+        sdss = []
+            
     if len(sdss) > 5:
         table_to_regions(sdss, output='%s_sdss.reg' %(product))
         sdss['ra','dec'].write('%s_sdss.radec' %(product), 
@@ -697,10 +784,12 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True):
 def process_direct_grism_visit(direct={}, grism={}, radec=None,
                                align_tolerance=5, 
                                align_mag_limits = [14,23],
-                               column_average=True):
-    """TBD
+                               column_average=True, 
+                               run_tweak_align=True):
+    """Full processing of a direct + grism image visit.
     
-    align direct images of a single visit
+    TBD
+    
     """    
     from stsci.tools import asnutil
     from stwcs import updatewcs
@@ -716,6 +805,23 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
         fresh_flt_file(file)
         updatewcs.updatewcs(file, verbose=False)
     
+    ### Make ASN
+    asn = asnutil.ASNTable(direct['files'], output=direct['product'])
+    asn.create()
+    asn.write()
+    
+    ### Initial grism processing
+    skip_grism = (grism == {}) | (grism is None) | (len(grism) == 0)
+    if not skip_grism:
+        for file in grism['files']:
+            fresh_flt_file(file)
+            updatewcs.updatewcs(file, verbose=False)
+    
+        ### Make ASN
+        asn = asnutil.ASNTable(grism['files'], output=grism['product'])
+        asn.create()
+        asn.write()
+            
     ACS = '_flc' in direct['files'][0]
     if ACS:
         bits = 0
@@ -725,12 +831,11 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
         bits = 576
         driz_cr_snr = '8.0 5.0'
         driz_cr_scale = '2.5 0.7'
-        
-    ### Make ASN
-    asn = asnutil.ASNTable(direct['files'], output=direct['product'])
-    asn.create()
-    asn.write()
     
+    if (not ACS) & run_tweak_align:
+        tweak_align(direct_group=direct, grism_group=grism, max_dist=1.,
+                    key=' ', drizzle=False, threshold=1.5)
+      
     ### Get reference astrometry from SDSS or WISE
     if radec is None:
         im = pyfits.open(direct['files'][0])
@@ -741,7 +846,7 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
         if ref_catalog == 'VISIT':
             align_mag_limits = [16,23]
         elif ref_catalog == 'WISE':
-            align_mag_limits = [16,20]
+            align_mag_limits = [16,21]
         elif ref_catalog == 'SDSS':
             align_mag_limits = [16,21]
     else:
@@ -822,25 +927,20 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
     
     ### Make DRZ catalog again with updated DRZWCS
     clean_drizzle(direct['product'])
-    cat = make_drz_catalog(root=direct['product'], threshold=2)
+    cat = make_drz_catalog(root=direct['product'], threshold=1.6)
     table_to_regions(cat, '%s.cat.reg' %(direct['product']))
     
     ################# 
     ##########  Grism image processing
     #################
     
-    if (grism == {}) | (grism is None) | (len(grism) == 0):
+    if skip_grism:       
         return True
     
     ### Match grism WCS to the direct images
-    match_direct_grism_wcs(direct=direct, grism=grism, get_fresh_flt=True,
+    match_direct_grism_wcs(direct=direct, grism=grism, get_fresh_flt=False,
                            run_drizzle=True)
-    
-    ### Make ASN
-    asn = asnutil.ASNTable(grism['files'], output=grism['product'])
-    asn.create()
-    asn.write()
-    
+        
     ### Subtract grism sky
     status = visit_grism_sky(grism=grism, apply=True,
                           column_average=column_average, verbose=True, ext=1)
@@ -872,8 +972,90 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
     
     return True
 
+def tweak_align(direct_group={}, grism_group={}, max_dist=1., key=' ', 
+                threshold=3, drizzle=False):
+    """
+    Intra-visit shifts (WFC3/IR)
+    """
+    from drizzlepac.astrodrizzle import AstroDrizzle
+    
+    if len(direct_group['files']) < 2:
+        print 'Only one direct image found, can\'t compute shifts!'
+        return True
+        
+    wcs_ref, shift_dict = tweak_flt(files=direct_group['files'],
+                                    max_dist=max_dist, threshold=threshold,
+                                    verbose=True)
+
+    grism_matches = find_direct_grism_pairs(direct=direct_group, grism=grism_group, check_pixel=[507, 507], toler=0.1, key=key)
+    
+    fp = open('%s_shifts.log' %(direct_group['product']), 'w')
+    fp.write('# flt xshift yshift rot scale\n')
+    for k in grism_matches:
+        fp.write('# match[\'%s\'] = %s\n' %(k, grism_matches[k]))
+    
+    for k in shift_dict:
+        d = shift_dict[k]
+        fp.write('%s %7.3f %7.3f %8.5f %8.5f\n' %(k, d[0], d[1], d[2], d[3]))
+    
+    fp.close()
+    
+    apply_tweak_shifts(wcs_ref, shift_dict, grism_matches=grism_matches,
+                       verbose=False)
+
+    if not drizzle:
+        return True
+        
+    ### Redrizzle
+    bits = 576
+    driz_cr_snr = '8.0 5.0'
+    driz_cr_scale = '2.5 0.7'
+    if 'par' in direct_group['product']:
+        pixfrac=1.0
+    else:
+        pixfrac=0.8
+
+    AstroDrizzle(direct_group['files'], output=direct_group['product'],
+                 clean=True, final_pixfrac=pixfrac, context=False,
+                 resetbits=4096, final_bits=bits, driz_sep_bits=bits,
+                 preserve=False, driz_cr_snr=driz_cr_snr,
+                 driz_cr_scale=driz_cr_scale)
+    
+    clean_drizzle(direct_group['product'])
+    cat = make_drz_catalog(root=direct_group['product'], threshold=1.6)
+    table_to_regions(cat, '%s.cat.reg' %(direct_group['product']))
+    
+    if (grism_group == {}) | (grism_group is None):
+        return True
+        
+    # Grism  
+    skyfile = '/tmp/%s.skyfile' %(grism_group['product'])
+    fp = open(skyfile,'w')
+    fp.writelines(['%s 0.0\n' %(f) for f in grism_group['files']])
+    fp.close()
+      
+    AstroDrizzle(grism_group['files'], output=grism_group['product'],
+                 clean=True, context=False, preserve=False, skysub=True,
+                 skyfile=skyfile, driz_separate=True, driz_sep_wcs=True,
+                 median=True, blot=True, driz_cr=True, driz_cr_corr=True,
+                 driz_combine=True, driz_sep_bits=bits, final_bits=bits,
+                 coeffs=True, resetbits=4096, final_pixfrac=pixfrac)
+    
+    clean_drizzle(grism_group['product'])
+    
+    return True
+    
 def clean_drizzle(root):
-    """TBD
+    """Zero-out WHT=0 pixels in drizzle mosaics
+    
+    Parameters
+    ----------
+    root : str
+        Rootname of the mosaics.  I.e., `{root}_drz_sci.fits`.
+    
+    Returns
+    -------
+    Nothing, science mosaic modified in-place
     """
     drz_file = glob.glob('%s_dr[zc]_sci.fits' %(root))[0]
     
@@ -883,56 +1065,183 @@ def clean_drizzle(root):
     sci[0].data[mask] = 0
     sci.flush()
 
-def match_wcs_exact(direct={}, grism={}, check=[507, 507], toler=0.1):
+def tweak_flt(files=[], max_dist=0.4, threshold=3, verbose=True):
+    """TBD
+    
+    Refine shifts of FLT files
+    """
+    import scipy.spatial
+    # https://github.com/megalut/sewpy
+    import sewpy
+    
+    ### Make FLT catalogs
+    cats = []
+    for i, file in enumerate(files):
+        sew = sewpy.SEW(params=["X_IMAGE", "Y_IMAGE", "X_WORLD", "Y_WORLD",
+                                "FLUX_RADIUS(3)", "FLAGS"],
+                        config={"DETECT_THRESH":threshold, "DETECT_MINAREA":8,
+                                "PHOT_FLUXFRAC":"0.3, 0.5, 0.8",
+                                "WEIGHT_TYPE":"MAP_RMS",
+                                "WEIGHT_IMAGE":"rms.fits"})
+        
+        im = pyfits.open(file)
+        ok = im['DQ',1].data == 0
+        sci = im['SCI',1].data*ok - np.median(im['SCI',1].data[ok])
+        
+        pyfits.writeto('sci.fits', data=sci, header=im['SCI',1].header,
+                       clobber=True)
+        
+        pyfits.writeto('rms.fits', data=im['ERR',1].data,
+                       header=im['ERR'].header, clobber=True)
+        
+        output = sew('sci.fits')        
+        
+        wcs = pywcs.WCS(im['SCI',1].header, relax=True)
+        cats.append([output['table'], wcs])
+    
+    c0 = cats[0][0]
+    wcs_0 = cats[0][1]
+    xy_0 = np.array([c0['X_IMAGE'], c0['Y_IMAGE']]).T
+    tree = scipy.spatial.cKDTree(xy_0, 10)
+    
+    d = OrderedDict()
+    for i in range(0, len(files)):
+        c_i, wcs_i = cats[i]
+        ## SExtractor doesn't do SIP WCS?
+        rd = np.array(wcs_i.all_pix2world(c_i['X_IMAGE'], c_i['Y_IMAGE'], 1))
+        xy = np.array(wcs_0.all_world2pix(rd.T, 1))
+        N = xy.shape[0]
+        dist, ix = np.zeros(N), np.zeros(N, dtype=int)
+        for j in range(N):
+            dist[j], ix[j] = tree.query(xy[j,:], k=1,
+                                        distance_upper_bound=np.inf)
+        
+        ok = dist < max_dist
+        if ok.sum() == 0:
+            d[files[i]] = [0.0, 0.0, 0.0, 1.0]
+            if verbose:
+                print files[i], '! no match'
+            
+            continue
+            
+        dr = xy - xy_0[ix,:] 
+        dx = np.median(dr[ok,:], axis=0)
+        rms = np.std(dr[ok,:], axis=0)/np.sqrt(ok.sum())
+
+        d[files[i]] = [dx[0], dx[1], 0.0, 1.0]
+        
+        if verbose:
+            print files[i], dx, rms, 'N=%d' %(ok.sum())
+    
+    wcs_ref = cats[0][1]
+    return wcs_ref, d
+
+def apply_tweak_shifts(wcs_ref, shift_dict, grism_matches={}, verbose=True):
+    """
+    
+    """
+    from drizzlepac import updatehdr
+
+    hdu = wcs_ref.to_fits(relax=True)
+    hdu.writeto('tweak_wcs.fits', clobber=True)
+    for file in shift_dict:
+        updatehdr.updatewcs_with_shift(file, 'tweak_wcs.fits',
+                                        xsh=shift_dict[file][0],
+                                        ysh=shift_dict[file][1],
+                                        rot=0., scale=1.,
+                                        wcsname='SHIFT', force=True,
+                                        reusename=True, verbose=verbose,
+                                        sciext='SCI')
+        
+        ### Bug in astrodrizzle? Dies if the FLT files don't have MJD-OBS
+        ### keywords
+        im = pyfits.open(file, mode='update')
+        im[0].header['MJD-OBS'] = im[0].header['EXPSTART']
+        im.flush()
+        
+        # Update paired grism exposures
+        if file in grism_matches:
+            for grism_file in grism_matches[file]:
+                updatehdr.updatewcs_with_shift(grism_file, 'tweak_wcs.fits',
+                                              xsh=shift_dict[file][0],
+                                              ysh=shift_dict[file][1],
+                                              rot=0., scale=1.,
+                                              wcsname='SHIFT', force=True,
+                                              reusename=True, verbose=verbose,
+                                              sciext='SCI')
+                
+                ### Bug in astrodrizzle? 
+                im = pyfits.open(grism_file, mode='update')
+                im[0].header['MJD-OBS'] = im[0].header['EXPSTART']
+                im.flush()
+                
+def find_direct_grism_pairs(direct={}, grism={}, check_pixel=[507, 507],
+                            toler=0.1, key='A'):
     """
     For each grism exposure, check if there is a direct exposure
     that matches the WCS to within `toler` pixels.  If so, copy that WCS 
     directly.
     """
     direct_wcs = {}
+    full_direct_wcs = {}
     direct_rd = {}
     
     grism_wcs = {}
     grism_pix = {}
     
-    for file in direct['files']:
-        im = pyfits.open(file)
-        direct_wcs[file] = pywcs.WCS(im[1].header, relax=True)
-        direct_rd[file] = direct_wcs[file].all_pix2world([check], 1)
+    grism_matches = OrderedDict()
     
+    for file in direct['files']:
+        grism_matches[file] = []
+        im = pyfits.open(file)
+        direct_wcs[file] = pywcs.WCS(im[1].header, relax=True, key=key)
+        full_direct_wcs[file] = pywcs.WCS(im[1].header, relax=True)
+        direct_rd[file] = direct_wcs[file].all_pix2world([check_pixel], 1)
+    
+    if 'files' not in grism:
+        return grism_matches
+         
     for file in grism['files']:
         im = pyfits.open(file)
-        grism_wcs[file] = pywcs.WCS(im[1].header, relax=True)
-        print file
+        grism_wcs[file] = pywcs.WCS(im[1].header, relax=True, key=key)
+        #print file
         delta_min = 10
         for d in direct['files']:
             pix = grism_wcs[file].all_world2pix(direct_rd[d], 1)
-            dx = pix-np.array(check)
+            dx = pix-np.array(check_pixel)
             delta = np.sqrt(np.sum(dx**2))
-            print '  %s %s, %.3f' %(d, dx, delta)
+            #print '  %s %s, %.3f' %(d, dx, delta)
             if delta < delta_min:
                 delta_min = delta
                 delta_min_file = d
-        
-        ### Found a match, copy the header
-        if delta_min < toler:
-            im = pyfits.open(file, mode='update')
+                if delta_min < toler:
+                    grism_matches[delta_min_file].append(file)
+    
+    return grism_matches
             
-            wcs_header = direct_wcs[delta_min_file].to_header(relax=True)
-            for i in [1,2]: 
-                for j in [1,2]:
-                    wcs_header.rename_keyword('PC%d_%d' %(i,j), 
-                                              'CD%d_%d' %(i,j))
-            
-            for ext in ['SCI','ERR','DQ']:
-                for key in wcs_header:
-                    im[ext].header[key] = wcs_header[key]
-            
-            im.flush()
+        # ### Found a match, copy the header
+        # if delta_min < toler:
+        #     print file, delta_min_file, delta_min
+        #     
+        #     im = pyfits.open(file, mode='update')
+        #     
+        #     wcs_header = full_direct_wcs[delta_min_file].to_header(relax=True)
+        #     for i in [1,2]: 
+        #         for j in [1,2]:
+        #             wcs_header.rename_keyword('PC%d_%d' %(i,j), 
+        #                                       'CD%d_%d' %(i,j))
+        #     
+        #     for ext in ['SCI','ERR','DQ']:
+        #         for key in wcs_header:
+        #             im[ext].header[key] = wcs_header[key]
+        #     
+        #     im.flush()
             
 def match_direct_grism_wcs(direct={}, grism={}, get_fresh_flt=True, 
                            run_drizzle=True):
-    """TBD
+    """Match WCS of grism exposures to corresponding direct images
+    
+    TBD
     """
     from drizzlepac import updatehdr
     from stwcs import updatewcs
@@ -967,7 +1276,13 @@ def match_direct_grism_wcs(direct={}, grism={}, get_fresh_flt=True,
                                       wcsname=ref_catalog, force=True,
                                       reusename=True, verbose=True,
                                       sciext='SCI')
-
+            
+            ### Bug in astrodrizzle? Dies if the FLT files don't have MJD-OBS
+            ### keywords
+            im = pyfits.open(file, mode='update')
+            im[0].header['MJD-OBS'] = im[0].header['EXPSTART']
+            im.flush()
+            
     ### Bug in astrodrizzle? Dies if the FLT files don't have MJD-OBS
     ### keywords
     for file in grism['files']:
@@ -1055,11 +1370,12 @@ def align_multiple_drizzled(mag_limits=[16,23]):
 
         
 def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext=1):
-    """TBD
+    """Subtract sky background from grism exposures
     
-    Implementation of sky subtraction from ISR 2015-17
+    Implementation of grism sky subtraction from ISR 2015-17    
     
-    Returns True if ACS
+    TBD
+    
     """
     import numpy.ma
     import scipy.ndimage as nd
@@ -1073,7 +1389,7 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
     flat = 1.
     if grism_element == 'G141':
         bg_fixed = ['zodi_G141_clean.fits']
-        bg_vary = ['zodi_G141_clean.fits', 'excess_G141_clean.fits',
+        bg_vary = ['zodi_G141_clean.fits', 'excess_lo_G141_clean.fits',
                    'G141_scattered_light.fits'][1:]
         ACS = False
     elif grism_element == 'G102':
@@ -1256,9 +1572,11 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
     fig = plt.figure(figsize=[6.,6.])
     ax = fig.add_subplot(111)
     
+    im_shape = (1014,1014)
+    
     for j in range(Nexp):
-        resid = (data[j*Npix:(j+1)*Npix] - sky[j,:]).reshape((1014,1014))
-        m = (mask & obj_mask)[j*Npix:(j+1)*Npix].reshape((1014,1014))
+        resid = (data[j*Npix:(j+1)*Npix] - sky[j,:]).reshape(im_shape)
+        m = (mask & obj_mask)[j*Npix:(j+1)*Npix].reshape(im_shape)
         
         ## Statistics of masked arrays    
         ma = np.ma.masked_array(resid, mask=(~m))
@@ -1266,7 +1584,7 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
     
         bg_sky = 1
         yrms = np.ma.std(ma, axis=0)/np.sqrt(np.sum(m, axis=0))
-        xmsk = np.arange(1014)
+        xmsk = np.arange(im_shape[0])
         yres = med
         yok = ~yrms.mask
         
@@ -1289,9 +1607,11 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
         
         ## result
         file = grism['files'][j]
-        np.savetxt(file.replace('_flt.fits', '_column.dat'), y_pred-1, 
-                   fmt='%.5f')
-            
+        fp = open(file.replace('_flt.fits', '_column.dat'), 'w')
+        fp.write('# column resid uncertainty\n')
+        np.savetxt(fp, np.array([xmsk, y_pred-1, gp_sigma]).T, fmt='%.5f')
+        fp.close()
+        
         if apply:
             ### Subtract the column average in 2D & log header keywords
             gp_res = np.dot(y_pred[:,None]-1, np.ones((1014,1)).T).T

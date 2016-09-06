@@ -452,6 +452,145 @@ class GroupFLT():
             
         return True
         #m2d = mb.reshape_flat(modelf)
+    
+    def drizzle_full_wavelength(self, wave=1.4e4, ref_header=None,
+                     kernel='point', pixfrac=1., verbose=True, 
+                     offset=[0,0]):
+        """Drizzle FLT frames recentered at a specified wavelength
+        
+        Script computes polynomial coefficients that define the dx and dy
+        offsets to a specific dispersed wavelengh relative to the reference
+        position and adds these to the SIP distortion keywords before
+        drizzling the input exposures to the output frame.
+                
+        Parameters
+        ----------
+        wave : float
+            Reference wavelength to center the output products
+            
+        ref_header : `~astropy.io.fits.Header`
+            Reference header for setting the output WCS and image dimensions.
+            
+        kernel : str, ('square' or 'point')
+            Drizzle kernel to use
+        
+        pixfrac : float
+            Drizzle PIXFRAC (for `kernel` = 'point')
+        
+        verbose : bool
+            Print information to terminal
+            
+        Returns
+        -------
+        sci, wht : `~np.ndarray`
+            Drizzle science and weight arrays with dimensions set in
+            `ref_header`.
+        """
+        from astropy.modeling import models, fitting
+        from drizzlepac.astrodrizzle import adrizzle
+        import astropy.wcs as pywcs
+        
+        ## Quick check now for which grism exposures we should use
+        if wave < 1.1e4:
+            use_grism = 'G102'
+        else:
+            use_grism = 'G141'
+        
+        # Get the configuration file
+        conf = None
+        for i in range(self.N):
+            if self.FLTs[i].grism.filter == use_grism:
+                conf = self.FLTs[i].conf
+        
+        # Grism not found in list
+        if conf is None:
+            return False
+        
+        # Compute field-dependent dispersion parameters
+        dydx_0_p = conf.conf['DYDX_A_0']
+        dydx_1_p = conf.conf['DYDX_A_1']
+
+        dldp_0_p = conf.conf['DLDP_A_0']
+        dldp_1_p = conf.conf['DLDP_A_1']
+
+        yp, xp = np.indices((1014,1014)) # hardcoded for WFC3/IR
+        sk = 10 # don't need to evaluate at every pixel
+
+        dydx_0 = conf.field_dependent(xp[::sk,::sk], yp[::sk,::sk], dydx_0_p)
+        dydx_1 = conf.field_dependent(xp[::sk,::sk], yp[::sk,::sk], dydx_1_p)
+
+        dldp_0 = conf.field_dependent(xp[::sk,::sk], yp[::sk,::sk], dldp_0_p)
+        dldp_1 = conf.field_dependent(xp[::sk,::sk], yp[::sk,::sk], dldp_1_p)
+        
+        # Inverse pixel offsets from the specified wavelength
+        dp = (wave - dldp_0)/dldp_1
+        i_x, i_y = 1, 0 # indexing offsets
+        dx = dp/np.sqrt(1+dydx_1) + i_x
+        dy = dydx_0 + dydx_1*dx + i_y
+        
+        dx += offset[0]
+        dy += offset[1]
+        
+        # Compute polynomial coefficients
+        p_init = models.Polynomial2D(degree=4)
+        fit_p = fitting.LevMarLSQFitter()
+        p_dx = fit_p(p_init, xp[::sk,::sk]-507, yp[::sk,::sk]-507, -dx)
+        p_dy = fit_p(p_init, xp[::sk,::sk]-507, yp[::sk,::sk]-507, -dy)
+
+        # Output WCS
+        out_wcs = pywcs.WCS(ref_header, relax=True)
+        out_wcs.pscale = utils.get_wcs_pscale(out_wcs)
+        
+        # Initialize outputs
+        shape = (ref_header['NAXIS2'], ref_header['NAXIS1'])
+        outsci = np.zeros(shape, dtype=np.float32)
+        outwht = np.zeros(shape, dtype=np.float32)
+        outctx = np.zeros(shape, dtype=np.int32)
+        
+        # Loop through exposures
+        for i in range(self.N):
+            flt = self.FLTs[i]
+            if flt.grism.filter != use_grism:
+                continue
+                
+            h = flt.grism.header.copy()
+
+            # Update SIP coefficients
+            for j, p in enumerate(p_dx.param_names):
+                key = 'A_'+p[1:]
+                if key in h:
+                    h[key] += p_dx.parameters[j]
+                else:
+                    h[key] = p_dx.parameters[j]
+
+            for j, p in enumerate(p_dy.param_names):
+                key = 'B_'+p[1:]
+                if key in h:
+                    h[key] += p_dy.parameters[j]
+                else:
+                    h[key] = p_dy.parameters[j]
+            
+            line_wcs = pywcs.WCS(h, relax=True)
+            line_wcs.pscale = utils.get_wcs_pscale(line_wcs)
+
+            # Science and wht arrays
+            sci = flt.grism['SCI'] - flt.model
+            wht = 1/(flt.grism['ERR']**2)
+            wht[~np.isfinite(wht)] = 0
+            
+            # Drizzle it
+            if verbose:
+                print 'Drizzle %s to wavelength %.2f' %(flt.grism.parent_file, 
+                                                        wave)
+                                                        
+            adrizzle.do_driz(sci, line_wcs, wht, out_wcs, 
+                             outsci, outwht, outctx, 1., 'cps', 1,
+                             wcslin_pscale=line_wcs.pscale, uniqid=1, 
+                             pixfrac=pixfrac, kernel=kernel, fillval=0, 
+                             stepsize=10, wcsmap=None)
+        
+        # Done!
+        return outsci, outwht
         
 class MultiBeam():
     def __init__(self, beams, group_name='group', fcontam=0.):
@@ -507,17 +646,22 @@ class MultiBeam():
         self.flat_flam = np.hstack([b.flat_flam for b in self.beams])
         self.fit_mask = np.hstack([b.fit_mask*b.contam_mask 
                                       for b in self.beams])
+                                       
         self.DoF = self.fit_mask.sum()
         self.ivarf = np.hstack([b.ivarf for b in self.beams])
+        self.fit_mask &= self.ivarf >= 0
+        
         self.scif = np.hstack([b.scif for b in self.beams])
         self.contamf = np.hstack([b.contam.flatten() for b in self.beams])
         
         self.fcontam = fcontam
         if fcontam > 0:
-            #self.ivarf = 1./(1./self.ivarf + fcontam*self.contamf)
-            #self.ivarf[~np.isfinite(self.ivarf)] = 0
-            mask = (self.contamf*np.sqrt(self.ivarf) > fcontam) & (self.contamf > fcontam*self.flat_flam)
-            self.ivarf[mask] = 0
+            self.ivarf = 1./(1./self.ivarf + (fcontam*self.contamf)**2)
+            self.ivarf[~np.isfinite(self.ivarf)] = 0
+            self.ivarf[self.ivarf < 0] = 0
+            
+            #mask = (self.contamf*np.sqrt(self.ivarf) > fcontam) & (self.contamf > fcontam*self.flat_flam)
+            #self.ivarf[mask] = 0
             
         ### Initialize background fit array
         self.A_bg = np.zeros((self.N, self.Ntot))
@@ -647,7 +791,12 @@ class MultiBeam():
                 ### Weight by ivar
                 y *= np.sqrt(self.ivarf[self.fit_mask])
 
-                out = np.linalg.lstsq(Ax,y)                         
+                try:
+                    out = np.linalg.lstsq(Ax,y)                         
+                except:
+                    print A.min(), Ax.min(), self.fit_mask.sum(), y.min()
+                    raise ValueError
+                    
                 lstsq_coeff, residuals, rank, s = out
                 coeffs = lstsq_coeff
             
@@ -734,31 +883,24 @@ class MultiBeam():
             # 
             # np.save('stars_bpgs.npy', [temp_list])
             
-            temp_list = np.load('stars.npy')[0]
+            temp_list = np.load(os.path.join(os.getenv('GRIZLI'), 
+                                             'templates/stars.npy'))[0]
             return temp_list
             
-        # templates = ['templates/EAZY_v1.0_lines/eazy_v1.0_sed1_nolines.dat',
-        # 'templates/EAZY_v1.0_lines/eazy_v1.0_sed2_nolines.dat',  
-        # 'templates/EAZY_v1.0_lines/eazy_v1.0_sed3_nolines.dat',     
-        # 'templates/EAZY_v1.0_lines/eazy_v1.0_sed4_nolines.dat',     
-        # 'templates/EAZY_v1.0_lines/eazy_v1.0_sed5_nolines.dat',     
-        # 'templates/EAZY_v1.0_lines/eazy_v1.0_sed6_nolines.dat',     
-        # 'templates/cvd12_t11_solar_Chabrier.extend.dat',     
-        # 'templates/dobos11/bc03_pr_ch_z02_ltau07.0_age09.2_av2.5.dat']
-        
         ## Intermediate and very old
-        templates = ['templates/EAZY_v1.0_lines/eazy_v1.0_sed3_nolines.dat',  
-                     'templates/cvd12_t11_solar_Chabrier.extend.skip10.dat']     
-        
+        # templates = ['templates/EAZY_v1.0_lines/eazy_v1.0_sed3_nolines.dat',  
+        #              'templates/cvd12_t11_solar_Chabrier.extend.skip10.dat']     
+        templates = ['templates/eazy_intermediate.dat', 
+                     'templates/cvd12_t11_solar_Chabrier.dat']
+                     
         ## Post starburst
-        templates.append('templates/UltraVISTA/eazy_v1.1_sed9.dat')
+        #templates.append('templates/UltraVISTA/eazy_v1.1_sed9.dat')
+        templates.append('templates/post_starburst.dat')
         
         ## Very blue continuum
-        templates.append('templates/YoungSB/erb2010_continuum.dat')
+        #templates.append('templates/YoungSB/erb2010_continuum.dat')
+        templates.append('templates/erb2010_continuum.dat')
         
-        # templates.extend(['templates/dobos11/SF0_0.emline.hiOIII.txt', 
-        #                   'templates/dobos11/SF0_0.emline.loOIII.txt'])
-                                  
         temp_list = OrderedDict()
         for temp in templates:
             data = np.loadtxt(os.getenv('GRIZLI') + '/' + temp, unpack=True)
@@ -775,7 +917,7 @@ class MultiBeam():
             #line_list = ['Ha+SII', 'OIII+Hb', 'OII']
             line_list = ['Ha+SII+SIII+He', 'OIII+Hb', 'OII+Ne']
         else:
-            line_list = ['SIII', 'SII', 'Ha', 'OI', 'OIII', 'Hb', 'Hg', 'Hd', 'NeIII', 'OII']
+            line_list = ['SIII', 'SII', 'Ha', 'OI', 'OIII', 'Hb', 'OIIIx', 'Hg', 'Hd', 'NeIII', 'OII']
             #line_list = ['Ha', 'SII']
             
         for li in line_list:
@@ -794,7 +936,7 @@ class MultiBeam():
         return temp_list
     
     def fit_stars(self, poly_order=1, fitter='nnls', fit_background=True, 
-                  verbose=True, make_figure=True,
+                  verbose=True, make_figure=True, zoom=None,
                   delta_chi2_threshold=0.004, zr=0, dz=0, fwhm=0, prior=None):
         """TBD
         """
@@ -831,12 +973,12 @@ class MultiBeam():
                                 fit_background=fit_background)
             
             A, coeffs[i,:], chi2[i], model_2d = out
-            if verbose:
-                if chi2[i] < chi2min:
-                    iz = i
-                    chi2min = chi2[i]
-                    best = key
-                    
+            if chi2[i] < chi2min:
+                iz = i
+                chi2min = chi2[i]
+                best = key
+
+            if verbose:                    
                 print utils.no_newline + '  %s %9.1f (%s)' %(key, chi2[i], best)
         
         ## Best-fit
@@ -963,15 +1105,14 @@ class MultiBeam():
                                 fit_background=fit_background)
             
             A, coeffs[i,:], chi2[i], model_2d = out
-            if verbose:
-                if chi2[i] < chi2min:
-                    iz = i
-                    chi2min = chi2[i]
-                    
+            if chi2[i] < chi2min:
+                iz = i
+                chi2min = chi2[i]
+
+            if verbose:                    
                 print utils.no_newline + '  %.4f %9.1f (%.4f)' %(zgrid[i], chi2[i], zgrid[iz])
         
-        if verbose:
-            print 'First iteration: z_best=%.4f\n' %(zgrid[iz])
+        print 'First iteration: z_best=%.4f\n' %(zgrid[iz])
             
         # peaks
         import peakutils
@@ -1018,11 +1159,11 @@ class MultiBeam():
                                     fit_background=fit_background)
 
                 A, coeffs_zoom[i,:], chi2_zoom[i], model_2d = out
+                if chi2_zoom[i] < chi2min:
+                    chi2min = chi2_zoom[i]
+                    iz = i
+                
                 if verbose:
-                    if chi2_zoom[i] < chi2min:
-                        chi2min = chi2_zoom[i]
-                        iz = i
-                    
                     print utils.no_newline+'- %.4f %9.1f (%.4f) %d/%d' %(zgrid_zoom[i], chi2_zoom[i], zgrid_zoom[iz], i+1, NZOOM)
         
             zgrid = np.append(zgrid, zgrid_zoom)
@@ -1040,8 +1181,7 @@ class MultiBeam():
         else:
             interp_prior = None
             
-        if verbose:
-            print ' Zoom iteration: z_best=%.4f' %(zgrid[np.argmin(chi2)])
+        print ' Zoom iteration: z_best=%.4f\n' %(zgrid[np.argmin(chi2)])
         
         ### Best redshift
         if not stars:
@@ -1387,8 +1527,10 @@ class MultiBeam():
         
         return fig, hdu_sci
     
-    def drizzle_fit_lines(self, fit, pline, force_line=['Ha', 'OIII', 'Hb', 'OII'], save_fits=True, mask_lines=True):
-
+    def drizzle_fit_lines(self, fit, pline, force_line=['Ha', 'OIII', 'Hb', 'OII'], save_fits=True, mask_lines=True, mask_sn_limit=3, wcs=None):
+        """
+        TBD
+        """
         line_wavelengths, line_ratios = utils.get_line_wavelengths()
         hdu_full = []
         saved_lines = []
@@ -1398,7 +1540,7 @@ class MultiBeam():
                 continue
 
             if (line_flux/line_err > 7) | (line in force_line):
-                print 'Drizzle line -> %s (%.2f %.2f)' %(line, line_flux,
+                print 'Drizzle line -> %4s (%.2f %.2f)' %(line, line_flux,
                                                          line_err)
 
                 line_wave_obs = line_wavelengths[line][0]*(1+fit['zbest'])
@@ -1428,7 +1570,8 @@ class MultiBeam():
                             
                         for l in fit['line1d']:
                             lf, le = fit['line_flux'][l]
-                            if lf == 0:
+                            ### Don't mask if the line missing or undetected
+                            if (lf == 0) | (lf < mask_sn_limit*le):
                                 continue
                                 
                             if l != line:
@@ -1445,9 +1588,9 @@ class MultiBeam():
                                     #print beam.grism.parent_file, l
                                     continue
                                     
-                                beam.ivar[lcontam > 5*lmodel] *= 0
+                                beam.ivar[lcontam > mask_sn_limit*lmodel] *= 0
 
-                hdu = drizzle_to_wavelength(self.beams, ra=self.ra, 
+                hdu = drizzle_to_wavelength(self.beams, wcs=wcs, ra=self.ra, 
                                             dec=self.dec, wave=line_wave_obs,
                                             **pline)
                 
@@ -1494,7 +1637,7 @@ class MultiBeam():
         
     def run_full_diagnostics(self, pzfit={}, pspec2={}, pline={}, 
                       force_line=['Ha', 'OIII', 'Hb'], GroupFLT=None,
-                      prior=None, zoom=True):
+                      prior=None, zoom=True, verbose=True):
         """TBD
         
         size=20, pixscale=0.1,
@@ -1548,6 +1691,7 @@ class MultiBeam():
         zfit_in['fwhm'] = fwhm
         zfit_in['prior'] = prior
         zfit_in['zoom'] = zoom
+        zfit_in['verbose'] = verbose
         
         if zfit_in['zr'] is 0:
             fit, fig = self.fit_stars(**zfit_in)
@@ -1566,14 +1710,14 @@ class MultiBeam():
         fig2, hdu2 = self.redshift_fit_twod_figure(**spec_in)#, kwargs=spec2) #dlam=dlam, spatial_scale=spatial_scale, NY=NY)
         
         ### Update master model
-        if GroupFLT is None:
+        if GroupFLT is not None:
             try:
                 ix = GroupFLT.catalog['NUMBER'] == self.beams[0].id
                 mag = GroupFLT.catalog['MAG_AUTO'][ix].data[0]
             except:
                 mag = 22
                 
-            sp = fit['model1d']
+            sp = fit['cont1d']
             GroupFLT.compute_single_model(id, mag=mag, size=None, store=False,
                                           spectrum_1d=[sp.wave, sp.flux],
                                           get_beams=None, in_place=True)
@@ -1907,7 +2051,7 @@ def drizzle_2d_spectrum(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
     
     return hdul
     
-def drizzle_to_wavelength(beams, ra=0., dec=0., wave=1.e4, size=5,
+def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
                           pixscale=0.1, pixfrac=0.6, kernel='square',
                           direct_extension='REF', fcontam=0.2, ds9=None):
     """Drizzle a cutout at a specific wavelength from a list of `BeamCutout`s
@@ -1916,6 +2060,10 @@ def drizzle_to_wavelength(beams, ra=0., dec=0., wave=1.e4, size=5,
     ----------
     beams : list of `~.model.BeamCutout` objects.
     
+    wcs : `~astropy.wcs.WCS` or None
+        Pre-determined WCS.  If not specified, generate one based on `ra`, 
+        `dec`, `pixscale` and `pixscale`
+        
     ra, dec, wave : float
         Sky coordinates and central wavelength
 
@@ -1954,8 +2102,15 @@ def drizzle_to_wavelength(beams, ra=0., dec=0., wave=1.e4, size=5,
         return False
         
     ### Get output header and WCS
-    header, output_wcs = utils.make_wcsheader(ra=ra, dec=dec, size=size, pixscale=pixscale, get_hdu=False)
-
+    if wcs is None:
+        header, output_wcs = utils.make_wcsheader(ra=ra, dec=dec, size=size, pixscale=pixscale, get_hdu=False)
+    else:
+        output_wcs = wcs.copy()
+        if not hasattr(output_wcs, 'pscale'):
+            output_wcs.pscale = utils.get_wcs_pscale(output_wcs)
+            
+        header = utils.to_header(output_wcs, relax=True)
+        
     ### Initialize data
     sh = (header['NAXIS1'], header['NAXIS2'])
     
