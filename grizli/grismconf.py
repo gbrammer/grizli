@@ -476,12 +476,12 @@ def get_config_filename(instrume='WFC3', filter='F140W',
                            
     if instrume == 'WFC3':
         conf_file = os.path.join(os.getenv('GRIZLI'), 
-                                 'CONF/%s.%s.V4.3.conf' %(grism, filter))
+                                 'CONF/%s.%s.V4.32.conf' %(grism, filter))
         
         ## When direct + grism combination not found for WFC3 assume F140W
         if not os.path.exists(conf_file):
             conf_file = os.path.join(os.getenv('GRIZLI'),
-                                 'CONF/%s.%s.V4.3.conf' %(grism, 'F140W'))
+                                 'CONF/%s.%s.V4.32.conf' %(grism, 'F140W'))
               
     if instrume == 'NIRISS':
         conf_file = os.path.join(os.getenv('GRIZLI'),

@@ -22,7 +22,7 @@ def get_flt_info(files=[]):
         Table containing header keywords
         
     """
-    from astropy.io.fits import Header
+    import astropy.io.fits as pyfits
     from astropy.table import Table
     
     if not files:
@@ -31,10 +31,15 @@ def get_flt_info(files=[]):
     N = len(files)
     columns = ['FILE', 'FILTER', 'TARGNAME', 'DATE-OBS', 'TIME-OBS', 'EXPSTART', 'EXPTIME', 'PA_V3', 'RA_TARG', 'DEC_TARG', 'POSTARG1', 'POSTARG2']
     data = []
-    head = Header()
+
     for i in range(N):
-        line = [files[i]]
-        h = Header().fromfile(files[i])
+        line = [os.path.basename(files[i]).split('.gz')[0]]
+        if files[i].endswith('.gz'):
+            im = pyfits.open(files[i])
+            h = im[0].header
+        else:
+            h = pyfits.Header().fromfile(files[i])
+        
         filt = get_hst_filter(h)
         line.append(filt)
         for key in columns[2:]:
@@ -191,7 +196,7 @@ def parse_flt_files(files=[], info=None, uniquename=False,
     
     targets = np.unique(target_list)
     
-    output_list = OrderedDict()
+    output_list = [] #OrderedDict()
     filter_list = OrderedDict()
     
     for filter in np.unique(info['filter']):
@@ -272,13 +277,20 @@ def parse_flt_files(files=[], info=None, uniquename=False,
                         print visit_product, len(visit_list)
                         so = np.argsort(visit_start)
                         exposure_list = np.array(visit_list)[so]
-                        output_list[visit_product.lower()] = visit_list
-                    
+                        #output_list[visit_product.lower()] = visit_list
+                        
+                        d = OrderedDict(product=visit_product.lower(),
+                                        files=list(np.array(visit_list)[so]))
+                        output_list.append(d)
+                        
                 if not uniquename:
                     print product, len(exposure_list)
                     so = np.argsort(exposure_start)
                     exposure_list = np.array(exposure_list)[so]
-                    output_list[product.lower()] = exposure_list
+                    #output_list[product.lower()] = exposure_list
+                    d = OrderedDict(product=product.lower(),
+                                    files=list(np.array(exposure_list)[so]))
+                    output_list.append(d)
     
     return output_list, filter_list
     
@@ -555,7 +567,7 @@ def get_line_wavelengths():
     line_wavelengths['OIII'] = [5008.240, 4960.295]
     line_ratios['OIII'] = [2.98, 1]
     line_wavelengths['OIII+Hb'] = [5008.240, 4960.295, 4862.68]
-    line_ratios['OIII+Hb'] = [2.98, 1, 3.98/8.]
+    line_ratios['OIII+Hb'] = [2.98, 1, 3.98/6.]
     
     line_wavelengths['OIII+Hb+Ha'] = [5008.240, 4960.295, 4862.68, 6564.61]
     line_ratios['OIII+Hb+Ha'] = [2.98, 1, 3.98/10., 3.98/10.*2.86]
@@ -873,6 +885,36 @@ def make_spectrum_wcsheader(center_wave=1.4e4, dlam=40, NX=100, spatial_scale=1,
     
     return refh, ref_wcs
 
+def to_header(wcs, relax=True):
+    """Modify `astropy.wcs.WCS.to_header` to produce more keywords
+    
+    Parameters
+    ----------
+    wcs : `~astropy.wcs.WCS`
+        Input WCS.
+    
+    relax : bool
+        Passed to `WCS.to_header(relax=)`.
+        
+    Returns
+    -------
+    header : `~astropy.io.fits.Header`
+        Output header.
+        
+    """
+    header = wcs.to_header(relax=relax)
+    if hasattr(wcs, '_naxis1'):
+        header['NAXIS'] = wcs.naxis
+        header['NAXIS1'] = wcs._naxis1
+        header['NAXIS2'] = wcs._naxis2
+    
+    for k in header:
+        if k.startswith('PC'):
+            cd = k.replace('PC','CD')
+            header.rename_keyword(k, cd)
+    
+    return header
+    
 def make_wcsheader(ra=40.07293, dec=-1.6137748, size=2, pixscale=0.1, get_hdu=False, theta=0):
     """Make a celestial WCS header
         
@@ -975,13 +1017,108 @@ def make_wcsheader(ra=40.07293, dec=-1.6137748, size=2, pixscale=0.1, get_hdu=Fa
             wcs_out.wcs.cd[i,j] = rot_cd[i,j]
                 
     cd = wcs_out.wcs.cd
-    wcs_out.pscale = np.sqrt((cd[0,:]**2).sum())*3600.
+    wcs_out.pscale = get_wcs_pscale(wcs_out) #np.sqrt((cd[0,:]**2).sum())*3600.
         
     if get_hdu:
         hdu = pyfits.ImageHDU(header=hout, data=np.zeros((npix[1], npix[0]), dtype=np.float32))
         return hdu
     else:
         return hout, wcs_out
-
     
+def fetch_hst_calib(file='iref$uc72113oi_pfl.fits', ftpdir='https://hst-crds.stsci.edu/unchecked_get/references/hst/'):
+    """
+    TBD
+    """
+    import os
+    
+    ref_dir = file.split('$')[0]
+    cimg = file.split('%s$' %(ref_dir))[1]
+    iref_file = os.path.join(os.getenv(ref_dir), cimg)
+    if not os.path.exists(iref_file):
+        os.system('curl -o %s %s/%s' %(iref_file, ftpdir, cimg))
+    else:
+        print '%s exists' %(iref_file)
+        
+def fetch_hst_calibs(flt_file, ftpdir='https://hst-crds.stsci.edu/unchecked_get/references/hst/', calib_types=['BPIXTAB', 'CCDTAB', 'OSCNTAB', 'CRREJTAB', 'DARKFILE', 'NLINFILE', 'PFLTFILE', 'IMPHTTAB', 'IDCTAB', 'NPOLFILE'], verbose=True):
+    """
+    TBD
+    Fetch necessary calibration files needed for running calwf3 from STScI FTP
+    
+    Old FTP dir: ftp://ftp.stsci.edu/cdbs/iref/"""
+    import os
+            
+    im = pyfits.open(flt_file)
+    if im[0].header['INSTRUME'] == 'ACS':
+        ref_dir = 'jref'
+    
+    if im[0].header['INSTRUME'] == 'WFC3':
+        ref_dir = 'iref'
+    
+    if not os.getenv(ref_dir):
+        print 'No $%s set!  Put it in ~/.bashrc or ~/.cshrc.' %(ref_dir)
+        return False
+    
+    for ctype in calib_types:
+        if ctype not in im[0].header:
+            continue
+            
+        if verbose:
+            print 'Calib: %s=%s' %(ctype, im[0].header[ctype])
+        
+        if im[0].header[ctype] == 'N/A':
+            continue
+        
+        fetch_hst_calib(im[0].header[ctype], ftpdir=ftpdir)
+            
+    return True
+    
+def fetch_default_calibs(ACS=False):
+    
+    for ref_dir in ['iref','jref']:
+        if not os.getenv(ref_dir):
+            print """
+No $%s set!  Make a directory and point to it in ~/.bashrc or ~/.cshrc.
+For example,
+
+  $ mkdir $GRIZLI/%s
+  $ export %s="${GRIZLI}/%s/" # put this in ~/.bashrc
+""" %(ref_dir, ref_dir, ref_dir, ref_dir)
+
+            return False
+        
+    ### WFC3
+    files = ['iref$uc72113oi_pfl.fits', #F105W Flat
+             'iref$uc721143i_pfl.fits', #F140W flat
+             'iref$u4m1335li_pfl.fits', #G102 flat
+             'iref$u4m1335mi_pfl.fits', #G141 flat
+             'iref$w3m18525i_idc.fits', #IDCTAB distortion table}
+             ]
+    
+    if ACS:
+        files.extend(['jref$n6u12592j_pfl.fits',#F814 Flat
+                      'jref$o841350mj_pfl.fits', #G800L flat])
+                      ])
+    
+    for file in files:
+        fetch_hst_calib(file)
+
+    os.system('curl -o %s/badpix_spars200_Nov9.fits https://raw.githubusercontent.com/gbrammer/wfc3/master/data/badpix_spars200_Nov9.fits' %(os.getenv('iref')))
+    
+def fetch_config_files():
+    """
+    Config files needed for Grizli
+    """
+    os.chdir('%s/CONF' %(os.getenv('GRIZLI')))
+    
+    tarfiles = ['ftp://ftp.stsci.edu/cdbs/wfc3_aux/WFC3.IR.G102.cal.V4.32.tar.gz',
+ 'ftp://ftp.stsci.edu/cdbs/wfc3_aux/WFC3.IR.G141.cal.V4.32.tar.gz',
+ 'ftp://ftp.stsci.edu/cdbs/wfc3_aux/grism_master_sky_v0.5.tar.gz']
+    
+    for url in tarfiles:
+        file=os.path.basename(url)
+        if not os.path.exists(file):
+            os.system('curl -o %s %s' %(file, url))
+        
+        os.system('tar xzvf %s' %(file))
+            
     
