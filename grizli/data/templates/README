@@ -1,0 +1,19 @@
+Default redshift-fit templates
+
+1)  eazy_intermediate.dat - originally EAZY_v1.0_lines/eazy_v1.0_sed3_nolines.dat
+    
+    Intermediate age SED with moderate D4000 break
+
+2)  cvd12_t11_solar_Chabrier.dat - Old SSP from Conroy & van Dokkum (2012)
+
+    Conroy models needed to get the low-level absorption features correct
+    at rest > 7000 A.
+
+3)  post_starburst.dat - originally UltraVISTA/eazy_v1.1_sed9.dat
+
+    Post-starburst template used by Adam Muzzin for UltraVISTA.  Prominent
+    *Balmer* break and strong D4000.
+
+4)  erb2010_continuum.dat - very young blue continuum
+    
+    SED parameters for the low-metallicity LBG from Erb et al. (2010).
