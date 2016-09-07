@@ -147,6 +147,9 @@ def _loadFLT(grism_file, sci_extn, direct_file, pad, ref_file,
     save_file = grism_file.replace('_flt.fits', '_GrismFLT.fits')
     save_file = save_file.replace('_flc.fits', '_GrismFLT.fits')
     save_file = save_file.replace('_cmb.fits', '_GrismFLT.fits')
+    if grism_file.find('_') < 0:
+        save_file = 'xxxxxxxxxxxxxxxxxxx'
+        
     if os.path.exists(save_file):
         print 'Load %s!' %(save_file)
         
@@ -1400,11 +1403,11 @@ class MultiBeam():
             ffull[grism] = np.append(ffull[grism], flux)
             efull[grism] = np.append(efull[grism], err)
         
-        #
         cp = {'G800L':(0.0, 0.4470588235294118, 0.6980392156862745),
               'G102':(0.0, 0.6196078431372549, 0.45098039215686275),
               'G141':(0.8352941176470589, 0.3686274509803922, 0.0),
-              'none':(0.8, 0.4745098039215686, 0.6549019607843137)}
+              'none':(0.8, 0.4745098039215686, 0.6549019607843137),
+              'GRISM':'k'}
         
         for grism in grisms:                        
             if self.Ngrism[grism] > 1:
@@ -1428,7 +1431,8 @@ class MultiBeam():
         xmin, xmax = 1.e5, 0
         limits = {'G800L':[0.545, 1.02],
                    'G102':[0.77, 1.18],
-                   'G141':[1.06, 1.73]}
+                   'G141':[1.06, 1.73],
+                   'GRISM':[0.98, 1.98]}
         
         for g in limits:
             if g in grisms:
@@ -1458,7 +1462,8 @@ class MultiBeam():
         xmin, xmax = 1.e5, 0
         limits = {'G800L':[0.545, 1.02],
                    'G102':[0.77, 1.18],
-                   'G141':[1.06, 1.73]}
+                   'G141':[1.06, 1.73],
+                   'GRISM':[0.98, 1.98]}
         
         for g in limits:
             if g in self.Ngrism:
@@ -1801,7 +1806,7 @@ class MultiBeam():
         data = '%7d %.6f %.6f %.5f' %(self.id, self.ra, self.dec,
                                       fit['zbest'])
         
-        for grism in ['G800L', 'G102', 'G141']:
+        for grism in ['G800L', 'G102', 'G141', 'GRISM']:
             label += ' N%s' %(grism)
             if grism in self.Ngrism:
                 data += ' %2d' %(self.Ngrism[grism])
@@ -2142,8 +2147,10 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
         beam_header, beam_wcs = beam.get_wavelength_wcs(wave)
         ## Make sure CRPIX set correctly for the SIP header
         for j in [0,1]: 
-            beam_wcs.sip.crpix[j] = beam_wcs.wcs.crpix[j]
-            beam.direct.wcs.sip.crpix[j] = beam.direct.wcs.wcs.crpix[j]
+            if beam_wcs.sip is not None:
+                beam_wcs.sip.crpix[j] = beam_wcs.wcs.crpix[j]
+            if beam.direct.wcs.sip is not None:
+                beam.direct.wcs.sip.crpix[j] = beam.direct.wcs.wcs.crpix[j]
         
         beam_data = beam.grism.data['SCI'] - beam.contam 
         beam_continuum = beam.model*1
