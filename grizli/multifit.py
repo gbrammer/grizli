@@ -725,6 +725,12 @@ class MultiBeam():
         
         self.n_poly = poly_order + 1
     
+    def compute_model(self, id=None, spectrum_1d=None):
+        """TBD
+        """
+        for beam in self.beams:
+            beam.beam.compute_model(id=id, spectrum_1d=spectrum_1d)
+            
     def fit_at_z(self, z=0., templates={}, fitter='nnls',
                  fit_background=True, poly_order=0):
         """TBD

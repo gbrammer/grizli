@@ -466,7 +466,13 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
                               outlier_threshold=outlier_threshold,
                               toler=toler)
             output_ix, input_ix, outliers, tf = res
-                                                      
+        
+        #
+        tf_out = tf(output[output_ix])
+        dx = input[input_ix] - tf_out
+        rms = utils.nmad(np.sqrt((dx**2).sum(axis=1)))
+        outliers = outliers | (np.sqrt((dx**2).sum(axis=1)) > 4*rms)
+                                                  
         if outliers.sum() > 0:
             res2 = match_lists(output[output_ix][~outliers],
                               input[input_ix][~outliers], scl=1., simple=True,
@@ -497,7 +503,6 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
     if log:
         tf_out = tf(output[output_ix][~outliers])
         dx = input[input_ix][~outliers] - tf_out
-        
         rms = utils.nmad(np.sqrt((dx**2).sum(axis=1)))
         
         interactive_status=plt.rcParams['interactive']
@@ -876,7 +881,9 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
     
     ### Make catalog & segmentation image
     cat = make_drz_catalog(root=direct['product'], threshold=2)
-    
+    if radec == 'self':
+        cat['X_WORLD', 'Y_WORLD'][(cat['MAG_AUTO'] > align_mag_limits[0]) & (cat['MAG_AUTO'] < align_mag_limits[1])].write('self', format='ascii.commented_header')
+        
     clip=20
     logfile = '%s_wcs.log' %(direct['product'])
     if os.path.exists(logfile):

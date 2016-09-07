@@ -854,10 +854,11 @@ class ImageData(object):
                 
             ### ACS bunit
             exptime = 1.
-            if hdulist['SCI', sci_extn].header['BUNIT'] == 'ELECTRONS':
-                exptime = hdulist[0].header['EXPTIME']
-                sci /= exptime
-                err /= exptime
+            if 'BUNIT' in hdulist['SCI', sci_extn].header:
+                if hdulist['SCI', sci_extn].header['BUNIT'] == 'ELECTRONS':
+                    exptime = hdulist[0].header['EXPTIME']
+                    sci /= exptime
+                    err /= exptime
                            
             if filter.startswith('G'):
                 photflam = 1
@@ -1263,6 +1264,10 @@ class ImageData(object):
         slice_obj.sci_extn = self.sci_extn
         slice_obj.is_slice = True
         
+        if hasattr(slice_obj.wcs, 'sip'):
+            for i in [0,1]:
+                slice_obj.wcs.sip.crpix[c] = slice_obj.wcs.wcs.crpix[c]
+            
         return slice_obj#, slx, sly
     
     def get_HDUList(self, extver=1):
