@@ -1265,9 +1265,10 @@ class ImageData(object):
         slice_obj.is_slice = True
         
         if hasattr(slice_obj.wcs, 'sip'):
-            for i in [0,1]:
-                slice_obj.wcs.sip.crpix[c] = slice_obj.wcs.wcs.crpix[c]
-            
+            if slice_obj.wcs.sip is not None:
+                for c in [0,1]:
+                    slice_obj.wcs.sip.crpix[c] = slice_obj.wcs.wcs.crpix[c]
+                    
         return slice_obj#, slx, sly
     
     def get_HDUList(self, extver=1):
@@ -2593,13 +2594,19 @@ class BeamCutout(object):
                                       self.beam.sensitivity_beam)
                 
         ### Update CRPIX
-        for cr in [wcs.sip.crpix, wcs.wcs.crpix]:
-                cr[0] += dx + self.beam.sh[0]/2 + self.beam.dxfull[0]
-                cr[1] += dy 
+        for wcs_ext in [wcs.sip, wcs.wcs]:
+            if wcs_ext is None:
+                continue
+            else:
+                cr = wcs_ext.crpix
+            
+            cr[0] += dx + self.beam.sh[0]/2 + self.beam.dxfull[0]
+            cr[1] += dy 
         
         ### Make SIP CRPIX match CRPIX
-        for i in [0,1]:
-            wcs.sip.crpix[i] = wcs.wcs.crpix[i]
+        if wcs.sip is not None:
+            for i in [0,1]:
+                wcs.sip.crpix[i] = wcs.wcs.crpix[i]
                     
         ### WCS header
         header = wcs.to_header(relax=True)
@@ -2674,8 +2681,9 @@ class BeamCutout(object):
         """
         pix_center = np.array([self.beam.sh][::-1])/2. 
         pix_center -= np.array([self.beam.xcenter, self.beam.ycenter]) 
-        for i in range(2):
-            self.direct.wcs.sip.crpix[i] = self.direct.wcs.wcs.crpix[i]
+        if self.direct.wcs.sip is not None:
+            for i in range(2):
+                self.direct.wcs.sip.crpix[i] = self.direct.wcs.wcs.crpix[i]
             
         ra, dec = self.direct.wcs.all_pix2world(pix_center, 1)[0]
         return ra, dec
