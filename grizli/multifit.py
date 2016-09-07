@@ -344,7 +344,7 @@ class GroupFLT():
             ids = self.catalog['NUMBER'][bright]
             mags = self.catalog['MAG_AUTO'][bright]
 
-            xspec = np.arange(0.6, 1.8, 0.05)-1
+            xspec = np.arange(0.6, 2.1, 0.05)-1
 
             yspec = [xspec**o*coeffs[o] for o in range(len(coeffs))]
             xspec = (xspec+1)*1.e4
@@ -436,7 +436,7 @@ class GroupFLT():
         except:
             return False
             
-        xspec = np.arange(0.3, 1.8, 0.05)-1
+        xspec = np.arange(0.3, 2.1, 0.05)-1
         scale_coeffs = out_coeffs[mb.N*mb.fit_bg:mb.N*mb.fit_bg+mb.n_poly]
         yspec = [xspec**o*scale_coeffs[o] for o in range(mb.poly_order+1)]
         if np.abs(scale_coeffs).max() > max_coeff:
@@ -924,9 +924,9 @@ class MultiBeam():
         if line_complexes:
             #line_list = ['Ha+SII', 'OIII+Hb+Ha', 'OII']
             #line_list = ['Ha+SII', 'OIII+Hb', 'OII']
-            line_list = ['Ha+SII+SIII+He', 'OIII+Hb', 'OII+Ne']
+            line_list = ['Ha+NII+SII+SIII+He', 'OIII+Hb', 'OII+Ne']
         else:
-            line_list = ['SIII', 'SII', 'Ha', 'OI', 'OIII', 'Hb', 'OIIIx', 'Hg', 'Hd', 'NeIII', 'OII']
+            line_list = ['SIII', 'SII', 'Ha', 'NII', 'OI', 'OIII', 'Hb', 'OIIIx', 'Hg', 'Hd', 'NeIII', 'OII']
             #line_list = ['Ha', 'SII']
             
         for li in line_list:
@@ -1039,6 +1039,7 @@ class MultiBeam():
         fit_data['A'] = A
         fit_data['coeffs'] = coeffs
         fit_data['chi2'] = chi2
+        fit_data['DoF'] = self.DoF
         fit_data['model_full'] = model_full
         fit_data['coeffs_full'] = coeffs_full
         fit_data['line_flux'] = {}
@@ -1277,6 +1278,7 @@ class MultiBeam():
         fit_data['A'] = A
         fit_data['coeffs'] = coeffs
         fit_data['chi2'] = chi2
+        fit_data['DoF'] = self.DoF
         fit_data['model_full'] = model_full
         fit_data['coeffs_full'] = coeffs_full
         fit_data['line_flux'] = line_flux
@@ -1685,7 +1687,10 @@ class MultiBeam():
                     fwhm = 1200
                 if 'G800L' in self.Ngrism:
                     fwhm = 1400
-   
+                # WFIRST
+                if 'GRISM' in self.Ngrism:
+                    fwhm = 350
+                
         ### Auto generate delta-wavelength of 2D spectrum
         if 'dlam' in pspec2:
             dlam = pspec2['dlam']
@@ -1696,6 +1701,9 @@ class MultiBeam():
                 
                 if 'G800L' in self.Ngrism:
                     dlam = 40
+                
+                if 'GRISM' in self.Ngrism:
+                    dlam = 11
                 
         ### Redshift fit
         zfit_in = copy.copy(pzfit)
@@ -2203,6 +2211,10 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
                          stepsize=10, wcsmap=None)
         
         ### Direct thumbnail
+        if direct_extension == 'REF':
+            if beam.direct['REF'] is None:
+                direct_extension = 'SCI'
+                
         if direct_extension == 'REF':
             thumb = beam.direct['REF']
             thumb_wht = np.cast[np.float32]((thumb != 0)*1)
