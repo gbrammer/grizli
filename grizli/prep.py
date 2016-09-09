@@ -32,8 +32,6 @@ For example,
   $ export %s="${GRIZLI}/%s/" # put this in ~/.bashrc
 """ %(ref_dir, ref_dir, ref_dir, ref_dir)
 
-            raise IOError
-
     ### WFC3
     if not os.getenv('iref').endswith('/'):
         print "Warning: $iref should end with a '/' character [%s]" %(os.getenv('iref'))
@@ -49,7 +47,6 @@ To fetch them, run
    >>> grizli.utils.fetch_default_calibs()
 
 """ %(os.getenv('iref'))
-        raise IOError
     
     ### Sewpy
     try:
@@ -59,7 +56,6 @@ To fetch them, run
 `sewpy` module needed for wrapping SExtractor within python.  
 Get it from https://github.com/megalut/sewpy.
 """
-        raise ImportError
         
 check_status()
  
