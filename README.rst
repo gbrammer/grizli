@@ -44,83 +44,9 @@ of the spectral properties (e.g., continuum shape, redshifts, line
 fluxes) of all objects in a given exposure taken in the slitless
 spectroscopic mode.
 
-Installation
-~~~~~~~~~~~~
-
-``grizli`` has the following Python dependencies, with the software
-versions on the development machine (MacBook Pro 2013, Mac0S 10.10.5) as
-indicated:
-
--  Numpy (1.10.4)
--  Scipy (0.15.1) / (scipy.ndimage, 2.0)
--  (Matplotlib, 1.5.1) - generally needed for making plots, though not
-   much plotting yet in ``grizli``
--  cython (0.20.1) - Needed for compiling the C-accelerated functions in
-   utils\_c
--  `astropy <http://www.astropy.org/>`__ (1.1.1)
--  `scikit-learn <http://scikit-learn.org/stable/install.html>`__
-   (0.14.1) - For the linear least squares solver in the emonstration
-   line-fitting code.
--  `stwcs <http://stsdas.stsci.edu/stsci_python_epydoc/stwcs/index.html>`__
-   (1.2.3.dev49124) - STScI packages for *HST*-specific WCS definitions.
-   This may be deprecated by
-   `astropy.wcs <http://docs.astropy.org/en/stable/wcs/>`__.
--  `drizzlepac <http://drizzlepac.stsci.edu/>`__ (2.1.3.dev49124) -
-   STScI drizzle/blot library
--  `(photutils) <https://photutils.readthedocs.org/en/latest/>`__
-   (0.2.1) - necessary if you want to create photometric catalogs and
-   segmentation images directly within python
--  `(pysynphot) <http://pysynphot.readthedocs.org/en/latest/>`__
-   (0.9.8.2.dev) - Not required, but can be useful for dealing with
-   *HST* filters and sensitivies, as well as handling unit conversions
-   for synthetic spectra
-
-The easiest way to satisfy all of these dependencies is to work within
-the STScI/Gemini "Ureka" Python distribution:
-http://ssb.stsci.edu/ureka/. The current development release of
-``Grizli`` has been tested in Python 2.7 within the "SSBX" Ureka
-distribution, available here: http://ssb.stsci.edu/ssb\_software.shtml.
-
-**Installation update (Apr 29, 2016):** ``grizli`` has been tested within the newly-released `"astroconda" <http://astroconda.readthedocs.io/en/latest/>`__ environment (Mac OSX, Python 2.7), which should now provide the easiest way to obtain and maintain all of the external and STScI dependencies.
-
-**Note on ``ImportError: No module named disperse``:** This message appears if you try to ``import grizli`` in the same directory where you downloaded and compiled the code from the repository.  The error will disappear if you use a different working directory.
-
-.. code:: bash
-
-    ### If you have the Github SSH key enabled
-    git clone git@github.com:gbrammer/grizli.git
-
-    ### Otherwise just use https
-    git clone https://github.com/gbrammer/grizli.git
-
-    ### Build and install
-    cd grizli
-    python setup.py build
-    python setup.py install
-
-``grizli`` requires an environment variable (``$GRIZLI``) set to point
-to a working directory where the grism trace configuration and any
-additional setup files will live. For example, with the BASH shell in
-``${HOME}/.bashrc``:
-
-.. code:: bash
-
-    export GRIZLI="${HOME}/Grizli"
-
-``grizli`` uses the aXe configuration files to define spectral traces
-and sensitivies. For *HST* WFC3/IR grism spectroscopy, these files can
-be downloaded here:
-http://www.stsci.edu/hst/wfc3/analysis/grism\_obs/wfc3-grism-resources.html.
-**Put the downloaded configuration files in** ``${GRIZLI}/CONF``, e.g.,
-
-.. code:: bash
-
-    mkdir $GRIZLI/CONF
-    cd $GRIZLI/CONF
-    wget http://www.stsci.edu/ftp/cdbs/wfc3_aux/WFC3.IR.G102.cal.V4.3.tar.gz
-    tar xzvf WFC3.IR.G102.cal.V4.3.tar.gz
-    wget http://www.stsci.edu/ftp/cdbs/wfc3_aux/WFC3.IR.G141.cal.V4.3.tar.gz
-    tar xzvf WFC3.IR.G141.cal.V4.3.tar.gz
+Installation & Documentation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Installation instructions and documentation (in progress) can be found at http://grizli.readthedocs.io.
 
 Working Examples
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -129,11 +55,18 @@ The following are IPython/jupyter notebooks demonstrating various aspects of the
 
 - `Grizly Demo <https://github.com/gbrammer/grizli/blob/master/examples/Grizli%20Demo.ipynb>`__: Simple interaction with WFC3/IR spectra
 
-- `Basic-Sim <https://github.com/gbrammer/grizli/blob/master/examples/Basic-Sim.ipynb>`__ (5.5.16): Basic simulations based on single WFC3/IR grism and direct exposures
+- `Basic-Sim <https://github.com/gbrammer/grizli/blob/master/examples/Basic-Sim.ipynb>`__ **(5.5.16)**: Basic simulations based on single WFC3/IR grism and direct exposures
 
-- `multimission-simulation <https://github.com/gbrammer/grizli/blob/master/examples/multimission-simulation.ipynb>`__ (5.11.16): 
+- `multimission-simulation <https://github.com/gbrammer/grizli/blob/master/examples/multimission-simulation.ipynb>`__ **(5.11.16)**: 
   
   1. Demonstration of more advanced simulation techniques using deep image mosaics and external catalogs/segmentation images as reference.
   2. Provide a comparison between dispersed spectra from WFC3/G141, *JWST*/NIRISS and *WFIRST*.
- 
+
+- `WFC3IR_Reduction <https://github.com/gbrammer/grizli/blob/master/examples/WFC3IR_Reduction.ipynb>`__ **(9.6.16)**: End-to-end processing of WFC3/IR data.
+
+  1. Pre-processing of files downloaded from MAST (astrometric alignment & background subtraction)
+  2. Field contamination modeling
+  3. Spectral extractions
+  4. Redshift & emission line fits (multiple grisms)
+  
  
