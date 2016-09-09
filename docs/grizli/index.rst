@@ -1,5 +1,5 @@
 
-Reference/API
+Spectrum Analysis
 =============
 
 .. automodapi:: grizli.utils
