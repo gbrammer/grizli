@@ -181,7 +181,7 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
         
         orig_file[0].header['NPOLFILE'] = 'jref$v971826jj_npl.fits' # F814W
         
-    if (head['INSTRUME'] == 'WFC3') & extra_badpix: 
+    if (head['INSTRUME'] == 'WFC3') & (head['DETECTOR'] == 'IR')&extra_badpix: 
         bp = pyfits.open(os.path.join(os.getenv('iref'),
                                       'badpix_spars200_Nov9.fits'))    
         orig_file['DQ'].data |= bp[0].data
