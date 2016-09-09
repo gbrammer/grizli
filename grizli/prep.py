@@ -31,22 +31,22 @@ For example,
   $ mkdir $GRIZLI/%s
   $ export %s="${GRIZLI}/%s/" # put this in ~/.bashrc
 """ %(ref_dir, ref_dir, ref_dir, ref_dir)
-
-    ### WFC3
-    if not os.getenv('iref').endswith('/'):
-        print "Warning: $iref should end with a '/' character [%s]" %(os.getenv('iref'))
+        else:
+            ### WFC3
+            if not os.getenv('iref').endswith('/'):
+                print "Warning: $iref should end with a '/' character [%s]" %(os.getenv('iref'))
         
-    test_file = 'iref$uc72113oi_pfl.fits'.replace('iref$', os.getenv('iref'))
-    if not os.path.exists(test_file):
-        print """
-HST calibrations not found in $iref [%s]
+            test_file = 'iref$uc72113oi_pfl.fits'.replace('iref$', os.getenv('iref'))
+            if not os.path.exists(test_file):
+                print """
+        HST calibrations not found in $iref [%s]
 
-To fetch them, run
+        To fetch them, run
 
-   >>> import grizli.utils
-   >>> grizli.utils.fetch_default_calibs()
+           >>> import grizli.utils
+           >>> grizli.utils.fetch_default_calibs()
 
-""" %(os.getenv('iref'))
+        """ %(os.getenv('iref'))
     
     ### Sewpy
     try:
