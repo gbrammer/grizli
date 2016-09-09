@@ -3,6 +3,8 @@ import os
 import glob
 from collections import OrderedDict
 
+import astropy.io.fits as pyfits
+
 import numpy as np
 
 # character to skip clearing line on STDOUT printing
@@ -1107,13 +1109,20 @@ For example,
     
     for file in files:
         fetch_hst_calib(file)
-
-    os.system('curl -o %s/badpix_spars200_Nov9.fits https://raw.githubusercontent.com/gbrammer/wfc3/master/data/badpix_spars200_Nov9.fits' %(os.getenv('iref')))
+    
+    badpix = '%s/badpix_spars200_Nov9.fits' %(os.getenv('iref'))
+    print 'Extra WFC3/IR bad pixels: %s' %(badpix)
+    if not os.path.exists(badpix):
+        os.system('curl -o %s/badpix_spars200_Nov9.fits https://raw.githubusercontent.com/gbrammer/wfc3/master/data/badpix_spars200_Nov9.fits' %(os.getenv('iref')))
     
 def fetch_config_files():
     """
     Config files needed for Grizli
     """
+    cwd = os.getcwd()
+    
+    print 'Config directory: %s/CONF' %(os.getenv('GRIZLI'))
+    
     os.chdir('%s/CONF' %(os.getenv('GRIZLI')))
     
     tarfiles = ['ftp://ftp.stsci.edu/cdbs/wfc3_aux/WFC3.IR.G102.cal.V4.32.tar.gz',
@@ -1123,8 +1132,173 @@ def fetch_config_files():
     for url in tarfiles:
         file=os.path.basename(url)
         if not os.path.exists(file):
+            print 'Get %s' %(file)
             os.system('curl -o %s %s' %(file, url))
         
         os.system('tar xzvf %s' %(file))
-            
     
+    # ePSF files for fitting point sources
+    files = ['http://www.stsci.edu/hst/wfc3/analysis/PSF/psf_downloads/wfc3_ir/PSFSTD_WFC3IR_%s.fits' %(filter) for filter in ['F105W', 'F125W', 'F140W', 'F160W']]
+    for url in files:
+        file=os.path.basename(url)
+        if not os.path.exists(file):
+            print 'Get %s' %(file)
+            os.system('curl -o %s %s' %(file, url))
+        else:
+            print 'File %s exists' %(file)
+    
+    # Stellar templates
+    print 'Templates directory: %s/templates' %(os.getenv('GRIZLI'))
+    os.chdir('%s/templates' %(os.getenv('GRIZLI')))
+    
+    files = ['http://www.stsci.edu/~brammer/Grizli/Files/stars_pickles.npy',
+             'http://www.stsci.edu/~brammer/Grizli/Files/stars_bpgs.npy']
+    
+    for url in files:
+        file=os.path.basename(url)
+        if not os.path.exists(file):
+            print 'Get %s' %(file)
+            os.system('curl -o %s %s' %(file, url))
+        else:
+            print 'File %s exists' %(file)
+    
+    print 'ln -s stars_pickles.npy stars.npy'
+    os.system('ln -s stars_pickles.npy stars.npy')
+    
+    os.chdir(cwd)
+      
+class EffectivePSF(object):
+    def __init__(self):
+        """Tools for handling WFC3/IR Effective PSF
+
+        See documentation at http://www.stsci.edu/hst/wfc3/analysis/PSF.
+        
+        PSF files stored in $GRIZLI/CONF/
+        
+        Attributes
+        ----------
+        
+        Methods
+        -------
+        
+        """
+        
+        self.load_PSF_data()
+        
+    def load_PSF_data(self):
+        """Load data from PSFSTD files
+        
+        Files should be located in ${GRIZLI}/CONF/ directory.
+        """
+        self.epsf = {}
+        for filter in ['F105W', 'F125W', 'F140W', 'F160W']:
+            file = os.path.join(os.getenv('GRIZLI'), 'CONF',
+                                'PSFSTD_WFC3IR_%s.fits' %(filter))
+            
+            data = pyfits.open(file)[0].data.T
+            data[data < 0] = 0 
+            
+            self.epsf[filter] = data
+        
+    def get_at_position(self, x=507, y=507, filter='F140W'):
+        """Evaluate ePSF at detector coordinates
+        TBD
+        """
+        epsf = self.epsf[filter]
+
+        rx = 1+(x-0)/507.
+        ry = 1+(y-0)/507.
+                
+        # zero index
+        rx -= 1
+        ry -= 1 
+
+        nx = np.clip(int(rx), 0, 2)
+        ny = np.clip(int(ry), 0, 2)
+
+        # print x, y, rx, ry, nx, ny
+
+        fx = rx-nx
+        fy = ry-ny
+
+        psf_xy = (1-fx)*(1-fy)*epsf[:, :, nx+ny*3]
+        psf_xy += fx*(1-fy)*epsf[:, :, (nx+1)+ny*3]
+        psf_xy += (1-fx)*fy*epsf[:, :, nx+(ny+1)*3]
+        psf_xy += fx*fy*epsf[:, :, (nx+1)+(ny+1)*3]
+
+        return psf_xy
+    
+    def eval_ePSF(self, psf_xy, dx, dy):
+        """Evaluate PSF at dx,dy coordinates
+        
+        TBD
+        """
+        # So much faster than scipy.interpolate.griddata!
+        from scipy.ndimage.interpolation import map_coordinates
+        
+        # ePSF only defined to 12.5 pixels
+        ok = (np.abs(dx) < 12.5) & (np.abs(dy) < 12.5)
+        coords = np.array([50+4*dx[ok], 50+4*dy[ok]])
+        
+        # Do the interpolation
+        interp_map = map_coordinates(psf_xy, coords, order=3)
+        
+        # Fill output data
+        out = np.zeros_like(dx, dtype=np.float32)
+        out[ok] = interp_map
+        return out
+    
+    @staticmethod
+    def objective_epsf(params, self, psf_xy, sci, ivar, xp, yp):
+        """Objective function for fitting ePSFs
+        
+        TBD
+        
+        params = [normalization, xc, yc, background]
+        """
+        dx = xp-params[1]
+        dy = yp-params[2]
+
+        ddx = xp-xp.min()
+        ddy = yp-yp.min()
+
+        psf_offset = self.eval_ePSF(psf_xy, dx, dy)*params[0] + params[3] + params[4]*ddx + params[5]*ddy + params[6]*ddx*ddy
+        
+        chi2 = np.sum((sci-psf_offset)**2*ivar)
+        #print params, chi2
+        return chi2
+    
+    def fit_ePSF(self, sci, center=None, origin=[0,0], ivar=1, N=7, 
+                 filter='F140W', tol=1.e-4):
+        """Fit ePSF to input data
+        TBD
+        """
+        from scipy.optimize import minimize
+        
+        sh = sci.shape
+        if center is None:
+            y0, x0 = np.array(sh)/2.
+        else:
+            x0, y0 = center
+        
+        xd = x0+origin[1]
+        yd = y0+origin[0]
+        
+        xc, yc = int(x0), int(y0)
+        
+        psf_xy = self.get_at_position(x=xd, y=yd, filter=filter)
+        
+        yp, xp = np.indices(sh)
+        args = (self, psf_xy, sci[yc-N:yc+N, xc-N:xc+N], ivar[yc-N:yc+N, xc-N:xc+N], xp[yc-N:yc+N, xc-N:xc+N], yp[yc-N:yc+N, xc-N:xc+N])
+        guess = [sci[yc-N:yc+N, xc-N:xc+N].sum()/psf_xy.sum(), x0, y0, 0, 0, 0, 0]
+        
+        out = minimize(self.objective_epsf, guess, args=args, method='Powell',
+                       tol=tol)
+        
+        params = out.x
+        dx = xp-params[1]
+        dy = yp-params[2]
+        output_psf = self.eval_ePSF(psf_xy, dx, dy)*params[0]
+        
+        return output_psf, params
+        

@@ -1091,7 +1091,52 @@ class ImageData(object):
         new_hdu = pyfits.ImageHDU(data=slice_data, header=slice_header)
         
         return new_hdu
-                    
+    
+    def expand_hdu(self, hdu=None, verbose=True):
+        """TBD
+        """
+        ref_wcs = pywcs.WCS(hdu.header)
+        
+        ### Borders of the flt frame
+        naxis = [self.header['NAXIS1'], self.header['NAXIS2']]
+        xflt = [-self.pad, naxis[0]+self.pad, naxis[0]+self.pad, -self.pad]
+        yflt = [-self.pad, -self.pad, naxis[1]+self.pad, naxis[1]+self.pad]
+                
+        raflt, deflt = self.wcs.all_pix2world(xflt, yflt, 0)
+        xref, yref = np.cast[int](ref_wcs.all_world2pix(raflt, deflt, 0))
+        ref_naxis = [hdu.header['NAXIS1'], hdu.header['NAXIS2']]
+                        
+        pad_min = np.minimum(xref.min(), yref.min())
+        pad_max = np.maximum((xref-ref_naxis[0]).max(), (yref-ref_naxis[1]).max())
+        
+        if (pad_min > 0) & (pad_max < 0):
+            # do nothing
+            return hdu
+            
+        pad = np.maximum(np.abs(pad_min), pad_max) + 50
+        if verbose:
+            print '%s / Pad ref HDU with %d pixels' %(self.parent_file, pad)
+            
+        ### Update data array
+        sh = hdu.data.shape
+        new_sh = np.array(sh) + 2*pad
+
+        new_data = np.zeros(new_sh, dtype=hdu.data.dtype)
+        new_data[pad:-pad, pad:-pad] += hdu.data
+            
+        header = hdu.header.copy()
+        
+        ### Padded image dimensions
+        header['NAXIS1'] += 2*pad
+        header['NAXIS2'] += 2*pad
+
+        ### Add padding to WCS
+        header['CRPIX1'] += pad
+        header['CRPIX2'] += pad        
+         
+        new_hdu = pyfits.ImageHDU(data=new_data, header=header)
+        return new_hdu
+        
     def blot_from_hdu(self, hdu=None, segmentation=False, grow=3, 
                       interp='nearest'):
         """Blot a rectified reference image to detector frame
@@ -1648,12 +1693,15 @@ class GrismFLT(object):
                                                        extra=self.pad,
                                                        verbose=True)
                 
+            ### Make sure image big enough
+            seg_hdu = self.direct.expand_hdu(seg_hdu)
             
             if verbose:
                 print '%s / blot segmentation %s' %(self.direct_file, seg_str)
             
-            blotted_seg = self.grism.blot_from_hdu(hdu=seg_hdu,
-                                          segmentation=True, grow=3)
+            blotted_seg = self.grism.blot_from_hdu(hdu=seg_hdu, 
+                                          segmentation=True, grow=3,
+                                          interp='poly5')
             self.seg = blotted_seg
                         
         else:
@@ -2687,7 +2735,100 @@ class BeamCutout(object):
             
         ra, dec = self.direct.wcs.all_pix2world(pix_center, 1)[0]
         return ra, dec
+    
+    def init_epsf(self, center=None, tol=1.e-3, yoff=0.):
+        """Initialize ePSF fitting for point sources
+        TBD
+        """
+        import scipy.sparse
         
+        EPSF = utils.EffectivePSF()
+        ivar = 1/self.direct['ERR']**2
+        ivar[~np.isfinite(ivar)] = 0
+        ivar[self.direct['DQ'] > 0] = 0
+        
+        origin = np.array(self.direct.origin) - np.array(self.direct.pad)
+        self.psf, self.psf_params = EPSF.fit_ePSF(self.direct['SCI'], 
+                                                  ivar=ivar, 
+                                                  center=center, tol=tol,
+                                                  N=12,
+                                                  origin=origin,
+                                                  filter=self.direct.filter)
+        
+        self.psf_resid = self.direct['SCI'] - self.psf
+        
+        # Center in detector coords
+        xd = self.psf_params[1] + self.direct.origin[1] - self.direct.pad
+        yd = self.psf_params[2] + self.direct.origin[0] - self.direct.pad
+
+        # Get wavelength array
+        psf_xy_lam = []
+        for i, filter in enumerate(['F105W', 'F125W', 'F160W']):
+            psf_xy_lam.append(EPSF.get_at_position(x=xd, y=yd, filter=filter))
+        
+        filt_ix = np.arange(3)
+        filt_lam = np.array([1.0551, 1.2486, 1.5369])*1.e4
+        
+        yp_beam, xp_beam = np.indices(self.beam.sh_beam)
+        skip = 1
+        xarr = np.arange(0,self.beam.lam_beam.shape[0], skip)
+        xbeam = np.arange(self.beam.lam_beam.shape[0])*1.
+
+        #yoff = 0 #-0.15
+        psf_model = self.model*0.
+        A_psf = []
+        lam_psf = []
+        
+        lam_offset = self.beam.sh[1]/2 - self.psf_params[1] - 1
+        #lam_offset = 0
+        self.lam_offset = lam_offset
+        
+        for xi in xarr:
+            yi = np.interp(xi, xbeam, self.beam.ytrace_beam)
+            li = np.interp(xi, xbeam, self.beam.lam_beam) #+ lam_offset*np.diff(self.beam.lam_beam)[0]
+            si = np.interp(xi, xbeam, self.beam.sensitivity_beam)
+            dx = xp_beam-self.psf_params[1]-xi
+            dy = yp_beam-self.psf_params[2]-yi+yoff
+
+            # wavelength-dependent
+            ii = np.interp(li, filt_lam, filt_ix, left=-1, right=10)
+            if ii == -1:
+                psf_xy_i = psf_xy_lam[0]*1
+            elif ii == 10:
+                psf_xy_i = psf_xy_lam[2]*1
+            else:
+                ni = int(ii)
+                f = 1-(li-filt_lam[ni])/(filt_lam[ni+1]-filt_lam[ni])
+                psf_xy_i = f*psf_xy_lam[ni] + (1-f)*psf_xy_lam[ni+1]
+
+            psf = EPSF.eval_ePSF(psf_xy_i, dx, dy)*self.psf_params[0]
+            psf *= si*self.direct.photflam/1.e-17 #/psf.sum()
+            
+            A_psf.append(psf.flatten())
+            lam_psf.append(li)
+            psf_model += psf
+            
+        self.A_psf = scipy.sparse.csr_matrix(np.array(A_psf).T)
+        self.lam_psf = np.array(lam_psf)
+                
+    def compute_model_psf(self, spectrum_1d=None, in_place=True):
+        if spectrum_1d is None:
+            model = np.array(self.A_psf.sum(axis=1))
+            model = model.reshape(self.beam.sh_beam)
+        else:
+            coeffs = interp.interp_conserve_c(self.lam_psf, spectrum_1d[0], 
+                                        spectrum_1d[1])
+        
+            model = self.A_psf.dot(coeffs).reshape(self.beam.sh_beam)
+        
+        if in_place:
+            self.model = model
+            return True
+        else:
+            return model
+                  
+    ####### Below here will be cut out after verifying that the demos 
+    ####### can be run with the new fitting tools    
     def init_poly_coeffs(self, poly_order=1, fit_background=True):
         """Initialize arrays for polynomial fits to the spectrum
         
