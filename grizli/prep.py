@@ -135,6 +135,18 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
     ### G141 -> F140W, uc72113oi_pfl.fits
     flat, extra_msg = 1., ''
     filter = utils.get_hst_filter(head)
+    
+    ### Copy calibs for ACS/UVIS files
+    if '_flc' in file:
+        ftpdir = 'https://hst-crds.stsci.edu/unchecked_get/references/hst/'
+        calib_types = ['IDCTAB', 'NPOLFILE', 'D2IMFILE']
+        if filter == 'G800L':
+            calib_types.append('PFLTFILE')
+            
+        utils.fetch_hst_calibs(orig_file.filename(), ftpdir=ftpdir, 
+                               calib_types=calib_types,
+                               verbose=False)
+    
     if filter in ['G102', 'G141']:
         flat_files = {'G102': 'uc72113oi_pfl.fits',
                       'G141': 'uc721143i_pfl.fits'}
@@ -185,9 +197,9 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
         
     if verbose:
         print '%s -> %s %s' %(orig_file.filename(), local_file, extra_msg)
-        
+            
     orig_file.writeto(local_file, clobber=True)
-    
+        
 def apply_persistence_mask(flt_file, path='../Persistence', dq_value=1024,
                            err_threshold=0.6, grow_mask=3, verbose=True):
     """Make a mask for pixels flagged as being affected by persistence
@@ -681,7 +693,7 @@ def get_sdss_catalog(ra=165.86, dec=34.829694, radius=3):
                               photoobj_fields = fields)
                               
     return table
-    
+
 def get_wise_catalog(ra=165.86, dec=34.829694, radius=3):
     """Query for objects in the `AllWISE <http://wise2.ipac.caltech.edu/docs/release/allwise/>`_ source catalog 
     
@@ -709,6 +721,114 @@ def get_wise_catalog(ra=165.86, dec=34.829694, radius=3):
     
     return table
 
+def get_gaia_catalog(ra=165.86, dec=34.829694, radius=3.):
+    """Query GAIA DR1 astrometric catalog
+    
+    Parameters
+    ----------
+    ra, dec : float
+        Center of the query region, decimal degrees
+    
+    radius : float
+        Radius of the query, in arcmin
+    
+    Returns
+    -------
+    table : `~astropy.table.Table`
+        Result of the query
+    
+    """
+    import httplib
+    import urllib
+    #import http.client in Python 3
+    #import urllib.parse in Python 3
+    import time
+    from xml.dom.minidom import parseString
+
+    host = "gea.esac.esa.int"
+    port = 80
+    pathinfo = "/tap-server/tap/async"
+
+
+    #-------------------------------------
+    #Create job
+
+    params = urllib.urlencode({\
+    	"REQUEST": "doQuery", \
+    	"LANG":    "ADQL", \
+    	"FORMAT":  "votable", \
+    	"PHASE":  "RUN", \
+    	"QUERY":   "SELECT TOP 500 * FROM gaiadr1.gaia_source  WHERE CONTAINS(POINT('ICRS',gaiadr1.gaia_source.ra,gaiadr1.gaia_source.dec),CIRCLE('ICRS',%f,%f,%.2f))=1" %(ra, dec, radius/60.)
+    	})
+
+    headers = {\
+    	"Content-type": "application/x-www-form-urlencoded", \
+    	"Accept":       "text/plain" \
+    	}
+
+    connection = httplib.HTTPConnection(host, port)
+    connection.request("POST",pathinfo,params,headers)
+
+    #Status
+    response = connection.getresponse()
+    print "Status: " +str(response.status), "Reason: " + str(response.reason)
+
+    #Server job location (URL)
+    location = response.getheader("location")
+    print "Location: " + location
+
+    #Jobid
+    jobid = location[location.rfind('/')+1:]
+    print "Job id: " + jobid
+
+    connection.close()
+
+    #-------------------------------------
+    #Check job status, wait until finished
+
+    while True:
+    	connection = httplib.HTTPConnection(host, port)
+    	connection.request("GET",pathinfo+"/"+jobid)
+    	response = connection.getresponse()
+    	data = response.read()
+    	#XML response: parse it to obtain the current status
+    	dom = parseString(data)
+    	phaseElement = dom.getElementsByTagName('uws:phase')[0]
+    	phaseValueElement = phaseElement.firstChild
+    	phase = phaseValueElement.toxml()
+    	print "Status: " + phase
+    	#Check finished
+    	if phase == 'COMPLETED': break
+    	#wait and repeat
+    	time.sleep(0.2)
+
+    #print "Data:"
+    #print data
+
+    connection.close()
+
+    #-------------------------------------
+    #Get results
+    connection = httplib.HTTPConnection(host, port)
+    connection.request("GET",pathinfo+"/"+jobid+"/results/result")
+    response = connection.getresponse()
+    data = response.read()
+    outputFileName = "gaia.vot.gz"
+    outputFile = open(outputFileName, "w")
+    outputFile.write(data)
+    outputFile.close()
+    connection.close()
+    print "Data saved in: " + outputFileName
+    
+    try:
+        os.remove('gaia.vot')
+    except:
+        pass
+    
+    os.system('gunzip gaia.vot.gz')
+    table = Table.read('gaia.vot', format='votable')
+    return table
+    
 def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True):
     """Decide what reference astrometric catalog to use
     
@@ -786,7 +906,8 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                                align_tolerance=5, 
                                align_mag_limits = [14,23],
                                column_average=True, 
-                               run_tweak_align=True):
+                               run_tweak_align=True,
+                               skip_direct=False):
     """Full processing of a direct + grism image visit.
     
     TBD
@@ -802,14 +923,15 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
     #################
     
     ### Copy FLT files from ../RAW
-    for file in direct['files']:
-        fresh_flt_file(file)
-        updatewcs.updatewcs(file, verbose=False)
+    if not skip_direct:
+        for file in direct['files']:
+            fresh_flt_file(file)
+            updatewcs.updatewcs(file, verbose=False)
     
-    ### Make ASN
-    asn = asnutil.ASNTable(direct['files'], output=direct['product'])
-    asn.create()
-    asn.write()
+        ### Make ASN
+        asn = asnutil.ASNTable(direct['files'], output=direct['product'])
+        asn.create()
+        asn.write()
     
     ### Initial grism processing
     skip_grism = (grism == {}) | (grism is None) | (len(grism) == 0)
@@ -825,7 +947,7 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
             
     ACS = '_flc' in direct['files'][0]
     if ACS:
-        bits = 0
+        bits = 64+32
         driz_cr_snr = '3.5 3.0'
         driz_cr_scale = '1.2 0.7'
     else:
@@ -833,105 +955,115 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
         driz_cr_snr = '8.0 5.0'
         driz_cr_scale = '2.5 0.7'
     
-    if (not ACS) & run_tweak_align:
-        tweak_align(direct_group=direct, grism_group=grism, max_dist=1.,
-                    key=' ', drizzle=False, threshold=1.5)
+    if not skip_direct:
+        if (not ACS) & run_tweak_align:
+            tweak_align(direct_group=direct, grism_group=grism, max_dist=1.,
+                        key=' ', drizzle=False, threshold=1.5)
       
-    ### Get reference astrometry from SDSS or WISE
-    if radec is None:
-        im = pyfits.open(direct['files'][0])
-        radec, ref_catalog = get_radec_catalog(ra=im[0].header['RA_TARG'],
-                        dec=im[0].header['DEC_TARG'], 
-                        product=direct['product'])
+        ### Get reference astrometry from SDSS or WISE
+        if radec is None:
+            im = pyfits.open(direct['files'][0])
+            radec, ref_catalog = get_radec_catalog(ra=im[0].header['RA_TARG'],
+                            dec=im[0].header['DEC_TARG'], 
+                            product=direct['product'])
         
-        if ref_catalog == 'VISIT':
-            align_mag_limits = [16,23]
-        elif ref_catalog == 'WISE':
-            align_mag_limits = [16,21]
-        elif ref_catalog == 'SDSS':
-            align_mag_limits = [16,21]
-    else:
-        ref_catalog = 'USER'
-    
-    print '%s: First Drizzle' %(direct['product'])
-    
-    ### Clean up
-    for ext in ['.fits', '.log']:
-        file = '%s_wcs.%s' %(direct['product'], ext)
-        if os.path.exists(file):
-            os.remove(file)
-                
-    ### First drizzle
-    if len(direct['files']) > 1:
-        AstroDrizzle(direct['files'], output=direct['product'], clean=True,
-                     context=False, preserve=False, skysub=True,
-                     driz_separate=True, driz_sep_wcs=True, median=True,
-                     blot=True, driz_cr=True, driz_cr_corr=False,
-                     driz_combine=True, final_bits=bits, coeffs=True)        
-    else:
-        AstroDrizzle(direct['files'], output=direct['product'], clean=True,
-                     final_scale=None, final_pixfrac=1, context=False,
-                     final_bits=bits, preserve=False, driz_separate=False,
-                     driz_sep_wcs=False, median=False, blot=False, 
-                     driz_cr=False, driz_cr_corr=False, driz_combine=True) 
-    
-    ### Make catalog & segmentation image
-    cat = make_drz_catalog(root=direct['product'], threshold=2)
-    if radec == 'self':
-        cat['X_WORLD', 'Y_WORLD'][(cat['MAG_AUTO'] > align_mag_limits[0]) & (cat['MAG_AUTO'] < align_mag_limits[1])].write('self', format='ascii.commented_header')
-        
-    clip=20
-    logfile = '%s_wcs.log' %(direct['product'])
-    if os.path.exists(logfile):
-        os.remove(logfile)
-        
-    result = align_drizzled_image(root=direct['product'], 
-                                  mag_limits=align_mag_limits,
-                                  radec=radec, NITER=5, clip=clip, log=True,
-                                  outlier_threshold=align_tolerance)
-                                  
-    orig_wcs, drz_wcs, out_shift, out_rot, out_scale = result
-        
-    ### Update direct FLT WCS
-    for file in direct['files']:
-        updatehdr.updatewcs_with_shift(file, 
-                                  '%s_wcs.fits' %(direct['product']),
-                                  xsh=out_shift[0], ysh=out_shift[1],
-                                  rot=out_rot, scale=out_scale,
-                                  wcsname=ref_catalog, force=True,
-                                  reusename=True, verbose=True,
-                                  sciext='SCI')
-        
-        ### Bug in astrodrizzle? Dies if the FLT files don't have MJD-OBS
-        ### keywords
-        im = pyfits.open(file, mode='update')
-        im[0].header['MJD-OBS'] = im[0].header['EXPSTART']
-        im.flush()
-    
-    ### Second drizzle with aligned wcs, refined CR-rejection params 
-    ### tuned for WFC3/IR
-    if len(direct['files']) == 1:
-        AstroDrizzle(direct['files'], output=direct['product'], clean=True,
-                     final_pixfrac=0.8, context=False, resetbits=4096, 
-                     final_bits=bits, driz_sep_bits=bits, preserve=False, 
-                     driz_cr_snr=driz_cr_snr, driz_cr_scale=driz_cr_scale, 
-                     driz_separate=False, driz_sep_wcs=False, median=False, 
-                     blot=False, driz_cr=False, driz_cr_corr=False) 
-    else:
-        if 'par' in direct['product']:
-            pixfrac=1.0
+            if ref_catalog == 'VISIT':
+                align_mag_limits = [16,23]
+            elif ref_catalog == 'WISE':
+                align_mag_limits = [16,21]
+            elif ref_catalog == 'SDSS':
+                align_mag_limits = [16,21]
         else:
-            pixfrac=0.8
-        
-        AstroDrizzle(direct['files'], output=direct['product'], clean=True, 
-                     final_pixfrac=pixfrac, context=False, resetbits=4096, 
-                     final_bits=bits, driz_sep_bits=bits, preserve=False, 
-                     driz_cr_snr=driz_cr_snr, driz_cr_scale=driz_cr_scale)
+            ref_catalog = 'USER'
     
-    ### Make DRZ catalog again with updated DRZWCS
-    clean_drizzle(direct['product'])
-    cat = make_drz_catalog(root=direct['product'], threshold=1.6)
-    table_to_regions(cat, '%s.cat.reg' %(direct['product']))
+        print '%s: First Drizzle' %(direct['product'])
+    
+        ### Clean up
+        for ext in ['.fits', '.log']:
+            file = '%s_wcs.%s' %(direct['product'], ext)
+            if os.path.exists(file):
+                os.remove(file)
+                
+        ### First drizzle
+        if len(direct['files']) > 1:
+            AstroDrizzle(direct['files'], output=direct['product'],
+                         clean=True, context=False, preserve=False,
+                         skysub=True, driz_separate=True, driz_sep_wcs=True,
+                         median=True, blot=True, driz_cr=True,
+                         driz_cr_corr=False, driz_combine=True,
+                         final_bits=bits, coeffs=True)
+        else:
+            AstroDrizzle(direct['files'], output=direct['product'], 
+                         clean=True, final_scale=None, final_pixfrac=1,
+                         context=False, final_bits=bits, preserve=False,
+                         driz_separate=False, driz_sep_wcs=False,
+                         median=False, blot=False, driz_cr=False,
+                         driz_cr_corr=False, driz_combine=True)
+    
+        ### Make catalog & segmentation image
+        cat = make_drz_catalog(root=direct['product'], threshold=2)
+        if radec == 'self':
+            okmag = ((cat['MAG_AUTO'] > align_mag_limits[0]) & 
+                    (cat['MAG_AUTO'] < align_mag_limits[1]))
+                    
+            cat['X_WORLD', 'Y_WORLD'][okmag].write('self',
+                                        format='ascii.commented_header')
+        
+        clip=20
+        logfile = '%s_wcs.log' %(direct['product'])
+        if os.path.exists(logfile):
+            os.remove(logfile)
+        
+        result = align_drizzled_image(root=direct['product'], 
+                                      mag_limits=align_mag_limits,
+                                      radec=radec, NITER=5, clip=clip,
+                                      log=True,
+                                      outlier_threshold=align_tolerance)
+                                  
+        orig_wcs, drz_wcs, out_shift, out_rot, out_scale = result
+        
+        ### Update direct FLT WCS
+        for file in direct['files']:
+            updatehdr.updatewcs_with_shift(file, 
+                                      '%s_wcs.fits' %(direct['product']),
+                                      xsh=out_shift[0], ysh=out_shift[1],
+                                      rot=out_rot, scale=out_scale,
+                                      wcsname=ref_catalog, force=True,
+                                      reusename=True, verbose=True,
+                                      sciext='SCI')
+        
+            ### Bug in astrodrizzle? Dies if the FLT files don't have MJD-OBS
+            ### keywords
+            im = pyfits.open(file, mode='update')
+            im[0].header['MJD-OBS'] = im[0].header['EXPSTART']
+            im.flush()
+    
+        ### Second drizzle with aligned wcs, refined CR-rejection params 
+        ### tuned for WFC3/IR
+        if len(direct['files']) == 1:
+            AstroDrizzle(direct['files'], output=direct['product'],
+                         clean=True, final_pixfrac=0.8, context=False,
+                         resetbits=4096, final_bits=bits, driz_sep_bits=bits,
+                         preserve=False, driz_cr_snr=driz_cr_snr,
+                         driz_cr_scale=driz_cr_scale, driz_separate=False,
+                         driz_sep_wcs=False, median=False, blot=False,
+                         driz_cr=False, driz_cr_corr=False)
+        else:
+            if 'par' in direct['product']:
+                pixfrac=1.0
+            else:
+                pixfrac=0.8
+        
+            AstroDrizzle(direct['files'], output=direct['product'], 
+                         clean=True, final_pixfrac=pixfrac, context=False,
+                         resetbits=4096, final_bits=bits, driz_sep_bits=bits,
+                         preserve=False, driz_cr_snr=driz_cr_snr,
+                         driz_cr_scale=driz_cr_scale)
+    
+        ### Make DRZ catalog again with updated DRZWCS
+        clean_drizzle(direct['product'])
+        cat = make_drz_catalog(root=direct['product'], threshold=1.6)
+        table_to_regions(cat, '%s.cat.reg' %(direct['product']))
     
     ################# 
     ##########  Grism image processing
@@ -941,23 +1073,47 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
         return True
     
     ### Match grism WCS to the direct images
-    match_direct_grism_wcs(direct=direct, grism=grism, get_fresh_flt=False,
-                           run_drizzle=True)
+    match_direct_grism_wcs(direct=direct, grism=grism, get_fresh_flt=False)
+    
+    ### First drizzle to flat CRs
+    AstroDrizzle(grism['files'], output=grism['product'], clean=True,
+                 context=False, preserve=False, skysub=True,
+                 driz_separate=True, driz_sep_wcs=True, median=True, 
+                 blot=True, driz_cr=True, driz_cr_corr=True, 
+                 driz_cr_snr=driz_cr_snr, driz_cr_scale=driz_cr_scale, 
+                 driz_combine=True, final_bits=bits, coeffs=True, 
+                 resetbits=4096)        
         
     ### Subtract grism sky
     status = visit_grism_sky(grism=grism, apply=True,
                           column_average=column_average, verbose=True, ext=1)
     
-    ### Run on second chip (also for UVIS/G280)
+    # Run on second chip (also for UVIS/G280)
     if ACS:
         visit_grism_sky(grism=grism, apply=True,
                         column_average=column_average, verbose=True, ext=2)
         
+        # Add back in some pedestal or CR rejection fails for ACS
+        for file in grism['files']:
+            flt = pyfits.open(file, mode='update')
+            h = flt[0].header
+            flat_sky = h['GSKY101']*h['EXPTIME']
+            
+            # Use same pedestal for both chips for skysub
+            for ext in [1,2]:
+                flt['SCI',ext].data += flat_sky
+            
+            flt.flush()
+            
+            
     ### Redrizzle with new background subtraction
-    skyfile = '/tmp/%s.skyfile' %(grism['product'])
-    fp = open(skyfile,'w')
-    fp.writelines(['%s 0.0\n' %(f) for f in grism['files']])
-    fp.close()
+    if ACS:
+        skyfile=''
+    else:
+        skyfile = '/tmp/%s.skyfile' %(grism['product'])
+        fp = open(skyfile,'w')
+        fp.writelines(['%s 0.0\n' %(f) for f in grism['files']])
+        fp.close()
     
     if 'par' in grism['product']:
         pixfrac=1.0
@@ -968,6 +1124,7 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                  context=False, preserve=False, skysub=True, skyfile=skyfile,
                  driz_separate=True, driz_sep_wcs=True, median=True, 
                  blot=True, driz_cr=True, driz_cr_corr=True, 
+                 driz_cr_snr=driz_cr_snr, driz_cr_scale=driz_cr_scale, 
                  driz_combine=True, driz_sep_bits=bits, final_bits=bits,
                  coeffs=True, resetbits=4096, final_pixfrac=pixfrac)        
     
@@ -1179,7 +1336,7 @@ def apply_tweak_shifts(wcs_ref, shift_dict, grism_matches={}, verbose=True):
                 im.flush()
                 
 def find_direct_grism_pairs(direct={}, grism={}, check_pixel=[507, 507],
-                            toler=0.1, key='A'):
+                            toler=0.1, key='A', same_visit=True):
     """
     For each grism exposure, check if there is a direct exposure
     that matches the WCS to within `toler` pixels.  If so, copy that WCS 
@@ -1210,6 +1367,9 @@ def find_direct_grism_pairs(direct={}, grism={}, check_pixel=[507, 507],
         #print file
         delta_min = 10
         for d in direct['files']:
+            if (os.path.basename(d)[:6] != os.path.basename(file)[:6]) & same_visit:
+                continue
+                
             pix = grism_wcs[file].all_world2pix(direct_rd[d], 1)
             dx = pix-np.array(check_pixel)
             delta = np.sqrt(np.sum(dx**2))
@@ -1292,15 +1452,7 @@ def match_direct_grism_wcs(direct={}, grism={}, get_fresh_flt=True,
         im = pyfits.open(file, mode='update')
         im[0].header['MJD-OBS'] = im[0].header['EXPSTART']
         im.flush()
-    
-    if run_drizzle:
-        AstroDrizzle(grism['files'], output=grism['product'], clean=True,
-                     context=False, preserve=False, skysub=True,
-                     driz_separate=True, driz_sep_wcs=True, median=True, 
-                     blot=True, driz_cr=True, driz_cr_corr=True, 
-                     driz_combine=True, final_bits=576, coeffs=True, 
-                     resetbits=4096)        
-        
+            
 def align_multiple_drizzled(mag_limits=[16,23]):
     """TBD
     """
@@ -1401,8 +1553,9 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
         ACS = False
     elif grism_element == 'G800L':
         bg_fixed = ['ACS.WFC.CHIP%d.msky.1.smooth.fits' %({1:2,2:1}[ext])]
+        bg_vary = ['ACS.WFC.flat.fits']
         #bg_fixed = ['ACS.WFC.CHIP%d.msky.1.fits' %({1:2,2:1}[ext])]
-        bg_vary = []
+        #bg_fixed = []
         ACS = True
         
         flat_files = {'G800L':'n6u12592j_pfl.fits'} # F814W
@@ -1447,10 +1600,15 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
     exptime = np.ones(Nexp)
     
     ### Build combined arrays
+    if ACS:
+        bits = 64+32
+    else:
+        bits = 576
     
     for i in range(Nexp):
         flt = pyfits.open(grism['files'][i])
-        dq_mask = flt['DQ',ext].data == 0
+        dq = utils.unset_dq_bits(flt['DQ',ext].data, okbits=bits)
+        dq_mask = dq == 0
         
         ## Data
         data[i*Npix:(i+1)*Npix] = (flt['SCI',ext].data*dq_mask).flatten()
@@ -1541,25 +1699,24 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
             
             flt = pyfits.open(file, mode='update')
             flt['SCI',ext].data -= sky[j,:].reshape(sh)*exptime[j]
-        
-            flt[0].header['GSKYCOL%d' %(ext)] = (False, 
-                                                 'Subtract column average')
-            flt[0].header['GSKYN%d' %(ext)] = (Nfix+Nvary, 
-                                               'Number of sky images')
-            flt[0].header['GSKY%d01' %(ext)] = (coeffs[0], 
+                
+            header = flt[0].header
+            header['GSKYCOL%d' %(ext)] = (False, 'Subtract column average')
+            header['GSKYN%d' %(ext)] = (Nfix+Nvary, 'Number of sky images')
+            header['GSKY%d01' %(ext)] = (coeffs[0], 
                                         'Sky image %s (fixed)' %(bg_fixed[0]))
             
-            flt[0].header['GSKY%d01F' %(ext)] = (bg_fixed[0], 
-                                                  'Sky image (fixed)')
+            header['GSKY%d01F' %(ext)] = (bg_fixed[0], 'Sky image (fixed)')
             
+                
             for v in range(Nvary):
                 k = Nfix + j*Nvary + v
                 #print coeffs[k]
-                flt[0].header['GSKY%d%02d' %(ext, v+Nfix+1)] = (coeffs[k], 
+                header['GSKY%d%02d' %(ext, v+Nfix+1)] = (coeffs[k], 
                                      'Sky image %s (variable)' %(bg_vary[v]))
                 
-                flt[0].header['GSKY%d%02dF' %(ext, v+Nfix+1)] = (bg_vary[v], 
-                                     'Sky image (variable)')
+                header['GSKY%d%02dF' %(ext, v+Nfix+1)] = (bg_vary[v], 
+                                                      'Sky image (variable)')
                 
             flt.flush()
     
