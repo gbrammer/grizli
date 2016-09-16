@@ -1294,6 +1294,8 @@ class ImageData(object):
         
         slice_obj.ref_photflam = self.ref_photflam
         slice_obj.ref_photplam = self.ref_photplam
+        slice_obj.ref_filter = self.ref_filter
+            
         slice_obj.ABZP = self.ABZP
         slice_obj.thumb_extension = self.thumb_extension
         
@@ -1544,8 +1546,13 @@ class GrismFLT(object):
         self.model = np.zeros_like(self.direct.data['SCI'])
         
         ### Grism configuration
+        if 'DFILTER' in self.grism.header:
+            direct_filter = self.grism.header['DFILTER']
+        else:
+            direct_filter = self.direct.filter
+            
         self.conf_file = grismconf.get_config_filename(self.grism.instrument,
-                                                       self.direct.filter,
+                                                       direct_filter,
                                                        self.grism.filter,
                                                        sci_extn)
         
@@ -2524,9 +2531,14 @@ class BeamCutout(object):
         
         h0 = hdu[0].header
         
+        if 'DFILTER' in self.grism.header:
+            direct_filter = self.grism.header['DFILTER']
+        else:
+            direct_filter = self.direct.filter
+        
         if conf is None:
             conf_file = grismconf.get_config_filename(self.direct.instrument,
-                                                      self.direct.filter,
+                                                      direct_filter,
                                                       self.grism.filter)
         
             conf = grismconf.load_grism_config(conf_file)
@@ -2812,7 +2824,7 @@ class BeamCutout(object):
         self.A_psf = scipy.sparse.csr_matrix(np.array(A_psf).T)
         self.lam_psf = np.array(lam_psf)
                 
-    def compute_model_psf(self, spectrum_1d=None, in_place=True):
+    def compute_model_psf(self, id=None, spectrum_1d=None, in_place=True):
         if spectrum_1d is None:
             model = np.array(self.A_psf.sum(axis=1))
             model = model.reshape(self.beam.sh_beam)
@@ -2826,7 +2838,7 @@ class BeamCutout(object):
             self.model = model
             return True
         else:
-            return model
+            return model.flatten()
                   
     ####### Below here will be cut out after verifying that the demos 
     ####### can be run with the new fitting tools    

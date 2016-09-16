@@ -573,8 +573,15 @@ def table_to_regions(table, output='ds9.reg'):
         rc, dc = 'X_WORLD', 'Y_WORLD'
     else:
         rc, dc = 'ra', 'dec'
+    
+    ### GAIA
+    if 'solution_id' in table.colnames:
+        e = np.sqrt(table['ra_error']**2+table['dec_error']**2)/1000.
+        e = np.maximum(e, 0.1)
+    else:
+        e  = np.ones(len(table))*0.5
         
-    lines = ['circle(%.6f, %.6f, 0.5")\n' %(table[rc][i], table[dc][i])
+    lines = ['circle(%.7f, %.7f, %.3f")\n' %(table[rc][i], table[dc][i], e[i])
                                               for i in range(len(table))]
 
     fp.writelines(lines)
@@ -865,6 +872,8 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True):
     
     if sdss is None:
         sdss = []
+    
+    has_catalog = False
             
     if len(sdss) > 5:
         table_to_regions(sdss, output='%s_sdss.reg' %(product))
@@ -872,7 +881,27 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True):
                                 format='ascii.commented_header')
         radec = '%s_sdss.radec' %(product)
         ref_catalog = 'SDSS'
-    else:
+        has_catalog = True
+    
+    ### GAIA
+    if not has_catalog:
+        try:
+            gaia = get_gaia_catalog(ra=ra, dec=dec, radius=2)
+            if len(gaia) < 2:
+                raise ValueError
+            table_to_regions(gaia, output='%s_gaia.reg' %(product))
+            gaia['ra','dec'].write('%s_gaia.radec' %(product),
+                                    format='ascii.commented_header')
+
+            radec = '%s_gaia.radec' %(product)
+            ref_catalog = 'GAIA'
+            has_catalog = True
+        except:
+            print 'GAIA query failed'
+            has_catalog = False
+    
+    ### WISE
+    if not has_catalog:    
         try:
             wise = get_wise_catalog(ra=ra, dec=dec, radius=2)
             
@@ -973,6 +1002,8 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                 align_mag_limits = [16,21]
             elif ref_catalog == 'SDSS':
                 align_mag_limits = [16,21]
+            elif ref_catalog == 'WISE':
+                align_mag_limits = [15,20]
         else:
             ref_catalog = 'USER'
     
@@ -1071,7 +1102,7 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
     
     if skip_grism:       
         return True
-    
+        
     ### Match grism WCS to the direct images
     match_direct_grism_wcs(direct=direct, grism=grism, get_fresh_flt=False)
     
@@ -1130,8 +1161,38 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
     
     clean_drizzle(grism['product'])
     
+    ### Add direct filter to grism FLT headers
+    set_grism_dfilter(direct, grism)
+    
     return True
 
+def set_grism_dfilter(direct, grism):
+    """Set direct imaging filter for grism exposures
+    
+    Parameters
+    ----------
+    direct, grism : dict
+        
+    Returns
+    -------
+    Nothing
+    
+    """
+    d_im = pyfits.open(direct['files'][0])
+    direct_filter = utils.get_hst_filter(d_im[0].header)
+    for file in grism['files']:
+        if '_flc' in file:
+            ext = [1,2]
+        else:
+            ext = [1]
+            
+        print 'DFILTER: %s %s' %(file, direct_filter)
+        flt = pyfits.open(file, mode='update')
+        for e in ext:
+            flt['SCI',e].header['DFILTER'] = (direct_filter, 
+                                              'Direct imaging filter')
+        flt.flush()
+    
 def tweak_align(direct_group={}, grism_group={}, max_dist=1., key=' ', 
                 threshold=3, drizzle=False):
     """
