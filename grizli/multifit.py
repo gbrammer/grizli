@@ -174,7 +174,48 @@ def _loadFLT(grism_file, sci_extn, direct_file, pad, ref_file,
     
     return flt #, out_cat
     
+def _fit_at_z(self, zgrid, i, templates, fitter, fit_background, poly_order):
+    """
+    For parallel processing
+    """
+    # self, z=0., templates={}, fitter='nnls',
+    #              fit_background=True, poly_order=0
+    print i, zgrid[i]
+    out = self.fit_at_z(z=zgrid[i], templates=templates,
+                        fitter=fitter, poly_order=poly_order,
+                        fit_background=fit_background)
+    
+    data = {'out':out, 'i':i}
+    return data
+    #A, coeffs[i,:], chi2[i], model_2d = out
+    
+def test_parallel():
+    
+    zgrid = np.linspace(1.1,1.3,10)
+    templates = mb.load_templates(fwhm=800)
+    fitter = 'nnls'
+    fit_background = True
+    poly_order = 0
+    
+    self.FLTs = []
+    t0_pool = time.time()
 
+    pool = mp.Pool(processes=4)
+    results = [pool.apply_async(_fit_at_z, (mb, zgrid, i, templates, fitter, fit_background, poly_order)) for i in xrange(len(zgrid))]
+
+    pool.close()
+    pool.join()
+    
+    chi = zgrid*0.
+    
+    for res in results:
+        data = res.get(timeout=1)
+        A, coeffs, chi[data['i']], model_2d = data['out']
+        #flt_i.catalog = cat_i
+
+    t1_pool = time.time()
+    
+    
 def _compute_model(i, flt, fit_info, store):
     """TBD
     """
@@ -451,7 +492,7 @@ class GroupFLT():
                       header=flt.grism.header)
         
         if verbose:
-            print '%d mag=%.2f %s' %(id, mag, scale_coeffs)
+            print '%6d mag=%6.2f %s' %(id, mag, scale_coeffs)
             
         return True
         #m2d = mb.reshape_flat(modelf)
@@ -618,20 +659,20 @@ class MultiBeam():
         self.N = len(beams)
         self.group_name = group_name
 
-        self.Ngrism = {}
-        for i in range(self.N):
-            grism = beams[i].grism.filter
-            if grism in self.Ngrism:
-                self.Ngrism[grism] += 1
-            else:
-                self.Ngrism[grism] = 1
-                
         if hasattr(beams[0], 'lower'):
             ### `beams` is list of strings
             self.load_beam_fits(beams)            
         else:
             self.beams = beams
-        
+
+        self.Ngrism = {}
+        for i in range(self.N):
+            grism = self.beams[i].grism.filter
+            if grism in self.Ngrism:
+                self.Ngrism[grism] += 1
+            else:
+                self.Ngrism[grism] = 1
+                        
         self.id = self.beams[0].id
         
         self.poly_order = None
@@ -652,7 +693,8 @@ class MultiBeam():
                                        
         self.DoF = self.fit_mask.sum()
         self.ivarf = np.hstack([b.ivarf for b in self.beams])
-        self.fit_mask &= self.ivarf >= 0
+        self.ivarf[~np.isfinite(self.ivarf)] = 0
+        self.fit_mask &= (self.ivarf >= 0) 
         
         self.scif = np.hstack([b.scif for b in self.beams])
         self.contamf = np.hstack([b.contam.flatten() for b in self.beams])
@@ -691,11 +733,14 @@ class MultiBeam():
             
         return outfiles
         
-    def load_beam_fits(self, beam_list, conf=None):
+    def load_beam_fits(self, beam_list, conf=None, verbose=True):
         """TBD
         """
         self.beams = []
         for file in beam_list:
+            if verbose:
+                print file
+            
             beam = model.BeamCutout(fits_file=file, conf=conf)
             self.beams.append(beam)
 
@@ -926,7 +971,7 @@ class MultiBeam():
             #line_list = ['Ha+SII', 'OIII+Hb', 'OII']
             line_list = ['Ha+NII+SII+SIII+He', 'OIII+Hb', 'OII+Ne']
         else:
-            line_list = ['SIII', 'SII', 'Ha', 'NII', 'OI', 'OIII', 'Hb', 'OIIIx', 'Hg', 'Hd', 'NeIII', 'OII']
+            line_list = ['SIII', 'SII', 'Ha', 'OI', 'OIII', 'Hb', 'OIIIx', 'Hg', 'Hd', 'NeIII', 'OII']
             #line_list = ['Ha', 'SII']
             
         for li in line_list:
