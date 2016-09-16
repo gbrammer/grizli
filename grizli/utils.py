@@ -90,13 +90,13 @@ def radec_to_targname(ra=0, dec=0, header=None):
     
     coo = astropy.coordinates.SkyCoord(ra=ra*u.deg, dec=dec*u.deg)
     
-    cstr = re.split('[hmsd.]', coo.to_string('hmsdms'))
-    targname = ('j%s%s' %(''.join(cstr[0:3]), ''.join(cstr[3:6])))
+    cstr = re.split('[hmsd.]', coo.to_string('hmsdms', precision=2))
+    targname = ('j%s%s' %(''.join(cstr[0:3]), ''.join(cstr[4:7])))
     targname = targname.replace(' ', '')
     
     return targname
     
-def parse_flt_files(files=[], info=None, uniquename=False, 
+def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
                     translate = {'AEGIS-':'aegis-', 
                                  'COSMOS-':'cosmos-', 
                                  'GNGRISM':'goodsn-', 
@@ -114,7 +114,30 @@ def parse_flt_files(files=[], info=None, uniquename=False,
     uniquename : bool
         If True, then split everything by program ID and visit name.  If 
         False, then just group by targname/filter/pa_v3.
+    
+    use_visit : bool
+        For parallel observations with `targname='ANY'`, use the filename 
+        up to the visit ID as the target name.  For example:
         
+            >>> flc = 'jbhj64d8q_flc.fits'
+            >>> visit_targname = flc[:6]
+            >>> print visit_targname
+            jbhj64
+        
+        If False, generate a targname for parallel observations based on the
+        pointing coordinates using `radec_to_targname`.  Use this keyword
+        for dithered parallels like 3D-HST / GLASS but set to False for
+        undithered parallels like WISP.  Should also generally be used with
+        `uniquename=False` otherwise generates names that are a bit redundant:
+            
+            +--------------+---------------------------+
+            | `uniquename` | Output Targname           |
+            +==============+===========================+
+            |     True     | jbhj45-bhj-45-180.0-F814W |
+            +--------------+---------------------------+
+            |     False    | jbhj45-180.0-F814W        |
+            +--------------+---------------------------+
+            
     translate : dict
         Translation dictionary to modify TARGNAME keywords to some other 
         value.  Used like:
@@ -181,7 +204,10 @@ def parse_flt_files(files=[], info=None, uniquename=False,
     for i in range(len(info)):
         #### Replace ANY targets with JRhRmRs-DdDmDs
         if info['targname'][i] == 'ANY':            
-            new_targname = 'par-'+radec_to_targname(ra=info['ra_targ'][i],
+            if use_visit:
+                new_targname=info['file'][i][:6]
+            else:
+                new_targname = 'par-'+radec_to_targname(ra=info['ra_targ'][i],
                                              dec=info['dec_targ'][i])
                                               
             target_list.append(new_targname.lower())
@@ -1033,7 +1059,7 @@ def make_wcsheader(ra=40.07293, dec=-1.6137748, size=2, pixscale=0.1, get_hdu=Fa
     else:
         return hout, wcs_out
     
-def fetch_hst_calib(file='iref$uc72113oi_pfl.fits', ftpdir='https://hst-crds.stsci.edu/unchecked_get/references/hst/'):
+def fetch_hst_calib(file='iref$uc72113oi_pfl.fits',  ftpdir='https://hst-crds.stsci.edu/unchecked_get/references/hst/', verbose=True):
     """
     TBD
     """
@@ -1045,7 +1071,8 @@ def fetch_hst_calib(file='iref$uc72113oi_pfl.fits', ftpdir='https://hst-crds.sts
     if not os.path.exists(iref_file):
         os.system('curl -o %s %s/%s' %(iref_file, ftpdir, cimg))
     else:
-        print '%s exists' %(iref_file)
+        if verbose:
+            print '%s exists' %(iref_file)
         
 def fetch_hst_calibs(flt_file, ftpdir='https://hst-crds.stsci.edu/unchecked_get/references/hst/', calib_types=['BPIXTAB', 'CCDTAB', 'OSCNTAB', 'CRREJTAB', 'DARKFILE', 'NLINFILE', 'PFLTFILE', 'IMPHTTAB', 'IDCTAB', 'NPOLFILE'], verbose=True):
     """
@@ -1076,7 +1103,7 @@ def fetch_hst_calibs(flt_file, ftpdir='https://hst-crds.stsci.edu/unchecked_get/
         if im[0].header[ctype] == 'N/A':
             continue
         
-        fetch_hst_calib(im[0].header[ctype], ftpdir=ftpdir)
+        fetch_hst_calib(im[0].header[ctype], ftpdir=ftpdir, verbose=verbose)
             
     return True
     
@@ -1115,7 +1142,7 @@ For example,
     if not os.path.exists(badpix):
         os.system('curl -o %s/badpix_spars200_Nov9.fits https://raw.githubusercontent.com/gbrammer/wfc3/master/data/badpix_spars200_Nov9.fits' %(os.getenv('iref')))
     
-def fetch_config_files():
+def fetch_config_files(ACS=False):
     """
     Config files needed for Grizli
     """
@@ -1128,6 +1155,10 @@ def fetch_config_files():
     tarfiles = ['ftp://ftp.stsci.edu/cdbs/wfc3_aux/WFC3.IR.G102.cal.V4.32.tar.gz',
  'ftp://ftp.stsci.edu/cdbs/wfc3_aux/WFC3.IR.G141.cal.V4.32.tar.gz',
  'ftp://ftp.stsci.edu/cdbs/wfc3_aux/grism_master_sky_v0.5.tar.gz']
+    
+    if ACS:
+        tarfiles.append('http://www.stsci.edu/~brammer/Grizli/Files/' + 
+                        'ACS.WFC.sky.tar.gz')
     
     for url in tarfiles:
         file=os.path.basename(url)
@@ -1153,7 +1184,7 @@ def fetch_config_files():
     
     files = ['http://www.stsci.edu/~brammer/Grizli/Files/stars_pickles.npy',
              'http://www.stsci.edu/~brammer/Grizli/Files/stars_bpgs.npy']
-    
+            
     for url in files:
         file=os.path.basename(url)
         if not os.path.exists(file):
