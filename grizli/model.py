@@ -2547,7 +2547,8 @@ class BeamCutout(object):
         
         self.grism.parent_file = h0['GPARENT']
         self.direct.parent_file = h0['DPARENT']
-    
+        self.id = h0['ID']
+        
     def write_fits(self, root='beam_', clobber=True):
         """Write attributes and data to FITS file
         
