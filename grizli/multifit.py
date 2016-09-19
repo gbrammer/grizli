@@ -637,7 +637,7 @@ class GroupFLT():
         return outsci, outwht
         
 class MultiBeam():
-    def __init__(self, beams, group_name='group', fcontam=0.):
+    def __init__(self, beams, group_name='group', fcontam=0., psf=False):
         """Tools for dealing with multiple `~.model.BeamCutout` instances 
         
         Parameters
@@ -902,7 +902,8 @@ class MultiBeam():
         
         return A, out_coeffs, chi2, modelf
     
-    def load_templates(self, fwhm=400, line_complexes=True, stars=False):
+    def load_templates(self, fwhm=400, line_complexes=True, stars=False,
+                       full_line_list=['SIII', 'SII', 'Ha', 'OI', 'OIII', 'Hb', 'OIIIx', 'Hg', 'Hd', 'NeIII', 'OII']):
         """TBD
         """
         
@@ -971,7 +972,8 @@ class MultiBeam():
             #line_list = ['Ha+SII', 'OIII+Hb', 'OII']
             line_list = ['Ha+NII+SII+SIII+He', 'OIII+Hb', 'OII+Ne']
         else:
-            line_list = ['SIII', 'SII', 'Ha', 'OI', 'OIII', 'Hb', 'OIIIx', 'Hg', 'Hd', 'NeIII', 'OII']
+            line_list = full_line_list
+            
             #line_list = ['Ha', 'SII']
             
         for li in line_list:
