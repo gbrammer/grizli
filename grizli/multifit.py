@@ -1456,7 +1456,8 @@ class MultiBeam():
               'G102':(0.0, 0.6196078431372549, 0.45098039215686275),
               'G141':(0.8352941176470589, 0.3686274509803922, 0.0),
               'none':(0.8, 0.4745098039215686, 0.6549019607843137),
-              'GRISM':'k'}
+              'GRISM':'k',
+              'G280':'purple'}
         
         for grism in grisms:                        
             if self.Ngrism[grism] > 1:
@@ -1481,7 +1482,8 @@ class MultiBeam():
         limits = {'G800L':[0.545, 1.02],
                    'G102':[0.77, 1.18],
                    'G141':[1.06, 1.73],
-                   'GRISM':[0.98, 1.98]}
+                   'GRISM':[0.98, 1.98],
+                   'G280':[0.2,0.4]}
         
         for g in limits:
             if g in grisms:
@@ -1510,6 +1512,7 @@ class MultiBeam():
         ### xlimits        
         xmin, xmax = 1.e5, 0
         limits = {'G800L':[0.545, 1.02],
+                  'G280':[0.2,0.4],
                    'G102':[0.77, 1.18],
                    'G141':[1.06, 1.73],
                    'GRISM':[0.98, 1.98]}
@@ -1734,6 +1737,9 @@ class MultiBeam():
                     fwhm = 1200
                 if 'G800L' in self.Ngrism:
                     fwhm = 1400
+                #
+                if 'G280' in self.Ngrism:
+                    fwhm = 1500
                 # WFIRST
                 if 'GRISM' in self.Ngrism:
                     fwhm = 350
@@ -1748,6 +1754,9 @@ class MultiBeam():
                 
                 if 'G800L' in self.Ngrism:
                     dlam = 40
+                
+                if 'G280' in self.Ngrism:
+                    dlam = 18
                 
                 if 'GRISM' in self.Ngrism:
                     dlam = 11
@@ -1861,7 +1870,7 @@ class MultiBeam():
         data = '%7d %.6f %.6f %.5f' %(self.id, self.ra, self.dec,
                                       fit['zbest'])
         
-        for grism in ['G800L', 'G102', 'G141', 'GRISM']:
+        for grism in ['G800L', 'G280', 'G102', 'G141', 'GRISM']:
             label += ' N%s' %(grism)
             if grism in self.Ngrism:
                 data += ' %2d' %(self.Ngrism[grism])

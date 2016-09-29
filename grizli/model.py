@@ -34,7 +34,8 @@ photflam_list = {'F098M': 6.0501324882418389e-20,
             'F814W': 7.0767633156044843e-20, 
             'VISTAH':1.9275637653833683e-20*0.95,
             'GRISM': 1.e-20,
-            'G800L': 1.}
+            'G800L': 1.,
+            'G280':  1.}
  
 ### Filter pivot wavelengths
 photplam_list = {'F098M': 9864.722728110915, 
@@ -49,7 +50,8 @@ photplam_list = {'F098M': 9864.722728110915,
             'F814W': 8058.784799323767,
             'VISTAH':1.6433e+04,
             'GRISM': 1.6e4,
-            'G800L': 7.4737026e3}
+            'G800L': 7.4737026e3,
+            'G280': 3651.}
 
 # character to skip clearing line on STDOUT printing
 no_newline = '\x1b[1A\x1b[1M' 
@@ -221,7 +223,9 @@ class GrismDisperser(object):
         
         xoff = 0.
         
-        xoff = -0.5 # tested for WFC3/IR
+        if 'G1' in self.conf.conf_file:
+            xoff = -0.5 # tested for WFC3/IR
+        
         #xoff = 0. # suggested by ACS
         #xoff = -2.5 # test
         
@@ -1491,8 +1495,12 @@ class GrismFLT(object):
             self.grism = ImageData(hdulist=grism_im, sci_extn=sci_extn,
                                    wcs=wcs)
         else:
-            self.grism = None
-            
+            if (grism_file is None) | (grism_file == ''):
+                self.grism = None
+            else:
+                print '\nFile not found: %s!\n' %(grism_file)
+                raise IOError
+                
         self.direct_file = direct_file
         if os.path.exists(direct_file):
             direct_im = pyfits.open(direct_file)
@@ -1505,8 +1513,12 @@ class GrismFLT(object):
             self.direct = ImageData(hdulist=direct_im, sci_extn=sci_extn,
                                     wcs=wcs)
         else:
-            self.direct = None
-        
+            if (direct_file is None) | (direct_file == ''):
+                self.direct = None
+            else:
+                print '\nFile not found: %s!\n' %(direct_file)
+                raise IOError
+            
         # ### Simulation mode, no grism exposure
         self.pad = self.grism.pad
         
@@ -1629,19 +1641,59 @@ class GrismFLT(object):
         blotted_ref = self.grism.blot_from_hdu(hdu=ref_hdu,
                                       segmentation=False, interp='poly5')
         
-        if 'PHOTFLAM' in refh:
-            self.direct.ref_photflam = ref_hdu.header['PHOTFLAM']
-        else:
-            self.direct.ref_photflam = photflam_list[refh['FILTER'].upper()]
+        header_values = {}
+        self.direct.ref_filter = utils.get_hst_filter(refh)
+        self.direct.ref_file = ref_str
         
-        if 'PHOTPLAM' in refh:
-            self.direct.ref_photplam = ref_hdu.header['PHOTPLAM']
-        else:
-            self.direct.ref_photplam = photplam_list[refh['FILTER'].upper()]
+        for key in ['PHOTFLAM', 'PHOTPLAM']:
+            if key in refh:
+                try:
+                    header_values[key] = ref_hdu.header['PHOTFLAM']*1.
+                except TypeError:
+                    print 'Problem processing header keyword PHOTFLAM: ** %s **' %(ref_hdu.header['PHOTFLAM'])
+                    raise TypeError
+            else:
+                filt = self.direct.ref_filter
+                if filt in photflam_list:
+                    header_values[key] = photflam_list[filt]
+                else:
+                    print 'Filter "%s" not found in %s tabulated list' %(filt, key)
+                    raise IndexError
+        
+        # Found keywords
+        self.direct.ref_photflam = header_values['PHOTFLAM']    
+        self.direct.ref_photplam = header_values['PHOTPLAM']    
+
+        # if 'PHOTFLAM' in refh:
+        #     try:
+        #         self.direct.ref_photflam = ref_hdu.header['PHOTFLAM']*1.
+        #     except TypeError:
+        #         print 'Problem reading header keyword PHOTFLAM: ** %s **' %(ref_hdu.header['PHOTFLAM'])
+        #         raise TypeError
+        # else:
+        #     key = refh['FILTER'].upper()
+        #     if key in photflam_list:
+        #         self.direct.ref_photflam = photflam_list[key]
+        #     else:
+        #         print 'Filter "%s" not found in `photflam_list`' %(key)
+        #         raise IndexError
+        #         
+        # if 'PHOTPLAM' in refh:
+        #     try:
+        #         self.direct.ref_photplam = ref_hdu.header['PHOTPLAM']*1.
+        #     except TypeError:
+        #         print 'Problem reading header keyword PHOTPLAM: ** %s **' %(ref_hdu.header['PHOTPLAM'])
+        #         raise TypeError
+        #     
+        # else:
+        #     key = refh['FILTER'].upper()
+        #     self.direct.ref_photplam = photplam_list[refh['FILTER'].upper()]
         
         ## TBD: compute something like a cross-correlation offset
         ##      between blotted reference and the direct image itself
         self.direct.data['REF'] = np.cast[np.float32](blotted_ref)
+        #print self.direct.data['REF'].shape, self.direct.ref_photflam
+        
         self.direct.data['REF'] *= self.direct.ref_photflam
         
         ## Fill empty pixels in the reference image from the SCI image
@@ -1649,10 +1701,7 @@ class GrismFLT(object):
         self.direct.data['REF'][empty] += self.direct.data['SCI'][empty]
         
         # self.direct.data['ERR'] *= 0.
-        # self.direct.data['DQ'] *= 0
-        self.direct.ref_filter = utils.get_hst_filter(refh)
-        self.direct.ref_file = ref_str
-        
+        # self.direct.data['DQ'] *= 0        
         self.direct.ABZP =  (0*np.log10(self.direct.ref_photflam) - 21.10 -
                       5*np.log10(self.direct.ref_photplam) + 18.6921)
         
@@ -3496,7 +3545,7 @@ class BeamCutout(object):
                 label=r'Flat $f_\lambda$ (%s)' %(self.direct.filter))
         
         ax.plot(xspecl/1.e4, yspecl, color='orange', linewidth=2, alpha=0.8,
-                label='Cont+line (%.3f, %.2e)' %(best_line_center/1.e4, best_line_flux*1.e-17))
+                label='Cont+line (%.4f, %.2e)' %(best_line_center/1.e4, best_line_flux*1.e-17))
 
         ax.legend(fontsize=8, loc='lower center', scatterpoints=1)
 
