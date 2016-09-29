@@ -293,7 +293,7 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
                                             
                         f = file.split('.gz')[0]
                         if f not in exposure_list:
-                            visit_list.append(f)
+                            visit_list.append(str(f))
                             visit_start.append(tstart)
                     
                     exposure_list = np.append(exposure_list, visit_list)
@@ -307,7 +307,7 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
                         exposure_list = np.array(visit_list)[so]
                         #output_list[visit_product.lower()] = visit_list
                         
-                        d = OrderedDict(product=visit_product.lower(),
+                        d = OrderedDict(product=str(visit_product.lower()),
                                         files=list(np.array(visit_list)[so]))
                         output_list.append(d)
                         
@@ -316,7 +316,7 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
                     so = np.argsort(exposure_start)
                     exposure_list = np.array(exposure_list)[so]
                     #output_list[product.lower()] = exposure_list
-                    d = OrderedDict(product=product.lower(),
+                    d = OrderedDict(product=str(product.lower()),
                                     files=list(np.array(exposure_list)[so]))
                     output_list.append(d)
     
