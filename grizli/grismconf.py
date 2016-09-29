@@ -217,17 +217,20 @@ class aXeConf():
             
             ## Integrate from 0 to dx / -dx
             dpfull = xfull*0.
-            lt0 = xfull <= 0
+            lt0 = xfull < 0
             if lt0.sum() > 1:
                 dpfull[lt0] = np.cumsum(np.sqrt(1+dyfull[lt0][::-1]**2))[::-1]
                 dpfull[lt0] *= -1
+                
             #
-            gt0 = xfull >= 0
+            gt0 = xfull > 0
             if gt0.sum() > 0:
                 dpfull[gt0] = np.cumsum(np.sqrt(1+dyfull[gt0]**2))
               
             dp = np.interp(dx, xfull, dpfull)
-        
+            if dp[-1] == dp[-2]:
+                dp[-1] = dp[-2]+np.diff(dp)[-2]
+                
         return dp
         
     def get_beam_trace(self, x=507, y=507, dx=0., beam='A', fwcpos=None):
@@ -475,6 +478,12 @@ def get_config_filename(instrume='WFC3', filter='F140W',
                     'CONF/ACS.WFC.CHIP%d.Cycle13.5.conf' %({1:2,2:1}[ext]))
                            
     if instrume == 'WFC3':
+        if grism == 'G280':
+            conf_file = os.path.join(os.getenv('GRIZLI'), 
+               'CONF/G280/WFC3.UVIS.G280.cal/WFC3.UVIS.G280.CHIP%d.V2.0.conf' %({1:2,2:1}[ext]))
+        
+            return conf_file
+            
         conf_file = os.path.join(os.getenv('GRIZLI'), 
                                  'CONF/%s.%s.V4.32.conf' %(grism, filter))
         
@@ -493,6 +502,9 @@ def get_config_filename(instrume='WFC3', filter='F140W',
     
     if instrume == 'WFIRST':
         conf_file = os.path.join(os.getenv('GRIZLI'), 'CONF/WFIRST.conf')
+
+    if instrume == 'SYN':
+        conf_file = os.path.join(os.getenv('GRIZLI'), 'CONF/syn.conf')
     
     return conf_file
         
