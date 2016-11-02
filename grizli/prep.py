@@ -795,8 +795,14 @@ def get_gaia_catalog(ra=165.86, dec=34.829694, radius=3.):
         Result of the query
     
     """
-    import httplib
-    import urllib
+    try:
+        import httplib
+        from urllib import urlencode
+    except:
+        # python 3
+        import http.client as httplib
+        from urllib.parse import urlencode
+        
     #import http.client in Python 3
     #import urllib.parse in Python 3
     import time
@@ -810,7 +816,7 @@ def get_gaia_catalog(ra=165.86, dec=34.829694, radius=3.):
     #-------------------------------------
     #Create job
 
-    params = urllib.urlencode({\
+    params = urlencode({\
     	"REQUEST": "doQuery", \
     	"LANG":    "ADQL", \
     	"FORMAT":  "votable", \
@@ -871,8 +877,14 @@ def get_gaia_catalog(ra=165.86, dec=34.829694, radius=3.):
     response = connection.getresponse()
     data = response.read()
     outputFileName = "gaia.vot.gz"
-    outputFile = open(outputFileName, "w")
-    outputFile.write(data)
+    try:
+        outputFile = open(outputFileName, "w")
+        outputFile.write(data)
+    except:
+        # Python 3
+        outputFile = open(outputFileName, "wb")
+        outputFile.write(data)
+        
     outputFile.close()
     connection.close()
     print("Data saved in: " + outputFileName)
@@ -1879,15 +1891,24 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
         yrms = np.ma.std(ma, axis=0)/np.sqrt(np.sum(m, axis=0))
         xmsk = np.arange(im_shape[0])
         yres = med
-        yok = ~yrms.mask
+        yok = (~yrms.mask) & np.isfinite(yrms) & np.isfinite(xmsk) & np.isfinite(yres)
         
+        if yok.sum() == 0:
+            print('ERROR: No valid pixels found!')
+            continue
+            
         ### Fit column average with smoothed Gaussian Process model
         gp = GaussianProcess(regr='constant', corr='squared_exponential',
                              theta0=8, thetaL=5, thetaU=12,
                              nugget=(yrms/bg_sky)[yok][::1]**2,
                              random_start=10, verbose=True, normalize=True)
                              
-        gp.fit(np.atleast_2d(xmsk[yok][::1]).T, yres[yok][::1]+bg_sky)
+        try:
+            gp.fit(np.atleast_2d(xmsk[yok][::1]).T, yres[yok][::1]+bg_sky)
+        except:
+            print('GaussianProces failed!  Check that this exposure wasn\'t fried by variable backgrounds.')
+            continue
+            
         y_pred, MSE = gp.predict(np.atleast_2d(xmsk).T, eval_MSE=True)
         gp_sigma = np.sqrt(MSE)
         
