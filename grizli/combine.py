@@ -66,9 +66,9 @@ def combine_flt(files=[], output='exposures_cmb.fits', grow=1,
     ###  `files` is an ASN filename, not  a list of exposures
     if '_asn.fits' in files:
         asn = asnutil.readASNTable(files)
-        files = ['%s_flt.fits' %(flt) for flt in asn['order']]
+        files = ['{0}_flt.fits'.format(flt) for flt in asn['order']]
         if output == 'combined_flt.fits':
-            output = '%s_cmb.fits' %(asn['output'])
+            output = '{0}_cmb.fits'.format(asn['output'])
             
     if False:
         files=glob.glob('ibhj3*flt.fits')
@@ -105,7 +105,8 @@ def combine_flt(files=[], output='exposures_cmb.fits', grow=1,
         for i, file in enumerate(files):
             hx = pyfits.getheader(file, 0)
             h0['EXPTIME'] += hx['EXPTIME']
-            h0['FILE%04d' %(i)] = file, 'Included file #%d' %(i)
+            h0['FILE{0:04d}'.format(i)] = (file, 
+                                        'Included file #{0:d}'.format(i))
         
             h = pyfits.getheader(file, 1)
             flt_wcs = pywcs.WCS(h, relax=True)
@@ -118,9 +119,7 @@ def combine_flt(files=[], output='exposures_cmb.fits', grow=1,
         pad = np.maximum(padx, pady)*grow
 
         if verbose:
-            print 'Maximum shift (x, y) = (%6.1f, %6.1f), pad=%d' %(xmax,
-                                                                    ymax,
-                                                                    pad)
+            print('Maximum shift (x, y) = ({0:6.1f}, {1:6.1f}), pad={2:d}'.format(xmax, ymax, pad))
     else:
         pad = 0
         
@@ -174,8 +173,8 @@ def combine_flt(files=[], output='exposures_cmb.fits', grow=1,
         im = pyfits.open(file)
         
         if verbose:
-            print '%3d %s %6.1f %6.1f %10.2f' %(i+1, file, x0[i], y0[i],
-                                               im[0].header['EXPTIME'])
+            print('{0:3d} {1:s} {2:6.1f} {3:6.1f} {4:10.2f}'.format(i+1, file,
+                                x0[i], y0[i], im[0].header['EXPTIME']))
 
         dq = utils.unset_dq_bits(im['DQ'].data, okbits=608,
                                            verbose=False)
@@ -277,10 +276,10 @@ def combine_visits_and_filters(grow=1, pixfrac=0.5, kernel='point',
         if filter not in filters:
             continue
         
-        output = '%s_cmb.fits' %(key)
+        output = '{0}_cmb.fits'.format(key)
 
         if verbose:
-            print '\n -- Combine: %s -- \n' %(output)
+            print('\n -- Combine: {0} -- \n'.format(output))
             
         if split_quadrants:
             combine_quadrants(files=output_list[key], output=output,
@@ -328,7 +327,7 @@ def get_shifts(files, ref_pixel=[507, 507]):
     for i, file in enumerate(files):
         hx = pyfits.getheader(file, 0)
         h0['EXPTIME'] += hx['EXPTIME']
-        h0['FILE%04d' %(i)] = file, 'Included file #%d' %(i)
+        h0['FILE{0:04d}'.format(i)] = file, 'Included file #{0:d}'.format(i)
     
         h = pyfits.getheader(file, 1)
         flt_wcs = pywcs.WCS(h, relax=True)
@@ -483,15 +482,17 @@ def combine_quadrants(files=[], output='images_cmb.fits', grow=1,
         Basename of the output file.  Must end in "_cmb.fits" because the 
         actual output files are derived with the following:
         
-        >>> quad_output = output.replace('_cmb.fits', '_q%d_cmb.fits' %(q))
+        >>> quad_output = output.replace('_cmb.fits',
+                                         '_q{0:d}_cmb.fits'.format(q))
     """
     h, dx, dy = get_shifts(files, ref_pixel=ref_pixel)
     out = split_pixel_quadrant(dx, dy, 
                                figure=output.replace('.fits', '_quad.png'))
                                
     for q in out:
-        print 'Quadrant %d, %d files' %(q, len(out[q]))
-        quad_output = output.replace('_cmb.fits', '_q%d_cmb.fits' %(q))
+        print('Quadrant {0:d}, {1:d} files'.format(q, len(out[q])))
+        quad_output = output.replace('_cmb.fits',
+                                     '_q{0:d}_cmb.fits'.format(q))
         combine_flt(files=np.array(files)[out[q]], output=quad_output, 
                     grow=grow, pixfrac=pixfrac, kernel=kernel, 
                     ds9=ds9, verbose=verbose, clobber=clobber)    

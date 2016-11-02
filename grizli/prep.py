@@ -24,38 +24,38 @@ def check_status():
     """
     for ref_dir in ['iref']:
         if not os.getenv(ref_dir):
-            print """
-No $%s set!  Make a directory and point to it in ~/.bashrc or ~/.cshrc.
+            print("""
+No ${0} set!  Make a directory and point to it in ~/.bashrc or ~/.cshrc.
 For example,
 
-  $ mkdir $GRIZLI/%s
-  $ export %s="${GRIZLI}/%s/" # put this in ~/.bashrc
-""" %(ref_dir, ref_dir, ref_dir, ref_dir)
+  $ mkdir $GRIZLI/{0}
+  $ export {0}="${GRIZLI}/{0}/" # put this in ~/.bashrc
+""".format(ref_dir))
         else:
             ### WFC3
             if not os.getenv('iref').endswith('/'):
-                print "Warning: $iref should end with a '/' character [%s]" %(os.getenv('iref'))
+                print("Warning: $iref should end with a '/' character [{0}]".format(os.getenv('iref')))
         
             test_file = 'iref$uc72113oi_pfl.fits'.replace('iref$', os.getenv('iref'))
             if not os.path.exists(test_file):
-                print """
-        HST calibrations not found in $iref [%s]
+                print("""
+        HST calibrations not found in $iref [{0}]
 
         To fetch them, run
 
            >>> import grizli.utils
            >>> grizli.utils.fetch_default_calibs()
 
-        """ %(os.getenv('iref'))
+        """.format(os.getenv('iref')))
     
     ### Sewpy
     try:
         import sewpy
     except:
-        print """
+        print("""
 `sewpy` module needed for wrapping SExtractor within python.  
 Get it from https://github.com/megalut/sewpy.
-"""
+""")
         
 check_status()
  
@@ -154,7 +154,7 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
                       'G141': 'uc721143i_pfl.fits'}
                 
         flat_file = flat_files[filter]
-        extra_msg = ' / flat: %s' %(flat_file)
+        extra_msg = ' / flat: {0}'.format(flat_file)
 
         flat_im = pyfits.open(os.path.join(os.getenv('iref'), flat_file))
         flat = flat_im['SCI'].data[5:-5, 5:-5]
@@ -175,7 +175,7 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
         ### Use F200LP flat
         flat_files = {'G280':'zcv2053ei_pfl.fits'} # F200LP
         flat_file = flat_files[filter]
-        extra_msg = ' / flat: %s' %(flat_file)
+        extra_msg = ' / flat: {0}'.format(flat_file)
         
         flat_im = pyfits.open(os.path.join(os.getenv('jref'), flat_file))
 
@@ -189,7 +189,7 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
     if filter == 'G800L':
         flat_files = {'G800L':'n6u12592j_pfl.fits'} # F814W
         flat_file = flat_files[filter]
-        extra_msg = ' / flat: %s' %(flat_file)
+        extra_msg = ' / flat: {0}'.format(flat_file)
         
         flat_im = pyfits.open(os.path.join(os.getenv('jref'), flat_file))
         pfl_file = orig_file[0].header['PFLTFILE'].replace('jref$',
@@ -215,7 +215,7 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
     if crclean:
         import lacosmicx
         for ext in [1,2]:
-            print 'Clean CRs with LACosmic, extension %d' %(ext)
+            print('Clean CRs with LACosmic, extension {0:d}'.format(ext))
             
             sci = orig_file['SCI',ext].data
             dq = orig_file['DQ',ext].data
@@ -231,7 +231,7 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
             sci[crmask] = 0
                             
     if verbose:
-        print '%s -> %s %s' %(orig_file.filename(), local_file, extra_msg)
+        print('{0} -> {1} {2}'.format(orig_file.filename(), local_file, extra_msg))
             
     orig_file.writeto(local_file, clobber=True)
         
@@ -278,7 +278,7 @@ def apply_persistence_mask(flt_file, path='../Persistence', dq_value=1024,
     
     if not os.path.exists(pers_file):
         if verbose:
-            print 'Persistence file %s not found' %(pers_file)
+            print('Persistence file {0} not found'.format(pers_file))
         
         #return 0
     
@@ -293,7 +293,7 @@ def apply_persistence_mask(flt_file, path='../Persistence', dq_value=1024,
     
     NPERS = pers_mask.sum()
     if verbose:
-        print '%s: flagged %d pixels affected by persistence (pers/err=%0.2f)' %(pers_file, NPERS, err_threshold)
+        print('{0}: flagged {1:d} pixels affected by persistence (pers/err={2:.2f})'.format(pers_file, NPERS, err_threshold))
     
     if NPERS > 0:
         flt['DQ'].data[pers_mask > 0] |= dq_value
@@ -332,7 +332,7 @@ def apply_saturated_mask(flt_file, dq_value=1024):
     
     NSAT = sat_mask.sum()
     if verbose:
-        print '%s: flagged %d pixels affected by saturation pulldown' %(flt_file, NSAT)
+        print('{0}: flagged {1:d} pixels affected by saturation pulldown'.format(flt_file, NSAT))
     
     if NSAT > 0:
         flt['DQ'].data[sat_mask > 0] |= dq_value
@@ -359,7 +359,7 @@ def clip_lists(input, output, clip=20):
     ok = dist < clip
     out_arr = output[ok]
     if ok.sum() == 0:
-        print 'No matches within `clip=%f`' %(clip)
+        print('No matches within `clip={0:f}`'.format(clip))
         return False
         
     ### Backward
@@ -384,6 +384,7 @@ def match_lists(input, output, transform=None, scl=3600., simple=True,
     
     If `transform` is None, use Similarity transform (shift, scale, rot) 
     """
+    import copy
     from astropy.table import Table    
     
     import skimage.transform
@@ -395,7 +396,7 @@ def match_lists(input, output, transform=None, scl=3600., simple=True,
         transform = skimage.transform.SimilarityTransform
         
     #print 'xyxymatch'
-    match = stsci.stimage.xyxymatch(input, output, 
+    match = stsci.stimage.xyxymatch(copy.copy(input), copy.copy(output), 
                                     origin=np.median(input, axis=0), 
                                     mag=(1.0, 1.0), rotation=(0.0, 0.0),
                                     ref_origin=np.median(input, axis=0), 
@@ -440,10 +441,11 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
     else:
         rd_ref = radec*1
         
-    if not os.path.exists('%s.cat' %(root)):
+    if not os.path.exists('{0}.cat'.format(root)):
         cat = make_drz_catalog(root=root)
     else:
-        cat = Table.read('%s.cat' %(root), format='ascii.commented_header')
+        cat = Table.read('{0}.cat'.format(root),
+                         format='ascii.commented_header')
     
     ### Clip obviously distant files to speed up match
     rd_cat = np.array([cat['X_WORLD'], cat['Y_WORLD']])
@@ -457,13 +459,13 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
     
     ok = (cat['MAG_AUTO'] > mag_limits[0]) & (cat['MAG_AUTO'] < mag_limits[1])
     if ok.sum() == 0:
-        print '%s.cat: no objects found in magnitude range %s' %(root,
-                                                                 mag_limits)
+        print('{0}.cat: no objects found in magnitude range {1}'.format(root,
+                                                                 mag_limits))
         return False
     
     xy_drz = np.array([cat['X_IMAGE'][ok], cat['Y_IMAGE'][ok]]).T
     
-    drz_file = glob.glob('%s_dr[zc]_sci.fits' %(root))[0]
+    drz_file = glob.glob('{0}_dr[zc]_sci.fits'.format(root))[0]
     drz_im = pyfits.open(drz_file)
     sh = drz_im[0].data.shape
     
@@ -484,9 +486,10 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
         N = ok2.sum()
         status = clip_lists(xy_drz, xy+1, clip=clip)
         if not status:
-            print 'Problem xxx'
+            print('Problem xxx')
         
         input, output = status
+        
         #print np.sum(input) + np.sum(output)
         
         toler=5
@@ -500,8 +503,8 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
             except:
                 toler += 5
                 titer += 1
-        #
-        #print output.shape, output_ix.shape, output_ix.min(), output_ix.max(), titer, toler, input_ix.shape, input.shape
+        
+        #print(output.shape, output_ix.shape, output_ix.min(), output_ix.max(), titer, toler, input_ix.shape, input.shape)
               
         titer = 0 
         while (len(input_ix)*1./len(input) < 0.1) & (titer < 3):
@@ -516,7 +519,7 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
                 
             output_ix, input_ix, outliers, tf = res
         
-        #print output.shape, output_ix.shape, output_ix.min(), output_ix.max(), titer, toler, input_ix.shape, input.shape
+        #print(output.shape, output_ix.shape, output_ix.min(), output_ix.max(), titer, toler, input_ix.shape, input.shape)
         
         tf_out = tf(output[output_ix])
         dx = input[input_ix] - tf_out
@@ -535,10 +538,10 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
         if verbose:
             shift = tf.translation
             NGOOD = (~outliers).sum()
-            print '%s (%d) %d: %6.2f %6.2f %7.3f %.3f' %(root,iter,NGOOD,
+            print('{0} ({1:d}) {2:d}: {3:6.2f} {4:6.2f} {5:7.3f} {6:7.3f}'.format(root,iter,NGOOD,
                                                    shift[0], shift[1], 
                                                    tf.rotation/np.pi*180, 
-                                                   1./tf.scale)
+                                                   1./tf.scale))
         
         out_shift += tf.translation
         out_rot -= tf.rotation
@@ -571,7 +574,7 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
         ax.grid()
         
         fig.tight_layout(pad=0.1)
-        fig.savefig('%s_wcs.png' %(root))
+        fig.savefig('{0}_wcs.png'.format(root))
         plt.close()
         
         if interactive_status:
@@ -585,25 +588,25 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
 def log_wcs(root, drz_wcs, shift, rot, scale, rms=0., n=-1, initialize=True):
     """Save WCS offset information to a file
     """
-    if (not os.path.exists('%s_wcs.log' %(root))) | initialize:
-        print 'Initialize %s_wcs.log' %(root)
+    if (not os.path.exists('{0}_wcs.log'.format(root))) | initialize:
+        print('Initialize {0}_wcs.log'.format(root))
         orig_hdul = pyfits.HDUList()
-        fp = open('%s_wcs.log' %(root), 'w')
+        fp = open('{0}_wcs.log'.format(root), 'w')
         fp.write('# ext xshift yshift rot scale rms N\n')
-        fp.write('# %s\n' %(root))
+        fp.write('# {0}\n'.format(root))
         count = 0
     else:
-        orig_hdul = pyfits.open('%s_wcs.fits' %(root))
-        fp = open('%s_wcs.log' %(root), 'a')
+        orig_hdul = pyfits.open('{0}_wcs.fits'.format(root))
+        fp = open('{0}_wcs.log'.format(root), 'a')
         count = len(orig_hdul)
     
     hdu = drz_wcs.to_fits()[0]
     orig_hdul.append(hdu)
-    orig_hdul.writeto('%s_wcs.fits' %(root), clobber=True)
+    orig_hdul.writeto('{0}_wcs.fits'.format(root), clobber=True)
     
-    fp.write('%5d %13.4f %13.4f %13.4f %13.5f %13.3f %4d\n' %(count, shift[0],
-                                                       shift[1], rot, scale,
-                                                       rms, n))
+    fp.write('{0:5d} {1:13.4f} {2:13.4f} {3:13.4f} {4:13.5f} {5:13.3f} {6:4d}\n'.format(
+              count, shift[0], shift[1], rot, scale, rms, n))
+              
     fp.close()
     
 def table_to_regions(table, output='ds9.reg'):
@@ -624,7 +627,8 @@ def table_to_regions(table, output='ds9.reg'):
     else:
         e  = np.ones(len(table))*0.5
         
-    lines = ['circle(%.7f, %.7f, %.3f")\n' %(table[rc][i], table[dc][i], e[i])
+    lines = ['circle({0:.7f}, {1:.7f}, {2:.3f}")\n'.format(table[rc][i],
+                                                           table[dc][i], e[i])
                                               for i in range(len(table))]
 
     fp.writelines(lines)
@@ -638,7 +642,7 @@ def make_drz_catalog(root='', threshold=2., get_background=True,
     """
     import sewpy
     
-    drz_file = glob.glob('%s_dr[zc]_sci.fits' %(root))[0]
+    drz_file = glob.glob('{0}_dr[zc]_sci.fits'.format(root))[0]
     im = pyfits.open(drz_file)
     
     if 'PHOTFNU' in im[0].header:
@@ -653,7 +657,7 @@ def make_drz_catalog(root='', threshold=2., get_background=True,
               WEIGHT_TYPE="MAP_WEIGHT",
               WEIGHT_IMAGE=drz_file.replace('_sci.fits', '_wht.fits'),
               CHECKIMAGE_TYPE="SEGMENTATION",
-              CHECKIMAGE_NAME='%s_seg.fits' %(root),
+              CHECKIMAGE_NAME='{0}_seg.fits'.format(root),
               MAG_ZEROPOINT=ZP, 
               CLEAN="N", 
               PHOT_APERTURES="6, 8.335, 16.337, 20",
@@ -661,7 +665,7 @@ def make_drz_catalog(root='', threshold=2., get_background=True,
     
     if get_background:
         config['CHECKIMAGE_TYPE'] = 'SEGMENTATION,BACKGROUND'
-        config['CHECKIMAGE_NAME'] = '%s_seg.fits,%s_bkg.fits' %(root,root)
+        config['CHECKIMAGE_NAME'] = '{0}_seg.fits,{0}_bkg.fits'.format(root)
     
     for key in extra_config:
         config[key] = extra_config[key]
@@ -676,10 +680,10 @@ def make_drz_catalog(root='', threshold=2., get_background=True,
     output = sew(drz_file)
     cat = output['table']
     cat.meta = config
-    cat.write('%s.cat' %(root), format='ascii.commented_header')
+    cat.write('{0}.cat'.format(root), format='ascii.commented_header')
             
     if verbose:
-        print '%s catalog: %d objects' %(root, len(cat))
+        print('{0} catalog: {1:d} objects'.format(root, len(cat)))
     
     return cat
     
@@ -808,7 +812,7 @@ def get_gaia_catalog(ra=165.86, dec=34.829694, radius=3.):
     	"LANG":    "ADQL", \
     	"FORMAT":  "votable", \
     	"PHASE":  "RUN", \
-    	"QUERY":   "SELECT TOP 500 * FROM gaiadr1.gaia_source  WHERE CONTAINS(POINT('ICRS',gaiadr1.gaia_source.ra,gaiadr1.gaia_source.dec),CIRCLE('ICRS',%f,%f,%.2f))=1" %(ra, dec, radius/60.)
+    	"QUERY":   "SELECT TOP 500 * FROM gaiadr1.gaia_source  WHERE CONTAINS(POINT('ICRS',gaiadr1.gaia_source.ra,gaiadr1.gaia_source.dec),CIRCLE('ICRS',{0},{1},{2:.2f}))=1".format(ra, dec, radius/60.)
     	})
 
     headers = {\
@@ -821,15 +825,15 @@ def get_gaia_catalog(ra=165.86, dec=34.829694, radius=3.):
 
     #Status
     response = connection.getresponse()
-    print "Status: " +str(response.status), "Reason: " + str(response.reason)
+    print("Status: " +str(response.status), "Reason: " + str(response.reason))
 
     #Server job location (URL)
     location = response.getheader("location")
-    print "Location: " + location
+    print("Location: " + location)
 
     #Jobid
     jobid = location[location.rfind('/')+1:]
-    print "Job id: " + jobid
+    print("Job id: " + jobid)
 
     connection.close()
 
@@ -846,7 +850,7 @@ def get_gaia_catalog(ra=165.86, dec=34.829694, radius=3.):
     	phaseElement = dom.getElementsByTagName('uws:phase')[0]
     	phaseValueElement = phaseElement.firstChild
     	phase = phaseValueElement.toxml()
-    	print "Status: " + phase
+    	print("Status: " + phase)
     	#Check finished
     	if phase == 'COMPLETED': break
     	#wait and repeat
@@ -868,7 +872,7 @@ def get_gaia_catalog(ra=165.86, dec=34.829694, radius=3.):
     outputFile.write(data)
     outputFile.close()
     connection.close()
-    print "Data saved in: " + outputFileName
+    print("Data saved in: " + outputFileName)
     
     try:
         os.remove('gaia.vot')
@@ -910,7 +914,7 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True):
     try:
         sdss = get_sdss_catalog(ra=ra, dec=dec, radius=radius)
     except:
-        print 'SDSS query failed'
+        print('SDSS query failed')
         sdss = []
     
     if sdss is None:
@@ -919,10 +923,10 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True):
     has_catalog = False
             
     if len(sdss) > 5:
-        table_to_regions(sdss, output='%s_sdss.reg' %(product))
-        sdss['ra','dec'].write('%s_sdss.radec' %(product), 
+        table_to_regions(sdss, output='{0}_sdss.reg'.format(product))
+        sdss['ra','dec'].write('{0}_sdss.radec'.format(product), 
                                 format='ascii.commented_header')
-        radec = '%s_sdss.radec' %(product)
+        radec = '{0}_sdss.radec'.format(product)
         ref_catalog = 'SDSS'
         has_catalog = True
     
@@ -932,15 +936,15 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True):
             gaia = get_gaia_catalog(ra=ra, dec=dec, radius=2)
             if len(gaia) < 2:
                 raise ValueError
-            table_to_regions(gaia, output='%s_gaia.reg' %(product))
-            gaia['ra','dec'].write('%s_gaia.radec' %(product),
+            table_to_regions(gaia, output='{0}_gaia.reg'.format(product))
+            gaia['ra','dec'].write('{0}_gaia.radec'.format(product),
                                     format='ascii.commented_header')
 
-            radec = '%s_gaia.radec' %(product)
+            radec = '{0}_gaia.radec'.format(product)
             ref_catalog = 'GAIA'
             has_catalog = True
         except:
-            print 'GAIA query failed'
+            print('GAIA query failed')
             has_catalog = False
     
     ### WISE
@@ -948,14 +952,14 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True):
         try:
             wise = get_wise_catalog(ra=ra, dec=dec, radius=2)
             
-            table_to_regions(wise, output='%s_wise.reg' %(product))
-            wise['ra','dec'].write('%s_wise.radec' %(product),
+            table_to_regions(wise, output='{0}_wise.reg'.format(product))
+            wise['ra','dec'].write('{0}_wise.radec'.format(product),
                                     format='ascii.commented_header')
 
-            radec = '%s_wise.radec' %(product)
+            radec = '{0}_wise.radec'.format(product)
             ref_catalog = 'WISE'
         except:
-            print 'WISE query failed'
+            print('WISE query failed')
     
     #### WISP, check if a catalog already exists for a given rootname and use 
     #### that if so.
@@ -963,19 +967,19 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True):
     if len(cat_files) > 0:
         cat = Table.read(cat_files[0], format='ascii.commented_header')
         root = cat_files[0].split('.cat')[0]
-        cat['X_WORLD','Y_WORLD'].write('%s.radec' %(root),
+        cat['X_WORLD','Y_WORLD'].write('{0}.radec'.format(root),
                                 format='ascii.commented_header')
         
-        radec = '%s.radec' %(root)
+        radec = '{0}.radec'.format(root)
         ref_catalog = 'VISIT'
     
     if verbose:
-        print '%s - Reference RADEC: %s [%s]' %(product, radec, ref_catalog)    
+        print('{0} - Reference RADEC: {1} [{2}]'.format(product, radec, ref_catalog))    
     
     return radec, ref_catalog
     
 def process_direct_grism_visit(direct={}, grism={}, radec=None,
-                               align_tolerance=5, 
+                               align_tolerance=5, align_clip=30,
                                align_mag_limits = [14,23],
                                column_average=True, 
                                run_tweak_align=True,
@@ -1052,11 +1056,11 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
         else:
             ref_catalog = 'USER'
     
-        print '%s: First Drizzle' %(direct['product'])
+        print('{0}: First Drizzle'.format(direct['product']))
     
         ### Clean up
         for ext in ['.fits', '.log']:
-            file = '%s_wcs.%s' %(direct['product'], ext)
+            file = '{0}_wcs.{1}'.format(direct['product'], ext)
             if os.path.exists(file):
                 os.remove(file)
                 
@@ -1085,14 +1089,14 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
             cat['X_WORLD', 'Y_WORLD'][okmag].write('self',
                                         format='ascii.commented_header')
         
-        clip=20
-        logfile = '%s_wcs.log' %(direct['product'])
+        #clip=30
+        logfile = '{0}_wcs.log'.format(direct['product'])
         if os.path.exists(logfile):
             os.remove(logfile)
         
         result = align_drizzled_image(root=direct['product'], 
                                       mag_limits=align_mag_limits,
-                                      radec=radec, NITER=5, clip=clip,
+                                      radec=radec, NITER=5, clip=align_clip,
                                       log=True,
                                       outlier_threshold=align_tolerance)
                                   
@@ -1101,7 +1105,7 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
         ### Update direct FLT WCS
         for file in direct['files']:
             updatehdr.updatewcs_with_shift(file, 
-                                      str('%s_wcs.fits' %(direct['product'])),
+                                str('{0}_wcs.fits'.format(direct['product'])),
                                       xsh=out_shift[0], ysh=out_shift[1],
                                       rot=out_rot, scale=out_scale,
                                       wcsname=ref_catalog, force=True,
@@ -1139,7 +1143,7 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
         ### Make DRZ catalog again with updated DRZWCS
         clean_drizzle(direct['product'])
         cat = make_drz_catalog(root=direct['product'], threshold=1.6)
-        table_to_regions(cat, '%s.cat.reg' %(direct['product']))
+        table_to_regions(cat, '{0}.cat.reg'.format(direct['product']))
         
         if (fix_stars) & (not ACS):
             fix_star_centers(root=direct['product'], drizzle=True)
@@ -1189,9 +1193,9 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
     if ACS:
         skyfile=''
     else:
-        skyfile = '/tmp/%s.skyfile' %(grism['product'])
+        skyfile = '/tmp/{0}.skyfile'.format(grism['product'])
         fp = open(skyfile,'w')
-        fp.writelines(['%s 0.0\n' %(f) for f in grism['files']])
+        fp.writelines(['{0} 0.0\n'.format(f) for f in grism['files']])
         fp.close()
     
     if 'par' in grism['product']:
@@ -1234,7 +1238,7 @@ def set_grism_dfilter(direct, grism):
         else:
             ext = [1]
             
-        print 'DFILTER: %s %s' %(file, direct_filter)
+        print('DFILTER: {0} {1}'.format(file, direct_filter))
         flt = pyfits.open(file, mode='update')
         for e in ext:
             flt['SCI',e].header['DFILTER'] = (direct_filter, 
@@ -1249,7 +1253,7 @@ def tweak_align(direct_group={}, grism_group={}, max_dist=1., key=' ',
     from drizzlepac.astrodrizzle import AstroDrizzle
     
     if len(direct_group['files']) < 2:
-        print 'Only one direct image found, can\'t compute shifts!'
+        print('Only one direct image found, can\'t compute shifts!')
         return True
         
     wcs_ref, shift_dict = tweak_flt(files=direct_group['files'],
@@ -1258,15 +1262,15 @@ def tweak_align(direct_group={}, grism_group={}, max_dist=1., key=' ',
 
     grism_matches = find_direct_grism_pairs(direct=direct_group, grism=grism_group, check_pixel=[507, 507], toler=0.1, key=key)
     
-    fp = open('%s_shifts.log' %(direct_group['product']), 'w')
+    fp = open('{0}_shifts.log'.format(direct_group['product']), 'w')
     fp.write('# flt xshift yshift rot scale N rmsx rmsy\n')
     for k in grism_matches:
         d = shift_dict[k]
-        fp.write('# match[\'%s\'] = %s\n' %(k, grism_matches[k]))
+        fp.write('# match[\'{0}\'] = {0}\n'.format(k, grism_matches[k]))
     
     for k in shift_dict:
         d = shift_dict[k]
-        fp.write('%s %7.3f %7.3f %8.5f %8.5f %5d %6.3f %6.3f\n' %(k, d[0], d[1], d[2], d[3], d[4], d[5][0], d[5][1]))
+        fp.write('{0:s} {1:7.3f} {2:7.3f} {3:8.5f} {4:8.5f} {5:5d} {6:6.3f} {7:6.3f}\n'.format(k, d[0], d[1], d[2], d[3], d[4], d[5][0], d[5][1]))
     
     fp.close()
     
@@ -1293,15 +1297,15 @@ def tweak_align(direct_group={}, grism_group={}, max_dist=1., key=' ',
     
     clean_drizzle(direct_group['product'])
     cat = make_drz_catalog(root=direct_group['product'], threshold=1.6)
-    table_to_regions(cat, '%s.cat.reg' %(direct_group['product']))
+    table_to_regions(cat, '{0}.cat.reg'.format(direct_group['product']))
     
     if (grism_group == {}) | (grism_group is None):
         return True
         
     # Grism  
-    skyfile = '/tmp/%s.skyfile' %(grism_group['product'])
+    skyfile = '/tmp/{0}.skyfile'.format(grism_group['product'])
     fp = open(skyfile,'w')
-    fp.writelines(['%s 0.0\n' %(f) for f in grism_group['files']])
+    fp.writelines(['{0} 0.0\n'.format(f) for f in grism_group['files']])
     fp.close()
       
     AstroDrizzle(grism_group['files'], output=grism_group['product'],
@@ -1327,7 +1331,7 @@ def clean_drizzle(root):
     -------
     Nothing, science mosaic modified in-place
     """
-    drz_file = glob.glob('%s_dr[zc]_sci.fits' %(root))[0]
+    drz_file = glob.glob('{0}_dr[zc]_sci.fits'.format(root))[0]
     
     sci = pyfits.open(drz_file, mode='update')
     wht = pyfits.open(drz_file.replace('_sci.fits', '_wht.fits'))
@@ -1354,26 +1358,26 @@ def tweak_flt(files=[], max_dist=0.4, threshold=3, verbose=True):
                         config={"DETECT_THRESH":threshold, "DETECT_MINAREA":8,
                                 "PHOT_FLUXFRAC":"0.3, 0.5, 0.8",
                                 "WEIGHT_TYPE":"MAP_RMS",
-                                "WEIGHT_IMAGE":"%s_xrms.fits" %(root)})
+                                "WEIGHT_IMAGE":"{0}_xrms.fits".format(root)})
         
         im = pyfits.open(file)
         ok = im['DQ',1].data == 0
         sci = im['SCI',1].data*ok - np.median(im['SCI',1].data[ok])
         
-        pyfits.writeto('%s_xsci.fits' %(root), data=sci,
+        pyfits.writeto('{0}_xsci.fits'.format(root), data=sci,
                        header=im['SCI',1].header,
                        clobber=True)
         
-        pyfits.writeto('%s_xrms.fits' %(root), data=im['ERR',1].data,
+        pyfits.writeto('{0}_xrms.fits'.format(root), data=im['ERR',1].data,
                        header=im['ERR'].header, clobber=True)
         
-        output = sew('%s_xsci.fits' %(root))        
+        output = sew('{0}_xsci.fits'.format(root))        
         
         wcs = pywcs.WCS(im['SCI',1].header, relax=True)
         cats.append([output['table'], wcs])
         
         for ext in ['xsci', 'xrms']:
-            os.remove('%s_%s.fits' %(root, ext))
+            os.remove('{0}_{1}.fits'.format(root, ext))
             
     c0 = cats[0][0]
     wcs_0 = cats[0][1]
@@ -1396,7 +1400,7 @@ def tweak_flt(files=[], max_dist=0.4, threshold=3, verbose=True):
         if ok.sum() == 0:
             d[files[i]] = [0.0, 0.0, 0.0, 1.0]
             if verbose:
-                print files[i], '! no match'
+                print(files[i], '! no match')
             
             continue
             
@@ -1407,7 +1411,7 @@ def tweak_flt(files=[], max_dist=0.4, threshold=3, verbose=True):
         d[files[i]] = [dx[0], dx[1], 0.0, 1.0, ok.sum(), rms]
         
         if verbose:
-            print files[i], dx, rms, 'N=%d' %(ok.sum())
+            print(files[i], dx, rms, 'N={0:d}'.format(ok.sum()))
     
     wcs_ref = cats[0][1]
     return wcs_ref, d
@@ -1419,7 +1423,8 @@ def apply_tweak_shifts(wcs_ref, shift_dict, grism_matches={}, verbose=True):
     from drizzlepac import updatehdr
 
     hdu = wcs_ref.to_fits(relax=True)
-    tweak_file = '%s_tweak_wcs.fits' %(shift_dict.keys()[0].split('.fits')[0])
+    file0 = list(shift_dict.keys())[0].split('.fits')[0]
+    tweak_file = '{0}_tweak_wcs.fits'.format(file0)
     hdu.writeto(tweak_file, clobber=True)
     for file in shift_dict:
         updatehdr.updatewcs_with_shift(file, tweak_file,
@@ -1529,10 +1534,10 @@ def match_direct_grism_wcs(direct={}, grism={}, get_fresh_flt=True,
     from stwcs import updatewcs
     from drizzlepac.astrodrizzle import AstroDrizzle
     
-    wcs_log = Table.read('%s_wcs.log' %(direct['product']),
+    wcs_log = Table.read('{0}_wcs.log'.format(direct['product']),
                          format='ascii.commented_header')
                          
-    wcs_hdu = pyfits.open('%s_wcs.fits' %(direct['product']))
+    wcs_hdu = pyfits.open('{0}_wcs.fits'.format(direct['product']))
     
     if get_fresh_flt:
         for file in grism['files']:
@@ -1543,7 +1548,7 @@ def match_direct_grism_wcs(direct={}, grism={}, get_fresh_flt=True,
     ref_catalog = direct_flt['SCI',1].header['WCSNAME']
     
     for ext in wcs_log['ext']:
-        tmp_wcs = '/tmp/%s_tmpwcs.fits' %(str(direct['product']))
+        tmp_wcs = '/tmp/{0}_tmpwcs.fits'.format(str(direct['product']))
         wcs_hdu[ext].writeto(tmp_wcs, clobber=True)
         if 'scale' in wcs_log.colnames:
             scale = wcs_log['scale'][ext]
@@ -1602,7 +1607,7 @@ def align_multiple_drizzled(mag_limits=[16,23]):
         im = pyfits.open(drz_file)
         files = []
         for i in range(im[0].header['NDRIZIM']):
-            files.append(im[0].header['D%03dDATA' %(i+1)].split('[')[0])
+          files.append(im[0].header['D{0:03d}DATA'.format(i+1)].split('[')[0])
         
         
         for file in files:
@@ -1673,12 +1678,12 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
     
     elif grism_element == 'G280':
         bg_fixed = ['UVIS.G280.flat.fits']
-        bg_vary = ['UVIS.G280.ext%d.sky.fits' %(ext)]
+        bg_vary = ['UVIS.G280.ext{0:d}.sky.fits'.format(ext)]
         ACS = True
         flat = 1.
         
     elif grism_element == 'G800L':
-        bg_fixed = ['ACS.WFC.CHIP%d.msky.1.smooth.fits' %({1:2,2:1}[ext])]
+        bg_fixed = ['ACS.WFC.CHIP{0:d}.msky.1.smooth.fits'.format({1:2,2:1}[ext])]
         bg_vary = ['ACS.WFC.flat.fits']
         #bg_fixed = ['ACS.WFC.CHIP%d.msky.1.fits' %({1:2,2:1}[ext])]
         #bg_fixed = []
@@ -1690,22 +1695,21 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
         flat = flat_im['SCI',ext].data.flatten()
     
     if verbose:
-        print '%s: EXTVER=%d / %s / %s' %(grism['product'], ext, bg_fixed,
-                                       bg_vary)
+        print('{0}: EXTVER={1:d} / {2} / {3}'.format(grism['product'], ext, bg_fixed, bg_vary))
     if not ACS:
         ext = 1
         
     ### Read sky files    
     data_fixed = []
     for file in bg_fixed:
-        im = pyfits.open('%s/CONF/%s' %(os.getenv('GRIZLI'), file))
+        im = pyfits.open('{0}/CONF/{1}'.format(os.getenv('GRIZLI'), file))
         sh = im[0].data.shape
         data = im[0].data.flatten()/flat
         data_fixed.append(data)
         
     data_vary = []
     for file in bg_vary:
-        im = pyfits.open('%s/CONF/%s' %(os.getenv('GRIZLI'), file))
+        im = pyfits.open('{0}/CONF/{1}'.format(os.getenv('GRIZLI'), file))
         data_vary.append(im[0].data.flatten()*1)
         sh = im[0].data.shape
         
@@ -1788,8 +1792,8 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
             ds9.view(r_i * mask_i)
         
         if verbose:
-            print '   %s > Iter: %d, masked: %d, %s' %(grism['product'], iter,
-                                                obj_mask.sum(), coeffs)
+            print('   {0} > Iter: {1:d}, masked: {2:d}, {3}'.format(grism['product'], iter,
+                                                obj_mask.sum(), coeffs))
                                                 
         out = np.linalg.lstsq(A[mask & obj_mask,:], data[mask & obj_mask])
         coeffs = out[0]
@@ -1798,22 +1802,22 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
     sky = np.dot(A, coeffs).reshape(Nexp, Npix)
         
     ## log file
-    fp = open('%s_%d_sky_background.info' %(grism['product'], ext), 'w')
-    fp.write('# file c1 %s\n' %(' '.join(['c%d' %(v+2) 
+    fp = open('{0}_{1}_sky_background.info'.format(grism['product'],ext), 'w')
+    fp.write('# file c1 {0}\n'.format(' '.join(['c{0:d}'.format(v+2) 
                                             for v in range(Nvary)])))
     
-    fp.write('# %s\n' %(grism['product']))
+    fp.write('# {0}\n'.format(grism['product']))
     
-    fp.write('# bg1: %s\n' %(bg_fixed[0]))
+    fp.write('# bg1: {0}\n'.format(bg_fixed[0]))
     for v in range(Nvary):
-        fp.write('# bg%d: %s\n' %(v+2, bg_vary[v]))
+        fp.write('# bg{0:d}: {1}\n'.format(v+2, bg_vary[v]))
     
     for j in range(Nexp):
         file = grism['files'][j]
-        line = '%s %9.4f' %(file, coeffs[0])           
+        line = '{0} {1:9.4f}'.format(file, coeffs[0])           
         for v in range(Nvary):
             k = Nfix + j*Nvary + v
-            line = '%s %9.4f' %(line, coeffs[k])
+            line = '{0} {1:9.4f}'.format(line, coeffs[k])
         
         fp.write(line+'\n')
     
@@ -1827,21 +1831,21 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
             flt['SCI',ext].data -= sky[j,:].reshape(sh)*exptime[j]
                 
             header = flt[0].header
-            header['GSKYCOL%d' %(ext)] = (False, 'Subtract column average')
-            header['GSKYN%d' %(ext)] = (Nfix+Nvary, 'Number of sky images')
-            header['GSKY%d01' %(ext)] = (coeffs[0], 
-                                        'Sky image %s (fixed)' %(bg_fixed[0]))
+            header['GSKYCOL{0:d}'.format(ext)] = (False, 'Subtract column average')
+            header['GSKYN{0:d}'.format(ext)] = (Nfix+Nvary, 'Number of sky images')
+            header['GSKY{0:d}01'.format(ext)] = (coeffs[0], 
+                                'Sky image {0} (fixed)'.format(bg_fixed[0]))
             
-            header['GSKY%d01F' %(ext)] = (bg_fixed[0], 'Sky image (fixed)')
+            header['GSKY{0:d}01F'.format(ext)] = (bg_fixed[0], 'Sky image (fixed)')
             
                 
             for v in range(Nvary):
                 k = Nfix + j*Nvary + v
                 #print coeffs[k]
-                header['GSKY%d%02d' %(ext, v+Nfix+1)] = (coeffs[k], 
-                                     'Sky image %s (variable)' %(bg_vary[v]))
+                header['GSKY{0}{1:02d}'.format(ext, v+Nfix+1)] = (coeffs[k], 
+                                'Sky image {0} (variable)'.format(bg_vary[v]))
                 
-                header['GSKY%d%02dF' %(ext, v+Nfix+1)] = (bg_vary[v], 
+                header['GSKY{0}{1:02d}F'.format(ext, v+Nfix+1)] = (bg_vary[v], 
                                                       'Sky image (variable)')
                 
             flt.flush()
@@ -1893,8 +1897,8 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
         
         ## result
         file = grism['files'][j]
-        fp = open(file.replace('_flt.fits', '_column.dat'), 'w')
-        fp.write('# column resid uncertainty\n')
+        fp = open(file.replace('_flt.fits', '_column.dat'), 'wb')
+        fp.write(b'# column resid uncertainty\n')
         np.savetxt(fp, np.array([xmsk, y_pred-1, gp_sigma]).T, fmt='%.5f')
         fp.close()
         
@@ -1916,7 +1920,7 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
     ax.grid()
     
     fig.tight_layout(pad=0.1)
-    fig.savefig('%s_column.png' %(grism['product']))
+    fig.savefig('{0}_column.png'.format(grism['product']))
     #fig.savefig('%s_column.pdf' %(grism['product']))
     plt.close()
     
@@ -1952,15 +1956,15 @@ def fix_star_centers(root='macs1149.6+2223-rot-ca5-22-032.0-f105w',
     """
     from drizzlepac.astrodrizzle import AstroDrizzle
     
-    sci = pyfits.open('%s_drz_sci.fits' %(root))
-    cat = Table.read('%s.cat' %(root), format='ascii.commented_header')
+    sci = pyfits.open('{0}_drz_sci.fits'.format(root))
+    cat = Table.read('{0}.cat'.format(root), format='ascii.commented_header')
     
     # Load FITS files
     N = sci[0].header['NDRIZIM']
     images = []
     wcs = []
     for i in range(N):
-        flt = pyfits.open(sci[0].header['D%03dDATA' %(i+1)].split('[')[0], mode='update')
+        flt = pyfits.open(sci[0].header['D{0:03d}DATA'.format(i+1)].split('[')[0], mode='update')
         wcs.append(pywcs.WCS(flt[1], relax=True))
         images.append(flt)
     
@@ -1980,9 +1984,8 @@ def fix_star_centers(root='macs1149.6+2223-rot-ca5-22-032.0-f105w',
                 images[i]['DQ'].data[unset] -= 4096
             
         if verbose:
-            print '%6d %12.6f %12.6f %7.2f %s' %(line['NUMBER'], rd[0], rd[1],
-                                                 line['MAG_AUTO'], 
-                                                 nset)
+            print('{0:6d} {1:12.6f} {2:12.6f} {3:7.2f} {4}'.format( 
+                line['NUMBER'], rd[0], rd[1], line['MAG_AUTO'], nset))
     
     # Overwrite image                                             
     for i in range(N):
