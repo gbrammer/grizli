@@ -114,7 +114,7 @@ def test():
     t0 = time.time()
     out = _compute_model(0, self.FLTs[i], fit_info, False)
     t1 = time.time()
-    print t1-t0
+    #print t1-t0
     
     id = 3219
     fwhm = 1200
@@ -134,8 +134,12 @@ def _loadFLT(grism_file, sci_extn, direct_file, pad, ref_file,
     TBD
     """
     import time
-    import cPickle as pickle
-    
+    try:
+        import cPickle as pickle
+    except:
+        # Python 3
+        import pickle
+        
     ## slight random delay to avoid synchronization problems
     # np.random.seed(ix)
     # sleeptime = ix*1
@@ -151,7 +155,7 @@ def _loadFLT(grism_file, sci_extn, direct_file, pad, ref_file,
         save_file = 'xxxxxxxxxxxxxxxxxxx'
         
     if os.path.exists(save_file):
-        print 'Load %s!' %(save_file)
+        print('Load {0}!'.format(save_file))
         
         fp = open(save_file.replace('GrismFLT.fits', 'GrismFLT.pkl'), 'rb')
         flt = pickle.load(fp)
@@ -180,7 +184,7 @@ def _fit_at_z(self, zgrid, i, templates, fitter, fit_background, poly_order):
     """
     # self, z=0., templates={}, fitter='nnls',
     #              fit_background=True, poly_order=0
-    print i, zgrid[i]
+    print(i, zgrid[i])
     out = self.fit_at_z(z=zgrid[i], templates=templates,
                         fitter=fitter, poly_order=poly_order,
                         fit_background=fit_background)
@@ -225,7 +229,7 @@ def _compute_model(i, flt, fit_info, store):
                           spectrum_1d = fit_info[id]['spec'], 
                           verbose=False)
     
-    print '%s: _compute_model Done' %(flt.grism.parent_file)
+    print('{0}: _compute_model Done'.format(flt.grism.parent_file))
         
     return i, flt.model, flt.object_dispersers
     
@@ -322,7 +326,7 @@ class GroupFLT():
             t1_pool = time.time()
         
         if verbose:
-            print 'Files loaded - %.2f sec.' %(t1_pool - t0_pool)
+            print('Files loaded - {0:.2f} sec.'.format(t1_pool - t0_pool))
     
     def save_full_data(self, warn=True):
         """TBD
@@ -331,13 +335,13 @@ class GroupFLT():
             file = self.FLTs[i].grism_file
             if self.FLTs[i].grism.data is None:
                 if warn:
-                    print '%s: Looks like data already saved!' %(file)
+                    print('{0}: Looks like data already saved!'.format(file))
                     continue
                     
             save_file = file.replace('_flt.fits', '_GrismFLT.fits')
             save_file = save_file.replace('_flc.fits', '_GrismFLT.fits')
             save_file = save_file.replace('_cmb.fits', '_GrismFLT.fits')
-            print 'Save %s' %(save_file)
+            print('Save {0}'.format(save_file))
             self.FLTs[i].save_full_pickle()
             
             ### Reload initialized data
@@ -354,9 +358,9 @@ class GroupFLT():
         self.grism_files.extend(new.grism_files)
         
         if verbose:
-            print 'Now we have %d FLTs' %(self.N)
+            print('Now we have {0:d} FLTs'.format(self.N))
             
-    def compute_single_model(self, id, mag=-99, size=None, store=False, spectrum_1d=None, get_beams=None, in_place=True):
+    def compute_single_model(self, id, mag=-99, size=-1, store=False, spectrum_1d=None, get_beams=None, in_place=True):
         """TBD
         """
         out_beams = []
@@ -410,7 +414,7 @@ class GroupFLT():
             
         t1_pool = time.time()
         if verbose:
-            print 'Models computed - %.2f sec.' %(t1_pool - t0_pool)
+            print('Models computed - {0:.2f} sec.'.format(t1_pool - t0_pool))
         
     def get_beams(self, id, size=10, beam_id='A', min_overlap=0.2, 
                   get_slice_header=True):
@@ -483,7 +487,7 @@ class GroupFLT():
         if np.abs(scale_coeffs).max() > max_coeff:
             return True
             
-        self.compute_single_model(id, mag=mag, size=None, store=False, spectrum_1d=[(xspec+1)*1.e4, np.sum(yspec, axis=0)], get_beams=None, in_place=True)
+        self.compute_single_model(id, mag=mag, size=-1, store=False, spectrum_1d=[(xspec+1)*1.e4, np.sum(yspec, axis=0)], get_beams=None, in_place=True)
         
         if ds9:
             flt = self.FLTs[0]
@@ -492,7 +496,7 @@ class GroupFLT():
                       header=flt.grism.header)
         
         if verbose:
-            print '%6d mag=%6.2f %s' %(id, mag, scale_coeffs)
+            print('{0:6d} mag={1:6.2f} {2}'.format(id, mag, scale_coeffs))
             
         return True
         #m2d = mb.reshape_flat(modelf)
@@ -624,8 +628,7 @@ class GroupFLT():
             
             # Drizzle it
             if verbose:
-                print 'Drizzle %s to wavelength %.2f' %(flt.grism.parent_file, 
-                                                        wave)
+                print('Drizzle {0} to wavelength {1:.2f}'.format(flt.grism.parent_file, wave))
                                                         
             adrizzle.do_driz(sci, line_wcs, wht, out_wcs, 
                              outsci, outwht, outctx, 1., 'cps', 1,
@@ -727,7 +730,7 @@ class MultiBeam():
             root = beam.grism.parent_file.split('.fits')[0]
             outfile = beam.write_fits(root)
             if verbose:
-                print 'Wrote %s' %(outfile)
+                print('Wrote {0}'.format(outfile))
             
             outfiles.append(outfile)
             
@@ -739,7 +742,7 @@ class MultiBeam():
         self.beams = []
         for file in beam_list:
             if verbose:
-                print file
+                print(file)
             
             beam = model.BeamCutout(fits_file=file, conf=conf)
             self.beams.append(beam)
@@ -848,7 +851,7 @@ class MultiBeam():
                 try:
                     out = np.linalg.lstsq(Ax,y)                         
                 except:
-                    print A.min(), Ax.min(), self.fit_mask.sum(), y.min()
+                    print(A.min(), Ax.min(), self.fit_mask.sum(), y.min())
                     raise ValueError
                     
                 lstsq_coeff, residuals, rank, s = out
@@ -987,7 +990,7 @@ class MultiBeam():
                 else:
                     line_temp = line_temp + line_i*scl[i]
             
-            temp_list['line %s' %(li)] = line_temp
+            temp_list['line {0}'.format(li)] = line_temp
                                      
         return temp_list
     
@@ -1035,7 +1038,7 @@ class MultiBeam():
                 best = key
 
             if verbose:                    
-                print utils.no_newline + '  %s %9.1f (%s)' %(key, chi2[i], best)
+                print(utils.no_newline + '  {0} {1:9.1f} ({2})'.format(key, chi2[i], best))
         
         ## Best-fit
         temp_i = {best:templates[best]}
@@ -1167,9 +1170,9 @@ class MultiBeam():
                 chi2min = chi2[i]
 
             if verbose:                    
-                print utils.no_newline + '  %.4f %9.1f (%.4f)' %(zgrid[i], chi2[i], zgrid[iz])
+                print(utils.no_newline + '  {0:.4f} {1:9.1f} ({2:.4f})'.format(zgrid[i], chi2[i], zgrid[iz]))
         
-        print 'First iteration: z_best=%.4f\n' %(zgrid[iz])
+        print('First iteration: z_best={0:.4f}\n'.format(zgrid[iz]))
             
         # peaks
         import peakutils
@@ -1221,7 +1224,7 @@ class MultiBeam():
                     iz = i
                 
                 if verbose:
-                    print utils.no_newline+'- %.4f %9.1f (%.4f) %d/%d' %(zgrid_zoom[i], chi2_zoom[i], zgrid_zoom[iz], i+1, NZOOM)
+                    print(utils.no_newline+'- {0:.4f} {1:9.1f} ({2:.4f}) {3:d}/{4:d}'.format(zgrid_zoom[i], chi2_zoom[i], zgrid_zoom[iz], i+1, NZOOM))
         
             zgrid = np.append(zgrid, zgrid_zoom)
             chi2 = np.append(chi2, chi2_zoom)
@@ -1238,7 +1241,7 @@ class MultiBeam():
         else:
             interp_prior = None
             
-        print ' Zoom iteration: z_best=%.4f\n' %(zgrid[np.argmin(chi2)])
+        print(' Zoom iteration: z_best={0:.4f}\n'.format(zgrid[np.argmin(chi2)]))
         
         ### Best redshift
         if not stars:
@@ -1352,20 +1355,19 @@ class MultiBeam():
         
         ax.plot(fit_data['zgrid'], fit_data['chi2']/self.DoF)
         ax.set_xlabel('z')
-        ax.set_ylabel(r'$\chi^2_\nu$, $\nu$=%d' %(self.DoF))
+        ax.set_ylabel(r'$\chi^2_\nu$, $\nu$={0:d}'.format(self.DoF))
         
         c2min = fit_data['chi2'].min()
         for delta in [1,4,9]:
             ax.plot(fit_data['zgrid'],
                     fit_data['zgrid']*0.+(c2min+delta)/self.DoF, 
-                    color='%.2f' %(1-delta*1./10))
+                    color='{0:.2f}'.format(1-delta*1./10))
         
         ax.plot(fit_data['zgrid'], (fit_data['chi2']*0+fit_data['chi_poly'])/self.DoF, color='b', linestyle='--', alpha=0.8)
         
         ax.set_xlim(fit_data['zgrid'].min(), fit_data['zgrid'].max())
         ax.grid()        
-        ax.set_title(r'ID = %d, $z_\mathrm{grism}$=%.4f' %(self.beams[0].id, 
-                                               fit_data['zbest']))
+        ax.set_title(r'ID = {0:d}, $z_\mathrm{{grism}}$={1:.4f}'.format(self.beams[0].id, fit_data['zbest']))
                                                
         ax = fig.add_subplot(212)
         
@@ -1443,7 +1445,7 @@ class MultiBeam():
             except:
                 continue
                 
-            ax.errorbar(wave/1.e4, flux, err, alpha=0.15+0.2*(self.N <= 2), linestyle='None', marker='.', color='%.2f' %(ib*0.5/self.N), zorder=1)
+            ax.errorbar(wave/1.e4, flux, err, alpha=0.15+0.2*(self.N <= 2), linestyle='None', marker='.', color='{0:.2f}'.format(ib*0.5/self.N), zorder=1)
             ax.plot(wave/1.e4, mflux, color='r', alpha=0.5, zorder=3)
             
             grism = beam.grism.filter
@@ -1470,9 +1472,9 @@ class MultiBeam():
             
                 N = int(np.ceil(self.Ngrism[grism]/2)*2)*2
                 kernel = np.ones(N, dtype=float)/N
-                fbin = nd.convolve(ffull[grism][okb][so], kernel)[N/2::N]
-                wbin = nd.convolve(wfull[grism][okb][so], kernel)[N/2::N]
-                vbin = nd.convolve(var[okb][so], kernel**2)[N/2::N]
+                fbin = nd.convolve(ffull[grism][okb][so], kernel)[N//2::N]
+                wbin = nd.convolve(wfull[grism][okb][so], kernel)[N//2::N]
+                vbin = nd.convolve(var[okb][so], kernel**2)[N//2::N]
                 ax.errorbar(wbin/1.e4, fbin, np.sqrt(vbin), alpha=0.8,
                             linestyle='None', marker='.', color=cp[grism], zorder=2)
                 
@@ -1494,7 +1496,7 @@ class MultiBeam():
         ax.set_xlim(xmin, xmax)
         
         ### Label
-        ax.text(0.03, 1.03, ('%s' %(self.Ngrism)).replace('\'','').replace('{','').replace('}',''), ha='left', va='bottom', transform=ax.transAxes, fontsize=10)
+        ax.text(0.03, 1.03, ('{0}'.format(self.Ngrism)).replace('\'','').replace('{','').replace('}',''), ha='left', va='bottom', transform=ax.transAxes, fontsize=10)
         
         ax.plot(wave/1.e4, wave/1.e4*0., linestyle='--', color='k')
         ax.set_xlabel(r'$\lambda$')
@@ -1575,11 +1577,11 @@ class MultiBeam():
         fig.tight_layout(pad=0.2)
 
         ## Label
-        label = 'ID=%6d, z=%.4f' %(self.beams[0].id, fit['zbest'])
+        label = 'ID={0:6d}, z={1:.4f}'.format(self.beams[0].id, fit['zbest'])
         fig.axes[-1].text(0.97, -0.27, label, ha='right', va='top',
                           transform=fig.axes[-1].transAxes, fontsize=10)
         
-        label2 = ('%s' %(self.Ngrism)).replace('\'', '').replace('{', '').replace('}', '')
+        label2 = ('{0}'.format(self.Ngrism)).replace('\'', '').replace('{', '').replace('}', '')
         fig.axes[-1].text(0.03, -0.27, label2, ha='left', va='top',
                           transform=fig.axes[-1].transAxes, fontsize=10)
                 
@@ -1603,8 +1605,7 @@ class MultiBeam():
                 continue
 
             if (line_flux/line_err > 7) | (line in force_line):
-                print 'Drizzle line -> %4s (%.2f %.2f)' %(line, line_flux,
-                                                         line_err)
+                print('Drizzle line -> {0:4s} ({1:.2f} {2:.2f})'.format(line, line_flux, line_err))
 
                 line_wave_obs = line_wavelengths[line][0]*(1+fit['zbest'])
                 
@@ -1681,10 +1682,10 @@ class MultiBeam():
                     hdu_full[0].header['NUMLINES'] += 1 
 
                 li = hdu_full[0].header['NUMLINES']
-                hdu_full[0].header['LINE%03d' %(li)] = line
-                hdu_full[0].header['FLUX%03d' %(li)] = (line_flux, 
+                hdu_full[0].header['LINE{0:03d}'.format(li)] = line
+                hdu_full[0].header['FLUX{0:03d}'.format(li)] = (line_flux, 
                                                 'Line flux, 1e-17 erg/s/cm2')
-                hdu_full[0].header['ERR%03d' %(li)] = (line_err, 
+                hdu_full[0].header['ERR{0:03d}'.format(li)] = (line_err, 
                                         'Line flux err, 1e-17 erg/s/cm2')
 
         if len(hdu_full) > 0:
@@ -1692,8 +1693,7 @@ class MultiBeam():
                                               'Lines in this file')
 
             if save_fits:
-                hdu_full.writeto('%s_zfit_%05d.line.fits' %(self.group_name,
-                                                            self.id),
+                hdu_full.writeto('{0}_zfit_{1:05d}.line.fits'.format(self.group_name, self.id),
                                  clobber=True, output_verify='fix')
         
         return hdu_full
@@ -1793,7 +1793,7 @@ class MultiBeam():
                 mag = 22
                 
             sp = fit['cont1d']
-            GroupFLT.compute_single_model(id, mag=mag, size=None, store=False,
+            GroupFLT.compute_single_model(id, mag=mag, size=-1, store=False,
                                           spectrum_1d=[sp.wave, sp.flux],
                                           get_beams=None, in_place=True)
         
@@ -1859,52 +1859,51 @@ class MultiBeam():
             
         #p = fit.pop('coeffs')
         
-        np.save('%s_zfit_%05d.fit.npy' %(self.group_name, self.id), [fit])
+        np.save('{0}_zfit_{1:05d}.fit.npy'.format(self.group_name, self.id), [fit])
             
-        fig.savefig('%s_zfit_%05d.png' %(self.group_name, self.id))
+        fig.savefig('{0}_zfit_{1:05d}.png'.format(self.group_name, self.id))
         
-        fig2.savefig('%s_zfit_%05d.2D.png' %(self.group_name, self.id))
-        hdu2.writeto('%s_zfit_%05d.2D.fits' %(self.group_name, self.id), clobber=True, output_verify='fix')
+        fig2.savefig('{0}_zfit_{1:05d}.2D.png'.format(self.group_name, self.id))
+        hdu2.writeto('{0}_zfit_{1:05d}.2D.fits'.format(self.group_name, self.id), clobber=True, output_verify='fix')
         
         label = '# id ra dec zbest '
-        data = '%7d %.6f %.6f %.5f' %(self.id, self.ra, self.dec,
+        data = '{0:7d} {1:.6f} {2:.6f} {3:.5f}'.format(self.id, self.ra, self.dec,
                                       fit['zbest'])
         
         for grism in ['G800L', 'G280', 'G102', 'G141', 'GRISM']:
-            label += ' N%s' %(grism)
+            label += ' N{0}'.format(grism)
             if grism in self.Ngrism:
-                data += ' %2d' %(self.Ngrism[grism])
+                data += ' {0:2d}'.format(self.Ngrism[grism])
             else:
-                data += ' %2d' %(0)
+                data += ' {0:2d}'.format(0)
                 
         label += ' chi2 DoF ' 
-        data += ' %14.1f %d ' %(fit['chibest'], self.DoF)
+        data += ' {0:14.1f} {1:d} '.format(fit['chibest'], self.DoF)
         
         for line in ['SII', 'Ha', 'OIII', 'Hb', 'Hg', 'OII']:
-            label += ' %s %s_err' %(line, line)
+            label += ' {0} {0}_err'.format(line)
             if line in fit['line_flux']:
                 flux = fit['line_flux'][line][0]
                 err =  fit['line_flux'][line][1]
-                data += ' %10.3e %10.3e' %(flux, err)
+                data += ' {0:10.3e} {1:10.3e}'.format(flux, err)
         
-        fp = open('%s_zfit_%05d.fit.dat' %(self.group_name, self.id),'w')
+        fp = open('{0}_zfit_{1:05d}.fit.dat'.format(self.group_name, self.id),'w')
         fp.write(label+'\n')
         fp.write(data+'\n')
         fp.close()
         
-        fp = open('%s_zfit_%05d.beams.dat' %(self.group_name, self.id),'w')
+        fp = open('{0}_zfit_{1:05d}.beams.dat'.format(self.group_name, self.id),'w')
         fp.write('# file filter origin_x origin_y size pad bg\n')
         for ib, beam in enumerate(self.beams):
-            data = '%40s %s %5d %5d %5d %5d' %(beam.grism.parent_file, 
-                                          beam.grism.filter,
+            data = '{0:40s} {1:s} {2:5d} {3:5d} {4:5d} {5:5d}'.format(beam.grism.parent_file, beam.grism.filter,
                                           beam.direct.origin[0],
                                           beam.direct.origin[1],
                                           beam.direct.sh[0], 
                                           beam.direct.pad)
             if self.fit_bg:
-                data += ' %8.4f' %(fit['coeffs_full'][ib])
+                data += ' {0:8.4f}'.format(fit['coeffs_full'][ib])
             else:
-                data += ' %8.4f' %(0.0)
+                data += ' {0:8.4f}'.format(0.0)
             
             fp.write(data + '\n')
         
@@ -1976,7 +1975,7 @@ class MultiBeam():
         modelf = np.dot(out_coeffs, A)
         chi2 = np.sum(((self.scif - modelf)**2*self.ivarf)[self.fit_mask])
 
-        print shifts, chi2/self.DoF
+        print(shifts, chi2/self.DoF)
         return chi2/self.DoF    
             
 def get_redshift_fit_defaults():
@@ -2043,7 +2042,7 @@ def drizzle_2d_spectrum(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
     """
     from drizzlepac.astrodrizzle import adrizzle
     
-    NX = int(np.round(np.diff(wlimit)[0]*1.e4/dlam))/2
+    NX = int(np.round(np.diff(wlimit)[0]*1.e4/dlam)) // 2
     center = np.mean(wlimit)*1.e4
     out_header, output_wcs = utils.make_spectrum_wcsheader(center_wave=center,
                                  dlam=dlam, NX=NX, 
@@ -2112,9 +2111,9 @@ def drizzle_2d_spectrum(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
     
     p.header['NINPUT'] = (len(beams), 'Number of drizzled beams')
     for i, beam in enumerate(beams):
-        p.header['FILE%04d' %(i+1)] = (beam.grism.parent_file, 
+        p.header['FILE{0:04d}'.format(i+1)] = (beam.grism.parent_file, 
                                              'Parent filename')
-        p.header['GRIS%04d' %(i+1)] = (beam.grism.filter, 
+        p.header['GRIS{0:04d}'.format(i+1)] = (beam.grism.filter, 
                                              'Beam grism element')
         
     h = out_header.copy()
@@ -2311,9 +2310,9 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
     
     p.header['NINPUT'] = (len(beams), 'Number of drizzled beams')
     for i, beam in enumerate(beams):
-        p.header['FILE%04d' %(i+1)] = (beam.grism.parent_file, 
+        p.header['FILE{0:04d}'.format(i+1)] = (beam.grism.parent_file, 
                                              'Parent filename')
-        p.header['GRIS%04d' %(i+1)] = (beam.grism.filter, 
+        p.header['GRIS{0:04d}'.format(i+1)] = (beam.grism.filter, 
                                              'Beam grism element')
         
     h = header.copy()

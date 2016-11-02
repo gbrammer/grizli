@@ -4,7 +4,7 @@
 Cython speedups for Grizli functions
 """
 
-import disperse
-import interp
+from . import disperse
+from . import interp
 #from .disperse import *
 #from .interp import *
