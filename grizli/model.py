@@ -64,13 +64,13 @@ if False:
     photflam_list = {}
     photplam_list = {}
     for filter in ['F098M', 'F105W', 'F110W', 'F125W', 'F140W', 'F160W', 'G102', 'G141']:
-        bp = S.ObsBandpass('wfc3,ir,%s' %(filter.lower()))
+        bp = S.ObsBandpass('wfc3,ir,{0}'.format(filter.lower()))
         photplam_list[filter] = bp.pivot()
         obs = S.Observation(spec, bp)
         photflam_list[filter] = n/obs.countrate()
         
     for filter in ['F435W', 'F606W', 'F775W', 'F814W']:
-        bp = S.ObsBandpass('acs,wfc1,%s' %(filter.lower()))
+        bp = S.ObsBandpass('acs,wfc1,{0}'.format(filter.lower()))
         photplam_list[filter] = bp.pivot()
         obs = S.Observation(spec, bp)
         photflam_list[filter] = n/obs.countrate()
@@ -269,12 +269,12 @@ class GrismDisperser(object):
         self.idx = np.arange(self.modelf.size).reshape(self.sh_beam)
         
         ## Indices of the trace in the flattened array 
-        self.x0 = np.array(self.sh)/2
+        self.x0 = np.array(self.sh) // 2
         self.dxpix = self.dx - self.dx[0] + self.x0[1] #+ 1
         try:
             self.flat_index = self.idx[dyc + self.x0[0], self.dxpix]
         except IndexError:
-            #print 'Index Error', id, self.x0[0], self.xc, self.yc, self.beam, self.ytrace_beam.max(), self.ytrace_beam.min()
+            #print('Index Error', id, dyc.dtype, self.dxpix.dtype, self.x0[0], self.xc, self.yc, self.beam, self.ytrace_beam.max(), self.ytrace_beam.min())
             raise IndexError
             
         ###### Trace, wavelength, sensitivity across entire 2D array
@@ -430,9 +430,9 @@ class GrismDisperser(object):
             thumb = self.direct
         else:
             if thumb.shape != self.sh:
-                print """
-Error: `thumb` must have the same dimensions as the direct image! (%d,%d)      
-                """ %(self.sh[0], self.sh[1])
+                print("""
+Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})      
+                """.format(self.sh[0], self.sh[1]))
                 return False
 
         ### Now compute the dispersed spectrum using the C helper
@@ -480,18 +480,18 @@ Error: `thumb` must have the same dimensions as the direct image! (%d,%d)
             self.optimal_profile = m/m.sum(axis=0)
         
         if data.shape != self.sh_beam:
-            print """
-`data` (%d,%d) must have the same shape as the data array (%d,%d)
-            """ %(data.shape[0], data.shape[1], self.sh_beam[0], 
-                  self.sh_beam[1])
+            print("""
+`data` ({0},{1}) must have the same shape as the data array ({2},{3})
+            """.format(data.shape[0], data.shape[1], self.sh_beam[0], 
+                  self.sh_beam[1]))
             return False
 
         if not isinstance(ivar, float):
             if ivar.shape != self.sh_beam:
-                print """
-`ivar` (%d,%d) must have the same shape as the data array (%d,%d)
-                """ %(ivar.shape[0], ivar.shape[1], self.sh_beam[0], 
-                      self.sh_beam[1])
+                print("""
+`ivar` ({0},{1}) must have the same shape as the data array ({2},{3})
+                """.format(ivar.shape[0], ivar.shape[1], self.sh_beam[0], 
+                      self.sh_beam[1]))
                 return False
                 
         num = self.optimal_profile*data*ivar
@@ -501,9 +501,9 @@ Error: `thumb` must have the same dimensions as the direct image! (%d,%d)
                 
         if bin > 1:
             kern = np.ones(bin, dtype=float)/bin
-            opt_flux = nd.convolve(opt_flux, kern)[bin/2::bin]
-            opt_var = nd.convolve(opt_var, kern**2)[bin/2::bin]
-            wave = self.lam[bin/2::bin]
+            opt_flux = nd.convolve(opt_flux, kern)[bin // 2::bin]
+            opt_var = nd.convolve(opt_var, kern**2)[bin // 2::bin]
+            wave = self.lam[bin // 2::bin]
         else:
             wave = self.lam
                 
@@ -545,7 +545,7 @@ Error: `thumb` must have the same dimensions as the direct image! (%d,%d)
         """
         dy = np.cast[int](np.round(self.ytrace))
         aper = np.zeros_like(self.model)
-        y0 = self.sh_beam[0]/2
+        y0 = self.sh_beam[0] // 2
         for d in range(-r, r+1):
             for i in range(self.sh_beam[1]):
                 aper[y0+d+dy[i]-1,i] = 1
@@ -559,9 +559,9 @@ Error: `thumb` must have the same dimensions as the direct image! (%d,%d)
         
         if bin > 1:
             kern = np.ones(bin, dtype=float)/bin
-            opt_flux = nd.convolve(opt_flux, kern)[bin/2::bin]
-            opt_var = nd.convolve(opt_var, kern**2)[bin/2::bin]
-            wave = self.lam[bin/2::bin]
+            opt_flux = nd.convolve(opt_flux, kern)[bin // 2::bin]
+            opt_var = nd.convolve(opt_var, kern**2)[bin // 2::bin]
+            wave = self.lam[bin // 2::bin]
         else:
             wave = self.lam
         
@@ -838,7 +838,7 @@ class ImageData(object):
             
             if not status:
                 msg = ('Couldn\'t find \'INSTRUME\' keyword in the headers' + 
-                       ' of extensions 0 or (SCI,%d)' %(sci_extn))
+                       ' of extensions 0 or (SCI,{0:d})'.format(sci_extn))
                 raise KeyError (msg)
             
             instrument = h['INSTRUME']
@@ -1075,12 +1075,11 @@ class ImageData(object):
         if ((xref.min() < 0) | (yref.min() < 0) | 
             (xref.max() > ref_naxis[0]) | (yref.max() > ref_naxis[1])):
             if verbose:
-                print ('Image cutout: x=%s, y=%s [Out of range]' 
-                    %(slx, sly))
+                print('Image cutout: x={0}, y={1} [Out of range]'.format(slx, sly))
             return hdu
         else:
             if verbose:
-                print 'Image cutout: x=%s, y=%s' %(slx, sly)
+                print('Image cutout: x={0}, y={1}'.format(slx, sly))
         
         ### Sliced subimage
         slice_wcs = ref_wcs.slice((sly, slx))
@@ -1119,7 +1118,7 @@ class ImageData(object):
             
         pad = np.maximum(np.abs(pad_min), pad_max) + 50
         if verbose:
-            print '%s / Pad ref HDU with %d pixels' %(self.parent_file, pad)
+            print('{0} / Pad ref HDU with {1:d} pixels'.format(self.parent_file, pad))
             
         ### Update data array
         sh = hdu.data.shape
@@ -1498,7 +1497,7 @@ class GrismFLT(object):
             if (grism_file is None) | (grism_file == ''):
                 self.grism = None
             else:
-                print '\nFile not found: %s!\n' %(grism_file)
+                print('\nFile not found: {0}!\n'.format(grism_file))
                 raise IOError
                 
         self.direct_file = direct_file
@@ -1516,7 +1515,7 @@ class GrismFLT(object):
             if (direct_file is None) | (direct_file == ''):
                 self.direct = None
             else:
-                print '\nFile not found: %s!\n' %(direct_file)
+                print('\nFile not found: {0}!\n'.format(direct_file))
                 raise IOError
             
         # ### Simulation mode, no grism exposure
@@ -1627,7 +1626,7 @@ class GrismFLT(object):
             refh = ref_hdu.header
         else:
             self.ref_file = ref_file
-            ref_str = '%s[0]' %(self.ref_file)
+            ref_str = '{0}[0]'.format(self.ref_file)
             ref_hdu = pyfits.open(ref_file)[ref_ext]
             refh = ref_hdu.header
         
@@ -1636,7 +1635,7 @@ class GrismFLT(object):
                                                    verbose=True)
             
         if verbose:
-            print '%s / blot reference %s' %(self.direct_file, ref_str)
+            print('{0} / blot reference {1}'.format(self.direct_file, ref_str))
                                               
         blotted_ref = self.grism.blot_from_hdu(hdu=ref_hdu,
                                       segmentation=False, interp='poly5')
@@ -1650,14 +1649,14 @@ class GrismFLT(object):
                 try:
                     header_values[key] = ref_hdu.header['PHOTFLAM']*1.
                 except TypeError:
-                    print 'Problem processing header keyword PHOTFLAM: ** %s **' %(ref_hdu.header['PHOTFLAM'])
+                    print('Problem processing header keyword PHOTFLAM: ** {0} **'.format(ref_hdu.header['PHOTFLAM']))
                     raise TypeError
             else:
                 filt = self.direct.ref_filter
                 if filt in photflam_list:
                     header_values[key] = photflam_list[filt]
                 else:
-                    print 'Filter "%s" not found in %s tabulated list' %(filt, key)
+                    print('Filter "{0}" not found in {1} tabulated list'.format(filt, key))
                     raise IndexError
         
         # Found keywords
@@ -1740,7 +1739,7 @@ class GrismFLT(object):
                 segh = seg_hdu.header
             else:
                 self.seg_file = seg_file
-                seg_str = '%s[0]' %(self.seg_file)
+                seg_str = '{0}[0]'.format(self.seg_file)
                 seg_hdu = pyfits.open(seg_file)[0]
                 segh = seg_hdu.header
             
@@ -1753,7 +1752,7 @@ class GrismFLT(object):
             seg_hdu = self.direct.expand_hdu(seg_hdu)
             
             if verbose:
-                print '%s / blot segmentation %s' %(self.direct_file, seg_str)
+                print('{0} / blot segmentation {1}'.format(self.direct_file, seg_str))
             
             blotted_seg = self.grism.blot_from_hdu(hdu=seg_hdu, 
                                           segmentation=True, grow=3,
@@ -1872,7 +1871,7 @@ class GrismFLT(object):
                 ix = self.catalog['id'] == id
                 if ix.sum() == 0:
                     if verbose:
-                        print 'ID %d not found in segmentation image' %(id)
+                        print('ID {0:d} not found in segmentation image'.format(id))
                     return False
                 
                 xcat = self.catalog['x_flt'][ix][0]-1
@@ -1888,7 +1887,7 @@ class GrismFLT(object):
                 ymin, ymax, y, xmin, xmax, x, area, segm_flux = out
                 if (area == 0) | ~np.isfinite(x) | ~np.isfinite(y):
                     if verbose:
-                        print 'ID %d not found in segmentation image' %(id)
+                        print('ID {0:d} not found in segmentation image'.format(id))
                     return False
                 
                 ### Object won't disperse spectrum onto the grism image
@@ -1939,7 +1938,7 @@ class GrismFLT(object):
                                                         np.array(thumb.shape))
             if test[-2] == 0:
                 if verbose:
-                    print 'ID %d not found in segmentation image' %(id)
+                    print('ID {0:d} not found in segmentation image'.format(id))
                 return False
             
             ### Compute spectral orders ("beams")
@@ -1951,7 +1950,7 @@ class GrismFLT(object):
                 
             for beam in beam_names:
                 ### Only compute order if bright enough
-                if mag > self.conf.conf['MMAG_EXTRACT_%s' %(beam)]:
+                if mag > self.conf.conf['MMAG_EXTRACT_{0}'.format(beam)]:
                     continue
                     
                 try:
@@ -2027,7 +2026,7 @@ class GrismFLT(object):
         ### segmentation regions.
         if mags is None:                                
             if verbose:
-                print 'Compute IDs/mags'
+                print('Compute IDs/mags')
             
             mags = np.zeros(len(ids))
             for i, id in enumerate(ids):
@@ -2052,7 +2051,7 @@ class GrismFLT(object):
         ### Now compute the full model
         for id_i, mag_i in zip(ids, mags):
             if verbose:
-                print utils.no_newline + 'compute model id=%d' %(id_i)
+                print(utils.no_newline + 'compute model id={0:d}'.format(id_i))
                 
             self.compute_model_orders(id=id_i, compute_size=True, mag=mag_i, 
                                       in_place=True, store=store)
@@ -2155,7 +2154,7 @@ class GrismFLT(object):
         if ds9:
             for i in range(len(catalog)):
                 x_flt, y_flt = catalog['x_flt'][i], catalog['y_flt'][i]
-                reg = 'circle %f %f 5\n' %(x_flt, y_flt)
+                reg = 'circle {0:f} {1:f} 5\n'.format(x_flt, y_flt)
                 ds9.set('regions', reg)
         
         return catalog
@@ -2224,7 +2223,7 @@ class GrismFLT(object):
             if (self.direct.data['REF'] is not None):
                 err = None
             else:
-                print 'No reference data found for `self.direct.data[\'REF\']`'
+                print('No reference data found for `self.direct.data[\'REF\']`')
                 return False
                 
         go_detect = utils.detect_with_photutils    
@@ -2258,7 +2257,7 @@ class GrismFLT(object):
             seg_file = root + '.detect_seg.fits'
         
         if not os.path.exists(seg_file):
-            print 'Segmentation image %s not found' %(segfile)
+            print('Segmentation image {0} not found'.format(segfile))
             return False
         
         self.seg = np.cast[np.float32](pyfits.open(seg_file)[0].data)
@@ -2267,7 +2266,7 @@ class GrismFLT(object):
             seg_cat = root + '.detect.cat'
         
         if not os.path.exists(seg_cat):
-            print 'Segmentation catalog %s not found' %(seg_cat)
+            print('Segmentation catalog {0} not found'.format(seg_cat))
             return False
         
         self.catalog = Table.read(seg_cat, format=catalog_format)
@@ -2275,8 +2274,12 @@ class GrismFLT(object):
     def save_model(self, clobber=True, verbose=True):
         """Save model properties to FITS file
         """
-        import cPickle as pickle
-        
+        try:
+            import cPickle as pickle
+        except:
+            # Python 3
+            import pickle
+            
         root = self.grism_file.split('_flt.fits')[0]
         
         h = pyfits.Header()
@@ -2312,21 +2315,25 @@ class GrismFLT(object):
         
             hdu.append(ref)
             
-        hdu.writeto('%s_model.fits' %(root), clobber=clobber,
+        hdu.writeto('{0}_model.fits'.format(root), clobber=clobber,
                     output_verify='fix')
         
-        fp = open('%s_model.pkl' %(root), 'wb')
+        fp = open('{0}_model.pkl'.format(root), 'wb')
         pickle.dump(self.object_dispersers, fp)
         fp.close()
         
         if verbose:
-            print 'Saved %s_model.fits and %s_model.pkl' %(root, root)
+            print('Saved {0}_model.fits and {0}_model.pkl'.format(root))
     
     def save_full_pickle(self, verbose=True):
         """Save entire `GrismFLT` object to a pickle
         """
-        import cPickle as pickle
-        
+        try:
+            import cPickle as pickle
+        except:
+            # Python 3
+            import pickle
+            
         root = self.grism_file.split('_flt.fits')[0].split('_cmb.fits')[0]
 
         hdu = pyfits.HDUList([pyfits.PrimaryHDU()])
@@ -2349,13 +2356,13 @@ class GrismFLT(object):
                                    name='MODEL'))
         
         
-        hdu.writeto('%s_GrismFLT.fits' %(root), clobber=True, 
+        hdu.writeto('{0}_GrismFLT.fits'.format(root), clobber=True, 
                     output_verify='fix')
         
         ## zero out large data objects
         self.direct.data = self.grism.data = self.seg = self.model = None
                                             
-        fp = open('%s_GrismFLT.pkl' %(root), 'wb')
+        fp = open('{0}_GrismFLT.pkl'.format(root), 'wb')
         pickle.dump(self, fp)
         fp.close()
     
@@ -2652,7 +2659,7 @@ class BeamCutout(object):
         hdu.append(pyfits.ImageHDU(data=self.model, header=hdu[-1].header,
                                    name='MODEL'))
         
-        outfile = '%s_%05d.%s.%s.fits' %(root, self.beam.id,
+        outfile = '{0}_{1:05d}.{2}.{3}.fits'.format(root, self.beam.id,
                                          self.grism.filter.lower(),
                                          self.beam.beam)
                                          
@@ -3011,7 +3018,7 @@ class BeamCutout(object):
                 else:
                     line_temp = line_temp + line_i*scl[i]
             
-            temp_list['line %s' %(line)] = line_temp
+            temp_list['line {0}'.format(line)] = line_temp
                                      
         return temp_list
                       
@@ -3134,7 +3141,7 @@ class BeamCutout(object):
             
             A, coeffs[i,:], chi2[i], model_2d = out
             if verbose:
-                print utils.no_newline + '%.4f %9.1f' %(zgrid[i], chi2[i])
+                print(utils.no_newline + '{0:.4f} {1:9.1f}'.format(zgrid[i], chi2[i]))
         
         # peaks
         import peakutils
@@ -3163,8 +3170,7 @@ class BeamCutout(object):
     
             A, coeffs_zoom[i,:], chi2_zoom[i], model_2d = out
             if verbose:
-                print utils.no_newline + '- %.4f %9.1f' %(zgrid_zoom[i],
-                                                          chi2_zoom[i])
+                print(utils.no_newline + '- {0:.4f} {1:9.1f}'.format(zgrid_zoom[i], chi2_zoom[i]))
     
         zgrid = np.append(zgrid, zgrid_zoom)
         chi2 = np.append(chi2, chi2_zoom)
@@ -3273,14 +3279,14 @@ class BeamCutout(object):
         ax = fig.add_subplot(gsb[-2:,:])
         ax.errorbar(xspec/1.e4, yspec, yerr, linestyle='None', marker='o',
                     markersize=3, color='black', alpha=0.5, 
-                    label='Data (id=%d)' %(self.beam.id))
+                    label='Data (id={0:d})'.format(self.beam.id))
         
         ax.plot(xspecm/1.e4, yspecm, color='red', linewidth=2, alpha=0.8,
-                label=r'Flat $f_\lambda$ (%s)' %(self.direct.filter))
+                label=r'Flat $f_\lambda$ ({0})'.format(self.direct.filter))
         
         zbest = fit_data['zgrid'][np.argmin(fit_data['chi2'])]
         ax.plot(xspecl/1.e4, yspecl, color='orange', linewidth=2, alpha=0.8,
-                label='Template (z=%.4f)' %(zbest))
+                label='Template (z={0:.4f})'.format(zbest))
     
         ax.legend(fontsize=8, loc='lower center', scatterpoints=1)
     
@@ -3301,10 +3307,10 @@ class BeamCutout(object):
         for d in [1,4,9]:
             ax.plot(fit_data['zgrid'],
                     fit_data['chi2']*0+(fit_data['chi2'].min()+d)/self.DoF,
-                    color='%.1f' %(d/20.))
+                    color='{0:.1f}'.format(d/20.))
             
         #ax.set_xticklabels([])
-        ax.set_ylabel(r'$\chi^2/(\nu=%d)$' %(self.DoF))
+        ax.set_ylabel(r'$\chi^2/(\nu={0:d})$'.format(self.DoF))
         ax.set_xlabel('z')
         ax.set_xlim(fit_data['zgrid'][0], fit_data['zgrid'][-1])
         
@@ -3447,7 +3453,7 @@ class BeamCutout(object):
         
         ### Normalized Gaussians on a grid
         waves = np.arange(grid[0], grid[1], grid[2])
-        line_centers = waves[grid[3]/2::grid[3]]
+        line_centers = waves[grid[3] // 2::grid[3]]
         
         rms = fwhm/2.35
         gaussian_lines = np.exp(-(line_centers[:,None]-waves)**2/2/rms**2)
@@ -3539,13 +3545,13 @@ class BeamCutout(object):
         ax = fig.add_subplot(gsb[-2:,:])
         ax.errorbar(xspec/1.e4, yspec, yerr, linestyle='None', marker='o',
                     markersize=3, color='black', alpha=0.5, 
-                    label='Data (id=%d)' %(self.beam.id))
+                    label='Data (id={0:d})'.format(self.beam.id))
         
         ax.plot(xspecm/1.e4, yspecm, color='red', linewidth=2, alpha=0.8,
-                label=r'Flat $f_\lambda$ (%s)' %(self.direct.filter))
+                label=r'Flat $f_\lambda$ ({0})'.format(self.direct.filter))
         
         ax.plot(xspecl/1.e4, yspecl, color='orange', linewidth=2, alpha=0.8,
-                label='Cont+line (%.4f, %.2e)' %(best_line_center/1.e4, best_line_flux*1.e-17))
+                label='Cont+line ({0:.4f}, {1:.2e})'.format(best_line_center/1.e4, best_line_flux*1.e-17))
 
         ax.legend(fontsize=8, loc='lower center', scatterpoints=1)
 
@@ -3554,7 +3560,7 @@ class BeamCutout(object):
         ax = fig.add_subplot(gsb[-3,:])
         ax.plot(line_centers/1.e4, chi2/ok_data.sum())
         ax.set_xticklabels([])
-        ax.set_ylabel(r'$\chi^2/(\nu=%d)$' %(ok_data.sum()))
+        ax.set_ylabel(r'$\chi^2/(\nu={0:d})$'.format(ok_data.sum()))
         
         if self.grism.filter == 'G102':
             xlim = [0.7, 1.25]
