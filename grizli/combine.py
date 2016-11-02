@@ -272,7 +272,8 @@ def combine_visits_and_filters(grow=1, pixfrac=0.5, kernel='point',
     if skip is None:
         skip = slice(0,len(output_list))
         
-    for key in output_list.keys()[skip]:
+    for i in range(len(output_list))[skip]:
+        key = output_list[i]['product']
         filter=key.split('-')[-1].upper()
         if filter not in filters:
             continue
@@ -283,12 +284,12 @@ def combine_visits_and_filters(grow=1, pixfrac=0.5, kernel='point',
             print '\n -- Combine: %s -- \n' %(output)
             
         if split_quadrants:
-            combine_quadrants(files=output_list[key], output=output,
+            combine_quadrants(files=output_list[i]['files'], output=output,
                               ref_pixel=[507,507], 
                               pixfrac=pixfrac, kernel=kernel, clobber=clobber,
                               ds9=ds9, verbose=verbose)
         else:
-            combine_flt(files=output_list[key], output=output, 
+            combine_flt(files=output_list[i]['files'], output=output, 
                     grow=grow, ds9=ds9, verbose=verbose, 
                     clobber=clobber, pixfrac=pixfrac, kernel=kernel)
 
