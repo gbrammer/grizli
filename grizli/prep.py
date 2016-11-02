@@ -209,7 +209,10 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
     if (head['INSTRUME'] == 'WFC3') & (head['DETECTOR'] == 'IR')&extra_badpix: 
         bp = pyfits.open(os.path.join(os.getenv('iref'),
                                       'badpix_spars200_Nov9.fits'))    
-        orig_file['DQ'].data |= bp[0].data
+        
+        if orig_file['DQ'].data.shape == bp[0].data.shape:
+            orig_file['DQ'].data |= bp[0].data
+        
         extra_msg += ' / bpix: $iref/badpix_spars200_Nov9.fits'
     
     if crclean:
