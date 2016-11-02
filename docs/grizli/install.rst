@@ -17,7 +17,7 @@ peakutils
 
 
 `Grizli` has been developed to work in the `astroconda <http://astroconda.readthedocs.io/en/latest/>`__
-Python environment (Python 2.7), which provides most of the required modules listed here, including general utilities like `numpy`, `scipy`, and `matplotlib`, as well as astronomy tools like `astropy` and specific software for dealing with space-telescope data (`stsci.tools`, `drizzlepac`, etc.).  
+Python environment, which provides most of the required modules listed here, including general utilities like `numpy`, `scipy`, and `matplotlib`, as well as astronomy tools like `astropy` and specific software for dealing with space-telescope data (`stsci.tools`, `drizzlepac`, etc.).  It has been tested to run in astroconda with Python versions ``2.7.12`` and ``3.5.2``.
 
 There are a few additional required modules not provided with `astroconda`, summarized here.  `/usr/local/share/python` is a good place to download and compile Python modules not provided automatically with `astroconda`:
 
@@ -88,7 +88,7 @@ The grism redshift fits require galaxy SED templates that are provided with the 
     .. code:: bash
         
         # Get installed location of grizli
-        dist=`python -c "import grizli; import os; print os.path.dirname(grizli.__file__)"`
+        dist=`python -c "import grizli; import os; print(os.path.dirname(grizli.__file__))"`
         
         cd $GRIZLI/templates                # created above
         ln -s ${dist}/data/templates/* ./

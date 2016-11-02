@@ -18,7 +18,7 @@ if USE_CYTHON:
 else:
     cext = '.c'
 
-print 'C extension: %s' %(cext)
+print('C extension: {0}'.format(cext))
 
 extensions = [
     Extension("grizli/utils_c/interp", ["grizli/utils_c/interp"+cext],

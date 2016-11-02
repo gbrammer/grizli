@@ -304,7 +304,7 @@ def wfirst_header(ra=53.1592277508136, dec=-27.782056346146, pa_aper=128.589, na
     anything you want in `naxis`.
     """
     #naxis = 2048, 2048
-    crpix = naxis[0]/2, naxis[0]/2
+    crpix = naxis[0]/2., naxis[0]/2.
     
     cd = np.array([[ -0.11,  0], [0, 0.11]])/3600.
     cd_rot = rotate_CD_matrix(cd, pa_aper)

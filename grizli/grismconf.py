@@ -73,10 +73,10 @@ class aXeConf():
         self.orders = {}
         for beam in ['A','B','C','D','E','F','G','H','I','J']:
             order = 0
-            while 'DYDX_%s_%d' %(beam, order) in self.conf.keys():
+            while 'DYDX_{0:s}_{1:d}'.format(beam, order) in self.conf.keys():
                 order += 1
             
-            while 'DLDP_%s_%d' %(beam, order) in self.conf.keys():
+            while 'DLDP_{0:s}_{1:d}'.format(beam, order) in self.conf.keys():
                 order += 1
             
             self.orders[beam] = order-1
@@ -96,9 +96,9 @@ class aXeConf():
         for beam in self.orders:
             if self.orders[beam] > 0:
                 self.beams.append(beam)
-                self.dxlam[beam] = np.arange(self.conf['BEAM%s' %(beam)].min(), self.conf['BEAM%s' %(beam)].max(), dtype=int)
+                self.dxlam[beam] = np.arange(self.conf['BEAM{0}'.format(beam)].min(), self.conf['BEAM{0}'.format(beam)].max(), dtype=int)
                 self.nx[beam] = int(self.dxlam[beam].max()-self.dxlam[beam].min())+1
-                self.sens[beam] = Table.read('%s/%s' %(os.path.dirname(self.conf_file), self.conf['SENSITIVITY_%s' %(beam)]))
+                self.sens[beam] = Table.read('{0}/{1}'.format(os.path.dirname(self.conf_file), self.conf['SENSITIVITY_{0}'.format(beam)]))
                 #self.sens[beam].wave = np.cast[np.double](self.sens[beam]['WAVELENGTH'])
                 #self.sens[beam].sens = np.cast[np.double](self.sens[beam]['SENSITIVITY'])
                 
@@ -142,7 +142,7 @@ class aXeConf():
         if isinstance(coeffs, float):
             order = 1
         else:
-            order = int(-1+np.sqrt(1+8*len(coeffs)))/2
+            order = int(-1+np.sqrt(1+8*len(coeffs))) // 2
     
         ## Build polynomial terms array
         ## $a = a_0+a_1x_i+a_2y_i+a_3x_i^2+a_4x_iy_i+a_5yi^2+$ ...
@@ -267,14 +267,14 @@ class aXeConf():
         NORDER = self.orders[beam]+1
         
         xi, yi = x-self.xoff, y-self.yoff
-        xoff_beam = self.field_dependent(xi, yi, self.conf['XOFF_%s' %(beam)])
-        yoff_beam = self.field_dependent(xi, yi, self.conf['YOFF_%s' %(beam)])
+        xoff_beam = self.field_dependent(xi, yi, self.conf['XOFF_{0}'.format(beam)])
+        yoff_beam = self.field_dependent(xi, yi, self.conf['YOFF_{0}'.format(beam)])
     
         ## y offset of trace (DYDX)
         dydx = np.zeros(NORDER) #0 #+1.e-80
         for i in range(NORDER):
-            if 'DYDX_%s_%d' %(beam, i) in self.conf.keys():
-                coeffs = self.conf['DYDX_%s_%d' %(beam, i)]
+            if 'DYDX_{0:s}_{1:d}'.format(beam, i) in self.conf.keys():
+                coeffs = self.conf['DYDX_{0:s}_{1:d}'.format(beam, i)]
                 dydx[i] = self.field_dependent(xi, yi, coeffs)
             
         # $dy = dydx_0+dydx_1 dx+dydx_2 dx^2+$ ...
@@ -285,8 +285,8 @@ class aXeConf():
         ## wavelength solution    
         dldp = np.zeros(NORDER)
         for i in range(NORDER):
-            if 'DLDP_%s_%d' %(beam, i) in self.conf.keys():
-                coeffs = self.conf['DLDP_%s_%d' %(beam, i)]
+            if 'DLDP_{0:s}_{1:d}'.format(beam, i) in self.conf.keys():
+                coeffs = self.conf['DLDP_{0:s}_{1:d}'.format(beam, i)]
                 dldp[i] = self.field_dependent(xi, yi, coeffs)
         
         dp = self.evaluate_dp(dx-xoff_beam, dydx)
@@ -332,12 +332,12 @@ class aXeConf():
         ### NIRISS rotation?
         if fwcpos is not None:
             if 'FWCPOS_REF' not in self.conf.keys():
-                print 'Parameter fwcpos=%f supplied but no FWCPOS_REF in %s' %(self.conf_file)
+                print('Parameter fwcpos={0:f} supplied but no FWCPOS_REF in {1:s}'.format(self.conf_file))
                 return dy, lam
             
-            order = self.conf['DYDX_ORDER_%s' %(beam)]
+            order = self.conf['DYDX_ORDER_{0}'.format(beam)]
             if order != 2:
-                print 'ORDER=%d not supported for NIRISS rotation' %(order)
+                print('ORDER={0:d} not supported for NIRISS rotation'.format(order))
                 return dy, lam
                 
             theta = (fwcpos - self.conf['FWCPOS_REF'])/180*np.pi
@@ -404,19 +404,18 @@ class aXeConf():
                     label='Direct')
         
         for beam in beams:
-            if 'XOFF_%s' %(beam) not in self.conf.keys():
+            if 'XOFF_{0}'.format(beam) not in self.conf.keys():
                 continue
             
-            xoff = self.field_dependent(x0, x1, self.conf['XOFF_%s' %(beam)])
+            xoff = self.field_dependent(x0, x1, self.conf['XOFF_{0}'.format(beam)])
             dy, lam = self.get_beam_trace(x0, x1, dx=dx, beam=beam)
-            xlim = self.conf['BEAM%s' %(beam)]
+            xlim = self.conf['BEAM{0}'.format(beam)]
             ok = (dx >= xlim[0]) & (dx <= xlim[1])
             plt.scatter(dx[ok]+xoff, dy[ok], c=lam[ok]/1.e4, marker='s', s=s,
                         alpha=0.5, edgecolor='None')
             plt.text(np.median(dx[ok]), np.median(dy[ok])+1, beam,
                      ha='center', va='center', fontsize=14)
-            print 'Beam %s, lambda=(%.1f - %.1f)' %(beam, lam[ok].min(),
-                                                    lam[ok].max())
+            print('Beam {0}, lambda=({1:.1f} - {2:.1f})'.format(beam, lam[ok].min(), lam[ok].max()))
             
         plt.grid()
         plt.xlabel(r'$\Delta x$')
@@ -426,7 +425,7 @@ class aXeConf():
         cb.set_label(r'$\lambda\,(\mu\mathrm{m})$')
         plt.title(self.conf_file)
         plt.tight_layout()
-        plt.savefig('%s.pdf' %(self.conf_file))    
+        plt.savefig('{0}.pdf'.format(self.conf_file))    
 
 def get_config_filename(instrume='WFC3', filter='F140W',
                         grism='G141', ext=1):
@@ -475,30 +474,30 @@ def get_config_filename(instrume='WFC3', filter='F140W',
     """   
     if instrume == 'ACS':
         conf_file = os.path.join(os.getenv('GRIZLI'), 
-                    'CONF/ACS.WFC.CHIP%d.Cycle13.5.conf' %({1:2,2:1}[ext]))
+                    'CONF/ACS.WFC.CHIP{0:d}.Cycle13.5.conf'.format({1:2,2:1}[ext]))
                            
     if instrume == 'WFC3':
         if grism == 'G280':
             conf_file = os.path.join(os.getenv('GRIZLI'), 
-               'CONF/G280/WFC3.UVIS.G280.cal/WFC3.UVIS.G280.CHIP%d.V2.0.conf' %({1:2,2:1}[ext]))
+               'CONF/G280/WFC3.UVIS.G280.cal/WFC3.UVIS.G280.CHIP{0:d}.V2.0.conf'.format({1:2,2:1}[ext]))
         
             return conf_file
             
         conf_file = os.path.join(os.getenv('GRIZLI'), 
-                                 'CONF/%s.%s.V4.32.conf' %(grism, filter))
+                                 'CONF/{0}.{1}.V4.32.conf'.format(grism, filter))
         
         ## When direct + grism combination not found for WFC3 assume F140W
         if not os.path.exists(conf_file):
             conf_file = os.path.join(os.getenv('GRIZLI'),
-                                 'CONF/%s.%s.V4.32.conf' %(grism, 'F140W'))
+                                 'CONF/{0}.{1}.V4.32.conf'.format(grism, 'F140W'))
               
     if instrume == 'NIRISS':
         conf_file = os.path.join(os.getenv('GRIZLI'),
-                                 'CONF/NIRISS.%s.conf' %(grism))
+                                 'CONF/NIRISS.{0}.conf'(grism))
     
     if instrume == 'NIRCam':
         conf_file = os.path.join(os.getenv('GRIZLI'),
-            'CONF/aXeSIM_NC_2016May/CONF/NIRCam_LWAR_%s.conf' %(grism))
+            'CONF/aXeSIM_NC_2016May/CONF/NIRCam_LWAR_{0}.conf'.format(grism))
     
     if instrume == 'WFIRST':
         conf_file = os.path.join(os.getenv('GRIZLI'), 'CONF/WFIRST.conf')

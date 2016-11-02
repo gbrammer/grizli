@@ -58,7 +58,7 @@ def radec_to_targname(ra=0, dec=0, header=None):
     Example:
 
         >>> from grizli.utils import radec_to_targname
-        >>> print radec_to_targname(ra=10., dec=-10.)
+        >>> print(radec_to_targname(ra=10., dec=-10.))
         j004000-100000
     
     Parameters
@@ -91,7 +91,7 @@ def radec_to_targname(ra=0, dec=0, header=None):
     coo = astropy.coordinates.SkyCoord(ra=ra*u.deg, dec=dec*u.deg)
     
     cstr = re.split('[hmsd.]', coo.to_string('hmsdms', precision=2))
-    targname = ('j%s%s' %(''.join(cstr[0:3]), ''.join(cstr[4:7])))
+    targname = ('j{0}{1}'.format(''.join(cstr[0:3]), ''.join(cstr[4:7])))
     targname = targname.replace(' ', '')
     
     return targname
@@ -121,7 +121,7 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
         
             >>> flc = 'jbhj64d8q_flc.fits'
             >>> visit_targname = flc[:6]
-            >>> print visit_targname
+            >>> print(visit_targname)
             jbhj64
         
         If False, generate a targname for parallel observations based on the
@@ -146,7 +146,7 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
             >>> translate = {'GOODS-SOUTH-': 'goodss-'}
             >>> for k in translate:
             >>>     targname = targname.replace(k, translate[k])
-            >>> print targname
+            >>> print(targname)
             goodss-10
         
     Returns
@@ -163,11 +163,10 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
             >>> propstr = flt_filename[1:4]
             >>> visit = flt_filename[4:6]
             >>> # uniquename = False
-            >>> print '%s-%05.1f-%s' %(targname, pa_v3, filter)
+            >>> print('{0}-{1:05.1f}-{2}'.format(targname, pa_v3, filter))
             macs1149.6+2223-032.0-f140w
             >>> # uniquename = True
-            >>> print '%s-%3s-%2s-%05.1f-%s' %(targname, propstr, visit, 
-                                               pa_v3, filter)
+            >>> print('{0}-{1:3s}-{2:2s}-{3:05.1f}-{4:s}'.format(targname, propstr, visit, pa_v3, filter))
             macs1149.6+2223-ca5-21-032.0-f140w
         
     filter_list : dict
@@ -246,7 +245,7 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
                 spl = target_use.split('-')
                 try:
                     if (int(spl[-1]) < 10) & (len(spl[-1]) == 1):
-                        spl[-1] = '%02d' %(int(spl[-1]))
+                        spl[-1] = '{0:02d}'.format(int(spl[-1]))
                         target_use = '-'.join(spl)
                 except:
                     pass
@@ -258,7 +257,7 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
             for angle in angles:
                 exposure_list = []
                 exposure_start = []
-                product='%s-%05.1f-%s' %(target_use, angle, filter)             
+                product='{0}-{1:05.1f}-{2}'.format(target_use, angle, filter)             
 
                 visit_match = np.unique(visits[(target_list == target) &
                                                (info['filter'] == filter)])
@@ -277,8 +276,7 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
                 for visit, prog in zip(this_visits, this_progs):
                     visit_list = []
                     visit_start = []
-                    visit_product='%s-%s-%s-%05.1f-%s' %(target_use, prog, 
-                                                 visit, angle, filter)             
+                    visit_product = '{0}-{1}-{2}-{3:05.1f}-{4}'.format(target_use, prog, visit, angle, filter)             
                                             
                     use = ((target_list == target) & 
                            (info['filter'] == filter) & 
@@ -302,7 +300,7 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
                     filter_list[filter][angle].extend(visit_list)
                     
                     if uniquename:
-                        print visit_product, len(visit_list)
+                        print(visit_product, len(visit_list))
                         so = np.argsort(visit_start)
                         exposure_list = np.array(visit_list)[so]
                         #output_list[visit_product.lower()] = visit_list
@@ -312,7 +310,7 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
                         output_list.append(d)
                         
                 if not uniquename:
-                    print product, len(exposure_list)
+                    print(product, len(exposure_list))
                     so = np.argsort(exposure_start)
                     exposure_list = np.array(exposure_list)[so]
                     #output_list[product.lower()] = exposure_list
@@ -333,11 +331,11 @@ def get_hst_filter(header):
         >>> h['FILTER1'] = 'CLEAR1L'
         >>> h['FILTER2'] = 'F814W'
         >>> from grizli.utils import get_hst_filter
-        >>> print get_hst_filter(h)
+        >>> print(get_hst_filter(h))
         F814W
         >>> h['FILTER1'] = 'G800L'
         >>> h['FILTER2'] = 'CLEAR2L'
-        >>> print get_hst_filter(h)
+        >>> print(get_hst_filter(h))
         G800L
     
     Parameters
@@ -352,7 +350,7 @@ def get_hst_filter(header):
     """
     if header['INSTRUME'].strip() == 'ACS':
         for i in [1,2]:
-            filter_i = header['FILTER%d' %(i)]
+            filter_i = header['FILTER{0:d}'.format(i)]
             if 'CLEAR' in filter_i:
                 continue
             else:
@@ -392,7 +390,7 @@ def unset_dq_bits(value, okbits=32+64+512, verbose=False):
     for i in range(n):
         if bin_bits[-(i+1)] == '1':
             if verbose:
-                print 2**i
+                print(2**i)
             
             value -= (value & 2**i)
     
@@ -474,7 +472,7 @@ def detect_with_photutils(sci, err=None, dq=None, seg=None, detect_thresh=2.,
         kernel.normalize()
     
         if verbose:
-            print '%s: photutils.detect_sources (detect_thresh=%.1f, grow_seg=%d, gauss_fwhm=%.1f, ZP=%.1f)' %(root, detect_thresh, grow_seg, gauss_fwhm, AB_zeropoint)
+            print('{0}: photutils.detect_sources (detect_thresh={1:.1f}, grow_seg={2:d}, gauss_fwhm={3:.1f}, ZP={4:.1f})'.format(root, detect_thresh, grow_seg, gauss_fwhm, AB_zeropoint))
         
         ### Detect sources
         segm = detect_sources(sci*(~mask), threshold, npixels=npixels,
@@ -488,7 +486,7 @@ def detect_with_photutils(sci, err=None, dq=None, seg=None, detect_thresh=2.,
         
     ### Source properties catalog
     if verbose:
-        print  '%s: photutils.source_properties' %(root)
+        print('{0}: photutils.source_properties'.format(root))
     
     props = source_properties(sci, segm, error=threshold/detect_thresh,
                               mask=mask, effective_gain=gain,
@@ -517,19 +515,18 @@ def detect_with_photutils(sci, err=None, dq=None, seg=None, detect_thresh=2.,
         
         catalog.rename_column(key, rename_columns[key])
         if verbose:
-            print 'Rename column: %s -> %s' %(key, rename_columns[key])
+            print('Rename column: {0} -> {1}'.format(key, rename_columns[key]))
     
     ### Done!
     if verbose:
-        print no_newline + ('%s: photutils.source_properties - %d objects'
-                             %(root, len(catalog)))
+        print(no_newline + ('{0}: photutils.source_properties - {1:d} objects'.format(root, len(catalog))))
     
     #### Save outputs?
     if save_detection:
         seg_file = root + '.detect_seg.fits'
         seg_cat  = root + '.detect.cat'
         if verbose:
-            print '%s: save %s, %s' %(root, seg_file, seg_cat)
+            print('{0}: save {1}, {2}'.format(root, seg_file, seg_cat))
         
         if wcs is not None:
             header = wcs.to_header(relax=True)
@@ -565,9 +562,9 @@ def get_line_wavelengths():
         
             >>> from grizli.utils import get_line_wavelengths
             >>> line_wavelengths, line_ratios = get_line_wavelengths()
-            >>> print line_wavelengths['Ha'], line_ratios['Ha']
+            >>> print(line_wavelengths['Ha'], line_ratios['Ha'])
             [6564.61] [1.0]
-            >>> print line_wavelengths['OIII'], line_ratios['OIII']
+            >>> print(line_wavelengths['OIII'], line_ratios['OIII'])
             [5008.24, 4960.295] [2.98, 1]
         
         Includes some additional combined line complexes useful for redshift
@@ -576,7 +573,7 @@ def get_line_wavelengths():
             >>> from grizli.utils import get_line_wavelengths
             >>> line_wavelengths, line_ratios = get_line_wavelengths()
             >>> key = 'Ha+SII+SIII+He'
-            >>> print line_wavelengths[key], '\\n', line_ratios[key]
+            >>> print(line_wavelengths[key], '\\n', line_ratios[key])
             [6564.61, 6718.29, 6732.67, 9068.6, 9530.6, 10830.0]
             [1.0, 0.1, 0.1, 0.05, 0.122, 0.04]
         
@@ -884,7 +881,7 @@ def make_spectrum_wcsheader(center_wave=1.4e4, dlam=40, NX=100, spatial_scale=1,
         
         >>> from grizli.utils import make_spectrum_wcsheader
         >>> h, wcs = make_spectrum_wcsheader()
-        >>> print wcs
+        >>> print(wcs)
         WCS Keywords
         Number of WCS axes: 2
         CTYPE : 'WAVE'  'LINEAR'  
@@ -982,7 +979,7 @@ def make_wcsheader(ra=40.07293, dec=-1.6137748, size=2, pixscale=0.1, get_hdu=Fa
     
         >>> from grizli.utils import make_wcsheader
         >>> h, wcs = make_wcsheader()
-        >>> print wcs
+        >>> print(wcs)
         WCS Keywords
         Number of WCS axes: 2
         CTYPE : 'RA---TAN'  'DEC--TAN'  
@@ -994,9 +991,9 @@ def make_wcsheader(ra=40.07293, dec=-1.6137748, size=2, pixscale=0.1, get_hdu=Fa
         
         >>> from grizli.utils import make_wcsheader
         >>> hdu = make_wcsheader(get_hdu=True)
-        >>> print hdu.data.shape
+        >>> print(hdu.data.shape)
         (20, 20)
-        >>> print hdu.header.tostring
+        >>> print(hdu.header.tostring)
         XTENSION= 'IMAGE   '           / Image extension                                
         BITPIX  =                  -32 / array data type                                
         NAXIS   =                    2 / number of array dimensions                     
@@ -1047,7 +1044,7 @@ def make_wcsheader(ra=40.07293, dec=-1.6137748, size=2, pixscale=0.1, get_hdu=Fa
     
     for i in [0,1]:
         for j in [0,1]:
-            hout['CD%d_%d' %(i+1, j+1)] = rot_cd[i,j]
+            hout['CD{0:d}_{1:d}'.format(i+1, j+1)] = rot_cd[i,j]
             wcs_out.wcs.cd[i,j] = rot_cd[i,j]
                 
     cd = wcs_out.wcs.cd
@@ -1066,13 +1063,13 @@ def fetch_hst_calib(file='iref$uc72113oi_pfl.fits',  ftpdir='https://hst-crds.st
     import os
     
     ref_dir = file.split('$')[0]
-    cimg = file.split('%s$' %(ref_dir))[1]
+    cimg = file.split('{0}$'.format(ref_dir))[1]
     iref_file = os.path.join(os.getenv(ref_dir), cimg)
     if not os.path.exists(iref_file):
-        os.system('curl -o %s %s/%s' %(iref_file, ftpdir, cimg))
+        os.system('curl -o {0} {1}/{2}'.format(iref_file, ftpdir, cimg))
     else:
         if verbose:
-            print '%s exists' %(iref_file)
+            print('{0} exists'.format(iref_file))
         
 def fetch_hst_calibs(flt_file, ftpdir='https://hst-crds.stsci.edu/unchecked_get/references/hst/', calib_types=['BPIXTAB', 'CCDTAB', 'OSCNTAB', 'CRREJTAB', 'DARKFILE', 'NLINFILE', 'PFLTFILE', 'IMPHTTAB', 'IDCTAB', 'NPOLFILE'], verbose=True):
     """
@@ -1090,7 +1087,7 @@ def fetch_hst_calibs(flt_file, ftpdir='https://hst-crds.stsci.edu/unchecked_get/
         ref_dir = 'iref'
     
     if not os.getenv(ref_dir):
-        print 'No $%s set!  Put it in ~/.bashrc or ~/.cshrc.' %(ref_dir)
+        print('No ${0} set!  Put it in ~/.bashrc or ~/.cshrc.'.format(ref_dir))
         return False
     
     for ctype in calib_types:
@@ -1098,7 +1095,7 @@ def fetch_hst_calibs(flt_file, ftpdir='https://hst-crds.stsci.edu/unchecked_get/
             continue
             
         if verbose:
-            print 'Calib: %s=%s' %(ctype, im[0].header[ctype])
+            print('Calib: {0}={1}'.format(ctype, im[0].header[ctype]))
         
         if im[0].header[ctype] == 'N/A':
             continue
@@ -1111,13 +1108,13 @@ def fetch_default_calibs(ACS=False):
     
     for ref_dir in ['iref','jref']:
         if not os.getenv(ref_dir):
-            print """
-No $%s set!  Make a directory and point to it in ~/.bashrc or ~/.cshrc.
+            print("""
+No ${0} set!  Make a directory and point to it in ~/.bashrc or ~/.cshrc.
 For example,
 
-  $ mkdir $GRIZLI/%s
-  $ export %s="${GRIZLI}/%s/" # put this in ~/.bashrc
-""" %(ref_dir, ref_dir, ref_dir, ref_dir)
+  $ mkdir $GRIZLI/{0}
+  $ export {0}="${GRIZLI}/{0}/" # put this in ~/.bashrc
+""".format(ref_dir))
 
             return False
         
@@ -1137,10 +1134,10 @@ For example,
     for file in files:
         fetch_hst_calib(file)
     
-    badpix = '%s/badpix_spars200_Nov9.fits' %(os.getenv('iref'))
-    print 'Extra WFC3/IR bad pixels: %s' %(badpix)
+    badpix = '{0}/badpix_spars200_Nov9.fits'.format(os.getenv('iref'))
+    print('Extra WFC3/IR bad pixels: {0}'.format(badpix))
     if not os.path.exists(badpix):
-        os.system('curl -o %s/badpix_spars200_Nov9.fits https://raw.githubusercontent.com/gbrammer/wfc3/master/data/badpix_spars200_Nov9.fits' %(os.getenv('iref')))
+        os.system('curl -o {0}/badpix_spars200_Nov9.fits https://raw.githubusercontent.com/gbrammer/wfc3/master/data/badpix_spars200_Nov9.fits'.format(os.getenv('iref')))
     
 def fetch_config_files(ACS=False):
     """
@@ -1148,9 +1145,9 @@ def fetch_config_files(ACS=False):
     """
     cwd = os.getcwd()
     
-    print 'Config directory: %s/CONF' %(os.getenv('GRIZLI'))
+    print('Config directory: {0}/CONF'.format(os.getenv('GRIZLI')))
     
-    os.chdir('%s/CONF' %(os.getenv('GRIZLI')))
+    os.chdir('{0}/CONF'.format(os.getenv('GRIZLI')))
     
     tarfiles = ['ftp://ftp.stsci.edu/cdbs/wfc3_aux/WFC3.IR.G102.cal.V4.32.tar.gz',
  'ftp://ftp.stsci.edu/cdbs/wfc3_aux/WFC3.IR.G141.cal.V4.32.tar.gz',
@@ -1163,24 +1160,24 @@ def fetch_config_files(ACS=False):
     for url in tarfiles:
         file=os.path.basename(url)
         if not os.path.exists(file):
-            print 'Get %s' %(file)
-            os.system('curl -o %s %s' %(file, url))
+            print('Get {0}'.format(file))
+            os.system('curl -o {0} {1}'.format(file, url))
         
-        os.system('tar xzvf %s' %(file))
+        os.system('tar xzvf {0}'.format(file))
     
     # ePSF files for fitting point sources
-    files = ['http://www.stsci.edu/hst/wfc3/analysis/PSF/psf_downloads/wfc3_ir/PSFSTD_WFC3IR_%s.fits' %(filter) for filter in ['F105W', 'F125W', 'F140W', 'F160W']]
+    files = ['http://www.stsci.edu/hst/wfc3/analysis/PSF/psf_downloads/wfc3_ir/PSFSTD_WFC3IR_{0}.fits'.format(filter) for filter in ['F105W', 'F125W', 'F140W', 'F160W']]
     for url in files:
         file=os.path.basename(url)
         if not os.path.exists(file):
-            print 'Get %s' %(file)
-            os.system('curl -o %s %s' %(file, url))
+            print('Get {0}'.format(file))
+            os.system('curl -o {0} {1}'.format(file, url))
         else:
-            print 'File %s exists' %(file)
+            print('File {0} exists'.format(file))
     
     # Stellar templates
-    print 'Templates directory: %s/templates' %(os.getenv('GRIZLI'))
-    os.chdir('%s/templates' %(os.getenv('GRIZLI')))
+    print('Templates directory: {0}/templates'.format(os.getenv('GRIZLI')))
+    os.chdir('{0}/templates'.format(os.getenv('GRIZLI')))
     
     files = ['http://www.stsci.edu/~brammer/Grizli/Files/stars_pickles.npy',
              'http://www.stsci.edu/~brammer/Grizli/Files/stars_bpgs.npy']
@@ -1188,12 +1185,12 @@ def fetch_config_files(ACS=False):
     for url in files:
         file=os.path.basename(url)
         if not os.path.exists(file):
-            print 'Get %s' %(file)
-            os.system('curl -o %s %s' %(file, url))
+            print('Get {0}'.format(file))
+            os.system('curl -o {0} {1}'.format(file, url))
         else:
-            print 'File %s exists' %(file)
+            print('File {0} exists'.format(file))
     
-    print 'ln -s stars_pickles.npy stars.npy'
+    print('ln -s stars_pickles.npy stars.npy')
     os.system('ln -s stars_pickles.npy stars.npy')
     
     os.chdir(cwd)
@@ -1224,7 +1221,7 @@ class EffectivePSF(object):
         self.epsf = {}
         for filter in ['F105W', 'F125W', 'F140W', 'F160W']:
             file = os.path.join(os.getenv('GRIZLI'), 'CONF',
-                                'PSFSTD_WFC3IR_%s.fits' %(filter))
+                                'PSFSTD_WFC3IR_{0}.fits'.format(filter))
             
             data = pyfits.open(file)[0].data.T
             data[data < 0] = 0 
