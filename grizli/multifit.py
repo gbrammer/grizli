@@ -292,6 +292,17 @@ class GroupFLT():
                     
             else:
                 self.catalog = catalog
+            
+            # necessary columns from SExtractor / photutils
+            pairs = [['NUMBER','id'], 
+                     ['MAG_AUTO', 'mag'], 
+                     ['MAGERR_AUTO', 'mag_err']]
+                     
+            cols = self.catalog.colnames
+            for pair in pairs:
+                if (pair[0] not in cols) & (pair[1] in cols):
+                    self.catalog[pair[0]] = self.catalog[pair[1]]
+                    
         else:
             self.catalog = None
                  
@@ -389,7 +400,7 @@ class GroupFLT():
             ids = self.catalog['NUMBER'][bright]
             mags = self.catalog['MAG_AUTO'][bright]
 
-            xspec = np.arange(0.6, 2.1, 0.05)-1
+            xspec = np.arange(0.3, 2.35, 0.05)-1
 
             yspec = [xspec**o*coeffs[o] for o in range(len(coeffs))]
             xspec = (xspec+1)*1.e4
@@ -481,7 +492,7 @@ class GroupFLT():
         except:
             return False
             
-        xspec = np.arange(0.3, 2.1, 0.05)-1
+        xspec = np.arange(0.3, 2.35, 0.05)-1
         scale_coeffs = out_coeffs[mb.N*mb.fit_bg:mb.N*mb.fit_bg+mb.n_poly]
         yspec = [xspec**o*scale_coeffs[o] for o in range(mb.poly_order+1)]
         if np.abs(scale_coeffs).max() > max_coeff:
@@ -1061,7 +1072,7 @@ class MultiBeam():
         #model_continuum.reshape(self.beam.sh_beam)
                 
         ### 1D spectrum
-        xspec = np.arange(0.3, 1.8, 0.05)-1
+        xspec = np.arange(0.3, 2.35, 0.05)-1
         scale_coeffs = coeffs_full[self.N*self.fit_bg:  
                                   self.N*self.fit_bg+self.n_poly]
                                   
@@ -1289,7 +1300,7 @@ class MultiBeam():
         #model_continuum.reshape(self.beam.sh_beam)
                 
         ### 1D spectrum
-        xspec = np.arange(0.3, 1.8, 0.05)-1
+        xspec = np.arange(0.3, 2.35, 0.05)-1
         scale_coeffs = coeffs_full[self.N*self.fit_bg:  
                                   self.N*self.fit_bg+self.n_poly]
                                   
