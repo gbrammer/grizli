@@ -29,7 +29,7 @@ No ${0} set!  Make a directory and point to it in ~/.bashrc or ~/.cshrc.
 For example,
 
   $ mkdir $GRIZLI/{0}
-  $ export {0}="${GRIZLI}/{0}/" # put this in ~/.bashrc
+  $ export {0}="$GRIZLI/{0}/" # put this in ~/.bashrc
 """.format(ref_dir))
         else:
             ### WFC3
