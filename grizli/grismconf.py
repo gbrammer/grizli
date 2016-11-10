@@ -493,7 +493,7 @@ def get_config_filename(instrume='WFC3', filter='F140W',
               
     if instrume == 'NIRISS':
         conf_file = os.path.join(os.getenv('GRIZLI'),
-                                 'CONF/NIRISS.{0}.conf'(grism))
+                                 'CONF/NIRISS.{0}.conf'.format(grism))
     
     if instrume == 'NIRCam':
         conf_file = os.path.join(os.getenv('GRIZLI'),
