@@ -1519,8 +1519,11 @@ class GrismFLT(object):
                 raise IOError
             
         # ### Simulation mode, no grism exposure
-        self.pad = self.grism.pad
-        
+        if self.grism is not None:
+            self.pad = self.grism.pad
+        else:
+            self.pad = pad
+            
         if (self.grism is None) & (self.direct is not None):
             self.grism = ImageData(hdulist=direct_im, sci_extn=sci_extn)
             self.grism_file = self.direct_file
