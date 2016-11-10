@@ -36,6 +36,8 @@ There are a few additional required modules not provided with `astroconda`, summ
     .. code:: bash
 
         git clone https://github.com/megalut/sewpy.git
+        # For Python 3, get the fork below
+        # git clone https://github.com/gbrammer/sewpy.git
         cd sewpy
         python setup.py install
 
