@@ -489,8 +489,7 @@ def detect_with_photutils(sci, err=None, dq=None, seg=None, detect_thresh=2.,
         print('{0}: photutils.source_properties'.format(root))
     
     props = source_properties(sci, segm, error=threshold/detect_thresh,
-                              mask=mask, effective_gain=gain,
-                              background=background, wcs=wcs)
+                              mask=mask, background=background, wcs=wcs)
                               
     catalog = properties_table(props)
     
