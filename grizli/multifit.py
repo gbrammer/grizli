@@ -1569,8 +1569,11 @@ class MultiBeam():
                                       kernel='point', pixfrac=0.6,
                                       wlimit=[xmin, xmax])
         
+        clip = hdu_full['WHT'].data > np.percentile(hdu_full['WHT'].data, 30)
+        #vmax = np.maximum(1.1*np.percentile(hdu_full['SCI'].data[clip], 98), 0.04)
+        avg_rms = 1/np.median(np.sqrt(hdu_full['WHT'].data[clip]))
+        vmax = np.maximum(1.1*np.percentile(hdu_full['SCI'].data[clip], 98), 5*avg_rms)
         
-        vmax = np.maximum(1.1*np.percentile(hdu_full[1].data, 98), 0.04)
         #print 'VMAX: %f\n\n' %vmax
         
         sh = hdu_full[1].data.shape
@@ -1721,7 +1724,7 @@ class MultiBeam():
 
             if save_fits:
                 hdu_full.writeto('{0}_zfit_{1:05d}.line.fits'.format(self.group_name, self.id),
-                                 clobber=True, output_verify='fix')
+                                 clobber=True, output_verify='silentfix')
         
         return hdu_full
         
@@ -1891,7 +1894,7 @@ class MultiBeam():
         fig.savefig('{0}_zfit_{1:05d}.png'.format(self.group_name, self.id))
         
         fig2.savefig('{0}_zfit_{1:05d}.2D.png'.format(self.group_name, self.id))
-        hdu2.writeto('{0}_zfit_{1:05d}.2D.fits'.format(self.group_name, self.id), clobber=True, output_verify='fix')
+        hdu2.writeto('{0}_zfit_{1:05d}.2D.fits'.format(self.group_name, self.id), clobber=True, output_verify='silentfix')
         
         label = '# id ra dec zbest '
         data = '{0:7d} {1:.6f} {2:.6f} {3:.5f}'.format(self.id, self.ra, self.dec,
