@@ -821,7 +821,7 @@ def get_gaia_catalog(ra=165.86, dec=34.829694, radius=3.):
     	"LANG":    "ADQL", \
     	"FORMAT":  "votable", \
     	"PHASE":  "RUN", \
-    	"QUERY":   "SELECT TOP 500 * FROM gaiadr1.gaia_source  WHERE CONTAINS(POINT('ICRS',gaiadr1.gaia_source.ra,gaiadr1.gaia_source.dec),CIRCLE('ICRS',{0},{1},{2:.2f}))=1".format(ra, dec, radius/60.)
+    	"QUERY":   "SELECT TOP 5000 * FROM gaiadr1.gaia_source  WHERE CONTAINS(POINT('ICRS',gaiadr1.gaia_source.ra,gaiadr1.gaia_source.dec),CIRCLE('ICRS',{0},{1},{2:.2f}))=1".format(ra, dec, radius/60.)
     	})
 
     headers = {\
