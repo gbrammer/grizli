@@ -911,12 +911,12 @@ class MultiBeam():
         """
         
         if stars:
-            #templates = glob.glob('%s/templates/Pickles_stars/ext/*dat' %(os.getenv('GRIZLI')))
+            # templates = glob.glob('%s/templates/Pickles_stars/ext/*dat' %(os.getenv('GRIZLI')))
             # templates = []
             # for t in 'obafgkmrw':
-            #     templates.extend( glob.glob('%s/templates/Pickles_stars/ext/uk%s*dat' %(os.getenv('GRIZLI'), t)))
-            # templates.extend(glob.glob('%s/templates/SPEX/spex-prism-M*txt' %(os.getenv('GRIZLI'))))
-            # templates.extend(glob.glob('%s/templates/SPEX/spex-prism-[LT]*txt' %(os.getenv('GRIZLI'))))
+            #     templates.extend( glob.glob('%s/templates/Pickles_stars/ext/uk%s*dat' %(os.getenv('THREEDHST'), t)))
+            # templates.extend(glob.glob('%s/templates/SPEX/spex-prism-M*txt' %(os.getenv('THREEDHST'))))
+            # templates.extend(glob.glob('%s/templates/SPEX/spex-prism-[LT]*txt' %(os.getenv('THREEDHST'))))
             # 
             # #templates = glob.glob('/Users/brammer/Downloads/templates/spex*txt')
             # templates = glob.glob('bpgs/*ascii')
@@ -930,15 +930,17 @@ class MultiBeam():
             #             
             # temp_list = OrderedDict()
             # for temp in templates:
-            #     data = np.loadtxt('bpgs/'+temp, unpack=True)
+            #     #data = np.loadtxt('bpgs/'+temp, unpack=True)
+            #     data = np.loadtxt(temp, unpack=True)
             #     #data[0] *= 1.e4 # spex
             #     scl = np.interp(5500., data[0], data[1])
             #     name = os.path.basename(temp)
-            #     ix = info['file'] == temp
-            #     name='%5s %s' %(info['type'][ix][0][1:], temp.split('.as')[0])
+            #     #ix = info['file'] == temp
+            #     #name='%5s %s' %(info['type'][ix][0][1:], temp.split('.as')[0])
+            #     print(name)
             #     temp_list[name] = utils.SpectrumTemplate(wave=data[0],
             #                                              flux=data[1]/scl)
-            # 
+            
             # np.save('stars_bpgs.npy', [temp_list])
             
             temp_list = np.load(os.path.join(os.getenv('GRIZLI'), 
@@ -1011,7 +1013,7 @@ class MultiBeam():
         templates = self.load_templates(fwhm=fwhm, stars=True)
         NTEMP = len(templates)
 
-        key = templates.keys()[0]
+        key = list(templates)[0]
         temp_i = {key:templates[key]}
         out = self.fit_at_z(z=0., templates=temp_i, fitter=fitter,
                             poly_order=poly_order,
@@ -1025,7 +1027,7 @@ class MultiBeam():
         chi2min = 1e30
         iz = 0
         best = key
-        for i, key in enumerate(templates):
+        for i, key in enumerate(list(templates)):
             temp_i = {key:templates[key]}
             out = self.fit_at_z(z=0., templates=temp_i,
                                 fitter=fitter, poly_order=poly_order,
