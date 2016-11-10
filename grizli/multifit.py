@@ -205,7 +205,7 @@ def test_parallel():
     t0_pool = time.time()
 
     pool = mp.Pool(processes=4)
-    results = [pool.apply_async(_fit_at_z, (mb, zgrid, i, templates, fitter, fit_background, poly_order)) for i in xrange(len(zgrid))]
+    results = [pool.apply_async(_fit_at_z, (mb, zgrid, i, templates, fitter, fit_background, poly_order)) for i in range(len(zgrid))]
 
     pool.close()
     pool.join()
@@ -313,7 +313,7 @@ class GroupFLT():
             ### serial
             self.FLTs = []
             t0_pool = time.time()
-            for i in xrange(self.N):
+            for i in range(self.N):
                 flt = _loadFLT(self.grism_files[i], sci_extn, self.direct_files[i], pad, ref_file, ref_ext, seg_file, verbose, self.catalog, i)
                 self.FLTs.append(flt)
                 
@@ -324,7 +324,7 @@ class GroupFLT():
             t0_pool = time.time()
         
             pool = mp.Pool(processes=cpu_count)
-            results = [pool.apply_async(_loadFLT, (self.grism_files[i], sci_extn, self.direct_files[i], pad, ref_file, ref_ext, seg_file, verbose, self.catalog, i)) for i in xrange(self.N)]
+            results = [pool.apply_async(_loadFLT, (self.grism_files[i], sci_extn, self.direct_files[i], pad, ref_file, ref_ext, seg_file, verbose, self.catalog, i)) for i in range(self.N)]
         
             pool.close()
             pool.join()
@@ -413,7 +413,7 @@ class GroupFLT():
         t0_pool = time.time()
         
         pool = mp.Pool(processes=cpu_count)
-        results = [pool.apply_async(_compute_model, (i, self.FLTs[i], fit_info, store)) for i in xrange(self.N)]
+        results = [pool.apply_async(_compute_model, (i, self.FLTs[i], fit_info, store)) for i in range(self.N)]
 
         pool.close()
         pool.join()
@@ -1172,7 +1172,7 @@ class MultiBeam():
         
         chi2min = 1e30
         iz = 0
-        for i in xrange(NZ):
+        for i in range(NZ):
             out = self.fit_at_z(z=zgrid[i], templates=templates,
                                 fitter=fitter, poly_order=poly_order,
                                 fit_background=fit_background)
@@ -1226,7 +1226,7 @@ class MultiBeam():
 
             iz = 0
             chi2min = 1.e30
-            for i in xrange(NZOOM):
+            for i in range(NZOOM):
                 out = self.fit_at_z(z=zgrid_zoom[i], templates=templates,
                                     fitter=fitter, poly_order=poly_order,
                                     fit_background=fit_background)
@@ -1511,7 +1511,7 @@ class MultiBeam():
         for g in limits:
             if g in grisms:
                 xmin = np.minimum(xmin, limits[g][0])
-                xmax = np.maximum(xmin, limits[g][1])
+                xmax = np.maximum(xmax, limits[g][1])
                 #print g, xmin, xmax
                 
         ax.set_xlim(xmin, xmax)
@@ -1549,7 +1549,7 @@ class MultiBeam():
         for g in limits:
             if g in self.Ngrism:
                 xmin = np.minimum(xmin, limits[g][0])
-                xmax = np.maximum(xmin, limits[g][1])
+                xmax = np.maximum(xmax, limits[g][1])
         
         hdu_sci = drizzle_2d_spectrum(self.beams, ds9=None, NY=NY,
                                       spatial_scale=spatial_scale, dlam=dlam, 
