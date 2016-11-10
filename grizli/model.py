@@ -3138,7 +3138,7 @@ class BeamCutout(object):
         chi2 = np.zeros(NZ)
         coeffs = np.zeros((NZ, coeffs.shape[0]))
         
-        for i in xrange(NZ):
+        for i in range(NZ):
             out = self.fit_at_z(z=zgrid[i], templates=templates,
                                 fitter='lstsq', poly_order=poly_order)
             
@@ -3167,7 +3167,7 @@ class BeamCutout(object):
         chi2_zoom = np.zeros(NZOOM)
         coeffs_zoom = np.zeros((NZOOM, coeffs.shape[1]))
     
-        for i in xrange(NZOOM):
+        for i in range(NZOOM):
             out = self.fit_at_z(z=zgrid_zoom[i], templates=templates,
                                 fitter='lstsq', poly_order=poly_order)
     
