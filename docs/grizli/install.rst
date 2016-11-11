@@ -25,6 +25,19 @@ There are a few additional required modules not provided with `astroconda`, summ
 
         cd /usr/local/share/python # or some other location, even /tmp/
 
+`scikit-learn <http://scikit-learn.org/>`__ - Machine learning tools.  This is provided with a full anaconda/astroconda distribution but may not be with "miniconda".  
+
+    .. code:: python
+    
+        >>> # test if it's installed
+        >>> import sklearn
+
+    .. code:: bash
+    
+        pip install scikit-learn
+        # or with anaconda
+        conda install scikit-learn
+        
 `peakutils <http://pythonhosted.org/PeakUtils/>`__ - detecting peaks in 1D data
 
     .. code:: bash
