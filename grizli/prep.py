@@ -18,6 +18,7 @@ import astropy.coordinates as coord
 from astropy.table import Table
 
 from . import utils
+from . import model
 
 def check_status():
     """Make sure all files and modules are in place and print some information if they're not
@@ -638,22 +639,39 @@ def table_to_regions(table, output='ds9.reg'):
     fp.close()
     
 def make_drz_catalog(root='', threshold=2., get_background=True, 
-                     verbose=True, extra_config={}):
+                     verbose=True, extra_config={}, sci=None):
     """Make a SExtractor catalog from drizzle products
     
     TBD
     """
     import sewpy
     
-    drz_file = glob.glob('{0}_dr[zc]_sci.fits'.format(root))[0]
+    if sci is not None:
+        drz_file = sci
+    else:
+        drz_file = glob.glob('{0}_dr[zc]_sci.fits'.format(root))[0]
+    
     im = pyfits.open(drz_file)
     
     if 'PHOTFNU' in im[0].header:
         ZP = -2.5*np.log10(im[0].header['PHOTFNU'])+8.90
-    else:
+    elif 'PHOTFLAM' in im[0].header:
         ZP = (-2.5*np.log10(im[0].header['PHOTFLAM']) - 21.10 -
                  5*np.log10(im[0].header['PHOTPLAM']) + 18.6921)
+    elif 'FILTER' in im[0].header:
+        fi = im[0].header['FILTER'].upper()
+        if fi in model.photflam_list:
+            ZP = (-2.5*np.log10(model.photflam_list[fi]) - 21.10 -
+                     5*np.log10(model.photplam_list[fi]) + 18.6921)
+        else:
+            print('Couldn\'t find PHOTFNU or PHOTPLAM/PHOTFLAM keywords, use ZP=25') 
+            ZP = 25
+    else:
+        print('Couldn\'t find FILTER, PHOTFNU or PHOTPLAM/PHOTFLAM keywords, use ZP=25') 
+        ZP = 25
         
+    print('Image AB zeropoint: {0:.3f}'.format(ZP))
+    
     config = OrderedDict(DETECT_THRESH=threshold, ANALYSIS_THRESH=threshold,
               DETECT_MINAREA=6,
               PHOT_FLUXFRAC="0.5", 
@@ -1086,14 +1104,16 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                          skysub=True, driz_separate=True, driz_sep_wcs=True,
                          median=True, blot=True, driz_cr=True,
                          driz_cr_corr=False, driz_combine=True,
-                         final_bits=bits, coeffs=True)
+                         final_bits=bits, coeffs=True, build=False, 
+                         final_wht_type='IVM')
         else:
             AstroDrizzle(direct['files'], output=direct['product'], 
                          clean=True, final_scale=None, final_pixfrac=1,
                          context=False, final_bits=bits, preserve=False,
                          driz_separate=False, driz_sep_wcs=False,
                          median=False, blot=False, driz_cr=False,
-                         driz_cr_corr=False, driz_combine=True)
+                         driz_cr_corr=False, driz_combine=True,
+                         build=False, final_wht_type='IVM')
     
         ### Make catalog & segmentation image
         cat = make_drz_catalog(root=direct['product'], threshold=2)
@@ -1142,7 +1162,8 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                          preserve=False, driz_cr_snr=driz_cr_snr,
                          driz_cr_scale=driz_cr_scale, driz_separate=False,
                          driz_sep_wcs=False, median=False, blot=False,
-                         driz_cr=False, driz_cr_corr=False)
+                         driz_cr=False, driz_cr_corr=False,
+                         build=False, final_wht_type='IVM')
         else:
             if 'par' in direct['product']:
                 pixfrac=1.0
@@ -1153,7 +1174,8 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                          clean=True, final_pixfrac=pixfrac, context=False,
                          resetbits=4096, final_bits=bits, driz_sep_bits=bits,
                          preserve=False, driz_cr_snr=driz_cr_snr,
-                         driz_cr_scale=driz_cr_scale)
+                         driz_cr_scale=driz_cr_scale, build=False, 
+                         final_wht_type='IVM')
     
         ### Make DRZ catalog again with updated DRZWCS
         clean_drizzle(direct['product'])
@@ -1173,14 +1195,14 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
     ### Match grism WCS to the direct images
     match_direct_grism_wcs(direct=direct, grism=grism, get_fresh_flt=False)
     
-    ### First drizzle to flat CRs
+    ### First drizzle to flag CRs
     AstroDrizzle(grism['files'], output=grism['product'], clean=True,
                  context=False, preserve=False, skysub=True,
                  driz_separate=True, driz_sep_wcs=True, median=True, 
                  blot=True, driz_cr=True, driz_cr_corr=True, 
                  driz_cr_snr=driz_cr_snr, driz_cr_scale=driz_cr_scale, 
                  driz_combine=True, final_bits=bits, coeffs=True, 
-                 resetbits=4096)        
+                 resetbits=4096, build=False, final_wht_type='IVM')        
         
     ### Subtract grism sky
     status = visit_grism_sky(grism=grism, apply=True,
@@ -1224,7 +1246,8 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                  blot=True, driz_cr=True, driz_cr_corr=True, 
                  driz_cr_snr=driz_cr_snr, driz_cr_scale=driz_cr_scale, 
                  driz_combine=True, driz_sep_bits=bits, final_bits=bits,
-                 coeffs=True, resetbits=4096, final_pixfrac=pixfrac)        
+                 coeffs=True, resetbits=4096, final_pixfrac=pixfrac, 
+                 build=False, final_wht_type='IVM')        
     
     clean_drizzle(grism['product'])
     
@@ -1308,7 +1331,8 @@ def tweak_align(direct_group={}, grism_group={}, max_dist=1., key=' ',
                  clean=True, final_pixfrac=pixfrac, context=False,
                  resetbits=4096, final_bits=bits, driz_sep_bits=bits,
                  preserve=False, driz_cr_snr=driz_cr_snr,
-                 driz_cr_scale=driz_cr_scale)
+                 driz_cr_scale=driz_cr_scale, build=False, 
+                 final_wht_type='IVM')
     
     clean_drizzle(direct_group['product'])
     cat = make_drz_catalog(root=direct_group['product'], threshold=1.6)
@@ -1328,7 +1352,8 @@ def tweak_align(direct_group={}, grism_group={}, max_dist=1., key=' ',
                  skyfile=skyfile, driz_separate=True, driz_sep_wcs=True,
                  median=True, blot=True, driz_cr=True, driz_cr_corr=True,
                  driz_combine=True, driz_sep_bits=bits, final_bits=bits,
-                 coeffs=True, resetbits=4096, final_pixfrac=pixfrac)
+                 coeffs=True, resetbits=4096, final_pixfrac=pixfrac, 
+                 build=False, final_wht_type='IVM')
     
     clean_drizzle(grism_group['product'])
     
@@ -1639,9 +1664,9 @@ def align_multiple_drizzled(mag_limits=[16,23]):
 
         ### Second drizzle
         if len(files) > 1:
-            AstroDrizzle(files, output=root, clean=True, context=False, preserve=False, skysub=True, driz_separate=False, driz_sep_wcs=False, median=False, blot=False, driz_cr=False, driz_cr_corr=False, driz_combine=True, final_bits=576, coeffs=True, resetbits=0)        
+            AstroDrizzle(files, output=root, clean=True, context=False, preserve=False, skysub=True, driz_separate=False, driz_sep_wcs=False, median=False, blot=False, driz_cr=False, driz_cr_corr=False, driz_combine=True, final_bits=576, coeffs=True, resetbits=0, build=False, final_wht_type='IVM')        
         else:
-            AstroDrizzle(files, output=root, clean=True, final_scale=None, final_pixfrac=1, context=False, final_bits=576, preserve=False, driz_separate=False, driz_sep_wcs=False, median=False, blot=False, driz_cr=False, driz_cr_corr=False, driz_combine=True) 
+            AstroDrizzle(files, output=root, clean=True, final_scale=None, final_pixfrac=1, context=False, final_bits=576, preserve=False, driz_separate=False, driz_sep_wcs=False, median=False, blot=False, driz_cr=False, driz_cr_corr=False, driz_combine=True, build=False, final_wht_type='IVM') 
 
         cat = make_drz_catalog(root=root, threshold=2)
         
@@ -1653,10 +1678,10 @@ def align_multiple_drizzled(mag_limits=[16,23]):
                'icou10frq_flt.fits']
         
         all_files = list(np.append(files0, files1))
-        AstroDrizzle(all_files, output='total', clean=True, context=False, preserve=False, skysub=True, driz_separate=False, driz_sep_wcs=False, median=False, blot=False, driz_cr=False, driz_cr_corr=False, driz_combine=True, final_bits=576, coeffs=True, resetbits=0, final_rot=0)    
+        AstroDrizzle(all_files, output='total', clean=True, context=False, preserve=False, skysub=True, driz_separate=False, driz_sep_wcs=False, median=False, blot=False, driz_cr=False, driz_cr_corr=False, driz_combine=True, final_bits=576, coeffs=True, resetbits=0, final_rot=0, build=False, final_wht_type='IVM')    
         
-        AstroDrizzle(files0, output='group0', clean=True, context=False, preserve=False, skysub=True, driz_separate=False, driz_sep_wcs=False, median=False, blot=False, driz_cr=False, driz_cr_corr=False, driz_combine=True, final_bits=576, coeffs=True, resetbits=0, final_refimage='total_drz_sci.fits')    
-        AstroDrizzle(files1, output='group1', clean=True, context=False, preserve=False, skysub=True, driz_separate=False, driz_sep_wcs=False, median=False, blot=False, driz_cr=False, driz_cr_corr=False, driz_combine=True, final_bits=576, coeffs=True, resetbits=0, final_refimage='total_drz_sci.fits')    
+        AstroDrizzle(files0, output='group0', clean=True, context=False, preserve=False, skysub=True, driz_separate=False, driz_sep_wcs=False, median=False, blot=False, driz_cr=False, driz_cr_corr=False, driz_combine=True, final_bits=576, coeffs=True, resetbits=0, final_refimage='total_drz_sci.fits', build=False, final_wht_type='IVM')    
+        AstroDrizzle(files1, output='group1', clean=True, context=False, preserve=False, skysub=True, driz_separate=False, driz_sep_wcs=False, median=False, blot=False, driz_cr=False, driz_cr_corr=False, driz_combine=True, final_bits=576, coeffs=True, resetbits=0, final_refimage='total_drz_sci.fits', build=False, final_wht_type='IVM')    
         
         im0 = pyfits.open('group0_drz_sci.fits')
         im1 = pyfits.open('group1_drz_sci.fits')
@@ -2030,7 +2055,8 @@ def fix_star_centers(root='macs1149.6+2223-rot-ca5-22-032.0-f105w',
                      resetbits=0, final_bits=bits, driz_sep_bits=bits,
                      preserve=False, driz_separate=False,
                      driz_sep_wcs=False, median=False, blot=False,
-                     driz_cr=False, driz_cr_corr=False)
+                     driz_cr=False, driz_cr_corr=False, build=False, 
+                     final_wht_type='IVM')
         
         clean_drizzle(root)
         cat = make_drz_catalog(root=root)
