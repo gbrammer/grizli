@@ -59,7 +59,9 @@ spectroscopic mode.
 
 .. warning::
     Grizli is under active development and significant changes may be 
-    made to the algorithms and code structure.
+    made to the algorithms and code structure.  Check the `commit history <https://github.com/gbrammer/grizli/commits/master>`__ and pull the changes from the repository to make sure you're running with up-to-date bug
+    fixes and feature implementation.
+    
   
 Installation
 ~~~~~~~~~~~~
