@@ -1,6 +1,6 @@
 Installation instructions
 
-Requirements
+Dependencies
 ------------
 
 **Python modules:**
@@ -25,7 +25,7 @@ There are a few additional required modules not provided with `astroconda`, summ
 
         cd /usr/local/share/python # or some other location, even /tmp/
 
-`scikit-learn <http://scikit-learn.org/>`__ - Machine learning tools.  This is provided with a full anaconda/astroconda distribution but may not be with "miniconda".  
+`scikit-learn <http://scikit-learn.org/>`__ - Machine learning tools.  This is provided with a full anaconda/astroconda distribution but may not be supplied with a "`miniconda <http://conda.pydata.org/miniconda.html>`__" distribution.  
 
     .. code:: python
     
@@ -62,6 +62,13 @@ There are a few additional required modules not provided with `astroconda`, summ
         # or with anaconda
         conda install -c astropy astroquery
 
+`lacosmicx <https://github.com/cmccully/lacosmicx>`__ - Fast Python implementation of Pieter van Dokkum's `L.A.Cosmic <http://www.astro.yale.edu/dokkum/lacosmic/>`__ (`ref <http://adsabs.harvard.edu/abs/2001PASP..113.1420V>`__) software for identifying cosmic rays in single images.  The image preparation wrapper scripts in `grizli.prep` run `lacosmicx` if a supplied list of direct or grism images contains only a single file.
+
+    .. code:: bash
+
+        git clone https://github.com/cmccully/lacosmicx.git
+        cd lacosmicx
+        python setup.py install
 
 Build ``grizli``
 ----------------
@@ -73,7 +80,7 @@ Build ``grizli``
         cd grizli
         python setup.py install
 
-`Grizli` requires a few environmental variables to be set that point to directory location of configuration files.  The "`export`" lines below can be put into the ~/.bashrc setup file so that they're set automatically.
+`Grizli` requires a few environmental variables to be set that point to directory location of configuration files.  The "`export`" lines below can be put into the *~/.bashrc* or *~/.bash_profile* setup files so that the system variables are set automatically when you start a new terminal/shell session.
 
     .. code:: bash
         
