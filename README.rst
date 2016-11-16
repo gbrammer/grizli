@@ -7,13 +7,13 @@
 What is ``grizli``?
 ~~~~~~~~~~~~~~~~~~~
 
-This early release of ``grizli`` is intended to demonstrate and
+This early release of `grizli` is intended to demonstrate and
 demystify some general techniques for manipulating *HST* slitless
 spectroscopic observations, providing software kernels to address
 questions such as
 
     "How does the WFC3/IR G141 grism disperse the spectrum of a
-    star/galaxy at pixel position ``(x,y)`` in my F140W direct image?".
+    star/galaxy at pixel position `(x,y)` in my F140W direct image?".
 
 Much of the background related to this question in the context of the
 currently available software tools was discussed in a document by
@@ -30,9 +30,9 @@ as aXe (`Kummel et al.
 2012 <http://adsabs.harvard.edu/abs/2012ApJS..200...13B>`__, `Momcheva
 et al. 2015 <http://adsabs.harvard.edu/abs/2015arXiv151002106M>`__). In
 fact, that relatively simple script serves as the low-level kernel for
-the way ``grizli`` computes the grism dispersion.
+the way `grizli` computes the grism dispersion.
 
-Eventually, ``grizli`` is intended to encourage and enable general users to move
+Eventually, `grizli` is intended to encourage and enable general users to move
 away from simple "data reduction" (e.g., extracting a 1D spectrum of a
 single object akin to standard slit spectroscopy) and toward
 more quantitative and comprehensive **modeling** and fitting of slitless
@@ -69,4 +69,9 @@ The following are IPython/jupyter notebooks demonstrating various aspects of the
   3. Spectral extractions
   4. Redshift & emission line fits (multiple grisms)
   
+- `NIRISS-simulation <https://github.com/gbrammer/grizli/blob/master/examples/NIRISS-simulation.ipynb>`__ **(11.11.16)**: Simulation and analysis of JWST/NIRISS observations
+
+1. Simulate NIRISS spectra in three blocking filters and two orients offset by 90 degrees.
+2. Simulation field taken from the Hubble WFC3/IR Ultra-Deep Field, with the WFC3 F140W image as the morphological reference and photo-z templates taken as the spectral models. 
+3. Extract spectra and fit redshifts and emission lines from the combined six exposures.
  
