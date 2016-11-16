@@ -71,7 +71,7 @@ The following are IPython/jupyter notebooks demonstrating various aspects of the
   
 - `NIRISS-simulation <https://github.com/gbrammer/grizli/blob/master/examples/NIRISS-simulation.ipynb>`__ **(11.11.16)**: Simulation and analysis of JWST/NIRISS observations
 
-1. Simulate NIRISS spectra in three blocking filters and two orients offset by 90 degrees.
-2. Simulation field taken from the Hubble WFC3/IR Ultra-Deep Field, with the WFC3 F140W image as the morphological reference and photo-z templates taken as the spectral models. 
-3. Extract spectra and fit redshifts and emission lines from the combined six exposures.
+  1. Simulate NIRISS spectra in three blocking filters and two orients offset by 90 degrees.
+  2. Simulation field taken from the Hubble WFC3/IR Ultra-Deep Field, with the WFC3 F140W image as the morphological reference and photo-z templates taken as the spectral models. 
+  3. Extract spectra and fit redshifts and emission lines from the combined six exposures.
  
