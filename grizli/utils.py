@@ -4,6 +4,7 @@ import glob
 from collections import OrderedDict
 
 import astropy.io.fits as pyfits
+import astropy.wcs as pywcs
 
 import numpy as np
 
@@ -319,6 +320,69 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
                     output_list.append(d)
     
     return output_list, filter_list
+
+def parse_visit_overlaps(visits, buffer=15.):
+    """Find overlapping visits/filters to make combined mosaics
+    
+    Parameters
+    ----------
+    visits : list
+        Output list of visit information from `~grizli.utils.parse_flt_files`.
+        The script looks for files like `visits[i]['product']+'_dr?_sci.fits'` 
+        to compute the WCS footprint of a visit.  These are produced, e.g., by 
+        `~grizli.prep.process_direct_grism_visit`.
+        
+    buffer : float
+        Buffer, in `~astropy.units.arcsec`, to add around visit footprints to 
+        look for overlaps.
+    
+    Returns
+    -------
+    overlap_visits : list
+        List of overlapping visits, with similar format as input `visits`.
+        
+    """
+    from shapely.geometry import Polygon
+    
+    N = len(visits)
+
+    save = []
+    used = np.arange(len(visits)) < 0
+    
+    for i in range(N-1):
+        f_i = visits[i]['product'].split('-')[-1]
+        if (f_i.startswith('g1')) | (used[i]):
+            continue
+        
+        im_i = pyfits.open(glob.glob(visits[i]['product']+'_dr?_sci.fits')[0])
+        wcs_i = pywcs.WCS(im_i[0])
+        fp_i = Polygon(wcs_i.calc_footprint()).buffer(buffer/3600.)
+        
+        save.append(visits[i])
+        
+        for j in range(i+1, N):
+            f_j = visits[j]['product'].split('-')[-1]
+            if (f_j != f_i) | (used[j]):
+                continue
+                
+            im_j = pyfits.open(glob.glob(visits[j]['product']+'_dr?_sci.fits')[0])
+            wcs_j = pywcs.WCS(im_j[0])
+            fp_j = Polygon(wcs_j.calc_footprint()).buffer(buffer/3600.)
+            
+            olap = fp_i.union(fp_j)
+            if olap.area > 0:
+                used[j] = True
+                save[-1]['files'].extend(visits[j]['files'])
+    
+    for i in range(len(save)):
+        flt_i = pyfits.open(save[i]['files'][0])
+        product = flt_i[0].header['TARGNAME'].lower()        
+        if product == 'any':
+            product += '-'+radec_to_targname(header=flt_i['SCI',1].header)
+        
+        f_i = save[i]['product'].split('-')[-1]
+        product += '-'+f_i
+        save[i]['product'] = product
     
 def get_hst_filter(header):
     """Get simple filter name out of an HST image header.  
@@ -891,8 +955,6 @@ def make_spectrum_wcsheader(center_wave=1.4e4, dlam=40, NX=100, spatial_scale=1,
         NAXIS    : 200 20
 
     """
-    import astropy.io.fits as pyfits
-    import astropy.wcs as pywcs
     
     h = pyfits.ImageHDU(data=np.zeros((2*NY, 2*NX), dtype=np.float32))
     
@@ -1011,8 +1073,6 @@ def make_wcsheader(ra=40.07293, dec=-1.6137748, size=2, pixscale=0.1, get_hdu=Fa
         CTYPE1  = 'RA---TAN'                                                            
         CTYPE2  = 'DEC--TAN'
     """
-    import astropy.io.fits as pyfits
-    import astropy.wcs as pywcs
     
     cdelt = pixscale/3600.
     if isinstance(size, list):

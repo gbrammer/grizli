@@ -1528,7 +1528,7 @@ class GrismFLT(object):
             self.grism = ImageData(hdulist=direct_im, sci_extn=sci_extn)
             self.grism_file = self.direct_file
             self.grism.filter = force_grism
-            
+
         ### Grism exposure only, assumes will get reference from ref_file
         if (self.direct is None) & (self.grism is not None):
             self.direct = ImageData(hdulist=grism_im, sci_extn=sci_extn)
@@ -1551,7 +1551,13 @@ class GrismFLT(object):
             self.grism.unset_dq()
             nbad = self.grism.flag_negative(sigma=-3)
             self.grism.data['SCI'] *= (self.grism.data['DQ'] == 0)
-                
+        
+        if 'FWCPOS' in self.grism.header:
+            self.grism.fwcpos = self.grism.header['FWCPOS']
+        else:
+            self.grism.fwcpos = None
+            
+               
         ### Load data from saved model files, if available
         # if os.path.exists('%s_model.fits' %(self.grism_file)):
         #     pass
@@ -1957,7 +1963,7 @@ class GrismFLT(object):
                     continue
                     
                 try:
-                    b = GrismDisperser(id=id, direct=thumb, segmentation=seg_thumb, xcenter=xcenter, ycenter=ycenter, origin=origin, pad=self.pad, grow=self.grism.grow,beam=beam, conf=self.conf)
+                    b = GrismDisperser(id=id, direct=thumb, segmentation=seg_thumb, xcenter=xcenter, ycenter=ycenter, origin=origin, pad=self.pad, grow=self.grism.grow,beam=beam, conf=self.conf, fwcpos=self.grism.fwcpos)
                 except:
                     continue
                 
@@ -2543,7 +2549,7 @@ class BeamCutout(object):
                            segmentation=beam.seg*1, origin=beam.origin,
                            pad=beam.pad, grow=beam.grow,
                            beam=beam.beam, conf=conf, xcenter=beam.xcenter,
-                           ycenter=beam.ycenter)
+                           ycenter=beam.ycenter, fwcpos=flt.grism.fwcpos)
         
         self.beam.compute_model(spectrum_1d = beam.spectrum_1d)
         
@@ -2614,7 +2620,7 @@ class BeamCutout(object):
                                    grow=grow, beam=h0['BEAM'], 
                                    xcenter=h0['XCENTER'],
                                    ycenter=h0['YCENTER'],
-                                   conf=conf)
+                                   conf=conf, fwcpos=h0['FWCPOS'])
         
         self.grism.parent_file = h0['GPARENT']
         self.direct.parent_file = h0['DPARENT']
@@ -2649,6 +2655,9 @@ class BeamCutout(object):
         
         h0['DPARENT'] = (self.direct.parent_file, 
                          'Parent direct file')
+        
+        h0['FWCPOS'] = (self.grism.fwcpos, 
+                         'Filter wheel position (NIRISS)')
         
         hdu = pyfits.HDUList([pyfits.PrimaryHDU(header=h0)])
         hdu.extend(self.direct.get_HDUList(extver=1))
