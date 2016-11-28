@@ -400,6 +400,10 @@ def match_lists(input, output, transform=None, scl=3600., simple=True,
         transform = skimage.transform.SimilarityTransform
         
     #print 'xyxymatch'
+    if (len(output) == 0) | (len(input) == 0):
+        print('No entries!')
+        return input, output, None, transform()
+    
     match = stsci.stimage.xyxymatch(copy.copy(input), copy.copy(output), 
                                     origin=np.median(input, axis=0), 
                                     mag=(1.0, 1.0), rotation=(0.0, 0.0),
@@ -612,6 +616,17 @@ def log_wcs(root, drz_wcs, shift, rot, scale, rms=0., n=-1, initialize=True):
               count, shift[0], shift[1], rot, scale, rms, n))
               
     fp.close()
+
+def table_to_radec(table, output='coords.radec'):
+    """Make a DS9 region file from a table object
+    """
+
+    if 'X_WORLD' in table.colnames:
+        rc, dc = 'X_WORLD', 'Y_WORLD'
+    else:
+        rc, dc = 'ra', 'dec'
+    
+    table[rc, dc].write(output, format='ascii.commented_header')
     
 def table_to_regions(table, output='ds9.reg'):
     """Make a DS9 region file from a table object
@@ -1181,6 +1196,7 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
         clean_drizzle(direct['product'])
         cat = make_drz_catalog(root=direct['product'], threshold=1.6)
         table_to_regions(cat, '{0}.cat.reg'.format(direct['product']))
+        table_to_radec(cat, '{0}.cat.radec'.format(direct['product']))
         
         if (fix_stars) & (not ACS):
             fix_star_centers(root=direct['product'], drizzle=True)
@@ -2061,4 +2077,65 @@ def fix_star_centers(root='macs1149.6+2223-rot-ca5-22-032.0-f105w',
         clean_drizzle(root)
         cat = make_drz_catalog(root=root)
         
+def drizzle_overlaps(exposure_groups, parse_visits=False, pixfrac=0.8, scale=0.06, skysub=True):
+    """Combine overlapping visits into single output mosaics
+    
+    Parameters
+    ----------
+    exposure_groups : list
+        Output list of visit information from `~grizli.utils.parse_flt_files`.
         
+    parse_visits : bool
+        If set, parse the `exposure_groups` list for overlaps with
+        `~grizli.utils.parse_visit_overlaps`, otherwise assume that it has
+        already been parsed.
+        
+    pixfrac : float
+        `~drizzlepac.astrodrizzle.AstroDrizzle` "pixfrac" value.
+        
+    scale : type
+        `~drizzlepac.astrodrizzle.AstroDrizzle` "scale" value, output pixel
+        scale in `~astropy.units.arcsec`.
+        
+    skysub : bool
+        Run `~drizzlepac.astrodrizzle.AstroDrizzle` sky subtraction.
+    
+    Returns
+    -------
+    Produces drizzled images.
+    
+    """
+    from drizzlepac.astrodrizzle import AstroDrizzle
+    
+    if parse_visits:
+        exposure_groups = utils.parse_visit_overlaps(exposure_groups, buffer=15.)
+        
+    for group in exposure_groups:
+        ACS = 'flc' in visit['files'][0]
+        if ACS:
+            bits = 64+32
+        else:
+            bits = 576
+        
+        if 'reference' in group:
+            AstroDrizzle(group['files'], output=group['product'],
+                     clean=True, context=False, preserve=False,
+                     skysub=skysub, driz_separate=False, driz_sep_wcs=False,
+                     median=False, blot=False, driz_cr=False,
+                     driz_cr_corr=False, driz_combine=True,
+                     final_bits=bits, coeffs=True, build=False, 
+                     final_wht_type='IVM', final_pixfrac=pixfrac,
+                     final_wcs=True, final_refimage=group['reference'],
+                     resetbits=0)
+        else:
+            AstroDrizzle(group['files'], output=group['product'],
+                     clean=True, context=False, preserve=False,
+                     skysub=skysub, driz_separate=False, driz_sep_wcs=False,
+                     median=False, blot=False, driz_cr=False,
+                     driz_cr_corr=False, driz_combine=True,
+                     final_bits=bits, coeffs=True, build=False, 
+                     final_wht_type='IVM', final_pixfrac=pixfrac,
+                     final_wcs=True, final_rot=0, final_scale=scale,
+                     resetbits=0)
+        
+        clean_drizzle(visit['product'])

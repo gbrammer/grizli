@@ -278,6 +278,7 @@ class aXeConf():
                 dydx[i] = self.field_dependent(xi, yi, coeffs)
             
         # $dy = dydx_0+dydx_1 dx+dydx_2 dx^2+$ ...
+
         dy = yoff_beam
         for i in range(NORDER):
             dy += dydx[i]*(dx-xoff_beam)**i
@@ -340,26 +341,31 @@ class aXeConf():
                 print('ORDER={0:d} not supported for NIRISS rotation'.format(order))
                 return dy, lam
                 
-            theta = (fwcpos - self.conf['FWCPOS_REF'])/180*np.pi
+            theta = (fwcpos - self.conf['FWCPOS_REF'])/180*np.pi*1
+            theta *= -1 # DMS rotation
+            #print('DMS')
+            
             if theta == 0:
                 return dy, lam
                 
             ### For the convention of swapping/inverting axes for GR150C
-            if 'GR150C' in self.conf_file:
-                theta = -theta
+            # if 'GR150C' in self.conf_file:
+            #     theta = -theta
             
             ### If theta is small, use a small angle approximation.  
             ### Otherwise, 1./tan(theta) blows up and results in numerical 
             ### noise.
             xp = (dx-xoff_beam)/np.cos(theta)
-            if (1-np.cos(theta) < 5.e-5):
-                #print 'Approximate!', xoff_beam, np.tan(theta)
+            if (1-np.cos(theta) < 5.e-8):
+                #print('Approximate!', xoff_beam, np.tan(theta))
                 dy = dy + (dx-xoff_beam)*np.tan(theta)
                 delta = 0.
+                #print('Approx')
             else:
                 ### Full transformed trace coordinates
                 c = dydx
-            
+                #print('Not approx')
+                
                 beta = c[1]+2*c[2]*xp-1/np.tan(theta)
                 chi = c[0]+c[1]*xp+c[2]*xp**2
                 if theta < 0:

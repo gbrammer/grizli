@@ -733,6 +733,8 @@ class MultiBeam():
         
         self.ra, self.dec = self.beams[0].get_sky_coords()
         
+        self.full_line_list = ['SIII', 'SII', 'Ha', 'OI', 'OIII', 'Hb', 'OIIIx', 'Hg', 'Hd', 'NeIII', 'OII']
+        
     def write_beam_fits(self, verbose=True):
         """TBD
         """
@@ -825,8 +827,8 @@ class MultiBeam():
             for ib in range(self.N):
                 beam = self.beams[ib]
                 lam_beam = beam.beam.lam_beam
-                if ((temp.wave[0] > lam_beam[-1]) | 
-                    (temp.wave[-1] < lam_beam[0])):
+                if ((temp.wave.min() > lam_beam.max()) | 
+                    (temp.wave.max() < lam_beam.min())):
                     tmodel = 0.
                 else:
                     tmodel = beam.compute_model(spectrum_1d=spectrum_1d, 
@@ -917,7 +919,7 @@ class MultiBeam():
         return A, out_coeffs, chi2, modelf
     
     def load_templates(self, fwhm=400, line_complexes=True, stars=False,
-                       full_line_list=['SIII', 'SII', 'Ha', 'OI', 'OIII', 'Hb', 'OIIIx', 'Hg', 'Hd', 'NeIII', 'OII']):
+                       full_line_list=None):
         """TBD
         """
         
@@ -988,8 +990,11 @@ class MultiBeam():
             #line_list = ['Ha+SII', 'OIII+Hb', 'OII']
             line_list = ['Ha+NII+SII+SIII+He', 'OIII+Hb', 'OII+Ne']
         else:
-            line_list = full_line_list
-            
+            if full_line_list is None:
+                line_list = self.full_line_list
+            else:
+                line_list = full_line_list
+                
             #line_list = ['Ha', 'SII']
             
         for li in line_list:
@@ -1124,7 +1129,8 @@ class MultiBeam():
     def fit_redshift(self, prior=None, poly_order=1, fwhm=1200,
                      make_figure=True, zr=None, dz=None, verbose=True,
                      fit_background=True, fitter='nnls', 
-                     delta_chi2_threshold=0.004, zoom=True):
+                     delta_chi2_threshold=0.004, zoom=True, 
+                     line_complexes=True):
         """TBD
         """
         from scipy import polyfit, polyval
@@ -1158,7 +1164,7 @@ class MultiBeam():
         A, coeffs, chi2_poly, model_2d = out
         
         ### Set up for template fit
-        templates = self.load_templates(fwhm=fwhm, stars=stars)
+        templates = self.load_templates(fwhm=fwhm, stars=stars, line_complexes=line_complexes)
         NTEMP = len(templates)
         
         out = self.fit_at_z(z=0., templates=templates, fitter=fitter,
@@ -1476,7 +1482,9 @@ class MultiBeam():
               'F090W':(0.0, 0.4470588235294118, 0.6980392156862745),
               'F115W':(0.0, 0.6196078431372549, 0.45098039215686275),
               'F150W':(0.8352941176470589, 0.3686274509803922, 0.0),
-              'F200W':(0.8, 0.4745098039215686, 0.6549019607843137)}
+              'F200W':(0.8, 0.4745098039215686, 0.6549019607843137),
+              'F140M':'orange',
+              'CLEARP':'b'}
         
         for grism in grisms:                        
             if self.Ngrism[grism] > 1:
@@ -1506,7 +1514,9 @@ class MultiBeam():
                    'F090W':[0.76,1.04],
                    'F115W':[0.97,1.32],
                    'F150W':[1.28, 1.72],
-                   'F200W':[1.68, 2.3]}
+                   'F200W':[1.68, 2.3],
+                   'F140M':[1.2,1.6],
+                   'CLEARP':[0.76, 2.3]}
         
         for g in limits:
             if g in grisms:
@@ -1543,7 +1553,9 @@ class MultiBeam():
                    'F090W':[0.76,1.04],
                    'F115W':[0.97,1.32],
                    'F150W':[1.28, 1.72],
-                   'F200W':[1.68, 2.3]}
+                   'F200W':[1.68, 2.3],
+                   'F140M':[1.2,1.6],
+                   'CLEARP':[0.76, 2.3]}
                    
         
         for g in limits:
