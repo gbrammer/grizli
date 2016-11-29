@@ -304,7 +304,7 @@ def apply_persistence_mask(flt_file, path='../Persistence', dq_value=1024,
         flt.flush()
 
 def apply_saturated_mask(flt_file, dq_value=1024):
-    """Saturated pixels have some pulldown in the opposite amplifier
+    """Saturated WFC3/IR pixels have some pulldown in the opposite amplifier
     
     Parameters
     ----------
@@ -2021,6 +2021,8 @@ def fix_star_centers(root='macs1149.6+2223-rot-ca5-22-032.0-f105w',
     """
     from drizzlepac.astrodrizzle import AstroDrizzle
     
+    EPSF = utils.EffectivePSF()
+    
     sci = pyfits.open('{0}_drz_sci.fits'.format(root))
     cat = Table.read('{0}.cat'.format(root), format='ascii.commented_header')
     
@@ -2032,14 +2034,20 @@ def fix_star_centers(root='macs1149.6+2223-rot-ca5-22-032.0-f105w',
         flt = pyfits.open(sci[0].header['D{0:03d}DATA'.format(i+1)].split('[')[0], mode='update')
         wcs.append(pywcs.WCS(flt[1], relax=True))
         images.append(flt)
-    
+        
     yp, xp = np.indices((1014,1014))
     use = cat['MAG_AUTO'] < mag_lim
     so = np.argsort(cat['MAG_AUTO'][use])
     
+    if verbose:
+        print('# {0:6s} {1:12s} {2:12s} {3:7s} {4}     {5}'.format('id', 'ra', 
+                                                             'dec', 'mag',
+                                                             'nDQ', 'nSat'))
+    
     for line in cat[use][so]:
         rd = line['X_WORLD'], line['Y_WORLD']
         nset = []
+        nsat = []
         for i in range(N):
             xi, yi = wcs[i].all_world2pix([rd[0],], [rd[1],], 0) 
             r = np.sqrt((xp-xi[0])**2 + (yp-yi[0])**2)
@@ -2048,10 +2056,37 @@ def fix_star_centers(root='macs1149.6+2223-rot-ca5-22-032.0-f105w',
             if nset[i] > 0:
                 images[i]['DQ'].data[unset] -= 4096
             
+            # Fill saturated with EPSF fit
+            satpix = (r <= 5) & (((images[i]['DQ'].data & 256) > 0) | ((images[i]['DQ'].data & 2048) > 0))
+            nsat.append(satpix.sum())
+            
+            if nsat[i] > 0:
+                xpi = int(np.round(xi[0]))
+                ypi = int(np.round(yi[0]))
+            
+                slx = slice(xpi-12, xpi+12)
+                sly = slice(ypi-12, ypi+12)
+                
+                sci = images[i]['SCI'].data[sly, slx]
+                dq = images[i]['DQ'].data[sly, slx]
+                err = images[i]['ERR'].data[sly, slx]
+                ivar = 1/err**2
+                ivar[(~np.isfinite(ivar)) | (dq > 0)] = 0
+                
+                # Fit the EPSF model
+                psf, psf_params = EPSF.fit_ePSF(sci, ivar=ivar, center=None, tol=1.e-3, N=12, origin=(ypi-12, xpi-12), filter=images[0][0].header['FILTER'])
+                
+                mask = satpix[sly, slx]
+                sci[mask] = psf[mask]
+                dq[mask] -= (dq[mask] & 2048)
+                dq[mask] -= (dq[mask] & 256)
+                #dq[mask] |= 512 
+                
         if verbose:
-            print('{0:6d} {1:12.6f} {2:12.6f} {3:7.2f} {4}'.format( 
-                line['NUMBER'], rd[0], rd[1], line['MAG_AUTO'], nset))
-    
+            print('{0:6d} {1:12.6f} {2:12.6f} {3:7.2f} {4} {5}'.format( 
+                line['NUMBER'], rd[0], rd[1], line['MAG_AUTO'], nset, nsat))
+                
+        
     # Overwrite image                                             
     for i in range(N):
         images[i].flush()
@@ -2111,7 +2146,7 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, pixfrac=0.8, scale=0.0
         exposure_groups = utils.parse_visit_overlaps(exposure_groups, buffer=15.)
         
     for group in exposure_groups:
-        ACS = 'flc' in visit['files'][0]
+        ACS = 'flc' in group['files'][0]
         if ACS:
             bits = 64+32
         else:
@@ -2138,4 +2173,4 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, pixfrac=0.8, scale=0.0
                      final_wcs=True, final_rot=0, final_scale=scale,
                      resetbits=0)
         
-        clean_drizzle(visit['product'])
+        clean_drizzle(group['product'])

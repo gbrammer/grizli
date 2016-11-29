@@ -2897,8 +2897,16 @@ class BeamCutout(object):
             model = np.array(self.A_psf.sum(axis=1))
             model = model.reshape(self.beam.sh_beam)
         else:
-            coeffs = interp.interp_conserve_c(self.lam_psf, spectrum_1d[0], 
-                                        spectrum_1d[1])
+            dx = np.diff(self.lam_psf)[0]
+            if dx < 0:
+                coeffs = interp.interp_conserve_c(self.lam_psf[::-1],
+                                                  spectrum_1d[0], 
+                                                  spectrum_1d[1])[::-1]
+            else:
+                coeffs = interp.interp_conserve_c(self.lam_psf,
+                                                  spectrum_1d[0], 
+                                                  spectrum_1d[1])
+                     
         
             model = self.A_psf.dot(coeffs).reshape(self.beam.sh_beam)
         
