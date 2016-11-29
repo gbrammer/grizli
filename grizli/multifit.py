@@ -788,7 +788,9 @@ class MultiBeam():
                                       for order in range(poly_order+1)])
         
         self.n_poly = poly_order + 1
-    
+        self.x_poly = np.array([(self.beams[0].beam.lam/1.e4-1)**order
+                                      for order in range(poly_order+1)])
+                                      
     def compute_model(self, id=None, spectrum_1d=None):
         """TBD
         """
@@ -915,6 +917,14 @@ class MultiBeam():
         out_coeffs[ok_temp] = coeffs
         modelf = np.dot(out_coeffs, A)
         chi2 = np.sum(((self.scif - modelf)**2*self.ivarf)[self.fit_mask])
+        
+        if fit_background:
+            poly_coeffs = out_coeffs[self.N:self.N+self.n_poly]
+        else:
+            poly_coeffs = out_coeffs[:self.n_poly]
+            
+        self.y_poly = np.dot(poly_coeffs, self.x_poly)
+        # x_poly = self.x_poly[1,:]+1 = self.beams[0].beam.lam/1.e4
         
         return A, out_coeffs, chi2, modelf
     

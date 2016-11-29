@@ -98,6 +98,7 @@ def radec_to_targname(ra=0, dec=0, header=None):
     return targname
     
 def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
+                    get_footprint = False, 
                     translate = {'AEGIS-':'aegis-', 
                                  'COSMOS-':'cosmos-', 
                                  'GNGRISM':'goodsn-', 
@@ -319,6 +320,23 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
                                     files=list(np.array(exposure_list)[so]))
                     output_list.append(d)
     
+    ### Get visit footprint from FLT WCS
+    if get_footprint:
+        from shapely.geometry import Polygon
+        
+        N = len(output_list)
+        for i in range(N):
+            for j in range(len(output_list[i]['files'])):
+                flt_j = pyfits.open(output_list[i]['files'][j])
+                wcs_j = pywcs.WCS(flt_j['SCI',1])
+                fp_j = Polygon(wcs_j.calc_footprint())
+                if j == 0:
+                    fp_i = fp_j
+                else:
+                    fp_i = fp_i.union(fp_j)
+            
+            output_list[i]['footprint'] = fp_i
+            
     return output_list, filter_list
 
 def parse_visit_overlaps(visits, buffer=15.):
@@ -338,27 +356,28 @@ def parse_visit_overlaps(visits, buffer=15.):
     
     Returns
     -------
-    overlap_visits : list
+    exposure_groups : list
         List of overlapping visits, with similar format as input `visits`.
         
     """
+    import copy
     from shapely.geometry import Polygon
     
     N = len(visits)
 
-    save = []
+    exposure_groups = []
     used = np.arange(len(visits)) < 0
     
     for i in range(N-1):
         f_i = visits[i]['product'].split('-')[-1]
-        if (f_i.startswith('g1')) | (used[i]):
+        if used[i]:
             continue
         
         im_i = pyfits.open(glob.glob(visits[i]['product']+'_dr?_sci.fits')[0])
         wcs_i = pywcs.WCS(im_i[0])
         fp_i = Polygon(wcs_i.calc_footprint()).buffer(buffer/3600.)
         
-        save.append(visits[i])
+        exposure_groups.append(copy.deepcopy(visits[i]))
         
         for j in range(i+1, N):
             f_j = visits[j]['product'].split('-')[-1]
@@ -369,21 +388,86 @@ def parse_visit_overlaps(visits, buffer=15.):
             wcs_j = pywcs.WCS(im_j[0])
             fp_j = Polygon(wcs_j.calc_footprint()).buffer(buffer/3600.)
             
-            olap = fp_i.union(fp_j)
+            olap = fp_i.intersection(fp_j)
             if olap.area > 0:
                 used[j] = True
-                save[-1]['files'].extend(visits[j]['files'])
-    
-    for i in range(len(save)):
-        flt_i = pyfits.open(save[i]['files'][0])
+                fp_i = fp_i.union(fp_j)
+                exposure_groups[-1]['footprint'] = fp_i
+                exposure_groups[-1]['files'].extend(visits[j]['files'])
+                
+    for i in range(len(exposure_groups)):
+        flt_i = pyfits.open(exposure_groups[i]['files'][0])
         product = flt_i[0].header['TARGNAME'].lower()        
         if product == 'any':
             product += '-'+radec_to_targname(header=flt_i['SCI',1].header)
         
-        f_i = save[i]['product'].split('-')[-1]
+        f_i = exposure_groups[i]['product'].split('-')[-1]
         product += '-'+f_i
-        save[i]['product'] = product
+        exposure_groups[i]['product'] = product
     
+    return exposure_groups
+    
+def parse_grism_associations(exposure_groups, 
+                             best_direct={'G102':'F105W', 'G141':'F140W'},
+                             get_max_overlap=True):
+    """Get associated lists of grism and direct exposures
+    
+    Parameters
+    ----------
+    exposure_grups : list
+        Output list of overlapping visits from
+        `~grizli.utils.parse_visit_overlaps`.
+    
+    best_direct : dict
+        Dictionary of the preferred direct imaging filters to use with a 
+        particular grism.
+    
+    Returns
+    -------
+    grism_groups : list
+        List of dictionaries with associated 'direct' and 'grism' entries.
+        
+    """
+    N = len(exposure_groups)
+    
+    grism_groups = []
+    for i in range(N):
+        f_i = exposure_groups[i]['product'].split('-')[-1]
+        if f_i.startswith('g1'):
+            group = OrderedDict(grism=exposure_groups[i], 
+                                direct=None)
+        else:
+            continue
+        
+        fp_i = exposure_groups[i]['footprint']
+        olap_i = 0.
+        
+        for j in range(N):
+            f_j = exposure_groups[j]['product'].split('-')[-1]
+            if f_j.startswith('g1'):
+                continue
+            
+            fp_j = exposure_groups[j]['footprint']
+            olap = fp_i.intersection(fp_j)
+            #print(exposure_groups[i]['product'], exposure_groups[j]['product'], olap.area*3600.)
+            
+            if olap.area > 0:
+                if group['direct'] is None:
+                    group['direct'] = exposure_groups[j]
+                    olap_i = olap.area
+                else:
+                    if (f_j.upper() == best_direct[f_i.upper()]):
+                        if get_max_overlap:
+                            if olap.area < olap_i:
+                                continue
+                                
+                        group['direct'] = exposure_groups[j]
+                        olap_i = olap.area
+                
+        grism_groups.append(group)
+    
+    return grism_groups
+            
 def get_hst_filter(header):
     """Get simple filter name out of an HST image header.  
     
