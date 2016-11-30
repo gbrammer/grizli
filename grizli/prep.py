@@ -691,7 +691,7 @@ def make_drz_catalog(root='', threshold=2., get_background=True,
               DETECT_MINAREA=6,
               PHOT_FLUXFRAC="0.5", 
               WEIGHT_TYPE="MAP_WEIGHT",
-              WEIGHT_IMAGE=drz_file.replace('_sci.fits', '_wht.fits'),
+              WEIGHT_IMAGE=drz_file.replace('_sci.fits', '_wht.fits').replace('_drz.fits', '_wht.fits'),
               CHECKIMAGE_TYPE="SEGMENTATION",
               CHECKIMAGE_NAME='{0}_seg.fits'.format(root),
               MAG_ZEROPOINT=ZP, 
@@ -2115,7 +2115,7 @@ def fix_star_centers(root='macs1149.6+2223-rot-ca5-22-032.0-f105w',
         clean_drizzle(root)
         cat = make_drz_catalog(root=root)
         
-def drizzle_overlaps(exposure_groups, parse_visits=False, pixfrac=0.8, scale=0.06, skysub=True):
+def drizzle_overlaps(exposure_groups, parse_visits=False, pixfrac=0.8, scale=0.06, skysub=True, bits=None):
     """Combine overlapping visits into single output mosaics
     
     Parameters
@@ -2150,10 +2150,11 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, pixfrac=0.8, scale=0.0
         
     for group in exposure_groups:
         ACS = 'flc' in group['files'][0]
-        if ACS:
-            bits = 64+32
-        else:
-            bits = 576
+        if bits is None:
+            if ACS:
+                bits = 64+32
+            else:
+                bits = 576
         
         if 'reference' in group:
             AstroDrizzle(group['files'], output=group['product'],
