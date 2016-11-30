@@ -1199,7 +1199,7 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
         table_to_radec(cat, '{0}.cat.radec'.format(direct['product']))
         
         if (fix_stars) & (not ACS):
-            fix_star_centers(root=direct['product'], drizzle=True)
+            fix_star_centers(root=direct['product'], drizzle=True, mag_lim=21)
         
     ################# 
     ##########  Grism image processing
@@ -1320,7 +1320,7 @@ def tweak_align(direct_group={}, grism_group={}, max_dist=1., key=' ',
     fp.write('# flt xshift yshift rot scale N rmsx rmsy\n')
     for k in grism_matches:
         d = shift_dict[k]
-        fp.write('# match[\'{0}\'] = {0}\n'.format(k, grism_matches[k]))
+        fp.write('# match[\'{0}\'] = {1}\n'.format(k, grism_matches[k]))
     
     for k in shift_dict:
         d = shift_dict[k]
@@ -2074,8 +2074,11 @@ def fix_star_centers(root='macs1149.6+2223-rot-ca5-22-032.0-f105w',
                 ivar[(~np.isfinite(ivar)) | (dq > 0)] = 0
                 
                 # Fit the EPSF model
-                psf, psf_params = EPSF.fit_ePSF(sci, ivar=ivar, center=None, tol=1.e-3, N=12, origin=(ypi-12, xpi-12), filter=images[0][0].header['FILTER'])
-                
+                try:
+                    psf, psf_params = EPSF.fit_ePSF(sci, ivar=ivar, center=None, tol=1.e-3, N=12, origin=(ypi-12, xpi-12), filter=images[0][0].header['FILTER'])
+                except:
+                    continue
+                    
                 mask = satpix[sly, slx]
                 sci[mask] = psf[mask]
                 dq[mask] -= (dq[mask] & 2048)
