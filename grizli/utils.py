@@ -328,7 +328,7 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
         for i in range(N):
             for j in range(len(output_list[i]['files'])):
                 flt_file = output_list[i]['files'][j]
-                if (not os.path.exists(flt_file)) & os.path.exists('../RAW/'+flt_file:
+                if (not os.path.exists(flt_file)) & os.path.exists('../RAW/'+flt_file):
                     flt_file = '../RAW/'+flt_file
                     
                 flt_j = pyfits.open(flt_file)
