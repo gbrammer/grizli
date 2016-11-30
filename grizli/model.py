@@ -223,8 +223,8 @@ class GrismDisperser(object):
         
         xoff = 0.
         
-        if 'G1' in self.conf.conf_file:
-            xoff = -0.5 # tested for WFC3/IR
+        # if 'G1' in self.conf.conf_file:
+        #     xoff = -0.5 # tested for WFC3/IR
         
         #xoff = 0. # suggested by ACS
         #xoff = -2.5 # test
@@ -2883,6 +2883,9 @@ class BeamCutout(object):
                 psf_xy_i = f*psf_xy_lam[ni] + (1-f)*psf_xy_lam[ni+1]
 
             psf = EPSF.eval_ePSF(psf_xy_i, dx, dy)*self.psf_params[0]
+            
+            #psf += self.psf_resid
+            
             psf *= si*self.direct.photflam/1.e-17 #/psf.sum()
             
             A_psf.append(psf.flatten())

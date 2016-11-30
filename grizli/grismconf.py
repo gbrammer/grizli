@@ -111,6 +111,11 @@ class aXeConf():
                 ### Scale BEAM F
                 if (beam == 'F') & ('G141' in self.conf_file): 
                     self.sens[beam]['SENSITIVITY'] *= 0.35
+                
+                
+                if (beam == 'B') & ('G141' in self.conf_file): 
+                    if self.conf['SENSITIVITY_B'] == 'WFC3.IR.G141.0th.sens.1.fits':
+                        self.sens[beam]['SENSITIVITY'] *= 2
                     
                 # wave = np.cast[np.double](self.sens[beam]['WAVELENGTH'])
                 # sens = np.cast[np.double](self.sens[beam]['SENSITIVITY']

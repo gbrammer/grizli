@@ -327,7 +327,11 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
         N = len(output_list)
         for i in range(N):
             for j in range(len(output_list[i]['files'])):
-                flt_j = pyfits.open(output_list[i]['files'][j])
+                flt_file = output_list[i]['files'][j]
+                if (not os.path.exists(flt_file)) & os.path.exists('../RAW/'+flt_file:
+                    flt_file = '../RAW/'+flt_file
+                    
+                flt_j = pyfits.open(flt_file)
                 wcs_j = pywcs.WCS(flt_j['SCI',1])
                 fp_j = Polygon(wcs_j.calc_footprint())
                 if j == 0:
@@ -898,8 +902,15 @@ class SpectrumTemplate(object):
             Redshifted and scaled spectrum.
             
         """
+        try:
+            import eazy.igm
+            igm = eazy.igm.Inoue14()
+            igmz = igm.full_IGM(z, self.wave*(1+z))
+        except:
+            igmz = 1.
+            
         return SpectrumTemplate(wave=self.wave*(1+z),
-                                flux=self.flux*scalar/(1+z))
+                                flux=self.flux*scalar/(1+z)*igmz)
     
     def __add__(self, spectrum):
         """Add two templates together
