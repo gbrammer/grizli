@@ -507,7 +507,7 @@ class GroupFLT():
                       header=flt.grism.header)
         
         if verbose:
-            print('{0:6d} mag={1:6.2f} {2}'.format(id, mag, scale_coeffs))
+            print('{0} mag={1:6.2f} {2}'.format(id, mag, scale_coeffs))
             
         return True
         #m2d = mb.reshape_flat(modelf)
