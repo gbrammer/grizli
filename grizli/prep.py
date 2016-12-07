@@ -1032,7 +1032,9 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                                column_average=True, 
                                run_tweak_align=True,
                                skip_direct=False,
-                               fix_stars=True):
+                               fix_stars=True,
+                               tweak_max_dist=1.,
+                               tweak_threshold=1.5):
     """Full processing of a direct + grism image visit.
     
     TBD
@@ -1083,8 +1085,9 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
     
     if not skip_direct:
         if (not ACS) & run_tweak_align:
-            tweak_align(direct_group=direct, grism_group=grism, max_dist=1.,
-                        key=' ', drizzle=False, threshold=1.5)
+            tweak_align(direct_group=direct, grism_group=grism,
+                        max_dist=tweak_max_dist, key=' ', drizzle=False,
+                        threshold=tweak_threshold)
       
         ### Get reference astrometry from SDSS or WISE
         if radec is None:

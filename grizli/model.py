@@ -198,24 +198,43 @@ class GrismDisperser(object):
             self.seg = segmentation
             if self.seg.dtype is not np.float32:
                 self.seg = np.cast[np.float32](self.seg)
-                
+        
+        self.total_flux = self.direct[self.seg == self.id].sum()
+        
+        ### Initialize attributes        
+        self.spectrum_1d =  None
+        
+        self.xc = self.sh[1]/2+self.origin[1]
+        self.yc = self.sh[0]/2+self.origin[0]
+        
+        # Sub-pixel centering of the exact center of the object, relative
+        # to the center of the thumbnail
+        self.xcenter = xcenter
+        self.ycenter = ycenter
+        
+        self.beam = beam
+        
+        ## Config file    
         if isinstance(conf, list):
             conf_f = grismconf.get_config_filename(conf[0], conf[1], conf[2])
             self.conf = grismconf.load_grism_config(conf_f)
         else:
             self.conf = conf
         
-        ### Initialize attributes
-        self.xc = self.sh[1]/2+self.origin[1]
-        self.yc = self.sh[0]/2+self.origin[0]
+        self.process_config()
         
-        ### Sub-pixel centering of the exact center of the object, relative
-        ### to the center of the thumbnail
-        self.xcenter = xcenter
-        self.ycenter = ycenter
+    def process_config(self):
+        """Process grism config file
         
-        self.beam = beam
+        Parameters
+        ----------
+        none
         
+        Returns
+        -------
+        Sets attributes that define how the dispersion is computed.  See the 
+        attributes list for `~grizli.model.GrismDisperser`.
+        """        
         ### Get dispersion parameters at the reference position
         self.dx = self.conf.dxlam[self.beam] #+ xcenter #-xoff
         if self.grow > 1:
@@ -231,10 +250,10 @@ class GrismDisperser(object):
         
         self.xoff = xoff
         self.ytrace_beam, self.lam_beam = self.conf.get_beam_trace(
-                                    x=(self.xc+xcenter-self.pad)/self.grow,
-                                    y=(self.yc+ycenter-self.pad)/self.grow,
-                                    dx=(self.dx+xcenter*0+xoff)/self.grow,
-                                    beam=self.beam, fwcpos=self.fwcpos)
+                            x=(self.xc+self.xcenter-self.pad)/self.grow,
+                            y=(self.yc+self.ycenter-self.pad)/self.grow,
+                            dx=(self.dx+self.xcenter*0+self.xoff)/self.grow,
+                            beam=self.beam, fwcpos=self.fwcpos)
         
         self.ytrace_beam *= self.grow
         
@@ -257,7 +276,6 @@ class GrismDisperser(object):
         dl = np.abs(np.append(self.lam_beam[1] - self.lam_beam[0],
                               np.diff(self.lam_beam)))
         ysens *= 1.e-17*dl
-        
         self.sensitivity_beam = ysens
         
         ### Initialize the model arrays
@@ -285,10 +303,10 @@ class GrismDisperser(object):
         #                  y=self.yc, dx=self.dxfull, beam=self.beam)
         
         self.ytrace, self.lam = self.conf.get_beam_trace(
-                                    x=(self.xc+xcenter-self.pad)/self.grow,
-                                    y=(self.yc+ycenter-self.pad)/self.grow,
-                                    dx=(self.dxfull+xcenter+xoff)/self.grow,
-                                    beam=self.beam, fwcpos=self.fwcpos)
+                                x=(self.xc+self.xcenter-self.pad)/self.grow,
+                                y=(self.yc+self.ycenter-self.pad)/self.grow,
+                                dx=(self.dxfull+self.xcenter+xoff)/self.grow,
+                                beam=self.beam, fwcpos=self.fwcpos)
         
         self.ytrace *= self.grow
         
@@ -303,18 +321,14 @@ class GrismDisperser(object):
         ysens *= 1.e-17*dl
         self.sensitivity = ysens
         
-        #print 'XXX wavelength: %s %s %s' %(self.lam[-5:], self.lam_beam[-5:], dl[-5:])
-        
-        self.total_flux = self.direct[self.seg == self.id].sum()
-        
-        ## Slices of the parent array based on the origin parameter
+        # Slices of the parent array based on the origin parameter
         self.slx_parent = slice(self.origin[1] + self.dxfull[0] + self.x0[1],
                             self.origin[1] + self.dxfull[-1] + self.x0[1]+1)
         
         self.sly_parent = slice(self.origin[0], self.origin[0] + self.sh[0])
         
-        self.spectrum_1d =  None
-    
+        #print 'XXX wavelength: %s %s %s' %(self.lam[-5:], self.lam_beam[-5:], dl[-5:])
+            
     def add_ytrace_offset(self, yoffset):
         """Add an offset in Y to the spectral trace
         
@@ -887,6 +901,7 @@ class ImageData(object):
         ### Array parameters
         self.pad = pad
         self.origin = origin
+        self.fwcpos = None
         
         self.data = OrderedDict()
         self.data['SCI'] = sci*photflam
@@ -1860,6 +1875,9 @@ class GrismFLT(object):
             If `in_place` is False, return a full array including the model 
             for the single object.
         """               
+        
+        # debug
+        # x=None; y=None; size=10; mag=-1; spectrum_1d=None; compute_size=True; store=False; in_place=False; add=True; get_beams=['A']; verbose=True
         if id in self.object_dispersers.keys():
             object_in_model = True
             beams = self.object_dispersers[id]
