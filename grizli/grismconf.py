@@ -338,7 +338,7 @@ class aXeConf():
         ### NIRISS rotation?
         if fwcpos is not None:
             if 'FWCPOS_REF' not in self.conf.keys():
-                print('Parameter fwcpos={0:f} supplied but no FWCPOS_REF in {1:s}'.format(self.conf_file))
+                print('Parameter fwcpos={0} supplied but no FWCPOS_REF in {1:s}'.format(fwcpos, self.conf_file))
                 return dy, lam
             
             order = self.conf['DYDX_ORDER_{0}'.format(beam)]

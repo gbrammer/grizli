@@ -947,7 +947,13 @@ class ImageData(object):
                 self.wcs = wcs.copy()
         else:
             self.header = pyfits.Header()
-            
+        
+        # For NIRISS
+        if 'FWCPOS' in self.header:
+            self.fwcpos = self.grism.header['FWCPOS']
+        else:
+            self.fwcpos = None
+        
     def unset_dq(self):
         """Flip OK data quality bits using utils.unset_dq_bits
         
@@ -1566,12 +1572,6 @@ class GrismFLT(object):
             self.grism.unset_dq()
             nbad = self.grism.flag_negative(sigma=-3)
             self.grism.data['SCI'] *= (self.grism.data['DQ'] == 0)
-        
-        if 'FWCPOS' in self.grism.header:
-            self.grism.fwcpos = self.grism.header['FWCPOS']
-        else:
-            self.grism.fwcpos = None
-            
                
         ### Load data from saved model files, if available
         # if os.path.exists('%s_model.fits' %(self.grism_file)):
@@ -2630,6 +2630,10 @@ class BeamCutout(object):
             grow = self.grism.header['GROW']
         else:
             grow = 1
+        
+        self.grism.fwcpos = h0['FWCPOS']
+        if (self.grism.fwcpos == 0) | (self.grism.fwcpos == ''):
+            self.grism.fwcpos = None
             
         self.beam = GrismDisperser(id=h0['ID'], direct=direct, 
                                    segmentation=hdu['SEG'].data*1,
@@ -2638,7 +2642,7 @@ class BeamCutout(object):
                                    grow=grow, beam=h0['BEAM'], 
                                    xcenter=h0['XCENTER'],
                                    ycenter=h0['YCENTER'],
-                                   conf=conf, fwcpos=h0['FWCPOS'])
+                                   conf=conf, fwcpos=self.grism.fwcpos)
         
         self.grism.parent_file = h0['GPARENT']
         self.direct.parent_file = h0['DPARENT']
