@@ -441,7 +441,7 @@ def match_lists(input, output, transform=None, scl=3600., simple=True,
 
 def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3, 
                          clip=20, log=True, outlier_threshold=5, 
-                         verbose=True):
+                         verbose=True, guess=[0., 0., 0., 1]):
     """TBD
     """
     if hasattr(radec, 'upper'):
@@ -480,8 +480,11 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
     drz_wcs = pywcs.WCS(drz_im[0].header, relax=True)
     orig_wcs = drz_wcs.copy()
     
-    out_shift, out_rot, out_scale = np.zeros(2), 0., 1.
-    
+    #out_shift, out_rot, out_scale = np.zeros(2), 0., 1.
+    out_shift, out_rot, out_scale = guess[:2], guess[2], guess[3]    
+    drz_wcs = utils.transform_wcs(drz_wcs, out_shift, out_rot, out_scale)
+    print('{0} (guess)   : {1:6.2f} {2:6.2f} {3:7.3f} {4:7.3f}'.format(root, guess[0], guess[1], guess[2]/np.pi*180, 1./guess[3]))
+        
     for iter in range(NITER):
         xy = np.array(drz_wcs.all_world2pix(rd_ref, 0))
         pix = np.cast[int](np.round(xy)).T
@@ -555,12 +558,15 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
         out_rot -= tf.rotation
         out_scale *= tf.scale
         
-        drz_wcs.wcs.crpix += tf.translation
-        theta = -tf.rotation
-        _mat = np.array([[np.cos(theta), -np.sin(theta)],
-                         [np.sin(theta), np.cos(theta)]])
-        
-        drz_wcs.wcs.cd = np.dot(drz_wcs.wcs.cd, _mat)/tf.scale
+        drz_wcs = utils.transform_wcs(drz_wcs, tf.translation, tf.rotation, 
+                                      tf.scale)
+                                      
+        # drz_wcs.wcs.crpix += tf.translation
+        # theta = -tf.rotation
+        # _mat = np.array([[np.cos(theta), -np.sin(theta)],
+        #                  [np.sin(theta), np.cos(theta)]])
+        # 
+        # drz_wcs.wcs.cd = np.dot(drz_wcs.wcs.cd, _mat)/tf.scale
                 
     if log:
         tf_out = tf(output[output_ix][~outliers])
@@ -1147,10 +1153,16 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
         if os.path.exists(logfile):
             os.remove(logfile)
         
+        guess_file = '{0}.align_guess'.format(direct['product'])
+        if os.path.exists(guess_file):
+            guess = np.loadtxt(guess_file)
+        else:
+            guess = [0., 0., 0., 1]
+            
         result = align_drizzled_image(root=direct['product'], 
                                       mag_limits=align_mag_limits,
                                       radec=radec, NITER=5, clip=align_clip,
-                                      log=True,
+                                      log=True, guess=guess,
                                       outlier_threshold=align_tolerance)
                                   
         orig_wcs, drz_wcs, out_shift, out_rot, out_scale = result
@@ -2118,7 +2130,7 @@ def fix_star_centers(root='macs1149.6+2223-rot-ca5-22-032.0-f105w',
         clean_drizzle(root)
         cat = make_drz_catalog(root=root)
         
-def drizzle_overlaps(exposure_groups, parse_visits=False, pixfrac=0.8, scale=0.06, skysub=True, bits=None):
+def drizzle_overlaps(exposure_groups, parse_visits=False, pixfrac=0.8, scale=0.06, skysub=True, bits=None, final_wcs=True, final_rot=0):
     """Combine overlapping visits into single output mosaics
     
     Parameters
@@ -2167,7 +2179,7 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, pixfrac=0.8, scale=0.0
                      driz_cr_corr=False, driz_combine=True,
                      final_bits=bits, coeffs=True, build=False, 
                      final_wht_type='IVM', final_pixfrac=pixfrac,
-                     final_wcs=True, final_refimage=group['reference'],
+                     final_wcs=final_wcs, final_refimage=group['reference'],
                      resetbits=0)
         else:
             AstroDrizzle(group['files'], output=group['product'],
@@ -2177,7 +2189,8 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, pixfrac=0.8, scale=0.0
                      driz_cr_corr=False, driz_combine=True,
                      final_bits=bits, coeffs=True, build=False, 
                      final_wht_type='IVM', final_pixfrac=pixfrac,
-                     final_wcs=True, final_rot=0, final_scale=scale,
+                     final_wcs=final_wcs, final_rot=final_rot,
+                     final_scale=scale,
                      resetbits=0)
         
         clean_drizzle(group['product'])

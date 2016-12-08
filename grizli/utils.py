@@ -1009,6 +1009,37 @@ def get_wcs_pscale(wcs):
     pscale = np.sqrt(np.abs(det))*3600.
     return pscale
     
+def transform_wcs(in_wcs, translation=[0.,0.], rotation=0., scale=1.):
+    """Update WCS with shift, rotation, & scale
+    
+    Paramters
+    ---------
+    in_wcs: `~astropy.wcs.WCS`
+        Input WCS
+        
+    translation: [float, float]
+        xshift & yshift in pixels
+    
+    rotation: float
+        CCW rotation (towards East), radians
+    
+    scale: float
+        Pixel scale factor
+    
+    Returns
+    -------
+    out_wcs: `~astropy.wcs.WCS`
+        Modified WCS
+    """
+    out_wcs = in_wcs.deepcopy()
+    out_wcs.wcs.crpix += np.array(translation)
+    theta = -rotation
+    _mat = np.array([[np.cos(theta), -np.sin(theta)],
+                     [np.sin(theta), np.cos(theta)]])
+    
+    out_wcs.wcs.cd = np.dot(out_wcs.wcs.cd, _mat)/scale
+    return out_wcs
+    
 def make_spectrum_wcsheader(center_wave=1.4e4, dlam=40, NX=100, spatial_scale=1, NY=10):
     """Make a WCS header for a 2D spectrum
     
