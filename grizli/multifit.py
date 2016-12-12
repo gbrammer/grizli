@@ -2118,7 +2118,7 @@ def drizzle_2d_spectrum(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
         beam_header, beam_wcs = beam.get_2d_wcs()
         
         # Downweight contamination
-        wht = 1/beam.ivar + fcontam*beam.contam
+        wht = 1/beam.ivar + (fcontam*beam.contam)**2
         wht = np.cast[np.float32](1/wht)
         wht[~np.isfinite(wht)] = 0.
         
@@ -2272,7 +2272,7 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
         
         # Downweight contamination
         if fcontam > 0:
-            wht = 1/beam.ivar + fcontam*beam.contam
+            wht = 1/beam.ivar + (fcontam*beam.contam)**2
             wht = np.cast[np.float32](1/wht)
             wht[~np.isfinite(wht)] = 0.
         else:
