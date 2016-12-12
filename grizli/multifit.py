@@ -2349,8 +2349,8 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
     
     outwht  *= (beams[0].grism.wcs.pscale/output_wcs.pscale)**4
     coutwht *= (beams[0].grism.wcs.pscale/output_wcs.pscale)**4
+    xoutwht *= (beams[0].grism.wcs.pscale/output_wcs.pscale)**4
     doutwht *= (beams[0].direct.wcs.pscale/output_wcs.pscale)**4
-    xoutwht *= (beams[0].direct.wcs.pscale/output_wcs.pscale)**4
     
     ### Make output FITS products
     p = pyfits.PrimaryHDU()
