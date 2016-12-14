@@ -18,6 +18,32 @@ from . import model
 from .utils_c import disperse
 from .utils_c import interp
 
+grism_colors = {'G800L':(0.0, 0.4470588235294118, 0.6980392156862745),
+      'G102':(0.0, 0.6196078431372549, 0.45098039215686275),
+      'G141':(0.8352941176470589, 0.3686274509803922, 0.0),
+      'none':(0.8, 0.4745098039215686, 0.6549019607843137),
+      'GRISM':'k',
+      'G280':'purple',
+      'F090W':(0.0, 0.4470588235294118, 0.6980392156862745),
+      'F115W':(0.0, 0.6196078431372549, 0.45098039215686275),
+      'F150W':(0.8352941176470589, 0.3686274509803922, 0.0),
+      'F200W':(0.8, 0.4745098039215686, 0.6549019607843137),
+      'F140M':'orange',
+      'CLEARP':'b'}
+
+grism_limits = {'G800L':[0.545, 1.02],
+          'G280':[0.2,0.4],
+           'G102':[0.77, 1.18],
+           'G141':[1.06, 1.73],
+           'GRISM':[0.98, 1.98],
+           'G280':[0.2,0.4],
+           'F090W':[0.76,1.04],
+           'F115W':[0.97,1.32],
+           'F150W':[1.28, 1.72],
+           'F200W':[1.68, 2.3],
+           'F140M':[1.2,1.6],
+           'CLEARP':[0.76, 2.3]}
+
 def test():
     
     import glob
@@ -686,7 +712,19 @@ class MultiBeam():
                 self.Ngrism[grism] += 1
             else:
                 self.Ngrism[grism] = 1
-                        
+        
+        self.PA = {}
+        for g in self.Ngrism:
+            self.PA[g] = {}
+            
+        for i in range(self.N):
+            grism = self.beams[i].grism.filter
+            PA = self.beams[i].get_dispersion_PA(decimals=1)
+            if PA in self.PA[grism]:
+                self.PA[grism][PA].append(i)
+            else:
+                self.PA[grism][PA] = [i]
+            
         self.id = self.beams[0].id
         
         self.poly_order = None
@@ -1482,20 +1520,7 @@ class MultiBeam():
             wfull[grism] = np.append(wfull[grism], wave)
             ffull[grism] = np.append(ffull[grism], flux)
             efull[grism] = np.append(efull[grism], err)
-        
-        cp = {'G800L':(0.0, 0.4470588235294118, 0.6980392156862745),
-              'G102':(0.0, 0.6196078431372549, 0.45098039215686275),
-              'G141':(0.8352941176470589, 0.3686274509803922, 0.0),
-              'none':(0.8, 0.4745098039215686, 0.6549019607843137),
-              'GRISM':'k',
-              'G280':'purple',
-              'F090W':(0.0, 0.4470588235294118, 0.6980392156862745),
-              'F115W':(0.0, 0.6196078431372549, 0.45098039215686275),
-              'F150W':(0.8352941176470589, 0.3686274509803922, 0.0),
-              'F200W':(0.8, 0.4745098039215686, 0.6549019607843137),
-              'F140M':'orange',
-              'CLEARP':'b'}
-        
+                
         for grism in grisms:                        
             if self.Ngrism[grism] > 1:
                 ## binned
@@ -1511,27 +1536,16 @@ class MultiBeam():
                 wbin = nd.convolve(wfull[grism][okb][so], kernel)[N//2::N]
                 vbin = nd.convolve(var[okb][so], kernel**2)[N//2::N]
                 ax.errorbar(wbin/1.e4, fbin, np.sqrt(vbin), alpha=0.8,
-                            linestyle='None', marker='.', color=cp[grism], zorder=2)
+                            linestyle='None', marker='.', 
+                            color=grism_colors[grism], zorder=2)
                 
         ax.set_ylim(ymin - 0.1*np.abs(ymax), 1.1*ymax)
         
-        xmin, xmax = 1.e5, 0
-        limits = {'G800L':[0.545, 1.02],
-                   'G102':[0.77, 1.18],
-                   'G141':[1.06, 1.73],
-                   'GRISM':[0.98, 1.98],
-                   'G280':[0.2,0.4],
-                   'F090W':[0.76,1.04],
-                   'F115W':[0.97,1.32],
-                   'F150W':[1.28, 1.72],
-                   'F200W':[1.68, 2.3],
-                   'F140M':[1.2,1.6],
-                   'CLEARP':[0.76, 2.3]}
-        
-        for g in limits:
+        xmin, xmax = 1.e5, 0        
+        for g in grism_limits:
             if g in grisms:
-                xmin = np.minimum(xmin, limits[g][0])
-                xmax = np.maximum(xmax, limits[g][1])
+                xmin = np.minimum(xmin, grism_limits[g][0])
+                xmax = np.maximum(xmax, grism_limits[g][1])
                 #print g, xmin, xmax
                 
         ax.set_xlim(xmin, xmax)
@@ -1554,24 +1568,11 @@ class MultiBeam():
         """        
         ### xlimits        
         xmin, xmax = 1.e5, 0
-        limits = {'G800L':[0.545, 1.02],
-                  'G280':[0.2,0.4],
-                   'G102':[0.77, 1.18],
-                   'G141':[1.06, 1.73],
-                   'GRISM':[0.98, 1.98],
-                   'G280':[0.2,0.4],
-                   'F090W':[0.76,1.04],
-                   'F115W':[0.97,1.32],
-                   'F150W':[1.28, 1.72],
-                   'F200W':[1.68, 2.3],
-                   'F140M':[1.2,1.6],
-                   'CLEARP':[0.76, 2.3]}
                    
-        
-        for g in limits:
+        for g in grism_limits:
             if g in self.Ngrism:
-                xmin = np.minimum(xmin, limits[g][0])
-                xmax = np.maximum(xmax, limits[g][1])
+                xmin = np.minimum(xmin, grism_limits[g][0])
+                xmax = np.maximum(xmax, grism_limits[g][1])
         
         hdu_sci = drizzle_2d_spectrum(self.beams, ds9=None, NY=NY,
                                       spatial_scale=spatial_scale, dlam=dlam, 
@@ -2030,6 +2031,106 @@ class MultiBeam():
         print(shifts, chi2/self.DoF)
         return chi2/self.DoF    
             
+    def show_grisms_and_PAs(self, size=10, fcontam=0):
+        """Make figure showing spectra at different orients/grisms
+        
+        TBD
+        """
+        from matplotlib.ticker import MultipleLocator
+        
+        NX = len(self.PA)
+        NY = 0
+        for g in self.PA:
+            NY = np.maximum(NY, len(self.PA[g]))
+        
+        NY += 1
+        
+        grism_major = {'G102':0.1, 'G141':0.1, 'G800L':0.2}
+        
+        fig = plt.figure(figsize=[4*NX, 1*NY])
+        for ig, g in enumerate(self.PA):
+            all_beams = []
+            hdus = []
+            for ipa, pa in enumerate(self.PA[g]):
+                beams = [self.beams[i] for i in self.PA[g][pa]]
+                all_beams.extend(beams)
+                dlam = np.ceil(np.diff(beams[0].beam.lam)[0])
+                
+                data = [beam.grism['SCI']-beam.contam for beam in beams]
+                hdu = drizzle_2d_spectrum(beams, data=data, 
+                                          wlimit=grism_limits[g], dlam=dlam, 
+                                          spatial_scale=1, NY=size,
+                                          pixfrac=0.5,
+                                          kernel='square',
+                                          convert_to_flambda=False,
+                                          fcontam=0, ds9=None)
+                
+                hdu[0].header['GRISM'] = (g, 'Grism')
+                hdu[0].header['PA'] = (pa, 'Dispersion PA')
+                hdus.append(hdu)
+                
+            data = [beam.grism['SCI']-beam.contam for beam in all_beams]
+            hdu = drizzle_2d_spectrum(all_beams, data=data, 
+                                      wlimit=grism_limits[g], dlam=dlam, 
+                                      spatial_scale=1, NY=size,
+                                      pixfrac=0.5,
+                                      kernel='square',
+                                      convert_to_flambda=False,
+                                      fcontam=fcontam, ds9=None)
+            
+            hdu[0].header['GRISM'] = (g, 'Grism')
+            hdus.append(hdu)
+            
+            clip = hdu['WHT'].data > 0 #np.percentile(hdu['WHT'].data, 10)
+            avg_rms = 1/np.median(np.sqrt(hdu['WHT'].data[clip]))
+            vmax = np.maximum(1.1*np.percentile(hdu['SCI'].data[clip],98),
+                             5*avg_rms)
+            
+            ax = fig.add_subplot(NY, NX, ig*NX+ipa+2)
+            sh = hdu[1].data.shape
+            extent = [hdu[0].header['WMIN'], hdu[0].header['WMAX'], 
+                      0, sh[0]]
+
+            ax.imshow(hdu['SCI'].data, origin='lower',
+                      interpolation='Nearest', vmin=-0.1*vmax, vmax=vmax, 
+                      extent=extent, cmap = plt.cm.viridis_r, 
+                      aspect='auto')
+
+            ax.set_yticklabels([])
+            ax.set_xlabel(r'$\lambda$ ($\mu$m) - '+g)
+            ax.xaxis.set_major_locator(MultipleLocator(grism_major[g]))
+                    
+            for ipa, pa in enumerate(self.PA[g]):
+            
+                ax = fig.add_subplot(NY, NX, ig*NX+ipa+1)
+                hdu = hdus[ipa]
+                
+                if (ig == 0) & (ipa == 0):
+                    ax.text(0.98, 0.94, 'ID = {0}'.format(self.id), 
+                            ha='right', va='top', transform=ax.transAxes,
+                            fontsize=8, backgroundcolor='w')
+                    
+                sh = hdu[1].data.shape
+                extent = [hdu[0].header['WMIN'], hdu[0].header['WMAX'], 
+                          0, sh[0]]
+
+                ax.imshow(hdu['SCI'].data, origin='lower',
+                          interpolation='Nearest', vmin=-0.1*vmax, vmax=vmax, 
+                          extent=extent, cmap = plt.cm.viridis_r, 
+                          aspect='auto')
+
+                ax.set_yticklabels([])
+                ax.set_xticklabels([])
+                ax.xaxis.set_major_locator(MultipleLocator(grism_major[g]))
+                ax.text(0.015, 0.94, '{0:.1f}'.format(pa), ha='left',
+                        va='top',
+                        transform=ax.transAxes, fontsize=8, 
+                        backgroundcolor='w')
+            
+        fig.tight_layout(pad=0.1)
+        
+        return fig, hdus
+                                      
 def get_redshift_fit_defaults():
     """TBD
     """
