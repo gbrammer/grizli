@@ -2130,7 +2130,7 @@ def fix_star_centers(root='macs1149.6+2223-rot-ca5-22-032.0-f105w',
         clean_drizzle(root)
         cat = make_drz_catalog(root=root)
         
-def drizzle_overlaps(exposure_groups, parse_visits=False, pixfrac=0.8, scale=0.06, skysub=True, bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None):
+def drizzle_overlaps(exposure_groups, parse_visits=False, pixfrac=0.8, scale=0.06, skysub=True, bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='EXP', final_wt_scl='exptime'):
     """Combine overlapping visits into single output mosaics
     
     Parameters
@@ -2178,7 +2178,9 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, pixfrac=0.8, scale=0.0
                      median=False, blot=False, driz_cr=False,
                      driz_cr_corr=False, driz_combine=True,
                      final_bits=bits, coeffs=True, build=False, 
-                     final_wht_type='IVM', final_pixfrac=pixfrac,
+                     final_wht_type=final_wht_type,
+                     final_wt_scl=final_wt_scl,
+                     final_pixfrac=pixfrac,
                      final_wcs=True, final_refimage=group['reference'],
                      resetbits=0)
         else:
@@ -2188,7 +2190,9 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, pixfrac=0.8, scale=0.0
                      median=False, blot=False, driz_cr=False,
                      driz_cr_corr=False, driz_combine=True,
                      final_bits=bits, coeffs=True, build=False, 
-                     final_wht_type='IVM', final_pixfrac=pixfrac,
+                     final_wht_type=final_wht_type,
+                     final_wt_scl=final_wt_scl,
+                     final_pixfrac=pixfrac,
                      final_wcs=final_wcs, final_rot=final_rot,
                      final_scale=scale, 
                      final_ra=final_ra, final_dec=final_dec,
