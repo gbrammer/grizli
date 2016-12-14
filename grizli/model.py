@@ -2839,6 +2839,45 @@ class BeamCutout(object):
         ra, dec = self.direct.wcs.all_pix2world(pix_center, 1)[0]
         return ra, dec
     
+    def get_dispersion_PA(self, decimals=1):
+        """Compute exact PA of the dispersion axis, including tilt of the 
+        trace and the FLT WCS
+        
+        Parameters
+        ----------
+        decimals : int or None
+            Number of decimal places to round to, passed to `~numpy.round`. 
+            If None, then don't round.
+            
+        Returns
+        -------
+        dispersion_PA : float
+            PA (angle East of North) of the dispersion axis.
+        """
+        from astropy.coordinates import Angle
+        import astropy.units as u
+                    
+        ### extra tilt of the 1st order grism spectra
+        x0 =  self.beam.conf.conf['BEAMA']
+        dy_trace, lam_trace = self.beam.conf.get_beam_trace(x=507, y=507,
+                                                         dx=x0, beam='A')
+        
+        extra = np.arctan2(dy_trace[1]-dy_trace[0], x0[1]-x0[0])/np.pi*180
+                
+        ### Distorted WCS
+        crpix = self.direct.wcs.wcs.crpix
+        xref = [crpix[0], crpix[0]+1]
+        yref = [crpix[1], crpix[1]]
+        r, d = self.direct.wcs.all_pix2world(xref, yref, 1)
+        pa =  Angle((extra + 
+                     np.arctan2(np.diff(r), np.diff(d))[0]/np.pi*180)*u.deg)
+        
+        dispersion_PA = pa.wrap_at(360*u.deg).value
+        if decimals is not None:
+            dispersion_PA = np.round(dispersion_PA, decimals=decimals)
+            
+        return dispersion_PA
+    
     def init_epsf(self, center=None, tol=1.e-3, yoff=0.):
         """Initialize ePSF fitting for point sources
         TBD

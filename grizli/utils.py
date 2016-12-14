@@ -693,7 +693,6 @@ def detect_with_photutils(sci, err=None, dq=None, seg=None, detect_thresh=2.,
     
     return catalog, seg
     
-#
 def nmad(data):
     """Normalized NMAD=1.48 * `~.astropy.stats.median_absolute_deviation`
     
