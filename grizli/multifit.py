@@ -719,7 +719,7 @@ class MultiBeam():
             
         for i in range(self.N):
             grism = self.beams[i].grism.filter
-            PA = self.beams[i].get_dispersion_PA(decimals=1)
+            PA = self.beams[i].get_dispersion_PA(decimals=0)
             if PA in self.PA[grism]:
                 self.PA[grism][PA].append(i)
             else:
@@ -2031,7 +2031,7 @@ class MultiBeam():
         print(shifts, chi2/self.DoF)
         return chi2/self.DoF    
             
-    def show_grisms_and_PAs(self, size=10, fcontam=0):
+    def show_grisms_and_PAs(self, size=10, fcontam=0, flambda=True):
         """Make figure showing spectra at different orients/grisms
         
         TBD
@@ -2051,10 +2051,15 @@ class MultiBeam():
         keys.sort()
         
         fig = plt.figure(figsize=[4*NX, 1*NY])
+        all_hdus = []
         for ig, g in enumerate(keys):
             all_beams = []
             hdus = []
-            for ipa, pa in enumerate(self.PA[g]):
+            
+            pas = list(self.PA[g].keys())
+            pas.sort()
+            
+            for ipa, pa in enumerate(pas):
                 beams = [self.beams[i] for i in self.PA[g][pa]]
                 all_beams.extend(beams)
                 dlam = np.ceil(np.diff(beams[0].beam.lam)[0])
@@ -2065,7 +2070,7 @@ class MultiBeam():
                                           spatial_scale=1, NY=size,
                                           pixfrac=0.5,
                                           kernel='square',
-                                          convert_to_flambda=False,
+                                          convert_to_flambda=flambda,
                                           fcontam=0, ds9=None)
                 
                 hdu[0].header['GRISM'] = (g, 'Grism')
@@ -2078,11 +2083,12 @@ class MultiBeam():
                                       spatial_scale=1, NY=size,
                                       pixfrac=0.5,
                                       kernel='square',
-                                      convert_to_flambda=False,
+                                      convert_to_flambda=flambda,
                                       fcontam=fcontam, ds9=None)
             
             hdu[0].header['GRISM'] = (g, 'Grism')
             hdus.append(hdu)
+            all_hdus.extend(hdus)
             
             clip = hdu['WHT'].data > 0 #np.percentile(hdu['WHT'].data, 10)
             avg_rms = 1/np.median(np.sqrt(hdu['WHT'].data[clip]))
@@ -2103,7 +2109,7 @@ class MultiBeam():
             ax.set_xlabel(r'$\lambda$ ($\mu$m) - '+g)
             ax.xaxis.set_major_locator(MultipleLocator(grism_major[g]))
                     
-            for ipa, pa in enumerate(self.PA[g]):
+            for ipa, pa in enumerate(pas):
             
                 ax = fig.add_subplot(NY, NX, ig+ipa*NX+1)
                 hdu = hdus[ipa]
@@ -2125,14 +2131,14 @@ class MultiBeam():
                 ax.set_yticklabels([])
                 ax.set_xticklabels([])
                 ax.xaxis.set_major_locator(MultipleLocator(grism_major[g]))
-                ax.text(0.015, 0.94, '{0:.1f}'.format(pa), ha='left',
+                ax.text(0.015, 0.94, '{0:3.0f}'.format(pa), ha='left',
                         va='top',
                         transform=ax.transAxes, fontsize=8, 
                         backgroundcolor='w')
             
         fig.tight_layout(pad=0.1)
         
-        return fig, hdus
+        return fig, all_hdus
                                       
 def get_redshift_fit_defaults():
     """TBD
