@@ -2047,8 +2047,11 @@ class MultiBeam():
         
         grism_major = {'G102':0.1, 'G141':0.1, 'G800L':0.2}
         
+        keys = list(self.PA)
+        keys.sort()
+        
         fig = plt.figure(figsize=[4*NX, 1*NY])
-        for ig, g in enumerate(self.PA):
+        for ig, g in enumerate(keys):
             all_beams = []
             hdus = []
             for ipa, pa in enumerate(self.PA[g]):
@@ -2086,7 +2089,7 @@ class MultiBeam():
             vmax = np.maximum(1.1*np.percentile(hdu['SCI'].data[clip],98),
                              5*avg_rms)
             
-            ax = fig.add_subplot(NY, NX, ig*NX+ipa+2)
+            ax = fig.add_subplot(NY, NX, ig+(NY-1)*NX+1)
             sh = hdu[1].data.shape
             extent = [hdu[0].header['WMIN'], hdu[0].header['WMAX'], 
                       0, sh[0]]
@@ -2102,7 +2105,7 @@ class MultiBeam():
                     
             for ipa, pa in enumerate(self.PA[g]):
             
-                ax = fig.add_subplot(NY, NX, ig*NX+ipa+1)
+                ax = fig.add_subplot(NY, NX, ig+ipa*NX+1)
                 hdu = hdus[ipa]
                 
                 if (ig == 0) & (ipa == 0):
