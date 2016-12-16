@@ -1056,10 +1056,10 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
     #################
     
     ### Copy FLT files from ../RAW
-    ACS = '_flc' in direct['files'][0]
+    isACS = '_flc' in direct['files'][0]
     if not skip_direct:
         for file in direct['files']:
-            crclean = ACS & (len(direct['files']) == 1)
+            crclean = isACS & (len(direct['files']) == 1)
             fresh_flt_file(file, crclean=crclean)
             updatewcs.updatewcs(file, verbose=False)
     
@@ -1080,7 +1080,7 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
         asn.create()
         asn.write()
             
-    if ACS:
+    if isACS:
         bits = 64+32
         driz_cr_snr = '3.5 3.0'
         driz_cr_scale = '1.2 0.7'
@@ -1090,7 +1090,8 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
         driz_cr_scale = '2.5 0.7'
     
     if not skip_direct:
-        if (not ACS) & run_tweak_align:
+        if (not isACS) & run_tweak_align:
+            #if run_tweak_align:
             tweak_align(direct_group=direct, grism_group=grism,
                         max_dist=tweak_max_dist, key=' ', drizzle=False,
                         threshold=tweak_threshold)
@@ -1138,7 +1139,23 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                          median=False, blot=False, driz_cr=False,
                          driz_cr_corr=False, driz_combine=True,
                          build=False, final_wht_type='IVM')
-    
+        
+        ## Now do tweak_align for ACS
+        if isACS & run_tweak_align:
+            tweak_align(direct_group=direct, grism_group=grism,
+                    max_dist=tweak_max_dist, key=' ', drizzle=False,
+                    threshold=tweak_threshold)
+            
+            # Redrizzle with no CR rejection
+            AstroDrizzle(direct['files'], output=direct['product'],
+                             clean=True, context=False, preserve=False,
+                             skysub=False, driz_separate=False,
+                             driz_sep_wcs=False,
+                             median=False, blot=False, driz_cr=False,
+                             driz_cr_corr=False, driz_combine=True,
+                             final_bits=bits, coeffs=True, build=False, 
+                             final_wht_type='IVM', resetbits=0)
+            
         ### Make catalog & segmentation image
         cat = make_drz_catalog(root=direct['product'], threshold=2)
         if radec == 'self':
@@ -1201,7 +1218,7 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                 pixfrac=0.8
         
             AstroDrizzle(direct['files'], output=direct['product'], 
-                         clean=True, final_pixfrac=pixfrac, context=False,
+                         clean=True, final_pixfrac=pixfrac, context=isACS,
                          resetbits=4096, final_bits=bits, driz_sep_bits=bits,
                          preserve=False, driz_cr_snr=driz_cr_snr,
                          driz_cr_scale=driz_cr_scale, build=False, 
@@ -1213,7 +1230,7 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
         table_to_regions(cat, '{0}.cat.reg'.format(direct['product']))
         table_to_radec(cat, '{0}.cat.radec'.format(direct['product']))
         
-        if (fix_stars) & (not ACS):
+        if (fix_stars) & (not isACS):
             fix_star_centers(root=direct['product'], drizzle=True, mag_lim=21)
         
     ################# 
@@ -1240,7 +1257,7 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                           column_average=column_average, verbose=True, ext=1)
     
     # Run on second chip (also for UVIS/G280)
-    if ACS:
+    if isACS:
         visit_grism_sky(grism=grism, apply=True,
                         column_average=column_average, verbose=True, ext=2)
         
@@ -1258,7 +1275,7 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
             
             
     ### Redrizzle with new background subtraction
-    if ACS:
+    if isACS:
         skyfile=''
     else:
         skyfile = '/tmp/{0}.skyfile'.format(grism['product'])
@@ -1440,11 +1457,15 @@ def tweak_flt(files=[], max_dist=0.4, threshold=3, verbose=True):
                        clobber=True)
         
         pyfits.writeto('{0}_xrms.fits'.format(root), data=im['ERR',1].data,
-                       header=im['ERR'].header, clobber=True)
+                       header=im['ERR',1].header, clobber=True)
         
         output = sew('{0}_xsci.fits'.format(root))        
         
-        wcs = pywcs.WCS(im['SCI',1].header, relax=True)
+        if '_flc' in file:
+            wcs = pywcs.WCS(im['SCI',1].header, fobj=im, relax=True)
+        else:
+            wcs = pywcs.WCS(im['SCI',1].header, relax=True)
+            
         cats.append([output['table'], wcs])
         
         for ext in ['xsci', 'xrms']:
@@ -1549,8 +1570,18 @@ def find_direct_grism_pairs(direct={}, grism={}, check_pixel=[507, 507],
     for file in direct['files']:
         grism_matches[file] = []
         im = pyfits.open(file)
-        direct_wcs[file] = pywcs.WCS(im[1].header, relax=True, key=key)
-        full_direct_wcs[file] = pywcs.WCS(im[1].header, relax=True)
+        #direct_wcs[file] = pywcs.WCS(im[1].header, relax=True, key=key)
+        #full_direct_wcs[file] = pywcs.WCS(im[1].header, relax=True)
+        
+        if '_flc' in file:
+            direct_wcs[file] = pywcs.WCS(im[1].header, fobj=im, relax=True,
+                                         key=key)
+            full_direct_wcs[file] = pywcs.WCS(im[1].header, fobj=im,
+                                              relax=True)
+        else:
+            direct_wcs[file] = pywcs.WCS(im[1].header, relax=True, key=key)
+            full_direct_wcs[file] = pywcs.WCS(im[1].header, relax=True)
+        
         direct_rd[file] = direct_wcs[file].all_pix2world([check_pixel], 1)
     
     if 'files' not in grism:
@@ -1741,16 +1772,16 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
         bg_fixed = ['zodi_G141_clean.fits']
         bg_vary = ['zodi_G141_clean.fits', 'excess_lo_G141_clean.fits',
                    'G141_scattered_light.fits'][1:]
-        ACS = False
+        isACS = False
     elif grism_element == 'G102':
         bg_fixed = ['zodi_G102_clean.fits']
         bg_vary = ['excess_G102_clean.fits']
-        ACS = False
+        isACS = False
     
     elif grism_element == 'G280':
         bg_fixed = ['UVIS.G280.flat.fits']
         bg_vary = ['UVIS.G280.ext{0:d}.sky.fits'.format(ext)]
-        ACS = True
+        isACS = True
         flat = 1.
         
     elif grism_element == 'G800L':
@@ -1758,7 +1789,7 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
         bg_vary = ['ACS.WFC.flat.fits']
         #bg_fixed = ['ACS.WFC.CHIP%d.msky.1.fits' %({1:2,2:1}[ext])]
         #bg_fixed = []
-        ACS = True
+        isACS = True
         
         flat_files = {'G800L':'n6u12592j_pfl.fits'} # F814W
         flat_file = flat_files[grism_element]        
@@ -1767,7 +1798,7 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
     
     if verbose:
         print('{0}: EXTVER={1:d} / {2} / {3}'.format(grism['product'], ext, bg_fixed, bg_vary))
-    if not ACS:
+    if not isACS:
         ext = 1
         
     ### Read sky files    
@@ -1801,7 +1832,7 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
     exptime = np.ones(Nexp)
     
     ### Build combined arrays
-    if ACS:
+    if isACS:
         bits = 64+32
     else:
         bits = 576
@@ -1817,7 +1848,7 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
         wht[i*Npix:(i+1)*Npix] = 1./(flt['ERR',ext].data**2*dq_mask).flatten()
         wht[~np.isfinite(wht)] = 0.
         
-        if ACS:
+        if isACS:
             exptime[i] = flt[0].header['EXPTIME']
             data[i*Npix:(i+1)*Npix] /= exptime[i]
             wht[i*Npix:(i+1)*Npix] *= exptime[i]**2
@@ -1922,8 +1953,8 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
             flt.flush()
     
     ### Don't do `column_average` for ACS
-    if (not column_average) | ACS:
-        return ACS
+    if (not column_average) | isACS:
+        return isACS
         
     ######
     ### Now fit residual column average & make diagnostic plot
@@ -2164,9 +2195,9 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, pixfrac=0.8, scale=0.0
         exposure_groups = utils.parse_visit_overlaps(exposure_groups, buffer=15.)
         
     for group in exposure_groups:
-        ACS = 'flc' in group['files'][0]
+        isACS = '_flc' in group['files'][0]
         if bits is None:
-            if ACS:
+            if isACS:
                 bits = 64+32
             else:
                 bits = 576
