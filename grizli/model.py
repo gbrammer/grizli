@@ -1719,9 +1719,11 @@ class GrismFLT(object):
         
         self.direct.data['REF'] *= self.direct.ref_photflam
         
-        ## Fill empty pixels in the reference image from the SCI image
-        empty = self.direct.data['REF'] == 0
-        self.direct.data['REF'][empty] += self.direct.data['SCI'][empty]
+        # Fill empty pixels in the reference image from the SCI image, 
+        # but don't do it if direct['SCI'] is just a copy from the grism
+        if not self.direct.filter.startswith('G'):
+            empty = self.direct.data['REF'] == 0
+            self.direct.data['REF'][empty] += self.direct['SCI'][empty]
         
         # self.direct.data['ERR'] *= 0.
         # self.direct.data['DQ'] *= 0        
@@ -1920,7 +1922,7 @@ class GrismFLT(object):
                 ### Object won't disperse spectrum onto the grism image
                 if ((ymax < self.pad-5) | 
                     (ymin > self.direct.sh[0]-self.pad+5) | 
-                    (xmin == 0) | (ymax == self.direct.sh[0]) |
+                    (ymin == 0) | (ymax == self.direct.sh[0]) |
                     (xmin == 0) | (xmax == self.direct.sh[1])):
                     return True
                     
