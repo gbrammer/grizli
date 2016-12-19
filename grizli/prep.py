@@ -2160,6 +2160,68 @@ def fix_star_centers(root='macs1149.6+2223-rot-ca5-22-032.0-f105w',
         
         clean_drizzle(root)
         cat = make_drz_catalog(root=root)
+
+def find_single_image_CRs(visit, simple_mask=False):
+    """Use LACosmic to find CRs in parts of an ACS mosaic where only one
+    exposure was available
+    
+    Paramters
+    ---------
+    visit : dict
+        List of visit information from `~grizli.utils.parse_flt_files`.
+    
+   simple_mask : bool
+        If true, set 1024 CR bit for all parts of a given FLT where it does
+        not overlap with any others in the visit.  If False, then run 
+        LACosmic to flag CRs in this area but keep the pixels.
+        
+    Requires context (CTX) image `visit['product']+'_drc_ctx.fits`.   
+    """
+    from drizzlepac import astrodrizzle
+    import lacosmicx
+    
+    ctx = pyfits.open(visit['product']+'_drc_ctx.fits')
+    bits = np.log2(ctx[0].data)
+    mask = ctx[0].data == 0
+    single_image = np.cast[np.float32]((np.cast[int](bits) == bits) & (~mask))
+    ctx_wcs = pywcs.WCS(ctx[0].header)
+    ctx_wcs.pscale = utils.get_wcs_pscale(ctx_wcs)
+    
+    for file in visit['files']:
+        flt = pyfits.open(file, mode='update')
+        for ext in [1,2]:
+            
+            flt_wcs = pywcs.WCS(flt['SCI',ext].header, fobj=flt, relax=True)
+            flt_wcs.pscale = utils.get_wcs_pscale(flt_wcs)
+            
+            blotted = astrodrizzle.ablot.do_blot(single_image, ctx_wcs,
+                            flt_wcs, 1, coeffs=True, interp='nearest',
+                            sinscl=1.0, stepsize=10, wcsmap=None)
+            
+            ctx_mask = blotted > 0
+            
+            sci = flt['SCI',ext].data
+            dq = flt['DQ',ext].data
+
+            if simple_mask:
+                print('{0}: Mask image without overlaps, extension {1:d}'.format(file, ext))
+                dq[ctx_mask] |= 1024
+            else:
+                print('{0}: Clean CRs with LACosmic, extension {1:d}'.format(file, ext))
+
+                inmask = blotted == 0
+                crmask, clean = lacosmicx.lacosmicx(sci, inmask=inmask,
+                             sigclip=4.5, sigfrac=0.3, objlim=5.0, gain=1.0,
+                             readnoise=6.5, satlevel=65536.0, pssl=0.0,
+                             niter=4, sepmed=True, cleantype='meanmask',
+                             fsmode='median', psfmodel='gauss',
+                             psffwhm=2.5,psfsize=7, psfk=None, psfbeta=4.765,
+                             verbose=False)
+            
+                dq[crmask & ctx_mask] |= 1024
+                #sci[crmask & ctx_mask] = 0
+        
+        flt.flush()
         
 def drizzle_overlaps(exposure_groups, parse_visits=False, pixfrac=0.8, scale=0.06, skysub=True, bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='EXP', final_wt_scl='exptime'):
     """Combine overlapping visits into single output mosaics
