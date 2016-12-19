@@ -1303,6 +1303,7 @@ class MultiBeam():
         coeffs=coeffs[so,:]
 
         if prior is not None:
+            #print('\n\nPrior!\n\n', chi2.min(), prior[1].min())
             interp_prior = np.interp(zgrid, prior[0], prior[1])
             chi2 += interp_prior
         else:
@@ -2050,6 +2051,16 @@ class MultiBeam():
         keys = list(self.PA)
         keys.sort()
         
+        # Fit background
+        try:
+            out = self.fit_at_z(z=0, templates={}, fitter='lstsq', poly_order=3, fit_background=True)
+            bg = out[-3][:self.N]
+        except:
+            bg = [0]*self.N
+            
+        for ib, beam in enumerate(self.beams):
+            beam.bg = bg[ib]
+            
         fig = plt.figure(figsize=[4*NX, 1*NY])
         all_hdus = []
         for ig, g in enumerate(keys):
@@ -2064,7 +2075,8 @@ class MultiBeam():
                 all_beams.extend(beams)
                 dlam = np.ceil(np.diff(beams[0].beam.lam)[0])
                 
-                data = [beam.grism['SCI']-beam.contam for beam in beams]
+                data = [beam.grism['SCI']-beam.contam-beam.bg 
+                           for beam in beams]
                 hdu = drizzle_2d_spectrum(beams, data=data, 
                                           wlimit=grism_limits[g], dlam=dlam, 
                                           spatial_scale=1, NY=size,
@@ -2077,7 +2089,9 @@ class MultiBeam():
                 hdu[0].header['PA'] = (pa, 'Dispersion PA')
                 hdus.append(hdu)
                 
-            data = [beam.grism['SCI']-beam.contam for beam in all_beams]
+            data = [beam.grism['SCI']-beam.contam-beam.bg 
+                        for beam in all_beams]
+            
             hdu = drizzle_2d_spectrum(all_beams, data=data, 
                                       wlimit=grism_limits[g], dlam=dlam, 
                                       spatial_scale=1, NY=size,
@@ -2091,6 +2105,9 @@ class MultiBeam():
             all_hdus.extend(hdus)
             
             clip = hdu['WHT'].data > 0 #np.percentile(hdu['WHT'].data, 10)
+            if clip.sum() == 0:
+                clip = np.isfinite(hdu['WHT'].data)
+            
             avg_rms = 1/np.median(np.sqrt(hdu['WHT'].data[clip]))
             vmax = np.maximum(1.1*np.percentile(hdu['SCI'].data[clip],98),
                              5*avg_rms)
@@ -2145,7 +2162,7 @@ def get_redshift_fit_defaults():
     """
     pzfit_def = dict(zr=[0.5, 1.6], dz=[0.005, 0.0004], fwhm=0,
                  poly_order=0, fit_background=True,
-                 delta_chi2_threshold=0.004, fitter='nnls')
+                 delta_chi2_threshold=0.004, fitter='nnls', prior=None)
     
     pspec2_def = dict(dlam=0, spatial_scale=1, NY=20)
     pline_def = dict(size=20, pixscale=0.1, pixfrac=0.2, kernel='square', 
