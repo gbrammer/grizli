@@ -1178,7 +1178,7 @@ class MultiBeam():
                      make_figure=True, zr=None, dz=None, verbose=True,
                      fit_background=True, fitter='nnls', 
                      delta_chi2_threshold=0.004, zoom=True, 
-                     line_complexes=True):
+                     line_complexes=True, templates={}):
         """TBD
         """
         from scipy import polyfit, polyval
@@ -1212,7 +1212,12 @@ class MultiBeam():
         A, coeffs, chi2_poly, model_2d = out
         
         ### Set up for template fit
-        templates = self.load_templates(fwhm=fwhm, stars=stars, line_complexes=line_complexes)
+        if templates == {}:
+            templates = self.load_templates(fwhm=fwhm, stars=stars, line_complexes=line_complexes)
+        else:
+            if verbose:
+                print('User templates! N={0} \n'.format(len(templates)))
+            
         NTEMP = len(templates)
         
         out = self.fit_at_z(z=0., templates=templates, fitter=fitter,
@@ -2162,7 +2167,8 @@ def get_redshift_fit_defaults():
     """
     pzfit_def = dict(zr=[0.5, 1.6], dz=[0.005, 0.0004], fwhm=0,
                  poly_order=0, fit_background=True,
-                 delta_chi2_threshold=0.004, fitter='nnls', prior=None)
+                 delta_chi2_threshold=0.004, fitter='nnls', 
+                 prior=None, templates={})
     
     pspec2_def = dict(dlam=0, spatial_scale=1, NY=20)
     pline_def = dict(size=20, pixscale=0.1, pixfrac=0.2, kernel='square', 
