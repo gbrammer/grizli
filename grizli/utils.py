@@ -5,6 +5,7 @@ from collections import OrderedDict
 
 import astropy.io.fits as pyfits
 import astropy.wcs as pywcs
+import astropy.table
 
 import numpy as np
 
@@ -1513,4 +1514,232 @@ class EffectivePSF(object):
         output_psf = self.eval_ePSF(psf_xy, dx, dy)*params[0]
         
         return output_psf, params
+    
+class GTable(astropy.table.Table):
+    """
+    Extend `~astropy.table.Table` class with more automatic IO and other
+    helper methods.
+    """ 
+    @classmethod
+    def gread(cls, file, sextractor=False, format=None):
+        """Assume `ascii.commented_header` by default
         
+        Parameters
+        ----------
+        sextractor : bool
+            Use `format='ascii.sextractor`.
+        
+        format : None or str
+            Override format passed to `~astropy.table.Table.read`.
+        
+        Returns
+        -------
+        tab : `~astropy.table.Table`
+            Table object
+        """
+        import astropy.units as u
+        
+        if format is None:
+            if sextractor:
+                format = 'ascii.sextractor'
+            else:
+                format = 'ascii.commented_header'
+        
+        #print(file, format)            
+        tab = cls.read(file, format=format)
+        
+        return tab
+    
+    def gwrite(self, output, format='ascii.commented_header'):
+        """Assume a format for the output table
+        
+        Parameters
+        ----------
+        output : str
+            Output filename
+            
+        format : str
+            Format string passed to `~astropy.table.Table.write`.
+        
+        """
+        self.write(output, format=format)
+    
+    @staticmethod
+    def parse_radec_columns(self, rd_pairs=None):
+        """Parse column names for RA/Dec and set to `~astropy.units.degree` units if not already set
+        
+        Parameters
+        ----------
+        rd_pairs : `~collections.OrderedDict` or None
+            Pairs of {ra:dec} names to search in the column list. If None,
+            then uses the following by default. 
+            
+                >>> rd_pairs = OrderedDict()
+                >>> rd_pairs['ra'] = 'dec'
+                >>> rd_pairs['ALPHA_J2000'] = 'DELTA_J2000'
+                >>> rd_pairs['X_WORLD'] = 'Y_WORLD'
+            
+            NB: search is performed in order of ``rd_pairs.keys()`` and stops
+            if/when a match is found.
+            
+        Returns
+        -------
+        rd_pair : [str, str]
+            Column names associated with RA/Dec.  Returns False if no column
+            pairs found based on `rd_pairs`.
+            
+        """
+        from collections import OrderedDict
+        import astropy.units as u
+        
+        if rd_pairs is None:
+            rd_pairs = OrderedDict()
+            rd_pairs['ra'] = 'dec'
+            rd_pairs['ALPHA_J2000'] = 'DELTA_J2000'
+            rd_pairs['X_WORLD'] = 'Y_WORLD'
+            rd_pairs['ALPHA_SKY'] = 'DELTA_SKY'
+               
+        rd_pair = None 
+        for c in rd_pairs:
+            if c.upper() in [col.upper() for col in self.colnames]:
+                rd_pair = [c, rd_pairs[c]]
+                break
+        
+        if rd_pair is None:
+            #print('No RA/Dec. columns found in input table.')
+            return False
+        
+        for c in rd_pair:
+            if self[c].unit is None:
+                self[c].unit = u.degree
+        
+        return rd_pair
+       
+    def match_to_catalog_sky(self, other, self_radec=None, other_radec=None):
+        """Compute `~astropy.coordinates.SkyCoord` projected matches between two `GTable` tables.
+        
+        Parameters
+        ----------
+        other : `~astropy.table.Table` or `GTable`
+            Other table to match positions from.
+        
+        self_radec, other_radec : None or [str, str]
+            Column names for RA and Dec.  If None, then try the following
+            pairs (in this order): 
+            
+                >>> rd_pairs = OrderedDict()
+                >>> rd_pairs['ra'] = 'dec'
+                >>> rd_pairs['ALPHA_J2000'] = 'DELTA_J2000'
+                >>> rd_pairs['X_WORLD'] = 'Y_WORLD'
+        
+        Returns
+        -------
+        idx : int array
+            Indices of the matches as in 
+            
+                >>> matched = self[idx]
+                >>> len(matched) == len(other)
+        
+        dr : float array
+            Projected separation of closest match.
+            
+        Example
+        -------
+                
+                >>> import astropy.units as u
+
+                >>> ref = GTable.gread('input.cat')
+                >>> gaia = GTable.gread('gaia.cat')
+                >>> idx, dr = ref.match_to_catalog_sky(gaia)
+                >>> close = dr < 1*u.arcsec
+
+                >>> ref_match = ref[idx][close]
+                >>> gaia_match = gaia[close]
+        
+        """
+        from astropy.coordinates import SkyCoord
+        
+        rd = self.parse_radec_columns(self)
+        if rd is False:
+            print('No RA/Dec. columns found in input table.')
+            return False
+            
+        self_coo = SkyCoord(ra=self[rd[0]], dec=self[rd[1]])
+
+        rd = self.parse_radec_columns(other)
+        if rd is False:
+            print('No RA/Dec. columns found in `other` table.')
+            return False
+            
+        other_coo = SkyCoord(ra=other[rd[0]], dec=other[rd[1]])
+                     
+        idx, d2d, d3d = other_coo.match_to_catalog_sky(self_coo)
+        return idx, d2d
+            
+    def write_sortable_html(self, output, replace_braces=True, localhost=True, max_lines=50, table_id=None, table_class="display compact", css=None):
+        """Wrapper around `~astropy.table.Table.write(format='jsviewer')`.
+        
+        Parameters
+        ----------
+        output : str
+            Output filename.
+            
+        replace_braces : bool
+            Replace '&lt;' and '&gt;' characters that are converted 
+            automatically from "<>" by the `~astropy.table.Table.write`
+            method. There are parameters for doing this automatically with 
+            `write(format='html')` but that don't appear to be available with 
+            `write(format='jsviewer')`.
+            
+        localhost : bool
+            Use local JS files. Otherwise use files hosted externally.
+            
+        etc : ...
+            Additional parameters passed through to `write`.
+        """
+        #from astropy.table.jsviewer import DEFAULT_CSS
+        DEFAULT_CSS = """
+body {font-family: sans-serif;}
+table.dataTable {width: auto !important; margin: 0 !important;}
+.dataTables_filter, .dataTables_paginate {float: left !important; margin-left:1em}
+td {font-size: 10pt;}
+        """
+        if css is not None:
+            DEFAULT_CSS += css
+
+        self.write(output, format='jsviewer', css=DEFAULT_CSS,
+                            max_lines=max_lines,
+                            jskwargs={'use_local_files':localhost},
+                            table_id=None, table_class=table_class)
+
+        if replace_braces:
+            lines = open(output).readlines()
+            if replace_braces:
+                for i in range(len(lines)):
+                    lines[i] = lines[i].replace('&lt;', '<')
+                    lines[i] = lines[i].replace('&gt;', '>')
+
+            fp = open(output, 'w')
+            fp.writelines(lines)
+            fp.close()
+    
+def column_values_in_list(col, test_list):
+    """Test if column elements "in" an iterable (e.g., a list of strings)
+    
+    Parameters
+    ----------
+    col : `astropy.table.Column` or other iterable
+        Group of entries to test
+        
+    test_list : iterable
+        List of values to search 
+    
+    Returns
+    -------
+    test : bool array
+        Simple test:
+            >>> [c_i in test_list for c_i in col]
+    """
+    test = np.array([c_i in test_list for c_i in col])
+    return test
+    
