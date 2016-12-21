@@ -742,7 +742,7 @@ class MultiBeam():
         self.flat_flam = np.hstack([b.flat_flam for b in self.beams])
         self.fit_mask = np.hstack([b.fit_mask*b.contam_mask 
                                       for b in self.beams])
-                                       
+                                               
         self.DoF = self.fit_mask.sum()
         self.ivarf = np.hstack([b.ivarf for b in self.beams])
         self.ivarf[~np.isfinite(self.ivarf)] = 0
@@ -751,11 +751,14 @@ class MultiBeam():
         self.scif = np.hstack([b.scif for b in self.beams])
         self.contamf = np.hstack([b.contam.flatten() for b in self.beams])
         
+        self.weight = np.exp(-(fcontam*np.abs(self.contamf)*np.sqrt(self.ivarf)))
+        self.DoF = int((self.weight*self.fit_mask).sum())
+        
         self.fcontam = fcontam
-        if fcontam > 0:
-            self.ivarf = 1./(1./self.ivarf + (fcontam*self.contamf)**2)
-            self.ivarf[~np.isfinite(self.ivarf)] = 0
-            self.ivarf[self.ivarf < 0] = 0
+        # if fcontam > 0:
+        #     self.ivarf = 1./(1./self.ivarf + (fcontam*self.contamf)**2)
+        #     self.ivarf[~np.isfinite(self.ivarf)] = 0
+        #     self.ivarf[self.ivarf < 0] = 0
             
             #mask = (self.contamf*np.sqrt(self.ivarf) > fcontam) & (self.contamf > fcontam*self.flat_flam)
             #self.ivarf[mask] = 0
@@ -954,7 +957,7 @@ class MultiBeam():
                 
         out_coeffs[ok_temp] = coeffs
         modelf = np.dot(out_coeffs, A)
-        chi2 = np.sum(((self.scif - modelf)**2*self.ivarf)[self.fit_mask])
+        chi2 = np.sum((self.weight*(self.scif - modelf)**2*self.ivarf)[self.fit_mask])
         
         if fit_background:
             poly_coeffs = out_coeffs[self.N:self.N+self.n_poly]
@@ -1062,7 +1065,8 @@ class MultiBeam():
     
     def fit_stars(self, poly_order=1, fitter='nnls', fit_background=True, 
                   verbose=True, make_figure=True, zoom=None,
-                  delta_chi2_threshold=0.004, zr=0, dz=0, fwhm=0, prior=None):
+                  delta_chi2_threshold=0.004, zr=0, dz=0, fwhm=0, 
+                  prior=None, templates={}):
         """TBD
         """
         
@@ -1472,14 +1476,17 @@ class MultiBeam():
             #ivar = 1./(1./beam.ivar + self.fcontam*beam.contam)
             #ivar[~np.isfinite(ivar)] = 0
             ivar = beam.ivar
-               
+            weight = np.exp(-(self.fcontam*np.abs(beam.contam)*np.sqrt(ivar)))
+            
             wave, flux, err = beam.beam.optimal_extract(clean, 
-                                                        ivar=ivar)
+                                                        ivar=ivar,
+                                                        weight=weight)
             
             mwave, mflux, merr = beam.beam.optimal_extract(line_fit[ib]-bg_i, 
-                                                        ivar=ivar)
+                                                        ivar=ivar,
+                                                        weight=weight)
             
-            wave, fflux, ferr = beam.beam.optimal_extract(beam.flat_flam.reshape(beam.beam.sh_beam), ivar=ivar)
+            wave, fflux, ferr = beam.beam.optimal_extract(beam.flat_flam.reshape(beam.beam.sh_beam), ivar=ivar, weight=weight)
                 
             # wave, flux, err = beam.beam.trace_extract(clean, 
             #                                             ivar=ivar, r=10)
@@ -1507,25 +1514,27 @@ class MultiBeam():
             if scl_region.sum() == 0:
                 continue
                 
-            try:
-                okerr = np.isfinite(err)
-                med_err = np.median(err[okerr])
-                
-                ymax = np.maximum(ymax, 
-                            (mflux[scl_region][2:-2] + med_err).max())
-                ymin = np.minimum(ymin, 
-                            (mflux[scl_region][2:-2] - med_err).min())
-            except:
-                continue
-                
-            ax.errorbar(wave/1.e4, flux, err, alpha=0.15+0.2*(self.N <= 2), linestyle='None', marker='.', color='{0:.2f}'.format(ib*0.5/self.N), zorder=1)
-            ax.plot(wave/1.e4, mflux, color='r', alpha=0.5, zorder=3)
+            # try:
+            #     okerr = np.isfinite(err) #& (np.abs(flux/err) > 0.2) & (err != 0)
+            #     med_err = np.median(err[okerr])
+            #     
+            #     ymax = np.maximum(ymax, 
+            #                 (mflux[scl_region][2:-2] + med_err).max())
+            #     ymin = np.minimum(ymin, 
+            #                 (mflux[scl_region][2:-2] - med_err).min())
+            # except:
+            #     continue
+            
+            #okerr = (err != 0) & (np.abs(flux/err) > 0.2)
+            okerr = np.isfinite(err)
+            ax.errorbar(wave[okerr]/1.e4, flux[okerr], err[okerr], alpha=0.15+0.2*(self.N <= 2), linestyle='None', marker='.', color='{0:.2f}'.format(ib*0.5/self.N), zorder=1)
+            ax.plot(wave[okerr]/1.e4, mflux[okerr], color='r', alpha=0.5, zorder=3)
             
             grism = beam.grism.filter
             #for grism in grisms:
-            wfull[grism] = np.append(wfull[grism], wave)
-            ffull[grism] = np.append(ffull[grism], flux)
-            efull[grism] = np.append(efull[grism], err)
+            wfull[grism] = np.append(wfull[grism], wave[okerr])
+            ffull[grism] = np.append(ffull[grism], flux[okerr])
+            efull[grism] = np.append(efull[grism], err[okerr])
                 
         for grism in grisms:                        
             if self.Ngrism[grism] > 1:
@@ -1538,14 +1547,27 @@ class MultiBeam():
             
                 N = int(np.ceil(self.Ngrism[grism]/2)*2)*2
                 kernel = np.ones(N, dtype=float)/N
-                fbin = nd.convolve(ffull[grism][okb][so], kernel)[N//2::N]
-                wbin = nd.convolve(wfull[grism][okb][so], kernel)[N//2::N]
-                vbin = nd.convolve(var[okb][so], kernel**2)[N//2::N]
+                wht = 1/var[okb][so]
+                fbin = nd.convolve(ffull[grism][okb][so]*wht, kernel)[N//2::N]
+                wbin = nd.convolve(wfull[grism][okb][so]*wht, kernel)[N//2::N]
+                #vbin = nd.convolve(var[okb][so], kernel**2)[N//2::N]
+                wht_bin = nd.convolve(wht, kernel)[N//2::N]
+                vbin = nd.convolve(wht, kernel**2)[N//2::N]/wht_bin**2
+                
+                fbin /= wht_bin
+                wbin /= wht_bin
+                #vbin = 1./wht_bin
+                
                 ax.errorbar(wbin/1.e4, fbin, np.sqrt(vbin), alpha=0.8,
                             linestyle='None', marker='.', 
                             color=grism_colors[grism], zorder=2)
                 
-        ax.set_ylim(ymin - 0.1*np.abs(ymax), 1.1*ymax)
+                med_err = np.median(np.sqrt(vbin))
+                ymin = np.minimum(ymin, (fbin-2*med_err).min())
+                ymax = np.maximum(ymax, (fbin+2*med_err).max())
+        
+        ymin = np.maximum(0, ymin)        
+        ax.set_ylim(ymin - 0.2*np.abs(ymax), 1.3*ymax)
         
         xmin, xmax = 1.e5, 0        
         for g in grism_limits:
@@ -1583,20 +1605,23 @@ class MultiBeam():
         hdu_sci = drizzle_2d_spectrum(self.beams, ds9=None, NY=NY,
                                       spatial_scale=spatial_scale, dlam=dlam, 
                                       kernel='point', pixfrac=0.6,
-                                      wlimit=[xmin, xmax])
+                                      wlimit=[xmin, xmax], 
+                                      fcontam=self.fcontam)
                                   
         ### Continuum model
         cont = self.reshape_flat(fit['model_cont'])        
         hdu_con = drizzle_2d_spectrum(self.beams, data=cont, ds9=None, NY=NY,
                                       spatial_scale=spatial_scale, dlam=dlam, 
                                       kernel='point', pixfrac=0.6,
-                                      wlimit=[xmin, xmax])
+                                      wlimit=[xmin, xmax], 
+                                      fcontam=self.fcontam)
         
         full = self.reshape_flat(fit['model_full'])        
         hdu_full = drizzle_2d_spectrum(self.beams, data=full, ds9=None, NY=NY,
                                       spatial_scale=spatial_scale, dlam=dlam, 
                                       kernel='point', pixfrac=0.6,
-                                      wlimit=[xmin, xmax])
+                                      wlimit=[xmin, xmax],
+                                      fcontam=self.fcontam)
         
         clip = hdu_full['WHT'].data > np.percentile(hdu_full['WHT'].data, 30)
         #vmax = np.maximum(1.1*np.percentile(hdu_full['SCI'].data[clip], 98), 0.04)
@@ -1841,6 +1866,7 @@ class MultiBeam():
         spec_in = copy.copy(pspec2)
         spec_in['fit'] = fit
         spec_in['dlam'] = dlam
+        
         fig2, hdu2 = self.redshift_fit_twod_figure(**spec_in)#, kwargs=spec2) #dlam=dlam, spatial_scale=spatial_scale, NY=NY)
         
         ### Update master model
@@ -2239,6 +2265,10 @@ def drizzle_2d_spectrum(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
     outwht = np.zeros(sh, dtype=np.float32)
     outctx = np.zeros(sh, dtype=np.int32)
     
+    outvar = np.zeros(sh, dtype=np.float32)
+    outwv = np.zeros(sh, dtype=np.float32)
+    outcv = np.zeros(sh, dtype=np.int32)
+    
     if data is None:
         data = []
         for i, beam in enumerate(beams):
@@ -2251,11 +2281,18 @@ def drizzle_2d_spectrum(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
         beam_header, beam_wcs = beam.get_2d_wcs()
         
         # Downweight contamination
-        wht = 1/beam.ivar + (fcontam*beam.contam)**2
-        wht = np.cast[np.float32](1/wht)
+        # wht = 1/beam.ivar + (fcontam*beam.contam)**2
+        # wht = np.cast[np.float32](1/wht)
+        # wht[~np.isfinite(wht)] = 0.
+        
+        contam_weight = np.exp(-(fcontam*np.abs(beam.contam)*np.sqrt(beam.ivar)))
+        wht = beam.ivar*contam_weight
+        
         wht[~np.isfinite(wht)] = 0.
+        contam_weight[beam.ivar == 0] = 0
         
         data_i = data[i]*1.
+        scl = 1.
         if convert_to_flambda:
             #data_i *= convert_to_flambda/beam.beam.sensitivity
             #wht *= (beam.beam.sensitivity/convert_to_flambda)**2
@@ -2265,9 +2302,11 @@ def drizzle_2d_spectrum(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
             #scl = convert_to_flambda/beam.beam.sensitivity
             
             data_i *= scl
-            wht *= (1/scl)**2
+            wht *= (1/scl)**2            
+            #contam_weight *= scl
             
             wht[~np.isfinite(data_i+scl)] = 0
+            contam_weight[~np.isfinite(data_i+scl)] = 0
             data_i[~np.isfinite(data_i+scl)] = 0
         
         ###### Go drizzle
@@ -2279,18 +2318,33 @@ def drizzle_2d_spectrum(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
                          pixfrac=pixfrac, kernel=kernel, fillval=0, 
                          stepsize=10, wcsmap=None)
         
+        # For variance
+        adrizzle.do_driz(contam_weight, beam_wcs, wht, output_wcs, 
+                         outvar, outwv, outcv, 1., 'cps', 1,
+                         wcslin_pscale=1.0, uniqid=1, 
+                         pixfrac=pixfrac, kernel=kernel, fillval=0, 
+                         stepsize=10, wcsmap=None)
+        
         if ds9 is not None:
             ds9.view(outsci/output_wcs.pscale**2, header=out_header)
     
     ### Correct for drizzle scaling
     outsci /= output_wcs.pscale**2
     
+    # variance
+    outvar /= outwv*output_wcs.pscale**2
+    outwht = 1/outvar
+    outwht[(outvar == 0) | (~np.isfinite(outwht))] = 0
+    
+    #return outwht, outsci, outvar, outwv, output_wcs.pscale
+        
     p = pyfits.PrimaryHDU()
     p.header['ID'] = (beams[0].id, 'Object ID')
     p.header['WMIN'] = (wlimit[0], 'Minimum wavelength')
     p.header['WMAX'] = (wlimit[1], 'Maximum wavelength')
     p.header['DLAM'] = (dlam, 'Delta wavelength')
     
+    p.header['FCONTAM'] = (fcontam, 'Contamination weight')
     p.header['PIXFRAC'] = (pixfrac, 'Drizzle PIXFRAC')
     p.header['DRIZKRNL'] = (kernel, 'Drizzle kernel')
     

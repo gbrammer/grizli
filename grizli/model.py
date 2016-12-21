@@ -461,7 +461,7 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         else:
             return True
     
-    def optimal_extract(self, data, bin=0, ivar=1.):        
+    def optimal_extract(self, data, bin=0, ivar=1., weight=1.):        
         """`Horne (1986) <http://adsabs.harvard.edu/abs/1986PASP...98..609H>`_ optimally-weighted 1D extraction
         
         Parameters
@@ -475,6 +475,8 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         ivar : float or `~numpy.ndarray` with shape `self.sh_beam`
             Inverse variance array or scalar float that multiplies the 
             optimal weights
+        
+        weight : TBD
             
         Returns
         -------
@@ -507,9 +509,9 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
                 """.format(ivar.shape[0], ivar.shape[1], self.sh_beam[0], 
                       self.sh_beam[1]))
                 return False
-                
-        num = self.optimal_profile*data*ivar
-        den = self.optimal_profile**2*ivar
+                            
+        num = self.optimal_profile*data*ivar*weight
+        den = self.optimal_profile**2*ivar*weight
         opt_flux = num.sum(axis=0)/den.sum(axis=0)
         opt_var = 1./den.sum(axis=0)
                 
@@ -2503,6 +2505,7 @@ class BeamCutout(object):
                      (self.grism.data['ERR'] == 0) | 
                      (self.grism.data['SCI'] == 0))
                              
+        self.var = self.grism.data['ERR']**2
         self.ivar = 1/self.grism.data['ERR']**2
         self.ivar[self.mask] = 0
         

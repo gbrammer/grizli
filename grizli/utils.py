@@ -1527,7 +1527,7 @@ class GTable(astropy.table.Table):
         Parameters
         ----------
         sextractor : bool
-            Use `format='ascii.sextractor`.
+            Use `format='ascii.sextractor'`.
         
         format : None or str
             Override format passed to `~astropy.table.Table.read`.
