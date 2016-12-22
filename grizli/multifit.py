@@ -1583,7 +1583,7 @@ class MultiBeam():
             
         return fit_data, fig
     
-    def run_individual_fits(self, z=0, templates=templates):
+    def run_individual_fits(self, z=0, templates={}):
         """Run template fits on each *exposure* individually to evaluate
         variance in line and continuum fits.
 
