@@ -247,7 +247,7 @@ def test_parallel():
     
     
 def _compute_model(i, flt, fit_info, store):
-    """TBD
+    """Helper function for computing model orders.
     """
     for id in fit_info:
         status = flt.compute_model_orders(id=id, compute_size=True,
@@ -265,37 +265,75 @@ class GroupFLT():
                  ref_file=None, ref_ext=0, seg_file=None,
                  shrink_segimage=True, verbose=True, cpu_count=0,
                  catalog=''):
-        """TBD
+        """Main container for handling multiple grism exposures together
         
         Parameters
         ----------
         grism_files : list
-        
+            List of grism exposures (typically WFC3/IR "FLT" or ACS/UVIS "FLC"
+            files). These can be from different grisms and/or orients.
+            
         sci_extn : int
-        
+            Science extension to extract from the files in `grism_files`.  For 
+            WFC3/IR this can only be 1, though for the two-chip instruments
+            WFC3/UVIS and ACS/WFC3 this can be 1 or 2.
+            
         direct_files : list
-        
+            List of direct exposures (typically WFC3/IR "FLT" or ACS/UVIS
+            "FLC" files). This list should either be empty or should 
+            correspond one-to-one with entries in the `grism_files` list, 
+            i.e., from an undithered pair of direct and grism exposures.  If 
+            such pairs weren't obtained or if you simply wish to ignore them
+            and just use the `ref_file` reference image, set to an empty list
+            (`[]`).
+            
         pad : int
-        
+            Padding in pixels to apply around the edge of the detector to 
+            allow modeling of sources that fall off of the nominal FOV.  For 
+            this to work requires using a `ref_file` reference image that 
+            covers this extra area.
+            
         group_name : str
-        
+            Name to apply to products produced by this group.
+            
         ref_file : `None` or str
-        
+            Undistorted reference image filename, e.g., a drizzled mosaic
+            covering the area around a given grism exposure.
+            
         ref_ext : 0
-        
+            FITS extension of the reference file where to find the image 
+            itself.  
+            
         seg_file : `None` or str
-        
+            Segmentation image filename.
+            
         shrink_segimage : bool
-        
+            Do some preprocessing on the segmentation image to speed up the
+            blotting to the distorted frame of the grism exposures.  
+            
         verbose : bool
-        
+            Print verbose information.
+            
         cpu_count : int
-        
+            Use parallelization if > 0.  If equal to zero, then use the 
+            maximum number of available cores.
+            
         catalog : str
-        
+            Catalog filename assocated with `seg_file`.  These are typically
+            generated with "SExtractor", but the source of the files 
+            themselves isn't critical.
+            
         Attributes
         ----------
-        TBD : type
+        catalog : `~astropy.table.Table`
+            The table read in with from the above file specified in `catalog`.
+        
+        FLTs : list
+            List of `~grizli.model.GrismFLT` objects generated from each of 
+            the files in the `grism_files` list.
+        
+        grp.N : int
+            Number of grism files (i.e., `len(FLTs)`.)
         
         """
         self.N = len(grism_files)
@@ -366,7 +404,26 @@ class GroupFLT():
             print('Files loaded - {0:.2f} sec.'.format(t1_pool - t0_pool))
     
     def save_full_data(self, warn=True):
-        """TBD
+        """Save models and data files for fast regeneration.
+        
+        Parameters
+        ----------
+        warn : bool
+            Print a warning and skip if an output file is already found to
+            exist.
+        
+        The filenames of the outputs are generated from the input grism 
+        exposure filenames with the following:
+            
+            >>> file = 'ib3701ryq_flt.fits'
+            >>> save_file = file.replace('_flt.fits', '_GrismFLT.fits')
+            >>> save_file = save_file.replace('_flc.fits', '_GrismFLT.fits')
+            >>> save_file = save_file.replace('_cmb.fits', '_GrismFLT.fits')
+        
+        It will also save data to a `~pickle` file:
+            
+            >>> pkl_file = save_file.replace('.fits', '.pkl')
+            
         """      
         for i in range(self.N):
             file = self.FLTs[i].grism_file
@@ -385,9 +442,12 @@ class GroupFLT():
             self.FLTs[i].load_from_fits(save_file)
             
     def extend(self, new, verbose=True):
-        """Add another GroupFLT instance to `self`
+        """Add another `GroupFLT` instance to `self`
         
-        TBD
+        This function appends the exposures if a separate `GroupFLT` instance
+        to the current instance.  You might do this, for example, if you 
+        generate separate `GroupFLT` instances for different grisms and 
+        reference images with different filters.
         """
         self.FLTs.extend(new.FLTs)
         self.N = len(self.FLTs)
@@ -398,7 +458,30 @@ class GroupFLT():
             print('Now we have {0:d} FLTs'.format(self.N))
             
     def compute_single_model(self, id, mag=-99, size=-1, store=False, spectrum_1d=None, get_beams=None, in_place=True):
-        """TBD
+        """Compute model spectrum in all exposures
+        TBD
+        
+        Parameters
+        ----------
+        id : type
+        
+        mag : type
+        
+        size : type
+        
+        store : type
+        
+        spectrum_1d : type
+        
+        get_beams : type
+        
+        in_place : type
+        
+        
+        Returns
+        -------
+        TBD
+               
         """
         out_beams = []
         for flt in self.FLTs:
@@ -969,9 +1052,134 @@ class MultiBeam():
         
         return A, out_coeffs, chi2, modelf
     
+    def parse_fit_outputs(self, z, templates, coeffs_full, A):
+        """Parse output from `fit_at_z`.
+
+        Parameters
+        ----------
+        z : float
+            Redshift at which to evaluate the fits.
+        
+        templates : list of `~grizli.utils.SpectrumTemplate` objects
+            Generated with, e.g., `load_templates`.
+        
+        coeffs_full : `~np.ndarray`
+            Template fit coefficients
+        
+        A : `~np.ndarray`
+            Matrix generated for fits and used for computing model 2D spectra:
+                
+                >>> model_flat = np.dot(coeffs_full, A)
+                >>> # mb = MultiBeam(...)
+                >>> all_models = mb.reshape_flat(model_flat)
+                >>> m0 = all_models[0] # model for mb.beams[0]
+        
+        Returns
+        -------        
+        line_flux : dict
+            Line fluxes and uncertainties, in cgs units (1e-17 erg/s/cm2)
+        
+        cont1d, line1d, model1d : `~grizli.utils.SpectrumTemplate`
+            Best-fit continuum, line, and full (continuum + line) templates
+            
+        model_continuum : `~np.ndarray`
+            Flat array of the best fit 2D continuum
+        
+        """
+        from collections import OrderedDict
+
+        ## Covariance matrix for line flux uncertainties
+        ok_temp = (np.sum(A, axis=1) > 0) & (coeffs_full != 0)
+        Ax = A[:, self.fit_mask][ok_temp,:].T
+        Ax *= np.sqrt(self.ivarf[self.fit_mask][:, np.newaxis])
+        try:
+            covar = np.matrix(np.dot(Ax.T, Ax)).I
+            covard = np.sqrt(covar.diagonal())
+        except:
+            covard = np.zeros(ok_temp.sum())#-1.
+
+        line_flux_err = coeffs_full*0.
+        line_flux_err[ok_temp] = covard
+
+        ## Continuum fit
+        mask = np.isfinite(coeffs_full)
+        for i, key in enumerate(templates.keys()):
+            if key.startswith('line'):
+                mask[self.N*self.fit_bg+self.n_poly+i] = False
+
+        model_continuum = np.dot(coeffs_full*mask, A)
+        self.model_continuum = self.reshape_flat(model_continuum)
+        #model_continuum.reshape(self.beam.sh_beam)
+
+        ### 1D spectrum
+        xspec = np.arange(0.3, 2.35, 0.05)-1
+        scale_coeffs = coeffs_full[self.N*self.fit_bg:  
+                                  self.N*self.fit_bg+self.n_poly]
+
+        yspec = [xspec**o*scale_coeffs[o] for o in range(self.poly_order+1)]
+        model1d = utils.SpectrumTemplate((xspec+1)*1.e4, 
+                                         np.sum(yspec, axis=0))
+
+        cont1d = model1d*1
+
+        i0 = self.fit_bg*self.N + self.n_poly
+
+        line_flux = OrderedDict()
+        fscl = self.beams[0].beam.total_flux/1.e-17
+        line1d = OrderedDict()
+        for i, key in enumerate(templates.keys()):
+            temp_i = templates[key].zscale(z, coeffs_full[i0+i])
+            model1d += temp_i
+            if not key.startswith('line'):
+                cont1d += temp_i
+            else:
+                line1d[key.split()[1]] = temp_i
+                line_flux[key.split()[1]] = np.array([coeffs_full[i0+i]*fscl, 
+                                             line_flux_err[i0+i]*fscl])
+
+        return line_flux, cont1d, line1d, model1d, model_continuum
+    
     def load_templates(self, fwhm=400, line_complexes=True, stars=False,
                        full_line_list=None):
-        """TBD
+        """Generate a list of templates for fitting to the grism spectra
+        
+        Parameters
+        ----------
+        fwhm : float
+            FWHM of a Gaussian, in km/s, that is convolved with the emission
+            line templates.  If too narrow, then can see pixel effects in the 
+            fits as a function of redshift.
+        
+        line_complexes : bool
+            Generate line complex templates with fixed flux ratios rather than
+            individual lines. This is useful for the redshift fits where there
+            would be redshift degeneracies if the line fluxes for individual
+            lines were allowed to vary completely freely. See the list of
+            available lines and line groups in
+            `~grizli.utils.get_line_wavelengths`. Currently,
+            `line_complexes=True` generates the following groups:
+            
+                Ha+NII+SII+SIII+He
+                OIII+Hb
+                OII+Ne
+            
+        stars : bool
+            Get stellar templates rather than galaxies + lines
+            
+        full_line_list : None or list
+            Full set of lines to try.  The default is currently
+            
+                >>> full_line_list = ['SIII', 'SII', 'Ha', 'OI', 
+                                      'OIII', 'Hb', 'OIIIx', 
+                                      'Hg', 'Hd', 'NeIII', 'OII']
+            
+            The full list of implemented lines is in `~grizli.utils.get_line_wavelengths`.
+        
+        Returns
+        -------
+        temp_list : list of `~grizli.utils.SpectrumTemplate` objects
+            Output template list
+        
         """
         
         if stars:
@@ -1340,60 +1548,11 @@ class MultiBeam():
         
         A, coeffs_full, chi2_best, model_full = out
         
-        ## Covariance matrix for line flux uncertainties
-        ok_temp = (np.sum(A, axis=1) > 0) & (coeffs_full != 0)
-        Ax = A[:, self.fit_mask][ok_temp,:].T
-        Ax *= np.sqrt(self.ivarf[self.fit_mask][:, np.newaxis])
-        try:
-            covar = np.matrix(np.dot(Ax.T, Ax)).I
-            covard = np.sqrt(covar.diagonal())
-        except:
-            covard = np.zeros(ok_temp.sum())#-1.
-            
-        line_flux_err = coeffs_full*0.
-        line_flux_err[ok_temp] = covard
+        # Parse results
+        out2 = self.parse_fit_outputs(zbest, templates, coeffs_full, A)
+        line_flux, cont1d, line1d, model1d, model_continuum = out2
         
-        ## Continuum fit
-        mask = np.isfinite(coeffs_full)
-        for i, key in enumerate(templates.keys()):
-            if key.startswith('line'):
-                mask[self.N*self.fit_bg+self.n_poly+i] = False
-            
-        model_continuum = np.dot(coeffs_full*mask, A)
-        self.model_continuum = self.reshape_flat(model_continuum)
-        #model_continuum.reshape(self.beam.sh_beam)
-                
-        ### 1D spectrum
-        xspec = np.arange(0.3, 2.35, 0.05)-1
-        scale_coeffs = coeffs_full[self.N*self.fit_bg:  
-                                  self.N*self.fit_bg+self.n_poly]
-                                  
-        yspec = [xspec**o*scale_coeffs[o] for o in range(self.poly_order+1)]
-        model1d = utils.SpectrumTemplate((xspec+1)*1.e4, 
-                                         np.sum(yspec, axis=0))
-        
-        # model1d = SpectrumTemplate(wave=self.beam.lam, 
-        #                 flux=np.dot(self.y_poly.T, 
-        #                       coeffs_full[self.n_bg:self.n_poly+self.n_bg]))
-        
-        cont1d = model1d*1
-        
-        i0 = self.fit_bg*self.N + self.n_poly
-        
-        line_flux = OrderedDict()
-        fscl = self.beams[0].beam.total_flux/1.e-17
-        line1d = OrderedDict()
-        for i, key in enumerate(templates.keys()):
-            temp_i = templates[key].zscale(zbest, coeffs_full[i0+i])
-            model1d += temp_i
-            if not key.startswith('line'):
-                cont1d += temp_i
-            else:
-                line1d[key.split()[1]] = temp_i
-                line_flux[key.split()[1]] = np.array([coeffs_full[i0+i]*fscl, 
-                                             line_flux_err[i0+i]*fscl])
-                
-                        
+        # Output dictionary with fit parameters
         fit_data = OrderedDict()
         fit_data['poly_order'] = poly_order
         fit_data['fwhm'] = fwhm
@@ -1423,6 +1582,77 @@ class MultiBeam():
             #fig.savefig('fit.pdf')
             
         return fit_data, fig
+    
+    def run_individual_fits(self, z=0, templates=templates):
+        """Run template fits on each *exposure* individually to evaluate
+        variance in line and continuum fits.
+
+        Parameters
+        ----------
+        z : float
+            Redshift at which to evaluate the fit
+
+        templates : list of `~grizli.utils.SpectrumTemplate` objects
+            Generated with, e.g., `load_templates`.
+
+        Returns
+        -------        
+        line_flux, line_err : dict
+            Dictionaries with the measured line fluxes and uncertainties for
+            each exposure fit.
+
+        coeffs_list : `~np.ndarray` [Nbeam x Ntemplate]
+            Raw fit coefficients
+
+        chi2_list, DoF_list : `~np.ndarray` [Nbeam]
+            Chi-squared and effective degrees of freedom for each separate fit
+
+        """        
+        out = self.fit_at_z(z=z, templates=templates,
+                            fitter='nnls', poly_order=self.poly_order, 
+                            fit_background=self.fit_bg)
+
+        A, coeffs_full, chi2_best, model_full = out
+
+        out2 = self.parse_fit_outputs(z, templates, coeffs_full, A)
+        line, cont1d, line1d, model1d, model_continuum = out2
+
+        NB, NTEMP = len(self.beams), len(templates)
+
+        coeffs_list = np.zeros((NB, NTEMP))
+        chi2_list = np.zeros(NB)
+        DoF_list = np.zeros(NB)
+
+        line_flux = OrderedDict()
+        line_err = OrderedDict()
+        line_keys = list(line.keys())
+
+        for k in line_keys:
+            line_flux[k] = np.zeros(NB)
+            line_err[k] = np.zeros(NB)
+
+        for i, b in enumerate(self.beams):
+            b_i = grizli.multifit.MultiBeam([b], fcontam=self.fcontam,
+                                            group_name=self.group_name)
+
+            out_i = b_i.fit_at_z(z=z, templates=templates,
+                                fitter='nnls', poly_order=self.poly_order, 
+                                fit_background=self.fit_bg)
+
+            A_i, coeffs_i, chi2_i, model_full_i = out_i
+
+            out2 = b_i.parse_fit_outputs(z, templates, coeffs_i, A_i)
+            line_i, cont1d_i, line1d_i, model1d_i, model_continuum_i = out2
+
+            for k in line_keys:
+                line_flux[k][i] = line_i[k][0]
+                line_err[k][i] = line_i[k][1]
+
+            coeffs_list[i,:] = coeffs_i[-NTEMP:]
+            chi2_list[i] = chi2_i
+            DoF_list[i] = b_i.DoF
+
+        return line_flux, line_err, coeffs_list, chi2_list, DoF_list
     
     def show_redshift_fit(self, fit_data, plot_flambda=True):
         """TBD
