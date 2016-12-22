@@ -438,6 +438,8 @@ def parse_grism_associations(exposure_groups,
     grism_groups = []
     for i in range(N):
         f_i = exposure_groups[i]['product'].split('-')[-1]
+        root_i = exposure_groups[i]['product'].split('-'+f_i)[0]
+        
         if f_i.startswith('g1'):
             group = OrderedDict(grism=exposure_groups[i], 
                                 direct=None)
@@ -451,24 +453,40 @@ def parse_grism_associations(exposure_groups,
             f_j = exposure_groups[j]['product'].split('-')[-1]
             if f_j.startswith('g1'):
                 continue
-            
+                 
             fp_j = exposure_groups[j]['footprint']
             olap = fp_i.intersection(fp_j)
+            root_j = exposure_groups[j]['product'].split('-'+f_j)[0]
+            if root_j == root_i:
+                group['direct'] = exposure_groups[j]
+                olap_i = olap.area
+                d_i = f_j
+                #print(0,group['grism']['product'], group['direct']['product'])
+                break
+                
             #print(exposure_groups[i]['product'], exposure_groups[j]['product'], olap.area*3600.)
             
             if olap.area > 0:
                 if group['direct'] is None:
                     group['direct'] = exposure_groups[j]
                     olap_i = olap.area
+                    d_i = f_j
+                    #print(1,group['grism']['product'], group['direct']['product'])
                 else:
-                    if (f_j.upper() == best_direct[f_i.upper()]):
-                        if get_max_overlap:
-                            if olap.area < olap_i:
+                    #if (f_j.upper() == best_direct[f_i.upper()]):
+                    if get_max_overlap:
+                        if olap.area < olap_i:
+                            continue
+                        
+                        if (olap.area == olap_i):
+                            if d_i != best_direct[f_i.upper()]:
                                 continue
                                 
-                        group['direct'] = exposure_groups[j]
-                        olap_i = olap.area
-                
+                    group['direct'] = exposure_groups[j]
+                    olap_i = olap.area
+                    d_i = f_j
+                    #print(2,group['grism']['product'], group['direct']['product'])
+                    
         grism_groups.append(group)
     
     return grism_groups
@@ -1659,14 +1677,22 @@ class GTable(astropy.table.Table):
         """
         from astropy.coordinates import SkyCoord
         
-        rd = self.parse_radec_columns(self)
+        if self_radec is None:
+            rd = self.parse_radec_columns(self)
+        else:
+            rd = self.parse_radec_columns(self, rd_pairs={self_radec[0]:self_radec[1]})
+            
         if rd is False:
             print('No RA/Dec. columns found in input table.')
             return False
             
         self_coo = SkyCoord(ra=self[rd[0]], dec=self[rd[1]])
 
-        rd = self.parse_radec_columns(other)
+        if other_radec is None:
+            rd = self.parse_radec_columns(other)
+        else:
+            rd = self.parse_radec_columns(other, rd_pairs={other_radec[0]:other_radec[1]})
+
         if rd is False:
             print('No RA/Dec. columns found in `other` table.')
             return False
