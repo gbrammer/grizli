@@ -1058,6 +1058,18 @@ def transform_wcs(in_wcs, translation=[0.,0.], rotation=0., scale=1.):
     out_wcs.wcs.cd = np.dot(out_wcs.wcs.cd, _mat)/scale
     return out_wcs
     
+def get_wcs_slice_header(wcs, slx, sly):
+    """TBD
+    """
+    slx, sly = slice(1279, 1445), slice(2665,2813)
+    h = wcs.slice((sly, slx)).to_header(relax=True)
+    h['NAXIS'] = 2
+    h['NAXIS1'] = slx.stop-slx.start
+    h['NAXIS2'] = sly.stop-sly.start
+    for k in h:
+        if k.startswith('PC'):
+            h.rename_keyword(k, k.replace('PC', 'CD'))
+            
 def make_spectrum_wcsheader(center_wave=1.4e4, dlam=40, NX=100, spatial_scale=1, NY=10):
     """Make a WCS header for a 2D spectrum
     

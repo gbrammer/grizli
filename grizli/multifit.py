@@ -623,7 +623,7 @@ class GroupFLT():
     
     def drizzle_full_wavelength(self, wave=1.4e4, ref_header=None,
                      kernel='point', pixfrac=1., verbose=True, 
-                     offset=[0,0]):
+                     offset=[0,0], fcontam=0.):
         """Drizzle FLT frames recentered at a specified wavelength
         
         Script computes polynomial coefficients that define the dx and dy
@@ -701,7 +701,8 @@ class GroupFLT():
         
         # Compute polynomial coefficients
         p_init = models.Polynomial2D(degree=4)
-        fit_p = fitting.LevMarLSQFitter()
+        #fit_p = fitting.LevMarLSQFitter()
+        fit_p = fitting.LinearLSQFitter()
         p_dx = fit_p(p_init, xp[::sk,::sk]-507, yp[::sk,::sk]-507, -dx)
         p_dy = fit_p(p_init, xp[::sk,::sk]-507, yp[::sk,::sk]-507, -dy)
 
@@ -744,6 +745,9 @@ class GroupFLT():
             # Science and wht arrays
             sci = flt.grism['SCI'] - flt.model
             wht = 1/(flt.grism['ERR']**2)
+            scl = np.exp(-(fcontam*np.abs(flt.model)/flt.grism['ERR']))
+            wht *= scl
+            
             wht[~np.isfinite(wht)] = 0
             
             # Drizzle it
@@ -1464,7 +1468,7 @@ class MultiBeam():
         # indexes = peakutils.indexes((chi2nu+delta_chi2_threshold)*(chi2nu > -delta_chi2_threshold), thres=0.3, min_dist=20)
         
         chi2_rev = (chi2_poly - chi2)/self.DoF
-        if chi2_poly < chi2.min():
+        if chi2_poly < (chi2.min() + 9):
             chi2_rev = (chi2.min() + 16 - chi2)/self.DoF
 
         chi2_rev[chi2_rev < 0] = 0
@@ -1607,7 +1611,9 @@ class MultiBeam():
         chi2_list, DoF_list : `~np.ndarray` [Nbeam]
             Chi-squared and effective degrees of freedom for each separate fit
 
-        """        
+        """  
+        
+        # Fit on the full set of beams      
         out = self.fit_at_z(z=z, templates=templates,
                             fitter='nnls', poly_order=self.poly_order, 
                             fit_background=self.fit_bg)
@@ -1618,7 +1624,8 @@ class MultiBeam():
         line, cont1d, line1d, model1d, model_continuum = out2
 
         NB, NTEMP = len(self.beams), len(templates)
-
+        
+        # Outputs
         coeffs_list = np.zeros((NB, NTEMP))
         chi2_list = np.zeros(NB)
         DoF_list = np.zeros(NB)
@@ -1630,17 +1637,19 @@ class MultiBeam():
         for k in line_keys:
             line_flux[k] = np.zeros(NB)
             line_err[k] = np.zeros(NB)
-
+        
+        # Generate separate MultiBeam objects for each individual beam
         for i, b in enumerate(self.beams):
-            b_i = grizli.multifit.MultiBeam([b], fcontam=self.fcontam,
-                                            group_name=self.group_name)
+            b_i = MultiBeam([b], fcontam=self.fcontam,
+                            group_name=self.group_name)
 
             out_i = b_i.fit_at_z(z=z, templates=templates,
                                 fitter='nnls', poly_order=self.poly_order, 
                                 fit_background=self.fit_bg)
 
             A_i, coeffs_i, chi2_i, model_full_i = out_i
-
+            
+            # Parse fit information from individual fits
             out2 = b_i.parse_fit_outputs(z, templates, coeffs_i, A_i)
             line_i, cont1d_i, line1d_i, model1d_i, model_continuum_i = out2
 
@@ -1705,6 +1714,7 @@ class MultiBeam():
             
             #ivar = 1./(1./beam.ivar + self.fcontam*beam.contam)
             #ivar[~np.isfinite(ivar)] = 0
+            ## New weight scheme
             ivar = beam.ivar
             weight = np.exp(-(self.fcontam*np.abs(beam.contam)*np.sqrt(ivar)))
             
@@ -1716,25 +1726,18 @@ class MultiBeam():
                                                         ivar=ivar,
                                                         weight=weight)
             
-            wave, fflux, ferr = beam.beam.optimal_extract(beam.flat_flam.reshape(beam.beam.sh_beam), ivar=ivar, weight=weight)
-                
-            # wave, flux, err = beam.beam.trace_extract(clean, 
-            #                                             ivar=ivar, r=10)
-            # 
-            # mwave, mflux, merr = beam.beam.trace_extract(line_fit[ib]-bg_i, 
-            #                                             ivar=ivar, r=10)
-            
+            flat = beam.flat_flam.reshape(beam.beam.sh_beam)
+            wave, fflux, ferr = beam.beam.optimal_extract(flat, ivar=ivar,
+                                                          weight=weight)
+                                         
             if plot_flambda:
                 ok = beam.beam.sensitivity > 0.1*beam.beam.sensitivity.max()
-                #wave = wave[ok]
-                #flux = (flux/beam.beam.sensitivity)[ok]
-                #err = (err/beam.beam.sensitivity)[ok]
-                #mflux = (mflux/beam.beam.sensitivity)[ok]
-                
+
                 wave = wave[ok]
-                flux  = (flux*beam.beam.total_flux/1.e-17/fflux)[ok]*beam.beam.scale
-                err   = (err*beam.beam.total_flux/1.e-17/fflux)[ok]
-                mflux = (mflux*beam.beam.total_flux/1.e-17/fflux)[ok]*beam.beam.scale
+                fscl = beam.beam.total_flux/1.e-17
+                flux  = (flux*fscl/fflux)[ok]*beam.beam.scale
+                err   = (err*fscl/fflux)[ok]
+                mflux = (mflux*fscl/fflux)[ok]*beam.beam.scale
                 
                 ylabel = r'$f_\lambda$'
             else:
@@ -1970,6 +1973,7 @@ class MultiBeam():
 
                 hdu = drizzle_to_wavelength(self.beams, wcs=wcs, ra=self.ra, 
                                             dec=self.dec, wave=line_wave_obs,
+                                            fcontam=self.fcontam,
                                             **pline)
                 
                 if mask_lines:
@@ -2689,9 +2693,14 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
         
         # Downweight contamination
         if fcontam > 0:
-            wht = 1/beam.ivar + (fcontam*beam.contam)**2
-            wht = np.cast[np.float32](1/wht)
+            # wht = 1/beam.ivar + (fcontam*beam.contam)**2
+            # wht = np.cast[np.float32](1/wht)
+            # wht[~np.isfinite(wht)] = 0.
+            
+            contam_weight = np.exp(-(fcontam*np.abs(beam.contam)*np.sqrt(beam.ivar)))
+            wht = beam.ivar*contam_weight
             wht[~np.isfinite(wht)] = 0.
+            
         else:
             wht = beam.ivar*1
         
