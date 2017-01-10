@@ -373,7 +373,7 @@ def parse_visit_overlaps(visits, buffer=15.):
     exposure_groups = []
     used = np.arange(len(visits)) < 0
     
-    for i in range(N-1):
+    for i in range(N):
         f_i = visits[i]['product'].split('-')[-1]
         if used[i]:
             continue
@@ -404,7 +404,7 @@ def parse_visit_overlaps(visits, buffer=15.):
         flt_i = pyfits.open(exposure_groups[i]['files'][0])
         product = flt_i[0].header['TARGNAME'].lower()        
         if product == 'any':
-            product += '-'+radec_to_targname(header=flt_i['SCI',1].header)
+            product = 'par-'+radec_to_targname(header=flt_i['SCI',1].header)
         
         f_i = exposure_groups[i]['product'].split('-')[-1]
         product += '-'+f_i
@@ -1061,7 +1061,7 @@ def transform_wcs(in_wcs, translation=[0.,0.], rotation=0., scale=1.):
 def get_wcs_slice_header(wcs, slx, sly):
     """TBD
     """
-    slx, sly = slice(1279, 1445), slice(2665,2813)
+    #slx, sly = slice(1279, 1445), slice(2665,2813)
     h = wcs.slice((sly, slx)).to_header(relax=True)
     h['NAXIS'] = 2
     h['NAXIS1'] = slx.stop-slx.start
@@ -1069,7 +1069,9 @@ def get_wcs_slice_header(wcs, slx, sly):
     for k in h:
         if k.startswith('PC'):
             h.rename_keyword(k, k.replace('PC', 'CD'))
-            
+    
+    return h
+    
 def make_spectrum_wcsheader(center_wave=1.4e4, dlam=40, NX=100, spatial_scale=1, NY=10):
     """Make a WCS header for a 2D spectrum
     
