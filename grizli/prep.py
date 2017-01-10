@@ -2223,7 +2223,7 @@ def find_single_image_CRs(visit, simple_mask=False):
         
         flt.flush()
         
-def drizzle_overlaps(exposure_groups, parse_visits=False, pixfrac=0.8, scale=0.06, skysub=True, bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='EXP', final_wt_scl='exptime'):
+def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, max_files=999, pixfrac=0.8, scale=0.06, skysub=True, bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='EXP', final_wt_scl='exptime'):
     """Combine overlapping visits into single output mosaics
     
     Parameters
@@ -2235,6 +2235,16 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, pixfrac=0.8, scale=0.0
         If set, parse the `exposure_groups` list for overlaps with
         `~grizli.utils.parse_visit_overlaps`, otherwise assume that it has
         already been parsed.
+    
+    check_overlaps: bool
+        Only pass exposures that overlap with the desired output mosaic to 
+        AstroDrizzle.
+    
+    max_files : bool
+        Split output products if the number of exposures in a group is greater
+        than `max_files`.  Default value of 999 appropriate for AstroDrizzle,
+        which crashes because it tries to create a header keyword with only 
+        three digits (i.e., 0-999).
         
     pixfrac : float
         `~drizzlepac.astrodrizzle.AstroDrizzle` "pixfrac" value.
@@ -2246,17 +2256,82 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, pixfrac=0.8, scale=0.0
     skysub : bool
         Run `~drizzlepac.astrodrizzle.AstroDrizzle` sky subtraction.
     
+    bits : None or int
+        Data quality bits to treat as OK.  If None, then default to 64+32 for 
+        ACS and 512+64 for WFC3/IR.
+    
+    final_* : Parameters passed through to AstroDrizzle to define output WCS
+        Note that these are overridden if an exposure group has a 'reference'
+        keyword pointing to a reference image / WCS.
+         
     Returns
     -------
     Produces drizzled images.
     
     """
     from drizzlepac.astrodrizzle import AstroDrizzle
+    from shapely.geometry import Polygon
     
     if parse_visits:
         exposure_groups = utils.parse_visit_overlaps(exposure_groups, buffer=15.)
+    
+    ## Drizzle can only handle 999 files at a time
+    if check_overlaps:
+        for group in exposure_groups:
+            if 'footprints' in group:
+                footprints = group['footprints']
+            else:
+                footprints = []
+                for i in range(len(files)):
+                    print(i, files[i])
+                    im = pyfits.open(files[i])
+                    wcs = pywcs.WCS(im[1])
+                    footprints.append(Polygon(wcs.calc_footprint()))
+            
+            ref = pyfits.getheader(group['reference'])
+            wcs = pywcs.WCS(ref)
+            ref_fp = Polygon(wcs.calc_footprint())
+            
+            files = []
+            out_fp = []
+            
+            for j in range(len(group['files'])):
+                olap = ref_fp.intersection(footprints[j])
+                if olap.area > 0:
+                    files.append(group['files'][j])
+                    out_fp.append(footprints[j])
+                    
+            print(group['product'], len(files), len(group['files']))
+            group['files'] = files
+            group['footprints'] = out_fp
+            
+    if max_files > 0:
+        all_groups = []
+        for group in exposure_groups:
+            N = len(group['files']) // int(max_files) +1
+            if N == 1:
+                all_groups.append(group)
+            else:
+                for k in range(N):
+                    sli = slice(k*999,(k+1)*999)
+                    files_list = group['files'][sli]
+                    root='{0}-{1:03d}'.format(group['product'], k)
+                    g_k = OrderedDict(product=root,
+                                      files=files_list,
+                                      reference=group['reference'])
+                    
+                    if 'footprints' in group:
+                        g_k['footprints'] = group['footprints'][sli]
+                                         
+                    all_groups.append(g_k)
+                
+    else:
+        all_groups = exposure_groups
         
-    for group in exposure_groups:
+    for group in all_groups:
+        if len(group['files']) == 0:
+            continue
+            
         isACS = '_flc' in group['files'][0]
         if bits is None:
             if isACS:
