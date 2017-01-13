@@ -1072,6 +1072,65 @@ def get_wcs_slice_header(wcs, slx, sly):
     
     return h
     
+def reproject_faster(input_hdu, output, pad=10, **kwargs):
+    """Speed up `reproject` module with array slices of the input image
+    
+    Parameters
+    ----------
+    input_hdu : `~astropy.io.fits.ImageHDU`
+        Input image HDU to reproject.  
+        
+    output : `~astropy.wcs.WCS` or `~astropy.io.fits.Header`
+        Output frame definition.
+    
+    pad : int
+        Pixel padding on slices cut from the `input_hdu`.
+        
+    kwargs : dict
+        Arguments passed through to `~reproject.reproject_interp`.  For 
+        example, `order='nearest-neighbor'`.
+    
+    Returns
+    -------
+    reprojected : `~numpy.ndarray`
+        Reprojected data from `input_hdu`.
+        
+    footprint : `~numpy.ndarray`
+        Footprint of the input array in the output frame.
+    
+    .. note::
+    
+    `reproject' is an astropy-compatible module that can be installed with 
+    `pip`.  See https://reproject.readthedocs.io.
+     
+    """
+    import reproject
+    
+    # Output WCS
+    if isinstance(output, pywcs.WCS):
+        out_wcs = output
+    else:
+        out_wcs = pywcs.WCS(output, relax=True)
+    
+    if 'SIP' in out_wcs.wcs.ctype[0]:
+        print('Warning: `reproject` doesn\'t appear to support SIP projection')
+        
+    # Compute pixel coordinates of the output frame corners in the input image
+    input_wcs = pywcs.WCS(input_hdu.header, relax=True)
+    out_fp = out_wcs.calc_footprint()
+    input_xy = input_wcs.all_world2pix(out_fp, 0)
+    slx = slice(int(input_xy[:,0].min())-pad, int(input_xy[:,0].max())+pad)
+    sly = slice(int(input_xy[:,1].min())-pad, int(input_xy[:,1].max())+pad)
+    
+    # Make the cutout
+    sub_data = input_hdu.data[sly, slx]
+    sub_header = get_wcs_slice_header(input_wcs, slx, sly)
+    sub_hdu = pyfits.PrimaryHDU(data=sub_data, header=sub_header)
+    
+    # Get the reprojection
+    seg_i, fp_i = reproject.reproject_interp(sub_hdu, output, **kwargs)
+    return seg_i.astype(sub_data.dtype), fp_i.astype(np.uint8)
+     
 def make_spectrum_wcsheader(center_wave=1.4e4, dlam=40, NX=100, spatial_scale=1, NY=10):
     """Make a WCS header for a 2D spectrum
     
