@@ -861,7 +861,7 @@ class MultiBeam():
         
         self.ra, self.dec = self.beams[0].get_sky_coords()
         
-        self.full_line_list = ['SIII', 'SII', 'Ha', 'OI', 'OIII', 'Hb', 'OIIIx', 'Hg', 'Hd', 'NeIII', 'OII']
+        self.full_line_list = ['SIII', 'SII', 'Ha', 'OI', 'OIII', 'Hb', 'OIIIx', 'Hg', 'Hd', 'NeIII', 'OII', 'MgII']
         
     def write_beam_fits(self, verbose=True):
         """TBD
@@ -1278,7 +1278,7 @@ class MultiBeam():
     def fit_stars(self, poly_order=1, fitter='nnls', fit_background=True, 
                   verbose=True, make_figure=True, zoom=None,
                   delta_chi2_threshold=0.004, zr=0, dz=0, fwhm=0, 
-                  prior=None, templates={}):
+                  prior=None, templates={}, figsize=[8,5]):
         """TBD
         """
         
@@ -1394,7 +1394,7 @@ class MultiBeam():
                      make_figure=True, zr=None, dz=None, verbose=True,
                      fit_background=True, fitter='nnls', 
                      delta_chi2_threshold=0.004, zoom=True, 
-                     line_complexes=True, templates={}):
+                     line_complexes=True, templates={}, figsize=[8,5]):
         """TBD
         """
         from scipy import polyfit, polyval
@@ -1582,7 +1582,7 @@ class MultiBeam():
         
         fig = None   
         if make_figure:
-            fig = self.show_redshift_fit(fit_data)
+            fig = self.show_redshift_fit(fit_data, figsize=figsize)
             #fig.savefig('fit.pdf')
             
         return fit_data, fig
@@ -1663,10 +1663,10 @@ class MultiBeam():
 
         return line_flux, line_err, coeffs_list, chi2_list, DoF_list
     
-    def show_redshift_fit(self, fit_data, plot_flambda=True):
+    def show_redshift_fit(self, fit_data, plot_flambda=True, figsize=[8,5]):
         """TBD
         """
-        fig = plt.figure(figsize=[8,5])
+        fig = plt.figure(figsize=figsize)
         ax = fig.add_subplot(211)
         
         ax.plot(fit_data['zgrid'], fit_data['chi2']/self.DoF)
@@ -1822,7 +1822,7 @@ class MultiBeam():
         return fig
     
     def redshift_fit_twod_figure(self, fit, spatial_scale=1, dlam=46., NY=10,
-                                 **kwargs):
+                                 figsize=[8,3.5], **kwargs):
         """Make figure of 2D spectrum
         
         TBD
@@ -1867,7 +1867,7 @@ class MultiBeam():
         extent = [hdu_full[0].header['WMIN'], hdu_full[0].header['WMAX'],
                   0, sh[0]]
                   
-        fig = plt.figure(figsize=[8,3.5])
+        fig = plt.figure(figsize=figsize)
         show = [hdu_sci[1].data, hdu_full[1].data,
                 hdu_sci[1].data-hdu_con[1].data]
         
@@ -2011,7 +2011,7 @@ class MultiBeam():
                                               'Lines in this file')
 
             if save_fits:
-                hdu_full.writeto('{0}_zfit_{1:05d}.line.fits'.format(self.group_name, self.id),
+                hdu_full.writeto('{0}_{1:05d}.line.fits'.format(self.group_name, self.id),
                                  clobber=True, output_verify='silentfix')
         
         return hdu_full
@@ -2045,7 +2045,7 @@ class MultiBeam():
             for key in d:
                 if key not in default:
                     p = d.pop(key)
-                    
+                            
         ### Auto generate FWHM (in km/s) to use for line fits
         if 'fwhm' in pzfit:
             fwhm = pzfit['fwhm']
@@ -2178,12 +2178,12 @@ class MultiBeam():
             
         #p = fit.pop('coeffs')
         
-        np.save('{0}_zfit_{1:05d}.fit.npy'.format(self.group_name, self.id), [fit])
+        np.save('{0}_{1:05d}.zfit.npy'.format(self.group_name, self.id), [fit])
             
-        fig.savefig('{0}_zfit_{1:05d}.png'.format(self.group_name, self.id))
+        fig.savefig('{0}_{1:05d}.zfit.png'.format(self.group_name, self.id))
         
-        fig2.savefig('{0}_zfit_{1:05d}.2D.png'.format(self.group_name, self.id))
-        hdu2.writeto('{0}_zfit_{1:05d}.2D.fits'.format(self.group_name, self.id), clobber=True, output_verify='silentfix')
+        fig2.savefig('{0}_{1:05d}.zfit.2D.png'.format(self.group_name, self.id))
+        hdu2.writeto('{0}_{1:05d}.zfit.2D.fits'.format(self.group_name, self.id), clobber=True, output_verify='silentfix')
         
         label = '# id ra dec zbest '
         data = '{0:7d} {1:.6f} {2:.6f} {3:.5f}'.format(self.id, self.ra, self.dec,
@@ -2206,12 +2206,12 @@ class MultiBeam():
                 err =  fit['line_flux'][line][1]
                 data += ' {0:10.3e} {1:10.3e}'.format(flux, err)
         
-        fp = open('{0}_zfit_{1:05d}.fit.dat'.format(self.group_name, self.id),'w')
+        fp = open('{0}_{1:05d}.zfit.dat'.format(self.group_name, self.id),'w')
         fp.write(label+'\n')
         fp.write(data+'\n')
         fp.close()
         
-        fp = open('{0}_zfit_{1:05d}.beams.dat'.format(self.group_name, self.id),'w')
+        fp = open('{0}_{1:05d}.zfit.beams.dat'.format(self.group_name, self.id),'w')
         fp.write('# file filter origin_x origin_y size pad bg\n')
         for ib, beam in enumerate(self.beams):
             data = '{0:40s} {1:s} {2:5d} {3:5d} {4:5d} {5:5d}'.format(beam.grism.parent_file, beam.grism.filter,
@@ -2428,9 +2428,9 @@ def get_redshift_fit_defaults():
     pzfit_def = dict(zr=[0.5, 1.6], dz=[0.005, 0.0004], fwhm=0,
                  poly_order=0, fit_background=True,
                  delta_chi2_threshold=0.004, fitter='nnls', 
-                 prior=None, templates={})
+                 prior=None, templates={}, figsize=[8,5])
     
-    pspec2_def = dict(dlam=0, spatial_scale=1, NY=20)
+    pspec2_def = dict(dlam=0, spatial_scale=1, NY=20, figsize=[8,3.5])
     pline_def = dict(size=20, pixscale=0.1, pixfrac=0.2, kernel='square', 
                      fcontam=0.05)
 
