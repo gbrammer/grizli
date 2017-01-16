@@ -31,18 +31,17 @@ grism_colors = {'G800L':(0.0, 0.4470588235294118, 0.6980392156862745),
       'F140M':'orange',
       'CLEARP':'b'}
 
-grism_limits = {'G800L':[0.545, 1.02],
-          'G280':[0.2,0.4],
-           'G102':[0.77, 1.18],
-           'G141':[1.06, 1.73],
-           'GRISM':[0.98, 1.98],
-           'G280':[0.2,0.4],
-           'F090W':[0.76,1.04],
-           'F115W':[0.97,1.32],
-           'F150W':[1.28, 1.72],
-           'F200W':[1.68, 2.3],
-           'F140M':[1.2,1.6],
-           'CLEARP':[0.76, 2.3]}
+grism_limits = {'G800L':[0.545, 1.02, 50.], # ACS/WFC
+          'G280':[0.2,0.4, 14], # WFC3/UVIS
+           'G102':[0.77, 1.18, 23.5], # WFC3/IR
+           'G141':[1.06, 1.73, 47.0],
+           'GRISM':[0.98, 1.98, 11.], # WFIRST
+           'F090W':[0.76,1.04, 45.0], # NIRISS
+           'F115W':[0.97,1.32, 45.0],
+           'F150W':[1.28,1.72, 45.0],
+           'F200W':[1.68,2.30, 45.0],
+           'F140M':[1.20,1.60, 45.0],
+           'CLEARP':[0.76, 2.3,45.0]}
 
 def test():
     
@@ -2297,12 +2296,13 @@ class MultiBeam():
         print(shifts, chi2/self.DoF)
         return chi2/self.DoF    
             
-    def show_grisms_and_PAs(self, size=10, fcontam=0, flambda=True):
+    def show_grisms_and_PAs(self, size=10, fcontam=0, flambda=True, scale=1, pixfrac=0.5, kernel='square'):
         """Make figure showing spectra at different orients/grisms
         
         TBD
         """
         from matplotlib.ticker import MultipleLocator
+        import pysynphot as S
         
         NX = len(self.PA)
         NY = 0
@@ -2338,34 +2338,85 @@ class MultiBeam():
             for ipa, pa in enumerate(pas):
                 beams = [self.beams[i] for i in self.PA[g][pa]]
                 all_beams.extend(beams)
-                dlam = np.ceil(np.diff(beams[0].beam.lam)[0])
+                #dlam = np.ceil(np.diff(beams[0].beam.lam)[0])*scale
+                dlam = grism_limits[g][2]*scale
                 
-                data = [beam.grism['SCI']-beam.contam-beam.bg 
+                data = [beam.grism['SCI']-beam.contam-beam.bg
                            for beam in beams]
+                
+                # for beam in beams:
+                #     beam.compute_model(spectrum_1d=[gau.wave, gau.flux/beam.beam.total_flux])
+                # 
+                # data = [beam.model for beam in beams]
+                
                 hdu = drizzle_2d_spectrum(beams, data=data, 
                                           wlimit=grism_limits[g], dlam=dlam, 
-                                          spatial_scale=1, NY=size,
-                                          pixfrac=0.5,
-                                          kernel='square',
+                                          spatial_scale=scale, NY=size,
+                                          pixfrac=pixfrac,
+                                          kernel=kernel,
                                           convert_to_flambda=flambda,
                                           fcontam=0, ds9=None)
                 
                 hdu[0].header['GRISM'] = (g, 'Grism')
                 hdu[0].header['PA'] = (pa, 'Dispersion PA')
+                
+                # Line kernel
+                h = hdu[1].header
+                gau = S.GaussianSource(1.e-17, h['CRVAL1'], h['CD1_1']*1)
+                for beam in beams:
+                    beam.compute_model(spectrum_1d=[gau.wave, gau.flux/beam.beam.total_flux])
+                
+                data = [beam.model for beam in beams]
+                
+                h_kern = drizzle_2d_spectrum(beams, data=data, 
+                                          wlimit=grism_limits[g], dlam=dlam, 
+                                          spatial_scale=scale, NY=size,
+                                          pixfrac=pixfrac,
+                                          kernel=kernel,
+                                          convert_to_flambda=flambda,
+                                          fcontam=0, ds9=None)
+                
+                kern = h_kern[1].data[:,h['CRPIX1']-1-size:h['CRPIX1']-1+size]
+                hdu_kern = pyfits.ImageHDU(data=kern, header=h_kern[1].header, name='KERNEL')
+                hdu.append(hdu_kern)
+                
                 hdus.append(hdu)
                 
             data = [beam.grism['SCI']-beam.contam-beam.bg 
                         for beam in all_beams]
             
+            #data = [beam.model for beam in all_beams]
+            
             hdu = drizzle_2d_spectrum(all_beams, data=data, 
                                       wlimit=grism_limits[g], dlam=dlam, 
-                                      spatial_scale=1, NY=size,
-                                      pixfrac=0.5,
-                                      kernel='square',
+                                      spatial_scale=scale, NY=size,
+                                      pixfrac=pixfrac,
+                                      kernel=kernel,
                                       convert_to_flambda=flambda,
                                       fcontam=fcontam, ds9=None)
             
             hdu[0].header['GRISM'] = (g, 'Grism')
+            
+            #
+            h = hdu[1].header
+            gau = S.GaussianSource(1.e-17, h['CRVAL1'], h['CD1_1']*1)
+            for beam in all_beams:
+                beam.compute_model(spectrum_1d=[gau.wave, gau.flux/beam.beam.total_flux])
+            
+            data = [beam.model for beam in all_beams]
+            
+            h_kern = drizzle_2d_spectrum(all_beams, data=data, 
+                                      wlimit=grism_limits[g], dlam=dlam, 
+                                      spatial_scale=scale, NY=size,
+                                      pixfrac=pixfrac,
+                                      kernel=kernel,
+                                      convert_to_flambda=flambda,
+                                      fcontam=0, ds9=None)
+            
+            kern = h_kern[1].data[:,h['CRPIX1']-1-size:h['CRPIX1']-1+size]
+            hdu_kern = pyfits.ImageHDU(data=kern, header=h_kern[1].header, name='KERNEL')
+            hdu.append(hdu_kern)
+            
             hdus.append(hdu)
             all_hdus.extend(hdus)
             
@@ -2488,7 +2539,7 @@ def drizzle_2d_spectrum(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
     from drizzlepac.astrodrizzle import adrizzle
     
     NX = int(np.round(np.diff(wlimit)[0]*1.e4/dlam)) // 2
-    center = np.mean(wlimit)*1.e4
+    center = np.mean(wlimit[:2])*1.e4
     out_header, output_wcs = utils.make_spectrum_wcsheader(center_wave=center,
                                  dlam=dlam, NX=NX, 
                                  spatial_scale=spatial_scale, NY=NY)
