@@ -810,6 +810,8 @@ def get_wise_catalog(ra=165.86, dec=34.829694, radius=3):
     from astroquery.irsa import Irsa
     
     all_wise = 'wise_allwise_p3as_psd'
+    all_wise = 'allwise_p3as_psd'
+    
     coo = coord.SkyCoord(ra*u.deg, dec*u.deg)
     
     table = Irsa.query_region(coo, catalog=all_wise, spatial="Cone",
@@ -936,8 +938,40 @@ def get_gaia_catalog(ra=165.86, dec=34.829694, radius=3.):
     os.system('gunzip gaia.vot.gz')
     table = Table.read('gaia.vot', format='votable')
     return table
+
+def get_panstarrs_catalog(ra=0., dec=0., radius=3, columns='objName,objID,raStack,decStack,raStackErr,decStackErr,rMeanKronMag,rMeanKronMagErr', max_records=10000):
+    """TBD
+    """
+    try:
+        import httplib
+        from urllib import urlencode
+        from urllib import urlopen
+    except:
+        # python 3
+        import http.client as httplib
+        from urllib.parse import urlencode
+        from urllib.request import urlopen
+        
+    query_url = "http://archive.stsci.edu/panstarrs/search.php?RA={ra}&DEC={dec}&radius={radius}&max_records={max_records}&outputformat=CSV&action=Search&coordformat=dec&selectedColumnsCsv={columns}&raStack%3E=0".format(ra=ra, dec=dec, radius=radius, max_records=max_records, columns=columns)
     
-def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True):
+    print('Query PanSTARRS catalog ({ra},{dec})'.format(ra=ra, dec=dec))
+    
+    query = urlopen(query_url)
+    lines = [bytes(columns+'\n', encoding='utf-8')]
+    lines.extend(query.readlines()[2:])
+    
+    csv_file = '/tmp/ps1_{ra}_{dec}.csv'.format(ra=ra, dec=dec)
+    fp = open(csv_file,'wb')
+    fp.writelines(lines)
+    fp.close()
+    
+    table = utils.GTable.read(csv_file)
+    clip = (table['rMeanKronMag'] > 0) & (table['raStack'] > 0)
+    table['ra'] = table['raStack']
+    table['dec'] = table['decStack']
+    return table[clip]
+    
+def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, reference_catalogs = ['GAIA', 'PS1', 'SDSS', 'WISE']):
     """Decide what reference astrometric catalog to use
     
     First search SDSS, then WISE looking for nearby matches.  
@@ -956,6 +990,10 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True):
         the external (low precision) catalogs so that you're matching
         HST-to-HST astrometry.
     
+    reference_catalogs : list
+        Order in which to query reference catalogs.  Options are 'GAIA',
+        'PS1' (STScI PanSTARRS), 'SDSS', 'WISE'.
+        
     Returns
     -------
     radec : str
@@ -965,70 +1003,101 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True):
         Provenance of the `radec` list.
     
     """
-    try:
-        sdss = get_sdss_catalog(ra=ra, dec=dec, radius=radius)
-    except:
-        print('SDSS query failed')
-        sdss = []
+    # try:
+    #     sdss = get_sdss_catalog(ra=ra, dec=dec, radius=radius)
+    # except:
+    #     print('SDSS query failed')
+    #     sdss = []
+    # 
+    # if sdss is None:
+    #     sdss = []
+        
+    query_functions = {'SDSS':get_sdss_catalog, 
+                       'GAIA':get_gaia_catalog,
+                       'PS1':get_panstarrs_catalog,
+                       'WISE':get_wise_catalog}
+      
+    # if len(sdss) > 5:
+    #     table_to_regions(sdss, output='{0}_sdss.reg'.format(product))
+    #     sdss['ra','dec'].write('{0}_sdss.radec'.format(product), 
+    #                             format='ascii.commented_header')
+    #     radec = '{0}_sdss.radec'.format(product)
+    #     ref_catalog = 'SDSS'
+    #     has_catalog = True
     
-    if sdss is None:
-        sdss = []
-    
+    ### Try queries
     has_catalog = False
-            
-    if len(sdss) > 5:
-        table_to_regions(sdss, output='{0}_sdss.reg'.format(product))
-        sdss['ra','dec'].write('{0}_sdss.radec'.format(product), 
-                                format='ascii.commented_header')
-        radec = '{0}_sdss.radec'.format(product)
-        ref_catalog = 'SDSS'
-        has_catalog = True
+    ref_catalog = 'None'
+    ref_cat = []
+    
+    for ref_src in reference_catalogs:
+        try:
+            ref_cat = query_functions[ref_src](ra=ra, dec=dec, radius=2)
+            if len(ref_cat) < 2:
+                raise ValueError
+                
+            table_to_regions(ref_cat, output='{0}_{1}.reg'.format(product,
+                                                         ref_src.lower()))
+            ref_cat['ra','dec'].write('{0}_{1}.radec'.format(product, 
+                                                         ref_src.lower()),
+                                    format='ascii.commented_header')
+
+            radec = '{0}_{1}.radec'.format(product, ref_src.lower())
+            ref_catalog = ref_src
+            has_catalog = True
+            break
+        except:
+            print('{0} query failed'.format(ref_src))
+            has_catalog = False
+        
     
     ### GAIA
-    if not has_catalog:
-        try:
-            gaia = get_gaia_catalog(ra=ra, dec=dec, radius=2)
-            if len(gaia) < 2:
-                raise ValueError
-            table_to_regions(gaia, output='{0}_gaia.reg'.format(product))
-            gaia['ra','dec'].write('{0}_gaia.radec'.format(product),
-                                    format='ascii.commented_header')
-
-            radec = '{0}_gaia.radec'.format(product)
-            ref_catalog = 'GAIA'
-            has_catalog = True
-        except:
-            print('GAIA query failed')
-            has_catalog = False
-    
-    ### WISE
-    if not has_catalog:    
-        try:
-            wise = get_wise_catalog(ra=ra, dec=dec, radius=2)
+    # if not has_catalog:
+    #     try:
+    #         gaia = get_gaia_catalog(ra=ra, dec=dec, radius=2)
+    #         if len(gaia) < 2:
+    #             raise ValueError
+    #         table_to_regions(gaia, output='{0}_gaia.reg'.format(product))
+    #         gaia['ra','dec'].write('{0}_gaia.radec'.format(product),
+    #                                 format='ascii.commented_header')
+    # 
+    #         radec = '{0}_gaia.radec'.format(product)
+    #         ref_catalog = 'GAIA'
+    #         has_catalog = True
+    #     except:
+    #         print('GAIA query failed')
+    #         has_catalog = False
+    # 
+    # ### WISE
+    # if not has_catalog:    
+    #     try:
+    #         wise = get_wise_catalog(ra=ra, dec=dec, radius=2)
+    #         
+    #         table_to_regions(wise, output='{0}_wise.reg'.format(product))
+    #         wise['ra','dec'].write('{0}_wise.radec'.format(product),
+    #                                 format='ascii.commented_header')
+    # 
+    #         radec = '{0}_wise.radec'.format(product)
+    #         ref_catalog = 'WISE'
+    #         has_catalog=True
+    #     except:
+    #         print('WISE query failed')
+    #         has_catalog=False
             
-            table_to_regions(wise, output='{0}_wise.reg'.format(product))
-            wise['ra','dec'].write('{0}_wise.radec'.format(product),
-                                    format='ascii.commented_header')
-
-            radec = '{0}_wise.radec'.format(product)
-            ref_catalog = 'WISE'
-        except:
-            print('WISE query failed')
-    
     #### WISP, check if a catalog already exists for a given rootname and use 
     #### that if so.
     cat_files = glob.glob('-f1'.join(product.split('-f1')[:-1]) + '-f*cat')
     if len(cat_files) > 0:
-        cat = Table.read(cat_files[0], format='ascii.commented_header')
+        ref_cat = Table.read(cat_files[0], format='ascii.commented_header')
         root = cat_files[0].split('.cat')[0]
-        cat['X_WORLD','Y_WORLD'].write('{0}.radec'.format(root),
+        ref_cat['X_WORLD','Y_WORLD'].write('{0}.radec'.format(root),
                                 format='ascii.commented_header')
         
         radec = '{0}.radec'.format(root)
         ref_catalog = 'VISIT'
     
     if verbose:
-        print('{0} - Reference RADEC: {1} [{2}]'.format(product, radec, ref_catalog))    
+        print('{0} - Reference RADEC: {1} [{2}] N={3}'.format(product, radec, ref_catalog, len(ref_cat)))    
     
     return radec, ref_catalog
     
@@ -1040,7 +1109,8 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                                skip_direct=False,
                                fix_stars=True,
                                tweak_max_dist=1.,
-                               tweak_threshold=1.5):
+                               tweak_threshold=1.5,
+                             reference_catalogs=['GAIA','PS1','SDSS','WISE']):
     """Full processing of a direct + grism image visit.
     
     TBD
@@ -1101,14 +1171,15 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
             im = pyfits.open(direct['files'][0])
             radec, ref_catalog = get_radec_catalog(ra=im[0].header['RA_TARG'],
                             dec=im[0].header['DEC_TARG'], 
-                            product=direct['product'])
+                            product=direct['product'],
+                            reference_catalogs=reference_catalogs)
         
             if ref_catalog == 'VISIT':
                 align_mag_limits = [16,23]
-            elif ref_catalog == 'WISE':
-                align_mag_limits = [16,21]
             elif ref_catalog == 'SDSS':
                 align_mag_limits = [16,21]
+            elif ref_catalog == 'PS1':
+                align_mag_limits = [16,22]
             elif ref_catalog == 'WISE':
                 align_mag_limits = [15,20]
         else:
