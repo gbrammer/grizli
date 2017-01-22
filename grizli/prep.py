@@ -2369,10 +2369,14 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, m
     ## Drizzle can only handle 999 files at a time
     if check_overlaps:
         for group in exposure_groups:
+            if 'reference' not in group:
+                continue
+            
             if 'footprints' in group:
                 footprints = group['footprints']
             else:
                 footprints = []
+                files=group['files']
                 for i in range(len(files)):
                     print(i, files[i])
                     im = pyfits.open(files[i])
