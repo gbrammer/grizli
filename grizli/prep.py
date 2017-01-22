@@ -1106,6 +1106,7 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                                align_mag_limits = [14,23],
                                column_average=True, 
                                run_tweak_align=True,
+                               tweak_fit_order=-1,
                                skip_direct=False,
                                fix_stars=True,
                                tweak_max_dist=1.,
@@ -1164,7 +1165,7 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
             #if run_tweak_align:
             tweak_align(direct_group=direct, grism_group=grism,
                         max_dist=tweak_max_dist, key=' ', drizzle=False,
-                        threshold=tweak_threshold)
+                        threshold=tweak_threshold, fit_order=tweak_fit_order)
       
         ### Get reference astrometry from SDSS or WISE
         if radec is None:
@@ -1403,11 +1404,12 @@ def set_grism_dfilter(direct, grism):
         flt.flush()
     
 def tweak_align(direct_group={}, grism_group={}, max_dist=1., key=' ', 
-                threshold=3, drizzle=False):
+                threshold=3, drizzle=False, fit_order=-1):
     """
     Intra-visit shifts (WFC3/IR)
     """
     from drizzlepac.astrodrizzle import AstroDrizzle
+    from scipy import polyfit, polyval
     
     if len(direct_group['files']) < 2:
         print('Only one direct image found, can\'t compute shifts!')
@@ -1421,6 +1423,8 @@ def tweak_align(direct_group={}, grism_group={}, max_dist=1., key=' ',
     
     fp = open('{0}_shifts.log'.format(direct_group['product']), 'w')
     fp.write('# flt xshift yshift rot scale N rmsx rmsy\n')
+    fp.write('# fit_order: {0}\n'.format(fit_order))
+    
     for k in grism_matches:
         d = shift_dict[k]
         fp.write('# match[\'{0}\'] = {1}\n'.format(k, grism_matches[k]))
@@ -1431,6 +1435,22 @@ def tweak_align(direct_group={}, grism_group={}, max_dist=1., key=' ',
     
     fp.close()
     
+    # Fit a polynomial, e.g., for DASH
+    if fit_order > 0:
+        print('Fit polynomial order={0} to shifts.'.format(fit_order))
+        
+        shifts = np.array([shift_dict[k][:2] for k in sorted(shift_dict)])
+        t = np.arange(shifts.shape[0])
+        cx = polyfit(t, shifts[:,0], fit_order)
+        sx = polyval(cx, t)
+        cy = polyfit(t, shifts[:,1], fit_order)
+        sy = polyval(cy, t)
+        fit_shift = np.array([sx, sy]).T
+        
+        for ik, k in enumerate(sorted(shift_dict)):
+            shift_dict[k][:2] = fit_shift[ik,:]
+    
+    ## Apply the shifts to the header WCS
     apply_tweak_shifts(wcs_ref, shift_dict, grism_matches=grism_matches,
                        verbose=False)
 
