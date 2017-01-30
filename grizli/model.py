@@ -242,8 +242,8 @@ class GrismDisperser(object):
         
         xoff = 0.
         
-        # if 'G1' in self.conf.conf_file:
-        #     xoff = -0.5 # tested for WFC3/IR
+        if ('G14' in self.conf.conf_file) & (self.beam == 'A'):
+             xoff = -0.5 # necessary for WFC3/IR G141, v4.32
         
         #xoff = 0. # suggested by ACS
         #xoff = -2.5 # test
