@@ -1142,6 +1142,7 @@ class MultiBeam():
 
         return line_flux, cont1d, line1d, model1d, model_continuum
     
+    @classmethod
     def load_templates(self, fwhm=400, line_complexes=True, stars=False,
                        full_line_list=None):
         """Generate a list of templates for fitting to the grism spectra
@@ -2296,7 +2297,7 @@ class MultiBeam():
         print(shifts, chi2/self.DoF)
         return chi2/self.DoF    
             
-    def show_grisms_and_PAs(self, size=10, fcontam=0, flambda=True, scale=1, pixfrac=0.5, kernel='square'):
+    def drizzle_grisms_and_PAs(self, size=10, fcontam=0, flambda=True, scale=1, pixfrac=0.5, kernel='square', make_figure=True):
         """Make figure showing spectra at different orients/grisms
         
         TBD
@@ -2325,8 +2326,16 @@ class MultiBeam():
             
         for ib, beam in enumerate(self.beams):
             beam.bg = bg[ib]
+        
+        prim = pyfits.PrimaryHDU()
+        h0 = prim.header
+        h0['ID'] = (self.id, 'Object ID')
+        h0['RA'] = (self.ra, 'Right ascension')
+        h0['DEC'] = (self.dec, 'Declination')
+        h0['ISFLAM'] = (flambda, 'Pixels in f-lam units')
+        h0['FCONTAM'] = (fcontam, 'Contamination parameter')
+        h0['NGRISM'] = (len(keys), 'Number of grisms')
             
-        fig = plt.figure(figsize=[4*NX, 1*NY])
         all_hdus = []
         for ig, g in enumerate(keys):
             all_beams = []
@@ -2335,7 +2344,13 @@ class MultiBeam():
             pas = list(self.PA[g].keys())
             pas.sort()
             
+            h0['GRISM{0:03d}'.format(ig+1)] = (g, 'Grism name')
+            
+            h0['N'+g] = (len(pas), 'Number of PAs for grism '+g)
+            
             for ipa, pa in enumerate(pas):
+                h0[g+'{0:02d}'.format(ipa+1)] = (pa, 'PA')
+                
                 beams = [self.beams[i] for i in self.PA[g][pa]]
                 all_beams.extend(beams)
                 #dlam = np.ceil(np.diff(beams[0].beam.lam)[0])*scale
@@ -2343,11 +2358,6 @@ class MultiBeam():
                 
                 data = [beam.grism['SCI']-beam.contam-beam.bg
                            for beam in beams]
-                
-                # for beam in beams:
-                #     beam.compute_model(spectrum_1d=[gau.wave, gau.flux/beam.beam.total_flux])
-                # 
-                # data = [beam.model for beam in beams]
                 
                 hdu = drizzle_2d_spectrum(beams, data=data, 
                                           wlimit=grism_limits[g], dlam=dlam, 
@@ -2385,7 +2395,14 @@ class MultiBeam():
                 hdu_kern = pyfits.ImageHDU(data=kern, header=h_kern[1].header, name='KERNEL')
                 hdu.append(hdu_kern)
                 
-                hdus.append(hdu)
+                ## Pull out zeroth extension
+                for k in hdu[0].header:
+                    hdu[1].header[k] = hdu[0].header[k]
+                
+                for e in hdu[1:]:
+                    e.header['EXTVER'] = '{0},{1}'.format(g, pa)
+                
+                hdus.append(hdu[1:])
                 
             data = [beam.grism['SCI']-beam.contam-beam.bg 
                         for beam in all_beams]
@@ -2426,61 +2443,25 @@ class MultiBeam():
             hdu_kern = pyfits.ImageHDU(data=kern, header=h_kern[1].header, name='KERNEL')
             hdu.append(hdu_kern)
             
-            hdus.append(hdu)
+            ## Pull out zeroth extension
+            for k in hdu[0].header:
+                hdu[1].header[k] = hdu[0].header[k]
+            
+            for e in hdu[1:]:
+                e.header['EXTVER'] = '{0}'.format(g)
+            
+            hdus.append(hdu[1:])
             all_hdus.extend(hdus)
-            
-            clip = hdu['WHT'].data > 0 #np.percentile(hdu['WHT'].data, 10)
-            if clip.sum() == 0:
-                clip = np.isfinite(hdu['WHT'].data)
-            
-            avg_rms = 1/np.median(np.sqrt(hdu['WHT'].data[clip]))
-            vmax = np.maximum(1.1*np.percentile(hdu['SCI'].data[clip],98),
-                             5*avg_rms)
-            
-            ax = fig.add_subplot(NY, NX, ig+(NY-1)*NX+1)
-            sh = hdu[1].data.shape
-            extent = [hdu[0].header['WMIN'], hdu[0].header['WMAX'], 
-                      0, sh[0]]
-
-            ax.imshow(hdu['SCI'].data, origin='lower',
-                      interpolation='Nearest', vmin=-0.1*vmax, vmax=vmax, 
-                      extent=extent, cmap = plt.cm.viridis_r, 
-                      aspect='auto')
-
-            ax.set_yticklabels([])
-            ax.set_xlabel(r'$\lambda$ ($\mu$m) - '+g)
-            ax.xaxis.set_major_locator(MultipleLocator(grism_major[g]))
                     
-            for ipa, pa in enumerate(pas):
+        output_hdu = pyfits.HDUList([prim])
+        for hdu in all_hdus:
+            output_hdu.extend(hdu)
             
-                ax = fig.add_subplot(NY, NX, ig+ipa*NX+1)
-                hdu = hdus[ipa]
-                
-                if (ig == 0) & (ipa == 0):
-                    ax.text(0.98, 0.94, 'ID = {0}'.format(self.id), 
-                            ha='right', va='top', transform=ax.transAxes,
-                            fontsize=8, backgroundcolor='w')
-                    
-                sh = hdu[1].data.shape
-                extent = [hdu[0].header['WMIN'], hdu[0].header['WMAX'], 
-                          0, sh[0]]
-
-                ax.imshow(hdu['SCI'].data, origin='lower',
-                          interpolation='Nearest', vmin=-0.1*vmax, vmax=vmax, 
-                          extent=extent, cmap = plt.cm.viridis_r, 
-                          aspect='auto')
-
-                ax.set_yticklabels([])
-                ax.set_xticklabels([])
-                ax.xaxis.set_major_locator(MultipleLocator(grism_major[g]))
-                ax.text(0.015, 0.94, '{0:3.0f}'.format(pa), ha='left',
-                        va='top',
-                        transform=ax.transAxes, fontsize=8, 
-                        backgroundcolor='w')
-            
-        fig.tight_layout(pad=0.1)
-        
-        return fig, all_hdus
+        if make_figure:
+            fig = show_drizzle_HDU(output_hdu)
+            return output_hdu, fig
+        else:
+            return output_hdu #all_hdus
                                       
 def get_redshift_fit_defaults():
     """TBD
@@ -2546,6 +2527,10 @@ def drizzle_2d_spectrum(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
         
     """
     from drizzlepac.astrodrizzle import adrizzle
+    from astropy import log
+    log.setLevel('ERROR')
+    #log.disable_warnings_logging()
+    adrizzle.log.setLevel('ERROR')
     
     NX = int(np.round(np.diff(wlimit)[0]*1.e4/dlam)) // 2
     center = np.mean(wlimit[:2])*1.e4
@@ -2703,6 +2688,7 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
         cutouts.
     """
     from drizzlepac.astrodrizzle import adrizzle
+    adrizzle.log.setLevel('ERROR')
     
     # Nothing to do
     if len(beams) == 0:
@@ -2870,3 +2856,137 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
     
     return pyfits.HDUList([p, thumb_sci, thumb_wht, grism_sci, grism_cont, 
                            grism_contam, grism_wht])
+
+def show_drizzle_HDU(hdu):
+    """Make a figure from the multiple extensions in the drizzled grism file.
+    
+    Parameters
+    ----------
+    hdu : `~astropy.io.fits.HDUList`
+        HDU list output by `drizzle_grisms_and_PAs`.
+        
+    Returns
+    -------
+    fig : `~matplotlib.figure.Figure`
+        The figure.
+
+    """
+    from collections import OrderedDict
+    from matplotlib.gridspec import GridSpec
+    from matplotlib.ticker import MultipleLocator
+    
+    h0 = hdu[0].header
+    NX = h0['NGRISM']
+    NY = 0
+    
+    grisms = OrderedDict()
+    
+    for ig in range(NX):
+        g = h0['GRISM{0:03d}'.format(ig+1)]
+        NY = np.maximum(NY, h0['N'+g])
+        grisms[g] = h0['N'+g]
+        
+    NY += 1
+    
+    grism_major = {'G102':0.1, 'G141':0.1, 'G800L':0.2}
+    
+    fig = plt.figure(figsize=(5*NX, 1*NY))
+    
+    widths = []
+    for i in range(NX):
+        widths.extend([0.2, 1])
+        
+    gs = GridSpec(NY, NX*2, height_ratios=[1]*NY, width_ratios=widths)
+    
+    for ig, g in enumerate(grisms):
+        
+        sci_i = hdu['SCI',g]
+        wht_i = hdu['WHT',g]
+        kern_i = hdu['KERNEL',g]
+        h_i = sci_i.header
+        
+        clip = wht_i.data > 0 
+        if clip.sum() == 0:
+            clip = np.isfinite(wht_i.data)
+        
+        avg_rms = 1/np.median(np.sqrt(wht_i.data[clip]))
+        vmax = np.maximum(1.1*np.percentile(sci_i.data[clip],98),
+                         5*avg_rms)
+        
+        vmax_kern = 1.1*np.percentile(kern_i.data,99.5)
+        
+        # Kernel
+        ax = fig.add_subplot(gs[NY-1, ig*2+0])
+        sh = kern_i.data.shape
+        extent = [0, sh[1], 0, sh[0]]
+        
+        ax.imshow(kern_i.data, origin='lower', interpolation='Nearest', 
+                  vmin=-0.1*vmax_kern, vmax=vmax_kern, cmap=plt.cm.viridis_r,
+                  extent=extent, aspect='auto')
+        
+        ax.set_xticklabels([]); ax.set_yticklabels([])
+        ax.xaxis.set_tick_params(length=0)
+        ax.yaxis.set_tick_params(length=0)
+        
+        # Spectrum
+        sh = sci_i.data.shape
+        extent = [h_i['WMIN'], h_i['WMAX'], 0, sh[0]]
+        
+        ax = fig.add_subplot(gs[NY-1, ig*2+1])
+        
+        ax.imshow(sci_i.data, origin='lower',
+                  interpolation='Nearest', vmin=-0.1*vmax, vmax=vmax, 
+                  extent=extent, cmap = plt.cm.viridis_r, 
+                  aspect='auto')
+        
+        ax.set_yticklabels([])
+        ax.set_xlabel(r'$\lambda$ ($\mu$m) - '+g)
+        ax.xaxis.set_major_locator(MultipleLocator(grism_major[g]))
+        
+        for ip in range(grisms[g]):
+            #print(ip, ig)
+            pa = h0['{0}{1:02d}'.format(g, ip+1)]
+
+            sci_i = hdu['SCI','{0},{1}'.format(g, pa)]
+            wht_i = hdu['WHT','{0},{1}'.format(g, pa)]
+            kern_i = hdu['KERNEL','{0},{1}'.format(g, pa)]
+            h_i = sci_i.header
+
+            # Kernel
+            ax = fig.add_subplot(gs[ip, ig*2+0])
+            sh = kern_i.data.shape
+            extent = [0, sh[1], 0, sh[0]]
+            
+            ax.imshow(kern_i.data, origin='lower', interpolation='Nearest', 
+                      vmin=-0.1*vmax_kern, vmax=vmax_kern, extent=extent,
+                      cmap=plt.cm.viridis_r, aspect='auto')
+
+            ax.set_xticklabels([]); ax.set_yticklabels([])
+            ax.xaxis.set_tick_params(length=0)
+            ax.yaxis.set_tick_params(length=0)
+            
+            # Spectrum
+            sh = sci_i.data.shape
+            extent = [h_i['WMIN'], h_i['WMAX'], 0, sh[0]]
+
+            ax = fig.add_subplot(gs[ip, ig*2+1])
+
+            ax.imshow(sci_i.data, origin='lower',
+                      interpolation='Nearest', vmin=-0.1*vmax, vmax=vmax, 
+                      extent=extent, cmap = plt.cm.viridis_r, 
+                      aspect='auto')
+           
+            ax.set_yticklabels([]); ax.set_xticklabels([])
+            ax.xaxis.set_major_locator(MultipleLocator(grism_major[g]))
+            ax.text(0.015, 0.94, '{0:3.0f}'.format(pa), ha='left',
+                    va='top',
+                    transform=ax.transAxes, fontsize=8, 
+                    backgroundcolor='w')
+            
+            if (ig == (NX-1)) & (ip == 0):
+                ax.text(0.98, 0.94, 'ID = {0}'.format(h0['ID']), 
+                        ha='right', va='top', transform=ax.transAxes,
+                        fontsize=8, backgroundcolor='w')
+            
+    gs.tight_layout(fig, pad=0.1)
+    return fig
