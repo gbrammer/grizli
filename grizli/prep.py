@@ -113,6 +113,8 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
     Nothing, but copies the file from `path` to `./`.
         
     """
+    import shutil
+    
     local_file = os.path.basename(file)
     if preserve_dq:
         if os.path.exists(local_file):
@@ -206,7 +208,10 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
             orig_file['SCI',ext].data *= grism_pfl/flat
         
         orig_file[0].header['NPOLFILE'] = 'jref$v971826jj_npl.fits' # F814W
-        
+    
+    if head['INSTRUME'] == 'WFPC2':
+        head['DETECTOR'] = 'WFPC2'
+            
     if (head['INSTRUME'] == 'WFC3') & (head['DETECTOR'] == 'IR')&extra_badpix: 
         bp = pyfits.open(os.path.join(os.getenv('iref'),
                                       'badpix_spars200_Nov9.fits'))    
@@ -236,9 +241,40 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
                             
     if verbose:
         print('{0} -> {1} {2}'.format(orig_file.filename(), local_file, extra_msg))
-            
-    orig_file.writeto(local_file, clobber=True)
         
+    ### WFPC2            
+    if '_c0m' in file:
+        # point to FITS reference files
+        for key in ['MASKFILE', 'ATODFILE', 'BLEVFILE', 'BLEVDFIL', 'BIASFILE', 'BIASDFIL', 'DARKFILE', 'DARKDFIL', 'FLATFILE', 'FLATDFIL', 'SHADFILE']:
+            ref_file = '_'.join(head[key].split('.'))+'.fits'
+            orig_file[0].header[key] = ref_file.replace('h.fits', 'f.fits')
+        
+        waiv = orig_file[0].header['FLATFILE']
+        orig_file[0].header['FLATFILE'] = waiv.replace('.fits', '_c0h.fits')
+        # 
+        # ## testing
+        # orig_file[0].header['FLATFILE'] = 'm341820ju_pfl.fits'
+        
+        # Copy WFPC2 DQ file (c1m)
+        dqfile = os.path.join(path, file.replace('_c0m', '_c1m'))
+        print('Copy WFPC2 DQ file: {0}'.format(dqfile))
+        if os.path.exists(os.path.basename(dqfile)):
+            os.remove(os.path.basename(dqfile))
+           
+        shutil.copy(dqfile, './')
+        
+        ## Add additional masking since AstroDrizzle having trouble with flats
+        flat_file = orig_file[0].header['FLATFILE'].replace('uref$', os.getenv('uref')+'/')
+        pfl = pyfits.open(flat_file)
+        c1m = pyfits.open(os.path.basename(dqfile), mode='update')
+        for ext in [1,2,3,4]:
+            mask = pfl[ext].data > 1.3
+            c1m[ext].data[mask] |= 2
+        
+        c1m.flush()
+        
+    orig_file.writeto(local_file, clobber=True)
+    
 def apply_persistence_mask(flt_file, path='../Persistence', dq_value=1024,
                            err_threshold=0.6, grow_mask=3, verbose=True):
     """Make a mask for pixels flagged as being affected by persistence
@@ -660,7 +696,7 @@ def table_to_regions(table, output='ds9.reg'):
     fp.close()
     
 def make_drz_catalog(root='', threshold=2., get_background=True, 
-                     verbose=True, extra_config={}, sci=None):
+                     verbose=True, extra_config={}, sci=None, get_sew=False):
     """Make a SExtractor catalog from drizzle products
     
     TBD
@@ -719,6 +755,9 @@ def make_drz_catalog(root='', threshold=2., get_background=True,
                     "FLUX_RADIUS", "BACKGROUND", "FLAGS"],
                     config=config)
     
+    if get_sew:
+        return sew
+        
     output = sew(drz_file)
     cat = output['table']
     cat.meta = config
@@ -1128,6 +1167,8 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
     
     ### Copy FLT files from ../RAW
     isACS = '_flc' in direct['files'][0]
+    isWFPC2 = '_c0m' in direct['files'][0]
+    
     if not skip_direct:
         for file in direct['files']:
             crclean = isACS & (len(direct['files']) == 1)
@@ -1135,9 +1176,10 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
             updatewcs.updatewcs(file, verbose=False)
     
         ### Make ASN
-        asn = asnutil.ASNTable(direct['files'], output=direct['product'])
-        asn.create()
-        asn.write()
+        if not isWFPC2:
+            asn = asnutil.ASNTable(inlist=direct['files'], output=direct['product'])
+            asn.create()
+            asn.write()
     
     ### Initial grism processing
     skip_grism = (grism == {}) | (grism is None) | (len(grism) == 0)
@@ -1155,13 +1197,17 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
         bits = 64+32
         driz_cr_snr = '3.5 3.0'
         driz_cr_scale = '1.2 0.7'
+    elif isWFPC2:
+        bits = 64+32
+        driz_cr_snr = '3.5 3.0'
+        driz_cr_scale = '1.2 0.7'
     else:
         bits = 576
         driz_cr_snr = '8.0 5.0'
         driz_cr_scale = '2.5 0.7'
     
     if not skip_direct:
-        if (not isACS) & run_tweak_align:
+        if (not isACS) & (not isWFPC2) & run_tweak_align:
             #if run_tweak_align:
             tweak_align(direct_group=direct, grism_group=grism,
                         max_dist=tweak_max_dist, key=' ', drizzle=False,
@@ -1229,7 +1275,13 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                              final_wht_type='IVM', resetbits=0)
             
         ### Make catalog & segmentation image
-        cat = make_drz_catalog(root=direct['product'], threshold=2)
+        if isWFPC2:
+            thresh = 8
+        else:
+            thresh = 2
+        
+        cat = make_drz_catalog(root=direct['product'], threshold=thresh)
+        
         if radec == 'self':
             okmag = ((cat['MAG_AUTO'] > align_mag_limits[0]) & 
                     (cat['MAG_AUTO'] < align_mag_limits[1]))
@@ -1298,11 +1350,18 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
     
         ### Make DRZ catalog again with updated DRZWCS
         clean_drizzle(direct['product'])
-        cat = make_drz_catalog(root=direct['product'], threshold=1.6)
+        
+        if isWFPC2:
+            thresh = 8
+        else:
+            thresh = 1.6
+        
+        cat = make_drz_catalog(root=direct['product'], threshold=thresh)
+        
         table_to_regions(cat, '{0}.cat.reg'.format(direct['product']))
         table_to_radec(cat, '{0}.cat.radec'.format(direct['product']))
         
-        if (fix_stars) & (not isACS):
+        if (fix_stars) & (not isACS) & (not isWFPC2):
             fix_star_centers(root=direct['product'], drizzle=True, mag_lim=21)
         
     ################# 
