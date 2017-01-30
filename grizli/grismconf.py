@@ -121,7 +121,9 @@ class aXeConf():
                 # sens = np.cast[np.double](self.sens[beam]['SENSITIVITY']
                 # self.sens[beam]['WAVELENGTH'] = np.cast[np.double](self.sens[beam]['WAVELENGTH'])
                 # self.sens[beam]['SENSITIVITY'] = )
-                
+        
+        self.beams.sort()
+        
     def field_dependent(self, xi, yi, coeffs):
         """aXe field-dependent coefficients
         
@@ -504,8 +506,11 @@ def get_config_filename(instrume='WFC3', filter='F140W',
               
     if instrume == 'NIRISS':
         conf_file = os.path.join(os.getenv('GRIZLI'),
+                                 'CONF/GR150C.{0}.conf'.format(grism))
+        if not os.path.exists(conf_file):
+            conf_file = os.path.join(os.getenv('GRIZLI'),
                                  'CONF/NIRISS.{0}.conf'.format(grism))
-    
+        
     if instrume == 'NIRCam':
         conf_file = os.path.join(os.getenv('GRIZLI'),
             'CONF/aXeSIM_NC_2016May/CONF/NIRCam_LWAR_{0}.conf'.format(grism))
