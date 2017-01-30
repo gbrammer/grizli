@@ -860,7 +860,7 @@ class MultiBeam():
         
         self.ra, self.dec = self.beams[0].get_sky_coords()
         
-        self.full_line_list = ['SIII', 'SII', 'Ha', 'OI', 'OIII', 'Hb', 'OIIIx', 'Hg', 'Hd', 'NeIII', 'OII', 'MgII']
+        self.full_line_list = ['SIII', 'SII', 'Ha', 'OI-6302', 'OIII', 'Hb', 'OIII-4363', 'Hg', 'Hd', 'NeIII', 'OII', 'MgII']
         
     def write_beam_fits(self, verbose=True):
         """TBD
@@ -1172,8 +1172,8 @@ class MultiBeam():
         full_line_list : None or list
             Full set of lines to try.  The default is currently
             
-                >>> full_line_list = ['SIII', 'SII', 'Ha', 'OI', 
-                                      'OIII', 'Hb', 'OIIIx', 
+                >>> full_line_list = ['SIII', 'SII', 'Ha', 'OI-6302', 
+                                      'OIII', 'Hb', 'OIII-4363', 
                                       'Hg', 'Hd', 'NeIII', 'OII']
             
             The full list of implemented lines is in `~grizli.utils.get_line_wavelengths`.
@@ -2356,9 +2356,14 @@ class MultiBeam():
                                           kernel=kernel,
                                           convert_to_flambda=flambda,
                                           fcontam=0, ds9=None)
-                
+                #
+                hdu[0].header['RA'] = (self.ra, 'Right ascension')
+                hdu[0].header['DEC'] = (self.dec, 'Declination')
                 hdu[0].header['GRISM'] = (g, 'Grism')
                 hdu[0].header['PA'] = (pa, 'Dispersion PA')
+                hdu[0].header['ISFLAM'] = (flambda, 'Pixels in f-lam units')
+                hdu[0].header['CONF'] = (beams[0].beam.conf.conf_file,
+                                         'Configuration file')
                 
                 # Line kernel
                 h = hdu[1].header
@@ -2395,9 +2400,13 @@ class MultiBeam():
                                       convert_to_flambda=flambda,
                                       fcontam=fcontam, ds9=None)
             
+            hdu[0].header['RA'] = (self.ra, 'Right ascension')
+            hdu[0].header['DEC'] = (self.dec, 'Declination')
             hdu[0].header['GRISM'] = (g, 'Grism')
+            hdu[0].header['ISFLAM'] = (flambda, 'Pixels in f-lam units')
+            hdu[0].header['CONF'] = (beams[0].beam.conf.conf_file,
+                                     'Configuration file')
             
-            #
             h = hdu[1].header
             gau = S.GaussianSource(1.e-17, h['CRVAL1'], h['CD1_1']*1)
             for beam in all_beams:
