@@ -46,12 +46,17 @@ def get_flt_info(files=[]):
         
         filt = get_hst_filter(h)
         line.append(filt)
+        has_columns = ['FILE', 'FILTER']
         for key in columns[2:]:
-            line.append(h[key])
-        
+            if key in h:
+                line.append(h[key])
+                has_columns.append(key)
+            else:
+                continue
+                
         data.append(line)
     
-    tab = Table(rows=data, names=columns)
+    tab = Table(rows=data, names=has_columns)
     return tab
 
 def radec_to_targname(ra=0, dec=0, header=None):
@@ -526,6 +531,8 @@ def get_hst_filter(header):
                 continue
             else:
                 filter = filter_i
+    elif header['INSTRUME'] == 'WFPC2':
+        filter = header['FILTNAM1']
     else:
         filter = header['FILTER']
     
@@ -756,8 +763,8 @@ def get_line_wavelengths():
     line_ratios['Hg'] = [1.]
     line_wavelengths['Hd'] = [4102.892]
     line_ratios['Hd'] = [1.]
-    line_wavelengths['OIIIx'] = [4364.436]
-    line_ratios['OIIIx'] = [1.]
+    line_wavelengths['OIII-4363'] = [4364.436]
+    line_ratios['OIII-4363'] = [1.]
     line_wavelengths['OIII'] = [5008.240, 4960.295]
     line_ratios['OIII'] = [2.98, 1]
     line_wavelengths['OIII+Hb'] = [5008.240, 4960.295, 4862.68]
@@ -778,8 +785,8 @@ def get_line_wavelengths():
     line_wavelengths['OII+Ne'] = [3729.875, 3869]
     line_ratios['OII+Ne'] = [1, 1./5]
     
-    line_wavelengths['OI'] = [6302.046]
-    line_ratios['OI'] = [1]
+    line_wavelengths['OI-6302'] = [6302.046]
+    line_ratios['OI-6302'] = [1]
 
     line_wavelengths['NeIII'] = [3869]
     line_ratios['NeIII'] = [1.]
@@ -791,15 +798,29 @@ def get_line_wavelengths():
     line_ratios['SIII'] = [1, 2.44]
     line_wavelengths['HeII'] = [4687.5]
     line_ratios['HeII'] = [1.]
-    line_wavelengths['HeI'] = [5877.2]
-    line_ratios['HeI'] = [1.]
-    line_wavelengths['HeIb'] = [3889.5]
-    line_ratios['HeIb'] = [1.]
+    line_wavelengths['HeI-5877'] = [5877.2]
+    line_ratios['HeI-5877'] = [1.]
+    line_wavelengths['HeI-3889'] = [3889.5]
+    line_ratios['HeI-3889'] = [1.]
     
     line_wavelengths['MgII'] = [2799.117]
     line_ratios['MgII'] = [1.]
+    
     line_wavelengths['CIV'] = [1549.480]
     line_ratios['CIV'] = [1.]
+    line_wavelengths['CIII]'] = [1908.]
+    line_ratios['CIII]'] = [1.]
+    line_wavelengths['OIII]'] = [1663.]
+    line_ratios['OIII]'] = [1.]
+    line_wavelengths['HeII-1640'] = [1640.]
+    line_ratios['HeII-1640'] = [1.]
+    line_wavelengths['NIII]'] = [1750.]
+    line_ratios['NIII]'] = [1.]
+    line_wavelengths['NIV'] = [1487.]
+    line_ratios['NIV'] = [1.]
+    line_wavelengths['NV'] = [1240.]
+    line_ratios['NV'] = [1.]
+
     line_wavelengths['Lya'] = [1215.4]
     line_ratios['Lya'] = [1.]
 
