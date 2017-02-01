@@ -43,6 +43,8 @@ grism_limits = {'G800L':[0.545, 1.02, 50.], # ACS/WFC
            'F140M':[1.20,1.60, 45.0],
            'CLEARP':[0.76, 2.3,45.0]}
 
+default_line_list = ['SIII', 'SII', 'Ha', 'OI-6302', 'OIII', 'Hb', 'OIII-4363', 'Hg', 'Hd', 'NeIII', 'OII', 'MgII']
+
 def test():
     
     import glob
@@ -859,9 +861,7 @@ class MultiBeam():
         self.init_poly_coeffs(poly_order=1)
         
         self.ra, self.dec = self.beams[0].get_sky_coords()
-        
-        self.full_line_list = ['SIII', 'SII', 'Ha', 'OI-6302', 'OIII', 'Hb', 'OIII-4363', 'Hg', 'Hd', 'NeIII', 'OII', 'MgII']
-        
+                
     def write_beam_fits(self, verbose=True):
         """TBD
         """
@@ -949,8 +949,8 @@ class MultiBeam():
         #print 'xxx Load templates'
         for i, key in enumerate(templates.keys()):
             NTEMP += 1
-            temp = templates[key].zscale(z, 1.)
-            spectrum_1d = [temp.wave, temp.flux]
+            temp = templates[key]#.zscale(z, 1.)
+            spectrum_1d = [temp.wave*(1+z), temp.flux/(1+z)]
                 
             i0 = 0            
             for ib in range(self.N):
@@ -1254,7 +1254,7 @@ class MultiBeam():
             line_list = ['Ha+NII+SII+SIII+He', 'OIII+Hb', 'OII+Ne']
         else:
             if full_line_list is None:
-                line_list = self.full_line_list
+                line_list = default_line_list
             else:
                 line_list = full_line_list
                 
@@ -2375,6 +2375,20 @@ class MultiBeam():
                 hdu[0].header['CONF'] = (beams[0].beam.conf.conf_file,
                                          'Configuration file')
                 
+                ## Contam
+                data = [beam.contam for beam in beams]
+                
+                hdu_contam = drizzle_2d_spectrum(beams, data=data, 
+                                          wlimit=grism_limits[g], dlam=dlam, 
+                                          spatial_scale=scale, NY=size,
+                                          pixfrac=pixfrac,
+                                          kernel=kernel,
+                                          convert_to_flambda=flambda,
+                                          fcontam=0, ds9=None)
+                
+                hdu_contam[1].header['EXTNAME'] = 'CONTAM'
+                hdu.append(hdu_contam[1])
+                
                 # Line kernel
                 h = hdu[1].header
                 gau = S.GaussianSource(1.e-17, h['CRVAL1'], h['CD1_1']*1)
@@ -2705,7 +2719,7 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
         header = utils.to_header(output_wcs, relax=True)
         
     ### Initialize data
-    sh = (header['NAXIS1'], header['NAXIS2'])
+    sh = (header['NAXIS2'], header['NAXIS1'])
     
     outsci = np.zeros(sh, dtype=np.float32)
     outwht = np.zeros(sh, dtype=np.float32)
