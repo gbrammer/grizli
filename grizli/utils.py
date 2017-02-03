@@ -453,7 +453,9 @@ def parse_grism_associations(exposure_groups,
         
         fp_i = exposure_groups[i]['footprint']
         olap_i = 0.
+        d_i = f_i
         
+        #print('\nx\n')
         for j in range(N):
             f_j = exposure_groups[j]['product'].split('-')[-1]
             if f_j.startswith('g1'):
@@ -462,15 +464,23 @@ def parse_grism_associations(exposure_groups,
             fp_j = exposure_groups[j]['footprint']
             olap = fp_i.intersection(fp_j)
             root_j = exposure_groups[j]['product'].split('-'+f_j)[0]
-            if root_j == root_i:
+
+            #print(root_j, root_i, root_j == root_i)
+            if (root_j == root_i):
+                if (group['direct'] is not None):
+                    pass
+                    if (group['direct']['product'].startswith(root_i)) & (d_i.upper() == best_direct[f_i.upper()]):
+                        continue
+                    
                 group['direct'] = exposure_groups[j]
                 olap_i = olap.area
                 d_i = f_j
                 #print(0,group['grism']['product'], group['direct']['product'])
-                break
+            #     continue
                 
             #print(exposure_groups[i]['product'], exposure_groups[j]['product'], olap.area*3600.)
             
+            #print(exposure_groups[j]['product'], olap_i, olap.area)
             if olap.area > 0:
                 if group['direct'] is None:
                     group['direct'] = exposure_groups[j]
@@ -483,11 +493,11 @@ def parse_grism_associations(exposure_groups,
                         if olap.area < olap_i:
                             continue
                         
-                        if (olap.area == olap_i):
-                            if d_i != best_direct[f_i.upper()]:
-                                continue
+                        if d_i.upper() == best_direct[f_i.upper()]:
+                            continue
                                 
                     group['direct'] = exposure_groups[j]
+                    #print(exposure_groups[j]['product'])
                     olap_i = olap.area
                     d_i = f_j
                     #print(2,group['grism']['product'], group['direct']['product'])
