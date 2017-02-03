@@ -15,6 +15,8 @@ import astropy.io.fits as pyfits
 from . import grismconf
 from . import utils
 from . import model
+from . import stack
+
 from .utils_c import disperse
 from .utils_c import interp
 
@@ -622,6 +624,59 @@ class GroupFLT():
         return True
         #m2d = mb.reshape_flat(modelf)
     
+    def make_stack(self, id, target='grism', skip=True, fcontam=1., save=True):
+        """Make drizzled 2D stack for a given object
+        
+        Parameters
+        ----------
+        id : int
+            Object ID number.
+        
+        target : str
+            Rootname for output files.
+            
+        skip : bool
+            If True and the stack PNG file already exists, don't proceed.
+            
+        fcontam : float
+            Contamination weighting parameter.
+        
+        save : bool
+            Save the figure and FITS HDU to files with names like
+            
+                >>> img_file = '{0}_{1:05d}.stack.png'.format(target, id)
+                >>> fits_file = '{0}_{1:05d}.stack.fits'.format(target, id)
+             
+        Returns
+        -------
+        hdu : `~astropy.io.fits.HDUList`
+            FITS HDU of the stacked spectra.
+        
+        fig : `~matplotlib.figure.Figure`
+            Stack figure object.  
+                                
+        """
+        print(target, id)
+        if os.path.exists('{0}_{1:05d}.stack.png'.format(target, id)) & skip:
+            return True
+        
+        beams = self.get_beams(id, size=size, beam_id='A')
+        if len(beams) == 0:
+            print('id = {0}: No beam cutouts available.'.format(id))
+            return None
+            
+        mb = MultiBeam(beams, fcontam=fcontam, group_name=target)
+
+        hdu, fig = mb.drizzle_grisms_and_PAs(fcontam=fcontam, flambda=False,
+                                             kernel='point')
+                                             
+        if save:
+            fig.savefig('{0}_{1:05d}.stack.png'.format(target, id))
+            hdu.writeto('{0}_{1:05d}.stack.fits'.format(target, id),
+                        clobber=True)
+        
+        return hdu, fig
+         
     def drizzle_full_wavelength(self, wave=1.4e4, ref_header=None,
                      kernel='point', pixfrac=1., verbose=True, 
                      offset=[0,0], fcontam=0.):
@@ -2296,7 +2351,7 @@ class MultiBeam():
 
         print(shifts, chi2/self.DoF)
         return chi2/self.DoF    
-            
+    
     def drizzle_grisms_and_PAs(self, size=10, fcontam=0, flambda=True, scale=1, pixfrac=0.5, kernel='square', make_figure=True):
         """Make figure showing spectra at different orients/grisms
         
