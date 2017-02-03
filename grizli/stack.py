@@ -30,7 +30,7 @@ def make_templates(grism='G141', return_lists=False):
         
     """
     
-    from grizli.multifit import Multibeam
+    from grizli.multifit import MultiBeam
     
     if grism == 'G141':    # WFC3/IR
         fwhm = 1100
@@ -61,7 +61,7 @@ def make_templates(grism='G141', return_lists=False):
         print('Wrote `templates_{0}.npy`'.format(fwhm))
 
 class StackFitter(object):
-    def __init__(self, file='gnt_18197.stack.fits', sys_err=0.02, mask_min=0.1, fit_stacks=True, fcontam=1):
+    def __init__(self, file='gnt_18197.stack.fits', sys_err=0.02, mask_min=0.1, fit_stacks=True, fcontam=1, pas=None, extensions=None):
         """Object for fitting stacked spectra.
         
         Parameters
@@ -98,12 +98,26 @@ class StackFitter(object):
         for i in range(self.Ngrism):
             g = self.h0['GRISM{0:03d}'.format(i+1)]
             if fit_stacks:
+                if extensions is not None:
+                    if g not in extensions:
+                        continue
+                        
                 self.ext.append(g)
             else:
                 ng = self.h0['N{0}'.format(g)]
                 for j in range(ng):
                     pa = self.h0['{0}{1:02d}'.format(g, j+1)]
-                    self.ext.append('{0},{1}'.format(g,pa))
+                    
+                    if pas is not None:
+                        if pa not in pas:
+                            continue
+                    
+                    ext = '{0},{1}'.format(g,pa)
+                    if extensions is not None:
+                        if ext not in extensions:
+                            continue
+                            
+                    self.ext.append(ext)
                 
         self.Next = len(self.ext)
         self.E = []
@@ -221,7 +235,8 @@ class StackFitter(object):
             s = [ti.wave*(1+z), ti.flux/(1+z)]
             
             for j, E in enumerate(self.E):
-                if (s[0][0] > E.wave.max()) | (s[0][-1] < E.wave.min()):
+                clip = E.ivar.sum(axis=0) > 0                    
+                if (s[0][0] > E.wave[clip].max()) | (s[0][-1] < E.wave[clip].min()):
                     continue
 
                 sl = self.slices[j]
@@ -266,7 +281,7 @@ class StackFitter(object):
         
         return chi2, background, full, full_coeffs, full_coeffs_err
     
-    def fit_zgrid(self, dz0=0.005, zr=[0.4, 3.4], fitter='nnls', make_plot=True, save_data=True, prior=None, templates_file='templates.npy', verbose=True):
+    def fit_zgrid(self, dz0=0.005, zr=[0.4, 3.4], fitter='nnls', make_plot=True, save_data=True, prior=None, templates_file='templates.npy', verbose=True, outlier_threshold=1e30):
         """Fit templates on a redshift grid.
         
         Parameters
@@ -361,6 +376,14 @@ class StackFitter(object):
         # Get the fit with the individual line templates at the best redshift
         chi2x, bgz, fullz, coeffs, err = self.fit_at_z(z=z[np.argmin(chi2)], templates=t_i, fitter=fitter, get_uncertainties=True)
         
+        # Mask outliers
+        if outlier_threshold > 0:
+            resid = self.scif - fullz - bgz
+            outlier_mask = resid*self.sivarf < outlier_threshold
+            print('Mask {0} pixels with resid > {1} sigma'.format((~outlier_mask & self.fit_mask).sum(), outlier_threshold))
+            self.fit_mask &= outlier_mask
+            self.DoF = self.fit_mask.sum() #(self.ivar > 0).sum()
+            
         # Table with z, chi-squared
         t = grizli.utils.GTable()
         t['z'] = z
@@ -391,17 +414,19 @@ class StackFitter(object):
         t.meta['HASPRIOR'] = (prior is not None, 'Was prior specified?')
         
         # Best-fit templates
-        for i, te in enumerate(t_i):
-            if i == 0:
-                tc = t_i[te].zscale(0, scalar=coeffs[i])
-                tl = t_i[te].zscale(0, scalar=coeffs[i])
-            else:
-                if te.startswith('line'):
-                    tc += t_i[te].zscale(0, scalar=0.)
-                else:
-                    tc += t_i[te].zscale(0, scalar=coeffs[i])
-                   
-                tl += t_i[te].zscale(0, scalar=coeffs[i])
+        tc, tl = self.generate_1D_templates(coeffs,
+                                            templates_file=templates_file)
+        # for i, te in enumerate(t_i):
+        #     if i == 0:
+        #         tc = t_i[te].zscale(0, scalar=coeffs[i])
+        #         tl = t_i[te].zscale(0, scalar=coeffs[i])
+        #     else:
+        #         if te.startswith('line'):
+        #             tc += t_i[te].zscale(0, scalar=0.)
+        #         else:
+        #             tc += t_i[te].zscale(0, scalar=coeffs[i])
+        #            
+        #         tl += t_i[te].zscale(0, scalar=coeffs[i])
             
         # Get line fluxes, uncertainties and EWs
         il = 0
@@ -456,6 +481,9 @@ class StackFitter(object):
             model_i = fullz[self.slices[i]].reshape(E.sh)
             bg_i = bgz[self.slices[i]].reshape(E.sh)
             
+            model_i[~np.isfinite(model_i)] = 0
+            bg_i[~np.isfinite(bg_i)] = 0
+            
             hdu.append(pyfits.ImageHDU(data=model_i, header=E.header,
                                        name='MODEL'))
         
@@ -468,7 +496,29 @@ class StackFitter(object):
             self.make_fit_plot(hdu)
 
         return hdu
-            
+    
+    @classmethod
+    def generate_1D_templates(self, coeffs, templates_file='templates.npy'):
+        """
+        TBD
+        """
+        t_complex, t_i = np.load(templates_file)
+        
+        # Best-fit templates
+        for i, te in enumerate(t_i):
+            if i == 0:
+                tc = t_i[te].zscale(0, scalar=coeffs[i])
+                tl = t_i[te].zscale(0, scalar=coeffs[i])
+            else:
+                if te.startswith('line'):
+                    tc += t_i[te].zscale(0, scalar=0.)
+                else:
+                    tc += t_i[te].zscale(0, scalar=coeffs[i])
+                   
+                tl += t_i[te].zscale(0, scalar=coeffs[i])
+        
+        return tc, tl
+                        
     def make_fit_plot(self, hdu):
         """Make a plot showing the fit
         
@@ -507,8 +557,8 @@ class StackFitter(object):
         axz.text(0.5, 1.02, self.file + '\n'+'z={0:.4f}'.format(z[np.argmin(chi2)]), ha='center', va='bottom', transform=axz.transAxes)
         
         axz.plot(z, chi2-chi2.min(), color='k')
-        axz.fill_between(z, chi2-chi2.min(), 25, color='k', alpha=0.5)
-        axz.set_ylim(0,25)
+        axz.fill_between(z, chi2-chi2.min(), 27, color='k', alpha=0.5)
+        axz.set_ylim(0,27)
         axz.set_xlabel(r'$z$')
         axz.set_ylabel(r'$\chi^2$ - {0:.0f} ($\nu$={1:d})'.format(chi2.min(), self.DoF))
         axz.set_yticks([1,4,9,16,25])
@@ -536,6 +586,8 @@ class StackFitter(object):
             ax_i.imshow(clean, vmin=-0.02*ymax, vmax=1.1*ymax, origin='lower',
                         extent=[w[0], w[-1], 0., 1.], aspect='auto',
                         cmap=cmap)
+            
+            ax_i.text(0.04, 0.92, self.ext[i], ha='left', va='top', transform=ax_i.transAxes, fontsize=8)
                         
             ax_i.set_xticklabels([]); ax_i.set_yticklabels([])
             twod_axes.append(ax_i)
@@ -571,6 +623,10 @@ class StackFitter(object):
                 unit_corr = 1./E.sens
                 clip = (E.sens > 0.1*E.sens.max()) 
                 clip &= (np.isfinite(flm)) & (er > 0)
+                
+            
+            if clip.sum() == 0:
+                continue
                 
             fl *= 100*unit_corr
             er *= 100*unit_corr
