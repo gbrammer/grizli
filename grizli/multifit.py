@@ -624,7 +624,7 @@ class GroupFLT():
         return True
         #m2d = mb.reshape_flat(modelf)
     
-    def make_stack(self, id, target='grism', skip=True, fcontam=1., save=True):
+    def make_stack(self, id, size=20, target='grism', skip=True, fcontam=1., save=True):
         """Make drizzled 2D stack for a given object
         
         Parameters
@@ -668,7 +668,7 @@ class GroupFLT():
         mb = MultiBeam(beams, fcontam=fcontam, group_name=target)
 
         hdu, fig = mb.drizzle_grisms_and_PAs(fcontam=fcontam, flambda=False,
-                                             kernel='point')
+                                             kernel='point', size=size)
                                              
         if save:
             fig.savefig('{0}_{1:05d}.stack.png'.format(target, id))
@@ -1006,13 +1006,23 @@ class MultiBeam():
             NTEMP += 1
             temp = templates[key]#.zscale(z, 1.)
             spectrum_1d = [temp.wave*(1+z), temp.flux/(1+z)]
-                
+            
+            if z > 4:
+                try:
+                    import eazy.igm
+                    igm = eazy.igm.Inoue14()
+                    igmz = igm.full_IGM(z, spectrum_1d[0])
+                    spectrum_1d[1]*=igmz                
+                except:
+                    # No IGM
+                    pass
+                  
             i0 = 0            
             for ib in range(self.N):
                 beam = self.beams[ib]
                 lam_beam = beam.beam.lam_beam
-                if ((temp.wave.min() > lam_beam.max()) | 
-                    (temp.wave.max() < lam_beam.min())):
+                if ((temp.wave.min()*(1+z) > lam_beam.max()) | 
+                    (temp.wave.max()*(1+z) < lam_beam.min())):
                     tmodel = 0.
                 else:
                     tmodel = beam.compute_model(spectrum_1d=spectrum_1d, 
