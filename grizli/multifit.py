@@ -1974,7 +1974,7 @@ class MultiBeam():
         
         return fig, hdu_sci
     
-    def drizzle_fit_lines(self, fit, pline, force_line=['Ha', 'OIII', 'Hb', 'OII'], save_fits=True, mask_lines=True, mask_sn_limit=3, wcs=None):
+    def drizzle_fit_lines(self, fit, pline, force_line=['Ha', 'OIII', 'Hb', 'OII'], save_fits=True, mask_lines=True, mask_sn_limit=3):
         """
         TBD
         """
@@ -2036,7 +2036,7 @@ class MultiBeam():
                                     
                                 beam.ivar[lcontam > mask_sn_limit*lmodel] *= 0
 
-                hdu = drizzle_to_wavelength(self.beams, wcs=wcs, ra=self.ra, 
+                hdu = drizzle_to_wavelength(self.beams, ra=self.ra, 
                                             dec=self.dec, wave=line_wave_obs,
                                             fcontam=self.fcontam,
                                             **pline)
@@ -2552,7 +2552,7 @@ def get_redshift_fit_defaults():
     
     pspec2_def = dict(dlam=0, spatial_scale=1, NY=20, figsize=[8,3.5])
     pline_def = dict(size=20, pixscale=0.1, pixfrac=0.2, kernel='square', 
-                     fcontam=0.05)
+                     fcontam=0.05, wcs=None)
 
     return pzfit_def, pspec2_def, pline_def
                 
