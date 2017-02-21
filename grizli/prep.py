@@ -276,7 +276,8 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
     orig_file.writeto(local_file, clobber=True)
     
 def apply_persistence_mask(flt_file, path='../Persistence', dq_value=1024,
-                           err_threshold=0.6, grow_mask=3, verbose=True):
+                           err_threshold=0.6, grow_mask=3, subtract=True,
+                           verbose=True):
     """Make a mask for pixels flagged as being affected by persistence
     
     Persistence products can be downloaded from https://archive.stsci.edu/prepds/persist/search.php, specifically the 
@@ -300,6 +301,9 @@ def apply_persistence_mask(flt_file, path='../Persistence', dq_value=1024,
         
     grow_mask : int
         Factor by which to dilate the persistence mask.
+    
+    subtract : bool
+        Subtract the persistence model itself from the SCI extension.
         
     verbose : bool
         Print information to the terminal
@@ -337,6 +341,18 @@ def apply_persistence_mask(flt_file, path='../Persistence', dq_value=1024,
     
     if NPERS > 0:
         flt['DQ'].data[pers_mask > 0] |= dq_value
+        if subtract:
+            dont_subtract=False
+            if 'SUBPERS' in flt[0].header:
+                if flt[0].header['SUBPERS']:
+                    dont_subtract = True
+                    
+            if not dont_subtract:
+                flt['SCI'].data -= pers['SCI'].data
+            
+            flt['ERR'].data = np.sqrt(flt['ERR'].data**2+pers['SCI'].data**2)
+            flt[0].header['SUBPERS'] = (True, 'Persistence model subtracted')
+            
         flt.flush()
 
 def apply_saturated_mask(flt_file, dq_value=1024):
