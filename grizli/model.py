@@ -765,7 +765,8 @@ class ImageData(object):
     def __init__(self, sci=None, err=None, dq=None,
                  header=None, wcs=None, photflam=1., photplam=1.,
                  origin=[0,0], pad=0,
-                 instrument='WFC3', filter='G141', hdulist=None, sci_extn=1):
+                 instrument='WFC3', filter='G141', pupil=None, hdulist=None,
+                 sci_extn=1):
         """
         Parameters
         ----------
@@ -859,6 +860,10 @@ class ImageData(object):
             
             instrument = h['INSTRUME']
             filter = utils.get_hst_filter(h)
+            
+            if 'PUPIL' in h:
+                pupil = h['PUPIL']
+                
             if 'PHOTFLAM' in h:
                 photflam = h['PHOTFLAM']
             else:
@@ -912,6 +917,8 @@ class ImageData(object):
         
         ### Header-like parameters
         self.filter = filter
+        self.pupil = pupil
+            
         self.instrument = instrument
         self.header = header
         
@@ -1316,7 +1323,7 @@ class ImageData(object):
                               header=slice_header, wcs=slice_wcs,
                               photflam=self.photflam, photplam=self.photplam,
                               origin=slice_origin, instrument=self.instrument,
-                              filter=self.filter)
+                              filter=self.filter, pupil=self.pupil)
         
         slice_obj.ref_photflam = self.ref_photflam
         slice_obj.ref_photplam = self.ref_photplam
@@ -1556,7 +1563,7 @@ class GrismFLT(object):
         if (self.direct is None) & (self.grism is not None):
             self.direct = ImageData(hdulist=grism_im, sci_extn=sci_extn)
             self.direct_file = self.grism_file
-            
+        
         ### Add padding
         if self.direct is not None:
             if pad > 0:
@@ -1585,9 +1592,11 @@ class GrismFLT(object):
         ### Grism configuration
         if 'DFILTER' in self.grism.header:
             direct_filter = self.grism.header['DFILTER']
+        elif self.grism.pupil is not None:
+            direct_filter = self.grism.pupil
         else:
             direct_filter = self.direct.filter
-            
+        
         self.conf_file = grismconf.get_config_filename(self.grism.instrument,
                                                        direct_filter,
                                                        self.grism.filter,
@@ -1610,8 +1619,10 @@ class GrismFLT(object):
         self.get_dispersion_PA()
         
         self.catalog = None
-                            
-        
+        self.catalog_file = None
+                           
+        self.is_rotated = False
+            
     def process_ref_file(self, ref_file, ref_ext=0, shrink_segimage=True,
                          verbose=True):
         """Read and blot a reference image
@@ -2269,6 +2280,8 @@ class GrismFLT(object):
                              clobber=True, verbose=verbose)
         
         self.catalog = cat
+        self.catalog_file = '<photutils>'
+        
         self.seg = seg
         
         return True
@@ -2301,7 +2314,8 @@ class GrismFLT(object):
             return False
         
         self.catalog = Table.read(seg_cat, format=catalog_format)
-    
+        self.catalog_file = seg_cat
+        
     def save_model(self, clobber=True, verbose=True):
         """Save model properties to FITS file
         """
@@ -2311,7 +2325,7 @@ class GrismFLT(object):
             # Python 3
             import pickle
             
-        root = self.grism_file.split('_flt.fits')[0]
+        root = self.grism_file.split('_flt.fits')[0].split('_rate.fits')[0]
         
         h = pyfits.Header()
         h['GFILE'] = (self.grism_file, 'Grism exposure name')
@@ -2366,6 +2380,7 @@ class GrismFLT(object):
             import pickle
             
         root = self.grism_file.split('_flt.fits')[0].split('_cmb.fits')[0]
+        root = root.split('_rate.fits')[0]
 
         hdu = pyfits.HDUList([pyfits.PrimaryHDU()])
         for key in self.direct.data.keys():
@@ -2432,7 +2447,69 @@ class GrismFLT(object):
                 pass
                 
         return True
+    
+    def transform_NIRISS(self, verbose=True):
+        """
+        Rotate data & wcs so that spectra are increasing to +x
+        """
         
+        if self.grism.filter == 'GR150C':
+            rot = 2
+        else:
+            rot = -1
+            
+        if self.is_rotated:
+            rot *= -1
+                
+        self.is_rotated = not self.is_rotated
+        if verbose:
+            print('Transform NIRISS: flip={0}'.format(self.is_rotated))
+        
+        ### Compute new CRPIX coordinates
+        center = np.array(self.grism.sh)/2.+0.5
+        crpix = self.grism.wcs.wcs.crpix
+        
+        rad = np.deg2rad(-90*rot)
+        mat = np.zeros((2,2))
+        mat[0,:] = np.array([np.cos(rad),-np.sin(rad)])
+        mat[1,:] = np.array([np.sin(rad),np.cos(rad)])
+        
+        crpix_new = np.dot(mat, crpix-center)+center
+        
+        for obj in [self.grism, self.direct]:
+
+            obj.header['CRPIX1'] = crpix_new[0]
+            obj.header['CRPIX2'] = crpix_new[1]
+
+            # Get rotated CD
+            out_wcs = utils.transform_wcs(obj.wcs, translation=[0.,0.], rotation=rad, scale=1.)
+            new_cd = out_wcs.wcs.cd
+            
+            for i in range(2):
+                for j in range(2):
+                    obj.header['CD{0}_{1}'.format(i+1, j+1)] = new_cd[i,j]
+            
+            # Update wcs
+            obj.get_wcs()
+            if obj.wcs.wcs.has_pc():
+                obj.get_wcs()
+                
+            # Rotate data
+            for k in obj.data.keys():
+                if obj.data[k] is not None:
+                    obj.data[k] = np.rot90(obj.data[k], rot)
+        
+        # Rotate segmentation image
+        self.seg = np.rot90(self.seg, rot)
+        self.model = np.rot90(self.model, rot)
+
+        #print('xx Rotate images {0}'.format(rot))
+        
+        if self.catalog is not None:
+            #print('xx Rotate catalog {0}'.format(rot))
+            self.catalog = self.blot_catalog(self.catalog, 
+                          sextractor=('X_WORLD' in self.catalog.colnames))
+            
 class BeamCutout(object):
     def __init__(self, flt=None, beam=None, conf=None, 
                  get_slice_header=True, fits_file=None, scale=1., 
@@ -2619,11 +2696,18 @@ class BeamCutout(object):
         
         h0 = hdu[0].header
         
+        # if 'DFILTER' in self.grism.header:
+        #     direct_filter = self.grism.header['DFILTER']
+        # else:
+        #     direct_filter = self.direct.filter
+        # #
         if 'DFILTER' in self.grism.header:
             direct_filter = self.grism.header['DFILTER']
+        elif self.grism.pupil is not None:
+            direct_filter = self.grism.pupil
         else:
             direct_filter = self.direct.filter
-        
+            
         if conf is None:
             conf_file = grismconf.get_config_filename(self.direct.instrument,
                                                       direct_filter,
