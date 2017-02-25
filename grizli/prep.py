@@ -729,11 +729,17 @@ def make_drz_catalog(root='', threshold=2., get_background=True,
         
     print('Image AB zeropoint: {0:.3f}'.format(ZP))
     
+    weight_file = drz_file.replace('_sci.fits', '_wht.fits').replace('_drz.fits', '_wht.fits')
+    if (weight_file == drz_file) | (not os.path.exists(weight_file)):
+        WEIGHT_TYPE = "NONE"
+    else:
+        WEIGHT_TYPE = "MAP_WEIGHT"
+        
     config = OrderedDict(DETECT_THRESH=threshold, ANALYSIS_THRESH=threshold,
               DETECT_MINAREA=6,
               PHOT_FLUXFRAC="0.5", 
-              WEIGHT_TYPE="MAP_WEIGHT",
-              WEIGHT_IMAGE=drz_file.replace('_sci.fits', '_wht.fits').replace('_drz.fits', '_wht.fits'),
+              WEIGHT_TYPE= WEIGHT_TYPE,
+              WEIGHT_IMAGE= weight_file,
               CHECKIMAGE_TYPE="SEGMENTATION",
               CHECKIMAGE_NAME='{0}_seg.fits'.format(root),
               MAG_ZEROPOINT=ZP, 
@@ -768,6 +774,80 @@ def make_drz_catalog(root='', threshold=2., get_background=True,
     
     return cat
     
+def add_external_sources(root='', maglim=20, fwhm=0.2, catalog='2mass'):
+    """Add Gaussian sources in empty parts of an image derived from an external catalog
+    
+    Parameters
+    ----------
+    root : type
+    
+    hlim : type
+    
+    
+    Returns
+    -------
+    savesimages : type
+
+    """
+    from astropy.modeling import models
+    
+    sci_file = glob.glob('{0}_dr[zc]_sci.fits'.format(root))[0]
+    wht_file = glob.glob('{0}_dr[zc]_wht.fits'.format(root))[0]
+    
+    sci = pyfits.open(sci_file)
+    wht = pyfits.open(wht_file)
+    
+    sh = sci[0].data.shape
+    yp, xp = np.indices(sh)
+    
+    PHOTPLAM = sci[0].header['PHOTPLAM']
+    PHOTFLAM = sci[0].header['PHOTFLAM']
+    
+    ZP =  -2.5*np.log10(PHOTFLAM) - 21.10 - 5*np.log10(PHOTPLAM) + 18.6921
+    
+    wcs = pywcs.WCS(sci[0])
+    pscale = utils.get_wcs_pscale(wcs)
+    
+    rd = wcs.all_pix2world(np.array([[sh[1]/2], [sh[0]/2]]).T, 0)[0]
+    
+    radius = np.sqrt(2)*np.maximum(sh[0], sh[1])/2.*pscale/60.
+    
+    if catalog == '2mass':
+        cat = get_irsa_catalog(rd[0], rd[1], radius=radius, twomass=True)
+        cat['mag'] = cat['h_m']+1.362 # AB
+        cat = cat[cat['mag'] < maglim]
+        table_to_regions(cat, '{0}.2mass.reg'.format(root))
+    elif catalog == 'panstarrs':
+        cat = grizli.prep.get_panstarrs_catalog(rd[0], rd[1], radius=radius)
+        cat['mag'] = cat['rMeanKronMag']+0.14 # AB
+        cat = cat[cat['mag'] < maglim]
+        table_to_regions(cat, '{0}.panstarrs.reg'.format(root))
+    else:
+        print('Not a valid catalog: ', catalog)
+        return False
+    
+    xy = wcs.all_world2pix(cat['ra'], cat['dec'], 0)
+    flux = sci[0].data*0.
+    N = len(cat)
+    for i in range(N):
+        print('Add object {0:3d}/{1:3d}, x={2:6.1f}, y={3:6.1f}, mag={4:6.2f}'.format(i, N, xy[0][i], xy[1][i], cat['mag'][i]))
+        
+        scale = 10**(-0.4*(cat['mag'][i]-ZP))
+        
+        src = models.Gaussian2D(amplitude=scale, x_mean=xy[0][i], y_mean=xy[1][i], x_stddev=fwhm/pscale/2.35, y_stddev=fwhm/pscale/2.35, theta=0.0)
+        flux += src(xp, yp)  
+    
+    clip = (wht[0].data == 0) & (flux > 1.e-6*flux.max())
+    wht_val = np.percentile(wht[0].data, 95)
+    wht[0].data[clip] = wht_val
+    sci[0].data[clip] = flux[clip]
+    
+    sci.writeto(sci_file.replace('_drz', '_{0}_drz'.format(catalog)), 
+                clobber=True)
+    
+    wht.writeto(wht_file.replace('_drz', '_{0}_drz'.format(catalog)), 
+                clobber=True)  
+                                          
 def asn_to_dict(input_asn):
     """Convert an ASN file to a dictionary
     
@@ -829,7 +909,7 @@ def get_sdss_catalog(ra=165.86, dec=34.829694, radius=3):
                               
     return table
 
-def get_wise_catalog(ra=165.86, dec=34.829694, radius=3):
+def get_irsa_catalog(ra=165.86, dec=34.829694, radius=3, catalog='allwise_p3as_psd', wise=False, twomass=False):
     """Query for objects in the `AllWISE <http://wise2.ipac.caltech.edu/docs/release/allwise/>`_ source catalog 
     
     Parameters
@@ -848,12 +928,16 @@ def get_wise_catalog(ra=165.86, dec=34.829694, radius=3):
     """
     from astroquery.irsa import Irsa
     
-    all_wise = 'wise_allwise_p3as_psd'
-    all_wise = 'allwise_p3as_psd'
-    
+    #all_wise = 'wise_allwise_p3as_psd'
+    #all_wise = 'allwise_p3as_psd'
+    if wise:
+        catalog = 'allwise_p3as_psd'
+    elif twomass:
+        catalog = 'fp_psc'
+        
     coo = coord.SkyCoord(ra*u.deg, dec*u.deg)
     
-    table = Irsa.query_region(coo, catalog=all_wise, spatial="Cone",
+    table = Irsa.query_region(coo, catalog=catalog, spatial="Cone",
                               radius=radius*u.arcmin, get_query_payload=False)
     
     return table
@@ -1054,7 +1138,7 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, ref
     query_functions = {'SDSS':get_sdss_catalog, 
                        'GAIA':get_gaia_catalog,
                        'PS1':get_panstarrs_catalog,
-                       'WISE':get_wise_catalog}
+                       'WISE':get_irsa_catalog}
       
     # if len(sdss) > 5:
     #     table_to_regions(sdss, output='{0}_sdss.reg'.format(product))
