@@ -33,6 +33,8 @@ grism_colors = {'G800L':(0.0, 0.4470588235294118, 0.6980392156862745),
       'F140M':'orange',
       'CLEARP':'b'}
 
+grism_major = {'G102':0.1, 'G141':0.1, 'G800L':0.2, 'F090W':0.1, 'F115W':0.1, 'F150W':0.1, 'F200W':0.1}
+
 grism_limits = {'G800L':[0.545, 1.02, 50.], # ACS/WFC
           'G280':[0.2,0.4, 14], # WFC3/UVIS
            'G102':[0.77, 1.18, 23.5], # WFC3/IR
@@ -180,6 +182,7 @@ def _loadFLT(grism_file, sci_extn, direct_file, pad, ref_file,
     save_file = grism_file.replace('_flt.fits', '_GrismFLT.fits')
     save_file = save_file.replace('_flc.fits', '_GrismFLT.fits')
     save_file = save_file.replace('_cmb.fits', '_GrismFLT.fits')
+    save_file = save_file.replace('_rate.fits', '_GrismFLT.fits')
     if grism_file.find('_') < 0:
         save_file = 'xxxxxxxxxxxxxxxxxxx'
         
@@ -202,9 +205,14 @@ def _loadFLT(grism_file, sci_extn, direct_file, pad, ref_file,
     if catalog is not None:
         flt.catalog = flt.blot_catalog(catalog, 
                                    sextractor=('X_WORLD' in catalog.colnames))
+        flt.catalog_file = catalog
+                   
     else:
         flt.catalog = None 
-    
+
+    if flt.grism.instrument == 'NIRISS':
+        flt.transform_NIRISS()
+        
     return flt #, out_cat
     
 def _fit_at_z(self, zgrid, i, templates, fitter, fit_background, poly_order):
@@ -399,8 +407,15 @@ class GroupFLT():
             for res in results:
                 flt_i = res.get(timeout=1)
                 #flt_i.catalog = cat_i
+                
+                # somehow WCS getting flipped from cd to pc in res.get()???
+                if flt_i.direct.wcs.wcs.has_pc():
+                    for obj in [flt_i.grism, flt_i.direct]:
+                        obj.get_wcs()
+                
                 self.FLTs.append(flt_i)
-        
+                
+                
             t1_pool = time.time()
         
         if verbose:
@@ -422,6 +437,7 @@ class GroupFLT():
             >>> save_file = file.replace('_flt.fits', '_GrismFLT.fits')
             >>> save_file = save_file.replace('_flc.fits', '_GrismFLT.fits')
             >>> save_file = save_file.replace('_cmb.fits', '_GrismFLT.fits')
+            >>> save_file = save_file.replace('_rate.fits', '_GrismFLT.fits')
         
         It will also save data to a `~pickle` file:
             
@@ -438,6 +454,7 @@ class GroupFLT():
             save_file = file.replace('_flt.fits', '_GrismFLT.fits')
             save_file = save_file.replace('_flc.fits', '_GrismFLT.fits')
             save_file = save_file.replace('_cmb.fits', '_GrismFLT.fits')
+            save_file = save_file.replace('_rate.fits', '_GrismFLT.fits')
             print('Save {0}'.format(save_file))
             self.FLTs[i].save_full_pickle()
             
@@ -850,7 +867,11 @@ class MultiBeam():
 
         self.Ngrism = {}
         for i in range(self.N):
-            grism = self.beams[i].grism.filter
+            if self.beams[i].grism.instrument == 'NIRISS':
+                grism = self.beams[i].grism.pupil
+            else:
+                grism = self.beams[i].grism.filter
+                
             if grism in self.Ngrism:
                 self.Ngrism[grism] += 1
             else:
@@ -861,7 +882,11 @@ class MultiBeam():
             self.PA[g] = {}
             
         for i in range(self.N):
-            grism = self.beams[i].grism.filter
+            if self.beams[i].grism.instrument == 'NIRISS':
+                grism = self.beams[i].grism.pupil
+            else:
+                grism = self.beams[i].grism.filter
+
             PA = self.beams[i].get_dispersion_PA(decimals=0)
             if PA in self.PA[grism]:
                 self.PA[grism][PA].append(i)
@@ -1828,7 +1853,11 @@ class MultiBeam():
             ax.errorbar(wave[okerr]/1.e4, flux[okerr], err[okerr], alpha=0.15+0.2*(self.N <= 2), linestyle='None', marker='.', color='{0:.2f}'.format(ib*0.5/self.N), zorder=1)
             ax.plot(wave[okerr]/1.e4, mflux[okerr], color='r', alpha=0.5, zorder=3)
             
-            grism = beam.grism.filter
+            if beam.grism.instrument == 'NIRISS':
+                grism = beam.grism.pupil
+            else:
+                grism = beam.grism.filter
+                
             #for grism in grisms:
             wfull[grism] = np.append(wfull[grism], wave[okerr])
             ffull[grism] = np.append(ffull[grism], flux[okerr])
@@ -1974,7 +2003,7 @@ class MultiBeam():
         
         return fig, hdu_sci
     
-    def drizzle_fit_lines(self, fit, pline, force_line=['Ha', 'OIII', 'Hb', 'OII'], save_fits=True, mask_lines=True, mask_sn_limit=3, wcs=None):
+    def drizzle_fit_lines(self, fit, pline, force_line=['Ha', 'OIII', 'Hb', 'OII'], save_fits=True, mask_lines=True, mask_sn_limit=3):
         """
         TBD
         """
@@ -2036,7 +2065,7 @@ class MultiBeam():
                                     
                                 beam.ivar[lcontam > mask_sn_limit*lmodel] *= 0
 
-                hdu = drizzle_to_wavelength(self.beams, wcs=wcs, ra=self.ra, 
+                hdu = drizzle_to_wavelength(self.beams, ra=self.ra, 
                                             dec=self.dec, wave=line_wave_obs,
                                             fcontam=self.fcontam,
                                             **pline)
@@ -2376,9 +2405,7 @@ class MultiBeam():
             NY = np.maximum(NY, len(self.PA[g]))
         
         NY += 1
-        
-        grism_major = {'G102':0.1, 'G141':0.1, 'G800L':0.2}
-        
+                
         keys = list(self.PA)
         keys.sort()
         
@@ -2552,7 +2579,7 @@ def get_redshift_fit_defaults():
     
     pspec2_def = dict(dlam=0, spatial_scale=1, NY=20, figsize=[8,3.5])
     pline_def = dict(size=20, pixscale=0.1, pixfrac=0.2, kernel='square', 
-                     fcontam=0.05)
+                     wcs=None)
 
     return pzfit_def, pspec2_def, pline_def
                 
@@ -2966,9 +2993,7 @@ def show_drizzle_HDU(hdu):
         grisms[g] = h0['N'+g]
         
     NY += 1
-    
-    grism_major = {'G102':0.1, 'G141':0.1, 'G800L':0.2}
-    
+        
     fig = plt.figure(figsize=(5*NX, 1*NY))
     
     widths = []
