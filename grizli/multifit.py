@@ -1037,7 +1037,8 @@ class MultiBeam():
                     import eazy.igm
                     igm = eazy.igm.Inoue14()
                     igmz = igm.full_IGM(z, spectrum_1d[0])
-                    spectrum_1d[1]*=igmz                
+                    spectrum_1d[1]*=igmz    
+                    #print('IGM')            
                 except:
                     # No IGM
                     pass
@@ -1234,7 +1235,8 @@ class MultiBeam():
     
     @classmethod
     def load_templates(self, fwhm=400, line_complexes=True, stars=False,
-                       full_line_list=None):
+                       full_line_list=None, continuum_list=None,
+                       fsps_templates=False):
         """Generate a list of templates for fitting to the grism spectra
         
         Parameters
@@ -1327,6 +1329,17 @@ class MultiBeam():
         #templates.append('templates/YoungSB/erb2010_continuum.dat')
         templates.append('templates/erb2010_continuum.dat')
         
+        ### Test new templates
+        # templates = ['templates/erb2010_continuum.dat',
+        # 'templates/fsps/tweak_fsps_temp_kc13_12_006.dat',
+        # 'templates/fsps/tweak_fsps_temp_kc13_12_008.dat']
+        
+        if fsps_templates:
+            templates = ['templates/fsps/tweak_fsps_temp_kc13_12_0{0:02d}.dat'.format(i+1) for i in range(12)]
+        
+        if continuum_list is not None:
+            templates = continuum_list
+            
         temp_list = OrderedDict()
         for temp in templates:
             data = np.loadtxt(os.getenv('GRIZLI') + '/' + temp, unpack=True)

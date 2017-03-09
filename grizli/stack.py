@@ -61,7 +61,7 @@ def make_templates(grism='G141', return_lists=False):
         print('Wrote `templates_{0}.npy`'.format(fwhm))
 
 class StackFitter(object):
-    def __init__(self, file='gnt_18197.stack.fits', sys_err=0.02, mask_min=0.1, fit_stacks=True, fcontam=1, pas=None, extensions=None):
+    def __init__(self, file='gnt_18197.stack.fits', sys_err=0.02, mask_min=0.1, fit_stacks=True, fcontam=1, pas=None, extensions=None, min_ivar=0.01, overlap_threshold=3):
         """Object for fitting stacked spectra.
         
         Parameters
@@ -93,10 +93,11 @@ class StackFitter(object):
         
         self.h0 = self.hdulist[0].header.copy()
         self.Ngrism = self.h0['NGRISM']
-        
+        self.grisms = []
         self.ext = []
         for i in range(self.Ngrism):
             g = self.h0['GRISM{0:03d}'.format(i+1)]
+            self.grisms.append(g)
             if fit_stacks:
                 if extensions is not None:
                     if g not in extensions:
@@ -121,14 +122,26 @@ class StackFitter(object):
                 
         self.Next = len(self.ext)
         self.E = []
+        pop = []
         for i in range(self.Next):
             E_i = StackedSpectrum(file=self.file, sys_err=sys_err,
                                   mask_min=mask_min, extver=self.ext[i], 
-                                  mask_threshold=-1, fcontam=fcontam)
+                                  mask_threshold=-1, fcontam=fcontam, 
+                                  min_ivar=min_ivar)
             E_i.compute_model()
             
-            self.E.append(E_i)
-            
+            if np.isfinite(E_i.kernel.sum()):
+                self.E.append(E_i)
+            else:
+                pop.append(i)
+        
+        for i in pop[::-1]:
+            self.Next -= 1
+            p = self.ext.pop(i)
+                    
+        if not fit_stacks:
+            self.mask_drizzle_overlaps(threshold=overlap_threshold)
+                
         self.Ndata = np.sum([E.size for E in self.E])
         self.scif = np.hstack([E.scif for E in self.E])
         self.ivarf = np.hstack([E.ivarf for E in self.E])
@@ -139,6 +152,8 @@ class StackFitter(object):
         self.sivarf = np.sqrt(self.ivarf)
 
         self.fit_mask = np.hstack([E.fit_mask for E in self.E])
+        self.fit_mask &= self.ivarf > min_ivar*self.ivarf.max()
+                
         self.DoF = int((self.fit_mask*self.weightf).sum())
         
         self.slices = self._get_slices()
@@ -260,7 +275,7 @@ class StackFitter(object):
         full = np.dot(coeffs[self.Next:], Ax[self.Next:,:]/self.sivarf)
         
         resid = self.scif - full - background
-        chi2 = np.sum(resid[self.fit_mask]**2*self.ivarf[self.fit_mask])
+        chi2 = np.sum(resid[self.fit_mask]**2*self.sivarf[self.fit_mask]**2)
         
         # Uncertainties from covariance matrix
         if get_uncertainties:
@@ -379,10 +394,15 @@ class StackFitter(object):
         # Mask outliers
         if outlier_threshold > 0:
             resid = self.scif - fullz - bgz
-            outlier_mask = resid*self.sivarf < outlier_threshold
+            outlier_mask = (resid*self.sivarf < outlier_threshold)
+            #outlier_mask &= self.fit_mask
+            #self.sivarf[outlier_mask] = 1/resid[outlier_mask]
+            #print('Mask {0} pixels with resid > {1} sigma'.format((outlier_mask).sum(), outlier_threshold))
+            
             print('Mask {0} pixels with resid > {1} sigma'.format((~outlier_mask & self.fit_mask).sum(), outlier_threshold))
             self.fit_mask &= outlier_mask
-            self.DoF = self.fit_mask.sum() #(self.ivar > 0).sum()
+            #self.DoF = self.fit_mask.sum() #(self.ivar > 0).sum()
+            self.DoF = int((self.fit_mask*self.weightf).sum())
             
         # Table with z, chi-squared
         t = grizli.utils.GTable()
@@ -518,8 +538,39 @@ class StackFitter(object):
                 tl += t_i[te].zscale(0, scalar=coeffs[i])
         
         return tc, tl
-                        
-    def make_fit_plot(self, hdu):
+    
+    def mask_drizzle_overlaps(self, threshold=3):
+        """
+        TBD
+        
+        mask pixels in beams of a given grism that are greater than 
+        `threshold` sigma times the minimum of all beams of that 
+        grism
+        """
+        min_grism = {}
+        for grism in self.grisms:
+            for E in self.E:
+                if not E.extver.startswith(grism):
+                    continue
+                
+                if grism not in min_grism:
+                    min_grism[grism] = E.scif*E.fit_mask
+                else:
+                    empty = (min_grism[grism] == 0) & E.fit_mask
+                    min_grism[grism][E.fit_mask] = np.minimum(min_grism[grism][E.fit_mask], E.scif[E.fit_mask])
+                    min_grism[grism][empty] = E.scif[empty]
+                    
+        for grism in self.grisms:
+            for E in self.E:
+                if not E.extver.startswith(grism):
+                    continue
+                
+                new_mask = (E.scif - min_grism[grism]) < threshold/E.sivarf                
+                print('Mask {0} additional pixels for ext {1}'.format((~new_mask & E.fit_mask).sum(), E.extver))
+                
+                E.fit_mask &= new_mask
+                            
+    def make_fit_plot(self, hdu, scale_pz=True, show_2d=False):
         """Make a plot showing the fit
         
         Parameters
@@ -535,6 +586,8 @@ class StackFitter(object):
         """
         import matplotlib.pyplot as plt
         import matplotlib.gridspec
+        from matplotlib.ticker import MultipleLocator
+        
         import grizli
         
         zfit = grizli.utils.GTable.read(hdu[1])
@@ -542,55 +595,71 @@ class StackFitter(object):
         chi2 = zfit['chi2']
         
         # Initialize plot window
-        height_ratios = [0.25]*self.Next
-        height_ratios.append(1)
-        gs = matplotlib.gridspec.GridSpec(self.Next+1,2, 
-                                 width_ratios=[1,1.5+0.5*(self.Ngrism == 2)],
-                                               height_ratios=height_ratios,
-                                               hspace=0.)
+        if show_2d:
+            height_ratios = [0.25]*self.Next
+            height_ratios.append(1)
+            gs = matplotlib.gridspec.GridSpec(self.Next+1,2, 
+                                     width_ratios=[1,1.5+0.5*(self.Ngrism == 2)],
+                                                   height_ratios=height_ratios,
+                                                   hspace=0.)
                 
-        fig = plt.figure(figsize=[8+4*(self.Ngrism == 2), 3.5+0.5*self.Next])
-        
+            fig = plt.figure(figsize=[8+4*(self.Ngrism == 2), 3.5+0.5*self.Next])
+        else:
+            gs = matplotlib.gridspec.GridSpec(1,2, 
+                            width_ratios=[1,1.5+0.5*(self.Ngrism == 2)],
+                            hspace=0.)
+                
+            fig = plt.figure(figsize=[8+4*(self.Ngrism == 2), 3.5])
+            
         # Chi-squared
         axz = fig.add_subplot(gs[-1,0]) #121)
         
-        axz.text(0.5, 1.02, self.file + '\n'+'z={0:.4f}'.format(z[np.argmin(chi2)]), ha='center', va='bottom', transform=axz.transAxes)
+        axz.text(0.95, 0.04, self.file + '\n'+'z={0:.4f}'.format(z[np.argmin(chi2)]), ha='right', va='bottom', transform=axz.transAxes, fontsize=9)
         
-        axz.plot(z, chi2-chi2.min(), color='k')
-        axz.fill_between(z, chi2-chi2.min(), 27, color='k', alpha=0.5)
-        axz.set_ylim(0,27)
+        # Scale p(z) to DoF=1.
+        if scale_pz:
+            scale_nu = chi2.min()/self.DoF
+            scl_label = '_s'
+        else:
+            scale_nu = 1.
+            scl_label = ''
+            
+        axz.plot(z, (chi2-chi2.min())/scale_nu, color='k')
+        axz.fill_between(z, (chi2-chi2.min())/scale_nu, 27, color='k', alpha=0.5)
+        axz.set_ylim(-4,27)
         axz.set_xlabel(r'$z$')
-        axz.set_ylabel(r'$\chi^2$ - {0:.0f} ($\nu$={1:d})'.format(chi2.min(), self.DoF))
+        axz.set_ylabel(r'$\Delta\chi^2{2}$ ({0:.0f}/$\nu$={1:d})'.format(chi2.min(), self.DoF, scl_label))
         axz.set_yticks([1,4,9,16,25])
         
         axz.set_xlim(z.min(), z.max())
         axz.grid()
         
         # 2D spectra
-        twod_axes = []
-        for i in range(self.Next):
-            ax_i = fig.add_subplot(gs[i,1])
+        if show_2d:
+            twod_axes = []
+            for i in range(self.Next):
+                ax_i = fig.add_subplot(gs[i,1])
 
-            model = hdu['MODEL', self.ext[i]].data
-            ymax = model[np.isfinite(model)].max()
-            #print('MAX', ymax)
+                model = hdu['MODEL', self.ext[i]].data
+                ymax = model[np.isfinite(model)].max()
+                #print('MAX', ymax)
             
-            cmap = 'viridis_r'
-            cmap = 'cubehelix_r'
+                cmap = 'viridis_r'
+                cmap = 'cubehelix_r'
             
-            clean = self.E[i].sci - hdu['BACKGROUND', self.ext[i]].data
-            clean *= self.E[i].fit_mask.reshape(self.E[i].sh)
+                clean = self.E[i].sci - hdu['BACKGROUND', self.ext[i]].data
+                clean *= self.E[i].fit_mask.reshape(self.E[i].sh)
             
-            w = self.E[i].wave/1.e4
+                w = self.E[i].wave/1.e4
             
-            ax_i.imshow(clean, vmin=-0.02*ymax, vmax=1.1*ymax, origin='lower',
-                        extent=[w[0], w[-1], 0., 1.], aspect='auto',
-                        cmap=cmap)
+                ax_i.imshow(clean, vmin=-0.02*ymax, vmax=1.1*ymax, origin='lower',
+                            extent=[w[0], w[-1], 0., 1.], aspect='auto',
+                            cmap=cmap)
             
-            ax_i.text(0.04, 0.92, self.ext[i], ha='left', va='top', transform=ax_i.transAxes, fontsize=8)
+                ax_i.text(0.04, 0.92, self.ext[i], ha='left', va='top', transform=ax_i.transAxes, fontsize=8)
                         
-            ax_i.set_xticklabels([]); ax_i.set_yticklabels([])
-            twod_axes.append(ax_i)
+                ax_i.set_xticklabels([]); ax_i.set_yticklabels([])
+                twod_axes.append(ax_i)
                     
         axc = fig.add_subplot(gs[-1,1]) #224)
         
@@ -631,10 +700,12 @@ class StackFitter(object):
             fl *= 100*unit_corr
             er *= 100*unit_corr
             flm *= 100*unit_corr
-        
-            axc.errorbar(w[clip], fl[clip], er[clip], color='k', alpha=0.3, marker='.', linestyle='None')
+            
+            f_alpha = 1./self.h0['N{0}'.format(E.header['GRISM'])]**0.5
+            
+            axc.errorbar(w[clip], fl[clip], er[clip], color='k', alpha=0.3*f_alpha, marker='.', linestyle='None')
             #axc.fill_between(w[clip], (fl+er)[clip], (fl-er)[clip], color='k', alpha=0.2)
-            axc.plot(w[clip], flm[clip], color='r', alpha=0.6, linewidth=2) 
+            axc.plot(w[clip], flm[clip], color='r', alpha=0.6*f_alpha, linewidth=2) 
               
             # Plot limits              
             ymax = np.maximum(ymax, (flm+er*0.)[clip].max())
@@ -643,24 +714,31 @@ class StackFitter(object):
             wmax = np.maximum(wmax, w.max())
             wmin = np.minimum(wmin, w.min())
                     
+        axc.semilogx()
         axc.set_xlabel(r'$\lambda$')
         axc.set_ylabel(r'$f_\lambda \times 10^{-19}$')
+        axc.xaxis.set_major_locator(MultipleLocator(0.1))
         
         axc.set_ylim(ymin-0.2*ymax, 1.2*ymax)
         axc.grid()
                 
         for ax in [axc]: #[axa, axb, axc]:
             ax.set_xlim(wmin, wmax)
-        
-        for ax in twod_axes:
-            ax.set_xlim(wmin, wmax)
+            labels = np.arange(np.ceil(wmin*10), np.ceil(wmax*10))/10.
+            ax.set_xticklabels(labels)
+            ax.set_xticks(labels)
+            #print(wmin, wmax)
+            
+        if show_2d:
+            for ax in twod_axes:
+                ax.set_xlim(wmin, wmax)
             
         gs.tight_layout(fig, pad=0.05, h_pad=0.01)
-        fig.savefig(self.file.replace('.fits', '.zfit.full.png'))        
+        fig.savefig(self.file.replace('.fits', '.zfit.png'))        
         return fig
                 
 class StackedSpectrum(object):
-    def __init__(self, file='gnt_18197.stack.G141.285.fits', sys_err=0.02, mask_min=0.1, extver='G141', mask_threshold=7, fcontam=1.):
+    def __init__(self, file='gnt_18197.stack.G141.285.fits', sys_err=0.02, mask_min=0.1, extver='G141', mask_threshold=7, fcontam=1., min_ivar=0.001):
         import grizli
         
         self.sys_err = sys_err
@@ -694,14 +772,14 @@ class StackedSpectrum(object):
         
         self.sivarf = np.sqrt(self.ivar).flatten()
         
-        self.fit_mask = (self.ivarf > 0) 
+        self.fit_mask = (self.ivarf > min_ivar*self.ivarf.max()) 
         self.fit_mask &= np.isfinite(self.scif) & np.isfinite(self.ivarf)
         
         # Contamination weighting
         self.fcontam = fcontam
         if ('CONTAM',extver) in self.hdulist:
             self.contam = np.abs(self.hdulist['CONTAM',extver].data*1.)
-            self.weight = np.exp(-fcontam*self.contam*np.sqrt(self.ivar0))
+            self.weight = np.exp(-fcontam*self.contam*np.sqrt(self.ivar0))            
             self.contamf = self.contam.flatten()
             self.weightf = self.weight.flatten()
         else:

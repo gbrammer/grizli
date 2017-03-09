@@ -858,9 +858,10 @@ class SpectrumTemplate(object):
         ----------
         wave, fwhm : None or float or array-like
             If both are float, then initialize with a Gaussian.  
+            In `astropy.units.Angstrom`.
             
         flux : None or array-like
-            Flux (density) array
+            Flux array (f-lambda flux density)
             
         velocity : bool
             `fwhm` is a velocity.
