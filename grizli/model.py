@@ -895,6 +895,16 @@ class ImageData(object):
             if 'GROW' in header:
                 self.grow = header['GROW']
             
+            if ('REF',sci_extn) in hdulist:
+                ref_h = hdulist['REF', sci_extn].header
+                ref_data = hdulist['REF', sci_extn].data/ref_h['PHOTFLAM']
+                ref_file = ref_h['REF_FILE']
+                ref_photflam = 1.
+                ref_photplam = ref_h['PHOTPLAM']
+                ref_filter = ref_h['FILTER']
+            else:
+                ref_data = None
+                
         else:
             if sci is None:
                 sci = np.zeros((1014,1014))
@@ -902,7 +912,8 @@ class ImageData(object):
             self.parent_file = 'Unknown'
             self.sci_extn = None    
             self.grow = 1
-                    
+            ref_data = None
+            
         self.is_slice = False
         
         ### Array parameters
@@ -942,12 +953,19 @@ class ImageData(object):
             if self.data['DQ'].shape != tuple(self.sh):
                 raise ValueError ('err and dq arrays have different shapes!')
         
-        self.ref_file = None
-        self.ref_photflam = None
-        self.ref_photplam = None
-        self.ref_filter = None
-        self.data['REF'] = None
-                
+        if ref_data is None:
+            self.data['REF'] = None
+            self.ref_file = None
+            self.ref_photflam = None
+            self.ref_photplam = None
+            self.ref_filter = None
+        else:
+            self.data['REF'] = ref_data
+            self.ref_file = ref_file
+            self.ref_photflam = ref_photflam
+            self.ref_photplam = ref_photplam
+            self.ref_filter = ref_filter
+            
         self.wcs = None
         if self.header is not None:
             if wcs is None:
