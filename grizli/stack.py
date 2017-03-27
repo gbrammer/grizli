@@ -203,6 +203,113 @@ class StackFitter(object):
         TBD
         """
         return False
+    
+    def fit_combined_at_z(self, z=0, fitter='nnls', get_uncertainties=False, eazyPhotoZ=None, eazy_ix=0):
+        """Fit the 2D spectra with a set of templates at a specified redshift.
+        TBD
+        Parameters
+        ----------
+        z : float
+            Redshift.
+        
+        templates : list
+            List of templates to fit.
+        
+        fitter : str
+            Minimization algorithm to compute template coefficients.
+            The default 'nnls' uses non-negative least squares.  
+            The other option is standard 'leastsq'.
+        
+        get_uncertainties : bool
+            Compute coefficient uncertainties from the covariance matrix
+        
+        
+        Returns
+        -------
+        chi2 : float
+            Chi-squared of the fit
+        
+        background : `~np.ndarray`
+            Background model
+        
+        full_model : `~np.ndarray`
+            Best-fit 2D model.
+        
+        coeffs, err : `~np.ndarray`
+            Template coefficients and uncertainties.
+        
+        """
+        import scipy.optimize
+        
+        # Photometry
+        ok_phot = (eazyPhotoZ.efnu[ix,:] > 0) & (eazyPhotoZ.fnu[ix,:] > eazyPhotoZ.param['NOT_OBS_THRESHOLD']) & np.isfinite(eazyPhotoZ.fnu[ix,:]) & np.isfinite(eazyPhotoZ.efnu[ix,:])
+        Nphot = ok_phot.sum()
+        photom_eflam = (eazyPhotoZ.efnu[ix,:]*eazyPhotoZ.to_flam/100.)[ok_phot]
+        photom_flam = (eazyPhotoZ.fnu[ix,:]*eazyPhotoZ.to_flam/100.)[ok_phot]
+        
+        templates = eazyPhotoZ.templates
+        
+        NTEMP = len(templates)
+        A = np.zeros((self.Next+NTEMP, self.Ndata+Nphot))
+        A[:self.Next,:-Nphot] += self.Abg
+        
+        sivarf = np.hstack((self.sivarf, 1/photom_eflam**2))
+        fit_mask = np.hstack((self.fit_mask, np.ones(Nphot, dtype=bool)))
+
+        # Photometry
+        Aphot = (eazyPhotoZ.tempfilt(z)*eazyPhotoZ.to_flam/100)[:,ok_phot]
+        A[self.Next:,-Nphot:] += Aphot
+        
+        for i, t in enumerate(templates):
+            ti = templates[t]
+            s = [ti.wave*(1+z), ti.flux/(1+z)]
+            
+            for j, E in enumerate(self.E):
+                clip = E.ivar.sum(axis=0) > 0                    
+                if (s[0][0] > E.wave[clip].max()) | (s[0][-1] < E.wave[clip].min()):
+                    continue
+
+                sl = self.slices[j]
+                A[self.Next+i, sl] = E.compute_model(spectrum_1d=s)
+                    
+        oktemp = (A*fit_mask).sum(axis=1) != 0
+        
+        Ax = A[oktemp,:]*sivarf
+        
+        pedestal = 0.04
+        
+        AxT = Ax[:,fit_mask].T
+        data = np.hstack(((self.scif+pedestal)*self.sivarf)[self.fit_mask], 
+        
+        if fitter == 'nnls':
+            coeffs, rnorm = scipy.optimize.nnls(AxT, data)            
+        else:
+            coeffs, residuals, rank, s = np.linalg.lstsq(AxT, data)
+                
+        background = np.dot(coeffs[:self.Next], A[:self.Next,:]) - pedestal
+        full = np.dot(coeffs[self.Next:], Ax[self.Next:,:]/self.sivarf)
+        
+        resid = self.scif - full - background
+        chi2 = np.sum(resid[self.fit_mask]**2*self.sivarf[self.fit_mask]**2)
+        
+        # Uncertainties from covariance matrix
+        if get_uncertainties:
+            try:
+                covar = np.matrix(np.dot(AxT.T, AxT)).I
+                covard = np.sqrt(covar.diagonal()).A.flatten()
+            except:
+                print('Except!')
+                covard = np.zeros(oktemp.sum())#-1.
+        else:
+            covard = np.zeros(oktemp.sum())#-1.
+        
+        full_coeffs = np.zeros(NTEMP)
+        full_coeffs[oktemp[self.Next:]] = coeffs[self.Next:]
+
+        full_coeffs_err = np.zeros(NTEMP)
+        full_coeffs_err[oktemp[self.Next:]] = covard[self.Next:]
+        
+        return chi2, background, full, full_coeffs, full_coeffs_err
         
     def fit_at_z(self, z=0, templates=[], fitter='nnls', get_uncertainties=False):
         """Fit the 2D spectra with a set of templates at a specified redshift.
