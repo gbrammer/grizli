@@ -7,7 +7,7 @@ from imp import reload
 import astropy.io.fits as pyfits
 import numpy as np
     
-def make_templates(grism='G141', return_lists=False):
+def make_templates(grism='G141', return_lists=False, fsps_templates=False):
     """Generate template savefile
     
     This script generates the template sets with the emission line 
@@ -44,14 +44,16 @@ def make_templates(grism='G141', return_lists=False):
         fwhm = 700 # G102
         
     # Line complex templates
-    t_complexes = MultiBeam.load_templates(fwhm=fwhm, line_complexes=True)
+    t_complexes = MultiBeam.load_templates(fwhm=fwhm, line_complexes=True,
+                                           fsps_templates=fsps_templates)
     
     # Individual lines
     line_list = ['SIII', 'SII', 'Ha', 'OI-6302', 'OIII', 'Hb', 
                  'OIII-4363', 'Hg', 'Hd', 'NeIII', 'OII', 'MgII']
                  
     t_lines = MultiBeam.load_templates(fwhm=fwhm, line_complexes=False,
-                                       full_line_list=line_list)
+                                       full_line_list=line_list,
+                                       fsps_templates=fsps_templates)
     
     if return_lists:
         return t_complexes, t_lines
