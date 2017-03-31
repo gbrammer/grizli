@@ -147,6 +147,7 @@ class StackFitter(object):
         self.Ndata = np.sum([E.size for E in self.E])
         self.scif = np.hstack([E.scif for E in self.E])
         self.ivarf = np.hstack([E.ivarf for E in self.E])
+        self.wavef = np.hstack([E.wavef for E in self.E])
 
         self.weightf = np.hstack([E.weightf for E in self.E])
         self.ivarf *= self.weightf
@@ -206,7 +207,7 @@ class StackFitter(object):
         """
         return False
     
-    def fit_combined_at_z(self, z=0, fitter='nnls', get_uncertainties=False, eazyPhotoZ=None, eazy_ix=0):
+    def fit_combined_at_z(self, z=0, fitter='nnls', get_uncertainties=False, eazyp=None, ix=0, order=1):
         """Fit the 2D spectra with a set of templates at a specified redshift.
         TBD
         Parameters
@@ -244,26 +245,33 @@ class StackFitter(object):
         import scipy.optimize
         
         # Photometry
-        ok_phot = (eazyPhotoZ.efnu[ix,:] > 0) & (eazyPhotoZ.fnu[ix,:] > eazyPhotoZ.param['NOT_OBS_THRESHOLD']) & np.isfinite(eazyPhotoZ.fnu[ix,:]) & np.isfinite(eazyPhotoZ.efnu[ix,:])
-        Nphot = ok_phot.sum()
-        photom_eflam = (eazyPhotoZ.efnu[ix,:]*eazyPhotoZ.to_flam/100.)[ok_phot]
-        photom_flam = (eazyPhotoZ.fnu[ix,:]*eazyPhotoZ.to_flam/100.)[ok_phot]
+        ok_phot = (eazyp.efnu[ix,:] > 0) & (eazyp.fnu[ix,:] > eazyp.param['NOT_OBS_THRESHOLD']) & np.isfinite(eazyp.fnu[ix,:]) & np.isfinite(eazyp.efnu[ix,:])
+        ok_phot = np.squeeze(ok_phot)
+        self.ok_phot = ok_phot
         
-        templates = eazyPhotoZ.templates
+        Nphot = ok_phot.sum()
+        photom_eflam = (eazyp.efnu[ix,:]*eazyp.to_flam*eazyp.ext_corr/100.)[ok_phot]
+        photom_flam = (eazyp.fnu[ix,:]*eazyp.to_flam*eazyp.ext_corr/100.)[ok_phot]
+        
+        templates = eazyp.templates
         
         NTEMP = len(templates)
         A = np.zeros((self.Next+NTEMP, self.Ndata+Nphot))
         A[:self.Next,:-Nphot] += self.Abg
         
-        sivarf = np.hstack((self.sivarf, 1/photom_eflam**2))
+        pedestal = 0.04
+        
+        sivarf = np.hstack((self.sivarf, 1/photom_eflam))
+        dataf = np.hstack((self.scif+pedestal, photom_flam))
         fit_mask = np.hstack((self.fit_mask, np.ones(Nphot, dtype=bool)))
-
+        #sivarf *= fit_mask
+        
         # Photometry
-        Aphot = (eazyPhotoZ.tempfilt(z)*eazyPhotoZ.to_flam/100)[:,ok_phot]
+        Aphot = (eazyp.tempfilt(z)*3.e18/eazyp.lc**2*(1+z))[:,ok_phot]
         A[self.Next:,-Nphot:] += Aphot
         
-        for i, t in enumerate(templates):
-            ti = templates[t]
+        for i, ti in enumerate(templates):
+            #ti = templates[t]
             s = [ti.wave*(1+z), ti.flux/(1+z)]
             
             for j, E in enumerate(self.E):
@@ -276,29 +284,41 @@ class StackFitter(object):
                     
         oktemp = (A*fit_mask).sum(axis=1) != 0
         
+        # ATA = np.dot(A[oktemp,:]*(sivarf*fit_mask)**2, A[oktemp,:].T)
+        # ATy = np.dot(A[oktemp,:]*(sivarf*fit_mask)**2, dataf)
+        
         Ax = A[oktemp,:]*sivarf
+        #AxT = Ax[:,fit_mask].T
+        #data = (dataf*sivarf)[fit_mask]
         
-        pedestal = 0.04
+        # Run the optimizer
+        method = 'Powell'
+        tol = 1.e-4
+        init = np.zeros(order+1)
+        init[0] = 10.
         
-        AxT = Ax[:,fit_mask].T
-        data = np.hstack(((self.scif+pedestal)*self.sivarf)[self.fit_mask], 
+        scale_fit = scipy.optimize.minimize(self.objective_scale, init, args=(Ax, dataf*sivarf, self.wavef, fit_mask, sivarf, Nphot, self.Next, 0), method=method, jac=None, hess=None, hessp=None, bounds=(), constraints=(), tol=tol, callback=None, options=None)
         
-        if fitter == 'nnls':
-            coeffs, rnorm = scipy.optimize.nnls(AxT, data)            
-        else:
-            coeffs, residuals, rank, s = np.linalg.lstsq(AxT, data)
-                
-        background = np.dot(coeffs[:self.Next], A[:self.Next,:]) - pedestal
-        full = np.dot(coeffs[self.Next:], Ax[self.Next:,:]/self.sivarf)
+        if order == 0:
+            scale_fit.x = np.array([np.float(scale_fit.x)])
+            
+        coeffs, full, resid, chi2, AxT = self.objective_scale(scale_fit.x, Ax, dataf*sivarf, self.wavef, fit_mask, sivarf, Nphot, self.Next, True)
         
-        resid = self.scif - full - background
-        chi2 = np.sum(resid[self.fit_mask]**2*self.sivarf[self.fit_mask]**2)
+        background = np.dot(coeffs[:self.Next], A[:self.Next,:])
+        full -= background
         
+        background -= pedestal
+        background[-Nphot:] = 0
+                 
         # Uncertainties from covariance matrix
         if get_uncertainties:
             try:
                 covar = np.matrix(np.dot(AxT.T, AxT)).I
                 covard = np.sqrt(covar.diagonal()).A.flatten()
+                
+                covarf = np.matrix(np.dot(ATA.T, ATA)).I
+                covardf = np.sqrt(covarf.diagonal()).A.flatten()
+                
             except:
                 print('Except!')
                 covard = np.zeros(oktemp.sum())#-1.
@@ -311,7 +331,45 @@ class StackFitter(object):
         full_coeffs_err = np.zeros(NTEMP)
         full_coeffs_err[oktemp[self.Next:]] = covard[self.Next:]
         
-        return chi2, background, full, full_coeffs, full_coeffs_err
+        return chi2, background, full, full_coeffs, full_coeffs_err, scale_fit
+    
+    @staticmethod
+    def objective_scale(p, Ax, data, spec_wave, fit_mask, sivarf, Nphot, Next, return_coeffs):
+        """
+        Objective function for fitting for a scale term between photometry and 
+        spectra
+        """
+        import scipy.optimize
+        from scipy import polyval
+        
+        scale = np.ones(Ax.shape[1])
+        scale[:-Nphot] = polyval(p[::-1]/10., (spec_wave-1.e4)/1000.)
+        AxT = Ax*scale
+        for i in range(Next):
+            AxT[i,:] /= scale
+        
+        AxT = AxT[:,fit_mask].T
+        #(Ax*scale)[:,fit_mask].T
+        #AxT[:,:Next] = 1.
+        
+        coeffs, rnorm = scipy.optimize.nnls(AxT, data[fit_mask])  
+            
+        full = np.dot(coeffs, Ax*scale/sivarf)
+        resid = data/sivarf - full# - background
+        chi2 = np.sum(resid[fit_mask]**2*sivarf[fit_mask]**2)
+        
+        #print('{0} {1}'.format(p, chi2))
+
+        if return_coeffs:
+            return coeffs, full, resid, chi2, AxT
+        else:
+            return chi2
+        
+        # Testing
+        # method = 'COBYLA'
+        # out = scipy.optimize.minimize(objective_scale, [10.], args=(Ax, dataf*sivarf, fit_mask, sivarf, Nphot, 0), method=method, jac=None, hess=None, hessp=None, bounds=None, constraints=(), tol=None, callback=None, options=None)
+        # print(method, out.nfev, out.x)
+        # out = scipy.optimize.minimize(objective_scale, [10.], args=(Ax, dataf*sivarf, fit_mask, sivarf, Nphot, 0), method='COBYLA', jac=None, hess=None, hessp=None, bounds=None, constraints=(), tol=None, callback=None, options=None)
         
     def fit_at_z(self, z=0, templates=[], fitter='nnls', get_uncertainties=False):
         """Fit the 2D spectra with a set of templates at a specified redshift.
@@ -405,7 +463,7 @@ class StackFitter(object):
         
         return chi2, background, full, full_coeffs, full_coeffs_err
     
-    def fit_zgrid(self, dz0=0.005, zr=[0.4, 3.4], fitter='nnls', make_plot=True, save_data=True, prior=None, templates_file='templates.npy', verbose=True, outlier_threshold=1e30):
+    def fit_zgrid(self, dz0=0.005, zr=[0.4, 3.4], fitter='nnls', make_plot=True, save_data=True, prior=None, templates_file='templates.npy', verbose=True, outlier_threshold=1e30, eazyp=None, ix=0, order=0):
         """Fit templates on a redshift grid.
         
         Parameters
@@ -455,8 +513,13 @@ class StackFitter(object):
         z = grizli.utils.log_zgrid(zr=zr, dz=dz0)
         chi2 = z*0.
         for i in range(len(z)):
-            out = self.fit_at_z(z=z[i], templates=t_complex)
-            chi2[i], bg, full, coeffs, err = out
+            if eazyp:
+                out = self.fit_combined_at_z(z=z[i], eazyp=eazyp, ix=ix, order=order)
+                chi2[i], bg, full, coeffs, err, scale_fit = out            
+            else:
+                out = self.fit_at_z(z=z[i], templates=t_complex)
+                chi2[i], bg, full, coeffs, err = out
+            
             if verbose:
                 print('{0:.4f} - {1:10.1f}'.format(z[i], chi2[i]))
         
@@ -477,10 +540,17 @@ class StackFitter(object):
             ci = zi*0.
             for i in range(len(zi)):
                 
-                out = self.fit_at_z(z=zi[i], templates=t_complex,
-                                    fitter=fitter)
+                if eazyp:
+                    out = self.fit_combined_at_z(z=zi[i], eazyp=eazyp, ix=ix, order=order)
+                    ci[i], bg, full, coeffs, err, scale_fit = out            
+                else:
+                    out = self.fit_at_z(z=zi[i], templates=t_complex, fitter=fitter)
+                    ci[i], bg, full, coeffs, err = out
                 
-                ci[i], bg, full, coeffs, err = out
+                # out = self.fit_at_z(z=zi[i], templates=t_complex,
+                #                     fitter=fitter)
+                # 
+                # ci[i], bg, full, coeffs, err = out
                 
                 if verbose:
                     print('{0:.4f} - {1:10.1f}'.format(zi[i], ci[i]))
@@ -783,9 +853,9 @@ class StackFitter(object):
             E = self.E[i]
             
             clean = E.sci - hdu['BACKGROUND', self.ext[i]].data
-            fl, er = E.optimal_extract(clean)            
-            flm, erm = E.optimal_extract(hdu['MODEL', self.ext[i]].data)
-            w = E.wave/1.e4
+            w, fl, er = E.optimal_extract(clean)            
+            w, flm, erm = E.optimal_extract(hdu['MODEL', self.ext[i]].data)
+            w = w/1.e4
             
             # Do we need to convert to F-lambda units?
             if E.is_flambda:
@@ -862,6 +932,7 @@ class StackedSpectrum(object):
         self.header = self.hdulist['SCI',extver].header.copy()
         self.sh = (self.header['NAXIS2'], self.header['NAXIS1'])
         self.wave = self.get_wavelength_from_header(self.header)
+        self.wavef = np.dot(np.ones((self.sh[0],1)), self.wave[None,:]).flatten()
         
         # Configuration file
         self.is_flambda = self.header['ISFLAM']
@@ -926,10 +997,12 @@ class StackedSpectrum(object):
         w = (np.arange(h['NAXIS1'])+1-h['CRPIX1'])*h['CD1_1'] + h['CRVAL1']
         return w
             
-    def optimal_extract(self, data):
+    def optimal_extract(self, data, bin=0):
         """
         Optimally-weighted 1D extraction
         """
+        import scipy.ndimage as nd
+        
         flatf = self.flat.reshape(self.sh).sum(axis=0)
         prof = self.flat.reshape(self.sh)/flatf
         
@@ -943,7 +1016,16 @@ class StackedSpectrum(object):
         opt_rms[clip] = 0
         opt_flux[clip] = 0
         
-        return opt_flux, opt_rms
+        if bin > 1:
+            kern = np.ones(bin, dtype=float)/bin
+            opt_flux = nd.convolve(opt_flux, kern)[bin // 2::bin]
+            opt_var = nd.convolve(opt_var, kern**2)[bin // 2::bin]
+            opt_rms = np.sqrt(opt_var)            
+            wave = self.wave[bin // 2::bin]
+        else:
+            wave = self.wave
+        
+        return wave, opt_flux, opt_rms
         
     def _build_model(self):
         """
