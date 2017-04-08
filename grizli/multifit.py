@@ -641,7 +641,7 @@ class GroupFLT():
         return True
         #m2d = mb.reshape_flat(modelf)
     
-    def make_stack(self, id, size=20, target='grism', skip=True, fcontam=1., save=True):
+    def make_stack(self, id, size=20, target='grism', skip=True, fcontam=1., scale=1, save=True):
         """Make drizzled 2D stack for a given object
         
         Parameters
@@ -685,7 +685,8 @@ class GroupFLT():
         mb = MultiBeam(beams, fcontam=fcontam, group_name=target)
 
         hdu, fig = mb.drizzle_grisms_and_PAs(fcontam=fcontam, flambda=False,
-                                             kernel='point', size=size)
+                                             kernel='point', size=size,
+                                             scale=scale)
                                              
         if save:
             fig.savefig('{0}_{1:05d}.stack.png'.format(target, id))

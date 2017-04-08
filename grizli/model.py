@@ -2852,14 +2852,16 @@ class BeamCutout(object):
                                       self.beam.sensitivity_beam)
                 
         ### Update CRPIX
+        dc = 0 # python array center to WCS pixel center
+        
         for wcs_ext in [wcs.sip, wcs.wcs]:
             if wcs_ext is None:
                 continue
             else:
                 cr = wcs_ext.crpix
             
-            cr[0] += dx + self.beam.sh[0]/2 + self.beam.dxfull[0]
-            cr[1] += dy 
+            cr[0] += dx + self.beam.sh[0]/2 + self.beam.dxfull[0] + dc
+            cr[1] += dy + dc
         
         ### Make SIP CRPIX match CRPIX
         if wcs.sip is not None:

@@ -63,7 +63,7 @@ def make_templates(grism='G141', return_lists=False, fsps_templates=False):
         print('Wrote `templates_{0}.npy`'.format(fwhm))
 
 class StackFitter(object):
-    def __init__(self, file='gnt_18197.stack.fits', sys_err=0.02, mask_min=0.1, fit_stacks=True, fcontam=1, pas=None, extensions=None, min_ivar=0.01, overlap_threshold=3):
+    def __init__(self, file='gnt_18197.stack.fits', sys_err=0.02, mask_min=0.1, fit_stacks=True, fcontam=1, pas=None, extensions=None, min_ivar=0.01, overlap_threshold=3, eazyp=None, eazy_ix=0):
         """Object for fitting stacked spectra.
         
         Parameters
@@ -163,6 +163,36 @@ class StackFitter(object):
         
         self.Abg = self._init_background()
         
+        ## Photometry
+        self.Nphot = 0
+        if eazyp is not None:
+            self.eazyp = eazyp
+            
+            # TBD: do matching to eazyp.cat directly?
+            self.eazy_ix = eazy_ix
+            
+            ok_phot = (eazyp.efnu[eazy_ix,:] > 0) & (eazyp.fnu[eazy_ix,:] > eazyp.param['NOT_OBS_THRESHOLD']) & np.isfinite(eazyp.fnu[eazy_ix,:]) & np.isfinite(eazyp.efnu[eazy_ix,:])
+            ok_phot = np.squeeze(ok_phot)
+            self.ok_phot = ok_phot
+
+            self.Nphot = ok_phot.sum()
+            if self.Nphot > 0:
+                
+                # F-lambda photometry, 1e-19 erg/s/cm2/A
+                self.photom_eflam = (eazyp.efnu[eazy_ix,:]*eazyp.to_flam*eazyp.zp*eazyp.ext_corr/100.)[ok_phot]
+                self.photom_flam = (eazyp.fnu[eazy_ix,:]*eazyp.to_flam*eazyp.zp*eazyp.ext_corr/100.)[ok_phot]
+                self.photom_lc = eazyp.lc[ok_phot]
+            
+                self.scif = np.hstack((self.scif, self.photom_flam))
+                self.ivarf = np.hstack((self.ivarf, 1/self.photom_eflam**2))
+                self.sivarf = np.hstack((self.sivarf, 1/self.photom_eflam))
+                self.wavef = np.hstack((self.wavef, self.photom_lc))
+
+                self.weightf = np.hstack((self.weightf, np.ones(self.Nphot)))
+                self.fit_mask = np.hstack((self.fit_mask, np.ones(self.Nphot, dtype=bool)))
+                self.DoF += self.Nphot
+                self.phot_scale = np.array([10.])
+                
     def _get_slices(self):
         """Precompute array slices for how the individual components map into the single combined arrays.
         
@@ -207,7 +237,7 @@ class StackFitter(object):
         """
         return False
     
-    def fit_combined_at_z(self, z=0, fitter='nnls', get_uncertainties=False, eazyp=None, ix=0, order=1):
+    def fit_combined_at_z(self, z=0, fitter='nnls', get_uncertainties=False, eazyp=None, ix=0, order=1, scale_fit=None):
         """Fit the 2D spectra with a set of templates at a specified redshift.
         TBD
         Parameters
@@ -297,10 +327,11 @@ class StackFitter(object):
         init = np.zeros(order+1)
         init[0] = 10.
         
-        scale_fit = scipy.optimize.minimize(self.objective_scale, init, args=(Ax, dataf*sivarf, self.wavef, fit_mask, sivarf, Nphot, self.Next, 0), method=method, jac=None, hess=None, hessp=None, bounds=(), constraints=(), tol=tol, callback=None, options=None)
+        if scale_fit is None:
+            scale_fit = scipy.optimize.minimize(self.objective_scale, init, args=(Ax, dataf*sivarf, self.wavef, fit_mask, sivarf, Nphot, self.Next, 0), method=method, jac=None, hess=None, hessp=None, bounds=(), constraints=(), tol=tol, callback=None, options=None)
         
-        if order == 0:
-            scale_fit.x = np.array([np.float(scale_fit.x)])
+            if order == 0:
+                scale_fit.x = np.array([np.float(scale_fit.x)])
             
         coeffs, full, resid, chi2, AxT = self.objective_scale(scale_fit.x, Ax, dataf*sivarf, self.wavef, fit_mask, sivarf, Nphot, self.Next, True)
         
@@ -333,6 +364,21 @@ class StackFitter(object):
         
         return chi2, background, full, full_coeffs, full_coeffs_err, scale_fit
     
+    @staticmethod 
+    def scale_AxT(p, Ax, spec_wave, Nphot, Next):
+        """
+        Scale spectrum templates by polynomial function
+        """
+        from scipy import polyval
+        
+        scale = np.ones(Ax.shape[1])
+        scale[:-Nphot] = polyval(p[::-1]/10., (spec_wave-1.e4)/1000.)
+        AxT = Ax*scale
+        for i in range(Next):
+            AxT[i,:] /= scale
+        
+        return AxT
+        
     @staticmethod
     def objective_scale(p, Ax, data, spec_wave, fit_mask, sivarf, Nphot, Next, return_coeffs):
         """
@@ -463,7 +509,7 @@ class StackFitter(object):
         
         return chi2, background, full, full_coeffs, full_coeffs_err
     
-    def fit_zgrid(self, dz0=0.005, zr=[0.4, 3.4], fitter='nnls', make_plot=True, save_data=True, prior=None, templates_file='templates.npy', verbose=True, outlier_threshold=1e30, eazyp=None, ix=0, order=0):
+    def fit_zgrid(self, dz0=0.005, zr=[0.4, 3.4], fitter='nnls', make_plot=True, save_data=True, prior=None, templates_file='templates.npy', verbose=True, outlier_threshold=1e30, eazyp=None, ix=0, order=0, scale_fit=None):
         """Fit templates on a redshift grid.
         
         Parameters
@@ -514,7 +560,7 @@ class StackFitter(object):
         chi2 = z*0.
         for i in range(len(z)):
             if eazyp:
-                out = self.fit_combined_at_z(z=z[i], eazyp=eazyp, ix=ix, order=order)
+                out = self.fit_combined_at_z(z=z[i], eazyp=eazyp, ix=ix, order=order, scale_fit=scale_fit)
                 chi2[i], bg, full, coeffs, err, scale_fit = out            
             else:
                 out = self.fit_at_z(z=z[i], templates=t_complex)
@@ -541,7 +587,7 @@ class StackFitter(object):
             for i in range(len(zi)):
                 
                 if eazyp:
-                    out = self.fit_combined_at_z(z=zi[i], eazyp=eazyp, ix=ix, order=order)
+                    out = self.fit_combined_at_z(z=zi[i], eazyp=eazyp, ix=ix, order=order, scale_fit=scale_fit)
                     ci[i], bg, full, coeffs, err, scale_fit = out            
                 else:
                     out = self.fit_at_z(z=zi[i], templates=t_complex, fitter=fitter)
