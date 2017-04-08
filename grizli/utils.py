@@ -804,8 +804,8 @@ def get_line_wavelengths():
     line_ratios['NeV'] = [1.]
     line_wavelengths['NeVI'] = [3426.85]
     line_ratios['NeVI'] = [1.]
-    line_wavelengths['SIII'] = [9068.6, 9530.6]
-    line_ratios['SIII'] = [1, 2.44]
+    line_wavelengths['SIII'] = [9068.6, 9530.6][::-1]
+    line_ratios['SIII'] = [1, 2.44][::-1]
     line_wavelengths['HeII'] = [4687.5]
     line_ratios['HeII'] = [1.]
     line_wavelengths['HeI-5877'] = [5877.2]
@@ -1873,4 +1873,20 @@ def column_values_in_list(col, test_list):
     """
     test = np.array([c_i in test_list for c_i in col])
     return test
+    
+def fill_between_steps(x, y0, y1, ax=None, *args, **kwargs):
+    """
+    Make `fill_between` work like linestyle='steps-mid'.
+    """
+    so = np.argsort(x)
+    mid = x[so][:-1] + np.diff(x[so])/2.
+    xfull = np.append(np.append(x, mid), mid+np.diff(x[so])/1.e6)
+    y0full = np.append(np.append(y0, y0[:-1]), y0[1:])
+    y1full = np.append(np.append(y1, y1[:-1]), y1[1:])
+    
+    so = np.argsort(xfull)
+    if ax is None:
+        ax = plt.gca()
+    
+    ax.fill_between(xfull[so], y0full[so], y1full[so], *args, **kwargs)
     
