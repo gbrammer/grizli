@@ -237,7 +237,7 @@ class StackFitter(object):
         """
         return False
     
-    def fit_combined_at_z(self, z=0, fitter='nnls', get_uncertainties=False, eazyp=None, ix=0, order=1, scale_fit=None):
+    def fit_combined_at_z(self, z=0, fitter='nnls', get_uncertainties=False, eazyp=None, ix=0, order=1, scale_fit=None, method='BFGS'):
         """Fit the 2D spectra with a set of templates at a specified redshift.
         TBD
         Parameters
@@ -322,7 +322,8 @@ class StackFitter(object):
         #data = (dataf*sivarf)[fit_mask]
         
         # Run the optimizer
-        method = 'Powell'
+        #method = 'Powell'
+        #method = 'BFGS'
         tol = 1.e-4
         init = np.zeros(order+1)
         init[0] = 10.
@@ -391,16 +392,18 @@ class StackFitter(object):
         scale = np.ones(Ax.shape[1])
         scale[:-Nphot] = polyval(p[::-1]/10., (spec_wave-1.e4)/1000.)
         AxT = Ax*scale
+        
+        # Remove scaling from background component
         for i in range(Next):
             AxT[i,:] /= scale
         
-        AxT = AxT[:,fit_mask].T
+        #AxT = AxT[:,fit_mask].T
         #(Ax*scale)[:,fit_mask].T
         #AxT[:,:Next] = 1.
         
-        coeffs, rnorm = scipy.optimize.nnls(AxT, data[fit_mask])  
+        coeffs, rnorm = scipy.optimize.nnls(AxT[:,fit_mask].T, data[fit_mask])  
             
-        full = np.dot(coeffs, Ax*scale/sivarf)
+        full = np.dot(coeffs, AxT/sivarf)
         resid = data/sivarf - full# - background
         chi2 = np.sum(resid[fit_mask]**2*sivarf[fit_mask]**2)
         
