@@ -721,7 +721,7 @@ class StackFitter(object):
                 t.meta['LINE{0:03d}W'.format(il)] = (EW, 
                             '{0} line rest EQW'.format(te[5:]))
                 
-        tfile = self.file.replace('.fits', '.zfit.full.fits')
+        tfile = self.file.replace('.fits', '.zfit.fits')
         if os.path.exists(tfile):
             os.remove(tfile)
 

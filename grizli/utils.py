@@ -795,8 +795,8 @@ def get_line_wavelengths():
     line_wavelengths['OII+Ne'] = [3729.875, 3869]
     line_ratios['OII+Ne'] = [1, 1./5]
     
-    line_wavelengths['OI-6302'] = [6302.046]
-    line_ratios['OI-6302'] = [1]
+    line_wavelengths['OI-6302'] = [6302.046, 6363.67]
+    line_ratios['OI-6302'] = [1, 0.33]
 
     line_wavelengths['NeIII'] = [3869]
     line_ratios['NeIII'] = [1.]
@@ -1088,6 +1088,12 @@ def transform_wcs(in_wcs, translation=[0.,0.], rotation=0., scale=1.):
                      [np.sin(theta), np.cos(theta)]])
     
     out_wcs.wcs.cd = np.dot(out_wcs.wcs.cd, _mat)/scale
+    out_wcs.pscale = get_wcs_pscale(out_wcs)
+    out_wcs.wcs.crpix *= scale
+    if hasattr(out_wcs, '_naxis1'):
+        out_wcs._naxis1 = int(np.round(out_wcs._naxis1*scale))
+        out_wcs._naxis2 = int(np.round(out_wcs._naxis2*scale))
+        
     return out_wcs
     
 def get_wcs_slice_header(wcs, slx, sly):
@@ -1264,7 +1270,7 @@ def make_wcsheader(ra=40.07293, dec=-1.6137748, size=2, pixscale=0.1, get_hdu=Fa
     ra, dec : float
         Celestial coordinates in decimal degrees
         
-    size, pixscale : float
+    size, pixscale : float or 2-list
         Size of the thumbnail, in arcsec, and pixel scale, in arcsec/pixel.
         Output image will have dimensions `(npix,npix)`, where
             
@@ -1323,20 +1329,24 @@ def make_wcsheader(ra=40.07293, dec=-1.6137748, size=2, pixscale=0.1, get_hdu=Fa
         CTYPE2  = 'DEC--TAN'
     """
     
-    cdelt = pixscale/3600.
-    if isinstance(size, list):
-        npix = np.cast[int]([size[0]/pixscale, size[1]/pixscale])
+    if np.isscalar(pixscale):
+        cdelt = [pixscale/3600.]*2
     else:
+        cdelt = [pixscale[0]/3600., pixscale[1]/3600.]
+        
+    if np.isscalar(size):
         npix = np.cast[int]([size/pixscale, size/pixscale])
+    else:
+        npix = np.cast[int]([size[0]/pixscale, size[1]/pixscale])
         
     hout = pyfits.Header()
     hout['CRPIX1'] = npix[0]/2
     hout['CRPIX2'] = npix[1]/2
     hout['CRVAL1'] = ra
     hout['CRVAL2'] = dec
-    hout['CD1_1'] = -cdelt
+    hout['CD1_1'] = -cdelt[0]
     hout['CD1_2'] = hout['CD2_1'] = 0.
-    hout['CD2_2'] = cdelt
+    hout['CD2_2'] = cdelt[1]
     hout['NAXIS1'] = npix[0]
     hout['NAXIS2'] = npix[1]
     hout['CTYPE1'] = 'RA---TAN'
