@@ -355,6 +355,38 @@ def apply_persistence_mask(flt_file, path='../Persistence', dq_value=1024,
             
         flt.flush()
 
+def apply_region_mask(flt_file, dq_value=1024):
+    """Apply DQ mask from a DS9 region file
+    
+    Parameters
+    ----------
+    flt_file : str
+        Filename of the FLT exposure
+    
+    dq_value : int
+        DQ bit to flip for affected pixels
+    
+    Searches for region files with filenames like 
+    `flt_file.replace('_flt.fits','.[ext].mask.reg')`, where `[ext]` is an 
+    integer referring to the SCI extension in the FLT file.
+
+    """
+    import pyregion
+    
+    mask_files = glob.glob(flt_file.replace('_flt.fits','.*.mask.reg'))
+    if len(mask_files) == 0:
+        return True
+        
+    flt = pyfits.open(flt_file, mode='update')
+    for mask_file in mask_files:
+        ext = int(mask_file.split('.')[-3])
+        reg = pyregion.open(mask_file).as_imagecoord(flt['SCI',ext].header)
+        mask = reg.get_mask(hdu=flt['SCI',ext])
+        flt['DQ',ext].data[mask] |= dq_value
+    
+    flt.flush()
+    return True
+    
 def apply_saturated_mask(flt_file, dq_value=1024):
     """Saturated WFC3/IR pixels have some pulldown in the opposite amplifier
     
@@ -831,28 +863,42 @@ def add_external_sources(root='', maglim=20, fwhm=0.2, catalog='2mass'):
     if catalog == '2mass':
         cat = get_irsa_catalog(rd[0], rd[1], radius=radius, twomass=True)
         cat['mag'] = cat['h_m']+1.362 # AB
-        cat = cat[cat['mag'] < maglim]
-        table_to_regions(cat, '{0}.2mass.reg'.format(root))
+        table_to_regions(cat, '{0}_2mass.reg'.format(root))
     elif catalog == 'panstarrs':
-        cat = grizli.prep.get_panstarrs_catalog(rd[0], rd[1], radius=radius)
-        cat['mag'] = cat['rMeanKronMag']+0.14 # AB
-        cat = cat[cat['mag'] < maglim]
-        table_to_regions(cat, '{0}.panstarrs.reg'.format(root))
+        cat = get_panstarrs_catalog(rd[0], rd[1], radius=radius)
+        #cat['mag'] = cat['rMeanKronMag']+0.14 # AB
+        cat['mag'] = cat['iMeanKronMag']+0.35 # AB
+        table_to_regions(cat, '{0}_panstarrs.reg'.format(root))
+    elif catalog == 'ukidss':
+        cat = get_ukidss_catalog(rd[0], rd[1], radius=radius)
+        cat['mag'] = cat['HAperMag3']+1.362 # AB
+        cat.rename_column('RA','ra')
+        cat.rename_column('Dec','dec')
+        table_to_regions(cat, '{0}_ukidss.reg'.format(root))
     else:
         print('Not a valid catalog: ', catalog)
         return False
     
+    cat = cat[(cat['mag'] < maglim) & (cat['mag'] > 0)]
+    
+    print('{0}: {1} objects'.format(catalog, len(cat)))
+    if len(cat) == 0:
+        return False
+        
     xy = wcs.all_world2pix(cat['ra'], cat['dec'], 0)
     flux = sci[0].data*0.
     N = len(cat)
+    
     for i in range(N):
         print('Add object {0:3d}/{1:3d}, x={2:6.1f}, y={3:6.1f}, mag={4:6.2f}'.format(i, N, xy[0][i], xy[1][i], cat['mag'][i]))
         
         scale = 10**(-0.4*(cat['mag'][i]-ZP))
         
         src = models.Gaussian2D(amplitude=scale, x_mean=xy[0][i], y_mean=xy[1][i], x_stddev=fwhm/pscale/2.35, y_stddev=fwhm/pscale/2.35, theta=0.0)
-        flux += src(xp, yp)  
-    
+        m_i = src(xp, yp) 
+        flux += m_i
+        #ds9.view(flux)
+        
     clip = (wht[0].data == 0) & (flux > 1.e-6*flux.max())
     wht_val = np.percentile(wht[0].data, 95)
     wht[0].data[clip] = wht_val
@@ -863,7 +909,15 @@ def add_external_sources(root='', maglim=20, fwhm=0.2, catalog='2mass'):
     
     wht.writeto(wht_file.replace('_drz', '_{0}_drz'.format(catalog)), 
                 clobber=True)  
-                                          
+                        
+    if False:
+        # Mask
+        kern = (np.arange(flt.conf.conf['BEAMA'][1]) > flt.conf.conf['BEAMA'][0])*1.
+        kern /= kern.sum()
+        
+        mask = flt.direct['REF'] == 0
+        full_mask = nd.convolve(mask*1., kern.reshape((1,-1)), origin=(0,-kern.size//2+20))
+            
 def asn_to_dict(input_asn):
     """Convert an ASN file to a dictionary
     
@@ -895,6 +949,34 @@ def asn_to_dict(input_asn):
     
     return output
 
+def get_ukidss_catalog(ra=165., dec=34.8, radius=3, database='UKIDSSDR9PLUS',
+                       programme_id='LAS'):
+    """Query for objects in the UKIDSS catalogs
+    
+    Parameters
+    ----------
+    ra, dec : float
+        Center of the query region, decimal degrees
+    
+    radius : float
+        Radius of the query, in arcmin
+    
+    Returns
+    -------
+    table : `~astropy.table.Table`
+        Result of the query
+        
+    """
+
+    from astroquery.ukidss import Ukidss
+    
+    coo = coord.SkyCoord(ra*u.deg, dec*u.deg)
+    
+    table = Ukidss.query_region(coo, radius=radius*u.arcmin,
+                                database=database, programme_id=programme_id)
+    
+    return table
+    
 def get_sdss_catalog(ra=165.86, dec=34.829694, radius=3):
     """Query for objects in the SDSS photometric catalog 
     
@@ -1078,7 +1160,7 @@ def get_gaia_catalog(ra=165.86, dec=34.829694, radius=3.):
     table = Table.read('gaia.vot', format='votable')
     return table
 
-def get_panstarrs_catalog(ra=0., dec=0., radius=3, columns='objName,objID,raStack,decStack,raStackErr,decStackErr,rMeanKronMag,rMeanKronMagErr', max_records=10000):
+def get_panstarrs_catalog(ra=0., dec=0., radius=3, columns='objName,objID,raStack,decStack,raStackErr,decStackErr,rMeanKronMag,rMeanKronMagErr,iMeanKronMag,iMeanKronMagErr', max_records=10000):
     """TBD
     """
     try:
@@ -1184,7 +1266,8 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, ref
             radec = '{0}_{1}.radec'.format(product, ref_src.lower())
             ref_catalog = ref_src
             has_catalog = True
-            break
+            if len(ref_cat) > 0:
+                break
         except:
             print('{0} query failed'.format(ref_src))
             has_catalog = False
@@ -2622,3 +2705,77 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, m
                      resetbits=0)
         
         clean_drizzle(group['product'])
+
+def manual_alignment(visit, ds9, reference=None, reference_catalogs=['SDSS', 'PS1', 'GAIA', 'WISE']):
+    """Manual alignment of a visit with respect to an external region file
+    
+    Parameters
+    ----------
+    visit : dict
+        List of visit information from `~grizli.utils.parse_flt_files`.
+    
+    ds9 : `~pyds9.DS9`
+        DS9 instance for interaction.  Requires the `view` method implemented
+        in the fork at https://github.com/gbrammer/pyds9.
+        
+    reference : str
+        Filename of a DS9 region file that will be used as reference.  If 
+        None, then tries to find a local file based on the `visit['product']`.
+        
+    reference_catalogs : list
+        If no valid `reference` file provided or found, query external 
+        catalogs with `~grizli.prep.get_radec_catalog`.  The external 
+        catalogs will be queried in the order specified in this list.
+    
+    
+    Returns
+    -------
+    Generates a file like `{{0}}.align_guess'.format(visit['product'])` that 
+    the alignment scripts know how to read.
+        
+    .. note::
+
+    The alignment here is done interactively in the DS9 window.  The script
+    prompts you to first center the frame on a source in the image itself, 
+    which can be done in "panning" mode.  After centering, hit <enter> in the
+    command line.  The script will then prompt to center the frame on the 
+    corresponding region from the reference file.  After recentering, type 
+    enter again and the output file will be computed and stored.
+    
+    If you wish to break out of the script and not generate the output file, 
+    type any character in the terminal at the first pause/prompt.
+    
+    """
+    import os
+    
+    im = pyfits.open('../RAW/'+visit['files'][0])
+    ra, dec = im[1].header['CRVAL1'], im[1].header['CRVAL2']
+    
+    if reference is None:
+        reg_files = glob.glob('{0}_*reg'.format(visit['product']))
+        if len(reg_files) == 0:
+            get_radec_catalog(ra=ra, dec=dec, radius=3., 
+                              product=visit['product'], verbose=True,
+                              reference_catalogs=reference_catalogs)
+        
+        reg_files = glob.glob('{0}_*reg'.format(visit['product']))
+        reference = os.path.join(os.getcwd(), reg_files[0])
+    
+    print(visit['product'], reference)
+
+    #im = pyfits.open('{0}_drz_sci.fits'.format(visit['product']))
+    ds9.view(im[1].data, header=im[1].header)
+    ds9.set('regions file '+reference)
+    x = input('pan to object in image: ')
+    if x:
+        print('Input detected ({0}).  Abort.'.format(x))
+        return False
+
+    x0 = np.cast[float](ds9.get('pan image').split())
+    x = input('pan to object in region: ')
+    x1 = np.cast[float](ds9.get('pan image').split())
+    
+    print ('Saved {0}.align_guess'.format(visit['product']))
+    
+    np.savetxt('{0}.align_guess'.format(visit['product']), [[x0[0]-x1[0], x0[1]-x1[1], 0, 1].__repr__()[1:-1].replace(',', '')], fmt='%s')
+        
