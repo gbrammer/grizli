@@ -1640,7 +1640,8 @@ class GrismFLT(object):
         self.catalog_file = None
                            
         self.is_rotated = False
-            
+        self.has_edge_mask = False
+        
     def process_ref_file(self, ref_file, ref_ext=0, shrink_segimage=True,
                          verbose=True):
         """Read and blot a reference image
@@ -2527,7 +2528,46 @@ class GrismFLT(object):
             #print('xx Rotate catalog {0}'.format(rot))
             self.catalog = self.blot_catalog(self.catalog, 
                           sextractor=('X_WORLD' in self.catalog.colnames))
+    
+    def make_edge_mask(self, scale=3, force=False):
+        """Make a mask for the edge of the grism FoV that isn't covered by the direct image
+        
+        Parameters
+        ----------
+        scale : float
+            Scale factor to multiply to the mask before it's applied to the 
+            `self.grism.data['ERR']` array.
+        
+        force : bool
+             Force apply the mask even if `self.has_edge_mask` is set 
+             indicating that the function has already been run.
+             
+        Returns
+        -------
+        Nothing, updates `self.grism.data['ERR']` in place.  
+        Sets `self.has_edge_mask = True`.
+        
+        """
+        import scipy.ndimage as nd
+        
+        if (self.has_edge_mask) & (force == False):
+            return True
             
+        kern = (np.arange(self.conf.conf['BEAMA'][1]) > self.conf.conf['BEAMA'][0])*1.
+        kern /= kern.sum()
+        
+        if self.direct['REF'] is not None:
+            mask = self.direct['REF'] == 0
+        else:
+            mask = self.direct['SCI'] == 0
+            
+        full_mask = nd.convolve(mask*1., kern.reshape((1,-1)),
+                                origin=(0,-kern.size//2+20))
+        
+        self.grism.data['ERR'] *= np.exp(full_mask*scale)
+        
+        self.has_edge_mask = True
+        
 class BeamCutout(object):
     def __init__(self, flt=None, beam=None, conf=None, 
                  get_slice_header=True, fits_file=None, scale=1., 
@@ -2975,11 +3015,13 @@ class BeamCutout(object):
                 
         ### Distorted WCS
         crpix = self.direct.wcs.wcs.crpix
+        
         xref = [crpix[0], crpix[0]+1]
         yref = [crpix[1], crpix[1]]
         r, d = self.direct.wcs.all_pix2world(xref, yref, 1)
         pa =  Angle((extra + 
-                     np.arctan2(np.diff(r), np.diff(d))[0]/np.pi*180)*u.deg)
+                     np.arctan2(np.diff(r)*np.cos(d[0]/180*np.pi),
+                                np.diff(d))[0]/np.pi*180)*u.deg)
         
         dispersion_PA = pa.wrap_at(360*u.deg).value
         if decimals is not None:
