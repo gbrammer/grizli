@@ -896,6 +896,27 @@ class MultiBeam():
             
         self.id = self.beams[0].id
         
+        # Use WFC3 ePSF for the fit
+        if psf & (self.beams[i].grism.instrument == 'WFC3'):
+            # Crude for now:  overwrite `beam.compute_model` methods with 
+            # the `compute_model_psf`
+            for ib, beam in enumerate(self.beams):
+                if beam.direct.data['REF'] is not None:
+                    
+                    # Use REF extension.  scale factors might be wrong
+                    beam.direct.data['SCI'] = beam.direct.data['REF'] 
+                    beam.direct.data['ERR'] *= beam.direct.ref_photflam
+                    beam.direct.filter = beam.direct.ref_filter #'F160W'
+                    beam.direct.photflam = beam.direct.ref_photflam
+                
+                beam.init_epsf(yoff = 0.06)
+                beam.compute_model = beam.compute_model_psf
+                beam.beam.compute_model = beam.compute_model_psf
+                beam.compute_model()
+                m = beam.compute_model(in_place=False)
+                beam.modelf = beam.model.flatten()
+                beam.model = beam.modelf.reshape(beam.beam.sh_beam)
+                
         self.poly_order = None
         
         self.shapes = [beam.model.shape for beam in self.beams]
@@ -942,7 +963,8 @@ class MultiBeam():
         self.init_poly_coeffs(poly_order=1)
         
         self.ra, self.dec = self.beams[0].get_sky_coords()
-                
+        
+        
     def write_beam_fits(self, verbose=True):
         """TBD
         """
@@ -1392,7 +1414,8 @@ class MultiBeam():
     def fit_stars(self, poly_order=1, fitter='nnls', fit_background=True, 
                   verbose=True, make_figure=True, zoom=None,
                   delta_chi2_threshold=0.004, zr=0, dz=0, fwhm=0, 
-                  prior=None, templates={}, figsize=[8,5]):
+                  prior=None, templates={}, figsize=[8,5],
+                  fsps_templates=False):
         """TBD
         """
         
@@ -2749,28 +2772,54 @@ def drizzle_2d_spectrum(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
         ### Contamination-cleaned
         adrizzle.do_driz(data_i, beam_wcs, wht, output_wcs, 
                          outsci, outwht, outctx, 1., 'cps', 1,
-                         wcslin_pscale=1.0, uniqid=1, 
+                         wcslin_pscale=1., uniqid=1, 
                          pixfrac=pixfrac, kernel=kernel, fillval=0, 
                          stepsize=10, wcsmap=None)
         
         # For variance
         adrizzle.do_driz(contam_weight, beam_wcs, wht, output_wcs, 
                          outvar, outwv, outcv, 1., 'cps', 1,
-                         wcslin_pscale=1.0, uniqid=1, 
+                         wcslin_pscale=1., uniqid=1, 
                          pixfrac=pixfrac, kernel=kernel, fillval=0, 
                          stepsize=10, wcsmap=None)
         
         if ds9 is not None:
             ds9.view(outsci/output_wcs.pscale**2, header=out_header)
+        
+        # if False:
+        #     # Plot the spectra for testing
+        #     w, f, e = beam.beam.trace_extract(data_i, ivar=wht, r=3)
+        #     clip = (f/e > 0.5) 
+        #     clip &= (e < 2*np.median(e[clip]))
+        #     plt.errorbar(w[clip], f[clip], e[clip], marker='.', color='k', alpha=0.5, ecolor='0.8', linestyle='None')
+        #     dw = np.median(np.diff(w))
+        
+    ### Correct for drizzle scaling    
+    area_ratio = 1./output_wcs.pscale**2
     
-    ### Correct for drizzle scaling
-    outsci /= output_wcs.pscale**2
+    ### Preserve flux (has to preserve aperture flux along spatial axis but
+    ### average in spectral axis).
+    area_ratio *= spatial_scale
+    
+    # science
+    outsci *= area_ratio
     
     # variance
-    outvar /= outwv*output_wcs.pscale**2
+    outvar *= area_ratio/outwv
     outwht = 1/outvar
     outwht[(outvar == 0) | (~np.isfinite(outwht))] = 0
     
+    # if True:
+    #     # Plot for testing....
+    #     yp, xp = np.indices(outsci.shape)
+    #     mask = np.abs(yp-NY) <= 3/spatial_scale
+    #     fl = (outsci*mask).sum(axis=0)
+    #     flv = (1/outwht*mask).sum(axis=0)
+    #     
+    #     wi = grizli.stack.StackedSpectrum.get_wavelength_from_header(out_header) 
+    #     
+    #     plt.errorbar(wi[:-1], fl[1:], np.sqrt(flv)[1:], alpha=0.8) #*area_ratio)
+            
     #return outwht, outsci, outvar, outwv, output_wcs.pscale
         
     p = pyfits.PrimaryHDU()
@@ -3361,12 +3410,19 @@ def drizzle_2d_spectrum_wcs(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
         
         if ds9 is not None:
             ds9.view(outsci, header=out_header)
-    
+        
+        # if True:
+        #     w, f, e = beam.beam.optimal_extract(data_i, ivar=beam.ivar)
+        #     plt.scatter(w, f, marker='.', color='k', alpha=0.5)
+            
     ### Correct for drizzle scaling
     #outsci /= output_wcs.pscale**2
     outls /= output_wcs.pscale**2
     wave = np.median(outls, axis=0)
-
+    
+    # # Testing
+    # fl = (sp[1].data*mask).sum(axis=0)
+    
     # variance
     outvar /= outwv#*output_wcs.pscale**2
     outwht = 1/outvar
