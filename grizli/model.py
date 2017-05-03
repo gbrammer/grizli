@@ -1840,9 +1840,10 @@ class GrismFLT(object):
         xref = [crpix[0], crpix[0]+1]
         yref = [crpix[1], crpix[1]]
         r, d = self.direct.wcs.all_pix2world(xref, yref, 1)
-        pa =  Angle((extra + 
-                     np.arctan2(np.diff(r), np.diff(d))[0]/np.pi*180)*u.deg)
-        
+        pa = Angle((extra + 
+                    np.arctan2(np.diff(r)*np.cos(d[0]/180*np.pi),
+                               np.diff(d))[0]/np.pi*180)*u.deg)
+                        
         self.dispersion_PA = pa.wrap_at(360*u.deg).value
         
     def compute_model_orders(self, id=0, x=None, y=None, size=10, mag=-1,
@@ -3019,9 +3020,9 @@ class BeamCutout(object):
         xref = [crpix[0], crpix[0]+1]
         yref = [crpix[1], crpix[1]]
         r, d = self.direct.wcs.all_pix2world(xref, yref, 1)
-        pa =  Angle((extra + 
-                     np.arctan2(np.diff(r)*np.cos(d[0]/180*np.pi),
-                                np.diff(d))[0]/np.pi*180)*u.deg)
+        pa = Angle((extra + 
+                    np.arctan2(np.diff(r)*np.cos(d[0]/180*np.pi),
+                               np.diff(d))[0]/np.pi*180)*u.deg)
         
         dispersion_PA = pa.wrap_at(360*u.deg).value
         if decimals is not None:
