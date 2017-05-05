@@ -47,7 +47,7 @@ grism_limits = {'G800L':[0.545, 1.02, 50.], # ACS/WFC
            'F140M':[1.20,1.60, 45.0],
            'CLEARP':[0.76, 2.3,45.0]}
 
-default_line_list = ['SIII', 'SII', 'Ha', 'OI-6302', 'OIII', 'Hb', 'OIII-4363', 'Hg', 'Hd', 'NeIII', 'OII', 'MgII']
+default_line_list = ['SIII', 'SII', 'Ha', 'OI-6302', 'OIII', 'Hb', 'OIII-4363', 'Hg', 'Hd', 'NeIII', 'OII', 'MgII','Lya']
 
 def test():
     
@@ -1387,7 +1387,7 @@ class MultiBeam():
         if line_complexes:
             #line_list = ['Ha+SII', 'OIII+Hb+Ha', 'OII']
             #line_list = ['Ha+SII', 'OIII+Hb', 'OII']
-            line_list = ['Ha+NII+SII+SIII+He', 'OIII+Hb', 'OII+Ne']
+            line_list = ['Ha+NII+SII+SIII+He', 'OIII+Hb', 'OII+Ne', 'Lya']
         else:
             if full_line_list is None:
                 line_list = default_line_list
