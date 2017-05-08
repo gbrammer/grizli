@@ -207,7 +207,9 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
             orig_file['DQ',ext].data |= 4*flat_dq
             orig_file['SCI',ext].data *= grism_pfl/flat
         
-        orig_file[0].header['NPOLFILE'] = 'jref$v971826jj_npl.fits' # F814W
+        if orig_file[0].header['NPOLFILE'] == 'N/A':
+            # Use an F814W file, but this should be updated
+            orig_file[0].header['NPOLFILE'] = 'jref$v971826jj_npl.fits'
     
     if head['INSTRUME'] == 'WFPC2':
         head['DETECTOR'] = 'WFPC2'
@@ -718,7 +720,7 @@ def table_to_radec(table, output='coords.radec'):
     
     table[rc, dc].write(output, format='ascii.commented_header')
     
-def table_to_regions(table, output='ds9.reg'):
+def table_to_regions(table, output='ds9.reg', comment=None):
     """Make a DS9 region file from a table object
     """
     fp = open(output,'w')
@@ -735,20 +737,34 @@ def table_to_regions(table, output='ds9.reg'):
         e = np.maximum(e, 0.1)
     else:
         e  = np.ones(len(table))*0.5
-        
+    
     lines = ['circle({0:.7f}, {1:.7f}, {2:.3f}")\n'.format(table[rc][i],
                                                            table[dc][i], e[i])
                                               for i in range(len(table))]
-
+    
+    if comment is not None:
+        for i in range(len(table)):
+            lines[i] = '{0} # text={{{1}}}\n'.format(lines[i].strip(), comment[i])
+                                                      
     fp.writelines(lines)
     fp.close()
     
-def make_drz_catalog(root='', threshold=2., get_background=True, 
-                     verbose=True, extra_config={}, sci=None, get_sew=False):
+SEXTRACTOR_DEFAULT_PARAMS = ["NUMBER", "X_IMAGE", "Y_IMAGE", "X_WORLD",
+                    "Y_WORLD", "A_IMAGE", "B_IMAGE", "THETA_IMAGE", 
+                    "MAG_AUTO", "MAGERR_AUTO", "FLUX_AUTO", "FLUXERR_AUTO",
+                    "FLUX_RADIUS", "BACKGROUND", "FLAGS"]
+
+SEXTRACTOR_PHOT_APERTURES = "6, 8.335, 16.337, 20"
+                    
+def make_drz_catalog(root='', sexpath='sex',threshold=2., get_background=True, 
+                     verbose=True, extra_config={}, sci=None, wht=None, 
+                     get_sew=False, output_params=SEXTRACTOR_DEFAULT_PARAMS,
+                     phot_apertures=SEXTRACTOR_PHOT_APERTURES):
     """Make a SExtractor catalog from drizzle products
     
     TBD
     """
+    import copy
     import sewpy
     
     if sci is not None:
@@ -782,6 +798,9 @@ def make_drz_catalog(root='', threshold=2., get_background=True,
         WEIGHT_TYPE = "NONE"
     else:
         WEIGHT_TYPE = "MAP_WEIGHT"
+    
+    if wht is not None:
+        weight_file = wht
         
     config = OrderedDict(DETECT_THRESH=threshold, ANALYSIS_THRESH=threshold,
               DETECT_MINAREA=6,
@@ -792,22 +811,38 @@ def make_drz_catalog(root='', threshold=2., get_background=True,
               CHECKIMAGE_NAME='{0}_seg.fits'.format(root),
               MAG_ZEROPOINT=ZP, 
               CLEAN="N", 
-              PHOT_APERTURES="6, 8.335, 16.337, 20",
-              BACK_SIZE=32)
+              PHOT_APERTURES=SEXTRACTOR_PHOT_APERTURES,
+              BACK_SIZE=32,
+              PIXEL_SCALE=0,
+              MEMORY_OBJSTACK=30000,
+              MEMORY_PIXSTACK=3000000,
+              MEMORY_BUFSIZE=8192)
     
     if get_background:
         config['CHECKIMAGE_TYPE'] = 'SEGMENTATION,BACKGROUND'
         config['CHECKIMAGE_NAME'] = '{0}_seg.fits,{0}_bkg.fits'.format(root)
-    
+    else:
+        config['BACK_TYPE'] = 'MANUAL'
+        config['BACK_VALUE'] = 0.
+        
     for key in extra_config:
         config[key] = extra_config[key]
-        
-    sew = sewpy.SEW(params=["NUMBER", "X_IMAGE", "Y_IMAGE", "X_WORLD",
-                    "Y_WORLD", "A_IMAGE", "B_IMAGE", "THETA_IMAGE", 
-                    "MAG_AUTO", "MAGERR_AUTO", "FLUX_AUTO", "FLUXERR_AUTO",
-                    "FLUX_APER", "FLUXERR_APER",
-                    "FLUX_RADIUS", "BACKGROUND", "FLAGS"],
-                    config=config)
+    
+    params = copy.copy(output_params)
+    NAPER = len(phot_apertures.split(','))
+    if NAPER == 1:
+        if not phot_apertures.split(',')[0]:
+            NAPER = 0
+    
+    if NAPER > 0:
+        params.extend(['FLUX_APER({0})'.format(NAPER),
+                       'FLUXERR_APER({0})'.format(NAPER)])
+        # if NAPER > 1:
+        #     for i in range(NAPER-1):
+        #         params.extend(['FLUX_APER{0}'.format(i+1),
+        #                        'FLUXERR_APER{0}'.format(i+1)])
+            
+    sew = sewpy.SEW(params=params, config=config)
     
     if get_sew:
         return sew
@@ -1369,8 +1404,33 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
     if not skip_grism:
         for file in grism['files']:
             fresh_flt_file(file)
+            
+            # Need to force F814W filter for updatewcs
+            if isACS:
+                flc = pyfits.open(file, mode='update')
+                if flc[0].header['INSTRUME'] == 'ACS':
+                    changed_filter = True
+                    flc[0].header['FILTER1'] = 'CLEAR1L'
+                    flc[0].header['FILTER2'] = 'F814W'
+                    flc.flush()
+                    flc.close()
+                else:
+                    changed_filter = False
+                    flc.close()
+            else:
+                changed_filter = False
+                     
+            # Run updatewcs 
             updatewcs.updatewcs(file, verbose=False)
-    
+            
+            # Change back
+            if changed_filter:
+                flc = pyfits.open(file, mode='update')
+                flc[0].header['FILTER1'] = 'CLEAR2L'
+                flc[0].header['FILTER2'] = 'G800L'
+                flc.flush()
+                flc.close()
+                
         ### Make ASN
         asn = asnutil.ASNTable(grism['files'], output=grism['product'])
         asn.create()
@@ -1922,7 +1982,12 @@ def find_direct_grism_pairs(direct={}, grism={}, check_pixel=[507, 507],
          
     for file in grism['files']:
         im = pyfits.open(file)
-        grism_wcs[file] = pywcs.WCS(im[1].header, relax=True, key=key)
+        if '_flc' in file:
+            grism_wcs[file] = pywcs.WCS(im[1].header, relax=True, key=key, 
+                                        fobj=im)
+        else:
+            grism_wcs[file] = pywcs.WCS(im[1].header, relax=True, key=key)
+        
         #print file
         delta_min = 10
         for d in direct['files']:

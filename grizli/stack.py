@@ -955,20 +955,23 @@ class StackFitter(object):
             wmax = np.maximum(wmax, w.max())
             wmin = np.minimum(wmin, w.min())
                     
-        axc.semilogx()
+        axc.set_xlim(wmin, wmax)
+        axc.semilogx(subsx=[wmax])
+        #axc.set_xticklabels([])
         axc.set_xlabel(r'$\lambda$')
         axc.set_ylabel(r'$f_\lambda \times 10^{-19}$')
-        axc.xaxis.set_major_locator(MultipleLocator(0.1))
+        #axc.xaxis.set_major_locator(MultipleLocator(0.1))
         
         axc.set_ylim(ymin-0.2*ymax, 1.2*ymax)
         axc.grid()
                 
         for ax in [axc]: #[axa, axb, axc]:
-            ax.set_xlim(wmin, wmax)
+            
             labels = np.arange(np.ceil(wmin*10), np.ceil(wmax*10))/10.
-            ax.set_xticklabels(labels)
             ax.set_xticks(labels)
-            #print(wmin, wmax)
+            ax.set_xticklabels(labels)
+            #ax.set_xticklabels([])
+            #print(labels, wmin, wmax)
             
         if show_2d:
             for ax in twod_axes:
