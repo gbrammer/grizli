@@ -469,10 +469,20 @@ class GroupFLT():
         generate separate `GroupFLT` instances for different grisms and 
         reference images with different filters.
         """
+        import copy
         self.FLTs.extend(new.FLTs)
         self.N = len(self.FLTs)
-        self.direct_files.extend(new.direct_files)
-        self.grism_files.extend(new.grism_files)
+        
+        direct_files = copy.copy(self.direct_files)
+        direct_files.extend(new.direct_files)
+        self.direct_files = direct_files
+
+        grism_files = copy.copy(self.grism_files)
+        grism_files.extend(new.grism_files)
+        self.grism_files = grism_files
+                        
+        # self.direct_files.extend(new.direct_files)
+        # self.grism_files.extend(new.grism_files)
         
         if verbose:
             print('Now we have {0:d} FLTs'.format(self.N))
@@ -2934,11 +2944,15 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
         beam_header, beam_wcs = beam.get_wavelength_wcs(wave)
         ## Make sure CRPIX set correctly for the SIP header
         for j in [0,1]: 
-            if beam_wcs.sip is not None:
-                beam_wcs.sip.crpix[j] = beam_wcs.wcs.crpix[j]
+            # if beam_wcs.sip is not None:
+            #     beam_wcs.sip.crpix[j] = beam_wcs.wcs.crpix[j]
             if beam.direct.wcs.sip is not None:
                 beam.direct.wcs.sip.crpix[j] = beam.direct.wcs.wcs.crpix[j]
-        
+            
+            for wcs_ext in [beam_wcs.sip, beam_wcs.cpdis1, beam_wcs.cpdis2, beam_wcs.det2im1, beam_wcs.det2im2]:
+                if wcs_ext is not None:
+                    wcs_ext.crpix[j] = beam_wcs.wcs.crpix[j]
+                    
         beam_data = beam.grism.data['SCI'] - beam.contam 
         beam_continuum = beam.model*1
         
@@ -3331,13 +3345,20 @@ def drizzle_2d_spectrum_wcs(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
         
         # Shift SIP reference
         dx_sip = beam.grism.origin[1] - beam.direct.origin[1]
-        beam_wcs.sip.crpix[0] += dx_sip
-        
+        #beam_wcs.sip.crpix[0] += dx_sip
+        for wcs_ext in [beam_wcs.sip, beam_wcs.cpdis1, beam_wcs.cpdis2, beam_wcs.det2im1, beam_wcs.det2im2]:
+            if wcs_ext is not None:
+                wcs_ext.crpix[0] += dx_sip
+                
         # Shift y for trace
         xy0 = beam.grism.wcs.all_world2pix(output_wcs.wcs.crval.reshape((1,2)),0)[0]
         dy = np.interp(xy0[0], np.arange(beam.beam.sh_beam[1]), beam.beam.ytrace)
-        beam_wcs.sip.crpix[1] += dy
+        #beam_wcs.sip.crpix[1] += dy
         beam_wcs.wcs.crpix[1] += dy
+        
+        for wcs_ext in [beam_wcs.sip, beam_wcs.cpdis1, beam_wcs.cpdis2, beam_wcs.det2im1, beam_wcs.det2im2]:
+            if wcs_ext is not None:
+                wcs_ext.crpix[1] += dy
         
         d_beam_wcs = beam.direct.wcs
         if beam.direct['REF'] is None:

@@ -338,7 +338,12 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
                     flt_file = '../RAW/'+flt_file
                     
                 flt_j = pyfits.open(flt_file)
-                wcs_j = pywcs.WCS(flt_j['SCI',1])
+                h = flt_j[0].header
+                if (h['INSTRUME'] == 'WFC3') & (h['DETECTOR'] == 'IR'):
+                    wcs_j = pywcs.WCS(flt_j['SCI',1])
+                else:
+                    wcs_j = pywcs.WCS(flt_j['SCI',1], fobj=flt_j)
+                    
                 fp_j = Polygon(wcs_j.calc_footprint())
                 if j == 0:
                     fp_i = fp_j
@@ -445,7 +450,7 @@ def parse_grism_associations(exposure_groups,
         f_i = exposure_groups[i]['product'].split('-')[-1]
         root_i = exposure_groups[i]['product'].split('-'+f_i)[0]
         
-        if f_i.startswith('g1'):
+        if f_i.startswith('g'):
             group = OrderedDict(grism=exposure_groups[i], 
                                 direct=None)
         else:
@@ -458,7 +463,7 @@ def parse_grism_associations(exposure_groups,
         #print('\nx\n')
         for j in range(N):
             f_j = exposure_groups[j]['product'].split('-')[-1]
-            if f_j.startswith('g1'):
+            if f_j.startswith('g'):
                 continue
                  
             fp_j = exposure_groups[j]['footprint']
@@ -1474,7 +1479,10 @@ def fetch_config_files(ACS=False):
     if ACS:
         tarfiles.append('http://www.stsci.edu/~brammer/Grizli/Files/' + 
                         'ACS.WFC.sky.tar.gz')
-    
+
+        tarfiles.append('http://www.stsci.edu/~brammer/Grizli/Files/' + 
+                        'ACS_CONFIG.tar.gz')
+                        
     for url in tarfiles:
         file=os.path.basename(url)
         if not os.path.exists(file):

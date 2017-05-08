@@ -828,7 +828,8 @@ class ImageData(object):
             Corresponding parameters for the reference image, if necessary.
             
         """
-                
+        import copy
+          
         ### Easy way, get everything from an image HDU list
         if isinstance(hdulist, pyfits.HDUList):
             sci = np.cast[np.float32](hdulist['SCI',sci_extn].data)
@@ -845,7 +846,11 @@ class ImageData(object):
             self.parent_file = hdulist.filename()
             
             header = hdulist['SCI',sci_extn].header.copy()
-            
+            if 'Lookup' in header['CPDIS1']:
+                self.wcs_is_lookup = True
+            else:
+                self.wcs_is_lookup = False
+                
             status = False
             for ext in [0, ('SCI',sci_extn)]:
                 h = hdulist[ext].header
@@ -1028,7 +1033,20 @@ class ImageData(object):
         """Get WCS from header"""
         import numpy.linalg
         
-        self.wcs = pywcs.WCS(self.header, relax=True)
+        if self.wcs_is_lookup:
+            fobj = pyfits.open(self.parent_file)
+            
+            try:
+                import stwcs
+                ext = self.header['EXTVER']
+                self.wcs = stwcs.wcsutil.hstwcs.HSTWCS(fobj=fobj, ext=ext)
+            except:
+                self.wcs = pywcs.WCS(self.header, relax=True, fobj=fobj)
+                
+        else:
+            fobj = None
+            self.wcs = pywcs.WCS(self.header, relax=True, fobj=fobj)
+        
         if not hasattr(self.wcs, 'pscale'):
             # self.wcs.pscale = np.sqrt(self.wcs.wcs.cd[0,0]**2 +
             #                           self.wcs.wcs.cd[1,0]**2)*3600.
@@ -1075,9 +1093,15 @@ class ImageData(object):
         self.header['CRPIX2'] += pad        
         self.wcs.wcs.crpix[0] += pad
         self.wcs.wcs.crpix[1] += pad
-        if self.wcs.sip is not None:
-            self.wcs.sip.crpix[0] += pad
-            self.wcs.sip.crpix[1] += pad           
+        
+        # if self.wcs.sip is not None:
+        #     self.wcs.sip.crpix[0] += pad
+        #     self.wcs.sip.crpix[1] += pad           
+        
+        for wcs_ext in [self.wcs.sip, self.wcs.cpdis1, self.wcs.cpdis2, self.wcs.det2im1, self.wcs.det2im2]:
+            if wcs_ext is not None:
+                wcs_ext.crpix[0] += pad
+                wcs_ext.crpix[1] += pad           
     
     def shrink_large_hdu(self, hdu=None, extra=100, verbose=False):
         """Shrink large image mosaic to speed up blotting
@@ -1228,7 +1252,7 @@ class ImageData(object):
         if segmentation:
             seg_ones = np.cast[np.float32](refdata > 0)-1
         
-        ref_wcs = pywcs.WCS(hdu.header)        
+        ref_wcs = pywcs.WCS(hdu.header, relax=True)        
         flt_wcs = self.wcs.copy()
         
         ### Fix some wcs attributes that might not be set correctly
@@ -1366,7 +1390,27 @@ class ImageData(object):
             if slice_obj.wcs.sip is not None:
                 for c in [0,1]:
                     slice_obj.wcs.sip.crpix[c] = slice_obj.wcs.wcs.crpix[c]
+        
+        if hasattr(slice_obj.wcs, 'cpdis1'):
+            if slice_obj.wcs.cpdis1 is not None:
+                for c in [0,1]:
+                    slice_obj.wcs.cpdis1.crpix[c] = slice_obj.wcs.wcs.crpix[c]
+        
+        if hasattr(slice_obj.wcs, 'cpdis2'):
+            if slice_obj.wcs.cpdis2 is not None:
+                for c in [0,1]:
+                    slice_obj.wcs.cpdis2.crpix[c] = slice_obj.wcs.wcs.crpix[c]
                     
+        if hasattr(slice_obj.wcs, 'det2im1'):
+            if slice_obj.wcs.det2im1 is not None:
+                for c in [0,1]:
+                    slice_obj.wcs.det2im1.crpix[c] = slice_obj.wcs.wcs.crpix[c]
+        
+        if hasattr(slice_obj.wcs, 'det2im2'):
+            if slice_obj.wcs.det2im2 is not None:
+                for c in [0,1]:
+                    slice_obj.wcs.det2im2.crpix[c] = slice_obj.wcs.wcs.crpix[c]
+                           
         return slice_obj#, slx, sly
     
     def get_HDUList(self, extver=1):
@@ -2422,7 +2466,7 @@ class GrismFLT(object):
                                    name='MODEL'))
         
         
-        hdu.writeto('{0}_GrismFLT.fits'.format(root), clobber=True, 
+        hdu.writeto('{0}.GrismFLT.fits'.format(root), clobber=True, 
                     output_verify='fix')
         
         ## zero out large data objects
@@ -2895,7 +2939,7 @@ class BeamCutout(object):
         ### Update CRPIX
         dc = 0 # python array center to WCS pixel center
         
-        for wcs_ext in [wcs.sip, wcs.wcs]:
+        for wcs_ext in [wcs.sip, wcs.wcs, wcs.cpdis1, wcs.cpdis2, wcs.det2im1, wcs.det2im2]:
             if wcs_ext is None:
                 continue
             else:
@@ -2905,10 +2949,15 @@ class BeamCutout(object):
             cr[1] += dy + dc
         
         ### Make SIP CRPIX match CRPIX
-        if wcs.sip is not None:
-            for i in [0,1]:
-                wcs.sip.crpix[i] = wcs.wcs.crpix[i]
-                    
+        # if wcs.sip is not None:
+        #     for i in [0,1]:
+        #         wcs.sip.crpix[i] = wcs.wcs.crpix[i]
+        
+        for wcs_ext in [wcs.sip, wcs.cpdis1, wcs.cpdis2, wcs.det2im1, wcs.det2im2]:
+            if wcs_ext is not None:
+                for i in [0,1]:
+                    wcs_ext.crpix[i] = wcs.wcs.crpix[i]
+        
         ### WCS header
         header = wcs.to_header(relax=True)
         for key in header:
