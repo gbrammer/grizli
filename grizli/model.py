@@ -846,11 +846,14 @@ class ImageData(object):
             self.parent_file = hdulist.filename()
             
             header = hdulist['SCI',sci_extn].header.copy()
-            if 'Lookup' in header['CPDIS1']:
-                self.wcs_is_lookup = True
+            if 'CPDIS1' in header:
+                if 'Lookup' in header['CPDIS1']:
+                    self.wcs_is_lookup = True
+                else:
+                    self.wcs_is_lookup = False
             else:
                 self.wcs_is_lookup = False
-                
+                    
             status = False
             for ext in [0, ('SCI',sci_extn)]:
                 h = hdulist[ext].header
@@ -1039,14 +1042,18 @@ class ImageData(object):
             try:
                 import stwcs
                 ext = self.header['EXTVER']
-                self.wcs = stwcs.wcsutil.hstwcs.HSTWCS(fobj=fobj, ext=ext)
+                #print(self.parent_file, 'Extension: {0}'.format(ext))
+                self.wcs = stwcs.wcsutil.hstwcs.HSTWCS(fobj=fobj, ext=('SCI',ext))
+                if self.pad > 0:
+                    self.wcs = self.add_padding_to_wcs(self.wcs, pad=self.pad)
+                
             except:
                 self.wcs = pywcs.WCS(self.header, relax=True, fobj=fobj)
                 
         else:
             fobj = None
             self.wcs = pywcs.WCS(self.header, relax=True, fobj=fobj)
-        
+                    
         if not hasattr(self.wcs, 'pscale'):
             # self.wcs.pscale = np.sqrt(self.wcs.wcs.cd[0,0]**2 +
             #                           self.wcs.wcs.cd[1,0]**2)*3600.
@@ -1057,7 +1064,37 @@ class ImageData(object):
             self.wcs.pscale = utils.get_wcs_pscale(self.wcs)
             
             #print '%s, PSCALE: %.4f' %(self.parent_file, self.wcs.pscale)
-            
+    
+    @staticmethod
+    def add_padding_to_wcs(wcs_in, pad=200):
+        """Pad the appropriate WCS keywords"""
+        wcs = wcs_in.deepcopy()
+        
+        for attr in ['naxis1', '_naxis1', 'naxis2', '_naxis2']:
+            if hasattr(wcs, attr):
+                value = wcs.__getattribute__(attr) 
+                wcs.__setattr__(attr, value+2*pad)
+        
+        wcs.naxis1 = wcs._naxis1
+        wcs.naxis2 = wcs._naxis2
+        
+        wcs.wcs.crpix[0] += pad
+        wcs.wcs.crpix[1] += pad
+        
+        # Pad CRPIX for SIP
+        for wcs_ext in [wcs.sip]:
+            if wcs_ext is not None:
+                wcs_ext.crpix[0] += pad
+                wcs_ext.crpix[1] += pad           
+        
+        # Pad CRVAL for Lookup Table, if necessary (e.g., ACS)        
+        for wcs_ext in [wcs.cpdis1, wcs.cpdis2, wcs.det2im1, wcs.det2im2]:
+            if wcs_ext is not None:
+                wcs_ext.crval[0] += pad
+                wcs_ext.crval[1] += pad
+        
+        return wcs
+        
     def add_padding(self, pad=200):
         """Pad the data array and update WCS keywords"""
         
@@ -1074,10 +1111,6 @@ class ImageData(object):
             new_data = np.zeros(new_sh, dtype=data.dtype)
             new_data[pad:-pad, pad:-pad] += data
             self.data[key] = new_data
-            
-        # new_sci = np.zeros(new_sh, dtype=self.sci.dtype)
-        # new_sci[pad:-pad,pad:-pad] = self.sci
-        # self.sci = new_sci
         
         self.sh = new_sh
         self.pad += pad
@@ -1085,24 +1118,14 @@ class ImageData(object):
         ### Padded image dimensions
         self.header['NAXIS1'] += 2*pad
         self.header['NAXIS2'] += 2*pad
-        self.wcs.naxis1 = self.wcs._naxis1 = self.header['NAXIS1']
-        self.wcs.naxis2 = self.wcs._naxis2 = self.header['NAXIS2']
-
-        ### Add padding to WCS
+        
         self.header['CRPIX1'] += pad
         self.header['CRPIX2'] += pad        
-        self.wcs.wcs.crpix[0] += pad
-        self.wcs.wcs.crpix[1] += pad
         
-        # if self.wcs.sip is not None:
-        #     self.wcs.sip.crpix[0] += pad
-        #     self.wcs.sip.crpix[1] += pad           
+        ### Add padding to WCS        
+        self.wcs = self.add_padding_to_wcs(self.wcs, pad=pad)
         
-        for wcs_ext in [self.wcs.sip, self.wcs.cpdis1, self.wcs.cpdis2, self.wcs.det2im1, self.wcs.det2im2]:
-            if wcs_ext is not None:
-                wcs_ext.crpix[0] += pad
-                wcs_ext.crpix[1] += pad           
-    
+                 
     def shrink_large_hdu(self, hdu=None, extra=100, verbose=False):
         """Shrink large image mosaic to speed up blotting
         
@@ -1391,25 +1414,16 @@ class ImageData(object):
                 for c in [0,1]:
                     slice_obj.wcs.sip.crpix[c] = slice_obj.wcs.wcs.crpix[c]
         
-        if hasattr(slice_obj.wcs, 'cpdis1'):
-            if slice_obj.wcs.cpdis1 is not None:
-                for c in [0,1]:
-                    slice_obj.wcs.cpdis1.crpix[c] = slice_obj.wcs.wcs.crpix[c]
-        
-        if hasattr(slice_obj.wcs, 'cpdis2'):
-            if slice_obj.wcs.cpdis2 is not None:
-                for c in [0,1]:
-                    slice_obj.wcs.cpdis2.crpix[c] = slice_obj.wcs.wcs.crpix[c]
-                    
-        if hasattr(slice_obj.wcs, 'det2im1'):
-            if slice_obj.wcs.det2im1 is not None:
-                for c in [0,1]:
-                    slice_obj.wcs.det2im1.crpix[c] = slice_obj.wcs.wcs.crpix[c]
-        
-        if hasattr(slice_obj.wcs, 'det2im2'):
-            if slice_obj.wcs.det2im2 is not None:
-                for c in [0,1]:
-                    slice_obj.wcs.det2im2.crpix[c] = slice_obj.wcs.wcs.crpix[c]
+        ACS_CRPIX = [4096/2,2048/2] # ACS
+        dx_crpix = slice_obj.wcs.wcs.crpix[0] - ACS_CRPIX[0]
+        dy_crpix = slice_obj.wcs.wcs.crpix[1] - ACS_CRPIX[1]
+        for ext in ['cpdis1','cpdis2','det2im1','det2im2']:
+            if hasattr(slice_obj.wcs, ext):
+                wcs_ext = slice_obj.wcs.__getattribute__(ext)
+                if wcs_ext is not None:
+                    wcs_ext.crval[0] += dx_crpix
+                    wcs_ext.crval[1] += dy_crpix
+                    slice_obj.wcs.__setattr__(ext, wcs_ext)
                            
         return slice_obj#, slx, sly
     
@@ -2466,13 +2480,12 @@ class GrismFLT(object):
                                    name='MODEL'))
         
         
-        hdu.writeto('{0}.GrismFLT.fits'.format(root), clobber=True, 
-                    output_verify='fix')
+        hdu.writeto('{0}.{1:02d}.GrismFLT.fits'.format(root, self.grism.sci_extn), clobber=True, output_verify='fix')
         
         ## zero out large data objects
         self.direct.data = self.grism.data = self.seg = self.model = None
                                             
-        fp = open('{0}_GrismFLT.pkl'.format(root), 'wb')
+        fp = open('{0}.{1:02d}.GrismFLT.pkl'.format(root, self.grism.sci_extn), 'wb')
         pickle.dump(self, fp)
         fp.close()
     
@@ -2939,11 +2952,20 @@ class BeamCutout(object):
         ### Update CRPIX
         dc = 0 # python array center to WCS pixel center
         
-        for wcs_ext in [wcs.sip, wcs.wcs, wcs.cpdis1, wcs.cpdis2, wcs.det2im1, wcs.det2im2]:
+        for wcs_ext in [wcs.sip, wcs.wcs]:
             if wcs_ext is None:
                 continue
             else:
                 cr = wcs_ext.crpix
+            
+            cr[0] += dx + self.beam.sh[0]/2 + self.beam.dxfull[0] + dc
+            cr[1] += dy + dc
+        
+        for wcs_ext in [wcs.cpdis1, wcs.cpdis2, wcs.det2im1, wcs.det2im2]:
+            if wcs_ext is None:
+                continue
+            else:
+                cr = wcs_ext.crval
             
             cr[0] += dx + self.beam.sh[0]/2 + self.beam.dxfull[0] + dc
             cr[1] += dy + dc
@@ -2953,7 +2975,7 @@ class BeamCutout(object):
         #     for i in [0,1]:
         #         wcs.sip.crpix[i] = wcs.wcs.crpix[i]
         
-        for wcs_ext in [wcs.sip, wcs.cpdis1, wcs.cpdis2, wcs.det2im1, wcs.det2im2]:
+        for wcs_ext in [wcs.sip]:
             if wcs_ext is not None:
                 for i in [0,1]:
                     wcs_ext.crpix[i] = wcs.wcs.crpix[i]
