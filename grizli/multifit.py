@@ -33,7 +33,7 @@ grism_colors = {'G800L':(0.0, 0.4470588235294118, 0.6980392156862745),
       'F140M':'orange',
       'CLEARP':'b'}
 
-grism_major = {'G102':0.1, 'G141':0.1, 'G800L':0.2, 'F090W':0.1, 'F115W':0.1, 'F150W':0.1, 'F200W':0.1}
+grism_major = {'G102':0.1, 'G141':0.1, 'G800L':0.1, 'F090W':0.1, 'F115W':0.1, 'F150W':0.1, 'F200W':0.1}
 
 grism_limits = {'G800L':[0.545, 1.02, 50.], # ACS/WFC
           'G280':[0.2,0.4, 14], # WFC3/UVIS
@@ -179,10 +179,12 @@ def _loadFLT(grism_file, sci_extn, direct_file, pad, ref_file,
     
     #print grism_file, direct_file
     
-    save_file = grism_file.replace('_flt.fits', '_GrismFLT.fits')
-    save_file = save_file.replace('_flc.fits', '_GrismFLT.fits')
-    save_file = save_file.replace('_cmb.fits', '_GrismFLT.fits')
-    save_file = save_file.replace('_rate.fits', '_GrismFLT.fits')
+    new_root = '.{0:02d}.GrismFLT.fits'.format(sci_extn)
+    save_file = grism_file.replace('_flt.fits', new_root)
+    save_file = save_file.replace('_flc.fits', new_root)
+    save_file = save_file.replace('_cmb.fits', new_root)
+    save_file = save_file.replace('_rate.fits', new_root)
+    
     if grism_file.find('_') < 0:
         save_file = 'xxxxxxxxxxxxxxxxxxx'
         
@@ -434,15 +436,25 @@ class GroupFLT():
         exposure filenames with the following:
             
             >>> file = 'ib3701ryq_flt.fits'
-            >>> save_file = file.replace('_flt.fits', '_GrismFLT.fits')
-            >>> save_file = save_file.replace('_flc.fits', '_GrismFLT.fits')
-            >>> save_file = save_file.replace('_cmb.fits', '_GrismFLT.fits')
-            >>> save_file = save_file.replace('_rate.fits', '_GrismFLT.fits')
-        
+            >>> sci_extn = 1
+            >>> new_root = '.{0:02d}.GrismFLT.fits'.format(sci_extn)
+            >>> 
+            >>> save_file = file.replace('_flt.fits', new_root)
+            >>> save_file = save_file.replace('_flc.fits', new_root)
+            >>> save_file = save_file.replace('_cmb.fits', new_root)
+            >>> save_file = save_file.replace('_rate.fits', new_root)
+                    
         It will also save data to a `~pickle` file:
             
             >>> pkl_file = save_file.replace('.fits', '.pkl')
-            
+        
+        .. note::
+        
+        The save filename format was changed May 9, 2017 to the format like 
+        `ib3701ryq.01.GrismFLT.fits` from `ib3701ryq_GrismFLT.fits` to both
+        allow easier filename parsing and also to allow for instruments that 
+        have multiple `SCI` extensions in a single calibrated file
+        (e.g., ACS and WFC3/UVIS).
         """      
         for i in range(self.N):
             file = self.FLTs[i].grism_file
@@ -450,11 +462,13 @@ class GroupFLT():
                 if warn:
                     print('{0}: Looks like data already saved!'.format(file))
                     continue
-                    
-            save_file = file.replace('_flt.fits', '_GrismFLT.fits')
-            save_file = save_file.replace('_flc.fits', '_GrismFLT.fits')
-            save_file = save_file.replace('_cmb.fits', '_GrismFLT.fits')
-            save_file = save_file.replace('_rate.fits', '_GrismFLT.fits')
+            
+            new_root = '.{0:02d}.GrismFLT.fits'.format(self.FLTs[i].grism.sci_extn)
+            
+            save_file = file.replace('_flt.fits', new_root)
+            save_file = save_file.replace('_flc.fits', new_root)
+            save_file = save_file.replace('_cmb.fits', new_root)
+            save_file = save_file.replace('_rate.fits', new_root)
             print('Save {0}'.format(save_file))
             self.FLTs[i].save_full_pickle()
             
@@ -2185,7 +2199,7 @@ class MultiBeam():
         return hdu_full
         
     def run_full_diagnostics(self, pzfit={}, pspec2={}, pline={}, 
-                      force_line=['Ha', 'OIII', 'Hb'], GroupFLT=None,
+                      force_line=['Ha', 'OIII', 'Hb', 'OII'], GroupFLT=None,
                       prior=None, zoom=True, verbose=True):
         """TBD
         
@@ -2949,10 +2963,18 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
             if beam.direct.wcs.sip is not None:
                 beam.direct.wcs.sip.crpix[j] = beam.direct.wcs.wcs.crpix[j]
             
-            for wcs_ext in [beam_wcs.sip, beam_wcs.cpdis1, beam_wcs.cpdis2, beam_wcs.det2im1, beam_wcs.det2im2]:
+            for wcs_ext in [beam_wcs.sip]: 
                 if wcs_ext is not None:
                     wcs_ext.crpix[j] = beam_wcs.wcs.crpix[j]
-                    
+                
+        ACS_CRPIX = [4096/2,2048/2] # ACS
+        dx_crpix = beam_wcs.wcs.crpix[0] - ACS_CRPIX[0]
+        dy_crpix = beam_wcs.wcs.crpix[1] - ACS_CRPIX[1]
+        for wcs_ext in [beam_wcs.cpdis1, beam_wcs.cpdis2, beam_wcs.det2im1, beam_wcs.det2im2]:
+            if wcs_ext is not None:
+                wcs_ext.crval[0] += dx_crpix
+                wcs_ext.crval[1] += dy_crpix
+                        
         beam_data = beam.grism.data['SCI'] - beam.contam 
         beam_continuum = beam.model*1
         
@@ -3346,20 +3368,28 @@ def drizzle_2d_spectrum_wcs(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
         # Shift SIP reference
         dx_sip = beam.grism.origin[1] - beam.direct.origin[1]
         #beam_wcs.sip.crpix[0] += dx_sip
-        for wcs_ext in [beam_wcs.sip, beam_wcs.cpdis1, beam_wcs.cpdis2, beam_wcs.det2im1, beam_wcs.det2im2]:
+        for wcs_ext in [beam_wcs.sip]:
             if wcs_ext is not None:
                 wcs_ext.crpix[0] += dx_sip
-                
+
+        for wcs_ext in [beam_wcs.cpdis1, beam_wcs.cpdis2, beam_wcs.det2im1, beam_wcs.det2im2]:
+            if wcs_ext is not None:
+                wcs_ext.crval[0] += dx_sip
+                        
         # Shift y for trace
         xy0 = beam.grism.wcs.all_world2pix(output_wcs.wcs.crval.reshape((1,2)),0)[0]
         dy = np.interp(xy0[0], np.arange(beam.beam.sh_beam[1]), beam.beam.ytrace)
         #beam_wcs.sip.crpix[1] += dy
         beam_wcs.wcs.crpix[1] += dy
         
-        for wcs_ext in [beam_wcs.sip, beam_wcs.cpdis1, beam_wcs.cpdis2, beam_wcs.det2im1, beam_wcs.det2im2]:
+        for wcs_ext in [beam_wcs.sip]:
             if wcs_ext is not None:
                 wcs_ext.crpix[1] += dy
         
+        for wcs_ext in [beam_wcs.cpdis1, beam_wcs.cpdis2, beam_wcs.det2im1, beam_wcs.det2im2]:
+            if wcs_ext is not None:
+                wcs_ext.crval[1] += dy
+                
         d_beam_wcs = beam.direct.wcs
         if beam.direct['REF'] is None:
             d_wht = 1./beam.direct['ERR']**2
