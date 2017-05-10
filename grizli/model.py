@@ -1775,8 +1775,8 @@ class GrismFLT(object):
                     raise TypeError
             else:
                 filt = self.direct.ref_filter
-                if filt in key_list:
-                    header_values[key] = key_list[filt]
+                if filt in key_list[key]:
+                    header_values[key] = key_list[key][filt]
                 else:
                     print('Filter "{0}" not found in {1} tabulated list'.format(filt, key))
                     raise IndexError
