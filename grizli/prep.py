@@ -1633,7 +1633,7 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
     
     # Run on second chip (also for UVIS/G280)
     if isACS:
-        visit_grism_sky(grism=grism, apply=True,
+        visit_grism_sky(grism=grism, apply=True, sky_iter=sky_iter,
                         column_average=column_average, verbose=True, ext=2)
         
         # Add back in some pedestal or CR rejection fails for ACS
