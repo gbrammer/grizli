@@ -47,7 +47,7 @@ def disperse_grism_object(np.ndarray[FTYPE_t, ndim=2] flam, np.ndarray[FTYPE_t, 
             if (x0[0]+j < 0) | (x0[0]+j >= shd[0]):
                 continue
 
-            fl_ij = flam[x0[0]+j, x0[1]+i]/1.e-17
+            fl_ij = flam[x0[0]+j, x0[1]+i] #/1.e-17
             if (fl_ij == 0) | (segm[x0[0]+j, x0[1]+i] != seg_id):
                 continue
                 
