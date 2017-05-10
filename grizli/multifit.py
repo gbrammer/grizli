@@ -50,7 +50,7 @@ grism_limits = {'G800L':[0.545, 1.02, 50.], # ACS/WFC
            'F140M':[1.20,1.60, 45.0],
            'CLEARP':[0.76, 2.3,45.0]}
 
-default_line_list = ['SIII', 'SII', 'Ha', 'OI-6302', 'OIII', 'Hb', 'OIII-4363', 'Hg', 'Hd', 'NeIII', 'OII', 'MgII','Lya']
+default_line_list = ['SIII', 'SII', 'Ha', 'OI-6302', 'OIII', 'Hb', 'OIII-4363', 'Hg', 'Hd', 'NeIII', 'OII', 'MgII','CIII]', 'CIV', 'Lya']
 
 def test():
     
@@ -504,7 +504,7 @@ class GroupFLT():
         if verbose:
             print('Now we have {0:d} FLTs'.format(self.N))
             
-    def compute_single_model(self, id, mag=-99, size=-1, store=False, spectrum_1d=None, get_beams=None, in_place=True):
+    def compute_single_model(self, id, mag=-99, size=-1, store=False, spectrum_1d=None, is_cgs=False, get_beams=None, in_place=True):
         """Compute model spectrum in all exposures
         TBD
         
@@ -535,7 +535,8 @@ class GroupFLT():
             status = flt.compute_model_orders(id=id, verbose=False,
                           size=size, compute_size=(size < 0),
                           mag=mag, in_place=in_place, store=store,
-                          spectrum_1d = spectrum_1d, get_beams=get_beams)
+                          spectrum_1d=spectrum_1d, is_cgs=is_cgs,
+                          get_beams=get_beams)
             
             out_beams.append(status)
         
@@ -650,11 +651,23 @@ class GroupFLT():
             
         xspec = np.arange(0.3, 2.35, 0.05)-1
         scale_coeffs = out_coeffs[mb.N*mb.fit_bg:mb.N*mb.fit_bg+mb.n_poly]
-        yspec = [xspec**o*scale_coeffs[o] for o in range(mb.poly_order+1)]
-        if np.abs(scale_coeffs).max() > max_coeff:
+        
+        # yspec = [xspec**o*scale_coeffs[o] for o in range(mb.poly_order+1)]
+        # yfull = np.sum(yspec, axis=0)
+        
+        yfull = np.polyval(scale_coeffs[::-1], xspec)
+        
+        xb = [beam.direct.ref_photplam if beam.direct['REF'] is not None else beam.direct.photplam for beam in beams]
+        fb = [beam.beam.total_flux for beam in beams]
+        mb = np.polyval(scale_coeffs[::-1], np.array(xb)/1.e4-1)
+        
+        if (np.abs(mb/fb).max() > max_coeff) | (~np.isfinite(mb/fb).sum() > 0) | (np.min(mb) < 0):
+            if verbose:
+                print('{0} mag={1:6.2f} {2} xx'.format(id, mag, scale_coeffs))
+
             return True
             
-        self.compute_single_model(id, mag=mag, size=-1, store=False, spectrum_1d=[(xspec+1)*1.e4, np.sum(yspec, axis=0)], get_beams=None, in_place=True)
+        self.compute_single_model(id, mag=mag, size=-1, store=False, spectrum_1d=[(xspec+1)*1.e4, yfull], is_cgs=True, get_beams=None, in_place=True)
         
         if ds9:
             flt = self.FLTs[0]
@@ -1056,11 +1069,12 @@ class MultiBeam():
         self.x_poly = np.array([(self.beams[0].beam.lam/1.e4-1)**order
                                       for order in range(poly_order+1)])
                                       
-    def compute_model(self, id=None, spectrum_1d=None):
+    def compute_model(self, id=None, spectrum_1d=None, is_cgs=False):
         """TBD
         """
         for beam in self.beams:
-            beam.beam.compute_model(id=id, spectrum_1d=spectrum_1d)
+            beam.beam.compute_model(id=id, spectrum_1d=spectrum_1d, 
+                                    is_cgs=is_cgs)
             
     def fit_at_z(self, z=0., templates={}, fitter='nnls',
                  fit_background=True, poly_order=0):
@@ -1110,7 +1124,7 @@ class MultiBeam():
                     tmodel = 0.
                 else:
                     tmodel = beam.compute_model(spectrum_1d=spectrum_1d, 
-                                                in_place=False)
+                                                in_place=False, is_cgs=True) #/beam.beam.total_flux
                 
                 A_temp[i, i0:i0+self.Nflat[ib]] = tmodel#.flatten()
                 i0 += self.Nflat[ib]
@@ -1277,7 +1291,7 @@ class MultiBeam():
         i0 = self.fit_bg*self.N + self.n_poly
 
         line_flux = OrderedDict()
-        fscl = self.beams[0].beam.total_flux/1.e-17
+        fscl = 1. #self.beams[0].beam.total_flux/1.e-17
         line1d = OrderedDict()
         for i, key in enumerate(templates.keys()):
             temp_i = templates[key].zscale(z, coeffs_full[i0+i])
@@ -1414,7 +1428,7 @@ class MultiBeam():
         if line_complexes:
             #line_list = ['Ha+SII', 'OIII+Hb+Ha', 'OII']
             #line_list = ['Ha+SII', 'OIII+Hb', 'OII']
-            line_list = ['Ha+NII+SII+SIII+He', 'OIII+Hb', 'OII+Ne', 'Lya']
+            line_list = ['Ha+NII+SII+SIII+He', 'OIII+Hb', 'OII+Ne', 'Lya+CIV']
         else:
             if full_line_list is None:
                 line_list = default_line_list
@@ -1518,7 +1532,7 @@ class MultiBeam():
         i0 = self.fit_bg*self.N + self.n_poly
         
         line_flux = OrderedDict()
-        fscl = self.beams[0].beam.total_flux/1.e-17
+        fscl = 1. #self.beams[0].beam.total_flux/1.e-17
 
         temp_i = templates[best].zscale(0, coeffs_full[i0])
         model1d += temp_i
@@ -1915,12 +1929,12 @@ class MultiBeam():
                 ok = beam.beam.sensitivity > 0.1*beam.beam.sensitivity.max()
 
                 wave = wave[ok]
-                fscl = beam.beam.total_flux/1.e-17
+                fscl = 1./1.e-18 #beam.beam.total_flux/1.e-17
                 flux  = (flux*fscl/fflux)[ok]*beam.beam.scale
                 err   = (err*fscl/fflux)[ok]
                 mflux = (mflux*fscl/fflux)[ok]*beam.beam.scale
                 
-                ylabel = r'$f_\lambda$'
+                ylabel = r'$f_\lambda\,/\,10^{-18}\,\mathrm{cgs}$'
             else:
                 ylabel = 'flux (e-/s)'
             
@@ -2107,14 +2121,15 @@ class MultiBeam():
                 continue
 
             if (line_flux/line_err > 7) | (line in force_line):
-                print('Drizzle line -> {0:4s} ({1:.2f} {2:.2f})'.format(line, line_flux, line_err))
+                print('Drizzle line -> {0:4s} ({1:.2f} {2:.2f})'.format(line, line_flux/1.e-17, line_err/1.e-17))
 
                 line_wave_obs = line_wavelengths[line][0]*(1+fit['zbest'])
                 
                 if mask_lines:
                     for beam in self.beams:
                         cont = fit['cont1d']
-                        beam.compute_model(spectrum_1d=[cont.wave, cont.flux])
+                        beam.compute_model(spectrum_1d=[cont.wave, cont.flux],
+                                           is_cgs=True)
                         
                         beam.oivar = beam.ivar*1
                         lam = beam.beam.lam_beam
@@ -2129,7 +2144,7 @@ class MultiBeam():
                         
                         sp = [lm.wave, lm.flux]
                         m = beam.compute_model(spectrum_1d=sp, 
-                                               in_place=False)
+                                               in_place=False, is_cgs=True) #/beam.beam.total_flux
                         lmodel = m.reshape(beam.beam.sh_beam)
                         if lmodel.max() == 0:
                             continue
@@ -2148,7 +2163,8 @@ class MultiBeam():
                                     continue
                                     
                                 m = beam.compute_model(spectrum_1d=sp, 
-                                                       in_place=False)
+                                                       in_place=False,
+                                                       is_cgs=True) #/beam.beam.total_flux
                                 lcontam = m.reshape(beam.beam.sh_beam)
                                 if lcontam.max() == 0:
                                     #print beam.grism.parent_file, l
@@ -2187,9 +2203,9 @@ class MultiBeam():
                 li = hdu_full[0].header['NUMLINES']
                 hdu_full[0].header['LINE{0:03d}'.format(li)] = line
                 hdu_full[0].header['FLUX{0:03d}'.format(li)] = (line_flux, 
-                                                'Line flux, 1e-17 erg/s/cm2')
+                                                'Line flux, erg/s/cm2')
                 hdu_full[0].header['ERR{0:03d}'.format(li)] = (line_err, 
-                                        'Line flux err, 1e-17 erg/s/cm2')
+                                        'Line flux err, erg/s/cm2')
 
         if len(hdu_full) > 0:
             hdu_full[0].header['HASLINES'] = (' '.join(saved_lines), 
@@ -2458,7 +2474,7 @@ class MultiBeam():
         for il, l in enumerate(indices):
             for i in l:
                 self.beams[i].beam.add_ytrace_offset(shifts[il])
-                self.beams[i].compute_model()
+                self.beams[i].compute_model()#/self.beams[i].beam.total_flux
 
         self.flat_flam = np.hstack([b.beam.model.flatten() for b in self.beams])
         self.poly_order=-1
@@ -2582,7 +2598,8 @@ class MultiBeam():
                     h = hdu[1].header
                     gau = S.GaussianSource(1.e-17, h['CRVAL1'], h['CD1_1']*1)
                     for beam in beams:
-                        beam.compute_model(spectrum_1d=[gau.wave, gau.flux/beam.beam.total_flux])
+                        beam.compute_model(spectrum_1d=[gau.wave, gau.flux],
+                                           is_cgs=True)
                 
                     data = [beam.model for beam in beams]
                 
@@ -2632,7 +2649,8 @@ class MultiBeam():
             h = hdu[1].header
             gau = S.GaussianSource(1.e-17, h['CRVAL1'], h['CD1_1']*1)
             for beam in all_beams:
-                beam.compute_model(spectrum_1d=[gau.wave, gau.flux/beam.beam.total_flux])
+                beam.compute_model(spectrum_1d=[gau.wave, gau.flux],
+                                   is_cgs=True)
             
             data = [beam.model for beam in all_beams]
             
@@ -2782,7 +2800,7 @@ def drizzle_2d_spectrum(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
             #data_i *= convert_to_flambda/beam.beam.sensitivity
             #wht *= (beam.beam.sensitivity/convert_to_flambda)**2
             
-            scl = convert_to_flambda*beam.beam.total_flux/1.e-17
+            scl = convert_to_flambda/1.e-17
             scl *= 1./beam.flat_flam.reshape(beam.beam.sh_beam).sum(axis=0)
             #scl = convert_to_flambda/beam.beam.sensitivity
             
@@ -3001,6 +3019,7 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
         
         dlam = np.interp(wave, beam.beam.lam[1:], np.diff(beam.beam.lam))
         # 1e-17 erg/s/cm2 #, scaling closer to e-/s
+        sens *= 1.e-17
         sens *= 1./dlam
         
         if sens == 0:
@@ -3421,7 +3440,7 @@ def drizzle_2d_spectrum_wcs(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
             #data_i *= convert_to_flambda/beam.beam.sensitivity
             #wht *= (beam.beam.sensitivity/convert_to_flambda)**2
             
-            scl = convert_to_flambda*beam.beam.total_flux/1.e-17
+            scl = convert_to_flambda/1.e-17
             scl *= 1./beam.flat_flam.reshape(beam.beam.sh_beam).sum(axis=0)
             #scl = convert_to_flambda/beam.beam.sensitivity
             

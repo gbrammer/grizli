@@ -838,7 +838,10 @@ def get_line_wavelengths():
 
     line_wavelengths['Lya'] = [1215.4]
     line_ratios['Lya'] = [1.]
-
+    
+    line_wavelengths['Lya+CIV'] = [1215.4, 1549.49]
+    line_ratios['Lya+CIV'] = [1., 0.1]
+    
     line_wavelengths['Ha+SII'] = [6564.61, 6718.29, 6732.67]
     line_ratios['Ha+SII'] = [1., 1./10, 1./10]
     line_wavelengths['Ha+SII+SIII+He'] = [6564.61, 6718.29, 6732.67, 9068.6, 9530.6, 10830.]

@@ -275,7 +275,7 @@ class GrismDisperser(object):
         ### Needs term of delta wavelength per pixel for flux densities
         dl = np.abs(np.append(self.lam_beam[1] - self.lam_beam[0],
                               np.diff(self.lam_beam)))
-        ysens *= 1.e-17*dl
+        ysens *= dl#*1.e-17
         self.sensitivity_beam = ysens
         
         ### Initialize the model arrays
@@ -318,7 +318,7 @@ class GrismDisperser(object):
         
         dl = np.abs(np.append(self.lam[1] - self.lam[0],
                               np.diff(self.lam)))
-        ysens *= 1.e-17*dl
+        ysens *= dl#*1.e-17
         self.sensitivity = ysens
         
         # Slices of the parent array based on the origin parameter
@@ -373,7 +373,7 @@ class GrismDisperser(object):
         self.ytrace += yoffset
                 
     def compute_model(self, id=None, thumb=None, spectrum_1d=None,
-                      in_place=True, outdata=None, scale=None):
+                      in_place=True, outdata=None, scale=None, is_cgs=False):
         """Compute a model 2D grism spectrum
 
         Parameters
@@ -399,7 +399,10 @@ class GrismDisperser(object):
         
         scale : float or None
            Multiplicative factor to apply to the modeled spectrum.
-                       
+        
+        is_cgs : bool
+            Units of `spectrum_1d` fluxes are f_lambda cgs.
+            
         Returns
         -------
         model : `~numpy.ndarray`
@@ -429,7 +432,11 @@ class GrismDisperser(object):
                                                 xspec, yspec)*scale
         else:
             scale_spec = scale
-            
+        
+        self.is_cgs = is_cgs
+        if is_cgs:
+            scale_spec /= self.total_flux
+               
         ### Output data, fastest is to compute in place but doesn't zero-out
         ### previous result                    
         if in_place:
@@ -1758,17 +1765,18 @@ class GrismFLT(object):
         self.direct.ref_filter = utils.get_hst_filter(refh)
         self.direct.ref_file = ref_str
         
+        key_list = {'PHOTFLAM':photflam_list, 'PHOTPLAM':photplam_list}
         for key in ['PHOTFLAM', 'PHOTPLAM']:
             if key in refh:
                 try:
-                    header_values[key] = ref_hdu.header['PHOTFLAM']*1.
+                    header_values[key] = ref_hdu.header[key]*1.
                 except TypeError:
-                    print('Problem processing header keyword PHOTFLAM: ** {0} **'.format(ref_hdu.header['PHOTFLAM']))
+                    print('Problem processing header keyword {0}: ** {1} **'.format(key, ref_hdu.header[key]))
                     raise TypeError
             else:
                 filt = self.direct.ref_filter
-                if filt in photflam_list:
-                    header_values[key] = photflam_list[filt]
+                if filt in key_list[key]:
+                    header_values[key] = key_list[key][filt]
                 else:
                     print('Filter "{0}" not found in {1} tabulated list'.format(filt, key))
                     raise IndexError
@@ -1905,7 +1913,8 @@ class GrismFLT(object):
         self.dispersion_PA = pa.wrap_at(360*u.deg).value
         
     def compute_model_orders(self, id=0, x=None, y=None, size=10, mag=-1,
-                      spectrum_1d=None, compute_size=False, store=True, 
+                      spectrum_1d=None, is_cgs=False,
+                      compute_size=False, store=True, 
                       in_place=True, add=True, get_beams=None, verbose=True):
         """Compute dispersed spectrum for a given object id
         
@@ -1936,6 +1945,10 @@ class GrismFLT(object):
             
             >>> wavelength, flux = spectrum_1d
         
+        is_cgs : bool
+            Flux units of `spectrum_1d[1]` are cgs f_lambda flux densities, 
+            rather than normalized in the detection band.
+            
         compute_size : bool
             Ignore `x`, `y`, and `size` and compute the extent of the 
             segmentation polygon directly using 
@@ -2078,12 +2091,14 @@ class GrismFLT(object):
                 except:
                     continue
                 
-                beams[beam] = b
                 if object_in_model:
                     #old_spectrum_1d = beams
-                    old_spectrum_1d = self.object_dispersers[id]
-                    b.compute_model(id=id, spectrum_1d=old_spectrum_1d)
-            
+                    old_cgs, old_spectrum_1d = self.object_dispersers[id]
+                    b.compute_model(id=id, spectrum_1d=old_spectrum_1d, 
+                                    is_cgs=old_cgs)
+                
+                beams[beam] = b
+                
             if get_beams:
                 return beams
                 
@@ -2093,7 +2108,7 @@ class GrismFLT(object):
                     self.object_dispersers[id] = beams
                 else:
                     ### Just save the model spectrum (or empty spectrum)
-                    self.object_dispersers[id] = spectrum_1d
+                    self.object_dispersers[id] = is_cgs, spectrum_1d
                         
         if in_place:
             ### Update the internal model attribute
@@ -2112,7 +2127,8 @@ class GrismFLT(object):
                 beam.add_to_full_image(-beam.model, output)
             
             ### Add in new model
-            beam.compute_model(id=id, spectrum_1d=spectrum_1d)
+            beam.compute_model(id=id, spectrum_1d=spectrum_1d, is_cgs=is_cgs)
+                
             beam.add_to_full_image(beam.model, output)
         
         if in_place:
@@ -2709,7 +2725,7 @@ class BeamCutout(object):
         self.modelf = self.model.flatten()
         
         ### Initialize for fits
-        self.flat_flam = self.compute_model(in_place=False)
+        self.flat_flam = self.compute_model(in_place=False, is_cgs=True) #/self.beam.total_flux
         
         ### OK data where the 2D model has non-zero flux
         self.fit_mask = (~self.mask.flatten()) & (self.ivar.flatten() != 0)
@@ -2767,8 +2783,12 @@ class BeamCutout(object):
                            beam=beam.beam, conf=conf, xcenter=beam.xcenter,
                            ycenter=beam.ycenter, fwcpos=flt.grism.fwcpos)
         
-        self.beam.compute_model(spectrum_1d = beam.spectrum_1d)
-        
+        if beam.spectrum_1d is None:
+            self.beam.compute_model()#spectrum_1d=beam.spectrum_1d)
+        else:
+            self.beam.compute_model(spectrum_1d=beam.spectrum_1d,
+                                    is_cgs=beam.is_cgs)
+            
         slx_thumb = slice(self.beam.origin[1], 
                           self.beam.origin[1]+self.beam.sh[1])
                           
@@ -3170,7 +3190,7 @@ class BeamCutout(object):
             
             #psf += self.psf_resid
             
-            psf *= si*self.direct.photflam/1.e-17 #/psf.sum()
+            psf *= si*self.direct.photflam#/1.e-17 #/psf.sum()
             
             A_psf.append(psf.flatten())
             lam_psf.append(li)
@@ -3519,8 +3539,8 @@ class BeamCutout(object):
             if not key.startswith('line'):
                 cont1d += temp_i
             else:
-                line_flux[key.split()[1]] = (coeffs_full[self.n_simp+i] * 
-                                             self.beam.total_flux/1.e-17)
+                line_flux[key.split()[1]] = (coeffs_full[self.n_simp+i] * 1.)
+                                             #self.beam.total_flux/1.e-17)
                 
                         
         fit_data = OrderedDict()
