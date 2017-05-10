@@ -1362,6 +1362,7 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                                align_tolerance=5, align_clip=30,
                                align_mag_limits = [14,23],
                                column_average=True, 
+                               sky_iter=10,
                                run_tweak_align=True,
                                tweak_fit_order=-1,
                                skip_direct=False,
@@ -1627,7 +1628,7 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                  resetbits=4096, build=False, final_wht_type='IVM')        
         
     ### Subtract grism sky
-    status = visit_grism_sky(grism=grism, apply=True,
+    status = visit_grism_sky(grism=grism, apply=True, sky_iter=sky_iter,
                           column_average=column_average, verbose=True, ext=1)
     
     # Run on second chip (also for UVIS/G280)
@@ -2148,7 +2149,7 @@ def align_multiple_drizzled(mag_limits=[16,23]):
         imt = pyfits.open('total_drz_sci.fits')
 
         
-def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext=1):
+def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext=1, sky_iter=10):
     """Subtract sky background from grism exposures
     
     Implementation of grism sky subtraction from ISR 2015-17    
@@ -2277,7 +2278,7 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
         
     model = np.dot(A, coeffs)
     
-    for iter in range(10):
+    for iter in range(sky_iter):
         model = np.dot(A, coeffs)
         resid = (data-model)*np.sqrt(wht)
         obj_mask = (resid < 2.5) & (resid > -3)
@@ -2292,8 +2293,7 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
             ds9.view(r_i * mask_i)
         
         if verbose:
-            print('   {0} > Iter: {1:d}, masked: {2:d}, {3}'.format(grism['product'], iter,
-                                                obj_mask.sum(), coeffs))
+            print('   {0} > Iter: {1:d}, masked: {2:d}, {3}'.format(grism['product'], iter+1, obj_mask.sum(), coeffs))
                                                 
         out = np.linalg.lstsq(A[mask & obj_mask,:], data[mask & obj_mask])
         coeffs = out[0]
@@ -2432,6 +2432,9 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
     fig.savefig('{0}_column.png'.format(grism['product']))
     #fig.savefig('%s_column.pdf' %(grism['product']))
     plt.close()
+    
+    ## Clean up large arrays
+    del(data); del(A); del(wht); del(mask); del(model)
     
     if interactive_status:
         plt.ion()
