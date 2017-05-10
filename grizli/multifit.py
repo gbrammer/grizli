@@ -1,3 +1,6 @@
+"""Functionality for manipulating multiple grism exposures simultaneously
+"""
+
 import os
 import time
 import glob
@@ -426,15 +429,9 @@ class GroupFLT():
     def save_full_data(self, warn=True):
         """Save models and data files for fast regeneration.
         
-        Parameters
-        ----------
-        warn : bool
-            Print a warning and skip if an output file is already found to
-            exist.
-        
         The filenames of the outputs are generated from the input grism 
         exposure filenames with the following:
-            
+        
             >>> file = 'ib3701ryq_flt.fits'
             >>> sci_extn = 1
             >>> new_root = '.{0:02d}.GrismFLT.fits'.format(sci_extn)
@@ -443,13 +440,19 @@ class GroupFLT():
             >>> save_file = save_file.replace('_flc.fits', new_root)
             >>> save_file = save_file.replace('_cmb.fits', new_root)
             >>> save_file = save_file.replace('_rate.fits', new_root)
-                    
+                
         It will also save data to a `~pickle` file:
-            
+        
             >>> pkl_file = save_file.replace('.fits', '.pkl')
         
-        .. note::
-        
+        Parameters
+        ----------
+        warn : bool
+            Print a warning and skip if an output file is already found to
+            exist.
+                
+        Notes
+        -----
         The save filename format was changed May 9, 2017 to the format like 
         `ib3701ryq.01.GrismFLT.fits` from `ib3701ryq_GrismFLT.fits` to both
         allow easier filename parsing and also to allow for instruments that 
