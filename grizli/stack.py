@@ -1,5 +1,5 @@
 """
-Utilities for fitting stacked spectra
+Utilities for fitting stacked (drizzled) spectra
 """
 from collections import OrderedDict
 from imp import reload
