@@ -770,6 +770,9 @@ def get_line_wavelengths():
         
     """
     line_wavelengths = OrderedDict() ; line_ratios = OrderedDict()
+    
+    line_wavelengths['PaB'] = [12821]
+    line_ratios['PaB'] = [1.]
     line_wavelengths['Ha'] = [6564.61]
     line_ratios['Ha'] = [1.]
     line_wavelengths['Hb'] = [4862.68]
@@ -778,27 +781,14 @@ def get_line_wavelengths():
     line_ratios['Hg'] = [1.]
     line_wavelengths['Hd'] = [4102.892]
     line_ratios['Hd'] = [1.]
+    
     line_wavelengths['OIII-4363'] = [4364.436]
     line_ratios['OIII-4363'] = [1.]
     line_wavelengths['OIII'] = [5008.240, 4960.295]
     line_ratios['OIII'] = [2.98, 1]
-    line_wavelengths['OIII+Hb'] = [5008.240, 4960.295, 4862.68]
-    line_ratios['OIII+Hb'] = [2.98, 1, 3.98/6.]
     
-    line_wavelengths['OIII+Hb+Ha'] = [5008.240, 4960.295, 4862.68, 6564.61]
-    line_ratios['OIII+Hb+Ha'] = [2.98, 1, 3.98/10., 3.98/10.*2.86]
-
-    line_wavelengths['OIII+Hb+Ha+SII'] = [5008.240, 4960.295, 4862.68, 6564.61, 6718.29, 6732.67]
-    line_ratios['OIII+Hb+Ha+SII'] = [2.98, 1, 3.98/10., 3.98/10.*2.86*4, 3.98/10.*2.86/10.*4, 3.98/10.*2.86/10.*4]
-
-    line_wavelengths['OIII+OII'] = [5008.240, 4960.295, 3729.875]
-    line_ratios['OIII+OII'] = [2.98, 1, 3.98/4.]
-
     line_wavelengths['OII'] = [3729.875]
     line_ratios['OII'] = [1]
-    
-    line_wavelengths['OII+Ne'] = [3729.875, 3869]
-    line_ratios['OII+Ne'] = [1, 1./5]
     
     line_wavelengths['OI-6302'] = [6302.046, 6363.67]
     line_ratios['OI-6302'] = [1, 0.33]
@@ -809,32 +799,41 @@ def get_line_wavelengths():
     line_ratios['NeV'] = [1.]
     line_wavelengths['NeVI'] = [3426.85]
     line_ratios['NeVI'] = [1.]
+    
     line_wavelengths['SIII'] = [9068.6, 9530.6][::-1]
     line_ratios['SIII'] = [1, 2.44][::-1]
+    line_wavelengths['SII'] = [6718.29, 6732.67]
+    line_ratios['SII'] = [1., 1.]   
+    
     line_wavelengths['HeII'] = [4687.5]
     line_ratios['HeII'] = [1.]
     line_wavelengths['HeI-5877'] = [5877.2]
     line_ratios['HeI-5877'] = [1.]
     line_wavelengths['HeI-3889'] = [3889.5]
     line_ratios['HeI-3889'] = [1.]
+    line_wavelengths['HeI-1083'] = [10830.]
+    line_ratios['HeI-1083'] = [1.]
     
     line_wavelengths['MgII'] = [2799.117]
     line_ratios['MgII'] = [1.]
     
-    line_wavelengths['CIV'] = [1549.480]
-    line_ratios['CIV'] = [1.]
-    line_wavelengths['CIII]'] = [1908.]
-    line_ratios['CIII]'] = [1.]
-    line_wavelengths['OIII]'] = [1663.]
-    line_ratios['OIII]'] = [1.]
+    line_wavelengths['CIV-1549'] = [1549.480]
+    line_ratios['CIV-1549'] = [1.]
+    line_wavelengths['CIII-1908'] = [1908.]
+    line_ratios['CIII-1908'] = [1.]
+    line_wavelengths['OIII-1663'] = [1663.]
+    line_ratios['OIII-1663'] = [1.]
     line_wavelengths['HeII-1640'] = [1640.]
     line_ratios['HeII-1640'] = [1.]
-    line_wavelengths['NIII]'] = [1750.]
-    line_ratios['NIII]'] = [1.]
-    line_wavelengths['NIV'] = [1487.]
-    line_ratios['NIV'] = [1.]
-    line_wavelengths['NV'] = [1240.]
-    line_ratios['NV'] = [1.]
+    
+    line_wavelengths['NII'] = [6549.86, 6585.27]
+    line_ratios['NII'] = [1., 3]
+    line_wavelengths['NIII-1750'] = [1750.]
+    line_ratios['NIII-1750'] = [1.]
+    line_wavelengths['NIV-1487'] = [1487.]
+    line_ratios['NIV-1487'] = [1.]
+    line_wavelengths['NV-1240'] = [1240.]
+    line_ratios['NV-1240'] = [1.]
 
     line_wavelengths['Lya'] = [1215.4]
     line_ratios['Lya'] = [1.]
@@ -850,11 +849,20 @@ def get_line_wavelengths():
     line_wavelengths['Ha+NII+SII+SIII+He'] = [6564.61, 6549.86, 6585.27, 6718.29, 6732.67, 9068.6, 9530.6, 10830.]
     line_ratios['Ha+NII+SII+SIII+He'] = [1., 1./(4.*4), 3./(4*4), 1./10, 1./10, 1./20, 2.44/20, 1./25.]
     
-    line_wavelengths['NII'] = [6549.86, 6585.27]
-    line_ratios['NII'] = [1., 3]
+    line_wavelengths['OIII+Hb'] = [5008.240, 4960.295, 4862.68]
+    line_ratios['OIII+Hb'] = [2.98, 1, 3.98/6.]
     
-    line_wavelengths['SII'] = [6718.29, 6732.67]
-    line_ratios['SII'] = [1., 1.]   
+    line_wavelengths['OIII+Hb+Ha'] = [5008.240, 4960.295, 4862.68, 6564.61]
+    line_ratios['OIII+Hb+Ha'] = [2.98, 1, 3.98/10., 3.98/10.*2.86]
+
+    line_wavelengths['OIII+Hb+Ha+SII'] = [5008.240, 4960.295, 4862.68, 6564.61, 6718.29, 6732.67]
+    line_ratios['OIII+Hb+Ha+SII'] = [2.98, 1, 3.98/10., 3.98/10.*2.86*4, 3.98/10.*2.86/10.*4, 3.98/10.*2.86/10.*4]
+
+    line_wavelengths['OIII+OII'] = [5008.240, 4960.295, 3729.875]
+    line_ratios['OIII+OII'] = [2.98, 1, 3.98/4.]
+    
+    line_wavelengths['OII+Ne'] = [3729.875, 3869]
+    line_ratios['OII+Ne'] = [1, 1./5]
     
     return line_wavelengths, line_ratios 
     
@@ -908,15 +916,19 @@ class SpectrumTemplate(object):
         self.flux = flux
 
         if (wave is not None) & (fwhm is not None):
-            self.make_gaussian(wave, fwhm, velocity=velocity)
-            
-    def make_gaussian(self, wave, fwhm, max_sigma=5, step=0.1, 
+            self.wave, self.flux = self.make_gaussian(wave, fwhm,
+                                                      velocity=velocity)
+        
+        self.set_fnu()
+        
+    @staticmethod 
+    def make_gaussian(central_wave, fwhm, max_sigma=5, step=0.1,
                       velocity=False):
         """Make Gaussian template
         
         Parameters
         ----------
-        wave, fwhm : None or float or array-like
+        central_wave, fwhm : None or float or array-like
             Central wavelength and FWHM of the desired Gaussian
             
         velocity : bool
@@ -926,22 +938,25 @@ class SpectrumTemplate(object):
             Generated wavelength array is
                 
                 >>> rms = fwhm/2.35
-                >>> xgauss = np.arange(-max_sigma, max_sigma, step)*rms+wave
+                >>> xgauss = np.arange(-max_sigma, max_sigma, step)*rms+central_wave
 
         Returns
         -------
-        Stores `wave`, `flux` attributes.        
+        wave, flux : array-like
+            Wavelength and flux of a Gaussian line
         """
         rms = fwhm/2.35
         if velocity:
-            rms *= wave/3.e5
+            rms *= central_wave/3.e5
             
-        xgauss = np.arange(-max_sigma, max_sigma, step)*rms+wave
-        gaussian = np.exp(-(xgauss-wave)**2/2/rms**2)
+        xgauss = np.arange(-max_sigma, max_sigma, step)*rms+central_wave
+        gaussian = np.exp(-(xgauss-central_wave)**2/2/rms**2)
         gaussian /= np.sqrt(2*np.pi*rms**2)
         
-        self.wave = xgauss
-        self.flux = gaussian
+        return xgauss, gaussian
+        
+        #self.wave = xgauss
+        #self.flux = gaussian
 
     def zscale(self, z, scalar=1):
         """Redshift the template and multiply by a scalar.
@@ -1004,7 +1019,66 @@ class SpectrumTemplate(object):
         new_spectrum : `~grizli.utils.SpectrumTemplate`    
         """
         return SpectrumTemplate(wave=self.wave, flux=self.flux*scalar)
+    
+    def set_fnu(self):
+        """Make fnu version of the template.
         
+        Sets the `flux_fnu` attribute, assuming that the wavelength is given 
+        in Angstrom and the flux is given in flambda:
+        
+            >>> flux_fnu = self.flux * self.wave**2 / 3.e18
+            
+        """
+        self.flux_fnu = self.flux * self.wave**2 / 3.e18
+    
+    def integrate_filter(self, filter, scale=1., z=0):
+        """Integrate the template through an `~eazy.FilterDefinition` filter
+        object.
+        
+        Examples
+        --------
+        
+        Compute the WFC3/IR F140W AB magnitude of a pure emission line at the 
+        5-sigma 3D-HST line detection limit (5e-17 erg/s/cm2):
+        
+            >>> from grizli.utils import SpectrumTemplate
+            >>> from eazy.filters import FilterDefinition
+            >>> import pysynphot as S 
+
+            >>> line = SpectrumTemplate(wave=1.4e4, fwhm=150., flux=None,
+                                        velocity=True)*5.e-17
+                                        
+            >>> filter = FilterDefinition(bp=S.ObsBandpass('wfc3,ir,f140w'))
+            
+            >>> fnu = line.integrate_filter(filter, z=0)
+            
+            >>> print('AB mag = {0:.3f}'.format(-2.5*np.log10(fnu)-48.6))
+            AB mag = 26.620
+            
+        """
+        INTEGRATOR = np.trapz
+        
+        try:
+            import grizli.utils_c
+            interp = grizli.utils_c.interp.interp_conserve_c
+        except ImportError:
+            interp = np.interp
+            
+        templ_filter = interp(filter.wave, self.wave*(1+z),
+                              self.flux_fnu*scale)
+        
+        if hasattr(filter, 'norm'):
+            filter_norm = filter.norm
+        else:
+            # e.g., pysynphot bandpass
+            filter_norm = INTEGRATOR(filter.throughput/filter.wave,
+                                     filter.wave)
+            
+        # f_nu/lam dlam == f_nu d (ln nu)    
+        temp_int = INTEGRATOR(filter.throughput*templ_filter/filter.wave, filter.wave) / filter_norm
+        
+        return temp_int
+    
 def log_zgrid(zr=[0.7,3.4], dz=0.01):
     """Make a logarithmically spaced redshift grid
     
@@ -1910,4 +1984,30 @@ def fill_between_steps(x, y0, y1, ax=None, *args, **kwargs):
         ax = plt.gca()
     
     ax.fill_between(xfull[so], y0full[so], y1full[so], *args, **kwargs)
+
+def fill_masked_covar(covar, mask):
+    """Fill a covariance matrix in a larger array that had masked values
+    
+    Parameters
+    ----------
+    covar : `(M,M)` square `~np.ndarray`
+        Masked covariance array.
+        
+    mask : bool mask, `N>M`
+        The original mask.
+    
+    Returns
+    -------
+    covar_full : `~np.ndarray`
+        Full covariance array with dimensions `(N,N)`.
+    
+    """
+    N = mask.shape[0]
+    idx = np.arange(N)[mask]
+    covar_full = np.zeros((N,N), dtype=covar.dtype)
+    for i, ii in enumerate(idx):
+        for j, jj in enumerate(idx):
+            covar_full[ii,jj] = covar[i,j]
+    
+    return covar_full
     

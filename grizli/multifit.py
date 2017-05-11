@@ -50,7 +50,7 @@ grism_limits = {'G800L':[0.545, 1.02, 50.], # ACS/WFC
            'F140M':[1.20,1.60, 45.0],
            'CLEARP':[0.76, 2.3,45.0]}
 
-default_line_list = ['SIII', 'SII', 'Ha', 'OI-6302', 'OIII', 'Hb', 'OIII-4363', 'Hg', 'Hd', 'NeIII', 'OII', 'MgII','CIII]', 'CIV', 'Lya']
+default_line_list = ['PaB', 'HeI-1083', 'SIII', 'SII', 'Ha', 'OI-6302', 'OIII', 'Hb', 'OIII-4363', 'Hg', 'Hd', 'NeIII', 'OII', 'NeVI', 'NeV', 'MgII','CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'NIII-1750', 'NIV-1487', 'NV-1240', 'Lya']
 
 def test():
     
@@ -557,12 +557,12 @@ class GroupFLT():
             ids = self.catalog['NUMBER'][bright]
             mags = self.catalog['MAG_AUTO'][bright]
 
+            # Polynomial component
             xspec = np.arange(0.3, 2.35, 0.05)-1
-
             yspec = [xspec**o*coeffs[o] for o in range(len(coeffs))]
             xspec = (xspec+1)*1.e4
             yspec = np.sum(yspec, axis=0)
-
+            
             fit_info = OrderedDict()
             for id, mag in zip(ids, mags):
                 fit_info[id] = {'mag':mag, 'spec': [xspec, yspec]}
@@ -639,6 +639,7 @@ class GroupFLT():
     def refine(self, id, mag=-99, poly_order=1, size=30, ds9=None, verbose=True, max_coeff=2.5):
         """TBD
         """
+        # Extract and fit beam spectra
         beams = self.get_beams(id, size=size, min_overlap=0.5, get_slice_header=False)
         if len(beams) == 0:
             return True
@@ -649,14 +650,11 @@ class GroupFLT():
         except:
             return False
             
-        xspec = np.arange(0.3, 2.35, 0.05)-1
+        # Poly template
         scale_coeffs = out_coeffs[mb.N*mb.fit_bg:mb.N*mb.fit_bg+mb.n_poly]
+        xspec, yfull = mb.eval_poly_spec(out_coeffs)
         
-        # yspec = [xspec**o*scale_coeffs[o] for o in range(mb.poly_order+1)]
-        # yfull = np.sum(yspec, axis=0)
-        
-        yfull = np.polyval(scale_coeffs[::-1], xspec)
-        
+        # Check where templates inconsistent with broad-band fluxes
         xb = [beam.direct.ref_photplam if beam.direct['REF'] is not None else beam.direct.photplam for beam in beams]
         fb = [beam.beam.total_flux for beam in beams]
         mb = np.polyval(scale_coeffs[::-1], np.array(xb)/1.e4-1)
@@ -666,9 +664,11 @@ class GroupFLT():
                 print('{0} mag={1:6.2f} {2} xx'.format(id, mag, scale_coeffs))
 
             return True
-            
+        
+        # Put the refined model into the full-field model    
         self.compute_single_model(id, mag=mag, size=-1, store=False, spectrum_1d=[(xspec+1)*1.e4, yfull], is_cgs=True, get_beams=None, in_place=True)
         
+        # Display the result?
         if ds9:
             flt = self.FLTs[0]
             mask = flt.grism['SCI'] != 0
@@ -1068,7 +1068,18 @@ class MultiBeam():
         self.n_poly = poly_order + 1
         self.x_poly = np.array([(self.beams[0].beam.lam/1.e4-1)**order
                                       for order in range(poly_order+1)])
-                                      
+    
+    def eval_poly_spec(self, coeffs_full):
+        """Evaluate polynomial spectrum
+        """
+        xspec = np.arange(0.3, 2.35, 0.05)-1
+        i0 = self.N*self.fit_bg
+        scale_coeffs = coeffs_full[i0:i0+self.n_poly]
+
+        #yspec = [xspec**o*scale_coeffs[o] for o in range(self.poly_order+1)]
+        yfull = np.polyval(scale_coeffs[::-1], xspec)
+        return xspec, yfull
+                                          
     def compute_model(self, id=None, spectrum_1d=None, is_cgs=False):
         """TBD
         """
@@ -1245,6 +1256,9 @@ class MultiBeam():
         line_flux : dict
             Line fluxes and uncertainties, in cgs units (1e-17 erg/s/cm2)
         
+        covar : `~np.ndarray`
+            Covariance matrix [xx only has dimensions for valid components of A.  still need to put in a full array with the same dimensions as the number of parameters]
+        
         cont1d, line1d, model1d : `~grizli.utils.SpectrumTemplate`
             Best-fit continuum, line, and full (continuum + line) templates
             
@@ -1255,15 +1269,23 @@ class MultiBeam():
         from collections import OrderedDict
 
         ## Covariance matrix for line flux uncertainties
-        ok_temp = (np.sum(A, axis=1) > 0) & (coeffs_full != 0)
-        Ax = A[:, self.fit_mask][ok_temp,:].T
+        Ax = A[:,self.fit_mask]
+        ok_temp = (np.sum(Ax, axis=1) > 0) & (coeffs_full != 0)
+        Ax = Ax[ok_temp,:].T*1 #A[:, self.fit_mask][ok_temp,:].T
         Ax *= np.sqrt(self.ivarf[self.fit_mask][:, np.newaxis])
         try:
             covar = np.matrix(np.dot(Ax.T, Ax)).I
             covard = np.sqrt(covar.diagonal())
         except:
-            covard = np.zeros(ok_temp.sum())#-1.
-
+            N = ok_temp.sum()
+            covar = np.zeros((N,N))
+            covard = np.zeros(N)#-1.
+        
+        covar_full = utils.fill_masked_covar(covar, ok_temp)
+        
+        ## Random draws from covariance matrix
+        # draws = np.random.multivariate_normal(coeffs_full[ok_temp], covar, size=500)
+                    
         line_flux_err = coeffs_full*0.
         line_flux_err[ok_temp] = covard
 
@@ -1278,13 +1300,11 @@ class MultiBeam():
         #model_continuum.reshape(self.beam.sh_beam)
 
         ### 1D spectrum
-        xspec = np.arange(0.3, 2.35, 0.05)-1
-        scale_coeffs = coeffs_full[self.N*self.fit_bg:  
-                                  self.N*self.fit_bg+self.n_poly]
-
-        yspec = [xspec**o*scale_coeffs[o] for o in range(self.poly_order+1)]
-        model1d = utils.SpectrumTemplate((xspec+1)*1.e4, 
-                                         np.sum(yspec, axis=0))
+        
+        # Polynomial component
+        xspec, yspec = self.eval_poly_spec(coeffs_full)
+        
+        model1d = utils.SpectrumTemplate((xspec+1)*1.e4, yspec)
 
         cont1d = model1d*1
 
@@ -1303,7 +1323,7 @@ class MultiBeam():
                 line_flux[key.split()[1]] = np.array([coeffs_full[i0+i]*fscl, 
                                              line_flux_err[i0+i]*fscl])
 
-        return line_flux, cont1d, line1d, model1d, model_continuum
+        return line_flux, covar_full, cont1d, line1d, model1d, model_continuum
     
     @classmethod
     def load_templates(self, fwhm=400, line_complexes=True, stars=False,
@@ -1519,13 +1539,13 @@ class MultiBeam():
         #model_continuum.reshape(self.beam.sh_beam)
                 
         ### 1D spectrum
-        xspec = np.arange(0.3, 2.35, 0.05)-1
-        scale_coeffs = coeffs_full[self.N*self.fit_bg:  
-                                  self.N*self.fit_bg+self.n_poly]
-                                  
-        yspec = [xspec**o*scale_coeffs[o] for o in range(self.poly_order+1)]
-        model1d = utils.SpectrumTemplate((xspec+1)*1.e4, 
-                                         np.sum(yspec, axis=0))
+        # xspec = np.arange(0.3, 2.35, 0.05)-1
+        # scale_coeffs = coeffs_full[self.N*self.fit_bg:  
+        #                           self.N*self.fit_bg+self.n_poly]
+        #                           
+        # yspec = [xspec**o*scale_coeffs[o] for o in range(self.poly_order+1)]
+        xspec, yspec = self.eval_poly_spec(coeffs_full)
+        model1d = utils.SpectrumTemplate((xspec+1)*1.e4, yspec)
 
         cont1d = model1d*1
         
@@ -1733,7 +1753,7 @@ class MultiBeam():
         
         # Parse results
         out2 = self.parse_fit_outputs(zbest, templates, coeffs_full, A)
-        line_flux, cont1d, line1d, model1d, model_continuum = out2
+        line_flux, covar, cont1d, line1d, model1d, model_continuum = out2
         
         # Output dictionary with fit parameters
         fit_data = OrderedDict()
@@ -1750,6 +1770,7 @@ class MultiBeam():
         fit_data['DoF'] = self.DoF
         fit_data['model_full'] = model_full
         fit_data['coeffs_full'] = coeffs_full
+        fit_data['covar'] = covar
         fit_data['line_flux'] = line_flux
         #fit_data['templates_full'] = templates
         fit_data['model_cont'] = model_continuum
@@ -1800,7 +1821,7 @@ class MultiBeam():
         A, coeffs_full, chi2_best, model_full = out
 
         out2 = self.parse_fit_outputs(z, templates, coeffs_full, A)
-        line, cont1d, line1d, model1d, model_continuum = out2
+        line, covar, cont1d, line1d, model1d, model_continuum = out2
 
         NB, NTEMP = len(self.beams), len(templates)
         
@@ -1830,7 +1851,7 @@ class MultiBeam():
             
             # Parse fit information from individual fits
             out2 = b_i.parse_fit_outputs(z, templates, coeffs_i, A_i)
-            line_i, cont1d_i, line1d_i, model1d_i, model_continuum_i = out2
+            line_i, covar_i, cont1d_i, line1d_i, model1d_i, model_continuum_i = out2
 
             for k in line_keys:
                 line_flux[k][i] = line_i[k][0]
@@ -1845,8 +1866,12 @@ class MultiBeam():
     def show_redshift_fit(self, fit_data, plot_flambda=True, figsize=[8,5]):
         """TBD
         """
+        import matplotlib.gridspec
+        gs = matplotlib.gridspec.GridSpec(2, 1, height_ratios=[0.6,1])
+        
+        
         fig = plt.figure(figsize=figsize)
-        ax = fig.add_subplot(211)
+        ax = fig.add_subplot(gs[0])
         
         c2min = fit_data['chi2'].min()
                
@@ -1880,7 +1905,7 @@ class MultiBeam():
         ax.grid()        
         ax.set_title(r'ID = {0:d}, $z_\mathrm{{grism}}$={1:.4f}'.format(self.beams[0].id, fit_data['zbest']))
                                                
-        ax = fig.add_subplot(212)
+        ax = fig.add_subplot(gs[1])
         
         ymax = 0
         ymin = 1e10
@@ -2009,15 +2034,29 @@ class MultiBeam():
                 #print g, xmin, xmax
                 
         ax.set_xlim(xmin, xmax)
+        ax.semilogx(subsx=[xmax])
+        #axc.set_xticklabels([])
+        #axc.set_xlabel(r'$\lambda$')
+        #axc.set_ylabel(r'$f_\lambda \times 10^{-19}$')
+        from matplotlib.ticker import MultipleLocator
+        ax.xaxis.set_major_locator(MultipleLocator(0.1))
+        
+        labels = np.arange(np.ceil(xmin*10), np.ceil(xmax*10))/10.
+        ax.set_xticks(labels)
+        ax.set_xticklabels(labels)
+        
+        ax.grid()
         
         ### Label
         ax.text(0.03, 1.03, ('{0}'.format(self.Ngrism)).replace('\'','').replace('{','').replace('}',''), ha='left', va='bottom', transform=ax.transAxes, fontsize=10)
         
-        ax.plot(wave/1.e4, wave/1.e4*0., linestyle='--', color='k')
+        #ax.plot(wave/1.e4, wave/1.e4*0., linestyle='--', color='k')
+        ax.hlines(0, xmin, xmax, linestyle='--', color='k')
+        
         ax.set_xlabel(r'$\lambda$')
         ax.set_ylabel(ylabel)
         
-        fig.tight_layout(pad=0.1)
+        gs.tight_layout(fig, pad=0.1)
         return fig
     
     def redshift_fit_twod_figure(self, fit, spatial_scale=1, dlam=46., NY=10,
