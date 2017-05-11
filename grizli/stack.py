@@ -48,8 +48,9 @@ def make_templates(grism='G141', return_lists=False, fsps_templates=False):
                                            fsps_templates=fsps_templates)
     
     # Individual lines
-    line_list = ['SIII', 'SII', 'Ha', 'OI-6302', 'OIII', 'Hb', 
-                 'OIII-4363', 'Hg', 'Hd', 'NeIII', 'OII', 'MgII']
+    # line_list = ['SIII', 'SII', 'Ha', 'OI-6302', 'OIII', 'Hb', 
+    #              'OIII-4363', 'Hg', 'Hd', 'NeIII', 'OII', 'MgII']
+    line_list = ['PaB', 'HeI-1083', 'SIII', 'SII', 'Ha', 'OI-6302', 'OIII', 'Hb', 'OIII-4363', 'Hg', 'Hd', 'NeIII', 'OII', 'NeVI', 'NeV', 'MgII','CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'NIII-1750', 'NIV-1487', 'NV-1240', 'Lya']
                  
     t_lines = MultiBeam.load_templates(fwhm=fwhm, line_complexes=False,
                                        full_line_list=line_list,
@@ -938,9 +939,13 @@ class StackFitter(object):
             if clip.sum() == 0:
                 continue
                 
-            fl *= 100*unit_corr
-            er *= 100*unit_corr
-            flm *= 100*unit_corr
+            # fl *= 100*unit_corr
+            # er *= 100*unit_corr
+            # flm *= 100*unit_corr
+
+            fl *= unit_corr/1.e-19
+            er *= unit_corr/1.e-19
+            flm *= unit_corr/1.e-19
             
             f_alpha = 1./self.h0['N{0}'.format(E.header['GRISM'])]**0.5
             
@@ -949,8 +954,13 @@ class StackFitter(object):
             axc.plot(w[clip], flm[clip], color='r', alpha=0.6*f_alpha, linewidth=2) 
               
             # Plot limits              
-            ymax = np.maximum(ymax, (flm+np.median(er))[clip].max())
-            ymin = np.minimum(ymin, (flm-er*0.)[clip].min())
+            # ymax = np.maximum(ymax, (flm+np.median(er))[clip].max())
+            # ymin = np.minimum(ymin, (flm-er*0.)[clip].min())
+            
+            ymax = np.maximum(ymax,
+                              np.percentile((flm+np.median(er))[clip], 98))
+            
+            ymin = np.minimum(ymin, np.percentile((flm-er*0.)[clip], 2))
             
             wmax = np.maximum(wmax, w.max())
             wmin = np.minimum(wmin, w.min())
@@ -977,7 +987,7 @@ class StackFitter(object):
             for ax in twod_axes:
                 ax.set_xlim(wmin, wmax)
             
-        gs.tight_layout(fig, pad=0.05, h_pad=0.01)
+        gs.tight_layout(fig, pad=0.1, w_pad=0.1)
         fig.savefig(self.file.replace('.fits', '.zfit.png'))        
         return fig
                 
@@ -1118,7 +1128,7 @@ class StackedSpectrum(object):
                                     self.conf.sens['A']['WAVELENGTH'],
                                     self.conf.sens['A']['SENSITIVITY'])
             
-            self.sens = sens*np.median(np.diff(self.wave))*1.e-17
+            self.sens = sens*np.median(np.diff(self.wave)) #*1.e-17
             self.fit_data = (self.fit_data.T*self.sens).T
             
     def compute_model(self, spectrum_1d=None):
