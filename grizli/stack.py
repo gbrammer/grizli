@@ -6,8 +6,11 @@ from imp import reload
 
 import astropy.io.fits as pyfits
 import numpy as np
-    
-def make_templates(grism='G141', return_lists=False, fsps_templates=False):
+
+from .utils import GRISM_COLORS, GRISM_MAJOR, GRISM_LIMITS, DEFAULT_LINE_LIST
+
+def make_templates(grism='G141', return_lists=False, fsps_templates=False,
+                   line_list=DEFAULT_LINE_LIST):
     """Generate template savefile
     
     This script generates the template sets with the emission line 
@@ -50,7 +53,6 @@ def make_templates(grism='G141', return_lists=False, fsps_templates=False):
     # Individual lines
     # line_list = ['SIII', 'SII', 'Ha', 'OI-6302', 'OIII', 'Hb', 
     #              'OIII-4363', 'Hg', 'Hd', 'NeIII', 'OII', 'MgII']
-    line_list = ['PaB', 'HeI-1083', 'SIII', 'SII', 'Ha', 'OI-6302', 'OIII', 'Hb', 'OIII-4363', 'Hg', 'Hd', 'NeIII', 'OII', 'NeVI', 'NeV', 'MgII','CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'NIII-1750', 'NIV-1487', 'NV-1240', 'Lya']
                  
     t_lines = MultiBeam.load_templates(fwhm=fwhm, line_complexes=False,
                                        full_line_list=line_list,
@@ -949,7 +951,7 @@ class StackFitter(object):
             
             f_alpha = 1./self.h0['N{0}'.format(E.header['GRISM'])]**0.5
             
-            axc.errorbar(w[clip], fl[clip], er[clip], color='k', alpha=0.3*f_alpha, marker='.', linestyle='None')
+            axc.errorbar(w[clip], fl[clip], er[clip], color=GRISM_COLORS[E.grism], alpha=0.3*f_alpha, marker='.', linestyle='None')
             #axc.fill_between(w[clip], (fl+er)[clip], (fl-er)[clip], color='k', alpha=0.2)
             axc.plot(w[clip], flm[clip], color='r', alpha=0.6*f_alpha, linewidth=2) 
               
@@ -998,6 +1000,7 @@ class StackedSpectrum(object):
         self.sys_err = sys_err
         self.mask_min = mask_min
         self.extver = extver
+        self.grism = self.extver.split(',')[0]
         self.mask_threshold=mask_threshold
         
         self.file = file

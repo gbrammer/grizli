@@ -10,7 +10,36 @@ import astropy.table
 import numpy as np
 
 # character to skip clearing line on STDOUT printing
-no_newline = '\x1b[1A\x1b[1M' 
+NO_NEWLINE = '\x1b[1A\x1b[1M' 
+
+GRISM_COLORS = {'G800L':(0.0, 0.4470588235294118, 0.6980392156862745),
+      'G102':(0.0, 0.6196078431372549, 0.45098039215686275),
+      'G141':(0.8352941176470589, 0.3686274509803922, 0.0),
+      'none':(0.8, 0.4745098039215686, 0.6549019607843137),
+      'GRISM':'k',
+      'G280':'purple',
+      'F090W':(0.0, 0.4470588235294118, 0.6980392156862745),
+      'F115W':(0.0, 0.6196078431372549, 0.45098039215686275),
+      'F150W':(0.8352941176470589, 0.3686274509803922, 0.0),
+      'F200W':(0.8, 0.4745098039215686, 0.6549019607843137),
+      'F140M':'orange',
+      'CLEARP':'b'}
+
+GRISM_MAJOR = {'G102':0.1, 'G141':0.1, 'G800L':0.1, 'F090W':0.1, 'F115W':0.1, 'F150W':0.1, 'F200W':0.1}
+
+GRISM_LIMITS = {'G800L':[0.545, 1.02, 50.], # ACS/WFC
+          'G280':[0.2,0.4, 14], # WFC3/UVIS
+           'G102':[0.77, 1.18, 23.], # WFC3/IR
+           'G141':[1.06, 1.73, 46.0],
+           'GRISM':[0.98, 1.98, 11.], # WFIRST
+           'F090W':[0.76,1.04, 45.0], # NIRISS
+           'F115W':[0.97,1.32, 45.0],
+           'F150W':[1.28,1.72, 45.0],
+           'F200W':[1.68,2.30, 45.0],
+           'F140M':[1.20,1.60, 45.0],
+           'CLEARP':[0.76, 2.3,45.0]}
+
+DEFAULT_LINE_LIST = ['PaB', 'HeI-1083', 'SIII', 'SII', 'Ha', 'OI-6302', 'OIII', 'Hb', 'OIII-4363', 'Hg', 'Hd', 'NeIII', 'OII', 'NeVI', 'NeV', 'MgII','CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'NIII-1750', 'NIV-1487', 'NV-1240', 'Lya']
 
 def get_flt_info(files=[]):
     """Extract header information from a list of FLT files
@@ -711,7 +740,7 @@ def detect_with_photutils(sci, err=None, dq=None, seg=None, detect_thresh=2.,
     
     ### Done!
     if verbose:
-        print(no_newline + ('{0}: photutils.source_properties - {1:d} objects'.format(root, len(catalog))))
+        print(NO_NEWLINE + ('{0}: photutils.source_properties - {1:d} objects'.format(root, len(catalog))))
     
     #### Save outputs?
     if save_detection:
