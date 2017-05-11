@@ -23,34 +23,8 @@ from . import stack
 from .utils_c import disperse
 from .utils_c import interp
 
-grism_colors = {'G800L':(0.0, 0.4470588235294118, 0.6980392156862745),
-      'G102':(0.0, 0.6196078431372549, 0.45098039215686275),
-      'G141':(0.8352941176470589, 0.3686274509803922, 0.0),
-      'none':(0.8, 0.4745098039215686, 0.6549019607843137),
-      'GRISM':'k',
-      'G280':'purple',
-      'F090W':(0.0, 0.4470588235294118, 0.6980392156862745),
-      'F115W':(0.0, 0.6196078431372549, 0.45098039215686275),
-      'F150W':(0.8352941176470589, 0.3686274509803922, 0.0),
-      'F200W':(0.8, 0.4745098039215686, 0.6549019607843137),
-      'F140M':'orange',
-      'CLEARP':'b'}
+from .utils import GRISM_COLORS, GRISM_MAJOR, GRISM_LIMITS, DEFAULT_LINE_LIST
 
-grism_major = {'G102':0.1, 'G141':0.1, 'G800L':0.1, 'F090W':0.1, 'F115W':0.1, 'F150W':0.1, 'F200W':0.1}
-
-grism_limits = {'G800L':[0.545, 1.02, 50.], # ACS/WFC
-          'G280':[0.2,0.4, 14], # WFC3/UVIS
-           'G102':[0.77, 1.18, 23.5], # WFC3/IR
-           'G141':[1.06, 1.73, 47.0],
-           'GRISM':[0.98, 1.98, 11.], # WFIRST
-           'F090W':[0.76,1.04, 45.0], # NIRISS
-           'F115W':[0.97,1.32, 45.0],
-           'F150W':[1.28,1.72, 45.0],
-           'F200W':[1.68,2.30, 45.0],
-           'F140M':[1.20,1.60, 45.0],
-           'CLEARP':[0.76, 2.3,45.0]}
-
-default_line_list = ['PaB', 'HeI-1083', 'SIII', 'SII', 'Ha', 'OI-6302', 'OIII', 'Hb', 'OIII-4363', 'Hg', 'Hd', 'NeIII', 'OII', 'NeVI', 'NeV', 'MgII','CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'NIII-1750', 'NIV-1487', 'NV-1240', 'Lya']
 
 def test():
     
@@ -681,7 +655,7 @@ class GroupFLT():
         return True
         #m2d = mb.reshape_flat(modelf)
     
-    def make_stack(self, id, size=20, target='grism', skip=True, fcontam=1., scale=1, save=True):
+    def make_stack(self, id, size=20, target='grism', skip=True, fcontam=1., scale=1, save=True, kernel='point', pixfrac=0):
         """Make drizzled 2D stack for a given object
         
         Parameters
@@ -725,8 +699,8 @@ class GroupFLT():
         mb = MultiBeam(beams, fcontam=fcontam, group_name=target)
 
         hdu, fig = mb.drizzle_grisms_and_PAs(fcontam=fcontam, flambda=False,
-                                             kernel='point', size=size,
-                                             scale=scale)
+                                             size=size, scale=scale, 
+                                             kernel=kernel, pixfrac=pixfrac)
                                              
         if save:
             fig.savefig('{0}_{1:05d}.stack.png'.format(target, id))
@@ -1451,7 +1425,7 @@ class MultiBeam():
             line_list = ['Ha+NII+SII+SIII+He', 'OIII+Hb', 'OII+Ne', 'Lya+CIV']
         else:
             if full_line_list is None:
-                line_list = default_line_list
+                line_list = DEFAULT_LINE_LIST
             else:
                 line_list = full_line_list
                 
@@ -2017,7 +1991,7 @@ class MultiBeam():
                 
                 ax.errorbar(wbin/1.e4, fbin, np.sqrt(vbin), alpha=0.8,
                             linestyle='None', marker='.', 
-                            color=grism_colors[grism], zorder=2)
+                            color=GRISM_COLORS[grism], zorder=2)
                 
                 med_err = np.median(np.sqrt(vbin))
                 ymin = np.minimum(ymin, (fbin-2*med_err).min())
@@ -2027,10 +2001,10 @@ class MultiBeam():
         ax.set_ylim(ymin - 0.2*np.abs(ymax), 1.3*ymax)
         
         xmin, xmax = 1.e5, 0        
-        for g in grism_limits:
+        for g in GRISM_LIMITS:
             if g in grisms:
-                xmin = np.minimum(xmin, grism_limits[g][0])
-                xmax = np.maximum(xmax, grism_limits[g][1])
+                xmin = np.minimum(xmin, GRISM_LIMITS[g][0])
+                xmax = np.maximum(xmax, GRISM_LIMITS[g][1])
                 #print g, xmin, xmax
                 
         ax.set_xlim(xmin, xmax)
@@ -2068,10 +2042,10 @@ class MultiBeam():
         ### xlimits        
         xmin, xmax = 1.e5, 0
                    
-        for g in grism_limits:
+        for g in GRISM_LIMITS:
             if g in self.Ngrism:
-                xmin = np.minimum(xmin, grism_limits[g][0])
-                xmax = np.maximum(xmax, grism_limits[g][1])
+                xmin = np.minimum(xmin, GRISM_LIMITS[g][0])
+                xmax = np.maximum(xmax, GRISM_LIMITS[g][1])
         
         hdu_sci = drizzle_2d_spectrum(self.beams, ds9=None, NY=NY,
                                       spatial_scale=spatial_scale, dlam=dlam, 
@@ -2555,13 +2529,13 @@ class MultiBeam():
                 beams = [self.beams[i] for i in self.PA[g][pa]]
                 all_beams.extend(beams)
                 #dlam = np.ceil(np.diff(beams[0].beam.lam)[0])*scale
-                dlam = grism_limits[g][2]*scale
+                dlam = GRISM_LIMITS[g][2]*scale
                 
                 data = [beam.grism['SCI']-beam.contam-beam.bg
                            for beam in beams]
                 
                 hdu = drizzle_function(beams, data=data, 
-                                          wlimit=grism_limits[g], dlam=dlam, 
+                                          wlimit=GRISM_LIMITS[g], dlam=dlam, 
                                           spatial_scale=scale, NY=size,
                                           pixfrac=pixfrac,
                                           kernel=kernel,
@@ -2580,7 +2554,7 @@ class MultiBeam():
                 data = [beam.contam for beam in beams]
                 
                 hdu_contam = drizzle_function(beams, data=data, 
-                                          wlimit=grism_limits[g], dlam=dlam, 
+                                          wlimit=GRISM_LIMITS[g], dlam=dlam, 
                                           spatial_scale=scale, NY=size,
                                           pixfrac=pixfrac,
                                           kernel=kernel,
@@ -2604,7 +2578,7 @@ class MultiBeam():
                 data = [beam.model for beam in beams]
                     
                 hdu_model = drizzle_function(beams, data=data, 
-                                          wlimit=grism_limits[g], dlam=dlam, 
+                                          wlimit=GRISM_LIMITS[g], dlam=dlam, 
                                           spatial_scale=scale, NY=size,
                                           pixfrac=pixfrac,
                                           kernel=kernel,
@@ -2631,7 +2605,7 @@ class MultiBeam():
                     data = [beam.model for beam in beams]
                 
                     h_kern = drizzle_function(beams, data=data, 
-                                              wlimit=grism_limits[g],
+                                              wlimit=GRISM_LIMITS[g],
                                               dlam=dlam, 
                                               spatial_scale=scale, NY=size,
                                               pixfrac=pixfrac,
@@ -2661,7 +2635,7 @@ class MultiBeam():
                         for beam in all_beams]
             
             hdu = drizzle_function(all_beams, data=data, 
-                                      wlimit=grism_limits[g], dlam=dlam, 
+                                      wlimit=GRISM_LIMITS[g], dlam=dlam, 
                                       spatial_scale=scale, NY=size,
                                       pixfrac=pixfrac,
                                       kernel=kernel,
@@ -2688,7 +2662,7 @@ class MultiBeam():
             data = [beam.model for beam in all_beams]
                 
             hdu_model = drizzle_function(all_beams, data=data, 
-                                      wlimit=grism_limits[g], dlam=dlam, 
+                                      wlimit=GRISM_LIMITS[g], dlam=dlam, 
                                       spatial_scale=scale, NY=size,
                                       pixfrac=pixfrac,
                                       kernel=kernel,
@@ -2715,7 +2689,7 @@ class MultiBeam():
             data = [beam.model for beam in all_beams]
             
             h_kern = drizzle_function(all_beams, data=data, 
-                                      wlimit=grism_limits[g], dlam=dlam, 
+                                      wlimit=GRISM_LIMITS[g], dlam=dlam, 
                                       spatial_scale=scale, NY=size,
                                       pixfrac=pixfrac,
                                       kernel=kernel,
@@ -2914,13 +2888,16 @@ def drizzle_2d_spectrum(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
     
     ### Preserve flux (has to preserve aperture flux along spatial axis but
     ### average in spectral axis).
-    area_ratio *= spatial_scale
+    #area_ratio *= spatial_scale
+    
+    # preserve flux density
+    flux_density_scale = spatial_scale**2
     
     # science
-    outsci *= area_ratio
+    outsci *= area_ratio*flux_density_scale
     
     # variance
-    outvar *= area_ratio/outwv
+    outvar *= area_ratio/outwv*flux_density_scale**2
     outwht = 1/outvar
     outwht[(outvar == 0) | (~np.isfinite(outwht))] = 0
     
@@ -2943,6 +2920,7 @@ def drizzle_2d_spectrum(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
     p.header['WMAX'] = (wlimit[1], 'Maximum wavelength')
     p.header['DLAM'] = (dlam, 'Delta wavelength')
     
+    p.header['SSCALE'] = (spatial_scale, 'Spatial scale factor w.r.t native')
     p.header['FCONTAM'] = (fcontam, 'Contamination weight')
     p.header['PIXFRAC'] = (pixfrac, 'Drizzle PIXFRAC')
     p.header['DRIZKRNL'] = (kernel, 'Drizzle kernel')
@@ -3272,7 +3250,7 @@ def show_drizzle_HDU(hdu):
         
         ax.set_yticklabels([])
         ax.set_xlabel(r'$\lambda$ ($\mu$m) - '+g)
-        ax.xaxis.set_major_locator(MultipleLocator(grism_major[g]))
+        ax.xaxis.set_major_locator(MultipleLocator(GRISM_MAJOR[g]))
         
         for ip in range(grisms[g]):
             #print(ip, ig)
@@ -3308,7 +3286,7 @@ def show_drizzle_HDU(hdu):
                       aspect='auto')
            
             ax.set_yticklabels([]); ax.set_xticklabels([])
-            ax.xaxis.set_major_locator(MultipleLocator(grism_major[g]))
+            ax.xaxis.set_major_locator(MultipleLocator(GRISM_MAJOR[g]))
             ax.text(0.015, 0.94, '{0:3.0f}'.format(pa), ha='left',
                     va='top',
                     transform=ax.transAxes, fontsize=8, 
