@@ -348,8 +348,8 @@ class StackFitter(object):
                 covar = np.matrix(np.dot(AxT.T, AxT)).I
                 covard = np.sqrt(covar.diagonal()).A.flatten()
                 
-                covarf = np.matrix(np.dot(ATA.T, ATA)).I
-                covardf = np.sqrt(covarf.diagonal()).A.flatten()
+                # covarf = np.matrix(np.dot(ATA.T, ATA)).I
+                # covardf = np.sqrt(covarf.diagonal()).A.flatten()
                 
             except:
                 print('Except!')
@@ -512,7 +512,7 @@ class StackFitter(object):
                 covar = np.matrix(np.dot(AxT.T, AxT)).I
                 covard = np.sqrt(covar.diagonal()).A.flatten()
             except:
-                print('Except!')
+                print('Except: covar!')
                 covard = np.zeros(oktemp.sum())#-1.
         else:
             covard = np.zeros(oktemp.sum())#-1.
