@@ -1042,7 +1042,9 @@ class SpectrumTemplate(object):
         
         new_flux = np.interp(new_wave, self.wave, self.flux)
         new_flux += np.interp(new_wave, spectrum.wave, spectrum.flux)
-        return SpectrumTemplate(wave=new_wave, flux=new_flux)
+        out = SpectrumTemplate(wave=new_wave, flux=new_flux)
+        out.fwhm = spectrum.fwhm
+        return out
     
     def __mul__(self, scalar):
         """Multiply spectrum by a scalar value
@@ -1056,7 +1058,9 @@ class SpectrumTemplate(object):
         -------
         new_spectrum : `~grizli.utils.SpectrumTemplate`    
         """
-        return SpectrumTemplate(wave=self.wave, flux=self.flux*scalar)
+        out = SpectrumTemplate(wave=self.wave, flux=self.flux*scalar)
+        out.fwhm = self.fwhm
+        return out
     
     def set_fnu(self):
         """Make fnu version of the template.
@@ -1276,11 +1280,25 @@ def load_templates(fwhm=400, line_complexes=True, stars=False,
                                  
     return temp_list    
 
+def polynomial_templates(wave, order=0, line=False):
+    temp = {}   
+    if line:
+        for sign in [1,-1]:
+            key = 'poly {0}'.format(sign)
+            temp[key] = SpectrumTemplate(wave, sign*(wave/1.e4-1)+1)
+        return temp
+        
+    for i in range(order+1):
+        key = 'poly {0}'.format(i)
+        temp[key] = SpectrumTemplate(wave, (wave/1.e4-1)**i)
+    
+    return temp
+        
 def dot_templates(coeffs, templates, z=0):
     """Compute template sum analogous to `np.dot(coeffs, templates)`.
     """  
     
-    if len(coeffs) == len(templates):
+    if len(coeffs) != len(templates):
         raise ValueError ('shapes of coeffs ({0}) and templates ({1}) don\'t match'.format(len(coeffs), len(templates)))
           
     for i, te in enumerate(templates):

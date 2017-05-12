@@ -706,7 +706,7 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         limits : None, list = `[x0, x1, dx]`
             Will automatically use the whole wavelength range defined by the
             spectrum. To change, specify `limits = [x0, x1, dx]` to
-            interpolate `self.wave` between x0*wscale and x1*wscale.
+            interpolate `self.beam.lam_beam` between x0*wscale and x1*wscale.
 
         mpl_axis : `matplotlib.axes._axes.Axes`
             Plotting axis to place the labels, e.g., 
@@ -930,7 +930,10 @@ class ImageData(object):
                     self.exptime = hdulist[0].header['EXPTIME']
                     # sci /= self.exptime
                     # err /= self.exptime
-                    
+            
+            sci = (sci-self.mdrizsky)/self.exptime
+            err /= self.exptime
+                   
             if filter.startswith('G'):
                 photflam = 1
             
@@ -968,7 +971,7 @@ class ImageData(object):
         self.fwcpos = None
         
         self.data = OrderedDict()
-        self.data['SCI'] = (sci-self.mdrizsky)/self.exptime*photflam
+        self.data['SCI'] = sci*photflam
 
         self.sh = np.array(self.data['SCI'].shape)
         
@@ -990,7 +993,7 @@ class ImageData(object):
         if err is None:
             self.data['ERR'] = np.zeros_like(self.data['SCI'])
         else:
-            self.data['ERR'] = err/self.exptime*photflam
+            self.data['ERR'] = err*photflam
             if self.data['ERR'].shape != tuple(self.sh):
                 raise ValueError ('err and sci arrays have different shapes!')
         
@@ -2770,7 +2773,8 @@ class BeamCutout(object):
         
         # Attributes
         self.size = self.modelf.size
-        self.wave = self.beam.lam_beam
+        self.wave = self.beam.lam
+        self.sh = self.beam.sh_beam
         
         ### Initialize for fits
         self.flat_flam = self.compute_model(in_place=False, is_cgs=True) #/self.beam.total_flux
@@ -3053,17 +3057,16 @@ class BeamCutout(object):
         """
         wcs = self.grism.wcs.deepcopy()
                 
-        xarr = np.arange(self.wave.shape[0])
+        xarr = np.arange(self.beam.lam_beam.shape[0])
         
         ### Trace properties at desired wavelength
-        dx = np.interp(wavelength, self.wave, xarr)
-        dy = np.interp(wavelength, self.wave, self.beam.ytrace_beam)
+        dx = np.interp(wavelength, self.beam.lam_beam, xarr)
+        dy = np.interp(wavelength, self.beam.lam_beam, self.beam.ytrace_beam)
         
-        dl = np.interp(wavelength, self.wave[1:],
-                                   np.diff(self.wave))
+        dl = np.interp(wavelength, self.beam.lam_beam[1:],
+                                   np.diff(self.beam.lam_beam))
                                    
-        ysens = np.interp(wavelength, self.wave,
-                                      self.beam.sensitivity_beam)
+        ysens = np.interp(wavelength, self.beam.lam_beam, self.beam.sensitivity_beam)
                 
         ### Update CRPIX
         dc = 0 # python array center to WCS pixel center
@@ -3137,8 +3140,8 @@ class BeamCutout(object):
         h = pyfits.Header()
         h['CRPIX1'] = self.beam.sh_beam[0]/2 - self.beam.xcenter
         h['CRPIX2'] = self.beam.sh_beam[0]/2 - self.beam.ycenter
-        h['CRVAL1'] = self.wave[0]        
-        h['CD1_1'] = self.wave[1] - self.wave[0]
+        h['CRVAL1'] = self.beam.lam_beam[0]        
+        h['CD1_1'] = self.beam.lam_beam[1] - self.beam.lam_beam[0]
         h['CD1_2'] = 0.
         
         h['CRVAL2'] = -1*self.beam.ytrace_beam[0]
@@ -3252,8 +3255,8 @@ class BeamCutout(object):
         
         yp_beam, xp_beam = np.indices(self.beam.sh_beam)
         skip = 1
-        xarr = np.arange(0,self.wave.shape[0], skip)
-        xbeam = np.arange(self.wave.shape[0])*1.
+        xarr = np.arange(0,self.beam.lam_beam.shape[0], skip)
+        xbeam = np.arange(self.beam.lam_beam.shape[0])*1.
 
         #yoff = 0 #-0.15
         psf_model = self.model*0.
@@ -3266,7 +3269,7 @@ class BeamCutout(object):
         
         for xi in xarr:
             yi = np.interp(xi, xbeam, self.beam.ytrace_beam)
-            li = np.interp(xi, xbeam, self.wave) #+ lam_offset*np.diff(self.wave)[0]
+            li = np.interp(xi, xbeam, self.wave_beam) #+ lam_offset*np.diff(self.wave)[0]
             si = np.interp(xi, xbeam, self.beam.sensitivity_beam)
             dx = xp_beam-self.psf_params[1]-xi
             dy = yp_beam-self.psf_params[2]-yi+yoff
@@ -3464,8 +3467,8 @@ class BeamCutout(object):
             temp = templates[key].zscale(z, 1.)
             spectrum_1d = [temp.wave, temp.flux]
             
-            if ((temp.wave[0] > self.wave[-1]) | 
-                (temp.wave[-1] < self.wave[0])):
+            if ((temp.wave[0] > self.beam.lam_beam[-1]) | 
+                (temp.wave[-1] < self.beam.lam_beam[0])):
                 
                 A_list.append(self.flat_flam*1)
                 ok_temp[NTEMP-1] = False

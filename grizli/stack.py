@@ -1099,9 +1099,11 @@ class StackedSpectrum(object):
             self.sens = sens*np.median(np.diff(self.wave)) #*1.e-17
             self.fit_data = (self.fit_data.T*self.sens).T
             
-    def compute_model(self, spectrum_1d=None):
+    def compute_model(self, spectrum_1d=None, is_cgs=None, in_place=False):
         """
         Generate the model spectrum
+        
+        xxx is_cgs and in_place are dummy parameters to match `MultiBeam.compute_model`.
         """
         import grizli.utils_c as u
         if spectrum_1d is None:
