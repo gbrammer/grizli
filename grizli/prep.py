@@ -1664,7 +1664,7 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
         pixfrac=0.8
             
     AstroDrizzle(grism['files'], output=grism['product'], clean=True,
-                 context=False, preserve=False, skysub=True, skyfile=skyfile,
+                 context=isACS, preserve=False, skysub=True, skyfile=skyfile,
                  driz_separate=True, driz_sep_wcs=True, median=True, 
                  blot=True, driz_cr=True, driz_cr_corr=True, 
                  driz_cr_snr=driz_cr_snr, driz_cr_scale=driz_cr_scale, 

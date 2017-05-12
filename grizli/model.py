@@ -875,9 +875,13 @@ class ImageData(object):
                 origin = [0,0]
             
             self.sci_extn = sci_extn    
-            self.parent_file = hdulist.filename()
-            
             header = hdulist[base_extn].header.copy()
+            
+            if 'PARENT' in header:
+                self.parent_file = header['PARENT']
+            else:
+                self.parent_file = hdulist.filename()
+
             if 'CPDIS1' in header:
                 if 'Lookup' in header['CPDIS1']:
                     self.wcs_is_lookup = True
@@ -887,7 +891,7 @@ class ImageData(object):
                 self.wcs_is_lookup = False
                     
             status = False
-            for ext in [0, (base_extn)]:
+            for ext in [base_extn, 0]:
                 h = hdulist[ext].header
                 if 'INSTRUME' in h:
                     status = True
@@ -914,17 +918,19 @@ class ImageData(object):
             else:
                 photplam = photplam_list[filter]
                         
-            if 'MDRIZSKY' in hdulist[(base_extn)].header:
-                sci -= hdulist[(base_extn)].header['MDRIZSKY']
+            self.mdrizsky = 0.
+            if 'MDRIZSKY' in header:
+                #sci -= header['MDRIZSKY']
+                self.mdrizsky = header['MDRIZSKY']
                 
             ### ACS bunit
-            exptime = 1.
-            if 'BUNIT' in hdulist[base_extn].header:
-                if hdulist[base_extn].header['BUNIT'] == 'ELECTRONS':
-                    exptime = hdulist[0].header['EXPTIME']
-                    sci /= exptime
-                    err /= exptime
-                           
+            self.exptime = 1.
+            if 'BUNIT' in header:
+                if header['BUNIT'] == 'ELECTRONS':
+                    self.exptime = hdulist[0].header['EXPTIME']
+                    # sci /= self.exptime
+                    # err /= self.exptime
+                    
             if filter.startswith('G'):
                 photflam = 1
             
@@ -944,6 +950,20 @@ class ImageData(object):
             self.grow = 1
             ref_data = None
             
+            if 'EXPTIME' in header:
+                self.exptime = header['EXPTIME']
+            else:
+                self.exptime = 1.
+
+            if 'MDRIZSKY' in header:
+                self.mdrizsky = header['MDRIZSKY']
+            else:
+                self.mdrizsky = 0.
+                     
+            print('xxx', 'EXPTIME' in header, header['EXPTIME'])
+            
+        print('yy', self.exptime, self.mdrizsky, 'BUNIT' in header)
+            
         self.is_slice = False
         
         ### Array parameters
@@ -952,7 +972,7 @@ class ImageData(object):
         self.fwcpos = None
         
         self.data = OrderedDict()
-        self.data['SCI'] = sci*photflam
+        self.data['SCI'] = (sci-self.mdrizsky)/self.exptime*photflam
 
         self.sh = np.array(self.data['SCI'].shape)
         
@@ -963,6 +983,8 @@ class ImageData(object):
         self.instrument = instrument
         self.header = header
         
+        self.header['EXPTIME'] = self.exptime
+        
         self.photflam = photflam
         self.photplam = photplam
         self.ABZP =  (0*np.log10(self.photflam) - 21.10 -
@@ -972,7 +994,7 @@ class ImageData(object):
         if err is None:
             self.data['ERR'] = np.zeros_like(self.data['SCI'])
         else:
-            self.data['ERR'] = err*photflam
+            self.data['ERR'] = err/self.exptime*photflam
             if self.data['ERR'].shape != tuple(self.sh):
                 raise ValueError ('err and sci arrays have different shapes!')
         
@@ -1005,6 +1027,12 @@ class ImageData(object):
         else:
             self.header = pyfits.Header()
         
+        # Detector chip
+        if 'CCDCHIP' in self.header:
+            self.ccdchip = self.header['CCDCHIP']
+        else:
+            self.ccdchip = 1
+            
         # For NIRISS
         if 'FWCPOS' in self.header:
             self.fwcpos = self.header['FWCPOS']
@@ -1415,7 +1443,10 @@ class ImageData(object):
         slice_obj.ref_photflam = self.ref_photflam
         slice_obj.ref_photplam = self.ref_photplam
         slice_obj.ref_filter = self.ref_filter
-            
+        
+        slice_obj.mdrizsky = self.mdrizsky
+        slice_obj.exptime = self.exptime
+                            
         slice_obj.ABZP = self.ABZP
         slice_obj.thumb_extension = self.thumb_extension
         
@@ -1482,10 +1513,12 @@ class ImageData(object):
         h['ORIGINY'] = self.origin[0], 'Origin from parent image, y'
         
         hdu = []
+        sci_data = self.data['SCI']*self.exptime + self.mdrizsky
+        err_data = self.data['ERR']*self.exptime
         
-        hdu.append(pyfits.ImageHDU(data=self.data['SCI'], header=h,
+        hdu.append(pyfits.ImageHDU(data=sci_data, header=h,
                                    name='SCI'))
-        hdu.append(pyfits.ImageHDU(data=self.data['ERR'], header=h,
+        hdu.append(pyfits.ImageHDU(data=err_data, header=h,
                                    name='ERR'))
         hdu.append(pyfits.ImageHDU(data=self.data['DQ'], header=h, name='DQ'))
         
@@ -1698,7 +1731,7 @@ class GrismFLT(object):
         self.conf_file = grismconf.get_config_filename(self.grism.instrument,
                                                        direct_filter,
                                                        self.grism.filter,
-                                                       sci_extn)
+                                                       self.grism.ccdchip)
         
         self.conf = grismconf.load_grism_config(self.conf_file)
         
@@ -2872,7 +2905,8 @@ class BeamCutout(object):
         if conf is None:
             conf_file = grismconf.get_config_filename(self.direct.instrument,
                                                       direct_filter,
-                                                      self.grism.filter)
+                                                      self.grism.filter,
+                                                      chip=self.grism.ccdchip)
         
             conf = grismconf.load_grism_config(conf_file)
         
