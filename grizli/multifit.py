@@ -18,7 +18,7 @@ import astropy.io.fits as pyfits
 from . import grismconf
 from . import utils
 from . import model
-from . import stack
+#from . import stack
 
 from .utils_c import disperse
 from .utils_c import interp
@@ -854,8 +854,55 @@ class GroupFLT():
         
         # Done!
         return outsci, outwht
+
+class GroupFitter(object):
+    """Combine stack.StackFitter and MultiBeam fitting into a single object
+    
+    Will have to match the attributes between the different objects, which 
+    is already close.
+    """
+    def _test(self):
+        print(self.Ngrism)
+    
+    def _get_slices(self):
+        """Precompute array slices for how the individual components map into the single combined arrays.
         
-class MultiBeam():
+        Parameters
+        ----------
+        None 
+        
+        Returns
+        -------
+        slices : list
+            List of slices.
+        """
+        x = 0
+        slices = []
+        for i in range(self.N):
+            slices.append(slice(x+0, x+self.beams[i].size))
+            x += self.beams[i].size
+        
+        return slices    
+    
+    def _init_background(self):
+        """Initialize the (flat) background model components
+        
+        Parameters
+        ----------
+        None :
+        
+        Returns
+        -------
+        A_bg : `~np.ndarray`
+            
+        """
+        A_bg = np.zeros((self.N, self.Ntot))
+        for i in range(self.N):
+            A_bg[i, self.slices[i]] = 1.
+        
+        return A_bg
+        
+class MultiBeam(GroupFitter):
     def __init__(self, beams, group_name='group', fcontam=0., psf=False):
         """Tools for dealing with multiple `~.model.BeamCutout` instances 
         
@@ -1001,6 +1048,8 @@ class MultiBeam():
             hdu.extend(hdu_i[1:])
             count.append(len(hdu_i)-1)
             hdu[0].header['FILE{0:04d}'.format(ib)] = (beam.grism.parent_file, 'Grism parent file')
+            hdu[0].header['GRIS{0:04d}'.format(ib)] = (beam.grism.filter, 'Grism element')
+            hdu[0].header['EXTN{0:04d}'.format(ib)] = (beam.grism.filter, 'Grism element')
              
         hdu[0].header['COUNT'] = (self.N, ' '.join(['{0}'.format(c) for c in count]))
                 
@@ -1008,6 +1057,9 @@ class MultiBeam():
             return hdu
         
         outfile = '{0}_{1:05d}.beams.fits'.format(self.group_name, self.id)
+        if verbose:
+            print(outfile)
+        
         hdu.writeto(outfile, clobber=True)
     
     def load_master_fits(self, beam_file, verbose=True):
@@ -1149,7 +1201,7 @@ class MultiBeam():
             i0 = 0            
             for ib in range(self.N):
                 beam = self.beams[ib]
-                lam_beam = beam.beam.lam_beam
+                lam_beam = beam.wave
                 if ((temp.wave.min()*(1+z) > lam_beam.max()) | 
                     (temp.wave.max()*(1+z) < lam_beam.min())):
                     tmodel = 0.
@@ -1258,7 +1310,7 @@ class MultiBeam():
             Redshift at which to evaluate the fits.
         
         templates : list of `~grizli.utils.SpectrumTemplate` objects
-            Generated with, e.g., `load_templates`.
+            Generated with, e.g., `~grizli.utils.load_templates`.
         
         coeffs_full : `~np.ndarray`
             Template fit coefficients
@@ -1344,158 +1396,7 @@ class MultiBeam():
                                              line_flux_err[i0+i]*fscl])
 
         return line_flux, covar_full, cont1d, line1d, model1d, model_continuum
-    
-    @classmethod
-    def load_templates(self, fwhm=400, line_complexes=True, stars=False,
-                       full_line_list=None, continuum_list=None,
-                       fsps_templates=False):
-        """Generate a list of templates for fitting to the grism spectra
         
-        The different sets of continuum templates are stored in 
-        
-            >>> temp_dir = os.path.join(os.getenv('GRIZLI'), 'templates')
-            
-        Parameters
-        ----------
-        fwhm : float
-            FWHM of a Gaussian, in km/s, that is convolved with the emission
-            line templates.  If too narrow, then can see pixel effects in the 
-            fits as a function of redshift.
-        
-        line_complexes : bool
-            Generate line complex templates with fixed flux ratios rather than
-            individual lines. This is useful for the redshift fits where there
-            would be redshift degeneracies if the line fluxes for individual
-            lines were allowed to vary completely freely. See the list of
-            available lines and line groups in
-            `~grizli.utils.get_line_wavelengths`. Currently,
-            `line_complexes=True` generates the following groups:
-            
-                Ha+NII+SII+SIII+He
-                OIII+Hb
-                OII+Ne
-            
-        stars : bool
-            Get stellar templates rather than galaxies + lines
-            
-        full_line_list : None or list
-            Full set of lines to try.  The default is currently
-            
-                >>> full_line_list = ['SIII', 'SII', 'Ha', 'OI-6302', 
-                                      'OIII', 'Hb', 'OIII-4363', 
-                                      'Hg', 'Hd', 'NeIII', 'OII']
-            
-            The full list of implemented lines is in `~grizli.utils.get_line_wavelengths`.
-        
-        Returns
-        -------
-        temp_list : list of `~grizli.utils.SpectrumTemplate` objects
-            Output template list
-        
-        """
-        
-        if stars:
-            # templates = glob.glob('%s/templates/Pickles_stars/ext/*dat' %(os.getenv('GRIZLI')))
-            # templates = []
-            # for t in 'obafgkmrw':
-            #     templates.extend( glob.glob('%s/templates/Pickles_stars/ext/uk%s*dat' %(os.getenv('THREEDHST'), t)))
-            # templates.extend(glob.glob('%s/templates/SPEX/spex-prism-M*txt' %(os.getenv('THREEDHST'))))
-            # templates.extend(glob.glob('%s/templates/SPEX/spex-prism-[LT]*txt' %(os.getenv('THREEDHST'))))
-            # 
-            # #templates = glob.glob('/Users/brammer/Downloads/templates/spex*txt')
-            # templates = glob.glob('bpgs/*ascii')
-            # info = catIO.Table('bpgs/bpgs.info')
-            # type = np.array([t[:2] for t in info['type']])
-            # templates = []
-            # for t in 'OBAFGKM':
-            #     test = type == '-%s' %(t)
-            #     so = np.argsort(info['type'][test])
-            #     templates.extend(info['file'][test][so])
-            #             
-            # temp_list = OrderedDict()
-            # for temp in templates:
-            #     #data = np.loadtxt('bpgs/'+temp, unpack=True)
-            #     data = np.loadtxt(temp, unpack=True)
-            #     #data[0] *= 1.e4 # spex
-            #     scl = np.interp(5500., data[0], data[1])
-            #     name = os.path.basename(temp)
-            #     #ix = info['file'] == temp
-            #     #name='%5s %s' %(info['type'][ix][0][1:], temp.split('.as')[0])
-            #     print(name)
-            #     temp_list[name] = utils.SpectrumTemplate(wave=data[0],
-            #                                              flux=data[1]/scl)
-            
-            # np.save('stars_bpgs.npy', [temp_list])
-            
-            temp_list = np.load(os.path.join(os.getenv('GRIZLI'), 
-                                             'templates/stars.npy'))[0]
-            return temp_list
-            
-        ## Intermediate and very old
-        # templates = ['templates/EAZY_v1.0_lines/eazy_v1.0_sed3_nolines.dat',  
-        #              'templates/cvd12_t11_solar_Chabrier.extend.skip10.dat']     
-        templates = ['eazy_intermediate.dat', 
-                     'cvd12_t11_solar_Chabrier.dat']
-                     
-        ## Post starburst
-        #templates.append('templates/UltraVISTA/eazy_v1.1_sed9.dat')
-        templates.append('post_starburst.dat')
-        
-        ## Very blue continuum
-        #templates.append('templates/YoungSB/erb2010_continuum.dat')
-        templates.append('erb2010_continuum.dat')
-        
-        ### Test new templates
-        # templates = ['templates/erb2010_continuum.dat',
-        # 'templates/fsps/tweak_fsps_temp_kc13_12_006.dat',
-        # 'templates/fsps/tweak_fsps_temp_kc13_12_008.dat']
-        
-        if fsps_templates:
-            #templates = ['templates/fsps/tweak_fsps_temp_kc13_12_0{0:02d}.dat'.format(i+1) for i in range(12)]
-            templates = ['fsps/fsps_QSF_12_v3_nolines_0{0:02d}.dat'.format(i+1) for i in range(12)]
-            #templates = ['fsps/fsps_QSF_7_v3_nolines_0{0:02d}.dat'.format(i+1) for i in range(7)]
-        
-        if continuum_list is not None:
-            templates = continuum_list
-            
-        temp_list = OrderedDict()
-        for temp in templates:
-            data = np.loadtxt(os.path.join(os.getenv('GRIZLI'), 'templates', temp), unpack=True)
-            scl = np.interp(5500., data[0], data[1])
-            name = temp #os.path.basename(temp)
-            temp_list[name] = utils.SpectrumTemplate(wave=data[0],
-                                                     flux=data[1]/scl)
-        
-        ### Emission lines:
-        line_wavelengths, line_ratios = utils.get_line_wavelengths()
-         
-        if line_complexes:
-            #line_list = ['Ha+SII', 'OIII+Hb+Ha', 'OII']
-            #line_list = ['Ha+SII', 'OIII+Hb', 'OII']
-            line_list = ['Ha+NII+SII+SIII+He', 'OIII+Hb', 'OII+Ne', 'Lya+CIV']
-        else:
-            if full_line_list is None:
-                line_list = DEFAULT_LINE_LIST
-            else:
-                line_list = full_line_list
-                
-            #line_list = ['Ha', 'SII']
-            
-        for li in line_list:
-            scl = line_ratios[li]/np.sum(line_ratios[li])
-            for i in range(len(scl)):
-                line_i = utils.SpectrumTemplate(wave=line_wavelengths[li][i], 
-                                          flux=None, fwhm=fwhm, velocity=True)
-                                          
-                if i == 0:
-                    line_temp = line_i*scl[i]
-                else:
-                    line_temp = line_temp + line_i*scl[i]
-            
-            temp_list['line {0}'.format(li)] = line_temp
-                                     
-        return temp_list
-    
     def fit_stars(self, poly_order=1, fitter='nnls', fit_background=True, 
                   verbose=True, make_figure=True, zoom=None,
                   delta_chi2_threshold=0.004, zr=0, dz=0, fwhm=0, 
@@ -1512,7 +1413,7 @@ class MultiBeam():
         A, coeffs, chi2_poly, model_2d = out
         
         ### Star templates
-        templates = self.load_templates(fwhm=fwhm, stars=True)
+        templates = utils.load_templates(fwhm=fwhm, stars=True)
         NTEMP = len(templates)
 
         key = list(templates)[0]
@@ -1542,7 +1443,7 @@ class MultiBeam():
                 best = key
 
             if verbose:                    
-                print(utils.no_newline + '  {0} {1:9.1f} ({2})'.format(key, chi2[i], best))
+                print(utils.NO_NEWLINE + '  {0} {1:9.1f} ({2})'.format(key, chi2[i], best))
         
         ## Best-fit
         temp_i = {best:templates[best]}
@@ -1652,7 +1553,7 @@ class MultiBeam():
         
         ### Set up for template fit
         if templates == {}:
-            templates = self.load_templates(fwhm=fwhm, stars=stars, line_complexes=line_complexes, fsps_templates=fsps_templates)
+            templates = utils.load_templates(fwhm=fwhm, stars=stars, line_complexes=line_complexes, fsps_templates=fsps_templates)
         else:
             if verbose:
                 print('User templates! N={0} \n'.format(len(templates)))
@@ -1681,7 +1582,7 @@ class MultiBeam():
                 chi2min = chi2[i]
 
             if verbose:                    
-                print(utils.no_newline + '  {0:.4f} {1:9.1f} ({2:.4f})'.format(zgrid[i], chi2[i], zgrid[iz]))
+                print(utils.NO_NEWLINE + '  {0:.4f} {1:9.1f} ({2:.4f})'.format(zgrid[i], chi2[i], zgrid[iz]))
         
         print('First iteration: z_best={0:.4f}\n'.format(zgrid[iz]))
             
@@ -1735,7 +1636,7 @@ class MultiBeam():
                     iz = i
                 
                 if verbose:
-                    print(utils.no_newline+'- {0:.4f} {1:9.1f} ({2:.4f}) {3:d}/{4:d}'.format(zgrid_zoom[i], chi2_zoom[i], zgrid_zoom[iz], i+1, NZOOM))
+                    print(utils.NO_NEWLINE+'- {0:.4f} {1:9.1f} ({2:.4f}) {3:d}/{4:d}'.format(zgrid_zoom[i], chi2_zoom[i], zgrid_zoom[iz], i+1, NZOOM))
         
             zgrid = np.append(zgrid, zgrid_zoom)
             chi2 = np.append(chi2, chi2_zoom)
@@ -1757,7 +1658,7 @@ class MultiBeam():
         
         ### Best redshift
         if not stars:
-            templates = self.load_templates(line_complexes=False, fwhm=fwhm, fsps_templates=fsps_templates)
+            templates = utils.load_templates(line_complexes=False, fwhm=fwhm, fsps_templates=fsps_templates)
         
         zbest = zgrid[np.argmin(chi2)]
         ix = np.argmin(chi2)
@@ -2201,7 +2102,7 @@ class MultiBeam():
                                            is_cgs=True)
                         
                         beam.oivar = beam.ivar*1
-                        lam = beam.beam.lam_beam
+                        lam = beam.wave
                         
                         ### another idea, compute a model for the line itself
                         ### and mask relatively "contaminated" pixels from 
@@ -2631,7 +2532,7 @@ class MultiBeam():
                     for beam in beams:
                         beam.compute_model()
 
-                data = [beam.model for beam in beams]
+                data = [beam.beam.model for beam in beams]
                     
                 hdu_model = drizzle_function(beams, data=data, 
                                           wlimit=GRISM_LIMITS[g], dlam=dlam, 
@@ -2658,7 +2559,7 @@ class MultiBeam():
                         beam.compute_model(spectrum_1d=[gau.wave, gau.flux],
                                            is_cgs=True)
                 
-                    data = [beam.model for beam in beams]
+                    data = [beam.beam.model for beam in beams]
                 
                     h_kern = drizzle_function(beams, data=data, 
                                               wlimit=GRISM_LIMITS[g],
@@ -2715,7 +2616,7 @@ class MultiBeam():
                 for beam in all_beams:
                     beam.compute_model()
 
-            data = [beam.model for beam in all_beams]
+            data = [beam.beam.model for beam in all_beams]
                 
             hdu_model = drizzle_function(all_beams, data=data, 
                                       wlimit=GRISM_LIMITS[g], dlam=dlam, 
@@ -2742,7 +2643,7 @@ class MultiBeam():
                 beam.compute_model(spectrum_1d=[gau.wave, gau.flux],
                                    is_cgs=True)
             
-            data = [beam.model for beam in all_beams]
+            data = [beam.beam.model for beam in all_beams]
             
             h_kern = drizzle_function(all_beams, data=data, 
                                       wlimit=GRISM_LIMITS[g], dlam=dlam, 
@@ -3101,7 +3002,7 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
                 wcs_ext.crval[1] += dy_crpix
                         
         beam_data = beam.grism.data['SCI'] - beam.contam 
-        beam_continuum = beam.model*1
+        beam_continuum = beam.beam.model*1
         
         # Downweight contamination
         if fcontam > 0:
@@ -3304,7 +3205,7 @@ def show_drizzle_HDU(hdu, diff=True):
         ax = fig.add_subplot(gs[NY-1, ig*2+1])
         
         if diff:
-            print('xx DIFF!')
+            #print('xx DIFF!')
             m = model_i.data
         else:
             m = 0

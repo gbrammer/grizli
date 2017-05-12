@@ -54,7 +54,7 @@ photplam_list = {'F098M': 9864.722728110915,
             'G280': 3651.}
 
 # character to skip clearing line on STDOUT printing
-no_newline = '\x1b[1A\x1b[1M' 
+#no_newline = '\x1b[1A\x1b[1M' 
 
 ### Demo for computing photflam and photplam with pysynphot
 if False:
@@ -887,7 +887,7 @@ class ImageData(object):
                 self.wcs_is_lookup = False
                     
             status = False
-            for ext in [(base_extn)]:
+            for ext in [0, (base_extn)]:
                 h = hdulist[ext].header
                 if 'INSTRUME' in h:
                     status = True
@@ -2202,7 +2202,7 @@ class GrismFLT(object):
         ### Now compute the full model
         for id_i, mag_i in zip(ids, mags):
             if verbose:
-                print(utils.no_newline + 'compute model id={0:d}'.format(id_i))
+                print(utils.NO_NEWLINE + 'compute model id={0:d}'.format(id_i))
                 
             self.compute_model_orders(id=id_i, compute_size=True, mag=mag_i, 
                                       in_place=True, store=store)
@@ -2739,6 +2739,10 @@ class BeamCutout(object):
         self.model = self.beam.model
         self.modelf = self.model.flatten()
         
+        # Attributes
+        self.size = self.modelf.size
+        self.wave = self.beam.lam_beam
+        
         ### Initialize for fits
         self.flat_flam = self.compute_model(in_place=False, is_cgs=True) #/self.beam.total_flux
         
@@ -2893,6 +2897,7 @@ class BeamCutout(object):
         self.grism.parent_file = h0['GPARENT']
         self.direct.parent_file = h0['DPARENT']
         self.id = h0['ID']
+        self.model = self.beam.model
         
     def write_fits(self, root='beam_', clobber=True, strip=False, get_hdu=False):
         """Write attributes and data to FITS file
@@ -3018,16 +3023,16 @@ class BeamCutout(object):
         """
         wcs = self.grism.wcs.deepcopy()
                 
-        xarr = np.arange(self.beam.lam_beam.shape[0])
+        xarr = np.arange(self.wave.shape[0])
         
         ### Trace properties at desired wavelength
-        dx = np.interp(wavelength, self.beam.lam_beam, xarr)
-        dy = np.interp(wavelength, self.beam.lam_beam, self.beam.ytrace_beam)
+        dx = np.interp(wavelength, self.wave, xarr)
+        dy = np.interp(wavelength, self.wave, self.beam.ytrace_beam)
         
-        dl = np.interp(wavelength, self.beam.lam_beam[1:],
-                                   np.diff(self.beam.lam_beam))
+        dl = np.interp(wavelength, self.wave[1:],
+                                   np.diff(self.wave))
                                    
-        ysens = np.interp(wavelength, self.beam.lam_beam,
+        ysens = np.interp(wavelength, self.wave,
                                       self.beam.sensitivity_beam)
                 
         ### Update CRPIX
@@ -3102,8 +3107,8 @@ class BeamCutout(object):
         h = pyfits.Header()
         h['CRPIX1'] = self.beam.sh_beam[0]/2 - self.beam.xcenter
         h['CRPIX2'] = self.beam.sh_beam[0]/2 - self.beam.ycenter
-        h['CRVAL1'] = self.beam.lam_beam[0]        
-        h['CD1_1'] = self.beam.lam_beam[1] - self.beam.lam_beam[0]
+        h['CRVAL1'] = self.wave[0]        
+        h['CD1_1'] = self.wave[1] - self.wave[0]
         h['CD1_2'] = 0.
         
         h['CRVAL2'] = -1*self.beam.ytrace_beam[0]
@@ -3217,8 +3222,8 @@ class BeamCutout(object):
         
         yp_beam, xp_beam = np.indices(self.beam.sh_beam)
         skip = 1
-        xarr = np.arange(0,self.beam.lam_beam.shape[0], skip)
-        xbeam = np.arange(self.beam.lam_beam.shape[0])*1.
+        xarr = np.arange(0,self.wave.shape[0], skip)
+        xbeam = np.arange(self.wave.shape[0])*1.
 
         #yoff = 0 #-0.15
         psf_model = self.model*0.
@@ -3231,7 +3236,7 @@ class BeamCutout(object):
         
         for xi in xarr:
             yi = np.interp(xi, xbeam, self.beam.ytrace_beam)
-            li = np.interp(xi, xbeam, self.beam.lam_beam) #+ lam_offset*np.diff(self.beam.lam_beam)[0]
+            li = np.interp(xi, xbeam, self.wave) #+ lam_offset*np.diff(self.wave)[0]
             si = np.interp(xi, xbeam, self.beam.sensitivity_beam)
             dx = xp_beam-self.psf_params[1]-xi
             dy = yp_beam-self.psf_params[2]-yi+yoff
@@ -3429,8 +3434,8 @@ class BeamCutout(object):
             temp = templates[key].zscale(z, 1.)
             spectrum_1d = [temp.wave, temp.flux]
             
-            if ((temp.wave[0] > self.beam.lam_beam[-1]) | 
-                (temp.wave[-1] < self.beam.lam_beam[0])):
+            if ((temp.wave[0] > self.wave[-1]) | 
+                (temp.wave[-1] < self.wave[0])):
                 
                 A_list.append(self.flat_flam*1)
                 ok_temp[NTEMP-1] = False
@@ -3529,7 +3534,7 @@ class BeamCutout(object):
             
             A, coeffs[i,:], chi2[i], model_2d = out
             if verbose:
-                print(utils.no_newline + '{0:.4f} {1:9.1f}'.format(zgrid[i], chi2[i]))
+                print(utils.NO_NEWLINE + '{0:.4f} {1:9.1f}'.format(zgrid[i], chi2[i]))
         
         # peaks
         import peakutils
@@ -3558,7 +3563,7 @@ class BeamCutout(object):
     
             A, coeffs_zoom[i,:], chi2_zoom[i], model_2d = out
             if verbose:
-                print(utils.no_newline + '- {0:.4f} {1:9.1f}'.format(zgrid_zoom[i], chi2_zoom[i]))
+                print(utils.NO_NEWLINE + '- {0:.4f} {1:9.1f}'.format(zgrid_zoom[i], chi2_zoom[i]))
     
         zgrid = np.append(zgrid, zgrid_zoom)
         chi2 = np.append(chi2, chi2_zoom)
