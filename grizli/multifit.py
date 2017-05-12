@@ -923,6 +923,7 @@ class MultiBeam(GroupFitter):
         
         """     
         self.group_name = group_name
+        self.fcontam = fcontam
 
         if isinstance(beams, str):
             self.load_master_fits(beams)            
@@ -932,6 +933,10 @@ class MultiBeam(GroupFitter):
                 self.load_beam_fits(beams)            
             else:
                 self.beams = beams
+        
+        self._parse_beams(psf=psf)
+        
+    def _parse_beams(self, psf=False):
         
         self.N = len(self.beams)
         self.Ngrism = {}
@@ -1009,18 +1014,9 @@ class MultiBeam(GroupFitter):
         self.scif = np.hstack([b.scif for b in self.beams])
         self.contamf = np.hstack([b.contam.flatten() for b in self.beams])
         
-        self.weight = np.exp(-(fcontam*np.abs(self.contamf)*np.sqrt(self.ivarf)))
+        self.weight = np.exp(-(self.fcontam*np.abs(self.contamf)*np.sqrt(self.ivarf)))
         self.DoF = int((self.weight*self.fit_mask).sum())
         
-        self.fcontam = fcontam
-        # if fcontam > 0:
-        #     self.ivarf = 1./(1./self.ivarf + (fcontam*self.contamf)**2)
-        #     self.ivarf[~np.isfinite(self.ivarf)] = 0
-        #     self.ivarf[self.ivarf < 0] = 0
-            
-            #mask = (self.contamf*np.sqrt(self.ivarf) > fcontam) & (self.contamf > fcontam*self.flat_flam)
-            #self.ivarf[mask] = 0
-            
         ### Initialize background fit array
         self.A_bg = np.zeros((self.N, self.Ntot))
         i0 = 0
@@ -1031,6 +1027,23 @@ class MultiBeam(GroupFitter):
         self.init_poly_coeffs(poly_order=1)
         
         self.ra, self.dec = self.beams[0].get_sky_coords()
+    
+    def extend(self, new, verbose=True):
+        """Concatenate `~grizli.multifit.MultiBeam` objects
+        
+        Parameters
+        ----------
+        new : `~grizli.multifit.MultiBeam`
+            Beam object containing new beams to add.
+            
+        verbose : bool
+            Print summary of the change.
+        
+        """
+        self.beams.extend(new.beams)
+        self._parse_beams()
+        if verbose:
+            print('Add beams: {0}\n      Now: {1}'.format(new.Ngrism, self.Ngrism))
         
     def write_master_fits(self, verbose=True, get_hdu=False):
         """Store all beams in a single HDU
