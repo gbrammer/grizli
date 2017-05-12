@@ -960,10 +960,6 @@ class ImageData(object):
             else:
                 self.mdrizsky = 0.
                      
-            print('xxx', 'EXPTIME' in header, header['EXPTIME'])
-            
-        print('yy', self.exptime, self.mdrizsky, 'BUNIT' in header)
-            
         self.is_slice = False
         
         ### Array parameters

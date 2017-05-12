@@ -1326,10 +1326,10 @@ class MultiBeam(GroupFitter):
         Returns
         -------        
         line_flux : dict
-            Line fluxes and uncertainties, in cgs units (1e-17 erg/s/cm2)
+            Line fluxes and uncertainties, in cgs units (erg/s/cm2)
         
         covar : `~np.ndarray`
-            Covariance matrix [xx only has dimensions for valid components of A.  still need to put in a full array with the same dimensions as the number of parameters]
+            Covariance matrix for the fit coefficients
         
         cont1d, line1d, model1d : `~grizli.utils.SpectrumTemplate`
             Best-fit continuum, line, and full (continuum + line) templates
