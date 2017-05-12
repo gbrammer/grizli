@@ -568,6 +568,9 @@ def get_hst_filter(header):
     filter : str
             
     """
+    if 'FILTER' in header:
+        return header['FILTER'].upper()
+        
     if header['INSTRUME'].strip() == 'ACS':
         for i in [1,2]:
             filter_i = header['FILTER{0:d}'.format(i)]
@@ -575,10 +578,11 @@ def get_hst_filter(header):
                 continue
             else:
                 filter = filter_i
+                
     elif header['INSTRUME'] == 'WFPC2':
         filter = header['FILTNAM1']
     else:
-        filter = header['FILTER']
+        raise KeyError ('Filter keyword not found for instrument {0}'.format(header['INSTRUME']))
     
     return filter.upper()
     
