@@ -943,8 +943,13 @@ class SpectrumTemplate(object):
         """
         self.wave = wave
         self.flux = flux
-
+        self.fwhm = None
+        self.velocity = None
+        
         if (wave is not None) & (fwhm is not None):
+            self.fwhm = fwhm
+            self.velocity = velocity
+            
             self.wave, self.flux = self.make_gaussian(wave, fwhm,
                                                       velocity=velocity)
         
@@ -1107,6 +1112,186 @@ class SpectrumTemplate(object):
         temp_int = INTEGRATOR(filter.throughput*templ_filter/filter.wave, filter.wave) / filter_norm
         
         return temp_int
+
+def load_templates(fwhm=400, line_complexes=True, stars=False,
+                   full_line_list=None, continuum_list=None,
+                   fsps_templates=False):
+    """Generate a list of templates for fitting to the grism spectra
+    
+    The different sets of continuum templates are stored in 
+    
+        >>> temp_dir = os.path.join(os.getenv('GRIZLI'), 'templates')
+        
+    Parameters
+    ----------
+    fwhm : float
+        FWHM of a Gaussian, in km/s, that is convolved with the emission
+        line templates.  If too narrow, then can see pixel effects in the 
+        fits as a function of redshift.
+    
+    line_complexes : bool
+        Generate line complex templates with fixed flux ratios rather than
+        individual lines. This is useful for the redshift fits where there
+        would be redshift degeneracies if the line fluxes for individual
+        lines were allowed to vary completely freely. See the list of
+        available lines and line groups in
+        `~grizli.utils.get_line_wavelengths`. Currently,
+        `line_complexes=True` generates the following groups:
+        
+            Ha+NII+SII+SIII+He
+            OIII+Hb
+            OII+Ne
+        
+    stars : bool
+        Get stellar templates rather than galaxies + lines
+        
+    full_line_list : None or list
+        Full set of lines to try.  The default is set in the global variable
+        `~grizli.utils.DEFAULT_LINE_LIST`, which is currently
+        
+            >>> full_line_list = ['PaB', 'HeI-1083', 'SIII', 'SII', 'Ha',
+                                  'OI-6302', 'OIII', 'Hb', 'OIII-4363', 'Hg',
+                                  'Hd', 'NeIII', 'OII', 'NeVI', 'NeV', 
+                                  'MgII','CIV-1549', 'CIII-1908', 'OIII-1663', 
+                                  'HeII-1640', 'NIII-1750', 'NIV-1487', 
+                                  'NV-1240', 'Lya']
+        
+        The full list of implemented lines is in `~grizli.utils.get_line_wavelengths`.
+    
+    continuum_list : None or list
+        Override the default continuum templates if None.
+    
+    fsps_templates : bool
+        If True, get the FSPS NMF templates.
+        
+    Returns
+    -------
+    temp_list : list of `~grizli.utils.SpectrumTemplate` objects
+        Output template list
+    
+    """
+    
+    if stars:
+        # templates = glob.glob('%s/templates/Pickles_stars/ext/*dat' %(os.getenv('GRIZLI')))
+        # templates = []
+        # for t in 'obafgkmrw':
+        #     templates.extend( glob.glob('%s/templates/Pickles_stars/ext/uk%s*dat' %(os.getenv('THREEDHST'), t)))
+        # templates.extend(glob.glob('%s/templates/SPEX/spex-prism-M*txt' %(os.getenv('THREEDHST'))))
+        # templates.extend(glob.glob('%s/templates/SPEX/spex-prism-[LT]*txt' %(os.getenv('THREEDHST'))))
+        # 
+        # #templates = glob.glob('/Users/brammer/Downloads/templates/spex*txt')
+        # templates = glob.glob('bpgs/*ascii')
+        # info = catIO.Table('bpgs/bpgs.info')
+        # type = np.array([t[:2] for t in info['type']])
+        # templates = []
+        # for t in 'OBAFGKM':
+        #     test = type == '-%s' %(t)
+        #     so = np.argsort(info['type'][test])
+        #     templates.extend(info['file'][test][so])
+        #             
+        # temp_list = OrderedDict()
+        # for temp in templates:
+        #     #data = np.loadtxt('bpgs/'+temp, unpack=True)
+        #     data = np.loadtxt(temp, unpack=True)
+        #     #data[0] *= 1.e4 # spex
+        #     scl = np.interp(5500., data[0], data[1])
+        #     name = os.path.basename(temp)
+        #     #ix = info['file'] == temp
+        #     #name='%5s %s' %(info['type'][ix][0][1:], temp.split('.as')[0])
+        #     print(name)
+        #     temp_list[name] = utils.SpectrumTemplate(wave=data[0],
+        #                                              flux=data[1]/scl)
+        
+        # np.save('stars_bpgs.npy', [temp_list])
+        
+        temp_list = np.load(os.path.join(os.getenv('GRIZLI'), 
+                                         'templates/stars.npy'))[0]
+        return temp_list
+        
+    ## Intermediate and very old
+    # templates = ['templates/EAZY_v1.0_lines/eazy_v1.0_sed3_nolines.dat',  
+    #              'templates/cvd12_t11_solar_Chabrier.extend.skip10.dat']     
+    templates = ['eazy_intermediate.dat', 
+                 'cvd12_t11_solar_Chabrier.dat']
+                 
+    ## Post starburst
+    #templates.append('templates/UltraVISTA/eazy_v1.1_sed9.dat')
+    templates.append('post_starburst.dat')
+    
+    ## Very blue continuum
+    #templates.append('templates/YoungSB/erb2010_continuum.dat')
+    templates.append('erb2010_continuum.dat')
+    
+    ### Test new templates
+    # templates = ['templates/erb2010_continuum.dat',
+    # 'templates/fsps/tweak_fsps_temp_kc13_12_006.dat',
+    # 'templates/fsps/tweak_fsps_temp_kc13_12_008.dat']
+    
+    if fsps_templates:
+        #templates = ['templates/fsps/tweak_fsps_temp_kc13_12_0{0:02d}.dat'.format(i+1) for i in range(12)]
+        templates = ['fsps/fsps_QSF_12_v3_nolines_0{0:02d}.dat'.format(i+1) for i in range(12)]
+        #templates = ['fsps/fsps_QSF_7_v3_nolines_0{0:02d}.dat'.format(i+1) for i in range(7)]
+    
+    if continuum_list is not None:
+        templates = continuum_list
+        
+    temp_list = OrderedDict()
+    for temp in templates:
+        data = np.loadtxt(os.path.join(os.getenv('GRIZLI'), 'templates', temp), unpack=True)
+        scl = np.interp(5500., data[0], data[1])
+        name = temp #os.path.basename(temp)
+        temp_list[name] = SpectrumTemplate(wave=data[0], flux=data[1]/scl)
+    
+    ### Emission lines:
+    line_wavelengths, line_ratios = get_line_wavelengths()
+     
+    if line_complexes:
+        #line_list = ['Ha+SII', 'OIII+Hb+Ha', 'OII']
+        #line_list = ['Ha+SII', 'OIII+Hb', 'OII']
+        line_list = ['Ha+NII+SII+SIII+He', 'OIII+Hb', 'OII+Ne', 'Lya+CIV']
+    else:
+        if full_line_list is None:
+            line_list = DEFAULT_LINE_LIST
+        else:
+            line_list = full_line_list
+            
+        #line_list = ['Ha', 'SII']
+        
+    for li in line_list:
+        scl = line_ratios[li]/np.sum(line_ratios[li])
+        for i in range(len(scl)):
+            line_i = SpectrumTemplate(wave=line_wavelengths[li][i], 
+                                      flux=None, fwhm=fwhm, velocity=True)
+                                      
+            if i == 0:
+                line_temp = line_i*scl[i]
+            else:
+                line_temp = line_temp + line_i*scl[i]
+        
+        temp_list['line {0}'.format(li)] = line_temp
+                                 
+    return temp_list    
+
+def dot_templates(coeffs, templates, z=0):
+    """Compute template sum analogous to `np.dot(coeffs, templates)`.
+    """  
+    
+    if len(coeffs) == len(templates):
+        raise ValueError ('shapes of coeffs ({0}) and templates ({1}) don\'t match'.format(len(coeffs), len(templates)))
+          
+    for i, te in enumerate(templates):
+        if i == 0:
+            tc = templates[te].zscale(z, scalar=coeffs[i])
+            tl = templates[te].zscale(z, scalar=coeffs[i])
+        else:
+            if te.startswith('line'):
+                tc += templates[te].zscale(z, scalar=0.)
+            else:
+                tc += templates[te].zscale(z, scalar=coeffs[i])
+               
+            tl += templates[te].zscale(z, scalar=coeffs[i])
+    
+    return tc, tl
     
 def log_zgrid(zr=[0.7,3.4], dz=0.01):
     """Make a logarithmically spaced redshift grid
