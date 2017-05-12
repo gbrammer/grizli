@@ -1660,6 +1660,9 @@ class EffectivePSF(object):
             
             self.epsf[filter] = data
         
+        # Dummy, use F105W ePSF for F098M
+        self.epsf['F098M'] = self.epsf['F105W']
+        
     def get_at_position(self, x=507, y=507, filter='F140W'):
         """Evaluate ePSF at detector coordinates
         TBD
