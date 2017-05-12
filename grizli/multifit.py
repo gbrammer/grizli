@@ -655,7 +655,7 @@ class GroupFLT():
         return True
         #m2d = mb.reshape_flat(modelf)
     
-    def make_stack(self, id, size=20, target='grism', skip=True, fcontam=1., scale=1, save=True, kernel='point', pixfrac=0):
+    def make_stack(self, id, size=20, target='grism', skip=True, fcontam=1., scale=1, save=True, kernel='point', pixfrac=0, diff=True):
         """Make drizzled 2D stack for a given object
         
         Parameters
@@ -677,6 +677,9 @@ class GroupFLT():
             
                 >>> img_file = '{0}_{1:05d}.stack.png'.format(target, id)
                 >>> fits_file = '{0}_{1:05d}.stack.fits'.format(target, id)
+        
+        diff : bool
+             Plot residual in final stack panel.
              
         Returns
         -------
@@ -700,7 +703,8 @@ class GroupFLT():
 
         hdu, fig = mb.drizzle_grisms_and_PAs(fcontam=fcontam, flambda=False,
                                              size=size, scale=scale, 
-                                             kernel=kernel, pixfrac=pixfrac)
+                                             kernel=kernel, pixfrac=pixfrac,
+                                             diff=diff)
                                              
         if save:
             fig.savefig('{0}_{1:05d}.stack.png'.format(target, id))
@@ -871,15 +875,18 @@ class MultiBeam():
         TBD : type
         
         """     
-        self.N = len(beams)
         self.group_name = group_name
 
-        if hasattr(beams[0], 'lower'):
-            ### `beams` is list of strings
-            self.load_beam_fits(beams)            
+        if isinstance(beams, str):
+            self.load_master_fits(beams)            
         else:
-            self.beams = beams
-
+            if isinstance(beams[0], str):
+                ### `beams` is list of strings
+                self.load_beam_fits(beams)            
+            else:
+                self.beams = beams
+        
+        self.N = len(self.beams)
         self.Ngrism = {}
         for i in range(self.N):
             if self.beams[i].grism.instrument == 'NIRISS':
@@ -978,7 +985,46 @@ class MultiBeam():
         
         self.ra, self.dec = self.beams[0].get_sky_coords()
         
+    def write_master_fits(self, verbose=True, get_hdu=False):
+        """Store all beams in a single HDU
+        TBD
+        """ 
+        hdu = pyfits.HDUList([pyfits.PrimaryHDU()])
+        rd = self.beams[0].get_sky_coords()
+        hdu[0].header['ID'] = (self.id, 'Object ID')
+        hdu[0].header['RA'] = (rd[0], 'Right Ascension')
+        hdu[0].header['DEC'] = (rd[1], 'Declination')
+                
+        count = []
+        for ib, beam in enumerate(self.beams):
+            hdu_i = beam.write_fits(get_hdu=True, strip=True)
+            hdu.extend(hdu_i[1:])
+            count.append(len(hdu_i)-1)
+            hdu[0].header['FILE{0:04d}'.format(ib)] = (beam.grism.parent_file, 'Grism parent file')
+             
+        hdu[0].header['COUNT'] = (self.N, ' '.join(['{0}'.format(c) for c in count]))
+                
+        if get_hdu:
+            return hdu
         
+        outfile = '{0}_{1:05d}.beams.fits'.format(self.group_name, self.id)
+        hdu.writeto(outfile, clobber=True)
+    
+    def load_master_fits(self, beam_file, verbose=True):
+        hdu = pyfits.open(beam_file)
+        N = hdu[0].header['COUNT']
+        Next = np.cast[int](hdu[0].header.comments['COUNT'].split())
+        
+        i0 = 1
+        self.beams = []
+        for i in range(N):
+            beam = model.BeamCutout(fits_file=hdu[i0:i0+Next[i]])
+            self.beams.append(beam)
+            if verbose:
+                print('{0} {1} {2}'.format(i+1, beam.grism.parent_file, beam.grism.filter))
+                
+            i0 += Next[i]
+            
     def write_beam_fits(self, verbose=True):
         """TBD
         """
@@ -992,7 +1038,7 @@ class MultiBeam():
             outfiles.append(outfile)
             
         return outfiles
-        
+    
     def load_beam_fits(self, beam_list, conf=None, verbose=True):
         """TBD
         """
@@ -1305,6 +1351,10 @@ class MultiBeam():
                        fsps_templates=False):
         """Generate a list of templates for fitting to the grism spectra
         
+        The different sets of continuum templates are stored in 
+        
+            >>> temp_dir = os.path.join(os.getenv('GRIZLI'), 'templates')
+            
         Parameters
         ----------
         fwhm : float
@@ -1384,16 +1434,16 @@ class MultiBeam():
         ## Intermediate and very old
         # templates = ['templates/EAZY_v1.0_lines/eazy_v1.0_sed3_nolines.dat',  
         #              'templates/cvd12_t11_solar_Chabrier.extend.skip10.dat']     
-        templates = ['templates/eazy_intermediate.dat', 
-                     'templates/cvd12_t11_solar_Chabrier.dat']
+        templates = ['eazy_intermediate.dat', 
+                     'cvd12_t11_solar_Chabrier.dat']
                      
         ## Post starburst
         #templates.append('templates/UltraVISTA/eazy_v1.1_sed9.dat')
-        templates.append('templates/post_starburst.dat')
+        templates.append('post_starburst.dat')
         
         ## Very blue continuum
         #templates.append('templates/YoungSB/erb2010_continuum.dat')
-        templates.append('templates/erb2010_continuum.dat')
+        templates.append('erb2010_continuum.dat')
         
         ### Test new templates
         # templates = ['templates/erb2010_continuum.dat',
@@ -1402,17 +1452,17 @@ class MultiBeam():
         
         if fsps_templates:
             #templates = ['templates/fsps/tweak_fsps_temp_kc13_12_0{0:02d}.dat'.format(i+1) for i in range(12)]
-            templates = ['templates/fsps/fsps_QSF_12_v3_nolines_0{0:02d}.dat'.format(i+1) for i in range(12)]
-            #templates = ['templates/fsps/fsps_QSF_7_v3_nolines_0{0:02d}.dat'.format(i+1) for i in range(7)]
+            templates = ['fsps/fsps_QSF_12_v3_nolines_0{0:02d}.dat'.format(i+1) for i in range(12)]
+            #templates = ['fsps/fsps_QSF_7_v3_nolines_0{0:02d}.dat'.format(i+1) for i in range(7)]
         
         if continuum_list is not None:
             templates = continuum_list
             
         temp_list = OrderedDict()
         for temp in templates:
-            data = np.loadtxt(os.getenv('GRIZLI') + '/' + temp, unpack=True)
+            data = np.loadtxt(os.path.join(os.getenv('GRIZLI'), 'templates', temp), unpack=True)
             scl = np.interp(5500., data[0], data[1])
-            name = os.path.basename(temp)
+            name = temp #os.path.basename(temp)
             temp_list[name] = utils.SpectrumTemplate(wave=data[0],
                                                      flux=data[1]/scl)
         
@@ -1966,6 +2016,12 @@ class MultiBeam():
             wfull[grism] = np.append(wfull[grism], wave[okerr])
             ffull[grism] = np.append(ffull[grism], flux[okerr])
             efull[grism] = np.append(efull[grism], err[okerr])
+            
+            ## Scatter direct image flux
+            if beam.direct.ref_photplam is None:
+                ax.scatter(beam.direct.photplam/1.e4, beam.beam.total_flux/1.e-19, marker='s', edgecolor='k', color=GRISM_COLORS[grism], alpha=0.2, zorder=100, s=100)
+            else:
+                ax.scatter(beam.direct.ref_photplam/1.e4, beam.beam.total_flux/1.e-19, marker='s', edgecolor='k', color=GRISM_COLORS[grism], alpha=0.2, zorder=100, s=100)
                 
         for grism in grisms:                        
             if self.Ngrism[grism] > 1:
@@ -2334,7 +2390,7 @@ class MultiBeam():
         
         ## 2D lines to drizzle
         hdu_full = self.drizzle_fit_lines(fit, pline, force_line=force_line, 
-                                     save_fits=True)
+                                          save_fits=True)
         
         
         fit['id'] = self.id
@@ -3168,13 +3224,16 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
     return pyfits.HDUList([p, thumb_sci, thumb_wht, grism_sci, grism_cont, 
                            grism_contam, grism_wht])
 
-def show_drizzle_HDU(hdu):
+def show_drizzle_HDU(hdu, diff=True):
     """Make a figure from the multiple extensions in the drizzled grism file.
     
     Parameters
     ----------
     hdu : `~astropy.io.fits.HDUList`
         HDU list output by `drizzle_grisms_and_PAs`.
+    
+    diff : bool
+        If True, then plot the stacked spectrum minus the model.
         
     Returns
     -------
@@ -3211,6 +3270,7 @@ def show_drizzle_HDU(hdu):
         
         sci_i = hdu['SCI',g]
         wht_i = hdu['WHT',g]
+        model_i = hdu['MODEL',g]
         kern_i = hdu['KERNEL',g]
         h_i = sci_i.header
         
@@ -3243,7 +3303,13 @@ def show_drizzle_HDU(hdu):
         
         ax = fig.add_subplot(gs[NY-1, ig*2+1])
         
-        ax.imshow(sci_i.data, origin='lower',
+        if diff:
+            print('xx DIFF!')
+            m = model_i.data
+        else:
+            m = 0
+            
+        ax.imshow(sci_i.data-m, origin='lower',
                   interpolation='Nearest', vmin=-0.1*vmax, vmax=vmax, 
                   extent=extent, cmap = plt.cm.viridis_r, 
                   aspect='auto')

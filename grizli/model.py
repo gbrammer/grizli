@@ -839,12 +839,37 @@ class ImageData(object):
           
         ### Easy way, get everything from an image HDU list
         if isinstance(hdulist, pyfits.HDUList):
-            sci = np.cast[np.float32](hdulist['SCI',sci_extn].data)
-            err = np.cast[np.float32](hdulist['ERR',sci_extn].data)
-            dq = np.cast[np.int16](hdulist['DQ',sci_extn].data)
             
-            if 'ORIGINX' in hdulist['SCI', sci_extn].header:
-                h0 = hdulist['SCI', sci_extn].header
+            if ('REF',sci_extn) in hdulist:
+                ref_h = hdulist['REF', sci_extn].header
+                ref_data = hdulist['REF', sci_extn].data/ref_h['PHOTFLAM']
+                ref_data = np.cast[np.float32](ref_data)
+                
+                ref_file = ref_h['REF_FILE']
+                ref_photflam = 1.
+                ref_photplam = ref_h['PHOTPLAM']
+                ref_filter = ref_h['FILTER']
+            else:
+                ref_data = None
+            
+            if ('SCI',sci_extn) in hdulist:
+                sci = np.cast[np.float32](hdulist['SCI',sci_extn].data)
+                err = np.cast[np.float32](hdulist['ERR',sci_extn].data)
+                dq = np.cast[np.int16](hdulist['DQ',sci_extn].data)
+                
+                base_extn = ('SCI', sci_extn)
+                
+            else:
+                if ref_data is None:
+                    raise KeyError ('No SCI or REF extensions found')
+                
+                # Doesn't have SCI, get from ref
+                sci = err = ref_data*0.+1
+                dq = np.zeros(sci.shape, dtype=np.int16)
+                base_extn = ('REF', sci_extn)
+                
+            if 'ORIGINX' in hdulist[base_extn].header:
+                h0 = hdulist[base_extn].header
                 origin = [h0['ORIGINY'], h0['ORIGINX']]
             else:
                 origin = [0,0]
@@ -852,7 +877,7 @@ class ImageData(object):
             self.sci_extn = sci_extn    
             self.parent_file = hdulist.filename()
             
-            header = hdulist['SCI',sci_extn].header.copy()
+            header = hdulist[base_extn].header.copy()
             if 'CPDIS1' in header:
                 if 'Lookup' in header['CPDIS1']:
                     self.wcs_is_lookup = True
@@ -862,7 +887,7 @@ class ImageData(object):
                 self.wcs_is_lookup = False
                     
             status = False
-            for ext in [0, ('SCI',sci_extn)]:
+            for ext in [(base_extn)]:
                 h = hdulist[ext].header
                 if 'INSTRUME' in h:
                     status = True
@@ -889,13 +914,13 @@ class ImageData(object):
             else:
                 photplam = photplam_list[filter]
                         
-            if 'MDRIZSKY' in hdulist[('SCI',sci_extn)].header:
-                sci -= hdulist[('SCI',sci_extn)].header['MDRIZSKY']
+            if 'MDRIZSKY' in hdulist[(base_extn)].header:
+                sci -= hdulist[(base_extn)].header['MDRIZSKY']
                 
             ### ACS bunit
             exptime = 1.
-            if 'BUNIT' in hdulist['SCI', sci_extn].header:
-                if hdulist['SCI', sci_extn].header['BUNIT'] == 'ELECTRONS':
+            if 'BUNIT' in hdulist[base_extn].header:
+                if hdulist[base_extn].header['BUNIT'] == 'ELECTRONS':
                     exptime = hdulist[0].header['EXPTIME']
                     sci /= exptime
                     err /= exptime
@@ -909,17 +934,7 @@ class ImageData(object):
             self.grow = 1
             if 'GROW' in header:
                 self.grow = header['GROW']
-            
-            if ('REF',sci_extn) in hdulist:
-                ref_h = hdulist['REF', sci_extn].header
-                ref_data = hdulist['REF', sci_extn].data/ref_h['PHOTFLAM']
-                ref_file = ref_h['REF_FILE']
-                ref_photflam = 1.
-                ref_photplam = ref_h['PHOTPLAM']
-                ref_filter = ref_h['FILTER']
-            else:
-                ref_data = None
-                
+                            
         else:
             if sci is None:
                 sci = np.zeros((1014,1014))
@@ -992,7 +1007,7 @@ class ImageData(object):
         
         # For NIRISS
         if 'FWCPOS' in self.header:
-            self.fwcpos = self.grism.header['FWCPOS']
+            self.fwcpos = self.header['FWCPOS']
         else:
             self.fwcpos = None
         
@@ -2805,7 +2820,7 @@ class BeamCutout(object):
         if self.beam.id in flt.object_dispersers:
             self.contam -= self.beam.model
         
-    def load_fits(self, file, conf=None):
+    def load_fits(self, file, conf=None, direct_extn=1, grism_extn=2):
         """Initialize from FITS file
         
         Parameters
@@ -2817,14 +2832,20 @@ class BeamCutout(object):
         -------
         Loads attributes to `self`.
         """        
-        hdu = pyfits.open(file)
-        
-        self.direct = ImageData(hdulist=hdu, sci_extn=1)
-        self.grism  = ImageData(hdulist=hdu, sci_extn=2)
+        if isinstance(file, str):
+            hdu = pyfits.open(file)
+        else:
+            hdu = file
+            
+        self.direct = ImageData(hdulist=hdu, sci_extn=direct_extn)
+        self.grism  = ImageData(hdulist=hdu, sci_extn=grism_extn)
         
         self.contam = hdu['CONTAM'].data*1
-        self.model = hdu['MODEL'].data*1
-        
+        try:
+            self.model = hdu['MODEL'].data*1
+        except:
+            self.model = self.grism['SCI']*0.
+            
         if ('REF',1) in hdu:
             direct = hdu['REF', 1].data*1
         else:
@@ -2873,7 +2894,7 @@ class BeamCutout(object):
         self.direct.parent_file = h0['DPARENT']
         self.id = h0['ID']
         
-    def write_fits(self, root='beam_', clobber=True):
+    def write_fits(self, root='beam_', clobber=True, strip=False, get_hdu=False):
         """Write attributes and data to FITS file
         
         Parameters
@@ -2887,6 +2908,24 @@ class BeamCutout(object):
         
         clobber : bool
             Overwrite existing file.
+        
+        strip : bool
+            Strip out extensions that aren't totally necessary for
+            regenerating the `ImageData` object.  That is, strip out the 
+            direct image `SCI`, `ERR`, and `DQ` extensions if `REF` is 
+            defined.  Also strip out `MODEL`.
+            
+        get_hdu : bool
+            Return `~astropy.io.fits.HDUList` rather than writing a file.
+        
+        Returns
+        -------
+        hdu : `~astropy.io.fits.HDUList`
+            If `get_hdu` is True
+        
+        outfile : str
+            If `get_hdu` is False, return the output filename.
+            
         """
         h0 = pyfits.Header()
         h0['ID'] = self.beam.id, 'Object ID'
@@ -2918,6 +2957,28 @@ class BeamCutout(object):
         hdu.append(pyfits.ImageHDU(data=self.model, header=hdu[-1].header,
                                    name='MODEL'))
         
+        if strip:
+            # Blotted reference is attached, don't need individual direct 
+            # arrays.
+            if self.direct['REF'] is not None:
+                for ext in [('SCI',1), ('ERR',1) , ('DQ',1)]:
+                    if ext in hdu:
+                        ix = hdu.index_of(ext)
+                        p = hdu.pop(ix)
+            
+            # This can be regenerated    
+            ix = hdu.index_of('MODEL')
+            p = hdu.pop(ix)
+            
+            # Put Primary keywords in first extension
+            SKIP_KEYS = ['EXTEND', 'SIMPLE']
+            for key in h0:
+                if key not in SKIP_KEYS:
+                    hdu[1].header[key] = (h0[key], h0.comments[key])
+                
+        if get_hdu:
+            return hdu
+            
         outfile = '{0}_{1:05d}.{2}.{3}.fits'.format(root, self.beam.id,
                                          self.grism.filter.lower(),
                                          self.beam.beam)
