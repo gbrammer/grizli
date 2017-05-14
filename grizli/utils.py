@@ -1073,7 +1073,7 @@ class SpectrumTemplate(object):
         """
         self.flux_fnu = self.flux * self.wave**2 / 3.e18
     
-    def integrate_filter(self, filter, scale=1., z=0):
+    def integrate_filter(self, filter, scale=1., z=0, flam=True):
         """Integrate the template through an `~eazy.FilterDefinition` filter
         object.
         
@@ -1105,8 +1105,12 @@ class SpectrumTemplate(object):
             interp = grizli.utils_c.interp.interp_conserve_c
         except ImportError:
             interp = np.interp
-            
-        templ_filter = interp(filter.wave, self.wave*(1+z),
+        
+        wz = self.wave*(1+z)
+        if (filter.wave.min() > wz.max()) | (filter.wave.max() < wz.min()) | (filter.wave.min() < wz.min()):
+            return 0.
+                
+        templ_filter = interp(filter.wave, wz,
                               self.flux_fnu*scale)
         
         if hasattr(filter, 'norm'):
