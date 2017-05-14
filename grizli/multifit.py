@@ -655,7 +655,7 @@ class GroupFLT():
         return True
         #m2d = mb.reshape_flat(modelf)
     
-    def make_stack(self, id, size=20, target='grism', skip=True, fcontam=1., scale=1, save=True, kernel='point', pixfrac=0, diff=True):
+    def make_stack(self, id, size=20, target='grism', skip=True, fcontam=1., scale=1, save=True, kernel='point', pixfrac=1, diff=True):
         """Make drizzled 2D stack for a given object
         
         Parameters
@@ -902,6 +902,63 @@ class GroupFitter(object):
         
         return A_bg
     
+    def set_photometry(self, flam=[], eflam=[], filters=[], force=False):
+        """
+        Add photometry
+        """
+        if (self.Nphot > 0) & (not force):
+            print('Photometry already set (Nphot={0})'.format(self.Nphot))
+            return True
+            
+        self.Nphot = len(flam)
+        if self.Nphot == 0:
+            return True
+        
+        if (len(flam) != len(eflam)) | (len(flam) != len(filters)):
+            print('flam/eflam/filters dimensions don\'t match')
+            return False
+            
+        self.photom_flam = flam
+        self.photom_eflam = eflam
+        self.photom_filters = filters
+        
+        self.sivarf = np.hstack((self.sivarf, 1/self.photom_eflam))
+        self.fit_mask = np.hstack((self.fit_mask, eflam > 0))
+        self.scif = np.hstack((self.scif, flam))
+        self.DoF = self.fit_mask.sum()
+        
+        self.is_spec = np.isfinite(self.scif)
+        self.is_spec[-self.Nphot:] = False
+        
+        self.photom_pivot = np.array([filter.pivot() for filter in filters])
+
+    def unset_photometry(self):
+        if self.Nphot == 0:
+            return True
+            
+        self.sivarf = self.sivarf[:-self.Nphot]
+        self.fit_mask = self.fit_mask[:-self.Nphot]
+        self.scif = self.scif[:-self.Nphot]
+        self.DoF = self.fit_mask.sum()
+        
+        self.is_spec = 1
+        self.Nphot = 0
+        
+    def _interpolate_photometry(self, z=0., templates=[]):
+        """
+        Interpolate templates through photometric filters
+        
+        xx: TBD better handling of emission line templates and use eazpy tempfilt
+        object for huge speedup
+        
+        """
+        A_phot = np.zeros((len(templates)+self.N, self.Nphot))
+        for it, key in enumerate(templates):
+            for ifilt, filt in enumerate(self.photom_filters):
+                A_phot[self.N+it, ifilt] = templates[key].integrate_filter(filt, scale=1., z=z)*3.e18/self.photom_pivot[ifilt]**2*(1+z)
+        
+        return A_phot
+        
     def xfit_at_z(self, z=0, templates=[], fitter='nnls', fit_background=True, get_uncertainties=False):
         """Fit the 2D spectra with a set of templates at a specified redshift.
         
@@ -973,9 +1030,7 @@ class GroupFitter(object):
 
                 sl = self.slices[j]
                 A[self.N+i, sl] = beam.compute_model(spectrum_1d=s, in_place=False, is_cgs=True)
-                    
-        oktemp = (A*self.fit_mask).sum(axis=1) != 0
-        
+                            
         if fit_background:
             if fitter == 'nnls':
                 pedestal = 0.04
@@ -983,11 +1038,18 @@ class GroupFitter(object):
                 pedestal = 0.
         else:
             pedestal = 0
+                    
+        # Photometry
+        if self.Nphot > 0:
+            A_phot = self._interpolate_photometry(z=z, templates=templates)
+            A = np.hstack((A, A_phot))
             
+        oktemp = (A*self.fit_mask).sum(axis=1) != 0
+        
         # Weight design matrix and data by 1/sigma
         Ax = A[oktemp,:]*self.sivarf        
         AxT = Ax[:,self.fit_mask].T
-        data = ((self.scif+pedestal)*self.sivarf)[self.fit_mask]
+        data = ((self.scif+pedestal*self.is_spec)*self.sivarf)[self.fit_mask]
         
         # Run the minimization
         if fitter == 'nnls':
@@ -998,6 +1060,7 @@ class GroupFitter(object):
         # Compute background array         
         if fit_background:
             background = np.dot(coeffs_i[:self.N], A[:self.N,:]) - pedestal
+            background[-self.Nphot:] = 0.
             coeffs_i[:self.N] -= pedestal
         else:
             background = self.scif*0.
@@ -1165,20 +1228,84 @@ class GroupFitter(object):
         chi2 = chi2[so]
         coeffs=coeffs[so,:]
         
-        return zgrid, chi2, coeffs, chi2_poly
+        fit = OrderedDict()
+        fit['zgrid'] = zgrid
+        fit['chi2'] = chi2
+        fit['coeffs'] = coeffs
+        fit['chi2poly'] = chi2_poly
         
-    def template_at_z(self, z=0, templates=None, fit_background=True):
+        return fit
+    
+    def parse_fit_outputs(self, fit):
+        """Parse best-fit redshift, etc.
+        TBD
+        """
+        scl_nu = fit['chi2'].min()/self.DoF
+
+        pdf = np.exp(-0.5*(fit['chi2']-fit['chi2'].min())*scl_nu)
+        pdf /= np.trapz(pdf, fit['zgrid'])
+        
+        dz = np.gradient(fit['zgrid'])
+        cdf = np.cumsum(pdf*dz)
+        
+        #rnd = np.interp(np.random.rand(1000), cdf, fit['zgrid']+dz/2.)
+        
+    def template_at_z(self, z=0, templates=None, fit_background=True, fitter='nnls', fwhm=1400):
         """TBD
         """
         if templates is None:
-            templates = utils.load_templates(line_complexes=False, fsps_templates=True, fwhm=1400)
+            templates = utils.load_templates(line_complexes=False, fsps_templates=True, fwhm=fwhm)
         
-        out = self.xfit_at_z(z=z, templates=templates, fitter='nnls', 
+        out = self.xfit_at_z(z=z, templates=templates, fitter=fitter, 
                              fit_background=fit_background,
                              get_uncertainties=True)
 
         chi2, modelBG, model2D, coeffs, coeffs_err, covar = out
         cont1d, line1d = utils.dot_templates(coeffs[self.N:], templates, z=z)
+
+        # Parse template coeffs
+        cfit = {}
+        for i in range(self.N):
+            cfit['bg {0}'.format(i)] = coeffs[i], coeffs_err[i]
+        
+        for j, key in enumerate(templates):
+            i = j+self.N
+            cfit[key] = coeffs[i], coeffs_err[i]
+        
+        if False:
+            # Compare drizzled and beam fits (very close)
+            for j, key in enumerate(templates):
+                print('{key:<16s} {0:.2e} {1:.2e}  {2:.2e} {3:.2e}'.format(mb_cfit[key][0], mb_cfit[key][1], st_cfit[key][0], st_cfit[key][1], key=key))
+                
+        return cont1d, line1d, cfit, covar
+        
+        ### Random draws
+        # Unique wavelengths
+        wfull = np.hstack([templates[key].wave for key in templates])
+        w = np.unique(wfull)
+        so = np.argsort(w)
+        w = w[so]
+        
+        xclip = (w*(1+z) > 7000) & (w*(1+z) < 1.8e4)
+        temp = np.array([grizli.utils_c.interp.interp_conserve_c(w[xclip], templates[key].wave, templates[key].flux) for key in templates])
+        
+        clip = coeffs_err[self.N:] > 0
+        covar_clip = covar[self.N:,self.N:][clip,:][:,clip]
+        draws = np.random.multivariate_normal(coeffs[self.N:][clip], covar_clip, size=100)
+        
+        tdraw = np.dot(draws, temp[clip,:])/(1+z)
+            
+        for ib, beam in enumerate(self.beams):
+            ww, ff, ee = beam.optimal_extract(beam.sci - beam.contam - coeffs[ib])
+            plt.errorbar(ww, ff/beam.sens, ee/beam.sens, color='k', marker='.', linestyle='None', alpha=0.5)
+            
+            for i in range(tdraw.shape[0]):
+                sp = [w[xclip]*(1+z), tdraw[i,:]]
+                m = beam.compute_model(spectrum_1d=sp, is_cgs=True, in_place=False).reshape(beam.sh)
+                ww, ff, ee = beam.optimal_extract(m)
+                plt.plot(ww, ff/beam.sens, color='r', alpha=0.05)
+                
+            plt.plot(w[xclip]*(1+z), tdraw.T, alpha=0.05, color='r')
             
     def process_zfit(self, zgrid, chi2):
         """Parse redshift fit"""
@@ -1275,6 +1402,8 @@ class MultiBeam(GroupFitter):
                 self.beams = beams
         
         self._parse_beams(psf=psf)
+        self.Nphot = 0
+        self.is_spec = 1
         
     def _parse_beams(self, psf=False):
         

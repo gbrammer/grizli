@@ -170,6 +170,7 @@ class StackFitter(GroupFitter):
         self.A_bg = self._init_background()
         
         ## Photometry
+        self.is_spec = 1
         self.Nphot = 0
         if eazyp is not None:
             self.eazyp = eazyp
@@ -205,6 +206,18 @@ class StackFitter(GroupFitter):
         TBD
         """
         return False
+
+    def get_sky_coords(self):
+        """Get WCS coordinates of the center of the direct image
+        
+        Returns
+        -------
+        ra, dec : float
+            Center coordinates of the beam thumbnail in decimal degrees
+        """
+        ra = self.beams[0].h0['RA']
+        dec = self.beams[0].h0['DEC']
+        return ra, dec
     
     def fit_combined_at_z(self, z=0, fitter='nnls', get_uncertainties=False, eazyp=None, ix=0, order=1, scale_fit=None, method='BFGS'):
         """Fit the 2D spectra with a set of templates at a specified redshift.
@@ -1040,9 +1053,11 @@ class StackedSpectrum(object):
         w = (np.arange(h['NAXIS1'])+1-h['CRPIX1'])*h['CD1_1'] + h['CRVAL1']
         return w
             
-    def optimal_extract(self, data, bin=0):
+    def optimal_extract(self, data, bin=0, ivar=None, weight=None):
         """
         Optimally-weighted 1D extraction
+        
+        xx Dummy parameters ivar & weight
         """
         import scipy.ndimage as nd
         
