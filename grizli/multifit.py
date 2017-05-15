@@ -902,7 +902,7 @@ class GroupFitter(object):
         
         return A_bg
     
-    def set_photometry(self, flam=[], eflam=[], filters=[], force=False):
+    def set_photometry(self, flam=[], eflam=[], filters=[], force=False, tempfilt=None):
         """
         Add photometry
         """
@@ -931,7 +931,10 @@ class GroupFitter(object):
         self.is_spec[-self.Nphot:] = False
         
         self.photom_pivot = np.array([filter.pivot() for filter in filters])
-
+        
+        # eazypy tempfilt for faster interpolation
+        self.tempfilt = tempfilt
+        
     def unset_photometry(self):
         if self.Nphot == 0:
             return True
@@ -952,10 +955,21 @@ class GroupFitter(object):
         object for huge speedup
         
         """
-        A_phot = np.zeros((len(templates)+self.N, self.Nphot))
+        NTEMP = len(templates)
+        A_phot = np.zeros((NTEMP+self.N, self.Nphot))
+        
+        if (self.tempfilt is not None):
+            if (self.tempfilt.NTEMP == NTEMP):
+                #A_spl = self.tempfilt(z)
+                A_phot[self.N:,:] = self.tempfilt(z)
+                A_phot *= 3.e18/self.photom_pivot**2*(1+z)
+                A_phot[~np.isfinite(A_phot)] = 0
+                return A_phot
+
         for it, key in enumerate(templates):
+            tz = templates[key].zscale(z, scalar=1)
             for ifilt, filt in enumerate(self.photom_filters):
-                A_phot[self.N+it, ifilt] = templates[key].integrate_filter(filt, scale=1., z=z)*3.e18/self.photom_pivot[ifilt]**2*(1+z)
+                A_phot[self.N+it, ifilt] = tz.integrate_filter(filt)*3.e18/self.photom_pivot[ifilt]**2#*(1+z)
         
         return A_phot
         
@@ -1126,14 +1140,16 @@ class GroupFitter(object):
         tpoly = utils.polynomial_templates(wpoly, line=True)
         out = self.xfit_at_z(z=0., templates=tpoly, fitter='nnls',
                             fit_background=True)
-        #
-        tpoly = utils.polynomial_templates(wpoly, order=3)
-        out = self.xfit_at_z(z=0., templates=tpoly, fitter='lstsq',
-                            fit_background=True)
-                            
+        
         chi2_poly, b, m2, coeffs_poly, c, cov = out
-        if True:
-            cp, lp = utils.dot_templates(coeffs_poly[self.N:], tpoly)
+
+        # tpoly = utils.polynomial_templates(wpoly, order=3)
+        # out = self.xfit_at_z(z=0., templates=tpoly, fitter='lstsq',
+        #                     fit_background=True)          
+        # chi2_poly, b, m2, coeffs_poly, c, cov = out
+
+        # if True:
+        #     cp, lp = utils.dot_templates(coeffs_poly[self.N:], tpoly)
             
         ### Set up for template fit
         if templates == {}:
@@ -1145,20 +1161,23 @@ class GroupFitter(object):
         NTEMP = len(templates)
         
         out = self.xfit_at_z(z=0., templates=templates, fitter=fitter,
-                            fit_background=fit_background)
+                            fit_background=fit_background, 
+                            get_uncertainties=True)
                             
         chi2, background, model2d, coeffs, coeffs_err, covar = out
         
         chi2 = np.zeros(NZ)
         coeffs = np.zeros((NZ, coeffs.shape[0]))
+        covar = np.zeros((NZ, covar.shape[0], covar.shape[1]))
         
         chi2min = 1e30
         iz = 0
         for i in range(NZ):
             out = self.xfit_at_z(z=zgrid[i], templates=templates,
-                                fitter=fitter, fit_background=fit_background)
+                                fitter=fitter, fit_background=fit_background,
+                                get_uncertainties=True)
             
-            chi2[i], background, model2d, coeffs[i,:], coeffs_err, covar = out
+            chi2[i], background, model2d, coeffs[i,:], coeffs_err, covar[i,:,:] = out
             if chi2[i] < chi2min:
                 iz = i
                 chi2min = chi2[i]
@@ -1170,11 +1189,15 @@ class GroupFitter(object):
             
         ## Find peaks
         import peakutils
-                
-        chi2_rev = (chi2_poly - chi2)/self.DoF
-        if chi2_poly < (chi2.min() + 9):
+        
+        # Make "negative" chi2 for peak-finding
+        if chi2_poly > (chi2.min()+100):
+            chi2_rev = (chi2.min() + 100 - chi2)/self.DoF
+        elif chi2_poly < (chi2.min() + 9):
             chi2_rev = (chi2.min() + 16 - chi2)/self.DoF
-
+        else:
+            chi2_rev = (chi2_poly - chi2)/self.DoF
+            
         chi2_rev[chi2_rev < 0] = 0
         indexes = peakutils.indexes(chi2_rev, thres=0.4, min_dist=8)
         num_peaks = len(indexes)
@@ -1202,15 +1225,17 @@ class GroupFitter(object):
         
             chi2_zoom = np.zeros(NZOOM)
             coeffs_zoom = np.zeros((NZOOM, coeffs.shape[1]))
+            covar_zoom = np.zeros((NZOOM, coeffs.shape[1], covar.shape[2]))
 
             iz = 0
             chi2min = 1.e30
             for i in range(NZOOM):
                 out = self.xfit_at_z(z=zgrid_zoom[i], templates=templates,
                                     fitter=fitter,
-                                    fit_background=fit_background)
+                                    fit_background=fit_background,
+                                    get_uncertainties=True)
 
-                chi2_zoom[i], b, m2, coeffs_zoom[i,:], err, cov = out
+                chi2_zoom[i], b, m2, coeffs_zoom[i,:], e, covar_zoom[i,:,:] = out
                 #A, coeffs_zoom[i,:], chi2_zoom[i], model_2d = out
                 if chi2_zoom[i] < chi2min:
                     chi2min = chi2_zoom[i]
@@ -1222,17 +1247,20 @@ class GroupFitter(object):
             zgrid = np.append(zgrid, zgrid_zoom)
             chi2 = np.append(chi2, chi2_zoom)
             coeffs = np.append(coeffs, coeffs_zoom, axis=0)
-        
+            covar = np.vstack((covar, covar_zoom))
+            
         so = np.argsort(zgrid)
         zgrid = zgrid[so]
         chi2 = chi2[so]
-        coeffs=coeffs[so,:]
+        coeffs = coeffs[so,:]
+        covar = covar[so,:,:]
         
         fit = OrderedDict()
         fit['zgrid'] = zgrid
         fit['chi2'] = chi2
-        fit['coeffs'] = coeffs
         fit['chi2poly'] = chi2_poly
+        fit['coeffs'] = coeffs
+        fit['covar'] = covar
         
         return fit
     

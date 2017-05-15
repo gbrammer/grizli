@@ -9,6 +9,12 @@ import astropy.table
 
 import numpy as np
 
+import astropy.units as u
+
+KMS = u.km/u.s
+FLAMBDA_CGS = u.erg/u.s/u.cm**2/u.angstrom
+FNU_CGS = u.erg/u.s/u.cm**2/u.Hz
+
 # character to skip clearing line on STDOUT printing
 NO_NEWLINE = '\x1b[1A\x1b[1M' 
 
@@ -900,20 +906,27 @@ def get_line_wavelengths():
     return line_wavelengths, line_ratios 
     
 class SpectrumTemplate(object):
-    def __init__(self, wave=None, flux=None, fwhm=None, velocity=False):
+    def __init__(self, wave=None, flux=None, central_wave=None, fwhm=None, velocity=False, fluxunits=FLAMBDA_CGS, waveunits=u.angstrom, name=''):
         """Container for template spectra.   
                 
         Parameters
         ----------
-        wave, fwhm : None or float or array-like
-            If both are float, then initialize with a Gaussian.  
+        wave : array-like
+            Wavelength 
             In `astropy.units.Angstrom`.
             
-        flux : None or array-like
-            Flux array (f-lambda flux density)
+        flux : float array-like
+            If float, then the integrated flux of a Gaussian line.  If 
+            array, then f-lambda flux density.
+        
+        central_wave, fwhm : float
+            Initialize the template with a Gaussian at this wavelength (in
+            `astropy.units.Angstrom`.) that has an integrated flux of `flux` 
+            and `fwhm` in `astropy.units.Angstrom` or `km/s` for 
+            `velocity=True`.
             
         velocity : bool
-            `fwhm` is a velocity.
+            `fwhm` is a velocity in `km/s`.
             
         Attributes
         ----------
@@ -950,18 +963,25 @@ class SpectrumTemplate(object):
         self.fwhm = None
         self.velocity = None
         
-        if (wave is not None) & (fwhm is not None):
+        self.fluxunits = fluxunits
+        self.waveunits = waveunits
+        self.name = ''
+        
+        if (central_wave is not None) & (fwhm is not None):
             self.fwhm = fwhm
             self.velocity = velocity
             
-            self.wave, self.flux = self.make_gaussian(wave, fwhm,
-                                                      velocity=velocity)
+            self.wave, self.flux = self.make_gaussian(central_wave, fwhm,
+                                                      wave_grid=wave,
+                                                      velocity=velocity,
+                                                      max_sigma=10)
         
-        self.set_fnu()
+        self.fnu_units = FNU_CGS
+        self.to_fnu()
         
     @staticmethod 
     def make_gaussian(central_wave, fwhm, max_sigma=5, step=0.1,
-                      velocity=False):
+                      wave_grid=None, velocity=False):
         """Make Gaussian template
         
         Parameters
@@ -983,15 +1003,32 @@ class SpectrumTemplate(object):
         wave, flux : array-like
             Wavelength and flux of a Gaussian line
         """
-        rms = fwhm/2.35
-        if velocity:
-            rms *= central_wave/3.e5
+        import astropy.constants as const
+                
+        if hasattr(fwhm, 'unit'):
+            rms = fwhm.value/2.35
+            velocity = u.physical.get_physical_type(fwhm.unit) == 'speed'
+            if velocity:
+                rms = central_wave*(fwhm/const.c.to(KMS)).value/2.35
+            else:
+                rms = fwhm.value/2.35
+        else:
+            if velocity:
+                rms = central_wave*(fwhm/const.c.to(KMS).value)/2.35
+            else:
+                rms = fwhm/2.35
+                
+        if wave_grid is None:
+            wave_grid = np.arange(-max_sigma, max_sigma, step)*rms
+            wave_grid += central_wave
+            wave_grid = np.hstack([91., wave_grid, 1.e8])
             
-        xgauss = np.arange(-max_sigma, max_sigma, step)*rms+central_wave
-        gaussian = np.exp(-(xgauss-central_wave)**2/2/rms**2)
+        gaussian = np.exp(-(wave_grid-central_wave)**2/2/rms**2)
+        peak = np.sqrt(2*np.pi*rms**2)
         gaussian /= np.sqrt(2*np.pi*rms**2)
+        gaussian[gaussian < peak*1.e-4] = 0
         
-        return xgauss, gaussian
+        return wave_grid, gaussian
         
         #self.wave = xgauss
         #self.flux = gaussian
@@ -1062,7 +1099,7 @@ class SpectrumTemplate(object):
         out.fwhm = self.fwhm
         return out
     
-    def set_fnu(self):
+    def to_fnu(self, fnu_units=FNU_CGS):
         """Make fnu version of the template.
         
         Sets the `flux_fnu` attribute, assuming that the wavelength is given 
@@ -1071,9 +1108,15 @@ class SpectrumTemplate(object):
             >>> flux_fnu = self.flux * self.wave**2 / 3.e18
             
         """
-        self.flux_fnu = self.flux * self.wave**2 / 3.e18
-    
-    def integrate_filter(self, filter, scale=1., z=0, flam=True):
+        #import astropy.constants as const
+        #flux_fnu = self.flux * self.wave**2 / 3.e18
+        #flux_fnu = (self.flux*self.fluxunits*(self.wave*self.waveunits)**2/const.c).to(FNU_CGS) #,  
+        flux_fnu = (self.flux*self.fluxunits).to(FNU_CGS, equivalencies=u.spectral_density(self.wave*self.waveunits))
+        
+        self.fnu_units = fnu_units
+        self.flux_fnu = flux_fnu.value
+        
+    def integrate_filter(self, filter):
         """Integrate the template through an `~eazy.FilterDefinition` filter
         object.
         
@@ -1106,12 +1149,11 @@ class SpectrumTemplate(object):
         except ImportError:
             interp = np.interp
         
-        wz = self.wave*(1+z)
-        if (filter.wave.min() > wz.max()) | (filter.wave.max() < wz.min()) | (filter.wave.min() < wz.min()):
+        #wz = self.wave*(1+z)
+        if (filter.wave.min() > self.wave.max()) | (filter.wave.max() < self.wave.min()) | (filter.wave.min() < self.wave.min()):
             return 0.
                 
-        templ_filter = interp(filter.wave, wz,
-                              self.flux_fnu*scale)
+        templ_filter = interp(filter.wave, self.wave, self.flux_fnu)
         
         if hasattr(filter, 'norm'):
             filter_norm = filter.norm
@@ -1252,8 +1294,11 @@ def load_templates(fwhm=400, line_complexes=True, stars=False,
         data = np.loadtxt(os.path.join(os.getenv('GRIZLI'), 'templates', temp), unpack=True)
         scl = np.interp(5500., data[0], data[1])
         name = temp #os.path.basename(temp)
-        temp_list[name] = SpectrumTemplate(wave=data[0], flux=data[1]/scl)
-    
+        temp_list[name] = SpectrumTemplate(wave=data[0], flux=data[1]/scl,
+                                           name=name)
+        
+        temp_list[name].name = name
+        
     ### Emission lines:
     line_wavelengths, line_ratios = get_line_wavelengths()
      
@@ -1268,11 +1313,19 @@ def load_templates(fwhm=400, line_complexes=True, stars=False,
             line_list = full_line_list
             
         #line_list = ['Ha', 'SII']
-        
+    
+    # Use FSPS grid for lines
+    wave_grid = None
+    # if fsps_templates:
+    #     wave_grid = data[0]
+    # else:
+    #     wave_grid = None   
+    
     for li in line_list:
         scl = line_ratios[li]/np.sum(line_ratios[li])
         for i in range(len(scl)):
-            line_i = SpectrumTemplate(wave=line_wavelengths[li][i], 
+            line_i = SpectrumTemplate(wave=wave_grid, 
+                                      central_wave=line_wavelengths[li][i], 
                                       flux=None, fwhm=fwhm, velocity=True)
                                       
             if i == 0:
@@ -1280,7 +1333,9 @@ def load_templates(fwhm=400, line_complexes=True, stars=False,
             else:
                 line_temp = line_temp + line_i*scl[i]
         
-        temp_list['line {0}'.format(li)] = line_temp
+        name = 'line {0}'.format(li)
+        line_temp.name = name
+        temp_list[name] = line_temp
                                  
     return temp_list    
 
@@ -1290,11 +1345,14 @@ def polynomial_templates(wave, order=0, line=False):
         for sign in [1,-1]:
             key = 'poly {0}'.format(sign)
             temp[key] = SpectrumTemplate(wave, sign*(wave/1.e4-1)+1)
+            temp[key].name = key
+            
         return temp
         
     for i in range(order+1):
         key = 'poly {0}'.format(i)
         temp[key] = SpectrumTemplate(wave, (wave/1.e4-1)**i)
+        temp[key].name = key
     
     return temp
         
