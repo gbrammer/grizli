@@ -69,14 +69,19 @@ def make_templates(grism='G141', return_lists=False, fsps_templates=False,
         print('Wrote `templates_{0}.npy`'.format(fwhm))
 
 class StackFitter(GroupFitter):
-    def __init__(self, file='gnt_18197.stack.fits', sys_err=0.02, mask_min=0.1, fit_stacks=True, fcontam=1, pas=None, extensions=None, min_ivar=0.01, overlap_threshold=3, eazyp=None, eazy_ix=0):
+    def __init__(self, files='gnt_18197.stack.fits', group_name=None, sys_err=0.02, mask_min=0.1, fit_stacks=True, fcontam=1, pas=None, extensions=None, min_ivar=0.01, overlap_threshold=3, verbose=True, eazyp=None, eazy_ix=0):
         """Object for fitting stacked spectra.
         
         Parameters
         ----------
-        file : str
-            Stack FITS filename.
+        files : str or list of str
+            Stack FITS filename.  If a list is supplied, e.g., the product
+            of a `~glob` command, then append all specified files.
         
+        group_name : str
+            Rootname to associate with the object.  If none, then default to 
+            `files`.
+            
         sys_err : float
             Minimum systematic error, interpreted as a fractional error.  
             The adjusted variance is taken to be
@@ -96,14 +101,29 @@ class StackFitter(GroupFitter):
             `fit_stacks=False`.  
             
         """
+        if isinstance(files, list):
+            file=files[0]
+        else:
+            file=files
+        
+        self.files = [file]
+        if group_name is not None:
+            self.group_name = group_name
+        else:
+            self.group_name = file
+            
+        if verbose:
+            print('Load file {0}'.format(file))
+            
         self.file = file
         self.hdulist = pyfits.open(file)
+        self.min_ivar = min_ivar
         
         self.h0 = self.hdulist[0].header.copy()
-        self.Ngrism = self.h0['NGRISM']
+        #self.Ngrism = self.h0['NGRISM']
         self.grisms = []
         self.ext = []
-        for i in range(self.Ngrism):
+        for i in range(self.h0['NGRISM']):
             g = self.h0['GRISM{0:03d}'.format(i+1)]
             self.grisms.append(g)
             if fit_stacks:
@@ -149,7 +169,19 @@ class StackFitter(GroupFitter):
                     
         if not fit_stacks:
             self.mask_drizzle_overlaps(threshold=overlap_threshold)
-                
+        
+        # Get some parameters from the beams
+        self.id = self.h0['ID']
+        self.ra = self.h0['RA']
+        self.dec = self.h0['DEC']
+        
+        self.Ngrism = {}
+        for grism in self.grisms:
+            self.Ngrism[grism] = 0
+        
+        for beam in self.beams:
+            self.Ngrism[beam.grism] += 1
+                    
         self.Ntot = np.sum([E.size for E in self.beams])
         self.scif = np.hstack([E.scif for E in self.beams])
         self.ivarf = np.hstack([E.ivarf for E in self.beams])
@@ -172,35 +204,83 @@ class StackFitter(GroupFitter):
         ## Photometry
         self.is_spec = 1
         self.Nphot = 0
-        if eazyp is not None:
-            self.eazyp = eazyp
-            
-            # TBD: do matching to eazyp.cat directly?
-            self.eazy_ix = eazy_ix
-            
-            ok_phot = (eazyp.efnu[eazy_ix,:] > 0) & (eazyp.fnu[eazy_ix,:] > eazyp.param['NOT_OBS_THRESHOLD']) & np.isfinite(eazyp.fnu[eazy_ix,:]) & np.isfinite(eazyp.efnu[eazy_ix,:])
-            ok_phot = np.squeeze(ok_phot)
-            self.ok_phot = ok_phot
-
-            self.Nphot = ok_phot.sum()
-            if self.Nphot > 0:
-                
-                # F-lambda photometry, 1e-19 erg/s/cm2/A
-                self.photom_eflam = (eazyp.efnu[eazy_ix,:]*eazyp.to_flam*eazyp.zp*eazyp.ext_corr/100.)[ok_phot]
-                self.photom_flam = (eazyp.fnu[eazy_ix,:]*eazyp.to_flam*eazyp.zp*eazyp.ext_corr/100.)[ok_phot]
-                self.photom_lc = eazyp.lc[ok_phot]
-            
-                self.scif = np.hstack((self.scif, self.photom_flam))
-                self.ivarf = np.hstack((self.ivarf, 1/self.photom_eflam**2))
-                self.sivarf = np.hstack((self.sivarf, 1/self.photom_eflam))
-                self.wavef = np.hstack((self.wavef, self.photom_lc))
-
-                self.weightf = np.hstack((self.weightf, np.ones(self.Nphot)))
-                self.fit_mask = np.hstack((self.fit_mask, np.ones(self.Nphot, dtype=bool)))
-                self.DoF += self.Nphot
-                self.phot_scale = np.array([10.])
+        
+        # Read multiple
+        if isinstance(files, list):
+            if len(files) > 1:
+                for file in files[1:]:
+                    extra = StackFitter(files=file, sys_err=sys_err, mask_min=mask_min, fit_stacks=fit_stacks, fcontam=fcontam, pas=pas, extensions=extensions, min_ivar=min_ivar, overlap_threshold=overlap_threshold, eazyp=eazyp, eazy_ix=eazy_ix, verbose=verbose)
+                    self.extend(extra)
+                    
+                    
+        # if eazyp is not None:
+        #     self.eazyp = eazyp
+        #     
+        #     # TBD: do matching to eazyp.cat directly?
+        #     self.eazy_ix = eazy_ix
+        #     
+        #     ok_phot = (eazyp.efnu[eazy_ix,:] > 0) & (eazyp.fnu[eazy_ix,:] > eazyp.param['NOT_OBS_THRESHOLD']) & np.isfinite(eazyp.fnu[eazy_ix,:]) & np.isfinite(eazyp.efnu[eazy_ix,:])
+        #     ok_phot = np.squeeze(ok_phot)
+        #     self.ok_phot = ok_phot
+        # 
+        #     self.Nphot = ok_phot.sum()
+        #     if self.Nphot > 0:
+        #         
+        #         # F-lambda photometry, 1e-19 erg/s/cm2/A
+        #         self.photom_eflam = (eazyp.efnu[eazy_ix,:]*eazyp.to_flam*eazyp.zp*eazyp.ext_corr/100.)[ok_phot]
+        #         self.photom_flam = (eazyp.fnu[eazy_ix,:]*eazyp.to_flam*eazyp.zp*eazyp.ext_corr/100.)[ok_phot]
+        #         self.photom_lc = eazyp.lc[ok_phot]
+        #     
+        #         self.scif = np.hstack((self.scif, self.photom_flam))
+        #         self.ivarf = np.hstack((self.ivarf, 1/self.photom_eflam**2))
+        #         self.sivarf = np.hstack((self.sivarf, 1/self.photom_eflam))
+        #         self.wavef = np.hstack((self.wavef, self.photom_lc))
+        # 
+        #         self.weightf = np.hstack((self.weightf, np.ones(self.Nphot)))
+        #         self.fit_mask = np.hstack((self.fit_mask, np.ones(self.Nphot, dtype=bool)))
+        #         self.DoF += self.Nphot
+        #         self.phot_scale = np.array([10.])
                         
-    
+    def extend(self, st):
+        pass
+        
+        self.beams.extend(st.beams)
+        self.grisms.extend(st.grisms)
+        self.grisms = list(np.unique(self.grisms))
+
+        self.Ngrism = {}
+        for grism in self.grisms:
+            self.Ngrism[grism] = 0
+        
+        for beam in self.beams:
+            self.Ngrism[beam.grism] += 1
+            
+        #self.Ngrism = len(self.grisms)
+        
+        self.N += st.N
+        self.ext.extend(st.ext)
+        self.files.extend(st.files)
+        
+        # Re-init
+        self.Ntot = np.sum([E.size for E in self.beams])
+        self.scif = np.hstack([E.scif for E in self.beams])
+        self.ivarf = np.hstack([E.ivarf for E in self.beams])
+        self.wavef = np.hstack([E.wavef for E in self.beams])
+
+        self.weightf = np.hstack([E.weightf for E in self.beams])
+        self.ivarf *= self.weightf
+
+        self.sivarf = np.sqrt(self.ivarf)
+
+        self.fit_mask = np.hstack([E.fit_mask for E in self.beams])
+        self.fit_mask &= self.ivarf > self.min_ivar*self.ivarf.max()
+                
+        self.DoF = int((self.fit_mask*self.weightf).sum())
+        
+        self.slices = self._get_slices()
+        
+        self.A_bg = self._init_background()
+        
     def compute_model(self, spectrum_1d=None):
         """
         TBD
@@ -649,7 +729,7 @@ class StackFitter(GroupFitter):
         t.meta['DEC'] = (self.h0['DEC'], 'Declination')
         t.meta['Z'] = (zbest, 'Best-fit redshift')
         t.meta['CHIMIN'] = (chi2.min(), 'Min Chi2')
-        t.meta['CHIMAX'] = (chi2.max(), 'Min Chi2')
+        t.meta['CHIMAX'] = (chi2.max(), 'Max Chi2')
         t.meta['DOF'] = (self.DoF, 'Degrees of freedom')
         t.meta['AREA25'] = (area25, 'Area under CHIMIN+25')
         t.meta['FITTER'] = (fitter, 'Minimization algorithm')
@@ -817,21 +897,21 @@ class StackFitter(GroupFitter):
         chi2 = zfit['chi2']
         
         # Initialize plot window
+        Ng = len(self.grisms)
         if show_2d:
             height_ratios = [0.25]*self.N
             height_ratios.append(1)
             gs = matplotlib.gridspec.GridSpec(self.N+1,2, 
-                                     width_ratios=[1,1.5+0.5*(self.Ngrism == 2)],
-                                                   height_ratios=height_ratios,
-                                                   hspace=0.)
+                                width_ratios=[1,1.5+0.5*(Ng>1)],
+                                height_ratios=height_ratios, hspace=0.)
                 
-            fig = plt.figure(figsize=[8+4*(self.Ngrism == 2), 3.5+0.5*self.N])
+            fig = plt.figure(figsize=[8+4*(Ng>1), 3.5+0.5*self.N])
         else:
             gs = matplotlib.gridspec.GridSpec(1,2, 
-                            width_ratios=[1,1.5+0.5*(self.Ngrism == 2)],
+                            width_ratios=[1,1.5+0.5*(Ng>1)],
                             hspace=0.)
                 
-            fig = plt.figure(figsize=[8+4*(self.Ngrism == 2), 3.5])
+            fig = plt.figure(figsize=[8+4*(Ng>1), 3.5])
             
         # Chi-squared
         axz = fig.add_subplot(gs[-1,0]) #121)
@@ -927,7 +1007,7 @@ class StackFitter(GroupFitter):
             er *= unit_corr/1.e-19
             flm *= unit_corr/1.e-19
             
-            f_alpha = 1./self.h0['N{0}'.format(E.header['GRISM'])]**0.5
+            f_alpha = 1./self.Ngrism[E.grism]**0.5 #self.h0['N{0}'.format(E.header['GRISM'])]**0.5
             
             axc.errorbar(w[clip], fl[clip], er[clip], color=GRISM_COLORS[E.grism], alpha=0.3*f_alpha, marker='.', linestyle='None')
             #axc.fill_between(w[clip], (fl+er)[clip], (fl-er)[clip], color='k', alpha=0.2)

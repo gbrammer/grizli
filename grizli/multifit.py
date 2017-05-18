@@ -1185,7 +1185,8 @@ class GroupFitter(object):
             if verbose:                    
                 print(utils.NO_NEWLINE + '  {0:.4f} {1:9.1f} ({2:.4f})'.format(zgrid[i], chi2[i], zgrid[iz]))
         
-        print('First iteration: z_best={0:.4f}\n'.format(zgrid[iz]))
+        if verbose:
+            print('First iteration: z_best={0:.4f}\n'.format(zgrid[iz]))
             
         ## Find peaks
         import peakutils
@@ -1255,48 +1256,71 @@ class GroupFitter(object):
         coeffs = coeffs[so,:]
         covar = covar[so,:,:]
         
-        fit = OrderedDict()
-        fit['zgrid'] = zgrid
-        fit['chi2'] = chi2
-        fit['chi2poly'] = chi2_poly
-        fit['coeffs'] = coeffs
-        fit['covar'] = covar
+        fit = utils.GTable()
+        fit.meta['chi2poly'] = (chi2_poly, 'Chi^2 of polynomial fit')
+        fit.meta['DoF'] = (self.DoF, 'Degrees of freedom (number of pixels)')
+        fit.meta['chimin'] = (chi2.min(), 'Minimum chi2')
+        fit.meta['chimax'] = (chi2.max(), 'Maximum chi2')
+        fit.meta['fitter'] = (fitter, 'Minimization algorithm')
+        
+        fit.meta['NTEMP'] = (len(templates), 'Number of fitting templates')
+        
+        for i, tname in enumerate(templates):
+            fit.meta['T{0:03d}NAME'.format(i+1)] = (templates[tname].name, 'Template name')
+            fit.meta['T{0:03d}FWHM'.format(i+1)] = (templates[tname].fwhm, 'FWHM, if emission line')
+        
+        dtype = np.float64
+        
+        fit['zgrid'] = np.cast[dtype](zgrid)
+        fit['chi2'] = np.cast[dtype](chi2)
+        #fit['chi2poly'] = chi2_poly
+        fit['coeffs'] = np.cast[dtype](coeffs)
+        fit['covar'] = np.cast[dtype](covar)
+        
+        fit = self._parse_zfit_output(fit, prior=prior)
         
         return fit
     
-    def parse_fit_outputs(self, fit, prior=None):
+    def _parse_zfit_output(self, fit, prior=None):
         """Parse best-fit redshift, etc.
         TBD
         """
+        import scipy.interpolate
+        
+        # Normalize to min(chi2)/DoF = 1.
         scl_nu = fit['chi2'].min()/self.DoF
-
+        
+        # PDF
         pdf = np.exp(-0.5*(fit['chi2']-fit['chi2'].min())/scl_nu)
         
         if prior is not None:
             interp_prior = np.interp(zgrid, prior[0], prior[1])
             pdf *= interp_prior
+            fit.meta['hasprior'] = True, 'Prior applied to PDF'
+            fit['prior'] = interp_prior
         else:
             interp_prior = None
-            
+            fit.meta['hasprior'] = False, 'Prior applied to PDF'
+
+        # Normalize PDF
         pdf /= np.trapz(pdf, fit['zgrid'])
         
+        # Interpolate pdf for more continuous measurement
         spl = scipy.interpolate.Akima1DInterpolator(fit['zgrid'], np.log(pdf), axis=1)
-        npdf = -np.log(pdf)
-        #npdf[0] = npdf[-1] = npdf.max()*5
-        spl_inv = scipy.interpolate.Akima1DInterpolator(fit['zgrid'], npdf, axis=1)
-        zfine = grizli.utils.log_zgrid(zr=[0.01,3.4], dz=0.00002)
+        zfine = utils.log_zgrid(zr=[0.01,3.4], dz=0.0001)
         ok = np.isfinite(spl(zfine))
-        #rnd = np.interp(np.random.rand(1000), cdf, fit['zgrid']+dz/2.)
         norm = np.trapz(np.exp(spl(zfine[ok])), zfine[ok])
+        
+        # Compute CDF and probability intervals
         dz = np.gradient(zfine[ok])
         cdf = np.cumsum(np.exp(spl(zfine[ok]))*dz/norm)
         pz_percentiles = np.interp(np.array([2.5, 16, 50, 84, 97.5])/100., cdf, zfine[ok])
+
+        # Random draws, testing
+        #rnd = np.interp(np.random.rand(1000), cdf, fit['zgrid']+dz/2.)
         
-        # dz0 = np.gradient(fit['zgrid'])
-        # cdf0 = np.cumsum(pdf*dz0)
-        
-        ### Risk
-        #@staticmethod    
+        ### Risk / Loss function
+        ### Tanaka et al., https://arxiv.org/abs/1704.05988
         def _loss(dz, gamma=0.15):
             return 1-1/(1+(dz/gamma)**2)
 
@@ -1311,7 +1335,21 @@ class GroupFitter(object):
         z_best = -c[1]/(2*c[0])
         risk_best = np.trapz(pdf*_loss((z_best-fit['zgrid'])/(1+fit['zgrid']), gamma=0.01), fit['zgrid'])
         
+        # Store data in the fit table
+        fit['pdf'] = pdf
+        fit['risk'] = risk
+        fit.meta['Z02'] = pz_percentiles[0], 'Integrated p(z) = 0.025'
+        fit.meta['Z16'] = pz_percentiles[1], 'Integrated p(z) = 0.16'
+        fit.meta['Z50'] = pz_percentiles[2], 'Integrated p(z) = 0.5'
+        fit.meta['Z84'] = pz_percentiles[3], 'Integrated p(z) = 0.84'
+        fit.meta['Z97'] = pz_percentiles[4], 'Integrated p(z) = 0.975'
+        fit.meta['ZWIDTH1'] = pz_percentiles[3]-pz_percentiles[1], 'Width between the 16th and 84th p(z) percentiles'
+        fit.meta['ZWIDTH2'] = pz_percentiles[4]-pz_percentiles[0], 'Width between the 2.5th and 97.5th p(z) percentiles'
         
+        fit.meta['z_risk'] = z_best, 'Redshift at minimum risk'
+        fit.meta['min_risk'] = risk_best, 'Minimum risk'
+        fit.meta['gam_loss'] = 0.01, 'Gamma factor of the risk/loss function'
+        return fit
                         
     def template_at_z(self, z=0, templates=None, fit_background=True, fitter='nnls', fwhm=1400):
         """TBD
@@ -1327,9 +1365,10 @@ class GroupFitter(object):
         cont1d, line1d = utils.dot_templates(coeffs[self.N:], templates, z=z)
 
         # Parse template coeffs
-        cfit = {}
+        cfit = OrderedDict()
+        
         for i in range(self.N):
-            cfit['bg {0}'.format(i)] = coeffs[i], coeffs_err[i]
+            cfit['bg {0:03d}'.format(i)] = coeffs[i], coeffs_err[i]
         
         for j, key in enumerate(templates):
             i = j+self.N
@@ -1339,8 +1378,16 @@ class GroupFitter(object):
             # Compare drizzled and beam fits (very close)
             for j, key in enumerate(templates):
                 print('{key:<16s} {0:.2e} {1:.2e}  {2:.2e} {3:.2e}'.format(mb_cfit[key][0], mb_cfit[key][1], st_cfit[key][0], st_cfit[key][1], key=key))
-                
-        return cont1d, line1d, cfit, covar
+        
+        tfit = OrderedDict()
+        tfit['cont1d'] = cont1d
+        tfit['line1d'] = line1d
+        tfit['cfit'] = cfit
+        tfit['covar'] = covar
+        tfit['z'] = z
+        tfit['templates'] = templates
+        
+        return tfit #cont1d, line1d, cfit, covar
         
         ### Random draws
         # Unique wavelengths
@@ -1369,7 +1416,121 @@ class GroupFitter(object):
                 plt.plot(ww, ff/beam.sens, color='r', alpha=0.05)
                 
             plt.plot(w[xclip]*(1+z), tdraw.T, alpha=0.05, color='r')
+    
+    def xmake_fit_plot(self, fit, tfit):
+        """TBD
+        """
+        import matplotlib.pyplot as plt
+        import matplotlib.gridspec
+        from matplotlib.ticker import MultipleLocator
+        
+        import grizli
+        
+        # Initialize plot window
+        Ng = len(self.grisms)
+        gs = matplotlib.gridspec.GridSpec(1,2, 
+                        width_ratios=[1,1.5+0.5*(Ng>1)],
+                        hspace=0.)
             
+        fig = plt.figure(figsize=[8+4*(Ng>1), 3.5])
+        
+        # p(z)
+        axz = fig.add_subplot(gs[-1,0]) #121)
+        
+        axz.text(0.95, 0.04, self.group_name + '\n'+'ID={0:<5d}  z={1:.4f}'.format(self.id, fit.meta['z_risk'][0]), ha='right', va='bottom', transform=axz.transAxes, fontsize=9)
+                 
+        axz.plot(fit['zgrid'], np.log10(fit['pdf']), color='k')
+        #axz.fill_between(z, (chi2-chi2.min())/scale_nu, 27, color='k', alpha=0.5)
+        
+        axz.set_xlabel(r'$z$')
+        axz.set_ylabel(r'$\log\ p(z)$'+' / '+ r'$\chi^2=\frac{{{0:.0f}}}{{{1:d}}}={2:.2f}$'.format(fit.meta['chimin'][0], fit.meta['DoF'][0], fit.meta['chimin'][0]/fit.meta['DoF'][0]))
+        #axz.set_yticks([1,4,9,16,25])
+        
+        axz.set_xlim(fit['zgrid'].min(), fit['zgrid'].max())
+        pzmax = np.log10(fit['pdf'].max())
+        axz.set_ylim(pzmax-3, pzmax+0.2)
+        axz.grid()
+        axz.yaxis.set_major_locator(MultipleLocator(base=1))
+        
+        #### Spectra
+        axc = fig.add_subplot(gs[-1,1]) #224)
+        ymin = 1.e30
+        ymax = -1.e30
+        wmin = 1.e30
+        wmax = -1.e30
+        
+        # 1D Model
+        sp = tfit['line1d'].wave, tfit['line1d'].flux
+        
+        for i in range(self.N):
+            beam = self.beams[i]
+            m_i = beam.compute_model(spectrum_1d=sp, is_cgs=True, in_place=False).reshape(beam.sh)
+            
+            if isinstance(beam, model.BeamCutout):
+                grism = beam.grism.filter
+                clean = beam.grism['SCI'] - beam.contam - tfit['cfit']['bg {0:03d}'.format(i)][0]
+                
+                w, fl, er = beam.beam.optimal_extract(clean, ivar=beam.ivar)            
+                w, flm, erm = beam.beam.optimal_extract(m_i, ivar=beam.ivar)
+                sens = beam.beam.sensitivity                
+            else:
+                grism = beam.grism
+                clean = beam.sci - beam.contam - tfit['cfit']['bg {0:03d}'.format(i)][0]
+                w, fl, er = beam.optimal_extract(clean, ivar=beam.ivar)            
+                w, flm, erm = beam.optimal_extract(m_i, ivar=beam.ivar)
+                
+                sens = beam.sens
+
+            w = w/1.e4
+                 
+            unit_corr = 1./sens
+            clip = (sens > 0.1*sens.max()) 
+            clip &= (np.isfinite(flm)) & (er > 0)
+            if clip.sum() == 0:
+                continue
+            
+            fl *= unit_corr/1.e-19
+            er *= unit_corr/1.e-19
+            flm *= unit_corr/1.e-19
+            
+            f_alpha = 1./(self.Ngrism[grism.upper()])*0.8 #**0.5
+            
+            # Plot
+            axc.errorbar(w[clip], fl[clip], er[clip], color=GRISM_COLORS[grism], alpha=f_alpha, marker='.', linestyle='None', zorder=1)
+            axc.plot(w[clip], flm[clip], color='r', alpha=f_alpha, linewidth=2, zorder=10) 
+              
+            # Plot limits         
+            print(ymin, ymax)     
+            ymax = np.maximum(ymax,
+                        np.percentile((flm+np.median(er[clip]))[clip], 98))
+            
+            ymin = np.minimum(ymin, np.percentile((flm-er*0.)[clip], 2))
+            
+            wmax = np.maximum(wmax, w[clip].max())
+            wmin = np.minimum(wmin, w[clip].min())
+        
+        # Cleanup
+        axc.set_xlim(wmin, wmax)
+        axc.semilogx(subsx=[wmax])
+        #axc.set_xticklabels([])
+        axc.set_xlabel(r'$\lambda$')
+        axc.set_ylabel(r'$f_\lambda \times 10^{-19}$')
+        #axc.xaxis.set_major_locator(MultipleLocator(0.1))
+        
+        axc.set_ylim(ymin-0.2*ymax, 1.2*ymax)
+        axc.grid()
+                
+        for ax in [axc]: #[axa, axb, axc]:
+            
+            labels = np.arange(np.ceil(wmin*10), np.ceil(wmax*10))/10.
+            ax.set_xticks(labels)
+            ax.set_xticklabels(labels)
+            #ax.set_xticklabels([])
+            #print(labels, wmin, wmax)
+
+        gs.tight_layout(fig, pad=0.1, w_pad=0.1)
+        return fig
+        
     def process_zfit(self, zgrid, chi2, prior=None):
         """Parse redshift fit"""
         
@@ -1484,6 +1645,8 @@ class MultiBeam(GroupFitter):
             else:
                 self.Ngrism[grism] = 1
         
+        self.grisms = list(self.Ngrism.keys())
+         
         self.PA = {}
         for g in self.Ngrism:
             self.PA[g] = {}
@@ -1602,7 +1765,7 @@ class MultiBeam(GroupFitter):
             count.append(len(hdu_i)-1)
             hdu[0].header['FILE{0:04d}'.format(ib)] = (beam.grism.parent_file, 'Grism parent file')
             hdu[0].header['GRIS{0:04d}'.format(ib)] = (beam.grism.filter, 'Grism element')
-            #hdu[0].header['EXTN{0:04d}'.format(ib)] = (beam.grism.filter, 'Grism element')
+            hdu[0].header['NEXT{0:04d}'.format(ib)] = (count[-1], 'Number of extensions')
             
             exptime[beam.grism.filter] += beam.grism.header['EXPTIME']
             
@@ -1627,12 +1790,12 @@ class MultiBeam(GroupFitter):
         i0 = 1
         self.beams = []
         for i in range(N):
-            beam = model.BeamCutout(fits_file=hdu[i0:i0+Next[i]])
+            beam = model.BeamCutout(fits_file=hdu[i0:i0+6])#Next[i]])
             self.beams.append(beam)
             if verbose:
                 print('{0} {1} {2}'.format(i+1, beam.grism.parent_file, beam.grism.filter))
                 
-            i0 += Next[i]
+            i0 += 6#Next[i]
             
     def write_beam_fits(self, verbose=True):
         """TBD
@@ -2642,16 +2805,30 @@ class MultiBeam(GroupFitter):
         line_wavelengths, line_ratios = utils.get_line_wavelengths()
         hdu_full = []
         saved_lines = []
-        for line in fit['line_flux']:
-            line_flux, line_err = fit['line_flux'][line]
+        
+        if 'zbest' in fit:
+            z_driz = fit['zbest']
+        else:
+            z_driz = fit['z']
+            
+        if 'line_flux' in fit:
+            line_flux_dict = fit['line_flux']
+        else:
+            line_flux_dict = OrderedDict()
+            for key in fit['cfit']:
+                if key.startswith('line'):
+                    line_flux_dict[key.replace('line ','')] = fit['cfit'][key]
+                    
+        for line in line_flux_dict:
+            line_flux, line_err = line_flux_dict[line]
             if line_flux == 0:
                 continue
 
             if (line_flux/line_err > 7) | (line in force_line):
                 print('Drizzle line -> {0:4s} ({1:.2f} {2:.2f})'.format(line, line_flux/1.e-17, line_err/1.e-17))
 
-                line_wave_obs = line_wavelengths[line][0]*(1+fit['zbest'])
-                
+                line_wave_obs = line_wavelengths[line][0]*(1+z_driz)
+                    
                 if mask_lines:
                     for beam in self.beams:
                         cont = fit['cont1d']
@@ -2664,27 +2841,48 @@ class MultiBeam(GroupFitter):
                         ### another idea, compute a model for the line itself
                         ### and mask relatively "contaminated" pixels from 
                         ### other lines
-                        lm = fit['line1d'][line]
+                        try:
+                            lm = fit['line1d'][line]
+                            sp = [lm.wave, lm.flux]
+                        except:
+                            key = 'line '+ line
+                            lm = fit['templates'][key]
+                            sp = [lm.wave, lm.flux*fit['cfit'][key][0]]
+                            
+                        #lm = fit['line1d'][line]
                         if ((lm.wave.max() < lam.min()) | 
                             (lm.wave.min() > lam.max())):
                             continue
                         
-                        sp = [lm.wave, lm.flux]
+                        #sp = [lm.wave, lm.flux]
                         m = beam.compute_model(spectrum_1d=sp, 
                                                in_place=False, is_cgs=True) #/beam.beam.total_flux
                         lmodel = m.reshape(beam.beam.sh_beam)
                         if lmodel.max() == 0:
                             continue
-                            
-                        for l in fit['line1d']:
-                            lf, le = fit['line_flux'][l]
+                        
+                        if 'cfit' in fit:
+                            keys = fit['cfit']
+                        else:
+                            keys = fit['line1d']
+                                
+                        for l in keys:
+                            if not l.startswith('line'):
+                                continue
+                                
+                            lf, le = line_flux_dict[l.replace('line ', '')]
                             ### Don't mask if the line missing or undetected
                             if (lf == 0) | (lf < mask_sn_limit*le):
                                 continue
                                 
                             if l != line:
-                                lm = fit['line1d'][l]
-                                sp = [lm.wave, lm.flux]
+                                try:
+                                    lm = fit['line1d'][l]
+                                    sp = [lm.wave, lm.flux]
+                                except:
+                                    lm = fit['templates'][key]
+                                    sp = [lm.wave, lm.flux*fit['cfit'][key][0]]
+                                    
                                 if ((lm.wave.max() < lam.min()) | 
                                     (lm.wave.min() > lam.max())):
                                     continue
@@ -2709,11 +2907,10 @@ class MultiBeam(GroupFitter):
                         beam.ivar = beam.oivar*1
                         delattr(beam, 'oivar')
                         
-                hdu[0].header['REDSHIFT'] = (fit['zbest'], 'Redshift used')
+                hdu[0].header['REDSHIFT'] = (z_driz, 'Redshift used')
                 for e in [3,4,5,6]:
                     hdu[e].header['EXTVER'] = line
-                    hdu[e].header['REDSHIFT'] = (fit['zbest'], 
-                                                 'Redshift used')
+                    hdu[e].header['REDSHIFT'] = (z_driz, 'Redshift used')
                     hdu[e].header['RESTWAVE'] = (line_wavelengths[line][0], 
                                                  'Line rest wavelength')
 
