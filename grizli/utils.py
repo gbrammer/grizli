@@ -1292,7 +1292,8 @@ def load_templates(fwhm=400, line_complexes=True, stars=False,
     temp_list = OrderedDict()
     for temp in templates:
         data = np.loadtxt(os.path.join(os.getenv('GRIZLI'), 'templates', temp), unpack=True)
-        scl = np.interp(5500., data[0], data[1])
+        #scl = np.interp(5500., data[0], data[1])
+        scl = 1.
         name = temp #os.path.basename(temp)
         temp_list[name] = SpectrumTemplate(wave=data[0], flux=data[1]/scl,
                                            name=name)
