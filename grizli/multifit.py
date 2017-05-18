@@ -1264,20 +1264,55 @@ class GroupFitter(object):
         
         return fit
     
-    def parse_fit_outputs(self, fit):
+    def parse_fit_outputs(self, fit, prior=None):
         """Parse best-fit redshift, etc.
         TBD
         """
         scl_nu = fit['chi2'].min()/self.DoF
 
-        pdf = np.exp(-0.5*(fit['chi2']-fit['chi2'].min())*scl_nu)
+        pdf = np.exp(-0.5*(fit['chi2']-fit['chi2'].min())/scl_nu)
+        
+        if prior is not None:
+            interp_prior = np.interp(zgrid, prior[0], prior[1])
+            pdf *= interp_prior
+        else:
+            interp_prior = None
+            
         pdf /= np.trapz(pdf, fit['zgrid'])
         
-        dz = np.gradient(fit['zgrid'])
-        cdf = np.cumsum(pdf*dz)
-        
+        spl = scipy.interpolate.Akima1DInterpolator(fit['zgrid'], np.log(pdf), axis=1)
+        npdf = -np.log(pdf)
+        #npdf[0] = npdf[-1] = npdf.max()*5
+        spl_inv = scipy.interpolate.Akima1DInterpolator(fit['zgrid'], npdf, axis=1)
+        zfine = grizli.utils.log_zgrid(zr=[0.01,3.4], dz=0.00002)
+        ok = np.isfinite(spl(zfine))
         #rnd = np.interp(np.random.rand(1000), cdf, fit['zgrid']+dz/2.)
+        norm = np.trapz(np.exp(spl(zfine[ok])), zfine[ok])
+        dz = np.gradient(zfine[ok])
+        cdf = np.cumsum(np.exp(spl(zfine[ok]))*dz/norm)
+        pz_percentiles = np.interp(np.array([2.5, 16, 50, 84, 97.5])/100., cdf, zfine[ok])
         
+        # dz0 = np.gradient(fit['zgrid'])
+        # cdf0 = np.cumsum(pdf*dz0)
+        
+        ### Risk
+        #@staticmethod    
+        def _loss(dz, gamma=0.15):
+            return 1-1/(1+(dz/gamma)**2)
+
+        dz = np.gradient(fit['zgrid'])
+        
+        zsq = np.dot(fit['zgrid'][:,None], np.ones_like(fit['zgrid'])[None,:])
+        L = _loss((zsq-fit['zgrid'])/(1+fit['zgrid']), gamma=0.01)
+        
+        risk = np.dot(pdf*L, dz)
+        zi = np.argmin(risk)
+        c = np.polyfit(fit['zgrid'][zi-1:zi+2], risk[zi-1:zi+2], 2)
+        z_best = -c[1]/(2*c[0])
+        risk_best = np.trapz(pdf*_loss((z_best-fit['zgrid'])/(1+fit['zgrid']), gamma=0.01), fit['zgrid'])
+        
+        
+                        
     def template_at_z(self, z=0, templates=None, fit_background=True, fitter='nnls', fwhm=1400):
         """TBD
         """
@@ -1335,7 +1370,7 @@ class GroupFitter(object):
                 
             plt.plot(w[xclip]*(1+z), tdraw.T, alpha=0.05, color='r')
             
-    def process_zfit(self, zgrid, chi2):
+    def process_zfit(self, zgrid, chi2, prior=None):
         """Parse redshift fit"""
         
         zbest = zgrid[np.argmin(chi2)]
@@ -1397,6 +1432,7 @@ class GroupFitter(object):
         fit_data['model1d'] = model1d
         fit_data['cont1d'] = cont1d
         fit_data['line1d'] = line1d
+        
 class MultiBeam(GroupFitter):
     def __init__(self, beams, group_name='group', fcontam=0., psf=False):
         """Tools for dealing with multiple `~.model.BeamCutout` instances 
@@ -1554,7 +1590,11 @@ class MultiBeam(GroupFitter):
         hdu[0].header['ID'] = (self.id, 'Object ID')
         hdu[0].header['RA'] = (rd[0], 'Right Ascension')
         hdu[0].header['DEC'] = (rd[1], 'Declination')
-                
+        
+        exptime = {}
+        for g in self.Ngrism:
+            exptime[g] = 0.
+         
         count = []
         for ib, beam in enumerate(self.beams):
             hdu_i = beam.write_fits(get_hdu=True, strip=True)
@@ -1562,10 +1602,14 @@ class MultiBeam(GroupFitter):
             count.append(len(hdu_i)-1)
             hdu[0].header['FILE{0:04d}'.format(ib)] = (beam.grism.parent_file, 'Grism parent file')
             hdu[0].header['GRIS{0:04d}'.format(ib)] = (beam.grism.filter, 'Grism element')
-            hdu[0].header['EXTN{0:04d}'.format(ib)] = (beam.grism.filter, 'Grism element')
-             
+            #hdu[0].header['EXTN{0:04d}'.format(ib)] = (beam.grism.filter, 'Grism element')
+            
+            exptime[beam.grism.filter] += beam.grism.header['EXPTIME']
+            
         hdu[0].header['COUNT'] = (self.N, ' '.join(['{0}'.format(c) for c in count]))
-                
+        for g in self.Ngrism:
+            hdu[0].header['T_{0}'.format(g)] = (exptime[g], 'Exposure time in grism {0}'.format(g))
+            
         if get_hdu:
             return hdu
         

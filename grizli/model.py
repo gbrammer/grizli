@@ -924,15 +924,20 @@ class ImageData(object):
                 self.mdrizsky = header['MDRIZSKY']
                 
             ### ACS bunit
-            self.exptime = 1.
+            #self.exptime = 1.
+            self.exptime = hdulist[0].header['EXPTIME']
+            # if 'BUNIT' in header:
+            #     if header['BUNIT'] == 'ELECTRONS':
+            #         self.exptime = hdulist[0].header['EXPTIME']
+            #         # sci /= self.exptime
+            #         # err /= self.exptime
+            
+            sci = (sci-self.mdrizsky)
+            
             if 'BUNIT' in header:
                 if header['BUNIT'] == 'ELECTRONS':
-                    self.exptime = hdulist[0].header['EXPTIME']
-                    # sci /= self.exptime
-                    # err /= self.exptime
-            
-            sci = (sci-self.mdrizsky)/self.exptime
-            err /= self.exptime
+                    sci /= self.exptime
+                    err /= self.exptime
                    
             if filter.startswith('G'):
                 photflam = 1
@@ -1512,8 +1517,15 @@ class ImageData(object):
         h['ORIGINY'] = self.origin[0], 'Origin from parent image, y'
         
         hdu = []
-        sci_data = self.data['SCI']*self.exptime + self.mdrizsky
-        err_data = self.data['ERR']*self.exptime
+        
+        exptime_corr = 1.
+        if 'BUNIT' in self.header:
+            if self.header['BUNIT'] == 'ELECTRONS':
+                exptime_corr = self.exptime
+        
+        # Put back into original units    
+        sci_data = self.data['SCI']*exptime_corr + self.mdrizsky
+        err_data = self.data['ERR']*exptime_corr
         
         hdu.append(pyfits.ImageHDU(data=sci_data, header=h,
                                    name='SCI'))
