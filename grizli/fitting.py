@@ -19,7 +19,7 @@ from .utils import GRISM_COLORS
 
 PLINE = {'kernel': 'point', 'pixfrac': 0.2, 'pixscale': 0.1, 'size': 10, 'wcs': None}
 
-def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.005, 0.0005], group_name='grism', fit_stacks=True, prior=None, fcontam=0.2, pline=PLINE):
+def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.001, 0.0002], group_name='grism', fit_stacks=True, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=3, fit_beams=True):
     """Run the full procedure
     
     1) Load MultiBeam and stack files 
@@ -52,11 +52,16 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.005, 0.0005],
     fit_hdu.header['EXTNAME'] = 'ZFIT_STACK'
     
     # Zoom-in fit with individual beams
-    mb_zr = fit.meta['Z50'][0] + 10*fit.meta['ZWIDTH1'][0]*np.array([-1,1])
-    mb_fit = mb.xfit_redshift(templates=t0, zr=mb_zr, dz=[0.0005, 0.0002], prior=prior) 
-    mb_fit_hdu = pyfits.table_to_hdu(mb_fit)
-    mb_fit_hdu.header['EXTNAME'] = 'ZFIT_BEAM'
-    
+    if fit_beams:
+        z0 = fit.meta['Z50'][0]
+        width = np.maximum(3*fit.meta['ZWIDTH1'][0], 3*0.001*(1+z0))
+        mb_zr = z0 + width*np.array([-1,1])
+        mb_fit = mb.xfit_redshift(templates=t0, zr=mb_zr, dz=[0.001, 0.0002], prior=prior) 
+        mb_fit_hdu = pyfits.table_to_hdu(mb_fit)
+        mb_fit_hdu.header['EXTNAME'] = 'ZFIT_BEAM'
+    else:
+        mb_fit = fit
+        
     # Get best-fit template of beams
     tfit = mb.template_at_z(z=mb_fit.meta['z_risk'][0], templates=t1, fit_background=True)
     tfit_sp = grizli.utils.GTable()
@@ -65,11 +70,11 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.005, 0.0005],
         tfit_sp.meta['CERR{0:03d}'.format(ik)] = tfit['cfit'][key][1], 'Uncertainty for {0}'.format(key)
         
     tfit_sp['wave'] = tfit['cont1d'].wave
-    tfit_sp['cont'] = tfit['cont1d'].flux
+    tfit_sp['continuum'] = tfit['cont1d'].flux
     tfit_sp['full'] = tfit['line1d'].flux
     
     tfit_sp['wave'].unit = tfit['cont1d'].waveunits
-    tfit_sp['cont'].unit = tfit['cont1d'].fluxunits
+    tfit_sp['continuum'].unit = tfit['cont1d'].fluxunits
     tfit_sp['full'].unit = tfit['line1d'].fluxunits
     
     tfit_hdu = pyfits.table_to_hdu(tfit_sp)
@@ -77,21 +82,65 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.005, 0.0005],
      
     # Make the plot
     fig = mb.xmake_fit_plot(mb_fit, tfit)
+    
+    # Add stack fit to the existing plot
     fig.axes[0].plot(fit['zgrid'], np.log10(fit['pdf']), color='0.5', alpha=0.5)
     fig.axes[0].set_xlim(fit['zgrid'].min(), fit['zgrid'].max())
     fig.savefig('{0}_{1:05d}.full.png'.format(group_name, id))
     
+    if not fit_stacks:
+        stx = StackFitter(st_files, fit_stacks=True, group_name=group_name, fcontam=fcontam)
+    else:
+        stx = st
+
+    tfit_st = stx.template_at_z(z=mb_fit.meta['z_risk'][0], templates=t1, fit_background=True)
+    
+    axc = fig.axes[1]
+    for i in range(stx.N):
+        beam = stx.beams[i]
+        #m_i = beam.compute_model(spectrum_1d=sp, is_cgs=True, in_place=False).reshape(beam.sh)
+        
+        grism = beam.grism
+        clean = beam.sci - beam.contam - tfit_st['cfit']['bg {0:03d}'.format(i)][0]
+        w, fl, er = beam.optimal_extract(clean, ivar=beam.ivar)            
+        #w, flm, erm = beam.optimal_extract(m_i, ivar=beam.ivar)
+        
+        sens = beam.sens
+        
+        # Some offset between drizzled and beam spectra, but can't shift
+        # in the StackedSpectrum because redshift fit is about right
+        w -= np.abs(w[1]-w[0])
+        w = w/1.e4
+             
+        unit_corr = 1./sens
+        clip = (sens > 0.1*sens.max()) 
+        clip &= (np.isfinite(fl)) & (er > 0)
+        if clip.sum() == 0:
+            continue
+        
+        fl *= unit_corr/1.e-19
+        er *= unit_corr/1.e-19
+        #flm *= unit_corr/1.e-19
+        
+        f_alpha = 0.8 #1./(stx.Ngrism[grism.upper()])*0.8 #**0.5
+        
+        # Plot
+        axc.errorbar(w[clip], fl[clip], er[clip], color=GRISM_COLORS[grism], alpha=f_alpha, marker='.', linestyle='None', zorder=1)
+        #axc.plot(w[clip], flm[clip], color='r', alpha=f_alpha, linewidth=2, zorder=10)
+            
     # Make the line maps
     if pline is None:
          pzfit, pspec2, pline = grizli.multifit.get_redshift_fit_defaults()
     
-    line_hdu = mb.drizzle_fit_lines(tfit, pline, force_line=['SIII','SII','Ha', 'OIII', 'Hb', 'OII'], save_fits=False, mask_lines=True, mask_sn_limit=3)
+    line_hdu = mb.drizzle_fit_lines(tfit, pline, force_line=['SIII','SII','Ha', 'OIII', 'Hb', 'OII'], save_fits=False, mask_lines=True, mask_sn_limit=mask_sn_limit)
     
     line_hdu.insert(1, fit_hdu)
-    line_hdu.insert(2, mb_fit_hdu)
+    if fit_beams:
+        line_hdu.insert(2, mb_fit_hdu)
     line_hdu.insert(3, tfit_hdu)
     
     line_hdu.writeto('{0}_{1:05d}.full.fits'.format(group_name, id), clobber=True, output_verify='fix')
+    return line_hdu
     
 def _loss(dz, gamma=0.15):
     """Risk / Loss function, Tanaka et al. (https://arxiv.org/abs/1704.05988)
@@ -428,7 +477,7 @@ class GroupFitter(object):
                 chi2min = chi2[i]
 
             if verbose:                    
-                print(utils.NO_NEWLINE + '  {0:.4f} {1:9.1f} ({2:.4f})'.format(zgrid[i], chi2[i], zgrid[iz]))
+                print(utils.NO_NEWLINE + '  {0:.4f} {1:9.1f} ({2:.4f}) {3:d}/{4:d}'.format(zgrid[i], chi2[i], zgrid[iz], i+1, NZ))
         
         if verbose:
             print('First iteration: z_best={0:.4f}\n'.format(zgrid[iz]))
@@ -688,7 +737,7 @@ class GroupFitter(object):
         
         axz.set_xlim(fit['zgrid'].min(), fit['zgrid'].max())
         pzmax = np.log10(fit['pdf'].max())
-        axz.set_ylim(pzmax-3, pzmax+0.2)
+        axz.set_ylim(pzmax-6, pzmax+0.8)
         axz.grid()
         axz.yaxis.set_major_locator(MultipleLocator(base=1))
         

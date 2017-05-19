@@ -2079,7 +2079,13 @@ class MultiBeam(GroupFitter):
             for key in fit['cfit']:
                 if key.startswith('line'):
                     line_flux_dict[key.replace('line ','')] = fit['cfit'][key]
-                    
+        
+        # Compute continuum model
+        cont = fit['cont1d']
+        for beam in self.beams:
+            beam.compute_model(spectrum_1d=[cont.wave, cont.flux],
+                               is_cgs=True)
+        
         for line in line_flux_dict:
             line_flux, line_err = line_flux_dict[line]
             if line_flux == 0:
@@ -2089,12 +2095,9 @@ class MultiBeam(GroupFitter):
                 print('Drizzle line -> {0:4s} ({1:.2f} {2:.2f})'.format(line, line_flux/1.e-17, line_err/1.e-17))
 
                 line_wave_obs = line_wavelengths[line][0]*(1+z_driz)
-                    
+                
                 if mask_lines:
                     for beam in self.beams:
-                        cont = fit['cont1d']
-                        beam.compute_model(spectrum_1d=[cont.wave, cont.flux],
-                                           is_cgs=True)
                         
                         beam.oivar = beam.ivar*1
                         lam = beam.beam.lam_beam
@@ -2108,7 +2111,8 @@ class MultiBeam(GroupFitter):
                         except:
                             key = 'line '+ line
                             lm = fit['templates'][key]
-                            sp = [lm.wave, lm.flux*fit['cfit'][key][0]]
+                            scl = fit['cfit'][key][0]/(1+z_driz)
+                            sp = [lm.wave*(1+z_driz), lm.flux*scl]
                             
                         #lm = fit['line1d'][line]
                         if ((lm.wave.max() < lam.min()) | 
@@ -2117,7 +2121,7 @@ class MultiBeam(GroupFitter):
                         
                         #sp = [lm.wave, lm.flux]
                         m = beam.compute_model(spectrum_1d=sp, 
-                                               in_place=False, is_cgs=True) #/beam.beam.total_flux
+                                               in_place=False, is_cgs=True)
                         lmodel = m.reshape(beam.beam.sh_beam)
                         if lmodel.max() == 0:
                             continue
@@ -2127,22 +2131,24 @@ class MultiBeam(GroupFitter):
                         else:
                             keys = fit['line1d']
                                 
-                        for l in keys:
-                            if not l.startswith('line'):
+                        for lkey in keys:
+                            if not lkey.startswith('line'):
                                 continue
-                                
-                            lf, le = line_flux_dict[l.replace('line ', '')]
+                            
+                            key = lkey.replace('line ', '')
+                            lf, le = line_flux_dict[key]
                             ### Don't mask if the line missing or undetected
                             if (lf == 0) | (lf < mask_sn_limit*le):
                                 continue
                                 
-                            if l != line:
+                            if key != line:
                                 try:
-                                    lm = fit['line1d'][l]
+                                    lm = fit['line1d'][lkey]
                                     sp = [lm.wave, lm.flux]
                                 except:
-                                    lm = fit['templates'][key]
-                                    sp = [lm.wave, lm.flux*fit['cfit'][key][0]]
+                                    lm = fit['templates'][lkey]
+                                    scl = fit['cfit'][lkey][0]/(1+z_driz)
+                                    sp = [lm.wave*(1+z_driz), lm.flux*scl]
                                     
                                 if ((lm.wave.max() < lam.min()) | 
                                     (lm.wave.min() > lam.max())):
@@ -2150,10 +2156,11 @@ class MultiBeam(GroupFitter):
                                     
                                 m = beam.compute_model(spectrum_1d=sp, 
                                                        in_place=False,
-                                                       is_cgs=True) #/beam.beam.total_flux
+                                                       is_cgs=True) 
+                                                       
                                 lcontam = m.reshape(beam.beam.sh_beam)
                                 if lcontam.max() == 0:
-                                    #print beam.grism.parent_file, l
+                                    #print beam.grism.parent_file, lkey
                                     continue
                                     
                                 beam.ivar[lcontam > mask_sn_limit*lmodel] *= 0
