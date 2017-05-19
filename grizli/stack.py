@@ -10,7 +10,7 @@ import numpy as np
 from . import utils
 from .utils import GRISM_COLORS, GRISM_MAJOR, GRISM_LIMITS, DEFAULT_LINE_LIST
 
-from .multifit import GroupFitter
+from .fitting import GroupFitter
 
 def make_templates(grism='G141', return_lists=False, fsps_templates=False,
                    line_list=DEFAULT_LINE_LIST):
