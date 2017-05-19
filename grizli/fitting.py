@@ -17,9 +17,17 @@ from . import utils
 from .model import BeamCutout
 from .utils import GRISM_COLORS
 
-PLINE = {'kernel': 'point', 'pixfrac': 0.2, 'pixscale': 0.1, 'size': 10, 'wcs': None}
+PLINE = {'kernel': 'point', 'pixfrac': 0.2, 'pixscale': 0.1, 'size': 8, 'wcs': None}
 
-def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.001, 0.0002], group_name='grism', fit_stacks=True, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=3, fit_beams=True):
+# IGM from eazy-py
+try:
+    import eazy.igm
+    IGM = eazy.igm.Inoue14()
+except:
+    IGM = None
+
+
+def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], group_name='grism', fit_stacks=True, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=3, fit_beams=True, root=''):
     """Run the full procedure
     
     1) Load MultiBeam and stack files 
@@ -30,8 +38,8 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.001, 0.0002],
     from grizli.stack import StackFitter
     from grizli.multifit import MultiBeam
     
-    mb_files = glob.glob('*{0:05d}.beams.fits'.format(id))
-    st_files = glob.glob('*{0:05d}.stack.fits'.format(id))
+    mb_files = glob.glob('{0}*{1:05d}.beams.fits'.format(root, id))
+    st_files = glob.glob('{0}*{1:05d}.stack.fits'.format(root, id))
     
     st = StackFitter(st_files, fit_stacks=fit_stacks, group_name=group_name, fcontam=fcontam)
     
@@ -54,7 +62,9 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.001, 0.0002],
     # Zoom-in fit with individual beams
     if fit_beams:
         z0 = fit.meta['Z50'][0]
-        width = np.maximum(3*fit.meta['ZWIDTH1'][0], 3*0.001*(1+z0))
+        #width = np.maximum(3*fit.meta['ZWIDTH1'][0], 3*0.001*(1+z0))
+        width = 5*0.001*(1+z0)
+        
         mb_zr = z0 + width*np.array([-1,1])
         mb_fit = mb.xfit_redshift(templates=t0, zr=mb_zr, dz=[0.001, 0.0002], prior=prior) 
         mb_fit_hdu = pyfits.table_to_hdu(mb_fit)
@@ -86,7 +96,6 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.001, 0.0002],
     # Add stack fit to the existing plot
     fig.axes[0].plot(fit['zgrid'], np.log10(fit['pdf']), color='0.5', alpha=0.5)
     fig.axes[0].set_xlim(fit['zgrid'].min(), fit['zgrid'].max())
-    fig.savefig('{0}_{1:05d}.full.png'.format(group_name, id))
     
     if not fit_stacks:
         stx = StackFitter(st_files, fit_stacks=True, group_name=group_name, fcontam=fcontam)
@@ -127,7 +136,10 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.001, 0.0002],
         # Plot
         axc.errorbar(w[clip], fl[clip], er[clip], color=GRISM_COLORS[grism], alpha=f_alpha, marker='.', linestyle='None', zorder=1)
         #axc.plot(w[clip], flm[clip], color='r', alpha=f_alpha, linewidth=2, zorder=10)
-            
+    
+    # Save the figure
+    fig.savefig('{0}_{1:05d}.full.png'.format(group_name, id))
+    
     # Make the line maps
     if pline is None:
          pzfit, pspec2, pline = grizli.multifit.get_redshift_fit_defaults()
@@ -319,16 +331,14 @@ class GroupFitter(object):
                         
         for i, t in enumerate(templates):
             ti = templates[t]
-            try:
-                import eazy.igm
-                if z > 5:
-                    igm = eazy.igm.Inoue14()
-                    igmz = igm.full_IGM(z, ti.wave*(1+z))         
-                else:
+            if z > 4:
+                if IGM is None:
                     igmz = 1.
-            except:
+                else:
+                    igmz = IGM.full_IGM(z, ti.wave*(1+z))         
+            else:
                 igmz = 1.
-
+                
             s = [ti.wave*(1+z), ti.flux/(1+z)*igmz]
             
             for j, beam in enumerate(self.beams):
@@ -601,7 +611,7 @@ class GroupFitter(object):
         
         # Interpolate pdf for more continuous measurement
         spl = scipy.interpolate.Akima1DInterpolator(fit['zgrid'], np.log(pdf), axis=1)
-        zfine = utils.log_zgrid(zr=[0.01,3.4], dz=0.0001)
+        zfine = utils.log_zgrid(zr=[fit['zgrid'].min(), fit['zgrid'].max()], dz=0.0001)
         ok = np.isfinite(spl(zfine))
         norm = np.trapz(np.exp(spl(zfine[ok])), zfine[ok])
         
