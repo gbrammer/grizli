@@ -27,11 +27,14 @@ except:
     IGM = None
 
 
-def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], group_name='grism', fit_stacks=True, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=3, fit_beams=True, root=''):
+def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter='nnls', group_name='grism', fit_stacks=True, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=3, fit_beams=True, root=''):
     """Run the full procedure
     
     1) Load MultiBeam and stack files 
     2) 
+    
+    fwhm=1200; zr=[0.65, 1.6]; dz=[0.004, 0.0002]; group_name='grism'; fit_stacks=True; prior=None; fcontam=0.2; mask_sn_limit=3; fit_beams=True; root=''
+    
     """
     import glob
     import grizli.multifit
@@ -55,7 +58,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
         t1 = grizli.utils.load_templates(line_complexes=False, fsps_templates=True, fwhm=fwhm)
         
     # Fit on stacked spectra
-    fit = st.xfit_redshift(templates=t0, zr=zr, dz=dz, prior=prior) 
+    fit = st.xfit_redshift(templates=t0, zr=zr, dz=dz, prior=prior, fitter=fitter) 
     fit_hdu = pyfits.table_to_hdu(fit)
     fit_hdu.header['EXTNAME'] = 'ZFIT_STACK'
     
@@ -66,14 +69,14 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
         width = 5*0.001*(1+z0)
         
         mb_zr = z0 + width*np.array([-1,1])
-        mb_fit = mb.xfit_redshift(templates=t0, zr=mb_zr, dz=[0.001, 0.0002], prior=prior) 
+        mb_fit = mb.xfit_redshift(templates=t0, zr=mb_zr, dz=[0.001, 0.0002], prior=prior, fitter=fitter) 
         mb_fit_hdu = pyfits.table_to_hdu(mb_fit)
         mb_fit_hdu.header['EXTNAME'] = 'ZFIT_BEAM'
     else:
         mb_fit = fit
         
     # Get best-fit template of beams
-    tfit = mb.template_at_z(z=mb_fit.meta['z_risk'][0], templates=t1, fit_background=True)
+    tfit = mb.template_at_z(z=mb_fit.meta['z_risk'][0], templates=t1, fit_background=True, fitter=fitter)
     tfit_sp = grizli.utils.GTable()
     for ik, key in enumerate(tfit['cfit']):
         tfit_sp.meta['CVAL{0:03d}'.format(ik)] = tfit['cfit'][key][0], 'Coefficient for {0}'.format(key)
@@ -118,10 +121,14 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
         
         # Some offset between drizzled and beam spectra, but can't shift
         # in the StackedSpectrum because redshift fit is about right
-        w -= np.abs(w[1]-w[0])
+        #w -= np.abs(w[1]-w[0])
         w = w/1.e4
              
         unit_corr = 1./sens
+        
+        # if 'DLAM0' in beam.header:
+        #     unit_corr *= beam.header['DLAM']/beam.header['DLAM0']
+            
         clip = (sens > 0.1*sens.max()) 
         clip &= (np.isfinite(fl)) & (er > 0)
         if clip.sum() == 0:
@@ -152,7 +159,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     line_hdu.insert(3, tfit_hdu)
     
     line_hdu.writeto('{0}_{1:05d}.full.fits'.format(group_name, id), clobber=True, output_verify='fix')
-    return line_hdu
+    return mb, st, fit, tfit, line_hdu
     
 def _loss(dz, gamma=0.15):
     """Risk / Loss function, Tanaka et al. (https://arxiv.org/abs/1704.05988)
@@ -176,12 +183,14 @@ class GroupFitter(object):
     def _test(self):
         print(self.Ngrism)
     
-    def _get_slices(self):
+    def _get_slices(self, masked=False):
         """Precompute array slices for how the individual components map into the single combined arrays.
         
         Parameters
         ----------
-        None 
+        masked : bool
+            Return indices of masked arrays rather than simple slices of the 
+            full beams.
         
         Returns
         -------
@@ -190,13 +199,35 @@ class GroupFitter(object):
         """
         x = 0
         slices = []
-        for i in range(self.N):
-            slices.append(slice(x+0, x+self.beams[i].size))
-            x += self.beams[i].size
+        # use masked index arrays rather than slices
+        if masked:
+            for i in range(self.N):
+                beam = self.beams[i]
+                if beam.fit_mask.sum() == 0:
+                    slices.append(None)
+                    continue
+                    
+                idx = np.arange(beam.fit_mask.sum())+x
+                slices.append(idx) #[slice(x+0, x+beam.size)][beam.fit_mask])
+                x = idx[-1]+1
+        else:    
+            for i in range(self.N):
+                slices.append(slice(x+0, x+self.beams[i].size))
+                x += self.beams[i].size
         
         return slices    
     
-    def _init_background(self):
+    def _update_beam_mask(self):
+        """
+        Compute versions of the masked arrays
+        """
+        for ib, b in enumerate(self.beams):
+            b.fit_mask &= self.fit_mask[self.slices[ib]]
+            
+        self.mslices = self._get_slices(masked=True)
+        self.Nmask = self.fit_mask.sum()       
+        
+    def _init_background(self, masked=True):
         """Initialize the (flat) background model components
         
         Parameters
@@ -208,10 +239,15 @@ class GroupFitter(object):
         A_bg : `~np.ndarray`
             
         """
-        A_bg = np.zeros((self.N, self.Ntot))
-        for i in range(self.N):
-            A_bg[i, self.slices[i]] = 1.
-        
+        if masked:
+            A_bg = np.zeros((self.N, self.Nmask))
+            for i in range(self.N):
+                A_bg[i, self.mslices[i]] = 1.
+        else:
+            A_bg = np.zeros((self.N, self.Ntot))
+            for i in range(self.N):
+                A_bg[i, self.slices[i]] = 1. 
+                           
         return A_bg
     
     def set_photometry(self, flam=[], eflam=[], filters=[], force=False, tempfilt=None):
@@ -229,7 +265,7 @@ class GroupFitter(object):
         if (len(flam) != len(eflam)) | (len(flam) != len(filters)):
             print('flam/eflam/filters dimensions don\'t match')
             return False
-            
+        
         self.photom_flam = flam
         self.photom_eflam = eflam
         self.photom_filters = filters
@@ -313,23 +349,33 @@ class GroupFitter(object):
         chi2 : float
             Chi-squared of the fit
         
-        background : `~np.ndarray`
-            Background model
-        
-        model2d : `~np.ndarray`
-            Best-fit 2D model.
-        
         coeffs, coeffs_err : `~np.ndarray`
             Template coefficients and uncertainties.
         
+        covariance : `~np.ndarray`
+            Full covariance
+            
         """
         import scipy.optimize
+        import scipy.sparse
         
         NTEMP = len(templates)
-        A = np.zeros((self.N+NTEMP, self.Ntot))
-        A[:self.N,:] += self.A_bg*fit_background
-                        
+        A = np.zeros((self.N+NTEMP, self.Nmask))
+        if fit_background:
+            A[:self.N,:] = self.A_bgm
+        
+        lower_bound = np.zeros(self.N+NTEMP)
+        lower_bound[:self.N] = -0.05
+        upper_bound = np.ones(self.N+NTEMP)*np.inf
+        upper_bound[:self.N] = 0.05
+        
+        # A = scipy.sparse.csr_matrix((self.N+NTEMP, self.Ntot))
+        # bg_sp = scipy.sparse.csc_matrix(self.A_bg)
+        
         for i, t in enumerate(templates):
+            if t.startswith('line'):
+                lower_bound[self.N+i] = -np.inf
+                
             ti = templates[t]
             if z > 4:
                 if IGM is None:
@@ -352,8 +398,8 @@ class GroupFitter(object):
                     (s[0].max() < lam_beam.min())):
                     continue
 
-                sl = self.slices[j]
-                A[self.N+i, sl] = beam.compute_model(spectrum_1d=s, in_place=False, is_cgs=True)
+                sl = self.mslices[j]
+                A[self.N+i, sl] = beam.compute_model(spectrum_1d=s, in_place=False, is_cgs=True)[beam.fit_mask]
                             
         if fit_background:
             if fitter == 'nnls':
@@ -362,25 +408,32 @@ class GroupFitter(object):
                 pedestal = 0.
         else:
             pedestal = 0
-                    
+        
         # Photometry
         if self.Nphot > 0:
             A_phot = self._interpolate_photometry(z=z, templates=templates)
             A = np.hstack((A, A_phot))
             
-        oktemp = (A*self.fit_mask).sum(axis=1) != 0
+        #oktemp = (A*self.fit_mask).sum(axis=1) != 0
+        oktemp = A.sum(axis=1) != 0
         
         # Weight design matrix and data by 1/sigma
-        Ax = A[oktemp,:]*self.sivarf        
-        AxT = Ax[:,self.fit_mask].T
+        Ax = A[oktemp,:]*self.sivarf[self.fit_mask]        
+        #AxT = Ax[:,self.fit_mask].T
+        AxT = Ax.T
+        
         data = ((self.scif+pedestal*self.is_spec)*self.sivarf)[self.fit_mask]
         
         # Run the minimization
         if fitter == 'nnls':
             coeffs_i, rnorm = scipy.optimize.nnls(AxT, data)            
-        else:
+        elif fitter == 'lstsq':
             coeffs_i, residuals, rank, s = np.linalg.lstsq(AxT, data)
-       
+        else:
+            # Bounded Least Squares
+            lsq_out = scipy.optimize.lsq_linear(AxT, data, bounds=(lower_bound[oktemp], upper_bound[oktemp]), method='bvls', tol=1.e-8)
+            coeffs_i = lsq_out.x
+            
         # Compute background array         
         if fit_background:
             background = np.dot(coeffs_i[:self.N], A[:self.N,:]) - pedestal
@@ -390,11 +443,12 @@ class GroupFitter(object):
             background = self.scif*0.
         
         # Full model
-        model2d = np.dot(coeffs_i[self.N:], Ax[self.N:,:]/self.sivarf)
+        model = np.dot(coeffs_i[self.N:], Ax[self.N:,:]/self.sivarf[self.fit_mask])
         
         # Residuals and Chi-squared
-        resid = self.scif - model2d - background
-        chi2 = np.sum(resid[self.fit_mask]**2*self.sivarf[self.fit_mask]**2)
+        resid = self.scif[self.fit_mask] - model - background
+        #chi2 = np.sum(resid[self.fit_mask]**2*self.sivarf[self.fit_mask]**2)
+        chi2 = np.sum(resid**2*self.sivarf[self.fit_mask]**2)
         
         # Uncertainties from covariance matrix
         if get_uncertainties:
@@ -416,8 +470,9 @@ class GroupFitter(object):
 
         coeffs_err = covard #np.zeros(NTEMP)
         #full_coeffs_err[oktemp[self.N:]] = covard[self.N:]
+        del(A); del(Ax); del(AxT)
         
-        return chi2, background, model2d, coeffs, coeffs_err, covar
+        return chi2, coeffs, coeffs_err, covar
     
     def xfit_redshift(self, prior=None, fwhm=1200,
                      make_figure=True, zr=[0.65, 1.6], dz=[0.005, 0.0004],
@@ -441,16 +496,17 @@ class GroupFitter(object):
         
         #### Polynomial SED fit
         wpoly = np.arange(1000,5.e4,1000)
-        tpoly = utils.polynomial_templates(wpoly, line=True)
+        #tpoly = utils.polynomial_templates(wpoly, line=True)
+        tpoly = utils.polynomial_templates(wpoly, order=1, line=False)
         out = self.xfit_at_z(z=0., templates=tpoly, fitter='nnls',
                             fit_background=True)
         
-        chi2_poly, b, m2, coeffs_poly, c, cov = out
+        chi2_poly, coeffs_poly, c, cov = out
 
         # tpoly = utils.polynomial_templates(wpoly, order=3)
         # out = self.xfit_at_z(z=0., templates=tpoly, fitter='lstsq',
         #                     fit_background=True)          
-        # chi2_poly, b, m2, coeffs_poly, c, cov = out
+        # chi2_poly, coeffs_poly, c, cov = out
 
         # if True:
         #     cp, lp = utils.dot_templates(coeffs_poly[self.N:], tpoly)
@@ -468,7 +524,7 @@ class GroupFitter(object):
                             fit_background=fit_background, 
                             get_uncertainties=True)
                             
-        chi2, background, model2d, coeffs, coeffs_err, covar = out
+        chi2, coeffs, coeffs_err, covar = out
         
         chi2 = np.zeros(NZ)
         coeffs = np.zeros((NZ, coeffs.shape[0]))
@@ -481,7 +537,7 @@ class GroupFitter(object):
                                 fitter=fitter, fit_background=fit_background,
                                 get_uncertainties=True)
             
-            chi2[i], background, model2d, coeffs[i,:], coeffs_err, covar[i,:,:] = out
+            chi2[i], coeffs[i,:], coeffs_err, covar[i,:,:] = out
             if chi2[i] < chi2min:
                 iz = i
                 chi2min = chi2[i]
@@ -540,7 +596,7 @@ class GroupFitter(object):
                                     fit_background=fit_background,
                                     get_uncertainties=True)
 
-                chi2_zoom[i], b, m2, coeffs_zoom[i,:], e, covar_zoom[i,:,:] = out
+                chi2_zoom[i], coeffs_zoom[i,:], e, covar_zoom[i,:,:] = out
                 #A, coeffs_zoom[i,:], chi2_zoom[i], model_2d = out
                 if chi2_zoom[i] < chi2min:
                     chi2min = chi2_zoom[i]
@@ -660,7 +716,7 @@ class GroupFitter(object):
                              fit_background=fit_background,
                              get_uncertainties=True)
 
-        chi2, modelBG, model2D, coeffs, coeffs_err, covar = out
+        chi2, coeffs, coeffs_err, covar = out
         cont1d, line1d = utils.dot_templates(coeffs[self.N:], templates, z=z)
 
         # Parse template coeffs
