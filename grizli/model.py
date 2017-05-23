@@ -986,7 +986,9 @@ class ImageData(object):
             
         self.instrument = instrument
         self.header = header
-        
+        if 'ISCUTOUT' in self.header:
+            self.is_slice = self.header['ISCUTOUT']
+            
         self.header['EXPTIME'] = self.exptime
         
         self.photflam = photflam
@@ -1103,6 +1105,15 @@ class ImageData(object):
                 
             except:
                 self.wcs = pywcs.WCS(self.header, relax=True, fobj=fobj)
+            
+            # Object is a cutout
+            if self.is_slice:
+                slx = slice(self.origin[1], self.origin[1]+self.sh[1])
+                sly = slice(self.origin[0], self.origin[0]+self.sh[0])
+                
+                slice_wcs = self.wcs.slice((sly, slx))
+                slice_wcs.naxis1 = slice_wcs._naxis1 = self.sh[0]
+                slice_wcs.naxis2 = slice_wcs._naxis2 = self.sh[1]
                 
         else:
             fobj = None
@@ -3174,6 +3185,57 @@ class BeamCutout(object):
         
         return hdu, wcs
     
+    def full_2d_wcs(self, data=None):
+        """Get simplified WCS of the 2D spectrum
+        
+        Parameters
+        ----------
+        data : array-like
+            Put this data in the output HDU rather than empty zeros
+        
+        Returns
+        -------
+        hdu : `~astropy.io.fits.ImageHDU`
+            Image HDU with header and data properties.
+        
+        wcs : `~astropy.wcs.WCS`
+            WCS appropriate for the 2D spectrum with spatial (y) and spectral
+            (x) axes.
+            
+            .. note:: 
+                Assumes linear dispersion and trace functions!
+            
+        """
+        h = pyfits.Header()
+        h['CRPIX1'] = self.beam.sh_beam[0]/2 - self.beam.xcenter
+        h['CRPIX2'] = self.beam.sh_beam[0]/2 - self.beam.ycenter
+        h['CRVAL1'] = self.beam.lam_beam[0]        
+        h['CD1_1'] = self.beam.lam_beam[1] - self.beam.lam_beam[0]
+        h['CD1_2'] = 0.
+        
+        h['CRVAL2'] = -1*self.beam.ytrace_beam[0]
+        h['CD2_2'] = 1.
+        h['CD2_1'] = -(self.beam.ytrace_beam[1] - self.beam.ytrace_beam[0])
+        
+        h['CTYPE1'] = 'WAVE'
+        h['CTYPE2'] = 'LINEAR'
+        
+        wcs_header = grizli.utils.to_header(self.grism.wcs)
+        
+        x = np.arange(len(self.beam.lam_beam))
+        c = np.polyfit(x, self.beam.lam_beam, 2)
+        
+        if data is None:
+            data = np.zeros(self.beam.sh_beam, dtype=np.float32)
+        
+        hdu = pyfits.ImageHDU(data=data, header=h)
+        wcs = pywcs.WCS(hdu.header)
+        
+        #wcs.pscale = np.sqrt(wcs.wcs.cd[0,0]**2 + wcs.wcs.cd[1,0]**2)*3600.
+        wcs.pscale = utils.get_wcs_pscale(wcs)
+        
+        return hdu, wcs
+        
     def get_sky_coords(self):
         """Get WCS coordinates of the center of the direct image
         

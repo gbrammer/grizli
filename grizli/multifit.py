@@ -975,16 +975,22 @@ class MultiBeam(GroupFitter):
         
         self.weight = np.exp(-(self.fcontam*np.abs(self.contamf)*np.sqrt(self.ivarf)))
         self.DoF = int((self.weight*self.fit_mask).sum())
+        self.Nmask = np.sum([b.fit_mask.sum() for b in self.beams])
         
         ### Initialize background fit array
-        self.A_bg = np.zeros((self.N, self.Ntot))
-        i0 = 0
-        for i in range(self.N):
-            self.A_bg[i, i0:i0+self.Nflat[i]] = 1.
-            i0 += self.Nflat[i]
+        # self.A_bg = np.zeros((self.N, self.Ntot))
+        # i0 = 0
+        # for i in range(self.N):
+        #     self.A_bg[i, i0:i0+self.Nflat[i]] = 1.
+        #     i0 += self.Nflat[i]
+        
+        self.slices = self._get_slices(masked=False)
+        self.A_bg = self._init_background(masked=False)
+        
+        self._update_beam_mask()
+        self.A_bgm = self._init_background(masked=True)
         
         self.init_poly_coeffs(poly_order=1)
-        self.slices = self._get_slices()
         
         self.ra, self.dec = self.beams[0].get_sky_coords()
     
@@ -2468,7 +2474,18 @@ class MultiBeam(GroupFitter):
         keys.sort()
                 
         if zfit is not None:
-            bg = zfit['coeffs_full'][:self.N]
+            if 'coeffs_full' in zfit:
+                bg = zfit['coeffs_full'][:self.N]
+                z_cont = zfit['zbest']
+            else:
+                # fitting.GroupFitter
+                z_cont = zfit['z']
+                bg = []
+                for k in zfit['cfit']:
+                    if k.startswith('bg '):
+                        bg.append(zfit['cfit'][k][0])
+                
+                bg = np.array(bg)
         else:
             # Fit background
             try:
@@ -2528,6 +2545,9 @@ class MultiBeam(GroupFitter):
                 hdu[0].header['ISFLAM'] = (flambda, 'Pixels in f-lam units')
                 hdu[0].header['CONF'] = (beams[0].beam.conf.conf_file,
                                          'Configuration file')
+                                         
+                hdu[0].header['DLAM0'] = (np.median(np.diff(beams[0].wave)),
+                                         'Native dispersion per pix')
                 
                 ## Contam
                 data = [beam.contam for beam in beams]
@@ -2567,7 +2587,7 @@ class MultiBeam(GroupFitter):
                 hdu_model[1].header['EXTNAME'] = 'MODEL'
                 if zfit is not None:
                     hdu_model[1].header['CONTIN1D'] = (True, 'Model is fit continuum')
-                    hdu_model[1].header['REDSHIFT'] = (zfit['zbest'], 'Redshift of the continuum spectrum')
+                    hdu_model[1].header['REDSHIFT'] = (z_cont, 'Redshift of the continuum spectrum')
                 else:
                     hdu_model[1].header['CONTIN1D'] = (False, 'Model is fit continuum')
                 hdu.append(hdu_model[1])
@@ -2627,7 +2647,9 @@ class MultiBeam(GroupFitter):
             hdu[0].header['ISFLAM'] = (flambda, 'Pixels in f-lam units')
             hdu[0].header['CONF'] = (beams[0].beam.conf.conf_file,
                                      'Configuration file')
-            
+            hdu[0].header['DLAM0'] = (np.median(np.diff(beams[0].wave)),
+                                     'Native dispersion per pix')
+                                     
             ## Full continuum model
             if zfit is not None:
                 m = zfit['cont1d']
@@ -2651,7 +2673,7 @@ class MultiBeam(GroupFitter):
             hdu_model[1].header['EXTNAME'] = 'MODEL'
             if zfit is not None:
                 hdu_model[1].header['CONTIN1D'] = (True, 'Model is fit continuum')
-                hdu_model[1].header['REDSHIFT'] = (zfit['zbest'], 'Redshift of the continuum spectrum')
+                hdu_model[1].header['REDSHIFT'] = (z_cont, 'Redshift of the continuum spectrum')
             else:
                 hdu_model[1].header['CONTIN1D'] = (False, 'Model is fit continuum')
                 

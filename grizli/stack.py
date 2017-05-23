@@ -196,10 +196,14 @@ class StackFitter(GroupFitter):
         self.fit_mask &= self.ivarf > min_ivar*self.ivarf.max()
                 
         self.DoF = int((self.fit_mask*self.weightf).sum())
+        #self.Nmask = self.fit_mask.sum()
+        self.Nmask = np.sum([E.fit_mask.sum() for E in self.beams])
         
-        self.slices = self._get_slices()
-        
-        self.A_bg = self._init_background()
+        self.slices = self._get_slices(masked=False)
+        self.A_bg = self._init_background(masked=False)
+
+        self._update_beam_mask()
+        self.A_bgm = self._init_background(masked=True)
         
         ## Photometry
         self.is_spec = 1
@@ -1191,7 +1195,15 @@ class StackedSpectrum(object):
                                     self.conf.sens['A']['WAVELENGTH'],
                                     self.conf.sens['A']['SENSITIVITY'])
             
-            self.sens = sens*np.median(np.diff(self.wave)) #*1.e-17
+            if 'DLAM0' in self.header:
+                #print('xx Header')
+                dlam = self.header['DLAM0']
+            else:
+                dlam = np.median(np.diff(self.wave))
+            
+            dlam = np.median(np.diff(self.wave))
+            
+            self.sens = sens*dlam #*1.e-17
             self.fit_data = (self.fit_data.T*self.sens).T
             
     def compute_model(self, spectrum_1d=None, is_cgs=None, in_place=False):
