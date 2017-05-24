@@ -2094,7 +2094,7 @@ class MultiBeam(GroupFitter):
         
         for line in line_flux_dict:
             line_flux, line_err = line_flux_dict[line]
-            if line_flux == 0:
+            if line_err == 0:
                 continue
 
             if (line_flux/line_err > 7) | (line in force_line):
@@ -2208,10 +2208,18 @@ class MultiBeam(GroupFitter):
         if len(hdu_full) > 0:
             hdu_full[0].header['HASLINES'] = (' '.join(saved_lines), 
                                               'Lines in this file')
-
-            if save_fits:
-                hdu_full.writeto('{0}_{1:05d}.line.fits'.format(self.group_name, self.id),
-                                 clobber=True, output_verify='silentfix')
+        else:
+            hdu = drizzle_to_wavelength(self.beams, ra=self.ra, 
+                                        dec=self.dec, 
+                                        wave=np.median(self.beams[0].wave),
+                                        fcontam=self.fcontam,
+                                        **pline)
+            hdu_full = hdu[:3]
+            hdu_full[0].header['NUMLINES'] = 0
+            hdu_full[0].header['HASLINES'] = ' '
+                                        
+        if save_fits:
+            hdu_full.writeto('{0}_{1:05d}.line.fits'.format(self.group_name, self.id), clobber=True, output_verify='silentfix')
         
         return hdu_full
         
@@ -2389,7 +2397,7 @@ class MultiBeam(GroupFitter):
             
         return fit, fig, fig2, hdu2, hdu_full
     
-    def fit_trace_shift(self, split_groups=True, max_shift=5, tol=1.e-2):
+    def fit_trace_shift(self, split_groups=True, max_shift=5, tol=1.e-2, verbose=True):
         """TBD
         """
         import scipy.optimize
@@ -2407,7 +2415,7 @@ class MultiBeam(GroupFitter):
         shifts = np.zeros(len(indices))
         bounds = np.array([[-max_shift,max_shift]]*len(indices))
         
-        args = (self, indices, 0)
+        args = (self, indices, 0, verbose)
         out = scipy.optimize.minimize(self.eval_trace_shift, shifts, bounds=bounds, args=args, method='Powell', tol=tol)
         
         self.eval_trace_shift(out.x, *args)
@@ -2420,7 +2428,7 @@ class MultiBeam(GroupFitter):
         return out.x
         
     @staticmethod
-    def eval_trace_shift(shifts, self, indices, poly_order):
+    def eval_trace_shift(shifts, self, indices, poly_order, verbose):
         """TBD
         """
         for il, l in enumerate(indices):
@@ -2447,7 +2455,9 @@ class MultiBeam(GroupFitter):
         modelf = np.dot(out_coeffs, A)
         chi2 = np.sum(((self.scif - modelf)**2*self.ivarf)[self.fit_mask])
 
-        print(shifts, chi2/self.DoF)
+        if verbose:
+            print(shifts, chi2/self.DoF)
+        
         return chi2/self.DoF    
     
     def drizzle_grisms_and_PAs(self, size=10, fcontam=0, flambda=True, scale=1, pixfrac=0.5, kernel='square', make_figure=True, usewcs=False, zfit=None, diff=True):
@@ -2596,7 +2606,13 @@ class MultiBeam(GroupFitter):
                 if not usewcs:
                     h = hdu[1].header
                     #gau = S.GaussianSource(1.e-17, h['CRVAL1'], h['CD1_1']*1)
-                    gau = S.GaussianSource(1., h['CRVAL1'], h['CD1_1']*1)
+                    
+                    # header keywords scaled to um
+                    toA = 1.e4
+                    #toA = 1.
+                    
+                    gau = S.GaussianSource(1., h['CRVAL1']*toA, h['CD1_1']*toA)
+                    #print('XXX', h['CRVAL1'], h['CD1_1'], h['CRPIX1'], toA, gau.wave[np.argmax(gau.flux)])
                     for beam in beams:
                         beam.compute_model(spectrum_1d=[gau.wave, gau.flux],
                                            is_cgs=True)
@@ -2614,6 +2630,7 @@ class MultiBeam(GroupFitter):
                                               ds9=None)
                 
                     kern = h_kern[1].data[:,h['CRPIX1']-1-size:h['CRPIX1']-1+size]
+                    #print('XXX', kern.max(), h_kern[1].data.max())
                     hdu_kern = pyfits.ImageHDU(data=kern, header=h_kern[1].header, name='KERNEL')
                     hdu.append(hdu_kern)
                 else:
@@ -2682,7 +2699,8 @@ class MultiBeam(GroupFitter):
             ## Full kernel
             h = hdu[1].header
             #gau = S.GaussianSource(1.e-17, h['CRVAL1'], h['CD1_1']*1)
-            gau = S.GaussianSource(1., h['CRVAL1'], h['CD1_1']*1)
+            toA = 1.e4
+            gau = S.GaussianSource(1., h['CRVAL1']*toA, h['CD1_1']*toA)
             for beam in all_beams:
                 beam.compute_model(spectrum_1d=[gau.wave, gau.flux],
                                    is_cgs=True)
@@ -2797,7 +2815,7 @@ def drizzle_2d_spectrum(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
     
     NX = int(np.round(np.diff(wlimit)[0]*1.e4/dlam)) // 2
     center = np.mean(wlimit[:2])*1.e4
-    out_header, output_wcs = utils.make_spectrum_wcsheader(center_wave=center,
+    out_header, output_wcs = utils.full_spectrum_wcsheader(center_wave=center,
                                  dlam=dlam, NX=NX, 
                                  spatial_scale=spatial_scale, NY=NY)
                                  
@@ -2820,7 +2838,7 @@ def drizzle_2d_spectrum(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
             
     for i, beam in enumerate(beams):
         ## Get specific WCS for each beam
-        beam_header, beam_wcs = beam.get_2d_wcs()
+        beam_header, beam_wcs = beam.full_2d_wcs()
         
         # Downweight contamination
         # wht = 1/beam.ivar + (fcontam*beam.contam)**2

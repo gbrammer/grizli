@@ -967,7 +967,15 @@ class ImageData(object):
                 self.mdrizsky = header['MDRIZSKY']
             else:
                 self.mdrizsky = 0.
-                     
+            
+            if 'CPDIS1' in header:
+                if 'Lookup' in header['CPDIS1']:
+                    self.wcs_is_lookup = True
+                else:
+                    self.wcs_is_lookup = False
+            else:
+                self.wcs_is_lookup = False
+                
         self.is_slice = False
         
         ### Array parameters
@@ -1097,39 +1105,47 @@ class ImageData(object):
             
             try:
                 import stwcs
-                ext = self.header['EXTVER']
+                if 'CCDCHIP' in self.header:
+                    ext = {1:2,2:1}[self.header['CCDCHIP']]
+                else:
+                    ext = self.header['EXTVER']
+                
                 #print(self.parent_file, 'Extension: {0}'.format(ext))
-                self.wcs = stwcs.wcsutil.hstwcs.HSTWCS(fobj=fobj, ext=('SCI',ext))
+                wcs = stwcs.wcsutil.hstwcs.HSTWCS(fobj=fobj, ext=('SCI',ext))
                 if self.pad > 0:
-                    self.wcs = self.add_padding_to_wcs(self.wcs, pad=self.pad)
+                    wcs = self.add_padding_to_wcs(wcs, pad=self.pad)
                 
             except:
-                self.wcs = pywcs.WCS(self.header, relax=True, fobj=fobj)
+                wcs = pywcs.WCS(self.header, relax=True, fobj=fobj)
             
             # Object is a cutout
             if self.is_slice:
                 slx = slice(self.origin[1], self.origin[1]+self.sh[1])
                 sly = slice(self.origin[0], self.origin[0]+self.sh[0])
                 
-                slice_wcs = self.wcs.slice((sly, slx))
-                slice_wcs.naxis1 = slice_wcs._naxis1 = self.sh[0]
-                slice_wcs.naxis2 = slice_wcs._naxis2 = self.sh[1]
+                wcs = self.get_slice_wcs(wcs, slx=slx, sly=sly)
+                # slice_wcs = wcs.slice((sly, slx))
+                # slice_wcs.naxis1 = slice_wcs._naxis1 = self.sh[0]
+                # slice_wcs.naxis2 = slice_wcs._naxis2 = self.sh[1]
+                # wcs = slice_wcs
                 
         else:
             fobj = None
-            self.wcs = pywcs.WCS(self.header, relax=True, fobj=fobj)
+            wcs = pywcs.WCS(self.header, relax=True, fobj=fobj)
                     
-        if not hasattr(self.wcs, 'pscale'):
-            # self.wcs.pscale = np.sqrt(self.wcs.wcs.cd[0,0]**2 +
-            #                           self.wcs.wcs.cd[1,0]**2)*3600.
+        if not hasattr(wcs, 'pscale'):
+            # wcs.pscale = np.sqrt(wcs.wcs.cd[0,0]**2 +
+            #                           wcs.wcs.cd[1,0]**2)*3600.
             
             ### From stwcs.distortion.utils
-            # det = np.linalg.det(self.wcs.wcs.cd)
-            # self.wcs.pscale = np.sqrt(np.abs(det))*3600.
-            self.wcs.pscale = utils.get_wcs_pscale(self.wcs)
+            # det = np.linalg.det(wcs.wcs.cd)
+            # wcd.pscale = np.sqrt(np.abs(det))*3600.
+            wcs.pscale = utils.get_wcs_pscale(self.wcs)
             
             #print '%s, PSCALE: %.4f' %(self.parent_file, self.wcs.pscale)
-    
+        
+        self.wcs = wcs
+        
     @staticmethod
     def add_padding_to_wcs(wcs_in, pad=200):
         """Pad the appropriate WCS keywords"""
@@ -1386,6 +1402,35 @@ class ImageData(object):
         
         return blotted
     
+    @staticmethod
+    def get_slice_wcs(wcs, slx=slice(480,520), sly=slice(480,520)):
+        """TBD
+        """
+        NX = slx.stop - slx.start
+        NY = sly.stop - sly.start
+        
+        slice_wcs = wcs.slice((sly, slx))
+        slice_wcs.naxis1 = slice_wcs._naxis1 = NX
+        slice_wcs.naxis2 = slice_wcs._naxis2 = NY
+        
+        if hasattr(slice_wcs, 'sip'):
+            if slice_wcs.sip is not None:
+                for c in [0,1]:
+                    slice_wcs.sip.crpix[c] = slice_wcs.wcs.crpix[c]
+        
+        ACS_CRPIX = [4096/2,2048/2] # ACS
+        dx_crpix = slice_wcs.wcs.crpix[0] - ACS_CRPIX[0]
+        dy_crpix = slice_wcs.wcs.crpix[1] - ACS_CRPIX[1]
+        for ext in ['cpdis1','cpdis2','det2im1','det2im2']:
+            if hasattr(slice_wcs, ext):
+                wcs_ext = slice_wcs.__getattribute__(ext)
+                if wcs_ext is not None:
+                    wcs_ext.crval[0] += dx_crpix
+                    wcs_ext.crval[1] += dy_crpix
+                    slice_wcs.__setattr__(ext, wcs_ext)
+        
+        return slice_wcs
+        
     def get_slice(self, slx=slice(480,520), sly=slice(480,520), 
                  get_slice_header=True):
         """Return cutout version of the `ImageData` object
@@ -1424,9 +1469,10 @@ class ImageData(object):
         
         slice_origin = [self.origin[i] + origin[i] for i in range(2)]
         
-        slice_wcs = self.wcs.slice((sly, slx))
-        slice_wcs.naxis1 = slice_wcs._naxis1 = NX
-        slice_wcs.naxis2 = slice_wcs._naxis2 = NY
+        slice_wcs = self.get_slice_wcs(self.wcs, slx=slx, sly=sly)
+        # slice_wcs = self.wcs.slice((sly, slx))
+        #slice_wcs.naxis1 = slice_wcs._naxis1 = NX
+        #slice_wcs.naxis2 = slice_wcs._naxis2 = NY
         
         ### Getting the full header can be slow as there appears to 
         ### be substantial overhead with header.copy() and wcs.to_header()
@@ -1477,21 +1523,21 @@ class ImageData(object):
         slice_obj.sci_extn = self.sci_extn
         slice_obj.is_slice = True
         
-        if hasattr(slice_obj.wcs, 'sip'):
-            if slice_obj.wcs.sip is not None:
-                for c in [0,1]:
-                    slice_obj.wcs.sip.crpix[c] = slice_obj.wcs.wcs.crpix[c]
-        
-        ACS_CRPIX = [4096/2,2048/2] # ACS
-        dx_crpix = slice_obj.wcs.wcs.crpix[0] - ACS_CRPIX[0]
-        dy_crpix = slice_obj.wcs.wcs.crpix[1] - ACS_CRPIX[1]
-        for ext in ['cpdis1','cpdis2','det2im1','det2im2']:
-            if hasattr(slice_obj.wcs, ext):
-                wcs_ext = slice_obj.wcs.__getattribute__(ext)
-                if wcs_ext is not None:
-                    wcs_ext.crval[0] += dx_crpix
-                    wcs_ext.crval[1] += dy_crpix
-                    slice_obj.wcs.__setattr__(ext, wcs_ext)
+        # if hasattr(slice_obj.wcs, 'sip'):
+        #     if slice_obj.wcs.sip is not None:
+        #         for c in [0,1]:
+        #             slice_obj.wcs.sip.crpix[c] = slice_obj.wcs.wcs.crpix[c]
+        # 
+        # ACS_CRPIX = [4096/2,2048/2] # ACS
+        # dx_crpix = slice_obj.wcs.wcs.crpix[0] - ACS_CRPIX[0]
+        # dy_crpix = slice_obj.wcs.wcs.crpix[1] - ACS_CRPIX[1]
+        # for ext in ['cpdis1','cpdis2','det2im1','det2im2']:
+        #     if hasattr(slice_obj.wcs, ext):
+        #         wcs_ext = slice_obj.wcs.__getattribute__(ext)
+        #         if wcs_ext is not None:
+        #             wcs_ext.crval[0] += dx_crpix
+        #             wcs_ext.crval[1] += dy_crpix
+        #             slice_obj.wcs.__setattr__(ext, wcs_ext)
                            
         return slice_obj#, slx, sly
     
@@ -1526,7 +1572,8 @@ class ImageData(object):
         h['ISCUTOUT'] = self.is_slice, 'Arrays are sliced from larger image'
         h['ORIGINX'] = self.origin[1], 'Origin from parent image, x'
         h['ORIGINY'] = self.origin[0], 'Origin from parent image, y'
-        
+        h['PAD'] = (self.pad, 'Image padding used')
+
         hdu = []
         
         exptime_corr = 1.
@@ -3037,6 +3084,7 @@ class BeamCutout(object):
             for key in h0:
                 if key not in SKIP_KEYS:
                     hdu[1].header[key] = (h0[key], h0.comments[key])
+                    hdu['SCI',2].header[key] = (h0[key], h0.comments[key])
                 
         if get_hdu:
             return hdu
@@ -3186,7 +3234,7 @@ class BeamCutout(object):
         return hdu, wcs
     
     def full_2d_wcs(self, data=None):
-        """Get simplified WCS of the 2D spectrum
+        """Get trace WCS of the 2D spectrum
         
         Parameters
         ----------
@@ -3209,27 +3257,52 @@ class BeamCutout(object):
         h = pyfits.Header()
         h['CRPIX1'] = self.beam.sh_beam[0]/2 - self.beam.xcenter
         h['CRPIX2'] = self.beam.sh_beam[0]/2 - self.beam.ycenter
-        h['CRVAL1'] = self.beam.lam_beam[0]        
-        h['CD1_1'] = self.beam.lam_beam[1] - self.beam.lam_beam[0]
+        h['CRVAL1'] = self.beam.lam_beam[0]/1.e4        
+        h['CD1_1'] = (self.beam.lam_beam[1] - self.beam.lam_beam[0])/1.e4
         h['CD1_2'] = 0.
         
         h['CRVAL2'] = -1*self.beam.ytrace_beam[0]
         h['CD2_2'] = 1.
         h['CD2_1'] = -(self.beam.ytrace_beam[1] - self.beam.ytrace_beam[0])
         
-        h['CTYPE1'] = 'WAVE'
-        h['CTYPE2'] = 'LINEAR'
-        
-        wcs_header = grizli.utils.to_header(self.grism.wcs)
+        h['CTYPE1'] = 'RA---TAN-SIP'
+        h['CUNIT1'] = 'mas'
+        h['CTYPE2'] = 'DEC--TAN-SIP'
+        h['CUNIT2'] = 'mas'
+
+        #wcs_header = grizli.utils.to_header(self.grism.wcs)
         
         x = np.arange(len(self.beam.lam_beam))
-        c = np.polyfit(x, self.beam.lam_beam, 2)
+        c = np.polyfit(x, self.beam.lam_beam/1.e4, 2)
+        #c = np.polyfit((self.beam.lam_beam-self.beam.lam_beam[0])/1.e4, x/h['CD1_1'], 2)
+        
+        ct = np.polyfit(x, self.beam.ytrace_beam, 2)
+        
+        h['A_ORDER'] = 2
+        h['B_ORDER'] = 2
+        
+        h['A_0_2'] = 0.
+        h['A_1_2'] = 0.
+        h['A_2_2'] = 0.
+        h['A_2_1'] = 0.
+        h['A_2_0'] = c[0]/c[1]
+        h['CD1_1'] = c[1]
+        
+        h['B_0_2'] = 0.
+        h['B_1_2'] = 0.
+        h['B_2_2'] = 0.
+        h['B_2_1'] = 0.
+        h['B_2_0'] = ct[0]/ct[1]
         
         if data is None:
             data = np.zeros(self.beam.sh_beam, dtype=np.float32)
         
         hdu = pyfits.ImageHDU(data=data, header=h)
         wcs = pywcs.WCS(hdu.header)
+        
+        # xf = x + h['CRPIX1']-1
+        # coo = np.array([xf, xf*0])
+        # tr = wcs.all_pix2world(coo.T, 0)
         
         #wcs.pscale = np.sqrt(wcs.wcs.cd[0,0]**2 + wcs.wcs.cd[1,0]**2)*3600.
         wcs.pscale = utils.get_wcs_pscale(wcs)

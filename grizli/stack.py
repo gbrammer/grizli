@@ -1135,6 +1135,11 @@ class StackedSpectrum(object):
         Generate wavelength array from WCS keywords
         """
         w = (np.arange(h['NAXIS1'])+1-h['CRPIX1'])*h['CD1_1'] + h['CRVAL1']
+        
+        # Now header keywords scaled to microns
+        if w.max() < 3:
+            w *= 1.e4
+        
         return w
             
     def optimal_extract(self, data, bin=0, ivar=None, weight=None):
@@ -1201,7 +1206,8 @@ class StackedSpectrum(object):
             else:
                 dlam = np.median(np.diff(self.wave))
             
-            dlam = np.median(np.diff(self.wave))
+            #dlam = np.median(np.diff(self.wave))
+            dlam = np.gradient(self.wave)
             
             self.sens = sens*dlam #*1.e-17
             self.fit_data = (self.fit_data.T*self.sens).T

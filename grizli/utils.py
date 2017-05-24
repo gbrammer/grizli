@@ -1549,7 +1549,74 @@ def reproject_faster(input_hdu, output, pad=10, **kwargs):
     # Get the reprojection
     seg_i, fp_i = reproject.reproject_interp(sub_hdu, output, **kwargs)
     return seg_i.astype(sub_data.dtype), fp_i.astype(np.uint8)
-     
+
+def full_spectrum_wcsheader(center_wave=1.4e4, dlam=40, NX=100, spatial_scale=1, NY=10):
+    """Make a WCS header for a 2D spectrum
+    
+    Parameters
+    ----------
+    center_wave : float
+        Wavelength of the central pixel, in Anstroms
+        
+    dlam : float
+        Delta-wavelength per (x) pixel
+        
+    NX, NY : int
+        Number of x & y pixels. Output will have shape `(2*NY, 2*NX)`.
+        
+    spatial_scale : float
+        Spatial scale of the output, in units of the input pixels
+    
+    Returns
+    -------
+    header : `~astropy.io.fits.Header`
+        Output WCS header
+    
+    wcs : `~astropy.wcs.WCS`
+        Output WCS
+    
+    Examples
+    --------
+        
+        >>> from grizli.utils import make_spectrum_wcsheader
+        >>> h, wcs = make_spectrum_wcsheader()
+        >>> print(wcs)
+        WCS Keywords
+        Number of WCS axes: 2
+        CTYPE : 'WAVE'  'LINEAR'  
+        CRVAL : 14000.0  0.0  
+        CRPIX : 101.0  11.0  
+        CD1_1 CD1_2  : 40.0  0.0  
+        CD2_1 CD2_2  : 0.0  1.0  
+        NAXIS    : 200 20
+
+    """
+    
+    h = pyfits.ImageHDU(data=np.zeros((2*NY, 2*NX), dtype=np.float32))
+    
+    refh = h.header
+    refh['CRPIX1'] = NX+1
+    refh['CRPIX2'] = NY+1
+    refh['CRVAL1'] = center_wave/1.e4
+    refh['CD1_1'] = dlam/1.e4
+    refh['CD1_2'] = 0.
+    refh['CRVAL2'] = 0.
+    refh['CD2_2'] = spatial_scale
+    refh['CD2_1'] = 0.
+    refh['RADESYS'] = ''
+    
+    refh['CTYPE1'] = 'RA---TAN-SIP'
+    refh['CUNIT1'] = 'mas'
+    refh['CTYPE2'] = 'DEC--TAN-SIP'
+    refh['CUNIT2'] = 'mas'
+    
+    ref_wcs = pywcs.WCS(refh)
+    #ref_wcs.pscale = np.sqrt(ref_wcs.wcs.cd[0,0]**2 + ref_wcs.wcs.cd[1,0]**2)*3600.
+    
+    ref_wcs.pscale = get_wcs_pscale(ref_wcs)
+    
+    return refh, ref_wcs
+    
 def make_spectrum_wcsheader(center_wave=1.4e4, dlam=40, NX=100, spatial_scale=1, NY=10):
     """Make a WCS header for a 2D spectrum
     
