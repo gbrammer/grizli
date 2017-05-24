@@ -2087,6 +2087,12 @@ class MultiBeam(GroupFitter):
                     line_flux_dict[key.replace('line ','')] = fit['cfit'][key]
         
         # Compute continuum model
+        if 'cfit' in fit:
+            if 'bg {0:03d}'.format(self.N-1) in fit['cfit']:
+                for ib, beam in enumerate(self.beams):
+                    key = 'bg {0:03d}'.format(ib)
+                    self.beams[ib].background = fit['cfit'][key][0]
+                    
         cont = fit['cont1d']
         for beam in self.beams:
             beam.compute_model(spectrum_1d=[cont.wave, cont.flux],
@@ -3066,6 +3072,9 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
                 wcs_ext.crval[1] += dy_crpix
                         
         beam_data = beam.grism.data['SCI'] - beam.contam 
+        if hasattr(beam, 'background'):
+            beam_data -= beam.background
+            
         beam_continuum = beam.beam.model*1
         
         # Downweight contamination
