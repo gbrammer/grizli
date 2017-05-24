@@ -2821,6 +2821,8 @@ class BeamCutout(object):
         poly_order : int
             Order of the polynomial model
         """
+        self.background = 0.
+        
         if fits_file is not None:
             self.load_fits(fits_file, conf)
         else:
