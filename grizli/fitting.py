@@ -27,7 +27,7 @@ except:
     IGM = None
 
 
-def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter='nnls', group_name='grism', fit_stacks=True, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=3, fit_beams=True, root=''):
+def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter='nnls', group_name='grism', fit_stacks=True, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=3, fit_beams=True, root='', fit_trace_shift=False, phot=None):
     """Run the full procedure
     
     1) Load MultiBeam and stack files 
@@ -50,6 +50,18 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     if len(mb_files) > 1:
         for file in mb_files[1:]:
             mb.extend(MultiBeam(file, fcontam=fcontam, group_name=group_name))
+        
+    if fit_trace_shift:
+        b = mb.beams[0]
+        sn_lim = fit_trace_shift*1
+        if np.max((b.model/b.grism['ERR'])[b.fit_mask.reshape(b.sh)]) > sn_lim:
+            mb.fit_trace_shift(tol=1.e-3)
+        
+        shift = mb.fit_trace_shift(tol=1.e-3)
+    
+    if phot is not None:
+        st.set_photometry(**phot)
+        mb.set_photometry(**phot)
             
     if t0 is None:
         t0 = grizli.utils.load_templates(line_complexes=True, fsps_templates=True, fwhm=fwhm)
@@ -66,7 +78,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     if fit_beams:
         z0 = fit.meta['Z50'][0]
         #width = np.maximum(3*fit.meta['ZWIDTH1'][0], 3*0.001*(1+z0))
-        width = 5*0.001*(1+z0)
+        width = 20*0.001*(1+z0)
         
         mb_zr = z0 + width*np.array([-1,1])
         mb_fit = mb.xfit_redshift(templates=t0, zr=mb_zr, dz=[0.001, 0.0002], prior=prior, fitter=fitter) 
@@ -102,6 +114,8 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     
     if not fit_stacks:
         stx = StackFitter(st_files, fit_stacks=True, group_name=group_name, fcontam=fcontam)
+        if phot is not None:
+            stx.set_photometry(**phot)
     else:
         stx = st
 
@@ -121,7 +135,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
         
         # Some offset between drizzled and beam spectra, but can't shift
         # in the StackedSpectrum because redshift fit is about right
-        #w -= np.abs(w[1]-w[0])
+        w -= np.abs(w[1]-w[0])
         w = w/1.e4
              
         unit_corr = 1./sens
@@ -143,7 +157,10 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
         # Plot
         axc.errorbar(w[clip], fl[clip], er[clip], color=GRISM_COLORS[grism], alpha=f_alpha, marker='.', linestyle='None', zorder=1)
         #axc.plot(w[clip], flm[clip], color='r', alpha=f_alpha, linewidth=2, zorder=10)
-    
+        
+        if phot is not None:
+            axc.errorbar(mb.photom_pivot/1.e4, mb.photom_flam/1.e-19, mb.photom_eflam/1.e-19, marker='.', linestyle='None', color='k', alpha=0.5)
+            
     # Save the figure
     fig.savefig('{0}_{1:05d}.full.png'.format(group_name, id))
     
@@ -152,7 +169,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
          pzfit, pspec2, pline = grizli.multifit.get_redshift_fit_defaults()
     
     line_hdu = mb.drizzle_fit_lines(tfit, pline, force_line=['SIII','SII','Ha', 'OIII', 'Hb', 'OII'], save_fits=False, mask_lines=True, mask_sn_limit=mask_sn_limit)
-    
+        
     line_hdu.insert(1, fit_hdu)
     if fit_beams:
         line_hdu.insert(2, mb_fit_hdu)
@@ -257,8 +274,8 @@ class GroupFitter(object):
         if (self.Nphot > 0) & (not force):
             print('Photometry already set (Nphot={0})'.format(self.Nphot))
             return True
-            
-        self.Nphot = len(flam)
+        
+        self.Nphot = (eflam > 0).sum() #len(flam)
         if self.Nphot == 0:
             return True
         
@@ -272,11 +289,13 @@ class GroupFitter(object):
         
         self.sivarf = np.hstack((self.sivarf, 1/self.photom_eflam))
         self.fit_mask = np.hstack((self.fit_mask, eflam > 0))
+        self.Nmask = self.fit_mask.sum()       
+        
         self.scif = np.hstack((self.scif, flam))
         self.DoF = self.fit_mask.sum()
         
         self.is_spec = np.isfinite(self.scif)
-        self.is_spec[-self.Nphot:] = False
+        self.is_spec[-len(flam):] = False
         
         self.photom_pivot = np.array([filter.pivot() for filter in filters])
         
@@ -304,7 +323,8 @@ class GroupFitter(object):
         
         """
         NTEMP = len(templates)
-        A_phot = np.zeros((NTEMP+self.N, self.Nphot))
+        A_phot = np.zeros((NTEMP+self.N, len(self.photom_flam))) #self.Nphot))
+        mask = self.photom_eflam > 0
         
         if (self.tempfilt is not None):
             if (self.tempfilt.NTEMP == NTEMP):
@@ -312,14 +332,17 @@ class GroupFitter(object):
                 A_phot[self.N:,:] = self.tempfilt(z)
                 A_phot *= 3.e18/self.photom_pivot**2*(1+z)
                 A_phot[~np.isfinite(A_phot)] = 0
-                return A_phot
+                return A_phot[:,mask]
 
         for it, key in enumerate(templates):
             tz = templates[key].zscale(z, scalar=1)
             for ifilt, filt in enumerate(self.photom_filters):
                 A_phot[self.N+it, ifilt] = tz.integrate_filter(filt)*3.e18/self.photom_pivot[ifilt]**2#*(1+z)
-        
-        return A_phot
+            
+            # pl = plt.plot(tz.wave, tz.flux)
+            # plt.scatter(self.photom_pivot, A_phot[self.N+it,:], color=pl[0].get_color())
+            
+        return A_phot[:,mask]
         
     def xfit_at_z(self, z=0, templates=[], fitter='nnls', fit_background=True, get_uncertainties=False):
         """Fit the 2D spectra with a set of templates at a specified redshift.
@@ -362,7 +385,7 @@ class GroupFitter(object):
         NTEMP = len(templates)
         A = np.zeros((self.N+NTEMP, self.Nmask))
         if fit_background:
-            A[:self.N,:] = self.A_bgm
+            A[:self.N,:self.Nmask-self.Nphot] = self.A_bgm
         
         lower_bound = np.zeros(self.N+NTEMP)
         lower_bound[:self.N] = -0.05
@@ -412,7 +435,7 @@ class GroupFitter(object):
         # Photometry
         if self.Nphot > 0:
             A_phot = self._interpolate_photometry(z=z, templates=templates)
-            A = np.hstack((A, A_phot))
+            A[:,-self.Nphot:] = A_phot #np.hstack((A, A_phot))
             
         #oktemp = (A*self.fit_mask).sum(axis=1) != 0
         oktemp = A.sum(axis=1) != 0
