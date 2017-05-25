@@ -425,7 +425,7 @@ class GroupFitter(object):
                 A[self.N+i, sl] = beam.compute_model(spectrum_1d=s, in_place=False, is_cgs=True)[beam.fit_mask]
                             
         if fit_background:
-            if fitter == 'nnls':
+            if fitter in ['nnls', 'lstsq']:
                 pedestal = 0.04
             else:
                 pedestal = 0.
@@ -463,7 +463,7 @@ class GroupFitter(object):
             background[-self.Nphot:] = 0.
             coeffs_i[:self.N] -= pedestal
         else:
-            background = self.scif*0.
+            background = self.scif[self.fit_mask]*0.
         
         # Full model
         model = np.dot(coeffs_i[self.N:], Ax[self.N:,:]/self.sivarf[self.fit_mask])
@@ -480,14 +480,31 @@ class GroupFitter(object):
                 covar_i = np.matrix(np.dot(AxT.T, AxT)).I.A
                 covar = utils.fill_masked_covar(covar_i, oktemp)
                 covard = np.sqrt(covar.diagonal())
+                
+                # Compute covariances after masking templates with coeffs = 0
+                if get_uncertainties == 2:
+                    nonzero = coeffs_i != 0
+                    if nonzero.sum() > 0:
+                        AxTm = AxT[:,nonzero]
+                        #mcoeffs_i, rnorm = scipy.optimize.nnls(AxTm, data)            
+                        #mcoeffs_i[:self.N] -= pedestal
+
+                        mcovar_i = np.matrix(np.dot(AxTm.T, AxTm)).I.A
+                        mcovar = utils.fill_masked_covar(mcovar_i, nonzero)
+                        mcovar = utils.fill_masked_covar(mcovar, oktemp)
+                        mcovard = np.sqrt(mcovar.diagonal())
+                        
+                        covar = mcovar
+                        covard = mcovard
             except:
                 print('Except: covar!')
                 covar = np.zeros((self.N+NTEMP, self.N+NTEMP))
                 covard = np.zeros(self.N+NTEMP)#-1.
+                mcovard = covard
         else:
             covar = np.zeros((self.N+NTEMP, self.N+NTEMP))
             covard = np.zeros(self.N+NTEMP)#-1.
-        
+            
         coeffs = np.zeros(self.N+NTEMP)
         coeffs[oktemp] = coeffs_i #[self.N:]] = coeffs[self.N:]
 
@@ -502,7 +519,7 @@ class GroupFitter(object):
                      verbose=True, fit_background=True, fitter='nnls', 
                      delta_chi2_threshold=0.004, zoom=True, 
                      line_complexes=True, templates={}, figsize=[8,5],
-                     fsps_templates=False):
+                     fsps_templates=False, get_uncertainties=True):
         """TBD
         """
         from scipy import polyfit, polyval
@@ -519,12 +536,13 @@ class GroupFitter(object):
         
         #### Polynomial SED fit
         wpoly = np.arange(1000,5.e4,1000)
-        #tpoly = utils.polynomial_templates(wpoly, line=True)
-        tpoly = utils.polynomial_templates(wpoly, order=1, line=False)
+        tpoly = utils.polynomial_templates(wpoly, line=True)
+        #tpoly = utils.polynomial_templates(wpoly, order=5, line=False)
         out = self.xfit_at_z(z=0., templates=tpoly, fitter='nnls',
-                            fit_background=True)
+                            fit_background=True, get_uncertainties=False)
         
-        chi2_poly, coeffs_poly, c, cov = out
+        chi2_poly, coeffs_poly, err_poly, cov = out
+        #poly1d, xxx = utils.dot_templates(coeffs_poly[self.N:], tpoly, z=0)
 
         # tpoly = utils.polynomial_templates(wpoly, order=3)
         # out = self.xfit_at_z(z=0., templates=tpoly, fitter='lstsq',
@@ -545,7 +563,7 @@ class GroupFitter(object):
         
         out = self.xfit_at_z(z=0., templates=templates, fitter=fitter,
                             fit_background=fit_background, 
-                            get_uncertainties=True)
+                            get_uncertainties=get_uncertainties)
                             
         chi2, coeffs, coeffs_err, covar = out
         
@@ -558,7 +576,7 @@ class GroupFitter(object):
         for i in range(NZ):
             out = self.xfit_at_z(z=zgrid[i], templates=templates,
                                 fitter=fitter, fit_background=fit_background,
-                                get_uncertainties=True)
+                                get_uncertainties=get_uncertainties)
             
             chi2[i], coeffs[i,:], coeffs_err, covar[i,:,:] = out
             if chi2[i] < chi2min:
@@ -617,7 +635,7 @@ class GroupFitter(object):
                 out = self.xfit_at_z(z=zgrid_zoom[i], templates=templates,
                                     fitter=fitter,
                                     fit_background=fit_background,
-                                    get_uncertainties=True)
+                                    get_uncertainties=get_uncertainties)
 
                 chi2_zoom[i], coeffs_zoom[i,:], e, covar_zoom[i,:,:] = out
                 #A, coeffs_zoom[i,:], chi2_zoom[i], model_2d = out
@@ -729,7 +747,7 @@ class GroupFitter(object):
         fit.meta['gam_loss'] = 0.01, 'Gamma factor of the risk/loss function'
         return fit
                         
-    def template_at_z(self, z=0, templates=None, fit_background=True, fitter='nnls', fwhm=1400):
+    def template_at_z(self, z=0, templates=None, fit_background=True, fitter='nnls', fwhm=1400, get_uncertainties=2):
         """TBD
         """
         if templates is None:
@@ -737,7 +755,7 @@ class GroupFitter(object):
         
         out = self.xfit_at_z(z=z, templates=templates, fitter=fitter, 
                              fit_background=fit_background,
-                             get_uncertainties=True)
+                             get_uncertainties=get_uncertainties)
 
         chi2, coeffs, coeffs_err, covar = out
         cont1d, line1d = utils.dot_templates(coeffs[self.N:], templates, z=z)
