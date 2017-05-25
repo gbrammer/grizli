@@ -1140,7 +1140,7 @@ class ImageData(object):
             ### From stwcs.distortion.utils
             # det = np.linalg.det(wcs.wcs.cd)
             # wcd.pscale = np.sqrt(np.abs(det))*3600.
-            wcs.pscale = utils.get_wcs_pscale(self.wcs)
+            wcs.pscale = utils.get_wcs_pscale(wcs)
             
             #print '%s, PSCALE: %.4f' %(self.parent_file, self.wcs.pscale)
         

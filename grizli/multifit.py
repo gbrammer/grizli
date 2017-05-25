@@ -2466,7 +2466,7 @@ class MultiBeam(GroupFitter):
         
         return chi2/self.DoF    
     
-    def drizzle_grisms_and_PAs(self, size=10, fcontam=0, flambda=True, scale=1, pixfrac=0.5, kernel='square', make_figure=True, usewcs=False, zfit=None, diff=True):
+    def drizzle_grisms_and_PAs(self, size=10, fcontam=0, flambda=False, scale=1, pixfrac=0.5, kernel='square', make_figure=True, usewcs=False, zfit=None, diff=True):
         """Make figure showing spectra at different orients/grisms
         
         TBD
