@@ -3418,7 +3418,7 @@ class BeamCutout(object):
         
         for xi in xarr:
             yi = np.interp(xi, xbeam, self.beam.ytrace_beam)
-            li = np.interp(xi, xbeam, self.wave_beam) #+ lam_offset*np.diff(self.wave)[0]
+            li = np.interp(xi, xbeam, self.beam.lam_beam) #+ lam_offset*np.diff(self.wave)[0]
             si = np.interp(xi, xbeam, self.beam.sensitivity_beam)
             dx = xp_beam-self.psf_params[1]-xi
             dy = yp_beam-self.psf_params[2]-yi+yoff
@@ -3447,7 +3447,7 @@ class BeamCutout(object):
         self.A_psf = scipy.sparse.csr_matrix(np.array(A_psf).T)
         self.lam_psf = np.array(lam_psf)
                 
-    def compute_model_psf(self, id=None, spectrum_1d=None, in_place=True):
+    def compute_model_psf(self, id=None, spectrum_1d=None, in_place=True, is_cgs=True):
         if spectrum_1d is None:
             model = np.array(self.A_psf.sum(axis=1))
             model = model.reshape(self.beam.sh_beam)
