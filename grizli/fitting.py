@@ -14,7 +14,7 @@ import numpy as np
 import astropy.io.fits as pyfits
 
 from . import utils
-from .model import BeamCutout
+#from .model import BeamCutout
 from .utils import GRISM_COLORS
 
 PLINE = {'kernel': 'point', 'pixfrac': 0.2, 'pixscale': 0.1, 'size': 8, 'wcs': None}
@@ -802,7 +802,7 @@ class GroupFitter(object):
         import matplotlib.gridspec
         from matplotlib.ticker import MultipleLocator
         
-        import grizli
+        import grizli.model
         
         # Initialize plot window
         Ng = len(self.grisms)
@@ -844,7 +844,8 @@ class GroupFitter(object):
             beam = self.beams[i]
             m_i = beam.compute_model(spectrum_1d=sp, is_cgs=True, in_place=False).reshape(beam.sh)
             
-            if isinstance(beam, BeamCutout):
+            #if isinstance(beam, grizli.model.BeamCutout):
+            if hasattr(beam, 'compute_model_psf'): # grizli.model.BeamCutout
                 grism = beam.grism.filter
                 clean = beam.grism['SCI'] - beam.contam - tfit['cfit']['bg {0:03d}'.format(i)][0]
                 
