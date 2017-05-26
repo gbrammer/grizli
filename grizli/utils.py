@@ -1258,36 +1258,56 @@ def load_templates(fwhm=400, line_complexes=True, stars=False,
         
         # np.save('stars_bpgs.npy', [temp_list])
         
-        temp_list = np.load(os.path.join(os.getenv('GRIZLI'), 
-                                         'templates/stars.npy'))[0]
-        return temp_list
         
-    ## Intermediate and very old
-    # templates = ['templates/EAZY_v1.0_lines/eazy_v1.0_sed3_nolines.dat',  
-    #              'templates/cvd12_t11_solar_Chabrier.extend.skip10.dat']     
-    templates = ['eazy_intermediate.dat', 
-                 'cvd12_t11_solar_Chabrier.dat']
+        # tall = np.load(os.path.join(os.getenv('GRIZLI'), 
+        #                                  'templates/stars.npy'))[0]
+        # 
+        # return tall
+        # 
+        # temp_list = OrderedDict()
+        # for k in tall:
+        #     if k.startswith('uk'):
+        #         temp_list[k] = tall[k]
+        # 
+        # return temp_list
+        # 
+        # for t in 'MLT':
+        #     for k in tall:
+        #         if k.startswith('spex-prism-'+t):
+        #             temp_list[k] = tall[k]
+        #             
+        # return temp_list
+        
+        #return temp_list
+        templates = ['M6.5.txt', 'M8.0.txt', 'L1.0.txt', 'L3.5.txt', 'L6.0.txt', 'T2.0.txt', 'T6.0.txt', 'T7.5.txt']
+        templates = ['stars/'+t for t in templates]
+    else:
+        ## Intermediate and very old
+        # templates = ['templates/EAZY_v1.0_lines/eazy_v1.0_sed3_nolines.dat',  
+        #              'templates/cvd12_t11_solar_Chabrier.extend.skip10.dat']     
+        templates = ['eazy_intermediate.dat', 
+                     'cvd12_t11_solar_Chabrier.dat']
                  
-    ## Post starburst
-    #templates.append('templates/UltraVISTA/eazy_v1.1_sed9.dat')
-    templates.append('post_starburst.dat')
+        ## Post starburst
+        #templates.append('templates/UltraVISTA/eazy_v1.1_sed9.dat')
+        templates.append('post_starburst.dat')
     
-    ## Very blue continuum
-    #templates.append('templates/YoungSB/erb2010_continuum.dat')
-    templates.append('erb2010_continuum.dat')
+        ## Very blue continuum
+        #templates.append('templates/YoungSB/erb2010_continuum.dat')
+        templates.append('erb2010_continuum.dat')
     
-    ### Test new templates
-    # templates = ['templates/erb2010_continuum.dat',
-    # 'templates/fsps/tweak_fsps_temp_kc13_12_006.dat',
-    # 'templates/fsps/tweak_fsps_temp_kc13_12_008.dat']
+        ### Test new templates
+        # templates = ['templates/erb2010_continuum.dat',
+        # 'templates/fsps/tweak_fsps_temp_kc13_12_006.dat',
+        # 'templates/fsps/tweak_fsps_temp_kc13_12_008.dat']
     
-    if fsps_templates:
-        #templates = ['templates/fsps/tweak_fsps_temp_kc13_12_0{0:02d}.dat'.format(i+1) for i in range(12)]
-        templates = ['fsps/fsps_QSF_12_v3_nolines_0{0:02d}.dat'.format(i+1) for i in range(12)]
-        #templates = ['fsps/fsps_QSF_7_v3_nolines_0{0:02d}.dat'.format(i+1) for i in range(7)]
+        if fsps_templates:
+            #templates = ['templates/fsps/tweak_fsps_temp_kc13_12_0{0:02d}.dat'.format(i+1) for i in range(12)]
+            templates = ['fsps/fsps_QSF_12_v3_nolines_0{0:02d}.dat'.format(i+1) for i in range(12)]
+            #templates = ['fsps/fsps_QSF_7_v3_nolines_0{0:02d}.dat'.format(i+1) for i in range(7)]
     
-    if continuum_list is not None:
-        templates = continuum_list
+        if continuum_list is not None:
+            templates = continuum_list
         
     temp_list = OrderedDict()
     for temp in templates:
@@ -1299,6 +1319,9 @@ def load_templates(fwhm=400, line_complexes=True, stars=False,
                                            name=name)
         
         temp_list[name].name = name
+    
+    if stars:
+        return temp_list
         
     ### Emission lines:
     line_wavelengths, line_ratios = get_line_wavelengths()

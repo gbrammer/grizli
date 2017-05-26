@@ -1119,7 +1119,15 @@ class ImageData(object):
                 # already padded.
                 wcsfile = self.parent_file.replace('.fits', '.{0:02d}.wcs.fits'.format(ext))
                 fobj = pyfits.open(wcsfile)
+                fh = fobj[0].header
+                if fh['NAXIS'] == 0:
+                    fh['NAXIS'] = 2
+                    fh['NAXIS1'] = int(fh['CRPIX1']*2)
+                    fh['NAXIS2'] = int(fh['CRPIX2']*2)
+                    
                 wcs = stwcs.wcsutil.hstwcs.HSTWCS(fobj=fobj, ext=0)
+            
+            #print('XXX WCS',wcs)
                                         
             # Object is a cutout
             if self.is_slice:
@@ -2035,7 +2043,7 @@ class GrismFLT(object):
         
     def compute_model_orders(self, id=0, x=None, y=None, size=10, mag=-1,
                       spectrum_1d=None, is_cgs=False,
-                      compute_size=False, store=True, 
+                      compute_size=False, max_size=None, store=True, 
                       in_place=True, add=True, get_beams=None, verbose=True):
         """Compute dispersed spectrum for a given object id
         
@@ -2075,6 +2083,9 @@ class GrismFLT(object):
             segmentation polygon directly using 
             `utils_c.disperse.compute_segmentation_limits`.
         
+        max_size : int or None
+            Enforce a maximum size of the cutout when using `compute_size`.
+            
         store : bool
             If True, then store the computed beams in the OrderedDict
             `self.object_dispersers[id]`.  
@@ -2163,9 +2174,14 @@ class GrismFLT(object):
                     ## Enforce minimum size
                     size = np.maximum(size, 16)
                     size = np.maximum(size, 26)
+                    
+                    ## maximum size
+                    if max_size is not None:
+                        size = np.min([size, max_size])
+                        
                     ## Avoid problems at the array edges
                     size = np.min([size, int(x)-2, int(y)-2])
-                
+                    
                     if (size < 4):
                         return True
                     
@@ -2631,23 +2647,29 @@ class GrismFLT(object):
     def save_wcs(self, overwrite=True, verbose=True):
         """TBD
         """
-        hwcs = self.wcs.to_fits(relax=True)
-        hwcs[0].header['PAD'] = self.pad
-        
-        if 'CCDCHIP' in self.header:
-            ext = {1:2,2:1}[self.header['CCDCHIP']]
+        if self.direct.parent_file == self.grism.parent_file:
+            base_list = [self.grism]
         else:
-            ext = self.header['EXTVER']
+            base_list = [self.direct, self.grism]
+            
+        for base in base_list:
+            hwcs = base.wcs.to_fits(relax=True)
+            hwcs[0].header['PAD'] = base.pad
         
-        wcsfile = self.parent_file.replace('.fits', '.{0:02d}.wcs.fits'.format(ext))
+            if 'CCDCHIP' in base.header:
+                ext = {1:2,2:1}[base.header['CCDCHIP']]
+            else:
+                ext = base.header['EXTVER']
         
-        try:
-            hwcs.writeto(wcsfile, clobber=overwrite)
-        except:
-            hwcs.writeto(wcsfile, overwrite=overwrite)
+            wcsfile = base.parent_file.replace('.fits', '.{0:02d}.wcs.fits'.format(ext))
         
-        if verbose:
-            print(wcsfile)
+            try:
+                hwcs.writeto(wcsfile, clobber=overwrite)
+            except:
+                hwcs.writeto(wcsfile, overwrite=overwrite)
+        
+            if verbose:
+                print(wcsfile)
             
     def load_from_fits(self, save_file):
         """Load saved data from a FITS file

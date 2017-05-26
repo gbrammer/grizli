@@ -240,11 +240,15 @@ def _compute_model(i, flt, fit_info, store):
     """Helper function for computing model orders.
     """
     for id in fit_info:
-        status = flt.compute_model_orders(id=id, compute_size=True,
+        try:
+            status = flt.compute_model_orders(id=id, compute_size=True,
                           mag=fit_info[id]['mag'], in_place=True, store=store,
                           spectrum_1d = fit_info[id]['spec'], 
                           verbose=False)
-    
+        except:
+            print('Failed: {0} {1}'.format(flt.grism.parent_file, id))
+            continue
+            
     print('{0}: _compute_model Done'.format(flt.grism.parent_file))
         
     return i, flt.model, flt.object_dispersers
