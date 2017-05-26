@@ -278,10 +278,13 @@ class StackFitter(GroupFitter):
 
         self.fit_mask = np.hstack([E.fit_mask for E in self.beams])
         self.fit_mask &= self.ivarf > self.min_ivar*self.ivarf.max()
-                
-        self.DoF = int((self.fit_mask*self.weightf).sum())
         
         self.slices = self._get_slices()
+        self._update_beam_mask()
+        self.A_bgm = self._init_background(masked=True)
+                
+        self.Nmask = self.fit_mask.sum()        
+        self.DoF = int((self.fit_mask*self.weightf).sum())
         
         self.A_bg = self._init_background()
         
