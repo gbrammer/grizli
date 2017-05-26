@@ -1398,30 +1398,6 @@ def log_zgrid(zr=[0.7,3.4], dz=0.01):
     zgrid = np.exp(np.arange(np.log(1+zr[0]), np.log(1+zr[1]), dz))-1
     return zgrid
 
-### Deprecated
-# def zoom_zgrid(zgrid, chi2nu, threshold=0.01, factor=10, grow=7):
-#     """TBD
-#     """
-#     import scipy.ndimage as nd
-#     
-#     mask = (chi2nu-chi2nu.min()) < threshold
-#     if grow > 1:
-#         mask_grow = nd.maximum_filter(mask*1, size=grow)
-#         mask = mask_grow > 0
-#         
-#     if mask.sum() == 0:
-#         return []
-#     
-#     idx = np.arange(zgrid.shape[0])
-#     out_grid = []
-#     for i in idx[mask]:
-#         if i == idx[-1]:
-#             continue
-#             
-#         out_grid = np.append(out_grid, np.linspace(zgrid[i], zgrid[i+1], factor+2)[1:-1])
-#     
-#     return out_grid
-
 def get_wcs_pscale(wcs):
     """Get correct pscale from a `~astropy.wcs.WCS` object
     
@@ -1610,9 +1586,7 @@ def full_spectrum_wcsheader(center_wave=1.4e4, dlam=40, NX=100, spatial_scale=1,
     refh['CTYPE2'] = 'DEC--TAN-SIP'
     refh['CUNIT2'] = 'mas'
     
-    ref_wcs = pywcs.WCS(refh)
-    #ref_wcs.pscale = np.sqrt(ref_wcs.wcs.cd[0,0]**2 + ref_wcs.wcs.cd[1,0]**2)*3600.
-    
+    ref_wcs = pywcs.WCS(refh)    
     ref_wcs.pscale = get_wcs_pscale(ref_wcs)
     
     return refh, ref_wcs
