@@ -1143,7 +1143,7 @@ def show_drizzled_lines(line_hdu, full_line_list=['OII', 'Hb', 'OIII', 'Ha', 'SI
     
     NL = len(show_lines)
     
-    fig = plt.figure(figsize=[3*(NL+1),3])
+    fig = plt.figure(figsize=[3*(NL+1),3.4])
     
     # Direct
     ax = fig.add_subplot(1,NL+1,1)
@@ -1156,8 +1156,8 @@ def show_drizzled_lines(line_hdu, full_line_list=['OII', 'Hb', 'OIII', 'Ha', 'SI
     pix_size = np.abs(line_hdu['DSCI'].header['CD1_1']*3600)
     majorLocator = MultipleLocator(1./pix_size)
     N = line_hdu['DSCI'].data.shape[0]/2
-    ax.errorbar([N-0.5/pix_size], N-1.5/pix_size, yerr=0, xerr=0.5/pix_size, color='k')
-    ax.text(N-0.5/pix_size, N-1.5/pix_size, r'$1^{\prime\prime}$', ha='center', va='bottom', color='k')
+    ax.errorbar([N-0.5/pix_size], N-0.9*size_arcsec/pix_size, yerr=0, xerr=0.5/pix_size, color='k')
+    ax.text(N-0.5/pix_size, N-0.9*size_arcsec/pix_size, r'$1^{\prime\prime}$', ha='center', va='bottom', color='k')
 
     # Line maps
     for i, line in enumerate(show_lines):
@@ -1174,6 +1174,6 @@ def show_drizzled_lines(line_hdu, full_line_list=['OII', 'Hb', 'OIII', 'Ha', 'SI
         ax.xaxis.set_major_locator(majorLocator)
         ax.yaxis.set_major_locator(majorLocator)
 
-    fig.tight_layout(pad=0.5)
+    fig.tight_layout(pad=0.1, w_pad=0.5)
     return fig
 
