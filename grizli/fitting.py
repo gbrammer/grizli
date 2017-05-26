@@ -27,7 +27,7 @@ except:
     IGM = None
 
 
-def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter='nnls', group_name='grism', fit_stacks=True, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=3, fit_beams=True, root='', fit_trace_shift=False, phot=None):
+def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter='nnls', group_name='grism', fit_stacks=True, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=3, fit_beams=True, root='', fit_trace_shift=False, phot=None, verbose=True):
     """Run the full procedure
     
     1) Load MultiBeam and stack files 
@@ -55,9 +55,9 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
         b = mb.beams[0]
         sn_lim = fit_trace_shift*1
         if np.max((b.model/b.grism['ERR'])[b.fit_mask.reshape(b.sh)]) > sn_lim:
-            mb.fit_trace_shift(tol=1.e-3)
+            shift = mb.fit_trace_shift(tol=1.e-3, verbose=verbose)
         
-        shift = mb.fit_trace_shift(tol=1.e-3)
+            #shift = mb.fit_trace_shift(tol=1.e-3)
     
     if phot is not None:
         st.set_photometry(**phot)
@@ -70,7 +70,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
         t1 = grizli.utils.load_templates(line_complexes=False, fsps_templates=True, fwhm=fwhm)
         
     # Fit on stacked spectra
-    fit = st.xfit_redshift(templates=t0, zr=zr, dz=dz, prior=prior, fitter=fitter) 
+    fit = st.xfit_redshift(templates=t0, zr=zr, dz=dz, prior=prior, fitter=fitter, verbose=verbose) 
     fit_hdu = pyfits.table_to_hdu(fit)
     fit_hdu.header['EXTNAME'] = 'ZFIT_STACK'
     
@@ -81,7 +81,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
         width = 20*0.001*(1+z0)
         
         mb_zr = z0 + width*np.array([-1,1])
-        mb_fit = mb.xfit_redshift(templates=t0, zr=mb_zr, dz=[0.001, 0.0002], prior=prior, fitter=fitter) 
+        mb_fit = mb.xfit_redshift(templates=t0, zr=mb_zr, dz=[0.001, 0.0002], prior=prior, fitter=fitter, verbose=verbose) 
         mb_fit_hdu = pyfits.table_to_hdu(mb_fit)
         mb_fit_hdu.header['EXTNAME'] = 'ZFIT_BEAM'
     else:
@@ -989,4 +989,189 @@ class GroupFitter(object):
         fit_data['model1d'] = model1d
         fit_data['cont1d'] = cont1d
         fit_data['line1d'] = line1d
+    
+    def xfit_star(self, tstar=None):
+        """Fit stellar templates
+        """
+        import matplotlib.pyplot as plt
+        import matplotlib.gridspec
+        from matplotlib.ticker import MultipleLocator
+        
+        #self = grizli.multifit.MultiBeam('ers-grism_{0:05d}.beams.fits'.format(id), fcontam=0.2, psf=True)
+        #self.extend(grizli.multifit.MultiBeam('/Volumes/Pegasus/Grizli/ACS/goodss/Prep/ers-grism-pears_{0:05d}.beams.fits'.format(id), fcontam=0.2))
+
+        if tstar is None:
+            tstar = grizli.utils.load_templates(fwhm=1200, line_complexes=True, fsps_templates=True, stars=True)
+
+        NTEMP = len(tstar)
+        covar = np.zeros((NTEMP, self.N+1, self.N+1))
+        coeffs = np.zeros((NTEMP, self.N+1))
+        chi2 = np.zeros(NTEMP)
+
+        types = np.array(list(tstar.keys()))
+
+        for ik, k in enumerate(tstar):
+            ts = {k:tstar[k]}
+            print(k)
+            chi2[ik], coeffs[ik,:], coeffs_err, covar[ik,:,:] = self.xfit_at_z(z=0, templates=ts, fitter='nnls', fit_background=True, get_uncertainties=True)
+
+        # Initialize plot window
+        Ng = len(self.grisms)
+        gs = matplotlib.gridspec.GridSpec(1,2, 
+                        width_ratios=[1,1.5+0.5*(Ng>1)],
+                        hspace=0.)
+
+        fig = plt.figure(figsize=[8+4*(Ng>1), 3.5])
+
+        # p(z)
+        axz = fig.add_subplot(gs[-1,0]) #121)
+
+        axz.text(0.95, 0.96, self.group_name + '\n'+'ID={0:<5d} {1:s}'.format(self.id, types[np.argmin(chi2)].strip('stars/').strip('.txt')), ha='right', va='top', transform=axz.transAxes, fontsize=9)
+
+        axz.plot(chi2-chi2.min(), marker='.', color='k')
+        #axz.fill_between(z, (chi2-chi2.min())/scale_nu, 27, color='k', alpha=0.5)
+
+        axz.set_xlabel(r'Sp. Type')
+        axz.set_ylabel(r'$\chi^2_\nu$'+' ; '+ r'$\chi^2_\mathrm{{min}}=\frac{{{0:.0f}}}{{{1:d}}}={2:.2f}$'.format(chi2.min(), self.DoF, chi2.min()/self.DoF))
+        #axz.set_yticks([1,4,9,16,25])
+
+        if len(tstar) < 30:
+            tx = [t.strip('stars/').strip('.txt') for t in types]
+            axz.set_xticks(np.arange(len(tx)))
+            tl = axz.set_xticklabels(tx)
+            for ti in tl:
+                ti.set_size(8)
+
+        axz.set_ylim(-2, 49)
+        axz.set_yticks([1,4,9,16,25])
+        axz.grid()
+        #axz.yaxis.set_major_locator(MultipleLocator(base=1))
+
+        #### Spectra
+        axc = fig.add_subplot(gs[-1,1]) #224)
+        ymin = 1.e30
+        ymax = -1.e30
+        wmin = 1.e30
+        wmax = -1.e30
+
+        # 1D Model
+        ix = np.argmin(chi2)
+        tbest = types[ix]
+        sp = tstar[tbest].wave, tstar[tbest].flux*coeffs[ix,-1]
+
+        for i in range(self.N):
+            beam = self.beams[i]
+            m_i = beam.compute_model(spectrum_1d=sp, is_cgs=True, in_place=False).reshape(beam.sh)
+
+            #if isinstance(beam, grizli.model.BeamCutout):
+            if hasattr(beam, 'compute_model_psf'): # grizli.model.BeamCutout
+                grism = beam.grism.filter
+                clean = beam.grism['SCI'] - beam.contam - coeffs[ix,i]
+
+                w, fl, er = beam.beam.optimal_extract(clean, ivar=beam.ivar)            
+                w, flm, erm = beam.beam.optimal_extract(m_i, ivar=beam.ivar)
+                sens = beam.beam.sensitivity                
+            else:
+                grism = beam.grism
+                clean = beam.sci - beam.contam - coeffs[ix,i]
+                w, fl, er = beam.optimal_extract(clean, ivar=beam.ivar)            
+                w, flm, erm = beam.optimal_extract(m_i, ivar=beam.ivar)
+
+                sens = beam.sens
+
+            w = w/1.e4
+
+            unit_corr = 1./sens
+            clip = (sens > 0.1*sens.max()) 
+            clip &= (np.isfinite(flm)) & (er > 0)
+            if clip.sum() == 0:
+                continue
+
+            fl *= unit_corr/1.e-19
+            er *= unit_corr/1.e-19
+            flm *= unit_corr/1.e-19
+
+            f_alpha = 1./(self.Ngrism[grism.upper()])*0.8 #**0.5
+
+            # Plot
+            axc.errorbar(w[clip], fl[clip], er[clip], color=GRISM_COLORS[grism], alpha=f_alpha, marker='.', linestyle='None', zorder=1)
+            axc.plot(w[clip], flm[clip], color='r', alpha=f_alpha, linewidth=2, zorder=10) 
+
+            # Plot limits         
+            ymax = np.maximum(ymax,
+                        np.percentile((flm+np.median(er[clip]))[clip], 98))
+
+            ymin = np.minimum(ymin, np.percentile((flm-er*0.)[clip], 2))
+
+            wmax = np.maximum(wmax, w[clip].max())
+            wmin = np.minimum(wmin, w[clip].min())
+
+        # Cleanup
+        axc.set_xlim(wmin, wmax)
+        #axc.semilogx(subsx=[wmax])
+        #axc.set_xticklabels([])
+        axc.set_xlabel(r'$\lambda$')
+        axc.set_ylabel(r'$f_\lambda \times 10^{-19}$')
+        #axc.xaxis.set_major_locator(MultipleLocator(0.1))
+
+        axc.set_ylim(ymin-0.2*ymax, 1.2*ymax)
+        axc.grid()
+
+        for ax in [axc]: #[axa, axb, axc]:
+
+            labels = np.arange(np.ceil(wmin*10), np.ceil(wmax*10))/10.
+            ax.set_xticks(labels)
+            ax.set_xticklabels(labels)
+            #ax.set_xticklabels([])
+            #print(labels, wmin, wmax)
+
+        gs.tight_layout(fig, pad=0.1, w_pad=0.1)
+        return fig
+        
+def show_drizzled_lines(line_hdu, full_line_list=['OII', 'Hb', 'OIII', 'Ha', 'SIII'], size_arcsec=2):
+    """TBD
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.ticker import MultipleLocator
+    
+    show_lines = []
+    for line in full_line_list:
+        if line in line_hdu[0].header['HASLINES']:
+            show_lines.append(line)
+    
+    N = len(show_lines)
+    
+    fig = plt.figure(figsize=[3*(N+1),3])
+    
+    # Direct
+    ax = fig.add_subplot(141)
+    ax.imshow(line_hdu['DSCI'].data, vmin=-0.02, vmax=0.4, cmap='cubehelix_r', origin='lower')
+    ax.set_title('Direct   {0}    z={1:.3f}'.format(line_hdu[0].header['ID'], line_hdu[0].header['REDSHIFT']))
+    
+    ax.set_xlabel('RA'); ax.set_ylabel('Decl.')
+
+    # 1" ticks
+    pix_size = np.abs(line_hdu['DSCI'].header['CD1_1']*3600)
+    majorLocator = MultipleLocator(1./pix_size)
+    N = line_hdu['DSCI'].data.shape[0]/2
+    ax.errorbar([N-0.5/pix_size], N-1.5/pix_size, yerr=0, xerr=0.5/pix_size, color='k')
+    ax.text(N-0.5/pix_size, N-1.5/pix_size, r'$1^{\prime\prime}$', ha='center', va='bottom', color='k')
+
+    # Line maps
+    for i, line in enumerate(show_lines):
+        ax = fig.add_subplot(142+i)
+        ax.imshow(line_hdu['LINE',line].data, vmin=-0.02, vmax=0.3, cmap='cubehelix_r', origin='lower')
+        ax.set_title(r'%s %.3f $\mu$m' %(line, line_hdu['LINE', line].header['WAVELEN']/1.e4))
+
+    # End things
+    for ax in fig.axes:
+        ax.set_yticklabels([]); ax.set_xticklabels([])
+        ax.set_xlim(N+np.array([-1,1])*size_arcsec/pix_size)
+        ax.set_ylim(N+np.array([-1,1])*size_arcsec/pix_size)
+
+        ax.xaxis.set_major_locator(majorLocator)
+        ax.yaxis.set_major_locator(majorLocator)
+
+    fig.tight_layout(pad=0.5)
+    return fig
 
