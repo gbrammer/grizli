@@ -1128,7 +1128,7 @@ class GroupFitter(object):
         gs.tight_layout(fig, pad=0.1, w_pad=0.1)
         return fig
         
-def show_drizzled_lines(line_hdu, full_line_list=['OII', 'Hb', 'OIII', 'Ha', 'SIII'], size_arcsec=2):
+def show_drizzled_lines(line_hdu, full_line_list=['OII', 'Hb', 'OIII', 'Ha', 'SII', 'SIII'], size_arcsec=2, cmap='cubehelix_r'):
     """TBD
     """
     import matplotlib.pyplot as plt
@@ -1136,16 +1136,18 @@ def show_drizzled_lines(line_hdu, full_line_list=['OII', 'Hb', 'OIII', 'Ha', 'SI
     
     show_lines = []
     for line in full_line_list:
-        if line in line_hdu[0].header['HASLINES']:
+        if line in line_hdu[0].header['HASLINES'].split():
             show_lines.append(line)
     
-    N = len(show_lines)
+    #print(line_hdu[0].header['HASLINES'], show_lines)
     
-    fig = plt.figure(figsize=[3*(N+1),3])
+    NL = len(show_lines)
+    
+    fig = plt.figure(figsize=[3*(NL+1),3])
     
     # Direct
-    ax = fig.add_subplot(141)
-    ax.imshow(line_hdu['DSCI'].data, vmin=-0.02, vmax=0.4, cmap='cubehelix_r', origin='lower')
+    ax = fig.add_subplot(1,NL+1,1)
+    ax.imshow(line_hdu['DSCI'].data, vmin=-0.02, vmax=0.6, cmap=cmap, origin='lower')
     ax.set_title('Direct   {0}    z={1:.3f}'.format(line_hdu[0].header['ID'], line_hdu[0].header['REDSHIFT']))
     
     ax.set_xlabel('RA'); ax.set_ylabel('Decl.')
@@ -1159,8 +1161,8 @@ def show_drizzled_lines(line_hdu, full_line_list=['OII', 'Hb', 'OIII', 'Ha', 'SI
 
     # Line maps
     for i, line in enumerate(show_lines):
-        ax = fig.add_subplot(142+i)
-        ax.imshow(line_hdu['LINE',line].data, vmin=-0.02, vmax=0.3, cmap='cubehelix_r', origin='lower')
+        ax = fig.add_subplot(1,NL+1,2+i)
+        ax.imshow(line_hdu['LINE',line].data, vmin=-0.02, vmax=0.6, cmap=cmap, origin='lower')
         ax.set_title(r'%s %.3f $\mu$m' %(line, line_hdu['LINE', line].header['WAVELEN']/1.e4))
 
     # End things
