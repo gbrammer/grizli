@@ -1099,25 +1099,28 @@ class ImageData(object):
     def get_wcs(self):
         """Get WCS from header"""
         import numpy.linalg
+        import stwcs
         
         if self.wcs_is_lookup:
-            fobj = pyfits.open(self.parent_file)
+
+            if 'CCDCHIP' in self.header:
+                ext = {1:2,2:1}[self.header['CCDCHIP']]
+            else:
+                ext = self.header['EXTVER']
             
-            try:
-                import stwcs
-                if 'CCDCHIP' in self.header:
-                    ext = {1:2,2:1}[self.header['CCDCHIP']]
-                else:
-                    ext = self.header['EXTVER']
-                
-                #print(self.parent_file, 'Extension: {0}'.format(ext))
+            if os.path.exists(self.parent_file):
+                fobj = pyfits.open(self.parent_file)
                 wcs = stwcs.wcsutil.hstwcs.HSTWCS(fobj=fobj, ext=('SCI',ext))
                 if self.pad > 0:
                     wcs = self.add_padding_to_wcs(wcs, pad=self.pad)
-                
-            except:
-                wcs = pywcs.WCS(self.header, relax=True, fobj=fobj)
             
+            else:
+                # Get WCS from a stripped wcs.fits file (from self.save_wcs)
+                # already padded.
+                wcsfile = self.parent_file.replace('.fits', '.{0:02d}.wcs.fits'.format(ext))
+                fobj = pyfits.open(wcsfile)
+                wcs = stwcs.wcsutil.hstwcs.HSTWCS(fobj=fobj, ext=0)
+                                        
             # Object is a cutout
             if self.is_slice:
                 slx = slice(self.origin[1], self.origin[1]+self.sh[1])
@@ -1154,7 +1157,8 @@ class ImageData(object):
         for attr in ['naxis1', '_naxis1', 'naxis2', '_naxis2']:
             if hasattr(wcs, attr):
                 value = wcs.__getattribute__(attr) 
-                wcs.__setattr__(attr, value+2*pad)
+                if value is not None:
+                    wcs.__setattr__(attr, value+2*pad)
         
         wcs.naxis1 = wcs._naxis1
         wcs.naxis2 = wcs._naxis2
@@ -2621,7 +2625,30 @@ class GrismFLT(object):
         fp = open('{0}.{1:02d}.GrismFLT.pkl'.format(root, self.grism.sci_extn), 'wb')
         pickle.dump(self, fp)
         fp.close()
-    
+        
+        self.save_wcs(overwrite=True, verbose=False)
+        
+    def save_wcs(self, overwrite=True, verbose=True):
+        """TBD
+        """
+        hwcs = self.wcs.to_fits(relax=True)
+        hwcs[0].header['PAD'] = self.pad
+        
+        if 'CCDCHIP' in self.header:
+            ext = {1:2,2:1}[self.header['CCDCHIP']]
+        else:
+            ext = self.header['EXTVER']
+        
+        wcsfile = self.parent_file.replace('.fits', '.{0:02d}.wcs.fits'.format(ext))
+        
+        try:
+            hwcs.writeto(wcsfile, clobber=overwrite)
+        except:
+            hwcs.writeto(wcsfile, overwrite=overwrite)
+        
+        if verbose:
+            print(wcsfile)
+            
     def load_from_fits(self, save_file):
         """Load saved data from a FITS file
         
