@@ -1,5 +1,7 @@
-from distutils.core import setup
-from distutils.extension import Extension
+#from distutils.core import setup
+#from distutils.extension import Extension
+from setuptools import setup
+from setuptools.extension import Extension
 
 import os
 import numpy
@@ -51,7 +53,7 @@ setup(
     license = "MIT",
     url = "https://github.com/gbrammer/grizli",
     download_url = "https://github.com/gbrammer/grizli/tarball/0.2.1",
-    packages=['grizli', 'grizli/utils_c'],
+    packages=['grizli', 'grizli/utils_c', 'grizli/tests'],
     # requires=['numpy', 'scipy', 'astropy', 'drizzlepac', 'stwcs'],
     # long_description=read('README.rst'),
     classifiers=[
