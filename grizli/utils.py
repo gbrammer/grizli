@@ -981,7 +981,7 @@ class SpectrumTemplate(object):
         
     @staticmethod 
     def make_gaussian(central_wave, fwhm, max_sigma=5, step=0.1,
-                      wave_grid=None, velocity=False):
+                      wave_grid=None, velocity=False, clip=1.e-5):
         """Make Gaussian template
         
         Parameters
@@ -997,7 +997,11 @@ class SpectrumTemplate(object):
                 
                 >>> rms = fwhm/2.35
                 >>> xgauss = np.arange(-max_sigma, max_sigma, step)*rms+central_wave
-
+        
+        clip : float
+            Clip values where the value of the gaussian function is less than 
+            `clip` times its maximum (i.e., `1/sqrt(2*pi*sigma**2)`).
+            
         Returns
         -------
         wave, flux : array-like
@@ -1026,7 +1030,7 @@ class SpectrumTemplate(object):
         gaussian = np.exp(-(wave_grid-central_wave)**2/2/rms**2)
         peak = np.sqrt(2*np.pi*rms**2)
         gaussian /= np.sqrt(2*np.pi*rms**2)
-        gaussian[gaussian < peak*1.e-4] = 0
+        gaussian[gaussian < peak*clip] = 0
         
         return wave_grid, gaussian
         
@@ -1220,7 +1224,7 @@ def load_templates(fwhm=400, line_complexes=True, stars=False,
         
     Returns
     -------
-    temp_list : list of `~grizli.utils.SpectrumTemplate` objects
+    temp_list : dictionary of `~grizli.utils.SpectrumTemplate` objects
         Output template list
     
     """
@@ -1380,27 +1384,84 @@ def polynomial_templates(wave, order=0, line=False):
     
     return temp
         
-def dot_templates(coeffs, templates, z=0):
+def dot_templates(coeffs, templates, z=0, max_R=5000):
     """Compute template sum analogous to `np.dot(coeffs, templates)`.
     """  
     
     if len(coeffs) != len(templates):
         raise ValueError ('shapes of coeffs ({0}) and templates ({1}) don\'t match'.format(len(coeffs), len(templates)))
           
-    for i, te in enumerate(templates):
-        if i == 0:
-            tc = templates[te].zscale(z, scalar=coeffs[i])
-            tl = templates[te].zscale(z, scalar=coeffs[i])
-        else:
-            if te.startswith('line'):
-                tc += templates[te].zscale(z, scalar=0.)
-            else:
-                tc += templates[te].zscale(z, scalar=coeffs[i])
-               
-            tl += templates[te].zscale(z, scalar=coeffs[i])
+    # for i, te in enumerate(templates):
+    #     if i == 0:
+    #         tc = templates[te].zscale(z, scalar=coeffs[i])
+    #         tl = templates[te].zscale(z, scalar=coeffs[i])
+    #     else:
+    #         if te.startswith('line'):
+    #             tc += templates[te].zscale(z, scalar=0.)
+    #         else:
+    #             tc += templates[te].zscale(z, scalar=coeffs[i])
+    #            
+    #         tl += templates[te].zscale(z, scalar=coeffs[i])
+    wave, flux_arr, is_line = array_templates(templates, max_R=max_R)
+    
+    # Continuum
+    cont = np.dot(coeffs*(~is_line), flux_arr)
+    tc = grizli.utils.SpectrumTemplate(wave=wave, flux=cont).zscale(z)
+    
+    # Full template
+    line = np.dot(coeffs, flux_arr)
+    tl = grizli.utils.SpectrumTemplate(wave=wave, flux=line).zscale(z)
     
     return tc, tl
     
+def array_templates(templates, max_R=5000):
+    """Return an array version of the templates that have all been interpolated to the same grid.
+    
+    
+    Parameters
+    ----------
+    templates : dictionary of `~grizli.utils.SpectrumTemplate` objects
+        Output template list with `NTEMP` templates.  
+    
+    max_R : float
+        Maximum spectral resolution of the regridded templates.
+        
+    Returns
+    -------
+    wave : `~numpy.ndarray`, dimensions `(NL,)`
+        Array containing unique wavelengths.
+        
+    flux_arr : `~numpy.ndarray`, dimensions `(NTEMP, NL)`
+        Array containing the template fluxes interpolated at `wave`.
+    
+    is_line : `~numpy.ndarray`
+        Boolean array indicating emission line templates (the key in the 
+        template dictionary starts with "line ").
+        
+    """
+    from grizli.utils_c.interp import interp_conserve_c
+        
+    wave = np.unique(np.hstack([templates[t].wave for t in templates]))
+    clipsum, iter = 1, 0
+    while (clipsum > 0) & (iter < 10):
+        clip = np.gradient(wave)/wave < 1/max_R
+        idx = np.arange(len(wave))[clip]
+        wave[idx[::2]] = np.nan
+        wave = wave[np.isfinite(wave)]
+        iter += 1
+        clipsum = clip.sum()
+        #print(iter, clipsum)
+        
+    NTEMP = len(templates)
+    flux_arr = np.zeros((NTEMP, len(wave)))
+    
+    for i, t in enumerate(templates):
+        flux_arr[i,:] = interp_conserve_c(wave, templates[t].wave, templates[t].flux)
+    
+    is_line = np.array([t.startswith('line ') for t in templates])
+    
+    return wave, flux_arr, is_line
+        
 def log_zgrid(zr=[0.7,3.4], dz=0.01):
     """Make a logarithmically spaced redshift grid
     
