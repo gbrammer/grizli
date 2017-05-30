@@ -1406,11 +1406,11 @@ def dot_templates(coeffs, templates, z=0, max_R=5000):
     
     # Continuum
     cont = np.dot(coeffs*(~is_line), flux_arr)
-    tc = grizli.utils.SpectrumTemplate(wave=wave, flux=cont).zscale(z)
+    tc = SpectrumTemplate(wave=wave, flux=cont).zscale(z)
     
     # Full template
     line = np.dot(coeffs, flux_arr)
-    tl = grizli.utils.SpectrumTemplate(wave=wave, flux=line).zscale(z)
+    tl = SpectrumTemplate(wave=wave, flux=line).zscale(z)
     
     return tc, tl
     
@@ -1456,12 +1456,35 @@ def array_templates(templates, max_R=5000):
     flux_arr = np.zeros((NTEMP, len(wave)))
     
     for i, t in enumerate(templates):
-        flux_arr[i,:] = interp_conserve_c(wave, templates[t].wave, templates[t].flux)
+        flux_arr[i,:] = interp_conserve_c(wave, templates[t].wave,
+                                          templates[t].flux)
     
     is_line = np.array([t.startswith('line ') for t in templates])
     
     return wave, flux_arr, is_line
-        
+    
+def compute_equivalent_widths(templates, coeffs, covar=None, max_R=5000):
+    """Compute template line equivalent widths
+    
+    Parameters
+    ----------
+    templates : type
+    
+    coeffs : type
+    
+    covar : type
+    
+    max_R : type
+    
+    
+    Returns
+    -------
+    ew : type
+    
+    ew_err : type
+    """
+    pass
+    
 def log_zgrid(zr=[0.7,3.4], dz=0.01):
     """Make a logarithmically spaced redshift grid
     
