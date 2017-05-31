@@ -2908,6 +2908,7 @@ class BeamCutout(object):
         ### Flat versions of sci/ivar arrays
         self.scif = (self.grism.data['SCI'] - self.contam).flatten()
         self.ivarf = self.ivar.flatten()
+        self.wavef = np.dot(np.ones((self.sh[0],1)), self.wave[None,:]).flatten()
         
         ### Mask large residuals
         resid = np.abs(self.scif - self.flat_flam)*np.sqrt(self.ivarf)

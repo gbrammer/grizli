@@ -1463,27 +1463,84 @@ def array_templates(templates, max_R=5000):
     
     return wave, flux_arr, is_line
     
-def compute_equivalent_widths(templates, coeffs, covar=None, max_R=5000):
-    """Compute template line equivalent widths
+def compute_equivalent_widths(templates, coeffs, covar, max_R=5000, Ndraw=1000, seed=0):
+    """Compute template-fit emission line equivalent widths
     
     Parameters
     ----------
-    templates : type
+    templates : dictionary of `~grizli.utils.SpectrumTemplate` objects
+        Output template list with `NTEMP` templates.  
     
-    coeffs : type
+    coeffs : `~numpy.ndarray`, dimensions (`NTEMP`)
+        Fit coefficients
+        
+    covar :  `~numpy.ndarray`, dimensions (`NTEMP`, `NTEMP`)
+        Covariance matrix
+        
+    max_R : float
+        Maximum spectral resolution of the regridded templates.
+
+    Ndraw : int
+        Number of random draws to extract from the covariance matrix
     
-    covar : type
-    
-    max_R : type
-    
-    
+    seed : positive int
+        Random number seed to produce repeatible results. If `None`, then 
+        use default state.
+        
     Returns
     -------
-    ew : type
+    EWdict : dict
+        Dictionary of [16, 50, 84th] percentiles of the line EW distributions.
     
-    ew_err : type
     """
-    pass
+    
+    if False:
+        # Testing
+        templates = t1
+        chi2, coeffsx, coeffs_errx, covarx = mb.xfit_at_z(z=tfit['z'], templates=templates, fitter='nnls', fit_background=True, get_uncertainties=2)
+        covar = covarx[mb.N:,mb.N:]
+        coeffs = coeffsx[mb.N:]
+    
+    # Array versions of the templates
+    wave, flux_arr, is_line = array_templates(templates, max_R=max_R)
+    keys = np.array(list(templates.keys()))
+    
+    EWdict = OrderedDict()
+    for key in keys[is_line]:
+        EWdict[key] = (0., 0., 0.)
+        
+    # Only worry about templates with non-zero coefficients, which should
+    # be accounted for in the covariance array (with get_uncertainties=2)
+    clip = coeffs != 0
+    # No valid lines
+    if (is_line & clip).sum() == 0:
+        return EWdict
+    
+    # Random draws from the covariance matrix
+    covar_clip = covar[clip,:][:,clip]
+    if seed is not None:
+        np.random.seed(seed)
+    
+    draws = np.random.multivariate_normal(coeffs[clip], covar_clip, size=Ndraw)
+    
+    # Evaluate the continuum fits from the draws             
+    continuum = np.dot(draws*(~is_line[clip]), flux_arr[clip,:])
+    
+    # Compute the emission line EWs
+    tidx = np.where(is_line[clip])[0]
+    for ix in tidx:
+        key = keys[clip][ix]
+
+        # Line template
+        line = np.dot(draws[:,ix][:,None], flux_arr[clip,:][ix,:][None,:])
+        
+        # Where line template non-zero
+        mask = flux_arr[clip,:][ix,:] > 0
+        ew_i = np.trapz((line/continuum)[:,mask], wave[mask], axis=1)
+        
+        EWdict[key] = np.percentile(ew_i, [16., 50., 84.])
+    
+    return EWdict
     
 def log_zgrid(zr=[0.7,3.4], dz=0.01):
     """Make a logarithmically spaced redshift grid

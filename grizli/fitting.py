@@ -86,14 +86,37 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
         mb_fit_hdu.header['EXTNAME'] = 'ZFIT_BEAM'
     else:
         mb_fit = fit
-        
-    # Get best-fit template of beams
+           
+    #### Get best-fit template 
     tfit = mb.template_at_z(z=mb_fit.meta['z_risk'][0], templates=t1, fit_background=True, fitter=fitter)
+        
+    # Fit covariance
+    cov_hdu = pyfits.ImageHDU(data=tfit['covar'], name='COVAR')
+    Next = mb_fit.meta['N']
+    cov_hdu.header['N'] = Next
+    
+    # Line EWs & fluxes
+    coeffs_clip = tfit['coeffs'][Next[0]:]
+    covar_clip = tfit['covar'][Next[0]:,Next[0]:]
+    lineEW = utils.compute_equivalent_widths(t1, coeffs_clip, covar_clip, max_R=5000, Ndraw=1000)
+    
+    for ik, key in enumerate(lineEW):
+        cov_hdu.header['FLUX_{0:03d}'.format(ik)] = tfit['cfit'][key][0], '{0} line flux; erg / (s cm2)'.format(key.strip('line '))
+        cov_hdu.header['ERR_{0:03d}'.format(ik)] = tfit['cfit'][key][1], '{0} line uncertainty; erg / (s cm2)'.format(key.strip('line '))
+        
+        cov_hdu.header['EW16_{0:03d}'.format(ik)] = lineEW[key][0], 'Rest-frame {0} EW, 16th percentile; Angstrom'.format(key.strip('line '))
+        cov_hdu.header['EW50_{0:03d}'.format(ik)] = lineEW[key][1], 'Rest-frame {0} EW, 50th percentile; Angstrom'.format(key.strip('line '))
+        cov_hdu.header['EW84_{0:03d}'.format(ik)] = lineEW[key][2], 'Rest-frame {0} EW, 84th percentile; Angstrom'.format(key.strip('line '))
+        cov_hdu.header['EWHW_{0:03d}'.format(ik)] = (lineEW[key][2]-lineEW[key][0])/2, 'Rest-frame {0} EW, 1-sigma half-width; Angstrom'.format(key.strip('line '))
+        
+    # Best-fit template itself
     tfit_sp = grizli.utils.GTable()
     for ik, key in enumerate(tfit['cfit']):
-        tfit_sp.meta['CVAL{0:03d}'.format(ik)] = tfit['cfit'][key][0], 'Coefficient for {0}'.format(key)
-        tfit_sp.meta['CERR{0:03d}'.format(ik)] = tfit['cfit'][key][1], 'Uncertainty for {0}'.format(key)
-        
+        for save in [tfit_sp.meta]:
+            save['CVAL{0:03d}'.format(ik)] = tfit['cfit'][key][0], 'Coefficient for {0}'.format(key)
+            save['CERR{0:03d}'.format(ik)] = tfit['cfit'][key][1], 'Uncertainty for {0}'.format(key)
+            save['CNAME{0:03d}'.format(ik)] = key, 'Template name'
+                
     tfit_sp['wave'] = tfit['cont1d'].wave
     tfit_sp['continuum'] = tfit['cont1d'].flux
     tfit_sp['full'] = tfit['line1d'].flux
@@ -171,6 +194,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     line_hdu = mb.drizzle_fit_lines(tfit, pline, force_line=['SIII','SII','Ha', 'OIII', 'Hb', 'OII'], save_fits=False, mask_lines=True, mask_sn_limit=mask_sn_limit)
         
     line_hdu.insert(1, fit_hdu)
+    line_hdu.insert(2, cov_hdu)
     if fit_beams:
         line_hdu.insert(2, mb_fit_hdu)
     line_hdu.insert(3, tfit_hdu)
@@ -267,7 +291,7 @@ class GroupFitter(object):
                            
         return A_bg
     
-    def set_photometry(self, flam=[], eflam=[], filters=[], force=False, tempfilt=None):
+    def set_photometry(self, flam=[], eflam=[], filters=[], force=False, tempfilt=None, min_err=0.02):
         """
         Add photometry
         """
@@ -284,7 +308,9 @@ class GroupFitter(object):
             return False
         
         self.photom_flam = flam
-        self.photom_eflam = eflam
+        self.photom_eflam = np.sqrt(eflam**2+(min_err*flam)**2)
+        self.photom_eflam[eflam < 0] = -99
+        
         self.photom_filters = filters
         
         self.sivarf = np.hstack((self.sivarf, 1/self.photom_eflam))
@@ -292,12 +318,14 @@ class GroupFitter(object):
         self.Nmask = self.fit_mask.sum()       
         
         self.scif = np.hstack((self.scif, flam))
+        
         self.DoF = self.fit_mask.sum()
         
         self.is_spec = np.isfinite(self.scif)
         self.is_spec[-len(flam):] = False
         
         self.photom_pivot = np.array([filter.pivot() for filter in filters])
+        self.wavef = np.hstack((self.wavef, self.photom_pivot))
         
         # eazypy tempfilt for faster interpolation
         self.tempfilt = tempfilt
@@ -309,6 +337,11 @@ class GroupFitter(object):
         self.sivarf = self.sivarf[:-self.Nphot]
         self.fit_mask = self.fit_mask[:-self.Nphot]
         self.scif = self.scif[:-self.Nphot]
+        self.wavef = self.wavef[:-self.Nphot]
+        
+        self.DoF = self.fit_mask.sum()
+        
+        self.Nmask = self.fit_mask.sum()
         self.DoF = self.fit_mask.sum()
         
         self.is_spec = 1
@@ -344,7 +377,7 @@ class GroupFitter(object):
             
         return A_phot[:,mask]
         
-    def xfit_at_z(self, z=0, templates=[], fitter='nnls', fit_background=True, get_uncertainties=False):
+    def xfit_at_z(self, z=0, templates=[], fitter='nnls', fit_background=True, get_uncertainties=False, get_design_matrix=False, pscale=None):
         """Fit the 2D spectra with a set of templates at a specified redshift.
         
         Parameters
@@ -366,7 +399,9 @@ class GroupFitter(object):
         get_uncertainties : bool
             Compute coefficient uncertainties from the covariance matrix
         
-        
+        get_design_matrix : bool
+            Return design matrix and data, rather than nominal outputs.
+            
         Returns
         -------
         chi2 : float
@@ -395,6 +430,8 @@ class GroupFitter(object):
         # A = scipy.sparse.csr_matrix((self.N+NTEMP, self.Ntot))
         # bg_sp = scipy.sparse.csc_matrix(self.A_bg)
         
+        COEFF_SCALE = 1.e-17
+        
         for i, t in enumerate(templates):
             if t.startswith('line'):
                 lower_bound[self.N+i] = -np.inf
@@ -422,8 +459,13 @@ class GroupFitter(object):
                     continue
 
                 sl = self.mslices[j]
-                A[self.N+i, sl] = beam.compute_model(spectrum_1d=s, in_place=False, is_cgs=True)[beam.fit_mask]
-                            
+                A[self.N+i, sl] = beam.compute_model(spectrum_1d=s, in_place=False, is_cgs=True)[beam.fit_mask]*COEFF_SCALE
+                
+                # if j == 0:
+                #     m = beam.compute_model(spectrum_1d=s, in_place=False, is_cgs=True)
+                #     ds9.frame(i)
+                #     ds9.view(m.reshape(beam.sh))
+                        
         if fit_background:
             if fitter in ['nnls', 'lstsq']:
                 pedestal = 0.04
@@ -435,7 +477,7 @@ class GroupFitter(object):
         # Photometry
         if self.Nphot > 0:
             A_phot = self._interpolate_photometry(z=z, templates=templates)
-            A[:,-self.Nphot:] = A_phot #np.hstack((A, A_phot))
+            A[:,-self.Nphot:] = A_phot*COEFF_SCALE #np.hstack((A, A_phot))
             
         #oktemp = (A*self.fit_mask).sum(axis=1) != 0
         oktemp = A.sum(axis=1) != 0
@@ -443,10 +485,28 @@ class GroupFitter(object):
         # Weight design matrix and data by 1/sigma
         Ax = A[oktemp,:]*self.sivarf[self.fit_mask]        
         #AxT = Ax[:,self.fit_mask].T
+        
+        # Scale photometry
+        if hasattr(self, 'pscale'):
+            if (self.pscale is not None):
+                scale = self.compute_scale_array(self.pscale, self.wavef[self.fit_mask]) 
+                if self.Nphot > 0:
+                    scale[-self.Nphot:] = 1.
+                
+                Ax *= scale
+                if fit_background:
+                    for i in range(self.N):
+                        Ax[i,:] /= scale
+        
+        # Need transpose
         AxT = Ax.T
         
+        # Masked data array, including background pedestal
         data = ((self.scif+pedestal*self.is_spec)*self.sivarf)[self.fit_mask]
         
+        if get_design_matrix:
+            return AxT, data
+            
         # Run the minimization
         if fitter == 'nnls':
             coeffs_i, rnorm = scipy.optimize.nnls(AxT, data)            
@@ -464,7 +524,7 @@ class GroupFitter(object):
             coeffs_i[:self.N] -= pedestal
         else:
             background = self.scif[self.fit_mask]*0.
-        
+            
         # Full model
         model = np.dot(coeffs_i[self.N:], Ax[self.N:,:]/self.sivarf[self.fit_mask])
         
@@ -473,6 +533,9 @@ class GroupFitter(object):
         #chi2 = np.sum(resid[self.fit_mask]**2*self.sivarf[self.fit_mask]**2)
         chi2 = np.sum(resid**2*self.sivarf[self.fit_mask]**2)
         
+        if self.Nphot > 0:
+            self.photom_model = model[-self.Nphot:]*1
+            
         # Uncertainties from covariance matrix
         if get_uncertainties:
             try:
@@ -512,12 +575,17 @@ class GroupFitter(object):
         #full_coeffs_err[oktemp[self.N:]] = covard[self.N:]
         del(A); del(Ax); del(AxT)
         
+        if fit_background:
+            coeffs[self.N:] *= COEFF_SCALE
+            coeffs_err[self.N:] *= COEFF_SCALE
+            covar[self.N:,self.N:] *= COEFF_SCALE**2
+            
         return chi2, coeffs, coeffs_err, covar
     
     def xfit_redshift(self, prior=None, fwhm=1200,
                      make_figure=True, zr=[0.65, 1.6], dz=[0.005, 0.0004],
                      verbose=True, fit_background=True, fitter='nnls', 
-                     delta_chi2_threshold=0.004, zoom=True, 
+                     delta_chi2_threshold=0.004, poly_order=3, zoom=True, 
                      line_complexes=True, templates={}, figsize=[8,5],
                      fsps_templates=False, get_uncertainties=True):
         """TBD
@@ -535,10 +603,13 @@ class GroupFitter(object):
         NZ = len(zgrid)
         
         #### Polynomial SED fit
-        wpoly = np.arange(1000,5.e4,1000)
-        tpoly = utils.polynomial_templates(wpoly, line=True)
-        #tpoly = utils.polynomial_templates(wpoly, order=5, line=False)
-        out = self.xfit_at_z(z=0., templates=tpoly, fitter='nnls',
+        wpoly = np.linspace(1000,5.e4,1000)
+        # tpoly = utils.polynomial_templates(wpoly, line=True)
+        # out = self.xfit_at_z(z=0., templates=tpoly, fitter='nnls',
+        #                     fit_background=True, get_uncertainties=False)
+        tpoly = utils.polynomial_templates(wpoly, order=poly_order,
+                                           line=False)
+        out = self.xfit_at_z(z=0., templates=tpoly, fitter='lstsq',
                             fit_background=True, get_uncertainties=False)
         
         chi2_poly, coeffs_poly, err_poly, cov = out
@@ -658,17 +729,29 @@ class GroupFitter(object):
         covar = covar[so,:,:]
         
         fit = utils.GTable()
+        fit.meta['N'] = (self.N, 'Number of spectrum extensions')
+        fit.meta['polyord'] = (poly_order, 'Order polynomial fit')
         fit.meta['chi2poly'] = (chi2_poly, 'Chi^2 of polynomial fit')
         fit.meta['DoF'] = (self.DoF, 'Degrees of freedom (number of pixels)')
         fit.meta['chimin'] = (chi2.min(), 'Minimum chi2')
         fit.meta['chimax'] = (chi2.max(), 'Maximum chi2')
         fit.meta['fitter'] = (fitter, 'Minimization algorithm')
         
+        # Bayesian information criteria, normalized to template min_chi2
+        # BIC = log(number of data points)*(number of params) + min(chi2) + C
+        # https://en.wikipedia.org/wiki/Bayesian_information_criterion
+        fit.meta['bic_poly'] = np.log(self.DoF)*(poly_order+1+self.N) + (chi2_poly-chi2.min()), 'BIC of polynomial fit'
+        
+        izbest = np.argmin(chi2)
+        clip = coeffs[izbest,:] != 0
+        fit.meta['bic_temp'] = np.log(self.DoF)*clip.sum(), 'BIC of template fit'
+        
         fit.meta['NTEMP'] = (len(templates), 'Number of fitting templates')
         
         for i, tname in enumerate(templates):
             fit.meta['T{0:03d}NAME'.format(i+1)] = (templates[tname].name, 'Template name')
-            fit.meta['T{0:03d}FWHM'.format(i+1)] = (templates[tname].fwhm, 'FWHM, if emission line')
+            if tname.startswith('line '):
+                fit.meta['T{0:03d}FWHM'.format(i+1)] = (templates[tname].fwhm, 'FWHM, if emission line')
         
         dtype = np.float64
         
@@ -723,13 +806,13 @@ class GroupFitter(object):
         dz = np.gradient(fit['zgrid'])
         
         zsq = np.dot(fit['zgrid'][:,None], np.ones_like(fit['zgrid'])[None,:])
-        L = _loss((zsq-fit['zgrid'])/(1+fit['zgrid']), gamma=0.01)
+        L = _loss((zsq-fit['zgrid'])/(1+fit['zgrid']), gamma=0.15)
         
         risk = np.dot(pdf*L, dz)
         zi = np.argmin(risk)
         c = np.polyfit(fit['zgrid'][zi-1:zi+2], risk[zi-1:zi+2], 2)
         z_best = -c[1]/(2*c[0])
-        risk_best = np.trapz(pdf*_loss((z_best-fit['zgrid'])/(1+fit['zgrid']), gamma=0.01), fit['zgrid'])
+        risk_best = np.trapz(pdf*_loss((z_best-fit['zgrid'])/(1+fit['zgrid']), gamma=0.15), fit['zgrid'])
         
         # Store data in the fit table
         fit['pdf'] = pdf
@@ -744,7 +827,7 @@ class GroupFitter(object):
         
         fit.meta['z_risk'] = z_best, 'Redshift at minimum risk'
         fit.meta['min_risk'] = risk_best, 'Minimum risk'
-        fit.meta['gam_loss'] = 0.01, 'Gamma factor of the risk/loss function'
+        fit.meta['gam_loss'] = 0.15, 'Gamma factor of the risk/loss function'
         return fit
                         
     def template_at_z(self, z=0, templates=None, fit_background=True, fitter='nnls', fwhm=1400, get_uncertainties=2):
@@ -779,6 +862,7 @@ class GroupFitter(object):
         tfit['cont1d'] = cont1d
         tfit['line1d'] = line1d
         tfit['cfit'] = cfit
+        tfit['coeffs'] = coeffs
         tfit['covar'] = covar
         tfit['z'] = z
         tfit['templates'] = templates
@@ -990,6 +1074,68 @@ class GroupFitter(object):
         fit_data['cont1d'] = cont1d
         fit_data['line1d'] = line1d
     
+    def scale_to_photometry(self, z=0, templates={}, tol=1.e-4, order=0, init=None, method='Powell'):
+        """Compute scale factor between spectra and photometry
+        
+        method : 'Powell' or 'BFGS' work well, latter a bit faster but less robust
+        
+        TBD
+        """
+        import scipy.optimize
+        
+        if self.Nphot == 0:
+            return np.array([10.])
+        
+        AxT, data = self.xfit_at_z(z=z, templates=templates, fitter='nnls', fit_background=True, get_uncertainties=False, get_design_matrix=True)
+        
+        if init is None:
+            init = np.zeros(order+1)
+            init[0] = 10.
+            
+        scale_fit = scipy.optimize.minimize(self.objfun_scale, init, args=(AxT, data, self, 0), method=method, jac=None, hess=None, hessp=None, tol=tol, callback=None, options=None)
+        
+        # pscale = scale_fit.x
+        return scale_fit
+    
+    @staticmethod
+    def compute_scale_array(pscale, wave):
+        """Return the scale array given the input coefficients
+        TBD
+        """
+        N = len(pscale)
+        rescale = 10**(np.arange(N)+1)
+        return np.polyval((pscale/rescale)[::-1], (wave-1.e4)/1000.)
+        
+    @staticmethod
+    def objfun_scale(pscale, AxT, data, self, return_coeffs):
+        """
+        Objective function for fitting for a scale term between photometry and 
+        spectra
+        """
+        import scipy.optimize
+        from scipy import polyval
+
+        scale = self.compute_scale_array(pscale, self.wavef[self.fit_mask])
+        scale[-self.Nphot:] = 1.
+        Ax = (AxT.T*scale)
+
+        # Remove scaling from background component
+        for i in range(self.N):
+            Ax[i,:] /= scale
+
+        coeffs, rnorm = scipy.optimize.nnls(Ax.T, data)  
+
+        full = np.dot(coeffs, Ax/self.sivarf[self.fit_mask])
+        resid = data/self.sivarf[self.fit_mask] - full# - background
+        chi2 = np.sum(resid**2*self.sivarf[self.fit_mask]**2)
+
+        #print('{0} {1}'.format(p, chi2))
+
+        if return_coeffs:
+            return coeffs, full, resid, chi2, AxT
+        else:
+            return chi2
+            
     def xfit_star(self, tstar=None):
         """Fit stellar templates
         """
