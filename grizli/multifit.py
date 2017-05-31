@@ -975,6 +975,7 @@ class MultiBeam(GroupFitter):
         self.fit_mask &= (self.ivarf >= 0) 
         
         self.scif = np.hstack([b.scif for b in self.beams])
+        self.wavef = np.hstack([b.wavef for b in self.beams])
         self.contamf = np.hstack([b.contam.flatten() for b in self.beams])
         
         self.weight = np.exp(-(self.fcontam*np.abs(self.contamf)*np.sqrt(self.ivarf)))
@@ -2211,9 +2212,9 @@ class MultiBeam(GroupFitter):
                 li = hdu_full[0].header['NUMLINES']
                 hdu_full[0].header['LINE{0:03d}'.format(li)] = line
                 hdu_full[0].header['FLUX{0:03d}'.format(li)] = (line_flux, 
-                                                'Line flux, erg/s/cm2')
+                                        'Line flux, 1e-17 erg/s/cm2')
                 hdu_full[0].header['ERR{0:03d}'.format(li)] = (line_err, 
-                                        'Line flux err, erg/s/cm2')
+                                        'Line flux err, 1e-17 erg/s/cm2')
 
         if len(hdu_full) > 0:
             hdu_full[0].header['HASLINES'] = (' '.join(saved_lines), 
