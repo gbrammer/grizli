@@ -2887,7 +2887,8 @@ class BeamCutout(object):
         self.ivar[self.mask] = 0
         
         self.beam.scale = scale
-             
+        self.thumbs = {}
+        
         #self.compute_model = self.beam.compute_model
         self.model = self.beam.model
         self.modelf = self.model.flatten()
