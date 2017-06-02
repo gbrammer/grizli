@@ -27,7 +27,7 @@ except:
     IGM = None
 
 
-def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter='nnls', group_name='grism', fit_stacks=True, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=3, fit_beams=True, root='', fit_trace_shift=False, phot=None, verbose=True):
+def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter='nnls', group_name='grism', fit_stacks=True, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=3, fit_beams=True, root='', fit_trace_shift=False, phot=None, verbose=True, scale_photometry=False):
     """Run the full procedure
     
     1) Load MultiBeam and stack files 
@@ -74,6 +74,17 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     fit_hdu = pyfits.table_to_hdu(fit)
     fit_hdu.header['EXTNAME'] = 'ZFIT_STACK'
     
+    if scale_photometry:
+        scl = mb.scale_to_photometry(z=fit.meta['z_risk'][0], method='Powell', templates=t0, order=1)
+        if scl.status == 0:
+            mb.pscale = scl.x
+            st.pscale = scl.x
+            
+            fit = st.xfit_redshift(templates=t0, zr=zr, dz=dz, prior=prior, fitter=fitter, verbose=verbose) 
+            fit_hdu = pyfits.table_to_hdu(fit)
+            fit_hdu.header['EXTNAME'] = 'ZFIT_STACK'
+            
+        
     # Zoom-in fit with individual beams
     if fit_beams:
         z0 = fit.meta['Z50'][0]
@@ -135,6 +146,9 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     fig.axes[0].plot(fit['zgrid'], np.log10(fit['pdf']), color='0.5', alpha=0.5)
     fig.axes[0].set_xlim(fit['zgrid'].min(), fit['zgrid'].max())
     
+    if phot is not None:
+        fig.axes[1].errorbar(mb.photom_pivot/1.e-4, mb.photom_flam, mb.photom_eflam, marker='s', alpha=0.5, color='k')
+        
     if not fit_stacks:
         stx = StackFitter(st_files, fit_stacks=True, group_name=group_name, fcontam=fcontam)
         if phot is not None:
@@ -459,8 +473,12 @@ class GroupFitter(object):
                     continue
 
                 sl = self.mslices[j]
-                A[self.N+i, sl] = beam.compute_model(spectrum_1d=s, in_place=False, is_cgs=True)[beam.fit_mask]*COEFF_SCALE
-                
+                if t in beam.thumbs:
+                    #print('Use thumbnail!', t)
+                    A[self.N+i, sl] = beam.compute_model(thumb=beam.thumbs[t], spectrum_1d=s, in_place=False, is_cgs=True)[beam.fit_mask]*COEFF_SCALE
+                else:
+                    A[self.N+i, sl] = beam.compute_model(spectrum_1d=s, in_place=False, is_cgs=True)[beam.fit_mask]*COEFF_SCALE
+                    
                 # if j == 0:
                 #     m = beam.compute_model(spectrum_1d=s, in_place=False, is_cgs=True)
                 #     ds9.frame(i)

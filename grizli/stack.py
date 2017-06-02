@@ -1086,6 +1086,7 @@ class StackedSpectrum(object):
         self.sci = self.hdulist['SCI',extver].data*1.
         self.ivar0 = self.hdulist['WHT',extver].data*1
         self.size = self.sci.size
+        self.thumbs = {}
         
         self.scif = self.sci.flatten()
         self.ivarf0 = self.ivar0.flatten()

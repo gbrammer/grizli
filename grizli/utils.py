@@ -826,6 +826,12 @@ def get_line_wavelengths():
     line_wavelengths['OIII'] = [5008.240, 4960.295]
     line_ratios['OIII'] = [2.98, 1]
     
+    # Split doublet, if needed
+    line_wavelengths['OIII4959'] = [4960.295]
+    line_ratios['OIII4959'] = [1]
+    line_wavelengths['OIII5007'] = [5008.240]
+    line_ratios['OIII5007'] = [1]
+    
     line_wavelengths['OII'] = [3729.875]
     line_ratios['OII'] = [1]
     
@@ -841,6 +847,13 @@ def get_line_wavelengths():
     
     line_wavelengths['SIII'] = [9068.6, 9530.6][::-1]
     line_ratios['SIII'] = [1, 2.44][::-1]
+    
+    # Split doublet, if needed
+    line_wavelengths['SIII9068'] = [9068.6]
+    line_ratios['SIII9068'] = [1]
+    line_wavelengths['SIII9531'] = [9530.6]
+    line_ratios['SIII9531'] = [1]
+    
     line_wavelengths['SII'] = [6718.29, 6732.67]
     line_ratios['SII'] = [1., 1.]   
     
