@@ -1077,6 +1077,11 @@ class StackedSpectrum(object):
         self.wave = self.get_wavelength_from_header(self.header)
         self.wavef = np.dot(np.ones((self.sh[0],1)), self.wave[None,:]).flatten()
         
+        if 'BEAM' in self.header:
+            self.beam_name = self.header['BEAM']
+        else:
+            self.beam_name = 'A'
+            
         # Configuration file
         self.is_flambda = self.header['ISFLAM']
         self.conf_file = self.header['CONF']
@@ -1201,8 +1206,8 @@ class StackedSpectrum(object):
         
         if not self.is_flambda:
             sens = u.interp.interp_conserve_c(self.wave, 
-                                    self.conf.sens['A']['WAVELENGTH'],
-                                    self.conf.sens['A']['SENSITIVITY'])
+                                self.conf.sens[self.beam_name]['WAVELENGTH'],
+                                self.conf.sens[self.beam_name]['SENSITIVITY'])
             
             if 'DLAM0' in self.header:
                 #print('xx Header')

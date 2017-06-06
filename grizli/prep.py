@@ -82,7 +82,7 @@ def go_all():
         asn.create()
         asn.write()
         
-def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_badpix=True, apply_grism_skysub=True, crclean=False):
+def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_badpix=True, apply_grism_skysub=True, crclean=False, mask_regions=True):
     """Copy "fresh" unmodified version of a data file from some central location
     
     TBD
@@ -240,7 +240,7 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
             
             dq[crmask] |= 1024
             sci[crmask] = 0
-                            
+                                    
     if verbose:
         print('{0} -> {1} {2}'.format(orig_file.filename(), local_file, extra_msg))
         
@@ -276,6 +276,9 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
         c1m.flush()
         
     orig_file.writeto(local_file, clobber=True)
+    
+    if mask_regions:
+        apply_region_mask(local_file, dq_value=1024)
     
 def apply_persistence_mask(flt_file, path='../Persistence', dq_value=1024,
                            err_threshold=0.6, grow_mask=3, subtract=True,
@@ -357,7 +360,7 @@ def apply_persistence_mask(flt_file, path='../Persistence', dq_value=1024,
             
         flt.flush()
 
-def apply_region_mask(flt_file, dq_value=1024):
+def apply_region_mask(flt_file, dq_value=1024, verbose=True):
     """Apply DQ mask from a DS9 region file
     
     Parameters
@@ -378,7 +381,10 @@ def apply_region_mask(flt_file, dq_value=1024):
     mask_files = glob.glob(flt_file.replace('_flt.fits','.*.mask.reg'))
     if len(mask_files) == 0:
         return True
-        
+     
+    if verbose:
+        print('Region mask for {0}: {1}'.format(flt_file, mask_files))
+    
     flt = pyfits.open(flt_file, mode='update')
     for mask_file in mask_files:
         ext = int(mask_file.split('.')[-3])
@@ -2624,7 +2630,7 @@ def find_single_image_CRs(visit, simple_mask=False):
         
         flt.flush()
         
-def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, max_files=999, pixfrac=0.8, scale=0.06, skysub=True, bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='EXP', final_wt_scl='exptime'):
+def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, max_files=999, pixfrac=0.8, scale=0.06, skysub=True, skyuser='MDRIZSKY', bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='EXP', final_wt_scl='exptime'):
     """Combine overlapping visits into single output mosaics
     
     Parameters
@@ -2747,7 +2753,8 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, m
         if 'reference' in group:
             AstroDrizzle(group['files'], output=group['product'],
                      clean=True, context=False, preserve=False,
-                     skysub=skysub, driz_separate=False, driz_sep_wcs=False,
+                     skysub=skysub, skyuser=skyuser,
+                     driz_separate=False, driz_sep_wcs=False,
                      median=False, blot=False, driz_cr=False,
                      driz_cr_corr=False, driz_combine=True,
                      final_bits=bits, coeffs=True, build=False, 
@@ -2759,7 +2766,8 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, m
         else:
             AstroDrizzle(group['files'], output=group['product'],
                      clean=True, context=False, preserve=False,
-                     skysub=skysub, driz_separate=False, driz_sep_wcs=False,
+                     skysub=skysub, skyuser=skyuser,
+                     driz_separate=False, driz_sep_wcs=False,
                      median=False, blot=False, driz_cr=False,
                      driz_cr_corr=False, driz_combine=True,
                      final_bits=bits, coeffs=True, build=False, 
@@ -2832,7 +2840,8 @@ def manual_alignment(visit, ds9, reference=None, reference_catalogs=['SDSS', 'PS
     print(visit['product'], reference)
 
     #im = pyfits.open('{0}_drz_sci.fits'.format(visit['product']))
-    ds9.view(im[1].data, header=im[1].header)
+    #ds9.view(im[1].data, header=im[1].header)
+    ds9.set('file {0}'.format(im.filename()))
     ds9.set('regions file '+reference)
     x = input('pan to object in image: ')
     if x:
