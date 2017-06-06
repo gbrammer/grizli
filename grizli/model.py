@@ -3420,7 +3420,7 @@ class BeamCutout(object):
             
         return dispersion_PA
     
-    def init_epsf(self, center=None, tol=1.e-3, yoff=0.):
+    def init_epsf(self, center=None, tol=1.e-3, yoff=0., skip=1., flat_sensitivity=False):
         """Initialize ePSF fitting for point sources
         TBD
         """
@@ -3454,8 +3454,9 @@ class BeamCutout(object):
         filt_lam = np.array([1.0551, 1.2486, 1.5369])*1.e4
         
         yp_beam, xp_beam = np.indices(self.beam.sh_beam)
-        skip = 1
+        #skip = 1
         xarr = np.arange(0,self.beam.lam_beam.shape[0], skip)
+        xarr = xarr[xarr <= self.beam.lam_beam.shape[0]-1]
         xbeam = np.arange(self.beam.lam_beam.shape[0])*1.
 
         #yoff = 0 #-0.15
@@ -3470,7 +3471,7 @@ class BeamCutout(object):
         for xi in xarr:
             yi = np.interp(xi, xbeam, self.beam.ytrace_beam)
             li = np.interp(xi, xbeam, self.beam.lam_beam) #+ lam_offset*np.diff(self.wave)[0]
-            si = np.interp(xi, xbeam, self.beam.sensitivity_beam)
+            #si = np.interp(xi, xbeam, self.beam.sensitivity_beam)
             dx = xp_beam-self.psf_params[1]-xi
             dy = yp_beam-self.psf_params[2]-yi+yoff
 
@@ -3489,14 +3490,26 @@ class BeamCutout(object):
             
             #psf += self.psf_resid
             
-            psf *= si*self.direct.photflam#/1.e-17 #/psf.sum()
+            #psf *= si*self.direct.photflam#/1.e-17 #/psf.sum()
             
             A_psf.append(psf.flatten())
             lam_psf.append(li)
-            psf_model += psf
-            
-        self.A_psf = scipy.sparse.csr_matrix(np.array(A_psf).T)
+            #psf_model += psf
+        
+        # Sensitivity
         self.lam_psf = np.array(lam_psf)
+        if flat_sensitivity:
+            s_i_scale = np.abs(np.gradient(self.lam_psf))*self.direct.photflam
+        else:
+            sens = self.beam.conf.sens[self.beam.beam]
+            so = np.argsort(self.lam_psf)
+            s_i = interp.interp_conserve_c(self.lam_psf[so], sens['WAVELENGTH'], sens['SENSITIVITY'])*np.gradient(self.lam_psf[so])*self.direct.photflam
+            s_i_scale = s_i*0.
+            s_i_scale[so] = s_i
+        
+        #s_i = np.interp(self.lam_psf, sens['WAVELENGTH'], sens['SENSITIVITY'])*np.gradient(self.lam_psf) 
+        
+        self.A_psf = scipy.sparse.csr_matrix(np.array(A_psf).T*s_i_scale)
                 
     def compute_model_psf(self, id=None, spectrum_1d=None, in_place=True, is_cgs=True):
         if spectrum_1d is None:

@@ -931,7 +931,7 @@ class MultiBeam(GroupFitter):
         self.id = self.beams[0].id
         
         # Use WFC3 ePSF for the fit
-        if psf & (self.beams[i].grism.instrument == 'WFC3'):
+        if (psf > 0) & (self.beams[i].grism.instrument == 'WFC3'):
             # Crude for now:  overwrite `beam.compute_model` methods with 
             # the `compute_model_psf`
             for ib, beam in enumerate(self.beams):
@@ -943,7 +943,7 @@ class MultiBeam(GroupFitter):
                     beam.direct.filter = beam.direct.ref_filter #'F160W'
                     beam.direct.photflam = beam.direct.ref_photflam
                 
-                beam.init_epsf(yoff = 0.06)
+                beam.init_epsf(yoff = 0.06, skip=psf*1)
                 beam.compute_model = beam.compute_model_psf
                 beam.beam.compute_model = beam.compute_model_psf
                 beam.compute_model()
