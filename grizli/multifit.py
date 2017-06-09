@@ -608,13 +608,66 @@ class GroupFLT():
             
             so = np.argsort(mags)
             ids, mags = ids[so], mags[so]
+        
+        wave = np.linspace(0.2,2.4e4,100)
+        poly_templates = utils.polynomial_templates(wave, order=poly_order, line=False)
             
         for id, mag in zip(ids, mags):
             self.refine(id, mag=mag, poly_order=poly_order,
                         max_coeff=max_coeff, size=30, ds9=ds9,
-                        verbose=verbose)
+                        verbose=verbose, templates=poly_templates)
+    
+    def refine(self, id, mag=-99, poly_order=1, size=30, ds9=None, verbose=True, max_coeff=2.5, templates=None):
+        """TBD
+        Use tools in `fitting`
+        """
+        beams = self.get_beams(id, size=size, min_overlap=0.5, get_slice_header=False)
+        if len(beams) == 0:
+            return True
+        
+        mb = MultiBeam(beams)
+        
+        if templates is None:
+            wave = np.linspace(0.9*mb.wavef.min(),1.1*mb.wavef.max(),100)
+            templates = grizli.utils.polynomial_templates(wave, order=poly_order, line=False)
+        
+        try:
+            tfit = mb.template_at_z(z=0, templates=templates, fit_background=True, fitter='lstsq', get_uncertainties=2)
+        except:
+            return False
             
-    def refine(self, id, mag=-99, poly_order=1, size=30, ds9=None, verbose=True, max_coeff=2.5):
+        scale_coeffs = [tfit['cfit']['poly {0}'.format(i)][0] for i in range(1+poly_order)]
+        xspec, ypoly = tfit['cont1d'].wave, tfit['cont1d'].flux
+        
+        # Check where templates inconsistent with broad-band fluxes
+        xb = [beam.direct.ref_photplam if beam.direct['REF'] is not None else beam.direct.photplam for beam in beams]
+        fb = [beam.beam.total_flux for beam in beams]
+        mb = np.polyval(scale_coeffs[::-1], np.array(xb)/1.e4-1)
+        
+        if (np.abs(mb/fb).max() > max_coeff) | (~np.isfinite(mb/fb).sum() > 0) | (np.min(mb) < 0):
+            if verbose:
+                print('{0} mag={1:6.2f} {2} xx'.format(id, mag, scale_coeffs))
+
+            return True
+        
+        # Put the refined model into the full-field model    
+        self.compute_single_model(id, mag=mag, size=-1, store=False, spectrum_1d=[xspec, ypoly], is_cgs=True, get_beams=None, in_place=True)
+        
+        # Display the result?
+        if ds9:
+            flt = self.FLTs[0]
+            mask = flt.grism['SCI'] != 0
+            ds9.view((flt.grism['SCI'] - flt.model)*mask,
+                      header=flt.grism.header)
+        
+        if verbose:
+            print('{0} mag={1:6.2f} {2}'.format(id, mag, scale_coeffs))
+            
+        return True
+        #m2d = mb.reshape_flat(modelf)
+        
+    ############
+    def old_refine(self, id, mag=-99, poly_order=1, size=30, ds9=None, verbose=True, max_coeff=2.5):
         """TBD
         """
         # Extract and fit beam spectra
@@ -999,6 +1052,21 @@ class MultiBeam(GroupFitter):
         
         self.ra, self.dec = self.beams[0].get_sky_coords()
     
+    def compute_exptime(self):
+        exptime = {}
+        for beam in self.beams:
+            if beam.grism.instrument == 'NIRISS':
+                grism = beam.grism.pupil
+            else:
+                grism = beam.grism.filter
+            
+            if grism in exptime:
+                exptime[grism] += beam.grism.exptime
+            else:
+                exptime[grism] = beam.grism.exptime
+        
+        return exptime
+        
     def extend(self, new, verbose=True):
         """Concatenate `~grizli.multifit.MultiBeam` objects
         
@@ -2528,8 +2596,13 @@ class MultiBeam(GroupFitter):
         
         NY += 1
                 
-        keys = list(self.PA)
-        keys.sort()
+        # keys = list(self.PA)
+        # keys.sort()
+        
+        keys = []
+        for key in ['G800L','G102','G141','F090W','F115W','F150W','F200W']:
+            if key in self.PA:
+                keys.append(key)
                 
         if zfit is not None:
             if 'coeffs_full' in zfit:
@@ -2994,6 +3067,7 @@ def drizzle_2d_spectrum(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
     p.header['BEAM'] = (beams[0].beam.beam, 'Grism order')
     
     p.header['NINPUT'] = (len(beams), 'Number of drizzled beams')
+    exptime = 0.
     for i, beam in enumerate(beams):
         p.header['FILE{0:04d}'.format(i+1)] = (beam.grism.parent_file, 
                                              'Parent filename')
@@ -3001,6 +3075,9 @@ def drizzle_2d_spectrum(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
                                              'Beam grism element')
         p.header['PA{0:04d}'.format(i+1)] = (beam.get_dispersion_PA(), 
                                              'PA of dispersion axis')
+        exptime += beam.grism.exptime
+    
+    p.header['EXPTIME'] = (exptime, 'Total exposure time [s]')
         
     h = out_header.copy()
         
