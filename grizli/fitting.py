@@ -26,7 +26,6 @@ try:
 except:
     IGM = None
 
-
 def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter='nnls', group_name='grism', fit_stacks=True, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=3, fit_beams=True, root='', fit_trace_shift=False, phot=None, verbose=True, scale_photometry=False):
     """Run the full procedure
     
@@ -54,7 +53,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     if fit_trace_shift:
         b = mb.beams[0]
         sn_lim = fit_trace_shift*1
-        if np.max((b.model/b.grism['ERR'])[b.fit_mask.reshape(b.sh)]) > sn_lim:
+        if (np.max((b.model/b.grism['ERR'])[b.fit_mask.reshape(b.sh)]) > sn_lim) | (sn_lim > 100):
             shift = mb.fit_trace_shift(tol=1.e-3, verbose=verbose)
         
             #shift = mb.fit_trace_shift(tol=1.e-3)
@@ -75,7 +74,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     fit_hdu.header['EXTNAME'] = 'ZFIT_STACK'
     
     if scale_photometry:
-        scl = mb.scale_to_photometry(z=fit.meta['z_risk'][0], method='Powell', templates=t0, order=1)
+        scl = mb.scale_to_photometry(z=fit.meta['z_map'][0], method='Powell', templates=t0, order=1)
         if scl.status == 0:
             mb.pscale = scl.x
             st.pscale = scl.x
@@ -99,16 +98,24 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
         mb_fit = fit
            
     #### Get best-fit template 
-    tfit = mb.template_at_z(z=mb_fit.meta['z_risk'][0], templates=t1, fit_background=True, fitter=fitter)
-        
+    tfit = mb.template_at_z(z=mb_fit.meta['z_map'][0], templates=t1, fit_background=True, fitter=fitter)
+    
+    # Redrizzle? ... testing
+    if False:
+        hdu, fig = mb.drizzle_grisms_and_PAs(fcontam=fcontam,
+                                         flambda=False,
+                                         size=48, scale=1., 
+                                         kernel='point', pixfrac=0.1,
+                                         zfit=tfit)
+                
     # Fit covariance
     cov_hdu = pyfits.ImageHDU(data=tfit['covar'], name='COVAR')
     Next = mb_fit.meta['N']
     cov_hdu.header['N'] = Next
     
     # Line EWs & fluxes
-    coeffs_clip = tfit['coeffs'][Next[0]:]
-    covar_clip = tfit['covar'][Next[0]:,Next[0]:]
+    coeffs_clip = tfit['coeffs'][mb.N:]
+    covar_clip = tfit['covar'][mb.N:,mb.N:]
     lineEW = utils.compute_equivalent_widths(t1, coeffs_clip, covar_clip, max_R=5000, Ndraw=1000)
     
     for ik, key in enumerate(lineEW):
@@ -156,7 +163,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     else:
         stx = st
 
-    tfit_st = stx.template_at_z(z=mb_fit.meta['z_risk'][0], templates=t1, fit_background=True)
+    tfit_st = stx.template_at_z(z=mb_fit.meta['z_map'][0], templates=t1, fit_background=True)
     
     axc = fig.axes[1]
     for i in range(stx.N):
@@ -206,7 +213,12 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
          pzfit, pspec2, pline = grizli.multifit.get_redshift_fit_defaults()
     
     line_hdu = mb.drizzle_fit_lines(tfit, pline, force_line=['SIII','SII','Ha', 'OIII', 'Hb', 'OII'], save_fits=False, mask_lines=True, mask_sn_limit=mask_sn_limit)
-        
+    
+    # Add beam exposure times
+    exptime = mb.compute_exptime()
+    for k in exptime:
+        line_hdu[0].header['T_{0}'.format(k)] = (exptime[k], 'Total exposure time [s]')
+         
     line_hdu.insert(1, fit_hdu)
     line_hdu.insert(2, cov_hdu)
     if fit_beams:
@@ -215,7 +227,119 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     
     line_hdu.writeto('{0}_{1:05d}.full.fits'.format(group_name, id), clobber=True, output_verify='fix')
     return mb, st, fit, tfit, line_hdu
+
+def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat', include_beam=True):
+    import glob
+    import os
+    import matplotlib.pyplot as plt
     
+    import astropy.units as u
+    import numpy as np
+    import grizli
+        
+    keys = {0:['ID','RA','DEC','NINPUT','REDSHIFT','T_G141'],
+            1:['CHI2POLY','DOF','CHIMIN','CHIMAX','BIC_POLY','BIC_TEMP','Z02', 'Z16', 'Z50', 'Z84', 'Z97', 'ZWIDTH1', 'ZWIDTH2', 'Z_MAP', 'Z_RISK', 'MIN_RISK'],
+            2:['CHI2POLY','DOF','CHIMIN','CHIMAX','BIC_POLY','BIC_TEMP','Z02', 'Z16', 'Z50', 'Z84', 'Z97', 'ZWIDTH1', 'ZWIDTH2', 'Z_MAP', 'Z_RISK', 'MIN_RISK'],
+            4:['FLUX_{0:03d} ERR_{0:03d} EW50_{0:03d} EWHW_{0:03d}'.format(i) for i in range(24)]}
+    
+    if not include_beam:
+        keys[2] = keys[4]
+        keys.pop(4)
+        
+    for k in keys:
+        if k == 0:
+            os.system('dfits {1}*full.fits | fitsort {2} | sed "s/\t/ , /g" > {1}.info.{0}'.format(k, target, ' '.join(keys[k])))
+        else:
+            os.system('dfits -x {0} {1}*full.fits | fitsort {2} |sed "s/FILE/FILE{0}/" | sed "s/\t/ , /g" > {1}.info.{0}'.format(k, target, ' '.join(keys[k])))
+    
+    for k in keys:
+        if k == 0:
+            info = grizli.utils.GTable.gread('{0}.info.{1}'.format(target, k), format='csv')
+            info = info[info.colnames[:-1]]
+        else:
+            tab = grizli.utils.GTable.gread('{0}.info.{1}'.format(target, k), format='csv')
+            tab = tab[tab.colnames[1:-1]]
+            if (k == 2) & (include_beam):
+                for c in tab.colnames:
+                    tab.rename_column(c, 'BEAM_'+c)
+                
+            for c in tab.colnames:
+                info.add_column(tab[c])
+                
+    for c in info.colnames:
+        info.rename_column(c, c.lower())
+    
+    # Emission line names
+    files=glob.glob('{0}*full.fits'.format(target))
+    im = pyfits.open(files[0])
+    h = im['COVAR'].header
+    for i in range(24):
+        line = h.comments['FLUX_{0:03d}'.format(i)].split()[0]
+        for root in ['flux','err','ew50','ewhw']:
+            col = '{0}_{1}'.format(root, line)
+            info.rename_column('{0}_{1:03d}'.format(root, i), col)
+            if root.startswith('ew'):
+                info[col].format = '.1f'
+            else:
+                info[col].format = '.1e'
+        
+        info['sn_{0}'.format(line)] = info['flux_'+line]/info['err_'+line]
+        info['sn_{0}'.format(line)][info['err_'+line] == 0] = -99
+        info['sn_{0}'.format(line)].format = '.1f'
+           
+    info['chinu'] = info['chimin']/info['dof']
+    info['chinu'].format = '.2f'
+    
+    info['bic_diff'] = info['bic_poly'] - info['bic_temp']
+    info['bic_diff'].format = '.1f'
+    
+    info['log_risk'] = np.log10(info['min_risk'])
+    info['log_risk'].format = '.2f'
+    
+    if include_beam:
+        info['beam_chinu'] = info['beam_chimin']/info['beam_dof']
+        info['beam_chinu'].format = '.2f'
+    
+        info['beam_bic_diff'] = info['beam_bic_poly'] - info['beam_bic_temp']
+        info['beam_bic_diff'].format = '.1f'
+    
+        info['beam_log_risk'] = np.log10(info['beam_min_risk'])
+        info['beam_log_risk'].format = '.2f'
+        
+    ### PNG columns    
+    for ext in ['stack','full','line']:
+        png = ['{0}_{1:05d}.{2}.png'.format(target, id, ext) for id in info['id']]
+        info['png_{0}'.format(ext)] = ['<a href={0}><img src={0} height=200></a>'.format(p) for p in png]
+    
+    ### Column formats
+    for col in info.colnames:
+        if col.strip('beam_').startswith('z'):
+            info[col].format = '.4f'
+        
+        if col in ['ra','dec']:
+            info[col].format = '.6f'
+            
+    ### Sextractor catalog
+    if sextractor is None:
+        info.write('{0}.info.fits'.format(target), overwrite=True)
+        return info
+        
+    #sextractor = glob.glob('{0}-f*cat'.format(target))[0]
+    try:
+        hcat = grizli.utils.GTable.gread(sextractor) #, format='ascii.sextractor')
+    except:
+        hcat = grizli.utils.GTable.gread(sextractor, sextractor=True)
+    
+    for c in hcat.colnames:
+        hcat.rename_column(c, c.lower())
+    
+    idx, dr = hcat.match_to_catalog_sky(info, self_radec=('x_world', 'y_world'), other_radec=None)
+    for c in hcat.colnames:
+        info.add_column(hcat[c][idx])
+        
+    info.write('{0}.info.fits'.format(target), overwrite=True)
+    return info
+        
 def _loss(dz, gamma=0.15):
     """Risk / Loss function, Tanaka et al. (https://arxiv.org/abs/1704.05988)
     
@@ -823,14 +947,20 @@ class GroupFitter(object):
         
         dz = np.gradient(fit['zgrid'])
         
+        gamma = 0.15
         zsq = np.dot(fit['zgrid'][:,None], np.ones_like(fit['zgrid'])[None,:])
-        L = _loss((zsq-fit['zgrid'])/(1+fit['zgrid']), gamma=0.15)
+        L = _loss((zsq-fit['zgrid'])/(1+fit['zgrid']), gamma=gamma)
         
         risk = np.dot(pdf*L, dz)
         zi = np.argmin(risk)
         c = np.polyfit(fit['zgrid'][zi-1:zi+2], risk[zi-1:zi+2], 2)
-        z_best = -c[1]/(2*c[0])
-        risk_best = np.trapz(pdf*_loss((z_best-fit['zgrid'])/(1+fit['zgrid']), gamma=0.15), fit['zgrid'])
+        z_risk = -c[1]/(2*c[0])
+        min_risk = np.trapz(pdf*_loss((z_risk-fit['zgrid'])/(1+fit['zgrid']), gamma=gamma), fit['zgrid'])
+        
+        # MAP, maximum p(z)
+        zi = np.argmax(pdf)
+        c = np.polyfit(fit['zgrid'][zi-1:zi+2], pdf[zi-1:zi+2], 2)
+        z_map = -c[1]/(2*c[0])
         
         # Store data in the fit table
         fit['pdf'] = pdf
@@ -843,9 +973,11 @@ class GroupFitter(object):
         fit.meta['ZWIDTH1'] = pz_percentiles[3]-pz_percentiles[1], 'Width between the 16th and 84th p(z) percentiles'
         fit.meta['ZWIDTH2'] = pz_percentiles[4]-pz_percentiles[0], 'Width between the 2.5th and 97.5th p(z) percentiles'
         
-        fit.meta['z_risk'] = z_best, 'Redshift at minimum risk'
-        fit.meta['min_risk'] = risk_best, 'Minimum risk'
-        fit.meta['gam_loss'] = 0.15, 'Gamma factor of the risk/loss function'
+        fit.meta['z_map'] = z_map, 'Redshift at MAX(PDF)'
+        
+        fit.meta['z_risk'] = z_risk, 'Redshift at minimum risk'
+        fit.meta['min_risk'] = min_risk, 'Minimum risk'
+        fit.meta['gam_loss'] = gamma, 'Gamma factor of the risk/loss function'
         return fit
                         
     def template_at_z(self, z=0, templates=None, fit_background=True, fitter='nnls', fwhm=1400, get_uncertainties=2):

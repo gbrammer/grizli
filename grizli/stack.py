@@ -1218,6 +1218,17 @@ class StackedSpectrum(object):
             #dlam = np.median(np.diff(self.wave))
             dlam = np.gradient(self.wave)
             
+            # G800 variable dispersion, which isn't coming out right 
+            # in the 2D drizzled spectrum
+            if self.grism == 'G800L':
+                ## Linear fit to differential G800L dispersion
+                # y = np.diff(beam.wave)/np.diff(beam.wave)[0]
+                # x = beam.wave[1:]
+                # c_i = np.polyfit(x/1.e4, y, 1)
+                c_i = np.array([ 0.07498747,  0.98928126])
+                scale = np.polyval(c_i, self.wave/1.e4)
+                sens *= scale
+                
             self.sens = sens*dlam #*1.e-17
             self.fit_data = (self.fit_data.T*self.sens).T
             
