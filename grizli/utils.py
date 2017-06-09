@@ -1381,7 +1381,7 @@ def load_templates(fwhm=400, line_complexes=True, stars=False,
     return temp_list    
 
 def polynomial_templates(wave, order=0, line=False):
-    temp = {}   
+    temp = OrderedDict()  
     if line:
         for sign in [1,-1]:
             key = 'poly {0}'.format(sign)
@@ -2420,7 +2420,7 @@ class GTable(astropy.table.Table):
         other_coo = SkyCoord(ra=other[rd[0]], dec=other[rd[1]])
                      
         idx, d2d, d3d = other_coo.match_to_catalog_sky(self_coo)
-        return idx, d2d
+        return idx, d2d.to(u.arcsec)
             
     def write_sortable_html(self, output, replace_braces=True, localhost=True, max_lines=50, table_id=None, table_class="display compact", css=None):
         """Wrapper around `~astropy.table.Table.write(format='jsviewer')`.
