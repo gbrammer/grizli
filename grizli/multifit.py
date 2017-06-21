@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 
 from astropy.table import Table
 import astropy.io.fits as pyfits
+import astropy.units as u
 
 ## local imports
 from . import grismconf
@@ -2859,7 +2860,56 @@ class MultiBeam(GroupFitter):
             return output_hdu, fig
         else:
             return output_hdu #all_hdus
-                                      
+    
+    def get_binned_spectra(self, bin=1, coeffs=None):
+        """
+        Get optimally-extracted, binned spectra in each available grism
+        """
+        binned_spectrum = OrderedDict()
+        for grism in self.Ngrism:
+            num = []
+            den = []
+            wave_x = []
+            
+            for ib, beam in enumerate(self.beams):
+                if beam.grism.filter == grism:
+                    
+                    if not hasattr(beam.beam, 'optimal_profile'):
+                        xxx = beam.beam.optimal_extract(beam.model, ivar=beam.ivar)
+                    
+                    proff = beam.beam.optimal_profile.flatten()
+                    clean = (beam.grism['SCI']-beam.contam).flatten()
+                    if coeffs is not None:
+                        clean -= coeffs[ib]
+                    
+                    wx = np.dot(np.ones(beam.sh[0])[:,None], beam.wave[None,:]).flatten()[beam.fit_mask]
+                    sx = np.dot(np.ones(beam.sh[0])[:,None], beam.beam.sensitivity[None,:]).flatten()#[beam.fit_mask]
+                    
+                    num.append((proff*clean*beam.ivarf*sx)[beam.fit_mask])
+                    den.append((proff**2*beam.ivarf*sx**2)[beam.fit_mask])
+                    wave_x.append(wx)
+                    
+            wave_x = np.hstack(wave_x)
+            num = np.hstack(num)
+            den = np.hstack(den)
+
+            lim = utils.GRISM_LIMITS[grism]
+            wave_bin = np.arange(lim[0]*1.e4, lim[1]*1.e4, lim[2]/bin)
+            
+            flux_bin = wave_bin*0.
+            var_bin = wave_bin*0.
+            
+            for j in range(len(wave_bin)):
+                ix = np.abs(wave_x-wave_bin[j]) < lim[2]/bin/2.
+                #ix = (wave_x > wave_bin[j]) & (wave_x <= wave_bin[j+1])
+                if ix.sum() > 0:
+                    var_bin[j] = 1./den[ix].sum()
+                    flux_bin[j] = num[ix].sum()*var_bin[j]
+                
+            binned_spectrum[grism] = [wave_bin*u.Angstrom, flux_bin*utils.FLAMBDA_CGS, np.sqrt(var_bin)*utils.FLAMBDA_CGS]
+        
+        return binned_spectrum
+        
 def get_redshift_fit_defaults():
     """TBD
     """
