@@ -155,55 +155,60 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     
     if phot is not None:
         fig.axes[1].errorbar(mb.photom_pivot/1.e-4, mb.photom_flam, mb.photom_eflam, marker='s', alpha=0.5, color='k')
-        
-    if not fit_stacks:
-        stx = StackFitter(st_files, fit_stacks=True, group_name=group_name, fcontam=fcontam)
-        if phot is not None:
-            stx.set_photometry(**phot)
-    else:
-        stx = st
-
-    tfit_st = stx.template_at_z(z=mb_fit.meta['z_map'][0], templates=t1, fit_background=True)
     
     axc = fig.axes[1]
-    for i in range(stx.N):
-        beam = stx.beams[i]
-        #m_i = beam.compute_model(spectrum_1d=sp, is_cgs=True, in_place=False).reshape(beam.sh)
-        
-        grism = beam.grism
-        clean = beam.sci - beam.contam - tfit_st['cfit']['bg {0:03d}'.format(i)][0]
-        w, fl, er = beam.optimal_extract(clean, ivar=beam.ivar)            
-        #w, flm, erm = beam.optimal_extract(m_i, ivar=beam.ivar)
-        
-        sens = beam.sens
-        
-        # Some offset between drizzled and beam spectra, but can't shift
-        # in the StackedSpectrum because redshift fit is about right
-        w -= np.abs(w[1]-w[0])
-        w = w/1.e4
-             
-        unit_corr = 1./sens
-        
-        # if 'DLAM0' in beam.header:
-        #     unit_corr *= beam.header['DLAM']/beam.header['DLAM0']
-            
-        clip = (sens > 0.1*sens.max()) 
-        clip &= (np.isfinite(fl)) & (er > 0)
-        if clip.sum() == 0:
-            continue
-        
-        fl *= unit_corr/1.e-19
-        er *= unit_corr/1.e-19
-        #flm *= unit_corr/1.e-19
-        
-        f_alpha = 0.8 #1./(stx.Ngrism[grism.upper()])*0.8 #**0.5
-        
-        # Plot
-        axc.errorbar(w[clip], fl[clip], er[clip], color=GRISM_COLORS[grism], alpha=f_alpha, marker='.', linestyle='None', zorder=1)
-        #axc.plot(w[clip], flm[clip], color='r', alpha=f_alpha, linewidth=2, zorder=10)
-        
-        if phot is not None:
-            axc.errorbar(mb.photom_pivot/1.e4, mb.photom_flam/1.e-19, mb.photom_eflam/1.e-19, marker='.', linestyle='None', color='k', alpha=0.5)
+    oned_spec = mb.get_binned_spectra(coeffs=tfit['coeffs'])
+    for g in oned_spec:
+        axc.errorbar(oned_spec[g][0].value/1.e4, oned_spec[g][1].value/1.e-19, oned_spec[g][2].value/1.e-19, color=GRISM_COLORS[g], alpha=0.8, marker='.', linestyle='None', zorder=1)
+          
+    # if not fit_stacks:
+    #     stx = StackFitter(st_files, fit_stacks=True, group_name=group_name, fcontam=fcontam)
+    #     if phot is not None:
+    #         stx.set_photometry(**phot)
+    # else:
+    #     stx = st
+    # 
+    # tfit_st = stx.template_at_z(z=mb_fit.meta['z_map'][0], templates=t1, fit_background=True)
+    # 
+    # axc = fig.axes[1]
+    # for i in range(stx.N):
+    #     beam = stx.beams[i]
+    #     #m_i = beam.compute_model(spectrum_1d=sp, is_cgs=True, in_place=False).reshape(beam.sh)
+    #     
+    #     grism = beam.grism
+    #     clean = beam.sci - beam.contam - tfit_st['cfit']['bg {0:03d}'.format(i)][0]
+    #     w, fl, er = beam.optimal_extract(clean, ivar=beam.ivar)            
+    #     #w, flm, erm = beam.optimal_extract(m_i, ivar=beam.ivar)
+    #     
+    #     sens = beam.sens
+    #     
+    #     # Some offset between drizzled and beam spectra, but can't shift
+    #     # in the StackedSpectrum because redshift fit is about right
+    #     w -= np.abs(w[1]-w[0])
+    #     w = w/1.e4
+    #          
+    #     unit_corr = 1./sens
+    #     
+    #     # if 'DLAM0' in beam.header:
+    #     #     unit_corr *= beam.header['DLAM']/beam.header['DLAM0']
+    #         
+    #     clip = (sens > 0.1*sens.max()) 
+    #     clip &= (np.isfinite(fl)) & (er > 0)
+    #     if clip.sum() == 0:
+    #         continue
+    #     
+    #     fl *= unit_corr/1.e-19
+    #     er *= unit_corr/1.e-19
+    #     #flm *= unit_corr/1.e-19
+    #     
+    #     f_alpha = 0.8 #1./(stx.Ngrism[grism.upper()])*0.8 #**0.5
+    #     
+    #     # Plot
+    #     axc.errorbar(w[clip], fl[clip], er[clip], color=GRISM_COLORS[grism], alpha=f_alpha, marker='.', linestyle='None', zorder=1)
+    #     #axc.plot(w[clip], flm[clip], color='r', alpha=f_alpha, linewidth=2, zorder=10)
+    #     
+    #     if phot is not None:
+    #         axc.errorbar(mb.photom_pivot/1.e4, mb.photom_flam/1.e-19, mb.photom_eflam/1.e-19, marker='.', linestyle='None', color='k', alpha=0.5)
             
     # Save the figure
     fig.savefig('{0}_{1:05d}.full.png'.format(group_name, id))
@@ -1424,7 +1429,7 @@ class GroupFitter(object):
         gs.tight_layout(fig, pad=0.1, w_pad=0.1)
         return fig
         
-def show_drizzled_lines(line_hdu, full_line_list=['OII', 'Hb', 'OIII', 'Ha', 'SII', 'SIII'], size_arcsec=2, cmap='cubehelix_r'):
+def show_drizzled_lines(line_hdu, full_line_list=['OII', 'Hb', 'OIII', 'Ha', 'SII', 'SIII'], size_arcsec=2, cmap='cubehelix_r', scale=1.):
     """TBD
     """
     import matplotlib.pyplot as plt
@@ -1443,7 +1448,7 @@ def show_drizzled_lines(line_hdu, full_line_list=['OII', 'Hb', 'OIII', 'Ha', 'SI
     
     # Direct
     ax = fig.add_subplot(1,NL+1,1)
-    ax.imshow(line_hdu['DSCI'].data, vmin=-0.02, vmax=0.6, cmap=cmap, origin='lower')
+    ax.imshow(line_hdu['DSCI'].data*scale, vmin=-0.02, vmax=0.6, cmap=cmap, origin='lower')
     ax.set_title('Direct   {0}    z={1:.3f}'.format(line_hdu[0].header['ID'], line_hdu[0].header['REDSHIFT']))
     
     ax.set_xlabel('RA'); ax.set_ylabel('Decl.')
@@ -1458,7 +1463,7 @@ def show_drizzled_lines(line_hdu, full_line_list=['OII', 'Hb', 'OIII', 'Ha', 'SI
     # Line maps
     for i, line in enumerate(show_lines):
         ax = fig.add_subplot(1,NL+1,2+i)
-        ax.imshow(line_hdu['LINE',line].data, vmin=-0.02, vmax=0.6, cmap=cmap, origin='lower')
+        ax.imshow(line_hdu['LINE',line].data*scale, vmin=-0.02, vmax=0.6, cmap=cmap, origin='lower')
         ax.set_title(r'%s %.3f $\mu$m' %(line, line_hdu['LINE', line].header['WAVELEN']/1.e4))
 
     # End things
