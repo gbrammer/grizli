@@ -378,7 +378,7 @@ def apply_region_mask(flt_file, dq_value=1024, verbose=True):
     """
     import pyregion
     
-    mask_files = glob.glob(flt_file.replace('_flt.fits','.*.mask.reg'))
+    mask_files = glob.glob(flt_file.replace('_flt.fits','.*.mask.reg').replace('_flc.fits','.*.mask.reg'))
     if len(mask_files) == 0:
         return True
      
