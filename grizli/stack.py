@@ -188,7 +188,7 @@ class StackFitter(GroupFitter):
         self.wavef = np.hstack([E.wavef for E in self.beams])
 
         self.weightf = np.hstack([E.weightf for E in self.beams])
-        self.ivarf *= self.weightf
+        #self.ivarf *= self.weightf
 
         self.sivarf = np.sqrt(self.ivarf)
 
@@ -272,7 +272,7 @@ class StackFitter(GroupFitter):
         self.wavef = np.hstack([E.wavef for E in self.beams])
 
         self.weightf = np.hstack([E.weightf for E in self.beams])
-        self.ivarf *= self.weightf
+        #self.ivarf *= self.weightf
 
         self.sivarf = np.sqrt(self.ivarf)
 

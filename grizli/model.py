@@ -1804,7 +1804,7 @@ class GrismFLT(object):
         ### Grism configuration
         if 'DFILTER' in self.grism.header:
             direct_filter = self.grism.header['DFILTER']
-        elif self.grism.pupil is not None:
+        elif self.grism.instrument in ['NIRCAM','NIRISS']:
             direct_filter = self.grism.pupil
         else:
             direct_filter = self.direct.filter
@@ -2712,10 +2712,20 @@ class GrismFLT(object):
         Rotate data & wcs so that spectra are increasing to +x
         """
         
-        if self.grism.filter == 'GR150C':
-            rot = 2
-        else:
-            rot = -1
+        if self.grism.instrument not in ['NIRCAM', 'NIRISS']:
+            return True
+            
+        if self.grism.instrument == 'NIRISS':
+            if self.grism.filter == 'GR150C':
+                rot = 2
+            else:
+                rot = -1
+        elif self.grism.instrument == 'NIRCAM':
+            # Only module A
+            if self.grism.pupil == 'GRISMC':
+                rot = 1
+            else:
+                return True
             
         if self.is_rotated:
             rot *= -1
@@ -3020,7 +3030,7 @@ class BeamCutout(object):
         # #
         if 'DFILTER' in self.grism.header:
             direct_filter = self.grism.header['DFILTER']
-        elif self.grism.pupil is not None:
+        elif self.grism.instrument in ['NIRCAM','NIRISS']:
             direct_filter = self.grism.pupil
         else:
             direct_filter = self.direct.filter

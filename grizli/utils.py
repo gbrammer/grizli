@@ -23,6 +23,9 @@ GRISM_COLORS = {'G800L':(0.0, 0.4470588235294118, 0.6980392156862745),
       'G141':(0.8352941176470589, 0.3686274509803922, 0.0),
       'none':(0.8, 0.4745098039215686, 0.6549019607843137),
       'GRISM':'k',
+      'F277W':(0.0, 0.6196078431372549, 0.45098039215686275),
+      'F356W':(0.8352941176470589, 0.3686274509803922, 0.0),
+      'F444W':(0.8, 0.4745098039215686, 0.6549019607843137),
       'G280':'purple',
       'F090W':(0.0, 0.4470588235294118, 0.6980392156862745),
       'F115W':(0.0, 0.6196078431372549, 0.45098039215686275),
@@ -31,7 +34,7 @@ GRISM_COLORS = {'G800L':(0.0, 0.4470588235294118, 0.6980392156862745),
       'F140M':'orange',
       'CLEARP':'b'}
 
-GRISM_MAJOR = {'G102':0.1, 'G141':0.1, 'G800L':0.1, 'F090W':0.1, 'F115W':0.1, 'F150W':0.1, 'F200W':0.1}
+GRISM_MAJOR = {'G102':0.1, 'G141':0.1, 'G800L':0.1, 'F090W':0.1, 'F115W':0.1, 'F150W':0.1, 'F200W':0.1, 'F277W':0.2, 'F356W':0.2, 'F444W':0.2}
 
 GRISM_LIMITS = {'G800L':[0.545, 1.02, 40.], # ACS/WFC
           'G280':[0.2,0.4, 14], # WFC3/UVIS
@@ -43,7 +46,10 @@ GRISM_LIMITS = {'G800L':[0.545, 1.02, 40.], # ACS/WFC
            'F150W':[1.28,1.72, 45.0],
            'F200W':[1.68,2.30, 45.0],
            'F140M':[1.20,1.60, 45.0],
-           'CLEARP':[0.76, 2.3,45.0]}
+           'CLEARP':[0.76, 2.3,45.0],
+           'F277W':[2.5, 3.2, 40.],
+           'F356W':[2.8, 4.2, 40.],
+           'F444W':[3.6, 5.2, 40]}
 
 DEFAULT_LINE_LIST = ['PaB', 'HeI-1083', 'SIII', 'SII', 'Ha', 'OI-6302', 'OIII', 'Hb', 'OIII-4363', 'Hg', 'Hd', 'NeIII', 'OII', 'NeVI', 'NeV', 'MgII','CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'NIII-1750', 'NIV-1487', 'NV-1240', 'Lya']
 
@@ -832,8 +838,8 @@ def get_line_wavelengths():
     line_wavelengths['OIII5007'] = [5008.240]
     line_ratios['OIII5007'] = [1]
     
-    line_wavelengths['OII'] = [3729.875]
-    line_ratios['OII'] = [1]
+    line_wavelengths['OII'] = [3727.092, 3729.875]
+    line_ratios['OII'] = [1, 1.] 
     
     line_wavelengths['OI-6302'] = [6302.046, 6363.67]
     line_ratios['OI-6302'] = [1, 0.33]
@@ -871,11 +877,11 @@ def get_line_wavelengths():
     
     line_wavelengths['CIV-1549'] = [1549.480]
     line_ratios['CIV-1549'] = [1.]
-    line_wavelengths['CIII-1908'] = [1908.]
+    line_wavelengths['CIII-1908'] = [1908.734]
     line_ratios['CIII-1908'] = [1.]
-    line_wavelengths['OIII-1663'] = [1663.]
+    line_wavelengths['OIII-1663'] = [1665.85]
     line_ratios['OIII-1663'] = [1.]
-    line_wavelengths['HeII-1640'] = [1640.]
+    line_wavelengths['HeII-1640'] = [1640.4]
     line_ratios['HeII-1640'] = [1.]
     
     line_wavelengths['NII'] = [6549.86, 6585.27]
@@ -884,7 +890,7 @@ def get_line_wavelengths():
     line_ratios['NIII-1750'] = [1.]
     line_wavelengths['NIV-1487'] = [1487.]
     line_ratios['NIV-1487'] = [1.]
-    line_wavelengths['NV-1240'] = [1240.]
+    line_wavelengths['NV-1240'] = [1240.81]
     line_ratios['NV-1240'] = [1.]
 
     line_wavelengths['Lya'] = [1215.4]
