@@ -17,6 +17,9 @@ from . import utils
 #from .model import BeamCutout
 from .utils import GRISM_COLORS
 
+# Minimum redshift where IGM is applied
+IGM_MINZ = 4
+
 PLINE = {'kernel': 'point', 'pixfrac': 0.2, 'pixscale': 0.1, 'size': 8, 'wcs': None}
 
 # IGM from eazy-py
@@ -26,7 +29,7 @@ try:
 except:
     IGM = None
 
-def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter='nnls', group_name='grism', fit_stacks=True, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=3, fit_beams=True, root='', fit_trace_shift=False, phot=None, verbose=True, scale_photometry=False):
+def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter='nnls', group_name='grism', fit_stacks=True, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=3, fit_beams=True, root='', fit_trace_shift=False, phot=None, verbose=True, scale_photometry=False, show_beams=True):
     """Run the full procedure
     
     1) Load MultiBeam and stack files 
@@ -74,7 +77,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     fit_hdu.header['EXTNAME'] = 'ZFIT_STACK'
     
     if scale_photometry:
-        scl = mb.scale_to_photometry(z=fit.meta['z_map'][0], method='Powell', templates=t0, order=1)
+        scl = mb.scale_to_photometry(z=fit.meta['z_map'][0], method='Powell', templates=t0, order=scale_photometry*1)
         if scl.status == 0:
             mb.pscale = scl.x
             st.pscale = scl.x
@@ -147,19 +150,25 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     tfit_hdu.header['EXTNAME'] = 'TEMPL'
      
     # Make the plot
-    fig = mb.xmake_fit_plot(mb_fit, tfit)
+    fig = mb.xmake_fit_plot(mb_fit, tfit, show_beams=show_beams)
     
     # Add stack fit to the existing plot
     fig.axes[0].plot(fit['zgrid'], np.log10(fit['pdf']), color='0.5', alpha=0.5)
     fig.axes[0].set_xlim(fit['zgrid'].min(), fit['zgrid'].max())
     
     if phot is not None:
-        fig.axes[1].errorbar(mb.photom_pivot/1.e-4, mb.photom_flam, mb.photom_eflam, marker='s', alpha=0.5, color='k')
+        fig.axes[1].errorbar(mb.photom_pivot/1.e4, mb.photom_flam/1.e-19, mb.photom_eflam/1.e-19, marker='s', alpha=0.5, color='k', linestyle='None')
     
     axc = fig.axes[1]
     oned_spec = mb.get_binned_spectra(coeffs=tfit['coeffs'])
     for g in oned_spec:
-        axc.errorbar(oned_spec[g][0].value/1.e4, oned_spec[g][1].value/1.e-19, oned_spec[g][2].value/1.e-19, color=GRISM_COLORS[g], alpha=0.8, marker='.', linestyle='None', zorder=1)
+        
+        pscale = 1.
+        if hasattr(mb, 'pscale'):
+            if (mb.pscale is not None):
+                pscale = mb.compute_scale_array(mb.pscale, oned_spec[g][0].value)
+                
+        axc.errorbar(oned_spec[g][0].value/1.e4, oned_spec[g][1].value/1.e-19/pscale, oned_spec[g][2].value/1.e-19/pscale, color=GRISM_COLORS[g], alpha=0.8, marker='.', linestyle='None', zorder=1)
           
     # if not fit_stacks:
     #     stx = StackFitter(st_files, fit_stacks=True, group_name=group_name, fcontam=fcontam)
@@ -457,12 +466,13 @@ class GroupFitter(object):
         self.photom_filters = filters
         
         self.sivarf = np.hstack((self.sivarf, 1/self.photom_eflam))
+        self.weightf = np.hstack((self.weightf, self.photom_eflam*0+1))
         self.fit_mask = np.hstack((self.fit_mask, eflam > 0))
         self.Nmask = self.fit_mask.sum()       
         
         self.scif = np.hstack((self.scif, flam))
         
-        self.DoF = self.fit_mask.sum()
+        self.DoF = int((self.weightf*self.fit_mask).sum())
         
         self.is_spec = np.isfinite(self.scif)
         self.is_spec[-len(flam):] = False
@@ -478,14 +488,14 @@ class GroupFitter(object):
             return True
             
         self.sivarf = self.sivarf[:-self.Nphot]
+        self.weightf = self.weightf[:-self.Nphot]
+        
         self.fit_mask = self.fit_mask[:-self.Nphot]
         self.scif = self.scif[:-self.Nphot]
         self.wavef = self.wavef[:-self.Nphot]
-        
-        self.DoF = self.fit_mask.sum()
-        
+                
         self.Nmask = self.fit_mask.sum()
-        self.DoF = self.fit_mask.sum()
+        self.DoF = int((self.weightf*self.fit_mask).sum())
         
         self.is_spec = 1
         self.Nphot = 0
@@ -511,6 +521,7 @@ class GroupFitter(object):
                 return A_phot[:,mask]
 
         for it, key in enumerate(templates):
+            #print(key)
             tz = templates[key].zscale(z, scalar=1)
             for ifilt, filt in enumerate(self.photom_filters):
                 A_phot[self.N+it, ifilt] = tz.integrate_filter(filt)*3.e18/self.photom_pivot[ifilt]**2#*(1+z)
@@ -573,14 +584,14 @@ class GroupFitter(object):
         # A = scipy.sparse.csr_matrix((self.N+NTEMP, self.Ntot))
         # bg_sp = scipy.sparse.csc_matrix(self.A_bg)
         
-        COEFF_SCALE = 1.e-17
+        COEFF_SCALE = 1.e-19
         
         for i, t in enumerate(templates):
             if t.startswith('line'):
                 lower_bound[self.N+i] = -np.inf
                 
             ti = templates[t]
-            if z > 4:
+            if z > IGM_MINZ:
                 if IGM is None:
                     igmz = 1.
                 else:
@@ -678,7 +689,7 @@ class GroupFitter(object):
         # Residuals and Chi-squared
         resid = self.scif[self.fit_mask] - model - background
         #chi2 = np.sum(resid[self.fit_mask]**2*self.sivarf[self.fit_mask]**2)
-        chi2 = np.sum(resid**2*self.sivarf[self.fit_mask]**2)
+        chi2 = np.sum(resid**2*self.sivarf[self.fit_mask]**2*self.weightf[self.fit_mask])
         
         if self.Nphot > 0:
             self.photom_model = model[-self.Nphot:]*1
@@ -925,7 +936,7 @@ class GroupFitter(object):
         pdf = np.exp(-0.5*(fit['chi2']-fit['chi2'].min())/scl_nu)
         
         if prior is not None:
-            interp_prior = np.interp(zgrid, prior[0], prior[1])
+            interp_prior = np.interp(fit['zgrid'], prior[0], prior[1])
             pdf *= interp_prior
             fit.meta['hasprior'] = True, 'Prior applied to PDF'
             fit['prior'] = interp_prior
@@ -1052,7 +1063,7 @@ class GroupFitter(object):
                 
             plt.plot(w[xclip]*(1+z), tdraw.T, alpha=0.05, color='r')
     
-    def xmake_fit_plot(self, fit, tfit):
+    def xmake_fit_plot(self, fit, tfit, show_beams=True, bin=0, minor=0.1):
         """TBD
         """
         import matplotlib.pyplot as plt
@@ -1096,27 +1107,37 @@ class GroupFitter(object):
         
         # 1D Model
         sp = tfit['line1d'].wave, tfit['line1d'].flux
+        spf = tfit['line1d'].wave, tfit['line1d'].flux*0+1
         
         for i in range(self.N):
             beam = self.beams[i]
             m_i = beam.compute_model(spectrum_1d=sp, is_cgs=True, in_place=False).reshape(beam.sh)
+            f_i = beam.compute_model(spectrum_1d=spf, is_cgs=True, in_place=False).reshape(beam.sh)
             
             #if isinstance(beam, grizli.model.BeamCutout):
             if hasattr(beam, 'compute_model_psf'): # grizli.model.BeamCutout
-                grism = beam.grism.filter
+                if beam.grism.instrument == 'NIRISS':
+                    grism = beam.grism.pupil
+                else:
+                    grism = beam.grism.filter
+                
                 clean = beam.grism['SCI'] - beam.contam - tfit['cfit']['bg {0:03d}'.format(i)][0]
                 
-                w, fl, er = beam.beam.optimal_extract(clean, ivar=beam.ivar)            
-                w, flm, erm = beam.beam.optimal_extract(m_i, ivar=beam.ivar)
-                sens = beam.beam.sensitivity                
+                w, fl, er = beam.beam.optimal_extract(clean, bin=bin, ivar=beam.ivar)            
+                w, flm, erm = beam.beam.optimal_extract(m_i, bin=bin, ivar=beam.ivar)
+                w, sens, ers = beam.beam.optimal_extract(f_i, bin=bin, ivar=beam.ivar)
+                #sens = beam.beam.sensitivity                
             else:
                 grism = beam.grism
                 clean = beam.sci - beam.contam - tfit['cfit']['bg {0:03d}'.format(i)][0]
-                w, fl, er = beam.optimal_extract(clean, ivar=beam.ivar)            
-                w, flm, erm = beam.optimal_extract(m_i, ivar=beam.ivar)
+                w, fl, er = beam.optimal_extract(clean, bin=bin, ivar=beam.ivar)            
+                w, flm, erm = beam.optimal_extract(m_i, bin=bin, ivar=beam.ivar)
+                w, sens, ers = beam.optimal_extract(f_i, bin=bin, ivar=beam.ivar)
                 
-                sens = beam.sens
-
+                #sens = beam.sens
+            
+            sens[~np.isfinite(sens)] = 1
+            
             w = w/1.e4
                  
             unit_corr = 1./sens
@@ -1132,7 +1153,13 @@ class GroupFitter(object):
             f_alpha = 1./(self.Ngrism[grism.upper()])*0.8 #**0.5
             
             # Plot
-            axc.errorbar(w[clip], fl[clip], er[clip], color=GRISM_COLORS[grism], alpha=f_alpha, marker='.', linestyle='None', zorder=1)
+            pscale = 1.
+            if hasattr(self, 'pscale'):
+                if (self.pscale is not None):
+                    pscale = self.compute_scale_array(self.pscale, w[clip]*1.e4)
+                    
+            if show_beams:
+                axc.errorbar(w[clip], fl[clip]/pscale, er[clip]/pscale, color=GRISM_COLORS[grism], alpha=f_alpha, marker='.', linestyle='None', zorder=1)
             axc.plot(w[clip], flm[clip], color='r', alpha=f_alpha, linewidth=2, zorder=10) 
               
             # Plot limits         
@@ -1157,7 +1184,7 @@ class GroupFitter(object):
                 
         for ax in [axc]: #[axa, axb, axc]:
             
-            labels = np.arange(np.ceil(wmin*10), np.ceil(wmax*10))/10.
+            labels = np.arange(np.ceil(wmin/minor), np.ceil(wmax/minor))*minor
             ax.set_xticks(labels)
             ax.set_xticklabels(labels)
             #ax.set_xticklabels([])
@@ -1279,12 +1306,12 @@ class GroupFitter(object):
             Ax[i,:] /= scale
 
         coeffs, rnorm = scipy.optimize.nnls(Ax.T, data)  
+            
+        full = np.dot(coeffs, Ax)
+        resid = data - full# - background
+        chi2 = np.sum(resid**2*self.weightf[self.fit_mask])
 
-        full = np.dot(coeffs, Ax/self.sivarf[self.fit_mask])
-        resid = data/self.sivarf[self.fit_mask] - full# - background
-        chi2 = np.sum(resid**2*self.sivarf[self.fit_mask]**2)
-
-        #print('{0} {1}'.format(p, chi2))
+        print('{0} {1}'.format(pscale, chi2))
 
         if return_coeffs:
             return coeffs, full, resid, chi2, AxT
@@ -1395,7 +1422,12 @@ class GroupFitter(object):
             f_alpha = 1./(self.Ngrism[grism.upper()])*0.8 #**0.5
 
             # Plot
-            axc.errorbar(w[clip], fl[clip], er[clip], color=GRISM_COLORS[grism], alpha=f_alpha, marker='.', linestyle='None', zorder=1)
+            pscale = 1.
+            if hasattr(self, 'pscale'):
+                if (self.pscale is not None):
+                    pscale = self.compute_scale_array(self.pscale, w[clip])
+                    
+            axc.errorbar(w[clip], fl[clip]/pscale, er[clip]/pscale, color=GRISM_COLORS[grism], alpha=f_alpha, marker='.', linestyle='None', zorder=1)
             axc.plot(w[clip], flm[clip], color='r', alpha=f_alpha, linewidth=2, zorder=10) 
 
             # Plot limits         
@@ -1429,7 +1461,7 @@ class GroupFitter(object):
         gs.tight_layout(fig, pad=0.1, w_pad=0.1)
         return fig
         
-def show_drizzled_lines(line_hdu, full_line_list=['OII', 'Hb', 'OIII', 'Ha', 'SII', 'SIII'], size_arcsec=2, cmap='cubehelix_r', scale=1.):
+def show_drizzled_lines(line_hdu, full_line_list=['OII', 'Hb', 'OIII', 'Ha', 'SII', 'SIII'], size_arcsec=2, cmap='cubehelix_r', scale=1., dscale=1):
     """TBD
     """
     import matplotlib.pyplot as plt
@@ -1448,7 +1480,7 @@ def show_drizzled_lines(line_hdu, full_line_list=['OII', 'Hb', 'OIII', 'Ha', 'SI
     
     # Direct
     ax = fig.add_subplot(1,NL+1,1)
-    ax.imshow(line_hdu['DSCI'].data*scale, vmin=-0.02, vmax=0.6, cmap=cmap, origin='lower')
+    ax.imshow(line_hdu['DSCI'].data*dscale, vmin=-0.02, vmax=0.6, cmap=cmap, origin='lower')
     ax.set_title('Direct   {0}    z={1:.3f}'.format(line_hdu[0].header['ID'], line_hdu[0].header['REDSHIFT']))
     
     ax.set_xlabel('RA'); ax.set_ylabel('Decl.')

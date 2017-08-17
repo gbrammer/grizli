@@ -121,7 +121,7 @@ def test():
     
     ### serial
     t0 = time.time()
-    out = _compute_model(0, self.FLTs[i], fit_info, False)
+    out = _compute_model(0, self.FLTs[i], fit_info, False, False)
     t1 = time.time()
     #print t1-t0
     
@@ -190,7 +190,7 @@ def _loadFLT(grism_file, sci_extn, direct_file, pad, ref_file,
     else:
         flt.catalog = None 
 
-    if flt.grism.instrument == 'NIRISS':
+    if flt.grism.instrument in ['NIRISS', 'NIRCAM']:
         flt.transform_NIRISS()
         
     return flt #, out_cat
@@ -237,14 +237,14 @@ def test_parallel():
     t1_pool = time.time()
     
     
-def _compute_model(i, flt, fit_info, store):
+def _compute_model(i, flt, fit_info, is_cgs, store):
     """Helper function for computing model orders.
     """
     for id in fit_info:
         try:
             status = flt.compute_model_orders(id=id, compute_size=True,
                           mag=fit_info[id]['mag'], in_place=True, store=store,
-                          spectrum_1d = fit_info[id]['spec'], 
+                          spectrum_1d = fit_info[id]['spec'], is_cgs=is_cgs, 
                           verbose=False)
         except:
             print('Failed: {0} {1}'.format(flt.grism.parent_file, id))
@@ -259,7 +259,7 @@ class GroupFLT():
                  pad=200, group_name='group', 
                  ref_file=None, ref_ext=0, seg_file=None,
                  shrink_segimage=True, verbose=True, cpu_count=0,
-                 catalog=''):
+                 catalog='', polyx=[0.3, 2.35]):
         """Main container for handling multiple grism exposures together
         
         Parameters
@@ -338,6 +338,9 @@ class GroupFLT():
         self.grism_files = grism_files
         self.direct_files = direct_files
         self.group_name = group_name
+        
+        # Wavelengths for polynomial fits
+        self.polyx = polyx
         
         ### Read catalog
         if catalog:
@@ -525,7 +528,8 @@ class GroupFLT():
             return True
             
     def compute_full_model(self, fit_info=None, verbose=True, store=False, 
-                           mag_limit=25, coeffs=[1.2, -0.5], cpu_count=0):
+                           mag_limit=25, coeffs=[1.2, -0.5], cpu_count=0,
+                           is_cgs=False):
         """TBD
         """
         if cpu_count == 0:
@@ -537,7 +541,9 @@ class GroupFLT():
             mags = self.catalog['MAG_AUTO'][bright]
 
             # Polynomial component
-            xspec = np.arange(0.3, 2.35, 0.05)-1
+            #xspec = np.arange(0.3, 5.35, 0.05)-1
+            xspec = np.arange(self.polyx[0], self.polyx[1], 0.05)-1
+            
             yspec = [xspec**o*coeffs[o] for o in range(len(coeffs))]
             xspec = (xspec+1)*1.e4
             yspec = np.sum(yspec, axis=0)
@@ -546,10 +552,12 @@ class GroupFLT():
             for id, mag in zip(ids, mags):
                 fit_info[id] = {'mag':mag, 'spec': [xspec, yspec]}
             
+            is_cgs = False
+            
         t0_pool = time.time()
         
         pool = mp.Pool(processes=cpu_count)
-        results = [pool.apply_async(_compute_model, (i, self.FLTs[i], fit_info, store)) for i in range(self.N)]
+        results = [pool.apply_async(_compute_model, (i, self.FLTs[i], fit_info, is_cgs, store)) for i in range(self.N)]
 
         pool.close()
         pool.join()
@@ -645,7 +653,7 @@ class GroupFLT():
         fb = [beam.beam.total_flux for beam in beams]
         mb = np.polyval(scale_coeffs[::-1], np.array(xb)/1.e4-1)
         
-        if (np.abs(mb/fb).max() > max_coeff) | (~np.isfinite(mb/fb).sum() > 0) | (np.min(mb) < 0):
+        if (np.abs(mb/fb).max() > max_coeff) | ((~np.isfinite(mb/fb)).sum() > 0) | (np.min(mb) < 0) | ((~np.isfinite(ypoly)).sum() > 0):
             if verbose:
                 print('{0} mag={1:6.2f} {2} xx'.format(id, mag, scale_coeffs))
 
@@ -1032,8 +1040,10 @@ class MultiBeam(GroupFitter):
         self.wavef = np.hstack([b.wavef for b in self.beams])
         self.contamf = np.hstack([b.contam.flatten() for b in self.beams])
         
-        self.weight = np.exp(-(self.fcontam*np.abs(self.contamf)*np.sqrt(self.ivarf)))
-        self.DoF = int((self.weight*self.fit_mask).sum())
+        self.weightf = np.exp(-(self.fcontam*np.abs(self.contamf)*np.sqrt(self.ivarf)))
+        self.weightf[~np.isfinite(self.weightf)] = 0
+        
+        self.DoF = int((self.weightf*self.fit_mask).sum())
         self.Nmask = np.sum([b.fit_mask.sum() for b in self.beams])
         
         ### Initialize background fit array
@@ -1108,8 +1118,11 @@ class MultiBeam(GroupFitter):
             hdu[0].header['GRIS{0:04d}'.format(ib)] = (beam.grism.filter, 'Grism element')
             hdu[0].header['NEXT{0:04d}'.format(ib)] = (count[-1], 'Number of extensions')
             
-            exptime[beam.grism.filter] += beam.grism.header['EXPTIME']
-            
+            try:
+                exptime[beam.grism.filter] += beam.grism.header['EXPTIME']
+            except:
+                exptime[beam.grism.pupil] += beam.grism.header['EXPTIME']
+                
         hdu[0].header['COUNT'] = (self.N, ' '.join(['{0}'.format(c) for c in count]))
         for g in self.Ngrism:
             hdu[0].header['T_{0}'.format(g)] = (exptime[g], 'Exposure time in grism {0}'.format(g))
@@ -1211,7 +1224,7 @@ class MultiBeam(GroupFitter):
     def eval_poly_spec(self, coeffs_full):
         """Evaluate polynomial spectrum
         """
-        xspec = np.arange(0.3, 2.35, 0.05)-1
+        xspec = np.arange(self.polyx[0], self.polyx[1], 0.05)-1
         i0 = self.N*self.fit_bg
         scale_coeffs = coeffs_full[i0:i0+self.n_poly]
 
@@ -1356,7 +1369,7 @@ class MultiBeam(GroupFitter):
                 
         out_coeffs[ok_temp] = coeffs
         modelf = np.dot(out_coeffs, A)
-        chi2 = np.sum((self.weight*(self.scif - modelf)**2*self.ivarf)[self.fit_mask])
+        chi2 = np.sum((self.weightf*(self.scif - modelf)**2*self.ivarf)[self.fit_mask])
         
         if fit_background:
             poly_coeffs = out_coeffs[self.N:self.N+self.n_poly]

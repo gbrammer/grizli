@@ -512,10 +512,13 @@ def get_config_filename(instrume='WFC3', filter='F140W',
             conf_file = os.path.join(os.getenv('GRIZLI'),
                                  'CONF/NIRISS.{0}.conf'.format(filter))
         
-    if instrume == 'NIRCam':
+    # if instrume == 'NIRCam':
+    #     conf_file = os.path.join(os.getenv('GRIZLI'),
+    #         'CONF/aXeSIM_NC_2016May/CONF/NIRCam_LWAR_{0}.conf'.format(grism))
+    if instrume == 'NIRCAM':
         conf_file = os.path.join(os.getenv('GRIZLI'),
-            'CONF/aXeSIM_NC_2016May/CONF/NIRCam_LWAR_{0}.conf'.format(grism))
-    
+                                 'CONF/NIRCam.A.{0}.{1}.conf'.format(filter, grism))
+        
     if instrume == 'WFIRST':
         conf_file = os.path.join(os.getenv('GRIZLI'), 'CONF/WFIRST.conf')
 
