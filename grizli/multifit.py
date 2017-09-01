@@ -928,7 +928,7 @@ class GroupFLT():
         return outsci, outwht
 
 class MultiBeam(GroupFitter):
-    def __init__(self, beams, group_name='group', fcontam=0., psf=False):
+    def __init__(self, beams, group_name='group', fcontam=0., psf=False, polyx=[0.3, 2.5]):
         """Tools for dealing with multiple `~.model.BeamCutout` instances 
         
         Parameters
@@ -949,7 +949,8 @@ class MultiBeam(GroupFitter):
         """     
         self.group_name = group_name
         self.fcontam = fcontam
-
+        self.polyx = polyx
+        
         if isinstance(beams, str):
             self.load_master_fits(beams)            
         else:
