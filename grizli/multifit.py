@@ -584,9 +584,15 @@ class GroupFLT():
                                         conf=flt.conf, 
                                         get_slice_header=get_slice_header)
             except:
+                print('Except: get_beams')
                 continue
             
+            # if flt.grism.pupil == 'f158m':
+            #     print(xxx)
+            #     pass
+                
             hasdata = ((out_beam.grism['SCI'] != 0).sum(axis=0) > 0).sum()
+            #print(out_beam.grism.pupil, hasdata*1./out_beam.model.shape[1])
             if hasdata*1./out_beam.model.shape[1] < min_overlap:
                 continue
             
