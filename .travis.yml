@@ -4,6 +4,10 @@ python:
   - "3.5"
   - "3.6"
 # command to install dependencies
-install: python setup.py install
+
+install: 
+    - git clone git://github.com/astropy/ci-helpers.git
+    - source ci-helpers/travis/setup_conda.sh
+
 # command to run tests
 script: python setup.py test 
