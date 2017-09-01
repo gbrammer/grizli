@@ -584,7 +584,7 @@ class GroupFLT():
                                         conf=flt.conf, 
                                         get_slice_header=get_slice_header)
             except:
-                print('Except: get_beams')
+                #print('Except: get_beams')
                 continue
             
             # if flt.grism.pupil == 'f158m':
