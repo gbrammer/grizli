@@ -4,6 +4,9 @@
 .. image:: https://travis-ci.org/gbrammer/grizli.svg?branch=clean_fit_outputs
     :target: https://travis-ci.org/gbrammer/grizli
     
+.. image:: https://coveralls.io/repos/github/gbrammer/grizli/badge.svg?branch=clean_fit_outputs
+:target: https://coveralls.io/github/gbrammer/grizli?branch=clean_fit_outputs
+
 *Grism redshift & line* analysis software for space-based slitless spectroscopy
 ========================================================================================
 
