@@ -3441,6 +3441,9 @@ class BeamCutout(object):
         ivar[~np.isfinite(ivar)] = 0
         ivar[self.direct['DQ'] > 0] = 0
         
+        if ivar.max() == 0:
+            ivar = ivar+1.
+            
         origin = np.array(self.direct.origin) - np.array(self.direct.pad)
         self.psf, self.psf_params = EPSF.fit_ePSF(self.direct['SCI'], 
                                                   ivar=ivar, 
@@ -3541,6 +3544,7 @@ class BeamCutout(object):
         
         if in_place:
             self.model = model
+            self.beam.model = self.model
             return True
         else:
             return model.flatten()
