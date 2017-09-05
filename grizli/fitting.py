@@ -678,7 +678,8 @@ class GroupFitter(object):
         # Compute background array         
         if fit_background:
             background = np.dot(coeffs_i[:self.N], A[:self.N,:]) - pedestal
-            background[-self.Nphot:] = 0.
+            if self.Nphot > 0:
+                background[-self.Nphot:] = 0.
             coeffs_i[:self.N] -= pedestal
         else:
             background = self.scif[self.fit_mask]*0.
