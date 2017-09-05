@@ -99,6 +99,9 @@ the GitHub repository until the versioning and tagging is straightened out:
     .. code:: bash
 
         git clone https://github.com/gbrammer/grizli.git
+        # Recommended, all recent development in the `clean_fit_outputs` branch
+        git checkout -b clean_fit_outputs origin/clean_fit_outputs
+        
         cd grizli
         python setup.py install
 
