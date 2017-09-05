@@ -9,7 +9,6 @@ env:
     global:
         - NUMPY_VERSION=stable
         - ASTROPY_VERSION=stable
-        - SCIPY_VERSION=stable
         - CONDA_DEPENDENCIES='scipy matplotlib'
         
 install: 
