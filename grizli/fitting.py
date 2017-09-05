@@ -1333,7 +1333,7 @@ class GroupFitter(object):
         #self.extend(grizli.multifit.MultiBeam('/Volumes/Pegasus/Grizli/ACS/goodss/Prep/ers-grism-pears_{0:05d}.beams.fits'.format(id), fcontam=0.2))
 
         if tstar is None:
-            tstar = grizli.utils.load_templates(fwhm=1200, line_complexes=True, fsps_templates=True, stars=True)
+            tstar = utils.load_templates(fwhm=1200, line_complexes=True, fsps_templates=True, stars=True)
 
         NTEMP = len(tstar)
         covar = np.zeros((NTEMP, self.N+1, self.N+1))
@@ -1442,7 +1442,17 @@ class GroupFitter(object):
 
             wmax = np.maximum(wmax, w[clip].max())
             wmin = np.minimum(wmin, w[clip].min())
+        
+        oned_spec = self.get_binned_spectra(coeffs=coeffs[ix,:])
+        for g in oned_spec:
 
+            pscale = 1.
+            if hasattr(self, 'pscale'):
+                if (self.pscale is not None):
+                    pscale = self.compute_scale_array(self.pscale, oned_spec[g][0].value)
+
+            axc.errorbar(oned_spec[g][0].value/1.e4, oned_spec[g][1].value/1.e-19/pscale, oned_spec[g][2].value/1.e-19/pscale, color=GRISM_COLORS[g], alpha=0.8, marker='.', linestyle='None', zorder=1)
+        
         # Cleanup
         axc.set_xlim(wmin, wmax)
         #axc.semilogx(subsx=[wmax])
@@ -1463,7 +1473,26 @@ class GroupFitter(object):
             #print(labels, wmin, wmax)
 
         gs.tight_layout(fig, pad=0.1, w_pad=0.1)
+        
         return fig
+        
+        # Output TBD
+        if False:
+            sfit = OrderedDict()
+
+            k = list(tstar.keys())[ix]
+            ts = {k:tstar[k]}
+            cont1d, line1d = utils.dot_templates(coeffs[ix,self.N:], ts, z=0.)
+        
+            sfit['cfit'] = {}
+            sfit['coeffs'] = coeffs[ix,:]
+            sfit['covar'] = covar[ix,:,:]
+            sfit['z'] = 0.
+            sfit['templates'] = ts
+            sfit['cont1d'] = cont1d
+            sfit['line1d'] = line1d
+        
+            return fig, sfit
         
 def show_drizzled_lines(line_hdu, full_line_list=['OII', 'Hb', 'OIII', 'Ha', 'SII', 'SIII'], size_arcsec=2, cmap='cubehelix_r', scale=1., dscale=1):
     """TBD
