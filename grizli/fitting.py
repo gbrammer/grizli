@@ -631,7 +631,7 @@ class GroupFitter(object):
                 pedestal = 0.
         else:
             pedestal = 0
-        
+         
         # Photometry
         if self.Nphot > 0:
             A_phot = self._interpolate_photometry(z=z, templates=templates)
@@ -685,8 +685,11 @@ class GroupFitter(object):
             background = self.scif[self.fit_mask]*0.
             
         # Full model
-        model = np.dot(coeffs_i[self.N:], Ax[self.N:,:]/self.sivarf[self.fit_mask])
-        
+        if fit_background:
+            model = np.dot(coeffs_i[self.N:], Ax[self.N:,:]/self.sivarf[self.fit_mask])
+        else:
+            model = np.dot(coeffs_i, Ax/self.sivarf[self.fit_mask])
+            
         # Residuals and Chi-squared
         resid = self.scif[self.fit_mask] - model - background
         #chi2 = np.sum(resid[self.fit_mask]**2*self.sivarf[self.fit_mask]**2)
@@ -734,10 +737,10 @@ class GroupFitter(object):
         #full_coeffs_err[oktemp[self.N:]] = covard[self.N:]
         del(A); del(Ax); del(AxT)
         
-        if fit_background:
-            coeffs[self.N:] *= COEFF_SCALE
-            coeffs_err[self.N:] *= COEFF_SCALE
-            covar[self.N:,self.N:] *= COEFF_SCALE**2
+        #if fit_background:
+        coeffs[self.N:] *= COEFF_SCALE
+        coeffs_err[self.N:] *= COEFF_SCALE
+        covar[self.N:,self.N:] *= COEFF_SCALE**2
             
         return chi2, coeffs, coeffs_err, covar
     
