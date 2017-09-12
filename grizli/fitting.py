@@ -168,7 +168,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
             if (mb.pscale is not None):
                 pscale = mb.compute_scale_array(mb.pscale, oned_spec[g][0].value)
                 
-        axc.errorbar(oned_spec[g][0].value/1.e4, oned_spec[g][1].value/1.e-19/pscale, oned_spec[g][2].value/1.e-19/pscale, color=GRISM_COLORS[g], alpha=0.8, marker='.', linestyle='None', zorder=1)
+        axc.errorbar(oned_spec[g]['wave']/1.e4, oned_spec[g]['flux']/1.e-19/pscale, oned_spec[g]['err']/1.e-19/pscale, color=GRISM_COLORS[g], alpha=0.8, marker='.', linestyle='None', zorder=1)
           
     # if not fit_stacks:
     #     stx = StackFitter(st_files, fit_stacks=True, group_name=group_name, fcontam=fcontam)
@@ -1451,7 +1451,7 @@ class GroupFitter(object):
                 if (self.pscale is not None):
                     pscale = self.compute_scale_array(self.pscale, oned_spec[g][0].value)
 
-            axc.errorbar(oned_spec[g][0].value/1.e4, oned_spec[g][1].value/1.e-19/pscale, oned_spec[g][2].value/1.e-19/pscale, color=GRISM_COLORS[g], alpha=0.8, marker='.', linestyle='None', zorder=1)
+            axc.errorbar(oned_spec[g]['wave']/1.e4, oned_spec[g]['flux']/1.e-19/pscale, oned_spec[g]['err']/1.e-19/pscale, color=GRISM_COLORS[g], alpha=0.8, marker='.', linestyle='None', zorder=1)
         
         # Cleanup
         axc.set_xlim(wmin, wmax)
