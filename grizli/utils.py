@@ -1157,15 +1157,15 @@ class SpectrumTemplate(object):
             >>> from eazy.filters import FilterDefinition
             >>> import pysynphot as S 
 
-            >>> line = SpectrumTemplate(wave=1.4e4, fwhm=150., flux=None,
+            >>> line = SpectrumTemplate(central_wave=1.4e4, fwhm=150.,
                                         velocity=True)*5.e-17
                                         
             >>> filter = FilterDefinition(bp=S.ObsBandpass('wfc3,ir,f140w'))
             
-            >>> fnu = line.integrate_filter(filter, z=0)
+            >>> fnu = line.integrate_filter(filter)
             
             >>> print('AB mag = {0:.3f}'.format(-2.5*np.log10(fnu)-48.6))
-            AB mag = 26.620
+            AB mag = 26.619
             
         """
         INTEGRATOR = np.trapz
