@@ -1,5 +1,7 @@
-from distutils.core import setup
-from distutils.extension import Extension
+#from distutils.core import setup
+#from distutils.extension import Extension
+from setuptools import setup
+from setuptools.extension import Extension
 
 import os
 import numpy
@@ -21,13 +23,13 @@ else:
 print('C extension: {0}'.format(cext))
 
 extensions = [
-    Extension("grizli/utils_c/interp", ["grizli/utils_c/interp"+cext],
+    Extension("grizli.utils_c.interp", ["grizli/utils_c/interp"+cext],
         include_dirs = [numpy.get_include()],),
         
     # Extension("grizli/utils_c/nmf", ["grizli/utils_c/nmf"+cext],
     #     include_dirs = [numpy.get_include()],),
     
-    Extension("grizli/utils_c/disperse", ["grizli/utils_c/disperse"+cext],
+    Extension("grizli.utils_c.disperse", ["grizli/utils_c/disperse"+cext],
         include_dirs = [numpy.get_include()],),
 
 ]
@@ -51,7 +53,7 @@ setup(
     license = "MIT",
     url = "https://github.com/gbrammer/grizli",
     download_url = "https://github.com/gbrammer/grizli/tarball/0.2.1",
-    packages=['grizli', 'grizli/utils_c'],
+    packages=['grizli', 'grizli/utils_c', 'grizli/tests'],
     # requires=['numpy', 'scipy', 'astropy', 'drizzlepac', 'stwcs'],
     # long_description=read('README.rst'),
     classifiers=[
@@ -60,6 +62,6 @@ setup(
         'Topic :: Scientific/Engineering :: Astronomy',
     ],
     ext_modules = extensions,
-    package_data={'grizli': ['data/*', 'data/templates/*']},
+    package_data={'grizli': ['data/*', 'data/templates/*', 'data/templates/stars/*', 'data/templates/fsps/*']},
     # scripts=['grizli/scripts/flt_info.sh'],
 )

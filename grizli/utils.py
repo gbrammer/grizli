@@ -9,8 +9,53 @@ import astropy.table
 
 import numpy as np
 
+import astropy.units as u
+
+KMS = u.km/u.s
+FLAMBDA_CGS = u.erg/u.s/u.cm**2/u.angstrom
+FNU_CGS = u.erg/u.s/u.cm**2/u.Hz
+
 # character to skip clearing line on STDOUT printing
-no_newline = '\x1b[1A\x1b[1M' 
+NO_NEWLINE = '\x1b[1A\x1b[1M' 
+
+GRISM_COLORS = {'G800L':(0.0, 0.4470588235294118, 0.6980392156862745),
+      'G102':(0.0, 0.6196078431372549, 0.45098039215686275),
+      'G141':(0.8352941176470589, 0.3686274509803922, 0.0),
+      'none':(0.8, 0.4745098039215686, 0.6549019607843137),
+      'GRISM':'k',
+      'F277W':(0.0, 0.6196078431372549, 0.45098039215686275),
+      'F356W':(0.8352941176470589, 0.3686274509803922, 0.0),
+      'F444W':(0.8, 0.4745098039215686, 0.6549019607843137),
+      'G280':'purple',
+      'F090W':(0.0, 0.4470588235294118, 0.6980392156862745),
+      'F115W':(0.0, 0.6196078431372549, 0.45098039215686275),
+      'F150W':(0.8352941176470589, 0.3686274509803922, 0.0),
+      'F140M':(0.8352941176470589, 0.3686274509803922, 0.0),
+      'F158M':(0.8352941176470589, 0.3686274509803922, 0.0),
+      'F200W':(0.8, 0.4745098039215686, 0.6549019607843137),
+      'F140M':'orange',
+      'CLEARP':'b'}
+
+GRISM_MAJOR = {'G102':0.1, 'G141':0.1, 'G800L':0.1, 'F090W':0.1, 'F115W':0.1, 'F150W':0.1, 'F140M':0.1, 'F158M':0.1, 'F200W':0.1, 'F277W':0.2, 'F356W':0.2, 'F444W':0.2}
+
+GRISM_LIMITS = {'G800L':[0.545, 1.02, 40.], # ACS/WFC
+          'G280':[0.2,0.4, 14], # WFC3/UVIS
+           'G102':[0.77, 1.18, 23.], # WFC3/IR
+           'G141':[1.06, 1.73, 46.0],
+           'GRISM':[0.98, 1.98, 11.], # WFIRST
+           'F090W':[0.76,1.04, 45.0], # NIRISS
+           'F115W':[0.97,1.32, 45.0],
+           'F140M':[1.28,1.52, 45.0],
+           'F158M':[1.28,1.72, 45.0],
+           'F150W':[1.28,1.72, 45.0],
+           'F200W':[1.68,2.30, 45.0],
+           'F140M':[1.20,1.60, 45.0],
+           'CLEARP':[0.76, 2.3,45.0],
+           'F277W':[2.5, 3.2, 40.],
+           'F356W':[2.8, 4.2, 40.],
+           'F444W':[3.6, 5.2, 40]}
+
+DEFAULT_LINE_LIST = ['PaB', 'HeI-1083', 'SIII', 'SII', 'Ha', 'OI-6302', 'OIII', 'Hb', 'OIII-4363', 'Hg', 'Hd', 'NeIII', 'OII', 'NeVI', 'NeV', 'MgII','CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'NIII-1750', 'NIV-1487', 'NV-1240', 'Lya']
 
 def get_flt_info(files=[]):
     """Extract header information from a list of FLT files
@@ -539,6 +584,9 @@ def get_hst_filter(header):
     filter : str
             
     """
+    if 'FILTER' in header:
+        return header['FILTER'].upper()
+        
     if header['INSTRUME'].strip() == 'ACS':
         for i in [1,2]:
             filter_i = header['FILTER{0:d}'.format(i)]
@@ -546,10 +594,11 @@ def get_hst_filter(header):
                 continue
             else:
                 filter = filter_i
+                
     elif header['INSTRUME'] == 'WFPC2':
         filter = header['FILTNAM1']
     else:
-        filter = header['FILTER']
+        raise KeyError ('Filter keyword not found for instrument {0}'.format(header['INSTRUME']))
     
     return filter.upper()
     
@@ -711,7 +760,7 @@ def detect_with_photutils(sci, err=None, dq=None, seg=None, detect_thresh=2.,
     
     ### Done!
     if verbose:
-        print(no_newline + ('{0}: photutils.source_properties - {1:d} objects'.format(root, len(catalog))))
+        print(NO_NEWLINE + ('{0}: photutils.source_properties - {1:d} objects'.format(root, len(catalog))))
     
     #### Save outputs?
     if save_detection:
@@ -770,6 +819,9 @@ def get_line_wavelengths():
         
     """
     line_wavelengths = OrderedDict() ; line_ratios = OrderedDict()
+    
+    line_wavelengths['PaB'] = [12821]
+    line_ratios['PaB'] = [1.]
     line_wavelengths['Ha'] = [6564.61]
     line_ratios['Ha'] = [1.]
     line_wavelengths['Hb'] = [4862.68]
@@ -778,10 +830,87 @@ def get_line_wavelengths():
     line_ratios['Hg'] = [1.]
     line_wavelengths['Hd'] = [4102.892]
     line_ratios['Hd'] = [1.]
+    
     line_wavelengths['OIII-4363'] = [4364.436]
     line_ratios['OIII-4363'] = [1.]
     line_wavelengths['OIII'] = [5008.240, 4960.295]
     line_ratios['OIII'] = [2.98, 1]
+    
+    # Split doublet, if needed
+    line_wavelengths['OIII4959'] = [4960.295]
+    line_ratios['OIII4959'] = [1]
+    line_wavelengths['OIII5007'] = [5008.240]
+    line_ratios['OIII5007'] = [1]
+    
+    line_wavelengths['OII'] = [3727.092, 3729.875]
+    line_ratios['OII'] = [1, 1.] 
+    
+    line_wavelengths['OI-6302'] = [6302.046, 6363.67]
+    line_ratios['OI-6302'] = [1, 0.33]
+
+    line_wavelengths['NeIII'] = [3869]
+    line_ratios['NeIII'] = [1.]
+    line_wavelengths['NeV'] = [3346.8]
+    line_ratios['NeV'] = [1.]
+    line_wavelengths['NeVI'] = [3426.85]
+    line_ratios['NeVI'] = [1.]
+    
+    line_wavelengths['SIII'] = [9068.6, 9530.6][::-1]
+    line_ratios['SIII'] = [1, 2.44][::-1]
+    
+    # Split doublet, if needed
+    line_wavelengths['SIII9068'] = [9068.6]
+    line_ratios['SIII9068'] = [1]
+    line_wavelengths['SIII9531'] = [9530.6]
+    line_ratios['SIII9531'] = [1]
+    
+    line_wavelengths['SII'] = [6718.29, 6732.67]
+    line_ratios['SII'] = [1., 1.]   
+    
+    line_wavelengths['HeII'] = [4687.5]
+    line_ratios['HeII'] = [1.]
+    line_wavelengths['HeI-5877'] = [5877.2]
+    line_ratios['HeI-5877'] = [1.]
+    line_wavelengths['HeI-3889'] = [3889.5]
+    line_ratios['HeI-3889'] = [1.]
+    line_wavelengths['HeI-1083'] = [10830.]
+    line_ratios['HeI-1083'] = [1.]
+    
+    line_wavelengths['MgII'] = [2799.117]
+    line_ratios['MgII'] = [1.]
+    
+    line_wavelengths['CIV-1549'] = [1549.480]
+    line_ratios['CIV-1549'] = [1.]
+    line_wavelengths['CIII-1908'] = [1908.734]
+    line_ratios['CIII-1908'] = [1.]
+    line_wavelengths['OIII-1663'] = [1665.85]
+    line_ratios['OIII-1663'] = [1.]
+    line_wavelengths['HeII-1640'] = [1640.4]
+    line_ratios['HeII-1640'] = [1.]
+    
+    line_wavelengths['NII'] = [6549.86, 6585.27]
+    line_ratios['NII'] = [1., 3]
+    line_wavelengths['NIII-1750'] = [1750.]
+    line_ratios['NIII-1750'] = [1.]
+    line_wavelengths['NIV-1487'] = [1487.]
+    line_ratios['NIV-1487'] = [1.]
+    line_wavelengths['NV-1240'] = [1240.81]
+    line_ratios['NV-1240'] = [1.]
+
+    line_wavelengths['Lya'] = [1215.4]
+    line_ratios['Lya'] = [1.]
+    
+    line_wavelengths['Lya+CIV'] = [1215.4, 1549.49]
+    line_ratios['Lya+CIV'] = [1., 0.1]
+    
+    line_wavelengths['Ha+SII'] = [6564.61, 6718.29, 6732.67]
+    line_ratios['Ha+SII'] = [1., 1./10, 1./10]
+    line_wavelengths['Ha+SII+SIII+He'] = [6564.61, 6718.29, 6732.67, 9068.6, 9530.6, 10830.]
+    line_ratios['Ha+SII+SIII+He'] = [1., 1./10, 1./10, 1./20, 2.44/20, 1./25.]
+
+    line_wavelengths['Ha+NII+SII+SIII+He'] = [6564.61, 6549.86, 6585.27, 6718.29, 6732.67, 9068.6, 9530.6, 10830.]
+    line_ratios['Ha+NII+SII+SIII+He'] = [1., 1./(4.*4), 3./(4*4), 1./10, 1./10, 1./20, 2.44/20, 1./25.]
+    
     line_wavelengths['OIII+Hb'] = [5008.240, 4960.295, 4862.68]
     line_ratios['OIII+Hb'] = [2.98, 1, 3.98/6.]
     
@@ -793,83 +922,34 @@ def get_line_wavelengths():
 
     line_wavelengths['OIII+OII'] = [5008.240, 4960.295, 3729.875]
     line_ratios['OIII+OII'] = [2.98, 1, 3.98/4.]
-
-    line_wavelengths['OII'] = [3729.875]
-    line_ratios['OII'] = [1]
     
     line_wavelengths['OII+Ne'] = [3729.875, 3869]
     line_ratios['OII+Ne'] = [1, 1./5]
     
-    line_wavelengths['OI-6302'] = [6302.046, 6363.67]
-    line_ratios['OI-6302'] = [1, 0.33]
-
-    line_wavelengths['NeIII'] = [3869]
-    line_ratios['NeIII'] = [1.]
-    line_wavelengths['NeV'] = [3346.8]
-    line_ratios['NeV'] = [1.]
-    line_wavelengths['NeVI'] = [3426.85]
-    line_ratios['NeVI'] = [1.]
-    line_wavelengths['SIII'] = [9068.6, 9530.6][::-1]
-    line_ratios['SIII'] = [1, 2.44][::-1]
-    line_wavelengths['HeII'] = [4687.5]
-    line_ratios['HeII'] = [1.]
-    line_wavelengths['HeI-5877'] = [5877.2]
-    line_ratios['HeI-5877'] = [1.]
-    line_wavelengths['HeI-3889'] = [3889.5]
-    line_ratios['HeI-3889'] = [1.]
-    
-    line_wavelengths['MgII'] = [2799.117]
-    line_ratios['MgII'] = [1.]
-    
-    line_wavelengths['CIV'] = [1549.480]
-    line_ratios['CIV'] = [1.]
-    line_wavelengths['CIII]'] = [1908.]
-    line_ratios['CIII]'] = [1.]
-    line_wavelengths['OIII]'] = [1663.]
-    line_ratios['OIII]'] = [1.]
-    line_wavelengths['HeII-1640'] = [1640.]
-    line_ratios['HeII-1640'] = [1.]
-    line_wavelengths['NIII]'] = [1750.]
-    line_ratios['NIII]'] = [1.]
-    line_wavelengths['NIV'] = [1487.]
-    line_ratios['NIV'] = [1.]
-    line_wavelengths['NV'] = [1240.]
-    line_ratios['NV'] = [1.]
-
-    line_wavelengths['Lya'] = [1215.4]
-    line_ratios['Lya'] = [1.]
-
-    line_wavelengths['Ha+SII'] = [6564.61, 6718.29, 6732.67]
-    line_ratios['Ha+SII'] = [1., 1./10, 1./10]
-    line_wavelengths['Ha+SII+SIII+He'] = [6564.61, 6718.29, 6732.67, 9068.6, 9530.6, 10830.]
-    line_ratios['Ha+SII+SIII+He'] = [1., 1./10, 1./10, 1./20, 2.44/20, 1./25.]
-
-    line_wavelengths['Ha+NII+SII+SIII+He'] = [6564.61, 6549.86, 6585.27, 6718.29, 6732.67, 9068.6, 9530.6, 10830.]
-    line_ratios['Ha+NII+SII+SIII+He'] = [1., 1./(4.*4), 3./(4*4), 1./10, 1./10, 1./20, 2.44/20, 1./25.]
-    
-    line_wavelengths['NII'] = [6549.86, 6585.27]
-    line_ratios['NII'] = [1., 3]
-    
-    line_wavelengths['SII'] = [6718.29, 6732.67]
-    line_ratios['SII'] = [1., 1.]   
-    
     return line_wavelengths, line_ratios 
     
 class SpectrumTemplate(object):
-    def __init__(self, wave=None, flux=None, fwhm=None, velocity=False):
+    def __init__(self, wave=None, flux=None, central_wave=None, fwhm=None, velocity=False, fluxunits=FLAMBDA_CGS, waveunits=u.angstrom, name=''):
         """Container for template spectra.   
                 
         Parameters
         ----------
-        wave, fwhm : None or float or array-like
-            If both are float, then initialize with a Gaussian.  
+        wave : array-like
+            Wavelength 
             In `astropy.units.Angstrom`.
             
-        flux : None or array-like
-            Flux array (f-lambda flux density)
+        flux : float array-like
+            If float, then the integrated flux of a Gaussian line.  If 
+            array, then f-lambda flux density.
+        
+        central_wave, fwhm : float
+            Initialize the template with a Gaussian at this wavelength (in
+            `astropy.units.Angstrom`.) that has an integrated flux of `flux` 
+            and `fwhm` in `astropy.units.Angstrom` or `km/s` for 
+            `velocity=True`.
             
         velocity : bool
-            `fwhm` is a velocity.
+            `fwhm` is a velocity in `km/s`.
             
         Attributes
         ----------
@@ -903,17 +983,33 @@ class SpectrumTemplate(object):
         """
         self.wave = wave
         self.flux = flux
-
-        if (wave is not None) & (fwhm is not None):
-            self.make_gaussian(wave, fwhm, velocity=velocity)
+        self.fwhm = None
+        self.velocity = None
+        
+        self.fluxunits = fluxunits
+        self.waveunits = waveunits
+        self.name = ''
+        
+        if (central_wave is not None) & (fwhm is not None):
+            self.fwhm = fwhm
+            self.velocity = velocity
             
-    def make_gaussian(self, wave, fwhm, max_sigma=5, step=0.1, 
-                      velocity=False):
+            self.wave, self.flux = self.make_gaussian(central_wave, fwhm,
+                                                      wave_grid=wave,
+                                                      velocity=velocity,
+                                                      max_sigma=10)
+        
+        self.fnu_units = FNU_CGS
+        self.to_fnu()
+        
+    @staticmethod 
+    def make_gaussian(central_wave, fwhm, max_sigma=5, step=0.1,
+                      wave_grid=None, velocity=False, clip=1.e-5):
         """Make Gaussian template
         
         Parameters
         ----------
-        wave, fwhm : None or float or array-like
+        central_wave, fwhm : None or float or array-like
             Central wavelength and FWHM of the desired Gaussian
             
         velocity : bool
@@ -923,22 +1019,46 @@ class SpectrumTemplate(object):
             Generated wavelength array is
                 
                 >>> rms = fwhm/2.35
-                >>> xgauss = np.arange(-max_sigma, max_sigma, step)*rms+wave
-
+                >>> xgauss = np.arange(-max_sigma, max_sigma, step)*rms+central_wave
+        
+        clip : float
+            Clip values where the value of the gaussian function is less than 
+            `clip` times its maximum (i.e., `1/sqrt(2*pi*sigma**2)`).
+            
         Returns
         -------
-        Stores `wave`, `flux` attributes.        
+        wave, flux : array-like
+            Wavelength and flux of a Gaussian line
         """
-        rms = fwhm/2.35
-        if velocity:
-            rms *= wave/3.e5
+        import astropy.constants as const
+                
+        if hasattr(fwhm, 'unit'):
+            rms = fwhm.value/2.35
+            velocity = u.physical.get_physical_type(fwhm.unit) == 'speed'
+            if velocity:
+                rms = central_wave*(fwhm/const.c.to(KMS)).value/2.35
+            else:
+                rms = fwhm.value/2.35
+        else:
+            if velocity:
+                rms = central_wave*(fwhm/const.c.to(KMS).value)/2.35
+            else:
+                rms = fwhm/2.35
+                
+        if wave_grid is None:
+            wave_grid = np.arange(-max_sigma, max_sigma, step)*rms
+            wave_grid += central_wave
+            wave_grid = np.hstack([91., wave_grid, 1.e8])
             
-        xgauss = np.arange(-max_sigma, max_sigma, step)*rms+wave
-        gaussian = np.exp(-(xgauss-wave)**2/2/rms**2)
+        gaussian = np.exp(-(wave_grid-central_wave)**2/2/rms**2)
+        peak = np.sqrt(2*np.pi*rms**2)
         gaussian /= np.sqrt(2*np.pi*rms**2)
+        gaussian[gaussian < peak*clip] = 0
         
-        self.wave = xgauss
-        self.flux = gaussian
+        return wave_grid, gaussian
+        
+        #self.wave = xgauss
+        #self.flux = gaussian
 
     def zscale(self, z, scalar=1):
         """Redshift the template and multiply by a scalar.
@@ -986,7 +1106,9 @@ class SpectrumTemplate(object):
         
         new_flux = np.interp(new_wave, self.wave, self.flux)
         new_flux += np.interp(new_wave, spectrum.wave, spectrum.flux)
-        return SpectrumTemplate(wave=new_wave, flux=new_flux)
+        out = SpectrumTemplate(wave=new_wave, flux=new_flux)
+        out.fwhm = spectrum.fwhm
+        return out
     
     def __mul__(self, scalar):
         """Multiply spectrum by a scalar value
@@ -1000,8 +1122,449 @@ class SpectrumTemplate(object):
         -------
         new_spectrum : `~grizli.utils.SpectrumTemplate`    
         """
-        return SpectrumTemplate(wave=self.wave, flux=self.flux*scalar)
+        out = SpectrumTemplate(wave=self.wave, flux=self.flux*scalar)
+        out.fwhm = self.fwhm
+        return out
+    
+    def to_fnu(self, fnu_units=FNU_CGS):
+        """Make fnu version of the template.
         
+        Sets the `flux_fnu` attribute, assuming that the wavelength is given 
+        in Angstrom and the flux is given in flambda:
+        
+            >>> flux_fnu = self.flux * self.wave**2 / 3.e18
+            
+        """
+        #import astropy.constants as const
+        #flux_fnu = self.flux * self.wave**2 / 3.e18
+        #flux_fnu = (self.flux*self.fluxunits*(self.wave*self.waveunits)**2/const.c).to(FNU_CGS) #,  
+        flux_fnu = (self.flux*self.fluxunits).to(FNU_CGS, equivalencies=u.spectral_density(self.wave*self.waveunits))
+        
+        self.fnu_units = fnu_units
+        self.flux_fnu = flux_fnu.value
+        
+    def integrate_filter(self, filter):
+        """Integrate the template through an `~eazy.FilterDefinition` filter
+        object.
+        
+        Examples
+        --------
+        
+        Compute the WFC3/IR F140W AB magnitude of a pure emission line at the 
+        5-sigma 3D-HST line detection limit (5e-17 erg/s/cm2):
+        
+            >>> from grizli.utils import SpectrumTemplate
+            >>> from eazy.filters import FilterDefinition
+            >>> import pysynphot as S 
+
+            >>> line = SpectrumTemplate(central_wave=1.4e4, fwhm=150.,
+                                        velocity=True)*5.e-17
+                                        
+            >>> filter = FilterDefinition(bp=S.ObsBandpass('wfc3,ir,f140w'))
+            
+            >>> fnu = line.integrate_filter(filter)
+            
+            >>> print('AB mag = {0:.3f}'.format(-2.5*np.log10(fnu)-48.6))
+            AB mag = 26.619
+            
+        """
+        INTEGRATOR = np.trapz
+        
+        try:
+            import grizli.utils_c
+            interp = grizli.utils_c.interp.interp_conserve_c
+        except ImportError:
+            interp = np.interp
+        
+        #wz = self.wave*(1+z)
+        if (filter.wave.min() > self.wave.max()) | (filter.wave.max() < self.wave.min()) | (filter.wave.min() < self.wave.min()):
+            return 0.
+                
+        templ_filter = interp(filter.wave, self.wave, self.flux_fnu)
+        
+        if hasattr(filter, 'norm'):
+            filter_norm = filter.norm
+        else:
+            # e.g., pysynphot bandpass
+            filter_norm = INTEGRATOR(filter.throughput/filter.wave,
+                                     filter.wave)
+            
+        # f_nu/lam dlam == f_nu d (ln nu)    
+        temp_int = INTEGRATOR(filter.throughput*templ_filter/filter.wave, filter.wave) / filter_norm
+        
+        return temp_int
+
+def load_templates(fwhm=400, line_complexes=True, stars=False,
+                   full_line_list=None, continuum_list=None,
+                   fsps_templates=False):
+    """Generate a list of templates for fitting to the grism spectra
+    
+    The different sets of continuum templates are stored in 
+    
+        >>> temp_dir = os.path.join(os.getenv('GRIZLI'), 'templates')
+        
+    Parameters
+    ----------
+    fwhm : float
+        FWHM of a Gaussian, in km/s, that is convolved with the emission
+        line templates.  If too narrow, then can see pixel effects in the 
+        fits as a function of redshift.
+    
+    line_complexes : bool
+        Generate line complex templates with fixed flux ratios rather than
+        individual lines. This is useful for the redshift fits where there
+        would be redshift degeneracies if the line fluxes for individual
+        lines were allowed to vary completely freely. See the list of
+        available lines and line groups in
+        `~grizli.utils.get_line_wavelengths`. Currently,
+        `line_complexes=True` generates the following groups:
+        
+            Ha+NII+SII+SIII+He
+            OIII+Hb
+            OII+Ne
+        
+    stars : bool
+        Get stellar templates rather than galaxies + lines
+        
+    full_line_list : None or list
+        Full set of lines to try.  The default is set in the global variable
+        `~grizli.utils.DEFAULT_LINE_LIST`, which is currently
+        
+            >>> full_line_list = ['PaB', 'HeI-1083', 'SIII', 'SII', 'Ha',
+                                  'OI-6302', 'OIII', 'Hb', 'OIII-4363', 'Hg',
+                                  'Hd', 'NeIII', 'OII', 'NeVI', 'NeV', 
+                                  'MgII','CIV-1549', 'CIII-1908', 'OIII-1663', 
+                                  'HeII-1640', 'NIII-1750', 'NIV-1487', 
+                                  'NV-1240', 'Lya']
+        
+        The full list of implemented lines is in `~grizli.utils.get_line_wavelengths`.
+    
+    continuum_list : None or list
+        Override the default continuum templates if None.
+    
+    fsps_templates : bool
+        If True, get the FSPS NMF templates.
+        
+    Returns
+    -------
+    temp_list : dictionary of `~grizli.utils.SpectrumTemplate` objects
+        Output template list
+    
+    """
+    
+    if stars:
+        # templates = glob.glob('%s/templates/Pickles_stars/ext/*dat' %(os.getenv('GRIZLI')))
+        # templates = []
+        # for t in 'obafgkmrw':
+        #     templates.extend( glob.glob('%s/templates/Pickles_stars/ext/uk%s*dat' %(os.getenv('THREEDHST'), t)))
+        # templates.extend(glob.glob('%s/templates/SPEX/spex-prism-M*txt' %(os.getenv('THREEDHST'))))
+        # templates.extend(glob.glob('%s/templates/SPEX/spex-prism-[LT]*txt' %(os.getenv('THREEDHST'))))
+        # 
+        # #templates = glob.glob('/Users/brammer/Downloads/templates/spex*txt')
+        # templates = glob.glob('bpgs/*ascii')
+        # info = catIO.Table('bpgs/bpgs.info')
+        # type = np.array([t[:2] for t in info['type']])
+        # templates = []
+        # for t in 'OBAFGKM':
+        #     test = type == '-%s' %(t)
+        #     so = np.argsort(info['type'][test])
+        #     templates.extend(info['file'][test][so])
+        #             
+        # temp_list = OrderedDict()
+        # for temp in templates:
+        #     #data = np.loadtxt('bpgs/'+temp, unpack=True)
+        #     data = np.loadtxt(temp, unpack=True)
+        #     #data[0] *= 1.e4 # spex
+        #     scl = np.interp(5500., data[0], data[1])
+        #     name = os.path.basename(temp)
+        #     #ix = info['file'] == temp
+        #     #name='%5s %s' %(info['type'][ix][0][1:], temp.split('.as')[0])
+        #     print(name)
+        #     temp_list[name] = utils.SpectrumTemplate(wave=data[0],
+        #                                              flux=data[1]/scl)
+        
+        # np.save('stars_bpgs.npy', [temp_list])
+        
+        
+        # tall = np.load(os.path.join(os.getenv('GRIZLI'), 
+        #                                  'templates/stars.npy'))[0]
+        # 
+        # return tall
+        # 
+        # temp_list = OrderedDict()
+        # for k in tall:
+        #     if k.startswith('uk'):
+        #         temp_list[k] = tall[k]
+        # 
+        # return temp_list
+        # 
+        # for t in 'MLT':
+        #     for k in tall:
+        #         if k.startswith('spex-prism-'+t):
+        #             temp_list[k] = tall[k]
+        #             
+        # return temp_list
+        
+        #return temp_list
+        templates = ['M6.5.txt', 'M8.0.txt', 'L1.0.txt', 'L3.5.txt', 'L6.0.txt', 'T2.0.txt', 'T6.0.txt', 'T7.5.txt']
+        templates = ['stars/'+t for t in templates]
+    else:
+        ## Intermediate and very old
+        # templates = ['templates/EAZY_v1.0_lines/eazy_v1.0_sed3_nolines.dat',  
+        #              'templates/cvd12_t11_solar_Chabrier.extend.skip10.dat']     
+        templates = ['eazy_intermediate.dat', 
+                     'cvd12_t11_solar_Chabrier.dat']
+                 
+        ## Post starburst
+        #templates.append('templates/UltraVISTA/eazy_v1.1_sed9.dat')
+        templates.append('post_starburst.dat')
+    
+        ## Very blue continuum
+        #templates.append('templates/YoungSB/erb2010_continuum.dat')
+        templates.append('erb2010_continuum.dat')
+    
+        ### Test new templates
+        # templates = ['templates/erb2010_continuum.dat',
+        # 'templates/fsps/tweak_fsps_temp_kc13_12_006.dat',
+        # 'templates/fsps/tweak_fsps_temp_kc13_12_008.dat']
+    
+        if fsps_templates:
+            #templates = ['templates/fsps/tweak_fsps_temp_kc13_12_0{0:02d}.dat'.format(i+1) for i in range(12)]
+            templates = ['fsps/fsps_QSF_12_v3_nolines_0{0:02d}.dat'.format(i+1) for i in range(12)]
+            #templates = ['fsps/fsps_QSF_7_v3_nolines_0{0:02d}.dat'.format(i+1) for i in range(7)]
+    
+        if continuum_list is not None:
+            templates = continuum_list
+        
+    temp_list = OrderedDict()
+    for temp in templates:
+        data = np.loadtxt(os.path.join(os.getenv('GRIZLI'), 'templates', temp), unpack=True)
+        #scl = np.interp(5500., data[0], data[1])
+        scl = 1.
+        name = temp #os.path.basename(temp)
+        temp_list[name] = SpectrumTemplate(wave=data[0], flux=data[1]/scl,
+                                           name=name)
+        
+        temp_list[name].name = name
+    
+    if stars:
+        return temp_list
+        
+    ### Emission lines:
+    line_wavelengths, line_ratios = get_line_wavelengths()
+     
+    if line_complexes:
+        #line_list = ['Ha+SII', 'OIII+Hb+Ha', 'OII']
+        #line_list = ['Ha+SII', 'OIII+Hb', 'OII']
+        line_list = ['Ha+NII+SII+SIII+He', 'OIII+Hb', 'OII+Ne', 'Lya+CIV']
+    else:
+        if full_line_list is None:
+            line_list = DEFAULT_LINE_LIST
+        else:
+            line_list = full_line_list
+            
+        #line_list = ['Ha', 'SII']
+    
+    # Use FSPS grid for lines
+    wave_grid = None
+    # if fsps_templates:
+    #     wave_grid = data[0]
+    # else:
+    #     wave_grid = None   
+    
+    for li in line_list:
+        scl = line_ratios[li]/np.sum(line_ratios[li])
+        for i in range(len(scl)):
+            line_i = SpectrumTemplate(wave=wave_grid, 
+                                      central_wave=line_wavelengths[li][i], 
+                                      flux=None, fwhm=fwhm, velocity=True)
+                                      
+            if i == 0:
+                line_temp = line_i*scl[i]
+            else:
+                line_temp = line_temp + line_i*scl[i]
+        
+        name = 'line {0}'.format(li)
+        line_temp.name = name
+        temp_list[name] = line_temp
+                                 
+    return temp_list    
+
+def polynomial_templates(wave, order=0, line=False):
+    temp = OrderedDict()  
+    if line:
+        for sign in [1,-1]:
+            key = 'poly {0}'.format(sign)
+            temp[key] = SpectrumTemplate(wave, sign*(wave/1.e4-1)+1)
+            temp[key].name = key
+            
+        return temp
+        
+    for i in range(order+1):
+        key = 'poly {0}'.format(i)
+        temp[key] = SpectrumTemplate(wave, (wave/1.e4-1)**i)
+        temp[key].name = key
+    
+    return temp
+        
+def dot_templates(coeffs, templates, z=0, max_R=5000):
+    """Compute template sum analogous to `np.dot(coeffs, templates)`.
+    """  
+    
+    if len(coeffs) != len(templates):
+        raise ValueError ('shapes of coeffs ({0}) and templates ({1}) don\'t match'.format(len(coeffs), len(templates)))
+          
+    # for i, te in enumerate(templates):
+    #     if i == 0:
+    #         tc = templates[te].zscale(z, scalar=coeffs[i])
+    #         tl = templates[te].zscale(z, scalar=coeffs[i])
+    #     else:
+    #         if te.startswith('line'):
+    #             tc += templates[te].zscale(z, scalar=0.)
+    #         else:
+    #             tc += templates[te].zscale(z, scalar=coeffs[i])
+    #            
+    #         tl += templates[te].zscale(z, scalar=coeffs[i])
+    wave, flux_arr, is_line = array_templates(templates, max_R=max_R)
+    
+    # Continuum
+    cont = np.dot(coeffs*(~is_line), flux_arr)
+    tc = SpectrumTemplate(wave=wave, flux=cont).zscale(z)
+    
+    # Full template
+    line = np.dot(coeffs, flux_arr)
+    tl = SpectrumTemplate(wave=wave, flux=line).zscale(z)
+    
+    return tc, tl
+    
+def array_templates(templates, max_R=5000):
+    """Return an array version of the templates that have all been interpolated to the same grid.
+    
+    
+    Parameters
+    ----------
+    templates : dictionary of `~grizli.utils.SpectrumTemplate` objects
+        Output template list with `NTEMP` templates.  
+    
+    max_R : float
+        Maximum spectral resolution of the regridded templates.
+        
+    Returns
+    -------
+    wave : `~numpy.ndarray`, dimensions `(NL,)`
+        Array containing unique wavelengths.
+        
+    flux_arr : `~numpy.ndarray`, dimensions `(NTEMP, NL)`
+        Array containing the template fluxes interpolated at `wave`.
+    
+    is_line : `~numpy.ndarray`
+        Boolean array indicating emission line templates (the key in the 
+        template dictionary starts with "line ").
+        
+    """
+    from grizli.utils_c.interp import interp_conserve_c
+        
+    wave = np.unique(np.hstack([templates[t].wave for t in templates]))
+    clipsum, iter = 1, 0
+    while (clipsum > 0) & (iter < 10):
+        clip = np.gradient(wave)/wave < 1/max_R
+        idx = np.arange(len(wave))[clip]
+        wave[idx[::2]] = np.nan
+        wave = wave[np.isfinite(wave)]
+        iter += 1
+        clipsum = clip.sum()
+        #print(iter, clipsum)
+        
+    NTEMP = len(templates)
+    flux_arr = np.zeros((NTEMP, len(wave)))
+    
+    for i, t in enumerate(templates):
+        flux_arr[i,:] = interp_conserve_c(wave, templates[t].wave,
+                                          templates[t].flux)
+    
+    is_line = np.array([t.startswith('line ') for t in templates])
+    
+    return wave, flux_arr, is_line
+    
+def compute_equivalent_widths(templates, coeffs, covar, max_R=5000, Ndraw=1000, seed=0):
+    """Compute template-fit emission line equivalent widths
+    
+    Parameters
+    ----------
+    templates : dictionary of `~grizli.utils.SpectrumTemplate` objects
+        Output template list with `NTEMP` templates.  
+    
+    coeffs : `~numpy.ndarray`, dimensions (`NTEMP`)
+        Fit coefficients
+        
+    covar :  `~numpy.ndarray`, dimensions (`NTEMP`, `NTEMP`)
+        Covariance matrix
+        
+    max_R : float
+        Maximum spectral resolution of the regridded templates.
+
+    Ndraw : int
+        Number of random draws to extract from the covariance matrix
+    
+    seed : positive int
+        Random number seed to produce repeatible results. If `None`, then 
+        use default state.
+        
+    Returns
+    -------
+    EWdict : dict
+        Dictionary of [16, 50, 84th] percentiles of the line EW distributions.
+    
+    """
+    
+    if False:
+        # Testing
+        templates = t1
+        chi2, coeffsx, coeffs_errx, covarx = mb.xfit_at_z(z=tfit['z'], templates=templates, fitter='nnls', fit_background=True, get_uncertainties=2)
+        covar = covarx[mb.N:,mb.N:]
+        coeffs = coeffsx[mb.N:]
+    
+    # Array versions of the templates
+    wave, flux_arr, is_line = array_templates(templates, max_R=max_R)
+    keys = np.array(list(templates.keys()))
+    
+    EWdict = OrderedDict()
+    for key in keys[is_line]:
+        EWdict[key] = (0., 0., 0.)
+        
+    # Only worry about templates with non-zero coefficients, which should
+    # be accounted for in the covariance array (with get_uncertainties=2)
+    clip = coeffs != 0
+    # No valid lines
+    if (is_line & clip).sum() == 0:
+        return EWdict
+    
+    # Random draws from the covariance matrix
+    covar_clip = covar[clip,:][:,clip]
+    if seed is not None:
+        np.random.seed(seed)
+    
+    draws = np.random.multivariate_normal(coeffs[clip], covar_clip, size=Ndraw)
+    
+    # Evaluate the continuum fits from the draws             
+    continuum = np.dot(draws*(~is_line[clip]), flux_arr[clip,:])
+    
+    # Compute the emission line EWs
+    tidx = np.where(is_line[clip])[0]
+    for ix in tidx:
+        key = keys[clip][ix]
+
+        # Line template
+        line = np.dot(draws[:,ix][:,None], flux_arr[clip,:][ix,:][None,:])
+        
+        # Where line template non-zero
+        mask = flux_arr[clip,:][ix,:] > 0
+        ew_i = np.trapz((line/continuum)[:,mask], wave[mask], axis=1)
+        
+        EWdict[key] = np.percentile(ew_i, [16., 50., 84.])
+    
+    return EWdict
+    
 def log_zgrid(zr=[0.7,3.4], dz=0.01):
     """Make a logarithmically spaced redshift grid
     
@@ -1021,30 +1584,6 @@ def log_zgrid(zr=[0.7,3.4], dz=0.01):
     """
     zgrid = np.exp(np.arange(np.log(1+zr[0]), np.log(1+zr[1]), dz))-1
     return zgrid
-
-### Deprecated
-# def zoom_zgrid(zgrid, chi2nu, threshold=0.01, factor=10, grow=7):
-#     """TBD
-#     """
-#     import scipy.ndimage as nd
-#     
-#     mask = (chi2nu-chi2nu.min()) < threshold
-#     if grow > 1:
-#         mask_grow = nd.maximum_filter(mask*1, size=grow)
-#         mask = mask_grow > 0
-#         
-#     if mask.sum() == 0:
-#         return []
-#     
-#     idx = np.arange(zgrid.shape[0])
-#     out_grid = []
-#     for i in idx[mask]:
-#         if i == idx[-1]:
-#             continue
-#             
-#         out_grid = np.append(out_grid, np.linspace(zgrid[i], zgrid[i+1], factor+2)[1:-1])
-#     
-#     return out_grid
 
 def get_wcs_pscale(wcs):
     """Get correct pscale from a `~astropy.wcs.WCS` object
@@ -1173,7 +1712,72 @@ def reproject_faster(input_hdu, output, pad=10, **kwargs):
     # Get the reprojection
     seg_i, fp_i = reproject.reproject_interp(sub_hdu, output, **kwargs)
     return seg_i.astype(sub_data.dtype), fp_i.astype(np.uint8)
-     
+
+def full_spectrum_wcsheader(center_wave=1.4e4, dlam=40, NX=100, spatial_scale=1, NY=10):
+    """Make a WCS header for a 2D spectrum
+    
+    Parameters
+    ----------
+    center_wave : float
+        Wavelength of the central pixel, in Anstroms
+        
+    dlam : float
+        Delta-wavelength per (x) pixel
+        
+    NX, NY : int
+        Number of x & y pixels. Output will have shape `(2*NY, 2*NX)`.
+        
+    spatial_scale : float
+        Spatial scale of the output, in units of the input pixels
+    
+    Returns
+    -------
+    header : `~astropy.io.fits.Header`
+        Output WCS header
+    
+    wcs : `~astropy.wcs.WCS`
+        Output WCS
+    
+    Examples
+    --------
+        
+        >>> from grizli.utils import make_spectrum_wcsheader
+        >>> h, wcs = make_spectrum_wcsheader()
+        >>> print(wcs)
+        WCS Keywords
+        Number of WCS axes: 2
+        CTYPE : 'WAVE'  'LINEAR'  
+        CRVAL : 14000.0  0.0  
+        CRPIX : 101.0  11.0  
+        CD1_1 CD1_2  : 40.0  0.0  
+        CD2_1 CD2_2  : 0.0  1.0  
+        NAXIS    : 200 20
+
+    """
+    
+    h = pyfits.ImageHDU(data=np.zeros((2*NY, 2*NX), dtype=np.float32))
+    
+    refh = h.header
+    refh['CRPIX1'] = NX+1
+    refh['CRPIX2'] = NY+1
+    refh['CRVAL1'] = center_wave/1.e4
+    refh['CD1_1'] = dlam/1.e4
+    refh['CD1_2'] = 0.
+    refh['CRVAL2'] = 0.
+    refh['CD2_2'] = spatial_scale
+    refh['CD2_1'] = 0.
+    refh['RADESYS'] = ''
+    
+    refh['CTYPE1'] = 'RA---TAN-SIP'
+    refh['CUNIT1'] = 'mas'
+    refh['CTYPE2'] = 'DEC--TAN-SIP'
+    refh['CUNIT2'] = 'mas'
+    
+    ref_wcs = pywcs.WCS(refh)    
+    ref_wcs.pscale = get_wcs_pscale(ref_wcs)
+    
+    return refh, ref_wcs
+    
 def make_spectrum_wcsheader(center_wave=1.4e4, dlam=40, NX=100, spatial_scale=1, NY=10):
     """Make a WCS header for a 2D spectrum
     
@@ -1554,6 +2158,9 @@ class EffectivePSF(object):
             
             self.epsf[filter] = data
         
+        # Dummy, use F105W ePSF for F098M
+        self.epsf['F098M'] = self.epsf['F105W']
+        
     def get_at_position(self, x=507, y=507, filter='F140W'):
         """Evaluate ePSF at detector coordinates
         TBD
@@ -1823,7 +2430,7 @@ class GTable(astropy.table.Table):
         other_coo = SkyCoord(ra=other[rd[0]], dec=other[rd[1]])
                      
         idx, d2d, d3d = other_coo.match_to_catalog_sky(self_coo)
-        return idx, d2d
+        return idx, d2d.to(u.arcsec)
             
     def write_sortable_html(self, output, replace_braces=True, localhost=True, max_lines=50, table_id=None, table_class="display compact", css=None):
         """Wrapper around `~astropy.table.Table.write(format='jsviewer')`.
@@ -1907,4 +2514,30 @@ def fill_between_steps(x, y0, y1, ax=None, *args, **kwargs):
         ax = plt.gca()
     
     ax.fill_between(xfull[so], y0full[so], y1full[so], *args, **kwargs)
+
+def fill_masked_covar(covar, mask):
+    """Fill a covariance matrix in a larger array that had masked values
+    
+    Parameters
+    ----------
+    covar : `(M,M)` square `~np.ndarray`
+        Masked covariance array.
+        
+    mask : bool mask, `N>M`
+        The original mask.
+    
+    Returns
+    -------
+    covar_full : `~np.ndarray`
+        Full covariance array with dimensions `(N,N)`.
+    
+    """
+    N = mask.shape[0]
+    idx = np.arange(N)[mask]
+    covar_full = np.zeros((N,N), dtype=covar.dtype)
+    for i, ii in enumerate(idx):
+        for j, jj in enumerate(idx):
+            covar_full[ii,jj] = covar[i,j]
+    
+    return covar_full
     

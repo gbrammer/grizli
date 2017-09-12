@@ -1,22 +1,20 @@
 language: python
 python:
-  - "2.6"
   - "2.7"
-  - "3.2"
-  - "3.3"
-  - "3.4"
   - "3.5"
-  - "3.5-dev" # 3.5 development branch
   - "3.6"
-  - "3.6-dev" # 3.6 development branch
-  - "3.7-dev" # 3.7 development branch
-  - "nightly" # currently points to 3.7-dev
-# command to install dependencies
-install: 
- - python setup.py install
-## install: "pip install -r requirements.txt"
-# command to run tests
-script: pytest
 
-notifications:
-  email: false
+env: 
+    global:
+        - NUMPY_VERSION=stable
+        - ASTROPY_VERSION=stable
+        - CONDA_DEPENDENCIES='scipy matplotlib'
+        
+# commands to install dependencies (astropy, conda)
+install: 
+    - git clone git://github.com/astropy/ci-helpers.git
+    - source ci-helpers/travis/setup_conda.sh
+
+# command to run tests
+script: 
+    python setup.py test 
