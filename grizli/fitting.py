@@ -29,7 +29,7 @@ try:
 except:
     IGM = None
 
-def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter='nnls', group_name='grism', fit_stacks=True, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=3, fit_beams=True, root='', fit_trace_shift=False, phot=None, verbose=True, scale_photometry=False, show_beams=True):
+def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter='nnls', group_name='grism', fit_stacks=True, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=3, fit_only_beams=False, fit_beams=True, root='', fit_trace_shift=False, phot=None, verbose=True, scale_photometry=False, show_beams=True):
     """Run the full procedure
     
     1) Load MultiBeam and stack files 
@@ -72,7 +72,12 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
         t1 = grizli.utils.load_templates(line_complexes=False, fsps_templates=True, fwhm=fwhm)
         
     # Fit on stacked spectra
-    fit = st.xfit_redshift(templates=t0, zr=zr, dz=dz, prior=prior, fitter=fitter, verbose=verbose) 
+    if fit_only_beams:
+        fit_obj = mb
+    else:
+        fit_obj = st
+        
+    fit = fit_obj.xfit_redshift(templates=t0, zr=zr, dz=dz, prior=prior, fitter=fitter, verbose=verbose) 
     fit_hdu = pyfits.table_to_hdu(fit)
     fit_hdu.header['EXTNAME'] = 'ZFIT_STACK'
     
@@ -82,14 +87,16 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
             mb.pscale = scl.x
             st.pscale = scl.x
             
-            fit = st.xfit_redshift(templates=t0, zr=zr, dz=dz, prior=prior, fitter=fitter, verbose=verbose) 
+            fit = fit_obj.xfit_redshift(templates=t0, zr=zr, dz=dz, prior=prior, fitter=fitter, verbose=verbose) 
             fit_hdu = pyfits.table_to_hdu(fit)
             fit_hdu.header['EXTNAME'] = 'ZFIT_STACK'
             
         
     # Zoom-in fit with individual beams
     if fit_beams:
-        z0 = fit.meta['Z50'][0]
+        #z0 = fit.meta['Z50'][0]
+        z0 = fit.meta['z_map'][0]
+        
         #width = np.maximum(3*fit.meta['ZWIDTH1'][0], 3*0.001*(1+z0))
         width = 20*0.001*(1+z0)
         
@@ -166,7 +173,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
         pscale = 1.
         if hasattr(mb, 'pscale'):
             if (mb.pscale is not None):
-                pscale = mb.compute_scale_array(mb.pscale, oned_spec[g][0].value)
+                pscale = mb.compute_scale_array(mb.pscale, oned_spec[g]['wave'])
                 
         axc.errorbar(oned_spec[g]['wave']/1.e4, oned_spec[g]['flux']/1.e-19/pscale, oned_spec[g]['err']/1.e-19/pscale, color=GRISM_COLORS[g], alpha=0.8, marker='.', linestyle='None', zorder=1)
           
@@ -443,6 +450,51 @@ class GroupFitter(object):
                            
         return A_bg
     
+    def get_SDSS_photometry(self, bands='ugriz', templ=None, radius=2):
+        from astroquery.sdss import SDSS
+        from astropy import coordinates as coords
+        import astropy.units as u
+        import pysynphot as S
+        
+        from eazy.templates import Template
+        from eazy.filters import FilterFile
+        from eazy.photoz import TemplateGrid
+        from eazy.filters import FilterDefinition
+        
+        pos = coords.SkyCoord(self.ra*u.deg, self.dec*u.deg, frame='icrs')
+        fields = ['ra','dec','modelMag_r', 'modelMagErr_r']
+        for b in bands:
+            fields.extend(['modelFlux_'+b, 'modelFluxIvar_'+b])
+            
+        xid = SDSS.query_region(pos, photoobj_fields=fields, spectro=False, radius=radius*u.arcsec)
+        
+        if xid is None:
+            return None
+            
+        filters = [FilterDefinition(bp=S.ObsBandpass('sdss,{0}'.format(b))) for b in bands]
+        pivot = {}
+        for ib, b in enumerate(bands):
+            pivot[b] = filters[ib].pivot()
+            
+        to_flam = 10**(-0.4*(22.5+48.6))*3.e18 # / pivot(Ang)**2
+        flam = np.array([xid['modelFlux_{0}'.format(b)][0]*to_flam/pivot[b]**2 for b in bands])
+        eflam = np.array([np.sqrt(1/xid['modelFluxIvar_{0}'.format(b)][0])*to_flam/pivot[b]**2 for b in bands])
+        
+        phot = {'flam':flam, 'eflam':eflam, 'filters':filters, 'tempfilt':None}
+        
+        if templ is None:
+            return phot
+        
+        # Make fast SDSS template grid
+        templates = [Template(arrays=[templ[t].wave, templ[t].flux], name=t) for t in templ]
+        zgrid = utils.log_zgrid(zr=[0.01, 3.4], dz=0.005)
+        
+        tempfilt = TemplateGrid(zgrid, templates, filters=filters, add_igm=True, galactic_ebv=0, Eb=0, n_proc=0)
+        
+        #filters = [all_filters.filters[f-1] for f in [156,157,158,159,160]]
+        phot = {'flam':flam, 'eflam':eflam, 'filters':filters, 'tempfilt':tempfilt}
+        return phot
+        
     def set_photometry(self, flam=[], eflam=[], filters=[], force=False, tempfilt=None, min_err=0.02):
         """
         Add photometry
@@ -973,15 +1025,25 @@ class GroupFitter(object):
         
         risk = np.dot(pdf*L, dz)
         zi = np.argmin(risk)
-        c = np.polyfit(fit['zgrid'][zi-1:zi+2], risk[zi-1:zi+2], 2)
-        z_risk = -c[1]/(2*c[0])
+        
+        #print('xxx', zi, len(risk))
+        
+        if (zi < len(risk)-1) & (zi > 0):
+            c = np.polyfit(fit['zgrid'][zi-1:zi+2], risk[zi-1:zi+2], 2)
+            z_risk = -c[1]/(2*c[0])
+        else:
+            z_risk = fit['zgrid'][zi]
+            
         min_risk = np.trapz(pdf*_loss((z_risk-fit['zgrid'])/(1+fit['zgrid']), gamma=gamma), fit['zgrid'])
         
         # MAP, maximum p(z)
         zi = np.argmax(pdf)
-        c = np.polyfit(fit['zgrid'][zi-1:zi+2], pdf[zi-1:zi+2], 2)
-        z_map = -c[1]/(2*c[0])
-        
+        if (zi < len(pdf)-1) & (zi > 0):
+            c = np.polyfit(fit['zgrid'][zi-1:zi+2], pdf[zi-1:zi+2], 2)
+            z_map = -c[1]/(2*c[0])
+        else:
+            z_map = fit['zgrid'][zi]
+            
         # Store data in the fit table
         fit['pdf'] = pdf
         fit['risk'] = risk
@@ -1449,7 +1511,7 @@ class GroupFitter(object):
             pscale = 1.
             if hasattr(self, 'pscale'):
                 if (self.pscale is not None):
-                    pscale = self.compute_scale_array(self.pscale, oned_spec[g][0].value)
+                    pscale = self.compute_scale_array(self.pscale, oned_spec[g]['wave'])
 
             axc.errorbar(oned_spec[g]['wave']/1.e4, oned_spec[g]['flux']/1.e-19/pscale, oned_spec[g]['err']/1.e-19/pscale, color=GRISM_COLORS[g], alpha=0.8, marker='.', linestyle='None', zorder=1)
         
