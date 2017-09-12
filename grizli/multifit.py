@@ -2333,7 +2333,13 @@ class MultiBeam(GroupFitter):
                 else:
                     hdu_full.extend(hdu[3:])
                     hdu_full[0].header['NUMLINES'] += 1 
-
+                
+                    # Make sure SCI extension is filled.  Can be empty for 
+                    # lines at the edge of the grism throughput
+                    if hdu['DWHT'].data.max() != 0:
+                        hdu_full['DSCI'] = hdu['DSCI']
+                        hdu_full['DWHT'] = hdu['DWHT']
+                    
                 li = hdu_full[0].header['NUMLINES']
                 hdu_full[0].header['LINE{0:03d}'.format(li)] = line
                 hdu_full[0].header['FLUX{0:03d}'.format(li)] = (line_flux, 
@@ -2881,10 +2887,11 @@ class MultiBeam(GroupFitter):
         else:
             return output_hdu #all_hdus
     
-    def get_binned_spectra(self, bin=1, coeffs=None):
+    def get_binned_spectra(self, bin=1, coeffs=None, get_model=False):
         """
         Get optimally-extracted, binned spectra in each available grism
         """
+        
         binned_spectrum = OrderedDict()
         for grism in self.Ngrism:
             num = []
@@ -2898,9 +2905,13 @@ class MultiBeam(GroupFitter):
                         xxx = beam.beam.optimal_extract(beam.model, ivar=beam.ivar)
                     
                     proff = beam.beam.optimal_profile.flatten()
-                    clean = (beam.grism['SCI']-beam.contam).flatten()
-                    if coeffs is not None:
-                        clean -= coeffs[ib]
+                    
+                    if get_model:
+                        clean = beam.model.flatten()
+                    else:
+                        clean = (beam.grism['SCI']-beam.contam).flatten()
+                        if coeffs is not None:
+                            clean -= coeffs[ib]
                     
                     wx = np.dot(np.ones(beam.sh[0])[:,None], beam.wave[None,:]).flatten()[beam.fit_mask]
                     sx = np.dot(np.ones(beam.sh[0])[:,None], beam.beam.sensitivity[None,:]).flatten()#[beam.fit_mask]
@@ -2926,8 +2937,12 @@ class MultiBeam(GroupFitter):
                     var_bin[j] = 1./den[ix].sum()
                     flux_bin[j] = num[ix].sum()*var_bin[j]
                 
-            binned_spectrum[grism] = [wave_bin*u.Angstrom, flux_bin*utils.FLAMBDA_CGS, np.sqrt(var_bin)*utils.FLAMBDA_CGS]
-        
+            #binned_spectrum[grism] = [wave_bin*u.Angstrom, flux_bin*utils.FLAMBDA_CGS, np.sqrt(var_bin)*utils.FLAMBDA_CGS]
+            binned_spectrum[grism] = utils.GTable()
+            binned_spectrum[grism]['wave'] = wave_bin*u.Angstrom
+            binned_spectrum[grism]['flux'] = flux_bin*utils.FLAMBDA_CGS
+            binned_spectrum[grism]['err'] = np.sqrt(var_bin)*utils.FLAMBDA_CGS
+            
         return binned_spectrum
         
 def get_redshift_fit_defaults():
