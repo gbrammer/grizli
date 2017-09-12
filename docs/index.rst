@@ -96,7 +96,12 @@ In lieu of detailed documentation for all of the `grizli` processing beyond info
   1. Simulate NIRISS spectra in three blocking filters and two orients offset by 90 degrees.
   2. Simulation field taken from the Hubble WFC3/IR Ultra-Deep Field, with the WFC3 F140W image as the morphological reference and photo-z templates taken as the spectral models. 
   3. Extract spectra and fit redshifts and emission lines from the combined six exposures.
-  
+
+- `NewSpectrumFits <https://github.com/gbrammer/grizli/blob/master/examples/NewSpectrumFits.ipynb>`__ **(09.05.17)**: New fitting tools
+
+  1. Unify the fitting tools between the stacked and exposure-level 2D cutouts ("beams").
+
+
 API
 ~~~
 

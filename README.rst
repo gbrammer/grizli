@@ -1,11 +1,11 @@
 
 .. image:: examples/grizli_logo.png
 
-.. image:: https://travis-ci.org/gbrammer/grizli.svg?branch=clean_fit_outputs
+.. image:: https://travis-ci.org/gbrammer/grizli.svg?branch=master
     :target: https://travis-ci.org/gbrammer/grizli
     
-.. image:: https://coveralls.io/repos/github/gbrammer/grizli/badge.svg?branch=clean_fit_outputs
-    :target: https://coveralls.io/github/gbrammer/grizli?branch=clean_fit_outputs
+.. image:: https://coveralls.io/repos/github/gbrammer/grizli/badge.svg?branch=master
+    :target: https://coveralls.io/github/gbrammer/grizli?branch=master
 
 *Grism redshift & line* analysis software for space-based slitless spectroscopy
 ========================================================================================
@@ -81,7 +81,7 @@ The following are IPython/jupyter notebooks demonstrating various aspects of the
   2. Simulation field taken from the Hubble WFC3/IR Ultra-Deep Field, with the WFC3 F140W image as the morphological reference and photo-z templates taken as the spectral models. 
   3. Extract spectra and fit redshifts and emission lines from the combined six exposures.
 
-- `NewSpectrumFits <https://github.com/gbrammer/grizli/blob/clean_fit_outputs/examples/NewSpectrumFits.ipynb>`__ **(09.05.17)**: New fitting tools
+- `NewSpectrumFits <https://github.com/gbrammer/grizli/blob/master/examples/NewSpectrumFits.ipynb>`__ **(09.05.17)**: New fitting tools
 
   1. Unify the fitting tools between the stacked and exposure-level 2D cutouts ("beams").
  
