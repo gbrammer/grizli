@@ -3,7 +3,6 @@ python:
   - "2.7"
   - "3.5"
   - "3.6"
-# command to install dependencies
 
 env: 
     global:
@@ -11,6 +10,7 @@ env:
         - ASTROPY_VERSION=stable
         - CONDA_DEPENDENCIES='scipy matplotlib'
         
+# commands to install dependencies (astropy, conda)
 install: 
     - git clone git://github.com/astropy/ci-helpers.git
     - source ci-helpers/travis/setup_conda.sh
