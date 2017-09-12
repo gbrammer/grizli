@@ -7,11 +7,11 @@ from .version import __version__
 import os
 
 ## Will get ImportError: No module named disperse" if imported in the repo directory
-if os.path.exists('README.rst') & os.path.exists('LICENSE.txt'):
-    print("""
-Warning: `import grizli` will fail if the working directory is the place 
-where the code repository was cloned and compiled!
-""")
+# if os.path.exists('README.rst') & os.path.exists('LICENSE.txt'):
+#     print("""
+# Warning: `import grizli` will fail if the working directory is the place 
+# where the code repository was cloned and compiled!
+# """)
 
 # Module imports
 from . import utils_c
