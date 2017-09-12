@@ -46,7 +46,7 @@ def read(fname):
 
 setup(
     name = "grizli",
-    version = "0.2.1",
+    version = "0.3.0",
     author = "Gabriel Brammer",
     author_email = "gbrammer@gmail.com",
     description = "Grism redshift and line analysis software",
