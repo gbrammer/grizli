@@ -1555,6 +1555,205 @@ class GroupFitter(object):
             sfit['line1d'] = line1d
         
             return fig, sfit
+    
+    ### 
+    ### Generic functions for generating flat model and background arrays
+    ###
+    def optimal_extract(self, data, bin=1, ivar=None):
+        """
+        TBD: split by grism
+        """
+        import astropy.units as u
+        
+        if data.size != self.fit_mask.sum():
+            print('`data` has to be sized of masked arrays (self.fit_mask)')
+            return False
+            
+        if not hasattr(self, 'optimal_profile_mask'):
+            self.initialize_masked_arrays()
+        
+        prof = self.optimal_profile_mask
+        if ivar is None:
+            ivar = 1./self.sigma2_mask
+            
+        num = prof*data*ivar
+        den = prof**2*ivar
+        
+        out = {}
+        for grism in self.Ngrism:
+            lim = utils.GRISM_LIMITS[grism]
+            wave_bin = np.arange(lim[0]*1.e4, lim[1]*1.e4, lim[2]*bin)
+            flux_bin = wave_bin*0.
+            var_bin = wave_bin*0.
+        
+            for j in range(len(wave_bin)):
+                ix = np.abs(self.wave_mask-wave_bin[j]) < lim[2]*bin/2.
+                ix &= self.grism_name_mask == grism
+                if ix.sum() > 0:
+                    var_bin[j] = 1./den[ix].sum()
+                    flux_bin[j] = num[ix].sum()*var_bin[j]
+        
+            binned_spectrum = utils.GTable()
+            binned_spectrum['wave'] = wave_bin*u.Angstrom
+            binned_spectrum['flux'] = flux_bin*(u.electron/u.second)
+            binned_spectrum['err'] = np.sqrt(var_bin)*(u.electron/u.second)
+            
+            binned_spectrum.meta['BIN'] = (bin, 'Spectrum binning')
+            
+            out[grism] = binned_spectrum
+            
+        return out
+
+            
+    def initialize_masked_arrays(self):
+        """
+        Initialize flat masked arrays for fast likelihood calculation
+        """
+        try:
+            # MultiBeam
+            self.contamf_mask = self.contamf[self.fit_mask]
+            
+            p = []
+            for beam in self.beams:
+                beam.beam.init_optimal_profile()
+                p.append(beam.beam.optimal_profile.flatten()[beam.fit_mask])
+            
+            self.optimal_profile_mask = np.hstack(p)
+            
+            # Inverse sensitivity
+            self.sens_mask = np.hstack([np.dot(np.ones(beam.sh[0])[:,None], beam.beam.sensitivity[None,:]).flatten()[beam.fit_mask] for beam in self.beams])
+            
+            self.grism_name_mask = np.hstack([[beam.grism.filter]*beam.fit_mask.sum() for beam in self.beams])
+        except:
+            # StackFitter
+            self.contamf_mask = np.hstack([beam.contamf[beam.fit_mask] 
+                                           for beam in self.beams])
+
+            p = []
+            for beam in self.beams:
+                beam.init_optimal_profile()
+                p.append(beam.optimal_profile.flatten()[beam.fit_mask])
+            
+            self.optimal_profile_mask = np.hstack(p)
+            
+            # Inverse sensitivity
+            self.sens_mask = np.hstack([np.dot(np.ones(beam.sh[0])[:,None], beam.sens[None,:]).flatten()[beam.fit_mask] for beam in self.beams])
+            
+            self.grism_name_mask = np.hstack([[beam.grism]*beam.fit_mask.sum() for beam in self.beams])
+            
+        self.wave_mask = np.hstack([np.dot(np.ones(beam.sh[0])[:,None], beam.wave[None,:]).flatten()[beam.fit_mask] for beam in self.beams])
+            
+        # (scif attribute is already contam subtracted)
+        self.scif_mask = self.scif[self.fit_mask] 
+        # sigma
+        self.sigma_mask = 1/self.sivarf[self.fit_mask]
+        # sigma-squared 
+        self.sigma2_mask = 1/self.ivarf[self.fit_mask] 
+                
+    def get_flat_model(self, spectrum_1d, apply_mask=True):
+        """
+        Generate model array based on the model 1D spectrum in `spectrum_1d`
+
+        Parameters
+        ----------
+
+        spectrum_1d : list
+        
+            List of 1D arrays [wavelength, flux].
+
+        Returns
+        -------
+
+        model : Array with dimensions `(self.fit_mask.sum(),)`
+        
+            Flattened, masked model array.
+
+        """
+        mfull = []
+        for ib, beam in enumerate(self.beams):
+            model_i = beam.compute_model(spectrum_1d=spectrum_1d, is_cgs=True,
+                                        in_place=False)
+
+            if apply_mask:
+                mfull.append(model_i.flatten()[beam.fit_mask])
+            else:
+                mfull.append(model_i.flatten())
+                
+        return np.hstack(mfull)
+
+    def get_flat_background(self, bg_params, apply_mask=True):
+        """
+        Generate background array the same size as the flattened total 
+        science array.
+
+        Parameters
+        ----------
+        bg_params : array with shape (self.N) or (self.N, M)
+        
+            Background parameters for each beam, where the `M` axis is
+            polynomial cofficients in the order expected by
+            `~astropy.modeling.models.Polynomial2D`.  If the array is 1D,
+            then provide a simple pedestal background.
+
+        Returns
+        -------
+
+        bg_model : Array with dimensions `(self.fit_mask.sum(),)`
+        
+            Flattened, masked background array.
+
+        """
+        from astropy.modeling.models import Polynomial2D
+        
+        # Initialize beam pixel coordinates
+        for beam in self.beams:
+            needs_init = not hasattr(beam, 'xp')
+            if hasattr(beam, 'xp_mask'):
+                needs_init |= apply_mask is not beam.xp_mask
+                
+            if needs_init:
+                #print('Initialize xp/yp')
+                yp, xp = np.indices(beam.sh)
+                xp = (xp - beam.sh[1]/2.)/(beam.sh[1]/2.)
+                yp = (yp - beam.sh[0]/2.)/(beam.sh[0]/2.)
+                
+                if apply_mask:
+                    beam.xp = xp.flatten()[beam.fit_mask]
+                    beam.yp = yp.flatten()[beam.fit_mask]
+                else:
+                    beam.xp = xp.flatten()
+                    beam.yp = yp.flatten()
+                    
+                beam.xp_mask = apply_mask
+                
+            if (not hasattr(beam, 'ones')) | needs_init:
+                if apply_mask:
+                    beam.ones = np.ones(beam.fit_mask.sum())
+                else:
+                    beam.ones = np.ones(beam.fit_mask.size)
+                    
+        # Initialize 2D polynomial
+        poly = None
+        if bg_params.ndim > 1:
+            if bg_params.shape[1] > 1:
+                M = bg_params.shape[1]
+                order = {3:1,6:2,10:3}
+                poly = Polynomial2D(order[M])
+
+        #mfull = self.scif[self.fit_mask]
+        bg_full = []
+
+        for ib, beam in enumerate(self.beams):        
+            if poly is not None:
+                poly.parameters = bg_params[ib, :]
+                bg_i = poly(beam.xp, beam.yp)
+            else:
+                # Order = 0, pedestal offset
+                bg_i = beam.ones*bg_params[ib]
+
+            bg_full.append(bg_i)
+
+        return np.hstack(bg_full)
         
 def show_drizzled_lines(line_hdu, full_line_list=['OII', 'Hb', 'OIII', 'Ha', 'SII', 'SIII'], size_arcsec=2, cmap='cubehelix_r', scale=1., dscale=1):
     """TBD

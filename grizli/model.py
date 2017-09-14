@@ -468,6 +468,14 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         else:
             return True
     
+    def init_optimal_profile(self):
+        """Initilize optimal extraction profile
+        """
+        m = self.compute_model(id=self.id, in_place=False)
+        m = m.reshape(self.sh_beam)
+        m[m < 0] = 0
+        self.optimal_profile = m/m.sum(axis=0)
+        
     def optimal_extract(self, data, bin=0, ivar=1., weight=1.):        
         """`Horne (1986) <http://adsabs.harvard.edu/abs/1986PASP...98..609H>`_ optimally-weighted 1D extraction
         
@@ -497,11 +505,8 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         import scipy.ndimage as nd
                
         if not hasattr(self, 'optimal_profile'):
-            m = self.compute_model(id=self.id, in_place=False)
-            m = m.reshape(self.sh_beam)
-            m[m < 0] = 0
-            self.optimal_profile = m/m.sum(axis=0)
-        
+            self.initialize_optimal_profile()
+            
         if data.shape != self.sh_beam:
             print("""
 `data` ({0},{1}) must have the same shape as the data array ({2},{3})
