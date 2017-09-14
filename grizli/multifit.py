@@ -644,7 +644,8 @@ class GroupFLT():
         
         if templates is None:
             wave = np.linspace(0.9*mb.wavef.min(),1.1*mb.wavef.max(),100)
-            templates = grizli.utils.polynomial_templates(wave, order=poly_order, line=False)
+            templates = utils.polynomial_templates(wave, order=poly_order,
+                                                   line=False)
         
         try:
             tfit = mb.template_at_z(z=0, templates=templates, fit_background=True, fitter='lstsq', get_uncertainties=2)

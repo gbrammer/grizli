@@ -1150,7 +1150,15 @@ class StackedSpectrum(object):
             w *= 1.e4
         
         return w
-            
+    
+    def init_optimal_profile(self):
+        """Initilize optimal extraction profile
+        """
+        m = self.compute_model(in_place=False)
+        m = m.reshape(self.sh)
+        m[m < 0] = 0
+        self.optimal_profile = m/m.sum(axis=0)
+               
     def optimal_extract(self, data, bin=0, ivar=None, weight=None):
         """
         Optimally-weighted 1D extraction
@@ -1159,8 +1167,13 @@ class StackedSpectrum(object):
         """
         import scipy.ndimage as nd
         
-        flatf = self.flat.reshape(self.sh).sum(axis=0)
-        prof = self.flat.reshape(self.sh)/flatf
+        # flatf = self.flat.reshape(self.sh).sum(axis=0)
+        # prof = self.flat.reshape(self.sh)/flatf
+        # 
+        if not hasattr(self, 'optimal_profile'):
+            self.init_optimal_profile
+        
+        prof = self.optimal_profile
         
         num = prof*data*self.ivar
         den = prof**2*self.ivar
