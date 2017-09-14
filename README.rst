@@ -85,4 +85,8 @@ The following are IPython/jupyter notebooks demonstrating various aspects of the
 
   1. Unify the fitting tools between the stacked and exposure-level 2D cutouts ("beams").
  
- 
+- `NewSpectrumFits <https://github.com/gbrammer/grizli/blob/master/examples/Fit-Optimization.ipynb>`__ **(09.14.17)**: Custom fitting
+
+  1. Demonstrate some of the workings behind the fitting wrapper scripts by defining custom model functions with parameters to optimize.
+
+
