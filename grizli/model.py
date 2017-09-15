@@ -505,7 +505,7 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         import scipy.ndimage as nd
                
         if not hasattr(self, 'optimal_profile'):
-            self.initialize_optimal_profile()
+            self.init_optimal_profile()
             
         if data.shape != self.sh_beam:
             print("""
