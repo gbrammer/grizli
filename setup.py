@@ -3,6 +3,8 @@
 from setuptools import setup
 from setuptools.extension import Extension
 
+import subprocess
+
 import os
 import numpy
 
@@ -33,6 +35,18 @@ extensions = [
         include_dirs = [numpy.get_include()],),
 
 ]
+
+#update version
+args = 'git describe --tags'
+p = subprocess.Popen(args.split(), stdout=subprocess.PIPE)
+version = p.communicate()[0].decode("utf-8").strip()
+#lines = open('grizli/version.py').readlines()
+version_str = """# git describe --tags
+__version__ = "{0}"\n""".format(version)
+fp = open('grizli/version.py','w')
+fp.write(version_str)
+fp.close()
+print('Git version: {0}'.format(version))
 
 if USE_CYTHON:
     extensions = cythonize(extensions)

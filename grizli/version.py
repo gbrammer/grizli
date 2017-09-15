@@ -1,2 +1,2 @@
-# Should be one commit behind latest
-__version__ = "0.3.0-3-g576cc4e"
+# git describe --tags
+__version__ = "0.3.0-6-g7baa8a9"
