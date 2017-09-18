@@ -1181,7 +1181,7 @@ class GroupFitter(object):
             f_i = beam.compute_model(spectrum_1d=spf, is_cgs=True, in_place=False).reshape(beam.sh)
             
             #if isinstance(beam, grizli.model.BeamCutout):
-            if hasattr(beam, 'compute_model_psf'): # grizli.model.BeamCutout
+            if hasattr(beam, 'init_epsf'): # grizli.model.BeamCutout
                 if beam.grism.instrument == 'NIRISS':
                     grism = beam.grism.pupil
                 else:
@@ -1458,7 +1458,7 @@ class GroupFitter(object):
             m_i = beam.compute_model(spectrum_1d=sp, is_cgs=True, in_place=False).reshape(beam.sh)
 
             #if isinstance(beam, grizli.model.BeamCutout):
-            if hasattr(beam, 'compute_model_psf'): # grizli.model.BeamCutout
+            if hasattr(beam, 'init_epsf'): # grizli.model.BeamCutout
                 grism = beam.grism.filter
                 clean = beam.grism['SCI'] - beam.contam - coeffs[ix,i]
 

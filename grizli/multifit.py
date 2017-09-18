@@ -486,7 +486,7 @@ class GroupFLT():
         if verbose:
             print('Now we have {0:d} FLTs'.format(self.N))
             
-    def compute_single_model(self, id, mag=-99, size=-1, store=False, spectrum_1d=None, is_cgs=False, get_beams=None, in_place=True):
+    def compute_single_model(self, id, mag=-99, size=-1, store=False, spectrum_1d=None, is_cgs=False, get_beams=None, in_place=True, psf_param_dict={}):
         """Compute model spectrum in all exposures
         TBD
         
@@ -513,12 +513,17 @@ class GroupFLT():
                
         """
         out_beams = []
-        for flt in self.FLTs:
+        for flt in self.FLTs:                
+            if flt.grism.parent_file in psf_param_dict:
+                psf_params = psf_param_dict[flt.grism.parent_file]
+            else:
+                psf_params = None
+                
             status = flt.compute_model_orders(id=id, verbose=False,
                           size=size, compute_size=(size < 0),
                           mag=mag, in_place=in_place, store=store,
                           spectrum_1d=spectrum_1d, is_cgs=is_cgs,
-                          get_beams=get_beams)
+                          get_beams=get_beams, psf_params=psf_params)
             
             out_beams.append(status)
         
@@ -1001,12 +1006,13 @@ class MultiBeam(GroupFitter):
         self.id = self.beams[0].id
         
         # Use WFC3 ePSF for the fit
+        self.psf_param_dict = None
         if (psf > 0) & (self.beams[i].grism.instrument == 'WFC3'):
             # Crude for now:  overwrite `beam.compute_model` methods with 
             # the `compute_model_psf`
+            self.psf_param_dict = OrderedDict()
             for ib, beam in enumerate(self.beams):
                 if beam.direct.data['REF'] is not None:
-                    
                     # Use REF extension.  scale factors might be wrong
                     beam.direct.data['SCI'] = beam.direct.data['REF'] 
                     beam.direct.data['ERR'] *= beam.direct.ref_photflam
@@ -1014,12 +1020,14 @@ class MultiBeam(GroupFitter):
                     beam.direct.photflam = beam.direct.ref_photflam
                 
                 beam.init_epsf(yoff = 0.06, skip=psf*1)
-                beam.compute_model = beam.compute_model_psf
-                beam.beam.compute_model = beam.compute_model_psf
-                beam.compute_model()
+                #beam.compute_model = beam.compute_model_psf
+                #beam.beam.compute_model = beam.beam.compute_model_psf
+                beam.compute_model(use_psf=True)
                 m = beam.compute_model(in_place=False)
-                beam.modelf = beam.model.flatten()
-                beam.model = beam.modelf.reshape(beam.beam.sh_beam)
+                #beam.modelf = beam.model.flatten()
+                #beam.model = beam.modelf.reshape(beam.beam.sh_beam)
+            
+                self.psf_param_dict[beam.grism.parent_file] = beam.beam.psf_params
                 
         self.poly_order = None
         
@@ -1247,6 +1255,19 @@ class MultiBeam(GroupFitter):
             beam.beam.compute_model(id=id, spectrum_1d=spectrum_1d, 
                                     is_cgs=is_cgs)
             
+            beam.modelf = beam.beam.modelf 
+            beam.model = beam.beam.modelf.reshape(beam.beam.sh_beam)
+            
+    def compute_model_psf(self, id=None, spectrum_1d=None, is_cgs=False):
+        """TBD
+        """
+        for beam in self.beams:
+            beam.beam.compute_model_psf(id=id, spectrum_1d=spectrum_1d, 
+                                    is_cgs=is_cgs)
+            
+            beam.modelf = beam.beam.modelf 
+            beam.model = beam.beam.modelf.reshape(beam.beam.sh_beam)
+                                            
     def fit_at_z(self, z=0., templates={}, fitter='nnls',
                  fit_background=True, poly_order=0):
         """TBD
