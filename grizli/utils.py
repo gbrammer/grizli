@@ -2198,7 +2198,7 @@ class EffectivePSF(object):
         from scipy.ndimage.interpolation import map_coordinates
         
         # ePSF only defined to 12.5 pixels
-        ok = (np.abs(dx) < 12.5) & (np.abs(dy) < 12.5)
+        ok = (np.abs(dx) <= 12.5) & (np.abs(dy) <= 12.5)
         coords = np.array([50+4*dx[ok], 50+4*dy[ok]])
         
         # Do the interpolation
@@ -2238,7 +2238,7 @@ class EffectivePSF(object):
         
         sh = sci.shape
         if center is None:
-            y0, x0 = np.array(sh)/2.
+            y0, x0 = np.array(sh)/2.-1
         else:
             x0, y0 = center
         
@@ -2256,13 +2256,40 @@ class EffectivePSF(object):
         out = minimize(self.objective_epsf, guess, args=args, method='Powell',
                        tol=tol)
         
-        params = out.x
-        dx = xp-params[1]
-        dy = yp-params[2]
-        output_psf = self.eval_ePSF(psf_xy, dx, dy)*params[0]
+        psf_params = out.x
+        psf_params[1] -= x0
+        psf_params[2] -= y0
         
-        return output_psf, params
+        return psf_params
+        
+        # dx = xp-psf_params[1]
+        # dy = yp-psf_params[2]
+        # output_psf = self.eval_ePSF(psf_xy, dx, dy)*psf_params[0]
+        # 
+        # return output_psf, psf_params
     
+    def get_ePSF(self, psf_params, origin=[0,0], shape=[20,20], filter='F140W'):
+        """
+        Evaluate an Effective PSF
+        """
+        sh = shape
+        y0, x0 = np.array(sh)/2.-1
+        
+        xd = x0+origin[1]
+        yd = y0+origin[0]
+        
+        xc, yc = int(x0), int(y0)
+        
+        psf_xy = self.get_at_position(x=xd, y=yd, filter=filter)
+        
+        yp, xp = np.indices(sh)
+        
+        dx = xp-psf_params[1]-x0
+        dy = yp-psf_params[2]-y0
+        output_psf = self.eval_ePSF(psf_xy, dx, dy)*psf_params[0]
+        
+        return output_psf
+        
 class GTable(astropy.table.Table):
     """
     Extend `~astropy.table.Table` class with more automatic IO and other
