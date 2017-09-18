@@ -781,19 +781,23 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         
         EPSF = utils.EffectivePSF()
         if psf_params is None:
-            self.psf_params = [self.total_flux/photflam_list[psf_filter], 0., 0.]
+            self.psf_params = [self.total_flux, 0., 0.]
         else:    
             self.psf_params = psf_params
         
-        if psf_params[0] is None:
-            psf_params[0] = self.total_flux/photflam_list[psf_filter]
+        if self.psf_params[0] is None:
+            self.psf_params[0] = self.total_flux#/photflam_list[psf_filter]
+        
+        origin = np.array(self.origin) - np.array(self.pad)
             
-        self.psf = EPSF.get_ePSF(psf_params, origin=self.origin, shape=self.sh, filter=psf_filter)
+        self.psf = EPSF.get_ePSF(self.psf_params, origin=origin, shape=self.sh, filter=psf_filter)
+        self.psf_params[0] /= self.psf.sum()
+        self.psf /= self.psf.sum()
                 
         # Center in detector coords
         y0, x0 = np.array(self.sh)/2.-1
-        xd = x0+self.psf_params[1] + self.origin[1] - self.pad
-        yd = y0+self.psf_params[2] + self.origin[0] - self.pad
+        xd = x0+self.psf_params[1] + origin[1]
+        yd = y0+self.psf_params[2] + origin[0] 
 
         # Get wavelength array
         psf_xy_lam = []
@@ -842,7 +846,8 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         # Sensitivity
         self.lam_psf = np.array(lam_psf)
         
-        photflam = photflam_list[psf_filter]
+        #photflam = photflam_list[psf_filter]
+        photflam = 1
         
         if flat_sensitivity:
             s_i_scale = np.abs(np.gradient(self.lam_psf))*photflam
@@ -3605,7 +3610,7 @@ class BeamCutout(object):
         import scipy.sparse
         
         EPSF = utils.EffectivePSF()
-        ivar = 1/self.direct['ERR']**2
+        ivar = 1/self.direct.data['ERR']**2
         ivar[~np.isfinite(ivar)] = 0
         ivar[self.direct['DQ'] > 0] = 0
         
@@ -3614,7 +3619,7 @@ class BeamCutout(object):
             
         origin = np.array(self.direct.origin) - np.array(self.direct.pad)
         if psf_params is None:
-            self.psf_params = EPSF.fit_ePSF(self.direct['SCI'], 
+            self.psf_params = EPSF.fit_ePSF(self.direct.data['SCI'], 
                                                   ivar=ivar, 
                                                   center=center, tol=tol,
                                                   N=12,

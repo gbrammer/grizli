@@ -591,7 +591,7 @@ class GroupFitter(object):
             
         return A_phot[:,mask]
         
-    def xfit_at_z(self, z=0, templates=[], fitter='nnls', fit_background=True, get_uncertainties=False, get_design_matrix=False, pscale=None):
+    def xfit_at_z(self, z=0, templates=[], fitter='nnls', fit_background=True, get_uncertainties=False, get_design_matrix=False, pscale=None, COEFF_SCALE=1.e-19):
         """Fit the 2D spectra with a set of templates at a specified redshift.
         
         Parameters
@@ -644,7 +644,7 @@ class GroupFitter(object):
         # A = scipy.sparse.csr_matrix((self.N+NTEMP, self.Ntot))
         # bg_sp = scipy.sparse.csc_matrix(self.A_bg)
         
-        COEFF_SCALE = 1.e-19
+        
         
         for i, t in enumerate(templates):
             if t.startswith('line'):
