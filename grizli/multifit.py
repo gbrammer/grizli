@@ -1008,11 +1008,10 @@ class MultiBeam(GroupFitter):
         # Use WFC3 ePSF for the fit
         self.psf_param_dict = None
         if (psf > 0) & (self.beams[i].grism.instrument == 'WFC3'):
-            # Crude for now:  overwrite `beam.compute_model` methods with 
-            # the `compute_model_psf`
+
             self.psf_param_dict = OrderedDict()
             for ib, beam in enumerate(self.beams):
-                if beam.direct.data['REF'] is not None:
+                if (beam.direct.data['REF'] is not None) & (beam.direct.filter.startswith('G')):
                     # Use REF extension.  scale factors might be wrong
                     beam.direct.data['SCI'] = beam.direct.data['REF'] 
                     beam.direct.data['ERR'] *= beam.direct.ref_photflam
@@ -2596,10 +2595,16 @@ class MultiBeam(GroupFitter):
     def eval_trace_shift(shifts, self, indices, poly_order, verbose):
         """TBD
         """
+        import scipy.ndimage as nd
+        
         for il, l in enumerate(indices):
             for i in l:
-                self.beams[i].beam.add_ytrace_offset(shifts[il])
-                self.beams[i].compute_model()#/self.beams[i].beam.total_flux
+                if hasattr(self.beams[i].beam, 'psf'):
+                    beam = self.beams[i].beam
+                    beam.model = nd.shift(beam.modelf.reshape(beam.sh_beam), (shifts[il], 0))
+                else:
+                    self.beams[i].beam.add_ytrace_offset(shifts[il])
+                    self.beams[i].compute_model()
 
         self.flat_flam = np.hstack([b.beam.model.flatten() for b in self.beams])
         self.poly_order=-1
