@@ -167,15 +167,23 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
         fig.axes[1].errorbar(mb.photom_pivot/1.e4, mb.photom_flam/1.e-19, mb.photom_eflam/1.e-19, marker='s', alpha=0.5, color='k', linestyle='None')
     
     axc = fig.axes[1]
-    oned_spec = mb.get_binned_spectra(coeffs=tfit['coeffs'])
-    for g in oned_spec:
+
+    # Binned spectrum by grism
+    #oned_spec = mb.get_binned_spectra(coeffs=tfit['coeffs'])
+    sp_flat = mb.optimal_extract(mb.flat_flam[mb.fit_mask], bin=1)
+    bg_model = mb.get_flat_background(tfit['coeffs'], apply_mask=True)
+    sp_data = mb.optimal_extract(mb.scif_mask-bg_model, bin=1)
+    
+    for g in sp_data:
+        
+        clip = sp_flat[g]['flux'] != 0
         
         pscale = 1.
         if hasattr(mb, 'pscale'):
             if (mb.pscale is not None):
-                pscale = mb.compute_scale_array(mb.pscale, oned_spec[g]['wave'])
+                pscale = mb.compute_scale_array(mb.pscale, sp_data[g]['wave'])
                 
-        axc.errorbar(oned_spec[g]['wave']/1.e4, oned_spec[g]['flux']/1.e-19/pscale, oned_spec[g]['err']/1.e-19/pscale, color=GRISM_COLORS[g], alpha=0.8, marker='.', linestyle='None', zorder=1)
+        axc.errorbar(sp_data[g]['wave'][clip]/1.e4, (sp_data[g]['flux']/sp_flat[g]['flux']/1.e-19/pscale)[clip], (sp_data[g]['err']/sp_flat[g]['flux']/1.e-19/pscale)[clip], color=GRISM_COLORS[g], alpha=0.8, marker='.', linestyle='None', zorder=1)
           
     # if not fit_stacks:
     #     stx = StackFitter(st_files, fit_stacks=True, group_name=group_name, fcontam=fcontam)
@@ -1505,15 +1513,32 @@ class GroupFitter(object):
             wmax = np.maximum(wmax, w[clip].max())
             wmin = np.minimum(wmin, w[clip].min())
         
-        oned_spec = self.get_binned_spectra(coeffs=coeffs[ix,:])
-        for g in oned_spec:
+        # oned_spec = self.get_binned_spectra(coeffs=coeffs[ix,:])
+        # for g in oned_spec:
+        # 
+        #     pscale = 1.
+        #     if hasattr(self, 'pscale'):
+        #         if (self.pscale is not None):
+        #             pscale = self.compute_scale_array(self.pscale, oned_spec[g]['wave'])
+        # 
+        #     axc.errorbar(oned_spec[g]['wave']/1.e4, oned_spec[g]['flux']/1.e-19/pscale, oned_spec[g]['err']/1.e-19/pscale, color=GRISM_COLORS[g], alpha=0.8, marker='.', linestyle='None', zorder=1)
+
+        # Binned spectrum by grism
+        #oned_spec = mb.get_binned_spectra(coeffs=tfit['coeffs'])
+        sp_flat = self.optimal_extract(self.flat_flam[self.fit_mask], bin=1)
+        bg_model = self.get_flat_background(coeffs[ix,:], apply_mask=True)
+        sp_data = self.optimal_extract(self.scif_mask-bg_model, bin=1)
+
+        for g in sp_data:
+
+            clip = sp_flat[g]['flux'] != 0
 
             pscale = 1.
             if hasattr(self, 'pscale'):
                 if (self.pscale is not None):
-                    pscale = self.compute_scale_array(self.pscale, oned_spec[g]['wave'])
+                    pscale = self.compute_scale_array(self.pscale, sp_data[g]['wave'])
 
-            axc.errorbar(oned_spec[g]['wave']/1.e4, oned_spec[g]['flux']/1.e-19/pscale, oned_spec[g]['err']/1.e-19/pscale, color=GRISM_COLORS[g], alpha=0.8, marker='.', linestyle='None', zorder=1)
+            axc.errorbar(sp_data[g]['wave'][clip]/1.e4, (sp_data[g]['flux']/sp_flat[g]['flux']/1.e-19/pscale)[clip], (sp_data[g]['err']/sp_flat[g]['flux']/1.e-19/pscale)[clip], color=GRISM_COLORS[g], alpha=0.8, marker='.', linestyle='None', zorder=1)
         
         # Cleanup
         axc.set_xlim(wmin, wmax)
@@ -1559,19 +1584,22 @@ class GroupFitter(object):
     ### 
     ### Generic functions for generating flat model and background arrays
     ###
-    def optimal_extract(self, data, bin=1, ivar=None):
+    def optimal_extract(self, data=None, bin=1, ivar=None):
         """
         TBD: split by grism
         """
         import astropy.units as u
         
-        if data.size != self.fit_mask.sum():
-            print('`data` has to be sized of masked arrays (self.fit_mask)')
-            return False
-            
         if not hasattr(self, 'optimal_profile_mask'):
             self.initialize_masked_arrays()
         
+        if data is None:
+            data = self.scif_mask
+            
+        if data.size != self.fit_mask.sum():
+            print('`data` has to be sized of masked arrays (self.fit_mask)')
+            return False
+                    
         prof = self.optimal_profile_mask
         if ivar is None:
             ivar = 1./self.sigma2_mask
