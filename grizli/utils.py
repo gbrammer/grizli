@@ -2223,10 +2223,13 @@ class EffectivePSF(object):
         ddx = xp-xp.min()
         ddy = yp-yp.min()
 
+        ddx = ddx/ddx.max()
+        ddy = ddy/ddy.max()
+        
         psf_offset = self.eval_ePSF(psf_xy, dx, dy)*params[0] + params[3] + params[4]*ddx + params[5]*ddy + params[6]*ddx*ddy
         
-        chi2 = np.sum((sci-psf_offset)**2*ivar)
-        #print params, chi2
+        chi2 = np.sum((sci/1.e-17-psf_offset)**2*(ivar*1.e-17**2))
+        #print(params, chi2)
         return chi2
     
     def fit_ePSF(self, sci, center=None, origin=[0,0], ivar=1, N=7, 
@@ -2251,10 +2254,14 @@ class EffectivePSF(object):
         
         yp, xp = np.indices(sh)
         args = (self, psf_xy, sci[yc-N:yc+N, xc-N:xc+N], ivar[yc-N:yc+N, xc-N:xc+N], xp[yc-N:yc+N, xc-N:xc+N], yp[yc-N:yc+N, xc-N:xc+N])
-        guess = [sci[yc-N:yc+N, xc-N:xc+N].sum()/psf_xy.sum(), x0, y0, 0, 0, 0, 0]
         
-        out = minimize(self.objective_epsf, guess, args=args, method='Powell',
-                       tol=tol)
+        ix = np.argmax(sci.flatten())
+        xguess = xp.flatten()[ix]
+        yguess = yp.flatten()[ix]
+
+        guess = [sci[yc-N:yc+N, xc-N:xc+N].sum()/psf_xy.sum(), xguess, yguess, 0, 0, 0, 0]
+        
+        out = minimize(self.objective_epsf, guess, args=args, method='Powell', tol=tol)
         
         psf_params = out.x
         psf_params[1] -= x0
