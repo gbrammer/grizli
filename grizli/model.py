@@ -472,7 +472,11 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
     def init_optimal_profile(self):
         """Initilize optimal extraction profile
         """
-        m = self.compute_model(id=self.id, in_place=False)
+        if hasattr(self, 'psf_params'):
+            m = self.compute_model_psf(id=self.id, in_place=False)
+        else:
+            m = self.compute_model(id=self.id, in_place=False)
+        
         m = m.reshape(self.sh_beam)
         m[m < 0] = 0
         self.optimal_profile = m/m.sum(axis=0)
@@ -818,7 +822,7 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         A_psf = []
         lam_psf = []
         
-        lam_offset = self.sh[1]/2 - self.psf_params[1] - 1
+        lam_offset = self.psf_params[1] #self.sh[1]/2 - self.psf_params[1] - 1
         self.lam_offset = lam_offset
         
         for xi in xarr:
@@ -854,12 +858,13 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         else:
             sens = self.conf.sens[self.beam]
             so = np.argsort(self.lam_psf)
-            s_i = interp.interp_conserve_c(self.lam_psf[so], sens['WAVELENGTH'], sens['SENSITIVITY'])*np.gradient(self.lam_psf[so])*photflam
+            s_i = interp.interp_conserve_c(self.lam_psf[so], sens['WAVELENGTH'], sens['SENSITIVITY'], integrate=1)#*np.gradient(self.lam_psf[so])*photflam
             s_i_scale = s_i*0.
             s_i_scale[so] = s_i
                 
         self.A_psf = scipy.sparse.csr_matrix(np.array(A_psf).T*s_i_scale)
-                
+        self.init_optimal_profile()
+               
     def compute_model_psf(self, id=None, spectrum_1d=None, in_place=True, is_cgs=True):
         if spectrum_1d is None:
             #modelf = np.array(self.A_psf.sum(axis=1)).flatten()
