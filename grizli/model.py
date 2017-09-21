@@ -269,13 +269,14 @@ class GrismDisperser(object):
         so = np.argsort(self.lam_beam)
         ysens[so] = interp.interp_conserve_c(self.lam_beam[so],
                                  self.conf.sens[self.beam]['WAVELENGTH'], 
-                                 self.conf.sens[self.beam]['SENSITIVITY'])
+                                 self.conf.sens[self.beam]['SENSITIVITY'],
+                                 integrate=1, left=0, right=0)
         self.lam_sort = so
         
         ### Needs term of delta wavelength per pixel for flux densities
-        dl = np.abs(np.append(self.lam_beam[1] - self.lam_beam[0],
-                              np.diff(self.lam_beam)))
-        ysens *= dl#*1.e-17
+        #dl = np.abs(np.append(self.lam_beam[1] - self.lam_beam[0],
+        #                     np.diff(self.lam_beam)))
+        #ysens *= dl#*1.e-17
         self.sensitivity_beam = ysens
         
         ### Initialize the model arrays
@@ -314,11 +315,12 @@ class GrismDisperser(object):
         so = np.argsort(self.lam)
         ysens[so] = interp.interp_conserve_c(self.lam[so],
                                  self.conf.sens[self.beam]['WAVELENGTH'], 
-                                 self.conf.sens[self.beam]['SENSITIVITY'])
+                                 self.conf.sens[self.beam]['SENSITIVITY'],
+                                 integrate=1, left=0, right=0)
         
-        dl = np.abs(np.append(self.lam[1] - self.lam[0],
-                              np.diff(self.lam)))
-        ysens *= dl#*1.e-17
+        # dl = np.abs(np.append(self.lam[1] - self.lam[0],
+        #                       np.diff(self.lam)))
+        # ysens *= dl#*1.e-17
         self.sensitivity = ysens
         
         # Slices of the parent array based on the origin parameter
@@ -545,7 +547,7 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         
         return wave, opt_flux, opt_rms
     
-    def trace_extract(self, data, r=0, bin=0, ivar=1.):
+    def trace_extract(self, data, r=0, bin=0, ivar=1., dy0=0):
         """Aperture extraction along the trace
         
         Parameters
@@ -564,7 +566,11 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         ivar : float or `~numpy.ndarray` with shape `self.sh_beam`
             Inverse variance array or scalar float that multiplies the 
             optimal weights
-
+        
+        dy0 : float 
+            Central pixel to extract, relative to the central pixel of 
+            the trace
+            
         Returns
         -------
         wave, opt_flux, opt_rms : `~numpy.array`
@@ -576,7 +582,7 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
 
         All are optionally binned in wavelength if `bin` > 1.        
         """
-        dy = np.cast[int](np.round(self.ytrace))
+        dy = np.cast[int](np.round(self.ytrace+dy0))
         aper = np.zeros_like(self.model)
         y0 = self.sh_beam[0] // 2
         for d in range(-r, r+1):
@@ -777,11 +783,13 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         else:
             return xpix
     
-    def x_init_epsf(self, flat_sensitivity=False, psf_params=None, psf_filter='F140W', yoff=0.06):
+    def x_init_epsf(self, flat_sensitivity=False, psf_params=None, psf_filter='F140W', yoff=0.06, skip=0.5):
         """Initialize ePSF fitting for point sources
         TBD
         """
         import scipy.sparse
+                
+        #print('SKIP: {0}'.format(skip))
         
         EPSF = utils.EffectivePSF()
         if psf_params is None:
@@ -795,6 +803,8 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         origin = np.array(self.origin) - np.array(self.pad)
             
         self.psf = EPSF.get_ePSF(self.psf_params, origin=origin, shape=self.sh, filter=psf_filter)
+        #print('XXX', self.psf_params[0], self.psf.sum())
+        
         self.psf_params[0] /= self.psf.sum()
         self.psf /= self.psf.sum()
                 
@@ -812,7 +822,6 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         filt_lam = np.array([1.0551, 1.2486, 1.5369])*1.e4
         
         yp_beam, xp_beam = np.indices(self.sh_beam)
-        skip = 1
         xarr = np.arange(0,self.lam_beam.shape[0], skip)
         xarr = xarr[xarr <= self.lam_beam.shape[0]-1]
         xbeam = np.arange(self.lam_beam.shape[0])*1.
@@ -843,6 +852,7 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
                 psf_xy_i = f*psf_xy_lam[ni] + (1-f)*psf_xy_lam[ni+1]
 
             psf = EPSF.eval_ePSF(psf_xy_i, dx, dy)*self.psf_params[0]
+            #print(xi, psf.sum())
             
             A_psf.append(psf.flatten())
             lam_psf.append(li)
@@ -858,13 +868,100 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         else:
             sens = self.conf.sens[self.beam]
             so = np.argsort(self.lam_psf)
-            s_i = interp.interp_conserve_c(self.lam_psf[so], sens['WAVELENGTH'], sens['SENSITIVITY'], integrate=1)#*np.gradient(self.lam_psf[so])*photflam
+            s_i = interp.interp_conserve_c(self.lam_psf[so], sens['WAVELENGTH'], sens['SENSITIVITY'], integrate=1)
             s_i_scale = s_i*0.
             s_i_scale[so] = s_i
                 
         self.A_psf = scipy.sparse.csr_matrix(np.array(A_psf).T*s_i_scale)
+        self.init_extended_epsf()
+        
+        self.PAM_value = self.get_PAM_value()
+        self.psf_renorm = 1.
+        
+        self.renormalize_epsf_model()
+        
         self.init_optimal_profile()
-               
+                
+    def renormalize_epsf_model(self, spectrum_1d=None, verbose=False):
+        """
+        Ensure normalization correct
+        """
+        if not hasattr(self, 'A_psf'):
+            print('ePSF not initialized')
+            return False
+        
+        if spectrum_1d is None:
+            dl = 0.1
+            flat_x = np.arange(self.lam.min()-10, self.lam.max()+10, dl)
+            flat_y = flat_x*0.+1.e-17
+            spectrum_1d = [flat_x, flat_y]
+            
+        tab = self.conf.sens[self.beam]
+        sens_i = interp.interp_conserve_c(spectrum_1d[0], tab['WAVELENGTH'], tab['SENSITIVITY'], integrate=1, left=0, right=0)
+        total_sens = np.trapz(spectrum_1d[1]*sens_i/np.gradient(spectrum_1d[0]), spectrum_1d[0])
+        
+        m = self.compute_model_psf(spectrum_1d=spectrum_1d, is_cgs=True, in_place=False).reshape(self.sh_beam)
+        #m2 = self.compute_model(spectrum_1d=[flat_x, flat_y], is_cgs=True, in_place=False).reshape(self.sh_beam)
+        
+        renorm = total_sens / m.sum()
+        
+        # Scale model to data, depends on Pixel Area Map and PSF normalization
+        scale_to_data = self.PAM_value * (self.psf_params[0]/0.95)
+        self.psf_renorm = scale_to_data
+        renorm /= scale_to_data # renorm PSF
+
+        if verbose:
+            print('Renorm ePSF model: {0:0.3f}'.format(renorm))
+        
+        self.A_psf *= renorm
+        
+    def get_PAM_value(self, verbose=False):
+        """
+        Apply Pixel Area Map correction to WFC3 effective PSF model
+        
+        http://www.stsci.edu/hst/wfc3/pam/pixel_area_maps
+        """        
+        pam_data = pyfits.open(os.getenv('iref')+'ir_wfc3_map.fits')[1].data
+        pam_value = pam_data[int(self.yc-self.pad), int(self.xc-self.pad)]
+        if verbose:
+            print ('PAM correction at x={0}, y={1}: {2:.3f}'.format(self.xc-self.pad, self.yc-self.pad, pam_value))
+        
+        return pam_value
+        
+        
+    def init_extended_epsf(self):
+        """
+        Hacky code for adding extended component of the EPSFs
+        """
+        ext_file = os.path.join(os.getenv('GRIZLI'), 'CONF',
+                            'ePSF_extended_splines.npy')
+        
+        if not os.path.exists(ext_file):
+            return False
+            
+        bg_splines = np.load(ext_file)[0]
+        spline_waves = np.array(list(bg_splines.keys()))
+        spline_waves.sort()
+        spl_ix = np.arange(len(spline_waves))
+        
+        yarr = np.arange(self.sh_beam[0]) - self.sh_beam[0]/2.+1
+        dy = self.psf_params[2]
+
+        spl_data = self.model * 0.
+        for i in range(self.sh_beam[1]):
+            dy_i = dy + self.ytrace[i]
+            x_i = np.interp(self.lam[i], spline_waves, spl_ix)
+            if (x_i == 0) | (x_i == 2):
+                spl_data[:,i] = bg_splines[spline_waves[int(x_i)]](yarr-dy_i)
+            else:
+                f = x_i-int(x_i)
+                sp = bg_splines[spline_waves[int(x_i)]](yarr-dy_i)*(1-f)
+                sp += bg_splines[spline_waves[int(x_i)+1]](yarr-dy_i)*f
+                
+                spl_data[:,i] = sp
+                
+        self.ext_psf_data = spl_data
+        
     def compute_model_psf(self, id=None, spectrum_1d=None, in_place=True, is_cgs=True):
         if spectrum_1d is None:
             #modelf = np.array(self.A_psf.sum(axis=1)).flatten()
@@ -883,10 +980,16 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
                      
         
         modelf = self.A_psf.dot(coeffs)#.reshape(self.sh_beam)
+        model = modelf.reshape(self.sh_beam)
         
+        if hasattr(self, 'ext_psf_data'):
+            model += self.ext_psf_data*model.sum(axis=0)
+            modelf = model.flatten()
+            model = modelf.reshape(self.sh_beam)
+            
         if in_place:
             self.modelf = modelf #.flatten()
-            self.model = modelf.reshape(self.sh_beam)
+            self.model = model
             #self.modelf = self.model.flatten()
             return True
         else:
@@ -3633,7 +3736,7 @@ class BeamCutout(object):
         else:
             self.psf_params = psf_params
             
-        self.beam.x_init_epsf(flat_sensitivity=False, psf_params=self.psf_params, psf_filter=self.direct.filter, yoff=yoff)
+        self.beam.x_init_epsf(flat_sensitivity=False, psf_params=self.psf_params, psf_filter=self.direct.filter, yoff=yoff, skip=skip)
         
         return None
         
