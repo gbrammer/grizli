@@ -2371,6 +2371,16 @@ class GrismFLT(object):
         if id in self.object_dispersers:
             object_in_model = True
             beams = self.object_dispersers[id]
+            
+            out = self.object_dispersers[id]
+            
+            # Handle pre 0.3.0-7 formats
+            if len(out) == 3:
+                old_cgs, old_spectrum_1d, beams = out
+            else:
+                old_cgs, old_spectrum_1d = out
+                beams = None
+            
         else:
             object_in_model = False
             beams = None
@@ -2379,9 +2389,18 @@ class GrismFLT(object):
             ext = 'SCI'
         else:
             ext = 'REF'
-            
+
+        # set up the beams to extract
+        if get_beams is None:
+            beam_names = self.conf.beams
+        else:
+            beam_names = get_beams
+        
+        # Did we initialize the PSF model this call?
+        INIT_PSF_NOW = False
+        
         ### Do we need to compute the dispersed beams?
-        if not isinstance(beams, OrderedDict):
+        if beams is None:
             ### Use catalog
             xcat = ycat = None
             if self.catalog is not None:
@@ -2463,72 +2482,92 @@ class GrismFLT(object):
                     print('ID {0:d} not found in segmentation image'.format(id))
                 return False
             
-            # set up the beams to extract
-            if get_beams is None:
-                beam_names = self.conf.beams
-            else:
-                beam_names = get_beams
+            # # Get precomputed dispersers
+            # beams, old_spectrum_1d, old_cgs = None, None, False
+            # if object_in_model:
+            #     out = self.object_dispersers[id]
+            #     
+            #     # Handle pre 0.3.0-7 formats
+            #     if len(out) == 3:
+            #         old_cgs, old_spectrum_1d, old_beams = out
+            #     else:
+            #         old_cgs, old_spectrum_1d = out
+            #         old_beams = None
+            #     
+            #     # Pull out just the requested beams
+            #     if old_beams is not None:
+            #         beams = OrderedDict()
+            #         for b in beam_names:
+            #             beams[b] = old_beams[b]
+            #             
+            #if beams is None:
             
-            # Get precomputed dispersers
-            beams, old_spectrum_1d, old_cgs = None, None, False
-            if object_in_model:
-                out = self.object_dispersers[id]
-                
-                # Handle pre 0.3.0-7 formats
-                if len(out) == 3:
-                    old_cgs, old_spectrum_1d, old_beams = out
-                else:
-                    old_cgs, old_spectrum_1d = out
-                    old_beams = None
-                
-                # Pull out just the requested beams
-                if old_beams is not None:
-                    beams = OrderedDict()
-                    for b in beam_names:
-                        beams[b] = old_beams[b]
-                        
-            if beams is None:
-                ### Compute spectral orders ("beams")
-                beams = OrderedDict()
-                
-                for b in beam_names:
-                    ### Only compute order if bright enough
-                    if mag > self.conf.conf['MMAG_EXTRACT_{0}'.format(b)]:
-                        continue
-                    
-                    try:
-                        beam = GrismDisperser(id=id, direct=thumb, segmentation=seg_thumb, xcenter=xcenter, ycenter=ycenter, origin=origin, pad=self.pad, grow=self.grism.grow, beam=b, conf=self.conf, fwcpos=self.grism.fwcpos)                            
-                    except:
-                        continue
-                    
-                    beams[b] = beam
+            ### Compute spectral orders ("beams")
+            beams = OrderedDict()
             
-            for b in beams:
+            for b in beam_names:
+                ### Only compute order if bright enough
+                if mag > self.conf.conf['MMAG_EXTRACT_{0}'.format(b)]:
+                    continue
+                
+                try:
+                    beam = GrismDisperser(id=id, direct=thumb, segmentation=seg_thumb, xcenter=xcenter, ycenter=ycenter, origin=origin, pad=self.pad, grow=self.grism.grow, beam=b, conf=self.conf, fwcpos=self.grism.fwcpos)                            
+                except:
+                    continue
+                
+                # Set PSF model if necessary
+                if psf_params is not None:
+                    store = True
+                    INIT_PSF_NOW = True
+                    print('xxx Init PSF', b)
+                    if self.direct.ref_filter is None:
+                        psf_filter = self.direct.filter
+                    else:
+                        psf_filter = self.direct.ref_filter
+                    
+                    beam.x_init_epsf(flat_sensitivity=False, psf_params=psf_params, psf_filter=psf_filter, yoff=0.06)
+                    
+                beams[b] = beam
+        
+        # Compure old model
+        if object_in_model:
+            for b in beam_names:
                 beam = beams[b]
-                if hasattr(beam, 'psf'):
+                if hasattr(beam, 'psf') & (not INIT_PSF_NOW):
+                    store = True
+                    print('xxx OLD PSF')
                     beam.compute_model_psf(spectrum_1d=old_spectrum_1d,
                                        is_cgs=old_cgs)
                 else:
                     beam.compute_model(spectrum_1d=old_spectrum_1d,
                                        is_cgs=old_cgs)
                                
-            if get_beams:
-                return beams
+        if get_beams:
+            out_beams = OrderedDict()
+            for b in beam_names:
+                out_beams[b] = beams[b]
+            return out_beams
                 
-            if in_place:
-                if store:
-                    ### Save the computed beams 
-                    self.object_dispersers[id] = is_cgs, spectrum_1d, beams
-                else:
-                    ### Just save the model spectrum (or empty spectrum)
-                    self.object_dispersers[id] = is_cgs, spectrum_1d, None
-                        
         if in_place:
             ### Update the internal model attribute
             output = self.model
+            
+            if store:
+                ### Save the computed beams 
+                self.object_dispersers[id] = is_cgs, spectrum_1d, beams
+            else:
+                ### Just save the model spectrum (or empty spectrum)
+                self.object_dispersers[id] = is_cgs, spectrum_1d, None
         else:
             ### Create a fresh array
             output = np.zeros_like(self.model)
+                                
+        # if in_place:
+        #     ### Update the internal model attribute
+        #     output = self.model
+        # else:
+        #     ### Create a fresh array
+        #     output = np.zeros_like(self.model)
         
         # Set PSF model if necessary
         if psf_params is not None:
@@ -2546,8 +2585,13 @@ class GrismFLT(object):
                 beam.add_to_full_image(-beam.model, output)
             
             ### Update PSF params
-            if psf_params is not None:
-                beam.x_init_epsf(flat_sensitivity=False, psf_params=psf_params, psf_filter=psf_filter, yoff=0.06)
+            # if psf_params is not None:
+            #     skip_init_psf = False
+            #     if hasattr(beam, 'psf_params'):
+            #         skip_init_psf |= np.product(np.isclose(beam.psf_params, psf_params)) > 0
+            #         
+            #     if not skip_init_psf:
+            #         beam.x_init_epsf(flat_sensitivity=False, psf_params=psf_params, psf_filter=psf_filter, yoff=0.06)
                 
             ### Compute model
             if hasattr(beam, 'psf'):
