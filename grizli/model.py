@@ -825,7 +825,9 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         xarr = np.arange(0,self.lam_beam.shape[0], skip)
         xarr = xarr[xarr <= self.lam_beam.shape[0]-1]
         xbeam = np.arange(self.lam_beam.shape[0])*1.
-
+        
+        #xbeam += 1.
+        
         #yoff = 0 #-0.15
         psf_model = self.model*0.
         A_psf = []
@@ -864,24 +866,39 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         photflam = 1
         
         if flat_sensitivity:
-            s_i_scale = np.abs(np.gradient(self.lam_psf))*photflam
+            psf_sensitivity = np.abs(np.gradient(self.lam_psf))*photflam
         else:
             sens = self.conf.sens[self.beam]
-            so = np.argsort(self.lam_psf)
-            s_i = interp.interp_conserve_c(self.lam_psf[so], sens['WAVELENGTH'], sens['SENSITIVITY'], integrate=1)
-            s_i_scale = s_i*0.
-            s_i_scale[so] = s_i
-                
-        self.A_psf = scipy.sparse.csr_matrix(np.array(A_psf).T*s_i_scale)
+            # so = np.argsort(self.lam_psf)
+            # s_i = interp.interp_conserve_c(self.lam_psf[so], sens['WAVELENGTH'], sens['SENSITIVITY'], integrate=1)
+            # psf_sensitivity = s_i*0.
+            # psf_sensitivity[so] = s_i
+            
+            psf_sensitivity = self.get_psf_sensitivity(sens['WAVELENGTH'], sens['SENSITIVITY'])
+            
+        self.psf_sensitivity = psf_sensitivity
+        self.A_psf = scipy.sparse.csr_matrix(np.array(A_psf).T)
         self.init_extended_epsf()
         
         self.PAM_value = self.get_PAM_value()
+        self.psf_scale_to_data = 1.
         self.psf_renorm = 1.
         
         self.renormalize_epsf_model()
         
         self.init_optimal_profile()
-                
+    
+    def get_psf_sensitivity(self, wave, sensitivity):
+        """
+        Integrate the sensitivity curve to the wavelengths for the 
+        PSF model
+        """
+        so = np.argsort(self.lam_psf)
+        s_i = interp.interp_conserve_c(self.lam_psf[so], wave, sensitivity, integrate=1)
+        psf_sensitivity = s_i*0.
+        psf_sensitivity[so] = s_i
+        return psf_sensitivity
+        
     def renormalize_epsf_model(self, spectrum_1d=None, verbose=False):
         """
         Ensure normalization correct
@@ -904,10 +921,11 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         #m2 = self.compute_model(spectrum_1d=[flat_x, flat_y], is_cgs=True, in_place=False).reshape(self.sh_beam)
         
         renorm = total_sens / m.sum()
+        self.psf_renorm = renorm
         
         # Scale model to data, depends on Pixel Area Map and PSF normalization
         scale_to_data = self.PAM_value * (self.psf_params[0]/0.95)
-        self.psf_renorm = scale_to_data
+        self.psf_scale_to_data = scale_to_data
         renorm /= scale_to_data # renorm PSF
 
         if verbose:
@@ -922,7 +940,11 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         http://www.stsci.edu/hst/wfc3/pam/pixel_area_maps
         """        
         pam_data = pyfits.open(os.getenv('iref')+'ir_wfc3_map.fits')[1].data
-        pam_value = pam_data[int(self.yc-self.pad), int(self.xc-self.pad)]
+        try:
+            pam_value = pam_data[int(self.yc-self.pad), int(self.xc-self.pad)]
+        except:
+            pam_value = 1
+            
         if verbose:
             print ('PAM correction at x={0}, y={1}: {2:.3f}'.format(self.xc-self.pad, self.yc-self.pad, pam_value))
         
@@ -951,7 +973,7 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         for i in range(self.sh_beam[1]):
             dy_i = dy + self.ytrace[i]
             x_i = np.interp(self.lam[i], spline_waves, spl_ix)
-            if (x_i == 0) | (x_i == 2):
+            if (x_i == 0) | (x_i == len(bg_splines)-1):
                 spl_data[:,i] = bg_splines[spline_waves[int(x_i)]](yarr-dy_i)
             else:
                 f = x_i-int(x_i)
@@ -960,7 +982,7 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
                 
                 spl_data[:,i] = sp
                 
-        self.ext_psf_data = spl_data
+        self.ext_psf_data = np.maximum(spl_data, 0)
         
     def compute_model_psf(self, id=None, spectrum_1d=None, in_place=True, is_cgs=True):
         if spectrum_1d is None:
@@ -979,7 +1001,7 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
                                                   spectrum_1d[1])
                      
         
-        modelf = self.A_psf.dot(coeffs)#.reshape(self.sh_beam)
+        modelf = self.A_psf.dot(coeffs*self.psf_sensitivity)
         model = modelf.reshape(self.sh_beam)
         
         if hasattr(self, 'ext_psf_data'):
@@ -1822,8 +1844,8 @@ class ImageData(object):
                 exptime_corr = self.exptime
         
         # Put back into original units    
-        sci_data = self.data['SCI']*exptime_corr + self.mdrizsky
-        err_data = self.data['ERR']*exptime_corr
+        sci_data = self['SCI']*exptime_corr + self.mdrizsky
+        err_data = self['ERR']*exptime_corr
         
         hdu.append(pyfits.ImageHDU(data=sci_data, header=h,
                                    name='SCI'))
@@ -3718,16 +3740,18 @@ class BeamCutout(object):
         import scipy.sparse
         
         EPSF = utils.EffectivePSF()
-        ivar = 1/self.direct.data['ERR']**2
+        ivar = 1/self.direct['ERR']**2
         ivar[~np.isfinite(ivar)] = 0
         ivar[self.direct['DQ'] > 0] = 0
+        
+        ivar[self.beam.seg != self.id] = 0
         
         if ivar.max() == 0:
             ivar = ivar+1.
             
         origin = np.array(self.direct.origin) - np.array(self.direct.pad)
         if psf_params is None:
-            self.psf_params = EPSF.fit_ePSF(self.direct.data['SCI'], 
+            self.psf_params = EPSF.fit_ePSF(self.direct['SCI'], 
                                                   ivar=ivar, 
                                                   center=center, tol=tol,
                                                   N=12,

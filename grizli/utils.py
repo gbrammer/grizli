@@ -2228,7 +2228,7 @@ class EffectivePSF(object):
         
         psf_offset = self.eval_ePSF(psf_xy, dx, dy)*params[0] + params[3] + params[4]*ddx + params[5]*ddy + params[6]*ddx*ddy
         
-        chi2 = np.sum((sci/1.e-17-psf_offset)**2*(ivar*1.e-17**2))
+        chi2 = np.sum((sci-psf_offset)**2*(ivar))
         #print(params, chi2)
         return chi2
     
@@ -2255,7 +2255,11 @@ class EffectivePSF(object):
         yp, xp = np.indices(sh)
         args = (self, psf_xy, sci[yc-N:yc+N, xc-N:xc+N], ivar[yc-N:yc+N, xc-N:xc+N], xp[yc-N:yc+N, xc-N:xc+N], yp[yc-N:yc+N, xc-N:xc+N])
         
-        ix = np.argmax(sci.flatten())
+        if np.isscalar(ivar):
+            ix = np.argmax(sci.flatten())
+        else:
+            ix = np.argmax((sci*(ivar > 0)).flatten())
+            
         xguess = xp.flatten()[ix]
         yguess = yp.flatten()[ix]
 
