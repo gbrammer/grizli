@@ -2198,7 +2198,7 @@ class EffectivePSF(object):
         from scipy.ndimage.interpolation import map_coordinates
         
         # ePSF only defined to 12.5 pixels
-        ok = (np.abs(dx) < 12.5) & (np.abs(dy) < 12.5)
+        ok = (np.abs(dx) <= 12.5) & (np.abs(dy) <= 12.5)
         coords = np.array([50+4*dx[ok], 50+4*dy[ok]])
         
         # Do the interpolation
@@ -2223,10 +2223,13 @@ class EffectivePSF(object):
         ddx = xp-xp.min()
         ddy = yp-yp.min()
 
+        ddx = ddx/ddx.max()
+        ddy = ddy/ddy.max()
+        
         psf_offset = self.eval_ePSF(psf_xy, dx, dy)*params[0] + params[3] + params[4]*ddx + params[5]*ddy + params[6]*ddx*ddy
         
-        chi2 = np.sum((sci-psf_offset)**2*ivar)
-        #print params, chi2
+        chi2 = np.sum((sci-psf_offset)**2*(ivar))
+        #print(params, chi2)
         return chi2
     
     def fit_ePSF(self, sci, center=None, origin=[0,0], ivar=1, N=7, 
@@ -2238,7 +2241,7 @@ class EffectivePSF(object):
         
         sh = sci.shape
         if center is None:
-            y0, x0 = np.array(sh)/2.
+            y0, x0 = np.array(sh)/2.-1
         else:
             x0, y0 = center
         
@@ -2250,19 +2253,57 @@ class EffectivePSF(object):
         psf_xy = self.get_at_position(x=xd, y=yd, filter=filter)
         
         yp, xp = np.indices(sh)
-        args = (self, psf_xy, sci[yc-N:yc+N, xc-N:xc+N], ivar[yc-N:yc+N, xc-N:xc+N], xp[yc-N:yc+N, xc-N:xc+N], yp[yc-N:yc+N, xc-N:xc+N])
-        guess = [sci[yc-N:yc+N, xc-N:xc+N].sum()/psf_xy.sum(), x0, y0, 0, 0, 0, 0]
         
-        out = minimize(self.objective_epsf, guess, args=args, method='Powell',
-                       tol=tol)
+        if np.isscalar(ivar):
+            ix = np.argmax(sci.flatten())
+        else:
+            ix = np.argmax((sci*(ivar > 0)).flatten())
+            
+        xguess = xp.flatten()[ix]
+        yguess = yp.flatten()[ix]
+
+        guess = [sci[yc-N:yc+N, xc-N:xc+N].sum()/psf_xy.sum(), xguess, yguess, 0, 0, 0, 0]
+        sly = slice(yc-N, yc+N); slx = slice(xc-N, xc+N)
+        sly = slice(yguess-N, yguess+N); slx = slice(xguess-N, xguess+N)
         
-        params = out.x
-        dx = xp-params[1]
-        dy = yp-params[2]
-        output_psf = self.eval_ePSF(psf_xy, dx, dy)*params[0]
+        args = (self, psf_xy, sci[sly, slx], ivar[sly, slx], xp[sly, slx], yp[sly, slx])
         
-        return output_psf, params
+        out = minimize(self.objective_epsf, guess, args=args, method='Powell', tol=tol)
+        
+        psf_params = out.x
+        psf_params[1] -= x0
+        psf_params[2] -= y0
+        
+        return psf_params
+        
+        # dx = xp-psf_params[1]
+        # dy = yp-psf_params[2]
+        # output_psf = self.eval_ePSF(psf_xy, dx, dy)*psf_params[0]
+        # 
+        # return output_psf, psf_params
     
+    def get_ePSF(self, psf_params, origin=[0,0], shape=[20,20], filter='F140W'):
+        """
+        Evaluate an Effective PSF
+        """
+        sh = shape
+        y0, x0 = np.array(sh)/2.-1
+        
+        xd = x0+origin[1]
+        yd = y0+origin[0]
+        
+        xc, yc = int(x0), int(y0)
+        
+        psf_xy = self.get_at_position(x=xd, y=yd, filter=filter)
+        
+        yp, xp = np.indices(sh)
+        
+        dx = xp-psf_params[1]-x0
+        dy = yp-psf_params[2]-y0
+        output_psf = self.eval_ePSF(psf_xy, dx, dy)*psf_params[0]
+        
+        return output_psf
+        
 class GTable(astropy.table.Table):
     """
     Extend `~astropy.table.Table` class with more automatic IO and other
