@@ -486,7 +486,7 @@ class GroupFLT():
         if verbose:
             print('Now we have {0:d} FLTs'.format(self.N))
             
-    def compute_single_model(self, id, mag=-99, size=-1, store=False, spectrum_1d=None, is_cgs=False, get_beams=None, in_place=True):
+    def compute_single_model(self, id, mag=-99, size=-1, store=False, spectrum_1d=None, is_cgs=False, get_beams=None, in_place=True, psf_param_dict={}):
         """Compute model spectrum in all exposures
         TBD
         
@@ -513,12 +513,17 @@ class GroupFLT():
                
         """
         out_beams = []
-        for flt in self.FLTs:
+        for flt in self.FLTs:                
+            if flt.grism.parent_file in psf_param_dict:
+                psf_params = psf_param_dict[flt.grism.parent_file]
+            else:
+                psf_params = None
+                
             status = flt.compute_model_orders(id=id, verbose=False,
                           size=size, compute_size=(size < 0),
                           mag=mag, in_place=in_place, store=store,
                           spectrum_1d=spectrum_1d, is_cgs=is_cgs,
-                          get_beams=get_beams)
+                          get_beams=get_beams, psf_params=psf_params)
             
             out_beams.append(status)
         
@@ -596,11 +601,18 @@ class GroupFLT():
             if hasdata*1./out_beam.model.shape[1] < min_overlap:
                 continue
             
+            if out_beam.beam.total_flux == 0:
+                continue
+                
+            # if hasattr(beam[beam_id], 'psf_params'):
+            #     #print('init epsf')
+            #     out_beam.init_epsf(yoff=beam[beam_id].psf_yoff, psf_params=beam[beam_id].psf_params)
+                
             out_beams.append(out_beam)
             
         return out_beams
     
-    def refine_list(self, ids=[], mags=[], poly_order=2, mag_limits=[16,24], 
+    def refine_list(self, ids=[], mags=[], poly_order=3, mag_limits=[16,24], 
                     max_coeff=5, ds9=None, verbose=True):
         """TBD
         
@@ -632,7 +644,7 @@ class GroupFLT():
                         max_coeff=max_coeff, size=30, ds9=ds9,
                         verbose=verbose, templates=poly_templates)
     
-    def refine(self, id, mag=-99, poly_order=1, size=30, ds9=None, verbose=True, max_coeff=2.5, templates=None):
+    def refine(self, id, mag=-99, poly_order=3, size=30, ds9=None, verbose=True, max_coeff=2.5, templates=None):
         """TBD
         Use tools in `fitting`
         """
@@ -657,12 +669,14 @@ class GroupFLT():
         
         # Check where templates inconsistent with broad-band fluxes
         xb = [beam.direct.ref_photplam if beam.direct['REF'] is not None else beam.direct.photplam for beam in beams]
-        fb = [beam.beam.total_flux for beam in beams]
-        mb = np.polyval(scale_coeffs[::-1], np.array(xb)/1.e4-1)
+        obs_flux = np.array([beam.beam.total_flux for beam in beams])
+        mod_flux = np.polyval(scale_coeffs[::-1], np.array(xb)/1.e4-1)
+        nonz = obs_flux != 0
         
-        if (np.abs(mb/fb).max() > max_coeff) | ((~np.isfinite(mb/fb)).sum() > 0) | (np.min(mb) < 0) | ((~np.isfinite(ypoly)).sum() > 0):
+        if (np.abs(mod_flux/obs_flux)[nonz].max() > max_coeff) | ((~np.isfinite(mod_flux/obs_flux)[nonz]).sum() > 0) | (np.min(mod_flux[nonz]) < 0) | ((~np.isfinite(ypoly)).sum() > 0):
             if verbose:
-                print('{0} mag={1:6.2f} {2} xx'.format(id, mag, scale_coeffs))
+                cstr = ' '.join(['{0:9.2e}'.format(c) for c in scale_coeffs])
+                print('{0} mag={1:6.2f} {2} xx'.format(id, mag, cstr))
 
             return True
         
@@ -677,7 +691,8 @@ class GroupFLT():
                       header=flt.grism.header)
         
         if verbose:
-            print('{0} mag={1:6.2f} {2}'.format(id, mag, scale_coeffs))
+            cstr = ' '.join(['{0:9.2e}'.format(c) for c in scale_coeffs])
+            print('{0} mag={1:6.2f} {2}'.format(id, mag, cstr))
             
         return True
         #m2d = mb.reshape_flat(modelf)
@@ -1001,25 +1016,27 @@ class MultiBeam(GroupFitter):
         self.id = self.beams[0].id
         
         # Use WFC3 ePSF for the fit
+        self.psf_param_dict = None
         if (psf > 0) & (self.beams[i].grism.instrument == 'WFC3'):
-            # Crude for now:  overwrite `beam.compute_model` methods with 
-            # the `compute_model_psf`
+
+            self.psf_param_dict = OrderedDict()
             for ib, beam in enumerate(self.beams):
-                if beam.direct.data['REF'] is not None:
-                    
+                if (beam.direct.data['REF'] is not None) & (beam.direct.filter.startswith('G')):
                     # Use REF extension.  scale factors might be wrong
                     beam.direct.data['SCI'] = beam.direct.data['REF'] 
                     beam.direct.data['ERR'] *= beam.direct.ref_photflam
                     beam.direct.filter = beam.direct.ref_filter #'F160W'
                     beam.direct.photflam = beam.direct.ref_photflam
                 
-                beam.init_epsf(yoff = 0.06, skip=psf*1)
-                beam.compute_model = beam.compute_model_psf
-                beam.beam.compute_model = beam.compute_model_psf
-                beam.compute_model()
+                beam.init_epsf(yoff=0.0, skip=psf*1, N=4)
+                #beam.compute_model = beam.compute_model_psf
+                #beam.beam.compute_model = beam.beam.compute_model_psf
+                beam.compute_model(use_psf=True)
                 m = beam.compute_model(in_place=False)
-                beam.modelf = beam.model.flatten()
-                beam.model = beam.modelf.reshape(beam.beam.sh_beam)
+                #beam.modelf = beam.model.flatten()
+                #beam.model = beam.modelf.reshape(beam.beam.sh_beam)
+            
+                self.psf_param_dict[beam.grism.parent_file] = beam.beam.psf_params
                 
         self.poly_order = None
         
@@ -1247,6 +1264,19 @@ class MultiBeam(GroupFitter):
             beam.beam.compute_model(id=id, spectrum_1d=spectrum_1d, 
                                     is_cgs=is_cgs)
             
+            beam.modelf = beam.beam.modelf 
+            beam.model = beam.beam.modelf.reshape(beam.beam.sh_beam)
+            
+    def compute_model_psf(self, id=None, spectrum_1d=None, is_cgs=False):
+        """TBD
+        """
+        for beam in self.beams:
+            beam.beam.compute_model_psf(id=id, spectrum_1d=spectrum_1d, 
+                                    is_cgs=is_cgs)
+            
+            beam.modelf = beam.beam.modelf 
+            beam.model = beam.beam.modelf.reshape(beam.beam.sh_beam)
+                                            
     def fit_at_z(self, z=0., templates={}, fitter='nnls',
                  fit_background=True, poly_order=0):
         """TBD
@@ -2575,10 +2605,16 @@ class MultiBeam(GroupFitter):
     def eval_trace_shift(shifts, self, indices, poly_order, verbose):
         """TBD
         """
+        import scipy.ndimage as nd
+        
         for il, l in enumerate(indices):
             for i in l:
-                self.beams[i].beam.add_ytrace_offset(shifts[il])
-                self.beams[i].compute_model()#/self.beams[i].beam.total_flux
+                if hasattr(self.beams[i].beam, 'psf'):
+                    beam = self.beams[i].beam
+                    beam.model = nd.shift(beam.modelf.reshape(beam.sh_beam), (shifts[il], 0))
+                else:
+                    self.beams[i].beam.add_ytrace_offset(shifts[il])
+                    self.beams[i].compute_model()
 
         self.flat_flam = np.hstack([b.beam.model.flatten() for b in self.beams])
         self.poly_order=-1

@@ -179,9 +179,9 @@ def new_interp_conserve_c(np.ndarray[DTYPE_t, ndim=1] x, np.ndarray[DTYPE_t, ndi
     
     
 @cython.boundscheck(False)
-def interp_conserve_c(np.ndarray[DTYPE_t, ndim=1] x, np.ndarray[DTYPE_t, ndim=1] tlam, np.ndarray[DTYPE_t, ndim=1] tf, double left=0, double right=0):
+def interp_conserve_c(np.ndarray[DTYPE_t, ndim=1] x, np.ndarray[DTYPE_t, ndim=1] tlam, np.ndarray[DTYPE_t, ndim=1] tf, double left=0, double right=0, double integrate=0):
     """
-    interp_conserve_c(x, xp, fp, left=0, right=0)
+    interp_conserve_c(x, xp, fp, left=0, right=0, integrate=0)
     
     Interpolate `xp`,`yp` array to the output x array, conserving flux.  
     `xp` can be irregularly spaced.
@@ -249,8 +249,10 @@ def interp_conserve_c(np.ndarray[DTYPE_t, ndim=1] x, np.ndarray[DTYPE_t, ndim=1]
                 h = templmid[k+1]-tlam[i];
                 numsum+=h*(tempfmid[k+1]+tf[i]);
 
-        outy[k] = numsum*0.5/(templmid[k+1]-templmid[k]);
-    
+        outy[k] = numsum*0.5;#/(templmid[k+1]-templmid[k]);
+        if integrate == 0.:
+            outy[k] /= (templmid[k+1]-templmid[k]);
+            
     return outy
     
 def midpoint(x):
@@ -275,7 +277,10 @@ def midpoint_c(np.ndarray[DTYPE_t, ndim=1] x, long N):
         xi = x[i]
         midpoint[i] = 0.5*xi+0.5*xi1
         xi1 = xi
-        
+    
+    midpoint[0] = 2*x[0]-midpoint[1]
+    midpoint[N] = 2*x[N-1]-midpoint[N-1]
+    
     return midpoint
     
 @cython.boundscheck(False)

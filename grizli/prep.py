@@ -1214,7 +1214,7 @@ def get_panstarrs_catalog(ra=0., dec=0., radius=3, columns='objName,objID,raStac
         from urllib.parse import urlencode
         from urllib.request import urlopen
         
-    query_url = "http://archive.stsci.edu/panstarrs/search.php?RA={ra}&DEC={dec}&radius={radius}&max_records={max_records}&outputformat=CSV&action=Search&coordformat=dec&selectedColumnsCsv={columns}&raStack%3E=0".format(ra=ra, dec=dec, radius=radius, max_records=max_records, columns=columns)
+    query_url = "http://archive.stsci.edu/panstarrs/search.php?RA={ra}&DEC={dec}&radius={radius}&max_records={max_records}&outputformat=CSV&action=Search&coordformat=dec&selectedColumnsCsv={columns}&raStack%3E=0".format(ra=ra, dec=dec, radius=radius, max_records=int(max_records), columns=columns)
     
     print('Query PanSTARRS catalog ({ra},{dec})'.format(ra=ra, dec=dec))
     
@@ -1625,10 +1625,12 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
     match_direct_grism_wcs(direct=direct, grism=grism, get_fresh_flt=False)
     
     ### First drizzle to flag CRs
+    gris_cr_corr = len(grism['files']) > 1
+    
     AstroDrizzle(grism['files'], output=grism['product'], clean=True,
                  context=False, preserve=False, skysub=True,
-                 driz_separate=True, driz_sep_wcs=True, median=True, 
-                 blot=True, driz_cr=True, driz_cr_corr=True, 
+                 driz_separate=gris_cr_corr, driz_sep_wcs=gris_cr_corr, median=gris_cr_corr, 
+                 blot=gris_cr_corr, driz_cr=gris_cr_corr, driz_cr_corr=gris_cr_corr, 
                  driz_cr_snr=driz_cr_snr, driz_cr_scale=driz_cr_scale, 
                  driz_combine=True, final_bits=bits, coeffs=True, 
                  resetbits=4096, build=False, final_wht_type='IVM')        
@@ -1671,8 +1673,8 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
             
     AstroDrizzle(grism['files'], output=grism['product'], clean=True,
                  context=isACS, preserve=False, skysub=True, skyfile=skyfile,
-                 driz_separate=True, driz_sep_wcs=True, median=True, 
-                 blot=True, driz_cr=True, driz_cr_corr=True, 
+                 driz_separate=gris_cr_corr, driz_sep_wcs=gris_cr_corr, median=gris_cr_corr, 
+                 blot=gris_cr_corr, driz_cr=gris_cr_corr, driz_cr_corr=gris_cr_corr, 
                  driz_cr_snr=driz_cr_snr, driz_cr_scale=driz_cr_scale, 
                  driz_combine=True, driz_sep_bits=bits, final_bits=bits,
                  coeffs=True, resetbits=4096, final_pixfrac=pixfrac, 
