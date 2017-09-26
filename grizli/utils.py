@@ -2253,7 +2253,6 @@ class EffectivePSF(object):
         psf_xy = self.get_at_position(x=xd, y=yd, filter=filter)
         
         yp, xp = np.indices(sh)
-        args = (self, psf_xy, sci[yc-N:yc+N, xc-N:xc+N], ivar[yc-N:yc+N, xc-N:xc+N], xp[yc-N:yc+N, xc-N:xc+N], yp[yc-N:yc+N, xc-N:xc+N])
         
         if np.isscalar(ivar):
             ix = np.argmax(sci.flatten())
@@ -2264,6 +2263,10 @@ class EffectivePSF(object):
         yguess = yp.flatten()[ix]
 
         guess = [sci[yc-N:yc+N, xc-N:xc+N].sum()/psf_xy.sum(), xguess, yguess, 0, 0, 0, 0]
+        sly = slice(yc-N, yc+N); slx = slice(xc-N, xc+N)
+        sly = slice(yguess-N, yguess+N); slx = slice(xguess-N, xguess+N)
+        
+        args = (self, psf_xy, sci[sly, slx], ivar[sly, slx], xp[sly, slx], yp[sly, slx])
         
         out = minimize(self.objective_epsf, guess, args=args, method='Powell', tol=tol)
         

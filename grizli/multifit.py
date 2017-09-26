@@ -601,11 +601,18 @@ class GroupFLT():
             if hasdata*1./out_beam.model.shape[1] < min_overlap:
                 continue
             
+            if out_beam.beam.total_flux == 0:
+                continue
+                
+            # if hasattr(beam[beam_id], 'psf_params'):
+            #     #print('init epsf')
+            #     out_beam.init_epsf(yoff=beam[beam_id].psf_yoff, psf_params=beam[beam_id].psf_params)
+                
             out_beams.append(out_beam)
             
         return out_beams
     
-    def refine_list(self, ids=[], mags=[], poly_order=2, mag_limits=[16,24], 
+    def refine_list(self, ids=[], mags=[], poly_order=3, mag_limits=[16,24], 
                     max_coeff=5, ds9=None, verbose=True):
         """TBD
         
@@ -637,7 +644,7 @@ class GroupFLT():
                         max_coeff=max_coeff, size=30, ds9=ds9,
                         verbose=verbose, templates=poly_templates)
     
-    def refine(self, id, mag=-99, poly_order=1, size=30, ds9=None, verbose=True, max_coeff=2.5, templates=None):
+    def refine(self, id, mag=-99, poly_order=3, size=30, ds9=None, verbose=True, max_coeff=2.5, templates=None):
         """TBD
         Use tools in `fitting`
         """
@@ -662,12 +669,14 @@ class GroupFLT():
         
         # Check where templates inconsistent with broad-band fluxes
         xb = [beam.direct.ref_photplam if beam.direct['REF'] is not None else beam.direct.photplam for beam in beams]
-        fb = [beam.beam.total_flux for beam in beams]
-        mb = np.polyval(scale_coeffs[::-1], np.array(xb)/1.e4-1)
+        obs_flux = np.array([beam.beam.total_flux for beam in beams])
+        mod_flux = np.polyval(scale_coeffs[::-1], np.array(xb)/1.e4-1)
+        nonz = obs_flux != 0
         
-        if (np.abs(mb/fb).max() > max_coeff) | ((~np.isfinite(mb/fb)).sum() > 0) | (np.min(mb) < 0) | ((~np.isfinite(ypoly)).sum() > 0):
+        if (np.abs(mod_flux/obs_flux)[nonz].max() > max_coeff) | ((~np.isfinite(mod_flux/obs_flux)[nonz]).sum() > 0) | (np.min(mod_flux[nonz]) < 0) | ((~np.isfinite(ypoly)[nonz]).sum() > 0):
             if verbose:
-                print('{0} mag={1:6.2f} {2} xx'.format(id, mag, scale_coeffs))
+                cstr = ' '.join(['{0:9.2e}'.format(c) for c in scale_coeffs])
+                print('{0} mag={1:6.2f} {2} xx'.format(id, mag, cstr))
 
             return True
         
@@ -682,7 +691,8 @@ class GroupFLT():
                       header=flt.grism.header)
         
         if verbose:
-            print('{0} mag={1:6.2f} {2}'.format(id, mag, scale_coeffs))
+            cstr = ' '.join(['{0:9.2e}'.format(c) for c in scale_coeffs])
+            print('{0} mag={1:6.2f} {2}'.format(id, mag, cstr))
             
         return True
         #m2d = mb.reshape_flat(modelf)
@@ -1018,7 +1028,7 @@ class MultiBeam(GroupFitter):
                     beam.direct.filter = beam.direct.ref_filter #'F160W'
                     beam.direct.photflam = beam.direct.ref_photflam
                 
-                beam.init_epsf(yoff = 0.06, skip=psf*1)
+                beam.init_epsf(yoff=0.0, skip=psf*1, N=4)
                 #beam.compute_model = beam.compute_model_psf
                 #beam.beam.compute_model = beam.beam.compute_model_psf
                 beam.compute_model(use_psf=True)
