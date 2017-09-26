@@ -203,6 +203,7 @@ class GrismDisperser(object):
         
         ### Initialize attributes        
         self.spectrum_1d =  None
+        self.is_cgs = False
         
         self.xc = self.sh[1]/2+self.origin[1]
         self.yc = self.sh[0]/2+self.origin[0]
@@ -783,7 +784,7 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         else:
             return xpix
     
-    def x_init_epsf(self, flat_sensitivity=False, psf_params=None, psf_filter='F140W', yoff=0.06, skip=0.5):
+    def x_init_epsf(self, flat_sensitivity=False, psf_params=None, psf_filter='F140W', yoff=0.0, skip=0.5):
         """Initialize ePSF fitting for point sources
         TBD
         """
@@ -801,7 +802,10 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
             self.psf_params[0] = self.total_flux#/photflam_list[psf_filter]
         
         origin = np.array(self.origin) - np.array(self.pad)
-            
+        
+        self.psf_yoff = yoff
+        self.psf_filter = psf_filter
+        
         self.psf = EPSF.get_ePSF(self.psf_params, origin=origin, shape=self.sh, filter=psf_filter)
         #print('XXX', self.psf_params[0], self.psf.sum())
         
@@ -984,11 +988,11 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
                 
         self.ext_psf_data = np.maximum(spl_data, 0)
         
-    def compute_model_psf(self, id=None, spectrum_1d=None, in_place=True, is_cgs=True):
+    def compute_model_psf(self, id=None, spectrum_1d=None, in_place=True, is_cgs=False):
         if spectrum_1d is None:
             #modelf = np.array(self.A_psf.sum(axis=1)).flatten()
             #model = model.reshape(self.sh_beam)
-            coeffs = np.ones(self.A_psf.shape[1])
+            coeffs = np.ones(self.A_psf.shape[1])*self.total_flux
         else:
             dx = np.diff(self.lam_psf)[0]
             if dx < 0:
@@ -1000,7 +1004,9 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
                                                   spectrum_1d[0], 
                                                   spectrum_1d[1])
                      
-        
+            if not is_cgs:
+                coeffs *= self.total_flux
+                
         modelf = self.A_psf.dot(coeffs*self.psf_sensitivity)
         model = modelf.reshape(self.sh_beam)
         
@@ -1010,6 +1016,10 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
             model = modelf.reshape(self.sh_beam)
             
         if in_place:
+            
+            self.spectrum_1d = spectrum_1d
+            self.is_cgs = is_cgs
+                    
             self.modelf = modelf #.flatten()
             self.model = model
             #self.modelf = self.model.flatten()
@@ -2519,23 +2529,23 @@ class GrismFLT(object):
                 if psf_params is not None:
                     store = True
                     INIT_PSF_NOW = True
-                    print('xxx Init PSF', b)
+                    #print('xxx Init PSF', b)
                     if self.direct.ref_filter is None:
                         psf_filter = self.direct.filter
                     else:
                         psf_filter = self.direct.ref_filter
                     
-                    beam.x_init_epsf(flat_sensitivity=False, psf_params=psf_params, psf_filter=psf_filter, yoff=0.06)
+                    beam.x_init_epsf(flat_sensitivity=False, psf_params=psf_params, psf_filter=psf_filter, yoff=0.)
                     
                 beams[b] = beam
         
-        # Compure old model
+        # Compute old model
         if object_in_model:
-            for b in beam_names:
+            for b in beams:
                 beam = beams[b]
                 if hasattr(beam, 'psf') & (not INIT_PSF_NOW):
                     store = True
-                    print('xxx OLD PSF')
+                    #print('xxx OLD PSF')
                     beam.compute_model_psf(spectrum_1d=old_spectrum_1d,
                                        is_cgs=old_cgs)
                 else:
@@ -3303,6 +3313,9 @@ class BeamCutout(object):
                            beam=beam.beam, conf=conf, xcenter=beam.xcenter,
                            ycenter=beam.ycenter, fwcpos=flt.grism.fwcpos)
         
+        if hasattr(beam, 'psf_params'):
+            self.beam.x_init_epsf(psf_params=beam.psf_params, psf_filter=beam.psf_filter, yoff=beam.psf_yoff)
+            
         if beam.spectrum_1d is None:
             self.compute_model()#spectrum_1d=beam.spectrum_1d)
         else:
@@ -3777,7 +3790,7 @@ class BeamCutout(object):
             
         return dispersion_PA
     
-    def init_epsf(self, center=None, tol=1.e-3, yoff=0., skip=1., flat_sensitivity=False, psf_params=None):
+    def init_epsf(self, center=None, tol=1.e-3, yoff=0., skip=1., flat_sensitivity=False, psf_params=None, N=4):
         """Initialize ePSF fitting for point sources
         TBD
         """
@@ -3798,8 +3811,7 @@ class BeamCutout(object):
             self.psf_params = EPSF.fit_ePSF(self.direct['SCI'], 
                                                   ivar=ivar, 
                                                   center=center, tol=tol,
-                                                  N=12,
-                                                  origin=origin,
+                                                  N=N, origin=origin,
                                                   filter=self.direct.filter)
         else:
             self.psf_params = psf_params
