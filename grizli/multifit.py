@@ -673,7 +673,7 @@ class GroupFLT():
         mod_flux = np.polyval(scale_coeffs[::-1], np.array(xb)/1.e4-1)
         nonz = obs_flux != 0
         
-        if (np.abs(mod_flux/obs_flux)[nonz].max() > max_coeff) | ((~np.isfinite(mod_flux/obs_flux)[nonz]).sum() > 0) | (np.min(mod_flux[nonz]) < 0) | ((~np.isfinite(ypoly)[nonz]).sum() > 0):
+        if (np.abs(mod_flux/obs_flux)[nonz].max() > max_coeff) | ((~np.isfinite(mod_flux/obs_flux)[nonz]).sum() > 0) | (np.min(mod_flux[nonz]) < 0) | ((~np.isfinite(ypoly)).sum() > 0):
             if verbose:
                 cstr = ' '.join(['{0:9.2e}'.format(c) for c in scale_coeffs])
                 print('{0} mag={1:6.2f} {2} xx'.format(id, mag, cstr))
