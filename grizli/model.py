@@ -784,7 +784,7 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         else:
             return xpix
     
-    def x_init_epsf(self, flat_sensitivity=False, psf_params=None, psf_filter='F140W', yoff=0.0, skip=0.5):
+    def x_init_epsf(self, flat_sensitivity=False, psf_params=None, psf_filter='F140W', yoff=0.0, skip=0.5, get_extended=False):
         """Initialize ePSF fitting for point sources
         TBD
         """
@@ -806,11 +806,11 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         self.psf_yoff = yoff
         self.psf_filter = psf_filter
         
-        self.psf = EPSF.get_ePSF(self.psf_params, origin=origin, shape=self.sh, filter=psf_filter)
+        self.psf = EPSF.get_ePSF(self.psf_params, origin=origin, shape=self.sh, filter=psf_filter, get_extended=get_extended)
         #print('XXX', self.psf_params[0], self.psf.sum())
         
-        self.psf_params[0] /= self.psf.sum()
-        self.psf /= self.psf.sum()
+        # self.psf_params[0] /= self.psf.sum()
+        # self.psf /= self.psf.sum()
                 
         # Center in detector coords
         y0, x0 = np.array(self.sh)/2.-1
@@ -819,8 +819,11 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
 
         # Get wavelength array
         psf_xy_lam = []
+        psf_ext_lam = []
+        
         for i, filter in enumerate(['F105W', 'F125W', 'F160W']):
             psf_xy_lam.append(EPSF.get_at_position(x=xd, y=yd, filter=filter))
+            psf_ext_lam.append(EPSF.extended_epsf[filter])
         
         filt_ix = np.arange(3)
         filt_lam = np.array([1.0551, 1.2486, 1.5369])*1.e4
@@ -850,14 +853,20 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
             ii = np.interp(li, filt_lam, filt_ix, left=-1, right=10)
             if ii == -1:
                 psf_xy_i = psf_xy_lam[0]*1
+                psf_ext_i = psf_ext_lam[0]*1
             elif ii == 10:
                 psf_xy_i = psf_xy_lam[2]*1
+                psf_ext_i = psf_ext_lam[2]*1
             else:
                 ni = int(ii)
                 f = 1-(li-filt_lam[ni])/(filt_lam[ni+1]-filt_lam[ni])
                 psf_xy_i = f*psf_xy_lam[ni] + (1-f)*psf_xy_lam[ni+1]
-
-            psf = EPSF.eval_ePSF(psf_xy_i, dx, dy)*self.psf_params[0]
+                psf_ext_i = f*psf_ext_lam[ni] + (1-f)*psf_ext_lam[ni+1]
+            
+            if not get_extended:
+                psf_ext_i = None
+                
+            psf = EPSF.eval_ePSF(psf_xy_i, dx, dy, extended_data=psf_ext_i)*self.psf_params[0]
             #print(xi, psf.sum())
             
             A_psf.append(psf.flatten())
@@ -882,7 +891,7 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
             
         self.psf_sensitivity = psf_sensitivity
         self.A_psf = scipy.sparse.csr_matrix(np.array(A_psf).T)
-        self.init_extended_epsf()
+        #self.init_extended_epsf()
         
         self.PAM_value = self.get_PAM_value()
         self.psf_scale_to_data = 1.
@@ -928,7 +937,7 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         self.psf_renorm = renorm
         
         # Scale model to data, depends on Pixel Area Map and PSF normalization
-        scale_to_data = self.PAM_value * (self.psf_params[0]/0.95)
+        scale_to_data = self.PAM_value #* (self.psf_params[0]/0.975)
         self.psf_scale_to_data = scale_to_data
         renorm /= scale_to_data # renorm PSF
 
@@ -1010,10 +1019,10 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         modelf = self.A_psf.dot(coeffs*self.psf_sensitivity)
         model = modelf.reshape(self.sh_beam)
         
-        if hasattr(self, 'ext_psf_data'):
-            model += self.ext_psf_data*model.sum(axis=0)
-            modelf = model.flatten()
-            model = modelf.reshape(self.sh_beam)
+        # if hasattr(self, 'ext_psf_data'):
+        #     model += self.ext_psf_data*model.sum(axis=0)
+        #     modelf = model.flatten()
+        #     model = modelf.reshape(self.sh_beam)
             
         if in_place:
             
@@ -3790,7 +3799,7 @@ class BeamCutout(object):
             
         return dispersion_PA
     
-    def init_epsf(self, center=None, tol=1.e-3, yoff=0., skip=1., flat_sensitivity=False, psf_params=None, N=4):
+    def init_epsf(self, center=None, tol=1.e-3, yoff=0., skip=1., flat_sensitivity=False, psf_params=None, N=4, get_extended=False):
         """Initialize ePSF fitting for point sources
         TBD
         """
@@ -3812,11 +3821,12 @@ class BeamCutout(object):
                                                   ivar=ivar, 
                                                   center=center, tol=tol,
                                                   N=N, origin=origin,
-                                                  filter=self.direct.filter)
+                                                  filter=self.direct.filter,
+                                                  get_extended=get_extended)
         else:
             self.psf_params = psf_params
             
-        self.beam.x_init_epsf(flat_sensitivity=False, psf_params=self.psf_params, psf_filter=self.direct.filter, yoff=yoff, skip=skip)
+        self.beam.x_init_epsf(flat_sensitivity=False, psf_params=self.psf_params, psf_filter=self.direct.filter, yoff=yoff, skip=skip, get_extended=get_extended)
         
         return None
         

@@ -2161,14 +2161,34 @@ class EffectivePSF(object):
         # Dummy, use F105W ePSF for F098M
         self.epsf['F098M'] = self.epsf['F105W']
         
+        # Extended
+        self.extended_epsf = {}
+        for filter in ['F105W', 'F125W', 'F140W', 'F160W']:
+            file = os.path.join(os.getenv('GRIZLI'), 'CONF',
+                                'extended_psf_{0}.fits'.format(filter))
+            
+            data = pyfits.open(file)[0].data#.T
+            data[data < 0] = 0 
+            
+            # Mask center
+            NX = data.shape[0]/2-1
+            yp, xp = np.indices(data.shape)
+            R = np.sqrt((xp-NX)**2+(yp-NX)**2)
+            data[R <= 4] = 0.
+            
+            self.extended_epsf[filter] = data
+            self.extended_N = int(NX)
+            
+        self.extended_epsf['F098M'] = self.extended_epsf['F105W']
+        
     def get_at_position(self, x=507, y=507, filter='F140W'):
         """Evaluate ePSF at detector coordinates
         TBD
         """
         epsf = self.epsf[filter]
-
-        rx = 1+(x-0)/507.
-        ry = 1+(y-0)/507.
+        
+        rx = 1+(np.clip(x,1,1013)-0)/507.
+        ry = 1+(np.clip(y,1,1013)-0)/507.
                 
         # zero index
         rx -= 1
@@ -2186,10 +2206,11 @@ class EffectivePSF(object):
         psf_xy += fx*(1-fy)*epsf[:, :, (nx+1)+ny*3]
         psf_xy += (1-fx)*fy*epsf[:, :, nx+(ny+1)*3]
         psf_xy += fx*fy*epsf[:, :, (nx+1)+(ny+1)*3]
-
+        self.eval_filter = filter
+        
         return psf_xy
     
-    def eval_ePSF(self, psf_xy, dx, dy):
+    def eval_ePSF(self, psf_xy, dx, dy, extended_data=None):
         """Evaluate PSF at dx,dy coordinates
         
         TBD
@@ -2207,10 +2228,19 @@ class EffectivePSF(object):
         # Fill output data
         out = np.zeros_like(dx, dtype=np.float32)
         out[ok] = interp_map
+        
+        # Extended PSF
+        if extended_data is not None:
+            ok = (np.abs(dx) < self.extended_N) & (np.abs(dy) < self.extended_N)
+            x0 = self.extended_N
+            coords = np.array([x0+dy[ok]+0, x0+dx[ok]])
+            interp_map = map_coordinates(extended_data, coords, order=0)
+            out[ok] += interp_map
+            
         return out
     
     @staticmethod
-    def objective_epsf(params, self, psf_xy, sci, ivar, xp, yp):
+    def objective_epsf(params, self, psf_xy, sci, ivar, xp, yp, extended_data, ret):
         """Objective function for fitting ePSFs
         
         TBD
@@ -2226,14 +2256,17 @@ class EffectivePSF(object):
         ddx = ddx/ddx.max()
         ddy = ddy/ddy.max()
         
-        psf_offset = self.eval_ePSF(psf_xy, dx, dy)*params[0] + params[3] + params[4]*ddx + params[5]*ddy + params[6]*ddx*ddy
+        psf_offset = self.eval_ePSF(psf_xy, dx, dy, extended_data=extended_data)*params[0] + params[3] + params[4]*ddx + params[5]*ddy + params[6]*ddx*ddy
         
+        if ret == 'resid':
+            return (sci-psf_offset)*np.sqrt(ivar)
+            
         chi2 = np.sum((sci-psf_offset)**2*(ivar))
         #print(params, chi2)
         return chi2
     
     def fit_ePSF(self, sci, center=None, origin=[0,0], ivar=1, N=7, 
-                 filter='F140W', tol=1.e-4):
+                 filter='F140W', tol=1.e-4, guess=None, get_extended=False):
         """Fit ePSF to input data
         TBD
         """
@@ -2253,20 +2286,28 @@ class EffectivePSF(object):
         psf_xy = self.get_at_position(x=xd, y=yd, filter=filter)
         
         yp, xp = np.indices(sh)
+                    
+        if guess is None:
+            if np.isscalar(ivar):
+                ix = np.argmax(sci.flatten())
+            else:
+                ix = np.argmax((sci*(ivar > 0)).flatten())
         
-        if np.isscalar(ivar):
-            ix = np.argmax(sci.flatten())
+            xguess = xp.flatten()[ix]
+            yguess = yp.flatten()[ix]
         else:
-            ix = np.argmax((sci*(ivar > 0)).flatten())
+            xguess, yguess = guess
             
-        xguess = xp.flatten()[ix]
-        yguess = yp.flatten()[ix]
-
         guess = [sci[yc-N:yc+N, xc-N:xc+N].sum()/psf_xy.sum(), xguess, yguess, 0, 0, 0, 0]
         sly = slice(yc-N, yc+N); slx = slice(xc-N, xc+N)
         sly = slice(yguess-N, yguess+N); slx = slice(xguess-N, xguess+N)
         
-        args = (self, psf_xy, sci[sly, slx], ivar[sly, slx], xp[sly, slx], yp[sly, slx])
+        if get_extended:
+            extended_data = self.extended_epsf[filter]
+        else:
+            extended_data = None
+        
+        args = (self, psf_xy, sci[sly, slx], ivar[sly, slx], xp[sly, slx], yp[sly, slx], extended_data, 'chi2')
         
         out = minimize(self.objective_epsf, guess, args=args, method='Powell', tol=tol)
         
@@ -2282,7 +2323,7 @@ class EffectivePSF(object):
         # 
         # return output_psf, psf_params
     
-    def get_ePSF(self, psf_params, origin=[0,0], shape=[20,20], filter='F140W'):
+    def get_ePSF(self, psf_params, origin=[0,0], shape=[20,20], filter='F140W', get_extended=False):
         """
         Evaluate an Effective PSF
         """
@@ -2300,7 +2341,13 @@ class EffectivePSF(object):
         
         dx = xp-psf_params[1]-x0
         dy = yp-psf_params[2]-y0
-        output_psf = self.eval_ePSF(psf_xy, dx, dy)*psf_params[0]
+        
+        if get_extended:
+            extended_data = self.extended_epsf[filter]
+        else:
+            extended_data = None
+            
+        output_psf = self.eval_ePSF(psf_xy, dx, dy, extended_data=extended_data)*psf_params[0]
         
         return output_psf
         
@@ -2581,4 +2628,36 @@ def fill_masked_covar(covar, mask):
             covar_full[ii,jj] = covar[i,j]
     
     return covar_full
+    
+def log_scale_ds9(im, lexp=1.e12, cmap=[7.97917, 0.8780493], scale=[-0.1,10]):
+    """
+    Scale an array like ds9 log scaling
+    """
+    import numpy as np
+    
+    contrast, bias = cmap
+    clip = (np.clip(im, scale[0], scale[1])-scale[0])/(scale[1]-scale[0])
+    clip_log = np.clip((np.log10(lexp*clip+1)/np.log10(lexp)-bias)*contrast+0.5, 0, 1)
+    
+    return clip_log
+
+def mode_statistic(data):
+    """
+    Get modal value of a distribution of data following Connor et al. 2017
+    https://arxiv.org/pdf/1709.01925.pdf
+    """
+    from scipy.interpolate import UnivariateSpline, LSQUnivariateSpline
+    
+    so = np.argsort(data)
+    order = np.arange(len(data))
+    #spl = UnivariateSpline(data[so], order)
+    
+    knots = np.percentile(data, np.arange(0,101,10))[1:-1]
+    spl = LSQUnivariateSpline(data[so], order, knots, ext='zeros')
+    mask = (data[so] >= knots[0]) & (data[so] <= knots[-1])
+    ix = (spl(data[so], nu=1, ext='zeros')*mask).argmax()
+    mode = data[so][ix]
+    return mode
+    
+    
     

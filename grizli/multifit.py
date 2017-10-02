@@ -1021,14 +1021,16 @@ class MultiBeam(GroupFitter):
 
             self.psf_param_dict = OrderedDict()
             for ib, beam in enumerate(self.beams):
-                if (beam.direct.data['REF'] is not None) & (beam.direct.filter.startswith('G')):
+                if (beam.direct.data['REF'] is not None):
                     # Use REF extension.  scale factors might be wrong
                     beam.direct.data['SCI'] = beam.direct.data['REF'] 
-                    beam.direct.data['ERR'] *= beam.direct.ref_photflam
+                    new_err = np.ones_like(beam.direct.data['ERR'])
+                    new_err *= utils.nmad(beam.direct.data['SCI'])
+                    beam.direct.data['ERR'] = new_err
                     beam.direct.filter = beam.direct.ref_filter #'F160W'
                     beam.direct.photflam = beam.direct.ref_photflam
                 
-                beam.init_epsf(yoff=0.0, skip=psf*1, N=4)
+                beam.init_epsf(yoff=0.0, skip=psf*1, N=4, get_extended=True)
                 #beam.compute_model = beam.compute_model_psf
                 #beam.beam.compute_model = beam.beam.compute_model_psf
                 beam.compute_model(use_psf=True)

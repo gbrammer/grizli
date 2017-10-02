@@ -553,6 +553,8 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
     cosdec = np.array([np.cos(rd_cat_center[1]/180*np.pi),1])
     dr_cat = np.sqrt(np.sum((rd_cat.T-rd_cat_center)**2*cosdec**2, axis=1))
     
+    #print('xxx', rd_ref.shape, rd_cat_center.shape, cosdec.shape)
+    
     dr = np.sqrt(np.sum((rd_ref-rd_cat_center)**2*cosdec**2, axis=1))
     
     rd_ref = rd_ref[dr < 1.1*dr_cat.max(),:]
