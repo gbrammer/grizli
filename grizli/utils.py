@@ -2074,18 +2074,20 @@ def fetch_config_files(ACS=False):
     
     print('Config directory: {0}/CONF'.format(os.getenv('GRIZLI')))
     
-    os.chdir('{0}/CONF'.format(os.getenv('GRIZLI')))
+    os.chdir(os.path.join(os.getenv('GRIZLI'), 'CONF'))
     
-    tarfiles = ['ftp://ftp.stsci.edu/cdbs/wfc3_aux/WFC3.IR.G102.cal.V4.32.tar.gz',
- 'ftp://ftp.stsci.edu/cdbs/wfc3_aux/WFC3.IR.G141.cal.V4.32.tar.gz',
- 'ftp://ftp.stsci.edu/cdbs/wfc3_aux/grism_master_sky_v0.5.tar.gz']
+    ftpdir = 'ftp://ftp.stsci.edu/cdbs/wfc3_aux/'
+    tarfiles = ['{0}/WFC3.IR.G102.cal.V4.32.tar.gz'.format(ftpdir),
+                '{0}/WFC3.IR.G141.cal.V4.32.tar.gz'.format(ftpdir),
+                '{0}/grism_master_sky_v0.5.tar.gz'.format(ftpdir)]
+    
+    gURL = 'http://www.stsci.edu/~brammer/Grizli/Files'
+    tarfiles.append('{0}/WFC3IR_extended_PSF.v1.tar.gz'.format(gURL))
     
     if ACS:
-        tarfiles.append('http://www.stsci.edu/~brammer/Grizli/Files/' + 
-                        'ACS.WFC.sky.tar.gz')
+        tarfiles.append('{0}/ACS.WFC.sky.tar.gz'.format(gURL))
 
-        tarfiles.append('http://www.stsci.edu/~brammer/Grizli/Files/' + 
-                        'ACS_CONFIG.tar.gz')
+        tarfiles.append('{0}/ACS_CONFIG.tar.gz'.format(gURL))
                         
     for url in tarfiles:
         file=os.path.basename(url)
@@ -2096,7 +2098,10 @@ def fetch_config_files(ACS=False):
         os.system('tar xzvf {0}'.format(file))
     
     # ePSF files for fitting point sources
-    files = ['http://www.stsci.edu/hst/wfc3/analysis/PSF/psf_downloads/wfc3_ir/PSFSTD_WFC3IR_{0}.fits'.format(filter) for filter in ['F105W', 'F125W', 'F140W', 'F160W']]
+    psf_path = 'http://www.stsci.edu/hst/wfc3/analysis/PSF/psf_downloads/wfc3_ir/'
+    files = ['{0}/PSFSTD_WFC3IR_{0}.fits'.format(psf_path, filter) 
+             for filter in ['F105W', 'F125W', 'F140W', 'F160W']]
+             
     for url in files:
         file=os.path.basename(url)
         if not os.path.exists(file):
@@ -2167,6 +2172,12 @@ class EffectivePSF(object):
             file = os.path.join(os.getenv('GRIZLI'), 'CONF',
                                 'extended_psf_{0}.fits'.format(filter))
             
+            if not os.path.exists(file):
+                msg = 'Extended PSF file \'{0}\' not found.'.format(file)
+                msg += '\n                   Get the archive from http://www.stsci.edu/~brammer/Grizli/Files/WFC3IR_extended_PSF.v1.tar.gz'
+                msg += '\n                   and unpack in ${GRIZLI}/CONF/' 
+                raise FileNotFoundError(msg)
+                
             data = pyfits.open(file)[0].data#.T
             data[data < 0] = 0 
             
