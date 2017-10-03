@@ -1,12 +1,16 @@
+# ASSUMPTIONS:
+# 1. in anaconda (preferably with astroconda distribution)
+# 2. python 3 (for sewpy git fork)
+
 #from distutils.core import setup
 #from distutils.extension import Extension
 from setuptools import setup
 from setuptools.extension import Extension
 
-import subprocess
-
 import os
 import numpy
+import pip
+import subprocess
 
 try:
     from Cython.Build import cythonize
@@ -51,6 +55,11 @@ print('Git version: {0}'.format(version))
 if USE_CYTHON:
     extensions = cythonize(extensions)
 
+pip_packages = ['peakutils', 'scikit-learn', 'astroquery', 'shapely', 'reproject']
+
+for package in pip_packages:
+    pip.main(['install', package])
+
 # Utility function to read the README file.
 # Used for the long_description.  It's nice, because now 1) we have a top level
 # README file and 2) it's easier to type in the README file than to put a raw
@@ -68,8 +77,13 @@ setup(
     url = "https://github.com/gbrammer/grizli",
     download_url = "https://github.com/gbrammer/grizli/tarball/0.2.1",
     packages=['grizli', 'grizli/utils_c', 'grizli/tests'],
-    # requires=['numpy', 'scipy', 'astropy', 'drizzlepac', 'stwcs'],
+    # the install_requires isn't working for me, but *should* work for normal
+    # people who don't destroy their conda installations...
+    #install_requires=['drizzlepac', 'stwcs', 'photutils', 'pysynphot', 'peakutils', 
+    #    'scikit-learn', 'astroquery', 'shapely', 'reproject'],
     # long_description=read('README.rst'),
+    dependency_links=['https://github.com/cmccully/lacosmicx.git', 
+    'https://github.com/gbrammer/sewpy.git'],
     classifiers=[
         "Development Status :: 1 - Planning",
         'Intended Audience :: Science/Research',
