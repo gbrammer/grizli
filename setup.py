@@ -55,7 +55,9 @@ print('Git version: {0}'.format(version))
 if USE_CYTHON:
     extensions = cythonize(extensions)
 
-pip_packages = ['peakutils', 'scikit-learn', 'astroquery', 'shapely', 'reproject']
+# For me reproject is having some trouble...
+pip_packages = ['peakutils', 'scikit-learn', 'astroquery', 'shapely', 'reproject', 
+    'git+https://github.com/cmccully/lacosmicx.git', 'git+https://github.com/gbrammer/sewpy.git']
 
 for package in pip_packages:
     pip.main(['install', package])
@@ -82,8 +84,6 @@ setup(
     #install_requires=['drizzlepac', 'stwcs', 'photutils', 'pysynphot', 'peakutils', 
     #    'scikit-learn', 'astroquery', 'shapely', 'reproject'],
     # long_description=read('README.rst'),
-    dependency_links=['https://github.com/cmccully/lacosmicx.git', 
-    'https://github.com/gbrammer/sewpy.git'],
     classifiers=[
         "Development Status :: 1 - Planning",
         'Intended Audience :: Science/Research',
