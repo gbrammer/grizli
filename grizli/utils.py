@@ -2652,10 +2652,13 @@ def log_scale_ds9(im, lexp=1.e12, cmap=[7.97917, 0.8780493], scale=[-0.1,10]):
     
     return clip_log
 
-def mode_statistic(data):
+def mode_statistic(data, percentiles=range(10,91,10)):
     """
     Get modal value of a distribution of data following Connor et al. 2017
     https://arxiv.org/pdf/1709.01925.pdf
+    
+    Here we fit a spline to the cumulative distribution evaluated at knots 
+    set to the `percentiles` of the distribution to improve smoothness.
     """
     from scipy.interpolate import UnivariateSpline, LSQUnivariateSpline
     
@@ -2663,8 +2666,11 @@ def mode_statistic(data):
     order = np.arange(len(data))
     #spl = UnivariateSpline(data[so], order)
     
-    knots = np.percentile(data, np.arange(0,101,10))[1:-1]
-    spl = LSQUnivariateSpline(data[so], order, knots, ext='zeros')
+    knots = np.percentile(data, percentiles)
+    dx = np.diff(knots)
+    mask = (data[so] >= knots[0]-dx[0]) & (data[so] <= knots[-1]+dx[-1])
+    spl = LSQUnivariateSpline(data[so][mask], order[mask], knots, ext='zeros')
+    
     mask = (data[so] >= knots[0]) & (data[so] <= knots[-1])
     ix = (spl(data[so], nu=1, ext='zeros')*mask).argmax()
     mode = data[so][ix]
