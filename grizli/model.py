@@ -182,6 +182,10 @@ class GrismDisperser(object):
         self.fwcpos = fwcpos
         self.scale = scale
         
+        # Get Pixel area map (xxx need to add test for WFC3)
+        #self.PAM_value = self.get_PAM_value()
+        #print('xxx PAM!')
+        
         ### Direct image
         if direct is None:
             direct = np.zeros((20,20), dtype=np.float32)
@@ -465,7 +469,10 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
                                  self.sensitivity_beam*scale_spec,
                                  modelf, self.x0, np.array(self.sh),
                                  self.x0, np.array(self.sh_beam))
-
+        
+        #print('yyy PAM')
+        #modelf *= self.PAM_value #= self.get_PAM_value()
+        
         if not in_place:
             return modelf
         else:
