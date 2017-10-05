@@ -1137,8 +1137,15 @@ class SpectrumTemplate(object):
         """
         #import astropy.constants as const
         #flux_fnu = self.flux * self.wave**2 / 3.e18
-        #flux_fnu = (self.flux*self.fluxunits*(self.wave*self.waveunits)**2/const.c).to(FNU_CGS) #,  
-        flux_fnu = (self.flux*self.fluxunits).to(FNU_CGS, equivalencies=u.spectral_density(self.wave*self.waveunits))
+        #flux_fnu = (self.flux*self.fluxunits*(self.wave*self.waveunits)**2/const.c).to(FNU_CGS) #,     
+        
+        if ((FNU_CGS.__str__() == 'erg / (cm2 Hz s)') & 
+            (self.fluxunits.__str__() == 'erg / (Angstrom cm2 s)')):
+            # Faster
+            flux_fnu = self.flux*self.wave**2/2.99792458e18*fnu_units
+        else:
+            # Use astropy conversion
+            flux_fnu = (self.flux*self.fluxunits).to(fnu_units, equivalencies=u.spectral_density(self.wave*self.waveunits))
         
         self.fnu_units = fnu_units
         self.flux_fnu = flux_fnu.value
@@ -2170,7 +2177,7 @@ class EffectivePSF(object):
         self.extended_epsf = {}
         for filter in ['F105W', 'F125W', 'F140W', 'F160W']:
             file = os.path.join(os.getenv('GRIZLI'), 'CONF',
-                                'extended_psf_{0}.fits'.format(filter))
+                                'extended_PSF_{0}.fits'.format(filter))
             
             if not os.path.exists(file):
                 msg = 'Extended PSF file \'{0}\' not found.'.format(file)

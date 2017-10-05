@@ -1334,26 +1334,34 @@ class GroupFitter(object):
         fit_data['cont1d'] = cont1d
         fit_data['line1d'] = line1d
     
-    def scale_to_photometry(self, z=0, templates={}, tol=1.e-4, order=0, init=None, method='Powell'):
+    def scale_to_photometry(self, z=0, templates={}, tol=1.e-4, order=0, init=None, method='lm', fit_background=True):
         """Compute scale factor between spectra and photometry
         
         method : 'Powell' or 'BFGS' work well, latter a bit faster but less robust
         
+        New implementation of Levenberg-Markwardt minimization
+        
         TBD
         """
-        import scipy.optimize
+        from scipy.optimize import minimize, least_squares
         
         if self.Nphot == 0:
             return np.array([10.])
         
-        AxT, data = self.xfit_at_z(z=z, templates=templates, fitter='nnls', fit_background=True, get_uncertainties=False, get_design_matrix=True)
+        AxT, data = self.xfit_at_z(z=z, templates=templates, fitter='nnls',
+                                   fit_background=fit_background,
+                                   get_uncertainties=False,
+                                   get_design_matrix=True)
         
         if init is None:
             init = np.zeros(order+1)
             init[0] = 10.
             
-        scale_fit = scipy.optimize.minimize(self.objfun_scale, init, args=(AxT, data, self, 0), method=method, jac=None, hess=None, hessp=None, tol=tol, callback=None, options=None)
-        
+        if method == 'lm':
+            scale_fit = least_squares(self.objfun_scale, init, jac='2-point', method='lm', ftol=tol, xtol=tol, gtol=tol, x_scale=1.0, loss='linear', f_scale=1.0, diff_step=None, tr_solver=None, tr_options={}, jac_sparsity=None, max_nfev=None, verbose=0, args=(AxT, data, self, 'resid'), kwargs={})
+        else:
+            scale_fit = minimize(self.objfun_scale, init, args=(AxT, data, self, 'chi2'), method=method, jac=None, hess=None, hessp=None, tol=tol, callback=None, options=None)
+            
         # pscale = scale_fit.x
         return scale_fit
     
@@ -1367,7 +1375,7 @@ class GroupFitter(object):
         return np.polyval((pscale/rescale)[::-1], (wave-1.e4)/1000.)
         
     @staticmethod
-    def objfun_scale(pscale, AxT, data, self, return_coeffs):
+    def objfun_scale(pscale, AxT, data, self, retval):
         """
         Objective function for fitting for a scale term between photometry and 
         spectra
@@ -1384,14 +1392,17 @@ class GroupFitter(object):
             Ax[i,:] /= scale
 
         coeffs, rnorm = scipy.optimize.nnls(Ax.T, data)  
+        #coeffs, rnorm, rank, s = np.linalg.lstsq(Ax.T, data)  
             
         full = np.dot(coeffs, Ax)
         resid = data - full# - background
         chi2 = np.sum(resid**2*self.weightf[self.fit_mask])
 
         print('{0} {1}'.format(pscale, chi2))
-
-        if return_coeffs:
+        if retval == 'resid':
+            return resid*np.sqrt(self.weightf[self.fit_mask])
+            
+        if retval == 'coeffs':
             return coeffs, full, resid, chi2, AxT
         else:
             return chi2
@@ -1681,7 +1692,9 @@ class GroupFitter(object):
         self.sigma_mask = 1/self.sivarf[self.fit_mask]
         # sigma-squared 
         self.sigma2_mask = 1/self.ivarf[self.fit_mask] 
-                
+        # weighted sigma-squared 
+        self.weighted_sigma2_mask = 1/(self.weightf*self.ivarf)[self.fit_mask] 
+            
     def get_flat_model(self, spectrum_1d, apply_mask=True):
         """
         Generate model array based on the model 1D spectrum in `spectrum_1d`
