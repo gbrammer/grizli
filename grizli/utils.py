@@ -1203,7 +1203,7 @@ class SpectrumTemplate(object):
 
 def load_templates(fwhm=400, line_complexes=True, stars=False,
                    full_line_list=None, continuum_list=None,
-                   fsps_templates=False):
+                   fsps_templates=False, alf_template=True):
     """Generate a list of templates for fitting to the grism spectra
     
     The different sets of continuum templates are stored in 
@@ -1339,7 +1339,11 @@ def load_templates(fwhm=400, line_complexes=True, stars=False,
             #templates = ['templates/fsps/tweak_fsps_temp_kc13_12_0{0:02d}.dat'.format(i+1) for i in range(12)]
             templates = ['fsps/fsps_QSF_12_v3_nolines_0{0:02d}.dat'.format(i+1) for i in range(12)]
             #templates = ['fsps/fsps_QSF_7_v3_nolines_0{0:02d}.dat'.format(i+1) for i in range(7)]
-    
+            
+        
+        if alf_template:
+            templates.append('alf_SSP.dat')
+            
         if continuum_list is not None:
             templates = continuum_list
         
