@@ -29,7 +29,7 @@ try:
 except:
     IGM = None
 
-def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter='nnls', group_name='grism', fit_stacks=True, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=3, fit_only_beams=False, fit_beams=True, root='', fit_trace_shift=False, phot=None, verbose=True, scale_photometry=False, show_beams=True):
+def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter='nnls', group_name='grism', fit_stacks=True, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=3, fit_only_beams=False, fit_beams=True, root='', fit_trace_shift=False, phot=None, verbose=True, scale_photometry=False, show_beams=True, overlap_threshold=5):
     """Run the full procedure
     
     1) Load MultiBeam and stack files 
@@ -46,7 +46,8 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     mb_files = glob.glob('{0}*{1:05d}.beams.fits'.format(root, id))
     st_files = glob.glob('{0}*{1:05d}.stack.fits'.format(root, id))
     
-    st = StackFitter(st_files, fit_stacks=fit_stacks, group_name=group_name, fcontam=fcontam)
+    st = StackFitter(st_files, fit_stacks=fit_stacks, group_name=group_name, fcontam=fcontam, overlap_threshold=overlap_threshold)
+    st.initialize_masked_arrays()
     
     mb = MultiBeam(mb_files[0], fcontam=fcontam, group_name=group_name)
     if len(mb_files) > 1:
@@ -61,6 +62,8 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
         
             #shift = mb.fit_trace_shift(tol=1.e-3)
     
+    mb.initialize_masked_arrays()
+
     if phot is not None:
         st.set_photometry(**phot)
         mb.set_photometry(**phot)
@@ -82,7 +85,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     fit_hdu.header['EXTNAME'] = 'ZFIT_STACK'
     
     if scale_photometry:
-        scl = mb.scale_to_photometry(z=fit.meta['z_map'][0], method='Powell', templates=t0, order=scale_photometry*1)
+        scl = mb.scale_to_photometry(z=fit.meta['z_map'][0], method='lm', templates=t0, order=scale_photometry*1)
         if scl.status == 0:
             mb.pscale = scl.x
             st.pscale = scl.x
@@ -159,18 +162,27 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     # Make the plot
     fig = mb.xmake_fit_plot(mb_fit, tfit, show_beams=show_beams)
     
+    # Add prior
+    if prior is not None:
+        fig.axes[0].plot(prior[0], np.log10(prior[1]), color='#1f77b4', alpha=0.5)
+        
     # Add stack fit to the existing plot
     fig.axes[0].plot(fit['zgrid'], np.log10(fit['pdf']), color='0.5', alpha=0.5)
     fig.axes[0].set_xlim(fit['zgrid'].min(), fit['zgrid'].max())
     
     if phot is not None:
         fig.axes[1].errorbar(mb.photom_pivot/1.e4, mb.photom_flam/1.e-19, mb.photom_eflam/1.e-19, marker='s', alpha=0.5, color='k', linestyle='None')
-    
+        #fig.axes[1].plot(tfit['line1d'].wave/1.e4, tfit['line1d'].flux/1.e-19, color='k', alpha=0.2, zorder=100)
+        
     axc = fig.axes[1]
 
     # Binned spectrum by grism
     #oned_spec = mb.get_binned_spectra(coeffs=tfit['coeffs'])
-    sp_flat = mb.optimal_extract(mb.flat_flam[mb.fit_mask], bin=1)
+    if mb.Nphot > 0:
+        sp_flat = mb.optimal_extract(mb.flat_flam[mb.fit_mask[:-mb.Nphot]], bin=1)
+    else:
+        sp_flat = mb.optimal_extract(mb.flat_flam[mb.fit_mask], bin=1)
+        
     bg_model = mb.get_flat_background(tfit['coeffs'], apply_mask=True)
     sp_data = mb.optimal_extract(mb.scif_mask-bg_model, bin=1)
     
@@ -1611,7 +1623,7 @@ class GroupFitter(object):
         if data is None:
             data = self.scif_mask
             
-        if data.size != self.fit_mask.sum():
+        if data.size != (self.fit_mask.sum()-self.Nphot):
             print('`data` has to be sized of masked arrays (self.fit_mask)')
             return False
                     
@@ -1654,8 +1666,11 @@ class GroupFitter(object):
         """
         try:
             # MultiBeam
-            self.contamf_mask = self.contamf[self.fit_mask]
-            
+            if self.Nphot > 0:
+                self.contamf_mask = self.contamf[self.fit_mask[:-self.Nphot]]
+            else:
+                self.contamf_mask = self.contamf[self.fit_mask]
+                
             p = []
             for beam in self.beams:
                 beam.beam.init_optimal_profile()
