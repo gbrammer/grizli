@@ -1983,15 +1983,17 @@ def make_wcsheader(ra=40.07293, dec=-1.6137748, size=2, pixscale=0.1, get_hdu=Fa
     else:
         return hout, wcs_out
     
-def fetch_hst_calib(file='iref$uc72113oi_pfl.fits',  ftpdir='https://hst-crds.stsci.edu/unchecked_get/references/hst/', verbose=True):
+def fetch_hst_calib(file='iref$uc72113oi_pfl.fits',  
+    ftpdir='https://hst-crds.stsci.edu/unchecked_get/references/hst/', 
+    verbose=True, path=None):
     """
     TBD
     """
-    import os
-    
     ref_dir = file.split('$')[0]
     cimg = file.split('{0}$'.format(ref_dir))[1]
-    iref_file = os.path.join(os.getenv(ref_dir), cimg)
+    if path == None:
+        path=os.getenv(ref_dir)
+    iref_file = os.path.join(path, cimg)
     if not os.path.exists(iref_file):
         os.system('curl -o {0} {1}/{2}'.format(iref_file, ftpdir, cimg))
     else:

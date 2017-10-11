@@ -55,7 +55,8 @@ print('Git version: {0}'.format(version))
 if USE_CYTHON:
     extensions = cythonize(extensions)
 
-# For me reproject is having some trouble...
+# For me 'reproject' is having trouble installing.
+# Remove if that is a general problem.
 pip_packages = ['peakutils', 'scikit-learn', 'astroquery', 'shapely', 'reproject', 
     'git+https://github.com/cmccully/lacosmicx.git', 'git+https://github.com/gbrammer/sewpy.git']
 
@@ -79,8 +80,7 @@ setup(
     url = "https://github.com/gbrammer/grizli",
     download_url = "https://github.com/gbrammer/grizli/tarball/0.2.1",
     packages=['grizli', 'grizli/utils_c', 'grizli/tests'],
-    # the install_requires isn't working for me, but *should* work for normal
-    # people who don't destroy their conda installations...
+    # 'install_requires' should work, but doesn't, not sure why...
     #install_requires=['drizzlepac', 'stwcs', 'photutils', 'pysynphot', 'peakutils', 
     #    'scikit-learn', 'astroquery', 'shapely', 'reproject'],
     # long_description=read('README.rst'),
