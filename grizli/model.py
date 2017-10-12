@@ -218,10 +218,6 @@ class GrismDisperser(object):
         self.xcenter = xcenter
         self.ycenter = ycenter
         
-        # Get Pixel area map (xxx need to add test for WFC3)
-        self.PAM_value = self.get_PAM_value(verbose=False)
-        #print('xxx PAM!')
-        
         self.beam = beam
         
         ## Config file    
@@ -230,6 +226,10 @@ class GrismDisperser(object):
             self.conf = grismconf.load_grism_config(conf_f)
         else:
             self.conf = conf
+        
+        # Get Pixel area map (xxx need to add test for WFC3)
+        self.PAM_value = self.get_PAM_value(verbose=False)
+        #print('xxx PAM!')
         
         self.process_config()
     
