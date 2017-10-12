@@ -1705,9 +1705,12 @@ class GroupFitter(object):
         # sigma
         self.sigma_mask = 1/self.sivarf[self.fit_mask]
         # sigma-squared 
-        self.sigma2_mask = 1/self.ivarf[self.fit_mask] 
+        self.sigma2_mask = self.sigma_mask**2
+        #self.sigma2_mask = 1/self.ivarf[self.fit_mask] 
+        
         # weighted sigma-squared 
-        self.weighted_sigma2_mask = 1/(self.weightf*self.ivarf)[self.fit_mask] 
+        #self.weighted_sigma2_mask = 1/(self.weightf*self.ivarf)[self.fit_mask] 
+        self.weighted_sigma2_mask = 1/(self.weightf*self.sivarf**2)[self.fit_mask] 
             
     def get_flat_model(self, spectrum_1d, apply_mask=True):
         """
