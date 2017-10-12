@@ -18,6 +18,9 @@ FNU_CGS = u.erg/u.s/u.cm**2/u.Hz
 # character to skip clearing line on STDOUT printing
 NO_NEWLINE = '\x1b[1A\x1b[1M' 
 
+# R_V for Galactic extinction
+MW_RV = 3.1
+
 GRISM_COLORS = {'G800L':(0.0, 0.4470588235294118, 0.6980392156862745),
       'G102':(0.0, 0.6196078431372549, 0.45098039215686275),
       'G141':(0.8352941176470589, 0.3686274509803922, 0.0),
