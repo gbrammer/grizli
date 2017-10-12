@@ -259,7 +259,8 @@ class GroupFLT():
                  pad=200, group_name='group', 
                  ref_file=None, ref_ext=0, seg_file=None,
                  shrink_segimage=True, verbose=True, cpu_count=0,
-                 catalog='', polyx=[0.3, 2.35]):
+                 catalog='', polyx=[0.3, 2.35],
+                 MW_EBV=0.):
         """Main container for handling multiple grism exposures together
         
         Parameters
@@ -944,7 +945,7 @@ class GroupFLT():
         return outsci, outwht
 
 class MultiBeam(GroupFitter):
-    def __init__(self, beams, group_name='group', fcontam=0., psf=False, polyx=[0.3, 2.5]):
+    def __init__(self, beams, group_name='group', fcontam=0., psf=False, polyx=[0.3, 2.5], MW_EBV=0.):
         """Tools for dealing with multiple `~.model.BeamCutout` instances 
         
         Parameters
@@ -976,10 +977,33 @@ class MultiBeam(GroupFitter):
             else:
                 self.beams = beams
         
+        self._set_MW_EBV(MW_EBV)
         self._parse_beams(psf=psf)
         self.Nphot = 0
         self.is_spec = 1
         
+    def _set_MW_EBV(self, MW_EBV, R_V=utils.MW_RV):
+        """
+        Initialize Galactic extinction
+        
+        Parameters
+        ----------
+        MW_EBV : float
+            Local E(B-V)
+        
+        R_V : float
+            Relation between specific and total extinction, 
+            ``a_v = r_v * ebv``.
+        
+        """
+        for b in self.beams:
+            beam = b.beam
+            if beam.MW_EBV != MW_EBV:
+                beam.MW_EBV = MW_EBV
+                beam.init_galactic_extinction(MW_EBV, R_V=R_V)
+                beam.process_config()
+                b.flat_flam = b.compute_model(in_place=False, is_cgs=True)
+                
     def _parse_beams(self, psf=False):
         
         self.N = len(self.beams)

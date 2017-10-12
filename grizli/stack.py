@@ -5,6 +5,8 @@ from collections import OrderedDict
 from imp import reload
 
 import astropy.io.fits as pyfits
+import astropy.units as u
+
 import numpy as np
 
 from . import utils
@@ -69,7 +71,7 @@ def make_templates(grism='G141', return_lists=False, fsps_templates=False,
         print('Wrote `templates_{0}.npy`'.format(fwhm))
 
 class StackFitter(GroupFitter):
-    def __init__(self, files='gnt_18197.stack.fits', group_name=None, sys_err=0.02, mask_min=0.1, fit_stacks=True, fcontam=1, pas=None, extensions=None, min_ivar=0.01, overlap_threshold=3, verbose=True, eazyp=None, eazy_ix=0):
+    def __init__(self, files='gnt_18197.stack.fits', group_name=None, sys_err=0.02, mask_min=0.1, fit_stacks=True, fcontam=1, pas=None, extensions=None, min_ivar=0.01, overlap_threshold=3, verbose=True, eazyp=None, eazy_ix=0, MW_EBV=0.):
         """Object for fitting stacked spectra.
         
         Parameters
@@ -119,6 +121,8 @@ class StackFitter(GroupFitter):
         self.hdulist = pyfits.open(file)
         self.min_ivar = min_ivar
         
+        self.MW_EBV = MW_EBV
+        
         self.h0 = self.hdulist[0].header.copy()
         #self.Ngrism = self.h0['NGRISM']
         self.grisms = []
@@ -155,7 +159,7 @@ class StackFitter(GroupFitter):
             E_i = StackedSpectrum(file=self.file, sys_err=sys_err,
                                   mask_min=mask_min, extver=self.ext[i], 
                                   mask_threshold=-1, fcontam=fcontam, 
-                                  min_ivar=min_ivar)
+                                  min_ivar=min_ivar, MW_EBV=MW_EBV)
             E_i.compute_model()
             
             if np.isfinite(E_i.kernel.sum()):
@@ -1059,7 +1063,7 @@ class StackFitter(GroupFitter):
         return fig
                 
 class StackedSpectrum(object):
-    def __init__(self, file='gnt_18197.stack.G141.285.fits', sys_err=0.02, mask_min=0.1, extver='G141', mask_threshold=7, fcontam=1., min_ivar=0.001):
+    def __init__(self, file='gnt_18197.stack.G141.285.fits', sys_err=0.02, mask_min=0.1, extver='G141', mask_threshold=7, fcontam=1., min_ivar=0.001, MW_EBV=0.):
         import grizli
         
         self.sys_err = sys_err
@@ -1067,6 +1071,9 @@ class StackedSpectrum(object):
         self.extver = extver
         self.grism = self.extver.split(',')[0]
         self.mask_threshold=mask_threshold
+        
+        self.MW_EBV = MW_EBV
+        self.init_galactic_extinction(MW_EBV)
         
         self.file = file
         self.hdulist = pyfits.open(file)
@@ -1138,6 +1145,35 @@ class StackedSpectrum(object):
         if mask_threshold > 0:
             self.drizzle_mask(mask_threshold=mask_threshold)
     
+    def init_galactic_extinction(self, MW_EBV=0., R_V=utils.MW_RV):
+        """
+        Initialize Fitzpatrick 99 Galactic extinction
+        
+        Parameters
+        ----------
+        MW_EBV : float
+            Local E(B-V)
+        
+        R_V : float
+            Relation between specific and total extinction, 
+            ``a_v = r_v * ebv``.
+        
+        Returns
+        -------
+        Sets `self.MW_F99` attribute, which is a callable function that 
+        returns the extinction for a supplied array of wavelengths.
+        
+        If MW_EBV <= 0, then sets `self.MW_F99 = None`.
+        
+        """
+        self.MW_F99 = None
+        if MW_EBV > 0:
+            try:
+                from specutils.extinction import ExtinctionF99
+                self.MW_F99 = ExtinctionF99(MW_EBV*R_V, r_v=R_V)
+            except(ImportError):
+                print('Couldn\'t import `specutils.extinction`, MW extinction not implemented')
+                
     @classmethod    
     def get_wavelength_from_header(self, h):
         """
@@ -1200,7 +1236,7 @@ class StackedSpectrum(object):
         """
         Initiazize components for generating 2D model
         """
-        import grizli.utils_c as u
+        from grizli.utils_c.interp import interp_conserve_c
         
         NY = self.sh[0]
         data = np.zeros((self.header['NAXIS1'], self.header['NAXIS2'], self.header['NAXIS1']))
@@ -1218,9 +1254,14 @@ class StackedSpectrum(object):
         self.fit_data = data.reshape(self.sh[1],-1)
         
         if not self.is_flambda:
-            sens = u.interp.interp_conserve_c(self.wave, 
-                                self.conf.sens[self.beam_name]['WAVELENGTH'],
-                                self.conf.sens[self.beam_name]['SENSITIVITY'])
+            conf_sens = self.conf.sens[self.beam_name]
+            if self.MW_F99 is not None:
+                MWext = 10**(-0.4*(self.MW_F99(conf_sens['WAVELENGTH']*u.AA)))
+            else:
+                MWext = 1.
+            
+            sens = interp_conserve_c(self.wave, conf_sens['WAVELENGTH'],
+                                     conf_sens['SENSITIVITY']*MWext)
             
             if 'DLAM0' in self.header:
                 #print('xx Header')
@@ -1251,11 +1292,12 @@ class StackedSpectrum(object):
         
         xxx is_cgs and in_place are dummy parameters to match `MultiBeam.compute_model`.
         """
-        import grizli.utils_c as u
+        from grizli.utils_c.interp import interp_conserve_c
+        
         if spectrum_1d is None:
             fl = self.wave*0+1
         else:
-            fl = u.interp.interp_conserve_c(self.wave, spectrum_1d[0], spectrum_1d[1])
+            fl = interp_conserve_c(self.wave, spectrum_1d[0], spectrum_1d[1])
             
         model = np.dot(fl, self.fit_data)#.reshape(self.sh)
         #self.model = model

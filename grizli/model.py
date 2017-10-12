@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import astropy.io.fits as pyfits
 from astropy.table import Table
 import astropy.wcs as pywcs
+import astropy.units as u
 
 #import stwcs
 
@@ -80,7 +81,7 @@ class GrismDisperser(object):
                        segmentation=None, origin=[500, 500], 
                        xcenter=0., ycenter=0., pad=0, grow=1, beam='A',
                        conf=['WFC3','F140W', 'G141'], scale=1.,
-                       fwcpos=None):
+                       fwcpos=None, MW_EBV=0.):
         """Object for computing dispersed model spectra
         
         Parameters
@@ -179,12 +180,12 @@ class GrismDisperser(object):
         self.pad = pad
         self.grow = grow
         
+        ### Galactic extinction
+        self.MW_EBV = MW_EBV
+        self.init_galactic_extinction(self.MW_EBV)
+            
         self.fwcpos = fwcpos
         self.scale = scale
-        
-        # Get Pixel area map (xxx need to add test for WFC3)
-        #self.PAM_value = self.get_PAM_value()
-        #print('xxx PAM!')
         
         ### Direct image
         if direct is None:
@@ -217,6 +218,10 @@ class GrismDisperser(object):
         self.xcenter = xcenter
         self.ycenter = ycenter
         
+        # Get Pixel area map (xxx need to add test for WFC3)
+        self.PAM_value = self.get_PAM_value(verbose=False)
+        #print('xxx PAM!')
+        
         self.beam = beam
         
         ## Config file    
@@ -227,6 +232,35 @@ class GrismDisperser(object):
             self.conf = conf
         
         self.process_config()
+    
+    def init_galactic_extinction(self, MW_EBV=0., R_V=utils.MW_RV):
+        """
+        Initialize Fitzpatrick 99 Galactic extinction
+        
+        Parameters
+        ----------
+        MW_EBV : float
+            Local E(B-V)
+        
+        R_V : float
+            Relation between specific and total extinction, 
+            ``a_v = r_v * ebv``.
+        
+        Returns
+        -------
+        Sets `self.MW_F99` attribute, which is a callable function that 
+        returns the extinction for a supplied array of wavelengths.
+        
+        If MW_EBV <= 0, then sets `self.MW_F99 = None`.
+        
+        """
+        self.MW_F99 = None
+        if MW_EBV > 0:
+            try:
+                from specutils.extinction import ExtinctionF99
+                self.MW_F99 = ExtinctionF99(MW_EBV*R_V, r_v=R_V)
+            except(ImportError):
+                print('Couldn\'t import `specutils.extinction`, MW extinction not implemented')
         
     def process_config(self):
         """Process grism config file
@@ -272,10 +306,17 @@ class GrismDisperser(object):
         ### Interpolate the sensitivity curve on the wavelength grid. 
         ysens = self.lam_beam*0
         so = np.argsort(self.lam_beam)
+        
+        conf_sens = self.conf.sens[self.beam]
+        if self.MW_F99 is not None:
+            MWext = 10**(-0.4*(self.MW_F99(conf_sens['WAVELENGTH']*u.AA)))
+        else:
+            MWext = 1.
+        
         ysens[so] = interp.interp_conserve_c(self.lam_beam[so],
-                                 self.conf.sens[self.beam]['WAVELENGTH'], 
-                                 self.conf.sens[self.beam]['SENSITIVITY'],
-                                 integrate=1, left=0, right=0)
+                                             conf_sens['WAVELENGTH'], 
+                                             conf_sens['SENSITIVITY']*MWext,
+                                             integrate=1, left=0, right=0)
         self.lam_sort = so
         
         ### Needs term of delta wavelength per pixel for flux densities
@@ -319,9 +360,9 @@ class GrismDisperser(object):
         ysens = self.lam*0
         so = np.argsort(self.lam)
         ysens[so] = interp.interp_conserve_c(self.lam[so],
-                                 self.conf.sens[self.beam]['WAVELENGTH'], 
-                                 self.conf.sens[self.beam]['SENSITIVITY'],
-                                 integrate=1, left=0, right=0)
+                                             conf_sens['WAVELENGTH'], 
+                                             conf_sens['SENSITIVITY']*MWext,
+                                             integrate=1, left=0, right=0)
         
         # dl = np.abs(np.append(self.lam[1] - self.lam[0],
         #                       np.diff(self.lam)))
@@ -471,7 +512,7 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
                                  self.x0, np.array(self.sh_beam))
         
         #print('yyy PAM')
-        #modelf *= self.PAM_value #= self.get_PAM_value()
+        modelf /= self.PAM_value #= self.get_PAM_value()
         
         if not in_place:
             return modelf
@@ -894,7 +935,12 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
             # psf_sensitivity = s_i*0.
             # psf_sensitivity[so] = s_i
             
-            psf_sensitivity = self.get_psf_sensitivity(sens['WAVELENGTH'], sens['SENSITIVITY'])
+            if self.MW_F99 is not None:
+                MWext = 10**(-0.4*(self.MW_F99(sens['WAVELENGTH']*u.AA)))
+            else:
+                MWext = 1.
+                                    
+            psf_sensitivity = self.get_psf_sensitivity(sens['WAVELENGTH'], sens['SENSITIVITY']*MWext)
             
         self.psf_sensitivity = psf_sensitivity
         self.A_psf = scipy.sparse.csr_matrix(np.array(A_psf).T)
@@ -934,7 +980,12 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
             spectrum_1d = [flat_x, flat_y]
             
         tab = self.conf.sens[self.beam]
-        sens_i = interp.interp_conserve_c(spectrum_1d[0], tab['WAVELENGTH'], tab['SENSITIVITY'], integrate=1, left=0, right=0)
+        if self.MW_F99 is not None:
+            MWext = 10**(-0.4*(self.MW_F99(tab['WAVELENGTH']*u.AA)))
+        else:
+            MWext = 1.
+        
+        sens_i = interp.interp_conserve_c(spectrum_1d[0], tab['WAVELENGTH'], tab['SENSITIVITY']*MWext, integrate=1, left=0, right=0)
         total_sens = np.trapz(spectrum_1d[1]*sens_i/np.gradient(spectrum_1d[0]), spectrum_1d[0])
         
         m = self.compute_model_psf(spectrum_1d=spectrum_1d, is_cgs=True, in_place=False).reshape(self.sh_beam)
@@ -959,8 +1010,15 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         
         http://www.stsci.edu/hst/wfc3/pam/pixel_area_maps
         """        
-        pam_data = pyfits.open(os.getenv('iref')+'ir_wfc3_map.fits')[1].data
+        confp = self.conf.conf
+        if ('INSTRUMENT' in confp) & ('CAMERA' in confp):
+            if '{0}-{1}'.format(confp['INSTRUMENT'], confp['CAMERA']) != 'WFC3-IR':
+                return 1
+        else:
+            return 1
+            
         try:
+            pam_data = pyfits.open(os.getenv('iref')+'ir_wfc3_map.fits')[1].data
             pam_value = pam_data[int(self.yc-self.pad), int(self.xc-self.pad)]
         except:
             pam_value = 1
@@ -1258,6 +1316,7 @@ class ImageData(object):
         self.pad = pad
         self.origin = origin
         self.fwcpos = None
+        self.MW_EBV = 0.
         
         self.data = OrderedDict()
         self.data['SCI'] = sci*photflam
@@ -1329,6 +1388,12 @@ class ImageData(object):
         else:
             self.fwcpos = None
         
+        # Galactic extinction
+        if 'MW_EBV' in self.header:
+            self.MW_EBV = self.header['MW_EBV']
+        else:
+            self.MW_EBV = None
+            
     def unset_dq(self):
         """Flip OK data quality bits using utils.unset_dq_bits
         
@@ -2537,7 +2602,7 @@ class GrismFLT(object):
                     continue
                 
                 try:
-                    beam = GrismDisperser(id=id, direct=thumb, segmentation=seg_thumb, xcenter=xcenter, ycenter=ycenter, origin=origin, pad=self.pad, grow=self.grism.grow, beam=b, conf=self.conf, fwcpos=self.grism.fwcpos)                            
+                    beam = GrismDisperser(id=id, direct=thumb, segmentation=seg_thumb, xcenter=xcenter, ycenter=ycenter, origin=origin, pad=self.pad, grow=self.grism.grow, beam=b, conf=self.conf, fwcpos=self.grism.fwcpos, MW_EBV=self.grism.MW_EBV)                            
                 except:
                     continue
                 
@@ -3282,7 +3347,7 @@ class BeamCutout(object):
         self.ivarf = self.ivar.flatten()
         self.wavef = np.dot(np.ones((self.sh[0],1)), self.wave[None,:]).flatten()
         
-        ### Mask large residuals
+        ### Mask large residuals where throughput is low
         resid = np.abs(self.scif - self.flat_flam)*np.sqrt(self.ivarf)
         bad_resid = (self.flat_flam < 0.05*self.flat_flam.max()) & (resid > 5)
         self.fit_mask *= ~bad_resid
@@ -3327,7 +3392,8 @@ class BeamCutout(object):
                            segmentation=beam.seg*1, origin=beam.origin,
                            pad=beam.pad, grow=beam.grow,
                            beam=beam.beam, conf=conf, xcenter=beam.xcenter,
-                           ycenter=beam.ycenter, fwcpos=flt.grism.fwcpos)
+                           ycenter=beam.ycenter, fwcpos=flt.grism.fwcpos,
+                           MW_EBV=flt.grism.MW_EBV)
         
         if hasattr(beam, 'psf_params'):
             self.beam.x_init_epsf(psf_params=beam.psf_params, psf_filter=beam.psf_filter, yoff=beam.psf_yoff)
@@ -3411,7 +3477,12 @@ class BeamCutout(object):
             grow = self.grism.header['GROW']
         else:
             grow = 1
-        
+
+        if 'MW_EBV' in h0:
+            self.grism.MW_EBV = h0['MW_EBV']
+        else:
+            self.grism.MW_EBV = 0
+            
         self.grism.fwcpos = h0['FWCPOS']
         if (self.grism.fwcpos == 0) | (self.grism.fwcpos == ''):
             self.grism.fwcpos = None
@@ -3423,7 +3494,8 @@ class BeamCutout(object):
                                    grow=grow, beam=h0['BEAM'], 
                                    xcenter=h0['XCENTER'],
                                    ycenter=h0['YCENTER'],
-                                   conf=conf, fwcpos=self.grism.fwcpos)
+                                   conf=conf, fwcpos=self.grism.fwcpos,
+                                   MW_EBV=self.grism.MW_EBV)
         
         self.grism.parent_file = h0['GPARENT']
         self.direct.parent_file = h0['DPARENT']
@@ -3480,6 +3552,9 @@ class BeamCutout(object):
         
         h0['FWCPOS'] = (self.grism.fwcpos, 
                          'Filter wheel position (NIRISS)')
+        
+        h0['MW_EBV'] = (self.grism.MW_EBV, 
+                         'Milky Way exctinction E(B-V)')
         
         hdu = pyfits.HDUList([pyfits.PrimaryHDU(header=h0)])
         hdu.extend(self.direct.get_HDUList(extver=1))

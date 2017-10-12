@@ -12,6 +12,7 @@ from collections import OrderedDict
 import numpy as np
 
 import astropy.io.fits as pyfits
+import astropy.units as u
 
 from . import utils
 #from .model import BeamCutout
@@ -29,7 +30,7 @@ try:
 except:
     IGM = None
 
-def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter='nnls', group_name='grism', fit_stacks=True, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=3, fit_only_beams=False, fit_beams=True, root='', fit_trace_shift=False, phot=None, verbose=True, scale_photometry=False, show_beams=True, overlap_threshold=5):
+def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter='nnls', group_name='grism', fit_stacks=True, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=3, fit_only_beams=False, fit_beams=True, root='', fit_trace_shift=False, phot=None, verbose=True, scale_photometry=False, show_beams=True, overlap_threshold=5, MW_EBV=0.):
     """Run the full procedure
     
     1) Load MultiBeam and stack files 
@@ -46,13 +47,13 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     mb_files = glob.glob('{0}*{1:05d}.beams.fits'.format(root, id))
     st_files = glob.glob('{0}*{1:05d}.stack.fits'.format(root, id))
     
-    st = StackFitter(st_files, fit_stacks=fit_stacks, group_name=group_name, fcontam=fcontam, overlap_threshold=overlap_threshold)
+    st = StackFitter(st_files, fit_stacks=fit_stacks, group_name=group_name, fcontam=fcontam, overlap_threshold=overlap_threshold, MW_EBV=MW_EBV)
     st.initialize_masked_arrays()
     
-    mb = MultiBeam(mb_files[0], fcontam=fcontam, group_name=group_name)
+    mb = MultiBeam(mb_files[0], fcontam=fcontam, group_name=group_name, MW_EBV=MW_EBV)
     if len(mb_files) > 1:
         for file in mb_files[1:]:
-            mb.extend(MultiBeam(file, fcontam=fcontam, group_name=group_name))
+            mb.extend(MultiBeam(file, fcontam=fcontam, group_name=group_name, MW_EBV=MW_EBV))
         
     if fit_trace_shift:
         b = mb.beams[0]
@@ -656,8 +657,6 @@ class GroupFitter(object):
         # A = scipy.sparse.csr_matrix((self.N+NTEMP, self.Ntot))
         # bg_sp = scipy.sparse.csc_matrix(self.A_bg)
         
-        
-        
         for i, t in enumerate(templates):
             if t.startswith('line'):
                 lower_bound[self.N+i] = -np.inf
@@ -670,7 +669,7 @@ class GroupFitter(object):
                     igmz = IGM.full_IGM(z, ti.wave*(1+z))         
             else:
                 igmz = 1.
-                
+            
             s = [ti.wave*(1+z), ti.flux/(1+z)*igmz]
             
             for j, beam in enumerate(self.beams):
