@@ -1392,7 +1392,7 @@ class ImageData(object):
         if 'MW_EBV' in self.header:
             self.MW_EBV = self.header['MW_EBV']
         else:
-            self.MW_EBV = None
+            self.MW_EBV = 0.
             
     def unset_dq(self):
         """Flip OK data quality bits using utils.unset_dq_bits
