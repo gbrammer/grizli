@@ -1210,7 +1210,7 @@ class SpectrumTemplate(object):
 
 def load_templates(fwhm=400, line_complexes=True, stars=False,
                    full_line_list=None, continuum_list=None,
-                   fsps_templates=False, alf_template=True):
+                   fsps_templates=False, alf_template=False):
     """Generate a list of templates for fitting to the grism spectra
     
     The different sets of continuum templates are stored in 
