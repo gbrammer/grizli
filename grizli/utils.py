@@ -2535,14 +2535,18 @@ class GTable(astropy.table.Table):
             
         self_coo = SkyCoord(ra=self[rd[0]], dec=self[rd[1]])
 
-        if other_radec is None:
-            rd = self.parse_radec_columns(other)
+        if isinstance(other, list) | isinstance(other, tuple):
+            rd = [slice(0,1),slice(1,2)]
+            
         else:
-            rd = self.parse_radec_columns(other, rd_pairs={other_radec[0]:other_radec[1]})
+            if other_radec is None:
+                rd = self.parse_radec_columns(other)
+            else:
+                rd = self.parse_radec_columns(other, rd_pairs={other_radec[0]:other_radec[1]})
 
-        if rd is False:
-            print('No RA/Dec. columns found in `other` table.')
-            return False
+            if rd is False:
+                print('No RA/Dec. columns found in `other` table.')
+                return False
             
         other_coo = SkyCoord(ra=other[rd[0]], dec=other[rd[1]])
                      
