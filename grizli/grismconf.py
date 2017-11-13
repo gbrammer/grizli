@@ -525,6 +525,15 @@ def get_config_filename(instrume='WFC3', filter='F140W',
     if instrume == 'SYN':
         conf_file = os.path.join(os.getenv('GRIZLI'), 'CONF/syn.conf')
     
+    # Euclid NISP, config files @ 
+    # http://www.astrodeep.eu/euclid-spectroscopic-simulations/
+    
+    if instrume == 'NISP':
+        if grism == 'BLUE':
+            conf_file = os.path.join(os.getenv('GRIZLI'), 'CONF/Euclid.Gblue.0.conf')
+        else:
+            conf_file = os.path.join(os.getenv('GRIZLI'), 'CONF/Euclid.Gred.0.conf')
+            
     return conf_file
         
 def load_grism_config(conf_file):
