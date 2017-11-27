@@ -3599,15 +3599,15 @@ class BeamCutout(object):
         
         return outfile
         
-    def compute_model(self, *args, use_psf=True, **kwargs):
+    def compute_model(self, use_psf=True, **kwargs):
         """Link to `self.beam.compute_model`
         
         `self.beam` is a `GrismDisperser` object.
         """
         if use_psf & hasattr(self.beam, 'psf'):
-            result = self.beam.compute_model_psf(*args, **kwargs)
+            result = self.beam.compute_model_psf(**kwargs)
         else:
-            result = self.beam.compute_model(*args, **kwargs)
+            result = self.beam.compute_model(**kwargs)
         
         reset = True
         if 'in_place' in kwargs:
