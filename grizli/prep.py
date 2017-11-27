@@ -579,7 +579,9 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
     drz_wcs = utils.transform_wcs(drz_wcs, out_shift, out_rot, out_scale)
     print('{0} (guess)   : {1:6.2f} {2:6.2f} {3:7.3f} {4:7.3f}'.format(root, guess[0], guess[1], guess[2]/np.pi*180, 1./guess[3]))
         
+    NGOOD, rms = 0, 0
     for iter in range(NITER):
+        #print('xx iter {0} {1}'.format(iter, NITER))
         xy = np.array(drz_wcs.all_world2pix(rd_ref, 0))
         pix = np.cast[int](np.round(xy)).T
 
@@ -688,8 +690,8 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
         if interactive_status:
             plt.ion()
         
-        log_wcs(root, orig_wcs, out_shift, out_rot/np.pi*180, out_scale, rms,
-                n=NGOOD, initialize=False)
+    log_wcs(root, orig_wcs, out_shift, out_rot/np.pi*180, out_scale, rms,
+            n=NGOOD, initialize=False)
             
     return orig_wcs, drz_wcs, out_shift, out_rot/np.pi*180, out_scale
 
@@ -726,7 +728,8 @@ def table_to_radec(table, output='coords.radec'):
     else:
         rc, dc = 'ra', 'dec'
     
-    table[rc, dc].write(output, format='ascii.commented_header')
+    table[rc, dc].write(output, format='ascii.commented_header', 
+                        overwrite=True)
     
 def table_to_regions(table, output='ds9.reg', comment=None):
     """Make a DS9 region file from a table object
@@ -858,7 +861,8 @@ def make_drz_catalog(root='', sexpath='sex',threshold=2., get_background=True,
     output = sew(drz_file)
     cat = output['table']
     cat.meta = config
-    cat.write('{0}.cat'.format(root), format='ascii.commented_header')
+    cat.write('{0}.cat'.format(root), format='ascii.commented_header',
+              overwrite=True)
             
     if verbose:
         print('{0} catalog: {1:d} objects'.format(root, len(cat)))
@@ -1304,7 +1308,8 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, ref
                                                          ref_src.lower()))
             ref_cat['ra','dec'].write('{0}_{1}.radec'.format(product, 
                                                          ref_src.lower()),
-                                    format='ascii.commented_header')
+                                    format='ascii.commented_header',
+                                    overwrite=True)
 
             radec = '{0}_{1}.radec'.format(product, ref_src.lower())
             ref_catalog = ref_src
@@ -1356,7 +1361,8 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, ref
         ref_cat = Table.read(cat_files[0], format='ascii.commented_header')
         root = cat_files[0].split('.cat')[0]
         ref_cat['X_WORLD','Y_WORLD'].write('{0}.radec'.format(root),
-                                format='ascii.commented_header')
+                                format='ascii.commented_header',
+                                overwrite=True)
         
         radec = '{0}.radec'.format(root)
         ref_catalog = 'VISIT'
@@ -1539,7 +1545,8 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                     (cat['MAG_AUTO'] < align_mag_limits[1]))
                     
             cat['X_WORLD', 'Y_WORLD'][okmag].write('self',
-                                        format='ascii.commented_header')
+                                        format='ascii.commented_header',
+                                        overwrite=True)
         
         #clip=30
         logfile = '{0}_wcs.log'.format(direct['product'])
@@ -1552,12 +1559,23 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
         else:
             guess = [0., 0., 0., 1]
             
-        result = align_drizzled_image(root=direct['product'], 
+        try:
+            result = align_drizzled_image(root=direct['product'], 
                                       mag_limits=align_mag_limits,
                                       radec=radec, NITER=5, clip=align_clip,
                                       log=True, guess=guess,
                                       outlier_threshold=align_tolerance)
-                                  
+        except:
+            fp = open('{0}.wcs_failed'.format(direct['product']),'w')
+            fp.write(guess.__str__())
+            fp.close()
+            
+            result = align_drizzled_image(root=direct['product'], 
+                                      mag_limits=align_mag_limits,
+                                      radec=radec, NITER=0, clip=align_clip,
+                                      log=False, guess=guess,
+                                      outlier_threshold=align_tolerance)
+                                       
         orig_wcs, drz_wcs, out_shift, out_rot, out_scale = result
         
         ### Update direct FLT WCS
