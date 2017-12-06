@@ -209,6 +209,8 @@ class StackFitter(GroupFitter):
         self._update_beam_mask()
         self.A_bgm = self._init_background(masked=True)
         
+        self.flat_flam = np.hstack([E.flat_flam for E in self.beams])
+        
         ## Photometry
         self.is_spec = 1
         self.Nphot = 0
@@ -1144,7 +1146,9 @@ class StackedSpectrum(object):
         
         if mask_threshold > 0:
             self.drizzle_mask(mask_threshold=mask_threshold)
-    
+        
+        self.flat_flam = self.compute_model(in_place=False, is_cgs=True)
+        
     def init_galactic_extinction(self, MW_EBV=0., R_V=utils.MW_RV):
         """
         Initialize Fitzpatrick 99 Galactic extinction
@@ -1207,7 +1211,7 @@ class StackedSpectrum(object):
         # prof = self.flat.reshape(self.sh)/flatf
         # 
         if not hasattr(self, 'optimal_profile'):
-            self.init_optimal_profile
+            self.init_optimal_profile()
         
         prof = self.optimal_profile
         
