@@ -13,6 +13,8 @@ import matplotlib.pyplot as plt
 
 from astropy.table import Table
 import astropy.io.fits as pyfits
+import astropy.wcs as pywcs
+
 import astropy.units as u
 
 ## local imports
@@ -2950,6 +2952,73 @@ class MultiBeam(GroupFitter):
         else:
             return output_hdu #all_hdus
     
+    def flag_with_drizzled(self, hdul, sigma=4, update=True, interp='nearest', verbose=True):
+        """
+        Update `MultiBeam` masks based on the blotted drizzled combined image
+        
+        [in progress ... xxx]
+        
+        Parameters
+        ----------
+        hdul : `~astropy.io.fits.HDUList`
+            FITS HDU list output from `drizzle_grisms_and_PAs` or read from a
+            `stack.fits` file.
+        
+        sigma : float
+            Residual threshold to flag.
+        
+        update : bool
+            Update the mask.
+        
+        interp : str
+            Interpolation method for `~drizzlepac.astrodrizzle.ablot`.
+            
+        Returns
+        -------
+        Updates the individual `fit_mask` attributes of the individual beams
+        if `update==True`.
+        
+        """
+        from drizzlepac import astrodrizzle
+        
+        # Read the drizzled arrays
+        Ng = hdul[0].header['NGRISM']
+        ref_wcs = {}
+        ref_data = {}
+        flag_grism = {}
+        
+        for i in range(Ng):
+            g = hdul[0].header['GRISM{0:03d}'.format(i+1)]
+            ref_wcs[g] = pywcs.WCS(hdul['SCI',g].header)
+            ref_wcs[g].pscale = utils.get_wcs_pscale(ref_wcs[g])
+            ref_data[g] = hdul['SCI',g].data
+            flag_grism[g] = hdul[0].header['N{0}'.format(g)] > 1
+        
+        # Do the masking
+        for i, beam in enumerate(self.beams):
+            g = beam.grism.filter
+            if not flag_grism[g]:
+                continue
+            
+            beam_header, flt_wcs = beam.full_2d_wcs()
+            blotted = astrodrizzle.ablot.do_blot(ref_data[g], ref_wcs[g],
+                                flt_wcs, 1,
+                                coeffs=True, interp=interp, sinscl=1.0,
+                                stepsize=10, wcsmap=None)
+            
+            resid = (beam.grism['SCI'] - beam.contam - blotted) 
+            resid *= np.sqrt(beam.ivar)
+            blot_mask = (blotted != 0) & (np.abs(resid) < sigma)
+            if verbose:
+                print('Beam {0:>3d}: {1:>4d} new masked pixels'.format(i, beam.fit_mask.sum() - (beam.fit_mask & blot_mask.flatten()).sum()))
+                
+            if update:
+                beam.fit_mask &= blot_mask.flatten()
+        
+        if update:
+            self._parse_beams()
+            self.initialize_masked_arrays()
+            
     def get_binned_spectra(self, bin=1, coeffs=None, get_model=False):
         """
         Get optimally-extracted, binned spectra in each available grism
