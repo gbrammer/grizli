@@ -174,79 +174,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     if phot is not None:
         fig.axes[1].errorbar(mb.photom_pivot/1.e4, mb.photom_flam/1.e-19, mb.photom_eflam/1.e-19, marker='s', alpha=0.5, color='k', linestyle='None')
         #fig.axes[1].plot(tfit['line1d'].wave/1.e4, tfit['line1d'].flux/1.e-19, color='k', alpha=0.2, zorder=100)
-        
-    axc = fig.axes[1]
-
-    # Binned spectrum by grism
-    #oned_spec = mb.get_binned_spectra(coeffs=tfit['coeffs'])
-    if mb.Nphot > 0:
-        sp_flat = mb.optimal_extract(mb.flat_flam[mb.fit_mask[:-mb.Nphot]], bin=1)
-    else:
-        sp_flat = mb.optimal_extract(mb.flat_flam[mb.fit_mask], bin=1)
-        
-    bg_model = mb.get_flat_background(tfit['coeffs'], apply_mask=True)
-    sp_data = mb.optimal_extract(mb.scif_mask-bg_model, bin=1)
-    
-    for g in sp_data:
-        
-        clip = sp_flat[g]['flux'] != 0
-        
-        pscale = 1.
-        if hasattr(mb, 'pscale'):
-            if (mb.pscale is not None):
-                pscale = mb.compute_scale_array(mb.pscale, sp_data[g]['wave'])
-                
-        axc.errorbar(sp_data[g]['wave'][clip]/1.e4, (sp_data[g]['flux']/sp_flat[g]['flux']/1.e-19/pscale)[clip], (sp_data[g]['err']/sp_flat[g]['flux']/1.e-19/pscale)[clip], color=GRISM_COLORS[g], alpha=0.8, marker='.', linestyle='None', zorder=1)
-          
-    # if not fit_stacks:
-    #     stx = StackFitter(st_files, fit_stacks=True, group_name=group_name, fcontam=fcontam)
-    #     if phot is not None:
-    #         stx.set_photometry(**phot)
-    # else:
-    #     stx = st
-    # 
-    # tfit_st = stx.template_at_z(z=mb_fit.meta['z_map'][0], templates=t1, fit_background=True)
-    # 
-    # axc = fig.axes[1]
-    # for i in range(stx.N):
-    #     beam = stx.beams[i]
-    #     #m_i = beam.compute_model(spectrum_1d=sp, is_cgs=True, in_place=False).reshape(beam.sh)
-    #     
-    #     grism = beam.grism
-    #     clean = beam.sci - beam.contam - tfit_st['cfit']['bg {0:03d}'.format(i)][0]
-    #     w, fl, er = beam.optimal_extract(clean, ivar=beam.ivar)            
-    #     #w, flm, erm = beam.optimal_extract(m_i, ivar=beam.ivar)
-    #     
-    #     sens = beam.sens
-    #     
-    #     # Some offset between drizzled and beam spectra, but can't shift
-    #     # in the StackedSpectrum because redshift fit is about right
-    #     w -= np.abs(w[1]-w[0])
-    #     w = w/1.e4
-    #          
-    #     unit_corr = 1./sens
-    #     
-    #     # if 'DLAM0' in beam.header:
-    #     #     unit_corr *= beam.header['DLAM']/beam.header['DLAM0']
-    #         
-    #     clip = (sens > 0.1*sens.max()) 
-    #     clip &= (np.isfinite(fl)) & (er > 0)
-    #     if clip.sum() == 0:
-    #         continue
-    #     
-    #     fl *= unit_corr/1.e-19
-    #     er *= unit_corr/1.e-19
-    #     #flm *= unit_corr/1.e-19
-    #     
-    #     f_alpha = 0.8 #1./(stx.Ngrism[grism.upper()])*0.8 #**0.5
-    #     
-    #     # Plot
-    #     axc.errorbar(w[clip], fl[clip], er[clip], color=GRISM_COLORS[grism], alpha=f_alpha, marker='.', linestyle='None', zorder=1)
-    #     #axc.plot(w[clip], flm[clip], color='r', alpha=f_alpha, linewidth=2, zorder=10)
-    #     
-    #     if phot is not None:
-    #         axc.errorbar(mb.photom_pivot/1.e4, mb.photom_flam/1.e-19, mb.photom_eflam/1.e-19, marker='.', linestyle='None', color='k', alpha=0.5)
-            
+         
     # Save the figure
     fig.savefig('{0}_{1:05d}.full.png'.format(group_name, id))
     
@@ -270,44 +198,64 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     line_hdu.writeto('{0}_{1:05d}.full.fits'.format(group_name, id), clobber=True, output_verify='fix')
     return mb, st, fit, tfit, line_hdu
 
-def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat', include_beam=True):
+def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat', verbose=True):
     import glob
     import os
+    from collections import OrderedDict
     import matplotlib.pyplot as plt
     
     import astropy.units as u
+    import astropy.io.fits as pyfits
     import numpy as np
     import grizli
-        
-    keys = {0:['ID','RA','DEC','NINPUT','REDSHIFT','T_G141'],
-            1:['CHI2POLY','DOF','CHIMIN','CHIMAX','BIC_POLY','BIC_TEMP','Z02', 'Z16', 'Z50', 'Z84', 'Z97', 'ZWIDTH1', 'ZWIDTH2', 'Z_MAP', 'Z_RISK', 'MIN_RISK'],
-            2:['CHI2POLY','DOF','CHIMIN','CHIMAX','BIC_POLY','BIC_TEMP','Z02', 'Z16', 'Z50', 'Z84', 'Z97', 'ZWIDTH1', 'ZWIDTH2', 'Z_MAP', 'Z_RISK', 'MIN_RISK'],
-            4:['FLUX_{0:03d} ERR_{0:03d} EW50_{0:03d} EWHW_{0:03d}'.format(i) for i in range(24)]}
+    from grizli import utils
     
-    if not include_beam:
-        keys[2] = keys[4]
-        keys.pop(4)
-        
-    for k in keys:
-        if k == 0:
-            os.system('dfits {1}*full.fits | fitsort {2} | sed "s/\t/ , /g" > {1}.info.{0}'.format(k, target, ' '.join(keys[k])))
-        else:
-            os.system('dfits -x {0} {1}*full.fits | fitsort {2} |sed "s/FILE/FILE{0}/" | sed "s/\t/ , /g" > {1}.info.{0}'.format(k, target, ' '.join(keys[k])))
+    keys = OrderedDict()
+    keys['PRIMARY'] = ['ID','RA','DEC','NINPUT','REDSHIFT','T_G102', 'T_G141','NUMLINES','HASLINES']
     
-    for k in keys:
-        if k == 0:
-            info = grizli.utils.GTable.gread('{0}.info.{1}'.format(target, k), format='csv')
-            info = info[info.colnames[:-1]]
+    keys['ZFIT_STACK'] = ['CHI2POLY','DOF','CHIMIN','CHIMAX','BIC_POLY','BIC_TEMP','Z02', 'Z16', 'Z50', 'Z84', 'Z97', 'ZWIDTH1', 'ZWIDTH2', 'Z_MAP', 'Z_RISK', 'MIN_RISK']
+    
+    keys['ZFIT_BEAM'] = ['CHI2POLY','DOF','CHIMIN','CHIMAX','BIC_POLY','BIC_TEMP','Z02', 'Z16', 'Z50', 'Z84', 'Z97', 'ZWIDTH1', 'ZWIDTH2', 'Z_MAP', 'Z_RISK', 'MIN_RISK']
+    
+    keys['COVAR'] = ' '.join(['FLUX_{0:03d} ERR_{0:03d} EW50_{0:03d} EWHW_{0:03d}'.format(i) for i in range(24)]).split()
+    
+    lines = []
+    pdf_max = []
+    files=glob.glob('{0}*full.fits'.format(target))
+    for file in files:
+        print(utils.NO_NEWLINE+file)
+        line = []
+        full = pyfits.open(file)
+        
+        tab = utils.GTable.read(full['ZFIT_STACK'])
+        pdf_max.append(tab['pdf'].max())
+        
+        for ext in keys:
+            if ext not in full:
+                for k in keys[ext]:
+                    line.append(np.nan)
+                
+                continue
+                
+            h = full[ext].header
+            for k in keys[ext]:
+                if k in h:
+                    line.append(h[k])
+                else:
+                    line.append(np.nan)
+        
+        lines.append(line)
+    
+    columns = []
+    for ext in keys:
+        if ext == 'ZFIT_BEAM':
+            columns.extend(['beam_{0}'.format(k) for k in keys[ext]])
         else:
-            tab = grizli.utils.GTable.gread('{0}.info.{1}'.format(target, k), format='csv')
-            tab = tab[tab.colnames[1:-1]]
-            if (k == 2) & (include_beam):
-                for c in tab.colnames:
-                    tab.rename_column(c, 'BEAM_'+c)
-                
-            for c in tab.colnames:
-                info.add_column(tab[c])
-                
+            columns.extend(keys[ext])
+    
+    info = utils.GTable(rows=lines, names=columns)
+    info['PDF_MAX'] = pdf_max
+                      
     for c in info.colnames:
         info.rename_column(c, c.lower())
     
@@ -323,11 +271,11 @@ def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat',
             if root.startswith('ew'):
                 info[col].format = '.1f'
             else:
-                info[col].format = '.1e'
+                info[col].format = '.1f'
         
         info['sn_{0}'.format(line)] = info['flux_'+line]/info['err_'+line]
         info['sn_{0}'.format(line)][info['err_'+line] == 0] = -99
-        info['sn_{0}'.format(line)].format = '.1f'
+        #info['sn_{0}'.format(line)].format = '.1f'
            
     info['chinu'] = info['chimin']/info['dof']
     info['chinu'].format = '.2f'
@@ -337,16 +285,21 @@ def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat',
     
     info['log_risk'] = np.log10(info['min_risk'])
     info['log_risk'].format = '.2f'
+        
+    info['log_pdf_max'] = np.log10(info['pdf_max'])
+    info['log_pdf_max'].format = '.2f'
     
-    if include_beam:
-        info['beam_chinu'] = info['beam_chimin']/info['beam_dof']
-        info['beam_chinu'].format = '.2f'
+    info['zq'] = info['log_risk'] - info['log_pdf_max']
+    info['zq'].format = '.2f'
     
-        info['beam_bic_diff'] = info['beam_bic_poly'] - info['beam_bic_temp']
-        info['beam_bic_diff'].format = '.1f'
-    
-        info['beam_log_risk'] = np.log10(info['beam_min_risk'])
-        info['beam_log_risk'].format = '.2f'
+    info['beam_chinu'] = info['beam_chimin']/info['beam_dof']
+    info['beam_chinu'].format = '.2f'
+
+    info['beam_bic_diff'] = info['beam_bic_poly'] - info['beam_bic_temp']
+    info['beam_bic_diff'].format = '.1f'
+
+    info['beam_log_risk'] = np.log10(info['beam_min_risk'])
+    info['beam_log_risk'].format = '.2f'
         
     ### PNG columns    
     for ext in ['stack','full','line']:
@@ -604,7 +557,7 @@ class GroupFitter(object):
             
         return A_phot[:,mask]
         
-    def xfit_at_z(self, z=0, templates=[], fitter='nnls', fit_background=True, get_uncertainties=False, get_design_matrix=False, pscale=None, COEFF_SCALE=1.e-19, get_components=False):
+    def xfit_at_z(self, z=0, templates=[], fitter='nnls', fit_background=True, get_uncertainties=False, get_design_matrix=False, pscale=None, COEFF_SCALE=1.e-19, get_components=False, huber_delta=4):
         """Fit the 2D spectra with a set of templates at a specified redshift.
         
         Parameters
@@ -628,6 +581,10 @@ class GroupFitter(object):
         
         get_design_matrix : bool
             Return design matrix and data, rather than nominal outputs.
+        
+        huber_delta : float
+            Use the Huber loss function (`~scipy.special.huber`) rather than
+            direct chi-squared.  If `huber_delta` < 0, then fall back to chi2.
             
         Returns
         -------
@@ -643,6 +600,7 @@ class GroupFitter(object):
         """
         import scipy.optimize
         import scipy.sparse
+        from scipy.special import huber
         
         NTEMP = len(templates)
         A = np.zeros((self.N+NTEMP, self.Nmask))
@@ -768,7 +726,13 @@ class GroupFitter(object):
             return model, background
             
         #chi2 = np.sum(resid[self.fit_mask]**2*self.sivarf[self.fit_mask]**2)
-        chi2 = np.sum(resid**2*self.sivarf[self.fit_mask]**2*self.weightf[self.fit_mask])
+        norm_resid = resid*(self.sivarf*np.sqrt(self.weightf))[self.fit_mask]
+        
+        # Use Huber loss function rather than direct chi2
+        if huber_delta > 0:
+            chi2 = np.sum(huber(huber_delta, norm_resid)*2.)
+        else:
+            chi2 = np.sum(norm_resid**2)
         
         if self.Nphot > 0:
             self.photom_model = model[-self.Nphot:]*1
@@ -1152,7 +1116,7 @@ class GroupFitter(object):
                 
             plt.plot(w[xclip]*(1+z), tdraw.T, alpha=0.05, color='r')
     
-    def xmake_fit_plot(self, fit, tfit, show_beams=True, bin=0, minor=0.1):
+    def xmake_fit_plot(self, fit, tfit, show_beams=True, bin=1, minor=0.1):
         """TBD
         """
         import matplotlib.pyplot as plt
@@ -1189,96 +1153,9 @@ class GroupFitter(object):
         
         #### Spectra
         axc = fig.add_subplot(gs[-1,1]) #224)
-        ymin = 1.e30
-        ymax = -1.e30
-        wmin = 1.e30
-        wmax = -1.e30
         
-        # 1D Model
-        sp = tfit['line1d'].wave, tfit['line1d'].flux
-        spf = tfit['line1d'].wave, tfit['line1d'].flux*0+1
+        self.oned_figure(bin=bin, show_beams=show_beams, minor=minor, tfit=tfit, axc=axc)
         
-        for i in range(self.N):
-            beam = self.beams[i]
-            m_i = beam.compute_model(spectrum_1d=sp, is_cgs=True, in_place=False).reshape(beam.sh)
-            f_i = beam.compute_model(spectrum_1d=spf, is_cgs=True, in_place=False).reshape(beam.sh)
-            
-            #if isinstance(beam, grizli.model.BeamCutout):
-            if hasattr(beam, 'init_epsf'): # grizli.model.BeamCutout
-                if beam.grism.instrument == 'NIRISS':
-                    grism = beam.grism.pupil
-                else:
-                    grism = beam.grism.filter
-                
-                clean = beam.grism['SCI'] - beam.contam - tfit['cfit']['bg {0:03d}'.format(i)][0]
-                
-                w, fl, er = beam.beam.optimal_extract(clean, bin=bin, ivar=beam.ivar)            
-                w, flm, erm = beam.beam.optimal_extract(m_i, bin=bin, ivar=beam.ivar)
-                w, sens, ers = beam.beam.optimal_extract(f_i, bin=bin, ivar=beam.ivar)
-                #sens = beam.beam.sensitivity                
-            else:
-                grism = beam.grism
-                clean = beam.sci - beam.contam - tfit['cfit']['bg {0:03d}'.format(i)][0]
-                w, fl, er = beam.optimal_extract(clean, bin=bin, ivar=beam.ivar)            
-                w, flm, erm = beam.optimal_extract(m_i, bin=bin, ivar=beam.ivar)
-                w, sens, ers = beam.optimal_extract(f_i, bin=bin, ivar=beam.ivar)
-                
-                #sens = beam.sens
-            
-            sens[~np.isfinite(sens)] = 1
-            
-            w = w/1.e4
-                 
-            unit_corr = 1./sens
-            clip = (sens > 0.1*sens.max()) 
-            clip &= (np.isfinite(flm)) & (er > 0)
-            if clip.sum() == 0:
-                continue
-            
-            fl *= unit_corr/1.e-19
-            er *= unit_corr/1.e-19
-            flm *= unit_corr/1.e-19
-            
-            f_alpha = 1./(self.Ngrism[grism.upper()])*0.8 #**0.5
-            
-            # Plot
-            pscale = 1.
-            if hasattr(self, 'pscale'):
-                if (self.pscale is not None):
-                    pscale = self.compute_scale_array(self.pscale, w[clip]*1.e4)
-                    
-            if show_beams:
-                axc.errorbar(w[clip], fl[clip]/pscale, er[clip]/pscale, color=GRISM_COLORS[grism], alpha=f_alpha, marker='.', linestyle='None', zorder=1)
-            axc.plot(w[clip], flm[clip], color='r', alpha=f_alpha, linewidth=2, zorder=10) 
-              
-            # Plot limits         
-            ymax = np.maximum(ymax,
-                        np.percentile((flm+np.median(er[clip]))[clip], 98))
-            
-            ymin = np.minimum(ymin, np.percentile((flm-er*0.)[clip], 2))
-            
-            wmax = np.maximum(wmax, w[clip].max())
-            wmin = np.minimum(wmin, w[clip].min())
-        
-        # Cleanup
-        axc.set_xlim(wmin, wmax)
-        axc.semilogx(subsx=[wmax])
-        #axc.set_xticklabels([])
-        axc.set_xlabel(r'$\lambda$')
-        axc.set_ylabel(r'$f_\lambda \times 10^{-19}$')
-        #axc.xaxis.set_major_locator(MultipleLocator(0.1))
-        
-        axc.set_ylim(ymin-0.2*ymax, 1.2*ymax)
-        axc.grid()
-                
-        for ax in [axc]: #[axa, axb, axc]:
-            
-            labels = np.arange(np.ceil(wmin/minor), np.ceil(wmax/minor))*minor
-            ax.set_xticks(labels)
-            ax.set_xticklabels(labels)
-            #ax.set_xticklabels([])
-            #print(labels, wmin, wmax)
-
         gs.tight_layout(fig, pad=0.1, w_pad=0.1)
         return fig
         
@@ -1607,6 +1484,183 @@ class GroupFitter(object):
         
             return fig, sfit
     
+    def oned_figure(self, bin=1, show_beams=True, minor=0.1, tfit=None, axc=None, figsize=[6,4], fill=False):
+        """
+        1D figure
+        
+        """
+        import matplotlib.pyplot as plt
+        
+        #### Spectra
+        if axc is None:
+            fig = plt.figure(figsize=figsize)
+            axc = fig.add_subplot(111)
+            newfigure=True
+        else:
+            newfigure=False
+            
+        ymin = 1.e30
+        ymax = -1.e30
+        wmin = 1.e30
+        wmax = -1.e30
+        
+        # 1D Model
+        if tfit is not None:
+            sp = tfit['line1d'].wave, tfit['line1d'].flux
+            w = sp[0]
+        else:
+            w = np.arange(self.wavef.min()-201, self.wavef.max()+201, 100)
+
+        spf = w, w*0+1
+        
+        for i in range(self.N):
+            beam = self.beams[i]
+            if tfit is not None:
+                m_i = beam.compute_model(spectrum_1d=sp, is_cgs=True, in_place=False).reshape(beam.sh)
+            
+            f_i = beam.compute_model(spectrum_1d=spf, is_cgs=True, in_place=False).reshape(beam.sh)
+            
+            if hasattr(beam, 'init_epsf'): # grizli.model.BeamCutout
+                if beam.grism.instrument == 'NIRISS':
+                    grism = beam.grism.pupil
+                else:
+                    grism = beam.grism.filter
+                
+                clean = beam.grism['SCI'] - beam.contam 
+                if tfit is not None:
+                    clean -= tfit['cfit']['bg {0:03d}'.format(i)][0]
+                    w, flm, erm = beam.beam.optimal_extract(m_i, bin=bin, ivar=beam.ivar)
+                    
+                w, fl, er = beam.beam.optimal_extract(clean, bin=bin, ivar=beam.ivar)            
+                w, sens, ers = beam.beam.optimal_extract(f_i, bin=bin, ivar=beam.ivar)
+                #sens = beam.beam.sensitivity                
+            else:
+                grism = beam.grism
+                clean = beam.sci - beam.contam
+                if tfit is not None:
+                    clean -= - tfit['cfit']['bg {0:03d}'.format(i)][0]
+                    w, flm, erm = beam.optimal_extract(m_i, bin=bin, ivar=beam.ivar)
+                    
+                w, fl, er = beam.optimal_extract(clean, bin=bin, ivar=beam.ivar)            
+                w, sens, ers = beam.optimal_extract(f_i, bin=bin, ivar=beam.ivar)
+                
+                #sens = beam.sens
+            
+            sens[~np.isfinite(sens)] = 1
+            
+            w = w/1.e4
+                 
+            unit_corr = 1./sens
+            clip = (sens > 0.1*sens.max()) 
+            clip &= (er > 0)
+            if clip.sum() == 0:
+                continue
+            
+            fl *= unit_corr/1.e-19
+            er *= unit_corr/1.e-19
+            if tfit is not None:
+                flm *= unit_corr/1.e-19
+            
+            f_alpha = 1./(self.Ngrism[grism.upper()])*0.8 #**0.5
+            
+            # Plot
+            pscale = 1.
+            if hasattr(self, 'pscale'):
+                if (self.pscale is not None):
+                    pscale = self.compute_scale_array(self.pscale, w[clip]*1.e4)
+                    
+            if show_beams:
+                axc.errorbar(w[clip], fl[clip]/pscale, er[clip]/pscale, color=GRISM_COLORS[grism], alpha=f_alpha, marker='.', linestyle='None', zorder=1)
+            if tfit is not None:
+                axc.plot(w[clip], flm[clip], color='r', alpha=f_alpha, linewidth=2, zorder=10) 
+
+                # Plot limits         
+                ymax = np.maximum(ymax,
+                            np.percentile((flm+np.median(er[clip]))[clip], 98))
+            
+                ymin = np.minimum(ymin, np.percentile((flm-er*0.)[clip], 2))
+
+            else:
+                
+                # Plot limits         
+                ymax = np.maximum(ymax,
+                            np.percentile((fl+np.median(er[clip]))[clip], 95))
+            
+                ymin = np.minimum(ymin, np.percentile((fl-er*0.)[clip], 5))
+            
+            wmax = np.maximum(wmax, w[clip].max())
+            wmin = np.minimum(wmin, w[clip].min())
+        
+        # Cleanup
+        axc.set_xlim(wmin, wmax)
+        axc.semilogx(subsx=[wmax])
+        #axc.set_xticklabels([])
+        axc.set_xlabel(r'$\lambda$')
+        axc.set_ylabel(r'$f_\lambda \times 10^{-19}$')
+        #axc.xaxis.set_major_locator(MultipleLocator(0.1))
+                                          
+        for ax in [axc]: #[axa, axb, axc]:
+            
+            labels = np.arange(np.ceil(wmin/minor), np.ceil(wmax/minor))*minor
+            ax.set_xticks(labels)
+            ax.set_xticklabels(labels)    
+        
+        ### Binned spectrum by grism
+        if tfit is None:
+            ymin = 1.e30
+            ymax = -1.e30
+        
+        if self.Nphot > 0:
+            sp_flat = self.optimal_extract(self.flat_flam[self.fit_mask[:-self.Nphot]], bin=bin)
+        else:
+            sp_flat = self.optimal_extract(self.flat_flam[self.fit_mask], bin=bin)
+
+        if tfit is not None:
+            bg_model = self.get_flat_background(tfit['coeffs'], apply_mask=True)
+        else:
+            bg_model = 0.
+        
+        sp_data = self.optimal_extract(self.scif_mask-bg_model, bin=bin)
+
+        for g in sp_data:
+
+            clip = sp_flat[g]['flux'] != 0
+
+            pscale = 1.
+            if hasattr(self, 'pscale'):
+                if (self.pscale is not None):
+                    pscale = self.compute_scale_array(self.pscale, sp_data[g]['wave'])
+            
+            flux = (sp_data[g]['flux']/sp_flat[g]['flux']/1.e-19/pscale)[clip]
+            err = (sp_data[g]['err']/sp_flat[g]['flux']/1.e-19/pscale)[clip]
+            
+            if fill:
+                axc.fill_between(sp_data[g]['wave'][clip]/1.e4, flux-err, flux+err, color=GRISM_COLORS[g], alpha=0.8, zorder=1) 
+            else:
+                axc.errorbar(sp_data[g]['wave'][clip]/1.e4, flux, err, color=GRISM_COLORS[g], alpha=0.8, marker='.', linestyle='None', zorder=1) 
+                
+            if tfit is None:
+                # Plot limits         
+                ymax = np.maximum(ymax, np.percentile(flux+err, 98))
+                ymin = np.minimum(ymin, np.percentile(flux-err, 2))
+                       
+        if (ymin < 0) & (ymax > 0):
+            ymin = -0.1*ymax
+        
+        axc.set_ylim(ymin-0.2*ymax, 1.2*ymax)            
+        axc.grid()
+        
+        if (ymin-0.2*ymax < 0) & (1.2*ymax > 0):
+            axc.plot([wmin, wmax], [0,0], color='k', linestyle=':', alpha=0.8)
+        
+        if newfigure:
+            axc.text(0.95, 0.95, '{0}  {1:>5d}'.format(self.group_name, self.id), ha='right', va='top', transform=axc.transAxes)
+            fig.tight_layout(pad=0.2)
+            return fig
+        
+        else:
+            return True
+            
     ### 
     ### Generic functions for generating flat model and background arrays
     ###
@@ -1628,7 +1682,8 @@ class GroupFitter(object):
                     
         prof = self.optimal_profile_mask
         if ivar is None:
-            ivar = 1./self.sigma2_mask
+            #ivar = 1./self.sigma2_mask
+            ivar = 1./self.weighted_sigma2_mask
             
         num = prof*data*ivar
         den = prof**2*ivar
