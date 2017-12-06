@@ -64,7 +64,7 @@ GRISM_LIMITS = {'G800L':[0.545, 1.02, 40.], # ACS/WFC
 
 DEFAULT_LINE_LIST = ['PaB', 'HeI-1083', 'SIII', 'SII', 'Ha', 'OI-6302', 'OIII', 'Hb', 'OIII-4363', 'Hg', 'Hd', 'NeIII', 'OII', 'NeVI', 'NeV', 'MgII','CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'NIII-1750', 'NIV-1487', 'NV-1240', 'Lya']
 
-def get_flt_info(files=[]):
+def get_flt_info(files=[], columns=['FILE', 'FILTER', 'INSTRUME', 'DETECTOR', 'TARGNAME', 'DATE-OBS', 'TIME-OBS', 'EXPSTART', 'EXPTIME', 'PA_V3', 'RA_TARG', 'DEC_TARG', 'POSTARG1', 'POSTARG2']):
     """Extract header information from a list of FLT files
     
     Parameters
@@ -85,7 +85,7 @@ def get_flt_info(files=[]):
         files=glob.glob('*flt.fits')
     
     N = len(files)
-    columns = ['FILE', 'FILTER', 'TARGNAME', 'DATE-OBS', 'TIME-OBS', 'EXPSTART', 'EXPTIME', 'PA_V3', 'RA_TARG', 'DEC_TARG', 'POSTARG1', 'POSTARG2']
+    
     data = []
 
     for i in range(N):
@@ -2404,12 +2404,17 @@ class GTable(astropy.table.Table):
         """
         import astropy.units as u
         
-        if format is None:
+        if format is None:            
             if sextractor:
                 format = 'ascii.sextractor'
-            else:
-                format = 'ascii.commented_header'
-        
+            else:            
+                if file.endswith('.fits'):
+                    format='fits'
+                elif file.endswith('.csv'):
+                    format = 'csv'
+                else:
+                    format = 'ascii.commented_header'
+                    
         #print(file, format)            
         tab = cls.read(file, format=format)
         
