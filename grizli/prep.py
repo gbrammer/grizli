@@ -1300,7 +1300,7 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, ref
     
     for ref_src in reference_catalogs:
         try:
-            ref_cat = query_functions[ref_src](ra=ra, dec=dec, radius=2)
+            ref_cat = query_functions[ref_src](ra=ra, dec=dec, radius=radius)
             if len(ref_cat) < 2:
                 raise ValueError
                 
@@ -2054,7 +2054,7 @@ def find_direct_grism_pairs(direct={}, grism={}, check_pixel=[507, 507],
         #     im.flush()
             
 def match_direct_grism_wcs(direct={}, grism={}, get_fresh_flt=True, 
-                           run_drizzle=True):
+                           run_drizzle=True, xyscale=None):
     """Match WCS of grism exposures to corresponding direct images
     
     TBD
@@ -2076,6 +2076,33 @@ def match_direct_grism_wcs(direct={}, grism={}, get_fresh_flt=True,
     direct_flt = pyfits.open(direct['files'][0])
     ref_catalog = direct_flt['SCI',1].header['WCSNAME']
     
+    #### User-defined shifts
+    if xyscale is not None:
+        # Use user-defined shifts
+        xsh, ysh, rot, scale = xyscale
+        
+        tmp_wcs = '/tmp/{0}_tmpwcs.fits'.format(str(direct['product']))
+        ext = len(wcs_hdu)-1
+        wcs_hdu[ext].writeto(tmp_wcs, clobber=True)
+        
+        for file in grism['files']:
+            updatehdr.updatewcs_with_shift(file, tmp_wcs,
+                                      xsh=xsh,
+                                      ysh=ysh,
+                                      rot=rot, scale=scale,
+                                      wcsname=ref_catalog, force=True,
+                                      reusename=True, verbose=True,
+                                      sciext='SCI')
+            
+            ### Bug in astrodrizzle? Dies if the FLT files don't have MJD-OBS
+            ### keywords
+            im = pyfits.open(file, mode='update')
+            im[0].header['MJD-OBS'] = im[0].header['EXPSTART']
+            im.flush()
+        
+        return True
+        
+    #### Get from WCS log file
     for ext in wcs_log['ext']:
         tmp_wcs = '/tmp/{0}_tmpwcs.fits'.format(str(direct['product']))
         wcs_hdu[ext].writeto(tmp_wcs, clobber=True)
