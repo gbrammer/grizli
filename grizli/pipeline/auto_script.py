@@ -1,14 +1,6 @@
 """
 Automatic processing scripts for grizli
 """
-try:
-    from hsaquery import query, fetch
-except ImportError as ERR:
-    warn = """{0}
-
-Get it from https://github.com/gbrammer/esa-hsaquery""".format(ERR)
-
-    raise(ImportError(warn))
         
 # Only fetch F814W optical data for now
 ONLY_F814W = True
@@ -38,15 +30,6 @@ def demo():
     root = 'j033217-274236'
     from grizli.pipeline import auto_script
     auto_script.go(root=root, maglim=[19,20], HOME_PATH='/Volumes/Pegasus/Grizli/DemoERS/')
-    
-    # On EC2
-    parent = query.run_query(box=None, proposid=[11359], instruments=['WFC3', 'ACS'], extensions=['FLT'], filters=['G102','G141'], extra=[])
-    extra = query.DEFAULT_EXTRA+["TARGET.TARGET_NAME LIKE 'WFC3-ERSII-G01'"]
-    tabs = overlaps.find_overlaps(parent, buffer_arcmin=0.1, filters=['F098M', 'G102'], proposid=[11359], instruments=['WFC3'], extra=extra, close=False)
-    
-    root = 'j033217-274236'
-    from grizli.pipeline import auto_script
-    auto_script.go(root=root, maglim=[19,20], HOME_PATH=os.getcwd())
     
 def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', inspect_ramps=False, manual_alignment=False):
     """
@@ -131,6 +114,15 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/
     import os
     import glob
     
+    try:
+        from hsaquery import query, fetch
+    except ImportError as ERR:
+        warn = """{0}
+
+    Get it from https://github.com/gbrammer/esa-hsaquery""".format(ERR)
+
+        raise(ImportError(warn))
+        
     #import grizli
     try:
         from .. import utils
@@ -430,8 +422,11 @@ def photutils_catalog(field_root='j142724+334246', threshold=1.8, subtract_bkg=T
     
     #import grizli
     #import grizli.prep
-    from .. import prep, utils
-    
+    try:
+        from .. import prep, utils
+    except:
+        from grizli import prep, utils
+        
     # Photutils catalog
     
     #overlaps = np.load('{0}_overlaps.npy'.format(field_root))[0]
@@ -489,10 +484,11 @@ def photutils_catalog(field_root='j142724+334246', threshold=1.8, subtract_bkg=T
             
         if subtract_bkg:
             bkg = background.Background2D(sci[0].data, 100, mask=wht_mask | (segment_img > 0), filter_size=(3, 3), filter_threshold=None, edge_method='pad')
+            bkg_obj = bkg.background
         else:
-            bkg = None
+            bkg_obj = None
             
-        cat = segmentation.source_properties(sci[0].data, segment_img, error=total_error, mask=mask, background=bkg.background, filter_kernel=None, wcs=pywcs.WCS(sci[0].header), labels=None)
+        cat = segmentation.source_properties(sci[0].data, segment_img, error=total_error, mask=mask, background=bkg_obj, filter_kernel=None, wcs=pywcs.WCS(sci[0].header), labels=None)
         
         if False:
             obj = cat[0]
