@@ -2117,8 +2117,8 @@ def fetch_config_files(ACS=False):
     
     # ePSF files for fitting point sources
     psf_path = 'http://www.stsci.edu/hst/wfc3/analysis/PSF/psf_downloads/wfc3_ir/'
-    files = ['{0}/PSFSTD_WFC3IR_{0}.fits'.format(psf_path, filter) 
-             for filter in ['F105W', 'F125W', 'F140W', 'F160W']]
+    files = ['{0}/PSFSTD_WFC3IR_{1}.fits'.format(psf_path, filt) 
+             for filt in ['F105W', 'F125W', 'F140W', 'F160W']]
              
     for url in files:
         file=os.path.basename(url)
