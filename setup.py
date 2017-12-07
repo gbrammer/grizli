@@ -67,7 +67,7 @@ setup(
     license = "MIT",
     url = "https://github.com/gbrammer/grizli",
     download_url = "https://github.com/gbrammer/grizli/tarball/0.2.1",
-    packages=['grizli', 'grizli/utils_c', 'grizli/tests'],
+    packages=['grizli', 'grizli/pipeline', 'grizli/utils_c', 'grizli/tests'],
     # requires=['numpy', 'scipy', 'astropy', 'drizzlepac', 'stwcs'],
     # long_description=read('README.rst'),
     classifiers=[

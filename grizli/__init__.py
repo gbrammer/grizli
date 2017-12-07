@@ -14,11 +14,11 @@ import os
 # """)
 
 # Module imports
-from . import utils_c
-from . import utils
-from . import grismconf
-from . import model
-from . import multifit
+# from . import utils_c
+# from . import utils
+# from . import grismconf
+# from . import model
+# from . import multifit
 
 # Test that GRIZLI system variable is set
 if os.getenv('GRIZLI') is None:
