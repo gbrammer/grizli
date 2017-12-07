@@ -2,7 +2,7 @@
 Reprocessing scripts for variable WFC3/IR backgrounds
 """
 
-def reprocess_wfc3ir():
+def reprocess_wfc3ir(parallel=False):
 
     import matplotlib as mpl
     mpl.rcParams['backend'] = 'agg'
@@ -20,13 +20,24 @@ Get it from https://github.com/gbrammer/wfc3 """)
         return False
         
     # Make ramp diagnostic images    
-    files=glob.glob('*raw.fits')
-    mywfc3.reprocess_wfc3.show_ramps_parallel(files, cpu_count=4)
+    if parallel:
+        files=glob.glob('*raw.fits')
+        mywfc3.reprocess_wfc3.show_ramps_parallel(files, cpu_count=4)
     
-    # Reprocess all raw files
-    files=glob.glob('*raw.fits')
-    mywfc3.reprocess_wfc3.reprocess_parallel(files, cpu_count=4)
-
+        # Reprocess all raw files
+        files=glob.glob('*raw.fits')
+        mywfc3.reprocess_wfc3.reprocess_parallel(files, cpu_count=4)
+    else:
+        files=glob.glob('*raw.fits')
+        for file in files:
+            if not os.path.exists(file.replace('raw.fits','ramp.png')):
+                mywfc3.reprocess_wfc3.show_MultiAccum_reads(raw=file, stats_region=[[300,700], [300,700]])
+        
+        
+        for file in files:
+            if not os.path.exists(file.replace('raw.fits','flt.fits')):
+                mywfc3.reprocess_wfc3.make_IMA_FLT(raw=file, stats_region=[[300,700], [300,700]])
+        
 def inspect(root='grizli'):
     """
     Run the GUI inspection tool on the `ramp.png` images to flag problematic
