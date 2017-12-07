@@ -89,7 +89,15 @@ but now appears to be trivial under conda:
 
         conda install shapely
 
+`hsaquery <https://github.com/gbrammer/esa-hsaquery>`__ - Python tools for 
+querying exposure-level data in the 
+`ESA Hubble Science Archive <http://archives.esac.esa.int/ehst/#search>`__.:
 
+    .. code:: bash
+
+        pip install hsaquery
+        
+                
 Build ``grizli``
 ----------------
 ``grizli`` - The main code repository. There is an old version of `grizli`
@@ -99,9 +107,7 @@ the GitHub repository until the versioning and tagging is straightened out:
     .. code:: bash
 
         git clone https://github.com/gbrammer/grizli.git
-        # Recommended, all recent development in the `clean_fit_outputs` branch
-        git checkout -b clean_fit_outputs origin/clean_fit_outputs
-        
+
         cd grizli
         python setup.py install
 
@@ -112,6 +118,7 @@ variables are set automatically when you start a new terminal/shell session.
 
     .. code:: bash
         
+        # Put these lines in ~/.bashrc
         export GRIZLI="${HOME}/grizli" # or anywhere else
         export iref="${GRIZLI}/iref/"  # for WFC3 calibration files
         export jref="${GRIZLI}/jref/"  # for ACS calibration files
