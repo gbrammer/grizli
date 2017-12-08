@@ -473,9 +473,12 @@ def parse_visit_overlaps(visits, buffer=15.):
         exposure_groups[i]['product'] = product
     
     return exposure_groups
-    
+
+DIRECT_ORDER = {'G102': ['F105W', 'F110W', 'F098M', 'F125W', 'F140W', 'F160W', 'F127M', 'F139M', 'F153M', 'F132N', 'F130N', 'F128N', 'F126N', 'F164N', 'F167N'],
+                'G141': ['F140W', 'F160W', 'F125W', 'F105W', 'F110W', 'F098M', 'F127M', 'F139M', 'F153M', 'F132N', 'F130N', 'F128N', 'F126N', 'F164N', 'F167N']}
+                
 def parse_grism_associations(exposure_groups, 
-                             best_direct={'G102':'F105W', 'G141':'F140W'},
+                             best_direct=DIRECT_ORDER,
                              get_max_overlap=True):
     """Get associated lists of grism and direct exposures
     
@@ -513,6 +516,7 @@ def parse_grism_associations(exposure_groups,
         d_i = f_i
         
         #print('\nx\n')
+        d_idx = 10
         for j in range(N):
             f_j = exposure_groups[j]['product'].split('-')[-1]
             if f_j.startswith('g'):
@@ -524,40 +528,42 @@ def parse_grism_associations(exposure_groups,
 
             #print(root_j, root_i, root_j == root_i)
             if (root_j == root_i):
-                if (group['direct'] is not None):
-                    pass
-                    if (group['direct']['product'].startswith(root_i)) & (d_i.upper() == best_direct[f_i.upper()]):
-                        continue
-                    
-                group['direct'] = exposure_groups[j]
-                olap_i = olap.area
-                d_i = f_j
+                # if (group['direct'] is not None):
+                #     pass
+                #     if (group['direct']['product'].startswith(root_i)) & (d_i.upper() == best_direct[f_i.upper()]):
+                #         continue
+                
+                if best_direct[f_i.upper()].index(f_j.upper()) < d_idx:
+                    d_idx = best_direct[f_i.upper()].index(f_j.upper())
+                    group['direct'] = exposure_groups[j]
+                    olap_i = olap.area
+                    d_i = f_j
                 #print(0,group['grism']['product'], group['direct']['product'])
             #     continue
                 
             #print(exposure_groups[i]['product'], exposure_groups[j]['product'], olap.area*3600.)
             
-            #print(exposure_groups[j]['product'], olap_i, olap.area)
-            if olap.area > 0:
-                if group['direct'] is None:
-                    group['direct'] = exposure_groups[j]
-                    olap_i = olap.area
-                    d_i = f_j
-                    #print(1,group['grism']['product'], group['direct']['product'])
-                else:
-                    #if (f_j.upper() == best_direct[f_i.upper()]):
-                    if get_max_overlap:
-                        if olap.area < olap_i:
-                            continue
-                        
-                        if d_i.upper() == best_direct[f_i.upper()]:
-                            continue
-                                
-                    group['direct'] = exposure_groups[j]
-                    #print(exposure_groups[j]['product'])
-                    olap_i = olap.area
-                    d_i = f_j
-                    #print(2,group['grism']['product'], group['direct']['product'])
+            # #print(exposure_groups[j]['product'], olap_i, olap.area)
+            # if olap.area > 0:
+            #     if group['direct'] is None:
+            #         group['direct'] = exposure_groups[j]
+            #         olap_i = olap.area
+            #         d_i = f_j
+            #         #print(1,group['grism']['product'], group['direct']['product'])
+            #     else:
+            #         #if (f_j.upper() == best_direct[f_i.upper()]):
+            #         if get_max_overlap:
+            #             if olap.area < olap_i:
+            #                 continue
+            #             
+            #             if d_i.upper() == best_direct[f_i.upper()]:
+            #                 continue
+            #                     
+            #         group['direct'] = exposure_groups[j]
+            #         #print(exposure_groups[j]['product'])
+            #         olap_i = olap.area
+            #         d_i = f_j
+            #         #print(2,group['grism']['product'], group['direct']['product'])
                     
         grism_groups.append(group)
     
