@@ -60,13 +60,13 @@ def read(fname):
 
 setup(
     name = "grizli",
-    version = "0.3.0",
+    version = "0.4.0",
     author = "Gabriel Brammer",
     author_email = "gbrammer@gmail.com",
     description = "Grism redshift and line analysis software",
     license = "MIT",
     url = "https://github.com/gbrammer/grizli",
-    download_url = "https://github.com/gbrammer/grizli/tarball/0.2.1",
+    download_url = "https://github.com/gbrammer/grizli/tarball/0.4.0",
     packages=['grizli', 'grizli/pipeline', 'grizli/utils_c', 'grizli/tests'],
     # requires=['numpy', 'scipy', 'astropy', 'drizzlepac', 'stwcs'],
     # long_description=read('README.rst'),
