@@ -66,24 +66,31 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
     os.chdir(HOME_PATH)
     auto_script.fetch_files(field_root=root, HOME_PATH=HOME_PATH)
     
+    ######################
+    ### Parse visit associations
+    auto_script.parse_visits(field_root=root, HOME_PATH=HOME_PATH, use_visit=True)
+    
     if inspect_ramps:
         # Inspect for CR trails
         os.chdir(os.path.join(HOME_PATH, root, 'RAW'))
         os.system("python -c 'from research.grizli.reprocess import inspect; inspect()'")
-           
+    
+    # Alignment catalogs
+    catalogs = ['PS1','SDSS','GAIA','WISE']
+    
     #######################
     ### Manual alignment
     if manual_alignment:
         os.chdir(os.path.join(HOME_PATH, root, 'Prep'))
-        auto_script.manual_alignment(field_root=root, HOME_PATH=HOME_PATH, skip=True)
+        auto_script.manual_alignment(field_root=root, HOME_PATH=HOME_PATH, skip=True, catalogs=catalogs)
 
     #####################
     ### Alignment & mosaics    
-    auto_script.preprocess(field_root=root, HOME_PATH=HOME_PATH, make_combined=False)
+    auto_script.preprocess(field_root=root, HOME_PATH=HOME_PATH, make_combined=False, catalogs=catalogs, use_visit=True)
         
     # Fine alignment
     stop = False
-    out = auto_script.fine_alignment(field_root=root, HOME_PATH=HOME_PATH, min_overlap=0.2, stopme=stop, ref_err=0.08, catalogs=['PS1'], NITER=1, maglim=[17,23], shift_only=True, method='Powell', redrizzle=True)
+    out = auto_script.fine_alignment(field_root=root, HOME_PATH=HOME_PATH, min_overlap=0.2, stopme=stop, ref_err=0.08, catalogs=catalogs, NITER=1, maglim=[17,23], shift_only=True, method='Powell', redrizzle=True)
     plt.close()
     
     # Photometric catalogs
@@ -94,11 +101,16 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
     ######################
     ### Grism prep
     os.chdir(os.path.join(HOME_PATH, root, 'Prep'))
-    auto_script.grism_prep(field_root=root)
+    auto_script.grism_prep(field_root=root, refine_niter=3)
     
     ######################
     ### Grism extractions
     os.chdir(os.path.join(HOME_PATH, root, 'Extractions'))
+    try:
+        test = maglim
+    except:
+        maglim = [17,23]
+        
     auto_script.extract(field_root=root, maglim=maglim, MW_EBV=exptab.meta['MW_EBV'])
     
     ######################
@@ -177,51 +189,8 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/
         os.system('tar xzvf {0}.tar.gz'.format(root))        
         os.system('rm {0}/*extper.fits {0}/*flt_cor.fits'.format(root))
         os.system('ln -sf {0}/*persist.fits ./'.format(root))
-      
-def manual_alignment(field_root='j151850-813028', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', skip=True, radius=5., catalogs=['PS1','SDSS','GAIA','WISE'], radec=None):
-    
-    import pyds9
-    import glob
-    import os
-    import numpy as np
-    
-    #import grizli
-    from ..prep import get_radec_catalog
-    from .. import utils, prep
-    
-    os.chdir(os.path.join(HOME_PATH, field_root, 'Prep'))
-    
-    files = glob.glob('*guess')
-    if (len(files) > 0) & skip:
-        return True
-        
-    tab = utils.GTable.gread('{0}/{1}_footprint.fits'.format(HOME_PATH, field_root))
-    
-    files=glob.glob('../RAW/*fl[tc].fits')
-    info = utils.get_flt_info(files)
-    info = info[(info['FILTER'] != 'G141') & (info['FILTER'] != 'G102')]
-    visits, filters = utils.parse_flt_files(info=info, uniquename=True, get_footprint=False)
-    
-    if radec is None:
-        radec, ref_catalog = get_radec_catalog(ra=np.mean(tab['ra']),
-                    dec=np.median(tab['dec']), 
-                    product=field_root,
-                    reference_catalogs=catalogs, radius=radius)
-    
-    ds9 = pyds9.DS9()
-    ds9.set('mode pan')
-    ds9.set('scale zscale')
-    ds9.set('scale log')
-    
-    for visit in visits:
-        filt = visit['product'].split('-')[-1]
-        if (not filt.startswith('g')):
-            prep.manual_alignment(visit, reference='{0}_{1}.reg'.format(field_root, ref_catalog.lower()), ds9=ds9)
-        
-    ds9.set('quit')
-    
-def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', min_overlap=0.2, make_combined=True, catalogs=['PS1','SDSS','GAIA','WISE']):
-    
+   
+def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=True):
     import os
     import glob
     import numpy as np
@@ -244,10 +213,84 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
     if ONLY_F814W:
         info = info[((info['INSTRUME'] == 'WFC3') & (info['DETECTOR'] == 'IR')) | (info['FILTER'] == 'F814W')]
     
-    visits, filters = utils.parse_flt_files(info=info, uniquename=True, get_footprint=True)
+    visits, filters = utils.parse_flt_files(info=info, uniquename=True, get_footprint=True, use_visit=use_visit)
+    
+    if combine_same_pa:
+        combined = {}
+        for visit in visits:
+            filter_pa = '-'.join(visit['product'].split('-')[-2:])
+            if filter_pa not in combined:
+                combined[filter_pa] = {'product':visit['product'], 'files':[], 'footprint':visit['footprint']}
+            
+            combined[filter_pa]['files'].extend(visit['files'])
+        
+        visits = [combined[k] for k in combined]
+        
     all_groups = utils.parse_grism_associations(visits)
     
-    np.save('{0}_visits.npy'.format(field_root), [visits, all_groups])
+    print('\n == Grism groups ==\n')
+    for g in all_groups:
+        print(g['direct']['product'], len(g['direct']['files']), g['grism']['product'], len(g['grism']['files']))
+        
+    np.save('{0}_visits.npy'.format(field_root), [visits, all_groups, info])
+    
+def manual_alignment(field_root='j151850-813028', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', skip=True, radius=5., catalogs=['PS1','SDSS','GAIA','WISE'], radec=None):
+    
+    import pyds9
+    import glob
+    import os
+    import numpy as np
+    
+    #import grizli
+    from ..prep import get_radec_catalog
+    from .. import utils, prep
+    
+    os.chdir(os.path.join(HOME_PATH, field_root, 'Prep'))
+    
+    files = glob.glob('*guess')
+    if (len(files) > 0) & skip:
+        return True
+        
+    tab = utils.GTable.gread('{0}/{1}_footprint.fits'.format(HOME_PATH, field_root))
+    
+    visits, all_groups, info = np.load('{0}_visits.npy'.format(field_root))
+    
+    if radec is None:
+        radec, ref_catalog = get_radec_catalog(ra=np.mean(tab['ra']),
+                    dec=np.median(tab['dec']), 
+                    product=field_root,
+                    reference_catalogs=catalogs, radius=radius)
+    
+    ds9 = pyds9.DS9()
+    ds9.set('mode pan')
+    ds9.set('scale zscale')
+    ds9.set('scale log')
+    
+    for visit in visits:
+        filt = visit['product'].split('-')[-1]
+        if (not filt.startswith('g')):
+            prep.manual_alignment(visit, reference='{0}_{1}.reg'.format(field_root, ref_catalog.lower()), ds9=ds9)
+        
+    ds9.set('quit')
+    
+def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', min_overlap=0.2, make_combined=True, catalogs=['PS1','SDSS','GAIA','WISE'], use_visit=True):
+    
+    import os
+    import glob
+    import numpy as np
+    import grizli
+
+    from shapely.geometry import Polygon
+    from scipy.spatial import ConvexHull
+    import copy
+
+    #import grizli.prep
+    from .. import prep, utils
+    
+    os.chdir(os.path.join(HOME_PATH, field_root, 'Prep'))
+    
+    files=glob.glob('../RAW/*fl[tc].fits')
+    visits, all_groups, info = np.load('{0}_visits.npy'.format(field_root))
     
     # Grism visits
     master_radec = None        
@@ -542,7 +585,7 @@ def grism_prep(field_root = 'j142724+334246', ds9=None, refine_niter=3):
     g102 = info['FILTER'] == 'G102'
     
     if g141.sum() > 0:
-        for f in ['F140W', 'F160W', 'F125W', 'F105W', 'F098M', 'F127M', 'F139M', 'F153M', 'F132N', 'F130N', 'F128N', 'F126N', 'F164N', 'F167N']:
+        for f in ['F140W', 'F160W', 'F125W', 'F105W', 'F110W', 'F098M', 'F127M', 'F139M', 'F153M', 'F132N', 'F130N', 'F128N', 'F126N', 'F164N', 'F167N']:
             if f in info['FILTER']:
                 g141_ref = f
                 break
@@ -550,7 +593,7 @@ def grism_prep(field_root = 'j142724+334246', ds9=None, refine_niter=3):
         grp = multifit.GroupFLT(grism_files=list(info['FILE'][g141]), direct_files=[], ref_file='{0}-{1}_drz_sci.fits'.format(field_root, g141_ref.lower()), seg_file='{0}-ir_seg.fits'.format(field_root), catalog='{0}-ir.cat'.format(field_root), cpu_count=-1, sci_extn=1, pad=256)
     
     if g102.sum() > 0:
-        for f in ['F105W', 'F098M', 'F125W', 'F140W', 'F160W', 'F127M', 'F139M', 'F153M', 'F132N', 'F130N', 'F128N', 'F126N', 'F164N', 'F167N']:
+        for f in ['F105W', 'F098M', 'F110W', 'F125W', 'F140W', 'F160W', 'F127M', 'F139M', 'F153M', 'F132N', 'F130N', 'F128N', 'F126N', 'F164N', 'F167N']:
             if f in info['FILTER']:
                 g102_ref = f
                 break
@@ -614,7 +657,10 @@ def grism_prep(field_root = 'j142724+334246', ds9=None, refine_niter=3):
     os.system('ln -s ../Prep/*-ir.cat .')
     os.system('ln -s ../Prep/*_phot.fits .')
    
-def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00, ids=None):
+DITHERED_PLINE = {'kernel': 'point', 'pixfrac': 0.2, 'pixscale': 0.1, 'size': 8, 'wcs': None}
+PARALLEL_PLINE = {'kernel': 'square', 'pixfrac': 0.8, 'pixscale': 0.1, 'size': 8, 'wcs': None}
+  
+def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00, ids=None, pline=DITHERED_PLINE):
     import glob
     import os
     
@@ -655,8 +701,7 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
     # Stack the different beans
     wave = np.linspace(2000,2.5e4,100)
     poly_templates = utils.polynomial_templates(wave, order=5)
-    
-    pline = {'kernel': 'point', 'pixfrac': 0.2, 'pixscale': 0.1, 'size': 8, 'wcs': None}
+        
     fsps = True
     t0 = utils.load_templates(fwhm=1000, line_complexes=True, stars=False, full_line_list=None, continuum_list=None, fsps_templates=fsps, alf_template=True)
     t1 = utils.load_templates(fwhm=1000, line_complexes=False, stars=False, full_line_list=None, continuum_list=None, fsps_templates=fsps, alf_template=True)
@@ -668,6 +713,7 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
     if __name__ == '__main__': # Interactive
         size=32
         close = Skip = False
+        pline = {'kernel': 'point', 'pixfrac': 0.2, 'pixscale': 0.1, 'size': 8, 'wcs': None}
         
     ###############
     # Stacked spectra
@@ -760,9 +806,23 @@ def summary_catalog(field_root=''):
     ### SUmmary catalog
     fit = fitting.make_summary_catalog(target=field_root, sextractor=None)
     
+    ## Add photometric catalog
+    phot = utils.GTable.gread('{0}_phot.fits'.format(field_root))
+    sex = utils.GTable.gread('../Prep/{0}-ir.cat'.format(field_root))
+    idx = np.arange(len(phot))
+    phot_idx = np.array([idx[phot['id'] == id][0] for id in fit['id']])
+    
+    for col in ['ellipticity', 'source_flam']:
+        fit[col] = phot[col][phot_idx]
+    
+    fit['ellipticity'].format = '.2f'
+    fit['source_flam'].format = '.2e'
+    
+    for col in ['FLUX_RADIUS', 'MAG_AUTO']:
+        fit[col] = sex[col][phot_idx]
+        
     clip = (fit['chinu'] < 2.0) & (fit['log_risk'] < -1)
     bins = utils.log_zgrid(zr=[0.1, 3.5], dz=0.02)
-    
     
     fig = plt.figure(figsize=[6,4])
     ax = fig.add_subplot(111)
@@ -785,7 +845,7 @@ def summary_catalog(field_root=''):
     fig.tight_layout(pad=0.2)
     fig.savefig('{0}_zhist.png'.format(field_root))
         
-    fit['id','ra', 'dec', 'z_map','log_risk', 'log_pdf_max', 'zq', 'chinu', 'bic_diff', 'png_stack', 'png_full', 'png_line'][clip].write_sortable_html(field_root+'-fit.html', replace_braces=True, localhost=False, max_lines=50000, table_id=None, table_class='display compact', css=None)
+    fit['id','ra', 'dec', 'source_flam', 'z_map','log_risk', 'log_pdf_max', 'zq', 'chinu', 'bic_diff', 'png_stack', 'png_full', 'png_line'][clip].write_sortable_html(field_root+'-fit.html', replace_braces=True, localhost=False, max_lines=50000, table_id=None, table_class='display compact', css=None)
     
 def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', min_overlap=0.2, stopme=False, ref_err = 1.e-3, radec=None, redrizzle=True, shift_only=True, maglim=[17,24], NITER=1, catalogs = ['PS1','SDSS','GAIA','WISE'], method='Powell'):
     """
@@ -818,16 +878,8 @@ def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Griz
     
     os.chdir(os.path.join(HOME_PATH, field_root, 'Prep'))
     
-    files=glob.glob('../RAW/*fl[tc].fits')
-    info = utils.get_flt_info(files)
-    
-    info = info[(info['FILTER'] != 'G141') & (info['FILTER'] != 'G102')]
-    
-    # Only F814W on ACS
-    if ONLY_F814W:
-        info = info[((info['INSTRUME'] == 'WFC3') & (info['DETECTOR'] == 'IR')) | (info['FILTER'] == 'F814W')]
-    
-    all_visits, filters = utils.parse_flt_files(info=info, uniquename=True, get_footprint=False)
+    all_visits, all_groups, info = np.load('{0}_visits.npy'.format(field_root))
+    #all_visits, filters = utils.parse_flt_files(info=info, uniquename=True, get_footprint=False)
     
     visits = []
     files = []
@@ -992,7 +1044,7 @@ def update_grism_wcs_headers(field_root):
     from .. import prep
     
     fine_visits, fine_fit = np.load('{0}_fine.npy'.format(field_root))
-    visits, all_groups = np.load('{0}_visits.npy'.format(field_root))
+    visits, all_groups, info = np.load('{0}_visits.npy'.format(field_root))
     
     N = len(fine_visits)
     trans = np.reshape(fine_fit.x, (N,-1))/10.
@@ -1020,25 +1072,26 @@ def drizzle_overlaps(field_root):
     
     ##############
     ## Redrizzle
-    overlaps = np.load('{0}_overlaps.npy'.format(field_root))[0]
-    keep = []
+    
+    visits, all_groups, info = np.load('{0}_visits.npy'.format(field_root))
+    
+    #overlaps = np.load('{0}_overlaps.npy'.format(field_root))[0]
+    #keep = []
     wfc3ir = {'product':'{0}-ir'.format(field_root), 'files':[]}
     
-    for overlap in overlaps:
-        filt = overlap['product'].split('-')[-1]
-        overlap['product'] = '{0}-{1}'.format(field_root, filt)
+    filter_groups = {}
+    for visit in visits:
+        filt = visit['product'].split('-')[-1]
+        if filt not in filter_groups:
+            filter_groups[filt] = {'product':'{0}-{1}'.format(field_root, filt), 'files':[], 'reference':'{0}-ir_drz_sci.fits'.format(field_root)}
         
-        overlap['reference'] = '{0}-ir_drz_sci.fits'.format(field_root)
+        filter_groups[filt]['files'].extend(visit['files'])
         
-        if False:
-            if 'g1' not in filt:
-                keep.append(overlap)
-        else:
-            keep.append(overlap)
-    
         if filt.upper() in ['F098M','F105W','F110W', 'F125W','F140W','F160W']:
-            wfc3ir['files'].extend(overlap['files'])
-
+            wfc3ir['files'].extend(visit['files'])
+    
+    keep = [filter_groups[k] for k in filter_groups]
+    
     prep.drizzle_overlaps([wfc3ir], parse_visits=False, pixfrac=0.6, scale=0.06, skysub=False, bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False)
                 
     prep.drizzle_overlaps(keep, parse_visits=False, pixfrac=0.6, scale=0.06, skysub=False, bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False)
