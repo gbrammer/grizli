@@ -68,12 +68,12 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
     
     ######################
     ### Parse visit associations
-    auto_script.parse_visits(field_root=root, HOME_PATH=HOME_PATH, use_visit=True)
+    auto_script.parse_visits(field_root=root, HOME_PATH=HOME_PATH, use_visit=True, combine_same_pa=False)
     
     if inspect_ramps:
         # Inspect for CR trails
         os.chdir(os.path.join(HOME_PATH, root, 'RAW'))
-        os.system("python -c 'from research.grizli.reprocess import inspect; inspect()'")
+        os.system("python -c 'from grizli.pipeline.reprocess import inspect; inspect()'")
     
     # Alignment catalogs
     catalogs = ['PS1','SDSS','GAIA','WISE']
@@ -117,7 +117,6 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
     ### Summary catalog & webpage
     os.chdir(os.path.join(HOME_PATH, root, 'Extractions'))
     auto_script.summary_catalog(field_root=root)
-    
 
 def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', inst_products={'WFPC2/WFPC2': ['C0M', 'C1M'], 'ACS/WFC': ['FLC'], 'WFC3/IR': ['RAW'], 'WFC3/UVIS': ['FLC']}):
     """
@@ -526,8 +525,11 @@ def photutils_catalog(field_root='j142724+334246', threshold=1.8, subtract_bkg=T
             continue
             
         if subtract_bkg:
-            bkg = background.Background2D(sci[0].data, 100, mask=wht_mask | (segment_img > 0), filter_size=(3, 3), filter_threshold=None, edge_method='pad')
-            bkg_obj = bkg.background
+            try:
+                bkg = background.Background2D(sci[0].data, 100, mask=wht_mask | (segment_img > 0), filter_size=(3, 3), filter_threshold=None, edge_method='pad')
+                bkg_obj = bkg.background
+            except:
+                bkg_obj = None
         else:
             bkg_obj = None
             
@@ -747,7 +749,7 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
         mb.write_master_fits()
         
         if close:
-            plt.close(fig); del(hdu); del(mb)
+            plt.close(fig); plt.close(fig1); del(hdu); del(mb)
     
     ###############
     # Redshift Fit    
@@ -793,7 +795,7 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
         except:
             pass
     
-def summary_catalog(field_root=''):
+def summary_catalog(field_root='', dzbin=0.02, use_localhost=True):
     """
     Make redshift histogram and summary catalog / HTML table
     """
@@ -811,18 +813,29 @@ def summary_catalog(field_root=''):
     sex = utils.GTable.gread('../Prep/{0}-ir.cat'.format(field_root))
     idx = np.arange(len(phot))
     phot_idx = np.array([idx[phot['id'] == id][0] for id in fit['id']])
+    sex_idx = np.array([idx[sex['NUMBER'] == id][0] for id in fit['id']])
     
     for col in ['ellipticity', 'source_flam']:
         fit[col] = phot[col][phot_idx]
-    
+        
     fit['ellipticity'].format = '.2f'
     fit['source_flam'].format = '.2e'
+    
+    for col in ['MAG_AUTO', 'FLUX_RADIUS']:
+        fit[col.lower()] = sex[col][sex_idx]
+    
+    fit['mag_auto'].format = '.2f'
+    fit['flux_radius'].format = '.2f'
+    
+    for c in ['log_risk', 'log_pdf_max', 'zq','chinu', 'bic_diff']: fit[c].format = '.2f'
+    for c in ['z_map', 'ra', 'dec']: fit[c].format = '.4f'
     
     for col in ['FLUX_RADIUS', 'MAG_AUTO']:
         fit[col] = sex[col][phot_idx]
         
     clip = (fit['chinu'] < 2.0) & (fit['log_risk'] < -1)
-    bins = utils.log_zgrid(zr=[0.1, 3.5], dz=0.02)
+    clip = (fit['chinu'] < 2.0) & (fit['zq'] < -3) & (fit['zwidth1']/(1+fit['z_map']) < 0.005)
+    bins = utils.log_zgrid(zr=[0.1, 3.5], dz=dzbin)
     
     fig = plt.figure(figsize=[6,4])
     ax = fig.add_subplot(111)
@@ -844,8 +857,10 @@ def summary_catalog(field_root=''):
     
     fig.tight_layout(pad=0.2)
     fig.savefig('{0}_zhist.png'.format(field_root))
+
+    fit['id','ra', 'dec', 'mag_auto', 'z_map','log_risk', 'log_pdf_max', 'zq', 'chinu', 'bic_diff', 'png_stack', 'png_full', 'png_line'].write_sortable_html(field_root+'-fit.html', replace_braces=True, localhost=use_localhost, max_lines=50000, table_id=None, table_class='display compact', css=None)
         
-    fit['id','ra', 'dec', 'source_flam', 'z_map','log_risk', 'log_pdf_max', 'zq', 'chinu', 'bic_diff', 'png_stack', 'png_full', 'png_line'][clip].write_sortable_html(field_root+'-fit.html', replace_braces=True, localhost=False, max_lines=50000, table_id=None, table_class='display compact', css=None)
+    fit['id','ra', 'dec', 'mag_auto', 'z_map','log_risk', 'log_pdf_max', 'zq', 'chinu', 'bic_diff', 'zwidth1', 'png_stack', 'png_full', 'png_line'][clip].write_sortable_html(field_root+'-fit.zq.html', replace_braces=True, localhost=use_localhost, max_lines=50000, table_id=None, table_class='display compact', css=None)
     
 def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', min_overlap=0.2, stopme=False, ref_err = 1.e-3, radec=None, redrizzle=True, shift_only=True, maglim=[17,24], NITER=1, catalogs = ['PS1','SDSS','GAIA','WISE'], method='Powell'):
     """
