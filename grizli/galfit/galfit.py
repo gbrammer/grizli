@@ -268,7 +268,7 @@ class GalfitSersic(GalfitObject):
             self.setfree(n=0)
     
 class Galfitter(object):
-    def __init__(self, root='sdssj1723+3411', filter='f140w', galfit_exec='./Galfit/galfit'):
+    def __init__(self, root='sdssj1723+3411', filter='f140w', galfit_exec='galfit'):
         self.root = root
         self.galfit_exec = galfit_exec
         
