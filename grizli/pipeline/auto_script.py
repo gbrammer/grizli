@@ -189,19 +189,22 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/
         os.system('rm {0}/*extper.fits {0}/*flt_cor.fits'.format(root))
         os.system('ln -sf {0}/*persist.fits ./'.format(root))
    
-def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=True):
+def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=True, is_dash=False):
     import os
     import glob
-    import numpy as np
-    import grizli
-
-    from shapely.geometry import Polygon
-    from scipy.spatial import ConvexHull
     import copy
 
-    #import grizli.prep
-    from .. import prep, utils
+    import numpy as np
+    import astropy.io.fits as pyfits
     
+    from shapely.geometry import Polygon
+    from scipy.spatial import ConvexHull
+
+    try:
+        from .. import prep, utils
+    except:
+        from grizli import prep, utils
+        
     os.chdir(os.path.join(HOME_PATH, field_root, 'Prep'))
     
     files=glob.glob('../RAW/*fl[tc].fits')
@@ -212,6 +215,33 @@ def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=
     if ONLY_F814W:
         info = info[((info['INSTRUME'] == 'WFC3') & (info['DETECTOR'] == 'IR')) | (info['FILTER'] == 'F814W')]
     
+    if is_dash:
+        # DASH visits split by exposure
+        ima_files=glob.glob('../RAW/*ima.fits')
+        ima_files.sort()
+        
+        visits = []
+        for file in ima_files:
+            # Build from IMA filename
+            root=os.path.basename(file).split("_ima")[0][:-1]
+            im = pyfits.open(file)
+            filt = utils.get_hst_filter(im[0].header).lower()
+            
+            # q_flt.fits is the pipeline product.  will always be 
+            # fewer DASH-split files
+            files=glob.glob('../RAW/%s*[a-o]_flt.fits' %(root))
+            if len(files) == 0:
+                continue
+
+            files = [os.path.basename(file) for file in files]
+            direct = {'product': '{0}-{1}'.format(root, filt), 
+                      'files':files}
+            visits.append(direct)
+        
+        all_groups = utils.parse_grism_associations(visits)
+        np.save('{0}_visits.npy'.format(field_root), [visits, all_groups, info])
+        return True
+        
     visits, filters = utils.parse_flt_files(info=info, uniquename=True, get_footprint=True, use_visit=use_visit)
     
     if combine_same_pa:
@@ -1079,8 +1109,7 @@ def update_grism_wcs_headers(field_root):
                 prep.match_direct_grism_wcs(direct=direct, grism=grism, get_fresh_flt=False, xyscale=trans[j,:])
                 
                 
-    
-def drizzle_overlaps(field_root):
+def drizzle_overlaps(field_root, pixfrac=0.6, scale=0.06, bits=None, ir_filters=['F098M','F105W','F110W', 'F125W','F140W','F160W']):
     import numpy as np
     #import grizli
     from .. import prep
@@ -1102,14 +1131,14 @@ def drizzle_overlaps(field_root):
         
         filter_groups[filt]['files'].extend(visit['files'])
         
-        if filt.upper() in ['F098M','F105W','F110W', 'F125W','F140W','F160W']:
+        if filt.upper() in ir_filters:
             wfc3ir['files'].extend(visit['files'])
     
     keep = [filter_groups[k] for k in filter_groups]
     
-    prep.drizzle_overlaps([wfc3ir], parse_visits=False, pixfrac=0.6, scale=0.06, skysub=False, bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False)
+    prep.drizzle_overlaps([wfc3ir], parse_visits=False, pixfrac=pixfrac, scale=scale, skysub=False, bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False)
                 
-    prep.drizzle_overlaps(keep, parse_visits=False, pixfrac=0.6, scale=0.06, skysub=False, bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False)
+    prep.drizzle_overlaps(keep, parse_visits=False, pixfrac=pixfrac, scale=scale, skysub=False, bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False)
         
 ######################
 ## Objective function for catalog shifts      
