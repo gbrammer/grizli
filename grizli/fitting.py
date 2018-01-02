@@ -30,7 +30,7 @@ try:
 except:
     IGM = None
 
-def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter='nnls', group_name='grism', fit_stacks=True, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=3, fit_only_beams=False, fit_beams=True, root='', fit_trace_shift=False, phot=None, verbose=True, scale_photometry=False, show_beams=True, overlap_threshold=5, MW_EBV=0.):
+def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter='nnls', group_name='grism', fit_stacks=True, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=3, fit_only_beams=False, fit_beams=True, root='', fit_trace_shift=False, phot=None, verbose=True, scale_photometry=False, show_beams=True, overlap_threshold=5, MW_EBV=0., sys_err=0.03):
     """Run the full procedure
     
     1) Load MultiBeam and stack files 
@@ -50,7 +50,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     st = StackFitter(st_files, fit_stacks=fit_stacks, group_name=group_name, fcontam=fcontam, overlap_threshold=overlap_threshold, MW_EBV=MW_EBV)
     st.initialize_masked_arrays()
     
-    mb = MultiBeam(mb_files[0], fcontam=fcontam, group_name=group_name, MW_EBV=MW_EBV)
+    mb = MultiBeam(mb_files[0], fcontam=fcontam, group_name=group_name, MW_EBV=MW_EBV, sys_err=sys_err)
     if len(mb_files) > 1:
         for file in mb_files[1:]:
             mb.extend(MultiBeam(file, fcontam=fcontam, group_name=group_name, MW_EBV=MW_EBV))
@@ -1484,7 +1484,7 @@ class GroupFitter(object):
         
             return fig, sfit
     
-    def oned_figure(self, bin=1, show_beams=True, minor=0.1, tfit=None, axc=None, figsize=[6,4], fill=False):
+    def oned_figure(self, bin=1, show_beams=True, minor=0.1, tfit=None, axc=None, figsize=[6,4], fill=False, units='flam'):
         """
         1D figure
         
@@ -1547,19 +1547,28 @@ class GroupFitter(object):
                 #sens = beam.sens
             
             sens[~np.isfinite(sens)] = 1
+                                         
+            if units == 'nJy':
+                unit_corr = 1./sens*w**2/2.99e18/1.e-23/1.e-9
+                unit_label = r'$f_\nu$ (nJy)'
+            elif units == 'uJy':
+                unit_corr = 1./sens*w**2/2.99e18/1.e-23/1.e-6
+                unit_label = r'$f_\nu$ ($\mu$Jy)'
+            else: # 'flam
+                unit_corr = 1./sens/1.e-19
+                unit_label = r'$f_\lambda \times 10^{-19}$'
             
             w = w/1.e4
-                 
-            unit_corr = 1./sens
+            
             clip = (sens > 0.1*sens.max()) 
             clip &= (er > 0)
             if clip.sum() == 0:
                 continue
             
-            fl *= unit_corr/1.e-19
-            er *= unit_corr/1.e-19
+            fl *= unit_corr#/1.e-19
+            er *= unit_corr#/1.e-19
             if tfit is not None:
-                flm *= unit_corr/1.e-19
+                flm *= unit_corr#/1.e-19
             
             f_alpha = 1./(self.Ngrism[grism.upper()])*0.8 #**0.5
             
@@ -1596,7 +1605,7 @@ class GroupFitter(object):
         axc.semilogx(subsx=[wmax])
         #axc.set_xticklabels([])
         axc.set_xlabel(r'$\lambda$')
-        axc.set_ylabel(r'$f_\lambda \times 10^{-19}$')
+        axc.set_ylabel(unit_label)
         #axc.xaxis.set_major_locator(MultipleLocator(0.1))
                                           
         for ax in [axc]: #[axa, axb, axc]:
@@ -1631,15 +1640,22 @@ class GroupFitter(object):
                 if (self.pscale is not None):
                     pscale = self.compute_scale_array(self.pscale, sp_data[g]['wave'])
             
-            flux = (sp_data[g]['flux']/sp_flat[g]['flux']/1.e-19/pscale)[clip]
-            err = (sp_data[g]['err']/sp_flat[g]['flux']/1.e-19/pscale)[clip]
+            if units == 'nJy':
+                unit_corr = sp_data[g]['wave']**2/2.99e18/1.e-23/1.e-9
+            elif units == 'uJy':
+                unit_corr = sp_data[g]['wave']**2/2.99e18/1.e-23/1.e-6
+            else: # 'flam
+                unit_corr = 1./1.e-19/pscale
+            
+            flux = (sp_data[g]['flux']/sp_flat[g]['flux']*unit_corr)[clip]
+            err = (sp_data[g]['err']/sp_flat[g]['flux']*unit_corr)[clip]
             
             if fill:
                 axc.fill_between(sp_data[g]['wave'][clip]/1.e4, flux-err, flux+err, color=GRISM_COLORS[g], alpha=0.8, zorder=1) 
             else:
                 axc.errorbar(sp_data[g]['wave'][clip]/1.e4, flux, err, color=GRISM_COLORS[g], alpha=0.8, marker='.', linestyle='None', zorder=1) 
                 
-            if tfit is None:
+            if (tfit is None) & (clip.sum() > 0):
                 # Plot limits         
                 ymax = np.maximum(ymax, np.percentile(flux+err, 98))
                 ymin = np.minimum(ymin, np.percentile(flux-err, 2))
