@@ -1,6 +1,6 @@
 """
-Generate PSF at an arbitrary position in a 
-drizzled image
+Generate PSF at an arbitrary position in a drizzled image using the WFC3/IR
+effective PSFs.
 """
 import os
 from collections import OrderedDict
@@ -23,6 +23,18 @@ except:
     
 class DrizzlePSF(object):
     def __init__(self, flt_files=DEMO_LIST, info=None, driz_image=DEMO_IMAGE):
+        """
+        Object for making drizzled PSFs
+        
+        Parameters
+        ----------
+        flt_files : list
+            List of FLT files that were used to create the drizzled image.
+        
+        driz_image : str
+            Filename of the drizzled image.
+            
+        """
         if info is None:
             self.wcs, self.footprint = self._get_flt_wcs(flt_files)
             self.flt_files = flt_files
@@ -39,6 +51,9 @@ class DrizzlePSF(object):
         
     @staticmethod
     def _get_flt_wcs(flt_files):
+        """
+        TBD
+        """
         wcs = OrderedDict()
         footprint = OrderedDict()
         
