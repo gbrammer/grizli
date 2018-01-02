@@ -2679,7 +2679,7 @@ def find_single_image_CRs(visit, simple_mask=False):
         
         flt.flush()
         
-def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, max_files=999, pixfrac=0.8, scale=0.06, skysub=True, skyuser='MDRIZSKY', bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='EXP', final_wt_scl='exptime'):
+def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, max_files=999, pixfrac=0.8, scale=0.06, skysub=True, skymethod='localmin', skyuser='MDRIZSKY', bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='EXP', final_wt_scl='exptime'):
     """Combine overlapping visits into single output mosaics
     
     Parameters
@@ -2802,7 +2802,7 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, m
         if 'reference' in group:
             AstroDrizzle(group['files'], output=group['product'],
                      clean=True, context=False, preserve=False,
-                     skysub=skysub, skyuser=skyuser,
+                     skysub=skysub, skyuser=skyuser, skymethod=skymethod,
                      driz_separate=False, driz_sep_wcs=False,
                      median=False, blot=False, driz_cr=False,
                      driz_cr_corr=False, driz_combine=True,
@@ -2815,7 +2815,7 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, m
         else:
             AstroDrizzle(group['files'], output=group['product'],
                      clean=True, context=False, preserve=False,
-                     skysub=skysub, skyuser=skyuser,
+                     skysub=skysub, skyuser=skyuser, skymethod=skymethod,
                      driz_separate=False, driz_sep_wcs=False,
                      median=False, blot=False, driz_cr=False,
                      driz_cr_corr=False, driz_combine=True,
