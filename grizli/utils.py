@@ -3,6 +3,8 @@ import os
 import glob
 from collections import OrderedDict
 
+import warnings
+
 import astropy.io.fits as pyfits
 import astropy.wcs as pywcs
 import astropy.table
@@ -64,6 +66,24 @@ GRISM_LIMITS = {'G800L':[0.545, 1.02, 40.], # ACS/WFC
 
 DEFAULT_LINE_LIST = ['PaB', 'HeI-1083', 'SIII', 'SII', 'Ha', 'OI-6302', 'OIII', 'Hb', 'OIII-4363', 'Hg', 'Hd', 'NeIII', 'OII', 'NeVI', 'NeV', 'MgII','CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'NIII-1750', 'NIV-1487', 'NV-1240', 'Lya']
 
+def set_warnings(numpy_level='ignore', astropy_level='ignore'):
+    """
+    Set global numpy and astropy warnings
+    
+    Parameters
+    ----------
+    numpy_level : {'ignore', 'warn', 'raise', 'call', 'print', 'log'}
+        Numpy error level (see `~numpy.seterr`).
+        
+    astropy_level : {'error', 'ignore', 'always', 'default', 'module', 'once'}
+        Astropy error level (see `~warnings.simplefilter`).
+    
+    """
+    from astropy.utils.exceptions import AstropyWarning
+    
+    np.seterr(all=numpy_level)
+    warnings.simplefilter(astropy_level, category=AstropyWarning)
+    
 def get_flt_info(files=[], columns=['FILE', 'FILTER', 'INSTRUME', 'DETECTOR', 'TARGNAME', 'DATE-OBS', 'TIME-OBS', 'EXPSTART', 'EXPTIME', 'PA_V3', 'RA_TARG', 'DEC_TARG', 'POSTARG1', 'POSTARG2']):
     """Extract header information from a list of FLT files
     
@@ -2229,8 +2249,9 @@ class EffectivePSF(object):
             
             self.epsf[filter] = data
         
-        # Dummy, use F105W ePSF for F098M
+        # Dummy, use F105W ePSF for F098M and F110W
         self.epsf['F098M'] = self.epsf['F105W']
+        self.epsf['F110W'] = self.epsf['F105W']
         
         # Extended
         self.extended_epsf = {}
@@ -2257,6 +2278,7 @@ class EffectivePSF(object):
             self.extended_N = int(NX)
             
         self.extended_epsf['F098M'] = self.extended_epsf['F105W']
+        self.extended_epsf['F110W'] = self.extended_epsf['F105W']
         
     def get_at_position(self, x=507, y=507, filter='F140W'):
         """Evaluate ePSF at detector coordinates
