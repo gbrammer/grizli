@@ -406,6 +406,48 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
             
     return output_list, filter_list
 
+def get_visit_footprints(visits):
+    """
+    Add `~shapely.geometry.Polygon` 'footprint' attributes to visit dict.
+        
+    Parameters
+    ----------
+    visits : list
+        List of visit dictionaries.
+    
+    """
+    
+    import os
+    
+    import astropy.io.fits as pyfits
+    import astropy.wcs as pywcs
+    
+    from shapely.geometry import Polygon
+    
+    N = len(visits)
+    for i in range(N):
+        for j in range(len(visits[i]['files'])):
+            flt_file = visits[i]['files'][j]
+            if (not os.path.exists(flt_file)) & os.path.exists('../RAW/'+flt_file):
+                flt_file = '../RAW/'+flt_file
+                
+            flt_j = pyfits.open(flt_file)
+            h = flt_j[0].header
+            if (h['INSTRUME'] == 'WFC3') & (h['DETECTOR'] == 'IR'):
+                wcs_j = pywcs.WCS(flt_j['SCI',1])
+            else:
+                wcs_j = pywcs.WCS(flt_j['SCI',1], fobj=flt_j)
+                
+            fp_j = Polygon(wcs_j.calc_footprint())
+            if j == 0:
+                fp_i = fp_j
+            else:
+                fp_i = fp_i.union(fp_j)
+        
+        visits[i]['footprint'] = fp_i
+    
+    return visits
+    
 def parse_visit_overlaps(visits, buffer=15.):
     """Find overlapping visits/filters to make combined mosaics
     
