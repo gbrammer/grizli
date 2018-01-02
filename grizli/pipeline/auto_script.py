@@ -1378,11 +1378,14 @@ def update_wcs_headers_with_fine(field_root, backup=True):
                                                 xyscale=trans[j,:])
                 
         
-def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140W','F160W'], ref_image=None, bits=None):
+def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140W','F160W'], ref_image=None, bits=None, pixfrac=0.6, scale=0.06):
     import numpy as np
-    #import grizli
-    from .. import prep
-    
+
+    try:
+        from .. import prep
+    except:
+        from grizli import prep
+        
     ##############
     ## Redrizzle
     
@@ -1413,9 +1416,9 @@ def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140
     
     keep = [filter_groups[k] for k in filter_groups]
     
-    prep.drizzle_overlaps([wfc3ir], parse_visits=False, pixfrac=0.6, scale=0.06, skysub=False, bits=bits, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False)
+    prep.drizzle_overlaps([wfc3ir], parse_visits=False, pixfrac=scale, scale=scale, skysub=False, bits=bits, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False)
                 
-    prep.drizzle_overlaps(keep, parse_visits=False, pixfrac=0.6, scale=0.06, skysub=False, bits=bits, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False)
+    prep.drizzle_overlaps(keep, parse_visits=False, pixfrac=scale, scale=scale, skysub=False, bits=bits, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False)
         
 ######################
 ## Objective function for catalog shifts      
