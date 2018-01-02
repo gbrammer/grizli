@@ -947,7 +947,7 @@ class GroupFLT():
         return outsci, outwht
 
 class MultiBeam(GroupFitter):
-    def __init__(self, beams, group_name='group', fcontam=0., psf=False, polyx=[0.3, 2.5], MW_EBV=0.):
+    def __init__(self, beams, group_name='group', fcontam=0., psf=False, polyx=[0.3, 2.5], MW_EBV=0., sys_err=0.0):
         """Tools for dealing with multiple `~.model.BeamCutout` instances 
         
         Parameters
@@ -979,6 +979,13 @@ class MultiBeam(GroupFitter):
             else:
                 self.beams = beams
         
+        # minimum error
+        self.sys_err = sys_err
+        for beam in self.beams:
+            beam.ivarf = 1./(1/beam.ivarf + (sys_err*beam.scif)**2)
+            beam.ivarf[~np.isfinite(beam.ivarf)] = 0
+            beam.ivar = beam.ivarf.reshape(beam.sh)
+            
         self._set_MW_EBV(MW_EBV)
         self._parse_beams(psf=psf)
         self.Nphot = 0
@@ -1084,12 +1091,15 @@ class MultiBeam(GroupFitter):
                                                
         self.DoF = self.fit_mask.sum()
         self.ivarf = np.hstack([b.ivarf for b in self.beams])
-        self.ivarf[~np.isfinite(self.ivarf)] = 0
-        self.sivarf = np.sqrt(self.ivarf)
         
         self.fit_mask &= (self.ivarf >= 0) 
         
         self.scif = np.hstack([b.scif for b in self.beams])
+
+        #self.ivarf = 1./(1/self.ivarf + (self.sys_err*self.scif)**2)
+        self.ivarf[~np.isfinite(self.ivarf)] = 0
+        self.sivarf = np.sqrt(self.ivarf)
+
         self.wavef = np.hstack([b.wavef for b in self.beams])
         self.contamf = np.hstack([b.contam.flatten() for b in self.beams])
         
