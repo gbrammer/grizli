@@ -1041,17 +1041,23 @@ def summary_catalog(field_root='', dzbin=0.02, use_localhost=True):
     fit = fitting.make_summary_catalog(target=field_root, sextractor=None)
     
     ## Add photometric catalog
-    phot = utils.GTable.gread('{0}_phot.fits'.format(field_root))
-    sex = utils.GTable.gread('../Prep/{0}-ir.cat'.format(field_root))
-    idx = np.arange(len(phot))
-    phot_idx = np.array([idx[phot['id'] == id][0] for id in fit['id']])
+    try:
+        sex = utils.GTable.gread('../Prep/{0}-ir.cat'.format(field_root))
+    except:
+        sex = utils.GTable.gread('../Prep/{0}-ir.cat'.format(field_root), sextractor=True)
+        
+    idx = np.arange(len(sex))
     sex_idx = np.array([idx[sex['NUMBER'] == id][0] for id in fit['id']])
     
-    for col in ['ellipticity', 'source_flam']:
-        fit[col] = phot[col][phot_idx]
+    phot_file = '{0}_phot.fits'.format(field_root)
+    if os.path.exists(phot_file):
+        phot = utils.GTable.gread(phot_file)
+        phot_idx = np.array([idx[phot['id'] == id][0] for id in fit['id']])
+        for col in ['ellipticity', 'source_flam']:
+            fit[col] = phot[col][phot_idx]
         
-    fit['ellipticity'].format = '.2f'
-    fit['source_flam'].format = '.2e'
+        fit['ellipticity'].format = '.2f'
+        fit['source_flam'].format = '.2e'
     
     for col in ['MAG_AUTO', 'FLUX_RADIUS']:
         fit[col.lower()] = sex[col][sex_idx]
@@ -1061,12 +1067,11 @@ def summary_catalog(field_root='', dzbin=0.02, use_localhost=True):
     
     for c in ['log_risk', 'log_pdf_max', 'zq','chinu', 'bic_diff']: fit[c].format = '.2f'
     for c in ['z_map', 'ra', 'dec']: fit[c].format = '.4f'
-    
-    for col in ['FLUX_RADIUS', 'MAG_AUTO']:
-        fit[col] = sex[col][phot_idx]
-        
+            
     clip = (fit['chinu'] < 2.0) & (fit['log_risk'] < -1)
     clip = (fit['chinu'] < 2.0) & (fit['zq'] < -3) & (fit['zwidth1']/(1+fit['z_map']) < 0.005)
+    clip &= fit['bic_diff'] > 40
+    
     bins = utils.log_zgrid(zr=[0.1, 3.5], dz=dzbin)
     
     fig = plt.figure(figsize=[6,4])
