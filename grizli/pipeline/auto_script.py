@@ -143,6 +143,7 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
     
     ######################
     ### Parse visit associations
+    os.chdir(os.path.join(HOME_PATH, root, 'Prep'))
     auto_script.parse_visits(field_root=root, HOME_PATH=HOME_PATH, use_visit=True, combine_same_pa=is_parallel_field)
     
     # Alignment catalogs
@@ -156,6 +157,7 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
 
     #####################
     ### Alignment & mosaics    
+    os.chdir(os.path.join(HOME_PATH, root, 'Prep'))
     auto_script.preprocess(field_root=root, HOME_PATH=HOME_PATH, make_combined=False, catalogs=catalogs, use_visit=True)
         
     # Fine alignment
@@ -310,7 +312,7 @@ def remove_bad_expflag(field_root='', HOME_PATH='./', min_bad=2):
         from grizli import prep, utils
     
     os.chdir(os.path.join(HOME_PATH, field_root, 'RAW'))
-    os.system('dfits *raw.fits | fitsort EXPFLAG > expflag.info')
+    os.system('dfits *raw.fits *flc.fits | fitsort EXPFLAG > expflag.info')
     
     expf = utils.GTable.gread('expflag.info', format='ascii')
     visit_name = np.array([file[:6] for file in expf['FILE']])
@@ -342,9 +344,7 @@ def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=
         from .. import prep, utils
     except:
         from grizli import prep, utils
-        
-    os.chdir(os.path.join(HOME_PATH, field_root, 'Prep'))
-    
+            
     files=glob.glob('../RAW/*fl[tc].fits')
     info = utils.get_flt_info(files)
     #info = info[(info['FILTER'] != 'G141') & (info['FILTER'] != 'G102')]
@@ -413,9 +413,7 @@ def manual_alignment(field_root='j151850-813028', HOME_PATH='/Volumes/Pegasus/Gr
     #import grizli
     from ..prep import get_radec_catalog
     from .. import utils, prep
-    
-    os.chdir(os.path.join(HOME_PATH, field_root, 'Prep'))
-    
+        
     files = glob.glob('*guess')
     if (len(files) > 0) & skip:
         return True
@@ -463,8 +461,6 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
     except:
         from grizli import prep, utils
         
-    os.chdir(os.path.join(HOME_PATH, field_root, 'Prep'))
-    
     files=glob.glob('../RAW/*fl[tc].fits')
     visits, all_groups, info = np.load('{0}_visits.npy'.format(field_root))
     
@@ -1225,9 +1221,7 @@ def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Griz
     from scipy.optimize import minimize, fmin_powell
     
     import copy
-    
-    os.chdir(os.path.join(HOME_PATH, field_root, 'Prep'))
-    
+        
     all_visits, all_groups, info = np.load('{0}_visits.npy'.format(field_root))
     #all_visits, filters = utils.parse_flt_files(info=info, uniquename=True, get_footprint=False)
     
