@@ -6,7 +6,6 @@ import os
 from collections import OrderedDict
 
 import numpy as np
-from shapely.geometry import Polygon, Point
 
 import astropy.io.fits as pyfits
 import astropy.wcs as pywcs
@@ -54,6 +53,8 @@ class DrizzlePSF(object):
         """
         TBD
         """
+        from shapely.geometry import Polygon, Point
+        
         wcs = OrderedDict()
         footprint = OrderedDict()
         
@@ -122,6 +123,7 @@ class DrizzlePSF(object):
     def get_psf(self, ra=53.06967306, dec=-27.72333015, filter='F140W', pixfrac=0.1, kernel='point', verbose=True, wcs_slice=None, get_extended=True,
     get_weight=False):
         from drizzlepac.astrodrizzle import adrizzle
+        from shapely.geometry import Polygon, Point
         
         pix = np.arange(-13,14)
         
