@@ -782,7 +782,10 @@ def photutils_catalog(field_root='j142724+334246', threshold=1.8, subtract_bkg=T
     
     return tab
     
-def grism_prep(field_root = 'j142724+334246', ds9=None, refine_niter=3):
+def load_GroupFLT(field_root='j142724+334246', force_ref=None, force_seg=None, force_cat=None, galfit=False, pad=256):
+    """
+    Initialize a GroupFLT object
+    """
     import glob
     import os
     import numpy as np
@@ -794,7 +797,12 @@ def grism_prep(field_root = 'j142724+334246', ds9=None, refine_niter=3):
     
     g141 = info['FILTER'] == 'G141'
     g102 = info['FILTER'] == 'G102'
-    
+                
+    if force_cat is None:
+        catalog = '{0}-ir.cat'.format(field_root)
+    else:
+        catalog = force_cat
+
     if g141.sum() > 0:
         for f in ['F140W', 'F160W', 'F125W', 'F105W', 'F110W', 'F098M', 'F127M', 'F139M', 'F153M', 'F132N', 'F130N', 'F128N', 'F126N', 'F164N', 'F167N']:
             
@@ -804,22 +812,111 @@ def grism_prep(field_root = 'j142724+334246', ds9=None, refine_niter=3):
             # if f in info['FILTER']:
             #     g141_ref = f
             #     break
-    
-        grp = multifit.GroupFLT(grism_files=list(info['FILE'][g141]), direct_files=[], ref_file='{0}-{1}_drz_sci.fits'.format(field_root, g141_ref.lower()), seg_file='{0}-ir_seg.fits'.format(field_root), catalog='{0}-ir.cat'.format(field_root), cpu_count=-1, sci_extn=1, pad=256)
+        
+        ## Segmentation image
+        if force_seg is None:
+            if galfit == 'clean':
+                seg_file = '{0}-{1}_galfit_orig_seg.fits'.format(field_root, g141_ref.lower())
+            elif galfit == 'model':
+                seg_file = '{0}-{1}_galfit_seg.fits'.format(field_root, g141_ref.lower())
+            else:
+                seg_file = '{0}-ir_seg.fits'.format(field_root)
+        else:
+            seg_file = force_seg
+            
+        ## Reference image
+        if force_ref is None:
+            if galfit == 'clean':
+                ref_file = '{0}-{1}_galfit_clean.fits'.format(field_root, g141_ref.lower())
+            elif galfit == 'model':
+                ref_file = '{0}-{1}_galfit.fits'.format(field_root, g141_ref.lower())
+            else:
+                ref_file = '{0}-{1}_drz_sci.fits'.format(field_root, g141_ref.lower())
+            
+        else:
+            ref_file = force_ref
+        
+        grp = multifit.GroupFLT(grism_files=list(info['FILE'][g141]), direct_files=[], ref_file=ref_file, seg_file=seg_file, catalog=catalog, cpu_count=-1, sci_extn=1, pad=pad)
     
     if g102.sum() > 0:
         for f in ['F105W', 'F098M', 'F110W', 'F125W', 'F140W', 'F160W', 'F127M', 'F139M', 'F153M', 'F132N', 'F130N', 'F128N', 'F126N', 'F164N', 'F167N']:
-            if f in info['FILTER']:
+            if os.path.exists('{0}-{1}_drz_sci.fits'.format(field_root, f.lower())):
                 g102_ref = f
                 break
-    
-        grp_i = multifit.GroupFLT(grism_files=list(info['FILE'][g102]), direct_files=[], ref_file='{0}-{1}_drz_sci.fits'.format(field_root, g102_ref.lower()), seg_file='{0}-ir_seg.fits'.format(field_root), catalog='{0}-ir.cat'.format(field_root), cpu_count=-1, sci_extn=1, pad=256)
+        
+        ## Segmentation image
+        if force_seg is None:
+            if galfit == 'clean':
+                seg_file = '{0}-{1}_galfit_orig_seg.fits'.format(field_root, g102_ref.lower())
+            elif galfit == 'model':
+                seg_file = '{0}-{1}_galfit_seg.fits'.format(field_root, g102_ref.lower())
+            else:
+                seg_file = '{0}-ir_seg.fits'.format(field_root)
+        else:
+            seg_file = force_seg
+        
+        ## Reference image
+        if force_ref is None:
+            if galfit == 'clean':
+                ref_file = '{0}-{1}_galfit_clean.fits'.format(field_root, g102_ref.lower())
+            elif galfit == 'model':
+                ref_file = '{0}-{1}_galfit.fits'.format(field_root, g102_ref.lower())
+            else:
+                ref_file = '{0}-{1}_drz_sci.fits'.format(field_root, g102_ref.lower())
+            
+        else:
+            ref_file = force_ref
+                    
+        grp_i = multifit.GroupFLT(grism_files=list(info['FILE'][g102]), direct_files=[], ref_file=ref_file, seg_file=seg_file, catalog=catalog, cpu_count=-1, sci_extn=1, pad=pad)
         if g141.sum() > 0:
             grp.extend(grp_i)
         else:
             grp = grp_i
             
         del(grp_i)
+    
+    return grp
+    
+def grism_prep(field_root='j142724+334246', ds9=None, refine_niter=3):
+    import glob
+    import os
+    import numpy as np
+    
+    from .. import prep, utils, multifit
+
+    grp = laod_GroupFLT(field_root=field_root)
+    
+    # files=glob.glob('../RAW/*fl[tc].fits')
+    # info = utils.get_flt_info(files)
+    # 
+    # g141 = info['FILTER'] == 'G141'
+    # g102 = info['FILTER'] == 'G102'
+    # 
+    # if g141.sum() > 0:
+    #     for f in ['F140W', 'F160W', 'F125W', 'F105W', 'F110W', 'F098M', 'F127M', 'F139M', 'F153M', 'F132N', 'F130N', 'F128N', 'F126N', 'F164N', 'F167N']:
+    #         
+    #         if os.path.exists('{0}-{1}_drz_sci.fits'.format(field_root, f.lower())):
+    #             g141_ref = f
+    #             break
+    #         # if f in info['FILTER']:
+    #         #     g141_ref = f
+    #         #     break
+    # 
+    #     grp = multifit.GroupFLT(grism_files=list(info['FILE'][g141]), direct_files=[], ref_file='{0}-{1}_drz_sci.fits'.format(field_root, g141_ref.lower()), seg_file='{0}-ir_seg.fits'.format(field_root), catalog='{0}-ir.cat'.format(field_root), cpu_count=-1, sci_extn=1, pad=256)
+    # 
+    # if g102.sum() > 0:
+    #     for f in ['F105W', 'F098M', 'F110W', 'F125W', 'F140W', 'F160W', 'F127M', 'F139M', 'F153M', 'F132N', 'F130N', 'F128N', 'F126N', 'F164N', 'F167N']:
+    #         if f in info['FILTER']:
+    #             g102_ref = f
+    #             break
+    # 
+    #     grp_i = multifit.GroupFLT(grism_files=list(info['FILE'][g102]), direct_files=[], ref_file='{0}-{1}_drz_sci.fits'.format(field_root, g102_ref.lower()), seg_file='{0}-ir_seg.fits'.format(field_root), catalog='{0}-ir.cat'.format(field_root), cpu_count=-1, sci_extn=1, pad=256)
+    #     if g141.sum() > 0:
+    #         grp.extend(grp_i)
+    #     else:
+    #         grp = grp_i
+    #         
+    #     del(grp_i)
     
     ################
     # Compute preliminary model
@@ -1026,6 +1123,7 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
     
     # Re-save data with updated models
     grp.save_full_data()
+    return grp
     
 def summary_catalog(field_root='', dzbin=0.02, use_localhost=True):
     """
