@@ -489,13 +489,15 @@ class GroupFLT():
         if verbose:
             print('Now we have {0:d} FLTs'.format(self.N))
             
-    def compute_single_model(self, id, mag=-99, size=-1, store=False, spectrum_1d=None, is_cgs=False, get_beams=None, in_place=True, psf_param_dict={}):
+    def compute_single_model(self, id, center_rd=None, mag=-99, size=-1, store=False, spectrum_1d=None, is_cgs=False, get_beams=None, in_place=True, psf_param_dict={}):
         """Compute model spectrum in all exposures
         TBD
         
         Parameters
         ----------
         id : type
+        
+        center_rd : None
         
         mag : type
         
@@ -521,8 +523,13 @@ class GroupFLT():
                 psf_params = psf_param_dict[flt.grism.parent_file]
             else:
                 psf_params = None
+            
+            if center_rd is None:
+                x = y = None
+            else:
+                x, y = flt.direct.wcs.all_world2pix(np.array(center_rd)[None,:], 0).flatten()
                 
-            status = flt.compute_model_orders(id=id, verbose=False,
+            status = flt.compute_model_orders(id=id, x=x, y=y, verbose=False,
                           size=size, compute_size=(size < 0),
                           mag=mag, in_place=in_place, store=store,
                           spectrum_1d=spectrum_1d, is_cgs=is_cgs,
@@ -579,11 +586,11 @@ class GroupFLT():
         if verbose:
             print('Models computed - {0:.2f} sec.'.format(t1_pool - t0_pool))
         
-    def get_beams(self, id, size=10, beam_id='A', min_overlap=0.2, 
+    def get_beams(self, id, size=10, center_rd=None, beam_id='A', min_overlap=0.2, 
                   get_slice_header=True):
         """TBD
         """
-        beams = self.compute_single_model(id, size=size, store=False, get_beams=[beam_id])
+        beams = self.compute_single_model(id, center_rd=center_rd, size=size, store=False, get_beams=[beam_id])
         
         out_beams = []
         for flt, beam in zip(self.FLTs, beams):
@@ -3410,7 +3417,8 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
                 if wcs_ext is not None:
                     wcs_ext.crpix[j] = beam_wcs.wcs.crpix[j]
                 
-        ACS_CRPIX = [4096/2,2048/2] # ACS
+        # ACS requires additional wcs attributes
+        ACS_CRPIX = [4096/2,2048/2] 
         dx_crpix = beam_wcs.wcs.crpix[0] - ACS_CRPIX[0]
         dy_crpix = beam_wcs.wcs.crpix[1] - ACS_CRPIX[1]
         for wcs_ext in [beam_wcs.cpdis1, beam_wcs.cpdis2, beam_wcs.det2im1, beam_wcs.det2im2]:

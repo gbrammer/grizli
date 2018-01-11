@@ -2505,6 +2505,12 @@ class GrismFLT(object):
                 ycat = self.catalog['y_flt'][ix][0]-1
                 #print '!!! X, Y: ', xcat, ycat, self.direct.origin, size
                 
+                # use x, y if defined
+                if x is not None:
+                    xcat = x
+                if y is not None: 
+                    ycat = y
+                
             if (compute_size) | (x is None) | (y is None) | (size is None):
                 ### Get the array indices of the segmentation region
                 out = disperse.compute_segmentation_limits(self.seg, id,
