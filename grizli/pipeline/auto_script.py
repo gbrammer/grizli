@@ -880,7 +880,7 @@ def grism_prep(field_root='j142724+334246', ds9=None, refine_niter=3):
     
     from .. import prep, utils, multifit
 
-    grp = laod_GroupFLT(field_root=field_root)
+    grp = load_GroupFLT(field_root=field_root)
     
     # files=glob.glob('../RAW/*fl[tc].fits')
     # info = utils.get_flt_info(files)
