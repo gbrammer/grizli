@@ -2356,10 +2356,20 @@ class GrismFLT(object):
         else:
             self.seg = np.zeros(self.direct.sh, dtype=np.float32)
     
-    def get_dispersion_PA(self):
-        """
-        Compute exact PA of the dispersion axis, including tilt of the 
+    def get_dispersion_PA(self, decimals=0):
+        """Compute exact PA of the dispersion axis, including tilt of the 
         trace and the FLT WCS
+        
+        Parameters
+        ----------
+        decimals : int or None
+            Number of decimal places to round to, passed to `~numpy.round`. 
+            If None, then don't round.
+            
+        Returns
+        -------
+        dispersion_PA : float
+            PA (angle East of North) of the dispersion axis.
         """
         from astropy.coordinates import Angle
         import astropy.units as u
@@ -2380,7 +2390,12 @@ class GrismFLT(object):
                     np.arctan2(np.diff(r)*np.cos(d[0]/180*np.pi),
                                np.diff(d))[0]/np.pi*180)*u.deg)
                         
-        self.dispersion_PA = pa.wrap_at(360*u.deg).value
+        dispersion_PA = pa.wrap_at(360*u.deg).value
+        if decimals is not None:
+            dispersion_PA = np.round(dispersion_PA, decimals=decimals)
+        
+        self.dispersion_PA = dispersion_PA
+        return dispersion_PA
         
     def compute_model_orders(self, id=0, x=None, y=None, size=10, mag=-1,
                       spectrum_1d=None, is_cgs=False,
@@ -3846,7 +3861,7 @@ class BeamCutout(object):
         ra, dec = self.direct.wcs.all_pix2world(pix_center, 1)[0]
         return ra, dec
     
-    def get_dispersion_PA(self, decimals=1):
+    def get_dispersion_PA(self, decimals=0):
         """Compute exact PA of the dispersion axis, including tilt of the 
         trace and the FLT WCS
         
@@ -3873,7 +3888,6 @@ class BeamCutout(object):
                 
         ### Distorted WCS
         crpix = self.direct.wcs.wcs.crpix
-        
         xref = [crpix[0], crpix[0]+1]
         yref = [crpix[1], crpix[1]]
         r, d = self.direct.wcs.all_pix2world(xref, yref, 1)

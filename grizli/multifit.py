@@ -408,6 +408,37 @@ class GroupFLT():
                 
             t1_pool = time.time()
         
+        # Parse grisms & PAs
+        self.Ngrism = {}
+        for i in range(self.N):
+            if self.FLTs[i].grism.instrument == 'NIRISS':
+                grism = self.FLTs[i].grism.pupil
+            else:
+                grism = self.FLTs[i].grism.filter
+
+            if grism in self.Ngrism:
+                self.Ngrism[grism] += 1
+            else:
+                self.Ngrism[grism] = 1
+
+        self.grisms = list(self.Ngrism.keys())
+
+        self.PA = {}
+        for g in self.Ngrism:
+            self.PA[g] = {}
+
+        for i in range(self.N):
+            if self.FLTs[i].grism.instrument == 'NIRISS':
+                grism = self.FLTs[i].grism.pupil
+            else:
+                grism = self.FLTs[i].grism.filter
+
+            PA = self.FLTs[i].get_dispersion_PA(decimals=0)
+            if PA in self.PA[grism]:
+                self.PA[grism][PA].append(i)
+            else:
+                self.PA[grism][PA] = [i]
+        
         if verbose:
             print('Files loaded - {0:.2f} sec.'.format(t1_pool - t0_pool))
     
