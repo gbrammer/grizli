@@ -1125,6 +1125,7 @@ def summary_catalog(field_root='', dzbin=0.02, use_localhost=True):
     """
     Make redshift histogram and summary catalog / HTML table
     """
+    import os
     import numpy as np
     from matplotlib.ticker import FixedLocator
     import matplotlib.pyplot as plt
