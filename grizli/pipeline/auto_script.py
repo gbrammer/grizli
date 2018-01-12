@@ -1190,7 +1190,7 @@ def summary_catalog(field_root='', dzbin=0.02, use_localhost=True):
     fig.tight_layout(pad=0.2)
     fig.savefig('{0}_zhist.png'.format(field_root))
 
-    fit['id','ra', 'dec', 'mag_auto', 'z_map','log_risk', 'log_pdf_max', 'zq', 'chinu', 'bic_diff', 'png_stack', 'png_full', 'png_line'].write_sortable_html(field_root+'-fit.html', replace_braces=True, localhost=use_localhost, max_lines=50000, table_id=None, table_class='display compact', css=None)
+    fit['id','ra', 'dec', 'mag_auto', 'z_map','log_risk', 'log_pdf_max', 'zq', 'chinu', 'bic_diff', 'zwidth1', 'png_stack', 'png_full', 'png_line'].write_sortable_html(field_root+'-fit.html', replace_braces=True, localhost=use_localhost, max_lines=50000, table_id=None, table_class='display compact', css=None)
         
     fit['id','ra', 'dec', 'mag_auto', 'z_map','log_risk', 'log_pdf_max', 'zq', 'chinu', 'bic_diff', 'zwidth1', 'png_stack', 'png_full', 'png_line'][clip].write_sortable_html(field_root+'-fit.zq.html', replace_braces=True, localhost=use_localhost, max_lines=50000, table_id=None, table_class='display compact', css=None)
     
