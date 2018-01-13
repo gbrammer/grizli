@@ -2068,7 +2068,112 @@ def make_wcsheader(ra=40.07293, dec=-1.6137748, size=2, pixscale=0.1, get_hdu=Fa
         return hdu
     else:
         return hout, wcs_out
+        
+def drizzle_array_groups(sci_list, wht_list, wcs_list, scale=0.1, kernel='point', pixfrac=1., verbose=True):
+    """Drizzle array data with associated wcs
     
+    Parameters
+    ----------
+    sci_list, wht_list : list
+        List of science and weight `~numpy.ndarray` objects.
+        
+    wcs_list : list
+    
+    scale : float
+        Output pixel scale in arcsec.
+    
+    kernel, pixfrac : str, float
+        Drizzle parameters
+    
+    verbose : bool
+        Print status messages
+        
+    Returns
+    -------
+    outsci, outwht, outctx : `~numpy.ndarray`
+        Output drizzled science, weight and context images
+        
+    header, outputwcs : `~astropy.fits.io.Header`, `~astropy.wcs.WCS`
+        Drizzled image header and WCS.
+    
+    """
+    from drizzlepac.astrodrizzle import adrizzle
+    from stsci.tools import logutil
+    log = logutil.create_logger(__name__)
+    
+    # Output header / WCS    
+    header, outputwcs = compute_output_wcs(wcs_list, pixel_scale=scale)
+    shape = (header['NAXIS2'], header['NAXIS1'])
+    
+    # Output arrays
+    outsci = np.zeros(shape, dtype=np.float32)
+    outwht = np.zeros(shape, dtype=np.float32)
+    outctx = np.zeros(shape, dtype=np.int32)
+    
+    # Do drizzle
+    N = len(sci_list)
+    for i in range(N):
+        if verbose:
+            log.info('Drizzle array {0}/{1}'.format(i+1, N))
+            
+        adrizzle.do_driz(sci_list[i].astype(np.float32, copy=False), 
+                         wcs_list[i], 
+                         wht_list[i].astype(np.float32, copy=False),
+                         outputwcs, outsci, outwht, outctx, 1., 'cps', 1,
+                         wcslin_pscale=wcs_list[i].pscale, uniqid=1, 
+                         pixfrac=pixfrac, kernel=kernel, fillval=0, 
+                         stepsize=10, wcsmap=None)
+        
+    return outsci, outwht, outctx, header, outputwcs
+    
+def compute_output_wcs(wcs_list, pixel_scale=0.1, max_size=10000):
+    """
+    Compute output WCS that contains the full list of input WCS
+    
+    Parameters
+    ----------
+    wcs_list : list
+        List of individual `~astropy.wcs.WCS` objects.
+        
+    pixel_scale : type
+        Pixel scale of the output WCS
+    
+    max_size : int
+        Maximum size out the output image dimensions
+        
+    Returns
+    -------
+    header : `~astropy.io.fits.Header`
+        WCS header
+        
+    outputwcs : `~astropy.wcs.WCS`
+        Output WCS
+    
+    """
+    from shapely.geometry import Polygon
+            
+    footprint = Polygon(wcs_list[0].calc_footprint())
+    for i in range(1, len(wcs_list)):
+        fp_i = Polygon(wcs_list[i].calc_footprint())
+        footprint = footprint.union(fp_i)
+    
+    x, y = footprint.convex_hull.boundary.xy
+    x, y = np.array(x), np.array(y)
+
+    # center
+    crval = np.array(footprint.centroid.xy).flatten()
+    
+    # dimensions in arcsec
+    xsize = (x.max()-x.min())*np.cos(crval[1]/180*np.pi)*3600
+    ysize = (y.max()-y.min())*3600
+
+    xsize = np.minimum(xsize, max_size*pixel_scale)
+    ysize = np.minimum(ysize, max_size*pixel_scale)
+    
+    header, outputwcs = make_wcsheader(ra=crval[0], dec=crval[1], size=(xsize, ysize), pixscale=pixel_scale, get_hdu=False, theta=0)
+    
+    return header, outputwcs
+
 def fetch_hst_calib(file='iref$uc72113oi_pfl.fits',  ftpdir='https://hst-crds.stsci.edu/unchecked_get/references/hst/', verbose=True):
     """
     TBD
