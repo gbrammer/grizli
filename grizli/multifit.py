@@ -841,7 +841,73 @@ class GroupFLT():
                         clobber=True)
         
         return hdu, fig
-         
+    
+    def drizzle_grism_models(self, root='grism_model', kernel='square', scale=0.1, pixfrac=1):
+        """
+        Make model-subtracted drizzled images of each grism / PA
+        
+        Parameters
+        ----------
+        root : str
+            Rootname of the output files.
+            
+        kernel : str
+            Drizzle kernel e.g., ('square', 'point').
+            
+        scale : float
+            Drizzle `scale` parameter, pixel scale in arcsec.
+            
+        pixfrac : float
+            Drizzle "pixfrac".
+        
+        """
+        from .utils import drizzle_array_groups
+        
+        # Loop through grisms and PAs
+        for g in self.PA:
+            for pa in self.PA[g]:
+                idx = self.PA[g][pa]
+
+                N = len(idx)
+                sci_list = [self.FLTs[i].grism['SCI'] for i in idx]
+                clean_list = [self.FLTs[i].grism['SCI']-self.FLTs[i].model 
+                                 for i in idx]
+
+                wht_list = [1/self.FLTs[i].grism['ERR']**2 for i in idx]
+                for i in range(N):
+                    mask = ~np.isfinite(wht_list[i])
+                    wht_list[i][mask] = 0
+
+                wcs_list = [self.FLTs[i].grism.wcs for i in idx]
+
+                # Science array
+                outfile='{0}-{1}-{2}_grism_sci.fits'.format(root, g.lower(),
+                                                            pa)
+                print(outfile)
+                out = drizzle_array_groups(sci_list, wht_list, wcs_list,
+                                           scale=scale, kernel=kernel, 
+                                           pixfrac=pixfrac)
+                                           
+                outsci, _, _, header, outputwcs = out
+                header['FILTER'] = g
+                header['PA'] = pa
+                pyfits.writeto(outfile, data=outsci, header=header, 
+                               overwrite=True, output_verify='fix')
+
+                # Model-subtracted
+                outfile='{0}-{1}-{2}_grism_clean.fits'.format(root, g.lower(), 
+                                                              pa)
+                print(outfile) 
+                out = drizzle_array_groups(clean_list, wht_list, wcs_list,
+                                           scale=scale, kernel=kernel, 
+                                           pixfrac=pixfrac)
+                                           
+                outsci, _, _, header, outputwcs = out
+                header['FILTER'] = g
+                header['PA'] = pa
+                pyfits.writeto(outfile, data=outsci, header=header, 
+                               overwrite=True, output_verify='fix')
+          
     def drizzle_full_wavelength(self, wave=1.4e4, ref_header=None,
                      kernel='point', pixfrac=1., verbose=True, 
                      offset=[0,0], fcontam=0.):
