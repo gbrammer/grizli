@@ -1183,7 +1183,9 @@ def summary_catalog(field_root='', dzbin=0.01, use_localhost=True):
     
     for c in ['log_risk', 'log_pdf_max', 'zq','chinu', 'bic_diff']: fit[c].format = '.2f'
     for c in ['z_map', 'ra', 'dec']: fit[c].format = '.4f'
-            
+    
+    fit.write('{0}_info.fits'.format(field_root), overwrite=True)
+    
     clip = (fit['chinu'] < 2.0) & (fit['log_risk'] < -1)
     clip = (fit['chinu'] < 2.0) & (fit['zq'] < -3) & (fit['zwidth1']/(1+fit['z_map']) < 0.005)
     clip &= fit['bic_diff'] > -40
