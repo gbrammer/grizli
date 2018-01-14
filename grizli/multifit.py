@@ -861,8 +861,11 @@ class GroupFLT():
             Drizzle "pixfrac".
         
         """
-        from .utils import drizzle_array_groups
-        
+        try:
+            from .utils import drizzle_array_groups
+        except:
+            from grizli.utils import drizzle_array_groups
+            
         # Loop through grisms and PAs
         for g in self.PA:
             for pa in self.PA[g]:
@@ -879,7 +882,10 @@ class GroupFLT():
                     wht_list[i][mask] = 0
 
                 wcs_list = [self.FLTs[i].grism.wcs for i in idx]
-
+                for i, ix in enumerate(idx):
+                    if wcs_list[i]._naxis[0] == 0:
+                        wcs_list[i]._naxis = self.FLTs[ix].grism.sh
+                        
                 # Science array
                 outfile='{0}-{1}-{2}_grism_sci.fits'.format(root, g.lower(),
                                                             pa)
