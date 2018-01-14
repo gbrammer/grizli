@@ -95,7 +95,7 @@ def get_extra_data(root='j114936+222414', HOME_PATH='/Volumes/Pegasus/Grizli/Aut
         os.system('rm {0}/*extper.fits {0}/*flt_cor.fits'.format(root))
         os.system('ln -sf {0}/*persist.fits ./'.format(root))
     
-def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', inspect_ramps=False, manual_alignment=False, is_parallel_field=False, reprocess_parallel=False):
+def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', inspect_ramps=False, manual_alignment=False, is_parallel_field=False, reprocess_parallel=False, only_preprocess=True):
     """
     Run the full pipeline for a given target
         
@@ -162,27 +162,41 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
         
     # Fine alignment
     fine_catalogs = ['GAIA','PS1','SDSS','WISE']
-    try:
-        out = auto_script.fine_alignment(field_root=root, HOME_PATH=HOME_PATH, min_overlap=0.2, stopme=False, ref_err=0.08, catalogs=fine_catalogs, NITER=1, maglim=[17,23], shift_only=True, method='Powell', redrizzle=True, radius=30, program_str=None, match_str=None)
-        plt.close()
+    if not os.path.exists('{0}_fine.png'.format(root)):
+        try:
+            out = auto_script.fine_alignment(field_root=root, HOME_PATH=HOME_PATH, min_overlap=0.2, stopme=False, ref_err=0.08, catalogs=fine_catalogs, NITER=1, maglim=[17,23], shift_only=True, method='Powell', redrizzle=True, radius=30, program_str=None, match_str=None)
+            plt.close()
 
-        # Update WCS headers with fine alignment
-        auto_script.update_wcs_headers_with_fine(root)
+            # Update WCS headers with fine alignment
+            auto_script.update_wcs_headers_with_fine(root)
 
-    except:
-        pass
+        except:
+            pass
             
     ## Make mosaics
-    auto_script.drizzle_overlaps(root, filters=['F105W', 'F110W', 'F125W', 'F140W', 'F160W', 'F098M', 'F139M', 'F127M', 'F153M']) #, filters=filters
+    if not os.path.exists('{0}-ir_drz_sci.fits'.format(root)):
+        auto_script.drizzle_overlaps(root, filters=['F105W', 'F110W', 'F125W', 'F140W', 'F160W', 'F098M', 'F139M', 'F127M', 'F153M']) 
     
     # Photometric catalogs
-    tab = auto_script.photutils_catalog(field_root=root)
-            
+    if not os.path.exists('{0}_phot.fits'.format(root)):
+        tab = auto_script.photutils_catalog(field_root=root)
+    
+    # Stop if only want to run pre-processing
+    if only_preprocess:
+        return True
+                
     ######################
     ### Grism prep
-    os.chdir(os.path.join(HOME_PATH, root, 'Prep'))
-    grp = auto_script.grism_prep(field_root=root, refine_niter=3)
-    del(grp)
+    files = glob.glob('*GrismFLT.fits')
+    if len(files) == 0:
+        os.chdir(os.path.join(HOME_PATH, root, 'Prep'))
+        grp = auto_script.grism_prep(field_root=root, refine_niter=3)
+        
+        # Make drizzle model images
+        grp.drizzle_grism_models(root=root, kernel='point')
+        
+        # Free grp object
+        del(grp)
     
     ######################
     ### Grism extractions
