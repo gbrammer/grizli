@@ -1047,7 +1047,11 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
             continue
             
         mb = multifit.MultiBeam(beams, fcontam=0.5, group_name=target, psf=False, MW_EBV=MW_EBV)
-        fig1 = mb.oned_figure(figsize=[5,3])
+        try:
+            fig1 = mb.oned_figure(figsize=[5,3])
+        except:
+            continue
+            
         fig1.savefig('{0}_{1:05d}.1D.png'.format(target, id))
         
         try:
@@ -1121,7 +1125,7 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
     grp.save_full_data()
     return grp
     
-def summary_catalog(field_root='', dzbin=0.02, use_localhost=True):
+def summary_catalog(field_root='', dzbin=0.01, use_localhost=True):
     """
     Make redshift histogram and summary catalog / HTML table
     """
@@ -1144,15 +1148,18 @@ def summary_catalog(field_root='', dzbin=0.02, use_localhost=True):
     idx = np.arange(len(sex))
     sex_idx = np.array([idx[sex['NUMBER'] == id][0] for id in fit['id']])
     
-    phot_file = '{0}_phot.fits'.format(field_root)
-    if os.path.exists(phot_file):
-        phot = utils.GTable.gread(phot_file)
-        phot_idx = np.array([idx[phot['id'] == id][0] for id in fit['id']])
-        for col in ['ellipticity', 'source_flam']:
-            fit[col] = phot[col][phot_idx]
-        
-        fit['ellipticity'].format = '.2f'
-        fit['source_flam'].format = '.2e'
+    fit['ellipticity'] = (sex['B_IMAGE']/sex['A_IMAGE'])[sex_idx]
+    fit['ellipticity'].format = '.2f'
+    
+    # phot_file = '{0}_phot.fits'.format(field_root)
+    # if os.path.exists(phot_file):
+    #     phot = utils.GTable.gread(phot_file)
+    #     phot_idx = np.array([idx[phot['id'] == id][0] for id in fit['id']])
+    #     for col in ['ellipticity', 'source_flam']:
+    #         fit[col] = phot[col][phot_idx]
+    #     
+    #     fit['ellipticity'].format = '.2f'
+    #     fit['source_flam'].format = '.2e'
     
     for col in ['MAG_AUTO', 'FLUX_RADIUS']:
         fit[col.lower()] = sex[col][sex_idx]
@@ -1165,7 +1172,7 @@ def summary_catalog(field_root='', dzbin=0.02, use_localhost=True):
             
     clip = (fit['chinu'] < 2.0) & (fit['log_risk'] < -1)
     clip = (fit['chinu'] < 2.0) & (fit['zq'] < -3) & (fit['zwidth1']/(1+fit['z_map']) < 0.005)
-    clip &= fit['bic_diff'] > 40
+    clip &= fit['bic_diff'] > -40
     
     bins = utils.log_zgrid(zr=[0.1, 3.5], dz=dzbin)
     
