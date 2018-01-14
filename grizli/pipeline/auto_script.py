@@ -1175,16 +1175,18 @@ def summary_catalog(field_root='', dzbin=0.01, use_localhost=True):
     #     fit['ellipticity'].format = '.2f'
     #     fit['source_flam'].format = '.2e'
     
-    for col in ['MAG_AUTO', 'FLUX_RADIUS']:
+    for col in ['MAG_AUTO', 'FLUX_RADIUS', 'A_IMAGE']:
         fit[col.lower()] = sex[col][sex_idx]
+        fit[col.lower()].format = '.2f'
+            
+    for c in ['log_risk', 'log_pdf_max', 'zq','chinu', 'bic_diff']:
+        fit[c].format = '.2f'
     
-    fit['mag_auto'].format = '.2f'
-    fit['flux_radius'].format = '.2f'
+    for c in ['z_map', 'ra', 'dec']: 
+        fit[c].format = '.4f'
     
-    for c in ['log_risk', 'log_pdf_max', 'zq','chinu', 'bic_diff']: fit[c].format = '.2f'
-    for c in ['z_map', 'ra', 'dec']: fit[c].format = '.4f'
-    
-    fit.write('{0}_info.fits'.format(field_root), overwrite=True)
+    # Overwrite with additional sextractor keywords
+    fit.write('{0}.info.fits'.format(field_root), overwrite=True)
     
     clip = (fit['chinu'] < 2.0) & (fit['log_risk'] < -1)
     clip = (fit['chinu'] < 2.0) & (fit['zq'] < -3) & (fit['zwidth1']/(1+fit['z_map']) < 0.005)
