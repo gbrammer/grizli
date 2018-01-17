@@ -102,6 +102,55 @@ class SersicModel(GalfitModel):
                                  ('n',1),
                                  ('q',1),
                                  ('pa',1)])
+
+class PSFModel(GalfitModel):
+    def __init__(self, position=[0,0], magnitude=20., output=0, id=0, wcs=None):
+        self.type = 'psf'
+        self.id = 0
+        
+        if wcs is not None:
+            self.ra, self.dec = np.array(wcs.all_world2pix([position[0]], 
+                                                          [position[1]],0))[0]
+                                                           
+        else:
+            self.ra = self.dec = None
+                
+        self.pidx = OrderedDict([('position',1),
+                                 ('magnitude',3),
+                                 ('output','Z')])
+                 
+        self.pdict = OrderedDict([('position',position),
+                                  ('magnitude',magnitude),
+                                  ('output',output)]) 
+        
+        self.pfree = OrderedDict([('position',[1,1]),
+                                 ('magnitude',1)])
+
+class SkyModel(GalfitModel):
+    def __init__(self, background=0, dx=0, dy=0, output=0, id=0, wcs=None, position=[0,0]):
+        self.type = 'sky'
+        self.id = 0
+        
+        if wcs is not None:
+            self.ra, self.dec = np.array(wcs.all_world2pix([position[0]], 
+                                                          [position[1]],0))[0]
+                                                           
+        else:
+            self.ra = self.dec = None
+                
+        self.pidx = OrderedDict([('background',1),
+                                 ('dx',2),
+                                 ('dy',3),
+                                 ('output','Z')])
+                 
+        self.pdict = OrderedDict([('background',background),
+                                  ('dx',dx),
+                                  ('dy',dy),
+                                  ('output',output)]) 
+        
+        self.pfree = OrderedDict([('background',1),
+                                 ('dx',1),
+                                 ('dy',1)])
                                                                  
 SERSIC="""
 # Object number: 1
@@ -266,7 +315,50 @@ class GalfitSersic(GalfitObject):
         elif dev:
             self.set(n=4)
             self.setfree(n=0)
-    
+            
+class GalfitPSF(GalfitObject):
+    def __init__(self, output=0, fix={}, **keys): 
+        import copy
+        
+        self.pidx = OrderedDict([('pos',1),
+                                 ('mag',3)])
+                                                  
+        self.pdef = OrderedDict([('pos', [0,0]),
+                                  ('mag', 20.)]) 
+                                            
+        self.pfree = OrderedDict([('pos', [1,1]), 
+                                  ('mag', 1)])
+        
+        self.name = 'psf'
+        self.output = output
+        
+        self.pdict = copy.deepcopy(self.pdef)
+        self.set(**keys)
+        self.setfree(**fix)
+
+class GalfitSky(GalfitObject):
+    def __init__(self, output=0, fix={}, **keys): 
+        import copy
+                
+        self.pidx = OrderedDict([('bg',1),
+                                 ('dx',2),
+                                 ('dy',3)])
+                                                  
+        self.pdef = OrderedDict([('bg', 0.),
+                                  ('dx', 0.),
+                                  ('dy', 0.)]) 
+                                            
+        self.pfree = OrderedDict([('bg', 1), 
+                                  ('dx', 0),
+                                  ('dy', 0)])
+        
+        self.name = 'sky'
+        self.output = output
+        
+        self.pdict = copy.deepcopy(self.pdef)
+        self.set(**keys)
+        self.setfree(**fix)
+                                
 class Galfitter(object):
     def __init__(self, root='sdssj1723+3411', filter='f140w', galfit_exec='galfit'):
         self.root = root
