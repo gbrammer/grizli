@@ -87,7 +87,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     
     if scale_photometry:
         scl = mb.scale_to_photometry(z=fit.meta['z_map'][0], method='lm', templates=t0, order=scale_photometry*1)
-        if scl.status == 0:
+        if scl.status > 0:
             mb.pscale = scl.x
             st.pscale = scl.x
             
