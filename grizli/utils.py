@@ -1476,6 +1476,37 @@ def load_templates(fwhm=400, line_complexes=True, stars=False,
                                  
     return temp_list    
 
+def load_sdss_pca_templates(file='spEigenQSO-55732.fits', smooth=3000):
+    """
+    Load SDSS eigen templates
+    """
+    from collections import OrderedDict
+    import scipy.ndimage as nd
+    
+    im = pyfits.open(os.path.join(os.getenv('GRIZLI'), 'templates', file))
+    h = im[0].header
+    log_wave = np.arange(h['NAXIS1'])*h['COEFF1']+h['COEFF0']
+    wave = 10**log_wave
+    
+    name = file.split('.fits')[0]
+    
+    if smooth > 0:
+        dv_in = h['COEFF1']*3.e5
+        n = smooth / dv_in
+        data = nd.gaussian_filter1d(im[0].data, n, axis=1).astype(np.float64)
+        skip = int(n/2.5)
+        wave = wave[::skip]
+        data = data[:,::skip]
+    else:
+        data = im[0].data.astype(np.float64)
+        
+    N = h['NAXIS2']
+    temp_list = OrderedDict()
+    for i in range(N):
+        temp_list['{0} {1}'.format(name, i+1)] = SpectrumTemplate(wave=wave, flux=data[i,:])
+    
+    return temp_list
+    
 def polynomial_templates(wave, order=0, line=False):
     temp = OrderedDict()  
     if line:
@@ -2767,7 +2798,8 @@ td {font-size: 10pt;}
         self.write(output, format='jsviewer', css=DEFAULT_CSS,
                             max_lines=max_lines,
                             jskwargs={'use_local_files':localhost},
-                            table_id=None, table_class=table_class)
+                            table_id=None, table_class=table_class,
+                            overwrite=True)
 
         if replace_braces:
             lines = open(output).readlines()
@@ -2878,5 +2910,30 @@ def mode_statistic(data, percentiles=range(10,91,10)):
     mode = data[so][ix]
     return mode
     
+def make_alf_template():
+    """
+    Make Alf + FSPS template
+    """
+    import alf.alf
+    import fsps
     
+    ssp = alf.alf.Alf()
+    
+    sp = fsps.StellarPopulation(zcontinuous=1)
+    sp.params['logzsol'] = 0.2
+
+    # Alf
+    m = ssp.get_model(in_place=False, logage=0.96, zh=0.2, mgh=0.2)
+    
+    # FSPS
+    w, spec = sp.get_spectrum(tage=10**0.96, peraa=True)
+    
+    # blue
+    blue_norm = spec[w > 3600][0] / m[ssp.wave > 3600][0]
+    red_norm = spec[w > 1.7e4][0] / m[ssp.wave > 1.7e4][0]
+    
+    templx = np.hstack([w[w < 3600], ssp.wave[(ssp.wave > 3600) & (ssp.wave < 1.7e4)], w[w > 1.7e4]])
+    temply = np.hstack([spec[w < 3600]/blue_norm, m[(ssp.wave > 3600) & (ssp.wave < 1.7e4)], spec[w > 1.7e4]/red_norm])
+    
+    np.savetxt('alf_SSP.dat', np.array([templx, temply]).T, fmt='%.5e', header='wave flux\nlogage = 0.96\nzh=0.2\nmgh=0.2\nfsps: w < 3600, w > 1.7e4')
     
