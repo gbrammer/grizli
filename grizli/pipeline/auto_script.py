@@ -493,6 +493,7 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
         
         if master_radec is not None:
             radec = master_radec
+            best_overlap = 0.
         else:
             radec = None
             best_overlap = 0
@@ -559,6 +560,8 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
         
         if master_radec is not None:
             radec = master_radec
+            best_overlap = 0
+            fp = direct['footprint']
         else:
             radec = None
             best_overlap = 0
