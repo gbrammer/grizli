@@ -135,6 +135,11 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
     ### Download data
     os.chdir(HOME_PATH)
     auto_script.fetch_files(field_root=root, HOME_PATH=HOME_PATH, remove_bad=True, reprocess_parallel=reprocess_parallel)
+    
+    files=glob.glob('../RAW/*_fl*fits')
+    if len(files) == 0:
+        print('No FL[TC] files found!')
+        return False
         
     if inspect_ramps:
         # Inspect for CR trails
@@ -326,14 +331,14 @@ def remove_bad_expflag(field_root='', HOME_PATH='./', min_bad=2):
         from grizli import prep, utils
     
     os.chdir(os.path.join(HOME_PATH, field_root, 'RAW'))
-    os.system('dfits *raw.fits *flc.fits | fitsort EXPFLAG > expflag.info')
+    os.system('dfits *raw.fits *flc.fits | fitsort EXPFLAG | sed "s/\t/ , /"> expflag.info')
     
-    expf = utils.GTable.gread('expflag.info', format='ascii')
+    expf = utils.GTable.gread('expflag.info', format='csv')
     visit_name = np.array([file[:6] for file in expf['FILE']])
     visits = np.unique(visit_name)
     
     for visit in visits:
-        bad = (visit_name == visit) & (expf['EXPFLAG'] == 'INDETERMINATE')
+        bad = (visit_name == visit) & (expf['EXPFLAG'] != 'NORMAL')
         if bad.sum() > min_bad:
             print('Found bad visit: {0}, N={1}\n'.format(visit, bad.sum()))
             if not os.path.exists('Expflag'):
@@ -1504,7 +1509,7 @@ def update_wcs_headers_with_fine(field_root, backup=True):
                                                 xyscale=trans[j,:])
                 
         
-def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140W','F160W'], ref_image=None, bits=None, pixfrac=0.6, scale=0.06):
+def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140W','F160W'], ref_image=None, bits=None, pixfrac=0.6, scale=0.06, make_combined=True, skysub=False, skymethod='localmin'):
     import numpy as np
 
     try:
@@ -1541,10 +1546,12 @@ def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140
             wfc3ir['files'].extend(visit['files'])
     
     keep = [filter_groups[k] for k in filter_groups]
+                        
+    if make_combined:
+        prep.drizzle_overlaps([wfc3ir], parse_visits=False, pixfrac=pixfrac, scale=scale, skysub=False, bits=bits, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False)
     
-    prep.drizzle_overlaps([wfc3ir], parse_visits=False, pixfrac=pixfrac, scale=scale, skysub=False, bits=bits, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False)
-                
-    prep.drizzle_overlaps(keep, parse_visits=False, pixfrac=pixfrac, scale=scale, skysub=False, bits=bits, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False)
+    prep.drizzle_overlaps(keep, parse_visits=False, pixfrac=pixfrac, scale=scale, skysub=skysub, skymethod=skymethod, bits=bits, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False)
+    
         
 ######################
 ## Objective function for catalog shifts      
