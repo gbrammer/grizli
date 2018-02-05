@@ -95,7 +95,6 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
             fit_hdu = pyfits.table_to_hdu(fit)
             fit_hdu.header['EXTNAME'] = 'ZFIT_STACK'
             
-        
     # Zoom-in fit with individual beams
     if fit_beams:
         #z0 = fit.meta['Z50'][0]
@@ -198,6 +197,156 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     line_hdu.writeto('{0}_{1:05d}.full.fits'.format(group_name, id), clobber=True, output_verify='fix')
     return mb, st, fit, tfit, line_hdu
 
+###################################
+def full_sed_plot(out, t1, bin=1, minor=0.1, save='png', sed_resolution=180, photometry_pz=None, zspec=None):
+    """
+    Make a separate plot showing photometry and the spectrum
+    """
+    import seaborn as sns
+    import prospect.utils.smoothing
+    
+    import matplotlib.pyplot as plt
+    from matplotlib.ticker import MultipleLocator
+    import matplotlib.gridspec as gridspec
+    
+    #mpl_colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    mpl_colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
+    sns_colors = colors = sns.color_palette("cubehelix", 8)
+    
+    # Best-fit
+    mb = out[0]
+    zfit = out[2]
+    tfit = out[3]
+
+    best_model = mb.get_flat_model([tfit['line1d'].wave, tfit['line1d'].flux])
+    flat_model = mb.get_flat_model([tfit['line1d'].wave, tfit['line1d'].flux*0+1])
+    bg = mb.get_flat_background(tfit['coeffs'])
+    
+    sp = mb.optimal_extract(mb.scif[mb.fit_mask][:-mb.Nphot] - bg, bin=bin)#['G141']
+    spm = mb.optimal_extract(best_model, bin=bin)#['G141']
+    spf = mb.optimal_extract(flat_model, bin=bin)#['G141']
+    
+    # Photometry 
+    A_phot = mb._interpolate_photometry(z=tfit['z'], templates=t1)
+    A_model = A_phot.T.dot(tfit['coeffs'])
+    photom_mask = mb.photom_flam > -98
+    
+    ##########
+    # Figure
+
+    if True:
+        fig = plt.figure(figsize=[11, 9./3])
+        gs = gridspec.GridSpec(1,3, width_ratios=[1,1.5,1])
+
+        ax1 = fig.add_subplot(gs[0])
+        ax2 = fig.add_subplot(gs[1])
+        ax3 = fig.add_subplot(gs[2])
+
+    else:
+        gs = None
+        fig = plt.figure(figsize=[9, 9./3])
+        ax1 = fig.add_subplot(131)
+        ax2 = fig.add_subplot(132)
+        ax3 = fig.add_subplot(133)
+    
+    # Photometry SED
+    ax1.errorbar(np.log10(mb.photom_pivot[photom_mask]/1.e4), mb.photom_flam[photom_mask]/1.e-19, mb.photom_eflam[photom_mask]/1.e-19, color='k', alpha=0.6, marker='s', linestyle='None', zorder=30)
+
+    sm = prospect.utils.smoothing.smoothspec(tfit['line1d'].wave, tfit['line1d'].flux, resolution=sed_resolution, smoothtype='R') #nsigma=10, inres=10)
+
+    ax1.scatter(np.log10(mb.photom_pivot[photom_mask]/1.e4), A_model/1.e-19, color='w', marker='s', s=80, zorder=10)
+    ax1.scatter(np.log10(mb.photom_pivot[photom_mask]/1.e4), A_model/1.e-19, color=sns_colors[4], marker='s', s=20, zorder=11)
+    yl1 = ax1.get_ylim()
+
+    ax1.plot(np.log10(tfit['line1d'].wave/1.e4), sm/1.e-19, color=sns_colors[4], linewidth=1, zorder=0)
+
+    ax1.set_xlim(np.log10(0.3), np.log10(9))
+    ax1.set_xticks(np.log10([0.5, 1, 2, 4, 8]))
+    ax1.set_xticklabels([0.5, 1, 2, 4, 8])
+    #ax1.grid()
+    ax1.set_xlabel(r'$\lambda$ / $\mu$m')
+    ax2.set_xlabel(r'$\lambda$ / $\mu$m')
+    
+    # Spectrum 
+    ymax, ymin = -1e30, 1e30
+    for g in sp:
+        sn = sp[g]['flux']/sp[g]['err']
+        clip = sn > 3
+        clip = spf[g]['flux'] > 0.2*spf[g]['flux'].max()
+        
+        try:
+            scale = mb.compute_scale_array(mb.pscale, sp[g]['wave']) 
+        except:
+            scale = 1
+            
+        ax2.errorbar(sp[g]['wave'][clip]/1.e4, (sp[g]['flux']/spf[g]['flux']/scale)[clip]/1.e-19, (sp[g]['err']/spf[g]['flux']/scale)[clip]/1.e-19, marker='.', color='k', alpha=0.2, linestyle='None', elinewidth=0.5)
+        ax2.plot(sp[g]['wave']/1.e4, spm[g]['flux']/spf[g]['flux']/1.e-19, color=sns_colors[4], linewidth=2, alpha=0.8, zorder=10)
+        ymax = np.maximum(ymax, (spm[g]['flux']/spf[g]['flux']/1.e-19)[clip].max())
+        ymin = np.minimum(ymin, (spm[g]['flux']/spf[g]['flux']/1.e-19)[clip].min())
+        
+        ax1.errorbar(np.log10(sp[g]['wave'][clip]/1.e4), (sp[g]['flux']/spf[g]['flux']/scale)[clip]/1.e-19, (sp[g]['err']/spf[g]['flux']/scale)[clip]/1.e-19, marker='.', color='k', alpha=0.2, linestyle='None', elinewidth=0.5, zorder=-100)
+        
+        
+    xl, yl = ax2.get_xlim(), ax2.get_ylim()
+    yl = (ymin-0.3*ymax, 1.3*ymax)
+    
+    ax2.scatter((mb.photom_pivot[photom_mask]/1.e4), A_model/1.e-19, color='w', marker='s', s=80, zorder=11)
+    ax2.scatter((mb.photom_pivot[photom_mask]/1.e4), A_model/1.e-19, color=sns_colors[4], marker='s', s=20, zorder=12)
+    
+    ax2.errorbar(mb.photom_pivot[photom_mask]/1.e4, mb.photom_flam[photom_mask]/1.e-19, mb.photom_eflam[photom_mask]/1.e-19, color='k', alpha=0.6, marker='s', linestyle='None', zorder=20)
+    ax2.set_xlim(xl); ax2.set_ylim(yl)
+
+    ax2.set_yticklabels([])
+    #ax2.set_xticks(np.arange(1.1, 1.8, 0.1))
+    #ax2.set_xticklabels([1.1, '', 1.3, '', 1.5, '', 1.7])
+    ax2.xaxis.set_minor_locator(MultipleLocator(minor))
+    ax2.xaxis.set_major_locator(MultipleLocator(minor*2))
+    
+    # Show spectrum range on SED panel
+    xb, yb = np.array([0, 1, 1, 0, 0]), np.array([0, 0, 1, 1, 0])
+    ax1.plot(np.log10(xl[0]+xb*(xl[1]-xl[0])), yl[0]+yb*(yl[1]-yl[0]), linestyle=':', color='k', alpha=0.4)
+    ax1.set_ylim(-0.1*yl1[1], yl1[1])
+    
+    tick_diff = np.diff(ax1.get_yticks())[0]
+    ax2.yaxis.set_major_locator(MultipleLocator(tick_diff))
+    #ax2.set_yticklabels([])
+    
+    ##########
+    # P(z)
+    if photometry_pz is not None:
+        ax3.plot(photometry_pz[0], np.log10(photometry_pz[1]), color=mpl_colors[0])
+        #zcl = (prior[0] >= zlimits[ix,0]) & (prior[0] <= zlimits[ix,4])
+        #ax3.fill_between(prior[0][zcl], np.log10(prior[1])[zcl], prior[1][zcl]*0-100, color=mpl_colors[0], alpha=0.3)
+
+    ax3.plot(zfit['zgrid'], np.log10(zfit['pdf']), color=sns_colors[0])
+    ax3.fill_between(zfit['zgrid'], np.log10(zfit['pdf']), np.log10(zfit['pdf'])*0-100, color=sns_colors[0], alpha=0.3)
+
+    ax3.set_ylim(-3, 2.9) #np.log10(zfit['pdf']).max())
+    ax3.set_xlim(zfit['zgrid'].min(), zfit['zgrid'].max())
+    ax1.set_ylabel(r'$f_\lambda$ / $10^{-19}$')
+    ax3.set_ylabel(r'log $p(z)$')
+    ax3.set_xlabel(r'$z$')
+
+    #ax3.text(0.95, 0.95, r'$z_\mathrm{phot}$='+'{0:.3f}'.format(eazyp.zbest[ix]), ha='right', va='top', transform=ax3.transAxes, color=mpl_colors[0], size=10)
+    axt = ax2
+    axt.text(0.95, 0.95, r'$z_\mathrm{grism}$='+'{0:.3f}'.format(tfit['z']), ha='right', va='top', transform=axt.transAxes, color=sns_colors[0], size=10)#, backgroundcolor='w')
+    if zspec is not None:
+        axt.text(0.95, 0.89, r'$z_\mathrm{spec}$='+'{0:.3f}'.format(zspec), ha='right', va='top', transform=axt.transAxes, color='r', size=10)
+        ax3.scatter(zspec, 2.7, color='r', marker='v', zorder=100)
+        
+    axt.text(0.05, 0.95, '{0}: {1:>6d}'.format(mb.group_name, mb.id), ha='left', va='top', transform=axt.transAxes, color='k', size=10)#, backgroundcolor='w')
+    #axt.text(0.05, 0.89, '{0:>6d}'.format(mb.id), ha='left', va='top', transform=axt.transAxes, color='k', size=10)#, backgroundcolor='w')
+
+    if gs is None:
+        gs.tight_layout(pad=0.1)
+    else:
+        fig.tight_layout(pad=0.1)
+        
+    if save:
+        fig.savefig('{0}_{1:05d}.sed.{2}'.format(mb.group_name, mb.id, save))
+        
+    return fig
+    
 def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat', verbose=True):
     import glob
     import os
@@ -469,7 +618,7 @@ class GroupFitter(object):
         phot = {'flam':flam, 'eflam':eflam, 'filters':filters, 'tempfilt':tempfilt}
         return phot
         
-    def set_photometry(self, flam=[], eflam=[], filters=[], force=False, tempfilt=None, min_err=0.02):
+    def set_photometry(self, flam=[], eflam=[], filters=[], force=False, tempfilt=None, min_err=0.02, TEF=None):
         """
         Add photometry
         """
@@ -478,6 +627,8 @@ class GroupFitter(object):
             return True
         
         self.Nphot = (eflam > 0).sum() #len(flam)
+        self.Nphotbands = len(eflam)
+        
         if self.Nphot == 0:
             return True
         
@@ -509,22 +660,26 @@ class GroupFitter(object):
         # eazypy tempfilt for faster interpolation
         self.tempfilt = tempfilt
         
+        self.TEF = TEF
+        
     def unset_photometry(self):
         if self.Nphot == 0:
             return True
-            
-        self.sivarf = self.sivarf[:-self.Nphot]
-        self.weightf = self.weightf[:-self.Nphot]
         
-        self.fit_mask = self.fit_mask[:-self.Nphot]
-        self.scif = self.scif[:-self.Nphot]
-        self.wavef = self.wavef[:-self.Nphot]
+        Nbands = self.Nphotbands
+        self.sivarf = self.sivarf[:-Nbands]
+        self.weightf = self.weightf[:-Nbands]
+        
+        self.fit_mask = self.fit_mask[:-Nbands]
+        self.scif = self.scif[:-Nbands]
+        self.wavef = self.wavef[:-Nbands]
                 
         self.Nmask = self.fit_mask.sum()
         self.DoF = int((self.weightf*self.fit_mask).sum())
         
         self.is_spec = 1
         self.Nphot = 0
+        self.Nphotbands = 0
         
     def _interpolate_photometry(self, z=0., templates=[]):
         """
@@ -660,15 +815,15 @@ class GroupFitter(object):
                 pedestal = 0.
         else:
             pedestal = 0
-         
+        
+        #oktemp = (A*self.fit_mask).sum(axis=1) != 0
+        oktemp = A.sum(axis=1) != 0
+        
         # Photometry
         if self.Nphot > 0:
             A_phot = self._interpolate_photometry(z=z, templates=templates)
             A[:,-self.Nphot:] = A_phot*COEFF_SCALE #np.hstack((A, A_phot))
-            
-        #oktemp = (A*self.fit_mask).sum(axis=1) != 0
-        oktemp = A.sum(axis=1) != 0
-        
+                    
         # Weight design matrix and data by 1/sigma
         Ax = A[oktemp,:]*self.sivarf[self.fit_mask]        
         #AxT = Ax[:,self.fit_mask].T
@@ -1466,23 +1621,23 @@ class GroupFitter(object):
         
         return fig
         
-        # Output TBD
-        if False:
-            sfit = OrderedDict()
-
-            k = list(tstar.keys())[ix]
-            ts = {k:tstar[k]}
-            cont1d, line1d = utils.dot_templates(coeffs[ix,self.N:], ts, z=0.)
-        
-            sfit['cfit'] = {}
-            sfit['coeffs'] = coeffs[ix,:]
-            sfit['covar'] = covar[ix,:,:]
-            sfit['z'] = 0.
-            sfit['templates'] = ts
-            sfit['cont1d'] = cont1d
-            sfit['line1d'] = line1d
-        
-            return fig, sfit
+        # # Output TBD
+        # if False:
+        #     sfit = OrderedDict()
+        # 
+        #     k = list(tstar.keys())[ix]
+        #     ts = {k:tstar[k]}
+        #     cont1d, line1d = utils.dot_templates(coeffs[ix,self.N:], ts, z=0.)
+        # 
+        #     sfit['cfit'] = {}
+        #     sfit['coeffs'] = coeffs[ix,:]
+        #     sfit['covar'] = covar[ix,:,:]
+        #     sfit['z'] = 0.
+        #     sfit['templates'] = ts
+        #     sfit['cont1d'] = cont1d
+        #     sfit['line1d'] = line1d
+        # 
+        #     return fig, sfit
     
     def oned_figure(self, bin=1, show_beams=True, minor=0.1, tfit=None, axc=None, figsize=[6,4], fill=False, units='flam'):
         """
@@ -1620,7 +1775,7 @@ class GroupFitter(object):
             ymax = -1.e30
         
         if self.Nphot > 0:
-            sp_flat = self.optimal_extract(self.flat_flam[self.fit_mask[:-self.Nphot]], bin=bin)
+            sp_flat = self.optimal_extract(self.flat_flam[self.fit_mask[:-self.Nphotbands]], bin=bin)
         else:
             sp_flat = self.optimal_extract(self.flat_flam[self.fit_mask], bin=bin)
 
@@ -1737,7 +1892,7 @@ class GroupFitter(object):
         try:
             # MultiBeam
             if self.Nphot > 0:
-                self.contamf_mask = self.contamf[self.fit_mask[:-self.Nphot]]
+                self.contamf_mask = self.contamf[self.fit_mask[:-self.Nphotbands]]
             else:
                 self.contamf_mask = self.contamf[self.fit_mask]
                 
