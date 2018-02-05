@@ -2794,12 +2794,15 @@ td {font-size: 10pt;}
         """
         if css is not None:
             DEFAULT_CSS += css
-
+    
+        if os.path.exists(output):
+            os.remove(output)
+            
         self.write(output, format='jsviewer', css=DEFAULT_CSS,
                             max_lines=max_lines,
                             jskwargs={'use_local_files':localhost},
-                            table_id=None, table_class=table_class,
-                            overwrite=True)
+                            table_id=None, table_class=table_class)#,
+                            #overwrite=True)
 
         if replace_braces:
             lines = open(output).readlines()
