@@ -182,6 +182,8 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
     if not os.path.exists('{0}-ir_drz_sci.fits'.format(root)):
         auto_script.drizzle_overlaps(root, filters=['F105W', 'F110W', 'F125W', 'F140W', 'F160W', 'F098M', 'F139M', 'F127M', 'F153M']) 
     
+        auto_script.fill_filter_mosaics(root)
+    
     # Photometric catalogs
     if not os.path.exists('{0}_phot.fits'.format(root)):
         tab = auto_script.photutils_catalog(field_root=root)
@@ -643,39 +645,39 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
         
     ###################################
     # Drizzle by filter
-    failed = [f.split('.failed')[0] for f in glob.glob('*failed')]
-    keep_visits = []
-    for visit in visits:
-        if visit['product'] not in failed:
-            keep_visits.append(visit)
-            
-    overlaps = utils.parse_visit_overlaps(keep_visits, buffer=15.0)
-    np.save('{0}_overlaps.npy'.format(field_root), [overlaps])
+    # failed = [f.split('.failed')[0] for f in glob.glob('*failed')]
+    # keep_visits = []
+    # for visit in visits:
+    #     if visit['product'] not in failed:
+    #         keep_visits.append(visit)
+    #         
+    # overlaps = utils.parse_visit_overlaps(keep_visits, buffer=15.0)
+    # np.save('{0}_overlaps.npy'.format(field_root), [overlaps])
+    # 
+    # keep = []
+    # wfc3ir = {'product':'{0}-ir'.format(field_root), 'files':[]}
     
-    keep = []
-    wfc3ir = {'product':'{0}-ir'.format(field_root), 'files':[]}
-    
-    if not make_combined:
-        return True
-        
-    for overlap in overlaps:
-        filt = overlap['product'].split('-')[-1]
-        overlap['product'] = '{0}-{1}'.format(field_root, filt)
-        
-        overlap['reference'] = '{0}-ir_drz_sci.fits'.format(field_root)
-        
-        if False:
-            if 'g1' not in filt:
-                keep.append(overlap)
-        else:
-            keep.append(overlap)
-    
-        if filt.upper() in ['F098M','F105W','F110W', 'F125W','F140W','F160W']:
-            wfc3ir['files'].extend(overlap['files'])
-
-    prep.drizzle_overlaps([wfc3ir], parse_visits=False, pixfrac=0.6, scale=0.06, skysub=False, bits=bits, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False)
-                
-    prep.drizzle_overlaps(keep, parse_visits=False, pixfrac=0.6, scale=0.06, skysub=False, bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False)
+    # if not make_combined:
+    #     return True
+    #     
+    # for overlap in overlaps:
+    #     filt = overlap['product'].split('-')[-1]
+    #     overlap['product'] = '{0}-{1}'.format(field_root, filt)
+    #     
+    #     overlap['reference'] = '{0}-ir_drz_sci.fits'.format(field_root)
+    #     
+    #     if False:
+    #         if 'g1' not in filt:
+    #             keep.append(overlap)
+    #     else:
+    #         keep.append(overlap)
+    # 
+    #     if filt.upper() in ['F098M','F105W','F110W', 'F125W','F140W','F160W']:
+    #         wfc3ir['files'].extend(overlap['files'])
+    # 
+    # prep.drizzle_overlaps([wfc3ir], parse_visits=False, pixfrac=0.6, scale=0.06, skysub=False, bits=Nonoe, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False)
+    #             
+    # prep.drizzle_overlaps(keep, parse_visits=False, pixfrac=0.6, scale=0.06, skysub=False, bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False)
             
 def photutils_catalog(field_root='j142724+334246', threshold=1.8, subtract_bkg=True):
     """
@@ -1100,6 +1102,8 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
     fit_beams = True
     zr = [0.1, 3.3]
     sys_err = 0.03
+    prior=None
+    pline = {'kernel': 'point', 'pixfrac': 0.2, 'pixscale': 0.1, 'size': 8, 'wcs': None}
     
     for id in ids:
         if Skip:
@@ -1227,7 +1231,7 @@ def summary_catalog(field_root='', dzbin=0.01, use_localhost=True):
         
     fit['id','ra', 'dec', 'mag_auto', 'z_map','log_risk', 'log_pdf_max', 'zq', 'chinu', 'bic_diff', 'zwidth1', 'png_stack', 'png_full', 'png_line'][clip].write_sortable_html(field_root+'-fit.zq.html', replace_braces=True, localhost=use_localhost, max_lines=50000, table_id=None, table_class='display compact', css=None)
     
-def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', min_overlap=0.2, stopme=False, ref_err = 1.e-3, radec=None, redrizzle=True, shift_only=True, maglim=[17,24], NITER=1, catalogs = ['PS1','SDSS','GAIA','WISE'], method='Powell', radius=5., program_str=None, match_str=None):
+def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', min_overlap=0.2, stopme=False, ref_err = 1.e-3, radec=None, redrizzle=True, shift_only=True, maglim=[17,24], NITER=1, catalogs = ['PS1','SDSS','GAIA','WISE'], method='Powell', radius=5., program_str=None, match_str=[]):
     """
     Try fine alignment from visit-based SExtractor catalogs
     """    
@@ -1269,8 +1273,12 @@ def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Griz
                 if prog != program_str:
                     continue
             
-            if match_str is not None:
-                if match_str not in visit['product']:
+            if len(match_str) > 0:
+                has_match = False
+                for m in match_str:
+                    has_match |= m in visit['product']
+                
+                if not has_match:
                     continue
                     
             visits.append(visit)
@@ -1375,7 +1383,7 @@ def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Griz
         extra_str += '.{0}'.format(program_str)
     
     if match_str is not None:
-        extra_str += '.{0}'.format(match_str)
+        extra_str += '.{0}'.format('.'.join(match_str))
         
     fig.savefig('{0}{1}_fine.png'.format(field_root, extra_str))
     np.save('{0}{1}_fine.npy'.format(field_root, extra_str), [visits, fit])
@@ -1509,7 +1517,7 @@ def update_wcs_headers_with_fine(field_root, backup=True):
                                                 xyscale=trans[j,:])
                 
         
-def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140W','F160W'], ref_image=None, bits=None, pixfrac=0.6, scale=0.06, make_combined=True, skysub=False, skymethod='localmin'):
+def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140W','F160W'], ref_image=None, bits=None, pixfrac=0.6, scale=0.06, make_combined=True, skysub=False, skymethod='localmin', match_str=[]):
     import numpy as np
 
     try:
@@ -1536,7 +1544,15 @@ def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140
         filt = visit['product'].split('-')[-1]
         if filt.upper() not in filters:
             continue
+        
+        if len(match_str) > 0:
+            has_match = False
+            for m in match_str:
+                has_match |= m in visit['product']
             
+            if not has_match:
+                continue
+                    
         if filt not in filter_groups:
             filter_groups[filt] = {'product':'{0}-{1}'.format(field_root, filt), 'files':[], 'reference':ref_image}
         
@@ -1552,6 +1568,26 @@ def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140
     
     prep.drizzle_overlaps(keep, parse_visits=False, pixfrac=pixfrac, scale=scale, skysub=skysub, skymethod=skymethod, bits=bits, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False)
     
+def fill_filter_mosaics(field_root):
+    """
+    Fill field mosaics with the average value taken from other filters so that all images have the same coverage
+    
+    Parameters
+    ----------
+    field_root : str
+
+    """  
+    ir = pyfits.open('{0}-ir_drz_sci.fits'.format(field_root))
+    filter_files = glob.glob('{0}-f[01]*sci.fits'.format(field_root))
+    
+    for file in filter_files:
+        print(file)
+        sci = pyfits.open(file, mode='update')
+        wht = pyfits.open(file.replace('sci','wht'))
+        mask = wht[0].data == 0
+        scale = ir[0].header['PHOTFLAM']/sci[0].header['PHOTFLAM']
+        sci[0].data[mask] = ir[0].data[mask]*scale
+        sci.flush()
         
 ######################
 ## Objective function for catalog shifts      
