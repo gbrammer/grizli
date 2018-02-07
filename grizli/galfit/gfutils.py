@@ -33,7 +33,7 @@ def galfit_model_image(root='j021737-051344', ids=[738], filter='f140w', ds9=Non
     filter : str
         Filter name.
         
-    ds9 : `~pyds9.DS9`
+    ds9 : `~grizli.utils.DS9`
         DS9 instance for plotting the galfit results interactively.
         
     ds9_frame : type

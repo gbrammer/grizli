@@ -2853,9 +2853,9 @@ def manual_alignment(visit, ds9, reference=None, reference_catalogs=['SDSS', 'PS
     visit : dict
         List of visit information from `~grizli.utils.parse_flt_files`.
     
-    ds9 : `~pyds9.DS9`
-        DS9 instance for interaction.  Requires the `view` method implemented
-        in the fork at https://github.com/gbrammer/pyds9.
+    ds9 : `~grizli.utils.DS9`
+        DS9 instance for interaction.  Requires `~pyds9` and the extended 
+        methods in `~grizli.utils.DS9`.
         
     reference : str
         Filename of a DS9 region file that will be used as reference.  If 
@@ -2887,7 +2887,7 @@ def manual_alignment(visit, ds9, reference=None, reference_catalogs=['SDSS', 'PS
     """
     import os
     
-    im = pyfits.open('../RAW/'+visit['files'][0])
+    im = pyfits.open(os.path.join(os.getcwd(), '../RAW/', visit['files'][0]))
     ra, dec = im[1].header['CRVAL1'], im[1].header['CRVAL2']
     
     if reference is None:

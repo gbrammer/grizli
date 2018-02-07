@@ -2819,7 +2819,7 @@ class GrismFLT(object):
             Detector coordinates will be computed with 
             `self.direct.wcs.all_world2pix` with `origin=1`.
         
-        ds9 : `pyds9.DS9`, optional
+        ds9 : `~grizli.utils.DS9`, optional
             If provided, load circular regions at the derived detector
             coordinates.
         
