@@ -2283,10 +2283,16 @@ For example,
     for file in files:
         fetch_hst_calib(file)
     
-    badpix = '{0}/badpix_spars200_Nov9.fits'.format(os.getenv('iref'))
+    badpix = os.path.join(os.getenv('iref'), 'badpix_spars200_Nov9.fits')
     print('Extra WFC3/IR bad pixels: {0}'.format(badpix))
     if not os.path.exists(badpix):
         os.system('curl -o {0}/badpix_spars200_Nov9.fits https://raw.githubusercontent.com/gbrammer/wfc3/master/data/badpix_spars200_Nov9.fits'.format(os.getenv('iref')))
+    
+    # Pixel area map
+    pam = os.path.join(os.getenv('iref'), 'ir_wfc3_map.fits')
+    print('Pixel area map: {0}'.format(pam))
+    if not os.path.exists(badpix):
+        os.system('curl -o {0} http://www.stsci.edu/hst/wfc3/pam/ir_wfc3_map.fits'.format(pam))
     
 def fetch_config_files(ACS=False):
     """
@@ -2308,7 +2314,6 @@ def fetch_config_files(ACS=False):
     
     if ACS:
         tarfiles.append('{0}/ACS.WFC.sky.tar.gz'.format(gURL))
-
         tarfiles.append('{0}/ACS_CONFIG.tar.gz'.format(gURL))
                         
     for url in tarfiles:
