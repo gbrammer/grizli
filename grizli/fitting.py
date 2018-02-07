@@ -202,7 +202,7 @@ def full_sed_plot(out, t1, bin=1, minor=0.1, save='png', sed_resolution=180, pho
     """
     Make a separate plot showing photometry and the spectrum
     """
-    import seaborn as sns
+    #import seaborn as sns
     import prospect.utils.smoothing
     
     import matplotlib.pyplot as plt
@@ -211,8 +211,17 @@ def full_sed_plot(out, t1, bin=1, minor=0.1, save='png', sed_resolution=180, pho
     
     #mpl_colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
     mpl_colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
-    sns_colors = colors = sns.color_palette("cubehelix", 8)
-    
+    # sns_colors = colors = sns.color_palette("cubehelix", 8)
+    ### seaborn cubehelix colors
+    sns_colors = colors = [(0.1036, 0.094, 0.206),
+                           (0.0825, 0.272, 0.307),
+                           (0.1700, 0.436, 0.223),
+                           (0.4587, 0.480, 0.199),
+                           (0.7576, 0.476, 0.437),
+                           (0.8299, 0.563, 0.776),
+                           (0.7638, 0.757, 0.949),
+                           (0.8106, 0.921, 0.937)]
+     
     # Best-fit
     mb = out[0]
     zfit = out[2]

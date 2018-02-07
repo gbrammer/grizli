@@ -426,7 +426,7 @@ def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=
     
 def manual_alignment(field_root='j151850-813028', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', skip=True, radius=5., catalogs=['PS1','SDSS','GAIA','WISE'], visit_list=None, radec=None):
     
-    import pyds9
+    #import pyds9
     import glob
     import os
     import numpy as np
@@ -449,7 +449,7 @@ def manual_alignment(field_root='j151850-813028', HOME_PATH='/Volumes/Pegasus/Gr
                     product=field_root,
                     reference_catalogs=catalogs, radius=radius)
     
-    ds9 = pyds9.DS9()
+    ds9 = utils.DS9()
     ds9.set('mode pan')
     ds9.set('scale zscale')
     ds9.set('scale log')

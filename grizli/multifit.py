@@ -3256,7 +3256,7 @@ def drizzle_2d_spectrum(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
         Fill `wht==0` pixels of the beam weights with the median nonzero 
         value.
         
-    ds9: `pyds9.DS9`
+    ds9: `~grizli.utils.DS9`
         Show intermediate steps of the drizzling
     
     Returns
@@ -3460,7 +3460,7 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
         Factor by which to scale the contamination arrays and add to the 
         pixel variances.
         
-    ds9 : `pyds9.DS9`, optional
+    ds9 : `~grizli.utils.DS9`, optional
         Display each step of the drizzling to an open DS9 window
     
     Returns
@@ -3843,7 +3843,7 @@ def drizzle_2d_spectrum_wcs(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
         Factor by which to scale the contamination arrays and add to the 
         pixel variances.
     
-    ds9: `pyds9.DS9`
+    ds9: `~grizli.utils.DS9`
         Show intermediate steps of the drizzling
     
     Returns
