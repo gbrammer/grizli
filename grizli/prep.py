@@ -378,7 +378,7 @@ def apply_region_mask(flt_file, dq_value=1024, verbose=True):
     """
     import pyregion
     
-    mask_files = glob.glob(flt_file.replace('_flt.fits','.*.mask.reg').replace('_flc.fits','.*.mask.reg'))
+    mask_files = glob.glob(flt_file.replace('_flt.fits','.*.mask.reg').replace('_flc.fits','.*.mask.reg').replace('_c0m.fits','.*.mask.reg'))
     if len(mask_files) == 0:
         return True
      
@@ -1382,7 +1382,8 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                                skip_direct=False,
                                fix_stars=True,
                                tweak_max_dist=1.,
-                               tweak_threshold=1.5,
+                               tweak_threshold=1.5, 
+                               drizzle_params = {},
                              reference_catalogs=['GAIA','PS1','SDSS','WISE']):
     """Full processing of a direct + grism image visit.
     
@@ -1464,6 +1465,18 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
         driz_cr_snr = '8.0 5.0'
         driz_cr_scale = '2.5 0.7'
     
+    if 'driz_cr_scale' in drizzle_params:
+        driz_cr_scale = drizzle_params['driz_cr_scale']
+        drizzle_params.pop('driz_cr_scale')
+        
+    if 'driz_cr_snr' in drizzle_params:
+        driz_cr_snr = drizzle_params['driz_cr_snr']
+        drizzle_params.pop('driz_cr_snr')
+    
+    if 'bits' in drizzle_params:
+        bits = drizzle_params['bits']    
+        drizzle_params.pop('bits')
+        
     if not skip_direct:
         if (not isACS) & (not isWFPC2) & run_tweak_align:
             #if run_tweak_align:
@@ -1504,9 +1517,10 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                          clean=True, context=False, preserve=False,
                          skysub=True, driz_separate=True, driz_sep_wcs=True,
                          median=True, blot=True, driz_cr=True,
+                         driz_cr_snr=driz_cr_snr, driz_cr_scale=driz_cr_scale,
                          driz_cr_corr=False, driz_combine=True,
                          final_bits=bits, coeffs=True, build=False, 
-                         final_wht_type='IVM')
+                         final_wht_type='IVM', **drizzle_params)
         else:
             AstroDrizzle(direct['files'], output=direct['product'], 
                          clean=True, final_scale=None, final_pixfrac=1,
@@ -1514,10 +1528,10 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                          driz_separate=False, driz_sep_wcs=False,
                          median=False, blot=False, driz_cr=False,
                          driz_cr_corr=False, driz_combine=True,
-                         build=False, final_wht_type='IVM')
+                         build=False, final_wht_type='IVM', **drizzle_params)
         
         ## Now do tweak_align for ACS
-        if isACS & run_tweak_align:
+        if (isACS | isWFPC2) & run_tweak_align:
             tweak_align(direct_group=direct, grism_group=grism,
                     max_dist=tweak_max_dist, key=' ', drizzle=False,
                     threshold=tweak_threshold)
@@ -1604,7 +1618,7 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                          driz_cr_scale=driz_cr_scale, driz_separate=False,
                          driz_sep_wcs=False, median=False, blot=False,
                          driz_cr=False, driz_cr_corr=False,
-                         build=False, final_wht_type='IVM')
+                         build=False, final_wht_type='IVM', **drizzle_params)
         else:
             if 'par' in direct['product']:
                 pixfrac=1.0
@@ -1616,7 +1630,7 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                          resetbits=4096, final_bits=bits, driz_sep_bits=bits,
                          preserve=False, driz_cr_snr=driz_cr_snr,
                          driz_cr_scale=driz_cr_scale, build=False, 
-                         final_wht_type='IVM')
+                         final_wht_type='IVM', **drizzle_params)
     
         ### Make DRZ catalog again with updated DRZWCS
         clean_drizzle(direct['product'])
