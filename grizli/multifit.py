@@ -617,9 +617,42 @@ class GroupFLT():
         if verbose:
             print('Models computed - {0:.2f} sec.'.format(t1_pool - t0_pool))
         
-    def get_beams(self, id, size=10, center_rd=None, beam_id='A', min_overlap=0.2, 
+    def get_beams(self, id, size=10, center_rd=None, beam_id='A',
+                  min_overlap=0.1, min_valid_pix=10,
                   get_slice_header=True):
-        """TBD
+        """Extract 2D spectra "beams" from the GroupFLT exposures.
+        
+        Parameters
+        ----------
+        id : int
+            Catalog ID of the object to extract.
+            
+        size : int
+            Half-size of the 2D spectrum to extract, along cross-dispersion
+            axis.
+            
+        center_rd : optional, (float, float)
+            Extract based on RA/Dec rather than catalog ID.
+            
+        beam_id : type
+            Name of the order to extract.  
+            
+        min_overlap : float
+            Fraction of the spectrum along wavelength axis that has one 
+            or more valid pixels.
+            
+        min_valid_pix : int
+            Minimum number of valid pixels (`beam.fit_mask == True`) in 2D
+            spectrum.
+            
+        get_slice_header : bool
+            Passed to `~grizli.model.BeamCutout`.
+            
+        Returns
+        -------
+        beams : list
+            List of `~grizli.model.BeamCutout` objects.
+        
         """
         beams = self.compute_single_model(id, center_rd=center_rd, size=size, store=False, get_beams=[beam_id])
         
@@ -633,21 +666,18 @@ class GroupFLT():
                 #print('Except: get_beams')
                 continue
             
-            # if flt.grism.pupil == 'f158m':
-            #     print(xxx)
-            #     pass
-                
-            hasdata = ((out_beam.grism['SCI'] != 0).sum(axis=0) > 0).sum()
-            #print(out_beam.grism.pupil, hasdata*1./out_beam.model.shape[1])
+            valid =  (out_beam.grism['SCI'] != 0) 
+            valid &= out_beam.fit_mask.reshape(out_beam.sh)               
+            hasdata = (valid.sum(axis=0) > 0).sum()
             if hasdata*1./out_beam.model.shape[1] < min_overlap:
                 continue
             
+            # Empty direct image?
             if out_beam.beam.total_flux == 0:
                 continue
                 
-            # if hasattr(beam[beam_id], 'psf_params'):
-            #     #print('init epsf')
-            #     out_beam.init_epsf(yoff=beam[beam_id].psf_yoff, psf_params=beam[beam_id].psf_params)
+            if out_beam.fit_mask.sum() < min_valid_pix:    
+                continue
                 
             out_beams.append(out_beam)
             
