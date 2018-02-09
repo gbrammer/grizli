@@ -21,6 +21,7 @@ from .utils import GRISM_COLORS
 # Minimum redshift where IGM is applied
 IGM_MINZ = 4
 
+# Default parameters for drizzled line map
 PLINE = {'kernel': 'point', 'pixfrac': 0.2, 'pixscale': 0.1, 'size': 8, 'wcs': None}
 
 # IGM from eazy-py
@@ -34,7 +35,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     """Run the full procedure
     
     1) Load MultiBeam and stack files 
-    2) 
+    2) ... tbd
     
     fwhm=1200; zr=[0.65, 1.6]; dz=[0.004, 0.0002]; group_name='grism'; fit_stacks=True; prior=None; fcontam=0.2; mask_sn_limit=3; fit_beams=True; root=''
     
@@ -75,16 +76,18 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     if t1 is None:
         t1 = grizli.utils.load_templates(line_complexes=False, fsps_templates=True, fwhm=fwhm)
         
-    # Fit on stacked spectra
+    # Fit on stacked spectra or individual beams
     if fit_only_beams:
         fit_obj = mb
     else:
         fit_obj = st
-        
+      
+    # First pass    
     fit = fit_obj.xfit_redshift(templates=t0, zr=zr, dz=dz, prior=prior, fitter=fitter, verbose=verbose) 
     fit_hdu = pyfits.table_to_hdu(fit)
     fit_hdu.header['EXTNAME'] = 'ZFIT_STACK'
     
+    # Second pass if rescaling spectrum to photometry
     if scale_photometry:
         scl = mb.scale_to_photometry(z=fit.meta['z_map'][0], method='lm', templates=t0, order=scale_photometry*1)
         if scl.status > 0:
@@ -1711,15 +1714,20 @@ class GroupFitter(object):
                 #sens = beam.sens
             
             sens[~np.isfinite(sens)] = 1
-                                         
+            
+            pscale = 1.
+            if hasattr(self, 'pscale'):
+                if (self.pscale is not None):
+                    pscale = self.compute_scale_array(self.pscale, w)
+                                                 
             if units == 'nJy':
-                unit_corr = 1./sens*w**2/2.99e18/1.e-23/1.e-9
+                unit_corr = 1./sens*w**2/2.99e18/1.e-23/1.e-9/pscale
                 unit_label = r'$f_\nu$ (nJy)'
             elif units == 'uJy':
-                unit_corr = 1./sens*w**2/2.99e18/1.e-23/1.e-6
+                unit_corr = 1./sens*w**2/2.99e18/1.e-23/1.e-6/pscale
                 unit_label = r'$f_\nu$ ($\mu$Jy)'
             else: # 'flam
-                unit_corr = 1./sens/1.e-19
+                unit_corr = 1./sens/1.e-19/pscale
                 unit_label = r'$f_\lambda \times 10^{-19}$'
             
             w = w/1.e4
@@ -1805,9 +1813,9 @@ class GroupFitter(object):
                     pscale = self.compute_scale_array(self.pscale, sp_data[g]['wave'])
             
             if units == 'nJy':
-                unit_corr = sp_data[g]['wave']**2/2.99e18/1.e-23/1.e-9
+                unit_corr = sp_data[g]['wave']**2/2.99e18/1.e-23/1.e-9/pscale
             elif units == 'uJy':
-                unit_corr = sp_data[g]['wave']**2/2.99e18/1.e-23/1.e-6
+                unit_corr = sp_data[g]['wave']**2/2.99e18/1.e-23/1.e-6/pscale
             else: # 'flam
                 unit_corr = 1./1.e-19/pscale
             
