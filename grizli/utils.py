@@ -2618,6 +2618,8 @@ class GTable(astropy.table.Table):
         if format is None:            
             if sextractor:
                 format = 'ascii.sextractor'
+            elif isinstance(file, pyfits.BinTableHDU):
+                format = 'fits'
             else:            
                 if file.endswith('.fits'):
                     format='fits'

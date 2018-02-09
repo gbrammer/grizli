@@ -3169,64 +3169,147 @@ class MultiBeam(GroupFitter):
             self._parse_beams()
             self.initialize_masked_arrays()
             
-    def get_binned_spectra(self, bin=1, coeffs=None, get_model=False):
-        """
-        Get optimally-extracted, binned spectra in each available grism
-        """
+    def oned_spectrum(self, bin=1, tfit=None, **kwargs):
+        """Compute full 1D spectrum with optional best-fit model
         
-        binned_spectrum = OrderedDict()
-        for grism in self.Ngrism:
-            num = []
-            den = []
-            wave_x = []
+        Parameters
+        ----------
+        bin : float / int
+            Bin factor relative to the size of the native spectral bins of a
+            given grism.
             
-            for ib, beam in enumerate(self.beams):
-                if beam.grism.filter == grism:
-                    
-                    if not hasattr(beam.beam, 'optimal_profile'):
-                        xxx = beam.beam.optimal_extract(beam.model, ivar=beam.ivar)
-                    
-                    proff = beam.beam.optimal_profile.flatten()
-                    
-                    if get_model:
-                        clean = beam.model.flatten()
-                    else:
-                        clean = (beam.grism['SCI']-beam.contam).flatten()
-                        if coeffs is not None:
-                            clean -= coeffs[ib]
-                    
-                    wx = np.dot(np.ones(beam.sh[0])[:,None], beam.wave[None,:]).flatten()[beam.fit_mask]
-                    sx = np.dot(np.ones(beam.sh[0])[:,None], beam.beam.sensitivity[None,:]).flatten()#[beam.fit_mask]
-                    
-                    num.append((proff*clean*beam.ivarf*sx)[beam.fit_mask])
-                    den.append((proff**2*beam.ivarf*sx**2)[beam.fit_mask])
-                    wave_x.append(wx)
-                    
-            wave_x = np.hstack(wave_x)
-            num = np.hstack(num)
-            den = np.hstack(den)
+        tfit : dict
+            Output of `~grizli.fitting.mb.template_at_z`.
+            
+        Returns
+        -------
+        sp : dict
+            Dictionary of the extracted 1D spectra.  Keys are the grism 
+            names and the values are `~astropy.table.Table` objects.
+        
+        """
+        import astropy.units as u
+        
+        # "Flat" spectrum to perform flux calibration
+        if self.Nphot > 0:
+            flat_data = self.flat_flam[self.fit_mask[:-self.Nphotbands]]
+        else:
+            flat_data = self.flat_flam[self.fit_mask]
 
-            lim = utils.GRISM_LIMITS[grism]
-            wave_bin = np.arange(lim[0]*1.e4, lim[1]*1.e4, lim[2]/bin)
-            
-            flux_bin = wave_bin*0.
-            var_bin = wave_bin*0.
-            
-            for j in range(len(wave_bin)):
-                ix = np.abs(wave_x-wave_bin[j]) < lim[2]/bin/2.
-                #ix = (wave_x > wave_bin[j]) & (wave_x <= wave_bin[j+1])
-                if ix.sum() > 0:
-                    var_bin[j] = 1./den[ix].sum()
-                    flux_bin[j] = num[ix].sum()*var_bin[j]
-                
-            #binned_spectrum[grism] = [wave_bin*u.Angstrom, flux_bin*utils.FLAMBDA_CGS, np.sqrt(var_bin)*utils.FLAMBDA_CGS]
-            binned_spectrum[grism] = utils.GTable()
-            binned_spectrum[grism]['wave'] = wave_bin*u.Angstrom
-            binned_spectrum[grism]['flux'] = flux_bin*utils.FLAMBDA_CGS
-            binned_spectrum[grism]['err'] = np.sqrt(var_bin)*utils.FLAMBDA_CGS
-            
-        return binned_spectrum
+        sp_flat = self.optimal_extract(flat_data, bin=bin)
+
+        # Best-fit line and continuum models, with background fit 
+        if tfit is not None:
+            bg_model = self.get_flat_background(tfit['coeffs'],
+                                                apply_mask=True)
+
+            line_model = self.get_flat_model([tfit['line1d'].wave,
+                                              tfit['line1d'].flux])
+            cont_model = self.get_flat_model([tfit['line1d'].wave,
+                                              tfit['cont1d'].flux])
+                                              
+            sp_line = self.optimal_extract(line_model, bin=bin)
+            sp_cont = self.optimal_extract(cont_model, bin=bin)
+        else:
+            bg_model = 0.
         
+        # Optimal spectral extraction
+        sp = self.optimal_extract(self.scif_mask-bg_model, bin=bin)
+        
+        # Loop through grisms, change units and add fit columns
+        # NB: setting units to "count / s" to comply with FITS standard, 
+        #     where count / s = electron / s
+        for k in sp:
+            sp[k]['flat'] = sp_flat[k]['flux']
+            flat_unit = (u.count / u.s) / (u.erg / u.s / u.cm**2 / u.AA)
+            sp[k]['flat'].unit = flat_unit
+            
+            sp[k]['flux'].unit = u.count / u.s
+            sp[k]['err'].unit = u.count / u.s
+            
+            if tfit is not None:
+                sp[k]['line'] = sp_line[k]['flux']
+                sp[k]['line'].unit = u.count / u.s
+                sp[k]['cont'] = sp_cont[k]['flux']
+                sp[k]['cont'].unit = u.count / u.s
+            
+            sp[k].meta['GRISM'] = (k, 'Grism name')
+            
+            # Metadata
+            exptime = count = 0            
+            for pa in self.PA[k]:
+                for i in self.PA[k][pa]:
+                    exptime += self.beams[i].grism.header['EXPTIME']
+                    count += 1
+                    parent = (self.beams[i].grism.parent_file, 'Parent file')
+                    sp[k].meta['FILE{0:04d}'.format(count)] = parent
+            
+            sp[k].meta['NEXP'] = (count, 'Number of exposures')
+            sp[k].meta['EXPTIME'] = (exptime, 'Total exposure time')
+            sp[k].meta['NPA'] = (len(self.PA[k]), 'Number of PAs')
+            
+        return sp
+    
+    def oned_spectrum_to_hdu(self, sp=None, outputfile=None, **kwargs):
+        """Generate 1D spectra fits HDUList
+        
+        Parameters
+        ----------
+        sp : optional, dict
+            Output of `~grizli.multifit.MultiBeam.oned_spectrum`.  If None, 
+            then run that function with `**kwargs`.
+            
+        outputfile : None, str
+            If a string supplied, then write the `~astropy.io.fits.HDUList` to
+            a file.
+        
+        Returns
+        -------
+        hdul : `~astropy.io.fits.HDUList`
+            FITS version of the 1D spectrum tables.
+        
+        """
+        from astropy.io.fits.convenience import table_to_hdu
+        
+        # Generate the spectrum if necessary
+        if sp is None:
+            sp = self.oned_spectrum(**kwargs)
+        
+        # Metadata in PrimaryHDU
+        prim = pyfits.PrimaryHDU()
+        prim.header['ID'] = (self.id, 'Object ID')
+        prim.header['RA'] = (self.ra, 'Right Ascension')
+        prim.header['DEC'] = (self.dec, 'Declination')
+        prim.header['TARGET'] = (self.group_name, 'Target Name')
+        
+        for g in ['G102', 'G141', 'G800L']:
+            if g in sp:
+                prim.header['N_{0}'.format(g)] = sp[g].meta['NEXP']
+                prim.header['T_{0}'.format(g)] = sp[g].meta['EXPTIME']
+                prim.header['PA_{0}'.format(g)] = sp[g].meta['NPA']
+            else:
+                prim.header['N_{0}'.format(g)] = (0, 'Number of exposures')
+                prim.header['T_{0}'.format(g)] = (0, 'Total exposure time')
+                prim.header['PA_{0}'.format(g)] = (0, 'Number of PAs')
+                    
+        for i, k in enumerate(sp):
+            prim.header['GRISM{0:03d}'.format(i+1)] = (k, 'Grism name')
+        
+        # Generate HDUList
+        hdul = [prim]
+        for k in sp:
+            hdu = table_to_hdu(sp[k])
+            hdu.header['EXTNAME'] = k
+            hdul.append(hdu)
+        
+        # Outputs
+        hdul = pyfits.HDUList(hdul)
+        if outputfile is None:
+            return hdul
+        else:
+            hdul.writeto(outputfile, overwrite=True)
+            return hdul
+            
 def get_redshift_fit_defaults():
     """TBD
     """
