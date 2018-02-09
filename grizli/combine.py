@@ -45,7 +45,7 @@ def combine_flt(files=[], output='exposures_cmb.fits', grow=1,
         However, can result in empty pixels given the camera distortions
         depending on the dithering of the input exposures.
     
-    ds9 : `~grizli.utils.DS9`
+    ds9 : `~grizli.ds9.DS9`
         Display the progress of the script to a DS9 window.
         
     verbose : bool

@@ -2853,9 +2853,9 @@ def manual_alignment(visit, ds9, reference=None, reference_catalogs=['SDSS', 'PS
     visit : dict
         List of visit information from `~grizli.utils.parse_flt_files`.
     
-    ds9 : `~grizli.utils.DS9`
+    ds9 : `~grizli.ds9.DS9`
         DS9 instance for interaction.  Requires `~pyds9` and the extended 
-        methods in `~grizli.utils.DS9`.
+        methods in `~grizli.ds9.DS9`.
         
     reference : str
         Filename of a DS9 region file that will be used as reference.  If 
