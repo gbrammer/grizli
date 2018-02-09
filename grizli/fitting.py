@@ -198,6 +198,10 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     line_hdu.insert(3, tfit_hdu)
     
     line_hdu.writeto('{0}_{1:05d}.full.fits'.format(group_name, id), clobber=True, output_verify='fix')
+    
+    # 1D spectrum
+    oned_hdul = mb.oned_spectrum_to_hdu(tfit=tfit, bin=1, outputfile='{0}_{1:05d}.1D.fits'.format(group_name, id))
+    
     return mb, st, fit, tfit, line_hdu
 
 ###################################
@@ -1582,19 +1586,7 @@ class GroupFitter(object):
 
             wmax = np.maximum(wmax, w[clip].max())
             wmin = np.minimum(wmin, w[clip].min())
-        
-        # oned_spec = self.get_binned_spectra(coeffs=coeffs[ix,:])
-        # for g in oned_spec:
-        # 
-        #     pscale = 1.
-        #     if hasattr(self, 'pscale'):
-        #         if (self.pscale is not None):
-        #             pscale = self.compute_scale_array(self.pscale, oned_spec[g]['wave'])
-        # 
-        #     axc.errorbar(oned_spec[g]['wave']/1.e4, oned_spec[g]['flux']/1.e-19/pscale, oned_spec[g]['err']/1.e-19/pscale, color=GRISM_COLORS[g], alpha=0.8, marker='.', linestyle='None', zorder=1)
 
-        # Binned spectrum by grism
-        #oned_spec = mb.get_binned_spectra(coeffs=tfit['coeffs'])
         sp_flat = self.optimal_extract(self.flat_flam[self.fit_mask], bin=1)
         bg_model = self.get_flat_background(coeffs[ix,:], apply_mask=True)
         sp_data = self.optimal_extract(self.scif_mask-bg_model, bin=1)
