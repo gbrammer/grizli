@@ -169,7 +169,7 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
     fine_catalogs = ['GAIA','PS1','SDSS','WISE']
     if not os.path.exists('{0}_fine.png'.format(root)):
         try:
-            out = auto_script.fine_alignment(field_root=root, HOME_PATH=HOME_PATH, min_overlap=0.2, stopme=False, ref_err=0.08, catalogs=fine_catalogs, NITER=1, maglim=[17,23], shift_only=True, method='Powell', redrizzle=True, radius=30, program_str=None, match_str=None)
+            out = auto_script.fine_alignment(field_root=root, HOME_PATH=HOME_PATH, min_overlap=0.2, stopme=False, ref_err=0.08, catalogs=fine_catalogs, NITER=1, maglim=[17,23], shift_only=True, method='Powell', redrizzle=False, radius=30, program_str=None, match_str=[])
             plt.close()
 
             # Update WCS headers with fine alignment
@@ -183,7 +183,10 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
         auto_script.drizzle_overlaps(root, filters=['F105W', 'F110W', 'F125W', 'F140W', 'F160W', 'F098M', 'F139M', 'F127M', 'F153M']) 
     
         auto_script.fill_filter_mosaics(root)
-    
+        
+        # optical images
+        auto_script.drizzle_overlaps(root, filters=['F814W', 'F606W', 'F435W', 'F850LP'], make_combined=False, ref_image='{0}-ir_drz_sci.fits'.format(root)) 
+        
     # Photometric catalogs
     if not os.path.exists('{0}_phot.fits'.format(root)):
         tab = auto_script.photutils_catalog(field_root=root)
@@ -433,7 +436,7 @@ def manual_alignment(field_root='j151850-813028', HOME_PATH='/Volumes/Pegasus/Gr
     
     #import grizli
     from ..prep import get_radec_catalog
-    from .. import utils, prep
+    from .. import utils, prep, ds9
         
     files = glob.glob('*guess')
     if (len(files) > 0) & skip:
@@ -449,7 +452,7 @@ def manual_alignment(field_root='j151850-813028', HOME_PATH='/Volumes/Pegasus/Gr
                     product=field_root,
                     reference_catalogs=catalogs, radius=radius)
     
-    ds9 = utils.DS9()
+    ds9 = ds9.DS9()
     ds9.set('mode pan')
     ds9.set('scale zscale')
     ds9.set('scale log')
@@ -461,7 +464,7 @@ def manual_alignment(field_root='j151850-813028', HOME_PATH='/Volumes/Pegasus/Gr
                 
         filt = visit['product'].split('-')[-1]
         if (not filt.startswith('g')):
-            prep.manual_alignment(visit, reference='{0}_{1}.reg'.format(field_root, ref_catalog.lower()), ds9=ds9)
+            prep.manual_alignment(visit, reference='{0}/{1}_{2}.reg'.format(os.getcwd(), field_root, ref_catalog.lower()), ds9=ds9)
         
     ds9.set('quit')
     
@@ -495,7 +498,7 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
 
         print(i, direct['product'], len(direct['files']), grism['product'], len(grism['files']))
         
-        if os.path.exists(grism['product']+'_drz_sci.fits'):
+        if len(glob.glob(grism['product']+'_dr?_sci.fits')) > 0:
             continue
         
         if master_radec is not None:
@@ -817,12 +820,14 @@ def load_GroupFLT(field_root='j142724+334246', force_ref=None, force_seg=None, f
     
     g141 = info['FILTER'] == 'G141'
     g102 = info['FILTER'] == 'G102'
+    g800l = info['FILTER'] == 'G800L'
                 
     if force_cat is None:
         catalog = '{0}-ir.cat'.format(field_root)
     else:
         catalog = force_cat
-
+    
+    grp = None
     if g141.sum() > 0:
         for f in ['F140W', 'F160W', 'F125W', 'F105W', 'F110W', 'F098M', 'F127M', 'F139M', 'F153M', 'F132N', 'F130N', 'F128N', 'F126N', 'F164N', 'F167N']:
             
@@ -895,6 +900,46 @@ def load_GroupFLT(field_root='j142724+334246', force_ref=None, force_seg=None, f
             
         del(grp_i)
     
+    # ACS
+    if g800l.sum() > 0:
+        for f in ['F814W', 'F606W', 'F850LP', 'F435W']:
+            if os.path.exists('{0}-{1}_drc_sci.fits'.format(field_root, f.lower())):
+                g800l_ref = f
+                break
+        
+        ## Segmentation image
+        if force_seg is None:
+            if galfit == 'clean':
+                seg_file = '{0}-{1}_galfit_orig_seg.fits'.format(field_root, g800l_ref.lower())
+            elif galfit == 'model':
+                seg_file = '{0}-{1}_galfit_seg.fits'.format(field_root, g800l_ref.lower())
+            else:
+                seg_file = '{0}-ir_seg.fits'.format(field_root)
+        else:
+            seg_file = force_seg
+        
+        ## Reference image
+        if force_ref is None:
+            if galfit == 'clean':
+                ref_file = '{0}-{1}_galfit_clean.fits'.format(field_root, g800l_ref.lower())
+            elif galfit == 'model':
+                ref_file = '{0}-{1}_galfit.fits'.format(field_root, g800l_ref.lower())
+            else:
+                ref_file = '{0}-{1}_drc_sci.fits'.format(field_root, g800l_ref.lower())
+            
+        else:
+            ref_file = force_ref
+        
+        for sci_extn in [1,2]:        
+            grp_i = multifit.GroupFLT(grism_files=list(info['FILE'][g800l]), direct_files=[], ref_file=ref_file, seg_file=seg_file, catalog=catalog, cpu_count=-1, sci_extn=sci_extn, pad=pad)
+        
+            if grp is not None:
+                grp.extend(grp_i)
+            else:
+                grp = grp_i
+            
+            del(grp_i)
+    
     return grp
     
 def grism_prep(field_root='j142724+334246', ds9=None, refine_niter=3):
@@ -905,38 +950,6 @@ def grism_prep(field_root='j142724+334246', ds9=None, refine_niter=3):
     from .. import prep, utils, multifit
 
     grp = load_GroupFLT(field_root=field_root)
-    
-    # files=glob.glob('../RAW/*fl[tc].fits')
-    # info = utils.get_flt_info(files)
-    # 
-    # g141 = info['FILTER'] == 'G141'
-    # g102 = info['FILTER'] == 'G102'
-    # 
-    # if g141.sum() > 0:
-    #     for f in ['F140W', 'F160W', 'F125W', 'F105W', 'F110W', 'F098M', 'F127M', 'F139M', 'F153M', 'F132N', 'F130N', 'F128N', 'F126N', 'F164N', 'F167N']:
-    #         
-    #         if os.path.exists('{0}-{1}_drz_sci.fits'.format(field_root, f.lower())):
-    #             g141_ref = f
-    #             break
-    #         # if f in info['FILTER']:
-    #         #     g141_ref = f
-    #         #     break
-    # 
-    #     grp = multifit.GroupFLT(grism_files=list(info['FILE'][g141]), direct_files=[], ref_file='{0}-{1}_drz_sci.fits'.format(field_root, g141_ref.lower()), seg_file='{0}-ir_seg.fits'.format(field_root), catalog='{0}-ir.cat'.format(field_root), cpu_count=-1, sci_extn=1, pad=256)
-    # 
-    # if g102.sum() > 0:
-    #     for f in ['F105W', 'F098M', 'F110W', 'F125W', 'F140W', 'F160W', 'F127M', 'F139M', 'F153M', 'F132N', 'F130N', 'F128N', 'F126N', 'F164N', 'F167N']:
-    #         if f in info['FILTER']:
-    #             g102_ref = f
-    #             break
-    # 
-    #     grp_i = multifit.GroupFLT(grism_files=list(info['FILE'][g102]), direct_files=[], ref_file='{0}-{1}_drz_sci.fits'.format(field_root, g102_ref.lower()), seg_file='{0}-ir_seg.fits'.format(field_root), catalog='{0}-ir.cat'.format(field_root), cpu_count=-1, sci_extn=1, pad=256)
-    #     if g141.sum() > 0:
-    #         grp.extend(grp_i)
-    #     else:
-    #         grp = grp_i
-    #         
-    #     del(grp_i)
     
     ################
     # Compute preliminary model
@@ -994,7 +1007,7 @@ def grism_prep(field_root='j142724+334246', ds9=None, refine_niter=3):
 DITHERED_PLINE = {'kernel': 'point', 'pixfrac': 0.2, 'pixscale': 0.1, 'size': 8, 'wcs': None}
 PARALLEL_PLINE = {'kernel': 'square', 'pixfrac': 0.8, 'pixscale': 0.1, 'size': 8, 'wcs': None}
   
-def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00, ids=None, pline=DITHERED_PLINE, fit_only_beams=True, run_fit=True):
+def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00, ids=None, pline=DITHERED_PLINE, fit_only_beams=True, run_fit=True, poly_order=7):
     import glob
     import os
     
@@ -1038,7 +1051,7 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
     
     # Stack the different beans
     wave = np.linspace(2000,2.5e4,100)
-    poly_templates = utils.polynomial_templates(wave, order=5)
+    poly_templates = utils.polynomial_templates(wave, order=poly_order)
         
     fsps = True
     t0 = utils.load_templates(fwhm=1000, line_complexes=True, stars=False, full_line_list=None, continuum_list=None, fsps_templates=fsps, alf_template=True)
@@ -1071,18 +1084,19 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
             continue
             
         mb = multifit.MultiBeam(beams, fcontam=0.5, group_name=target, psf=False, MW_EBV=MW_EBV)
-        try:
-            fig1 = mb.oned_figure(figsize=[5,3])
-        except:
-            continue
-            
-        fig1.savefig('{0}_{1:05d}.1D.png'.format(target, id))
         
         try:
             pfit = mb.template_at_z(z=0, templates=poly_templates, fit_background=True, fitter='lstsq', get_uncertainties=2)
         except:
             pfit = None
+    
+        try:
+            fig1 = mb.oned_figure(figsize=[5,3], tfit=pfit)
+            fig1.savefig('{0}_{1:05d}.1D.png'.format(target, id))
+        except:
+            continue
 
+            
         hdu, fig = mb.drizzle_grisms_and_PAs(fcontam=0.5, flambda=False, kernel='point', size=32, zfit=pfit)
         fig.savefig('{0}_{1:05d}.stack.png'.format(target, id))
 
@@ -1561,6 +1575,10 @@ def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140
         if filt.upper() in filters:
             wfc3ir['files'].extend(visit['files'])
     
+    if len(filter_groups) == 0:
+        print('No filters found ({0})'.format(filters))
+        return None
+        
     keep = [filter_groups[k] for k in filter_groups]
                         
     if make_combined:
@@ -1576,7 +1594,10 @@ def fill_filter_mosaics(field_root):
     ----------
     field_root : str
 
-    """  
+    """ 
+    import astropy.io.fits as pyfits
+    import glob
+     
     ir = pyfits.open('{0}-ir_drz_sci.fits'.format(field_root))
     filter_files = glob.glob('{0}-f[01]*sci.fits'.format(field_root))
     
