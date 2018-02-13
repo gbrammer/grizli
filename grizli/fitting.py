@@ -135,6 +135,10 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     lineEW = utils.compute_equivalent_widths(t1, coeffs_clip, covar_clip, max_R=5000, Ndraw=1000)
     
     for ik, key in enumerate(lineEW):
+        for j in range(3):
+            if not np.isfinite(lineEW[key][j]):
+                lineEW[key][j] = -1.e30
+                
         cov_hdu.header['FLUX_{0:03d}'.format(ik)] = tfit['cfit'][key][0], '{0} line flux; erg / (s cm2)'.format(key.strip('line '))
         cov_hdu.header['ERR_{0:03d}'.format(ik)] = tfit['cfit'][key][1], '{0} line uncertainty; erg / (s cm2)'.format(key.strip('line '))
         
@@ -1947,7 +1951,7 @@ class GroupFitter(object):
         #self.weighted_sigma2_mask = 1/(self.weightf*self.ivarf)[self.fit_mask] 
         self.weighted_sigma2_mask = 1/(self.weightf*self.sivarf**2)[self.fit_mask] 
             
-    def get_flat_model(self, spectrum_1d, apply_mask=True):
+    def get_flat_model(self, spectrum_1d, apply_mask=True, is_cgs=True):
         """
         Generate model array based on the model 1D spectrum in `spectrum_1d`
 
@@ -1955,21 +1959,22 @@ class GroupFitter(object):
         ----------
 
         spectrum_1d : list
-        
             List of 1D arrays [wavelength, flux].
 
+        is_cgs : bool
+            `spectrum_1d` flux array has CGS f-lambda flux density units.
+            
         Returns
         -------
 
         model : Array with dimensions `(self.fit_mask.sum(),)`
-        
             Flattened, masked model array.
 
         """
         mfull = []
         for ib, beam in enumerate(self.beams):
-            model_i = beam.compute_model(spectrum_1d=spectrum_1d, is_cgs=True,
-                                        in_place=False)
+            model_i = beam.compute_model(spectrum_1d=spectrum_1d, 
+                                         is_cgs=is_cgs, in_place=False)
 
             if apply_mask:
                 mfull.append(model_i.flatten()[beam.fit_mask])
