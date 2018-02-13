@@ -31,9 +31,12 @@ def demo():
     extra = query.DEFAULT_EXTRA+["TARGET.TARGET_NAME LIKE 'WFC3-ERSII-G01'"]
     tabs = overlaps.find_overlaps(parent, buffer_arcmin=0.1, filters=['F098M', 'F140W', 'G102', 'G141'], proposid=[11359], instruments=['WFC3'], extra=extra, close=False)
     
+    HOME_PATH = '/Volumes/Pegasus/Grizli/DemoERS/'
+    HOME_PATH = os.getcwd()
+    
     root = 'j033217-274236'
     from grizli.pipeline import auto_script
-    auto_script.go(root=root, maglim=[19,20], HOME_PATH='/Volumes/Pegasus/Grizli/DemoERS/')
+    auto_script.go(root=root, maglim=[19,20], HOME_PATH=HOME_PATH)
     
     # Interactive session
     from grizli.pipeline import auto_script
