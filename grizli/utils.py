@@ -2206,6 +2206,36 @@ def compute_output_wcs(wcs_list, pixel_scale=0.1, max_size=10000):
     
     return header, outputwcs
 
+def symlink_templates(force=False):
+    """Symlink templates from module to $GRIZLI/templates as part of the initial setup
+    
+    Parameters
+    ----------
+    force : bool
+        Force link files even if they already exist.
+    """
+    if 'GRIZLI' not in os.environ:
+        print('"GRIZLI" environment variable not set!')
+        return False
+        
+    module_path = os.path.dirname(__file__)
+    out_path = os.path.join(os.environ['GRIZLI'], 'templates')
+    
+    files = glob.glob(os.path.join(module_path, 'data/templates/*'))
+    #print(files)
+    for file in files:
+        filename = os.path.basename(file)
+        out_file = os.path.join(out_path, filename)
+        #print(filename, out_file)
+        if (not os.path.exists(out_file)) | force:
+            if os.path.exists(out_file): # (force)
+                os.remove(out_file)
+                
+            os.symlink(file, out_file)
+            print('Symlink: {0} -> {1}'.format(file, out_path))
+        else:
+            print('File exists: {0}'.format(out_file))
+            
 def fetch_hst_calib(file='iref$uc72113oi_pfl.fits',  ftpdir='https://hst-crds.stsci.edu/unchecked_get/references/hst/', verbose=True):
     """
     TBD
