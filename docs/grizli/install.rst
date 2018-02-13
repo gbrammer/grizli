@@ -9,7 +9,10 @@ provides most of the required modules listed here, including general utilities
 like `numpy`, `scipy`, and `matplotlib`, as well as astronomy tools like
 `astropy` and specific software for dealing with space-telescope data
 (`stsci.tools`, `drizzlepac`, etc.). It has been tested to run in astroconda
-with Python versions ``2.7.12`` and ``3.5.2``.
+with Python version ``3.5.4``.  The basic build is tested in Python ``2.7``, 
+``3.5`` and ``3.6`` with `travis <https://travis-ci.org/gbrammer/grizli>`__, 
+but the current test suite does not test much actual functionality of the 
+code.
 
 There are a few additional required modules not provided with `astroconda`,
 summarized here. `/usr/local/share/python` is a good place to download and
@@ -137,7 +140,7 @@ files that are currently hard-coded:
     
     .. code:: python
     
-        >>> import grizli
+        >>> import grizli.utils
         >>> # set ACS=True below to get files necessary for G800L processing
         >>> grizli.utils.fetch_default_calibs(ACS=False) # to iref/iref
         >>> grizli.utils.fetch_config_files()            # to $GRIZLI/CONF
@@ -148,14 +151,13 @@ the repository but that need to be in a specific directory,
 that directory without touching the files in the repository itself. For
 default processing they can by symlinked from the repository:
 
-    .. code:: bash
-        
-        # Get installed location of grizli
-        dist=`python -c "import grizli; import os; print(os.path.dirname(grizli.__file__))"`
-        
-        cd $GRIZLI/templates                # created above
-        ln -s ${dist}/data/templates/* ./
-        
+    .. code:: python
+
+        >>> import grizli.utils
+        >>> grizli.utils.symlink_templates(force=False)
+        >>> # Set force=True to symlink files even if they already exist in 
+        >>> # $GRIZLI/templates/.
+
 
 
 
