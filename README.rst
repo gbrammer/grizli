@@ -3,6 +3,9 @@
 
 .. image:: https://travis-ci.org/gbrammer/grizli.svg?branch=master
     :target: https://travis-ci.org/gbrammer/grizli
+
+.. image:: https://badge.fury.io/py/grizli.svg
+    :target: https://badge.fury.io/py/grizli
     
 .. image:: https://coveralls.io/repos/github/gbrammer/grizli/badge.svg?branch=master
     :target: https://coveralls.io/github/gbrammer/grizli?branch=master
