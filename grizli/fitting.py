@@ -45,7 +45,7 @@ def run_all_parallel(id): #id):
     args['verbose'] = False
     
     fp = open('{0}_{1}.log_par'.format(args['group_name'], id),'w')
-    fp.write(time.ctime())
+    fp.write('{0}_{1}: {2}\n'.format(args['group_name'], id, time.ctime()))
     fp.close()
     
     try:
