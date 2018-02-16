@@ -1149,6 +1149,7 @@ def generate_fit_params(field_root='j142724+334246', prior=None, MW_EBV=0.00, pl
     """
     Generate a parameter dictionary for passing to the fitting script
     """
+    import numpy as np
     from grizli import utils, fitting
     phot = None
     
