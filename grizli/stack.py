@@ -172,7 +172,8 @@ class StackFitter(GroupFitter):
             p = self.ext.pop(i)
                     
         if not fit_stacks:
-            self.mask_drizzle_overlaps(threshold=overlap_threshold)
+            self.mask_drizzle_overlaps(threshold=overlap_threshold,
+                                      verbose=verbose)
         
         # Get some parameters from the beams
         self.id = self.h0['ID']
@@ -854,7 +855,7 @@ class StackFitter(GroupFitter):
         
         return tc, tl
     
-    def mask_drizzle_overlaps(self, threshold=3):
+    def mask_drizzle_overlaps(self, threshold=3, verbose=True):
         """
         TBD
         
@@ -881,7 +882,8 @@ class StackFitter(GroupFitter):
                     continue
                 
                 new_mask = (E.scif - min_grism[grism]) < threshold/E.sivarf                
-                print('Mask {0} additional pixels for ext {1}'.format((~new_mask & E.fit_mask).sum(), E.extver))
+                if verbose:
+                    print('Mask {0} additional pixels for ext {1}'.format((~new_mask & E.fit_mask).sum(), E.extver))
                 
                 E.fit_mask &= new_mask
                             

@@ -1087,7 +1087,7 @@ class GroupFLT():
         return outsci, outwht
 
 class MultiBeam(GroupFitter):
-    def __init__(self, beams, group_name='group', fcontam=0., psf=False, polyx=[0.3, 2.5], MW_EBV=0., sys_err=0.0):
+    def __init__(self, beams, group_name='group', fcontam=0., psf=False, polyx=[0.3, 2.5], MW_EBV=0., sys_err=0.0, verbose=True):
         """Tools for dealing with multiple `~.model.BeamCutout` instances 
         
         Parameters
@@ -1111,7 +1111,7 @@ class MultiBeam(GroupFitter):
         self.polyx = polyx
         
         if isinstance(beams, str):
-            self.load_master_fits(beams)            
+            self.load_master_fits(beams, verbose=verbose)            
         else:
             if isinstance(beams[0], str):
                 ### `beams` is list of strings
@@ -1340,7 +1340,8 @@ class MultiBeam(GroupFitter):
         hdu.writeto(outfile, clobber=True)
     
     def load_master_fits(self, beam_file, verbose=True):
-        hdu = pyfits.open(beam_file)
+        import copy
+        hdu = pyfits.open(beam_file, lazy_load_hdus=False)
         N = hdu[0].header['COUNT']
         Next = np.cast[int](hdu[0].header.comments['COUNT'].split())
         
@@ -1352,14 +1353,24 @@ class MultiBeam(GroupFitter):
                 Next_i = hdu[0].header[key]
             else:
                 Next_i = 6 # Assume doesn't have direct SCI/ERR cutouts
-                
-            beam = model.BeamCutout(fits_file=hdu[i0:i0+Next_i])#Next[i]])
+            
+            # Testing for multiprocessing
+            if True:
+                hducopy = hdu[i0:i0+Next_i]
+            else:
+                #print('Copy!')
+                hducopy = pyfits.HDUList([hdu[i].__class__(data=hdu[i].data*1, header=copy.deepcopy(hdu[i].header), name=hdu[i].name) for i in range(i0, i0+Next_i)])
+            
+            beam = model.BeamCutout(fits_file=hducopy)#Next[i]])
+            
             self.beams.append(beam)
             if verbose:
                 print('{0} {1} {2}'.format(i+1, beam.grism.parent_file, beam.grism.filter))
                 
             i0 += Next_i #6#Next[i]
-            
+        
+        hdu.close()
+        
     def write_beam_fits(self, verbose=True):
         """TBD
         """
@@ -2374,7 +2385,7 @@ class MultiBeam(GroupFitter):
         
         return fig, hdu_sci
     
-    def drizzle_fit_lines(self, fit, pline, force_line=['Ha', 'OIII', 'Hb', 'OII'], save_fits=True, mask_lines=True, mask_sn_limit=3, mask_4959=True):
+    def drizzle_fit_lines(self, fit, pline, force_line=['Ha', 'OIII', 'Hb', 'OII'], save_fits=True, mask_lines=True, mask_sn_limit=3, mask_4959=True, verbose=True):
         """
         TBD
         """
@@ -2417,7 +2428,8 @@ class MultiBeam(GroupFitter):
                 continue
 
             if (line_flux/line_err > 4) | (line in force_line):
-                print('Drizzle line -> {0:4s} ({1:.2f} {2:.2f})'.format(line, line_flux/1.e-17, line_err/1.e-17))
+                if verbose:
+                    print('Drizzle line -> {0:4s} ({1:.2f} {2:.2f})'.format(line, line_flux/1.e-17, line_err/1.e-17))
 
                 line_wave_obs = line_wavelengths[line][0]*(1+z_driz)
                 

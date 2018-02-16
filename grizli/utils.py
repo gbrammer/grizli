@@ -1058,13 +1058,19 @@ class SpectrumTemplate(object):
             
         """
         self.wave = wave
+        if wave is not None:
+            self.wave = np.cast[np.float](wave)
+            
         self.flux = flux
+        if flux is not None:
+            self.flux = np.cast[np.float](flux)
+
         self.fwhm = None
         self.velocity = None
         
         self.fluxunits = fluxunits
         self.waveunits = waveunits
-        self.name = ''
+        self.name = name
         
         if (central_wave is not None) & (fwhm is not None):
             self.fwhm = fwhm
@@ -1226,10 +1232,23 @@ class SpectrumTemplate(object):
         self.fnu_units = fnu_units
         self.flux_fnu = flux_fnu.value
         
-    def integrate_filter(self, filter):
+    def integrate_filter(self, filter, abmag=False):
         """Integrate the template through an `~eazy.FilterDefinition` filter
         object.
         
+        Parameters
+        ----------
+        filter : `~pysynphot.ObsBandpass`
+            Or any object that has `wave` and `throughput` attributes, with 
+            the former in the same units as the input spectrum.
+        
+        abmag : bool
+            Return AB magnitude rather than fnu flux
+        
+        Returns
+        -------
+        temp_flux : float
+            
         Examples
         --------
         
@@ -1263,7 +1282,8 @@ class SpectrumTemplate(object):
         if (filter.wave.min() > self.wave.max()) | (filter.wave.max() < self.wave.min()) | (filter.wave.min() < self.wave.min()):
             return 0.
                 
-        templ_filter = interp(filter.wave, self.wave, self.flux_fnu)
+        templ_filter = interp(filter.wave.astype(np.float), self.wave,
+                              self.flux_fnu)
         
         if hasattr(filter, 'norm'):
             filter_norm = filter.norm
@@ -1273,9 +1293,12 @@ class SpectrumTemplate(object):
                                      filter.wave)
             
         # f_nu/lam dlam == f_nu d (ln nu)    
-        temp_int = INTEGRATOR(filter.throughput*templ_filter/filter.wave, filter.wave) / filter_norm
+        temp_flux = INTEGRATOR(filter.throughput*templ_filter/filter.wave, filter.wave) / filter_norm
         
-        return temp_int
+        if abmag:
+            return -2.5*np.log10(temp_flux)-48.6
+        else:
+            return temp_flux
 
 def load_templates(fwhm=400, line_complexes=True, stars=False,
                    full_line_list=None, continuum_list=None,
@@ -1682,6 +1705,38 @@ def compute_equivalent_widths(templates, coeffs, covar, max_R=5000, Ndraw=1000, 
         EWdict[key] = np.percentile(ew_i, [16., 50., 84.])
     
     return EWdict
+
+def get_spectrum_AB_mags(spectrum, bandpasses=[]):
+    """
+    Integrate a `~pysynphot` spectrum through filter bandpasses
+    
+    Parameters
+    ----------
+    spectrum : type
+
+    bandpasses : list
+        List of `pysynphot` bandpass objects, e.g., 
+        
+           >>> import pysynphot as S
+           >>> bandpasses = [S.ObsBandpass('wfc3,ir,f140w')]
+    
+    
+    Returns
+    -------
+    ab_mags : dict
+        Dictionary with keys from `bandpasses` and the integrated magnitudes
+        
+    """
+    import pysynphot as S
+    flat = S.FlatSpectrum(0, fluxunits='ABMag')
+    ab_mags = OrderedDict()
+    
+    for bp in bandpasses:
+        flat_obs = S.Observation(flat, bp)
+        spec_obs = S.Observation(spectrum, bp)
+        ab_mags[bp.name] = -2.5*np.log10(spec_obs.countrate()/flat_obs.countrate())
+    
+    return ab_mags
     
 def log_zgrid(zr=[0.7,3.4], dz=0.01):
     """Make a logarithmically spaced redshift grid
