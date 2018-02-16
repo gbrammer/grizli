@@ -31,7 +31,7 @@ def demo():
     extra = query.DEFAULT_EXTRA+["TARGET.TARGET_NAME LIKE 'WFC3-ERSII-G01'"]
     tabs = overlaps.find_overlaps(parent, buffer_arcmin=0.1, filters=['F098M', 'F140W', 'G102', 'G141'], proposid=[11359], instruments=['WFC3'], extra=extra, close=False)
     
-    HOME_PATH = '/Volumes/Pegasus/Grizli/DemoERS/'
+    #HOME_PATH = '/Volumes/Pegasus/Grizli/DemoERS/'
     HOME_PATH = os.getcwd()
     
     root = 'j033217-274236'
@@ -1134,29 +1134,6 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
             spectrum_1d = [tfit['cont1d'].wave, tfit['cont1d'].flux]
             grp.compute_single_model(id, mag=-99, size=-1, store=False, spectrum_1d=spectrum_1d, get_beams=None, in_place=True, is_cgs=True)
             
-            if False:
-                fig = plt.gcf()
-                ix = photom['id'] == id
-                ax = fig.axes[1]
-                ax.errorbar(photom_pivot/1.e4, photom_flux[:,ix].flatten()/1.e-19, photom_err[:,ix].flatten()/1.e-19, color='k', linestyle='None', marker='s', alpha=0.5)
-                
-                if False:
-                     spectrum_1d = [tfit['line1d'].wave, tfit['line1d'].flux]
-                     model_mask = mb.get_flat_model(spectrum_1d, apply_mask=True)
-                     resid = (mb.scif_mask-model_mask)/mb.sigma_mask
-                     
-            ######
-            # Show the drizzled lines and direct image cutout, which are
-            # extensions `DSCI`, `LINE`, etc.
-            s, si = 1, 1.6
-            
-            s = 4.e-19/np.max([beam.beam.total_flux for beam in mb.beams]) 
-            s = np.clip(s, 0.25, 4)
-            
-            full_line_list = ['OII', 'Hb', 'OIII', 'Ha', 'SII', 'SIII']
-            fig = fitting.show_drizzled_lines(out[-1], size_arcsec=si, cmap='plasma_r', scale=s, dscale=s, full_line_list=full_line_list)
-            fig.savefig('{0}_{1:05d}.line.png'.format(target, id))
-                        
             if close:
                 for k in range(1000): plt.close()
                 
@@ -1167,8 +1144,24 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
     # Re-save data with updated models
     grp.save_full_data()
     return grp
+
+def generate_fit_params(field_root='j142724+334246', prior=None, MW_EBV=0.00, pline=DITHERED_PLINE, fit_only_beams=True, run_fit=True, poly_order=7, fsps=True, sys_err = 0.03, fcontam=0.2, zr=[0.1, 3.4], save_file='fit_args.npy'):
+    """
+    Generate a parameter dictionary for passing to the fitting script
+    """
+    from grizli import utils, fitting
+    phot = None
     
-def summary_catalog(field_root='', dzbin=0.01, use_localhost=True):
+    t0 = utils.load_templates(fwhm=1000, line_complexes=True, stars=False, full_line_list=None, continuum_list=None, fsps_templates=fsps, alf_template=True)
+    t1 = utils.load_templates(fwhm=1000, line_complexes=False, stars=False, full_line_list=None, continuum_list=None, fsps_templates=fsps, alf_template=True)
+
+    args = fitting.run_all(0, t0=t0, t1=t1, fwhm=1200, zr=zr, dz=[0.004, 0.0005], fitter='nnls', group_name=field_root, fit_stacks=False, prior=prior,  fcontam=fcontam, pline=pline, mask_sn_limit=10, fit_beams=False,  root=field_root+'_', fit_trace_shift=False, phot=phot, verbose=True, scale_photometry=False, show_beams=True, overlap_threshold=10, fit_only_beams=fit_only_beams, MW_EBV=MW_EBV, sys_err=sys_err, get_dict=True)
+    
+    np.save(save_file, [args])
+    print('Saved arguments to {0}.'.format(save_file))
+    return args
+    
+def summary_catalog(field_root='', dzbin=0.01, use_localhost=True, filter_bandpasses=None):
     """
     Make redshift histogram and summary catalog / HTML table
     """
@@ -1179,8 +1172,15 @@ def summary_catalog(field_root='', dzbin=0.01, use_localhost=True):
     
     from grizli import utils, fitting
     
+    if filter_bandpasses is None:
+        import pysynphot as S
+        filter_bandpasses = [S.ObsBandpass(bpstr) for bpstr in ['wfc3,ir,f105w', 'wfc3,ir,f110w', 'wfc3,ir,f125w', 'wfc3,ir,f140w', 'wfc3,ir,f160w']]
+        
     ### SUmmary catalog
-    fit = fitting.make_summary_catalog(target=field_root, sextractor=None)
+    fit = fitting.make_summary_catalog(target=field_root, sextractor=None,
+                                       filter_bandpasses=filter_bandpasses)
+                                       
+    fit.meta['root'] = field_root
     
     ## Add photometric catalog
     try:
@@ -1193,19 +1193,11 @@ def summary_catalog(field_root='', dzbin=0.01, use_localhost=True):
     
     fit['ellipticity'] = (sex['B_IMAGE']/sex['A_IMAGE'])[sex_idx]
     fit['ellipticity'].format = '.2f'
-    
-    # phot_file = '{0}_phot.fits'.format(field_root)
-    # if os.path.exists(phot_file):
-    #     phot = utils.GTable.gread(phot_file)
-    #     phot_idx = np.array([idx[phot['id'] == id][0] for id in fit['id']])
-    #     for col in ['ellipticity', 'source_flam']:
-    #         fit[col] = phot[col][phot_idx]
-    #     
-    #     fit['ellipticity'].format = '.2f'
-    #     fit['source_flam'].format = '.2e'
-    
+        
     for col in ['MAG_AUTO', 'FLUX_RADIUS', 'A_IMAGE']:
         fit[col.lower()] = sex[col][sex_idx]
+
+    for col in ['MAG_AUTO', 'FLUX_RADIUS', 'A_IMAGE']:
         fit[col.lower()].format = '.2f'
             
     for c in ['log_risk', 'log_pdf_max', 'zq','chinu', 'bic_diff']:
@@ -1244,11 +1236,20 @@ def summary_catalog(field_root='', dzbin=0.01, use_localhost=True):
     fig.tight_layout(pad=0.2)
     fig.savefig('{0}_zhist.png'.format(field_root))
 
-    fit['id','ra', 'dec', 'mag_auto', 'z_map','log_risk', 'log_pdf_max', 'zq', 'chinu', 'bic_diff', 'zwidth1', 'png_stack', 'png_full', 'png_line'].write_sortable_html(field_root+'-fit.html', replace_braces=True, localhost=use_localhost, max_lines=50000, table_id=None, table_class='display compact', css=None)
-        
-    fit['id','ra', 'dec', 'mag_auto', 'z_map','log_risk', 'log_pdf_max', 'zq', 'chinu', 'bic_diff', 'zwidth1', 'png_stack', 'png_full', 'png_line'][clip].write_sortable_html(field_root+'-fit.zq.html', replace_braces=True, localhost=use_localhost, max_lines=50000, table_id=None, table_class='display compact', css=None)
+    cols = ['id','ra', 'dec', 'mag_auto', 'z_map','log_risk', 'log_pdf_max', 'zq', 'chinu', 'bic_diff', 'zwidth1', 'png_stack', 'png_full', 'png_line']
     
-def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', min_overlap=0.2, stopme=False, ref_err = 1.e-3, radec=None, redrizzle=True, shift_only=True, maglim=[17,24], NITER=1, catalogs = ['PS1','SDSS','GAIA','WISE'], method='Powell', radius=5., program_str=None, match_str=[]):
+    fit[cols].write_sortable_html(field_root+'-fit.html', replace_braces=True, localhost=use_localhost, max_lines=50000, table_id=None, table_class='display compact', css=None)
+        
+    fit[cols][clip].write_sortable_html(field_root+'-fit.zq.html', replace_braces=True, localhost=use_localhost, max_lines=50000, table_id=None, table_class='display compact', css=None)
+
+    if False:
+        cols = ['id','ra', 'dec', 'mag_auto', 'flux_Ha', 'z_map','log_risk', 'log_pdf_max', 'zq', 'chinu', 'bic_diff', 'zwidth1', 'png_stack', 'png_full', 'png_line']
+        clip = (info['sn_Ha'] > 5) & (info['bic_diff'] > 50) & (info['chinu'] < 3)
+        clip = (info['sn_OIII'] > 5) & (info['bic_diff'] > 100) & (info['chinu'] < 3)
+
+        fit[cols][clip].write_sortable_html(field_root+'-fit.Ha.html', replace_braces=True, localhost=use_localhost, max_lines=50000, table_id=None, table_class='display compact', css=None)
+        
+def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', min_overlap=0.2, stopme=False, ref_err = 1.e-3, radec=None, redrizzle=True, shift_only=True, maglim=[17,24], NITER=1, catalogs = ['PS1','SDSS','GAIA','WISE'], method='Powell', radius=5., program_str=None, match_str=[], all_visits=None):
     """
     Try fine alignment from visit-based SExtractor catalogs
     """    
@@ -1277,7 +1278,8 @@ def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Griz
     
     import copy
         
-    all_visits, all_groups, info = np.load('{0}_visits.npy'.format(field_root))
+    if all_visits is None:
+        all_visits, all_groups, info = np.load('{0}_visits.npy'.format(field_root))
     #all_visits, filters = utils.parse_flt_files(info=info, uniquename=True, get_footprint=False)
     
     visits = []

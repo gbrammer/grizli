@@ -6,6 +6,7 @@ Created by Gabriel Brammer on 2017-05-19.
 """
 import os
 import glob
+import inspect
 
 from collections import OrderedDict
 
@@ -31,7 +32,30 @@ try:
 except:
     IGM = None
 
-def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter='nnls', group_name='grism', fit_stacks=True, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=3, fit_only_beams=False, fit_beams=True, root='', fit_trace_shift=False, phot=None, verbose=True, scale_photometry=False, show_beams=True, overlap_threshold=5, MW_EBV=0., sys_err=0.03):
+def run_all_parallel(id): #id):
+    import numpy as np
+    from grizli.fitting import run_all
+    from grizli import multifit
+    import time
+    
+    t0 = time.time()
+    
+    try:
+        print('Run {0}'.format(id))
+        args = np.load('fit_args.npy')[0]
+        args['verbose'] = False
+        #args['zr'] = [0.7, 1.0]
+        #mb = multifit.MultiBeam('j100025+021651_{0:05d}.beams.fits'.format(id))
+        out = run_all(id, **args)
+        status=1
+    except:
+        status=-1
+    
+    t1 = time.time()
+    
+    return id, status, t1-t0
+    
+def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter='nnls', group_name='grism', fit_stacks=True, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=3, fit_only_beams=False, fit_beams=True, root='', fit_trace_shift=False, phot=None, verbose=True, scale_photometry=False, show_beams=True, overlap_threshold=5, MW_EBV=0., sys_err=0.03, get_dict=False, **kwargs):
     """Run the full procedure
     
     1) Load MultiBeam and stack files 
@@ -45,13 +69,25 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     from grizli.stack import StackFitter
     from grizli.multifit import MultiBeam
     
+    if get_dict:
+        frame = inspect.currentframe()
+        args = inspect.getargvalues(frame).locals
+        for k in ['id', 'get_dict', 'frame', 'glob', 'grizli', 'StackFitter', 'MultiBeam']:
+            if k in args:
+                args.pop(k)
+        
+        return args 
+        
     mb_files = glob.glob('{0}*{1:05d}.beams.fits'.format(root, id))
     st_files = glob.glob('{0}*{1:05d}.stack.fits'.format(root, id))
     
-    st = StackFitter(st_files, fit_stacks=fit_stacks, group_name=group_name, fcontam=fcontam, overlap_threshold=overlap_threshold, MW_EBV=MW_EBV)
-    st.initialize_masked_arrays()
+    if fit_only_beams:
+        st = None
+    else:
+        st = StackFitter(st_files, fit_stacks=fit_stacks, group_name=group_name, fcontam=fcontam, overlap_threshold=overlap_threshold, MW_EBV=MW_EBV, verbose=verbose)
+        st.initialize_masked_arrays()
     
-    mb = MultiBeam(mb_files[0], fcontam=fcontam, group_name=group_name, MW_EBV=MW_EBV, sys_err=sys_err)
+    mb = MultiBeam(mb_files[0], fcontam=fcontam, group_name=group_name, MW_EBV=MW_EBV, sys_err=sys_err, verbose=verbose)
     if len(mb_files) > 1:
         for file in mb_files[1:]:
             mb.extend(MultiBeam(file, fcontam=fcontam, group_name=group_name, MW_EBV=MW_EBV))
@@ -188,7 +224,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     if pline is None:
          pzfit, pspec2, pline = grizli.multifit.get_redshift_fit_defaults()
     
-    line_hdu = mb.drizzle_fit_lines(tfit, pline, force_line=['SIII','SII','Ha', 'OIII', 'Hb', 'OII'], save_fits=False, mask_lines=True, mask_sn_limit=mask_sn_limit)
+    line_hdu = mb.drizzle_fit_lines(tfit, pline, force_line=['SIII','SII','Ha', 'OIII', 'Hb', 'OII'], save_fits=False, mask_lines=True, mask_sn_limit=mask_sn_limit, verbose=verbose)
     
     # Add beam exposure times
     exptime = mb.compute_exptime()
@@ -205,6 +241,18 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     
     # 1D spectrum
     oned_hdul = mb.oned_spectrum_to_hdu(tfit=tfit, bin=1, outputfile='{0}_{1:05d}.1D.fits'.format(group_name, id))
+    
+    ######
+    # Show the drizzled lines and direct image cutout, which are
+    # extensions `DSCI`, `LINE`, etc.
+    s, si = 1, 1.6
+    
+    s = 4.e-19/np.max([beam.beam.total_flux for beam in mb.beams]) 
+    s = np.clip(s, 0.25, 4)
+    
+    full_line_list = ['OII', 'Hb', 'OIII', 'Ha', 'SII', 'SIII']
+    fig = show_drizzled_lines(line_hdu, size_arcsec=si, cmap='plasma_r', scale=s, dscale=s, full_line_list=full_line_list)
+    fig.savefig('{0}_{1:05d}.line.png'.format(group_name, id))
     
     return mb, st, fit, tfit, line_hdu
 
@@ -367,7 +415,8 @@ def full_sed_plot(out, t1, bin=1, minor=0.1, save='png', sed_resolution=180, pho
         
     return fig
     
-def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat', verbose=True):
+def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat', verbose=True, filter_bandpasses=[]):
+    
     import glob
     import os
     from collections import OrderedDict
@@ -391,6 +440,8 @@ def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat',
     lines = []
     pdf_max = []
     files=glob.glob('{0}*full.fits'.format(target))
+    template_mags = []
+    
     for file in files:
         print(utils.NO_NEWLINE+file)
         line = []
@@ -414,7 +465,16 @@ def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat',
                     line.append(np.nan)
         
         lines.append(line)
-    
+        
+        # Integrate best-fit template through filter bandpasses
+        if filter_bandpasses:
+            tfit = utils.GTable.gread(full['TEMPL'])
+            sp = utils.SpectrumTemplate(wave=tfit['wave'], flux=tfit['full'])
+            mags = [sp.integrate_filter(bp, abmag=True) 
+                        for bp in filter_bandpasses]
+            
+            template_mags.append(mags)
+            
     columns = []
     for ext in keys:
         if ext == 'ZFIT_BEAM':
@@ -424,7 +484,13 @@ def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat',
     
     info = utils.GTable(rows=lines, names=columns)
     info['PDF_MAX'] = pdf_max
-                      
+    
+    if filter_bandpasses:
+        arr = np.array(template_mags)
+        for i, bp in enumerate(filter_bandpasses):
+            info['mag_{0}'.format(bp.name)] = arr[:,i]
+            info['mag_{0}'.format(bp.name)].format = '.3f'
+            
     for c in info.colnames:
         info.rename_column(c, c.lower())
     
@@ -1311,7 +1377,7 @@ class GroupFitter(object):
         # p(z)
         axz = fig.add_subplot(gs[-1,0]) #121)
         
-        axz.text(0.95, 0.96, self.group_name + '\n'+'ID={0:<5d}  z={1:.4f}'.format(self.id, fit.meta['z_risk'][0]), ha='right', va='top', transform=axz.transAxes, fontsize=9)
+        axz.text(0.95, 0.96, self.group_name + '\n'+'ID={0:<5d}  z={1:.4f}'.format(self.id, fit.meta['z_map'][0]), ha='right', va='top', transform=axz.transAxes, fontsize=9)
                  
         axz.plot(fit['zgrid'], np.log10(fit['pdf']), color='k')
         #axz.fill_between(z, (chi2-chi2.min())/scale_nu, 27, color='k', alpha=0.5)
