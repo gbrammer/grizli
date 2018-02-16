@@ -39,11 +39,16 @@ def run_all_parallel(id): #id):
     import time
     
     t0 = time.time()
+
+    print('Run {0}'.format(id))
+    args = np.load('fit_args.npy')[0]
+    args['verbose'] = False
+    
+    fp = open('{0}_{1}.log_par'.format(args['group_name'], id),'w')
+    fp.write(time.ctime())
+    fp.close()
     
     try:
-        print('Run {0}'.format(id))
-        args = np.load('fit_args.npy')[0]
-        args['verbose'] = False
         #args['zr'] = [0.7, 1.0]
         #mb = multifit.MultiBeam('j100025+021651_{0:05d}.beams.fits'.format(id))
         out = run_all(id, **args)
