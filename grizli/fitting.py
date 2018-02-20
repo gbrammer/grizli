@@ -542,7 +542,11 @@ def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat',
 
     info['beam_log_risk'] = np.log10(info['beam_min_risk'])
     info['beam_log_risk'].format = '.2f'
-        
+    
+    # ID with link to CDS
+    idx = ['<a href="http://vizier.u-strasbg.fr/viz-bin/VizieR?-c={0:.6f}+{1:.6f}&-c.rs=2">{2}</a>'.format(info['ra'][i], info['dec'][i], info['id'][i]) for i in range(len(info))]
+    info['idx'] = idx
+    
     ### PNG columns    
     for ext in ['stack','full','line']:
         png = ['{0}_{1:05d}.{2}.png'.format(target, id, ext) for id in info['id']]
