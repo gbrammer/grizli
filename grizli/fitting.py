@@ -32,7 +32,7 @@ try:
 except:
     IGM = None
 
-def run_all_parallel(id): #id):
+def run_all_parallel(id, **kwargs):
     import numpy as np
     from grizli.fitting import run_all
     from grizli import multifit
@@ -43,7 +43,9 @@ def run_all_parallel(id): #id):
     print('Run {0}'.format(id))
     args = np.load('fit_args.npy')[0]
     args['verbose'] = False
-    
+    for k in kwargs:
+        args[k] = kwargs[k]
+        
     fp = open('{0}_{1}.log_par'.format(args['group_name'], id),'w')
     fp.write('{0}_{1}: {2}\n'.format(args['group_name'], id, time.ctime()))
     fp.close()
@@ -83,8 +85,8 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
         
         return args 
         
-    mb_files = glob.glob('{0}*{1:05d}.beams.fits'.format(root, id))
-    st_files = glob.glob('{0}*{1:05d}.stack.fits'.format(root, id))
+    mb_files = glob.glob('{0}_{1:05d}.beams.fits'.format(root, id))
+    st_files = glob.glob('{0}_{1:05d}.stack.fits'.format(root, id))
     
     if fit_only_beams:
         st = None
