@@ -1128,7 +1128,7 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
                 continue
         
         try:
-            out = fitting.run_all(id, t0=t0, t1=t1, fwhm=1200, zr=zr, dz=[0.004, 0.0005], fitter='nnls', group_name=target, fit_stacks=False, prior=prior,  fcontam=0.2, pline=pline, mask_sn_limit=10, fit_beams=(not fit_only_beams),  root=target+'_', fit_trace_shift=False, phot=phot, verbose=True, scale_photometry=(phot is not None) & (scale_photometry), show_beams=True, overlap_threshold=10, fit_only_beams=fit_only_beams, MW_EBV=MW_EBV, sys_err=sys_err)
+            out = fitting.run_all(id, t0=t0, t1=t1, fwhm=1200, zr=zr, dz=[0.004, 0.0005], fitter='nnls', group_name=target, fit_stacks=False, prior=prior,  fcontam=0.2, pline=pline, mask_sn_limit=10, fit_beams=(not fit_only_beams),  root=target+'*', fit_trace_shift=False, phot=phot, verbose=True, scale_photometry=(phot is not None) & (scale_photometry), show_beams=True, overlap_threshold=10, fit_only_beams=fit_only_beams, MW_EBV=MW_EBV, sys_err=sys_err)
             mb, st, fit, tfit, line_hdu = out
             
             spectrum_1d = [tfit['cont1d'].wave, tfit['cont1d'].flux]
@@ -1156,11 +1156,53 @@ def generate_fit_params(field_root='j142724+334246', prior=None, MW_EBV=0.00, pl
     t0 = utils.load_templates(fwhm=1000, line_complexes=True, stars=False, full_line_list=None, continuum_list=None, fsps_templates=fsps, alf_template=True)
     t1 = utils.load_templates(fwhm=1000, line_complexes=False, stars=False, full_line_list=None, continuum_list=None, fsps_templates=fsps, alf_template=True)
 
-    args = fitting.run_all(0, t0=t0, t1=t1, fwhm=1200, zr=zr, dz=[0.004, 0.0005], fitter='nnls', group_name=field_root, fit_stacks=False, prior=prior,  fcontam=fcontam, pline=pline, mask_sn_limit=10, fit_beams=False,  root=field_root+'_', fit_trace_shift=False, phot=phot, verbose=True, scale_photometry=False, show_beams=True, overlap_threshold=10, fit_only_beams=fit_only_beams, MW_EBV=MW_EBV, sys_err=sys_err, get_dict=True)
+    args = fitting.run_all(0, t0=t0, t1=t1, fwhm=1200, zr=zr, dz=[0.004, 0.0005], fitter='nnls', group_name=field_root, fit_stacks=False, prior=prior,  fcontam=fcontam, pline=pline, mask_sn_limit=10, fit_beams=False,  root=field_root, fit_trace_shift=False, phot=phot, verbose=True, scale_photometry=False, show_beams=True, overlap_threshold=10, fit_only_beams=fit_only_beams, MW_EBV=MW_EBV, sys_err=sys_err, get_dict=True)
     
     np.save(save_file, [args])
     print('Saved arguments to {0}.'.format(save_file))
     return args
+
+def set_column_formats(fit):
+    """
+    Set print formats for the master catalog columns
+    """
+    fit['ellipticity'].format = '.2f'
+    
+    for c in ['ra', 'dec']:
+        fit[c].format = '.5f'
+    
+    for col in ['MAG_AUTO', 'FLUX_RADIUS', 'A_IMAGE']:
+        fit[col.lower()].format = '.2f'
+            
+    for c in ['log_risk', 'log_pdf_max', 'zq','chinu', 'bic_diff']:
+        fit[c].format = '.2f'
+    
+    for c in ['z_risk', 'z_map', 'z02', 'z16', 'z50', 'z84', 'z97']: 
+        fit[c].format = '.4f'
+    
+    for c in ['t_g102', 't_g141']: 
+        fit[c].format = '.0f'
+    
+    for c in fit.colnames:
+        if c.startswith('flux_'):
+            fit[c].format = '.1e'
+        
+        if c.startswith('err_'):
+            fit[c].format = '.1e'
+        
+        if c.startswith('ew50_'):
+            fit[c].format = '.1e'
+        
+        if c.startswith('ewhw_'):
+            fit[c].format = '.1e'
+            
+        if c.startswith('sn_'):
+            fit[c].format = '.1f'
+        
+        if c.startswith('zwidth'):
+            fit[c].format = '.3f'
+        
+    return fit
     
 def summary_catalog(field_root='', dzbin=0.01, use_localhost=True, filter_bandpasses=None):
     """
@@ -1193,19 +1235,11 @@ def summary_catalog(field_root='', dzbin=0.01, use_localhost=True, filter_bandpa
     sex_idx = np.array([idx[sex['NUMBER'] == id][0] for id in fit['id']])
     
     fit['ellipticity'] = (sex['B_IMAGE']/sex['A_IMAGE'])[sex_idx]
-    fit['ellipticity'].format = '.2f'
         
     for col in ['MAG_AUTO', 'FLUX_RADIUS', 'A_IMAGE']:
         fit[col.lower()] = sex[col][sex_idx]
 
-    for col in ['MAG_AUTO', 'FLUX_RADIUS', 'A_IMAGE']:
-        fit[col.lower()].format = '.2f'
-            
-    for c in ['log_risk', 'log_pdf_max', 'zq','chinu', 'bic_diff']:
-        fit[c].format = '.2f'
-    
-    for c in ['z_map', 'ra', 'dec']: 
-        fit[c].format = '.4f'
+    fit = set_column_formats(fit)
     
     # Overwrite with additional sextractor keywords
     fit.write('{0}.info.fits'.format(field_root), overwrite=True)
@@ -1237,18 +1271,44 @@ def summary_catalog(field_root='', dzbin=0.01, use_localhost=True, filter_bandpa
     fig.tight_layout(pad=0.2)
     fig.savefig('{0}_zhist.png'.format(field_root))
 
-    cols = ['id','ra', 'dec', 'mag_auto', 'z_map','log_risk', 'log_pdf_max', 'zq', 'chinu', 'bic_diff', 'zwidth1', 'png_stack', 'png_full', 'png_line']
+    cols = ['id','ra', 'dec', 'mag_auto', 't_g102', 't_g141', 'z_map', 'log_risk', 'log_pdf_max', 'zq', 'chinu', 'bic_diff', 'zwidth1', 'png_stack', 'png_full', 'png_line']
     
     fit[cols].write_sortable_html(field_root+'-fit.html', replace_braces=True, localhost=use_localhost, max_lines=50000, table_id=None, table_class='display compact', css=None)
         
     fit[cols][clip].write_sortable_html(field_root+'-fit.zq.html', replace_braces=True, localhost=use_localhost, max_lines=50000, table_id=None, table_class='display compact', css=None)
 
     if False:
-        cols = ['id','ra', 'dec', 'mag_auto', 'flux_Ha', 'z_map','log_risk', 'log_pdf_max', 'zq', 'chinu', 'bic_diff', 'zwidth1', 'png_stack', 'png_full', 'png_line']
-        clip = (info['sn_Ha'] > 5) & (info['bic_diff'] > 50) & (info['chinu'] < 3)
-        clip = (info['sn_OIII'] > 5) & (info['bic_diff'] > 100) & (info['chinu'] < 3)
-
-        fit[cols][clip].write_sortable_html(field_root+'-fit.Ha.html', replace_braces=True, localhost=use_localhost, max_lines=50000, table_id=None, table_class='display compact', css=None)
+        
+        fit = utils.GTable.gread('{0}.info.fits'.format(root))
+        fit = auto_script.set_column_formats(fit)
+        
+        cols = ['id','ra', 'dec', 'mag_auto', 't_g102', 't_g141', 'sn_Ha', 'sn_OIII', 'sn_Hb', 'z_map','log_risk', 'log_pdf_max', 'zq', 'chinu', 'bic_diff', 'zwidth1', 'png_stack', 'png_full', 'png_line']
+        
+        #clip = ((fit['sn_Ha'] > 5) | (fit['sn_OIII'] > 5)) & (fit['bic_diff'] > 50) & (fit['chinu'] < 2)
+        #clip = (fit['sn_OIII'] > 5) & (fit['bic_diff'] > 100) & (fit['chinu'] < 3)
+        
+        test_line = {}
+        for l in ['Ha','OIII','OII']:
+            test_line[l] = (fit['sn_'+l] > 5) & (fit['err_'+l] < 1.e-16)
+            
+        clip = (test_line['Ha'] | test_line['OIII'] | test_line['OII']) & (fit['bic_diff'] > 50) & (fit['chinu'] < 2)
+        
+        star = fit['flux_radius'] < 2.3
+        clip &= ~star
+        
+        jh = fit['mag_wfc3,ir,f125w'] - fit['mag_wfc3,ir,f160w']
+        clip = (fit['chinu'] < 2) & (jh > 0.9) & (fit['mag_wfc3,ir,f160w'] < 23)
+        fit['jh'] = jh
+        fit['jh'].format = '.1f'
+        
+        fit['dmag'] = fit['mag_wfc3,ir,f140w'] - fit['mag_auto']
+        fit['dmag'].format = '.1f'
+        
+        cols = ['idx','ra', 'dec', 'mag_auto', 'jh', 'dmag', 't_g141', 'sn_Ha', 'sn_OIII', 'sn_Hb', 'z_map','log_risk', 'log_pdf_max', 'zq', 'chinu', 'bic_diff', 'zwidth1', 'png_stack', 'png_full', 'png_line']
+        
+        fit[cols][clip].write_sortable_html(root+'-fit.lines.html', replace_braces=True, localhost=False, max_lines=50000, table_id=None, table_class='display compact', css=None)
+        
+        
         
 def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', min_overlap=0.2, stopme=False, ref_err = 1.e-3, radec=None, redrizzle=True, shift_only=True, maglim=[17,24], NITER=1, catalogs = ['PS1','SDSS','GAIA','WISE'], method='Powell', radius=5., program_str=None, match_str=[], all_visits=None):
     """
