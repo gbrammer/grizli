@@ -596,6 +596,10 @@ def parse_grism_associations(exposure_groups,
                 #     if (group['direct']['product'].startswith(root_i)) & (d_i.upper() == best_direct[f_i.upper()]):
                 #         continue
                 
+                if f_j.upper() not in best_direct[f_i.upper()]:
+                    #print(f_j.upper())
+                    continue
+                    
                 if best_direct[f_i.upper()].index(f_j.upper()) < d_idx:
                     d_idx = best_direct[f_i.upper()].index(f_j.upper())
                     group['direct'] = exposure_groups[j]
