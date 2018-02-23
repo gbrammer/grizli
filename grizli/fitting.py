@@ -46,8 +46,8 @@ def run_all_parallel(id, **kwargs):
     for k in kwargs:
         args[k] = kwargs[k]
         
-    fp = open('{0}_{1}.log_par'.format(args['group_name'], id),'w')
-    fp.write('{0}_{1}: {2}\n'.format(args['group_name'], id, time.ctime()))
+    fp = open('{0}_{1:05d}.log_par'.format(args['group_name'], id),'w')
+    fp.write('{0}_{1:05d}: {2}\n'.format(args['group_name'], id, time.ctime()))
     fp.close()
     
     try:
