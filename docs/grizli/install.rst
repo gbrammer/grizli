@@ -1,7 +1,7 @@
 Installation instructions
 
-Dependencies
-------------
+Python Environment
+------------------
 
 `Grizli` has been developed to work in the `astroconda
 <http://astroconda.readthedocs.io/en/latest/>`__ Python environment, which
@@ -14,8 +14,39 @@ with Python version ``3.5.4``.  The basic build is tested in Python ``2.7``,
 but the current test suite does not test much actual functionality of the 
 code.
 
-There are a few additional required modules not provided with `astroconda`,
-summarized here. `/usr/local/share/python` is a good place to download and
+Installation with a Conda environment
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An `environment.yml <https://github.com/gbrammer/grizli/blob/master/environment.yml>`__ file is included with the `~grizli` distribution to 
+provide an automatic way of installing the required dependencies, getting
+them from `conda`, `pip`, and directly from `github` as necessary.  To use 
+this file, do the following
+
+    .. code:: bash
+
+        cd /usr/local/share/python # or some other location, even /tmp/
+
+        # Fetch the grizli repo
+        git clone https://github.com/gbrammer/grizli.git
+        cd grizli
+        
+        # Generate the conda environment
+        conda env create -f environment.yml
+        
+        # Activate the environment.  This needs to be done each time you 
+        # start a new terminal, or put it in ~/.bashrc
+        source activate grizli-dev
+        
+        # Compile and install the grizli module.  Only needs to be done
+        # once or after updating the repository.
+        python setup.py install 
+
+Once you've built the code, proceed to `Set up directories and fetch config files`_.
+
+Manual installation of dependencies
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+There are a number of additional required modules not provided with `astroconda`,
+summarized here.   `/usr/local/share/python` is a good place to download and
 compile Python modules not provided automatically with `astroconda`:
 
     .. code:: bash
@@ -114,6 +145,8 @@ the GitHub repository until the versioning and tagging is straightened out:
         cd grizli
         python setup.py install
 
+Set up directories and fetch config files
+-----------------------------------------
 `Grizli` requires a few environmental variables to be set that point to
 directory location of configuration files. The "`export`" lines below can be
 put into the *~/.bashrc* or *~/.bash_profile* setup files so that the system
