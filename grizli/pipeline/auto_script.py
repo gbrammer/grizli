@@ -47,7 +47,7 @@ def demo():
     reprocess_parallel=True
     is_parallel_field=False
     
-def get_extra_data(root='j114936+222414', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', instruments=['WFC3'], filters=['F160W','F140W','F098M','F105W'], radius=2, run_fetch=True):
+def get_extra_data(root='j114936+222414', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', instruments=['WFC3'], filters=['F160W','F140W','F098M','F105W'], radius=2, run_fetch=True, from_mast=True):
     
     import os
     import numpy as np
@@ -77,7 +77,25 @@ def get_extra_data(root='j114936+222414', HOME_PATH='/Volumes/Pegasus/Grizli/Aut
     extra.write(os.path.join(HOME_PATH, root, 'extra_data.fits'), format='fits', overwrite=True)
     
     if run_fetch:
-        out = fetch_mast.get_from_MAST(extra, inst_products=DEFAULT_PRODUCTS, direct=True, path=os.path.join(HOME_PATH, root, 'RAW'), skip_existing=True)
+        if from_mast:
+            out = fetch_mast.get_from_MAST(extra, inst_products=DEFAULT_PRODUCTS, direct=True, path=os.path.join(HOME_PATH, root, 'RAW'), skip_existing=True)
+        else:
+            curl = fetch.make_curl_script(extra, level=None, script_name='extra.sh', inst_products={'WFC3/UVIS': ['FLC'], 'WFPC2/WFPC2': ['C0M', 'C1M'], 'WFC3/IR': ['RAW'], 'ACS/WFC': ['FLC']}, skip_existing=True, output_path='./')
+    
+            os.system('sh extra.sh')
+            files = glob.glob('*raw.fits.gz')
+            files.extend(glob.glob('*fl?.fits.gz'))
+            for file in files:
+                print('gunzip '+file)
+                os.system('gunzip {0}'.format(file))
+                        
+    else:
+        return extra
+        
+    remove_bad_expflag(field_root=root, HOME_PATH=HOME_PATH, min_bad=2)
+
+    #### Reprocess the RAWs into FLTs    
+    os.system("python -c 'from grizli.pipeline import reprocess; reprocess.reprocess_wfc3ir(parallel={0})'".format(reprocess_parallel))
     
     # Persistence products
     os.chdir(os.path.join(HOME_PATH, root, 'Persistence'))
@@ -98,7 +116,7 @@ def get_extra_data(root='j114936+222414', HOME_PATH='/Volumes/Pegasus/Grizli/Aut
         os.system('rm {0}/*extper.fits {0}/*flt_cor.fits'.format(root))
         os.system('ln -sf {0}/*persist.fits ./'.format(root))
     
-def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', inspect_ramps=False, manual_alignment=False, is_parallel_field=False, reprocess_parallel=False, only_preprocess=False):
+def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', inspect_ramps=False, manual_alignment=False, is_parallel_field=False, reprocess_parallel=False, only_preprocess=False, run_fit=True):
     """
     Run the full pipeline for a given target
         
@@ -152,7 +170,7 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
     ######################
     ### Parse visit associations
     os.chdir(os.path.join(HOME_PATH, root, 'Prep'))
-    auto_script.parse_visits(field_root=root, HOME_PATH=HOME_PATH, use_visit=True, combine_same_pa=is_parallel_field)
+    visits, all_groups, info = auto_script.parse_visits(field_root=root, HOME_PATH=HOME_PATH, use_visit=True, combine_same_pa=is_parallel_field)
     
     # Alignment catalogs
     catalogs = ['PS1','SDSS','GAIA','WISE']
@@ -195,7 +213,7 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
         tab = auto_script.photutils_catalog(field_root=root)
     
     # Stop if only want to run pre-processing
-    if only_preprocess:
+    if only_preprocess | (len(all_groups) == 0):
         return True
                 
     ######################
@@ -224,7 +242,11 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
     else:
         pline = auto_script.DITHERED_PLINE
     
-    auto_script.extract(field_root=root, maglim=maglim, MW_EBV=exptab.meta['MW_EBV'], pline=pline)
+    # Make script for parallel processing
+    auto_script.generate_fit_params(field_root=root, prior=None, MW_EBV=exptab.meta['MW_EBV'], pline=pline, fit_only_beams=True, run_fit=True, poly_order=7, fsps=True, sys_err = 0.03, fcontam=0.2, zr=[0.1, 3.4], save_file='fit_args.npy')
+    
+    # Run extractions (and fits)
+    auto_script.extract(field_root=root, maglim=maglim, MW_EBV=exptab.meta['MW_EBV'], pline=pline, run_fit=run_fit)
     
     ######################
     ### Summary catalog & webpage
@@ -430,6 +452,7 @@ def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=
         
     np.save('{0}_visits.npy'.format(field_root), [visits, all_groups, info])
     
+    return visits, all_groups, info
 def manual_alignment(field_root='j151850-813028', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', skip=True, radius=5., catalogs=['PS1','SDSS','GAIA','WISE'], visit_list=None, radec=None):
     
     #import pyds9
@@ -1109,8 +1132,8 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
         if close:
             plt.close(fig); plt.close(fig1); del(hdu); del(mb)
     
-    #if not run_fit:
-    #    return True
+    if not run_fit:
+       return True
         
     ###############
     # Redshift Fit    
