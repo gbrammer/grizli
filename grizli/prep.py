@@ -2471,7 +2471,7 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
         ax.plot(y_pred-1, color=pi[0].get_color())
         ax.fill_between(xmsk, y_pred-1-gp_sigma, y_pred-1+gp_sigma,
                         color=pi[0].get_color(), alpha=0.3,
-                        label=grism['files'][j])
+                        label=grism['files'][j].split('_fl')[0])
         
         ## result
         file = grism['files'][j]
