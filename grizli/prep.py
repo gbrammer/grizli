@@ -1130,7 +1130,7 @@ def get_gaia_catalog(ra=165.86, dec=34.829694, radius=3.):
     	"LANG":    "ADQL", \
     	"FORMAT":  "votable", \
     	"PHASE":  "RUN", \
-    	"QUERY":   "SELECT TOP 5000 * FROM gaiadr1.gaia_source  WHERE CONTAINS(POINT('ICRS',gaiadr1.gaia_source.ra,gaiadr1.gaia_source.dec),CIRCLE('ICRS',{0},{1},{2:.2f}))=1".format(ra, dec, radius/60.)
+    	"QUERY":   "SELECT TOP 100000 * FROM gaiadr1.gaia_source  WHERE CONTAINS(POINT('ICRS',gaiadr1.gaia_source.ra,gaiadr1.gaia_source.dec),CIRCLE('ICRS',{0},{1},{2:.2f}))=1".format(ra, dec, radius/60.)
     	})
 
     headers = {\
@@ -1843,7 +1843,7 @@ def tweak_align(direct_group={}, grism_group={}, max_dist=1., key=' ',
     
     return True
     
-def clean_drizzle(root):
+def clean_drizzle(root, context=False):
     """Zero-out WHT=0 pixels in drizzle mosaics
     
     Parameters
@@ -1860,6 +1860,16 @@ def clean_drizzle(root):
     sci = pyfits.open(drz_file, mode='update')
     wht = pyfits.open(drz_file.replace('_sci.fits', '_wht.fits'))
     mask = wht[0].data == 0
+    
+    # Mask where context shows that mosaic comes from a single input
+    ctx_file = drz_file.replace('_sci.','_ctx.')
+    if context & os.path.exists(ctx_file):
+        ctx = pyfits.open(ctx_file)
+        
+        bits = np.log(ctx[0].data)/np.log(2)
+        # bits = round(bits) when is a power of 2
+        mask &= bits != np.round(bits) 
+        
     sci[0].data[mask] = 0
     sci.flush()
 
@@ -2693,7 +2703,7 @@ def find_single_image_CRs(visit, simple_mask=False):
         
         flt.flush()
         
-def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, max_files=999, pixfrac=0.8, scale=0.06, skysub=True, skymethod='localmin', skyuser='MDRIZSKY', bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='EXP', final_wt_scl='exptime'):
+def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, max_files=999, pixfrac=0.8, scale=0.06, skysub=True, skymethod='localmin', skyuser='MDRIZSKY', bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='EXP', final_wt_scl='exptime', context=False):
     """Combine overlapping visits into single output mosaics
     
     Parameters
@@ -2815,7 +2825,7 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, m
         
         if 'reference' in group:
             AstroDrizzle(group['files'], output=group['product'],
-                     clean=True, context=False, preserve=False,
+                     clean=True, context=context, preserve=False,
                      skysub=skysub, skyuser=skyuser, skymethod=skymethod,
                      driz_separate=False, driz_sep_wcs=False,
                      median=False, blot=False, driz_cr=False,
@@ -2828,7 +2838,7 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, m
                      resetbits=0)
         else:
             AstroDrizzle(group['files'], output=group['product'],
-                     clean=True, context=False, preserve=False,
+                     clean=True, context=context, preserve=False,
                      skysub=skysub, skyuser=skyuser, skymethod=skymethod,
                      driz_separate=False, driz_sep_wcs=False,
                      median=False, blot=False, driz_cr=False,
