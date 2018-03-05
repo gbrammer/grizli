@@ -1408,11 +1408,12 @@ def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Griz
             
         tab[i]['cat'] = t_i[mclip]
         
-        sci_file = glob.glob(file.replace('.cat','_dr?_sci.fits'))[0]
-        print(sci_file, mclip.sum())
-        
+        sci_file = glob.glob(file.replace('.cat','_dr?_sci.fits'))[0]        
         im = pyfits.open(sci_file)
         tab[i]['wcs'] = pywcs.WCS(im[0].header)
+        
+        print(sci_file, mclip.sum())
+        
         tab[i]['transform'] = [0, 0, 0, 1]
         tab[i]['xy'] = np.array([tab[i]['cat']['X_IMAGE'], tab[i]['cat']['Y_IMAGE']]).T
         
@@ -1455,6 +1456,7 @@ def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Griz
     
     fit_args = (tab, ref_tab, ref_err, shift_only, 'huber')
     plot_args = (tab, ref_tab, ref_err, shift_only, 'plot')
+    plotx_args = (tab, ref_tab, ref_err, shift_only, 'plotx')
     
     pi = p0*10.
     for iter in range(NITER):
@@ -1463,23 +1465,33 @@ def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Griz
         
     ########
     # Show the result
-    fig = plt.figure(figsize=[8,4])
-    ax = fig.add_subplot(121)
+    fig = plt.figure(figsize=[8,8])
+    ax = fig.add_subplot(221)
     _objfun_align(p0*10., *plot_args)
-    ax.grid()
-    ax.set_xlabel('dRA')
+    ax.set_xticklabels([])
     ax.set_ylabel('dDec')
     
-    ax = fig.add_subplot(122)
-    ax.grid()
+    ax = fig.add_subplot(223)
+    _objfun_align(p0*10., *plotx_args)
+    ax.set_ylabel('dDec')
+    ax.set_xlabel('dRA')
+    
+    ax = fig.add_subplot(222)
     _objfun_align(fit.x, *plot_args)
     ax.set_yticklabels([])
+    ax.set_xticklabels([])
+    
+    ax = fig.add_subplot(224)
+    _objfun_align(fit.x, *plotx_args)
+    ax.set_yticklabels([])
     ax.set_xlabel('dRA')
-    fig.tight_layout(pad=0.5)
     
     for ax in fig.axes:
+        ax.grid()
         ax.set_xlim(-0.35, 0.35)
         ax.set_ylim(-0.35, 0.35)
+
+    fig.tight_layout(pad=0.5)
 
     extra_str = ''
     if program_str is not None:
@@ -1620,7 +1632,7 @@ def update_wcs_headers_with_fine(field_root, backup=True):
                                                 xyscale=trans[j,:])
                 
         
-def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140W','F160W'], ref_image=None, bits=None, pixfrac=0.6, scale=0.06, make_combined=True, skysub=False, skymethod='localmin', match_str=[]):
+def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140W','F160W'], ref_image=None, bits=None, pixfrac=0.6, scale=0.06, make_combined=True, skysub=False, skymethod='localmin', match_str=[], context=False):
     import numpy as np
 
     try:
@@ -1671,9 +1683,9 @@ def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140
     keep = [filter_groups[k] for k in filter_groups]
                         
     if make_combined:
-        prep.drizzle_overlaps([wfc3ir], parse_visits=False, pixfrac=pixfrac, scale=scale, skysub=False, bits=bits, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False)
+        prep.drizzle_overlaps([wfc3ir], parse_visits=False, pixfrac=pixfrac, scale=scale, skysub=False, bits=bits, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False, context=context)
     
-    prep.drizzle_overlaps(keep, parse_visits=False, pixfrac=pixfrac, scale=scale, skysub=skysub, skymethod=skymethod, bits=bits, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False)
+    prep.drizzle_overlaps(keep, parse_visits=False, pixfrac=pixfrac, scale=scale, skysub=skysub, skymethod=skymethod, bits=bits, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False, context=context)
     
 def fill_filter_mosaics(field_root):
     """
@@ -1781,7 +1793,7 @@ def _objfun_align(p0, tab, ref_tab, ref_err, shift_only, ret):
                 dx.append(dx_i/0.01)
                 dy.append(dy_i/0.01)                
             
-                if ret.startswith('plot'):
+                if ret == 'plot':
                     plt.gca().scatter(dx_i, dy_i, marker='.', alpha=0.1)
         
         # Reference sources
@@ -1797,7 +1809,7 @@ def _objfun_align(p0, tab, ref_tab, ref_err, shift_only, ret):
             dx.append(dx_i/(ref_err/np.clip(mcount/rcount, 1, 1000)))
             dy.append(dy_i/(ref_err/np.clip(mcount/rcount, 1, 1000)))
 
-            if ret.startswith('plot') & (ref_err < 0.1):
+            if ret.startswith('plotx') & (ref_err < 0.1):
                 plt.gca().scatter(dx_i, dy_i, marker='+', color='k', alpha=0.3, zorder=1000)
     
     # Residuals        
