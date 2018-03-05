@@ -388,8 +388,15 @@ def apply_region_mask(flt_file, dq_value=1024, verbose=True):
     flt = pyfits.open(flt_file, mode='update')
     for mask_file in mask_files:
         ext = int(mask_file.split('.')[-3])
-        reg = pyregion.open(mask_file).as_imagecoord(flt['SCI',ext].header)
-        mask = reg.get_mask(hdu=flt['SCI',ext])
+        try:
+            reg = pyregion.open(mask_file).as_imagecoord(flt['SCI',ext].header)
+            mask = reg.get_mask(hdu=flt['SCI',ext])
+        except:
+            # Above fails for lookup-table distortion (ACS / UVIS)
+            # Here just assume the region file is defined in image coords
+            reg = pyregion.open(mask_file)
+            mask = reg.get_mask(shape=flt['SCI',ext].data.shape)
+             
         flt['DQ',ext].data[mask] |= dq_value
     
     flt.flush()
@@ -2641,7 +2648,7 @@ def fix_star_centers(root='macs1149.6+2223-rot-ca5-22-032.0-f105w',
         clean_drizzle(root)
         cat = make_drz_catalog(root=root)
 
-def find_single_image_CRs(visit, simple_mask=False):
+def find_single_image_CRs(visit, simple_mask=False, with_ctx_mask=True):
     """Use LACosmic to find CRs in parts of an ACS mosaic where only one
     exposure was available
     
@@ -2689,7 +2696,11 @@ def find_single_image_CRs(visit, simple_mask=False):
             else:
                 print('{0}: Clean CRs with LACosmic, extension {1:d}'.format(file, ext))
 
-                inmask = blotted == 0
+                if with_ctx_mask:
+                    inmask = blotted == 0
+                else:
+                    inmask = dq > 0
+                    
                 crmask, clean = lacosmicx.lacosmicx(sci, inmask=inmask,
                              sigclip=4.5, sigfrac=0.3, objlim=5.0, gain=1.0,
                              readnoise=6.5, satlevel=65536.0, pssl=0.0,
@@ -2698,7 +2709,11 @@ def find_single_image_CRs(visit, simple_mask=False):
                              psffwhm=2.5,psfsize=7, psfk=None, psfbeta=4.765,
                              verbose=False)
             
-                dq[crmask & ctx_mask] |= 1024
+                if with_ctx_mask:
+                    dq[crmask & ctx_mask] |= 1024
+                else:
+                    dq[crmask] |= 1024
+                    
                 #sci[crmask & ctx_mask] = 0
         
         flt.flush()
