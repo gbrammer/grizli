@@ -876,7 +876,9 @@ class GroupFitter(object):
                 if IGM is None:
                     igmz = 1.
                 else:
-                    igmz = IGM.full_IGM(z, ti.wave*(1+z))         
+                    lylim = ti.wave < 1250
+                    igmz = np.ones_like(ti.wave)
+                    igmz[lylim] = IGM.full_IGM(z, ti.wave[lylim]*(1+z))         
             else:
                 igmz = 1.
             
@@ -1996,7 +1998,7 @@ class GroupFitter(object):
             # Inverse sensitivity
             self.sens_mask = np.hstack([np.dot(np.ones(beam.sh[0])[:,None], beam.beam.sensitivity[None,:]).flatten()[beam.fit_mask] for beam in self.beams])
             
-            self.grism_name_mask = np.hstack([[beam.grism.filter]*beam.fit_mask.sum() for beam in self.beams])
+            self.grism_name_mask = np.hstack([[beam.grism.pupil]*beam.fit_mask.sum() if beam.grism.instrument == 'NIRISS' else [beam.grism.filter]*beam.fit_mask.sum() for beam in self.beams])
         except:
             # StackFitter
             self.contamf_mask = np.hstack([beam.contamf[beam.fit_mask] 
