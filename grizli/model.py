@@ -1276,6 +1276,9 @@ class ImageData(object):
             if filter.startswith('G'):
                 photflam = 1
             
+            if (instrument == 'NIRCAM') & pupil.startswith('G'):
+                photflam = 1
+            
             if 'PAD' in header:
                 pad = header['PAD']
             
@@ -3820,15 +3823,20 @@ class BeamCutout(object):
         h['A_1_2'] = 0.
         h['A_2_2'] = 0.
         h['A_2_1'] = 0.
-        h['A_2_0'] = c[0]/c[1]
+        h['A_2_0'] = c[0]#/c[1]
         h['CD1_1'] = c[1]
         
         h['B_0_2'] = 0.
         h['B_1_2'] = 0.
         h['B_2_2'] = 0.
         h['B_2_1'] = 0.
-        h['B_2_0'] = ct[0]/ct[1]
-        
+        if ct[1] != 0:
+            h['B_2_0'] = ct[0]#/ct[1]
+        else:
+            h['B_2_0'] = 0
+
+        #h['B_2_0'] = 0
+            
         if data is None:
             data = np.zeros(self.beam.sh_beam, dtype=np.float32)
         
