@@ -2854,7 +2854,7 @@ class MultiBeam(GroupFitter):
         # keys.sort()
         
         keys = []
-        for key in ['G800L','G102','G141','F090W','F115W','F150W','F200W']:
+        for key in ['G800L','G102','G141','F090W','F115W','F150W','F200W','F356W','F410M','F444W']:
             if key in self.PA:
                 keys.append(key)
                 
@@ -2874,7 +2874,7 @@ class MultiBeam(GroupFitter):
         else:
             # Fit background
             try:
-                out = self.fit_at_z(z=0, templates={}, fitter='lstsq',
+                out = self.xfit_at_z(z=0, templates={}, fitter='lstsq',
                                     poly_order=3, fit_background=True)
                 bg = out[-3][:self.N]
             except:
