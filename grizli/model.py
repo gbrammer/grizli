@@ -1276,8 +1276,9 @@ class ImageData(object):
             if filter.startswith('G'):
                 photflam = 1
             
-            if (instrument == 'NIRCAM') & pupil.startswith('G'):
-                photflam = 1
+            if (instrument == 'NIRCAM') & (pupil is not None):
+                if pupil.startswith('G'):
+                    photflam = 1
             
             if 'PAD' in header:
                 pad = header['PAD']
