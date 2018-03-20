@@ -365,11 +365,11 @@ def remove_bad_expflag(field_root='', HOME_PATH='./', min_bad=2):
     if len(files) == 0:
         return False
     
+    os.chdir(os.path.join(HOME_PATH, field_root, 'RAW'))
     expf = utils.header_keys_from_filelist(files, keywords=['EXPFLAG'], 
                                            ext=0, colname_case=str.upper)
     expf.write('expflag.info', format='csv', overwrite=True)
     
-    # os.chdir(os.path.join(HOME_PATH, field_root, 'RAW'))
     # os.system('dfits *raw.fits *flc.fits | fitsort EXPFLAG | sed "s/\t/ , /"> expflag.info')
     # expf = utils.GTable.gread('expflag.info', format='csv')
     
