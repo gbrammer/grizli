@@ -912,6 +912,18 @@ def get_line_wavelengths():
     line_ratios['Hg'] = [1.]
     line_wavelengths['Hd'] = [4102.892]
     line_ratios['Hd'] = [1.]
+
+    # Groves et al. 2011, Table 1
+    line_wavelengths['Balmer 10kK'] = [6564.61, 4862.68, 4341.68, 4101.73]
+    line_ratios['Balmer 10kK'] = [2.86, 1.0, 0.468, 0.259]
+    
+    # Reddened with Kriek & Conroy dust, tau_V=0.5
+    line_wavelengths['Balmer 10kK t0.5'] = [6564.61, 4862.68, 4341.68, 4101.73]
+    line_ratios['Balmer 10kK t0.5'] = [2.86*0.68, 1.0*0.55, 0.468*0.51, 0.259*0.48]
+    
+    # Reddened with Kriek & Conroy dust, tau_V=1
+    line_wavelengths['Balmer 10kK t1'] = [6564.61, 4862.68, 4341.68, 4101.73]
+    line_ratios['Balmer 10kK t1'] = [2.86*0.46, 1.0*0.31, 0.468*0.256, 0.259*0.232]
     
     line_wavelengths['OIII-4363'] = [4364.436]
     line_ratios['OIII-4363'] = [1.]
@@ -2161,7 +2173,64 @@ def make_wcsheader(ra=40.07293, dec=-1.6137748, size=2, pixscale=0.1, get_hdu=Fa
         return hdu
     else:
         return hout, wcs_out
+
+def header_keys_from_filelist(fits_files, keywords=[], ext=0, colname_case=str.lower):
+    """Dump header keywords to a `~astropy.table.Table`
+    
+    Parameters
+    ----------
+    fits_files : list
+        List of FITS filenames
+    
+    keywords : list or None
+        List of header keywords to retrieve.  If `None`, then generate a list
+        of *all* keywords from the first file in the list.
         
+    ext : int, tuple
+        FITS extension from which to pull the header.  Can be integer or 
+        tuple, e.g., ('SCI',1) for HST ACS/WFC3 FLT files. 
+    
+    colname_case : func
+        Function to set the case of the output colnames, e.g., `str.lower`, 
+        `str.upper`, `str.title`.
+        
+    Returns
+    -------
+    tab : `~astropy.table.Table`
+        Output table.
+    
+    """
+    import numpy as np
+    import astropy.io.fits as pyfits
+    from astropy.table import Table
+    
+    # If keywords=None, get full list from first FITS file
+    if keywords is None:
+        h = pyfits.getheader(fits_files[0], ext)
+        keywords = list(np.unique(list(h.keys())))
+        keywords.pop(keywords.index(''))
+        keywords.pop(keywords.index('HISTORY'))
+    
+    # Loop through files
+    lines = []
+    for file in fits_files:
+        line = [file]
+        h = pyfits.getheader(file, ext)
+        for key in keywords:
+            if key in h:
+                line.append(h[key])
+            else:
+                line.append(None)
+        
+        lines.append(line)
+    
+    # Column names
+    table_header = [colname_case(key) for key in ['file']+keywords]
+    
+    # Output table
+    tab = Table(data=np.array(lines), names=table_header)
+    
+    return tab        
 def drizzle_array_groups(sci_list, wht_list, wcs_list, scale=0.1, kernel='point', pixfrac=1., verbose=True):
     """Drizzle array data with associated wcs
     
