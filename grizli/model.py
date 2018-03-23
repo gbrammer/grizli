@@ -3336,7 +3336,13 @@ class BeamCutout(object):
             self.load_fits(fits_file, conf)
         else:
             self.init_from_input(flt, beam, conf, get_slice_header)
-                    
+        
+        self.beam.scale = scale
+        self.contam_sn_mask = contam_sn_mask
+        self._parse_from_data(contam_sn_mask=contam_sn_mask)
+        
+    def _parse_from_data(self, contam_sn_mask=[10,3]):
+        
         ### bad pixels or problems with uncertainties
         self.mask = ((self.grism.data['DQ'] > 0) | 
                      (self.grism.data['ERR'] == 0) | 
@@ -3346,7 +3352,6 @@ class BeamCutout(object):
         self.ivar = 1/self.grism.data['ERR']**2
         self.ivar[self.mask] = 0
         
-        self.beam.scale = scale
         self.thumbs = {}
         
         #self.compute_model = self.beam.compute_model
