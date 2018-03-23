@@ -7,7 +7,8 @@ if False:
     np.seterr(divide='ignore', invalid='ignore', over='ignore', under='ignore')
  
 # Only fetch F814W optical data for now
-ONLY_F814W = True
+#ONLY_F814W = True
+ONLY_F814W = False
 
 def demo():
     """
@@ -47,9 +48,11 @@ def demo():
     reprocess_parallel=True
     is_parallel_field=False
     
-def get_extra_data(root='j114936+222414', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', instruments=['WFC3'], filters=['F160W','F140W','F098M','F105W'], radius=2, run_fetch=True, from_mast=True):
+def get_extra_data(root='j114936+222414', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', instruments=['WFC3'], filters=['F160W','F140W','F098M','F105W'], radius=2, run_fetch=True, from_mast=True, reprocess_parallel=True):
     
     import os
+    import glob
+    
     import numpy as np
     try:
         from .. import utils
@@ -76,11 +79,15 @@ def get_extra_data(root='j114936+222414', HOME_PATH='/Volumes/Pegasus/Grizli/Aut
     
     extra.write(os.path.join(HOME_PATH, root, 'extra_data.fits'), format='fits', overwrite=True)
     
+    CWD = os.getcwd()
+    os.chdir(os.path.join(HOME_PATH, root, 'RAW'))
+    
     if run_fetch:
         if from_mast:
             out = fetch_mast.get_from_MAST(extra, inst_products=DEFAULT_PRODUCTS, direct=True, path=os.path.join(HOME_PATH, root, 'RAW'), skip_existing=True)
         else:
-            curl = fetch.make_curl_script(extra, level=None, script_name='extra.sh', inst_products={'WFC3/UVIS': ['FLC'], 'WFPC2/WFPC2': ['C0M', 'C1M'], 'WFC3/IR': ['RAW'], 'ACS/WFC': ['FLC']}, skip_existing=True, output_path='./')
+                        
+            curl = fetch.make_curl_script(extra, level=None, script_name='extra.sh', inst_products={'WFC3/UVIS': ['FLC'], 'WFPC2/WFPC2': ['C0M', 'C1M'], 'WFC3/IR': ['RAW'], 'ACS/WFC': ['FLC']}, skip_existing=True, output_path=os.path.join(HOME_PATH, root, 'RAW'))
     
             os.system('sh extra.sh')
             files = glob.glob('*raw.fits.gz')
@@ -115,6 +122,8 @@ def get_extra_data(root='j114936+222414', HOME_PATH='/Volumes/Pegasus/Grizli/Aut
         os.system('tar xzvf {0}.tar.gz'.format(root))        
         os.system('rm {0}/*extper.fits {0}/*flt_cor.fits'.format(root))
         os.system('ln -sf {0}/*persist.fits ./'.format(root))
+
+    os.chdir(CWD)
     
 def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', inspect_ramps=False, manual_alignment=False, is_parallel_field=False, reprocess_parallel=False, only_preprocess=False, run_fit=True):
     """
@@ -188,7 +197,7 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
         
     # Fine alignment
     fine_catalogs = ['GAIA','PS1','SDSS','WISE']
-    if not os.path.exists('{0}_fine.png'.format(root)):
+    if len(glob.glob('{0}*fine.png'.format(root))) == 0:
         try:
             out = auto_script.fine_alignment(field_root=root, HOME_PATH=HOME_PATH, min_overlap=0.2, stopme=False, ref_err=0.08, catalogs=fine_catalogs, NITER=1, maglim=[17,23], shift_only=True, method='Powell', redrizzle=False, radius=30, program_str=None, match_str=[])
             plt.close()
@@ -199,16 +208,23 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
         except:
             pass
             
-    ## Make mosaics
     if not os.path.exists('{0}-ir_drz_sci.fits'.format(root)):
-        auto_script.drizzle_overlaps(root, filters=['F105W', 'F110W', 'F125W', 'F140W', 'F160W', 'F098M', 'F139M', 'F127M', 'F153M']) 
+        
+        ## Make mosaics
+        IR_filters = ['F105W', 'F110W', 'F125W', 'F140W', 'F160W', 
+                      'F098M', 'F139M', 'F127M', 'F153M']
+        auto_script.drizzle_overlaps(root, filters=IR_filters) 
     
+        # Fill image mosaics with scaled data so they can be used as
+        # grism reference
         auto_script.fill_filter_mosaics(root)
         
         # optical images
-        auto_script.drizzle_overlaps(root, filters=['F814W', 'F606W', 'F435W', 'F850LP'], make_combined=False, ref_image='{0}-ir_drz_sci.fits'.format(root)) 
+        optical_filters = ['F814W', 'F606W', 'F435W', 'F850LP']
+        auto_script.drizzle_overlaps(root, filters=optical_filters,
+            make_combined=False, ref_image='{0}-ir_drz_sci.fits'.format(root)) 
         
-    # Photometric catalogs
+    # Photometric catalog
     if not os.path.exists('{0}_phot.fits'.format(root)):
         tab = auto_script.photutils_catalog(field_root=root)
     
@@ -251,7 +267,8 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
     ######################
     ### Summary catalog & webpage
     os.chdir(os.path.join(HOME_PATH, root, 'Extractions'))
-    auto_script.summary_catalog(field_root=root)
+    if run_fit:
+        auto_script.summary_catalog(field_root=root)
 
 def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', inst_products={'WFPC2/WFPC2': ['C0M', 'C1M'], 'ACS/WFC': ['FLC'], 'WFC3/IR': ['RAW'], 'WFC3/UVIS': ['FLC']}, remove_bad=True, reprocess_parallel=False):
     """
@@ -588,6 +605,11 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
         if 'g800l' in direct['product']:
             continue
         
+        # Skip singleton optical visits
+        if (fwave[i] < 900) & (len(direct['files']) == 1):
+            print('Only one exposure, skip', direct['product'])
+            continue
+            
         if len(glob.glob(direct['product']+'_dr?_sci.fits')) > 0:
             print('Skip', direct['product'])
             continue
@@ -732,7 +754,8 @@ def photutils_catalog(field_root='j142724+334246', threshold=1.8, subtract_bkg=T
     #overlaps = np.load('{0}_overlaps.npy'.format(field_root))[0]
     
     # Make catalog
-    sexcat = prep.make_drz_catalog(root='{0}-ir'.format(field_root), threshold=threshold)
+    sexcat = prep.make_drz_catalog(root='{0}-ir'.format(field_root), threshold=threshold, extra_config=prep.SEXTRACTOR_CONFIG_3DHST)
+    
     for c in sexcat.colnames:
         sexcat.rename_column(c, c.lower())
     
@@ -774,7 +797,9 @@ def photutils_catalog(field_root='j142724+334246', threshold=1.8, subtract_bkg=T
         bkg_err[~np.isfinite(bkg_err)] = 0#1e30        
         total_error = photutils.utils.calc_total_error(sci[0].data, bkg_err, sci[0].header['EXPTIME'])
         
-        wht_mask = (wht[0].data == 0) | (sci[0].data == 0)        
+        wht_mask = (wht[0].data == 0) | (sci[0].data == 0)    
+        sci[0].data[wht[0].data == 0] = 0
+            
         mask = None #bkg_err > 1.e29
         
         ok = wht[0].data > 0
@@ -831,7 +856,7 @@ def photutils_catalog(field_root='j142724+334246', threshold=1.8, subtract_bkg=T
     
     return tab
     
-def load_GroupFLT(field_root='j142724+334246', force_ref=None, force_seg=None, force_cat=None, galfit=False, pad=256):
+def load_GroupFLT(field_root='j142724+334246', force_ref=None, force_seg=None, force_cat=None, galfit=False, pad=256, files=None):
     """
     Initialize a GroupFLT object
     """
@@ -841,7 +866,9 @@ def load_GroupFLT(field_root='j142724+334246', force_ref=None, force_seg=None, f
     
     from .. import prep, utils, multifit
     
-    files=glob.glob('../RAW/*fl[tc].fits')
+    if files is None:
+        files=glob.glob('../RAW/*fl[tc].fits')
+    
     info = utils.get_flt_info(files)
     
     g141 = info['FILTER'] == 'G141'
@@ -1497,7 +1524,7 @@ def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Griz
     if program_str is not None:
         extra_str += '.{0}'.format(program_str)
     
-    if match_str is not None:
+    if match_str is not []:
         extra_str += '.{0}'.format('.'.join(match_str))
         
     fig.savefig('{0}{1}_fine.png'.format(field_root, extra_str))
