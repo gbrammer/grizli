@@ -176,13 +176,17 @@ def _loadFLT(grism_file, sci_extn, direct_file, pad, ref_file,
         fp.close()
         
         status = flt.load_from_fits(save_file)
-                        
+                
     else:    
         flt = model.GrismFLT(grism_file=grism_file, sci_extn=sci_extn,
                          direct_file=direct_file, pad=pad, 
                          ref_file=ref_file, ref_ext=ref_ext, 
                          seg_file=seg_file, shrink_segimage=True, 
                          verbose=verbose)
+    
+    if flt.direct.wcs.wcs.has_pc():
+        for obj in [flt.grism, flt.direct]:
+            obj.get_wcs()
     
     if catalog is not None:
         flt.catalog = flt.blot_catalog(catalog, 
@@ -684,17 +688,42 @@ class GroupFLT():
         return out_beams
     
     def refine_list(self, ids=[], mags=[], poly_order=3, mag_limits=[16,24], 
-                    max_coeff=5, ds9=None, verbose=True):
-        """TBD
+                    max_coeff=5, ds9=None, verbose=True, 
+                    wave=np.linspace(0.2, 2.5e4, 100)):
+        """Refine contamination model for list of objects.  Loops over `refine`.
         
-        bright = self.catalog['MAG_AUTO'] < 24
-        ids = self.catalog['NUMBER'][bright]*1
-        mags = self.catalog['MAG_AUTO'][bright]*1
-        so = np.argsort(mags)
+        Parameters
+        ----------
+        ids : list
+            List of object IDs
         
-        ids, mags = ids[so], mags[so]
+        mags : list
+            Magnitudes to to along with IDs.  If `ids` and `mags` not 
+            specified, then get the ID list from `self.catalog['MAG_AUTO']`.
         
-        self.refine_list(ids, mags, ds9=ds9)
+        poly_order : int
+            Order of the polynomial fit to the spectra.
+        
+        mag_limits : [float, float]
+            Magnitude limits of objects to fit from `self.catalog['MAG_AUTO']`
+            when `ids` and `mags` not set.
+        
+        max_coeff : float
+            Fit is considered bad when one of the coefficients is greater
+            than this value.  See `refine`.
+        
+        ds9 : `~grizli.ds9.DS9`, optional
+            Display the refined models to DS9 as they are computed.
+        
+        verbose : bool
+            Print fit coefficients.
+        
+        wave : `~numpy.array`
+            Wavelength array for the polynomial fit.  
+        
+        Returns
+        -------
+        Updates `self.model` in place.
         
         """
         if (len(ids) == 0) | (len(ids) != len(mags)):
@@ -707,7 +736,7 @@ class GroupFLT():
             so = np.argsort(mags)
             ids, mags = ids[so], mags[so]
         
-        wave = np.linspace(0.2,2.4e4,100)
+        #wave = np.linspace(0.2,5.4e4,100)
         poly_templates = utils.polynomial_templates(wave, order=poly_order, line=False)
             
         for id, mag in zip(ids, mags):
@@ -716,8 +745,43 @@ class GroupFLT():
                         verbose=verbose, templates=poly_templates)
     
     def refine(self, id, mag=-99, poly_order=3, size=30, ds9=None, verbose=True, max_coeff=2.5, templates=None):
-        """TBD
-        Use tools in `fitting`
+        """Fit polynomial to extracted spectrum of single object to use for contamination model.
+        
+        Parameters
+        ----------
+        id : int
+            Object ID to extract.
+        
+        mag : float
+            Object magnitude.  Determines which orders to extract; see
+            `~grizli.model.GrismFLT.compute_model_orders`.
+        
+        poly_order : int
+            Order of the polynomial to fit.
+        
+        size : int
+            Size of cutout to extract.
+        
+        ds9 : `~grizli.ds9.DS9`, optional
+            Display the refined models to DS9 as they are computed.
+        
+        verbose : bool
+            Print information about the fit
+        
+        max_coeff : float
+            The script computes the implied flux of the polynomial template
+            at the pivot wavelength of the direct image filters.  If this
+            flux is greater than `max_coeff` times the *observed* flux in the
+            direct image, then the polynomal fit is considered bad.
+        
+        templates : dict, optional
+            Precomputed template dictionary.  If `None` then compute 
+            polynomial templates with order `poly_order`.
+        
+        Returns
+        -------
+        Updates `self.model` in place.
+        
         """
         beams = self.get_beams(id, size=size, min_overlap=0.5, get_slice_header=False)
         if len(beams) == 0:
@@ -2830,7 +2894,7 @@ class MultiBeam(GroupFitter):
         
         return chi2/self.DoF    
     
-    def drizzle_grisms_and_PAs(self, size=10, fcontam=0, flambda=False, scale=1, pixfrac=0.5, kernel='square', make_figure=True, usewcs=False, zfit=None, diff=True):
+    def drizzle_grisms_and_PAs(self, size=10, fcontam=0, flambda=False, scale=1, pixfrac=0.5, kernel='square', make_figure=True, usewcs=False, zfit=None, diff=True, grism_list=['G800L','G102','G141','F090W','F115W','F150W','F200W','F356W','F410M','F444W']):
         """Make figure showing spectra at different orients/grisms
         
         TBD
@@ -2854,7 +2918,7 @@ class MultiBeam(GroupFitter):
         # keys.sort()
         
         keys = []
-        for key in ['G800L','G102','G141','F090W','F115W','F150W','F200W','F356W','F410M','F444W']:
+        for key in grism_list:
             if key in self.PA:
                 keys.append(key)
                 

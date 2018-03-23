@@ -370,6 +370,7 @@ def remove_bad_expflag(field_root='', HOME_PATH='./', min_bad=2):
     
     """
     import os
+    import glob
     import numpy as np
     
     try:
@@ -378,9 +379,18 @@ def remove_bad_expflag(field_root='', HOME_PATH='./', min_bad=2):
         from grizli import prep, utils
     
     os.chdir(os.path.join(HOME_PATH, field_root, 'RAW'))
-    os.system('dfits *raw.fits *flc.fits | fitsort EXPFLAG | sed "s/\t/ , /"> expflag.info')
+
+    files = glob.glob('*raw.fits')+glob.glob('*flc.fits')
+    if len(files) == 0:
+        return False
     
-    expf = utils.GTable.gread('expflag.info', format='csv')
+    expf = utils.header_keys_from_filelist(files, keywords=['EXPFLAG'], 
+                                           ext=0, colname_case=str.upper)
+    expf.write('expflag.info', format='csv', overwrite=True)
+    
+    # os.system('dfits *raw.fits *flc.fits | fitsort EXPFLAG | sed "s/\t/ , /"> expflag.info')
+    # expf = utils.GTable.gread('expflag.info', format='csv')
+    
     visit_name = np.array([file[:6] for file in expf['FILE']])
     visits = np.unique(visit_name)
     
@@ -1723,10 +1733,16 @@ def fill_filter_mosaics(field_root):
     field_root : str
 
     """ 
-    import astropy.io.fits as pyfits
     import glob
+    import os
+
+    import astropy.io.fits as pyfits
      
-    ir = pyfits.open('{0}-ir_drz_sci.fits'.format(field_root))
+    ir_drz = '{0}-ir_drz_sci.fits'.format(field_root)
+    if not os.path.exists(ir_drz):
+        return False
+        
+    ir = pyfits.open(ir_drz)
     filter_files = glob.glob('{0}-f[01]*sci.fits'.format(field_root))
     
     for file in filter_files:
@@ -1738,6 +1754,8 @@ def fill_filter_mosaics(field_root):
         sci[0].data[mask] = ir[0].data[mask]*scale
         sci.flush()
         
+    return True
+    
 ######################
 ## Objective function for catalog shifts      
 def _objfun_align(p0, tab, ref_tab, ref_err, shift_only, ret):
