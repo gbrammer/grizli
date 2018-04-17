@@ -66,7 +66,7 @@ GRISM_LIMITS = {'G800L':[0.545, 1.02, 40.], # ACS/WFC
            'BLUE':[0.8, 1.2, 10.], # Euclid
            'RED':[1.1, 1.9, 14.]}
 
-DEFAULT_LINE_LIST = ['PaB', 'HeI-1083', 'SIII', 'SII', 'Ha', 'OI-6302', 'OIII', 'Hb', 'OIII-4363', 'Hg', 'Hd', 'NeIII', 'OII', 'NeVI', 'NeV', 'MgII','CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'NIII-1750', 'NIV-1487', 'NV-1240', 'Lya']
+DEFAULT_LINE_LIST = ['PaB', 'HeI-1083', 'SIII', 'SII', 'Ha', 'OI-6302', 'OIII', 'Hb', 'OIII-4363', 'Hg', 'Hd', 'NeIII-3867', 'OII', 'NeVI-3426', 'NeV-3346', 'MgII','CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'NIII-1750', 'NIV-1487', 'NV-1240', 'Lya']
 
 def set_warnings(numpy_level='ignore', astropy_level='ignore'):
     """
@@ -931,38 +931,42 @@ def get_line_wavelengths():
     line_ratios['OIII'] = [2.98, 1]
     
     # Split doublet, if needed
-    line_wavelengths['OIII4959'] = [4960.295]
-    line_ratios['OIII4959'] = [1]
-    line_wavelengths['OIII5007'] = [5008.240]
-    line_ratios['OIII5007'] = [1]
+    line_wavelengths['OIII-4959'] = [4960.295]
+    line_ratios['OIII-4959'] = [1]
+    line_wavelengths['OIII-5007'] = [5008.240]
+    line_ratios['OIII-5007'] = [1]
     
     line_wavelengths['OII'] = [3727.092, 3729.875]
     line_ratios['OII'] = [1, 1.] 
     
     line_wavelengths['OI-6302'] = [6302.046, 6363.67]
     line_ratios['OI-6302'] = [1, 0.33]
+    line_wavelengths['OI-5578'] = [5578.6]
+    line_ratios['OI-5578'] = [1]
 
-    line_wavelengths['NeIII'] = [3869]
-    line_ratios['NeIII'] = [1.]
-    line_wavelengths['NeV'] = [3346.8]
-    line_ratios['NeV'] = [1.]
-    line_wavelengths['NeVI'] = [3426.85]
-    line_ratios['NeVI'] = [1.]
+    line_wavelengths['NeIII-3867'] = [3867.5]
+    line_ratios['NeIII-3867'] = [1.]
+    line_wavelengths['NeV-3346'] = [3346.8]
+    line_ratios['NeV-3346'] = [1.]
+    line_wavelengths['NeVI-3426'] = [3426.85]
+    line_ratios['NeVI-3426'] = [1.]
     
     line_wavelengths['SIII'] = [9068.6, 9530.6][::-1]
     line_ratios['SIII'] = [1, 2.44][::-1]
     
     # Split doublet, if needed
-    line_wavelengths['SIII9068'] = [9068.6]
-    line_ratios['SIII9068'] = [1]
-    line_wavelengths['SIII9531'] = [9530.6]
-    line_ratios['SIII9531'] = [1]
+    line_wavelengths['SIII-9068'] = [9068.6]
+    line_ratios['SIII-9068'] = [1]
+    line_wavelengths['SIII-9531'] = [9530.6]
+    line_ratios['SIII-9531'] = [1]
     
     line_wavelengths['SII'] = [6718.29, 6732.67]
     line_ratios['SII'] = [1., 1.]   
     
-    line_wavelengths['HeII'] = [4687.5]
-    line_ratios['HeII'] = [1.]
+    line_wavelengths['HeII-4687'] = [4687.5]
+    line_ratios['HeII-4697'] = [1.]
+    line_wavelengths['HeII-5412'] = [5412.5]
+    line_ratios['HeII-5410'] = [1.]
     line_wavelengths['HeI-5877'] = [5877.2]
     line_ratios['HeI-5877'] = [1.]
     line_wavelengths['HeI-3889'] = [3889.5]
@@ -1023,7 +1027,7 @@ def get_line_wavelengths():
     return line_wavelengths, line_ratios 
     
 class SpectrumTemplate(object):
-    def __init__(self, wave=None, flux=None, central_wave=None, fwhm=None, velocity=False, fluxunits=FLAMBDA_CGS, waveunits=u.angstrom, name=''):
+    def __init__(self, wave=None, flux=None, central_wave=None, fwhm=None, velocity=False, fluxunits=FLAMBDA_CGS, waveunits=u.angstrom, name='', lorentz=False):
         """Container for template spectra.   
                 
         Parameters
@@ -1097,14 +1101,16 @@ class SpectrumTemplate(object):
             self.wave, self.flux = self.make_gaussian(central_wave, fwhm,
                                                       wave_grid=wave,
                                                       velocity=velocity,
-                                                      max_sigma=10)
+                                                      max_sigma=10,
+                                                      lorentz=lorentz)
         
         self.fnu_units = FNU_CGS
         self.to_fnu()
         
     @staticmethod 
     def make_gaussian(central_wave, fwhm, max_sigma=5, step=0.1,
-                      wave_grid=None, velocity=False, clip=1.e-5):
+                      wave_grid=None, velocity=False, clip=1.e-5,
+                      lorentz=False):
         """Make Gaussian template
         
         Parameters
@@ -1124,6 +1130,9 @@ class SpectrumTemplate(object):
         clip : float
             Clip values where the value of the gaussian function is less than 
             `clip` times its maximum (i.e., `1/sqrt(2*pi*sigma**2)`).
+        
+        lorentz : book
+            Make a Lorentzian line instead of a Gaussian.
             
         Returns
         -------
@@ -1150,12 +1159,28 @@ class SpectrumTemplate(object):
             wave_grid += central_wave
             wave_grid = np.hstack([91., wave_grid, 1.e8])
             
-        gaussian = np.exp(-(wave_grid-central_wave)**2/2/rms**2)
-        peak = np.sqrt(2*np.pi*rms**2)
-        gaussian /= np.sqrt(2*np.pi*rms**2)
-        gaussian[gaussian < peak*clip] = 0
+        if lorentz:
+            from astropy.modeling.models import Lorentz1D
+            if velocity:
+                use_fwhm = central_wave*(fwhm/const.c.to(KMS).value)
+            else:
+                use_fwhm = fwhm
+                
+            lmodel = Lorentz1D(amplitude=1, x_0=central_wave, fwhm=use_fwhm)
+            line = lmodel(wave_grid)
+            line[0:2] = 0
+            line[-2:] = 0
+            line /= np.trapz(line, wave_grid)
+            peak = line.max()
+        else:
+            # Gaussian
+            line = np.exp(-(wave_grid-central_wave)**2/2/rms**2)
+            peak = np.sqrt(2*np.pi*rms**2)
+            line /= np.sqrt(2*np.pi*rms**2)
+            
+        line[line < peak*clip] = 0
         
-        return wave_grid, gaussian
+        return wave_grid, line
         
         #self.wave = xgauss
         #self.flux = gaussian
@@ -1320,7 +1345,7 @@ class SpectrumTemplate(object):
 
 def load_templates(fwhm=400, line_complexes=True, stars=False,
                    full_line_list=None, continuum_list=None,
-                   fsps_templates=False, alf_template=False):
+                   fsps_templates=False, alf_template=False, lorentz=False):
     """Generate a list of templates for fitting to the grism spectra
     
     The different sets of continuum templates are stored in 
@@ -1505,7 +1530,8 @@ def load_templates(fwhm=400, line_complexes=True, stars=False,
         for i in range(len(scl)):
             line_i = SpectrumTemplate(wave=wave_grid, 
                                       central_wave=line_wavelengths[li][i], 
-                                      flux=None, fwhm=fwhm, velocity=True)
+                                      flux=None, fwhm=fwhm, velocity=True,
+                                      lorentz=lorentz)
                                       
             if i == 0:
                 line_temp = line_i*scl[i]
