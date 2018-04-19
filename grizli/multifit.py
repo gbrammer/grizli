@@ -2459,7 +2459,7 @@ class MultiBeam(GroupFitter):
         
         if ('cfit' in fit) & mask_4959:
             if 'line OIII' in fit['templates']:
-                t_o3 = utils.load_templates(fwhm=fit['templates']['line OIII'].fwhm, line_complexes=False, stars=False, full_line_list=['OIII4959'], continuum_list=[], fsps_templates=False)
+                t_o3 = utils.load_templates(fwhm=fit['templates']['line OIII'].fwhm, line_complexes=False, stars=False, full_line_list=['OIII-4959'], continuum_list=[], fsps_templates=False)
         
         if 'zbest' in fit:
             z_driz = fit['zbest']
@@ -2572,7 +2572,7 @@ class MultiBeam(GroupFitter):
                         
                         # Subtract 4959
                         if (line == 'OIII') & ('cfit' in fit) & mask_4959:
-                            lm = t_o3['line OIII4959']
+                            lm = t_o3['line OIII-4959']
                             scl = fit['cfit']['line OIII'][0]/(1+z_driz)
                             scl *= 1./(2.98+1)
                             sp = [lm.wave*(1+z_driz), lm.flux*scl]
