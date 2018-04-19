@@ -1098,6 +1098,131 @@ def get_irsa_catalog(ra=165.86, dec=34.829694, radius=3, catalog='allwise_p3as_p
 
 def get_gaia_catalog(ra=165.86, dec=34.829694, radius=3.):
     """Query GAIA DR1 astrometric catalog
+
+    Get from http://gaia.ari.uni-heidelberg.de.
+    
+    Parameters
+    ----------
+    ra, dec : float
+        Center of the query region, decimal degrees
+
+    radius : float
+        Radius of the query, in arcmin
+
+    Returns
+    -------
+    table : `~astropy.table.Table`
+        Result of the query
+
+    """
+    try:
+        import httplib
+        from urllib import urlencode
+    except:
+        # python 3
+        import http.client as httplib
+        from urllib.parse import urlencode
+
+    #import http.client in Python 3
+    #import urllib.parse in Python 3
+    import time
+    from xml.dom.minidom import parseString
+
+    host = "gea.esac.esa.int"
+    port = 80
+    pathinfo = "/tap-server/tap/async"
+
+    host = "gaia.ari.uni-heidelberg.de"
+    pathinfo = "/tap/async"
+
+    #-------------------------------------
+    #Create job
+
+    params = urlencode({\
+    	"REQUEST": "doQuery", \
+    	"LANG":    "ADQL", \
+    	"FORMAT":  "votable", \
+    	"PHASE":  "RUN", \
+    	"QUERY":   "SELECT TOP 100000 * FROM gaiadr1.gaia_source  WHERE CONTAINS(POINT('ICRS',gaiadr1.gaia_source.ra,gaiadr1.gaia_source.dec),CIRCLE('ICRS',{0},{1},{2:.2f}))=1".format(ra, dec, radius/60.)
+    	})
+
+    headers = {\
+    	"Content-type": "application/x-www-form-urlencoded", \
+    	"Accept":       "text/plain" \
+    	}
+
+    connection = httplib.HTTPConnection(host, port)
+    connection.request("POST",pathinfo,params,headers)
+
+    #Status
+    response = connection.getresponse()
+    print("Status: " +str(response.status), "Reason: " + str(response.reason))
+
+    #Server job location (URL)
+    location = response.getheader("location")
+    print("Location: " + location)
+
+    #Jobid
+    jobid = location[location.rfind('/')+1:]
+    print("Job id: " + jobid)
+
+    connection.close()
+
+    #-------------------------------------
+    #Check job status, wait until finished
+
+    while True:
+    	connection = httplib.HTTPConnection(host, port)
+    	connection.request("GET",pathinfo+"/"+jobid)
+    	response = connection.getresponse()
+    	data = response.read()
+    	#XML response: parse it to obtain the current status
+    	dom = parseString(data)
+    	phaseElement = dom.getElementsByTagName('phase')[0]
+    	phaseValueElement = phaseElement.firstChild
+    	phase = phaseValueElement.toxml()
+    	print("Status: " + phase)
+    	#Check finished
+    	if phase == 'COMPLETED': break
+    	#wait and repeat
+    	time.sleep(0.2)
+
+    #print "Data:"
+    #print data
+
+    connection.close()
+
+    #-------------------------------------
+    #Get results
+    connection = httplib.HTTPConnection(host, port)
+    connection.request("GET",pathinfo+"/"+jobid+"/results/result")
+    response = connection.getresponse()
+    data = response.read()
+    outputFileName = "gaia.vot"
+    try:
+        outputFile = open(outputFileName, "w")
+        outputFile.write(data)
+    except:
+        # Python 3
+        outputFile = open(outputFileName, "wb")
+        outputFile.write(data)
+
+    outputFile.close()
+    connection.close()
+    print("Data saved in: " + outputFileName)
+
+    # try:
+    #     os.remove('gaia.vot')
+    # except:
+    #     pass
+    # 
+    # os.system('gunzip gaia.vot.gz')
+    table = Table.read('gaia.vot', format='votable')
+    return table
+    
+    
+def get_gaia_catalog_ESA_dead(ra=165.86, dec=34.829694, radius=3.):
+    """Query GAIA DR1 astrometric catalog
     
     Parameters
     ----------
@@ -1129,8 +1254,8 @@ def get_gaia_catalog(ra=165.86, dec=34.829694, radius=3.):
     host = "gea.esac.esa.int"
     port = 80
     pathinfo = "/tap-server/tap/async"
-
-
+    
+    
     #-------------------------------------
     #Create job
 
