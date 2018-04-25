@@ -1096,24 +1096,78 @@ def get_irsa_catalog(ra=165.86, dec=34.829694, radius=3, catalog='allwise_p3as_p
     
     return table
 
-def get_gaia_catalog(ra=165.86, dec=34.829694, radius=3.):
-    """Query GAIA DR1 astrometric catalog
+def get_gaia_radec_at_time(gaia_tbl, date=2015.5, format='decimalyear'):
+    """
+    Use `~astropy.coordinates.SkyCoord.apply_space_motion` to compute GAIA positions at a specific observation date
+    
+    Parameters
+    ----------
+    gaia_tbl : `~astropy.table.Table`
+        GAIA table query, e.g., provided by `get_gaia_DR2_catalog`.
+    
+    date : e.g., float
+        Observation date that can be parsed with `~astropy.time.Time`
+        
+    format : str
+        Date format, see `~astropy.time.Time.FORMATS`.
+    
+    Returns
+    -------
+    coords : `~astropy.coordinates.SkyCoord`
+        Projected sky coordinates.
+    
+    """
+    import astropy.time 
+    import pyia
+    
+    obstime = astropy.time.Time(date, format=format)
+    g = pyia.GaiaData(gaia_tbl)
+    coord_at_time = g.skycoord.apply_space_motion(obstime)
+    return(coord_at_time)
+    
+def gaia_dr2_conesearch_query(ra=165.86, dec=34.829694, radius=3., max=100000):
+    """
+    Generate a query string for the TAP servers
+    TBD
+    
+    Parameters
+    ----------
+    ra, dec : float
+        RA, Dec in decimal degrees
 
-    Get from http://gaia.ari.uni-heidelberg.de.
+    radius : float
+        Search radius, in arc-minutes.
+    
+    Returns
+    -------
+    query : str
+        Query string
+        
+    """
+    query =  "SELECT TOP {3} * FROM gaiadr2.gaia_source  WHERE CONTAINS(POINT('ICRS',gaiadr2.gaia_source.ra,gaiadr2.gaia_source.dec),CIRCLE('ICRS',{0},{1},{2:.2f}))=1".format(ra, dec, radius/60., max)
+    return query
+    
+def get_gaia_DR2_catalog(ra=165.86, dec=34.829694, radius=3.,
+                         use_mirror=True):
+    """Query GAIA DR2 astrometric catalog
     
     Parameters
     ----------
     ra, dec : float
         Center of the query region, decimal degrees
-
+    
     radius : float
         Radius of the query, in arcmin
-
+    
+    use_mirror : bool
+        If True, use the mirror at `gaia.ari.uni-heidelberg.de`.  Otherwise
+        use `gea.esac.esa.int`.
+        
     Returns
     -------
     table : `~astropy.table.Table`
         Result of the query
-
+    
     """
     try:
         import httplib
@@ -1122,7 +1176,7 @@ def get_gaia_catalog(ra=165.86, dec=34.829694, radius=3.):
         # python 3
         import http.client as httplib
         from urllib.parse import urlencode
-
+        
     #import http.client in Python 3
     #import urllib.parse in Python 3
     import time
@@ -1131,19 +1185,23 @@ def get_gaia_catalog(ra=165.86, dec=34.829694, radius=3.):
     host = "gea.esac.esa.int"
     port = 80
     pathinfo = "/tap-server/tap/async"
-
-    host = "gaia.ari.uni-heidelberg.de"
-    pathinfo = "/tap/async"
-
+    
+    if use_mirror:
+        host = "gaia.ari.uni-heidelberg.de"
+        pathinfo = "/tap/async"
+    
     #-------------------------------------
     #Create job
 
+    query =  gaia_dr2_conesearch_query(ra=ra, dec=dec, radius=radius) #"SELECT TOP 100000 * FROM gaiadr2.gaia_source  WHERE CONTAINS(POINT('ICRS',gaiadr2.gaia_source.ra,gaiadr2.gaia_source.dec),CIRCLE('ICRS',{0},{1},{2:.2f}))=1".format(ra, dec, radius/60.)
+    print(query)
+    
     params = urlencode({\
     	"REQUEST": "doQuery", \
     	"LANG":    "ADQL", \
-    	"FORMAT":  "votable", \
+    	"FORMAT":  "fits", \
     	"PHASE":  "RUN", \
-    	"QUERY":   "SELECT TOP 100000 * FROM gaiadr1.gaia_source  WHERE CONTAINS(POINT('ICRS',gaiadr1.gaia_source.ra,gaiadr1.gaia_source.dec),CIRCLE('ICRS',{0},{1},{2:.2f}))=1".format(ra, dec, radius/60.)
+    	"QUERY":  query
     	})
 
     headers = {\
@@ -1178,7 +1236,12 @@ def get_gaia_catalog(ra=165.86, dec=34.829694, radius=3.):
     	data = response.read()
     	#XML response: parse it to obtain the current status
     	dom = parseString(data)
-    	phaseElement = dom.getElementsByTagName('phase')[0]
+    	
+    	if use_mirror:
+    	    phaseElement = dom.getElementsByTagName('phase')[0]
+    	else:
+    	    phaseElement = dom.getElementsByTagName('uws:phase')[0]
+    	
     	phaseValueElement = phaseElement.firstChild
     	phase = phaseValueElement.toxml()
     	print("Status: " + phase)
@@ -1198,128 +1261,7 @@ def get_gaia_catalog(ra=165.86, dec=34.829694, radius=3.):
     connection.request("GET",pathinfo+"/"+jobid+"/results/result")
     response = connection.getresponse()
     data = response.read()
-    outputFileName = "gaia.vot"
-    try:
-        outputFile = open(outputFileName, "w")
-        outputFile.write(data)
-    except:
-        # Python 3
-        outputFile = open(outputFileName, "wb")
-        outputFile.write(data)
-
-    outputFile.close()
-    connection.close()
-    print("Data saved in: " + outputFileName)
-
-    # try:
-    #     os.remove('gaia.vot')
-    # except:
-    #     pass
-    # 
-    # os.system('gunzip gaia.vot.gz')
-    table = Table.read('gaia.vot', format='votable')
-    return table
-    
-    
-def get_gaia_catalog_ESA_dead(ra=165.86, dec=34.829694, radius=3.):
-    """Query GAIA DR1 astrometric catalog
-    
-    Parameters
-    ----------
-    ra, dec : float
-        Center of the query region, decimal degrees
-    
-    radius : float
-        Radius of the query, in arcmin
-    
-    Returns
-    -------
-    table : `~astropy.table.Table`
-        Result of the query
-    
-    """
-    try:
-        import httplib
-        from urllib import urlencode
-    except:
-        # python 3
-        import http.client as httplib
-        from urllib.parse import urlencode
-        
-    #import http.client in Python 3
-    #import urllib.parse in Python 3
-    import time
-    from xml.dom.minidom import parseString
-
-    host = "gea.esac.esa.int"
-    port = 80
-    pathinfo = "/tap-server/tap/async"
-    
-    
-    #-------------------------------------
-    #Create job
-
-    params = urlencode({\
-    	"REQUEST": "doQuery", \
-    	"LANG":    "ADQL", \
-    	"FORMAT":  "votable", \
-    	"PHASE":  "RUN", \
-    	"QUERY":   "SELECT TOP 100000 * FROM gaiadr1.gaia_source  WHERE CONTAINS(POINT('ICRS',gaiadr1.gaia_source.ra,gaiadr1.gaia_source.dec),CIRCLE('ICRS',{0},{1},{2:.2f}))=1".format(ra, dec, radius/60.)
-    	})
-
-    headers = {\
-    	"Content-type": "application/x-www-form-urlencoded", \
-    	"Accept":       "text/plain" \
-    	}
-
-    connection = httplib.HTTPConnection(host, port)
-    connection.request("POST",pathinfo,params,headers)
-
-    #Status
-    response = connection.getresponse()
-    print("Status: " +str(response.status), "Reason: " + str(response.reason))
-
-    #Server job location (URL)
-    location = response.getheader("location")
-    print("Location: " + location)
-
-    #Jobid
-    jobid = location[location.rfind('/')+1:]
-    print("Job id: " + jobid)
-
-    connection.close()
-
-    #-------------------------------------
-    #Check job status, wait until finished
-
-    while True:
-    	connection = httplib.HTTPConnection(host, port)
-    	connection.request("GET",pathinfo+"/"+jobid)
-    	response = connection.getresponse()
-    	data = response.read()
-    	#XML response: parse it to obtain the current status
-    	dom = parseString(data)
-    	phaseElement = dom.getElementsByTagName('uws:phase')[0]
-    	phaseValueElement = phaseElement.firstChild
-    	phase = phaseValueElement.toxml()
-    	print("Status: " + phase)
-    	#Check finished
-    	if phase == 'COMPLETED': break
-    	#wait and repeat
-    	time.sleep(0.2)
-
-    #print "Data:"
-    #print data
-
-    connection.close()
-
-    #-------------------------------------
-    #Get results
-    connection = httplib.HTTPConnection(host, port)
-    connection.request("GET",pathinfo+"/"+jobid+"/results/result")
-    response = connection.getresponse()
-    data = response.read()
-    outputFileName = "gaia.vot.gz"
+    outputFileName = "gaia.fits" + (not use_mirror)*".gz"
     try:
         outputFile = open(outputFileName, "w")
         outputFile.write(data)
@@ -1332,13 +1274,16 @@ def get_gaia_catalog_ESA_dead(ra=165.86, dec=34.829694, radius=3.):
     connection.close()
     print("Data saved in: " + outputFileName)
     
-    try:
-        os.remove('gaia.vot')
-    except:
-        pass
+    if not use_mirror:
+        ## ESA archive returns gzipped
+        try:
+            os.remove('gaia.fits')
+        except:
+            pass
     
-    os.system('gunzip gaia.vot.gz')
-    table = Table.read('gaia.vot', format='votable')
+        os.system('gunzip gaia.fits.gz')
+    
+    table = Table.read('gaia.fits', format='fits')
     return table
 
 def get_panstarrs_catalog(ra=0., dec=0., radius=3, columns='objName,objID,raStack,decStack,raStackErr,decStackErr,rMeanKronMag,rMeanKronMagErr,iMeanKronMag,iMeanKronMagErr', max_records=10000):
@@ -1373,7 +1318,7 @@ def get_panstarrs_catalog(ra=0., dec=0., radius=3, columns='objName,objID,raStac
     table['dec'] = table['decStack']
     return table[clip]
     
-def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, reference_catalogs = ['GAIA', 'PS1', 'SDSS', 'WISE']):
+def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, reference_catalogs = ['GAIA', 'PS1', 'SDSS', 'WISE'], **kwargs):
     """Decide what reference astrometric catalog to use
     
     First search SDSS, then WISE looking for nearby matches.  
@@ -1415,7 +1360,7 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, ref
     #     sdss = []
         
     query_functions = {'SDSS':get_sdss_catalog, 
-                       'GAIA':get_gaia_catalog,
+                       'GAIA':get_gaia_DR2_catalog,
                        'PS1':get_panstarrs_catalog,
                        'WISE':get_irsa_catalog}
       
@@ -1454,39 +1399,39 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, ref
             print('{0} query failed'.format(ref_src))
             has_catalog = False
         
+    if (ref_src == 'GAIA') & ('date' in kwargs) & has_catalog:
+        
+        gaia_tbl = utils.GTable.gread('gaia.fits')
+        if 'date_format' in kwargs:
+            date_format = kwargs['date_format']
+        else:
+            date_format = 'decimalyear'
+        
+        coo = get_gaia_radec_at_time(gaia_tbl, date=kwargs['date'],
+                                     format=date_format)
+        
+        coo_tbl = utils.GTable()
+        coo_tbl['ra'] = coo.ra
+        coo_tbl['dec'] = coo.dec
+        
+        ok = np.isfinite(coo_tbl['ra']) & np.isfinite(coo_tbl['dec'])
+        
+        coo_tbl.meta['date'] = kwargs['date']
+        coo_tbl.meta['datefmt'] = date_format
+        
+        print('Apply observation ({0},{1}) to GAIA catalog'.format(kwargs['date'], date_format))
+        
+        table_to_regions(coo_tbl[ok], output='{0}_{1}.reg'.format(product,
+                                                     ref_src.lower()))
+        
+        coo_tbl['ra','dec'][ok].write('{0}_{1}.radec'.format(product, 
+                                                     ref_src.lower()),
+                                format='ascii.commented_header',
+                                overwrite=True)
+        
     
-    ### GAIA
-    # if not has_catalog:
-    #     try:
-    #         gaia = get_gaia_catalog(ra=ra, dec=dec, radius=2)
-    #         if len(gaia) < 2:
-    #             raise ValueError
-    #         table_to_regions(gaia, output='{0}_gaia.reg'.format(product))
-    #         gaia['ra','dec'].write('{0}_gaia.radec'.format(product),
-    #                                 format='ascii.commented_header')
-    # 
-    #         radec = '{0}_gaia.radec'.format(product)
-    #         ref_catalog = 'GAIA'
-    #         has_catalog = True
-    #     except:
-    #         print('GAIA query failed')
-    #         has_catalog = False
-    # 
-    # ### WISE
-    # if not has_catalog:    
-    #     try:
-    #         wise = get_wise_catalog(ra=ra, dec=dec, radius=2)
-    #         
-    #         table_to_regions(wise, output='{0}_wise.reg'.format(product))
-    #         wise['ra','dec'].write('{0}_wise.radec'.format(product),
-    #                                 format='ascii.commented_header')
-    # 
-    #         radec = '{0}_wise.radec'.format(product)
-    #         ref_catalog = 'WISE'
-    #         has_catalog=True
-    #     except:
-    #         print('WISE query failed')
-    #         has_catalog=False
+    if not has_catalog:
+        return False
             
     #### WISP, check if a catalog already exists for a given rootname and use 
     #### that if so.
@@ -1624,7 +1569,9 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
             radec, ref_catalog = get_radec_catalog(ra=im[0].header['RA_TARG'],
                             dec=im[0].header['DEC_TARG'], 
                             product=direct['product'],
-                            reference_catalogs=reference_catalogs)
+                            reference_catalogs=reference_catalogs,
+                            date=im[0].header['EXPSTART'],
+                            date_format='mjd')
         
             if ref_catalog == 'VISIT':
                 align_mag_limits = [16,23]
@@ -2374,6 +2321,7 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
     import scipy.ndimage as nd
     
     from sklearn.gaussian_process import GaussianProcess
+    from sklearn.gaussian_process import GaussianProcessRegressor
     
     ### Figure out which grism 
     im = pyfits.open(grism['files'][0])
@@ -3047,7 +2995,9 @@ def manual_alignment(visit, ds9, reference=None, reference_catalogs=['SDSS', 'PS
         if len(reg_files) == 0:
             get_radec_catalog(ra=ra, dec=dec, radius=3., 
                               product=visit['product'], verbose=True,
-                              reference_catalogs=reference_catalogs)
+                              reference_catalogs=reference_catalogs,
+                              date=im[0].header['EXPSTART'],
+                              date_format='mjd')
         
         reg_files = glob.glob('{0}_*reg'.format(visit['product']))
         reference = os.path.join(os.getcwd(), reg_files[0])
