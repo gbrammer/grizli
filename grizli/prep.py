@@ -776,6 +776,242 @@ SEXTRACTOR_PHOT_APERTURES = "6, 8.335, 16.337, 20"
                     
 SEXTRACTOR_CONFIG_3DHST = {'DETECT_MINAREA':14, 'DEBLEND_NTHRESH':32, 'DEBLEND_MINCONT':0.005, 'FILTER_NAME':'/usr/local/share/sextractor/gauss_3.0_7x7.conv', 'FILTER':'Y'}
 
+# /usr/local/share/sextractor/gauss_3.0_7x7.conv
+GAUSS_3_7x7 = np.array(
+[[ 0.004963,  0.021388,  0.051328,  0.068707,  0.051328,  0.021388,  0.004963], 
+ [ 0.021388,  0.092163,  0.221178,  0.296069,  0.221178,  0.092163,  0.021388], 
+ [ 0.051328,  0.221178,  0.530797,  0.710525,  0.530797,  0.221178,  0.051328], 
+ [ 0.068707,  0.296069,  0.710525,  0.951108,  0.710525,  0.296069,  0.068707], 
+ [ 0.051328,  0.221178,  0.530797,  0.710525,  0.530797,  0.221178,  0.051328], 
+ [ 0.021388,  0.092163,  0.221178,  0.296069,  0.221178,  0.092163,  0.021388], 
+ [ 0.004963,  0.021388,  0.051328,  0.068707,  0.051328,  0.021388,  0.004963]])
+
+def make_SEP_catalog(root='',threshold=2., get_background=True, 
+                      verbose=True, extra_config={}, sci=None, wht=None, 
+                      phot_apertures=SEXTRACTOR_PHOT_APERTURES,
+                      filter_kernel=GAUSS_3_7x7, filter_type='conv',
+                      clean=True, rescale_weight=True, minarea=14,
+                      **kwargs):
+     """Make a catalog from drizzle products using the SEP implementation of SExtractdor
+
+     """
+     import copy
+     import astropy.units as u
+     import sep
+
+     if sci is not None:
+         drz_file = sci
+     else:
+         drz_file = glob.glob('{0}_dr[zc]_sci.fits'.format(root))[0]
+
+     im = pyfits.open(drz_file)
+
+     if 'PHOTFNU' in im[0].header:
+         ZP = -2.5*np.log10(im[0].header['PHOTFNU'])+8.90
+     elif 'PHOTFLAM' in im[0].header:
+         ZP = (-2.5*np.log10(im[0].header['PHOTFLAM']) - 21.10 -
+                  5*np.log10(im[0].header['PHOTPLAM']) + 18.6921)
+     elif 'FILTER' in im[0].header:
+         fi = im[0].header['FILTER'].upper()
+         if fi in model.photflam_list:
+             ZP = (-2.5*np.log10(model.photflam_list[fi]) - 21.10 -
+                      5*np.log10(model.photplam_list[fi]) + 18.6921)
+         else:
+             print('Couldn\'t find PHOTFNU or PHOTPLAM/PHOTFLAM keywords, use ZP=25') 
+             ZP = 25
+     else:
+         print('Couldn\'t find FILTER, PHOTFNU or PHOTPLAM/PHOTFLAM keywords, use ZP=25') 
+         ZP = 25
+
+     print('Image AB zeropoint: {0:.3f}'.format(ZP))
+
+     weight_file = drz_file.replace('_sci.fits', '_wht.fits').replace('_drz.fits', '_wht.fits')
+     if (weight_file == drz_file) | (not os.path.exists(weight_file)):
+         WEIGHT_TYPE = "NONE"
+         weight_file = None
+     else:
+         WEIGHT_TYPE = "MAP_WEIGHT"
+
+     drz_im = pyfits.open(drz_file)
+     data = drz_im[0].data.byteswap().newbyteorder()
+     wcs = pywcs.WCS(drz_im[0].header)
+
+     if weight_file is not None:
+         wht_im = pyfits.open(weight_file)
+         wht_data = wht_im[0].data.byteswap().newbyteorder()
+
+         err = 1/np.sqrt(wht_data)
+         err[~np.isfinite(err)] = 0
+         mask = (err == 0) 
+     else:
+         mask = (data == 0)
+         err = None
+
+     if get_background:
+         bkg = sep.Background(data, mask=mask, bw=32, bh=32, fw=3, fh=3)
+         bkg_data = bkg.back()
+
+         pyfits.writeto('{0}_bkg.fits'.format(root), data=bkg_data,
+                        header=utils.to_header(wcs), overwrite=True)
+
+         if err is None:
+             err = bkg.rms()
+             
+         ratio = bkg.rms()/err
+         err_scale = np.median(ratio[(~mask) & np.isfinite(ratio)])
+
+     else:
+         bkg_data = 0.
+         err_scale = 1.
+     
+     if rescale_weight:
+         err *= err_scale
+             
+     #mask = None
+
+     ### Run the detection
+     objects, seg = sep.extract(data - bkg_data, 
+                           thresh=threshold, err=err, mask=mask, 
+                           minarea=minarea,
+                           filter_kernel=filter_kernel,
+                           filter_type=filter_type, deblend_nthresh=32, 
+                           deblend_cont=0.005, clean=clean, clean_param=1.,
+                           segmentation_map=True)
+
+     tab = utils.GTable(objects)
+
+     # ID
+     tab['number'] = np.arange(len(tab), dtype=np.int32)+1
+
+     ## Segmentation
+     pyfits.writeto('{0}_seg.fits'.format(root), data=seg,
+                    header=utils.to_header(wcs), overwrite=True)
+
+     for c in ['a','b']:
+         tab = tab[np.isfinite(tab[c])]
+
+     # WCS coordinates
+     tab['ra'], tab['dec'] = wcs.all_pix2world(tab['x'], tab['y'], 0)
+     tab['ra'].unit = u.deg
+     tab['dec'].unit = u.deg
+
+     tab.meta['ZP'] = (ZP, 'AB zeropoint')
+     uJy_to_dn = 1/(3631*1e6*10**(-0.4*ZP))
+     tab.meta['uJy2dn'] = (uJy_to_dn, 'Convert uJy fluxes to image DN')
+
+     tab.meta['DRZ_FILE'] = (drz_file, 'SCI file')
+     tab.meta['WHT_FILE'] = (weight_file, 'WHT file')
+     
+     tab.meta['MINAREA'] = (minarea, 'Minimum source area in pixels')
+     tab.meta['CLEAN'] = clean
+     tab.meta['FILTER_TYPE'] = (filter_type, 'Type of filter applied, conv or weight')
+     tab.meta['THRESHOLD'] = (threshold, 'Detection threshold')
+     tab.meta['GET_BACK'] = (get_background, 'Background computed')
+     tab.meta['ERR_SCALE'] = (err_scale, 'Scale factor applied to weight image (like MAP_WEIGHT)')
+     
+     
+     ## Photometry
+     apertures = np.cast[float](phot_apertures.replace(',','').split())
+     for iap, aper in enumerate(apertures):
+         flux, fluxerr, flag = sep.sum_circle(data - bkg_data, 
+                                          tab['x'], tab['y'],
+                                          aper/2, err=err, 
+                                          gain=2000., subpix=5)
+
+         if False:
+             ix, dri = cat.match_to_catalog_sky(tab); mat = dr < 0.1*u.arcsec
+
+             flux, fluxerr, flag = sep.sum_circle(data - bkg_data, 
+                                              cat['X_IMAGE'][ix]-1,
+                                              cat['Y_IMAGE'][ix]-1,
+                                              aper/2, err=err, 
+                                              gain=1.0, subpix=5)
+
+
+         tab['flux_aper_{0}'.format(iap)] = flux/uJy_to_dn*u.uJy
+         tab['fluxerr_aper_{0}'.format(iap)] = fluxerr/uJy_to_dn*u.uJy
+         tab['flag_aper_{0}'.format(iap)] = flag
+
+         if get_background:
+             flux, fluxerr, flag = sep.sum_circle(bkg_data, 
+                                              tab['x'], tab['y'],
+                                              aper*2, err=err, gain=1.0)
+
+             tab['bkg_aper_{0}'.format(iap)] = flux
+         else:
+             tab['bkg_aper_{0}'.format(iap)] = 0.
+
+         tab.meta['aper_{0}'.format(iap)] = (aper, 'Aperture diameter, pix')
+
+     ## FLUX_AUTO
+     # https://sep.readthedocs.io/en/v1.0.x/apertures.html#equivalent-of-flux-auto-e-g-mag-auto-in-source-extractor
+     kronrad, krflag = sep.kron_radius(data - bkg_data, tab['x'], tab['y'],
+                                       tab['a'], tab['b'], tab['theta'], 6.0)
+
+     #kronrad *= 2.5
+
+     kron_out = sep.sum_ellipse(data - bkg_data, tab['x'], tab['y'], 
+                                tab['a'], tab['b'], tab['theta'], 
+                                2.5*kronrad, subpix=5)
+
+     kron_flux, kron_fluxerr, kron_flag = kron_out
+
+     # Minimum radius = 3.5, PHOT_AUTOPARAMS 2.5, 3.5
+     r_min = 1.75*2
+     use_circle = kronrad * np.sqrt(tab['a'] * tab['b']) < r_min
+     cflux, cfluxerr, cflag = sep.sum_circle(data - bkg_data,
+                                             tab['x'][use_circle], 
+                                             tab['y'][use_circle],
+                                             r_min, subpix=5)
+
+     kron_flux[use_circle] = cflux
+     kron_fluxerr[use_circle] = cfluxerr
+     kronrad[use_circle] = r_min
+
+     tab['flux_auto'] = kron_flux/uJy_to_dn*u.uJy
+     tab['fluxerr_auto'] = kron_fluxerr/uJy_to_dn*u.uJy
+
+     if get_background:
+         kron_out = sep.sum_ellipse(bkg_data, tab['x'], tab['y'], tab['a'], tab['b'],
+                                    tab['theta'], 2.5*kronrad, subpix=1)
+
+         kron_bkg, kron_bkg_fluxerr, kron_flag = kron_out
+         tab['flux_bkg_auto'] = kron_bkg/uJy_to_dn*u.uJy
+     else:
+         tab['flux_bkg_auto'] = 0.
+
+     tab['mag_auto'] = ZP - 2.5*np.log10(kron_flux)
+     tab['magerr_auto'] = 2.5/np.log(10)*kron_fluxerr/kron_flux
+
+     tab['kron_radius'] = kronrad*u.pixel
+     tab['kron_flag'] = krflag
+
+     ## FLUX_RADIUS
+     # https://sep.readthedocs.io/en/v1.0.x/apertures.html#equivalent-of-flux-radius-in-source-extractor
+     fr, fr_flag = sep.flux_radius(data - bkg_data, tab['x'], tab['y'],
+                                   tab['a']*6, 0.5, normflux=kron_flux)
+     tab['flux_radius'] = fr*u.pixel
+
+     fr, fr_flag = sep.flux_radius(data - bkg_data, tab['x'], tab['y'],
+                                   tab['a']*6, 0.9, normflux=kron_flux)
+     tab['flux_radius_90'] = fr*u.pixel
+
+     for c in ['x','y','a','b','theta', 'cxx', 'cxy', 'cyy', 'x2', 'y2', 'xy']:
+         tab.rename_column(c, c+'_image')
+
+     for c in ['cflux','flux','peak','cpeak']:
+         tab[c] *= 1. / uJy_to_dn
+         tab[c].unit = u.uJy
+
+     bad = (tab['flux_auto'] <= 0) | (tab['flux_radius'] <= 0)
+     # for id in tab['number'][bad]:
+     #     is_seg = seg == id
+     #     seg[is_seg] = 0
+
+     tab[bad].write('{0}.cat.fits'.format(root), format='fits', overwrite=True)
+
+     return tab
+     
 def make_drz_catalog(root='', sexpath='sex',threshold=2., get_background=True, 
                      verbose=True, extra_config={}, sci=None, wht=None, 
                      get_sew=False, output_params=SEXTRACTOR_DEFAULT_PARAMS,
@@ -831,7 +1067,7 @@ def make_drz_catalog(root='', sexpath='sex',threshold=2., get_background=True,
               CHECKIMAGE_NAME='{0}_seg.fits'.format(root),
               MAG_ZEROPOINT=ZP, 
               CLEAN="N", 
-              PHOT_APERTURES=SEXTRACTOR_PHOT_APERTURES,
+              PHOT_APERTURES=phot_apertures,
               BACK_SIZE=32,
               PIXEL_SCALE=0,
               MEMORY_OBJSTACK=30000,
