@@ -8,6 +8,9 @@ ctypedef np.double_t DTYPE_t
 ctypedef np.uint_t UINT_t
 
 import cython
+
+cdef extern from "math.h":
+    double fabs(double)
     
 @cython.boundscheck(False)
 @cython.wraparound(False)
@@ -346,9 +349,6 @@ def run_nmf(np.ndarray[DTYPE_t, ndim=1] flux, np.ndarray[DTYPE_t, ndim=1] varian
     cdef double vold,av
     cdef np.ndarray[DTYPE_t, ndim=1] bvector
     
-    cdef extern from "math.h":
-        double fabs(double)
-
     NTEMP, NFILT = np.shape(templates)
             
     #### Make Bvector
@@ -412,9 +412,6 @@ def interpolate_tempfilt(np.ndarray[DTYPE_t, ndim=3] tempfilt, np.ndarray[DTYPE_
     """
     cdef unsigned long NT, NF, NZ, itemp, ifilt, iz
     cdef double dz, fint, fint2
-    
-    cdef extern from "math.h":
-        double fabs(double)
     
     NF, NT, NZ = np.shape(tempfilt)
     

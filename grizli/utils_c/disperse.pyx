@@ -21,7 +21,6 @@ cdef extern from "math.h":
     double sqrt(double x)
     double exp(double x)
     
-
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.embedsignature(True)
