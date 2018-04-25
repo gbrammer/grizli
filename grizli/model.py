@@ -256,12 +256,8 @@ class GrismDisperser(object):
         """
         self.MW_F99 = None
         if MW_EBV > 0:
-            try:
-                from specutils.extinction import ExtinctionF99
-                self.MW_F99 = ExtinctionF99(MW_EBV*R_V, r_v=R_V)
-            except(ImportError):
-                print('Couldn\'t import `specutils.extinction`, MW extinction not implemented')
-        
+            self.MW_F99 = utils.MW_F99(MW_EBV*R_V, r_v=R_V)
+            
     def process_config(self):
         """Process grism config file
         

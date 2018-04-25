@@ -2543,7 +2543,66 @@ def fetch_config_files(ACS=False):
     os.system('ln -s stars_pickles.npy stars.npy')
     
     os.chdir(cwd)
-      
+
+class MW_F99(object):
+    """
+    Wrapper around the `specutils.extinction` / `extinction` modules, which are called differently
+    """
+    def __init__(self, a_v, r_v=3.1):
+        self.a_v = a_v
+        self.r_v = r_v
+        
+        self.IS_SPECUTILS = False
+        self.IS_EXTINCTION = False
+        
+        try:
+            from specutils.extinction import ExtinctionF99
+            self.IS_SPECUTILS = True
+            self.F99 = ExtinctionF99(self.a_v, r_v=self.r_v)
+        except(ImportError):
+            try:
+                from extinction import Fitzpatrick99
+                self.IS_EXTINCTION = True
+                self.F99 = Fitzpatrick99(r_v=self.r_v)
+                
+            except(ImportError):
+                print("""
+Couldn\'t find extinction modules in 
+`specutils.extinction` or 
+`extinction.Fitzpatrick99`.
+
+MW extinction not implemented.
+""")
+
+        self.status = self.IS_SPECUTILS | self.IS_EXTINCTION
+        
+    def __call__(self, wave_input):
+        import astropy.units as u
+        
+        if isinstance(wave_input, list):
+            wave = np.array(wave_input)
+        else:
+            wave = wave_input
+            
+        if self.status is False:
+            return np.zeros_like(wave)
+             
+        if self.IS_SPECUTILS:
+            if hasattr(wave, 'unit'):
+                wave_aa = wave
+            else:
+                wave_aa = wave*u.AA
+            
+            return self.F99(wave_aa)
+        
+        if self.IS_EXTINCTION:
+            if hasattr(wave, 'unit'):
+                wave_aa = wave.to(u.AA)
+            else:
+                wave_aa = wave
+                
+            return self.F99(wave_aa, self.a_v, unit='aa')
+            
 class EffectivePSF(object):
     def __init__(self):
         """Tools for handling WFC3/IR Effective PSF
