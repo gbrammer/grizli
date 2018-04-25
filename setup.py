@@ -26,13 +26,12 @@ print('C extension: {0}'.format(cext))
 
 extensions = [
     Extension("grizli.utils_c.interp", ["grizli/utils_c/interp"+cext],
-        include_dirs = [numpy.get_include()],),
+        include_dirs = [numpy.get_include()],
+        libraries=["m"]),
         
-    # Extension("grizli/utils_c/nmf", ["grizli/utils_c/nmf"+cext],
-    #     include_dirs = [numpy.get_include()],),
-    
     Extension("grizli.utils_c.disperse", ["grizli/utils_c/disperse"+cext],
-        include_dirs = [numpy.get_include()],),
+        include_dirs = [numpy.get_include()],
+        libraries=["m"]),
 
 ]
 
