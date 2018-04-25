@@ -2556,8 +2556,9 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
     import numpy.ma
     import scipy.ndimage as nd
     
-    from sklearn.gaussian_process import GaussianProcess
+    #from sklearn.gaussian_process import GaussianProcess
     from sklearn.gaussian_process import GaussianProcessRegressor
+    from sklearn.gaussian_process.kernels import RBF, WhiteKernel
     
     ### Figure out which grism 
     im = pyfits.open(grism['files'][0])
@@ -2762,6 +2763,9 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
     im_shape = (1014,1014)
     
     for j in range(Nexp):
+        
+        file = grism['files'][j]
+        
         resid = (data[j*Npix:(j+1)*Npix] - sky[j,:]).reshape(im_shape)
         m = (mask & obj_mask)[j*Npix:(j+1)*Npix].reshape(im_shape)
         
@@ -2780,19 +2784,37 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
             continue
             
         ### Fit column average with smoothed Gaussian Process model
-        gp = GaussianProcess(regr='constant', corr='squared_exponential',
-                             theta0=8, thetaL=5, thetaU=12,
-                             nugget=(yrms/bg_sky)[yok][::1]**2,
-                             random_start=10, verbose=True, normalize=True)
+        if False:
+            gp = GaussianProcess(regr='constant', corr='squared_exponential',
+                                 theta0=8, thetaL=5, thetaU=12,
+                                 nugget=(yrms/bg_sky)[yok][::1]**2,
+                                 random_start=10, verbose=True, normalize=True)
                              
-        try:
-            gp.fit(np.atleast_2d(xmsk[yok][::1]).T, yres[yok][::1]+bg_sky)
-        except:
-            print('GaussianProces failed!  Check that this exposure wasn\'t fried by variable backgrounds.')
-            continue
+            try:
+                gp.fit(np.atleast_2d(xmsk[yok][::1]).T, yres[yok][::1]+bg_sky)
+            except:
+                print('GaussianProces failed!  Check that this exposure wasn\'t fried by variable backgrounds.')
+                continue
             
-        y_pred, MSE = gp.predict(np.atleast_2d(xmsk).T, eval_MSE=True)
-        gp_sigma = np.sqrt(MSE)
+            y_pred, MSE = gp.predict(np.atleast_2d(xmsk).T, eval_MSE=True)
+            gp_sigma = np.sqrt(MSE)
+        
+        ## Updated sklearn
+        nmad_y = utils.nmad(yres)
+        
+        gpscl = 100 # rough normalization
+        k1 = 0.3**2 * RBF(length_scale=80)  # Background variations
+        k2 = 1**2 * WhiteKernel(noise_level=(nmad_y*gpscl)**2) # noise
+        gp_kernel = k1+k2#+outliers
+        
+        yok &= np.abs(yres-np.median(yres)) < 50*nmad_y
+
+        gp = GaussianProcessRegressor(kernel=gp_kernel, alpha=1e-10, optimizer='fmin_l_bfgs_b', n_restarts_optimizer=0, normalize_y=False, copy_X_train=True, random_state=None)
+
+        gp.fit(np.atleast_2d(xmsk[yok][::1]).T, (yres[yok][::1]+bg_sky)*gpscl)
+        y_pred, gp_sigma = gp.predict(np.atleast_2d(xmsk).T, return_std=True)
+        gp_sigma /= gpscl
+        y_pred /= gpscl
         
         ## Plot Results
         pi = ax.plot(med[0:2], alpha=0.2)
@@ -2802,10 +2824,9 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
                         label=grism['files'][j].split('_fl')[0])
         
         ## result
-        file = grism['files'][j]
         fp = open(file.replace('_flt.fits', '_column.dat'), 'wb')
-        fp.write(b'# column resid uncertainty\n')
-        np.savetxt(fp, np.array([xmsk, y_pred-1, gp_sigma]).T, fmt='%.5f')
+        fp.write(b'# column obs_resid ok resid uncertainty\n')
+        np.savetxt(fp, np.array([xmsk, yres, yok*1, y_pred-bg_sky, gp_sigma]).T, fmt='%.5f')
         fp.close()
         
         if apply:
