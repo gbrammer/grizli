@@ -33,6 +33,7 @@ def demo():
     tabs = overlaps.find_overlaps(parent, buffer_arcmin=0.1, filters=['F098M', 'F140W', 'G102', 'G141'], proposid=[11359], instruments=['WFC3'], extra=extra, close=False)
     
     #HOME_PATH = '/Volumes/Pegasus/Grizli/DemoERS/'
+    import os
     HOME_PATH = os.getcwd()
     
     root = 'j033217-274236'
@@ -835,7 +836,7 @@ def photutils_catalog(field_root='j142724+334246', threshold=1.8, subtract_bkg=T
             
         if filt == 'ir':
             cols = ['id', 'xcentroid', 'ycentroid', 'sky_centroid', 'sky_centroid_icrs', 'source_sum', 'source_sum_err', 'xmin', 'xmax', 'ymin', 'ymax', 'min_value', 'max_value', 'minval_xpos', 'minval_ypos', 'maxval_xpos', 'maxval_ypos', 'area', 'equivalent_radius', 'perimeter', 'semimajor_axis_sigma', 'semiminor_axis_sigma', 'eccentricity', 'orientation', 'ellipticity', 'elongation', 'covar_sigx2', 'covar_sigxy', 'covar_sigy2', 'cxx', 'cxy', 'cyy']
-            tab = cat.to_table(columns=cols)
+            tab = utils.GTable(cat.to_table(columns=cols))
             cols = ['source_sum', 'source_sum_err']
             for c in cols:
                 tab[c.replace('sum','flam')] = tab[c]*photflam            
@@ -1181,7 +1182,7 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
     sys_err = 0.03
     prior=None
     pline = {'kernel': 'point', 'pixfrac': 0.2, 'pixscale': 0.1, 'size': 8, 'wcs': None}
-    
+        
     for id in ids:
         if Skip:
             if os.path.exists('{0}_{1:05d}.line.png'.format(target, id)):
