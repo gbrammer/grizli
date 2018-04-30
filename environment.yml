@@ -83,7 +83,6 @@ dependencies:
   - peakutils>=1.0.3
   - extinction>=0.3.0
   - sep>=1.0.1
-  - mpi4py>=2.1.0
   - git+https://github.com/cmccully/lacosmicx.git
   - git+https://github.com/gbrammer/pyia.git
   - git+https://github.com/gbrammer/reprocess_wfc3
