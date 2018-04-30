@@ -39,7 +39,7 @@ def demo():
     
     root = 'j033217-274236'
     from grizli.pipeline import auto_script
-    auto_script.go(root=root, maglim=[19,20], HOME_PATH=HOME_PATH, reprocess_parallel=True, s3_sync=True, run_fit=False)
+    auto_script.go(root=root, maglim=[19,20], HOME_PATH=HOME_PATH, reprocess_parallel=True, s3_sync=False, run_fit=False)
     
     # Interactive session
     from grizli.pipeline import auto_script
@@ -1636,10 +1636,10 @@ def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Griz
     fig.tight_layout(pad=0.5)
 
     extra_str = ''
-    if program_str is not None:
+    if program_str:
         extra_str += '.{0}'.format(program_str)
     
-    if match_str is not []:
+    if match_str:
         extra_str += '.{0}'.format('.'.join(match_str))
         
     fig.savefig('{0}{1}_fine.png'.format(field_root, extra_str))
