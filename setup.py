@@ -39,9 +39,12 @@ extensions = [
 args = 'git describe --tags'
 p = subprocess.Popen(args.split(), stdout=subprocess.PIPE)
 version = p.communicate()[0].decode("utf-8").strip()
-#lines = open('grizli/version.py').readlines()
+
+version = "0.6.0"
+
 version_str = """# git describe --tags
 __version__ = "{0}"\n""".format(version)
+
 fp = open('grizli/version.py','w')
 fp.write(version_str)
 fp.close()
@@ -59,13 +62,13 @@ def read(fname):
 
 setup(
     name = "grizli",
-    version = "0.5.0",
+    version = version,
     author = "Gabriel Brammer",
     author_email = "gbrammer@gmail.com",
     description = "Grism redshift and line analysis software",
     license = "MIT",
     url = "https://github.com/gbrammer/grizli",
-    download_url = "https://github.com/gbrammer/grizli/tarball/0.5.0",
+    download_url = "https://github.com/gbrammer/grizli/tarball/{0}".format(version),
     packages=['grizli', 'grizli/pipeline', 'grizli/utils_c', 'grizli/tests', 'grizli/galfit'],
     # requires=['numpy', 'scipy', 'astropy', 'drizzlepac', 'stwcs'],
     # long_description=read('README.rst'),
