@@ -21,6 +21,12 @@ def reprocess_wfc3ir(parallel=False):
     Couldn\'t `import mywfc3.reprocess_wfc3`.  
     Get it from https://github.com/gbrammer/wfc3 """)
             return False
+    
+    # Fetch calibs in serial
+    print('\ngrizli.pipeline.reprocess: Fetch calibrations...\n')
+    files=glob.glob('*raw.fits')
+    for file in files:
+        reprocess_wfc3.fetch_calibs(file, ftpdir='https://hst-crds.stsci.edu/unchecked_get/references/hst/', verbose=False)    
         
     # Make ramp diagnostic images    
     if parallel:
