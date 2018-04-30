@@ -352,13 +352,7 @@ class GroupFLT():
         ### Read catalog
         if catalog:
             if isinstance(catalog, str):
-                try:
-                    self.catalog = Table.read(catalog,
-                                              format='ascii.sextractor')
-                except:
-                    self.catalog = Table.read(catalog,
-                                              format='ascii.commented_header')
-                    
+                self.catalog = utils.GTable.gread(catalog)                
             else:
                 self.catalog = catalog
             
