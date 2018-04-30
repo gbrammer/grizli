@@ -1415,7 +1415,7 @@ def gaia_dr2_conesearch_query(ra=165.86, dec=34.829694, radius=3., max=100000):
     return query
     
 def get_gaia_DR2_catalog(ra=165.86, dec=34.829694, radius=3.,
-                         use_mirror=False):
+                         use_mirror=True, max_wait=20):
     """Query GAIA DR2 astrometric catalog
     
     Parameters
@@ -1495,28 +1495,33 @@ def get_gaia_DR2_catalog(ra=165.86, dec=34.829694, radius=3.,
 
     #-------------------------------------
     #Check job status, wait until finished
-
+    
+    tcount = 0
     while True:
-    	connection = httplib.HTTPConnection(host, port)
-    	connection.request("GET",pathinfo+"/"+jobid)
-    	response = connection.getresponse()
-    	data = response.read()
-    	#XML response: parse it to obtain the current status
-    	dom = parseString(data)
-    	
-    	if use_mirror:
-    	    phaseElement = dom.getElementsByTagName('phase')[0]
-    	else:
-    	    phaseElement = dom.getElementsByTagName('uws:phase')[0]
-    	
-    	phaseValueElement = phaseElement.firstChild
-    	phase = phaseValueElement.toxml()
-    	print("Status: " + phase)
-    	#Check finished
-    	if phase == 'COMPLETED': break
-    	#wait and repeat
-    	time.sleep(0.2)
-
+        connection = httplib.HTTPConnection(host, port)
+        connection.request("GET",pathinfo+"/"+jobid)
+        response = connection.getresponse()
+        data = response.read()
+        #XML response: parse it to obtain the current status
+        dom = parseString(data)
+        
+        if use_mirror:
+            phaseElement = dom.getElementsByTagName('phase')[0]
+        else:
+            phaseElement = dom.getElementsByTagName('uws:phase')[0]
+        
+        phaseValueElement = phaseElement.firstChild
+        phase = phaseValueElement.toxml()
+        print("Status: " + phase)
+        #Check finished
+        if phase == 'COMPLETED': break
+        #wait and repeat
+        time.sleep(0.2)
+        tcount += 0.2
+        
+        if (phase == 'ERROR') | (tcount > max_wait):
+            return False
+        
     #print "Data:"
     #print data
 
@@ -1617,28 +1622,11 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, ref
         Provenance of the `radec` list.
     
     """
-    # try:
-    #     sdss = get_sdss_catalog(ra=ra, dec=dec, radius=radius)
-    # except:
-    #     print('SDSS query failed')
-    #     sdss = []
-    # 
-    # if sdss is None:
-    #     sdss = []
-        
     query_functions = {'SDSS':get_sdss_catalog, 
                        'GAIA':get_gaia_DR2_catalog,
                        'PS1':get_panstarrs_catalog,
                        'WISE':get_irsa_catalog}
       
-    # if len(sdss) > 5:
-    #     table_to_regions(sdss, output='{0}_sdss.reg'.format(product))
-    #     sdss['ra','dec'].write('{0}_sdss.radec'.format(product), 
-    #                             format='ascii.commented_header')
-    #     radec = '{0}_sdss.radec'.format(product)
-    #     ref_catalog = 'SDSS'
-    #     has_catalog = True
-    
     ### Try queries
     has_catalog = False
     ref_catalog = 'None'
@@ -1646,7 +1634,18 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, ref
     
     for ref_src in reference_catalogs:
         try:
-            ref_cat = query_functions[ref_src](ra=ra, dec=dec, radius=radius)
+            if ref_src == 'GAIA':
+                ref_cat = query_functions[ref_src](ra=ra, dec=dec,
+                                             radius=radius, use_mirror=False)
+                
+                # Try GAIA mirror at Heidelberg
+                if ref_cat is False:
+                    ref_cat = query_functions[ref_src](ra=ra, dec=dec,
+                                              radius=radius, use_mirror=True)
+            else:
+                ref_cat = query_functions[ref_src](ra=ra, dec=dec,
+                                                   radius=radius)
+                
             if len(ref_cat) < 2:
                 raise ValueError
                 
