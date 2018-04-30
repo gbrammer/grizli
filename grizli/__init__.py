@@ -28,3 +28,10 @@ won't be able to find the aXe configuration files!
 (These assumed to be in $GRIZLI/CONF.)
     """)
 
+try:
+    import sep
+except:
+    print("""
+Couldn't `import sep`.  SExtractor replaced with SEP 
+in April 2018.  Install with `pip install sep`.
+""")
