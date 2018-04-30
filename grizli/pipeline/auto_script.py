@@ -2,8 +2,9 @@
 Automatic processing scripts for grizli
 """
 
+import numpy as np
+
 if False:
-    import numpy as np
     np.seterr(divide='ignore', invalid='ignore', over='ignore', under='ignore')
  
 # Only fetch F814W optical data for now
@@ -25,8 +26,8 @@ def demo():
     parent = query.run_query(box=None, proposid=[11359], instruments=['WFC3', 'ACS'], extensions=['FLT'], filters=['G102','G141'], extra=[])
     
     # Demo: match everything nearby, includes tons of things from GOODS-S
-    extra = query.DEFAULT_EXTRA
-    tabs = overlaps.find_overlaps(parent, buffer_arcmin=0.1, filters=[], proposid=[], instruments=['WFC3','ACS'], extra=extra, close=False)
+    #extra = query.DEFAULT_EXTRA
+    #tabs = overlaps.find_overlaps(parent, buffer_arcmin=0.1, filters=[], proposid=[], instruments=['WFC3','ACS'], extra=extra, close=False)
     
     # Match only the grism visit
     extra = query.DEFAULT_EXTRA+["TARGET.TARGET_NAME LIKE 'WFC3-ERSII-G01'"]
@@ -38,7 +39,7 @@ def demo():
     
     root = 'j033217-274236'
     from grizli.pipeline import auto_script
-    auto_script.go(root=root, maglim=[19,20], HOME_PATH=HOME_PATH)
+    auto_script.go(root=root, maglim=[19,20], HOME_PATH=HOME_PATH, reprocess_parallel=True, s3_sync=True, run_fit=False)
     
     # Interactive session
     from grizli.pipeline import auto_script
@@ -49,7 +50,7 @@ def demo():
     reprocess_parallel=True
     is_parallel_field=False
     
-def get_extra_data(root='j114936+222414', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', instruments=['WFC3'], filters=['F160W','F140W','F098M','F105W'], radius=2, run_fetch=True, from_mast=True, reprocess_parallel=True):
+def get_extra_data(root='j114936+222414', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', instruments=['WFC3'], filters=['F160W','F140W','F098M','F105W'], radius=2, run_fetch=True, from_mast=True, reprocess_parallel=True, s3_sync=False):
     
     import os
     import glob
@@ -88,7 +89,7 @@ def get_extra_data(root='j114936+222414', HOME_PATH='/Volumes/Pegasus/Grizli/Aut
             out = fetch_mast.get_from_MAST(extra, inst_products=DEFAULT_PRODUCTS, direct=True, path=os.path.join(HOME_PATH, root, 'RAW'), skip_existing=True)
         else:
                         
-            curl = fetch.make_curl_script(extra, level=None, script_name='extra.sh', inst_products={'WFC3/UVIS': ['FLC'], 'WFPC2/WFPC2': ['C0M', 'C1M'], 'WFC3/IR': ['RAW'], 'ACS/WFC': ['FLC']}, skip_existing=True, output_path=os.path.join(HOME_PATH, root, 'RAW'))
+            curl = fetch.make_curl_script(extra, level=None, script_name='extra.sh', inst_products={'WFC3/UVIS': ['FLC'], 'WFPC2/WFPC2': ['C0M', 'C1M'], 'WFC3/IR': ['RAW'], 'ACS/WFC': ['FLC']}, skip_existing=True, output_path=os.path.join(HOME_PATH, root, 'RAW'), s3_sync=s3_sync)
     
             os.system('sh extra.sh')
             files = glob.glob('*raw.fits.gz')
@@ -126,7 +127,7 @@ def get_extra_data(root='j114936+222414', HOME_PATH='/Volumes/Pegasus/Grizli/Aut
 
     os.chdir(CWD)
     
-def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', inspect_ramps=False, manual_alignment=False, is_parallel_field=False, reprocess_parallel=False, only_preprocess=False, run_fit=True):
+def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', inspect_ramps=False, manual_alignment=False, is_parallel_field=False, reprocess_parallel=False, only_preprocess=False, run_fit=True, s3_sync=False):
     """
     Run the full pipeline for a given target
         
@@ -165,7 +166,7 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
     ######################
     ### Download data
     os.chdir(HOME_PATH)
-    auto_script.fetch_files(field_root=root, HOME_PATH=HOME_PATH, remove_bad=True, reprocess_parallel=reprocess_parallel)
+    auto_script.fetch_files(field_root=root, HOME_PATH=HOME_PATH, remove_bad=True, reprocess_parallel=reprocess_parallel, s3_sync=s3_sync)
     
     files=glob.glob('../RAW/*_fl*fits')
     if len(files) == 0:
@@ -227,7 +228,7 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
         
     # Photometric catalog
     if not os.path.exists('{0}_phot.fits'.format(root)):
-        tab = auto_script.photutils_catalog(field_root=root)
+        tab = auto_script.multiband_catalog(field_root=root)
     
     # Stop if only want to run pre-processing
     if only_preprocess | (len(all_groups) == 0):
@@ -271,7 +272,7 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
     if run_fit:
         auto_script.summary_catalog(field_root=root)
 
-def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', inst_products={'WFPC2/WFPC2': ['C0M', 'C1M'], 'ACS/WFC': ['FLC'], 'WFC3/IR': ['RAW'], 'WFC3/UVIS': ['FLC']}, remove_bad=True, reprocess_parallel=False):
+def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', inst_products={'WFPC2/WFPC2': ['C0M', 'C1M'], 'ACS/WFC': ['FLC'], 'WFC3/IR': ['RAW'], 'WFC3/UVIS': ['FLC']}, remove_bad=True, reprocess_parallel=False, s3_sync=False):
     """
     Fully automatic script
     """
@@ -311,7 +312,7 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/
     # Fetch and preprocess IR backgrounds
     os.chdir(os.path.join(HOME_PATH, field_root, 'RAW'))
     
-    curl = fetch.make_curl_script(tab, level=None, script_name='fetch_{0}.sh'.format(field_root), inst_products=inst_products, skip_existing=True, output_path='./')
+    curl = fetch.make_curl_script(tab, level=None, script_name='fetch_{0}.sh'.format(field_root), inst_products=inst_products, skip_existing=True, output_path='./', s3_sync=s3_sync)
         
     # Ugly callout to shell
     os.system('sh fetch_{0}.sh'.format(field_root))
@@ -325,8 +326,12 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/
         remove_bad_expflag(field_root=field_root, HOME_PATH=HOME_PATH, min_bad=2)
     
     #### Reprocess the RAWs into FLTs    
-    os.system("python -c 'from grizli.pipeline import reprocess; reprocess.reprocess_wfc3ir(parallel={0})'".format(reprocess_parallel))
-    
+    if reprocess_parallel:
+        os.system("python -c 'from grizli.pipeline import reprocess; reprocess.reprocess_wfc3ir(parallel={0})'".format(reprocess_parallel))
+    else:
+        from grizli.pipeline import reprocess
+        reprocess.reprocess_wfc3ir(parallel=False)
+        
     # Persistence products
     os.chdir(os.path.join(HOME_PATH, field_root, 'Persistence'))
     persist_files = fetch.persistence_products(tab)
@@ -521,8 +526,29 @@ def manual_alignment(field_root='j151850-813028', HOME_PATH='/Volumes/Pegasus/Gr
             prep.manual_alignment(visit, reference='{0}/{1}_{2}.reg'.format(os.getcwd(), field_root, ref_catalog.lower()), ds9=ds9)
         
     ds9.set('quit')
-    
-def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', min_overlap=0.2, make_combined=True, catalogs=['PS1','SDSS','GAIA','WISE'], use_visit=True, master_radec=None, use_first_radec=False, skip_imaging=False):
+
+def clean_prep(field_root='j142724+334246'):
+    """
+    Clean unneeded files after the field preparation
+    """
+    import glob
+    import os
+
+    visits, all_groups, info = np.load('{0}_visits.npy'.format(field_root))
+
+    for visit in visits:
+        for ext in ['_drz_wht', '_seg', '_bkg']:
+            file = visit['product']+ext+'.fits'
+            if os.path.exists(file):
+                print('remove '+file)
+                os.remove(file)
+
+    clean_files = glob.glob('*crclean.fits')
+    for file in clean_files:
+        print('remove '+file)
+        os.remove(file)
+                
+def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', min_overlap=0.2, make_combined=True, catalogs=['PS1','SDSS','GAIA','WISE'], use_visit=True, master_radec=None, use_first_radec=False, skip_imaging=False, clean=True):
     
     import os
     import glob
@@ -704,6 +730,11 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
         for file in info['FILE'][wfc3]:
             print(file)
             mask = _detsat_one(file, update=False, ds9=None, plot=False, verbose=True)
+    
+    ###################################
+    # Clean up
+    if clean:
+        clean_prep(field_root=field_root)
         
     ###################################
     # Drizzle by filter
@@ -740,7 +771,79 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
     # prep.drizzle_overlaps([wfc3ir], parse_visits=False, pixfrac=0.6, scale=0.06, skysub=False, bits=Nonoe, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False)
     #             
     # prep.drizzle_overlaps(keep, parse_visits=False, pixfrac=0.6, scale=0.06, skysub=False, bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False)
+
+def multiband_catalog(field_root='j142724+334246', threshold=1.8, get_background=True):
+    """
+    Make a detection catalog with SExtractor and then measure
+    photometry with `~photutils`.
+    """
+    import glob
+    import numpy as np
+    import astropy.io.fits as pyfits
+    import astropy.wcs as pywcs
+    from photutils import segmentation, background
+    import photutils.utils
+    
+    #import grizli
+    #import grizli.prep
+    try:
+        from .. import prep, utils
+    except:
+        from grizli import prep, utils
             
+    # Make catalog
+    tab = prep.make_SEP_catalog(root='{0}-ir'.format(field_root), threshold=threshold, get_background=get_background, save_to_fits=True)
+        
+    # Source positions
+    source_xy = tab['X_IMAGE'], tab['Y_IMAGE']
+    
+    files=glob.glob('../RAW/*fl[tc].fits')
+    info = utils.get_flt_info(files)
+    
+    if ONLY_F814W:
+        info = info[((info['INSTRUME'] == 'WFC3') & (info['DETECTOR'] == 'IR')) | (info['FILTER'] == 'F814W')]
+    
+    filters = [f.lower() for f in np.unique(info['FILTER'])]
+    
+    #filters.insert(0, 'ir')
+    
+    segment_img = pyfits.open('{0}-ir_seg.fits'.format(field_root))[0].data
+    
+    for ii, filt in enumerate(filters):
+        print(filt)
+        if filt.startswith('g'):
+            continue
+                
+        if filt not in ['g102','g141','g800l']:
+            sci_files = glob.glob(('{0}-{1}_dr?_sci.fits'.format(field_root, filt)))
+            if len(sci_files) == 0:
+                continue
+            
+            root = '{0}-{1}'.format(field_root, filt)
+                
+            filter_tab = prep.make_SEP_catalog(root=root,
+                      threshold=threshold, get_background=get_background,
+                      save_to_fits=False, source_xy=source_xy)
+            
+            for k in filter_tab.meta:
+                newk = '{0}_{1}'.format(filt.upper(), k)
+                tab.meta[newk] = filter_tab.meta[k]
+            
+            for c in filter_tab.colnames:
+                newc = '{0}_{1}'.format(filt.upper(), c)         
+                tab[newc] = filter_tab[c]
+
+        else:
+            continue
+        
+    
+    for c in tab.colnames:
+        tab.rename_column(c, c.lower())
+    
+    tab.write('{0}_phot.fits'.format(field_root), format='fits', overwrite=True)
+    
+    return tab   
+          
 def photutils_catalog(field_root='j142724+334246', threshold=1.8, subtract_bkg=True):
     """
     Make a detection catalog with SExtractor and then measure
@@ -766,6 +869,7 @@ def photutils_catalog(field_root='j142724+334246', threshold=1.8, subtract_bkg=T
     
     # Make catalog
     sexcat = prep.make_drz_catalog(root='{0}-ir'.format(field_root), threshold=threshold, extra_config=prep.SEXTRACTOR_CONFIG_3DHST)
+    #sexcat = prep.make_SEP_catalog(root='{0}-ir'.format(field_root), threshold=threshold, extra_config=prep.SEXTRACTOR_CONFIG_3DHST)
     
     for c in sexcat.colnames:
         sexcat.rename_column(c, c.lower())
@@ -887,7 +991,7 @@ def load_GroupFLT(field_root='j142724+334246', force_ref=None, force_seg=None, f
     g800l = info['FILTER'] == 'G800L'
                 
     if force_cat is None:
-        catalog = '{0}-ir.cat'.format(field_root)
+        catalog = '{0}-ir.cat.fits'.format(field_root)
     else:
         catalog = force_cat
     
@@ -1005,7 +1109,7 @@ def load_GroupFLT(field_root='j142724+334246', force_ref=None, force_seg=None, f
             del(grp_i)
     
     return grp
-    
+        
 def grism_prep(field_root='j142724+334246', ds9=None, refine_niter=3):
     import glob
     import os
@@ -1063,7 +1167,7 @@ def grism_prep(field_root='j142724+334246', ds9=None, refine_niter=3):
     # Link minimal files to Extractions directory
     os.chdir('../Extractions/')
     os.system('ln -s ../Prep/*GrismFLT* .')
-    os.system('ln -s ../Prep/*-ir.cat .')
+    os.system('ln -s ../Prep/*-ir.cat.fits .')
     os.system('ln -s ../Prep/*_phot.fits .')
    
     return grp
@@ -1084,7 +1188,7 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
     except:
         from grizli import multifit, prep, utils, fitting
         
-    grp = multifit.GroupFLT(grism_files=glob.glob('*GrismFLT.fits'), direct_files=[], ref_file=None, seg_file='{0}-ir_seg.fits'.format(field_root), catalog='{0}-ir.cat'.format(field_root), cpu_count=-1, sci_extn=1, pad=256)
+    grp = multifit.GroupFLT(grism_files=glob.glob('*GrismFLT.fits'), direct_files=[], ref_file=None, seg_file='{0}-ir_seg.fits'.format(field_root), catalog='{0}-ir.cat.fits'.format(field_root), cpu_count=-1, sci_extn=1, pad=256)
     
     ###############
     # PHotometry
@@ -1095,12 +1199,12 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
         photom = utils.GTable.gread('{0}_phot.fits'.format(target))
         photom_filters = []
         for c in photom.colnames:
-            if c.endswith('source_sum') & (c.startswith('f')):
-                photom_filters.append(c.split('_source_sum')[0])
+            if c.endswith('_flux_aper_0'):
+                photom_filters.append(c.split('_flux_aper_0')[0])
     
-        photom_flux = np.vstack([photom['{0}_source_flam'.format(f)].data for f in photom_filters])
-        photom_err = np.vstack([photom['{0}_source_flam_err'.format(f)].data for f in photom_filters])
-        photom_pivot = np.array([photom.meta['PW{0}'.format(f.upper())] for f in photom_filters])
+        photom_flux = np.vstack([photom['{0}_flux_aper_0'.format(f)].data for f in photom_filters])
+        photom_err = np.vstack([photom['{0}_fluxerr_aper_0'.format(f)].data for f in photom_filters])
+        photom_pivot = np.array([photom.meta['{0}_PLAM'.format(f.upper())] for f in photom_filters])
     else:
         photom = None
         
@@ -1287,10 +1391,10 @@ def summary_catalog(field_root='', dzbin=0.01, use_localhost=True, filter_bandpa
     fit.meta['root'] = field_root
     
     ## Add photometric catalog
-    try:
-        sex = utils.GTable.gread('../Prep/{0}-ir.cat'.format(field_root))
-    except:
-        sex = utils.GTable.gread('../Prep/{0}-ir.cat'.format(field_root), sextractor=True)
+    sex = utils.GTable.gread('../Prep/{0}-ir.cat.fits'.format(field_root))
+    # try:
+    # except:
+    #     sex = utils.GTable.gread('../Prep/{0}-ir.cat.fits'.format(field_root), sextractor=True)
         
     idx = np.arange(len(sex))
     sex_idx = np.array([idx[sex['NUMBER'] == id][0] for id in fit['id']])
@@ -1407,7 +1511,7 @@ def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Griz
     visits = []
     files = []
     for visit in all_visits:
-        file = '{0}.cat'.format(visit['product'])
+        file = '{0}.cat.fits'.format(visit['product'])
         if os.path.exists(file):
             if program_str is not None:
                 prog = visit['product'].split('-')[-4]
@@ -1439,14 +1543,14 @@ def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Griz
     tab = {}
     for i, file in enumerate(files):
         tab[i] = {}
-        t_i = utils.GTable.gread(file)#, sextractor=True)
+        t_i = utils.GTable.gread(file)
         mclip = (t_i['MAG_AUTO'] > maglim[0]) & (t_i['MAG_AUTO'] < maglim[1])
         if mclip.sum() == 0:
             continue
             
         tab[i]['cat'] = t_i[mclip]
         
-        sci_file = glob.glob(file.replace('.cat','_dr?_sci.fits'))[0]        
+        sci_file = glob.glob(file.replace('.cat','_dr?_sci'))[0]        
         im = pyfits.open(sci_file)
         tab[i]['wcs'] = pywcs.WCS(im[0].header)
         
