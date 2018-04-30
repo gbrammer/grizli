@@ -1,4 +1,3 @@
-name: grizli-dev
 channels:
 - astropy
 - http://ssb.stsci.edu/astroconda
