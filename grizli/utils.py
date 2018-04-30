@@ -2923,14 +2923,17 @@ class GTable(astropy.table.Table):
         
         if rd_pairs is None:
             rd_pairs = OrderedDict()
-            rd_pairs['ra'] = 'dec'
+            rd_pairs['RA'] = 'DEC'
             rd_pairs['ALPHA_J2000'] = 'DELTA_J2000'
             rd_pairs['X_WORLD'] = 'Y_WORLD'
             rd_pairs['ALPHA_SKY'] = 'DELTA_SKY'
-               
+            
+            for k in list(rd_pairs.keys()):
+                rd_pairs[k.lower()] = rd_pairs[k].lower()
+                
         rd_pair = None 
         for c in rd_pairs:
-            if c.upper() in [col.upper() for col in self.colnames]:
+            if c in self.colnames:
                 rd_pair = [c, rd_pairs[c]]
                 break
         
