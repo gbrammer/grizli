@@ -682,7 +682,7 @@ class GroupFLT():
         return out_beams
     
     def refine_list(self, ids=[], mags=[], poly_order=3, mag_limits=[16,24], 
-                    max_coeff=5, ds9=None, verbose=True, 
+                    max_coeff=5, ds9=None, verbose=True, fcontam=0.5,
                     wave=np.linspace(0.2, 2.5e4, 100)):
         """Refine contamination model for list of objects.  Loops over `refine`.
         
@@ -712,6 +712,9 @@ class GroupFLT():
         verbose : bool
             Print fit coefficients.
         
+        fcontam : float
+            Contamination weighting parameter.
+                
         wave : `~numpy.array`
             Wavelength array for the polynomial fit.  
         
@@ -736,9 +739,10 @@ class GroupFLT():
         for id, mag in zip(ids, mags):
             self.refine(id, mag=mag, poly_order=poly_order,
                         max_coeff=max_coeff, size=30, ds9=ds9,
-                        verbose=verbose, templates=poly_templates)
+                        verbose=verbose, fcontam=fcontam, 
+                        templates=poly_templates)
     
-    def refine(self, id, mag=-99, poly_order=3, size=30, ds9=None, verbose=True, max_coeff=2.5, templates=None):
+    def refine(self, id, mag=-99, poly_order=3, size=30, ds9=None, verbose=True, max_coeff=2.5, fcontam=0.5, templates=None):
         """Fit polynomial to extracted spectrum of single object to use for contamination model.
         
         Parameters
@@ -767,7 +771,10 @@ class GroupFLT():
             at the pivot wavelength of the direct image filters.  If this
             flux is greater than `max_coeff` times the *observed* flux in the
             direct image, then the polynomal fit is considered bad.
-        
+
+        fcontam : float
+            Contamination weighting parameter.
+            
         templates : dict, optional
             Precomputed template dictionary.  If `None` then compute 
             polynomial templates with order `poly_order`.
@@ -781,7 +788,7 @@ class GroupFLT():
         if len(beams) == 0:
             return True
         
-        mb = MultiBeam(beams)
+        mb = MultiBeam(beams, fcontam=fcontam)
         
         if templates is None:
             wave = np.linspace(0.9*mb.wavef.min(),1.1*mb.wavef.max(),100)
