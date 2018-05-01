@@ -1859,7 +1859,7 @@ class GroupFitter(object):
             
             labels = np.arange(np.ceil(wmin/minor), np.ceil(wmax/minor))*minor
             ax.set_xticks(labels)
-            ax.set_xticklabels(labels)    
+            ax.set_xticklabels(['{0:.1f}'.format(l) for l in labels])    
         
         ### Binned spectrum by grism
         if tfit is None:
