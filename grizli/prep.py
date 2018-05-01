@@ -879,9 +879,8 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
 
     if source_xy is None:
         ### Run the detection
-        objects, seg = sep.extract(data - bkg_data, 
-                           thresh=threshold, err=err, mask=mask, 
-                           minarea=minarea,
+        objects, seg = sep.extract(data - bkg_data, threshold, err=err,
+                           mask=mask, minarea=minarea,
                            filter_kernel=filter_kernel,
                            filter_type=filter_type, deblend_nthresh=32, 
                            deblend_cont=0.005, clean=clean, clean_param=1.,
@@ -889,6 +888,10 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
 
         tab = utils.GTable(objects)
 
+        # make one indexed like SExtractor
+        tab['x'] += 1
+        tab['y'] += 1 
+        
         # ID
         tab['number'] = np.arange(len(tab), dtype=np.int32)+1
 
@@ -900,7 +903,7 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
             tab = tab[np.isfinite(tab[c])]
 
         # WCS coordinates
-        tab['ra'], tab['dec'] = wcs.all_pix2world(tab['x'], tab['y'], 0)
+        tab['ra'], tab['dec'] = wcs.all_pix2world(tab['x'], tab['y'], 1)
         tab['ra'].unit = u.deg
         tab['dec'].unit = u.deg
         tab['x_world'], tab['y_world'] = tab['ra'], tab['dec']
@@ -912,13 +915,15 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
 
         ## FLUX_AUTO
         # https://sep.readthedocs.io/en/v1.0.x/apertures.html#equivalent-of-flux-auto-e-g-mag-auto-in-source-extractor
-        kronrad, krflag = sep.kron_radius(data - bkg_data, tab['x'], tab['y'],
+        kronrad, krflag = sep.kron_radius(data - bkg_data, 
+                                       tab['x']-1, tab['y']-1,
                                        tab['a'], tab['b'], tab['theta'], 6.0)
 
         #kronrad *= 2.5
         kronrad[~np.isfinite(kronrad)] = 1.75*2
         
-        kron_out = sep.sum_ellipse(data - bkg_data, tab['x'], tab['y'], 
+        kron_out = sep.sum_ellipse(data - bkg_data, 
+                                tab['x']-1, tab['y']-1, 
                                 tab['a'], tab['b'], tab['theta'], 
                                 2.5*kronrad, subpix=5)
 
@@ -928,8 +933,8 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
         r_min = 1.75*2
         use_circle = kronrad * np.sqrt(tab['a'] * tab['b']) < r_min
         cflux, cfluxerr, cflag = sep.sum_circle(data - bkg_data,
-                                             tab['x'][use_circle], 
-                                             tab['y'][use_circle],
+                                             tab['x'][use_circle]-1, 
+                                             tab['y'][use_circle]-1,
                                              r_min, subpix=5)
 
         kron_flux[use_circle] = cflux
@@ -940,7 +945,8 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
         tab['fluxerr_auto'] = kron_fluxerr/uJy_to_dn*u.uJy
 
         if get_background:
-            kron_out = sep.sum_ellipse(bkg_data, tab['x'], tab['y'], tab['a'], tab['b'],
+            kron_out = sep.sum_ellipse(bkg_data, tab['x']-1, tab['y']-1,
+                                    tab['a'], tab['b'],
                                     tab['theta'], 2.5*kronrad, subpix=1)
 
             kron_bkg, kron_bkg_fluxerr, kron_flag = kron_out
@@ -956,11 +962,13 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
 
         ## FLUX_RADIUS
         # https://sep.readthedocs.io/en/v1.0.x/apertures.html#equivalent-of-flux-radius-in-source-extractor
-        fr, fr_flag = sep.flux_radius(data - bkg_data, tab['x'], tab['y'],
+        fr, fr_flag = sep.flux_radius(data - bkg_data, 
+                                      tab['x']-1, tab['y']-1,
                                       tab['a']*6, 0.5, normflux=kron_flux)
         tab['flux_radius'] = fr*u.pixel
 
-        fr, fr_flag = sep.flux_radius(data - bkg_data, tab['x'], tab['y'],
+        fr, fr_flag = sep.flux_radius(data - bkg_data, 
+                                      tab['x']-1, tab['y']-1,
                                       tab['a']*6, 0.9, normflux=kron_flux)
         tab['flux_radius_90'] = fr*u.pixel
 
@@ -988,7 +996,7 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
         if hasattr(source_x, 'unit'):
             if source_x.unit == u.deg:
                 ra, dec = source_xy
-                source_x, source_y = wcs.all_world2pix(ra, dec, 0)
+                source_x, source_y = wcs.all_world2pix(ra, dec, 1)
                 
         tab = utils.GTable()
 
@@ -996,7 +1004,9 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
     tab.meta['ZP'] = (ZP, 'AB zeropoint')
     if 'PHOTPLAM' in im[0].header:
         tab.meta['PLAM'] = (im[0].header['PHOTPLAM'], 'AB zeropoint')
-        tab.meta['FNU'] = (im[0].header['PHOTFNU'], 'AB zeropoint')
+        if 'PHOTFNU' in im[0].header:
+            tab.meta['FNU'] = (im[0].header['PHOTFNU'], 'AB zeropoint')
+        
         tab.meta['FLAM'] = (im[0].header['PHOTFLAM'], 'AB zeropoint')
     
     tab.meta['uJy2dn'] = (uJy_to_dn, 'Convert uJy fluxes to image DN')
@@ -1011,7 +1021,7 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
     apertures = np.cast[float](phot_apertures.replace(',','').split())
     for iap, aper in enumerate(apertures):
         flux, fluxerr, flag = sep.sum_circle(data - bkg_data, 
-                                      source_x, source_y,
+                                      source_x-1, source_y-1,
                                       aper/2, err=err, 
                                       gain=2000., subpix=5)
 
@@ -1021,7 +1031,7 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
 
         if get_background:
             flux, fluxerr, flag = sep.sum_circle(bkg_data, 
-                                          source_x, source_y,
+                                          source_x-1, source_y-1,
                                           aper*2, err=err, gain=1.0)
 
             tab['bkg_aper_{0}'.format(iap)] = flux
@@ -1198,6 +1208,10 @@ def add_external_sources(root='', maglim=20, fwhm=0.2, catalog='2mass'):
         cat.rename_column('RA','ra')
         cat.rename_column('Dec','dec')
         table_to_regions(cat, '{0}_ukidss.reg'.format(root))
+    elif catalog == 'gaia':
+        cat = get_gaia_DR2_vizier(rd[0], rd[1], radius=radius)
+        cat['mag'] = np.minimum(cat['phot_g_mean_mag'], 19)-2
+        table_to_regions(cat, '{0}_gaia.reg'.format(root))
     else:
         print('Not a valid catalog: ', catalog)
         return False
@@ -1392,6 +1406,60 @@ def get_gaia_radec_at_time(gaia_tbl, date=2015.5, format='decimalyear'):
     coord_at_time = g.skycoord.apply_space_motion(obstime)
     return(coord_at_time)
     
+def get_gaia_DR2_vizier_columns():
+    """
+    Get translation of Vizier GAIA DR2 columns
+    """
+    from collections import OrderedDict
+    
+    file = os.path.join(os.path.dirname(__file__), 'data/gaia_dr2_vizier_columns.txt')
+    lines = open(file).readlines()[1:]
+    
+    gdict = OrderedDict()
+    for line in lines:
+        viz_col = line.split()[0]
+        gaia_col = line.split()[1][1:-1]
+        gdict[viz_col] = gaia_col
+    
+    return gdict
+    
+    
+def get_gaia_DR2_vizier(ra=165.86, dec=34.829694, radius=3., max=100000,
+                    catalog="I/345/gaia2"):
+    
+    from astroquery.vizier import Vizier
+    import astropy.units as u
+    import astropy.coordinates as coord
+    
+    coo = coord.SkyCoord(ra=ra, dec=dec, unit=(u.deg, u.deg),
+                         frame='icrs')
+        
+    gdict = get_gaia_DR2_vizier_columns()
+    
+    try:
+        keys = list(gdict.keys())
+        
+        # Hack, Vizier object doesn't seem to allow getting all keys
+        # simultaneously (astroquery v0.3.7)
+        N = 9
+        for i in range(len(keys)//N+1):
+            v = Vizier(catalog=catalog, columns=['+_r']+keys[i*N:(i+1)*N])
+            tab = v.query_region(coo, radius="{0}m".format(radius), catalog=catalog)[0]
+            if i == 0:
+                result = tab
+            else:
+                for k in tab.colnames:
+                    #print(i, k)
+                    result[k] = tab[k]
+                    
+        for k in gdict:
+            if k in result.colnames:
+                result.rename_column(k, gdict[k])
+    except:
+        return False
+        
+    return result
+          
 def gaia_dr2_conesearch_query(ra=165.86, dec=34.829694, radius=3., max=100000):
     """
     Generate a query string for the TAP servers
@@ -1623,7 +1691,7 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, ref
     
     """
     query_functions = {'SDSS':get_sdss_catalog, 
-                       'GAIA':get_gaia_DR2_catalog,
+                       'GAIA':get_gaia_DR2_vizier,
                        'PS1':get_panstarrs_catalog,
                        'WISE':get_irsa_catalog}
       
@@ -1634,17 +1702,20 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, ref
     
     for ref_src in reference_catalogs:
         try:
-            if ref_src == 'GAIA':
-                ref_cat = query_functions[ref_src](ra=ra, dec=dec,
-                                             radius=radius, use_mirror=False)
-                
-                # Try GAIA mirror at Heidelberg
-                if ref_cat is False:
-                    ref_cat = query_functions[ref_src](ra=ra, dec=dec,
-                                              radius=radius, use_mirror=True)
-            else:
-                ref_cat = query_functions[ref_src](ra=ra, dec=dec,
-                                                   radius=radius)
+            # if ref_src == 'GAIA':
+            #     ref_cat = query_functions[ref_src](ra=ra, dec=dec,
+            #                                  radius=radius, use_mirror=False)
+            #     
+            #     # Try GAIA mirror at Heidelberg
+            #     if ref_cat is False:
+            #         ref_cat = query_functions[ref_src](ra=ra, dec=dec,
+            #                                   radius=radius, use_mirror=True)
+            # else:
+            #     ref_cat = query_functions[ref_src](ra=ra, dec=dec,
+            #                                        radius=radius)
+            # #
+            ref_cat = query_functions[ref_src](ra=ra, dec=dec,
+                                               radius=radius)
                 
             if len(ref_cat) < 2:
                 raise ValueError
@@ -1666,13 +1737,13 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, ref
             has_catalog = False
         
     if (ref_src == 'GAIA') & ('date' in kwargs) & has_catalog:
-        
-        gaia_tbl = utils.GTable.gread('gaia.fits')
+                
         if 'date_format' in kwargs:
             date_format = kwargs['date_format']
         else:
             date_format = 'decimalyear'
         
+        gaia_tbl = ref_cat #utils.GTable.gread('gaia.fits')
         coo = get_gaia_radec_at_time(gaia_tbl, date=kwargs['date'],
                                      format=date_format)
         
@@ -1878,7 +1949,7 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                          build=False, final_wht_type='IVM', **drizzle_params)
         
         ## Now do tweak_align for ACS
-        if (isACS | isWFPC2) & run_tweak_align:
+        if (isACS) & run_tweak_align:
             tweak_align(direct_group=direct, grism_group=grism,
                     max_dist=tweak_max_dist, key=' ', drizzle=False,
                     threshold=tweak_threshold)
@@ -2242,7 +2313,11 @@ def tweak_flt(files=[], max_dist=0.4, threshold=3, verbose=True, use_sewpy=False
         root = file.split('.fits')[0]
         
         im = pyfits.open(file)
-        ok = im['DQ',1].data == 0
+        try:
+            ok = im['DQ',1].data == 0
+        except:
+            ok = np.isfinite(im['SCI',1].data)
+            
         sci = im['SCI',1].data*ok - np.median(im['SCI',1].data[ok])
         
         header = im['SCI',1].header.copy()
@@ -2834,7 +2909,7 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
         ma = np.ma.masked_array(resid, mask=(~m))
         med = np.ma.median(ma, axis=0)
     
-        bg_sky = 1
+        bg_sky = 0
         yrms = np.ma.std(ma, axis=0)/np.sqrt(np.sum(m, axis=0))
         xmsk = np.arange(im_shape[0])
         yres = med
@@ -2861,7 +2936,7 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
             y_pred, MSE = gp.predict(np.atleast_2d(xmsk).T, eval_MSE=True)
             gp_sigma = np.sqrt(MSE)
         
-        ## Updated sklearn
+        ## Updated sklearn GaussianProcessRegressor
         nmad_y = utils.nmad(yres)
         
         gpscl = 100 # rough normalization
@@ -2871,17 +2946,22 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
         
         yok &= np.abs(yres-np.median(yres)) < 50*nmad_y
 
-        gp = GaussianProcessRegressor(kernel=gp_kernel, alpha=1e-10, optimizer='fmin_l_bfgs_b', n_restarts_optimizer=0, normalize_y=False, copy_X_train=True, random_state=None)
+        gp = GaussianProcessRegressor(kernel=gp_kernel, alpha=nmad_y*gpscl/5,
+                                      optimizer='fmin_l_bfgs_b',
+                                      n_restarts_optimizer=0, 
+                                      normalize_y=False, 
+                                      copy_X_train=True, random_state=None)
 
         gp.fit(np.atleast_2d(xmsk[yok][::1]).T, (yres[yok][::1]+bg_sky)*gpscl)
+        
         y_pred, gp_sigma = gp.predict(np.atleast_2d(xmsk).T, return_std=True)
         gp_sigma /= gpscl
         y_pred /= gpscl
         
         ## Plot Results
         pi = ax.plot(med[0:2], alpha=0.2)
-        ax.plot(y_pred-1, color=pi[0].get_color())
-        ax.fill_between(xmsk, y_pred-1-gp_sigma, y_pred-1+gp_sigma,
+        ax.plot(y_pred-bg_sky, color=pi[0].get_color())
+        ax.fill_between(xmsk, y_pred-bg_sky-gp_sigma, y_pred-bg_sky+gp_sigma,
                         color=pi[0].get_color(), alpha=0.3,
                         label=grism['files'][j].split('_fl')[0])
         
@@ -2893,7 +2973,7 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
         
         if apply:
             ### Subtract the column average in 2D & log header keywords
-            gp_res = np.dot(y_pred[:,None]-1, np.ones((1014,1)).T).T
+            gp_res = np.dot(y_pred[:,None]-bg_sky, np.ones((1014,1)).T).T
             flt = pyfits.open(file, mode='update')
             flt['SCI',1].data -= gp_res 
             flt[0].header['GSKYCOL'] = (True, 'Subtract column average')
@@ -2922,7 +3002,8 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
     return False
     
 def fix_star_centers(root='macs1149.6+2223-rot-ca5-22-032.0-f105w',
-                     mag_lim=22, verbose=True, drizzle=False):
+                     mag_lim=22, verbose=True, drizzle=False,
+                     cutout_size=16):
     """Unset CR bit (4096) in the centers of bright objects
     
     TBD
@@ -2940,6 +3021,9 @@ def fix_star_centers(root='macs1149.6+2223-rot-ca5-22-032.0-f105w',
     
     drizzle : bool
         Redrizzle the output image
+    
+    cutout_size : int
+        Size of the cutout to extract around the bright stars
         
     Returns
     -------
@@ -2992,8 +3076,8 @@ def fix_star_centers(root='macs1149.6+2223-rot-ca5-22-032.0-f105w',
                 xpi = int(np.round(xi[0]))
                 ypi = int(np.round(yi[0]))
             
-                slx = slice(xpi-12, xpi+12)
-                sly = slice(ypi-12, ypi+12)
+                slx = slice(xpi-cutout_size, xpi+cutout_size)
+                sly = slice(ypi-cutout_size, ypi+cutout_size)
                 
                 sci = images[i]['SCI'].data[sly, slx]
                 dq = images[i]['DQ'].data[sly, slx]
@@ -3003,7 +3087,17 @@ def fix_star_centers(root='macs1149.6+2223-rot-ca5-22-032.0-f105w',
                 
                 # Fit the EPSF model
                 try:
-                    psf, psf_params = EPSF.fit_ePSF(sci, ivar=ivar, center=None, tol=1.e-3, N=12, origin=(ypi-12, xpi-12), filter=images[0][0].header['FILTER'])
+                    psf_filter = images[0][0].header['FILTER']
+                    psf_params = EPSF.fit_ePSF(sci, ivar=ivar, center=None,
+                                               tol=1.e-3, N=12, 
+                                    origin=(ypi-cutout_size, xpi-cutout_size), 
+                                    filter=psf_filter, get_extended=True)
+                    
+                    psf = EPSF.get_ePSF(psf_params, 
+                                    origin=(ypi-cutout_size, xpi-cutout_size), 
+                                    shape=sci.shape, filter=psf_filter, 
+                                    get_extended=True)
+                                                
                 except:
                     continue
                     
