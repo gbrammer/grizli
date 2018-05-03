@@ -258,6 +258,11 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
         # ## testing
         # orig_file[0].header['FLATFILE'] = 'm341820ju_pfl.fits'
         
+        # Make sure has correct header keys
+        for ext in range(4):
+            if 'BUNIT' not in orig_file[ext+1].header:
+                orig_file[ext+1].header['BUNIT'] = 'COUNTS'
+            
         # Copy WFPC2 DQ file (c1m)
         dqfile = os.path.join(path, file.replace('_c0m', '_c1m'))
         print('Copy WFPC2 DQ file: {0}'.format(dqfile))
@@ -792,8 +797,9 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
                       phot_apertures=SEXTRACTOR_PHOT_APERTURES,
                       filter_kernel=GAUSS_3_7x7, filter_type='conv',
                       clean=True, rescale_weight=True, minarea=14,
-                      uppercase_columns=True, save_to_fits=True,
-                      source_xy=None,
+                      column_case=str.upper, save_to_fits=True,
+                      source_xy=None, autoparams=[2.5, 3.5], mask_kron=False,
+                      max_total_corr=2,
                       **kwargs):
     """Make a catalog from drizzle products using the SEP implementation of SExtractor
 
@@ -842,6 +848,8 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
 
     drz_im = pyfits.open(drz_file)
     data = drz_im[0].data.byteswap().newbyteorder()
+    data_mask = np.cast[data.dtype](data == 0)
+    
     wcs = pywcs.WCS(drz_im[0].header)
 
     if weight_file is not None:
@@ -885,7 +893,7 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
                            filter_type=filter_type, deblend_nthresh=32, 
                            deblend_cont=0.005, clean=clean, clean_param=1.,
                            segmentation_map=True)
-
+                
         tab = utils.GTable(objects)
 
         # make one indexed like SExtractor
@@ -918,28 +926,78 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
         kronrad, krflag = sep.kron_radius(data - bkg_data, 
                                        tab['x']-1, tab['y']-1,
                                        tab['a'], tab['b'], tab['theta'], 6.0)
-
+                
         #kronrad *= 2.5
-        kronrad[~np.isfinite(kronrad)] = 1.75*2
+        kronrad *= autoparams[0]
+        
+        kronrad[~np.isfinite(kronrad)] = autoparams[1]
+        kronrad = np.maximum(kronrad, autoparams[1])
         
         kron_out = sep.sum_ellipse(data - bkg_data, 
                                 tab['x']-1, tab['y']-1, 
                                 tab['a'], tab['b'], tab['theta'], 
-                                2.5*kronrad, subpix=5)
+                                kronrad, subpix=5, err=err)
 
         kron_flux, kron_fluxerr, kron_flag = kron_out
-
+        kron_flux_flag = kron_flag
+        
+        ## By object
+        # kronrad = tab['x']*1.
+        # krflag = kronrad*1.
+        if mask_kron:
+            if mask_kron*1 == 1:
+                # Only flagged objects
+                keep = (tab['flag'] & 1) > 0
+            else:
+                keep = tab['flag'] > -1
+                
+            print('Manual mask for Kron radius/flux')
+            for i in range(len(tab)):
+                #print(keep[i], tab['flag'][i], mask_kron*1)
+                if not keep[i]:
+                    continue
+                
+                id = tab['number'][i]
+                #print('Kron ',id)
+                mask = (seg > 0) & (seg != id)
+                kr, krflag[i] = sep.kron_radius(data - bkg_data, 
+                                           tab['x'][i]-1, tab['y'][i]-1,
+                                           tab['a'][i], tab['b'][i], 
+                                           tab['theta'][i], 6.0, mask=mask)
+            
+                kronrad[i] = np.maximum(kr*autoparams[0], autoparams[1])
+            
+                out = sep.sum_ellipse(data - bkg_data, 
+                                        tab['x'][i]-1, tab['y'][i]-1, 
+                                        tab['a'][i], tab['b'][i],
+                                        tab['theta'][i], 
+                                        kronrad[i], subpix=5, mask=mask, 
+                                        err=err)
+            
+                kron_flux[i], kron_fluxerr[i], kron_flux_flag[i] = out
+                                  
         # Minimum radius = 3.5, PHOT_AUTOPARAMS 2.5, 3.5
-        r_min = 1.75*2
-        use_circle = kronrad * np.sqrt(tab['a'] * tab['b']) < r_min
-        cflux, cfluxerr, cflag = sep.sum_circle(data - bkg_data,
-                                             tab['x'][use_circle]-1, 
-                                             tab['y'][use_circle]-1,
-                                             r_min, subpix=5)
+        # r_min = autoparams[1] #3.5
+        # #use_circle = kronrad * np.sqrt(tab['a'] * tab['b']) < r_min
+        # use_circle = kronrad < r_min
+        # kron_out = sep.sum_ellipse(data - bkg_data, 
+        #                         tab['x'][use_circle]-1, 
+        #                         tab['y'][use_circle]-1, 
+        #                         tab['a'][use_circle], tab['b'][use_circle],
+        #                         tab['theta'][use_circle], 
+        #                         r_min, subpix=5)
+        # 
+        # cflux, cfluxerr, cflag = kron_out
+        # kron_flux_flag[use_circle] = cflag
+        
+        # cflux, cfluxerr, cflag = sep.sum_circle(data - bkg_data,
+        #                                      tab['x'][use_circle]-1, 
+        #                                      tab['y'][use_circle]-1,
+        #                                      autoparams[0]*r_min, subpix=5)
 
-        kron_flux[use_circle] = cflux
-        kron_fluxerr[use_circle] = cfluxerr
-        kronrad[use_circle] = r_min
+        # kron_flux[use_circle] = cflux
+        # kron_fluxerr[use_circle] = cfluxerr
+        # kronrad[use_circle] = r_min
 
         tab['flux_auto'] = kron_flux/uJy_to_dn*u.uJy
         tab['fluxerr_auto'] = kron_fluxerr/uJy_to_dn*u.uJy
@@ -947,24 +1005,30 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
         if get_background:
             kron_out = sep.sum_ellipse(bkg_data, tab['x']-1, tab['y']-1,
                                     tab['a'], tab['b'],
-                                    tab['theta'], 2.5*kronrad, subpix=1)
+                                    tab['theta'], 
+                                    kronrad, subpix=1)
 
             kron_bkg, kron_bkg_fluxerr, kron_flag = kron_out
             tab['flux_bkg_auto'] = kron_bkg/uJy_to_dn*u.uJy
         else:
             tab['flux_bkg_auto'] = 0.
 
-        tab['mag_auto'] = ZP - 2.5*np.log10(kron_flux)
-        tab['magerr_auto'] = 2.5/np.log(10)*kron_fluxerr/kron_flux
+        tab['mag_auto_raw'] = ZP - 2.5*np.log10(kron_flux)
+        tab['magerr_auto_raw'] = 2.5/np.log(10)*kron_fluxerr/kron_flux
 
+        tab['mag_auto'] = tab['mag_auto_raw']*1.
+        tab['magerr_auto'] = tab['magerr_auto_raw']*1.
+                
         tab['kron_radius'] = kronrad*u.pixel
         tab['kron_flag'] = krflag
+        tab['kron_flux_flag'] = kron_flux_flag
 
         ## FLUX_RADIUS
         # https://sep.readthedocs.io/en/v1.0.x/apertures.html#equivalent-of-flux-radius-in-source-extractor
         fr, fr_flag = sep.flux_radius(data - bkg_data, 
                                       tab['x']-1, tab['y']-1,
                                       tab['a']*6, 0.5, normflux=kron_flux)
+        
         tab['flux_radius'] = fr*u.pixel
 
         fr, fr_flag = sep.flux_radius(data - bkg_data, 
@@ -1034,15 +1098,41 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
                                           source_x-1, source_y-1,
                                           aper*2, err=err, gain=1.0)
 
-            tab['bkg_aper_{0}'.format(iap)] = flux
+            tab['bkg_aper_{0}'.format(iap)] = flux/uJy_to_dn*u.uJy
         else:
             tab['bkg_aper_{0}'.format(iap)] = 0.
-
-        tab.meta['aper_{0}'.format(iap)] = (aper, 'Aperture diameter, pix')
         
-    if uppercase_columns:
-        for c in tab.colnames:
-            tab.rename_column(c, c.upper())
+        # Aperture contains empty pixels
+        flux, fluxerr, flag = sep.sum_circle(data_mask, 
+                                      source_x-1, source_y-1,
+                                      aper/2, err=err, 
+                                      gain=2000., subpix=5)
+        
+        tab['mask_aper_{0}'.format(iap)] = flux
+        
+        tab.meta['aper_{0}'.format(iap)] = (aper, 'Aperture diameter, pix')
+    
+    # If blended, use largest aperture magnitude
+    if 'flag' in tab.colnames:    
+        last_flux = tab['flux_aper_{0}'.format(iap)]
+        last_fluxerr = tab['fluxerr_aper_{0}'.format(iap)]
+                
+        blended = (tab['flag'] & 1) > 0
+        
+        total_corr = tab['flux_auto']/last_flux
+        blended |= total_corr > max_total_corr
+        
+        tab['flag'][blended] |= 1024
+        
+        aper_mag = 23.9 - 2.5*np.log10(last_flux)
+        aper_magerr = 2.5/np.log(10)*last_fluxerr/last_flux
+        
+        tab['mag_auto'][blended] = aper_mag[blended]
+        tab['magerr_auto'][blended] = aper_magerr[blended]
+        
+    #if uppercase_columns:
+    for c in tab.colnames:
+        tab.rename_column(c, column_case(c))
             
     if save_to_fits:
         tab.write('{0}.cat.fits'.format(root), format='fits', overwrite=True)
@@ -1055,7 +1145,8 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
 def make_drz_catalog(root='', sexpath='sex',threshold=2., get_background=True, 
                      verbose=True, extra_config={}, sci=None, wht=None, 
                      get_sew=False, output_params=SEXTRACTOR_DEFAULT_PARAMS,
-                     phot_apertures=SEXTRACTOR_PHOT_APERTURES):
+                     phot_apertures=SEXTRACTOR_PHOT_APERTURES,
+                     column_case=str.upper):
     """Make a SExtractor catalog from drizzle products
     
     TBD
@@ -1147,6 +1238,10 @@ def make_drz_catalog(root='', sexpath='sex',threshold=2., get_background=True,
     output = sew(drz_file)
     cat = output['table']
     cat.meta = config
+    
+    for c in cat.colnames:
+        cat.rename_column(c, column_case(c))
+    
     cat.write('{0}.cat'.format(root), format='ascii.commented_header',
               overwrite=True)
             
@@ -1425,7 +1520,7 @@ def get_gaia_DR2_vizier_columns():
     
     
 def get_gaia_DR2_vizier(ra=165.86, dec=34.829694, radius=3., max=100000,
-                    catalog="I/345/gaia2"):
+                    catalog="I/345/gaia2", server='vizier.cfa.harvard.edu'):
     
     from astroquery.vizier import Vizier
     import astropy.units as u
@@ -1444,6 +1539,7 @@ def get_gaia_DR2_vizier(ra=165.86, dec=34.829694, radius=3., max=100000,
         N = 9
         for i in range(len(keys)//N+1):
             v = Vizier(catalog=catalog, columns=['+_r']+keys[i*N:(i+1)*N])
+            v.VIZIER_SERVER = server
             tab = v.query_region(coo, radius="{0}m".format(radius), catalog=catalog)[0]
             if i == 0:
                 result = tab
@@ -1691,9 +1787,10 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, ref
     
     """
     query_functions = {'SDSS':get_sdss_catalog, 
-                       'GAIA':get_gaia_DR2_vizier,
+                       'GAIA':get_gaia_DR2_catalog,
                        'PS1':get_panstarrs_catalog,
-                       'WISE':get_irsa_catalog}
+                       'WISE':get_irsa_catalog,
+                       'GAIA_Vizier':get_gaia_DR2_vizier}
       
     ### Try queries
     has_catalog = False
@@ -1702,20 +1799,20 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, ref
     
     for ref_src in reference_catalogs:
         try:
-            # if ref_src == 'GAIA':
-            #     ref_cat = query_functions[ref_src](ra=ra, dec=dec,
-            #                                  radius=radius, use_mirror=False)
-            #     
-            #     # Try GAIA mirror at Heidelberg
-            #     if ref_cat is False:
-            #         ref_cat = query_functions[ref_src](ra=ra, dec=dec,
-            #                                   radius=radius, use_mirror=True)
-            # else:
-            #     ref_cat = query_functions[ref_src](ra=ra, dec=dec,
-            #                                        radius=radius)
+            if ref_src == 'GAIA':
+                ref_cat = query_functions[ref_src](ra=ra, dec=dec,
+                                             radius=radius, use_mirror=False)
+                
+                # Try GAIA mirror at Heidelberg
+                if ref_cat is False:
+                    ref_cat = query_functions[ref_src](ra=ra, dec=dec,
+                                              radius=radius, use_mirror=True)
+            else:
+                ref_cat = query_functions[ref_src](ra=ra, dec=dec,
+                                                   radius=radius)
             # #
-            ref_cat = query_functions[ref_src](ra=ra, dec=dec,
-                                               radius=radius)
+            # ref_cat = query_functions[ref_src](ra=ra, dec=dec,
+            #                                    radius=radius)
                 
             if len(ref_cat) < 2:
                 raise ValueError
@@ -3360,7 +3457,7 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, m
         
         clean_drizzle(group['product'])
 
-def manual_alignment(visit, ds9, reference=None, reference_catalogs=['SDSS', 'PS1', 'GAIA', 'WISE']):
+def manual_alignment(visit, ds9, reference=None, reference_catalogs=['SDSS', 'PS1', 'GAIA', 'WISE'], use_drz=False):
     """Manual alignment of a visit with respect to an external region file
     
     Parameters
@@ -3402,8 +3499,15 @@ def manual_alignment(visit, ds9, reference=None, reference_catalogs=['SDSS', 'PS
     """
     import os
     
-    im = pyfits.open(os.path.join(os.getcwd(), '../RAW/', visit['files'][0]))
-    ra, dec = im[1].header['CRVAL1'], im[1].header['CRVAL2']
+    ref_image = os.path.join(os.getcwd(), '../RAW/', visit['files'][0])
+    files = glob.glob('{0}_dr?_sci.fits'.format(visit['product']))
+    ext=1
+    if use_drz & (len(files) > 0):
+        ref_image = files[0]
+        ext=0
+        
+    im = pyfits.open(ref_image)
+    ra, dec = im[ext].header['CRVAL1'], im[ext].header['CRVAL2']
     
     if reference is None:
         reg_files = glob.glob('{0}_*reg'.format(visit['product']))
@@ -3421,7 +3525,11 @@ def manual_alignment(visit, ds9, reference=None, reference_catalogs=['SDSS', 'PS
 
     #im = pyfits.open('{0}_drz_sci.fits'.format(visit['product']))
     #ds9.view(im[1].data, header=im[1].header)
-    ds9.set('file {0}'.format(im.filename()))
+    if 'c0m' in im.filename():
+        ds9.set('file {0}[3]'.format(im.filename()))
+    else:
+        ds9.set('file {0}'.format(im.filename()))
+
     ds9.set('regions file '+reference)
     x = input('pan to object in image: ')
     if x:
@@ -3434,5 +3542,12 @@ def manual_alignment(visit, ds9, reference=None, reference_catalogs=['SDSS', 'PS
     
     print ('Saved {0}.align_guess'.format(visit['product']))
     
-    np.savetxt('{0}.align_guess'.format(visit['product']), [[x0[0]-x1[0], x0[1]-x1[1], 0, 1].__repr__()[1:-1].replace(',', '')], fmt='%s')
+    dx = x0[0]-x1[0]
+    dy = x0[1]-x1[1]
+    
+    if 'c0m' in im.filename():
+        dx *= -1
+        dy *+ -1
+        
+    np.savetxt('{0}.align_guess'.format(visit['product']), [[dx, dy, 0, 1].__repr__()[1:-1].replace(',', '')], fmt='%s')
         
