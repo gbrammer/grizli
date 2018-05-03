@@ -109,7 +109,7 @@ def get_flt_info(files=[], columns=['FILE', 'FILTER', 'INSTRUME', 'DETECTOR', 'T
     N = len(files)
     
     data = []
-
+        
     for i in range(N):
         line = [os.path.basename(files[i]).split('.gz')[0]]
         if files[i].endswith('.gz'):
@@ -121,11 +121,13 @@ def get_flt_info(files=[], columns=['FILE', 'FILTER', 'INSTRUME', 'DETECTOR', 'T
         filt = get_hst_filter(h)
         line.append(filt)
         has_columns = ['FILE', 'FILTER']
+        
         for key in columns[2:]:
+            has_columns.append(key)
             if key in h:
                 line.append(h[key])
-                has_columns.append(key)
             else:
+                line.append(np.nan)
                 continue
                 
         data.append(line)
@@ -413,7 +415,12 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
                     
                 flt_j = pyfits.open(flt_file)
                 h = flt_j[0].header
-                if (h['INSTRUME'] == 'WFC3') & (h['DETECTOR'] == 'IR'):
+                if (h['INSTRUME'] == 'WFC3'):
+                    if (h['DETECTOR'] == 'IR'):
+                        wcs_j = pywcs.WCS(flt_j['SCI',1])
+                    else:
+                        wcs_j = pywcs.WCS(flt_j['SCI',1], fobj=flt_j)
+                elif (h['INSTRUME'] == 'WFPC2'):
                     wcs_j = pywcs.WCS(flt_j['SCI',1])
                 else:
                     wcs_j = pywcs.WCS(flt_j['SCI',1], fobj=flt_j)
