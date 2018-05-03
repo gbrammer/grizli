@@ -39,7 +39,7 @@ def demo():
     
     root = 'j033217-274236'
     from grizli.pipeline import auto_script
-    auto_script.go(root=root, maglim=[19,20], HOME_PATH=HOME_PATH, reprocess_parallel=True, s3_sync=False, run_fit=False)
+    auto_script.go(root=root, maglim=[19,20], HOME_PATH=HOME_PATH, reprocess_parallel=True, s3_sync=False, run_fit=False, only_preprocess=False)
     
     # Interactive session
     from grizli.pipeline import auto_script
@@ -222,7 +222,7 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
         auto_script.fill_filter_mosaics(root)
         
         # optical images
-        optical_filters = ['F814W', 'F606W', 'F435W', 'F850LP']
+        optical_filters = ['F814W', 'F606W', 'F435W', 'F850LP', 'F702W', 'F555W', 'F438W', 'F475W', 'F625W', 'F775W', 'F225W', 'F275W', 'F300W', 'F390W']
         auto_script.drizzle_overlaps(root, filters=optical_filters,
             make_combined=False, ref_image='{0}-ir_drz_sci.fits'.format(root)) 
         
@@ -318,6 +318,8 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/
     os.system('sh fetch_{0}.sh'.format(field_root))
     files = glob.glob('*raw.fits.gz')
     files.extend(glob.glob('*fl?.fits.gz'))
+    files.extend(glob.glob('*c[01]?.fits.gz')) # WFPC2
+    
     for file in files:
         print('gunzip '+file)
         os.system('gunzip {0}'.format(file))
@@ -428,6 +430,7 @@ def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=
         from grizli import prep, utils
             
     files=glob.glob('../RAW/*fl[tc].fits')
+    files.extend(glob.glob('../RAW/*c0m.fits'))
     info = utils.get_flt_info(files)
     #info = info[(info['FILTER'] != 'G141') & (info['FILTER'] != 'G102')]
     
@@ -486,6 +489,7 @@ def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=
     np.save('{0}_visits.npy'.format(field_root), [visits, all_groups, info])
     
     return visits, all_groups, info
+    
 def manual_alignment(field_root='j151850-813028', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', skip=True, radius=5., catalogs=['PS1','SDSS','GAIA','WISE'], visit_list=None, radec=None):
     
     #import pyds9
@@ -572,6 +576,13 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
     master_footprint = None
     radec = None
     
+    # Master table
+    visit_table = os.path.join(os.path.dirname(grizli.__file__), 'data/visit_alignment.txt')
+    if os.path.exists(visit_table):
+        visit_table = utils.GTable.gread(visit_table)
+    else:
+        visit_table = None
+        
     for i in range(len(all_groups)):
         direct = all_groups[i]['direct']
         grism = all_groups[i]['grism']
@@ -581,6 +592,19 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
         if len(glob.glob(grism['product']+'_dr?_sci.fits')) > 0:
             continue
         
+        # Make guess file
+        # if visit_table is not None:
+        #     ix = ((visit_table['visit'] == direct['product']) & 
+        #           (visit_table['field'] == field_root))
+        #     
+        #     if ix.sum() > 0:
+        #         guess = visit_table['xshift', 'yshift', 'rot', 'scale'][ix]
+        #         guess['rot'] = 0.
+        #         guess['scale'] = 1.
+        #         print('\nWCS: '+direct['product']+'\n', guess)
+        #         guess.write('{0}.align_guess'.format(direct['product']), 
+        #                     format='ascii.commented_header')
+                            
         if master_radec is not None:
             radec = master_radec
             best_overlap = 0.
@@ -792,13 +816,12 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, get_background
         from grizli import prep, utils
             
     # Make catalog
-    tab = prep.make_SEP_catalog(root='{0}-ir'.format(field_root), threshold=threshold, get_background=get_background, save_to_fits=True)
+    tab = prep.make_SEP_catalog(root='{0}-ir'.format(field_root), threshold=threshold, get_background=get_background, save_to_fits=True, clean=False)
         
     # Source positions
     source_xy = tab['X_IMAGE'], tab['Y_IMAGE']
-    
-    files=glob.glob('../RAW/*fl[tc].fits')
-    info = utils.get_flt_info(files)
+
+    visits, all_groups, info = np.load('{0}_visits.npy'.format(field_root))
     
     if ONLY_F814W:
         info = info[((info['INSTRUME'] == 'WFC3') & (info['DETECTOR'] == 'IR')) | (info['FILTER'] == 'F814W')]
@@ -1158,7 +1181,7 @@ def grism_prep(field_root='j142724+334246', ds9=None, refine_niter=3):
         if ds9:
             ds9.set('frame {0}'.format(int(fr)+iter+1))
         
-        grp.refine_list(poly_order=3, mag_limits=[19, 24], max_coeff=5, ds9=ds9, verbose=True)
+        grp.refine_list(poly_order=3, mag_limits=[18, 24], max_coeff=5, ds9=ds9, verbose=True, fcontam=10)
 
     ##############
     # Save model to avoid having to recompute it again
@@ -1530,8 +1553,9 @@ def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Griz
             files.append(file)
 
     if radec is None:
-        radec, ref_catalog = get_radec_catalog(ra=np.mean(info['RA_TARG']),
-                    dec=np.median(info['DEC_TARG']), 
+        ra_i, dec_i = np.median(info['RA_TARG']), np.median(info['DEC_TARG'])
+        print('xxx', ra_i, dec_i)
+        radec, ref_catalog = get_radec_catalog(ra=ra_i, dec=dec_i, 
                     product=field_root,
                     reference_catalogs=catalogs, radius=radius)
                                  
@@ -1562,7 +1586,7 @@ def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Griz
         tab[i]['match_idx'] = {}
         idx, dr = tab[i]['cat'].match_to_catalog_sky(ref_tab)
         clip = dr < 0.6*u.arcsec
-        if clip.sum() > 2:
+        if clip.sum() > 1:
             tab[i]['match_idx'][-1] = [idx[clip], ridx[clip]]
         
         # ix, jx = tab[i]['match_idx'][-1]
