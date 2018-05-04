@@ -62,7 +62,7 @@ def run_all_parallel(id, **kwargs):
     
     return id, status, t1-t0
     
-def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter='nnls', group_name='grism', fit_stacks=True, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=3, fit_only_beams=False, fit_beams=True, root='', fit_trace_shift=False, phot=None, verbose=True, scale_photometry=False, show_beams=True, overlap_threshold=5, MW_EBV=0., sys_err=0.03, get_dict=False, **kwargs):
+def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter='nnls', group_name='grism', fit_stacks=True, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=3, fit_only_beams=False, fit_beams=True, root='', fit_trace_shift=False, phot=None, verbose=True, scale_photometry=False, show_beams=True, overlap_threshold=5, MW_EBV=0., sys_err=0.03, get_dict=False, bad_pa_threshold=1.5, **kwargs):
     """Run the full procedure
     
     1) Load MultiBeam and stack files 
@@ -98,7 +98,17 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     if len(mb_files) > 1:
         for file in mb_files[1:]:
             mb.extend(MultiBeam(file, fcontam=fcontam, group_name=group_name, MW_EBV=MW_EBV))
+    
+    keep_dict, has_bad = mb.check_for_bad_PAs(chi2_threshold=bad_pa_threshold,
+                                               poly_order=1, reinit=True, 
+                                              fit_background=True)
+    
+    if has_bad:
+        print('Has bad PA!  Final list:', keep_dict)        
+        hdu, fig = mb.drizzle_grisms_and_PAs(fcontam=0.5, flambda=False, kernel='point', size=32)
+        fig.savefig('{0}_{1:05d}.fix.stack.png'.format(group_name, id))
         
+
     if fit_trace_shift:
         b = mb.beams[0]
         sn_lim = fit_trace_shift*1
@@ -593,6 +603,89 @@ def _loss(dz, gamma=0.15):
     loss : float
     """
     return 1-1/(1+(dz/gamma)**2)
+
+def refit_beams(root='j012017+213343', append='x', id=708, keep_dict={'G141':[201, 291]}, poly_order=3, make_products=True, run_fit=True, **kwargs):
+    """
+    Regenerate a MultiBeam object selecting only certiain PAs
+    
+    Parameters
+    ----------
+    root : str
+        Root of the "beams.fits" file to load.
+        
+    append : str
+        String to append to the rootname of the updated products.
+        
+    id : int
+        Object ID.  The input filename is built like 
+        
+           >>> beams_file = '{0}_{1:05d}.beams.fits'.format(root, id)
+           
+    keep_dict : bool
+        Dictionary of the PAs/grisms to keep.  (See the
+        `~grizli.multifit.MultiBeam.PA` attribute.)
+    
+    poly_order : int
+        Order of the polynomial to fit.
+    
+    make_products : bool
+        Make stacked spectra and diagnostic figures.
+        
+    run_fit : bool
+        Run the redshift fit on the new products
+    
+    kwargs : dict
+        Optional keywords passed to `~grizli.fitting.run_all_parallel`.
+        
+    Returns
+    -------
+
+    mb : `~grizli.multifit.MultiBeam`
+        New beam object.
+
+    """
+    import numpy as np
+    
+    try:
+        from grizli import utils, fitting
+    except:
+        from . import utils, fitting
+    
+    mb = MultiBeam('{0}_{1:05d}.beams.fits'.format(root, id), group_name=root)
+    
+    keep_beams = []
+    for g in keep_dict:
+        if g not in mb.PA:
+            continue
+            
+        for pa in keep_dict[g]:
+            if float(pa) in mb.PA[g]:
+                keep_beams.extend([mb.beams[i] for i in mb.PA[g][float(pa)]])
+    
+    mb = MultiBeam(keep_beams, group_name=root+append)
+    mb.write_master_fits()
+    
+    if not make_products:
+        return mb
+            
+    wave = np.linspace(2000,2.5e4,100)
+    poly_templates = utils.polynomial_templates(wave, order=poly_order)
+    
+    pfit = mb.template_at_z(z=0, templates=poly_templates, fit_background=True, fitter='lstsq', get_uncertainties=2)
+    
+    try:
+        fig1 = mb.oned_figure(figsize=[5,3], tfit=pfit)
+        fig1.savefig('{0}_{1:05d}.1D.png'.format(root+append, id))
+    except:
+        pass
+    
+    hdu, fig = mb.drizzle_grisms_and_PAs(fcontam=0.5, flambda=False, kernel='point', size=32, zfit=pfit)
+    fig.savefig('{0}_{1:05d}.stack.png'.format(root+append, id))
+    
+    if run_fit:
+        fitting.run_all_parallel(id, group_name=root+append, root=root+'x', verbose=True, **kwargs)
+    
+    return mb
     
 class GroupFitter(object):
     """Combine stack.StackFitter and MultiBeam fitting into a single object
