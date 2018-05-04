@@ -1150,7 +1150,8 @@ class GroupFLT():
         
         # Done!
         return outsci, outwht
-
+            
+    
 class MultiBeam(GroupFitter):
     def __init__(self, beams, group_name='group', fcontam=0., psf=False, polyx=[0.3, 2.5], MW_EBV=0., sys_err=0.0, verbose=True):
         """Tools for dealing with multiple `~.model.BeamCutout` instances 
@@ -3386,7 +3387,65 @@ class MultiBeam(GroupFitter):
         else:
             hdul.writeto(outputfile, overwrite=True)
             return hdul
+    
+    def check_for_bad_PAs(self, poly_order=1, chi2_threshold=1.5, fit_background=True, reinit=True):
+        """
+        """
+
+        wave = np.linspace(2000,2.5e4,100)
+        poly_templates = utils.polynomial_templates(wave, order=poly_order)
+        
+        fit_log = OrderedDict()
+        keep_dict = {}
+        has_bad = False
+        
+        keep_beams = []
+        
+        for g in self.PA:
+            fit_log[g] = OrderedDict()
+            keep_dict[g] = []
+                            
+            for pa in self.PA[g]:
+                beams = [self.beams[i] for i in self.PA[g][pa]]
+                mb_i = MultiBeam(beams, fcontam=self.fcontam,
+                                 sys_err=self.sys_err)
+                              
+                try:
+                    chi2, _, _, _ = mb_i.xfit_at_z(z=0,
+                                                   templates=poly_templates,
+                                                fit_background=fit_background)
+                except:
+                    chi2 = 1e30
+                    
+                if False:
+                    p_i = mb_i.template_at_z(z=0, templates=poly_templates, fit_background=fit_background, fitter='lstsq', fwhm=1400, get_uncertainties=2)
+                
+                fit_log[g][pa] = {'chi2': chi2, 'DoF': mb_i.DoF, 
+                                  'chi_nu': chi2/np.maximum(mb_i.DoF, 1)}
+                
             
+            min_chinu = 1e30
+            for pa in self.PA[g]:
+                min_chinu = np.minimum(min_chinu, fit_log[g][pa]['chi_nu'])
+            
+            fit_log[g]['min_chinu'] = min_chinu
+            
+            for pa in self.PA[g]:
+                fit_log[g][pa]['chinu_ratio'] = fit_log[g][pa]['chi_nu']/min_chinu
+                
+                if fit_log[g][pa]['chinu_ratio'] < chi2_threshold:
+                    keep_dict[g].append(pa)
+                    keep_beams.extend([self.beams[i] for i in self.PA[g][pa]])
+                else:
+                    has_bad = True
+        
+        if reinit:
+            self.beams = keep_beams
+            self._parse_beams(psf=self.psf_param_dict is not None)
+            
+        return keep_dict, has_bad
+            
+                
 def get_redshift_fit_defaults():
     """TBD
     """
