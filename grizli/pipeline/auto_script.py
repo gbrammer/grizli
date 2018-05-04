@@ -1275,7 +1275,7 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
             continue
             
         mb = multifit.MultiBeam(beams, fcontam=0.5, group_name=target, psf=False, MW_EBV=MW_EBV)
-        
+                
         try:
             pfit = mb.template_at_z(z=0, templates=poly_templates, fit_background=True, fitter='lstsq', get_uncertainties=2)
         except:
@@ -1401,11 +1401,16 @@ def summary_catalog(field_root='', dzbin=0.01, use_localhost=True, filter_bandpa
     from matplotlib.ticker import FixedLocator
     import matplotlib.pyplot as plt
     
-    from grizli import utils, fitting
+    try:
+        from .. import prep, utils, fitting
+        from . import auto_script
+    except:
+        from grizli import prep, utils, fitting
+        from grizli.pipeline import auto_script
     
     if filter_bandpasses is None:
         import pysynphot as S
-        filter_bandpasses = [S.ObsBandpass(bpstr) for bpstr in ['wfc3,ir,f105w', 'wfc3,ir,f110w', 'wfc3,ir,f125w', 'wfc3,ir,f140w', 'wfc3,ir,f160w']]
+        filter_bandpasses = [S.ObsBandpass(bpstr) for bpstr in ['acs,wfc1,f814w','wfc3,ir,f105w', 'wfc3,ir,f110w', 'wfc3,ir,f125w', 'wfc3,ir,f140w', 'wfc3,ir,f160w']]
         
     ### SUmmary catalog
     fit = fitting.make_summary_catalog(target=field_root, sextractor=None,
@@ -1434,7 +1439,7 @@ def summary_catalog(field_root='', dzbin=0.01, use_localhost=True, filter_bandpa
     
     clip = (fit['chinu'] < 2.0) & (fit['log_risk'] < -1)
     clip = (fit['chinu'] < 2.0) & (fit['zq'] < -3) & (fit['zwidth1']/(1+fit['z_map']) < 0.005)
-    clip &= fit['bic_diff'] > -40
+    clip &= fit['bic_diff'] > 30 #-40
     
     bins = utils.log_zgrid(zr=[0.1, 3.5], dz=dzbin)
     
@@ -1464,7 +1469,11 @@ def summary_catalog(field_root='', dzbin=0.01, use_localhost=True, filter_bandpa
     fit[cols].write_sortable_html(field_root+'-fit.html', replace_braces=True, localhost=use_localhost, max_lines=50000, table_id=None, table_class='display compact', css=None)
         
     fit[cols][clip].write_sortable_html(field_root+'-fit.zq.html', replace_braces=True, localhost=use_localhost, max_lines=50000, table_id=None, table_class='display compact', css=None)
+    
+    zstr = ['{0:.3f}'.format(z) for z in fit['z_map'][clip]]
+    prep.table_to_regions(fit[clip], output=field_root+'-fit.zq.reg', comment=zstr)
 
+    
     if False:
         
         fit = utils.GTable.gread('{0}.info.fits'.format(root))
