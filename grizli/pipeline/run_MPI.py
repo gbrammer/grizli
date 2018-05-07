@@ -15,7 +15,6 @@ import os
 import glob
 
 import numpy as np
-import drizzlepac
 
 import matplotlib.pyplot as plt
 plt.ioff()
@@ -41,6 +40,7 @@ def find_ids():
 if __name__ == '__main__':
 
     from mpi4py.futures import MPIPoolExecutor
+    import drizzlepac # In here for travis
     
     t1 = time.time()
     
