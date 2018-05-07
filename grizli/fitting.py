@@ -62,7 +62,7 @@ def run_all_parallel(id, **kwargs):
     
     return id, status, t1-t0
     
-def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter='nnls', group_name='grism', fit_stacks=True, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=3, fit_only_beams=False, fit_beams=True, root='', fit_trace_shift=False, phot=None, verbose=True, scale_photometry=False, show_beams=True, overlap_threshold=5, MW_EBV=0., sys_err=0.03, get_dict=False, bad_pa_threshold=1.5, **kwargs):
+def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter='nnls', group_name='grism', fit_stacks=True, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=3, fit_only_beams=False, fit_beams=True, root='', fit_trace_shift=False, phot=None, verbose=True, scale_photometry=False, show_beams=True, overlap_threshold=5, MW_EBV=0., sys_err=0.03, get_dict=False, bad_pa_threshold=1.6, **kwargs):
     """Run the full procedure
     
     1) Load MultiBeam and stack files 
@@ -99,12 +99,15 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
         for file in mb_files[1:]:
             mb.extend(MultiBeam(file, fcontam=fcontam, group_name=group_name, MW_EBV=MW_EBV))
     
-    keep_dict, has_bad = mb.check_for_bad_PAs(chi2_threshold=bad_pa_threshold,
+    out = mb.check_for_bad_PAs(chi2_threshold=bad_pa_threshold,
                                                poly_order=1, reinit=True, 
                                               fit_background=True)
     
+    fit_log, keep_dict, has_bad = out
+    
     if has_bad:
-        print('Has bad PA!  Final list:', keep_dict)        
+        print('\nHas bad PA!  Final list: {0}\n{1}'.format(keep_dict, fit_log))
+                
         hdu, fig = mb.drizzle_grisms_and_PAs(fcontam=0.5, flambda=False, kernel='point', size=32)
         fig.savefig('{0}_{1:05d}.fix.stack.png'.format(group_name, id))
         
