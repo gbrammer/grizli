@@ -850,8 +850,13 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
     data = drz_im[0].data.byteswap().newbyteorder()
     data_mask = np.cast[data.dtype](data == 0)
     
-    wcs = pywcs.WCS(drz_im[0].header)
-
+    try:
+        wcs = pywcs.WCS(drz_im[0].header)
+        wcs_header = utils.to_header(wcs)
+    except:
+        wcs = None
+        wcs_header = drz_im[0].header.copy()
+        
     if weight_file is not None:
         wht_im = pyfits.open(weight_file)
         wht_data = wht_im[0].data.byteswap().newbyteorder()
@@ -868,7 +873,7 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
         bkg_data = bkg.back()
 
         pyfits.writeto('{0}_bkg.fits'.format(root), data=bkg_data,
-                    header=utils.to_header(wcs), overwrite=True)
+                    header=wcs_header, overwrite=True)
 
         if err is None:
          err = bkg.rms()
@@ -905,16 +910,17 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
 
         ## Segmentation
         pyfits.writeto('{0}_seg.fits'.format(root), data=seg,
-                       header=utils.to_header(wcs), overwrite=True)
+                       header=wcs_header, overwrite=True)
 
         for c in ['a','b']:
             tab = tab[np.isfinite(tab[c])]
 
         # WCS coordinates
-        tab['ra'], tab['dec'] = wcs.all_pix2world(tab['x'], tab['y'], 1)
-        tab['ra'].unit = u.deg
-        tab['dec'].unit = u.deg
-        tab['x_world'], tab['y_world'] = tab['ra'], tab['dec']
+        if wcs is not None:
+            tab['ra'], tab['dec'] = wcs.all_pix2world(tab['x'], tab['y'], 1)
+            tab['ra'].unit = u.deg
+            tab['dec'].unit = u.deg
+            tab['x_world'], tab['y_world'] = tab['ra'], tab['dec']
 
         tab.meta['MINAREA'] = (minarea, 'Minimum source area in pixels')
         tab.meta['CLEAN'] = clean
@@ -2389,6 +2395,27 @@ def clean_drizzle(root, context=False):
         mask &= bits != np.round(bits) 
         
     sci[0].data[mask] = 0
+    
+    # Rescale WFPC2 to ~WFC3 image zeropoint
+    if sci[0].header['INSTRUME'] == 'WFPC2':
+        #exptime = sci[0].header['EXPTIME']
+        
+        scl = sci[0].header['PHOTFLAM'] / 1.5e-20
+        
+        #sci[0].data /= exptime
+        
+        sci[0].data *= scl
+        
+        for k in ['PHOTFLAM', 'PHOTFNU']:
+            if k in sci[0].header:
+                sci[0].header[k] /= scl
+        
+        wht = pyfits.open(drz_file.replace('_sci.fits', '_wht.fits'),
+                          mode='update')
+        
+        wht[0].data /= scl**2
+        wht.flush()
+        
     sci.flush()
 
 def tweak_flt(files=[], max_dist=0.4, threshold=3, verbose=True, use_sewpy=False):
@@ -2418,9 +2445,14 @@ def tweak_flt(files=[], max_dist=0.4, threshold=3, verbose=True, use_sewpy=False
         sci = im['SCI',1].data*ok - np.median(im['SCI',1].data[ok])
         
         header = im['SCI',1].header.copy()
+        
         for k in ['PHOTFNU', 'PHOTFLAM', 'PHOTPLAM', 'FILTER']:
-            header[k] = im[0].header[k]
-            
+            if k in im[0].header:
+                header[k] = im[0].header[k]
+
+        hst_filter = utils.get_hst_filter(im[0].header)
+        header['FILTER'] = hst_filter
+        
         pyfits.writeto('{0}_xsci.fits'.format(root), data=sci,
                        header=header,
                        clobber=True)
