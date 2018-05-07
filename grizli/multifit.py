@@ -3443,7 +3443,7 @@ class MultiBeam(GroupFitter):
             self.beams = keep_beams
             self._parse_beams(psf=self.psf_param_dict is not None)
             
-        return keep_dict, has_bad
+        return fit_log, keep_dict, has_bad
             
                 
 def get_redshift_fit_defaults():
