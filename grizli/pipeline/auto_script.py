@@ -1540,10 +1540,16 @@ def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Griz
         all_visits, all_groups, info = np.load('{0}_visits.npy'.format(field_root))
     #all_visits, filters = utils.parse_flt_files(info=info, uniquename=True, get_footprint=False)
     
+    failed_list = glob.glob('*failed')
+    
     visits = []
     files = []
     for visit in all_visits:
         file = '{0}.cat.fits'.format(visit['product'])
+        
+        if visit['product']+'.failed' in failed_list:
+            continue
+            
         if os.path.exists(file):
             if program_str is not None:
                 prog = visit['product'].split('-')[-4]
@@ -1809,7 +1815,8 @@ def update_wcs_headers_with_fine(field_root, backup=True):
         
 def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140W','F160W'], ref_image=None, bits=None, pixfrac=0.6, scale=0.06, make_combined=True, skysub=False, skymethod='localmin', match_str=[], context=False):
     import numpy as np
-
+    import glob
+    
     try:
         from .. import prep
     except:
@@ -1819,6 +1826,8 @@ def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140
     ## Redrizzle
     
     visits, all_groups, info = np.load('{0}_visits.npy'.format(field_root))
+    
+    failed_list = glob.glob('*failed')
     
     #overlaps = np.load('{0}_overlaps.npy'.format(field_root))[0]
     #keep = []
@@ -1831,6 +1840,10 @@ def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140
         
     filter_groups = {}
     for visit in visits:
+        
+        if visit['product']+'.failed' in failed_list:
+            continue
+        
         filt = visit['product'].split('-')[-1]
         if filt.upper() not in filters:
             continue
