@@ -1425,7 +1425,7 @@ def summary_catalog(field_root='', dzbin=0.01, use_localhost=True, filter_bandpa
     fit.meta['root'] = field_root
     
     ## Add photometric catalog
-    sex = utils.GTable.gread('../Prep/{0}-ir.cat.fits'.format(field_root))
+    sex = utils.GTable.gread('{0}-ir.cat.fits'.format(field_root))
     # try:
     # except:
     #     sex = utils.GTable.gread('../Prep/{0}-ir.cat.fits'.format(field_root), sextractor=True)

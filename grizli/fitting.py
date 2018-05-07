@@ -106,7 +106,9 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     fit_log, keep_dict, has_bad = out
     
     if has_bad:
-        print('\nHas bad PA!  Final list: {0}\n{1}'.format(keep_dict, fit_log))
+        if verbose:
+            print('\nHas bad PA!  Final list: {0}\n{1}'.format(keep_dict,
+                                                               fit_log))
                 
         hdu, fig = mb.drizzle_grisms_and_PAs(fcontam=0.5, flambda=False, kernel='point', size=32)
         fig.savefig('{0}_{1:05d}.fix.stack.png'.format(group_name, id))
