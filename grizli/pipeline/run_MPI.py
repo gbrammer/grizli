@@ -3,7 +3,7 @@ Script to run all redshift fits in parallel with OpenMPI
 
 Usage:  
 
-    mpiexec -n 10 python -m mpi4py.futures $GRIZLICODE/grizli/pipeline/run_MPI.py
+    mpiexec -n 8 python -m mpi4py.futures $GRIZLICODE/grizli/pipeline/run_MPI.py
    
 where "-n 8" indicates running 8 parallel threads.
 
@@ -13,6 +13,16 @@ Needs 'fit_args.py' created by `auto_script.generate_fit_params`.
 import time
 import os
 import glob
+
+import numpy as np
+import drizzlepac
+
+import matplotlib.pyplot as plt
+plt.ioff()
+
+from grizli.fitting import run_all_parallel
+from grizli import utils
+utils.set_warnings()
 
 def find_ids():
     # Find objects that with extarcted spectra and that need to be fit
@@ -30,17 +40,7 @@ def find_ids():
     
 if __name__ == '__main__':
 
-    import numpy as np
-    import drizzlepac
-
-    import matplotlib.pyplot as plt
-    plt.ioff()
-
     from mpi4py.futures import MPIPoolExecutor
-
-    from grizli.fitting import run_all_parallel
-    from grizli import utils
-    utils.set_warnings()
     
     t1 = time.time()
     
