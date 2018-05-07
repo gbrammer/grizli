@@ -127,7 +127,7 @@ def get_extra_data(root='j114936+222414', HOME_PATH='/Volumes/Pegasus/Grizli/Aut
 
     os.chdir(CWD)
     
-def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', inspect_ramps=False, manual_alignment=False, is_parallel_field=False, reprocess_parallel=False, only_preprocess=False, run_fit=True, s3_sync=False):
+def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', inspect_ramps=False, manual_alignment=False, is_parallel_field=False, reprocess_parallel=False, only_preprocess=False, run_extractions=True, run_fit=True, s3_sync=False):
     """
     Run the full pipeline for a given target
         
@@ -263,6 +263,9 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
     # Make script for parallel processing
     auto_script.generate_fit_params(field_root=root, prior=None, MW_EBV=exptab.meta['MW_EBV'], pline=pline, fit_only_beams=True, run_fit=True, poly_order=7, fsps=True, sys_err = 0.03, fcontam=0.2, zr=[0.1, 3.4], save_file='fit_args.npy')
     
+    if not run_extractions:
+        return True
+        
     # Run extractions (and fits)
     auto_script.extract(field_root=root, maglim=maglim, MW_EBV=exptab.meta['MW_EBV'], pline=pline, run_fit=run_fit)
     
@@ -1260,7 +1263,7 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
         
     ###############
     # Stacked spectra
-    for id in ids:
+    for ii, id in enumerate(ids):
         if Skip:
             if os.path.exists('{0}_{1:05d}.stack.png'.format(target, id)):
                 continue
@@ -1270,7 +1273,7 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
             if beams[i].fit_mask.sum() < 10:
                 beams.pop(i)
                 
-        print(id, len(beams))
+        print('{0}/{1}: {2} {3}'.format(ii, len(ids), id, len(beams)))
         if len(beams) < 1:
             continue
             
@@ -1310,10 +1313,13 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
     prior=None
     pline = {'kernel': 'point', 'pixfrac': 0.2, 'pixscale': 0.1, 'size': 8, 'wcs': None}
         
-    for id in ids:
+    for ii, id in enumerate(ids):
+        print('{0}/{1}: {2}'.format(ii, len(ids), id))
+        
         if Skip:
             if os.path.exists('{0}_{1:05d}.line.png'.format(target, id)):
                 continue
+        
         
         try:
             out = fitting.run_all(id, t0=t0, t1=t1, fwhm=1200, zr=zr, dz=[0.004, 0.0005], fitter='nnls', group_name=target, fit_stacks=False, prior=prior,  fcontam=0.2, pline=pline, mask_sn_limit=10, fit_beams=(not fit_only_beams),  root=target+'*', fit_trace_shift=False, phot=phot, verbose=True, scale_photometry=(phot is not None) & (scale_photometry), show_beams=True, overlap_threshold=10, fit_only_beams=fit_only_beams, MW_EBV=MW_EBV, sys_err=sys_err)
