@@ -907,13 +907,14 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
         
         # ID
         tab['number'] = np.arange(len(tab), dtype=np.int32)+1
+        tab['theta'] = np.clip(tab['theta'], -np.pi/2, np.pi/2)
+        for c in ['a','b','x','y','theta']:
+            tab = tab[np.isfinite(tab[c])]
 
         ## Segmentation
         pyfits.writeto('{0}_seg.fits'.format(root), data=seg,
                        header=wcs_header, overwrite=True)
 
-        for c in ['a','b']:
-            tab = tab[np.isfinite(tab[c])]
 
         # WCS coordinates
         if wcs is not None:
@@ -939,11 +940,21 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
         kronrad[~np.isfinite(kronrad)] = autoparams[1]
         kronrad = np.maximum(kronrad, autoparams[1])
         
-        kron_out = sep.sum_ellipse(data - bkg_data, 
+        try:
+            kron_out = sep.sum_ellipse(data - bkg_data, 
                                 tab['x']-1, tab['y']-1, 
-                                tab['a'], tab['b'], tab['theta'], 
+                                tab['a'], tab['b'], 
+                                tab['theta'],
                                 kronrad, subpix=5, err=err)
-
+        except:
+            kron_out=None
+            print(tab['theta'].min(), tab['theta'].max())
+            
+        #except:
+        # kron_out = sep.sum_circle(data - bkg_data, 
+        #                     tab['x']-1, tab['y']-1, 
+        #                     kronrad, subpix=5, err=err)
+            
         kron_flux, kron_fluxerr, kron_flag = kron_out
         kron_flux_flag = kron_flag
         
@@ -1013,7 +1024,7 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
                                     tab['a'], tab['b'],
                                     tab['theta'], 
                                     kronrad, subpix=1)
-
+                                    
             kron_bkg, kron_bkg_fluxerr, kron_flag = kron_out
             tab['flux_bkg_auto'] = kron_bkg/uJy_to_dn*u.uJy
         else:
