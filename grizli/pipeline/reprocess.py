@@ -47,7 +47,7 @@ def reprocess_wfc3ir(parallel=False):
             if not os.path.exists(file.replace('raw.fits','flt.fits')):
                 reprocess_wfc3.make_IMA_FLT(raw=file, stats_region=[[300,700], [300,700]])
         
-def inspect(root='grizli'):
+def inspect(root='grizli', force=False):
     """
     Run the GUI inspection tool on the `ramp.png` images to flag problematic
     reads with high backgrounds and/or satellite trails.
@@ -81,8 +81,8 @@ def inspect(root='grizli'):
     import matplotlib
     matplotlib.use("TkAgg") ### This needs to be run first!
     
-    import mywfc3.inspect
-    import mywfc3.reprocess_wfc3
+    #import mywfc3.reprocess_wfc3
+    from reprocess_wfc3 import reprocess_wfc3
     
     import astropy.io.fits as pyfits
     import numpy as np
@@ -91,8 +91,15 @@ def inspect(root='grizli'):
     files.sort()
 
     # Run the GUI, 'q' to quit
-    x = mywfc3.inspect.ImageClassifier(images=files, logfile='{0}_inspect'.format(root))
-
+    try:
+        import mywfc3.inspect
+        x = mywfc3.inspect.ImageClassifier(images=files, logfile='{0}_inspect'.format(root))
+    except:
+        pass
+    
+    if not os.path.exists('{0}_inspect.fits'.format(root)):
+        return True
+        
     #im = pyfits.open('inspect_raw.info.fits')
     im = pyfits.open('{0}_inspect.fits'.format(root))
     tab = im[1].data
@@ -112,9 +119,9 @@ def inspect(root='grizli'):
         raw = tab['images'][i].replace('_ramp.png', '_raw.fits')
         
         ramp_file = tab['images'][i].replace('_ramp.png', '_ramp.dat')
-        sn_pop = mywfc3.inspect.check_background_SN(ramp_file=ramp_file, show=False)
-        pop_reads = np.cast[int](np.unique(np.hstack((pop_reads, sn_pop))))
-        pop_reads = list(pop_reads)
+        #sn_pop = mywfc3.inspect.check_background_SN(ramp_file=ramp_file, show=False)
+        #pop_reads = np.cast[int](np.unique(np.hstack((pop_reads, sn_pop))))
+        #pop_reads = list(pop_reads)
         
         flt = raw.replace('_raw','_flt')
         if os.path.exists(flt):
@@ -126,6 +133,6 @@ def inspect(root='grizli'):
         
         print('Process %s %s' %(raw, pop_reads))
         
-        mywfc3.reprocess_wfc3.make_IMA_FLT(raw=raw, pop_reads=pop_reads, flatten_ramp=True)
+        reprocess_wfc3.make_IMA_FLT(raw=raw, pop_reads=pop_reads, flatten_ramp=True)
     
     return True
