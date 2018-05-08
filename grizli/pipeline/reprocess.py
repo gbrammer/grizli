@@ -93,7 +93,10 @@ def inspect(root='grizli', force=False):
     # Run the GUI, 'q' to quit
     try:
         import mywfc3.inspect
-        x = mywfc3.inspect.ImageClassifier(images=files, logfile='{0}_inspect'.format(root))
+        if os.path.exists('{0}_inspect.fits'.format(root)):
+            if force:
+                x = mywfc3.inspect.ImageClassifier(images=files,
+                                           logfile='{0}_inspect'.format(root))
     except:
         pass
     
