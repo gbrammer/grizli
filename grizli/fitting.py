@@ -462,6 +462,8 @@ def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat',
     lines = []
     pdf_max = []
     files=glob.glob('{0}*full.fits'.format(target))
+    files.sort()
+    
     template_mags = []
     
     for file in files:
