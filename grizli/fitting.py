@@ -1418,7 +1418,7 @@ class GroupFitter(object):
 
         # Parse template coeffs
         cfit = OrderedDict()
-        
+                
         for i in range(self.N):
             cfit['bg {0:03d}'.format(i)] = coeffs[i], coeffs_err[i]
         
@@ -1436,6 +1436,7 @@ class GroupFitter(object):
         tfit['line1d'] = line1d
         tfit['cfit'] = cfit
         tfit['coeffs'] = coeffs
+        tfit['chi2'] = chi2
         tfit['covar'] = covar
         tfit['z'] = z
         tfit['templates'] = templates
