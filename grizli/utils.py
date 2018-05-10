@@ -1551,6 +1551,50 @@ def load_templates(fwhm=400, line_complexes=True, stars=False,
                                  
     return temp_list    
 
+def load_quasar_templates(fwhm=2500, broad_lines=['OI-6302', 'HeI-5877', 'MgII'], narrow_lines=['OIII', 'SII'], include_feii=True):
+    
+    """
+    Make templates suitable for fitting broad-line quasars
+    """
+    
+    from collections import OrderedDict
+    import scipy.ndimage as nd
+    
+    t0 = OrderedDict()
+    t1 = OrderedDict()
+    
+    broad0 = load_templates(fwhm=2500, line_complexes=False, stars=False, full_line_list=['Balmer 10kK'] + broad_lines, continuum_list=[], fsps_templates=False, alf_template=False, lorentz=True)
+
+    broad1 = load_templates(fwhm=2500, line_complexes=False, stars=False, full_line_list=['Ha', 'Hb', 'Hg', 'Hd', 'OI-6302', 'HeI-5877', 'MgII'], continuum_list=[], fsps_templates=False, alf_template=False, lorentz=True)
+
+    narrow = load_templates(fwhm=1200, line_complexes=False, stars=False, full_line_list=narrow_lines, continuum_list=[], fsps_templates=False, alf_template=False)
+    
+    for k in broad0:
+        t0[k] = broad0[k]
+
+    for k in broad1:
+        t1[k] = broad1[k]
+    
+    for k in narrow:
+        t0[k] = t1[k] = narrow[k]
+    
+    ##### Fe II 
+    if include_feii:
+        feii_wave, feii_flux = np.loadtxt(os.path.dirname(__file__) + '/data/templates/FeII_VeronCetty2004.txt', unpack=True)
+    
+        # smoothing, in units of input velocity resolution
+        feii_kern = fwhm/2.3548/75.
+        feii_sm = nd.gaussian_filter(feii_flux, feii_kern)
+        t0['line feii'] = t1['line feii'] = SpectrumTemplate(wave=feii_wave, flux=feii_sm)
+    
+    # Linear continua
+    cont_wave = np.arange(1216, 2.5e4)
+    t0['blue'] = t1['blue'] = SpectrumTemplate(wave=cont_wave, flux=(cont_wave/6563.)**-2.8)
+    t0['mid'] = t1['mid'] = SpectrumTemplate(wave=cont_wave, flux=(cont_wave/6563.)**0)
+    t0['red'] = t1['mid'] = SpectrumTemplate(wave=cont_wave, flux=(cont_wave/6563.)**2.8)
+
+    return t0, t1
+    
 def load_sdss_pca_templates(file='spEigenQSO-55732.fits', smooth=3000):
     """
     Load SDSS eigen templates
