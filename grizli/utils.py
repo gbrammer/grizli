@@ -1585,7 +1585,7 @@ def load_quasar_templates(fwhm=2500, broad_lines=['OI-6302', 'HeI-5877', 'MgII']
         # smoothing, in units of input velocity resolution
         feii_kern = fwhm/2.3548/75.
         feii_sm = nd.gaussian_filter(feii_flux, feii_kern)
-        t0['line feii'] = t1['line feii'] = SpectrumTemplate(wave=feii_wave, flux=feii_sm)
+        t0['FeII-VC2004'] = t1['line feii'] = SpectrumTemplate(wave=feii_wave, flux=feii_sm)
     
     # Linear continua
     cont_wave = np.arange(1216, 2.5e4)
