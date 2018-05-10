@@ -1619,6 +1619,19 @@ def dot_templates(coeffs, templates, z=0, max_R=5000):
     #         tl += templates[te].zscale(z, scalar=coeffs[i])
     wave, flux_arr, is_line = array_templates(templates, max_R=max_R)
     
+    # IGM
+    try:
+        import eazy.igm
+        IGM = eazy.igm.Inoue14()
+        
+        lylim = wave < 1250
+        igmz = np.ones_like(wave)
+        igmz[lylim] = IGM.full_IGM(z, wave[lylim]*(1+z))    
+    except:
+        igmz = 1.
+    
+    flux_arr *= igmz
+    
     # Continuum
     cont = np.dot(coeffs*(~is_line), flux_arr)
     tc = SpectrumTemplate(wave=wave, flux=cont).zscale(z)
