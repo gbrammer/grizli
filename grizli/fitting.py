@@ -14,6 +14,8 @@ import numpy as np
 
 import astropy.io.fits as pyfits
 import astropy.units as u
+from astropy.cosmology import Planck15
+import astropy.constants as const
 
 from . import utils
 #from .model import BeamCutout
@@ -465,6 +467,7 @@ def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat',
     files.sort()
     
     template_mags = []
+    sps_params = []
     
     for file in files:
         print(utils.NO_NEWLINE+file)
@@ -488,6 +491,13 @@ def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat',
                 else:
                     line.append(np.nan)
         
+        # SPS
+        try:
+            sps = compute_sps_params(full)
+        except:
+            sps = {'Lv':-1*u.solLum, 'MLv':-1*u.solMass/u.solLum, 'MLv_rms':-1*u.solMass/u.solLum, 'SFRv':-1*u.solMass/u.year, 'SFRv_rms':-1*u.solMass/u.year, 'templ':-1}
+        sps_params.append(sps)
+        
         lines.append(line)
         
         # Integrate best-fit template through filter bandpasses
@@ -508,6 +518,26 @@ def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat',
     
     info = utils.GTable(rows=lines, names=columns)
     info['PDF_MAX'] = pdf_max
+    
+    root_col = utils.GTable.Column(name='root', data=[target]*len(info))
+    info.add_column(root_col, index=0)
+    
+    for k in ['Lv','MLv','MLv_rms','SFRv','SFRv_rms']:
+        datak = [sps[k].value for sps in sps_params]
+        info[k] = datak
+        info[k].unit = sps[k].unit
+    
+    info['sSFR'] = info['SFRv']/info['MLv']
+    info['stellar_mass'] = info['Lv']*info['MLv']
+    
+    info['Lv'].format = '.1e'
+    info['MLv'].format = '.2f'
+    info['MLv_rms'].format = '.2f'
+    info['SFRv'].format = '.1f'
+    info['SFRv_rms'].format = '.1f'
+    info['sSFR'].format = '.1e'
+    info['stellar_mass'].format = '.1e'
+    
     
     if filter_bandpasses:
         arr = np.array(template_mags)
@@ -597,7 +627,94 @@ def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat',
         
     info.write('{0}.info.fits'.format(target), overwrite=True)
     return info
+
+def compute_sps_params(full='j021820-051015_01276.full.fits', cosmology=Planck15):
+    import numpy as np
+
+    from astropy.io import fits as pyfits
+    from astropy.table import Table
+    import astropy.units as u
+    
+    from grizli import utils
         
+    import pysynphot as S
+    
+    if isinstance(full, str):
+        im = pyfits.open(full)
+    else:
+        im = full
+        
+    h = im['TEMPL'].header
+    templ = Table(im['TEMPL'].data)
+    z = im['ZFIT_STACK'].header['Z_MAP']
+    
+    # Get coefffs
+    coeffs, keys, ix = [], [], []
+    count=0
+    for k in h:
+        if k.startswith('CNAME'):
+            if h[k].startswith('fsps'):
+                ix.append(count)
+                keys.append(h[k])
+                coeffs.append(h[k.replace('CNAME','CVAL')])
+
+            count += 1
+    
+    cov = im['COVAR'].data[np.array(ix),:][:,np.array(ix)]
+    covd = cov.diagonal()
+    
+    # Normalize to V band, fsps_QSF_12_v3
+    normV = np.array([3.75473763e-15, 2.73797790e-15, 1.89469588e-15,
+    1.32683449e-15, 9.16760812e-16, 2.43922395e-16, 4.76835746e-15,
+    3.55616962e-15, 2.43745972e-15, 1.61394625e-15, 1.05358710e-15,
+    5.23733297e-16])
+           
+    coeffsV = np.array(coeffs)*normV
+    rmsV = np.sqrt(covd)*normV
+    rms_norm = rmsV/coeffsV.sum()
+    coeffs_norm = coeffsV/coeffsV.sum()
+    
+    param_file = os.path.join(os.path.dirname(__file__), 'data/templates/fsps/fsps_QSF_12_v3.param.fits')
+    tab_temp = Table.read(param_file)
+    temp_MLv = tab_temp['mass']/tab_temp['Lv']
+    temp_SFRv = tab_temp['sfr']
+    
+    mass_norm = (coeffs_norm*tab_temp['mass']).sum()*u.solMass
+    Lv_norm = (coeffs_norm*tab_temp['Lv']).sum()*u.solLum
+    MLv = mass_norm / Lv_norm
+        
+    SFR_norm = (coeffs_norm*tab_temp['sfr']).sum()*u.solMass/u.yr
+    SFRv = SFR_norm / Lv_norm
+    
+    mass_var = ((rms_norm*tab_temp['mass'])**2).sum()
+    Lv_var = ((rms_norm*tab_temp['Lv'])**2).sum()
+    SFR_var = ((rms_norm*tab_temp['sfr'])**2).sum()
+    
+    MLv_var = MLv**2 * (mass_var/mass_norm.value**2 + Lv_var/Lv_norm.value**2)
+    MLv_rms = np.sqrt(MLv_var)
+
+    SFRv_var = SFRv**2 * (SFR_var/SFR_norm.value**2 + Lv_var/Lv_norm.value**2)
+    SFRv_rms = np.sqrt(SFRv_var)
+    
+    vband = S.ObsBandpass('v')
+    vbandz = S.ArrayBandpass(vband.wave*(1+z), vband.throughput)
+    
+    best_templ = utils.SpectrumTemplate(templ['wave'], templ['full'])
+    fnu = best_templ.integrate_filter(vbandz)*(u.erg/u.s/u.cm**2/u.Hz)
+    
+    dL = cosmology.luminosity_distance(z).to(u.cm)
+    Lnu = fnu*4*np.pi*dL**2
+    pivotV = vbandz.pivot()*u.Angstrom
+    nuV = (const.c/pivotV).to(u.Hz) 
+    Lv = (nuV*Lnu).to(u.L_sun)
+            
+    mass = MLv*Lv
+    SFR = SFRv*Lv
+    
+    sps = {'Lv':Lv, 'MLv':MLv, 'MLv_rms':MLv_rms, 'SFRv':SFRv, 'SFRv_rms':SFRv_rms, 'templ':best_templ}
+    
+    return sps
+  
 def _loss(dz, gamma=0.15):
     """Risk / Loss function, Tanaka et al. (https://arxiv.org/abs/1704.05988)
     
