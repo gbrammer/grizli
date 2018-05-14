@@ -477,6 +477,9 @@ def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat',
         line = []
         full = pyfits.open(file)
         
+        if 'DSCI' not in full:
+            continue
+            
         tab = utils.GTable.read(full['ZFIT_STACK'])
         pdf_max.append(tab['pdf'].max())
         
