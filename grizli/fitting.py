@@ -125,7 +125,9 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     mb.initialize_masked_arrays()
 
     if phot is not None:
-        st.set_photometry(**phot)
+        if st is not None:
+            st.set_photometry(**phot)
+        
         mb.set_photometry(**phot)
             
     if t0 is None:
@@ -147,10 +149,11 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     
     # Second pass if rescaling spectrum to photometry
     if scale_photometry:
-        scl = mb.scale_to_photometry(z=fit.meta['z_map'][0], method='lm', templates=t0, order=scale_photometry*1)
+        scl = mb.scale_to_photometry(z=fit.meta['z_map'][0], method='lm', templates=t0, order=scale_photometry*1-1)
         if scl.status > 0:
             mb.pscale = scl.x
-            st.pscale = scl.x
+            if st is not None:
+                st.pscale = scl.x
             
             fit = fit_obj.xfit_redshift(templates=t0, zr=zr, dz=dz, prior=prior, fitter=fitter, verbose=verbose) 
             fit_hdu = pyfits.table_to_hdu(fit)
@@ -770,10 +773,14 @@ class GroupFitter(object):
                            
         return A_bg
     
-    def get_SDSS_photometry(self, bands='ugriz', templ=None, radius=2):
-        from astroquery.sdss import SDSS
-        from astropy import coordinates as coords
+    def get_SDSS_photometry(self, bands='ugriz', templ=None, radius=2, SDSS_CATALOG='V/147/sdss12'):
+        #from astroquery.sdss import SDSS
+        #from astropy import coordinates as coords
         import astropy.units as u
+        
+        from astroquery.vizier import Vizier
+        import astropy.coordinates as coord
+        
         import pysynphot as S
         
         from eazy.templates import Template
@@ -781,24 +788,42 @@ class GroupFitter(object):
         from eazy.photoz import TemplateGrid
         from eazy.filters import FilterDefinition
         
-        pos = coords.SkyCoord(self.ra*u.deg, self.dec*u.deg, frame='icrs')
-        fields = ['ra','dec','modelMag_r', 'modelMagErr_r']
-        for b in bands:
-            fields.extend(['modelFlux_'+b, 'modelFluxIvar_'+b])
-            
-        xid = SDSS.query_region(pos, photoobj_fields=fields, spectro=False, radius=radius*u.arcsec)
+        # pos = coords.SkyCoord(self.ra*u.deg, self.dec*u.deg, frame='icrs')
+        # fields = ['ra','dec','modelMag_r', 'modelMagErr_r']
+        # for b in bands:
+        #     fields.extend(['modelFlux_'+b, 'modelFluxIvar_'+b])
+        #     
+        # xid = SDSS.query_region(pos, photoobj_fields=fields, spectro=False, radius=radius*u.arcsec)
         
-        if xid is None:
-            return None
+        from astroquery.vizier import Vizier
+        import astropy.units as u
+        import astropy.coordinates as coord
+
+        coo = coord.SkyCoord(ra=self.ra, dec=self.dec, unit=(u.deg, u.deg),
+                             frame='icrs')
+                                                          
+        v = Vizier(catalog=SDSS_CATALOG, columns=['+_r','*'])
+        try:
+            tab = v.query_region(coo, radius="{0}s".format(radius),
+                              catalog=SDSS_CATALOG)[0]
             
+            ix = np.argmin(tab['rmag'])
+            tab = tab[ix]
+        except:
+            return None
+                               
         filters = [FilterDefinition(bp=S.ObsBandpass('sdss,{0}'.format(b))) for b in bands]
         pivot = {}
         for ib, b in enumerate(bands):
             pivot[b] = filters[ib].pivot()
             
-        to_flam = 10**(-0.4*(22.5+48.6))*3.e18 # / pivot(Ang)**2
-        flam = np.array([xid['modelFlux_{0}'.format(b)][0]*to_flam/pivot[b]**2 for b in bands])
-        eflam = np.array([np.sqrt(1/xid['modelFluxIvar_{0}'.format(b)][0])*to_flam/pivot[b]**2 for b in bands])
+        #to_flam = 10**(-0.4*(22.5+48.6))*3.e18 # / pivot(Ang)**2
+        #flam = np.array([xid['modelFlux_{0}'.format(b)][0]*to_flam/pivot[b]**2 for b in bands])
+        #eflam = np.array([np.sqrt(1/xid['modelFluxIvar_{0}'.format(b)][0])*to_flam/pivot[b]**2 for b in bands])
+        
+        to_flam = 10**(-0.4*(48.6))*3.e18 # / pivot(Ang)**2
+        flam = np.array([10**(-0.4*(tab[b+'mag']))*to_flam/pivot[b]**2 for ib, b in enumerate(bands)])
+        eflam = np.array([tab['e_{0}mag'.format(b)]*np.log(10)/2.5*flam[ib] for ib, b in enumerate(bands)])
         
         phot = {'flam':flam, 'eflam':eflam, 'filters':filters, 'tempfilt':None}
         
@@ -814,6 +839,10 @@ class GroupFitter(object):
         #filters = [all_filters.filters[f-1] for f in [156,157,158,159,160]]
         phot = {'flam':flam, 'eflam':eflam, 'filters':filters, 'tempfilt':tempfilt}
         return phot
+        
+        ### Vizier
+               
+
         
     def set_photometry(self, flam=[], eflam=[], filters=[], force=False, tempfilt=None, min_err=0.02, TEF=None):
         """
