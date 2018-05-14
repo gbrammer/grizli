@@ -575,7 +575,7 @@ def parse_grism_associations(exposure_groups,
     grism_groups = []
     for i in range(N):
         f_i = exposure_groups[i]['product'].split('-')[-1]
-        root_i = exposure_groups[i]['product'].split('-'+f_i)[0]
+        root_i = exposure_groups[i]['product'][:-len('-'+f_i)]
         
         if f_i.startswith('g'):
             group = OrderedDict(grism=exposure_groups[i], 
@@ -596,7 +596,7 @@ def parse_grism_associations(exposure_groups,
                  
             fp_j = exposure_groups[j]['footprint']
             olap = fp_i.intersection(fp_j)
-            root_j = exposure_groups[j]['product'].split('-'+f_j)[0]
+            root_j = exposure_groups[j]['product'][:-len('-'+f_j)]
 
             #print(root_j, root_i, root_j == root_i)
             if (root_j == root_i):
@@ -1551,7 +1551,7 @@ def load_templates(fwhm=400, line_complexes=True, stars=False,
                                  
     return temp_list    
 
-def load_quasar_templates(fwhm=2500, broad_lines=['OI-6302', 'HeI-5877', 'MgII'], narrow_lines=['OIII', 'SII'], include_feii=True):
+def load_quasar_templates(fwhm=2500, broad_lines=['OI-6302', 'HeI-5877', 'MgII', 'NeIII-3867'], narrow_lines=['OII', 'OIII', 'SII'], include_feii=True, slopes=[-2.8, 0, 2.8]):
     
     """
     Make templates suitable for fitting broad-line quasars
@@ -1589,9 +1589,13 @@ def load_quasar_templates(fwhm=2500, broad_lines=['OI-6302', 'HeI-5877', 'MgII']
     
     # Linear continua
     cont_wave = np.arange(1216, 2.5e4)
-    t0['blue'] = t1['blue'] = SpectrumTemplate(wave=cont_wave, flux=(cont_wave/6563.)**-2.8)
-    t0['mid'] = t1['mid'] = SpectrumTemplate(wave=cont_wave, flux=(cont_wave/6563.)**0)
-    t0['red'] = t1['mid'] = SpectrumTemplate(wave=cont_wave, flux=(cont_wave/6563.)**2.8)
+    for slope in slopes:
+        key = 'slope {0}'.format(slope)
+        t0[key] = t1[key] = SpectrumTemplate(wave=cont_wave, flux=(cont_wave/6563.)**slope)
+        
+    # t0['blue'] = t1['blue'] = SpectrumTemplate(wave=cont_wave, flux=(cont_wave/6563.)**-2.8)
+    # t0['mid'] = t1['mid'] = SpectrumTemplate(wave=cont_wave, flux=(cont_wave/6563.)**0)
+    # t0['red'] = t1['mid'] = SpectrumTemplate(wave=cont_wave, flux=(cont_wave/6563.)**2.8)
 
     return t0, t1
     
