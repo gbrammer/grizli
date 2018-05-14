@@ -239,7 +239,10 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
     files = glob.glob('*GrismFLT.fits')
     if len(files) == 0:
         os.chdir(os.path.join(HOME_PATH, root, 'Prep'))
-        grp = auto_script.grism_prep(field_root=root, refine_niter=3)
+        auto_script.grism_prep(field_root=root, refine_niter=3)
+        
+        # All files
+        grp = multifit.GroupFLT(grism_files=glob.glob('*GrismFLT.fits'), direct_files=[], ref_file=None, seg_file='{0}-ir_seg.fits'.format(root), catalog='{0}-ir.cat.fits'.format(root), cpu_count=-1, sci_extn=1, pad=256)
         
         # Make drizzle model images
         grp.drizzle_grism_models(root=root, kernel='point')
@@ -407,7 +410,7 @@ def remove_bad_expflag(field_root='', HOME_PATH='./', min_bad=2):
     
     for visit in visits:
         bad = (visit_name == visit) & (expf['EXPFLAG'] != 'NORMAL')
-        if bad.sum() > min_bad:
+        if bad.sum() >= min_bad:
             print('Found bad visit: {0}, N={1}\n'.format(visit, bad.sum()))
             if not os.path.exists('Expflag'):
                 os.mkdir('Expflag')
