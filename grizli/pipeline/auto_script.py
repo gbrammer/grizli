@@ -1476,7 +1476,7 @@ def summary_catalog(field_root='', dzbin=0.01, use_localhost=True, filter_bandpa
     fig.tight_layout(pad=0.2)
     fig.savefig('{0}_zhist.png'.format(field_root))
 
-    cols = ['id','ra', 'dec', 'mag_auto', 't_g102', 't_g141', 'z_map', 'log_risk', 'log_pdf_max', 'zq', 'chinu', 'bic_diff', 'zwidth1', 'png_stack', 'png_full', 'png_line']
+    cols = ['idx','ra', 'dec', 'mag_auto', 't_g102', 't_g141', 'z_map', 'chinu', 'bic_diff', 'zwidth1', 'stellar_mass', 'ssfr', 'png_stack', 'png_full', 'png_line']
     
     fit[cols].write_sortable_html(field_root+'-fit.html', replace_braces=True, localhost=use_localhost, max_lines=50000, table_id=None, table_class='display compact', css=None)
         
@@ -1484,7 +1484,6 @@ def summary_catalog(field_root='', dzbin=0.01, use_localhost=True, filter_bandpa
     
     zstr = ['{0:.3f}'.format(z) for z in fit['z_map'][clip]]
     prep.table_to_regions(fit[clip], output=field_root+'-fit.zq.reg', comment=zstr)
-
     
     if False:
         
