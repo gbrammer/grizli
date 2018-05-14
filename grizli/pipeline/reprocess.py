@@ -71,7 +71,7 @@ def inspect(root='grizli', force=False):
     
     
     .. note:: If the script fails puking lots of Tk-related messages, be sure
-              to run this script in a fresh python session *before* importing
+              to run this script iin a fresh python session *before* importing
               `~matplotlib`.
 
     """
@@ -97,6 +97,9 @@ def inspect(root='grizli', force=False):
             if force:
                 x = mywfc3.inspect.ImageClassifier(images=files,
                                            logfile='{0}_inspect'.format(root))
+        else:
+            x = mywfc3.inspect.ImageClassifier(images=files,
+                                       logfile='{0}_inspect'.format(root))                
     except:
         pass
     
