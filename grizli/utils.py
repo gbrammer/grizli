@@ -3088,7 +3088,7 @@ class GTable(astropy.table.Table):
         idx, d2d, d3d = other_coo.match_to_catalog_sky(self_coo)
         return idx, d2d.to(u.arcsec)
             
-    def write_sortable_html(self, output, replace_braces=True, localhost=True, max_lines=50, table_id=None, table_class="display compact", css=None):
+    def write_sortable_html(self, output, replace_braces=True, localhost=True, max_lines=50, table_id=None, table_class="display compact", css=None, filter_columns=[], toggle=True):
         """Wrapper around `~astropy.table.Table.write(format='jsviewer')`.
         
         Parameters
@@ -3138,7 +3138,164 @@ td {font-size: 10pt;}
             fp = open(output, 'w')
             fp.writelines(lines)
             fp.close()
+        
+        # Range columns
+        lines = open(output).readlines()
+        ic_list = []
+        
+        filter_lines = ["<table>\n"]
+        
+        for ic, col in enumerate(self.colnames):
+            if col in filter_columns:
+                found=False
+                for i in range(len(lines)):
+                    if '<th>{0}'.format(col) in lines[i]:
+                        found=True
+                        break
+                
+                if found:
+                    #print(col)
+                    ic_list.append(ic)
+                    #lines[i] = lines[i].replace(col, '{0} <br> <input type="text" id="{0}_min" name="{0}_min" style="width:30px;"> <input type="text" id="{0}_max" name="{0}_max" style="width:30px;">'.format(col))
+                    
+                    filter_lines += '<tr> <td> <input type="text" id="{0}_min" name="{0}_min" style="width:40px;"> &#60; </td> <td> {0} </td> <td>  &#60; <input type="text" id="{0}_max" name="{0}_max" style="width:40px;">\n'.format(col)
+                    
+        if ic_list:
+            # Insert input lines
+            lines = open(output).readlines()
+
+            for il, line in enumerate(lines):
+                if '} );  </script>' in line:
+                    break
+            
+            filter_input = """
+
+<div>
+<b> Filter: </b>
+    <table>
+      {0}
+    </table>
+</div>
+
+""".format('\n'.join(['<tr> <td> <input type="text" id="{0}_min" name="{0}_min" style="width:40px;"> &#60; </td> <td style="align:center;"> <tt>{0}</tt> </td> <td>  &#60; <input type="text" id="{0}_max" name="{0}_max" style="width:40px;">\n'.format(self.colnames[ic]) for ic in ic_list]))
+
+            lines.insert(il+1, filter_input)
+                    
+            # Javascript push function
+            header_lines = ""
+            tester = []
+            
+            for ic in ic_list:
+                header_lines += """
+        var min_{0} = parseFloat( $('#{0}_min').val()) || -1e30;
+        var max_{0} = parseFloat( $('#{0}_max').val()) ||  1e30;
+        var data_{0} = parseFloat( data[{1}] ) || 0; 
+                """.format(self.colnames[ic], ic)
+                
+                tester.append("""( ( isNaN( min_{0} ) && isNaN( max_{0} ) ) || ( isNaN( min_{0} ) && data_{0} <= max_{0} ) || ( min_{0} <= data_{0}  && isNaN( max_{0} ) ) || ( min_{0} <= data_{0}  && data_{0} <= max_{0} ) )""".format(self.colnames[ic]))
+                     
+            # Javascript filter function
+            filter_function = """
+
+//// Parser
+// https://stackoverflow.com/questions/19491336/get-url-parameter-jquery-or-how-to-get-query-string-values-in-js @ Reza Baradaran
+$.urlParam = function(name){{
+    var results = new RegExp('[\?&]' + name + '=([^&#]*)').exec(window.location.href);
+    if (results==null){{
+       return null;
+    }}
+    else{{
+       return decodeURI(results[1]) || 0;
+    }}
+}}
+            
+$.fn.dataTable.ext.search.push(
+    function( settings, data, dataIndex ) {{
+{0}
+
+        if ( {1} ) 
+        {{ 
+            return true;
+        }}
+        return false;
+    }}
+);
+
+            """.format(header_lines, "\n && ".join(tester))
+            
+            for i, line in enumerate(lines):
+                if "$(document).ready(function()" in line:
+                    istart = i
+                    break
+            
+            lines.insert(istart, filter_function)
+            
+            # Parse address bar
+            lines.insert(istart+2, "\n\n")
+            for ic in ic_list:
+                lines.insert(istart+2, "        $('#{0}_max').val($.urlParam('{0}_max'));\n".format(self.colnames[ic]))
+                lines.insert(istart+2, "        $('#{0}_min').val($.urlParam('{0}_min'));\n".format(self.colnames[ic]))
+            
+            # Input listener
+            listener = """
+    // Event listener to the two range filtering inputs to redraw on input
+    $('{0}').keyup( function() {{
+        table.draw();
+    }} );
+            """.format(', '.join(['#{0}_min, #{0}_max'.format(self.colnames[ic]) for ic in ic_list]))
+
+            for il, line in enumerate(lines):
+                if '} );  </script>' in line:
+                    break
+            
+            lines.insert(il, listener)
+                            
+            fp = open(output, 'w')
+            fp.writelines(lines)
+            fp.close()
+        
+        if toggle:
+            lines = open(output).readlines()
+            
+            # Change call to DataTable
+            for il, line in enumerate(lines):
+                if 'dataTable(' in line:
+                    break
+            
+            lines[il] = "   var table = {0}\n".format(lines[il].strip().replace('dataTable','DataTable'))
+            
+            # Add function
+            for il, line in enumerate(lines):
+                if '} );  </script>' in line:
+                    break
+            
+            toggler = """
+    $('a.toggle-vis').on( 'click', function (e) {
+        e.preventDefault();
+
+        // Get the column API object
+        var column = table.column( $(this).attr('data-column') );
+
+        // Toggle the visibility
+        column.visible( ! column.visible() );
+    } );
     
+            """
+            lines.insert(il, toggler)
+            
+            toggle_div = """
+<div style="pad:50 50 50 50;">
+	<b>Toggle column:</b></br> {0}
+</div>
+            
+            """.format(' <b>/</b> '.join(['<a class="toggle-vis" data-column="{0}"> <tt>{1}</tt> </a>'.format(ic, col) for ic, col in enumerate(self.colnames)]))
+            
+            lines.insert(il+2, toggle_div)
+            
+            fp = open(output, 'w')
+            fp.writelines(lines)
+            fp.close()
+            
 def column_values_in_list(col, test_list):
     """Test if column elements "in" an iterable (e.g., a list of strings)
     
