@@ -3088,7 +3088,7 @@ class GTable(astropy.table.Table):
         idx, d2d, d3d = other_coo.match_to_catalog_sky(self_coo)
         return idx, d2d.to(u.arcsec)
             
-    def write_sortable_html(self, output, replace_braces=True, localhost=True, max_lines=50, table_id=None, table_class="display compact", css=None, filter_columns=[], toggle=True):
+    def write_sortable_html(self, output, replace_braces=True, localhost=True, max_lines=50, table_id=None, table_class="display compact", css=None, filter_columns=[], buttons=['csv'], toggle=True, use_json=False):
         """Wrapper around `~astropy.table.Table.write(format='jsviewer')`.
         
         Parameters
@@ -3105,6 +3105,21 @@ class GTable(astropy.table.Table):
             
         localhost : bool
             Use local JS files. Otherwise use files hosted externally.
+        
+        filter_columns : list
+            Add option to limit min/max values of column data
+        
+        buttons : list
+            Add buttons for exporting data.  Allowed options are
+            'copy', 'csv', 'excel', 'pdf', 'print'.
+        
+        toggle : bool
+            Add links at top of page for toggling columns on/off
+        
+        use_json : bool
+            Write the data to a JSON file and strip out of the HTML header. 
+            Use this for large datasets or if columns include rendered 
+            images.
             
         etc : ...
             Additional parameters passed through to `write`.
@@ -3139,8 +3154,43 @@ td {font-size: 10pt;}
             fp.writelines(lines)
             fp.close()
         
-        # Range columns
+        # Read all lines
         lines = open(output).readlines()
+        
+        # Export buttons
+        if buttons:
+            # CSS
+            css_script = '<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/buttons/1.5.1/css/buttons.dataTables.min.css">\n'
+            for il, line in enumerate(lines):
+                if 'css/jquery.dataTable' in line:
+                    break
+                                
+            lines.insert(il+1, css_script)
+
+            # JS libraries
+            js_scripts = """
+            <script type="text/javascript" language="javascript" src="https://cdn.datatables.net/buttons/1.5.1/js/dataTables.buttons.min.js"></script>
+            <script type="text/javascript" language="javascript" src="https://cdn.datatables.net/buttons/1.5.1/js/buttons.flash.min.js"></script>
+            <script type="text/javascript" language="javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
+            <script type="text/javascript" language="javascript" src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.32/pdfmake.min.js"></script>
+            <script type="text/javascript" language="javascript" src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.32/vfs_fonts.js"></script>
+            <script type="text/javascript" language="javascript" src="https://cdn.datatables.net/buttons/1.5.1/js/buttons.html5.min.js"></script>
+            <script type="text/javascript" language="javascript" src="https://cdn.datatables.net/buttons/1.5.1/js/buttons.print.min.js"></script>
+            """
+            
+            for il, line in enumerate(lines):
+                if 'js/jquery.dataTable' in line:
+                    break
+            lines.insert(il+2, js_scripts)
+            
+            for il, line in enumerate(lines):
+                if 'pageLength' in line:
+                    break
+            
+            button_option = '{spacer}dom: \'Bfrtip\',\n{spacer}buttons: {bstr},\n'.format(spacer=' '*8, bstr=buttons.__repr__())
+            lines.insert(il+1, button_option)
+            
+        # Range columns
         ic_list = []
         
         filter_lines = ["<table>\n"]
@@ -3162,7 +3212,6 @@ td {font-size: 10pt;}
                     
         if ic_list:
             # Insert input lines
-            lines = open(output).readlines()
 
             for il, line in enumerate(lines):
                 if '} );  </script>' in line:
@@ -3170,7 +3219,7 @@ td {font-size: 10pt;}
             
             filter_input = """
 
-<div>
+<div style="border:1px solid black; padding:10px; margin:10px">
 <b> Filter: </b>
     <table>
       {0}
@@ -3221,7 +3270,28 @@ $.fn.dataTable.ext.search.push(
     }}
 );
 
-            """.format(header_lines, "\n && ".join(tester))
+//// Update URL with filter parameters
+var filter_params = {2};
+
+$.UpdateFilterURL = function () {{
+    var i;
+    var filter_url = "";
+    for (i = 0; i < filter_params.length; i++) {{ 
+        if ($('#'+filter_params[i]+'_min').val() != "") {{
+            filter_url += '&'+filter_params[i]+'_min='+
+                    $('#'+filter_params[i]+'_min').val();
+        }}
+        if ($('#'+filter_params[i]+'_max').val() != "") {{
+            filter_url += '&'+filter_params[i]+'_max='+
+                    $('#'+filter_params[i]+'_max').val();
+        }}
+    }}
+
+    if (filter_url != "") {{
+        var filtered_url = window.location.href.split('?')[0] + '?' + filter_url;
+        window.history.pushState('', '', filtered_url);
+    }}
+}}\n\n""".format(header_lines, "\n && ".join(tester), [self.colnames[ic] for ic in ic_list].__repr__())
             
             for i, line in enumerate(lines):
                 if "$(document).ready(function()" in line:
@@ -3231,16 +3301,18 @@ $.fn.dataTable.ext.search.push(
             lines.insert(istart, filter_function)
             
             # Parse address bar
-            lines.insert(istart+2, "\n\n")
+            lines.insert(istart+2, "\n")
             for ic in ic_list:
-                lines.insert(istart+2, "        $('#{0}_max').val($.urlParam('{0}_max'));\n".format(self.colnames[ic]))
-                lines.insert(istart+2, "        $('#{0}_min').val($.urlParam('{0}_min'));\n".format(self.colnames[ic]))
+                lines.insert(istart+2, "{1}$('#{0}_max').val($.urlParam('{0}_max'));\n".format(self.colnames[ic], ' '*3))
+                lines.insert(istart+2, "{1}$('#{0}_min').val($.urlParam('{0}_min'));\n".format(self.colnames[ic], ' '*3))
+            lines.insert(istart+2, "\n")
             
             # Input listener
             listener = """
     // Event listener to the two range filtering inputs to redraw on input
     $('{0}').keyup( function() {{
         table.draw();
+        $.UpdateFilterURL();
     }} );
             """.format(', '.join(['#{0}_min, #{0}_max'.format(self.colnames[ic]) for ic in ic_list]))
 
@@ -3284,7 +3356,7 @@ $.fn.dataTable.ext.search.push(
             lines.insert(il, toggler)
             
             toggle_div = """
-<div style="pad:50 50 50 50;">
+<div style="border:1px solid black; padding:10px; margin:10px">
 	<b>Toggle column:</b></br> {0}
 </div>
             
@@ -3295,6 +3367,57 @@ $.fn.dataTable.ext.search.push(
             fp = open(output, 'w')
             fp.writelines(lines)
             fp.close()
+        
+        if use_json:
+            ### Write as json
+            
+            # Workaround to get ascii formatting
+            #pd = self.to_pandas()
+            new = GTable()
+            for c in self.colnames:
+                new[c] = self[c]
+            
+            new.write('/tmp/table.csv', format='csv', overwrite=True)
+            pd = GTable.gread('/tmp/table.csv').to_pandas()
+            
+            # Reformat to json
+            json_data = '        ' + pd.to_json(orient='values').replace('],[','\n    ]xxxxxx\n    [\n        ').replace(',',',\n        ').replace('xxxxxx',',')
+            json_str = """{{
+  "data": 
+{0}  
+  
+}}
+""".format(json_data.replace('\\""','"'))
+            
+            fp = open(output.replace('.html','.json'),'w')
+            fp.write(json_str)
+            fp.close()
+            
+            # Edit HTML file
+            lines = open(output).readlines()
+            
+            # Add ajax call to DataTable
+            for il, line in enumerate(lines):
+                if 'pageLength' in line:
+                    break
+            
+            ajax_call = '{spacer}"ajax": "{json}",\n{spacer}"deferRender": true,\n'.format(spacer=' '*8, json=output.replace('.html','.json'))
+            lines.insert(il+1, ajax_call)
+            
+            # Strip out table body
+            for ihead, line in enumerate(lines):
+                if '</thead>' in line:
+                    break
+            
+            for itail, line in enumerate(lines[::-1]):
+                if '</tr>' in line:
+                    break
+            
+            fp = open(output, 'w')
+            fp.writelines(lines[:ihead+1])
+            fp.writelines(lines[-itail:])
+            fp.close()
+        
             
 def column_values_in_list(col, test_list):
     """Test if column elements "in" an iterable (e.g., a list of strings)
