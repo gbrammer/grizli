@@ -141,4 +141,11 @@ def inspect(root='grizli', force=False):
         
         reprocess_wfc3.make_IMA_FLT(raw=raw, pop_reads=pop_reads, flatten_ramp=True)
     
+    # Remove "killed"
+    kill_files = [file.replace('ramp.png', 'flt.fits') for file in tab['images'][tab['kill'] > 0]]
+    for file in kill_files:
+        if os.path.exists(file):
+            os.remove(file)
+        
+    
     return True
