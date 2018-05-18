@@ -229,7 +229,7 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
             ir_ref = None
             
         auto_script.drizzle_overlaps(root, filters=optical_filters,
-            make_combined=(ir_ref is not None), ref_image=ir_ref) 
+            make_combined=(ir_ref is None), ref_image=ir_ref) 
         
         if ir_ref is None:
             # Need 
