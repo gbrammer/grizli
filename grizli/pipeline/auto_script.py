@@ -210,7 +210,7 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
         except:
             pass
             
-    if not os.path.exists('{0}-ir_drz_sci.fits'.format(root)):
+    if len(glob.glob('{0}-ir_dr?_sci.fits'.format(root))) == 0:
         
         ## Make mosaics
         IR_filters = ['F105W', 'F110W', 'F125W', 'F140W', 'F160W', 
@@ -223,9 +223,21 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
         
         # optical images
         optical_filters = ['F814W', 'F606W', 'F435W', 'F850LP', 'F702W', 'F555W', 'F438W', 'F475W', 'F625W', 'F775W', 'F225W', 'F275W', 'F300W', 'F390W']
+        if os.path.exists('{0}-ir_drz_sci.fits'.format(root)):
+            ir_ref = '{0}-ir_drz_sci.fits'.format(root)
+        else:
+            ir_ref = None
+            
         auto_script.drizzle_overlaps(root, filters=optical_filters,
-            make_combined=False, ref_image='{0}-ir_drz_sci.fits'.format(root)) 
+            make_combined=(ir_ref is not None), ref_image=ir_ref) 
         
+        if ir_ref is None:
+            # Need 
+            files = glob.glob('{0}-f*drc*sci.fits'.format(root))
+            filt = files[0].split('_drc')[0].split('-')[-1]
+            os.system('ln -s {0} {1}-ir_drc_sci.fits'.format(files[0], root))
+            os.system('ln -s {0} {1}-ir_drc_wht.fits'.format(files[0].replace('_sci','_wht'), root))
+            
     # Photometric catalog
     if not os.path.exists('{0}_phot.fits'.format(root)):
         tab = auto_script.multiband_catalog(field_root=root)
@@ -1201,6 +1213,7 @@ def grism_prep(field_root='j142724+334246', ds9=None, refine_niter=3):
     # Link minimal files to Extractions directory
     os.chdir('../Extractions/')
     os.system('ln -s ../Prep/*GrismFLT* .')
+    os.system('ln -s ../Prep/*_fl*wcs.fits .')
     os.system('ln -s ../Prep/*-ir.cat.fits .')
     os.system('ln -s ../Prep/*_phot.fits .')
    
@@ -1849,7 +1862,7 @@ def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140
     #keep = []
     
     if ref_image is None:
-        ref_image = '{0}-ir_drz_sci.fits'.format(field_root)
+        #ref_image = '{0}-ir_drz_sci.fits'.format(field_root)
         wfc3ir = {'product':'{0}-ir'.format(field_root), 'files':[]}
     else:
         wfc3ir = {'product':'{0}-ir'.format(field_root), 'files':[], 'reference':ref_image}
@@ -1885,7 +1898,15 @@ def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140
         return None
         
     keep = [filter_groups[k] for k in filter_groups]
-                        
+    
+    if ref_image is None:
+        if ('flc' in wfc3ir['files'][0]):
+            for i in range(len(keep)):
+                keep[i]['reference'] = '{0}-ir_drc_sci.fits'.format(field_root)
+        else:
+            for i in range(len(keep)):
+                keep[i]['reference'] = '{0}-ir_drz_sci.fits'.format(field_root)
+            
     if make_combined:
         prep.drizzle_overlaps([wfc3ir], parse_visits=False, pixfrac=pixfrac, scale=scale, skysub=False, bits=bits, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False, context=context)
     
