@@ -456,7 +456,7 @@ def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat',
     from grizli import utils
     
     keys = OrderedDict()
-    keys['PRIMARY'] = ['ID','RA','DEC','NINPUT','REDSHIFT','T_G102', 'T_G141','NUMLINES','HASLINES']
+    keys['PRIMARY'] = ['ID','RA','DEC','NINPUT','REDSHIFT','T_G102', 'T_G141', 'T_G800L', 'NUMLINES','HASLINES']
     
     keys['ZFIT_STACK'] = ['CHI2POLY','DOF','CHIMIN','CHIMAX','BIC_POLY','BIC_TEMP','Z02', 'Z16', 'Z50', 'Z84', 'Z97', 'ZWIDTH1', 'ZWIDTH2', 'Z_MAP', 'Z_RISK', 'MIN_RISK']
     
