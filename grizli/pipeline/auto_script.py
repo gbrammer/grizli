@@ -215,7 +215,8 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
         ## Make mosaics
         IR_filters = ['F105W', 'F110W', 'F125W', 'F140W', 'F160W', 
                       'F098M', 'F139M', 'F127M', 'F153M']
-        auto_script.drizzle_overlaps(root, filters=IR_filters) 
+        auto_script.drizzle_overlaps(root, filters=IR_filters, 
+                                     pad_reference=60) 
     
         # Fill image mosaics with scaled data so they can be used as
         # grism reference
@@ -229,14 +230,15 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
             ir_ref = None
             
         auto_script.drizzle_overlaps(root, filters=optical_filters,
-            make_combined=(ir_ref is None), ref_image=ir_ref) 
+            make_combined=(ir_ref is None), ref_image=ir_ref,
+            pad_reference=60, scale=(0.03 if ir_ref is None else 0.06)) 
         
-        if ir_ref is None:
-            # Need 
-            files = glob.glob('{0}-f*drc*sci.fits'.format(root))
-            filt = files[0].split('_drc')[0].split('-')[-1]
-            os.system('ln -s {0} {1}-ir_drc_sci.fits'.format(files[0], root))
-            os.system('ln -s {0} {1}-ir_drc_wht.fits'.format(files[0].replace('_sci','_wht'), root))
+        # if ir_ref is None:
+        #     # Need 
+        #     files = glob.glob('{0}-f*drc*sci.fits'.format(root))
+        #     filt = files[0].split('_drc')[0].split('-')[-1]
+        #     os.system('ln -s {0} {1}-ir_drc_sci.fits'.format(files[0], root))
+        #     os.system('ln -s {0} {1}-ir_drc_wht.fits'.format(files[0].replace('_sci','_wht'), root))
             
     # Photometric catalog
     if not os.path.exists('{0}_phot.fits'.format(root)):
@@ -1116,7 +1118,7 @@ def load_GroupFLT(field_root='j142724+334246', force_ref=None, force_seg=None, f
     
     # ACS
     if g800l.sum() > 0:
-        for f in ['F814W', 'F606W', 'F850LP', 'F435W']:
+        for f in ['F814W', 'F606W', 'F850LP', 'F435W', 'F777W']:
             if os.path.exists('{0}-{1}_drc_sci.fits'.format(field_root, f.lower())):
                 g800l_ref = f
                 break
@@ -1145,7 +1147,7 @@ def load_GroupFLT(field_root='j142724+334246', force_ref=None, force_seg=None, f
             ref_file = force_ref
         
         for sci_extn in [1,2]:        
-            grp_i = multifit.GroupFLT(grism_files=list(info['FILE'][g800l]), direct_files=[], ref_file=ref_file, seg_file=seg_file, catalog=catalog, cpu_count=-1, sci_extn=sci_extn, pad=pad)
+            grp_i = multifit.GroupFLT(grism_files=list(info['FILE'][g800l]), direct_files=[], ref_file=ref_file, seg_file=seg_file, catalog=catalog, cpu_count=-1, sci_extn=sci_extn, pad=0, shrink_segimage=False)
         
             if grp is not None:
                 grp.extend(grp_i)
@@ -1201,6 +1203,7 @@ def grism_prep(field_root='j142724+334246', ds9=None, refine_niter=3):
         fr = ds9.get('frame')
     
     for iter in range(refine_niter):
+        print('\nRefine contamination model, iter # {0}\n'.format(iter))
         if ds9:
             ds9.set('frame {0}'.format(int(fr)+iter+1))
         
@@ -1398,8 +1401,9 @@ def set_column_formats(fit):
     for c in ['z_risk', 'z_map', 'z02', 'z16', 'z50', 'z84', 'z97']: 
         fit[c].format = '.4f'
     
-    for c in ['t_g102', 't_g141']: 
-        fit[c].format = '.0f'
+    for c in ['t_g102', 't_g141', 't_g800l']: 
+        if c in fit.colnames:
+            fit[c].format = '.0f'
     
     for c in fit.colnames:
         if c.startswith('flux_'):
@@ -1494,7 +1498,7 @@ def summary_catalog(field_root='', dzbin=0.01, use_localhost=True, filter_bandpa
     fig.tight_layout(pad=0.2)
     fig.savefig('{0}_zhist.png'.format(field_root))
 
-    cols = ['idx','ra', 'dec', 'mag_auto', 't_g102', 't_g141', 'z_map', 'chinu', 'bic_diff', 'zwidth1', 'stellar_mass', 'ssfr', 'png_stack', 'png_full', 'png_line']
+    cols = ['idx','ra', 'dec', 'mag_auto', 't_g800l', 't_g102', 't_g141', 'z_map', 'chinu', 'bic_diff', 'zwidth1', 'stellar_mass', 'ssfr', 'png_stack', 'png_full', 'png_line']
     
     fit[cols].write_sortable_html(field_root+'-fit.html', replace_braces=True, localhost=use_localhost, max_lines=50000, table_id=None, table_class='display compact', css=None)
         
@@ -1842,12 +1846,12 @@ def update_wcs_headers_with_fine(field_root, backup=True):
                                                 xyscale=trans[j,:])
                 
         
-def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140W','F160W'], ref_image=None, bits=None, pixfrac=0.6, scale=0.06, make_combined=True, skysub=False, skymethod='localmin', match_str=[], context=False):
+def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140W','F160W'], ref_image=None, bits=None, pixfrac=0.6, scale=0.06, make_combined=True, skysub=False, skymethod='localmin', match_str=[], context=False, pad_reference=60):
     import numpy as np
     import glob
     
     try:
-        from .. import prep
+        from .. import prep, utils
     except:
         from grizli import prep
         
@@ -1900,12 +1904,16 @@ def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140
     keep = [filter_groups[k] for k in filter_groups]
     
     if ref_image is None:
-        if ('flc' in wfc3ir['files'][0]):
-            for i in range(len(keep)):
-                keep[i]['reference'] = '{0}-ir_drc_sci.fits'.format(field_root)
-        else:
-            for i in range(len(keep)):
-                keep[i]['reference'] = '{0}-ir_drz_sci.fits'.format(field_root)
+        print('\nCompute mosaic WCS: {0}_wcs-ref.fits\n'.format(field_root))
+        
+        ref_hdu = utils.make_maximal_wcs(wfc3ir['files'], pixel_scale=scale, get_hdu=True, pad=pad_reference, verbose=True)
+        
+        ref_hdu.writeto('{0}_wcs-ref.fits'.format(field_root), clobber=True,
+                        output_verify='fix')
+        
+        wfc3ir['reference'] = '{0}_wcs-ref.fits'.format(field_root)
+        for i in range(len(keep)):
+            keep[i]['reference'] = '{0}_wcs-ref.fits'.format(field_root)
             
     if make_combined:
         prep.drizzle_overlaps([wfc3ir], parse_visits=False, pixfrac=pixfrac, scale=scale, skysub=False, bits=bits, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False, context=context)

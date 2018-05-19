@@ -2268,6 +2268,83 @@ def make_wcsheader(ra=40.07293, dec=-1.6137748, size=2, pixscale=0.1, get_hdu=Fa
     else:
         return hout, wcs_out
 
+def make_maximal_wcs(files, pixel_scale=0.1, get_hdu=True, pad=90, verbose=True):
+    """
+    Compute a North-up HDU with a footprint that contains all of `files`
+    
+    Parameters
+    ----------
+    files : list
+        List of HST FITS files (e.g., FLT.)
+    
+    pixel_scale : float
+        Pixel scale of output WCS, in `~astropy.units.arcsec`.
+    
+    get_hdu : bool
+        See below.
+    
+    pad : float
+        Padding to add to the total image size, in `~astropy.units.arcsec`.
+        
+    Returns
+    -------
+    hdu : `~astropy.io.fits.ImageHDU`
+        If `get_hdu` is True.
+    
+    -or- 
+    
+    header, wcs : `~astropy.io.fits.Header`, `~astropy.wcs.WCS`
+        If `get_hdu` is False.
+    
+    """
+    import numpy as np
+    from shapely.geometry import Polygon
+    #from descartes import PolygonPatch
+    
+    import astropy.io.fits as pyfits
+    import astropy.wcs as pywcs
+    
+    group_poly = None
+    
+    for i, file in enumerate(files):
+        im = pyfits.open(file)
+        
+        if im[0].header['INSTRUME'] == 'ACS':
+            chips = 2
+        elif im[0].header['INSTRUME'] == 'WFPC2':
+            chips = 4
+        else:
+            chips = 1
+        
+        for chip in range(chips):
+            if ('SCI',chip+1) not in im:
+                continue
+                
+            wcs = pywcs.WCS(im['SCI',chip+1].header, fobj=im)
+            p_i = Polygon(wcs.calc_footprint())
+            if group_poly is None:
+                group_poly = p_i
+            else:
+                group_poly = group_poly.union(p_i)
+                
+            x0, y0 = np.cast[float](group_poly.centroid.xy)[:,0]
+            if verbose:
+                print('{0:>3d}/{1:>3d}: {2}[SCI,{3}]  {4:>6.2f}'.format(i, len(files), file, chip+1, group_poly.area*3600*np.cos(y0/180*np.pi)))
+    
+    px, py = np.cast[float](group_poly.convex_hull.boundary.xy   )  
+    x0, y0 = np.cast[float](group_poly.centroid.xy)[:,0]
+    
+    sx = (px.max()-px.min())*np.cos(y0/180*np.pi)*3600 # arcsec
+    sy = (py.max()-py.min())*3600 # arcsec
+    size = np.maximum(sx+pad, sy+pad)
+
+    out = make_wcsheader(ra=x0, dec=y0, size=size, pixscale=pixel_scale, get_hdu=get_hdu, theta=0)
+    
+    if verbose:
+        print('\n  Mosaic WCS: ({0:.5f},{1:.5f})  {2:.1f}\'/axis  {3:.3f}"/pix\n'.format(x0, y0, size/60, pixel_scale))
+        
+    return out
+    
 def header_keys_from_filelist(fits_files, keywords=[], ext=0, colname_case=str.lower):
     """Dump header keywords to a `~astropy.table.Table`
     

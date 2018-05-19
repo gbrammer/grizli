@@ -22,6 +22,9 @@ from . import utils
 from .utils_c import disperse
 from .utils_c import interp
 
+# Would prefer 'nearest' but that occasionally segment faults out
+SEGMENTATION_INTERP = 'nearest' 
+
 ### Factors for converting HST countrates to Flamba flux densities
 photflam_list = {'F098M': 6.0501324882418389e-20, 
             'F105W': 3.038658152508547e-20, 
@@ -1689,9 +1692,12 @@ class ImageData(object):
         
         #ref = pyfits.open(refimage)
         if hdu.data.dtype.type != np.float32:
-            hdu.data = np.cast[np.float32](hdu.data)
+            #hdu.data = np.cast[np.float32](hdu.data)
+            refdata = np.cast[np.float32](hdu.data)
+        else:
+            refdata = hdu.data
         
-        refdata = hdu.data
+        
         if 'ORIENTAT' in hdu.header.keys():
             hdu.header.remove('ORIENTAT')
             
@@ -1722,15 +1728,24 @@ class ImageData(object):
             ### Handle segmentation images a bit differently to preserve
             ### integers.
             ### +1 here is a hack for some memory issues
-            blotted_seg = astrodrizzle.ablot.do_blot(refdata+0., ref_wcs,
-                                flt_wcs, 1, coeffs=True, interp='nearest',
-                                sinscl=1.0, stepsize=10, wcsmap=None)
+            
+            seg_interp = 'nearest'
             
             blotted_ones = astrodrizzle.ablot.do_blot(seg_ones+1, ref_wcs,
-                                flt_wcs, 1, coeffs=True, interp='nearest',
+                                flt_wcs, 1, coeffs=True, 
+                                interp=seg_interp,
                                 sinscl=1.0, stepsize=10, wcsmap=None)
             
+            blotted_seg = astrodrizzle.ablot.do_blot(refdata*1., ref_wcs,
+                                flt_wcs, 1, coeffs=True, 
+                                interp=seg_interp,
+                                sinscl=1.0, stepsize=10, wcsmap=None)
+                        
             blotted_ones[blotted_ones == 0] = 1
+            
+            #pixel_ratio = (flt_wcs.idcscale / ref_wcs.idcscale)**2
+            #in_seg = np.abs(blotted_ones - pixel_ratio) < 1.e-2
+            
             ratio = np.round(blotted_seg/blotted_ones)
             seg = nd.maximum_filter(ratio, size=grow, mode='constant', cval=0)
             ratio[ratio == 0] = seg[ratio == 0]
@@ -2342,8 +2357,8 @@ class GrismFLT(object):
                                                        extra=self.pad,
                                                        verbose=True)
                 
-            ### Make sure image big enough
-            seg_hdu = self.direct.expand_hdu(seg_hdu)
+                ### Make sure image big enough
+                seg_hdu = self.direct.expand_hdu(seg_hdu)
             
             if verbose:
                 print('{0} / blot segmentation {1}'.format(self.direct_file, seg_str))
