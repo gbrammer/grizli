@@ -812,7 +812,7 @@ class GroupFLT():
         if (np.abs(mod_flux/obs_flux)[nonz].max() > max_coeff) | ((~np.isfinite(mod_flux/obs_flux)[nonz]).sum() > 0) | (np.min(mod_flux[nonz]) < 0) | ((~np.isfinite(ypoly)).sum() > 0):
             if verbose:
                 cstr = ' '.join(['{0:9.2e}'.format(c) for c in scale_coeffs])
-                print('{0} mag={1:6.2f} {2} xx'.format(id, mag, cstr))
+                print('{0:>5d} mag={1:6.2f} {2} xx'.format(id, mag, cstr))
 
             return True
         
@@ -828,7 +828,7 @@ class GroupFLT():
         
         if verbose:
             cstr = ' '.join(['{0:9.2e}'.format(c) for c in scale_coeffs])
-            print('{0} mag={1:6.2f} {2}'.format(id, mag, cstr))
+            print('{0:>5d} mag={1:6.2f} {2}'.format(id, mag, cstr))
             
         return True
         #m2d = mb.reshape_flat(modelf)
