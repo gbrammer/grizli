@@ -22,7 +22,7 @@ from . import utils
 from .utils import GRISM_COLORS
 
 # Minimum redshift where IGM is applied
-IGM_MINZ = 4
+IGM_MINZ = 3.4 # blue edge of G800L
 
 # Default parameters for drizzled line map
 PLINE = {'kernel': 'point', 'pixfrac': 0.2, 'pixscale': 0.1, 'size': 8, 'wcs': None}
@@ -39,6 +39,7 @@ def run_all_parallel(id, **kwargs):
     from grizli.fitting import run_all
     from grizli import multifit
     import time
+    import traceback
     
     t0 = time.time()
 
@@ -59,7 +60,10 @@ def run_all_parallel(id, **kwargs):
         status=1
     except:
         status=-1
-    
+        trace = traceback.format_exc(limit=2)#, file=fp)
+        if args['verbose']:
+            print(trace)
+            
     t1 = time.time()
     
     return id, status, t1-t0
@@ -1115,7 +1119,7 @@ class GroupFitter(object):
         
         # A = scipy.sparse.csr_matrix((self.N+NTEMP, self.Ntot))
         # bg_sp = scipy.sparse.csc_matrix(self.A_bg)
-        
+                
         for i, t in enumerate(templates):
             if t.startswith('line'):
                 lower_bound[self.N+i] = -np.inf
@@ -1563,7 +1567,8 @@ class GroupFitter(object):
                              get_uncertainties=get_uncertainties)
 
         chi2, coeffs, coeffs_err, covar = out
-        cont1d, line1d = utils.dot_templates(coeffs[self.N:], templates, z=z)
+        cont1d, line1d = utils.dot_templates(coeffs[self.N:], templates, z=z,
+                                             apply_igm=(z > IGM_MINZ))
 
         # Parse template coeffs
         cfit = OrderedDict()
@@ -1976,7 +1981,7 @@ class GroupFitter(object):
         # 
         #     return fig, sfit
     
-    def oned_figure(self, bin=1, show_beams=True, minor=0.1, tfit=None, axc=None, figsize=[6,4], fill=False, units='flam'):
+    def oned_figure(self, bin=1, show_beams=True, minor=0.1, tfit=None, axc=None, figsize=[6,4], fill=False, units='flam', min_sens=0.1):
         """
         1D figure
         
@@ -2057,7 +2062,7 @@ class GroupFitter(object):
             
             w = w/1.e4
             
-            clip = (sens > 0.1*sens.max()) 
+            clip = (sens > min_sens*sens.max()) 
             clip &= (er > 0)
             if clip.sum() == 0:
                 continue

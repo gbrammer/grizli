@@ -993,6 +993,9 @@ def get_line_wavelengths():
     line_wavelengths['HeII-1640'] = [1640.4]
     line_ratios['HeII-1640'] = [1.]
     
+    line_wavelengths['SiIV+OIV-1398'] = [1398.]
+    line_ratios['SiIV+OIV-1398'] = [1.]
+    
     line_wavelengths['NII'] = [6549.86, 6585.27]
     line_ratios['NII'] = [1., 3]
     line_wavelengths['NIII-1750'] = [1750.]
@@ -1192,7 +1195,7 @@ class SpectrumTemplate(object):
         #self.wave = xgauss
         #self.flux = gaussian
 
-    def zscale(self, z, scalar=1):
+    def zscale(self, z, scalar=1, apply_igm=True):
         """Redshift the template and multiply by a scalar.
         
         Parameters
@@ -1209,11 +1212,14 @@ class SpectrumTemplate(object):
             Redshifted and scaled spectrum.
             
         """
-        try:
-            import eazy.igm
-            igm = eazy.igm.Inoue14()
-            igmz = igm.full_IGM(z, self.wave*(1+z))
-        except:
+        if apply_igm:
+            try:
+                import eazy.igm
+                igm = eazy.igm.Inoue14()
+                igmz = igm.full_IGM(z, self.wave*(1+z))
+            except:
+                igmz = 1.
+        else:
             igmz = 1.
             
         return SpectrumTemplate(wave=self.wave*(1+z),
@@ -1551,8 +1557,7 @@ def load_templates(fwhm=400, line_complexes=True, stars=False,
                                  
     return temp_list    
 
-def load_quasar_templates(fwhm=2500, broad_lines=['OI-6302', 'HeI-5877', 'MgII', 'NeIII-3867'], narrow_lines=['OII', 'OIII', 'SII'], include_feii=True, slopes=[-2.8, 0, 2.8]):
-    
+def load_quasar_templates(broad_fwhm=2500, narrow_fwhm=1200, broad_lines=    ['OI-6302', 'HeI-5877', 'MgII', 'NeIII-3867', 'Lya', 'CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'SiIV+OIV-1398', 'NIV-1487', 'NV-1240'], narrow_lines=['OII', 'OIII', 'SII'], include_feii=True, slopes=[-2.8, 0, 2.8]):
     """
     Make templates suitable for fitting broad-line quasars
     """
@@ -1563,11 +1568,11 @@ def load_quasar_templates(fwhm=2500, broad_lines=['OI-6302', 'HeI-5877', 'MgII',
     t0 = OrderedDict()
     t1 = OrderedDict()
     
-    broad0 = load_templates(fwhm=2500, line_complexes=False, stars=False, full_line_list=['Balmer 10kK'] + broad_lines, continuum_list=[], fsps_templates=False, alf_template=False, lorentz=True)
+    broad0 = load_templates(fwhm=broad_fwhm, line_complexes=False, stars=False, full_line_list=['Balmer 10kK'] + broad_lines, continuum_list=[], fsps_templates=False, alf_template=False, lorentz=True)
 
-    broad1 = load_templates(fwhm=2500, line_complexes=False, stars=False, full_line_list=['Ha', 'Hb', 'Hg', 'Hd', 'OI-6302', 'HeI-5877', 'MgII'], continuum_list=[], fsps_templates=False, alf_template=False, lorentz=True)
+    broad1 = load_templates(fwhm=broad_fwhm, line_complexes=False, stars=False, full_line_list=['Ha', 'Hb', 'Hg', 'Hd'] + broad_lines, continuum_list=[], fsps_templates=False, alf_template=False, lorentz=True)
 
-    narrow = load_templates(fwhm=1200, line_complexes=False, stars=False, full_line_list=narrow_lines, continuum_list=[], fsps_templates=False, alf_template=False)
+    narrow = load_templates(fwhm=narrow_fwhm, line_complexes=False, stars=False, full_line_list=narrow_lines, continuum_list=[], fsps_templates=False, alf_template=False)
     
     for k in broad0:
         t0[k] = broad0[k]
@@ -1583,12 +1588,12 @@ def load_quasar_templates(fwhm=2500, broad_lines=['OI-6302', 'HeI-5877', 'MgII',
         feii_wave, feii_flux = np.loadtxt(os.path.dirname(__file__) + '/data/templates/FeII_VeronCetty2004.txt', unpack=True)
     
         # smoothing, in units of input velocity resolution
-        feii_kern = fwhm/2.3548/75.
+        feii_kern = broad_fwhm/2.3548/75.
         feii_sm = nd.gaussian_filter(feii_flux, feii_kern)
         t0['FeII-VC2004'] = t1['FeII-VC2004'] = SpectrumTemplate(wave=feii_wave, flux=feii_sm)
     
     # Linear continua
-    cont_wave = np.arange(1216, 2.5e4)
+    cont_wave = np.arange(400, 2.5e4)
     for slope in slopes:
         key = 'slope {0}'.format(slope)
         t0[key] = t1[key] = SpectrumTemplate(wave=cont_wave, flux=(cont_wave/6563.)**slope)
@@ -1647,7 +1652,7 @@ def polynomial_templates(wave, order=0, line=False):
     
     return temp
         
-def dot_templates(coeffs, templates, z=0, max_R=5000):
+def dot_templates(coeffs, templates, z=0, max_R=5000, apply_igm=True):
     """Compute template sum analogous to `np.dot(coeffs, templates)`.
     """  
     
@@ -1668,25 +1673,28 @@ def dot_templates(coeffs, templates, z=0, max_R=5000):
     wave, flux_arr, is_line = array_templates(templates, max_R=max_R)
     
     # IGM
-    try:
-        import eazy.igm
-        IGM = eazy.igm.Inoue14()
+    if apply_igm:
+        try:
+            import eazy.igm
+            IGM = eazy.igm.Inoue14()
         
-        lylim = wave < 1250
-        igmz = np.ones_like(wave)
-        igmz[lylim] = IGM.full_IGM(z, wave[lylim]*(1+z))    
-    except:
+            lylim = wave < 1250
+            igmz = np.ones_like(wave)
+            igmz[lylim] = IGM.full_IGM(z, wave[lylim]*(1+z))    
+        except:
+            igmz = 1.
+    else:
         igmz = 1.
-    
+        
     flux_arr *= igmz
     
     # Continuum
     cont = np.dot(coeffs*(~is_line), flux_arr)
-    tc = SpectrumTemplate(wave=wave, flux=cont).zscale(z)
+    tc = SpectrumTemplate(wave=wave, flux=cont).zscale(z, apply_igm=False)
     
     # Full template
     line = np.dot(coeffs, flux_arr)
-    tl = SpectrumTemplate(wave=wave, flux=line).zscale(z)
+    tl = SpectrumTemplate(wave=wave, flux=line).zscale(z, apply_igm=False)
     
     return tc, tl
     
