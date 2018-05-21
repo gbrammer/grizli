@@ -216,7 +216,8 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
         IR_filters = ['F105W', 'F110W', 'F125W', 'F140W', 'F160W', 
                       'F098M', 'F139M', 'F127M', 'F153M']
         auto_script.drizzle_overlaps(root, filters=IR_filters, 
-                                     pad_reference=60) 
+                                     pad_reference=60,
+                                     min_nexp=1) 
     
         # Fill image mosaics with scaled data so they can be used as
         # grism reference
@@ -231,7 +232,8 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
             
         auto_script.drizzle_overlaps(root, filters=optical_filters,
             make_combined=(ir_ref is None), ref_image=ir_ref,
-            pad_reference=60, scale=(0.03 if ir_ref is None else 0.06)) 
+            pad_reference=60, scale=(0.03 if ir_ref is None else 0.06),
+            min_nexp=2) 
         
         # if ir_ref is None:
         #     # Need 
@@ -1846,7 +1848,7 @@ def update_wcs_headers_with_fine(field_root, backup=True):
                                                 xyscale=trans[j,:])
                 
         
-def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140W','F160W'], ref_image=None, bits=None, pixfrac=0.6, scale=0.06, make_combined=True, skysub=False, skymethod='localmin', match_str=[], context=False, pad_reference=60):
+def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140W','F160W'], ref_image=None, bits=None, pixfrac=0.6, scale=0.06, make_combined=True, skysub=False, skymethod='localmin', match_str=[], context=False, pad_reference=60, min_nexp=2):
     import numpy as np
     import glob
     
@@ -1874,9 +1876,15 @@ def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140
     filter_groups = {}
     for visit in visits:
         
+        # Visit failed for some reason
         if visit['product']+'.failed' in failed_list:
             continue
         
+        # Too few exposures (i.e., one with unreliable CR flags)
+        if len(visit['files']) < min_nexp:
+            continue
+        
+        # Not one of the desired filters    
         filt = visit['product'].split('-')[-1]
         if filt.upper() not in filters:
             continue
