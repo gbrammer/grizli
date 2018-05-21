@@ -912,6 +912,8 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
             tab = tab[np.isfinite(tab[c])]
 
         ## Segmentation
+        seg[mask] = 0
+        
         pyfits.writeto('{0}_seg.fits'.format(root), data=seg,
                        header=wcs_header, overwrite=True)
 
