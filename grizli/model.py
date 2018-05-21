@@ -3282,7 +3282,7 @@ class GrismFLT(object):
 class BeamCutout(object):
     def __init__(self, flt=None, beam=None, conf=None, 
                  get_slice_header=True, fits_file=None, scale=1., 
-                 contam_sn_mask=[10,3]):
+                 contam_sn_mask=[10,3], min_mask=0.01):
         """Cutout spectral object from the full frame.
         
         Parameters
@@ -3308,6 +3308,10 @@ class BeamCutout(object):
             
         contam_sn_mask : TBD
         
+        min_mask : float
+            Minimum factor relative to the maximum pixel value where the 
+            2D cutout data are considered good.
+            
         Attributes
         ----------
         grism, direct : `ImageData` (sliced)
@@ -3350,9 +3354,11 @@ class BeamCutout(object):
         
         self.beam.scale = scale
         self.contam_sn_mask = contam_sn_mask
-        self._parse_from_data(contam_sn_mask=contam_sn_mask)
+        self.min_mask = min_mask
+        self._parse_from_data(contam_sn_mask=contam_sn_mask,
+                              min_mask=min_mask)
         
-    def _parse_from_data(self, contam_sn_mask=[10,3]):
+    def _parse_from_data(self, contam_sn_mask=[10,3], min_mask=0.01):
         
         ### bad pixels or problems with uncertainties
         self.mask = ((self.grism.data['DQ'] > 0) | 
@@ -3380,7 +3386,7 @@ class BeamCutout(object):
         
         ### OK data where the 2D model has non-zero flux
         self.fit_mask = (~self.mask.flatten()) & (self.ivar.flatten() != 0)
-        self.fit_mask &= (self.flat_flam > 0.01*self.flat_flam.max())
+        self.fit_mask &= (self.flat_flam > min_mask*self.flat_flam.max())
         #self.fit_mask &= (self.flat_flam > 3*self.contam.flatten())
             
         ### Flat versions of sci/ivar arrays
