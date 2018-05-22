@@ -1004,9 +1004,12 @@ def get_line_wavelengths():
     line_ratios['NIV-1487'] = [1.]
     line_wavelengths['NV-1240'] = [1240.81]
     line_ratios['NV-1240'] = [1.]
-
+    
     line_wavelengths['Lya'] = [1215.4]
     line_ratios['Lya'] = [1.]
+
+    line_wavelengths['QSO-UV-lines'] = [line_wavelengths[k][0] for k in ['Lya','CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'SiIV+OIV-1398', 'NV-1240']]
+    line_ratios['QSO-UV-lines'] = [1., 0.5, 0.1, 0.008, 0.09, 0.1, 0.3]
     
     line_wavelengths['Lya+CIV'] = [1215.4, 1549.49]
     line_ratios['Lya+CIV'] = [1., 0.1]
@@ -1557,7 +1560,7 @@ def load_templates(fwhm=400, line_complexes=True, stars=False,
                                  
     return temp_list    
 
-def load_quasar_templates(broad_fwhm=2500, narrow_fwhm=1200, broad_lines=    ['OI-6302', 'HeI-5877', 'MgII', 'NeIII-3867', 'Lya', 'CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'SiIV+OIV-1398', 'NIV-1487', 'NV-1240'], narrow_lines=['OII', 'OIII', 'SII'], include_feii=True, slopes=[-2.8, 0, 2.8]):
+def load_quasar_templates(broad_fwhm=2500, narrow_fwhm=1200, broad_lines=    ['OI-6302', 'HeI-5877', 'MgII', 'NeIII-3867', 'Lya', 'CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'SiIV+OIV-1398', 'NIV-1487', 'NV-1240'], narrow_lines=['OII', 'OIII', 'SII'], include_feii=True, slopes=[-2.8, 0, 2.8], uv_line_complex=True):
     """
     Make templates suitable for fitting broad-line quasars
     """
@@ -1568,7 +1571,10 @@ def load_quasar_templates(broad_fwhm=2500, narrow_fwhm=1200, broad_lines=    ['O
     t0 = OrderedDict()
     t1 = OrderedDict()
     
-    broad0 = load_templates(fwhm=broad_fwhm, line_complexes=False, stars=False, full_line_list=['Balmer 10kK'] + broad_lines, continuum_list=[], fsps_templates=False, alf_template=False, lorentz=True)
+    if uv_line_complex:
+        broad0 = load_templates(fwhm=broad_fwhm, line_complexes=False, stars=False, full_line_list=['Balmer 10kK', 'QSO-UV-lines'], continuum_list=[], fsps_templates=False, alf_template=False, lorentz=True)
+    else:
+        broad0 = load_templates(fwhm=broad_fwhm, line_complexes=False, stars=False, full_line_list=['Balmer 10kK'] + broad_lines, continuum_list=[], fsps_templates=False, alf_template=False, lorentz=True)
 
     broad1 = load_templates(fwhm=broad_fwhm, line_complexes=False, stars=False, full_line_list=['Ha', 'Hb', 'Hg', 'Hd'] + broad_lines, continuum_list=[], fsps_templates=False, alf_template=False, lorentz=True)
 
