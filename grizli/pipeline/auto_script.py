@@ -217,7 +217,7 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
                       'F098M', 'F139M', 'F127M', 'F153M']
         auto_script.drizzle_overlaps(root, filters=IR_filters, 
                                      pad_reference=60,
-                                     min_nexp=1) 
+                                     min_nexp=1, ref_image=None) 
     
         # Fill image mosaics with scaled data so they can be used as
         # grism reference
@@ -255,7 +255,9 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
     files = glob.glob('*GrismFLT.fits')
     if len(files) == 0:
         os.chdir(os.path.join(HOME_PATH, root, 'Prep'))
-        grp = auto_script.grism_prep(field_root=root, refine_niter=3)
+        gris_ref_filters = GRIS_REF_FILTERS
+        grp = auto_script.grism_prep(field_root=root, refine_niter=3,
+                                     gris_ref_filters=gris_ref_filters)
         del(grp)
               
     ######################
@@ -1021,7 +1023,11 @@ def photutils_catalog(field_root='j142724+334246', threshold=1.8, subtract_bkg=T
     
     return tab
     
-def load_GroupFLT(field_root='j142724+334246', force_ref=None, force_seg=None, force_cat=None, galfit=False, pad=256, files=None):
+GRIS_REF_FILTERS = {'G141': ['F140W', 'F160W', 'F125W', 'F105W', 'F110W', 'F098M', 'F127M', 'F139M', 'F153M', 'F132N', 'F130N', 'F128N', 'F126N', 'F164N', 'F167N'],
+                    'G102': ['F105W', 'F098M', 'F110W', 'F125W', 'F140W', 'F160W', 'F127M', 'F139M', 'F153M', 'F132N', 'F130N', 'F128N', 'F126N', 'F164N', 'F167N'],
+                    'G800L': ['F814W', 'F606W', 'F850LP', 'F435W', 'F777W']}
+                    
+def load_GroupFLT(field_root='j142724+334246', force_ref=None, force_seg=None, force_cat=None, galfit=False, pad=256, files=None, gris_ref_filters=GRIS_REF_FILTERS):
     """
     Initialize a GroupFLT object
     """
@@ -1047,7 +1053,7 @@ def load_GroupFLT(field_root='j142724+334246', force_ref=None, force_seg=None, f
     
     grp = None
     if g141.sum() > 0:
-        for f in ['F140W', 'F160W', 'F125W', 'F105W', 'F110W', 'F098M', 'F127M', 'F139M', 'F153M', 'F132N', 'F130N', 'F128N', 'F126N', 'F164N', 'F167N']:
+        for f in gris_ref_filters['G141']:
             
             if os.path.exists('{0}-{1}_drz_sci.fits'.format(field_root, f.lower())):
                 g141_ref = f
@@ -1082,7 +1088,7 @@ def load_GroupFLT(field_root='j142724+334246', force_ref=None, force_seg=None, f
         grp = multifit.GroupFLT(grism_files=list(info['FILE'][g141]), direct_files=[], ref_file=ref_file, seg_file=seg_file, catalog=catalog, cpu_count=-1, sci_extn=1, pad=pad)
     
     if g102.sum() > 0:
-        for f in ['F105W', 'F098M', 'F110W', 'F125W', 'F140W', 'F160W', 'F127M', 'F139M', 'F153M', 'F132N', 'F130N', 'F128N', 'F126N', 'F164N', 'F167N']:
+        for f in gris_ref_filters['G102']:
             if os.path.exists('{0}-{1}_drz_sci.fits'.format(field_root, f.lower())):
                 g102_ref = f
                 break
@@ -1120,7 +1126,7 @@ def load_GroupFLT(field_root='j142724+334246', force_ref=None, force_seg=None, f
     
     # ACS
     if g800l.sum() > 0:
-        for f in ['F814W', 'F606W', 'F850LP', 'F435W', 'F777W']:
+        for f in gris_ref_filters['G800L']:
             if os.path.exists('{0}-{1}_drc_sci.fits'.format(field_root, f.lower())):
                 g800l_ref = f
                 break
@@ -1159,15 +1165,15 @@ def load_GroupFLT(field_root='j142724+334246', force_ref=None, force_seg=None, f
             del(grp_i)
     
     return grp
-        
-def grism_prep(field_root='j142724+334246', ds9=None, refine_niter=3):
+    
+def grism_prep(field_root='j142724+334246', ds9=None, refine_niter=3, gris_ref_filters=GRIS_REF_FILTERS):
     import glob
     import os
     import numpy as np
     
     from .. import prep, utils, multifit
 
-    grp = load_GroupFLT(field_root=field_root)
+    grp = load_GroupFLT(field_root=field_root, gris_ref_filters=gris_ref_filters)
     
     ################
     # Compute preliminary model
