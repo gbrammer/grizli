@@ -871,7 +871,7 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
     if get_background:
         bkg = sep.Background(data, mask=mask, bw=32, bh=32, fw=3, fh=3)
         bkg_data = bkg.back()
-
+        
         pyfits.writeto('{0}_bkg.fits'.format(root), data=bkg_data,
                     header=wcs_header, overwrite=True)
 
@@ -3280,7 +3280,8 @@ def fix_star_centers(root='macs1149.6+2223-rot-ca5-22-032.0-f105w',
         #cat = make_drz_catalog(root=root)
         cat = make_SEP_catalog(root=root)
 
-def find_single_image_CRs(visit, simple_mask=False, with_ctx_mask=True):
+def find_single_image_CRs(visit, simple_mask=False, with_ctx_mask=True, 
+                          run_lacosmic=True):
     """Use LACosmic to find CRs in parts of an ACS mosaic where only one
     exposure was available
     
@@ -3289,10 +3290,13 @@ def find_single_image_CRs(visit, simple_mask=False, with_ctx_mask=True):
     visit : dict
         List of visit information from `~grizli.utils.parse_flt_files`.
     
-   simple_mask : bool
+    simple_mask : bool
         If true, set 1024 CR bit for all parts of a given FLT where it does
         not overlap with any others in the visit.  If False, then run 
         LACosmic to flag CRs in this area but keep the pixels.
+    
+    run_lacosmic : bool
+        Run LA Cosmic.
         
     Requires context (CTX) image `visit['product']+'_drc_ctx.fits`.   
     """
@@ -3333,14 +3337,17 @@ def find_single_image_CRs(visit, simple_mask=False, with_ctx_mask=True):
                 else:
                     inmask = dq > 0
                     
-                crmask, clean = lacosmicx.lacosmicx(sci, inmask=inmask,
+                if run_lacosmic:
+                    crmask, clean = lacosmicx.lacosmicx(sci, inmask=inmask,
                              sigclip=4.5, sigfrac=0.3, objlim=5.0, gain=1.0,
                              readnoise=6.5, satlevel=65536.0, pssl=0.0,
                              niter=4, sepmed=True, cleantype='meanmask',
                              fsmode='median', psfmodel='gauss',
                              psffwhm=2.5,psfsize=7, psfk=None, psfbeta=4.765,
                              verbose=False)
-            
+                else:
+                    crmask = ctx_mask
+                    
                 if with_ctx_mask:
                     dq[crmask & ctx_mask] |= 1024
                 else:
