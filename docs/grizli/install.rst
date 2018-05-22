@@ -29,8 +29,8 @@ this file, do the following
         git clone https://github.com/gbrammer/grizli.git
         cd grizli
         
-        # Generate the conda environment
-        conda env create -f environment.yml
+        # Generate a conda environment named "grizli-dev"
+        conda env create -f environment.yml -n grizli-dev
         
         # Activate the environment.  This needs to be done each time you 
         # start a new terminal, or put it in ~/.bashrc
