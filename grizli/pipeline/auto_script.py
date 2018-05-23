@@ -127,7 +127,7 @@ def get_extra_data(root='j114936+222414', HOME_PATH='/Volumes/Pegasus/Grizli/Aut
 
     os.chdir(CWD)
     
-def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', inspect_ramps=False, manual_alignment=False, is_parallel_field=False, reprocess_parallel=False, only_preprocess=False, run_extractions=True, run_fit=True, s3_sync=False):
+def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', inspect_ramps=False, manual_alignment=False, is_parallel_field=False, reprocess_parallel=False, only_preprocess=False, run_extractions=True, run_fit=True, s3_sync=False, fine_radec=None):
     """
     Run the full pipeline for a given target
         
@@ -201,7 +201,7 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
     fine_catalogs = ['GAIA','PS1','SDSS','WISE']
     if len(glob.glob('{0}*fine.png'.format(root))) == 0:
         try:
-            out = auto_script.fine_alignment(field_root=root, HOME_PATH=HOME_PATH, min_overlap=0.2, stopme=False, ref_err=0.08, catalogs=fine_catalogs, NITER=1, maglim=[17,23], shift_only=True, method='Powell', redrizzle=False, radius=30, program_str=None, match_str=[])
+            out = auto_script.fine_alignment(field_root=root, HOME_PATH=HOME_PATH, min_overlap=0.2, stopme=False, ref_err=0.08, catalogs=fine_catalogs, NITER=1, maglim=[17,23], shift_only=True, method='Powell', redrizzle=False, radius=30, program_str=None, match_str=[], radec=fine_radec)
             plt.close()
 
             # Update WCS headers with fine alignment
@@ -244,7 +244,7 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
             
     # Photometric catalog
     if not os.path.exists('{0}_phot.fits'.format(root)):
-        tab = auto_script.multiband_catalog(field_root=root)
+        tab = auto_script.multiband_catalog(field_root=root, threshold=1.8, get_background=False, get_all_filters=False)
     
     # Stop if only want to run pre-processing
     if only_preprocess | (len(all_groups) == 0):
@@ -825,7 +825,7 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
     #             
     # prep.drizzle_overlaps(keep, parse_visits=False, pixfrac=0.6, scale=0.06, skysub=False, bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False)
 
-def multiband_catalog(field_root='j142724+334246', threshold=1.8, get_background=True):
+def multiband_catalog(field_root='j142724+334246', threshold=1.8, get_background=True, get_all_filters=False):
     """
     Make a detection catalog with SExtractor and then measure
     photometry with `~photutils`.
@@ -849,14 +849,17 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, get_background
         
     # Source positions
     source_xy = tab['X_IMAGE'], tab['Y_IMAGE']
+    
+    if get_all_filters:
+        filters = [file.split('_')[-3][len(field_root)+1:] for file in glob.glob('{0}-f*dr?_sci.fits'.format(field_root))]
+    else:
+        visits, all_groups, info = np.load('{0}_visits.npy'.format(field_root))
 
-    visits, all_groups, info = np.load('{0}_visits.npy'.format(field_root))
-    
-    if ONLY_F814W:
-        info = info[((info['INSTRUME'] == 'WFC3') & (info['DETECTOR'] == 'IR')) | (info['FILTER'] == 'F814W')]
-    
-    filters = [f.lower() for f in np.unique(info['FILTER'])]
-    
+        if ONLY_F814W:
+            info = info[((info['INSTRUME'] == 'WFC3') & (info['DETECTOR'] == 'IR')) | (info['FILTER'] == 'F814W')]
+
+        filters = [f.lower() for f in np.unique(info['FILTER'])]
+        
     #filters.insert(0, 'ir')
     
     segment_img = pyfits.open('{0}-ir_seg.fits'.format(field_root))[0].data
@@ -1233,7 +1236,7 @@ def grism_prep(field_root='j142724+334246', ds9=None, refine_niter=3, gris_ref_f
 DITHERED_PLINE = {'kernel': 'point', 'pixfrac': 0.2, 'pixscale': 0.1, 'size': 8, 'wcs': None}
 PARALLEL_PLINE = {'kernel': 'square', 'pixfrac': 0.8, 'pixscale': 0.1, 'size': 8, 'wcs': None}
   
-def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00, ids=None, pline=DITHERED_PLINE, fit_only_beams=True, run_fit=True, poly_order=7, master_files=None):
+def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00, ids=None, pline=DITHERED_PLINE, fit_only_beams=True, run_fit=True, poly_order=7, master_files=None, fit_trace_shift=False):
     import glob
     import os
     
@@ -1313,7 +1316,14 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
             continue
             
         mb = multifit.MultiBeam(beams, fcontam=0.5, group_name=target, psf=False, MW_EBV=MW_EBV)
-                
+        if fit_trace_shift:
+            b = mb.beams[0]
+            b.compute_model()
+            sn_lim = fit_trace_shift*1
+            if (np.max((b.model/b.grism['ERR'])[b.fit_mask.reshape(b.sh)]) > sn_lim) | (sn_lim > 100):
+                print(' Fit trace shift: \n')
+                shift = mb.fit_trace_shift(tol=1.e-3, verbose=verbose, split_groups=True, lm=True)
+            
         try:
             pfit = mb.template_at_z(z=0, templates=poly_templates, fit_background=True, fitter='lstsq', get_uncertainties=2)
         except:
@@ -1324,8 +1334,7 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
             fig1.savefig('{0}_{1:05d}.1D.png'.format(target, id))
         except:
             continue
-
-            
+   
         hdu, fig = mb.drizzle_grisms_and_PAs(fcontam=0.5, flambda=False, kernel='point', size=32, zfit=pfit)
         fig.savefig('{0}_{1:05d}.stack.png'.format(target, id))
 
