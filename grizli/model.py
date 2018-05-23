@@ -84,7 +84,7 @@ class GrismDisperser(object):
                        segmentation=None, origin=[500, 500], 
                        xcenter=0., ycenter=0., pad=0, grow=1, beam='A',
                        conf=['WFC3','F140W', 'G141'], scale=1.,
-                       fwcpos=None, MW_EBV=0.):
+                       fwcpos=None, MW_EBV=0., yoffset=0):
         """Object for computing dispersed model spectra
         
         Parameters
@@ -133,6 +133,12 @@ class GrismDisperser(object):
         
         fwcpos : float
             Rotation position of the NIRISS filter wheel
+        
+        MW_EBV : float
+            Galactic extinction
+        
+        yoffset : float
+            Cross-dispersion offset to apply to the trace
             
         Attributes
         ----------
@@ -233,9 +239,14 @@ class GrismDisperser(object):
         # Get Pixel area map (xxx need to add test for WFC3)
         self.PAM_value = self.get_PAM_value(verbose=False)
         #print('xxx PAM!')
-        
+                
         self.process_config()
     
+        self.yoffset = yoffset
+        if yoffset != 0:
+            #print('yoffset!', yoffset)
+            self.add_ytrace_offset(yoffset)
+            
     def init_galactic_extinction(self, MW_EBV=0., R_V=utils.MW_RV):
         """
         Initialize Fitzpatrick 99 Galactic extinction
@@ -393,6 +404,7 @@ class GrismDisperser(object):
                                 beam=self.beam, fwcpos=self.fwcpos)
         
         self.ytrace_beam *= self.grow
+        self.yoffset = yoffset
         
         self.ytrace_beam += yoffset
         
@@ -3533,7 +3545,12 @@ class BeamCutout(object):
         self.grism.fwcpos = h0['FWCPOS']
         if (self.grism.fwcpos == 0) | (self.grism.fwcpos == ''):
             self.grism.fwcpos = None
-            
+        
+        if 'TYOFFSET' in h0:
+            yoffset = h0['TYOFFSET']
+        else:
+            yoffset = 0.
+                 
         self.beam = GrismDisperser(id=h0['ID'], direct=direct, 
                                    segmentation=hdu['SEG'].data*1,
                                    origin=self.direct.origin,
@@ -3542,7 +3559,8 @@ class BeamCutout(object):
                                    xcenter=h0['XCENTER'],
                                    ycenter=h0['YCENTER'],
                                    conf=conf, fwcpos=self.grism.fwcpos,
-                                   MW_EBV=self.grism.MW_EBV)
+                                   MW_EBV=self.grism.MW_EBV, 
+                                   yoffset=yoffset)
         
         self.grism.parent_file = h0['GPARENT']
         self.direct.parent_file = h0['DPARENT']
@@ -3589,8 +3607,12 @@ class BeamCutout(object):
         h0['XCENTER'] = (self.beam.xcenter, 
                          'Offset of centroid wrt thumb center')
         h0['YCENTER'] = (self.beam.ycenter, 
-                         'Offset of centroid wrt thumb center')
-                         
+                         'Offset of centroid wrt thumb center')        
+        
+        if hasattr(self.beam, 'yoffset'):
+            h0['TYOFFSET'] = (self.beam.yoffset, 
+                         'Cross dispersion offset of the trace')
+        
         h0['GPARENT'] = (self.grism.parent_file, 
                          'Parent grism file')
         

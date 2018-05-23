@@ -1193,7 +1193,11 @@ class MultiBeam(GroupFitter):
             beam.ivar = beam.ivarf.reshape(beam.sh)
             
         self._set_MW_EBV(MW_EBV)
+        
         self._parse_beams(psf=psf)
+
+        self.apply_trace_shift()
+
         self.Nphot = 0
         self.is_spec = 1
         
@@ -1278,7 +1282,12 @@ class MultiBeam(GroupFitter):
                 #beam.model = beam.modelf.reshape(beam.beam.sh_beam)
             
                 self.psf_param_dict[beam.grism.parent_file] = beam.beam.psf_params
-                
+        
+        self._parse_beam_arrays()
+        
+    def _parse_beam_arrays(self):
+        """
+        """        
         self.poly_order = None
         
         self.shapes = [beam.model.shape for beam in self.beams]
@@ -1314,7 +1323,7 @@ class MultiBeam(GroupFitter):
         
         self.DoF = int((self.weightf*self.fit_mask).sum())
         self.Nmask = np.sum([b.fit_mask.sum() for b in self.beams])
-        
+                
         ### Initialize background fit array
         # self.A_bg = np.zeros((self.N, self.Ntot))
         # i0 = 0
@@ -2827,42 +2836,65 @@ class MultiBeam(GroupFitter):
             
         return fit, fig, fig2, hdu2, hdu_full
     
-    def fit_trace_shift(self, split_groups=True, max_shift=5, tol=1.e-2, verbose=True):
+    def apply_trace_shift(self, set_to_zero=False):
+        """
+        Set beam.yoffset back to zero
+        """
+        indices = [[i] for i in range(self.N)]
+        if set_to_zero:
+            s0 = np.zeros(len(indices))
+        else:
+            s0 = [beam.beam.yoffset for beam in self.beams] 
+            
+        args = (self, indices, 0, False, False)
+        self.eval_trace_shift(s0, *args)
+        
+        ### Reset model profile for optimal extractions
+        for b in self.beams:
+            b._parse_from_data()
+        
+        self._parse_beam_arrays()
+                
+    def fit_trace_shift(self, split_groups=True, max_shift=5, tol=1.e-2, verbose=True, lm=False):
         """TBD
         """
-        import scipy.optimize
+        from scipy.optimize import leastsq, minimize
         
         if split_groups:
-            roots = np.unique([b.grism.parent_file.split('_')[0] for b in self.beams])
             indices = []
-            for root in roots:
-                idx = [i for i in range(self.N) if self.beams[i].grism.parent_file.startswith(root)]
-                indices.append(idx)
-            
+            for g in self.PA:
+                for p in self.PA[g]:
+                    indices.append(self.PA[g][p])
         else:
             indices = [[i] for i in range(self.N)]
         
-        shifts = np.zeros(len(indices))
+        s0 = np.zeros(len(indices))
         bounds = np.array([[-max_shift,max_shift]]*len(indices))
         
-        args = (self, indices, 0, verbose)
-        out = scipy.optimize.minimize(self.eval_trace_shift, shifts, bounds=bounds, args=args, method='Powell', tol=tol)
+        args = (self, indices, 0, lm, verbose)
+        if lm:
+            out = leastsq(self.eval_trace_shift, s0, args=args, Dfun=None, full_output=0, col_deriv=0, ftol=1.49012e-08, xtol=1.49012e-08, gtol=0.0, maxfev=0, epsfcn=None, factor=100, diag=None)
+            shifts = out[0]
+        else:
+            out = minimize(self.eval_trace_shift, s0, bounds=bounds, args=args, method='Powell', tol=tol)
+            shifts = out.x
         
-        self.eval_trace_shift(out.x, *args)
+        self.eval_trace_shift(shifts, *args)
         
-        ### Rest model profile for optimal extractions
+        ### Reset model profile for optimal extractions
         for b in self.beams:
-            if hasattr(b.beam, 'optimal_profile'):
-                delattr(b.beam, 'optimal_profile')
-            
-        return out.x
+            b._parse_from_data()
+        
+        self._parse_beam_arrays()
+           
+        return shifts, out
         
     @staticmethod
-    def eval_trace_shift(shifts, self, indices, poly_order, verbose):
+    def eval_trace_shift(shifts, self, indices, poly_order, lm, verbose):
         """TBD
         """
         import scipy.ndimage as nd
-        
+
         for il, l in enumerate(indices):
             for i in l:
                 if hasattr(self.beams[i].beam, 'psf'):
@@ -2889,10 +2921,17 @@ class MultiBeam(GroupFitter):
         out_coeffs = np.zeros(A.shape[0])
         out_coeffs[ok_temp] = coeffs
         modelf = np.dot(out_coeffs, A)
+        
+        if lm:
+            # L-M, return residuals
+            if verbose:
+                print('{0} [{1}]'.format(utils.NO_NEWLINE, ' '.join(['{0:5.2f}'.format(s) for s in shifts])))
+                return ((self.scif-modelf)*self.sivarf)[self.fit_mask]
+                
         chi2 = np.sum(((self.scif - modelf)**2*self.ivarf)[self.fit_mask])
 
         if verbose:
-            print(shifts, chi2/self.DoF)
+            print('{0} [{1}] {2:6.2f}'.format(utils.NO_NEWLINE, ' '.join(['{0:5.2f}'.format(s) for s in shifts]), chi2/self.DoF))
         
         return chi2/self.DoF    
     
