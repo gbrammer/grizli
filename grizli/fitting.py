@@ -68,7 +68,7 @@ def run_all_parallel(id, **kwargs):
     
     return id, status, t1-t0
     
-def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter='nnls', group_name='grism', fit_stacks=True, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=3, fit_only_beams=False, fit_beams=True, root='', fit_trace_shift=False, phot=None, verbose=True, scale_photometry=False, show_beams=True, overlap_threshold=5, MW_EBV=0., sys_err=0.03, get_dict=False, bad_pa_threshold=1.6, **kwargs):
+def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter='nnls', group_name='grism', fit_stacks=True, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=3, fit_only_beams=False, fit_beams=True, root='', fit_trace_shift=False, phot=None, verbose=True, scale_photometry=False, show_beams=True, overlap_threshold=5, MW_EBV=0., sys_err=0.03, get_dict=False, bad_pa_threshold=1.6, units1d='flam', **kwargs):
     """Run the full procedure
     
     1) Load MultiBeam and stack files 
@@ -122,12 +122,12 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
 
     if fit_trace_shift:
         b = mb.beams[0]
+        b.compute_model()
         sn_lim = fit_trace_shift*1
         if (np.max((b.model/b.grism['ERR'])[b.fit_mask.reshape(b.sh)]) > sn_lim) | (sn_lim > 100):
-            shift = mb.fit_trace_shift(tol=1.e-3, verbose=verbose)
-        
-            #shift = mb.fit_trace_shift(tol=1.e-3)
-    
+            shift, _ = mb.fit_trace_shift(tol=1.e-3, verbose=verbose, 
+                                       split_groups=True)
+            
     mb.initialize_masked_arrays()
 
     if phot is not None:
@@ -255,7 +255,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     if pline is None:
          pzfit, pspec2, pline = grizli.multifit.get_redshift_fit_defaults()
     
-    line_hdu = mb.drizzle_fit_lines(tfit, pline, force_line=['SIII','SII','Ha', 'OIII', 'Hb', 'OII'], save_fits=False, mask_lines=True, mask_sn_limit=mask_sn_limit, verbose=verbose)
+    line_hdu = mb.drizzle_fit_lines(tfit, pline, force_line=['SIII','SII','Ha', 'OIII', 'Hb', 'OII', 'Lya'], save_fits=False, mask_lines=True, mask_sn_limit=mask_sn_limit, verbose=verbose)
     
     # Add beam exposure times
     exptime = mb.compute_exptime()
@@ -271,7 +271,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     line_hdu.writeto('{0}_{1:05d}.full.fits'.format(group_name, id), clobber=True, output_verify='fix')
     
     # 1D spectrum
-    oned_hdul = mb.oned_spectrum_to_hdu(tfit=tfit, bin=1, outputfile='{0}_{1:05d}.1D.fits'.format(group_name, id))
+    oned_hdul = mb.oned_spectrum_to_hdu(tfit=tfit, bin=1, outputfile='{0}_{1:05d}.1D.fits'.format(group_name, id), units=units1d)
     
     ######
     # Show the drizzled lines and direct image cutout, which are
@@ -280,8 +280,8 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     
     s = 4.e-19/np.max([beam.beam.total_flux for beam in mb.beams]) 
     s = np.clip(s, 0.25, 4)
-    
-    full_line_list = ['OII', 'Hb', 'OIII', 'Ha', 'SII', 'SIII']
+
+    full_line_list = ['Lya', 'OII', 'Hb', 'OIII', 'Ha', 'SII', 'SIII']
     fig = show_drizzled_lines(line_hdu, size_arcsec=si, cmap='plasma_r', scale=s, dscale=s, full_line_list=full_line_list)
     fig.savefig('{0}_{1:05d}.line.png'.format(group_name, id))
     
@@ -1981,13 +1981,47 @@ class GroupFitter(object):
         # 
         #     return fig, sfit
     
-    def oned_figure(self, bin=1, show_beams=True, minor=0.1, tfit=None, axc=None, figsize=[6,4], fill=False, units='flam', min_sens=0.1):
+    def oned_figure(self, bin=1, show_beams=True, minor=0.1, tfit=None, axc=None, figsize=[6,4], fill=False, units='flam', min_sens=0.1, ylim_percentile=2, scale_on_stacked=False):
         """
         1D figure
+        1D figure
+        
+        Parameters
+        ----------
+        bin : type
+        
+        show_beams : type
+        
+        minor : type
+        
+        tfit : type
+        
+        acx : type
+        
+        figsize : type
+        
+        fill : type
+        
+        units : 'flam', 'nJy', 'mJy', 'eps', 'meps'
+            Plot units. 
+            
+        min_sens : type
+        
+        ylim_percentile : float
+        
+        Returns
+        -------
+        fig : type
+        
         
         """
         import matplotlib.pyplot as plt
+        from scipy.interpolate import UnivariateSpline
         
+        if (tfit is None) & (units in ['resid', 'spline']):
+            print('`tfit` not specified.  Can\'t plot units=\'{0}\'.'.format(units))
+            return False
+            
         #### Spectra
         if axc is None:
             fig = plt.figure(figsize=figsize)
@@ -2001,11 +2035,26 @@ class GroupFitter(object):
         wmin = 1.e30
         wmax = -1.e30
         
+        if units == 'spline':
+            ran = ((tfit['cont1d'].wave >= self.wavef.min()) & 
+                   (tfit['cont1d'].wave <= self.wavef.max()))
+            
+            if ran.sum() == 0:
+                print('No overlap with template')
+                return False
+                
+            spl = UnivariateSpline(tfit['cont1d'].wave[ran], 
+                                   tfit['cont1d'].flux[ran], ext=1)
+            mspl = (tfit['cont1d'].wave, spl(tfit['cont1d'].wave))
+        else:
+            mspl = None
+                                   
         # 1D Model
         if tfit is not None:
             sp = tfit['line1d'].wave, tfit['line1d'].flux
             w = sp[0]
         else:
+            sp = None
             w = np.arange(self.wavef.min()-201, self.wavef.max()+201, 100)
 
         spf = w, w*0+1
@@ -2015,6 +2064,9 @@ class GroupFitter(object):
             if tfit is not None:
                 m_i = beam.compute_model(spectrum_1d=sp, is_cgs=True, in_place=False).reshape(beam.sh)
             
+            if mspl is not None:
+                mspl_i = beam.compute_model(spectrum_1d=mspl, is_cgs=True, in_place=False).reshape(beam.sh)
+                
             f_i = beam.compute_model(spectrum_1d=spf, is_cgs=True, in_place=False).reshape(beam.sh)
             
             if hasattr(beam, 'init_epsf'): # grizli.model.BeamCutout
@@ -2027,7 +2079,10 @@ class GroupFitter(object):
                 if tfit is not None:
                     clean -= tfit['cfit']['bg {0:03d}'.format(i)][0]
                     w, flm, erm = beam.beam.optimal_extract(m_i, bin=bin, ivar=beam.ivar)
-                    
+                
+                if mspl is not None:
+                    w, flspl, erm = beam.beam.optimal_extract(mspl_i, bin=bin, ivar=beam.ivar)
+                        
                 w, fl, er = beam.beam.optimal_extract(clean, bin=bin, ivar=beam.ivar)            
                 w, sens, ers = beam.beam.optimal_extract(f_i, bin=bin, ivar=beam.ivar)
                 #sens = beam.beam.sensitivity                
@@ -2037,6 +2092,9 @@ class GroupFitter(object):
                 if tfit is not None:
                     clean -= - tfit['cfit']['bg {0:03d}'.format(i)][0]
                     w, flm, erm = beam.optimal_extract(m_i, bin=bin, ivar=beam.ivar)
+                    
+                if mspl is not None:
+                    w, flspl, erm = beam.beam.optimal_extract(mspl_i, bin=bin, ivar=beam.ivar)
                     
                 w, fl, er = beam.optimal_extract(clean, bin=bin, ivar=beam.ivar)            
                 w, sens, ers = beam.optimal_extract(f_i, bin=bin, ivar=beam.ivar)
@@ -2056,6 +2114,18 @@ class GroupFitter(object):
             elif units == 'uJy':
                 unit_corr = 1./sens*w**2/2.99e18/1.e-23/1.e-6/pscale
                 unit_label = r'$f_\nu$ ($\mu$Jy)'
+            elif units == 'meps':
+                unit_corr = 1000.
+                unit_label = 'milli-e/s'
+            elif units == 'eps':
+                unit_corr = 1.
+                unit_label = 'e/s'
+            elif units == 'resid':
+                unit_corr = 1./flm
+                unit_label = 'resid'
+            elif units == 'spline':
+                unit_corr = 1/flspl
+                unit_label = 'spline resid'
             else: # 'flam
                 unit_corr = 1./sens/1.e-19/pscale
                 unit_label = r'$f_\lambda \times 10^{-19}$'
@@ -2087,10 +2157,11 @@ class GroupFitter(object):
 
                 # Plot limits         
                 ymax = np.maximum(ymax,
-                            np.percentile((flm+np.median(er[clip]))[clip], 98))
+                            np.percentile((flm+np.median(er[clip]))[clip],
+                                           100-ylim_percentile))
             
-                ymin = np.minimum(ymin, np.percentile((flm-er*0.)[clip], 2))
-
+                ymin = np.minimum(ymin, np.percentile((flm-er*0.)[clip],
+                                                       ylim_percentile))
             else:
                 
                 # Plot limits         
@@ -2117,7 +2188,7 @@ class GroupFitter(object):
             ax.set_xticklabels(['{0:.1f}'.format(l) for l in labels])    
         
         ### Binned spectrum by grism
-        if tfit is None:
+        if (tfit is None) | (scale_on_stacked):
             ymin = 1.e30
             ymax = -1.e30
         
@@ -2128,9 +2199,16 @@ class GroupFitter(object):
 
         if tfit is not None:
             bg_model = self.get_flat_background(tfit['coeffs'], apply_mask=True)
+            m2d = self.get_flat_model(sp, apply_mask=True, is_cgs=True)
+            sp_model = self.optimal_extract(m2d, bin=bin)
         else:
             bg_model = 0.
+            sp_model = 1.
         
+        if mspl is not None:
+            m2d = self.get_flat_model(mspl, apply_mask=True, is_cgs=True)
+            sp_spline = self.optimal_extract(m2d, bin=bin)
+            
         sp_data = self.optimal_extract(self.scif_mask-bg_model, bin=bin)
 
         for g in sp_data:
@@ -2143,24 +2221,36 @@ class GroupFitter(object):
                     pscale = self.compute_scale_array(self.pscale, sp_data[g]['wave'])
             
             if units == 'nJy':
-                unit_corr = sp_data[g]['wave']**2/2.99e18/1.e-23/1.e-9/pscale
+                unit_corr = sp_data[g]['wave']**2/sp_flat[g]['flux']
+                unit_corr *= 1/2.99e18/1.e-23/1.e-9/pscale
             elif units == 'uJy':
-                unit_corr = sp_data[g]['wave']**2/2.99e18/1.e-23/1.e-6/pscale
+                unit_corr = sp_data[g]['wave']**2/sp_flat[g]['flux']
+                unit_corr *= 1/2.99e18/1.e-23/1.e-6/pscale
+            elif units == 'meps':
+                unit_corr = 1000.
+            elif units == 'eps':
+                unit_corr = 1.
+            elif units == 'resid':
+                unit_corr = 1./sp_model[g]['flux']
+            elif units == 'spline':
+                unit_corr = 1./sp_spline[g]['flux']
             else: # 'flam
-                unit_corr = 1./1.e-19/pscale
+                unit_corr = 1./sp_flat[g]['flux']/1.e-19/pscale
             
-            flux = (sp_data[g]['flux']/sp_flat[g]['flux']*unit_corr)[clip]
-            err = (sp_data[g]['err']/sp_flat[g]['flux']*unit_corr)[clip]
+            flux = (sp_data[g]['flux']*unit_corr)[clip]
+            err = (sp_data[g]['err']*unit_corr)[clip]
             
             if fill:
                 axc.fill_between(sp_data[g]['wave'][clip]/1.e4, flux-err, flux+err, color=GRISM_COLORS[g], alpha=0.8, zorder=1) 
             else:
                 axc.errorbar(sp_data[g]['wave'][clip]/1.e4, flux, err, color=GRISM_COLORS[g], alpha=0.8, marker='.', linestyle='None', zorder=1) 
                 
-            if (tfit is None) & (clip.sum() > 0):
+            if ((tfit is None) & (clip.sum() > 0)) | (scale_on_stacked):
                 # Plot limits         
-                ymax = np.maximum(ymax, np.percentile(flux+err, 98))
-                ymin = np.minimum(ymin, np.percentile(flux-err, 2))
+                ymax = np.maximum(ymax, np.percentile(flux+err,
+                                                     100-ylim_percentile))
+                ymin = np.minimum(ymin, np.percentile(flux-err,
+                                                      ylim_percentile))
                        
         if (ymin < 0) & (ymax > 0):
             ymin = -0.1*ymax
@@ -2433,7 +2523,12 @@ def show_drizzled_lines(line_hdu, full_line_list=['OII', 'Hb', 'OIII', 'Ha', 'SI
         ax.set_yticklabels([]); ax.set_xticklabels([])
         ax.set_xlim(N+np.array([-1,1])*size_arcsec/pix_size)
         ax.set_ylim(N+np.array([-1,1])*size_arcsec/pix_size)
-
+        
+        x0 = np.mean(ax.get_xlim())
+        y0 = np.mean(ax.get_xlim())
+        ax.scatter(N, N, marker='+', color='k', zorder=100, alpha=0.5)
+        ax.scatter(N, N, marker='+', color='w', zorder=101, alpha=0.5)
+        
         ax.xaxis.set_major_locator(majorLocator)
         ax.yaxis.set_major_locator(majorLocator)
 
