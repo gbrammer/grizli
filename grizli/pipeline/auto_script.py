@@ -1236,7 +1236,7 @@ def grism_prep(field_root='j142724+334246', ds9=None, refine_niter=3, gris_ref_f
 DITHERED_PLINE = {'kernel': 'point', 'pixfrac': 0.2, 'pixscale': 0.1, 'size': 8, 'wcs': None}
 PARALLEL_PLINE = {'kernel': 'square', 'pixfrac': 0.8, 'pixscale': 0.1, 'size': 8, 'wcs': None}
   
-def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00, ids=None, pline=DITHERED_PLINE, fit_only_beams=True, run_fit=True, poly_order=7, master_files=None, fit_trace_shift=False):
+def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00, ids=None, pline=DITHERED_PLINE, fit_only_beams=True, run_fit=True, poly_order=7, master_files=None, grp=None):
     import glob
     import os
     
@@ -1252,8 +1252,12 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
     if master_files is None:
         master_files = glob.glob('*GrismFLT.fits')
         
-    grp = multifit.GroupFLT(grism_files=master_files, direct_files=[], ref_file=None, seg_file='{0}-ir_seg.fits'.format(field_root), catalog='{0}-ir.cat.fits'.format(field_root), cpu_count=-1, sci_extn=1, pad=256)
-    
+    if grp is None:
+        init_grp = True
+        grp = multifit.GroupFLT(grism_files=master_files, direct_files=[], ref_file=None, seg_file='{0}-ir_seg.fits'.format(field_root), catalog='{0}-ir.cat.fits'.format(field_root), cpu_count=-1, sci_extn=1, pad=256)
+    else:
+        init_grp = False
+        
     ###############
     # PHotometry
     
@@ -1380,9 +1384,12 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
             pass
     
     # Re-save data with updated models
-    grp.save_full_data()
-    return grp
-
+    if init_grp:
+        grp.save_full_data()
+        return grp
+    else:
+        return True
+        
 def generate_fit_params(field_root='j142724+334246', prior=None, MW_EBV=0.00, pline=DITHERED_PLINE, fit_only_beams=True, run_fit=True, poly_order=7, fsps=True, sys_err = 0.03, fcontam=0.2, zr=[0.1, 3.4], save_file='fit_args.npy'):
     """
     Generate a parameter dictionary for passing to the fitting script
