@@ -301,6 +301,21 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
     if run_fit:
         auto_script.summary_catalog(field_root=root)
 
+def make_directories(field_root='j142724+334246', HOME_PATH='./'):
+    """
+    Make RAW, Prep, Persistence, Extractions directories
+    """
+    import os
+    
+    for dir in [os.path.join(HOME_PATH, field_root), 
+                os.path.join(HOME_PATH, field_root, 'RAW'),
+                os.path.join(HOME_PATH, field_root, 'Prep'),
+                os.path.join(HOME_PATH, field_root, 'Persistence'),
+                os.path.join(HOME_PATH, field_root, 'Extractions')]:
+        
+        if not os.path.exists(dir):
+            os.mkdir(dir)
+            
 def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', inst_products={'WFPC2/WFPC2': ['C0M', 'C1M'], 'ACS/WFC': ['FLC'], 'WFC3/IR': ['RAW'], 'WFC3/UVIS': ['FLC']}, remove_bad=True, reprocess_parallel=False, s3_sync=False):
     """
     Fully automatic script
@@ -322,18 +337,23 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/
         from .. import utils
     except:
         from grizli import utils
+    
+    if not os.path.exists(os.path.join(HOME_PATH, field_root, 'RAW')):
+        make_directories(field_root=field_root, HOME_PATH=HOME_PATH)
         
-    for dir in [os.path.join(HOME_PATH, field_root), 
-                os.path.join(HOME_PATH, field_root, 'RAW'),
-                os.path.join(HOME_PATH, field_root, 'Prep'),
-                os.path.join(HOME_PATH, field_root, 'Persistence'),
-                os.path.join(HOME_PATH, field_root, 'Extractions')]:
-        
-        if not os.path.exists(dir):
-            os.mkdir(dir)
+    # for dir in [os.path.join(HOME_PATH, field_root), 
+    #             os.path.join(HOME_PATH, field_root, 'RAW'),
+    #             os.path.join(HOME_PATH, field_root, 'Prep'),
+    #             os.path.join(HOME_PATH, field_root, 'Persistence'),
+    #             os.path.join(HOME_PATH, field_root, 'Extractions')]:
+    #     
+    #     if not os.path.exists(dir):
+    #         os.mkdir(dir)
             
     
-    tab = utils.GTable.gread('{0}_footprint.fits'.format(field_root))
+    tab = utils.GTable.gread('{0}/{1}_footprint.fits'.format(HOME_PATH,
+                             field_root))
+                             
     tab = tab[(tab['filter'] != 'F218W')]
     if ONLY_F814W:
         tab = tab[(tab['filter'] == 'F814W') | (tab['instdet'] == 'WFC3/IR')]
@@ -341,10 +361,18 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/
     # Fetch and preprocess IR backgrounds
     os.chdir(os.path.join(HOME_PATH, field_root, 'RAW'))
     
-    curl = fetch.make_curl_script(tab, level=None, script_name='fetch_{0}.sh'.format(field_root), inst_products=inst_products, skip_existing=True, output_path='./', s3_sync=s3_sync)
+    # Ignore files already moved to RAW/Expflag
+    bad_files = glob.glob('./Expflag/*')
+    badexp = np.zeros(len(tab), dtype=bool)
+    for file in bad_files:
+        root = os.path.basename(file).split('_')[0]
+        badexp |= tab['observation_id'] == root.upper()
+        
+    curl = fetch.make_curl_script(tab[~badexp], level=None, script_name='fetch_{0}.sh'.format(field_root), inst_products=inst_products, skip_existing=True, output_path='./', s3_sync=s3_sync)
         
     # Ugly callout to shell
     os.system('sh fetch_{0}.sh'.format(field_root))
+    
     files = glob.glob('*raw.fits.gz')
     files.extend(glob.glob('*fl?.fits.gz'))
     files.extend(glob.glob('*c[01]?.fits.gz')) # WFPC2
@@ -661,7 +689,8 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
         status = prep.process_direct_grism_visit(direct=direct, grism=grism,
                             radec=radec, skip_direct=False,
                             align_mag_limits=[14,22],
-                            reference_catalogs=catalogs)
+                            reference_catalogs=catalogs, 
+                            sky_iter=10, iter_atol=1.e-4)
         
         ###################################
         # Persistence Masking
@@ -825,7 +854,7 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
     #             
     # prep.drizzle_overlaps(keep, parse_visits=False, pixfrac=0.6, scale=0.06, skysub=False, bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False)
 
-def multiband_catalog(field_root='j142724+334246', threshold=1.8, get_background=True, get_all_filters=False):
+def multiband_catalog(field_root='j142724+334246', threshold=1.8, get_background=True, get_all_filters=False, det_err_scale=-np.inf, clean=True):
     """
     Make a detection catalog with SExtractor and then measure
     photometry with `~photutils`.
@@ -845,7 +874,7 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, get_background
         from grizli import prep, utils
             
     # Make catalog
-    tab = prep.make_SEP_catalog(root='{0}-ir'.format(field_root), threshold=threshold, get_background=get_background, save_to_fits=True, clean=False)
+    tab = prep.make_SEP_catalog(root='{0}-ir'.format(field_root), threshold=threshold, get_background=get_background, save_to_fits=True, clean=clean, err_scale=det_err_scale)
         
     # Source positions
     source_xy = tab['X_IMAGE'], tab['Y_IMAGE']
@@ -1028,7 +1057,7 @@ def photutils_catalog(field_root='j142724+334246', threshold=1.8, subtract_bkg=T
     
 GRIS_REF_FILTERS = {'G141': ['F140W', 'F160W', 'F125W', 'F105W', 'F110W', 'F098M', 'F127M', 'F139M', 'F153M', 'F132N', 'F130N', 'F128N', 'F126N', 'F164N', 'F167N'],
                     'G102': ['F105W', 'F098M', 'F110W', 'F125W', 'F140W', 'F160W', 'F127M', 'F139M', 'F153M', 'F132N', 'F130N', 'F128N', 'F126N', 'F164N', 'F167N'],
-                    'G800L': ['F814W', 'F606W', 'F850LP', 'F435W', 'F777W']}
+                    'G800L': ['F814W', 'F850LP', 'F606W', 'F435W', 'F777W']}
                     
 def load_GroupFLT(field_root='j142724+334246', force_ref=None, force_seg=None, force_cat=None, galfit=False, pad=256, files=None, gris_ref_filters=GRIS_REF_FILTERS):
     """
@@ -1169,19 +1198,23 @@ def load_GroupFLT(field_root='j142724+334246', force_ref=None, force_seg=None, f
     
     return grp
     
-def grism_prep(field_root='j142724+334246', ds9=None, refine_niter=3, gris_ref_filters=GRIS_REF_FILTERS):
+def grism_prep(field_root='j142724+334246', ds9=None, refine_niter=3, gris_ref_filters=GRIS_REF_FILTERS, files=None):
     import glob
     import os
     import numpy as np
     
     from .. import prep, utils, multifit
 
-    grp = load_GroupFLT(field_root=field_root, gris_ref_filters=gris_ref_filters)
+    grp = load_GroupFLT(field_root=field_root, gris_ref_filters=gris_ref_filters, files=files)
     
     ################
     # Compute preliminary model
     grp.compute_full_model(fit_info=None, verbose=True, store=False, mag_limit=25, coeffs=[1.1, -0.5], cpu_count=4)
-        
+    
+    ##############
+    # Save model to avoid having to recompute it again
+    grp.save_full_data()
+    
     ################
     # Remove constant modal background 
     import scipy.stats
@@ -1236,7 +1269,7 @@ def grism_prep(field_root='j142724+334246', ds9=None, refine_niter=3, gris_ref_f
 DITHERED_PLINE = {'kernel': 'point', 'pixfrac': 0.2, 'pixscale': 0.1, 'size': 8, 'wcs': None}
 PARALLEL_PLINE = {'kernel': 'square', 'pixfrac': 0.8, 'pixscale': 0.1, 'size': 8, 'wcs': None}
   
-def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00, ids=None, pline=DITHERED_PLINE, fit_only_beams=True, run_fit=True, poly_order=7, master_files=None, grp=None):
+def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00, ids=None, pline=DITHERED_PLINE, fit_only_beams=True, run_fit=True, poly_order=7, master_files=None, grp=None, bad_pa_threshold=None):
     import glob
     import os
     
@@ -1320,13 +1353,25 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
             continue
             
         mb = multifit.MultiBeam(beams, fcontam=0.5, group_name=target, psf=False, MW_EBV=MW_EBV)
+        
+        if bad_pa_threshold is not None:
+            out = mb.check_for_bad_PAs(chi2_threshold=bad_pa_threshold,
+                                                   poly_order=1, reinit=True, 
+                                                  fit_background=True)
+
+            fit_log, keep_dict, has_bad = out
+
+            if has_bad:
+                print('\n  Has bad PA!  Final list: {0}\n{1}'.format(keep_dict, fit_log))
+        
+        
         if fit_trace_shift:
             b = mb.beams[0]
             b.compute_model()
             sn_lim = fit_trace_shift*1
             if (np.max((b.model/b.grism['ERR'])[b.fit_mask.reshape(b.sh)]) > sn_lim) | (sn_lim > 100):
                 print(' Fit trace shift: \n')
-                shift = mb.fit_trace_shift(tol=1.e-3, verbose=verbose, split_groups=True, lm=True)
+                shift = mb.fit_trace_shift(tol=1.e-3, verbose=True, split_groups=True, lm=True)
             
         try:
             pfit = mb.template_at_z(z=0, templates=poly_templates, fit_background=True, fitter='lstsq', get_uncertainties=2)
@@ -1339,7 +1384,7 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
         except:
             continue
    
-        hdu, fig = mb.drizzle_grisms_and_PAs(fcontam=0.5, flambda=False, kernel='point', size=32, zfit=pfit)
+        hdu, fig = mb.drizzle_grisms_and_PAs(fcontam=0.5, flambda=False, kernel='point', size=32, zfit=pfit, diff=False)
         fig.savefig('{0}_{1:05d}.stack.png'.format(target, id))
 
         hdu.writeto('{0}_{1:05d}.stack.fits'.format(target, id), clobber=True)
