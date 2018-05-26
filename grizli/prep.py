@@ -799,7 +799,7 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
                       clean=True, rescale_weight=True, minarea=14,
                       column_case=str.upper, save_to_fits=True,
                       source_xy=None, autoparams=[2.5, 3.5], mask_kron=False,
-                      max_total_corr=2,
+                      max_total_corr=2, err_scale=-np.inf,
                       **kwargs):
     """Make a catalog from drizzle products using the SEP implementation of SExtractor
 
@@ -849,7 +849,7 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
     drz_im = pyfits.open(drz_file)
     data = drz_im[0].data.byteswap().newbyteorder()
     data_mask = np.cast[data.dtype](data == 0)
-    
+        
     try:
         wcs = pywcs.WCS(drz_im[0].header)
         wcs_header = utils.to_header(wcs)
@@ -862,13 +862,15 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
         wht_data = wht_im[0].data.byteswap().newbyteorder()
 
         err = 1/np.sqrt(wht_data)
+        del(wht_data)
+        
         err[~np.isfinite(err)] = 0
         mask = (err == 0) 
     else:
         mask = (data == 0)
         err = None
 
-    if get_background:
+    if get_background | (err_scale < 0):
         bkg = sep.Background(data, mask=mask, bw=32, bh=32, fw=3, fh=3)
         bkg_data = bkg.back()
         
@@ -879,11 +881,17 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
          err = bkg.rms()
 
         ratio = bkg.rms()/err
-        err_scale = np.median(ratio[(~mask) & np.isfinite(ratio)])
-
+        if err_scale == -np.inf:
+            err_scale = np.median(ratio[(~mask) & np.isfinite(ratio)])
+        else:
+            # Just return the error scale
+            if err_scale < 0:
+                xerr_scale = np.median(ratio[(~mask) & np.isfinite(ratio)])
+                return xerr_scale
     else:
         bkg_data = 0.
-        err_scale = 1.
+        if err_scale is None:
+            err_scale = 1.
 
     if rescale_weight:
         err *= err_scale
@@ -892,13 +900,25 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
 
     if source_xy is None:
         ### Run the detection
-        objects, seg = sep.extract(data - bkg_data, threshold, err=err,
+        if verbose:
+            print('   SEP: Extract...')
+            
+        if get_background:
+            objects, seg = sep.extract(data - bkg_data, threshold, err=err,
                            mask=mask, minarea=minarea,
                            filter_kernel=filter_kernel,
                            filter_type=filter_type, deblend_nthresh=32, 
                            deblend_cont=0.005, clean=clean, clean_param=1.,
                            segmentation_map=True)
-                
+        else:
+            objects, seg = sep.extract(data, threshold, err=err,
+                           mask=mask, minarea=minarea,
+                           filter_kernel=filter_kernel,
+                           filter_type=filter_type, deblend_nthresh=32, 
+                           deblend_cont=0.005, clean=clean, clean_param=1.,
+                           segmentation_map=True)
+
+        print('    Done.')
         tab = utils.GTable(objects)
 
         # make one indexed like SExtractor
@@ -2823,7 +2843,7 @@ def align_multiple_drizzled(mag_limits=[16,23]):
         imt = pyfits.open('total_drz_sci.fits')
 
         
-def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext=1, sky_iter=10):
+def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext=1, sky_iter=10, iter_atol=1.e-4):
     """Subtract sky background from grism exposures
     
     Implementation of grism sky subtraction from ISR 2015-17    
@@ -2899,8 +2919,8 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
     Nvary = len(data_vary)
     Nimg = Nexp*Nvary + Nfix
     
-    A = np.zeros((Npix*Nexp, Nimg))
-    data = np.zeros(Npix*Nexp)
+    A = np.zeros((Npix*Nexp, Nimg), dtype=np.float32)
+    data = np.zeros(Npix*Nexp, dtype=np.float32)
     wht = data*0.    
     mask = data > -1
     medians = np.zeros(Nexp)
@@ -2954,6 +2974,8 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
         
     model = np.dot(A, coeffs)
     
+    coeffs_0 = coeffs
+    
     for iter in range(sky_iter):
         model = np.dot(A, coeffs)
         resid = (data-model)*np.sqrt(wht)
@@ -2969,11 +2991,17 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
             ds9.view(r_i * mask_i)
         
         if verbose:
-            print('   {0} > Iter: {1:d}, masked: {2:d}, {3}'.format(grism['product'], iter+1, obj_mask.sum(), coeffs))
+            print('   {0} > Iter: {1:d}, masked: {2:2.0f}%, {3}'.format(grism['product'], iter+1, obj_mask.sum()/Npix/Nimg*100, coeffs))
                                                 
         out = np.linalg.lstsq(A[mask & obj_mask,:], data[mask & obj_mask])
         coeffs = out[0]
-            
+        
+        # Test for convergence
+        if np.allclose(coeffs, coeffs_0, rtol=1.e-5, atol=iter_atol):
+            break
+        else:
+            coeffs_0 = coeffs
+                 
     ### Best-fit sky
     sky = np.dot(A, coeffs).reshape(Nexp, Npix)
         
