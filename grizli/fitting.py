@@ -34,7 +34,7 @@ try:
 except:
     IGM = None
 
-def run_all_parallel(id, **kwargs):
+def run_all_parallel(id, get_output_data=False, **kwargs):
     import numpy as np
     from grizli.fitting import run_all
     from grizli import multifit
@@ -57,6 +57,8 @@ def run_all_parallel(id, **kwargs):
         #args['zr'] = [0.7, 1.0]
         #mb = multifit.MultiBeam('j100025+021651_{0:05d}.beams.fits'.format(id))
         out = run_all(id, **args)
+        if get_output_data:
+            return out
         status=1
     except:
         status=-1
@@ -93,13 +95,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
         
     mb_files = glob.glob('{0}_{1:05d}.beams.fits'.format(root, id))
     st_files = glob.glob('{0}_{1:05d}.stack.fits'.format(root, id))
-    
-    if fit_only_beams:
-        st = None
-    else:
-        st = StackFitter(st_files, fit_stacks=fit_stacks, group_name=group_name, fcontam=fcontam, overlap_threshold=overlap_threshold, MW_EBV=MW_EBV, verbose=verbose, sys_err=sys_err)
-        st.initialize_masked_arrays()
-    
+        
     mb = MultiBeam(mb_files[0], fcontam=fcontam, group_name=group_name, MW_EBV=MW_EBV, sys_err=sys_err, verbose=verbose)
     if len(mb_files) > 1:
         for file in mb_files[1:]:
@@ -118,8 +114,18 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
                 
         hdu, fig = mb.drizzle_grisms_and_PAs(fcontam=0.5, flambda=False, kernel='point', size=32)
         fig.savefig('{0}_{1:05d}.fix.stack.png'.format(group_name, id))
+        good_PAs = []
+        for k in keep_dict:
+            good_PAs.extend(keep_dict[k])
+    else:
+        good_PAs = None # All good
         
-
+    if fit_only_beams:
+        st = None
+    else:
+        st = StackFitter(st_files, fit_stacks=fit_stacks, group_name=group_name, fcontam=fcontam, overlap_threshold=overlap_threshold, MW_EBV=MW_EBV, verbose=verbose, sys_err=sys_err, pas=good_PAs)
+        st.initialize_masked_arrays()
+    
     if fit_trace_shift:
         b = mb.beams[0]
         b.compute_model()
@@ -285,10 +291,17 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     fig = show_drizzled_lines(line_hdu, size_arcsec=si, cmap='plasma_r', scale=s, dscale=s, full_line_list=full_line_list)
     fig.savefig('{0}_{1:05d}.line.png'.format(group_name, id))
     
+    if phot is not None:
+        out = mb, st, fit, tfit, line_hdu
+        if 'pz' in phot:
+            full_sed_plot(out, t1, photometry_pz=phot['pz'])
+        else:
+            full_sed_plot(out, t1)
+        
     return mb, st, fit, tfit, line_hdu
 
 ###################################
-def full_sed_plot(out, t1, bin=1, minor=0.1, save='png', sed_resolution=180, photometry_pz=None, zspec=None):
+def full_sed_plot(out, t1, bin=1, minor=0.1, save='png', sed_resolution=180, photometry_pz=None, zspec=None, spectrum_steps=False, **kwargs):
     """
     Make a separate plot showing photometry and the spectrum
     """
@@ -328,7 +341,7 @@ def full_sed_plot(out, t1, bin=1, minor=0.1, save='png', sed_resolution=180, pho
     # Photometry 
     A_phot = mb._interpolate_photometry(z=tfit['z'], templates=t1)
     A_model = A_phot.T.dot(tfit['coeffs'])
-    photom_mask = mb.photom_flam > -98
+    photom_mask = mb.photom_eflam > -98
     
     ##########
     # Figure
@@ -378,8 +391,13 @@ def full_sed_plot(out, t1, bin=1, minor=0.1, save='png', sed_resolution=180, pho
         except:
             scale = 1
             
-        ax2.errorbar(sp[g]['wave'][clip]/1.e4, (sp[g]['flux']/spf[g]['flux']/scale)[clip]/1.e-19, (sp[g]['err']/spf[g]['flux']/scale)[clip]/1.e-19, marker='.', color='k', alpha=0.2, linestyle='None', elinewidth=0.5)
-        ax2.plot(sp[g]['wave']/1.e4, spm[g]['flux']/spf[g]['flux']/1.e-19, color=sns_colors[4], linewidth=2, alpha=0.8, zorder=10)
+        ax2.errorbar(sp[g]['wave'][clip]/1.e4, (sp[g]['flux']/spf[g]['flux']/scale)[clip]/1.e-19, (sp[g]['err']/spf[g]['flux']/scale)[clip]/1.e-19, marker='.', color='k', alpha=0.5, linestyle='None', elinewidth=0.5, zorder=11)
+        
+        if spectrum_steps:
+            ax2.plot(sp[g]['wave']/1.e4, spm[g]['flux']/spf[g]['flux']/1.e-19, color=sns_colors[4], linewidth=2, alpha=0.8, zorder=10, linestyle='steps-mid')
+        else:
+            ax2.plot(sp[g]['wave']/1.e4, spm[g]['flux']/spf[g]['flux']/1.e-19, color=sns_colors[4], linewidth=2, alpha=0.8, zorder=10, marker='.')
+            
         ymax = np.maximum(ymax, (spm[g]['flux']/spf[g]['flux']/1.e-19)[clip].max())
         ymin = np.minimum(ymin, (spm[g]['flux']/spf[g]['flux']/1.e-19)[clip].min())
         
@@ -968,7 +986,7 @@ class GroupFitter(object):
                
 
         
-    def set_photometry(self, flam=[], eflam=[], filters=[], force=False, tempfilt=None, min_err=0.02, TEF=None):
+    def set_photometry(self, flam=[], eflam=[], filters=[], force=False, tempfilt=None, min_err=0.02, TEF=None, pz=None):
         """
         Add photometry
         """
@@ -988,6 +1006,7 @@ class GroupFitter(object):
         
         self.photom_flam = flam
         self.photom_eflam = np.sqrt(eflam**2+(min_err*flam)**2)
+        self.photom_flam[eflam < 0] = -99
         self.photom_eflam[eflam < 0] = -99
         
         self.photom_filters = filters
@@ -1030,6 +1049,7 @@ class GroupFitter(object):
         self.is_spec = 1
         self.Nphot = 0
         self.Nphotbands = 0
+        self.tempfilt = None
         
     def _interpolate_photometry(self, z=0., templates=[]):
         """
@@ -1795,7 +1815,7 @@ class GroupFitter(object):
         resid = data - full# - background
         chi2 = np.sum(resid**2*self.weightf[self.fit_mask])
 
-        print('{0} {1}'.format(pscale, chi2))
+        print('{0} {1:.1f}'.format(' '.join(['{0:6.2f}'.format(p) for p in pscale]), chi2))
         if retval == 'resid':
             return resid*np.sqrt(self.weightf[self.fit_mask])
             
@@ -2109,10 +2129,10 @@ class GroupFitter(object):
                     pscale = self.compute_scale_array(self.pscale, w)
                                                  
             if units == 'nJy':
-                unit_corr = 1./sens*w**2/2.99e18/1.e-23/1.e-9/pscale
+                unit_corr = 1./sens*w**2/2.99e18/1.e-23/1.e-9#/pscale
                 unit_label = r'$f_\nu$ (nJy)'
             elif units == 'uJy':
-                unit_corr = 1./sens*w**2/2.99e18/1.e-23/1.e-6/pscale
+                unit_corr = 1./sens*w**2/2.99e18/1.e-23/1.e-6#/pscale
                 unit_label = r'$f_\nu$ ($\mu$Jy)'
             elif units == 'meps':
                 unit_corr = 1000.
@@ -2124,10 +2144,10 @@ class GroupFitter(object):
                 unit_corr = 1./flm
                 unit_label = 'resid'
             elif units == 'spline':
-                unit_corr = 1/flspl
+                unit_corr = 1./flspl
                 unit_label = 'spline resid'
             else: # 'flam
-                unit_corr = 1./sens/1.e-19/pscale
+                unit_corr = 1./sens/1.e-19#/pscale
                 unit_label = r'$f_\lambda \times 10^{-19}$'
             
             w = w/1.e4
@@ -2137,21 +2157,21 @@ class GroupFitter(object):
             if clip.sum() == 0:
                 continue
             
-            fl *= unit_corr#/1.e-19
-            er *= unit_corr#/1.e-19
+            fl *= unit_corr/pscale#/1.e-19
+            er *= unit_corr/pscale#/1.e-19
             if tfit is not None:
                 flm *= unit_corr#/1.e-19
             
             f_alpha = 1./(self.Ngrism[grism.upper()])*0.8 #**0.5
             
             # Plot
-            pscale = 1.
-            if hasattr(self, 'pscale'):
-                if (self.pscale is not None):
-                    pscale = self.compute_scale_array(self.pscale, w[clip]*1.e4)
+            # pscale = 1.
+            # if hasattr(self, 'pscale'):
+            #     if (self.pscale is not None):
+            #         pscale = self.compute_scale_array(self.pscale, w[clip]*1.e4)
                     
             if show_beams:
-                axc.errorbar(w[clip], fl[clip]/pscale, er[clip]/pscale, color=GRISM_COLORS[grism], alpha=f_alpha, marker='.', linestyle='None', zorder=1)
+                axc.errorbar(w[clip], fl[clip], er[clip], color=GRISM_COLORS[grism], alpha=f_alpha, marker='.', linestyle='None', zorder=1)
             if tfit is not None:
                 axc.plot(w[clip], flm[clip], color='r', alpha=f_alpha, linewidth=2, zorder=10) 
 
@@ -2222,10 +2242,10 @@ class GroupFitter(object):
             
             if units == 'nJy':
                 unit_corr = sp_data[g]['wave']**2/sp_flat[g]['flux']
-                unit_corr *= 1/2.99e18/1.e-23/1.e-9/pscale
+                unit_corr *= 1/2.99e18/1.e-23/1.e-9#/pscale
             elif units == 'uJy':
                 unit_corr = sp_data[g]['wave']**2/sp_flat[g]['flux']
-                unit_corr *= 1/2.99e18/1.e-23/1.e-6/pscale
+                unit_corr *= 1/2.99e18/1.e-23/1.e-6#/pscale
             elif units == 'meps':
                 unit_corr = 1000.
             elif units == 'eps':
@@ -2235,10 +2255,10 @@ class GroupFitter(object):
             elif units == 'spline':
                 unit_corr = 1./sp_spline[g]['flux']
             else: # 'flam
-                unit_corr = 1./sp_flat[g]['flux']/1.e-19/pscale
+                unit_corr = 1./sp_flat[g]['flux']/1.e-19#/pscale
             
-            flux = (sp_data[g]['flux']*unit_corr)[clip]
-            err = (sp_data[g]['err']*unit_corr)[clip]
+            flux = (sp_data[g]['flux']*unit_corr/pscale)[clip]
+            err = (sp_data[g]['err']*unit_corr/pscale)[clip]
             
             if fill:
                 axc.fill_between(sp_data[g]['wave'][clip]/1.e4, flux-err, flux+err, color=GRISM_COLORS[g], alpha=0.8, zorder=1) 
@@ -2292,7 +2312,7 @@ class GroupFitter(object):
         if ivar is None:
             #ivar = 1./self.sigma2_mask
             ivar = 1./self.weighted_sigma2_mask
-            
+                
         num = prof*data*ivar
         den = prof**2*ivar
         
