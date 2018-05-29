@@ -2171,7 +2171,10 @@ class GroupFitter(object):
             #         pscale = self.compute_scale_array(self.pscale, w[clip]*1.e4)
                     
             if show_beams:
-                axc.errorbar(w[clip], fl[clip], er[clip], color=GRISM_COLORS[grism], alpha=f_alpha, marker='.', linestyle='None', zorder=1)
+                if show_beams == 1:
+                    axc.errorbar(w[clip], fl[clip], er[clip], color='k', alpha=f_alpha, marker='.', linestyle='None', zorder=1)
+                else:
+                    axc.errorbar(w[clip], fl[clip], er[clip], color=GRISM_COLORS[grism], alpha=f_alpha, marker='.', linestyle='None', zorder=1)
             if tfit is not None:
                 axc.plot(w[clip], flm[clip], color='r', alpha=f_alpha, linewidth=2, zorder=10) 
 
