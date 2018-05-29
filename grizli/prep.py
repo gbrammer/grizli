@@ -1936,6 +1936,7 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                                tweak_max_dist=1.,
                                tweak_threshold=1.5, 
                                drizzle_params = {},
+                               iter_atol=1.e-4,
                              reference_catalogs=['GAIA','PS1','SDSS','WISE']):
     """Full processing of a direct + grism image visit.
     
@@ -2227,12 +2228,14 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
         
     ### Subtract grism sky
     status = visit_grism_sky(grism=grism, apply=True, sky_iter=sky_iter,
-                          column_average=column_average, verbose=True, ext=1)
+                          column_average=column_average, verbose=True, ext=1,
+                          iter_atol=iter_atol)
     
     # Run on second chip (also for UVIS/G280)
     if isACS:
         visit_grism_sky(grism=grism, apply=True, sky_iter=sky_iter,
-                        column_average=column_average, verbose=True, ext=2)
+                        column_average=column_average, verbose=True, ext=2,
+                        iter_atol=iter_atol)
         
         # Add back in some pedestal or CR rejection fails for ACS
         for file in grism['files']:
