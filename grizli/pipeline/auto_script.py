@@ -1329,6 +1329,7 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
     size = 32
     close = True
     Skip = True
+    show_beams = True
     
     if __name__ == '__main__': # Interactive
         size=32
@@ -1364,22 +1365,25 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
             if has_bad:
                 print('\n  Has bad PA!  Final list: {0}\n{1}'.format(keep_dict, fit_log))
         
-        
-        if fit_trace_shift:
+        ixi = grp.catalog['NUMBER'] == id
+        if fit_trace_shift & (grp.catalog['MAG_AUTO'][ixi][0] < 24.5):
             b = mb.beams[0]
             b.compute_model()
             sn_lim = fit_trace_shift*1
             if (np.max((b.model/b.grism['ERR'])[b.fit_mask.reshape(b.sh)]) > sn_lim) | (sn_lim > 100):
                 print(' Fit trace shift: \n')
-                shift = mb.fit_trace_shift(tol=1.e-3, verbose=True, split_groups=True, lm=True)
-            
+                try:
+                    shift = mb.fit_trace_shift(tol=1.e-3, verbose=True, split_groups=True, lm=True)
+                except:
+                    pass
+                    
         try:
             pfit = mb.template_at_z(z=0, templates=poly_templates, fit_background=True, fitter='lstsq', get_uncertainties=2)
         except:
             pfit = None
     
         try:
-            fig1 = mb.oned_figure(figsize=[5,3], tfit=pfit)
+            fig1 = mb.oned_figure(figsize=[5,3], tfit=pfit, show_beams=show_beams)
             fig1.savefig('{0}_{1:05d}.1D.png'.format(target, id))
         except:
             continue
@@ -1390,9 +1394,14 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
         hdu.writeto('{0}_{1:05d}.stack.fits'.format(target, id), clobber=True)
         mb.write_master_fits()
         
+        if False:
+            # Fit here for AWS...
+            fitting.run_all_parallel(id, verbose=True)
+            
         if close:
             plt.close(fig); plt.close(fig1); del(hdu); del(mb)
-    
+            for k in range(100000): plt.close()
+            
     if not run_fit:
        return True
         
