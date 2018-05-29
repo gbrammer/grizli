@@ -253,8 +253,9 @@ class StackFitter(GroupFitter):
         #         self.phot_scale = np.array([10.])
                         
     def extend(self, st):
-        pass
-        
+        """
+        Append second StackFitter objects to `self`.
+        """
         self.beams.extend(st.beams)
         self.grisms.extend(st.grisms)
         self.grisms = list(np.unique(self.grisms))
@@ -286,14 +287,16 @@ class StackFitter(GroupFitter):
         self.fit_mask = np.hstack([E.fit_mask for E in self.beams])
         self.fit_mask &= self.ivarf > self.min_ivar*self.ivarf.max()
         
-        self.slices = self._get_slices()
+        self.slices = self._get_slices(masked=False)
+        self.A_bg = self._init_background(masked=False)
+
         self._update_beam_mask()
         self.A_bgm = self._init_background(masked=True)
                 
         self.Nmask = self.fit_mask.sum()        
         self.DoF = int((self.fit_mask*self.weightf).sum())
-        
-        self.A_bg = self._init_background()
+
+        self.flat_flam = np.hstack([E.flat_flam for E in self.beams])
         
     def compute_model(self, spectrum_1d=None):
         """
@@ -1217,8 +1220,11 @@ class StackedSpectrum(object):
         
         prof = self.optimal_profile
         
-        num = prof*data*self.ivar
-        den = prof**2*self.ivar
+        if ivar is None:
+            ivar = self.ivar
+            
+        num = prof*data*ivar*self.weight
+        den = prof**2*ivar*self.weight
         opt_flux = num.sum(axis=0)/den.sum(axis=0)
         opt_var = 1./den.sum(axis=0)
         
