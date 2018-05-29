@@ -1181,7 +1181,16 @@ class MultiBeam(GroupFitter):
         else:
             if isinstance(beams[0], str):
                 ### `beams` is list of strings
-                self.load_beam_fits(beams)            
+                if 'beams.fits' in beams[0]:
+                    # Master beam files
+                    self.load_master_fits(beams[0], verbose=verbose)            
+                    for i in range(1, len(beams)):
+                        b_i = MultiBeam(beams[i], group_name=group_name, fcontam=fcontam, psf=psf, polyx=polyx, MW_EBV=MW_EBV, sys_err=sys_err, verbose=verbose)
+                        self.extend(b_i)
+                        
+                else:
+                    # List of individual beam.fits files
+                    self.load_beam_fits(beams)            
             else:
                 self.beams = beams
         
