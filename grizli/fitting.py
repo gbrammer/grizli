@@ -70,7 +70,7 @@ def run_all_parallel(id, get_output_data=False, **kwargs):
     
     return id, status, t1-t0
     
-def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter='nnls', group_name='grism', fit_stacks=True, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=3, fit_only_beams=False, fit_beams=True, root='', fit_trace_shift=False, phot=None, verbose=True, scale_photometry=False, show_beams=True, overlap_threshold=5, MW_EBV=0., sys_err=0.03, get_dict=False, bad_pa_threshold=1.6, units1d='flam', **kwargs):
+def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter='nnls', group_name='grism', fit_stacks=True, only_stacks=False, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=3, fit_only_beams=False, fit_beams=True, root='*', fit_trace_shift=False, phot=None, verbose=True, scale_photometry=False, show_beams=True, scale_on_stacked_1d=True, overlap_threshold=5, MW_EBV=0., sys_err=0.03, get_dict=False, bad_pa_threshold=1.6, units1d='flam', redshift_only=False, line_size=1.6, **kwargs):
     """Run the full procedure
     
     1) Load MultiBeam and stack files 
@@ -95,46 +95,52 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
         
     mb_files = glob.glob('{0}_{1:05d}.beams.fits'.format(root, id))
     st_files = glob.glob('{0}_{1:05d}.stack.fits'.format(root, id))
-        
-    mb = MultiBeam(mb_files[0], fcontam=fcontam, group_name=group_name, MW_EBV=MW_EBV, sys_err=sys_err, verbose=verbose)
-    if len(mb_files) > 1:
-        for file in mb_files[1:]:
-            mb.extend(MultiBeam(file, fcontam=fcontam, group_name=group_name, MW_EBV=MW_EBV))
     
-    out = mb.check_for_bad_PAs(chi2_threshold=bad_pa_threshold,
-                                               poly_order=1, reinit=True, 
-                                              fit_background=True)
+    if not only_stacks:
+        mb = MultiBeam(mb_files, fcontam=fcontam, group_name=group_name, MW_EBV=MW_EBV, sys_err=sys_err, verbose=verbose)
+        # Check for PAs with unflagged contamination or otherwise discrepant
+        # fit
+        out = mb.check_for_bad_PAs(chi2_threshold=bad_pa_threshold,
+                                                   poly_order=1, reinit=True, 
+                                                  fit_background=True)
     
-    fit_log, keep_dict, has_bad = out
+        fit_log, keep_dict, has_bad = out
     
-    if has_bad:
-        if verbose:
-            print('\nHas bad PA!  Final list: {0}\n{1}'.format(keep_dict,
-                                                               fit_log))
+        if has_bad:
+            if verbose:
+                print('\nHas bad PA!  Final list: {0}\n{1}'.format(keep_dict,
+                                                                   fit_log))
                 
-        hdu, fig = mb.drizzle_grisms_and_PAs(fcontam=0.5, flambda=False, kernel='point', size=32)
-        fig.savefig('{0}_{1:05d}.fix.stack.png'.format(group_name, id))
-        good_PAs = []
-        for k in keep_dict:
-            good_PAs.extend(keep_dict[k])
+            hdu, fig = mb.drizzle_grisms_and_PAs(fcontam=0.5, flambda=False, kernel='point', size=32)
+            fig.savefig('{0}_{1:05d}.fix.stack.png'.format(group_name, id))
+            good_PAs = []
+            for k in keep_dict:
+                good_PAs.extend(keep_dict[k])
+        else:
+            good_PAs = None # All good
     else:
         good_PAs = None # All good
+        redshift_only=True # can't drizzle line maps from stacks
         
     if fit_only_beams:
         st = None
     else:
-        st = StackFitter(st_files, fit_stacks=fit_stacks, group_name=group_name, fcontam=fcontam, overlap_threshold=overlap_threshold, MW_EBV=MW_EBV, verbose=verbose, sys_err=sys_err, pas=good_PAs)
+        st = StackFitter(st_files, fit_stacks=fit_stacks, group_name=group_name, fcontam=fcontam, overlap_threshold=overlap_threshold, MW_EBV=MW_EBV, verbose=verbose, sys_err=sys_err, pas=good_PAs, chi2_threshold=bad_pa_threshold)
         st.initialize_masked_arrays()
     
-    if fit_trace_shift:
-        b = mb.beams[0]
-        b.compute_model()
-        sn_lim = fit_trace_shift*1
-        if (np.max((b.model/b.grism['ERR'])[b.fit_mask.reshape(b.sh)]) > sn_lim) | (sn_lim > 100):
-            shift, _ = mb.fit_trace_shift(tol=1.e-3, verbose=verbose, 
-                                       split_groups=True)
+    if only_stacks:
+        mb = st
+        
+    if not only_stacks:
+        if fit_trace_shift:
+            b = mb.beams[0]
+            b.compute_model()
+            sn_lim = fit_trace_shift*1
+            if (np.max((b.model/b.grism['ERR'])[b.fit_mask.reshape(b.sh)]) > sn_lim) | (sn_lim > 100):
+                shift, _ = mb.fit_trace_shift(tol=1.e-3, verbose=verbose, 
+                                           split_groups=True)
             
-    mb.initialize_masked_arrays()
+        mb.initialize_masked_arrays()
 
     if phot is not None:
         if st is not None:
@@ -240,7 +246,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     tfit_hdu.header['EXTNAME'] = 'TEMPL'
      
     # Make the plot
-    fig = mb.xmake_fit_plot(mb_fit, tfit, show_beams=show_beams)
+    fig = mb.xmake_fit_plot(mb_fit, tfit, show_beams=show_beams, scale_on_stacked_1d=scale_on_stacked_1d)
     
     # Add prior
     if prior is not None:
@@ -257,6 +263,9 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     # Save the figure
     fig.savefig('{0}_{1:05d}.full.png'.format(group_name, id))
     
+    if redshift_only:
+        return mb, st, fit, tfit, None
+        
     # Make the line maps
     if pline is None:
          pzfit, pspec2, pline = grizli.multifit.get_redshift_fit_defaults()
@@ -282,7 +291,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     ######
     # Show the drizzled lines and direct image cutout, which are
     # extensions `DSCI`, `LINE`, etc.
-    s, si = 1, 1.6
+    s, si = 1, line_size
     
     s = 4.e-19/np.max([beam.beam.total_flux for beam in mb.beams]) 
     s = np.clip(s, 0.25, 4)
@@ -1645,7 +1654,8 @@ class GroupFitter(object):
                 
             plt.plot(w[xclip]*(1+z), tdraw.T, alpha=0.05, color='r')
     
-    def xmake_fit_plot(self, fit, tfit, show_beams=True, bin=1, minor=0.1):
+    def xmake_fit_plot(self, fit, tfit, show_beams=True, bin=1, minor=0.1,
+                       scale_on_stacked_1d=True):
         """TBD
         """
         import matplotlib.pyplot as plt
@@ -1683,7 +1693,7 @@ class GroupFitter(object):
         #### Spectra
         axc = fig.add_subplot(gs[-1,1]) #224)
         
-        self.oned_figure(bin=bin, show_beams=show_beams, minor=minor, tfit=tfit, axc=axc)
+        self.oned_figure(bin=bin, show_beams=show_beams, minor=minor, tfit=tfit, axc=axc, scale_on_stacked=scale_on_stacked_1d)
         
         gs.tight_layout(fig, pad=0.1, w_pad=0.1)
         return fig
@@ -2055,6 +2065,9 @@ class GroupFitter(object):
         wmin = 1.e30
         wmax = -1.e30
         
+        if not show_beams:
+            scale_on_stacked=True
+            
         if units == 'spline':
             ran = ((tfit['cont1d'].wave >= self.wavef.min()) & 
                    (tfit['cont1d'].wave <= self.wavef.max()))
@@ -2171,7 +2184,8 @@ class GroupFitter(object):
             #         pscale = self.compute_scale_array(self.pscale, w[clip]*1.e4)
                     
             if show_beams:
-                if show_beams == 1:
+                
+                if (show_beams == 1) & (f_alpha < 0.09):
                     axc.errorbar(w[clip], fl[clip], er[clip], color='k', alpha=f_alpha, marker='.', linestyle='None', zorder=1)
                 else:
                     axc.errorbar(w[clip], fl[clip], er[clip], color=GRISM_COLORS[grism], alpha=f_alpha, marker='.', linestyle='None', zorder=1)
@@ -2211,7 +2225,7 @@ class GroupFitter(object):
             ax.set_xticklabels(['{0:.1f}'.format(l) for l in labels])    
         
         ### Binned spectrum by grism
-        if (tfit is None) | (scale_on_stacked):
+        if (tfit is None) | (scale_on_stacked) | (not show_beams):
             ymin = 1.e30
             ymax = -1.e30
         
@@ -2270,9 +2284,9 @@ class GroupFitter(object):
                 
             if ((tfit is None) & (clip.sum() > 0)) | (scale_on_stacked):
                 # Plot limits         
-                ymax = np.maximum(ymax, np.percentile(flux+err,
+                ymax = np.maximum(ymax, np.percentile((flux+err),
                                                      100-ylim_percentile))
-                ymin = np.minimum(ymin, np.percentile(flux-err,
+                ymin = np.minimum(ymin, np.percentile((flux-err),
                                                       ylim_percentile))
                        
         if (ymin < 0) & (ymax > 0):
