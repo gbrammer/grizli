@@ -2506,6 +2506,15 @@ class MultiBeam(GroupFitter):
             beam.compute_model(spectrum_1d=[cont.wave, cont.flux],
                                is_cgs=True)
         
+            if hasattr(self, 'pscale'):
+                if (self.pscale is not None):
+                    scale = self.compute_scale_array(self.pscale, beam.wavef) 
+                    beam.beam.pscale_array = scale.reshape(beam.sh)
+                else:
+                    beam.beam.pscale_array = 1.
+            else:
+                beam.beam.pscale_array = 1.
+                
         for line in line_flux_dict:
             line_flux, line_err = line_flux_dict[line]
             if line_err == 0:
@@ -2523,6 +2532,11 @@ class MultiBeam(GroupFitter):
                         beam.oivar = beam.ivar*1
                         lam = beam.beam.lam_beam
                         
+                        if hasattr(beam.beam, 'pscale_array'):
+                            pscale_array = beam.beam.pscale_array
+                        else:
+                            pscale_array = 1.
+                            
                         ### another idea, compute a model for the line itself
                         ### and mask relatively "contaminated" pixels from 
                         ### other lines
@@ -2543,7 +2557,7 @@ class MultiBeam(GroupFitter):
                         #sp = [lm.wave, lm.flux]
                         m = beam.compute_model(spectrum_1d=sp, 
                                                in_place=False, is_cgs=True)
-                        lmodel = m.reshape(beam.beam.sh_beam)
+                        lmodel = m.reshape(beam.beam.sh_beam)*pscale_array
                         if lmodel.max() == 0:
                             continue
                         
@@ -2582,6 +2596,7 @@ class MultiBeam(GroupFitter):
                                                        is_cgs=True) 
                                                        
                                 lcontam = m.reshape(beam.beam.sh_beam)
+                                lcontam *= pscale_array
                                 if lcontam.max() == 0:
                                     #print beam.grism.parent_file, lkey
                                     continue
@@ -2606,6 +2621,7 @@ class MultiBeam(GroupFitter):
                                                    is_cgs=True) 
                                                    
                             lcontam = m.reshape(beam.beam.sh_beam)
+                            lcontam *= pscale_array
                             if lcontam.max() == 0:
                                 continue
 
@@ -3834,7 +3850,9 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
             beam_data -= beam.extra_lines    
         
         beam_continuum = beam.beam.model*1
-        
+        if hasattr(beam.beam, 'pscale_array'):
+            beam_continuum *= beam.beam.pscale_array
+                
         # Downweight contamination
         if fcontam > 0:
             # wht = 1/beam.ivar + (fcontam*beam.contam)**2
