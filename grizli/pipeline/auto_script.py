@@ -1,7 +1,7 @@
 """
 Automatic processing scripts for grizli
 """
-
+import os
 import numpy as np
 
 if False:
@@ -195,7 +195,7 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
     #####################
     ### Alignment & mosaics    
     os.chdir(os.path.join(HOME_PATH, root, 'Prep'))
-    auto_script.preprocess(field_root=root, HOME_PATH=HOME_PATH, make_combined=False, catalogs=catalogs, use_visit=True)
+    auto_script.preprocess(field_root=root, HOME_PATH=HOME_PATH, make_combined=False, catalogs=catalogs, use_visit=True, tweak_max_dist=(5 if is_parallel_field else 1))
         
     # Fine alignment
     fine_catalogs = ['GAIA','PS1','SDSS','WISE']
@@ -244,7 +244,7 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
             
     # Photometric catalog
     if not os.path.exists('{0}_phot.fits'.format(root)):
-        tab = auto_script.multiband_catalog(field_root=root, threshold=1.8, get_background=False, get_all_filters=False)
+        tab = auto_script.multiband_catalog(field_root=root, threshold=1.8, detection_background=False, photometry_background=True, get_all_filters=False)
     
     # Stop if only want to run pre-processing
     if only_preprocess | (len(all_groups) == 0):
@@ -609,7 +609,7 @@ def clean_prep(field_root='j142724+334246'):
         print('remove '+file)
         os.remove(file)
                 
-def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', min_overlap=0.2, make_combined=True, catalogs=['PS1','SDSS','GAIA','WISE'], use_visit=True, master_radec=None, use_first_radec=False, skip_imaging=False, clean=True):
+def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', min_overlap=0.2, make_combined=True, catalogs=['PS1','SDSS','GAIA','WISE'], use_visit=True, master_radec=None, use_first_radec=False, skip_imaging=False, clean=True, tweak_max_dist=1.):
     
     import os
     import glob
@@ -690,7 +690,8 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
                             radec=radec, skip_direct=False,
                             align_mag_limits=[14,22],
                             reference_catalogs=catalogs, 
-                            sky_iter=10, iter_atol=1.e-4)
+                            sky_iter=10, iter_atol=1.e-4, 
+                            tweak_max_dist=tweak_max_dist)
         
         ###################################
         # Persistence Masking
@@ -765,7 +766,8 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
                                         run_tweak_align=True,
                                         align_mag_limits=[14,24],
                                         reference_catalogs=catalogs,
-                                        align_tolerance=8)
+                                        align_tolerance=8,
+                                        tweak_max_dist=tweak_max_dist)
             except:
                 status = prep.process_direct_grism_visit(direct=direct,
                                             grism={}, radec=radec,
@@ -773,7 +775,8 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
                                             run_tweak_align=False,
                                             align_mag_limits=[14,24],
                                             reference_catalogs=catalogs,
-                                            align_tolerance=8)
+                                            align_tolerance=8,
+                                            tweak_max_dist=tweak_max_dist)
                 
             failed_file = '%s.failed' %(direct['product'])
             if os.path.exists(failed_file):
@@ -854,7 +857,7 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
     #             
     # prep.drizzle_overlaps(keep, parse_visits=False, pixfrac=0.6, scale=0.06, skysub=False, bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False)
 
-def multiband_catalog(field_root='j142724+334246', threshold=1.8, get_background=True, get_all_filters=False, det_err_scale=-np.inf, clean=True):
+def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_background=True, photometry_background=True, get_all_filters=False, det_err_scale=-np.inf, clean=True, run_detection=True):
     """
     Make a detection catalog with SExtractor and then measure
     photometry with `~photutils`.
@@ -874,7 +877,13 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, get_background
         from grizli import prep, utils
             
     # Make catalog
-    tab = prep.make_SEP_catalog(root='{0}-ir'.format(field_root), threshold=threshold, get_background=get_background, save_to_fits=True, clean=clean, err_scale=det_err_scale)
+    if not os.path.exists('{0}-ir.cat.fits'.format(field_root)):
+        run_detection=True
+    
+    if run_detection:    
+        tab = prep.make_SEP_catalog(root='{0}-ir'.format(field_root), threshold=threshold, get_background=detection_background, save_to_fits=True, clean=clean, err_scale=det_err_scale)
+    else:
+        tab = utils.GTable.gread('{0}-ir.cat.fits'.format(field_root))
         
     # Source positions
     source_xy = tab['X_IMAGE'], tab['Y_IMAGE']
@@ -906,7 +915,8 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, get_background
             root = '{0}-{1}'.format(field_root, filt)
                 
             filter_tab = prep.make_SEP_catalog(root=root,
-                      threshold=threshold, get_background=get_background,
+                      threshold=threshold, 
+                      get_background=photometry_background,
                       save_to_fits=False, source_xy=source_xy)
             
             for k in filter_tab.meta:
@@ -1336,6 +1346,10 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
         close = Skip = False
         pline = {'kernel': 'point', 'pixfrac': 0.2, 'pixscale': 0.1, 'size': 8, 'wcs': None}
         prior=None
+        
+        fit_trace_shift=False
+        bad_pa_threshold=1.6
+        MW_EBV = 0
         
     ###############
     # Stacked spectra
