@@ -2995,7 +2995,16 @@ class EffectivePSF(object):
         output_psf = self.eval_ePSF(psf_xy, dx, dy, extended_data=extended_data)*psf_params[0]
         
         return output_psf
-        
+
+def read_catalog(file, sextractor=False, format=None):
+    """
+    Wrapper around `~grizli.utils.Gtable.gread`.
+    
+    Auto-detects formats 'csv' and 'fits' and defaults to
+    'ascii.commented_header'.
+    """
+    return GTable.gread(file, sextractor=sextractor, format=format)
+    
 class GTable(astropy.table.Table):
     """
     Extend `~astropy.table.Table` class with more automatic IO and other
@@ -3634,4 +3643,103 @@ def make_alf_template():
     temply = np.hstack([spec[w < 3600]/blue_norm, m[(ssp.wave > 3600) & (ssp.wave < 1.7e4)], spec[w > 1.7e4]/red_norm])
     
     np.savetxt('alf_SSP.dat', np.array([templx, temply]).T, fmt='%.5e', header='wave flux\nlogage = 0.96\nzh=0.2\nmgh=0.2\nfsps: w < 3600, w > 1.7e4')
+    
+def catalog_area(ra=[], dec=[], make_plot=True, NMAX=5000, buff=0.8, verbose=True):
+    """Compute the surface area of a list of RA/DEC coordinates
+    
+    Parameters
+    ----------
+    ra, dec : `~numpy.ndarray`
+        RA and Dec. coordinates in decimal degrees
+            
+    make_plot : bool
+        Make a figure.
+    
+    NMAX : int
+        If the catalog has more then `NMAX` entries, draw `NMAX` random 
+        samples.
+        
+    buff : float
+        Buffer in arcmin to add around each catalog point.
+    
+    
+    Returns
+    -------
+    area : float
+        Computed catalog area in square arcminutes
+    
+    fig : `~matplotlib.figure.Figure`
+        Figure object returned if `make_plot==True`.
+        
+    """
+    import matplotlib.pyplot as plt
+    from shapely.geometry import Polygon, Point, MultiPolygon, MultiLineString
+    from scipy import spatial
+    
+    points = np.array([ra, dec])*1.
+    center = np.mean(points, axis=1)
+    points = (points.T - center)*60. # arcmin
+    points[:,0] *= np.cos(center[1]/180*np.pi)
+
+    hull = spatial.ConvexHull(points)
+    edge = points[hull.vertices,:]
+
+    #pbuff = 1
+    
+    if len(ra) > NMAX:
+        rnd_idx = np.unique(np.cast[int](np.round(np.random.rand(NMAX)*len(ra))))
+    else:
+        rnd_idx = np.arange(len(ra))
+        
+    poly = Point(points[rnd_idx[0],:]).buffer(buff)
+    for i, ix in enumerate(rnd_idx):
+        if verbose:
+            print(NO_NEWLINE + '{0} {1}'.format(i, ix))
+
+        poly = poly.union(Point(points[ix,:]).buffer(buff))
+    
+    # Final (multi)Polygon
+    pjoin = poly.buffer(-buff)
+    
+    if make_plot:
+        
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        
+        if isinstance(pjoin, MultiPolygon):
+            for p_i in pjoin:
+                if isinstance(p_i.boundary, MultiLineString):
+                    for s in p_i.boundary:
+                        p = s.xy
+                        ax.plot(p[0], p[1])
+                else:
+                    p = p_i.boundary.xy
+                    ax.plot(p[0], p[1])
+        else:
+            p_i = pjoin
+            if isinstance(p_i.boundary, MultiLineString):
+                for s in p_i.boundary:
+                    p = s.xy
+                    ax.plot(p[0], p[1])
+            else:
+                p = p_i.boundary.xy
+                ax.plot(p[0], p[1])
+
+        ax.scatter(points[rnd_idx,0], points[rnd_idx,1], alpha=0.1, marker='+')
+
+        ax.set_xlim(ax.get_xlim()[::-1])
+        ax.set_xlabel(r'$\Delta$RA ({0:.5f})'.format(center[0]))
+        ax.set_ylabel(r'$\Delta$Dec. ({0:.5f})'.format(center[1]))
+        ax.set_title('Total area: {0:.1f} arcmin$^2$'.format(pjoin.area))
+        ax.grid()
+        fig.tight_layout(pad=0.1)
+        
+        return pjoin.area, fig
+    
+    else:
+        return pjoin.area
+        
+        
+    
+    
     
