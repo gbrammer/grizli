@@ -793,6 +793,8 @@ GAUSS_3_7x7 = np.array(
  [ 0.004963,  0.021388,  0.051328,  0.068707,  0.051328,  0.021388,  0.004963]])
 
 def make_SEP_catalog(root='',threshold=2., get_background=True, 
+                      bkg_only=False, 
+                      bkg_params={'bw':32, 'bh':32, 'fw':3, 'fh':3},
                       verbose=True, extra_config={}, sci=None, wht=None, 
                       phot_apertures=SEXTRACTOR_PHOT_APERTURES,
                       filter_kernel=GAUSS_3_7x7, filter_type='conv',
@@ -848,7 +850,6 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
 
     drz_im = pyfits.open(drz_file)
     data = drz_im[0].data.byteswap().newbyteorder()
-    data_mask = np.cast[data.dtype](data == 0)
         
     try:
         wcs = pywcs.WCS(drz_im[0].header)
@@ -869,11 +870,16 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
     else:
         mask = (data == 0)
         err = None
-
+    
+    data_mask = np.cast[data.dtype](mask)
+    
     if get_background | (err_scale < 0):
-        bkg = sep.Background(data, mask=mask, bw=32, bh=32, fw=3, fh=3)
-        bkg_data = bkg.back()
+        bkg = sep.Background(data, mask=mask, **bkg_params)
         
+        bkg_data = bkg.back()
+        if bkg_only:
+            return bkg_data
+            
         pyfits.writeto('{0}_bkg.fits'.format(root), data=bkg_data,
                     header=wcs_header, overwrite=True)
 
@@ -889,10 +895,15 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
                 xerr_scale = np.median(ratio[(~mask) & np.isfinite(ratio)])
                 return xerr_scale
     else:
-        bkg_data = 0.
         if err_scale is None:
             err_scale = 1.
-
+    
+    if not get_background:
+        bkg_data = 0.
+        
+    if verbose:
+        print('SEP: err_scale={:.3f}'.format(err_scale))
+        
     if rescale_weight:
         err *= err_scale
      
@@ -1135,7 +1146,7 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
         if get_background:
             flux, fluxerr, flag = sep.sum_circle(bkg_data, 
                                           source_x-1, source_y-1,
-                                          aper*2, err=err, gain=1.0)
+                                          aper/2, err=err, gain=1.0)
 
             tab['bkg_aper_{0}'.format(iap)] = flux/uJy_to_dn*u.uJy
         else:
@@ -1288,6 +1299,58 @@ def make_drz_catalog(root='', sexpath='sex',threshold=2., get_background=True,
         print('{0} catalog: {1:d} objects'.format(root, len(cat)))
     
     return cat
+    
+def blot_background(visit={'product': '', 'files':None}, 
+                    bkg_params={'bw':64, 'bh':64, 'fw':3, 'fh':3}, 
+                    verbose=True):
+    """
+    Blot SEP background of drizzled image back to component FLTs
+    """
+    import astropy.io.fits as pyfits
+    import astropy.wcs as pywcs
+    from drizzlepac import astrodrizzle
+    
+    drz_files = glob.glob('{0}_dr[zc]_sci.fits'.format(visit['product']))
+    
+    if len(drz_files) == 0:
+        print('blot_background: No mosaic found {0}_dr[zc]_sci.fits'.format(visit['product']))
+        return False
+    
+    drz_file = drz_files[0]
+    drz_im = pyfits.open(drz_file)
+    drz_wcs = pywcs.WCS(drz_im[0].header)
+    drz_wcs.pscale = utils.get_wcs_pscale(drz_wcs)
+    
+    # Get SEP background 
+    bkg_data = make_SEP_catalog(root=visit['product'], bkg_only=True, bkg_params=bkg_params, verbose=False)
+            
+    if verbose:
+        print('   Blot background from {0}'.format(drz_file))
+        
+    for file in visit['files']:
+        flt = pyfits.open(file, mode='update')
+        
+        for ext in range(1,5):
+            if ('SCI',ext) not in flt:
+                continue
+            
+            if verbose:
+                print('  Blot background: {0}[SCI,{1}]'.format(file, ext))
+                    
+            flt_wcs = pywcs.WCS(flt['SCI',ext].header, fobj=flt, relax=True)
+            flt_wcs.pscale = utils.get_wcs_pscale(flt_wcs)
+            
+            blotted = astrodrizzle.ablot.do_blot(bkg_data.astype(np.float32),
+                            drz_wcs,
+                            flt_wcs, 1, coeffs=True, interp='nearest',
+                            sinscl=1.0, stepsize=10, wcsmap=None)
+            
+            flt['SCI',ext].data -= blotted
+            flt[0].header['BLOTSKY'] = (True, 'Sky blotted from {0}'.format(drz_file))
+        
+        flt.flush()
+    
+    return True
     
 def add_external_sources(root='', maglim=20, fwhm=0.2, catalog='2mass'):
     """Add Gaussian sources in empty parts of an image derived from an external catalog
