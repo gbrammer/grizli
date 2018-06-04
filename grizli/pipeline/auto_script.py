@@ -2164,3 +2164,185 @@ def _objfun_align(p0, tab, ref_tab, ref_err, shift_only, ret):
     else: # Normal log prob (maximize)
         lnp = norm.logpdf(dr, loc=0, scale=1).sum()
         return lnp
+
+def get_rgb_filters(filter_list, force_ir=False):
+    """
+    Compute which filters to use to make an RGB cutout
+    
+    Parameters
+    ----------
+    filter_list : list
+        All available filters
+    
+    force_ir : bool
+        Only use IR filters.
+        
+    Returns
+    -------
+    rgb_filt : [r, g, b]
+        List of filters to use
+    """
+    bfilt = None
+    for filt in ['f814w', 'f606w', 'f775w','f435w','f555w','f200lp']:
+        if filt in filter_list:
+            bfilt = filt
+            break
+    
+    gfilt = 'sum'
+    for filt in ['f105w','f110w','f125w','f140w']:
+        if filt in filter_list:
+            gfilt = filt
+            break
+    
+    if (bfilt is None) | (force_ir):
+        bfilt = gfilt
+        gfilt = 'sum'
+        
+    rfilt = None
+    for filt in ['f160w','f140w','f110w','f125w','f105w']:
+        if filt in filter_list:
+            rfilt = filt
+            break
+    
+    
+    if rfilt == gfilt:
+        gfilt = 'sum'
+        
+    if rfilt+gfilt+bfilt == 'f110wf110wf200lp':
+        gfilt = 'sum'
+            
+    return rfilt, gfilt, bfilt
+    
+def make_rgb_thumbnails(root='j140814+565638', maglim=23, cutout=12., figsize=[2,2], ids=None, close=True, skip=True, force_ir=False):
+    """
+    Make RGB color cutouts
+    """
+    import os
+    import glob
+    import numpy as np
+    
+    import matplotlib.pyplot as plt
+    from matplotlib.ticker import MultipleLocator
+
+    import montage_wrapper
+    from astropy.visualization import make_lupton_rgb
+    import astropy.wcs as pywcs
+    import astropy.io.fits as pyfits
+    
+    try:
+        from .. import utils
+    except:
+        from grizli import utils
+        
+    phot_file = '../Prep/{0}_phot.fits'.format(root)
+    if not os.path.exists(phot_file):
+        return False
+    
+    phot_file = '../Prep/{0}_phot.fits'.format(root)
+    phot = utils.GTable.gread(phot_file)
+    sci_files = glob.glob('../Prep/{0}-f*sci.fits'.format(root))
+    filters = [file.split('_')[-3].split('-')[-1] for file in sci_files]
+    
+    mag_auto = 23.9-2.5*np.log10(phot['flux_auto'])
+    
+    if ids is None:
+        sel = mag_auto < maglim
+        ids = phot['number'][sel]
+    #
+    ims = {}
+    for f in filters + ['ir']:
+        img = glob.glob('../Prep/{0}-{1}_dr?_sci.fits'.format(root, f))[0]
+        try:
+            ims[f] = pyfits.open(img)
+        except:
+            continue
+        
+    filters = list(ims.keys())
+    
+    wcs = pywcs.WCS(ims['ir'][0].header)
+    pscale = utils.get_wcs_pscale(wcs)
+    minor = MultipleLocator(1./pscale)
+            
+    rf, gf, bf = get_rgb_filters(filters, force_ir=force_ir)
+
+    pf = 1
+    pl = 1
+    bimg = ims[bf][0].data * (ims[bf][0].header['PHOTFLAM']/5.e-20)**pf * (ims[bf][0].header['PHOTPLAM']/1.e4)**pl
+    rimg = ims[rf][0].data * (ims[rf][0].header['PHOTFLAM']/5.e-20)**pf * (ims[rf][0].header['PHOTPLAM']/1.e4)**pl
+
+    if gf == 'sum':
+        gimg = (rimg+bimg)/2.
+    else:
+        gimg = ims[gf][0].data * (ims[gf][0].header['PHOTFLAM']/5.e-20)**pf * (ims[gf][0].header['PHOTPLAM']/1.e4)**pl#* 1.5
+
+    image = make_lupton_rgb(rimg, gimg, bimg, stretch=0.1, minimum=-0.01)
+    
+    
+    for id in ids:
+        
+        ix = np.where(phot['number'] == id)[0][0]
+
+        name='{0}_{1:05d}.rgb.png'.format(root, id)
+        print(name)
+        
+        # ims = {}
+        # for f in filters + ['ir']:
+        #     img = glob.glob('../Prep/{0}-{1}_dr?_sci.fits'.format(root, f))[0]
+        #     try:
+        #         montage_wrapper.mSubimage(img, '/tmp/cutout_{0}.fits'.format(f), phot['ra'][ix], phot['dec'][ix], cutout/3600, debug=False, all_pixels=False, hdu=None, status_file=None, ysize=None)
+        #         ims[f] = pyfits.open('/tmp/cutout_{0}.fits'.format(f))
+        #     except:
+        #         continue
+        #     
+        # filters = list(ims.keys())
+        # 
+        # wcs = pywcs.WCS(ims['ir'][0].header)
+        # pscale = utils.get_wcs_pscale(wcs)
+        # minor = MultipleLocator(1./pscale)
+        #         
+        # rf, gf, bf = get_rgb_filters(filters, force_ir=force_ir)
+        # 
+        # pf = 1
+        # pl = 1
+        # bimg = ims[bf][0].data * (ims[bf][0].header['PHOTFLAM']/5.e-20)**pf * (ims[bf][0].header['PHOTPLAM']/1.e4)**pl
+        # rimg = ims[rf][0].data * (ims[rf][0].header['PHOTFLAM']/5.e-20)**pf * (ims[rf][0].header['PHOTPLAM']/1.e4)**pl
+        # 
+        # if gf == 'sum':
+        #     gimg = (rimg+bimg)/2.
+        # else:
+        #     gimg = ims[gf][0].data * (ims[gf][0].header['PHOTFLAM']/5.e-20)**pf * (ims[gf][0].header['PHOTPLAM']/1.e4)**pl#* 1.5
+        # 
+        # image = make_lupton_rgb(rimg, gimg, bimg, stretch=0.1, minimum=-0.01)
+        #     
+        #wcs = pywcs.WCS(ims['f110w'][0].header)
+
+        fig = plt.figure(figsize=figsize)
+        ax = fig.add_subplot(111)#, projection=wcs)
+        sx = ims['ir'][0].data.shape[0]/2
+        
+        x0, y0 = phot['x_image'][ix]-1, phot['y_image'][ix]-1
+        ax.imshow(image, origin='lower', extent=(-x0, -x0+2*sx, -y0, -y0+2*sx))
+        ax.set_xlim(-cutout/2/pscale, cutout/2/pscale)
+        ax.set_ylim(-cutout/2/pscale, cutout/2/pscale)
+        
+        #ax.text(0.015, 0.99, r'{0} {1:5d}'.format(root, phot['number'][ix], mag_auto[ix]), ha='left', va='top', transform=ax.transAxes, backgroundcolor='w', size=10)
+        
+        ax.xaxis.set_major_locator(minor)
+        ax.yaxis.set_major_locator(minor)
+        ax.grid()
+        ax.set_xticklabels([]); ax.set_yticklabels([])
+
+        ax.text(0.06, 0.01, rf, color='r', backgroundcolor='w', size=9, ha='center', va='bottom', transform=ax.transAxes)
+        ax.text(0.06+0.08*5/figsize[0], 0.01, gf, color='g', backgroundcolor='w', size=9, ha='center', va='bottom', transform=ax.transAxes)
+        ax.text(0.06+0.08*2*5/figsize[0], 0.01, bf, color='b', backgroundcolor='w', size=9, ha='center', va='bottom', transform=ax.transAxes)
+
+        for j in range(3):
+            #time.sleep(0.5)
+            fig.tight_layout(pad=0.5)
+
+        fig.savefig(name)
+        if close:
+            plt.close()
+        
+    return True
+    
