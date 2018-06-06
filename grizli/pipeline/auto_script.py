@@ -522,7 +522,7 @@ def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=
         
         all_groups = utils.parse_grism_associations(visits)
         np.save('{0}_visits.npy'.format(field_root), [visits, all_groups, info])
-        return True
+        return visits, all_groups, info
         
     visits, filters = utils.parse_flt_files(info=info, uniquename=True, get_footprint=True, use_visit=use_visit)
     
