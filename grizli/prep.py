@@ -792,16 +792,20 @@ GAUSS_3_7x7 = np.array(
  [ 0.021388,  0.092163,  0.221178,  0.296069,  0.221178,  0.092163,  0.021388], 
  [ 0.004963,  0.021388,  0.051328,  0.068707,  0.051328,  0.021388,  0.004963]])
 
+SEP_DETECT_PARAMS = {'minarea':5, 'filter_kernel':GAUSS_3_7x7,
+                    'filter_type':'conv', 'clean':True, 'clean_param':1,
+                    'deblend_nthresh':32, 'deblend_cont':0.005}
+                                           
 def make_SEP_catalog(root='',threshold=2., get_background=True, 
                       bkg_only=False, 
                       bkg_params={'bw':32, 'bh':32, 'fw':3, 'fh':3},
-                      verbose=True, extra_config={}, sci=None, wht=None, 
+                      verbose=True, sci=None, wht=None, 
                       phot_apertures=SEXTRACTOR_PHOT_APERTURES,
-                      filter_kernel=GAUSS_3_7x7, filter_type='conv',
-                      clean=True, rescale_weight=True, minarea=14,
+                      rescale_weight=True,
                       column_case=str.upper, save_to_fits=True,
                       source_xy=None, autoparams=[2.5, 3.5], mask_kron=False,
-                      max_total_corr=2, err_scale=-np.inf,
+                      max_total_corr=2, err_scale=-np.inf, 
+                      detection_params = SEP_DETECT_PARAMS, 
                       **kwargs):
     """Make a catalog from drizzle products using the SEP implementation of SExtractor
 
@@ -916,19 +920,13 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
             
         if get_background:
             objects, seg = sep.extract(data - bkg_data, threshold, err=err,
-                           mask=mask, minarea=minarea,
-                           filter_kernel=filter_kernel,
-                           filter_type=filter_type, deblend_nthresh=32, 
-                           deblend_cont=0.005, clean=clean, clean_param=1.,
-                           segmentation_map=True)
+                           mask=mask, segmentation_map=True,
+                           **detection_params)
         else:
             objects, seg = sep.extract(data, threshold, err=err,
-                           mask=mask, minarea=minarea,
-                           filter_kernel=filter_kernel,
-                           filter_type=filter_type, deblend_nthresh=32, 
-                           deblend_cont=0.005, clean=clean, clean_param=1.,
-                           segmentation_map=True)
-
+                           mask=mask, segmentation_map=True,
+                           **detection_params)
+                           
         print('    Done.')
         tab = utils.GTable(objects)
 
@@ -956,9 +954,37 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
             tab['dec'].unit = u.deg
             tab['x_world'], tab['y_world'] = tab['ra'], tab['dec']
 
-        tab.meta['MINAREA'] = (minarea, 'Minimum source area in pixels')
-        tab.meta['CLEAN'] = clean
-        tab.meta['FILTER_TYPE'] = (filter_type, 'Type of filter applied, conv or weight')
+        if 'minarea' in detection_params:
+            tab.meta['MINAREA'] = (detection_params['minarea'], 
+                                   'Minimum source area in pixels')
+        else:
+            tab.meta['MINAREA'] = (5, 'Minimum source area in pixels')
+            
+        if 'clean' in detection_params:
+            tab.meta['CLEAN'] = (detection_params['clean'], 
+                                 'Detection cleaning')
+        else:
+            tab.meta['CLEAN'] = (True, 'Detection cleaning')
+        
+        if 'deblend_cont' in detection_params:
+            tab.meta['DEBCONT'] = (detection_params['deblend_cont'], 
+                                 'Deblending contrast ratio')
+        else:
+            tab.meta['DEBCONT'] = (0.005, 'Deblending contrast ratio')
+        
+        if 'deblend_nthresh' in detection_params:
+            tab.meta['DEBTHRSH'] = (detection_params['deblend_nthresh'], 
+                                 'Number of deblending thresholds')
+        else:
+            tab.meta['DEBTHRSH'] = (32, 'Number of deblending thresholds')
+            
+        if 'filter_type' in detection_params:
+            tab.meta['FILTER_TYPE'] = (detection_params['filter_type'], 
+                                     'Type of filter applied, conv or weight')
+        else:
+            tab.meta['FILTER_TYPE'] = ('conv', 
+                                     'Type of filter applied, conv or weight')
+                                        
         tab.meta['THRESHOLD'] = (threshold, 'Detection threshold')
 
         ## FLUX_AUTO
@@ -2577,11 +2603,14 @@ def tweak_flt(files=[], max_dist=0.4, threshold=3, verbose=True, use_sewpy=False
             wht[~np.isfinite(wht)] = 0
             pyfits.writeto('{0}_xwht.fits'.format(root), data=wht,
                            header=im['ERR',1].header, clobber=True)
-        
+            
+            pars = SEP_DETECT_PARAMS.copy()
+            pars['minarea'] = 8
+            
             cat = make_SEP_catalog(root=root, 
                                    sci='{0}_xsci.fits'.format(root),
                                    wht='{0}_xwht.fits'.format(root),
-                                   threshold=threshold, minarea=8, 
+                                   threshold=threshold, detection_params=pars, 
                                    get_background=True, verbose=False)
         
         ######
