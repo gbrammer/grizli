@@ -859,7 +859,7 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
     #             
     # prep.drizzle_overlaps(keep, parse_visits=False, pixfrac=0.6, scale=0.06, skysub=False, bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False)
 
-def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_background=True, photometry_background=True, get_all_filters=False, det_err_scale=-np.inf, clean=True, run_detection=True, phot_apertures=prep.SEXTRACTOR_PHOT_APERTURES, master_catalog=None):
+def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_background=True, photometry_background=True, get_all_filters=False, det_err_scale=-np.inf, run_detection=True, detection_params=prep.SEP_DETECT_PARAMS,  phot_apertures=prep.SEXTRACTOR_PHOT_APERTURES, master_catalog=None):
     """
     Make a detection catalog with SExtractor and then measure
     photometry with `~photutils`.
@@ -879,15 +879,19 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
         from grizli import prep, utils
             
     # Make catalog
-    if not os.path.exists('{0}-ir.cat.fits'.format(field_root)):
+    if master_catalog is None:
+        master_catalog = '{0}-ir.cat.fits'.format(field_root)
+    else:
+        if not os.path.exists(master_catalog):
+            print('Master catalog {0} not found'.format(master_catalog))
+            return False
+        
+    if not os.path.exists(master_catalog):
         run_detection=True
     
     if run_detection:    
-        tab = prep.make_SEP_catalog(root='{0}-ir'.format(field_root), threshold=threshold, get_background=detection_background, save_to_fits=True, clean=clean, err_scale=det_err_scale, phot_apertures=phot_apertures)
+        tab = prep.make_SEP_catalog(root='{0}-ir'.format(field_root), threshold=threshold, get_background=detection_background, save_to_fits=True, err_scale=det_err_scale, phot_apertures=phot_apertures, detection_params=detection_params)
     else:
-        if master_catalog is None:
-            master_catalog = '{0}-ir.cat.fits'.format(field_root)
-            
         tab = utils.GTable.gread(master_catalog)
         
     # Source positions
@@ -1963,11 +1967,18 @@ def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140
     #overlaps = np.load('{0}_overlaps.npy'.format(field_root))[0]
     #keep = []
     
+    if make_combined:
+        if isinstance(make_combined, str):
+            label = make_combined
+        else:
+            label = 'ir'
+            
     if ref_image is None:
         #ref_image = '{0}-ir_drz_sci.fits'.format(field_root)
-        wfc3ir = {'product':'{0}-ir'.format(field_root), 'files':[]}
+        wfc3ir = {'product':'{0}-{1}'.format(field_root, label), 'files':[]}
     else:
-        wfc3ir = {'product':'{0}-ir'.format(field_root), 'files':[], 'reference':ref_image}
+        wfc3ir = {'product':'{0}-{1}'.format(field_root, label), 'files':[],
+                  'reference':ref_image}
         
     filter_groups = {}
     for visit in visits:
