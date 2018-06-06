@@ -4,6 +4,8 @@ Automatic processing scripts for grizli
 import os
 import numpy as np
 
+from .. import prep, utils
+
 if False:
     np.seterr(divide='ignore', invalid='ignore', over='ignore', under='ignore')
  
@@ -857,7 +859,7 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
     #             
     # prep.drizzle_overlaps(keep, parse_visits=False, pixfrac=0.6, scale=0.06, skysub=False, bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False)
 
-def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_background=True, photometry_background=True, get_all_filters=False, det_err_scale=-np.inf, clean=True, run_detection=True):
+def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_background=True, photometry_background=True, get_all_filters=False, det_err_scale=-np.inf, clean=True, run_detection=True, phot_apertures=prep.SEXTRACTOR_PHOT_APERTURES, master_catalog=None):
     """
     Make a detection catalog with SExtractor and then measure
     photometry with `~photutils`.
@@ -881,9 +883,12 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
         run_detection=True
     
     if run_detection:    
-        tab = prep.make_SEP_catalog(root='{0}-ir'.format(field_root), threshold=threshold, get_background=detection_background, save_to_fits=True, clean=clean, err_scale=det_err_scale)
+        tab = prep.make_SEP_catalog(root='{0}-ir'.format(field_root), threshold=threshold, get_background=detection_background, save_to_fits=True, clean=clean, err_scale=det_err_scale, phot_apertures=phot_apertures)
     else:
-        tab = utils.GTable.gread('{0}-ir.cat.fits'.format(field_root))
+        if master_catalog is None:
+            master_catalog = '{0}-ir.cat.fits'.format(field_root)
+            
+        tab = utils.GTable.gread(master_catalog)
         
     # Source positions
     source_xy = tab['X_IMAGE'], tab['Y_IMAGE']
@@ -900,7 +905,7 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
         
     #filters.insert(0, 'ir')
     
-    segment_img = pyfits.open('{0}-ir_seg.fits'.format(field_root))[0].data
+    #segment_img = pyfits.open('{0}-ir_seg.fits'.format(field_root))[0].data
     
     for ii, filt in enumerate(filters):
         print(filt)
@@ -917,7 +922,8 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
             filter_tab = prep.make_SEP_catalog(root=root,
                       threshold=threshold, 
                       get_background=photometry_background,
-                      save_to_fits=False, source_xy=source_xy)
+                      save_to_fits=False, source_xy=source_xy,
+                      phot_apertures=phot_apertures)
             
             for k in filter_tab.meta:
                 newk = '{0}_{1}'.format(filt.upper(), k)
