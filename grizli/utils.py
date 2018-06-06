@@ -2795,6 +2795,19 @@ class EffectivePSF(object):
             
             self.epsf[filter] = data
         
+        # UVIS
+        for filter in ['F275W', 'F336W', 'F438W', 'F606W', 'F814W', 'F850L']:
+            file = os.path.join(os.getenv('GRIZLI'), 'CONF',
+                                'PSFSTD_WFC3UV_{0}.fits'.format(filter))
+            
+            if not os.path.exists(file):
+                continue
+            
+            data = pyfits.open(file, ignore_missing_end=True)[0].data.T
+            data[data < 0] = 0 
+            
+            self.epsf[filter] = data
+            
         # Dummy, use F105W ePSF for F098M and F110W
         self.epsf['F098M'] = self.epsf['F105W']
         self.epsf['F110W'] = self.epsf['F105W']
@@ -2832,27 +2845,57 @@ class EffectivePSF(object):
         """
         epsf = self.epsf[filter]
         
-        rx = 1+(np.clip(x,1,1013)-0)/507.
-        ry = 1+(np.clip(y,1,1013)-0)/507.
-                
-        # zero index
-        rx -= 1
-        ry -= 1 
-
-        nx = np.clip(int(rx), 0, 2)
-        ny = np.clip(int(ry), 0, 2)
-
-        # print x, y, rx, ry, nx, ny
-
-        fx = rx-nx
-        fy = ry-ny
-
-        psf_xy = (1-fx)*(1-fy)*epsf[:, :, nx+ny*3]
-        psf_xy += fx*(1-fy)*epsf[:, :, (nx+1)+ny*3]
-        psf_xy += (1-fx)*fy*epsf[:, :, nx+(ny+1)*3]
-        psf_xy += fx*fy*epsf[:, :, (nx+1)+(ny+1)*3]
-        self.eval_filter = filter
+        if filter in ['F098M', 'F110W', 'F105W', 'F125W', 'F140W', 'F160W']:
+            isir = True
+        else:
+            isir = False
         
+        if isir:
+            #  IR detector
+            rx = 1+(np.clip(x,1,1013)-0)/507.
+            ry = 1+(np.clip(y,1,1013)-0)/507.
+                
+            # zero index
+            rx -= 1
+            ry -= 1 
+
+            nx = np.clip(int(rx), 0, 2)
+            ny = np.clip(int(ry), 0, 2)
+
+            # print x, y, rx, ry, nx, ny
+
+            fx = rx-nx
+            fy = ry-ny
+
+            psf_xy = (1-fx)*(1-fy)*epsf[:, :, nx+ny*3]
+            psf_xy += fx*(1-fy)*epsf[:, :, (nx+1)+ny*3]
+            psf_xy += (1-fx)*fy*epsf[:, :, nx+(ny+1)*3]
+            psf_xy += fx*fy*epsf[:, :, (nx+1)+(ny+1)*3]
+            self.eval_filter = filter
+        else:
+            # UVIS
+            rx = 1+(np.clip(x,1,4095)-0)/(4096/(7-1))
+            ry = 1+(np.clip(y,1,4095)-0)/(4096/(8-1))
+                
+            # zero index
+            rx -= 1
+            ry -= 1 
+
+            nx = np.clip(np.cast[int](rx), 0, 6)
+            ny = np.clip(np.cast[int](ry), 0, 7)
+
+            # print x, y, rx, ry, nx, ny
+
+            fx = rx-nx
+            fy = ry-ny
+
+            psf_xy = (1-fx)*(1-fy)*epsf[:, :, nx+ny*7]
+            psf_xy += fx*(1-fy)*epsf[:, :, (nx+1)+ny*7]
+            psf_xy += (1-fx)*fy*epsf[:, :, nx+(ny+1)*7]
+            psf_xy += fx*fy*epsf[:, :, (nx+1)+(ny+1)*7]
+
+            self.eval_filter = filter
+            
         return psf_xy
     
     def eval_ePSF(self, psf_xy, dx, dy, extended_data=None):
@@ -2885,7 +2928,63 @@ class EffectivePSF(object):
         return out
     
     @staticmethod
-    def objective_epsf(params, self, psf_xy, sci, ivar, xp, yp, extended_data, ret):
+    def objective_epsf_center(params, self, psf_xy, sci, ivar, xp, yp, extended_data, ret, ds9):
+        """Objective function for fitting ePSFs
+        
+        TBD
+        
+        params = [normalization, xc, yc, background]
+        """
+        from numpy.linalg import lstsq
+        
+        sh = sci.shape
+        y0, x0 = np.array(sh)/2.-1
+        
+        dx = xp-params[0]
+        dy = yp-params[1]
+
+        ddx = xp#-x0
+        ddy = yp#-y0
+
+        ddx = ddx/ddx.max()
+        ddy = ddy/ddy.max()
+        
+        #bkg = params[3] + params[4]*ddx + params[5]*ddy #+ params[6]*ddx*ddy
+        
+        psf_offset = self.eval_ePSF(psf_xy, dx, dy, extended_data=extended_data)#*params[0]
+        
+        A = (np.array([psf_offset, np.ones_like(sci), ddx, ddy])*np.sqrt(ivar)).reshape((4,-1))
+        scif = (sci*np.sqrt(ivar)).flatten()
+        mask = (scif != 0)
+        coeffs, _resid, _rank, _s = lstsq(A[:,mask].T, scif[mask], rcond=-1)
+        resid =  (scif - np.dot(coeffs, A))
+        
+        if ds9:
+            Ax = (np.array([psf_offset, np.ones_like(sci), ddx, ddy])).reshape((4,-1))
+            psf_model = np.dot(coeffs[:1], Ax[:1,:]).reshape(sci.shape)
+            bkg = np.dot(coeffs[1:], Ax[1:,:]).reshape(sci.shape)
+            ds9.view((sci-psf_model-bkg)*mask.reshape(sci.shape))
+            
+        if ret == 'resid':
+            return resid
+        elif ret == 'lm':
+            # masked residuals for LM optimization
+            if True:
+                print(params, (resid**2).sum(), coeffs[0])
+            
+            return resid[resid != 0]
+        elif ret == 'model':
+            Ax = (np.array([psf_offset, np.ones_like(sci), ddx, ddy])).reshape((4,-1))
+            psf_model = np.dot(coeffs[:1], Ax[:1,:]).reshape(sci.shape)
+            bkg = np.dot(coeffs[1:], Ax[1:,:]).reshape(sci.shape)
+            return psf_model, bkg, Ax, coeffs
+        else:    
+            chi2 = (resid**2).sum()
+            print(params, chi2, coeffs[0])
+            return chi2
+            
+    @staticmethod
+    def objective_epsf(params, self, psf_xy, sci, ivar, xp, yp, extended_data, ret, ds9):
         """Objective function for fitting ePSFs
         
         TBD
@@ -2901,21 +3000,37 @@ class EffectivePSF(object):
         ddx = ddx/ddx.max()
         ddy = ddy/ddy.max()
         
-        psf_offset = self.eval_ePSF(psf_xy, dx, dy, extended_data=extended_data)*params[0] + params[3] + params[4]*ddx + params[5]*ddy + params[6]*ddx*ddy
+        bkg = params[3] + params[4]*ddx + params[5]*ddy #+ params[6]*ddx*ddy
         
-        if ret == 'resid':
-            return (sci-psf_offset)*np.sqrt(ivar)
+        psf_offset = self.eval_ePSF(psf_xy, dx, dy, extended_data=extended_data)*params[0]
+        
+        resid =  (sci-psf_offset-bkg)*np.sqrt(ivar)
+        
+        if ds9:
+            ds9.view(sci-psf_offset-bkg)
             
-        chi2 = np.sum((sci-psf_offset)**2*(ivar))
-        #print(params, chi2)
-        return chi2
+        if ret == 'resid':
+            return resid
+        elif ret == 'lm':
+            # masked residuals for LM optimization
+            if True:
+                print(params, (resid**2).sum())
+            
+            return resid[resid != 0]
+        elif ret == 'model':
+            return psf_offset, bkg, None, None
+        else:    
+            chi2 = (resid**2).sum()
+            print(params, chi2)
+            return chi2
     
     def fit_ePSF(self, sci, center=None, origin=[0,0], ivar=1, N=7, 
-                 filter='F140W', tol=1.e-4, guess=None, get_extended=False):
+                 filter='F140W', tol=1.e-4, guess=None, get_extended=False,
+                 method='lm', ds9=None, psf_params=None, only_centering=True):
         """Fit ePSF to input data
         TBD
         """
-        from scipy.optimize import minimize
+        from scipy.optimize import minimize, least_squares
         
         sh = sci.shape
         if center is None:
@@ -2942,24 +3057,77 @@ class EffectivePSF(object):
             yguess = yp.flatten()[ix]
         else:
             xguess, yguess = guess
-            
-        guess = [sci[yc-N:yc+N, xc-N:xc+N].sum()/psf_xy.sum(), xguess, yguess, 0, 0, 0, 0]
+        
+        med_bkg = np.median(sci)
+         
+        if only_centering:
+            # Only fit for centering and compute normalizations
+            guess = [xguess, yguess]
+            _objfun = self.objective_epsf_center
+        else:
+            # Fit for centering and normalization   
+            guess = [(sci-med_bkg)[yc-N:yc+N, xc-N:xc+N].sum(), xguess, yguess, med_bkg, 0, 0]
+            _objfun = self.objective_epsf
+                
         sly = slice(yc-N, yc+N); slx = slice(xc-N, xc+N)
         sly = slice(yguess-N, yguess+N); slx = slice(xguess-N, xguess+N)
+        
+        ivar_mask = np.zeros_like(sci)
+        ivar_mask[sly, slx] = 1
+        ivar_mask *= ivar
         
         if get_extended:
             extended_data = self.extended_epsf[filter]
         else:
             extended_data = None
         
-        args = (self, psf_xy, sci[sly, slx], ivar[sly, slx], xp[sly, slx], yp[sly, slx], extended_data, 'chi2')
+        # Get model
+        if psf_params is not None:
+            px = psf_params*1
+            if len(px) == 2:
+                _objfun = self.objective_epsf_center
+                px[0] += x0
+                px[1] += y0            
+            else:
+                _objfun = self.objective_epsf
+                px[1] += x0
+                px[2] += y0            
+            
+            args = (self, psf_xy, sci, ivar_mask, xp, yp, extended_data, 'model', ds9)
+            psf_model, bkg, A, coeffs = _objfun(px, *args)
+            return psf_model, bkg, A, coeffs
+            
+        if method == 'lm':
+            args = (self, psf_xy, sci, ivar_mask, xp, yp, extended_data, 'lm', ds9)
+            
+            x_scale = 'jac'
+            #x_scale = [guess[0], 1, 1, 10, 10, 10]
+            #out = least_squares(_objfun, guess, args=args, method='trf', x_scale=x_scale, loss='huber')
+            out = least_squares(_objfun, guess, args=args, method='lm', x_scale=x_scale, loss='linear')
+            psf_params = out.x*1
+        else:    
+            args = (self, psf_xy, sci, ivar_mask, xp, yp, extended_data, 'chi2', ds9)
+            out = minimize(_objfun, guess, args=args, method=method, tol=tol)
+            psf_params = out.x*1
         
-        out = minimize(self.objective_epsf, guess, args=args, method='Powell', tol=tol)
+        if len(guess) == 2:
+            psf_params[0] -= x0
+            psf_params[1] -= y0
+        else:
+            psf_params[1] -= x0
+            psf_params[2] -= y0
         
-        psf_params = out.x
-        psf_params[1] -= x0
-        psf_params[2] -= y0
-        
+        if False:
+            
+            psf_fit  = epsf.get_ePSF(psf_params, origin=origin, 
+                                       filter=filter, shape=sh, 
+                                       get_extended=get_extended)
+                                       
+            xargs = (self, psf_xy, sci, ivar_mask, xp, yp, extended_data, 'lm', None)
+            lm = _objfun(out.x, *xargs)
+            cargs = (self, psf_xy, sci, ivar_mask, xp, yp, extended_data, 'chi2', None)
+            chi2 = _objfun(out.x, *cargs)
+            
         return psf_params
         
         # dx = xp-psf_params[1]
@@ -2968,7 +3136,7 @@ class EffectivePSF(object):
         # 
         # return output_psf, psf_params
     
-    def get_ePSF(self, psf_params, origin=[0,0], shape=[20,20], filter='F140W', get_extended=False):
+    def get_ePSF(self, psf_params, origin=[0,0], shape=[20,20], filter='F140W', get_extended=False, get_background=False):
         """
         Evaluate an Effective PSF
         """
@@ -2984,17 +3152,30 @@ class EffectivePSF(object):
         
         yp, xp = np.indices(sh)
         
-        dx = xp-psf_params[1]-x0
-        dy = yp-psf_params[2]-y0
+        if len(psf_params) == 2:
+            _objfun = self.objective_epsf_center
+            dx = xp-psf_params[0]-x0
+            dy = yp-psf_params[1]-y0            
+        else:
+            _objfun = self.objective_epsf
+            dx = xp-psf_params[1]-x0
+            dy = yp-psf_params[2]-y0
         
         if get_extended:
             extended_data = self.extended_epsf[filter]
         else:
             extended_data = None
-            
-        output_psf = self.eval_ePSF(psf_xy, dx, dy, extended_data=extended_data)*psf_params[0]
         
-        return output_psf
+        ones = np.ones(sh, dtype=float)
+        args = (self, psf_xy, ones, ones, xp-x0, yp-y0, extended_data, 'model', None)
+        output_psf, bkg, _, _ = _objfun(psf_params, *args)
+             
+        #output_psf = self.eval_ePSF(psf_xy, dx, dy, extended_data=extended_data)*psf_params[0]
+        
+        if get_background:
+            return output_psf, bkg
+        else:
+            return output_psf
 
 def read_catalog(file, sextractor=False, format=None):
     """
