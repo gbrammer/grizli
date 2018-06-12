@@ -805,7 +805,7 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
                       column_case=str.upper, save_to_fits=True,
                       source_xy=None, autoparams=[2.5, 3.5], mask_kron=False,
                       max_total_corr=2, err_scale=-np.inf, 
-                      detection_params = SEP_DETECT_PARAMS, 
+                      detection_params = SEP_DETECT_PARAMS, bkg_mask=None,
                       **kwargs):
     """Make a catalog from drizzle products using the SEP implementation of SExtractor
 
@@ -845,7 +845,11 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
     # Scale fluxes to mico-Jy
     uJy_to_dn = 1/(3631*1e6*10**(-0.4*ZP))
 
-    weight_file = drz_file.replace('_sci.fits', '_wht.fits').replace('_drz.fits', '_wht.fits')
+    if wht is not None:
+        weight_file = wht
+    else:
+        weight_file = drz_file.replace('_sci.fits', '_wht.fits').replace('_drz.fits', '_wht.fits')
+    
     if (weight_file == drz_file) | (not os.path.exists(weight_file)):
         WEIGHT_TYPE = "NONE"
         weight_file = None
@@ -878,8 +882,11 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
     data_mask = np.cast[data.dtype](mask)
     
     if get_background | (err_scale < 0):
-        bkg = sep.Background(data, mask=mask, **bkg_params)
-        
+        if bkg_mask is not None:
+            bkg = sep.Background(data, mask=mask | bkg_mask, **bkg_params)
+        else:
+            bkg = sep.Background(data, mask=mask, **bkg_params)
+            
         bkg_data = bkg.back()
         if bkg_only:
             return bkg_data
@@ -927,7 +934,9 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
                            mask=mask, segmentation_map=True,
                            **detection_params)
                            
-        print('    Done.')
+        if verbose:
+            print('    Done.')
+        
         tab = utils.GTable(objects)
 
         # make one indexed like SExtractor
@@ -1966,7 +1975,7 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, ref
         if 'date_format' in kwargs:
             date_format = kwargs['date_format']
         else:
-            date_format = 'decimalyear'
+            date_format = 'mjd'
         
         gaia_tbl = ref_cat #utils.GTable.gread('gaia.fits')
         coo = get_gaia_radec_at_time(gaia_tbl, date=kwargs['date'],
@@ -2580,10 +2589,10 @@ def tweak_flt(files=[], max_dist=0.4, threshold=3, verbose=True, use_sewpy=False
         
         pyfits.writeto('{0}_xsci.fits'.format(root), data=sci,
                        header=header,
-                       clobber=True)
+                       overwrite=True)
         
         pyfits.writeto('{0}_xrms.fits'.format(root), data=im['ERR',1].data,
-                       header=im['ERR',1].header, clobber=True)
+                       header=im['ERR',1].header, overwrite=True)
         
         if use_sewpy:
             params = ["X_IMAGE", "Y_IMAGE", "X_WORLD", "Y_WORLD",
@@ -2602,7 +2611,7 @@ def tweak_flt(files=[], max_dist=0.4, threshold=3, verbose=True, use_sewpy=False
             wht = 1/im['ERR',1].data**2
             wht[~np.isfinite(wht)] = 0
             pyfits.writeto('{0}_xwht.fits'.format(root), data=wht,
-                           header=im['ERR',1].header, clobber=True)
+                           header=im['ERR',1].header, overwrite=True)
             
             pars = SEP_DETECT_PARAMS.copy()
             pars['minarea'] = 8
