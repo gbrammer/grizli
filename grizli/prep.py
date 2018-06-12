@@ -3489,7 +3489,7 @@ def find_single_image_CRs(visit, simple_mask=False, with_ctx_mask=True,
         
         flt.flush()
         
-def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, max_files=999, pixfrac=0.8, scale=0.06, skysub=True, skymethod='localmin', skyuser='MDRIZSKY', bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='EXP', final_wt_scl='exptime', context=False):
+def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, max_files=999, pixfrac=0.8, scale=0.06, skysub=True, skymethod='localmin', skyuser='MDRIZSKY', bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='EXP', final_wt_scl='exptime', context=False, static=True):
     """Combine overlapping visits into single output mosaics
     
     Parameters
@@ -3609,6 +3609,8 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, m
             else:
                 bits = 576
         
+        inst_keys = np.unique([os.path.basename(file)[0] for file in group['files']])
+        
         if 'reference' in group:
             AstroDrizzle(group['files'], output=group['product'],
                      clean=True, context=context, preserve=False,
@@ -3621,7 +3623,7 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, m
                      final_wt_scl=final_wt_scl,
                      final_pixfrac=pixfrac,
                      final_wcs=True, final_refimage=group['reference'],
-                     resetbits=0)
+                     resetbits=0, static=(static & (len(inst_keys) == 1)))
         else:
             AstroDrizzle(group['files'], output=group['product'],
                      clean=True, context=context, preserve=False,
@@ -3637,7 +3639,7 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, m
                      final_scale=scale, 
                      final_ra=final_ra, final_dec=final_dec,
                      final_outnx=final_outnx, final_outny=final_outny,
-                     resetbits=0)
+                     resetbits=0, static=(static & (len(inst_keys) == 1)))
         
         clean_drizzle(group['product'])
 
