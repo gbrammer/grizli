@@ -2346,16 +2346,20 @@ def make_maximal_wcs(files, pixel_scale=0.1, get_hdu=True, pad=90, verbose=True)
                 print('{0:>3d}/{1:>3d}: {2}[SCI,{3}]  {4:>6.2f}'.format(i, len(files), file, chip+1, group_poly.area*3600*np.cos(y0/180*np.pi)))
     
     px, py = np.cast[float](group_poly.convex_hull.boundary.xy   )  
-    x0, y0 = np.cast[float](group_poly.centroid.xy)[:,0]
+    #x0, y0 = np.cast[float](group_poly.centroid.xy)[:,0]
+
+    x0 = (px.max()+px.min())/2.
+    y0 = (py.max()+py.min())/2.
     
     sx = (px.max()-px.min())*np.cos(y0/180*np.pi)*3600 # arcsec
     sy = (py.max()-py.min())*3600 # arcsec
+    
     size = np.maximum(sx+pad, sy+pad)
 
-    out = make_wcsheader(ra=x0, dec=y0, size=size, pixscale=pixel_scale, get_hdu=get_hdu, theta=0)
+    out = make_wcsheader(ra=x0, dec=y0, size=(sx+pad*2, sy+pad*2), pixscale=pixel_scale, get_hdu=get_hdu, theta=0)
     
     if verbose:
-        print('\n  Mosaic WCS: ({0:.5f},{1:.5f})  {2:.1f}\'/axis  {3:.3f}"/pix\n'.format(x0, y0, size/60, pixel_scale))
+        print('\n  Mosaic WCS: ({0:.5f},{1:.5f})  {2:.1f}\'x{3:.1f}\'  {4:.3f}"/pix\n'.format(x0, y0, (sx+pad)/60., (sy+pad)/60., pixel_scale))
         
     return out
     
@@ -2969,7 +2973,7 @@ class EffectivePSF(object):
             return resid
         elif ret == 'lm':
             # masked residuals for LM optimization
-            if True:
+            if False:
                 print(params, (resid**2).sum(), coeffs[0])
             
             return resid[resid != 0]
@@ -2980,7 +2984,7 @@ class EffectivePSF(object):
             return psf_model, bkg, Ax, coeffs
         else:    
             chi2 = (resid**2).sum()
-            print(params, chi2, coeffs[0])
+            #print(params, chi2, coeffs[0])
             return chi2
             
     @staticmethod
