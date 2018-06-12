@@ -1289,7 +1289,10 @@ class MultiBeam(GroupFitter):
                 m = beam.compute_model(in_place=False)
                 #beam.modelf = beam.model.flatten()
                 #beam.model = beam.modelf.reshape(beam.beam.sh_beam)
-            
+                
+                beam.flat_flam = beam.compute_model(in_place=False, is_cgs=True) #/self.beam.total_flux
+                
+                
                 self.psf_param_dict[beam.grism.parent_file] = beam.beam.psf_params
         
         self._parse_beam_arrays()
@@ -2927,7 +2930,7 @@ class MultiBeam(GroupFitter):
                     beam.model = nd.shift(beam.modelf.reshape(beam.sh_beam), (shifts[il], 0))
                 else:
                     self.beams[i].beam.add_ytrace_offset(shifts[il])
-                    self.beams[i].compute_model()
+                    self.beams[i].compute_model(is_cgs=True)
 
         self.flat_flam = np.hstack([b.beam.model.flatten() for b in self.beams])
         self.poly_order=-1

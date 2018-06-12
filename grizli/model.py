@@ -843,12 +843,13 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         else:
             return xpix
     
-    def x_init_epsf(self, flat_sensitivity=False, psf_params=None, psf_filter='F140W', yoff=0.0, skip=0.5, get_extended=False):
+    def x_init_epsf(self, flat_sensitivity=False, psf_params=None, psf_filter='F140W', yoff=0.0, skip=0.5, get_extended=False, seg_mask=True):
         """Initialize ePSF fitting for point sources
         TBD
         """
         import scipy.sparse
-                
+        import scipy.ndimage
+        
         #print('SKIP: {0}'.format(skip))
         
         EPSF = utils.EffectivePSF()
@@ -907,7 +908,7 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
             li = np.interp(xi, xbeam, self.lam_beam) 
             dx = xp_beam-self.psf_params[1]-xi-x0
             dy = yp_beam-self.psf_params[2]-yi+yoff-y0
-
+            
             # wavelength-dependent
             ii = np.interp(li, filt_lam, filt_ix, left=-1, right=10)
             if ii == -1:
@@ -928,7 +929,14 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
             psf = EPSF.eval_ePSF(psf_xy_i, dx, dy, extended_data=psf_ext_i)*self.psf_params[0]
             #print(xi, psf.sum())
             
-            A_psf.append(psf.flatten())
+            if seg_mask:
+                segm = nd.maximum_filter((self.seg == self.id)*1., size=7)
+                #yps, xps = np.indices(self.sh)
+                seg_i = nd.map_coordinates(segm, np.array([dx+x0, dy+y0]), order=1, mode='constant', cval=0.0, prefilter=True) > 0
+            else:
+                seg_i = 1
+                
+            A_psf.append((psf*seg_i).flatten())
             lam_psf.append(li)
                     
         # Sensitivity
@@ -1077,7 +1085,9 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         if spectrum_1d is None:
             #modelf = np.array(self.A_psf.sum(axis=1)).flatten()
             #model = model.reshape(self.sh_beam)
-            coeffs = np.ones(self.A_psf.shape[1])*self.total_flux
+            coeffs = np.ones(self.A_psf.shape[1])
+            if not is_cgs:
+                coeffs *= self.total_flux
         else:
             dx = np.diff(self.lam_psf)[0]
             if dx < 0:
@@ -3177,6 +3187,8 @@ class GrismFLT(object):
                     self.grism.data[key] = fits[ext].data*1
             else:
                 pass
+        
+        del(fits)
                 
         return True
     
@@ -3977,11 +3989,15 @@ class BeamCutout(object):
                                                   center=center, tol=tol,
                                                   N=N, origin=origin,
                                                   filter=self.direct.filter,
-                                                  get_extended=get_extended)
+                                                  get_extended=get_extended,
+                                                  only_centering=False)
         else:
             self.psf_params = psf_params
             
         self.beam.x_init_epsf(flat_sensitivity=False, psf_params=self.psf_params, psf_filter=self.direct.filter, yoff=yoff, skip=skip, get_extended=get_extended)
+        
+        self._parse_from_data(contam_sn_mask=self.contam_sn_mask,
+                              min_mask=self.min_mask)
         
         return None
         
