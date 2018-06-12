@@ -2905,7 +2905,10 @@ class MultiBeam(GroupFitter):
             shifts = out[0]
         else:
             out = minimize(self.eval_trace_shift, s0, bounds=bounds, args=args, method='Powell', tol=tol)
-            shifts = out.x
+            if out.x.shape == ():
+                shifts = [float(out.x)]
+            else:
+                shifts = out.x
         
         self.eval_trace_shift(shifts, *args)
         
