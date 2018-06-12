@@ -1102,7 +1102,7 @@ GRIS_REF_FILTERS = {'G141': ['F140W', 'F160W', 'F125W', 'F105W', 'F110W', 'F098M
                     'G102': ['F105W', 'F098M', 'F110W', 'F125W', 'F140W', 'F160W', 'F127M', 'F139M', 'F153M', 'F132N', 'F130N', 'F128N', 'F126N', 'F164N', 'F167N'],
                     'G800L': ['F814W', 'F850LP', 'F606W', 'F435W', 'F777W']}
                     
-def load_GroupFLT(field_root='j142724+334246', force_ref=None, force_seg=None, force_cat=None, galfit=False, pad=256, files=None, gris_ref_filters=GRIS_REF_FILTERS):
+def load_GroupFLT(field_root='j142724+334246', force_ref=None, force_seg=None, force_cat=None, galfit=False, pad=256, files=None, gris_ref_filters=GRIS_REF_FILTERS, split_by_grism=False):
     """
     Initialize a GroupFLT object
     """
@@ -1126,7 +1126,9 @@ def load_GroupFLT(field_root='j142724+334246', force_ref=None, force_seg=None, f
     else:
         catalog = force_cat
     
-    grp = None
+    grp_objects = []
+     
+    #grp = None
     if g141.sum() > 0:
         for f in gris_ref_filters['G141']:
             
@@ -1161,7 +1163,9 @@ def load_GroupFLT(field_root='j142724+334246', force_ref=None, force_seg=None, f
             ref_file = force_ref
         
         grp = multifit.GroupFLT(grism_files=list(info['FILE'][g141]), direct_files=[], ref_file=ref_file, seg_file=seg_file, catalog=catalog, cpu_count=-1, sci_extn=1, pad=pad)
-    
+        
+        grp_objects.append(grp)
+        
     if g102.sum() > 0:
         for f in gris_ref_filters['G102']:
             if os.path.exists('{0}-{1}_drz_sci.fits'.format(field_root, f.lower())):
@@ -1192,15 +1196,19 @@ def load_GroupFLT(field_root='j142724+334246', force_ref=None, force_seg=None, f
             ref_file = force_ref
                     
         grp_i = multifit.GroupFLT(grism_files=list(info['FILE'][g102]), direct_files=[], ref_file=ref_file, seg_file=seg_file, catalog=catalog, cpu_count=-1, sci_extn=1, pad=pad)
-        if g141.sum() > 0:
-            grp.extend(grp_i)
-        else:
-            grp = grp_i
-            
-        del(grp_i)
+        #if g141.sum() > 0:
+        #    grp.extend(grp_i)
+        #else:
+        #    grp = grp_i
+        grp_objects.append(grp_i)
+           
+        #del(grp_i)
     
     # ACS
     if g800l.sum() > 0:
+        
+        acs_grp = None
+        
         for f in gris_ref_filters['G800L']:
             if os.path.exists('{0}-{1}_drc_sci.fits'.format(field_root, f.lower())):
                 g800l_ref = f
@@ -1232,73 +1240,86 @@ def load_GroupFLT(field_root='j142724+334246', force_ref=None, force_seg=None, f
         for sci_extn in [1,2]:        
             grp_i = multifit.GroupFLT(grism_files=list(info['FILE'][g800l]), direct_files=[], ref_file=ref_file, seg_file=seg_file, catalog=catalog, cpu_count=-1, sci_extn=sci_extn, pad=0, shrink_segimage=False)
         
-            if grp is not None:
-                grp.extend(grp_i)
+            if acs_grp is not None:
+                acs_grp.extend(grp_i)
+                del(grp_i)
             else:
-                grp = grp_i
+                acs_grp = grp_i
             
-            del(grp_i)
+        if acs_grp is not None:
+            grp_objects.append(acs_grp)
     
-    return grp
+    if split_by_grism:
+        return grp_objects
+    else:
+        grp = grp_objects[0]
+        if len(grp_objects) > 0:
+            for i in range(1,len(grp_objects)):
+                grp.extend(grp_objects[i])
+                del(grp_objects[i])
+                
+        return [grp]
     
-def grism_prep(field_root='j142724+334246', ds9=None, refine_niter=3, gris_ref_filters=GRIS_REF_FILTERS, files=None):
+def grism_prep(field_root='j142724+334246', ds9=None, refine_niter=3, gris_ref_filters=GRIS_REF_FILTERS, files=None, split_by_grism=True):
     import glob
     import os
     import numpy as np
     
     from .. import prep, utils, multifit
 
-    grp = load_GroupFLT(field_root=field_root, gris_ref_filters=gris_ref_filters, files=files)
+    grp_objects = load_GroupFLT(field_root=field_root, gris_ref_filters=gris_ref_filters, files=files, split_by_grism=split_by_grism)
     
-    ################
-    # Compute preliminary model
-    grp.compute_full_model(fit_info=None, verbose=True, store=False, mag_limit=25, coeffs=[1.1, -0.5], cpu_count=4)
-    
-    ##############
-    # Save model to avoid having to recompute it again
-    grp.save_full_data()
-    
-    ################
-    # Remove constant modal background 
-    import scipy.stats
-    
-    for i in range(grp.N):
-        mask = (grp.FLTs[i].model < grp.FLTs[i].grism['ERR']*0.6) & (grp.FLTs[i].grism['SCI'] != 0)
+    for grp in grp_objects:
         
-        # Fit Gaussian to the masked pixel distribution
-        clip = np.ones(mask.sum(), dtype=bool)
-        for iter in range(3):
-            n = scipy.stats.norm.fit(grp.FLTs[i].grism.data['SCI'][mask][clip])
-            clip = np.abs(grp.FLTs[i].grism.data['SCI'][mask]) < 3*n[1]
-        
-        mode = n[0]
-        
-        print(grp.FLTs[i].grism.parent_file, grp.FLTs[i].grism.filter, mode)
-        try:
-            ds9.view(grp.FLTs[i].grism['SCI'] - grp.FLTs[i].model)
-        except:
-            pass
-        
-        ## Subtract
-        grp.FLTs[i].grism.data['SCI'] -= mode
+        ################
+        # Compute preliminary model
+        grp.compute_full_model(fit_info=None, verbose=True, store=False, mag_limit=25, coeffs=[1.1, -0.5], cpu_count=4)
     
-    #############
-    # Refine the model
-    i=0
-    if ds9:
-        ds9.view(grp.FLTs[i].grism['SCI'] - grp.FLTs[i].model)
-        fr = ds9.get('frame')
+        ##############
+        # Save model to avoid having to recompute it again
+        grp.save_full_data()
     
-    for iter in range(refine_niter):
-        print('\nRefine contamination model, iter # {0}\n'.format(iter))
+        ################
+        # Remove constant modal background 
+        import scipy.stats
+    
+        for i in range(grp.N):
+            mask = (grp.FLTs[i].model < grp.FLTs[i].grism['ERR']*0.6) & (grp.FLTs[i].grism['SCI'] != 0)
+        
+            # Fit Gaussian to the masked pixel distribution
+            clip = np.ones(mask.sum(), dtype=bool)
+            for iter in range(3):
+                n = scipy.stats.norm.fit(grp.FLTs[i].grism.data['SCI'][mask][clip])
+                clip = np.abs(grp.FLTs[i].grism.data['SCI'][mask]) < 3*n[1]
+        
+            mode = n[0]
+        
+            print(grp.FLTs[i].grism.parent_file, grp.FLTs[i].grism.filter, mode)
+            try:
+                ds9.view(grp.FLTs[i].grism['SCI'] - grp.FLTs[i].model)
+            except:
+                pass
+        
+            ## Subtract
+            grp.FLTs[i].grism.data['SCI'] -= mode
+    
+        #############
+        # Refine the model
+        i=0
         if ds9:
-            ds9.set('frame {0}'.format(int(fr)+iter+1))
+            ds9.view(grp.FLTs[i].grism['SCI'] - grp.FLTs[i].model)
+            fr = ds9.get('frame')
+    
+        for iter in range(refine_niter):
+            print('\nRefine contamination model, iter # {0}\n'.format(iter))
+            if ds9:
+                ds9.set('frame {0}'.format(int(fr)+iter+1))
         
-        grp.refine_list(poly_order=3, mag_limits=[18, 24], max_coeff=5, ds9=ds9, verbose=True, fcontam=10)
+            grp.refine_list(poly_order=3, mag_limits=[18, 24], max_coeff=5, ds9=ds9, verbose=True, fcontam=10)
 
-    ##############
-    # Save model to avoid having to recompute it again
-    grp.save_full_data()
+        ##############
+        # Save model to avoid having to recompute it again
+        grp.save_full_data()
     
     # Link minimal files to Extractions directory
     os.chdir('../Extractions/')
@@ -2009,7 +2030,7 @@ def make_reference_wcs(info, output='mosaic_wcs-ref.fits', filters=['G800L', 'G1
     
     
     """
-    if filters is None:
+    if filters is not None:
         use = utils.column_values_in_list(info['FILTER'], filters)
         if use.sum() == 0:
             # All files
@@ -2045,7 +2066,7 @@ def make_reference_wcs(info, output='mosaic_wcs-ref.fits', filters=['G800L', 'G1
         return ref_hdu[1]
         
     
-def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140W','F160W'], ref_image=None, bits=None, pixfrac=0.6, scale=0.06, make_combined=True, drizzle_filters=True, skysub=False, skymethod='localmin', match_str=[], context=False, pad_reference=60, min_nexp=2):
+def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140W','F160W'], ref_image=None, bits=None, pixfrac=0.6, scale=0.06, make_combined=True, drizzle_filters=True, skysub=False, skymethod='localmin', match_str=[], context=False, pad_reference=60, min_nexp=2, static=True):
     import numpy as np
     import glob
     
@@ -2130,10 +2151,14 @@ def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140
             keep[i]['reference'] = '{0}_wcs-ref.fits'.format(field_root)
             
     if make_combined:
-        prep.drizzle_overlaps([wfc3ir], parse_visits=False, pixfrac=pixfrac, scale=scale, skysub=False, bits=bits, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False, context=context)
+        
+        # Figure out if we have more than one instrument
+        inst_keys = np.unique([os.path.basename(file)[0] for file in wfc3ir['files']])
+        
+        prep.drizzle_overlaps([wfc3ir], parse_visits=False, pixfrac=pixfrac, scale=scale, skysub=False, bits=bits, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False, context=context, static=(static & (len(inst_keys) == 1)))
     
-    if drizzle_filters:
-        prep.drizzle_overlaps(keep, parse_visits=False, pixfrac=pixfrac, scale=scale, skysub=skysub, skymethod=skymethod, bits=bits, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False, context=context)
+    if drizzle_filters:        
+        prep.drizzle_overlaps(keep, parse_visits=False, pixfrac=pixfrac, scale=scale, skysub=skysub, skymethod=skymethod, bits=bits, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False, context=context, static=static)
     
 def fill_filter_mosaics(field_root):
     """
