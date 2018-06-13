@@ -1337,7 +1337,7 @@ def make_drz_catalog(root='', sexpath='sex',threshold=2., get_background=True,
     
 def blot_background(visit={'product': '', 'files':None}, 
                     bkg_params={'bw':64, 'bh':64, 'fw':3, 'fh':3}, 
-                    verbose=True):
+                    verbose=True, skip_existing=True):
     """
     Blot SEP background of drizzled image back to component FLTs
     """
@@ -1367,6 +1367,10 @@ def blot_background(visit={'product': '', 'files':None},
         
         for ext in range(1,5):
             if ('SCI',ext) not in flt:
+                continue
+            
+            if ('BLOTSKY' in flt[0].header) & (skip_existing):
+                print('\'BLOTSKY\' keyword found in {0}.  Skipping....'.format(file))
                 continue
             
             if verbose:
@@ -1971,34 +1975,34 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, ref
             has_catalog = False
         
     if (ref_src == 'GAIA') & ('date' in kwargs) & has_catalog:
-                
-        if 'date_format' in kwargs:
-            date_format = kwargs['date_format']
-        else:
-            date_format = 'mjd'
+        if kwargs['date'] is not None:        
+            if 'date_format' in kwargs:
+                date_format = kwargs['date_format']
+            else:
+                date_format = 'mjd'
         
-        gaia_tbl = ref_cat #utils.GTable.gread('gaia.fits')
-        coo = get_gaia_radec_at_time(gaia_tbl, date=kwargs['date'],
-                                     format=date_format)
+            gaia_tbl = ref_cat #utils.GTable.gread('gaia.fits')
+            coo = get_gaia_radec_at_time(gaia_tbl, date=kwargs['date'],
+                                         format=date_format)
         
-        coo_tbl = utils.GTable()
-        coo_tbl['ra'] = coo.ra
-        coo_tbl['dec'] = coo.dec
+            coo_tbl = utils.GTable()
+            coo_tbl['ra'] = coo.ra
+            coo_tbl['dec'] = coo.dec
         
-        ok = np.isfinite(coo_tbl['ra']) & np.isfinite(coo_tbl['dec'])
+            ok = np.isfinite(coo_tbl['ra']) & np.isfinite(coo_tbl['dec'])
         
-        coo_tbl.meta['date'] = kwargs['date']
-        coo_tbl.meta['datefmt'] = date_format
+            coo_tbl.meta['date'] = kwargs['date']
+            coo_tbl.meta['datefmt'] = date_format
         
-        print('Apply observation ({0},{1}) to GAIA catalog'.format(kwargs['date'], date_format))
+            print('Apply observation ({0},{1}) to GAIA catalog'.format(kwargs['date'], date_format))
         
-        table_to_regions(coo_tbl[ok], output='{0}_{1}.reg'.format(product,
-                                                     ref_src.lower()))
+            table_to_regions(coo_tbl[ok], output='{0}_{1}.reg'.format(product,
+                                                         ref_src.lower()))
         
-        coo_tbl['ra','dec'][ok].write('{0}_{1}.radec'.format(product, 
-                                                     ref_src.lower()),
-                                format='ascii.commented_header',
-                                overwrite=True)
+            coo_tbl['ra','dec'][ok].write('{0}_{1}.radec'.format(product, 
+                                                         ref_src.lower()),
+                                    format='ascii.commented_header',
+                                    overwrite=True)
         
     
     if not has_catalog:
