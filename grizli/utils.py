@@ -3472,7 +3472,7 @@ td {font-size: 10pt;}
                 if 'pageLength' in line:
                     break
             
-            button_option = '{spacer}dom: \'Bfrtip\',\n{spacer}buttons: {bstr},\n'.format(spacer=' '*8, bstr=buttons.__repr__())
+            button_option = '{spacer}dom: \'Blfrtip\',\n{spacer}buttons: {bstr},\n'.format(spacer=' '*8, bstr=buttons.__repr__())
             lines.insert(il+1, button_option)
             
         # Range columns
