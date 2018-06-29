@@ -10,7 +10,8 @@ import numpy as np
 import astropy.io.fits as pyfits
 import astropy.wcs as pywcs
 
-import grizli
+from grizli import utils
+
 try:
     from .psf import DrizzlePSF
 except:
@@ -28,7 +29,7 @@ G) none                # File with parameter constraints (ASCII file)
 H) 1    {xmax}   1    {ymax}   # Image region to fit (xmin xmax ymin ymax)
 I) {sh}    {sh}          # Size of the convolution box (x y)
 J) 26.563              # Magnitude photometric zeropoint 
-K) 0.06 0.06        # Plate scale (dx dy)    [arcsec per pixel]
+K) {ps:.3f} {ps:.3f}        # Plate scale (dx dy)    [arcsec per pixel]
 O) regular             # Display type (regular, curses, both)
 P) 0                   # Choose: 0=optimize, 1=model, 2=imgblock, 3=subcomps
 
@@ -315,7 +316,44 @@ class GalfitSersic(GalfitObject):
         elif dev:
             self.set(n=4)
             self.setfree(n=0)
-            
+
+class GalfitKing(GalfitObject):
+    """King profile"""
+    def __init__(self, output=0, fix={}, **keys): 
+        import copy
+        
+        self.pidx = OrderedDict([('pos', 1), 
+                                 ('mu', 3), 
+                                 ('Rc', 4), 
+                                 ('Rt', 5), 
+                                 ('alpha', 6), 
+                                 ('q', 9), 
+                                 ('pa', 10)])
+                                 
+        self.pdef = OrderedDict([('pos', [0,0]), 
+                                    ('mu', 20.), 
+                                    ('Rc', 1.), 
+                                    ('Rt', 4), 
+                                    ('alpha', 2.0), 
+                                    ('q', 0.9), 
+                                    ('pa', 0)])
+                                    
+        self.pfree = OrderedDict([('pos', [1,1]), 
+                                  ('mu', 1), 
+                                  ('Rc', 1), 
+                                  ('Rt', 1), 
+                                  ('alpha', 1), 
+                                  ('q', 1), 
+                                  ('pa', 1)])
+        
+        self.name = 'king'
+        self.output = output
+        
+        self.pdict = copy.deepcopy(self.pdef)
+        self.set(**keys)
+        self.setfree(**fix)
+        
+                        
 class GalfitPSF(GalfitObject):
     def __init__(self, output=0, fix={}, **keys): 
         import copy
@@ -371,12 +409,15 @@ class Galfitter(object):
         self.DPSF = DrizzlePSF(flt_files=self.flt_files, info=None, driz_image=self.sci.filename())
         
     def get_data(self, filter='f140w'):
+        import glob
         
-        sci = pyfits.open('{0}-{1}_drz_sci.fits'.format(self.root, filter))
-        wht = pyfits.open('{0}-{1}_drz_wht.fits'.format(self.root, filter))
-        seg = pyfits.open('{0}-{1}_seg.fits'.format(self.root, filter))
+        sci_file = glob.glob('{0}-{1}_dr?_sci.fits'.format(self.root, filter))
         
-        cat = grizli.utils.GTable.gread('{0}-{1}.cat'.format(self.root, filter))
+        sci = pyfits.open(sci_file[0])
+        wht = pyfits.open(sci_file[0].replace('sci','wht'))
+        seg = pyfits.open(sci_file[0].split('_dr')[0]+'_seg.fits')
+        
+        cat = utils.GTable.gread('{0}-{1}.cat.fits'.format(self.root, filter))
         
         wcs = pywcs.WCS(sci[0].header, relax=True)
         return sci, wht, seg, cat, wcs
@@ -385,11 +426,13 @@ class Galfitter(object):
         flt_files = []
         h = self.sci[0].header
         for i in range(h['NDRIZIM']):
-            flt_files.append(h['D{0:03d}DATA'.format(i+1)].split('[sci')[0])
+            file = h['D{0:03d}DATA'.format(i+1)].split('[sci')[0]
+            if file not in flt_files:
+                flt_files.append(file)
         
         return flt_files
         
-    def fit_object(self, id=449, radec=(None, None), size=40, components=[GalfitSersic()], recenter=True, get_mosaic=True, gaussian_guess=False):
+    def fit_object(self, id=449, radec=(None, None), size=40, components=[GalfitSersic()], recenter=True, get_mosaic=True, gaussian_guess=False, get_extended=True):
         """
         Fit an object
         """
@@ -404,7 +447,7 @@ class Galfitter(object):
         slx, sly, wcs_slice = self.DPSF.get_driz_cutout(ra=radec[0], dec=radec[1], get_cutout=False, size=size)
         #drz_cutout = self.get_driz_cutout(ra=ra, dec=dec, get_cutout=True)
         h = self.sci[0].header
-        psf = self.DPSF.get_psf(ra=radec[0], dec=radec[1], filter=self.filter.upper(), wcs_slice=wcs_slice, pixfrac=h['D001PIXF'], kernel=h['D001KERN'], get_extended=True)
+        psf = self.DPSF.get_psf(ra=radec[0], dec=radec[1], filter=self.filter.upper(), wcs_slice=wcs_slice, pixfrac=h['D001PIXF'], kernel=h['D001KERN'], get_extended=get_extended)
         
         exptime = h['EXPTIME']
         sci = self.sci[0].data[sly, slx]#*exptime
@@ -427,7 +470,7 @@ class Galfitter(object):
         
         fp = open(path+'galfit.feedme','w')
         
-        fp.write(GALFIT_IMAGES.format(input=path+'gf_sci.fits', output=path+'gf_out.fits', sigma=path+'gf_rms.fits', psf=psf_file, mask=path+'gf_mask.fits', xmax=sh, ymax=sh, sh=sh))
+        fp.write(GALFIT_IMAGES.format(input=path+'gf_sci.fits', output=path+'gf_out.fits', sigma=path+'gf_rms.fits', psf=psf_file, mask=path+'gf_mask.fits', xmax=sh, ymax=sh, sh=sh, ps=self.DPSF.driz_pscale))
         
         if gaussian_guess:
             fit, q, theta = fit_gauss(sci)
