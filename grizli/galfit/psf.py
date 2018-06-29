@@ -35,12 +35,11 @@ class DrizzlePSF(object):
             
         """
         if info is None:
-            self.wcs, self.footprint = self._get_flt_wcs(flt_files)
-            self.flt_files = flt_files
-        else:
-            self.wcs, self.footprint = info
-            self.flt_files = list(self.wcs.keys())
-        
+            info = self._get_flt_wcs(flt_files)
+
+        self.flt_keys, self.wcs, self.footprint = info
+        self.flt_files = list(np.unique([key[0] for key in self.flt_keys]))
+
         self.ePSF = utils.EffectivePSF()
         
         self.driz_image = driz_image
@@ -55,20 +54,34 @@ class DrizzlePSF(object):
         """
         from shapely.geometry import Polygon, Point
         
+        from grizli import utils
         wcs = OrderedDict()
         footprint = OrderedDict()
         
+        flt_keys = []
         for file in flt_files:
             flt_j = pyfits.open(file)
-            wcs[file] = pywcs.WCS(flt_j['SCI',1], relax=True)
-            footprint[file] = Polygon(wcs[file].calc_footprint())
-        
-        return wcs, footprint
+            for ext in range(1,5):
+                if ('SCI',ext) in flt_j:
+                    key = file, ext
+                    wcs[key] = pywcs.WCS(flt_j['SCI', ext], relax=True,
+                                          fobj=flt_j)
+                    
+                    wcs[key].pscale = utils.get_wcs_pscale(wcs[key])
+                    
+                    footprint[key] = Polygon(wcs[key].calc_footprint())
+                    flt_keys.append(key)
+                    
+        return flt_keys, wcs, footprint
     
-    def get_driz_cutout(self, ra=53.06967306, dec=-27.72333015, size=15, get_cutout=False):
+    def get_driz_cutout(self, ra=53.06967306, dec=-27.72333015, size=15, get_cutout=False, N=None):
+        """
+        TBD
+        """
         xy = self.driz_wcs.all_world2pix(np.array([[ra,dec]]), 0)[0]
         xyp = np.cast[int](np.round(xy))
-        N = int(np.round(size*0.128254/self.driz_pscale))
+        if N is None:
+            N = int(np.round(size*self.wcs[self.flt_keys[0]].pscale/self.driz_pscale))
         
         slx = slice(xyp[0]-N, xyp[0]+N)
         sly = slice(xyp[1]-N, xyp[1]+N)
@@ -80,10 +93,16 @@ class DrizzlePSF(object):
         # outsci = np.zeros((2*N,2*N), dtype=np.float32)
         # outwht = np.zeros((2*N,2*N), dtype=np.float32)
         # outctx = np.zeros((2*N,2*N), dtype=np.int32)
-        if get_cutout:
+        if get_cutout > 1:
             os.system("getfits -o sub.fits {0} {1} {2} {3} {3}".format(self.driz_image, xyp[0], xyp[1], 2*N))
             hdu = pyfits.open('sub.fits')
             return slx, sly, hdu
+        elif get_cutout == 1:
+            im = pyfits.open(self.driz_image)
+            data = im[0].data[sly, slx]*1
+            header = utils.to_header(wcs_slice, relax=True)
+            hdu = pyfits.PrimaryHDU(data=data, header=header)
+            return slx, sly, pyfits.HDUList([hdu])
             
         return slx, sly, wcs_slice
     
@@ -120,8 +139,7 @@ class DrizzlePSF(object):
         print(params, chi2)
         return chi2
         
-    def get_psf(self, ra=53.06967306, dec=-27.72333015, filter='F140W', pixfrac=0.1, kernel='point', verbose=True, wcs_slice=None, get_extended=True,
-    get_weight=False):
+    def get_psf(self, ra=53.06967306, dec=-27.72333015, filter='F140W', pixfrac=0.1, kernel='point', verbose=True, wcs_slice=None, get_extended=True, get_weight=False):
         from drizzlepac.astrodrizzle import adrizzle
         from shapely.geometry import Polygon, Point
         
@@ -131,17 +149,25 @@ class DrizzlePSF(object):
         outsci, outwht, outctx = self._get_empty_driz(wcs_slice)
         
         count = 1
-        for file in self.flt_files:
-            if self.footprint[file].contains(Point(ra, dec)):
+        for key in self.flt_keys:
+            if self.footprint[key].contains(Point(ra, dec)):
+                file, ext = key
                 if verbose:
-                    print(file)
+                    print('{0}[SCI,{1}]'.format(file, ext))
                 
-                xy = self.wcs[file].all_world2pix(np.array([[ra,dec]]), 0)[0]
+                xy = self.wcs[key].all_world2pix(np.array([[ra,dec]]), 0)[0]
                 xyp = np.cast[int](xy)#+1
                 dx = xy[0]-int(xy[0])
                 dy = xy[1]-int(xy[1])
                 
-                psf_xy = self.ePSF.get_at_position(xy[0], xy[1], filter=filter)
+                if ext == 2:
+                    # UVIS
+                    #print('UVIS1!')
+                    chip_offset = 2051
+                else:
+                    chip_offset = 0
+                    
+                psf_xy = self.ePSF.get_at_position(xy[0], xy[1]+chip_offset, filter=filter)
                 yp, xp = np.meshgrid(pix-dy, pix-dx, sparse=False, indexing='ij')
                 if get_extended:
                     extended_data = self.ePSF.extended_epsf[filter]
@@ -157,8 +183,8 @@ class DrizzlePSF(object):
                     flt_weight = 1
                     
                 N = 13
-                psf_wcs = model.ImageData.get_slice_wcs(self.wcs[file], slice(xyp[0]-N, xyp[0]+N+1), slice(xyp[1]-N, xyp[1]+N+1))
-                psf_wcs.pscale = utils.get_wcs_pscale(self.wcs[file])
+                psf_wcs = model.ImageData.get_slice_wcs(self.wcs[key], slice(xyp[0]-N, xyp[0]+N+1), slice(xyp[1]-N, xyp[1]+N+1))
+                psf_wcs.pscale = utils.get_wcs_pscale(self.wcs[key])
                 
                 adrizzle.do_driz(psf, psf_wcs, psf*0+flt_weight, wcs_slice, 
                                  outsci, outwht, outctx, 1., 'cps', 1,
