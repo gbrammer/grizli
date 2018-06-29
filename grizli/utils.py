@@ -1016,11 +1016,15 @@ def get_line_wavelengths():
     
     line_wavelengths['Ha+SII'] = [6564.61, 6718.29, 6732.67]
     line_ratios['Ha+SII'] = [1., 1./10, 1./10]
+    
     line_wavelengths['Ha+SII+SIII+He'] = [6564.61, 6718.29, 6732.67, 9068.6, 9530.6, 10830.]
     line_ratios['Ha+SII+SIII+He'] = [1., 1./10, 1./10, 1./20, 2.44/20, 1./25.]
 
     line_wavelengths['Ha+NII+SII+SIII+He'] = [6564.61, 6549.86, 6585.27, 6718.29, 6732.67, 9068.6, 9530.6, 10830.]
     line_ratios['Ha+NII+SII+SIII+He'] = [1., 1./(4.*4), 3./(4*4), 1./10, 1./10, 1./20, 2.44/20, 1./25.]
+    
+    line_wavelengths['Ha+NII+SII+SIII+He+PaB'] = [6564.61, 6549.86, 6585.27, 6718.29, 6732.67, 9068.6, 9530.6, 10830., 12821]
+    line_ratios['Ha+NII+SII+SIII+He+PaB'] = [1., 1./(4.*4), 3./(4*4), 1./10, 1./10, 1./20, 2.44/20, 1./25., 1./10]
     
     line_wavelengths['OIII+Hb'] = [5008.240, 4960.295, 4862.68]
     line_ratios['OIII+Hb'] = [2.98, 1, 3.98/6.]
@@ -1525,7 +1529,7 @@ def load_templates(fwhm=400, line_complexes=True, stars=False,
     if line_complexes:
         #line_list = ['Ha+SII', 'OIII+Hb+Ha', 'OII']
         #line_list = ['Ha+SII', 'OIII+Hb', 'OII']
-        line_list = ['Ha+NII+SII+SIII+He', 'OIII+Hb', 'OII+Ne', 'Lya+CIV']
+        line_list = ['Ha+NII+SII+SIII+He+PaB', 'OIII+Hb', 'OII+Ne', 'Lya+CIV']
     else:
         if full_line_list is None:
             line_list = DEFAULT_LINE_LIST
