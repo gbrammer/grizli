@@ -583,12 +583,28 @@ def manual_alignment(field_root='j151850-813028', HOME_PATH='/Volumes/Pegasus/Gr
     from .. import utils, prep, ds9
         
     files = glob.glob('*guess')
-    if (len(files) > 0) & skip:
-        return True
         
     tab = utils.GTable.gread('{0}/{1}_footprint.fits'.format(HOME_PATH, field_root))
     
     visits, all_groups, info = np.load('{0}_visits.npy'.format(field_root))
+    
+    use_visits = []
+    
+    for visit in visits:
+        if visit_list is not None:
+            if visit['product'] not in visit_list:
+                continue
+        
+        filt = visit['product'].split('-')[-1]
+        if (not filt.startswith('g')):
+            
+            if os.path.exists('{0}.align_guess'.format(visit['product'])) & skip:
+                continue
+                
+            use_visits.append(visit)
+            
+    if len(use_visits) == 0:
+        return True
     
     if radec is None:
         radec, ref_catalog = get_radec_catalog(ra=np.mean(tab['ra']),
