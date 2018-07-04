@@ -2506,6 +2506,77 @@ def make_rgb_thumbnails(root='j140814+565638', maglim=23, cutout=12., figsize=[2
         
     return True
     
+def test_psf():
+    """
+    xxx
+    """
+    import statmorph
+    import astropy.io.fits as pyfits
+    import numpy as np
+    import scipy.ndimage as nd
+    import photutils
+    import os
+    import sep
+    
+    root='j002746+261626'
+    filter = 'f140w'
+    
+    im_sci = pyfits.open('{0}-{1}_drz_sci.fits'.format(root, filter))
+    im_wht = pyfits.open('{0}-{1}_drz_wht.fits'.format(root, filter))
+    im_psf = pyfits.open('{0}-{1}_psf.fits'.format(root, filter))
+    psf = im_psf['PSF','DRIZ1'].data*1
+    
+    x0 = np.cast[int](np.round(np.cast[float](ds9.get('pan image').split())))
+    #x0 = [1885, 1193]
+    
+    #N = 32
+    slx = slice(x0[0]-N, x0[0]+N)
+    sly = slice(x0[1]-N, x0[1]+N)
+    
+    sci = im_sci[0].data[sly, slx].byteswap().newbyteorder()
+    wht = im_wht[0].data[sly, slx].byteswap().newbyteorder()
+    gain = im_sci[0].header['EXPTIME']
+    
+    rms = 1/np.sqrt(wht)
+    mask = (wht <= 0) #| ((segm.data > 0) & (segm.data != label))
+    rms[mask] = np.median(rms[~mask])
+    
+    #cat, segm = sep.extract(sci, 1.5, err=rms, mask=mask, minarea=5, segmentation_map=True, gain=gain, clean=True)
+
+    threshold = photutils.detect_threshold(sci, snr=1.5)
+    npixels = 5  # minimum number of connected pixels
+    segm = photutils.detect_sources(sci, threshold, npixels)
+    label = np.argmax(segm.areas[1:]) + 1
+    segmap = segm.data == label
+    
+    segmap_float = nd.uniform_filter(np.float64(segmap), size=10)
+    segmap = segmap_float > 0.5
+    
+    source_morphs = statmorph.source_morphology(sci, segmap, weightmap=rms, gain=gain, psf=psf, mask=mask*1)
+    morph = source_morphs[0]
+    
+    ny, nx = sci.shape
+    yp, xp = np.mgrid[0:ny, 0:nx] #+ 0.5
+    fitted_model = statmorph.statmorph.ConvolvedSersic2D(
+        amplitude=morph.sersic_amplitude,
+        r_eff=morph.sersic_rhalf,
+        n=morph.sersic_n,
+        x_0=morph.sersic_xc,
+        y_0=morph.sersic_yc,
+        ellip=morph.sersic_ellip,
+        theta=morph.sersic_theta)
+    #
+    fitted_model.set_psf(psf)  # always required when using ConvolvedSersic2D
+    image_model = fitted_model(xp, yp)
+    
+    # Galfit, multiple components
+    from grizli.galfit import galfit
+    gf = galfit.Galfitter(root=root, filter=filter, segfile='{0}-ir_seg.fits'.format(root), catfile='{0}-ir.cat'.format(root))
+    
+    id=212; gfit, model = gf.fit_object(id=id, size=int(128*0.06), components=[galfit.GalfitSersic(), galfit.GalfitSersic()])
+    
+    
+
 def field_psf(root='j020924-044344', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/WISP/', factors=[1,2,4], get_drizzle_scale=True, subsample=256, size=6, get_line_maps=True, raise_fault=False, verbose=True):
     """
     Generate PSFs for the available filters in a given field

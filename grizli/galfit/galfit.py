@@ -398,26 +398,34 @@ class GalfitSky(GalfitObject):
         self.setfree(**fix)
                                 
 class Galfitter(object):
-    def __init__(self, root='sdssj1723+3411', filter='f140w', galfit_exec='galfit'):
+    def __init__(self, root='sdssj1723+3411', filter='f140w', galfit_exec='galfit', catfile=None, segfile=None):
         self.root = root
         self.galfit_exec = galfit_exec
         
         self.filter = filter
-        data = self.get_data(filter=filter)
+        data = self.get_data(filter=filter, catfile=catfile, segfile=segfile)
         self.sci, self.wht, self.seg, self.cat, self.wcs = data
+        
         self.flt_files = self.get_flt_files(sci_hdu=self.sci)
         self.DPSF = DrizzlePSF(flt_files=self.flt_files, info=None, driz_image=self.sci.filename())
         
-    def get_data(self, filter='f140w'):
+    def get_data(self, filter='f140w', catfile=None, segfile=None):
         import glob
         
         sci_file = glob.glob('{0}-{1}_dr?_sci.fits'.format(self.root, filter))
         
         sci = pyfits.open(sci_file[0])
         wht = pyfits.open(sci_file[0].replace('sci','wht'))
-        seg = pyfits.open(sci_file[0].split('_dr')[0]+'_seg.fits')
         
-        cat = utils.GTable.gread('{0}-{1}.cat.fits'.format(self.root, filter))
+        if segfile is None:
+            segfile = sci_file[0].split('_dr')[0]+'_seg.fits'
+            
+        seg = pyfits.open(segfile)
+        
+        if catfile is None:
+            catfile = '{0}-{1}.cat.fits'.format(self.root, filter)
+            
+        cat = utils.GTable.gread(catfile)
         
         wcs = pywcs.WCS(sci[0].header, relax=True)
         return sci, wht, seg, cat, wcs
@@ -528,7 +536,12 @@ class Galfitter(object):
         fp.close()
         
         os.system('{0} galfit.{1}.{2:05d}'.format(self.galfit_exec, self.filter, id))
-        return(lines)
+        
+        model = pyfits.open('{0}-{1}_galfit_{2:05d}.fits'.format(self.root, self.filter, id), mode='update')
+        model[0].data /= self.sci[0].header['EXPTIME']
+        model.flush()
+        
+        return(lines, model)
         
         model = pyfits.open('/tmp/gf_model.fits')
         if False:
