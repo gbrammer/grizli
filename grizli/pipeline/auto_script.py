@@ -2506,7 +2506,7 @@ def make_rgb_thumbnails(root='j140814+565638', maglim=23, cutout=12., figsize=[2
         
     return True
     
-def field_psf(root='j020924-044344', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/WISP/', factors=[1,2,4], get_drizzle_scale=True, subsample=256, size=6):
+def field_psf(root='j020924-044344', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/WISP/', factors=[1,2,4], get_drizzle_scale=True, subsample=256, size=6, get_line_maps=True, raise_fault=False, verbose=True):
     """
     Generate PSFs for the available filters in a given field
     """
@@ -2524,44 +2524,55 @@ def field_psf(root='j020924-044344', HOME_PATH='/Volumes/Pegasus/Grizli/Automati
         from grizli.galfit import psf as gpsf
         
     os.chdir(os.path.join(HOME_PATH, root, 'Prep'))
-    if not os.path.join('../Extractions/fit_args.npy'):
-        print('No fit_args.npy found.')
-        return False
     
     drz_file = '{0}-ir_drz_sci.fits'.format(root)
     if not os.path.exists(drz_file):
-        print('No reference file found: {0}'.format(drz_file))
-        return False
+        err = 'Reference file {0} not found.'.format(drz_file)
+        if raise_fault:
+            raise FileNotFoundError(err)
+        else:
+            print(err)
+            return False
         
-    # Parameters of the line maps
-    args = np.load('../Extractions/fit_args.npy')[0]
-
     scale = []
     pixfrac = []
     kernel = []
     labels = []
     
-    default = DITHERED_PLINE
-    
-    # Line images
-    pline = args['pline']
-    for factor in factors:
-        if 'pixscale' in pline:
-            scale.append(pline['pixscale']/factor)
-        else:
-            scale.append(default['pixscale']/factor)
+    # For the line maps
+    if get_line_maps:
+        if not os.path.join('../Extractions/fit_args.npy'):
+            err='fit_args.npy not found.'
+            if raise_fault:
+                raise FileNotFoundError(err)
+            else:
+                print(err)
+                return False
         
-        if 'pixfrac' in pline:
-            pixfrac.append(pline['pixfrac'])
-        else:
-            pixfrac.append(default['pixfrac'])
+        default = DITHERED_PLINE
 
-        if 'kernel' in pline:
-            kernel.append(pline['kernel'])
-        else:
-            kernel.append(default['kernel'])
+        # Parameters of the line maps
+        args = np.load('../Extractions/fit_args.npy')[0]
+    
+        # Line images
+        pline = args['pline']
+        for factor in factors:
+            if 'pixscale' in pline:
+                scale.append(pline['pixscale']/factor)
+            else:
+                scale.append(default['pixscale']/factor)
         
-        labels.append('LINE{0}'.format(factor))
+            if 'pixfrac' in pline:
+                pixfrac.append(pline['pixfrac'])
+            else:
+                pixfrac.append(default['pixfrac'])
+
+            if 'kernel' in pline:
+                kernel.append(pline['kernel'])
+            else:
+                kernel.append(default['kernel'])
+        
+            labels.append('LINE{0}'.format(factor))
         
     # Mosaic
     im = pyfits.open(drz_file)
@@ -2570,13 +2581,20 @@ def field_psf(root='j020924-044344', HOME_PATH='/Volumes/Pegasus/Grizli/Automati
     sh = im[0].data.shape
         
     if get_drizzle_scale:
-        scale.append(int(np.round(im[0].header['D001SCAL']*1000))/1000.)
-        kernel.append(im[0].header['D001KERN'])
-        pixfrac.append(im[0].header['D001PIXF'])
-        labels.append('DRIZ')
+        rounded = int(np.round(im[0].header['D001SCAL']*1000))/1000.
+        
+        for factor in factors:
+            scale.append(rounded/factor)
+            kernel.append(im[0].header['D001KERN'])
+            pixfrac.append(im[0].header['D001PIXF'])
+            labels.append('DRIZ{0}'.format(factor))
         
     # FITS info
-    visits, groups, info = np.load('{0}_visits.npy'.format(root))
+    visits_file = '{0}_visits.npy'.format(root)
+    if not os.path.exists(visits_file):
+        parse_visits(field_root=root, HOME_PATH=HOME_PATH)
+        
+    visits, groups, info = np.load(visits_file)
     
     # Average PSF
     xp, yp = np.meshgrid(np.arange(0,sh[1],subsample), np.arange(0, sh[0], subsample))
@@ -2585,6 +2603,9 @@ def field_psf(root='j020924-044344', HOME_PATH='/Volumes/Pegasus/Grizli/Automati
     # Ref images
     files = glob.glob('{0}-f[01]*sci.fits'.format(root))
     
+    if verbose:
+        print(' ')
+        
     for file in files:
         filter = file.split(root+'-')[1].split('_')[0]
         flt_files = info['FILE'][info['FILTER'] == filter.upper()]
@@ -2596,7 +2617,9 @@ def field_psf(root='j020924-044344', HOME_PATH='/Volumes/Pegasus/Grizli/Automati
         
         for scl, pf, kern, label in zip(scale, pixfrac, kernel, labels):
             ix = 0
-            print('{0} {5} / scale:{1} pixf:{2} kern:{3} filter:{4}'.format(root, scl, pf, kern, filter, label))
+            if verbose:
+                print('{0} {5:6} / {1:>6}" / pixf: {2} / {3} / {4}'.format(root, scl, pf, kern, filter, label))
+            
             for ri, di in zip(ra.flatten(), dec.flatten()):
                 slice_h, wcs_slice = utils.make_wcsheader(ra=ri, dec=di, size=size, pixscale=scl, get_hdu=False, theta=0)
                 psf_i = GP.get_psf(ra=ri, dec=di, filter=filter.upper(), pixfrac=pf, kernel=kern, verbose=False, wcs_slice=wcs_slice, get_extended=True, get_weight=True)
