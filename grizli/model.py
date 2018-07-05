@@ -1280,7 +1280,11 @@ class ImageData(object):
                 
             ### ACS bunit
             #self.exptime = 1.
-            self.exptime = hdulist[0].header['EXPTIME']
+            if 'EXPTIME' in hdulist[0].header:
+                self.exptime = hdulist[0].header['EXPTIME']
+            else:
+                self.exptime = hdulist[0].header['EFFEXPTM']
+                
             # if 'BUNIT' in header:
             #     if header['BUNIT'] == 'ELECTRONS':
             #         self.exptime = hdulist[0].header['EXPTIME']
@@ -1393,6 +1397,10 @@ class ImageData(object):
             self.ref_filter = ref_filter
             
         self.wcs = None
+        
+        if instrument in ['NIRISS','NIRCAM']:
+            self.update_jwst_wcsheader(hdulist)
+            
         if self.header is not None:
             if wcs is None:
                 self.get_wcs()
@@ -1461,7 +1469,25 @@ class ImageData(object):
         bad = self.data['SCI'] < sigma*self.data['ERR']
         self.data['DQ'][bad] |= 4
         return bad.sum()
+    
+    def update_jwst_wcsheader(self, hdulist):
+        """
+        For now generate an approximate SIP header for NIRISS
+        """    
+        from . import jwst as _jwst
         
+        datamodel = _jwst.img_with_wcs(hdulist)
+        sip_header = _jwst.model_wcs_header(datamodel, get_sip=True)
+        for k in sip_header:
+            self.header[k] = sip_header[k]
+        
+        # Remove PC
+        for i in [1,2]:
+            for j in [1,2]:
+                k = 'PC{0}_{1}'.format(i,j)
+                if k in self.header:
+                    self.header.remove(k)
+                    
     def get_wcs(self):
         """Get WCS from header"""
         import numpy.linalg

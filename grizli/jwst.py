@@ -89,6 +89,50 @@ def xxx(header):
     
     groups = ModelContainer([wcs_model])
     sampler = resample.ResampleData(groups, output=driz)
+
+def change_header_pointing(header, ra_ref=0., dec_ref=0., pa_v3=0.):
+    """
+    Update a FITS header for a new pointing (center + roll).  
+    
+    Parameters
+    ----------
+    header : `~astropy.io.fits.Header`
+        Parent header (must contain `V2_REF`, `V3_REF` keywords).
+    
+    ra_ref, dec_ref : float
+        Pointing center, in decimal degrees, at reference the pixel defined 
+        in.
+        
+    pa_v3 : float
+        Position angle of the telescope V3 axis, degrees.
+    
+    .. warning::
+    
+    Doesn't update PC keywords based on pa_v3, which would rather have to 
+    be computed from the new `gwcs`.
+
+    """
+    from jwst.lib.set_telescope_pointing import compute_local_roll
+    
+    v2_ref = header['V2_REF']
+    v3_ref = header['V3_REF']
+    
+    # Strip units, if any
+    args = []
+    for v in (pa_v3, ra_ref, dec_ref, v2_ref, v3_ref):
+        if hasattr(v, 'value'):
+            args.append(v.value)
+        else:
+            args.append(v)
+            
+    roll_ref = compute_local_roll(*tuple(args))
+    
+    new_header = header.copy()
+    new_header['XPA_V3'] = args[0]
+    new_header['CRVAL1'] = new_header['RA_REF'] = args[1]
+    new_header['CRVAL2'] = new_header['DEC_REF'] = args[2]
+    new_header['ROLL_REF'] = roll_ref
+    return new_header
     
 def img_with_wcs(input):
     """
@@ -151,7 +195,7 @@ def strip_telescope_header(header, simplify_wcs=True):
 
     return new_header
 
-def model_wcs_header(datamodel, get_sip=False, order=4):
+def model_wcs_header(datamodel, get_sip=False, order=4, step=32):
     """
     Make a header with approximate WCS for use in DS9.
     
@@ -166,6 +210,11 @@ def model_wcs_header(datamodel, get_sip=False, order=4):
     
     order : int
         Order of the SIP polynomial model.
+    
+    step : int
+        For fitting the SIP model, generate a grid of detector pixels every
+        `step` pixels in both axes for passing through
+        `datamodel.meta.wcs.forward_transform`.
         
     Returns
     -------
@@ -175,6 +224,8 @@ def model_wcs_header(datamodel, get_sip=False, order=4):
     """  
     from astropy.io.fits import Header
     from scipy.optimize import least_squares
+    
+    sh = datamodel.data.shape
     
     try:
         pipe = datamodel.meta.wcs.pipeline[0][1]
@@ -187,10 +238,9 @@ def model_wcs_header(datamodel, get_sip=False, order=4):
             c_x = pipe.offset_0.value
             c_y = pipe.offset_1.value
         
-        crpix = np.array([-c_x, -c_y])
+        crpix = np.array([-c_x+1, -c_y+1])
         
     except:
-        sh = datamodel.data.shape
         crpix = np.array(sh)/2.+0.5
     
     crval = datamodel.meta.wcs.forward_transform(crpix[0], crpix[1])
@@ -223,7 +273,7 @@ def model_wcs_header(datamodel, get_sip=False, order=4):
         return header
     
     #### Fit a SIP header to the gwcs transformed coordinates
-    v, u = np.meshgrid(np.arange(1,2049,32), np.arange(1,2049,32))
+    v, u = np.meshgrid(np.arange(1,sh[0]+1,step), np.arange(1,sh[1]+1,step))
     x, y = datamodel.meta.wcs.forward_transform(u, v)
     y -= crval[1]
     x = (x-crval[0])*np.cos(crval[1]/180*np.pi)
