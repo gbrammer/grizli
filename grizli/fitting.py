@@ -2309,7 +2309,7 @@ class GroupFitter(object):
     ### 
     ### Generic functions for generating flat model and background arrays
     ###
-    def optimal_extract(self, data=None, bin=1, ivar=None):
+    def optimal_extract(self, data=None, bin=1, wave=None, ivar=None):
         """
         TBD: split by grism
         """
@@ -2336,7 +2336,11 @@ class GroupFitter(object):
         out = {}
         for grism in self.Ngrism:
             lim = utils.GRISM_LIMITS[grism]
-            wave_bin = np.arange(lim[0]*1.e4, lim[1]*1.e4, lim[2]*bin)
+            if wave is None:
+                wave_bin = np.arange(lim[0]*1.e4, lim[1]*1.e4, lim[2]*bin)
+            else:
+                wave_bin = wave
+                
             flux_bin = wave_bin*0.
             var_bin = wave_bin*0.
         
