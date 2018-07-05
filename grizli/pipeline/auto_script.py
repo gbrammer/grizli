@@ -2679,6 +2679,9 @@ def field_psf(root='j020924-044344', HOME_PATH='/Volumes/Pegasus/Grizli/Automati
         
     for file in files:
         filter = file.split(root+'-')[1].split('_')[0]
+        if filter.upper() not in ['F098M', 'F110W', 'F105W', 'F125W', 'F140W', 'F160W']:
+            continue
+            
         flt_files = info['FILE'][info['FILTER'] == filter.upper()]
         
         GP = gpsf.DrizzlePSF(flt_files=list(flt_files), info=None, driz_image=drz_file)
