@@ -103,6 +103,7 @@ def galfit_model_image(root='j021737-051344', ids=[738], filter='f140w', ds9=Non
             if ds9_frame is not None:
                 ds9.frame(ds9_frame)
             
+            im = pyfits.open('{0}-{1}_galfit_{2:05d}.fits'.format(root, filter, id))
             ds9.view(gf.sci[0].data - im[0].data/gf.sci[0].header['EXPTIME'], header=gf.sci[0].header)
     
     ###############
