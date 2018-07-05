@@ -583,12 +583,28 @@ def manual_alignment(field_root='j151850-813028', HOME_PATH='/Volumes/Pegasus/Gr
     from .. import utils, prep, ds9
         
     files = glob.glob('*guess')
-    if (len(files) > 0) & skip:
-        return True
         
     tab = utils.GTable.gread('{0}/{1}_footprint.fits'.format(HOME_PATH, field_root))
     
     visits, all_groups, info = np.load('{0}_visits.npy'.format(field_root))
+    
+    use_visits = []
+    
+    for visit in visits:
+        if visit_list is not None:
+            if visit['product'] not in visit_list:
+                continue
+        
+        filt = visit['product'].split('-')[-1]
+        if (not filt.startswith('g')):
+            
+            if os.path.exists('{0}.align_guess'.format(visit['product'])) & skip:
+                continue
+                
+            use_visits.append(visit)
+            
+    if len(use_visits) == 0:
+        return True
     
     if radec is None:
         radec, ref_catalog = get_radec_catalog(ra=np.mean(tab['ra']),
@@ -2490,3 +2506,226 @@ def make_rgb_thumbnails(root='j140814+565638', maglim=23, cutout=12., figsize=[2
         
     return True
     
+def test_psf():
+    """
+    xxx
+    """
+    import statmorph
+    import astropy.io.fits as pyfits
+    import numpy as np
+    import scipy.ndimage as nd
+    import photutils
+    import os
+    import sep
+    
+    root='j002746+261626'
+    filter = 'f140w'
+    
+    im_sci = pyfits.open('{0}-{1}_drz_sci.fits'.format(root, filter))
+    im_wht = pyfits.open('{0}-{1}_drz_wht.fits'.format(root, filter))
+    im_psf = pyfits.open('{0}-{1}_psf.fits'.format(root, filter))
+    psf = im_psf['PSF','DRIZ1'].data*1
+    
+    x0 = np.cast[int](np.round(np.cast[float](ds9.get('pan image').split())))
+    #x0 = [1885, 1193]
+    
+    #N = 32
+    slx = slice(x0[0]-N, x0[0]+N)
+    sly = slice(x0[1]-N, x0[1]+N)
+    
+    sci = im_sci[0].data[sly, slx].byteswap().newbyteorder()
+    wht = im_wht[0].data[sly, slx].byteswap().newbyteorder()
+    gain = im_sci[0].header['EXPTIME']
+    
+    rms = 1/np.sqrt(wht)
+    mask = (wht <= 0) #| ((segm.data > 0) & (segm.data != label))
+    rms[mask] = np.median(rms[~mask])
+    
+    #cat, segm = sep.extract(sci, 1.5, err=rms, mask=mask, minarea=5, segmentation_map=True, gain=gain, clean=True)
+
+    threshold = photutils.detect_threshold(sci, snr=1.5)
+    npixels = 5  # minimum number of connected pixels
+    segm = photutils.detect_sources(sci, threshold, npixels)
+    label = np.argmax(segm.areas[1:]) + 1
+    segmap = segm.data == label
+    
+    segmap_float = nd.uniform_filter(np.float64(segmap), size=10)
+    segmap = segmap_float > 0.5
+    
+    source_morphs = statmorph.source_morphology(sci, segmap, weightmap=rms, gain=gain, psf=psf, mask=mask*1)
+    morph = source_morphs[0]
+    
+    ny, nx = sci.shape
+    yp, xp = np.mgrid[0:ny, 0:nx] #+ 0.5
+    fitted_model = statmorph.statmorph.ConvolvedSersic2D(
+        amplitude=morph.sersic_amplitude,
+        r_eff=morph.sersic_rhalf,
+        n=morph.sersic_n,
+        x_0=morph.sersic_xc,
+        y_0=morph.sersic_yc,
+        ellip=morph.sersic_ellip,
+        theta=morph.sersic_theta)
+    #
+    fitted_model.set_psf(psf)  # always required when using ConvolvedSersic2D
+    image_model = fitted_model(xp, yp)
+    
+    # Galfit, multiple components
+    from grizli.galfit import galfit
+    gf = galfit.Galfitter(root=root, filter=filter, segfile='{0}-ir_seg.fits'.format(root), catfile='{0}-ir.cat'.format(root))
+    
+    id=212; gfit, model = gf.fit_object(id=id, size=int(128*0.06), components=[galfit.GalfitSersic(), galfit.GalfitSersic()])
+    
+    
+
+def field_psf(root='j020924-044344', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/WISP/', factors=[1,2,4], get_drizzle_scale=True, subsample=256, size=6, get_line_maps=True, raise_fault=False, verbose=True):
+    """
+    Generate PSFs for the available filters in a given field
+    """
+    import os
+    import glob
+    
+    import astropy.wcs as pywcs
+    import astropy.io.fits as pyfits
+
+    try:
+        from .. import utils
+        from ..galfit import psf as gpsf
+    except:
+        from grizli import utils
+        from grizli.galfit import psf as gpsf
+        
+    os.chdir(os.path.join(HOME_PATH, root, 'Prep'))
+    
+    drz_file = '{0}-ir_drz_sci.fits'.format(root)
+    if not os.path.exists(drz_file):
+        err = 'Reference file {0} not found.'.format(drz_file)
+        if raise_fault:
+            raise FileNotFoundError(err)
+        else:
+            print(err)
+            return False
+        
+    scale = []
+    pixfrac = []
+    kernel = []
+    labels = []
+    
+    # For the line maps
+    if get_line_maps:
+        if not os.path.join('../Extractions/fit_args.npy'):
+            err='fit_args.npy not found.'
+            if raise_fault:
+                raise FileNotFoundError(err)
+            else:
+                print(err)
+                return False
+        
+        default = DITHERED_PLINE
+
+        # Parameters of the line maps
+        args = np.load('../Extractions/fit_args.npy')[0]
+    
+        # Line images
+        pline = args['pline']
+        for factor in factors:
+            if 'pixscale' in pline:
+                scale.append(pline['pixscale']/factor)
+            else:
+                scale.append(default['pixscale']/factor)
+        
+            if 'pixfrac' in pline:
+                pixfrac.append(pline['pixfrac'])
+            else:
+                pixfrac.append(default['pixfrac'])
+
+            if 'kernel' in pline:
+                kernel.append(pline['kernel'])
+            else:
+                kernel.append(default['kernel'])
+        
+            labels.append('LINE{0}'.format(factor))
+        
+    # Mosaic
+    im = pyfits.open(drz_file)
+    drz_wcs = pywcs.WCS(im[0].header)
+    pscale = utils.get_wcs_pscale(drz_wcs)
+    sh = im[0].data.shape
+        
+    if get_drizzle_scale:
+        rounded = int(np.round(im[0].header['D001SCAL']*1000))/1000.
+        
+        for factor in factors:
+            scale.append(rounded/factor)
+            kernel.append(im[0].header['D001KERN'])
+            pixfrac.append(im[0].header['D001PIXF'])
+            labels.append('DRIZ{0}'.format(factor))
+        
+    # FITS info
+    visits_file = '{0}_visits.npy'.format(root)
+    if not os.path.exists(visits_file):
+        parse_visits(field_root=root, HOME_PATH=HOME_PATH)
+        
+    visits, groups, info = np.load(visits_file)
+    
+    # Average PSF
+    xp, yp = np.meshgrid(np.arange(0,sh[1],subsample), np.arange(0, sh[0], subsample))
+    ra, dec = drz_wcs.all_pix2world(xp, yp, 0)
+    
+    # Ref images
+    files = glob.glob('{0}-f[01]*sci.fits'.format(root))
+    
+    if verbose:
+        print(' ')
+        
+    for file in files:
+        filter = file.split(root+'-')[1].split('_')[0]
+        flt_files = info['FILE'][info['FILTER'] == filter.upper()]
+        
+        GP = gpsf.DrizzlePSF(flt_files=list(flt_files), info=None, driz_image=drz_file)
+        
+        hdu = pyfits.HDUList([pyfits.PrimaryHDU()])
+        hdu[0].header['ROOT'] = root
+        
+        for scl, pf, kern, label in zip(scale, pixfrac, kernel, labels):
+            ix = 0
+            if verbose:
+                print('{0} {5:6} / {1:>6}" / pixf: {2} / {3} / {4}'.format(root, scl, pf, kern, filter, label))
+            
+            for ri, di in zip(ra.flatten(), dec.flatten()):
+                slice_h, wcs_slice = utils.make_wcsheader(ra=ri, dec=di, size=size, pixscale=scl, get_hdu=False, theta=0)
+                psf_i = GP.get_psf(ra=ri, dec=di, filter=filter.upper(), pixfrac=pf, kernel=kern, verbose=False, wcs_slice=wcs_slice, get_extended=True, get_weight=True)
+                if ix == 0:
+                    msk_f = ((psf_i[1].data != 0) & np.isfinite(psf_i[1].data))*1
+                    if msk_f.sum() == 0:
+                        continue
+                    
+                    ix += 1
+                    psf_f = psf_i
+                    psf_f[1].data[msk_f == 0] = 0
+                    
+                else:
+                    msk_i = ((psf_i[1].data != 0) & np.isfinite(psf_i[1].data))*1
+                    if msk_i.sum() == 0:
+                        continue
+                        
+                    msk_f += msk_i
+                    psf_f[1].data[msk_i > 0] += psf_i[1].data[msk_i > 0]
+                    
+                    ix += 1
+                    
+            msk = np.maximum(msk_f, 1)
+            psf_f[1].header['FILTER'] = filter, 'Filter'
+            psf_f[1].header['PSCALE'] = scl, 'Pixel scale, arcsec'
+            psf_f[1].header['PIXFRAC'] = pf, 'Pixfrac'
+            psf_f[1].header['KERNEL'] = kern, 'Kernel'
+            psf_f[1].header['EXTNAME'] = 'PSF'
+            psf_f[1].header['EXTVER'] = label
+            
+            hdu.append(psf_f[1])
+            
+        hdu.writeto('{0}-{1}_psf.fits'.format(root, filter), overwrite=True)
+        
+        
+                
+    
+        
