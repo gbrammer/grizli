@@ -2472,6 +2472,33 @@ class MultiBeam(GroupFitter):
         
         return fig, hdu_sci
     
+    def drizzle_segmentation(self, id=None, wcsobj=None, kernel='square', pixfrac=1, verbose=True):
+        import numpy as np
+
+        import astropy.wcs as pywcs
+        import astropy.io.fits as pyfits
+
+        from grizli import multifit, utils
+
+        # Can be either a header or WCS object
+        if isinstance(wcsobj, pyfits.Header):
+            wcs = pywcs.WCS(wcsobj)
+            wcs.pscale = utils.get_wcs_pscale(wcs)
+        else:
+            wcs = wcsobj
+
+        if id is None:
+            id = self.id
+
+        sci_list = [(beam.beam.seg == id)*1. for beam in self.beams]        
+        wht_list = [np.isfinite(beam.beam.seg)*1. for beam in self.beams]        
+        wcs_list = [beam.direct.wcs for beam in self.beams]        
+
+        out = utils.drizzle_array_groups(sci_list, wht_list, wcs_list, outputwcs=wcs, scale=0.1, kernel=kernel, pixfrac=pixfrac, verbose=verbose)
+        drizzled_segm = (out[0] > 0)*id
+
+        return drizzled_segm
+        
     def drizzle_fit_lines(self, fit, pline, force_line=['Ha', 'OIII', 'Hb', 'OII'], save_fits=True, mask_lines=True, mask_sn_limit=3, mask_4959=True, verbose=True):
         """
         TBD
