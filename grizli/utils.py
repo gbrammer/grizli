@@ -2424,7 +2424,8 @@ def header_keys_from_filelist(fits_files, keywords=[], ext=0, colname_case=str.l
     tab = Table(data=np.array(lines), names=table_header)
     
     return tab        
-def drizzle_array_groups(sci_list, wht_list, wcs_list, scale=0.1, kernel='point', pixfrac=1., verbose=True):
+def drizzle_array_groups(sci_list, wht_list, wcs_list, outputwcs=None,
+                         scale=0.1, kernel='point', pixfrac=1., verbose=True):
     """Drizzle array data with associated wcs
     
     Parameters
@@ -2457,7 +2458,11 @@ def drizzle_array_groups(sci_list, wht_list, wcs_list, scale=0.1, kernel='point'
     log = logutil.create_logger(__name__)
     
     # Output header / WCS    
-    header, outputwcs = compute_output_wcs(wcs_list, pixel_scale=scale)
+    if outputwcs is None:
+        header, outputwcs = compute_output_wcs(wcs_list, pixel_scale=scale)
+    else:
+        header = to_header(outputwcs)
+        
     shape = (header['NAXIS2'], header['NAXIS1'])
     
     # Output arrays
@@ -3646,7 +3651,7 @@ $.UpdateFilterURL = function () {{
             
             toggle_div = """
 <div style="border:1px solid black; padding:10px; margin:10px">
-	<b>Toggle column:</b></br> {0}
+    <b>Toggle column:</b></br> {0}
 </div>
             
             """.format(' <b>/</b> '.join(['<a class="toggle-vis" data-column="{0}"> <tt>{1}</tt> </a>'.format(ic, col) for ic, col in enumerate(self.colnames)]))
