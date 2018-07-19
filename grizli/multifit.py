@@ -2472,13 +2472,84 @@ class MultiBeam(GroupFitter):
         
         return fig, hdu_sci
     
-    def drizzle_segmentation(self, id=None, wcsobj=None, kernel='square', pixfrac=1, verbose=True):
+    def drizzle_segmentation(self, wcsobj=None, kernel='square', pixfrac=1, verbose=False):
+        """
+        Drizzle segmentation image from individual `MultiBeam.beams`.
+        
+        Parameters
+        ----------
+        wcsobj: `~astropy.wcs.WCS` or `~astropy.io.fits.Header`
+            Output WCS.
+        
+        kernel: e.g., 'square', 'point', 'gaussian'
+            Drizzle kernel, see `~drizzlepac.adrizzle.drizzle`.
+        
+        pixfrac: float
+            Drizzle 'pixfrac', see `~drizzlepac.adrizzle.drizzle`.
+        
+        verbose: bool
+            Print status messages.
+                        
+        Returns
+        ----------
+        drizzled_segm: `~numpy.ndarray`, type `~numpy.int64`.
+            Drizzled segmentation image, with image dimensions and 
+            WCS defined in `wcsobj`.
+            
+        """
         import numpy as np
 
         import astropy.wcs as pywcs
         import astropy.io.fits as pyfits
+        
+        try:
+            from . import utils
+        except:
+            from grizli import multifit, utils
+        
+        all_ids = [np.unique(beam.beam.seg) for beam in self.beams]
+        all_ids = np.unique(np.hstack(all_ids))[1:]
+        
+        if isinstance(wcsobj, pyfits.Header):
+            wcs = pywcs.WCS(wcsobj)
+            wcs.pscale = utils.get_wcs_pscale(wcs)
+        else:
+            wcs = wcsobj
+        
+        if not hasattr(wcs, 'pscale'):
+            wcs.pscale = utils.get_wcs_pscale(wcs)
+        
+        if verbose:
+            print('Drizzle ID={0:.0f} (primary)'.format(self.id))
+                
+        drizzled_segm = self.drizzle_segmentation_id(id=self.id, wcsobj=wcsobj, kernel=kernel, pixfrac=pixfrac, verbose=verbose)
+        
+        for id in all_ids:
+            if int(id) == self.id:
+                continue
 
-        from grizli import multifit, utils
+            if verbose:
+                print('Drizzle ID={0:.0f}'.format(id))
+            
+            dseg_i = self.drizzle_segmentation_id(id=id, wcsobj=wcsobj, kernel=kernel, pixfrac=pixfrac, verbose=False)
+            new_seg = drizzled_segm == 0
+            drizzled_segm[new_seg] = dseg_i[new_seg]
+        
+        return drizzled_segm
+        
+    def drizzle_segmentation_id(self, id=None, wcsobj=None, kernel='square', pixfrac=1, verbose=True):
+        """
+        Drizzle segmentation image for a single ID
+        """
+        import numpy as np
+
+        import astropy.wcs as pywcs
+        import astropy.io.fits as pyfits
+        
+        try:
+            from . import utils
+        except:
+            from grizli import multifit, utils
 
         # Can be either a header or WCS object
         if isinstance(wcsobj, pyfits.Header):
@@ -2486,7 +2557,10 @@ class MultiBeam(GroupFitter):
             wcs.pscale = utils.get_wcs_pscale(wcs)
         else:
             wcs = wcsobj
-
+        
+        if not hasattr(wcs, 'pscale'):
+            wcs.pscale = utils.get_wcs_pscale(wcs)
+        
         if id is None:
             id = self.id
 
@@ -4006,8 +4080,8 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
     grism_contam = pyfits.ImageHDU(data=xoutsci, header=h, name='CONTAM')
     grism_wht = pyfits.ImageHDU(data=outwht, header=h, name='LINEWHT')
     
-    return pyfits.HDUList([p, thumb_sci, thumb_wht, grism_sci, grism_cont, 
-                           grism_contam, grism_wht])
+    HDUL = [p, thumb_sci, thumb_wht, grism_sci, grism_cont, grism_contam, grism_wht]        
+    return pyfits.HDUList(HDUL)
 
 def show_drizzle_HDU(hdu, diff=True):
     """Make a figure from the multiple extensions in the drizzled grism file.
