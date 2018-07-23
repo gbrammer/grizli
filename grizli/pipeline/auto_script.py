@@ -2064,7 +2064,7 @@ def make_reference_wcs(info, output='mosaic_wcs-ref.fits', filters=['G800L', 'G1
                                                   ['G800L', 'G102', 'G141'])
         acs_grism = (info['FILTER'] == 'G800L')
         only_acs = list(np.unique(info['INSTRUME'])) == ['ACS']
-        if (acs_grism.sum() == any_grism.sum()) | (only_acs):
+        if ((acs_grism.sum() == any_grism.sum()) & (any_grism.sum() > 0)) | (only_acs):
             pixel_scale = 0.03
         else:
             pixel_scale = 0.06
