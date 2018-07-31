@@ -35,3 +35,10 @@ except:
 Couldn't `import sep`.  SExtractor replaced with SEP 
 in April 2018.  Install with `pip install sep`.
 """)
+
+try:
+    import tristars
+except:
+    print("""
+Couldn't `import tristars`.  Get it from https://github.com/gbrammer/tristars to enable improved blind astrometric matching with triangle asterisms.
+""")
