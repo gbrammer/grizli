@@ -509,28 +509,59 @@ def match_lists(input, output, transform=None, scl=3600., simple=True,
         print('No entries!')
         return input, output, None, transform()
     
-    match = stsci.stimage.xyxymatch(copy.copy(input), copy.copy(output), 
-                                    origin=np.median(input, axis=0), 
-                                    mag=(1.0, 1.0), rotation=(0.0, 0.0),
-                                    ref_origin=np.median(input, axis=0), 
-                                    algorithm='tolerance', tolerance=toler, 
-                                    separation=0.5, nmatch=10, maxratio=10.0, 
-                                    nreject=10)
-                                    
-    m = Table(match)
+    try:        
+        from tristars import match
+        pair_ix = match.match_catalog_tri(input, output, maxKeep=10, auto_keep=3, auto_transform=transform, auto_limit=3, size_limit=[5, 800], ignore_rot=False, ignore_scale=True, ba_max=0.9)
+        
+        input_ix = pair_ix[:,0]
+        output_ix = pair_ix[:,1]
+        
+        print('  tristars.match: Nin={0}, Nout={1}, match={2}'.format(len(input), len(output), len(output_ix)))
+        
+        #print('xxx Match from tristars!')
 
-    output_ix = m['ref_idx'].data
-    input_ix = m['input_idx'].data
-    
+        # fig = match.match_diagnostic_plot(input, output, pair_ix, tf=None, new_figure=True)
+        # fig.savefig('/tmp/xtristars.png')
+        # plt.close(fig)
+                
+    except:
+        
+        match = stsci.stimage.xyxymatch(copy.copy(input), copy.copy(output), 
+                                        origin=np.median(input, axis=0), 
+                                        mag=(1.0, 1.0), rotation=(0.0, 0.0),
+                                        ref_origin=np.median(input, axis=0), 
+                                        algorithm='tolerance', tolerance=toler, 
+                                        separation=0.5, nmatch=10, maxratio=10.0, 
+                                        nreject=10)
+                                    
+        m = Table(match)
+
+        output_ix = m['ref_idx'].data
+        input_ix = m['input_idx'].data
+        
+        print('  xyxymatch.match: Nin={0}, Nout={1}, match={2}'.format(len(input), len(output), len(output_ix)))
+        
     tf = transform()
     tf.estimate(input[input_ix,:], output[output_ix])
     
     if not simple:
-        model, inliers = ransac((input[input_ix,:], output[output_ix]),
+        model, inliers = ransac((input[input_ix,:], output[output_ix,:]),
                                    transform, min_samples=3,
-                                   residual_threshold=2, max_trials=100)
+                                   residual_threshold=3, max_trials=100)
         
+        # Iterate
+        if inliers.sum() > 2:
+            m_i, in_i = ransac((input[input_ix[inliers],:], output[output_ix[inliers],:]),
+                                   transform, min_samples=3,
+                                   residual_threshold=3, max_trials=100)
+            if in_i.sum() > 2:
+                model = m_i
+                inliers[np.arange(len(inliers), dtype=np.int)[inliers][in_i]] = False
+                
         outliers = ~inliers 
+        mout = model(input[input_ix,:])
+        dx = mout - output[output_ix]
+        
     else:
         model = tf
         ### Compute statistics
@@ -546,7 +577,8 @@ def match_lists(input, output, transform=None, scl=3600., simple=True,
 
 def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3, 
                          clip=20, log=True, outlier_threshold=5, 
-                         verbose=True, guess=[0., 0., 0., 1]):
+                         verbose=True, guess=[0., 0., 0., 1], simple=True, 
+                         rms_limit=2):
     """TBD
     """
     if hasattr(radec, 'upper'):
@@ -561,16 +593,16 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
         cat = Table.read('{0}.cat.fits'.format(root))
     
     ### Clip obviously distant files to speed up match
-    rd_cat = np.array([cat['X_WORLD'], cat['Y_WORLD']])
-    rd_cat_center = np.median(rd_cat, axis=1)
-    cosdec = np.array([np.cos(rd_cat_center[1]/180*np.pi),1])
-    dr_cat = np.sqrt(np.sum((rd_cat.T-rd_cat_center)**2*cosdec**2, axis=1))
-    
-    #print('xxx', rd_ref.shape, rd_cat_center.shape, cosdec.shape)
-    
-    dr = np.sqrt(np.sum((rd_ref-rd_cat_center)**2*cosdec**2, axis=1))
-    
-    rd_ref = rd_ref[dr < 1.1*dr_cat.max(),:]
+    # rd_cat = np.array([cat['X_WORLD'], cat['Y_WORLD']])
+    # rd_cat_center = np.median(rd_cat, axis=1)
+    # cosdec = np.array([np.cos(rd_cat_center[1]/180*np.pi),1])
+    # dr_cat = np.sqrt(np.sum((rd_cat.T-rd_cat_center)**2*cosdec**2, axis=1))
+    # 
+    # #print('xxx', rd_ref.shape, rd_cat_center.shape, cosdec.shape)
+    # 
+    # dr = np.sqrt(np.sum((rd_ref-rd_cat_center)**2*cosdec**2, axis=1))
+    # 
+    # rd_ref = rd_ref[dr < 1.1*dr_cat.max(),:]
     
     ok = (cat['MAG_AUTO'] > mag_limits[0]) & (cat['MAG_AUTO'] < mag_limits[1])
     if ok.sum() == 0:
@@ -586,6 +618,22 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
     
     drz_wcs = pywcs.WCS(drz_im[0].header, relax=True)
     orig_wcs = drz_wcs.copy()
+    
+    ##########
+    # Only include reference objects in the DRZ footprint
+    ref_x, ref_y = drz_wcs.all_world2pix(rd_ref[:,0], rd_ref[:,1], 0)
+    ref_cut = (ref_x > 0) & (ref_x < drz_wcs._naxis1) & (ref_y > 0) & (ref_y < drz_wcs._naxis2)
+    if ref_cut.sum() == 0:
+        print('{0}: no reference objects found in the DRZ footprint'.format(root))
+        return False
+    
+    rd_ref = rd_ref[ref_cut,:]
+    
+    ########
+    # Match surface density of drizzled and reference catalogs
+    icut = np.minimum(len(cat)-2, int(1.5*ref_cut.sum()))
+    cut = np.argsort(cat['MAG_AUTO'])[:icut]
+    xy_drz = np.array([cat['X_IMAGE'][cut], cat['Y_IMAGE'][cut]]).T
     
     #out_shift, out_rot, out_scale = np.zeros(2), 0., 1.
     out_shift, out_rot, out_scale = guess[:2], guess[2], guess[3]    
@@ -604,19 +652,21 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
         ok2 = drz_im[0].data[pix[1,okp], pix[0,okp]] != 0
 
         N = ok2.sum()
-        status = clip_lists(xy_drz, xy+1, clip=clip)
-        if not status:
-            print('Problem xxx')
+        if clip > 0:
+            status = clip_lists(xy_drz, xy+1, clip=clip)
+            if not status:
+                print('Problem xxx')
         
-        input, output = status
-        
+            input, output = status
+        else:
+            input, output = xy_drz+0., xy+1
         #print np.sum(input) + np.sum(output)
         
         toler=5
         titer=0
         while (titer < 3):
             try:
-                res = match_lists(output, input, scl=1., simple=True,
+                res = match_lists(output, input, scl=1., simple=simple,
                           outlier_threshold=outlier_threshold, toler=toler)
                 output_ix, input_ix, outliers, tf = res
                 break
@@ -631,7 +681,7 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
             titer += 1
             toler += 5
             try:
-                res = match_lists(output, input, scl=1., simple=True,
+                res = match_lists(output, input, scl=1., simple=simple,
                               outlier_threshold=outlier_threshold,
                               toler=toler)
             except:
@@ -649,7 +699,8 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
                                           
         if outliers.sum() > 0:
             res2 = match_lists(output[output_ix][~outliers],
-                              input[input_ix][~outliers], scl=1., simple=True,
+                              input[input_ix][~outliers], scl=1., 
+                              simple=simple,
                               outlier_threshold=outlier_threshold,
                               toler=toler)
             
@@ -676,7 +727,16 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
         #                  [np.sin(theta), np.cos(theta)]])
         # 
         # drz_wcs.wcs.cd = np.dot(drz_wcs.wcs.cd, _mat)/tf.scale
-                
+    
+    # Bad fit
+    if (rms > rms_limit) | (NGOOD <= 3):
+        drz_wcs = orig_wcs
+        out_shift = [0,0]
+        out_rot = 0.
+        out_scale = 1.
+        
+        log = False
+        
     if log:
         tf_out = tf(output[output_ix][~outliers])
         dx = input[input_ix][~outliers] - tf_out
@@ -1337,7 +1397,7 @@ def make_drz_catalog(root='', sexpath='sex',threshold=2., get_background=True,
     
 def blot_background(visit={'product': '', 'files':None}, 
                     bkg_params={'bw':64, 'bh':64, 'fw':3, 'fh':3}, 
-                    verbose=True, skip_existing=True):
+                    verbose=True, skip_existing=True, get_median=False):
     """
     Blot SEP background of drizzled image back to component FLTs
     """
@@ -1353,12 +1413,16 @@ def blot_background(visit={'product': '', 'files':None},
     
     drz_file = drz_files[0]
     drz_im = pyfits.open(drz_file)
+    
     drz_wcs = pywcs.WCS(drz_im[0].header)
     drz_wcs.pscale = utils.get_wcs_pscale(drz_wcs)
     
     # Get SEP background 
     bkg_data = make_SEP_catalog(root=visit['product'], bkg_only=True, bkg_params=bkg_params, verbose=False)
-            
+    if get_median:
+        mask = drz_im[0].data != 0
+        bkg_data = bkg_data*0.+np.median(np.median(bkg_data[mask]))
+        
     if verbose:
         print('   Blot background from {0}'.format(drz_file))
         
@@ -2037,6 +2101,7 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                                fix_stars=True,
                                tweak_max_dist=1.,
                                tweak_threshold=1.5, 
+                               align_simple=True,
                                drizzle_params = {},
                                iter_atol=1.e-4,
                              reference_catalogs=['GAIA','PS1','SDSS','WISE']):
@@ -2064,11 +2129,11 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
             fresh_flt_file(file, crclean=crclean)
             updatewcs.updatewcs(file, verbose=False)
     
-        ### Make ASN
-        if not isWFPC2:
-            asn = asnutil.ASNTable(inlist=direct['files'], output=direct['product'])
-            asn.create()
-            asn.write()
+        # ### Make ASN
+        # if not isWFPC2:
+        #     asn = asnutil.ASNTable(inlist=direct['files'], output=direct['product'])
+        #     asn.create()
+        #     asn.write()
     
     ### Initial grism processing
     skip_grism = (grism == {}) | (grism is None) | (len(grism) == 0)
@@ -2236,7 +2301,8 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                                       mag_limits=align_mag_limits,
                                       radec=radec, NITER=5, clip=align_clip,
                                       log=True, guess=guess,
-                                      outlier_threshold=align_tolerance)
+                                      outlier_threshold=align_tolerance, 
+                                      simple=align_simple)
         except:
             fp = open('{0}.wcs_failed'.format(direct['product']),'w')
             fp.write(guess.__str__())
@@ -2246,7 +2312,8 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                                       mag_limits=align_mag_limits,
                                       radec=radec, NITER=0, clip=align_clip,
                                       log=False, guess=guess,
-                                      outlier_threshold=align_tolerance)
+                                      outlier_threshold=align_tolerance,
+                                      simple=align_simple)
                                        
         orig_wcs, drz_wcs, out_shift, out_rot, out_scale = result
         
@@ -2302,7 +2369,14 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
         cat = make_SEP_catalog(root=direct['product'], threshold=thresh)
         
         table_to_regions(cat, '{0}.cat.reg'.format(direct['product']))
-        table_to_radec(cat, '{0}.cat.radec'.format(direct['product']))
+        
+        # 100 brightest or mag range
+        clip = (cat['MAG_AUTO'] > align_mag_limits[0]) & (cat['MAG_AUTO'] < align_mag_limits[1])
+        
+        if clip.sum() > 100:
+            clip = np.argsort(cat['MAG_AUTO'])[:100]
+            
+        table_to_radec(cat[clip], '{0}.cat.radec'.format(direct['product']))
         
         if (fix_stars) & (not isACS) & (not isWFPC2):
             fix_star_centers(root=direct['product'], drizzle=True, mag_lim=21)

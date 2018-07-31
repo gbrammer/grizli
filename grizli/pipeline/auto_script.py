@@ -129,7 +129,7 @@ def get_extra_data(root='j114936+222414', HOME_PATH='/Volumes/Pegasus/Grizli/Aut
 
     os.chdir(CWD)
     
-def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', inspect_ramps=False, manual_alignment=False, is_parallel_field=False, reprocess_parallel=False, only_preprocess=False, run_extractions=True, run_fit=True, s3_sync=False, fine_radec=None, combine_all_filters=True):
+def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', inspect_ramps=False, manual_alignment=False, is_parallel_field=False, reprocess_parallel=False, only_preprocess=False, run_extractions=True, run_fit=True, s3_sync=False, fine_radec=None, combine_all_filters=True, gaia_by_date=False, align_simple=False, align_clip=-1, master_radec=None):
     """
     Run the full pipeline for a given target
         
@@ -197,13 +197,13 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
     #####################
     ### Alignment & mosaics    
     os.chdir(os.path.join(HOME_PATH, root, 'Prep'))
-    auto_script.preprocess(field_root=root, HOME_PATH=HOME_PATH, make_combined=False, catalogs=catalogs, use_visit=True, tweak_max_dist=(5 if is_parallel_field else 1))
+    auto_script.preprocess(field_root=root, HOME_PATH=HOME_PATH, make_combined=False, catalogs=catalogs, master_radec=master_radec, use_visit=True, tweak_max_dist=(5 if is_parallel_field else 1), align_simple=align_simple, align_clip=align_clip)
         
     # Fine alignment
     fine_catalogs = ['GAIA','PS1','SDSS','WISE']
     if len(glob.glob('{0}*fine.png'.format(root))) == 0:
         try:
-            out = auto_script.fine_alignment(field_root=root, HOME_PATH=HOME_PATH, min_overlap=0.2, stopme=False, ref_err=0.08, catalogs=fine_catalogs, NITER=1, maglim=[17,23], shift_only=True, method='Powell', redrizzle=False, radius=30, program_str=None, match_str=[], radec=fine_radec)
+            out = auto_script.fine_alignment(field_root=root, HOME_PATH=HOME_PATH, min_overlap=0.2, stopme=False, ref_err=0.08, catalogs=fine_catalogs, NITER=1, maglim=[17,23], shift_only=True, method='Powell', redrizzle=False, radius=30, program_str=None, match_str=[], radec=fine_radec, gaia_by_date=gaia_by_date)
             plt.close()
 
             # Update WCS headers with fine alignment
@@ -649,7 +649,7 @@ def clean_prep(field_root='j142724+334246'):
         print('remove '+file)
         os.remove(file)
                 
-def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', min_overlap=0.2, make_combined=True, catalogs=['PS1','SDSS','GAIA','WISE'], use_visit=True, master_radec=None, use_first_radec=False, skip_imaging=False, clean=True, tweak_max_dist=1.):
+def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', min_overlap=0.2, make_combined=True, catalogs=['PS1','SDSS','GAIA','WISE'], use_visit=True, master_radec=None, use_first_radec=False, skip_imaging=False, clean=True, tweak_max_dist=1., align_simple=True, align_clip=30):
     
     import os
     import glob
@@ -706,9 +706,9 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
             radec = master_radec
             best_overlap = 0.
         else:
+            radec_files = glob.glob('*cat.radec')
             radec = None
             best_overlap = 0
-            radec_files = glob.glob('*cat.radec')
             fp = direct['footprint']
             for rdfile in radec_files:
                 points = np.loadtxt(rdfile)
@@ -731,7 +731,8 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
                             align_mag_limits=[14,22],
                             reference_catalogs=catalogs, 
                             sky_iter=10, iter_atol=1.e-4, 
-                            tweak_max_dist=tweak_max_dist)
+                            tweak_max_dist=tweak_max_dist, 
+                            align_simple=align_simple, align_clip=align_clip)
         
         ###################################
         # Persistence Masking
@@ -781,10 +782,10 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
             best_overlap = 0
             fp = direct['footprint']
         else:
+            radec_files = glob.glob('*cat.radec')
             radec = None
             best_overlap = 0
             radec_n = 0
-            radec_files = glob.glob('*cat.radec')
             fp = direct['footprint']
             for rdfile in radec_files:
                 points = np.loadtxt(rdfile)
@@ -807,7 +808,9 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
                                         align_mag_limits=[14,24],
                                         reference_catalogs=catalogs,
                                         align_tolerance=8,
-                                        tweak_max_dist=tweak_max_dist)
+                                        tweak_max_dist=tweak_max_dist,
+                                        align_simple=align_simple,
+                                        align_clip=align_clip)
             except:
                 status = prep.process_direct_grism_visit(direct=direct,
                                             grism={}, radec=radec,
@@ -816,7 +819,9 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
                                             align_mag_limits=[14,24],
                                             reference_catalogs=catalogs,
                                             align_tolerance=8,
-                                            tweak_max_dist=tweak_max_dist)
+                                            tweak_max_dist=tweak_max_dist,
+                                            align_simple=align_simple,
+                                            align_clip=align_clip)
                 
             failed_file = '%s.failed' %(direct['product'])
             if os.path.exists(failed_file):
@@ -1702,7 +1707,7 @@ def summary_catalog(field_root='', dzbin=0.01, use_localhost=True, filter_bandpa
         
         
         
-def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', min_overlap=0.2, stopme=False, ref_err = 1.e-3, radec=None, redrizzle=True, shift_only=True, maglim=[17,24], NITER=1, catalogs = ['PS1','SDSS','GAIA','WISE'], method='Powell', radius=5., program_str=None, match_str=[], all_visits=None, date=None):
+def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', min_overlap=0.2, stopme=False, ref_err = 1.e-3, radec=None, redrizzle=True, shift_only=True, maglim=[17,24], NITER=1, catalogs = ['PS1','SDSS','GAIA','WISE'], method='Powell', radius=5., program_str=None, match_str=[], all_visits=None, date=None, gaia_by_date=False):
     """
     Try fine alignment from visit-based SExtractor catalogs
     """    
@@ -1799,6 +1804,20 @@ def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Griz
         tab[i]['xy'] = np.array([tab[i]['cat']['X_IMAGE'], tab[i]['cat']['Y_IMAGE']]).T
         
         tab[i]['match_idx'] = {}
+        
+        if gaia_by_date:
+            drz_file = glob.glob(file.replace('.cat.fits','*dr?_sci.fits'))[0]
+            drz_im = pyfits.open(drz_file)
+            
+            radec, ref_catalog = get_radec_catalog(ra=drz_im[0].header['CRVAL1'], 
+                    dec=drz_im[0].header['CRVAL2'], 
+                    product='-'.join(file.split('-')[:-1]),  date=drz_im[0].header['EXPSTART'], date_format = 'mjd',
+                    reference_catalogs=['GAIA'], radius=5.)
+            
+            ref_tab = utils.GTable(np.loadtxt(radec, unpack=True).T, names=['ra','dec'])
+            ridx = np.arange(len(ref_tab))
+        
+        tab[i]['ref_tab'] = ref_tab
         idx, dr = tab[i]['cat'].match_to_catalog_sky(ref_tab)
         clip = dr < 0.6*u.arcsec
         if clip.sum() > 1:
@@ -2082,7 +2101,7 @@ def make_reference_wcs(info, output='mosaic_wcs-ref.fits', filters=['G800L', 'G1
         return ref_hdu[1]
         
     
-def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140W','F160W'], ref_image=None, bits=None, pixfrac=0.6, scale=0.06, make_combined=True, drizzle_filters=True, skysub=False, skymethod='localmin', match_str=[], context=False, pad_reference=60, min_nexp=2, static=True):
+def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140W','F160W'], ref_image=None, bits=None, pixfrac=0.6, scale=0.06, make_combined=True, drizzle_filters=True, skysub=False, skymethod='localmin', match_str=[], context=False, pad_reference=60, min_nexp=2, static=True, skip_products=[]):
     import numpy as np
     import glob
     
@@ -2120,7 +2139,7 @@ def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140
     for visit in visits:
         
         # Visit failed for some reason
-        if visit['product']+'.failed' in failed_list:
+        if (visit['product']+'.failed' in failed_list) | (visit['product'] in skip_products):
             continue
         
         # Too few exposures (i.e., one with unreliable CR flags)
@@ -2300,8 +2319,8 @@ def _objfun_align(p0, tab, ref_tab, ref_err, shift_only, ret):
             m = -1
             ix, jx = tab[i]['match_idx'][m]
         
-            dx_i = (trans_rd[i][ix,0] - ref_tab['ra'][jx])*3600.*cosd
-            dy_i = (trans_rd[i][ix,1] - ref_tab['dec'][jx])*3600.
+            dx_i = (trans_rd[i][ix,0] - tab[i]['ref_tab']['ra'][jx])*3600.*cosd
+            dy_i = (trans_rd[i][ix,1] - tab[i]['ref_tab']['dec'][jx])*3600.
             rcount = len(dx_i)
             mcount = np.maximum(mcount, 1)
             rcount = np.maximum(rcount, 1)
@@ -2478,10 +2497,11 @@ def make_rgb_thumbnails(root='j140814+565638', maglim=23, cutout=12., figsize=[2
 
         fig = plt.figure(figsize=figsize)
         ax = fig.add_subplot(111)#, projection=wcs)
-        sx = ims['ir'][0].data.shape[0]/2
+        sx = ims['ir'][0].data.shape[1]/2
+        sy = ims['ir'][0].data.shape[0]/2
         
         x0, y0 = phot['x_image'][ix]-1, phot['y_image'][ix]-1
-        ax.imshow(image, origin='lower', extent=(-x0, -x0+2*sx, -y0, -y0+2*sx))
+        ax.imshow(image, origin='lower', extent=(-x0, -x0+2*sx, -y0, -y0+2*sy))
         ax.set_xlim(-cutout/2/pscale, cutout/2/pscale)
         ax.set_ylim(-cutout/2/pscale, cutout/2/pscale)
         
@@ -2492,9 +2512,9 @@ def make_rgb_thumbnails(root='j140814+565638', maglim=23, cutout=12., figsize=[2
         ax.grid()
         ax.set_xticklabels([]); ax.set_yticklabels([])
 
-        ax.text(0.06, 0.01, rf, color='r', backgroundcolor='w', size=9, ha='center', va='bottom', transform=ax.transAxes)
-        ax.text(0.06+0.08*5/figsize[0], 0.01, gf, color='g', backgroundcolor='w', size=9, ha='center', va='bottom', transform=ax.transAxes)
-        ax.text(0.06+0.08*2*5/figsize[0], 0.01, bf, color='b', backgroundcolor='w', size=9, ha='center', va='bottom', transform=ax.transAxes)
+        ax.text(0.06, 0.01, rf, color='r', backgroundcolor='w', size=6, ha='center', va='bottom', transform=ax.transAxes)
+        ax.text(0.06+0.08*5/figsize[0], 0.01, gf, color='g', backgroundcolor='w', size=6, ha='center', va='bottom', transform=ax.transAxes)
+        ax.text(0.06+0.08*2*5/figsize[0], 0.01, bf, color='b', backgroundcolor='w', size=6, ha='center', va='bottom', transform=ax.transAxes)
 
         for j in range(3):
             #time.sleep(0.5)
