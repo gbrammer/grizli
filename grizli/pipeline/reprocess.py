@@ -149,3 +149,42 @@ def inspect(root='grizli', force=False):
         
     
     return True
+
+def make_masks(files=None, inspect='grizli_inspect.fits', ext=1):
+    """
+    Make satellite trail masks
+    """
+    import os
+    import astropy.io.fits as pyfits
+    
+    try:
+        from .. import utils
+        from ..ds9 import DS9
+    except:
+        from grizli import utils
+        from grizli.ds9 import DS9
+        
+    if files is None:
+        insp = utils.read_catalog(inspect)
+        flag = (insp['satellite'] > 0) | (insp['earth'] > 0)
+        files=[f.replace('_ramp.png','_flt.fits') for f in insp['images'][flag]]
+    
+    ds9 = DS9()
+    for file in files:
+        im = pyfits.open(file)
+        med = np.median(im['SCI',ext].data)
+        ds9.view(im['SCI',ext].data-med)
+        reg_file = file.replace('_flt.fits','.*.mask.reg').replace('_flc.fits','.*.mask.reg').replace('_c0m.fits','.*.mask.reg').replace('*', '{0:02d}'.format(ext))
+        if os.path.exists(reg_file):
+            ds9.set('regions file '+reg_file)
+        
+        x = input(file+': draw region (x to skip, q to abort): ')
+        if x in ['q']:
+            print('Abort.')
+            #continue
+            return False
+        elif x in ['x']:
+            print('Skip {0}.'.format(file))
+            continue
+        
+        ds9.set('regions save '+reg_file)
