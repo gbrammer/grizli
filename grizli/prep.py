@@ -2102,6 +2102,7 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                                tweak_max_dist=1.,
                                tweak_threshold=1.5, 
                                align_simple=True,
+                               single_image_CRs=True,
                                drizzle_params = {},
                                iter_atol=1.e-4,
                              reference_catalogs=['GAIA','PS1','SDSS','WISE']):
@@ -2356,7 +2357,13 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                          preserve=False, driz_cr_snr=driz_cr_snr,
                          driz_cr_scale=driz_cr_scale, build=False, 
                          final_wht_type='IVM', **drizzle_params)
-    
+        
+        ### Flag areas of ACS images covered by a single image, where
+        ### CRs aren't appropriately masked
+        if (single_image_CRs) & (isACS | isWFPC2):
+            print('Mask areas of the mosaic covered by a single input image')
+            find_single_image_CRs(direct, simple_mask=True, with_ctx_mask=True, run_lacosmic=False)
+            
         ### Make DRZ catalog again with updated DRZWCS
         clean_drizzle(direct['product'])
         
@@ -3511,7 +3518,8 @@ def find_single_image_CRs(visit, simple_mask=False, with_ctx_mask=True,
     Requires context (CTX) image `visit['product']+'_drc_ctx.fits`.   
     """
     from drizzlepac import astrodrizzle
-    import lacosmicx
+    if run_lacosmic:
+        import lacosmicx
     
     ctx = pyfits.open(visit['product']+'_drc_ctx.fits')
     bits = np.log2(ctx[0].data)
