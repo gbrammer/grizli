@@ -2169,12 +2169,12 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                 flc.close()
                 
         ### Make ASN
-        asn = asnutil.ASNTable(grism['files'], output=grism['product'])
-        asn.create()
-        asn.write()
+        # asn = asnutil.ASNTable(grism['files'], output=grism['product'])
+        # asn.create()
+        # asn.write()
             
     if isACS:
-        bits = 64+32
+        bits = 64+32+256
         driz_cr_snr = '3.5 3.0'
         driz_cr_scale = '1.2 0.7'
     elif isWFPC2:
@@ -2182,7 +2182,7 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
         driz_cr_snr = '3.5 3.0'
         driz_cr_scale = '1.2 0.7'
     else:
-        bits = 576
+        bits = 576+256
         driz_cr_snr = '8.0 5.0'
         driz_cr_scale = '2.5 0.7'
     
@@ -2725,34 +2725,86 @@ def tweak_flt(files=[], max_dist=0.4, threshold=3, verbose=True, use_sewpy=False
     xy_0 = np.array([c0['X_IMAGE'], c0['Y_IMAGE']]).T
     tree = scipy.spatial.cKDTree(xy_0, 10)
     
-    d = OrderedDict()
-    for i in range(0, len(files)):
-        c_i, wcs_i = cats[i]
-        ## SExtractor doesn't do SIP WCS?
-        rd = np.array(wcs_i.all_pix2world(c_i['X_IMAGE'], c_i['Y_IMAGE'], 1))
-        xy = np.array(wcs_0.all_world2pix(rd.T, 1))
-        N = xy.shape[0]
-        dist, ix = np.zeros(N), np.zeros(N, dtype=int)
-        for j in range(N):
-            dist[j], ix[j] = tree.query(xy[j,:], k=1,
-                                        distance_upper_bound=np.inf)
-        
-        ok = dist < max_dist
-        if ok.sum() == 0:
-            d[files[i]] = [0.0, 0.0, 0.0, 1.0]
-            if verbose:
-                print(files[i], '! no match')
-            
-            continue
-            
-        dr = xy - xy_0[ix,:] 
-        dx = np.median(dr[ok,:], axis=0)
-        rms = np.std(dr[ok,:], axis=0)/np.sqrt(ok.sum())
+    try:
+        import tristars.match
+        ### Use Tristars for matching
 
-        d[files[i]] = [dx[0], dx[1], 0.0, 1.0, ok.sum(), rms]
+        # First 100
+        NMAX = 50
+        if len(xy_0) > NMAX:
+            so = np.argsort(c0['MAG_AUTO'])
+            xy_0 = xy_0[so[:NMAX],:]
+            
+        d = OrderedDict()
+        for i in range(0, len(files)):
+            c_i, wcs_i = cats[i]
+            ## SExtractor doesn't do SIP WCS?
+            rd = np.array(wcs_i.all_pix2world(c_i['X_IMAGE'], c_i['Y_IMAGE'], 1))
+            xy = np.array(wcs_0.all_world2pix(rd.T, 1))
+            
+            if len(xy) > NMAX:
+                so = np.argsort(c_i['MAG_AUTO'])
+                xy = xy[so[:NMAX],:]
+            
+            pair_ix = tristars.match.match_catalog_tri(xy, xy_0, maxKeep=10, auto_keep=3, auto_transform=None, auto_limit=3, size_limit=[5, 1000], ignore_rot=False, ignore_scale=True, ba_max=0.9)
+            
+            if False:
+                tristars.match.match_diagnostic_plot(xy, xy_0, pair_ix, tf=None, new_figure=False)
+                
+            # N = xy.shape[0]
+            # dist, ix = np.zeros(N), np.zeros(N, dtype=int)
+            # for j in range(N):
+            #     dist[j], ix[j] = tree.query(xy[j,:], k=1,
+            #                                 distance_upper_bound=np.inf)
+            #         
+            # ok = dist < max_dist
+            # if ok.sum() == 0:
+            #     d[files[i]] = [0.0, 0.0, 0.0, 1.0]
+            #     if verbose:
+            #         print(files[i], '! no match')
+            # 
+            #     continue
+            
+            dr = xy[pair_ix[:,0],:] - xy_0[pair_ix[:,1],:] 
+            ok = dr.max(axis=1) < 1000
+            dx = np.median(dr[ok,:], axis=0)
+            rms = np.std(dr[ok,:], axis=0)/np.sqrt(ok.sum())
+
+            d[files[i]] = [dx[0], dx[1], 0.0, 1.0, ok.sum(), rms]
         
-        if verbose:
-            print(files[i], dx, rms, 'N={0:d}'.format(ok.sum()))
+            if verbose:
+                print("{0} [{1:6.3f}, {2:6.3f}]  [{3:6.3f}, {4:6.3f}] N={5}".format(files[i], dx[0], dx[1], rms[0], rms[1], ok.sum()))
+                
+    except:
+        
+        d = OrderedDict()
+        for i in range(0, len(files)):
+            c_i, wcs_i = cats[i]
+            ## SExtractor doesn't do SIP WCS?
+            rd = np.array(wcs_i.all_pix2world(c_i['X_IMAGE'], c_i['Y_IMAGE'], 1))
+            xy = np.array(wcs_0.all_world2pix(rd.T, 1))
+            N = xy.shape[0]
+            dist, ix = np.zeros(N), np.zeros(N, dtype=int)
+            for j in range(N):
+                dist[j], ix[j] = tree.query(xy[j,:], k=1,
+                                            distance_upper_bound=np.inf)
+        
+            ok = dist < max_dist
+            if ok.sum() == 0:
+                d[files[i]] = [0.0, 0.0, 0.0, 1.0]
+                if verbose:
+                    print(files[i], '! no match')
+            
+                continue
+            
+            dr = xy - xy_0[ix,:] 
+            dx = np.median(dr[ok,:], axis=0)
+            rms = np.std(dr[ok,:], axis=0)/np.sqrt(ok.sum())
+
+            d[files[i]] = [dx[0], dx[1], 0.0, 1.0, ok.sum(), rms]
+        
+            if verbose:
+                print(files[i], dx, rms, 'N={0:d}'.format(ok.sum()))
     
     wcs_ref = cats[0][1]
     return wcs_ref, d
@@ -3463,7 +3515,7 @@ def fix_star_centers(root='macs1149.6+2223-rot-ca5-22-032.0-f105w',
                 mask = satpix[sly, slx]
                 sci[mask] = psf[mask]
                 dq[mask] -= (dq[mask] & 2048)
-                dq[mask] -= (dq[mask] & 256)
+                #dq[mask] -= (dq[mask] & 256)
                 #dq[mask] |= 512 
                 
         if verbose:
