@@ -313,6 +313,11 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
     # Make script for parallel processing
     auto_script.generate_fit_params(field_root=root, prior=None, MW_EBV=exptab.meta['MW_EBV'], pline=pline, fit_only_beams=True, run_fit=True, poly_order=7, fsps=True, sys_err = 0.03, fcontam=0.2, zr=[0.1, 3.4], save_file='fit_args.npy')
     
+    # Make PSF
+    print('Make field PSFs')
+    auto_script.field_psf(root=root, HOME_PATH=HOME_PATH)
+    
+    # Done?
     if not run_extractions:
         return True
         
@@ -2392,6 +2397,113 @@ def get_rgb_filters(filter_list, force_ir=False):
             
     return rfilt, gfilt, bfilt
     
+def field_rgb(root='j010514+021532', xsize=6, HOME_PATH='./', show_ir=True, pl=1, pf=1, scl=1, ds9=None, force_ir=False):
+    import os
+    import glob
+    import numpy as np
+    
+    import matplotlib.pyplot as plt
+    from matplotlib.ticker import MultipleLocator
+
+    import montage_wrapper
+    from astropy.visualization import make_lupton_rgb
+    import astropy.wcs as pywcs
+    import astropy.io.fits as pyfits
+    
+    try:
+        from .. import utils
+    except:
+        from grizli import utils
+        
+    phot_file = '{0}/{1}/Prep/{1}_phot.fits'.format(HOME_PATH, root)
+    if not os.path.exists(phot_file):
+        return False
+    
+    phot = utils.GTable.gread(phot_file)
+    sci_files = glob.glob('{0}/{1}/Prep/{1}-f*sci.fits'.format(HOME_PATH, root))
+    filters = [file.split('_')[-3].split('-')[-1] for file in sci_files]
+    
+    mag_auto = 23.9-2.5*np.log10(phot['flux_auto'])
+    
+    ims = {}
+    for f in filters + ['ir']:
+        img = glob.glob('{0}/{1}/Prep/{1}-{2}_dr?_sci.fits'.format(HOME_PATH, root, f))[0]
+        try:
+            ims[f] = pyfits.open(img)
+        except:
+            continue
+                
+    filters = list(ims.keys())
+    
+    wcs = pywcs.WCS(ims['ir'][0].header)
+    pscale = utils.get_wcs_pscale(wcs)
+    minor = MultipleLocator(1./pscale)
+            
+    rf, gf, bf = get_rgb_filters(filters, force_ir=force_ir)
+
+    #pf = 1
+    #pl = 1
+
+    rimg = ims[rf][0].data * (ims[rf][0].header['PHOTFLAM']/5.e-20)**pf * (ims[rf][0].header['PHOTPLAM']/1.e4)**pl*scl
+    
+    if bf == 'sum':
+        bimg = rimg
+    else:
+        bimg = ims[bf][0].data * (ims[bf][0].header['PHOTFLAM']/5.e-20)**pf * (ims[bf][0].header['PHOTPLAM']/1.e4)**pl*scl
+
+    if gf == 'sum':
+        gimg = (rimg+bimg)/2.
+    else:
+        gimg = ims[gf][0].data * (ims[gf][0].header['PHOTFLAM']/5.e-20)**pf * (ims[gf][0].header['PHOTPLAM']/1.e4)**pl*scl#* 1.5
+
+    if ds9:
+        ds9.set('rgb')
+        ds9.set('rgb channel red')
+        ds9.view(rimg, header=ims['ir'][0].header)
+        ds9.set_defaults(); ds9.set('cmap value 9.75 0.8455')
+        
+        ds9.set('rgb channel green')
+        ds9.view(gimg, header=ims['ir'][0].header)
+        ds9.set_defaults(); ds9.set('cmap value 9.75 0.8455')
+
+        ds9.set('rgb channel blue')
+        ds9.view(bimg, header=ims['ir'][0].header)
+        ds9.set_defaults(); ds9.set('cmap value 9.75 0.8455')
+        
+        return False
+        
+    if show_ir:
+        # Show only area where IR is available
+        yp, xp = np.indices(ims[rf][0].data.shape)
+        wht = pyfits.open(ims[rf].filename().replace('_sci','_wht'))
+        mask = wht[0].data > 0
+        xsl = slice(xp[mask].min(), xp[mask].max())
+        ysl = slice(yp[mask].min(), yp[mask].max())
+    
+        rimg = rimg[ysl, xsl]
+        bimg = bimg[ysl, xsl]
+        gimg = gimg[ysl, xsl]
+    
+    image = make_lupton_rgb(rimg, gimg, bimg, stretch=0.1, minimum=-0.01)
+    sh = image.shape
+    
+    dim = [xsize, xsize/sh[1]*sh[0]]
+    
+    fig = plt.figure(figsize=dim)
+    ax = fig.add_subplot(111)
+    ax.imshow(image, origin='lower')
+    ax.set_xticklabels([])
+    ax.set_yticklabels([])
+    ax.text(0.03, 0.97, root, bbox=dict(facecolor='w', alpha=0.8), size=10, ha='left', va='top', transform=ax.transAxes)
+    
+    ax.text(0.06+0.08*2, 0.02, rf, color='r', bbox=dict(facecolor='w', alpha=1), size=8, ha='center', va='bottom', transform=ax.transAxes)
+    ax.text(0.06+0.08, 0.02, gf, color='g', bbox=dict(facecolor='w', alpha=1), size=8, ha='center', va='bottom', transform=ax.transAxes)
+    ax.text(0.06, 0.02, bf, color='b', bbox=dict(facecolor='w', alpha=1), size=8, ha='center', va='bottom', transform=ax.transAxes)
+    
+    fig.tight_layout(pad=0.1)
+    fig.savefig('{0}.field.jpg'.format(root))
+    return fig
+    
 def make_rgb_thumbnails(root='j140814+565638', maglim=23, cutout=12., figsize=[2,2], ids=None, close=True, skip=True, force_ir=False):
     """
     Make RGB color cutouts
@@ -2595,8 +2707,6 @@ def test_psf():
     
     id=212; gfit, model = gf.fit_object(id=id, size=int(128*0.06), components=[galfit.GalfitSersic(), galfit.GalfitSersic()])
     
-    
-
 def field_psf(root='j020924-044344', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/WISP/', factors=[1,2,4], get_drizzle_scale=True, subsample=256, size=6, get_line_maps=True, raise_fault=False, verbose=True):
     """
     Generate PSFs for the available filters in a given field
@@ -2616,14 +2726,17 @@ def field_psf(root='j020924-044344', HOME_PATH='/Volumes/Pegasus/Grizli/Automati
         
     os.chdir(os.path.join(HOME_PATH, root, 'Prep'))
     
-    drz_file = '{0}-ir_drz_sci.fits'.format(root)
-    if not os.path.exists(drz_file):
-        err = 'Reference file {0} not found.'.format(drz_file)
+    drz_str = '{0}-ir_dr?_sci.fits'.format(root)
+    drz_file = glob.glob(drz_str)
+    if len(drz_file) == 0:
+        err = 'Reference file {0} not found.'.format(drz_str)
         if raise_fault:
             raise FileNotFoundError(err)
         else:
             print(err)
             return False
+    else:
+        drz_file = drz_file[0]
         
     scale = []
     pixfrac = []
@@ -2712,7 +2825,7 @@ def field_psf(root='j020924-044344', HOME_PATH='/Volumes/Pegasus/Grizli/Automati
         for scl, pf, kern, label in zip(scale, pixfrac, kernel, labels):
             ix = 0
             if verbose:
-                print('{0} {5:6} / {1:>6}" / pixf: {2} / {3} / {4}'.format(root, scl, pf, kern, filter, label))
+                print('{0} {5:6} / {1:.3f}" / pixf: {2} / {3:8} / {4}'.format(root, scl, pf, kern, filter, label))
             
             for ri, di in zip(ra.flatten(), dec.flatten()):
                 slice_h, wcs_slice = utils.make_wcsheader(ra=ri, dec=di, size=size, pixscale=scl, get_hdu=False, theta=0)
