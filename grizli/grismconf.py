@@ -7,6 +7,8 @@ explanation how the grism configuration parameters and coefficients are defined 
 import os
 import numpy as np
 
+from . import GRIZLI_PATH
+
 class aXeConf():
     def __init__(self, conf_file='WFC3.IR.G141.V2.5.conf'):
         """Read an aXe-compatible configuration file
@@ -486,53 +488,53 @@ def get_config_filename(instrume='WFC3', filter='F140W',
             
     """   
     if instrume == 'ACS':
-        conf_file = os.path.join(os.getenv('GRIZLI'), 
+        conf_file = os.path.join(GRIZLI_PATH, 
                     'CONF/ACS.WFC.CHIP{0:d}.Cycle13.5.conf'.format(chip))
                            
     if instrume == 'WFC3':
         if grism == 'G280':
-            conf_file = os.path.join(os.getenv('GRIZLI'), 'CONF/G280/',
+            conf_file = os.path.join(GRIZLI_PATH, 'CONF/G280/',
          'WFC3.UVIS.G280.cal/WFC3.UVIS.G280.CHIP{0:d}.V2.0.conf'.format(chip))
         
             return conf_file
             
-        conf_file = os.path.join(os.getenv('GRIZLI'), 
+        conf_file = os.path.join(GRIZLI_PATH, 
                                  'CONF/{0}.{1}.V4.32.conf'.format(grism, filter))
         
         ## When direct + grism combination not found for WFC3 assume F140W
         if not os.path.exists(conf_file):
-            conf_file = os.path.join(os.getenv('GRIZLI'),
+            conf_file = os.path.join(GRIZLI_PATH,
                                  'CONF/{0}.{1}.V4.32.conf'.format(grism, 'F140W'))
               
     if instrume == 'NIRISS':
-        conf_file = os.path.join(os.getenv('GRIZLI'),
+        conf_file = os.path.join(GRIZLI_PATH,
                                  'CONF/{0}.{1}.conf'.format(grism, filter))
         if not os.path.exists(conf_file):
             print('CONF/{0}.{1}.conf'.format(grism, filter))
-            conf_file = os.path.join(os.getenv('GRIZLI'),
+            conf_file = os.path.join(GRIZLI_PATH,
                                  'CONF/NIRISS.{0}.conf'.format(filter))
         
     # if instrume == 'NIRCam':
-    #     conf_file = os.path.join(os.getenv('GRIZLI'),
+    #     conf_file = os.path.join(GRIZLI_PATH,
     #         'CONF/aXeSIM_NC_2016May/CONF/NIRCam_LWAR_{0}.conf'.format(grism))
     if instrume == 'NIRCAM':
-        conf_file = os.path.join(os.getenv('GRIZLI'),
+        conf_file = os.path.join(GRIZLI_PATH,
                                  'CONF/NIRCam.A.{0}.{1}.conf'.format(filter, grism))
         
     if instrume == 'WFIRST':
-        conf_file = os.path.join(os.getenv('GRIZLI'), 'CONF/WFIRST.conf')
+        conf_file = os.path.join(GRIZLI_PATH, 'CONF/WFIRST.conf')
 
     if instrume == 'SYN':
-        conf_file = os.path.join(os.getenv('GRIZLI'), 'CONF/syn.conf')
+        conf_file = os.path.join(GRIZLI_PATH, 'CONF/syn.conf')
     
     # Euclid NISP, config files @ 
     # http://www.astrodeep.eu/euclid-spectroscopic-simulations/
     
     if instrume == 'NISP':
         if grism == 'BLUE':
-            conf_file = os.path.join(os.getenv('GRIZLI'), 'CONF/Euclid.Gblue.0.conf')
+            conf_file = os.path.join(GRIZLI_PATH, 'CONF/Euclid.Gblue.0.conf')
         else:
-            conf_file = os.path.join(os.getenv('GRIZLI'), 'CONF/Euclid.Gred.0.conf')
+            conf_file = os.path.join(GRIZLI_PATH, 'CONF/Euclid.Gred.0.conf')
             
     return conf_file
         

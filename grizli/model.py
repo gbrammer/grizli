@@ -21,6 +21,7 @@ from . import grismconf
 from . import utils
 from .utils_c import disperse
 from .utils_c import interp
+from . import GRIZLI_PATH
 
 # Would prefer 'nearest' but that occasionally segment faults out
 SEGMENTATION_INTERP = 'nearest' 
@@ -1052,7 +1053,7 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         """
         Hacky code for adding extended component of the EPSFs
         """
-        ext_file = os.path.join(os.getenv('GRIZLI'), 'CONF',
+        ext_file = os.path.join(GRIZLI_PATH, 'CONF',
                             'ePSF_extended_splines.npy')
         
         if not os.path.exists(ext_file):
@@ -4196,7 +4197,7 @@ class BeamCutout(object):
     #     
     #     temp_list = OrderedDict()
     #     for temp in templates:
-    #         data = np.loadtxt(os.getenv('GRIZLI') + '/' + temp, unpack=True)
+    #         data = np.loadtxt(GRIZLI_PATH + '/' + temp, unpack=True)
     #         scl = np.interp(5500., data[0], data[1])
     #         name = os.path.basename(temp)
     #         temp_list[name] = utils.SpectrumTemplate(wave=data[0],

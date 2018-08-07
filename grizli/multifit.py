@@ -1043,9 +1043,25 @@ class GroupFLT():
             `ref_header`.
         """
         from astropy.modeling import models, fitting
-        from drizzlepac.astrodrizzle import adrizzle
         import astropy.wcs as pywcs
         
+        try:
+            import drizzle
+            if drizzle.__version__ != '1.12.99':
+                # Not the fork that works for all input/output arrays
+                raise(ImportError)
+            
+            print('drizzle!!')
+            
+            from drizzle.dodrizzle import dodrizzle
+            drizzler = dodrizzle
+            dfillval = '0'
+        except:
+            from drizzlepac.astrodrizzle import adrizzle
+            adrizzle.log.setLevel('ERROR')
+            drizzler = adrizzle.do_driz
+            dfillval = 0
+            
         ## Quick check now for which grism exposures we should use
         if wave < 1.1e4:
             use_grism = 'G102'
@@ -1142,11 +1158,10 @@ class GroupFLT():
             if verbose:
                 print('Drizzle {0} to wavelength {1:.2f}'.format(flt.grism.parent_file, wave))
                                                         
-            adrizzle.do_driz(sci, line_wcs, wht, out_wcs, 
+            drizzler(sci, line_wcs, wht, out_wcs, 
                              outsci, outwht, outctx, 1., 'cps', 1,
                              wcslin_pscale=line_wcs.pscale, uniqid=1, 
-                             pixfrac=pixfrac, kernel=kernel, fillval=0, 
-                             stepsize=10, wcsmap=None)
+                             pixfrac=pixfrac, kernel=kernel, fillval=dfillval)
         
         # Done!
         return outsci, outwht
@@ -1631,7 +1646,7 @@ class MultiBeam(GroupFitter):
                 y *= np.sqrt(self.ivarf[self.fit_mask])
 
                 try:
-                    out = np.linalg.lstsq(Ax,y)                         
+                    out = np.linalg.lstsq(Ax,y, rcond=None)                      
                 except:
                     print(A.min(), Ax.min(), self.fit_mask.sum(), y.min())
                     raise ValueError
@@ -3046,7 +3061,7 @@ class MultiBeam(GroupFitter):
         out_coeffs = np.zeros(A.shape[0])
 
         y = self.scif
-        out = np.linalg.lstsq(A.T,y)                         
+        out = np.linalg.lstsq(A.T, y, rcond=None)                       
         lstsq_coeff, residuals, rank, s = out
         coeffs = lstsq_coeff
 
@@ -3073,7 +3088,7 @@ class MultiBeam(GroupFitter):
         TBD
         """
         from matplotlib.ticker import MultipleLocator
-        import pysynphot as S
+        #import pysynphot as S
         
         if usewcs:
             drizzle_function = drizzle_2d_spectrum_wcs
@@ -3223,7 +3238,9 @@ class MultiBeam(GroupFitter):
                     toA = 1.e4
                     #toA = 1.
                     
-                    gau = S.GaussianSource(1., h['CRVAL1']*toA, h['CD1_1']*toA)
+                    #gau = S.GaussianSource(1., h['CRVAL1']*toA, h['CD1_1']*toA)
+                    gau = utils.SpectrumTemplate(central_wave=h['CRVAL1']*toA, fwhm=h['CD1_1']*toA)
+                    
                     #print('XXX', h['CRVAL1'], h['CD1_1'], h['CRPIX1'], toA, gau.wave[np.argmax(gau.flux)])
                     for beam in beams:
                         beam.compute_model(spectrum_1d=[gau.wave, gau.flux],
@@ -3312,7 +3329,9 @@ class MultiBeam(GroupFitter):
             h = hdu[1].header
             #gau = S.GaussianSource(1.e-17, h['CRVAL1'], h['CD1_1']*1)
             toA = 1.e4
-            gau = S.GaussianSource(1., h['CRVAL1']*toA, h['CD1_1']*toA)
+            #gau = S.GaussianSource(1., h['CRVAL1']*toA, h['CD1_1']*toA)
+            gau = utils.SpectrumTemplate(central_wave=h['CRVAL1']*toA, fwhm=h['CD1_1']*toA)
+            
             for beam in all_beams:
                 beam.compute_model(spectrum_1d=[gau.wave, gau.flux],
                                    is_cgs=True)
@@ -3378,7 +3397,12 @@ class MultiBeam(GroupFitter):
         if `update==True`.
         
         """
-        from drizzlepac import astrodrizzle
+        try:
+            from drizzle.doblot import doblot
+            blotter = doblot
+        except:
+            from drizzlepac.astrodrizzle import ablot
+            blotter = ablot.do_blot
         
         # Read the drizzled arrays
         Ng = hdul[0].header['NGRISM']
@@ -3400,7 +3424,7 @@ class MultiBeam(GroupFitter):
                 continue
             
             beam_header, flt_wcs = beam.full_2d_wcs()
-            blotted = astrodrizzle.ablot.do_blot(ref_data[g], ref_wcs[g],
+            blotted = blotter(ref_data[g], ref_wcs[g],
                                 flt_wcs, 1,
                                 coeffs=True, interp=interp, sinscl=1.0,
                                 stepsize=10, wcsmap=None)
@@ -3685,11 +3709,26 @@ def drizzle_2d_spectrum(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
         FITS HDUList with the drizzled 2D spectrum and weight arrays
         
     """
-    from drizzlepac.astrodrizzle import adrizzle
     from astropy import log
+    try:
+        import drizzle
+        if drizzle.__version__ != '1.12.99':
+            # Not the fork that works for all input/output arrays
+            raise(ImportError)
+        
+        print('drizzle!!')
+        
+        from drizzle.dodrizzle import dodrizzle
+        drizzler = dodrizzle
+        dfillval = '0'
+    except:
+        from drizzlepac.astrodrizzle import adrizzle
+        adrizzle.log.setLevel('ERROR')
+        drizzler = adrizzle.do_driz
+        dfillval = 0
+    
     log.setLevel('ERROR')
     #log.disable_warnings_logging()
-    adrizzle.log.setLevel('ERROR')
     
     NX = int(np.round(np.diff(wlimit)[0]*1.e4/dlam)) // 2
     center = np.mean(wlimit[:2])*1.e4
@@ -3756,18 +3795,16 @@ def drizzle_2d_spectrum(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
         ###### Go drizzle
         
         ### Contamination-cleaned
-        adrizzle.do_driz(data_i, beam_wcs, wht, output_wcs, 
+        drizzler(data_i, beam_wcs, wht, output_wcs, 
                          outsci, outwht, outctx, 1., 'cps', 1,
                          wcslin_pscale=1., uniqid=1, 
-                         pixfrac=pixfrac, kernel=kernel, fillval=0, 
-                         stepsize=10, wcsmap=None)
+                         pixfrac=pixfrac, kernel=kernel, fillval=dfillval)
         
         # For variance
-        adrizzle.do_driz(contam_weight, beam_wcs, wht, output_wcs, 
+        drizzler(contam_weight, beam_wcs, wht, output_wcs, 
                          outvar, outwv, outcv, 1., 'cps', 1,
                          wcslin_pscale=1., uniqid=1, 
-                         pixfrac=pixfrac, kernel=kernel, fillval=0, 
-                         stepsize=10, wcsmap=None)
+                         pixfrac=pixfrac, kernel=kernel, fillval=dfillval)
         
         if ds9 is not None:
             ds9.view(outsci/output_wcs.pscale**2, header=out_header)
@@ -3889,9 +3926,23 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
         FITS HDUList with the drizzled thumbnail, line and continuum 
         cutouts.
     """
-    from drizzlepac.astrodrizzle import adrizzle
-    adrizzle.log.setLevel('ERROR')
-    
+    try:
+        import drizzle
+        if drizzle.__version__ != '1.12.99':
+            # Not the fork that works for all input/output arrays
+            raise(ImportError)
+        
+        print('drizzle!!')
+        from drizzle.dodrizzle import dodrizzle
+        drizzler = dodrizzle
+        dfillval = '0'
+        
+    except:
+        from drizzlepac.astrodrizzle import adrizzle
+        adrizzle.log.setLevel('ERROR')
+        drizzler = adrizzle.do_driz
+        dfillval = 0
+        
     # Nothing to do
     if len(beams) == 0:
         return False
@@ -3993,25 +4044,22 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
         ###### Go drizzle
         
         ### Contamination-cleaned
-        adrizzle.do_driz(beam_data, beam_wcs, wht, output_wcs, 
+        drizzler(beam_data, beam_wcs, wht, output_wcs, 
                          outsci, outwht, outctx, 1., 'cps', 1,
                          wcslin_pscale=beam.grism.wcs.pscale, uniqid=1, 
-                         pixfrac=pixfrac, kernel=kernel, fillval=0, 
-                         stepsize=10, wcsmap=None)
+                         pixfrac=pixfrac, kernel=kernel, fillval=dfillval)
         
         ### Continuum
-        adrizzle.do_driz(beam_continuum, beam_wcs, wht, output_wcs, 
+        drizzler(beam_continuum, beam_wcs, wht, output_wcs, 
                          coutsci, coutwht, coutctx, 1., 'cps', 1, 
                          wcslin_pscale=beam.grism.wcs.pscale, uniqid=1, 
-                         pixfrac=pixfrac, kernel=kernel, fillval=0, 
-                         stepsize=10, wcsmap=None)
+                         pixfrac=pixfrac, kernel=kernel, fillval=dfillval)
         
         ### Contamination
-        adrizzle.do_driz(beam.contam, beam_wcs, wht, output_wcs, 
+        drizzler(beam.contam, beam_wcs, wht, output_wcs, 
                          xoutsci, xoutwht, xoutctx, 1., 'cps', 1, 
                          wcslin_pscale=beam.grism.wcs.pscale, uniqid=1, 
-                         pixfrac=pixfrac, kernel=kernel, fillval=0, 
-                         stepsize=10, wcsmap=None)
+                         pixfrac=pixfrac, kernel=kernel, fillval=dfillval)
         
         ### Direct thumbnail
         if direct_extension == 'REF':
@@ -4027,11 +4075,10 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
             thumb_wht[~np.isfinite(thumb_wht)] = 0
             
         
-        adrizzle.do_driz(thumb, beam.direct.wcs, thumb_wht, output_wcs, 
+        drizzler(thumb, beam.direct.wcs, thumb_wht, output_wcs, 
                          doutsci, doutwht, doutctx, 1., 'cps', 1, 
                          wcslin_pscale=beam.direct.wcs.pscale, uniqid=1, 
-                         pixfrac=pixfrac, kernel=kernel, fillval=0, 
-                         stepsize=10, wcsmap=None)
+                         pixfrac=pixfrac, kernel=kernel, fillval=dfillval)
         
         ## Show in ds9
         if ds9 is not None:
@@ -4274,7 +4321,23 @@ def drizzle_2d_spectrum_wcs(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
         FITS HDUList with the drizzled 2D spectrum and weight arrays
         
     """
-    from drizzlepac.astrodrizzle import adrizzle
+    try:
+        import drizzle
+        if drizzle.__version__ != '1.12.99':
+            # Not the fork that works for all input/output arrays
+            raise(ImportError)
+        
+        print('drizzle!!')
+        
+        from drizzle.dodrizzle import dodrizzle
+        drizzler = dodrizzle
+        dfillval = '0'
+    except:
+        from drizzlepac.astrodrizzle import adrizzle
+        adrizzle.log.setLevel('ERROR')
+        drizzler = adrizzle.do_driz
+        dfillval = 0
+
     from stwcs import distortion
     from astropy import log
     
@@ -4427,32 +4490,28 @@ def drizzle_2d_spectrum_wcs(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
         
         ###### Go drizzle
         data_wave = np.dot(np.ones(beam.beam.sh_beam[0])[:,None], beam.beam.lam[None,:])
-        adrizzle.do_driz(data_wave, beam_wcs, wht*0.+1, output_wcs, 
+        drizzler(data_wave, beam_wcs, wht*0.+1, output_wcs, 
                          outls, outlw, outlc, 1., 'cps', 1,
                          wcslin_pscale=1., uniqid=1, 
-                         pixfrac=1, kernel='square', fillval=0, 
-                         stepsize=10, wcsmap=None)
+                         pixfrac=1, kernel='square', fillval=dfillval)
         
         ### Direct image
-        adrizzle.do_driz(d_sci, d_beam_wcs, d_wht, d_output_wcs, 
+        drizzler(d_sci, d_beam_wcs, d_wht, d_output_wcs, 
                          doutsci, doutwht, doutctx, 1., 'cps', 1,
                          wcslin_pscale=d_beam_wcs.pscale, uniqid=1, 
-                         pixfrac=pixfrac, kernel=kernel, fillval=0, 
-                         stepsize=10, wcsmap=None)
+                         pixfrac=pixfrac, kernel=kernel, fillval=dfillval)
                            
         ### Contamination-cleaned
-        adrizzle.do_driz(data_i, beam_wcs, wht, output_wcs, 
+        drizzler(data_i, beam_wcs, wht, output_wcs, 
                          outsci, outwht, outctx, 1., 'cps', 1,
                          wcslin_pscale=beam_wcs.pscale, uniqid=1, 
-                         pixfrac=pixfrac, kernel=kernel, fillval=0, 
-                         stepsize=10, wcsmap=None)
+                         pixfrac=pixfrac, kernel=kernel, fillval=dfillval)
         
         # For variance
-        adrizzle.do_driz(contam_weight, beam_wcs, wht, output_wcs, 
+        drizzler(contam_weight, beam_wcs, wht, output_wcs, 
                          outvar, outwv, outcv, 1., 'cps', 1,
                          wcslin_pscale=beam_wcs.pscale, uniqid=1, 
-                         pixfrac=pixfrac, kernel=kernel, fillval=0, 
-                         stepsize=10, wcsmap=None)
+                         pixfrac=pixfrac, kernel=kernel, fillval=dfillval)
         
         if ds9 is not None:
             ds9.view(outsci, header=out_header)

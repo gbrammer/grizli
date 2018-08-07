@@ -1133,7 +1133,7 @@ class GroupFitter(object):
             
         """
         import scipy.optimize
-        import scipy.sparse
+        #import scipy.sparse
         from scipy.special import huber
         
         NTEMP = len(templates)
@@ -1234,7 +1234,7 @@ class GroupFitter(object):
         if fitter == 'nnls':
             coeffs_i, rnorm = scipy.optimize.nnls(AxT, data)            
         elif fitter == 'lstsq':
-            coeffs_i, residuals, rank, s = np.linalg.lstsq(AxT, data)
+            coeffs_i, residuals, rank, s = np.linalg.lstsq(AxT, data, rcond=None)
         else:
             # Bounded Least Squares
             lsq_out = scipy.optimize.lsq_linear(AxT, data, bounds=(lower_bound[oktemp], upper_bound[oktemp]), method='bvls', tol=1.e-8)
