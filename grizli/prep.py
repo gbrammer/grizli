@@ -19,6 +19,7 @@ from astropy.table import Table
 
 from . import utils
 from . import model
+from . import GRIZLI_PATH
 
 def check_status():
     """Make sure all files and modules are in place and print some information if they're not
@@ -3140,14 +3141,14 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
     ### Read sky files    
     data_fixed = []
     for file in bg_fixed:
-        im = pyfits.open('{0}/CONF/{1}'.format(os.getenv('GRIZLI'), file))
+        im = pyfits.open('{0}/CONF/{1}'.format(GRIZLI_PATH, file))
         sh = im[0].data.shape
         data = im[0].data.flatten()/flat
         data_fixed.append(data)
         
     data_vary = []
     for file in bg_vary:
-        im = pyfits.open('{0}/CONF/{1}'.format(os.getenv('GRIZLI'), file))
+        im = pyfits.open('{0}/CONF/{1}'.format(GRIZLI_PATH, file))
         data_vary.append(im[0].data.flatten()*1)
         sh = im[0].data.shape
         

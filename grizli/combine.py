@@ -13,6 +13,7 @@ import astropy.wcs as pywcs
 import astropy.io.fits as pyfits
 
 from . import utils
+from . import GRIZLI_PATH
 
 def combine_flt(files=[], output='exposures_cmb.fits', grow=1,
                 add_padding=True, pixfrac=0.5, kernel='point',

@@ -22,12 +22,16 @@ import os
 
 # Test that GRIZLI system variable is set
 if os.getenv('GRIZLI') is None:
-    print("""
-Warning: $GRIZLI system variable not set, `grizli`
-won't be able to find the aXe configuration files!
-(These assumed to be in $GRIZLI/CONF.)
-    """)
+    GRIZLI_PATH = os.path.join(os.path.dirname(__file__), 'data/')
 
+    print("""
+Warning: $GRIZLI system variable not set and will default to {0}. 
+Grizli will need to find the configuration files in $GRIZLI/CONF.
+    """.format(GRIZLI_PATH))
+    #GRIZLI_PATH = '/usr/local/share/grizli_home'
+else:
+    GRIZLI_PATH = os.getenv('GRIZLI')
+    
 try:
     import sep
 except:

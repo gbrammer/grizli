@@ -13,6 +13,8 @@ import numpy as np
 
 import astropy.units as u
 
+from . import GRIZLI_PATH
+
 KMS = u.km/u.s
 FLAMBDA_CGS = u.erg/u.s/u.cm**2/u.angstrom
 FNU_CGS = u.erg/u.s/u.cm**2/u.Hz
@@ -1193,9 +1195,9 @@ class SpectrumTemplate(object):
             # Gaussian
             line = np.exp(-(wave_grid-central_wave)**2/2/rms**2)
             peak = np.sqrt(2*np.pi*rms**2)
-            line /= np.sqrt(2*np.pi*rms**2)
+            line *= 1./peak#np.sqrt(2*np.pi*rms**2)
             
-        line[line < peak*clip] = 0
+        line[line < 1./peak*clip] = 0
         
         return wave_grid, line
         
@@ -1370,7 +1372,7 @@ def load_templates(fwhm=400, line_complexes=True, stars=False,
     
     The different sets of continuum templates are stored in 
     
-        >>> temp_dir = os.path.join(os.getenv('GRIZLI'), 'templates')
+        >>> temp_dir = os.path.join(GRIZLI_PATH, 'templates')
         
     Parameters
     ----------
@@ -1422,7 +1424,7 @@ def load_templates(fwhm=400, line_complexes=True, stars=False,
     """
     
     if stars:
-        # templates = glob.glob('%s/templates/Pickles_stars/ext/*dat' %(os.getenv('GRIZLI')))
+        # templates = glob.glob('%s/templates/Pickles_stars/ext/*dat' %(GRIZLI_PATH))
         # templates = []
         # for t in 'obafgkmrw':
         #     templates.extend( glob.glob('%s/templates/Pickles_stars/ext/uk%s*dat' %(os.getenv('THREEDHST'), t)))
@@ -1455,7 +1457,7 @@ def load_templates(fwhm=400, line_complexes=True, stars=False,
         # np.save('stars_bpgs.npy', [temp_list])
         
         
-        # tall = np.load(os.path.join(os.getenv('GRIZLI'), 
+        # tall = np.load(os.path.join(GRIZLI_PATH, 
         #                                  'templates/stars.npy'))[0]
         # 
         # return tall
@@ -1511,7 +1513,7 @@ def load_templates(fwhm=400, line_complexes=True, stars=False,
         
     temp_list = OrderedDict()
     for temp in templates:
-        data = np.loadtxt(os.path.join(os.getenv('GRIZLI'), 'templates', temp), unpack=True)
+        data = np.loadtxt(os.path.join(GRIZLI_PATH, 'templates', temp), unpack=True)
         #scl = np.interp(5500., data[0], data[1])
         scl = 1.
         name = temp #os.path.basename(temp)
@@ -1621,7 +1623,7 @@ def load_sdss_pca_templates(file='spEigenQSO-55732.fits', smooth=3000):
     from collections import OrderedDict
     import scipy.ndimage as nd
     
-    im = pyfits.open(os.path.join(os.getenv('GRIZLI'), 'templates', file))
+    im = pyfits.open(os.path.join(GRIZLI_PATH, 'templates', file))
     h = im[0].header
     log_wave = np.arange(h['NAXIS1'])*h['COEFF1']+h['COEFF0']
     wave = 10**log_wave
@@ -2481,8 +2483,7 @@ def drizzle_array_groups(sci_list, wht_list, wcs_list, outputwcs=None,
                          wht_list[i].astype(np.float32, copy=False),
                          outputwcs, outsci, outwht, outctx, 1., 'cps', 1,
                          wcslin_pscale=wcs_list[i].pscale, uniqid=1, 
-                         pixfrac=pixfrac, kernel=kernel, fillval=0, 
-                         stepsize=10, wcsmap=None)
+                         pixfrac=pixfrac, kernel=kernel, fillval=0)
         
     return outsci, outwht, outctx, header, outputwcs
     
@@ -2542,12 +2543,12 @@ def symlink_templates(force=False):
     force : bool
         Force link files even if they already exist.
     """
-    if 'GRIZLI' not in os.environ:
-        print('"GRIZLI" environment variable not set!')
-        return False
+    # if 'GRIZLI' not in os.environ:
+    #     print('"GRIZLI" environment variable not set!')
+    #     return False
         
     module_path = os.path.dirname(__file__)
-    out_path = os.path.join(os.environ['GRIZLI'], 'templates')
+    out_path = os.path.join(GRIZLI_PATH, 'templates')
     
     files = glob.glob(os.path.join(module_path, 'data/templates/*'))
     #print(files)
@@ -2653,20 +2654,22 @@ For example,
     if not os.path.exists(pam):
         os.system('curl -o {0} http://www.stsci.edu/hst/wfc3/pam/ir_wfc3_map.fits'.format(pam))
     
-def fetch_config_files(ACS=False):
+def fetch_config_files(ACS=False, get_sky=True, get_stars=True, get_epsf=True):
     """
     Config files needed for Grizli
     """
     cwd = os.getcwd()
     
-    print('Config directory: {0}/CONF'.format(os.getenv('GRIZLI')))
+    print('Config directory: {0}/CONF'.format(GRIZLI_PATH))
     
-    os.chdir(os.path.join(os.getenv('GRIZLI'), 'CONF'))
+    os.chdir(os.path.join(GRIZLI_PATH, 'CONF'))
     
     ftpdir = 'ftp://ftp.stsci.edu/cdbs/wfc3_aux/'
     tarfiles = ['{0}/WFC3.IR.G102.cal.V4.32.tar.gz'.format(ftpdir),
-                '{0}/WFC3.IR.G141.cal.V4.32.tar.gz'.format(ftpdir),
-                '{0}/grism_master_sky_v0.5.tar.gz'.format(ftpdir)]
+                '{0}/WFC3.IR.G141.cal.V4.32.tar.gz'.format(ftpdir)]
+    
+    if get_sky:
+        tarfiles.append('{0}/grism_master_sky_v0.5.tar.gz'.format(ftpdir))
     
     gURL = 'http://www.stsci.edu/~brammer/Grizli/Files'
     tarfiles.append('{0}/WFC3IR_extended_PSF.v1.tar.gz'.format(gURL))
@@ -2683,36 +2686,38 @@ def fetch_config_files(ACS=False):
         
         os.system('tar xzvf {0}'.format(file))
     
-    # ePSF files for fitting point sources
-    psf_path = 'http://www.stsci.edu/hst/wfc3/analysis/PSF/psf_downloads/wfc3_ir/'
-    files = ['{0}/PSFSTD_WFC3IR_{1}.fits'.format(psf_path, filt) 
-             for filt in ['F105W', 'F125W', 'F140W', 'F160W']]
+    if get_epsf:
+        # ePSF files for fitting point sources
+        psf_path = 'http://www.stsci.edu/hst/wfc3/analysis/PSF/psf_downloads/wfc3_ir/'
+        files = ['{0}/PSFSTD_WFC3IR_{1}.fits'.format(psf_path, filt) 
+                 for filt in ['F105W', 'F125W', 'F140W', 'F160W']]
              
-    for url in files:
-        file=os.path.basename(url)
-        if not os.path.exists(file):
-            print('Get {0}'.format(file))
-            os.system('curl -o {0} {1}'.format(file, url))
-        else:
-            print('File {0} exists'.format(file))
+        for url in files:
+            file=os.path.basename(url)
+            if not os.path.exists(file):
+                print('Get {0}'.format(file))
+                os.system('curl -o {0} {1}'.format(file, url))
+            else:
+                print('File {0} exists'.format(file))
+
+    if get_stars:
+        # Stellar templates
+        print('Templates directory: {0}/templates'.format(GRIZLI_PATH))
+        os.chdir('{0}/templates'.format(GRIZLI_PATH))
     
-    # Stellar templates
-    print('Templates directory: {0}/templates'.format(os.getenv('GRIZLI')))
-    os.chdir('{0}/templates'.format(os.getenv('GRIZLI')))
-    
-    files = ['http://www.stsci.edu/~brammer/Grizli/Files/stars_pickles.npy',
-             'http://www.stsci.edu/~brammer/Grizli/Files/stars_bpgs.npy']
+        url = 'http://www.stsci.edu/~brammer/Grizli/Files/'
+        files = [url+'stars_pickles.npy', url+'stars_bpgs.npy']
             
-    for url in files:
-        file=os.path.basename(url)
-        if not os.path.exists(file):
-            print('Get {0}'.format(file))
-            os.system('curl -o {0} {1}'.format(file, url))
-        else:
-            print('File {0} exists'.format(file))
+        for url in files:
+            file=os.path.basename(url)
+            if not os.path.exists(file):
+                print('Get {0}'.format(file))
+                os.system('curl -o {0} {1}'.format(file, url))
+            else:
+                print('File {0} exists'.format(file))
     
-    print('ln -s stars_pickles.npy stars.npy')
-    os.system('ln -s stars_pickles.npy stars.npy')
+        print('ln -s stars_pickles.npy stars.npy')
+        os.system('ln -s stars_pickles.npy stars.npy')
     
     os.chdir(cwd)
 
@@ -2800,7 +2805,7 @@ class EffectivePSF(object):
         """
         self.epsf = {}
         for filter in ['F105W', 'F125W', 'F140W', 'F160W']:
-            file = os.path.join(os.getenv('GRIZLI'), 'CONF',
+            file = os.path.join(GRIZLI_PATH, 'CONF',
                                 'PSFSTD_WFC3IR_{0}.fits'.format(filter))
             
             data = pyfits.open(file)[0].data.T
@@ -2810,7 +2815,7 @@ class EffectivePSF(object):
         
         # UVIS
         for filter in ['F275W', 'F336W', 'F438W', 'F606W', 'F814W', 'F850L']:
-            file = os.path.join(os.getenv('GRIZLI'), 'CONF',
+            file = os.path.join(GRIZLI_PATH, 'CONF',
                                 'PSFSTD_WFC3UV_{0}.fits'.format(filter))
             
             if not os.path.exists(file):
@@ -2828,7 +2833,7 @@ class EffectivePSF(object):
         # Extended
         self.extended_epsf = {}
         for filter in ['F105W', 'F125W', 'F140W', 'F160W']:
-            file = os.path.join(os.getenv('GRIZLI'), 'CONF',
+            file = os.path.join(GRIZLI_PATH, 'CONF',
                                 'extended_PSF_{0}.fits'.format(filter))
             
             if not os.path.exists(file):
