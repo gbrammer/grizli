@@ -38,7 +38,7 @@ def make_templates(grism='G141', return_lists=False, fsps_templates=False,
         
     """
     
-    from grizli.multifit import MultiBeam
+    from .multifit import MultiBeam
     
     if grism == 'G141':    # WFC3/IR
         fwhm = 1100
@@ -71,7 +71,7 @@ def make_templates(grism='G141', return_lists=False, fsps_templates=False,
         print('Wrote `templates_{0}.npy`'.format(fwhm))
 
 class StackFitter(GroupFitter):
-    def __init__(self, files='gnt_18197.stack.fits', group_name=None, sys_err=0.02, mask_min=0.1, fit_stacks=True, fcontam=1, pas=None, extensions=None, min_ivar=0.01, overlap_threshold=3, verbose=True, eazyp=None, eazy_ix=0, MW_EBV=0., chi2_threshold=1.5, min_DoF=200):
+    def __init__(self, files='gnt_18197.stack.fits', group_name=None, sys_err=0.02, mask_min=0.1, fit_stacks=True, fcontam=1, PAs=None, extensions=None, min_ivar=0.01, overlap_threshold=3, verbose=True, eazyp=None, eazy_ix=0, MW_EBV=0., chi2_threshold=1.5, min_DoF=200):
         """Object for fitting stacked spectra.
         
         Parameters
@@ -143,8 +143,8 @@ class StackFitter(GroupFitter):
                 for j in range(ng):
                     pa = self.h0['{0}{1:02d}'.format(g, j+1)]
                     
-                    if pas is not None:
-                        if pa not in pas:
+                    if PAs is not None:
+                        if pa not in PAs:
                             continue
                     
                     ext = '{0},{1}'.format(g,pa)
@@ -255,7 +255,11 @@ class StackFitter(GroupFitter):
 
         for i in range(self.N):
             grism = self.ext[i].split(',')[0]
-            PA = float(self.ext[i].split(',')[1])
+            if ',' in self.ext[i]:
+                PA = float(self.ext[i].split(',')[1])
+            else:
+                PA = 0
+                
             if PA in self.PA[grism]:
                 self.PA[grism][PA].append(i)
             else:
@@ -743,14 +747,17 @@ class StackFitter(GroupFitter):
         
         """
         import os
-        import grizli
+        #import grizli
+        
         import matplotlib.gridspec
         import matplotlib.pyplot as plt
         import numpy as np
         
+        from . import utils
+        
         t_complex, t_i = np.load(templates_file)
         
-        z = grizli.utils.log_zgrid(zr=zr, dz=dz0)
+        z = utils.log_zgrid(zr=zr, dz=dz0)
         chi2 = z*0.
         for i in range(len(z)):
             if eazyp:
@@ -776,7 +783,7 @@ class StackFitter(GroupFitter):
             iz = np.argmin(cp)
             z0 = zi[iz]
             dz = dz0/2.02**iter
-            zi = grizli.utils.log_zgrid(zr=[z0-dz*4, z0+dz*4], dz=dz)
+            zi = utils.log_zgrid(zr=[z0-dz*4, z0+dz*4], dz=dz)
             ci = zi*0.
             for i in range(len(zi)):
                 
@@ -824,7 +831,7 @@ class StackFitter(GroupFitter):
             self.DoF = int((self.fit_mask*self.weightf).sum())
             
         # Table with z, chi-squared
-        t = grizli.utils.GTable()
+        t = utils.GTable()
         t['z'] = z
         t['chi2'] = chi2
         
@@ -1008,9 +1015,10 @@ class StackFitter(GroupFitter):
         import matplotlib.gridspec
         from matplotlib.ticker import MultipleLocator
         
-        import grizli
+        #import grizli
+        from . import utils
         
-        zfit = grizli.utils.GTable.read(hdu[1])
+        zfit = utils.GTable.read(hdu[1])
         z = zfit['z']
         chi2 = zfit['chi2']
         
@@ -1171,7 +1179,10 @@ class StackFitter(GroupFitter):
                 
 class StackedSpectrum(object):
     def __init__(self, file='gnt_18197.stack.G141.285.fits', sys_err=0.02, mask_min=0.1, extver='G141', mask_threshold=7, fcontam=1., min_ivar=0.001, MW_EBV=0.):
-        import grizli
+        import os
+        #import grizli
+        from . import GRIZLI_PATH
+        from . import grismconf
         
         self.sys_err = sys_err
         self.mask_min = mask_min
@@ -1199,7 +1210,14 @@ class StackedSpectrum(object):
         # Configuration file
         self.is_flambda = self.header['ISFLAM']
         self.conf_file = self.header['CONF']
-        self.conf = grizli.grismconf.aXeConf(self.conf_file)
+        try:
+            self.conf = grismconf.aXeConf(self.conf_file)
+        except:
+            # Try global path 
+            base = os.path.basename(self.conf_file)
+            localfile = os.path.join(GRIZLI_PATH, 'CONF', base)
+            self.conf = grismconf.aXeConf(localfile)
+            
         self.conf.get_beams()
         
         self.sci = self.hdulist['SCI',extver].data*1.
@@ -1348,7 +1366,7 @@ class StackedSpectrum(object):
         """
         Initiazize components for generating 2D model
         """
-        from grizli.utils_c.interp import interp_conserve_c
+        from .utils_c.interp import interp_conserve_c
         
         NY = self.sh[0]
         data = np.zeros((self.header['NAXIS1'], self.header['NAXIS2'], self.header['NAXIS1']))
@@ -1404,7 +1422,7 @@ class StackedSpectrum(object):
         
         xxx is_cgs and in_place are dummy parameters to match `MultiBeam.compute_model`.
         """
-        from grizli.utils_c.interp import interp_conserve_c
+        from .utils_c.interp import interp_conserve_c
         
         if spectrum_1d is None:
             fl = self.wave*0+1
