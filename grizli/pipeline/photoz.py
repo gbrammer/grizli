@@ -87,4 +87,16 @@ def eazy_photoz(root, force=False):
     
     return self, cat, zout
     
+def show_from_ds9(ds9, self, zout, **kwargs):
+    
+    xy = np.cast[float](ds9.get('pan image').split())
+    r = np.sqrt((self.cat['x_image']-xy[0])**2 + (self.cat['y_image']-xy[1])**2)
+    
+    ix = np.argmin(r)
+    print('ID: {0}, r={1:.1f} pix'.format(self.cat['id'][ix], r[ix]))
+    print('  z={0:.2f} logM={1:.2f}'.format(zout['z_phot'][ix], np.log10(zout['mass'][ix])))
+    
+    self.show_fit(self.cat['id'][ix], **kwargs)
+    
+    
     
