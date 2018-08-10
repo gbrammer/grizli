@@ -512,7 +512,7 @@ def match_lists(input, output, transform=None, scl=3600., simple=True,
     
     try:        
         from tristars import match
-        pair_ix = match.match_catalog_tri(input, output, maxKeep=10, auto_keep=3, auto_transform=transform, auto_limit=3, size_limit=[5, 800], ignore_rot=False, ignore_scale=True, ba_max=0.9)
+        pair_ix = match.match_catalog_tri(input, output, maxKeep=10, auto_keep=3, auto_transform=transform, auto_limit=outlier_threshold, size_limit=[5, 800], ignore_rot=False, ignore_scale=True, ba_max=0.9)
         
         input_ix = pair_ix[:,0]
         output_ix = pair_ix[:,1]
@@ -579,19 +579,23 @@ def match_lists(input, output, transform=None, scl=3600., simple=True,
 def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3, 
                          clip=20, log=True, outlier_threshold=5, 
                          verbose=True, guess=[0., 0., 0., 1], simple=True, 
-                         rms_limit=2):
+                         rms_limit=2, use_guess=False):
     """TBD
-    """
-    if hasattr(radec, 'upper'):
-        rd_ref = np.loadtxt(radec)
-    else:
-        rd_ref = radec*1
-        
+    """        
     if not os.path.exists('{0}.cat.fits'.format(root)):
         #cat = make_drz_catalog(root=root)
         cat = make_SEP_catalog(root=root)
     else:
         cat = Table.read('{0}.cat.fits'.format(root))
+    
+    if hasattr(radec, 'upper'):
+        rd_ref = np.loadtxt(radec)
+    elif radec is False:
+        # Align to self, i.e., do nothing
+        so = np.argsort(cat['MAG_AUTO'])
+        rd_ref = np.array([cat['X_WORLD'], cat['Y_WORLD']]).T[so[:50],:]
+    else:
+        rd_ref = radec*1
     
     ### Clip obviously distant files to speed up match
     # rd_cat = np.array([cat['X_WORLD'], cat['Y_WORLD']])
@@ -620,10 +624,14 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
     drz_wcs = pywcs.WCS(drz_im[0].header, relax=True)
     orig_wcs = drz_wcs.copy()
     
+    if use_guess:
+        drz_wcs = utils.transform_wcs(drz_wcs, guess[:2], guess[2], guess[3])
+        return orig_wcs, drz_wcs,  guess[:2], guess[2]/np.pi*180, guess[3]
+        
     ##########
     # Only include reference objects in the DRZ footprint
     ref_x, ref_y = drz_wcs.all_world2pix(rd_ref[:,0], rd_ref[:,1], 0)
-    ref_cut = (ref_x > 0) & (ref_x < drz_wcs._naxis1) & (ref_y > 0) & (ref_y < drz_wcs._naxis2)
+    ref_cut = (ref_x > -100) & (ref_x < drz_wcs._naxis1+100) & (ref_y > -100) & (ref_y < drz_wcs._naxis2+100)
     if ref_cut.sum() == 0:
         print('{0}: no reference objects found in the DRZ footprint'.format(root))
         return False
@@ -632,7 +640,7 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
     
     ########
     # Match surface density of drizzled and reference catalogs
-    icut = np.minimum(len(cat)-2, int(1.5*ref_cut.sum()))
+    icut = np.minimum(len(cat)-2, int(2*ref_cut.sum()))
     cut = np.argsort(cat['MAG_AUTO'])[:icut]
     xy_drz = np.array([cat['X_IMAGE'][cut], cat['Y_IMAGE'][cut]]).T
     
@@ -730,7 +738,7 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
         # drz_wcs.wcs.cd = np.dot(drz_wcs.wcs.cd, _mat)/tf.scale
     
     # Bad fit
-    if (rms > rms_limit) | (NGOOD <= 3):
+    if (rms > rms_limit) | (NGOOD < 3):
         drz_wcs = orig_wcs
         out_shift = [0,0]
         out_rot = 0.
@@ -1645,6 +1653,10 @@ def get_sdss_catalog(ra=165.86, dec=34.829694, radius=3):
                               
     return table
 
+
+def get_twomass_catalog(ra=165.86, dec=34.829694, radius=3, catalog='allwise_p3as_psd'):
+    return get_irsa_catalog(ra=ra, dec=dec, radius=radius, catalog='fp_psc', wise=False, twomass=True)
+
 def get_irsa_catalog(ra=165.86, dec=34.829694, radius=3, catalog='allwise_p3as_psd', wise=False, twomass=False):
     """Query for objects in the `AllWISE <http://wise2.ipac.caltech.edu/docs/release/allwise/>`_ source catalog 
     
@@ -1663,6 +1675,7 @@ def get_irsa_catalog(ra=165.86, dec=34.829694, radius=3, catalog='allwise_p3as_p
         
     """
     from astroquery.irsa import Irsa
+    Irsa.ROW_LIMIT = 100000
     
     #all_wise = 'wise_allwise_p3as_psd'
     #all_wise = 'allwise_p3as_psd'
@@ -1996,6 +2009,7 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, ref
                        'GAIA':get_gaia_DR2_catalog,
                        'PS1':get_panstarrs_catalog,
                        'WISE':get_irsa_catalog,
+                       '2MASS':get_twomass_catalog,
                        'GAIA_Vizier':get_gaia_DR2_vizier}
       
     ### Try queries
@@ -2093,7 +2107,8 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, ref
     
 def process_direct_grism_visit(direct={}, grism={}, radec=None,
                                align_tolerance=5, align_clip=30,
-                               align_mag_limits = [14,23],
+                               align_mag_limits=[14,23],
+                               align_rms_limit=2,
                                column_average=True, 
                                sky_iter=10,
                                run_tweak_align=True,
@@ -2198,6 +2213,14 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
     if 'bits' in drizzle_params:
         bits = drizzle_params['bits']    
         drizzle_params.pop('bits')
+    
+    # Relax CR rejection for first-pass ACS
+    if isACS:
+        driz_cr_snr_first = '15. 10.0'
+        driz_cr_scale_first = '1.2 0.7'
+    else:
+        driz_cr_snr_first = driz_cr_snr
+        driz_cr_scale_first = driz_cr_scale
         
     if not skip_direct:
         if (not isACS) & (not isWFPC2) & run_tweak_align:
@@ -2209,8 +2232,8 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
         ### Get reference astrometry from SDSS or WISE
         if radec is None:
             im = pyfits.open(direct['files'][0])
-            radec, ref_catalog = get_radec_catalog(ra=im[0].header['RA_TARG'],
-                            dec=im[0].header['DEC_TARG'], 
+            radec, ref_catalog = get_radec_catalog(ra=im[1].header['CRVAL1'],
+                            dec=im[1].header['CRVAL2'], 
                             product=direct['product'],
                             reference_catalogs=reference_catalogs,
                             date=im[0].header['EXPSTART'],
@@ -2241,7 +2264,8 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                          clean=True, context=False, preserve=False,
                          skysub=True, driz_separate=True, driz_sep_wcs=True,
                          median=True, blot=True, driz_cr=True,
-                         driz_cr_snr=driz_cr_snr, driz_cr_scale=driz_cr_scale,
+                         driz_cr_snr=driz_cr_snr_first,
+                         driz_cr_scale=driz_cr_scale_first,
                          driz_cr_corr=False, driz_combine=True,
                          final_bits=bits, coeffs=True, build=False, 
                          final_wht_type='IVM', **drizzle_params)
@@ -2304,7 +2328,8 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                                       radec=radec, NITER=5, clip=align_clip,
                                       log=True, guess=guess,
                                       outlier_threshold=align_tolerance, 
-                                      simple=align_simple)
+                                      simple=align_simple,
+                                      rms_limit=align_rms_limit)
         except:
             fp = open('{0}.wcs_failed'.format(direct['product']),'w')
             fp.write(guess.__str__())
@@ -2315,7 +2340,8 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                                       radec=radec, NITER=0, clip=align_clip,
                                       log=False, guess=guess,
                                       outlier_threshold=align_tolerance,
-                                      simple=align_simple)
+                                      simple=align_simple,
+                                      rms_limit=align_rms_limit)
                                        
         orig_wcs, drz_wcs, out_shift, out_rot, out_scale = result
         
@@ -2381,8 +2407,9 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
         # 100 brightest or mag range
         clip = (cat['MAG_AUTO'] > align_mag_limits[0]) & (cat['MAG_AUTO'] < align_mag_limits[1])
         
-        if clip.sum() > 100:
-            clip = np.argsort(cat['MAG_AUTO'])[:100]
+        NMAX = 100
+        if clip.sum() > NMAX:
+            clip = np.argsort(cat['MAG_AUTO'])[:NMAX]
             
         table_to_radec(cat[clip], '{0}.cat.radec'.format(direct['product']))
         
