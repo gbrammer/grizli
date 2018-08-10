@@ -23,7 +23,7 @@ A) {input}           # Input data image (FITS file)
 B) {output}       # Output data image block
 C) {sigma}                # Sigma image name (made from data if blank or "none") 
 D) {psf}   #        # Input PSF image and (optional) diffusion kernel
-E) 1                   # PSF fine sampling factor relative to data 
+E) {psf_sample}                   # PSF fine sampling factor relative to data 
 F) {mask}                # Bad pixel mask (FITS image or ASCII coord list)
 G) none                # File with parameter constraints (ASCII file) 
 H) 1    {xmax}   1    {ymax}   # Image region to fit (xmin xmax ymin ymax)
@@ -439,7 +439,55 @@ class Galfitter(object):
                 flt_files.append(file)
         
         return flt_files
+    
+    @staticmethod
+    def fit_arrays(sci, wht, seg, psf, id=None, platescale=0.06, exptime=0, path='/tmp/', galfit_exec='galfit', gaussian_guess=False, components=[GalfitSersic()] ,recenter=True, psf_sample=1):
         
+        rms = 1/np.sqrt(wht)#*exptime
+        if exptime > 0:
+            rms = np.sqrt((rms*exptime)**2+sci*exptime*(sci > 0))/exptime
+        
+        rms[wht == 0] = 1e30
+        
+        if id is not None:
+            mask = ((seg > 0) & (seg != id)) | (wht == 0)
+        else:
+            mask = wht == 0
+        
+        sh = sci.shape[0]
+        
+        fp = open(path+'galfit.feedme','w')
+        
+        fp.write(GALFIT_IMAGES.format(input=path+'gf_sci.fits', output=path+'gf_out.fits', sigma=path+'gf_rms.fits', psf=path+'gf_psf.fits', mask=path+'gf_mask.fits', xmax=sh, ymax=sh, sh=sh, ps=platescale, psf_sample=psf_sample))
+        
+        if gaussian_guess:
+            fit, q, theta = fit_gauss(sci)
+        
+        from astropy.coordinates import Angle
+        import astropy.units as u
+            
+        for comp in components:
+            if recenter:
+                comp.set(pos=[sh/2., sh/2.])
+            
+            if gaussian_guess:
+                comp.set(q=q, pa=Angle.wrap_at(theta*u.rad, 360*u.deg).to(u.deg).value)
+                
+            fp.write(str(comp))
+            
+        fp.close()
+        
+        pyfits.writeto(path+'gf_sci.fits', data=sci, overwrite=True)
+        pyfits.writeto(path+'gf_rms.fits', data=rms, overwrite=True)
+        pyfits.writeto(path+'gf_mask.fits', data=mask*1, overwrite=True)        
+        pyfits.writeto(path+'gf_psf.fits', data=psf, overwrite=True)
+        
+        for ext in ['out', 'model']:
+            if os.path.exists(path+'gf_{0}.fits'.format(ext)):
+                os.remove(path+'gf_{0}.fits'.format(ext))
+            
+        os.system('{0} {1}/galfit.feedme'.format(galfit_exec, path))
+            
     def fit_object(self, id=449, radec=(None, None), size=40, components=[GalfitSersic()], recenter=True, get_mosaic=True, gaussian_guess=False, get_extended=True):
         """
         Fit an object
@@ -478,7 +526,7 @@ class Galfitter(object):
         
         fp = open(path+'galfit.feedme','w')
         
-        fp.write(GALFIT_IMAGES.format(input=path+'gf_sci.fits', output=path+'gf_out.fits', sigma=path+'gf_rms.fits', psf=psf_file, mask=path+'gf_mask.fits', xmax=sh, ymax=sh, sh=sh, ps=self.DPSF.driz_pscale))
+        fp.write(GALFIT_IMAGES.format(input=path+'gf_sci.fits', output=path+'gf_out.fits', sigma=path+'gf_rms.fits', psf=psf_file, mask=path+'gf_mask.fits', xmax=sh, ymax=sh, sh=sh, ps=self.DPSF.driz_pscale, psf_sample=1))
         
         if gaussian_guess:
             fit, q, theta = fit_gauss(sci)
