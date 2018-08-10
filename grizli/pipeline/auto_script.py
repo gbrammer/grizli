@@ -129,7 +129,7 @@ def get_extra_data(root='j114936+222414', HOME_PATH='/Volumes/Pegasus/Grizli/Aut
 
     os.chdir(CWD)
     
-def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', inspect_ramps=False, manual_alignment=False, is_parallel_field=False, reprocess_parallel=False, only_preprocess=False, run_extractions=True, run_fit=True, s3_sync=False, fine_radec=None, combine_all_filters=True, gaia_by_date=False, align_simple=False, align_clip=-1, master_radec=None):
+def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', inspect_ramps=False, manual_alignment=False, is_parallel_field=False, reprocess_parallel=False, only_preprocess=False, run_extractions=True, run_fit=True, s3_sync=False, fine_radec=None, combine_all_filters=True, gaia_by_date=False, align_simple=False, align_clip=-1, master_radec=None, is_dash=False, run_parse_visits=True):
     """
     Run the full pipeline for a given target
         
@@ -183,8 +183,11 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
     ######################
     ### Parse visit associations
     os.chdir(os.path.join(HOME_PATH, root, 'Prep'))
-    visits, all_groups, info = auto_script.parse_visits(field_root=root, HOME_PATH=HOME_PATH, use_visit=True, combine_same_pa=is_parallel_field)
-    
+    if (not os.path.exists('{0}_visits.npy'.format(root))) | run_parse_visits:
+        visits, all_groups, info = auto_script.parse_visits(field_root=root, HOME_PATH=HOME_PATH, use_visit=True, combine_same_pa=is_parallel_field, is_dash=is_dash)
+    else:
+        visits, all_groups, info = np.load('{0}_visits.npy'.format(root))
+        
     # Alignment catalogs
     catalogs = ['PS1','SDSS','GAIA','WISE']
     
@@ -505,6 +508,7 @@ def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=
 
     import numpy as np
     import astropy.io.fits as pyfits
+    import astropy.wcs as pywcs
     
     from shapely.geometry import Polygon
     from scipy.spatial import ConvexHull
@@ -535,6 +539,8 @@ def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=
             root=os.path.basename(file).split("_ima")[0][:-1]
             im = pyfits.open(file)
             filt = utils.get_hst_filter(im[0].header).lower()
+            wcs = pywcs.WCS(im['SCI'].header)
+            fp = Polygon(wcs.calc_footprint())
             
             # q_flt.fits is the pipeline product.  will always be 
             # fewer DASH-split files
@@ -544,7 +550,8 @@ def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=
 
             files = [os.path.basename(file) for file in files]
             direct = {'product': '{0}-{1}'.format(root, filt), 
-                      'files':files}
+                      'files':files, 'footprint':fp}
+                      
             visits.append(direct)
         
         all_groups = utils.parse_grism_associations(visits)
@@ -607,7 +614,8 @@ def manual_alignment(field_root='j151850-813028', HOME_PATH='/Volumes/Pegasus/Gr
                 continue
                 
             use_visits.append(visit)
-            
+    
+    print(len(use_visits), len(visits))        
     if len(use_visits) == 0:
         return True
     
@@ -616,20 +624,22 @@ def manual_alignment(field_root='j151850-813028', HOME_PATH='/Volumes/Pegasus/Gr
                     dec=np.median(tab['dec']), 
                     product=field_root,
                     reference_catalogs=catalogs, radius=radius)
-    
+    else:
+        ref_catalog = catalogs[0]
+        
+    reference = '{0}/{1}_{2}.reg'.format(os.getcwd(), field_root, ref_catalog.lower())
+
+        
     ds9 = ds9.DS9()
     ds9.set('mode pan')
     ds9.set('scale zscale')
     ds9.set('scale log')
     
-    for visit in visits:
-        if visit_list is not None:
-            if visit['product'] not in visit_list:
-                continue
+    for visit in use_visits:
                 
         filt = visit['product'].split('-')[-1]
         if (not filt.startswith('g')):
-            prep.manual_alignment(visit, reference='{0}/{1}_{2}.reg'.format(os.getcwd(), field_root, ref_catalog.lower()), ds9=ds9)
+            prep.manual_alignment(visit, reference=reference, ds9=ds9)
         
     ds9.set('quit')
 
