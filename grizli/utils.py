@@ -3386,6 +3386,80 @@ class GTable(astropy.table.Table):
                      
         idx, d2d, d3d = other_coo.match_to_catalog_sky(self_coo)
         return idx, d2d.to(u.arcsec)
+
+    def match_triangles(self, other, self_wcs=None, x_column='X_IMAGE', y_column='Y_IMAGE', mag_column='MAG_AUTO', other_ra='X_WORLD', other_dec='Y_WORLD', pixel_index=1, match_kwargs={}, pad=100, show_diagnostic=False, auto_keep=3, maxKeep=10, auto_limit=3, ba_max=0.99, scale_density=10):
+        
+        """
+        
+        x_column = 'X_IMAGE'
+        y_column = 'Y_IMAGE'
+        mag_column = 'MAG_AUTO'
+        pixel_index=1
+        pad=100
+        
+        auto_keep=3
+        maxKeep=10
+        auto_limit=3
+        ba_max = 0.99
+        
+        """
+        from tristars import match
+        
+        if hasattr(other, 'shape'):
+            other_radec = other*1.
+        else:
+            other_radec = np.array([other[other_ra], other[other_dec]]).T
+        
+        self_xy = np.array([self[x_column], self[y_column]]).T
+        
+        #xy_drz = np.array([cat['X_IMAGE'][ok], cat['Y_IMAGE'][ok]]).T
+
+        if self_wcs is None:
+            other_xy = other_radec
+            cut = (other_xy[:,0] > -pad) & (other_xy[:,0] < self_xy[:,0].max()+pad) & (other_xy[:,1] > -pad) & (other_xy[:,0] < self_xy[:,1].max()+pad)  
+            other_xy = other_xy[cut,:]     
+            
+            xy_center = np.zeros(2)
+                 
+        else:
+            other_xy = self_wcs.all_world2pix(other_radec, pixel_index)
+            cut = (other_xy[:,0] > -pad) & (other_xy[:,0] < self_wcs._naxis1+pad) & (other_xy[:,1] > -pad) & (other_xy[:,1] < self_wcs._naxis2+pad)
+            other_xy = other_xy[cut,:]          
+            xy_center = self_wcs.wcs.crpix*1
+        
+        if len(other_xy) < 3:
+            print('Not enough sources in match catalog')
+            return False
+            
+        self_xy -= xy_center
+        other_xy -= xy_center
+        
+        ########
+        # Match surface density of drizzled and reference catalogs
+        if mag_column is not None:
+            icut = np.minimum(len(self)-2, int(scale_density*other_xy.shape[0]))
+            self_ix = np.argsort(self[mag_column])[:icut]
+        else:
+            self_ix = np.arange(self_xy.shape[0])
+
+        self_xy = self_xy[self_ix,:]
+        
+        pair_ix = match.match_catalog_tri(self_xy, other_xy, maxKeep=maxKeep, auto_keep=auto_keep, auto_transform=None, auto_limit=auto_limit, size_limit=[5, 1000], ignore_rot=False, ignore_scale=True, ba_max=ba_max)
+        
+        if len(pair_ix) == 0:
+            print('No matches')
+            return False
+            
+        tf, dx, rms = match.get_transform(self_xy, other_xy, pair_ix, transform=None, use_ransac=True)
+        
+        match_ix = pair_ix*1
+        match_ix[:,0] = self_ix[pair_ix[:,0]]
+        
+        if show_diagnostic:
+            fig = match.match_diagnostic_plot(self_xy, other_xy, pair_ix, tf=None, new_figure=True)
+            return match_ix, tf, dx, rms, fig
+        else:
+            return match_ix, tf, dx, rms
             
     def write_sortable_html(self, output, replace_braces=True, localhost=True, max_lines=50, table_id=None, table_class="display compact", css=None, filter_columns=[], buttons=['csv'], toggle=True, use_json=False):
         """Wrapper around `~astropy.table.Table.write(format='jsviewer')`.
