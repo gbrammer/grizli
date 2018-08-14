@@ -18,7 +18,6 @@ import astropy.wcs as pywcs
 import astropy.units as u
 
 ## local imports
-from . import grismconf
 from . import utils
 from . import model
 #from . import stack
@@ -2990,7 +2989,7 @@ class MultiBeam(GroupFitter):
         else:
             s0 = [beam.beam.yoffset for beam in self.beams] 
             
-        args = (self, indices, 0, False, False)
+        args = (self, indices, 0, False, False, True)
         self.eval_trace_shift(s0, *args)
         
         ### Reset model profile for optimal extractions
@@ -2999,7 +2998,7 @@ class MultiBeam(GroupFitter):
         
         self._parse_beam_arrays()
                 
-    def fit_trace_shift(self, split_groups=True, max_shift=5, tol=1.e-2, verbose=True, lm=False):
+    def fit_trace_shift(self, split_groups=True, max_shift=5, tol=1.e-2, verbose=True, lm=False, fit_with_psf=False):
         """TBD
         """
         from scipy.optimize import leastsq, minimize
@@ -3015,7 +3014,7 @@ class MultiBeam(GroupFitter):
         s0 = np.zeros(len(indices))
         bounds = np.array([[-max_shift,max_shift]]*len(indices))
         
-        args = (self, indices, 0, lm, verbose)
+        args = (self, indices, 0, lm, verbose, fit_with_psf)
         if lm:
             out = leastsq(self.eval_trace_shift, s0, args=args, Dfun=None, full_output=0, col_deriv=0, ftol=1.49012e-08, xtol=1.49012e-08, gtol=0.0, maxfev=0, epsfcn=None, factor=100, diag=None)
             shifts = out[0]
@@ -3026,31 +3025,56 @@ class MultiBeam(GroupFitter):
             else:
                 shifts = out.x
         
+        # Apply to PSF if necessary
+        args = (self, indices, 0, lm, verbose, True)
         self.eval_trace_shift(shifts, *args)
         
         ### Reset model profile for optimal extractions
         for b in self.beams:
             b._parse_from_data()
-        
+            
+            # Needed for background modeling
+            if hasattr(b, 'xp'):
+                delattr(b, 'xp')
+                
         self._parse_beam_arrays()
+        self.initialize_masked_arrays()
            
         return shifts, out
         
     @staticmethod
-    def eval_trace_shift(shifts, self, indices, poly_order, lm, verbose):
+    def eval_trace_shift(shifts, self, indices, poly_order, lm, verbose, fit_with_psf):
         """TBD
         """
         import scipy.ndimage as nd
 
         for il, l in enumerate(indices):
             for i in l:
-                if hasattr(self.beams[i].beam, 'psf'):
-                    beam = self.beams[i].beam
-                    beam.model = nd.shift(beam.modelf.reshape(beam.sh_beam), (shifts[il], 0))
-                else:
-                    self.beams[i].beam.add_ytrace_offset(shifts[il])
-                    self.beams[i].compute_model(is_cgs=True)
+                beam = self.beams[i]
+                beam.beam.add_ytrace_offset(shifts[il])
 
+                if hasattr(self.beams[i].beam, 'psf') & fit_with_psf:
+                    #beam.model = nd.shift(beam.modelf.reshape(beam.sh_beam), (shifts[il], 0))
+                    # This is slow, so run with fit_with_psf=False if possible
+                    beam.init_epsf(yoff=0, #shifts[il],
+                                   psf_params=beam.beam.psf_params)
+
+                    beam.compute_model(use_psf=True)
+                    m = beam.compute_model(in_place=False)
+                    #beam.modelf = beam.model.flatten()
+                    #beam.model = beam.modelf.reshape(beam.beam.sh_beam)
+
+                    beam.flat_flam = beam.compute_model(in_place=False, is_cgs=True) 
+                                                         
+                else:
+                    #self.beams[i].beam.add_ytrace_offset(shifts[il])
+                    #self.beams[i].compute_model(is_cgs=True)
+                    beam.compute_model(use_psf=False)
+                    
+                if __name__ == '__main__':
+                    print(self.beams[i].beam.yoffset, shifts[il])
+                    ds9.view(self.beams[i].model)
+                    
         self.flat_flam = np.hstack([b.beam.model.flatten() for b in self.beams])
         self.poly_order=-1
         self.init_poly_coeffs(poly_order=poly_order)
