@@ -211,7 +211,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     # Line EWs & fluxes
     coeffs_clip = tfit['coeffs'][mb.N:]
     covar_clip = tfit['covar'][mb.N:,mb.N:]
-    lineEW = utils.compute_equivalent_widths(t1, coeffs_clip, covar_clip, max_R=5000, Ndraw=1000)
+    lineEW = utils.compute_equivalent_widths(t1, coeffs_clip, covar_clip, max_R=5000, Ndraw=1000, z=tfit['z'])
     
     for ik, key in enumerate(lineEW):
         for j in range(3):
@@ -225,7 +225,18 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
         cov_hdu.header['EW50_{0:03d}'.format(ik)] = lineEW[key][1], 'Rest-frame {0} EW, 50th percentile; Angstrom'.format(key.strip('line '))
         cov_hdu.header['EW84_{0:03d}'.format(ik)] = lineEW[key][2], 'Rest-frame {0} EW, 84th percentile; Angstrom'.format(key.strip('line '))
         cov_hdu.header['EWHW_{0:03d}'.format(ik)] = (lineEW[key][2]-lineEW[key][0])/2, 'Rest-frame {0} EW, 1-sigma half-width; Angstrom'.format(key.strip('line '))
+    
+    # Velocity width
+    vel_width_res = mb.fit_line_width(z0=tfit['z'], bl=1.2, nl=1.2)
+    if verbose:
+        print('Velocity width: BL/NL = {0:.0f}/{1:.0f}, z={2:.4f}'.format(vel_width_res[0]*1000, vel_width_res[1]*1000, vel_width_res[2]))
         
+    fit_hdu.header['VEL_BL'] = vel_width_res[0]*1000, 'Broad line FWHM'
+    fit_hdu.header['VEL_NL'] = vel_width_res[1]*1000, 'Narrow line FWHM'
+    fit_hdu.header['VEL_Z'] = vel_width_res[2], 'Line width, best redshift'
+    fit_hdu.header['VEL_NFEV'] = vel_width_res[3], 'Line width, NFEV'
+    fit_hdu.header['VEL_FLAG'] = vel_width_res[4], 'Line width, NFEV'
+    
     # Best-fit template itself
     tfit_sp = grizli.utils.GTable()
     for ik, key in enumerate(tfit['cfit']):
@@ -489,9 +500,9 @@ def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat',
     keys = OrderedDict()
     keys['PRIMARY'] = ['ID','RA','DEC','NINPUT','REDSHIFT','T_G102', 'T_G141', 'T_G800L', 'NUMLINES','HASLINES']
     
-    keys['ZFIT_STACK'] = ['CHI2POLY','DOF','CHIMIN','CHIMAX','BIC_POLY','BIC_TEMP','Z02', 'Z16', 'Z50', 'Z84', 'Z97', 'ZWIDTH1', 'ZWIDTH2', 'Z_MAP', 'Z_RISK', 'MIN_RISK']
+    keys['ZFIT_STACK'] = ['CHI2POLY','CHI2SPL','SPLF01','SPLE01','SPLF02','SPLE02','SPLF03','SPLE03','SPLF04','SPLE04', 'DOF','CHIMIN','CHIMAX','BIC_POLY','BIC_SPL','BIC_TEMP','Z02', 'Z16', 'Z50', 'Z84', 'Z97', 'ZWIDTH1', 'ZWIDTH2', 'Z_MAP', 'Z_RISK', 'MIN_RISK', 'VEL_BL','VEL_NL','VEL_Z','VEL_NFEV','VEL_FLAG']
     
-    keys['ZFIT_BEAM'] = ['CHI2POLY','DOF','CHIMIN','CHIMAX','BIC_POLY','BIC_TEMP','Z02', 'Z16', 'Z50', 'Z84', 'Z97', 'ZWIDTH1', 'ZWIDTH2', 'Z_MAP', 'Z_RISK', 'MIN_RISK']
+    keys['ZFIT_BEAM'] = ['CHI2POLY','CHI2SPL','SPLF01','SPLE01','SPLF02','SPLE02','SPLF03','SPLE03','SPLF04','SPLE04', 'DOF','CHIMIN','CHIMAX','BIC_POLY','BIC_SPL','BIC_TEMP','Z02', 'Z16', 'Z50', 'Z84', 'Z97', 'ZWIDTH1', 'ZWIDTH2', 'Z_MAP', 'Z_RISK', 'MIN_RISK', 'VEL_BL','VEL_NL','VEL_Z','VEL_NFEV','VEL_FLAG']
     
     keys['COVAR'] = ' '.join(['FLUX_{0:03d} ERR_{0:03d} EW50_{0:03d} EWHW_{0:03d}'.format(i) for i in range(24)]).split()
     
@@ -590,7 +601,12 @@ def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat',
     im = pyfits.open(files[0])
     h = im['COVAR'].header
     for i in range(24):
-        line = h.comments['FLUX_{0:03d}'.format(i)].split()[0]
+        key = 'FLUX_{0:03d}'.format(i)
+        if key not in h:
+            continue
+        
+        line = h.comments[key].split()[0]
+        
         for root in ['flux','err','ew50','ewhw']:
             col = '{0}_{1}'.format(root, line)
             info.rename_column('{0}_{1:03d}'.format(root, i), col)
@@ -1091,7 +1107,7 @@ class GroupFitter(object):
             
         return A_phot[:,mask]
         
-    def xfit_at_z(self, z=0, templates=[], fitter='nnls', fit_background=True, get_uncertainties=False, get_design_matrix=False, pscale=None, COEFF_SCALE=1.e-19, get_components=False, huber_delta=4):
+    def xfit_at_z(self, z=0, templates=[], fitter='nnls', fit_background=True, get_uncertainties=False, get_design_matrix=False, pscale=None, COEFF_SCALE=1.e-19, get_components=False, huber_delta=4, get_residuals=False):
         """Fit the 2D spectra with a set of templates at a specified redshift.
         
         Parameters
@@ -1164,7 +1180,11 @@ class GroupFitter(object):
             else:
                 igmz = 1.
             
-            s = [ti.wave*(1+z), ti.flux/(1+z)*igmz]
+            # Don't redshift spline templates
+            if ti.name.startswith('bspl'):
+                s = [ti.wave, ti.flux*igmz]            
+            else:
+                s = [ti.wave*(1+z), ti.flux/(1+z)*igmz]
             
             for j, beam in enumerate(self.beams):
                 mask_i = beam.fit_mask.reshape(beam.sh)
@@ -1266,10 +1286,15 @@ class GroupFitter(object):
         
         # Use Huber loss function rather than direct chi2
         if huber_delta > 0:
-            chi2 = np.sum(huber(huber_delta, norm_resid)*2.)
+            chi2 = huber(huber_delta, norm_resid)*2.
         else:
-            chi2 = np.sum(norm_resid**2)
+            chi2 = norm_resid**2
         
+        if get_residuals:
+            chi2 = norm_resid
+        else:
+            chi2 = np.sum(chi2)
+            
         if self.Nphot > 0:
             self.photom_model = model[-self.Nphot:]*1
             
@@ -1315,8 +1340,10 @@ class GroupFitter(object):
         #if fit_background:
         coeffs[self.N:] *= COEFF_SCALE
         coeffs_err[self.N:] *= COEFF_SCALE
-        covar[self.N:,self.N:] *= COEFF_SCALE**2
-            
+        #covar[self.N:,self.N:] *= COEFF_SCALE**2
+        covar[self.N:,:] *= COEFF_SCALE
+        covar[:,self.N:] *= COEFF_SCALE
+           
         return chi2, coeffs, coeffs_err, covar
     
     def xfit_redshift(self, prior=None, fwhm=1200,
@@ -1350,6 +1377,18 @@ class GroupFitter(object):
                             fit_background=True, get_uncertainties=False)
         
         chi2_poly, coeffs_poly, err_poly, cov = out
+        
+        #### Spline SED fit
+        wspline = np.arange(4200, 2.5e4)
+        Rspline = 30
+        df_spl = len(utils.log_zgrid(zr=[wspline[0], wspline[-1]], dz=1./Rspline))
+        tspline = utils.bspline_templates(wspline, df=df_spl+2, log=True, clip=0.001)
+        
+        out = self.xfit_at_z(z=0., templates=tspline, fitter='lstsq',
+                            fit_background=True, get_uncertainties=True)
+        
+        chi2_spline, coeffs_spline, err_spline, cov = out
+                
         #poly1d, xxx = utils.dot_templates(coeffs_poly[self.N:], tpoly, z=0)
 
         # tpoly = utils.polynomial_templates(wpoly, order=3)
@@ -1401,12 +1440,15 @@ class GroupFitter(object):
         import peakutils
         
         # Make "negative" chi2 for peak-finding
-        if chi2_poly > (chi2.min()+100):
+        chi2_test = chi2_poly
+        chi2_test = chi2_spline
+        
+        if chi2_test > (chi2.min()+100):
             chi2_rev = (chi2.min() + 100 - chi2)/self.DoF
-        elif chi2_poly < (chi2.min() + 9):
+        elif chi2_test < (chi2.min() + 9):
             chi2_rev = (chi2.min() + 16 - chi2)/self.DoF
         else:
-            chi2_rev = (chi2_poly - chi2)/self.DoF
+            chi2_rev = (chi2_test - chi2)/self.DoF
             
         chi2_rev[chi2_rev < 0] = 0
         indexes = peakutils.indexes(chi2_rev, thres=0.4, min_dist=8)
@@ -1469,21 +1511,46 @@ class GroupFitter(object):
         fit.meta['N'] = (self.N, 'Number of spectrum extensions')
         fit.meta['polyord'] = (poly_order, 'Order polynomial fit')
         fit.meta['chi2poly'] = (chi2_poly, 'Chi^2 of polynomial fit')
+        
+        kspl = (coeffs_spline != 0).sum()
+        fit.meta['chi2spl'] = (chi2_spline, 'Chi^2 of spline fit')
+        fit.meta['kspl'] = (kspl, 'Parameters, k, of spline fit')
+        
+        # Evaluate spline at wavelengths for stars
+        xspline = np.array([8500, 9000, 1.27e4, 1.4e4])
+        flux_spline = utils.eval_bspline_templates(xspline, tspline, coeffs_spline[self.N:])
+        fluxerr_spline = utils.eval_bspline_templates(xspline, tspline, err_spline[self.N:])
+        
+        for i in range(len(xspline)):
+            fit.meta['splf{0:02d}'.format(i+1)] = flux_spline[i], 'Spline flux at {0:.2f} um'.format(xspline[i]/1.e4)
+            fit.meta['sple{0:02d}'.format(i+1)] = fluxerr_spline[i], 'Spline flux err at {0:.2f} um'.format(xspline[i]/1.e4)
+            
+        izbest = np.argmin(chi2)
+        clip = coeffs[izbest,:] != 0
+        ktempl = clip.sum()
+                
+        fit.meta['NTEMP'] = (len(templates), 'Number of fitting templates')
+        
         fit.meta['DoF'] = (self.DoF, 'Degrees of freedom (number of pixels)')
-        fit.meta['chimin'] = (chi2.min(), 'Minimum chi2')
-        fit.meta['chimax'] = (chi2.max(), 'Maximum chi2')
+        
+        fit.meta['ktempl'] = (ktempl, 'Parameters, k, of template fit')
+        fit.meta['chimin'] = (chi2.min(), 'Minimum chi2 of template fit')
+        fit.meta['chimax'] = (chi2.max(), 'Maximum chi2 of template fit')
         fit.meta['fitter'] = (fitter, 'Minimization algorithm')
         
         # Bayesian information criteria, normalized to template min_chi2
         # BIC = log(number of data points)*(number of params) + min(chi2) + C
         # https://en.wikipedia.org/wiki/Bayesian_information_criterion
-        fit.meta['bic_poly'] = np.log(self.DoF)*(poly_order+1+self.N) + (chi2_poly-chi2.min()), 'BIC of polynomial fit'
         
-        izbest = np.argmin(chi2)
-        clip = coeffs[izbest,:] != 0
-        fit.meta['bic_temp'] = np.log(self.DoF)*clip.sum(), 'BIC of template fit'
+        scale_chinu = self.DoF/chi2.min()
+        scale_chinu = 1 # Don't rescale
         
-        fit.meta['NTEMP'] = (len(templates), 'Number of fitting templates')
+        fit.meta['bic_poly'] = np.log(self.DoF)*(poly_order+1+self.N) + (chi2_poly-chi2.min())*scale_chinu, 'BIC of polynomial fit'
+
+        fit.meta['bic_spl'] = np.log(self.DoF)*kspl + (chi2_spline-chi2.min())*scale_chinu, 'BIC of spline fit'
+        
+        fit.meta['bic_temp'] = np.log(self.DoF)*ktempl, 'BIC of template fit'
+        
         
         for i, tname in enumerate(templates):
             fit.meta['T{0:03d}NAME'.format(i+1)] = (templates[tname].name, 'Template name')
@@ -1585,7 +1652,7 @@ class GroupFitter(object):
         fit.meta['gam_loss'] = gamma, 'Gamma factor of the risk/loss function'
         return fit
                         
-    def template_at_z(self, z=0, templates=None, fit_background=True, fitter='nnls', fwhm=1400, get_uncertainties=2):
+    def template_at_z(self, z=0, templates=None, fit_background=True, fitter='nnls', fwhm=1400, get_uncertainties=2, get_residuals=False):
         """TBD
         """
         if templates is None:
@@ -1593,7 +1660,8 @@ class GroupFitter(object):
         
         out = self.xfit_at_z(z=z, templates=templates, fitter=fitter, 
                              fit_background=fit_background,
-                             get_uncertainties=get_uncertainties)
+                             get_uncertainties=get_uncertainties,
+                             get_residuals=get_residuals)
 
         chi2, coeffs, coeffs_err, covar = out
         cont1d, line1d = utils.dot_templates(coeffs[self.N:], templates, z=z,
@@ -1634,7 +1702,15 @@ class GroupFitter(object):
         w = w[so]
         
         xclip = (w*(1+z) > 7000) & (w*(1+z) < 1.8e4)
-        temp = np.array([grizli.utils_c.interp.interp_conserve_c(w[xclip], templates[key].wave, templates[key].flux) for key in templates])
+        temp = []
+        for key in templates:
+            if key.startswith('bspl'):
+                temp.append(grizli.utils_c.interp.interp_conserve_c(w[xclip]/(1+z), templates[key].wave, templates[key].flux))
+            else:
+                temp.append(grizli.utils_c.interp.interp_conserve_c(w[xclip], templates[key].wave, templates[key].flux))
+                
+        temp = np.vstack(temp)
+        #array([) for key in templates])
         
         clip = coeffs_err[self.N:] > 0
         covar_clip = covar[self.N:,self.N:][clip,:][:,clip]
@@ -2521,7 +2597,42 @@ class GroupFitter(object):
             bg_full.append(bg_i)
 
         return np.hstack(bg_full)
-        
+    
+    @staticmethod
+    def _objective_line_width(params, self, verbose):
+        """
+        Objective function for emission line velocity widths
+        """
+        bl, nl, z = params
+
+        t0, t1 = utils.load_quasar_templates(uv_line_complex=False, broad_fwhm=bl*1000, narrow_fwhm=nl*1000, t1_only=True)
+        tfit = self.template_at_z(z=z, templates=t1, fitter='nnls', fit_background=True, get_residuals=True)
+
+        if verbose:
+            print(params, tfit['chi2'].sum())
+
+        return tfit['chi2']
+    
+    def fit_line_width(self, bl=2.5, nl=1.1, z0=1.9367, max_nfev=100, tol=1.e-3, verbose=False):
+        """
+        Fit for emisson line width
+
+        Returns:
+
+            width/(1000 km/s), z, nfev, (nfev==max_nfev)
+
+        """
+        from scipy.optimize import least_squares
+
+        init = [bl, nl, z0]
+        args = (self, verbose)
+
+        out = least_squares(self._objective_line_width, init, jac='2-point', method='lm', ftol=tol, xtol=tol, gtol=tol, x_scale=1.0, loss='linear', f_scale=1.0, diff_step=None, tr_solver=None, tr_options={}, jac_sparsity=None, max_nfev=max_nfev, verbose=0, args=args, kwargs={})
+
+        params = out.x
+        res = [out.x[0], out.x[1], out.x[2], out.nfev, out.nfev == max_nfev]
+        return res
+    
 def show_drizzled_lines(line_hdu, full_line_list=['OII', 'Hb', 'OIII', 'Ha', 'SII', 'SIII'], size_arcsec=2, cmap='cubehelix_r', scale=1., dscale=1):
     """TBD
     """

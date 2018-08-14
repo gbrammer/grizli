@@ -925,6 +925,9 @@ def get_line_wavelengths():
     # Groves et al. 2011, Table 1
     line_wavelengths['Balmer 10kK'] = [6564.61, 4862.68, 4341.68, 4101.73]
     line_ratios['Balmer 10kK'] = [2.86, 1.0, 0.468, 0.259]
+
+    line_wavelengths['Balmer 10kK + MgII'] = [6564.61, 4862.68, 4341.68, 4101.73, 2799.117]
+    line_ratios['Balmer 10kK + MgII'] = [2.86, 1.0, 0.468, 0.259, 1.]
     
     # Reddened with Kriek & Conroy dust, tau_V=0.5
     line_wavelengths['Balmer 10kK t0.5'] = [6564.61, 4862.68, 4341.68, 4101.73]
@@ -1012,6 +1015,9 @@ def get_line_wavelengths():
 
     line_wavelengths['QSO-UV-lines'] = [line_wavelengths[k][0] for k in ['Lya','CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'SiIV+OIV-1398', 'NV-1240']]
     line_ratios['QSO-UV-lines'] = [1., 0.5, 0.1, 0.008, 0.09, 0.1, 0.3]
+
+    line_wavelengths['QSO-Narrow-lines'] = [line_wavelengths[k][0] for k in ['OII', 'OIII', 'SII', 'OI-6302', 'NeIII-3867', 'NeVI-3426', 'NeV-3346']]
+    line_ratios['QSO-Narrow-lines'] = [0.2, 1, 0.15, 0.01, 0.15, 0.1, 0.08]
     
     line_wavelengths['Lya+CIV'] = [1215.4, 1549.49]
     line_ratios['Lya+CIV'] = [1., 0.1]
@@ -1566,7 +1572,7 @@ def load_templates(fwhm=400, line_complexes=True, stars=False,
                                  
     return temp_list    
 
-def load_quasar_templates(broad_fwhm=2500, narrow_fwhm=1200, broad_lines=    ['OI-6302', 'HeI-5877', 'MgII', 'NeIII-3867', 'Lya', 'CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'SiIV+OIV-1398', 'NIV-1487', 'NV-1240'], narrow_lines=['OII', 'OIII', 'SII'], include_feii=True, slopes=[-2.8, 0, 2.8], uv_line_complex=True):
+def load_quasar_templates(broad_fwhm=2500, narrow_fwhm=1200, broad_lines=    ['HeI-5877', 'MgII', 'Lya', 'CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'SiIV+OIV-1398', 'NIV-1487', 'NV-1240'], narrow_lines=['OII', 'OIII', 'SII', 'OI-6302', 'NeIII-3867', 'NeVI-3426', 'NeV-3346'], include_feii=True, slopes=[-2.8, 0, 2.8], uv_line_complex=True, fixed_narrow_lines=False, t1_only=False):
     """
     Make templates suitable for fitting broad-line quasars
     """
@@ -1577,23 +1583,39 @@ def load_quasar_templates(broad_fwhm=2500, narrow_fwhm=1200, broad_lines=    ['O
     t0 = OrderedDict()
     t1 = OrderedDict()
     
-    if uv_line_complex:
-        broad0 = load_templates(fwhm=broad_fwhm, line_complexes=False, stars=False, full_line_list=['Balmer 10kK', 'QSO-UV-lines'], continuum_list=[], fsps_templates=False, alf_template=False, lorentz=True)
-    else:
-        broad0 = load_templates(fwhm=broad_fwhm, line_complexes=False, stars=False, full_line_list=['Balmer 10kK'] + broad_lines, continuum_list=[], fsps_templates=False, alf_template=False, lorentz=True)
-
     broad1 = load_templates(fwhm=broad_fwhm, line_complexes=False, stars=False, full_line_list=['Ha', 'Hb', 'Hg', 'Hd'] + broad_lines, continuum_list=[], fsps_templates=False, alf_template=False, lorentz=True)
 
-    narrow = load_templates(fwhm=narrow_fwhm, line_complexes=False, stars=False, full_line_list=narrow_lines, continuum_list=[], fsps_templates=False, alf_template=False)
+    narrow1 = load_templates(fwhm=narrow_fwhm, line_complexes=False, stars=False, full_line_list=narrow_lines, continuum_list=[], fsps_templates=False, alf_template=False)
     
-    for k in broad0:
-        t0[k] = broad0[k]
+    if fixed_narrow_lines:
+        if t1_only:
+            narrow0 = narrow1
+        else:
+            narrow0 = load_templates(fwhm=narrow_fwhm, line_complexes=False, stars=False, full_line_list=['QSO-Narrow-lines'], continuum_list=[], fsps_templates=False, alf_template=False)
+        
+    else:
+        narrow0 = narrow1
+        
+    if t1_only:
+        broad0 = broad1
+    else:
+        if uv_line_complex:
+            broad0 = load_templates(fwhm=broad_fwhm, line_complexes=False, stars=False, full_line_list=['Balmer 10kK + MgII', 'QSO-UV-lines'], continuum_list=[], fsps_templates=False, alf_template=False, lorentz=True)
+        else:
+            #broad0 = load_templates(fwhm=broad_fwhm, line_complexes=False, stars=False, full_line_list=['Balmer 10kK'] + broad_lines, continuum_list=[], fsps_templates=False, alf_template=False, lorentz=True)
+            broad0 = load_templates(fwhm=broad_fwhm, line_complexes=False, stars=False, full_line_list=['Balmer 10kK + MgII'], continuum_list=[], fsps_templates=False, alf_template=False, lorentz=True)
+         
+        for k in broad0:
+            t0[k] = broad0[k]
 
     for k in broad1:
         t1[k] = broad1[k]
     
-    for k in narrow:
-        t0[k] = t1[k] = narrow[k]
+    for k in narrow0:
+        t0[k] = narrow0[k]
+
+    for k in narrow1:
+        t1[k] = narrow1[k]
     
     ##### Fe II 
     if include_feii:
@@ -1604,16 +1626,22 @@ def load_quasar_templates(broad_fwhm=2500, narrow_fwhm=1200, broad_lines=    ['O
         feii_sm = nd.gaussian_filter(feii_flux, feii_kern)
         t0['FeII-VC2004'] = t1['FeII-VC2004'] = SpectrumTemplate(wave=feii_wave, flux=feii_sm)
     
-    # Linear continua
-    cont_wave = np.arange(400, 2.5e4)
-    for slope in slopes:
-        key = 'slope {0}'.format(slope)
-        t0[key] = t1[key] = SpectrumTemplate(wave=cont_wave, flux=(cont_wave/6563.)**slope)
-        
+    ### Linear continua
+    # cont_wave = np.arange(400, 2.5e4)
+    # for slope in slopes:
+    #     key = 'slope {0}'.format(slope)
+    #     t0[key] = t1[key] = SpectrumTemplate(wave=cont_wave, flux=(cont_wave/6563.)**slope)
+
+    ### Spline continua
+    cont_wave = np.arange(5000, 2.4e4)
+    bsplines = bspline_templates(cont_wave, df=13, log=True)
+    for key in bsplines:
+        t0[key] = t1[key] = bsplines[key]
+    
     # t0['blue'] = t1['blue'] = SpectrumTemplate(wave=cont_wave, flux=(cont_wave/6563.)**-2.8)
     # t0['mid'] = t1['mid'] = SpectrumTemplate(wave=cont_wave, flux=(cont_wave/6563.)**0)
     # t0['red'] = t1['mid'] = SpectrumTemplate(wave=cont_wave, flux=(cont_wave/6563.)**2.8)
-
+    
     return t0, t1
     
 def load_sdss_pca_templates(file='spEigenQSO-55732.fits', smooth=3000):
@@ -1646,6 +1674,62 @@ def load_sdss_pca_templates(file='spEigenQSO-55732.fits', smooth=3000):
         temp_list['{0} {1}'.format(name, i+1)] = SpectrumTemplate(wave=wave, flux=data[i,:])
     
     return temp_list
+    
+def bspline_templates(wave, degree=3, df=6, get_matrix=False, log=False, clip=1.e-4):
+    """
+    B-spline basis functions, modeled after `~patsy.splines`
+    """
+    from scipy.interpolate import splev
+    
+    order = degree+1
+    n_inner_knots = df - order
+    inner_knots = np.linspace(0, 1, n_inner_knots + 2)[1:-1]
+    
+    norm_knots = np.concatenate(([0, 1] * order,
+                                inner_knots))
+    norm_knots.sort()
+    
+    if log:
+        xspl = np.log(wave)
+    else:
+        xspl = wave*1
+        
+    mi = xspl.min()
+    ma = xspl.max()
+    width = ma-mi
+    all_knots = norm_knots*width+mi
+    
+    n_bases = len(all_knots) - (degree + 1)
+    basis = np.empty((xspl.shape[0], n_bases), dtype=float)
+    
+    coefs = np.identity(n_bases)
+    basis = splev(xspl, (all_knots, coefs, degree))
+    
+    maxval = np.max(basis, axis=1)
+    for i in range(n_bases):
+        basis[i][basis[i] < clip*maxval[i]] = 0
+        
+    if get_matrix:
+        return np.vstack(basis).T
+        
+    temp = OrderedDict()  
+    for i in range(n_bases):
+        key = 'bspl {0}'.format(i)
+        temp[key] = SpectrumTemplate(wave, basis[i])
+        temp[key].name = key
+    
+    temp.knots = all_knots
+    temp.degree = degree
+    temp.xspl = xspl
+    
+    return temp
+
+def eval_bspline_templates(wave, bspl, coefs):
+    from scipy.interpolate import splev
+    
+    xspl = np.log(wave)
+    basis = splev(xspl, (bspl.knots, coefs, bspl.degree))
+    return np.array(basis)
     
 def polynomial_templates(wave, order=0, line=False):
     temp = OrderedDict()  
@@ -1682,7 +1766,7 @@ def dot_templates(coeffs, templates, z=0, max_R=5000, apply_igm=True):
     #             tc += templates[te].zscale(z, scalar=coeffs[i])
     #            
     #         tl += templates[te].zscale(z, scalar=coeffs[i])
-    wave, flux_arr, is_line = array_templates(templates, max_R=max_R)
+    wave, flux_arr, is_line = array_templates(templates, max_R=max_R, z=z)
     
     # IGM
     if apply_igm:
@@ -1710,7 +1794,7 @@ def dot_templates(coeffs, templates, z=0, max_R=5000, apply_igm=True):
     
     return tc, tl
     
-def array_templates(templates, max_R=5000):
+def array_templates(templates, max_R=5000, z=0):
     """Return an array version of the templates that have all been interpolated to the same grid.
     
     
@@ -1736,8 +1820,8 @@ def array_templates(templates, max_R=5000):
         
     """
     from grizli.utils_c.interp import interp_conserve_c
-        
-    wave = np.unique(np.hstack([templates[t].wave for t in templates]))
+    
+    wave = np.unique(np.hstack([templates[t].wave/(1+z*t.startswith('bspl')) for t in templates]))
     clipsum, iter = 1, 0
     while (clipsum > 0) & (iter < 10):
         clip = np.gradient(wave)/wave < 1/max_R
@@ -1752,14 +1836,18 @@ def array_templates(templates, max_R=5000):
     flux_arr = np.zeros((NTEMP, len(wave)))
     
     for i, t in enumerate(templates):
-        flux_arr[i,:] = interp_conserve_c(wave, templates[t].wave,
+        if templates[t].name.startswith('bspl'):
+            flux_arr[i,:] = interp_conserve_c(wave, templates[t].wave/(1+z),
+                                          templates[t].flux*(1+z))
+        else:
+            flux_arr[i,:] = interp_conserve_c(wave, templates[t].wave,
                                           templates[t].flux)
-    
+            
     is_line = np.array([t.startswith('line ') for t in templates])
     
     return wave, flux_arr, is_line
     
-def compute_equivalent_widths(templates, coeffs, covar, max_R=5000, Ndraw=1000, seed=0):
+def compute_equivalent_widths(templates, coeffs, covar, max_R=5000, Ndraw=1000, seed=0, z=0):
     """Compute template-fit emission line equivalent widths
     
     Parameters
@@ -1798,7 +1886,7 @@ def compute_equivalent_widths(templates, coeffs, covar, max_R=5000, Ndraw=1000, 
         coeffs = coeffsx[mb.N:]
     
     # Array versions of the templates
-    wave, flux_arr, is_line = array_templates(templates, max_R=max_R)
+    wave, flux_arr, is_line = array_templates(templates, max_R=max_R, z=z)
     keys = np.array(list(templates.keys()))
     
     EWdict = OrderedDict()
@@ -3031,7 +3119,7 @@ class EffectivePSF(object):
             return resid
         elif ret == 'lm':
             # masked residuals for LM optimization
-            if True:
+            if False:
                 print(params, (resid**2).sum())
             
             return resid[resid != 0]
