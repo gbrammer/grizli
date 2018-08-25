@@ -441,7 +441,7 @@ class Galfitter(object):
         return flt_files
     
     @staticmethod
-    def fit_arrays(sci, wht, seg, psf, id=None, platescale=0.06, exptime=0, path='/tmp/', galfit_exec='galfit', gaussian_guess=False, components=[GalfitSersic()] ,recenter=True, psf_sample=1):
+    def fit_arrays(sci, wht, seg, psf, id=None, platescale=0.06, exptime=0, path='/tmp/', galfit_exec='galfit', gaussian_guess=False, components=[GalfitSersic()], recenter=True, psf_sample=1):
         
         rms = 1/np.sqrt(wht)#*exptime
         if exptime > 0:
