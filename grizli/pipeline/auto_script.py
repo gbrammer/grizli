@@ -2377,14 +2377,14 @@ def get_rgb_filters(filter_list, force_ir=False):
         List of filters to use
     """
     bfilt = None
-    for filt in ['f814w', 'f606w', 'f775w','f435w','f555w','f200lp']:
+    for filt in ['f814w', 'f606w', 'f775w','f435w','f555w','f200lp','f105w','f110w','f125w']:
         if filt in filter_list:
             bfilt = filt
             break
     
     gfilt = 'sum'
     for filt in ['f105w','f110w','f125w','f140w']:
-        if filt in filter_list:
+        if (filt in filter_list) & (filt != bfilt):
             gfilt = filt
             break
     
@@ -2514,7 +2514,7 @@ def field_rgb(root='j010514+021532', xsize=6, HOME_PATH='./', show_ir=True, pl=1
     fig.savefig('{0}.field.jpg'.format(root))
     return fig
     
-def make_rgb_thumbnails(root='j140814+565638', maglim=23, cutout=12., figsize=[2,2], ids=None, close=True, skip=True, force_ir=False):
+def make_rgb_thumbnails(root='j140814+565638', HOME_PATH='./', maglim=23, cutout=12., figsize=[2,2], ids=None, close=True, skip=True, force_ir=False, add_grid=True):
     """
     Make RGB color cutouts
     """
@@ -2535,13 +2535,14 @@ def make_rgb_thumbnails(root='j140814+565638', maglim=23, cutout=12., figsize=[2
     except:
         from grizli import utils
         
-    phot_file = '../Prep/{0}_phot.fits'.format(root)
+    phot_file = '{0}/{1}/Prep/{1}_phot.fits'.format(HOME_PATH, root)
+    
     if not os.path.exists(phot_file):
         return False
     
-    phot_file = '../Prep/{0}_phot.fits'.format(root)
+    #phot_file = '../Prep/{0}_phot.fits'.format(root)
     phot = utils.GTable.gread(phot_file)
-    sci_files = glob.glob('../Prep/{0}-f*sci.fits'.format(root))
+    sci_files = glob.glob('{0}/{1}/Prep/{1}-f*sci.fits'.format(HOME_PATH, root))
     filters = [file.split('_')[-3].split('-')[-1] for file in sci_files]
     
     mag_auto = 23.9-2.5*np.log10(phot['flux_auto'])
@@ -2552,7 +2553,7 @@ def make_rgb_thumbnails(root='j140814+565638', maglim=23, cutout=12., figsize=[2
     #
     ims = {}
     for f in filters + ['ir']:
-        img = glob.glob('../Prep/{0}-{1}_dr?_sci.fits'.format(root, f))[0]
+        img = glob.glob('{0}/{1}/Prep/{1}-{2}_dr?_sci.fits'.format(HOME_PATH, root, f))[0]
         try:
             ims[f] = pyfits.open(img)
         except:
@@ -2566,10 +2567,24 @@ def make_rgb_thumbnails(root='j140814+565638', maglim=23, cutout=12., figsize=[2
             
     rf, gf, bf = get_rgb_filters(filters, force_ir=force_ir)
 
+    for f in [rf, gf, bf]:
+        try:
+            if ims[f][0].header['PHOTFLAM'] == 0:
+                ims[f][0].header['PHOTFLAM'] = model.photflam_list[f.upper()]
+                ims[f][0].header['PHOTPLAM'] = model.photplam_list[f.upper()]
+            
+            print(f, ims[f][0].header['PHOTFLAM'], ims[f][0].header['PHOTPLAM'])
+        except:
+            pass
+            
     pf = 1
     pl = 1
-    bimg = ims[bf][0].data * (ims[bf][0].header['PHOTFLAM']/5.e-20)**pf * (ims[bf][0].header['PHOTPLAM']/1.e4)**pl
     rimg = ims[rf][0].data * (ims[rf][0].header['PHOTFLAM']/5.e-20)**pf * (ims[rf][0].header['PHOTPLAM']/1.e4)**pl
+
+    if bf == 'sum':
+        bimg = rimg
+    else:
+        bimg = ims[bf][0].data * (ims[bf][0].header['PHOTFLAM']/5.e-20)**pf * (ims[bf][0].header['PHOTPLAM']/1.e4)**pl
 
     if gf == 'sum':
         gimg = (rimg+bimg)/2.
@@ -2586,15 +2601,17 @@ def make_rgb_thumbnails(root='j140814+565638', maglim=23, cutout=12., figsize=[2
         name='{0}_{1:05d}.rgb.png'.format(root, id)
         print(name)
         
-        # ims = {}
-        # for f in filters + ['ir']:
-        #     img = glob.glob('../Prep/{0}-{1}_dr?_sci.fits'.format(root, f))[0]
-        #     try:
-        #         montage_wrapper.mSubimage(img, '/tmp/cutout_{0}.fits'.format(f), phot['ra'][ix], phot['dec'][ix], cutout/3600, debug=False, all_pixels=False, hdu=None, status_file=None, ysize=None)
-        #         ims[f] = pyfits.open('/tmp/cutout_{0}.fits'.format(f))
-        #     except:
-        #         continue
-        #     
+        if False:
+            ims = {}
+            for f in filters + ['ir']:
+                #img = glob.glob('../Prep/{0}-{1}_dr?_sci.fits'.format(root, f))[0]
+                img = glob.glob('{0}/{1}/Prep/{1}-{2}_dr?_sci.fits'.format(HOME_PATH, root, f))[0]
+                try:
+                    montage_wrapper.mSubimage(img, '/tmp/cutout_{0}.fits'.format(f), phot['ra'][ix], phot['dec'][ix], cutout/3600, debug=False, all_pixels=False, hdu=None, status_file=None, ysize=None)
+                    ims[f] = pyfits.open('/tmp/cutout_{0}.fits'.format(f))
+                except:
+                    continue
+            
         # filters = list(ims.keys())
         # 
         # wcs = pywcs.WCS(ims['ir'][0].header)
@@ -2623,6 +2640,9 @@ def make_rgb_thumbnails(root='j140814+565638', maglim=23, cutout=12., figsize=[2
         sy = ims['ir'][0].data.shape[0]/2
         
         x0, y0 = phot['x_image'][ix]-1, phot['y_image'][ix]-1
+        xy = wcs.all_world2pix([phot['x_world'][ix]], [phot['y_world'][ix]], 0)
+        x0, y0 = np.array(xy).flatten()
+        
         ax.imshow(image, origin='lower', extent=(-x0, -x0+2*sx, -y0, -y0+2*sy))
         ax.set_xlim(-cutout/2/pscale, cutout/2/pscale)
         ax.set_ylim(-cutout/2/pscale, cutout/2/pscale)
@@ -2631,16 +2651,25 @@ def make_rgb_thumbnails(root='j140814+565638', maglim=23, cutout=12., figsize=[2
         
         ax.xaxis.set_major_locator(minor)
         ax.yaxis.set_major_locator(minor)
-        ax.grid()
+
+        ax.tick_params(axis='x', colors='w', which='both')
+        ax.tick_params(axis='y', colors='w', which='both')
+
+        if add_grid:
+            ax.grid(alpha=0.2, linestyle='-', color='w')
+
+            
         ax.set_xticklabels([]); ax.set_yticklabels([])
 
-        ax.text(0.06, 0.01, rf, color='r', backgroundcolor='w', size=6, ha='center', va='bottom', transform=ax.transAxes)
-        ax.text(0.06+0.08*5/figsize[0], 0.01, gf, color='g', backgroundcolor='w', size=6, ha='center', va='bottom', transform=ax.transAxes)
-        ax.text(0.06+0.08*2*5/figsize[0], 0.01, bf, color='b', backgroundcolor='w', size=6, ha='center', va='bottom', transform=ax.transAxes)
+        bbox = {'facecolor':'w', 'alpha':0.8, 'ec':'none'}
+        
+        ax.text(0.45, 0.97, rf, color='r', bbox=bbox, size=5, ha='center', va='top', transform=ax.transAxes)
+        ax.text(0.45+0.08*5/figsize[0], 0.97, gf, color='g', bbox=bbox, size=5, ha='center', va='top', transform=ax.transAxes)
+        ax.text(0.45+0.08*2*5/figsize[0], 0.97, bf, color='b', bbox=bbox, size=5, ha='center', va='top', transform=ax.transAxes)
 
         for j in range(3):
             #time.sleep(0.5)
-            fig.tight_layout(pad=0.5)
+            fig.tight_layout(pad=0.1)
 
         fig.savefig(name)
         if close:
