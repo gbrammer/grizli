@@ -150,13 +150,22 @@ def img_with_wcs(input):
         
     """
     from jwst.datamodels import util
-    from jwst.stpipe import crds_client
-    from jwst.assign_wcs import assign_wcs
+    from jwst.assign_wcs import AssignWcsStep
+
+    # from jwst.stpipe import crds_client
+    # from jwst.assign_wcs import assign_wcs
     
+    # HDUList -> jwst.datamodels.ImageModel
     img = util.open(input)
-    dist_file = crds_client.get_reference_file(img, 'distortion')
-    reference_files = {'distortion': dist_file}
-    with_wcs = assign_wcs.load_wcs(img, reference_files=reference_files)
+    
+    # AssignWcs to pupulate img.meta.wcsinfo
+    step = AssignWcsStep()
+    with_wcs = step.process(img)
+    
+    ## Above should be more robust to get all of the necessary ref files
+    #dist_file = crds_client.get_reference_file(img, 'distortion')
+    #reference_files = {'distortion': dist_file}
+    #with_wcs = assign_wcs.load_wcs(img, reference_files=reference_files)
     
     return with_wcs
     
