@@ -1199,7 +1199,7 @@ class MultiBeam(GroupFitter):
                     # Master beam files
                     self.load_master_fits(beams[0], verbose=verbose)            
                     for i in range(1, len(beams)):
-                        b_i = MultiBeam(beams[i], group_name=group_name, fcontam=fcontam, psf=psf, polyx=polyx, MW_EBV=MW_EBV, sys_err=sys_err, verbose=verbose)
+                        b_i = MultiBeam(beams[i], group_name=group_name, fcontam=fcontam, psf=psf, polyx=polyx, MW_EBV=np.maximum(MW_EBV, 0), sys_err=sys_err, verbose=verbose)
                         self.extend(b_i)
                         
                 else:
@@ -1214,7 +1214,19 @@ class MultiBeam(GroupFitter):
             beam.ivarf = 1./(1/beam.ivarf + (sys_err*beam.scif)**2)
             beam.ivarf[~np.isfinite(beam.ivarf)] = 0
             beam.ivar = beam.ivarf.reshape(beam.sh)
-            
+        
+        self.ra, self.dec = self.beams[0].get_sky_coords()
+        
+        if MW_EBV < 0:
+            ### Try to get MW_EBV from hsaquery.utils
+            try:
+                import hsaquery.utils
+                MW_EBV = hsaquery.utils.get_irsa_dust(self.ra, self.dec)
+            except:
+                MW_EBV = 0
+        
+        self.MW_EBV = MW_EBV
+        
         self._set_MW_EBV(MW_EBV)
         
         self._parse_beams(psf=psf)
@@ -1283,7 +1295,7 @@ class MultiBeam(GroupFitter):
         
         # Use WFC3 ePSF for the fit
         self.psf_param_dict = None
-        if (psf > 0) & (self.beams[i].grism.instrument == 'WFC3'):
+        if (psf > 0) & (self.beams[i].grism.instrument in ['WFC3', 'ACS']):
 
             self.psf_param_dict = OrderedDict()
             for ib, beam in enumerate(self.beams):
@@ -3466,7 +3478,7 @@ class MultiBeam(GroupFitter):
             self._parse_beams()
             self.initialize_masked_arrays()
             
-    def oned_spectrum(self, bin=1, wave=None, tfit=None, **kwargs):
+    def oned_spectrum(self, tfit=None, **kwargs):
         """Compute full 1D spectrum with optional best-fit model
         
         Parameters
@@ -3493,7 +3505,7 @@ class MultiBeam(GroupFitter):
         else:
             flat_data = self.flat_flam[self.fit_mask]
 
-        sp_flat = self.optimal_extract(flat_data, bin=bin, wave=wave)
+        sp_flat = self.optimal_extract(flat_data, **kwargs)
 
         # Best-fit line and continuum models, with background fit 
         if tfit is not None:
@@ -3505,13 +3517,13 @@ class MultiBeam(GroupFitter):
             cont_model = self.get_flat_model([tfit['line1d'].wave,
                                               tfit['cont1d'].flux])
                                               
-            sp_line = self.optimal_extract(line_model, bin=bin, wave=wave)
-            sp_cont = self.optimal_extract(cont_model, bin=bin, wave=wave)
+            sp_line = self.optimal_extract(line_model, **kwargs)
+            sp_cont = self.optimal_extract(cont_model, **kwargs)
         else:
             bg_model = 0.
         
         # Optimal spectral extraction
-        sp = self.optimal_extract(self.scif_mask-bg_model, bin=bin, wave=wave)
+        sp = self.optimal_extract(self.scif_mask-bg_model, **kwargs)
         
         # Loop through grisms, change units and add fit columns
         # NB: setting units to "count / s" to comply with FITS standard, 
@@ -3547,7 +3559,7 @@ class MultiBeam(GroupFitter):
             
         return sp
     
-    def oned_spectrum_to_hdu(self, sp=None, outputfile=None, **kwargs):
+    def oned_spectrum_to_hdu(self, sp=None, outputfile=None, units=None, **kwargs):
         """Generate 1D spectra fits HDUList
         
         Parameters
@@ -3578,6 +3590,7 @@ class MultiBeam(GroupFitter):
         prim.header['RA'] = (self.ra, 'Right Ascension')
         prim.header['DEC'] = (self.dec, 'Declination')
         prim.header['TARGET'] = (self.group_name, 'Target Name')
+        prim.header['MW_EBV'] = (self.MW_EBV, 'Galactic extinction E(B-V)')
         
         for g in ['G102', 'G141', 'G800L']:
             if g in sp:
