@@ -1657,7 +1657,7 @@ def get_sdss_catalog(ra=165.86, dec=34.829694, radius=3):
 def get_twomass_catalog(ra=165.86, dec=34.829694, radius=3, catalog='allwise_p3as_psd'):
     return get_irsa_catalog(ra=ra, dec=dec, radius=radius, catalog='fp_psc', wise=False, twomass=True)
 
-def get_irsa_catalog(ra=165.86, dec=34.829694, radius=3, catalog='allwise_p3as_psd', wise=False, twomass=False):
+def get_irsa_catalog(ra=165.86, dec=34.829694, tab=None, radius=3, catalog='allwise_p3as_psd', wise=False, twomass=False, ROW_LIMIT=500000, TIMEOUT=3600):
     """Query for objects in the `AllWISE <http://wise2.ipac.caltech.edu/docs/release/allwise/>`_ source catalog 
     
     Parameters
@@ -1675,7 +1675,8 @@ def get_irsa_catalog(ra=165.86, dec=34.829694, radius=3, catalog='allwise_p3as_p
         
     """
     from astroquery.irsa import Irsa
-    Irsa.ROW_LIMIT = 100000
+    Irsa.ROW_LIMIT = ROW_LIMIT
+    Irsa.TIMEOUT = TIMEOUT
     
     #all_wise = 'wise_allwise_p3as_psd'
     #all_wise = 'allwise_p3as_psd'
