@@ -98,5 +98,73 @@ def show_from_ds9(ds9, self, zout, **kwargs):
     
     self.show_fit(self.cat['id'][ix], **kwargs)
     
+class EazyPhot(object):
+    def __init__(self, photoz, grizli_templates=None, zgrid=None):
+        """
+        photoz : `~eazypy.photoz.PhotoZ`
+        """
+        try:
+            from .. import utils
+        except:
+            from grizli import utils
+            
+        not_obs_mask =  (photoz.fnu < -90) | (photoz.efnu < 0)
+        
+        self.zgrid = photoz.zgrid
+        
+        self.flam = photoz.fnu*photoz.to_flam*photoz.zp*photoz.ext_corr
+        self.flam[not_obs_mask] = -99
+        
+        self.eflam = photoz.efnu*photoz.to_flam*photoz.zp**photoz.ext_corr
+        self.eflam[not_obs_mask] = -99
+        
+        self.rdcat = utils.GTable(photoz.cat['ra','dec'])
+        
+        self.filters = photoz.filters
+        self.f_numbers = photoz.f_numbers
+        self.param = photoz.param
+        
+        if grizli_templates is None:
+            self.tempfilt = None
+        else:
+            self.tempfilt = self.initialize_templates(grizli_templates,
+                                                      zgrid=zgrid)
+            
+    def initialize_templates(self, grizli_templates, zgrid=None):
+        
+        from eazy import templates as templates_module 
+        from eazy.photoz import TemplateGrid
+        
+        if zgrid is None:
+            zgrid = self.zgrid
+            
+        template_list = [templates_module.Template(arrays=(grizli_templates[k].wave, grizli_templates[k].flux), name=k) for k in grizli_templates]
+        
+        tempfilt = TemplateGrid(zgrid, template_list, RES=self.param['FILTERS_RES'], f_numbers=self.f_numbers, add_igm=True, galactic_ebv=self.param['MW_EBV'], Eb=self.param['SCALE_2175_BUMP'])
+        
+        return tempfilt
     
-    
+    def get_phot_dict(self, ra, dec):
+        """
+        
+        """
+        from collections import OrderedDict
+        try:
+            from .. import utils
+        except:
+            from grizli import utils
+            
+        icat = utils.GTable()
+        icat['ra'] = [ra]
+        icat['dec'] = [dec]
+        
+        ix, dr = self.rdcat.match_to_catalog_sky(icat)
+        
+        phot = OrderedDict()
+        phot['flam'] = self.flam[ix[0],:]*1.e-19
+        phot['eflam'] = self.eflam[ix[0],:]*1.e-19
+        phot['filters'] = self.filters
+        phot['tempfilt'] = self.tempfilt
+        return phot, ix[0], dr[0]
+        
+        
