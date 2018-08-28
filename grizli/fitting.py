@@ -70,7 +70,7 @@ def run_all_parallel(id, get_output_data=False, **kwargs):
     
     return id, status, t1-t0
     
-def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter='nnls', group_name='grism', fit_stacks=True, only_stacks=False, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=3, fit_only_beams=False, fit_beams=True, root='*', fit_trace_shift=False, phot=None, verbose=True, scale_photometry=False, show_beams=True, scale_on_stacked_1d=True, overlap_threshold=5, MW_EBV=0., sys_err=0.03, get_dict=False, bad_pa_threshold=1.6, units1d='flam', redshift_only=False, line_size=1.6, use_psf=False, **kwargs):
+def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter='nnls', group_name='grism', fit_stacks=True, only_stacks=False, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=3, fit_only_beams=False, fit_beams=True, root='*', fit_trace_shift=False, phot=None, verbose=True, scale_photometry=False, show_beams=True, scale_on_stacked_1d=True, overlap_threshold=5, MW_EBV=0., sys_err=0.03, get_dict=False, bad_pa_threshold=1.6, units1d='flam', redshift_only=False, line_size=1.6, use_psf=False, get_line_width=False, **kwargs):
     """Run the full procedure
     
     1) Load MultiBeam and stack files 
@@ -159,23 +159,31 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
         fit_obj = mb
     else:
         fit_obj = st
-      
+    
+    ### Do scaling now with direct spectrum function
+    if scale_photometry:
+        scl = mb.scale_to_photometry(z=0, method='lm', templates=t0, order=scale_photometry*1-1)
+        if scl.status > 0:
+            mb.pscale = scl.x
+            if st is not None:
+                st.pscale = scl.x
+    
     # First pass    
     fit = fit_obj.xfit_redshift(templates=t0, zr=zr, dz=dz, prior=prior, fitter=fitter, verbose=verbose) 
     fit_hdu = pyfits.table_to_hdu(fit)
     fit_hdu.header['EXTNAME'] = 'ZFIT_STACK'
     
-    # Second pass if rescaling spectrum to photometry
-    if scale_photometry:
-        scl = mb.scale_to_photometry(z=fit.meta['z_map'][0], method='lm', templates=t0, order=scale_photometry*1-1)
-        if scl.status > 0:
-            mb.pscale = scl.x
-            if st is not None:
-                st.pscale = scl.x
-            
-            fit = fit_obj.xfit_redshift(templates=t0, zr=zr, dz=dz, prior=prior, fitter=fitter, verbose=verbose) 
-            fit_hdu = pyfits.table_to_hdu(fit)
-            fit_hdu.header['EXTNAME'] = 'ZFIT_STACK'
+    # # Second pass if rescaling spectrum to photometry
+    # if scale_photometry:
+    #     scl = mb.scale_to_photometry(z=fit.meta['z_map'][0], method='lm', templates=t0, order=scale_photometry*1-1)
+    #     if scl.status > 0:
+    #         mb.pscale = scl.x
+    #         if st is not None:
+    #             st.pscale = scl.x
+    #         
+    #         fit = fit_obj.xfit_redshift(templates=t0, zr=zr, dz=dz, prior=prior, fitter=fitter, verbose=verbose) 
+    #         fit_hdu = pyfits.table_to_hdu(fit)
+    #         fit_hdu.header['EXTNAME'] = 'ZFIT_STACK'
             
     # Zoom-in fit with individual beams
     if fit_beams:
@@ -227,16 +235,23 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
         cov_hdu.header['EWHW_{0:03d}'.format(ik)] = (lineEW[key][2]-lineEW[key][0])/2, 'Rest-frame {0} EW, 1-sigma half-width; Angstrom'.format(key.strip('line '))
     
     # Velocity width
-    vel_width_res = mb.fit_line_width(z0=tfit['z'], bl=1.2, nl=1.2)
-    if verbose:
-        print('Velocity width: BL/NL = {0:.0f}/{1:.0f}, z={2:.4f}'.format(vel_width_res[0]*1000, vel_width_res[1]*1000, vel_width_res[2]))
+    if get_line_width:
+        if phot is not None:
+            mb.unset_photometry()
         
-    fit_hdu.header['VEL_BL'] = vel_width_res[0]*1000, 'Broad line FWHM'
-    fit_hdu.header['VEL_NL'] = vel_width_res[1]*1000, 'Narrow line FWHM'
-    fit_hdu.header['VEL_Z'] = vel_width_res[2], 'Line width, best redshift'
-    fit_hdu.header['VEL_NFEV'] = vel_width_res[3], 'Line width, NFEV'
-    fit_hdu.header['VEL_FLAG'] = vel_width_res[4], 'Line width, NFEV'
+        vel_width_res = mb.fit_line_width(z0=tfit['z'], bl=1.2, nl=1.2)
+        if verbose:
+            print('Velocity width: BL/NL = {0:.0f}/{1:.0f}, z={2:.4f}'.format(vel_width_res[0]*1000, vel_width_res[1]*1000, vel_width_res[2]))
+        
+        fit_hdu.header['VEL_BL'] = vel_width_res[0]*1000, 'Broad line FWHM'
+        fit_hdu.header['VEL_NL'] = vel_width_res[1]*1000, 'Narrow line FWHM'
+        fit_hdu.header['VEL_Z'] = vel_width_res[2], 'Line width, best redshift'
+        fit_hdu.header['VEL_NFEV'] = vel_width_res[3], 'Line width, NFEV'
+        fit_hdu.header['VEL_FLAG'] = vel_width_res[4], 'Line width, NFEV'
     
+        if phot is not None:
+            mb.set_photometry(**phot)
+        
     # Best-fit template itself
     tfit_sp = grizli.utils.GTable()
     for ik, key in enumerate(tfit['cfit']):
@@ -1858,6 +1873,31 @@ class GroupFitter(object):
         if self.Nphot == 0:
             return np.array([10.])
         
+        oned = self.oned_spectrum()
+        
+        if init is None:
+            init = np.zeros(order+1)
+            init[0] = 10.
+            
+        scale_fit = least_squares(self._objective_scale_direct, init, jac='2-point', method='lm', ftol=tol, xtol=tol, gtol=tol, x_scale=1.0, loss='linear', f_scale=1.0, diff_step=None, tr_solver=None, tr_options={}, jac_sparsity=None, max_nfev=None, verbose=0, args=(self, oned), kwargs={})
+            
+        # pscale = scale_fit.x
+        return scale_fit
+    
+    def _old_scale_to_photometry(self, z=0, templates={}, tol=1.e-4, order=0, init=None, method='lm', fit_background=True):
+        """Compute scale factor between spectra and photometry
+        
+        method : 'Powell' or 'BFGS' work well, latter a bit faster but less robust
+        
+        New implementation of Levenberg-Markwardt minimization
+        
+        TBD
+        """
+        from scipy.optimize import minimize, least_squares
+        
+        if self.Nphot == 0:
+            return np.array([10.])
+        
         AxT, data = self.xfit_at_z(z=z, templates=templates, fitter='nnls',
                                    fit_background=fit_background,
                                    get_uncertainties=False,
@@ -1916,7 +1956,47 @@ class GroupFitter(object):
             return coeffs, full, resid, chi2, AxT
         else:
             return chi2
-            
+
+    @staticmethod
+    def _objective_scale_direct(pscale, self, oned):
+
+        flam = []
+        eflam = []
+        spec_flux = []
+        
+        filters = np.array(self.photom_filters)
+        lc = self.photom_pivot
+        
+        for k in oned:
+            #spec, okfilt, lc = spec1d[k]
+
+            # Covered filters
+            spec1 = utils.SpectrumTemplate(wave=oned[k]['wave'], flux=3.e18/oned[k]['wave']**2)
+            okfilt = np.array([spec1.integrate_filter(filt) for filt in filters]) > 0.98
+
+            if okfilt.sum() == 0:
+                continue
+
+            scale = 1./self.compute_scale_array(pscale, oned[k]['wave'])
+
+            spec = utils.SpectrumTemplate(wave=oned[k]['wave'], flux=oned[k]['flux']*scale/np.maximum(oned[k]['flat'], 1), err=oned[k]['err']*scale/np.maximum(oned[k]['flat'], 1))
+
+            spec_flux.append((np.array([spec.integrate_filter(filt, use_wave='templ') for filt in filters[okfilt]]).T*3.e18/lc[okfilt]**2).T)
+
+            flam.append(self.photom_flam[okfilt])
+            eflam.append(self.photom_eflam[okfilt])
+
+        if not flam:
+            return [0]
+
+        spec_flux = np.vstack(spec_flux)
+        flam = np.hstack(flam)
+        eflam = np.hstack(eflam)
+        chi2 = (flam-spec_flux[:,0])**2/(eflam**2+spec_flux[:,1]**2)
+
+        print(pscale, chi2.sum())
+        return chi2
+                
     def xfit_star(self, tstar=None, spline_correction=True, fitter='nnls', fit_background=True, spline_args={'Rspline':5}, oned_args={}):
         """Fit stellar templates
         """

@@ -1052,7 +1052,7 @@ def get_line_wavelengths():
     return line_wavelengths, line_ratios 
     
 class SpectrumTemplate(object):
-    def __init__(self, wave=None, flux=None, central_wave=None, fwhm=None, velocity=False, fluxunits=FLAMBDA_CGS, waveunits=u.angstrom, name='', lorentz=False):
+    def __init__(self, wave=None, flux=None, central_wave=None, fwhm=None, velocity=False, fluxunits=FLAMBDA_CGS, waveunits=u.angstrom, name='', lorentz=False, err=None):
         """Container for template spectra.   
                 
         Parameters
@@ -1111,7 +1111,12 @@ class SpectrumTemplate(object):
         self.flux = flux
         if flux is not None:
             self.flux = np.cast[np.float](flux)
-
+        
+        if err is not None:
+            self.err = np.cast[np.float](err)
+        else:
+            self.err = None
+            
         self.fwhm = None
         self.velocity = None
         
@@ -1298,14 +1303,22 @@ class SpectrumTemplate(object):
             (self.fluxunits.__str__() == 'erg / (Angstrom cm2 s)')):
             # Faster
             flux_fnu = self.flux*self.wave**2/2.99792458e18*fnu_units
+            if self.err is not None:
+                err_fnu = self.err*self.wave**2/2.99792458e18*fnu_units
         else:
             # Use astropy conversion
             flux_fnu = (self.flux*self.fluxunits).to(fnu_units, equivalencies=u.spectral_density(self.wave*self.waveunits))
-        
+            if self.err is not None:
+                err_fnu = (self.err*self.fluxunits).to(fnu_units, equivalencies=u.spectral_density(self.wave*self.waveunits))
+                
         self.fnu_units = fnu_units
         self.flux_fnu = flux_fnu.value
-        
-    def integrate_filter(self, filter, abmag=False):
+        if self.err is not None:
+            self.err_fnu = err_fnu.value
+        else:
+            self.err_fnu = None
+            
+    def integrate_filter(self, filter, abmag=False, use_wave='filter'):
         """Integrate the template through an `~eazy.FilterDefinition` filter
         object.
         
@@ -1352,26 +1365,68 @@ class SpectrumTemplate(object):
             interp = np.interp
         
         #wz = self.wave*(1+z)
-        if (filter.wave.min() > self.wave.max()) | (filter.wave.max() < self.wave.min()) | (filter.wave.min() < self.wave.min()):
-            return 0.
+        nonzero = filter.throughput > 0
+        if (filter.wave[nonzero].min() > self.wave.max()) | (filter.wave[nonzero].max() < self.wave.min()) | (filter.wave[nonzero].min() < self.wave.min()):
+            if self.err is None:
+                return 0.
+            else:
+                return 0., 0.
                 
-        templ_filter = interp(filter.wave.astype(np.float), self.wave,
+        if use_wave == 'filter':
+            ### Interpolate to filter wavelengths
+            integrate_wave = filter.wave
+
+            integrate_templ = interp(filter.wave.astype(np.float), self.wave,
                               self.flux_fnu)
-        
-        if hasattr(filter, 'norm'):
+            
+            if self.err is not None:
+                templ_ivar = 1./interp(filter.wave.astype(np.float), 
+                                       self.wave, self.err_fnu)**2
+                                       
+                templ_ivar[~np.isfinite(templ_ivar)] = 0
+                                      
+                integrate_weight = filter.throughput/filter.wave*templ_ivar/filter.norm
+            else:
+                integrate_weight = filter.throughput/filter.wave
+        else:
+            ### Interpolate to spectrum wavelengths
+            integrate_wave = self.wave
+            integrate_templ = self.flux_fnu
+                        
+            if self.err is not None:
+                templ_ivar = 1/self.err_fnu**2
+                templ_ivar[~np.isfinite(templ_ivar)] = 0
+                
+                # test = nonzero
+                test = np.isfinite(filter.throughput)
+                interp_thru = interp(integrate_wave, filter.wave[test],
+                                      filter.throughput[test], 
+                                      left=0, right=0)
+
+                integrate_weight = interp_thru/integrate_wave*templ_ivar/filter.norm
+            else:
+                integrate_weight = interp_thru/integrate_wave#/templ_err**2
+                    
+        if hasattr(filter, 'norm') & (self.err is None):
             filter_norm = filter.norm
         else:
             # e.g., pysynphot bandpass
-            filter_norm = INTEGRATOR(filter.throughput/filter.wave,
-                                     filter.wave)
+            filter_norm = INTEGRATOR(integrate_weight, integrate_wave)
             
         # f_nu/lam dlam == f_nu d (ln nu)    
-        temp_flux = INTEGRATOR(filter.throughput*templ_filter/filter.wave, filter.wave) / filter_norm
+        temp_flux = INTEGRATOR(integrate_templ*integrate_weight, integrate_wave) / filter_norm
         
+        if self.err is not None:
+            temp_err = 1/np.sqrt(filter_norm)
+            
         if abmag:
-            return -2.5*np.log10(temp_flux)-48.6
+            temp_mag = -2.5*np.log10(temp_flux)-48.6
+            return temp_mag
         else:
-            return temp_flux
+            if self.err is not None:
+                return temp_flux, temp_err
+            else:
+                return temp_flux
 
 def load_templates(fwhm=400, line_complexes=True, stars=False,
                    full_line_list=None, continuum_list=None,
