@@ -1,4 +1,4 @@
-def eazy_photoz(root, force=False):
+def eazy_photoz(root, force=False, object_only=True):
     
     import os
     import eazy
@@ -70,6 +70,9 @@ def eazy_photoz(root, force=False):
     
     self = eazy.photoz.PhotoZ(param_file=None, translate_file='zphot.translate', zeropoint_file=zpfile, params=params, load_prior=True, load_products=load_products)
     
+    if object_only:
+        return self
+        
     idx = np.arange(self.NOBJ)
     
     #sample = (mag < 27) #& (self.cat['star_flag'] != 1)
@@ -118,7 +121,9 @@ class EazyPhot(object):
         self.eflam = photoz.efnu*photoz.to_flam*photoz.zp**photoz.ext_corr
         self.eflam[not_obs_mask] = -99
         
-        self.rdcat = utils.GTable(photoz.cat['ra','dec'])
+        #self.rdcat = utils.GTable(photoz.cat['ra','dec'])
+        self.ra_cat = photoz.cat['ra'].data
+        self.dec_cat = photoz.cat['dec'].data
         
         self.filters = photoz.filters
         self.f_numbers = photoz.f_numbers
@@ -158,7 +163,11 @@ class EazyPhot(object):
         icat['ra'] = [ra]
         icat['dec'] = [dec]
         
-        ix, dr = self.rdcat.match_to_catalog_sky(icat)
+        rdcat = utils.GTable()
+        rdcat['ra'] = self.ra_cat
+        rdcat['dec'] = self.dec_cat
+        
+        ix, dr = rdcat.match_to_catalog_sky(icat)
         
         phot = OrderedDict()
         phot['flam'] = self.flam[ix[0],:]*1.e-19
