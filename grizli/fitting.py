@@ -329,14 +329,14 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     if phot is not None:
         out = mb, st, fit, tfit, line_hdu
         if 'pz' in phot:
-            full_sed_plot(out, t1, photometry_pz=phot['pz'])
+            full_sed_plot(mb, tfit, zfit=fit, photometry_pz=phot['pz'])
         else:
-            full_sed_plot(out, t1)
+            full_sed_plot(mb, tfit, zfit=fit)
         
     return mb, st, fit, tfit, line_hdu
 
 ###################################
-def full_sed_plot(out, t1, bin=1, minor=0.1, save='png', sed_resolution=180, photometry_pz=None, zspec=None, spectrum_steps=False, **kwargs):
+def full_sed_plot(mb, tfit, zfit=None, bin=1, minor=0.1, save='png', sed_resolution=180, photometry_pz=None, zspec=None, spectrum_steps=False, **kwargs):
     """
     Make a separate plot showing photometry and the spectrum
     """
@@ -361,10 +361,11 @@ def full_sed_plot(out, t1, bin=1, minor=0.1, save='png', sed_resolution=180, pho
                            (0.8106, 0.921, 0.937)]
      
     # Best-fit
-    mb = out[0]
-    zfit = out[2]
-    tfit = out[3]
-
+    #mb = out[0]
+    #zfit = out[2]
+    #tfit = out[3]
+    t1 = tfit['templates']
+    
     best_model = mb.get_flat_model([tfit['line1d'].wave, tfit['line1d'].flux])
     flat_model = mb.get_flat_model([tfit['line1d'].wave, tfit['line1d'].flux*0+1])
     bg = mb.get_flat_background(tfit['coeffs'])
@@ -382,13 +383,17 @@ def full_sed_plot(out, t1, bin=1, minor=0.1, save='png', sed_resolution=180, pho
     # Figure
 
     if True:
-        fig = plt.figure(figsize=[11, 9./3])
-        gs = gridspec.GridSpec(1,3, width_ratios=[1,1.5,1])
-
-        ax1 = fig.add_subplot(gs[0])
-        ax2 = fig.add_subplot(gs[1])
-        ax3 = fig.add_subplot(gs[2])
-
+        if zfit is not None:
+            fig = plt.figure(figsize=[11, 9./3])
+            gs = gridspec.GridSpec(1,3, width_ratios=[1,1.5,1])
+            ax1 = fig.add_subplot(gs[0])
+            ax2 = fig.add_subplot(gs[1])
+            ax3 = fig.add_subplot(gs[2])
+        else:
+            fig = plt.figure(figsize=[9, 9./3])
+            gs = gridspec.GridSpec(1,2, width_ratios=[1,1.5])
+            ax1 = fig.add_subplot(gs[0])
+            ax2 = fig.add_subplot(gs[1])
     else:
         gs = None
         fig = plt.figure(figsize=[9, 9./3])
@@ -465,26 +470,28 @@ def full_sed_plot(out, t1, bin=1, minor=0.1, save='png', sed_resolution=180, pho
     
     ##########
     # P(z)
-    if photometry_pz is not None:
-        ax3.plot(photometry_pz[0], np.log10(photometry_pz[1]), color=mpl_colors[0])
-        #zcl = (prior[0] >= zlimits[ix,0]) & (prior[0] <= zlimits[ix,4])
-        #ax3.fill_between(prior[0][zcl], np.log10(prior[1])[zcl], prior[1][zcl]*0-100, color=mpl_colors[0], alpha=0.3)
+    if zfit is not None:
 
-    ax3.plot(zfit['zgrid'], np.log10(zfit['pdf']), color=sns_colors[0])
-    ax3.fill_between(zfit['zgrid'], np.log10(zfit['pdf']), np.log10(zfit['pdf'])*0-100, color=sns_colors[0], alpha=0.3)
+        if photometry_pz is not None:
+            ax3.plot(photometry_pz[0], np.log10(photometry_pz[1]), color=mpl_colors[0])
 
-    ax3.set_ylim(-3, 2.9) #np.log10(zfit['pdf']).max())
-    ax3.set_xlim(zfit['zgrid'].min(), zfit['zgrid'].max())
+        ax3.plot(zfit['zgrid'], np.log10(zfit['pdf']), color=sns_colors[0])
+        ax3.fill_between(zfit['zgrid'], np.log10(zfit['pdf']), np.log10(zfit['pdf'])*0-100, color=sns_colors[0], alpha=0.3)
+        ax3.set_xlim(zfit['zgrid'].min(), zfit['zgrid'].max())
+
+        ax3.set_ylim(-3, 2.9) #np.log10(zfit['pdf']).max())
+        ax3.set_ylabel(r'log $p(z)$')
+        ax3.set_xlabel(r'$z$')
+
     ax1.set_ylabel(r'$f_\lambda$ / $10^{-19}$')
-    ax3.set_ylabel(r'log $p(z)$')
-    ax3.set_xlabel(r'$z$')
 
-    #ax3.text(0.95, 0.95, r'$z_\mathrm{phot}$='+'{0:.3f}'.format(eazyp.zbest[ix]), ha='right', va='top', transform=ax3.transAxes, color=mpl_colors[0], size=10)
     axt = ax2
     axt.text(0.95, 0.95, r'$z_\mathrm{grism}$='+'{0:.3f}'.format(tfit['z']), ha='right', va='top', transform=axt.transAxes, color=sns_colors[0], size=10)#, backgroundcolor='w')
     if zspec is not None:
         axt.text(0.95, 0.89, r'$z_\mathrm{spec}$='+'{0:.3f}'.format(zspec), ha='right', va='top', transform=axt.transAxes, color='r', size=10)
-        ax3.scatter(zspec, 2.7, color='r', marker='v', zorder=100)
+        
+        if zfit is not None:
+            ax3.scatter(zspec, 2.7, color='r', marker='v', zorder=100)
         
     axt.text(0.05, 0.95, '{0}: {1:>6d}'.format(mb.group_name, mb.id), ha='left', va='top', transform=axt.transAxes, color='k', size=10)#, backgroundcolor='w')
     #axt.text(0.05, 0.89, '{0:>6d}'.format(mb.id), ha='left', va='top', transform=axt.transAxes, color='k', size=10)#, backgroundcolor='w')
@@ -492,8 +499,11 @@ def full_sed_plot(out, t1, bin=1, minor=0.1, save='png', sed_resolution=180, pho
     if gs is None:
         gs.tight_layout(pad=0.1)
     else:
-        fig.tight_layout(pad=0.1)
-        
+        if zfit is not None:
+            fig.tight_layout(pad=0.1)
+        else:
+            fig.tight_layout(pad=0.5)
+            
     if save:
         fig.savefig('{0}_{1:05d}.sed.{2}'.format(mb.group_name, mb.id, save))
         
@@ -931,6 +941,10 @@ class GroupFitter(object):
             
         self.mslices = self._get_slices(masked=True)
         self.Nmask = self.fit_mask.sum()       
+        if hasattr(self, 'Nphot'):
+            self.Nspec = self.Nmask - self.Nphot
+        else:
+            self.Nspec = self.Nmask
         
     def _init_background(self, masked=True):
         """Initialize the (flat) background model components
@@ -1060,7 +1074,12 @@ class GroupFitter(object):
         self.fit_mask = np.hstack((self.fit_mask, eflam > 0))
         #self.flat_flam = np.hstack((self.flat_flam, self.photom_eflam*0.))
         
+        # Mask for just spectra
+        self.fit_mask_spec = self.fit_mask & True
+        self.fit_mask_spec[-self.Nphotbands:] = False
+        
         self.Nmask = self.fit_mask.sum()       
+        self.Nspec = self.Nmask - self.Nphot
         
         self.scif = np.hstack((self.scif, flam))
         
@@ -1087,15 +1106,19 @@ class GroupFitter(object):
 
         #self.flat_flam = self.flat_flam[:-Nbands]        
         self.fit_mask = self.fit_mask[:-Nbands]
+        self.fit_mask_spec = self.fit_mask & True
+        
         self.scif = self.scif[:-Nbands]
         self.wavef = self.wavef[:-Nbands]
-                
-        self.Nmask = self.fit_mask.sum()
+                        
         self.DoF = int((self.weightf*self.fit_mask).sum())
         
         self.is_spec = 1
         self.Nphot = 0
         self.Nphotbands = 0
+        self.Nmask = self.fit_mask.sum()
+        self.Nspec = self.Nmask - self.Nphot
+
         self.tempfilt = None
         
     def _interpolate_photometry(self, z=0., templates=[]):
@@ -1129,7 +1152,7 @@ class GroupFitter(object):
             
         return A_phot[:,mask]
         
-    def xfit_at_z(self, z=0, templates=[], fitter='nnls', fit_background=True, get_uncertainties=False, get_design_matrix=False, pscale=None, COEFF_SCALE=1.e-19, get_components=False, huber_delta=4, get_residuals=False):
+    def xfit_at_z(self, z=0, templates=[], fitter='nnls', fit_background=True, get_uncertainties=False, get_design_matrix=False, pscale=None, COEFF_SCALE=1.e-19, get_components=False, huber_delta=4, get_residuals=False, include_photometry=True):
         """Fit the 2D spectra with a set of templates at a specified redshift.
         
         Parameters
@@ -1175,9 +1198,13 @@ class GroupFitter(object):
         from scipy.special import huber
         
         NTEMP = len(templates)
-        A = np.zeros((self.N+NTEMP, self.Nmask))
+        if (self.Nphot > 0) & include_photometry:
+            A = np.zeros((self.N+NTEMP, self.Nmask))
+        else:
+            A = np.zeros((self.N+NTEMP, self.Nspec))
+            
         if fit_background:
-            A[:self.N,:self.Nmask-self.Nphot] = self.A_bgm
+            A[:self.N,:self.Nspec] = self.A_bgm
         
         lower_bound = np.zeros(self.N+NTEMP)
         lower_bound[:self.N] = -0.05
@@ -1243,18 +1270,25 @@ class GroupFitter(object):
         oktemp = A.sum(axis=1) != 0
         
         # Photometry
-        if self.Nphot > 0:
-            A_phot = self._interpolate_photometry(z=z, templates=templates)
-            A[:,-self.Nphot:] = A_phot*COEFF_SCALE #np.hstack((A, A_phot))
-                    
+        if (self.Nphot > 0):
+            if include_photometry:
+                A_phot = self._interpolate_photometry(z=z,
+                                                      templates=templates)
+                A[:,-self.Nphot:] = A_phot*COEFF_SCALE #np.hstack((A, A_phot))
+                full_fit_mask = self.fit_mask
+            else:
+                full_fit_mask = self.fit_mask_spec
+        else:
+            full_fit_mask = self.fit_mask
+            
         # Weight design matrix and data by 1/sigma
-        Ax = A[oktemp,:]*self.sivarf[self.fit_mask]        
-        #AxT = Ax[:,self.fit_mask].T
+        Ax = A[oktemp,:]*self.sivarf[full_fit_mask]        
+        #AxT = Ax[:,full_fit_mask].T
         
         # Scale photometry
         if hasattr(self, 'pscale'):
             if (self.pscale is not None):
-                scale = self.compute_scale_array(self.pscale, self.wavef[self.fit_mask]) 
+                scale = self.compute_scale_array(self.pscale, self.wavef[full_fit_mask]) 
                 if self.Nphot > 0:
                     scale[-self.Nphot:] = 1.
                 
@@ -1267,7 +1301,7 @@ class GroupFitter(object):
         AxT = Ax.T
         
         # Masked data array, including background pedestal
-        data = ((self.scif+pedestal*self.is_spec)*self.sivarf)[self.fit_mask]
+        data = ((self.scif+pedestal*self.is_spec)*self.sivarf)[full_fit_mask]
         
         if get_design_matrix:
             return AxT, data
@@ -1289,22 +1323,22 @@ class GroupFitter(object):
                 background[-self.Nphot:] = 0.
             coeffs_i[:self.N] -= pedestal
         else:
-            background = self.scif[self.fit_mask]*0.
+            background = self.scif[full_fit_mask]*0.
             
         # Full model
         if fit_background:
-            model = np.dot(coeffs_i[self.N:], Ax[self.N:,:]/self.sivarf[self.fit_mask])
+            model = np.dot(coeffs_i[self.N:], Ax[self.N:,:]/self.sivarf[full_fit_mask])
         else:
-            model = np.dot(coeffs_i, Ax/self.sivarf[self.fit_mask])
+            model = np.dot(coeffs_i, Ax/self.sivarf[full_fit_mask])
             
         # Residuals and Chi-squared
-        resid = self.scif[self.fit_mask] - model - background
+        resid = self.scif[full_fit_mask] - model - background
         
         if get_components:
             return model, background
             
-        #chi2 = np.sum(resid[self.fit_mask]**2*self.sivarf[self.fit_mask]**2)
-        norm_resid = resid*(self.sivarf*np.sqrt(self.weightf))[self.fit_mask]
+        #chi2 = np.sum(resid[full_fit_mask]**2*self.sivarf[full_fit_mask]**2)
+        norm_resid = resid*(self.sivarf*np.sqrt(self.weightf))[full_fit_mask]
         
         # Use Huber loss function rather than direct chi2
         if huber_delta > 0:
@@ -1373,7 +1407,8 @@ class GroupFitter(object):
                      verbose=True, fit_background=True, fitter='nnls', 
                      delta_chi2_threshold=0.004, poly_order=3, zoom=True, 
                      line_complexes=True, templates={}, figsize=[8,5],
-                     fsps_templates=False, get_uncertainties=True):
+                     fsps_templates=False, get_uncertainties=True,
+                     Rspline=30):
         """TBD
         """
         from scipy import polyfit, polyval
@@ -1396,18 +1431,20 @@ class GroupFitter(object):
         tpoly = utils.polynomial_templates(wpoly, order=poly_order,
                                            line=False)
         out = self.xfit_at_z(z=0., templates=tpoly, fitter='lstsq',
-                            fit_background=True, get_uncertainties=False)
+                            fit_background=True, get_uncertainties=False,
+                            include_photometry=False)
         
         chi2_poly, coeffs_poly, err_poly, cov = out
         
         #### Spline SED fit
         wspline = np.arange(4200, 2.5e4)
-        Rspline = 30
+        #Rspline = 30
         df_spl = len(utils.log_zgrid(zr=[wspline[0], wspline[-1]], dz=1./Rspline))
         tspline = utils.bspline_templates(wspline, df=df_spl+2, log=True, clip=0.0001)
         
         out = self.xfit_at_z(z=0., templates=tspline, fitter='lstsq',
-                            fit_background=True, get_uncertainties=True)
+                            fit_background=True, get_uncertainties=True,
+                            include_photometry=False)
         
         chi2_spline, coeffs_spline, err_spline, cov = out
                 
@@ -1462,7 +1499,7 @@ class GroupFitter(object):
         import peakutils
         
         # Make "negative" chi2 for peak-finding
-        chi2_test = chi2_poly
+        #chi2_test = chi2_poly
         chi2_test = chi2_spline
         
         if chi2_test > (chi2.min()+100):
@@ -1674,7 +1711,7 @@ class GroupFitter(object):
         fit.meta['gam_loss'] = gamma, 'Gamma factor of the risk/loss function'
         return fit
                         
-    def template_at_z(self, z=0, templates=None, fit_background=True, fitter='nnls', fwhm=1400, get_uncertainties=2, get_residuals=False):
+    def template_at_z(self, z=0, templates=None, fit_background=True, fitter='nnls', fwhm=1400, get_uncertainties=2, get_residuals=False, include_photometry=True):
         """TBD
         """
         if templates is None:
@@ -1683,7 +1720,8 @@ class GroupFitter(object):
         out = self.xfit_at_z(z=z, templates=templates, fitter=fitter, 
                              fit_background=fit_background,
                              get_uncertainties=get_uncertainties,
-                             get_residuals=get_residuals)
+                             get_residuals=get_residuals,
+                             include_photometry=include_photometry)
 
         chi2, coeffs, coeffs_err, covar = out
         cont1d, line1d = utils.dot_templates(coeffs[self.N:], templates, z=z,
@@ -1859,7 +1897,7 @@ class GroupFitter(object):
         fit_data['cont1d'] = cont1d
         fit_data['line1d'] = line1d
     
-    def scale_to_photometry(self, z=0, templates={}, tol=1.e-4, order=0, init=None, method='lm', fit_background=True):
+    def scale_to_photometry(self, tfit=None, tol=1.e-4, order=0, init=None, fit_background=True, Rspline=50, **kwargs):
         """Compute scale factor between spectra and photometry
         
         method : 'Powell' or 'BFGS' work well, latter a bit faster but less robust
@@ -1873,7 +1911,14 @@ class GroupFitter(object):
         if self.Nphot == 0:
             return np.array([10.])
         
-        oned = self.oned_spectrum()
+        if (tfit is None) & (fit_background):
+            wspline = np.arange(4200, 2.5e4)
+            #Rspline = 50
+            df_spl = len(utils.log_zgrid(zr=[wspline[0], wspline[-1]], dz=1./Rspline))
+            tspline = utils.bspline_templates(wspline, df=df_spl+2, log=True, clip=0.0001)
+            tfit = self.template_at_z(z=0, templates=tspline, include_photometry=False, fit_background=fit_background)
+        
+        oned = self.oned_spectrum(tfit=tfit)
         
         if init is None:
             init = np.zeros(order+1)
@@ -1960,11 +2005,21 @@ class GroupFitter(object):
     @staticmethod
     def _objective_scale_direct(pscale, self, oned):
 
+        from eazy.filters import FilterDefinition
+        
         flam = []
         eflam = []
         spec_flux = []
         
-        filters = np.array(self.photom_filters)
+        filters = []
+        for filt in self.photom_filters:
+            clip = filt.throughput > 0.001*filt.throughput.max()
+            filters.append(FilterDefinition(name=filt.name,
+                                            wave=filt.wave[clip],
+                                            throughput=filt.throughput[clip]))
+        
+        filters = np.array(filters)
+                 
         lc = self.photom_pivot
         
         for k in oned:
@@ -1972,9 +2027,11 @@ class GroupFitter(object):
 
             # Covered filters
             spec1 = utils.SpectrumTemplate(wave=oned[k]['wave'], flux=3.e18/oned[k]['wave']**2)
-            okfilt = np.array([spec1.integrate_filter(filt) for filt in filters]) > 0.98
-
+            flux1 = np.array([spec1.integrate_filter(filt, use_wave='filter') for filt in filters]) 
+            okfilt = flux1 > 0.98
+            
             if okfilt.sum() == 0:
+                print('scale_to_photometry: no filters overlap '+k)
                 continue
 
             scale = 1./self.compute_scale_array(pscale, oned[k]['wave'])
@@ -2578,8 +2635,8 @@ class GroupFitter(object):
         if data is None:
             data = self.scif_mask
             
-        if data.size != (self.fit_mask.sum()-self.Nphot):
-            print('`data` has to be sized of masked arrays (self.fit_mask)')
+        if data.size not in [self.Nmask, self.Nspec]:
+            print('`data` has to be sized like masked arrays (self.fit_mask)')
             return False
         
         if ivar is None:
@@ -2589,15 +2646,15 @@ class GroupFitter(object):
         if trace_limits is None:
             prof = self.optimal_profile_mask
             
-            num = prof*data*ivar
-            den = prof**2*ivar
+            num = prof[:self.Nspec]*data[:self.Nspec]*ivar[:self.Nspec]
+            den = prof[:self.Nspec]**2*ivar[:self.Nspec]
             
         else:
             prof = np.isfinite(self.optimal_profile_mask)
-            trace_mask = (self.yp_trace_mask > trace_limits[0]) & (self.yp_trace_mask < trace_limits[1])
+            trace_mask = ((self.yp_trace_mask > trace_limits[0]) & (self.yp_trace_mask < trace_limits[1]))[:self.Nspec]
             
-            num = data*trace_mask
-            den = ivar*trace_mask
+            num = data[:self.Nspec]*trace_mask
+            den = ivar[:self.Nspec]*trace_mask
             
         out = {}
         for grism in self.Ngrism:
@@ -2696,6 +2753,12 @@ class GroupFitter(object):
         # weighted sigma-squared 
         #self.weighted_sigma2_mask = 1/(self.weightf*self.ivarf)[self.fit_mask] 
         self.weighted_sigma2_mask = 1/(self.weightf*self.sivarf**2)[self.fit_mask] 
+        
+        self.Nmask = self.fit_mask.sum()
+        if hasattr(self, 'Nphot'):
+            self.Nspec = self.Nmask - self.Nphot
+        else:
+            self.Nspec = self.Nmask
             
     def get_flat_model(self, spectrum_1d, apply_mask=True, is_cgs=True):
         """
