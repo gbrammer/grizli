@@ -283,7 +283,7 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
     info = info[so]
 
     #pa_v3 = np.round(info['pa_v3']*10)/10 % 360.
-    pa_v3 = np.round(info['pa_v3']) % 360.
+    pa_v3 = np.round(np.round(info['pa_v3'], decimals=1)) % 360.
     
     target_list = []
     for i in range(len(info)):
@@ -1377,7 +1377,7 @@ class SpectrumTemplate(object):
             integrate_wave = filter.wave
 
             integrate_templ = interp(filter.wave.astype(np.float), self.wave,
-                              self.flux_fnu)
+                              self.flux_fnu, left=0, right=0)
             
             if self.err is not None:
                 templ_ivar = 1./interp(filter.wave.astype(np.float), 
@@ -1392,17 +1392,17 @@ class SpectrumTemplate(object):
             ### Interpolate to spectrum wavelengths
             integrate_wave = self.wave
             integrate_templ = self.flux_fnu
-                        
+
+            # test = nonzero
+            test = np.isfinite(filter.throughput)
+            interp_thru = interp(integrate_wave, filter.wave[test],
+                                  filter.throughput[test], 
+                                  left=0, right=0)          
+                                                
             if self.err is not None:
                 templ_ivar = 1/self.err_fnu**2
                 templ_ivar[~np.isfinite(templ_ivar)] = 0
                 
-                # test = nonzero
-                test = np.isfinite(filter.throughput)
-                interp_thru = interp(integrate_wave, filter.wave[test],
-                                      filter.throughput[test], 
-                                      left=0, right=0)
-
                 integrate_weight = interp_thru/integrate_wave*templ_ivar/filter.norm
             else:
                 integrate_weight = interp_thru/integrate_wave#/templ_err**2
