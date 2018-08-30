@@ -3523,7 +3523,7 @@ class MultiBeam(GroupFitter):
             bg_model = 0.
         
         # Optimal spectral extraction
-        sp = self.optimal_extract(self.scif_mask-bg_model, **kwargs)
+        sp = self.optimal_extract(self.scif_mask[:self.Nspec]-bg_model, **kwargs)
         
         # Loop through grisms, change units and add fit columns
         # NB: setting units to "count / s" to comply with FITS standard, 
