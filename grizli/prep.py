@@ -2145,8 +2145,11 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
         for file in direct['files']:
             crclean = isACS & (len(direct['files']) == 1)
             fresh_flt_file(file, crclean=crclean)
-            updatewcs.updatewcs(file, verbose=False)
-    
+            try:
+                updatewcs.updatewcs(file, verbose=False, use_db=False)
+            except:
+                updatewcs.updatewcs(file, verbose=False)
+                
         # ### Make ASN
         # if not isWFPC2:
         #     asn = asnutil.ASNTable(inlist=direct['files'], output=direct['product'])
@@ -2175,8 +2178,11 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                 changed_filter = False
                      
             # Run updatewcs 
-            updatewcs.updatewcs(file, verbose=False)
-            
+            try:
+                updatewcs.updatewcs(file, verbose=False, use_db=False)
+            except:
+                updatewcs.updatewcs(file, verbose=False)
+                
             # Change back
             if changed_filter:
                 flc = pyfits.open(file, mode='update')
@@ -2979,7 +2985,10 @@ def match_direct_grism_wcs(direct={}, grism={}, get_fresh_flt=True,
     if get_fresh_flt:
         for file in grism['files']:
             fresh_flt_file(file)
-            updatewcs.updatewcs(file, verbose=False)
+            try:
+                updatewcs.updatewcs(file, verbose=False, use_db=False)
+            except:
+                updatewcs.updatewcs(file, verbose=False)
         
     direct_flt = pyfits.open(direct['files'][0])
     ref_catalog = direct_flt['SCI',1].header['WCSNAME']
