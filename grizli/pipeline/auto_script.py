@@ -1486,6 +1486,14 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
         except:
             pfit = None
     
+        if False:
+            # Use spline for first-pass continuum fit
+            wspline = np.arange(4200, 2.5e4)
+            Rspline = 10
+            df_spl = len(utils.log_zgrid(zr=[wspline[0], wspline[-1]], dz=1./Rspline))
+            tspline = utils.bspline_templates(wspline, df=df_spl+2, log=True, clip=0.0001)
+            pfit = mb.template_at_z(z=0, templates=tspline, fit_background=True, fitter='lstsq', get_uncertainties=2)
+            
         try:
             fig1 = mb.oned_figure(figsize=[5,3], tfit=pfit, show_beams=show_beams, scale_on_stacked=True)
             fig1.savefig('{0}_{1:05d}.1D.png'.format(target, id))
