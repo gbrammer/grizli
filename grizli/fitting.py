@@ -161,18 +161,25 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
         fit_obj = st
     
     ### Do scaling now with direct spectrum function
-    if scale_photometry & (phot is not None):
+    if (scale_photometry > 0) & (phot is not None):
         scl = mb.scale_to_photometry(z=0, method='lm', templates=t0, order=scale_photometry*1-1)
-        if scl.status > 0:
-            mb.pscale = scl.x
-            if st is not None:
-                st.pscale = scl.x
+        if hasattr(scl,'status'):
+            if scl.status > 0:
+                print('scale_to_photometry: {0}'.format(scl.x))
+                mb.pscale = scl.x
+                if st is not None:
+                    st.pscale = scl.x
     
     # First pass    
     fit = fit_obj.xfit_redshift(templates=t0, zr=zr, dz=dz, prior=prior, fitter=fitter, verbose=verbose) 
     fit_hdu = pyfits.table_to_hdu(fit)
     fit_hdu.header['EXTNAME'] = 'ZFIT_STACK'
     
+    if hasattr(fit_obj, 'pscale'):
+        fit_hdu.header['PSCALEN'] = (len(fit_obj.pscale)-1, 'PSCALE order')
+        for i, p in enumerate(fit_obj.pscale):
+            fit_hdu.header['PSCALE{0}'.format(i)] = (p, 'PSCALE parameter {0}'.format(i))
+            
     # # Second pass if rescaling spectrum to photometry
     # if scale_photometry:
     #     scl = mb.scale_to_photometry(z=fit.meta['z_map'][0], method='lm', templates=t0, order=scale_photometry*1-1)
@@ -2051,7 +2058,7 @@ class GroupFitter(object):
         eflam = np.hstack(eflam)
         chi2 = (flam-spec_flux[:,0])**2/(eflam**2+spec_flux[:,1]**2)
 
-        print(pscale, chi2.sum())
+        #print(pscale, chi2.sum())
         return chi2
                 
     def xfit_star(self, tstar=None, spline_correction=True, fitter='nnls', fit_background=True, spline_args={'Rspline':5}, oned_args={}):
@@ -2507,8 +2514,7 @@ class GroupFitter(object):
             sp_flat = self.optimal_extract(self.flat_flam[self.fit_mask[:-self.Nphotbands]], bin=bin)
         else:
             sp_flat = self.optimal_extract(self.flat_flam[self.fit_mask], bin=bin)
-        #sp_flat = self.optimal_extract(self.flat_flam[self.fit_mask], bin=bin)
-
+        
         if tfit is not None:
             bg_model = self.get_flat_background(tfit['coeffs'], apply_mask=True)
             m2d = self.get_flat_model(sp, apply_mask=True, is_cgs=True)
@@ -2521,7 +2527,7 @@ class GroupFitter(object):
             m2d = self.get_flat_model(mspl, apply_mask=True, is_cgs=True)
             sp_spline = self.optimal_extract(m2d, bin=bin)
             
-        sp_data = self.optimal_extract(self.scif_mask-bg_model, bin=bin)
+        sp_data = self.optimal_extract(self.scif_mask[:self.Nspec]-bg_model, bin=bin)
 
         for g in sp_data:
 
