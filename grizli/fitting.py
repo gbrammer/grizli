@@ -161,7 +161,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
         fit_obj = st
     
     ### Do scaling now with direct spectrum function
-    if scale_photometry:
+    if scale_photometry & (phot is not None):
         scl = mb.scale_to_photometry(z=0, method='lm', templates=t0, order=scale_photometry*1-1)
         if scl.status > 0:
             mb.pscale = scl.x
