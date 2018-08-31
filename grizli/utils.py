@@ -2067,14 +2067,21 @@ def compute_equivalent_widths(templates, coeffs, covar, max_R=5000, Ndraw=1000, 
 def get_multiple_vizier():
     pass
     
-PS1_CATALOG = 'II/349'
+PS1_VIZIER = 'II/349'
 PS1_BANDS = OrderedDict([('g_HSC', ['gKmag', 'e_gKmag']),
                  ('r_HSC', ['rKmag', 'e_rKmag']),
                  ('i_HSC', ['iKmag', 'e_iKmag']),
                  ('z_HSC', ['zKmag', 'e_zKmag']),
                  ('y_HSC', ['yKmag', 'e_yKmag'])])
+
+SDSS_VIZIER = 'V/147/sdss12'
+SDSS_BANDS = OrderedDict([('SDSS/u', ['umag', 'e_umag']),
+                          ('SDSS/g', ['gmag', 'e_gmag']),
+                          ('SDSS/r', ['rmag', 'e_rmag']),
+                          ('SDSS/i', ['imag', 'e_imag']),
+                          ('SDSS/z', ['zmag', 'e_zmag'])])
                  
-def get_Vizier_photometry(ra, dec, templates=None, radius=2, vizier_catalog=PS1_CATALOG, bands=PS1_BANDS, filter_file='/usr/local/share/eazy-photoz/filters/FILTER.RES.latest', MW_EBV=0):
+def get_Vizier_photometry(ra, dec, templates=None, radius=2, vizier_catalog=PS1_VIZIER, bands=PS1_BANDS, filter_file='/usr/local/share/eazy-photoz/filters/FILTER.RES.latest', MW_EBV=0):
     """
     Fetch photometry from a Vizier catalog
     
@@ -2159,6 +2166,41 @@ def get_Vizier_photometry(ra, dec, templates=None, radius=2, vizier_catalog=PS1_
             
     phot = OrderedDict([('flam', np.array(flam)), ('eflam', np.array(eflam)), ('filters', filters), ('tempfilt',tempfilt), ('lc',np.array(lc))])
     
+    return phot
+
+def generate_tempfilt(templates, filters, zgrid=None, MW_EBV=0):
+    
+    from eazy.templates import Template
+    from eazy.photoz import TemplateGrid
+    
+    twave, tflux, is_line = array_templates(templates, z=0)
+    eazy_templates = []
+    for i, t in enumerate(templates):
+        eazy_templates.append(Template(arrays=[twave, np.maximum(twave, 1.e-30)], name=t))
+        
+    if zgrid is None:
+        zgrid = log_zgrid(zr=[0.01, 3.4], dz=0.005)
+
+    tempfilt = TemplateGrid(zgrid, eazy_templates, filters=filters, add_igm=True, galactic_ebv=MW_EBV, Eb=0, n_proc=0, verbose=False)
+    
+    return tempfilt
+    
+def combine_phot_dict(phots, templates=None, MW_EBV=0):
+    """
+    Combine photmetry dictionaries
+    """
+    phot = {}
+    phot['flam'] = []
+    phot['eflam'] = []
+    phot['filters'] = []
+    for p in phots:
+        phot['flam'] = np.append(phot['flam'], p['flam'])
+        phot['eflam'] = np.append(phot['eflam'], p['eflam'])
+        phot['filters'].extend(p['filters'])
+    
+    if templates is not None:
+        phot['tempfilt'] = generate_tempfilt(templates, phot['filters'], MW_EBV=MW_EBV)
+        
     return phot
     
 def get_spectrum_AB_mags(spectrum, bandpasses=[]):
