@@ -70,7 +70,7 @@ def run_all_parallel(id, get_output_data=False, **kwargs):
     
     return id, status, t1-t0
     
-def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter='nnls', group_name='grism', fit_stacks=True, only_stacks=False, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=3, fit_only_beams=False, fit_beams=True, root='*', fit_trace_shift=False, phot=None, verbose=True, scale_photometry=False, show_beams=True, scale_on_stacked_1d=True, overlap_threshold=5, MW_EBV=0., sys_err=0.03, get_dict=False, bad_pa_threshold=1.6, units1d='flam', redshift_only=False, line_size=1.6, use_psf=False, get_line_width=False, **kwargs):
+def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter='nnls', group_name='grism', fit_stacks=True, only_stacks=False, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=3, fit_only_beams=False, fit_beams=True, root='*', fit_trace_shift=False, phot=None, phot_obj=None, verbose=True, scale_photometry=False, show_beams=True, scale_on_stacked_1d=True, overlap_threshold=5, MW_EBV=0., sys_err=0.03, get_dict=False, bad_pa_threshold=1.6, units1d='flam', redshift_only=False, line_size=1.6, use_psf=False, get_line_width=False, sed_args={'bin':1, 'xlim':[0.3, 9]}, **kwargs):
     """Run the full procedure
     
     1) Load MultiBeam and stack files 
@@ -141,7 +141,13 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
                                            split_groups=True)
             
         mb.initialize_masked_arrays()
-
+    
+    ## Get photometry from phot_obj
+    if (phot is None) & (phot_obj is not None):
+        phot_i, ii, dd = phot_obj.get_phot_dict(mb.ra, mb.dec)
+        if dd < 0.5*u.arcsec:
+            phot = phot_i
+            
     if phot is not None:
         if st is not None:
             st.set_photometry(**phot)
@@ -162,10 +168,14 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     
     ### Do scaling now with direct spectrum function
     if (scale_photometry > 0) & (phot is not None):
-        scl = mb.scale_to_photometry(z=0, method='lm', templates=t0, order=scale_photometry*1-1)
+        try:
+            scl = mb.scale_to_photometry(z=0, method='lm', templates=t0, order=scale_photometry*1-1)
+        except:
+            scl = [10.]
+            
         if hasattr(scl,'status'):
             if scl.status > 0:
-                print('scale_to_photometry: {0}'.format(scl.x))
+                print('scale_to_photometry: [{0}]'.format(', '.join(['{0:.2f}'.format(x_i) for x_i in scl.x])))
                 mb.pscale = scl.x
                 if st is not None:
                     st.pscale = scl.x
@@ -179,6 +189,16 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
         fit_hdu.header['PSCALEN'] = (len(fit_obj.pscale)-1, 'PSCALE order')
         for i, p in enumerate(fit_obj.pscale):
             fit_hdu.header['PSCALE{0}'.format(i)] = (p, 'PSCALE parameter {0}'.format(i))
+    
+    # Add photometry information
+    if (fit_obj.Nphot > 0) & hasattr(fit_obj, 'photom_filters'):
+        h = fit_hdu.header
+        h['NPHOT'] = fit_obj.Nphot, 'Number of photometry filters'
+        for i in range(len(fit_obj.photom_filters)):
+            h['PHOTN{0:03d}'.format(i)] = fit_obj.photom_filters[i].name.split()[0], 'Filter {0} name'.format(i)
+            h['PHOTL{0:03d}'.format(i)] = fit_obj.photom_pivot[i], 'Filter {0} pivot wavelength'.format(i)
+            h['PHOTF{0:03d}'.format(i)] = fit_obj.photom_flam[i], 'Filter {0} flux flam'.format(i)
+            h['PHOTE{0:03d}'.format(i)] = fit_obj.photom_eflam[i], 'Filter {0} err flam'.format(i)
             
     # # Second pass if rescaling spectrum to photometry
     # if scale_photometry:
@@ -336,14 +356,14 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     if phot is not None:
         out = mb, st, fit, tfit, line_hdu
         if 'pz' in phot:
-            full_sed_plot(mb, tfit, zfit=fit, photometry_pz=phot['pz'])
+            full_sed_plot(mb, tfit, zfit=fit, photometry_pz=phot['pz'], **sed_args)
         else:
-            full_sed_plot(mb, tfit, zfit=fit)
+            full_sed_plot(mb, tfit, zfit=fit, **sed_args)
         
     return mb, st, fit, tfit, line_hdu
 
 ###################################
-def full_sed_plot(mb, tfit, zfit=None, bin=1, minor=0.1, save='png', sed_resolution=180, photometry_pz=None, zspec=None, spectrum_steps=False, **kwargs):
+def full_sed_plot(mb, tfit, zfit=None, bin=1, minor=0.1, save='png', sed_resolution=180, photometry_pz=None, zspec=None, spectrum_steps=False, xlim=[0.3, 9], **kwargs):
     """
     Make a separate plot showing photometry and the spectrum
     """
@@ -419,9 +439,17 @@ def full_sed_plot(mb, tfit, zfit=None, bin=1, minor=0.1, save='png', sed_resolut
 
     ax1.plot(np.log10(tfit['line1d'].wave/1.e4), sm/1.e-19, color=sns_colors[4], linewidth=1, zorder=0)
 
-    ax1.set_xlim(np.log10(0.3), np.log10(9))
-    ax1.set_xticks(np.log10([0.5, 1, 2, 4, 8]))
-    ax1.set_xticklabels([0.5, 1, 2, 4, 8])
+    if xlim is None:
+        xlim = [0.7*mb.photom_pivot.min()/1.e4, mb.photom_pivot.max()/1.e4/0.7]
+        
+    ax1.set_xlim(np.log10(xlim[0]), np.log10(xlim[1]))
+    
+    ticks = np.array([0.5, 1, 2, 4, 8])
+    ticks = ticks[(ticks >= xlim[0]) & (ticks <= xlim[1])]
+    
+    ax1.set_xticks(np.log10(ticks))
+    ax1.set_xticklabels(ticks)
+    
     #ax1.grid()
     ax1.set_xlabel(r'$\lambda$ / $\mu$m')
     ax2.set_xlabel(r'$\lambda$ / $\mu$m')
@@ -469,7 +497,8 @@ def full_sed_plot(mb, tfit, zfit=None, bin=1, minor=0.1, save='png', sed_resolut
     # Show spectrum range on SED panel
     xb, yb = np.array([0, 1, 1, 0, 0]), np.array([0, 0, 1, 1, 0])
     ax1.plot(np.log10(xl[0]+xb*(xl[1]-xl[0])), yl[0]+yb*(yl[1]-yl[0]), linestyle=':', color='k', alpha=0.4)
-    ax1.set_ylim(-0.1*yl1[1], yl1[1])
+    ymax = np.maximum(yl1[1], yl[1]+0.02*(yl[1]-yl[0]))
+    ax1.set_ylim(-0.1*ymax, ymax)
     
     tick_diff = np.diff(ax1.get_yticks())[0]
     ax2.yaxis.set_major_locator(MultipleLocator(tick_diff))
@@ -1718,7 +1747,7 @@ class GroupFitter(object):
         fit.meta['gam_loss'] = gamma, 'Gamma factor of the risk/loss function'
         return fit
                         
-    def template_at_z(self, z=0, templates=None, fit_background=True, fitter='nnls', fwhm=1400, get_uncertainties=2, get_residuals=False, include_photometry=True):
+    def template_at_z(self, z=0, templates=None, fit_background=True, fitter='nnls', fwhm=1400, get_uncertainties=2, get_residuals=False, include_photometry=True, draws=0):
         """TBD
         """
         if templates is None:
@@ -1733,7 +1762,7 @@ class GroupFitter(object):
         chi2, coeffs, coeffs_err, covar = out
         cont1d, line1d = utils.dot_templates(coeffs[self.N:], templates, z=z,
                                              apply_igm=(z > IGM_MINZ))
-
+        
         # Parse template coeffs
         cfit = OrderedDict()
                 
@@ -1759,6 +1788,17 @@ class GroupFitter(object):
         tfit['z'] = z
         tfit['templates'] = templates
         
+        if draws > 0:
+            xte, yte, lte = utils.array_templates(templates, max_R=5000, z=z)
+            err = np.sqrt(covar.diagonal())
+            nonzero = err > 0
+            cov_norm = ((covar/err).T/err)[nonzero,:][:,nonzero]
+            draw_coeff = np.zeros((draws, len(err)))
+            draw_coeff[:,nonzero] = np.random.multivariate_normal((coeffs/err)[nonzero], cov_norm, draws)*err[nonzero]
+            draw_spec = draw_coeff[:,self.N:].dot(yte)
+            err_spec = np.diff(np.percentile(draw_spec, [16,84], axis=0), axis=0).flatten()/2.
+            tfit['line1d_err'] = err_spec
+            
         return tfit #cont1d, line1d, cfit, covar
         
         ### Random draws
@@ -1904,7 +1944,7 @@ class GroupFitter(object):
         fit_data['cont1d'] = cont1d
         fit_data['line1d'] = line1d
     
-    def scale_to_photometry(self, tfit=None, tol=1.e-4, order=0, init=None, fit_background=True, Rspline=50, **kwargs):
+    def scale_to_photometry(self, tfit=None, tol=1.e-4, order=0, init=None, fit_background=True, Rspline=50, use_fit=True, **kwargs):
         """Compute scale factor between spectra and photometry
         
         method : 'Powell' or 'BFGS' work well, latter a bit faster but less robust
@@ -1923,15 +1963,25 @@ class GroupFitter(object):
             #Rspline = 50
             df_spl = len(utils.log_zgrid(zr=[wspline[0], wspline[-1]], dz=1./Rspline))
             tspline = utils.bspline_templates(wspline, df=df_spl+2, log=True, clip=0.0001)
-            tfit = self.template_at_z(z=0, templates=tspline, include_photometry=False, fit_background=fit_background)
+            tfit = self.template_at_z(z=0, templates=tspline, include_photometry=False, fit_background=fit_background, draws=1000)
         
-        oned = self.oned_spectrum(tfit=tfit)
-        
+        if use_fit:
+            oned = self.oned_spectrum(tfit=tfit)
+            wmi = np.min([oned[k]['wave'].min() for k in oned])
+            wma = np.max([oned[k]['wave'].max() for k in oned])
+            
+            clip = (tfit['line1d'].wave > wmi) & (tfit['line1d'].wave < wma) & (tfit['line1d_err'] > 0)
+            spl_temp = utils.SpectrumTemplate(wave=tfit['line1d'].wave[clip], flux=tfit['line1d'].flux[clip], err=tfit['line1d_err'][clip])
+            args = (self, {'spl':spl_temp})
+        else:
+            oned = self.oned_spectrum(tfit=tfit)
+            args = (self, oned)
+            
         if init is None:
             init = np.zeros(order+1)
             init[0] = 10.
             
-        scale_fit = least_squares(self._objective_scale_direct, init, jac='2-point', method='lm', ftol=tol, xtol=tol, gtol=tol, x_scale=1.0, loss='linear', f_scale=1.0, diff_step=None, tr_solver=None, tr_options={}, jac_sparsity=None, max_nfev=None, verbose=0, args=(self, oned), kwargs={})
+        scale_fit = least_squares(self._objective_scale_direct, init, jac='2-point', method='lm', ftol=tol, xtol=tol, gtol=tol, x_scale=1.0, loss='linear', f_scale=1.0, diff_step=None, tr_solver=None, tr_options={}, jac_sparsity=None, max_nfev=None, verbose=0, args=args, kwargs={})
             
         # pscale = scale_fit.x
         return scale_fit
@@ -2008,7 +2058,7 @@ class GroupFitter(object):
             return coeffs, full, resid, chi2, AxT
         else:
             return chi2
-
+        
     @staticmethod
     def _objective_scale_direct(pscale, self, oned):
 
@@ -2033,7 +2083,11 @@ class GroupFitter(object):
             #spec, okfilt, lc = spec1d[k]
 
             # Covered filters
-            spec1 = utils.SpectrumTemplate(wave=oned[k]['wave'], flux=3.e18/oned[k]['wave']**2)
+            if isinstance(oned[k], utils.SpectrumTemplate):
+                spec1 = utils.SpectrumTemplate(wave=oned[k].wave, flux=3.e18/oned[k].wave**2)
+            else:
+                spec1 = utils.SpectrumTemplate(wave=oned[k]['wave'], flux=3.e18/oned[k]['wave']**2)
+            
             flux1 = np.array([spec1.integrate_filter(filt, use_wave='filter') for filt in filters]) 
             okfilt = flux1 > 0.98
             
@@ -2041,9 +2095,12 @@ class GroupFitter(object):
                 print('scale_to_photometry: no filters overlap '+k)
                 continue
 
-            scale = 1./self.compute_scale_array(pscale, oned[k]['wave'])
-
-            spec = utils.SpectrumTemplate(wave=oned[k]['wave'], flux=oned[k]['flux']*scale/np.maximum(oned[k]['flat'], 1), err=oned[k]['err']*scale/np.maximum(oned[k]['flat'], 1))
+            if isinstance(oned[k], utils.SpectrumTemplate):
+                scale = 1./self.compute_scale_array(pscale, oned[k].wave)
+                spec = utils.SpectrumTemplate(wave=oned[k].wave, flux=oned[k].flux*scale, err=oned[k].err*scale)
+            else:
+                scale = 1./self.compute_scale_array(pscale, oned[k]['wave'])
+                spec = utils.SpectrumTemplate(wave=oned[k]['wave'], flux=oned[k]['flux']*scale/np.maximum(oned[k]['flat'], 1), err=oned[k]['err']*scale/np.maximum(oned[k]['flat'], 1))
 
             spec_flux.append((np.array([spec.integrate_filter(filt, use_wave='templ') for filt in filters[okfilt]]).T*3.e18/lc[okfilt]**2).T)
 
