@@ -181,13 +181,120 @@ def radec_to_targname(ra=0, dec=0, header=None):
     
     return targname
     
+def blot_nearest_exact(in_data, in_wcs, out_wcs, verbose=True, stepsize=-1):
+    """
+    Own blot function for blotting exact pixels without rescaling for input 
+    and output pixel size
+    
+    test
+    
+    Parameters
+    ----------
+    in_data : `~numpy.ndarray`
+        Input data to blot.
+    
+    in_wcs : `~astropy.wcs.WCS`
+        Input WCS.  Must have _naxis1, _naxis2 attributes.
+        
+    out_wcs : `~astropy.wcs.WCS`
+        Output WCS.  Must have _naxis1, _naxis2 attributes.
+    
+    Returns
+    -------
+    out_data : `~numpy.ndarray`
+        Blotted data.
+    
+    """
+    from shapely.geometry import Polygon
+    import pyregion
+    import scipy.ndimage as nd
+    from drizzlepac import cdriz
+    
+    try:
+        from .utils_c.interp import pixel_map_c
+    except:
+        from grizli.utils_c.interp import pixel_map_c
+        
+    if False:
+        # Testing
+        im = pyfits.open('jbhj40-bhj-40-000.0-f814w_drc_sci.fits')
+        out = pyfits.open('jbhj40hbq_flc.fits')
+
+        in_data = im[0].data
+        in_wcs = pywcs.WCS(im[0].header)
+        
+        ext = 1
+        out_wcs = pywcs.WCS(out['SCI',ext].header, fobj=out)
+
+        out_data = utils.blot_nearest_exact(in_data, in_wcs, out_wcs)
+        
+        # Try HSTWCS
+        from stwcs.wcsutil import HSTWCS
+        source_wcs = HSTWCS(fobj=out, ext=('SCI',ext), minerr=0.0, wcskey=' ')
+        blot_wcs = HSTWCS(fobj=im, ext=(0), minerr=0.0, wcskey=' ')
+        
+    in_sh = (in_wcs._naxis2, in_wcs._naxis1)
+    out_sh = (out_wcs._naxis2, out_wcs._naxis1)
+            
+    in_px = in_wcs.calc_footprint()
+    in_poly = Polygon(in_px)
+     
+    out_px = out_wcs.calc_footprint()
+    out_poly = Polygon(out_px)
+
+    olap = in_poly.intersection(out_poly)
+    if olap.area == 0:
+        print('No overlap')
+        return np.zeros(out_sh)
+        
+    # Region mask for speedup
+    olap_poly = np.array(olap.exterior.xy)
+    poly_reg = "fk5\npolygon("+','.join(['{0}'.format(p) for p in olap_poly.T.flatten()])+')\n'
+    reg = pyregion.parse(poly_reg)
+    mask = reg.get_mask(header=to_header(in_wcs), shape=in_sh)
+    
+    #yp, xp = np.indices(in_data.shape)
+    #xi, yi = xp[mask], yp[mask]
+    yi, xi = np.where(mask > 0)
+    
+    if stepsize <= 1:        
+        rd = in_wcs.all_pix2world(xi, yi, 0)
+        xf, yf = out_wcs.all_world2pix(rd[0], rd[1], 0)
+    else:
+        ## Seems backwards and doesn't quite agree with above
+        blot_wcs = in_wcs
+        source_wcs = out_wcs
+        
+        nx, ny = int(blot_wcs._naxis1), int(blot_wcs._naxis2)
+        mapping = cdriz.DefaultWCSMapping(blot_wcs, source_wcs, nx, ny,
+                                          stepsize)
+        xf, yf = mapping(xi+1, yi+1)
+        
+    xo, yo = np.cast[int](np.round(xf)), np.cast[int](np.round(yf))
+        
+    m2 = (xo >= 0) & (yo >= 0) & (xo < out_sh[1]) & (yo < out_sh[0])
+    xi, yi, xf, yf, xo, yo = xi[m2], yi[m2], xf[m2], yf[m2], xo[m2], yo[m2]
+    
+    out_data = np.zeros(out_sh, dtype=np.float)
+    status = pixel_map_c(np.cast[np.float](in_data), xi, yi, out_data, xo, yo)
+        
+    # Fill empty 
+    func = nd.maximum_filter
+    fill = out_data == 0
+    filtered = func(out_data, size=5)
+    out_data[fill] = filtered[fill]
+    
+    return out_data
+    
+        
 def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
                     get_footprint = False, 
                     translate = {'AEGIS-':'aegis-', 
                                  'COSMOS-':'cosmos-', 
                                  'GNGRISM':'goodsn-', 
                                  'GOODS-SOUTH-':'goodss-', 
-                                 'UDS-':'uds-'}):
+                                 'UDS-':'uds-'},
+                    visit_split_shift=1.5):
     """Read header information from a list of exposures and parse out groups based on filter/target/orientation.
     
     Parameters
@@ -404,6 +511,15 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
                                     files=list(np.array(exposure_list)[so]))
                     output_list.append(d)
     
+    ### Split large shifts
+    if visit_split_shift > 0:
+        split_list = []
+        for o in output_list:
+            split_list.extend(split_visit(o,
+                              visit_split_shift=visit_split_shift))
+        
+        output_list = split_list
+        
     ### Get visit footprint from FLT WCS
     if get_footprint:
         from shapely.geometry import Polygon
@@ -437,6 +553,40 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
             
     return output_list, filter_list
 
+def split_visit(visit, visit_split_shift=1.5, path='../RAW'):
+    """
+    Check if files in a visit have large shifts and split them otherwise
+    
+    visit : visit dictionary
+    
+    visit_split_shift : split if shifts larger than `visit_split_shift` arcmin
+    """
+    
+    ims = [pyfits.open(os.path.join(path, file)) for file in visit['files']]
+    crval1 = np.array([im[1].header['CRVAL1'] for im in ims])
+    crval2 = np.array([im[1].header['CRVAL2'] for im in ims])
+    
+    dx = (crval1 - crval1[0])*60*np.cos(crval2[0]/180*np.pi)
+    dy = (crval2 - crval2[0])*60
+    
+    dxi = np.cast[int](np.round(dx/visit_split_shift))
+    dyi = np.cast[int](np.round(dy/visit_split_shift))
+    keys = dxi*100+dyi
+    un = np.unique(keys)
+    if len(un) == 1:
+        return [visit]
+    else:
+        spl = visit['product'].split('-')
+        spl.insert(-1,'')
+        visits = []
+        for i in range(len(un)):
+            ix = keys == un[i]
+            spl[-2] = 'abcdefghi'[i]
+            visits.append({'files':list(np.array(visit['files'])[ix]), 
+                           'product':'-'.join(spl)})
+    
+    return visits               
+    
 def get_visit_footprints(visits):
     """
     Add `~shapely.geometry.Polygon` 'footprint' attributes to visit dict.
@@ -2064,24 +2214,111 @@ def compute_equivalent_widths(templates, coeffs, covar, max_R=5000, Ndraw=1000, 
     
     return EWdict
 
-def get_multiple_vizier():
-    pass
-    
-PS1_VIZIER = 'II/349'
-PS1_BANDS = OrderedDict([('g_HSC', ['gKmag', 'e_gKmag']),
-                 ('r_HSC', ['rKmag', 'e_rKmag']),
-                 ('i_HSC', ['iKmag', 'e_iKmag']),
-                 ('z_HSC', ['zKmag', 'e_zKmag']),
-                 ('y_HSC', ['yKmag', 'e_yKmag'])])
+#####################
+### Photometry from Vizier tables
 
-SDSS_VIZIER = 'V/147/sdss12'
-SDSS_BANDS = OrderedDict([('SDSS/u', ['umag', 'e_umag']),
+# CFHTLS
+CFHTLS_W_VIZIER = 'II/317/cfhtls_w'
+CFHTLS_W_BANDS = OrderedDict([('cfht_mega_u', ['umag', 'e_umag']),
+                             ('cfht_mega_g', ['gmag', 'e_gmag']),
+                             ('cfht_mega_r', ['rmag', 'e_rmag']),
+                             ('cfht_mega_i', ['imag', 'e_imag']),
+                             ('cfht_mega_z', ['zmag', 'e_zmag'])])
+
+CFHTLS_D_VIZIER = 'II/317/cfhtls_d'
+CFHTLS_D_BANDS = OrderedDict([('cfht_mega_u', ['umag', 'e_umag']),
+                             ('cfht_mega_g', ['gmag', 'e_gmag']),
+                             ('cfht_mega_r', ['rmag', 'e_rmag']),
+                             ('cfht_mega_i', ['imag', 'e_imag']),
+                             ('cfht_mega_z', ['zmag', 'e_zmag'])])
+
+# SDSS DR12
+SDSS_DR12_VIZIER = 'V/147/sdss12'
+SDSS_DR12_BANDS = OrderedDict([('SDSS/u', ['umag', 'e_umag']),
                           ('SDSS/g', ['gmag', 'e_gmag']),
                           ('SDSS/r', ['rmag', 'e_rmag']),
                           ('SDSS/i', ['imag', 'e_imag']),
                           ('SDSS/z', ['zmag', 'e_zmag'])])
+
+# PanStarrs    
+PS1_VIZIER = 'II/349/ps1'
+PS1_BANDS = OrderedDict([('PS1.g', ['gKmag', 'e_gKmag']),
+                 ('PS1.r', ['rKmag', 'e_rKmag']),
+                 ('PS1.i', ['iKmag', 'e_iKmag']),
+                 ('PS1.z', ['zKmag', 'e_zKmag']),
+                 ('PS1.y', ['yKmag', 'e_yKmag'])])
+
+# KIDS DR3
+KIDS_DR3_VIZIER = 'II/347/kids_dr3'
+KIDS_DR3_BANDS = OrderedDict([('OCam.sdss.u', ['umag', 'e_umag']),
+                          ('OCam.sdss.g', ['gmag', 'e_gmag']),
+                          ('OCam.sdss.r', ['rmag', 'e_rmag']),
+                          ('OCam.sdss.i', ['imag', 'e_imag'])])
+
+# WISE all-sky
+WISE_VIZIER = 'II/328/allwise'
+WISE_BANDS = OrderedDict([('WISE/RSR-W1', ['W1mag', 'e_W1mag']),
+                          ('WISE/RSR-W2', ['W2mag', 'e_W2mag'])])#,
+                          # ('WISE/RSR-W3', ['W3mag', 'e_W3mag']),
+                          # ('WISE/RSR-W4', ['W4mag', 'e_W4mag'])])
+
+# VIKING VISTA
+VIKING_VIZIER = 'II/343/viking2'
+VIKING_BANDS = OrderedDict([('SDSS/z', ['Zpmag', 'e_Zpmag']),
+                            ('VISTA/Y',  ['Ypmag',  'e_Ypmag']),
+                            ('VISTA/J',  ['Jpmag',  'e_Jpmag']),
+                            ('VISTA/H',  ['Hpmag',  'e_Hpmag']),
+                            ('VISTA/Ks', ['Kspmag', 'e_Kspmag'])])
+
+# UKIDSS wide surveys
+UKIDSS_LAS_VIZIER = 'II/319/las9'
+UKIDSS_LAS_BANDS = OrderedDict([('WFCAM_Y', ['Ymag', 'e_Ymag']),
+                            ('WFCAM_J', ['Jmag1', 'e_Jmag1']),
+                            ('WFCAM_J', ['Jmag2', 'e_Jmag2']),
+                            ('WFCAM_H', ['Hmag', 'e_Hmag']),
+                            ('WFCAM_K', ['Kmag', 'e_Kmag'])])
+
+UKIDSS_DXS_VIZIER = 'II/319/dxs9'
+UKIDSS_DXS_BANDS = OrderedDict([('WFCAM_J', ['Jmag', 'e_Jmag']),
+                            ('WFCAM_K', ['Kmag', 'e_Kmag'])])
+
+# GALEX
+GALEX_MIS_VIZIER = 'II/312/mis'
+GALEX_MIS_BANDS = OrderedDict([('FUV', ['FUV', 'e_FUV']),
+                              ('NUV', ['NUV', 'e_NUV'])])
+
+GALEX_AIS_VIZIER = 'II/312/ais'
+GALEX_AIS_BANDS = OrderedDict([('FUV', ['FUV', 'e_FUV']),
+                              ('NUV', ['NUV', 'e_NUV'])])
+
+# Combined Dict
+VIZIER_BANDS = OrderedDict()
+VIZIER_BANDS[CFHTLS_W_VIZIER] = CFHTLS_W_BANDS
+VIZIER_BANDS[CFHTLS_D_VIZIER] = CFHTLS_D_BANDS
+VIZIER_BANDS[SDSS_DR12_VIZIER] = SDSS_DR12_BANDS
+VIZIER_BANDS[PS1_VIZIER] = PS1_BANDS
+VIZIER_BANDS[KIDS_DR3_VIZIER] = KIDS_DR3_BANDS
+VIZIER_BANDS[WISE_VIZIER] = WISE_BANDS
+VIZIER_BANDS[VIKING_VIZIER] = VIKING_BANDS
+VIZIER_BANDS[UKIDSS_LAS_VIZIER] = UKIDSS_LAS_BANDS
+VIZIER_BANDS[UKIDSS_DXS_VIZIER] = UKIDSS_DXS_BANDS
+VIZIER_BANDS[GALEX_MIS_VIZIER] = GALEX_MIS_BANDS
+VIZIER_BANDS[GALEX_AIS_VIZIER] = GALEX_AIS_BANDS
+
+VIZIER_VEGA = OrderedDict()
+VIZIER_VEGA[CFHTLS_W_VIZIER] = False
+VIZIER_VEGA[CFHTLS_D_VIZIER] = False
+VIZIER_VEGA[SDSS_DR12_VIZIER] = False
+VIZIER_VEGA[PS1_VIZIER] = False
+VIZIER_VEGA[KIDS_DR3_VIZIER] = False
+VIZIER_VEGA[WISE_VIZIER] = True
+VIZIER_VEGA[VIKING_VIZIER] = True
+VIZIER_VEGA[UKIDSS_LAS_VIZIER] = True
+VIZIER_VEGA[UKIDSS_DXS_VIZIER] = True
+VIZIER_VEGA[GALEX_MIS_VIZIER] = False
+VIZIER_VEGA[GALEX_AIS_VIZIER] = False
                  
-def get_Vizier_photometry(ra, dec, templates=None, radius=2, vizier_catalog=PS1_VIZIER, bands=PS1_BANDS, filter_file='/usr/local/share/eazy-photoz/filters/FILTER.RES.latest', MW_EBV=0):
+def get_Vizier_photometry(ra, dec, templates=None, radius=2, vizier_catalog=PS1_VIZIER, bands=PS1_BANDS, filter_file='/usr/local/share/eazy-photoz/filters/FILTER.RES.latest', MW_EBV=0, convert_vega=False, raw_query=False, verbose=True, timeout=300, rowlimit=50000):
     """
     Fetch photometry from a Vizier catalog
     
@@ -2092,6 +2329,11 @@ def get_Vizier_photometry(ra, dec, templates=None, radius=2, vizier_catalog=PS1_
     
     import astropy.units as u    
     from astroquery.vizier import Vizier
+    Vizier.ROW_LIMIT = rowlimit
+    Vizier.TIMEOUT = timeout
+    
+    #print('xxx', Vizier.ROW_LIMIT, Vizier.TIMEOUT)
+    
     import astropy.coordinates as coord
     import astropy.units as u
     
@@ -2104,22 +2346,47 @@ def get_Vizier_photometry(ra, dec, templates=None, radius=2, vizier_catalog=PS1_
     
     res = FilterFile(filter_file)
     
-    # PS1
-    #vizier_catalog = 'II/349'
-    # bands = 'grizy'
-    # 
-    # bands = OrderedDict()
-    # for b in 'grizy':
-    #     bands['{0}_HSC'.format(b)] = [b+'Kmag', 'e_{0}Kmag'.format(b)]
-            
     coo = coord.SkyCoord(ra=ra, dec=dec, unit=(u.deg, u.deg),
                          frame='icrs')
                                                       
-    v = Vizier(catalog=vizier_catalog, columns=['+_r','*'])
-    try:
-        tab = v.query_region(coo, radius="{0}s".format(radius),
-                          catalog=vizier_catalog)[0]
+    columns = ['*']
+    #columns = []
+    if isinstance(vizier_catalog, list):
+        for c in [VIKING_VIZIER]:
+            for b in VIZIER_BANDS[c]:
+                columns += VIZIER_BANDS[c][b]
         
+        columns = list(np.unique(columns))
+        #print("xxx columns", columns)
+    else:
+        for b in bands:
+           columns += bands[b] 
+    
+    if isinstance(vizier_catalog, list):
+        v = Vizier(catalog=VIKING_VIZIER, columns=['+_r']+columns)
+    else:
+        v = Vizier(catalog=vizier_catalog, columns=['+_r']+columns)
+    
+    v.ROW_LIMIT = rowlimit
+    v.TIMEOUT = timeout
+    
+    #query_catalog = vizier_catalog
+    try:
+        tabs = v.query_region(coo, radius="{0}s".format(radius),
+                          catalog=vizier_catalog)#[0]
+        
+        if raw_query:
+            return(tabs)
+            
+        tab = tabs[0]
+        
+        if False:
+            for t in tabs:
+                bands = VIZIER_BANDS[t.meta['name']]
+                for b in bands:
+                    for c in bands[b]:
+                        print(t.meta['name'], c, c in t.colnames)#c = bands[b][0]
+                    
         ix = np.argmin(tab['_r'])
         tab = tab[ix]
     except:
@@ -2127,36 +2394,72 @@ def get_Vizier_photometry(ra, dec, templates=None, radius=2, vizier_catalog=PS1_
         
         return None
     
-    filters = [res.filters[res.search(b, verbose=False)[0]] for b in bands]
-                      
-    pivot = OrderedDict()
-    for ib, b in enumerate(bands):
-        pivot[b] = filters[ib].pivot()
+    viz_tables = ', '.join([t.meta['name'] for t in tabs])
+    if verbose:
+        print('Photometry from vizier catalogs: {0}'.format(viz_tables))
         
-    to_flam = 10**(-0.4*(48.6))*3.e18 # / pivot(Ang)**2
-    
+    pivot = []#OrderedDict()
     flam = []
     eflam = []
-    for b in bands:
-        fcol, ecol = bands[b]
-        flam.append(10**(-0.4*(tab[fcol]))*to_flam/pivot[b]**2)
-        eflam.append(tab[ecol]*np.log(10)/2.5*flam[-1])
+    filters = []
     
-    lc = [pivot[b] for b in bands]
-     
+    for tab in tabs:
+        
+        # Downweight PS1 if have SDSS ?  For now, do nothing
+        if (tab.meta['name'] == PS1_VIZIER) & (SDSS_DR12_VIZIER in viz_tables):
+            #continue
+            err_scale = 1
+        else:
+            err_scale = 1
+        
+        # Only use one CFHT catalog
+        if (tab.meta['name'] == CFHTLS_W_VIZIER) & (CFHTLS_D_VIZIER in viz_tables):
+            continue
+        
+        if (tab.meta['name'] == UKIDSS_LAS_VIZIER):
+            flux_scale = 1.33
+        else:
+            flux_scale = 1.
+            
+        convert_vega = VIZIER_VEGA[tab.meta['name']]
+        bands = VIZIER_BANDS[tab.meta['name']]
+        
+        #if verbose:
+        #    print(tab.colnames)
+            
+        #filters += [res.filters[res.search(b, verbose=False)[0]] for b in bands]
+                              
+        to_flam = 10**(-0.4*(48.6))*3.e18 # / pivot(Ang)**2
+    
+        for ib, b in enumerate(bands):
+            filt = res.filters[res.search(b, verbose=False)[0]]
+            filters.append(filt)
+            
+            if convert_vega:
+                to_ab = filt.ABVega()
+            else:
+                to_ab = 0.
+            
+            fcol, ecol = bands[b]
+            pivot.append(filt.pivot())
+            flam.append(10**(-0.4*(tab[fcol][0]+to_ab))*to_flam/pivot[-1]**2)
+            flam[-1] *= flux_scale
+            eflam.append(tab[ecol][0]*np.log(10)/2.5*flam[-1]*err_scale)
+         
     for i in range(len(filters))[::-1]:
-        if not np.isscalar(flam[i]):
+        if np.isscalar(flam[i]) & np.isscalar(eflam[i]):
+            continue
+        else:
             flam.pop(i)
             eflam.pop(i)
             filters.pop(i)
-            lc.pop(i)
+            pivot.pop(i)
     
-    #
+    lc = np.array(pivot) #[pivot[ib] for ib in range(len(bands))]
+    
     if templates is not None:
-        twave, tflux, is_line = array_templates(templates, z=0)
-        eazy_templates = []
-        for i, t in enumerate(templates):
-            eazy_templates.append(Template(arrays=[twave, np.maximum(twave, 1.e-30)], name=t))
+
+        eazy_templates = [Template(arrays=(templates[k].wave, templates[k].flux), name=k) for k in templates]
             
         zgrid = log_zgrid(zr=[0.01, 3.4], dz=0.005)
     
@@ -2164,7 +2467,7 @@ def get_Vizier_photometry(ra, dec, templates=None, radius=2, vizier_catalog=PS1_
     else:
         tempfilt = None
             
-    phot = OrderedDict([('flam', np.array(flam)), ('eflam', np.array(eflam)), ('filters', filters), ('tempfilt',tempfilt), ('lc',np.array(lc))])
+    phot = OrderedDict([('flam', np.array(flam)), ('eflam', np.array(eflam)), ('filters', filters), ('tempfilt',tempfilt), ('lc',np.array(lc)), ('source', 'Vizier '+viz_tables)])
     
     return phot
 
@@ -2173,10 +2476,12 @@ def generate_tempfilt(templates, filters, zgrid=None, MW_EBV=0):
     from eazy.templates import Template
     from eazy.photoz import TemplateGrid
     
-    twave, tflux, is_line = array_templates(templates, z=0)
-    eazy_templates = []
-    for i, t in enumerate(templates):
-        eazy_templates.append(Template(arrays=[twave, np.maximum(twave, 1.e-30)], name=t))
+    # twave, tflux, is_line = array_templates(templates, z=0)
+    # eazy_templates = []
+    # for i, t in enumerate(templates):
+    #     eazy_templates.append(Template(arrays=[twave, np.maximum(twave, 1.e-30)], name=t))
+
+    eazy_templates = [Template(arrays=(templates[k].wave, templates[k].flux), name=k) for k in templates]
         
     if zgrid is None:
         zgrid = log_zgrid(zr=[0.01, 3.4], dz=0.005)
@@ -2692,6 +2997,9 @@ def make_maximal_wcs(files, pixel_scale=0.1, get_hdu=True, pad=90, verbose=True)
     group_poly = None
     
     for i, file in enumerate(files):
+        if not os.path.exists(file):
+            continue
+        
         im = pyfits.open(file)
         
         if im[0].header['INSTRUME'] == 'ACS':
@@ -2960,6 +3268,9 @@ def fetch_hst_calibs(flt_file, ftpdir='https://hst-crds.stsci.edu/unchecked_get/
     if im[0].header['INSTRUME'] == 'WFC3':
         ref_dir = 'iref'
     
+    if im[0].header['INSTRUME'] == 'WFPC2':
+        ref_dir = 'uref'
+    
     if not os.getenv(ref_dir):
         print('No ${0} set!  Put it in ~/.bashrc or ~/.cshrc.'.format(ref_dir))
         return False
@@ -3018,7 +3329,49 @@ For example,
     print('Pixel area map: {0}'.format(pam))
     if not os.path.exists(pam):
         os.system('curl -o {0} http://www.stsci.edu/hst/wfc3/pam/ir_wfc3_map.fits'.format(pam))
+
+def fetch_wfpc2_calib(file='g6q1912hu_r4f.fits', path=os.getenv('uref')):
+
+    try: # Python 3.x
+        import http.client as httplib 
+    except ImportError:  # Python 2.x
+        import httplib
+
+    from stsci.tools import convertwaiveredfits
     
+    server='mast.stsci.edu'
+    conn = httplib.HTTPSConnection(server)
+    outPath = os.path.join(path, file)
+    uri = 'mast:HST/product/'+file
+    
+    conn.request("GET", "/api/v0/download/file?uri="+uri)
+    resp = conn.getresponse()
+    fileContent = resp.read()
+    
+    # save to file
+    with open(outPath,'wb') as FLE:
+        FLE.write(fileContent)
+
+    # check for file 
+    if not os.path.isfile(outPath):
+        print("ERROR: " + outPath + " failed to download.")
+        status = False
+    else:
+        print("COMPLETE: ", outPath)
+        status = True
+        
+    conn.close()
+    
+    if status:
+        try:
+            hdu = convertwaiveredfits.convertwaiveredfits(outPath)
+            hdu.writeto(outPath.replace('.fits','_c0h.fits'))
+        except:
+            return True
+            
+        while 'HISTORY' in hdu[0].header:
+            hdu[0].header.remove('HISTORY')
+            
 def fetch_config_files(ACS=False, get_sky=True, get_stars=True, get_epsf=True):
     """
     Config files needed for Grizli
@@ -4184,6 +4537,47 @@ $.UpdateFilterURL = function () {{
             fp.writelines(lines[-itail:])
             fp.close()
         
+def column_string_operation(col, test, method='startswith', logical=None):
+    """
+    Analogous to `str.startswith` for table column
+    """           
+    if isinstance(test, list):
+        test_list = test
+    else:
+        test_list = [test]
+    
+    out_test = []
+    
+    for i, c_i in enumerate(col):
+        if isinstance(test, slice):
+            out_test.append(c_i[test])
+            continue
+
+        func = getattr(c_i, method)
+        if test is None:
+            out_test.append(func())         
+            continue
+            
+        list_i = []
+        for t_i in test_list:
+            try:
+                list_i.append(func(t_i))
+            except:
+                list_i.append(False)
+                
+        out_test.append(list_i)
+    
+    arr = np.array(out_test)
+    sh = arr.shape
+    
+    if logical is None:
+        return np.squeeze(arr)
+    elif logical.upper() == 'AND':
+        return np.sum(arr, axis=1) >= sh[1]
+    elif logical.upper() == 'NOT':
+        return np.sum(arr, axis=1) == 0
+    else: # OR
+        return np.sum(arr, axis=1) > 0
             
 def column_values_in_list(col, test_list):
     """Test if column elements "in" an iterable (e.g., a list of strings)
@@ -4405,7 +4799,7 @@ def catalog_area(ra=[], dec=[], make_plot=True, NMAX=5000, buff=0.8, verbose=Tru
     else:
         return pjoin.area
         
-        
+
     
     
     
