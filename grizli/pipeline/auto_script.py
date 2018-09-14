@@ -13,6 +13,8 @@ if False:
 #ONLY_F814W = True
 ONLY_F814W = False
 
+VALID_FILTERS = ['F098M', 'F105W', 'F110W', 'F125W', 'F127M', 'F139M', 'F140W', 'F153M', 'F160W', 'F410M', 'F435W', 'F438W', 'F439W', 'F450W', 'F467M', 'F475W', 'F475X', 'F547M', 'F550M', 'F555W', 'F569W', 'F600LP', 'F606W', 'F621M', 'F622W', 'F625W', 'F675W', 'F689M', 'F702W', 'F763M', 'F775W', 'F791W', 'F814W', 'F845M', 'F850LP','G800L','G141','G102','G280']
+
 def demo():
     """
     Test full pipeline, program #12471
@@ -91,7 +93,7 @@ def get_extra_data(root='j114936+222414', HOME_PATH='/Volumes/Pegasus/Grizli/Aut
             out = fetch_mast.get_from_MAST(extra, inst_products=DEFAULT_PRODUCTS, direct=True, path=os.path.join(HOME_PATH, root, 'RAW'), skip_existing=True)
         else:
                         
-            curl = fetch.make_curl_script(extra, level=None, script_name='extra.sh', inst_products={'WFC3/UVIS': ['FLC'], 'WFPC2/WFPC2': ['C0M', 'C1M'], 'WFC3/IR': ['RAW'], 'ACS/WFC': ['FLC']}, skip_existing=True, output_path=os.path.join(HOME_PATH, root, 'RAW'), s3_sync=s3_sync)
+            curl = fetch.make_curl_script(extra, level=None, script_name='extra.sh', inst_products={'WFC3/UVIS': ['FLC'], 'WFPC2/PC': ['C0M', 'C1M'], 'WFC3/IR': ['RAW'], 'ACS/WFC': ['FLC']}, skip_existing=True, output_path=os.path.join(HOME_PATH, root, 'RAW'), s3_sync=s3_sync)
     
             os.system('sh extra.sh')
             files = glob.glob('*raw.fits.gz')
@@ -129,7 +131,7 @@ def get_extra_data(root='j114936+222414', HOME_PATH='/Volumes/Pegasus/Grizli/Aut
 
     os.chdir(CWD)
     
-def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', inspect_ramps=False, manual_alignment=False, is_parallel_field=False, reprocess_parallel=False, only_preprocess=False, run_extractions=True, run_fit=True, s3_sync=False, fine_radec=None, combine_all_filters=True, gaia_by_date=False, align_simple=False, align_clip=-1, master_radec=None, is_dash=False, run_parse_visits=True):
+def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', inspect_ramps=False, manual_alignment=False, is_parallel_field=False, reprocess_parallel=False, only_preprocess=False, run_extractions=True, run_fit=True, s3_sync=False, fine_radec=None, combine_all_filters=True, gaia_by_date=False, align_simple=False, align_clip=-1, master_radec=None, is_dash=False, run_parse_visits=True, reference_wcs_filters=['G800L', 'G102', 'G141']):
     """
     Run the full pipeline for a given target
         
@@ -183,8 +185,9 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
     ######################
     ### Parse visit associations
     os.chdir(os.path.join(HOME_PATH, root, 'Prep'))
+        
     if (not os.path.exists('{0}_visits.npy'.format(root))) | run_parse_visits:
-        visits, all_groups, info = auto_script.parse_visits(field_root=root, HOME_PATH=HOME_PATH, use_visit=True, combine_same_pa=is_parallel_field, is_dash=is_dash)
+        visits, all_groups, info = auto_script.parse_visits(field_root=root, HOME_PATH=HOME_PATH, use_visit=True, combine_same_pa=is_parallel_field, is_dash=is_dash, filters=VALID_FILTERS)
     else:
         visits, all_groups, info = np.load('{0}_visits.npy'.format(root))
         
@@ -222,7 +225,7 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
         wcs_ref_file = '{0}_wcs-ref.fits'.format(root)
         if not os.path.exists(wcs_ref_file):
             make_reference_wcs(info, output=wcs_ref_file, 
-                               filters=['G800L', 'G102', 'G141'], 
+                               filters=reference_wcs_filters, 
                                pad_reference=90, pixel_scale=None,
                                get_hdu=True)
         
@@ -230,7 +233,7 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
         IR_filters = ['F105W', 'F110W', 'F125W', 'F140W', 'F160W', 
                       'F098M', 'F139M', 'F127M', 'F153M']
         
-        optical_filters = ['F814W', 'F606W', 'F435W', 'F850LP', 'F702W', 'F555W', 'F438W', 'F475W', 'F625W', 'F775W', 'F225W', 'F275W', 'F300W', 'F390W']
+        optical_filters = ['F814W', 'F606W', 'F435W', 'F850LP', 'F702W', 'F555W', 'F438W', 'F475W', 'F625W', 'F775W', 'F225W', 'F275W', 'F300W', 'F390W','F350LP']
         
         if combine_all_filters:
             auto_script.drizzle_overlaps(root, 
@@ -348,7 +351,7 @@ def make_directories(field_root='j142724+334246', HOME_PATH='./'):
         if not os.path.exists(dir):
             os.mkdir(dir)
             
-def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', inst_products={'WFPC2': ['C0M', 'C1M'], 'ACS-WFC': ['FLC'], 'WFC3-IR': ['RAW'], 'WFC3-UVIS': ['FLC']}, remove_bad=True, reprocess_parallel=False, s3_sync=False):
+def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', inst_products={'WFPC2/WFC': ['C0M', 'C1M'], 'WFPC2/PC': ['C0M', 'C1M'], 'ACS/WFC': ['FLC'], 'WFC3/IR': ['RAW'], 'WFC3/UVIS': ['FLC']}, remove_bad=True, reprocess_parallel=False, s3_sync=False):
     """
     Fully automatic script
     """
@@ -356,11 +359,23 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/
     import glob
     
     try:
-        from hsaquery import query, fetch
+        try:
+            from mastquery import query, fetch
+            MAST_QUERY = True
+            instdet_key = 'instrument_name'
+        except:
+            from hsaquery import query, fetch
+            MAST_QUERY = False
+            instdet_key = 'instdet'
+            
     except ImportError as ERR:
         warn = """{0}
 
-    Get it from https://github.com/gbrammer/esa-hsaquery""".format(ERR)
+    Get one of the query scripts from    
+        https://github.com/gbrammer/esa-hsaquery
+        https://github.com/gbrammer/mastquery
+    
+    """.format(ERR)
 
         raise(ImportError(warn))
         
@@ -385,10 +400,13 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/
     
     tab = utils.GTable.gread('{0}/{1}_footprint.fits'.format(HOME_PATH,
                              field_root))
-                             
+    
+    if MAST_QUERY:
+        tab = query.get_products_table(tab, extensions=['RAW','C1M'])
+                                 
     tab = tab[(tab['filter'] != 'F218W')]
     if ONLY_F814W:
-        tab = tab[(tab['filter'] == 'F814W') | (tab['instdet'] == 'WFC3/IR')]
+        tab = tab[(tab['filter'] == 'F814W') | (tab[instdet_key] == 'WFC3/IR')]
     
     # Fetch and preprocess IR backgrounds
     os.chdir(os.path.join(HOME_PATH, field_root, 'RAW'))
@@ -410,9 +428,11 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/
     files.extend(glob.glob('*c[01]?.fits.gz')) # WFPC2
     
     for file in files:
-        print('gunzip '+file)
-        os.system('gunzip {0}'.format(file))
-    
+        status = os.system('gunzip {0}'.format(file))
+        print('gunzip '+file+'  # status="{0}"'.format(status))
+        if status == 256:
+            os.system('mv {0} {1}'.format(file, file.split('.gz')[0]))
+            
     if remove_bad:
         remove_bad_expflag(field_root=field_root, HOME_PATH=HOME_PATH, min_bad=2)
     
@@ -422,7 +442,10 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/
     else:
         from grizli.pipeline import reprocess
         reprocess.reprocess_wfc3ir(parallel=False)
-        
+    
+    #### Copy mask files generated from preprocessing
+    os.system('cp *mask.reg ../Prep/')
+    
     # Persistence products
     os.chdir(os.path.join(HOME_PATH, field_root, 'Persistence'))
     persist_files = fetch.persistence_products(tab)
@@ -501,7 +524,7 @@ def remove_bad_expflag(field_root='', HOME_PATH='./', min_bad=2):
             os.system('mv {0}* Expflag/'.format(visit))
             
 
-def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=True, is_dash=False):
+def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=True, is_dash=False, filters=VALID_FILTERS):
     import os
     import glob
     import copy
@@ -521,13 +544,17 @@ def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=
             
     files=glob.glob('../RAW/*fl[tc].fits')
     files.extend(glob.glob('../RAW/*c0m.fits'))
+    files.extend(glob.glob('../RAW/*c0f.fits'))
     info = utils.get_flt_info(files)
     #info = info[(info['FILTER'] != 'G141') & (info['FILTER'] != 'G102')]
     
     # Only F814W on ACS
     if ONLY_F814W:
         info = info[((info['INSTRUME'] == 'WFC3') & (info['DETECTOR'] == 'IR')) | (info['FILTER'] == 'F814W')]
-    
+    elif filters is not None:
+        sel = utils.column_string_operation(info['FILTER'], filters, method='count', logical='OR')
+        info = info[sel]
+        
     if is_dash:
         # DASH visits split by exposure
         ima_files=glob.glob('../RAW/*ima.fits')
