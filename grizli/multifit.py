@@ -1358,6 +1358,7 @@ class MultiBeam(GroupFitter):
         
         self.weightf = np.exp(-(self.fcontam*np.abs(self.contamf)*np.sqrt(self.ivarf)))
         self.weightf[~np.isfinite(self.weightf)] = 0
+        self.fit_mask *= self.weightf > 0
         
         self.DoF = int((self.weightf*self.fit_mask).sum())
         self.Nmask = np.sum([b.fit_mask.sum() for b in self.beams])
