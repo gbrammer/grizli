@@ -5,12 +5,36 @@ import numpy as np
 cimport numpy as np
 DTYPE = np.double
 ctypedef np.double_t DTYPE_t
+ctypedef np.int_t ITYPE_t
 ctypedef np.uint_t UINT_t
 
 import cython
 
 cdef extern from "math.h":
     double fabs(double)
+
+#
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.cdivision(True)
+@cython.embedsignature(True)
+def pixel_map_c(np.ndarray[DTYPE_t, ndim=2] in_data, np.ndarray[ITYPE_t, ndim=1] xi, np.ndarray[ITYPE_t, ndim=1] yi, np.ndarray[DTYPE_t, ndim=2] out_data, np.ndarray[ITYPE_t, ndim=1] xo, np.ndarray[ITYPE_t, ndim=1] yo):
+    """
+    pixel_map_c(in_data, xi, yi, out_data, xo, yo)
+    
+    Fast pixel mapping from one image to another:
+        
+        in_data[yi, xi] -> out_data[yo, xo]
+        
+    
+    """
+    cdef unsigned long i, N
+
+    N = len(xi)
+    for i in range(N):
+        out_data[yo[i], xo[i]] = in_data[yi[i], xi[i]]
+        
+    return True
     
 @cython.boundscheck(False)
 @cython.wraparound(False)
