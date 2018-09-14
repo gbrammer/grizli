@@ -247,7 +247,7 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
         print('{0} -> {1} {2}'.format(orig_file.filename(), local_file, extra_msg))
         
     ### WFPC2            
-    if '_c0m' in file:
+    if '_c0' in file:
         # point to FITS reference files
         for key in ['MASKFILE', 'ATODFILE', 'BLEVFILE', 'BLEVDFIL', 'BIASFILE', 'BIASDFIL', 'DARKFILE', 'DARKDFIL', 'FLATFILE', 'FLATDFIL', 'SHADFILE']:
             ref_file = '_'.join(head[key].split('.'))+'.fits'
@@ -255,6 +255,10 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
         
         waiv = orig_file[0].header['FLATFILE']
         orig_file[0].header['FLATFILE'] = waiv.replace('.fits', '_c0h.fits')
+        
+        if not os.path.exists(''):
+            pass
+            
         # 
         # ## testing
         # orig_file[0].header['FLATFILE'] = 'm341820ju_pfl.fits'
@@ -265,7 +269,7 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
                 orig_file[ext+1].header['BUNIT'] = 'COUNTS'
             
         # Copy WFPC2 DQ file (c1m)
-        dqfile = os.path.join(path, file.replace('_c0m', '_c1m'))
+        dqfile = os.path.join(path, file.replace('_c0', '_c1'))
         print('Copy WFPC2 DQ file: {0}'.format(dqfile))
         if os.path.exists(os.path.basename(dqfile)):
             os.remove(os.path.basename(dqfile))
@@ -385,7 +389,7 @@ def apply_region_mask(flt_file, dq_value=1024, verbose=True):
     """
     import pyregion
     
-    mask_files = glob.glob(flt_file.replace('_flt.fits','.*.mask.reg').replace('_flc.fits','.*.mask.reg').replace('_c0m.fits','.*.mask.reg'))
+    mask_files = glob.glob(flt_file.replace('_flt.fits','.*.mask.reg').replace('_flc.fits','.*.mask.reg').replace('_c0m.fits','.*.mask.reg').replace('_c0f.fits','.*.mask.reg'))
     if len(mask_files) == 0:
         return True
      
@@ -2139,7 +2143,7 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
     
     ### Copy FLT files from ../RAW
     isACS = '_flc' in direct['files'][0]
-    isWFPC2 = '_c0m' in direct['files'][0]
+    isWFPC2 = '_c0' in direct['files'][0]
     
     if not skip_direct:
         for file in direct['files']:
@@ -2386,7 +2390,8 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                 pixfrac=0.8
         
             AstroDrizzle(direct['files'], output=direct['product'], 
-                         clean=True, final_pixfrac=pixfrac, context=isACS,
+                         clean=True, final_pixfrac=pixfrac, 
+                         context=(isACS | isWFPC2),
                          resetbits=4096, final_bits=bits, driz_sep_bits=bits,
                          preserve=False, driz_cr_snr=driz_cr_snr,
                          driz_cr_scale=driz_cr_scale, build=False, 
@@ -3611,28 +3616,57 @@ def find_single_image_CRs(visit, simple_mask=False, with_ctx_mask=True,
     if run_lacosmic:
         import lacosmicx
     
-    ctx = pyfits.open(visit['product']+'_drc_ctx.fits')
+    # try:
+    #     import reproject
+    #     HAS_REPROJECT = True
+    # except:
+    #     HAS_REPROJECT = False
+    HAS_REPROJECT = False
+    
+    ctx = pyfits.open(glob.glob(visit['product']+'_dr?_ctx.fits')[0])
     bits = np.log2(ctx[0].data)
     mask = ctx[0].data == 0
-    single_image = np.cast[np.float32]((np.cast[int](bits) == bits) & (~mask))
+    #single_image = np.cast[np.float32]((np.cast[int](bits) == bits) & (~mask))
+    single_image = np.cast[np.float]((np.cast[int](bits) == bits) & (~mask))
     ctx_wcs = pywcs.WCS(ctx[0].header)
     ctx_wcs.pscale = utils.get_wcs_pscale(ctx_wcs)
     
     for file in visit['files']:
         flt = pyfits.open(file, mode='update')
-        for ext in [1,2]:
+        
+        ### WFPC2
+        if '_c0' in file:
+            dq_hdu = pyfits.open(file.replace('_c0','_c1'), mode='update')
+            dq_extname = 'SCI'
+        else:
+            dq_hdu = flt
+            dq_extname = 'DQ'
             
+        for ext in [1,2,3,4]:
+            
+            if ('SCI',ext) not in flt:
+                continue
+                
             flt_wcs = pywcs.WCS(flt['SCI',ext].header, fobj=flt, relax=True)
             flt_wcs.pscale = utils.get_wcs_pscale(flt_wcs)
+
+            blotted = utils.blot_nearest_exact(single_image, ctx_wcs, flt_wcs)
             
-            blotted = astrodrizzle.ablot.do_blot(single_image, ctx_wcs,
-                            flt_wcs, 1, coeffs=True, interp='nearest',
-                            sinscl=1.0, stepsize=10, wcsmap=None)
-            
+            # if HAS_REPROJECT:
+            #     inp = (single_image, flt_wcs)
+            #     blotted, footp = reproject.reproject_interp(inp, ctx_wcs,
+            #                 shape_out=flt['SCI',ext].data.shape, 
+            #                 order='nearest-neighbor')
+            # else:
+            #     blotted = astrodrizzle.ablot.do_blot(single_image, ctx_wcs,
+            #                 flt_wcs, 1.0, coeffs=True, interp='nearest',
+            #                 sinscl=1.0, stepsize=100, wcsmap=None)
+                            
+                
             ctx_mask = blotted > 0
             
             sci = flt['SCI',ext].data
-            dq = flt['DQ',ext].data
+            dq = dq_hdu[dq_extname,ext].data
 
             if simple_mask:
                 print('{0}: Mask image without overlaps, extension {1:d}'.format(file, ext))
@@ -3887,7 +3921,7 @@ def manual_alignment(visit, ds9, reference=None, reference_catalogs=['SDSS', 'PS
 
     #im = pyfits.open('{0}_drz_sci.fits'.format(visit['product']))
     #ds9.view(im[1].data, header=im[1].header)
-    if 'c0m' in im.filename():
+    if '_c0' in im.filename():
         ds9.set('file {0}[3]'.format(im.filename()))
     else:
         ds9.set('file {0}'.format(im.filename()))
@@ -3907,7 +3941,7 @@ def manual_alignment(visit, ds9, reference=None, reference_catalogs=['SDSS', 'PS
     dx = x0[0]-x1[0]
     dy = x0[1]-x1[1]
     
-    if 'c0m' in im.filename():
+    if '_c0' in im.filename():
         dx *= -1
         dy *+ -1
         
