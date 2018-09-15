@@ -131,7 +131,7 @@ def get_extra_data(root='j114936+222414', HOME_PATH='/Volumes/Pegasus/Grizli/Aut
 
     os.chdir(CWD)
     
-def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', inspect_ramps=False, manual_alignment=False, is_parallel_field=False, reprocess_parallel=False, only_preprocess=False, run_extractions=True, run_fit=True, s3_sync=False, fine_radec=None, combine_all_filters=True, gaia_by_date=False, align_simple=False, align_clip=-1, master_radec=None, is_dash=False, run_parse_visits=True, reference_wcs_filters=['G800L', 'G102', 'G141']):
+def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', inspect_ramps=False, manual_alignment=False, is_parallel_field=False, reprocess_parallel=False, only_preprocess=False, run_extractions=True, run_fit=True, s3_sync=False, fine_radec=None, combine_all_filters=True, gaia_by_date=False, align_simple=False, align_clip=-1, master_radec=None, is_dash=False, run_parse_visits=True, imaging_bkg_params=prep.BKG_PARAMS, reference_wcs_filters=['G800L', 'G102', 'G141']):
     """
     Run the full pipeline for a given target
         
@@ -203,7 +203,7 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
     #####################
     ### Alignment & mosaics    
     os.chdir(os.path.join(HOME_PATH, root, 'Prep'))
-    auto_script.preprocess(field_root=root, HOME_PATH=HOME_PATH, make_combined=False, catalogs=catalogs, master_radec=master_radec, use_visit=True, tweak_max_dist=(5 if is_parallel_field else 1), align_simple=align_simple, align_clip=align_clip)
+    auto_script.preprocess(field_root=root, HOME_PATH=HOME_PATH, make_combined=False, catalogs=catalogs, master_radec=master_radec, use_visit=True, tweak_max_dist=(5 if is_parallel_field else 1), align_simple=align_simple, align_clip=align_clip, imaging_bkg_params=imaging_bkg_params)
         
     # Fine alignment
     fine_catalogs = ['GAIA','PS1','SDSS','WISE']
@@ -691,7 +691,7 @@ def clean_prep(field_root='j142724+334246'):
         print('remove '+file)
         os.remove(file)
                 
-def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', min_overlap=0.2, make_combined=True, catalogs=['PS1','SDSS','GAIA','WISE'], use_visit=True, master_radec=None, use_first_radec=False, skip_imaging=False, clean=True, tweak_max_dist=1., align_simple=True, align_clip=30):
+def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', min_overlap=0.2, make_combined=True, catalogs=['PS1','SDSS','GAIA','WISE'], use_visit=True, master_radec=None, use_first_radec=False, skip_imaging=False, clean=True, tweak_max_dist=1., align_simple=True, align_clip=30, imaging_bkg_params=None):
     
     import os
     import glob
@@ -774,7 +774,8 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
                             reference_catalogs=catalogs, 
                             sky_iter=10, iter_atol=1.e-4, 
                             tweak_max_dist=tweak_max_dist, 
-                            align_simple=align_simple, align_clip=align_clip)
+                            align_simple=align_simple, align_clip=align_clip,
+                            imaging_bkg_params=imaging_bkg_params)
         
         ###################################
         # Persistence Masking
@@ -852,7 +853,8 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
                                         align_tolerance=8,
                                         tweak_max_dist=tweak_max_dist,
                                         align_simple=align_simple,
-                                        align_clip=align_clip)
+                                        align_clip=align_clip,
+                                        imaging_bkg_params=imaging_bkg_params)
             except:
                 status = prep.process_direct_grism_visit(direct=direct,
                                             grism={}, radec=radec,
@@ -863,7 +865,8 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
                                             align_tolerance=8,
                                             tweak_max_dist=tweak_max_dist,
                                             align_simple=align_simple,
-                                            align_clip=align_clip)
+                                            align_clip=align_clip,
+                                        imaging_bkg_params=imaging_bkg_params)
                 
             failed_file = '%s.failed' %(direct['product'])
             if os.path.exists(failed_file):
@@ -2151,7 +2154,7 @@ def make_reference_wcs(info, output='mosaic_wcs-ref.fits', filters=['G800L', 'G1
         return ref_hdu[1]
         
     
-def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140W','F160W'], ref_image=None, bits=None, pixfrac=0.6, scale=0.06, make_combined=True, drizzle_filters=True, skysub=False, skymethod='localmin', match_str=[], context=False, pad_reference=60, min_nexp=2, static=True, skip_products=[]):
+def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140W','F160W'], ref_image=None, ref_wcs=None, bits=None, pixfrac=0.6, scale=0.06, make_combined=True, drizzle_filters=True, skysub=False, skymethod='localmin', match_str=[], context=False, pad_reference=60, min_nexp=2, static=True, skip_products=[]):
     import numpy as np
     import glob
     
@@ -2178,13 +2181,14 @@ def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140
     else:
         label = 'ir'
                
-    if ref_image is None:
-        #ref_image = '{0}-ir_drz_sci.fits'.format(field_root)
-        wfc3ir = {'product':'{0}-{1}'.format(field_root, label), 'files':[]}
-    else:
-        wfc3ir = {'product':'{0}-{1}'.format(field_root, label), 'files':[],
-                  'reference':ref_image}
-        
+    wfc3ir = {'product':'{0}-{1}'.format(field_root, label), 'files':[]}
+    
+    if ref_image is not None:
+        wfc3ir['reference'] = ref_image
+    
+    if ref_wcs is not None:
+        wfc3ir['reference_wcs'] = ref_wcs
+            
     filter_groups = {}
     for visit in visits:
         
@@ -2210,7 +2214,7 @@ def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140
                 continue
                     
         if filt not in filter_groups:
-            filter_groups[filt] = {'product':'{0}-{1}'.format(field_root, filt), 'files':[], 'reference':ref_image}
+            filter_groups[filt] = {'product':'{0}-{1}'.format(field_root, filt), 'files':[], 'reference':ref_image, 'reference_wcs':ref_wcs}
         
         filter_groups[filt]['files'].extend(visit['files'])
         
@@ -2223,7 +2227,7 @@ def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140
         
     keep = [filter_groups[k] for k in filter_groups]
     
-    if ref_image is None:
+    if (ref_image is None) & (ref_wcs is None):
         print('\nCompute mosaic WCS: {0}_wcs-ref.fits\n'.format(field_root))
         
         ref_hdu = utils.make_maximal_wcs(wfc3ir['files'], pixel_scale=scale, get_hdu=True, pad=pad_reference, verbose=True)
@@ -2234,7 +2238,10 @@ def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140
         wfc3ir['reference'] = '{0}_wcs-ref.fits'.format(field_root)
         for i in range(len(keep)):
             keep[i]['reference'] = '{0}_wcs-ref.fits'.format(field_root)
-            
+    
+    if ref_wcs is not None:
+        pass
+                
     if make_combined:
         
         # Figure out if we have more than one instrument
