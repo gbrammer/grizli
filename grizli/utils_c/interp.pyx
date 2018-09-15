@@ -13,7 +13,6 @@ import cython
 cdef extern from "math.h":
     double fabs(double)
 
-#
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.cdivision(True)
