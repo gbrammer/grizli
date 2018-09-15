@@ -12,14 +12,14 @@ def reprocess_wfc3ir(parallel=False):
 
     # https://github.com/gbrammer/wfc3
     try:
-        from mywfc3 import reprocess_wfc3
+        from reprocess_wfc3 import reprocess_wfc3
     except:
         try:
-            from reprocess_wfc3 import reprocess_wfc3
+            from mywfc3 import reprocess_wfc3
         except:
             print("""
-    Couldn\'t `import mywfc3.reprocess_wfc3`.  
-    Get it from https://github.com/gbrammer/wfc3 """)
+    Couldn\'t `import reprocess_wfc3`.  
+    Get it from https://github.com/gbrammer/reprocess_wfc3 """)
             return False
     
     # Fetch calibs in serial
