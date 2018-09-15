@@ -2109,6 +2109,9 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, ref
         print('{0} - Reference RADEC: {1} [{2}] N={3}'.format(product, radec, ref_catalog, len(ref_cat)))    
     
     return radec, ref_catalog
+
+# Visit-level ackground subtraction parameters for blot_background
+BKG_PARAMS = {'bw': 128, 'bh': 128, 'fw': 3, 'fh': 3}
     
 def process_direct_grism_visit(direct={}, grism={}, radec=None,
                                align_tolerance=5, align_clip=30,
@@ -2126,6 +2129,7 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                                single_image_CRs=True,
                                drizzle_params = {},
                                iter_atol=1.e-4,
+                               imaging_bkg_params=None,
                              reference_catalogs=['GAIA','PS1','SDSS','WISE']):
     """Full processing of a direct + grism image visit.
     
@@ -2406,6 +2410,13 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
         ### Make DRZ catalog again with updated DRZWCS
         clean_drizzle(direct['product'])
         
+        ### Subtract visit-level background based on the drizzled mosaic
+        print('xxx Imaging background: ', imaging_bkg_params)
+        if imaging_bkg_params is not None:
+            blot_background(visit=direct, bkg_params=imaging_bkg_params, 
+                            verbose=True, skip_existing=True,
+                            get_median=False)
+                            
         if isWFPC2:
             thresh = 8
         else:
