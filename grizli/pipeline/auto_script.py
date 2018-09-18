@@ -2457,7 +2457,7 @@ def field_rgb(root='j010514+021532', xsize=6, HOME_PATH='./', show_ir=True, pl=1
     import matplotlib.pyplot as plt
     from matplotlib.ticker import MultipleLocator
 
-    import montage_wrapper
+    #import montage_wrapper
     from astropy.visualization import make_lupton_rgb
     import astropy.wcs as pywcs
     import astropy.io.fits as pyfits
