@@ -108,8 +108,11 @@ def get_extra_data(root='j114936+222414', HOME_PATH='/Volumes/Pegasus/Grizli/Aut
     remove_bad_expflag(field_root=root, HOME_PATH=HOME_PATH, min_bad=2)
 
     #### Reprocess the RAWs into FLTs    
-    os.system("python -c 'from grizli.pipeline import reprocess; reprocess.reprocess_wfc3ir(parallel={0})'".format(reprocess_parallel))
-    
+    status = os.system("python -c 'from grizli.pipeline import reprocess; reprocess.reprocess_wfc3ir(parallel={0})'".format(reprocess_parallel))
+    if status != 0:
+        from grizli.pipeline import reprocess
+        reprocess.reprocess_wfc3ir(parallel=False)
+        
     # Persistence products
     os.chdir(os.path.join(HOME_PATH, root, 'Persistence'))
     persist_files = fetch.persistence_products(extra)
@@ -180,8 +183,8 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
     if inspect_ramps:
         # Inspect for CR trails
         os.chdir(os.path.join(HOME_PATH, root, 'RAW'))
-        os.system("python -c 'from grizli.pipeline.reprocess import inspect; inspect()'")
-    
+        status = os.system("python -c 'from grizli.pipeline.reprocess import inspect; inspect()'")
+        
     ######################
     ### Parse visit associations
     os.chdir(os.path.join(HOME_PATH, root, 'Prep'))
@@ -350,6 +353,7 @@ def make_directories(field_root='j142724+334246', HOME_PATH='./'):
         
         if not os.path.exists(dir):
             os.mkdir(dir)
+            os.system('chmod ugoa+rwx {0}'.format(dir))
             
 def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', inst_products={'WFPC2/WFC': ['C0M', 'C1M'], 'WFPC2/PC': ['C0M', 'C1M'], 'ACS/WFC': ['FLC'], 'WFC3/IR': ['RAW'], 'WFC3/UVIS': ['FLC']}, remove_bad=True, reprocess_parallel=False, s3_sync=False):
     """
