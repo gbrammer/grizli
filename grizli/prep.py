@@ -881,7 +881,9 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
                       detection_params = SEP_DETECT_PARAMS, bkg_mask=None,
                       **kwargs):
     """Make a catalog from drizzle products using the SEP implementation of SExtractor
-
+    
+    phot_apertures are aperture *diameters*, in pixels.
+    
     """
     import copy
     import astropy.units as u
@@ -1446,7 +1448,7 @@ def blot_background(visit={'product': '', 'files':None},
             if ('SCI',ext) not in flt:
                 continue
             
-            if ('BLOTSKY' in flt[0].header) & (skip_existing):
+            if ('BLOTSKY' in flt['SCI',ext].header) & (skip_existing):
                 print('\'BLOTSKY\' keyword found in {0}.  Skipping....'.format(file))
                 continue
             
@@ -1462,7 +1464,7 @@ def blot_background(visit={'product': '', 'files':None},
                             sinscl=1.0, stepsize=10, wcsmap=None)
             
             flt['SCI',ext].data -= blotted
-            flt[0].header['BLOTSKY'] = (True, 'Sky blotted from {0}'.format(drz_file))
+            flt['SCI',ext].header['BLOTSKY'] = (True, 'Sky blotted from {0}'.format(drz_file))
         
         flt.flush()
     
@@ -2405,8 +2407,11 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
         ### CRs aren't appropriately masked
         if (single_image_CRs) & (isACS | isWFPC2):
             print('Mask areas of the mosaic covered by a single input image')
-            find_single_image_CRs(direct, simple_mask=True, with_ctx_mask=True, run_lacosmic=False)
-            
+            try:
+                find_single_image_CRs(direct, simple_mask=True, with_ctx_mask=True, run_lacosmic=False)
+            except:
+                pass
+                
         ### Make DRZ catalog again with updated DRZWCS
         clean_drizzle(direct['product'])
         
@@ -2636,6 +2641,34 @@ def tweak_align(direct_group={}, grism_group={}, max_dist=1., key=' ',
     clean_drizzle(grism_group['product'])
     
     return True
+
+def drizzle_footprint(weight_image, skip=10, outfile='wht.reg', label=None):
+    """
+    Footprint of drizzled image
+    """
+    from scipy.spatial import ConvexHull
+    
+    im = pyfits.open(weight_image)
+    wcs = pywcs.WCS(im[0].header)
+    sh = np.array(im[0].data.shape)//skip
+    yp, xp = np.indices(tuple(sh))*skip
+    nonzero = im[0].data[yp, xp] > 0
+    
+    h = ConvexHull(np.array([xp[nonzero], yp[nonzero]]).T)
+    hx = xp[nonzero][h.vertices]
+    hy = yp[nonzero][h.vertices]
+    
+    hrd = wcs.all_pix2world(np.stack([hx, hy]).T, 0)
+    
+    fp = open(outfile,'w')
+    fp.write('fk5\n')
+    
+    pstr = 'polygon('+','.join(['{0:.6f}'.format(i) for i in hrd.flatten()])+')'
+    if label is not None:
+        pstr += ' # text={{{0}}}'.format(label)
+        
+    fp.write(pstr+'\n')
+    fp.close()
     
 def clean_drizzle(root, context=False):
     """Zero-out WHT=0 pixels in drizzle mosaics
