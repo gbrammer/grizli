@@ -1,4 +1,4 @@
-def eazy_photoz(root, force=False, object_only=True, apply_background=True, aper_ix=1, apply_prior=True, beta_prior=True, get_external_photometry=True, external_limits=3, external_sys_err=0.3, external_timeout=300, sys_err=0.05, z_step=0.01, z_min=0.01, z_max=12):
+def eazy_photoz(root, force=False, object_only=True, apply_background=True, aper_ix=1, apply_prior=True, beta_prior=True, get_external_photometry=True, external_limits=3, external_sys_err=0.3, external_timeout=300, sys_err=0.05, z_step=0.01, z_min=0.01, z_max=12, total_flux='flux'):
     
     import os
     import eazy
@@ -13,7 +13,7 @@ def eazy_photoz(root, force=False, object_only=True, apply_background=True, aper
         cat = utils.read_catalog('{0}_phot_apcorr.fits'.format(root))
         return self, cat, zout
         
-    trans = {'f098m':201, 'f105w':202, 'f110w':241, 'f125w':203, 'f140w':204, 'f160w':205, 'f435w':233, 'f438w':211, 'f625w':237, 'f606w':236, 'f814w':239, 'f702w':15, 'f555w':235, 'f350lp':339}
+    trans = {'f098m':201, 'f105w':202, 'f110w':241, 'f125w':203, 'f140w':204, 'f160w':205, 'f435w':233, 'f438w':211, 'f606w':236, 'f625w':237, 'f814w':239, 'f702w':15, 'f555w':235, 'f350lp':339}
     
     cat = utils.read_catalog('{0}_phot.fits'.format(root))
     filters = []
@@ -38,10 +38,12 @@ def eazy_photoz(root, force=False, object_only=True, apply_background=True, aper
             pass
         
     # Total flux
+    cat.meta['TOTALCOL'] = total_flux, 'Column for total flux'
+    
     apcorr = {}
     for i in range(5):
         if 'flux_aper_{0}'.format(i) in cat.colnames:
-            cat['apcorr_{0}'.format(i)] = cat['flux_auto']/cat['flux_aper_{0}'.format(i)]
+            cat['apcorr_{0}'.format(i)] = cat[total_flux]/cat['flux_aper_{0}'.format(i)]
             for f in filters:
                 bkgc = '{0}_bkg_aper_{1}'.format(f, i)
                 if (bkgc in cat.colnames) & apply_background:
@@ -62,6 +64,25 @@ def eazy_photoz(root, force=False, object_only=True, apply_background=True, aper
                 
     cat.rename_column('number','id')
     cat['z_spec'] = cat['id']*0.-1
+    
+    # Spurious sources, sklearn SVM model trained for a single field
+    morph_model = os.path.join(os.path.dirname(utils.__file__),
+                               'data/sep_catalog_junk.pkl')
+                               
+    if os.path.exists(morph_model):
+        from sklearn.externals import joblib
+        clf = joblib.load(morph_model)
+        X = np.hstack([[cat['peak']/cat['flux'], 
+                        cat['cpeak']/cat['peak']]]).T
+        
+        # Predict labels, which where generated for 
+        #    bad_bright, bad_faint, stars, big_galaxies, small_galaxies
+        pred = clf.predict_proba(X)
+        
+        # Should be >~ 0.9 for valid sources, stars & galaxies in "ir" image
+        cat['class_valid'] = pred[:,-3:].sum(axis=1) 
+        cat['class_valid'].format = '.2f'
+        
     cat.write('{0}_phot_apcorr.fits'.format(root), overwrite=True)
     
     # Translate
