@@ -134,7 +134,7 @@ def get_extra_data(root='j114936+222414', HOME_PATH='/Volumes/Pegasus/Grizli/Aut
 
     os.chdir(CWD)
     
-def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', inspect_ramps=False, manual_alignment=False, is_parallel_field=False, reprocess_parallel=False, only_preprocess=False, run_extractions=True, run_fit=True, s3_sync=False, fine_radec=None, combine_all_filters=True, gaia_by_date=False, align_simple=False, align_clip=-1, master_radec=None, is_dash=False, run_parse_visits=True, imaging_bkg_params=prep.BKG_PARAMS, reference_wcs_filters=['G800L', 'G102', 'G141']):
+def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', inspect_ramps=False, manual_alignment=False, is_parallel_field=False, reprocess_parallel=False, only_preprocess=False, run_extractions=True, run_fit=True, s3_sync=False, fine_radec=None, combine_all_filters=True, gaia_by_date=False, align_simple=False, align_clip=-1, master_radec=None, is_dash=False, run_parse_visits=True, imaging_bkg_params=prep.BKG_PARAMS, reference_wcs_filters=['G800L', 'G102', 'G141'], catalogs=['PS1','SDSS','GAIA','WISE']):
     """
     Run the full pipeline for a given target
         
@@ -195,7 +195,7 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
         visits, all_groups, info = np.load('{0}_visits.npy'.format(root))
         
     # Alignment catalogs
-    catalogs = ['PS1','SDSS','GAIA','WISE']
+    #catalogs = ['PS1','SDSS','GAIA','WISE']
     
     #######################
     ### Manual alignment
@@ -281,6 +281,11 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
             
     # Stop if only want to run pre-processing
     if only_preprocess | (len(all_groups) == 0):
+        # Make PSF
+        print('Make field PSFs')
+        auto_script.field_psf(root=root, HOME_PATH=HOME_PATH, 
+                              get_line_maps=False)
+        
         return True
                 
     ######################
@@ -355,7 +360,7 @@ def make_directories(field_root='j142724+334246', HOME_PATH='./'):
             os.mkdir(dir)
             os.system('chmod ugoa+rwx {0}'.format(dir))
             
-def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', inst_products={'WFPC2/WFC': ['C0M', 'C1M'], 'WFPC2/PC': ['C0M', 'C1M'], 'ACS/WFC': ['FLC'], 'WFC3/IR': ['RAW'], 'WFC3/UVIS': ['FLC']}, remove_bad=True, reprocess_parallel=False, s3_sync=False):
+def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', inst_products={'WFPC2/WFC': ['C0M', 'C1M'], 'WFPC2/PC': ['C0M', 'C1M'], 'ACS/WFC': ['FLC'], 'WFC3/IR': ['RAW'], 'WFC3/UVIS': ['FLC']}, remove_bad=True, reprocess_parallel=False, s3_sync=False, fetch_flt_calibs=['IDCTAB','PFLTFILE','NPOLFILE']):
     """
     Fully automatic script
     """
@@ -421,12 +426,20 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/
     for file in bad_files:
         root = os.path.basename(file).split('_')[0]
         badexp |= tab['observation_id'] == root.lower()
-        
-    curl = fetch.make_curl_script(tab[~badexp], level=None, script_name='fetch_{0}.sh'.format(field_root), inst_products=inst_products, skip_existing=True, output_path='./', s3_sync=s3_sync)
-        
+    
+    is_wfpc2 = utils.column_string_operation(tab['instrument_name'], 'WFPC2', method='startswith', logical='or')
+    
+    curl = fetch.make_curl_script(tab[(~badexp) & (~is_wfpc2)], level=None, script_name='fetch_{0}.sh'.format(field_root), inst_products=inst_products, skip_existing=True, output_path='./', s3_sync=s3_sync)
+           
     # Ugly callout to shell
     os.system('sh fetch_{0}.sh'.format(field_root))
     
+    if is_wfpc2.sum() > 0:
+        ## Have to get WFPC2 from ESA
+        curl = fetch.make_curl_script(tab[(~badexp) & (is_wfpc2)], level=None, script_name='fetch_wfpc2_{0}.sh'.format(field_root), inst_products=inst_products, skip_existing=True, output_path='./', s3_sync=False)
+        
+        os.system('sh fetch_wfpc2_{0}.sh'.format(field_root))
+        
     files = glob.glob('*raw.fits.gz')
     files.extend(glob.glob('*fl?.fits.gz'))
     files.extend(glob.glob('*c[01]?.fits.gz')) # WFPC2
@@ -447,6 +460,12 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/
         from grizli.pipeline import reprocess
         reprocess.reprocess_wfc3ir(parallel=False)
     
+    #### Fetch PFLAT reference files needed for optimal drizzled weight images
+    if fetch_flt_calibs:
+        flt_files = glob.glob('*_fl?.fits')
+        for file in flt_files:
+            utils.fetch_hst_calibs(file, calib_types=fetch_flt_calibs)
+        
     #### Copy mask files generated from preprocessing
     os.system('cp *mask.reg ../Prep/')
     
@@ -712,7 +731,7 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
     except:
         from grizli import prep, utils
         
-    files=glob.glob('../RAW/*fl[tc].fits')
+    #files=glob.glob('../RAW/*fl[tc].fits')
     visits, all_groups, info = np.load('{0}_visits.npy'.format(field_root))
     
     # Grism visits
@@ -955,6 +974,9 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
     """
     Make a detection catalog with SExtractor and then measure
     photometry with `~photutils`.
+    
+    phot_apertures are aperture *diameters*, in pixels.
+    
     """
     import glob
     import numpy as np
@@ -2255,6 +2277,40 @@ def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140
     
     if drizzle_filters:        
         prep.drizzle_overlaps(keep, parse_visits=False, pixfrac=pixfrac, scale=scale, skysub=skysub, skymethod=skymethod, bits=bits, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False, context=context, static=static)
+    
+def make_mosaic_footprints(field_root):
+    """
+    Make region files where wht images nonzero
+    """
+    files=glob.glob('{0}-f*dr?_wht.fits'.format(field_root))
+    files.sort()
+    
+    fp = open('{0}_mosaic.reg'.format(field_root), 'w')
+    fp.write('fk5\n')
+    fp.close()
+    
+    for weight_image in files:
+        filt = weight_image.split('_dr')[0].split('-')[-1]
+        
+        wave = filt[1:4]
+        if wave[0] in '01':
+            w = float(wave)*10
+        else:
+            w = float(wave)
+        
+                
+        wint = np.clip(np.interp(np.log10(w/800), [-0.3,0.3], [0,1]), 0, 1)
+
+        print(filt, w, wint)
+        
+        clr = utils.RGBtoHex(plt.cm.Spectral_r(wint))
+        #plt.scatter([0],[0], color=clr, label=filt)
+        
+        reg = prep.drizzle_footprint(weight_image, shrink=10, ext=0, outfile=None, label=filt) + ' color={0}\n'.format(clr)
+        
+        fp = open('{0}_mosaic.reg'.format(field_root), 'a')
+        fp.write(reg)
+        fp.close()
     
 def fill_filter_mosaics(field_root):
     """
