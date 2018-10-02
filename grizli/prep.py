@@ -2642,30 +2642,35 @@ def tweak_align(direct_group={}, grism_group={}, max_dist=1., key=' ',
     
     return True
 
-def drizzle_footprint(weight_image, skip=10, outfile='wht.reg', label=None):
+def drizzle_footprint(weight_image, shrink=10, ext=0, outfile=None, label=None):
     """
-    Footprint of drizzled image
+    Footprint of image pixels where values > 0.  Works best with drizzled 
+    weight images.
     """
     from scipy.spatial import ConvexHull
     
     im = pyfits.open(weight_image)
-    wcs = pywcs.WCS(im[0].header)
-    sh = np.array(im[0].data.shape)//skip
-    yp, xp = np.indices(tuple(sh))*skip
-    nonzero = im[0].data[yp, xp] > 0
+    wcs = pywcs.WCS(im[ext].header, fobj=im)
+    sh = np.array(im[ext].data.shape)//shrink
+    
+    yp, xp = np.indices(tuple(sh))*shrink
+    nonzero = im[ext].data[yp, xp] > 0
     
     h = ConvexHull(np.array([xp[nonzero], yp[nonzero]]).T)
     hx = xp[nonzero][h.vertices]
     hy = yp[nonzero][h.vertices]
     
     hrd = wcs.all_pix2world(np.stack([hx, hy]).T, 0)
-    
-    fp = open(outfile,'w')
-    fp.write('fk5\n')
-    
+        
     pstr = 'polygon('+','.join(['{0:.6f}'.format(i) for i in hrd.flatten()])+')'
     if label is not None:
         pstr += ' # text={{{0}}}'.format(label)
+    
+    if outfile is None:
+        return pstr
+        
+    fp = open(outfile,'w')
+    fp.write('fk5\n')
         
     fp.write(pstr+'\n')
     fp.close()
@@ -2805,6 +2810,9 @@ def tweak_flt(files=[], max_dist=0.4, threshold=3, verbose=True, use_sewpy=False
                 os.remove(file)
             
     c0 = cats[0][0]
+    not_CR = c0['FLUX_RADIUS'] > 1
+    c0 = c0[not_CR]
+    
     wcs_0 = cats[0][1]
     xy_0 = np.array([c0['X_IMAGE'], c0['Y_IMAGE']]).T
     tree = scipy.spatial.cKDTree(xy_0, 10)
@@ -2821,7 +2829,11 @@ def tweak_flt(files=[], max_dist=0.4, threshold=3, verbose=True, use_sewpy=False
             
         d = OrderedDict()
         for i in range(0, len(files)):
-            c_i, wcs_i = cats[i]
+            c_ii, wcs_i = cats[i]
+            
+            not_CR = c_ii['FLUX_RADIUS'] > 1
+            c_i = c_ii[not_CR]
+            
             ## SExtractor doesn't do SIP WCS?
             rd = np.array(wcs_i.all_pix2world(c_i['X_IMAGE'], c_i['Y_IMAGE'], 1))
             xy = np.array(wcs_0.all_world2pix(rd.T, 1))
