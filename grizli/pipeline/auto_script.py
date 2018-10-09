@@ -2848,7 +2848,7 @@ def test_psf():
     
     id=212; gfit, model = gf.fit_object(id=id, size=int(128*0.06), components=[galfit.GalfitSersic(), galfit.GalfitSersic()])
     
-def field_psf(root='j020924-044344', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/WISP/', factors=[1,2,4], get_drizzle_scale=True, subsample=256, size=6, get_line_maps=True, raise_fault=False, verbose=True):
+def field_psf(root='j020924-044344', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/WISP/', factors=[1,2,4], get_drizzle_scale=True, subsample=256, size=6, get_line_maps=True, raise_fault=False, verbose=True, psf_filters=['F098M', 'F110W', 'F105W', 'F125W', 'F140W', 'F160W']):
     """
     Generate PSFs for the available filters in a given field
     """
@@ -2946,14 +2946,14 @@ def field_psf(root='j020924-044344', HOME_PATH='/Volumes/Pegasus/Grizli/Automati
     ra, dec = drz_wcs.all_pix2world(xp, yp, 0)
     
     # Ref images
-    files = glob.glob('{0}-f[01]*sci.fits'.format(root))
+    files = glob.glob('{0}-f[0-9]*sci.fits'.format(root))
     
     if verbose:
         print(' ')
         
     for file in files:
         filter = file.split(root+'-')[1].split('_')[0]
-        if filter.upper() not in ['F098M', 'F110W', 'F105W', 'F125W', 'F140W', 'F160W']:
+        if filter.upper() not in psf_filters:
             continue
             
         flt_files = info['FILE'][info['FILTER'] == filter.upper()]
