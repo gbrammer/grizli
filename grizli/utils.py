@@ -1065,12 +1065,24 @@ def get_line_wavelengths():
     line_ratios['PaB'] = [1.]
     line_wavelengths['Ha'] = [6564.61]
     line_ratios['Ha'] = [1.]
-    line_wavelengths['Hb'] = [4862.68]
+    line_wavelengths['Hb'] = [4862.71]
     line_ratios['Hb'] = [1.]
-    line_wavelengths['Hg'] = [4341.68]
+    line_wavelengths['Hg'] = [4341.692]
     line_ratios['Hg'] = [1.]
     line_wavelengths['Hd'] = [4102.892]
     line_ratios['Hd'] = [1.]
+
+    line_wavelengths['H8'] = [3971.198]
+    line_ratios['H8'] = [1.]
+
+    line_wavelengths['H9'] = [3890.166]
+    line_ratios['H9'] = [1.]
+
+    line_wavelengths['H10'] = [3836.485]
+    line_ratios['H10'] = [1.]
+
+    line_wavelengths['H11'] = [3798.987]
+    line_ratios['H11'] = [1.]
 
     # Groves et al. 2011, Table 1
     line_wavelengths['Balmer 10kK'] = [6564.61, 4862.68, 4341.68, 4101.73]
