@@ -4,11 +4,11 @@
 {
     "distutils": {
         "depends": [
-            "/Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/numpy/core/include/numpy/arrayobject.h",
-            "/Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/numpy/core/include/numpy/ufuncobject.h"
+            "/Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/numpy/core/include/numpy/arrayobject.h",
+            "/Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/numpy/core/include/numpy/ufuncobject.h"
         ],
         "include_dirs": [
-            "/Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/numpy/core/include"
+            "/Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/numpy/core/include"
         ],
         "libraries": [
             "m"
@@ -855,7 +855,7 @@ typedef struct {
 } __Pyx_BufFmt_Context;
 
 
-/* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":730
+/* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":730
  * # in Cython to enable them only on the right systems.
  * 
  * ctypedef npy_int8       int8_t             # <<<<<<<<<<<<<<
@@ -864,7 +864,7 @@ typedef struct {
  */
 typedef npy_int8 __pyx_t_5numpy_int8_t;
 
-/* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":731
+/* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":731
  * 
  * ctypedef npy_int8       int8_t
  * ctypedef npy_int16      int16_t             # <<<<<<<<<<<<<<
@@ -873,7 +873,7 @@ typedef npy_int8 __pyx_t_5numpy_int8_t;
  */
 typedef npy_int16 __pyx_t_5numpy_int16_t;
 
-/* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":732
+/* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":732
  * ctypedef npy_int8       int8_t
  * ctypedef npy_int16      int16_t
  * ctypedef npy_int32      int32_t             # <<<<<<<<<<<<<<
@@ -882,7 +882,7 @@ typedef npy_int16 __pyx_t_5numpy_int16_t;
  */
 typedef npy_int32 __pyx_t_5numpy_int32_t;
 
-/* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":733
+/* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":733
  * ctypedef npy_int16      int16_t
  * ctypedef npy_int32      int32_t
  * ctypedef npy_int64      int64_t             # <<<<<<<<<<<<<<
@@ -891,7 +891,7 @@ typedef npy_int32 __pyx_t_5numpy_int32_t;
  */
 typedef npy_int64 __pyx_t_5numpy_int64_t;
 
-/* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":737
+/* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":737
  * #ctypedef npy_int128     int128_t
  * 
  * ctypedef npy_uint8      uint8_t             # <<<<<<<<<<<<<<
@@ -900,7 +900,7 @@ typedef npy_int64 __pyx_t_5numpy_int64_t;
  */
 typedef npy_uint8 __pyx_t_5numpy_uint8_t;
 
-/* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":738
+/* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":738
  * 
  * ctypedef npy_uint8      uint8_t
  * ctypedef npy_uint16     uint16_t             # <<<<<<<<<<<<<<
@@ -909,7 +909,7 @@ typedef npy_uint8 __pyx_t_5numpy_uint8_t;
  */
 typedef npy_uint16 __pyx_t_5numpy_uint16_t;
 
-/* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":739
+/* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":739
  * ctypedef npy_uint8      uint8_t
  * ctypedef npy_uint16     uint16_t
  * ctypedef npy_uint32     uint32_t             # <<<<<<<<<<<<<<
@@ -918,7 +918,7 @@ typedef npy_uint16 __pyx_t_5numpy_uint16_t;
  */
 typedef npy_uint32 __pyx_t_5numpy_uint32_t;
 
-/* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":740
+/* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":740
  * ctypedef npy_uint16     uint16_t
  * ctypedef npy_uint32     uint32_t
  * ctypedef npy_uint64     uint64_t             # <<<<<<<<<<<<<<
@@ -927,7 +927,7 @@ typedef npy_uint32 __pyx_t_5numpy_uint32_t;
  */
 typedef npy_uint64 __pyx_t_5numpy_uint64_t;
 
-/* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":744
+/* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":744
  * #ctypedef npy_uint128    uint128_t
  * 
  * ctypedef npy_float32    float32_t             # <<<<<<<<<<<<<<
@@ -936,7 +936,7 @@ typedef npy_uint64 __pyx_t_5numpy_uint64_t;
  */
 typedef npy_float32 __pyx_t_5numpy_float32_t;
 
-/* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":745
+/* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":745
  * 
  * ctypedef npy_float32    float32_t
  * ctypedef npy_float64    float64_t             # <<<<<<<<<<<<<<
@@ -945,7 +945,7 @@ typedef npy_float32 __pyx_t_5numpy_float32_t;
  */
 typedef npy_float64 __pyx_t_5numpy_float64_t;
 
-/* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":754
+/* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":754
  * # The int types are mapped a bit surprising --
  * # numpy.int corresponds to 'l' and numpy.long to 'q'
  * ctypedef npy_long       int_t             # <<<<<<<<<<<<<<
@@ -954,7 +954,7 @@ typedef npy_float64 __pyx_t_5numpy_float64_t;
  */
 typedef npy_long __pyx_t_5numpy_int_t;
 
-/* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":755
+/* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":755
  * # numpy.int corresponds to 'l' and numpy.long to 'q'
  * ctypedef npy_long       int_t
  * ctypedef npy_longlong   long_t             # <<<<<<<<<<<<<<
@@ -963,7 +963,7 @@ typedef npy_long __pyx_t_5numpy_int_t;
  */
 typedef npy_longlong __pyx_t_5numpy_long_t;
 
-/* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":756
+/* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":756
  * ctypedef npy_long       int_t
  * ctypedef npy_longlong   long_t
  * ctypedef npy_longlong   longlong_t             # <<<<<<<<<<<<<<
@@ -972,7 +972,7 @@ typedef npy_longlong __pyx_t_5numpy_long_t;
  */
 typedef npy_longlong __pyx_t_5numpy_longlong_t;
 
-/* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":758
+/* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":758
  * ctypedef npy_longlong   longlong_t
  * 
  * ctypedef npy_ulong      uint_t             # <<<<<<<<<<<<<<
@@ -981,7 +981,7 @@ typedef npy_longlong __pyx_t_5numpy_longlong_t;
  */
 typedef npy_ulong __pyx_t_5numpy_uint_t;
 
-/* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":759
+/* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":759
  * 
  * ctypedef npy_ulong      uint_t
  * ctypedef npy_ulonglong  ulong_t             # <<<<<<<<<<<<<<
@@ -990,7 +990,7 @@ typedef npy_ulong __pyx_t_5numpy_uint_t;
  */
 typedef npy_ulonglong __pyx_t_5numpy_ulong_t;
 
-/* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":760
+/* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":760
  * ctypedef npy_ulong      uint_t
  * ctypedef npy_ulonglong  ulong_t
  * ctypedef npy_ulonglong  ulonglong_t             # <<<<<<<<<<<<<<
@@ -999,7 +999,7 @@ typedef npy_ulonglong __pyx_t_5numpy_ulong_t;
  */
 typedef npy_ulonglong __pyx_t_5numpy_ulonglong_t;
 
-/* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":762
+/* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":762
  * ctypedef npy_ulonglong  ulonglong_t
  * 
  * ctypedef npy_intp       intp_t             # <<<<<<<<<<<<<<
@@ -1008,7 +1008,7 @@ typedef npy_ulonglong __pyx_t_5numpy_ulonglong_t;
  */
 typedef npy_intp __pyx_t_5numpy_intp_t;
 
-/* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":763
+/* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":763
  * 
  * ctypedef npy_intp       intp_t
  * ctypedef npy_uintp      uintp_t             # <<<<<<<<<<<<<<
@@ -1017,7 +1017,7 @@ typedef npy_intp __pyx_t_5numpy_intp_t;
  */
 typedef npy_uintp __pyx_t_5numpy_uintp_t;
 
-/* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":765
+/* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":765
  * ctypedef npy_uintp      uintp_t
  * 
  * ctypedef npy_double     float_t             # <<<<<<<<<<<<<<
@@ -1026,7 +1026,7 @@ typedef npy_uintp __pyx_t_5numpy_uintp_t;
  */
 typedef npy_double __pyx_t_5numpy_float_t;
 
-/* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":766
+/* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":766
  * 
  * ctypedef npy_double     float_t
  * ctypedef npy_double     double_t             # <<<<<<<<<<<<<<
@@ -1035,7 +1035,7 @@ typedef npy_double __pyx_t_5numpy_float_t;
  */
 typedef npy_double __pyx_t_5numpy_double_t;
 
-/* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":767
+/* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":767
  * ctypedef npy_double     float_t
  * ctypedef npy_double     double_t
  * ctypedef npy_longdouble longdouble_t             # <<<<<<<<<<<<<<
@@ -1124,7 +1124,7 @@ static CYTHON_INLINE __pyx_t_double_complex __pyx_t_double_complex_from_parts(do
 
 /*--- Type declarations ---*/
 
-/* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":769
+/* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":769
  * ctypedef npy_longdouble longdouble_t
  * 
  * ctypedef npy_cfloat      cfloat_t             # <<<<<<<<<<<<<<
@@ -1133,7 +1133,7 @@ static CYTHON_INLINE __pyx_t_double_complex __pyx_t_double_complex_from_parts(do
  */
 typedef npy_cfloat __pyx_t_5numpy_cfloat_t;
 
-/* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":770
+/* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":770
  * 
  * ctypedef npy_cfloat      cfloat_t
  * ctypedef npy_cdouble     cdouble_t             # <<<<<<<<<<<<<<
@@ -1142,7 +1142,7 @@ typedef npy_cfloat __pyx_t_5numpy_cfloat_t;
  */
 typedef npy_cdouble __pyx_t_5numpy_cdouble_t;
 
-/* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":771
+/* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":771
  * ctypedef npy_cfloat      cfloat_t
  * ctypedef npy_cdouble     cdouble_t
  * ctypedef npy_clongdouble clongdouble_t             # <<<<<<<<<<<<<<
@@ -1151,7 +1151,7 @@ typedef npy_cdouble __pyx_t_5numpy_cdouble_t;
  */
 typedef npy_clongdouble __pyx_t_5numpy_clongdouble_t;
 
-/* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":773
+/* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":773
  * ctypedef npy_clongdouble clongdouble_t
  * 
  * ctypedef npy_cdouble     complex_t             # <<<<<<<<<<<<<<
@@ -1792,9 +1792,9 @@ static PyObject *__pyx_codeobj__15;
 /* "grizli/utils_c/disperse.pyx":27
  * @cython.wraparound(False)
  * @cython.embedsignature(True)
- * def disperse_grism_object(np.ndarray[FTYPE_t, ndim=2] flam, np.ndarray[FTYPE_t, ndim=2] segm, int seg_id, np.ndarray[LINT_t, ndim=1] idxl, np.ndarray[DTYPE_t, ndim=1] yfrac, np.ndarray[DTYPE_t, ndim=1] ysens, np.ndarray[DTYPE_t, ndim=1] full, np.ndarray[LINT_t, ndim=1] x0, np.ndarray[LINT_t, ndim=1] shd, np.ndarray[LINT_t, ndim=1] sh_thumb, np.ndarray[LINT_t, ndim=1] shg):             # <<<<<<<<<<<<<<
- *     """Compute a dispersed 2D spectrum
- * 
+ * def disperse_grism_object(np.ndarray[FTYPE_t, ndim=2] flam,             # <<<<<<<<<<<<<<
+ *                           np.ndarray[FTYPE_t, ndim=2] segm,
+ *                           int seg_id,
  */
 
 /* Python wrapper */
@@ -1934,7 +1934,7 @@ static PyObject *__pyx_pw_6grizli_7utils_c_8disperse_1disperse_grism_object(PyOb
     }
     __pyx_v_flam = ((PyArrayObject *)values[0]);
     __pyx_v_segm = ((PyArrayObject *)values[1]);
-    __pyx_v_seg_id = __Pyx_PyInt_As_int(values[2]); if (unlikely((__pyx_v_seg_id == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 27, __pyx_L3_error)
+    __pyx_v_seg_id = __Pyx_PyInt_As_int(values[2]); if (unlikely((__pyx_v_seg_id == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 29, __pyx_L3_error)
     __pyx_v_idxl = ((PyArrayObject *)values[3]);
     __pyx_v_yfrac = ((PyArrayObject *)values[4]);
     __pyx_v_ysens = ((PyArrayObject *)values[5]);
@@ -1953,15 +1953,15 @@ static PyObject *__pyx_pw_6grizli_7utils_c_8disperse_1disperse_grism_object(PyOb
   return NULL;
   __pyx_L4_argument_unpacking_done:;
   if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_flam), __pyx_ptype_5numpy_ndarray, 1, "flam", 0))) __PYX_ERR(0, 27, __pyx_L1_error)
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_segm), __pyx_ptype_5numpy_ndarray, 1, "segm", 0))) __PYX_ERR(0, 27, __pyx_L1_error)
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_idxl), __pyx_ptype_5numpy_ndarray, 1, "idxl", 0))) __PYX_ERR(0, 27, __pyx_L1_error)
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_yfrac), __pyx_ptype_5numpy_ndarray, 1, "yfrac", 0))) __PYX_ERR(0, 27, __pyx_L1_error)
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_ysens), __pyx_ptype_5numpy_ndarray, 1, "ysens", 0))) __PYX_ERR(0, 27, __pyx_L1_error)
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_full), __pyx_ptype_5numpy_ndarray, 1, "full", 0))) __PYX_ERR(0, 27, __pyx_L1_error)
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_x0), __pyx_ptype_5numpy_ndarray, 1, "x0", 0))) __PYX_ERR(0, 27, __pyx_L1_error)
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_shd), __pyx_ptype_5numpy_ndarray, 1, "shd", 0))) __PYX_ERR(0, 27, __pyx_L1_error)
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_sh_thumb), __pyx_ptype_5numpy_ndarray, 1, "sh_thumb", 0))) __PYX_ERR(0, 27, __pyx_L1_error)
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_shg), __pyx_ptype_5numpy_ndarray, 1, "shg", 0))) __PYX_ERR(0, 27, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_segm), __pyx_ptype_5numpy_ndarray, 1, "segm", 0))) __PYX_ERR(0, 28, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_idxl), __pyx_ptype_5numpy_ndarray, 1, "idxl", 0))) __PYX_ERR(0, 30, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_yfrac), __pyx_ptype_5numpy_ndarray, 1, "yfrac", 0))) __PYX_ERR(0, 31, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_ysens), __pyx_ptype_5numpy_ndarray, 1, "ysens", 0))) __PYX_ERR(0, 32, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_full), __pyx_ptype_5numpy_ndarray, 1, "full", 0))) __PYX_ERR(0, 33, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_x0), __pyx_ptype_5numpy_ndarray, 1, "x0", 0))) __PYX_ERR(0, 34, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_shd), __pyx_ptype_5numpy_ndarray, 1, "shd", 0))) __PYX_ERR(0, 35, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_sh_thumb), __pyx_ptype_5numpy_ndarray, 1, "sh_thumb", 0))) __PYX_ERR(0, 36, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_shg), __pyx_ptype_5numpy_ndarray, 1, "shg", 0))) __PYX_ERR(0, 37, __pyx_L1_error)
   __pyx_r = __pyx_pf_6grizli_7utils_c_8disperse_disperse_grism_object(__pyx_self, __pyx_v_flam, __pyx_v_segm, __pyx_v_seg_id, __pyx_v_idxl, __pyx_v_yfrac, __pyx_v_ysens, __pyx_v_full, __pyx_v_x0, __pyx_v_shd, __pyx_v_sh_thumb, __pyx_v_shg);
 
   /* function exit code */
@@ -2135,27 +2135,27 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_disperse_grism_object(CYTHO
   }
   __pyx_pybuffernd_shg.diminfo[0].strides = __pyx_pybuffernd_shg.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_shg.diminfo[0].shape = __pyx_pybuffernd_shg.rcbuffer->pybuffer.shape[0];
 
-  /* "grizli/utils_c/disperse.pyx":38
+  /* "grizli/utils_c/disperse.pyx":48
  *     cdef double fl_ij
  * 
  *     nk = len(idxl)             # <<<<<<<<<<<<<<
  *     nl = len(full)
  * 
  */
-  __pyx_t_1 = PyObject_Length(((PyObject *)__pyx_v_idxl)); if (unlikely(__pyx_t_1 == ((Py_ssize_t)-1))) __PYX_ERR(0, 38, __pyx_L1_error)
+  __pyx_t_1 = PyObject_Length(((PyObject *)__pyx_v_idxl)); if (unlikely(__pyx_t_1 == ((Py_ssize_t)-1))) __PYX_ERR(0, 48, __pyx_L1_error)
   __pyx_v_nk = __pyx_t_1;
 
-  /* "grizli/utils_c/disperse.pyx":39
+  /* "grizli/utils_c/disperse.pyx":49
  * 
  *     nk = len(idxl)
  *     nl = len(full)             # <<<<<<<<<<<<<<
  * 
  *     for i in range(0-sh_thumb[1], sh_thumb[1]):
  */
-  __pyx_t_1 = PyObject_Length(((PyObject *)__pyx_v_full)); if (unlikely(__pyx_t_1 == ((Py_ssize_t)-1))) __PYX_ERR(0, 39, __pyx_L1_error)
+  __pyx_t_1 = PyObject_Length(((PyObject *)__pyx_v_full)); if (unlikely(__pyx_t_1 == ((Py_ssize_t)-1))) __PYX_ERR(0, 49, __pyx_L1_error)
   __pyx_v_nl = __pyx_t_1;
 
-  /* "grizli/utils_c/disperse.pyx":41
+  /* "grizli/utils_c/disperse.pyx":51
  *     nl = len(full)
  * 
  *     for i in range(0-sh_thumb[1], sh_thumb[1]):             # <<<<<<<<<<<<<<
@@ -2169,7 +2169,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_disperse_grism_object(CYTHO
   for (__pyx_t_6 = (0 - (*__Pyx_BufPtrStrided1d(__pyx_t_6grizli_7utils_c_8disperse_LINT_t *, __pyx_pybuffernd_sh_thumb.rcbuffer->pybuffer.buf, __pyx_t_4, __pyx_pybuffernd_sh_thumb.diminfo[0].strides))); __pyx_t_6 < __pyx_t_5; __pyx_t_6+=1) {
     __pyx_v_i = __pyx_t_6;
 
-    /* "grizli/utils_c/disperse.pyx":42
+    /* "grizli/utils_c/disperse.pyx":52
  * 
  *     for i in range(0-sh_thumb[1], sh_thumb[1]):
  *         if (x0[1]+i < 0) | (x0[1]+i >= shd[1]):             # <<<<<<<<<<<<<<
@@ -2182,7 +2182,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_disperse_grism_object(CYTHO
     __pyx_t_10 = (((((*__Pyx_BufPtrStrided1d(__pyx_t_6grizli_7utils_c_8disperse_LINT_t *, __pyx_pybuffernd_x0.rcbuffer->pybuffer.buf, __pyx_t_7, __pyx_pybuffernd_x0.diminfo[0].strides)) + __pyx_v_i) < 0) | (((*__Pyx_BufPtrStrided1d(__pyx_t_6grizli_7utils_c_8disperse_LINT_t *, __pyx_pybuffernd_x0.rcbuffer->pybuffer.buf, __pyx_t_8, __pyx_pybuffernd_x0.diminfo[0].strides)) + __pyx_v_i) >= (*__Pyx_BufPtrStrided1d(__pyx_t_6grizli_7utils_c_8disperse_LINT_t *, __pyx_pybuffernd_shd.rcbuffer->pybuffer.buf, __pyx_t_9, __pyx_pybuffernd_shd.diminfo[0].strides)))) != 0);
     if (__pyx_t_10) {
 
-      /* "grizli/utils_c/disperse.pyx":43
+      /* "grizli/utils_c/disperse.pyx":53
  *     for i in range(0-sh_thumb[1], sh_thumb[1]):
  *         if (x0[1]+i < 0) | (x0[1]+i >= shd[1]):
  *             continue             # <<<<<<<<<<<<<<
@@ -2191,7 +2191,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_disperse_grism_object(CYTHO
  */
       goto __pyx_L3_continue;
 
-      /* "grizli/utils_c/disperse.pyx":42
+      /* "grizli/utils_c/disperse.pyx":52
  * 
  *     for i in range(0-sh_thumb[1], sh_thumb[1]):
  *         if (x0[1]+i < 0) | (x0[1]+i >= shd[1]):             # <<<<<<<<<<<<<<
@@ -2200,7 +2200,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_disperse_grism_object(CYTHO
  */
     }
 
-    /* "grizli/utils_c/disperse.pyx":45
+    /* "grizli/utils_c/disperse.pyx":55
  *             continue
  * 
  *         for j in range(0-sh_thumb[0], sh_thumb[0]):             # <<<<<<<<<<<<<<
@@ -2214,7 +2214,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_disperse_grism_object(CYTHO
     for (__pyx_t_15 = (0 - (*__Pyx_BufPtrStrided1d(__pyx_t_6grizli_7utils_c_8disperse_LINT_t *, __pyx_pybuffernd_sh_thumb.rcbuffer->pybuffer.buf, __pyx_t_13, __pyx_pybuffernd_sh_thumb.diminfo[0].strides))); __pyx_t_15 < __pyx_t_14; __pyx_t_15+=1) {
       __pyx_v_j = __pyx_t_15;
 
-      /* "grizli/utils_c/disperse.pyx":46
+      /* "grizli/utils_c/disperse.pyx":56
  * 
  *         for j in range(0-sh_thumb[0], sh_thumb[0]):
  *             if (x0[0]+j < 0) | (x0[0]+j >= shd[0]):             # <<<<<<<<<<<<<<
@@ -2227,7 +2227,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_disperse_grism_object(CYTHO
       __pyx_t_10 = (((((*__Pyx_BufPtrStrided1d(__pyx_t_6grizli_7utils_c_8disperse_LINT_t *, __pyx_pybuffernd_x0.rcbuffer->pybuffer.buf, __pyx_t_16, __pyx_pybuffernd_x0.diminfo[0].strides)) + __pyx_v_j) < 0) | (((*__Pyx_BufPtrStrided1d(__pyx_t_6grizli_7utils_c_8disperse_LINT_t *, __pyx_pybuffernd_x0.rcbuffer->pybuffer.buf, __pyx_t_17, __pyx_pybuffernd_x0.diminfo[0].strides)) + __pyx_v_j) >= (*__Pyx_BufPtrStrided1d(__pyx_t_6grizli_7utils_c_8disperse_LINT_t *, __pyx_pybuffernd_shd.rcbuffer->pybuffer.buf, __pyx_t_18, __pyx_pybuffernd_shd.diminfo[0].strides)))) != 0);
       if (__pyx_t_10) {
 
-        /* "grizli/utils_c/disperse.pyx":47
+        /* "grizli/utils_c/disperse.pyx":57
  *         for j in range(0-sh_thumb[0], sh_thumb[0]):
  *             if (x0[0]+j < 0) | (x0[0]+j >= shd[0]):
  *                 continue             # <<<<<<<<<<<<<<
@@ -2236,7 +2236,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_disperse_grism_object(CYTHO
  */
         goto __pyx_L6_continue;
 
-        /* "grizli/utils_c/disperse.pyx":46
+        /* "grizli/utils_c/disperse.pyx":56
  * 
  *         for j in range(0-sh_thumb[0], sh_thumb[0]):
  *             if (x0[0]+j < 0) | (x0[0]+j >= shd[0]):             # <<<<<<<<<<<<<<
@@ -2245,7 +2245,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_disperse_grism_object(CYTHO
  */
       }
 
-      /* "grizli/utils_c/disperse.pyx":49
+      /* "grizli/utils_c/disperse.pyx":59
  *                 continue
  * 
  *             fl_ij = flam[x0[0]+j, x0[1]+i] #/1.e-17             # <<<<<<<<<<<<<<
@@ -2258,7 +2258,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_disperse_grism_object(CYTHO
       __pyx_t_22 = ((*__Pyx_BufPtrStrided1d(__pyx_t_6grizli_7utils_c_8disperse_LINT_t *, __pyx_pybuffernd_x0.rcbuffer->pybuffer.buf, __pyx_t_20, __pyx_pybuffernd_x0.diminfo[0].strides)) + __pyx_v_i);
       __pyx_v_fl_ij = (*__Pyx_BufPtrStrided2d(__pyx_t_6grizli_7utils_c_8disperse_FTYPE_t *, __pyx_pybuffernd_flam.rcbuffer->pybuffer.buf, __pyx_t_21, __pyx_pybuffernd_flam.diminfo[0].strides, __pyx_t_22, __pyx_pybuffernd_flam.diminfo[1].strides));
 
-      /* "grizli/utils_c/disperse.pyx":50
+      /* "grizli/utils_c/disperse.pyx":60
  * 
  *             fl_ij = flam[x0[0]+j, x0[1]+i] #/1.e-17
  *             if (fl_ij == 0) | (segm[x0[0]+j, x0[1]+i] != seg_id):             # <<<<<<<<<<<<<<
@@ -2272,7 +2272,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_disperse_grism_object(CYTHO
       __pyx_t_10 = (((__pyx_v_fl_ij == 0.0) | ((*__Pyx_BufPtrStrided2d(__pyx_t_6grizli_7utils_c_8disperse_FTYPE_t *, __pyx_pybuffernd_segm.rcbuffer->pybuffer.buf, __pyx_t_25, __pyx_pybuffernd_segm.diminfo[0].strides, __pyx_t_26, __pyx_pybuffernd_segm.diminfo[1].strides)) != __pyx_v_seg_id)) != 0);
       if (__pyx_t_10) {
 
-        /* "grizli/utils_c/disperse.pyx":51
+        /* "grizli/utils_c/disperse.pyx":61
  *             fl_ij = flam[x0[0]+j, x0[1]+i] #/1.e-17
  *             if (fl_ij == 0) | (segm[x0[0]+j, x0[1]+i] != seg_id):
  *                 continue             # <<<<<<<<<<<<<<
@@ -2281,7 +2281,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_disperse_grism_object(CYTHO
  */
         goto __pyx_L6_continue;
 
-        /* "grizli/utils_c/disperse.pyx":50
+        /* "grizli/utils_c/disperse.pyx":60
  * 
  *             fl_ij = flam[x0[0]+j, x0[1]+i] #/1.e-17
  *             if (fl_ij == 0) | (segm[x0[0]+j, x0[1]+i] != seg_id):             # <<<<<<<<<<<<<<
@@ -2290,7 +2290,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_disperse_grism_object(CYTHO
  */
       }
 
-      /* "grizli/utils_c/disperse.pyx":53
+      /* "grizli/utils_c/disperse.pyx":63
  *                 continue
  * 
  *             for k in range(nk):             # <<<<<<<<<<<<<<
@@ -2302,7 +2302,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_disperse_grism_object(CYTHO
       for (__pyx_t_29 = 0; __pyx_t_29 < __pyx_t_28; __pyx_t_29+=1) {
         __pyx_v_k = __pyx_t_29;
 
-        /* "grizli/utils_c/disperse.pyx":54
+        /* "grizli/utils_c/disperse.pyx":64
  * 
  *             for k in range(nk):
  *                 k1 = idxl[k]+j*shg[1]+i             # <<<<<<<<<<<<<<
@@ -2313,7 +2313,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_disperse_grism_object(CYTHO
         __pyx_t_31 = 1;
         __pyx_v_k1 = (((*__Pyx_BufPtrStrided1d(__pyx_t_6grizli_7utils_c_8disperse_LINT_t *, __pyx_pybuffernd_idxl.rcbuffer->pybuffer.buf, __pyx_t_30, __pyx_pybuffernd_idxl.diminfo[0].strides)) + (__pyx_v_j * (*__Pyx_BufPtrStrided1d(__pyx_t_6grizli_7utils_c_8disperse_LINT_t *, __pyx_pybuffernd_shg.rcbuffer->pybuffer.buf, __pyx_t_31, __pyx_pybuffernd_shg.diminfo[0].strides)))) + __pyx_v_i);
 
-        /* "grizli/utils_c/disperse.pyx":55
+        /* "grizli/utils_c/disperse.pyx":65
  *             for k in range(nk):
  *                 k1 = idxl[k]+j*shg[1]+i
  *                 if (k1 >= 0) & (k1 < nl):             # <<<<<<<<<<<<<<
@@ -2323,7 +2323,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_disperse_grism_object(CYTHO
         __pyx_t_10 = (((__pyx_v_k1 >= 0) & (__pyx_v_k1 < __pyx_v_nl)) != 0);
         if (__pyx_t_10) {
 
-          /* "grizli/utils_c/disperse.pyx":56
+          /* "grizli/utils_c/disperse.pyx":66
  *                 k1 = idxl[k]+j*shg[1]+i
  *                 if (k1 >= 0) & (k1 < nl):
  *                     full[k1] += ysens[k]*fl_ij*yfrac[k]             # <<<<<<<<<<<<<<
@@ -2335,7 +2335,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_disperse_grism_object(CYTHO
           __pyx_t_34 = __pyx_v_k1;
           *__Pyx_BufPtrStrided1d(__pyx_t_6grizli_7utils_c_8disperse_DTYPE_t *, __pyx_pybuffernd_full.rcbuffer->pybuffer.buf, __pyx_t_34, __pyx_pybuffernd_full.diminfo[0].strides) += (((*__Pyx_BufPtrStrided1d(__pyx_t_6grizli_7utils_c_8disperse_DTYPE_t *, __pyx_pybuffernd_ysens.rcbuffer->pybuffer.buf, __pyx_t_32, __pyx_pybuffernd_ysens.diminfo[0].strides)) * __pyx_v_fl_ij) * (*__Pyx_BufPtrStrided1d(__pyx_t_6grizli_7utils_c_8disperse_DTYPE_t *, __pyx_pybuffernd_yfrac.rcbuffer->pybuffer.buf, __pyx_t_33, __pyx_pybuffernd_yfrac.diminfo[0].strides)));
 
-          /* "grizli/utils_c/disperse.pyx":55
+          /* "grizli/utils_c/disperse.pyx":65
  *             for k in range(nk):
  *                 k1 = idxl[k]+j*shg[1]+i
  *                 if (k1 >= 0) & (k1 < nl):             # <<<<<<<<<<<<<<
@@ -2344,7 +2344,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_disperse_grism_object(CYTHO
  */
         }
 
-        /* "grizli/utils_c/disperse.pyx":58
+        /* "grizli/utils_c/disperse.pyx":68
  *                     full[k1] += ysens[k]*fl_ij*yfrac[k]
  * 
  *                 k2 = idxl[k]+(j-1)*shg[1]+i             # <<<<<<<<<<<<<<
@@ -2355,7 +2355,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_disperse_grism_object(CYTHO
         __pyx_t_36 = 1;
         __pyx_v_k2 = (((*__Pyx_BufPtrStrided1d(__pyx_t_6grizli_7utils_c_8disperse_LINT_t *, __pyx_pybuffernd_idxl.rcbuffer->pybuffer.buf, __pyx_t_35, __pyx_pybuffernd_idxl.diminfo[0].strides)) + ((__pyx_v_j - 1) * (*__Pyx_BufPtrStrided1d(__pyx_t_6grizli_7utils_c_8disperse_LINT_t *, __pyx_pybuffernd_shg.rcbuffer->pybuffer.buf, __pyx_t_36, __pyx_pybuffernd_shg.diminfo[0].strides)))) + __pyx_v_i);
 
-        /* "grizli/utils_c/disperse.pyx":59
+        /* "grizli/utils_c/disperse.pyx":69
  * 
  *                 k2 = idxl[k]+(j-1)*shg[1]+i
  *                 if (k2 >= 0) & (k2 < nl):             # <<<<<<<<<<<<<<
@@ -2365,7 +2365,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_disperse_grism_object(CYTHO
         __pyx_t_10 = (((__pyx_v_k2 >= 0) & (__pyx_v_k2 < __pyx_v_nl)) != 0);
         if (__pyx_t_10) {
 
-          /* "grizli/utils_c/disperse.pyx":60
+          /* "grizli/utils_c/disperse.pyx":70
  *                 k2 = idxl[k]+(j-1)*shg[1]+i
  *                 if (k2 >= 0) & (k2 < nl):
  *                     full[k2] += ysens[k]*fl_ij*(1-yfrac[k])             # <<<<<<<<<<<<<<
@@ -2377,7 +2377,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_disperse_grism_object(CYTHO
           __pyx_t_39 = __pyx_v_k2;
           *__Pyx_BufPtrStrided1d(__pyx_t_6grizli_7utils_c_8disperse_DTYPE_t *, __pyx_pybuffernd_full.rcbuffer->pybuffer.buf, __pyx_t_39, __pyx_pybuffernd_full.diminfo[0].strides) += (((*__Pyx_BufPtrStrided1d(__pyx_t_6grizli_7utils_c_8disperse_DTYPE_t *, __pyx_pybuffernd_ysens.rcbuffer->pybuffer.buf, __pyx_t_37, __pyx_pybuffernd_ysens.diminfo[0].strides)) * __pyx_v_fl_ij) * (1.0 - (*__Pyx_BufPtrStrided1d(__pyx_t_6grizli_7utils_c_8disperse_DTYPE_t *, __pyx_pybuffernd_yfrac.rcbuffer->pybuffer.buf, __pyx_t_38, __pyx_pybuffernd_yfrac.diminfo[0].strides))));
 
-          /* "grizli/utils_c/disperse.pyx":59
+          /* "grizli/utils_c/disperse.pyx":69
  * 
  *                 k2 = idxl[k]+(j-1)*shg[1]+i
  *                 if (k2 >= 0) & (k2 < nl):             # <<<<<<<<<<<<<<
@@ -2391,7 +2391,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_disperse_grism_object(CYTHO
     __pyx_L3_continue:;
   }
 
-  /* "grizli/utils_c/disperse.pyx":62
+  /* "grizli/utils_c/disperse.pyx":72
  *                     full[k2] += ysens[k]*fl_ij*(1-yfrac[k])
  * 
  *     return True             # <<<<<<<<<<<<<<
@@ -2406,9 +2406,9 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_disperse_grism_object(CYTHO
   /* "grizli/utils_c/disperse.pyx":27
  * @cython.wraparound(False)
  * @cython.embedsignature(True)
- * def disperse_grism_object(np.ndarray[FTYPE_t, ndim=2] flam, np.ndarray[FTYPE_t, ndim=2] segm, int seg_id, np.ndarray[LINT_t, ndim=1] idxl, np.ndarray[DTYPE_t, ndim=1] yfrac, np.ndarray[DTYPE_t, ndim=1] ysens, np.ndarray[DTYPE_t, ndim=1] full, np.ndarray[LINT_t, ndim=1] x0, np.ndarray[LINT_t, ndim=1] shd, np.ndarray[LINT_t, ndim=1] sh_thumb, np.ndarray[LINT_t, ndim=1] shg):             # <<<<<<<<<<<<<<
- *     """Compute a dispersed 2D spectrum
- * 
+ * def disperse_grism_object(np.ndarray[FTYPE_t, ndim=2] flam,             # <<<<<<<<<<<<<<
+ *                           np.ndarray[FTYPE_t, ndim=2] segm,
+ *                           int seg_id,
  */
 
   /* function exit code */
@@ -2448,7 +2448,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_disperse_grism_object(CYTHO
   return __pyx_r;
 }
 
-/* "grizli/utils_c/disperse.pyx":67
+/* "grizli/utils_c/disperse.pyx":77
  * @cython.wraparound(False)
  * @cython.embedsignature(True)
  * def compute_segmentation_limits(np.ndarray[FTYPE_t, ndim=2] segm, int seg_id, np.ndarray[FTYPE_t, ndim=2] flam, np.ndarray[LINT_t, ndim=1] shd):             # <<<<<<<<<<<<<<
@@ -2495,23 +2495,23 @@ static PyObject *__pyx_pw_6grizli_7utils_c_8disperse_3compute_segmentation_limit
         case  1:
         if (likely((values[1] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_seg_id)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("compute_segmentation_limits", 1, 4, 4, 1); __PYX_ERR(0, 67, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("compute_segmentation_limits", 1, 4, 4, 1); __PYX_ERR(0, 77, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  2:
         if (likely((values[2] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_flam)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("compute_segmentation_limits", 1, 4, 4, 2); __PYX_ERR(0, 67, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("compute_segmentation_limits", 1, 4, 4, 2); __PYX_ERR(0, 77, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  3:
         if (likely((values[3] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_shd)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("compute_segmentation_limits", 1, 4, 4, 3); __PYX_ERR(0, 67, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("compute_segmentation_limits", 1, 4, 4, 3); __PYX_ERR(0, 77, __pyx_L3_error)
         }
       }
       if (unlikely(kw_args > 0)) {
-        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "compute_segmentation_limits") < 0)) __PYX_ERR(0, 67, __pyx_L3_error)
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "compute_segmentation_limits") < 0)) __PYX_ERR(0, 77, __pyx_L3_error)
       }
     } else if (PyTuple_GET_SIZE(__pyx_args) != 4) {
       goto __pyx_L5_argtuple_error;
@@ -2522,21 +2522,21 @@ static PyObject *__pyx_pw_6grizli_7utils_c_8disperse_3compute_segmentation_limit
       values[3] = PyTuple_GET_ITEM(__pyx_args, 3);
     }
     __pyx_v_segm = ((PyArrayObject *)values[0]);
-    __pyx_v_seg_id = __Pyx_PyInt_As_int(values[1]); if (unlikely((__pyx_v_seg_id == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 67, __pyx_L3_error)
+    __pyx_v_seg_id = __Pyx_PyInt_As_int(values[1]); if (unlikely((__pyx_v_seg_id == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 77, __pyx_L3_error)
     __pyx_v_flam = ((PyArrayObject *)values[2]);
     __pyx_v_shd = ((PyArrayObject *)values[3]);
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("compute_segmentation_limits", 1, 4, 4, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 67, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("compute_segmentation_limits", 1, 4, 4, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 77, __pyx_L3_error)
   __pyx_L3_error:;
   __Pyx_AddTraceback("grizli.utils_c.disperse.compute_segmentation_limits", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_segm), __pyx_ptype_5numpy_ndarray, 1, "segm", 0))) __PYX_ERR(0, 67, __pyx_L1_error)
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_flam), __pyx_ptype_5numpy_ndarray, 1, "flam", 0))) __PYX_ERR(0, 67, __pyx_L1_error)
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_shd), __pyx_ptype_5numpy_ndarray, 1, "shd", 0))) __PYX_ERR(0, 67, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_segm), __pyx_ptype_5numpy_ndarray, 1, "segm", 0))) __PYX_ERR(0, 77, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_flam), __pyx_ptype_5numpy_ndarray, 1, "flam", 0))) __PYX_ERR(0, 77, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_shd), __pyx_ptype_5numpy_ndarray, 1, "shd", 0))) __PYX_ERR(0, 77, __pyx_L1_error)
   __pyx_r = __pyx_pf_6grizli_7utils_c_8disperse_2compute_segmentation_limits(__pyx_self, __pyx_v_segm, __pyx_v_seg_id, __pyx_v_flam, __pyx_v_shd);
 
   /* function exit code */
@@ -2607,21 +2607,21 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_2compute_segmentation_limit
   __pyx_pybuffernd_shd.rcbuffer = &__pyx_pybuffer_shd;
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_segm.rcbuffer->pybuffer, (PyObject*)__pyx_v_segm, &__Pyx_TypeInfo_nn___pyx_t_6grizli_7utils_c_8disperse_FTYPE_t, PyBUF_FORMAT| PyBUF_STRIDES, 2, 0, __pyx_stack) == -1)) __PYX_ERR(0, 67, __pyx_L1_error)
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_segm.rcbuffer->pybuffer, (PyObject*)__pyx_v_segm, &__Pyx_TypeInfo_nn___pyx_t_6grizli_7utils_c_8disperse_FTYPE_t, PyBUF_FORMAT| PyBUF_STRIDES, 2, 0, __pyx_stack) == -1)) __PYX_ERR(0, 77, __pyx_L1_error)
   }
   __pyx_pybuffernd_segm.diminfo[0].strides = __pyx_pybuffernd_segm.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_segm.diminfo[0].shape = __pyx_pybuffernd_segm.rcbuffer->pybuffer.shape[0]; __pyx_pybuffernd_segm.diminfo[1].strides = __pyx_pybuffernd_segm.rcbuffer->pybuffer.strides[1]; __pyx_pybuffernd_segm.diminfo[1].shape = __pyx_pybuffernd_segm.rcbuffer->pybuffer.shape[1];
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_flam.rcbuffer->pybuffer, (PyObject*)__pyx_v_flam, &__Pyx_TypeInfo_nn___pyx_t_6grizli_7utils_c_8disperse_FTYPE_t, PyBUF_FORMAT| PyBUF_STRIDES, 2, 0, __pyx_stack) == -1)) __PYX_ERR(0, 67, __pyx_L1_error)
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_flam.rcbuffer->pybuffer, (PyObject*)__pyx_v_flam, &__Pyx_TypeInfo_nn___pyx_t_6grizli_7utils_c_8disperse_FTYPE_t, PyBUF_FORMAT| PyBUF_STRIDES, 2, 0, __pyx_stack) == -1)) __PYX_ERR(0, 77, __pyx_L1_error)
   }
   __pyx_pybuffernd_flam.diminfo[0].strides = __pyx_pybuffernd_flam.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_flam.diminfo[0].shape = __pyx_pybuffernd_flam.rcbuffer->pybuffer.shape[0]; __pyx_pybuffernd_flam.diminfo[1].strides = __pyx_pybuffernd_flam.rcbuffer->pybuffer.strides[1]; __pyx_pybuffernd_flam.diminfo[1].shape = __pyx_pybuffernd_flam.rcbuffer->pybuffer.shape[1];
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_shd.rcbuffer->pybuffer, (PyObject*)__pyx_v_shd, &__Pyx_TypeInfo_nn___pyx_t_6grizli_7utils_c_8disperse_LINT_t, PyBUF_FORMAT| PyBUF_STRIDES, 1, 0, __pyx_stack) == -1)) __PYX_ERR(0, 67, __pyx_L1_error)
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_shd.rcbuffer->pybuffer, (PyObject*)__pyx_v_shd, &__Pyx_TypeInfo_nn___pyx_t_6grizli_7utils_c_8disperse_LINT_t, PyBUF_FORMAT| PyBUF_STRIDES, 1, 0, __pyx_stack) == -1)) __PYX_ERR(0, 77, __pyx_L1_error)
   }
   __pyx_pybuffernd_shd.diminfo[0].strides = __pyx_pybuffernd_shd.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_shd.diminfo[0].shape = __pyx_pybuffernd_shd.rcbuffer->pybuffer.shape[0];
 
-  /* "grizli/utils_c/disperse.pyx":87
+  /* "grizli/utils_c/disperse.pyx":97
  *     cdef double inumer, jnumer, denom, wht_ij
  * 
  *     area = 0             # <<<<<<<<<<<<<<
@@ -2630,7 +2630,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_2compute_segmentation_limit
  */
   __pyx_v_area = 0;
 
-  /* "grizli/utils_c/disperse.pyx":89
+  /* "grizli/utils_c/disperse.pyx":99
  *     area = 0
  * 
  *     imin = shd[0]             # <<<<<<<<<<<<<<
@@ -2640,7 +2640,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_2compute_segmentation_limit
   __pyx_t_1 = 0;
   __pyx_v_imin = (*__Pyx_BufPtrStrided1d(__pyx_t_6grizli_7utils_c_8disperse_LINT_t *, __pyx_pybuffernd_shd.rcbuffer->pybuffer.buf, __pyx_t_1, __pyx_pybuffernd_shd.diminfo[0].strides));
 
-  /* "grizli/utils_c/disperse.pyx":90
+  /* "grizli/utils_c/disperse.pyx":100
  * 
  *     imin = shd[0]
  *     imax = 0             # <<<<<<<<<<<<<<
@@ -2649,7 +2649,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_2compute_segmentation_limit
  */
   __pyx_v_imax = 0;
 
-  /* "grizli/utils_c/disperse.pyx":91
+  /* "grizli/utils_c/disperse.pyx":101
  *     imin = shd[0]
  *     imax = 0
  *     jmin = shd[1]             # <<<<<<<<<<<<<<
@@ -2659,7 +2659,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_2compute_segmentation_limit
   __pyx_t_2 = 1;
   __pyx_v_jmin = (*__Pyx_BufPtrStrided1d(__pyx_t_6grizli_7utils_c_8disperse_LINT_t *, __pyx_pybuffernd_shd.rcbuffer->pybuffer.buf, __pyx_t_2, __pyx_pybuffernd_shd.diminfo[0].strides));
 
-  /* "grizli/utils_c/disperse.pyx":92
+  /* "grizli/utils_c/disperse.pyx":102
  *     imax = 0
  *     jmin = shd[1]
  *     jmax = 0             # <<<<<<<<<<<<<<
@@ -2668,7 +2668,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_2compute_segmentation_limit
  */
   __pyx_v_jmax = 0;
 
-  /* "grizli/utils_c/disperse.pyx":94
+  /* "grizli/utils_c/disperse.pyx":104
  *     jmax = 0
  * 
  *     inumer = 0.             # <<<<<<<<<<<<<<
@@ -2677,7 +2677,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_2compute_segmentation_limit
  */
   __pyx_v_inumer = 0.;
 
-  /* "grizli/utils_c/disperse.pyx":95
+  /* "grizli/utils_c/disperse.pyx":105
  * 
  *     inumer = 0.
  *     jnumer = 0.             # <<<<<<<<<<<<<<
@@ -2686,7 +2686,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_2compute_segmentation_limit
  */
   __pyx_v_jnumer = 0.;
 
-  /* "grizli/utils_c/disperse.pyx":96
+  /* "grizli/utils_c/disperse.pyx":106
  *     inumer = 0.
  *     jnumer = 0.
  *     denom = 0.             # <<<<<<<<<<<<<<
@@ -2695,7 +2695,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_2compute_segmentation_limit
  */
   __pyx_v_denom = 0.;
 
-  /* "grizli/utils_c/disperse.pyx":98
+  /* "grizli/utils_c/disperse.pyx":108
  *     denom = 0.
  * 
  *     for i in range(shd[0]):             # <<<<<<<<<<<<<<
@@ -2708,7 +2708,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_2compute_segmentation_limit
   for (__pyx_t_6 = 0; __pyx_t_6 < __pyx_t_5; __pyx_t_6+=1) {
     __pyx_v_i = __pyx_t_6;
 
-    /* "grizli/utils_c/disperse.pyx":99
+    /* "grizli/utils_c/disperse.pyx":109
  * 
  *     for i in range(shd[0]):
  *         for j in range(shd[1]):             # <<<<<<<<<<<<<<
@@ -2721,7 +2721,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_2compute_segmentation_limit
     for (__pyx_t_10 = 0; __pyx_t_10 < __pyx_t_9; __pyx_t_10+=1) {
       __pyx_v_j = __pyx_t_10;
 
-      /* "grizli/utils_c/disperse.pyx":100
+      /* "grizli/utils_c/disperse.pyx":110
  *     for i in range(shd[0]):
  *         for j in range(shd[1]):
  *             if segm[i,j] != seg_id:             # <<<<<<<<<<<<<<
@@ -2733,7 +2733,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_2compute_segmentation_limit
       __pyx_t_13 = (((*__Pyx_BufPtrStrided2d(__pyx_t_6grizli_7utils_c_8disperse_FTYPE_t *, __pyx_pybuffernd_segm.rcbuffer->pybuffer.buf, __pyx_t_11, __pyx_pybuffernd_segm.diminfo[0].strides, __pyx_t_12, __pyx_pybuffernd_segm.diminfo[1].strides)) != __pyx_v_seg_id) != 0);
       if (__pyx_t_13) {
 
-        /* "grizli/utils_c/disperse.pyx":101
+        /* "grizli/utils_c/disperse.pyx":111
  *         for j in range(shd[1]):
  *             if segm[i,j] != seg_id:
  *                 continue             # <<<<<<<<<<<<<<
@@ -2742,7 +2742,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_2compute_segmentation_limit
  */
         goto __pyx_L5_continue;
 
-        /* "grizli/utils_c/disperse.pyx":100
+        /* "grizli/utils_c/disperse.pyx":110
  *     for i in range(shd[0]):
  *         for j in range(shd[1]):
  *             if segm[i,j] != seg_id:             # <<<<<<<<<<<<<<
@@ -2751,7 +2751,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_2compute_segmentation_limit
  */
       }
 
-      /* "grizli/utils_c/disperse.pyx":103
+      /* "grizli/utils_c/disperse.pyx":113
  *                 continue
  * 
  *             area += 1             # <<<<<<<<<<<<<<
@@ -2760,7 +2760,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_2compute_segmentation_limit
  */
       __pyx_v_area = (__pyx_v_area + 1);
 
-      /* "grizli/utils_c/disperse.pyx":104
+      /* "grizli/utils_c/disperse.pyx":114
  * 
  *             area += 1
  *             wht_ij = flam[i,j]             # <<<<<<<<<<<<<<
@@ -2771,7 +2771,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_2compute_segmentation_limit
       __pyx_t_15 = __pyx_v_j;
       __pyx_v_wht_ij = (*__Pyx_BufPtrStrided2d(__pyx_t_6grizli_7utils_c_8disperse_FTYPE_t *, __pyx_pybuffernd_flam.rcbuffer->pybuffer.buf, __pyx_t_14, __pyx_pybuffernd_flam.diminfo[0].strides, __pyx_t_15, __pyx_pybuffernd_flam.diminfo[1].strides));
 
-      /* "grizli/utils_c/disperse.pyx":105
+      /* "grizli/utils_c/disperse.pyx":115
  *             area += 1
  *             wht_ij = flam[i,j]
  *             inumer += i*wht_ij             # <<<<<<<<<<<<<<
@@ -2780,7 +2780,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_2compute_segmentation_limit
  */
       __pyx_v_inumer = (__pyx_v_inumer + (__pyx_v_i * __pyx_v_wht_ij));
 
-      /* "grizli/utils_c/disperse.pyx":106
+      /* "grizli/utils_c/disperse.pyx":116
  *             wht_ij = flam[i,j]
  *             inumer += i*wht_ij
  *             jnumer += j*wht_ij             # <<<<<<<<<<<<<<
@@ -2789,7 +2789,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_2compute_segmentation_limit
  */
       __pyx_v_jnumer = (__pyx_v_jnumer + (__pyx_v_j * __pyx_v_wht_ij));
 
-      /* "grizli/utils_c/disperse.pyx":107
+      /* "grizli/utils_c/disperse.pyx":117
  *             inumer += i*wht_ij
  *             jnumer += j*wht_ij
  *             denom += wht_ij             # <<<<<<<<<<<<<<
@@ -2798,7 +2798,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_2compute_segmentation_limit
  */
       __pyx_v_denom = (__pyx_v_denom + __pyx_v_wht_ij);
 
-      /* "grizli/utils_c/disperse.pyx":109
+      /* "grizli/utils_c/disperse.pyx":119
  *             denom += wht_ij
  * 
  *             if i < imin:             # <<<<<<<<<<<<<<
@@ -2808,7 +2808,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_2compute_segmentation_limit
       __pyx_t_13 = ((__pyx_v_i < __pyx_v_imin) != 0);
       if (__pyx_t_13) {
 
-        /* "grizli/utils_c/disperse.pyx":110
+        /* "grizli/utils_c/disperse.pyx":120
  * 
  *             if i < imin:
  *                 imin = i             # <<<<<<<<<<<<<<
@@ -2817,7 +2817,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_2compute_segmentation_limit
  */
         __pyx_v_imin = __pyx_v_i;
 
-        /* "grizli/utils_c/disperse.pyx":109
+        /* "grizli/utils_c/disperse.pyx":119
  *             denom += wht_ij
  * 
  *             if i < imin:             # <<<<<<<<<<<<<<
@@ -2826,7 +2826,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_2compute_segmentation_limit
  */
       }
 
-      /* "grizli/utils_c/disperse.pyx":111
+      /* "grizli/utils_c/disperse.pyx":121
  *             if i < imin:
  *                 imin = i
  *             if i > imax:             # <<<<<<<<<<<<<<
@@ -2836,7 +2836,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_2compute_segmentation_limit
       __pyx_t_13 = ((__pyx_v_i > __pyx_v_imax) != 0);
       if (__pyx_t_13) {
 
-        /* "grizli/utils_c/disperse.pyx":112
+        /* "grizli/utils_c/disperse.pyx":122
  *                 imin = i
  *             if i > imax:
  *                 imax = i             # <<<<<<<<<<<<<<
@@ -2845,7 +2845,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_2compute_segmentation_limit
  */
         __pyx_v_imax = __pyx_v_i;
 
-        /* "grizli/utils_c/disperse.pyx":111
+        /* "grizli/utils_c/disperse.pyx":121
  *             if i < imin:
  *                 imin = i
  *             if i > imax:             # <<<<<<<<<<<<<<
@@ -2854,7 +2854,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_2compute_segmentation_limit
  */
       }
 
-      /* "grizli/utils_c/disperse.pyx":114
+      /* "grizli/utils_c/disperse.pyx":124
  *                 imax = i
  * 
  *             if j < jmin:             # <<<<<<<<<<<<<<
@@ -2864,7 +2864,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_2compute_segmentation_limit
       __pyx_t_13 = ((__pyx_v_j < __pyx_v_jmin) != 0);
       if (__pyx_t_13) {
 
-        /* "grizli/utils_c/disperse.pyx":115
+        /* "grizli/utils_c/disperse.pyx":125
  * 
  *             if j < jmin:
  *                 jmin = j             # <<<<<<<<<<<<<<
@@ -2873,7 +2873,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_2compute_segmentation_limit
  */
         __pyx_v_jmin = __pyx_v_j;
 
-        /* "grizli/utils_c/disperse.pyx":114
+        /* "grizli/utils_c/disperse.pyx":124
  *                 imax = i
  * 
  *             if j < jmin:             # <<<<<<<<<<<<<<
@@ -2882,7 +2882,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_2compute_segmentation_limit
  */
       }
 
-      /* "grizli/utils_c/disperse.pyx":116
+      /* "grizli/utils_c/disperse.pyx":126
  *             if j < jmin:
  *                 jmin = j
  *             if j > jmax:             # <<<<<<<<<<<<<<
@@ -2892,7 +2892,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_2compute_segmentation_limit
       __pyx_t_13 = ((__pyx_v_j > __pyx_v_jmax) != 0);
       if (__pyx_t_13) {
 
-        /* "grizli/utils_c/disperse.pyx":117
+        /* "grizli/utils_c/disperse.pyx":127
  *                 jmin = j
  *             if j > jmax:
  *                 jmax = j             # <<<<<<<<<<<<<<
@@ -2901,7 +2901,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_2compute_segmentation_limit
  */
         __pyx_v_jmax = __pyx_v_j;
 
-        /* "grizli/utils_c/disperse.pyx":116
+        /* "grizli/utils_c/disperse.pyx":126
  *             if j < jmin:
  *                 jmin = j
  *             if j > jmax:             # <<<<<<<<<<<<<<
@@ -2913,7 +2913,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_2compute_segmentation_limit
     }
   }
 
-  /* "grizli/utils_c/disperse.pyx":120
+  /* "grizli/utils_c/disperse.pyx":130
  * 
  *     ### No matched pixels
  *     if denom == 0:             # <<<<<<<<<<<<<<
@@ -2923,7 +2923,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_2compute_segmentation_limit
   __pyx_t_13 = ((__pyx_v_denom == 0.0) != 0);
   if (__pyx_t_13) {
 
-    /* "grizli/utils_c/disperse.pyx":121
+    /* "grizli/utils_c/disperse.pyx":131
  *     ### No matched pixels
  *     if denom == 0:
  *         denom = -99             # <<<<<<<<<<<<<<
@@ -2932,7 +2932,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_2compute_segmentation_limit
  */
     __pyx_v_denom = -99.0;
 
-    /* "grizli/utils_c/disperse.pyx":120
+    /* "grizli/utils_c/disperse.pyx":130
  * 
  *     ### No matched pixels
  *     if denom == 0:             # <<<<<<<<<<<<<<
@@ -2941,7 +2941,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_2compute_segmentation_limit
  */
   }
 
-  /* "grizli/utils_c/disperse.pyx":123
+  /* "grizli/utils_c/disperse.pyx":133
  *         denom = -99
  * 
  *     return imin, imax, inumer/denom, jmin, jmax, jnumer/denom, area, denom             # <<<<<<<<<<<<<<
@@ -2949,31 +2949,31 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_2compute_segmentation_limit
  * 
  */
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_16 = __Pyx_PyInt_From_int(__pyx_v_imin); if (unlikely(!__pyx_t_16)) __PYX_ERR(0, 123, __pyx_L1_error)
+  __pyx_t_16 = __Pyx_PyInt_From_int(__pyx_v_imin); if (unlikely(!__pyx_t_16)) __PYX_ERR(0, 133, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_16);
-  __pyx_t_17 = __Pyx_PyInt_From_int(__pyx_v_imax); if (unlikely(!__pyx_t_17)) __PYX_ERR(0, 123, __pyx_L1_error)
+  __pyx_t_17 = __Pyx_PyInt_From_int(__pyx_v_imax); if (unlikely(!__pyx_t_17)) __PYX_ERR(0, 133, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_17);
   if (unlikely(__pyx_v_denom == 0)) {
     PyErr_SetString(PyExc_ZeroDivisionError, "float division");
-    __PYX_ERR(0, 123, __pyx_L1_error)
+    __PYX_ERR(0, 133, __pyx_L1_error)
   }
-  __pyx_t_18 = PyFloat_FromDouble((__pyx_v_inumer / __pyx_v_denom)); if (unlikely(!__pyx_t_18)) __PYX_ERR(0, 123, __pyx_L1_error)
+  __pyx_t_18 = PyFloat_FromDouble((__pyx_v_inumer / __pyx_v_denom)); if (unlikely(!__pyx_t_18)) __PYX_ERR(0, 133, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_18);
-  __pyx_t_19 = __Pyx_PyInt_From_int(__pyx_v_jmin); if (unlikely(!__pyx_t_19)) __PYX_ERR(0, 123, __pyx_L1_error)
+  __pyx_t_19 = __Pyx_PyInt_From_int(__pyx_v_jmin); if (unlikely(!__pyx_t_19)) __PYX_ERR(0, 133, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_19);
-  __pyx_t_20 = __Pyx_PyInt_From_int(__pyx_v_jmax); if (unlikely(!__pyx_t_20)) __PYX_ERR(0, 123, __pyx_L1_error)
+  __pyx_t_20 = __Pyx_PyInt_From_int(__pyx_v_jmax); if (unlikely(!__pyx_t_20)) __PYX_ERR(0, 133, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_20);
   if (unlikely(__pyx_v_denom == 0)) {
     PyErr_SetString(PyExc_ZeroDivisionError, "float division");
-    __PYX_ERR(0, 123, __pyx_L1_error)
+    __PYX_ERR(0, 133, __pyx_L1_error)
   }
-  __pyx_t_21 = PyFloat_FromDouble((__pyx_v_jnumer / __pyx_v_denom)); if (unlikely(!__pyx_t_21)) __PYX_ERR(0, 123, __pyx_L1_error)
+  __pyx_t_21 = PyFloat_FromDouble((__pyx_v_jnumer / __pyx_v_denom)); if (unlikely(!__pyx_t_21)) __PYX_ERR(0, 133, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_21);
-  __pyx_t_22 = __Pyx_PyInt_From_int(__pyx_v_area); if (unlikely(!__pyx_t_22)) __PYX_ERR(0, 123, __pyx_L1_error)
+  __pyx_t_22 = __Pyx_PyInt_From_int(__pyx_v_area); if (unlikely(!__pyx_t_22)) __PYX_ERR(0, 133, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_22);
-  __pyx_t_23 = PyFloat_FromDouble(__pyx_v_denom); if (unlikely(!__pyx_t_23)) __PYX_ERR(0, 123, __pyx_L1_error)
+  __pyx_t_23 = PyFloat_FromDouble(__pyx_v_denom); if (unlikely(!__pyx_t_23)) __PYX_ERR(0, 133, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_23);
-  __pyx_t_24 = PyTuple_New(8); if (unlikely(!__pyx_t_24)) __PYX_ERR(0, 123, __pyx_L1_error)
+  __pyx_t_24 = PyTuple_New(8); if (unlikely(!__pyx_t_24)) __PYX_ERR(0, 133, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_24);
   __Pyx_GIVEREF(__pyx_t_16);
   PyTuple_SET_ITEM(__pyx_t_24, 0, __pyx_t_16);
@@ -3003,7 +3003,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_2compute_segmentation_limit
   __pyx_t_24 = 0;
   goto __pyx_L0;
 
-  /* "grizli/utils_c/disperse.pyx":67
+  /* "grizli/utils_c/disperse.pyx":77
  * @cython.wraparound(False)
  * @cython.embedsignature(True)
  * def compute_segmentation_limits(np.ndarray[FTYPE_t, ndim=2] segm, int seg_id, np.ndarray[FTYPE_t, ndim=2] flam, np.ndarray[LINT_t, ndim=1] shd):             # <<<<<<<<<<<<<<
@@ -3043,7 +3043,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_2compute_segmentation_limit
   return __pyx_r;
 }
 
-/* "grizli/utils_c/disperse.pyx":130
+/* "grizli/utils_c/disperse.pyx":140
  * @cython.wraparound(False)
  * @cython.embedsignature(True)
  * def seg_flux(np.ndarray[FTYPE_t, ndim=2] flam, np.ndarray[LINT_t, ndim=1] idxl, np.ndarray[DTYPE_t, ndim=1] yfrac, np.ndarray[DTYPE_t, ndim=1] ysens, np.ndarray[DTYPE_t, ndim=1] full, np.ndarray[LINT_t, ndim=1] x0, np.ndarray[LINT_t, ndim=1] shd, np.ndarray[LINT_t, ndim=1] shg):             # <<<<<<<<<<<<<<
@@ -3101,47 +3101,47 @@ static PyObject *__pyx_pw_6grizli_7utils_c_8disperse_5seg_flux(PyObject *__pyx_s
         case  1:
         if (likely((values[1] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_idxl)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("seg_flux", 1, 8, 8, 1); __PYX_ERR(0, 130, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("seg_flux", 1, 8, 8, 1); __PYX_ERR(0, 140, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  2:
         if (likely((values[2] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_yfrac)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("seg_flux", 1, 8, 8, 2); __PYX_ERR(0, 130, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("seg_flux", 1, 8, 8, 2); __PYX_ERR(0, 140, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  3:
         if (likely((values[3] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_ysens)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("seg_flux", 1, 8, 8, 3); __PYX_ERR(0, 130, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("seg_flux", 1, 8, 8, 3); __PYX_ERR(0, 140, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  4:
         if (likely((values[4] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_full)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("seg_flux", 1, 8, 8, 4); __PYX_ERR(0, 130, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("seg_flux", 1, 8, 8, 4); __PYX_ERR(0, 140, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  5:
         if (likely((values[5] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_x0)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("seg_flux", 1, 8, 8, 5); __PYX_ERR(0, 130, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("seg_flux", 1, 8, 8, 5); __PYX_ERR(0, 140, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  6:
         if (likely((values[6] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_shd)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("seg_flux", 1, 8, 8, 6); __PYX_ERR(0, 130, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("seg_flux", 1, 8, 8, 6); __PYX_ERR(0, 140, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  7:
         if (likely((values[7] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_shg)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("seg_flux", 1, 8, 8, 7); __PYX_ERR(0, 130, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("seg_flux", 1, 8, 8, 7); __PYX_ERR(0, 140, __pyx_L3_error)
         }
       }
       if (unlikely(kw_args > 0)) {
-        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "seg_flux") < 0)) __PYX_ERR(0, 130, __pyx_L3_error)
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "seg_flux") < 0)) __PYX_ERR(0, 140, __pyx_L3_error)
       }
     } else if (PyTuple_GET_SIZE(__pyx_args) != 8) {
       goto __pyx_L5_argtuple_error;
@@ -3166,20 +3166,20 @@ static PyObject *__pyx_pw_6grizli_7utils_c_8disperse_5seg_flux(PyObject *__pyx_s
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("seg_flux", 1, 8, 8, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 130, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("seg_flux", 1, 8, 8, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 140, __pyx_L3_error)
   __pyx_L3_error:;
   __Pyx_AddTraceback("grizli.utils_c.disperse.seg_flux", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_flam), __pyx_ptype_5numpy_ndarray, 1, "flam", 0))) __PYX_ERR(0, 130, __pyx_L1_error)
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_idxl), __pyx_ptype_5numpy_ndarray, 1, "idxl", 0))) __PYX_ERR(0, 130, __pyx_L1_error)
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_yfrac), __pyx_ptype_5numpy_ndarray, 1, "yfrac", 0))) __PYX_ERR(0, 130, __pyx_L1_error)
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_ysens), __pyx_ptype_5numpy_ndarray, 1, "ysens", 0))) __PYX_ERR(0, 130, __pyx_L1_error)
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_full), __pyx_ptype_5numpy_ndarray, 1, "full", 0))) __PYX_ERR(0, 130, __pyx_L1_error)
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_x0), __pyx_ptype_5numpy_ndarray, 1, "x0", 0))) __PYX_ERR(0, 130, __pyx_L1_error)
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_shd), __pyx_ptype_5numpy_ndarray, 1, "shd", 0))) __PYX_ERR(0, 130, __pyx_L1_error)
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_shg), __pyx_ptype_5numpy_ndarray, 1, "shg", 0))) __PYX_ERR(0, 130, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_flam), __pyx_ptype_5numpy_ndarray, 1, "flam", 0))) __PYX_ERR(0, 140, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_idxl), __pyx_ptype_5numpy_ndarray, 1, "idxl", 0))) __PYX_ERR(0, 140, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_yfrac), __pyx_ptype_5numpy_ndarray, 1, "yfrac", 0))) __PYX_ERR(0, 140, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_ysens), __pyx_ptype_5numpy_ndarray, 1, "ysens", 0))) __PYX_ERR(0, 140, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_full), __pyx_ptype_5numpy_ndarray, 1, "full", 0))) __PYX_ERR(0, 140, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_x0), __pyx_ptype_5numpy_ndarray, 1, "x0", 0))) __PYX_ERR(0, 140, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_shd), __pyx_ptype_5numpy_ndarray, 1, "shd", 0))) __PYX_ERR(0, 140, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_shg), __pyx_ptype_5numpy_ndarray, 1, "shg", 0))) __PYX_ERR(0, 140, __pyx_L1_error)
   __pyx_r = __pyx_pf_6grizli_7utils_c_8disperse_4seg_flux(__pyx_self, __pyx_v_flam, __pyx_v_idxl, __pyx_v_yfrac, __pyx_v_ysens, __pyx_v_full, __pyx_v_x0, __pyx_v_shd, __pyx_v_shg);
 
   /* function exit code */
@@ -3245,42 +3245,42 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_4seg_flux(CYTHON_UNUSED PyO
   __pyx_pybuffernd_shg.rcbuffer = &__pyx_pybuffer_shg;
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_flam.rcbuffer->pybuffer, (PyObject*)__pyx_v_flam, &__Pyx_TypeInfo_nn___pyx_t_6grizli_7utils_c_8disperse_FTYPE_t, PyBUF_FORMAT| PyBUF_STRIDES, 2, 0, __pyx_stack) == -1)) __PYX_ERR(0, 130, __pyx_L1_error)
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_flam.rcbuffer->pybuffer, (PyObject*)__pyx_v_flam, &__Pyx_TypeInfo_nn___pyx_t_6grizli_7utils_c_8disperse_FTYPE_t, PyBUF_FORMAT| PyBUF_STRIDES, 2, 0, __pyx_stack) == -1)) __PYX_ERR(0, 140, __pyx_L1_error)
   }
   __pyx_pybuffernd_flam.diminfo[0].strides = __pyx_pybuffernd_flam.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_flam.diminfo[0].shape = __pyx_pybuffernd_flam.rcbuffer->pybuffer.shape[0]; __pyx_pybuffernd_flam.diminfo[1].strides = __pyx_pybuffernd_flam.rcbuffer->pybuffer.strides[1]; __pyx_pybuffernd_flam.diminfo[1].shape = __pyx_pybuffernd_flam.rcbuffer->pybuffer.shape[1];
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_idxl.rcbuffer->pybuffer, (PyObject*)__pyx_v_idxl, &__Pyx_TypeInfo_nn___pyx_t_6grizli_7utils_c_8disperse_LINT_t, PyBUF_FORMAT| PyBUF_STRIDES, 1, 0, __pyx_stack) == -1)) __PYX_ERR(0, 130, __pyx_L1_error)
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_idxl.rcbuffer->pybuffer, (PyObject*)__pyx_v_idxl, &__Pyx_TypeInfo_nn___pyx_t_6grizli_7utils_c_8disperse_LINT_t, PyBUF_FORMAT| PyBUF_STRIDES, 1, 0, __pyx_stack) == -1)) __PYX_ERR(0, 140, __pyx_L1_error)
   }
   __pyx_pybuffernd_idxl.diminfo[0].strides = __pyx_pybuffernd_idxl.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_idxl.diminfo[0].shape = __pyx_pybuffernd_idxl.rcbuffer->pybuffer.shape[0];
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_yfrac.rcbuffer->pybuffer, (PyObject*)__pyx_v_yfrac, &__Pyx_TypeInfo_nn___pyx_t_6grizli_7utils_c_8disperse_DTYPE_t, PyBUF_FORMAT| PyBUF_STRIDES, 1, 0, __pyx_stack) == -1)) __PYX_ERR(0, 130, __pyx_L1_error)
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_yfrac.rcbuffer->pybuffer, (PyObject*)__pyx_v_yfrac, &__Pyx_TypeInfo_nn___pyx_t_6grizli_7utils_c_8disperse_DTYPE_t, PyBUF_FORMAT| PyBUF_STRIDES, 1, 0, __pyx_stack) == -1)) __PYX_ERR(0, 140, __pyx_L1_error)
   }
   __pyx_pybuffernd_yfrac.diminfo[0].strides = __pyx_pybuffernd_yfrac.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_yfrac.diminfo[0].shape = __pyx_pybuffernd_yfrac.rcbuffer->pybuffer.shape[0];
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_ysens.rcbuffer->pybuffer, (PyObject*)__pyx_v_ysens, &__Pyx_TypeInfo_nn___pyx_t_6grizli_7utils_c_8disperse_DTYPE_t, PyBUF_FORMAT| PyBUF_STRIDES, 1, 0, __pyx_stack) == -1)) __PYX_ERR(0, 130, __pyx_L1_error)
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_ysens.rcbuffer->pybuffer, (PyObject*)__pyx_v_ysens, &__Pyx_TypeInfo_nn___pyx_t_6grizli_7utils_c_8disperse_DTYPE_t, PyBUF_FORMAT| PyBUF_STRIDES, 1, 0, __pyx_stack) == -1)) __PYX_ERR(0, 140, __pyx_L1_error)
   }
   __pyx_pybuffernd_ysens.diminfo[0].strides = __pyx_pybuffernd_ysens.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_ysens.diminfo[0].shape = __pyx_pybuffernd_ysens.rcbuffer->pybuffer.shape[0];
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_full.rcbuffer->pybuffer, (PyObject*)__pyx_v_full, &__Pyx_TypeInfo_nn___pyx_t_6grizli_7utils_c_8disperse_DTYPE_t, PyBUF_FORMAT| PyBUF_STRIDES, 1, 0, __pyx_stack) == -1)) __PYX_ERR(0, 130, __pyx_L1_error)
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_full.rcbuffer->pybuffer, (PyObject*)__pyx_v_full, &__Pyx_TypeInfo_nn___pyx_t_6grizli_7utils_c_8disperse_DTYPE_t, PyBUF_FORMAT| PyBUF_STRIDES, 1, 0, __pyx_stack) == -1)) __PYX_ERR(0, 140, __pyx_L1_error)
   }
   __pyx_pybuffernd_full.diminfo[0].strides = __pyx_pybuffernd_full.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_full.diminfo[0].shape = __pyx_pybuffernd_full.rcbuffer->pybuffer.shape[0];
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_x0.rcbuffer->pybuffer, (PyObject*)__pyx_v_x0, &__Pyx_TypeInfo_nn___pyx_t_6grizli_7utils_c_8disperse_LINT_t, PyBUF_FORMAT| PyBUF_STRIDES, 1, 0, __pyx_stack) == -1)) __PYX_ERR(0, 130, __pyx_L1_error)
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_x0.rcbuffer->pybuffer, (PyObject*)__pyx_v_x0, &__Pyx_TypeInfo_nn___pyx_t_6grizli_7utils_c_8disperse_LINT_t, PyBUF_FORMAT| PyBUF_STRIDES, 1, 0, __pyx_stack) == -1)) __PYX_ERR(0, 140, __pyx_L1_error)
   }
   __pyx_pybuffernd_x0.diminfo[0].strides = __pyx_pybuffernd_x0.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_x0.diminfo[0].shape = __pyx_pybuffernd_x0.rcbuffer->pybuffer.shape[0];
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_shd.rcbuffer->pybuffer, (PyObject*)__pyx_v_shd, &__Pyx_TypeInfo_nn___pyx_t_6grizli_7utils_c_8disperse_LINT_t, PyBUF_FORMAT| PyBUF_STRIDES, 1, 0, __pyx_stack) == -1)) __PYX_ERR(0, 130, __pyx_L1_error)
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_shd.rcbuffer->pybuffer, (PyObject*)__pyx_v_shd, &__Pyx_TypeInfo_nn___pyx_t_6grizli_7utils_c_8disperse_LINT_t, PyBUF_FORMAT| PyBUF_STRIDES, 1, 0, __pyx_stack) == -1)) __PYX_ERR(0, 140, __pyx_L1_error)
   }
   __pyx_pybuffernd_shd.diminfo[0].strides = __pyx_pybuffernd_shd.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_shd.diminfo[0].shape = __pyx_pybuffernd_shd.rcbuffer->pybuffer.shape[0];
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_shg.rcbuffer->pybuffer, (PyObject*)__pyx_v_shg, &__Pyx_TypeInfo_nn___pyx_t_6grizli_7utils_c_8disperse_LINT_t, PyBUF_FORMAT| PyBUF_STRIDES, 1, 0, __pyx_stack) == -1)) __PYX_ERR(0, 130, __pyx_L1_error)
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_shg.rcbuffer->pybuffer, (PyObject*)__pyx_v_shg, &__Pyx_TypeInfo_nn___pyx_t_6grizli_7utils_c_8disperse_LINT_t, PyBUF_FORMAT| PyBUF_STRIDES, 1, 0, __pyx_stack) == -1)) __PYX_ERR(0, 140, __pyx_L1_error)
   }
   __pyx_pybuffernd_shg.diminfo[0].strides = __pyx_pybuffernd_shg.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_shg.diminfo[0].shape = __pyx_pybuffernd_shg.rcbuffer->pybuffer.shape[0];
 
@@ -3319,7 +3319,7 @@ static PyObject *__pyx_pf_6grizli_7utils_c_8disperse_4seg_flux(CYTHON_UNUSED PyO
   return __pyx_r;
 }
 
-/* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":215
+/* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":215
  *         # experimental exception made for __getbuffer__ and __releasebuffer__
  *         # -- the details of this may change.
  *         def __getbuffer__(ndarray self, Py_buffer* info, int flags):             # <<<<<<<<<<<<<<
@@ -3367,7 +3367,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
   __pyx_v_info->obj = Py_None; __Pyx_INCREF(Py_None);
   __Pyx_GIVEREF(__pyx_v_info->obj);
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":222
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":222
  * 
  *             cdef int i, ndim
  *             cdef int endian_detector = 1             # <<<<<<<<<<<<<<
@@ -3376,7 +3376,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
  */
   __pyx_v_endian_detector = 1;
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":223
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":223
  *             cdef int i, ndim
  *             cdef int endian_detector = 1
  *             cdef bint little_endian = ((<char*>&endian_detector)[0] != 0)             # <<<<<<<<<<<<<<
@@ -3385,7 +3385,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
  */
   __pyx_v_little_endian = ((((char *)(&__pyx_v_endian_detector))[0]) != 0);
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":225
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":225
  *             cdef bint little_endian = ((<char*>&endian_detector)[0] != 0)
  * 
  *             ndim = PyArray_NDIM(self)             # <<<<<<<<<<<<<<
@@ -3394,7 +3394,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
  */
   __pyx_v_ndim = PyArray_NDIM(__pyx_v_self);
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":227
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":227
  *             ndim = PyArray_NDIM(self)
  * 
  *             if ((flags & pybuf.PyBUF_C_CONTIGUOUS == pybuf.PyBUF_C_CONTIGUOUS)             # <<<<<<<<<<<<<<
@@ -3408,7 +3408,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
     goto __pyx_L4_bool_binop_done;
   }
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":228
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":228
  * 
  *             if ((flags & pybuf.PyBUF_C_CONTIGUOUS == pybuf.PyBUF_C_CONTIGUOUS)
  *                 and not PyArray_CHKFLAGS(self, NPY_C_CONTIGUOUS)):             # <<<<<<<<<<<<<<
@@ -3419,7 +3419,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
   __pyx_t_1 = __pyx_t_2;
   __pyx_L4_bool_binop_done:;
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":227
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":227
  *             ndim = PyArray_NDIM(self)
  * 
  *             if ((flags & pybuf.PyBUF_C_CONTIGUOUS == pybuf.PyBUF_C_CONTIGUOUS)             # <<<<<<<<<<<<<<
@@ -3428,7 +3428,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
  */
   if (unlikely(__pyx_t_1)) {
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":229
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":229
  *             if ((flags & pybuf.PyBUF_C_CONTIGUOUS == pybuf.PyBUF_C_CONTIGUOUS)
  *                 and not PyArray_CHKFLAGS(self, NPY_C_CONTIGUOUS)):
  *                 raise ValueError(u"ndarray is not C contiguous")             # <<<<<<<<<<<<<<
@@ -3441,7 +3441,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
     __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
     __PYX_ERR(1, 229, __pyx_L1_error)
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":227
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":227
  *             ndim = PyArray_NDIM(self)
  * 
  *             if ((flags & pybuf.PyBUF_C_CONTIGUOUS == pybuf.PyBUF_C_CONTIGUOUS)             # <<<<<<<<<<<<<<
@@ -3450,7 +3450,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
  */
   }
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":231
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":231
  *                 raise ValueError(u"ndarray is not C contiguous")
  * 
  *             if ((flags & pybuf.PyBUF_F_CONTIGUOUS == pybuf.PyBUF_F_CONTIGUOUS)             # <<<<<<<<<<<<<<
@@ -3464,7 +3464,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
     goto __pyx_L7_bool_binop_done;
   }
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":232
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":232
  * 
  *             if ((flags & pybuf.PyBUF_F_CONTIGUOUS == pybuf.PyBUF_F_CONTIGUOUS)
  *                 and not PyArray_CHKFLAGS(self, NPY_F_CONTIGUOUS)):             # <<<<<<<<<<<<<<
@@ -3475,7 +3475,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
   __pyx_t_1 = __pyx_t_2;
   __pyx_L7_bool_binop_done:;
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":231
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":231
  *                 raise ValueError(u"ndarray is not C contiguous")
  * 
  *             if ((flags & pybuf.PyBUF_F_CONTIGUOUS == pybuf.PyBUF_F_CONTIGUOUS)             # <<<<<<<<<<<<<<
@@ -3484,7 +3484,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
  */
   if (unlikely(__pyx_t_1)) {
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":233
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":233
  *             if ((flags & pybuf.PyBUF_F_CONTIGUOUS == pybuf.PyBUF_F_CONTIGUOUS)
  *                 and not PyArray_CHKFLAGS(self, NPY_F_CONTIGUOUS)):
  *                 raise ValueError(u"ndarray is not Fortran contiguous")             # <<<<<<<<<<<<<<
@@ -3497,7 +3497,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
     __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
     __PYX_ERR(1, 233, __pyx_L1_error)
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":231
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":231
  *                 raise ValueError(u"ndarray is not C contiguous")
  * 
  *             if ((flags & pybuf.PyBUF_F_CONTIGUOUS == pybuf.PyBUF_F_CONTIGUOUS)             # <<<<<<<<<<<<<<
@@ -3506,7 +3506,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
  */
   }
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":235
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":235
  *                 raise ValueError(u"ndarray is not Fortran contiguous")
  * 
  *             info.buf = PyArray_DATA(self)             # <<<<<<<<<<<<<<
@@ -3515,7 +3515,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
  */
   __pyx_v_info->buf = PyArray_DATA(__pyx_v_self);
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":236
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":236
  * 
  *             info.buf = PyArray_DATA(self)
  *             info.ndim = ndim             # <<<<<<<<<<<<<<
@@ -3524,7 +3524,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
  */
   __pyx_v_info->ndim = __pyx_v_ndim;
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":237
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":237
  *             info.buf = PyArray_DATA(self)
  *             info.ndim = ndim
  *             if sizeof(npy_intp) != sizeof(Py_ssize_t):             # <<<<<<<<<<<<<<
@@ -3534,7 +3534,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
   __pyx_t_1 = (((sizeof(npy_intp)) != (sizeof(Py_ssize_t))) != 0);
   if (__pyx_t_1) {
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":240
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":240
  *                 # Allocate new buffer for strides and shape info.
  *                 # This is allocated as one block, strides first.
  *                 info.strides = <Py_ssize_t*>PyObject_Malloc(sizeof(Py_ssize_t) * 2 * <size_t>ndim)             # <<<<<<<<<<<<<<
@@ -3543,7 +3543,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
  */
     __pyx_v_info->strides = ((Py_ssize_t *)PyObject_Malloc((((sizeof(Py_ssize_t)) * 2) * ((size_t)__pyx_v_ndim))));
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":241
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":241
  *                 # This is allocated as one block, strides first.
  *                 info.strides = <Py_ssize_t*>PyObject_Malloc(sizeof(Py_ssize_t) * 2 * <size_t>ndim)
  *                 info.shape = info.strides + ndim             # <<<<<<<<<<<<<<
@@ -3552,7 +3552,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
  */
     __pyx_v_info->shape = (__pyx_v_info->strides + __pyx_v_ndim);
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":242
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":242
  *                 info.strides = <Py_ssize_t*>PyObject_Malloc(sizeof(Py_ssize_t) * 2 * <size_t>ndim)
  *                 info.shape = info.strides + ndim
  *                 for i in range(ndim):             # <<<<<<<<<<<<<<
@@ -3564,7 +3564,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
     for (__pyx_t_6 = 0; __pyx_t_6 < __pyx_t_5; __pyx_t_6+=1) {
       __pyx_v_i = __pyx_t_6;
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":243
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":243
  *                 info.shape = info.strides + ndim
  *                 for i in range(ndim):
  *                     info.strides[i] = PyArray_STRIDES(self)[i]             # <<<<<<<<<<<<<<
@@ -3573,7 +3573,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
  */
       (__pyx_v_info->strides[__pyx_v_i]) = (PyArray_STRIDES(__pyx_v_self)[__pyx_v_i]);
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":244
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":244
  *                 for i in range(ndim):
  *                     info.strides[i] = PyArray_STRIDES(self)[i]
  *                     info.shape[i] = PyArray_DIMS(self)[i]             # <<<<<<<<<<<<<<
@@ -3583,7 +3583,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
       (__pyx_v_info->shape[__pyx_v_i]) = (PyArray_DIMS(__pyx_v_self)[__pyx_v_i]);
     }
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":237
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":237
  *             info.buf = PyArray_DATA(self)
  *             info.ndim = ndim
  *             if sizeof(npy_intp) != sizeof(Py_ssize_t):             # <<<<<<<<<<<<<<
@@ -3593,7 +3593,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
     goto __pyx_L9;
   }
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":246
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":246
  *                     info.shape[i] = PyArray_DIMS(self)[i]
  *             else:
  *                 info.strides = <Py_ssize_t*>PyArray_STRIDES(self)             # <<<<<<<<<<<<<<
@@ -3603,7 +3603,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
   /*else*/ {
     __pyx_v_info->strides = ((Py_ssize_t *)PyArray_STRIDES(__pyx_v_self));
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":247
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":247
  *             else:
  *                 info.strides = <Py_ssize_t*>PyArray_STRIDES(self)
  *                 info.shape = <Py_ssize_t*>PyArray_DIMS(self)             # <<<<<<<<<<<<<<
@@ -3614,7 +3614,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
   }
   __pyx_L9:;
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":248
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":248
  *                 info.strides = <Py_ssize_t*>PyArray_STRIDES(self)
  *                 info.shape = <Py_ssize_t*>PyArray_DIMS(self)
  *             info.suboffsets = NULL             # <<<<<<<<<<<<<<
@@ -3623,7 +3623,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
  */
   __pyx_v_info->suboffsets = NULL;
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":249
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":249
  *                 info.shape = <Py_ssize_t*>PyArray_DIMS(self)
  *             info.suboffsets = NULL
  *             info.itemsize = PyArray_ITEMSIZE(self)             # <<<<<<<<<<<<<<
@@ -3632,7 +3632,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
  */
   __pyx_v_info->itemsize = PyArray_ITEMSIZE(__pyx_v_self);
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":250
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":250
  *             info.suboffsets = NULL
  *             info.itemsize = PyArray_ITEMSIZE(self)
  *             info.readonly = not PyArray_ISWRITEABLE(self)             # <<<<<<<<<<<<<<
@@ -3641,7 +3641,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
  */
   __pyx_v_info->readonly = (!(PyArray_ISWRITEABLE(__pyx_v_self) != 0));
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":253
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":253
  * 
  *             cdef int t
  *             cdef char* f = NULL             # <<<<<<<<<<<<<<
@@ -3650,7 +3650,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
  */
   __pyx_v_f = NULL;
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":254
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":254
  *             cdef int t
  *             cdef char* f = NULL
  *             cdef dtype descr = self.descr             # <<<<<<<<<<<<<<
@@ -3662,7 +3662,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
   __pyx_v_descr = ((PyArray_Descr *)__pyx_t_3);
   __pyx_t_3 = 0;
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":257
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":257
  *             cdef int offset
  * 
  *             info.obj = self             # <<<<<<<<<<<<<<
@@ -3675,7 +3675,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
   __Pyx_DECREF(__pyx_v_info->obj);
   __pyx_v_info->obj = ((PyObject *)__pyx_v_self);
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":259
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":259
  *             info.obj = self
  * 
  *             if not PyDataType_HASFIELDS(descr):             # <<<<<<<<<<<<<<
@@ -3685,7 +3685,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
   __pyx_t_1 = ((!(PyDataType_HASFIELDS(__pyx_v_descr) != 0)) != 0);
   if (__pyx_t_1) {
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":260
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":260
  * 
  *             if not PyDataType_HASFIELDS(descr):
  *                 t = descr.type_num             # <<<<<<<<<<<<<<
@@ -3695,7 +3695,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
     __pyx_t_4 = __pyx_v_descr->type_num;
     __pyx_v_t = __pyx_t_4;
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":261
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":261
  *             if not PyDataType_HASFIELDS(descr):
  *                 t = descr.type_num
  *                 if ((descr.byteorder == c'>' and little_endian) or             # <<<<<<<<<<<<<<
@@ -3715,7 +3715,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
     }
     __pyx_L15_next_or:;
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":262
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":262
  *                 t = descr.type_num
  *                 if ((descr.byteorder == c'>' and little_endian) or
  *                     (descr.byteorder == c'<' and not little_endian)):             # <<<<<<<<<<<<<<
@@ -3732,7 +3732,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
     __pyx_t_1 = __pyx_t_2;
     __pyx_L14_bool_binop_done:;
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":261
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":261
  *             if not PyDataType_HASFIELDS(descr):
  *                 t = descr.type_num
  *                 if ((descr.byteorder == c'>' and little_endian) or             # <<<<<<<<<<<<<<
@@ -3741,7 +3741,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
  */
     if (unlikely(__pyx_t_1)) {
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":263
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":263
  *                 if ((descr.byteorder == c'>' and little_endian) or
  *                     (descr.byteorder == c'<' and not little_endian)):
  *                     raise ValueError(u"Non-native byte order not supported")             # <<<<<<<<<<<<<<
@@ -3754,7 +3754,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
       __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
       __PYX_ERR(1, 263, __pyx_L1_error)
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":261
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":261
  *             if not PyDataType_HASFIELDS(descr):
  *                 t = descr.type_num
  *                 if ((descr.byteorder == c'>' and little_endian) or             # <<<<<<<<<<<<<<
@@ -3763,7 +3763,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
  */
     }
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":264
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":264
  *                     (descr.byteorder == c'<' and not little_endian)):
  *                     raise ValueError(u"Non-native byte order not supported")
  *                 if   t == NPY_BYTE:        f = "b"             # <<<<<<<<<<<<<<
@@ -3775,7 +3775,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
       __pyx_v_f = ((char *)"b");
       break;
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":265
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":265
  *                     raise ValueError(u"Non-native byte order not supported")
  *                 if   t == NPY_BYTE:        f = "b"
  *                 elif t == NPY_UBYTE:       f = "B"             # <<<<<<<<<<<<<<
@@ -3786,7 +3786,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
       __pyx_v_f = ((char *)"B");
       break;
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":266
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":266
  *                 if   t == NPY_BYTE:        f = "b"
  *                 elif t == NPY_UBYTE:       f = "B"
  *                 elif t == NPY_SHORT:       f = "h"             # <<<<<<<<<<<<<<
@@ -3797,7 +3797,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
       __pyx_v_f = ((char *)"h");
       break;
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":267
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":267
  *                 elif t == NPY_UBYTE:       f = "B"
  *                 elif t == NPY_SHORT:       f = "h"
  *                 elif t == NPY_USHORT:      f = "H"             # <<<<<<<<<<<<<<
@@ -3808,7 +3808,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
       __pyx_v_f = ((char *)"H");
       break;
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":268
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":268
  *                 elif t == NPY_SHORT:       f = "h"
  *                 elif t == NPY_USHORT:      f = "H"
  *                 elif t == NPY_INT:         f = "i"             # <<<<<<<<<<<<<<
@@ -3819,7 +3819,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
       __pyx_v_f = ((char *)"i");
       break;
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":269
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":269
  *                 elif t == NPY_USHORT:      f = "H"
  *                 elif t == NPY_INT:         f = "i"
  *                 elif t == NPY_UINT:        f = "I"             # <<<<<<<<<<<<<<
@@ -3830,7 +3830,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
       __pyx_v_f = ((char *)"I");
       break;
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":270
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":270
  *                 elif t == NPY_INT:         f = "i"
  *                 elif t == NPY_UINT:        f = "I"
  *                 elif t == NPY_LONG:        f = "l"             # <<<<<<<<<<<<<<
@@ -3841,7 +3841,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
       __pyx_v_f = ((char *)"l");
       break;
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":271
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":271
  *                 elif t == NPY_UINT:        f = "I"
  *                 elif t == NPY_LONG:        f = "l"
  *                 elif t == NPY_ULONG:       f = "L"             # <<<<<<<<<<<<<<
@@ -3852,7 +3852,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
       __pyx_v_f = ((char *)"L");
       break;
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":272
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":272
  *                 elif t == NPY_LONG:        f = "l"
  *                 elif t == NPY_ULONG:       f = "L"
  *                 elif t == NPY_LONGLONG:    f = "q"             # <<<<<<<<<<<<<<
@@ -3863,7 +3863,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
       __pyx_v_f = ((char *)"q");
       break;
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":273
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":273
  *                 elif t == NPY_ULONG:       f = "L"
  *                 elif t == NPY_LONGLONG:    f = "q"
  *                 elif t == NPY_ULONGLONG:   f = "Q"             # <<<<<<<<<<<<<<
@@ -3874,7 +3874,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
       __pyx_v_f = ((char *)"Q");
       break;
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":274
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":274
  *                 elif t == NPY_LONGLONG:    f = "q"
  *                 elif t == NPY_ULONGLONG:   f = "Q"
  *                 elif t == NPY_FLOAT:       f = "f"             # <<<<<<<<<<<<<<
@@ -3885,7 +3885,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
       __pyx_v_f = ((char *)"f");
       break;
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":275
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":275
  *                 elif t == NPY_ULONGLONG:   f = "Q"
  *                 elif t == NPY_FLOAT:       f = "f"
  *                 elif t == NPY_DOUBLE:      f = "d"             # <<<<<<<<<<<<<<
@@ -3896,7 +3896,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
       __pyx_v_f = ((char *)"d");
       break;
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":276
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":276
  *                 elif t == NPY_FLOAT:       f = "f"
  *                 elif t == NPY_DOUBLE:      f = "d"
  *                 elif t == NPY_LONGDOUBLE:  f = "g"             # <<<<<<<<<<<<<<
@@ -3907,7 +3907,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
       __pyx_v_f = ((char *)"g");
       break;
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":277
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":277
  *                 elif t == NPY_DOUBLE:      f = "d"
  *                 elif t == NPY_LONGDOUBLE:  f = "g"
  *                 elif t == NPY_CFLOAT:      f = "Zf"             # <<<<<<<<<<<<<<
@@ -3918,7 +3918,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
       __pyx_v_f = ((char *)"Zf");
       break;
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":278
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":278
  *                 elif t == NPY_LONGDOUBLE:  f = "g"
  *                 elif t == NPY_CFLOAT:      f = "Zf"
  *                 elif t == NPY_CDOUBLE:     f = "Zd"             # <<<<<<<<<<<<<<
@@ -3929,7 +3929,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
       __pyx_v_f = ((char *)"Zd");
       break;
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":279
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":279
  *                 elif t == NPY_CFLOAT:      f = "Zf"
  *                 elif t == NPY_CDOUBLE:     f = "Zd"
  *                 elif t == NPY_CLONGDOUBLE: f = "Zg"             # <<<<<<<<<<<<<<
@@ -3940,7 +3940,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
       __pyx_v_f = ((char *)"Zg");
       break;
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":280
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":280
  *                 elif t == NPY_CDOUBLE:     f = "Zd"
  *                 elif t == NPY_CLONGDOUBLE: f = "Zg"
  *                 elif t == NPY_OBJECT:      f = "O"             # <<<<<<<<<<<<<<
@@ -3952,7 +3952,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
       break;
       default:
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":282
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":282
  *                 elif t == NPY_OBJECT:      f = "O"
  *                 else:
  *                     raise ValueError(u"unknown dtype code in numpy.pxd (%d)" % t)             # <<<<<<<<<<<<<<
@@ -3973,7 +3973,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
       break;
     }
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":283
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":283
  *                 else:
  *                     raise ValueError(u"unknown dtype code in numpy.pxd (%d)" % t)
  *                 info.format = f             # <<<<<<<<<<<<<<
@@ -3982,7 +3982,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
  */
     __pyx_v_info->format = __pyx_v_f;
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":284
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":284
  *                     raise ValueError(u"unknown dtype code in numpy.pxd (%d)" % t)
  *                 info.format = f
  *                 return             # <<<<<<<<<<<<<<
@@ -3992,7 +3992,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
     __pyx_r = 0;
     goto __pyx_L0;
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":259
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":259
  *             info.obj = self
  * 
  *             if not PyDataType_HASFIELDS(descr):             # <<<<<<<<<<<<<<
@@ -4001,7 +4001,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
  */
   }
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":286
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":286
  *                 return
  *             else:
  *                 info.format = <char*>PyObject_Malloc(_buffer_format_string_len)             # <<<<<<<<<<<<<<
@@ -4011,7 +4011,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
   /*else*/ {
     __pyx_v_info->format = ((char *)PyObject_Malloc(0xFF));
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":287
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":287
  *             else:
  *                 info.format = <char*>PyObject_Malloc(_buffer_format_string_len)
  *                 info.format[0] = c'^' # Native data types, manual alignment             # <<<<<<<<<<<<<<
@@ -4020,7 +4020,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
  */
     (__pyx_v_info->format[0]) = '^';
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":288
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":288
  *                 info.format = <char*>PyObject_Malloc(_buffer_format_string_len)
  *                 info.format[0] = c'^' # Native data types, manual alignment
  *                 offset = 0             # <<<<<<<<<<<<<<
@@ -4029,7 +4029,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
  */
     __pyx_v_offset = 0;
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":289
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":289
  *                 info.format[0] = c'^' # Native data types, manual alignment
  *                 offset = 0
  *                 f = _util_dtypestring(descr, info.format + 1,             # <<<<<<<<<<<<<<
@@ -4039,7 +4039,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
     __pyx_t_8 = __pyx_f_5numpy__util_dtypestring(__pyx_v_descr, (__pyx_v_info->format + 1), (__pyx_v_info->format + 0xFF), (&__pyx_v_offset)); if (unlikely(__pyx_t_8 == ((char *)NULL))) __PYX_ERR(1, 289, __pyx_L1_error)
     __pyx_v_f = __pyx_t_8;
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":292
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":292
  *                                       info.format + _buffer_format_string_len,
  *                                       &offset)
  *                 f[0] = c'\0' # Terminate format string             # <<<<<<<<<<<<<<
@@ -4049,7 +4049,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
     (__pyx_v_f[0]) = '\x00';
   }
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":215
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":215
  *         # experimental exception made for __getbuffer__ and __releasebuffer__
  *         # -- the details of this may change.
  *         def __getbuffer__(ndarray self, Py_buffer* info, int flags):             # <<<<<<<<<<<<<<
@@ -4081,7 +4081,7 @@ static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, P
   return __pyx_r;
 }
 
-/* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":294
+/* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":294
  *                 f[0] = c'\0' # Terminate format string
  * 
  *         def __releasebuffer__(ndarray self, Py_buffer* info):             # <<<<<<<<<<<<<<
@@ -4105,7 +4105,7 @@ static void __pyx_pf_5numpy_7ndarray_2__releasebuffer__(PyArrayObject *__pyx_v_s
   int __pyx_t_1;
   __Pyx_RefNannySetupContext("__releasebuffer__", 0);
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":295
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":295
  * 
  *         def __releasebuffer__(ndarray self, Py_buffer* info):
  *             if PyArray_HASFIELDS(self):             # <<<<<<<<<<<<<<
@@ -4115,7 +4115,7 @@ static void __pyx_pf_5numpy_7ndarray_2__releasebuffer__(PyArrayObject *__pyx_v_s
   __pyx_t_1 = (PyArray_HASFIELDS(__pyx_v_self) != 0);
   if (__pyx_t_1) {
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":296
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":296
  *         def __releasebuffer__(ndarray self, Py_buffer* info):
  *             if PyArray_HASFIELDS(self):
  *                 PyObject_Free(info.format)             # <<<<<<<<<<<<<<
@@ -4124,7 +4124,7 @@ static void __pyx_pf_5numpy_7ndarray_2__releasebuffer__(PyArrayObject *__pyx_v_s
  */
     PyObject_Free(__pyx_v_info->format);
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":295
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":295
  * 
  *         def __releasebuffer__(ndarray self, Py_buffer* info):
  *             if PyArray_HASFIELDS(self):             # <<<<<<<<<<<<<<
@@ -4133,7 +4133,7 @@ static void __pyx_pf_5numpy_7ndarray_2__releasebuffer__(PyArrayObject *__pyx_v_s
  */
   }
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":297
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":297
  *             if PyArray_HASFIELDS(self):
  *                 PyObject_Free(info.format)
  *             if sizeof(npy_intp) != sizeof(Py_ssize_t):             # <<<<<<<<<<<<<<
@@ -4143,7 +4143,7 @@ static void __pyx_pf_5numpy_7ndarray_2__releasebuffer__(PyArrayObject *__pyx_v_s
   __pyx_t_1 = (((sizeof(npy_intp)) != (sizeof(Py_ssize_t))) != 0);
   if (__pyx_t_1) {
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":298
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":298
  *                 PyObject_Free(info.format)
  *             if sizeof(npy_intp) != sizeof(Py_ssize_t):
  *                 PyObject_Free(info.strides)             # <<<<<<<<<<<<<<
@@ -4152,7 +4152,7 @@ static void __pyx_pf_5numpy_7ndarray_2__releasebuffer__(PyArrayObject *__pyx_v_s
  */
     PyObject_Free(__pyx_v_info->strides);
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":297
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":297
  *             if PyArray_HASFIELDS(self):
  *                 PyObject_Free(info.format)
  *             if sizeof(npy_intp) != sizeof(Py_ssize_t):             # <<<<<<<<<<<<<<
@@ -4161,7 +4161,7 @@ static void __pyx_pf_5numpy_7ndarray_2__releasebuffer__(PyArrayObject *__pyx_v_s
  */
   }
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":294
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":294
  *                 f[0] = c'\0' # Terminate format string
  * 
  *         def __releasebuffer__(ndarray self, Py_buffer* info):             # <<<<<<<<<<<<<<
@@ -4173,7 +4173,7 @@ static void __pyx_pf_5numpy_7ndarray_2__releasebuffer__(PyArrayObject *__pyx_v_s
   __Pyx_RefNannyFinishContext();
 }
 
-/* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":775
+/* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":775
  * ctypedef npy_cdouble     complex_t
  * 
  * cdef inline object PyArray_MultiIterNew1(a):             # <<<<<<<<<<<<<<
@@ -4187,7 +4187,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew1(PyObject *__
   PyObject *__pyx_t_1 = NULL;
   __Pyx_RefNannySetupContext("PyArray_MultiIterNew1", 0);
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":776
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":776
  * 
  * cdef inline object PyArray_MultiIterNew1(a):
  *     return PyArray_MultiIterNew(1, <void*>a)             # <<<<<<<<<<<<<<
@@ -4201,7 +4201,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew1(PyObject *__
   __pyx_t_1 = 0;
   goto __pyx_L0;
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":775
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":775
  * ctypedef npy_cdouble     complex_t
  * 
  * cdef inline object PyArray_MultiIterNew1(a):             # <<<<<<<<<<<<<<
@@ -4220,7 +4220,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew1(PyObject *__
   return __pyx_r;
 }
 
-/* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":778
+/* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":778
  *     return PyArray_MultiIterNew(1, <void*>a)
  * 
  * cdef inline object PyArray_MultiIterNew2(a, b):             # <<<<<<<<<<<<<<
@@ -4234,7 +4234,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew2(PyObject *__
   PyObject *__pyx_t_1 = NULL;
   __Pyx_RefNannySetupContext("PyArray_MultiIterNew2", 0);
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":779
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":779
  * 
  * cdef inline object PyArray_MultiIterNew2(a, b):
  *     return PyArray_MultiIterNew(2, <void*>a, <void*>b)             # <<<<<<<<<<<<<<
@@ -4248,7 +4248,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew2(PyObject *__
   __pyx_t_1 = 0;
   goto __pyx_L0;
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":778
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":778
  *     return PyArray_MultiIterNew(1, <void*>a)
  * 
  * cdef inline object PyArray_MultiIterNew2(a, b):             # <<<<<<<<<<<<<<
@@ -4267,7 +4267,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew2(PyObject *__
   return __pyx_r;
 }
 
-/* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":781
+/* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":781
  *     return PyArray_MultiIterNew(2, <void*>a, <void*>b)
  * 
  * cdef inline object PyArray_MultiIterNew3(a, b, c):             # <<<<<<<<<<<<<<
@@ -4281,7 +4281,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew3(PyObject *__
   PyObject *__pyx_t_1 = NULL;
   __Pyx_RefNannySetupContext("PyArray_MultiIterNew3", 0);
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":782
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":782
  * 
  * cdef inline object PyArray_MultiIterNew3(a, b, c):
  *     return PyArray_MultiIterNew(3, <void*>a, <void*>b, <void*> c)             # <<<<<<<<<<<<<<
@@ -4295,7 +4295,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew3(PyObject *__
   __pyx_t_1 = 0;
   goto __pyx_L0;
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":781
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":781
  *     return PyArray_MultiIterNew(2, <void*>a, <void*>b)
  * 
  * cdef inline object PyArray_MultiIterNew3(a, b, c):             # <<<<<<<<<<<<<<
@@ -4314,7 +4314,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew3(PyObject *__
   return __pyx_r;
 }
 
-/* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":784
+/* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":784
  *     return PyArray_MultiIterNew(3, <void*>a, <void*>b, <void*> c)
  * 
  * cdef inline object PyArray_MultiIterNew4(a, b, c, d):             # <<<<<<<<<<<<<<
@@ -4328,7 +4328,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew4(PyObject *__
   PyObject *__pyx_t_1 = NULL;
   __Pyx_RefNannySetupContext("PyArray_MultiIterNew4", 0);
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":785
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":785
  * 
  * cdef inline object PyArray_MultiIterNew4(a, b, c, d):
  *     return PyArray_MultiIterNew(4, <void*>a, <void*>b, <void*>c, <void*> d)             # <<<<<<<<<<<<<<
@@ -4342,7 +4342,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew4(PyObject *__
   __pyx_t_1 = 0;
   goto __pyx_L0;
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":784
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":784
  *     return PyArray_MultiIterNew(3, <void*>a, <void*>b, <void*> c)
  * 
  * cdef inline object PyArray_MultiIterNew4(a, b, c, d):             # <<<<<<<<<<<<<<
@@ -4361,7 +4361,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew4(PyObject *__
   return __pyx_r;
 }
 
-/* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":787
+/* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":787
  *     return PyArray_MultiIterNew(4, <void*>a, <void*>b, <void*>c, <void*> d)
  * 
  * cdef inline object PyArray_MultiIterNew5(a, b, c, d, e):             # <<<<<<<<<<<<<<
@@ -4375,7 +4375,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew5(PyObject *__
   PyObject *__pyx_t_1 = NULL;
   __Pyx_RefNannySetupContext("PyArray_MultiIterNew5", 0);
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":788
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":788
  * 
  * cdef inline object PyArray_MultiIterNew5(a, b, c, d, e):
  *     return PyArray_MultiIterNew(5, <void*>a, <void*>b, <void*>c, <void*> d, <void*> e)             # <<<<<<<<<<<<<<
@@ -4389,7 +4389,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew5(PyObject *__
   __pyx_t_1 = 0;
   goto __pyx_L0;
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":787
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":787
  *     return PyArray_MultiIterNew(4, <void*>a, <void*>b, <void*>c, <void*> d)
  * 
  * cdef inline object PyArray_MultiIterNew5(a, b, c, d, e):             # <<<<<<<<<<<<<<
@@ -4408,7 +4408,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew5(PyObject *__
   return __pyx_r;
 }
 
-/* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":790
+/* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":790
  *     return PyArray_MultiIterNew(5, <void*>a, <void*>b, <void*>c, <void*> d, <void*> e)
  * 
  * cdef inline tuple PyDataType_SHAPE(dtype d):             # <<<<<<<<<<<<<<
@@ -4422,7 +4422,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyDataType_SHAPE(PyArray_Descr *__
   int __pyx_t_1;
   __Pyx_RefNannySetupContext("PyDataType_SHAPE", 0);
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":791
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":791
  * 
  * cdef inline tuple PyDataType_SHAPE(dtype d):
  *     if PyDataType_HASSUBARRAY(d):             # <<<<<<<<<<<<<<
@@ -4432,7 +4432,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyDataType_SHAPE(PyArray_Descr *__
   __pyx_t_1 = (PyDataType_HASSUBARRAY(__pyx_v_d) != 0);
   if (__pyx_t_1) {
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":792
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":792
  * cdef inline tuple PyDataType_SHAPE(dtype d):
  *     if PyDataType_HASSUBARRAY(d):
  *         return <tuple>d.subarray.shape             # <<<<<<<<<<<<<<
@@ -4444,7 +4444,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyDataType_SHAPE(PyArray_Descr *__
     __pyx_r = ((PyObject*)__pyx_v_d->subarray->shape);
     goto __pyx_L0;
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":791
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":791
  * 
  * cdef inline tuple PyDataType_SHAPE(dtype d):
  *     if PyDataType_HASSUBARRAY(d):             # <<<<<<<<<<<<<<
@@ -4453,7 +4453,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyDataType_SHAPE(PyArray_Descr *__
  */
   }
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":794
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":794
  *         return <tuple>d.subarray.shape
  *     else:
  *         return ()             # <<<<<<<<<<<<<<
@@ -4467,7 +4467,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyDataType_SHAPE(PyArray_Descr *__
     goto __pyx_L0;
   }
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":790
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":790
  *     return PyArray_MultiIterNew(5, <void*>a, <void*>b, <void*>c, <void*> d, <void*> e)
  * 
  * cdef inline tuple PyDataType_SHAPE(dtype d):             # <<<<<<<<<<<<<<
@@ -4482,7 +4482,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyDataType_SHAPE(PyArray_Descr *__
   return __pyx_r;
 }
 
-/* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":796
+/* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":796
  *         return ()
  * 
  * cdef inline char* _util_dtypestring(dtype descr, char* f, char* end, int* offset) except NULL:             # <<<<<<<<<<<<<<
@@ -4511,7 +4511,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *__pyx
   char *__pyx_t_9;
   __Pyx_RefNannySetupContext("_util_dtypestring", 0);
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":801
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":801
  * 
  *     cdef dtype child
  *     cdef int endian_detector = 1             # <<<<<<<<<<<<<<
@@ -4520,7 +4520,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *__pyx
  */
   __pyx_v_endian_detector = 1;
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":802
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":802
  *     cdef dtype child
  *     cdef int endian_detector = 1
  *     cdef bint little_endian = ((<char*>&endian_detector)[0] != 0)             # <<<<<<<<<<<<<<
@@ -4529,7 +4529,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *__pyx
  */
   __pyx_v_little_endian = ((((char *)(&__pyx_v_endian_detector))[0]) != 0);
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":805
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":805
  *     cdef tuple fields
  * 
  *     for childname in descr.names:             # <<<<<<<<<<<<<<
@@ -4552,7 +4552,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *__pyx
     __Pyx_XDECREF_SET(__pyx_v_childname, __pyx_t_3);
     __pyx_t_3 = 0;
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":806
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":806
  * 
  *     for childname in descr.names:
  *         fields = descr.fields[childname]             # <<<<<<<<<<<<<<
@@ -4569,7 +4569,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *__pyx
     __Pyx_XDECREF_SET(__pyx_v_fields, ((PyObject*)__pyx_t_3));
     __pyx_t_3 = 0;
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":807
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":807
  *     for childname in descr.names:
  *         fields = descr.fields[childname]
  *         child, new_offset = fields             # <<<<<<<<<<<<<<
@@ -4604,7 +4604,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *__pyx
     __Pyx_XDECREF_SET(__pyx_v_new_offset, __pyx_t_4);
     __pyx_t_4 = 0;
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":809
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":809
  *         child, new_offset = fields
  * 
  *         if (end - f) - <int>(new_offset - offset[0]) < 15:             # <<<<<<<<<<<<<<
@@ -4621,7 +4621,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *__pyx
     __pyx_t_6 = ((((__pyx_v_end - __pyx_v_f) - ((int)__pyx_t_5)) < 15) != 0);
     if (unlikely(__pyx_t_6)) {
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":810
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":810
  * 
  *         if (end - f) - <int>(new_offset - offset[0]) < 15:
  *             raise RuntimeError(u"Format string allocated too short, see comment in numpy.pxd")             # <<<<<<<<<<<<<<
@@ -4634,7 +4634,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *__pyx
       __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
       __PYX_ERR(1, 810, __pyx_L1_error)
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":809
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":809
  *         child, new_offset = fields
  * 
  *         if (end - f) - <int>(new_offset - offset[0]) < 15:             # <<<<<<<<<<<<<<
@@ -4643,7 +4643,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *__pyx
  */
     }
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":812
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":812
  *             raise RuntimeError(u"Format string allocated too short, see comment in numpy.pxd")
  * 
  *         if ((child.byteorder == c'>' and little_endian) or             # <<<<<<<<<<<<<<
@@ -4663,7 +4663,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *__pyx
     }
     __pyx_L8_next_or:;
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":813
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":813
  * 
  *         if ((child.byteorder == c'>' and little_endian) or
  *             (child.byteorder == c'<' and not little_endian)):             # <<<<<<<<<<<<<<
@@ -4680,7 +4680,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *__pyx
     __pyx_t_6 = __pyx_t_7;
     __pyx_L7_bool_binop_done:;
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":812
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":812
  *             raise RuntimeError(u"Format string allocated too short, see comment in numpy.pxd")
  * 
  *         if ((child.byteorder == c'>' and little_endian) or             # <<<<<<<<<<<<<<
@@ -4689,7 +4689,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *__pyx
  */
     if (unlikely(__pyx_t_6)) {
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":814
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":814
  *         if ((child.byteorder == c'>' and little_endian) or
  *             (child.byteorder == c'<' and not little_endian)):
  *             raise ValueError(u"Non-native byte order not supported")             # <<<<<<<<<<<<<<
@@ -4702,7 +4702,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *__pyx
       __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
       __PYX_ERR(1, 814, __pyx_L1_error)
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":812
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":812
  *             raise RuntimeError(u"Format string allocated too short, see comment in numpy.pxd")
  * 
  *         if ((child.byteorder == c'>' and little_endian) or             # <<<<<<<<<<<<<<
@@ -4711,7 +4711,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *__pyx
  */
     }
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":824
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":824
  * 
  *         # Output padding bytes
  *         while offset[0] < new_offset:             # <<<<<<<<<<<<<<
@@ -4727,7 +4727,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *__pyx
       __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
       if (!__pyx_t_6) break;
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":825
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":825
  *         # Output padding bytes
  *         while offset[0] < new_offset:
  *             f[0] = 120 # "x"; pad byte             # <<<<<<<<<<<<<<
@@ -4736,7 +4736,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *__pyx
  */
       (__pyx_v_f[0]) = 0x78;
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":826
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":826
  *         while offset[0] < new_offset:
  *             f[0] = 120 # "x"; pad byte
  *             f += 1             # <<<<<<<<<<<<<<
@@ -4745,7 +4745,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *__pyx
  */
       __pyx_v_f = (__pyx_v_f + 1);
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":827
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":827
  *             f[0] = 120 # "x"; pad byte
  *             f += 1
  *             offset[0] += 1             # <<<<<<<<<<<<<<
@@ -4756,7 +4756,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *__pyx
       (__pyx_v_offset[__pyx_t_8]) = ((__pyx_v_offset[__pyx_t_8]) + 1);
     }
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":829
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":829
  *             offset[0] += 1
  * 
  *         offset[0] += child.itemsize             # <<<<<<<<<<<<<<
@@ -4766,7 +4766,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *__pyx
     __pyx_t_8 = 0;
     (__pyx_v_offset[__pyx_t_8]) = ((__pyx_v_offset[__pyx_t_8]) + __pyx_v_child->elsize);
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":831
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":831
  *         offset[0] += child.itemsize
  * 
  *         if not PyDataType_HASFIELDS(child):             # <<<<<<<<<<<<<<
@@ -4776,7 +4776,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *__pyx
     __pyx_t_6 = ((!(PyDataType_HASFIELDS(__pyx_v_child) != 0)) != 0);
     if (__pyx_t_6) {
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":832
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":832
  * 
  *         if not PyDataType_HASFIELDS(child):
  *             t = child.type_num             # <<<<<<<<<<<<<<
@@ -4788,7 +4788,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *__pyx
       __Pyx_XDECREF_SET(__pyx_v_t, __pyx_t_4);
       __pyx_t_4 = 0;
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":833
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":833
  *         if not PyDataType_HASFIELDS(child):
  *             t = child.type_num
  *             if end - f < 5:             # <<<<<<<<<<<<<<
@@ -4798,7 +4798,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *__pyx
       __pyx_t_6 = (((__pyx_v_end - __pyx_v_f) < 5) != 0);
       if (unlikely(__pyx_t_6)) {
 
-        /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":834
+        /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":834
  *             t = child.type_num
  *             if end - f < 5:
  *                 raise RuntimeError(u"Format string allocated too short.")             # <<<<<<<<<<<<<<
@@ -4811,7 +4811,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *__pyx
         __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
         __PYX_ERR(1, 834, __pyx_L1_error)
 
-        /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":833
+        /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":833
  *         if not PyDataType_HASFIELDS(child):
  *             t = child.type_num
  *             if end - f < 5:             # <<<<<<<<<<<<<<
@@ -4820,7 +4820,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *__pyx
  */
       }
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":837
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":837
  * 
  *             # Until ticket #99 is fixed, use integers to avoid warnings
  *             if   t == NPY_BYTE:        f[0] =  98 #"b"             # <<<<<<<<<<<<<<
@@ -4838,7 +4838,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *__pyx
         goto __pyx_L15;
       }
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":838
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":838
  *             # Until ticket #99 is fixed, use integers to avoid warnings
  *             if   t == NPY_BYTE:        f[0] =  98 #"b"
  *             elif t == NPY_UBYTE:       f[0] =  66 #"B"             # <<<<<<<<<<<<<<
@@ -4856,7 +4856,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *__pyx
         goto __pyx_L15;
       }
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":839
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":839
  *             if   t == NPY_BYTE:        f[0] =  98 #"b"
  *             elif t == NPY_UBYTE:       f[0] =  66 #"B"
  *             elif t == NPY_SHORT:       f[0] = 104 #"h"             # <<<<<<<<<<<<<<
@@ -4874,7 +4874,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *__pyx
         goto __pyx_L15;
       }
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":840
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":840
  *             elif t == NPY_UBYTE:       f[0] =  66 #"B"
  *             elif t == NPY_SHORT:       f[0] = 104 #"h"
  *             elif t == NPY_USHORT:      f[0] =  72 #"H"             # <<<<<<<<<<<<<<
@@ -4892,7 +4892,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *__pyx
         goto __pyx_L15;
       }
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":841
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":841
  *             elif t == NPY_SHORT:       f[0] = 104 #"h"
  *             elif t == NPY_USHORT:      f[0] =  72 #"H"
  *             elif t == NPY_INT:         f[0] = 105 #"i"             # <<<<<<<<<<<<<<
@@ -4910,7 +4910,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *__pyx
         goto __pyx_L15;
       }
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":842
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":842
  *             elif t == NPY_USHORT:      f[0] =  72 #"H"
  *             elif t == NPY_INT:         f[0] = 105 #"i"
  *             elif t == NPY_UINT:        f[0] =  73 #"I"             # <<<<<<<<<<<<<<
@@ -4928,7 +4928,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *__pyx
         goto __pyx_L15;
       }
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":843
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":843
  *             elif t == NPY_INT:         f[0] = 105 #"i"
  *             elif t == NPY_UINT:        f[0] =  73 #"I"
  *             elif t == NPY_LONG:        f[0] = 108 #"l"             # <<<<<<<<<<<<<<
@@ -4946,7 +4946,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *__pyx
         goto __pyx_L15;
       }
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":844
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":844
  *             elif t == NPY_UINT:        f[0] =  73 #"I"
  *             elif t == NPY_LONG:        f[0] = 108 #"l"
  *             elif t == NPY_ULONG:       f[0] = 76  #"L"             # <<<<<<<<<<<<<<
@@ -4964,7 +4964,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *__pyx
         goto __pyx_L15;
       }
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":845
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":845
  *             elif t == NPY_LONG:        f[0] = 108 #"l"
  *             elif t == NPY_ULONG:       f[0] = 76  #"L"
  *             elif t == NPY_LONGLONG:    f[0] = 113 #"q"             # <<<<<<<<<<<<<<
@@ -4982,7 +4982,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *__pyx
         goto __pyx_L15;
       }
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":846
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":846
  *             elif t == NPY_ULONG:       f[0] = 76  #"L"
  *             elif t == NPY_LONGLONG:    f[0] = 113 #"q"
  *             elif t == NPY_ULONGLONG:   f[0] = 81  #"Q"             # <<<<<<<<<<<<<<
@@ -5000,7 +5000,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *__pyx
         goto __pyx_L15;
       }
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":847
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":847
  *             elif t == NPY_LONGLONG:    f[0] = 113 #"q"
  *             elif t == NPY_ULONGLONG:   f[0] = 81  #"Q"
  *             elif t == NPY_FLOAT:       f[0] = 102 #"f"             # <<<<<<<<<<<<<<
@@ -5018,7 +5018,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *__pyx
         goto __pyx_L15;
       }
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":848
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":848
  *             elif t == NPY_ULONGLONG:   f[0] = 81  #"Q"
  *             elif t == NPY_FLOAT:       f[0] = 102 #"f"
  *             elif t == NPY_DOUBLE:      f[0] = 100 #"d"             # <<<<<<<<<<<<<<
@@ -5036,7 +5036,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *__pyx
         goto __pyx_L15;
       }
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":849
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":849
  *             elif t == NPY_FLOAT:       f[0] = 102 #"f"
  *             elif t == NPY_DOUBLE:      f[0] = 100 #"d"
  *             elif t == NPY_LONGDOUBLE:  f[0] = 103 #"g"             # <<<<<<<<<<<<<<
@@ -5054,7 +5054,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *__pyx
         goto __pyx_L15;
       }
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":850
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":850
  *             elif t == NPY_DOUBLE:      f[0] = 100 #"d"
  *             elif t == NPY_LONGDOUBLE:  f[0] = 103 #"g"
  *             elif t == NPY_CFLOAT:      f[0] = 90; f[1] = 102; f += 1 # Zf             # <<<<<<<<<<<<<<
@@ -5074,7 +5074,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *__pyx
         goto __pyx_L15;
       }
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":851
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":851
  *             elif t == NPY_LONGDOUBLE:  f[0] = 103 #"g"
  *             elif t == NPY_CFLOAT:      f[0] = 90; f[1] = 102; f += 1 # Zf
  *             elif t == NPY_CDOUBLE:     f[0] = 90; f[1] = 100; f += 1 # Zd             # <<<<<<<<<<<<<<
@@ -5094,7 +5094,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *__pyx
         goto __pyx_L15;
       }
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":852
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":852
  *             elif t == NPY_CFLOAT:      f[0] = 90; f[1] = 102; f += 1 # Zf
  *             elif t == NPY_CDOUBLE:     f[0] = 90; f[1] = 100; f += 1 # Zd
  *             elif t == NPY_CLONGDOUBLE: f[0] = 90; f[1] = 103; f += 1 # Zg             # <<<<<<<<<<<<<<
@@ -5114,7 +5114,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *__pyx
         goto __pyx_L15;
       }
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":853
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":853
  *             elif t == NPY_CDOUBLE:     f[0] = 90; f[1] = 100; f += 1 # Zd
  *             elif t == NPY_CLONGDOUBLE: f[0] = 90; f[1] = 103; f += 1 # Zg
  *             elif t == NPY_OBJECT:      f[0] = 79 #"O"             # <<<<<<<<<<<<<<
@@ -5132,7 +5132,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *__pyx
         goto __pyx_L15;
       }
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":855
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":855
  *             elif t == NPY_OBJECT:      f[0] = 79 #"O"
  *             else:
  *                 raise ValueError(u"unknown dtype code in numpy.pxd (%d)" % t)             # <<<<<<<<<<<<<<
@@ -5151,7 +5151,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *__pyx
       }
       __pyx_L15:;
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":856
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":856
  *             else:
  *                 raise ValueError(u"unknown dtype code in numpy.pxd (%d)" % t)
  *             f += 1             # <<<<<<<<<<<<<<
@@ -5160,7 +5160,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *__pyx
  */
       __pyx_v_f = (__pyx_v_f + 1);
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":831
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":831
  *         offset[0] += child.itemsize
  * 
  *         if not PyDataType_HASFIELDS(child):             # <<<<<<<<<<<<<<
@@ -5170,7 +5170,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *__pyx
       goto __pyx_L13;
     }
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":860
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":860
  *             # Cython ignores struct boundary information ("T{...}"),
  *             # so don't output it
  *             f = _util_dtypestring(child, f, end, offset)             # <<<<<<<<<<<<<<
@@ -5183,7 +5183,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *__pyx
     }
     __pyx_L13:;
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":805
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":805
  *     cdef tuple fields
  * 
  *     for childname in descr.names:             # <<<<<<<<<<<<<<
@@ -5193,7 +5193,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *__pyx
   }
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":861
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":861
  *             # so don't output it
  *             f = _util_dtypestring(child, f, end, offset)
  *     return f             # <<<<<<<<<<<<<<
@@ -5203,7 +5203,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *__pyx
   __pyx_r = __pyx_v_f;
   goto __pyx_L0;
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":796
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":796
  *         return ()
  * 
  * cdef inline char* _util_dtypestring(dtype descr, char* f, char* end, int* offset) except NULL:             # <<<<<<<<<<<<<<
@@ -5228,7 +5228,7 @@ static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *__pyx
   return __pyx_r;
 }
 
-/* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":977
+/* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":977
  * 
  * 
  * cdef inline void set_array_base(ndarray arr, object base):             # <<<<<<<<<<<<<<
@@ -5243,7 +5243,7 @@ static CYTHON_INLINE void __pyx_f_5numpy_set_array_base(PyArrayObject *__pyx_v_a
   int __pyx_t_2;
   __Pyx_RefNannySetupContext("set_array_base", 0);
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":979
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":979
  * cdef inline void set_array_base(ndarray arr, object base):
  *      cdef PyObject* baseptr
  *      if base is None:             # <<<<<<<<<<<<<<
@@ -5254,7 +5254,7 @@ static CYTHON_INLINE void __pyx_f_5numpy_set_array_base(PyArrayObject *__pyx_v_a
   __pyx_t_2 = (__pyx_t_1 != 0);
   if (__pyx_t_2) {
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":980
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":980
  *      cdef PyObject* baseptr
  *      if base is None:
  *          baseptr = NULL             # <<<<<<<<<<<<<<
@@ -5263,7 +5263,7 @@ static CYTHON_INLINE void __pyx_f_5numpy_set_array_base(PyArrayObject *__pyx_v_a
  */
     __pyx_v_baseptr = NULL;
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":979
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":979
  * cdef inline void set_array_base(ndarray arr, object base):
  *      cdef PyObject* baseptr
  *      if base is None:             # <<<<<<<<<<<<<<
@@ -5273,7 +5273,7 @@ static CYTHON_INLINE void __pyx_f_5numpy_set_array_base(PyArrayObject *__pyx_v_a
     goto __pyx_L3;
   }
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":982
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":982
  *          baseptr = NULL
  *      else:
  *          Py_INCREF(base) # important to do this before decref below!             # <<<<<<<<<<<<<<
@@ -5283,7 +5283,7 @@ static CYTHON_INLINE void __pyx_f_5numpy_set_array_base(PyArrayObject *__pyx_v_a
   /*else*/ {
     Py_INCREF(__pyx_v_base);
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":983
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":983
  *      else:
  *          Py_INCREF(base) # important to do this before decref below!
  *          baseptr = <PyObject*>base             # <<<<<<<<<<<<<<
@@ -5294,7 +5294,7 @@ static CYTHON_INLINE void __pyx_f_5numpy_set_array_base(PyArrayObject *__pyx_v_a
   }
   __pyx_L3:;
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":984
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":984
  *          Py_INCREF(base) # important to do this before decref below!
  *          baseptr = <PyObject*>base
  *      Py_XDECREF(arr.base)             # <<<<<<<<<<<<<<
@@ -5303,7 +5303,7 @@ static CYTHON_INLINE void __pyx_f_5numpy_set_array_base(PyArrayObject *__pyx_v_a
  */
   Py_XDECREF(__pyx_v_arr->base);
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":985
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":985
  *          baseptr = <PyObject*>base
  *      Py_XDECREF(arr.base)
  *      arr.base = baseptr             # <<<<<<<<<<<<<<
@@ -5312,7 +5312,7 @@ static CYTHON_INLINE void __pyx_f_5numpy_set_array_base(PyArrayObject *__pyx_v_a
  */
   __pyx_v_arr->base = __pyx_v_baseptr;
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":977
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":977
  * 
  * 
  * cdef inline void set_array_base(ndarray arr, object base):             # <<<<<<<<<<<<<<
@@ -5324,7 +5324,7 @@ static CYTHON_INLINE void __pyx_f_5numpy_set_array_base(PyArrayObject *__pyx_v_a
   __Pyx_RefNannyFinishContext();
 }
 
-/* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":987
+/* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":987
  *      arr.base = baseptr
  * 
  * cdef inline object get_array_base(ndarray arr):             # <<<<<<<<<<<<<<
@@ -5338,7 +5338,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_get_array_base(PyArrayObject *__py
   int __pyx_t_1;
   __Pyx_RefNannySetupContext("get_array_base", 0);
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":988
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":988
  * 
  * cdef inline object get_array_base(ndarray arr):
  *     if arr.base is NULL:             # <<<<<<<<<<<<<<
@@ -5348,7 +5348,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_get_array_base(PyArrayObject *__py
   __pyx_t_1 = ((__pyx_v_arr->base == NULL) != 0);
   if (__pyx_t_1) {
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":989
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":989
  * cdef inline object get_array_base(ndarray arr):
  *     if arr.base is NULL:
  *         return None             # <<<<<<<<<<<<<<
@@ -5359,7 +5359,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_get_array_base(PyArrayObject *__py
     __pyx_r = Py_None; __Pyx_INCREF(Py_None);
     goto __pyx_L0;
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":988
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":988
  * 
  * cdef inline object get_array_base(ndarray arr):
  *     if arr.base is NULL:             # <<<<<<<<<<<<<<
@@ -5368,7 +5368,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_get_array_base(PyArrayObject *__py
  */
   }
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":991
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":991
  *         return None
  *     else:
  *         return <object>arr.base             # <<<<<<<<<<<<<<
@@ -5382,7 +5382,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_get_array_base(PyArrayObject *__py
     goto __pyx_L0;
   }
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":987
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":987
  *      arr.base = baseptr
  * 
  * cdef inline object get_array_base(ndarray arr):             # <<<<<<<<<<<<<<
@@ -5397,7 +5397,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_get_array_base(PyArrayObject *__py
   return __pyx_r;
 }
 
-/* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":996
+/* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":996
  * # Versions of the import_* functions which are more suitable for
  * # Cython code.
  * cdef inline int import_array() except -1:             # <<<<<<<<<<<<<<
@@ -5418,7 +5418,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_array(void) {
   PyObject *__pyx_t_8 = NULL;
   __Pyx_RefNannySetupContext("import_array", 0);
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":997
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":997
  * # Cython code.
  * cdef inline int import_array() except -1:
  *     try:             # <<<<<<<<<<<<<<
@@ -5434,7 +5434,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_array(void) {
     __Pyx_XGOTREF(__pyx_t_3);
     /*try:*/ {
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":998
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":998
  * cdef inline int import_array() except -1:
  *     try:
  *         _import_array()             # <<<<<<<<<<<<<<
@@ -5443,7 +5443,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_array(void) {
  */
       __pyx_t_4 = _import_array(); if (unlikely(__pyx_t_4 == ((int)-1))) __PYX_ERR(1, 998, __pyx_L3_error)
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":997
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":997
  * # Cython code.
  * cdef inline int import_array() except -1:
  *     try:             # <<<<<<<<<<<<<<
@@ -5457,7 +5457,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_array(void) {
     goto __pyx_L8_try_end;
     __pyx_L3_error:;
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":999
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":999
  *     try:
  *         _import_array()
  *     except Exception:             # <<<<<<<<<<<<<<
@@ -5472,7 +5472,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_array(void) {
       __Pyx_GOTREF(__pyx_t_6);
       __Pyx_GOTREF(__pyx_t_7);
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":1000
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":1000
  *         _import_array()
  *     except Exception:
  *         raise ImportError("numpy.core.multiarray failed to import")             # <<<<<<<<<<<<<<
@@ -5488,7 +5488,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_array(void) {
     goto __pyx_L5_except_error;
     __pyx_L5_except_error:;
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":997
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":997
  * # Cython code.
  * cdef inline int import_array() except -1:
  *     try:             # <<<<<<<<<<<<<<
@@ -5503,7 +5503,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_array(void) {
     __pyx_L8_try_end:;
   }
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":996
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":996
  * # Versions of the import_* functions which are more suitable for
  * # Cython code.
  * cdef inline int import_array() except -1:             # <<<<<<<<<<<<<<
@@ -5526,7 +5526,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_array(void) {
   return __pyx_r;
 }
 
-/* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":1002
+/* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":1002
  *         raise ImportError("numpy.core.multiarray failed to import")
  * 
  * cdef inline int import_umath() except -1:             # <<<<<<<<<<<<<<
@@ -5547,7 +5547,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_umath(void) {
   PyObject *__pyx_t_8 = NULL;
   __Pyx_RefNannySetupContext("import_umath", 0);
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":1003
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":1003
  * 
  * cdef inline int import_umath() except -1:
  *     try:             # <<<<<<<<<<<<<<
@@ -5563,7 +5563,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_umath(void) {
     __Pyx_XGOTREF(__pyx_t_3);
     /*try:*/ {
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":1004
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":1004
  * cdef inline int import_umath() except -1:
  *     try:
  *         _import_umath()             # <<<<<<<<<<<<<<
@@ -5572,7 +5572,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_umath(void) {
  */
       __pyx_t_4 = _import_umath(); if (unlikely(__pyx_t_4 == ((int)-1))) __PYX_ERR(1, 1004, __pyx_L3_error)
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":1003
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":1003
  * 
  * cdef inline int import_umath() except -1:
  *     try:             # <<<<<<<<<<<<<<
@@ -5586,7 +5586,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_umath(void) {
     goto __pyx_L8_try_end;
     __pyx_L3_error:;
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":1005
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":1005
  *     try:
  *         _import_umath()
  *     except Exception:             # <<<<<<<<<<<<<<
@@ -5601,7 +5601,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_umath(void) {
       __Pyx_GOTREF(__pyx_t_6);
       __Pyx_GOTREF(__pyx_t_7);
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":1006
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":1006
  *         _import_umath()
  *     except Exception:
  *         raise ImportError("numpy.core.umath failed to import")             # <<<<<<<<<<<<<<
@@ -5617,7 +5617,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_umath(void) {
     goto __pyx_L5_except_error;
     __pyx_L5_except_error:;
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":1003
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":1003
  * 
  * cdef inline int import_umath() except -1:
  *     try:             # <<<<<<<<<<<<<<
@@ -5632,7 +5632,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_umath(void) {
     __pyx_L8_try_end:;
   }
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":1002
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":1002
  *         raise ImportError("numpy.core.multiarray failed to import")
  * 
  * cdef inline int import_umath() except -1:             # <<<<<<<<<<<<<<
@@ -5655,7 +5655,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_umath(void) {
   return __pyx_r;
 }
 
-/* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":1008
+/* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":1008
  *         raise ImportError("numpy.core.umath failed to import")
  * 
  * cdef inline int import_ufunc() except -1:             # <<<<<<<<<<<<<<
@@ -5676,7 +5676,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_ufunc(void) {
   PyObject *__pyx_t_8 = NULL;
   __Pyx_RefNannySetupContext("import_ufunc", 0);
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":1009
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":1009
  * 
  * cdef inline int import_ufunc() except -1:
  *     try:             # <<<<<<<<<<<<<<
@@ -5692,7 +5692,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_ufunc(void) {
     __Pyx_XGOTREF(__pyx_t_3);
     /*try:*/ {
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":1010
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":1010
  * cdef inline int import_ufunc() except -1:
  *     try:
  *         _import_umath()             # <<<<<<<<<<<<<<
@@ -5701,7 +5701,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_ufunc(void) {
  */
       __pyx_t_4 = _import_umath(); if (unlikely(__pyx_t_4 == ((int)-1))) __PYX_ERR(1, 1010, __pyx_L3_error)
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":1009
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":1009
  * 
  * cdef inline int import_ufunc() except -1:
  *     try:             # <<<<<<<<<<<<<<
@@ -5715,7 +5715,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_ufunc(void) {
     goto __pyx_L8_try_end;
     __pyx_L3_error:;
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":1011
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":1011
  *     try:
  *         _import_umath()
  *     except Exception:             # <<<<<<<<<<<<<<
@@ -5729,7 +5729,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_ufunc(void) {
       __Pyx_GOTREF(__pyx_t_6);
       __Pyx_GOTREF(__pyx_t_7);
 
-      /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":1012
+      /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":1012
  *         _import_umath()
  *     except Exception:
  *         raise ImportError("numpy.core.umath failed to import")             # <<<<<<<<<<<<<<
@@ -5743,7 +5743,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_ufunc(void) {
     goto __pyx_L5_except_error;
     __pyx_L5_except_error:;
 
-    /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":1009
+    /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":1009
  * 
  * cdef inline int import_ufunc() except -1:
  *     try:             # <<<<<<<<<<<<<<
@@ -5758,7 +5758,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_ufunc(void) {
     __pyx_L8_try_end:;
   }
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":1008
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":1008
  *         raise ImportError("numpy.core.umath failed to import")
  * 
  * cdef inline int import_ufunc() except -1:             # <<<<<<<<<<<<<<
@@ -5878,7 +5878,7 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {0, 0, 0, 0, 0, 0, 0}
 };
 static int __Pyx_InitCachedBuiltins(void) {
-  __pyx_builtin_range = __Pyx_GetBuiltinName(__pyx_n_s_range); if (!__pyx_builtin_range) __PYX_ERR(0, 41, __pyx_L1_error)
+  __pyx_builtin_range = __Pyx_GetBuiltinName(__pyx_n_s_range); if (!__pyx_builtin_range) __PYX_ERR(0, 51, __pyx_L1_error)
   __pyx_builtin_ValueError = __Pyx_GetBuiltinName(__pyx_n_s_ValueError); if (!__pyx_builtin_ValueError) __PYX_ERR(1, 229, __pyx_L1_error)
   __pyx_builtin_RuntimeError = __Pyx_GetBuiltinName(__pyx_n_s_RuntimeError); if (!__pyx_builtin_RuntimeError) __PYX_ERR(1, 810, __pyx_L1_error)
   __pyx_builtin_ImportError = __Pyx_GetBuiltinName(__pyx_n_s_ImportError); if (!__pyx_builtin_ImportError) __PYX_ERR(1, 1000, __pyx_L1_error)
@@ -5891,7 +5891,7 @@ static int __Pyx_InitCachedConstants(void) {
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("__Pyx_InitCachedConstants", 0);
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":229
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":229
  *             if ((flags & pybuf.PyBUF_C_CONTIGUOUS == pybuf.PyBUF_C_CONTIGUOUS)
  *                 and not PyArray_CHKFLAGS(self, NPY_C_CONTIGUOUS)):
  *                 raise ValueError(u"ndarray is not C contiguous")             # <<<<<<<<<<<<<<
@@ -5902,7 +5902,7 @@ static int __Pyx_InitCachedConstants(void) {
   __Pyx_GOTREF(__pyx_tuple_);
   __Pyx_GIVEREF(__pyx_tuple_);
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":233
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":233
  *             if ((flags & pybuf.PyBUF_F_CONTIGUOUS == pybuf.PyBUF_F_CONTIGUOUS)
  *                 and not PyArray_CHKFLAGS(self, NPY_F_CONTIGUOUS)):
  *                 raise ValueError(u"ndarray is not Fortran contiguous")             # <<<<<<<<<<<<<<
@@ -5913,7 +5913,7 @@ static int __Pyx_InitCachedConstants(void) {
   __Pyx_GOTREF(__pyx_tuple__2);
   __Pyx_GIVEREF(__pyx_tuple__2);
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":263
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":263
  *                 if ((descr.byteorder == c'>' and little_endian) or
  *                     (descr.byteorder == c'<' and not little_endian)):
  *                     raise ValueError(u"Non-native byte order not supported")             # <<<<<<<<<<<<<<
@@ -5924,7 +5924,7 @@ static int __Pyx_InitCachedConstants(void) {
   __Pyx_GOTREF(__pyx_tuple__3);
   __Pyx_GIVEREF(__pyx_tuple__3);
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":810
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":810
  * 
  *         if (end - f) - <int>(new_offset - offset[0]) < 15:
  *             raise RuntimeError(u"Format string allocated too short, see comment in numpy.pxd")             # <<<<<<<<<<<<<<
@@ -5935,7 +5935,7 @@ static int __Pyx_InitCachedConstants(void) {
   __Pyx_GOTREF(__pyx_tuple__4);
   __Pyx_GIVEREF(__pyx_tuple__4);
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":814
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":814
  *         if ((child.byteorder == c'>' and little_endian) or
  *             (child.byteorder == c'<' and not little_endian)):
  *             raise ValueError(u"Non-native byte order not supported")             # <<<<<<<<<<<<<<
@@ -5946,7 +5946,7 @@ static int __Pyx_InitCachedConstants(void) {
   __Pyx_GOTREF(__pyx_tuple__5);
   __Pyx_GIVEREF(__pyx_tuple__5);
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":834
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":834
  *             t = child.type_num
  *             if end - f < 5:
  *                 raise RuntimeError(u"Format string allocated too short.")             # <<<<<<<<<<<<<<
@@ -5957,7 +5957,7 @@ static int __Pyx_InitCachedConstants(void) {
   __Pyx_GOTREF(__pyx_tuple__6);
   __Pyx_GIVEREF(__pyx_tuple__6);
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":1000
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":1000
  *         _import_array()
  *     except Exception:
  *         raise ImportError("numpy.core.multiarray failed to import")             # <<<<<<<<<<<<<<
@@ -5968,7 +5968,7 @@ static int __Pyx_InitCachedConstants(void) {
   __Pyx_GOTREF(__pyx_tuple__7);
   __Pyx_GIVEREF(__pyx_tuple__7);
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":1006
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":1006
  *         _import_umath()
  *     except Exception:
  *         raise ImportError("numpy.core.umath failed to import")             # <<<<<<<<<<<<<<
@@ -5979,7 +5979,7 @@ static int __Pyx_InitCachedConstants(void) {
   __Pyx_GOTREF(__pyx_tuple__8);
   __Pyx_GIVEREF(__pyx_tuple__8);
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":1012
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":1012
  *         _import_umath()
  *     except Exception:
  *         raise ImportError("numpy.core.umath failed to import")             # <<<<<<<<<<<<<<
@@ -5991,37 +5991,37 @@ static int __Pyx_InitCachedConstants(void) {
   /* "grizli/utils_c/disperse.pyx":27
  * @cython.wraparound(False)
  * @cython.embedsignature(True)
- * def disperse_grism_object(np.ndarray[FTYPE_t, ndim=2] flam, np.ndarray[FTYPE_t, ndim=2] segm, int seg_id, np.ndarray[LINT_t, ndim=1] idxl, np.ndarray[DTYPE_t, ndim=1] yfrac, np.ndarray[DTYPE_t, ndim=1] ysens, np.ndarray[DTYPE_t, ndim=1] full, np.ndarray[LINT_t, ndim=1] x0, np.ndarray[LINT_t, ndim=1] shd, np.ndarray[LINT_t, ndim=1] sh_thumb, np.ndarray[LINT_t, ndim=1] shg):             # <<<<<<<<<<<<<<
- *     """Compute a dispersed 2D spectrum
- * 
+ * def disperse_grism_object(np.ndarray[FTYPE_t, ndim=2] flam,             # <<<<<<<<<<<<<<
+ *                           np.ndarray[FTYPE_t, ndim=2] segm,
+ *                           int seg_id,
  */
   __pyx_tuple__10 = PyTuple_Pack(21, __pyx_n_s_flam, __pyx_n_s_segm, __pyx_n_s_seg_id, __pyx_n_s_idxl, __pyx_n_s_yfrac, __pyx_n_s_ysens, __pyx_n_s_full, __pyx_n_s_x0, __pyx_n_s_shd, __pyx_n_s_sh_thumb, __pyx_n_s_shg, __pyx_n_s_i, __pyx_n_s_j, __pyx_n_s_k1, __pyx_n_s_k2, __pyx_n_s_nk, __pyx_n_s_nl, __pyx_n_s_k, __pyx_n_s_shx, __pyx_n_s_shy, __pyx_n_s_fl_ij); if (unlikely(!__pyx_tuple__10)) __PYX_ERR(0, 27, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__10);
   __Pyx_GIVEREF(__pyx_tuple__10);
   __pyx_codeobj__11 = (PyObject*)__Pyx_PyCode_New(11, 0, 21, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__10, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_grizli_utils_c_disperse_pyx, __pyx_n_s_disperse_grism_object, 27, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__11)) __PYX_ERR(0, 27, __pyx_L1_error)
 
-  /* "grizli/utils_c/disperse.pyx":67
+  /* "grizli/utils_c/disperse.pyx":77
  * @cython.wraparound(False)
  * @cython.embedsignature(True)
  * def compute_segmentation_limits(np.ndarray[FTYPE_t, ndim=2] segm, int seg_id, np.ndarray[FTYPE_t, ndim=2] flam, np.ndarray[LINT_t, ndim=1] shd):             # <<<<<<<<<<<<<<
  *     """Find pixel limits of a segmentation region
  * 
  */
-  __pyx_tuple__12 = PyTuple_Pack(15, __pyx_n_s_segm, __pyx_n_s_seg_id, __pyx_n_s_flam, __pyx_n_s_shd, __pyx_n_s_i, __pyx_n_s_j, __pyx_n_s_imin, __pyx_n_s_imax, __pyx_n_s_jmin, __pyx_n_s_jmax, __pyx_n_s_area, __pyx_n_s_inumer, __pyx_n_s_jnumer, __pyx_n_s_denom, __pyx_n_s_wht_ij); if (unlikely(!__pyx_tuple__12)) __PYX_ERR(0, 67, __pyx_L1_error)
+  __pyx_tuple__12 = PyTuple_Pack(15, __pyx_n_s_segm, __pyx_n_s_seg_id, __pyx_n_s_flam, __pyx_n_s_shd, __pyx_n_s_i, __pyx_n_s_j, __pyx_n_s_imin, __pyx_n_s_imax, __pyx_n_s_jmin, __pyx_n_s_jmax, __pyx_n_s_area, __pyx_n_s_inumer, __pyx_n_s_jnumer, __pyx_n_s_denom, __pyx_n_s_wht_ij); if (unlikely(!__pyx_tuple__12)) __PYX_ERR(0, 77, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__12);
   __Pyx_GIVEREF(__pyx_tuple__12);
-  __pyx_codeobj__13 = (PyObject*)__Pyx_PyCode_New(4, 0, 15, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__12, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_grizli_utils_c_disperse_pyx, __pyx_n_s_compute_segmentation_limits, 67, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__13)) __PYX_ERR(0, 67, __pyx_L1_error)
+  __pyx_codeobj__13 = (PyObject*)__Pyx_PyCode_New(4, 0, 15, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__12, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_grizli_utils_c_disperse_pyx, __pyx_n_s_compute_segmentation_limits, 77, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__13)) __PYX_ERR(0, 77, __pyx_L1_error)
 
-  /* "grizli/utils_c/disperse.pyx":130
+  /* "grizli/utils_c/disperse.pyx":140
  * @cython.wraparound(False)
  * @cython.embedsignature(True)
  * def seg_flux(np.ndarray[FTYPE_t, ndim=2] flam, np.ndarray[LINT_t, ndim=1] idxl, np.ndarray[DTYPE_t, ndim=1] yfrac, np.ndarray[DTYPE_t, ndim=1] ysens, np.ndarray[DTYPE_t, ndim=1] full, np.ndarray[LINT_t, ndim=1] x0, np.ndarray[LINT_t, ndim=1] shd, np.ndarray[LINT_t, ndim=1] shg):             # <<<<<<<<<<<<<<
  *     pass
  */
-  __pyx_tuple__14 = PyTuple_Pack(8, __pyx_n_s_flam, __pyx_n_s_idxl, __pyx_n_s_yfrac, __pyx_n_s_ysens, __pyx_n_s_full, __pyx_n_s_x0, __pyx_n_s_shd, __pyx_n_s_shg); if (unlikely(!__pyx_tuple__14)) __PYX_ERR(0, 130, __pyx_L1_error)
+  __pyx_tuple__14 = PyTuple_Pack(8, __pyx_n_s_flam, __pyx_n_s_idxl, __pyx_n_s_yfrac, __pyx_n_s_ysens, __pyx_n_s_full, __pyx_n_s_x0, __pyx_n_s_shd, __pyx_n_s_shg); if (unlikely(!__pyx_tuple__14)) __PYX_ERR(0, 140, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__14);
   __Pyx_GIVEREF(__pyx_tuple__14);
-  __pyx_codeobj__15 = (PyObject*)__Pyx_PyCode_New(8, 0, 8, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__14, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_grizli_utils_c_disperse_pyx, __pyx_n_s_seg_flux, 130, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__15)) __PYX_ERR(0, 130, __pyx_L1_error)
+  __pyx_codeobj__15 = (PyObject*)__Pyx_PyCode_New(8, 0, 8, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__14, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_grizli_utils_c_disperse_pyx, __pyx_n_s_seg_flux, 140, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__15)) __PYX_ERR(0, 140, __pyx_L1_error)
   __Pyx_RefNannyFinishContext();
   return 0;
   __pyx_L1_error:;
@@ -6334,36 +6334,36 @@ if (!__Pyx_RefNanny) {
   /* "grizli/utils_c/disperse.pyx":27
  * @cython.wraparound(False)
  * @cython.embedsignature(True)
- * def disperse_grism_object(np.ndarray[FTYPE_t, ndim=2] flam, np.ndarray[FTYPE_t, ndim=2] segm, int seg_id, np.ndarray[LINT_t, ndim=1] idxl, np.ndarray[DTYPE_t, ndim=1] yfrac, np.ndarray[DTYPE_t, ndim=1] ysens, np.ndarray[DTYPE_t, ndim=1] full, np.ndarray[LINT_t, ndim=1] x0, np.ndarray[LINT_t, ndim=1] shd, np.ndarray[LINT_t, ndim=1] sh_thumb, np.ndarray[LINT_t, ndim=1] shg):             # <<<<<<<<<<<<<<
- *     """Compute a dispersed 2D spectrum
- * 
+ * def disperse_grism_object(np.ndarray[FTYPE_t, ndim=2] flam,             # <<<<<<<<<<<<<<
+ *                           np.ndarray[FTYPE_t, ndim=2] segm,
+ *                           int seg_id,
  */
   __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_6grizli_7utils_c_8disperse_1disperse_grism_object, NULL, __pyx_n_s_grizli_utils_c_disperse); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 27, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_disperse_grism_object, __pyx_t_1) < 0) __PYX_ERR(0, 27, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "grizli/utils_c/disperse.pyx":67
+  /* "grizli/utils_c/disperse.pyx":77
  * @cython.wraparound(False)
  * @cython.embedsignature(True)
  * def compute_segmentation_limits(np.ndarray[FTYPE_t, ndim=2] segm, int seg_id, np.ndarray[FTYPE_t, ndim=2] flam, np.ndarray[LINT_t, ndim=1] shd):             # <<<<<<<<<<<<<<
  *     """Find pixel limits of a segmentation region
  * 
  */
-  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_6grizli_7utils_c_8disperse_3compute_segmentation_limits, NULL, __pyx_n_s_grizli_utils_c_disperse); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 67, __pyx_L1_error)
+  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_6grizli_7utils_c_8disperse_3compute_segmentation_limits, NULL, __pyx_n_s_grizli_utils_c_disperse); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 77, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
-  if (PyDict_SetItem(__pyx_d, __pyx_n_s_compute_segmentation_limits, __pyx_t_1) < 0) __PYX_ERR(0, 67, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_compute_segmentation_limits, __pyx_t_1) < 0) __PYX_ERR(0, 77, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "grizli/utils_c/disperse.pyx":130
+  /* "grizli/utils_c/disperse.pyx":140
  * @cython.wraparound(False)
  * @cython.embedsignature(True)
  * def seg_flux(np.ndarray[FTYPE_t, ndim=2] flam, np.ndarray[LINT_t, ndim=1] idxl, np.ndarray[DTYPE_t, ndim=1] yfrac, np.ndarray[DTYPE_t, ndim=1] ysens, np.ndarray[DTYPE_t, ndim=1] full, np.ndarray[LINT_t, ndim=1] x0, np.ndarray[LINT_t, ndim=1] shd, np.ndarray[LINT_t, ndim=1] shg):             # <<<<<<<<<<<<<<
  *     pass
  */
-  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_6grizli_7utils_c_8disperse_5seg_flux, NULL, __pyx_n_s_grizli_utils_c_disperse); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 130, __pyx_L1_error)
+  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_6grizli_7utils_c_8disperse_5seg_flux, NULL, __pyx_n_s_grizli_utils_c_disperse); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 140, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
-  if (PyDict_SetItem(__pyx_d, __pyx_n_s_seg_flux, __pyx_t_1) < 0) __PYX_ERR(0, 130, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_seg_flux, __pyx_t_1) < 0) __PYX_ERR(0, 140, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
   /* "grizli/utils_c/disperse.pyx":2
@@ -6377,7 +6377,7 @@ if (!__Pyx_RefNanny) {
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_test, __pyx_t_1) < 0) __PYX_ERR(0, 2, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "../../../../../Users/brammer/anaconda3/envs/jwst/lib/python3.6/site-packages/Cython/Includes/numpy/__init__.pxd":1008
+  /* "../../../../../Users/gbrammer/anaconda3/envs/grizli-dev/lib/python3.5/site-packages/Cython/Includes/numpy/__init__.pxd":1008
  *         raise ImportError("numpy.core.umath failed to import")
  * 
  * cdef inline int import_ufunc() except -1:             # <<<<<<<<<<<<<<
