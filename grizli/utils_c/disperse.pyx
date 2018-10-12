@@ -24,7 +24,17 @@ cdef extern from "math.h":
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.embedsignature(True)
-def disperse_grism_object(np.ndarray[FTYPE_t, ndim=2] flam, np.ndarray[FTYPE_t, ndim=2] segm, int seg_id, np.ndarray[LINT_t, ndim=1] idxl, np.ndarray[DTYPE_t, ndim=1] yfrac, np.ndarray[DTYPE_t, ndim=1] ysens, np.ndarray[DTYPE_t, ndim=1] full, np.ndarray[LINT_t, ndim=1] x0, np.ndarray[LINT_t, ndim=1] shd, np.ndarray[LINT_t, ndim=1] sh_thumb, np.ndarray[LINT_t, ndim=1] shg):
+def disperse_grism_object(np.ndarray[FTYPE_t, ndim=2] flam, 
+                          np.ndarray[FTYPE_t, ndim=2] segm, 
+                          int seg_id, 
+                          np.ndarray[LINT_t, ndim=1] idxl, 
+                          np.ndarray[DTYPE_t, ndim=1] yfrac, 
+                          np.ndarray[DTYPE_t, ndim=1] ysens, 
+                          np.ndarray[DTYPE_t, ndim=1] full, 
+                          np.ndarray[LINT_t, ndim=1] x0, 
+                          np.ndarray[LINT_t, ndim=1] shd, 
+                          np.ndarray[LINT_t, ndim=1] sh_thumb, 
+                          np.ndarray[LINT_t, ndim=1] shg):
     """Compute a dispersed 2D spectrum
     
     Parameters
