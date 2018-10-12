@@ -2094,7 +2094,7 @@ def dot_templates(coeffs, templates, z=0, max_R=5000, apply_igm=True):
     
     return tc, tl
     
-def array_templates(templates, max_R=5000, z=0):
+def array_templates(templates, wave=None, max_R=5000, z=0):
     """Return an array version of the templates that have all been interpolated to the same grid.
     
     
@@ -2121,7 +2121,9 @@ def array_templates(templates, max_R=5000, z=0):
     """
     from grizli.utils_c.interp import interp_conserve_c
     
-    wave = np.unique(np.hstack([templates[t].wave/(1+z*t.startswith('bspl')) for t in templates]))
+    if wave is None:
+        wave = np.unique(np.hstack([templates[t].wave/(1+z*t.startswith('bspl')) for t in templates]))
+    
     clipsum, iter = 1, 0
     while (clipsum > 0) & (iter < 10):
         clip = np.gradient(wave)/wave < 1/max_R
@@ -3249,7 +3251,51 @@ def symlink_templates(force=False):
             print('Symlink: {0} -> {1}'.format(file, out_path))
         else:
             print('File exists: {0}'.format(out_file))
-            
+
+def fetch_acs_wcs_files(beams_file):
+    """
+    Fetch wcs files for a given beams.fits files
+    """   
+    from urllib import request
+    try:
+        import boto3
+        HAS_BOTO = True
+    except:
+        HAS_BOTO = False
+        
+    im = pyfits.open(beams_file)
+    root = '_'.join(beams_file.split('_')[:-1])
+    
+    for i in range(len(im)):
+        h = im[i].header
+        if 'EXTNAME' not in h:
+            continue
+        
+        if (h['EXTNAME'] != 'SCI') | (h['FILTER'] not in ['G800L']):
+            continue
+        
+        ext = {1:2,2:1}[h['CCDCHIP']]
+        
+        wcsfile = h['GPARENT'].replace('.fits', '.{0:02d}.wcs.fits'.format(ext))
+        
+        # Download the file with S3 or HTTP
+        if not os.path.exists(wcsfile):
+            if HAS_BOTO:
+                s3 = boto3.resource('s3')
+                s3_client = boto3.client('s3')
+                bkt = s3.Bucket('aws-grivam')
+                
+                s3_path = 'Pipeline/{0}/Extractions/{1}'.format(root, wcsfile)
+                bkt.download_file(s3_path, './{0}'.format(wcsfile),
+                                  ExtraArgs={"RequestPayer": "requester"})
+                
+            else:
+                url = 'https://s3.amazonaws.com/aws-grivam/'
+                url += 'Pipeline/{0}/Extractions/{1}'.format(root, wcsfile)
+                
+                print('Fetch WCS file: {0}'.format(url))
+                req = request.urlretrieve(url, wcsfile)
+                    
 def fetch_hst_calib(file='iref$uc72113oi_pfl.fits',  ftpdir='https://hst-crds.stsci.edu/unchecked_get/references/hst/', verbose=True):
     """
     TBD
@@ -4870,5 +4916,3 @@ def RGBtoHex(vals, rgbtype=1):
   #Ensure values are rounded integers, convert to hex, and concatenate
   return '#' + ''.join(['{:02X}'.format(int(round(x))) for x in vals])
 
-    
-    
