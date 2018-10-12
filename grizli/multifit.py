@@ -1455,6 +1455,12 @@ class MultiBeam(GroupFitter):
     
     def load_master_fits(self, beam_file, verbose=True):
         import copy
+        
+        try:
+            utils.fetch_acs_wcs_files(beam_file)
+        except:
+            pass
+            
         hdu = pyfits.open(beam_file, lazy_load_hdus=False)
         N = hdu[0].header['COUNT']
         Next = np.cast[int](hdu[0].header.comments['COUNT'].split())
