@@ -517,9 +517,12 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
                 return False
 
         ### Now compute the dispersed spectrum using the C helper
-        status = disperse.disperse_grism_object(thumb, self.seg, id,
-                                 self.flat_index, self.yfrac_beam,
-                                 self.sensitivity_beam*scale_spec,
+        nonz = (self.sensitivity_beam*scale_spec) != 0
+        
+        if nonz.sum() > 0:
+            status = disperse.disperse_grism_object(thumb, self.seg, id,
+                                 self.flat_index[nonz], self.yfrac_beam[nonz],
+                                 (self.sensitivity_beam*scale_spec)[nonz],
                                  modelf, self.x0, np.array(self.sh),
                                  self.x0, np.array(self.sh_beam))
         
