@@ -868,7 +868,56 @@ GAUSS_3_7x7 = np.array(
 SEP_DETECT_PARAMS = {'minarea':5, 'filter_kernel':GAUSS_3_7x7,
                     'filter_type':'conv', 'clean':True, 'clean_param':1,
                     'deblend_nthresh':32, 'deblend_cont':0.005}
-                                           
+    
+def make_SEP_FLT_catalog(flt_file, ext=1, **kwargs):
+    import astropy.io.fits as pyfits
+    import astropy.wcs as pywcs
+    
+    im = pyfits.open(flt_file)
+    sci = im['SCI',ext].data - im['SCI',ext].header['MDRIZSKY']
+    err = im['ERR',ext].data
+    mask = im['DQ',ext].data > 0
+    
+    wcs = pywcs.WCS(im['SCI',ext].header, fobj=im)
+    tab, seg = make_SEP_catalog_from_arrays(sci, err, mask, wcs=wcs, **kwargs)
+    return tab, seg
+    
+def make_SEP_catalog_from_arrays(sci, err, mask, wcs=None, threshold=2., ZP=25, get_background=True, detection_params=SEP_DETECT_PARAMS, segmentation_map=False):
+    import copy
+    import astropy.units as u
+    import sep
+       
+    uJy_to_dn = 1/(3631*1e6*10**(-0.4*ZP))
+
+    if sci.dtype != np.float32:
+        sci_data = sci.byteswap().newbyteorder()
+    else:
+        sci_data = sci
+    
+    if err.dtype != np.float32:
+        err_data = err.byteswap().newbyteorder()
+    else:
+        err_data = err
+    
+    if segmentation_map:
+        objects, seg = sep.extract(sci_data, threshold, err=err_data,
+                   mask=mask, segmentation_map=True, **detection_params)
+    else:
+        objects = sep.extract(sci_data, threshold, err=err_data,
+                   mask=mask, segmentation_map=False, **detection_params)
+        seg = None
+
+    tab = utils.GTable(objects)
+
+    if wcs is not None:
+       tab['ra'], tab['dec'] = wcs.all_pix2world(tab['x'], tab['y'], 1)
+       tab['ra'].unit = u.deg
+       tab['dec'].unit = u.deg
+       tab['x_world'], tab['y_world'] = tab['ra'], tab['dec']
+
+    return tab, seg
+   
+                   
 def make_SEP_catalog(root='',threshold=2., get_background=True, 
                       bkg_only=False, 
                       bkg_params={'bw':32, 'bh':32, 'fw':3, 'fh':3},
