@@ -32,7 +32,6 @@ dependencies:
   - sep>=1.0.1
   - git+https://github.com/cmccully/lacosmicx.git
   - git+https://github.com/gbrammer/pyia.git
-  - git+https://github.com/gbrammer/drizzle.git
   - git+https://github.com/gbrammer/reprocess_wfc3.git
   - git+https://github.com/gbrammer/eazy-py.git
   - git+https://github.com/gbrammer/tristars.git
