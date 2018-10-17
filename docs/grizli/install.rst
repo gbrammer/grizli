@@ -30,11 +30,15 @@ this file, do the following
         cd grizli
         
         # Generate a conda environment named "grizli-dev"
-        conda env create -f environment.yml -n grizli-dev
-        
+        conda env create -f environment_min.yml -n grizli-dev
+                
         # Activate the environment.  This needs to be done each time you 
         # start a new terminal, or put it in ~/.bashrc
         source activate grizli-dev
+        
+        # Install fork of drizzle
+        # (this breaks if within the environment file)
+        pip install git+https://github.com/gbrammer/drizzle.git
         
         # Compile and install the grizli module.  Only needs to be done
         # once or after updating the repository.
