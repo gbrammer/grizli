@@ -713,7 +713,12 @@ def clean_prep(field_root='j142724+334246'):
     for file in clean_files:
         print('remove '+file)
         os.remove(file)
-                
+    
+    # Fix NaNs
+    flt_files = glob.glob('*_fl?.fits')
+    for flt_file in flt_files:
+        utils.fix_flt_nan(flt_file, verbose=True)
+         
 def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', min_overlap=0.2, make_combined=True, catalogs=['PS1','SDSS','GAIA','WISE'], use_visit=True, master_radec=None, use_first_radec=False, skip_imaging=False, clean=True, tweak_max_dist=1., align_simple=True, align_clip=30, imaging_bkg_params=None, align_rms_limit=2.):
     
     import os

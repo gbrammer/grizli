@@ -4890,7 +4890,27 @@ def catalog_area(ra=[], dec=[], make_plot=True, NMAX=5000, buff=0.8, verbose=Tru
     
     else:
         return pjoin.area
-        
+
+def fix_flt_nan(flt_file, verbose=True):
+    """
+    Fix NaN values in FLT files
+    """
+    im = pyfits.open(flt_file, mode='update')
+    for ext in range(1,5):
+        if ('SCI',ext) in im:
+            mask = ~np.isfinite(im['SCI',ext].data)
+            if verbose:
+                label = 'utils.fix_flt_nan: {0}[SCI,{1}] NaNPixels={2}'
+                print(label.format(flt_file, ext, mask.sum()))
+
+            if mask.sum() == 0:
+                continue
+                                            
+            im['SCI',ext].data[mask] = 0
+            im['DQ',ext].data[mask] |= 4096
+    
+    im.flush()
+         
 def RGBtoHex(vals, rgbtype=1):
   """Converts RGB values in a variety of formats to Hex values.
 
