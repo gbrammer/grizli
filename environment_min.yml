@@ -30,6 +30,7 @@ dependencies:
 - pip:
   - peakutils>=1.0.3
   - extinction>=0.3.0
+  - specutils==0.2.2
   - sep>=1.0.1
   - git+https://github.com/cmccully/lacosmicx.git
   - git+https://github.com/gbrammer/pyia.git
