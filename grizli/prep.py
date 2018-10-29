@@ -491,7 +491,8 @@ def clip_lists(input, output, clip=20):
     return in_arr, out_arr
 
 def match_lists(input, output, transform=None, scl=3600., simple=True,
-                outlier_threshold=5, toler=5):
+                outlier_threshold=5, toler=5, triangle_size_limit=[5, 800],
+                triangle_ba_max=0.9):
     """TBD
     
     Compute matched objects and transformation between two [x,y] lists.
@@ -516,7 +517,7 @@ def match_lists(input, output, transform=None, scl=3600., simple=True,
     
     try:        
         from tristars import match
-        pair_ix = match.match_catalog_tri(input, output, maxKeep=10, auto_keep=3, auto_transform=transform, auto_limit=outlier_threshold, size_limit=[5, 800], ignore_rot=False, ignore_scale=True, ba_max=0.9)
+        pair_ix = match.match_catalog_tri(input, output, maxKeep=10, auto_keep=3, auto_transform=transform, auto_limit=outlier_threshold, size_limit=triangle_size_limit, ignore_rot=False, ignore_scale=True, ba_max=triangle_ba_max)
         
         input_ix = pair_ix[:,0]
         output_ix = pair_ix[:,1]
@@ -525,10 +526,13 @@ def match_lists(input, output, transform=None, scl=3600., simple=True,
         
         #print('xxx Match from tristars!')
 
-        # fig = match.match_diagnostic_plot(input, output, pair_ix, tf=None, new_figure=True)
-        # fig.savefig('/tmp/xtristars.png')
-        # plt.close(fig)
-                
+        if False:
+            fig = match.match_diagnostic_plot(input, output, pair_ix, tf=None, new_figure=True)
+            fig.savefig('/tmp/xtristars.png')
+            plt.close(fig)
+            
+            tform = match.get_transform(input, output, pair_ix, transform=transform, use_ransac=True)
+            
     except:
         
         match = stsci.stimage.xyxymatch(copy.copy(input), copy.copy(output), 
@@ -583,7 +587,9 @@ def match_lists(input, output, transform=None, scl=3600., simple=True,
 def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3, 
                          clip=20, log=True, outlier_threshold=5, 
                          verbose=True, guess=[0., 0., 0., 1], simple=True, 
-                         rms_limit=2, use_guess=False):
+                         rms_limit=2, use_guess=False, 
+                         triangle_size_limit=[5,1800], 
+                         triangle_ba_max=0.9):
     """TBD
     """        
     if not os.path.exists('{0}.cat.fits'.format(root)):
@@ -680,7 +686,10 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
         while (titer < 3):
             try:
                 res = match_lists(output, input, scl=1., simple=simple,
-                          outlier_threshold=outlier_threshold, toler=toler)
+                          outlier_threshold=outlier_threshold, toler=toler,
+                          triangle_size_limit=triangle_size_limit,
+                          triangle_ba_max=triangle_ba_max)
+                          
                 output_ix, input_ix, outliers, tf = res
                 break
             except:
@@ -696,7 +705,9 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
             try:
                 res = match_lists(output, input, scl=1., simple=simple,
                               outlier_threshold=outlier_threshold,
-                              toler=toler)
+                              toler=toler,
+                              triangle_size_limit=triangle_size_limit,
+                              triangle_ba_max=triangle_ba_max)
             except:
                 pass
                 
@@ -715,7 +726,9 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
                               input[input_ix][~outliers], scl=1., 
                               simple=simple,
                               outlier_threshold=outlier_threshold,
-                              toler=toler)
+                              toler=toler,
+                              triangle_size_limit=triangle_size_limit,
+                              triangle_ba_max=triangle_ba_max)
             
             output_ix2, input_ix2, outliers2, tf = res2
         
