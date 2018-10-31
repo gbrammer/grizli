@@ -1792,13 +1792,16 @@ def summary_catalog(field_root='', dzbin=0.01, use_localhost=True, filter_bandpa
         
         
         
-def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', min_overlap=0.2, stopme=False, ref_err = 1.e-3, radec=None, redrizzle=True, shift_only=True, maglim=[17,24], NITER=1, catalogs = ['PS1','SDSS','GAIA','WISE'], method='Powell', radius=5., program_str=None, match_str=[], all_visits=None, date=None, gaia_by_date=False):
+def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', min_overlap=0.2, stopme=False, ref_err = 1.e-3, radec=None, redrizzle=True, shift_only=True, maglim=[17,24], NITER=1, catalogs = ['PS1','SDSS','GAIA','WISE'], method='Powell', radius=5., program_str=None, match_str=[], all_visits=None, date=None, gaia_by_date=False, tol=None, fit_options=None, print_options={'precision':3, 'sign':' '}):
     """
     Try fine alignment from visit-based SExtractor catalogs
     """    
     import os
     import glob
+    
     import numpy as np
+    np.set_printoptions(**print_options)
+    
     import matplotlib.pyplot as plt
 
     from shapely.geometry import Polygon
@@ -1820,7 +1823,7 @@ def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Griz
     from scipy.optimize import minimize, fmin_powell
     
     import copy
-        
+    
     if all_visits is None:
         all_visits, all_groups, info = np.load('{0}_visits.npy'.format(field_root))
     #all_visits, filters = utils.parse_flt_files(info=info, uniquename=True, get_footprint=False)
@@ -1854,7 +1857,7 @@ def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Griz
 
     if radec is None:
         ra_i, dec_i = np.median(info['RA_TARG']), np.median(info['DEC_TARG'])
-        print('xxx', ra_i, dec_i)
+        print('Center coordinate: ', ra_i, dec_i)
         if date is not None:
             radec, ref_catalog = get_radec_catalog(ra=ra_i, dec=dec_i, 
                     product=field_root, date=date, 
@@ -1928,10 +1931,18 @@ def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Griz
     #ref_err = 0.01
         
     #shift_only=True
-    if shift_only: 
+    if shift_only > 0: 
+        # Shift only
         p0 = np.vstack([[0,0] for i in tab])
-    else:
+        pscl = np.array([10.,10.])
+    elif shift_only < 0: 
+        # Shift + rot + scale
         p0 = np.vstack([[0,0,0,1] for i in tab])
+        pscl = np.array([10.,10.,100., 100.])    
+    else:
+        # Shift + rot
+        p0 = np.vstack([[0,0,0] for i in tab])
+        pscl = np.array([10.,10.,100.])
         
     #ref_err = 0.06
 
@@ -1943,21 +1954,21 @@ def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Griz
     plot_args = (tab, ref_tab, ref_err, shift_only, 'plot')
     plotx_args = (tab, ref_tab, ref_err, shift_only, 'plotx')
     
-    pi = p0*10.
+    pi = p0*1.#*10.
     for iter in range(NITER):
-        fit = minimize(_objfun_align, pi*10, args=fit_args, method=method, jac=None, hess=None, hessp=None, bounds=None, constraints=(), tol=None, callback=None, options=None)
-        pi = fit.x/10.
+        fit = minimize(_objfun_align, pi*pscl, args=fit_args, method=method, jac=None, hess=None, hessp=None, bounds=None, constraints=(), tol=tol, callback=None, options=fit_options)
+        pi = fit.x.reshape((-1,len(pscl)))/pscl
         
     ########
     # Show the result
     fig = plt.figure(figsize=[8,8])
     ax = fig.add_subplot(221)
-    _objfun_align(p0*10., *plot_args)
+    _objfun_align(p0*pscl, *plot_args)
     ax.set_xticklabels([])
     ax.set_ylabel('dDec')
     
     ax = fig.add_subplot(223)
-    _objfun_align(p0*10., *plotx_args)
+    _objfun_align(p0*pscl, *plotx_args)
     ax.set_ylabel('dDec')
     ax.set_xlabel('dRA')
     
@@ -2367,13 +2378,21 @@ def _objfun_align(p0, tab, ref_tab, ref_err, shift_only, ret):
     
     N = len(tab)
     
-    trans = np.reshape(p0, (N,-1))/10.
+    trans = np.reshape(p0, (N,-1))#/10.
     #trans[0,:] = [0,0,0,1]
     sh = trans.shape
     if sh[1] == 2:
-        trans = np.hstack([trans, np.zeros((N,1)), np.ones((N,1))])
+        # Shift only
+        pscl = np.array([10.,10.])
+        trans = np.hstack([trans/pscl, np.zeros((N,1)), np.ones((N,1))])
     elif sh[1] == 3:
-        trans = np.hstack([trans, np.ones((N,1))])
+        # Shift + rot
+        pscl = np.array([10.,10.,100.])
+        trans = np.hstack([trans/pscl, np.ones((N,1))])
+    elif sh[1] == 4:
+        # Shift + rot + scale
+        pscl = np.array([10.,10.,100.,100])
+        trans = trans/pscl
         
     print(trans)
     
@@ -2385,7 +2404,7 @@ def _objfun_align(p0, tab, ref_tab, ref_err, shift_only, ret):
             trans_wcs[i] = transform_wcs(tab[i]['wcs'], translation=[0,0], rotation=0., scale=1.) 
             trans_rd[i] = trans_wcs[i].all_pix2world(tab[i]['xy'], 1)
         else:
-            trans_wcs[i] = transform_wcs(tab[i]['wcs'], translation=list(trans[ix,:2]), rotation=trans[ix,2], scale=trans[ix,3]) 
+            trans_wcs[i] = transform_wcs(tab[i]['wcs'], translation=list(trans[ix,:2]), rotation=trans[ix,2]/180*np.pi, scale=trans[ix,3]) 
             trans_rd[i] = trans_wcs[i].all_pix2world(tab[i]['xy'], 1) 
     
     # Cosine declination factor
@@ -2416,7 +2435,10 @@ def _objfun_align(p0, tab, ref_tab, ref_err, shift_only, ret):
     trans_wcs = {}
     trans_rd = {}
     for ix, i in enumerate(tab):
-        trans_wcs[i] = transform_wcs(tab[i]['wcs'], translation=list(trans[ix,:2]), rotation=trans[ix,2], scale=trans[ix,3]) 
+        trans_wcs[i] = transform_wcs(tab[i]['wcs'], 
+                                     translation=list(trans[ix,:2]), 
+                                     rotation=trans[ix,2]/180*np.pi, 
+                                     scale=trans[ix,3]) 
         trans_rd[i] = trans_wcs[i].all_pix2world(tab[i]['xy'], 1)
                     
     dx, dy = [], []    
@@ -2515,7 +2537,7 @@ def get_rgb_filters(filter_list, force_ir=False):
             
     return rfilt, gfilt, bfilt
     
-def field_rgb(root='j010514+021532', xsize=6, HOME_PATH='./', show_ir=True, pl=1, pf=1, scl=1, ds9=None, force_ir=False):
+def field_rgb(root='j010514+021532', xsize=6, HOME_PATH='./', show_ir=True, pl=1, pf=1, scl=1, ds9=None, force_ir=False, filters=None, add_labels=True, output_format='jpg', rgb_min=-0.01, xyslice=None):
     import os
     import glob
     import numpy as np
@@ -2532,20 +2554,28 @@ def field_rgb(root='j010514+021532', xsize=6, HOME_PATH='./', show_ir=True, pl=1
         from .. import utils
     except:
         from grizli import utils
+    
+    if HOME_PATH is not None:    
+        phot_file = '{0}/{1}/Prep/{1}_phot.fits'.format(HOME_PATH, root)
+        if not os.path.exists(phot_file):
+            return False
+    
+        phot = utils.GTable.gread(phot_file)
+        sci_files = glob.glob('{0}/{1}/Prep/{1}-f*sci.fits'.format(HOME_PATH, root))
         
-    phot_file = '{0}/{1}/Prep/{1}_phot.fits'.format(HOME_PATH, root)
-    if not os.path.exists(phot_file):
-        return False
+        PATH_TO = '{0}/{1}/Prep'.format(HOME_PATH, root)
+    else:
+        PATH_TO = './'
     
-    phot = utils.GTable.gread(phot_file)
-    sci_files = glob.glob('{0}/{1}/Prep/{1}-f*sci.fits'.format(HOME_PATH, root))
-    filters = [file.split('_')[-3].split('-')[-1] for file in sci_files]
-    
-    mag_auto = 23.9-2.5*np.log10(phot['flux_auto'])
+    if filters is None:
+        filters = [file.split('_')[-3].split('-')[-1] for file in sci_files]
+        filters += ['ir']
+        
+    #mag_auto = 23.9-2.5*np.log10(phot['flux_auto'])
     
     ims = {}
-    for f in filters + ['ir']:
-        img = glob.glob('{0}/{1}/Prep/{1}-{2}_dr?_sci.fits'.format(HOME_PATH, root, f))[0]
+    for f in filters:
+        img = glob.glob('{0}/{1}-{2}_dr?_sci.fits'.format(PATH_TO, root, f))[0]
         try:
             ims[f] = pyfits.open(img)
         except:
@@ -2553,7 +2583,7 @@ def field_rgb(root='j010514+021532', xsize=6, HOME_PATH='./', show_ir=True, pl=1
                 
     filters = list(ims.keys())
     
-    wcs = pywcs.WCS(ims['ir'][0].header)
+    wcs = pywcs.WCS(ims[filters[-1]][0].header)
     pscale = utils.get_wcs_pscale(wcs)
     minor = MultipleLocator(1./pscale)
             
@@ -2601,8 +2631,14 @@ def field_rgb(root='j010514+021532', xsize=6, HOME_PATH='./', show_ir=True, pl=1
         rimg = rimg[ysl, xsl]
         bimg = bimg[ysl, xsl]
         gimg = gimg[ysl, xsl]
-    
-    image = make_lupton_rgb(rimg, gimg, bimg, stretch=0.1, minimum=-0.01)
+    else:
+        if xyslice is not None:
+            xsl, ysl = xyslice
+            rimg = rimg[ysl, xsl]
+            bimg = bimg[ysl, xsl]
+            gimg = gimg[ysl, xsl]
+            
+    image = make_lupton_rgb(rimg, gimg, bimg, stretch=0.1, minimum=rgb_min)
     sh = image.shape
     
     dim = [xsize, xsize/sh[1]*sh[0]]
@@ -2612,14 +2648,15 @@ def field_rgb(root='j010514+021532', xsize=6, HOME_PATH='./', show_ir=True, pl=1
     ax.imshow(image, origin='lower')
     ax.set_xticklabels([])
     ax.set_yticklabels([])
-    ax.text(0.03, 0.97, root, bbox=dict(facecolor='w', alpha=0.8), size=10, ha='left', va='top', transform=ax.transAxes)
+    if add_labels:
+        ax.text(0.03, 0.97, root, bbox=dict(facecolor='w', alpha=0.8), size=10, ha='left', va='top', transform=ax.transAxes)
     
-    ax.text(0.06+0.08*2, 0.02, rf, color='r', bbox=dict(facecolor='w', alpha=1), size=8, ha='center', va='bottom', transform=ax.transAxes)
-    ax.text(0.06+0.08, 0.02, gf, color='g', bbox=dict(facecolor='w', alpha=1), size=8, ha='center', va='bottom', transform=ax.transAxes)
-    ax.text(0.06, 0.02, bf, color='b', bbox=dict(facecolor='w', alpha=1), size=8, ha='center', va='bottom', transform=ax.transAxes)
+        ax.text(0.06+0.08*2, 0.02, rf, color='r', bbox=dict(facecolor='w', alpha=1), size=8, ha='center', va='bottom', transform=ax.transAxes)
+        ax.text(0.06+0.08, 0.02, gf, color='g', bbox=dict(facecolor='w', alpha=1), size=8, ha='center', va='bottom', transform=ax.transAxes)
+        ax.text(0.06, 0.02, bf, color='b', bbox=dict(facecolor='w', alpha=1), size=8, ha='center', va='bottom', transform=ax.transAxes)
     
     fig.tight_layout(pad=0.1)
-    fig.savefig('{0}.field.jpg'.format(root))
+    fig.savefig('{0}.field.{1}'.format(root, output_format))
     return fig
     
 def make_rgb_thumbnails(root='j140814+565638', HOME_PATH='./', maglim=23, cutout=12., figsize=[2,2], ids=None, close=True, skip=True, force_ir=False, add_grid=True):
