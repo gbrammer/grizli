@@ -2615,14 +2615,22 @@ def transform_wcs(in_wcs, translation=[0.,0.], rotation=0., scale=1.):
         Modified WCS
     """
     out_wcs = in_wcs.deepcopy()
-    out_wcs.wcs.crpix += np.array(translation)
+    
+    #out_wcs.wcs.crpix += np.array(translation)
+    
+    # Compute shift for crval, not crpix
+    crval = in_wcs.all_pix2world([in_wcs.wcs.crpix-np.array(translation)], 
+                                     1).flatten()
+    
+    out_wcs.wcs.crval = crval
+    
     theta = -rotation
     _mat = np.array([[np.cos(theta), -np.sin(theta)],
                      [np.sin(theta), np.cos(theta)]])
     
     out_wcs.wcs.cd = np.dot(out_wcs.wcs.cd, _mat)/scale
     out_wcs.pscale = get_wcs_pscale(out_wcs)
-    out_wcs.wcs.crpix *= scale
+    #out_wcs.wcs.crpix *= scale
     if hasattr(out_wcs, '_naxis1'):
         out_wcs._naxis1 = int(np.round(out_wcs._naxis1*scale))
         out_wcs._naxis2 = int(np.round(out_wcs._naxis2*scale))

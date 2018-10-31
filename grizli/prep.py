@@ -658,7 +658,9 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
     out_shift, out_rot, out_scale = guess[:2], guess[2], guess[3]    
     drz_wcs = utils.transform_wcs(drz_wcs, out_shift, out_rot, out_scale)
     print('{0} (guess)   : {1:6.2f} {2:6.2f} {3:7.3f} {4:7.3f}'.format(root, guess[0], guess[1], guess[2]/np.pi*180, 1./guess[3]))
-        
+    
+    drz_crpix = drz_wcs.wcs.crpix
+       
     NGOOD, rms = 0, 0
     for iter in range(NITER):
         #print('xx iter {0} {1}'.format(iter, NITER))
@@ -672,13 +674,13 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
 
         N = ok2.sum()
         if clip > 0:
-            status = clip_lists(xy_drz, xy+1, clip=clip)
+            status = clip_lists(xy_drz-drz_crpix, xy+1-drz_crpix, clip=clip)
             if not status:
                 print('Problem xxx')
         
             input, output = status
         else:
-            input, output = xy_drz+0., xy+1
+            input, output = xy_drz+0.-drz_crpix, xy+1-drz_crpix
         #print np.sum(input) + np.sum(output)
         
         toler=5
@@ -2404,7 +2406,7 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
         try:
             result = align_drizzled_image(root=direct['product'], 
                                       mag_limits=align_mag_limits,
-                                      radec=radec, NITER=5, clip=align_clip,
+                                      radec=radec, NITER=3, clip=align_clip,
                                       log=True, guess=guess,
                                       outlier_threshold=align_tolerance, 
                                       simple=align_simple,
