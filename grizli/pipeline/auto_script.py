@@ -2082,12 +2082,17 @@ def update_wcs_headers_with_fine(field_root, backup=True):
                     os.system('cp {0} FineBkup/'.format(file))
                     print(file)
     
-        trans = np.reshape(fine_fit.x, (N,-1))/10.
+        trans = np.reshape(fine_fit.x, (N,-1))#/10.
         sh = trans.shape
         if sh[1] == 2:
-            trans = np.hstack([trans, np.zeros((N,1)), np.ones((N,1))])
+            pscl = np.array([10.,10.])
+            trans = np.hstack([trans/pscl, np.zeros((N,1)), np.ones((N,1))])
         elif sh[1] == 3:
-            trans = np.hstack([trans, np.ones((N,1))])
+            pscl = np.array([10.,10.,100])
+            trans = np.hstack([trans/pscl, np.ones((N,1))])
+        elif sh[1] == 4:
+            pscl = np.array([10.,10.,100,100])
+            trans = trans/pscl
         
         # Update direct WCS
         for ix, direct in enumerate(fine_visits):
