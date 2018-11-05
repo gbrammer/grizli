@@ -4899,7 +4899,7 @@ def catalog_area(ra=[], dec=[], make_plot=True, NMAX=5000, buff=0.8, verbose=Tru
     else:
         return pjoin.area
 
-def fix_flt_nan(flt_file, verbose=True):
+def fix_flt_nan(flt_file, bad_bit=4096, verbose=True):
     """
     Fix NaN values in FLT files
     """
@@ -4915,7 +4915,7 @@ def fix_flt_nan(flt_file, verbose=True):
                 continue
                                             
             im['SCI',ext].data[mask] = 0
-            im['DQ',ext].data[mask] |= 4096
+            im['DQ',ext].data[mask] |= bad_bit
     
     im.flush()
          

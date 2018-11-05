@@ -2506,7 +2506,7 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
         table_to_radec(cat[clip], '{0}.cat.radec'.format(direct['product']))
         
         if (fix_stars) & (not isACS) & (not isWFPC2):
-            fix_star_centers(root=direct['product'], drizzle=True, mag_lim=21)
+            fix_star_centers(root=direct['product'], drizzle=False, mag_lim=21)
         
     ################# 
     ##########  Grism image processing
@@ -3684,8 +3684,7 @@ def fix_star_centers(root='macs1149.6+2223-rot-ca5-22-032.0-f105w',
         if verbose:
             print('{0:6d} {1:12.6f} {2:12.6f} {3:7.2f} {4} {5}'.format( 
                 line['NUMBER'], rd[0], rd[1], line['MAG_AUTO'], nset, nsat))
-                
-        
+                                
     # Overwrite image                                             
     for i in range(N):
         images[i].flush()
@@ -3700,6 +3699,10 @@ def fix_star_centers(root='macs1149.6+2223-rot-ca5-22-032.0-f105w',
         else:
             pixfrac=0.8
         
+        # Fix Nans:
+        for flt_file in files:
+            utils.fix_flt_nan(flt_file, bad_bit=4096, verbose=True)
+            
         AstroDrizzle(files, output=root,
                      clean=True, final_pixfrac=pixfrac, context=False,
                      resetbits=0, final_bits=bits, driz_sep_bits=bits,
