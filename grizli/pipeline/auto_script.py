@@ -134,7 +134,7 @@ def get_extra_data(root='j114936+222414', HOME_PATH='/Volumes/Pegasus/Grizli/Aut
 
     os.chdir(CWD)
     
-def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', inspect_ramps=False, manual_alignment=False, is_parallel_field=False, reprocess_parallel=False, only_preprocess=False, make_mosaics=True, make_phot=True, run_extractions=True, run_fit=True, s3_sync=False, fine_radec=None, run_fine_alignment=True, combine_all_filters=True, gaia_by_date=False, align_simple=False, align_clip=-1, align_rms_limit=2, align_min_overlap=0.2, master_radec=None, is_dash=False, run_parse_visits=True, imaging_bkg_params=prep.BKG_PARAMS, reference_wcs_filters=['G800L', 'G102', 'G141'], catalogs=['PS1','SDSS','GAIA','WISE']):
+def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', inspect_ramps=False, manual_alignment=False, is_parallel_field=False, reprocess_parallel=False, only_preprocess=False, make_mosaics=True, make_phot=True, run_extractions=True, run_fit=True, s3_sync=False, fine_radec=None, run_fine_alignment=True, combine_all_filters=True, gaia_by_date=False, align_simple=False, align_clip=-1, align_rms_limit=2, align_min_overlap=0.2, master_radec=None, parent_radec=None, is_dash=False, run_parse_visits=True, imaging_bkg_params=prep.BKG_PARAMS, reference_wcs_filters=['G800L', 'G102', 'G141'], catalogs=['PS1','SDSS','GAIA','WISE']):
     """
     Run the full pipeline for a given target
         
@@ -206,7 +206,7 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
     #####################
     ### Alignment & mosaics    
     os.chdir(os.path.join(HOME_PATH, root, 'Prep'))
-    auto_script.preprocess(field_root=root, HOME_PATH=HOME_PATH, make_combined=False, catalogs=catalogs, master_radec=master_radec, use_visit=True, tweak_max_dist=(5 if is_parallel_field else 1), align_simple=align_simple, align_clip=align_clip, imaging_bkg_params=imaging_bkg_params, align_rms_limit=align_rms_limit, min_overlap=align_min_overlap)
+    auto_script.preprocess(field_root=root, HOME_PATH=HOME_PATH, make_combined=False, catalogs=catalogs, master_radec=master_radec, parent_radec=parent_radec, use_visit=True, tweak_max_dist=(5 if is_parallel_field else 1), align_simple=align_simple, align_clip=align_clip, imaging_bkg_params=imaging_bkg_params, align_rms_limit=align_rms_limit, min_overlap=align_min_overlap)
         
     # Fine alignment
     if (len(glob.glob('{0}*fine.png'.format(root))) == 0) & (run_fine_alignment):
@@ -719,8 +719,13 @@ def clean_prep(field_root='j142724+334246'):
     for flt_file in flt_files:
         utils.fix_flt_nan(flt_file, verbose=True)
          
-def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', min_overlap=0.2, make_combined=True, catalogs=['PS1','SDSS','GAIA','WISE'], use_visit=True, master_radec=None, use_first_radec=False, skip_imaging=False, clean=True, tweak_max_dist=1., align_simple=True, align_clip=30, imaging_bkg_params=None, align_rms_limit=2.):
+def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', min_overlap=0.2, make_combined=True, catalogs=['PS1','SDSS','GAIA','WISE'], use_visit=True, master_radec=None, parent_radec=None, use_first_radec=False, skip_imaging=False, clean=True, tweak_max_dist=1., align_simple=True, align_clip=30, imaging_bkg_params=None, align_rms_limit=2.):
+    """
+    master_radec: force use this radec file
     
+    parent_radec: use this file if overlap < min_overlap
+    
+    """
     import os
     import glob
     import numpy as np
@@ -777,7 +782,7 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
             best_overlap = 0.
         else:
             radec_files = glob.glob('*cat.radec')
-            radec = None
+            radec = parent_radec
             best_overlap = 0
             fp = direct['footprint']
             for rdfile in radec_files:
