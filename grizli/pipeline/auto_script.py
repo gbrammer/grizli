@@ -304,7 +304,7 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
     
     # Drizzled grp objects
     # All files
-    if len(glob.glob('*grism*fits')) == 0:
+    if len(glob.glob('{0}*_grism*fits'.format(root))) == 0:
         grp = multifit.GroupFLT(grism_files=glob.glob('*GrismFLT.fits'), direct_files=[], ref_file=None, seg_file='{0}-ir_seg.fits'.format(root), catalog='{0}-ir.cat.fits'.format(root), cpu_count=-1, sci_extn=1, pad=256)
         
         # Make drizzle model images
