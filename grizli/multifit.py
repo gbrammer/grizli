@@ -2606,7 +2606,7 @@ class MultiBeam(GroupFitter):
 
         return drizzled_segm
         
-    def drizzle_fit_lines(self, fit, pline, force_line=['Ha', 'OIII', 'Hb', 'OII'], save_fits=True, mask_lines=True, mask_sn_limit=3, mask_4959=True, verbose=True):
+    def drizzle_fit_lines(self, fit, pline, force_line=['Ha', 'OIII', 'Hb', 'OII'], save_fits=True, mask_lines=True, mask_sn_limit=3, mask_4959=True, verbose=True, include_segmentation=True):
         """
         TBD
         """
@@ -2776,7 +2776,8 @@ class MultiBeam(GroupFitter):
                         delattr(beam, 'oivar')
                         
                 hdu[0].header['REDSHIFT'] = (z_driz, 'Redshift used')
-                for e in [3,4,5,6]:
+                #for e in [3,4,5,6]:
+                for e in [-4,-3,-2,-1]:
                     hdu[e].header['EXTVER'] = line
                     hdu[e].header['REDSHIFT'] = (z_driz, 'Redshift used')
                     hdu[e].header['RESTWAVE'] = (line_wavelengths[line][0], 
@@ -2789,14 +2790,16 @@ class MultiBeam(GroupFitter):
                     hdu_full[0].header['NUMLINES'] = (1, 
                                                "Number of lines in this file")
                 else:
-                    hdu_full.extend(hdu[3:])
+                    hdu_full.extend(hdu[-4:])
                     hdu_full[0].header['NUMLINES'] += 1 
                 
-                    # Make sure SCI extension is filled.  Can be empty for 
+                    # Make sure DSCI extension is filled.  Can be empty for 
                     # lines at the edge of the grism throughput
-                    if hdu['DWHT'].data.max() != 0:
-                        hdu_full['DSCI'] = hdu['DSCI']
-                        hdu_full['DWHT'] = hdu['DWHT']
+                    for f_i in range(hdu[0].header['NDFILT']):
+                        filt_i = hdu[0].header['DFILT{0:02d}'.format(f_i+1)]
+                        if hdu['DWHT',filt_i].data.max() != 0:
+                            hdu_full['DSCI',filt_i] = hdu['DSCI',filt_i]
+                            hdu_full['DWHT',filt_i] = hdu['DWHT',filt_i]
                     
                 li = hdu_full[0].header['NUMLINES']
                 hdu_full[0].header['LINE{0:03d}'.format(li)] = line
@@ -2814,11 +2817,17 @@ class MultiBeam(GroupFitter):
                                         wave=np.median(self.beams[0].wave),
                                         fcontam=self.fcontam,
                                         **pline)
-            hdu_full = hdu[:3]
+            hdu_full = hdu[:-4]
             hdu_full[0].header['REDSHIFT'] = (z_driz, 'Redshift used')
             hdu_full[0].header['NUMLINES'] = 0
             hdu_full[0].header['HASLINES'] = ' '
-                                        
+        
+        if include_segmentation:
+            line_wcs = pywcs.WCS(hdu_full[1].header)
+            segm = self.drizzle_segmentation(wcsobj=line_wcs)
+            seg_hdu = pyfits.ImageHDU(data=segm.astype(np.int32), name='SEG')
+            hdu_full.insert(1, seg_hdu)
+            
         if save_fits:
             hdu_full.writeto('{0}_{1:05d}.line.fits'.format(self.group_name, self.id), clobber=True, output_verify='silentfix')
         
@@ -4015,10 +4024,30 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
     xoutsci = np.zeros(sh, dtype=np.float32)
     xoutwht = np.zeros(sh, dtype=np.float32)
     xoutctx = np.zeros(sh, dtype=np.int32)
+    
+    #direct_filters = np.unique([b.direct.filter for b in self.beams])
+    all_direct_filters = []
+    for beam in beams:
+        if direct_extension == 'REF':
+            if beam.direct['REF'] is None:
+                filt_i = beam.direct.ref_filter
+                direct_extension = 'SCI'
+            else:
+                filt_i = beam.direct.filter
+        
+        all_direct_filters.append(filt_i)
+    
+    direct_filters = np.unique(all_direct_filters)
+    
+    doutsci, doutwht, doutctx = {}, {}, {}
+    for f in direct_filters:
+        doutsci[f] = np.zeros(sh, dtype=np.float32)
+        doutwht[f] = np.zeros(sh, dtype=np.float32)
+        doutctx[f] = np.zeros(sh, dtype=np.int32)
 
-    doutsci = np.zeros(sh, dtype=np.float32)
-    doutwht = np.zeros(sh, dtype=np.float32)
-    doutctx = np.zeros(sh, dtype=np.int32)
+    # doutsci = np.zeros(sh, dtype=np.float32)
+    # doutwht = np.zeros(sh, dtype=np.float32)
+    # doutctx = np.zeros(sh, dtype=np.int32)
     
     ## Loop through beams and run drizzle
     for i, beam in enumerate(beams):
@@ -4106,10 +4135,8 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
                          pixfrac=pixfrac, kernel=kernel, fillval=dfillval)
         
         ### Direct thumbnail
-        if direct_extension == 'REF':
-            if beam.direct['REF'] is None:
-                direct_extension = 'SCI'
-                
+        filt_i = all_direct_filters[i]
+        
         if direct_extension == 'REF':
             thumb = beam.direct['REF']
             thumb_wht = np.cast[np.float32]((thumb != 0)*1)
@@ -4118,9 +4145,9 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
             thumb_wht = 1./(beam.direct.data['ERR']/beam.direct.photflam)**2
             thumb_wht[~np.isfinite(thumb_wht)] = 0
             
-        
         drizzler(thumb, beam.direct.wcs, thumb_wht, output_wcs, 
-                         doutsci, doutwht, doutctx, 1., 'cps', 1, 
+                         doutsci[filt_i], doutwht[filt_i], doutctx[filt_i], 
+                         1., 'cps', 1, 
                          wcslin_pscale=beam.direct.wcs.pscale, uniqid=1, 
                          pixfrac=pixfrac, kernel=kernel, fillval=dfillval)
         
@@ -4137,7 +4164,9 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
     outwht  *= (beams[0].grism.wcs.pscale/output_wcs.pscale)**4
     coutwht *= (beams[0].grism.wcs.pscale/output_wcs.pscale)**4
     xoutwht *= (beams[0].grism.wcs.pscale/output_wcs.pscale)**4
-    doutwht *= (beams[0].direct.wcs.pscale/output_wcs.pscale)**4
+    
+    for filt_i in all_direct_filters:
+        doutwht[filt_i] *= (beams[0].direct.wcs.pscale/output_wcs.pscale)**4
     
     ### Make output FITS products
     p = pyfits.PrimaryHDU()
@@ -4158,9 +4187,28 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
         
     h = header.copy()
     h['ID'] = (beam.id, 'Object ID')
-    h['FILTER'] = (beam.direct.filter, 'Direct image filter')
-    thumb_sci = pyfits.ImageHDU(data=doutsci, header=h, name='DSCI')
-    thumb_wht = pyfits.ImageHDU(data=doutwht, header=h, name='DWHT')
+    h['PIXFRAC'] = (pixfrac, 'Drizzle PIXFRAC')
+    h['DRIZKRNL'] = (kernel, 'Drizzle kernel')
+    
+    p.header['NDFILT'] = len(direct_filters), 'Number of direct image filters'
+    for i, filt_i in enumerate(direct_filters):
+        p.header['DFILT{0:02d}'.format(i+1)] = filt_i
+        p.header['NFILT{0:02d}'.format(i+1)] = all_direct_filters.count(filt_i), 'Number of beams with this direct filter'
+    
+    HDUL = [p]
+    for i, filt_i in enumerate(direct_filters):
+        h['FILTER'] = (filt_i, 'Direct image filter')
+        
+        thumb_sci = pyfits.ImageHDU(data=doutsci[filt_i], header=h,
+                                    name='DSCI')
+        thumb_wht = pyfits.ImageHDU(data=doutwht[filt_i], header=h,
+                                    name='DWHT')
+
+        thumb_sci.header['EXTVER'] = filt_i                         
+        thumb_wht.header['EXTVER'] = filt_i                         
+        
+        HDUL += [thumb_sci, thumb_wht]
+                                    
     #thumb_seg = pyfits.ImageHDU(data=seg_slice, header=h, name='DSEG')
         
     h['FILTER'] = (beam.grism.filter, 'Grism filter')
@@ -4171,7 +4219,9 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
     grism_contam = pyfits.ImageHDU(data=xoutsci, header=h, name='CONTAM')
     grism_wht = pyfits.ImageHDU(data=outwht, header=h, name='LINEWHT')
     
-    HDUL = [p, thumb_sci, thumb_wht, grism_sci, grism_cont, grism_contam, grism_wht]        
+    #HDUL = [p, thumb_sci, thumb_wht, grism_sci, grism_cont, grism_contam, grism_wht]        
+    HDUL += [grism_sci, grism_cont, grism_contam, grism_wht]        
+
     return pyfits.HDUList(HDUL)
 
 def show_drizzle_HDU(hdu, diff=True):
