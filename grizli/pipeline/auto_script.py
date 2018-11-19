@@ -134,7 +134,7 @@ def get_extra_data(root='j114936+222414', HOME_PATH='/Volumes/Pegasus/Grizli/Aut
 
     os.chdir(CWD)
     
-def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', inspect_ramps=False, manual_alignment=False, is_parallel_field=False, reprocess_parallel=False, only_preprocess=False, make_mosaics=True, make_phot=True, run_extractions=True, run_fit=True, s3_sync=False, fine_radec=None, run_fine_alignment=True, combine_all_filters=True, gaia_by_date=False, align_simple=False, align_clip=-1, align_rms_limit=2, align_min_overlap=0.2, master_radec=None, parent_radec=None, is_dash=False, run_parse_visits=True, imaging_bkg_params=prep.BKG_PARAMS, reference_wcs_filters=['G800L', 'G102', 'G141'], catalogs=['PS1','SDSS','GAIA','WISE']):
+def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', inspect_ramps=False, manual_alignment=False, is_parallel_field=False, reprocess_parallel=False, only_preprocess=False, make_mosaics=True, make_phot=True, run_extractions=True, run_fit=True, s3_sync=False, fine_radec=None, run_fine_alignment=True, combine_all_filters=True, gaia_by_date=False, align_simple=False, align_clip=-1, align_rms_limit=2, align_min_overlap=0.2, master_radec=None, parent_radec=None, is_dash=False, run_parse_visits=True, imaging_bkg_params=prep.BKG_PARAMS, reference_wcs_filters=['G800L', 'G102', 'G141'], catalogs=['NSC','PS1','SDSS','GAIA','WISE']):
     """
     Run the full pipeline for a given target
         
@@ -720,7 +720,7 @@ def clean_prep(field_root='j142724+334246'):
     for flt_file in flt_files:
         utils.fix_flt_nan(flt_file, verbose=True)
          
-def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', min_overlap=0.2, make_combined=True, catalogs=['PS1','SDSS','GAIA','WISE'], use_visit=True, master_radec=None, parent_radec=None, use_first_radec=False, skip_imaging=False, clean=True, tweak_max_dist=1., align_simple=True, align_clip=30, imaging_bkg_params=None, align_rms_limit=2.):
+def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', min_overlap=0.2, make_combined=True, catalogs=['NSC','PS1','SDSS','GAIA','WISE'], use_visit=True, master_radec=None, parent_radec=None, use_first_radec=False, skip_imaging=False, clean=True, tweak_max_dist=1., align_simple=True, align_clip=30, imaging_bkg_params=None, align_rms_limit=2.):
     """
     master_radec: force use this radec file
     
@@ -1798,7 +1798,7 @@ def summary_catalog(field_root='', dzbin=0.01, use_localhost=True, filter_bandpa
         
         
         
-def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', min_overlap=0.2, stopme=False, ref_err = 1.e-3, radec=None, redrizzle=True, shift_only=True, maglim=[17,24], NITER=1, catalogs = ['PS1','SDSS','GAIA','WISE'], method='Powell', radius=5., program_str=None, match_str=[], all_visits=None, date=None, gaia_by_date=False, tol=None, fit_options=None, print_options={'precision':3, 'sign':' '}):
+def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', min_overlap=0.2, stopme=False, ref_err = 1.e-3, radec=None, redrizzle=True, shift_only=True, maglim=[17,24], NITER=1, catalogs = ['GAIA','PS1','NSC','SDSS','WISE'], method='Powell', radius=5., program_str=None, match_str=[], all_visits=None, date=None, gaia_by_date=False, tol=None, fit_options=None, print_options={'precision':3, 'sign':' '}):
     """
     Try fine alignment from visit-based SExtractor catalogs
     """    
