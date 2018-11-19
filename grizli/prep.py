@@ -2140,6 +2140,8 @@ def get_nsc_catalog(ra=0., dec=0., radius=3, max=100000, extra=' AND (rerr < 0.0
     The default `extra` query returns well-detected sources in red bands.
     
     """
+    print('Query NOAO Source Catalog ({ra:.5f},{dec:.5f},{radius:.1f}\')'.format(ra=ra, dec=dec, radius=radius))
+    
     tab = query_tap_catalog(ra=ra, dec=dec, radius=radius, extra=extra, nsc=True, verbose=verbose)
     return tab
     

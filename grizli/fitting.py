@@ -3039,8 +3039,13 @@ class GroupFitter(object):
         res = [out.x[0], out.x[1], out.x[2], out.nfev, out.nfev == max_nfev]
         return res
     
-def show_drizzled_lines(line_hdu, full_line_list=['OII', 'Hb', 'OIII', 'Ha', 'SII', 'SIII'], size_arcsec=2, cmap='cubehelix_r', scale=1., dscale=1):
+def show_drizzled_lines(line_hdu, full_line_list=['OII', 'Hb', 'OIII', 'Ha', 'SII', 'SIII'], size_arcsec=2, cmap='cubehelix_r', scale=1., dscale=1, direct_filter=['F140W','F160W','F125W','F105W','F110W','F098M']):
     """TBD
+    
+    `direct_filter` : list
+        Filter preference to show in the direct image panel.  Step through 
+        and stop if the indicated filter is available.
+        
     """
     import matplotlib.pyplot as plt
     from matplotlib.ticker import MultipleLocator
@@ -3058,9 +3063,21 @@ def show_drizzled_lines(line_hdu, full_line_list=['OII', 'Hb', 'OIII', 'Ha', 'SI
     
     # Direct
     ax = fig.add_subplot(1,NL+1,1)
-    ax.imshow(line_hdu['DSCI'].data*dscale, vmin=-0.02, vmax=0.6, cmap=cmap, origin='lower')
+    
+    dext = 'DSCI'
+    # Try preference for direct filter
+    for filt in direct_filter:
+        if ('DSCI',filt) in line_hdu:
+            dext = 'DSCI',filt
+            break
+            
+    ax.imshow(line_hdu[dext].data*dscale, vmin=-0.02, vmax=0.6, cmap=cmap, origin='lower')
     ax.set_title('Direct   {0}    z={1:.3f}'.format(line_hdu[0].header['ID'], line_hdu[0].header['REDSHIFT']))
     
+    if 'FILTER' in line_hdu[dext].header:
+        ax.text(0.03, 0.97, line_hdu[dext].header['FILTER'],
+                transform=ax.transAxes, ha='left', va='top', fontsize=8)
+        
     ax.set_xlabel('RA'); ax.set_ylabel('Decl.')
 
     # 1" ticks
