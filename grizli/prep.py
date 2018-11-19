@@ -1869,7 +1869,8 @@ def gaia_dr2_conesearch_query(ra=165.86, dec=34.829694, radius=3., max=100000):
     return query
     
 def get_gaia_DR2_catalog(ra=165.86, dec=34.829694, radius=3.,
-                         use_mirror=True, max_wait=20):
+                         use_mirror=True, max_wait=20,
+                         max=100000):
     """Query GAIA DR2 astrometric catalog
     
     Parameters
@@ -1914,7 +1915,7 @@ def get_gaia_DR2_catalog(ra=165.86, dec=34.829694, radius=3.,
     #-------------------------------------
     #Create job
 
-    query =  gaia_dr2_conesearch_query(ra=ra, dec=dec, radius=radius) #"SELECT TOP 100000 * FROM gaiadr2.gaia_source  WHERE CONTAINS(POINT('ICRS',gaiadr2.gaia_source.ra,gaiadr2.gaia_source.dec),CIRCLE('ICRS',{0},{1},{2:.2f}))=1".format(ra, dec, radius/60.)
+    query =  gaia_dr2_conesearch_query(ra=ra, dec=dec, radius=radius, max=max) #"SELECT TOP 100000 * FROM gaiadr2.gaia_source  WHERE CONTAINS(POINT('ICRS',gaiadr2.gaia_source.ra,gaiadr2.gaia_source.dec),CIRCLE('ICRS',{0},{1},{2:.2f}))=1".format(ra, dec, radius/60.)
     print(query)
     
     params = urlencode({\
@@ -2012,6 +2013,136 @@ def get_gaia_DR2_catalog(ra=165.86, dec=34.829694, radius=3.,
     table = Table.read('gaia.fits', format='fits')
     return table
 
+def gen_tap_box_query(ra=165.86, dec=34.829694, radius=3., max=100000, db='ls_dr7.tractor_primary', columns=['*'], rd_colnames=['ra','dec']):
+    """
+    Generate a query string for the NOAO Legacy Survey TAP server
+    TBD
+    
+    Parameters
+    ----------
+    ra, dec : float
+        RA, Dec in decimal degrees
+
+    radius : float
+        Search radius, in arc-minutes.
+    
+    Returns
+    -------
+    query : str
+        Query string
+        
+    """
+    #query =  "SELECT TOP {max} * FROM {table}  WHERE CONTAINS(POINT('ICRS',{table}.ra,{table}.dec),CIRCLE('ICRS',{ra},{dec},{rad:.2f}))=1".format(ra=ra, dec=dec, rad=radius/60., max=max, table='ls_dr7.tractor_primary')
+        
+    rmi = radius/60/2
+    cosd = np.cos(dec/180*np.pi)
+    
+    query =  """SELECT TOP {max} {output_columns} FROM {db}  WHERE {db}.{rc} > {left} AND {db}.{rc} < {right} AND {db}.{dc} > {bottom} AND {db}.{dc} < {top} """.format(rc=rd_colnames[0], dc=rd_colnames[1], left=ra-rmi/cosd, right=ra+rmi/cosd, top=dec+rmi, bottom=dec-rmi, max=max, db=db, output_columns=', '.join(columns))
+    
+    return query
+
+def query_tap_catalog(ra=165.86, dec=34.829694, radius=3., max_wait=20,
+                    db='ls_dr7.tractor_primary', columns=['*'], extra='',
+                    rd_colnames=['ra','dec'], 
+                    tap_url='http://datalab.noao.edu/tap',
+                    max=100000, clean_xml=True, verbose=True,
+                    des=False, gaia=False, nsc=False):
+    """Query NOAO Catalog holdings
+    
+    Parameters
+    ----------
+    ra, dec : float
+        Center of the query region, decimal degrees
+    
+    radius : float
+        Radius of the query, in arcmin
+    
+    db : str
+        Parent database (https://datalab.noao.edu/query.php).
+    
+    columns : list of str
+        List of columns to output.  Default ['*'] returns all columns.
+    
+    extra : str
+        String to add to the end of the positional box query, e.g., 
+        'AND mag_auto_i > 16 AND mag_auto_i < 16.5'.
+        
+    rd_colnames : str, str
+        Column names in `db` corresponding to ra/dec (degrees).
+
+    tap_url : str
+        TAP hostname
+        
+    des : bool
+        Query `des_dr1.main` from NOAO.
+    
+    gaia : bool
+        Query `gaiadr2.gaia_source` from http://gea.esac.esa.int.
+    
+    nsc : bool
+        Query the NOAO Source Catalog (Nidever et al. 2018), `nsc_dr1.object`.
+        
+    Returns
+    -------
+    table : `~astropy.table.Table`
+        Result of the query
+    
+    """
+    from astroquery.utils.tap.core import TapPlus
+    
+    # DES DR1
+    if des:
+        if verbose:
+            print('Query DES DR1 from NOAO')
+        
+        db = 'des_dr1.main'
+        tap_url = 'http://datalab.noao.edu/tap'
+
+    # NOAO source catalog, seems to have some junk
+    if nsc:
+        if verbose:
+            print('Query NOAO source catalog')
+        
+        db = 'nsc_dr1.object'
+        tap_url = 'http://datalab.noao.edu/tap'
+        extra += ' AND nsc_dr1.object.flags = 0'
+        
+    # GAIA DR2     
+    if gaia:
+        if verbose:
+            print('Query GAIA DR2 from ESA')
+
+        db = 'gaiadr2.gaia_source'
+        tap_url = 'http://gea.esac.esa.int/tap-server/tap'
+        
+    tap = TapPlus(url=tap_url)
+    
+    query =  gen_tap_box_query(ra=ra, dec=dec, radius=radius, max=max, 
+                               db=db, columns=columns,
+                               rd_colnames=rd_colnames)
+    
+    job = tap.launch_job(query+extra, dump_to_file=True, verbose=verbose)
+    try:
+        table = job.get_results()
+        if clean_xml:
+            os.remove(job.get_output_file())
+            
+    except:
+        print('Query failed, check {0} for error messages'.format(job.get_output_file()))
+        table = None
+        
+    return table   
+
+def get_nsc_catalog(ra=0., dec=0., radius=3, max=100000, extra=' AND (rerr < 0.08 OR ierr < 0.08 OR zerr < 0.08) AND raerr < 0.2 AND decerr < 0.2', verbose=True):
+    """
+    Query NOAO Source Catalog, which is aligned to GAIA DR1.  
+    
+    The default `extra` query returns well-detected sources in red bands.
+    
+    """
+    tab = query_tap_catalog(ra=ra, dec=dec, radius=radius, extra=extra, nsc=True, verbose=verbose)
+    return tab
+    
 def get_panstarrs_catalog(ra=0., dec=0., radius=3, columns='objName,objID,raStack,decStack,raStackErr,decStackErr,rMeanKronMag,rMeanKronMagErr,iMeanKronMag,iMeanKronMagErr', max_records=10000):
     """TBD
     """
@@ -2044,7 +2175,7 @@ def get_panstarrs_catalog(ra=0., dec=0., radius=3, columns='objName,objID,raStac
     table['dec'] = table['decStack']
     return table[clip]
     
-def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, reference_catalogs = ['GAIA', 'PS1', 'SDSS', 'WISE'], **kwargs):
+def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, reference_catalogs = ['GAIA', 'PS1', 'NSC', 'SDSS', 'WISE'], **kwargs):
     """Decide what reference astrometric catalog to use
     
     First search SDSS, then WISE looking for nearby matches.  
@@ -2065,7 +2196,7 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, ref
     
     reference_catalogs : list
         Order in which to query reference catalogs.  Options are 'GAIA',
-        'PS1' (STScI PanSTARRS), 'SDSS', 'WISE'.
+        'PS1' (STScI PanSTARRS), 'SDSS', 'WISE', 'NSC' (NOAO Source Catalog).
         
     Returns
     -------
@@ -2081,7 +2212,8 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, ref
                        'PS1':get_panstarrs_catalog,
                        'WISE':get_irsa_catalog,
                        '2MASS':get_twomass_catalog,
-                       'GAIA_Vizier':get_gaia_DR2_vizier}
+                       'GAIA_Vizier':get_gaia_DR2_vizier,
+                       'NSC':get_nsc_catalog}
       
     ### Try queries
     has_catalog = False
@@ -4069,4 +4201,45 @@ def manual_alignment(visit, ds9, reference=None, reference_catalogs=['SDSS', 'PS
         dy *+ -1
         
     np.savetxt('{0}.align_guess'.format(visit['product']), [[dx, dy, 0, 1].__repr__()[1:-1].replace(',', '')], fmt='%s')
+
+def extract_fits_log(file='idk106ckq_flt.fits', get_dq=True):
+    log = OrderedDict()
+    im = pyfits.open(file)
+    
+    for k in im[0].header:
+        if k  in ['HISTORY','COMMENT','ORIGIN','']: 
+            continue
         
+        if k.strip().startswith('/'):
+            continue
+                
+        log[k] = im[0].header[k]
+    
+    log['chips'] = []
+    
+    if get_dq:
+        idx = np.arange(1014**2, dtype=np.int32).reshape((1014,1014))
+        
+    for chip in [1,2,3,4]:
+        key = 'SCI{0}'.format(chip)
+        if ('SCI',chip) in im:
+            log['chips'].append(chip)
+            log[key] = OrderedDict()
+            h = im['SCI',chip].header
+            for k in h:
+                if k  in ['HISTORY','COMMENT','ORIGIN','']: 
+                    continue
+
+                if k.strip().startswith('/'):
+                    continue
+
+                log[key][k] = h[k]
+            
+            if get_dq:
+                dq = im['DQ',chip].data
+                mask = dq > 0
+                log['DQi{0}'.format(chip)] = list(idx[mask].astype(str))
+                log['DQv{0}'.format(chip)] = list(dq[mask].astype(str))
+    
+    return log
+    
