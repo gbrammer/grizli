@@ -175,7 +175,7 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
     os.chdir(HOME_PATH)
     auto_script.fetch_files(field_root=root, HOME_PATH=HOME_PATH, remove_bad=True, reprocess_parallel=reprocess_parallel, s3_sync=s3_sync)
     
-    files=glob.glob('../RAW/*_fl*fits')
+    files=glob.glob('../RAW/*_fl*fits')+glob.glob('../RAW/*_c[01]m.fits')
     if len(files) == 0:
         print('No FL[TC] files found!')
         return False
@@ -237,6 +237,7 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
                       'F098M', 'F139M', 'F127M', 'F153M']
         
         optical_filters = ['F814W', 'F606W', 'F435W', 'F850LP', 'F702W', 'F555W', 'F438W', 'F475W', 'F625W', 'F775W', 'F225W', 'F275W', 'F300W', 'F390W','F350LP']
+        optical_filters += ['F410M', 'F450W']
         
         if combine_all_filters:
             auto_script.drizzle_overlaps(root, 
