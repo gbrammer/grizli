@@ -181,7 +181,8 @@ def radec_to_targname(ra=0, dec=0, header=None):
     
     return targname
     
-def blot_nearest_exact(in_data, in_wcs, out_wcs, verbose=True, stepsize=-1):
+def blot_nearest_exact(in_data, in_wcs, out_wcs, verbose=True, stepsize=-1, 
+                       scale_by_pixel_area=False):
     """
     Own blot function for blotting exact pixels without rescaling for input 
     and output pixel size
@@ -198,7 +199,11 @@ def blot_nearest_exact(in_data, in_wcs, out_wcs, verbose=True, stepsize=-1):
         
     out_wcs : `~astropy.wcs.WCS`
         Output WCS.  Must have _naxis1, _naxis2 attributes.
-    
+   
+    scale_by_pixel_area : bool
+        If True, then scale the output image by the square of the image pixel
+        scales (out**2/in**2), i.e., the pixel areas.
+        
     Returns
     -------
     out_data : `~numpy.ndarray`
@@ -284,6 +289,11 @@ def blot_nearest_exact(in_data, in_wcs, out_wcs, verbose=True, stepsize=-1):
     filtered = func(out_data, size=5)
     out_data[fill] = filtered[fill]
     
+    if scale_by_pixel_area:
+        in_scale  = utils.get_wcs_pscale(in_wcs)
+        out_scale  = utils.get_wcs_pscale(out_wcs)
+        out_data *= out_scale**2/in_scale**2
+        
     return out_data
     
         
@@ -2957,6 +2967,13 @@ def make_wcsheader(ra=40.07293, dec=-1.6137748, size=2, pixscale=0.1, get_hdu=Fa
     hout['NAXIS2'] = npix[1]
     hout['CTYPE1'] = 'RA---TAN'
     hout['CTYPE2'] = 'DEC--TAN'
+    
+    hout['RADESYS'] = 'ICRS'
+    hout['EQUINOX'] = 2000
+    hout['LATPOLE'] = hout['CRVAL2']
+    hout['LONPOLE'] = 180
+    
+    hout['PIXASEC'] = pixscale, 'Pixel scale in arcsec'
     
     wcs_out = pywcs.WCS(hout)
     
