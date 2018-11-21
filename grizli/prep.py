@@ -600,12 +600,15 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
     
     if hasattr(radec, 'upper'):
         rd_ref = np.loadtxt(radec)
+        radec_comment = radec
     elif radec is False:
         # Align to self, i.e., do nothing
         so = np.argsort(cat['MAG_AUTO'])
         rd_ref = np.array([cat['X_WORLD'], cat['Y_WORLD']]).T[so[:50],:]
+        radec_comment = 'self catalog'
     else:
         rd_ref = radec*1
+        radec_comment = 'input arrays (N={0})'.format(rd_ref.shape)
     
     ### Clip obviously distant files to speed up match
     # rd_cat = np.array([cat['X_WORLD'], cat['Y_WORLD']])
@@ -792,11 +795,12 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
             plt.ion()
         
     log_wcs(root, orig_wcs, out_shift, out_rot/np.pi*180, out_scale, rms,
-            n=NGOOD, initialize=False)
+            n=NGOOD, initialize=False, 
+            comment=['radec: {0}'.format(radec_comment)])
             
     return orig_wcs, drz_wcs, out_shift, out_rot/np.pi*180, out_scale
 
-def log_wcs(root, drz_wcs, shift, rot, scale, rms=0., n=-1, initialize=True):
+def log_wcs(root, drz_wcs, shift, rot, scale, rms=0., n=-1, initialize=True, comment=[]):
     """Save WCS offset information to a file
     """
     if (not os.path.exists('{0}_wcs.log'.format(root))) | initialize:
@@ -804,6 +808,9 @@ def log_wcs(root, drz_wcs, shift, rot, scale, rms=0., n=-1, initialize=True):
         orig_hdul = pyfits.HDUList()
         fp = open('{0}_wcs.log'.format(root), 'w')
         fp.write('# ext xshift yshift rot scale rms N\n')
+        for c in comment:
+            fp.write('# {0}\n'.format(c))
+            
         fp.write('# {0}\n'.format(root))
         count = 0
     else:
@@ -866,8 +873,10 @@ SEXTRACTOR_DEFAULT_PARAMS = ["NUMBER", "X_IMAGE", "Y_IMAGE", "X_WORLD",
                     "MAG_AUTO", "MAGERR_AUTO", "FLUX_AUTO", "FLUXERR_AUTO",
                     "FLUX_RADIUS", "BACKGROUND", "FLAGS"]
 
+# Aperture *Diameters*
 SEXTRACTOR_PHOT_APERTURES = "6, 8.335, 16.337, 20"
-                    
+SEXTRACTOR_PHOT_APERTURES_ARCSEC = [float(ap)*0.06*u.arcsec for ap in SEXTRACTOR_PHOT_APERTURES.split(',')]
+                
 SEXTRACTOR_CONFIG_3DHST = {'DETECT_MINAREA':14, 'DEBLEND_NTHRESH':32, 'DEBLEND_MINCONT':0.005, 'FILTER_NAME':'/usr/local/share/sextractor/gauss_3.0_7x7.conv', 'FILTER':'Y'}
 
 # /usr/local/share/sextractor/gauss_3.0_7x7.conv
@@ -943,6 +952,7 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
                       source_xy=None, autoparams=[2.5, 3.5], mask_kron=False,
                       max_total_corr=2, err_scale=-np.inf, 
                       detection_params = SEP_DETECT_PARAMS, bkg_mask=None,
+                      pixel_scale=0.06, 
                       **kwargs):
     """Make a catalog from drizzle products using the SEP implementation of SExtractor
     
@@ -1001,9 +1011,20 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
     try:
         wcs = pywcs.WCS(drz_im[0].header)
         wcs_header = utils.to_header(wcs)
+        pixel_scale = utils.get_wcs_pscale(wcs)
     except:
         wcs = None
         wcs_header = drz_im[0].header.copy()
+        
+    if isinstance(phot_apertures, str):
+        apertures = np.cast[float](phot_apertures.replace(',','').split())
+    else:
+        apertures = []
+        for ap in phot_apertures:
+            if hasattr(ap, 'unit'):
+                apertures.append(ap.to(u.arcsec).value/pixel_scale)
+            else:
+                apertures.append(ap)
         
     if weight_file is not None:
         wht_im = pyfits.open(weight_file)
@@ -1306,7 +1327,6 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
     tab.meta['ERR_SCALE'] = (err_scale, 'Scale factor applied to weight image (like MAP_WEIGHT)')
     
     ## Photometry
-    apertures = np.cast[float](phot_apertures.replace(',','').split())
     for iap, aper in enumerate(apertures):
         flux, fluxerr, flag = sep.sum_circle(data - bkg_data, 
                                       source_x-1, source_y-1,
@@ -1335,6 +1355,8 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
         tab['mask_aper_{0}'.format(iap)] = flux
         
         tab.meta['aper_{0}'.format(iap)] = (aper, 'Aperture diameter, pix')
+        tab.meta['asec_{0}'.format(iap)] = (aper*pixel_scale, 
+                                            'Aperture diameter, arcsec')
     
     # If blended, use largest aperture magnitude
     if 'flag' in tab.colnames:    
@@ -1522,11 +1544,15 @@ def blot_background(visit={'product': '', 'files':None},
             flt_wcs = pywcs.WCS(flt['SCI',ext].header, fobj=flt, relax=True)
             flt_wcs.pscale = utils.get_wcs_pscale(flt_wcs)
             
-            blotted = astrodrizzle.ablot.do_blot(bkg_data.astype(np.float32),
-                            drz_wcs,
-                            flt_wcs, 1, coeffs=True, interp='nearest',
-                            sinscl=1.0, stepsize=10, wcsmap=None)
+            blotted = utils.blot_nearest_exact(bkg_data.astype(np.float32),
+                                               drz_wcs, flt_wcs,
+                                               scale_by_pixel_area=True)
             
+            # blotted = astrodrizzle.ablot.do_blot(bkg_data.astype(np.float32),
+            #                 drz_wcs,
+            #                 flt_wcs, 1, coeffs=True, interp='nearest',
+            #                 sinscl=1.0, stepsize=10, wcsmap=None)
+                        
             flt['SCI',ext].data -= blotted
             flt['SCI',ext].header['BLOTSKY'] = (True, 'Sky blotted from {0}'.format(drz_file))
         
