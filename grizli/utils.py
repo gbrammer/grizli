@@ -290,8 +290,8 @@ def blot_nearest_exact(in_data, in_wcs, out_wcs, verbose=True, stepsize=-1,
     out_data[fill] = filtered[fill]
     
     if scale_by_pixel_area:
-        in_scale  = utils.get_wcs_pscale(in_wcs)
-        out_scale  = utils.get_wcs_pscale(out_wcs)
+        in_scale  = get_wcs_pscale(in_wcs)
+        out_scale  = get_wcs_pscale(out_wcs)
         out_data *= out_scale**2/in_scale**2
         
     return out_data
