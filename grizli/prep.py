@@ -3982,7 +3982,7 @@ def find_single_image_CRs(visit, simple_mask=False, with_ctx_mask=True,
         
         flt.flush()
         
-def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, max_files=999, pixfrac=0.8, scale=0.06, skysub=True, skymethod='localmin', skyuser='MDRIZSKY', bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='EXP', final_wt_scl='exptime', context=False, static=True, use_group_footprint=False):
+def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, max_files=999, pixfrac=0.8, scale=0.06, skysub=True, skymethod='localmin', skyuser='MDRIZSKY', bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='EXP', final_wt_scl='exptime', context=False, static=True, use_group_footprint=False, fetch_flats=True):
     """Combine overlapping visits into single output mosaics
     
     Parameters
@@ -4149,8 +4149,18 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, m
             else:
                 bits = 576
         
+        # All the same instrument?
         inst_keys = np.unique([os.path.basename(file)[0] for file in group['files']])
         
+        if fetch_flats:
+            # PFL files needed for IVM weights
+            for file in group['files']: 
+                try:
+                    utils.fetch_hst_calibs(file, calib_types=['PFLTFILE'],
+                                       verbose=False)  
+                except:
+                    pass
+                    
         # Fetch files from aws
         if 'reference' in group:
             AstroDrizzle(group['files'], output=group['product'],
