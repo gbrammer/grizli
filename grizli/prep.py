@@ -4123,7 +4123,7 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, m
                 all_groups.append(group)
             else:
                 for k in range(N):
-                    sli = slice(k*999,(k+1)*999)
+                    sli = slice(k*max_files,(k+1)*max_files)
                     files_list = group['files'][sli]
                     root='{0}-{1:03d}'.format(group['product'], k)
                     g_k = OrderedDict(product=root,
