@@ -3982,7 +3982,7 @@ def find_single_image_CRs(visit, simple_mask=False, with_ctx_mask=True,
         
         flt.flush()
         
-def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, max_files=999, pixfrac=0.8, scale=0.06, skysub=True, skymethod='localmin', skyuser='MDRIZSKY', bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='EXP', final_wt_scl='exptime', context=False, static=True):
+def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, max_files=999, pixfrac=0.8, scale=0.06, skysub=True, skymethod='localmin', skyuser='MDRIZSKY', bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='EXP', final_wt_scl='exptime', context=False, static=True, use_group_footprint=False):
     """Combine overlapping visits into single output mosaics
     
     Parameters
@@ -4042,14 +4042,25 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, m
             
             if 'footprints' in group:
                 footprints = group['footprints']
+            elif ('footprint' in group) & use_group_footprint:
+                footprints = [group['footprint']]*len(group['files'])
             else:
                 footprints = []
                 files=group['files']
                 for i in range(len(files)):
                     print(i, files[i])
                     im = pyfits.open(files[i])
-                    wcs = pywcs.WCS(im[1])
-                    footprints.append(Polygon(wcs.calc_footprint()))
+                    p_i = None
+                    for ext in [1,2,3,4]:
+                        if ('SCI',ext) in im:
+                            wcs = pywcs.WCS(im['SCI',ext], fobj=im)
+                            fp_x = wcs.calc_footprint()
+                            if p_i is None:
+                                p_i = Polygon(fp_x)
+                            else:
+                                p_i = p_i.union(fp_x)
+                                
+                    footprints.append()
             
             ref = pyfits.getheader(group['reference'])
             wcs = pywcs.WCS(ref)
@@ -4058,16 +4069,52 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, m
             files = []
             out_fp = []
             
+            if 'awspath' in group:
+                aws = []
+                
             for j in range(len(group['files'])):
                 olap = ref_fp.intersection(footprints[j])
                 if olap.area > 0:
                     files.append(group['files'][j])
+                    if 'awspath' in group:
+                        aws.append(group['awspath'][j])
+                        
                     out_fp.append(footprints[j])
                     
             print(group['product'], len(files), len(group['files']))
             group['files'] = files
             group['footprints'] = out_fp
-            
+            if 'awspath' in group:
+                group['awspath'] = aws
+                
+            # Download the file from aws.  The 'awspath' entry
+            # is a list with the same length of 'files', and starts with 
+            # the bucket name.
+            if 'awspath' in group:
+                import boto3
+                session = boto3.Session()
+                s3 = boto3.resource('s3')
+                
+                bkt = None
+                for awspath, file in zip(group['awspath'], group['files']):
+                    if os.path.exists(file):
+                        continue
+                    
+                    spl = awspath.split('/')    
+                    bucket_name=spl[0]
+                    path_to_file = '/'.join(spl[1:])
+
+                    if bkt is None:
+                        bkt = s3.Bucket(bucket_name)
+                    else:
+                        if bkt.name != bucket_name:
+                            bkt = s3.Bucket(bucket_name)
+                                                
+                    s3_file = (path_to_file+'/'+file).replace('//','/')
+                    print('Fetch from s3:  s3://{0}/{1}'.format(bucket_name, s3_file))
+                    bkt.download_file(s3_file, file,
+                                    ExtraArgs={"RequestPayer": "requester"})
+                
     if max_files > 0:
         all_groups = []
         for group in exposure_groups:
@@ -4104,6 +4151,7 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, m
         
         inst_keys = np.unique([os.path.basename(file)[0] for file in group['files']])
         
+        # Fetch files from aws
         if 'reference' in group:
             AstroDrizzle(group['files'], output=group['product'],
                      clean=True, context=context, preserve=False,

@@ -673,20 +673,31 @@ def parse_visit_overlaps(visits, buffer=15.):
         if used[i]:
             continue
         
-        im_i = pyfits.open(glob.glob(visits[i]['product']+'_dr?_sci.fits')[0])
-        wcs_i = pywcs.WCS(im_i[0])
-        fp_i = Polygon(wcs_i.calc_footprint()).buffer(buffer/3600.)
-        
+        if 'footprint' in visits[i]:
+            fp_i = visits[i]['footprint'].buffer(buffer/3600.)
+        else:
+            im_i = pyfits.open(glob.glob(visits[i]['product']+'_dr?_sci.fits')[0])
+            wcs_i = pywcs.WCS(im_i[0])
+            fp_i = Polygon(wcs_i.calc_footprint()).buffer(buffer/3600.)
+            
         exposure_groups.append(copy.deepcopy(visits[i]))
         
         for j in range(i+1, N):
             f_j = visits[j]['product'].split('-')[-1]
             if (f_j != f_i) | (used[j]):
                 continue
+            
+            #
+            if 'footprint' in visits[j]:
+                fp_j = visits[j]['footprint'].buffer(buffer/3600.)
+            else:
+                im_j = pyfits.open(glob.glob(visits[j]['product']+'_dr?_sci.fits')[0])
+                wcs_j = pywcs.WCS(im_j[0])
+                fp_j = Polygon(wcs_j.calc_footprint()).buffer(buffer/3600.)
                 
-            im_j = pyfits.open(glob.glob(visits[j]['product']+'_dr?_sci.fits')[0])
-            wcs_j = pywcs.WCS(im_j[0])
-            fp_j = Polygon(wcs_j.calc_footprint()).buffer(buffer/3600.)
+            # im_j = pyfits.open(glob.glob(visits[j]['product']+'_dr?_sci.fits')[0])
+            # wcs_j = pywcs.WCS(im_j[0])
+            # fp_j = Polygon(wcs_j.calc_footprint()).buffer(buffer/3600.)
             
             olap = fp_i.intersection(fp_j)
             if olap.area > 0:
