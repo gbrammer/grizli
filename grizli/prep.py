@@ -286,7 +286,7 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
         
         c1m.flush()
         
-    orig_file.writeto(local_file, clobber=True)
+    orig_file.writeto(local_file, overwrite=True)
     
     if mask_regions:
         apply_region_mask(local_file, dq_value=1024)
@@ -589,7 +589,7 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
                          verbose=True, guess=[0., 0., 0., 1], simple=True, 
                          rms_limit=2, use_guess=False, 
                          triangle_size_limit=[5,1800], 
-                         triangle_ba_max=0.9):
+                         triangle_ba_max=0.9, max_err_percentile=80):
     """TBD
     """        
     if not os.path.exists('{0}.cat.fits'.format(root)):
@@ -598,6 +598,12 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
     else:
         cat = Table.read('{0}.cat.fits'.format(root))
     
+    if max_err_percentile < 100:
+        ecol = 'FLUXERR_APER_0'
+        if ecol in cat:
+            emax = np.percentile(cat[ecol], max_err_percentile)
+            cat = cat[cat[ecol] < emax]
+            
     if hasattr(radec, 'upper'):
         rd_ref = np.loadtxt(radec)
         radec_comment = radec
@@ -820,7 +826,7 @@ def log_wcs(root, drz_wcs, shift, rot, scale, rms=0., n=-1, initialize=True, com
     
     hdu = drz_wcs.to_fits()[0]
     orig_hdul.append(hdu)
-    orig_hdul.writeto('{0}_wcs.fits'.format(root), clobber=True)
+    orig_hdul.writeto('{0}_wcs.fits'.format(root), overwrite=True)
     
     fp.write('{0:5d} {1:13.4f} {2:13.4f} {3:13.4f} {4:13.5f} {5:13.3f} {6:4d}\n'.format(
               count, shift[0], shift[1], rot, scale, rms, n))
@@ -1647,10 +1653,10 @@ def add_external_sources(root='', maglim=20, fwhm=0.2, catalog='2mass'):
     sci[0].data[clip] = flux[clip]
     
     sci.writeto(sci_file.replace('_drz', '_{0}_drz'.format(catalog)), 
-                clobber=True)
+                overwrite=True)
     
     wht.writeto(wht_file.replace('_drz', '_{0}_drz'.format(catalog)), 
-                clobber=True)  
+                overwrite=True)  
                         
     if False:
         # Mask
@@ -3138,7 +3144,7 @@ def apply_tweak_shifts(wcs_ref, shift_dict, grism_matches={}, verbose=True):
     hdu = wcs_ref.to_fits(relax=True)
     file0 = list(shift_dict.keys())[0].split('.fits')[0]
     tweak_file = '{0}_tweak_wcs.fits'.format(file0)
-    hdu.writeto(tweak_file, clobber=True)
+    hdu.writeto(tweak_file, overwrite=True)
     for file in shift_dict:
         updatehdr.updatewcs_with_shift(file, tweak_file,
                                         xsh=shift_dict[file][0],
@@ -3285,7 +3291,7 @@ def match_direct_grism_wcs(direct={}, grism={}, get_fresh_flt=True,
         
         tmp_wcs = '/tmp/{0}_tmpwcs.fits'.format(str(direct['product']))
         ext = len(wcs_hdu)-1
-        wcs_hdu[ext].writeto(tmp_wcs, clobber=True)
+        wcs_hdu[ext].writeto(tmp_wcs, overwrite=True)
         
         for file in grism['files']:
             updatehdr.updatewcs_with_shift(file, tmp_wcs,
@@ -3307,7 +3313,7 @@ def match_direct_grism_wcs(direct={}, grism={}, get_fresh_flt=True,
     #### Get from WCS log file
     for ext in wcs_log['ext']:
         tmp_wcs = '/tmp/{0}_tmpwcs.fits'.format(str(direct['product']))
-        wcs_hdu[ext].writeto(tmp_wcs, clobber=True)
+        wcs_hdu[ext].writeto(tmp_wcs, overwrite=True)
         if 'scale' in wcs_log.colnames:
             scale = wcs_log['scale'][ext]
         else:
