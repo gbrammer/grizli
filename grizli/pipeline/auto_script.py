@@ -227,6 +227,11 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
         except:
             pass
     
+    # Update the visits file with the new exposure footprints
+    print('Update exposure footprints in {0}_visits.npy'.format(root))
+    get_visit_exposure_footprints(visit_file='{0}_visits.npy'.format(root),
+                                  check_paths=['./', '../RAW'])
+                                  
     ###### Make combined mosaics        
     if (len(glob.glob('{0}-ir_dr?_sci.fits'.format(root))) == 0) & (make_mosaics):
         
@@ -605,6 +610,9 @@ def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=
     files=glob.glob('../RAW/*fl[tc].fits')
     files.extend(glob.glob('../RAW/*c0m.fits'))
     files.extend(glob.glob('../RAW/*c0f.fits'))
+    
+    files.sort()
+    
     info = utils.get_flt_info(files)
     #info = info[(info['FILTER'] != 'G141') & (info['FILTER'] != 'G102')]
     
@@ -632,6 +640,8 @@ def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=
             # q_flt.fits is the pipeline product.  will always be 
             # fewer DASH-split files
             files=glob.glob('../RAW/%s*[a-o]_flt.fits' %(root))
+            files.sort()
+            
             if len(files) == 0:
                 continue
 
@@ -669,6 +679,63 @@ def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=
     np.save('{0}_visits.npy'.format(field_root), [visits, all_groups, info])
     
     return visits, all_groups, info
+    
+def get_visit_exposure_footprints(visit_file='j1000p0210_visits.npy', check_paths=['./', '../RAW'], simplify=1.e-6):
+    """
+    Add exposure-level footprints to the visit dictionary
+    
+    Parameters
+    ----------
+    visit_file : str
+        File produced by `parse_visits` (`visits`, `all_groups`, `info`).
+        
+    check_paths : list
+        Look for the individual exposures in `visits[i]['files']` in these 
+        paths.
+    
+    simplify : float
+        Shapely `simplify` parameter the visit footprint polygon.
+        
+    Returns
+    -------
+    visits : dict
+    
+    """
+    visits, all_groups, info = np.load(visit_file)
+    
+    fps = {}
+    
+    for visit in visits:
+        visit['footprints'] = []
+        visit_fp = None
+        for file in visit['files']:
+            fp_i = None
+            for path in check_paths:
+                pfile = os.path.join(path, file)
+                if os.path.exists(pfile):
+                    fp_i = utils.get_flt_footprint(flt_file=pfile)
+                    
+                    if visit_fp is None:
+                        visit_fp = fp_i
+                    else:
+                        visit_fp = visit_fp.union(fp_i).buffer(0.05/3600)
+                    break
+            
+            visit['footprints'].append(fp_i)
+            if visit_fp is not None:
+                if simplify > 0:
+                    visit['footprint'] = visit_fp.simplify(simplify)
+                else:
+                    visit['footprint'] = visit_fp
+                    
+            fps[file] = fp_i
+    
+    ### ToDo: also update visits in all_groups with `fps`
+    
+    # Resave the file
+    np.save(visit_file, [visits, all_groups, info])
+    
+    return visits
     
 def manual_alignment(field_root='j151850-813028', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', skip=True, radius=5., catalogs=['PS1','SDSS','GAIA','WISE'], visit_list=None, radec=None):
     

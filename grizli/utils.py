@@ -3008,6 +3008,48 @@ def make_wcsheader(ra=40.07293, dec=-1.6137748, size=2, pixscale=0.1, get_hdu=Fa
     else:
         return hout, wcs_out
 
+def get_flt_footprint(flt_file, extensions=[1,2,3,4], patch_args=None):
+    """
+    Compute footprint of all SCI extensions of an HST exposure
+    
+    Parameters
+    ----------
+    extensions : list
+        List of extensions to retrieve (can have extras).
+    
+    patch_args : dict or None
+        If a `dict`, then generate a patch for the footprint passing 
+        `**patch_args` arguments (e.g., `{'fc':'blue', 'alpha':0.1}`).
+        
+    Returns
+    -------
+    fp / patch : `~shapely.geometry` object or `~descartes.PolygonPatch`
+        The footprint or footprint patch.
+    
+    """
+    from shapely.geometry import Polygon
+    from descartes import PolygonPatch
+    
+    im = pyfits.open(flt_file, mode='update')
+    fp = None
+    
+    for ext in extensions:
+        if ('SCI',ext) not in im:
+            continue
+            
+        wcs = pywcs.WCS(im['SCI',ext].header, fobj=im)
+        p_i = Polygon(wcs.calc_footprint())
+        if fp is None:
+            fp = p_i
+        else:
+            fp = fp.union(p_i)
+    
+    if patch_args is not None:
+        patch = PolygonPatch(fp, **patch_args)
+        return patch
+    else:
+        return fp
+            
 def make_maximal_wcs(files, pixel_scale=0.1, get_hdu=True, pad=90, verbose=True):
     """
     Compute a North-up HDU with a footprint that contains all of `files`
