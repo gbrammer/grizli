@@ -2905,7 +2905,7 @@ def drizzle_footprint(weight_image, shrink=10, ext=0, outfile=None, label=None):
     fp.write(pstr+'\n')
     fp.close()
     
-def clean_drizzle(root, context=False):
+def clean_drizzle(root, context=False, fix_wcs_system=False):
     """Zero-out WHT=0 pixels in drizzle mosaics
     
     Parameters
@@ -2923,6 +2923,12 @@ def clean_drizzle(root, context=False):
     wht = pyfits.open(drz_file.replace('_sci.fits', '_wht.fits'))
     mask = wht[0].data == 0
     
+    if fix_wcs_system:
+        # Force RADESYS/EQUINOX = ICRS/2000. and fix LATPOLE to CRVAL2
+        sci[0].header['RADESYS'] = 'ICRS'
+        sci[0].header['EQUINOX'] = 2000.0
+        sci[0].header['LATPOLE'] =  sci[0].header['CRVAL2']
+        
     # Mask where context shows that mosaic comes from a single input
     ctx_file = drz_file.replace('_sci.','_ctx.')
     if context & os.path.exists(ctx_file):
@@ -3988,7 +3994,7 @@ def find_single_image_CRs(visit, simple_mask=False, with_ctx_mask=True,
         
         flt.flush()
         
-def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, max_files=999, pixfrac=0.8, scale=0.06, skysub=True, skymethod='localmin', skyuser='MDRIZSKY', bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='EXP', final_wt_scl='exptime', context=False, static=True, use_group_footprint=False, fetch_flats=True):
+def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, max_files=999, pixfrac=0.8, scale=0.06, skysub=True, skymethod='localmin', skyuser='MDRIZSKY', bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='EXP', final_wt_scl='exptime', context=False, static=True, use_group_footprint=False, fetch_flats=True, fix_wcs_system=False):
     """Combine overlapping visits into single output mosaics
     
     Parameters
@@ -4198,7 +4204,7 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, m
                      final_outnx=final_outnx, final_outny=final_outny,
                      resetbits=0, static=(static & (len(inst_keys) == 1)))
         
-        clean_drizzle(group['product'])
+        clean_drizzle(group['product'], fix_wcs_system=fix_wcs_system)
 
 def manual_alignment(visit, ds9, reference=None, reference_catalogs=['SDSS', 'PS1', 'GAIA', 'WISE'], use_drz=False):
     """Manual alignment of a visit with respect to an external region file
