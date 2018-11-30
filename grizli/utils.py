@@ -2609,7 +2609,11 @@ def get_wcs_pscale(wcs):
         
     """
     from numpy import linalg
-    det = linalg.det(wcs.wcs.cd)
+    try:
+        det = linalg.det(wcs.wcs.cd)
+    except:
+        det = linalg.det(wcs.wcs.pc)
+        
     pscale = np.sqrt(np.abs(det))*3600.
     return pscale
     
@@ -2649,7 +2653,11 @@ def transform_wcs(in_wcs, translation=[0.,0.], rotation=0., scale=1.):
     _mat = np.array([[np.cos(theta), -np.sin(theta)],
                      [np.sin(theta), np.cos(theta)]])
     
-    out_wcs.wcs.cd = np.dot(out_wcs.wcs.cd, _mat)/scale
+    try:
+        out_wcs.wcs.cd = np.dot(out_wcs.wcs.cd, _mat)/scale
+    except:
+        out_wcs.wcs.pc = np.dot(out_wcs.wcs.pc, _mat)/scale
+        
     out_wcs.pscale = get_wcs_pscale(out_wcs)
     #out_wcs.wcs.crpix *= scale
     if hasattr(out_wcs, '_naxis1'):
