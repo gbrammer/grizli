@@ -941,7 +941,7 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
             imaging_visits.append(visit)
     
     filters = [v['product'].split('-')[-1] for v in visits]
-    fwave = np.cast[float]([f.replace('f1','f10').replace('f0','f00').replace('lp','w')[1:-1] for f in filters])
+    fwave = np.cast[float]([f.replace('f1','f10').replace('f098m','f0980m').replace('lp','w')[1:-1] for f in filters])
     sort_idx = np.argsort(fwave)[::-1]
     
     for i in sort_idx:
