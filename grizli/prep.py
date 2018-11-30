@@ -1382,6 +1382,9 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
         tab['mag_auto'][blended] = aper_mag[blended]
         tab['magerr_auto'][blended] = aper_magerr[blended]
         
+        # "ISO" mag, integrated within the segment
+        tab['mag_iso'] = 23.9-2.5*np.log10(tab['flux'])
+        
     #if uppercase_columns:
     for c in tab.colnames:
         tab.rename_column(c, column_case(c))
@@ -3994,7 +3997,7 @@ def find_single_image_CRs(visit, simple_mask=False, with_ctx_mask=True,
         
         flt.flush()
         
-def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, max_files=999, pixfrac=0.8, scale=0.06, skysub=True, skymethod='localmin', skyuser='MDRIZSKY', bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='EXP', final_wt_scl='exptime', context=False, static=True, use_group_footprint=False, fetch_flats=True, fix_wcs_system=False):
+def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, max_files=999, pixfrac=0.8, scale=0.06, skysub=True, skymethod='localmin', skyuser='MDRIZSKY', bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='EXP', final_wt_scl='exptime', context=False, static=True, use_group_footprint=False, fetch_flats=True, fix_wcs_system=False, include_saturated=False):
     """Combine overlapping visits into single output mosaics
     
     Parameters
@@ -4160,7 +4163,10 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, m
                 bits = 64+32
             else:
                 bits = 576
-        
+            
+            if include_saturated:
+                bits |= 256
+                
         # All the same instrument?
         inst_keys = np.unique([os.path.basename(file)[0] for file in group['files']])
         
