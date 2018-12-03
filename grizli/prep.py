@@ -2081,7 +2081,7 @@ def query_tap_catalog(ra=165.86, dec=34.829694, radius=3., max_wait=20,
                     rd_colnames=['ra','dec'], 
                     tap_url='http://datalab.noao.edu/tap',
                     max=100000, clean_xml=True, verbose=True,
-                    des=False, gaia=False, nsc=False):
+                    des=False, gaia=False, nsc=False, vizier=False):
     """Query NOAO Catalog holdings
     
     Parameters
@@ -2116,6 +2116,9 @@ def query_tap_catalog(ra=165.86, dec=34.829694, radius=3., max_wait=20,
     
     nsc : bool
         Query the NOAO Source Catalog (Nidever et al. 2018), `nsc_dr1.object`.
+    
+    vizier : bool
+        Use the VizieR TAP server at  http://tapvizier.u-strasbg.fr/TAPVizieR/tap, see http://tapvizier.u-strasbg.fr/adql/about.html.
         
     Returns
     -------
@@ -2149,6 +2152,14 @@ def query_tap_catalog(ra=165.86, dec=34.829694, radius=3., max_wait=20,
 
         db = 'gaiadr2.gaia_source'
         tap_url = 'http://gea.esac.esa.int/tap-server/tap'
+    
+    # VizieR TAP server
+    if vizier:
+        if verbose:
+            print('Query {0} from VizieR TAP server'.format(db))
+
+        tap_url = 'http://tapvizier.u-strasbg.fr/TAPVizieR/tap'
+        rd_colnames = ['RAJ2000','DEJ2000']
         
     tap = TapPlus(url=tap_url)
     
@@ -2161,11 +2172,16 @@ def query_tap_catalog(ra=165.86, dec=34.829694, radius=3., max_wait=20,
         table = job.get_results()
         if clean_xml:
             os.remove(job.get_output_file())
+    
+        # Provide ra/dec columns
+        for c, cc in zip(rd_colnames, ['ra','dec']):
+            if (c in table.colnames) & (cc not in table.colnames):
+                table[cc] = table[c]
             
     except:
         print('Query failed, check {0} for error messages'.format(job.get_output_file()))
         table = None
-        
+                
     return table   
 
 def get_nsc_catalog(ra=0., dec=0., radius=3, max=100000, extra=' AND (rerr < 0.08 OR ierr < 0.08 OR zerr < 0.08) AND raerr < 0.2 AND decerr < 0.2', verbose=True):
@@ -2179,9 +2195,33 @@ def get_nsc_catalog(ra=0., dec=0., radius=3, max=100000, extra=' AND (rerr < 0.0
     
     tab = query_tap_catalog(ra=ra, dec=dec, radius=radius, extra=extra, nsc=True, verbose=verbose)
     return tab
+
+def get_desdr1_catalog(ra=0., dec=0., radius=3, max=100000, extra=' AND (magerr_auto_r < 0.15 OR magerr_auto_i < 0.15)', verbose=True):
+    """
+    Query DES DR1 Catalog.  
     
-def get_panstarrs_catalog(ra=0., dec=0., radius=3, columns='objName,objID,raStack,decStack,raStackErr,decStackErr,rMeanKronMag,rMeanKronMagErr,iMeanKronMag,iMeanKronMagErr', max_records=10000):
-    """TBD
+    The default `extra` query returns well-detected sources in one or more
+    red bands.
+    
+    """
+    print('Query DES Source Catalog ({ra:.5f},{dec:.5f},{radius:.1f}\')'.format(ra=ra, dec=dec, radius=radius))
+    
+    tab = query_tap_catalog(ra=ra, dec=dec, radius=radius, extra=extra, des=True, verbose=verbose)
+    return tab
+    
+def get_panstarrs_catalog(ra=0., dec=0., radius=3., max_records=500000, verbose=True, extra='AND "II/349/ps1".e_imag < 0.2 AND "II/349/ps1".e_RAJ2000 < 0.2 AND "II/349/ps1".e_DEJ2000 < 0.2'):
+    """
+    Get PS1 from Vizier
+    """
+    print('Query PanSTARRS catalog ({ra},{dec},{radius})'.format(ra=ra, dec=dec, radius=radius))
+    tab = query_tap_catalog(ra=ra, dec=dec, radius=radius*2, extra=extra, vizier=True, db='"II/349/ps1"', verbose=verbose)
+    return tab
+    
+def get_panstarrs_catalog_old(ra=0., dec=0., radius=3, columns='objName,objID,raMean,decMean,raStack,decStack,raStackErr,decStackErr,rMeanKronMag,rMeanKronMagErr,iMeanKronMag,iMeanKronMagErr', max_records=10000):
+    """
+    Get PS1 from STScI
+    
+    Need to get mean positions rather than stack positions!
     """
     try:
         import httplib
@@ -2212,7 +2252,7 @@ def get_panstarrs_catalog(ra=0., dec=0., radius=3, columns='objName,objID,raStac
     table['dec'] = table['decStack']
     return table[clip]
     
-def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, reference_catalogs = ['GAIA', 'PS1', 'NSC', 'SDSS', 'WISE'], **kwargs):
+def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, reference_catalogs = ['GAIA', 'PS1', 'NSC', 'SDSS', 'WISE', 'DES'], **kwargs):
     """Decide what reference astrometric catalog to use
     
     First search SDSS, then WISE looking for nearby matches.  
@@ -2233,7 +2273,8 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, ref
     
     reference_catalogs : list
         Order in which to query reference catalogs.  Options are 'GAIA',
-        'PS1' (STScI PanSTARRS), 'SDSS', 'WISE', 'NSC' (NOAO Source Catalog).
+        'PS1' (STScI PanSTARRS), 'SDSS', 'WISE', 'NSC' (NOAO Source Catalog), 
+        'DES' (Dark Energy Survey DR1).
         
     Returns
     -------
@@ -2250,7 +2291,8 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, ref
                        'WISE':get_irsa_catalog,
                        '2MASS':get_twomass_catalog,
                        'GAIA_Vizier':get_gaia_DR2_vizier,
-                       'NSC':get_nsc_catalog}
+                       'NSC':get_nsc_catalog,
+                       'DES':get_desdr1_catalog}
       
     ### Try queries
     has_catalog = False
