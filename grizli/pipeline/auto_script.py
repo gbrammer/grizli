@@ -135,7 +135,7 @@ def get_extra_data(root='j114936+222414', HOME_PATH='/Volumes/Pegasus/Grizli/Aut
 
     os.chdir(CWD)
     
-def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', inspect_ramps=False, manual_alignment=False, is_parallel_field=False, reprocess_parallel=False, only_preprocess=False, make_mosaics=True, make_phot=True, run_extractions=True, run_fit=True, s3_sync=False, fine_radec=None, run_fine_alignment=True, combine_all_filters=True, gaia_by_date=False, align_simple=False, align_clip=-1, align_rms_limit=2, align_min_overlap=0.2, master_radec=None, parent_radec=None, fix_stars=True, is_dash=False, run_parse_visits=True, imaging_bkg_params=prep.BKG_PARAMS, reference_wcs_filters=['G800L', 'G102', 'G141'], catalogs=['NSC','PS1','SDSS','GAIA','WISE'], mosaic_pixel_scale=None, mosaic_pixfrac=0.6, half_optical_pixscale=False):
+def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', inspect_ramps=False, manual_alignment=False, is_parallel_field=False, reprocess_parallel=False, only_preprocess=False, make_mosaics=True, make_phot=True, run_extractions=True, run_fit=True, s3_sync=False, fine_radec=None, run_fine_alignment=True, combine_all_filters=True, gaia_by_date=False, align_simple=False, align_clip=-1, align_rms_limit=2, align_min_overlap=0.2, master_radec=None, parent_radec=None, fix_stars=True, is_dash=False, run_parse_visits=True, imaging_bkg_params=prep.BKG_PARAMS, reference_wcs_filters=['G800L', 'G102', 'G141'], catalogs=['PS1','DES','NSC', 'SDSS','GAIA','WISE'], mosaic_pixel_scale=None, mosaic_pixfrac=0.6, half_optical_pixscale=False):
     """
     Run the full pipeline for a given target
         
@@ -216,7 +216,7 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
         
     # Fine alignment
     if (len(glob.glob('{0}*fine.png'.format(root))) == 0) & (run_fine_alignment) & (len(visits) > 1):
-        fine_catalogs = ['GAIA','PS1','SDSS','WISE']
+        fine_catalogs = ['GAIA','PS1','DES','SDSS','WISE']
         try:
             out = auto_script.fine_alignment(field_root=root, HOME_PATH=HOME_PATH, min_overlap=0.2, stopme=False, ref_err=0.08, catalogs=fine_catalogs, NITER=1, maglim=[17,23], shift_only=True, method='Powell', redrizzle=False, radius=30, program_str=None, match_str=[], radec=fine_radec, gaia_by_date=gaia_by_date)
             plt.close()
@@ -737,7 +737,7 @@ def get_visit_exposure_footprints(visit_file='j1000p0210_visits.npy', check_path
     
     return visits
     
-def manual_alignment(field_root='j151850-813028', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', skip=True, radius=5., catalogs=['PS1','SDSS','GAIA','WISE'], visit_list=None, radec=None):
+def manual_alignment(field_root='j151850-813028', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', skip=True, radius=5., catalogs=['PS1','DES','SDSS','GAIA','WISE'], visit_list=None, radec=None):
     
     #import pyds9
     import glob
@@ -823,7 +823,7 @@ def clean_prep(field_root='j142724+334246'):
     for flt_file in flt_files:
         utils.fix_flt_nan(flt_file, verbose=True)
          
-def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', min_overlap=0.2, make_combined=True, catalogs=['NSC','PS1','SDSS','GAIA','WISE'], use_visit=True, master_radec=None, parent_radec=None, use_first_radec=False, skip_imaging=False, clean=True, fix_stars=True, tweak_max_dist=1., align_simple=True, align_clip=30, imaging_bkg_params=None, align_rms_limit=2.):
+def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', min_overlap=0.2, make_combined=True, catalogs=['PS1','DES','NSC','SDSS','GAIA','WISE'], use_visit=True, master_radec=None, parent_radec=None, use_first_radec=False, skip_imaging=False, clean=True, fix_stars=True, tweak_max_dist=1., align_simple=True, align_clip=30, imaging_bkg_params=None, align_rms_limit=2.):
     """
     master_radec: force use this radec file
     
@@ -2641,7 +2641,7 @@ def get_rgb_filters(filter_list, force_ir=False, pure_sort=False):
         gfilts = bfilts
         rfilts = bfilts[::-1]
     else:
-        bfilts = ['f814w', 'f606w', 'f775w','f435w','f475w','f555w','f200lp','f105w','f110w','f125w']
+        bfilts = ['f814w', 'f606w', 'f775w','f435w','f475w','f555w','f200lp','f098m','f105w','f110w','f125w']
         gfilts = ['f105w','f110w','f125w','f140w','f606w','f814w']
         rfilts = ['f160w','f140w','f110w','f125w','f105w','f814w','f606w']
         
@@ -2704,7 +2704,8 @@ def field_rgb(root='j010514+021532', xsize=6, HOME_PATH='./', show_ir=True, pl=1
         PATH_TO = '{0}/{1}/Prep'.format(HOME_PATH, root)
     else:
         PATH_TO = './'
-    
+        sci_files = glob.glob('./{1}-f*sci.fits'.format(HOME_PATH, root))
+        
     if filters is None:
         filters = [file.split('_')[-3].split('-')[-1] for file in sci_files]
         filters += ['ir']
@@ -2756,21 +2757,24 @@ def field_rgb(root='j010514+021532', xsize=6, HOME_PATH='./', show_ir=True, pl=1
         gimg = nd.convolve(gimg, kern)[::2,::2]
     
     if ds9:
+        
         ds9.set('rgb')
         ds9.set('rgb channel red')
-        ds9.view(rimg, header=ims['ir'][0].header)
+        ds9.view(rimg, header=ims[rf][0].header)
         ds9.set_defaults(); ds9.set('cmap value 9.75 0.8455')
         
         ds9.set('rgb channel green')
-        ds9.view(gimg, header=ims['ir'][0].header)
+        ds9.view(gimg, header=ims[gf][0].header)
         ds9.set_defaults(); ds9.set('cmap value 9.75 0.8455')
 
         ds9.set('rgb channel blue')
-        ds9.view(bimg, header=ims['ir'][0].header)
+        ds9.view(bimg, header=ims[bf][0].header)
         ds9.set_defaults(); ds9.set('cmap value 9.75 0.8455')
         
         return False
-        
+    
+    xsl = ysl = None
+    
     if show_ir:
         # Show only area where IR is available
         yp, xp = np.indices(ims[rf][0].data.shape)
