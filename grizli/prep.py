@@ -2209,7 +2209,7 @@ def get_desdr1_catalog(ra=0., dec=0., radius=3, max=100000, extra=' AND (magerr_
     tab = query_tap_catalog(ra=ra, dec=dec, radius=radius, extra=extra, des=True, verbose=verbose)
     return tab
     
-def get_panstarrs_catalog(ra=0., dec=0., radius=3., max_records=500000, verbose=True, extra='AND "II/349/ps1".e_imag < 0.2 AND "II/349/ps1".e_RAJ2000 < 0.2 AND "II/349/ps1".e_DEJ2000 < 0.2'):
+def get_panstarrs_catalog(ra=0., dec=0., radius=3., max_records=500000, verbose=True, extra='AND "II/349/ps1".e_imag < 0.2 AND "II/349/ps1".e_RAJ2000 < 0.15 AND "II/349/ps1".e_DEJ2000 < 0.15'):
     """
     Get PS1 from Vizier
     """
