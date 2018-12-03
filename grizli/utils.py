@@ -2867,6 +2867,136 @@ def make_spectrum_wcsheader(center_wave=1.4e4, dlam=40, NX=100, spatial_scale=1,
     
     return refh, ref_wcs
 
+def read_gzipped_header(file='test.fits.gz', BLOCK=1024, NMAX=256, nspace=16, strip=False):
+    """
+    Read primary header from a (potentially large) zipped FITS file
+    
+    The script proceeds by reading `NMAX` segments of size `BLOCK` bytes from  
+    the file and searching for a string `END + ' '*nspace` in the data 
+    indicating the end of the primary header.
+    
+    Parameters
+    ----------
+    file : str
+        Filename of gzipped FITS file
+    
+    BLOCK, NMAX, nspace : int
+        Parameters for reading bytes from the input file
+    
+    strip : bool
+        Send output through `strip_header_keys`.
+        
+        
+    Returns
+    -------
+    header : `~astropy.io.fits.Header`
+        Header object
+        
+    """
+    import gzip
+    import astropy.io.fits as pyfits
+    
+    f = gzip.GzipFile(fileobj=open(file,'rb'))
+        
+    data = b''
+    end=b' END'+b' '*nspace
+    
+    for i in range(NMAX):
+        data_i = f.read(BLOCK)
+        if end in data_i:
+            break
+        
+        data += data_i
+    
+    if (i == NMAX-1):
+        print('Error: END+{3}*" " not found in first {0}x{1} bytes of {2})'.format(NMAX, BLOCK, file, nspace))
+        f.close()
+        return {}
+        
+    ix = data_i.index(end)
+    data += data_i[:ix]+end #data_i[:ix]
+        
+    f.close()
+    data_str = data.decode('utf8')
+    h = pyfits.Header.fromstring(data_str)
+    
+    if strip:
+        return strip_header_keys(h, usewcs=True)
+    else:
+        return h
+        
+DRIZZLE_KEYS = ['GEOM','DATA', 'DEXP', 'OUDA', 'OUWE', 'OUCO', 'MASK', 'WTSC', 'KERN', 'PIXF', 'COEF', 'OUUN', 'FVAL', 'WKEY', 'SCAL', 'ISCL']
+def strip_header_keys(header, comment=True, history=True, drizzle_keys=DRIZZLE_KEYS, usewcs=False, keep_with_wcs=['EXPTIME','FILTER','TELESCOP','INSTRUME','DATE-OBS','EXPSTART','EXPEND']):
+    """
+    Strip header keywords
+    
+    Parameters
+    ----------
+    
+    comment, history : bool
+        Strip 'COMMENT' and 'HISTORY' keywords, respectively.
+        
+    drizzle_keys : list
+        Strip keys produced by `~drizzlepac.astrodrizzle`.
+    
+    usewcs : bool
+        Alternatively, just generate a simple WCS-only header from the input 
+        header.
+    
+    keep_with_wcs : list
+        Additional keys to try to add to the `usewcs` header.
+    
+    Returns
+    -------
+    
+    header : `~astropy.io.fits.Header`
+        Header object.
+    
+    """
+    import copy
+    import astropy.wcs as pywcs
+    
+    # Parse WCS and build header
+    if usewcs:
+        wcs = pywcs.WCS(header)
+        h = to_header(wcs)
+        for k in keep_with_wcs:
+            if k in header:
+                if k in header.comments:
+                    h[k] = header[k], header.comments[k]
+                else:
+                    h[k] = header[k]
+        
+        if 'FILTER' in keep_with_wcs:
+            try:
+                h['FILTER'] = (get_hst_filter(header), 
+                               'element selected from filter wheel')
+            except:
+                pass
+        
+        return h
+    
+    h = copy.deepcopy(header)    
+    keys = list(h.keys())
+    strip_keys = []
+    if comment:
+        strip_keys.append('COMMENT')
+    
+    if history:
+        strip_keys.append('HISTORY')
+            
+    for k in keys:
+        if k in strip_keys:
+            h.remove(k)
+            
+        if drizzle_keys:
+            if k.startswith('D'):
+                if (k[-4:] in drizzle_keys) | k.endswith('VER'):
+                    h.remove(k)
+    
+    return h
+    
+            
 def to_header(wcs, relax=True):
     """Modify `astropy.wcs.WCS.to_header` to produce more keywords
     
