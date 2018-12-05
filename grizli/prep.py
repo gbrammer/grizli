@@ -2302,9 +2302,12 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, ref
     for ref_src in reference_catalogs:
         try:
             if ref_src == 'GAIA':
-                ref_cat = query_functions[ref_src](ra=ra, dec=dec,
+                try:
+                    ref_cat = query_functions[ref_src](ra=ra, dec=dec,
                                              radius=radius, use_mirror=False)
-                
+                except:
+                    ref_cat = False
+                    
                 # Try GAIA mirror at Heidelberg
                 if ref_cat is False:
                     ref_cat = query_functions[ref_src](ra=ra, dec=dec,
@@ -2335,7 +2338,7 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, ref
             print('{0} query failed'.format(ref_src))
             has_catalog = False
         
-    if (ref_src == 'GAIA') & ('date' in kwargs) & has_catalog:
+    if (ref_src.startswith('GAIA')) & ('date' in kwargs) & has_catalog:
         if kwargs['date'] is not None:        
             if 'date_format' in kwargs:
                 date_format = kwargs['date_format']
