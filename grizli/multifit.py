@@ -1050,8 +1050,7 @@ class GroupFLT():
                 # Not the fork that works for all input/output arrays
                 raise(ImportError)
             
-            print('drizzle!!')
-            
+            #print('drizzle!!')
             from drizzle.dodrizzle import dodrizzle
             drizzler = dodrizzle
             dfillval = '0'
@@ -3769,8 +3768,7 @@ def drizzle_2d_spectrum(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
             # Not the fork that works for all input/output arrays
             raise(ImportError)
         
-        print('drizzle!!')
-        
+        #print('drizzle!!')
         from drizzle.dodrizzle import dodrizzle
         drizzler = dodrizzle
         dfillval = '0'
@@ -3985,11 +3983,10 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
             # Not the fork that works for all input/output arrays
             raise(ImportError)
         
-        print('drizzle!!')
+        #print('drizzle!!')
         from drizzle.dodrizzle import dodrizzle
         drizzler = dodrizzle
         dfillval = '0'
-        
     except:
         from drizzlepac.astrodrizzle import adrizzle
         adrizzle.log.setLevel('ERROR')
@@ -4421,8 +4418,7 @@ def drizzle_2d_spectrum_wcs(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
             # Not the fork that works for all input/output arrays
             raise(ImportError)
         
-        print('drizzle!!')
-        
+        #print('drizzle!!')
         from drizzle.dodrizzle import dodrizzle
         drizzler = dodrizzle
         dfillval = '0'
