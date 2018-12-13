@@ -169,10 +169,10 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
             mb.set_photometry(**phot, min_err=sys_err)
             
     if t0 is None:
-        t0 = grizli.utils.load_templates(line_complexes=True, fsps_templates=True, fwhm=fwhm)
+        t0 = utils.load_templates(line_complexes=True, fsps_templates=True, fwhm=fwhm)
     
     if t1 is None:
-        t1 = grizli.utils.load_templates(line_complexes=False, fsps_templates=True, fwhm=fwhm)
+        t1 = utils.load_templates(line_complexes=False, fsps_templates=True, fwhm=fwhm)
         
     # Fit on stacked spectra or individual beams
     if fit_only_beams:
@@ -295,7 +295,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
             mb.set_photometry(**phot)
         
     # Best-fit template itself
-    tfit_sp = grizli.utils.GTable()
+    tfit_sp = utils.GTable()
     for ik, key in enumerate(tfit['cfit']):
         for save in [tfit_sp.meta]:
             save['CVAL{0:03d}'.format(ik)] = tfit['cfit'][key][0], 'Coefficient for {0}'.format(key)
@@ -338,7 +338,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     if pline is None:
          pzfit, pspec2, pline = grizli.multifit.get_redshift_fit_defaults()
     
-    line_hdu = mb.drizzle_fit_lines(tfit, pline, force_line=['SIII','SII','Ha', 'OIII', 'Hb', 'OII', 'Lya'], save_fits=False, mask_lines=True, mask_sn_limit=mask_sn_limit, verbose=verbose)
+    line_hdu = mb.drizzle_fit_lines(tfit, pline, force_line=utils.DEFAULT_LINE_LIST, save_fits=False, mask_lines=True, mask_sn_limit=mask_sn_limit, verbose=verbose)
     
     # Add beam exposure times
     exptime = mb.compute_exptime()
@@ -3055,6 +3055,9 @@ def show_drizzled_lines(line_hdu, full_line_list=['OII', 'Hb', 'OIII', 'Ha', 'SI
         if line in line_hdu[0].header['HASLINES'].split():
             show_lines.append(line)
     
+    if full_line_list == 'all':
+        show_lines = line_hdu[0].header['HASLINES'].split()
+        
     #print(line_hdu[0].header['HASLINES'], show_lines)
     
     NL = len(show_lines)
