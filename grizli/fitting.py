@@ -70,7 +70,7 @@ def run_all_parallel(id, get_output_data=False, **kwargs):
     
     return id, status, t1-t0
     
-def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter='nnls', group_name='grism', fit_stacks=True, only_stacks=False, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=3, fit_only_beams=False, fit_beams=True, root='*', fit_trace_shift=False, phot=None, phot_obj=None, verbose=True, scale_photometry=False, show_beams=True, scale_on_stacked_1d=True, overlap_threshold=5, MW_EBV=0., sys_err=0.03, get_dict=False, bad_pa_threshold=1.6, units1d='flam', redshift_only=False, line_size=1.6, use_psf=False, get_line_width=False, sed_args={'bin':1, 'xlim':[0.3, 9]}, **kwargs):
+def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter='nnls', group_name='grism', fit_stacks=True, only_stacks=False, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=3, fit_only_beams=False, fit_beams=True, root='*', fit_trace_shift=False, phot=None, phot_obj=None, verbose=True, scale_photometry=False, show_beams=True, scale_on_stacked_1d=True, overlap_threshold=5, MW_EBV=0., sys_err=0.03, get_dict=False, bad_pa_threshold=1.6, units1d='flam', redshift_only=False, line_size=1.6, use_psf=False, get_line_width=False, sed_args={'bin':1, 'xlim':[0.3, 9]}, get_ir_psfs=True, **kwargs):
     """Run the full procedure
     
     1) Load MultiBeam and stack files 
@@ -338,7 +338,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     if pline is None:
          pzfit, pspec2, pline = grizli.multifit.get_redshift_fit_defaults()
     
-    line_hdu = mb.drizzle_fit_lines(tfit, pline, force_line=utils.DEFAULT_LINE_LIST, save_fits=False, mask_lines=True, mask_sn_limit=mask_sn_limit, verbose=verbose)
+    line_hdu = mb.drizzle_fit_lines(tfit, pline, force_line=utils.DEFAULT_LINE_LIST, save_fits=False, mask_lines=True, mask_sn_limit=mask_sn_limit, verbose=verbose, get_ir_psfs=get_ir_psfs)
     
     # Add beam exposure times
     exptime = mb.compute_exptime()
