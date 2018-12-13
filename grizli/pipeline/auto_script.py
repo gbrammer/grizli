@@ -222,7 +222,7 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
             plt.close()
 
             # Update WCS headers with fine alignment
-            auto_script.update_wcs_headers_with_fine(root)
+            auto_script.update_wcs_headers_with_fine(root, backup=True)
 
         except:
             pass
@@ -1746,7 +1746,7 @@ def generate_fit_params(field_root='j142724+334246', prior=None, MW_EBV=0.00, pl
     t0 = utils.load_templates(fwhm=1000, line_complexes=True, stars=False, full_line_list=None, continuum_list=None, fsps_templates=fsps, alf_template=True)
     t1 = utils.load_templates(fwhm=1000, line_complexes=False, stars=False, full_line_list=None, continuum_list=None, fsps_templates=fsps, alf_template=True)
 
-    args = fitting.run_all(0, t0=t0, t1=t1, fwhm=1200, zr=zr, dz=[0.004, 0.0005], fitter='nnls', group_name=field_root, fit_stacks=False, prior=prior,  fcontam=fcontam, pline=pline, mask_sn_limit=10, fit_beams=False,  root=field_root, fit_trace_shift=False, phot=phot, verbose=True, scale_photometry=False, show_beams=True, overlap_threshold=10, fit_only_beams=fit_only_beams, MW_EBV=MW_EBV, sys_err=sys_err, get_dict=True)
+    args = fitting.run_all(0, t0=t0, t1=t1, fwhm=1200, zr=zr, dz=[0.004, 0.0005], fitter='nnls', group_name=field_root, fit_stacks=False, prior=prior,  fcontam=fcontam, pline=pline, mask_sn_limit=10, fit_beams=False,  root=field_root, fit_trace_shift=False, phot=phot, verbose=True, scale_photometry=False, show_beams=True, overlap_threshold=10, get_ir_psfs=True, fit_only_beams=fit_only_beams, MW_EBV=MW_EBV, sys_err=sys_err, get_dict=True)
     
     np.save(save_file, [args])
     print('Saved arguments to {0}.'.format(save_file))
@@ -2675,7 +2675,7 @@ def get_rgb_filters(filter_list, force_ir=False, pure_sort=False):
             
     return rfilt, gfilt, bfilt
     
-def field_rgb(root='j010514+021532', xsize=6, HOME_PATH='./', show_ir=True, pl=1, pf=1, scl=1, ds9=None, force_ir=False, filters=None, add_labels=True, output_format='jpg', rgb_min=-0.01, xyslice=None, pure_sort=False, verbose=True):
+def field_rgb(root='j010514+021532', xsize=6, HOME_PATH='./', show_ir=True, pl=1, pf=1, scl=1, ds9=None, force_ir=False, filters=None, add_labels=True, output_format='jpg', rgb_min=-0.01, xyslice=None, pure_sort=False, verbose=True, force_rgb=None):
     import os
     import glob
     import numpy as np
@@ -2726,7 +2726,11 @@ def field_rgb(root='j010514+021532', xsize=6, HOME_PATH='./', show_ir=True, pl=1
     pscale = utils.get_wcs_pscale(wcs)
     minor = MultipleLocator(1./pscale)
             
-    rf, gf, bf = get_rgb_filters(filters, force_ir=force_ir, pure_sort=pure_sort)
+    if force_rgb is None:
+        rf, gf, bf = get_rgb_filters(filters, force_ir=force_ir, pure_sort=pure_sort)
+    else:
+        rf, gf, bf = force_rgb
+        
     if verbose:
         print('{0}: r {1} / g {2} / b {3}'.format(root, rf, gf, bf))
     

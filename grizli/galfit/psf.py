@@ -21,7 +21,7 @@ except:
     from grizli import utils, model
     
 class DrizzlePSF(object):
-    def __init__(self, flt_files=DEMO_LIST, info=None, driz_image=DEMO_IMAGE):
+    def __init__(self, flt_files=DEMO_LIST, info=None, driz_image=DEMO_IMAGE, driz_hdu=None, beams=None):
         """
         Object for making drizzled PSFs
         
@@ -35,17 +35,28 @@ class DrizzlePSF(object):
             
         """
         if info is None:
-            info = self._get_flt_wcs(flt_files)
-
+            if beams is None:
+                info = self._get_flt_wcs(flt_files)
+            else:
+                info = self._get_wcs_from_beams(beams)
+                
         self.flt_keys, self.wcs, self.footprint = info
         self.flt_files = list(np.unique([key[0] for key in self.flt_keys]))
 
         self.ePSF = utils.EffectivePSF()
         
-        self.driz_image = driz_image
-        self.driz_header = pyfits.getheader(driz_image)
-        self.driz_wcs = pywcs.WCS(self.driz_header)
-        self.driz_pscale = utils.get_wcs_pscale(self.driz_wcs)
+        if driz_hdu is None:
+            self.driz_image = driz_image
+            self.driz_header = pyfits.getheader(driz_image)
+            self.driz_wcs = pywcs.WCS(self.driz_header)
+            self.driz_pscale = utils.get_wcs_pscale(self.driz_wcs)
+        else:
+            self.driz_image = driz_image
+            self.driz_header = driz_hdu.header
+            self.driz_wcs = pywcs.WCS(self.driz_header)
+            self.driz_pscale = utils.get_wcs_pscale(self.driz_wcs)
+        
+        self.driz_wcs.pscale = self.driz_pscale
         
     @staticmethod
     def _get_flt_wcs(flt_files):
@@ -74,6 +85,33 @@ class DrizzlePSF(object):
                     
         return flt_keys, wcs, footprint
     
+    @staticmethod
+    def _get_wcs_from_beams(beams):
+        """
+        TBD
+        """
+        from shapely.geometry import Polygon, Point
+        
+        from grizli import utils
+        wcs = OrderedDict()
+        footprint = OrderedDict()
+        
+        flt_keys = []
+        for beam in beams:
+            #flt_j = pyfits.open(file)
+            file = beam.direct.parent_file
+            ext = beam.direct.sci_extn
+            
+            key = file, ext
+            wcs[key] = beam.direct.wcs.copy()
+            
+            wcs[key].pscale = utils.get_wcs_pscale(wcs[key])
+            
+            footprint[key] = Polygon(wcs[key].calc_footprint())
+            flt_keys.append(key)
+                    
+        return flt_keys, wcs, footprint
+        
     def get_driz_cutout(self, ra=53.06967306, dec=-27.72333015, size=15, get_cutout=False, N=None):
         """
         TBD

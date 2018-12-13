@@ -2605,7 +2605,7 @@ class MultiBeam(GroupFitter):
 
         return drizzled_segm
         
-    def drizzle_fit_lines(self, fit, pline, force_line=['Ha', 'OIII', 'Hb', 'OII'], save_fits=True, mask_lines=True, mask_sn_limit=3, mask_4959=True, verbose=True, include_segmentation=True):
+    def drizzle_fit_lines(self, fit, pline, force_line=['Ha', 'OIII', 'Hb', 'OII'], save_fits=True, mask_lines=True, mask_sn_limit=3, mask_4959=True, verbose=True, include_segmentation=True, get_ir_psfs=True):
         """
         TBD
         """
@@ -2826,7 +2826,40 @@ class MultiBeam(GroupFitter):
             segm = self.drizzle_segmentation(wcsobj=line_wcs)
             seg_hdu = pyfits.ImageHDU(data=segm.astype(np.int32), name='SEG')
             hdu_full.insert(1, seg_hdu)
+        
+        if get_ir_psfs:
+            import grizli.galfit.psf
+            ir_beams = []
+            gr_filters = {'G102':['F105W'], 'G141':['F105W','F125W','F140W','F160W']}
+            show_filters = []
             
+            for gr in ['G102','G141']:
+                if gr in self.PA:
+                    show_filters.extend(gr_filters[gr])
+                    for pa in self.PA[gr]:
+                        for i in self.PA[gr][pa]:
+                            ir_beams.append(self.beams[i])
+            
+            if len(ir_beams) > 0:             
+                dp = grizli.galfit.psf.DrizzlePSF(driz_hdu=hdu_full['DSCI'], 
+                                    beams=self.beams)
+                
+                for filt in np.unique(show_filters):
+                    if verbose:
+                        print('Get linemap PSF: {0}'.format(filt))
+                    
+                    psf = dp.get_psf(ra=dp.driz_wcs.wcs.crval[0],
+                                     dec=dp.driz_wcs.wcs.crval[1], 
+                                     filter=filt, 
+                                     pixfrac=dp.driz_header['PIXFRAC'], 
+                                     kernel=dp.driz_header['DRIZKRNL'], 
+                                     wcs_slice=dp.driz_wcs, get_extended=True, 
+                                     verbose=False, get_weight=False)
+                                     
+                    psf[1].header['EXTNAME'] = 'DPSF'
+                    psf[1].header['EXTVER'] = filt
+                    hdu_full.append(psf[1])
+                    
         if save_fits:
             hdu_full.writeto('{0}_{1:05d}.line.fits'.format(self.group_name, self.id), clobber=True, output_verify='silentfix')
         
