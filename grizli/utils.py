@@ -2126,6 +2126,11 @@ def array_templates(templates, wave=None, max_R=5000, z=0):
     
     max_R : float
         Maximum spectral resolution of the regridded templates.
+    
+    z : float
+        Redshift where to evaluate the templates.  But note that this is only
+        used to shift templates produced by `bspline_templates`, which are
+        defined in the observed frame.
         
     Returns
     -------
@@ -2170,7 +2175,7 @@ def array_templates(templates, wave=None, max_R=5000, z=0):
     
     return wave, flux_arr, is_line
     
-def compute_equivalent_widths(templates, coeffs, covar, max_R=5000, Ndraw=1000, seed=0, z=0):
+def compute_equivalent_widths(templates, coeffs, covar, max_R=5000, Ndraw=1000, seed=0, z=0, observed_frame=False):
     """Compute template-fit emission line equivalent widths
     
     Parameters
@@ -2193,6 +2198,13 @@ def compute_equivalent_widths(templates, coeffs, covar, max_R=5000, Ndraw=1000, 
     seed : positive int
         Random number seed to produce repeatible results. If `None`, then 
         use default state.
+    
+    z : float
+        Redshift where the fit is evaluated
+    
+    observed_framme : bool
+        If true, then computed EWs are observed frame, otherwise they are 
+        rest frame at redshift `z`.
         
     Returns
     -------
@@ -2243,7 +2255,8 @@ def compute_equivalent_widths(templates, coeffs, covar, max_R=5000, Ndraw=1000, 
         
         # Where line template non-zero
         mask = flux_arr[clip,:][ix,:] > 0
-        ew_i = np.trapz((line/continuum)[:,mask], wave[mask], axis=1)
+        ew_i = np.trapz((line/continuum)[:,mask], 
+                        wave[mask]*(1+z*observed_frame), axis=1)
         
         EWdict[key] = np.percentile(ew_i, [16., 50., 84.])
     
