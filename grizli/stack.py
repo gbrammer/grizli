@@ -279,7 +279,10 @@ class StackFitter(GroupFitter):
 
         self.fit_mask = np.hstack([E.fit_mask for E in self.beams])
         self.fit_mask &= self.ivarf > self.min_ivar*self.ivarf.max()
-                
+        
+        # Dummy parameter.  Implemented for MultiBeam
+        self.sens_mask = 1. 
+        
         self.DoF = int((self.fit_mask*self.weightf).sum())
         #self.Nmask = self.fit_mask.sum()
         self.Nmask = np.sum([E.fit_mask.sum() for E in self.beams])
@@ -1235,6 +1238,9 @@ class StackedSpectrum(object):
         
         self.fit_mask = (self.ivarf > min_ivar*self.ivarf.max()) 
         self.fit_mask &= np.isfinite(self.scif) & np.isfinite(self.ivarf)
+        
+        # Dummy parameter.  Implemented for MultiBeam
+        self.sens_mask = 1.
         
         # Contamination weighting
         self.fcontam = fcontam

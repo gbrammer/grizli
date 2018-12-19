@@ -70,7 +70,7 @@ def run_all_parallel(id, get_output_data=False, **kwargs):
     
     return id, status, t1-t0
     
-def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter='nnls', group_name='grism', fit_stacks=True, only_stacks=False, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=3, fit_only_beams=False, fit_beams=True, root='*', fit_trace_shift=False, phot=None, phot_obj=None, verbose=True, scale_photometry=False, show_beams=True, scale_on_stacked_1d=True, overlap_threshold=5, MW_EBV=0., sys_err=0.03, get_dict=False, bad_pa_threshold=1.6, units1d='flam', redshift_only=False, line_size=1.6, use_psf=False, get_line_width=False, sed_args={'bin':1, 'xlim':[0.3, 9]}, get_ir_psfs=True, **kwargs):
+def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter='nnls', group_name='grism', fit_stacks=True, only_stacks=False, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=3, fit_only_beams=False, fit_beams=True, root='*', fit_trace_shift=False, phot=None, phot_obj=None, verbose=True, scale_photometry=False, show_beams=True, scale_on_stacked_1d=True, overlap_threshold=5, MW_EBV=0., sys_err=0.03, get_dict=False, bad_pa_threshold=1.6, units1d='flam', redshift_only=False, line_size=1.6, use_psf=False, get_line_width=False, sed_args={'bin':1, 'xlim':[0.3, 9]}, get_ir_psfs=True, min_mask=0.01, min_sens=0.08, **kwargs):
     """Run the full procedure
     
     1) Load MultiBeam and stack files 
@@ -97,7 +97,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     st_files = glob.glob('{0}_{1:05d}.stack.fits'.format(root, id))
     
     if not only_stacks:
-        mb = MultiBeam(mb_files, fcontam=fcontam, group_name=group_name, MW_EBV=MW_EBV, sys_err=sys_err, verbose=verbose, psf=use_psf)
+        mb = MultiBeam(mb_files, fcontam=fcontam, group_name=group_name, MW_EBV=MW_EBV, sys_err=sys_err, verbose=verbose, psf=use_psf, min_mask=min_mask, min_sens=min_sens)
         # Check for PAs with unflagged contamination or otherwise discrepant
         # fit
         out = mb.check_for_bad_PAs(chi2_threshold=bad_pa_threshold,
@@ -2422,7 +2422,7 @@ class GroupFitter(object):
         # 
         #     return fig, sfit
     
-    def oned_figure(self, bin=1, show_beams=True, minor=0.1, tfit=None, axc=None, figsize=[6,4], fill=False, units='flam', min_sens=0.1, ylim_percentile=2, scale_on_stacked=False, show_individual_templates=False):
+    def oned_figure(self, bin=1, show_beams=True, minor=0.1, tfit=None, axc=None, figsize=[6,4], fill=False, units='flam', min_sens_show=0.1, ylim_percentile=2, scale_on_stacked=False, show_individual_templates=False, apply_beam_mask=True):
         """
         1D figure
         1D figure
@@ -2446,7 +2446,7 @@ class GroupFitter(object):
         units : 'flam', 'nJy', 'mJy', 'eps', 'meps'
             Plot units. 
             
-        min_sens : type
+        min_sens_show : type
         
         ylim_percentile : float
         
@@ -2505,6 +2505,11 @@ class GroupFitter(object):
         
         for i in range(self.N):
             beam = self.beams[i]
+            if apply_beam_mask:
+                b_mask = beam.fit_mask.reshape(beam.sh)
+            else:
+                b_mask = 1
+                
             if tfit is not None:
                 m_i = beam.compute_model(spectrum_1d=sp, is_cgs=True, in_place=False).reshape(beam.sh)
             
@@ -2522,26 +2527,26 @@ class GroupFitter(object):
                 clean = beam.grism['SCI'] - beam.contam 
                 if tfit is not None:
                     clean -= tfit['cfit']['bg {0:03d}'.format(i)][0]
-                    w, flm, erm = beam.beam.optimal_extract(m_i, bin=bin, ivar=beam.ivar)
+                    w, flm, erm = beam.beam.optimal_extract(m_i, bin=bin, ivar=beam.ivar*b_mask)
                 
                 if mspl is not None:
-                    w, flspl, erm = beam.beam.optimal_extract(mspl_i, bin=bin, ivar=beam.ivar)
+                    w, flspl, erm = beam.beam.optimal_extract(mspl_i, bin=bin, ivar=beam.ivar*b_mask)
                         
-                w, fl, er = beam.beam.optimal_extract(clean, bin=bin, ivar=beam.ivar)            
-                w, sens, ers = beam.beam.optimal_extract(f_i, bin=bin, ivar=beam.ivar)
+                w, fl, er = beam.beam.optimal_extract(clean, bin=bin, ivar=beam.ivar*b_mask)            
+                w, sens, ers = beam.beam.optimal_extract(f_i, bin=bin, ivar=beam.ivar*b_mask)
                 #sens = beam.beam.sensitivity                
             else:
                 grism = beam.grism
                 clean = beam.sci - beam.contam
                 if tfit is not None:
                     clean -= - tfit['cfit']['bg {0:03d}'.format(i)][0]
-                    w, flm, erm = beam.optimal_extract(m_i, bin=bin, ivar=beam.ivar)
+                    w, flm, erm = beam.optimal_extract(m_i, bin=bin, ivar=beam.ivar*b_mask)
                     
                 if mspl is not None:
-                    w, flspl, erm = beam.beam.optimal_extract(mspl_i, bin=bin, ivar=beam.ivar)
+                    w, flspl, erm = beam.beam.optimal_extract(mspl_i, bin=bin, ivar=beam.ivar*b_mask)
                     
-                w, fl, er = beam.optimal_extract(clean, bin=bin, ivar=beam.ivar)            
-                w, sens, ers = beam.optimal_extract(f_i, bin=bin, ivar=beam.ivar)
+                w, fl, er = beam.optimal_extract(clean, bin=bin, ivar=beam.ivar*b_mask)            
+                w, sens, ers = beam.optimal_extract(f_i, bin=bin, ivar=beam.ivar*b_mask)
                 
                 #sens = beam.sens
             
@@ -2576,7 +2581,7 @@ class GroupFitter(object):
             
             w = w/1.e4
             
-            clip = (sens > min_sens*sens.max()) 
+            clip = (sens > min_sens_show*sens.max()) 
             clip &= (er > 0)
             if clip.sum() == 0:
                 continue
