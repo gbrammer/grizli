@@ -3336,7 +3336,7 @@ class GrismFLT(object):
 class BeamCutout(object):
     def __init__(self, flt=None, beam=None, conf=None, 
                  get_slice_header=True, fits_file=None, scale=1., 
-                 contam_sn_mask=[10,3], min_mask=0.01):
+                 contam_sn_mask=[10,3], min_mask=0.01, min_sens=0.08):
         """Cutout spectral object from the full frame.
         
         Parameters
@@ -3363,8 +3363,12 @@ class BeamCutout(object):
         contam_sn_mask : TBD
         
         min_mask : float
-            Minimum factor relative to the maximum pixel value where the 
-            2D cutout data are considered good.
+            Minimum factor relative to the maximum pixel value of the flat
+            f-lambda model where the 2D cutout data are considered good.
+        
+        min_sens : float
+            Minimum sensitivity relative to the maximum for a given grism 
+            above which pixels are included in the fit.
             
         Attributes
         ----------
@@ -3409,11 +3413,16 @@ class BeamCutout(object):
         self.beam.scale = scale
         self.contam_sn_mask = contam_sn_mask
         self.min_mask = min_mask
+        self.min_sens = min_sens
+        
         self._parse_from_data(contam_sn_mask=contam_sn_mask,
-                              min_mask=min_mask)
+                              min_mask=min_mask, min_sens=min_sens)
         
-    def _parse_from_data(self, contam_sn_mask=[10,3], min_mask=0.01):
-        
+    def _parse_from_data(self, contam_sn_mask=[10,3], min_mask=0.01, 
+                         min_sens=0.08):
+        """
+        See parameter description for `~grizli.model.BeamCutout`.
+        """
         ### bad pixels or problems with uncertainties
         self.mask = ((self.grism.data['DQ'] > 0) | 
                      (self.grism.data['ERR'] == 0) | 
@@ -3442,7 +3451,21 @@ class BeamCutout(object):
         self.fit_mask = (~self.mask.flatten()) & (self.ivar.flatten() != 0)
         self.fit_mask &= (self.flat_flam > min_mask*self.flat_flam.max())
         #self.fit_mask &= (self.flat_flam > 3*self.contam.flatten())
-            
+        
+        ### Apply minimum sensitivity mask
+        self.sens_mask = 1.        
+        if min_sens > 0:
+            flux_min_sens = (self.beam.sensitivity < min_sens*self.beam.sensitivity.max())*1.
+            if flux_min_sens.sum() > 0:
+                flat_sens = self.compute_model(in_place=False, is_cgs=True,
+                                  spectrum_1d=[self.beam.lam, flux_min_sens])
+                
+                # self.sens_mask = flat_sens == 0                
+                # Make mask along columns
+                is_masked = (flat_sens.reshape(self.sh) > 0).sum(axis=0)
+                self.sens_mask = (np.dot(np.ones((self.sh[0],1)), is_masked[None,:]) == 0).flatten()  
+                self.fit_mask &= self.sens_mask
+                
         ### Flat versions of sci/ivar arrays
         self.scif = (self.grism.data['SCI'] - self.contam).flatten()
         self.ivarf = self.ivar.flatten()
@@ -4027,7 +4050,7 @@ class BeamCutout(object):
         self.beam.x_init_epsf(flat_sensitivity=False, psf_params=self.psf_params, psf_filter=self.direct.filter, yoff=yoff, skip=skip, get_extended=get_extended)
         
         self._parse_from_data(contam_sn_mask=self.contam_sn_mask,
-                              min_mask=self.min_mask)
+                              min_mask=self.min_mask, min_sens=self.min_sens)
         
         return None
         

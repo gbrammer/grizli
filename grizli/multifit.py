@@ -615,8 +615,8 @@ class GroupFLT():
             print('Models computed - {0:.2f} sec.'.format(t1_pool - t0_pool))
         
     def get_beams(self, id, size=10, center_rd=None, beam_id='A',
-                  min_overlap=0.1, min_valid_pix=10,
-                  get_slice_header=True):
+                  min_overlap=0.1, min_valid_pix=10, min_mask=0.01, 
+                  min_sens=0.08, get_slice_header=True):
         """Extract 2D spectra "beams" from the GroupFLT exposures.
         
         Parameters
@@ -641,6 +641,14 @@ class GroupFLT():
         min_valid_pix : int
             Minimum number of valid pixels (`beam.fit_mask == True`) in 2D
             spectrum.
+        
+        min_mask : float
+            Minimum factor relative to the maximum pixel value of the flat
+            f-lambda model where the 2D cutout data are considered good.  
+            Passed through to `~grizli.model.BeamCutout`.
+        
+        min_sens : float
+            See `~grizli.model.BeamCutout`.
             
         get_slice_header : bool
             Passed to `~grizli.model.BeamCutout`.
@@ -657,7 +665,8 @@ class GroupFLT():
         for flt, beam in zip(self.FLTs, beams):
             try:
                 out_beam = model.BeamCutout(flt=flt, beam=beam[beam_id],
-                                        conf=flt.conf, 
+                                        conf=flt.conf, min_mask=min_mask,
+                                        min_sens=min_sens,
                                         get_slice_header=get_slice_header)
             except:
                 #print('Except: get_beams')
@@ -1166,7 +1175,7 @@ class GroupFLT():
             
     
 class MultiBeam(GroupFitter):
-    def __init__(self, beams, group_name='group', fcontam=0., psf=False, polyx=[0.3, 2.5], MW_EBV=0., sys_err=0.0, verbose=True):
+    def __init__(self, beams, group_name='group', fcontam=0., psf=False, polyx=[0.3, 2.5], MW_EBV=0., min_mask=0.01, min_sens=0.08, sys_err=0.0, verbose=True):
         """Tools for dealing with multiple `~.model.BeamCutout` instances 
         
         Parameters
@@ -1174,12 +1183,39 @@ class MultiBeam(GroupFitter):
         beams : list
             List of `~.model.BeamCutout` objects.
         
-        group_name : type
+        group_name : str
             Rootname to use for saved products
             
-        fcontam : type
-            Factor to use to downweight contaminated pixels.
+        fcontam : float
+            Factor to use to downweight contaminated pixels.  The pixel 
+            inverse variances are scaled by the following weight factor when 
+            evaluating chi-squared of a 2D fit,
+            
+            `weight = np.exp(-(fcontam*np.abs(contam)*np.sqrt(ivar)))`
+            
+            where `contam` is the contaminating flux and `ivar` is the initial
+            pixel inverse variance.
+            
+        psf : bool
+            Fit an ePSF model to the direct image to use as the morphological
+            reference.
+            
+        MW_EBV : float
+            Milky way foreground extinction.
         
+        min_mask : float
+            Minimum factor relative to the maximum pixel value of the flat
+            f-lambda model where the 2D cutout data are considered good.  
+            Passed through to `~grizli.model.BeamCutout`.
+
+        min_sens : float
+            See `~grizli.model.BeamCutout`.
+            
+        sys_err : float
+            Systematic error added in quadrature to the pixel variances: 
+                
+                `var_total = var_initial + (beam.sci*sys_err)**2`
+                
         Attributes
         ----------
         TBD : type
@@ -1188,6 +1224,8 @@ class MultiBeam(GroupFitter):
         self.group_name = group_name
         self.fcontam = fcontam
         self.polyx = polyx
+        self.min_mask = min_mask
+        self.min_sens = min_sens
         
         if isinstance(beams, str):
             self.load_master_fits(beams, verbose=verbose)            
@@ -1480,7 +1518,8 @@ class MultiBeam(GroupFitter):
                 #print('Copy!')
                 hducopy = pyfits.HDUList([hdu[i].__class__(data=hdu[i].data*1, header=copy.deepcopy(hdu[i].header), name=hdu[i].name) for i in range(i0, i0+Next_i)])
             
-            beam = model.BeamCutout(fits_file=hducopy)#Next[i]])
+            beam = model.BeamCutout(fits_file=hducopy, min_mask=self.min_mask,
+                                    min_sens=self.min_sens) 
             
             self.beams.append(beam)
             if verbose:
@@ -1512,7 +1551,9 @@ class MultiBeam(GroupFitter):
             if verbose:
                 print(file)
             
-            beam = model.BeamCutout(fits_file=file, conf=conf)
+            beam = model.BeamCutout(fits_file=file, conf=conf, 
+                                    min_mask=self.min_mask, 
+                                    min_sens=self.min_sens)
             self.beams.append(beam)
 
     def reshape_flat(self, flat_array):
@@ -3054,7 +3095,9 @@ class MultiBeam(GroupFitter):
         
         ### Reset model profile for optimal extractions
         for b in self.beams:
-            b._parse_from_data()
+            #b._parse_from_data()
+            b._parse_from_data(contam_sn_mask=b.contam_sn_mask,
+                                  min_mask=b.min_mask, min_sens=b.min_sens)
         
         self._parse_beam_arrays()
                 
@@ -3091,7 +3134,9 @@ class MultiBeam(GroupFitter):
         
         ### Reset model profile for optimal extractions
         for b in self.beams:
-            b._parse_from_data()
+            #b._parse_from_data()
+            b._parse_from_data(contam_sn_mask=b.contam_sn_mask,
+                                  min_mask=b.min_mask, min_sens=b.min_sens)
             
             # Needed for background modeling
             if hasattr(b, 'xp'):
