@@ -2252,7 +2252,7 @@ def get_panstarrs_catalog_old(ra=0., dec=0., radius=3, columns='objName,objID,ra
     table['dec'] = table['decStack']
     return table[clip]
     
-def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, reference_catalogs = ['GAIA', 'PS1', 'NSC', 'SDSS', 'WISE', 'DES'], **kwargs):
+def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, reference_catalogs = ['GAIA', 'PS1', 'NSC', 'SDSS', 'WISE', 'DES'], use_self_catalog=False, **kwargs):
     """Decide what reference astrometric catalog to use
     
     First search SDSS, then WISE looking for nearby matches.  
@@ -2375,7 +2375,7 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, ref
     #### WISP, check if a catalog already exists for a given rootname and use 
     #### that if so.
     cat_files = glob.glob('-f1'.join(product.split('-f1')[:-1]) + '-f*.cat*')
-    if len(cat_files) > 0:
+    if (len(cat_files) > 0) & (use_self_catalog):
         ref_cat = utils.GTable.gread(cat_files[0])
         root = cat_files[0].split('.cat')[0]
         ref_cat['X_WORLD','Y_WORLD'].write('{0}.radec'.format(root),
@@ -2410,7 +2410,8 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                                drizzle_params = {},
                                iter_atol=1.e-4,
                                imaging_bkg_params=None,
-                             reference_catalogs=['GAIA','PS1','SDSS','WISE']):
+                              reference_catalogs=['GAIA','PS1','SDSS','WISE'],
+                               use_self_catalog=False):
     """Full processing of a direct + grism image visit.
     
     TBD
@@ -2532,7 +2533,8 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                             product=direct['product'],
                             reference_catalogs=reference_catalogs,
                             date=im[0].header['EXPSTART'],
-                            date_format='mjd')
+                            date_format='mjd', 
+                            use_self_catalog=use_self_catalog)
         
             if ref_catalog == 'VISIT':
                 align_mag_limits = [16,23]

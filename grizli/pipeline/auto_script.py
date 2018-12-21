@@ -212,7 +212,7 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
     #####################
     ### Alignment & mosaics    
     os.chdir(os.path.join(HOME_PATH, root, 'Prep'))
-    auto_script.preprocess(field_root=root, HOME_PATH=HOME_PATH, make_combined=False, catalogs=catalogs, master_radec=master_radec, parent_radec=parent_radec, use_visit=True, fix_stars=fix_stars, tweak_max_dist=(5 if is_parallel_field else 1), align_simple=align_simple, align_clip=align_clip, imaging_bkg_params=imaging_bkg_params, align_rms_limit=align_rms_limit, min_overlap=align_min_overlap)
+    auto_script.preprocess(field_root=root, HOME_PATH=HOME_PATH, make_combined=False, catalogs=catalogs, master_radec=master_radec, parent_radec=parent_radec, use_visit=True, fix_stars=fix_stars, tweak_max_dist=(5 if is_parallel_field else 1), align_simple=align_simple, align_clip=align_clip, imaging_bkg_params=imaging_bkg_params, align_rms_limit=align_rms_limit, min_overlap=align_min_overlap, use_self_catalog=is_parallel_field)
         
     # Fine alignment
     if (len(glob.glob('{0}*fine.png'.format(root))) == 0) & (run_fine_alignment) & (len(visits) > 1):
@@ -823,7 +823,7 @@ def clean_prep(field_root='j142724+334246'):
     for flt_file in flt_files:
         utils.fix_flt_nan(flt_file, verbose=True)
          
-def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', min_overlap=0.2, make_combined=True, catalogs=['PS1','DES','NSC','SDSS','GAIA','WISE'], use_visit=True, master_radec=None, parent_radec=None, use_first_radec=False, skip_imaging=False, clean=True, fix_stars=True, tweak_max_dist=1., align_simple=True, align_clip=30, imaging_bkg_params=None, align_rms_limit=2.):
+def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', min_overlap=0.2, make_combined=True, catalogs=['PS1','DES','NSC','SDSS','GAIA','WISE'], use_visit=True, master_radec=None, parent_radec=None, use_first_radec=False, skip_imaging=False, clean=True, fix_stars=True, tweak_max_dist=1., align_simple=True, align_clip=30, imaging_bkg_params=None, align_rms_limit=2., use_self_catalog=False):
     """
     master_radec: force use this radec file
     
@@ -915,7 +915,9 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
                             tweak_max_dist=tweak_max_dist, 
                             align_simple=align_simple, align_clip=align_clip,
                             align_rms_limit=align_rms_limit,
-                            imaging_bkg_params=imaging_bkg_params)
+                            imaging_bkg_params=imaging_bkg_params,
+                            use_self_catalog=use_self_catalog)
+                            
         
         ###################################
         # Persistence Masking
@@ -1609,6 +1611,7 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
     close = True
     Skip = True
     show_beams = True
+    min_sens = 0.08
     
     if __name__ == '__main__': # Interactive
         size=32
@@ -1627,7 +1630,7 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
             if os.path.exists('{0}_{1:05d}.stack.png'.format(target, id)):
                 continue
             
-        beams = grp.get_beams(id, size=size, beam_id='A')
+        beams = grp.get_beams(id, size=size, beam_id='A', min_sens=min_sens)
         for i in range(len(beams))[::-1]:
             if beams[i].fit_mask.sum() < 10:
                 beams.pop(i)
@@ -1636,7 +1639,7 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
         if len(beams) < 1:
             continue
             
-        mb = multifit.MultiBeam(beams, fcontam=0.5, group_name=target, psf=False, MW_EBV=MW_EBV)
+        mb = multifit.MultiBeam(beams, fcontam=0.5, group_name=target, psf=False, MW_EBV=MW_EBV, min_sens=min_sens)
         
         if bad_pa_threshold is not None:
             out = mb.check_for_bad_PAs(chi2_threshold=bad_pa_threshold,
