@@ -2541,7 +2541,7 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
             elif ref_catalog == 'SDSS':
                 align_mag_limits = [16,21]
             elif ref_catalog == 'PS1':
-                align_mag_limits = [16,22]
+                align_mag_limits = [16,24]
             elif ref_catalog == 'WISE':
                 align_mag_limits = [15,20]
         else:
