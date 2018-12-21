@@ -135,7 +135,7 @@ def get_extra_data(root='j114936+222414', HOME_PATH='/Volumes/Pegasus/Grizli/Aut
 
     os.chdir(CWD)
     
-def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', inspect_ramps=False, manual_alignment=False, is_parallel_field=False, reprocess_parallel=False, only_preprocess=False, make_mosaics=True, make_phot=True, run_extractions=True, run_fit=True, s3_sync=False, fine_radec=None, run_fine_alignment=True, combine_all_filters=True, gaia_by_date=False, align_simple=False, align_clip=-1, align_rms_limit=2, align_min_overlap=0.2, master_radec=None, parent_radec=None, fix_stars=True, is_dash=False, run_parse_visits=True, imaging_bkg_params=prep.BKG_PARAMS, reference_wcs_filters=['G800L', 'G102', 'G141'], catalogs=['PS1','DES','NSC', 'SDSS','GAIA','WISE'], mosaic_pixel_scale=None, mosaic_pixfrac=0.6, half_optical_pixscale=False):
+def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', inspect_ramps=False, manual_alignment=False, is_parallel_field=False, reprocess_parallel=False, only_preprocess=False, make_mosaics=True, make_phot=True, run_extractions=True, run_fit=True, s3_sync=False, fine_radec=None, run_fine_alignment=True, combine_all_filters=True, gaia_by_date=False, align_mag_limits=[14,24], align_simple=False, align_clip=-1, align_rms_limit=2, align_min_overlap=0.2, master_radec=None, parent_radec=None, fix_stars=True, is_dash=False, run_parse_visits=True, imaging_bkg_params=prep.BKG_PARAMS, reference_wcs_filters=['G800L', 'G102', 'G141'], catalogs=['PS1','DES','NSC', 'SDSS','GAIA','WISE'], mosaic_pixel_scale=None, mosaic_pixfrac=0.6, half_optical_pixscale=False):
     """
     Run the full pipeline for a given target
         
@@ -212,7 +212,7 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
     #####################
     ### Alignment & mosaics    
     os.chdir(os.path.join(HOME_PATH, root, 'Prep'))
-    auto_script.preprocess(field_root=root, HOME_PATH=HOME_PATH, make_combined=False, catalogs=catalogs, master_radec=master_radec, parent_radec=parent_radec, use_visit=True, fix_stars=fix_stars, tweak_max_dist=(5 if is_parallel_field else 1), align_simple=align_simple, align_clip=align_clip, imaging_bkg_params=imaging_bkg_params, align_rms_limit=align_rms_limit, min_overlap=align_min_overlap, use_self_catalog=is_parallel_field)
+    auto_script.preprocess(field_root=root, HOME_PATH=HOME_PATH, make_combined=False, catalogs=catalogs, master_radec=master_radec, parent_radec=parent_radec, use_visit=True, fix_stars=fix_stars, tweak_max_dist=(5 if is_parallel_field else 1), align_simple=align_simple, align_clip=align_clip, imaging_bkg_params=imaging_bkg_params, align_rms_limit=align_rms_limit, min_overlap=align_min_overlap, use_self_catalog=is_parallel_field, align_mag_limits=align_mag_limits)
         
     # Fine alignment
     if (len(glob.glob('{0}*fine.png'.format(root))) == 0) & (run_fine_alignment) & (len(visits) > 1):
@@ -823,7 +823,7 @@ def clean_prep(field_root='j142724+334246'):
     for flt_file in flt_files:
         utils.fix_flt_nan(flt_file, verbose=True)
          
-def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', min_overlap=0.2, make_combined=True, catalogs=['PS1','DES','NSC','SDSS','GAIA','WISE'], use_visit=True, master_radec=None, parent_radec=None, use_first_radec=False, skip_imaging=False, clean=True, fix_stars=True, tweak_max_dist=1., align_simple=True, align_clip=30, imaging_bkg_params=None, align_rms_limit=2., use_self_catalog=False):
+def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', min_overlap=0.2, make_combined=True, catalogs=['PS1','DES','NSC','SDSS','GAIA','WISE'], use_visit=True, master_radec=None, parent_radec=None, use_first_radec=False, skip_imaging=False, clean=True, fix_stars=True, tweak_max_dist=1., align_simple=True, align_clip=30, imaging_bkg_params=None, align_rms_limit=2., use_self_catalog=False, align_mag_limits=[14,24]):
     """
     master_radec: force use this radec file
     
@@ -908,7 +908,7 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
         # Preprocessing script, background subtraction, etc.
         status = prep.process_direct_grism_visit(direct=direct, grism=grism,
                             radec=radec, skip_direct=False,
-                            align_mag_limits=[14,22],
+                            align_mag_limits=align_mag_limits,
                             reference_catalogs=catalogs, 
                             sky_iter=10, iter_atol=1.e-4, 
                             fix_stars=fix_stars,
@@ -990,7 +990,7 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
                                         grism={}, radec=radec,
                                         skip_direct=False,
                                         run_tweak_align=True,
-                                        align_mag_limits=[14,24],
+                                        align_mag_limits=align_mag_limits,
                                         reference_catalogs=catalogs,
                                         align_tolerance=8,
                                         fix_stars=fix_stars,
@@ -1003,7 +1003,7 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
                                             grism={}, radec=radec,
                                             skip_direct=False,
                                             run_tweak_align=False,
-                                            align_mag_limits=[14,24],
+                                            align_mag_limits=align_mag_limits,
                                             reference_catalogs=catalogs,
                                             align_tolerance=8,
                                             fix_stars=fix_stars,
