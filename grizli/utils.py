@@ -68,7 +68,7 @@ GRISM_LIMITS = {'G800L':[0.545, 1.02, 40.], # ACS/WFC
            'BLUE':[0.8, 1.2, 10.], # Euclid
            'RED':[1.1, 1.9, 14.]}
 
-DEFAULT_LINE_LIST = ['PaB', 'HeI-1083', 'SIII', 'SII', 'Ha', 'OI-6302', 'OIII', 'Hb', 'OIII-4363', 'Hg', 'Hd', 'NeIII-3867', 'OII', 'NeVI-3426', 'NeV-3346', 'MgII','CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'NIII-1750', 'NIV-1487', 'NV-1240', 'Lya']
+DEFAULT_LINE_LIST = ['PaB', 'HeI-1083', 'SIII', 'OII-7325', 'ArIII-7138', 'SII', 'Ha', 'OI-6302', 'HeI-5877', 'OIII', 'Hb', 'OIII-4363', 'Hg', 'Hd', 'H8','H9','NeIII-3867', 'OII', 'NeVI-3426', 'NeV-3346', 'MgII','CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'NIII-1750', 'NIV-1487', 'NV-1240', 'Lya']
 
 def set_warnings(numpy_level='ignore', astropy_level='ignore'):
     """
@@ -1138,7 +1138,16 @@ def get_line_wavelengths():
     line_ratios['OI-6302'] = [1, 0.33]
     line_wavelengths['OI-5578'] = [5578.6]
     line_ratios['OI-5578'] = [1]
-
+    
+    # Auroral OII
+    # lines roughly taken from https://arxiv.org/pdf/1610.06939.pdf 
+    line_wavelengths['OII-7325'] = [7322.0, 7332.]
+    line_ratios['OII-7325'] = [1.2, 1.] 
+    
+    # Weak Ar III in SF galaxies
+    line_wavelengths['ArIII-7138'] = [7138.0]
+    line_ratios['ArIII-7138'] = [1.] 
+    
     line_wavelengths['NeIII-3867'] = [3867.5]
     line_ratios['NeIII-3867'] = [1.]
     line_wavelengths['NeV-3346'] = [3346.8]
@@ -1823,7 +1832,7 @@ def load_quasar_templates(broad_fwhm=2500, narrow_fwhm=1200, broad_lines=    ['H
     t0 = OrderedDict()
     t1 = OrderedDict()
     
-    broad1 = load_templates(fwhm=broad_fwhm, line_complexes=False, stars=False, full_line_list=['Ha', 'Hb', 'Hg', 'Hd'] + broad_lines, continuum_list=[], fsps_templates=False, alf_template=False, lorentz=True)
+    broad1 = load_templates(fwhm=broad_fwhm, line_complexes=False, stars=False, full_line_list=['Ha', 'Hb', 'Hg', 'Hd', 'H8'] + broad_lines, continuum_list=[], fsps_templates=False, alf_template=False, lorentz=True)
 
     narrow1 = load_templates(fwhm=narrow_fwhm, line_complexes=False, stars=False, full_line_list=narrow_lines, continuum_list=[], fsps_templates=False, alf_template=False)
     
