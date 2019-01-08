@@ -27,6 +27,10 @@ IGM_MINZ = 3.4 # blue edge of G800L
 # Default parameters for drizzled line map
 PLINE = {'kernel': 'point', 'pixfrac': 0.2, 'pixscale': 0.1, 'size': 8, 'wcs': None}
 
+# Default arguments for optional bounded least-squares fits
+BOUNDED_DEFAULTS = {'method':'bvls', 'tol':1.e-8, 'verbose':0}
+LINE_BOUNDS = [-1.e-16, 1.e-13] # erg/s/cm2
+
 # IGM from eazy-py
 try:
     import eazy.igm
@@ -70,7 +74,7 @@ def run_all_parallel(id, get_output_data=False, **kwargs):
     
     return id, status, t1-t0
     
-def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter='nnls', group_name='grism', fit_stacks=True, only_stacks=False, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=3, fit_only_beams=False, fit_beams=True, root='*', fit_trace_shift=False, phot=None, phot_obj=None, verbose=True, scale_photometry=False, show_beams=True, scale_on_stacked_1d=True, overlap_threshold=5, MW_EBV=0., sys_err=0.03, get_dict=False, bad_pa_threshold=1.6, units1d='flam', redshift_only=False, line_size=1.6, use_psf=False, get_line_width=False, sed_args={'bin':1, 'xlim':[0.3, 9]}, get_ir_psfs=True, min_mask=0.01, min_sens=0.08, **kwargs):
+def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter='bounded', group_name='grism', fit_stacks=True, only_stacks=False, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=np.inf, fit_only_beams=False, fit_beams=True, root='*', fit_trace_shift=False, phot=None, phot_obj=None, verbose=True, scale_photometry=False, show_beams=True, scale_on_stacked_1d=True, loglam_1d=True, overlap_threshold=5, MW_EBV=0., sys_err=0.03, get_dict=False, bad_pa_threshold=1.6, units1d='flam', redshift_only=False, line_size=1.6, use_psf=False, get_line_width=False, sed_args={'bin':1, 'xlim':[0.3, 9]}, get_ir_psfs=True, min_mask=0.01, min_sens=0.08,  bounded_kwargs=BOUNDED_DEFAULTS, **kwargs):
     """Run the full procedure
     
     1) Load MultiBeam and stack files 
@@ -195,7 +199,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
                     st.pscale = scl.x
     
     # First pass    
-    fit = fit_obj.xfit_redshift(templates=t0, zr=zr, dz=dz, prior=prior, fitter=fitter, verbose=verbose) 
+    fit = fit_obj.xfit_redshift(templates=t0, zr=zr, dz=dz, prior=prior, fitter=fitter, verbose=verbose, bounded_kwargs=bounded_kwargs) 
     fit_hdu = pyfits.table_to_hdu(fit)
     fit_hdu.header['EXTNAME'] = 'ZFIT_STACK'
     
@@ -236,14 +240,14 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
         width = 20*0.001*(1+z0)
         
         mb_zr = z0 + width*np.array([-1,1])
-        mb_fit = mb.xfit_redshift(templates=t0, zr=mb_zr, dz=[0.001, 0.0002], prior=prior, fitter=fitter, verbose=verbose) 
+        mb_fit = mb.xfit_redshift(templates=t0, zr=mb_zr, dz=[0.001, 0.0002], prior=prior, fitter=fitter, verbose=verbose, bounded_kwargs=bounded_kwargs) 
         mb_fit_hdu = pyfits.table_to_hdu(mb_fit)
         mb_fit_hdu.header['EXTNAME'] = 'ZFIT_BEAM'
     else:
         mb_fit = fit
            
     #### Get best-fit template 
-    tfit = mb.template_at_z(z=mb_fit.meta['z_map'][0], templates=t1, fit_background=True, fitter=fitter)
+    tfit = mb.template_at_z(z=mb_fit.meta['z_map'][0], templates=t1, fit_background=True, fitter=fitter, bounded_kwargs=bounded_kwargs)
     
     # Redrizzle? ... testing
     if False:
@@ -314,7 +318,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     tfit_hdu.header['EXTNAME'] = 'TEMPL'
      
     # Make the plot
-    fig = mb.xmake_fit_plot(mb_fit, tfit, show_beams=show_beams, scale_on_stacked_1d=scale_on_stacked_1d)
+    fig = mb.xmake_fit_plot(mb_fit, tfit, show_beams=show_beams, scale_on_stacked_1d=scale_on_stacked_1d, loglam_1d=loglam_1d)
     
     # Add prior
     if prior is not None:
@@ -354,7 +358,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     line_hdu.writeto('{0}_{1:05d}.full.fits'.format(group_name, id), clobber=True, output_verify='fix')
     
     # 1D spectrum
-    oned_hdul = mb.oned_spectrum_to_hdu(tfit=tfit, bin=1, outputfile='{0}_{1:05d}.1D.fits'.format(group_name, id))#, units=units1d)
+    oned_hdul = mb.oned_spectrum_to_hdu(tfit=tfit, bin=1, outputfile='{0}_{1:05d}.1D.fits'.format(group_name, id), loglam=loglam_1d)#, units=units1d)
     
     ######
     # Show the drizzled lines and direct image cutout, which are
@@ -364,7 +368,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     s = 4.e-19/np.max([beam.beam.total_flux for beam in mb.beams]) 
     s = np.clip(s, 0.25, 4)
 
-    full_line_list = ['Lya', 'OII', 'Hb', 'OIII', 'Ha', 'SII', 'SIII']
+    full_line_list = ['Lya', 'OII', 'Hb', 'OIII', 'Ha', 'Ha+NII', 'SII', 'SIII']
     fig = show_drizzled_lines(line_hdu, size_arcsec=si, cmap='plasma_r', scale=s, dscale=s, full_line_list=full_line_list)
     fig.savefig('{0}_{1:05d}.line.png'.format(group_name, id))
     
@@ -930,7 +934,7 @@ def refit_beams(root='j012017+213343', append='x', id=708, keep_dict={'G141':[20
     pfit = mb.template_at_z(z=0, templates=poly_templates, fit_background=True, fitter='lstsq', get_uncertainties=2)
     
     try:
-        fig1 = mb.oned_figure(figsize=[5,3], tfit=pfit)
+        fig1 = mb.oned_figure(figsize=[5,3], tfit=pfit, loglam_1d=loglam_1d)
         fig1.savefig('{0}_{1:05d}.1D.png'.format(root+append, id))
     except:
         pass
@@ -1213,7 +1217,7 @@ class GroupFitter(object):
             
         return A_phot[:,mask]
         
-    def xfit_at_z(self, z=0, templates=[], fitter='nnls', fit_background=True, get_uncertainties=False, get_design_matrix=False, pscale=None, COEFF_SCALE=1.e-19, get_components=False, huber_delta=4, get_residuals=False, include_photometry=True):
+    def xfit_at_z(self, z=0, templates=[], fitter='nnls', fit_background=True, get_uncertainties=False, get_design_matrix=False, pscale=None, COEFF_SCALE=1.e-19, get_components=False, huber_delta=4, get_residuals=False, include_photometry=True, bounded_kwargs=BOUNDED_DEFAULTS):
         """Fit the 2D spectra with a set of templates at a specified redshift.
         
         Parameters
@@ -1226,9 +1230,15 @@ class GroupFitter(object):
         
         fitter : str
             Minimization algorithm to compute template coefficients.
-            The default 'nnls' uses non-negative least squares.  
-            The other option is standard 'leastsq'.
-        
+            
+            Available options are:
+              'nnls'   - Non-negative least squares (`~scipy.optimize.nnls`)
+              'lstsq'  - Standard least squares (`~numpy.linalg.lstsq`)
+              'bounded' - Bounded least squares (`~scipy.optimize.lsq_linear`)
+            
+            For the last option, the line flux limits are set by `LINE_BOUNDS`
+            and `bounded_kwargs` are passed to `~scipy.optimize.lsq_linear`.
+            
         fit_background : bool
             Fit additive pedestal background offset.
             
@@ -1268,8 +1278,10 @@ class GroupFitter(object):
             A[:self.N,:self.Nspec] = self.A_bgm
         
         lower_bound = np.zeros(self.N+NTEMP)
-        lower_bound[:self.N] = -0.05
         upper_bound = np.ones(self.N+NTEMP)*np.inf
+        
+        # Background limits
+        lower_bound[:self.N] = -0.05
         upper_bound[:self.N] = 0.05
         
         # A = scipy.sparse.csr_matrix((self.N+NTEMP, self.Ntot))
@@ -1277,7 +1289,8 @@ class GroupFitter(object):
                 
         for i, t in enumerate(templates):
             if t.startswith('line'):
-                lower_bound[self.N+i] = -np.inf
+                lower_bound[self.N+i] = LINE_BOUNDS[0]/COEFF_SCALE
+                upper_bound[self.N+i] = LINE_BOUNDS[1]/COEFF_SCALE
                 
             ti = templates[t]
             if z > IGM_MINZ:
@@ -1375,10 +1388,13 @@ class GroupFitter(object):
         if fitter == 'nnls':
             coeffs_i, rnorm = scipy.optimize.nnls(AxT, data)            
         elif fitter == 'lstsq':
-            coeffs_i, residuals, rank, s = np.linalg.lstsq(AxT, data, rcond=None)
+            coeffs_i, residuals, rank, s = np.linalg.lstsq(AxT, data,
+                                                           rcond=None)
         else:
             # Bounded Least Squares
-            lsq_out = scipy.optimize.lsq_linear(AxT, data, bounds=(lower_bound[oktemp], upper_bound[oktemp]), method='bvls', tol=1.e-8)
+            func = scipy.optimize.lsq_linear
+            bounds = (lower_bound[oktemp], upper_bound[oktemp])
+            lsq_out = func(AxT, data, bounds=bounds, **bounded_kwargs)
             coeffs_i = lsq_out.x
         
         if False:
@@ -1475,9 +1491,11 @@ class GroupFitter(object):
                      make_figure=True, zr=[0.65, 1.6], dz=[0.005, 0.0004],
                      verbose=True, fit_background=True, fitter='nnls', 
                      delta_chi2_threshold=0.004, poly_order=3, zoom=True, 
-                     line_complexes=True, templates={}, figsize=[8,5],
+                     line_complexes=True, templates={}, 
+                     figsize=[8,5],
                      fsps_templates=False, get_uncertainties=True,
-                     Rspline=30, huber_delta=4, get_student_logpdf=False):
+                     Rspline=30, huber_delta=4, get_student_logpdf=False,
+                     bounded_kwargs=BOUNDED_DEFAULTS):
         """TBD
         """
         from scipy import polyfit, polyval
@@ -1542,7 +1560,7 @@ class GroupFitter(object):
         else:
             if verbose:
                 print('User templates! N={0} \n'.format(len(templates)))
-            
+        
         NTEMP = len(templates)
         
         out = self.xfit_at_z(z=0., templates=templates, fitter=fitter,
@@ -1563,7 +1581,8 @@ class GroupFitter(object):
             out = self.xfit_at_z(z=zgrid[i], templates=templates,
                                 fitter=fitter, fit_background=fit_background,
                                 get_uncertainties=get_uncertainties, 
-                                get_residuals=True)
+                                get_residuals=True, 
+                                bounded_kwargs=bounded_kwargs)
             
             fit_resid, coeffs[i,:], coeffs_err, covar[i,:,:] = out
 
@@ -1636,7 +1655,8 @@ class GroupFitter(object):
                                     fitter=fitter,
                                     fit_background=fit_background,
                                     get_uncertainties=get_uncertainties,
-                                    get_residuals=True)
+                                    get_residuals=True,
+                                    bounded_kwargs=bounded_kwargs)
 
                 fit_resid, coeffs_zoom[i,:], e, covar_zoom[i,:,:] = out
                 if huber_delta > 0:
@@ -1820,17 +1840,17 @@ class GroupFitter(object):
         fit.meta['gam_loss'] = gamma, 'Gamma factor of the risk/loss function'
         return fit
                         
-    def template_at_z(self, z=0, templates=None, fit_background=True, fitter='nnls', fwhm=1400, get_uncertainties=2, get_residuals=False, include_photometry=True, draws=0):
+    def template_at_z(self, z=0, templates=None, fwhm=1400, get_uncertainties=2, draws=0, **kwargs):
         """TBD
         """
         if templates is None:
             templates = utils.load_templates(line_complexes=False, fsps_templates=True, fwhm=fwhm)
         
-        out = self.xfit_at_z(z=z, templates=templates, fitter=fitter, 
-                             fit_background=fit_background,
-                             get_uncertainties=get_uncertainties,
-                             get_residuals=get_residuals,
-                             include_photometry=include_photometry)
+        kwargs['z'] = z
+        kwargs['templates'] = templates
+        kwargs['get_uncertainties'] = 2
+                        
+        out = self.xfit_at_z(**kwargs)
 
         chi2, coeffs, coeffs_err, covar = out
         cont1d, line1d = utils.dot_templates(coeffs[self.N:], templates, z=z,
@@ -1911,7 +1931,7 @@ class GroupFitter(object):
             plt.plot(w[xclip]*(1+z), tdraw.T, alpha=0.05, color='r')
     
     def xmake_fit_plot(self, fit, tfit, show_beams=True, bin=1, minor=0.1,
-                       scale_on_stacked_1d=True):
+                       scale_on_stacked_1d=True, loglam_1d=True):
         """TBD
         """
         import matplotlib.pyplot as plt
@@ -1949,7 +1969,7 @@ class GroupFitter(object):
         #### Spectra
         axc = fig.add_subplot(gs[-1,1]) #224)
         
-        self.oned_figure(bin=bin, show_beams=show_beams, minor=minor, tfit=tfit, axc=axc, scale_on_stacked=scale_on_stacked_1d)
+        self.oned_figure(bin=bin, show_beams=show_beams, minor=minor, tfit=tfit, axc=axc, scale_on_stacked=scale_on_stacked_1d, loglam_1d=loglam_1d)
         
         gs.tight_layout(fig, pad=0.1, w_pad=0.1)
         return fig
@@ -2039,7 +2059,7 @@ class GroupFitter(object):
             tfit = self.template_at_z(z=0, templates=tspline, include_photometry=False, fit_background=fit_background, draws=1000)
         
         if use_fit:
-            oned = self.oned_spectrum(tfit=tfit)
+            oned = self.oned_spectrum(tfit=tfit, loglam=False)
             wmi = np.min([oned[k]['wave'].min() for k in oned])
             wma = np.max([oned[k]['wave'].max() for k in oned])
             
@@ -2047,7 +2067,7 @@ class GroupFitter(object):
             spl_temp = utils.SpectrumTemplate(wave=tfit['line1d'].wave[clip], flux=tfit['line1d'].flux[clip], err=tfit['line1d_err'][clip])
             args = (self, {'spl':spl_temp})
         else:
-            oned = self.oned_spectrum(tfit=tfit)
+            oned = self.oned_spectrum(tfit=tfit, loglam=False)
             args = (self, oned)
             
         if init is None:
@@ -2422,7 +2442,7 @@ class GroupFitter(object):
         # 
         #     return fig, sfit
     
-    def oned_figure(self, bin=1, show_beams=True, minor=0.1, tfit=None, axc=None, figsize=[6,4], fill=False, units='flam', min_sens_show=0.1, ylim_percentile=2, scale_on_stacked=False, show_individual_templates=False, apply_beam_mask=True):
+    def oned_figure(self, bin=1, show_beams=True, minor=0.1, tfit=None, axc=None, figsize=[6,4], fill=False, units='flam', min_sens_show=0.1, ylim_percentile=2, scale_on_stacked=False, show_individual_templates=False, apply_beam_mask=True, loglam_1d=True):
         """
         1D figure
         1D figure
@@ -2646,23 +2666,23 @@ class GroupFitter(object):
             ymax = -1.e30
         
         if self.Nphot > 0:
-            sp_flat = self.optimal_extract(self.flat_flam[self.fit_mask[:-self.Nphotbands]], bin=bin)
+            sp_flat = self.optimal_extract(self.flat_flam[self.fit_mask[:-self.Nphotbands]], bin=bin, loglam=loglam_1d)
         else:
-            sp_flat = self.optimal_extract(self.flat_flam[self.fit_mask], bin=bin)
+            sp_flat = self.optimal_extract(self.flat_flam[self.fit_mask], bin=bin, loglam=loglam_1d)
         
         if tfit is not None:
             bg_model = self.get_flat_background(tfit['coeffs'], apply_mask=True)
             m2d = self.get_flat_model(sp, apply_mask=True, is_cgs=True)
-            sp_model = self.optimal_extract(m2d, bin=bin)
+            sp_model = self.optimal_extract(m2d, bin=bin, loglam=loglam_1d)
         else:
             bg_model = 0.
             sp_model = 1.
         
         if mspl is not None:
             m2d = self.get_flat_model(mspl, apply_mask=True, is_cgs=True)
-            sp_spline = self.optimal_extract(m2d, bin=bin)
+            sp_spline = self.optimal_extract(m2d, bin=bin, loglam=loglam_1d)
             
-        sp_data = self.optimal_extract(self.scif_mask[:self.Nspec]-bg_model, bin=bin)
+        sp_data = self.optimal_extract(self.scif_mask[:self.Nspec]-bg_model, bin=bin, loglam=loglam_1d)
 
         for g in sp_data:
 
@@ -2764,9 +2784,53 @@ class GroupFitter(object):
     ### 
     ### Generic functions for generating flat model and background arrays
     ###
-    def optimal_extract(self, data=None, bin=1, wave=None, ivar=None, trace_limits=None):
+    def optimal_extract(self, data=None, bin=1, wave=None, ivar=None, trace_limits=None, loglam=True):
         """
-        TBD: split by grism
+        Binned optimal extractions by grism.
+        
+        TBD
+        
+        Parameters
+        ----------
+        data : `~numpy.ndarray`, None
+            Data array with same dimensions as `self.scif_mask` 
+            (flattened & masked) 2D spectra of all beams.  If `None`, then
+            use `self.scif_mask`.
+        
+        bin : bool
+            Binning factor relative to the grism-dependent resolution values, 
+            specified in `~grizli.utils.GRISM_LIMITS`.
+        
+        wave : `~numpy.ndarray`, None
+            Wavelength array.  If `None`, then compute from parameters in 
+            `~grizli.utils.GRISM_LIMITS`.
+            
+        ivar : `~numpy.ndarray`, None
+            Inverse variance array with same dimensions as `self.scif_mask` 
+            (flattened & masked) 2D spectra of all beams.  If `None`, then
+            use `self.weighted_sigma2_mask`.
+                
+        trace_limits : [float, float] or None
+            If specified, perform a simple sum in cross-dispersion axis
+            between `trace_limits` relative to the central pixel of the trace
+            rather than the optimally-weighted sum. Similarly, the output
+            variances are the sum of the input variances in the trace
+            interval.
+            
+            Note that the trace interval is evaluated with `< >`, as opposed
+            to `<= >=`, as the center of the trace is a float rather than an
+            integer pixel index.
+        
+        loglam : bool
+            If True and `wave` not specified (see above), then output 
+            wavelength grid is log-spaced.
+        
+        Returns
+        -------
+        tab : dict
+            Dictionary of `~astropy.table.Table` spectra for each available 
+            grism.
+            
         """
         import astropy.units as u
         
@@ -2801,7 +2865,11 @@ class GroupFitter(object):
         for grism in self.Ngrism:
             lim = utils.GRISM_LIMITS[grism]
             if wave is None:
-                wave_bin = np.arange(lim[0]*1.e4, lim[1]*1.e4, lim[2]*bin)
+                if loglam:
+                    ran = np.array(lim[:2])*1.e4
+                    wave_bin = utils.log_zgrid(ran, lim[2]*bin/np.mean(ran))
+                else:
+                    wave_bin = np.arange(lim[0]*1.e4, lim[1]*1.e4, lim[2]*bin)
             else:
                 wave_bin = wave
                 
@@ -3044,7 +3112,7 @@ class GroupFitter(object):
         res = [out.x[0], out.x[1], out.x[2], out.nfev, out.nfev == max_nfev]
         return res
     
-def show_drizzled_lines(line_hdu, full_line_list=['OII', 'Hb', 'OIII', 'Ha', 'SII', 'SIII'], size_arcsec=2, cmap='cubehelix_r', scale=1., dscale=1, direct_filter=['F140W','F160W','F125W','F105W','F110W','F098M']):
+def show_drizzled_lines(line_hdu, full_line_list=['OII', 'Hb', 'OIII', 'Ha+NII', 'Ha', 'SII', 'SIII'], size_arcsec=2, cmap='cubehelix_r', scale=1., dscale=1, direct_filter=['F140W','F160W','F125W','F105W','F110W','F098M']):
     """TBD
     
     `direct_filter` : list
@@ -3065,6 +3133,20 @@ def show_drizzled_lines(line_hdu, full_line_list=['OII', 'Hb', 'OIII', 'Ha', 'SI
         
     #print(line_hdu[0].header['HASLINES'], show_lines)
     
+    # Dimensions
+    pix_size = np.abs(line_hdu['DSCI'].header['CD1_1']*3600)
+    majorLocator = MultipleLocator(1.)#/pix_size)
+    N = line_hdu['DSCI'].data.shape[0]/2
+
+    crp = line_hdu['DSCI'].header['CRPIX1'], line_hdu['DSCI'].header['CRPIX2']
+    crv = line_hdu['DSCI'].header['CRVAL1'], line_hdu['DSCI'].header['CRVAL2']
+    imsize_arcsec = line_hdu['DSCI'].data.shape[0]*pix_size
+    # Assume square
+    sh = line_hdu['DSCI'].data.shape 
+    dp = -0.5*pix_size # FITS reference is center of a pixel, array is edge
+    extent = (-imsize_arcsec/2.-dp, imsize_arcsec/2.-dp, 
+              -imsize_arcsec/2.-dp, imsize_arcsec/2.-dp)
+              
     NL = len(show_lines)
     
     fig = plt.figure(figsize=[3*(NL+1),3.4])
@@ -3079,7 +3161,8 @@ def show_drizzled_lines(line_hdu, full_line_list=['OII', 'Hb', 'OIII', 'Ha', 'SI
             dext = 'DSCI',filt
             break
             
-    ax.imshow(line_hdu[dext].data*dscale, vmin=-0.02, vmax=0.6, cmap=cmap, origin='lower')
+    ax.imshow(line_hdu[dext].data*dscale, vmin=-0.02, vmax=0.6, cmap=cmap, origin='lower', extent=extent)
+    
     ax.set_title('Direct   {0}    z={1:.3f}'.format(line_hdu[0].header['ID'], line_hdu[0].header['REDSHIFT']))
     
     if 'FILTER' in line_hdu[dext].header:
@@ -3088,29 +3171,26 @@ def show_drizzled_lines(line_hdu, full_line_list=['OII', 'Hb', 'OIII', 'Ha', 'SI
         
     ax.set_xlabel('RA'); ax.set_ylabel('Decl.')
 
-    # 1" ticks
-    pix_size = np.abs(line_hdu['DSCI'].header['CD1_1']*3600)
-    majorLocator = MultipleLocator(1./pix_size)
-    N = line_hdu['DSCI'].data.shape[0]/2
-    ax.errorbar([N-0.5/pix_size], N-0.9*size_arcsec/pix_size, yerr=0, xerr=0.5/pix_size, color='k')
-    ax.text(N-0.5/pix_size, N-0.9*size_arcsec/pix_size, r'$1^{\prime\prime}$', ha='center', va='bottom', color='k')
+    # 1" ticks    
+    ax.errorbar(-0.5, -0.9*size_arcsec, yerr=0, xerr=0.5, color='k')
+    ax.text(-0.5, -0.9*size_arcsec, r'$1^{\prime\prime}$', ha='center', va='bottom', color='k')
 
     # Line maps
     for i, line in enumerate(show_lines):
         ax = fig.add_subplot(1,NL+1,2+i)
-        ax.imshow(line_hdu['LINE',line].data*scale, vmin=-0.02, vmax=0.6, cmap=cmap, origin='lower')
+        ax.imshow(line_hdu['LINE',line].data*scale, vmin=-0.02, vmax=0.6, cmap=cmap, origin='lower', extent=extent)
         ax.set_title(r'%s %.3f $\mu$m' %(line, line_hdu['LINE', line].header['WAVELEN']/1.e4))
 
     # End things
     for ax in fig.axes:
         ax.set_yticklabels([]); ax.set_xticklabels([])
-        ax.set_xlim(N+np.array([-1,1])*size_arcsec/pix_size)
-        ax.set_ylim(N+np.array([-1,1])*size_arcsec/pix_size)
+        ax.set_xlim(np.array([-1,1])*size_arcsec)
+        ax.set_ylim(np.array([-1,1])*size_arcsec)
         
-        x0 = np.mean(ax.get_xlim())
-        y0 = np.mean(ax.get_xlim())
-        ax.scatter(N, N, marker='+', color='k', zorder=100, alpha=0.5)
-        ax.scatter(N, N, marker='+', color='w', zorder=101, alpha=0.5)
+        #x0 = np.mean(ax.get_xlim())
+        #y0 = np.mean(ax.get_xlim())
+        ax.scatter(0, 0, marker='+', color='k', zorder=100, alpha=0.5)
+        ax.scatter(0, 0, marker='+', color='w', zorder=101, alpha=0.5)
         
         ax.xaxis.set_major_locator(majorLocator)
         ax.yaxis.set_major_locator(majorLocator)

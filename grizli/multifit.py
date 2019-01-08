@@ -2646,7 +2646,7 @@ class MultiBeam(GroupFitter):
 
         return drizzled_segm
         
-    def drizzle_fit_lines(self, fit, pline, force_line=['Ha', 'OIII', 'Hb', 'OII'], save_fits=True, mask_lines=True, mask_sn_limit=3, mask_4959=True, verbose=True, include_segmentation=True, get_ir_psfs=True):
+    def drizzle_fit_lines(self, fit, pline, force_line=['Ha+NII', 'Ha', 'OIII', 'Hb', 'OII'], save_fits=True, mask_lines=True, mask_sn_limit=3, mask_4959=True, verbose=True, include_segmentation=True, get_ir_psfs=True):
         """
         TBD
         """
@@ -2752,7 +2752,7 @@ class MultiBeam(GroupFitter):
                             key = lkey.replace('line ', '')
                             lf, le = line_flux_dict[key]
                             ### Don't mask if the line missing or undetected
-                            if (lf == 0):# | (lf < mask_sn_limit*le):
+                            if (lf <= 0):# | (lf < mask_sn_limit*le):
                                 continue
                                 
                             if key != line:
@@ -2907,7 +2907,8 @@ class MultiBeam(GroupFitter):
         return hdu_full
         
     def run_full_diagnostics(self, pzfit={}, pspec2={}, pline={}, 
-                      force_line=['Ha', 'OIII', 'Hb', 'OII'], GroupFLT=None,
+                      force_line=['Ha+NII', 'Ha', 'OIII', 'Hb', 'OII'],
+                      GroupFLT=None,
                       prior=None, zoom=True, verbose=True):
         """TBD
         

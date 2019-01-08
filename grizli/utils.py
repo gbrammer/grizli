@@ -68,7 +68,8 @@ GRISM_LIMITS = {'G800L':[0.545, 1.02, 40.], # ACS/WFC
            'BLUE':[0.8, 1.2, 10.], # Euclid
            'RED':[1.1, 1.9, 14.]}
 
-DEFAULT_LINE_LIST = ['PaB', 'HeI-1083', 'SIII', 'OII-7325', 'ArIII-7138', 'SII', 'Ha', 'OI-6302', 'HeI-5877', 'OIII', 'Hb', 'OIII-4363', 'Hg', 'Hd', 'H8','H9','NeIII-3867', 'OII', 'NeVI-3426', 'NeV-3346', 'MgII','CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'NIII-1750', 'NIV-1487', 'NV-1240', 'Lya']
+#DEFAULT_LINE_LIST = ['PaB', 'HeI-1083', 'SIII', 'OII-7325', 'ArIII-7138', 'SII', 'Ha', 'OI-6302', 'HeI-5877', 'OIII', 'Hb', 'OIII-4363', 'Hg', 'Hd', 'H8','H9','NeIII-3867', 'OII', 'NeVI-3426', 'NeV-3346', 'MgII','CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'NIII-1750', 'NIV-1487', 'NV-1240', 'Lya']
+DEFAULT_LINE_LIST = ['PaB', 'HeI-1083', 'SIII', 'OII-7325', 'ArIII-7138', 'SII', 'Ha+NII', 'OI-6302', 'HeI-5877', 'OIII', 'Hb', 'OIII-4363', 'Hg', 'Hd', 'H8','H9','NeIII-3867', 'OII', 'NeVI-3426', 'NeV-3346', 'MgII','CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'NIII-1750', 'NIV-1487', 'NV-1240', 'Lya']
 
 def set_warnings(numpy_level='ignore', astropy_level='ignore'):
     """
@@ -1082,8 +1083,12 @@ def get_line_wavelengths():
     """
     line_wavelengths = OrderedDict() ; line_ratios = OrderedDict()
     
-    line_wavelengths['PaB'] = [12821]
+    # Paschen: https://www.gemini.edu/sciops/instruments/nearir-resources/astronomical-lines/h-lines
+    line_wavelengths['PaB'] = [12821.6]
     line_ratios['PaB'] = [1.]
+    line_wavelengths['PaG'] = [10941.1]
+    line_ratios['PaG'] = [1.]
+    
     line_wavelengths['Ha'] = [6564.61]
     line_ratios['Ha'] = [1.]
     line_wavelengths['Hb'] = [4862.71]
@@ -1214,6 +1219,9 @@ def get_line_wavelengths():
     line_wavelengths['Lya+CIV'] = [1215.4, 1549.49]
     line_ratios['Lya+CIV'] = [1., 0.1]
     
+    line_wavelengths['Gal-UV-lines'] = [line_wavelengths[k][0] for k in ['Lya','CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'SiIV+OIV-1398', 'NV-1240', 'MgII']]
+    line_ratios['Gal-UV-lines'] = [1., 0.2, 0.1, 0.008, 0.09, 0.1, 0.3, 0.3]
+    
     line_wavelengths['Ha+SII'] = [6564.61, 6718.29, 6732.67]
     line_ratios['Ha+SII'] = [1., 1./10, 1./10]
     
@@ -1225,9 +1233,20 @@ def get_line_wavelengths():
     
     line_wavelengths['Ha+NII+SII+SIII+He+PaB'] = [6564.61, 6549.86, 6585.27, 6718.29, 6732.67, 9068.6, 9530.6, 10830., 12821]
     line_ratios['Ha+NII+SII+SIII+He+PaB'] = [1., 1./(4.*4), 3./(4*4), 1./10, 1./10, 1./20, 2.44/20, 1./25., 1./10]
+
+    line_wavelengths['Ha+NII'] = [6564.61, 6549.86, 6585.27]
+    n2ha = 1./4 # log NII/Ha ~ -0.6, Kewley 2013
+    line_ratios['Ha+NII'] = [1., 1./4.*n2ha, 3/4.*n2ha]
     
     line_wavelengths['OIII+Hb'] = [5008.240, 4960.295, 4862.68]
     line_ratios['OIII+Hb'] = [2.98, 1, 3.98/6.]
+
+    # Include more balmer lines
+    o3hb = 1./6
+    line_wavelengths['OIII+Hb+Hg+Hd'] = line_wavelengths['OIII'] + line_wavelengths['Balmer 10kK'][1:] 
+    line_ratios['OIII+Hb+Hg+Hd'] = line_ratios['OIII'] + line_ratios['Balmer 10kK'][1:] 
+    for i in range(2, len(line_ratios['Balmer 10kK'])-1):
+        line_ratios['OIII+Hb+Hg+Hd'][i] *= 3.98*o3hb
     
     line_wavelengths['OIII+Hb+Ha'] = [5008.240, 4960.295, 4862.68, 6564.61]
     line_ratios['OIII+Hb+Ha'] = [2.98, 1, 3.98/10., 3.98/10.*2.86]
@@ -1786,7 +1805,10 @@ def load_templates(fwhm=400, line_complexes=True, stars=False,
     if line_complexes:
         #line_list = ['Ha+SII', 'OIII+Hb+Ha', 'OII']
         #line_list = ['Ha+SII', 'OIII+Hb', 'OII']
-        line_list = ['Ha+NII+SII+SIII+He+PaB', 'OIII+Hb', 'OII+Ne', 'Lya+CIV']
+        #line_list = ['Ha+NII+SII+SIII+He+PaB', 'OIII+Hb', 'OII+Ne', 'Lya+CIV']
+        #line_list = ['Ha+NII+SII+SIII+He+PaB', 'OIII+Hb+Hg+Hd', 'OII+Ne', 'Lya+CIV']
+        line_list = ['Ha+NII+SII+SIII+He+PaB', 'OIII+Hb+Hg+Hd', 'OII+Ne', 'Gal-UV-lines']
+
     else:
         if full_line_list is None:
             line_list = DEFAULT_LINE_LIST

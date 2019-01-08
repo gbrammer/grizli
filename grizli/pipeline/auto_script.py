@@ -1738,7 +1738,7 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
     else:
         return True
         
-def generate_fit_params(field_root='j142724+334246', prior=None, MW_EBV=0.00, pline=DITHERED_PLINE, fit_only_beams=True, run_fit=True, poly_order=7, fsps=True, sys_err = 0.03, fcontam=0.2, zr=[0.1, 3.4], save_file='fit_args.npy'):
+def generate_fit_params(field_root='j142724+334246', prior=None, MW_EBV=0.00, pline=DITHERED_PLINE, fit_only_beams=True, run_fit=True, poly_order=7, fsps=True, sys_err = 0.03, fcontam=0.2, zr=[0.1, 3.4], fwhm=1000, lorentz=False, save_file='fit_args.npy'):
     """
     Generate a parameter dictionary for passing to the fitting script
     """
@@ -1746,8 +1746,8 @@ def generate_fit_params(field_root='j142724+334246', prior=None, MW_EBV=0.00, pl
     from grizli import utils, fitting
     phot = None
     
-    t0 = utils.load_templates(fwhm=1000, line_complexes=True, stars=False, full_line_list=None, continuum_list=None, fsps_templates=fsps, alf_template=True)
-    t1 = utils.load_templates(fwhm=1000, line_complexes=False, stars=False, full_line_list=None, continuum_list=None, fsps_templates=fsps, alf_template=True)
+    t0 = utils.load_templates(fwhm=fwhm, line_complexes=True, stars=False, full_line_list=None, continuum_list=None, fsps_templates=fsps, alf_template=True, lorentz=lorentz)
+    t1 = utils.load_templates(fwhm=fwhm, line_complexes=False, stars=False, full_line_list=None, continuum_list=None, fsps_templates=fsps, alf_template=True, lorentz=lorentz)
 
     args = fitting.run_all(0, t0=t0, t1=t1, fwhm=1200, zr=zr, dz=[0.004, 0.0005], fitter='nnls', group_name=field_root, fit_stacks=False, prior=prior,  fcontam=fcontam, pline=pline, mask_sn_limit=10, fit_beams=False,  root=field_root, fit_trace_shift=False, phot=phot, verbose=True, scale_photometry=False, show_beams=True, overlap_threshold=10, get_ir_psfs=True, fit_only_beams=fit_only_beams, MW_EBV=MW_EBV, sys_err=sys_err, get_dict=True)
     
