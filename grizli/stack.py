@@ -1328,11 +1328,11 @@ class StackedSpectrum(object):
         m[m < 0] = 0
         self.optimal_profile = m/m.sum(axis=0)
                
-    def optimal_extract(self, data, bin=0, ivar=None, weight=None):
+    def optimal_extract(self, data, bin=0, ivar=None, weight=None, loglam=False):
         """
         Optimally-weighted 1D extraction
         
-        xx Dummy parameters ivar & weight
+        xx Dummy parameters ivar, weight, loglam
         """
         import scipy.ndimage as nd
         
