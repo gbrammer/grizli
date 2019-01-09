@@ -1021,6 +1021,8 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
     except:
         wcs = None
         wcs_header = drz_im[0].header.copy()
+        pixel_scale = np.sqrt(wcs_header['CD1_1']**2+wcs_header['CD1_2']**2)
+        pixel_scale *= 3600.
         
     if isinstance(phot_apertures, str):
         apertures = np.cast[float](phot_apertures.replace(',','').split())
@@ -1048,10 +1050,30 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
     data_mask = np.cast[data.dtype](mask)
     
     if get_background | (err_scale < 0):
-        if bkg_mask is not None:
-            bkg = sep.Background(data, mask=mask | bkg_mask, **bkg_params)
+                    
+        # Account for pixel scale in bkg_params
+        bkg_input = {}
+        if 'pixel_scale' in bkg_params:
+            bkg_pscale = bkg_params['pixel_scale']
         else:
-            bkg = sep.Background(data, mask=mask, **bkg_params)
+            bkg_pscale = pixel_scale
+        
+        for k in bkg_params:
+            if k in ['pixel_scale']:
+                continue
+            
+            if k in ['bw','bh']:
+                bkg_input[k] = bkg_params[k]*bkg_pscale/pixel_scale
+            else:
+                bkg_input[k] = bkg_params[k]
+
+        if verbose:
+            print('SEP: Get background {0}'.format(bkg_input))
+                
+        if bkg_mask is not None:
+            bkg = sep.Background(data, mask=mask | bkg_mask, **bkg_input)
+        else:
+            bkg = sep.Background(data, mask=mask, **bkg_input)
             
         bkg_data = bkg.back()
         if bkg_only:
@@ -1506,7 +1528,7 @@ def make_drz_catalog(root='', sexpath='sex',threshold=2., get_background=True,
     return cat
     
 def blot_background(visit={'product': '', 'files':None}, 
-                    bkg_params={'bw':64, 'bh':64, 'fw':3, 'fh':3}, 
+                    bkg_params={'bw':64, 'bh':64, 'fw':3, 'fh':3, 'pixel_scale':0.06}, 
                     verbose=True, skip_existing=True, get_median=False):
     """
     Blot SEP background of drizzled image back to component FLTs
@@ -2391,7 +2413,7 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, ref
     return radec, ref_catalog
 
 # Visit-level ackground subtraction parameters for blot_background
-BKG_PARAMS = {'bw': 128, 'bh': 128, 'fw': 3, 'fh': 3}
+BKG_PARAMS = {'bw': 128, 'bh': 128, 'fw': 3, 'fh': 3, 'pixel_scale':0.06}
     
 def process_direct_grism_visit(direct={}, grism={}, radec=None,
                                align_tolerance=5, align_clip=30,

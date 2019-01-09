@@ -1091,7 +1091,7 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
     #             
     # prep.drizzle_overlaps(keep, parse_visits=False, pixfrac=0.6, scale=0.06, skysub=False, bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False)
 
-def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_background=True, photometry_background=True, get_all_filters=False, det_err_scale=-np.inf, run_detection=True, detection_params=prep.SEP_DETECT_PARAMS,  phot_apertures=prep.SEXTRACTOR_PHOT_APERTURES_ARCSEC, master_catalog=None, bkg_mask=None, bkg_params={'bw':32, 'bh':32, 'fw':3, 'fh':3}):
+def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_background=True, photometry_background=True, get_all_filters=False, det_err_scale=-np.inf, run_detection=True, detection_params=prep.SEP_DETECT_PARAMS,  phot_apertures=prep.SEXTRACTOR_PHOT_APERTURES_ARCSEC, master_catalog=None, bkg_mask=None, bkg_params={'bw':32, 'bh':32, 'fw':3, 'fh':3, 'pixel_scale':0.06}):
     """
     Make a detection catalog with SExtractor and then measure
     photometry with `~photutils`.
@@ -2699,6 +2699,7 @@ def field_rgb(root='j010514+021532', xsize=6, HOME_PATH='./', show_ir=True, pl=1
     if HOME_PATH is not None:    
         phot_file = '{0}/{1}/Prep/{1}_phot.fits'.format(HOME_PATH, root)
         if not os.path.exists(phot_file):
+            print('Photometry file {0} not found.'.format(phot_file))
             return False
     
         phot = utils.GTable.gread(phot_file)
@@ -3160,7 +3161,10 @@ def field_psf(root='j020924-044344', HOME_PATH='/Volumes/Pegasus/Grizli/Automati
         filter = file.split(root+'-')[1].split('_')[0]
         if filter.upper() not in psf_filters:
             continue
-            
+        
+        if os.path.exists('{0}-{1}_psf.fits'.format(root, filter)):
+            continue
+                
         flt_files = info['FILE'][info['FILTER'] == filter.upper()]
         
         GP = gpsf.DrizzlePSF(flt_files=list(flt_files), info=None, driz_image=drz_file)
