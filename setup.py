@@ -79,6 +79,6 @@ setup(
         'Topic :: Scientific/Engineering :: Astronomy',
     ],
     ext_modules = extensions,
-    package_data={'grizli': ['data/*', 'data/templates/*', 'data/templates/stars/*', 'data/templates/fsps/*']},
+    package_data={'grizli': ['data/*', 'data/*fits.gz', 'data/templates/*', 'data/templates/stars/*', 'data/templates/fsps/*']},
     # scripts=['grizli/scripts/flt_info.sh'],
 )
