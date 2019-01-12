@@ -224,7 +224,14 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
             orig_file['DQ'].data |= bp[0].data
         
         extra_msg += ' / bpix: $iref/badpix_spars200_Nov9.fits'
-    
+        
+        # New flags based on darks
+        new_bp = pyfits.open(os.path.join(os.path.dirname(__file__), 'data', 
+                                    'wfc3ir_dark_badpix_2019.01.12.fits.gz'))
+        if orig_file['DQ'].data.shape == new_bp[0].data.shape:
+            orig_file['DQ'].data |= new_bp[0].data
+            extra_msg += ' / wfc3ir_dark_badpix_2019.01.12.fits'
+        
     if crclean:
         import lacosmicx
         for ext in [1,2]:
