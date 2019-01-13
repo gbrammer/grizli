@@ -14,7 +14,17 @@ if False:
 #ONLY_F814W = True
 ONLY_F814W = False
 
-VALID_FILTERS = ['F098M', 'F105W', 'F110W', 'F125W', 'F127M', 'F139M', 'F140W', 'F153M', 'F160W', 'F410M', 'F435W', 'F438W', 'F439W', 'F450W', 'F467M', 'F475W', 'F475X', 'F547M', 'F550M', 'F555W', 'F569W', 'F600LP', 'F606W', 'F621M', 'F622W', 'F625W', 'F675W', 'F689M', 'F702W', 'F763M', 'F775W', 'F791W', 'F814W', 'F845M', 'F850LP','G800L','G141','G102','G280']
+IR_M_FILTERS = ['F098M', 'F127M', 'F139M', 'F153M']
+IR_W_FILTERS = ['F105W', 'F110W', 'F125W', 'F140W', 'F160W']
+IR_GRISMS = ['G102', 'G141']
+
+OPT_M_FILTERS = ['F410M', 'F467M', 'F547M', 'F550M', 'F621M', 'F689M', 'F763M', 'F845M']
+OPT_W_FILTERS = ['F435W', 'F438W', 'F439W', 'F450W', 'F475W', 'F475X', 'F555W', 'F569W', 'F600LP', 'F606W', 'F622W', 'F625W', 'F675W', 'F702W', 'F775W', 'F791W', 'F814W', 'F850LP']
+OPT_GRISMS = ['G800L']
+UV_GRISMS = ['G280']
+
+VALID_FILTERS = OPT_M_FILTERS + OPT_W_FILTERS + OPT_GRISMS + UV_GRISMS 
+VALID_FILTERS += IR_M_FILTERS + IR_W_FILTERS + IR_GRISMS
 
 def demo():
     """
@@ -135,7 +145,7 @@ def get_extra_data(root='j114936+222414', HOME_PATH='/Volumes/Pegasus/Grizli/Aut
 
     os.chdir(CWD)
     
-def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', inspect_ramps=False, manual_alignment=False, is_parallel_field=False, reprocess_parallel=False, only_preprocess=False, make_mosaics=True, make_phot=True, run_extractions=True, run_fit=True, s3_sync=False, fine_radec=None, run_fine_alignment=True, combine_all_filters=True, gaia_by_date=False, align_mag_limits=[14,24], align_simple=False, align_clip=-1, align_rms_limit=2, align_min_overlap=0.2, master_radec=None, parent_radec=None, fix_stars=True, is_dash=False, run_parse_visits=True, imaging_bkg_params=prep.BKG_PARAMS, reference_wcs_filters=['G800L', 'G102', 'G141'], catalogs=['PS1','DES','NSC', 'SDSS','GAIA','WISE'], mosaic_pixel_scale=None, mosaic_pixfrac=0.6, half_optical_pixscale=False):
+def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', inspect_ramps=False, manual_alignment=False, is_parallel_field=False, reprocess_parallel=False, only_preprocess=False, make_mosaics=True, make_phot=True, run_extractions=True, run_fit=True, s3_sync=False, fine_radec=None, run_fine_alignment=True, combine_all_filters=True, gaia_by_date=False, align_mag_limits=[14,24], align_simple=False, align_clip=-1, align_rms_limit=2, align_min_overlap=0.2, master_radec=None, parent_radec=None, fix_stars=True, is_dash=False, run_parse_visits=True, imaging_bkg_params=prep.BKG_PARAMS, reference_wcs_filters=['G800L', 'G102', 'G141'], filters=VALID_FILTERS, catalogs=['PS1','DES','NSC', 'SDSS','GAIA','WISE'], mosaic_pixel_scale=None, mosaic_pixfrac=0.6, half_optical_pixscale=False):
     """
     Run the full pipeline for a given target
         
@@ -174,7 +184,7 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
     ######################
     ### Download data
     os.chdir(HOME_PATH)
-    auto_script.fetch_files(field_root=root, HOME_PATH=HOME_PATH, remove_bad=True, reprocess_parallel=reprocess_parallel, s3_sync=s3_sync)
+    auto_script.fetch_files(field_root=root, HOME_PATH=HOME_PATH, remove_bad=True, reprocess_parallel=reprocess_parallel, s3_sync=s3_sync, filters=filters)
     
     if is_dash:
         from wfc3dash import process_raw
@@ -196,7 +206,7 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
     os.chdir(os.path.join(HOME_PATH, root, 'Prep'))
         
     if (not os.path.exists('{0}_visits.npy'.format(root))) | run_parse_visits:
-        visits, all_groups, info = auto_script.parse_visits(field_root=root, HOME_PATH=HOME_PATH, use_visit=True, combine_same_pa=is_parallel_field, is_dash=is_dash, filters=VALID_FILTERS)
+        visits, all_groups, info = auto_script.parse_visits(field_root=root, HOME_PATH=HOME_PATH, use_visit=True, combine_same_pa=is_parallel_field, is_dash=is_dash, filters=filters)
     else:
         visits, all_groups, info = np.load('{0}_visits.npy'.format(root))
         
@@ -402,7 +412,7 @@ def make_directories(field_root='j142724+334246', HOME_PATH='./'):
             os.mkdir(dir)
             os.system('chmod ugoa+rwx {0}'.format(dir))
             
-def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', inst_products={'WFPC2/WFC': ['C0M', 'C1M'], 'WFPC2/PC': ['C0M', 'C1M'], 'ACS/WFC': ['FLC'], 'WFC3/IR': ['RAW'], 'WFC3/UVIS': ['FLC']}, remove_bad=True, reprocess_parallel=False, s3_sync=False, fetch_flt_calibs=['IDCTAB','PFLTFILE','NPOLFILE']):
+def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', inst_products={'WFPC2/WFC': ['C0M', 'C1M'], 'WFPC2/PC': ['C0M', 'C1M'], 'ACS/WFC': ['FLC'], 'WFC3/IR': ['RAW'], 'WFC3/UVIS': ['FLC']}, remove_bad=True, reprocess_parallel=False, s3_sync=False, fetch_flt_calibs=['IDCTAB','PFLTFILE','NPOLFILE'], filters=VALID_FILTERS):
     """
     Fully automatic script
     """
@@ -471,14 +481,16 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/
     
     is_wfpc2 = utils.column_string_operation(tab['instrument_name'], 'WFPC2', method='startswith', logical='or')
     
-    curl = fetch.make_curl_script(tab[(~badexp) & (~is_wfpc2)], level=None, script_name='fetch_{0}.sh'.format(field_root), inst_products=inst_products, skip_existing=True, output_path='./', s3_sync=s3_sync)
+    use_filters = utils.column_string_operation(tab['filter'], filters, method='startswith', logical='or')
+    
+    curl = fetch.make_curl_script(tab[(~badexp) & (~is_wfpc2) & use_filters], level=None, script_name='fetch_{0}.sh'.format(field_root), inst_products=inst_products, skip_existing=True, output_path='./', s3_sync=s3_sync)
            
     # Ugly callout to shell
     os.system('sh fetch_{0}.sh'.format(field_root))
     
-    if is_wfpc2.sum() > 0:
+    if (is_wfpc2 & use_filters).sum() > 0:
         ## Have to get WFPC2 from ESA
-        curl = fetch.make_curl_script(tab[(~badexp) & (is_wfpc2)], level=None, script_name='fetch_wfpc2_{0}.sh'.format(field_root), inst_products=inst_products, skip_existing=True, output_path='./', s3_sync=False)
+        curl = fetch.make_curl_script(tab[(~badexp) & (is_wfpc2) & use_filters], level=None, script_name='fetch_wfpc2_{0}.sh'.format(field_root), inst_products=inst_products, skip_existing=True, output_path='./', s3_sync=False)
         
         os.system('sh fetch_wfpc2_{0}.sh'.format(field_root))
         
@@ -1603,10 +1615,6 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
     wave = np.linspace(2000,2.5e4,100)
     poly_templates = utils.polynomial_templates(wave, order=poly_order)
         
-    fsps = True
-    t0 = utils.load_templates(fwhm=1000, line_complexes=True, stars=False, full_line_list=None, continuum_list=None, fsps_templates=fsps, alf_template=True)
-    t1 = utils.load_templates(fwhm=1000, line_complexes=False, stars=False, full_line_list=None, continuum_list=None, fsps_templates=fsps, alf_template=True)
-    
     #size = 32
     close = True
     Skip = True
@@ -1698,6 +1706,10 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
             
     if not run_fit:
        return True
+    
+    fsps = True
+    t0 = utils.load_templates(fwhm=1000, line_complexes=True, stars=False, full_line_list=None, continuum_list=None, fsps_templates=fsps, alf_template=True)
+    t1 = utils.load_templates(fwhm=1000, line_complexes=False, stars=False, full_line_list=None, continuum_list=None, fsps_templates=fsps, alf_template=True)
         
     ###############
     # Redshift Fit    
@@ -1738,7 +1750,7 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
     else:
         return True
         
-def generate_fit_params(field_root='j142724+334246', prior=None, MW_EBV=0.00, pline=DITHERED_PLINE, fit_only_beams=True, run_fit=True, poly_order=7, fsps=True, sys_err = 0.03, fcontam=0.2, zr=[0.1, 3.4], fwhm=1000, lorentz=False, save_file='fit_args.npy'):
+def generate_fit_params(field_root='j142724+334246', fitter='bounded', prior=None, MW_EBV=0.00, pline=DITHERED_PLINE, fit_only_beams=True, run_fit=True, poly_order=7, fsps=True, sys_err = 0.03, fcontam=0.2, zr=[0.1, 3.4], fwhm=1000, lorentz=False, save_file='fit_args.npy'):
     """
     Generate a parameter dictionary for passing to the fitting script
     """
@@ -1749,7 +1761,7 @@ def generate_fit_params(field_root='j142724+334246', prior=None, MW_EBV=0.00, pl
     t0 = utils.load_templates(fwhm=fwhm, line_complexes=True, stars=False, full_line_list=None, continuum_list=None, fsps_templates=fsps, alf_template=True, lorentz=lorentz)
     t1 = utils.load_templates(fwhm=fwhm, line_complexes=False, stars=False, full_line_list=None, continuum_list=None, fsps_templates=fsps, alf_template=True, lorentz=lorentz)
 
-    args = fitting.run_all(0, t0=t0, t1=t1, fwhm=1200, zr=zr, dz=[0.004, 0.0005], fitter='nnls', group_name=field_root, fit_stacks=False, prior=prior,  fcontam=fcontam, pline=pline, mask_sn_limit=10, fit_beams=False,  root=field_root, fit_trace_shift=False, phot=phot, verbose=True, scale_photometry=False, show_beams=True, overlap_threshold=10, get_ir_psfs=True, fit_only_beams=fit_only_beams, MW_EBV=MW_EBV, sys_err=sys_err, get_dict=True)
+    args = fitting.run_all(0, t0=t0, t1=t1, fwhm=1200, zr=zr, dz=[0.004, 0.0005], fitter=fitter, group_name=field_root, fit_stacks=False, prior=prior,  fcontam=fcontam, pline=pline, mask_sn_limit=10, fit_beams=False,  root=field_root, fit_trace_shift=False, phot=phot, verbose=True, scale_photometry=False, show_beams=True, overlap_threshold=10, get_ir_psfs=True, fit_only_beams=fit_only_beams, MW_EBV=MW_EBV, sys_err=sys_err, get_dict=True)
     
     np.save(save_file, [args])
     print('Saved arguments to {0}.'.format(save_file))
