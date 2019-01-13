@@ -4524,7 +4524,29 @@ class GTable(astropy.table.Table):
             return match_ix, tf, dx, rms, fig
         else:
             return match_ix, tf, dx, rms
-            
+
+    def add_aladdin(self, rd_cols=['ra', 'dec'], fov=0.5, size=(400,200), default_view="P/DSS2/color"):
+        """
+        Add AladinLite DIV column to the table
+
+        fov : fov in degrees
+        size : size of DIVs (w, h) in pixels (w, h)
+
+        """
+        # <!-- include Aladin Lite CSS file in the head section of your page -->
+        # <link rel="stylesheet" href="//aladin.u-strasbg.fr/AladinLite/api/v2/latest/aladin.min.css" />
+        # 
+        # <!-- you can skip the following line if your page already integrates the jQuery library -->
+        # <script type="text/javascript" src="//code.jquery.com/jquery-1.12.1.min.js" charset="utf-8"></script>
+
+        ala = ["""    <div id="aladin-lite-div-{i}" style="width:{wsize}px;height:{hsize}px;"></div>
+        <script type="text/javascript" src="http://aladin.u-strasbg.fr/AladinLite/api/v2/latest/aladin.min.js" charset="utf-8"></script>
+        <script type="text/javascript">
+            var aladin = A.aladin('#aladin-lite-div-{i}', xxxsurvey: "{survey}", fov:{fov}, target: "{ra} {dec}"yyy);
+        </script></div>""".format(i=i, ra=row[rd_cols[0]], dec=row[rd_cols[1]], survey=default_view, fov=fov, hsize=size[1], wsize=size[0]).replace('xxx','{').replace('yyy','}') for i, row in enumerate(self)]
+
+        self['aladin'] = ala
+                
     def write_sortable_html(self, output, replace_braces=True, localhost=True, max_lines=50, table_id=None, table_class="display compact", css=None, filter_columns=[], buttons=['csv'], toggle=True, use_json=False):
         """Wrapper around `~astropy.table.Table.write(format='jsviewer')`.
         
@@ -4594,6 +4616,16 @@ td {font-size: 10pt;}
         # Read all lines
         lines = open(output).readlines()
         
+        if 'aladin' in self.colnames:
+            # Insert Aladin CSS
+            aladin_css = '<link rel="stylesheet" href="https://aladin.u-strasbg.fr/AladinLite/api/v2/latest/aladin.min.css" />\n'
+            
+            for il, line in enumerate(lines):
+                if '<link href=' in line:
+                    break
+                                
+            lines.insert(il+1, aladin_css)
+            
         # Export buttons
         if buttons:
             # CSS
@@ -4814,11 +4846,14 @@ $.UpdateFilterURL = function () {{
             for c in self.colnames:
                 new[c] = self[c]
             
-            new.write('/tmp/table.csv', format='csv', overwrite=True)
-            pd = GTable.gread('/tmp/table.csv').to_pandas()
+            if 'aladin' in self.colnames:
+                pd = GTable(new).to_pandas()
+            else:
+                new.write('/tmp/table.csv', format='csv', overwrite=True)
+                pd = GTable.gread('/tmp/table.csv').to_pandas()
             
             # Reformat to json
-            json_data = '        ' + pd.to_json(orient='values').replace('],[','\n    ]xxxxxx\n    [\n        ').replace(',',',\n        ').replace('xxxxxx',',')
+            json_data = '        ' + pd.to_json(orient='values').replace('],[','\n    ]xxxxxx\n    [\n        ').replace(', ', 'xcommaspacex').replace(',',',\n        ').replace('xxxxxx',',').replace('xcommaspace',', ')
             json_str = """{{
   "data": 
 {0}  
