@@ -13,7 +13,7 @@ def eazy_photoz(root, force=False, object_only=True, apply_background=True, aper
         cat = utils.read_catalog('{0}_phot_apcorr.fits'.format(root))
         return self, cat, zout
         
-    trans = {'f098m':201, 'f105w':202, 'f110w':241, 'f125w':203, 'f140w':204, 'f160w':205, 'f435w':233, 'f438w':211, 'f606w':236, 'f625w':237, 'f814w':239, 'f702w':15, 'f555w':235, 'f350lp':339}
+    trans = {'f098m':201, 'f105w':202, 'f110w':241, 'f125w':203, 'f140w':204, 'f160w':205, 'f435w':233, 'f438w':211, 'f606w':236, 'f625w':237, 'f814w':239, 'f702w':15, 'f555w':235, 'f350lp':339, 'f475w':212}
     
     cat = utils.read_catalog('{0}_phot.fits'.format(root))
     filters = []
