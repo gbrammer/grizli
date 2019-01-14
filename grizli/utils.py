@@ -864,7 +864,73 @@ def get_hst_filter(header):
         raise KeyError ('Filter keyword not found for instrument {0}'.format(header['INSTRUME']))
     
     return filter.upper()
+
+def calc_header_zeropoint(im, ext=0):
+    """
+    Determine AB zeropoint from image header
     
+    Parameters
+    ----------
+    im : `~astropy.io.fits.HDUList` or 
+        Image object or header.
+    
+    Returns
+    -------
+    ZP : float
+        AB zeropoint
+    
+    """
+    scale_exptime = 1.
+    
+    if isinstance(im, pyfits.Header):
+        header = im
+    else:
+        if '_dr' in im.filename():
+            ext = 0
+        elif '_fl' in im.filename():
+            if 'DETECTOR' in im[0].header:
+                if im[0].header['DETECTOR'] == 'IR':
+                    ext = 0
+                    bunit = im[1].header['BUNIT']
+                else:
+                    # ACS / UVIS
+                    if ext == 0:
+                        ext = 1
+
+                    bunit = im[1].header['BUNIT']
+                    
+                if bunit == 'ELECTRONS':
+                    scale_exptime = im[0].header['EXPTIME']
+                    
+        header = im[ext].header
+    
+    try:
+        fi = get_hst_filter(im[0].header).upper()
+    except:
+        fi = None
+             
+    ## Get AB zeropoint
+    if 'PHOTFNU' in header:
+        ZP = -2.5*np.log10(header['PHOTFNU'])+8.90
+        ZP += 2.5*np.log10(scale_exptime)
+    elif 'PHOTFLAM' in header:
+        ZP = (-2.5*np.log10(header['PHOTFLAM']) - 21.10 -
+              5*np.log10(header['PHOTPLAM']) + 18.6921)
+        
+        ZP += 2.5*np.log10(scale_exptime)
+    elif (fi is not None):
+        if fi in model.photflam_list:
+            ZP = (-2.5*np.log10(model.photflam_list[fi]) - 21.10 -
+                  5*np.log10(model.photplam_list[fi]) + 18.6921)
+        else:
+            print('Couldn\'t find PHOTFNU or PHOTPLAM/PHOTFLAM keywords, use ZP=25') 
+            ZP = 25
+    else:
+        print('Couldn\'t find FILTER, PHOTFNU or PHOTPLAM/PHOTFLAM keywords, use ZP=25') 
+        ZP = 25    
+    
+    return ZP
+        
 def unset_dq_bits(value, okbits=32+64+512, verbose=False):
     """
     Unset bit flags from a DQ array
@@ -5231,3 +5297,81 @@ def RGBtoHex(vals, rgbtype=1):
   #Ensure values are rounded integers, convert to hex, and concatenate
   return '#' + ''.join(['{:02X}'.format(int(round(x))) for x in vals])
 
+def catalog_mask(cat, ecol='FLUXERR_APER_0', max_err_percentile=90, pad=0.05, pad_is_absolute=False, min_flux_radius=1.):
+    """
+    """
+    test = np.isfinite(cat['FLUX_AUTO'])
+    if 'FLUX_RADIUS' in cat.colnames:
+        test &= cat['FLUX_RADIUS'] > min_flux_radius
+    
+    test &= (cat['THRESH'] > 0) & (cat['THRESH'] < 1e28)
+
+    not_edge = hull_edge_mask(cat['X_IMAGE'], cat['Y_IMAGE'], pad=pad, pad_is_absolute=pad_is_absolute)
+    
+    if ecol in cat.colnames:
+        test &= cat[ecol] < np.percentile(cat[ecol][~not_edge], max_err_percentile)
+    
+    return test
+    
+def hull_edge_mask(x, y, pad=100, pad_is_absolute=True, mask=None):
+    """
+    Compute geometrical edge mask for points within a convex hull
+    
+    Parameters
+    ----------
+    x, y : array
+        Coordinates of the catalog
+        
+    pad : float
+        Buffer padding
+        
+    pad_is_absolute : bool
+        If True, then the buffer is taken from `pad` (e.g., pixels).  If 
+        False, then `pad` is treated as a fraction of the linear dimension
+        of the catalog (`~sqrt(hull area)`).
+    
+    mask : bool array
+        Mask to apply to x/y before computing the convex hull
+        
+    Returns
+    -------
+    mask : bool array
+        True if points within the buffered hull
+    
+    """
+    
+    from scipy.spatial import ConvexHull
+    from shapely.geometry import Polygon, Point
+    
+    xy = np.array([x, y]).T
+    
+    if mask is None:
+        hull = ConvexHull(xy)
+    else:
+        hull = ConvexHull(xy[mask,:])
+        
+    pxy = xy[hull.vertices,:]
+    poly = Polygon(pxy)
+    
+    if pad_is_absolute:
+        buff = -pad
+    else:
+        # linear dimension ~ sqrt(area)
+        buff = -pad*np.sqrt(poly.area)
+    
+    pbuff = poly.buffer(buff)
+    in_buff = np.array([pbuff.contains(Point([x[i], y[i]])) for i in range(len(x))])
+    
+    return in_buff
+       
+def hull_area(x, y):
+    from scipy.spatial import ConvexHull
+    from shapely.geometry import Polygon, Point
+    
+    xy = np.array([x, y]).T
+    hull = ConvexHull(xy)
+    pxy = xy[hull.vertices,:]
+    poly = Polygon(pxy)
+    
+    return poly.area
+    
