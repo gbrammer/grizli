@@ -2,8 +2,11 @@
 Align direct images & make mosaics
 """
 import os
+import inspect
+
 from collections import OrderedDict
 import glob
+import traceback
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -123,13 +126,13 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
     """
     import shutil
     
-    if crclean:
-        try:
-            import lacosmicx
-            has_lacosmicx = True
+    try:
+        import lacosmicx
+        has_lacosmicx = True
+        if crclean:
             print('Warning (fresh_flt_file): couldn\'t import lacosmicx')
-        except:
-            has_lacosmicx = False
+    except:
+        has_lacosmicx = False
     
     local_file = os.path.basename(file)
     if preserve_dq:
@@ -269,9 +272,11 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
             dq[crmask] |= 1024
             sci[crmask] = 0
                                     
-    if verbose:
-        print('{0} -> {1} {2}'.format(orig_file.filename(), local_file, extra_msg))
-        
+    
+    logstr = '# {0} -> {1} {2}'
+    logstr = logstr.format(orig_file.filename(), local_file, extra_msg)
+    utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
+    
     ### WFPC2            
     if '_c0' in file:
         # point to FITS reference files
@@ -363,8 +368,9 @@ def apply_persistence_mask(flt_file, path='../Persistence', dq_value=1024,
              os.path.basename(flt_file).replace('_flt.fits', '_persist.fits'))
     
     if not os.path.exists(pers_file):
-        if verbose:
-            print('Persistence file {0} not found'.format(pers_file))
+        
+        logstr = '# Persistence file {0} not found'.format(pers_file)
+        utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
         
         #return 0
     
@@ -378,8 +384,9 @@ def apply_persistence_mask(flt_file, path='../Persistence', dq_value=1024,
         pers_mask = pers_mask * 1
     
     NPERS = pers_mask.sum()
-    if verbose:
-        print('{0}: flagged {1:d} pixels affected by persistence (pers/err={2:.2f})'.format(pers_file, NPERS, err_threshold))
+    
+    logstr = '# {0}: flagged {1:d} pixels affected by persistence (pers/err={2:.2f})'.format(pers_file, NPERS, err_threshold)
+    utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
     
     if NPERS > 0:
         flt['DQ'].data[pers_mask > 0] |= dq_value
@@ -419,8 +426,8 @@ def apply_region_mask(flt_file, dq_value=1024, verbose=True):
     if len(mask_files) == 0:
         return True
      
-    if verbose:
-        print('Region mask for {0}: {1}'.format(flt_file, mask_files))
+    logstr = '# Region mask for {0}: {1}'.format(flt_file, mask_files)
+    utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
     
     flt = pyfits.open(flt_file, mode='update')
     for mask_file in mask_files:
@@ -471,8 +478,10 @@ def apply_saturated_mask(flt_file, dq_value=1024):
     sat_mask = (sat & (sat_grow > 2))[::-1,:]*1
     
     NSAT = sat_mask.sum()
-    if verbose:
-        print('{0}: flagged {1:d} pixels affected by saturation pulldown'.format(flt_file, NSAT))
+
+    logstr = '# {0}: flagged {1:d} pixels affected by saturation pulldown'
+    logstr = logstr.format(flt_file, NSAT)
+    utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
     
     if NSAT > 0:
         flt['DQ'].data[sat_mask > 0] |= dq_value
@@ -561,6 +570,9 @@ def match_lists(input, output, transform=None, scl=3600., simple=True,
             
     except:
         
+        utils.log_exception(utils.LOGFILE, traceback)
+        utils.log_comment(utils.LOGFILE, "# ! tristars failed")
+        
         match = stsci.stimage.xyxymatch(copy.copy(input), copy.copy(output), 
                                         origin=np.median(input, axis=0), 
                                         mag=(1.0, 1.0), rotation=(0.0, 0.0),
@@ -617,7 +629,11 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
                          triangle_size_limit=[5,1800], 
                          triangle_ba_max=0.9, max_err_percentile=99):
     """TBD
-    """        
+    """     
+    frame = inspect.currentframe()
+    utils.log_function_arguments(utils.LOGFILE, frame,
+                                 'prep.align_drizzled_image')
+       
     if not os.path.exists('{0}.cat.fits'.format(root)):
         #cat = make_drz_catalog(root=root)
         cat = make_SEP_catalog(root=root)
@@ -694,12 +710,16 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
         cut = np.argsort(cat['MAG_AUTO'][ok])[:icut]
         xy_drz = np.array([cat['X_IMAGE'][ok][cut], cat['Y_IMAGE'][ok][cut]]).T
     
-    print('Ncat={0}, Nref={1}'.format(xy_drz.shape[0], rd_ref.shape[0]))
+    logstr = '# wcs {0} radec="{1}"; Ncat={2}; Nref={3}'
+    logstr = logstr.format(root, radec, xy_drz.shape[0], rd_ref.shape[0])
+    utils.log_comment(utils.LOGFILE, logstr, verbose=True)
     
     #out_shift, out_rot, out_scale = np.zeros(2), 0., 1.
     out_shift, out_rot, out_scale = guess[:2], guess[2], guess[3]    
     drz_wcs = utils.transform_wcs(drz_wcs, out_shift, out_rot, out_scale)
-    print('{0} (guess)   : {1:6.2f} {2:6.2f} {3:7.3f} {4:7.3f}'.format(root, guess[0], guess[1], guess[2]/np.pi*180, 1./guess[3]))
+        
+    logstr = '# wcs {0} (guess)   : {1:6.2f} {2:6.2f} {3:7.3f} {4:7.3f}'.format(root, guess[0], guess[1], guess[2]/np.pi*180, 1./guess[3])
+    utils.log_comment(utils.LOGFILE, logstr, verbose=True)
     
     drz_crpix = drz_wcs.wcs.crpix
        
@@ -776,14 +796,15 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
             
             output_ix2, input_ix2, outliers2, tf = res2
         
-        if verbose:
-            shift = tf.translation
-            NGOOD = (~outliers).sum()
-            print('{0} ({1:d}) {2:d}: {3:6.2f} {4:6.2f} {5:7.3f} {6:7.3f}'.format(root,iter,NGOOD,
-                                                   shift[0], shift[1], 
-                                                   tf.rotation/np.pi*180, 
-                                                   1./tf.scale))
+        # Log
+        shift = tf.translation
+        NGOOD = (~outliers).sum()
+        logstr = '# wcs {0} ({1:d}) {2:d}: {3:6.2f} {4:6.2f} {5:7.3f} {6:7.3f}'   
+        logstr = logstr.format(root,iter,NGOOD, shift[0], shift[1], 
+                               tf.rotation/np.pi*180, 1./tf.scale)
         
+        utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
+            
         out_shift += tf.translation
         out_rot -= tf.rotation
         out_scale *= tf.scale
@@ -1005,13 +1026,18 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
                       source_xy=None, autoparams=[2.5, 3.5], mask_kron=False,
                       max_total_corr=2, err_scale=-np.inf, 
                       detection_params = SEP_DETECT_PARAMS, bkg_mask=None,
-                      pixel_scale=0.06, 
+                      pixel_scale=0.06, log=False,
                       **kwargs):
     """Make a catalog from drizzle products using the SEP implementation of SExtractor
     
     phot_apertures are aperture *diameters*, in pixels.
     
     """
+    if log:
+        frame = inspect.currentframe()
+        utils.log_function_arguments(utils.LOGFILE, frame,
+                                     'prep.make_SEP_catalog')
+
     import copy
     import astropy.units as u
     import sep
@@ -1446,9 +1472,9 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
     if save_to_fits:
         tab.write('{0}.cat.fits'.format(root), format='fits', overwrite=True)
 
-    if verbose:
-        print('{0}.cat.fits: {1:d} objects'.format(root, len(tab)))
-
+    logstr = '# SEP {0}.cat.fits: {1:d} objects'.format(root, len(tab))
+    utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
+    
     return tab
      
 def make_drz_catalog(root='', sexpath='sex',threshold=2., get_background=True, 
@@ -1554,17 +1580,23 @@ def make_drz_catalog(root='', sexpath='sex',threshold=2., get_background=True,
     cat.write('{0}.cat'.format(root), format='ascii.commented_header',
               overwrite=True)
             
-    if verbose:
-        print('{0} catalog: {1:d} objects'.format(root, len(cat)))
+    logstr = '# DRZ {0} catalog: {1:d} objects'.format(root, len(cat))
+    utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
     
     return cat
     
 def blot_background(visit={'product': '', 'files':None}, 
                     bkg_params={'bw':64, 'bh':64, 'fw':3, 'fh':3, 'pixel_scale':0.06}, 
-                    verbose=True, skip_existing=True, get_median=False):
+                    verbose=True, skip_existing=True, get_median=False, 
+                    log=True, stepsize=10):
     """
     Blot SEP background of drizzled image back to component FLTs
     """
+    if log:
+        frame = inspect.currentframe()
+        utils.log_function_arguments(utils.LOGFILE, frame,
+                                     'prep.blot_background')
+        
     import astropy.io.fits as pyfits
     import astropy.wcs as pywcs
     from drizzlepac import astrodrizzle
@@ -1572,11 +1604,15 @@ def blot_background(visit={'product': '', 'files':None},
     drz_files = glob.glob('{0}_dr[zc]_sci.fits'.format(visit['product']))
     
     if len(drz_files) == 0:
-        print('blot_background: No mosaic found {0}_dr[zc]_sci.fits'.format(visit['product']))
+        logstr = '# blot_background: No mosaic found {0}_dr[zc]_sci.fits'
+        logstr = logstr.format(visit['product'])
+        utils.log_comment(utils.LOGFILE, logstr, verbose=True)
+                
         return False
     
     drz_file = drz_files[0]
     drz_im = pyfits.open(drz_file)
+    drz_unit = drz_im[0].header['BUNIT']
     
     drz_wcs = pywcs.WCS(drz_im[0].header)
     drz_wcs.pscale = utils.get_wcs_pscale(drz_wcs)
@@ -1587,9 +1623,9 @@ def blot_background(visit={'product': '', 'files':None},
         mask = drz_im[0].data != 0
         bkg_data = bkg_data*0.+np.median(np.median(bkg_data[mask]))
         
-    if verbose:
-        print('   Blot background from {0}'.format(drz_file))
-        
+    logstr = '#   Blot background from {0}'.format(drz_file)
+    utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
+    
     for file in visit['files']:
         flt = pyfits.open(file, mode='update')
         
@@ -1601,22 +1637,31 @@ def blot_background(visit={'product': '', 'files':None},
                 print('\'BLOTSKY\' keyword found in {0}.  Skipping....'.format(file))
                 continue
             
-            if verbose:
-                print('  Blot background: {0}[SCI,{1}]'.format(file, ext))
-                    
+            logstr = '#   Blot background: {0}[SCI,{1}]'.format(file, ext)
+            utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
+            
             flt_wcs = pywcs.WCS(flt['SCI',ext].header, fobj=flt, relax=True)
             flt_wcs.pscale = utils.get_wcs_pscale(flt_wcs)
             
             blotted = utils.blot_nearest_exact(bkg_data.astype(np.float32),
                                                drz_wcs, flt_wcs,
+                                               stepsize=stepsize,
                                                scale_by_pixel_area=True)
-            
+
+            flt_unit = flt['SCI',ext].header['BUNIT']            
+            if flt_unit+'/S' == drz_unit:
+                tscale = flt[0].header['EXPTIME']
+            elif flt_unit == drz_unit + '/S':
+                tscale = 1./flt[0].header['EXPTIME']
+            else:
+                tscale = 1.
+                     
             # blotted = astrodrizzle.ablot.do_blot(bkg_data.astype(np.float32),
             #                 drz_wcs,
             #                 flt_wcs, 1, coeffs=True, interp='nearest',
             #                 sinscl=1.0, stepsize=10, wcsmap=None)
                         
-            flt['SCI',ext].data -= blotted
+            flt['SCI',ext].data -= blotted*tscale
             flt['SCI',ext].header['BLOTSKY'] = (True, 'Sky blotted from {0}'.format(drz_file))
         
         flt.flush()
@@ -1931,6 +1976,7 @@ def get_gaia_DR2_vizier(ra=165.86, dec=34.829694, radius=3., max=100000,
             if k in result.colnames:
                 result.rename_column(k, gdict[k])
     except:
+        utils.log_exception(utils.LOGFILE, traceback)
         return False
         
     return result
@@ -2471,6 +2517,10 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
     TBD
     
     """    
+    frame = inspect.currentframe()
+    utils.log_function_arguments(utils.LOGFILE, frame,
+                                 'prep.process_direct_grism_visit')
+    
     from stsci.tools import asnutil
     from stwcs import updatewcs
     from drizzlepac import updatehdr
@@ -2483,7 +2533,7 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
     ### Copy FLT files from ../RAW
     isACS = '_flc' in direct['files'][0]
     isWFPC2 = '_c0' in direct['files'][0]
-    
+        
     if not skip_direct:
         for file in direct['files']:
             crclean = isACS & (len(direct['files']) == 1)
@@ -2604,7 +2654,8 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
         else:
             ref_catalog = 'USER'
     
-        print('{0}: First Drizzle'.format(direct['product']))
+        logstr = '#  {0}: First Drizzle'.format(direct['product'])
+        utils.log_comment(utils.LOGFILE, logstr, verbose=True, show_date=True)
     
         ### Clean up
         for ext in ['.fits', '.log']:
@@ -2685,6 +2736,10 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                                       simple=align_simple,
                                       rms_limit=align_rms_limit)
         except:
+
+            utils.log_exception(utils.LOGFILE, traceback)
+            utils.log_comment(utils.LOGFILE, "# !! Drizzle alignment failed")
+
             fp = open('{0}.wcs_failed'.format(direct['product']),'w')
             fp.write(guess.__str__())
             fp.close()
@@ -2717,6 +2772,9 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
     
         ### Second drizzle with aligned wcs, refined CR-rejection params 
         ### tuned for WFC3/IR
+        logstr = '# {0}: Second Drizzle'.format(direct['product'])
+        utils.log_comment(utils.LOGFILE, logstr, verbose=True, show_date=True)
+        
         if len(direct['files']) == 1:
             AstroDrizzle(direct['files'], output=direct['product'],
                          clean=True, final_pixfrac=0.8, context=False,
@@ -2744,18 +2802,23 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
         ### CRs aren't appropriately masked
         is_single = (len(direct['files']) == 1)
         if (single_image_CRs) & (isACS | isWFPC2):
-            print('Mask areas of the mosaic covered by a single input image')
+            logstr='# Mask areas of the mosaic covered by a single input image'
+            utils.log_comment(utils.LOGFILE, logstr, verbose=True)
+            
             try:
                 find_single_image_CRs(direct, simple_mask=(not is_single), with_ctx_mask=(not is_single), run_lacosmic=is_single)
             except:
+                utils.log_exception(utils.LOGFILE, traceback)
                 pass
                 
         ### Make DRZ catalog again with updated DRZWCS
         clean_drizzle(direct['product'])
         
         ### Subtract visit-level background based on the drizzled mosaic
-        print('xxx Imaging background: ', imaging_bkg_params)
         if imaging_bkg_params is not None:
+            logstr = '# Imaging background: {0}'.format(imaging_bkg_params)
+            utils.log_comment(utils.LOGFILE, logstr, verbose=True)
+            
             blot_background(visit=direct, bkg_params=imaging_bkg_params, 
                             verbose=True, skip_existing=True,
                             get_median=False)
@@ -2894,11 +2957,18 @@ def tweak_align(direct_group={}, grism_group={}, max_dist=1., key=' ',
     """
     Intra-visit shifts (WFC3/IR)
     """
+    frame = inspect.currentframe()
+    utils.log_function_arguments(utils.LOGFILE, frame,
+                                 'prep.tweak_align')
+    
     from drizzlepac.astrodrizzle import AstroDrizzle
     from scipy import polyfit, polyval
     
     if len(direct_group['files']) < 2:
-        print('Only one direct image found, can\'t compute shifts!')
+        logstr = '# ! {0}: Only one direct image found, can\'t compute shifts'
+        logstr = logstr.format(direct_group['product'])
+        
+        utils.log_comment(utils.LOGFILE, logstr, verbose=True)
         return True
         
     wcs_ref, shift_dict = tweak_flt(files=direct_group['files'],
@@ -2906,6 +2976,8 @@ def tweak_align(direct_group={}, grism_group={}, max_dist=1., key=' ',
                                     verbose=True)
 
     grism_matches = find_direct_grism_pairs(direct=direct_group, grism=grism_group, check_pixel=[507, 507], toler=0.1, key=key)
+    logstr = '\ngrism_matches = {0}\n'.format(grism_matches)
+    utils.log_comment(utils.LOGFILE, logstr, verbose=True)
     
     fp = open('{0}_shifts.log'.format(direct_group['product']), 'w')
     fp.write('# flt xshift yshift rot scale N rmsx rmsy\n')
@@ -2923,7 +2995,9 @@ def tweak_align(direct_group={}, grism_group={}, max_dist=1., key=' ',
     
     # Fit a polynomial, e.g., for DASH
     if fit_order > 0:
-        print('Fit polynomial order={0} to shifts.'.format(fit_order))
+        logstr = '# {0}: Fit polynomial order={1} to shifts.'
+        logstr = logstr.format(direct_group['product'], fit_order)
+        utils.log_comment(utils.LOGFILE, logstr, verbose=True)
         
         shifts = np.array([shift_dict[k][:2] for k in sorted(shift_dict)])
         t = np.arange(shifts.shape[0])
@@ -3091,7 +3165,8 @@ def tweak_flt(files=[], max_dist=0.4, threshold=3, verbose=True, use_sewpy=False
     
     ### Make FLT catalogs
     cats = []
-    print('*** Tweak alignment (use_sewpy={0}) ***'.format(use_sewpy))
+    logstr = '### Tweak alignment (use_sewpy={0}) '.format(use_sewpy)
+    utils.log_comment(utils.LOGFILE, logstr, verbose=True)
     
     for i, file in enumerate(files):
         root = file.split('.fits')[0]
@@ -3220,10 +3295,14 @@ def tweak_flt(files=[], max_dist=0.4, threshold=3, verbose=True, use_sewpy=False
 
             d[files[i]] = [dx[0], dx[1], 0.0, 1.0, ok.sum(), rms]
         
-            if verbose:
-                print("{0} [{1:6.3f}, {2:6.3f}]  [{3:6.3f}, {4:6.3f}] N={5}".format(files[i], dx[0], dx[1], rms[0], rms[1], ok.sum()))
+            logstr="# tw {0} [{1:6.3f}, {2:6.3f}]  [{3:6.3f}, {4:6.3f}] N={5}"
+            logstr = logstr.format(files[i], dx[0], dx[1], rms[0], rms[1],
+                                   ok.sum())
+            utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
                 
     except:
+        utils.log_exception(utils.LOGFILE, traceback)
+        utils.log_comment(utils.LOGFILE, "# !! `tweak_flt` tristars failed")
         
         d = OrderedDict()
         for i in range(0, len(files)):
@@ -3240,8 +3319,8 @@ def tweak_flt(files=[], max_dist=0.4, threshold=3, verbose=True, use_sewpy=False
             ok = dist < max_dist
             if ok.sum() == 0:
                 d[files[i]] = [0.0, 0.0, 0.0, 1.0]
-                if verbose:
-                    print(files[i], '! no match')
+                logstr = '# tw {0}'.format(files[i], '! no match')
+                utils.log_comment(utils.LOGFILE, logstr, verbose=True)
             
                 continue
             
@@ -3251,18 +3330,24 @@ def tweak_flt(files=[], max_dist=0.4, threshold=3, verbose=True, use_sewpy=False
 
             d[files[i]] = [dx[0], dx[1], 0.0, 1.0, ok.sum(), rms]
         
-            if verbose:
-                print(files[i], dx, rms, 'N={0:d}'.format(ok.sum()))
-    
+            logstr = '# tw {0} {1} {2} {3}'
+            logstr = logstr.format(files[i], dx, rms, 'N={0:d}'.format(ok.sum()))
+            utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
+                
     wcs_ref = cats[0][1]
     return wcs_ref, d
 
-def apply_tweak_shifts(wcs_ref, shift_dict, grism_matches={}, verbose=True):
+def apply_tweak_shifts(wcs_ref, shift_dict, grism_matches={}, verbose=True, log=True):
     """
     
     """
     from drizzlepac import updatehdr
-
+    
+    if log:
+        frame = inspect.currentframe()
+        utils.log_function_arguments(utils.LOGFILE, frame,
+                                     'prep.apply_tweak_shifts')
+            
     hdu = wcs_ref.to_fits(relax=True)
     file0 = list(shift_dict.keys())[0].split('.fits')[0]
     tweak_file = '{0}_tweak_wcs.fits'.format(file0)
@@ -3301,12 +3386,17 @@ def apply_tweak_shifts(wcs_ref, shift_dict, grism_matches={}, verbose=True):
     os.remove(tweak_file)
     
 def find_direct_grism_pairs(direct={}, grism={}, check_pixel=[507, 507],
-                            toler=0.1, key='A', same_visit=True):
+                            toler=0.1, key='A', same_visit=True, log=True):
     """
     For each grism exposure, check if there is a direct exposure
     that matches the WCS to within `toler` pixels.  If so, copy that WCS 
     directly.
     """
+    if log:
+        frame = inspect.currentframe()
+        utils.log_function_arguments(utils.LOGFILE, frame,
+                                     'prep.find_direct_grism_pairs')
+                
     direct_wcs = {}
     full_direct_wcs = {}
     direct_rd = {}
@@ -3543,10 +3633,14 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
     
     TBD
     
-    """
+    """    
     import numpy.ma
     import scipy.ndimage as nd
     
+    frame = inspect.currentframe()
+    utils.log_function_arguments(utils.LOGFILE, frame,
+                                 'prep.visit_grism_sky')
+            
     #from sklearn.gaussian_process import GaussianProcess
     from sklearn.gaussian_process import GaussianProcessRegressor
     from sklearn.gaussian_process.kernels import RBF, WhiteKernel
@@ -3584,8 +3678,10 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
         flat_im = pyfits.open(os.path.join(os.getenv('jref'), flat_file))
         flat = flat_im['SCI',ext].data.flatten()
     
-    if verbose:
-        print('{0}: EXTVER={1:d} / {2} / {3}'.format(grism['product'], ext, bg_fixed, bg_vary))
+    logstr = '# visit_grism_sky / {0}: EXTVER={1:d} / {2} / {3}'
+    logstr = logstr.format(grism['product'], ext, bg_fixed, bg_vary)
+    utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
+    
     if not isACS:
         ext = 1
         
@@ -3683,8 +3779,9 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
             r_i = (data-model)[j*Npix:(j+1)*Npix].reshape(sh)
             ds9.view(r_i * mask_i)
         
-        if verbose:
-            print('   {0} > Iter: {1:d}, masked: {2:2.0f}%, {3}'.format(grism['product'], iter+1, obj_mask.sum()/Npix/Nimg*100, coeffs))
+        logstr = '# visit_grism_sky   {0} > Iter: {1:d}, masked: {2:2.0f}%, {3}'
+        logstr = logstr.format(grism['product'], iter+1, obj_mask.sum()/Npix/Nimg*100, coeffs)
+        utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
                                                 
         out = np.linalg.lstsq(A[mask & obj_mask,:], data[mask & obj_mask])
         coeffs = out[0]
@@ -3793,7 +3890,11 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
             try:
                 gp.fit(np.atleast_2d(xmsk[yok][::1]).T, yres[yok][::1]+bg_sky)
             except:
-                print('GaussianProces failed!  Check that this exposure wasn\'t fried by variable backgrounds.')
+                warn = '# visit_grism_sky / GaussianProces failed!\n# visit_grism_sky / Check that this exposure wasn\'t fried by variable backgrounds.'
+                print(warn)
+                utils.log_exception(utils.LOGFILE, traceback)
+                utils.log_comment(utils.LOGFILE, warn)
+                
                 continue
             
             y_pred, MSE = gp.predict(np.atleast_2d(xmsk).T, eval_MSE=True)
@@ -3893,6 +3994,10 @@ def fix_star_centers(root='macs1149.6+2223-rot-ca5-22-032.0-f105w',
     Nothing, updates FLT files in place.
 
     """
+    frame = inspect.currentframe()
+    utils.log_function_arguments(utils.LOGFILE, frame,
+                                 'prep.fix_star_centers')
+
     from drizzlepac.astrodrizzle import AstroDrizzle
     
     EPSF = utils.EffectivePSF()
@@ -4025,14 +4130,17 @@ def find_single_image_CRs(visit, simple_mask=False, with_ctx_mask=True,
     Requires context (CTX) image `visit['product']+'_drc_ctx.fits`.   
     """
     from drizzlepac import astrodrizzle
-    if run_lacosmic:
-        try:
-            import lacosmicx
-            has_lacosmicx = True
+    try:
+        import lacosmicx
+        has_lacosmicx = True
+    except:
+        if run_lacosmic:
             print('Warning (find_single_image_CRs): couldn\'t import lacosmicx')
-        except:
-            has_lacosmicx = False
-            
+
+        utils.log_exception(utils.LOGFILE, traceback)
+        utils.log_comment(utils.LOGFILE, "# ! LACosmicx requested but not found")
+        has_lacosmicx = False
+    
     # try:
     #     import reproject
     #     HAS_REPROJECT = True
@@ -4115,7 +4223,7 @@ def find_single_image_CRs(visit, simple_mask=False, with_ctx_mask=True,
 
         flt.flush()
         
-def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, max_files=999, pixfrac=0.8, scale=0.06, skysub=True, skymethod='localmin', skyuser='MDRIZSKY', bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='EXP', final_wt_scl='exptime', context=False, static=True, use_group_footprint=False, fetch_flats=True, fix_wcs_system=False, include_saturated=False):
+def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, max_files=999, pixfrac=0.8, scale=0.06, skysub=True, skymethod='localmin', skyuser='MDRIZSKY', bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='EXP', final_wt_scl='exptime', context=False, static=True, use_group_footprint=False, fetch_flats=True, fix_wcs_system=False, include_saturated=False,log=False):
     """Combine overlapping visits into single output mosaics
     
     Parameters
@@ -4161,6 +4269,11 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, m
     Produces drizzled images.
     
     """
+    if log:
+        frame = inspect.currentframe()
+        utils.log_function_arguments(utils.LOGFILE, frame,
+                                     'prep.drizzle_overlaps')
+        
     from drizzlepac.astrodrizzle import AstroDrizzle
     from shapely.geometry import Polygon
     
@@ -4295,7 +4408,7 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, m
                     utils.fetch_hst_calibs(file, calib_types=['PFLTFILE'],
                                        verbose=False)  
                 except:
-                    pass
+                    utils.log_exception(utils.LOGFILE, traceback)
                     
         # Fetch files from aws
         if 'reference' in group:
