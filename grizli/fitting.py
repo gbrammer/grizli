@@ -325,8 +325,22 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
         fig.axes[0].plot(prior[0], np.log10(prior[1]), color='#1f77b4', alpha=0.5)
         
     # Add stack fit to the existing plot
-    fig.axes[0].plot(fit['zgrid'], np.log10(fit['pdf']), color='0.5', alpha=0.5)
-    fig.axes[0].set_xlim(fit['zgrid'].min(), fit['zgrid'].max())
+    # fig.axes[0].plot(fit['zgrid'], np.log10(fit['pdf']), color='0.5', alpha=0.5)
+    # fig.axes[0].set_xlim(fit['zgrid'].min(), fit['zgrid'].max())
+    
+    axz = fig.axes[0]
+    zmi, zma = fit['zgrid'].min(), fit['zgrid'].max()
+    if (zma-zmi) > 5:
+        ticks = np.arange(np.ceil(zmi), np.floor(zma), 1)
+        lz = np.log(1+fit['zgrid'])
+        axz.plot(lz, np.log10(fit['pdf']), color='0.5', alpha=0.5)
+        axz.set_xticks(np.log(1+ticks))
+        axz.set_xticklabels(np.cast[int](ticks))
+        axz.set_xlim(lz.min(), lz.max())  
+    else:
+        axz.plot(fit['zgrid'], np.log10(fit['pdf']), color='0.5', alpha=0.5)
+        axz.set_xlim(zmi, zma)
+    
     
     if phot is not None:
         fig.axes[1].errorbar(mb.photom_pivot/1.e4, mb.photom_flam/1.e-19, mb.photom_eflam/1.e-19, marker='s', alpha=0.5, color='k', linestyle='None')
@@ -1952,15 +1966,25 @@ class GroupFitter(object):
         axz = fig.add_subplot(gs[-1,0]) #121)
         
         axz.text(0.95, 0.96, self.group_name + '\n'+'ID={0:<5d}  z={1:.4f}'.format(self.id, fit.meta['z_map'][0]), ha='right', va='top', transform=axz.transAxes, fontsize=9)
-                 
-        axz.plot(fit['zgrid'], np.log10(fit['pdf']), color='k')
+         
+        zmi, zma = fit['zgrid'].min(), fit['zgrid'].max()
+        if (zma-zmi) > 5:
+            ticks = np.arange(np.ceil(zmi), np.floor(zma)+0.5, 1)
+            lz = np.log(1+fit['zgrid'])
+            axz.plot(lz, np.log10(fit['pdf']), color='k')
+            axz.set_xticks(np.log(1+ticks))
+            axz.set_xticklabels(np.cast[int](ticks))
+            axz.set_xlim(lz.min(), lz.max())  
+        else:
+            axz.plot(fit['zgrid'], np.log10(fit['pdf']), color='k')
+            axz.set_xlim(zmi, zma)
+
         #axz.fill_between(z, (chi2-chi2.min())/scale_nu, 27, color='k', alpha=0.5)
         
         axz.set_xlabel(r'$z$')
         axz.set_ylabel(r'$\log\ p(z)$'+' / '+ r'$\chi^2=\frac{{{0:.0f}}}{{{1:d}}}={2:.2f}$'.format(fit.meta['chimin'][0], fit.meta['DoF'][0], fit.meta['chimin'][0]/fit.meta['DoF'][0]))
         #axz.set_yticks([1,4,9,16,25])
         
-        axz.set_xlim(fit['zgrid'].min(), fit['zgrid'].max())
         pzmax = np.log10(fit['pdf'].max())
         axz.set_ylim(pzmax-6, pzmax+0.8)
         axz.grid()
