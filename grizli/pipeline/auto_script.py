@@ -3377,6 +3377,21 @@ def make_report(root, gzipped_links=True):
     
     tab.write_sortable_html('{0}.summary.html'.format(root), replace_braces=True, localhost=False, max_lines=500, table_id=None, table_class='display compact', css=None, filter_columns=[], buttons=['csv'], toggle=False, use_json=False)
     
+    # Grism
+    column_files = glob.glob('*column.png')
+    if len(column_files) > 0:
+        column_url = '<div>' + ' '.join(['<a href="./{0}"><img src="./{0}" height=100px></a>'.format(f) for f in column_files]) + '</div>'
+    else:
+        column_url = ''
+
+    grism_files = glob.glob('*../Extractions/*grism*fits')
+    if len(grism_files) > 0:
+        grism_url = '<div>' + '<br>'.join(['<a href="./{0}">{0}</a><br>'.format(f) for f in grism_files]) + '</div>'
+        if gzipped_links:
+            grism_url = grism_url.replace('.fits','.fits.gz')
+    else:
+        grism_url = ''
+        
     body="""
     
     <h4>{0}</h4>
@@ -3389,12 +3404,15 @@ def make_report(root, gzipped_links=True):
     <a href={0}-ir_drz_sci.fits>{0}_visits.npy</a>
     </pre>
     
+    {1}
+    {2}
+    
     <a href="./{0}.rgb.jpg"><img src="./{0}.rgb.jpg" height=300px></a>
     <a href="https://s3.amazonaws.com/aws-grivam/FullQuery/{0}_footprint.png"><img src="https://s3.amazonaws.com/aws-grivam/FullQuery/{0}_footprint.png" height=300px></a>
     <a href="./{0}_fine.png"><img src="./{0}_fine.png" height=200px></a>
     <br>
     
-    """.format(root)
+    """.format(root, column_url, grism_url)
     
     lines = open('{0}.summary.html'.format(root)).readlines()
     for i in range(len(lines)):
