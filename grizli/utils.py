@@ -1,6 +1,7 @@
 """General utilities"""
 import os
 import glob
+import inspect
 from collections import OrderedDict
 
 import warnings
@@ -257,28 +258,28 @@ def blot_nearest_exact(in_data, in_wcs, out_wcs, verbose=True, stepsize=-1,
     olap_poly = np.array(olap.exterior.xy)
     poly_reg = "fk5\npolygon("+','.join(['{0}'.format(p) for p in olap_poly.T.flatten()])+')\n'
     reg = pyregion.parse(poly_reg)
-    mask = reg.get_mask(header=to_header(in_wcs), shape=in_sh)
+    mask = reg.get_mask(header=to_header(out_wcs), shape=in_sh)
     
     #yp, xp = np.indices(in_data.shape)
     #xi, yi = xp[mask], yp[mask]
-    yi, xi = np.where(mask > 0)
+    yo, xo = np.where(mask > 0)
     
     if stepsize <= 1:        
-        rd = in_wcs.all_pix2world(xi, yi, 0)
-        xf, yf = out_wcs.all_world2pix(rd[0], rd[1], 0)
+        rd = out_wcs.all_pix2world(xo, yo, 0)
+        xf, yf = in_wcs.all_world2pix(rd[0], rd[1], 0)
     else:
         ## Seems backwards and doesn't quite agree with above
-        blot_wcs = in_wcs
-        source_wcs = out_wcs
+        blot_wcs = out_wcs
+        source_wcs = in_wcs
         
         nx, ny = int(blot_wcs._naxis1), int(blot_wcs._naxis2)
         mapping = cdriz.DefaultWCSMapping(blot_wcs, source_wcs, nx, ny,
                                           stepsize)
-        xf, yf = mapping(xi+1, yi+1)
+        xf, yf = mapping(xo, yo)
         
-    xo, yo = np.cast[int](np.round(xf)), np.cast[int](np.round(yf))
+    xi, yi = np.cast[int](np.round(xf)), np.cast[int](np.round(yf))
         
-    m2 = (xo >= 0) & (yo >= 0) & (xo < out_sh[1]) & (yo < out_sh[0])
+    m2 = (xi >= 0) & (yi >= 0) & (xi < in_sh[1]) & (yi < in_sh[0])
     xi, yi, xf, yf, xo, yo = xi[m2], yi[m2], xf[m2], yf[m2], xo[m2], yo[m2]
     
     out_data = np.zeros(out_sh, dtype=np.float)
@@ -5374,4 +5375,47 @@ def hull_area(x, y):
     poly = Polygon(pxy)
     
     return poly.area
+
+LOGFILE = '/tmp/grizli.log'
+
+def log_function_arguments(LOGFILE, frame, func='func', verbose=True):
+    """
+    Log local variables to a file
+    """
+    args = inspect.getargvalues(frame).locals
+    args.pop('frame')
+    for k in list(args.keys()): 
+        if hasattr(args[k], '__builtins__'):
+            args.pop(k)
+    
+    if func is not None:
+        logstr = '\n{0}(**{1})\n'
+    else:
+        logstr = '\n{1}'
+        
+    logstr = logstr.format(func, args)
+    log_comment(LOGFILE, logstr, verbose=verbose, show_date=True)
+    
+def log_comment(LOGFILE, comment, verbose=False, show_date=False):
+    import time
+    fp = open(LOGFILE,'a')
+    
+    if show_date:
+        fp.write('\n# ({0})\n'.format(time.ctime()))
+    
+    fp.write('{0}\n'.format(comment))
+    fp.close()
+    
+    if verbose:
+        print(comment)
+        
+def log_exception(LOGFILE, traceback):
+    import time
+    
+    fp = open(LOGFILE,'a')
+    fp.write('\n########################################## \n# ! Exception ({0})\n'.format(time.ctime()))
+    trace = traceback.format_exc(limit=2)
+    fp.write('#\n# !'+'\n# !'.join(trace.split('\n')))
+    fp.write('\n######################################### \n\n')
+    fp.close()
     
