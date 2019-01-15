@@ -110,12 +110,26 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
     apply_grism_skysub : bool
         xx nothing now xxx
     
+    crclean : bool
+        Run LACosmicx on the exposure
+    
+    mask_regions : bool
+        Apply exposure region mask (like *_flt.01.mask.reg) if it exists.
+        
     Returns
     -------
     Nothing, but copies the file from `path` to `./`.
         
     """
     import shutil
+    
+    if crclean:
+        try:
+            import lacosmicx
+            has_lacosmicx = True
+            print('Warning (fresh_flt_file): couldn\'t import lacosmicx')
+        except:
+            has_lacosmicx = False
     
     local_file = os.path.basename(file)
     if preserve_dq:
@@ -238,8 +252,7 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
                 orig_file['DQ'].data |= new_bp[0].data
                 extra_msg += ' / wfc3ir_dark_badpix_2019.01.12.fits'
         
-    if crclean:
-        import lacosmicx
+    if crclean & has_lacosmicx:
         for ext in [1,2]:
             print('Clean CRs with LACosmic, extension {0:d}'.format(ext))
             
@@ -4013,8 +4026,13 @@ def find_single_image_CRs(visit, simple_mask=False, with_ctx_mask=True,
     """
     from drizzlepac import astrodrizzle
     if run_lacosmic:
-        import lacosmicx
-    
+        try:
+            import lacosmicx
+            has_lacosmicx = True
+            print('Warning (find_single_image_CRs): couldn\'t import lacosmicx')
+        except:
+            has_lacosmicx = False
+            
     # try:
     #     import reproject
     #     HAS_REPROJECT = True
@@ -4060,7 +4078,9 @@ def find_single_image_CRs(visit, simple_mask=False, with_ctx_mask=True,
                                                    flt_wcs)
             
                 ctx_mask = blotted > 0
-            
+            else:
+                ctx_mask = np.zeros(flt['SCI',ext].data.shape, dtype=bool)
+                
             sci = flt['SCI',ext].data
             dq = dq_hdu[dq_extname,ext].data
 
@@ -4075,7 +4095,7 @@ def find_single_image_CRs(visit, simple_mask=False, with_ctx_mask=True,
                 else:
                     inmask = dq > 0
                     
-                if run_lacosmic:                
+                if run_lacosmic & has_lacosmicx:                
                     crmask, clean = lacosmicx.lacosmicx(sci, inmask=inmask,
                              sigclip=4.5, sigfrac=0.3, objlim=5.0, gain=1.0,
                              readnoise=6.5, satlevel=65536.0, pssl=0.0,
@@ -4092,7 +4112,7 @@ def find_single_image_CRs(visit, simple_mask=False, with_ctx_mask=True,
                     dq[crmask] |= 1024
                     
                 #sci[crmask & ctx_mask] = 0
-        
+
         flt.flush()
         
 def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, max_files=999, pixfrac=0.8, scale=0.06, skysub=True, skymethod='localmin', skyuser='MDRIZSKY', bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='EXP', final_wt_scl='exptime', context=False, static=True, use_group_footprint=False, fetch_flats=True, fix_wcs_system=False, include_saturated=False):
