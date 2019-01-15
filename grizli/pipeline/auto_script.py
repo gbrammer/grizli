@@ -2,6 +2,8 @@
 Automatic processing scripts for grizli
 """
 import os
+import inspect
+
 import numpy as np
 import astropy.io.fits as pyfits
 
@@ -19,11 +21,11 @@ IR_W_FILTERS = ['F105W', 'F110W', 'F125W', 'F140W', 'F160W']
 IR_GRISMS = ['G102', 'G141']
 
 OPT_M_FILTERS = ['F410M', 'F467M', 'F547M', 'F550M', 'F621M', 'F689M', 'F763M', 'F845M']
-OPT_W_FILTERS = ['F350LP, ''F435W', 'F438W', 'F439W', 'F450W', 'F475W', 'F475X', 'F555W', 'F569W', 'F600LP', 'F606W', 'F622W', 'F625W', 'F675W', 'F702W', 'F775W', 'F791W', 'F814W', 'F850LP']
+OPT_W_FILTERS = ['F350LP', 'F435W', 'F438W', 'F439W', 'F450W', 'F475W', 'F475X', 'F555W', 'F569W', 'F600LP', 'F606W', 'F622W', 'F625W', 'F675W', 'F702W', 'F775W', 'F791W', 'F814W', 'F850LP']
 OPT_GRISMS = ['G800L']
 UV_GRISMS = ['G280']
 
-VALID_FILTERS = OPT_M_FILTERS + OPT_W_FILTERS + OPT_GRISMS + UV_GRISMS 
+VALID_FILTERS = OPT_M_FILTERS + OPT_W_FILTERS + OPT_GRISMS #+ UV_GRISMS 
 VALID_FILTERS += IR_M_FILTERS + IR_W_FILTERS + IR_GRISMS
 
 def demo():
@@ -145,7 +147,7 @@ def get_extra_data(root='j114936+222414', HOME_PATH='/Volumes/Pegasus/Grizli/Aut
 
     os.chdir(CWD)
     
-def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', inspect_ramps=False, manual_alignment=False, is_parallel_field=False, reprocess_parallel=False, only_preprocess=False, make_mosaics=True, fill_mosaics=True, make_phot=True, run_extractions=True, run_fit=True, s3_sync=False, fine_radec=None, run_fine_alignment=True, combine_all_filters=True, gaia_by_date=False, align_mag_limits=[14,24], align_outlier_threshold=3, align_simple=False, align_clip=-1, align_rms_limit=2, align_min_overlap=0.2, master_radec=None, parent_radec=None, fix_stars=True, is_dash=False, run_parse_visits=True, imaging_bkg_params=prep.BKG_PARAMS, reference_wcs_filters=['G800L', 'G102', 'G141'], filters=VALID_FILTERS, catalogs=['PS1','DES','NSC', 'SDSS','GAIA','WISE'], mosaic_pixel_scale=None, mosaic_pixfrac=0.6, half_optical_pixscale=False, skip_single_optical_visits=True):
+def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', inspect_ramps=False, manual_alignment=False, is_parallel_field=False, reprocess_parallel=False, only_preprocess=False, make_mosaics=True, fill_mosaics='grism', make_phot=True, run_extractions=False, run_fit=False, s3_sync=False, fine_radec=None, run_fine_alignment=True, combine_all_filters=True, gaia_by_date=True, align_mag_limits=[14,24], align_outlier_threshold=4, align_simple=False, align_clip=-1, align_rms_limit=2, align_min_overlap=0.2, master_radec=None, parent_radec=None, fix_stars=True, is_dash=False, run_parse_visits=True, imaging_bkg_params=prep.BKG_PARAMS, reference_wcs_filters=['G800L', 'G102', 'G141'], filters=VALID_FILTERS, catalogs=['PS1','DES','NSC','SDSS','GAIA','WISE'], mosaic_pixel_scale=None, mosaic_pixfrac=0.75, half_optical_pixscale=False, skip_single_optical_visits=True, get_dict=False, **kwargs):
     """
     Run the full pipeline for a given target
         
@@ -158,6 +160,41 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
         Magnitude limits of objects to extract and fit.
     
     """
+    
+    # Function defaults
+    if get_dict:
+        if get_dict <= 2:
+            # Default function arguments (different value to avoid recursion)
+            default_args = go(get_dict=10)
+            
+        frame = inspect.currentframe()
+        args = inspect.getargvalues(frame).locals
+        for k in ['root', 'HOME_PATH', 'frame', 'get_dict']:
+            if k in args:
+                args.pop(k)
+        
+        if get_dict == 2:
+            # Print keywords summary
+            if len(kwargs) > 0:
+                print('\n*** Extra args ***\n')
+                for k in kwargs:
+                    if k not in default_args:
+                        print('\'{0}\':{1},'.format(k, kwargs[k]))
+                
+            print('\n*** User args ***\n')
+            for k in args:
+                if k in default_args:
+                    if args[k] != default_args[k]:
+                        print('\'{0}\':{1},'.format(k, args[k]))
+            
+            print('\n*** Default args ***\n')
+            for k in args:                
+                if k in default_args:
+                    print('\'{0}\':{1},'.format(k, args[k]))
+            return args 
+        else:        
+            return args
+            
     import os
     import glob
     import matplotlib.pyplot as plt
@@ -278,7 +315,15 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
         # Fill IR filter mosaics with scaled combined data so they can be used 
         # as grism reference
         if fill_mosaics:
-            auto_script.fill_filter_mosaics(root)
+            if fill_mosaics == 'grism':
+                # Only fill mosaics if grism filters exist
+                has_grism = utils.column_string_operation(info['FILTER'], 
+                                         ['G141','G102','G800L'],
+                                         'count', 'or')
+                if has_grism:
+                    auto_script.fill_filter_mosaics(root)                                             
+            else:
+                auto_script.fill_filter_mosaics(root)
         
         ## Optical filters
         
