@@ -3,6 +3,8 @@ Automatic processing scripts for grizli
 """
 import os
 import inspect
+import traceback
+import glob
 
 import numpy as np
 import astropy.io.fits as pyfits
@@ -21,7 +23,7 @@ IR_W_FILTERS = ['F105W', 'F110W', 'F125W', 'F140W', 'F160W']
 IR_GRISMS = ['G102', 'G141']
 
 OPT_M_FILTERS = ['F410M', 'F467M', 'F547M', 'F550M', 'F621M', 'F689M', 'F763M', 'F845M']
-OPT_W_FILTERS = ['F350LP', 'F435W', 'F438W', 'F439W', 'F450W', 'F475W', 'F475X', 'F555W', 'F569W', 'F600LP', 'F606W', 'F622W', 'F625W', 'F675W', 'F702W', 'F775W', 'F791W', 'F814W', 'F850LP']
+OPT_W_FILTERS = ['F200LP','F350LP', 'F435W', 'F438W', 'F439W', 'F450W', 'F475W', 'F475X', 'F555W', 'F569W', 'F600LP', 'F606W', 'F622W', 'F625W', 'F675W', 'F702W', 'F775W', 'F791W', 'F814W', 'F850LP']
 OPT_GRISMS = ['G800L']
 UV_GRISMS = ['G280']
 
@@ -73,11 +75,7 @@ def get_extra_data(root='j114936+222414', HOME_PATH='/Volumes/Pegasus/Grizli/Aut
     import glob
     
     import numpy as np
-    try:
-        from .. import utils
-    except:
-        from grizli import utils
-        
+
     from hsaquery import query, fetch, fetch_mast
     from hsaquery.fetch import DEFAULT_PRODUCTS
     
@@ -195,18 +193,20 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
         else:        
             return args
             
-    import os
-    import glob
-    import matplotlib.pyplot as plt
-
+    # import os
+    # import glob
+    # import traceback
+    # 
+    # 
     try:
-        from .. import prep, utils, multifit
+        from .. import multifit
         from . import auto_script
     except:
-        from grizli import prep, utils, multifit
+        from grizli import multifit
         from grizli.pipeline import auto_script
-        
-    #import grizli.utils
+    
+    # #import grizli.utils
+    import matplotlib.pyplot as plt
     
     # Silence numpy and astropy warnings
     utils.set_warnings()
@@ -215,6 +215,10 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
     
     exptab = utils.GTable.gread(os.path.join(HOME_PATH, '{0}_footprint.fits'.format(root)))
     
+    utils.LOGFILE = os.path.join(HOME_PATH, '{0}.auto_script.log'.format(root))
+    
+    utils.log_comment(utils.LOGFILE, '### Pipeline start', show_date=True)
+        
     if False:
         is_parallel_field = 'MALKAN' in [name.split()[0] for name in np.unique(exptab['pi_name'])]
         
@@ -231,6 +235,7 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
     files=glob.glob('../RAW/*_fl*fits')+glob.glob('../RAW/*_c[01]m.fits')
     if len(files) == 0:
         print('No FL[TC] files found!')
+        utils.LOGFILE = '/tmp/grizli.log'
         return False
         
     if inspect_ramps:
@@ -270,10 +275,11 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
 
             # Update WCS headers with fine alignment
             auto_script.update_wcs_headers_with_fine(root, backup=True)
-
+        
         except:
-            pass
-    
+            utils.log_exception(utils.LOGFILE, traceback)
+            utils.log_comment(utils.LOGFILE, "# !! Fine alignment failed")
+            
     # Update the visits file with the new exposure footprints
     print('Update exposure footprints in {0}_visits.npy'.format(root))
     get_visit_exposure_footprints(visit_file='{0}_visits.npy'.format(root),
@@ -295,7 +301,7 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
         IR_filters = ['F105W', 'F110W', 'F125W', 'F140W', 'F160W', 
                       'F098M', 'F139M', 'F127M', 'F153M']
         
-        optical_filters = ['F814W', 'F606W', 'F435W', 'F850LP', 'F702W', 'F555W', 'F438W', 'F475W', 'F625W', 'F775W', 'F225W', 'F275W', 'F300W', 'F390W','F350LP']
+        optical_filters = ['F814W', 'F606W', 'F435W', 'F850LP', 'F702W', 'F555W', 'F438W', 'F475W', 'F625W', 'F775W', 'F225W', 'F275W', 'F300W', 'F390W','F350LP','F200LP']
         optical_filters += ['F410M', 'F450W']
         
         if combine_all_filters:
@@ -319,7 +325,7 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
                 # Only fill mosaics if grism filters exist
                 has_grism = utils.column_string_operation(info['FILTER'], 
                                          ['G141','G102','G800L'],
-                                         'count', 'or')
+                                         'count', 'or').sum() > 0
                 if has_grism:
                     auto_script.fill_filter_mosaics(root)                                             
             else:
@@ -374,16 +380,23 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
         try:
             tab = auto_script.multiband_catalog(field_root=root, threshold=threshold, detection_background=False, photometry_background=True, get_all_filters=False)
         except:
-            tab = auto_script.multiband_catalog(field_root=root, threshold=threshold, detection_background=True, photometry_background=True, get_all_filters=False)
+            utils.log_exception(utils.LOGFILE, traceback)
+            utils.log_comment(utils.LOGFILE, 
+               '# Run `multiband_catalog` with `detection_background=True`')
             
+            tab = auto_script.multiband_catalog(field_root=root, threshold=threshold, detection_background=True, photometry_background=True, get_all_filters=False)
+    
+    if (not is_dash):
+        # Make PSFs.  Always set get_line_maps=False since PSFs now
+        # provided for each object.
+        print('Make field PSFs')
+        auto_script.field_psf(root=root, HOME_PATH=HOME_PATH, 
+                          get_line_maps=False)
+    
+    
     # Stop if only want to run pre-processing
     if (only_preprocess | (len(all_groups) == 0)):
-        if (not is_dash):
-            # Make PSF
-            print('Make field PSFs')
-            auto_script.field_psf(root=root, HOME_PATH=HOME_PATH, 
-                              get_line_maps=False)
-        
+        utils.LOGFILE = '/tmp/grizli.log'
         return True
                 
     ######################
@@ -406,11 +419,10 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
         grp = multifit.GroupFLT(grism_files=glob.glob('*GrismFLT.fits'), direct_files=[], ref_file=None, seg_file='{0}-ir_seg.fits'.format(root), catalog='{0}-ir.cat.fits'.format(root), cpu_count=-1, sci_extn=1, pad=256)
         
         # Make drizzle model images
-        grp.drizzle_grism_models(root=root, kernel='point')
+        grp.drizzle_grism_models(root=root, kernel='point', scale=0.2)
     
         # Free grp object
         del(grp)
-    
     
     try:
         test = maglim
@@ -423,14 +435,15 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
         pline = auto_script.DITHERED_PLINE
     
     # Make script for parallel processing
-    auto_script.generate_fit_params(field_root=root, prior=None, MW_EBV=exptab.meta['MW_EBV'], pline=pline, fit_only_beams=True, run_fit=True, poly_order=7, fsps=True, sys_err = 0.03, fcontam=0.2, zr=[0.1, 3.4], save_file='fit_args.npy')
+    auto_script.generate_fit_params(field_root=root, prior=None, MW_EBV=exptab.meta['MW_EBV'], pline=pline, fit_only_beams=True, run_fit=True, poly_order=7, fsps=True, sys_err = 0.03, fcontam=0.2, zr=[0.05, 3.4], save_file='fit_args.npy')
     
     # Make PSF
-    print('Make field PSFs')
-    auto_script.field_psf(root=root, HOME_PATH=HOME_PATH)
+    # print('Make field PSFs')
+    # auto_script.field_psf(root=root, HOME_PATH=HOME_PATH)
     
     # Done?
     if not run_extractions:
+        utils.LOGFILE = '/tmp/grizli.log'
         return True
         
     # Run extractions (and fits)
@@ -441,7 +454,8 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
     os.chdir(os.path.join(HOME_PATH, root, 'Extractions'))
     if run_fit:
         auto_script.summary_catalog(field_root=root)
-
+    
+    
 def make_directories(field_root='j142724+334246', HOME_PATH='./'):
     """
     Make RAW, Prep, Persistence, Extractions directories
@@ -466,6 +480,14 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/
     import glob
     
     try:
+        from .. import utils
+        frame = inspect.currentframe()
+        utils.log_function_arguments(utils.LOGFILE, frame,
+                                     'auto_script.fetch_files')
+    except:
+        from grizli import utils
+    
+    try:
         try:
             from mastquery import query, fetch
             MAST_QUERY = True
@@ -485,13 +507,7 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/
     """.format(ERR)
 
         raise(ImportError(warn))
-        
-    #import grizli
-    try:
-        from .. import utils
-    except:
-        from grizli import utils
-    
+            
     if not os.path.exists(os.path.join(HOME_PATH, field_root, 'RAW')):
         make_directories(field_root=field_root, HOME_PATH=HOME_PATH)
         
@@ -640,7 +656,10 @@ def remove_bad_expflag(field_root='', HOME_PATH='./', min_bad=2):
     for visit in visits:
         bad = (visit_name == visit) & (expf['EXPFLAG'] != 'NORMAL')
         if bad.sum() >= min_bad:
-            print('Found bad visit: {0}, N={1}\n'.format(visit, bad.sum()))
+            logstr = '# Found bad visit: {0}, N={1}\n'
+            logstr = logstr.format(visit, bad.sum())
+            utils.log_comment(utils.LOGFILE, logstr, verbose=True)
+            
             if not os.path.exists('Expflag'):
                 os.mkdir('Expflag')
             
@@ -880,7 +899,8 @@ def clean_prep(field_root='j142724+334246'):
     flt_files = glob.glob('*_fl?.fits')
     for flt_file in flt_files:
         utils.fix_flt_nan(flt_file, verbose=True)
-         
+
+             
 def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', min_overlap=0.2, make_combined=True, catalogs=['PS1','DES','NSC','SDSS','GAIA','WISE'], use_visit=True, master_radec=None, parent_radec=None, use_first_radec=False, skip_imaging=False, clean=True, fix_stars=True, tweak_max_dist=1., align_simple=True, align_clip=30, imaging_bkg_params=None, align_rms_limit=2., use_self_catalog=False, align_mag_limits=[14,24], outlier_threshold=3, skip_single_optical_visits=True):
     """
     master_radec: force use this radec file
@@ -888,6 +908,15 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
     parent_radec: use this file if overlap < min_overlap
     
     """
+
+    try:
+        from .. import prep, utils
+        frame = inspect.currentframe()
+        utils.log_function_arguments(utils.LOGFILE, frame,
+                                     'auto_script.preprocess')
+    except:
+        from grizli import prep, utils
+    
     import os
     import glob
     import numpy as np
@@ -896,12 +925,6 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
     from shapely.geometry import Polygon
     from scipy.spatial import ConvexHull
     import copy
-
-    #import grizli.prep
-    try:
-        from .. import prep, utils
-    except:
-        from grizli import prep, utils
         
     #files=glob.glob('../RAW/*fl[tc].fits')
     visits, all_groups, info = np.load('{0}_visits.npy'.format(field_root))
@@ -1058,6 +1081,9 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
                                         align_clip=align_clip,
                                         imaging_bkg_params=imaging_bkg_params)
             except:
+                utils.log_exception(utils.LOGFILE, traceback)
+                utils.log_comment(utils.LOGFILE, "# !! First `prep` run failed with `run_tweak_align`. Try again")
+                
                 status = prep.process_direct_grism_visit(direct=direct,
                                             grism={}, radec=radec,
                                             skip_direct=False,
@@ -1168,13 +1194,14 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
     from photutils import segmentation, background
     import photutils.utils
     
-    #import grizli
-    #import grizli.prep
     try:
         from .. import prep, utils
+        frame = inspect.currentframe()
+        utils.log_function_arguments(utils.LOGFILE, frame,
+                                     'auto_script.multiband_catalog')
     except:
         from grizli import prep, utils
-            
+                    
     # Make catalog
     if master_catalog is None:
         master_catalog = '{0}-ir.cat.fits'.format(field_root)
@@ -1259,8 +1286,6 @@ def photutils_catalog(field_root='j142724+334246', threshold=1.8, subtract_bkg=T
     from photutils import segmentation, background
     import photutils.utils
     
-    #import grizli
-    #import grizli.prep
     try:
         from .. import prep, utils
     except:
@@ -1331,6 +1356,9 @@ def photutils_catalog(field_root='j142724+334246', threshold=1.8, subtract_bkg=T
                 bkg_obj = bkg.background
             except:
                 bkg_obj = None
+                
+                utils.log_exception(utils.LOGFILE, traceback)
+                utils.log_comment(utils.LOGFILE, "# !! Couldn't make bkg_obj")
         else:
             bkg_obj = None
             
@@ -1536,13 +1564,22 @@ def load_GroupFLT(field_root='j142724+334246', force_ref=None, force_seg=None, f
                 
         return [grp]
     
-def grism_prep(field_root='j142724+334246', ds9=None, refine_niter=3, gris_ref_filters=GRIS_REF_FILTERS, files=None, split_by_grism=True):
+def grism_prep(field_root='j142724+334246', ds9=None, refine_niter=3, gris_ref_filters=GRIS_REF_FILTERS, files=None, split_by_grism=True, refine_poly_order=1, refine_fcontam=0.5):
+    """
+    Contamination model for grism exposures
+    """
     import glob
     import os
     import numpy as np
     
-    from .. import prep, utils, multifit
-
+    try:
+        from .. import prep, utils, multifit
+        frame = inspect.currentframe()
+        utils.log_function_arguments(utils.LOGFILE, frame,
+                                     'auto_script.grism_prep')
+    except:
+        from grizli import prep, utils, multifit
+        
     grp_objects = load_GroupFLT(field_root=field_root, gris_ref_filters=gris_ref_filters, files=files, split_by_grism=split_by_grism)
     
     for grp in grp_objects:
@@ -1570,7 +1607,10 @@ def grism_prep(field_root='j142724+334246', ds9=None, refine_niter=3, gris_ref_f
         
             mode = n[0]
         
-            print(grp.FLTs[i].grism.parent_file, grp.FLTs[i].grism.filter, mode)
+            logstr = '# grism_mode_bg {0} {1} {2:.4f}'
+            logstr = logstr.format(grp.FLTs[i].grism.parent_file, grp.FLTs[i].grism.filter, mode)
+            utils.log_comment(utils.LOGFILE, logstr, verbose=True)
+            
             try:
                 ds9.view(grp.FLTs[i].grism['SCI'] - grp.FLTs[i].model)
             except:
@@ -1585,13 +1625,15 @@ def grism_prep(field_root='j142724+334246', ds9=None, refine_niter=3, gris_ref_f
         if ds9:
             ds9.view(grp.FLTs[i].grism['SCI'] - grp.FLTs[i].model)
             fr = ds9.get('frame')
-    
+        
+        utils.log_comment(utils.LOGFILE, '# Refine contamination', verbose=True, show_date=True)
+        
         for iter in range(refine_niter):
             print('\nRefine contamination model, iter # {0}\n'.format(iter))
             if ds9:
                 ds9.set('frame {0}'.format(int(fr)+iter+1))
         
-            grp.refine_list(poly_order=3, mag_limits=[18, 24], max_coeff=5, ds9=ds9, verbose=True, fcontam=10)
+            grp.refine_list(poly_order=refine_poly_order, mag_limits=[18, 24], max_coeff=5, ds9=ds9, verbose=True, fcontam=refine_fcontam)
 
         ##############
         # Save model to avoid having to recompute it again
@@ -1607,7 +1649,8 @@ def grism_prep(field_root='j142724+334246', ds9=None, refine_niter=3, gris_ref_f
     return grp
     
 DITHERED_PLINE = {'kernel': 'point', 'pixfrac': 0.2, 'pixscale': 0.1, 'size': 8, 'wcs': None}
-PARALLEL_PLINE = {'kernel': 'square', 'pixfrac': 0.8, 'pixscale': 0.1, 'size': 8, 'wcs': None}
+PARALLEL_PLINE = {'kernel': 'square', 'pixfrac': 1.0, 'pixscale': 0.1, 'size': 8, 'wcs': None}
+
   
 def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00, ids=None, pline=DITHERED_PLINE, fit_only_beams=True, run_fit=True, poly_order=7, master_files=None, grp=None, bad_pa_threshold=None, fit_trace_shift=False, size=32, diff=False):
     import glob
@@ -1621,7 +1664,7 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
         from .. import multifit, prep, utils, fitting
     except:
         from grizli import multifit, prep, utils, fitting
-        
+    
     if master_files is None:
         master_files = glob.glob('*GrismFLT.fits')
         
@@ -1797,7 +1840,7 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
     else:
         return True
         
-def generate_fit_params(field_root='j142724+334246', fitter='bounded', prior=None, MW_EBV=0.00, pline=DITHERED_PLINE, fit_only_beams=True, run_fit=True, poly_order=7, fsps=True, sys_err = 0.03, fcontam=0.2, zr=[0.1, 3.4], fwhm=1000, lorentz=False, save_file='fit_args.npy'):
+def generate_fit_params(field_root='j142724+334246', fitter='bounded', prior=None, MW_EBV=0.00, pline=DITHERED_PLINE, fit_only_beams=True, run_fit=True, poly_order=7, fsps=True, sys_err = 0.03, fcontam=0.2, zr=[0.05, 3.6], dz=[0.004, 0.0004], fwhm=1000, lorentz=False, save_file='fit_args.npy'):
     """
     Generate a parameter dictionary for passing to the fitting script
     """
@@ -1808,7 +1851,7 @@ def generate_fit_params(field_root='j142724+334246', fitter='bounded', prior=Non
     t0 = utils.load_templates(fwhm=fwhm, line_complexes=True, stars=False, full_line_list=None, continuum_list=None, fsps_templates=fsps, alf_template=True, lorentz=lorentz)
     t1 = utils.load_templates(fwhm=fwhm, line_complexes=False, stars=False, full_line_list=None, continuum_list=None, fsps_templates=fsps, alf_template=True, lorentz=lorentz)
 
-    args = fitting.run_all(0, t0=t0, t1=t1, fwhm=1200, zr=zr, dz=[0.004, 0.0005], fitter=fitter, group_name=field_root, fit_stacks=False, prior=prior,  fcontam=fcontam, pline=pline, mask_sn_limit=10, fit_beams=False,  root=field_root, fit_trace_shift=False, phot=phot, verbose=True, scale_photometry=False, show_beams=True, overlap_threshold=10, get_ir_psfs=True, fit_only_beams=fit_only_beams, MW_EBV=MW_EBV, sys_err=sys_err, get_dict=True)
+    args = fitting.run_all(0, t0=t0, t1=t1, fwhm=1200, zr=zr, dz=dz, fitter=fitter, group_name=field_root, fit_stacks=False, prior=prior,  fcontam=fcontam, pline=pline, mask_sn_limit=np.inf, fit_beams=False,  root=field_root, fit_trace_shift=False, phot=phot, verbose=True, scale_photometry=False, show_beams=True, overlap_threshold=10, get_ir_psfs=True, fit_only_beams=fit_only_beams, MW_EBV=MW_EBV, sys_err=sys_err, get_dict=True)
     
     np.save(save_file, [args])
     print('Saved arguments to {0}.'.format(save_file))
@@ -1867,7 +1910,7 @@ def summary_catalog(field_root='', dzbin=0.01, use_localhost=True, filter_bandpa
     import matplotlib.pyplot as plt
     
     try:
-        from .. import prep, utils, fitting
+        from .. import fitting
         from . import auto_script
     except:
         from grizli import prep, utils, fitting
@@ -1978,6 +2021,20 @@ def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Griz
     import os
     import glob
     
+    try:
+        from .. import prep, utils
+        from ..prep import get_radec_catalog
+        from ..utils import transform_wcs
+        
+        frame = inspect.currentframe()
+        utils.log_function_arguments(utils.LOGFILE, frame,
+                                     'auto_script.fine_alignment')
+        
+    except:
+        from grizli import prep, utils
+        from grizli.prep import get_radec_catalog
+        from grizli.utils import transform_wcs
+
     import numpy as np
     np.set_printoptions(**print_options)
     
@@ -1986,15 +2043,6 @@ def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Griz
     from shapely.geometry import Polygon
     from scipy.spatial import ConvexHull
     from drizzlepac import updatehdr
-        
-    try:
-        from .. import prep, utils
-        from ..prep import get_radec_catalog
-        from ..utils import transform_wcs
-    except:
-        from grizli import prep, utils
-        from grizli.prep import get_radec_catalog
-        from grizli.utils import transform_wcs
             
     import astropy.units as u
     import astropy.io.fits as pyfits
@@ -2385,7 +2433,7 @@ def make_reference_wcs(info, output='mosaic_wcs-ref.fits', filters=['G800L', 'G1
         return ref_hdu[1]
         
     
-def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140W','F160W'], ref_image=None, ref_wcs=None, bits=None, pixfrac=0.6, scale=0.06, make_combined=True, drizzle_filters=True, skysub=False, skymethod='localmin', match_str=[], context=False, pad_reference=60, min_nexp=2, static=True, skip_products=[], include_saturated=False):
+def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140W','F160W'], ref_image=None, ref_wcs=None, bits=None, pixfrac=0.75, scale=0.06, make_combined=True, drizzle_filters=True, skysub=False, skymethod='localmin', match_str=[], context=False, pad_reference=60, min_nexp=2, static=True, skip_products=[], include_saturated=False):
     import numpy as np
     import glob
     
@@ -2732,9 +2780,12 @@ def get_rgb_filters(filter_list, force_ir=False, pure_sort=False):
     if rfilt == gfilt:
         gfilt = 'sum'
         
-    if rfilt+gfilt+bfilt == 'f110wf110wf200lp':
+    if [rfilt,gfilt,bfilt] == ['f110w','f110w','f200lp']:
         gfilt = 'sum'
-            
+
+    if [rfilt,gfilt,bfilt] == ['f814w','f606w','f814w']:
+        rfilt,gfilt,bfilt = 'f814w','sum','f606w'
+    
     return rfilt, gfilt, bfilt
     
 def field_rgb(root='j010514+021532', xsize=6, HOME_PATH='./', show_ir=True, pl=1, pf=1, scl=1, ds9=None, force_ir=False, filters=None, add_labels=True, output_format='jpg', rgb_min=-0.01, xyslice=None, pure_sort=False, verbose=True, force_rgb=None, suffix='.field'):
@@ -2797,8 +2848,9 @@ def field_rgb(root='j010514+021532', xsize=6, HOME_PATH='./', show_ir=True, pl=1
     else:
         rf, gf, bf = force_rgb
         
-    if verbose:
-        print('{0}: r {1} / g {2} / b {3}'.format(root, rf, gf, bf))
+
+    logstr = '# field_rgb {0}: r {1} / g {2} / b {3}'.format(root, rf, gf, bf)
+    utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
     
     #pf = 1
     #pl = 1
@@ -3117,7 +3169,7 @@ def test_psf():
     
     id=212; gfit, model = gf.fit_object(id=id, size=int(128*0.06), components=[galfit.GalfitSersic(), galfit.GalfitSersic()])
     
-def field_psf(root='j020924-044344', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/WISP/', factors=[1,2,4], get_drizzle_scale=True, subsample=256, size=6, get_line_maps=True, raise_fault=False, verbose=True, psf_filters=['F098M', 'F110W', 'F105W', 'F125W', 'F140W', 'F160W']):
+def field_psf(root='j020924-044344', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/WISP/', factors=[1,2,4], get_drizzle_scale=True, subsample=256, size=6, get_line_maps=False, raise_fault=False, verbose=True, psf_filters=['F098M', 'F110W', 'F105W', 'F125W', 'F140W', 'F160W']):
     """
     Generate PSFs for the available filters in a given field
     """
@@ -3237,8 +3289,11 @@ def field_psf(root='j020924-044344', HOME_PATH='/Volumes/Pegasus/Grizli/Automati
         
         for scl, pf, kern, label in zip(scale, pixfrac, kernel, labels):
             ix = 0
-            if verbose:
-                print('{0} {5:6} / {1:.3f}" / pixf: {2} / {3:8} / {4}'.format(root, scl, pf, kern, filter, label))
+            
+            logstr = '# psf {0} {5:6} / {1:.3f}" / pixf: {2} / {3:8} / {4}'
+            logstr = logstr.format(root, scl, pf, kern, filter, label)
+            utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
+            
             
             for ri, di in zip(ra.flatten(), dec.flatten()):
                 slice_h, wcs_slice = utils.make_wcsheader(ra=ri, dec=di, size=size, pixscale=scl, get_hdu=False, theta=0)
@@ -3279,6 +3334,8 @@ def make_report(root):
     Make table, etc.
     """
     import glob
+    import matplotlib.pyplot as plt
+    plt.ioff()
     
     os.chdir('../Prep/')
 
