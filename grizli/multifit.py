@@ -2713,7 +2713,7 @@ class MultiBeam(GroupFitter):
                             pscale_array = beam.beam.pscale_array
                         else:
                             pscale_array = 1.
-                            
+                        
                         ### another idea, compute a model for the line itself
                         ### and mask relatively "contaminated" pixels from 
                         ### other lines
@@ -2723,7 +2723,8 @@ class MultiBeam(GroupFitter):
                         except:
                             key = 'line '+ line
                             lm = fit['templates'][key]
-                            scl = fit['cfit'][key][0]/(1+z_driz)
+                            line_flux = fit['cfit'][key][0]
+                            scl = line_flux/(1+z_driz)
                             sp = [lm.wave*(1+z_driz), lm.flux*scl]
                             
                         #lm = fit['line1d'][line]
@@ -2732,11 +2733,15 @@ class MultiBeam(GroupFitter):
                             continue
                         
                         #sp = [lm.wave, lm.flux]
-                        m = beam.compute_model(spectrum_1d=sp, 
+                        if line_flux > 0:
+                            m = beam.compute_model(spectrum_1d=sp, 
                                                in_place=False, is_cgs=True)
-                        lmodel = m.reshape(beam.beam.sh_beam)*pscale_array
-                        if lmodel.max() == 0:
-                            continue
+                            lmodel = m.reshape(beam.beam.sh_beam)*pscale_array
+                        else:
+                            lmodel = np.zeros(beam.beam.sh_beam)
+                            
+                        # if lmodel.max() == 0:
+                        #     continue
                         
                         if 'cfit' in fit:
                             keys = fit['cfit']
@@ -2779,8 +2784,14 @@ class MultiBeam(GroupFitter):
                                     continue
 
                                 beam.extra_lines += lcontam
-                                    
-                                beam.ivar[lcontam > mask_sn_limit*lmodel] *= 0
+                                
+                                # Only mask if line flux > 0
+                                if line_flux > 0:
+                                    extra_msk = lcontam > mask_sn_limit*lmodel
+                                    extra_msk &= (lcontam > 0)
+                                    extra_msk &= (lmodel > 0)
+                                
+                                    beam.ivar[extra_msk] *= 0
                         
                         # Subtract 4959
                         if (line == 'OIII') & ('cfit' in fit) & mask_4959:
