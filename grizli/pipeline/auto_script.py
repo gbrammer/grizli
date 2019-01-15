@@ -3384,9 +3384,9 @@ def make_report(root, gzipped_links=True):
     else:
         column_url = ''
 
-    grism_files = glob.glob('*../Extractions/*grism*fits')
+    grism_files = glob.glob('../Extractions/*grism*fits')
     if len(grism_files) > 0:
-        grism_url = '<div>' + '<br>'.join(['<a href="./{0}">{0}</a><br>'.format(f) for f in grism_files]) + '</div>'
+        grism_url = '<pre>' + '\n'.join(['<a href="./{0}">{0}</a>'.format(f) for f in grism_files]) + '</pre>'
         if gzipped_links:
             grism_url = grism_url.replace('.fits','.fits.gz')
     else:
@@ -3397,9 +3397,9 @@ def make_report(root, gzipped_links=True):
     <h4>{0}</h4>
     
     <pre>
-    <a href={0}-ir_drz_sci.fits>{0}-ir_drz_sci.fits</a>
-    <a href={0}-ir_drz_sci.fits>{0}-ir_drz_wht.fits</a>
-    <a href={0}-ir_drz_sci.fits>{0}-ir_seg.fits</a>
+    <a href={0}-ir_drz_sci.fits{3}>{0}-ir_drz_sci.fits{3}</a>
+    <a href={0}-ir_drz_sci.fits{3}>{0}-ir_drz_wht.fits{3}</a>
+    <a href={0}-ir_drz_sci.fits{3}>{0}-ir_seg.fits{3}</a>
     <a href={0}-ir_drz_sci.fits>{0}_phot.fits</a>
     <a href={0}-ir_drz_sci.fits>{0}_visits.npy</a>
     </pre>
@@ -3412,7 +3412,7 @@ def make_report(root, gzipped_links=True):
     <a href="./{0}_fine.png"><img src="./{0}_fine.png" height=200px></a>
     <br>
     
-    """.format(root, column_url, grism_url)
+    """.format(root, column_url, grism_url, '.gz'*(gzipped_links))
     
     lines = open('{0}.summary.html'.format(root)).readlines()
     for i in range(len(lines)):
