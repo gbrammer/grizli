@@ -1176,7 +1176,7 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
     #             
     # prep.drizzle_overlaps(keep, parse_visits=False, pixfrac=0.6, scale=0.06, skysub=False, bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False)
 
-def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_background=True, photometry_background=True, get_all_filters=False, det_err_scale=-np.inf, run_detection=True, detection_params=prep.SEP_DETECT_PARAMS,  phot_apertures=prep.SEXTRACTOR_PHOT_APERTURES_ARCSEC, master_catalog=None, bkg_mask=None, bkg_params={'bw':32, 'bh':32, 'fw':3, 'fh':3, 'pixel_scale':0.06}):
+def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_background=True, photometry_background=True, get_all_filters=False, det_err_scale=-np.inf, run_detection=True, detection_params=prep.SEP_DETECT_PARAMS,  phot_apertures=prep.SEXTRACTOR_PHOT_APERTURES_ARCSEC, master_catalog=None, bkg_mask=None, bkg_params={'bw':64, 'bh':64, 'fw':3, 'fh':3, 'pixel_scale':0.06}):
     """
     Make a detection catalog with SExtractor and then measure
     photometry with `~photutils`.
@@ -3329,7 +3329,7 @@ def field_psf(root='j020924-044344', HOME_PATH='/Volumes/Pegasus/Grizli/Automati
             
         hdu.writeto('{0}-{1}_psf.fits'.format(root, filter), overwrite=True)
         
-def make_report(root):
+def make_report(root, gzipped_links=True):
     """
     Make table, etc.
     """
@@ -3361,6 +3361,9 @@ def make_report(root):
         url = '<a href="./{0}">sci</a>'.format(im.filename())
         url += '  '+url.replace('_sci','_wht').replace('>sci','>wht')
         
+        if gzipped_links:
+            url = url.replace('.fits','.fits.gz')
+            
         psf_file = '{0}-{1}_psf.fits'.format(root, filter)
         if os.path.exists(psf_file):
             url += ' '+'<a href="./{0}">psf</a>'.format(psf_file)
