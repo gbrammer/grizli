@@ -931,6 +931,73 @@ def calc_header_zeropoint(im, ext=0):
         ZP = 25    
     
     return ZP
+
+DEFAULT_PRIMARY_KEYS = ['FILENAME','INSTRUME','INSTRUME','DETECTOR','FILTER','FILTER1','FILTER2','EXPSTART','DATE-OBS','EXPTIME','IDCTAB', 'NPOLFILE', 'D2IMFILE','PA_V3','FGSLOCK', 'GYROMODE', 'PROPOSID']
+
+# For grism
+DEFAULT_EXT_KEYS = ['EXTNAME', 'EXTVER', 'MDRIZSKY', 'CRPIX1', 'CRPIX2', 'CRVAL1', 'CRVAL2', 'CD1_1', 'CD1_2', 'CD2_1', 'CD2_2', 'PC1_1', 'PC1_2', 'PC2_1', 'PC2_2', 'CDELT1', 'CDELT2', 'CUNIT1', 'CUNIT2', 'CTYPE1', 'CTYPE2', 'RADESYS', 'LONPOLE', 'LATPOLE', 'IDCTAB', 'D2IMEXT', 'WCSNAME', 'PHOTMODE', 'ORIENTAT', 'CCDCHIP']
+
+def flt_to_dict(fobj, primary_keys=DEFAULT_PRIMARY_KEYS, extensions=[('SCI',i+1) for i in range(2)], ext_keys=DEFAULT_EXT_KEYS):
+    """
+    Parse basic elements from a FLT/FLC header to a dictionary
+    
+    TBD
+    
+    Parameters
+    ----------
+    fobj : `~astropy.io.fits.HDUList`
+        FITS object
+        
+    primary_keys : list
+        Keywords to extract from the primary extension (0).
+    
+    extensions : list
+        List of additional extension names / indices.
+    
+    ext_keys : list
+        Keywords to extract from the extension headers.
+        
+    Returns
+    -------
+    flt_dict : dict
+    
+    """        
+    import astropy.time
+    
+    flt_dict = OrderedDict()
+    flt_dict['timestamp'] = astropy.time.Time.now().iso
+    h0 = fobj[0].header
+    
+    # Primary keywords
+    for k in primary_keys:
+        if k in h0:
+            flt_dict[k] = h0[k]
+    
+    # Grism keys
+    for k in h0:
+        if k.startswith('GSKY'):
+            flt_dict[k] = h0[k]
+            
+    # WCS, etc. keywords from SCI extensions
+    flt_dict['extensions'] = OrderedDict()
+    count = 0
+    for ext in extensions:
+        if ext in fobj:
+            d_i = OrderedDict()
+            h_i = fobj[ext].header
+            for k in ext_keys:
+                if k in h_i:
+                    d_i[k] = h_i[k]
+            
+            # Grism keys
+            for k in h_i:
+                if k.startswith('GSKY'):
+                    d_i[k] = h_i[k]
+            
+            count += 1
+            flt_dict['extensions'][count] = d_i
+    
+    return flt_dict
         
 def unset_dq_bits(value, okbits=32+64+512, verbose=False):
     """
