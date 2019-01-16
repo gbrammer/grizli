@@ -244,10 +244,10 @@ def blot_nearest_exact(in_data, in_wcs, out_wcs, verbose=True, stepsize=-1,
     out_sh = (out_wcs._naxis2, out_wcs._naxis1)
             
     in_px = in_wcs.calc_footprint()
-    in_poly = Polygon(in_px)
+    in_poly = Polygon(in_px).buffer(5./3600.)
      
     out_px = out_wcs.calc_footprint()
-    out_poly = Polygon(out_px)
+    out_poly = Polygon(out_px).buffer(5./3600)
 
     olap = in_poly.intersection(out_poly)
     if olap.area == 0:
@@ -258,7 +258,7 @@ def blot_nearest_exact(in_data, in_wcs, out_wcs, verbose=True, stepsize=-1,
     olap_poly = np.array(olap.exterior.xy)
     poly_reg = "fk5\npolygon("+','.join(['{0}'.format(p) for p in olap_poly.T.flatten()])+')\n'
     reg = pyregion.parse(poly_reg)
-    mask = reg.get_mask(header=to_header(out_wcs), shape=in_sh)
+    mask = reg.get_mask(header=to_header(out_wcs), shape=out_sh)
     
     #yp, xp = np.indices(in_data.shape)
     #xi, yi = xp[mask], yp[mask]
