@@ -3626,7 +3626,7 @@ def align_multiple_drizzled(mag_limits=[16,23]):
         imt = pyfits.open('total_drz_sci.fits')
 
         
-def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext=1, sky_iter=10, iter_atol=1.e-4):
+def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext=1, sky_iter=10, iter_atol=1.e-4, use_spline=True, NXSPL=50):
     """Subtract sky background from grism exposures
     
     Implementation of grism sky subtraction from ISR 2015-17    
@@ -3874,56 +3874,84 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
         xmsk = np.arange(im_shape[0])
         yres = med
         yok = (~yrms.mask) & np.isfinite(yrms) & np.isfinite(xmsk) & np.isfinite(yres)
-        
+                    
         if yok.sum() == 0:
             print('ERROR: No valid pixels found!')
             continue
             
         ### Fit column average with smoothed Gaussian Process model
-        if False:
-            #### xxx old GaussianProcess implementation
-            gp = GaussianProcess(regr='constant', corr='squared_exponential',
-                                 theta0=8, thetaL=5, thetaU=12,
-                                 nugget=(yrms/bg_sky)[yok][::1]**2,
-                                 random_start=10, verbose=True, normalize=True)
-                             
-            try:
-                gp.fit(np.atleast_2d(xmsk[yok][::1]).T, yres[yok][::1]+bg_sky)
-            except:
-                warn = '# visit_grism_sky / GaussianProces failed!\n# visit_grism_sky / Check that this exposure wasn\'t fried by variable backgrounds.'
-                print(warn)
-                utils.log_exception(utils.LOGFILE, traceback)
-                utils.log_comment(utils.LOGFILE, warn)
-                
-                continue
+        # if False:
+        #     #### xxx old GaussianProcess implementation
+        #     gp = GaussianProcess(regr='constant', corr='squared_exponential',
+        #                          theta0=8, thetaL=5, thetaU=12,
+        #                          nugget=(yrms/bg_sky)[yok][::1]**2,
+        #                          random_start=10, verbose=True, normalize=True)
+        #                      
+        #     try:
+        #         gp.fit(np.atleast_2d(xmsk[yok][::1]).T, yres[yok][::1]+bg_sky)
+        #     except:
+        #         warn = '# visit_grism_sky / GaussianProces failed!\n# visit_grism_sky / Check that this exposure wasn\'t fried by variable backgrounds.'
+        #         print(warn)
+        #         utils.log_exception(utils.LOGFILE, traceback)
+        #         utils.log_comment(utils.LOGFILE, warn)
+        #         
+        #         continue
+        #     
+        #     y_pred, MSE = gp.predict(np.atleast_2d(xmsk).T, eval_MSE=True)
+        #     gp_sigma = np.sqrt(MSE)
+        
+        if use_spline:
+            ###### Fit with Spline basis functions
             
-            y_pred, MSE = gp.predict(np.atleast_2d(xmsk).T, eval_MSE=True)
-            gp_sigma = np.sqrt(MSE)
+            #NXSPL = 50
+            xpad = np.arange(-1*NXSPL,im_shape[0]+1*NXSPL)
+            
+            Aspl = utils.bspline_templates(xpad, degree=3,
+                                           df=4+im_shape[0]//NXSPL,
+                                           get_matrix=True, log=False, 
+                                           clip=0.0001)[1*NXSPL:-1*NXSPL,:]
+            
+            Ax = (Aspl.T/yrms).T
+            cspl, _, _, _ =  np.linalg.lstsq(Ax, (yres+bg_sky)/yrms, rcond=-1)
+            y_pred = Aspl.dot(cspl)
+                                    
+            try:
+                ND = 100
+                covar = np.matrix(np.dot(Ax.T, Ax)).I.A
+                draws = np.random.multivariate_normal(cspl, covar, ND)
+                gp_sigma = np.std(Aspl.dot(draws.T), axis=1)
+            except:
+                gp_sigma = y_pred*0.
+                        
+        else:
+            ## Updated sklearn GaussianProcessRegressor
+            nmad_y = utils.nmad(yres)
         
-        ## Updated sklearn GaussianProcessRegressor
-        nmad_y = utils.nmad(yres)
+            gpscl = 100 # rough normalization
+            k1 = 0.3**2 * RBF(length_scale=80)  # Background variations
+            k2 = 1**2 * WhiteKernel(noise_level=(nmad_y*gpscl)**2) # noise
+            gp_kernel = k1+k2#+outliers
         
-        gpscl = 100 # rough normalization
-        k1 = 0.3**2 * RBF(length_scale=80)  # Background variations
-        k2 = 1**2 * WhiteKernel(noise_level=(nmad_y*gpscl)**2) # noise
-        gp_kernel = k1+k2#+outliers
-        
-        yok &= np.abs(yres-np.median(yres)) < 50*nmad_y
+            yok &= np.abs(yres-np.median(yres)) < 50*nmad_y
 
-        gp = GaussianProcessRegressor(kernel=gp_kernel, alpha=nmad_y*gpscl/5,
-                                      optimizer='fmin_l_bfgs_b',
-                                      n_restarts_optimizer=0, 
-                                      normalize_y=False, 
-                                      copy_X_train=True, random_state=None)
+            gp = GaussianProcessRegressor(kernel=gp_kernel,
+                                          alpha=nmad_y*gpscl/5,
+                                          optimizer='fmin_l_bfgs_b',
+                                          n_restarts_optimizer=0, 
+                                          normalize_y=False, 
+                                          copy_X_train=True,
+                                          random_state=None)
 
-        gp.fit(np.atleast_2d(xmsk[yok][::1]).T, (yres[yok][::1]+bg_sky)*gpscl)
+            gp.fit(np.atleast_2d(xmsk[yok][::1]).T,
+                   (yres[yok][::1]+bg_sky)*gpscl)
         
-        y_pred, gp_sigma = gp.predict(np.atleast_2d(xmsk).T, return_std=True)
-        gp_sigma /= gpscl
-        y_pred /= gpscl
+            y_pred, gp_sigma = gp.predict(np.atleast_2d(xmsk).T,
+                                          return_std=True)
+            gp_sigma /= gpscl
+            y_pred /= gpscl
         
         ## Plot Results
-        pi = ax.plot(med[0:2], alpha=0.2)
+        pi = ax.plot(med, alpha=0.1, zorder=-100)
         ax.plot(y_pred-bg_sky, color=pi[0].get_color())
         ax.fill_between(xmsk, y_pred-bg_sky-gp_sigma, y_pred-bg_sky+gp_sigma,
                         color=pi[0].get_color(), alpha=0.3,
