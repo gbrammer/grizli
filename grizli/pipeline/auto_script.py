@@ -393,6 +393,8 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
         auto_script.field_psf(root=root, HOME_PATH=HOME_PATH, 
                           get_line_maps=False)
     
+    # Make exposure json / html report
+    auto_script.exposure_report(root, log=True)
     
     # Stop if only want to run pre-processing
     if (only_preprocess | (len(all_groups) == 0)):
@@ -3424,6 +3426,71 @@ def make_report(root, gzipped_links=True):
     fp.writelines(lines)
     fp.close()
     
-                
+def exposure_report(root, log=True):
+    """
+    Save exposure info to webpage & json file
+    """
+    if log:
+        frame = inspect.currentframe()
+        utils.log_function_arguments(utils.LOGFILE, frame,
+                                     'auto_script.exposure_report')
     
-        
+    from collections import OrderedDict
+    import json
+    
+    # Exposures
+    visits, all_groups, info = np.load('{0}_visits.npy'.format(root))
+    
+    tab = utils.GTable(info)
+    tab.add_index('FILE')
+    
+    visit_product = ['']*len(info)
+    ramp = ['']*len(info)
+    trails = ['']*len(info)
+    
+    tab['complete'] = False
+    
+    flt_dict = OrderedDict()
+    
+    for visit in visits:
+        failed = len(glob.glob('{0}*fail*'.format(visit['product']))) > 0
+
+        for file in visit['files']:
+            
+            if os.path.exists(file):
+                fobj = pyfits.open(file)
+                fd = utils.flt_to_dict(fobj)
+                fd['complete'] = not failed
+                flt_dict[file] = fd
+                flt_dict['visit'] = visit['product']
+                
+            ix = tab.loc_indices[file]
+            visit_product[ix] = visit['product']
+            tab['complete'][ix] = not failed
+            
+            base = file.split('_')[0]
+            ramp_file = '../RAW/{0}_ramp.png'.format(base)
+           
+            has_mask = glob.glob('{0}*mask.reg'.format(base))
+            if has_mask:
+                extra = ' style="border:5px solid red;"'
+            else:
+                extra = ''
+                
+            if os.path.exists(ramp_file):
+                ramp[ix] = '<a href="{0}"><img src="{0}" height=180 {1}></a>'.format(ramp_file, extra)
+            
+            trails_file = '../RAW/{0}_trails.png'.format(base)
+            if os.path.exists(trails_file):
+                trails[ix] = '<a href="{0}"><img src="{0}" height=180 {1}></a>'.format(trails_file, extra)
+            
+    tab['product'] = visit_product
+    tab['ramp'] = ramp
+    tab['trails'] = trails
+    
+    fp = open('{0}_exposures.json'.format(root),'w')
+    json.dump(flt_dict, fp)
+    fp.close()
+    
+    tab.write_sortable_html('{0}_exposures.html'.format(root), replace_braces=True, localhost=False, max_lines=1e5, table_id=None, table_class='display compact', css=None, filter_columns=[], buttons=['csv'], toggle=True, use_json=False)
+    
