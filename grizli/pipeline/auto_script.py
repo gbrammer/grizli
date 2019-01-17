@@ -2884,15 +2884,15 @@ def field_rgb(root='j010514+021532', xsize=6, HOME_PATH='./', show_ir=True, pl=1
         
         ds9.set('rgb')
         ds9.set('rgb channel red')
-        ds9.view(rimg, header=ims[rf][0].header)
+        ds9.view(rimg)#, header=ims[rf][0].header)
         ds9.set_defaults(); ds9.set('cmap value 9.75 0.8455')
         
         ds9.set('rgb channel green')
-        ds9.view(gimg, header=ims[gf][0].header)
+        ds9.view(gimg)#, header=ims[gf][0].header)
         ds9.set_defaults(); ds9.set('cmap value 9.75 0.8455')
 
         ds9.set('rgb channel blue')
-        ds9.view(bimg, header=ims[bf][0].header)
+        ds9.view(bimg)#, header=ims[bf][0].header)
         ds9.set_defaults(); ds9.set('cmap value 9.75 0.8455')
         
         return False
@@ -3337,6 +3337,10 @@ def make_report(root, gzipped_links=True):
     """
     import glob
     import matplotlib.pyplot as plt
+    import astropy.time
+    
+    now = astropy.time.Time.now().iso
+    
     plt.ioff()
     
     os.chdir('../Prep/')
@@ -3396,25 +3400,29 @@ def make_report(root, gzipped_links=True):
         
     body="""
     
-    <h4>{0}</h4>
+    <h4>{root} </h4>
+
+    {now}<br>
+    
+    <a href={root}.exposures.html>Exposure report</a>
     
     <pre>
-    <a href={0}-ir_drz_sci.fits{3}>{0}-ir_drz_sci.fits{3}</a>
-    <a href={0}-ir_drz_sci.fits{3}>{0}-ir_drz_wht.fits{3}</a>
-    <a href={0}-ir_drz_sci.fits{3}>{0}-ir_seg.fits{3}</a>
-    <a href={0}-ir_drz_sci.fits>{0}_phot.fits</a>
-    <a href={0}-ir_drz_sci.fits>{0}_visits.npy</a>
+    <a href={root}-ir_drz_sci.fits{gz}>{root}-ir_drz_sci.fits{gz}</a>
+    <a href={root}-ir_drz_sci.fits{gz}>{root}-ir_drz_wht.fits{gz}</a>
+    <a href={root}-ir_drz_sci.fits{gz}>{root}-ir_seg.fits{gz}</a>
+    <a href={root}-ir_drz_sci.fits>{root}_phot.fits</a>
+    <a href={root}-ir_drz_sci.fits>{root}_visits.npy</a>
     </pre>
     
-    {1}
-    {2}
+    {column}
+    {grism}
     
-    <a href="./{0}.rgb.jpg"><img src="./{0}.rgb.jpg" height=300px></a>
-    <a href="https://s3.amazonaws.com/aws-grivam/FullQuery/{0}_footprint.png"><img src="https://s3.amazonaws.com/aws-grivam/FullQuery/{0}_footprint.png" height=300px></a>
-    <a href="./{0}_fine.png"><img src="./{0}_fine.png" height=200px></a>
+    <a href="./{root}.rgb.jpg"><img src="./{root}.rgb.jpg" height=300px></a>
+    <a href="https://s3.amazonaws.com/aws-grivam/FullQuery/{root}_footprint.png"><img src="https://s3.amazonaws.com/aws-grivam/FullQuery/{root}_footprint.png" height=300px></a>
+    <a href="./{root}_fine.png"><img src="./{root}_fine.png" height=200px></a>
     <br>
     
-    """.format(root, column_url, grism_url, '.gz'*(gzipped_links))
+    """.format(root=root, column=column_url, grism=grism_url, gz='.gz'*(gzipped_links), now=now)
     
     lines = open('{0}.summary.html'.format(root)).readlines()
     for i in range(len(lines)):
@@ -3430,6 +3438,7 @@ def exposure_report(root, log=True):
     """
     Save exposure info to webpage & json file
     """
+    
     if log:
         frame = inspect.currentframe()
         utils.log_function_arguments(utils.LOGFILE, frame,
@@ -3488,9 +3497,16 @@ def exposure_report(root, log=True):
     tab['ramp'] = ramp
     tab['trails'] = trails
     
+    tab['EXPSTART'].format = '.3f'
+    tab['EXPTIME'].format = '.1f'
+    tab['PA_V3'].format = '.1f'
+
+    tab['RA_TARG'].format = '.6f'
+    tab['DEC_TARG'].format = '.6f'
+    
     fp = open('{0}_exposures.json'.format(root),'w')
     json.dump(flt_dict, fp)
     fp.close()
     
-    tab.write_sortable_html('{0}_exposures.html'.format(root), replace_braces=True, localhost=False, max_lines=1e5, table_id=None, table_class='display compact', css=None, filter_columns=[], buttons=['csv'], toggle=True, use_json=False)
+    tab.write_sortable_html('{0}.exposures.html'.format(root), replace_braces=True, localhost=False, max_lines=1e5, table_id=None, table_class='display compact', css=None, filter_columns=[], buttons=['csv'], toggle=True, use_json=False)
     
