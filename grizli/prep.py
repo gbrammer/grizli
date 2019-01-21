@@ -709,7 +709,12 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
     
         cut = np.argsort(cat['MAG_AUTO'][ok])[:icut]
         xy_drz = np.array([cat['X_IMAGE'][ok][cut], cat['Y_IMAGE'][ok][cut]]).T
-    
+    else:
+        # Limit to brightest X objects
+        icut = 400
+        cut = np.argsort(cat['MAG_AUTO'][ok])[:icut]
+        xy_drz = np.array([cat['X_IMAGE'][ok][cut], cat['Y_IMAGE'][ok][cut]]).T
+        
     logstr = '# wcs {0} radec="{1}"; Ncat={2}; Nref={3}'
     logstr = logstr.format(root, radec, xy_drz.shape[0], rd_ref.shape[0])
     utils.log_comment(utils.LOGFILE, logstr, verbose=True)
