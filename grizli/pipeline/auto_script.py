@@ -2754,7 +2754,7 @@ def get_rgb_filters(filter_list, force_ir=False, pure_sort=False):
         rfilts = bfilts[::-1]
     else:
         bfilts = ['f814w', 'f606w', 'f775w','f850lp', 'f435w','f475w','f555w','f200lp','f098m','f105w','f110w','f125w']
-        gfilts = ['f105w','f110w','f125w','f140w','f606w','f814w']
+        gfilts = ['f105w','f110w','f125w','f127m','f139m','f140w','f140w', 'f606w','f814w']
         rfilts = ['f160w','f140w','f110w','f125w','f105w','f814w','f606w']
         
     for filt in bfilts:
