@@ -2790,7 +2790,7 @@ def get_rgb_filters(filter_list, force_ir=False, pure_sort=False):
     
     return rfilt, gfilt, bfilt
     
-def field_rgb(root='j010514+021532', xsize=6, HOME_PATH='./', show_ir=True, pl=1, pf=1, scl=1, rgb_scl=[1,1,1], ds9=None, force_ir=False, filters=None, add_labels=True, output_format='jpg', rgb_min=-0.01, xyslice=None, pure_sort=False, verbose=True, force_rgb=None, suffix='.field'):
+def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', show_ir=True, pl=1, pf=1, scl=1, rgb_scl=[1,1,1], ds9=None, force_ir=False, filters=None, add_labels=True, output_format='jpg', rgb_min=-0.01, xyslice=None, pure_sort=False, verbose=True, force_rgb=None, suffix='.field'):
     """
     RGB image of the field mosaics
     """
@@ -2921,6 +2921,9 @@ def field_rgb(root='j010514+021532', xsize=6, HOME_PATH='./', show_ir=True, pl=1
     
     sh = image.shape
     
+    if output_dpi is not None:
+        xsize = sh[1]/output_dpi
+
     dim = [xsize, xsize/sh[1]*sh[0]]
     
     fig = plt.figure(figsize=dim)
@@ -3331,7 +3334,7 @@ def field_psf(root='j020924-044344', HOME_PATH='/Volumes/Pegasus/Grizli/Automati
             
         hdu.writeto('{0}-{1}_psf.fits'.format(root, filter), overwrite=True)
         
-def make_report(root, gzipped_links=True):
+def make_report(root, gzipped_links=True, xsize=18, output_dpi=None):
     """
     Make table, etc.
     """
@@ -3352,7 +3355,7 @@ def make_report(root, gzipped_links=True):
     rfilters.sort()
     filters = [f.split('-')[-1].split('_dr')[0] for f in bfilters + rfilters]
     
-    field_rgb(root, HOME_PATH=None, xsize=18, ds9=None, scl=2, suffix='.rgb')
+    field_rgb(root, HOME_PATH=None, xsize=xsize, output_dpi=output_dpi, ds9=None, scl=2, suffix='.rgb')
     for filter in filters:
         field_rgb(root, HOME_PATH=None, xsize=18, ds9=None, scl=2, force_rgb=[filter,'sum','sum'], suffix='.'+filter)
         
