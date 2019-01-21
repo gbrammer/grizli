@@ -3384,14 +3384,16 @@ def make_report(root, gzipped_links=True):
     tab.write_sortable_html('{0}.summary.html'.format(root), replace_braces=True, localhost=False, max_lines=500, table_id=None, table_class='display compact', css=None, filter_columns=[], buttons=['csv'], toggle=False, use_json=False)
     
     # Grism
-    column_files = glob.glob('*column.png')
+    column_files = glob.glob('*column.png')    
     if len(column_files) > 0:
+        column_files.sort()
         column_url = '<div>' + ' '.join(['<a href="./{0}"><img src="./{0}" height=100px></a>'.format(f) for f in column_files]) + '</div>'
     else:
         column_url = ''
 
     grism_files = glob.glob('../Extractions/*grism*fits')
     if len(grism_files) > 0:
+        grism_files.sort()
         grism_url = '<pre>' + '\n'.join(['<a href="./{0}">{0}</a>'.format(f) for f in grism_files]) + '</pre>'
         if gzipped_links:
             grism_url = grism_url.replace('.fits','.fits.gz')
