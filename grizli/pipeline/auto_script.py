@@ -526,6 +526,9 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/
     tab = utils.GTable.gread('{0}/{1}_footprint.fits'.format(HOME_PATH,
                              field_root))
     
+    use_filters = utils.column_string_operation(tab['filter'], filters, method='startswith', logical='or')
+    tab = tab[use_filters]
+    
     if MAST_QUERY:
         tab = query.get_products_table(tab, extensions=['RAW','C1M'])
                                  
