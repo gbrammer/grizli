@@ -3334,7 +3334,7 @@ def field_psf(root='j020924-044344', HOME_PATH='/Volumes/Pegasus/Grizli/Automati
             
         hdu.writeto('{0}-{1}_psf.fits'.format(root, filter), overwrite=True)
         
-def make_report(root, gzipped_links=True, xsize=18, output_dpi=None):
+def make_report(root, gzipped_links=True, xsize=18, output_dpi=None, make_rgb=True):
     """
     Make table, etc.
     """
@@ -3355,10 +3355,11 @@ def make_report(root, gzipped_links=True, xsize=18, output_dpi=None):
     rfilters.sort()
     filters = [f.split('-')[-1].split('_dr')[0] for f in bfilters + rfilters]
     
-    field_rgb(root, HOME_PATH=None, xsize=xsize, output_dpi=output_dpi, ds9=None, scl=2, suffix='.rgb')
-    for filter in filters:
-        field_rgb(root, HOME_PATH=None, xsize=18, ds9=None, scl=2, force_rgb=[filter,'sum','sum'], suffix='.'+filter)
-        
+    if make_rgb:
+        field_rgb(root, HOME_PATH=None, xsize=xsize, output_dpi=output_dpi, ds9=None, scl=2, suffix='.rgb')
+        for filter in filters:
+            field_rgb(root, HOME_PATH=None, xsize=18, ds9=None, scl=2, force_rgb=[filter,'sum','sum'], suffix='.'+filter)
+    
     rows = []
     for filter in filters:
         os.system('grep " 0 " *{0}*wcs.log > /tmp/{1}.log'.format(filter, root))
@@ -3413,10 +3414,10 @@ def make_report(root, gzipped_links=True, xsize=18, output_dpi=None):
     
     <pre>
     <a href={root}-ir_drz_sci.fits{gz}>{root}-ir_drz_sci.fits{gz}</a>
-    <a href={root}-ir_drz_sci.fits{gz}>{root}-ir_drz_wht.fits{gz}</a>
-    <a href={root}-ir_drz_sci.fits{gz}>{root}-ir_seg.fits{gz}</a>
-    <a href={root}-ir_drz_sci.fits>{root}_phot.fits</a>
-    <a href={root}-ir_drz_sci.fits>{root}_visits.npy</a>
+    <a href={root}-ir_drz_wht.fits{gz}>{root}-ir_drz_wht.fits{gz}</a>
+    <a href={root}-ir_seg.fits{gz}>{root}-ir_seg.fits{gz}</a>
+    <a href={root}_phot.fits>{root}_phot.fits</a>
+    <a href={root}_visits.npy>{root}_visits.npy</a>
     </pre>
     
     {column}
