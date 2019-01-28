@@ -671,7 +671,13 @@ def remove_bad_expflag(field_root='', HOME_PATH='./', min_bad=2):
             os.system('mv {0}* Expflag/'.format(visit))
             
 
-def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=True, combine_singles=True, is_dash=False, filters=VALID_FILTERS):
+def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=True, combine_minexp=2, is_dash=False, filters=VALID_FILTERS):
+    """
+    
+    Try to combine visits at the same PA/filter with fewer than 
+    `combine_minexp` exposures.
+    
+    """
     import os
     import glob
     import copy
@@ -756,10 +762,10 @@ def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=
         for i, visit in enumerate(visits):
             print('{0} {1} {2}'.format(i, visit['product'], len(visit['files'])))
             
-    elif combine_singles:
+    elif combine_minexp:
         combined = []
         for visit in visits:
-            if len(visit['files']) > 1:
+            if len(visit['files']) > combine_minexp*1:
                 combined.append(copy.deepcopy(visit))
             else:
                 filter_pa = '-'.join(visit['product'].split('-')[-2:])
