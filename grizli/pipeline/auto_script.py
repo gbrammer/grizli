@@ -751,7 +751,11 @@ def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=
             combined[key]['files'].extend(visit['files'])
         
         visits = [combined[k] for k in combined]
-    
+        
+        print('** Combine same PA: **')
+        for i, visit in enumerate(visits):
+            print('{0} {1} {2}'.format(i, visit['product'], len(visit['files'])))
+            
     elif combine_singles:
         combined = []
         for visit in visits:
@@ -778,6 +782,9 @@ def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=
                     combined.append(copy.deepcopy(visit))
         
         visits = combined    
+        print('** Combine Singles: **')
+        for i, visit in enumerate(visits):
+            print('{0} {1} {2}'.format(i, visit['product'], len(visit['files'])))    
             
     all_groups = utils.parse_grism_associations(visits)
     
