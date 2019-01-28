@@ -270,7 +270,7 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
                          psfbeta=4.765, verbose=False)
             
             dq[crmask] |= 1024
-            sci[crmask] = 0
+            #sci[crmask] = 0
                                     
     
     logstr = '# {0} -> {1} {2}'
