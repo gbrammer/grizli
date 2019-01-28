@@ -776,7 +776,8 @@ def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=
                 # No match, add the singleton visit    
                 if not has_match:
                     combined.append(copy.deepcopy(visit))
-                    
+        
+        visits = combined    
             
     all_groups = utils.parse_grism_associations(visits)
     
