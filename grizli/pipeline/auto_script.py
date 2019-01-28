@@ -671,7 +671,7 @@ def remove_bad_expflag(field_root='', HOME_PATH='./', min_bad=2):
             os.system('mv {0}* Expflag/'.format(visit))
             
 
-def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=True, is_dash=False, filters=VALID_FILTERS):
+def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=True, combine_singles=True, is_dash=False, filters=VALID_FILTERS):
     import os
     import glob
     import copy
@@ -751,7 +751,33 @@ def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=
             combined[key]['files'].extend(visit['files'])
         
         visits = [combined[k] for k in combined]
-        
+    
+    elif combine_singles:
+        combined = []
+        for visit in visits:
+            if len(visit['files']) > 1:
+                combined.append(copy.deepcopy(visit))
+            else:
+                filter_pa = '-'.join(visit['product'].split('-')[-2:])
+                has_match = False
+                fp = visit['footprint']
+                for ic, cvisit in enumerate(combined):
+                    ckey = '-'.join(cvisit['product'].split('-')[-2:])
+                    if ckey == filter_pa:
+                        cfp = cvisit['footprint']
+                        
+                        if cfp.intersection(fp).area > 0.2*fp.area:
+                            has_match = True
+                            cvisit['files'].extend(visit['files'])
+                            if 'footprints' in visit.keys():
+                                cvisit['footprints'].extend( visit['footprints'])
+                            cvisit['footprint'] = cfp.union(fp)
+                
+                # No match, add the singleton visit    
+                if not has_match:
+                    combined.append(copy.deepcopy(visit))
+                    
+            
     all_groups = utils.parse_grism_associations(visits)
     
     print('\n == Grism groups ==\n')
@@ -2793,7 +2819,7 @@ def get_rgb_filters(filter_list, force_ir=False, pure_sort=False):
     
     return rfilt, gfilt, bfilt
     
-def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', show_ir=True, pl=1, pf=1, scl=1, rgb_scl=[1,1,1], ds9=None, force_ir=False, filters=None, add_labels=True, output_format='jpg', rgb_min=-0.01, xyslice=None, pure_sort=False, verbose=True, force_rgb=None, suffix='.field'):
+def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', show_ir=True, pl=1, pf=1, scl=1, scale_ab=None, rgb_scl=[1,1,1], ds9=None, force_ir=False, filters=None, add_labels=True, output_format='jpg', rgb_min=-0.01, xyslice=None, pure_sort=False, verbose=True, force_rgb=None, suffix='.field'):
     """
     RGB image of the field mosaics
     """
@@ -2830,7 +2856,8 @@ def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', s
         
     if filters is None:
         filters = [file.split('_')[-3].split('-')[-1] for file in sci_files]
-        filters += ['ir']
+        if show_ir:
+            filters += ['ir']
         
     #mag_auto = 23.9-2.5*np.log10(phot['flux_auto'])
     
@@ -2859,7 +2886,11 @@ def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', s
     
     #pf = 1
     #pl = 1
-
+    
+    if scale_ab is not None:
+        zp_r = utils.calc_header_zeropoint(ims[rf], ext=0)
+        scl = 10**(-0.4*(zp_r-5-scale_ab))
+        
     rimg = ims[rf][0].data * (ims[rf][0].header['PHOTFLAM']/5.e-20)**pf * (ims[rf][0].header['PHOTPLAM']/1.e4)**pl*scl*rgb_scl[0]
     
     if bf == 'sum':
