@@ -2792,11 +2792,11 @@ def get_rgb_filters(filter_list, force_ir=False, pure_sort=False):
     """
     bfilt = None
     if pure_sort:
-        bfilts = ['f200lp', 'f435w','f475w','f555w','f600w','f606w', 'f775w', 'f814w', 'f850lp', 'f098m','f105w','f110w','f125w','f140w','f160w']
+        bfilts = ['f200lp', 'f350lp','f435w','f475w','f555w','f600w','f606w', 'f775w', 'f814w', 'f850lp', 'f098m','f105w','f110w','f125w','f140w','f160w']
         gfilts = bfilts
         rfilts = bfilts[::-1]
     else:
-        bfilts = ['f814w', 'f606w', 'f775w','f850lp', 'f435w','f475w','f555w','f200lp','f098m','f105w','f110w','f125w']
+        bfilts = ['f814w', 'f606w', 'f775w','f850lp', 'f435w','f475w','f555w','f200lp','f350lp','f098m','f105w','f110w','f125w']
         gfilts = ['f105w','f110w','f125w','f127m','f139m','f140w','f140w', 'f606w','f814w']
         rfilts = ['f160w','f140w','f110w','f125w','f105w','f814w','f606w']
         
