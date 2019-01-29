@@ -3366,14 +3366,14 @@ def get_flt_footprint(flt_file, extensions=[1,2,3,4], patch_args=None):
     else:
         return fp
             
-def make_maximal_wcs(files, pixel_scale=0.1, get_hdu=True, pad=90, verbose=True):
+def make_maximal_wcs(files, pixel_scale=0.1, get_hdu=True, pad=90, verbose=True, theta=0):
     """
-    Compute a North-up HDU with a footprint that contains all of `files`
+    Compute an ImageHDU with a footprint that contains all of `files`
     
     Parameters
     ----------
     files : list
-        List of HST FITS files (e.g., FLT.)
+        List of HST FITS files (e.g., FLT.) or WCS objects.
     
     pixel_scale : float
         Pixel scale of output WCS, in `~astropy.units.arcsec`.
@@ -3402,51 +3402,68 @@ def make_maximal_wcs(files, pixel_scale=0.1, get_hdu=True, pad=90, verbose=True)
     import astropy.io.fits as pyfits
     import astropy.wcs as pywcs
     
-    group_poly = None
-    
-    for i, file in enumerate(files):
-        if not os.path.exists(file):
-            continue
-        
-        im = pyfits.open(file)
-        
-        if im[0].header['INSTRUME'] == 'ACS':
-            chips = 2
-        elif im[0].header['INSTRUME'] == 'WFPC2':
-            chips = 4
-        else:
-            chips = 1
-        
-        for chip in range(chips):
-            if ('SCI',chip+1) not in im:
+    if isinstance(files[0], pywcs.WCS):
+        # Already wcs_list
+        wcs_list = [(wcs, 'WCS', -1) for wcs in files]
+    else:
+        wcs_list = []
+        for i, file in enumerate(files):
+            if not os.path.exists(file):
                 continue
-                
-            wcs = pywcs.WCS(im['SCI',chip+1].header, fobj=im)
-            p_i = Polygon(wcs.calc_footprint())
-            if group_poly is None:
-                group_poly = p_i
+        
+            im = pyfits.open(file)
+        
+            if im[0].header['INSTRUME'] == 'ACS':
+                chips = 2
+            elif im[0].header['INSTRUME'] == 'WFPC2':
+                chips = 4
             else:
-                group_poly = group_poly.union(p_i)
+                chips = 1
+        
+            for chip in range(chips):
+                if ('SCI',chip+1) not in im:
+                    continue
                 
-            x0, y0 = np.cast[float](group_poly.centroid.xy)[:,0]
-            if verbose:
-                print('{0:>3d}/{1:>3d}: {2}[SCI,{3}]  {4:>6.2f}'.format(i, len(files), file, chip+1, group_poly.area*3600*np.cos(y0/180*np.pi)))
+                wcs = pywcs.WCS(im['SCI',chip+1].header, fobj=im)
+                wcs_list.append((wcs, file, chip))
+        
+    group_poly = None
+    for i, (wcs, file, chip) in enumerate(wcs_list):
+        p_i = Polygon(wcs.calc_footprint())
+        if group_poly is None:
+            group_poly = p_i
+        else:
+            group_poly = group_poly.union(p_i)
+            
+        x0, y0 = np.cast[float](group_poly.centroid.xy)[:,0]
+        if verbose:
+            print('{0:>3d}/{1:>3d}: {2}[SCI,{3}]  {4:>6.2f}'.format(i, len(files), file, chip+1, group_poly.area*3600*np.cos(y0/180*np.pi)))
     
-    px, py = np.cast[float](group_poly.convex_hull.boundary.xy   )  
+    px = np.cast[float](group_poly.convex_hull.boundary.xy).T
     #x0, y0 = np.cast[float](group_poly.centroid.xy)[:,0]
-
-    x0 = (px.max()+px.min())/2.
-    y0 = (py.max()+py.min())/2.
     
-    sx = (px.max()-px.min())*np.cos(y0/180*np.pi)*3600 # arcsec
-    sy = (py.max()-py.min())*3600 # arcsec
+    x0 = (px.max(axis=0)+px.min(axis=0))/2.
+    
+    cosd = np.array([np.cos(x0[1]/180*np.pi),1])
+    
+    _mat = np.array([[np.cos(theta), -np.sin(theta)],
+                     [np.sin(theta), np.cos(theta)]])
+    
+    # Rotated
+    pr = ((px-x0)*cosd).dot(_mat)/cosd+x0
+    
+    size_arcsec = (pr.max(axis=0)-pr.min(axis=0))*cosd*3600
+    sx, sy = size_arcsec
+    
+    #sx = (px.max()-px.min())*cosd*3600 # arcsec
+    #sy = (py.max()-py.min())*3600 # arcsec
     
     size = np.maximum(sx+pad, sy+pad)
 
-    out = make_wcsheader(ra=x0, dec=y0, size=(sx+pad*2, sy+pad*2), pixscale=pixel_scale, get_hdu=get_hdu, theta=0)
+    out = make_wcsheader(ra=x0[0], dec=x0[1], size=(sx+pad*2, sy+pad*2), pixscale=pixel_scale, get_hdu=get_hdu, theta=theta/np.pi*180)
     
     if verbose:
-        print('\n  Mosaic WCS: ({0:.5f},{1:.5f})  {2:.1f}\'x{3:.1f}\'  {4:.3f}"/pix\n'.format(x0, y0, (sx+pad)/60., (sy+pad)/60., pixel_scale))
+        print('\n  Mosaic WCS: ({0:.5f},{1:.5f})  {2:.1f}\'x{3:.1f}\'  {4:.3f}"/pix\n'.format(x0[0], x0[1], (sx+pad)/60., (sy+pad)/60., pixel_scale))
         
     return out
     
@@ -3506,9 +3523,11 @@ def header_keys_from_filelist(fits_files, keywords=[], ext=0, colname_case=str.l
     # Output table
     tab = Table(data=np.array(lines), names=table_header)
     
-    return tab        
+    return tab     
+       
 def drizzle_array_groups(sci_list, wht_list, wcs_list, outputwcs=None,
-                         scale=0.1, kernel='point', pixfrac=1., verbose=True):
+                         scale=0.1, kernel='point', pixfrac=1., 
+                         calc_wcsmap=False, verbose=True):
     """Drizzle array data with associated wcs
     
     Parameters
@@ -3537,6 +3556,8 @@ def drizzle_array_groups(sci_list, wht_list, wcs_list, outputwcs=None,
     
     """
     from drizzlepac.astrodrizzle import adrizzle
+    from drizzlepac import cdriz
+    
     from stsci.tools import logutil
     log = logutil.create_logger(__name__)
     
@@ -3545,7 +3566,17 @@ def drizzle_array_groups(sci_list, wht_list, wcs_list, outputwcs=None,
         header, outputwcs = compute_output_wcs(wcs_list, pixel_scale=scale)
     else:
         header = to_header(outputwcs)
-        
+    
+    # Output WCS requires full WCS map?
+    if calc_wcsmap < 2:
+        ctype = outputwcs.wcs.ctype
+        if '-SIP' in ctype[0]:
+            print('Output WCS ({0}) requires `calc_wcsmap=2`'.format(ctype))
+            calc_wcsmap=2
+        else:
+            # Internal WCSMAP not required
+            calc_wcsmap=0
+            
     shape = (header['NAXIS2'], header['NAXIS1'])
     
     # Output arrays
@@ -3558,16 +3589,82 @@ def drizzle_array_groups(sci_list, wht_list, wcs_list, outputwcs=None,
     for i in range(N):
         if verbose:
             log.info('Drizzle array {0}/{1}'.format(i+1, N))
+        
+        if calc_wcsmap > 1:
+            wcsmap =  WCSMapAll#(wcs_list[i], outputwcs)
+            #wcsmap = cdriz.DefaultWCSMapping
+        else:
+            wcsmap = None
             
         adrizzle.do_driz(sci_list[i].astype(np.float32, copy=False), 
                          wcs_list[i], 
                          wht_list[i].astype(np.float32, copy=False),
                          outputwcs, outsci, outwht, outctx, 1., 'cps', 1,
                          wcslin_pscale=wcs_list[i].pscale, uniqid=1, 
-                         pixfrac=pixfrac, kernel=kernel, fillval=0)
+                         pixfrac=pixfrac, kernel=kernel, fillval=0, 
+                         wcsmap=wcsmap)
         
     return outsci, outwht, outctx, header, outputwcs
-    
+
+class WCSMapAll:
+    """ Sample class to demonstrate how to define a coordinate transformation
+    """
+    def __init__(self,input,output,origin=0):
+        # Verify that we have valid WCS input objects
+        import copy
+        self.checkWCS(input,'Input')
+        self.checkWCS(output,'Output')
+
+        self.input = input
+        self.output = copy.deepcopy(output)
+        #self.output = output
+
+        self.origin = origin
+        self.shift = None
+        self.rot = None
+        self.scale = None
+
+    def checkWCS(self,obj,name):
+        try:
+            assert isinstance(obj, pywcs.WCS)
+        except AssertionError:
+            print(name +' object needs to be an instance or subclass of a PyWCS object.')
+            raise
+
+    def forward(self,pixx,pixy):
+        """ Transform the input pixx,pixy positions in the input frame
+            to pixel positions in the output frame.
+
+            This method gets passed to the drizzle algorithm.
+        """
+        # This matches WTRAXY results to better than 1e-4 pixels.
+        skyx,skyy = self.input.all_pix2world(pixx,pixy,self.origin)
+        result= self.output.all_world2pix(skyx,skyy,self.origin)
+        return result
+
+    def backward(self,pixx,pixy):
+        """ Transform pixx,pixy positions from the output frame back onto their
+            original positions in the input frame.
+        """
+        skyx,skyy = self.output.all_pix2world(pixx,pixy,self.origin)
+        result = self.input.all_world2pix(skyx,skyy,self.origin)
+        return result
+
+    def get_pix_ratio(self):
+        """ Return the ratio of plate scales between the input and output WCS.
+            This is used to properly distribute the flux in each pixel in 'tdriz'.
+        """
+        return self.output.pscale / self.input.pscale
+
+    def xy2rd(self,wcs,pixx,pixy):
+        """ Transform input pixel positions into sky positions in the WCS provided.
+        """
+        return wcs.all_pix2world(pixx,pixy,1)
+    def rd2xy(self,wcs,ra,dec):
+        """ Transform input sky positions into pixel positions in the WCS provided.
+        """
+        return wcs.all_world2pix(ra,dec,1)    
+        
 def compute_output_wcs(wcs_list, pixel_scale=0.1, max_size=10000):
     """
     Compute output WCS that contains the full list of input WCS
