@@ -145,7 +145,7 @@ def get_extra_data(root='j114936+222414', HOME_PATH='/Volumes/Pegasus/Grizli/Aut
 
     os.chdir(CWD)
     
-def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', inspect_ramps=False, manual_alignment=False, is_parallel_field=False, reprocess_parallel=False, only_preprocess=False, make_mosaics=True, fill_mosaics='grism', make_phot=True, run_extractions=False, run_fit=False, s3_sync=False, fine_radec=None, run_fine_alignment=True, combine_all_filters=True, gaia_by_date=True, align_mag_limits=[14,24], align_outlier_threshold=4, align_simple=False, align_clip=-1, align_rms_limit=2, align_min_overlap=0.2, master_radec=None, parent_radec=None, fix_stars=True, is_dash=False, run_parse_visits=True, imaging_bkg_params=prep.BKG_PARAMS, reference_wcs_filters=['G800L', 'G102', 'G141'], filters=VALID_FILTERS, catalogs=['PS1','DES','NSC','SDSS','GAIA','WISE'], mosaic_pixel_scale=None, mosaic_pixfrac=0.75, half_optical_pixscale=False, skip_single_optical_visits=True, get_dict=False, **kwargs):
+def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', inspect_ramps=False, manual_alignment=False, is_parallel_field=False, reprocess_parallel=False, only_preprocess=False, make_mosaics=True, fill_mosaics='grism', make_phot=True, run_extractions=False, run_fit=False, s3_sync=False, fine_radec=None, run_fine_alignment=True, combine_all_filters=True, gaia_by_date=True, align_mag_limits=[14,24], align_outlier_threshold=4, align_simple=False, align_clip=-1, align_rms_limit=2, align_min_overlap=0.2, master_radec=None, parent_radec=None, fix_stars=True, is_dash=False, run_parse_visits=True, imaging_bkg_params=prep.BKG_PARAMS, reference_wcs_filters=['G800L', 'G102', 'G141'], filters=VALID_FILTERS, catalogs=['PS1','DES','NSC','SDSS','GAIA','WISE'], mosaic_pixel_scale=None, mosaic_pixfrac=0.75, half_optical_pixscale=False, skip_single_optical_visits=True, get_dict=False, combine_minexp=2, **kwargs):
     """
     Run the full pipeline for a given target
         
@@ -248,7 +248,7 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
     os.chdir(os.path.join(HOME_PATH, root, 'Prep'))
         
     if (not os.path.exists('{0}_visits.npy'.format(root))) | run_parse_visits:
-        visits, all_groups, info = auto_script.parse_visits(field_root=root, HOME_PATH=HOME_PATH, use_visit=True, combine_same_pa=is_parallel_field, is_dash=is_dash, filters=filters)
+        visits, all_groups, info = auto_script.parse_visits(field_root=root, HOME_PATH=HOME_PATH, use_visit=True, combine_same_pa=is_parallel_field, is_dash=is_dash, filters=filters, combine_minexp=combine_minexp)
     else:
         visits, all_groups, info = np.load('{0}_visits.npy'.format(root))
         
