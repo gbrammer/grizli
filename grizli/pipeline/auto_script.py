@@ -2517,7 +2517,7 @@ def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140
     for visit in visits:
         
         # Visit failed for some reason
-        if (visit['product']+'.failed' in failed_list) | (visit['product'] in skip_products):
+        if (visit['product']+'.wcs_failed' in failed_list) | (visit['product']+'.failed' in failed_list) | (visit['product'] in skip_products):
             continue
         
         # Too few exposures (i.e., one with unreliable CR flags)
