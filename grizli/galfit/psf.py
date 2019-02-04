@@ -178,7 +178,7 @@ class DrizzlePSF(object):
         return chi2
         
     def get_psf(self, ra=53.06967306, dec=-27.72333015, filter='F140W', pixfrac=0.1, kernel='point', verbose=True, wcs_slice=None, get_extended=True, get_weight=False):
-        from drizzlepac.astrodrizzle import adrizzle
+        from drizzlepac import adrizzle
         from shapely.geometry import Polygon, Point
         
         pix = np.arange(-13,14)
