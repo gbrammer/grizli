@@ -3555,7 +3555,7 @@ def drizzle_array_groups(sci_list, wht_list, wcs_list, outputwcs=None,
         Drizzled image header and WCS.
     
     """
-    from drizzlepac.astrodrizzle import adrizzle
+    from drizzlepac import adrizzle
     from drizzlepac import cdriz
     
     from stsci.tools import logutil
