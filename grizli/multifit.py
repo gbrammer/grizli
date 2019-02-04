@@ -1053,21 +1053,21 @@ class GroupFLT():
         from astropy.modeling import models, fitting
         import astropy.wcs as pywcs
         
-        try:
-            import drizzle
-            if drizzle.__version__ != '1.12.99':
-                # Not the fork that works for all input/output arrays
-                raise(ImportError)
-            
-            #print('drizzle!!')
-            from drizzle.dodrizzle import dodrizzle
-            drizzler = dodrizzle
-            dfillval = '0'
-        except:
-            from drizzlepac.astrodrizzle import adrizzle
-            adrizzle.log.setLevel('ERROR')
-            drizzler = adrizzle.do_driz
-            dfillval = 0
+        # try:
+        #     import drizzle
+        #     if drizzle.__version__ != '1.12.99':
+        #         # Not the fork that works for all input/output arrays
+        #         raise(ImportError)
+        #     
+        #     #print('drizzle!!')
+        #     from drizzle.dodrizzle import dodrizzle
+        #     drizzler = dodrizzle
+        #     dfillval = '0'
+        # except:
+        from drizzlepac import adrizzle
+        adrizzle.log.setLevel('ERROR')
+        drizzler = adrizzle.do_driz
+        dfillval = 0
             
         ## Quick check now for which grism exposures we should use
         if wave < 1.1e4:
@@ -3530,7 +3530,7 @@ class MultiBeam(GroupFitter):
             Update the mask.
         
         interp : str
-            Interpolation method for `~drizzlepac.astrodrizzle.ablot`.
+            Interpolation method for `~drizzlepac.ablot`.
             
         Returns
         -------
@@ -3542,7 +3542,7 @@ class MultiBeam(GroupFitter):
             from drizzle.doblot import doblot
             blotter = doblot
         except:
-            from drizzlepac.astrodrizzle import ablot
+            from drizzlepac import ablot
             blotter = ablot.do_blot
         
         # Read the drizzled arrays
@@ -3852,21 +3852,21 @@ def drizzle_2d_spectrum(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
         
     """
     from astropy import log
-    try:
-        import drizzle
-        if drizzle.__version__ != '1.12.99':
-            # Not the fork that works for all input/output arrays
-            raise(ImportError)
-        
-        #print('drizzle!!')
-        from drizzle.dodrizzle import dodrizzle
-        drizzler = dodrizzle
-        dfillval = '0'
-    except:
-        from drizzlepac.astrodrizzle import adrizzle
-        adrizzle.log.setLevel('ERROR')
-        drizzler = adrizzle.do_driz
-        dfillval = 0
+    # try:
+    #     import drizzle
+    #     if drizzle.__version__ != '1.12.99':
+    #         # Not the fork that works for all input/output arrays
+    #         raise(ImportError)
+    #     
+    #     #print('drizzle!!')
+    #     from drizzle.dodrizzle import dodrizzle
+    #     drizzler = dodrizzle
+    #     dfillval = '0'
+    # except:
+    from drizzlepac import adrizzle
+    adrizzle.log.setLevel('ERROR')
+    drizzler = adrizzle.do_driz
+    dfillval = 0
     
     log.setLevel('ERROR')
     #log.disable_warnings_logging()
@@ -4067,21 +4067,21 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
         FITS HDUList with the drizzled thumbnail, line and continuum 
         cutouts.
     """
-    try:
-        import drizzle
-        if drizzle.__version__ != '1.12.99':
-            # Not the fork that works for all input/output arrays
-            raise(ImportError)
-        
-        #print('drizzle!!')
-        from drizzle.dodrizzle import dodrizzle
-        drizzler = dodrizzle
-        dfillval = '0'
-    except:
-        from drizzlepac.astrodrizzle import adrizzle
-        adrizzle.log.setLevel('ERROR')
-        drizzler = adrizzle.do_driz
-        dfillval = 0
+    # try:
+    #     import drizzle
+    #     if drizzle.__version__ != '1.12.99':
+    #         # Not the fork that works for all input/output arrays
+    #         raise(ImportError)
+    #     
+    #     #print('drizzle!!')
+    #     from drizzle.dodrizzle import dodrizzle
+    #     drizzler = dodrizzle
+    #     dfillval = '0'
+    # except:
+    from drizzlepac import adrizzle
+    adrizzle.log.setLevel('ERROR')
+    drizzler = adrizzle.do_driz
+    dfillval = 0
         
     # Nothing to do
     if len(beams) == 0:
@@ -4502,21 +4502,21 @@ def drizzle_2d_spectrum_wcs(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
         FITS HDUList with the drizzled 2D spectrum and weight arrays
         
     """
-    try:
-        import drizzle
-        if drizzle.__version__ != '1.12.99':
-            # Not the fork that works for all input/output arrays
-            raise(ImportError)
-        
-        #print('drizzle!!')
-        from drizzle.dodrizzle import dodrizzle
-        drizzler = dodrizzle
-        dfillval = '0'
-    except:
-        from drizzlepac.astrodrizzle import adrizzle
-        adrizzle.log.setLevel('ERROR')
-        drizzler = adrizzle.do_driz
-        dfillval = 0
+    # try:
+    #     import drizzle
+    #     if drizzle.__version__ != '1.12.99':
+    #         # Not the fork that works for all input/output arrays
+    #         raise(ImportError)
+    #     
+    #     #print('drizzle!!')
+    #     from drizzle.dodrizzle import dodrizzle
+    #     drizzler = dodrizzle
+    #     dfillval = '0'
+    # except:
+    from drizzlepac import adrizzle
+    adrizzle.log.setLevel('ERROR')
+    drizzler = adrizzle.do_driz
+    dfillval = 0
 
     from stwcs import distortion
     from astropy import log
