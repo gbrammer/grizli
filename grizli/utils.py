@@ -3618,9 +3618,9 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
                     
                     print('       PHOTFLAM={0:.2e}, scale={1:.1f}'.format(h['PHOTFLAM'], phot_scale))
                     keys['PHOTFLAM'] = h['PHOTFLAM']
-                    for k in ['PHOTPLAM','PHOTFNU','EXPTIME']:
-                        if k in flt[0].header:
-                            keys[k] = flt[0].header[k]
+                    for k in ['PHOTFLAM','PHOTPLAM','PHOTFNU', 'PHOTZPT', 'PHOTBW', 'PHOTMODE']:
+                        if k in h:
+                            keys[k] = h[k]
                     
                     phot_scale *= to_per_sec
                     
