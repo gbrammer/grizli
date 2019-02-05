@@ -3524,10 +3524,129 @@ def header_keys_from_filelist(fits_files, keywords=[], ext=0, colname_case=str.l
     tab = Table(data=np.array(lines), names=table_header)
     
     return tab     
-       
+    
+def drizzle_from_visit(visit, output, pixfrac=1., kernel='point', 
+                       clean=True):
+    """
+    Make drizzle mosaic from exposures in a visit dictionary
+    """
+    from shapely.geometry import Polygon
+    import boto3
+    
+    bucket_name = None
+    s3 = boto3.resource('s3')
+    s3_client = boto3.client('s3')
+    
+    if isinstance(output, pywcs.WCS):
+        outputwcs = output
+    elif isinstance(output, pyfits.Header):
+        outputwcs = pywcs.WCS(output)
+    elif isinstance(output, pyfits.PrimaryHDU) | isinstance(output, pyfits.ImageHDU):
+        outputwcs = pywcs.WCS(output.header)
+    else:
+        return None 
+    
+    outputwcs.pscale = get_wcs_pscale(outputwcs)
+    
+    output_poly = Polygon(outputwcs.calc_footprint())
+    count = 0
+    
+    for i in range(len(visit['files'])):
+        olap = visit['footprints'][i].intersection(output_poly)
+        if olap.area == 0:
+            continue
+
+        file = visit['files'][i]
+        print('Add exposure {0}'.format(file))
+        
+        if not os.path.exists(file):
+            bucket_i = visit['awspath'][i].split('/')[0]
+            if bucket_name != bucket_i:
+                bucket_name = bucket_i
+                bkt = s3.Bucket(bucket_name)
+                
+            s3_path = '/'.join(visit['awspath'][i].split('/')[1:])
+            print('   (fetch from s3://{0}{1})'.format(visit['awspath'][i],
+                                      file))
+                                      
+            bkt.download_file(os.path.join(s3_path, file), file,
+                              ExtraArgs={"RequestPayer": "requester"})
+        
+        flt = pyfits.open(file)
+        sci_list, wht_list, wcs_list = [], [], []
+        
+        if flt[0].header['DETECTOR'] == 'IR':
+            bits = 576
+        else:
+            bits = 64+32
+            
+        for ext in [1,2,3,4]:
+            if ('SCI',ext) in flt:
+                
+                h = flt[('SCI',ext)].header
+                if 'MDRIZSKY' in h:
+                    sky = h['MDRIZSKY']
+                else:
+                    sky = 0
+                
+                print('  Extension (SCI,{0}), sky={1:.3f}'.format(ext, sky))    
+                sci_list.append(flt[('SCI',ext)].data - sky)
+                
+                err = flt[('ERR',ext)].data
+                dq = unset_dq_bits(flt[('DQ',ext)].data, bits)
+                wht = 1/err**2
+                wht[(err == 0) | (dq > 0)] = 0
+                
+                wht_list.append(wht)
+                
+                wcs_i = pywcs.WCS(header=flt[('SCI',ext)].header, fobj=flt)
+                wcs_i.pscale = get_wcs_pscale(wcs_i)
+                
+                # wcs_i = HSTWCS(fobj=flt, ext=('SCI',ext), minerr=0.0, 
+                #                wcskey=' ')
+                if not hasattr(wcs_i, 'pixel_shape'):
+                    wcs_i.pixel_shape = wcs_i._naxis1, wcs_i._naxis2
+                    
+                wcs_list.append(wcs_i)
+                
+        if count == 0:
+            res = drizzle_array_groups(sci_list, wht_list, wcs_list,
+                                     outputwcs=outputwcs,
+                                     scale=0.1, kernel=kernel, 
+                                     pixfrac=pixfrac, calc_wcsmap=False, 
+                                     verbose=True, data=None)
+           
+            outsci, outwht, outctx, header, xoutwcs = res
+            header['EXPTIME'] = flt[0].header['EXPTIME']
+            header['NDRIZIM'] = 1
+            header['PIXFRAC'] = pixfrac
+            header['KERNEL'] = kernel
+        else:
+            data = outsci, outwht, outctx
+            res = drizzle_array_groups(sci_list, wht_list, wcs_list,
+                                     outputwcs=outputwcs,
+                                     scale=0.1, kernel=kernel, 
+                                     pixfrac=pixfrac, calc_wcsmap=False, 
+                                     verbose=True, data=data)
+            
+            outsci, outwht, outctx = res[:3]
+            header['EXPTIME'] += flt[0].header['EXPTIME']
+            
+        count += 1
+        header['FLT{0:05d}'.format(count)] = file
+        
+        if clean:
+            os.remove(file)
+    
+    if count == 0:
+        return None
+        
+    outwht  *= (wcs_i.pscale/outputwcs.pscale)**4
+    return outsci, outwht, header  
+    
 def drizzle_array_groups(sci_list, wht_list, wcs_list, outputwcs=None,
                          scale=0.1, kernel='point', pixfrac=1., 
-                         calc_wcsmap=False, verbose=True):
+                         calc_wcsmap=False, verbose=True, data=None):
     """Drizzle array data with associated wcs
     
     Parameters
@@ -3580,9 +3699,12 @@ def drizzle_array_groups(sci_list, wht_list, wcs_list, outputwcs=None,
     shape = (header['NAXIS2'], header['NAXIS1'])
     
     # Output arrays
-    outsci = np.zeros(shape, dtype=np.float32)
-    outwht = np.zeros(shape, dtype=np.float32)
-    outctx = np.zeros(shape, dtype=np.int32)
+    if data is not None:
+        outsci, outwht, outctx = data
+    else:
+        outsci = np.zeros(shape, dtype=np.float32)
+        outwht = np.zeros(shape, dtype=np.float32)
+        outctx = np.zeros(shape, dtype=np.int32)
     
     # Do drizzle
     N = len(sci_list)
@@ -3601,7 +3723,7 @@ def drizzle_array_groups(sci_list, wht_list, wcs_list, outputwcs=None,
                          wht_list[i].astype(np.float32, copy=False),
                          outputwcs, outsci, outwht, outctx, 1., 'cps', 1,
                          wcslin_pscale=wcs_list[i].pscale, uniqid=1, 
-                         pixfrac=pixfrac, kernel=kernel, fillval=0, 
+                         pixfrac=pixfrac, kernel=kernel, fillval='0', 
                          wcsmap=wcsmap)
         
     return outsci, outwht, outctx, header, outputwcs
