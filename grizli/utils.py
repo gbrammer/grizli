@@ -3551,6 +3551,8 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
     output_poly = Polygon(outputwcs.calc_footprint())
     count = 0
     
+    ref_photflam = None
+    
     for i in range(len(visit['files'])):
         olap = visit['footprints'][i].intersection(output_poly)
         if olap.area == 0:
@@ -3579,7 +3581,17 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
             bits = 576
         else:
             bits = 64+32
-            
+        
+        keys = OrderedDict()
+        for k in ['EXPTIME','FILTER', 'FILTER1', 'FILTER2', 'DETECTOR', 'INSTRUME', 'PHOTFLAM','PHOTPLAM','PHOTFNU', 'PHOTZPT', 'PHOTBW', 'PHOTMODE', 'EXPSTART','EXPEND','DATE-OBS','TIME-OBS']:
+            if k in flt[0].header:
+                keys[k] = flt[0].header[k]
+        
+        if 'PHOTFLAM' in keys:
+            print('  0    PHOTFLAM={0:.2e}, scale={1:.1f}'.format(keys['PHOTFLAM'], 1.))
+            if ref_photflam is None:
+                ref_photflam = keys['PHOTFLAM']
+                
         for ext in [1,2,3,4]:
             if ('SCI',ext) in flt:
                 
@@ -3589,10 +3601,32 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
                 else:
                     sky = 0
                 
-                print('  Extension (SCI,{0}), sky={1:.3f}'.format(ext, sky))    
-                sci_list.append(flt[('SCI',ext)].data - sky)
+                print('  ext (SCI,{0}), sky={1:.3f}'.format(ext, sky))    
+
+                if h['BUNIT'] == 'ELECTRONS':
+                    to_per_sec = 1./keys['EXPTIME']
+                else:
+                    to_per_sec = 1.
                 
-                err = flt[('ERR',ext)].data
+                phot_scale = to_per_sec
+                
+                if 'PHOTFLAM' in h:
+                    if ref_photflam is None:
+                        ref_photflam = h['PHOTFLAM']
+                    
+                    phot_scale = h['PHOTFLAM']/ref_photflam
+                    
+                    print('       PHOTFLAM={0:.2e}, scale={1:.1f}'.format(h['PHOTFLAM'], phot_scale))
+                    keys['PHOTFLAM'] = h['PHOTFLAM']
+                    for k in ['PHOTPLAM','PHOTFNU','EXPTIME']:
+                        if k in flt[0].header:
+                            keys[k] = flt[0].header[k]
+                    
+                    phot_scale *= to_per_sec
+                    
+                sci_list.append((flt[('SCI',ext)].data - sky)*phot_scale)
+                
+                err = flt[('ERR',ext)].data*phot_scale
                 dq = unset_dq_bits(flt[('DQ',ext)].data, bits)
                 wht = 1/err**2
                 wht[(err == 0) | (dq > 0)] = 0
@@ -3621,6 +3655,9 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
             header['NDRIZIM'] = 1
             header['PIXFRAC'] = pixfrac
             header['KERNEL'] = kernel
+            for k in keys:
+                header[k] = keys[k]
+                
         else:
             data = outsci, outwht, outctx
             res = drizzle_array_groups(sci_list, wht_list, wcs_list,
