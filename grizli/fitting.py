@@ -581,7 +581,7 @@ def full_sed_plot(mb, tfit, zfit=None, bin=1, minor=0.1, save='png', sed_resolut
         
     return fig
     
-def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat', verbose=True, filter_bandpasses=[]):
+def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat', verbose=True, files=None, filter_bandpasses=[]):
     
     import glob
     import os
@@ -605,8 +605,12 @@ def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat',
     
     lines = []
     pdf_max = []
-    files=glob.glob('{0}*full.fits'.format(target))
-    files.sort()
+    if files is None:
+        files=glob.glob('{0}*full.fits'.format(target))
+    
+        files.sort()
+    
+    roots = ['_'.join(os.path.basename(file).split('_')[:-1]) for file in files]
     
     template_mags = []
     sps_params = []
@@ -664,7 +668,7 @@ def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat',
     info = utils.GTable(rows=lines, names=columns)
     info['PDF_MAX'] = pdf_max
     
-    root_col = utils.GTable.Column(name='root', data=[target]*len(info))
+    root_col = utils.GTable.Column(name='root', data=roots)
     info.add_column(root_col, index=0)
     
     for k in ['Lv','MLv','MLv_rms','SFRv','SFRv_rms']:
@@ -694,7 +698,7 @@ def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat',
         info.rename_column(c, c.lower())
     
     # Emission line names
-    files=glob.glob('{0}*full.fits'.format(target))
+    #files=glob.glob('{0}*full.fits'.format(target))
     im = pyfits.open(files[0])
     h = im['COVAR'].header
     for i in range(24):
@@ -746,7 +750,7 @@ def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat',
     
     ### PNG columns    
     for ext in ['stack','full','line']:
-        png = ['{0}_{1:05d}.{2}.png'.format(target, id, ext) for id in info['id']]
+        png = ['{0}_{1:05d}.{2}.png'.format(root, id, ext) for root, id in zip(info['root'], info['id'])]
         info['png_{0}'.format(ext)] = ['<a href={0}><img src={0} height=200></a>'.format(p) for p in png]
     
     ### Column formats
