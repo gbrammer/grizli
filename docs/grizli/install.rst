@@ -36,10 +36,6 @@ this file, do the following
         # start a new terminal, or put it in ~/.bashrc
         source activate grizli-dev
         
-        # Install fork of drizzle
-        # (this breaks if within the environment file)
-        pip install git+https://github.com/gbrammer/drizzle.git
-        
         # Compile and install the grizli module.  Only needs to be done
         # once or after updating the repository.
         python setup.py install 
