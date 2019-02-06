@@ -13,14 +13,16 @@ def eazy_photoz(root, force=False, object_only=True, apply_background=True, aper
         cat = utils.read_catalog('{0}_phot_apcorr.fits'.format(root))
         return self, cat, zout
         
-    trans = {'f098m':201, 'f105w':202, 'f110w':241, 'f125w':203, 'f140w':204, 'f160w':205, 'f435w':233, 'f438w':211, 'f606w':236, 'f625w':237, 'f814w':239, 'f702w':15, 'f555w':235, 'f350lp':339, 'f475w':212, 'f775w':238}
+    trans = {'f098m':201, 'f105w':202, 'f110w':241, 'f125w':203, 'f140w':204, 'f160w':205, 'f435w':233, 'f438w':211, 'f606w':236, 'f625w':237, 'f814w':239, 'f702w':15, 'f555w':235, 'f350lp':339, 'f475w':212, 'f775w':238, 'f850lp':240}
+    #trans.pop('f814w')
     
     cat = utils.read_catalog('{0}_phot.fits'.format(root))
     filters = []
     for c in cat.meta:
         if c.endswith('_ZP'):
             filters.append(c.split('_ZP')[0].lower())
-
+    
+    
     if get_external_photometry:
         print('Get external photometry from Vizier')
         try:
@@ -102,6 +104,9 @@ def eazy_photoz(root, force=False, object_only=True, apply_background=True, aper
         if f in trans:
             fp.write('{0}_corr_{1} F{2}\n'.format(f, aper_ix, trans[f]))
             fp.write('{0}_ecorr_{1} E{2}\n'.format(f, aper_ix, trans[f]))
+    
+    fp.write('irac_ch1_flux F18\n')
+    fp.write('irac_ch1_err  E18\n')
     
     # For zeropoint
     if dummy_prior:
@@ -380,13 +385,15 @@ def select_objects():
 
     chi2 = (self.chi_best / self.nusefilt)
 
-    iz6 = np.where(self.zgrid > 6.5)[0][0]
+    iz6 = np.where(self.zgrid > 6.0)[0][0]
+    iz7 = np.where(self.zgrid > 7)[0][0]
     iz8 = np.where(self.zgrid > 8)[0][0]
-    iz10 = np.where(self.zgrid > 9)[0][0]
+    iz9 = np.where(self.zgrid > 9)[0][0]
 
-    highz_sel = (cumpz[:,iz6] > 0) & ((cumpz[:,iz6] < 0.3) | (cumpz[:,iz8] < 0.5) | (cumpz[:,iz10] < 0.6)) 
+    highz_sel = (cumpz[:,iz6] > 0) & ((cumpz[:,iz7] < 0.3) | (cumpz[:,iz8] < 0.4) |  (cumpz[:,iz8] < 0.5)) 
+    #highz_sel |= (cumpz[:,iz6] < 0.3) & (self.cat['flux_radius'] > 2.5) 
     highz_sel &= (hmag < 27.5) & (self.cat['class_valid'] > 0.8)
-    highz_sel &= (self.cat['flux_radius'] > 2.5) 
+    #highz_sel &= (self.cat['flux_radius'] > 2.5) 
     highz_sel &= chi2 < 3
     highz_sel &= (sn_red > 5)
 
@@ -401,12 +408,12 @@ def select_objects():
     # Red 
     uv = -2.5*np.log10(zout['restU']/zout['restV'])
     red_sel = ((zout['z160'] > 1.) & (uv > 1.5)) | ((zout['z160'] > 1.5) & (uv > 1.1))
-    red_sel &= (self.zbest < 4) & (hmag < 24) 
-    red_sel &= (zout['mass'] > 10**10.5) & (self.cat['class_valid'] > 0.8)
+    red_sel &= (self.zbest < 4) & (hmag < 22) & (~hmag.mask) 
+    red_sel &= (zout['mass'] > 10**10.5) #& (self.cat['class_valid'] > 0.8)
     red_sel &= (self.cat['flux_radius'] > 2.5)
     red_sel &= (zout['restV']/zout['restV_err'] > 3)
     red_sel &= (chi2 < 3)
-    red_sel &= (sn_red > 20)
+    #red_sel &= (sn_red > 20)
 
     sel = red_sel
 
