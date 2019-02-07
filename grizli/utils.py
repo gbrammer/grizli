@@ -69,8 +69,10 @@ GRISM_LIMITS = {'G800L':[0.545, 1.02, 40.], # ACS/WFC
            'BLUE':[0.8, 1.2, 10.], # Euclid
            'RED':[1.1, 1.9, 14.]}
 
-#DEFAULT_LINE_LIST = ['PaB', 'HeI-1083', 'SIII', 'OII-7325', 'ArIII-7138', 'SII', 'Ha', 'OI-6302', 'HeI-5877', 'OIII', 'Hb', 'OIII-4363', 'Hg', 'Hd', 'H8','H9','NeIII-3867', 'OII', 'NeVI-3426', 'NeV-3346', 'MgII','CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'NIII-1750', 'NIV-1487', 'NV-1240', 'Lya']
-DEFAULT_LINE_LIST = ['PaB', 'HeI-1083', 'SIII', 'OII-7325', 'ArIII-7138', 'SII', 'Ha+NII', 'OI-6302', 'HeI-5877', 'OIII', 'Hb', 'OIII-4363', 'Hg', 'Hd', 'H8','H9','NeIII-3867', 'OII', 'NeVI-3426', 'NeV-3346', 'MgII','CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'NIII-1750', 'NIV-1487', 'NV-1240', 'Lya']
+#DEFAULT_LINE_LIST = ['PaB', 'HeI-1083', 'SIII', 'OII-7325', 'ArIII-7138', 'SII', 'Ha+NII', 'OI-6302', 'HeI-5877', 'OIII', 'Hb', 'OIII-4363', 'Hg', 'Hd', 'H8','H9','NeIII-3867', 'OII', 'NeVI-3426', 'NeV-3346', 'MgII','CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'NIII-1750', 'NIV-1487', 'NV-1240', 'Lya']
+
+# Line species for determining individual line fluxes.  See `load_templates`.
+DEFAULT_LINE_LIST = ['PaB', 'HeI-1083', 'SIII', 'OII-7325', 'ArIII-7138', 'SII', 'Ha', 'OI-6302', 'HeI-5877', 'OIII', 'Hb', 'OIII-4363', 'Hg', 'Hd', 'H8','H9','NeIII-3867', 'OII', 'NeVI-3426', 'NeV-3346', 'MgII','CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'NIII-1750', 'NIV-1487', 'NV-1240', 'Lya']
 
 def set_warnings(numpy_level='ignore', astropy_level='ignore'):
     """
@@ -1774,7 +1776,7 @@ class SpectrumTemplate(object):
                 return temp_flux
 
 def load_templates(fwhm=400, line_complexes=True, stars=False,
-                   full_line_list=None, continuum_list=None,
+                   full_line_list=DEFAULT_LINE_LIST, continuum_list=None,
                    fsps_templates=False, alf_template=False, lorentz=False):
     """Generate a list of templates for fitting to the grism spectra
     
@@ -1807,14 +1809,7 @@ def load_templates(fwhm=400, line_complexes=True, stars=False,
         
     full_line_list : None or list
         Full set of lines to try.  The default is set in the global variable
-        `~grizli.utils.DEFAULT_LINE_LIST`, which is currently
-        
-            >>> full_line_list = ['PaB', 'HeI-1083', 'SIII', 'SII', 'Ha',
-                                  'OI-6302', 'OIII', 'Hb', 'OIII-4363', 'Hg',
-                                  'Hd', 'NeIII', 'OII', 'NeVI', 'NeV', 
-                                  'MgII','CIV-1549', 'CIII-1908', 'OIII-1663', 
-                                  'HeII-1640', 'NIII-1750', 'NIV-1487', 
-                                  'NV-1240', 'Lya']
+        `~grizli.utils.DEFAULT_LINE_LIST`.
         
         The full list of implemented lines is in `~grizli.utils.get_line_wavelengths`.
     
