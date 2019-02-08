@@ -1152,6 +1152,8 @@ class GroupFLT():
             
             line_wcs = pywcs.WCS(h, relax=True)
             line_wcs.pscale = utils.get_wcs_pscale(line_wcs)
+            if not hasattr(line_wcs, 'pixel_shape'):
+                line_wcs.pixel_shape = line_wcs._naxis1, line_wcs._naxis2
 
             # Science and wht arrays
             sci = flt.grism['SCI'] - flt.model
@@ -3897,6 +3899,8 @@ def drizzle_2d_spectrum(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
     for i, beam in enumerate(beams):
         ## Get specific WCS for each beam
         beam_header, beam_wcs = beam.full_2d_wcs()
+        if not hasattr(beam_wcs, 'pixel_shape'):
+            beam_wcs.pixel_shape = beam_wcs._naxis1, beam_wcs._naxis2
         
         # Downweight contamination
         # wht = 1/beam.ivar + (fcontam*beam.contam)**2
@@ -4140,6 +4144,10 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
     for i, beam in enumerate(beams):
         ## Get specific wavelength WCS for each beam
         beam_header, beam_wcs = beam.get_wavelength_wcs(wave)
+        
+        if not hasattr(beam_wcs, 'pixel_shape'):
+            beam_wcs.pixel_shape = beam_wcs._naxis1, beam_wcs._naxis2
+        
         ## Make sure CRPIX set correctly for the SIP header
         for j in [0,1]: 
             # if beam_wcs.sip is not None:
@@ -4202,7 +4210,7 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
             beam_continuum /= sens
         
         ###### Go drizzle
-        
+                
         ### Contamination-cleaned
         drizzler(beam_data, beam_wcs, wht, output_wcs, 
                          outsci, outwht, outctx, 1., 'cps', 1,
@@ -4231,7 +4239,10 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
             thumb = beam.direct[direct_extension]#/beam.direct.photflam
             thumb_wht = 1./(beam.direct.data['ERR']/beam.direct.photflam)**2
             thumb_wht[~np.isfinite(thumb_wht)] = 0
-            
+        
+        if not hasattr(beam.direct.wcs, 'pixel_shape'):
+            beam.direct.wcs.pixel_shape = beam.direct.wcs._naxis1, beam.direct.wcs._naxis2
+           
         drizzler(thumb, beam.direct.wcs, thumb_wht, output_wcs, 
                          doutsci[filt_i], doutwht[filt_i], doutctx[filt_i], 
                          1., 'cps', 1, 
@@ -4627,6 +4638,9 @@ def drizzle_2d_spectrum_wcs(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
         for wcs_ext in [beam_wcs.cpdis1, beam_wcs.cpdis2, beam_wcs.det2im1, beam_wcs.det2im2]:
             if wcs_ext is not None:
                 wcs_ext.crval[1] += dy
+        
+        if not hasattr(beam_wcs, 'pixel_shape'):
+            beam_wcs.pixel_shape = beam_wcs._naxis1, beam_wcs._naxis2
                 
         d_beam_wcs = beam.direct.wcs
         if beam.direct['REF'] is None:
@@ -4669,6 +4683,7 @@ def drizzle_2d_spectrum_wcs(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
             data_i[~np.isfinite(data_i+scl)] = 0
         
         ###### Go drizzle
+        
         data_wave = np.dot(np.ones(beam.beam.sh_beam[0])[:,None], beam.beam.lam[None,:])
         drizzler(data_wave, beam_wcs, wht*0.+1, output_wcs, 
                          outls, outlw, outlc, 1., 'cps', 1,
