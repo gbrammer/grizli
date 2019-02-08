@@ -3718,6 +3718,11 @@ def drizzle_array_groups(sci_list, wht_list, wcs_list, outputwcs=None,
     else:
         header = to_header(outputwcs)
     
+    # Try to fix deprecated WCS
+    for wcs_i in wcs_list:
+        if not hasattr(wcs_i, 'pixel_shape'):
+            wcs_i.pixel_shape = wcs_i._naxis1, wcs_i._naxis2
+        
     # Output WCS requires full WCS map?
     if calc_wcsmap < 2:
         ctype = outputwcs.wcs.ctype

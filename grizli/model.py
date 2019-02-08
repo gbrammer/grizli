@@ -1410,6 +1410,9 @@ class ImageData(object):
                 self.get_wcs()
             else:
                 self.wcs = wcs.copy()
+                if not hasattr(self.wcs, 'pixel_shape'):
+                    self.wcs.pixel_shape = self.wcs._naxis1, self.wcs._naxis2
+                
         else:
             self.header = pyfits.Header()
         
@@ -1541,6 +1544,8 @@ class ImageData(object):
             wcs.pscale = utils.get_wcs_pscale(wcs)
                     
         self.wcs = wcs
+        if not hasattr(self.wcs, 'pixel_shape'):
+            self.wcs.pixel_shape = self.wcs._naxis1, self.wcs._naxis2
         
     @staticmethod
     def add_padding_to_wcs(wcs_in, pad=200):
@@ -1602,6 +1607,8 @@ class ImageData(object):
         
         ### Add padding to WCS        
         self.wcs = self.add_padding_to_wcs(self.wcs, pad=pad)
+        if not hasattr(self.wcs, 'pixel_shape'):
+            self.wcs.pixel_shape = self.wcs._naxis1, self.wcs._naxis2
         
                  
     def shrink_large_hdu(self, hdu=None, extra=100, verbose=False):
