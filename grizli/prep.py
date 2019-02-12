@@ -4089,10 +4089,12 @@ def fix_star_centers(root='macs1149.6+2223-rot-ca5-22-032.0-f105w',
                 # Fit the EPSF model
                 try:
                     psf_filter = images[0][0].header['FILTER']
+                    Np=9
                     psf_params = EPSF.fit_ePSF(sci, ivar=ivar, center=None,
-                                               tol=1.e-3, N=12, 
+                                               tol=1.e-3, N=Np, 
                                     origin=(ypi-cutout_size, xpi-cutout_size), 
-                                    filter=psf_filter, get_extended=True)
+                                    filter=psf_filter, get_extended=True,
+                                    method='Powell', only_centering=False)
                     
                     psf = EPSF.get_ePSF(psf_params, 
                                     origin=(ypi-cutout_size, xpi-cutout_size), 
@@ -4141,7 +4143,7 @@ def fix_star_centers(root='macs1149.6+2223-rot-ca5-22-032.0-f105w',
         clean_drizzle(root)
         #cat = make_drz_catalog(root=root)
         cat = make_SEP_catalog(root=root)
-
+        
 def find_single_image_CRs(visit, simple_mask=False, with_ctx_mask=True, 
                           run_lacosmic=True):
     """Use LACosmic to find CRs in parts of an ACS mosaic where only one

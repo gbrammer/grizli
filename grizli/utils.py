@@ -4487,7 +4487,7 @@ class EffectivePSF(object):
             return psf_offset, bkg, None, None
         else:    
             chi2 = (resid**2).sum()
-            print(params, chi2)
+            #print(params, chi2)
             return chi2
     
     def fit_ePSF(self, sci, center=None, origin=[0,0], ivar=1, N=7, 
