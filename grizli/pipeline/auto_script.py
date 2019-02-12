@@ -145,7 +145,7 @@ def get_extra_data(root='j114936+222414', HOME_PATH='/Volumes/Pegasus/Grizli/Aut
 
     os.chdir(CWD)
     
-def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', inspect_ramps=False, manual_alignment=False, is_parallel_field=False, remove_bad=True, reprocess_parallel=False, only_preprocess=False, make_mosaics=True, fill_mosaics='grism', make_phot=True, run_extractions=False, run_fit=False, s3_sync=False, fine_radec=None, run_fine_alignment=True, combine_all_filters=True, gaia_by_date=True, align_mag_limits=[14,24], align_outlier_threshold=4, align_simple=False, align_clip=-1, align_rms_limit=2, align_min_overlap=0.2, master_radec=None, parent_radec=None, fix_stars=True, is_dash=False, run_parse_visits=True, imaging_bkg_params=prep.BKG_PARAMS, reference_wcs_filters=['G800L', 'G102', 'G141'], filters=VALID_FILTERS, catalogs=['PS1','DES','NSC','SDSS','GAIA','WISE'], mosaic_pixel_scale=None, mosaic_pixfrac=0.75, half_optical_pixscale=False, skip_single_optical_visits=True, get_dict=False, combine_minexp=2, **kwargs):
+def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', inspect_ramps=False, manual_alignment=False, is_parallel_field=False, remove_bad=True, reprocess_parallel=False, only_preprocess=False, make_mosaics=True, fill_mosaics='grism', mask_spikes=True, make_phot=True, run_extractions=False, run_fit=False, s3_sync=False, fine_radec=None, run_fine_alignment=True, combine_all_filters=True, gaia_by_date=True, align_mag_limits=[14,24], align_outlier_threshold=4, align_simple=False, align_clip=-1, align_rms_limit=2, align_min_overlap=0.2, master_radec=None, parent_radec=None, fix_stars=True, is_dash=False, run_parse_visits=True, imaging_bkg_params=prep.BKG_PARAMS, reference_wcs_filters=['G800L', 'G102', 'G141'], filters=VALID_FILTERS, catalogs=['PS1','DES','NSC','SDSS','GAIA','WISE'], mosaic_pixel_scale=None, mosaic_pixfrac=0.75, half_optical_pixscale=False, skip_single_optical_visits=True, get_dict=False, combine_minexp=2, **kwargs):
     """
     Run the full pipeline for a given target
         
@@ -316,8 +316,30 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
         auto_script.drizzle_overlaps(root, filters=IR_filters, 
                                      min_nexp=1, pixfrac=mosaic_pixfrac,
                                      make_combined=(not combine_all_filters),
-                                     ref_image=wcs_ref_file) 
-    
+                                     ref_image=wcs_ref_file,
+                                     include_saturated=fix_stars) 
+        
+        ## Mask diffraction spikes
+        ir_mosaics = glob.glob('{0}-f*drz_sci.fits'.format(root))
+        if (len(ir_mosaics) > 0) & (mask_spikes):
+            cat = prep.make_SEP_catalog('{0}-ir'.format(root), threshold=4, 
+                                        save_fits=False, 
+                                        column_case=str.lower)
+            
+            selection = (cat['mag_auto'] < 17) & (cat['flux_radius'] < 4.5)
+            for visit in visits:
+                filt = visit['product'].split('-')[-1]
+                if filt[:2] in ['f0','f1']:
+                    mask_IR_psf_spikes(visit=visit, selection=selection,
+                                       cat=cat, minR=5, dy=5)
+            
+            ## Remake mosaics
+            auto_script.drizzle_overlaps(root, filters=IR_filters, 
+                                         min_nexp=1, pixfrac=mosaic_pixfrac,
+                                    make_combined=(not combine_all_filters),
+                                         ref_image=wcs_ref_file,
+                                         include_saturated=fix_stars) 
+            
         # Fill IR filter mosaics with scaled combined data so they can be used 
         # as grism reference
         if fill_mosaics:
@@ -332,9 +354,8 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
                 auto_script.fill_filter_mosaics(root)
         
         ## Optical filters
-        
         mosaics = glob.glob('{0}-ir_dr?_sci.fits'.format(root))
-        
+           
         if (half_optical_pixscale) & (len(mosaics) > 0):
             # Drizzle optical images to half the pixel scale determined for 
             # the IR mosaics.  The optical mosaics can be 2x2 block averaged
@@ -1220,7 +1241,119 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
     # prep.drizzle_overlaps([wfc3ir], parse_visits=False, pixfrac=0.6, scale=0.06, skysub=False, bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False)
     #             
     # prep.drizzle_overlaps(keep, parse_visits=False, pixfrac=0.6, scale=0.06, skysub=False, bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False)
+    
+def mask_IR_psf_spikes(visit={},
+mag_lim=17, cat=None, cols=['mag_auto','ra','dec'], minR=5, dy=5, selection=None):
+    """
+    Mask 45-degree diffraction spikes around bright stars
+    
+    minR: float
+        Mask spike pixels > minR from the star centers
+    
+    dy : int
+        Mask spike pixels +/- `dy` pixels from the computed center of a spike.
+    
+    selection : bool array
+        If None, then compute `mag < mag_auto` from `cat`.  Otherwise if 
+        supplied, use as the selection mask.
+        
+    """
+    import astropy.wcs as pywcs
+    from scipy.interpolate import griddata    
+    
+    if cat is None:
+        cat = utils.read_catalog('{0}.cat.fits'.format(visit['product']))
 
+    try:
+        mag, ra, dec = cat[cols[0]], cat[cols[1]], cat[cols[2]]
+    except:
+        mag, ra, dec = cat['MAG_AUTO'], cat['X_WORLD'], cat['Y_WORLD']
+
+    if selection is None:
+        selection = mag < 17
+    
+    for file in visit['files']:
+        im = pyfits.open(file, mode='update')
+        print('Mask diffraction spikes ({0}), N={1} objects'.format(file, selection.sum()))
+        
+        for ext in [1,2,3,4]:
+            if ('SCI',ext) not in im:
+                break
+                
+            wcs = pywcs.WCS(im['SCI',ext].header, fobj=im)
+            try:
+                cd = wcs.wcs.cd
+            except:
+                cd = wcs.wcs.pc
+            
+            sh = im['SCI',ext].data.shape
+            mask = np.zeros(sh, dtype=int)
+            iy, ix = np.indices(sh)
+            
+            ###  Spider angles, by hand!
+            thetas = np.array([[ 1.07000000e+02, 1.07000000e+02, -8.48089636e-01,  8.46172810e-01],
+             [ 3.07000000e+02, 1.07000000e+02, -8.48252315e-01,  8.40896646e-01],
+             [ 5.07000000e+02, 1.07000000e+02, -8.42360089e-01,  8.38631568e-01],
+             [ 7.07000000e+02, 1.07000000e+02, -8.43990233e-01,  8.36766818e-01],
+             [ 9.07000000e+02, 1.07000000e+02, -8.37264191e-01,  8.31481992e-01],
+             [ 1.07000000e+02, 3.07000000e+02, -8.49196752e-01,  8.47137753e-01],
+             [ 3.07000000e+02, 3.07000000e+02, -8.46919396e-01,  8.43697746e-01],
+             [ 5.07000000e+02, 3.07000000e+02, -8.43849045e-01,  8.39136104e-01],
+             [ 7.07000000e+02, 3.07000000e+02, -8.40070025e-01,  8.36362299e-01],
+             [ 9.07000000e+02, 3.07000000e+02, -8.35218388e-01,  8.34258999e-01],
+             [ 1.07000000e+02, 5.07000000e+02, -8.48708154e-01,  8.48377823e-01],
+             [ 3.07000000e+02, 5.07000000e+02, -8.45874787e-01,  8.38512574e-01],
+             [ 5.07000000e+02, 5.07000000e+02, -8.37238493e-01,  8.42544142e-01],
+             [ 7.07000000e+02, 5.07000000e+02, -8.26696970e-01,  8.37981214e-01],
+             [ 9.07000000e+02, 5.07000000e+02, -8.29422567e-01,  8.32182726e-01],
+             [ 1.07000000e+02, 7.07000000e+02, -8.42331487e-01,  8.43417815e-01],
+             [ 3.07000000e+02, 7.07000000e+02, -8.40006233e-01,  8.48355643e-01],
+             [ 5.07000000e+02, 7.07000000e+02, -8.39776844e-01,  8.48106508e-01],
+             [ 7.07000000e+02, 7.07000000e+02, -8.38620315e-01,  8.40031240e-01],
+             [ 9.07000000e+02, 7.07000000e+02, -8.28351652e-01,  8.31933185e-01],
+             [ 1.07000000e+02, 9.07000000e+02, -8.40726238e-01,  8.51621083e-01],
+             [ 3.07000000e+02, 9.07000000e+02, -8.36006159e-01,  8.46746171e-01],
+             [ 5.07000000e+02, 9.07000000e+02, -8.35987878e-01,  8.48932633e-01],
+             [ 7.07000000e+02, 9.07000000e+02, -8.34104095e-01,  8.46009851e-01],
+             [ 9.07000000e+02, 9.07000000e+02, -8.32700159e-01,  8.38512715e-01]])
+
+            thetas[thetas == 107] = 0
+            thetas[thetas == 907] = 1014
+
+            xy = np.array(wcs.all_world2pix(ra[selection], dec[selection], 0)).T
+            
+            
+            t0 = griddata(thetas[:,:2], thetas[:,2], xy, method='linear', 
+                          fill_value=np.mean(thetas[:,2]))
+            t1 = griddata(thetas[:,:2], thetas[:,3], xy, method='linear',
+                          fill_value=np.mean(thetas[:,3]))
+            
+            for i, m in enumerate(mag[selection]):
+                xlen = np.sqrt(10**(-0.4*(m-17)))/0.06*2
+                x = np.arange(-xlen,xlen,0.05)
+                xx = np.array([x, x*0.])
+                
+                for t in [t0[i], t1[i]]:
+                    _mat = np.array([[np.cos(t), -np.sin(t)],
+                                     [np.sin(t), np.cos(t)]])
+                
+                    xr = _mat.dot(xx).T
+                        
+                    x = xr+xy[i,:]
+                    xp = np.cast[int](np.round(x))
+                    #plt.plot(xp[:,0], xp[:,1], color='pink', alpha=0.3, linewidth=5)
+                    
+                    for j in range(-dy,dy+1):
+                        ok = (xp[:,1]+j >= 0) & (xp[:,1]+j < sh[0])
+                        ok &= (xp[:,0] >= 0) & (xp[:,0] < sh[1])
+                        ok &= np.abs(xp[:,1]+j - xy[i,1]) > minR
+                        ok &= np.abs(xp[:,0] - xy[i,0]) > minR
+                        
+                        mask[xp[ok,1]+j, xp[ok,0]] = 1
+            
+            im['DQ',ext].data |= mask*2048
+            im.flush()
+            
 def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_background=True, photometry_background=True, get_all_filters=False, det_err_scale=-np.inf, run_detection=True, detection_params=prep.SEP_DETECT_PARAMS,  phot_apertures=prep.SEXTRACTOR_PHOT_APERTURES_ARCSEC, master_catalog=None, bkg_mask=None, bkg_params={'bw':64, 'bh':64, 'fw':3, 'fh':3, 'pixel_scale':0.06}):
     """
     Make a detection catalog with SExtractor and then measure
