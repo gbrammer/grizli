@@ -398,9 +398,12 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
         #     filt = files[0].split('_drc')[0].split('-')[-1]
         #     os.system('ln -s {0} {1}-ir_drc_sci.fits'.format(files[0], root))
         #     os.system('ln -s {0} {1}-ir_drc_wht.fits'.format(files[0].replace('_sci','_wht'), root))
-            
+    
+    # Are there full-field mosaics?
+    mosaic_files = glob.glob('{0}-f*sci.fits'.format(root)) 
+           
     # Photometric catalog
-    if (not os.path.exists('{0}_phot.fits'.format(root))) & make_phot:
+    if (not os.path.exists('{0}_phot.fits'.format(root))) & make_phot & (len(mosaic_files) > 0):
         threshold = 1.8
         try:
             tab = auto_script.multiband_catalog(field_root=root, threshold=threshold, detection_background=False, photometry_background=True, get_all_filters=False)
@@ -411,7 +414,7 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
             
             tab = auto_script.multiband_catalog(field_root=root, threshold=threshold, detection_background=True, photometry_background=True, get_all_filters=False)
     
-    if (not is_dash):
+    if (not is_dash) & (len(mosaic_files) > 0):
         # Make PSFs.  Always set get_line_maps=False since PSFs now
         # provided for each object.
         print('Make field PSFs')
