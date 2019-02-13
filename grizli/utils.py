@@ -3521,7 +3521,7 @@ def header_keys_from_filelist(fits_files, keywords=[], ext=0, colname_case=str.l
     return tab     
     
 def drizzle_from_visit(visit, output, pixfrac=1., kernel='point', 
-                       clean=True):
+                       clean=True, include_saturated=True):
     """
     Make drizzle mosaic from exposures in a visit dictionary
     """
@@ -3548,13 +3548,19 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
     
     ref_photflam = None
     
+    indices = []
+    
     for i in range(len(visit['files'])):
         olap = visit['footprints'][i].intersection(output_poly)
-        if olap.area == 0:
-            continue
-
+        if olap.area > 0:
+            indices.append(i)
+    
+    NTOTAL = len(indices)
+    
+    for i in enumerate(indices):
+        
         file = visit['files'][i]
-        print('Add exposure {0}'.format(file))
+        print('\n({0:4d}/{1:4d}) Add exposure {2}\n'.format(count+1, NTOTAL, file))
         
         if not os.path.exists(file):
             bucket_i = visit['awspath'][i].split('/')[0]
@@ -3577,6 +3583,9 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
         else:
             bits = 64+32
         
+        if include_saturated:
+            bits |= 256
+            
         keys = OrderedDict()
         for k in ['EXPTIME','FILTER', 'FILTER1', 'FILTER2', 'DETECTOR', 'INSTRUME', 'PHOTFLAM','PHOTPLAM','PHOTFNU', 'PHOTZPT', 'PHOTBW', 'PHOTMODE', 'EXPSTART','EXPEND','DATE-OBS','TIME-OBS']:
             if k in flt[0].header:
