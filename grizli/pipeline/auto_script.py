@@ -1020,9 +1020,19 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
         print(i, direct['product'], len(direct['files']), grism['product'], len(grism['files']))
         
         if len(glob.glob(grism['product']+'_dr?_sci.fits')) > 0:
-            print('Skip', direct['product'])
+            print('Skip grism', direct['product'], grism['product'])
             continue
         
+        # Do all ACS G800L files exist?
+        if 'g800l' in grism['product']:
+            test_flc = True
+            for file in grism['files']:
+                test_flc &= os.path.exists(file)
+            
+            if test_flc:
+                print('Skip grism (all FLC exist)', direct['product'], 
+                      grism['product'])
+                
         # Make guess file
         # if visit_table is not None:
         #     ix = ((visit_table['visit'] == direct['product']) & 
