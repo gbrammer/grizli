@@ -3557,7 +3557,7 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
     
     NTOTAL = len(indices)
     
-    for i in enumerate(indices):
+    for i in indices:
         
         file = visit['files'][i]
         print('\n({0:4d}/{1:4d}) Add exposure {2}\n'.format(count+1, NTOTAL, file))
