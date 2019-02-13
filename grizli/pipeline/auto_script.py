@@ -3576,7 +3576,14 @@ def make_report(root, gzipped_links=True, xsize=18, output_dpi=None, make_rgb=Tr
     rfilters.sort()
     filters = [f.split('-')[-1].split('_dr')[0] for f in bfilters + rfilters]
     
-    if make_rgb & (len(filters) > 0):
+    if len(filters) == 0:
+        has_mosaics = False
+        visits, groups, info = np.load('{0}_visits.npy'.format(root))
+        filters = np.unique([v['product'].split('-')[-1] for v in visits])
+    else:
+        has_mosaics = True
+        
+    if make_rgb & has_mosaics:
         field_rgb(root, HOME_PATH=None, xsize=xsize, output_dpi=output_dpi, ds9=None, scl=2, suffix='.rgb')
         for filter in filters:
             field_rgb(root, HOME_PATH=None, xsize=18, ds9=None, scl=2, force_rgb=[filter,'sum','sum'], suffix='.'+filter)
