@@ -3659,6 +3659,8 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
             header['NDRIZIM'] = 1
             header['PIXFRAC'] = pixfrac
             header['KERNEL'] = kernel
+            header['OKBITS'] = (bits, "FLT bits treated as valid")
+            
             for k in keys:
                 header[k] = keys[k]
                 
