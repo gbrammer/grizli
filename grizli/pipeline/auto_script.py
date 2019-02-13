@@ -3593,20 +3593,24 @@ def make_report(root, gzipped_links=True, xsize=18, output_dpi=None, make_rgb=Tr
         os.system('grep " 0 " *{0}*wcs.log > /tmp/{1}.log'.format(filter, root))
         wcs = '<pre>'+''.join(open('/tmp/{0}.log'.format(root)).readlines())+'</pre>'
         
-        im = pyfits.open(glob.glob('{0}-{1}*sci.fits'.format(root, filter))[0])
-        h = im[0].header
+        try:
+            im = pyfits.open(glob.glob('{0}-{1}*sci.fits'.format(root, filter))[0])
+            h = im[0].header
                 
-        url = '<a href="./{0}">sci</a>'.format(im.filename())
-        url += '  '+url.replace('_sci','_wht').replace('>sci','>wht')
+            url = '<a href="./{0}">sci</a>'.format(im.filename())
+            url += '  '+url.replace('_sci','_wht').replace('>sci','>wht')
         
-        if gzipped_links:
-            url = url.replace('.fits','.fits.gz')
+            if gzipped_links:
+                url = url.replace('.fits','.fits.gz')
             
-        psf_file = '{0}-{1}_psf.fits'.format(root, filter)
-        if os.path.exists(psf_file):
-            url += ' '+'<a href="./{0}">psf</a>'.format(psf_file)
+            psf_file = '{0}-{1}_psf.fits'.format(root, filter)
+            if os.path.exists(psf_file):
+                url += ' '+'<a href="./{0}">psf</a>'.format(psf_file)
         
-        row = [filter, url, '{0} {1}'.format(h['NAXIS1'], h['NAXIS2']), '{0:.5f} {1:.5f}'.format(h['CRVAL1'], h['CRVAL2']), h['EXPTIME'], h['NDRIZIM'], wcs, '<a href={0}.{1}.jpg><img src={0}.{1}.jpg height=200px></a>'.format(root, filter)]
+            row = [filter, url, '{0} {1}'.format(h['NAXIS1'], h['NAXIS2']), '{0:.5f} {1:.5f}'.format(h['CRVAL1'], h['CRVAL2']), h['EXPTIME'], h['NDRIZIM'], wcs, '<a href={0}.{1}.jpg><img src={0}.{1}.jpg height=200px></a>'.format(root, filter)]
+        except:
+            row = [filter, '--', '--', '--', 0., 0, wcs, '--']
+            
         rows.append(row)
     
     #
