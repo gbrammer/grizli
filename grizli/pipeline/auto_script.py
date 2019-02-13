@@ -2937,8 +2937,11 @@ def get_rgb_filters(filter_list, force_ir=False, pure_sort=False):
     for_sort = OrderedDict()
     use_filters = []
     ir_filters = []
-    
+            
     for f in filter_list:            
+        if f == 'ir':
+            continue
+            
         if f[1] in '01':
             val = f[:4]+'0'
         else:
@@ -2959,8 +2962,11 @@ def get_rgb_filters(filter_list, force_ir=False, pure_sort=False):
         f = use_filters[0]
         return [f,f,f]
 
-    ### e.g., force_ir = True but no IR filters
-    if (len(use_filters) == 0) & (len(filter_list) > 0):
+    if len(filter_list) == 1:
+        f = filter_list[0]
+        return [f,f,f]
+                
+    if (len(use_filters) == 0) & (len(filter_list)  > 0):
         so = np.argsort(filter_list)
         f = filter_list[so[-1]]
         return [f,f,f]
