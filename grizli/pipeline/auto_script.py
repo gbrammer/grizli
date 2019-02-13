@@ -3605,14 +3605,14 @@ def make_report(root, gzipped_links=True, xsize=18, output_dpi=None, make_rgb=Tr
     column_files = glob.glob('*column.png')    
     if len(column_files) > 0:
         column_files.sort()
-        column_url = '<div>' + ' '.join(['<a href="./{0}"><img src="./{0}" height=100px></a>'.format(f) for f in column_files]) + '</div>'
+        column_url = '<div>' + ' '.join(['<a href="./{0}"><img src="./{0}" height=100px></a>'.format(f.replace('+','%2B')) for f in column_files]) + '</div>'
     else:
         column_url = ''
 
     grism_files = glob.glob('../Extractions/*grism*fits')
     if len(grism_files) > 0:
         grism_files.sort()
-        grism_url = '<pre>' + '\n'.join(['<a href="./{0}">{0}</a>'.format(f) for f in grism_files]) + '</pre>'
+        grism_url = '<pre>' + '\n'.join(['<a href="./{0}">{1}</a>'.format(f.replace('+','%2B'), f) for f in grism_files]) + '</pre>'
         if gzipped_links:
             grism_url = grism_url.replace('.fits','.fits.gz')
     else:
