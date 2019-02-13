@@ -1032,6 +1032,7 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
             if test_flc:
                 print('Skip grism (all FLC exist)', direct['product'], 
                       grism['product'])
+                continue
                 
         # Make guess file
         # if visit_table is not None:
