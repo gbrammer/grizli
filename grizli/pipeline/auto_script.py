@@ -335,7 +335,7 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
                 filt = visit['product'].split('-')[-1]
                 if filt[:2] in ['f0','f1']:
                     mask_IR_psf_spikes(visit=visit, selection=selection,
-                                       cat=cat, minR=5, dy=5)
+                                       cat=cat, minR=8, dy=5)
             
             ## Remake mosaics
             auto_script.drizzle_overlaps(root, filters=IR_filters, 
@@ -1250,7 +1250,7 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
     # prep.drizzle_overlaps(keep, parse_visits=False, pixfrac=0.6, scale=0.06, skysub=False, bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False)
     
 def mask_IR_psf_spikes(visit={},
-mag_lim=17, cat=None, cols=['mag_auto','ra','dec'], minR=5, dy=5, selection=None):
+mag_lim=17, cat=None, cols=['mag_auto','ra','dec'], minR=8, dy=5, selection=None):
     """
     Mask 45-degree diffraction spikes around bright stars
     
@@ -1336,7 +1336,9 @@ mag_lim=17, cat=None, cols=['mag_auto','ra','dec'], minR=5, dy=5, selection=None
                           fill_value=np.mean(thetas[:,3]))
             
             for i, m in enumerate(mag[selection]):
-                xlen = np.sqrt(10**(-0.4*(m-17)))/0.06*2
+                
+                # Size that depends on magnitude
+                xlen = 4*np.sqrt(10**(-0.4*(np.minimum(m,17)-17)))/0.06
                 x = np.arange(-xlen,xlen,0.05)
                 xx = np.array([x, x*0.])
                 
