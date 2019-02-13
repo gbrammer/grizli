@@ -326,7 +326,9 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
                                         save_fits=False, 
                                         column_case=str.lower)
             
-            selection = (cat['mag_auto'] < 17) & (cat['flux_radius'] < 4.5)
+            selection = (cat['mag_auto'] < 18) & (cat['flux_radius'] < 4.5)
+            selection |= (cat['mag_auto'] < 15.2) & (cat['flux_radius'] < 20)
+
             for visit in visits:
                 filt = visit['product'].split('-')[-1]
                 if filt[:2] in ['f0','f1']:
