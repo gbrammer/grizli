@@ -2924,56 +2924,75 @@ def get_rgb_filters(filter_list, force_ir=False, pure_sort=False):
         Only use IR filters.
     
     pure_sort : bool
-        Don't use filter preferences, just use order they appear
+        Don't use preference for red filters, just use order they appear
         
     Returns
     -------
     rgb_filt : [r, g, b]
         List of filters to use
     """
-    bfilt = None
-    if pure_sort:
-        bfilts = ['f200lp', 'f350lp','f435w','f475w','f555w','f600w','f606w', 'f775w', 'f814w', 'f850lp', 'f098m','f105w','f110w','f125w','f140w','f160w']
-        gfilts = bfilts
-        rfilts = bfilts[::-1]
-    else:
-        bfilts = ['f814w', 'f606w', 'f775w','f850lp', 'f435w','f475w','f555w','f200lp','f350lp','f098m','f105w','f110w','f125w']
-        gfilts = ['f105w','f110w','f125w','f127m','f139m','f140w','f140w', 'f606w','f814w']
-        rfilts = ['f160w','f140w','f110w','f125w','f105w','f814w','f606w']
+    from collections import OrderedDict
+    
+    # Sort by wavelength
+    for_sort = OrderedDict()
+    use_filters = []
+    ir_filters = []
+    
+    for f in filter_list:            
+        if f[1] in '01':
+            val = f[:4]+'0'
+        else:
+            val = 'f0'+f[1:4]
         
-    for filt in bfilts:
-        if filt in filter_list:
-            bfilt = filt
-            break
-    
-    gfilt = 'sum'
-    for filt in gfilts:
-        if (filt in filter_list) & (filt != bfilt):
-            gfilt = filt
-            break
-    
-    if (bfilt is None) | (force_ir):
-        bfilt = gfilt
-        gfilt = 'sum'
+        # Red filters (>6000)
+        if f[1] in '0178':
+            if (f[1] not in '01') & force_ir:
+                continue
+            else:
+                ir_filters.append(f)
         
-    rfilt = None
-    for filt in rfilts:
-        if filt in filter_list:
-            rfilt = filt
-            break
+        use_filters.append(f)
+        for_sort[f] = val
     
-    
-    if rfilt == gfilt:
-        gfilt = 'sum'
-        
-    if [rfilt,gfilt,bfilt] == ['f110w','f110w','f200lp']:
-        gfilt = 'sum'
+    ### Only one filter
+    if len(use_filters) == 1:
+        f = use_filters[0]
+        return [f,f,f]
 
-    if [rfilt,gfilt,bfilt] == ['f814w','f606w','f814w']:
-        rfilt,gfilt,bfilt = 'f814w','sum','f606w'
+    ### e.g., force_ir = True but no IR filters
+    if (len(use_filters) == 0) & (len(filter_list) > 0):
+        so = np.argsort(filter_list)
+        f = filter_list[so[-1]]
+        return [f,f,f]
     
-    return rfilt, gfilt, bfilt
+    # Preference for red filters
+    if (len(ir_filters) >= 3) & (not pure_sort):
+        use_filters = ir_filters
+        for k in list(for_sort.keys()):
+            if k not in ir_filters:
+                p = for_sort.pop(k)
+                
+    so = np.argsort(list(for_sort.values()))
+    waves = np.cast[float]([for_sort[f][1:] for f in for_sort])
     
+    # Reddest  
+    rfilt = use_filters[so[-1]]
+    
+    # Bluest
+    bfilt = use_filters[so[0]]
+    
+    if len(use_filters) == 2:
+        return [rfilt, 'sum', bfilt]
+    elif len(use_filters) == 3:
+        gfilt = use_filters[so[1]]
+        return [rfilt, gfilt, bfilt]
+    else:
+        # Closest to average wavelength
+        mean = np.mean([waves.max(), waves.min()])
+        ix_g = np.argmin(np.abs(waves-mean))
+        gfilt = use_filters[ix_g]
+        return [rfilt, gfilt, bfilt]
+        
 def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', show_ir=True, pl=1, pf=1, scl=1, scale_ab=None, rgb_scl=[1,1,1], ds9=None, force_ir=False, filters=None, add_labels=True, output_format='jpg', rgb_min=-0.01, xyslice=None, pure_sort=False, verbose=True, force_rgb=None, suffix='.field'):
     """
     RGB image of the field mosaics
