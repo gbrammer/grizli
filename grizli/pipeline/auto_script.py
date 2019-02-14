@@ -434,9 +434,9 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
     files = glob.glob('*GrismFLT.fits')
     if len(files) == 0:
         os.chdir(os.path.join(HOME_PATH, root, 'Prep'))
-        gris_ref_filters = GRIS_REF_FILTERS
+        #gris_ref_filters = GRIS_REF_FILTERS
         grp = auto_script.grism_prep(field_root=root, refine_niter=3,
-                                     gris_ref_filters=gris_ref_filters)
+                                     gris_ref_filters=GRIS_REF_FILTERS)
         del(grp)
               
     ######################
