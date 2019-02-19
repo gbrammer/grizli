@@ -1,4 +1,4 @@
-def eazy_photoz(root, force=False, object_only=True, apply_background=True, aper_ix=1, apply_prior=True, beta_prior=True, get_external_photometry=True, external_limits=3, external_sys_err=0.3, external_timeout=300, sys_err=0.05, z_step=0.01, z_min=0.01, z_max=12, total_flux='flux_auto_fix', compute_residuals=True, dummy_prior=True):
+def eazy_photoz(root, force=False, object_only=True, apply_background=True, aper_ix=1, apply_prior=False, beta_prior=True, get_external_photometry=False, external_limits=3, external_sys_err=0.3, external_timeout=300, sys_err=0.05, z_step=0.01, z_min=0.01, z_max=12, total_flux='flux_auto', compute_residuals=False, dummy_prior=False, extra_rf_filters=[]):
     
     import os
     import eazy
@@ -162,7 +162,7 @@ def eazy_photoz(root, force=False, object_only=True, apply_background=True, aper
         if compute_residuals:
             self.error_residuals()
     
-    self.standard_output(prior=apply_prior, beta_prior=beta_prior)
+    self.standard_output(prior=apply_prior, beta_prior=beta_prior, extra_rf_filters=extra_rf_filters)
     
     zout = utils.read_catalog('{0}.eazypy.zout.fits'.format(root))
     

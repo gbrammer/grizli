@@ -939,7 +939,7 @@ SEXTRACTOR_DEFAULT_PARAMS = ["NUMBER", "X_IMAGE", "Y_IMAGE", "X_WORLD",
                     "FLUX_RADIUS", "BACKGROUND", "FLAGS"]
 
 # Aperture *Diameters*
-SEXTRACTOR_PHOT_APERTURES = "6, 8.335, 16.337, 20"
+SEXTRACTOR_PHOT_APERTURES = "6, 8.33335, 11.66667, 16.66667, 20, 25, 50"
 SEXTRACTOR_PHOT_APERTURES_ARCSEC = [float(ap)*0.06*u.arcsec for ap in SEXTRACTOR_PHOT_APERTURES.split(',')]
                 
 SEXTRACTOR_CONFIG_3DHST = {'DETECT_MINAREA':14, 'DEBLEND_NTHRESH':32, 'DEBLEND_MINCONT':0.005, 'FILTER_NAME':'/usr/local/share/sextractor/gauss_3.0_7x7.conv', 'FILTER':'Y'}
@@ -954,7 +954,7 @@ GAUSS_3_7x7 = np.array(
  [ 0.021388,  0.092163,  0.221178,  0.296069,  0.221178,  0.092163,  0.021388], 
  [ 0.004963,  0.021388,  0.051328,  0.068707,  0.051328,  0.021388,  0.004963]])
 
-SEP_DETECT_PARAMS = {'minarea':5, 'filter_kernel':GAUSS_3_7x7,
+SEP_DETECT_PARAMS = {'minarea':9, 'filter_kernel':GAUSS_3_7x7,
                     'filter_type':'conv', 'clean':True, 'clean_param':1,
                     'deblend_nthresh':32, 'deblend_cont':0.005}
     
@@ -1020,32 +1020,54 @@ def make_SEP_catalog_from_arrays(sci, err, mask, wcs=None, threshold=2., ZP=25, 
 
     return tab, seg
    
-                   
+def get_SEP_flag_dict():
+    """
+    Get dictionary of SEP integer flags
+    """
+    import sep
+    d = OrderedDict()
+    for f in ['OBJ_MERGED', 'OBJ_TRUNC', 'OBJ_DOVERFLOW', 'OBJ_SINGU', 'APER_TRUNC', 'APER_HASMASKED', 'APER_ALLMASKED', 'APER_NONPOSITIVE']:
+        d[f] = getattr(sep, f)
+    
+    return d
+                    
 def make_SEP_catalog(root='',threshold=2., get_background=True, 
                       bkg_only=False, 
                       bkg_params={'bw':32, 'bh':32, 'fw':3, 'fh':3},
                       verbose=True, sci=None, wht=None, 
                       phot_apertures=SEXTRACTOR_PHOT_APERTURES,
+                      aper_segmask=False, 
                       rescale_weight=True,
                       column_case=str.upper, save_to_fits=True,
-                      source_xy=None, autoparams=[2.5, 3.5], mask_kron=False,
-                      max_total_corr=2, err_scale=-np.inf, 
-                      detection_params = SEP_DETECT_PARAMS, bkg_mask=None,
-                      pixel_scale=0.06, log=False,
+                      source_xy=None, autoparams=[2.5, 0.35*u.arcsec],
+                      flux_radii=[0.2, 0.5, 0.9], 
+                      mask_kron=False,
+                      max_total_corr=2, err_scale=-np.inf, use_bkg_err=False,
+                      detection_params=SEP_DETECT_PARAMS, bkg_mask=None,
+                      pixel_scale=0.06, log=False, 
+                      compute_auto_quantities=True,
+                      gain=2000., 
                       **kwargs):
     """Make a catalog from drizzle products using the SEP implementation of SExtractor
     
-    phot_apertures are aperture *diameters*, in pixels.
+    phot_apertures are aperture *diameters*. If given as a string then assume
+    units of pixels. If an array or list, can have units (e.g.,
+    `~astropy.units.arcsec`).
     
+    source_xy : (x, y) or (ra, dec) arrays
+        Force extraction positions.  If the arrays have units, then pass them 
+        through the header WCS.  If no units, positions are *zero indexed* 
+        array coordinates.
+        
     """
     if log:
         frame = inspect.currentframe()
-        utils.log_function_arguments(utils.LOGFILE, frame,
-                                     'prep.make_SEP_catalog')
+        utils.log_function_arguments(utils.LOGFILE, frame, 
+                                     'prep.make_SEP_catalog', verbose=True)
 
     import copy
     import astropy.units as u
-    import sep
+    import sep # prefer v1.0.4 (fork on github.com/gbrammer/sep.git)
 
     if sci is not None:
         drz_file = sci
@@ -1053,12 +1075,19 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
         drz_file = glob.glob('{0}_dr[zc]_sci.fits'.format(root))[0]
 
     im = pyfits.open(drz_file)
-
+    
+    ## Filter
+    drz_filter = utils.get_hst_filter(im[0].header)
+    if 'PHOTPLAM' in im[0].header:
+        drz_photplam = im[0].header['PHOTPLAM']
+    else:
+        drz_photplam = None
+        
     ## Get AB zeropoint
     ZP = utils.calc_header_zeropoint(im, ext=0)
 
-    if verbose:
-        print('Image AB zeropoint: {0:.3f}'.format(ZP))
+    logstr = 'sep: Image AB zeropoint =  {0:.3f}'.format(ZP)
+    utils.log_comment(utils.LOGFILE, logstr, verbose=verbose, show_date=True)
 
     # Scale fluxes to mico-Jy
     uJy_to_dn = 1/(3631*1e6*10**(-0.4*ZP))
@@ -1080,12 +1109,12 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
     try:
         wcs = pywcs.WCS(drz_im[0].header)
         wcs_header = utils.to_header(wcs)
-        pixel_scale = utils.get_wcs_pscale(wcs)
+        pixel_scale = utils.get_wcs_pscale(wcs) # arcsec
     except:
         wcs = None
         wcs_header = drz_im[0].header.copy()
         pixel_scale = np.sqrt(wcs_header['CD1_1']**2+wcs_header['CD1_2']**2)
-        pixel_scale *= 3600.
+        pixel_scale *= 3600. # arcsec
         
     if isinstance(phot_apertures, str):
         apertures = np.cast[float](phot_apertures.replace(',','').split())
@@ -1096,23 +1125,27 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
                 apertures.append(ap.to(u.arcsec).value/pixel_scale)
             else:
                 apertures.append(ap)
-        
-    if weight_file is not None:
+    
+    # Do we need to compute the error from the wht image?
+    need_err = (not use_bkg_err) | (not get_background)
+    if (weight_file is not None) & need_err:
         wht_im = pyfits.open(weight_file)
         wht_data = wht_im[0].data.byteswap().newbyteorder()
 
         err = 1/np.sqrt(wht_data)
         del(wht_data)
         
-        err[~np.isfinite(err)] = 0
-        mask = (err == 0) 
+        # True mask pixels are masked with sep
+        mask = (~np.isfinite(err)) | (err == 0) | (~np.isfinite(data))
+        err[mask] = 0
     else:
-        mask = (data == 0)
+        # True mask pixels are masked with sep
+        mask = (data == 0) | (~np.isfinite(data))
         err = None
     
     data_mask = np.cast[data.dtype](mask)
     
-    if get_background | (err_scale < 0):
+    if get_background | (err_scale < 0) | (use_bkg_err):
                     
         # Account for pixel scale in bkg_params
         bkg_input = {}
@@ -1130,9 +1163,10 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
             else:
                 bkg_input[k] = bkg_params[k]
 
-        if verbose:
-            print('SEP: Get background {0}'.format(bkg_input))
-                
+        logstr = 'SEP: Get background {0}'.format(bkg_input)
+        utils.log_comment(utils.LOGFILE, logstr, verbose=verbose,
+                          show_date=True)
+                            
         if bkg_mask is not None:
             bkg = sep.Background(data, mask=mask | bkg_mask, **bkg_input)
         else:
@@ -1145,8 +1179,12 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
         pyfits.writeto('{0}_bkg.fits'.format(root), data=bkg_data,
                     header=wcs_header, overwrite=True)
 
-        if err is None:
-         err = bkg.rms()
+        if (err is None) | use_bkg_err:
+            logstr = 'sep: Use bkg.rms() for error array'
+            utils.log_comment(utils.LOGFILE, logstr, verbose=verbose,
+                              show_date=True)
+
+            err = bkg.rms()
 
         ratio = bkg.rms()/err
         if err_scale == -np.inf:
@@ -1162,6 +1200,9 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
     
     if not get_background:
         bkg_data = 0.
+        data_bkg = data 
+    else:
+        data_bkg = data - bkg_data
         
     if verbose:
         print('SEP: err_scale={:.3f}'.format(err_scale))
@@ -1169,35 +1210,29 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
     if rescale_weight:
         err *= err_scale
      
-    #mask = None
-
     if source_xy is None:
         ### Run the detection
         if verbose:
             print('   SEP: Extract...')
             
-        if get_background:
-            objects, seg = sep.extract(data - bkg_data, threshold, err=err,
-                           mask=mask, segmentation_map=True,
-                           **detection_params)
-        else:
-            objects, seg = sep.extract(data, threshold, err=err,
-                           mask=mask, segmentation_map=True,
-                           **detection_params)
+        objects, seg = sep.extract(data_bkg, threshold, err=err,
+                       mask=mask, segmentation_map=True,
+                       **detection_params)
                            
         if verbose:
             print('    Done.')
         
         tab = utils.GTable(objects)
-
-        # make one indexed like SExtractor
-        tab['x'] += 1
-        tab['y'] += 1 
+        tab.meta['VERSION'] = (sep.__version__, 'SEP version')
+        
+        # make unit-indexed like SExtractor
+        tab['x_image'] = tab['x']+1
+        tab['y_image'] = tab['y']+1 
         
         # ID
         tab['number'] = np.arange(len(tab), dtype=np.int32)+1
         tab['theta'] = np.clip(tab['theta'], -np.pi/2, np.pi/2)
-        for c in ['a','b','x','y','theta']:
+        for c in ['a', 'b', 'x', 'y', 'x_image', 'y_image', 'theta']:
             tab = tab[np.isfinite(tab[c])]
 
         ## Segmentation
@@ -1205,8 +1240,14 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
         
         pyfits.writeto('{0}_seg.fits'.format(root), data=seg,
                        header=wcs_header, overwrite=True)
-
-
+        
+        # Use segmentation image to mask aperture fluxes
+        if aper_segmask:
+            aseg = seg
+            aseg_id = tab['number']
+        else:
+            aseg = aseg_id = None
+                        
         # WCS coordinates
         if wcs is not None:
             tab['ra'], tab['dec'] = wcs.all_pix2world(tab['x'], tab['y'], 1)
@@ -1246,160 +1287,176 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
                                      'Type of filter applied, conv or weight')
                                         
         tab.meta['THRESHOLD'] = (threshold, 'Detection threshold')
-
-        ## FLUX_AUTO
-        # https://sep.readthedocs.io/en/v1.0.x/apertures.html#equivalent-of-flux-auto-e-g-mag-auto-in-source-extractor
-        kronrad, krflag = sep.kron_radius(data - bkg_data, 
-                                       tab['x']-1, tab['y']-1,
-                                       tab['a'], tab['b'], tab['theta'], 6.0)
-                
-        #kronrad *= 2.5
-        kronrad *= autoparams[0]
         
-        kronrad[~np.isfinite(kronrad)] = autoparams[1]
-        kronrad = np.maximum(kronrad, autoparams[1])
+        # ISO fluxes (flux within segments)
+        iso_flux, iso_fluxerr, iso_area = get_seg_iso_flux(data_bkg, seg, tab, 
+                                                 err=err, verbose=1)
         
-        try:
-            kron_out = sep.sum_ellipse(data - bkg_data, 
-                                tab['x']-1, tab['y']-1, 
-                                tab['a'], tab['b'], 
-                                tab['theta'],
-                                kronrad, subpix=5, err=err)
-        except:
-            kron_out=None
-            print(tab['theta'].min(), tab['theta'].max())
-            
-        #except:
-        # kron_out = sep.sum_circle(data - bkg_data, 
-        #                     tab['x']-1, tab['y']-1, 
-        #                     kronrad, subpix=5, err=err)
-            
-        kron_flux, kron_fluxerr, kron_flag = kron_out
-        kron_flux_flag = kron_flag
+        tab['flux_iso'] = iso_flux/uJy_to_dn*u.uJy
+        tab['fluxerr_iso'] = iso_fluxerr/uJy_to_dn*u.uJy
+        tab['area_iso'] = iso_area
+        tab['mag_iso'] = 23.9-2.5*np.log10(tab['flux_iso'])
         
-        ## By object
-        # kronrad = tab['x']*1.
-        # krflag = kronrad*1.
-        if mask_kron:
-            if mask_kron*1 == 1:
-                # Only flagged objects
-                keep = (tab['flag'] & 1) > 0
-            else:
-                keep = tab['flag'] > -1
-                
-            print('Manual mask for Kron radius/flux')
-            for i in range(len(tab)):
-                #print(keep[i], tab['flag'][i], mask_kron*1)
-                if not keep[i]:
-                    continue
-                
-                id = tab['number'][i]
-                #print('Kron ',id)
-                mask = (seg > 0) & (seg != id)
-                kr, krflag[i] = sep.kron_radius(data - bkg_data, 
-                                           tab['x'][i]-1, tab['y'][i]-1,
-                                           tab['a'][i], tab['b'][i], 
-                                           tab['theta'][i], 6.0, mask=mask)
+        # Compute FLUX_AUTO, FLUX_RADIUS
+        if compute_auto_quantities:
+            auto = compute_SEP_auto_params(data, data_bkg, mask,
+                                pixel_scale=pixel_scale,
+                                err=err, seg=seg, tab=tab, 
+                                autoparams=autoparams, flux_radii=flux_radii, 
+                                subpix=5, verbose=verbose)
             
-                kronrad[i] = np.maximum(kr*autoparams[0], autoparams[1])
+            for k in auto.meta:
+                tab.meta[k] = auto.meta[k]
             
-                out = sep.sum_ellipse(data - bkg_data, 
-                                        tab['x'][i]-1, tab['y'][i]-1, 
-                                        tab['a'][i], tab['b'][i],
-                                        tab['theta'][i], 
-                                        kronrad[i], subpix=5, mask=mask, 
-                                        err=err)
+            auto_flux_cols = ['flux_auto', 'fluxerr_auto', 'bkg_auto']
+            for c in auto.colnames:
+                if c in auto_flux_cols:
+                    tab[c] = auto[c]/uJy_to_dn*u.uJy
+                else:
+                    tab[c] = auto[c]
+                        
+            # Problematic sources
+            bad = (tab['flux_auto'] <= 0) | (tab['flux_radius'] <= 0) 
+            bad |= (tab['kron_radius'] <= 0)
+            tab = tab[~bad]
             
-                kron_flux[i], kron_fluxerr[i], kron_flux_flag[i] = out
-                                  
-        # Minimum radius = 3.5, PHOT_AUTOPARAMS 2.5, 3.5
-        # r_min = autoparams[1] #3.5
-        # #use_circle = kronrad * np.sqrt(tab['a'] * tab['b']) < r_min
-        # use_circle = kronrad < r_min
-        # kron_out = sep.sum_ellipse(data - bkg_data, 
-        #                         tab['x'][use_circle]-1, 
-        #                         tab['y'][use_circle]-1, 
-        #                         tab['a'][use_circle], tab['b'][use_circle],
-        #                         tab['theta'][use_circle], 
-        #                         r_min, subpix=5)
+            # Correction for flux outside Kron aperture
+            tot_corr = get_wfc3ir_kron_tot_corr(tab, drz_filter, pixel_scale=pixel_scale, photplam=drz_photplam)
+            tab['tot_corr'] = tot_corr
+            tab.meta['TOTCFILT'] = (drz_filter, 'Filter for tot_corr')
+            tab.meta['TOTCWAVE'] = (drz_photplam, 'PLAM for tot_corr')
+            
+            total_flux = tab['flux_auto']*tot_corr
+            tab['mag_auto'] = 23.9-2.5*np.log10(total_flux)
+            tab['magerr_auto'] = 2.5/np.log(10)*(tab['fluxerr_auto']/tab['flux_auto'])
+            
+        # ## FLUX_AUTO
+        # # https://sep.readthedocs.io/en/v1.0.x/apertures.html#equivalent-of-flux-auto-e-g-mag-auto-in-source-extractor
+        # kronrad, krflag = sep.kron_radius(data_bkg, 
+        #                                tab['x']-1, tab['y']-1,
+        #                                tab['a'], tab['b'], tab['theta'], 6.0,
+        #                                mask=mask)
+        #         
+        # kronrad *= autoparams[0]
         # 
-        # cflux, cfluxerr, cflag = kron_out
-        # kron_flux_flag[use_circle] = cflag
-        
-        # cflux, cfluxerr, cflag = sep.sum_circle(data - bkg_data,
-        #                                      tab['x'][use_circle]-1, 
-        #                                      tab['y'][use_circle]-1,
-        #                                      autoparams[0]*r_min, subpix=5)
-
-        # kron_flux[use_circle] = cflux
-        # kron_fluxerr[use_circle] = cfluxerr
-        # kronrad[use_circle] = r_min
-
-        tab['flux_auto'] = kron_flux/uJy_to_dn*u.uJy
-        tab['fluxerr_auto'] = kron_fluxerr/uJy_to_dn*u.uJy
-
-        if get_background:
-            kron_out = sep.sum_ellipse(bkg_data, tab['x']-1, tab['y']-1,
-                                    tab['a'], tab['b'],
-                                    tab['theta'], 
-                                    kronrad, subpix=1)
-                                    
-            kron_bkg, kron_bkg_fluxerr, kron_flag = kron_out
-            tab['flux_bkg_auto'] = kron_bkg/uJy_to_dn*u.uJy
-        else:
-            tab['flux_bkg_auto'] = 0.
-
-        tab['mag_auto_raw'] = ZP - 2.5*np.log10(kron_flux)
-        tab['magerr_auto_raw'] = 2.5/np.log(10)*kron_fluxerr/kron_flux
-
-        tab['mag_auto'] = tab['mag_auto_raw']*1.
-        tab['magerr_auto'] = tab['magerr_auto_raw']*1.
-                
-        tab['kron_radius'] = kronrad*u.pixel
-        tab['kron_flag'] = krflag
-        tab['kron_flux_flag'] = kron_flux_flag
-
-        ## FLUX_RADIUS
-        # https://sep.readthedocs.io/en/v1.0.x/apertures.html#equivalent-of-flux-radius-in-source-extractor
-        fr, fr_flag = sep.flux_radius(data - bkg_data, 
-                                      tab['x']-1, tab['y']-1,
-                                      tab['a']*6, 0.5, normflux=kron_flux)
-        
-        tab['flux_radius'] = fr*u.pixel
-
-        fr, fr_flag = sep.flux_radius(data - bkg_data, 
-                                      tab['x']-1, tab['y']-1,
-                                      tab['a']*6, 0.9, normflux=kron_flux)
-        tab['flux_radius_90'] = fr*u.pixel
-
-        ## Bad DQ
-        bad = (tab['flux_auto'] <= 0) | (tab['flux_radius'] <= 0)
-        tab = tab[~bad]
+        # # Circularized Kron radius
+        # kroncirc = kronrad * np.sqrt(tab['a'] * tab['b'])
+        # 
+        # kronrad[~np.isfinite(kronrad)] = autoparams[1]
+        # #kronrad = np.maximum(kronrad, autoparams[1])
+        # 
+        # try:
+        #     kron_out = sep.sum_ellipse(data - bkg_data, 
+        #                         tab['x'], tab['y'], 
+        #                         tab['a'], tab['b'], 
+        #                         tab['theta'],
+        #                         kronrad, subpix=5, err=err)
+        # except:
+        #     kron_out=None
+        #     print(tab['theta'].min(), tab['theta'].max())
+        #     
+        # kron_flux, kron_fluxerr, kron_flag = kron_out
+        # kron_flux_flag = kron_flag
+        #                                   
+        # # Minimum radius = 3.5, PHOT_AUTOPARAMS 2.5, 3.5
+        # # r_min = autoparams[1] #3.5
+        # # #use_circle = kronrad * np.sqrt(tab['a'] * tab['b']) < r_min
+        # # use_circle = kronrad < r_min
+        # # kron_out = sep.sum_ellipse(data - bkg_data, 
+        # #                         tab['x'][use_circle]-1, 
+        # #                         tab['y'][use_circle]-1, 
+        # #                         tab['a'][use_circle], tab['b'][use_circle],
+        # #                         tab['theta'][use_circle], 
+        # #                         r_min, subpix=5)
+        # # 
+        # # cflux, cfluxerr, cflag = kron_out
+        # # kron_flux_flag[use_circle] = cflag
+        # 
+        # # cflux, cfluxerr, cflag = sep.sum_circle(data - bkg_data,
+        # #                                      tab['x'][use_circle]-1, 
+        # #                                      tab['y'][use_circle]-1,
+        # #                                      autoparams[0]*r_min, subpix=5)
+        # 
+        # # kron_flux[use_circle] = cflux
+        # # kron_fluxerr[use_circle] = cfluxerr
+        # # kronrad[use_circle] = r_min
+        # 
+        # tab['flux_auto'] = kron_flux/uJy_to_dn*u.uJy
+        # tab['fluxerr_auto'] = kron_fluxerr/uJy_to_dn*u.uJy
+        # 
+        # if get_background:
+        #     kron_out = sep.sum_ellipse(bkg_data, tab['x']-1, tab['y']-1,
+        #                             tab['a'], tab['b'],
+        #                             tab['theta'], 
+        #                             kronrad, subpix=1)
+        #                             
+        #     kron_bkg, kron_bkg_fluxerr, kron_flag = kron_out
+        #     tab['flux_bkg_auto'] = kron_bkg/uJy_to_dn*u.uJy
+        # else:
+        #     tab['flux_bkg_auto'] = 0.
+        # 
+        # tab['mag_auto_raw'] = ZP - 2.5*np.log10(kron_flux)
+        # tab['magerr_auto_raw'] = 2.5/np.log(10)*kron_fluxerr/kron_flux
+        # 
+        # tab['mag_auto'] = tab['mag_auto_raw']*1.
+        # tab['magerr_auto'] = tab['magerr_auto_raw']*1.
+        #         
+        # tab['kron_radius'] = kronrad*u.pixel
+        # tab['kron_flag'] = krflag
+        # tab['kron_flux_flag'] = kron_flux_flag
+        # 
+        # ## FLUX_RADIUS
+        # # https://sep.readthedocs.io/en/v1.0.x/apertures.html#equivalent-of-flux-radius-in-source-extractor
+        # fr, fr_flag = sep.flux_radius(data - bkg_data, 
+        #                               tab['x']-1, tab['y']-1,
+        #                               tab['a']*6, 0.5, normflux=kron_flux,
+        #                               mask=mask)
+        # 
+        # tab['flux_radius'] = fr*u.pixel
+        # 
+        # fr, fr_flag = sep.flux_radius(data - bkg_data, 
+        #                               tab['x']-1, tab['y']-1,
+        #                               tab['a']*6, 0.9, normflux=kron_flux,
+        #                               mask=mask)
+        # 
+        # tab['flux_radius_90'] = fr*u.pixel
+        # 
+        # ## Bad DQ
+        # bad = (tab['flux_auto'] <= 0) | (tab['flux_radius'] <= 0)
+        # tab = tab[~bad]
         
         # for id in tab['number'][bad]:
         #     is_seg = seg == id
         #     seg[is_seg] = 0
-
+        
+        # More flux columns
         for c in ['cflux','flux','peak','cpeak']:
             tab[c] *= 1. / uJy_to_dn
             tab[c].unit = u.uJy
         
         source_x, source_y = tab['x'], tab['y']
 
-        # Rename to look like SExtractor
-        for c in ['x','y','a','b','theta','cxx','cxy','cyy','x2','y2','xy']:
+        # Rename some columns to look like SExtractor
+        for c in ['a','b','theta','cxx','cxy','cyy','x2','y2','xy']:
             tab.rename_column(c, c+'_image')
 
     else:
-        source_x, source_y = source_xy
-        
+        if len(source_xy) == 2:
+            source_x, source_y = source_xy
+            aseg, aseg_id = None, None
+            aper_segmask = False
+        else:
+            source_x, source_y, aseg, aseg_id = source_xy
+            aper_segmask = True
+            
         if hasattr(source_x, 'unit'):
             if source_x.unit == u.deg:
                 ra, dec = source_xy
-                source_x, source_y = wcs.all_world2pix(ra, dec, 1)
+                source_x, source_y = wcs.all_world2pix(ra, dec, 0)
                 
         tab = utils.GTable()
-
+        tab.meta['VERSION'] = (sep.__version__, 'SEP version')
+        
     # Info
     tab.meta['ZP'] = (ZP, 'AB zeropoint')
     if 'PHOTPLAM' in im[0].header:
@@ -1417,31 +1474,52 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
     tab.meta['GET_BACK'] = (get_background, 'Background computed')
     tab.meta['ERR_SCALE'] = (err_scale, 'Scale factor applied to weight image (like MAP_WEIGHT)')
     
+    tab.meta['APERMASK'] = (aper_segmask, 'Mask apertures with seg image')
+    
     ## Photometry
     for iap, aper in enumerate(apertures):
-        flux, fluxerr, flag = sep.sum_circle(data - bkg_data, 
-                                      source_x-1, source_y-1,
-                                      aper/2, err=err, 
-                                      gain=2000., subpix=5)
-
+        try:
+            flux, fluxerr, flag = sep.sum_circle(data_bkg, 
+                                                 source_x, source_y,
+                                                 aper/2, err=err, 
+                                                 gain=gain, subpix=5,
+                                                 seg=aseg, seg_id=aseg_id, 
+                                                 mask=mask)
+        except:
+            flux, fluxerr, flag = sep.sum_circle(data_bkg, 
+                                                 source_x, source_y,
+                                                 aper/2, err=err, 
+                                                 gain=gain, subpix=5,
+                                                 mask=mask)
+        
+        tab.meta['GAIN'] = gain
+                                                     
         tab['flux_aper_{0}'.format(iap)] = flux/uJy_to_dn*u.uJy
         tab['fluxerr_aper_{0}'.format(iap)] = fluxerr/uJy_to_dn*u.uJy
         tab['flag_aper_{0}'.format(iap)] = flag
 
         if get_background:
-            flux, fluxerr, flag = sep.sum_circle(bkg_data, 
-                                          source_x-1, source_y-1,
-                                          aper/2, err=err, gain=1.0)
-
+            try:
+                flux, fluxerr, flag = sep.sum_circle(bkg_data, 
+                                          source_x, source_y,
+                                          aper/2, err=None, gain=1.0,
+                                          seg=aseg, seg_id=aseg_id, 
+                                          mask=mask)
+            except:
+                flux, fluxerr, flag = sep.sum_circle(bkg_data, 
+                                          source_x, source_y,
+                                          aper/2, err=None, gain=1.0,
+                                          mask=mask)
+                                          
             tab['bkg_aper_{0}'.format(iap)] = flux/uJy_to_dn*u.uJy
         else:
-            tab['bkg_aper_{0}'.format(iap)] = 0.
+            tab['bkg_aper_{0}'.format(iap)] = 0.*u.uJy
         
-        # Aperture contains empty pixels
+        # Count masked pixels in the aperture, not including segmask
         flux, fluxerr, flag = sep.sum_circle(data_mask, 
-                                      source_x-1, source_y-1,
+                                      source_x, source_y,
                                       aper/2, err=err, 
-                                      gain=2000., subpix=5)
+                                      gain=gain, subpix=5)
         
         tab['mask_aper_{0}'.format(iap)] = flux
         
@@ -1449,26 +1527,26 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
         tab.meta['asec_{0}'.format(iap)] = (aper*pixel_scale, 
                                             'Aperture diameter, arcsec')
     
-    # If blended, use largest aperture magnitude
-    if 'flag' in tab.colnames:    
-        last_flux = tab['flux_aper_{0}'.format(iap)]
-        last_fluxerr = tab['fluxerr_aper_{0}'.format(iap)]
-                
-        blended = (tab['flag'] & 1) > 0
-        
-        total_corr = tab['flux_auto']/last_flux
-        blended |= total_corr > max_total_corr
-        
-        tab['flag'][blended] |= 1024
-        
-        aper_mag = 23.9 - 2.5*np.log10(last_flux)
-        aper_magerr = 2.5/np.log(10)*last_fluxerr/last_flux
-        
-        tab['mag_auto'][blended] = aper_mag[blended]
-        tab['magerr_auto'][blended] = aper_magerr[blended]
-        
-        # "ISO" mag, integrated within the segment
-        tab['mag_iso'] = 23.9-2.5*np.log10(tab['flux'])
+    # # If blended, use largest aperture magnitude
+    # if 'flag' in tab.colnames:    
+    #     last_flux = tab['flux_aper_{0}'.format(iap)]
+    #     last_fluxerr = tab['fluxerr_aper_{0}'.format(iap)]
+    #             
+    #     blended = (tab['flag'] & 1) > 0
+    #     
+    #     total_corr = tab['flux_auto']/last_flux
+    #     blended |= total_corr > max_total_corr
+    #     
+    #     tab['flag'][blended] |= 1024
+    #     
+    #     aper_mag = 23.9 - 2.5*np.log10(last_flux)
+    #     aper_magerr = 2.5/np.log(10)*last_fluxerr/last_flux
+    #     
+    #     tab['mag_auto'][blended] = aper_mag[blended]
+    #     tab['magerr_auto'][blended] = aper_magerr[blended]
+    #     
+    #     # "ISO" mag, integrated within the segment
+    #     tab['mag_iso'] = 23.9-2.5*np.log10(tab['flux'])
         
     #if uppercase_columns:
     for c in tab.colnames:
@@ -1481,7 +1559,236 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
     utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
     
     return tab
-     
+
+def get_seg_iso_flux(data, seg, tab, err=None, verbose=0):
+    """
+    Integrate flux within the segmentation regions.
+    
+    `tab` is the detection catalog with columns (at least):
+        'number' / 'id',  'xmin', 'xmax', 'ymin', 'ymax'.
+    
+    """
+    if 'number' in tab.colnames:
+        ids = tab['number']
+    else:
+        ids = tab['id']
+    
+    sh = data.shape
+    
+    iso_flux = ids*0.
+    iso_err = ids*0.
+    iso_area = np.cast[int](ids*0)
+    
+    xmin = np.clip(tab['xmin'], 0, sh[1])
+    xmax = np.clip(tab['xmax'], 0, sh[1])
+    ymin = np.clip(tab['ymin'], 0, sh[0])
+    ymax = np.clip(tab['ymax'], 0, sh[0])
+    
+    for ii, id in enumerate(ids):
+
+        if (verbose > 1):
+            if (ii % verbose == 0):
+                print(' {0}'.format(ii))
+            
+        slx = slice(xmin[ii], xmax[ii])
+        sly = slice(ymin[ii], ymax[ii])
+        
+        data_sub = data[sly, slx]
+        seg_sub = seg[sly, slx]
+        seg_mask = (seg_sub == id)
+
+        iso_flux[ii] = data_sub[seg_mask].sum()
+        iso_area[ii] = seg_mask.sum()
+        
+        if err is not None:
+            err_sub = err[sly, slx]
+            iso_err[ii] = np.sqrt((err_sub[seg_mask]**2).sum())
+    
+    return iso_flux, iso_err, iso_area
+    
+            
+def compute_SEP_auto_params(data, data_bkg, mask, pixel_scale=0.06, err=None, seg=None, tab=None, autoparams=[2.5, 0.35*u.arcsec], flux_radii=[0.2, 0.5, 0.9], subpix=5, verbose=True):
+    """
+    Compute AUTO params
+    https://sep.readthedocs.io/en/v1.0.x/apertures.html#equivalent-of-flux-auto-e-g-mag-auto-in-source-extractor
+    
+    """
+    import sep
+    
+    logstr = 'compute_SEP_auto_params: autoparams={0}; pixel_scale={1}; subpix={2}; flux_radii={3}'.format(autoparams, pixel_scale, subpix, flux_radii)
+    utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
+    
+    # Check datatype of seg
+    segb = seg
+    if seg is not None:
+        if seg.dtype == np.dtype('>i4'):
+            segb = seg.byteswap().newbyteorder()
+  
+    if 'a_image' in tab.colnames:
+        x, y = tab['x_image']-1, tab['y_image']-1
+        a, b = tab['a_image'], tab['b_image']
+        theta = tab['theta_image']
+    else:
+        x, y, a, b = tab['x'], tab['y'], tab['a'], tab['b']
+        theta = tab['theta']
+    
+    if 'number' in tab.colnames:
+        seg_id = tab['number']
+    else:
+        seg_id = tab['id']  
+          
+    # Kron radius
+    try:
+        # Try with seg mask (sep v1.0.4)
+        kronrad, krflag = sep.kron_radius(data_bkg, x, y, a, b, theta, 
+                                          6.0, mask=mask,
+                                          seg=segb, seg_id=seg_id)
+    except:
+        logstr = 'sep.kron_radius: ! Warning ! couldn\'t run with seg mask'
+        utils.log_comment(utils.LOGFILE, logstr, verbose=True)
+        
+        kronrad, krflag = sep.kron_radius(data_bkg, x, y, a, b, theta, 
+                                          6.0, mask=mask)
+                                          
+          
+    kronrad *= autoparams[0]
+    
+    # Circularized Kron radius
+    kroncirc = kronrad * np.sqrt(a*b)
+    
+    # Minimum Kron radius
+    if hasattr(autoparams[1], 'unit'):
+        min_radius_pix = autoparams[1].to(u.arcsec).value/pixel_scale
+    else:
+        # Assume arcsec
+        min_radius_pix = autoparams[1]/pixel_scale
+    
+    kron_min = kroncirc <= min_radius_pix
+    
+    kron_flux = x*0.
+    kron_bkg = x*0.
+    kron_fluxerr = x*0.
+    kron_flag = np.zeros(len(x), dtype=int)
+    kron_area = np.pi*np.maximum(kroncirc, min_radius_pix)**2
+    
+    ########
+    # Ellipse photometry in apertures larger than the minimum
+    # Extract on both data and background subtracted to compute the 
+    # background within the aperture
+    try:
+        # Try with seg mask (sep v1.0.4)
+        kout0 = sep.sum_ellipse(data, x[~kron_min], y[~kron_min], 
+                               a[~kron_min], b[~kron_min], theta[~kron_min],
+                               kronrad[~kron_min], subpix=subpix, err=None,
+                               seg=segb, seg_id=seg_id[~kron_min], mask=mask)
+
+        kout = sep.sum_ellipse(data_bkg, x[~kron_min], y[~kron_min], 
+                               a[~kron_min], b[~kron_min], theta[~kron_min],
+                               kronrad[~kron_min], subpix=subpix, err=err,
+                               seg=segb, seg_id=seg_id[~kron_min], mask=mask)
+    except:
+        kout0 = sep.sum_ellipse(data_bkg, x[~kron_min], y[~kron_min], 
+                               a[~kron_min], b[~kron_min], theta[~kron_min],
+                               kronrad[~kron_min], subpix=subpix, err=None,
+                               mask=mask)
+
+        kout = sep.sum_ellipse(data_bkg, x[~kron_min], y[~kron_min], 
+                               a[~kron_min], b[~kron_min], theta[~kron_min],
+                               kronrad[~kron_min], subpix=subpix, err=err,
+                               mask=mask)
+    
+    kron_flux[~kron_min] = kout[0]
+    kron_bkg[~kron_min] = kout0[0]-kout[0]
+    kron_fluxerr[~kron_min] = kout[1]
+    kron_flag[~kron_min] = kout[2]
+    
+    # Circular apertures below minimum size
+    try:
+        # Try with seg mask (sep v1.0.4)
+        kout0 = sep.sum_circle(data, x[kron_min], y[kron_min], 
+                              min_radius_pix, subpix=subpix, err=None,
+                              seg=segb, seg_id=seg_id[kron_min], mask=mask)
+
+        kout = sep.sum_circle(data_bkg, x[kron_min], y[kron_min], 
+                              min_radius_pix, subpix=subpix, err=err,
+                              seg=segb, seg_id=seg_id[kron_min], mask=mask)
+    except:
+        kout0 = sep.sum_circle(data, x[kron_min], y[kron_min], 
+                              min_radius_pix, subpix=subpix, err=None,
+                              mask=mask)
+
+        kout = sep.sum_circle(data_bkg, x[kron_min], y[kron_min], 
+                              min_radius_pix, subpix=subpix, err=err,
+                              mask=mask)
+    
+    kron_flux[kron_min] = kout[0]
+    kron_bkg[kron_min] = kout0[0]-kout[0]
+    kron_fluxerr[kron_min] = kout[1]
+    kron_flag[kron_min] = kout[2]
+    
+    #############
+    # Flux radius
+    try:
+        fr, fr_flag = sep.flux_radius(data_bkg, x, y, a*6, flux_radii, 
+                                  normflux=kron_flux, mask=mask,
+                                  seg=segb, seg_id=seg_id)
+    except:
+        fr, fr_flag = sep.flux_radius(data_bkg, x, y, a*6, flux_radii, 
+                                  normflux=kron_flux, mask=mask)
+    
+    tab = utils.GTable()
+    tab.meta['KRONFACT'] = (autoparams[0], 'Kron radius scale factor')
+    tab.meta['MINKRON'] = (min_radius_pix, 'Minimum Kron aperture, pix')
+    
+    tab['kron_radius'] = kronrad*u.pixel    
+    tab['kron_rcirc'] = kroncirc*u.pixel
+    
+    tab['flux_auto'] = kron_flux
+    tab['fluxerr_auto'] = kron_fluxerr
+    tab['bkg_auto'] = kron_bkg
+    tab['flag_auto'] = kron_flag
+    tab['area_auto'] = kron_area
+    
+    tab['flux_radius_flag'] = fr_flag
+    for i, r_i in enumerate(flux_radii):
+        c = 'flux_radius_{0:02d}'.format(int(np.round(r_i*100)))
+        if c.endswith('_50'):
+            c = 'flux_radius'
+            
+        tab[c] = fr[:,i]
+    
+    return tab
+    
+def get_wfc3ir_kron_tot_corr(tab, filter, pixel_scale=0.06, photplam=None):
+    """
+    Compute total correction from WFC3/IR EE curves
+    """
+    ee_raw = np.loadtxt((os.path.join(os.path.dirname(__file__),
+                            'data', 'wfc3ir_ee.txt')))
+    ee_data = ee_raw[1:,1:]
+    ee_wave = ee_raw[0,1:]
+    ee_rad = ee_raw[1:,0]
+    
+    kron_raper = np.clip(tab['kron_rcirc']*pixel_scale,
+                         tab.meta['MINKRON'][0]*pixel_scale, 2.1)
+    
+    if (filter.lower()[:2] not in ['f0','f1']) & (photplam is None):
+        return kron_raper*0.+1
+            
+    if photplam is None:
+        wum = int(filter[1:-1])*100/1.e4
+    else:
+        wum = photplam/1.e4
+        if wum < 0.9:
+            return kron_raper*0.+1
+        
+    xi = np.interp(wum, ee_wave, np.arange(len(ee_wave)))
+    i0 = int(xi)
+    fi = 1-(xi-i0)
+    ee_y = ee_data[:,i0:i0+2].dot([fi, 1-fi])
+    ee_interp = np.interp(kron_raper, ee_rad, ee_y, left=0.01, right=1.)
+    return 1./ee_interp
+    
 def make_drz_catalog(root='', sexpath='sex',threshold=2., get_background=True, 
                      verbose=True, extra_config={}, sci=None, wht=None, 
                      get_sew=False, output_params=SEXTRACTOR_DEFAULT_PARAMS,
