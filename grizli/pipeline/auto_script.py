@@ -1374,7 +1374,7 @@ mag_lim=17, cat=None, cols=['mag_auto','ra','dec'], minR=8, dy=5, selection=None
             im['DQ',ext].data |= mask*2048
             im.flush()
             
-def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_background=True, photometry_background=True, get_all_filters=False, det_err_scale=-np.inf, run_detection=True, detection_params=prep.SEP_DETECT_PARAMS,  phot_apertures=prep.SEXTRACTOR_PHOT_APERTURES_ARCSEC, master_catalog=None, bkg_mask=None, bkg_params={'bw':64, 'bh':64, 'fw':3, 'fh':3, 'pixel_scale':0.06}):
+def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_background=True, photometry_background=True, get_all_filters=False, det_err_scale=-np.inf, run_detection=True, detection_params=prep.SEP_DETECT_PARAMS,  phot_apertures=prep.SEXTRACTOR_PHOT_APERTURES_ARCSEC, master_catalog=None, bkg_mask=None, bkg_params={'bw':64, 'bh':64, 'fw':3, 'fh':3, 'pixel_scale':0.06}, use_bkg_err=False):
     """
     Make a detection catalog with SExtractor and then measure
     photometry with `~photutils`.
@@ -1412,7 +1412,7 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
         run_detection=True
     
     if run_detection:    
-        tab = prep.make_SEP_catalog(root='{0}-ir'.format(field_root), threshold=threshold, get_background=detection_background, save_to_fits=True, err_scale=det_err_scale, phot_apertures=phot_apertures, detection_params=detection_params, bkg_mask=bkg_mask, bkg_params=bkg_params)
+        tab = prep.make_SEP_catalog(root='{0}-ir'.format(field_root), threshold=threshold, get_background=detection_background, save_to_fits=True, err_scale=det_err_scale, phot_apertures=phot_apertures, detection_params=detection_params, bkg_mask=bkg_mask, bkg_params=bkg_params, use_bkg_err=use_bkg_err)
     else:
         tab = utils.GTable.gread(master_catalog)
         
@@ -1451,7 +1451,7 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
                       get_background=photometry_background,
                       save_to_fits=False, source_xy=source_xy,
                       phot_apertures=phot_apertures, bkg_mask=bkg_mask,
-                      bkg_params=bkg_params)
+                      bkg_params=bkg_params, use_bkg_err=use_bkg_err)
             
             for k in filter_tab.meta:
                 newk = '{0}_{1}'.format(filt.upper(), k)
