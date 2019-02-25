@@ -38,7 +38,7 @@ try:
 except:
     IGM = None
 
-def run_all_parallel(id, get_output_data=False, **kwargs):
+def run_all_parallel(id, get_output_data=False, argsfile='fit_args.npy', **kwargs):
     import numpy as np
     from grizli.fitting import run_all
     from grizli import multifit
@@ -47,8 +47,9 @@ def run_all_parallel(id, get_output_data=False, **kwargs):
     
     t0 = time.time()
 
-    print('Run {0}'.format(id))
-    args = np.load('fit_args.npy')[0]
+    print('Run id={0} with {1}'.format(id, argsfile))
+    args = np.load(argsfile)[0]
+
     args['verbose'] = False
     for k in kwargs:
         args[k] = kwargs[k]
