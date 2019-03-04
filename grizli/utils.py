@@ -72,7 +72,7 @@ GRISM_LIMITS = {'G800L':[0.545, 1.02, 40.], # ACS/WFC
 #DEFAULT_LINE_LIST = ['PaB', 'HeI-1083', 'SIII', 'OII-7325', 'ArIII-7138', 'SII', 'Ha+NII', 'OI-6302', 'HeI-5877', 'OIII', 'Hb', 'OIII-4363', 'Hg', 'Hd', 'H8','H9','NeIII-3867', 'OII', 'NeVI-3426', 'NeV-3346', 'MgII','CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'NIII-1750', 'NIV-1487', 'NV-1240', 'Lya']
 
 # Line species for determining individual line fluxes.  See `load_templates`.
-DEFAULT_LINE_LIST = ['PaB', 'HeI-1083', 'SIII', 'OII-7325', 'ArIII-7138', 'SII', 'Ha', 'OI-6302', 'HeI-5877', 'OIII', 'Hb', 'OIII-4363', 'Hg', 'Hd', 'H8','H9','NeIII-3867', 'OII', 'NeVI-3426', 'NeV-3346', 'MgII','CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'NIII-1750', 'NIV-1487', 'NV-1240', 'Lya']
+DEFAULT_LINE_LIST = ['PaB', 'HeI-1083', 'SIII', 'OII-7325', 'ArIII-7138', 'SII', 'Ha', 'OI-6302', 'HeI-5877', 'OIII', 'Hb', 'OIII-4363', 'Hg', 'Hd', 'H7','H8','H9','H10','NeIII-3867','OII', 'NeVI-3426', 'NeV-3346', 'MgII','CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'NIII-1750', 'NIV-1487', 'NV-1240', 'Lya']
 
 def set_warnings(numpy_level='ignore', astropy_level='ignore'):
     """
@@ -1234,18 +1234,24 @@ def get_line_wavelengths():
     line_wavelengths['Hd'] = [4102.892]
     line_ratios['Hd'] = [1.]
 
-    line_wavelengths['H8'] = [3971.198]
+    line_wavelengths['H7'] = [3971.198]
+    line_ratios['H7'] = [1.]
+
+    line_wavelengths['H8'] = [3890.166]
     line_ratios['H8'] = [1.]
 
-    line_wavelengths['H9'] = [3890.166]
+    line_wavelengths['H9'] = [3836.485]
     line_ratios['H9'] = [1.]
 
-    line_wavelengths['H10'] = [3836.485]
+    line_wavelengths['H10'] = [3798.987]
     line_ratios['H10'] = [1.]
 
-    line_wavelengths['H11'] = [3798.987]
+    line_wavelengths['H11'] = [3771.70]
     line_ratios['H11'] = [1.]
-
+    
+    line_wavelengths['H12'] = [3751.22]
+    line_ratios['H12'] = [1.]
+    
     # Groves et al. 2011, Table 1
     line_wavelengths['Balmer 10kK'] = [6564.61, 4862.68, 4341.68, 4101.73]
     line_ratios['Balmer 10kK'] = [2.86, 1.0, 0.468, 0.259]
@@ -1289,8 +1295,10 @@ def get_line_wavelengths():
     line_wavelengths['ArIII-7138'] = [7138.0]
     line_ratios['ArIII-7138'] = [1.] 
     
-    line_wavelengths['NeIII-3867'] = [3867.5]
+    line_wavelengths['NeIII-3867'] = [3869.87]
     line_ratios['NeIII-3867'] = [1.]
+    line_wavelengths['NeIII-3968'] = [3968.16]
+    line_ratios['NeIII-3968'] = [1.]
     line_wavelengths['NeV-3346'] = [3346.8]
     line_ratios['NeV-3346'] = [1.]
     line_wavelengths['NeVI-3426'] = [3426.85]
@@ -1309,7 +1317,7 @@ def get_line_wavelengths():
     line_ratios['SII'] = [1., 1.]   
     
     line_wavelengths['HeII-4687'] = [4687.5]
-    line_ratios['HeII-4697'] = [1.]
+    line_ratios['HeII-4687'] = [1.]
     line_wavelengths['HeII-5412'] = [5412.5]
     line_ratios['HeII-5410'] = [1.]
     line_wavelengths['HeI-5877'] = [5877.2]
@@ -1333,6 +1341,10 @@ def get_line_wavelengths():
     
     line_wavelengths['SiIV+OIV-1398'] = [1398.]
     line_ratios['SiIV+OIV-1398'] = [1.]
+    
+    # Weak line in LEGA-C spectra
+    line_wavelengths['NI-5199'] = [5199.4, 5201.76]
+    line_ratios['NI-5199'] = [1., 1.]
     
     line_wavelengths['NII'] = [6549.86, 6585.27]
     line_ratios['NII'] = [1., 3]
@@ -1983,7 +1995,7 @@ def load_quasar_templates(broad_fwhm=2500, narrow_fwhm=1200, broad_lines=    ['H
     t0 = OrderedDict()
     t1 = OrderedDict()
     
-    broad1 = load_templates(fwhm=broad_fwhm, line_complexes=False, stars=False, full_line_list=['Ha', 'Hb', 'Hg', 'Hd', 'H8'] + broad_lines, continuum_list=[], fsps_templates=False, alf_template=False, lorentz=True)
+    broad1 = load_templates(fwhm=broad_fwhm, line_complexes=False, stars=False, full_line_list=['Ha', 'Hb', 'Hg', 'Hd', 'H7'] + broad_lines, continuum_list=[], fsps_templates=False, alf_template=False, lorentz=True)
 
     narrow1 = load_templates(fwhm=narrow_fwhm, line_complexes=False, stars=False, full_line_list=narrow_lines, continuum_list=[], fsps_templates=False, alf_template=False)
     
