@@ -169,9 +169,9 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
         
         if phot is not None:
             if st is not None:
-                st.set_photometry(**phot, min_err=sys_err)
+                st.set_photometry(min_err=sys_err, **phot)
         
-            mb.set_photometry(**phot, min_err=sys_err)
+            mb.set_photometry(min_err=sys_err, **phot)
             
     if t0 is None:
         t0 = utils.load_templates(line_complexes=True, fsps_templates=True, fwhm=fwhm)
