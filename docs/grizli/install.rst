@@ -30,7 +30,8 @@ this file, do the following
         cd grizli
         
         # Generate a conda environment named "grizli-dev"
-        conda env create -f environment_min.yml -n grizli-dev
+        # (Note environment_min.yml renamed to environment.yml for >0.10.0)
+        conda env create -f environment.yml -n grizli-dev
                 
         # Activate the environment.  This needs to be done each time you 
         # start a new terminal, or put it in ~/.bashrc
