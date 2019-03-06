@@ -346,6 +346,8 @@ class GrismDisperser(object):
         
         ## Indices of the trace in the flattened array 
         self.x0 = np.array(self.sh) // 2
+        self.x0 -= 1 # zero index!
+        
         self.dxpix = self.dx - self.dx[0] + self.x0[1] #+ 1
         try:
             self.flat_index = self.idx[dyc + self.x0[0], self.dxpix]
@@ -3803,7 +3805,7 @@ class BeamCutout(object):
             else:
                 cr = wcs_ext.crpix
             
-            cr[0] += dx + self.beam.sh[0]/2 + self.beam.dxfull[0] + dc
+            cr[0] += dx + self.beam.x0[1] + self.beam.dxfull[0] + dc
             cr[1] += dy + dc
         
         for wcs_ext in [wcs.cpdis1, wcs.cpdis2, wcs.det2im1, wcs.det2im2]:
