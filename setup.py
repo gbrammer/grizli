@@ -42,7 +42,7 @@ version = p.communicate()[0].decode("utf-8").strip()
 
 # version = "0.8.0"
 # version = "0.9.0" # bounded fits by default
-version = "0.10.0" # Relatively small fixes, fix bug in 1D wave
+# version = "0.10.0" # Relatively small fixes, fix bug in 1D wave
 
 version_str = """# git describe --tags
 __version__ = "{0}"\n""".format(version)
