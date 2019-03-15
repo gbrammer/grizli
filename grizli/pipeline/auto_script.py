@@ -1261,7 +1261,7 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
     # prep.drizzle_overlaps(keep, parse_visits=False, pixfrac=0.6, scale=0.06, skysub=False, bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False)
     
 def mask_IR_psf_spikes(visit={},
-mag_lim=17, cat=None, cols=['mag_auto','ra','dec'], minR=8, dy=5, selection=None):
+mag_lim=17, cat=None, cols=['mag_auto','ra','dec'], minR=8, dy=5, selection=None, length_scale=1):
     """
     Mask 45-degree diffraction spikes around bright stars
     
@@ -1274,6 +1274,14 @@ mag_lim=17, cat=None, cols=['mag_auto','ra','dec'], minR=8, dy=5, selection=None
     selection : bool array
         If None, then compute `mag < mag_auto` from `cat`.  Otherwise if 
         supplied, use as the selection mask.
+    
+    length_scale : float
+        Scale length of the spike mask by this factor.  The default spike mask 
+        length in pixels is
+        
+        >>> # m = star AB magnitude
+        >>> mask_len = 4*np.sqrt(10**(-0.4*(np.minimum(m,17)-17)))/0.06
+        
         
     """
     import astropy.wcs as pywcs
@@ -1350,6 +1358,8 @@ mag_lim=17, cat=None, cols=['mag_auto','ra','dec'], minR=8, dy=5, selection=None
                 
                 # Size that depends on magnitude
                 xlen = 4*np.sqrt(10**(-0.4*(np.minimum(m,17)-17)))/0.06
+                xlen *= length_scale
+                
                 x = np.arange(-xlen,xlen,0.05)
                 xx = np.array([x, x*0.])
                 
@@ -1374,7 +1384,7 @@ mag_lim=17, cat=None, cols=['mag_auto','ra','dec'], minR=8, dy=5, selection=None
             im['DQ',ext].data |= mask*2048
             im.flush()
             
-def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_background=True, photometry_background=True, get_all_filters=False, det_err_scale=-np.inf, run_detection=True, detection_params=prep.SEP_DETECT_PARAMS,  phot_apertures=prep.SEXTRACTOR_PHOT_APERTURES_ARCSEC, master_catalog=None, bkg_mask=None, bkg_params={'bw':64, 'bh':64, 'fw':3, 'fh':3, 'pixel_scale':0.06}, use_bkg_err=False):
+def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_background=True, photometry_background=True, get_all_filters=False, det_err_scale=-np.inf, run_detection=True, detection_params=prep.SEP_DETECT_PARAMS,  phot_apertures=prep.SEXTRACTOR_PHOT_APERTURES_ARCSEC, master_catalog=None, bkg_mask=None, bkg_params={'bw':64, 'bh':64, 'fw':3, 'fh':3, 'pixel_scale':0.06}, use_bkg_err=False, aper_segmask=True):
     """
     Make a detection catalog with SExtractor and then measure
     photometry with `~photutils`.
@@ -1412,13 +1422,19 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
         run_detection=True
     
     if run_detection:    
-        tab = prep.make_SEP_catalog(root='{0}-ir'.format(field_root), threshold=threshold, get_background=detection_background, save_to_fits=True, err_scale=det_err_scale, phot_apertures=phot_apertures, detection_params=detection_params, bkg_mask=bkg_mask, bkg_params=bkg_params, use_bkg_err=use_bkg_err)
+        tab = prep.make_SEP_catalog(root='{0}-ir'.format(field_root), threshold=threshold, get_background=detection_background, save_to_fits=True, err_scale=det_err_scale, phot_apertures=phot_apertures, detection_params=detection_params, bkg_mask=bkg_mask, bkg_params=bkg_params, use_bkg_err=use_bkg_err, aper_segmask=aper_segmask)
     else:
         tab = utils.GTable.gread(master_catalog)
         
     # Source positions
     #source_xy = tab['X_IMAGE'], tab['Y_IMAGE']
-    source_xy = tab['X_WORLD'], tab['Y_WORLD']
+    if aper_segmask:
+        seg_data = pyfits.open('{0}-ir_seg.fits'.format(field_root))[0].data
+        aseg, aseg_id = seg_data, tab['NUMBER']
+        
+        source_xy = tab['X_WORLD'], tab['Y_WORLD'], aseg, aseg_id
+    else:
+        source_xy = tab['X_WORLD'], tab['Y_WORLD']
     
     if get_all_filters:
         filters = [file.split('_')[-3][len(field_root)+1:] for file in glob.glob('{0}-f*dr?_sci.fits'.format(field_root))]
@@ -3187,7 +3203,7 @@ def make_rgb_thumbnails(root='j140814+565638', HOME_PATH='./', maglim=23, cutout
     import matplotlib.pyplot as plt
     from matplotlib.ticker import MultipleLocator
 
-    import montage_wrapper
+    #import montage_wrapper
     from astropy.visualization import make_lupton_rgb
     import astropy.wcs as pywcs
     import astropy.io.fits as pyfits

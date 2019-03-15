@@ -692,7 +692,8 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
         
     ##########
     # Only include reference objects in the DRZ footprint
-    ref_x, ref_y = drz_wcs.all_world2pix(rd_ref[:,0], rd_ref[:,1], 0)
+    pix_origin = 1
+    ref_x, ref_y = drz_wcs.all_world2pix(rd_ref, pix_origin).T
     ref_cut = (ref_x > -100) & (ref_x < drz_wcs._naxis1+100) & (ref_y > -100) & (ref_y < drz_wcs._naxis2+100)
     if ref_cut.sum() == 0:
         print('{0}: no reference objects found in the DRZ footprint'.format(root))
@@ -731,7 +732,7 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
     NGOOD, rms = 0, 0
     for iter in range(NITER):
         #print('xx iter {0} {1}'.format(iter, NITER))
-        xy = np.array(drz_wcs.all_world2pix(rd_ref, 0))
+        xy = np.array(drz_wcs.all_world2pix(rd_ref, pix_origin))
         pix = np.cast[int](np.round(xy)).T
 
         ### Find objects where drz pixels are non-zero
@@ -741,13 +742,13 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
 
         N = ok2.sum()
         if clip > 0:
-            status = clip_lists(xy_drz-drz_crpix, xy+1-drz_crpix, clip=clip)
+            status = clip_lists(xy_drz-drz_crpix, xy+0-drz_crpix, clip=clip)
             if not status:
                 print('Problem xxx')
         
             input, output = status
         else:
-            input, output = xy_drz+0.-drz_crpix, xy+1-drz_crpix
+            input, output = xy_drz+0.-drz_crpix, xy+0-drz_crpix
         #print np.sum(input) + np.sum(output)
         
         toler=5
@@ -1013,7 +1014,7 @@ def make_SEP_catalog_from_arrays(sci, err, mask, wcs=None, threshold=2., ZP=25, 
     tab = utils.GTable(objects)
     
     if wcs is not None:
-       tab['ra'], tab['dec'] = wcs.all_pix2world(tab['x'], tab['y'], 1)
+       tab['ra'], tab['dec'] = wcs.all_pix2world(tab['x'], tab['y'], 0)
        tab['ra'].unit = u.deg
        tab['dec'].unit = u.deg
        tab['x_world'], tab['y_world'] = tab['ra'], tab['dec']
@@ -1054,10 +1055,21 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
     units of pixels. If an array or list, can have units (e.g.,
     `~astropy.units.arcsec`).
     
+    aper_segmask : bool
+        If true, then run SEP photometry with segmentation masking.  This 
+        requires the sep fork at https://github.com/gbrammer/sep.git, which
+        should be included if you installed with the "environment.yml" 
+        conda environment file.
+        
     source_xy : (x, y) or (ra, dec) arrays
         Force extraction positions.  If the arrays have units, then pass them 
         through the header WCS.  If no units, positions are *zero indexed* 
         array coordinates.
+        
+        To run with segmentation masking, also provide aseg and aseg_id
+        arrays with source_xy, like
+        
+            `source_xy = ra, dec, aseg, aseg_id`
         
     """
     if log:
@@ -1250,7 +1262,7 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
                         
         # WCS coordinates
         if wcs is not None:
-            tab['ra'], tab['dec'] = wcs.all_pix2world(tab['x'], tab['y'], 1)
+            tab['ra'], tab['dec'] = wcs.all_pix2world(tab['x'], tab['y'], 0)
             tab['ra'].unit = u.deg
             tab['dec'].unit = u.deg
             tab['x_world'], tab['y_world'] = tab['ra'], tab['dec']
@@ -1448,10 +1460,11 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
         else:
             source_x, source_y, aseg, aseg_id = source_xy
             aper_segmask = True
-            
+        
         if hasattr(source_x, 'unit'):
             if source_x.unit == u.deg:
-                ra, dec = source_xy
+                # Input positions are ra/dec, convert with WCS    
+                ra, dec = source_x, source_y
                 source_x, source_y = wcs.all_world2pix(ra, dec, 0)
                 
         tab = utils.GTable()
@@ -1479,6 +1492,7 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
     ## Photometry
     for iap, aper in enumerate(apertures):
         try:
+            # Should work with the sep fork at gbrammer/sep
             flux, fluxerr, flag = sep.sum_circle(data_bkg, 
                                                  source_x, source_y,
                                                  aper/2, err=err, 
@@ -2583,7 +2597,12 @@ def query_tap_catalog(ra=165.86, dec=34.829694, radius=3., max_wait=20,
     try:
         table = job.get_results()
         if clean_xml:
-            os.remove(job.get_output_file())
+            if hasattr(job, 'outputFile'):
+                jobFile = job.outputFile
+            else:
+                jobFile = job.get_output_file()
+                
+            os.remove(jobFile)
     
         # Provide ra/dec columns
         for c, cc in zip(rd_colnames, ['ra','dec']):
@@ -2591,7 +2610,12 @@ def query_tap_catalog(ra=165.86, dec=34.829694, radius=3., max_wait=20,
                 table[cc] = table[c]
             
     except:
-        print('Query failed, check {0} for error messages'.format(job.get_output_file()))
+        if hasattr(job, 'outputFile'):
+            jobFile = job.outputFile
+        else:
+            jobFile = job.get_output_file()
+            
+        print('Query failed, check {0} for error messages'.format(jobFile))
         table = None
                 
     return table   

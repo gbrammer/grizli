@@ -199,10 +199,10 @@ def blot_nearest_exact(in_data, in_wcs, out_wcs, verbose=True, stepsize=-1,
         Input data to blot.
     
     in_wcs : `~astropy.wcs.WCS`
-        Input WCS.  Must have _naxis1, _naxis2 attributes.
+        Input WCS.  Must have _naxis1, _naxis2 or pixel_shape attributes.
         
     out_wcs : `~astropy.wcs.WCS`
-        Output WCS.  Must have _naxis1, _naxis2 attributes.
+        Output WCS.  Must have _naxis1, _naxis2 or pixel_shape attributes.
    
     scale_by_pixel_area : bool
         If True, then scale the output image by the square of the image pixel
@@ -241,9 +241,17 @@ def blot_nearest_exact(in_data, in_wcs, out_wcs, verbose=True, stepsize=-1,
         from stwcs.wcsutil import HSTWCS
         source_wcs = HSTWCS(fobj=out, ext=('SCI',ext), minerr=0.0, wcskey=' ')
         blot_wcs = HSTWCS(fobj=im, ext=(0), minerr=0.0, wcskey=' ')
+    
+    # Shapes, in numpy array convention (y, x)
+    if hasattr(in_wcs, 'pixel_shape'):  
+        in_sh = in_wcs.pixel_shape[::-1]
+    else:
+        in_sh = (in_wcs._naxis2, in_wcs._naxis1)
         
-    in_sh = (in_wcs._naxis2, in_wcs._naxis1)
-    out_sh = (out_wcs._naxis2, out_wcs._naxis1)
+    if hasattr(out_wcs, 'pixel_shape'):
+        out_sh = out_wcs.pixel_shape[::-1]
+    else:
+        out_sh = (out_wcs._naxis2, out_wcs._naxis1)
             
     in_px = in_wcs.calc_footprint()
     in_poly = Polygon(in_px).buffer(5./3600.)
@@ -273,8 +281,12 @@ def blot_nearest_exact(in_data, in_wcs, out_wcs, verbose=True, stepsize=-1,
         ## Seems backwards and doesn't quite agree with above
         blot_wcs = out_wcs
         source_wcs = in_wcs
-        
-        nx, ny = int(blot_wcs._naxis1), int(blot_wcs._naxis2)
+
+        if hasattr(blot_wcs, 'pixel_shape'):
+            nx, ny = blot_wcs.pixel_shape
+        else:
+            nx, ny = int(blot_wcs._naxis1), int(blot_wcs._naxis2)
+
         mapping = cdriz.DefaultWCSMapping(blot_wcs, source_wcs, nx, ny,
                                           stepsize)
         xf, yf = mapping(xo, yo)
@@ -2845,7 +2857,11 @@ def transform_wcs(in_wcs, translation=[0.,0.], rotation=0., scale=1.):
         
     out_wcs.pscale = get_wcs_pscale(out_wcs)
     #out_wcs.wcs.crpix *= scale
-    if hasattr(out_wcs, '_naxis1'):
+    if hasattr(out_wcs, 'pixel_shape'):
+        _naxis1 = int(np.round(out_wcs.pixel_shape[0]*scale))
+        _naxis2 = int(np.round(out_wcs.pixel_shape[1]*scale))
+        out_wcs.pixel_shape = [_naxis1, _naxis2]
+    elif hasattr(out_wcs, '_naxis1'):
         out_wcs._naxis1 = int(np.round(out_wcs._naxis1*scale))
         out_wcs._naxis2 = int(np.round(out_wcs._naxis2*scale))
         
@@ -3200,7 +3216,11 @@ def to_header(wcs, relax=True):
         
     """
     header = wcs.to_header(relax=relax)
-    if hasattr(wcs, '_naxis1'):
+    if hasattr(wcs, 'pixel_shape'):
+        header['NAXIS'] = wcs.naxis
+        header['NAXIS1'] = wcs.pixel_shape[0]
+        header['NAXIS2'] = wcs.pixel_shape[1] 
+    elif hasattr(wcs, '_naxis1'):
         header['NAXIS'] = wcs.naxis
         header['NAXIS1'] = wcs._naxis1
         header['NAXIS2'] = wcs._naxis2
@@ -4900,7 +4920,12 @@ class GTable(astropy.table.Table):
                  
         else:
             other_xy = self_wcs.all_world2pix(other_radec, pixel_index)
-            cut = (other_xy[:,0] > -pad) & (other_xy[:,0] < self_wcs._naxis1+pad) & (other_xy[:,1] > -pad) & (other_xy[:,1] < self_wcs._naxis2+pad)
+            if hasattr(self_wcs, 'pixel_shape'):
+                _naxis1, _naxis2 = self_wcs.pixel_shape
+            else:
+                _naxis1, _naxis2 = self_wcs._naxis1, self_wcs._naxis2
+                
+            cut = (other_xy[:,0] > -pad) & (other_xy[:,0] < _naxis1+pad) & (other_xy[:,1] > -pad) & (other_xy[:,1] < _naxis2+pad)
             other_xy = other_xy[cut,:]          
             xy_center = self_wcs.wcs.crpix*1
         
