@@ -3,5 +3,5 @@ matplotlib
 numpy
 scikit-image
 scipy
-astropy==2.0.2
+astropy
 sphinx_astropy
