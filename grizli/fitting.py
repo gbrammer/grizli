@@ -2492,7 +2492,7 @@ class GroupFitter(object):
         
         fill : type
         
-        units : 'flam', 'nJy', 'mJy', 'eps', 'meps'
+        units : 'flam', 'nJy', 'mJy', 'eps', 'meps', 'spline[N]', 'resid'
             Plot units. 
             
         min_sens_show : type
@@ -2528,17 +2528,35 @@ class GroupFitter(object):
         if not show_beams:
             scale_on_stacked=True
             
-        if units == 'spline':
+        if units.startswith('spline'):
             ran = ((tfit['cont1d'].wave >= self.wavef.min()) & 
                    (tfit['cont1d'].wave <= self.wavef.max()))
-            
+                            
             if ran.sum() == 0:
                 print('No overlap with template')
                 return False
-                
-            spl = UnivariateSpline(tfit['cont1d'].wave[ran], 
-                                   tfit['cont1d'].flux[ran], ext=1)
-            mspl = (tfit['cont1d'].wave, spl(tfit['cont1d'].wave))
+            
+            if True:
+                try:
+                    df = int(units.split('spline')[1])
+                except:
+                    df = 21
+
+                Aspl = utils.bspline_templates(tfit['cont1d'].wave[ran], 
+                                               degree=3, df=df,
+                                               get_matrix=True, log=True)
+
+                cspl, _, _, _ = np.linalg.lstsq(Aspl, tfit['cont1d'].flux[ran], rcond=-1)
+
+                yspl = tfit['cont1d'].flux*0.
+                yspl[ran] = Aspl.dot(cspl)
+            
+            else:
+                spl = UnivariateSpline(tfit['cont1d'].wave[ran], 
+                                       tfit['cont1d'].flux[ran], ext=1)
+                yspl = spl(tfit['cont1d'].wave)
+            
+            mspl = (tfit['cont1d'].wave, yspl)
         else:
             mspl = None
                                    
@@ -2621,7 +2639,7 @@ class GroupFitter(object):
             elif units == 'resid':
                 unit_corr = 1./flm
                 unit_label = 'resid'
-            elif units == 'spline':
+            elif units.startswith('spline'):
                 unit_corr = 1./flspl
                 unit_label = 'spline resid'
             else: # 'flam
@@ -2734,7 +2752,7 @@ class GroupFitter(object):
                 unit_corr = 1.
             elif units == 'resid':
                 unit_corr = 1./sp_model[g]['flux']
-            elif units == 'spline':
+            elif units.startswith('spline'):
                 unit_corr = 1./sp_spline[g]['flux']
             else: # 'flam
                 unit_corr = 1./sp_flat[g]['flux']/1.e-19#/pscale
