@@ -3115,7 +3115,9 @@ class MultiBeam(GroupFitter):
         
         self._parse_beam_arrays()
                 
-    def fit_trace_shift(self, split_groups=True, max_shift=5, tol=1.e-2, verbose=True, lm=False, fit_with_psf=False):
+    def fit_trace_shift(self, split_groups=True, max_shift=5, tol=1.e-2, 
+                        verbose=True, lm=False, fit_with_psf=False,
+                        reset=False):
         """TBD
         """
         from scipy.optimize import leastsq, minimize
@@ -3132,7 +3134,10 @@ class MultiBeam(GroupFitter):
         bounds = np.array([[-max_shift,max_shift]]*len(indices))
         
         args = (self, indices, 0, lm, verbose, fit_with_psf)
-        if lm:
+        if reset:
+            shifts = np.zeros(len(indices))
+            out = None
+        elif lm:
             out = leastsq(self.eval_trace_shift, s0, args=args, Dfun=None, full_output=0, col_deriv=0, ftol=1.49012e-08, xtol=1.49012e-08, gtol=0.0, maxfev=0, epsfcn=None, factor=100, diag=None)
             shifts = out[0]
         else:
