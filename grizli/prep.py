@@ -2274,12 +2274,29 @@ def get_gaia_radec_at_time(gaia_tbl, date=2015.5, format='decimalyear'):
         Projected sky coordinates.
     
     """
-    import astropy.time 
-    import pyia
+    from astropy.time import Time
+    from astropy.coordinates import SkyCoord
     
-    obstime = astropy.time.Time(date, format=format)
-    g = pyia.GaiaData(gaia_tbl)
-    coord_at_time = g.skycoord.apply_space_motion(obstime)
+    try:
+        # Try to use pyia
+        import pyia
+        g = pyia.GaiaData(gaia_tbl)
+        coord = g.get_skycoord(distance=1*u.kpc, radial_velocity=0.*u.km/u.second)
+    except:
+        # From table itself
+        if 'ref_epoch' in gaia_tbl.colnames:
+            ref_epoch = Time(gaia_tbl['ref_epoch'].data, 
+                             format='decimalyear')
+        else:
+            ref_epoch = Time(2015.5, format='decimalyear')
+            
+        coord = SkyCoord(ra=gaia_tbl['ra'], dec=gaia_tbl['dec'], 
+                         pm_ra_cosdec=gaia_tbl['pmra'], 
+                         pm_dec=gaia_tbl['pmdec'], 
+                         obstime=ref_epoch)
+        
+    new_obstime = Time(date, format=format)
+    coord_at_time = coord.apply_space_motion(new_obstime=new_obstime)
     return(coord_at_time)
     
 def get_gaia_DR2_vizier_columns():

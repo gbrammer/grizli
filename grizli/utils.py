@@ -5678,10 +5678,12 @@ def catalog_mask(cat, ecol='FLUXERR_APER_0', max_err_percentile=90, pad=0.05, pa
     
     test &= (cat['THRESH'] > 0) & (cat['THRESH'] < 1e28)
 
-    not_edge = hull_edge_mask(cat['X_IMAGE'], cat['Y_IMAGE'], pad=pad, pad_is_absolute=pad_is_absolute)
-    
+    not_edge = hull_edge_mask(cat['X_IMAGE'], cat['Y_IMAGE'], 
+                              pad=pad, pad_is_absolute=pad_is_absolute)
     if ecol in cat.colnames:
-        test &= cat[ecol] < np.percentile(cat[ecol][~not_edge], max_err_percentile)
+        valid = np.isfinite(cat[ecol])
+        test &= cat[ecol] < np.percentile(cat[ecol][(~not_edge) & valid], 
+                                          max_err_percentile)
     
     return test
     
