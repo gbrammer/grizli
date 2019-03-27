@@ -990,7 +990,17 @@ def make_SEP_catalog_from_arrays(sci, err, mask, wcs=None, threshold=2., ZP=25, 
     import copy
     import astropy.units as u
     import sep
-       
+    
+    logstr = 'make_SEP_catalog_from_arrays: sep version = {0}'.format(sep.__version__)
+    utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
+    if sep.__version__ < '1.10.0':
+        print("""!!!!!!!!!!
+        !  SEP version = {0}
+        !  Get >= 1.10.0 to enable segmentation masking, e.g., 
+        !  $ pip install git+https://github.com/gbrammer/sep.git
+        !!!!!!!!!!
+        """.format(sep.__version__))
+        
     uJy_to_dn = 1/(3631*1e6*10**(-0.4*ZP))
 
     if sci.dtype != np.float32:
@@ -1079,7 +1089,17 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
 
     import copy
     import astropy.units as u
-    import sep # prefer v1.0.4 (fork on github.com/gbrammer/sep.git)
+    import sep 
+
+    logstr = 'make_SEP_catalog: sep version = {0}'.format(sep.__version__)
+    utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
+    if sep.__version__ < '1.10.0':
+        print("""!!!!!!!!!!
+        !  SEP version = {0}
+        !  Get >= 1.10.0 to enable segmentation masking, e.g., 
+        !  $ pip install git+https://github.com/gbrammer/sep.git
+        !!!!!!!!!!
+        """.format(sep.__version__))
 
     if sci is not None:
         drz_file = sci
@@ -1313,7 +1333,7 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
         if compute_auto_quantities:
             auto = compute_SEP_auto_params(data, data_bkg, mask,
                                 pixel_scale=pixel_scale,
-                                err=err, seg=seg, tab=tab, 
+                                err=err, segmap=seg, tab=tab, 
                                 autoparams=autoparams, flux_radii=flux_radii, 
                                 subpix=5, verbose=verbose)
             
@@ -1497,9 +1517,10 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
                                                  source_x, source_y,
                                                  aper/2, err=err, 
                                                  gain=gain, subpix=5,
-                                                 seg=aseg, seg_id=aseg_id, 
+                                                 segmap=aseg, seg_id=aseg_id, 
                                                  mask=mask)
         except:
+            tab.meta['APERMASK'] = (False, 'Mask apertures with seg image - Failed')
             flux, fluxerr, flag = sep.sum_circle(data_bkg, 
                                                  source_x, source_y,
                                                  aper/2, err=err, 
@@ -1517,7 +1538,7 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
                 flux, fluxerr, flag = sep.sum_circle(bkg_data, 
                                           source_x, source_y,
                                           aper/2, err=None, gain=1.0,
-                                          seg=aseg, seg_id=aseg_id, 
+                                          segmap=aseg, seg_id=aseg_id, 
                                           mask=mask)
             except:
                 flux, fluxerr, flag = sep.sum_circle(bkg_data, 
@@ -1621,22 +1642,31 @@ def get_seg_iso_flux(data, seg, tab, err=None, verbose=0):
     return iso_flux, iso_err, iso_area
     
             
-def compute_SEP_auto_params(data, data_bkg, mask, pixel_scale=0.06, err=None, seg=None, tab=None, autoparams=[2.5, 0.35*u.arcsec], flux_radii=[0.2, 0.5, 0.9], subpix=5, verbose=True):
+def compute_SEP_auto_params(data, data_bkg, mask, pixel_scale=0.06, err=None, segmap=None, tab=None, autoparams=[2.5, 0.35*u.arcsec], flux_radii=[0.2, 0.5, 0.9], subpix=5, verbose=True):
     """
     Compute AUTO params
     https://sep.readthedocs.io/en/v1.0.x/apertures.html#equivalent-of-flux-auto-e-g-mag-auto-in-source-extractor
     
     """
     import sep
+    logstr = 'compute_SEP_auto_params: sep version = {0}'.format(sep.__version__)
+    utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
+    if sep.__version__ < '1.10.0':
+        print("""!!!!!!!!!!
+        !  SEP version = {0}
+        !  Get >= 1.10.0 to enable segmentation masking, e.g., 
+        !  $ pip install git+https://github.com/gbrammer/sep.git
+        !!!!!!!!!!
+        """.format(sep.__version__))
     
     logstr = 'compute_SEP_auto_params: autoparams={0}; pixel_scale={1}; subpix={2}; flux_radii={3}'.format(autoparams, pixel_scale, subpix, flux_radii)
     utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
     
     # Check datatype of seg
-    segb = seg
-    if seg is not None:
-        if seg.dtype == np.dtype('>i4'):
-            segb = seg.byteswap().newbyteorder()
+    segb = segmap
+    if segmap is not None:
+        if segmap.dtype == np.dtype('>i4'):
+            segb = segmap.byteswap().newbyteorder()
   
     if 'a_image' in tab.colnames:
         x, y = tab['x_image']-1, tab['y_image']-1
@@ -1653,10 +1683,10 @@ def compute_SEP_auto_params(data, data_bkg, mask, pixel_scale=0.06, err=None, se
           
     # Kron radius
     try:
-        # Try with seg mask (sep v1.0.4)
+        # Try with seg mask (sep > v1.0.4)
         kronrad, krflag = sep.kron_radius(data_bkg, x, y, a, b, theta, 
                                           6.0, mask=mask,
-                                          seg=segb, seg_id=seg_id)
+                                          segmap=segb, seg_id=seg_id)
     except:
         logstr = 'sep.kron_radius: ! Warning ! couldn\'t run with seg mask'
         utils.log_comment(utils.LOGFILE, logstr, verbose=True)
@@ -1690,16 +1720,17 @@ def compute_SEP_auto_params(data, data_bkg, mask, pixel_scale=0.06, err=None, se
     # Extract on both data and background subtracted to compute the 
     # background within the aperture
     try:
-        # Try with seg mask (sep v1.0.4)
+        # Try with seg mask (sep=>v1.0.4)
         kout0 = sep.sum_ellipse(data, x[~kron_min], y[~kron_min], 
                                a[~kron_min], b[~kron_min], theta[~kron_min],
                                kronrad[~kron_min], subpix=subpix, err=None,
-                               seg=segb, seg_id=seg_id[~kron_min], mask=mask)
+                               segmap=segb, seg_id=seg_id[~kron_min],
+                               mask=mask)
 
         kout = sep.sum_ellipse(data_bkg, x[~kron_min], y[~kron_min], 
                                a[~kron_min], b[~kron_min], theta[~kron_min],
                                kronrad[~kron_min], subpix=subpix, err=err,
-                               seg=segb, seg_id=seg_id[~kron_min], mask=mask)
+                               segmap=segb, seg_id=seg_id[~kron_min], mask=mask)
     except:
         kout0 = sep.sum_ellipse(data_bkg, x[~kron_min], y[~kron_min], 
                                a[~kron_min], b[~kron_min], theta[~kron_min],
@@ -1721,11 +1752,11 @@ def compute_SEP_auto_params(data, data_bkg, mask, pixel_scale=0.06, err=None, se
         # Try with seg mask (sep v1.0.4)
         kout0 = sep.sum_circle(data, x[kron_min], y[kron_min], 
                               min_radius_pix, subpix=subpix, err=None,
-                              seg=segb, seg_id=seg_id[kron_min], mask=mask)
+                              segmap=segb, seg_id=seg_id[kron_min], mask=mask)
 
         kout = sep.sum_circle(data_bkg, x[kron_min], y[kron_min], 
                               min_radius_pix, subpix=subpix, err=err,
-                              seg=segb, seg_id=seg_id[kron_min], mask=mask)
+                              segmap=segb, seg_id=seg_id[kron_min], mask=mask)
     except:
         kout0 = sep.sum_circle(data, x[kron_min], y[kron_min], 
                               min_radius_pix, subpix=subpix, err=None,
@@ -1745,7 +1776,7 @@ def compute_SEP_auto_params(data, data_bkg, mask, pixel_scale=0.06, err=None, se
     try:
         fr, fr_flag = sep.flux_radius(data_bkg, x, y, a*6, flux_radii, 
                                   normflux=kron_flux, mask=mask,
-                                  seg=segb, seg_id=seg_id)
+                                  segmap=segb, seg_id=seg_id)
     except:
         fr, fr_flag = sep.flux_radius(data_bkg, x, y, a*6, flux_radii, 
                                   normflux=kron_flux, mask=mask)
