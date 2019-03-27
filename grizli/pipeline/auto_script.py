@@ -1057,7 +1057,11 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
             fp = direct['footprint']
             for rdfile in radec_files:
                 points = np.loadtxt(rdfile)
-                hull = ConvexHull(points)
+                try:
+                    hull = ConvexHull(points)
+                except:
+                    continue
+                    
                 rd_fp = Polygon(points[hull.vertices,:])                
                 olap = rd_fp.intersection(fp)
                 if (olap.area > min_overlap*fp.area) & (olap.area > best_overlap):

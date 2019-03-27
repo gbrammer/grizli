@@ -138,8 +138,10 @@ def eazy_photoz(root, force=False, object_only=True, apply_background=True, aper
             mag = 23.9-2.5*np.log10(cat['{0}_corr_{1}'.format(f, aper_ix)])
             break
     #
-   # params['TEMPLATES_FILE'] = 'templates/fsps_full/tweak_fsps_QSF_12_v3.param'
-    params['TEMPLATES_FILE'] = 'templates/fsps_full/tweak_fsps_QSF_11_v3_noRed.param'
+    if os.path.exists('templates/fsps_full/tweak_fsps_QSF_11_v3_noRed.param.fits'):
+        params['TEMPLATES_FILE'] = 'templates/fsps_full/tweak_fsps_QSF_11_v3_noRed.param'
+    else:
+        params['TEMPLATES_FILE'] = 'templates/fsps_full/tweak_fsps_QSF_12_v3.param'
 
     zpfile = None
     load_products = False
@@ -369,9 +371,13 @@ def get_external_catalog(phot, filter_file='/usr/local/share/eazy-photoz/filters
     
 ########### Selecting objects
 def select_objects():
-    self, cat, zout = photoz.eazy_photoz(root, object_only=False, apply_prior=False, beta_prior=True, aper_ix=1, force=True, get_external_photometry=False, compute_residuals=False, total_flux='flux_auto_fix')
+    
+    total_flux = 'flux_auto_fix'
+    total_flux = 'flux_auto' # new segmentation masked SEP catalogs
+    
+    self, cat, zout = photoz.eazy_photoz(root, object_only=False, apply_prior=False, beta_prior=True, aper_ix=1, force=True, get_external_photometry=False, compute_residuals=False, total_flux=total_flux)
 
-    flux = self.cat['flux_auto_fix']*1.
+    flux = self.cat[total_flux]*1.
     hmag = 23.9-2.5*np.log10(flux)
 
     # Reddest HST band
@@ -418,12 +424,14 @@ def select_objects():
     sel = red_sel
 
     so = np.argsort(hmag[sel]); ids = self.cat['id'][sel][so]; i=-1
-
+    
+    ds9 = None
+    
     for j in self.idx[sel][so]:
         id_j, ra, dec = self.cat['id', 'ra', 'dec'][j]
 
         # Photo-z
-        fig = self.show_fit(id_j, ds9=None, show_fnu=highz_sel[j])    
+        fig, data = self.show_fit(id_j, ds9=ds9, show_fnu=True) #highz_sel[j])    
         lab = '{0} {1}\n'.format(root, id_j)
         lab += 'H={0:.1f} z={1:.1f}\n'.format(hmag[j], self.zbest[j])
         lab += 'U-V={0:.1f}, logM={1:4.1f}'.format(uv[j], np.log10(zout['mass'][j]))
@@ -502,3 +510,39 @@ def show_all_thumbnails(label='j022708p4901_00273', filters=['f775w','f814w','f0
     if close:
         plt.close()
         
+def iyj():
+
+    flux = 'corr'
+    err = 'ecorr'
+    ap = 0
+    
+    iflux = np.maximum(self.cat['f814w_{0}_{1}'.format(flux, ap)], self.cat['f814w_{0}_{1}'.format(err, ap)])
+
+    iSN = self.cat['f814w_{0}_{1}'.format(flux, ap)]/self.cat['f814w_{0}_{1}'.format(flux, ap)]
+
+    yflux = self.cat['f105w_{0}_{1}'.format(flux, ap)]
+    jflux = self.cat['f125w_{0}_{1}'.format(flux, ap)]
+    
+    iy = -2.5*np.log10(iflux/yflux)
+    yj = -2.5*np.log10(yflux/jflux)
+    
+    sel = (hmag > 22) & (self.cat['f814w_{0}_{1}'.format(flux, ap)] > -90)
+    qso = self.cat['id'] == 1072
+    plt.scatter(yj[sel], iy[sel], marker='.', color='k', alpha=0.5)
+    plt.scatter(yj[highz_sel], iy[highz_sel], marker='s', color='r', alpha=0.5)
+    plt.scatter(yj[qso], iy[qso], marker='*', color='r')
+    
+    red = (yj > 0.5) & (iy > 1.2) & (self.cat['f814w_{0}_{1}'.format(flux, ap)] > -90) & (iSN < 2)
+
+    red = (yj > -0.2) & (iy > 1.9) & (self.cat['f814w_{0}_{1}'.format(flux, ap)] > -90) & (iSN < 2)
+
+    plt.scatter(yj[red], iy[red], marker='.', color='pink')
+    
+    tf = self.tempfilt.tempfilt
+    tiy = -2.5*np.log10(tf[:,:,2]/tf[:,:,0])
+    tyj = -2.5*np.log10(tf[:,:,0]/tf[:,:,1])
+    lowz = self.zgrid < 6
+    plt.plot(tyj[lowz,:], tiy[lowz,:], alpha=0.3, color='orange')
+    plt.plot(tyj[~lowz,:], tiy[~lowz,:], alpha=0.4, color='r')
+    plt.xlim(-1,3); plt.ylim(-1,10); plt.grid()
+    
