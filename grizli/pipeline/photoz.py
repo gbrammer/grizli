@@ -146,8 +146,22 @@ def eazy_photoz(root, force=False, object_only=True, apply_background=True, aper
     zpfile = None
     load_products = False
 
-    eazy.symlink_eazy_inputs(path='/usr/local/share/python/eazy-py/eazy-photoz', path_is_env=False)
+    if (not os.path.exists('FILTER.RES.latest') or 
+        not os.path.exists('templates')):
+        try:
+            # should work with eazy-py >= 0.2.0
+            eazy.symlink_eazy_inputs(path=None)
+        except:
+            print("""
+The filter file `FILTER.RES.latest` and `templates` directory were not
+found in the working directory and the automatic command to retrieve them 
+failed: 
     
+    >>> import eazy; eazy.symlink_eazy_inputs(path=None)  
+
+Run it with `path` pointing to the location of the `eazy-photoz` repository.""")
+            return False
+            
     self = eazy.photoz.PhotoZ(param_file=None, translate_file='zphot.translate', zeropoint_file=zpfile, params=params, load_prior=True, load_products=load_products)
     
     if object_only:
@@ -187,9 +201,18 @@ def show_from_ds9(ds9, self, zout, **kwargs):
     return fig, self.cat['id'][ix], zout['z_phot'][ix]
      
 class EazyPhot(object):
-    def __init__(self, photoz, grizli_templates=None, zgrid=None):
+    def __init__(self, photoz, grizli_templates=None, zgrid=None, apcorr=None):
         """
         photoz : `~eazypy.photoz.PhotoZ`
+        
+        apcorr : array
+            Aperture correction applied to the photometry to match the 
+            grism spectra.  For the internal grizli catalogs, this should 
+            generally be something like 
+            
+            >>> apcorr = 'flux_iso' / 'flux_auto'
+            
+            
         """
         try:
             from .. import utils
@@ -200,6 +223,11 @@ class EazyPhot(object):
         
         self.zgrid = photoz.zgrid
         
+        if apcorr is None:
+            self.apcorr = np.ones(photoz.NOBJ)
+        else:
+            self.apcorr = apcorr
+            
         self.flam = photoz.fnu*photoz.to_flam*photoz.zp*photoz.ext_corr
         self.flam[not_obs_mask] = -99
         
@@ -255,8 +283,10 @@ class EazyPhot(object):
         ix, dr = rdcat.match_to_catalog_sky(icat)
         
         phot = OrderedDict()
-        phot['flam'] = self.flam[ix[0],:]*1.e-19
-        phot['eflam'] = self.eflam[ix[0],:]*1.e-19
+        apcorr_i = self.apcorr[ix[0]]
+        
+        phot['flam'] = self.flam[ix[0],:]*1.e-19*apcorr_i
+        phot['eflam'] = self.eflam[ix[0],:]*1.e-19*apcorr_i
         phot['filters'] = self.filters
         phot['tempfilt'] = self.tempfilt
         return phot, ix[0], dr[0]
