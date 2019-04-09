@@ -146,7 +146,7 @@ def eazy_photoz(root, force=False, object_only=True, apply_background=True, aper
     zpfile = None
     load_products = False
 
-    eazy.symlink_eazy_inputs(path='/usr/local/share/python/eazy-py/eazy-photoz', path_is_env=False)
+    eazy.symlink_eazy_inputs() #path='/usr/local/share/python/eazy-py/eazy-photoz', path_is_env=False)
     
     self = eazy.photoz.PhotoZ(param_file=None, translate_file='zphot.translate', zeropoint_file=zpfile, params=params, load_prior=True, load_products=load_products)
     
