@@ -1871,7 +1871,7 @@ DITHERED_PLINE = {'kernel': 'point', 'pixfrac': 0.2, 'pixscale': 0.1, 'size': 8,
 PARALLEL_PLINE = {'kernel': 'square', 'pixfrac': 1.0, 'pixscale': 0.1, 'size': 8, 'wcs': None}
 
   
-def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00, ids=None, pline=DITHERED_PLINE, fit_only_beams=True, run_fit=True, poly_order=7, master_files=None, grp=None, bad_pa_threshold=None, fit_trace_shift=False, size=32, diff=False):
+def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00, ids=None, pline=DITHERED_PLINE, fit_only_beams=True, run_fit=True, poly_order=7, master_files=None, grp=None, bad_pa_threshold=None, fit_trace_shift=False, size=32, diff=False, min_sens=0.08, skip_complete=True, fit_args={}):
     import glob
     import os
     
@@ -1926,9 +1926,7 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
         
     #size = 32
     close = True
-    Skip = True
     show_beams = True
-    min_sens = 0.08
     
     if __name__ == '__main__': # Interactive
         size=32
@@ -1936,6 +1934,7 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
         pline = {'kernel': 'point', 'pixfrac': 0.2, 'pixscale': 0.1, 'size': 8, 'wcs': None}
         prior=None
         
+        skip_complete = True
         fit_trace_shift=False
         bad_pa_threshold=1.6
         MW_EBV = 0
@@ -1943,7 +1942,7 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
     ###############
     # Stacked spectra
     for ii, id in enumerate(ids):
-        if Skip:
+        if skip_complete:
             if os.path.exists('{0}_{1:05d}.stack.png'.format(target, id)):
                 continue
             
@@ -2033,13 +2032,14 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
     for ii, id in enumerate(ids):
         print('{0}/{1}: {2}'.format(ii, len(ids), id))
         
-        if Skip:
+        if skip_complete:
             if os.path.exists('{0}_{1:05d}.line.png'.format(target, id)):
                 continue
         
         
         try:
-            out = fitting.run_all(id, t0=t0, t1=t1, fwhm=1200, zr=zr, dz=[0.004, 0.0005], fitter='nnls', group_name=target, fit_stacks=False, prior=prior,  fcontam=0.2, pline=pline, mask_sn_limit=10, fit_beams=(not fit_only_beams),  root=target+'*', fit_trace_shift=False, phot=phot, verbose=True, scale_photometry=(phot is not None) & (scale_photometry), show_beams=True, overlap_threshold=10, fit_only_beams=fit_only_beams, MW_EBV=MW_EBV, sys_err=sys_err)
+            #out = fitting.run_all(id, t0=t0, t1=t1, fwhm=1200, zr=zr, dz=[0.004, 0.0005], fitter='nnls', group_name=target, fit_stacks=False, prior=prior,  fcontam=0.2, pline=pline, mask_sn_limit=10, fit_beams=(not fit_only_beams),  root=target+'*', fit_trace_shift=False, phot=phot, verbose=True, scale_photometry=(phot is not None) & (scale_photometry), show_beams=True, overlap_threshold=10, fit_only_beams=fit_only_beams, MW_EBV=MW_EBV, sys_err=sys_err, min_sens=min_sens)
+            out = fitting.run_all_parallel(id, get_output_data=True, min_sens=min_sens, verbose=True, **fit_args)
             mb, st, fit, tfit, line_hdu = out
             
             spectrum_1d = [tfit['cont1d'].wave, tfit['cont1d'].flux]
