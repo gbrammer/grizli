@@ -144,8 +144,25 @@ def get_extra_data(root='j114936+222414', HOME_PATH='/Volumes/Pegasus/Grizli/Aut
         os.system('ln -sf {0}/*persist.fits ./'.format(root))
 
     os.chdir(CWD)
-    
-def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', inspect_ramps=False, manual_alignment=False, is_parallel_field=False, remove_bad=True, reprocess_parallel=False, only_preprocess=False, make_mosaics=True, fill_mosaics='grism', mask_spikes=False, make_phot=True, run_extractions=False, run_fit=False, s3_sync=False, fine_radec=None, run_fine_alignment=True, combine_all_filters=True, gaia_by_date=True, align_mag_limits=[14,24], align_outlier_threshold=4, align_simple=False, align_clip=-1, align_rms_limit=2, align_min_overlap=0.2, master_radec=None, parent_radec=None, fix_stars=True, is_dash=False, run_parse_visits=True, imaging_bkg_params=prep.BKG_PARAMS, reference_wcs_filters=['G800L', 'G102', 'G141'], filters=VALID_FILTERS, catalogs=['PS1','DES','NSC','SDSS','GAIA','WISE'], mosaic_pixel_scale=None, mosaic_pixfrac=0.75, half_optical_pixscale=False, skip_single_optical_visits=True, get_dict=False, combine_minexp=2, **kwargs):
+
+PREPROCESS_ARGS = {'align_rms_limit': 2,
+                   'align_mag_limits': [14, 24],
+                   'drizzle_params': {},
+                   'single_image_CRs': True,
+                   'tweak_fit_order': -1,
+                   'column_average': True,
+                   'run_tweak_align': True,
+                   'align_simple': False,
+                   'tweak_threshold': 1.5,
+                   'iter_atol': 0.0001,
+                   'align_clip': 120,
+                   'imaging_bkg_params': prep.BKG_PARAMS,
+                   'fix_stars': True,
+                   'reference_catalogs': ['PS1', 'GAIA', 'NSC', 'WISE'],
+                   'sky_iter': 10,
+                   'outlier_threshold': 4}
+                       
+def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', inspect_ramps=False, manual_alignment=False, is_parallel_field=False, remove_bad=True, reprocess_parallel=False, only_preprocess=False, make_mosaics=True, fill_mosaics='grism', mask_spikes=False, make_phot=True, run_extractions=False, run_fit=False, s3_sync=False, fine_radec=None, run_fine_alignment=True, combine_all_filters=True, gaia_by_date=True, align_min_overlap=0.2, master_radec=None, parent_radec=None, is_dash=False, run_parse_visits=True, reference_wcs_filters=['G800L', 'G102', 'G141'], filters=VALID_FILTERS, mosaic_pixel_scale=None, mosaic_pixfrac=0.75, half_optical_pixscale=False, skip_single_optical_visits=True, get_dict=False, combine_minexp=2, prep_args=PREPROCESS_ARGS, **kwargs):
     """
     Run the full pipeline for a given target
         
@@ -259,12 +276,20 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
     ### Manual alignment
     if manual_alignment:
         os.chdir(os.path.join(HOME_PATH, root, 'Prep'))
-        auto_script.manual_alignment(field_root=root, HOME_PATH=HOME_PATH, skip=True, catalogs=catalogs, radius=15, visit_list=None)
+        auto_script.manual_alignment(field_root=root, HOME_PATH=HOME_PATH, skip=True, catalogs=['GAIA'], radius=15, visit_list=None)
 
     #####################
     ### Alignment & mosaics    
     os.chdir(os.path.join(HOME_PATH, root, 'Prep'))
-    auto_script.preprocess(field_root=root, HOME_PATH=HOME_PATH, make_combined=False, catalogs=catalogs, master_radec=master_radec, parent_radec=parent_radec, use_visit=True, fix_stars=fix_stars, tweak_max_dist=(5 if is_parallel_field else 1), align_simple=align_simple, align_clip=align_clip, imaging_bkg_params=imaging_bkg_params, align_rms_limit=align_rms_limit, min_overlap=align_min_overlap, use_self_catalog=is_parallel_field, align_mag_limits=align_mag_limits, outlier_threshold=align_outlier_threshold, skip_single_optical_visits=skip_single_optical_visits)
+    
+    tweak_max_dist = (5 if is_parallel_field else 1)
+    if 'tweak_max_dist' not in prep_args:
+        prep_args['tweak_max_dist'] = tweak_max_dist
+    
+    if 'use_self_catalog' not in prep_args:
+        prep_args['use_self_catalog'] = is_parallel_field
+            
+    auto_script.preprocess(field_root=root, HOME_PATH=HOME_PATH, make_combined=False, master_radec=master_radec, parent_radec=parent_radec, use_visit=True, min_overlap=align_min_overlap, prep_args=prep_args)
         
     # Fine alignment
     if (len(glob.glob('{0}*fine.png'.format(root))) == 0) & (run_fine_alignment) & (len(visits) > 1):
@@ -313,6 +338,11 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
                                      drizzle_filters=False) 
         
         ## IR filters
+        if 'fix_stars' in prep_args:
+            fix_stars = prep_args['fix_stars']
+        else:
+            fix_stars = False
+            
         auto_script.drizzle_overlaps(root, filters=IR_filters, 
                                      min_nexp=1, pixfrac=mosaic_pixfrac,
                                      make_combined=(not combine_all_filters),
@@ -446,7 +476,10 @@ def go(root='j010311+131615', maglim=[17,26], HOME_PATH='/Volumes/Pegasus/Grizli
     # Drizzled grp objects
     # All files
     if len(glob.glob('{0}*_grism*fits'.format(root))) == 0:
-        grp = multifit.GroupFLT(grism_files=glob.glob('*GrismFLT.fits'), direct_files=[], ref_file=None, seg_file='{0}-ir_seg.fits'.format(root), catalog='{0}-ir.cat.fits'.format(root), cpu_count=-1, sci_extn=1, pad=256)
+        grism_files = glob.glob('*GrismFLT.fits')
+        grism_files.sort()
+        
+        grp = multifit.GroupFLT(grism_files=grism_files, direct_files=[], ref_file=None, seg_file='{0}-ir_seg.fits'.format(root), catalog='{0}-ir.cat.fits'.format(root), cpu_count=-1, sci_extn=1, pad=256)
         
         # Make drizzle model images
         grp.drizzle_grism_models(root=root, kernel='point', scale=0.2)
@@ -972,9 +1005,8 @@ def clean_prep(field_root='j142724+334246'):
     flt_files = glob.glob('*_fl?.fits')
     for flt_file in flt_files:
         utils.fix_flt_nan(flt_file, verbose=True)
-
-             
-def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', min_overlap=0.2, make_combined=True, catalogs=['PS1','DES','NSC','SDSS','GAIA','WISE'], use_visit=True, master_radec=None, parent_radec=None, use_first_radec=False, skip_imaging=False, clean=True, fix_stars=True, tweak_max_dist=1., align_simple=True, align_clip=30, imaging_bkg_params=None, align_rms_limit=2., use_self_catalog=False, align_mag_limits=[14,24], outlier_threshold=3, skip_single_optical_visits=True):
+            
+def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', min_overlap=0.2, make_combined=True, catalogs=['PS1','DES','NSC','SDSS','GAIA','WISE'], use_visit=True, master_radec=None, parent_radec=None, use_first_radec=False, skip_imaging=False, clean=True, prep_args=PREPROCESS_ARGS):
     """
     master_radec: force use this radec file
     
@@ -1076,17 +1108,7 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
         ###########################
         # Preprocessing script, background subtraction, etc.
         status = prep.process_direct_grism_visit(direct=direct, grism=grism,
-                            radec=radec, skip_direct=False,
-                            align_mag_limits=align_mag_limits,
-                            outlier_threshold=outlier_threshold,
-                            reference_catalogs=catalogs, 
-                            sky_iter=10, iter_atol=1.e-4, 
-                            fix_stars=fix_stars,
-                            tweak_max_dist=tweak_max_dist, 
-                            align_simple=align_simple, align_clip=align_clip,
-                            align_rms_limit=align_rms_limit,
-                            imaging_bkg_params=imaging_bkg_params,
-                            use_self_catalog=use_self_catalog)
+                            radec=radec, skip_direct=False, **prep_args)
                                         
         ###################################
         # Persistence Masking
@@ -1158,33 +1180,18 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
             try:
                 status = prep.process_direct_grism_visit(direct=direct,
                                         grism={}, radec=radec,
-                                        skip_direct=False,
-                                        run_tweak_align=True,
-                                        align_mag_limits=align_mag_limits,
-                                        reference_catalogs=catalogs,
-                                        outlier_threshold=outlier_threshold,
-                                        fix_stars=fix_stars,
-                                        tweak_max_dist=tweak_max_dist,
-                                        align_simple=align_simple,
-                                        align_clip=align_clip,
-                                        imaging_bkg_params=imaging_bkg_params)
+                                        skip_direct=False, **prep_args)
             except:
                 utils.log_exception(utils.LOGFILE, traceback)
                 utils.log_comment(utils.LOGFILE, "# !! First `prep` run failed with `run_tweak_align`. Try again")
                 
+                if 'run_tweak_align' in prep_args:
+                    prep_args['run_tweak_align'] = False
+                    
                 status = prep.process_direct_grism_visit(direct=direct,
-                                            grism={}, radec=radec,
-                                            skip_direct=False,
-                                            run_tweak_align=False,
-                                            align_mag_limits=align_mag_limits,
-                                            reference_catalogs=catalogs,
-                                        outlier_threshold=outlier_threshold,
-                                            fix_stars=fix_stars,
-                                            tweak_max_dist=tweak_max_dist,
-                                            align_simple=align_simple,
-                                            align_clip=align_clip,
-                                        imaging_bkg_params=imaging_bkg_params)
-                
+                                        grism={}, radec=radec,
+                                        skip_direct=False, **prep_args)
+            
             failed_file = '%s.failed' %(direct['product'])
             if os.path.exists(failed_file):
                 os.remove(failed_file)
@@ -1886,6 +1893,7 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
     
     if master_files is None:
         master_files = glob.glob('*GrismFLT.fits')
+        master_files.sort()
         
     if grp is None:
         init_grp = True
