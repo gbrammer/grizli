@@ -195,7 +195,7 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
        fine_backup=True,
        fine_alignment_args=args['fine_alignment_args'],
        make_mosaics=True,
-       mosaic_params=args['mosaic_args'],
+       mosaic_args=args['mosaic_args'],
        mask_spikes=False,
        make_phot=True, 
        multiband_catalog_args=args['multiband_catalog_args'],
@@ -317,8 +317,11 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
         # Parsing for parallel fields, where time-adjacent exposures 
         # may have different visit IDs and should be combined
         if 'combine_same_pa' in parse_visits_args:
-            if (parse_visits_args['combine_same_pa'] == -1) & is_parallel_field:
-                parse_visits_args['combine_same_pa'] = True
+            if (parse_visits_args['combine_same_pa'] == -1):
+                if is_parallel_field:
+                    parse_visits_args['combine_same_pa'] = True
+                else:
+                    parse_visits_args['combine_same_pa'] = False                    
         else:
             parse_visits_args['combine_same_pa'] = is_parallel_field
             
@@ -354,7 +357,7 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
         visit_prep_args['use_self_catalog'] = is_parallel_field
             
     #auto_script.preprocess(field_root=root, HOME_PATH=HOME_PATH, make_combined=False, master_radec=master_radec, parent_radec=parent_radec, use_visit=True, min_overlap=align_min_overlap, visit_prep_args=visit_prep_args)
-    auto_script.preprocess(field_root=root, HOME_PATH=HOME_PATH, visit_prep_args=visit_prep_args, **preprocess_args)
+    auto_script.preprocess(field_root=root, HOME_PATH=HOME_PATH, visit_prep_args=visit_prep_args, persistence_args=persistence_args, **preprocess_args)
        
     # Fine alignment
     if (len(glob.glob('{0}*fine.png'.format(root))) == 0) & (run_fine_alignment) & (len(visits) > 1):
@@ -399,6 +402,7 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
         # optical_filters += ['F410M', 'F450W']
         
         mosaic_pixfrac = mosaic_args['mosaic_pixfrac']
+        combine_all_filters = mosaic_args['combine_all_filters']
         
         if combine_all_filters:
             all_filters = mosaic_args['ir_filters'] + mosaic_args['optical_filters']
@@ -1084,7 +1088,7 @@ def clean_prep(field_root='j142724+334246'):
     for flt_file in flt_files:
         utils.fix_flt_nan(flt_file, verbose=True)
             
-def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', min_overlap=0.2, make_combined=True, catalogs=['PS1','DES','NSC','SDSS','GAIA','WISE'], use_visit=True, master_radec=None, parent_radec=None, use_first_radec=False, skip_imaging=False, clean=True, skip_single_optical_visits=True, visit_prep_args=args['visit_prep_args']):
+def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', min_overlap=0.2, make_combined=True, catalogs=['PS1','DES','NSC','SDSS','GAIA','WISE'], use_visit=True, master_radec=None, parent_radec=None, use_first_radec=False, skip_imaging=False, clean=True, skip_single_optical_visits=True, visit_prep_args=args['visit_prep_args'], persistence_args=args['persistence_args']):
     """
     master_radec: force use this radec file
     

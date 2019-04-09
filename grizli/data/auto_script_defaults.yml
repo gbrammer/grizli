@@ -10,7 +10,7 @@ filters: &filters
 fetch_files_args: 
     reprocess_parallel: False 
     remove_bad: True 
-    s3_sync: False
+    s3_sync: True
     #filters: *filters
     fetch_flt_calibs: [IDCTAB, PFLTFILE, NPOLFILE]
     inst_products: 
@@ -140,8 +140,8 @@ multiband_catalog_args:
     photometry_background: True
     get_all_filters: False
     run_detection: True
-    detection_params: null,
-    phot_apertures: null, 
+    detection_params: null
+    phot_apertures: null
     bkg_mask: null
     bkg_params: {bw: 64, bh: 64, fw: 3, fh: 3, pixel_scale: 0.06}
     use_bkg_err: False

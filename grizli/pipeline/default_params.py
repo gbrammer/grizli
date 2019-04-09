@@ -27,7 +27,7 @@ def test_aws_availability():
     """
     Test if aws s3 is available
     """
-    s3_status = os.system('aws s3 ls s3://stpubdata --request-payer requester')
+    s3_status = os.system('aws s3 ls s3://stpubdata --request-payer requester > /tmp/aws.x')
     if s3_status == 0:
         s3_sync='cp'  # As of late October 2018, 's3 sync' not working with 'stpubdata'
     else:
@@ -60,14 +60,6 @@ def get_yml_parameters(local_file=None, copy_defaults=False, verbose=True, skip_
     kwargs = yaml.load(fp)
     fp.close()
     
-    # s3 sync
-    kwargs['fetch_files_args']['s3_sync'] = test_aws_availability()
-    
-    # catalog defaults
-    dd = kwargs['multiband_catalog_args']
-    dd['detection_params'] =  prep.SEP_DETECT_PARAMS 
-    dd['phot_apertures'] = prep.SEXTRACTOR_PHOT_APERTURES_ARCSEC
-    
     if local_file is not None:
         fp = open(local_file)
         local_args = yaml.load(fp)
@@ -88,6 +80,17 @@ def get_yml_parameters(local_file=None, copy_defaults=False, verbose=True, skip_
                     kwargs[k][subk] = local_args[k][subk]
             else:
                 kwargs[k] = local_args[k]
+    
+    if kwargs['fetch_files_args']['s3_sync']:
+        kwargs['fetch_files_args']['s3_sync'] = test_aws_availability()
+        
+    # catalog defaults
+    dd = kwargs['multiband_catalog_args']
+    if dd['detection_params'] is None:
+        dd['detection_params'] =  prep.SEP_DETECT_PARAMS 
+    
+    if dd['phot_apertures'] is None:
+        dd['phot_apertures'] = prep.SEXTRACTOR_PHOT_APERTURES_ARCSEC
             
     return kwargs
 
