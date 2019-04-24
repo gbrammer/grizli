@@ -880,6 +880,78 @@ def get_hst_filter(header):
     
     return filter.upper()
 
+EE_RADII = [0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.8 , 1., 1.5, 2.]
+
+def tabulate_encircled_energy(aper_radii=EE_RADII, norm_radius=4.0):
+    
+    import pysynphot as S
+    
+    from .pipeline import default_params
+    
+    # Default spectrum
+    sp = S.FlatSpectrum(25, fluxunits='ABMag')
+    
+    tab = GTable()
+    tab['radius'] = aper_radii*u.arcsec
+    tab.meta['RNORM'] = norm_radius, 'Normalization radius, arcsec'
+    
+    # IR
+    for f in default_params.IR_M_FILTERS+default_params.IR_W_FILTERS:
+        obsmode = 'wfc3,ir,'+f.lower()
+        print(obsmode)
+        tab[obsmode] = synphot_encircled_energy(obsmode=obsmode, sp=sp, aper_radii=aper_radii, norm_radius=norm_radius)
+        tab.meta['ZP_{0}'.format(obsmode)] = synphot_zeropoint(obsmode=obsmode, radius=norm_radius)
+        
+    # Optical.  Wrap in try/except to catch missing filters
+    for inst in ['acs,wfc1,', 'wfc3,uvis2,']:
+        for f in default_params.OPT_M_FILTERS+default_params.OPT_W_FILTERS:
+            obsmode = inst+f.lower()
+            
+            try:
+                tab[obsmode] = synphot_encircled_energy(obsmode=obsmode, sp=sp, aper_radii=aper_radii, norm_radius=norm_radius)
+                print(obsmode)
+                tab.meta['ZP_{0}'.format(obsmode)] = synphot_zeropoint(obsmode=obsmode, radius=norm_radius)
+            except:
+                continue
+    
+    tab.meta['PSYNVER'] = S.__version__, 'Pysynphot version'
+    
+    tab.write('hst_encircled_energy.fits', overwrite=True)
+    
+def synphot_zeropoint(obsmode='wfc3,ir,f160w', radius=4.0):
+    """
+    Compute synphot for a specific aperture
+    """        
+    import pysynphot as S
+    sp = S.FlatSpectrum(25, fluxunits='ABMag')
+    bp = S.ObsBandpass(obsmode+',aper#{0:.2f}'.format(radius))
+    obs = S.Observation(sp, bp)
+    ZP = 25 + 2.5*np.log10(obs.countrate())
+    return ZP
+    
+def synphot_encircled_energy(obsmode='wfc3,ir,f160w', sp='default', aper_radii=EE_RADII, norm_radius=4.0):
+    """
+    Compute encircled energy curves with pysynphot
+    """    
+    import pysynphot as S
+    
+    if sp == 'default':
+        sp = S.FlatSpectrum(25, fluxunits='ABMag')
+    
+    # Normalization
+    bp = S.ObsBandpass(obsmode+',aper#{0:.2f}'.format(norm_radius))
+    obs = S.Observation(sp, bp)
+    norm_counts = obs.countrate()
+    
+    counts = np.ones_like(aper_radii)    
+    for i, r_aper in enumerate(aper_radii):
+        #print(obsmode, r_aper)
+        bp = S.ObsBandpass(obsmode+',aper#{0:.2f}'.format(r_aper))
+        obs = S.Observation(sp, bp)
+        counts[i] = obs.countrate()
+    
+    return counts / norm_counts
+    
 def calc_header_zeropoint(im, ext=0):
     """
     Determine AB zeropoint from image header

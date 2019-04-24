@@ -1,15 +1,21 @@
 """
 Reprocessing scripts for variable WFC3/IR backgrounds
 """
+from .. import utils
 
-def reprocess_wfc3ir(parallel=False):
-
-    import matplotlib as mpl
-    mpl.rcParams['backend'] = 'agg'
+def reprocess_wfc3ir(parallel=False, cpu_count=0):
+    """
+    Run reprocessing script to flatten IR backgrounds
+    
+    """
+    if parallel:
+        # Might require light backend to avoid segfaults in multiprocessing
+        import matplotlib as mpl
+        mpl.rcParams['backend'] = 'agg'
 
     import glob
     import os
-
+        
     # https://github.com/gbrammer/wfc3
     try:
         from reprocess_wfc3 import reprocess_wfc3
@@ -31,11 +37,11 @@ def reprocess_wfc3ir(parallel=False):
     # Make ramp diagnostic images    
     if parallel:
         files=glob.glob('*raw.fits')
-        reprocess_wfc3.show_ramps_parallel(files, cpu_count=4)
+        reprocess_wfc3.show_ramps_parallel(files, cpu_count=cpu_count)
     
         # Reprocess all raw files
         files=glob.glob('*raw.fits')
-        reprocess_wfc3.reprocess_parallel(files, cpu_count=4)
+        reprocess_wfc3.reprocess_parallel(files, cpu_count=cpu_count)
     else:
         files=glob.glob('*raw.fits')
         for file in files:

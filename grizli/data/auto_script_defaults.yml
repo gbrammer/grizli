@@ -1,0 +1,171 @@
+# Full Grizli pipeline arguments
+
+filters: &filters 
+    [F410M, F467M, F547M, F550M, F621M, F689M, F763M, F845M, F200LP, F350LP,
+     F435W, F438W, F439W, F450W, F475W, F475X, F555W, F569W, F600LP, F606W,
+     F622W, F625W, F675W, F702W, F775W, F791W, F814W, F850LP, G800L, F098M,
+     F127M, F139M, F153M, F105W, F110W, F125W, F140W, F160W, G102, G141]
+
+# Arguments to grizli.pipeline.fetch_files
+fetch_files_args: 
+    reprocess_parallel: False 
+    remove_bad: True 
+    s3_sync: True
+    #filters: *filters
+    fetch_flt_calibs: [IDCTAB, PFLTFILE, NPOLFILE]
+    inst_products: 
+        ACS/WFC: [FLC]
+        WFC3/IR: [RAW]
+        WFC3/UVIS: [FLC]
+        WFPC2/PC: [C0M, C1M]
+        WFPC2/WFC: [C0M, C1M]
+
+# Manual inspection of the IR ramps
+inspect_ramps: False 
+
+# Split DASH exposures using wfc3dash
+is_dash: &is_dash False 
+
+# Parse 
+run_parse_visits: True 
+is_parallel_field: &is_parallel_field False
+
+# Arguments to grizli.pipeline.fetch_files
+parse_visits_args: 
+    combine_minexp: 2 
+    combine_same_pa: -1
+    #filters: *filters
+    #is_dash: *is_dash
+    use_visit: True
+
+# Run manual alignment for each visit using prep.manual_alignment
+manual_alignment: False 
+manual_alignment_args: 
+    skip: True
+    catalogs: [GAIA]
+    radius: 15
+    visit_list: null
+    radec: null
+
+####
+# Preprocessing
+preprocess_args: 
+    min_overlap: 0.2 
+    master_radec: null 
+    parent_radec: null 
+    use_visit: True
+    make_combined: False
+    catalogs: [PS1, DES, DSC, SDSS, GAIA, WISE]
+    skip_single_optical_visits: True 
+    use_first_radec: False
+    skip_imaging: False
+    clean: True
+    
+# Arguments to grizli.prep.process_direct_grism_visit for each visit    
+visit_prep_args: &prep_args
+    align_rms_limit: 2
+    align_mag_limits: [14, 24]
+    drizzle_params: {}
+    single_image_CRs: True
+    run_tweak_align: True
+    tweak_threshold: 1.5
+    tweak_fit_order: -1
+    align_simple: False
+    align_clip: 120
+    column_average: True
+    sky_iter: 10
+    iter_atol: 0.0001
+    imaging_bkg_params: {bh: 128, bw: 128, fh: 3, fw: 3, pixel_scale: 0.06}
+    fix_stars: True
+    reference_catalogs: [PS1, GAIA, NSC, WISE]
+    outlier_threshold: 4
+    # use_self_catalog: *is_parallel_field
+
+# Arguments to prep.apply_persistence_mask
+persistence_args:
+    dq_value: 1024
+    err_threshold: 0.6
+    grow_mask: 3
+    verbose: True
+            
+# Fine alignment
+run_fine_alignment: True 
+fine_backup: True
+fine_alignment_args:
+    min_overlap: 0.2
+    stopme: False
+    ref_err: 0.08
+    radec: null 
+    catalogs: [GAIA,PS1,DES,SDSS]
+    radius: 30
+    gaia_by_date: True
+    NITER: 1
+    maglim: [17,23]
+    shift_only: True
+    method: Powell
+    redrizzle: False
+    program_str: null
+    match_str: []
+    all_visits: null
+    date: null
+    tol: null
+    fit_options: null
+    print_options: {precision: 3, sign: ' '}
+    
+# Combined mosaics
+make_mosaics: True 
+mosaic_args:
+    combine_all_filters: False 
+    ir_filters: 
+        [F105W, F110W, F125W, F140W, F160W, F098M, F139M, F127M, F153M]
+    optical_filters:
+        [F814W, F606W, F435W, F850LP, F702W, F555W, F438W, F475W, F625W,
+          F775W, F225W, F275W, F300W, F390W, F350LP, F200LP, F410M, F450W]
+    fill_mosaics: grism 
+    half_optical_pixscale: False 
+    mosaic_pixfrac: 0.75 
+    wcs_params: 
+        pad_reference: 90
+        filters: [G800L, G102, G141] 
+        pixel_scale: null 
+        
+# Mask IR difraction spikes
+mask_spikes: False 
+
+# Multiband photometric catalog
+make_phot: True 
+multiband_catalog_args: 
+    threshold: 1.8
+    detection_background: False
+    photometry_background: True
+    get_all_filters: False
+    run_detection: True
+    detection_params: null
+    phot_apertures: null
+    bkg_mask: null
+    bkg_params: {bw: 64, bh: 64, fw: 3, fh: 3, pixel_scale: 0.06}
+    use_bkg_err: False
+    aper_segmask: True
+
+# Stop after image preparation even if grism exists    
+only_preprocess: False 
+
+# If continuing with grism, compute grism contamination model
+grism_prep_args: 
+    gris_ref_filters: &gris_ref_filters
+        G102: [F105W, F098M, F110W, F125W, F140W, F160W, F127M, F139M, 
+               F153M, F132N, F130N, F128N, F126N, F164N, F167N]
+        G141: [F140W, F160W, F125W, F105W, F110W, F098M, F127M, F139M, 
+               F153M, F132N, F130N, F128N, F126N, F164N, F167N]
+        G800L: [F814W, F850LP, F606W, F435W, F777W]
+    files: null
+    split_by_grism: True
+    refine_niter: 3
+    refine_poly_order: 1
+    refine_fcontam: 0.5
+    ds9: null
+
+run_extractions: False 
+extract_maglim: [17,26] 
+run_fit: False 
+ 
