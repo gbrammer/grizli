@@ -1272,14 +1272,7 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
         
         pyfits.writeto('{0}_seg.fits'.format(root), data=seg,
                        header=wcs_header, overwrite=True)
-        
-        # Use segmentation image to mask aperture fluxes
-        if aper_segmask:
-            aseg = seg
-            aseg_id = tab['number']
-        else:
-            aseg = aseg_id = None
-                        
+                                
         # WCS coordinates
         if wcs is not None:
             tab['ra'], tab['dec'] = wcs.all_pix2world(tab['x'], tab['y'], 0)
@@ -1361,113 +1354,21 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
             total_flux = tab['flux_auto']*tot_corr
             tab['mag_auto'] = 23.9-2.5*np.log10(total_flux)
             tab['magerr_auto'] = 2.5/np.log(10)*(tab['fluxerr_auto']/tab['flux_auto'])
-            
-        # ## FLUX_AUTO
-        # # https://sep.readthedocs.io/en/v1.0.x/apertures.html#equivalent-of-flux-auto-e-g-mag-auto-in-source-extractor
-        # kronrad, krflag = sep.kron_radius(data_bkg, 
-        #                                tab['x']-1, tab['y']-1,
-        #                                tab['a'], tab['b'], tab['theta'], 6.0,
-        #                                mask=mask)
-        #         
-        # kronrad *= autoparams[0]
-        # 
-        # # Circularized Kron radius
-        # kroncirc = kronrad * np.sqrt(tab['a'] * tab['b'])
-        # 
-        # kronrad[~np.isfinite(kronrad)] = autoparams[1]
-        # #kronrad = np.maximum(kronrad, autoparams[1])
-        # 
-        # try:
-        #     kron_out = sep.sum_ellipse(data - bkg_data, 
-        #                         tab['x'], tab['y'], 
-        #                         tab['a'], tab['b'], 
-        #                         tab['theta'],
-        #                         kronrad, subpix=5, err=err)
-        # except:
-        #     kron_out=None
-        #     print(tab['theta'].min(), tab['theta'].max())
-        #     
-        # kron_flux, kron_fluxerr, kron_flag = kron_out
-        # kron_flux_flag = kron_flag
-        #                                   
-        # # Minimum radius = 3.5, PHOT_AUTOPARAMS 2.5, 3.5
-        # # r_min = autoparams[1] #3.5
-        # # #use_circle = kronrad * np.sqrt(tab['a'] * tab['b']) < r_min
-        # # use_circle = kronrad < r_min
-        # # kron_out = sep.sum_ellipse(data - bkg_data, 
-        # #                         tab['x'][use_circle]-1, 
-        # #                         tab['y'][use_circle]-1, 
-        # #                         tab['a'][use_circle], tab['b'][use_circle],
-        # #                         tab['theta'][use_circle], 
-        # #                         r_min, subpix=5)
-        # # 
-        # # cflux, cfluxerr, cflag = kron_out
-        # # kron_flux_flag[use_circle] = cflag
-        # 
-        # # cflux, cfluxerr, cflag = sep.sum_circle(data - bkg_data,
-        # #                                      tab['x'][use_circle]-1, 
-        # #                                      tab['y'][use_circle]-1,
-        # #                                      autoparams[0]*r_min, subpix=5)
-        # 
-        # # kron_flux[use_circle] = cflux
-        # # kron_fluxerr[use_circle] = cfluxerr
-        # # kronrad[use_circle] = r_min
-        # 
-        # tab['flux_auto'] = kron_flux/uJy_to_dn*u.uJy
-        # tab['fluxerr_auto'] = kron_fluxerr/uJy_to_dn*u.uJy
-        # 
-        # if get_background:
-        #     kron_out = sep.sum_ellipse(bkg_data, tab['x']-1, tab['y']-1,
-        #                             tab['a'], tab['b'],
-        #                             tab['theta'], 
-        #                             kronrad, subpix=1)
-        #                             
-        #     kron_bkg, kron_bkg_fluxerr, kron_flag = kron_out
-        #     tab['flux_bkg_auto'] = kron_bkg/uJy_to_dn*u.uJy
-        # else:
-        #     tab['flux_bkg_auto'] = 0.
-        # 
-        # tab['mag_auto_raw'] = ZP - 2.5*np.log10(kron_flux)
-        # tab['magerr_auto_raw'] = 2.5/np.log(10)*kron_fluxerr/kron_flux
-        # 
-        # tab['mag_auto'] = tab['mag_auto_raw']*1.
-        # tab['magerr_auto'] = tab['magerr_auto_raw']*1.
-        #         
-        # tab['kron_radius'] = kronrad*u.pixel
-        # tab['kron_flag'] = krflag
-        # tab['kron_flux_flag'] = kron_flux_flag
-        # 
-        # ## FLUX_RADIUS
-        # # https://sep.readthedocs.io/en/v1.0.x/apertures.html#equivalent-of-flux-radius-in-source-extractor
-        # fr, fr_flag = sep.flux_radius(data - bkg_data, 
-        #                               tab['x']-1, tab['y']-1,
-        #                               tab['a']*6, 0.5, normflux=kron_flux,
-        #                               mask=mask)
-        # 
-        # tab['flux_radius'] = fr*u.pixel
-        # 
-        # fr, fr_flag = sep.flux_radius(data - bkg_data, 
-        #                               tab['x']-1, tab['y']-1,
-        #                               tab['a']*6, 0.9, normflux=kron_flux,
-        #                               mask=mask)
-        # 
-        # tab['flux_radius_90'] = fr*u.pixel
-        # 
-        # ## Bad DQ
-        # bad = (tab['flux_auto'] <= 0) | (tab['flux_radius'] <= 0)
-        # tab = tab[~bad]
-        
-        # for id in tab['number'][bad]:
-        #     is_seg = seg == id
-        #     seg[is_seg] = 0
-        
+                    
         # More flux columns
         for c in ['cflux','flux','peak','cpeak']:
             tab[c] *= 1. / uJy_to_dn
             tab[c].unit = u.uJy
         
         source_x, source_y = tab['x'], tab['y']
-
+        
+        # Use segmentation image to mask aperture fluxes
+        if aper_segmask:
+            aseg = seg
+            aseg_id = tab['number']
+        else:
+            aseg = aseg_id = None
+        
         # Rename some columns to look like SExtractor
         for c in ['a','b','theta','cxx','cxy','cyy','x2','y2','xy']:
             tab.rename_column(c, c+'_image')
@@ -1511,15 +1412,15 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
     
     ## Photometry
     for iap, aper in enumerate(apertures):
-        try:
-            # Should work with the sep fork at gbrammer/sep
+        if sep.__version__ > '1.03':
+            # Should work with the sep fork at gbrammer/sep and latest sep
             flux, fluxerr, flag = sep.sum_circle(data_bkg, 
                                                  source_x, source_y,
                                                  aper/2, err=err, 
                                                  gain=gain, subpix=5,
                                                  segmap=aseg, seg_id=aseg_id, 
                                                  mask=mask)
-        except:
+        else:
             tab.meta['APERMASK'] = (False, 'Mask apertures with seg image - Failed')
             flux, fluxerr, flag = sep.sum_circle(data_bkg, 
                                                  source_x, source_y,
@@ -1803,7 +1704,41 @@ def compute_SEP_auto_params(data, data_bkg, mask, pixel_scale=0.06, err=None, se
         tab[c] = fr[:,i]
     
     return tab
+
+def get_kron_tot_corr(tab, filter, inst=None, pixel_scale=0.06, photplam=None):
+    """
+    Compute total correction from tabulated EE curves
+    """
+    ee = utils.read_catalog((os.path.join(os.path.dirname(__file__),
+                             'data', 'hst_encircled_energy.fits')))
     
+    if filter.lower()[:2] in ['f0', 'f1']:
+        inst = 'wfc3,ir'
+    else:
+        if inst is None:
+            inst = 'acs,wfc1'
+    
+    
+    try:
+        min_kron = tab.meta['MINKRON'][0]
+    except:
+        min_kron = tab.meta['MINKRON']
+    
+    if 'kron_rcirc' in tab.colnames:        
+        kron_raper = np.clip(tab['kron_rcirc']*pixel_scale, 
+                             min_kron*pixel_scale, 2.1)
+    else:
+        kron_raper = np.clip(tab['KRON_RCIRC']*pixel_scale, 
+                             min_kron*pixel_scale, 2.1)
+        
+    obsmode = inst+','+filter.lower()
+    # Filter not available
+    if obsmode not in ee.colnames:
+        return kron_raper*0.+1
+    else:
+        ee_interp = np.interp(kron_raper, ee['radius'], ee[obsmode], left=0.01, right=1.)
+        return 1./ee_interp
+           
 def get_wfc3ir_kron_tot_corr(tab, filter, pixel_scale=0.06, photplam=None):
     """
     Compute total correction from WFC3/IR EE curves
