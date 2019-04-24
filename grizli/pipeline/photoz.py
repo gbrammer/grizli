@@ -463,7 +463,7 @@ def select_objects():
         so = np.argsort(cumpz[sel,iz7]); ids = self.cat['id'][sel][so]; i=-1
         so = np.argsort(flux_ratio[sel])[::-1]; ids = self.cat['id'][sel][so]; i=-1
         
-    highz_sel &= (cumpz[:,iz6] > 0) & (flux_ratio > 0.4) & ((cumpz[:,iz6] < 0.3) | (cumpz[:,iz7] < 0.3) | (((cumpz[:,iz8] < 0.4) |  (cumpz[:,iz9] < 0.5)) & (flux_ratio < 0.5))) 
+    highz_sel &= (cumpz[:,iz6] > 0) & (flux_ratio < 0.45) & ((cumpz[:,iz6] < 0.3) | (cumpz[:,iz7] < 0.3) | (((cumpz[:,iz8] < 0.4) |  (cumpz[:,iz9] < 0.5)) & (flux_ratio < 0.5))) 
 
     # Big objects likely diffraction spikes
     # big = (self.cat['flux_radius'] > 10)
