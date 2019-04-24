@@ -1522,6 +1522,8 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
     #source_xy = tab['X_IMAGE'], tab['Y_IMAGE']
     if aper_segmask:
         seg_data = pyfits.open('{0}-ir_seg.fits'.format(field_root))[0].data
+        seg_data = np.cast[np.int32](seg_data)
+        
         aseg, aseg_id = seg_data, tab['NUMBER']
         
         source_xy = tab['X_WORLD'], tab['Y_WORLD'], aseg, aseg_id
@@ -1553,7 +1555,7 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
                 continue
             
             root = '{0}-{1}'.format(field_root, filt)
-                
+                        
             filter_tab = prep.make_SEP_catalog(root=root,
                       threshold=threshold, 
                       get_background=photometry_background,
@@ -1568,7 +1570,11 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
             for c in filter_tab.colnames:
                 newc = '{0}_{1}'.format(filt.upper(), c)         
                 tab[newc] = filter_tab[c]
-
+            
+            # Kron total correction from EE
+            ee_corr = prep.get_kron_tot_corr(tab, filter=filt.lower()) 
+            tab['{0}_tot_corr'.format(filt.upper())] = ee_corr
+            
         else:
             continue
         
