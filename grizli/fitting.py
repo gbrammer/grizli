@@ -75,7 +75,7 @@ def run_all_parallel(id, get_output_data=False, argsfile='fit_args.npy', **kwarg
     
     return id, status, t1-t0
     
-def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter='bounded', group_name='grism', fit_stacks=True, only_stacks=False, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=np.inf, fit_only_beams=False, fit_beams=True, root='*', fit_trace_shift=False, phot=None, phot_obj=None, verbose=True, scale_photometry=False, show_beams=True, scale_on_stacked_1d=True, loglam_1d=True, overlap_threshold=5, MW_EBV=0., sys_err=0.03, get_dict=False, bad_pa_threshold=1.6, units1d='flam', redshift_only=False, line_size=1.6, use_psf=False, get_line_width=False, sed_args={'bin':1, 'xlim':[0.3, 9]}, get_ir_psfs=True, min_mask=0.01, min_sens=0.08,  bounded_kwargs=BOUNDED_DEFAULTS, **kwargs):
+def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter='bounded', group_name='grism', fit_stacks=True, only_stacks=False, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=np.inf, fit_only_beams=False, fit_beams=True, root='*', fit_trace_shift=False, phot=None, phot_obj=None, verbose=True, scale_photometry=False, show_beams=True, scale_on_stacked_1d=True, loglam_1d=True, overlap_threshold=5, MW_EBV=0., sys_err=0.03, get_dict=False, bad_pa_threshold=1.6, units1d='flam', redshift_only=False, line_size=1.6, use_psf=False, get_line_width=False, sed_args={'bin':1, 'xlim':[0.3, 9]}, get_ir_psfs=True, min_mask=0.01, min_sens=0.08, save_stack=True,  bounded_kwargs=BOUNDED_DEFAULTS, **kwargs):
     """Run the full procedure
     
     1) Load MultiBeam and stack files 
@@ -375,6 +375,18 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     # 1D spectrum
     oned_hdul = mb.oned_spectrum_to_hdu(tfit=tfit, bin=1, outputfile='{0}_{1:05d}.1D.fits'.format(group_name, id), loglam=loglam_1d)#, units=units1d)
     
+    if save_stack:
+        hdu, fig = mb.drizzle_grisms_and_PAs(fcontam=fcontam, flambda=False, 
+                                             kernel='point', size=32, 
+                                             zfit=tfit, diff=True)
+                                             
+        fig.savefig('{0}_{1:05d}.stack.png'.format(group_name, id))
+
+        hdu.writeto('{0}_{1:05d}.stack.fits'.format(group_name, id), 
+                    overwrite=True)
+                    
+        #mb.write_master_fits(include_model=True, get_trace_table=True)
+        
     ######
     # Show the drizzled lines and direct image cutout, which are
     # extensions `DSCI`, `LINE`, etc.
