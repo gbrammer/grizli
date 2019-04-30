@@ -401,4 +401,4 @@ def make_fake_image(header, output='direct.fits', background=None, exptime=1.e4,
     hdu['ERR'].data += rms
     hdu['SCI'].data = np.random.normal(size=np.array(naxis).T)*rms
     
-    hdu.writeto(output, clobber=True, output_verify='fix')
+    hdu.writeto(output, overwrite=True, output_verify='fix')

@@ -941,7 +941,7 @@ class GroupFLT():
         if save:
             fig.savefig('{0}_{1:05d}.stack.png'.format(target, id))
             hdu.writeto('{0}_{1:05d}.stack.fits'.format(target, id),
-                        clobber=True)
+                        overwrite=True)
         
         return hdu, fig
     
@@ -1490,7 +1490,7 @@ class MultiBeam(GroupFitter):
         if verbose:
             print(outfile)
         
-        hdu.writeto(outfile, clobber=True)
+        hdu.writeto(outfile, overwrite=True)
     
     def load_master_fits(self, beam_file, verbose=True):
         import copy
@@ -2915,7 +2915,7 @@ class MultiBeam(GroupFitter):
                     hdu_full.append(psf[1])
                     
         if save_fits:
-            hdu_full.writeto('{0}_{1:05d}.line.fits'.format(self.group_name, self.id), clobber=True, output_verify='silentfix')
+            hdu_full.writeto('{0}_{1:05d}.line.fits'.format(self.group_name, self.id), overwrite=True, output_verify='silentfix')
         
         return hdu_full
         
@@ -3041,7 +3041,7 @@ class MultiBeam(GroupFitter):
         fig.savefig('{0}_{1:05d}.zfit.png'.format(self.group_name, self.id))
         
         #fig2.savefig('{0}_{1:05d}.zfit.2D.png'.format(self.group_name, self.id))
-        #hdu2.writeto('{0}_{1:05d}.zfit.2D.fits'.format(self.group_name, self.id), clobber=True, output_verify='silentfix')
+        #hdu2.writeto('{0}_{1:05d}.zfit.2D.fits'.format(self.group_name, self.id), overwrite=True, output_verify='silentfix')
         
         label = '# id ra dec zbest '
         data = '{0:7d} {1:.6f} {2:.6f} {3:.5f}'.format(self.id, self.ra, self.dec,

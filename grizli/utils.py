@@ -1129,7 +1129,7 @@ def detect_with_photutils(sci, err=None, dq=None, seg=None, detect_thresh=2.,
                                           'ycentroid': 'y_flt',
                                           'ra_icrs_centroid': 'ra',
                                           'dec_icrs_centroid': 'dec'},
-                        clobber=True, verbose=True):
+                        overwrite=True, verbose=True):
     """Use `photutils <https://photutils.readthedocs.io/>`__ to detect objects and make segmentation map
     
     Parameters
@@ -1257,9 +1257,9 @@ def detect_with_photutils(sci, err=None, dq=None, seg=None, detect_thresh=2.,
         else:
             header=None
             
-        pyfits.writeto(seg_file, data=seg, header=header, clobber=clobber)
+        pyfits.writeto(seg_file, data=seg, header=header, overwrite=overwrite)
             
-        if os.path.exists(seg_cat) & clobber:
+        if os.path.exists(seg_cat) & overwrite:
             os.remove(seg_cat)
         
         catalog.write(seg_cat, format='ascii.commented_header')
@@ -3270,7 +3270,7 @@ def strip_header_keys(header, comment=True, history=True, drizzle_keys=DRIZZLE_K
     return h
     
             
-def to_header(wcs, relax=True):
+def to_header(wcs, add_naxis=True, relax=True, key=None):
     """Modify `astropy.wcs.WCS.to_header` to produce more keywords
     
     Parameters
@@ -3278,8 +3278,14 @@ def to_header(wcs, relax=True):
     wcs : `~astropy.wcs.WCS`
         Input WCS.
     
+    add_naxis : bool
+        Add NAXIS keywords from WCS dimensions
+        
     relax : bool
         Passed to `WCS.to_header(relax=)`.
+    
+    key : str
+        See `~astropy.wcs.WCS.to_header`.
         
     Returns
     -------
@@ -3287,15 +3293,18 @@ def to_header(wcs, relax=True):
         Output header.
         
     """
-    header = wcs.to_header(relax=relax)
-    if hasattr(wcs, 'pixel_shape'):
-        header['NAXIS'] = wcs.naxis
-        header['NAXIS1'] = wcs.pixel_shape[0]
-        header['NAXIS2'] = wcs.pixel_shape[1] 
-    elif hasattr(wcs, '_naxis1'):
-        header['NAXIS'] = wcs.naxis
-        header['NAXIS1'] = wcs._naxis1
-        header['NAXIS2'] = wcs._naxis2
+    header = wcs.to_header(relax=relax, key=key)
+    if add_naxis:
+        if hasattr(wcs, 'pixel_shape'):
+            header['NAXIS'] = wcs.naxis
+            if wcs.pixel_shape is not None:
+                header['NAXIS1'] = wcs.pixel_shape[0]
+                header['NAXIS2'] = wcs.pixel_shape[1] 
+        
+        elif hasattr(wcs, '_naxis1'):
+            header['NAXIS'] = wcs.naxis
+            header['NAXIS1'] = wcs._naxis1
+            header['NAXIS2'] = wcs._naxis2
     
     for k in header:
         if k.startswith('PC'):

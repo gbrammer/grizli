@@ -370,7 +370,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
         line_hdu.insert(2, mb_fit_hdu)
     line_hdu.insert(3, tfit_hdu)
     
-    line_hdu.writeto('{0}_{1:05d}.full.fits'.format(group_name, id), clobber=True, output_verify='fix')
+    line_hdu.writeto('{0}_{1:05d}.full.fits'.format(group_name, id), overwrite=True, output_verify='fix')
     
     # 1D spectrum
     oned_hdul = mb.oned_spectrum_to_hdu(tfit=tfit, bin=1, outputfile='{0}_{1:05d}.1D.fits'.format(group_name, id), loglam=loglam_1d)#, units=units1d)
@@ -1875,6 +1875,27 @@ class GroupFitter(object):
         cont1d, line1d = utils.dot_templates(coeffs[self.N:], templates, z=z,
                                              apply_igm=(z > IGM_MINZ))
         
+        if False:
+            # Test draws from covariance matrix
+            NDRAW = 100
+            nonzero = coeffs[self.N:] != 0
+            covarx = covar[self.N:,self.N:][nonzero,:][:,nonzero]
+            draws = np.random.multivariate_normal(coeffs[self.N:][nonzero], 
+                                                  covarx, NDRAW)
+            
+            contarr = np.zeros((NDRAW, len(cont1d.flux)))
+            linearr = np.zeros((NDRAW, len(line1d.flux)))
+            for i in range(NDRAW):
+                print(i)
+                coeffs_i = np.zeros(len(nonzero))
+                coeffs_i[nonzero] = draws[i,:]
+                _out = utils.dot_templates(coeffs_i, templates, z=z,
+                                                     apply_igm=(z > IGM_MINZ))
+                contarr[i,:], linearr[i,:] = _out[0].flux, _out[1].flux
+            
+            contrms = np.std(contarr, axis=0)
+            linerms = np.std(linearr, axis=0)
+
         # Parse template coeffs
         cfit = OrderedDict()
                 
