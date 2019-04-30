@@ -17,7 +17,7 @@ from . import GRIZLI_PATH
 
 def combine_flt(files=[], output='exposures_cmb.fits', grow=1,
                 add_padding=True, pixfrac=0.5, kernel='point',
-                verbose=True, clobber=True, ds9=None):
+                verbose=True, overwrite=True, ds9=None):
     """Drizzle distorted FLT frames to an "interlaced" image
         
     Parameters
@@ -52,7 +52,7 @@ def combine_flt(files=[], output='exposures_cmb.fits', grow=1,
     verbose : bool
         Print logging information
         
-    clobber : bool
+    overwrite : bool
         Overwrite existing files
     
     Returns
@@ -217,12 +217,12 @@ def combine_flt(files=[], output='exposures_cmb.fits', grow=1,
     hdu.append(pyfits.ImageHDU(data=rms/grow**2, header=outh, name='ERR'))
     hdu.append(pyfits.ImageHDU(data=mask*1024, header=outh, name='DQ'))
     
-    pyfits.HDUList(hdu).writeto(output, clobber=clobber, output_verify='fix')
+    pyfits.HDUList(hdu).writeto(output, overwrite=overwrite, output_verify='fix')
                     
 def combine_visits_and_filters(grow=1, pixfrac=0.5, kernel='point', 
                                filters=['G102', 'G141'], skip=None,
                                split_visit=False, split_quadrants=True, 
-                               clobber=True, ds9=None, verbose=True):
+                               overwrite=True, ds9=None, verbose=True):
     """Make combined FLT files for all FLT files in the working directory separated by targname/visit/filter
     
     Parameters
@@ -259,7 +259,7 @@ def combine_visits_and_filters(grow=1, pixfrac=0.5, kernel='point',
     verbose : bool
         Print logging information
         
-    clobber : bool
+    overwrite : bool
         Overwrite existing files
     
     Returns
@@ -286,12 +286,13 @@ def combine_visits_and_filters(grow=1, pixfrac=0.5, kernel='point',
         if split_quadrants:
             combine_quadrants(files=output_list[i]['files'], output=output,
                               ref_pixel=[507,507], 
-                              pixfrac=pixfrac, kernel=kernel, clobber=clobber,
+                              pixfrac=pixfrac, kernel=kernel, 
+                              overwrite=overwrite,
                               ds9=ds9, verbose=verbose)
         else:
             combine_flt(files=output_list[i]['files'], output=output, 
                     grow=grow, ds9=ds9, verbose=verbose, 
-                    clobber=clobber, pixfrac=pixfrac, kernel=kernel)
+                    overwrite=overwrite, pixfrac=pixfrac, kernel=kernel)
 
 def get_shifts(files, ref_pixel=[507, 507]):
     """Compute relative pixel shifts based on header WCS
@@ -468,7 +469,7 @@ def split_pixel_quadrant(dx, dy, figure='quadrants.png', show=False):
             
 def combine_quadrants(files=[], output='images_cmb.fits', grow=1, 
                  pixfrac=0.5, kernel='point', ref_pixel=[507,507],
-                 ds9=None, verbose=True, clobber=True):
+                 ds9=None, verbose=True, overwrite=True):
     """Wrapper to split a list of exposures based on their shift sub-pixel quadrants
 
     Parameters are all passed directly to `~grizli.combine.combine_flt` but 
@@ -497,7 +498,7 @@ def combine_quadrants(files=[], output='images_cmb.fits', grow=1,
                                      '_q{0:d}_cmb.fits'.format(q))
         combine_flt(files=np.array(files)[out[q]], output=quad_output, 
                     grow=grow, pixfrac=pixfrac, kernel=kernel, 
-                    ds9=ds9, verbose=verbose, clobber=clobber)    
+                    ds9=ds9, verbose=verbose, overwrite=overwrite)    
 
 # Default mapping function based on PyWCS
 class SIP_WCSMap:
