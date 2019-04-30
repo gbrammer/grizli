@@ -3643,8 +3643,26 @@ class BeamCutout(object):
         self.direct.parent_file = h0['DPARENT']
         self.id = h0['ID']
         self.modelf = self.beam.modelf
+    
+    @property 
+    def trace_table(self):
+        """
+        Table of trace parameters.  Trace is unit-indexed.
+        """    
+        dtype = np.float32
         
-    def write_fits(self, root='beam_', overwrite=True, strip=False, get_hdu=False):
+        tab = utils.GTable()
+        tab.meta['CONFFILE'] = os.path.basename(self.beam.conf.conf_file)
+
+        tab['wavelength'] = np.cast[dtype](self.beam.lam*u.Angstrom)
+        tab['trace'] = np.cast[dtype](self.beam.ytrace + self.beam.sh_beam[0]/2 - self.beam.ycenter)
+        
+        sens_units = u.erg/u.second/u.cm**2/u.Angstrom/(u.electron/u.second)
+        tab['sensitivity'] = np.cast[dtype](self.beam.sensitivity*sens_units)
+        
+        return tab
+        
+    def write_fits(self, root='beam_', overwrite=True, strip=False, include_model=True, get_hdu=False, get_trace_table=True):
         """Write attributes and data to FITS file
         
         Parameters
@@ -3733,9 +3751,16 @@ class BeamCutout(object):
         hdu.append(pyfits.ImageHDU(data=self.contam, header=hdu[-1].header,
                                    name='CONTAM'))
                                    
-        hdu.append(pyfits.ImageHDU(data=self.model, header=hdu[-1].header,
-                                   name='MODEL'))
+        if include_model:
+            hdu.append(pyfits.ImageHDU(data=np.cast[np.float32](self.model), 
+                                       header=hdu[-1].header, name='MODEL'))
         
+        if get_trace_table:
+            trace_hdu = pyfits.table_to_hdu(self.trace_table)
+            trace_hdu.header['EXTNAME'] = 'TRACE'
+            trace_hdu.header['EXTVER'] = 2
+            hdu.append(trace_hdu)
+            
         if strip:
             # Blotted reference is attached, don't need individual direct 
             # arrays.
@@ -3746,8 +3771,9 @@ class BeamCutout(object):
                         p = hdu.pop(ix)
             
             # This can be regenerated    
-            ix = hdu.index_of('MODEL')
-            p = hdu.pop(ix)
+            # if strip & 2:
+            #     ix = hdu.index_of('MODEL')
+            #     p = hdu.pop(ix)
             
             # Put Primary keywords in first extension
             SKIP_KEYS = ['EXTEND', 'SIMPLE']
