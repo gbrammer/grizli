@@ -1177,7 +1177,7 @@ class GroupFLT():
             
     
 class MultiBeam(GroupFitter):
-    def __init__(self, beams, group_name='group', fcontam=0., psf=False, polyx=[0.3, 2.5], MW_EBV=0., min_mask=0.01, min_sens=0.08, sys_err=0.0, verbose=True):
+    def __init__(self, beams, group_name=None, fcontam=0., psf=False, polyx=[0.3, 2.5], MW_EBV=0., min_mask=0.01, min_sens=0.08, sys_err=0.0, verbose=True):
         """Tools for dealing with multiple `~.model.BeamCutout` instances 
         
         Parameters
@@ -1185,8 +1185,9 @@ class MultiBeam(GroupFitter):
         beams : list
             List of `~.model.BeamCutout` objects.
         
-        group_name : str
-            Rootname to use for saved products
+        group_name : str, None
+            Rootname to use for saved products.  If None, then default to
+            'group'.
             
         fcontam : float
             Factor to use to downweight contaminated pixels.  The pixel 
@@ -1223,14 +1224,24 @@ class MultiBeam(GroupFitter):
         TBD : type
         
         """     
-        self.group_name = group_name
+        if group_name is None:
+            self.group_name = 'group'
+        else:
+            self.group_name = group_name
+            
         self.fcontam = fcontam
         self.polyx = polyx
         self.min_mask = min_mask
         self.min_sens = min_sens
         
         if isinstance(beams, str):
-            self.load_master_fits(beams, verbose=verbose)            
+            self.load_master_fits(beams, verbose=verbose)    
+            
+            # Auto-generate group_name from filename, e.g., 
+            # j100140p0130_00237.beams.fits > j100140p0130
+            if group_name is None:
+                self.group_name = beams.split('_')[0]
+                        
         else:
             if isinstance(beams[0], str):
                 ### `beams` is list of strings
@@ -1451,7 +1462,7 @@ class MultiBeam(GroupFitter):
         if verbose:
             print('Add beams: {0}\n      Now: {1}'.format(new.Ngrism, self.Ngrism))
         
-    def write_master_fits(self, verbose=True, get_hdu=False):
+    def write_master_fits(self, verbose=True, get_hdu=False, strip=True, include_model=False, get_trace_table=True):
         """Store all beams in a single HDU
         TBD
         """ 
@@ -1467,7 +1478,10 @@ class MultiBeam(GroupFitter):
          
         count = []
         for ib, beam in enumerate(self.beams):
-            hdu_i = beam.write_fits(get_hdu=True, strip=True)
+            hdu_i = beam.write_fits(get_hdu=True, strip=strip, 
+                                    include_model=include_model,
+                                    get_trace_table=get_trace_table)
+                                    
             hdu.extend(hdu_i[1:])
             count.append(len(hdu_i)-1)
             hdu[0].header['FILE{0:04d}'.format(ib)] = (beam.grism.parent_file, 'Grism parent file')
@@ -3359,8 +3373,13 @@ class MultiBeam(GroupFitter):
                     for beam in beams:
                         beam.compute_model()
 
-                data = [beam.beam.model for beam in beams]
-                    
+                data = []
+                for beam in beams:
+                    if hasattr(beam.beam, 'pscale_array'):
+                        data.append(beam.beam.model*beam.beam.pscale_array)
+                    else:
+                        data.append(beam.beam.model)
+                        
                 hdu_model = drizzle_function(beams, data=data, 
                                           wlimit=GRISM_LIMITS[g], dlam=dlam, 
                                           spatial_scale=scale, NY=size,
@@ -3454,8 +3473,15 @@ class MultiBeam(GroupFitter):
                 for beam in all_beams:
                     beam.compute_model()
 
-            data = [beam.beam.model for beam in all_beams]
-                
+            #data = [beam.beam.model for beam in all_beams]
+               
+            data = []
+            for beam in all_beams:
+                if hasattr(beam.beam, 'pscale_array'):
+                    data.append(beam.beam.model*beam.beam.pscale_array)
+                else:
+                    data.append(beam.beam.model)
+             
             hdu_model = drizzle_function(all_beams, data=data, 
                                       wlimit=GRISM_LIMITS[g], dlam=dlam, 
                                       spatial_scale=scale, NY=size,
