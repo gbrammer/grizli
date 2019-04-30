@@ -75,7 +75,27 @@ Working Examples
 ~~~~~~~~~~~~~~~~~~~~~~
 In lieu of detailed documentation for all of the `grizli` processing beyond information extracted from the docstrings, the following IPython/jupyter notebooks demonstrate various aspects of the code functionality.  They render statically in the GitHub pages or can be run locally after cloning and installing the software repository.
 
-- `Grizly Demo <https://github.com/gbrammer/grizli/blob/master/examples/Grizli%20Demo.ipynb>`__: Basic interaction with WFC3/IR slitless exposures.
+- `Grizli-Pipeline <https://github.com/gbrammer/grizli/blob/master/examples/Grizli-Pipeline.ipynb>`__ : End-to-end processing of WFC3/IR data.
+
+  1. Query the MAST archive and automatically download files
+  2. Image pre-processing  (astrometric alignment & background subtraction)
+  3. Field contamination modeling
+  4. Spectral extractions
+  5. Redshift & emission line fits (multiple grisms)
+
+- `Fit-with-Photometry <https://github.com/gbrammer/grizli/blob/master/examples/Fit-with-Photometry.ipynb>`__ : Demonstrate simultaneous fitting with grism spectra + ancillary photometry
+
+- `NewSpectrumFits <https://github.com/gbrammer/grizli/blob/master/examples/NewSpectrumFits.ipynb>`__: Demonstration of the lower-level fitting tools
+
+  1. Unify the fitting tools between the stacked and exposure-level 2D cutouts ("beams").
+ 
+- `Fit-Optimization <https://github.com/gbrammer/grizli/blob/master/examples/Fit-Optimization.ipynb>`__ **(09.14.17)**: Custom fitting (hasn't been tested recently)
+
+  1. Demonstrate some of the workings behind the fitting wrapper scripts by defining custom model functions with parameters to optimize.
+
+The notebooks below are deprecated and haven't been tested against the master branch since perhaps late 2017.
+
+- `Grizli Demo <https://github.com/gbrammer/grizli/blob/master/examples/Grizli%20Demo.ipynb>`__: Simple interaction with WFC3/IR spectra
 
 - `Basic-Sim <https://github.com/gbrammer/grizli/blob/master/examples/Basic-Sim.ipynb>`__ **(5.5.16)**: Basic simulations based on single WFC3/IR grism and direct exposures
 
@@ -90,20 +110,13 @@ In lieu of detailed documentation for all of the `grizli` processing beyond info
   2. Field contamination modeling
   3. Spectral extractions
   4. Redshift & emission line fits (multiple grisms)
-
+  
 - `NIRISS-simulation <https://github.com/gbrammer/grizli/blob/master/examples/NIRISS-simulation.ipynb>`__ **(11.11.16)**: Simulation and analysis of JWST/NIRISS observations
 
   1. Simulate NIRISS spectra in three blocking filters and two orients offset by 90 degrees.
   2. Simulation field taken from the Hubble WFC3/IR Ultra-Deep Field, with the WFC3 F140W image as the morphological reference and photo-z templates taken as the spectral models. 
   3. Extract spectra and fit redshifts and emission lines from the combined six exposures.
 
-- `NewSpectrumFits <https://github.com/gbrammer/grizli/blob/master/examples/NewSpectrumFits.ipynb>`__ **(09.05.17)**: New fitting tools
-
-  1. Unify the fitting tools between the stacked and exposure-level 2D cutouts ("beams").
-
-- `Fit-Optimization <https://github.com/gbrammer/grizli/blob/master/examples/Fit-Optimization.ipynb>`__ **(09.14.17)**: Custom fitting
-
-  1. Demonstrate some of the workings behind the fitting wrapper scripts by defining custom model functions with parameters to optimize.
 
 API
 ~~~
