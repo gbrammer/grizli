@@ -136,7 +136,8 @@ mask_spikes: False
 make_phot: True 
 multiband_catalog_args: 
     threshold: 1.8
-    detection_background: False
+    detection_background: True
+    detection_filter: ir
     photometry_background: True
     get_all_filters: False
     run_detection: True
