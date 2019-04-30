@@ -345,7 +345,7 @@ class GrismDisperser(object):
         self.idx = np.arange(self.modelf.size).reshape(self.sh_beam)
         
         ## Indices of the trace in the flattened array 
-        self.x0 = np.array(self.sh) // 2
+        self.x0 = np.array(self.sh, dtype=np.int64) // 2
         self.x0 -= 1 # zero index!
         
         self.dxpix = self.dx - self.dx[0] + self.x0[1] #+ 1
@@ -522,11 +522,14 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         nonz = (self.sensitivity_beam*scale_spec) != 0
         
         if nonz.sum() > 0:
-            status = disperse.disperse_grism_object(thumb, self.seg, id,
+            status = disperse.disperse_grism_object(thumb, self.seg, 
+                                 np.int32(id),
                                  self.flat_index[nonz], self.yfrac_beam[nonz],
                                  (self.sensitivity_beam*scale_spec)[nonz],
-                                 modelf, self.x0, np.array(self.sh),
-                                 self.x0, np.array(self.sh_beam))
+                                 modelf, self.x0, 
+                                 np.array(self.sh, dtype=np.int64),
+                                 self.x0, 
+                                 np.array(self.sh_beam, dtype=np.int64))
         
         #print('yyy PAM')
         modelf /= self.PAM_value #= self.get_PAM_value()
