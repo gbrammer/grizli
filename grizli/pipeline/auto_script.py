@@ -383,123 +383,134 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
     ###### Make combined mosaics        
     if (len(glob.glob('{0}-ir_dr?_sci.fits'.format(root))) == 0) & (make_mosaics):
         
-        ## Mosaic WCS
-        wcs_ref_file = '{0}_wcs-ref.fits'.format(root)
-        if not os.path.exists(wcs_ref_file):
-            # make_reference_wcs(info, output=wcs_ref_file, 
-            #                    filters=reference_wcs_filters, 
-            #                    pad_reference=90,
-            #                    pixel_scale=mosaic_pixel_scale,
-            #                    get_hdu=True)
-            make_reference_wcs(info, output=wcs_ref_file, get_hdu=True, 
-                               **mosaic_args['wcs_params'])
-                                       
-        # All combined
-        # IR_filters = ['F105W', 'F110W', 'F125W', 'F140W', 'F160W', 
-        #               'F098M', 'F139M', 'F127M', 'F153M']
-        # 
-        # optical_filters = ['F814W', 'F606W', 'F435W', 'F850LP', 'F702W', 'F555W', 'F438W', 'F475W', 'F625W', 'F775W', 'F225W', 'F275W', 'F300W', 'F390W','F350LP','F200LP']
-        # optical_filters += ['F410M', 'F450W']
+        skip_single = preprocess_args['skip_single_optical_visits']
         
-        mosaic_pixfrac = mosaic_args['mosaic_pixfrac']
-        combine_all_filters = mosaic_args['combine_all_filters']
-        
-        if combine_all_filters:
-            all_filters = mosaic_args['ir_filters'] + mosaic_args['optical_filters']
-            auto_script.drizzle_overlaps(root, 
-                                     filters=all_filters, 
-                                     min_nexp=1, pixfrac=mosaic_pixfrac,
-                                     make_combined=True,
-                                     ref_image=wcs_ref_file,
-                                     drizzle_filters=False) 
-        
-        ## IR filters
         if 'fix_stars' in visit_prep_args:
             fix_stars = visit_prep_args['fix_stars']
         else:
             fix_stars = False
             
-        auto_script.drizzle_overlaps(root, filters=mosaic_args['ir_filters'], 
-                                     min_nexp=1, pixfrac=mosaic_pixfrac,
-                                     make_combined=(not combine_all_filters),
-                                     ref_image=wcs_ref_file,
-                                     include_saturated=fix_stars) 
+        make_combined_mosaics(root, mosaic_args=mosaic_args, 
+                        fix_stars=fix_stars, mask_spikes=mask_spikes,
+                        skip_single_optical_visits=skip_single)
         
-        ## Mask diffraction spikes
-        ir_mosaics = glob.glob('{0}-f*drz_sci.fits'.format(root))
-        if (len(ir_mosaics) > 0) & (mask_spikes):
-            cat = prep.make_SEP_catalog('{0}-ir'.format(root), threshold=4, 
-                                        save_fits=False, 
-                                        column_case=str.lower)
-            
-            selection = (cat['mag_auto'] < 18) & (cat['flux_radius'] < 4.5)
-            selection |= (cat['mag_auto'] < 15.2) & (cat['flux_radius'] < 20)
-            # Note: vry bright stars could still be saturated and the spikes
-            # might not be big enough given their catalog mag
-            
-            for visit in visits:
-                filt = visit['product'].split('-')[-1]
-                if filt[:2] in ['f0','f1']:
-                    mask_IR_psf_spikes(visit=visit, selection=selection,
-                                       cat=cat, minR=8, dy=5)
-            
-            ## Remake mosaics
-            auto_script.drizzle_overlaps(root, 
-                                         filters=mosaic_args['ir_filters'], 
-                                         min_nexp=1, pixfrac=mosaic_pixfrac,
-                                    make_combined=(not combine_all_filters),
-                                         ref_image=wcs_ref_file,
-                                         include_saturated=fix_stars) 
-            
-        # Fill IR filter mosaics with scaled combined data so they can be used 
-        # as grism reference
-        fill_mosaics = mosaic_args['fill_mosaics']
-        if fill_mosaics:
-            if fill_mosaics == 'grism':
-                # Only fill mosaics if grism filters exist
-                has_grism = utils.column_string_operation(info['FILTER'], 
-                                         ['G141','G102','G800L'],
-                                         'count', 'or').sum() > 0
-                if has_grism:
-                    auto_script.fill_filter_mosaics(root)                                             
-            else:
-                auto_script.fill_filter_mosaics(root)
-        
-        ## Optical filters
-        mosaics = glob.glob('{0}-ir_dr?_sci.fits'.format(root))
-           
-        if (mosaic_args['half_optical_pixscale']) & (len(mosaics) > 0):
-            # Drizzle optical images to half the pixel scale determined for 
-            # the IR mosaics.  The optical mosaics can be 2x2 block averaged
-            # to match the IR images.
-
-            ref = pyfits.open('{0}_wcs-ref.fits'.format(root))
-            h = ref[1].header.copy()
-            for k in ['NAXIS1','NAXIS2','CRPIX1','CRPIX2']:
-                h[k] *= 2
-
-            h['CRPIX1'] -= 0.5
-            h['CRPIX2'] -= 0.5
-
-            for k in ['CD1_1', 'CD2_2']:
-                h[k] /= 2
-
-            wcs_ref_optical = '{0}-opt_wcs-ref.fits'.format(root)
-            data = np.zeros((h['NAXIS2'], h['NAXIS1']), dtype=np.int16)
-            pyfits.writeto(wcs_ref_optical, header=h, data=data, overwrite=True)
-        else:
-            wcs_ref_optical = wcs_ref_file
-            
-        auto_script.drizzle_overlaps(root, 
-            filters=mosaic_args['optical_filters'], 
-            pixfrac=mosaic_pixfrac,
-            make_combined=(len(mosaics) == 0), ref_image=wcs_ref_optical,
-            min_nexp=1+preprocess_args['skip_single_optical_visits']*1) 
-        
-        # Remove the WCS reference files
-        for file in [wcs_ref_optical, wcs_ref_file]:
-            if os.path.exists(file):
-                os.remove(file)
+        # ## Mosaic WCS
+        # wcs_ref_file = '{0}_wcs-ref.fits'.format(root)
+        # if not os.path.exists(wcs_ref_file):
+        #     # make_reference_wcs(info, output=wcs_ref_file, 
+        #     #                    filters=reference_wcs_filters, 
+        #     #                    pad_reference=90,
+        #     #                    pixel_scale=mosaic_pixel_scale,
+        #     #                    get_hdu=True)
+        #     make_reference_wcs(info, output=wcs_ref_file, get_hdu=True, 
+        #                        **mosaic_args['wcs_params'])
+        #                                
+        # # All combined
+        # # IR_filters = ['F105W', 'F110W', 'F125W', 'F140W', 'F160W', 
+        # #               'F098M', 'F139M', 'F127M', 'F153M']
+        # # 
+        # # optical_filters = ['F814W', 'F606W', 'F435W', 'F850LP', 'F702W', 'F555W', 'F438W', 'F475W', 'F625W', 'F775W', 'F225W', 'F275W', 'F300W', 'F390W','F350LP','F200LP']
+        # # optical_filters += ['F410M', 'F450W']
+        # 
+        # mosaic_pixfrac = mosaic_args['mosaic_pixfrac']
+        # combine_all_filters = mosaic_args['combine_all_filters']
+        # 
+        # if combine_all_filters:
+        #     all_filters = mosaic_args['ir_filters'] + mosaic_args['optical_filters']
+        #     auto_script.drizzle_overlaps(root, 
+        #                              filters=all_filters, 
+        #                              min_nexp=1, pixfrac=mosaic_pixfrac,
+        #                              make_combined=True,
+        #                              ref_image=wcs_ref_file,
+        #                              drizzle_filters=False) 
+        # 
+        # ## IR filters
+        # if 'fix_stars' in visit_prep_args:
+        #     fix_stars = visit_prep_args['fix_stars']
+        # else:
+        #     fix_stars = False
+        #     
+        # auto_script.drizzle_overlaps(root, filters=mosaic_args['ir_filters'], 
+        #                              min_nexp=1, pixfrac=mosaic_pixfrac,
+        #                              make_combined=(not combine_all_filters),
+        #                              ref_image=wcs_ref_file,
+        #                              include_saturated=fix_stars) 
+        # 
+        # ## Mask diffraction spikes
+        # ir_mosaics = glob.glob('{0}-f*drz_sci.fits'.format(root))
+        # if (len(ir_mosaics) > 0) & (mask_spikes):
+        #     cat = prep.make_SEP_catalog('{0}-ir'.format(root), threshold=4, 
+        #                                 save_fits=False, 
+        #                                 column_case=str.lower)
+        #     
+        #     selection = (cat['mag_auto'] < 18) & (cat['flux_radius'] < 4.5)
+        #     selection |= (cat['mag_auto'] < 15.2) & (cat['flux_radius'] < 20)
+        #     # Note: vry bright stars could still be saturated and the spikes
+        #     # might not be big enough given their catalog mag
+        #     
+        #     for visit in visits:
+        #         filt = visit['product'].split('-')[-1]
+        #         if filt[:2] in ['f0','f1']:
+        #             mask_IR_psf_spikes(visit=visit, selection=selection,
+        #                                cat=cat, minR=8, dy=5)
+        #     
+        #     ## Remake mosaics
+        #     auto_script.drizzle_overlaps(root, 
+        #                                  filters=mosaic_args['ir_filters'], 
+        #                                  min_nexp=1, pixfrac=mosaic_pixfrac,
+        #                             make_combined=(not combine_all_filters),
+        #                                  ref_image=wcs_ref_file,
+        #                                  include_saturated=fix_stars) 
+        #     
+        # # Fill IR filter mosaics with scaled combined data so they can be used 
+        # # as grism reference
+        # fill_mosaics = mosaic_args['fill_mosaics']
+        # if fill_mosaics:
+        #     if fill_mosaics == 'grism':
+        #         # Only fill mosaics if grism filters exist
+        #         has_grism = utils.column_string_operation(info['FILTER'], 
+        #                                  ['G141','G102','G800L'],
+        #                                  'count', 'or').sum() > 0
+        #         if has_grism:
+        #             auto_script.fill_filter_mosaics(root)                                             
+        #     else:
+        #         auto_script.fill_filter_mosaics(root)
+        # 
+        # ## Optical filters
+        # mosaics = glob.glob('{0}-ir_dr?_sci.fits'.format(root))
+        #    
+        # if (mosaic_args['half_optical_pixscale']) & (len(mosaics) > 0):
+        #     # Drizzle optical images to half the pixel scale determined for 
+        #     # the IR mosaics.  The optical mosaics can be 2x2 block averaged
+        #     # to match the IR images.
+        # 
+        #     ref = pyfits.open('{0}_wcs-ref.fits'.format(root))
+        #     h = ref[1].header.copy()
+        #     for k in ['NAXIS1','NAXIS2','CRPIX1','CRPIX2']:
+        #         h[k] *= 2
+        # 
+        #     h['CRPIX1'] -= 0.5
+        #     h['CRPIX2'] -= 0.5
+        # 
+        #     for k in ['CD1_1', 'CD2_2']:
+        #         h[k] /= 2
+        # 
+        #     wcs_ref_optical = '{0}-opt_wcs-ref.fits'.format(root)
+        #     data = np.zeros((h['NAXIS2'], h['NAXIS1']), dtype=np.int16)
+        #     pyfits.writeto(wcs_ref_optical, header=h, data=data, overwrite=True)
+        # else:
+        #     wcs_ref_optical = wcs_ref_file
+        #     
+        # auto_script.drizzle_overlaps(root, 
+        #     filters=mosaic_args['optical_filters'], 
+        #     pixfrac=mosaic_pixfrac,
+        #     make_combined=(len(mosaics) == 0), ref_image=wcs_ref_optical,
+        #     min_nexp=1+preprocess_args['skip_single_optical_visits']*1) 
+        # 
+        # # Remove the WCS reference files
+        # for file in [wcs_ref_optical, wcs_ref_file]:
+        #     if os.path.exists(file):
+        #         os.remove(file)
                 
         # if ir_ref is None:
         #     # Need 
@@ -563,7 +574,10 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
         grism_files = glob.glob('*GrismFLT.fits')
         grism_files.sort()
         
-        grp = multifit.GroupFLT(grism_files=grism_files, direct_files=[], ref_file=None, seg_file='{0}-ir_seg.fits'.format(root), catalog='{0}-ir.cat.fits'.format(root), cpu_count=-1, sci_extn=1, pad=256)
+        catalog = glob.glob('{0}-*.cat.fits'.format(root))[0]
+        seg_file = glob.glob('{0}-*_seg.fits'.format(root))[0]
+        
+        grp = multifit.GroupFLT(grism_files=grism_files, direct_files=[], ref_file=None, seg_file=seg_file, catalog=catalog, cpu_count=-1, sci_extn=1, pad=256)
         
         # Make drizzle model images
         grp.drizzle_grism_models(root=root, kernel='point', scale=0.2)
@@ -1476,7 +1490,7 @@ mag_lim=17, cat=None, cols=['mag_auto','ra','dec'], minR=8, dy=5, selection=None
             im['DQ',ext].data |= mask*2048
             im.flush()
             
-def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_background=True, photometry_background=True, get_all_filters=False, det_err_scale=-np.inf, run_detection=True, detection_params=prep.SEP_DETECT_PARAMS,  phot_apertures=prep.SEXTRACTOR_PHOT_APERTURES_ARCSEC, master_catalog=None, bkg_mask=None, bkg_params={'bw':64, 'bh':64, 'fw':3, 'fh':3, 'pixel_scale':0.06}, use_bkg_err=False, aper_segmask=True):
+def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_background=True, photometry_background=True, get_all_filters=False, det_err_scale=-np.inf, run_detection=True, detection_filter='ir',  detection_params=prep.SEP_DETECT_PARAMS,  phot_apertures=prep.SEXTRACTOR_PHOT_APERTURES_ARCSEC, master_catalog=None, bkg_mask=None, bkg_params={'bw':64, 'bh':64, 'fw':3, 'fh':3, 'pixel_scale':0.06}, use_bkg_err=False, aper_segmask=True):
     """
     Make a detection catalog with SExtractor and then measure
     photometry with `~photutils`.
@@ -1504,7 +1518,7 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
                     
     # Make catalog
     if master_catalog is None:
-        master_catalog = '{0}-ir.cat.fits'.format(field_root)
+        master_catalog = '{0}-{1}.cat.fits'.format(field_root, detection_filter)
     else:
         if not os.path.exists(master_catalog):
             print('Master catalog {0} not found'.format(master_catalog))
@@ -1514,14 +1528,14 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
         run_detection=True
     
     if run_detection:    
-        tab = prep.make_SEP_catalog(root='{0}-ir'.format(field_root), threshold=threshold, get_background=detection_background, save_to_fits=True, err_scale=det_err_scale, phot_apertures=phot_apertures, detection_params=detection_params, bkg_mask=bkg_mask, bkg_params=bkg_params, use_bkg_err=use_bkg_err, aper_segmask=aper_segmask)
+        tab = prep.make_SEP_catalog(root='{0}-{1}'.format(field_root, detection_filter), threshold=threshold, get_background=detection_background, save_to_fits=True, err_scale=det_err_scale, phot_apertures=phot_apertures, detection_params=detection_params, bkg_mask=bkg_mask, bkg_params=bkg_params, use_bkg_err=use_bkg_err, aper_segmask=aper_segmask)
     else:
         tab = utils.GTable.gread(master_catalog)
         
     # Source positions
     #source_xy = tab['X_IMAGE'], tab['Y_IMAGE']
     if aper_segmask:
-        seg_data = pyfits.open('{0}-ir_seg.fits'.format(field_root))[0].data
+        seg_data = pyfits.open('{0}-{1}_seg.fits'.format(field_root, detection_filter))[0].data
         seg_data = np.cast[np.int32](seg_data)
         
         aseg, aseg_id = seg_data, tab['NUMBER']
@@ -1735,7 +1749,8 @@ def load_GroupFLT(field_root='j142724+334246', force_ref=None, force_seg=None, f
     g800l = info['FILTER'] == 'G800L'
                 
     if force_cat is None:
-        catalog = '{0}-ir.cat.fits'.format(field_root)
+        #catalog = '{0}-ir.cat.fits'.format(field_root)
+        catalog = glob.glob('{0}-*.cat.fits'.format(field_root))[0]
     else:
         catalog = force_cat
     
@@ -1759,7 +1774,8 @@ def load_GroupFLT(field_root='j142724+334246', force_ref=None, force_seg=None, f
             elif galfit == 'model':
                 seg_file = '{0}-{1}_galfit_seg.fits'.format(field_root, g141_ref.lower())
             else:
-                seg_file = '{0}-ir_seg.fits'.format(field_root)
+                seg_file = glob.glob('{0}-*_seg.fits'.format(field_root))[0]
+                #seg_file = '{0}-ir_seg.fits'.format(field_root)
         else:
             seg_file = force_seg
             
@@ -1792,7 +1808,7 @@ def load_GroupFLT(field_root='j142724+334246', force_ref=None, force_seg=None, f
             elif galfit == 'model':
                 seg_file = '{0}-{1}_galfit_seg.fits'.format(field_root, g102_ref.lower())
             else:
-                seg_file = '{0}-ir_seg.fits'.format(field_root)
+                seg_file = glob.glob('{0}-*_seg.fits'.format(field_root))[0]
         else:
             seg_file = force_seg
         
@@ -1834,7 +1850,8 @@ def load_GroupFLT(field_root='j142724+334246', force_ref=None, force_seg=None, f
             elif galfit == 'model':
                 seg_file = '{0}-{1}_galfit_seg.fits'.format(field_root, g800l_ref.lower())
             else:
-                seg_file = '{0}-ir_seg.fits'.format(field_root)
+                #seg_file = '{0}-ir_seg.fits'.format(field_root)
+                seg_file = glob.glob('{0}-*_seg.fits'.format(field_root))[0]
         else:
             seg_file = force_seg
         
@@ -1952,7 +1969,8 @@ def grism_prep(field_root='j142724+334246', ds9=None, refine_niter=3, gris_ref_f
     os.chdir('../Extractions/')
     os.system('ln -s ../Prep/*GrismFLT* .')
     os.system('ln -s ../Prep/*_fl*wcs.fits .')
-    os.system('ln -s ../Prep/*-ir.cat.fits .')
+    os.system('ln -s ../Prep/{0}-*.cat.fits .'.format(field_root))
+    os.system('ln -s ../Prep/{0}-*seg.fits .'.format(field_root))
     os.system('ln -s ../Prep/*_phot.fits .')
    
     return grp
@@ -1980,7 +1998,10 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
         
     if grp is None:
         init_grp = True
-        grp = multifit.GroupFLT(grism_files=master_files, direct_files=[], ref_file=None, seg_file='{0}-ir_seg.fits'.format(field_root), catalog='{0}-ir.cat.fits'.format(field_root), cpu_count=-1, sci_extn=1, pad=256)
+        catalog = glob.glob('{0}-*.cat.fits'.format(field_root))[0]
+        seg_file = glob.glob('{0}-*_seg.fits'.format(field_root))[0]
+        
+        grp = multifit.GroupFLT(grism_files=master_files, direct_files=[], ref_file=None, seg_file=seg_file, catalog=catalog, cpu_count=-1, sci_extn=1, pad=256)
     else:
         init_grp = False
         
@@ -2239,7 +2260,8 @@ def summary_catalog(field_root='', dzbin=0.01, use_localhost=True, filter_bandpa
     
     ## Add photometric catalog
     try:
-        sex = utils.GTable.gread('{0}-ir.cat.fits'.format(field_root))
+        catalog = glob.glob('{0}-*.cat.fits'.format(field_root))[0]
+        sex = utils.GTable.gread(catalog)
         # try:
         # except:
         #     sex = utils.GTable.gread('../Prep/{0}-ir.cat.fits'.format(field_root), sextractor=True)
@@ -2847,7 +2869,129 @@ def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140
     
     if drizzle_filters:        
         prep.drizzle_overlaps(keep, parse_visits=False, pixfrac=pixfrac, scale=scale, skysub=skysub, skymethod=skymethod, bits=bits, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False, context=context, static=static, include_saturated=include_saturated)
+
+def make_combined_mosaics(root, fix_stars=False, mask_spikes=False, skip_single_optical_visits=True, mosaic_args=args['mosaic_args']):
+    """
+    Drizzle combined mosaics
+    """
     
+    visits_file = '{0}_visits.npy'.format(root)
+    visits, groups, info = np.load(visits_file)
+    
+    ## Mosaic WCS
+    wcs_ref_file = '{0}_wcs-ref.fits'.format(root)
+    if not os.path.exists(wcs_ref_file):
+        # make_reference_wcs(info, output=wcs_ref_file, 
+        #                    filters=reference_wcs_filters, 
+        #                    pad_reference=90,
+        #                    pixel_scale=mosaic_pixel_scale,
+        #                    get_hdu=True)
+        make_reference_wcs(info, output=wcs_ref_file, get_hdu=True, 
+                           **mosaic_args['wcs_params'])
+                                   
+    # All combined
+    # IR_filters = ['F105W', 'F110W', 'F125W', 'F140W', 'F160W', 
+    #               'F098M', 'F139M', 'F127M', 'F153M']
+    # 
+    # optical_filters = ['F814W', 'F606W', 'F435W', 'F850LP', 'F702W', 'F555W', 'F438W', 'F475W', 'F625W', 'F775W', 'F225W', 'F275W', 'F300W', 'F390W','F350LP','F200LP']
+    # optical_filters += ['F410M', 'F450W']
+    
+    mosaic_pixfrac = mosaic_args['mosaic_pixfrac']
+    combine_all_filters = mosaic_args['combine_all_filters']
+    
+    if combine_all_filters:
+        all_filters = mosaic_args['ir_filters'] + mosaic_args['optical_filters']
+        auto_script.drizzle_overlaps(root, 
+                                 filters=all_filters, 
+                                 min_nexp=1, pixfrac=mosaic_pixfrac,
+                                 make_combined=True,
+                                 ref_image=wcs_ref_file,
+                                 drizzle_filters=False) 
+    
+    ## IR filters
+    # if 'fix_stars' in visit_prep_args:
+    #     fix_stars = visit_prep_args['fix_stars']
+    # else:
+    #     fix_stars = False
+        
+    drizzle_overlaps(root, filters=mosaic_args['ir_filters'], min_nexp=1, 
+                     pixfrac=mosaic_pixfrac,
+                     make_combined=(not combine_all_filters),
+                     ref_image=wcs_ref_file, include_saturated=fix_stars) 
+    
+    ## Mask diffraction spikes
+    ir_mosaics = glob.glob('{0}-f*drz_sci.fits'.format(root))
+    if (len(ir_mosaics) > 0) & (mask_spikes):
+        cat = prep.make_SEP_catalog('{0}-ir'.format(root), threshold=4, 
+                                    save_fits=False, 
+                                    column_case=str.lower)
+        
+        selection = (cat['mag_auto'] < 18) & (cat['flux_radius'] < 4.5)
+        selection |= (cat['mag_auto'] < 15.2) & (cat['flux_radius'] < 20)
+        # Note: vry bright stars could still be saturated and the spikes
+        # might not be big enough given their catalog mag
+        
+        for visit in visits:
+            filt = visit['product'].split('-')[-1]
+            if filt[:2] in ['f0','f1']:
+                mask_IR_psf_spikes(visit=visit, selection=selection,
+                                   cat=cat, minR=8, dy=5)
+        
+        ## Remake mosaics
+        drizzle_overlaps(root, filters=mosaic_args['ir_filters'], min_nexp=1, 
+                         pixfrac=mosaic_pixfrac,
+                         make_combined=(not combine_all_filters),
+                         ref_image=wcs_ref_file, include_saturated=fix_stars) 
+        
+    # Fill IR filter mosaics with scaled combined data so they can be used 
+    # as grism reference
+    fill_mosaics = mosaic_args['fill_mosaics']
+    if fill_mosaics:
+        if fill_mosaics == 'grism':
+            # Only fill mosaics if grism filters exist
+            has_grism = utils.column_string_operation(info['FILTER'], 
+                                     ['G141','G102','G800L'],
+                                     'count', 'or').sum() > 0
+            if has_grism:
+                auto_script.fill_filter_mosaics(root)                                             
+        else:
+            auto_script.fill_filter_mosaics(root)
+    
+    ## Optical filters
+    mosaics = glob.glob('{0}-ir_dr?_sci.fits'.format(root))
+       
+    if (mosaic_args['half_optical_pixscale']) & (len(mosaics) > 0):
+        # Drizzle optical images to half the pixel scale determined for 
+        # the IR mosaics.  The optical mosaics can be 2x2 block averaged
+        # to match the IR images.
+
+        ref = pyfits.open('{0}_wcs-ref.fits'.format(root))
+        h = ref[1].header.copy()
+        for k in ['NAXIS1','NAXIS2','CRPIX1','CRPIX2']:
+            h[k] *= 2
+
+        h['CRPIX1'] -= 0.5
+        h['CRPIX2'] -= 0.5
+
+        for k in ['CD1_1', 'CD2_2']:
+            h[k] /= 2
+
+        wcs_ref_optical = '{0}-opt_wcs-ref.fits'.format(root)
+        data = np.zeros((h['NAXIS2'], h['NAXIS1']), dtype=np.int16)
+        pyfits.writeto(wcs_ref_optical, header=h, data=data, overwrite=True)
+    else:
+        wcs_ref_optical = wcs_ref_file
+        
+    drizzle_overlaps(root, filters=mosaic_args['optical_filters'], 
+        pixfrac=mosaic_pixfrac, make_combined=(len(mosaics) == 0), 
+        ref_image=wcs_ref_optical,
+        min_nexp=1+skip_single_optical_visits*1) 
+    
+    # Remove the WCS reference files
+    for file in [wcs_ref_optical, wcs_ref_file]:
+        if os.path.exists(file):
+            os.remove(file)
+            
 def make_mosaic_footprints(field_root):
     """
     Make region files where wht images nonzero
@@ -3130,7 +3274,7 @@ def get_rgb_filters(filter_list, force_ir=False, pure_sort=False):
         gfilt = use_filters[ix_g]
         return [rfilt, gfilt, bfilt]
         
-def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', show_ir=True, pl=1, pf=1, scl=1, scale_ab=None, rgb_scl=[1,1,1], ds9=None, force_ir=False, filters=None, add_labels=True, output_format='jpg', rgb_min=-0.01, xyslice=None, pure_sort=False, verbose=True, force_rgb=None, suffix='.field'):
+def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', show_ir=True, pl=1, pf=1, scl=1, scale_ab=None, rgb_scl=[1,1,1], ds9=None, force_ir=False, filters=None, add_labels=True, output_format='jpg', rgb_min=-0.01, xyslice=None, pure_sort=False, verbose=True, force_rgb=None, suffix='.field', mask_empty=False, tick_interval=60):
     """
     RGB image of the field mosaics
     """
@@ -3184,7 +3328,7 @@ def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', s
     
     wcs = pywcs.WCS(ims[filters[-1]][0].header)
     pscale = utils.get_wcs_pscale(wcs)
-    minor = MultipleLocator(1./pscale)
+    minor = MultipleLocator(tick_interval/pscale)
             
     if force_rgb is None:
         rf, gf, bf = get_rgb_filters(filters, force_ir=force_ir, pure_sort=pure_sort)
@@ -3225,6 +3369,14 @@ def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', s
         kern = np.ones((2,2))
         gimg = nd.convolve(gimg, kern)[::2,::2]
     
+    if mask_empty:
+        mask = (rimg == 0) | (gimg==0) | (bimg == 0)
+        print('Mask empty pixels in any channel: {0}'.format(mask.sum()))
+        
+        rimg[mask] = 0
+        gimg[mask] = 0
+        bimg[mask] = 0
+        
     if ds9:
         
         ds9.set('rgb')
@@ -3265,17 +3417,27 @@ def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', s
     image = make_lupton_rgb(rimg, gimg, bimg, stretch=0.1, minimum=rgb_min)
     
     sh = image.shape
+    ny, nx, _ = sh
     
     if output_dpi is not None:
-        xsize = sh[1]/output_dpi
+        xsize = nx/output_dpi
 
-    dim = [xsize, xsize/sh[1]*sh[0]]
+    dim = [xsize, xsize/nx*ny]
     
     fig = plt.figure(figsize=dim)
     ax = fig.add_subplot(111)
-    ax.imshow(image, origin='lower')
+    
+    ax.imshow(image, origin='lower', extent=(-nx/2, nx/2, -ny/2, ny/2))
+    
     ax.set_xticklabels([])
     ax.set_yticklabels([])
+    
+    ax.xaxis.set_major_locator(minor)
+    ax.yaxis.set_major_locator(minor)
+    
+    ax.tick_params(axis='x', colors='w', which='both')
+    ax.tick_params(axis='y', colors='w', which='both')
+    
     if add_labels:
         ax.text(0.03, 0.97, root, bbox=dict(facecolor='w', alpha=0.8), size=10, ha='left', va='top', transform=ax.transAxes)
     
@@ -3286,8 +3448,88 @@ def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', s
     fig.tight_layout(pad=0.1)
     fig.savefig('{0}{1}.{2}'.format(root, suffix, output_format))
     return xsl, ysl, (rf, gf, bf), fig
+
+THUMB_RGB_PARAMS = {'xsize':4, 
+              'output_dpi': None, 
+              'rgb_min':-0.01,
+              'add_labels':False, 
+              'output_format':'png', 
+              'show_ir':False, 
+              'scl':2, 
+              'suffix':'.rgb', 
+              'mask_empty':False,
+              'tick_interval':1,
+              'pl':2, # 1 for f_lambda, 2 for f_nu
+              }
+
+DRIZZLER_ARGS = {'aws_bucket':False, 
+                 'scale_ab':21.5,
+                 'subtract_median':False, 
+                 'pixscale':0.1, 
+                 'kernel':'point', 
+                 'size':3, 
+                 'thumb_height':2,
+                 'rgb_params':THUMB_RGB_PARAMS}
+               
+def make_rgb_thumbnails(root='j140814+565638', ids=None, maglim=21,
+                        drizzler_args=DRIZZLER_ARGS, 
+                        remove_fits=False, skip=True, 
+                        auto_size=False, size_limits=[4, 15]):
+    """
+    Make RGB thumbnails in working directory
+    """
+    from grizli_aws import aws_drizzler
     
-def make_rgb_thumbnails(root='j140814+565638', HOME_PATH='./', maglim=23, cutout=12., figsize=[2,2], ids=None, close=True, skip=True, force_ir=False, add_grid=True):
+    cat = utils.read_catalog('{0}_phot.fits'.format(root))
+    mag = 23.9-2.5*np.log10(cat['flux_auto']*cat['tot_corr'])
+    pixel_scale = cat.meta['ASEC_0']/cat.meta['APER_0']
+    sx = (cat['xmax']-cat['xmin'])*pixel_scale
+    sy = (cat['ymax']-cat['ymin'])*pixel_scale
+    
+    #lim_mag  = 23.9-2.5*np.log10(200*np.percentile(cat['fluxerr_aper_4'], 50))
+    #print('limiting mag: ', lim_mag)
+    lim_mag = 22.8
+    
+    if ids is None:
+        ids = cat['id'][mag < maglim]
+    
+    for id_column in ['id', 'number']:
+        if id_column in cat.colnames:
+            break
+    
+    args = drizzler_args.copy()
+     
+    N = len(ids)
+    for i, id in enumerate(ids):
+        ix = cat[id_column] == id        
+        label = '{0}_{1:05d}'.format(root, id)
+        
+        if skip & os.path.exists('{0}.thumb.png'.format(label)):
+            print('\n##\n## RGB thumbnail {0}  ({1}/{2})\n##'.format(label, i+1, N))
+            continue
+                
+        args['scale_ab'] = np.clip(mag[ix][0]-1, 17, lim_mag)
+        if auto_size:
+            s_i = np.maximum(sx[ix][0], sy[ix][0])
+            args['size'] = np.ceil(np.clip(s_i, 
+                                           size_limits[0], size_limits[1]))
+                                           
+            print('\n##\n## RGB thumbnail {0} *size={3}* ({1}/{2})\n##'.format(label, i+1, N, args['size']))
+        else:
+            print('\n##\n## RGB thumbnail {0}  ({1}/{2})\n##'.format(label, i+1, N))
+            
+        aws_drizzler.drizzle_images(label=label,       
+                         ra=cat['ra'][ix][0], dec=cat['dec'][ix][0],
+                         master='local', **args)
+        
+        if remove_fits:
+            files = glob.glob('{0}*_drz*fits'.format(label))
+            for file in files:
+                os.remove(file)
+                
+        
+        
+def make_rgb_thumbnails_OLD(root='j140814+565638', HOME_PATH='./', maglim=23, cutout=12., figsize=[2,2], ids=None, close=True, skip=True, force_ir=False, add_grid=True, scl=1):
     """
     Make RGB color cutouts
     """
@@ -3352,17 +3594,17 @@ def make_rgb_thumbnails(root='j140814+565638', HOME_PATH='./', maglim=23, cutout
             
     pf = 1
     pl = 1
-    rimg = ims[rf][0].data * (ims[rf][0].header['PHOTFLAM']/5.e-20)**pf * (ims[rf][0].header['PHOTPLAM']/1.e4)**pl
+    rimg = ims[rf][0].data * (ims[rf][0].header['PHOTFLAM']/5.e-20)**pf * (ims[rf][0].header['PHOTPLAM']/1.e4)**pl*scl
 
     if bf == 'sum':
         bimg = rimg
     else:
-        bimg = ims[bf][0].data * (ims[bf][0].header['PHOTFLAM']/5.e-20)**pf * (ims[bf][0].header['PHOTPLAM']/1.e4)**pl
+        bimg = ims[bf][0].data * (ims[bf][0].header['PHOTFLAM']/5.e-20)**pf * (ims[bf][0].header['PHOTPLAM']/1.e4)**pl*scl
 
     if gf == 'sum':
         gimg = (rimg+bimg)/2.
     else:
-        gimg = ims[gf][0].data * (ims[gf][0].header['PHOTFLAM']/5.e-20)**pf * (ims[gf][0].header['PHOTPLAM']/1.e4)**pl#* 1.5
+        gimg = ims[gf][0].data * (ims[gf][0].header['PHOTFLAM']/5.e-20)**pf * (ims[gf][0].header['PHOTPLAM']/1.e4)**pl*scl #* 1.5
 
     image = make_lupton_rgb(rimg, gimg, bimg, stretch=0.1, minimum=-0.01)
     
@@ -3424,7 +3666,7 @@ def make_rgb_thumbnails(root='j140814+565638', HOME_PATH='./', maglim=23, cutout
         
         ax.xaxis.set_major_locator(minor)
         ax.yaxis.set_major_locator(minor)
-
+        
         ax.tick_params(axis='x', colors='w', which='both')
         ax.tick_params(axis='y', colors='w', which='both')
 
@@ -3515,7 +3757,10 @@ def test_psf():
     
     # Galfit, multiple components
     from grizli.galfit import galfit
-    gf = galfit.Galfitter(root=root, filter=filter, segfile='{0}-ir_seg.fits'.format(root), catfile='{0}-ir.cat'.format(root))
+    catfile = glob.glob('{0}-*.cat.fits'.format(root))[0]
+    segfile = glob.glob('{0}-*_seg.fits'.format(root))[0]
+    
+    gf = galfit.Galfitter(root=root, filter=filter, segfile=segfile, catfile=catfile)
     
     id=212; gfit, model = gf.fit_object(id=id, size=int(128*0.06), components=[galfit.GalfitSersic(), galfit.GalfitSersic()])
     
@@ -3759,7 +4004,10 @@ def make_report(root, gzipped_links=True, xsize=18, output_dpi=None, make_rgb=Tr
             grism_url = grism_url.replace('.fits','.fits.gz')
     else:
         grism_url = ''
-        
+    
+    catalog = glob.glob('{0}-*.cat.fits'.format(root))[0]
+    catroot = catalog.split('.cat.fits')[0]
+    
     body="""
     
     <h4>{root} </h4>
@@ -3771,7 +4019,8 @@ def make_report(root, gzipped_links=True, xsize=18, output_dpi=None, make_rgb=Tr
     <pre>
     <a href={root}-ir_drz_sci.fits{gz}>{root}-ir_drz_sci.fits{gz}</a>
     <a href={root}-ir_drz_wht.fits{gz}>{root}-ir_drz_wht.fits{gz}</a>
-    <a href={root}-ir_seg.fits{gz}>{root}-ir_seg.fits{gz}</a>
+    <a href={catroot}_seg.fits{gz}>{catroot}_seg.fits{gz}</a>
+    <a href={catroot}.cat.fits{gz}>{catroot}.cat.fits{gz}</a>
     <a href={root}_phot.fits>{root}_phot.fits</a>
     <a href={root}_visits.npy>{root}_visits.npy</a>
     </pre>
@@ -3784,7 +4033,7 @@ def make_report(root, gzipped_links=True, xsize=18, output_dpi=None, make_rgb=Tr
     <a href="./{root}_fine.png"><img src="./{root}_fine.png" height=200px></a>
     <br>
     
-    """.format(root=root, column=column_url, grism=grism_url, gz='.gz'*(gzipped_links), now=now)
+    """.format(root=root, column=column_url, grism=grism_url, gz='.gz'*(gzipped_links), now=now, catroot=catroot)
     
     lines = open('{0}.summary.html'.format(root)).readlines()
     for i in range(len(lines)):
