@@ -3033,7 +3033,7 @@ class GrismFLT(object):
                              save_detection=save_detection, 
                              root=self.direct_file.split('.fits')[0],
                              background=None, gain=None, AB_zeropoint=ZP,
-                             clobber=True, verbose=verbose)
+                             overwrite=True, verbose=verbose)
         
         self.catalog = cat
         self.catalog_file = '<photutils>'
@@ -3072,7 +3072,7 @@ class GrismFLT(object):
         self.catalog = Table.read(seg_cat, format=catalog_format)
         self.catalog_file = seg_cat
         
-    def save_model(self, clobber=True, verbose=True):
+    def save_model(self, overwrite=True, verbose=True):
         """Save model properties to FITS file
         """
         try:
@@ -3116,7 +3116,7 @@ class GrismFLT(object):
         
             hdu.append(ref)
             
-        hdu.writeto('{0}_model.fits'.format(root), clobber=clobber,
+        hdu.writeto('{0}_model.fits'.format(root), overwrite=overwrite,
                     output_verify='fix')
         
         fp = open('{0}_model.pkl'.format(root), 'wb')
@@ -3158,7 +3158,7 @@ class GrismFLT(object):
                                    name='MODEL'))
         
         
-        hdu.writeto('{0}.{1:02d}.GrismFLT.fits'.format(root, self.grism.sci_extn), clobber=True, output_verify='fix')
+        hdu.writeto('{0}.{1:02d}.GrismFLT.fits'.format(root, self.grism.sci_extn), overwrite=True, output_verify='fix')
         
         ## zero out large data objects
         self.direct.data = self.grism.data = self.seg = self.model = None
@@ -3644,7 +3644,7 @@ class BeamCutout(object):
         self.id = h0['ID']
         self.modelf = self.beam.modelf
         
-    def write_fits(self, root='beam_', clobber=True, strip=False, get_hdu=False):
+    def write_fits(self, root='beam_', overwrite=True, strip=False, get_hdu=False):
         """Write attributes and data to FITS file
         
         Parameters
@@ -3656,7 +3656,7 @@ class BeamCutout(object):
             
             with `self.id` zero-padded with 5 digits.
         
-        clobber : bool
+        overwrite : bool
             Overwrite existing file.
         
         strip : bool
@@ -3707,7 +3707,29 @@ class BeamCutout(object):
         hdu.append(pyfits.ImageHDU(data=np.cast[np.int32](self.beam.seg), 
                                    header=hdu[-1].header, name='SEG'))
         
-        hdu.extend(self.grism.get_HDUList(extver=2))
+        ### 2D grism spectra
+        grism_hdu = self.grism.get_HDUList(extver=2)
+        
+        #######
+        # 2D Spectroscopic WCS
+        hdu2d, wcs2d = self.get_2d_wcs()
+        
+        # Get available 'WCSNAME'+key
+        for key in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ':
+            if 'WCSNAME{0}'.format(key) not in self.grism.header:
+                break
+            else:
+                wcsname = self.grism.header['WCSNAME{0}'.format(key)]
+                if wcsname == 'BeamLinear2D':
+                    break
+        
+        h2d = wcs2d.to_header(key=key)
+        for ext in grism_hdu:
+            for k in h2d:
+                ext.header[k] = h2d[k], h2d.comments[k]
+        ####
+                 
+        hdu.extend(grism_hdu)
         hdu.append(pyfits.ImageHDU(data=self.contam, header=hdu[-1].header,
                                    name='CONTAM'))
                                    
@@ -3741,7 +3763,7 @@ class BeamCutout(object):
                                          self.grism.filter.lower(),
                                          self.beam.beam)
                                          
-        hdu.writeto(outfile, clobber=clobber)
+        hdu.writeto(outfile, overwrite=overwrite)
         
         return outfile
         
@@ -3847,7 +3869,7 @@ class BeamCutout(object):
         
         return header, wcs
     
-    def get_2d_wcs(self, data=None):
+    def get_2d_wcs(self, data=None, key=None):
         """Get simplified WCS of the 2D spectrum
         
         Parameters
@@ -3855,6 +3877,9 @@ class BeamCutout(object):
         data : array-like
             Put this data in the output HDU rather than empty zeros
         
+        key : None
+            Key for WCS extension, passed to `~astropy.wcs.WCS.to_header`.
+            
         Returns
         -------
         hdu : `~astropy.io.fits.ImageHDU`
@@ -3869,18 +3894,26 @@ class BeamCutout(object):
             
         """
         h = pyfits.Header()
+        
+        h['WCSNAME'] = 'BeamLinear2D'
+        
         h['CRPIX1'] = self.beam.sh_beam[0]/2 - self.beam.xcenter
         h['CRPIX2'] = self.beam.sh_beam[0]/2 - self.beam.ycenter
+        
+        # Wavelength, A
+        h['CNAME1'] = 'Wave-Angstrom'
+        h['CTYPE1'] = 'WAVE'
+        #h['CUNIT1'] = 'Angstrom'
         h['CRVAL1'] = self.beam.lam_beam[0]        
         h['CD1_1'] = self.beam.lam_beam[1] - self.beam.lam_beam[0]
         h['CD1_2'] = 0.
         
+        # Linear trace
+        h['CNAME2'] = 'Trace'
+        h['CTYPE2'] = 'LINEAR'
         h['CRVAL2'] = -1*self.beam.ytrace_beam[0]
         h['CD2_2'] = 1.
         h['CD2_1'] = -(self.beam.ytrace_beam[1] - self.beam.ytrace_beam[0])
-        
-        h['CTYPE1'] = 'WAVE'
-        h['CTYPE2'] = 'LINEAR'
         
         if data is None:
             data = np.zeros(self.beam.sh_beam, dtype=np.float32)
