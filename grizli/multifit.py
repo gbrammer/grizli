@@ -3373,8 +3373,13 @@ class MultiBeam(GroupFitter):
                     for beam in beams:
                         beam.compute_model()
 
-                data = [beam.beam.model for beam in beams]
-                    
+                data = []
+                for beam in beams:
+                    if hasattr(beam.beam, 'pscale_array'):
+                        data.append(beam.beam.model*beam.beam.pscale_array)
+                    else:
+                        data.append(beam.beam.model)
+                        
                 hdu_model = drizzle_function(beams, data=data, 
                                           wlimit=GRISM_LIMITS[g], dlam=dlam, 
                                           spatial_scale=scale, NY=size,
@@ -3468,8 +3473,15 @@ class MultiBeam(GroupFitter):
                 for beam in all_beams:
                     beam.compute_model()
 
-            data = [beam.beam.model for beam in all_beams]
-                
+            #data = [beam.beam.model for beam in all_beams]
+               
+            data = []
+            for beam in all_beams:
+                if hasattr(beam.beam, 'pscale_array'):
+                    data.append(beam.beam.model*beam.beam.pscale_array)
+                else:
+                    data.append(beam.beam.model)
+             
             hdu_model = drizzle_function(all_beams, data=data, 
                                       wlimit=GRISM_LIMITS[g], dlam=dlam, 
                                       spatial_scale=scale, NY=size,
