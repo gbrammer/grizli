@@ -2113,7 +2113,8 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
         hdu, fig = mb.drizzle_grisms_and_PAs(fcontam=0.5, flambda=False, kernel='point', size=32, zfit=pfit, diff=diff)
         fig.savefig('{0}_{1:05d}.stack.png'.format(target, id))
 
-        hdu.writeto('{0}_{1:05d}.stack.fits'.format(target, id), clobber=True)
+        hdu.writeto('{0}_{1:05d}.stack.fits'.format(target, id), 
+                    overwrite=True)
         mb.write_master_fits()
         
         if False:
@@ -2765,7 +2766,7 @@ def make_reference_wcs(info, output='mosaic_wcs-ref.fits', filters=['G800L', 'G1
         ref_hdu.data = ref_hdu.data.astype(np.int16)
         
         if output is not None:
-            ref_hdu.writeto(output, clobber=True, output_verify='fix')
+            ref_hdu.writeto(output, overwrite=True, output_verify='fix')
     
         return ref_hdu
     else:
@@ -2850,7 +2851,7 @@ def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140
         
         ref_hdu = utils.make_maximal_wcs(wfc3ir['files'], pixel_scale=scale, get_hdu=True, pad=pad_reference, verbose=True)
         
-        ref_hdu.writeto('{0}_wcs-ref.fits'.format(field_root), clobber=True,
+        ref_hdu.writeto('{0}_wcs-ref.fits'.format(field_root), overwrite=True,
                         output_verify='fix')
         
         wfc3ir['reference'] = '{0}_wcs-ref.fits'.format(field_root)
