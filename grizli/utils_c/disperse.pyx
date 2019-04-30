@@ -26,7 +26,7 @@ cdef extern from "math.h":
 @cython.embedsignature(True)
 def disperse_grism_object(np.ndarray[FTYPE_t, ndim=2] flam, 
                           np.ndarray[FTYPE_t, ndim=2] segm, 
-                          int seg_id, 
+                          FINT_t seg_id, 
                           np.ndarray[LINT_t, ndim=1] idxl, 
                           np.ndarray[DTYPE_t, ndim=1] yfrac, 
                           np.ndarray[DTYPE_t, ndim=1] ysens, 
