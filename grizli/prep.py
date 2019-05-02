@@ -246,6 +246,9 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
         old_darks = ['x5g1509ki_drk.fits']
         old_darks += ['xag1929{x}i_drk.fits'.format(x=x) for x in '345689a']
         
+        # For more recent SPARS5
+        old_darks += ['zb21929si_drk.fits']
+        
         if head['DARKFILE'].strip('iref$') in old_darks:
             new_bp = pyfits.open(os.path.join(os.path.dirname(__file__),
                                     'data', 

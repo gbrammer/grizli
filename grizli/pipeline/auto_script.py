@@ -842,15 +842,18 @@ def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=
     import numpy as np
     import astropy.io.fits as pyfits
     import astropy.wcs as pywcs
-    
-    from shapely.geometry import Polygon
-    from scipy.spatial import ConvexHull
 
     #import grizli.prep
     try:
         from .. import prep, utils
+        frame = inspect.currentframe()
+        utils.log_function_arguments(utils.LOGFILE, frame,
+                                     'auto_script.parse_visits')
     except:
         from grizli import prep, utils
+    
+    from shapely.geometry import Polygon
+    from scipy.spatial import ConvexHull
             
     files=glob.glob('../RAW/*fl[tc].fits')
     files.extend(glob.glob('../RAW/*c0m.fits'))
