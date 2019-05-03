@@ -92,8 +92,19 @@ def apply_catalog_corrections(root, total_flux='flux_auto', auto_corr=True, get_
     # Spurious sources, sklearn SVM model trained for a single field
     morph_model = os.path.join(os.path.dirname(utils.__file__),
                                'data/sep_catalog_junk.pkl')
-                               
-    if os.path.exists(morph_model):
+    
+    # Only apply if detection pixel scale is 0.06"
+    if 'ASEC_0' in cat.meta:
+        try:
+            detection_pscale = cat.meta['ASEC_0'][0]/cat.meta['APER_0'][0]
+        except:
+            detection_pscale = cat.meta['ASEC_0']/cat.meta['APER_0']
+        
+        run_morph_model = np.isclose(detection_pscale, 0.06, atol=0.005)
+    else:
+        run_morph_model = True
+        
+    if os.path.exists(morph_model) & run_morph_model:
         if verbose:
             print('Apply morphological validity class')
         
@@ -136,7 +147,8 @@ def eazy_photoz(root, force=False, object_only=True, apply_background=True, aper
         cat = utils.read_catalog('{0}_phot_apcorr.fits'.format(root))
         return self, cat, zout
         
-    trans = {'f098m':201, 'f105w':202, 'f110w':241, 'f125w':203, 'f140w':204, 'f160w':205, 'f435w':233, 'f438w':211, 'f606w':236, 'f625w':237, 'f814w':239, 'f702w':15, 'f555w':235, 'f350lp':339, 'f475w':212, 'f775w':238, 'f850lp':240}
+    trans = {'f098m':201, 'f105w':202, 'f110w':241, 'f125w':203, 'f140w':204, 'f160w':205, 'f435w':233, 'f438w':211, 'f606w':236, 'f625w':237, 'f814w':239, 'f702w':15, 'f555w':235, 'f350lp':339, 'f475w':212, 'f775w':238, 'f850lp':240, 'f390w':210}
+    
     #trans.pop('f814w')
     
     print('Apply catalog corrections')
