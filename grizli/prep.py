@@ -958,9 +958,15 @@ GAUSS_3_7x7 = np.array(
  [ 0.021388,  0.092163,  0.221178,  0.296069,  0.221178,  0.092163,  0.021388], 
  [ 0.004963,  0.021388,  0.051328,  0.068707,  0.051328,  0.021388,  0.004963]])
 
-SEP_DETECT_PARAMS = {'minarea':9, 'filter_kernel':GAUSS_3_7x7,
+# Try to match 3D-HST detection
+SEP_DETECT_PARAMS_3DHST = {'minarea':9, 'filter_kernel':GAUSS_3_7x7,
                     'filter_type':'conv', 'clean':True, 'clean_param':1,
                     'deblend_nthresh':32, 'deblend_cont':0.005}
+
+# More agressive deblending
+SEP_DETECT_PARAMS = {'minarea':9, 'filter_kernel':GAUSS_3_7x7,
+                    'filter_type':'conv', 'clean':True, 'clean_param':1,
+                    'deblend_nthresh':32, 'deblend_cont':0.001}
     
 def make_SEP_FLT_catalog(flt_file, ext=1, column_case=str.upper, **kwargs):
     import astropy.io.fits as pyfits
