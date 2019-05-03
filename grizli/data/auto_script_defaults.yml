@@ -135,12 +135,13 @@ mask_spikes: False
 # Multiband photometric catalog
 make_phot: True 
 multiband_catalog_args: 
-    threshold: 1.8
+    threshold: 1.0
     detection_background: True
     detection_filter: ir
     photometry_background: True
     get_all_filters: False
     run_detection: True
+    use_psf_filter: True
     detection_params: null
     phot_apertures: null
     bkg_mask: null

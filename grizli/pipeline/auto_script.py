@@ -389,6 +389,13 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
             fix_stars = visit_prep_args['fix_stars']
         else:
             fix_stars = False
+        
+        # For running at the command line
+        if False:
+            mos_args = {'mosaic_args':kwargs['mosaic_args'],
+                        'fix_stars':kwargs['visit_prep_args']['fix_stars'], 
+                        'mask_spikes':kwargs['mask_spikes'], 'skip_single_optical_visits':kwargs['preprocess_args']['skip_single_optical_visits']}    
+            auto_script.make_combined_mosaics(root, **mos_args)  
             
         make_combined_mosaics(root, mosaic_args=mosaic_args, 
                         fix_stars=fix_stars, mask_spikes=mask_spikes,
@@ -521,11 +528,19 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
     
     # Are there full-field mosaics?
     mosaic_files = glob.glob('{0}-f*sci.fits'.format(root)) 
-           
+    
+    # Make PSFs.  Always set get_line_maps=False since PSFs now
+    # provided for each object.
+    if (not is_dash) & (len(mosaic_files) > 0):
+        print('Make field PSFs')
+        auto_script.field_psf(root=root, HOME_PATH=HOME_PATH, 
+                          get_line_maps=False)
+    
     # Photometric catalog
     if (not os.path.exists('{0}_phot.fits'.format(root))) & make_phot & (len(mosaic_files) > 0):
         try:
             #tab = auto_script.multiband_catalog(field_root=root, threshold=threshold, detection_background=False, photometry_background=True, get_all_filters=False)
+            
             tab = auto_script.multiband_catalog(field_root=root,
                                                 **multiband_catalog_args)
         except:
@@ -537,14 +552,7 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
             tab = auto_script.multiband_catalog(field_root=root,
                                                 **multiband_catalog_args)
             #tab = auto_script.multiband_catalog(field_root=root, threshold=threshold, detection_background=True, photometry_background=True, get_all_filters=False)
-    
-    if (not is_dash) & (len(mosaic_files) > 0):
-        # Make PSFs.  Always set get_line_maps=False since PSFs now
-        # provided for each object.
-        print('Make field PSFs')
-        auto_script.field_psf(root=root, HOME_PATH=HOME_PATH, 
-                          get_line_maps=False)
-    
+        
     # Make exposure json / html report
     auto_script.exposure_report(root, log=True)
     
@@ -1493,7 +1501,7 @@ mag_lim=17, cat=None, cols=['mag_auto','ra','dec'], minR=8, dy=5, selection=None
             im['DQ',ext].data |= mask*2048
             im.flush()
             
-def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_background=True, photometry_background=True, get_all_filters=False, det_err_scale=-np.inf, run_detection=True, detection_filter='ir',  detection_params=prep.SEP_DETECT_PARAMS,  phot_apertures=prep.SEXTRACTOR_PHOT_APERTURES_ARCSEC, master_catalog=None, bkg_mask=None, bkg_params={'bw':64, 'bh':64, 'fw':3, 'fh':3, 'pixel_scale':0.06}, use_bkg_err=False, aper_segmask=True):
+def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_background=True, photometry_background=True, get_all_filters=False, det_err_scale=-np.inf, run_detection=True, detection_filter='ir', use_psf_filter=True, detection_params=prep.SEP_DETECT_PARAMS,  phot_apertures=prep.SEXTRACTOR_PHOT_APERTURES_ARCSEC, master_catalog=None, bkg_mask=None, bkg_params={'bw':64, 'bh':64, 'fw':3, 'fh':3, 'pixel_scale':0.06}, use_bkg_err=False, aper_segmask=True):
     """
     Make a detection catalog with SExtractor and then measure
     photometry with `~photutils`.
@@ -1531,6 +1539,27 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
         run_detection=True
     
     if run_detection:    
+        if use_psf_filter:
+            psf_files = glob.glob('{0}*psf.fits'.format(field_root))
+            if len(psf_files) > 0:
+                psf_files.sort()
+                psf_im = pyfits.open(psf_files[-1])
+                
+                msg = '# Generate PSF kernel from {0}\n'.format(psf_files[-1])
+                utils.log_comment(utils.LOGFILE, msg, verbose=True)
+                
+                sh = psf_im['PSF','DRIZ1'].data.shape
+                # Cut out center of PSF
+                skip = (sh[0]-1-11)//2
+                psf = psf_im['PSF','DRIZ1'].data[skip:-1-skip,skip:-1-skip]*1
+            
+                # Optimal filter is reversed PSF (i.e., PSF cross-correlation)
+                # https://arxiv.org/pdf/1512.06872.pdf
+                psf_kernel = psf[::-1,:][:,::-1]
+                psf_kernel /= psf_kernel.sum()
+            
+                detection_params['filter_kernel'] = psf_kernel
+            
         tab = prep.make_SEP_catalog(root='{0}-{1}'.format(field_root, detection_filter), threshold=threshold, get_background=detection_background, save_to_fits=True, err_scale=det_err_scale, phot_apertures=phot_apertures, detection_params=detection_params, bkg_mask=bkg_mask, bkg_params=bkg_params, use_bkg_err=use_bkg_err, aper_segmask=aper_segmask)
     else:
         tab = utils.GTable.gread(master_catalog)
@@ -3886,9 +3915,14 @@ def field_psf(root='j020924-044344', HOME_PATH='/Volumes/Pegasus/Grizli/Automati
         hdu = pyfits.HDUList([pyfits.PrimaryHDU()])
         hdu[0].header['ROOT'] = root
         
-        for scl, pf, kern, label in zip(scale, pixfrac, kernel, labels):
+        for scl, pf, kern_i, label in zip(scale, pixfrac, kernel, labels):
             ix = 0
             
+            if pf == 0:
+                kern = 'point'
+            else:
+                kern = kern_i
+                
             logstr = '# psf {0} {5:6} / {1:.3f}" / pixf: {2} / {3:8} / {4}'
             logstr = logstr.format(root, scl, pf, kern, filter, label)
             utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
