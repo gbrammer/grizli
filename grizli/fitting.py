@@ -2504,7 +2504,7 @@ class GroupFitter(object):
         # 
         #     return fig, sfit
     
-    def oned_figure(self, bin=1, show_beams=True, minor=0.1, tfit=None, axc=None, figsize=[6,4], fill=False, units='flam', min_sens_show=0.1, ylim_percentile=2, scale_on_stacked=False, show_individual_templates=False, apply_beam_mask=True, loglam_1d=True):
+    def oned_figure(self, bin=1, show_beams=True, minor=0.1, tfit=None, axc=None, figsize=[6,4], fill=False, units='flam', min_sens_show=0.1, ylim_percentile=2, scale_on_stacked=False, show_individual_templates=False, apply_beam_mask=True, loglam_1d=True, trace_limits=None):
         """
         1D figure
         1D figure
@@ -2746,23 +2746,27 @@ class GroupFitter(object):
             ymax = -1.e30
         
         if self.Nphot > 0:
-            sp_flat = self.optimal_extract(self.flat_flam[self.fit_mask[:-self.Nphotbands]], bin=bin, loglam=loglam_1d)
+            sp_flat = self.optimal_extract(self.flat_flam[self.fit_mask[:-self.Nphotbands]], bin=bin, loglam=loglam_1d, trace_limits=trace_limits)
         else:
-            sp_flat = self.optimal_extract(self.flat_flam[self.fit_mask], bin=bin, loglam=loglam_1d)
+            sp_flat = self.optimal_extract(self.flat_flam[self.fit_mask], bin=bin, loglam=loglam_1d, trace_limits=trace_limits)
         
         if tfit is not None:
             bg_model = self.get_flat_background(tfit['coeffs'], apply_mask=True)
             m2d = self.get_flat_model(sp, apply_mask=True, is_cgs=True)
-            sp_model = self.optimal_extract(m2d, bin=bin, loglam=loglam_1d)
+            sp_model = self.optimal_extract(m2d, bin=bin, loglam=loglam_1d, 
+                                           trace_limits=trace_limits)
         else:
             bg_model = 0.
             sp_model = 1.
         
         if mspl is not None:
             m2d = self.get_flat_model(mspl, apply_mask=True, is_cgs=True)
-            sp_spline = self.optimal_extract(m2d, bin=bin, loglam=loglam_1d)
+            sp_spline = self.optimal_extract(m2d, bin=bin, loglam=loglam_1d, 
+                                             trace_limits=trace_limits)
             
-        sp_data = self.optimal_extract(self.scif_mask[:self.Nspec]-bg_model, bin=bin, loglam=loglam_1d)
+        sp_data = self.optimal_extract(self.scif_mask[:self.Nspec]-bg_model, 
+                                       bin=bin, loglam=loglam_1d, 
+                                       trace_limits=trace_limits)
 
         for g in sp_data:
 
