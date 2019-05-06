@@ -2031,8 +2031,11 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
     if grp is None:
         init_grp = True
         catalog = glob.glob('{0}-*.cat.fits'.format(field_root))[0]
-        seg_file = glob.glob('{0}-*_seg.fits'.format(field_root))[0]
-        
+        try:
+            seg_file = glob.glob('{0}-*_seg.fits'.format(field_root))[0]
+        except:
+            seg_file = None
+            
         grp = multifit.GroupFLT(grism_files=master_files, direct_files=[], ref_file=None, seg_file=seg_file, catalog=catalog, cpu_count=-1, sci_extn=1, pad=256)
     else:
         init_grp = False
