@@ -125,8 +125,13 @@ mosaic_args:
     half_optical_pixscale: False 
     mosaic_pixfrac: 0.75 
     wcs_params: 
-        pad_reference: 90
-        filters: [G800L, G102, G141] 
+        pad_reference: 60
+        filters: 
+            [F410M, F467M, F547M, F550M, F621M, F689M, F763M, F845M, F200LP,
+            F350LP, F390W, F435W, F438W, F439W, F450W, F475W, F475X, F555W,
+            F569W, F600LP, F606W, F622W, F625W, F675W, F702W, F775W, F791W,
+            F814W, F850LP, G800L, F098M, F127M, F139M, F153M, F105W, F110W,
+            F125W, F140W, F160W, G102, G141]
         pixel_scale: null 
         
 # Mask IR difraction spikes
