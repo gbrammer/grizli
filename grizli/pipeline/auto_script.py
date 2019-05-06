@@ -2986,9 +2986,9 @@ def make_combined_mosaics(root, fix_stars=False, mask_spikes=False, skip_single_
                                      ['G141','G102','G800L'],
                                      'count', 'or').sum() > 0
             if has_grism:
-                auto_script.fill_filter_mosaics(root)                                             
+                fill_filter_mosaics(root)                                             
         else:
-            auto_script.fill_filter_mosaics(root)
+            fill_filter_mosaics(root)
     
     ## Optical filters
     mosaics = glob.glob('{0}-ir_dr?_sci.fits'.format(root))
