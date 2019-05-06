@@ -3998,7 +3998,7 @@ def make_report(root, gzipped_links=True, xsize=18, output_dpi=None, make_rgb=Tr
     
     rows = []
     for filter in filters:
-        os.system('grep " 0 " *{0}*wcs.log > /tmp/{1}.log'.format(filter, root))
+        os.system('grep -e " 0 " -e "radec" *{0}*wcs.log > /tmp/{1}.log'.format(filter, root))
         wcs = '<pre>'+''.join(open('/tmp/{0}.log'.format(root)).readlines())+'</pre>'
         
         try:
