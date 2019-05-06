@@ -2011,7 +2011,7 @@ DITHERED_PLINE = {'kernel': 'point', 'pixfrac': 0.2, 'pixscale': 0.1, 'size': 8,
 PARALLEL_PLINE = {'kernel': 'square', 'pixfrac': 1.0, 'pixscale': 0.1, 'size': 8, 'wcs': None}
 
   
-def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00, ids=None, pline=DITHERED_PLINE, fit_only_beams=True, run_fit=True, poly_order=7, master_files=None, grp=None, bad_pa_threshold=None, fit_trace_shift=False, size=32, diff=True, min_sens=0.08, skip_complete=True, fit_args={}):
+def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00, ids=None, pline=DITHERED_PLINE, fit_only_beams=True, run_fit=True, poly_order=7, master_files=None, grp=None, bad_pa_threshold=None, fit_trace_shift=False, size=32, diff=True, min_sens=0.02, skip_complete=True, fit_args={}):
     import glob
     import os
     
@@ -2207,7 +2207,7 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
     else:
         return True
         
-def generate_fit_params(field_root='j142724+334246', fitter='bounded', prior=None, MW_EBV=0.00, pline=DITHERED_PLINE, fit_only_beams=True, run_fit=True, poly_order=7, fsps=True, sys_err = 0.03, fcontam=0.2, zr=[0.05, 3.6], dz=[0.004, 0.0004], fwhm=1000, lorentz=False, save_file='fit_args.npy'):
+def generate_fit_params(field_root='j142724+334246', fitter='bounded', prior=None, MW_EBV=0.00, pline=DITHERED_PLINE, fit_only_beams=True, run_fit=True, poly_order=7, fsps=True, sys_err=0.03, fcontam=0.2, zr=[0.05, 3.6], dz=[0.004, 0.0004], fwhm=1000, lorentz=False, save_file='fit_args.npy'):
     """
     Generate a parameter dictionary for passing to the fitting script
     """
