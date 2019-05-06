@@ -55,8 +55,7 @@ preprocess_args:
     parent_radec: null 
     use_visit: True
     make_combined: False
-    catalogs: [PS1, DES, DSC, SDSS, GAIA, WISE]
-    skip_single_optical_visits: True 
+    skip_single_optical_visits: False 
     use_first_radec: False
     skip_imaging: False
     clean: True
@@ -77,7 +76,7 @@ visit_prep_args: &prep_args
     iter_atol: 0.0001
     imaging_bkg_params: {bh: 128, bw: 128, fh: 3, fw: 3, pixel_scale: 0.06}
     fix_stars: True
-    reference_catalogs: [PS1, GAIA, NSC, WISE]
+    reference_catalogs: [PS1, DES, DSC, SDSS, GAIA, WISE]
     outlier_threshold: 4
     # use_self_catalog: *is_parallel_field
 
