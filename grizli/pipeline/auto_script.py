@@ -207,8 +207,7 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
        only_preprocess=False,
        grism_prep_args=args['grism_prep_args'],
        run_extractions=False,
-       extract_maglim=[17,26],
-       run_fit=False,
+       extract_args=args['extract_args'],
        get_dict=False,
        **kwargs
        ):
@@ -596,7 +595,7 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
         grp = multifit.GroupFLT(grism_files=grism_files, direct_files=[], ref_file=None, seg_file=seg_file, catalog=catalog, cpu_count=-1, sci_extn=1, pad=256)
         
         # Make drizzle model images
-        grp.drizzle_grism_models(root=root, kernel='point', scale=0.2)
+        grp.drizzle_grism_models(root=root, kernel='point', scale=0.15)
     
         # Free grp object
         del(grp)
@@ -612,7 +611,7 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
         pline = auto_script.DITHERED_PLINE
     
     # Make script for parallel processing
-    auto_script.generate_fit_params(field_root=root, prior=None, MW_EBV=exptab.meta['MW_EBV'], pline=pline, fit_only_beams=True, run_fit=True, poly_order=7, fsps=True, sys_err = 0.03, fcontam=0.2, zr=[0.05, 3.4], save_file='fit_args.npy')
+    auto_script.generate_fit_params(field_root=root, prior=None, MW_EBV=exptab.meta['MW_EBV'], pline=pline, fit_only_beams=True, run_fit=True, poly_order=7, fsps=True, sys_err=0.03, fcontam=0.2, zr=[0.05, 3.4], save_file='fit_args.npy')
     
     # Make PSF
     # print('Make field PSFs')
@@ -624,13 +623,31 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
         return True
         
     # Run extractions (and fits)
-    auto_script.extract(field_root=root, maglim=extract_maglim, MW_EBV=exptab.meta['MW_EBV'], pline=pline, run_fit=run_fit)
+    auto_script.extract(field_root=root, **extract_args) #maglim=extract_maglim, MW_EBV=exptab.meta['MW_EBV'], pline=pline, run_fit=run_fit)
     
-    ######################
-    ### Summary catalog & webpage
-    os.chdir(os.path.join(HOME_PATH, root, 'Extractions'))
-    if run_fit:
-        auto_script.summary_catalog(field_root=root)
+    if extract_args['run_fit']:
+        os.chdir(os.path.join(HOME_PATH, root, 'Extractions'))
+
+        # Redrizzle grism models
+        grism_files = glob.glob('*GrismFLT.fits')
+        grism_files.sort()
+    
+        catalog = glob.glob('{0}-*.cat.fits'.format(root))[0]
+        seg_file = glob.glob('{0}-*_seg.fits'.format(root))[0]
+    
+        grp = multifit.GroupFLT(grism_files=grism_files, direct_files=[], ref_file=None, seg_file=seg_file, catalog=catalog, cpu_count=-1, sci_extn=1, pad=256)
+    
+        # Make drizzle model images
+        grp.drizzle_grism_models(root=root, kernel='point', scale=0.15)
+
+        # Free grp object
+        del(grp)
+    
+        ######################
+        ### Summary catalog & webpage
+        auto_script.summary_catalog(field_root=root, dzbin=0.01, 
+                                    use_localhost=False, 
+                                    filter_bandpasses=None)
     
     
 def make_directories(field_root='j142724+334246', HOME_PATH='./'):
@@ -2019,7 +2036,7 @@ DITHERED_PLINE = {'kernel': 'point', 'pixfrac': 0.2, 'pixscale': 0.1, 'size': 8,
 PARALLEL_PLINE = {'kernel': 'square', 'pixfrac': 1.0, 'pixscale': 0.1, 'size': 8, 'wcs': None}
 
   
-def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00, ids=None, pline=DITHERED_PLINE, fit_only_beams=True, run_fit=True, poly_order=7, master_files=None, grp=None, bad_pa_threshold=None, fit_trace_shift=False, size=32, diff=True, min_sens=0.02, skip_complete=True, fit_args={}):
+def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00, ids=[], pline=DITHERED_PLINE, fit_only_beams=True, run_fit=True, poly_order=7, master_files=None, grp=None, bad_pa_threshold=None, fit_trace_shift=False, size=32, diff=True, min_sens=0.02, skip_complete=True, fit_args={}):
     import glob
     import os
     
@@ -2053,28 +2070,43 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
     
     target = field_root
     
-    if os.path.exists('{0}_phot.fits'.format(target)):
-        photom = utils.GTable.gread('{0}_phot.fits'.format(target))
-        photom_filters = []
-        for c in photom.colnames:
-            if c.endswith('_flux_aper_0'):
-                photom_filters.append(c.split('_flux_aper_0')[0])
-    
-        photom_flux = np.vstack([photom['{0}_flux_aper_0'.format(f)].data for f in photom_filters])
-        photom_err = np.vstack([photom['{0}_fluxerr_aper_0'.format(f)].data for f in photom_filters])
-        photom_pivot = np.array([photom.meta['{0}_PLAM'.format(f.upper())] for f in photom_filters])
-    else:
-        photom = None
+    try:
+        file_args = np.load('fit_args.npy')[0]
+        MW_EBV = file_args['MW_EBV']
+        min_sens = file_args['min_sens']
+        min_mask = file_args['min_mask']
+        fcontam = file_args['fcontam']
+        sys_err = file_args['sys_err']  
+        pline = file_args['pline']
+        fit_args = file_args
+        fit_args.pop('kwargs')
+    except:
+        pass
+        
+    # if os.path.exists('{0}_phot.fits'.format(target)):
+    #     photom = utils.GTable.gread('{0}_phot.fits'.format(target))
+    #     photom_filters = []
+    #     for c in photom.colnames:
+    #         if c.endswith('_flux_aper_0'):
+    #             photom_filters.append(c.split('_flux_aper_0')[0])
+    # 
+    #     photom_flux = np.vstack([photom['{0}_flux_aper_0'.format(f)].data for f in photom_filters])
+    #     photom_err = np.vstack([photom['{0}_fluxerr_aper_0'.format(f)].data for f in photom_filters])
+    #     photom_pivot = np.array([photom.meta['{0}_PLAM'.format(f.upper())] for f in photom_filters])
+    # else:
+    #     photom = None
         
     ###########
     # IDs to extract
     #ids=[1096]
     
-    if ids is None:
+    if ids == []:
         clip = (grp.catalog['MAG_AUTO'] > maglim[0]) & (grp.catalog['MAG_AUTO'] < maglim[1])
         so = np.argsort(grp.catalog['MAG_AUTO'][clip])
         ids = grp.catalog['NUMBER'][clip][so]
-    
+    else:
+        ids = [int(id) for id in ids]
+        
     # Stack the different beans
     wave = np.linspace(2000,2.5e4,100)
     poly_templates = utils.polynomial_templates(wave, order=poly_order)
@@ -2110,7 +2142,9 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
         if len(beams) < 1:
             continue
             
-        mb = multifit.MultiBeam(beams, fcontam=0.5, group_name=target, psf=False, MW_EBV=MW_EBV, min_sens=min_sens)
+        #mb = multifit.MultiBeam(beams, fcontam=fcontam, group_name=target, psf=False, MW_EBV=MW_EBV, min_sens=min_sens)
+        
+        mb = multifit.MultiBeam(beams, fcontam=fcontam, group_name=target, psf=False, MW_EBV=MW_EBV, sys_err=sys_err, min_mask=min_mask, min_sens=min_sens)
         
         if bad_pa_threshold is not None:
             out = mb.check_for_bad_PAs(chi2_threshold=bad_pa_threshold,
@@ -2170,32 +2204,19 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
             
     if not run_fit:
        return True
-    
-    fsps = True
-    t0 = utils.load_templates(fwhm=1000, line_complexes=True, stars=False, full_line_list=None, continuum_list=None, fsps_templates=fsps, alf_template=True)
-    t1 = utils.load_templates(fwhm=1000, line_complexes=False, stars=False, full_line_list=None, continuum_list=None, fsps_templates=fsps, alf_template=True)
-        
-    ###############
-    # Redshift Fit    
-    phot = None
-    scale_photometry = False
-    fit_beams = True
-    zr = [0.1, 3.3]
-    sys_err = 0.03
-    prior=None
-    pline = {'kernel': 'point', 'pixfrac': 0.2, 'pixscale': 0.1, 'size': 8, 'wcs': None}
-        
+            
     for ii, id in enumerate(ids):
         print('{0}/{1}: {2}'.format(ii, len(ids), id))
         
+        if not os.path.exists('{0}_{1:05d}.beams.fits'.format(target, id)):
+            continue
+            
         if skip_complete:
             if os.path.exists('{0}_{1:05d}.line.png'.format(target, id)):
                 continue
         
-        
         try:
-            #out = fitting.run_all(id, t0=t0, t1=t1, fwhm=1200, zr=zr, dz=[0.004, 0.0005], fitter='nnls', group_name=target, fit_stacks=False, prior=prior,  fcontam=0.2, pline=pline, mask_sn_limit=10, fit_beams=(not fit_only_beams),  root=target+'*', fit_trace_shift=False, phot=phot, verbose=True, scale_photometry=(phot is not None) & (scale_photometry), show_beams=True, overlap_threshold=10, fit_only_beams=fit_only_beams, MW_EBV=MW_EBV, sys_err=sys_err, min_sens=min_sens)
-            out = fitting.run_all_parallel(id, get_output_data=True, min_sens=min_sens, verbose=True, **fit_args)
+            out = fitting.run_all_parallel(id, get_output_data=True, **fit_args)
             mb, st, fit, tfit, line_hdu = out
             
             spectrum_1d = [tfit['cont1d'].wave, tfit['cont1d'].flux]
