@@ -10,7 +10,12 @@ import numpy as np
 import astropy.io.fits as pyfits
 
 from .. import prep, utils
-from .default_params import VALID_FILTERS, GRIS_REF_FILTERS, get_yml_parameters
+from .default_params import VALID_FILTERS, GRIS_REF_FILTERS
+from .default_params import IR_M_FILTERS, IR_W_FILTERS, IR_GRISMS
+from .default_params import OPT_M_FILTERS, OPT_W_FILTERS, OPT_GRISMS
+from .default_params import UV_GRISMS
+
+from .default_params import get_yml_parameters, write_params_to_yml
 
 args = get_yml_parameters()
 

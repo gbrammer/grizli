@@ -34,10 +34,66 @@ def test_aws_availability():
         s3_sync=False # Fetch from ESA archive
     
     return s3_sync
+
+def write_params_to_yml(kwargs, output_file='grizli.auto_script.yml', verbose=True):
+    """
+    Write grizli parameters to a file
+    """
+    import time
+    import yaml
+    import grizli
     
+    # Make copies of some parameters that can't be dumped with yaml
+    try:
+        phot_apertures = kwargs['multiband_catalog_args']['phot_apertures']
+        kwargs['multiband_catalog_args']['phot_apertures'] = None 
+    except:
+        phot_apertures = None
+    
+    try:    
+        filter_kernel = kwargs['multiband_catalog_args']['detection_params']['filter_kernel'] 
+        kwargs['multiband_catalog_args']['detection_params']['filter_kernel'] = None
+    except:
+        filter_kernel = None
+     
+    # Write the file   
+    fp = open(output_file,'w')  
+    fp.write('# {0}\n'.format(time.ctime()))
+    fp.write('# Grizli version = {0}\n'.format(grizli.__version__))
+      
+    for k in kwargs: 
+        
+        try: 
+            # Write copies of dicts
+            d = {k:kwargs[k].copy()} 
+        except: 
+            # Write single variables
+            d = {k:kwargs[k]} 
+        
+        # flow_style = False to get the correct dict/variable formatting
+        yaml.dump(d, stream=fp, default_flow_style=False) 
+    
+    fp.close()
+    
+    # Revert the things we changed above
+    if phot_apertures is not None:
+        kwargs['multiband_catalog_args']['phot_apertures'] = phot_apertures 
+    
+    if filter_kernel is not None:
+        kwargs['multiband_catalog_args']['detection_params']['filter_kernel'] = filter_kernel
+    
+    if verbose:
+        print('\n# Write parameters to {0}\n'.format(output_file))
+        
 def get_yml_parameters(local_file=None, copy_defaults=False, verbose=True, skip_unknown_parameters=True):
     """
     Read default parameters from the YAML file in `grizli/data`
+    
+    Returns:
+    
+    kwargs : dict
+        Parameter dictionary (with nested sub dictionaries).
+        
     """
     import yaml
     import shutil
