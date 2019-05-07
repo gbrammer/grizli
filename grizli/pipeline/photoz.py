@@ -468,9 +468,14 @@ def select_objects():
     
     total_flux = 'flux_auto_fix'
     total_flux = 'flux_auto' # new segmentation masked SEP catalogs
+    object_only = False
     
-    self, cat, zout = photoz.eazy_photoz(root, object_only=False, apply_prior=False, beta_prior=True, aper_ix=1, force=True, get_external_photometry=False, compute_residuals=False, total_flux=total_flux)
-
+    self, cat, zout = photoz.eazy_photoz(root, object_only=object_only, apply_prior=False, beta_prior=True, aper_ix=1, force=True, get_external_photometry=False, compute_residuals=False, total_flux=total_flux)
+    
+    if False:
+        args = np.load('fit_args.npy')[0]
+        phot_obj = photoz.EazyPhot(self, grizli_templates=args['t0'], zgrid=self.zgrid, apcorr=self.idx*0.+1)
+        
     flux = self.cat[total_flux]*1.
     hmag = 23.9-2.5*np.log10(cat['f160w_tot_2'])
 

@@ -156,6 +156,9 @@ multiband_catalog_args:
 # Stop after image preparation even if grism exists    
 only_preprocess: False 
 
+# Overwrite fit_args.npy if it exists
+overwrite_fit_params: False
+
 # If continuing with grism, compute grism contamination model
 grism_prep_args: 
     gris_ref_filters: &gris_ref_filters

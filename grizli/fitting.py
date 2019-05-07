@@ -395,6 +395,8 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     s = 4.e-19/np.max([beam.beam.total_flux for beam in mb.beams]) 
     s = np.clip(s, 0.25, 4)
 
+    s /= (pline['pixscale']/0.1)**2
+    
     full_line_list = ['Lya', 'OII', 'Hb', 'OIII', 'Ha', 'Ha+NII', 'SII', 'SIII']
     fig = show_drizzled_lines(line_hdu, size_arcsec=si, cmap='plasma_r', scale=s, dscale=s, full_line_list=full_line_list)
     fig.savefig('{0}_{1:05d}.line.png'.format(group_name, id))

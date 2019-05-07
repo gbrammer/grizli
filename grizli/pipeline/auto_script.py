@@ -205,6 +205,7 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
        make_phot=True, 
        multiband_catalog_args=args['multiband_catalog_args'],
        only_preprocess=False,
+       overwrite_fit_params=False,
        grism_prep_args=args['grism_prep_args'],
        run_extractions=False,
        extract_args=args['extract_args'],
@@ -611,7 +612,9 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
         pline = auto_script.DITHERED_PLINE
     
     # Make script for parallel processing
-    auto_script.generate_fit_params(field_root=root, prior=None, MW_EBV=exptab.meta['MW_EBV'], pline=pline, fit_only_beams=True, run_fit=True, poly_order=7, fsps=True, sys_err=0.03, fcontam=0.2, zr=[0.05, 3.4], save_file='fit_args.npy')
+    if (not os.path.exists('fit_args.npy')) | (overwrite_fit_params):
+        print('# generate_fit_params: fit_args.npy')
+        auto_script.generate_fit_params(field_root=root, prior=None, MW_EBV=exptab.meta['MW_EBV'], pline=pline, fit_only_beams=True, run_fit=True, poly_order=7, fsps=True, sys_err=0.03, fcontam=0.2, zr=[0.05, 3.4], save_file='fit_args.npy')
     
     # Make PSF
     # print('Make field PSFs')
