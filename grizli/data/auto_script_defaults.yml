@@ -172,6 +172,22 @@ grism_prep_args:
     ds9: null
 
 run_extractions: False 
+
+# Arguments for spectral extractions
+# def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00, ids=None, pline=DITHERED_PLINE, fit_only_beams=True, run_fit=True, poly_order=7, master_files=None, grp=None, bad_pa_threshold=None, fit_trace_shift=False, size=32, diff=True, min_sens=0.02, skip_complete=True, fit_args={}):
+
+extract_args: 
+    maglim: [17,26]
+    ids: []
+    poly_order: 7
+    bad_pa_threshold: null
+    fit_trace_shift: False
+    size: 32
+    diff: True
+    MW_EBV: 0.0
+    skip_complete: True
+    run_fit: False
+    
 extract_maglim: [17,26] 
 run_fit: False 
  
