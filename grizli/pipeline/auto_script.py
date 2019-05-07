@@ -401,6 +401,15 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
                         fix_stars=fix_stars, mask_spikes=mask_spikes,
                         skip_single_optical_visits=skip_single)
         
+        # Make PSFs.  Always set get_line_maps=False since PSFs now
+        # provided for each object.
+        mosaic_files = glob.glob('{0}-f*sci.fits'.format(root)) 
+        
+        if (not is_dash) & (len(mosaic_files) > 0):
+            print('Make field PSFs')
+            auto_script.field_psf(root=root, HOME_PATH=HOME_PATH, 
+                                  get_line_maps=False, skip=False)
+        
         # ## Mosaic WCS
         # wcs_ref_file = '{0}_wcs-ref.fits'.format(root)
         # if not os.path.exists(wcs_ref_file):
@@ -529,12 +538,6 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
     # Are there full-field mosaics?
     mosaic_files = glob.glob('{0}-f*sci.fits'.format(root)) 
     
-    # Make PSFs.  Always set get_line_maps=False since PSFs now
-    # provided for each object.
-    if (not is_dash) & (len(mosaic_files) > 0):
-        print('Make field PSFs')
-        auto_script.field_psf(root=root, HOME_PATH=HOME_PATH, 
-                          get_line_maps=False)
     
     # Photometric catalog
     if (not os.path.exists('{0}_phot.fits'.format(root))) & make_phot & (len(mosaic_files) > 0):
@@ -3801,7 +3804,7 @@ def test_psf():
     
     id=212; gfit, model = gf.fit_object(id=id, size=int(128*0.06), components=[galfit.GalfitSersic(), galfit.GalfitSersic()])
     
-def field_psf(root='j020924-044344', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/WISP/', factors=[1,2,4], get_drizzle_scale=True, subsample=256, size=6, get_line_maps=False, raise_fault=False, verbose=True, psf_filters=['F098M', 'F110W', 'F105W', 'F125W', 'F140W', 'F160W']):
+def field_psf(root='j020924-044344', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/WISP/', factors=[1,2,4], get_drizzle_scale=True, subsample=256, size=6, get_line_maps=False, raise_fault=False, verbose=True, psf_filters=['F098M', 'F110W', 'F105W', 'F125W', 'F140W', 'F160W'], skip=False):
     """
     Generate PSFs for the available filters in a given field
     """
@@ -3909,7 +3912,7 @@ def field_psf(root='j020924-044344', HOME_PATH='/Volumes/Pegasus/Grizli/Automati
         if filter.upper() not in psf_filters:
             continue
         
-        if os.path.exists('{0}-{1}_psf.fits'.format(root, filter)):
+        if (os.path.exists('{0}-{1}_psf.fits'.format(root, filter))) & skip:
             continue
                 
         flt_files = info['FILE'][info['FILTER'] == filter.upper()]
