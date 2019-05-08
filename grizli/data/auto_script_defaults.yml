@@ -190,6 +190,7 @@ extract_args:
     MW_EBV: 0.0
     skip_complete: True
     run_fit: False
+    args_file: fit_args.npy
     
 extract_maglim: [17,26] 
 run_fit: False 

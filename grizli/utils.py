@@ -4012,6 +4012,8 @@ def symlink_templates(force=False):
     out_path = os.path.join(GRIZLI_PATH, 'templates')
     
     files = glob.glob(os.path.join(module_path, 'data/templates/*'))
+    files.sort()
+    
     #print(files)
     for file in files:
         filename = os.path.basename(file)
