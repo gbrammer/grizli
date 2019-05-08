@@ -38,7 +38,7 @@ try:
 except:
     IGM = None
 
-def run_all_parallel(id, get_output_data=False, argsfile='fit_args.npy', **kwargs):
+def run_all_parallel(id, get_output_data=False, args_file='fit_args.npy', **kwargs):
     import numpy as np
     from grizli.fitting import run_all
     from grizli import multifit
@@ -47,8 +47,8 @@ def run_all_parallel(id, get_output_data=False, argsfile='fit_args.npy', **kwarg
     
     t0 = time.time()
 
-    print('Run id={0} with {1}'.format(id, argsfile))
-    args = np.load(argsfile)[0]
+    print('Run id={0} with {1}'.format(id, args_file))
+    args = np.load(args_file)[0]
 
     args['verbose'] = False
     for k in kwargs:
@@ -101,6 +101,11 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     mb_files = glob.glob('{0}_{1:05d}.beams.fits'.format(root, id))
     st_files = glob.glob('{0}_{1:05d}.stack.fits'.format(root, id))
     
+    # Allow for fitter to be a string, or a 2-list with different
+    # values for the redshift and final fits
+    if isinstance(fitter, str):
+        fitter = [fitter, fitter]
+        
     if not only_stacks:
         mb = MultiBeam(mb_files, fcontam=fcontam, group_name=group_name, MW_EBV=MW_EBV, sys_err=sys_err, verbose=verbose, psf=use_psf, min_mask=min_mask, min_sens=min_sens)
         # Check for PAs with unflagged contamination or otherwise discrepant
@@ -200,7 +205,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
                     st.pscale = scl.x
     
     # First pass    
-    fit = fit_obj.xfit_redshift(templates=t0, zr=zr, dz=dz, prior=prior, fitter=fitter, verbose=verbose, bounded_kwargs=bounded_kwargs) 
+    fit = fit_obj.xfit_redshift(templates=t0, zr=zr, dz=dz, prior=prior, fitter=fitter[0], verbose=verbose, bounded_kwargs=bounded_kwargs) 
     fit_hdu = pyfits.table_to_hdu(fit)
     fit_hdu.header['EXTNAME'] = 'ZFIT_STACK'
     
@@ -241,14 +246,14 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
         width = 20*0.001*(1+z0)
         
         mb_zr = z0 + width*np.array([-1,1])
-        mb_fit = mb.xfit_redshift(templates=t0, zr=mb_zr, dz=[0.001, 0.0002], prior=prior, fitter=fitter, verbose=verbose, bounded_kwargs=bounded_kwargs) 
+        mb_fit = mb.xfit_redshift(templates=t0, zr=mb_zr, dz=[0.001, 0.0002], prior=prior, fitter=fitter[0], verbose=verbose, bounded_kwargs=bounded_kwargs) 
         mb_fit_hdu = pyfits.table_to_hdu(mb_fit)
         mb_fit_hdu.header['EXTNAME'] = 'ZFIT_BEAM'
     else:
         mb_fit = fit
            
     #### Get best-fit template 
-    tfit = mb.template_at_z(z=mb_fit.meta['z_map'][0], templates=t1, fit_background=True, fitter=fitter, bounded_kwargs=bounded_kwargs)
+    tfit = mb.template_at_z(z=mb_fit.meta['z_map'][0], templates=t1, fit_background=True, fitter=fitter[1], bounded_kwargs=bounded_kwargs)
     
     # Redrizzle? ... testing
     if False:
