@@ -119,7 +119,8 @@ mosaic_args:
         [F105W, F110W, F125W, F140W, F160W, F098M, F139M, F127M, F153M]
     optical_filters:
         [F814W, F606W, F435W, F850LP, F702W, F555W, F438W, F475W, F625W,
-          F775W, F225W, F275W, F300W, F390W, F350LP, F200LP, F410M, F450W]
+          F775W, F225W, F275W, F300W, F390W, F350LP, F200LP, F410M, F450W,
+          F600LP, F475X]
     fill_mosaics: grism 
     half_optical_pixscale: False 
     mosaic_pixfrac: 0.75 
@@ -130,7 +131,7 @@ mosaic_args:
             F350LP, F390W, F435W, F438W, F439W, F450W, F475W, F475X, F555W,
             F569W, F600LP, F606W, F622W, F625W, F675W, F702W, F775W, F791W,
             F814W, F850LP, G800L, F098M, F127M, F139M, F153M, F105W, F110W,
-            F125W, F140W, F160W, G102, G141]
+            F125W, F140W, F160W, G102, G141, F600LP, F475X]
         pixel_scale: null 
         
 # Mask IR difraction spikes
