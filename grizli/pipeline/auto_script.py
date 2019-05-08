@@ -1601,6 +1601,7 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
         aseg, aseg_id = seg_data, tab['NUMBER']
         
         source_xy = tab['X_WORLD'], tab['Y_WORLD'], aseg, aseg_id
+        aseg_half = None
     else:
         source_xy = tab['X_WORLD'], tab['Y_WORLD']
     
@@ -1629,7 +1630,25 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
                 continue
             
             root = '{0}-{1}'.format(field_root, filt)
-                        
+            
+            # Check for half-pixel optical images if using segmask
+            if aper_segmask:
+                sci = pyfits.open(sci_files[0])
+                sci_shape = sci[0].data.shape
+                
+                if sci_shape[0] != aseg.shape[0]:
+                    print('# filt={0}, need half-size segmentation image!'.format(filt), sci_shape, aseg.shape)
+                    if aseg_half is None:
+                        aseg_half = np.zeros(sci_shape, dtype=aseg.dtype)
+                        for i in [0,1]:
+                            for j in [0,1]:
+                                aseg_half[i::2,j::2] += aseg
+                    
+                
+                    source_xy = tab['X_WORLD'], tab['Y_WORLD'], aseg_half, aseg_id
+                else:
+                    source_xy = tab['X_WORLD'], tab['Y_WORLD'], aseg, aseg_id
+                    
             filter_tab = prep.make_SEP_catalog(root=root,
                       threshold=threshold, 
                       get_background=photometry_background,
@@ -3413,7 +3432,9 @@ def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', s
     if scale_ab is not None:
         zp_r = utils.calc_header_zeropoint(ims[rf], ext=0)
         scl = 10**(-0.4*(zp_r-5-scale_ab))
-        
+    
+    scl *= (0.06/pscale)**2
+    
     rimg = ims[rf][0].data * (ims[rf][0].header['PHOTFLAM']/5.e-20)**pf * (ims[rf][0].header['PHOTPLAM']/1.e4)**pl*scl*rgb_scl[0]
     
     if bf == 'sum':
