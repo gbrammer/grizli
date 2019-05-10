@@ -2341,6 +2341,8 @@ def summary_catalog(field_root='', dzbin=0.01, use_localhost=True, filter_bandpa
     if os.path.exists('{0}.info.fits'.format(field_root)):
         orig = utils.read_catalog('{0}.info.fits'.format(field_root))
         all_files = glob.glob('*full.fits')
+        all_files.sort()
+        
         files = []
         for file in all_files:
             id = int(file.split('_')[1].split('.full')[0])
@@ -2348,10 +2350,10 @@ def summary_catalog(field_root='', dzbin=0.01, use_localhost=True, filter_bandpa
                 files.append(file)
         
         if len(files) == 0:
-            print('Found {0}.info.fits, and {1} new objects'.format(field_root, len(files)))
+            print('Found {0}.info.fits, and {1} new objects.\n'.format(field_root, len(files)))
             return False
         else:
-            print('Found {0}.info.fits.  Adding {1} new objects'.format(field_root, len(files)))
+            print('Found {0}.info.fits.  Adding {1} new objects.\n'.format(field_root, len(files)))
     else:
         orig = None
             
