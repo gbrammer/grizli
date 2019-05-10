@@ -2326,6 +2326,7 @@ def summary_catalog(field_root='', dzbin=0.01, use_localhost=True, filter_bandpa
     import numpy as np
     from matplotlib.ticker import FixedLocator
     import matplotlib.pyplot as plt
+    import astropy.table
     
     try:
         from .. import fitting, prep, utils
