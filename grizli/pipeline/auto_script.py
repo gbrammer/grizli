@@ -2337,14 +2337,35 @@ def summary_catalog(field_root='', dzbin=0.01, use_localhost=True, filter_bandpa
     if filter_bandpasses is None:
         import pysynphot as S
         filter_bandpasses = [S.ObsBandpass(bpstr) for bpstr in ['acs,wfc1,f814w','wfc3,ir,f105w', 'wfc3,ir,f110w', 'wfc3,ir,f125w', 'wfc3,ir,f140w', 'wfc3,ir,f160w']]
+    
+    if os.path.exists('{0}.info.fits'.format(field_root)):
+        orig = utils.read_catalog('{0}.info.fits'.format(field_root))
+        all_files = glob.glob('*full.fits')
+        files = []
+        for file in all_files:
+            id = int(file.split('_')[1].split('.full')[0])
+            if id not in orig['id']:
+                files.append(file)
         
+        if len(files) == 0:
+            print('Found {0}.info.fits, and {1} new objects'.format(field_root, len(files)))
+            return False
+        else:
+            print('Found {0}.info.fits.  Adding {1} new objects'.format(field_root, len(files)))
+    else:
+        orig = None
+            
     ### SUmmary catalog
     fit = fitting.make_summary_catalog(target=field_root, sextractor=None,
                                        filter_bandpasses=filter_bandpasses,
                                        files=files)
-                                       
     fit.meta['root'] = field_root
     
+    if orig is not None:
+        if len(fit) > 0:
+            fit = astropy.table.vstack([orig, fit])
+            fit.write('{0}.info.fits'.format(field_root), overwrite=True)
+        
     ## Add photometric catalog
     try:
         catalog = glob.glob('{0}-*.cat.fits'.format(field_root))[0]
