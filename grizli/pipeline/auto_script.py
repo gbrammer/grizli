@@ -1529,7 +1529,7 @@ mag_lim=17, cat=None, cols=['mag_auto','ra','dec'], minR=8, dy=5, selection=None
             im['DQ',ext].data |= mask*2048
             im.flush()
             
-def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_background=True, photometry_background=True, get_all_filters=False, det_err_scale=-np.inf, run_detection=True, detection_filter='ir', use_psf_filter=True, detection_params=prep.SEP_DETECT_PARAMS,  phot_apertures=prep.SEXTRACTOR_PHOT_APERTURES_ARCSEC, master_catalog=None, bkg_mask=None, bkg_params={'bw':64, 'bh':64, 'fw':3, 'fh':3, 'pixel_scale':0.06}, use_bkg_err=False, aper_segmask=True):
+def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_background=True, photometry_background=True, get_all_filters=False, det_err_scale=-np.inf, rescale_weight=True, run_detection=True, detection_filter='ir', use_psf_filter=True, detection_params=prep.SEP_DETECT_PARAMS,  phot_apertures=prep.SEXTRACTOR_PHOT_APERTURES_ARCSEC, master_catalog=None, bkg_mask=None, bkg_params={'bw':64, 'bh':64, 'fw':3, 'fh':3, 'pixel_scale':0.06}, use_bkg_err=False, aper_segmask=True):
     """
     Make a detection catalog with SExtractor and then measure
     photometry with `~photutils`.
@@ -1588,7 +1588,7 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
             
                 detection_params['filter_kernel'] = psf_kernel
             
-        tab = prep.make_SEP_catalog(root='{0}-{1}'.format(field_root, detection_filter), threshold=threshold, get_background=detection_background, save_to_fits=True, err_scale=det_err_scale, phot_apertures=phot_apertures, detection_params=detection_params, bkg_mask=bkg_mask, bkg_params=bkg_params, use_bkg_err=use_bkg_err, aper_segmask=aper_segmask)
+        tab = prep.make_SEP_catalog(root='{0}-{1}'.format(field_root, detection_filter), threshold=threshold, get_background=detection_background, save_to_fits=True, rescale_weight=rescale_weight, err_scale=det_err_scale, phot_apertures=phot_apertures, detection_params=detection_params, bkg_mask=bkg_mask, bkg_params=bkg_params, use_bkg_err=use_bkg_err, aper_segmask=aper_segmask)
     else:
         tab = utils.GTable.gread(master_catalog)
         
@@ -3494,7 +3494,7 @@ def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', s
         
         ds9.set('rgb')
         ds9.set('rgb channel red')
-        ds9.view(rimg)#, header=ims[rf][0].header)
+        ds9.view(rimg, header=ims[rf][0].header)
         ds9.set_defaults(); ds9.set('cmap value 9.75 0.8455')
         
         ds9.set('rgb channel green')
@@ -3504,6 +3504,8 @@ def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', s
         ds9.set('rgb channel blue')
         ds9.view(bimg)#, header=ims[bf][0].header)
         ds9.set_defaults(); ds9.set('cmap value 9.75 0.8455')
+
+        ds9.set('rgb channel red')
         
         return False
     
@@ -3588,14 +3590,17 @@ DRIZZLER_ARGS = {'aws_bucket':False,
 def make_rgb_thumbnails(root='j140814+565638', ids=None, maglim=21,
                         drizzler_args=DRIZZLER_ARGS, 
                         remove_fits=False, skip=True, 
-                        auto_size=False, size_limits=[4, 15]):
+                        auto_size=False, size_limits=[4, 15], mag=None):
     """
     Make RGB thumbnails in working directory
     """
     from grizli_aws import aws_drizzler
     
     cat = utils.read_catalog('{0}_phot.fits'.format(root))
-    mag = 23.9-2.5*np.log10(cat['flux_auto']*cat['tot_corr'])
+    
+    if mag is None:
+        mag = 23.9-2.5*np.log10(cat['flux_auto']*cat['tot_corr'])
+    
     pixel_scale = cat.meta['ASEC_0']/cat.meta['APER_0']
     sx = (cat['xmax']-cat['xmin'])*pixel_scale
     sy = (cat['ymax']-cat['ymin'])*pixel_scale
