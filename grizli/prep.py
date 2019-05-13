@@ -1244,11 +1244,11 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
         data_bkg = data 
     else:
         data_bkg = data - bkg_data
-        
-    if verbose:
-        print('SEP: err_scale={:.3f}'.format(err_scale))
-        
+                
     if rescale_weight:
+        if verbose:
+            print('SEP: err_scale={:.3f}'.format(err_scale))
+    
         err *= err_scale
      
     if source_xy is None:
@@ -1350,9 +1350,9 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
                     tab[c] = auto[c]
                         
             # Problematic sources
-            bad = (tab['flux_auto'] <= 0) | (tab['flux_radius'] <= 0) 
-            bad |= (tab['kron_radius'] <= 0)
-            tab = tab[~bad]
+            # bad = (tab['flux_auto'] <= 0) | (tab['flux_radius'] <= 0) 
+            # bad |= (tab['kron_radius'] <= 0)
+            # tab = tab[~bad]
             
             # Correction for flux outside Kron aperture
             tot_corr = get_wfc3ir_kron_tot_corr(tab, drz_filter, pixel_scale=pixel_scale, photplam=drz_photplam)
@@ -1416,6 +1416,7 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
 
     tab.meta['GET_BACK'] = (get_background, 'Background computed')
     tab.meta['ERR_SCALE'] = (err_scale, 'Scale factor applied to weight image (like MAP_WEIGHT)')
+    tab.meta['RESCALEW'] = (rescale_weight, 'Was the weight applied?')
     
     tab.meta['APERMASK'] = (aper_segmask, 'Mask apertures with seg image')
     

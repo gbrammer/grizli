@@ -153,6 +153,7 @@ multiband_catalog_args:
     bkg_params: {bw: 64, bh: 64, fw: 3, fh: 3, pixel_scale: 0.06}
     use_bkg_err: False
     aper_segmask: True
+    rescale_weight: True
 
 # Stop after image preparation even if grism exists    
 only_preprocess: False 
