@@ -1651,6 +1651,8 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
                     
             filter_tab = prep.make_SEP_catalog(root=root,
                       threshold=threshold, 
+                      rescale_weight=rescale_weight,
+                      err_scale=det_err_scale,
                       get_background=photometry_background,
                       save_to_fits=False, source_xy=source_xy,
                       phot_apertures=phot_apertures, bkg_mask=bkg_mask,
