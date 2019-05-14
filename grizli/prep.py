@@ -249,7 +249,10 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
         # For more recent SPARS5
         old_darks += ['zb21929si_drk.fits']
         
-        if head['DARKFILE'].strip('iref$') in old_darks:
+        #need_badpix = head['DARKFILE'].strip('iref$') in old_darks
+        need_badpix = True # always add the additional bad pix files
+        
+        if need_badpix:
             new_bp = pyfits.open(os.path.join(os.path.dirname(__file__),
                                     'data', 
                                     'wfc3ir_dark_badpix_2019.01.12.fits.gz'))
