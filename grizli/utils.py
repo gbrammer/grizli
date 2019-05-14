@@ -4220,6 +4220,9 @@ def fetch_config_files(ACS=False, get_sky=True, get_stars=True, get_epsf=True):
     tarfiles = ['{0}/WFC3.IR.G102.cal.V4.32.tar.gz'.format(ftpdir),
                 '{0}/WFC3.IR.G141.cal.V4.32.tar.gz'.format(ftpdir)]
     
+    # Test config files
+    tarfiles = ['https://s3.amazonaws.com/grizli/CONF/WFC3.IR.G102.WD.V4.32.tar.gz', 'https://s3.amazonaws.com/grizli/CONF/WFC3.IR.G141.WD.V4.32.tar.gz'] 
+    
     if get_sky:
         tarfiles.append('{0}/grism_master_sky_v0.5.tar.gz'.format(ftpdir))
     
