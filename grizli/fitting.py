@@ -48,8 +48,11 @@ def run_all_parallel(id, get_output_data=False, args_file='fit_args.npy', **kwar
     t0 = time.time()
 
     print('Run id={0} with {1}'.format(id, args_file))
-    args = np.load(args_file)[0]
-
+    try:
+        args = np.load(args_file)[0]
+    except:
+        args = np.load(args_file, allow_pickle=True)[0]
+        
     args['verbose'] = False
     for k in kwargs:
         args[k] = kwargs[k]
