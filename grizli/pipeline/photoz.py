@@ -1,3 +1,4 @@
+import numpy as np
 
 def apply_catalog_corrections(root, total_flux='flux_auto', auto_corr=True, get_external_photometry=False, aperture_indices='all', suffix='_apcorr', verbose=True, apply_background=True):
     """
@@ -263,7 +264,7 @@ def show_from_ds9(ds9, self, zout, **kwargs):
     return fig, self.cat['id'][ix], zout['z_phot'][ix]
      
 class EazyPhot(object):
-    def __init__(self, photoz, grizli_templates=None, zgrid=None, apcorr=None):
+    def __init__(self, photoz, grizli_templates=None, zgrid=None, apcorr=None, include_photometry=True, include_pz=False):
         """
         photoz : `~eazypy.photoz.PhotoZ`
         
@@ -296,6 +297,8 @@ class EazyPhot(object):
         self.eflam = photoz.efnu*photoz.to_flam*photoz.zp**photoz.ext_corr
         self.eflam[not_obs_mask] = -99
         
+        self.include_photometry = include_photometry
+        
         #self.rdcat = utils.GTable(photoz.cat['ra','dec'])
         self.ra_cat = photoz.cat['ra'].data
         self.dec_cat = photoz.cat['dec'].data
@@ -304,11 +307,29 @@ class EazyPhot(object):
         self.f_numbers = photoz.f_numbers
         self.param = photoz.param
         
+        if 'z_spec' in photoz.cat.colnames:
+            self.z_spec = photoz.cat['z_spec']*1
+        else:
+            self.z_spec = np.zeros(photoz.N)-1
+        
+        self.include_pz = include_pz
+        
+        if include_pz:
+            try:
+                self.pz = photoz.pz*1
+                self.zgrid = photoz.zgrid
+            except:
+                self.pz = None
+        else:
+            self.pz = None
+            
         if grizli_templates is None:
             self.tempfilt = None
+            self.grizli_templates = None
         else:
             self.tempfilt = self.initialize_templates(grizli_templates,
                                                       zgrid=zgrid)
+            self.grizli_templates = grizli_templates
             
     def initialize_templates(self, grizli_templates, zgrid=None):
         
@@ -326,7 +347,13 @@ class EazyPhot(object):
     
     def get_phot_dict(self, ra, dec):
         """
+        Return catalog info for nearest object to supplied coordinates
         
+        Returns:
+        
+        phot - photometry dictionary
+        ix   - index in catalog of nearest match
+        dr   - distance to nearest match
         """
         from collections import OrderedDict
         try:
@@ -351,6 +378,18 @@ class EazyPhot(object):
         phot['eflam'] = self.eflam[ix[0],:]*1.e-19*apcorr_i
         phot['filters'] = self.filters
         phot['tempfilt'] = self.tempfilt
+        
+        if self.include_pz & (self.pz is not None):
+            pz = (self.zgrid, self.pz[ix[0],:].flatten())
+        else:
+            pz = None
+        
+        phot['pz'] = pz
+        phot['z_spec'] = self.z_spec[ix[0]]
+        
+        if not self.include_photometry:
+            phot['flam'] = None
+            
         return phot, ix[0], dr[0]
         
 def get_external_catalog(phot, filter_file='/usr/local/share/eazy-photoz/filters/FILTER.RES.latest', ZP=23.9, sys_err=0.3, verbose=True, external_limits=3, timeout=300):

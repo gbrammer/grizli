@@ -147,16 +147,40 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
             b.compute_model()
             sn_lim = fit_trace_shift*1
             if (np.max((b.model/b.grism['ERR'])[b.fit_mask.reshape(b.sh)]) > sn_lim) | (sn_lim > 100):
+                if verbose:
+                    print('Trace shift\n')
+                
                 shift, _ = mb.fit_trace_shift(tol=1.e-3, verbose=verbose, 
                                            split_groups=True)
             
         mb.initialize_masked_arrays()
     
     ## Get photometry from phot_obj
+    zspec = None
     if (phot is None) & (phot_obj is not None):
         phot_i, ii, dd = phot_obj.get_phot_dict(mb.ra, mb.dec)
         if dd < 0.5*u.arcsec:
-            phot = phot_i
+            if verbose:
+                print('Match photometry object ix={0}, dr={1:.1f}'.format(ii, dd))
+                
+            if phot_i['flam'] is not None:
+                phot = phot_i
+            else:
+                if 'pz' in phot_i:
+                    prior = phot_i['pz']
+                    sed_args['photometry_pz'] = phot_i['pz']
+                    
+            if 'z_spec' in phot_i:
+                if phot_i['z_spec'] >= 0:
+                    sed_args['zspec'] = phot_i['z_spec']*1
+                    zspec = sed_args['zspec']
+                    if verbose:
+                        print('zspec = {0:.4f}'.format(zspec))
+                        
+    if prior is not None:
+        if verbose:
+            zpr = prior[0][np.argmax(prior[1])]
+            print('Use supplied prior,  z[max(pz)] = {0:.3f}'.format(zpr))            
             
     if phot is not None:
         if phot == 'vizier':
@@ -324,7 +348,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     tfit_hdu.header['EXTNAME'] = 'TEMPL'
      
     # Make the plot
-    fig = mb.xmake_fit_plot(mb_fit, tfit, show_beams=show_beams, scale_on_stacked_1d=scale_on_stacked_1d, loglam_1d=loglam_1d)
+    fig = mb.xmake_fit_plot(mb_fit, tfit, show_beams=show_beams, scale_on_stacked_1d=scale_on_stacked_1d, loglam_1d=loglam_1d, zspec=zspec)
     
     # Add prior
     if prior is not None:
@@ -1140,7 +1164,7 @@ class GroupFitter(object):
                
 
         
-    def set_photometry(self, flam=[], eflam=[], filters=[], lc=None, force=False, tempfilt=None, min_err=0.02, TEF=None, pz=None, source='unknown'):
+    def set_photometry(self, flam=[], eflam=[], filters=[], lc=None, force=False, tempfilt=None, min_err=0.02, TEF=None, pz=None, source='unknown', **kwargs):
         """
         Add photometry
         """
@@ -1990,7 +2014,7 @@ class GroupFitter(object):
             plt.plot(w[xclip]*(1+z), tdraw.T, alpha=0.05, color='r')
     
     def xmake_fit_plot(self, fit, tfit, show_beams=True, bin=1, minor=0.1,
-                       scale_on_stacked_1d=True, loglam_1d=True):
+                       scale_on_stacked_1d=True, loglam_1d=True, zspec=None):
         """TBD
         """
         import matplotlib.pyplot as plt
@@ -2031,9 +2055,16 @@ class GroupFitter(object):
         #axz.set_yticks([1,4,9,16,25])
         
         pzmax = np.log10(fit['pdf'].max())
-        axz.set_ylim(pzmax-6, pzmax+0.8)
+        axz.set_ylim(pzmax-6, pzmax+0.9)
         axz.grid()
         axz.yaxis.set_major_locator(MultipleLocator(base=1))
+        
+        if zspec is not None:
+            #axz.text(0.95, 0.96, self.group_name + '\n'+'ID={0:<5d}  z={1:.4f}'.format(self.id, fit.meta['z_map'][0]), ha='right', va='top', transform=axz.transAxes, fontsize=9)
+            
+            axz.text(0.95, 0.95, '\n\n'+r'$z_\mathrm{spec}$='+'{0:.4f}'.format(zspec), ha='right', va='top', transform=axz.transAxes, color='r', fontsize=9)
+            
+            axz.scatter(zspec, pzmax+0.3, color='r', marker='v', zorder=-100)
         
         #### Spectra
         axc = fig.add_subplot(gs[-1,1]) #224)
