@@ -571,7 +571,7 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
                 
     ######################
     ### Grism prep
-    files = glob.glob('*GrismFLT.fits')
+    files = glob.glob('../Prep/*GrismFLT.fits') + glob.glob('../Extractions/*GrismFLT.fits')
     if len(files) == 0:
         os.chdir(os.path.join(HOME_PATH, root, 'Prep'))
         #gris_ref_filters = GRIS_REF_FILTERS
