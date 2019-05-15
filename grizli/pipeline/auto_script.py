@@ -2346,17 +2346,29 @@ def summary_catalog(field_root='', dzbin=0.01, use_localhost=True, filter_bandpa
         all_files = glob.glob('*full.fits')
         all_files.sort()
         
+        info_mtime = os.stat('{0}.info.fits'.format(field_root)).st_mtime
+        keep = np.ones(len(orig), dtype=bool)
+        
         files = []
         for file in all_files:
             id = int(file.split('_')[1].split('.full')[0])
             if id not in orig['id']:
                 files.append(file)
+            else:
+                full_mtime = os.stat(file).st_mtime
+                if full_mtime > info_mtime:
+                    files.append(file)
+                    keep[orig['id'] == id] = False
+        
+        orig = orig[keep]
         
         if len(files) == 0:
             print('Found {0}.info.fits, and {1} new objects.\n'.format(field_root, len(files)))
             return False
         else:
             print('Found {0}.info.fits.  Adding {1} new objects.\n'.format(field_root, len(files)))
+            
+        
     else:
         orig = None
             
