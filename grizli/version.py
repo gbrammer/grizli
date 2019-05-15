@@ -1,2 +1,2 @@
 # git describe --tags
-__version__ = "0.12.0-45-gaa71dfd"
+__version__ = "0.12.0-46-g2ada582"
