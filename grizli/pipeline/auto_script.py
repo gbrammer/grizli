@@ -615,7 +615,7 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
     if (not os.path.exists('fit_args.npy')) | (overwrite_fit_params):
         print('# generate_fit_params: fit_args.npy')
 
-        pline['pixscale'] = mosaic_args['wcs']['pixel_scale']
+        pline['pixscale'] = mosaic_args['wcs_params']['pixel_scale']
         pline['pixfrac'] = mosaic_args['mosaic_pixfrac']
         if pline['pixfrac'] > 0:
             pline['kernel'] = 'square'
