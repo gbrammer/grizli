@@ -1144,10 +1144,11 @@ def clean_prep(field_root='j142724+334246'):
         print('remove '+file)
         os.remove(file)
     
+    # Do this in preprocess to avoid doing it over and over
     # Fix NaNs
-    flt_files = glob.glob('*_fl?.fits')
-    for flt_file in flt_files:
-        utils.fix_flt_nan(flt_file, verbose=True)
+    # flt_files = glob.glob('*_fl?.fits')
+    # for flt_file in flt_files:
+    #     utils.fix_flt_nan(flt_file, verbose=True)
             
 def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', min_overlap=0.2, make_combined=True, catalogs=['PS1','DES','NSC','SDSS','GAIA','WISE'], use_visit=True, master_radec=None, parent_radec=None, use_first_radec=False, skip_imaging=False, clean=True, skip_single_optical_visits=True, visit_prep_args=args['visit_prep_args'], persistence_args=args['persistence_args']):
     """
@@ -1261,7 +1262,10 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
             if os.path.exists(pfile):
                 prep.apply_persistence_mask(file, path='../Persistence',
                                             **persistence_args)
-        
+            
+            # Fix NaNs
+            utils.fix_flt_nan(file, verbose=True)
+            
     # From here, `radec` will be the radec file from the first grism visit
     #master_radec = radec
     
@@ -1347,7 +1351,9 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
                     prep.apply_persistence_mask(file, path='../Persistence',
                                          dq_value=1024, err_threshold=0.6,
                                          grow_mask=3, verbose=True)
-            
+
+                # Fix NaNs
+                utils.fix_flt_nan(file, verbose=True)
         except:
             fp = open('%s.failed' %(direct['product']), 'w')
             fp.write('\n')
