@@ -607,13 +607,21 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
         extract_maglim = [17,23]
     
     if is_parallel_field:
-        pline = auto_script.PARALLEL_PLINE
+        pline = auto_script.PARALLEL_PLINE.copy()
     else:
-        pline = auto_script.DITHERED_PLINE
-    
+        pline = auto_script.DITHERED_PLINE.copy()
+                
     # Make script for parallel processing
     if (not os.path.exists('fit_args.npy')) | (overwrite_fit_params):
         print('# generate_fit_params: fit_args.npy')
+
+        pline['pixscale'] = mosaic_args['wcs']['pixel_scale']
+        pline['pixfrac'] = mosaic_args['mosaic_pixfrac']
+        if pline['pixfrac'] > 0:
+            pline['kernel'] = 'square'
+        else:
+            pline['kernel'] = 'point'
+
         auto_script.generate_fit_params(field_root=root, prior=None, MW_EBV=exptab.meta['MW_EBV'], pline=pline, fit_only_beams=True, run_fit=True, poly_order=7, fsps=True, sys_err=0.03, fcontam=0.2, zr=[0.05, 3.4], save_file='fit_args.npy')
     
     # Make PSF
@@ -2260,7 +2268,7 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
     else:
         return True
         
-def generate_fit_params(field_root='j142724+334246', fitter='bounded', prior=None, MW_EBV=0.00, pline=DITHERED_PLINE, fit_only_beams=True, run_fit=True, poly_order=7, fsps=True, sys_err=0.03, fcontam=0.2, zr=[0.05, 3.6], dz=[0.004, 0.0004], fwhm=1000, lorentz=False, save_file='fit_args.npy'):
+def generate_fit_params(field_root='j142724+334246', fitter=['nnls', 'bounded'], prior=None, MW_EBV=0.00, pline=DITHERED_PLINE, fit_only_beams=True, run_fit=True, poly_order=7, fsps=True, sys_err=0.03, fcontam=0.2, zr=[0.05, 3.6], dz=[0.004, 0.0004], fwhm=1000, lorentz=False, save_file='fit_args.npy'):
     """
     Generate a parameter dictionary for passing to the fitting script
     """
@@ -4134,12 +4142,17 @@ def make_report(root, gzipped_links=True, xsize=18, output_dpi=None, make_rgb=Tr
     else:
         column_url = ''
 
-    grism_files = glob.glob('../Extractions/*grism*fits')
+    grism_files = glob.glob('../Extractions/*grism*fits*')
     if len(grism_files) > 0:
         grism_files.sort()
-        grism_url = '<pre>' + '\n'.join(['<a href="./{0}">{1}</a>'.format(f.replace('+','%2B'), f) for f in grism_files]) + '</pre>'
+        grism_url = '<pre>'
+        grism_url += '\n'.join(['<a href="./{0}">{1}</a>'.format(f.replace('+','%2B'), f) for f in grism_files])
+        grism_url += '\n <a href=../Extractions/{0}-fit.html> {0}-fit.html </a>'.format(root)
+        grism_url += '\n</pre>'
         if gzipped_links:
             grism_url = grism_url.replace('.fits','.fits.gz')
+        
+        
     else:
         grism_url = ''
     
@@ -4152,7 +4165,9 @@ def make_report(root, gzipped_links=True, xsize=18, output_dpi=None, make_rgb=Tr
 
     {now}<br>
     
-    <a href={root}.exposures.html>Exposure report</a>
+    <a href={root}.exposures.html>Exposure report</a> 
+    / <a href={root}.auto_script.log>{root}.auto_script.log</a>
+    / <a href={root}.auto_script.yml>{root}.auto_script.yml</a>
     
     <pre>
     <a href={root}-ir_drz_sci.fits{gz}>{root}-ir_drz_sci.fits{gz}</a>
