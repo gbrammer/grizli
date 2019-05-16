@@ -1052,7 +1052,8 @@ class GroupFLT():
                              bbox=dict(facecolor='w', edgecolor='None'), 
                              ha='center', va='top', transform=fig.transFigure)
                     
-                    fig.savefig(outfile.split('_clean')[0]+'.png')
+                    fig.savefig(outfile.split('_clean')[0]+'.png',
+                                transparent=True)
                     plt.close(fig)
                     
     def drizzle_full_wavelength(self, wave=1.4e4, ref_header=None,
