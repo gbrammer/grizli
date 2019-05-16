@@ -264,7 +264,7 @@ def show_from_ds9(ds9, self, zout, **kwargs):
     return fig, self.cat['id'][ix], zout['z_phot'][ix]
      
 class EazyPhot(object):
-    def __init__(self, photoz, grizli_templates=None, zgrid=None, apcorr=None, include_photometry=True, include_pz=False):
+    def __init__(self, photoz, grizli_templates=None, zgrid=None, apcorr=None, include_photometry=True, include_pz=False, source_text='unknown'):
         """
         photoz : `~eazypy.photoz.PhotoZ`
         
@@ -290,11 +290,14 @@ class EazyPhot(object):
             self.apcorr = np.ones(photoz.NOBJ)
         else:
             self.apcorr = apcorr
-            
+        
+        self.source_text = source_text
+        
+        self.ext_corr = photoz.ext_corr
         self.flam = photoz.fnu*photoz.to_flam*photoz.zp*photoz.ext_corr
         self.flam[not_obs_mask] = -99
         
-        self.eflam = photoz.efnu*photoz.to_flam*photoz.zp**photoz.ext_corr
+        self.eflam = photoz.efnu*photoz.to_flam*photoz.zp*photoz.ext_corr
         self.eflam[not_obs_mask] = -99
         
         self.include_photometry = include_photometry
@@ -374,10 +377,12 @@ class EazyPhot(object):
         phot = OrderedDict()
         apcorr_i = self.apcorr[ix[0]]
         
+        phot['source'] = self.source_text
         phot['flam'] = self.flam[ix[0],:]*1.e-19*apcorr_i
         phot['eflam'] = self.eflam[ix[0],:]*1.e-19*apcorr_i
         phot['filters'] = self.filters
         phot['tempfilt'] = self.tempfilt
+        phot['ext_corr'] = self.ext_corr
         
         if self.include_pz & (self.pz is not None):
             pz = (self.zgrid, self.pz[ix[0],:].flatten())

@@ -792,11 +792,14 @@ class GroupFLT():
         Updates `self.model` in place.
         
         """
-        beams = self.get_beams(id, size=size, min_overlap=0.5, get_slice_header=False)
+        beams = self.get_beams(id, size=size, min_overlap=0.1,
+                               get_slice_header=False, min_mask=0.01, 
+                               min_sens=0.01)
         if len(beams) == 0:
             return True
         
-        mb = MultiBeam(beams, fcontam=fcontam)
+        mb = MultiBeam(beams, fcontam=fcontam, min_sens=0.01, sys_err=0.03,
+                       min_mask=0.01)
         
         if templates is None:
             wave = np.linspace(0.9*mb.wavef.min(),1.1*mb.wavef.max(),100)
@@ -806,10 +809,17 @@ class GroupFLT():
         try:
             tfit = mb.template_at_z(z=0, templates=templates, fit_background=True, fitter='lstsq', get_uncertainties=2)
         except:
+            ret = False
             return False
             
         scale_coeffs = [tfit['cfit']['poly {0}'.format(i)][0] for i in range(1+poly_order)]
         xspec, ypoly = tfit['cont1d'].wave, tfit['cont1d'].flux
+        # Don't extrapolate
+        mb_waves = mb.wavef[mb.fit_mask]
+        mb_clip = (xspec > mb_waves.min()) & (xspec < mb_waves.max())
+        if mb_clip.sum() > 0:
+            ypoly[xspec < mb_waves.min()] = ypoly[mb_clip][0]
+            ypoly[xspec > mb_waves.max()] = ypoly[mb_clip][-1]
         
         # Check where templates inconsistent with broad-band fluxes
         xb = [beam.direct.ref_photplam if beam.direct['REF'] is not None else beam.direct.photplam for beam in beams]

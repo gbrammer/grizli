@@ -208,6 +208,7 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
        overwrite_fit_params=False,
        grism_prep_args=args['grism_prep_args'],
        run_extractions=False,
+       include_photometry_in_fit=False,
        extract_args=args['extract_args'],
        get_dict=False,
        **kwargs
@@ -551,6 +552,7 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
             
             tab = auto_script.multiband_catalog(field_root=root,
                                                 **multiband_catalog_args)
+            
         except:
             utils.log_exception(utils.LOGFILE, traceback)
             utils.log_comment(utils.LOGFILE, 
@@ -622,7 +624,7 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
         else:
             pline['kernel'] = 'point'
 
-        auto_script.generate_fit_params(field_root=root, prior=None, MW_EBV=exptab.meta['MW_EBV'], pline=pline, fit_only_beams=True, run_fit=True, poly_order=7, fsps=True, sys_err=0.03, fcontam=0.2, zr=[0.05, 3.4], save_file='fit_args.npy')
+        auto_script.generate_fit_params(field_root=root, prior=None, MW_EBV=exptab.meta['MW_EBV'], pline=pline, fit_only_beams=True, run_fit=True, poly_order=7, fsps=True, sys_err=0.03, fcontam=0.2, zr=[0.05, 3.4], save_file='fit_args.npy', include_photometry=include_photometry_in_fit)
     
     # Make PSF
     # print('Make field PSFs')
@@ -2054,7 +2056,9 @@ def grism_prep(field_root='j142724+334246', ds9=None, refine_niter=3, gris_ref_f
             if ds9:
                 ds9.set('frame {0}'.format(int(fr)+iter+1))
         
-            grp.refine_list(poly_order=refine_poly_order, mag_limits=[18, 24], max_coeff=5, ds9=ds9, verbose=True, fcontam=refine_fcontam)
+            grp.refine_list(poly_order=refine_poly_order, mag_limits=[18, 24],
+                            max_coeff=5, ds9=ds9, verbose=True, 
+                            fcontam=refine_fcontam)
 
         ##############
         # Save model to avoid having to recompute it again
@@ -2241,7 +2245,10 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
             for k in range(100000): plt.close()
             
     if not run_fit:
-       return True
+        if init_grp:
+            return grp
+        else:
+            return True
             
     for ii, id in enumerate(ids):
         print('{0}/{1}: {2}'.format(ii, len(ids), id))
@@ -2274,12 +2281,14 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
     else:
         return True
         
-def generate_fit_params(field_root='j142724+334246', fitter=['nnls', 'bounded'], prior=None, MW_EBV=0.00, pline=DITHERED_PLINE, fit_only_beams=True, run_fit=True, poly_order=7, fsps=True, sys_err=0.03, fcontam=0.2, zr=[0.05, 3.6], dz=[0.004, 0.0004], fwhm=1000, lorentz=False, save_file='fit_args.npy'):
+def generate_fit_params(field_root='j142724+334246', fitter=['nnls', 'bounded'], prior=None, MW_EBV=0.00, pline=DITHERED_PLINE, fit_only_beams=True, run_fit=True, poly_order=7, fsps=True, sys_err=0.03, fcontam=0.2, zr=[0.05, 3.6], dz=[0.004, 0.0004], fwhm=1000, lorentz=False, include_photometry=False, save_file='fit_args.npy', **kwargs):
     """
     Generate a parameter dictionary for passing to the fitting script
     """
     import numpy as np
     from grizli import utils, fitting
+    from . import photoz
+    
     phot = None
     
     t0 = utils.load_templates(fwhm=fwhm, line_complexes=True, stars=False, full_line_list=None, continuum_list=None, fsps_templates=fsps, alf_template=True, lorentz=lorentz)
@@ -2287,6 +2296,30 @@ def generate_fit_params(field_root='j142724+334246', fitter=['nnls', 'bounded'],
 
     args = fitting.run_all(0, t0=t0, t1=t1, fwhm=1200, zr=zr, dz=dz, fitter=fitter, group_name=field_root, fit_stacks=False, prior=prior,  fcontam=fcontam, pline=pline, mask_sn_limit=np.inf, fit_beams=False,  root=field_root, fit_trace_shift=False, phot=phot, verbose=True, scale_photometry=False, show_beams=True, overlap_threshold=10, get_ir_psfs=True, fit_only_beams=fit_only_beams, MW_EBV=MW_EBV, sys_err=sys_err, get_dict=True)
     
+    if include_photometry:
+        aper_ix = include_photometry*1
+        utils.set_warnings()
+        
+        total_flux = 'flux_auto' 
+        obj = photoz.eazy_photoz(field_root, object_only=True,
+                  apply_prior=False, beta_prior=True, aper_ix=aper_ix-1, 
+                  force=True,
+                  get_external_photometry=False, compute_residuals=False, 
+                  total_flux=total_flux)
+        
+        cat = obj.cat
+        
+        #apcorr = cat['flux_iso']/(cat['flux_auto']*cat['tot_corr'])
+        apcorr = None
+        
+        phot_obj = photoz.EazyPhot(obj, grizli_templates=t0, 
+                                   source_text='grizli_HST_photometry', 
+                                   apcorr=apcorr,
+                                   include_photometry=True, include_pz=False)
+        
+        args['phot_obj'] = phot_obj
+        args['scale_photometry'] = True
+        
     np.save(save_file, [args])
     print('Saved arguments to {0}.'.format(save_file))
     return args
