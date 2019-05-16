@@ -945,7 +945,7 @@ class GroupFLT():
         
         return hdu, fig
     
-    def drizzle_grism_models(self, root='grism_model', kernel='square', scale=0.1, pixfrac=1):
+    def drizzle_grism_models(self, root='grism_model', kernel='square', scale=0.1, pixfrac=1, make_figure=True, fig_xsize=10):
         """
         Make model-subtracted drizzled images of each grism / PA
         
@@ -1016,7 +1016,45 @@ class GroupFLT():
                 header['PA'] = pa
                 pyfits.writeto(outfile, data=outsci, header=header, 
                                overwrite=True, output_verify='fix')
-          
+                
+                # Make figure
+                if make_figure:
+                    im = pyfits.open(outfile.replace('clean','sci'))[0].data
+                    im[im == 0] = np.nan
+                
+                    sh = im.shape
+                    yp, xp = np.indices(sh)
+                    mask = np.isfinite(im)
+                    xsl = slice(xp[mask].min()-10, xp[mask].max()+10)
+                    ysl = slice(yp[mask].min()-10, yp[mask].max()+10)
+                
+                    sh_aspect = (ysl.stop - ysl.start) / (xsl.stop - xsl.start)
+                
+                    fig = plt.figure(figsize=[fig_xsize, fig_xsize/2*sh_aspect])
+                
+                    ax = fig.add_subplot(121)
+                    ax.imshow(im[ysl, xsl], origin='lower', cmap='gray_r', vmin=-0.05, vmax=0.2)
+                             
+                    # Clean
+                    ax = fig.add_subplot(122)
+                    im = pyfits.open(outfile)[0].data
+                    im[im == 0] = np.nan
+                    ax.imshow(im[ysl, xsl], origin='lower', cmap='gray_r', vmin=-0.05, vmax=0.2)
+                
+                    for ax in fig.axes:
+                        ax.set_xticklabels([])
+                        ax.set_yticklabels([])
+                        ax.axis('off')
+                        
+                    fig.tight_layout(pad=0.)
+                    
+                    fig.text(0.5, 0.98, outfile.split('_grism')[0], color='k', 
+                             bbox=dict(facecolor='w', edgecolor='None'), 
+                             ha='center', va='top', transform=fig.transFigure)
+                    
+                    fig.savefig(outfile.split('_clean')[0]+'.png')
+                    plt.close(fig)
+                    
     def drizzle_full_wavelength(self, wave=1.4e4, ref_header=None,
                      kernel='point', pixfrac=1., verbose=True, 
                      offset=[0,0], fcontam=0.):
