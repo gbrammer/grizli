@@ -220,7 +220,8 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     ### Do scaling now with direct spectrum function
     if (scale_photometry > 0) & (phot is not None):
         try:
-            scl = mb.scale_to_photometry(z=0, method='lm', templates=t0, order=scale_photometry*1-1)
+            scl = mb.scale_to_photometry(z=0, method='lm', order=scale_photometry*1-1, tol=1.e-4, init=None, fit_background=True, Rspline=50, use_fit=True)
+            # tfit=None, tol=1.e-4, order=0, init=None, fit_background=True, Rspline=50, use_fit=True
         except:
             scl = [10.]
             
@@ -484,6 +485,8 @@ def full_sed_plot(mb, tfit, zfit=None, bin=1, minor=0.1, save='png', sed_resolut
     # Photometry 
     A_phot = mb._interpolate_photometry(z=tfit['z'], templates=t1)
     A_model = A_phot.T.dot(tfit['coeffs'])
+    A_model /= mb.photom_ext_corr
+    
     photom_mask = mb.photom_eflam > -98
     
     ##########
@@ -509,7 +512,7 @@ def full_sed_plot(mb, tfit, zfit=None, bin=1, minor=0.1, save='png', sed_resolut
         ax3 = fig.add_subplot(133)
     
     # Photometry SED
-    ax1.errorbar(np.log10(mb.photom_pivot[photom_mask]/1.e4), mb.photom_flam[photom_mask]/1.e-19, mb.photom_eflam[photom_mask]/1.e-19, color='k', alpha=0.6, marker='s', linestyle='None', zorder=30)
+    ax1.errorbar(np.log10(mb.photom_pivot[photom_mask]/1.e4), (mb.photom_flam/mb.photom_ext_corr)[photom_mask]/1.e-19, (mb.photom_eflam/mb.photom_ext_corr)[photom_mask]/1.e-19, color='k', alpha=0.6, marker='s', linestyle='None', zorder=30)
 
     sm = prospect.utils.smoothing.smoothspec(tfit['line1d'].wave, tfit['line1d'].flux, resolution=sed_resolution, smoothtype='R') #nsigma=10, inres=10)
 
@@ -1167,7 +1170,7 @@ class GroupFitter(object):
                
 
         
-    def set_photometry(self, flam=[], eflam=[], filters=[], lc=None, force=False, tempfilt=None, min_err=0.02, TEF=None, pz=None, source='unknown', **kwargs):
+    def set_photometry(self, flam=[], eflam=[], filters=[], ext_corr=1, lc=None, force=False, tempfilt=None, min_err=0.02, TEF=None, pz=None, source='unknown', **kwargs):
         """
         Add photometry
         """
@@ -1195,6 +1198,8 @@ class GroupFitter(object):
         
         self.photom_filters = filters
         self.photom_source = source
+        
+        self.photom_ext_corr = ext_corr
         
         self.sivarf = np.hstack([self.sivarf, 1/self.photom_eflam])
         self.weightf = np.hstack([self.weightf, np.ones_like(self.photom_eflam)])
@@ -2300,10 +2305,10 @@ class GroupFitter(object):
 
             spec_flux.append((np.array([spec.integrate_filter(filt, use_wave='templ') for filt in filters[okfilt]]).T*3.e18/lc[okfilt]**2).T)
 
-            flam.append(self.photom_flam[okfilt])
-            eflam.append(self.photom_eflam[okfilt])
+            flam.append((self.photom_flam/self.photom_ext_corr)[okfilt])
+            eflam.append((self.photom_eflam/self.photom_ext_corr)[okfilt])
 
-        if not flam:
+        if flam == []:
             return [0]
 
         spec_flux = np.vstack(spec_flux)
