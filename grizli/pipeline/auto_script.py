@@ -4144,14 +4144,22 @@ def make_report(root, gzipped_links=True, xsize=18, output_dpi=None, make_rgb=Tr
     column_files = glob.glob('*column.png')    
     if len(column_files) > 0:
         column_files.sort()
-        column_url = '<div>' + ' '.join(['<a href="./{0}"><img src="./{0}" height=100px></a>'.format(f.replace('+','%2B')) for f in column_files]) + '</div>'
+        column_url = '<div>' + ' '.join(['<a href="./{0}"><img src="./{0}" height=100px title="{1}"></a>'.format(f.replace('+','%2B'), f) for f in column_files]) + '</div>'
     else:
         column_url = ''
 
     grism_files = glob.glob('../Extractions/*grism*fits*')
     if len(grism_files) > 0:
         grism_files.sort()
-        grism_url = '<pre>'
+        grism_pngs = glob.glob('../Extractions/*grism*png')
+        if len(grism_pngs) > 0:
+            grism_pngs.sort()
+            grism_url = '<div>' + ' '.join(['<a href="./{0}"><img src="./{0}" width=400px title="{1}"></a>'.format(f.replace('+','%2B'), f) for f in grism_pngs]) + '</div>\n'
+        
+        else:
+            grism_url = ''
+            
+        grism_url += '<pre>'
         grism_url += '\n'.join(['<a href="./{0}">{1}</a>'.format(f.replace('+','%2B'), f) for f in grism_files])
         grism_url += '\n <a href=../Extractions/{0}-fit.html> {0}-fit.html </a>'.format(root)
         grism_url += '\n</pre>'
