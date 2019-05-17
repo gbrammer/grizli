@@ -590,6 +590,10 @@ def full_sed_plot(mb, tfit, zfit=None, bin=1, minor=0.1, save='png', sed_resolut
     ax2.yaxis.set_major_locator(MultipleLocator(tick_diff))
     #ax2.set_yticklabels([])
     
+    for ax in [ax1, ax2]:
+        if ax.get_ylim()[0] < 0:
+            ax.hlines(0, ax.get_xlim()[0], ax.get_xlim()[1], color='k', zorder=-100, alpha=0.3, linestyle='--')
+            
     ##########
     # P(z)
     if zfit is not None:
@@ -604,7 +608,8 @@ def full_sed_plot(mb, tfit, zfit=None, bin=1, minor=0.1, save='png', sed_resolut
         ax3.set_ylim(-3, 2.9) #np.log10(zfit['pdf']).max())
         ax3.set_ylabel(r'log $p(z)$')
         ax3.set_xlabel(r'$z$')
-
+        ax3.grid()
+        
     ax1.set_ylabel(r'$f_\lambda$ / $10^{-19}$')
 
     axt = ax2
