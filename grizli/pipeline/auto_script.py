@@ -593,8 +593,11 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
         grism_files.sort()
         
         catalog = glob.glob('{0}-*.cat.fits'.format(root))[0]
-        seg_file = glob.glob('{0}-*_seg.fits'.format(root))[0]
-
+        try:
+            seg_file = glob.glob('{0}-*_seg.fits'.format(root))[0]
+        except:
+            seg_file = None
+            
         grp = multifit.GroupFLT(grism_files=grism_files, direct_files=[], ref_file=None, seg_file=seg_file, catalog=catalog, cpu_count=-1, sci_extn=1, pad=256)
         
         # Make drizzle model images
