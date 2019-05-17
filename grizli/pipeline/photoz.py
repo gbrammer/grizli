@@ -377,21 +377,32 @@ class EazyPhot(object):
         phot = OrderedDict()
         apcorr_i = self.apcorr[ix[0]]
         
-        phot['source'] = self.source_text
+        try:
+            phot['source'] = self.source_text
+        except:
+            phot['source'] = 'unknown'
+            
         phot['flam'] = self.flam[ix[0],:]*1.e-19*apcorr_i
         phot['eflam'] = self.eflam[ix[0],:]*1.e-19*apcorr_i
         phot['filters'] = self.filters
         phot['tempfilt'] = self.tempfilt
-        phot['ext_corr'] = self.ext_corr
         
+        try:
+            phot['ext_corr'] = self.ext_corr
+        except:
+            phot['ext_corr'] = 1
+            
         if self.include_pz & (self.pz is not None):
             pz = (self.zgrid, self.pz[ix[0],:].flatten())
         else:
             pz = None
         
         phot['pz'] = pz
-        phot['z_spec'] = self.z_spec[ix[0]]
-        
+        try:
+            phot['z_spec'] = self.z_spec[ix[0]]
+        except:
+            phot['z_spec'] = -1
+            
         if not self.include_photometry:
             phot['flam'] = None
             
