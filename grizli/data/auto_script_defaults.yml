@@ -175,6 +175,7 @@ grism_prep_args:
     refine_poly_order: 3
     refine_fcontam: 0.5
     ds9: null
+    mask_mosaic_edges: True
 
 run_extractions: False 
 include_photometry_in_fit: False

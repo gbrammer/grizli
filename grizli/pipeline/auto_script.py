@@ -1990,7 +1990,7 @@ def load_GroupFLT(field_root='j142724+334246', force_ref=None, force_seg=None, f
                 
         return [grp]
     
-def grism_prep(field_root='j142724+334246', ds9=None, refine_niter=3, gris_ref_filters=GRIS_REF_FILTERS, files=None, split_by_grism=True, refine_poly_order=1, refine_fcontam=0.5):
+def grism_prep(field_root='j142724+334246', ds9=None, refine_niter=3, gris_ref_filters=GRIS_REF_FILTERS, files=None, split_by_grism=True, refine_poly_order=1, refine_fcontam=0.5, mask_mosaic_edges=True):
     """
     Contamination model for grism exposures
     """
@@ -2018,6 +2018,20 @@ def grism_prep(field_root='j142724+334246', ds9=None, refine_niter=3, gris_ref_f
         # Save model to avoid having to recompute it again
         grp.save_full_data()
     
+        #############
+        # Mask edges of the exposures not covered by reference image
+        if mask_mosaic_edges:
+            try:
+                # Read footprint file created ealier
+                fp_file = '{0}-ir.npy'.format(field_root)
+                det_poly = np.load(fp_file)[0]['footprint']
+                for flt in grp.FLTs:
+                    flt.mask_mosaic_edges(sky_poly=det_poly, verbose=True, 
+                                          dq_mask=False, dq_value=1024,
+                                          err_scale=10, resid_sn=-1)
+            except:
+                pass
+                
         ################
         # Remove constant modal background 
         import scipy.stats
@@ -2059,9 +2073,14 @@ def grism_prep(field_root='j142724+334246', ds9=None, refine_niter=3, gris_ref_f
             if ds9:
                 ds9.set('frame {0}'.format(int(fr)+iter+1))
         
+            if (iter == 0) & (refine_niter > 0):
+                refine_i = 1
+            else:
+                refine_i = refine_fcontam
+                
             grp.refine_list(poly_order=refine_poly_order, mag_limits=[18, 24],
                             max_coeff=5, ds9=ds9, verbose=True, 
-                            fcontam=refine_fcontam)
+                            fcontam=refine_i)
 
         ##############
         # Save model to avoid having to recompute it again
@@ -2081,7 +2100,7 @@ DITHERED_PLINE = {'kernel': 'point', 'pixfrac': 0.2, 'pixscale': 0.1, 'size': 8,
 PARALLEL_PLINE = {'kernel': 'square', 'pixfrac': 1.0, 'pixscale': 0.1, 'size': 8, 'wcs': None}
 
   
-def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00, ids=[], pline=DITHERED_PLINE, fit_only_beams=True, run_fit=True, poly_order=7, master_files=None, grp=None, bad_pa_threshold=None, fit_trace_shift=False, size=32, diff=True, min_sens=0.02, skip_complete=True, fit_args={}, args_file='fit_args.npy'):
+def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00, ids=[], pline=DITHERED_PLINE, fit_only_beams=True, run_fit=True, poly_order=7, oned_R=30, master_files=None, grp=None, bad_pa_threshold=None, fit_trace_shift=False, size=32, diff=True, min_sens=0.02, fcontam=0.2, min_mask=0.01, sys_err=0.03, skip_complete=True, fit_args={}, args_file='fit_args.npy'):
     import glob
     import os
     
@@ -2153,8 +2172,17 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
         ids = [int(id) for id in ids]
         
     # Stack the different beans
-    wave = np.linspace(2000,2.5e4,100)
-    poly_templates = utils.polynomial_templates(wave, order=poly_order)
+    
+    # Use "binning" templates for standardized extraction
+    if oned_R:
+        bin_steps, step_templ = utils.step_templates(wlim=[5000, 18000.0], 
+                                                     R=oned_R, round=10)  
+        init_templates = step_templ                                             
+    else:
+        # Polynomial templates
+        wave = np.linspace(2000,2.5e4,100)
+        poly_templ = utils.polynomial_templates(wave, order=poly_order)
+        init_templates = poly_templ
         
     #size = 32
     close = True
@@ -2214,25 +2242,34 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
                     pass
                     
         try:
-            pfit = mb.template_at_z(z=0, templates=poly_templates, fit_background=True, fitter='lstsq', get_uncertainties=2)
+            tfit = mb.template_at_z(z=0, templates=init_templates, fit_background=True, fitter='lstsq', get_uncertainties=2)
         except:
-            pfit = None
+            tfit = None
     
-        if False:
-            # Use spline for first-pass continuum fit
-            wspline = np.arange(4200, 2.5e4)
-            Rspline = 10
-            df_spl = len(utils.log_zgrid(zr=[wspline[0], wspline[-1]], dz=1./Rspline))
-            tspline = utils.bspline_templates(wspline, df=df_spl+2, log=True, clip=0.0001)
-            pfit = mb.template_at_z(z=0, templates=tspline, fit_background=True, fitter='lstsq', get_uncertainties=2)
+        # if False:
+        #     # Use spline for first-pass continuum fit
+        #     wspline = np.arange(4200, 2.5e4)
+        #     Rspline = 10
+        #     df_spl = len(utils.log_zgrid(zr=[wspline[0], wspline[-1]], dz=1./Rspline))
+        #     tspline = utils.bspline_templates(wspline, df=df_spl+2, log=True, clip=0.0001)
+        #     pfit = mb.template_at_z(z=0, templates=tspline, fit_background=True, fitter='lstsq', get_uncertainties=2)
             
         try:
-            fig1 = mb.oned_figure(figsize=[5,3], tfit=pfit, show_beams=show_beams, scale_on_stacked=True)
-            fig1.savefig('{0}_{1:05d}.1D.png'.format(target, id))
+            fig1 = mb.oned_figure(figsize=[5,3], tfit=tfit, show_beams=show_beams, scale_on_stacked=True, ylim_percentile=5)
+            if oned_R:
+                outroot='{0}_{1:05d}.R{2:.0f}'.format(target, id, oned_R)
+                mb.oned_spectrum_to_hdu(outputfile=outroot+'.fits', tfit=tfit,
+                                        wave=bin_steps)                     
+            else:
+                outroot='{0}_{1:05d}.1D'.format(target, id)
+                mb.oned_spectrum_to_hdu(outputfile=outroot+'.fits', tfit=tfit)
+                
+            fig1.savefig(outroot+'.png')
+            
         except:
             continue
    
-        hdu, fig = mb.drizzle_grisms_and_PAs(fcontam=0.5, flambda=False, kernel='point', size=32, zfit=pfit, diff=diff)
+        hdu, fig = mb.drizzle_grisms_and_PAs(fcontam=0.5, flambda=False, kernel='point', size=32, zfit=tfit, diff=diff)
         fig.savefig('{0}_{1:05d}.stack.png'.format(target, id))
 
         hdu.writeto('{0}_{1:05d}.stack.fits'.format(target, id), 
@@ -3011,9 +3048,23 @@ def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140
         
         filter_groups[filt]['files'].extend(visit['files'])
         
+        # Add polygon
+        if 'footprints' in visit:
+            for fp in visit['footprints']:
+                if 'footprint' in filter_groups[filt]:
+                    filter_groups[filt]['footprint'] = filter_groups[filt]['footprint'].union(fp)
+                else:
+                    filter_groups[filt]['footprint'] = fp.buffer(0)
+                    
         if filt.upper() in filters:
             wfc3ir['files'].extend(visit['files'])
-    
+            if 'footprint' in filter_groups[filt]:
+                fp_i = filter_groups[filt]['footprint']
+                if 'footprint' in wfc3ir:
+                    wfc3ir['footprint'] = wfc3ir['footprint'].union(fp_i)
+                else:
+                    wfc3ir['footprint'] = fp_i.buffer(0)
+                
     if len(filter_groups) == 0:
         print('No filters found ({0})'.format(filters))
         return None
@@ -3041,7 +3092,9 @@ def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140
         inst_keys = np.unique([os.path.basename(file)[0] for file in wfc3ir['files']])
         
         prep.drizzle_overlaps([wfc3ir], parse_visits=False, pixfrac=pixfrac, scale=scale, skysub=False, bits=bits, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False, context=context, static=(static & (len(inst_keys) == 1)), include_saturated=include_saturated)
-    
+        
+        np.save('{0}.npy'.format(wfc3ir['product']), [wfc3ir])
+        
     if drizzle_filters:        
         prep.drizzle_overlaps(keep, parse_visits=False, pixfrac=pixfrac, scale=scale, skysub=skysub, skymethod=skymethod, bits=bits, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False, context=context, static=static, include_saturated=include_saturated)
 
@@ -3166,7 +3219,7 @@ def make_combined_mosaics(root, fix_stars=False, mask_spikes=False, skip_single_
     for file in [wcs_ref_optical, wcs_ref_file]:
         if os.path.exists(file):
             os.remove(file)
-            
+
 def make_mosaic_footprints(field_root):
     """
     Make region files where wht images nonzero
@@ -4318,9 +4371,15 @@ def exposure_report(root, log=True):
     tab['RA_TARG'].format = '.6f'
     tab['DEC_TARG'].format = '.6f'
     
+    # Turn fileinto a URL
+    file_urls = ['<a href="./{0}">{0}</a>'.format(f) for f in tab['FILE']]
+    tab['FLT'] = file_urls
+    
+    cols = ['FLT']+tab.colnames[1:-1]
+    
     fp = open('{0}_exposures.json'.format(root),'w')
     json.dump(flt_dict, fp)
     fp.close()
     
-    tab.write_sortable_html('{0}.exposures.html'.format(root), replace_braces=True, localhost=False, max_lines=1e5, table_id=None, table_class='display compact', css=None, filter_columns=[], buttons=['csv'], toggle=True, use_json=False)
+    tab[cols].write_sortable_html('{0}.exposures.html'.format(root), replace_braces=True, localhost=False, max_lines=1e5, table_id=None, table_class='display compact', css=None, filter_columns=[], buttons=['csv'], toggle=True, use_json=False)
     
