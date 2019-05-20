@@ -2308,6 +2308,27 @@ def split_spline_template(templ, wavelength_range=[5000,2.4e4], Rspline=10, log=
     stemp.knots = knots
     
     return stemp
+
+def step_templates(wlim=[5000, 1.8e4], R=30, round=10):
+    """
+    Step-function templates for easy binning
+    """
+    bin_steps = np.round(log_zgrid(wlim, 1./R)/round)*round
+    
+    ds = np.diff(bin_steps)
+    xspec = np.arange(wlim[0]-ds[0], wlim[1]+ds[-1])
+    
+    bin_mid = bin_steps[:-1]+ds/2.
+    
+    step_templ = {}
+    for i in range(len(bin_steps)-1):
+        label = 'step {0:.0f}'.format(bin_mid[i])
+        yspec = ((xspec >= bin_steps[i]) & (xspec < bin_steps[i+1]))*1        
+        step_templ[label] = SpectrumTemplate(wave=xspec, flux=yspec,
+                                             name=label)
+    
+    return bin_steps, step_templ
+    
 def polynomial_templates(wave, order=0, line=False):
     temp = OrderedDict()  
     if line:
