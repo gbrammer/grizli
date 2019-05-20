@@ -92,6 +92,8 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     from grizli.stack import StackFitter
     from grizli.multifit import MultiBeam
     
+    from .version import __version__ as grizli__version
+    
     if get_dict:
         frame = inspect.currentframe()
         args = inspect.getargvalues(frame).locals
@@ -396,7 +398,9 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     exptime = mb.compute_exptime()
     for k in exptime:
         line_hdu[0].header['T_{0}'.format(k)] = (exptime[k], 'Total exposure time [s]')
-         
+    
+    line_hdu[0].header['GRIZLIV'] = (grizli__version, 'Grizli version')
+       
     line_hdu.insert(1, fit_hdu)
     line_hdu.insert(2, cov_hdu)
     if fit_beams:
@@ -407,11 +411,14 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     
     # 1D spectrum
     oned_hdul = mb.oned_spectrum_to_hdu(tfit=tfit, bin=1, outputfile='{0}_{1:05d}.1D.fits'.format(group_name, id), loglam=loglam_1d)#, units=units1d)
+    oned_hdul[0].header['GRIZLIV'] = (grizli__version, 'Grizli version')
     
     if save_stack:
         hdu, fig = mb.drizzle_grisms_and_PAs(fcontam=fcontam, flambda=False, 
                                              kernel='point', size=32, 
                                              zfit=tfit, diff=True)
+
+        hdu[0].header['GRIZLIV'] = (grizli__version, 'Grizli version')
                                              
         fig.savefig('{0}_{1:05d}.stack.png'.format(group_name, id))
 
@@ -2937,7 +2944,7 @@ class GroupFitter(object):
             specified in `~grizli.utils.GRISM_LIMITS`.
         
         wave : `~numpy.ndarray`, None
-            Wavelength array.  If `None`, then compute from parameters in 
+            Wavelength bin edges.  If `None`, then compute from parameters in 
             `~grizli.utils.GRISM_LIMITS`.
             
         ivar : `~numpy.ndarray`, None
@@ -3002,19 +3009,28 @@ class GroupFitter(object):
             if wave is None:
                 if loglam:
                     ran = np.array(lim[:2])*1.e4
+                    ran[1] += lim[2]*bin
                     wave_bin = utils.log_zgrid(ran, lim[2]*bin/np.mean(ran))
                 else:
-                    wave_bin = np.arange(lim[0]*1.e4, lim[1]*1.e4, lim[2]*bin)
+                    wave_bin = np.arange(lim[0]*1.e4, lim[1]*1.e4+lim[2]*bin, 
+                                         lim[2]*bin)
             else:
                 wave_bin = wave
                 
-            flux_bin = wave_bin*0.
-            var_bin = wave_bin*0.
-        
-            for j in range(len(wave_bin)):
-                ix = np.abs(self.wave_mask-wave_bin[j]) < lim[2]*bin/2.
+            flux_bin = wave_bin[:-1]*0.
+            var_bin = wave_bin[:-1]*0.
+            n_bin = wave_bin[:-1]*0.
+            
+            for j in range(len(wave_bin)-1):
+                #ix = np.abs(self.wave_mask-wave_bin[j]) < lim[2]*bin/2.
+                
+                # Wavelength bin
+                ix = (self.wave_mask >= wave_bin[j]) 
+                ix *= (self.wave_mask < wave_bin[j+1])
                 ix &= self.grism_name_mask == grism
+                
                 if ix.sum() > 0:
+                    n_bin[j] = ix.sum()
                     if trace_limits is None:
                         var_bin[j] = 1./den[ix].sum()
                         flux_bin[j] = num[ix].sum()*var_bin[j]
@@ -3023,9 +3039,10 @@ class GroupFitter(object):
                         flux_bin[j] = num[ix].sum()
                         
             binned_spectrum = utils.GTable()
-            binned_spectrum['wave'] = wave_bin*u.Angstrom
+            binned_spectrum['wave'] = (wave_bin[:-1]+np.diff(wave_bin)/2)*u.Angstrom
             binned_spectrum['flux'] = flux_bin*(u.electron/u.second)
             binned_spectrum['err'] = np.sqrt(var_bin)*(u.electron/u.second)
+            binned_spectrum['npix'] = np.cast[int](n_bin)
             
             binned_spectrum.meta['BIN'] = (bin, 'Spectrum binning')
             
