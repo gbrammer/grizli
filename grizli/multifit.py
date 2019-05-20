@@ -3827,7 +3827,8 @@ class MultiBeam(GroupFitter):
             for pa in self.PA[g]:
                 beams = [self.beams[i] for i in self.PA[g][pa]]
                 mb_i = MultiBeam(beams, fcontam=self.fcontam,
-                                 sys_err=self.sys_err)
+                                 sys_err=self.sys_err, min_sens=self.min_sens,
+                                 min_mask=self.min_mask, MW_EBV=self.MW_EBV)
                               
                 try:
                     chi2, _, _, _ = mb_i.xfit_at_z(z=0,
