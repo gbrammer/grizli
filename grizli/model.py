@@ -3306,7 +3306,57 @@ class GrismFLT(object):
             self.catalog = self.blot_catalog(self.catalog, 
                           sextractor=('X_WORLD' in self.catalog.colnames))
     
-    def make_edge_mask(self, scale=3, force=False):
+    def mask_mosaic_edges(self, sky_poly=None, verbose=True, force=False, err_scale=10, dq_mask=False, dq_value=1024, resid_sn=7):
+        """
+        Mask edges of exposures that might not have modeled spectra
+        """
+        import pyregion
+        import scipy.ndimage as nd
+        
+        if (self.has_edge_mask) & (force == False):
+            return True
+        
+        if sky_poly is None:
+            return True
+                    
+        xy_image = self.grism.wcs.all_world2pix(np.array(sky_poly.boundary.xy).T, 0)
+        
+        # Calculate edge for mask
+        #xedge = 100
+        x0 = 0
+        y0 = (self.grism.sh[0]-2*self.pad)/2
+        dx = np.arange(500)
+        tr_y, tr_lam = self.conf.get_beam_trace(x0, y0, dx=dx, beam='A')
+        tr_sens = np.interp(tr_lam, self.conf.sens['A']['WAVELENGTH'], 
+                                   self.conf.sens['A']['SENSITIVITY'], 
+                                   left=0, right=0)
+        
+        xedge = dx[tr_sens > tr_sens.max()*0.05].max()  
+                
+        xy_image[:,0] += xedge
+        
+        xy_str = 'image;polygon('+','.join(['{0:.1f}'.format(p) for p in xy_image.flatten()])+')'
+        reg = pyregion.parse(xy_str)
+        mask = reg.get_mask(shape=tuple(self.grism.sh))*1 == 0
+        
+        # Only mask large residuals
+        if resid_sn > 0:
+            resid_mask = (self.grism['SCI'] - self.model) > resid_sn*self.grism['ERR'] 
+            resid_mask = nd.binary_dilation(resid_mask, iterations=3)
+            mask &= resid_mask
+            
+        if dq_mask:
+            self.grism.data['DQ'] |= dq_value*mask
+            if verbose:
+                print('# mask mosaic edges: {0} ({1}, {2} pix) DQ={3:.0f}'.format(self.grism.parent_file, self.grism.filter, xedge, dq_value))
+        else:
+            self.grism.data['ERR'][mask] *= err_scale
+            if verbose:
+                print('# mask mosaic edges: {0} ({1}, {2} pix) err_scale={3:.1f}'.format(self.grism.parent_file, self.grism.filter, xedge, err_scale))
+            
+        self.has_edge_mask = True
+    
+    def old_make_edge_mask(self, scale=3, force=False):
         """Make a mask for the edge of the grism FoV that isn't covered by the direct image
         
         Parameters
