@@ -989,7 +989,7 @@ class GroupFLT():
                 clean_list = [self.FLTs[i].grism['SCI']-self.FLTs[i].model 
                                  for i in idx]
 
-                wht_list = [1/self.FLTs[i].grism['ERR']**2 for i in idx]
+                wht_list = [(self.FLTs[i].grism['DQ'] == 0)/self.FLTs[i].grism['ERR']**2 for i in idx]
                 for i in range(N):
                     mask = ~np.isfinite(wht_list[i])
                     wht_list[i][mask] = 0
