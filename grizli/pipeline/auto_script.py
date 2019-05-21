@@ -4258,8 +4258,8 @@ def make_report(root, gzipped_links=True, xsize=18, output_dpi=None, make_rgb=Tr
         grism_url += '<pre>'
         grism_url += '\n'.join(['<a href="./{0}">{1}</a>'.format(f.replace('+','%2B'), f) for f in grism_files])
         grism_url += '\n <a href=../Extractions/{0}-fit.html> {0}-fit.html </a>'.format(root)
+        grism_url += '\n <a href="../Extractions/{0}_zhist.png"><img src="../Extractions/{0}_zhist.png" width=400px title="{0}_zhist.png"> </a>'.format(root)
         grism_url += '\n</pre>'
-        grism_url += '\n <a href="../Extractions/{0}_zhist.png"><img src= href="../Extractions/{0}_zhist.png" width=400px title="{0}_zhist.png"> </a>'.format(root)
         if gzipped_links:
             grism_url = grism_url.replace('.fits','.fits.gz')
         
