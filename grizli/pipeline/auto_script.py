@@ -976,7 +976,7 @@ def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=
         for i, visit in enumerate(visits):
             print('{0} {1} {2}'.format(i, visit['product'], len(visit['files'])))
             
-    elif (combine_minexp > 0) & (not has_grism)):
+    elif (combine_minexp > 0) & (not has_grism):
         combined = []
         for visit in visits:
             if len(visit['files']) > combine_minexp*1:
