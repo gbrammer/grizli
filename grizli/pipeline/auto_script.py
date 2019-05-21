@@ -207,6 +207,7 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
        only_preprocess=False,
        overwrite_fit_params=False,
        grism_prep_args=args['grism_prep_args'],
+       refine_with_fits=True, 
        run_extractions=False,
        include_photometry_in_fit=False,
        extract_args=args['extract_args'],
@@ -586,6 +587,14 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
     ### Grism extractions
     os.chdir(os.path.join(HOME_PATH, root, 'Extractions'))
     
+    #####################
+    # Update the contam model with the "full.fits" 
+    # files in the working directory
+    if (len(glob.glob('*full.fits')) > 0) & (refine_with_fits):
+        auto_script.refine_model_with_fits(field_root=root, clean=True, 
+                                           grp=None, master_files=None, 
+                                           spectrum='continuum') 
+
     # Drizzled grp objects
     # All files
     if len(glob.glob('{0}*_grism*fits*'.format(root))) == 0:
@@ -2104,7 +2113,63 @@ def grism_prep(field_root='j142724+334246', ds9=None, refine_niter=3, gris_ref_f
 DITHERED_PLINE = {'kernel': 'point', 'pixfrac': 0.2, 'pixscale': 0.1, 'size': 8, 'wcs': None}
 PARALLEL_PLINE = {'kernel': 'square', 'pixfrac': 1.0, 'pixscale': 0.1, 'size': 8, 'wcs': None}
 
-  
+def refine_model_with_fits(field_root='j142724+334246', grp=None, master_files=None, spectrum='continuum', clean=True):
+    """
+    """
+    import glob
+    import traceback
+    
+    try:
+        from .. import multifit
+    except:
+        from grizli import multifit
+    
+    if grp is None:
+        if master_files is None:
+            master_files = glob.glob('*GrismFLT.fits')
+            master_files.sort()
+        
+        catalog = glob.glob('{0}-*.cat.fits'.format(field_root))[0]
+        try:
+            seg_file = glob.glob('{0}-*_seg.fits'.format(field_root))[0]
+        except:
+            seg_file = None
+            
+        grp = multifit.GroupFLT(grism_files=master_files, direct_files=[], ref_file=None, seg_file=seg_file, catalog=catalog, cpu_count=-1, sci_extn=1, pad=256)
+        
+    fit_files = glob.glob('*full.fits')
+    fit_files.sort()
+    N = len(fit_files)
+    if N == 0:
+        return False
+        
+    for i, file in fit_files:
+        try:
+            hdu = pyfits.open(file)
+            id = hdu[0].header['ID']
+            sp = utils.GTable(hdu['TEMPL'].data)
+            dt = np.float
+            wave = np.cast[dt](sp['wave'])#.byteswap()
+            flux = np.cast[dt](sp[spectrum])#.byteswap()
+            grp.compute_single_model(int(id), mag=19, size=-1, store=False,
+                                     spectrum_1d=[wave, flux], is_cgs=True, 
+                                     get_beams=None, in_place=True)
+            print('Refine model: {0}'.format(file))
+        except:
+            print('Refine model: {0} (failed)'.format(file))
+    
+    grp.save_full_data()
+    
+    if clean:
+        print('# refine_model_with_fits: cleanup')
+        files = glob.glob('*_grism_*fits')
+        files += glob.glob('*beams.fits')
+        files += glob.glob('*full.fits')
+        for file in files:
+            os.remove(file)
+    
+    del(grp)
+    
 def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00, ids=[], pline=DITHERED_PLINE, fit_only_beams=True, run_fit=True, poly_order=7, oned_R=30, master_files=None, grp=None, bad_pa_threshold=None, fit_trace_shift=False, size=32, diff=True, min_sens=0.02, fcontam=0.2, min_mask=0.01, sys_err=0.03, skip_complete=True, fit_args={}, args_file='fit_args.npy'):
     import glob
     import os

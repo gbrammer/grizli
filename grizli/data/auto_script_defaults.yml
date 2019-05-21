@@ -177,6 +177,7 @@ grism_prep_args:
     ds9: null
     mask_mosaic_edges: True
 
+refine_with_fits: False
 run_extractions: False 
 include_photometry_in_fit: False
  
