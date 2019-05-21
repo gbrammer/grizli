@@ -1863,6 +1863,8 @@ class GroupFitter(object):
         # Normalize PDF
         pdf /= np.trapz(pdf, fit['zgrid'])
         
+        pdf = np.maximum(pdf, 1.e-40)
+        
         # Interpolate pdf for more continuous measurement
         spl = scipy.interpolate.Akima1DInterpolator(fit['zgrid'], np.log(pdf), axis=1)
         zfine = utils.log_zgrid(zr=[fit['zgrid'].min(), fit['zgrid'].max()], dz=0.0001)
