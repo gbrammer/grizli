@@ -954,6 +954,11 @@ def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=
         
     visits, filters = utils.parse_flt_files(info=info, uniquename=True, get_footprint=True, use_visit=use_visit)
     
+    # Don't run combine_minexp if have grism exposures
+    grisms = ['G141', 'G102', 'G800L', 'G280']
+    has_grism = utils.column_string_operation(info['FILTER'], grisms, 
+                                              'count', 'or').sum() 
+    
     if combine_same_pa:
         combined = {}
         for visit in visits:
@@ -971,7 +976,7 @@ def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=
         for i, visit in enumerate(visits):
             print('{0} {1} {2}'.format(i, visit['product'], len(visit['files'])))
             
-    elif combine_minexp:
+    elif (combine_minexp > 0) & (not has_grism)):
         combined = []
         for visit in visits:
             if len(visit['files']) > combine_minexp*1:
@@ -2524,10 +2529,12 @@ def summary_catalog(field_root='', dzbin=0.01, use_localhost=True, filter_bandpa
     for i in range(len(cols))[::-1]:
         if cols[i] not in fit.colnames:
             cols.pop(i)
-            
-    fit[cols].write_sortable_html(field_root+'-fit.html', replace_braces=True, localhost=use_localhost, max_lines=50000, table_id=None, table_class='display compact', css=None)
+    
+    filter_columns = ['ra', 'dec', 'mag_auto', 't_g800l', 't_g102', 't_g141', 'z_map', 'chinu', 'bic_diff', 'zwidth1', 'stellar_mass', 'ssfr']
+    
+    fit[cols].write_sortable_html(field_root+'-fit.html', replace_braces=True, localhost=use_localhost, max_lines=50000, table_id=None, table_class='display compact', css=None, filter_columns=filter_columns)
         
-    fit[cols][clip].write_sortable_html(field_root+'-fit.zq.html', replace_braces=True, localhost=use_localhost, max_lines=50000, table_id=None, table_class='display compact', css=None)
+    fit[cols][clip].write_sortable_html(field_root+'-fit.zq.html', replace_braces=True, localhost=use_localhost, max_lines=50000, table_id=None, table_class='display compact', css=None, filter_columns=filter_columns)
     
     zstr = ['{0:.3f}'.format(z) for z in fit['z_map'][clip]]
     prep.table_to_regions(fit[clip], output=field_root+'-fit.zq.reg', comment=zstr)
@@ -4252,6 +4259,7 @@ def make_report(root, gzipped_links=True, xsize=18, output_dpi=None, make_rgb=Tr
         grism_url += '\n'.join(['<a href="./{0}">{1}</a>'.format(f.replace('+','%2B'), f) for f in grism_files])
         grism_url += '\n <a href=../Extractions/{0}-fit.html> {0}-fit.html </a>'.format(root)
         grism_url += '\n</pre>'
+        grism_url += '\n <a href="../Extractions/{0}_zhist.png"><img src= href="../Extractions/{0}_zhist.png" width=400px title="{0}_zhist.png"> </a>'.format(root)
         if gzipped_links:
             grism_url = grism_url.replace('.fits','.fits.gz')
         

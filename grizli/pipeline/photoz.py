@@ -629,7 +629,9 @@ def show_all_thumbnails(label='j022708p4901_00273', filters=['f775w','f814w','f0
     Show individual filter and RGB thumbnails
     """
     from astropy.visualization import make_lupton_rgb
-    from PIL import Image
+    import matplotlib.pyplot as plt
+    
+    #from PIL import Image
     
     ims = {}
     for filter in filters:
@@ -642,7 +644,8 @@ def show_all_thumbnails(label='j022708p4901_00273', filters=['f775w','f814w','f0
     if close:
         plt.close()
     
-    rgb = np.array(Image.open('{0}.rgb.png'.format(label)))
+    #rgb = np.array(Image.open('{0}.rgb.png'.format(label)))
+    rgb = plt.imread('{0}.rgb.png'.format(label))
     
     NX = (len(filters)+1)
     fig = plt.figure(figsize=[1.5*NX,1.5])
