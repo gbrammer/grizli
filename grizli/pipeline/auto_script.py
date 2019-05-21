@@ -2143,7 +2143,7 @@ def refine_model_with_fits(field_root='j142724+334246', grp=None, master_files=N
     if N == 0:
         return False
         
-    for i, file in fit_files:
+    for i, file in enumerate(fit_files):
         try:
             hdu = pyfits.open(file)
             id = hdu[0].header['ID']
@@ -2154,9 +2154,9 @@ def refine_model_with_fits(field_root='j142724+334246', grp=None, master_files=N
             grp.compute_single_model(int(id), mag=19, size=-1, store=False,
                                      spectrum_1d=[wave, flux], is_cgs=True, 
                                      get_beams=None, in_place=True)
-            print('Refine model: {0}'.format(file))
+            print('Refine model ({0}/{1}): {2}'.format(i, N, file))
         except:
-            print('Refine model: {0} (failed)'.format(file))
+            print('Refine model ({0}/{1}): {2} / failed'.format(i, N, file))
     
     grp.save_full_data()
     
