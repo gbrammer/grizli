@@ -2164,6 +2164,8 @@ def refine_model_with_fits(field_root='j142724+334246', grp=None, master_files=N
         print('# refine_model_with_fits: cleanup')
         files = glob.glob('*_grism_*fits')
         files += glob.glob('*beams.fits')
+        files += glob.glob('*stack.fits')
+        files += glob.glob('*stack.png')
         files += glob.glob('*full.fits')
         for file in files:
             os.remove(file)
