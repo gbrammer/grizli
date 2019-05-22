@@ -2621,7 +2621,7 @@ def summary_catalog(field_root='', dzbin=0.01, use_localhost=True, filter_bandpa
     fig.tight_layout(pad=0.2)
     fig.savefig('{0}_zhist.png'.format(field_root))
 
-    cols = ['root', 'mtime', 'idx','ra', 'dec', 'mag_auto', 't_g800l', 't_g102', 't_g141', 'z_map', 'chinu', 'bic_diff', 'zwidth1', 'stellar_mass', 'ssfr', 'png_stack', 'png_full', 'png_thumb', 'png_line']
+    cols = ['root', 'mtime', 'idx','ra', 'dec', 'mag_auto', 't_g800l', 't_g102', 't_g141', 'z_map', 'chinu', 'bic_diff', 'zwidth1', 'stellar_mass', 'ssfr', 'png_stack', 'png_full', 'png_rgb', 'png_line']
     
     for i in range(len(cols))[::-1]:
         if cols[i] not in fit.colnames:
@@ -3865,7 +3865,8 @@ def make_rgb_thumbnails(root='j140814+565638', ids=None, maglim=21,
         ix = cat[id_column] == id        
         label = '{0}_{1:05d}'.format(root, id)
         
-        if skip & os.path.exists('{0}.thumb.png'.format(label)):
+        thumb_files = glob.glob('../*/{0}.thumb.png'.format(label))
+        if (skip) & (len(thumb_files) > 0):
             print('\n##\n## RGB thumbnail {0}  ({1}/{2})\n##'.format(label, i+1, N))
             continue
                 
