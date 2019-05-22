@@ -815,8 +815,8 @@ def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat',
         info['png_{0}'.format(ext)] = ['<a href={0}><img src={0} height=200></a>'.format(p) for p in png]
     
     # Thumbnails
-    png = ['../Thumbnails/{0}_{1:05d}.{2}.png'.format(root, id, 'thumb') for root, id in zip(info['root'], info['id'])]
-    info['png_{0}'.format('thumb')] = ['<a href={0}><img src={0} height=200></a>'.format(p) for p in png]
+    png = ['../Thumbnails/{0}_{1:05d}.{2}.png'.format(root, id, 'rgb') for root, id in zip(info['root'], info['id'])]
+    info['png_{0}'.format('rgb')] = ['<a href={1}><img src={0} height=200></a>'.format(p, p.replace('.rgb.png', '.thumb.fits')) for p in png]
     
     ### Column formats
     for col in info.colnames:
