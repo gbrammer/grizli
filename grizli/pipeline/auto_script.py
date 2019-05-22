@@ -665,7 +665,7 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
         
         if not os.path.exists('../Thumbnails'):
             os.mkdir('../Thumbnails/')
-            os.system('mv {0}_[0-8]*.[rt][gh][bu]* ../Thumbnails/'.format(root))
+            os.system('mv {0}_[0-9]*.[rt][gh][bu]* ../Thumbnails/'.format(root))
             
     if extract_args['run_fit']:
         os.chdir(os.path.join(HOME_PATH, root, 'Extractions'))
@@ -2629,9 +2629,9 @@ def summary_catalog(field_root='', dzbin=0.01, use_localhost=True, filter_bandpa
     
     filter_columns = ['ra', 'dec', 'mag_auto', 't_g800l', 't_g102', 't_g141', 'z_map', 'chinu', 'bic_diff', 'zwidth1', 'stellar_mass', 'ssfr']
     
-    fit[cols].write_sortable_html(field_root+'-fit.html', replace_braces=True, localhost=use_localhost, max_lines=50000, table_id=None, table_class='display compact', css=None, filter_columns=filter_columns)
+    fit[cols].write_sortable_html(field_root+'-fit.html', replace_braces=True, localhost=use_localhost, max_lines=50000, table_id=None, table_class='display compact', css=None, filter_columns=filter_columns, use_json=(not use_localhost))
         
-    fit[cols][clip].write_sortable_html(field_root+'-fit.zq.html', replace_braces=True, localhost=use_localhost, max_lines=50000, table_id=None, table_class='display compact', css=None, filter_columns=filter_columns)
+    fit[cols][clip].write_sortable_html(field_root+'-fit.zq.html', replace_braces=True, localhost=use_localhost, max_lines=50000, table_id=None, table_class='display compact', css=None, filter_columns=filter_columns, use_json=(not use_localhost))
     
     zstr = ['{0:.3f}'.format(z) for z in fit['z_map'][clip]]
     prep.table_to_regions(fit[clip], output=field_root+'-fit.zq.reg', comment=zstr)
