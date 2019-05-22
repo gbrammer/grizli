@@ -3818,7 +3818,7 @@ DRIZZLER_ARGS = {'aws_bucket':False,
                
 def make_rgb_thumbnails(root='j140814+565638', ids=None, maglim=21,
                         drizzler_args=DRIZZLER_ARGS, use_line_wcs=False,
-                        remove_fits=False, skip=True, 
+                        remove_fits=False, skip=True, min_filters=2, 
                         auto_size=False, size_limits=[4, 15], mag=None):
     """
     Make RGB thumbnails in working directory
@@ -3829,6 +3829,16 @@ def make_rgb_thumbnails(root='j140814+565638', ids=None, maglim=21,
     phot_cat = glob.glob('../Prep/{0}_phot.fits'.format(root))[0]
     cat = utils.read_catalog(phot_cat)
     
+    # Count filters
+    num_filters = 0
+    for k in cat.meta:
+        if k.startswith('F') & k.endswith('uJy2dn'):
+            num_filters += 1
+    
+    if min_filters > num_filters:
+        print('# make_rgb_thumbnails: only {0} filters found'.format(num_filters))
+        return False
+        
     if mag is None:
         auto_mag = 23.9-2.5*np.log10(cat['flux_auto']*cat['tot_corr'])
         # More like surface brightness
