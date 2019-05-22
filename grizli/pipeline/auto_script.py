@@ -3829,8 +3829,14 @@ def make_rgb_thumbnails(root='j140814+565638', ids=None, maglim=21,
     cat = utils.read_catalog(phot_cat)
     
     if mag is None:
-        mag = 23.9-2.5*np.log10(cat['flux_auto']*cat['tot_corr'])
-    
+        auto_mag = 23.9-2.5*np.log10(cat['flux_auto']*cat['tot_corr'])
+        # More like surface brightness
+        try:
+            mag = 23.9-2.5*np.log10(cat['flux_aper_2'])
+            mag[~np.isfinite(mag)] = auto_mag[~np.isfinite(mag)]
+        except:
+            mag = auto_mag
+            
     pixel_scale = cat.meta['ASEC_0']/cat.meta['APER_0']
     sx = (cat['xmax']-cat['xmin'])*pixel_scale
     sy = (cat['ymax']-cat['ymin'])*pixel_scale
