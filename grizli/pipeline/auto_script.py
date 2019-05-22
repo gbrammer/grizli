@@ -2555,10 +2555,7 @@ def summary_catalog(field_root='', dzbin=0.01, use_localhost=True, filter_bandpa
                                        filter_bandpasses=filter_bandpasses,
                                        files=files)
     fit.meta['root'] = field_root
-    
-    mtime = []
-    for i in range(len(fit)):
-        
+            
     if orig is not None:
         if len(fit) > 0:
             fit = astropy.table.vstack([orig, fit])
