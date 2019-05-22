@@ -3765,29 +3765,38 @@ THUMB_RGB_PARAMS = {'xsize':4,
               'suffix':'.rgb', 
               'mask_empty':False,
               'tick_interval':1,
-              'pl':2, # 1 for f_lambda, 2 for f_nu
+              'pl':1, # 1 for f_lambda, 2 for f_nu
               }
 
 DRIZZLER_ARGS = {'aws_bucket':False, 
                  'scale_ab':21.5,
                  'subtract_median':False, 
+                 'theta': 0., 
                  'pixscale':0.1, 
-                 'pixfrac':0.8,
-                 'kernel':'point', 
+                 'pixfrac':0.33,
+                 'kernel':'square', 
+                 'half_optical_pixscale':True,
+                 'filters':['f160w', 'f814w', 'f140w', 'f125w', 'f105w',
+                            'f110w', 'f098m', 'f850lp', 'f775w', 'f606w', 
+                            'f475w', 'f555w', 'f600lp', 'f390w', 'f350lp'],
                  'size':3, 
-                 'thumb_height':2,
-                 'rgb_params':THUMB_RGB_PARAMS}
+                 'thumb_height':1.5,
+                 'rgb_params':THUMB_RGB_PARAMS,
+                 'remove':False,
+                 'include_ir_psf':True}
                
 def make_rgb_thumbnails(root='j140814+565638', ids=None, maglim=21,
-                        drizzler_args=DRIZZLER_ARGS, 
+                        drizzler_args=DRIZZLER_ARGS, use_line_wcs=False,
                         remove_fits=False, skip=True, 
                         auto_size=False, size_limits=[4, 15], mag=None):
     """
     Make RGB thumbnails in working directory
     """
+    import astropy.wcs as pywcs
     from grizli_aws import aws_drizzler
     
-    cat = utils.read_catalog('{0}_phot.fits'.format(root))
+    phot_cat = glob.glob('../Prep/{0}_phot.fits'.format(root))[0]
+    cat = utils.read_catalog(phot_cat)
     
     if mag is None:
         mag = 23.9-2.5*np.log10(cat['flux_auto']*cat['tot_corr'])
@@ -3800,9 +3809,21 @@ def make_rgb_thumbnails(root='j140814+565638', ids=None, maglim=21,
     #print('limiting mag: ', lim_mag)
     lim_mag = 22.8
     
+    extracted_ids = False
+    
     if ids is None:
         ids = cat['id'][mag < maglim]
     
+    elif ids == 'extracted':
+        extracted_ids = True
+        # Make thumbnails for extracted objects
+        beams_files = glob.glob('../Extractions/*beams.fits')
+        if len(beams_files) == 0:
+            return False
+        
+        beams_files.sort()
+        ids = [int(os.path.basename(file).split('_')[-1].split('.beams')[0]) for file in beams_files]
+        
     for id_column in ['id', 'number']:
         if id_column in cat.colnames:
             break
@@ -3819,7 +3840,42 @@ def make_rgb_thumbnails(root='j140814+565638', ids=None, maglim=21,
             continue
                 
         args['scale_ab'] = np.clip(mag[ix][0]-1, 17, lim_mag)
-        if auto_size:
+
+        # Use drizzled line image for WCS?        
+        if use_line_wcs:
+            line_file = glob.glob('../Extractions/{0}.full.fits'.format(label))
+            
+            # Reset
+            if 'wcs' in args:
+                args.pop('wcs')
+            
+            for k in ['pixfrac', 'kernel']:
+                if k in drizzler_args:
+                    args[k] = drizzler_args[k]
+            
+            # Find line extrension        
+            msg = 'Use WCS from {0}[{1},{2}] (pixfrac={3:.2f}, kernel={4})'
+            if len(line_file) > 0:
+                full = pyfits.open(line_file[0])
+                for ext in full:
+                    if 'EXTNAME' in ext.header:
+                        if ext.header['EXTNAME'] == 'LINE':
+                            try:
+                                wcs = pywcs.WCS(ext.header) 
+                                args['wcs'] = wcs
+                                args['pixfrac'] = ext.header['PIXFRAC']
+                                args['kernel'] = ext.header['DRIZKRNL']
+                                
+                                print(msg.format(line_file[0], 
+                                      ext.header['EXTNAME'], 
+                                      ext.header['EXTVER'], args['pixfrac'], 
+                                      args['kernel']))
+                            except:
+                                pass
+                                
+                            break
+                
+        if (auto_size == True) & ('wcs' not in args):
             s_i = np.maximum(sx[ix][0], sy[ix][0])
             args['size'] = np.ceil(np.clip(s_i, 
                                            size_limits[0], size_limits[1]))
@@ -3832,13 +3888,47 @@ def make_rgb_thumbnails(root='j140814+565638', ids=None, maglim=21,
                          ra=cat['ra'][ix][0], dec=cat['dec'][ix][0],
                          master='local', **args)
         
-        if remove_fits:
-            files = glob.glob('{0}*_drz*fits'.format(label))
+        if remove_fits > 0:
+            files = glob.glob('{0}*_dr[cz]*fits'.format(label))
             for file in files:
                 os.remove(file)
+        elif remove_fits < 0:
+            # Concatenate into a single FITS file
+            files = glob.glob('{0}*_dr[cz]_sci.fits'.format(label))
+            files.sort()
+            hdul = None
+            for file in files:
+                hdu_i = pyfits.open(file)
+                hdu_i[0].header['EXTNAME'] = 'SCI'
+                if 'vis_dr' in file:
+                    filt_i = 'VIS'
+                else:
+                    filt_i = utils.get_hst_filter(hdu_i[0].header)
                 
-        
-        
+                for h in hdu_i:
+                    h.header['EXTVER'] = filt_i
+                    if hdul is None:
+                        hdul = pyfits.HDUList([h])
+                    else:
+                        hdul.append(h)
+                
+                # Weight
+                hdu_i = pyfits.open(file.replace('_sci', '_wht'))
+                hdu_i[0].header['EXTNAME'] = 'WHT'
+                for h in hdu_i:
+                    h.header['EXTVER'] = filt_i
+                    if hdul is None:
+                        hdul = pyfits.HDUList([h])
+                    else:
+                        hdul.append(h)
+            
+            hdul.writeto('{0}.thumb.fits'.format(label), overwrite=True, 
+                         output_verify='fix')
+            
+            files = glob.glob('{0}*_dr[cz]*fits'.format(label))
+            for file in files:
+                os.remove(file)
+              
 def make_rgb_thumbnails_OLD(root='j140814+565638', HOME_PATH='./', maglim=23, cutout=12., figsize=[2,2], ids=None, close=True, skip=True, force_ir=False, add_grid=True, scl=1):
     """
     Make RGB color cutouts
