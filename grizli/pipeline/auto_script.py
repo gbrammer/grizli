@@ -2501,6 +2501,8 @@ def summary_catalog(field_root='', dzbin=0.01, use_localhost=True, filter_bandpa
     Make redshift histogram and summary catalog / HTML table
     """
     import os
+    import time
+    
     import numpy as np
     from matplotlib.ticker import FixedLocator
     import matplotlib.pyplot as plt
@@ -2554,11 +2556,24 @@ def summary_catalog(field_root='', dzbin=0.01, use_localhost=True, filter_bandpa
                                        files=files)
     fit.meta['root'] = field_root
     
+    mtime = []
+    for i in range(len(fit)):
+        
     if orig is not None:
         if len(fit) > 0:
             fit = astropy.table.vstack([orig, fit])
             fit.write('{0}.info.fits'.format(field_root), overwrite=True)
-        
+    
+    mtime = []
+    for i in range(len(fit)):
+        full_file = '{0}_{1:05d}.full.fits'.format(fit['root'][i], fit['id'][i])
+        if os.path.exists(full_file):
+            mtime.append(time.ctime(os.stat(full_file).st_mtime))
+        else:
+            mtime.append('-')
+    
+    fit['mtime'] = mtime
+    
     ## Add photometric catalog
     try:
         catalog = glob.glob('{0}-*.cat.fits'.format(field_root))[0]
@@ -2609,7 +2624,8 @@ def summary_catalog(field_root='', dzbin=0.01, use_localhost=True, filter_bandpa
     fig.tight_layout(pad=0.2)
     fig.savefig('{0}_zhist.png'.format(field_root))
 
-    cols = ['root', 'idx','ra', 'dec', 'mag_auto', 't_g800l', 't_g102', 't_g141', 'z_map', 'chinu', 'bic_diff', 'zwidth1', 'stellar_mass', 'ssfr', 'png_stack', 'png_full', 'png_line']
+    cols = ['root', 'mtime', 'idx','ra', 'dec', 'mag_auto', 't_g800l', 't_g102', 't_g141', 'z_map', 'chinu', 'bic_diff', 'zwidth1', 'stellar_mass', 'ssfr', 'png_stack', 'png_full', 'png_thumb', 'png_line']
+    
     for i in range(len(cols))[::-1]:
         if cols[i] not in fit.colnames:
             cols.pop(i)

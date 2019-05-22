@@ -669,7 +669,6 @@ def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat',
     pdf_max = []
     if files is None:
         files=glob.glob('{0}*full.fits'.format(target))
-    
         files.sort()
     
     roots = ['_'.join(os.path.basename(file).split('_')[:-1]) for file in files]
@@ -814,6 +813,10 @@ def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat',
     for ext in ['stack','full','line']:
         png = ['{0}_{1:05d}.{2}.png'.format(root, id, ext) for root, id in zip(info['root'], info['id'])]
         info['png_{0}'.format(ext)] = ['<a href={0}><img src={0} height=200></a>'.format(p) for p in png]
+    
+    # Thumbnails
+    png = ['../Thumbnails/{0}_{1:05d}.{2}.png'.format(root, id, 'thumb') for root, id in zip(info['root'], info['id'])]
+    info['png_{0}'.format('thumb')] = ['<a href={0}><img src={0} height=200></a>'.format(p) for p in png]
     
     ### Column formats
     for col in info.colnames:
