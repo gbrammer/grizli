@@ -3,6 +3,10 @@ Script to run all redshift fits in parallel with OpenMPI
 
 Usage:  
 
+    if [ -e $GRIZLICODE ]; then
+        GRIZLICODE=`python -c "import grizli; import os; print(os.path.dirname(grizli.__file__))"`
+    fi
+    
     mpiexec -n 8 python -m mpi4py.futures $GRIZLICODE/grizli/pipeline/run_MPI.py
    
 where "-n 8" indicates running 8 parallel threads.
