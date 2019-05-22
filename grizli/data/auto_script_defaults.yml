@@ -180,7 +180,20 @@ grism_prep_args:
 refine_with_fits: False
 run_extractions: False 
 include_photometry_in_fit: False
- 
+
+# RGB thumbnails based on spectral extractions
+make_thumbnails: True
+thumbnail_args: 
+    ids: extracted
+    maglim: 21
+    drizzler_args: null
+    use_line_wcs: True
+    auto_size: True
+    size_limits: [4,15]
+    remove_fits: -1
+    skip: True
+    mag: null
+
 # Arguments for spectral extractions
 # def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00, ids=None, pline=DITHERED_PLINE, fit_only_beams=True, run_fit=True, poly_order=7, master_files=None, grp=None, bad_pa_threshold=None, fit_trace_shift=False, size=32, diff=True, min_sens=0.02, skip_complete=True, fit_args={}):
 

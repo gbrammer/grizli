@@ -211,6 +211,8 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
        run_extractions=False,
        include_photometry_in_fit=False,
        extract_args=args['extract_args'],
+       make_thumbnails=True, 
+       thumbnail_args=args['thumbnail_args'],
        get_dict=False,
        **kwargs
        ):
@@ -650,6 +652,21 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
     # Run extractions (and fits)
     auto_script.extract(field_root=root, **extract_args) #maglim=extract_maglim, MW_EBV=exptab.meta['MW_EBV'], pline=pline, run_fit=run_fit)
     
+    # Make RGB thumbnails
+    if make_thumbnails:
+        print('#####\n# Make RGB thumbnails\n#####')
+        
+        if thumbnail_args['drizzler_args'] is None:
+            thumbnail_args['drizzler_args'] = DRIZZLER_ARGS.copy()
+        
+        os.chdir(os.path.join(HOME_PATH, root, 'Prep'))
+        
+        auto_script.make_rgb_thumbnails(root=root, **thumbnail_args)
+        
+        if not os.path.exists('../Thumbnails'):
+            os.mkdir('../Thumbnails/')
+            os.system('mv {0}_[0-8]*.[rt][gh][bu]* ../Thumbnails/'.format(root))
+            
     if extract_args['run_fit']:
         os.chdir(os.path.join(HOME_PATH, root, 'Extractions'))
 
@@ -3854,7 +3871,7 @@ def make_rgb_thumbnails(root='j140814+565638', ids=None, maglim=21,
                     args[k] = drizzler_args[k]
             
             # Find line extrension        
-            msg = 'Use WCS from {0}[{1},{2}] (pixfrac={3:.2f}, kernel={4})'
+            msg = '\n# Use WCS from {0}[{1},{2}] (pixfrac={3:.2f}, kernel={4})'
             if len(line_file) > 0:
                 full = pyfits.open(line_file[0])
                 for ext in full:
