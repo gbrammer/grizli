@@ -595,7 +595,7 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
     if (len(glob.glob('*full.fits')) > 0) & (refine_with_fits):
         auto_script.refine_model_with_fits(field_root=root, clean=True, 
                                            grp=None, master_files=None, 
-                                           spectrum='continuum') 
+                                           spectrum='continuum', max_chinu=5) 
 
     # Drizzled grp objects
     # All files
@@ -2131,7 +2131,7 @@ def grism_prep(field_root='j142724+334246', ds9=None, refine_niter=3, gris_ref_f
 DITHERED_PLINE = {'kernel': 'point', 'pixfrac': 0.2, 'pixscale': 0.1, 'size': 8, 'wcs': None}
 PARALLEL_PLINE = {'kernel': 'square', 'pixfrac': 1.0, 'pixscale': 0.1, 'size': 8, 'wcs': None}
 
-def refine_model_with_fits(field_root='j142724+334246', grp=None, master_files=None, spectrum='continuum', clean=True):
+def refine_model_with_fits(field_root='j142724+334246', grp=None, master_files=None, spectrum='continuum', clean=True, max_chinu=5):
     """
     """
     import glob
@@ -2165,7 +2165,15 @@ def refine_model_with_fits(field_root='j142724+334246', grp=None, master_files=N
         try:
             hdu = pyfits.open(file)
             id = hdu[0].header['ID']
+            
+            fith = hdu['ZFIT_STACK'].header
+            chinu = fith['CHIMIN']/fith['DOF'] 
+            if (chinu > max_chinu) | (fith['DOF'] < 10):
+                print('Refine model ({0}/{1}): {2} / skip (chinu={3:.1f}, dof={4})'.format(i, N, file, chinu, fith['DOF']))
+                continue
+                
             sp = utils.GTable(hdu['TEMPL'].data)
+            
             dt = np.float
             wave = np.cast[dt](sp['wave'])#.byteswap()
             flux = np.cast[dt](sp[spectrum])#.byteswap()
