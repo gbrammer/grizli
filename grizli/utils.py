@@ -5398,7 +5398,7 @@ $.UpdateFilterURL = function () {{
                 pd = GTable.gread('/tmp/table.csv').to_pandas()
             
             # Reformat to json
-            json_data = '        ' + pd.to_json(orient='values').replace('],[','\n    ]xxxxxx\n    [\n        ').replace(', ', 'xcommaspacex').replace(',',',\n        ').replace('xxxxxx',',').replace('xcommaspace',', ')
+            json_data = '        ' + pd.to_json(orient='values').replace('],[','\n    ]xxxxxx\n    [\n        ').replace(', ', 'xcommaspacex').replace(',',',\n        ').replace('xxxxxx',',').replace('xcommaspacex',', ')
             json_str = """{{
   "data": 
 {0}  
