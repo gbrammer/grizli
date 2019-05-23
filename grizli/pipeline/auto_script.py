@@ -666,7 +666,7 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
         if not os.path.exists('../Thumbnails'):
             os.mkdir('../Thumbnails/')
         
-        os.system('mv {0}_[0-9]*.[rt][gh][bu]* ../Thumbnails/'.format(root))
+        os.system('mv {0}_[0-9]*.[srt][egh][gbu]* ../Thumbnails/'.format(root))
             
     if extract_args['run_fit']:
         os.chdir(os.path.join(HOME_PATH, root, 'Extractions'))
@@ -3819,16 +3819,35 @@ DRIZZLER_ARGS = {'aws_bucket':False,
 def make_rgb_thumbnails(root='j140814+565638', ids=None, maglim=21,
                         drizzler_args=DRIZZLER_ARGS, use_line_wcs=False,
                         remove_fits=False, skip=True, min_filters=2, 
-                        auto_size=False, size_limits=[4, 15], mag=None):
+                        auto_size=False, size_limits=[4, 15], mag=None, 
+                        make_segmentation_figure=True):
     """
     Make RGB thumbnails in working directory
-    """
+    """    
+    import matplotlib.pyplot as plt
     import astropy.wcs as pywcs
     from grizli_aws import aws_drizzler
     
     phot_cat = glob.glob('../Prep/{0}_phot.fits'.format(root))[0]
     cat = utils.read_catalog(phot_cat)
     
+    if make_segmentation_figure:
+        plt.ioff()
+        
+        seg_files = glob.glob('../*/{0}*seg.fits*'.format(root))
+        if len(seg_files) == 0:
+            make_segmentation_figure = False
+        else:
+            seg = pyfits.open(seg_files[0])
+            seg_data = seg[0].data
+            seg_wcs = pywcs.WCS(seg[0].header)
+            
+            # Randomize seg to get dispersion between neighboring objects 
+            np.random.seed(hash(root) % (10 ** 8))
+            rnd_ids = np.append([0], np.argsort(np.random.rand(len(cat)))+1)
+            #rnd_seg = rnd_ids[seg[0].data]
+            #phot_xy = seg_wcs.all_world2pix(cat['ra'], cat['dec'], 0)
+            
     # Count filters
     num_filters = 0
     for k in cat.meta:
@@ -3936,6 +3955,49 @@ def make_rgb_thumbnails(root='j140814+565638', ids=None, maglim=21,
                          ra=cat['ra'][ix][0], dec=cat['dec'][ix][0],
                          master='local', **args)
         
+        files = glob.glob('{0}*_dr[cz]*sci.fits'.format(label))
+        if (make_segmentation_figure) & (len(files) > 0):
+            th = pyfits.open(files[0])
+            th_wcs = pywcs.WCS(th[0].header)
+            blot_seg = utils.blot_nearest_exact(seg_data, seg_wcs, th_wcs, 
+                                       stepsize=-1, scale_by_pixel_area=False)
+            
+            rnd_seg = rnd_ids[np.cast[int](blot_seg)]*1.
+            th_ids = np.unique(blot_seg)
+            
+            sh = th[0].data.shape
+            yp, xp = np.indices(sh)
+            
+            thumb_height = 2.
+            fig = plt.figure(figsize=[thumb_height*sh[1]/sh[0], thumb_height])
+            ax = fig.add_subplot(111)
+            rnd_seg[rnd_seg == 0] = np.nan
+            
+            ax.imshow(rnd_seg, aspect='equal', cmap='terrain_r', 
+                      vmin=-0.05*len(cat), vmax=1.05*len(cat))
+            ax.set_xticklabels([])
+            ax.set_yticklabels([])
+            
+            ix = utils.column_values_in_list(cat['number'], th_ids)  
+            xc, yc = th_wcs.all_world2pix(cat['ra'][ix], cat['dec'][ix], 0)
+            xc = np.clip(xc, 0.09*sh[1], 0.91*sh[1])
+            yc = np.clip(yc, 0.08*sh[0], 0.92*sh[0])
+            
+            for th_id, x_i, y_i in zip(cat['number'][ix], xc, yc):
+                if th_id == 0:
+                    continue
+                                
+                ax.text(x_i, y_i, '{0:.0f}'.format(th_id), ha='center', va='center', fontsize=8,  color='w')
+                ax.text(x_i, y_i, '{0:.0f}'.format(th_id), ha='center', va='center', fontsize=8,  color='k', alpha=0.95)
+            
+            ax.set_xlim(0, sh[1]-1)
+            ax.set_ylim(0, sh[0]-1)
+            ax.set_axis_off() 
+            
+            fig.tight_layout(pad=0.01)
+            fig.savefig('{0}.seg.png'.format(label))
+            plt.close(fig)
+            
         if remove_fits > 0:
             files = glob.glob('{0}*_dr[cz]*fits'.format(label))
             for file in files:
