@@ -646,6 +646,22 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
     
     # Done?
     if not run_extractions:
+        # Make RGB thumbnails
+        if make_thumbnails:
+            print('#####\n# Make RGB thumbnails\n#####')
+
+            if thumbnail_args['drizzler_args'] is None:
+                thumbnail_args['drizzler_args'] = DRIZZLER_ARGS.copy()
+
+            os.chdir(os.path.join(HOME_PATH, root, 'Prep'))
+
+            auto_script.make_rgb_thumbnails(root=root, **thumbnail_args)
+
+            if not os.path.exists('../Thumbnails'):
+                os.mkdir('../Thumbnails/')
+
+            os.system('mv {0}_[0-9]*.[srt][egh][gbu]* ../Thumbnails/'.format(root))
+            
         utils.LOGFILE = '/tmp/grizli.log'
         return True
         
@@ -3557,22 +3573,64 @@ def get_rgb_filters(filter_list, force_ir=False, pure_sort=False):
     for f in filter_list:            
         if f == 'ir':
             continue
-            
-        if f[1] in '01':
+        
+        if f == 'uv':
+            val = 'f0300'
+        elif f == 'visb':
+            val = 'f0435'
+        elif f == 'visr':
+            val = 'f0814'
+        elif f == 'y':
+            val = 'f1000'
+        elif f == 'j':
+            val = 'f1250'
+        elif f == 'h':
+            val = 'f1500'
+        elif f[1] in '01':
             val = f[:4]+'0'
         else:
             val = 'f0'+f[1:4]
         
         # Red filters (>6000)
-        if f[1] in '0178':
-            if (f[1] not in '01') & force_ir:
-                continue
-            else:
+        if val > 'f07':
+            if (val >= 'v09') & (force_ir):
                 ir_filters.append(f)
         
         use_filters.append(f)
         for_sort[f] = val
     
+    pop_indices = []
+    
+    joined = {'uv':'23', 'visb':'45', 'visr':'678', 
+               'y':['f098m', 'f105w'],
+               'j':['f110w', 'f125w'],
+               'h':['f140w', 'f160w']}
+    
+    for j in joined:           
+        if j in use_filters:
+            indices = []
+            for f in use_filters:
+                if f in joined:
+                    continue
+                    
+                if j in 'yjh':
+                    if f in joined[j]:
+                        indices.append(use_filters.index(f))
+                else:
+                    if f[1] in joined[j]:
+                        indices.append(use_filters.index(f))
+        
+            if len(indices) == len(use_filters)-1:
+                # All filters are in a given group so pop the group
+                pop_indices.append(use_filters.index(j))
+            else:
+                pop_indices.extend(indices)
+    
+    pop_indices.sort()
+    for i in pop_indices[::-1]:
+        filt_i = use_filters.pop(i)
+        for_sort.pop(filt_i)
+               
     ### Only one filter
     if len(use_filters) == 1:
         f = use_filters[0]
@@ -3662,6 +3720,8 @@ def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', s
         img = glob.glob('{0}/{1}-{2}_dr?_sci.fits'.format(PATH_TO, root, f))[0]
         try:
             ims[f] = pyfits.open(img)
+            if 'IMGMED' in ims[f][0].header:
+                ims[f][0].data -= ims[f][0].header['IMGMED']
         except:
             continue
                 

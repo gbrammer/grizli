@@ -183,11 +183,44 @@ include_photometry_in_fit: False
 
 # RGB thumbnails based on spectral extractions
 make_thumbnails: True
+
+thumb_rgb_params: &thumb_rgb_params 
+  add_labels: false
+  mask_empty: false
+  output_dpi: null
+  output_format: png
+  pl: 1
+  rgb_min: -0.01
+  scl: 2
+  show_ir: false
+  suffix: .rgb
+  tick_interval: 1
+  xsize: 4
+
+drizzler_args: &drizzler_args
+  aws_bucket: false
+  filters: [f160w, f140w, f125w, f105w, f110w, f098m, 
+            f850lp, f814w, f775w, f606w, f475w, f555w, f600lp, f390w, f350lp]
+  half_optical_pixscale: true
+  include_ir_psf: true
+  kernel: square
+  pixfrac: 0.33
+  pixscale: 0.1
+  remove: false
+  rgb_params: *thumb_rgb_params
+  scale_ab: 21.5
+  size: 6
+  subtract_median: true
+  theta: 0.0
+  thumb_height: 1.5
+  show_filters: [visb, visr, y, j, h]
+  combine_similar_filters: true
+                 
 thumbnail_args: 
     ids: extracted
     maglim: 21
     min_filters: 2
-    drizzler_args: null
+    drizzler_args: *drizzler_args
     use_line_wcs: True
     auto_size: True
     size_limits: [4,15]
