@@ -3808,6 +3808,7 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
             
             outsci, outwht, outctx = res[:3]
             header['EXPTIME'] += flt[0].header['EXPTIME']
+            header['NDRIZIM'] += 1
             
         count += 1
         header['FLT{0:05d}'.format(count)] = file
