@@ -682,7 +682,7 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
         if not os.path.exists('../Thumbnails'):
             os.mkdir('../Thumbnails/')
         
-        os.system('mv {0}_[0-9]*.[srt][egh][gbu]* ../Thumbnails/'.format(root))
+        os.system('mv {0}_[0-9]*.png {0}_[0-9]*.fits ../Thumbnails/'.format(root))
             
     if extract_args['run_fit']:
         os.chdir(os.path.join(HOME_PATH, root, 'Extractions'))
