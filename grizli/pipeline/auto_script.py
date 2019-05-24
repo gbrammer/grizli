@@ -4024,6 +4024,7 @@ def make_rgb_thumbnails(root='j140814+565638', ids=None, maglim=21,
                          master='local', **args)
         
         files = glob.glob('{0}*_dr[cz]*sci.fits'.format(label))
+        blot_seg = None
         if (make_segmentation_figure) & (len(files) > 0):
             th = pyfits.open(files[0])
             th_wcs = pywcs.WCS(th[0].header)
@@ -4100,6 +4101,12 @@ def make_rgb_thumbnails(root='j140814+565638', ids=None, maglim=21,
                     else:
                         hdul.append(h)
             
+            print('xxxx blot_seg', blot_seg is not None)
+            if blot_seg is not None:
+                hdul.info()
+                hdul.append(pyfits.ImageHDU(data=np.cast[int](blot_seg),
+                                            name='SEG')
+                                            
             hdul.writeto('{0}.thumb.fits'.format(label), overwrite=True, 
                          output_verify='fix')
             
