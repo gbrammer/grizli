@@ -286,7 +286,7 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
     
     exptab = utils.GTable.gread(os.path.join(HOME_PATH, '{0}_footprint.fits'.format(root)))
     
-    utils.LOGFILE = os.path.join(HOME_PATH, '{0}.auto_script.log'.format(root))
+    utils.LOGFILE = os.path.join(HOME_PATH, '{0}.auto_script.log.txt'.format(root))
     
     utils.log_comment(utils.LOGFILE, '### Pipeline start', show_date=True)
         
@@ -901,7 +901,7 @@ def remove_bad_expflag(field_root='', HOME_PATH='./', min_bad=2):
     
     expf = utils.header_keys_from_filelist(files, keywords=['EXPFLAG'], 
                                            ext=0, colname_case=str.upper)
-    expf.write('{0}_expflag.info'.format(field_root), 
+    expf.write('{0}_expflag.txt'.format(field_root), 
                format='csv', overwrite=True)
     
     visit_name = np.array([file[:6] for file in expf['FILE']])
@@ -4612,7 +4612,7 @@ def make_report(root, gzipped_links=True, xsize=18, output_dpi=None, make_rgb=Tr
     {now}<br>
     
     <a href={root}.exposures.html>Exposure report</a> 
-    / <a href={root}.auto_script.log>{root}.auto_script.log</a>
+    / <a href={root}.auto_script.log.txt>{root}.auto_script.log.txt</a>
     / <a href={root}.auto_script.yml>{root}.auto_script.yml</a>
     
     <pre>
