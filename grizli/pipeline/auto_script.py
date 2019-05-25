@@ -2262,7 +2262,7 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
         pass
     
     if get_only_beams:
-        beams = grp.get_beams(id, size=size, beam_id='A', min_sens=min_sens)
+        beams = grp.get_beams(ids, size=size, beam_id='A', min_sens=min_sens)
         return(beams)
         
     # if os.path.exists('{0}_phot.fits'.format(target)):
