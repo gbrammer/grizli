@@ -2622,8 +2622,8 @@ class GroupFitter(object):
             
         ymin = 1.e30
         ymax = -1.e30
-        wmin = 1.e30
-        wmax = -1.e30
+        #wmin = 1.e30
+        #wmax = -1.e30
         
         if not show_beams:
             scale_on_stacked=True
@@ -2775,9 +2775,9 @@ class GroupFitter(object):
             if tfit is not None:
                 axc.plot(w[clip], flm[clip], color='r', alpha=f_alpha, linewidth=2, zorder=10) 
 
-                # Plot limits         
-                ymax = np.maximum(ymax,
-                            np.percentile((flm+np.median(er[clip]))[clip],
+                # Plot limits 
+                ep = np.percentile(er[clip], ylim_percentile)        
+                ymax = np.maximum(ymax, np.percentile((flm+ep)[clip],
                                            100-ylim_percentile))
             
                 ymin = np.minimum(ymin, np.percentile((flm-er*0.)[clip],
@@ -2785,13 +2785,17 @@ class GroupFitter(object):
             else:
                 
                 # Plot limits         
-                ymax = np.maximum(ymax,
-                            np.percentile((fl+np.median(er[clip]))[clip], 95))
+                ep = np.percentile(er[clip], ylim_percentile)        
+                ymax = np.maximum(ymax, np.percentile((fl+ep)[clip], 95))
             
                 ymin = np.minimum(ymin, np.percentile((fl-er*0.)[clip], 5))
             
-            wmax = np.maximum(wmax, w[clip].max())
-            wmin = np.minimum(wmin, w[clip].min())
+            #wmax = np.maximum(wmax, w[clip].max())
+            #wmin = np.minimum(wmin, w[clip].min())
+        
+        lims = [utils.GRISM_LIMITS[g][:2] for g in self.PA]
+        wmin = np.min(lims)#*1.e4
+        wmax = np.max(lims)#*1.e4
         
         # Cleanup
         axc.set_xlim(wmin, wmax)
@@ -2863,6 +2867,7 @@ class GroupFitter(object):
             
             flux = (sp_data[g]['flux']*unit_corr/pscale)[clip]
             err = (sp_data[g]['err']*unit_corr/pscale)[clip]
+            ep = np.percentile(err, ylim_percentile)
             
             if fill:
                 axc.fill_between(sp_data[g]['wave'][clip]/1.e4, flux-err, flux+err, color=GRISM_COLORS[g], alpha=0.8, zorder=1, label=g) 
@@ -2871,9 +2876,9 @@ class GroupFitter(object):
                 
             if ((tfit is None) & (clip.sum() > 0)) | (scale_on_stacked):
                 # Plot limits         
-                ymax = np.maximum(ymax, np.percentile((flux+err),
+                ymax = np.maximum(ymax, np.percentile((flux+ep),
                                                      100-ylim_percentile))
-                ymin = np.minimum(ymin, np.percentile((flux-err),
+                ymin = np.minimum(ymin, np.percentile((flux-ep),
                                                       ylim_percentile))
                        
         if (ymin < 0) & (ymax > 0):
