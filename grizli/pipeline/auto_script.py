@@ -2214,7 +2214,7 @@ def refine_model_with_fits(field_root='j142724+334246', grp=None, master_files=N
     
     del(grp)
     
-def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00, ids=[], pline=DITHERED_PLINE, fit_only_beams=True, run_fit=True, poly_order=7, oned_R=30, master_files=None, grp=None, bad_pa_threshold=None, fit_trace_shift=False, size=32, diff=True, min_sens=0.02, fcontam=0.2, min_mask=0.01, sys_err=0.03, skip_complete=True, fit_args={}, args_file='fit_args.npy'):
+def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00, ids=[], pline=DITHERED_PLINE, fit_only_beams=True, run_fit=True, poly_order=7, oned_R=30, master_files=None, grp=None, bad_pa_threshold=None, fit_trace_shift=False, size=32, diff=True, min_sens=0.02, fcontam=0.2, min_mask=0.01, sys_err=0.03, skip_complete=True, fit_args={}, args_file='fit_args.npy', get_only_beams=False):
     import glob
     import os
     
@@ -2260,6 +2260,10 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
         fit_args.pop('kwargs')
     except:
         pass
+    
+    if get_only_beams:
+        beams = grp.get_beams(id, size=size, beam_id='A', min_sens=min_sens)
+        return(beams)
         
     # if os.path.exists('{0}_phot.fits'.format(target)):
     #     photom = utils.GTable.gread('{0}_phot.fits'.format(target))
