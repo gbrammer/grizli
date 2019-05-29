@@ -1495,7 +1495,7 @@ def get_line_wavelengths():
     return line_wavelengths, line_ratios 
     
 class SpectrumTemplate(object):
-    def __init__(self, wave=None, flux=None, central_wave=None, fwhm=None, velocity=False, fluxunits=FLAMBDA_CGS, waveunits=u.angstrom, name='', lorentz=False, err=None):
+    def __init__(self, wave=None, flux=None, central_wave=None, fwhm=None, velocity=False, fluxunits=FLAMBDA_CGS, waveunits=u.angstrom, name='template', lorentz=False, err=None):
         """Container for template spectra.   
                 
         Parameters
@@ -2120,7 +2120,7 @@ def load_quasar_templates(broad_fwhm=2500, narrow_fwhm=1200, broad_lines=    ['H
         # smoothing, in units of input velocity resolution
         feii_kern = broad_fwhm/2.3548/75.
         feii_sm = nd.gaussian_filter(feii_flux, feii_kern)
-        t0['FeII-VC2004'] = t1['FeII-VC2004'] = SpectrumTemplate(wave=feii_wave, flux=feii_sm)
+        t0['FeII-VC2004'] = t1['FeII-VC2004'] = SpectrumTemplate(wave=feii_wave, flux=feii_sm, name='FeII-VC2004')
     
     ### Linear continua
     # cont_wave = np.arange(400, 2.5e4)
@@ -2309,7 +2309,7 @@ def split_spline_template(templ, wavelength_range=[5000,2.4e4], Rspline=10, log=
     
     return stemp
 
-def step_templates(wlim=[5000, 1.8e4], R=30, round=10):
+def step_templates(wlim=[5000, 1.8e4], R=30, round=10, rest=False):
     """
     Step-function templates for easy binning
     """
@@ -2323,6 +2323,9 @@ def step_templates(wlim=[5000, 1.8e4], R=30, round=10):
     step_templ = {}
     for i in range(len(bin_steps)-1):
         label = 'step {0:.0f}'.format(bin_mid[i])
+        if rest:
+            label = 'r'+label
+            
         yspec = ((xspec >= bin_steps[i]) & (xspec < bin_steps[i+1]))*1        
         step_templ[label] = SpectrumTemplate(wave=xspec, flux=yspec,
                                              name=label)
@@ -2379,8 +2382,10 @@ def dot_templates(coeffs, templates, z=0, max_R=5000, apply_igm=True):
             igmz = 1.
     else:
         igmz = 1.
+    
+    is_obsframe = np.array([t.split()[0] in ['bspl', 'step'] for t in templates])
         
-    flux_arr *= igmz
+    flux_arr[~is_obsframe,:] *= igmz
     
     # Continuum
     cont = np.dot(coeffs*(~is_line), flux_arr)
@@ -2425,7 +2430,14 @@ def array_templates(templates, wave=None, max_R=5000, z=0):
     from grizli.utils_c.interp import interp_conserve_c
     
     if wave is None:
-        wave = np.unique(np.hstack([templates[t].wave/(1+z*t.startswith('bspl')) for t in templates]))
+        wstack = []
+        for t in templates:
+            if t.split()[0] in ['bspl', 'step']:
+                wstack.append(templates[t].wave/(1+z))
+            else:
+                wstack.append(templates[t].wave)
+                
+        wave = np.unique(np.hstack(wstack))
     
     clipsum, iter = 1, 0
     while (clipsum > 0) & (iter < 10):
@@ -2441,7 +2453,7 @@ def array_templates(templates, wave=None, max_R=5000, z=0):
     flux_arr = np.zeros((NTEMP, len(wave)))
     
     for i, t in enumerate(templates):
-        if templates[t].name.startswith('bspl'):
+        if t.split()[0] in ['bspl', 'step']:
             flux_arr[i,:] = interp_conserve_c(wave, templates[t].wave/(1+z),
                                           templates[t].flux*(1+z))
         else:
