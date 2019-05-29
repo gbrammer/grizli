@@ -643,7 +643,7 @@ def full_sed_plot(mb, tfit, zfit=None, bin=1, minor=0.1, save='png', sed_resolut
         
     return fig
     
-def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat', verbose=True, files=None, filter_bandpasses=[]):
+def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat', verbose=True, files=None, filter_bandpasses=[], get_sps=False):
     
     import glob
     import os
@@ -701,13 +701,17 @@ def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat',
                 else:
                     line.append(np.nan)
         
-        # SPS
-        try:
-            sps = compute_sps_params(full)
-        except:
+        # SPS params, stellar mass, etc.
+        if get_sps:
+            try:
+                sps = compute_sps_params(full)
+            except:
+                sps = {'Lv':-1*u.solLum, 'MLv':-1*u.solMass/u.solLum, 'MLv_rms':-1*u.solMass/u.solLum, 'SFRv':-1*u.solMass/u.year, 'SFRv_rms':-1*u.solMass/u.year, 'templ':-1}
+        else:
             sps = {'Lv':-1*u.solLum, 'MLv':-1*u.solMass/u.solLum, 'MLv_rms':-1*u.solMass/u.solLum, 'SFRv':-1*u.solMass/u.year, 'SFRv_rms':-1*u.solMass/u.year, 'templ':-1}
+
         sps_params.append(sps)
-        
+            
         lines.append(line)
         
         # Integrate best-fit template through filter bandpasses
@@ -804,6 +808,9 @@ def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat',
 
     info['beam_log_risk'] = np.log10(info['beam_min_risk'])
     info['beam_log_risk'].format = '.2f'
+    
+    info['log_mass'] = np.log10(info['stellar_mass'])
+    info['log_mass'].format = '.2f'
     
     # ID with link to CDS
     idx = ['<a href="http://vizier.u-strasbg.fr/viz-bin/VizieR?-c={0:.6f}+{1:.6f}&-c.rs=2">{2}</a>'.format(info['ra'][i], info['dec'][i], info['id'][i]) for i in range(len(info))]
@@ -1393,8 +1400,8 @@ class GroupFitter(object):
                 igmz = 1.
             
             # Don't redshift spline templates
-            if ti.name.startswith('bspl'):
-                s = [ti.wave, ti.flux*igmz]            
+            if ti.name.split()[0] in ['bspl', 'step']:
+                s = [ti.wave, ti.flux]            
             else:
                 s = [ti.wave*(1+z), ti.flux/(1+z)*igmz]
             
@@ -2016,11 +2023,14 @@ class GroupFitter(object):
         xclip = (w*(1+z) > 7000) & (w*(1+z) < 1.8e4)
         temp = []
         for key in templates:
-            if key.startswith('bspl'):
-                temp.append(grizli.utils_c.interp.interp_conserve_c(w[xclip]/(1+z), templates[key].wave, templates[key].flux))
+            if key.split()[0] in ['bspl', 'step']:
+                w_templ = w[xclip]/(1+z)
             else:
-                temp.append(grizli.utils_c.interp.interp_conserve_c(w[xclip], templates[key].wave, templates[key].flux))
-                
+                w_templ = w[xclip]
+
+            temp.append(grizli.utils_c.interp.interp_conserve_c(w_templ,
+                              templates[key].wave, templates[key].flux))
+            
         temp = np.vstack(temp)
         #array([) for key in templates])
         
@@ -2907,7 +2917,7 @@ class GroupFitter(object):
             
             tscl = (yt.T*cfit[self.N:])/(1+tfit['z'])*unit_corr
             t_names = np.array(list(tfit['cfit'].keys()))[self.N:]
-            is_spline = np.array([t.startswith('bspl') for t in tfit['cfit']][self.N:])
+            is_spline = np.array([t.split()[0] in ['bspl', 'step'] for t in tfit['cfit']][self.N:])
             
             if is_spline.sum() > 0:
                 spline_templ = tscl[:,is_spline].sum(axis=1)

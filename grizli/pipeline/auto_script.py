@@ -2376,11 +2376,12 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
             fig1 = mb.oned_figure(figsize=[5,3], tfit=tfit, show_beams=show_beams, scale_on_stacked=True, ylim_percentile=5)
             if oned_R:
                 outroot='{0}_{1:05d}.R{2:.0f}'.format(target, id, oned_R)
-                mb.oned_spectrum_to_hdu(outputfile=outroot+'.fits', tfit=tfit,
-                                        wave=bin_steps)                     
+                hdu = mb.oned_spectrum_to_hdu(outputfile=outroot+'.fits', 
+                                              tfit=tfit, wave=bin_steps)                     
             else:
                 outroot='{0}_{1:05d}.1D'.format(target, id)
-                mb.oned_spectrum_to_hdu(outputfile=outroot+'.fits', tfit=tfit)
+                hdu = mb.oned_spectrum_to_hdu(outputfile=outroot+'.fits',
+                                              tfit=tfit)
                 
             fig1.savefig(outroot+'.png')
             
@@ -2650,13 +2651,13 @@ def summary_catalog(field_root='', dzbin=0.01, use_localhost=True, filter_bandpa
     fig.tight_layout(pad=0.2)
     fig.savefig('{0}_zhist.png'.format(field_root))
 
-    cols = ['root', 'mtime', 'idx','ra', 'dec', 'mag_auto', 't_g800l', 't_g102', 't_g141', 'z_map', 'chinu', 'bic_diff', 'zwidth1', 'stellar_mass', 'ssfr', 'png_stack', 'png_full', 'png_rgb', 'png_line']
+    cols = ['root', 'mtime', 'idx','ra', 'dec', 'mag_auto', 't_g800l', 't_g102', 't_g141', 'z_map', 'chinu', 'bic_diff', 'zwidth1', 'log_mass', 'ssfr', 'png_stack', 'png_full', 'png_rgb', 'png_line']
     
     for i in range(len(cols))[::-1]:
         if cols[i] not in fit.colnames:
             cols.pop(i)
     
-    filter_columns = ['ra', 'dec', 'mag_auto', 't_g800l', 't_g102', 't_g141', 'z_map', 'chinu', 'bic_diff', 'zwidth1', 'stellar_mass', 'ssfr']
+    filter_columns = ['ra', 'dec', 'mag_auto', 't_g800l', 't_g102', 't_g141', 'z_map', 'chinu', 'bic_diff', 'zwidth1', 'log_mass', 'ssfr']
     
     fit[cols].write_sortable_html(field_root+'-fit.html', replace_braces=True, localhost=use_localhost, max_lines=50000, table_id=None, table_class='display compact', css=None, filter_columns=filter_columns, use_json=(not use_localhost))
         
