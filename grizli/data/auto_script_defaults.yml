@@ -236,6 +236,7 @@ extract_args:
     maglim: [17,26]
     ids: []
     poly_order: 7
+    oned_R: 30
     bad_pa_threshold: null
     fit_trace_shift: False
     size: 32
