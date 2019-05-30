@@ -3665,7 +3665,7 @@ class MultiBeam(GroupFitter):
             self._parse_beams()
             self.initialize_masked_arrays()
             
-    def oned_spectrum(self, tfit=None, **kwargs):
+    def oned_spectrum(self, tfit=None, get_contam=True, **kwargs):
         """Compute full 1D spectrum with optional best-fit model
         
         Parameters
@@ -3711,7 +3711,10 @@ class MultiBeam(GroupFitter):
         
         # Optimal spectral extraction
         sp = self.optimal_extract(self.scif_mask[:self.Nspec]-bg_model, **kwargs)
-        
+        if get_contam:
+            spc = self.optimal_extract(self.contamf_mask[:self.Nspec],
+                                       **kwargs)
+            
         # Loop through grisms, change units and add fit columns
         # NB: setting units to "count / s" to comply with FITS standard, 
         #     where count / s = electron / s
@@ -3723,6 +3726,10 @@ class MultiBeam(GroupFitter):
             sp[k]['flux'].unit = u.count / u.s
             sp[k]['err'].unit = u.count / u.s
             
+            if get_contam:
+                sp[k]['contam'] = spc[k]['flux']
+                sp[k]['contam'].unit = u.count / u.s
+                
             if tfit is not None:
                 sp[k]['line'] = sp_line[k]['flux']
                 sp[k]['line'].unit = u.count / u.s

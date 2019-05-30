@@ -2581,7 +2581,7 @@ class GroupFitter(object):
         # 
         #     return fig, sfit
     
-    def oned_figure(self, bin=1, show_beams=True, minor=0.1, tfit=None, axc=None, figsize=[6,4], fill=False, units='flam', min_sens_show=0.1, ylim_percentile=2, scale_on_stacked=False, show_individual_templates=False, apply_beam_mask=True, loglam_1d=True, trace_limits=None):
+    def oned_figure(self, bin=1, show_beams=True, minor=0.1, tfit=None, axc=None, figsize=[6,4], fill=False, units='flam', min_sens_show=0.1, ylim_percentile=2, scale_on_stacked=False, show_individual_templates=False, apply_beam_mask=True, loglam_1d=True, trace_limits=None, show_contam=False):
         """
         1D figure
         1D figure
@@ -2710,6 +2710,7 @@ class GroupFitter(object):
                     w, flspl, erm = beam.beam.optimal_extract(mspl_i, bin=bin, ivar=beam.ivar*b_mask)
                         
                 w, fl, er = beam.beam.optimal_extract(clean, bin=bin, ivar=beam.ivar*b_mask)            
+                #w, flc, erc = beam.beam.optimal_extract(beam.contam, bin=bin, ivar=beam.ivar*b_mask)            
                 w, sens, ers = beam.beam.optimal_extract(f_i, bin=bin, ivar=beam.ivar*b_mask)
                 #sens = beam.beam.sensitivity                
             else:
@@ -2723,6 +2724,7 @@ class GroupFitter(object):
                     w, flspl, erm = beam.beam.optimal_extract(mspl_i, bin=bin, ivar=beam.ivar*b_mask)
                     
                 w, fl, er = beam.optimal_extract(clean, bin=bin, ivar=beam.ivar*b_mask)            
+                #w, flc, erc = beam.optimal_extract(beam.contam, bin=bin, ivar=beam.ivar*b_mask)            
                 w, sens, ers = beam.optimal_extract(f_i, bin=bin, ivar=beam.ivar*b_mask)
                 
                 #sens = beam.sens
@@ -2764,6 +2766,7 @@ class GroupFitter(object):
                 continue
             
             fl *= unit_corr/pscale#/1.e-19
+            #flc *= unit_corr/pscale#/1.e-19
             er *= unit_corr/pscale#/1.e-19
             if tfit is not None:
                 flm *= unit_corr#/1.e-19
@@ -2848,7 +2851,13 @@ class GroupFitter(object):
         sp_data = self.optimal_extract(self.scif_mask[:self.Nspec]-bg_model, 
                                        bin=bin, loglam=loglam_1d, 
                                        trace_limits=trace_limits)
-
+        
+        # Contamination
+        if show_contam:
+            sp_contam = self.optimal_extract(self.contamf_mask[:self.Nspec], 
+                                       bin=bin, loglam=loglam_1d, 
+                                       trace_limits=trace_limits)
+        
         for g in sp_data:
 
             clip = sp_flat[g]['flux'] != 0
@@ -2877,12 +2886,18 @@ class GroupFitter(object):
             
             flux = (sp_data[g]['flux']*unit_corr/pscale)[clip]
             err = (sp_data[g]['err']*unit_corr/pscale)[clip]
+
             ep = np.percentile(err, ylim_percentile)
             
             if fill:
                 axc.fill_between(sp_data[g]['wave'][clip]/1.e4, flux-err, flux+err, color=GRISM_COLORS[g], alpha=0.8, zorder=1, label=g) 
             else:
                 axc.errorbar(sp_data[g]['wave'][clip]/1.e4, flux, err, color=GRISM_COLORS[g], alpha=0.8, marker='.', linestyle='None', zorder=1, label=g) 
+            
+            if show_contam:
+                contam = (sp_contam[g]['flux']*unit_corr/pscale)[clip]
+                axc.plot(sp_data[g]['wave'][clip]/1.e4, contam,
+                         color='brown')
                 
             if ((tfit is None) & (clip.sum() > 0)) | (scale_on_stacked):
                 # Plot limits         
