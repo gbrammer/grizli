@@ -342,7 +342,8 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
         parsed = np.load('{0}_visits.npy'.format(root))
     
     visits, all_groups, info = parsed
-    run_has_grism = utils.column_string_operation(info['FILTER'], grisms, 
+    run_has_grism = utils.column_string_operation(info['FILTER'], 
+                                                ['G141','G102','G800L'], 
                                               'count', 'or').sum() 
     
     # Alignment catalogs
