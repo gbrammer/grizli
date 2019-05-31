@@ -4182,7 +4182,7 @@ For example,
     if ACS:
         files.extend(['jref$n6u12592j_pfl.fits',#F814 Flat
                       'jref$o841350mj_pfl.fits', #G800L flat])
-                      ])
+                      'jref$v971826jj_npl.fits'])
     
     for file in files:
         fetch_hst_calib(file)
