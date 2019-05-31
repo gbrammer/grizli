@@ -581,7 +581,9 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
                 thumbnail_args['drizzler_args'] = DRIZZLER_ARGS.copy()
 
             os.chdir(os.path.join(HOME_PATH, root, 'Prep'))
-
+            
+            #print('XXX ', thumbnail_args)
+            
             auto_script.make_rgb_thumbnails(root=root, **thumbnail_args)
 
             if not os.path.exists('../Thumbnails'):

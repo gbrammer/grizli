@@ -1029,27 +1029,38 @@ class GroupFLT():
                 
                 # Make figure
                 if make_figure:
-                    im = pyfits.open(outfile.replace('clean','sci'))[0].data
+                    img = pyfits.open(outfile.replace('clean','sci'))
+                    im = img[0].data
                     im[im == 0] = np.nan
                 
                     sh = im.shape
                     yp, xp = np.indices(sh)
                     mask = np.isfinite(im)
-                    xsl = slice(xp[mask].min()-10, xp[mask].max()+10)
-                    ysl = slice(yp[mask].min()-10, yp[mask].max()+10)
+                    
+                    xmi = np.maximum(xp[mask].min()-10, 0)
+                    xma = np.minimum(xp[mask].max()+10, sh[1])
+                    ymi = np.maximum(yp[mask].min()-10, 0)
+                    yma = np.minimum(yp[mask].max()+10, sh[0])
+                    
+                    xsl = slice(xmi, xma)
+                    ysl = slice(ymi, yma)
                 
                     sh_aspect = (ysl.stop - ysl.start) / (xsl.stop - xsl.start)
+                    vmi, vma = -0.05, 0.2
                 
                     fig = plt.figure(figsize=[fig_xsize, fig_xsize/2*sh_aspect])
                 
                     ax = fig.add_subplot(121)
-                    ax.imshow(im[ysl, xsl], origin='lower', cmap='gray_r', vmin=-0.05, vmax=0.2)
+                    ax.imshow(im[ysl, xsl], origin='lower', cmap='gray_r',
+                              vmin=vmi, vmax=vma)
                              
                     # Clean
                     ax = fig.add_subplot(122)
                     im = pyfits.open(outfile)[0].data
                     im[im == 0] = np.nan
-                    ax.imshow(im[ysl, xsl], origin='lower', cmap='gray_r', vmin=-0.05, vmax=0.2)
+                                        
+                    ax.imshow(im[ysl, xsl], origin='lower', cmap='gray_r',
+                              vmin=vmi, vmax=vma)
                 
                     for ax in fig.axes:
                         ax.set_xticklabels([])

@@ -200,7 +200,8 @@ thumb_rgb_params: &thumb_rgb_params
 drizzler_args: &drizzler_args
   aws_bucket: false
   filters: [f160w, f140w, f125w, f105w, f110w, f098m, 
-            f850lp, f814w, f775w, f606w, f475w, f555w, f600lp, f390w, f350lp]
+            f850lp, f814w, f775w, f606w, f475w, f435w,
+            f555w, f600lp, f390w, f350lp]
   half_optical_pixscale: true
   include_ir_psf: true
   kernel: square
