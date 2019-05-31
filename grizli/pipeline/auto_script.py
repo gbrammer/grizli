@@ -574,6 +574,21 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
     
     # Stop if only want to run pre-processing
     if (only_preprocess | (len(all_groups) == 0)):
+        if make_thumbnails:
+            print('#####\n# Make RGB thumbnails\n#####')
+
+            if thumbnail_args['drizzler_args'] is None:
+                thumbnail_args['drizzler_args'] = DRIZZLER_ARGS.copy()
+
+            os.chdir(os.path.join(HOME_PATH, root, 'Prep'))
+
+            auto_script.make_rgb_thumbnails(root=root, **thumbnail_args)
+
+            if not os.path.exists('../Thumbnails'):
+                os.mkdir('../Thumbnails/')
+
+            os.system('mv {0}_[0-9]*.png {0}_[0-9]*.fits ../Thumbnails/'.format(root))
+        
         utils.LOGFILE = '/tmp/grizli.log'
         return True
                 
