@@ -342,7 +342,9 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
         parsed = np.load('{0}_visits.npy'.format(root))
     
     visits, all_groups, info = parsed
-        
+    run_has_grism = utils.column_string_operation(info['FILTER'], grisms, 
+                                              'count', 'or').sum() 
+    
     # Alignment catalogs
     #catalogs = ['PS1','SDSS','GAIA','WISE']
     
@@ -645,7 +647,7 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
     # auto_script.field_psf(root=root, HOME_PATH=HOME_PATH)
     
     # Done?
-    if not run_extractions:
+    if (not run_extractions) | (not run_has_grism):
         # Make RGB thumbnails
         if make_thumbnails:
             print('#####\n# Make RGB thumbnails\n#####')
