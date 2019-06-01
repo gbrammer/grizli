@@ -663,10 +663,12 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
         
         if has_g800l > 0:
             min_sens = 0.
+            fit_trace_shift=True
         else:
             min_sens = 0.01
+            fit_trace_shift=False
             
-        auto_script.generate_fit_params(field_root=root, prior=None, MW_EBV=exptab.meta['MW_EBV'], pline=pline, fit_only_beams=True, run_fit=True, poly_order=7, fsps=True, min_sens=min_sens, sys_err=0.03, fcontam=0.2, zr=[0.05, 3.4], save_file='fit_args.npy', include_photometry=include_photometry_in_fit)
+        auto_script.generate_fit_params(field_root=root, prior=None, MW_EBV=exptab.meta['MW_EBV'], pline=pline, fit_only_beams=True, run_fit=True, poly_order=7, fsps=True, min_sens=min_sens, sys_err=0.03, fcontam=0.2, zr=[0.05, 3.4], save_file='fit_args.npy', fit_trace_shift=fit_trace_shift, include_photometry=include_photometry_in_fit)
     
     # Make PSF
     # print('Make field PSFs')
@@ -1279,7 +1281,7 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
         if len(glob.glob(grism['product']+'_dr?_sci.fits')) > 0:
             print('Skip grism', direct['product'], grism['product'])
             continue
-        
+                    
         # Do all ACS G800L files exist?
         if 'g800l' in grism['product']:
             test_flc = True
@@ -2468,7 +2470,7 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
     else:
         return True
         
-def generate_fit_params(field_root='j142724+334246', fitter=['nnls', 'bounded'], prior=None, MW_EBV=0.00, pline=DITHERED_PLINE, fit_only_beams=True, run_fit=True, poly_order=7, fsps=True, min_sens=0.01, sys_err=0.03, fcontam=0.2, zr=[0.05, 3.6], dz=[0.004, 0.0004], fwhm=1000, lorentz=False, include_photometry=False, save_file='fit_args.npy', **kwargs):
+def generate_fit_params(field_root='j142724+334246', fitter=['nnls', 'bounded'], prior=None, MW_EBV=0.00, pline=DITHERED_PLINE, fit_only_beams=True, run_fit=True, poly_order=7, fsps=True, min_sens=0.01, sys_err=0.03, fcontam=0.2, zr=[0.05, 3.6], dz=[0.004, 0.0004], fwhm=1000, lorentz=False, include_photometry=False, save_file='fit_args.npy', fit_trace_shift=False, **kwargs):
     """
     Generate a parameter dictionary for passing to the fitting script
     """
@@ -2481,7 +2483,7 @@ def generate_fit_params(field_root='j142724+334246', fitter=['nnls', 'bounded'],
     t0 = utils.load_templates(fwhm=fwhm, line_complexes=True, stars=False, full_line_list=None, continuum_list=None, fsps_templates=fsps, alf_template=True, lorentz=lorentz)
     t1 = utils.load_templates(fwhm=fwhm, line_complexes=False, stars=False, full_line_list=None, continuum_list=None, fsps_templates=fsps, alf_template=True, lorentz=lorentz)
 
-    args = fitting.run_all(0, t0=t0, t1=t1, fwhm=1200, zr=zr, dz=dz, fitter=fitter, group_name=field_root, fit_stacks=False, prior=prior,  fcontam=fcontam, pline=pline, min_sens=min_sens, mask_sn_limit=np.inf, fit_beams=False,  root=field_root, fit_trace_shift=False, phot=phot, verbose=True, scale_photometry=False, show_beams=True, overlap_threshold=10, get_ir_psfs=True, fit_only_beams=fit_only_beams, MW_EBV=MW_EBV, sys_err=sys_err, get_dict=True)
+    args = fitting.run_all(0, t0=t0, t1=t1, fwhm=1200, zr=zr, dz=dz, fitter=fitter, group_name=field_root, fit_stacks=False, prior=prior,  fcontam=fcontam, pline=pline, min_sens=min_sens, mask_sn_limit=np.inf, fit_beams=False,  root=field_root, fit_trace_shift=fit_trace_shift, phot=phot, verbose=True, scale_photometry=False, show_beams=True, overlap_threshold=10, get_ir_psfs=True, fit_only_beams=fit_only_beams, MW_EBV=MW_EBV, sys_err=sys_err, get_dict=True)
     
     if include_photometry:
         aper_ix = include_photometry*1
@@ -3438,7 +3440,9 @@ def fill_filter_mosaics(field_root):
         
     ir = pyfits.open(ir_drz)
     filter_files = glob.glob('{0}-f[01]*sci.fits'.format(field_root))
-    
+    if len(filter_files) == 0:
+        filter_files = glob.glob('{0}-f[5-8]*sci.fits'.format(field_root))
+        
     for file in filter_files:
         print(file)
         sci = pyfits.open(file, mode='update')
