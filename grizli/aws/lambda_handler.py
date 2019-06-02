@@ -151,11 +151,15 @@ def run_grizli_fit(event):
     for k in event:
         
         # Lists
-        if ',' in event[k]:
-            try:
-                event_kwargs[k] = np.cast[float](event[k].split(','))
-            except:
-                event_kwargs[k] = event[k].split(',')
+        if isinstance(event[k], str):
+            # Split lists
+            if ',' in event[k]:
+                try:
+                    event_kwargs[k] = np.cast[float](event[k].split(','))
+                except:
+                    event_kwargs[k] = event[k].split(',')
+            else:
+                event_kwargs[k] = event[k]
         else:
             try:
                 event_kwargs[k] = json.loads(event[k])
