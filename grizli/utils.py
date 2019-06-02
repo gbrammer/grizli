@@ -4062,7 +4062,7 @@ def symlink_templates(force=False):
         else:
             print('File exists: {0}'.format(out_file))
 
-def fetch_acs_wcs_files(beams_file):
+def fetch_acs_wcs_files(beams_file, bucket_name='aws-grivam'):
     """
     Fetch wcs files for a given beams.fits files
     """   
@@ -4090,17 +4090,20 @@ def fetch_acs_wcs_files(beams_file):
         
         # Download the file with S3 or HTTP
         if not os.path.exists(wcsfile):
+            print('Fetch {0} from {1}/Pipeline/{2}'.format(wcsfile,
+                                                           bucket_name, root))
+            
             if HAS_BOTO:
                 s3 = boto3.resource('s3')
                 s3_client = boto3.client('s3')
-                bkt = s3.Bucket('aws-grivam')
+                bkt = s3.Bucket(bucket_name)
                 
                 s3_path = 'Pipeline/{0}/Extractions/{1}'.format(root, wcsfile)
                 bkt.download_file(s3_path, './{0}'.format(wcsfile),
                                   ExtraArgs={"RequestPayer": "requester"})
                 
             else:
-                url = 'https://s3.amazonaws.com/aws-grivam/'
+                url = 'https://s3.amazonaws.com/{0}/'.format(bucket_name)
                 url += 'Pipeline/{0}/Extractions/{1}'.format(root, wcsfile)
                 
                 print('Fetch WCS file: {0}'.format(url))
