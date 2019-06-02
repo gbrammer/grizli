@@ -112,6 +112,24 @@ def extract_beams_from_flt(root, bucket, id):
     args = np.load('fit_args.npy', allow_pickle=True)[0]
     mb = multifit.MultiBeam(beams, **args)
     mb.write_master_fits()
+    
+    # 1D spectrum with R=30 fit
+    if True:
+        bin_steps, step_templ = utils.step_templates(wlim=[5000, 18000.0], 
+                                                     R=30, round=10)  
+
+        tfit = mb.template_at_z(z=0, templates=step_templ,
+                                fit_background=True, fitter='lstsq', 
+                                get_uncertainties=2)
+        
+        fig1 = mb.oned_figure(figsize=[5,3], tfit=tfit, show_beams=True, 
+                              scale_on_stacked=True, ylim_percentile=5)
+                              
+        outroot='{0}_{1:05d}.R{2:.0f}'.format(root, id, 30)
+        hdu = mb.oned_spectrum_to_hdu(outputfile=outroot+'.fits', 
+                                              tfit=tfit, wave=bin_steps)                     
+        fig1.savefig(outroot+'.png')
+        
     return('{0}_{1:05d}.beams.fits'.format(root, id))
     
 def run_grizli_fit(event):
@@ -138,7 +156,7 @@ def run_grizli_fit(event):
         if ',' in event[k]:
             try:
                 event_kwargs[k] = np.cast[float](event[k].split(','))
-            else:
+            except:
                 event_kwargs[k] = event[k].split(',')
         
     # Defaults
