@@ -74,10 +74,12 @@ def fit_lambda(root='j100025+021706', beams=[], ids=[], newfunc=False, bucket_na
             if isinstance(event[k], (list, np.ndarray)):
                 event[k] = ','.join(['{0}'.format(a) for a in event[k]])
             else:
-                try:
-                    event[k] = json.dumps(event[k])
-                except:
-                    print('Couldn\'t json.dumps item: ', event[k])
+                pass
+                
+                # try:
+                #     event[k] = json.dumps(event[k])
+                # except:
+                #     print('Couldn\'t json.dumps item: ', event[k])
                     
             # if isinstance(event[k], bool):
             #     event[k] = str(event[k])
