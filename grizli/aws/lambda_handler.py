@@ -149,13 +149,6 @@ def run_grizli_fit(event):
     ### 
     event_kwargs = {}
     for k in event:
-        # Bool
-        if event[k].lower() in ['false', 'true']:
-            event_kwargs[k] = event[k].lower() in ["true"]
-        
-        # None
-        if event[k].lower() in ['none']:
-            event_kwargs[k] = None
         
         # Lists
         if ',' in event[k]:
@@ -163,13 +156,11 @@ def run_grizli_fit(event):
                 event_kwargs[k] = np.cast[float](event[k].split(','))
             except:
                 event_kwargs[k] = event[k].split(',')
-        
-        # Dict
-        if '{' in event[k]:
+        else:
             try:
                 event_kwargs[k] = json.loads(event[k])
             except:
-                pass
+                event_kwargs[k] = event[k]
                 
     # Defaults
     for k in ['quasar_fit', 'skip_started', 'extract_from_flt']:
