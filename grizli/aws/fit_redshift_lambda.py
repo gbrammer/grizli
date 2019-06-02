@@ -57,12 +57,12 @@ def fit_lambda(root='j100025+021706', beams=[], ids=[], newfunc=False, bucket_na
         event = {
               "s3_object_path": s3_object_path,
               "bucket": bucket_name,
-              "skip_started": str(skip_started),
-              "quasar_fit" : str(quasar_fit),
+              "skip_started": skip_started,
+              "quasar_fit" : quasar_fit,
             }
         
         for arg in kwargs:
-            event[arg] = str(arg)
+            event[arg] = kwargs[arg] #str(arg)
                     
         if output_path is not None:
             if output_path == 'self':
