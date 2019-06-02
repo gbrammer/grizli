@@ -4081,6 +4081,9 @@ def fetch_acs_wcs_files(beams_file, bucket_name='aws-grivam'):
         if 'EXTNAME' not in h:
             continue
         
+        if 'FILTER' not in h:
+            continue
+        
         if (h['EXTNAME'] != 'SCI') | (h['FILTER'] not in ['G800L']):
             continue
         
