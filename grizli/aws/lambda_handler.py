@@ -3,19 +3,21 @@ Helper function for running Grizli redshift fits in AWS lambda
 
 event = {'s3_object_path' : 'Pipeline/j001452+091221/Extractions/j001452+091221_00277.beams.fits'}
 
-Optional event keys:
-
-    'verbose' : verbose output
+Optional event key (and anything to grizli.fitting.run_all):
     
     'skip_started' : Look for a start.log file and abort if found
     
     'check_wcs' : check for WCS files, needed for ACS fits
     
     'quasar_fit' : run fit with quasar templates
-    
-    'use_psf' : Use point source models (for quasar fits)
-    
+
     'output_path' : optional output path in the aws-grivam bucket
+
+Example run_all arguments:
+
+    'use_psf' : Use point source models (for quasar fits)
+
+    'verbose' : verbose output
     
     'zr' : [zmin, zmax] Redshift fitting range
     
@@ -134,6 +136,8 @@ def extract_beams_from_flt(root, bucket, id):
     
 def run_grizli_fit(event):
     import boto3
+    import json
+    
     import grizli
     from grizli import fitting, utils, multifit
     utils.set_warnings()
@@ -160,17 +164,18 @@ def run_grizli_fit(event):
             except:
                 event_kwargs[k] = event[k].split(',')
         
+        # Dict
+        if '{' in event[k]:
+            try:
+                event_kwargs[k] = json.loads(event[k])
+            except:
+                pass
+                
     # Defaults
-    for k in ['verbose', 'check_wcs', 'quasar_fit', 'use_psf', 'skip_started', 'extract_from_flt']:
+    for k in ['quasar_fit', 'skip_started', 'extract_from_flt']:
         if k not in event_kwargs:
             event_kwargs[k] = False
-            
-    # for k in ['verbose', 'check_wcs', 'quasar_fit', 'use_psf', 'skip_started', 'extract_from_flt']:
-    #     if k in event:
-    #         event_bools[k] = event[k].lower() in ["true", True]
-    #     else:
-    #         event_bools[k] = False
-    
+        
     print('Grizli version: ', grizli.__version__)
     
     ## Output path
@@ -179,7 +184,7 @@ def run_grizli_fit(event):
     else:
         output_path = None
     
-    if 'bucket' not in event:
+    if 'bucket' in event:
         event_kwargs['bucket'] = event['bucket']
     else:
         event_kwargs['bucket'] = 'aws-grivam'
@@ -238,27 +243,29 @@ def run_grizli_fit(event):
         if 'run_fit' in event:
             if event['run_fit'].lower() == 'false':
                 return True
+    
+    utils.fetch_acs_wcs_files(beams_file, bucket_name=event_kwargs['bucket'])
                 
     # Download WCS files
-    if event_kwargs['check_wcs']:
-        # WCS files for ACS
-        files = [obj.key for obj in bkt.objects.filter(Prefix='Pipeline/{0}/Extractions/j'.format(root))]
-        for file in files:
-            if 'wcs.fits' in file:
-                if os.path.exists(os.path.basename(file)):
-                    continue
-                
-                bkt.download_file(file, os.path.basename(file),
-                                  ExtraArgs={"RequestPayer": "requester"})
+    # if event_kwargs['check_wcs']:
+    #     # WCS files for ACS
+    #     files = [obj.key for obj in bkt.objects.filter(Prefix='Pipeline/{0}/Extractions/j'.format(root))]
+    #     for file in files:
+    #         if 'wcs.fits' in file:
+    #             if os.path.exists(os.path.basename(file)):
+    #                 continue
+    #             
+    #             bkt.download_file(file, os.path.basename(file),
+    #                               ExtraArgs={"RequestPayer": "requester"})
      
     # Is zr in the event dict?
-    if 'zr' in event:
-        zr = list(np.cast[float](event['zr']))
-    else:
-        try:
-            zr = np.load('fit_args.npy')[0]['zr']
-        except:
-            zr = np.load('fit_args.npy', allow_pickle=True)[0]['zr']
+    # if 'zr' in event:
+    #     zr = list(np.cast[float](event['zr']))
+    # else:
+    #     try:
+    #         zr = np.load('fit_args.npy')[0]['zr']
+    #     except:
+    #         zr = np.load('fit_args.npy', allow_pickle=True)[0]['zr']
     
     # Directory listing
     files = glob.glob('*')
@@ -278,7 +285,7 @@ def run_grizli_fit(event):
                                             nspline=13)
         
         fitting.run_all_parallel(id, t0=t0, t1=t1, fit_only_beams=True,
-                                 fit_beams=False,  zr=zr, phot_obj=None, 
+                                 fit_beams=False, phot_obj=None, 
                                  **event_kwargs)
         
         if output_path is None:
@@ -287,8 +294,8 @@ def run_grizli_fit(event):
     else:
         
         # Normal galaxy redshift fit
-        fitting.run_all_parallel(id, zr=zr, fit_only_beams=True,
-                                 fit_beams=False,  **event_kwargs)
+        fitting.run_all_parallel(id, fit_only_beams=True, fit_beams=False,  
+                                 **event_kwargs)
         
         if output_path is None:
             output_path = 'Pipeline/{0}/Extractions'.format(root)
@@ -307,16 +314,44 @@ def run_grizli_fit(event):
 def clean(root='', verbose=True):
     import glob
     import os
+    
     files = glob.glob(root+'*')
+    files += glob.glob('*wcs.fits')
     files.sort()
+    
     for file in files:
         print('Cleanup: {0}'.format(file))
         os.remove(file)
         
 TESTER = 'Pipeline/j001452+091221/Extractions/j001452+091221_00277.beams.fits'
 def run_test(s3_object_path=TESTER):
-    event = {'s3_object_path': s3_object_path, 'verbose':'True'}
+    import os
+    
+    from importlib import reload
+    import grizli.aws.lambda_handler
+    reload(grizli.aws.lambda_handler)
+    
+    from grizli.aws.lambda_handler import run_grizli_fit, clean
+    
+    #event = {'s3_object_path': s3_object_path, 'verbose':'True'}
+    
+    obj = 'j224916m4432_02983'
+    
+    bucket = 'grizli'
+    root, id = obj.split('_')
+    s3_object_path = 'Pipeline/{0}/Extractions/{0}_{1:05d}.beams.fits'.format(root, int(id))
+    event = {'s3_object_path':s3_object_path,
+             'bucket':bucket,
+             'verbose': 'True',
+             'check_wcs': 'True',
+             'zr':'0.1,0.3',
+             }
+             
     run_grizli_fit(event)
+    
+    beams_file = os.path.basename(event['s3_object_path'])
+    root = beams_file.split('_')[0]
+    clean(root=root, verbose=True)
     
 def handler(event, context):
     import traceback

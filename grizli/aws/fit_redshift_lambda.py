@@ -1,7 +1,7 @@
 #!/usr/bin/env python
-def fit_lambda(root='j100025+021706', beams=[], ids=[], newfunc=False, bucket_name='aws-grivam', skip_existing=True, sleep=True, check_wcs=False, use_psf=False, verbose=False, skip_started=True, quasar_fit=False, zr=None, output_path=None, show_event=False, **kwargs):
+def fit_lambda(root='j100025+021706', beams=[], ids=[], newfunc=False, bucket_name='aws-grivam', skip_existing=True, sleep=True, skip_started=True, quasar_fit=False, output_path=None, show_event=False, **kwargs):
     """
-    check_wcs=True for ACS
+
     """
     import time
     import os
@@ -51,30 +51,39 @@ def fit_lambda(root='j100025+021706', beams=[], ids=[], newfunc=False, bucket_na
         
         if False:
             # Defaults
-            check_wcs=False # Set to true for ACS
-            use_psf=False   # Use point source profile
-            verbose=False   # Logging
             skip_started=True # SKip objects already started
             quasar_fit=False  # Fit with quasar templates
             
         event = {
               "s3_object_path": s3_object_path,
               "bucket": bucket_name,
-              "verbose":      str(verbose),
               "skip_started": str(skip_started),
-              "check_wcs" :   str(check_wcs),
               "quasar_fit" : str(quasar_fit),
-              "use_psf"   : str(use_psf)
             }
         
+        for arg in kwargs:
+            event[arg] = str(arg)
+                    
         if output_path is not None:
             if output_path == 'self':
                 event['output_path'] = os.path.dirname(s3_object_path)
             else:
                 event['output_path'] = output_path
-        
-        if zr is not None:
-            event['zr'] = zr.split(',')
+                
+        for k in event:
+            if isinstance(event[k], (list, np.ndarray)):
+                event[k] = ','.join(['{0}'.format(a) for a in event[k]])
+            else:
+                try:
+                    event[k] = json.dumps(event[k])
+                except:
+                    print('Couldn\'t json.dumps item: ', event[k])
+                    
+            # if isinstance(event[k], bool):
+            #     event[k] = str(event[k])
+            # 
+            # if isinstance(event[k], dict):
+            #     event[k] = json.dumps(event[k])
             
         if show_event:
             print('Event: \n\n', event.__str__().replace('\'', '"').replace(',', ',\n'))
@@ -186,9 +195,6 @@ if __name__ == "__main__":
               'show_event':False}
     
     # Args passed to the lambda event
-    kwargs['check_wcs'] = False # Set to true for ACS
-    kwargs['use_psf'] = False   # Use point source profile
-    kwargs['verbose'] = False   # Logging
     kwargs['skip_started'] = True # SKip objects already started
     kwargs['quasar_fit'] = False  # Fit with quasar templates
     
@@ -199,7 +205,7 @@ if __name__ == "__main__":
             keypair = args.strip('--').split('=')
             
             # Booleans
-            if keypair[0] in ['newfunc','skip_existing','sleep','check_wcs','use_psf','verbose','skip_started','quasar_fit', 'show_event']:
+            if keypair[0] in ['newfunc','skip_existing','sleep','skip_started','quasar_fit', 'show_event']:
                 if len(keypair) == 1:
                     kwargs[keypair[0]] = True
                 else:
