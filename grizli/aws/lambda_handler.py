@@ -27,12 +27,12 @@ import time
 
 import numpy as np
 
-import boto3
-
 def extract_beams_from_flt(root, bucket, id):
     """
     Download GrismFLT files and extract the beams file
     """
+    import boto3
+    
     import grizli
     from grizli import fitting, utils, multifit
     utils.set_warnings()
@@ -133,6 +133,7 @@ def extract_beams_from_flt(root, bucket, id):
     return('{0}_{1:05d}.beams.fits'.format(root, id))
     
 def run_grizli_fit(event):
+    import boto3
     import grizli
     from grizli import fitting, utils, multifit
     utils.set_warnings()
