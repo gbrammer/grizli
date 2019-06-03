@@ -3829,6 +3829,9 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
         count += 1
         header['FLT{0:05d}'.format(count)] = file
         
+        xfiles = glob.glob('*')
+        print('Clean: ', clean, xfiles)
+        
         if clean:
             os.remove(file)
     
