@@ -408,8 +408,8 @@ def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixsca
         if remove:
             os.system('rm *_fl*fits')
                 
-        if combine_similar_filters:
-            combine_filters(label=label)    
+    if combine_similar_filters:
+        combine_filters(label=label)    
                  
     if len(has_filts) == 0:
         return []
