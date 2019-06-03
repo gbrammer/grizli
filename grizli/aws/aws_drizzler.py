@@ -564,6 +564,9 @@ def get_cutout_from_aws(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, m
     
     if (len(files) == 0) | force:
         print('Call lambda: {0}'.format(label))
+        
+        print(event)
+        
         response = client.invoke(
             FunctionName=lambda_func,
             InvocationType='Event',
@@ -577,6 +580,9 @@ def get_cutout_from_aws(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, m
     
 def handler(event, context):
     import os
+    import grizli
+    print(grizli.__version__)
+    
     os.chdir('/tmp/')
     os.system('rm *')
     
