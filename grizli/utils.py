@@ -2902,7 +2902,7 @@ def get_wcs_pscale(wcs):
     
     Parameters
     ----------
-    wcs : `~astropy.wcs.WCS`
+    wcs : `~astropy.wcs.WCS` or `~astropy.io.fits.Header`
         
     Returns
     -------
@@ -2911,6 +2911,10 @@ def get_wcs_pscale(wcs):
         
     """
     from numpy import linalg
+    
+    if isinstance(wcs, pyfits.Header):
+        wcs = pywcs.WCS(wcs, relax=True)
+        
     try:
         det = linalg.det(wcs.wcs.cd)
     except:
