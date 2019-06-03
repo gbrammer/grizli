@@ -4059,7 +4059,7 @@ def make_rgb_thumbnails(root='j140814+565638', ids=None, maglim=21,
             
         aws_drizzler.drizzle_images(label=label,       
                          ra=cat['ra'][ix][0], dec=cat['dec'][ix][0],
-                         master='local', single_output=True, 
+                         master='local', single_output=True, remove=False, 
                          make_segmentation_figure=False, **args)
         
         files = glob.glob('{0}.thumb.fits'.format(label))
