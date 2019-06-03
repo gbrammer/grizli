@@ -1,4 +1,5 @@
 #!/bin/env python
+import inspect
 
 def group_by_filter():
     """
@@ -12,7 +13,7 @@ def group_by_filter():
     master='grizli-jan2019'
     
     tab = utils.read_catalog('{0}_visits.fits'.format(master))
-    all_visits = np.load('{0}_visits.npy'.format(master))[0]
+    all_visits = np.load('{0}_visits.npy'.format(master), allow_pickle=True)[0]
     
     # By filter
     
@@ -143,7 +144,7 @@ def segmentation_figure(label, cat, segfile):
                  output_verify='fix')
     th.close()
     
-def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixscale=0.1, size=10, wcs=None, pixfrac=0.33, kernel='square', theta=0, half_optical_pixscale=True, filters=['f160w', 'f140w', 'f125w', 'f105w', 'f110w', 'f098m', 'f850lp', 'f814w', 'f775w', 'f606w', 'f475w', 'f555w', 'f600lp', 'f390w', 'f350lp'], remove=True, rgb_params=RGB_PARAMS, master='grizli-jan2019', aws_bucket='s3://grizli/CutoutProducts/', scale_ab=21, thumb_height=2.0, sync_fits=True, subtract_median=True, include_saturated=True, include_ir_psf=False, show_filters=['visb', 'visr', 'y', 'j', 'h'], combine_similar_filters=True, single_output=True, aws_prep_dir=None, make_segmentation_figure=False):
+def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixscale=0.1, size=10, wcs=None, pixfrac=0.33, kernel='square', theta=0, half_optical_pixscale=True, filters=['f160w', 'f140w', 'f125w', 'f105w', 'f110w', 'f098m', 'f850lp', 'f814w', 'f775w', 'f606w', 'f475w', 'f555w', 'f600lp', 'f390w', 'f350lp'], remove=True, rgb_params=RGB_PARAMS, master='grizli-jan2019', aws_bucket='s3://grizli/CutoutProducts/', scale_ab=21, thumb_height=2.0, sync_fits=True, subtract_median=True, include_saturated=True, include_ir_psf=False, show_filters=['visb', 'visr', 'y', 'j', 'h'], combine_similar_filters=True, single_output=True, aws_prep_dir=None, make_segmentation_figure=False, get_dict=False, **kwargs):
     """
     label='cp561356'; ra=150.208875; dec=1.850241667; size=40; filters=['f160w','f814w', 'f140w','f125w','f105w','f606w','f475w']
     
@@ -160,16 +161,36 @@ def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixsca
     import astropy.units as u
     from drizzlepac.adrizzle import do_driz
     
-    try:
-        import boto3
-        s3 = boto3.resource('s3')
-        s3_client = boto3.client('s3')
-    except:
-        pass
+    import boto3
         
     from grizli import prep, utils
     from grizli.pipeline import auto_script
+    
+    # Function arguments
+    if get_dict:
+        frame = inspect.currentframe()
+        args = inspect.getargvalues(frame).locals
         
+        pop_args = ['get_dict', 'frame', 'kwargs']
+        pop_classes = (np.__class__, do_driz.__class__, SkyCoord.__class__)
+        
+        for k in kwargs:
+            args[k] = kwargs[k]
+            
+        for k in args:
+            if isinstance(args[k], pop_classes):
+                pop_args.append(k)
+                
+        for k in pop_args:
+            if k in args:
+                args.pop(k)
+                
+        return args 
+    
+    # Boto objects
+    s3 = boto3.resource('s3')
+    s3_client = boto3.client('s3')
+    
     if isinstance(ra, str):
         coo = SkyCoord('{0} {1}'.format(ra, dec), unit=(u.hour, u.deg))
         ra, dec = coo.ra.value, coo.dec.value
@@ -246,7 +267,7 @@ def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixsca
             
             visit_file = glob.glob(visit_query+'visits.npy')[0]
             
-            visits, groups, info = np.load(visit_file)
+            visits, groups, info = np.load(visit_file, allow_pickle=True)
             visit_root = visit_file.split('_visits')[0]
             
             visit_filters = np.array([v['product'].split('-')[-1] for v in visits])
@@ -273,7 +294,7 @@ def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixsca
             np.save('{0}_filter_groups.npy'.format(visit_root), [groups])
                 
         else:
-            groups = np.load(groups_files[0])[0]
+            groups = np.load(groups_files[0], allow_pickle=True)[0]
         
     #filters = ['f160w','f814w', 'f110w', 'f098m', 'f140w','f125w','f105w','f606w', 'f475w']
     
