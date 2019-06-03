@@ -813,7 +813,7 @@ def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat',
     info['log_mass'].format = '.2f'
     
     # ID with link to CDS
-    idx = ['<a href="http://vizier.u-strasbg.fr/viz-bin/VizieR?-c={0:.6f}+{1:.6f}&-c.rs=2">{2}</a>'.format(info['ra'][i], info['dec'][i], info['id'][i]) for i in range(len(info))]
+    idx = ['<a href="http://vizier.u-strasbg.fr/viz-bin/VizieR?-c={0:.6f}+{1:.6f}&-c.rs=2">{2:05d}</a>'.format(info['ra'][i], info['dec'][i], info['id'][i]) for i in range(len(info))]
     info['idx'] = idx
     
     ### PNG columns    
@@ -2056,6 +2056,7 @@ class GroupFitter(object):
                        scale_on_stacked_1d=True, loglam_1d=True, zspec=None):
         """TBD
         """
+        import time
         import matplotlib.pyplot as plt
         import matplotlib.gridspec
         from matplotlib.ticker import MultipleLocator
@@ -2068,13 +2069,18 @@ class GroupFitter(object):
                         width_ratios=[1,1.5+0.5*(Ng>1)],
                         hspace=0.)
             
-        fig = plt.figure(figsize=[8+4*(Ng>1), 3.5])
+        xsize = 8+4*(Ng>1)
+        fig = plt.figure(figsize=[xsize, 3.5])
         
         # p(z)
         axz = fig.add_subplot(gs[-1,0]) #121)
         
         axz.text(0.95, 0.96, self.group_name + '\n'+'ID={0:<5d}  z={1:.4f}'.format(self.id, fit.meta['z_map'][0]), ha='right', va='top', transform=axz.transAxes, fontsize=9)
-         
+                
+        if 'FeII-VC2004' in tfit['cfit']:
+            # Quasar templates 
+            axz.text(0.04, 0.96, 'quasar templ.', ha='left', va='top', transform=axz.transAxes, fontsize=5)
+
         zmi, zma = fit['zgrid'].min(), fit['zgrid'].max()
         if (zma-zmi) > 5:
             ticks = np.arange(np.ceil(zmi), np.floor(zma)+0.5, 1)
@@ -2111,6 +2117,9 @@ class GroupFitter(object):
         self.oned_figure(bin=bin, show_beams=show_beams, minor=minor, tfit=tfit, axc=axc, scale_on_stacked=scale_on_stacked_1d, loglam_1d=loglam_1d)
         
         gs.tight_layout(fig, pad=0.1, w_pad=0.1)
+        
+        fig.text(1-0.015*8./xsize, 0.02, time.ctime(), ha='right', va='bottom', transform=fig.transFigure, fontsize=5)
+        
         return fig
         
     def process_zfit(self, zgrid, chi2, prior=None):
@@ -3311,6 +3320,8 @@ def show_drizzled_lines(line_hdu, full_line_list=['OII', 'Hb', 'OIII', 'Ha+NII',
         and stop if the indicated filter is available.
         
     """
+    import time
+    
     import matplotlib.pyplot as plt
     from matplotlib.ticker import MultipleLocator
     
@@ -3340,7 +3351,8 @@ def show_drizzled_lines(line_hdu, full_line_list=['OII', 'Hb', 'OIII', 'Ha+NII',
               
     NL = len(show_lines)
     
-    fig = plt.figure(figsize=[3*(NL+1),3.4])
+    xsize = 3*(NL+1)
+    fig = plt.figure(figsize=[xsize,3.4])
     
     # Direct
     ax = fig.add_subplot(1,NL+1,1)
@@ -3387,5 +3399,7 @@ def show_drizzled_lines(line_hdu, full_line_list=['OII', 'Hb', 'OIII', 'Ha+NII',
         ax.yaxis.set_major_locator(majorLocator)
 
     fig.tight_layout(pad=0.1, w_pad=0.5)
+    fig.text(1-0.015*12./xsize, 0.02, time.ctime(), ha='right', va='bottom', transform=fig.transFigure, fontsize=5)
+    
     return fig
 
