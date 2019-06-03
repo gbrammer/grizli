@@ -264,6 +264,8 @@ def run_grizli_fit(event):
     
     # Directory listing
     files = glob.glob('*')
+    files.sort()
+    
     for i, file in enumerate(files):
         print('File ({0}): {1}'.format(i+1, file))
                 
@@ -347,14 +349,32 @@ def run_test(s3_object_path=TESTER):
     beams_file = os.path.basename(event['s3_object_path'])
     root = beams_file.split('_')[0]
     clean(root=root, verbose=True)
-    
+
 def handler(event, context):
+    
+    if 'handler_type' not in event:
+        handler_type = 'redshift_handler'
+    else:
+        handler_type = event.pop('handler_type')
+    
+    print('Handler type: ', handler_type)
+    
+    # Send the event to the appropriate function
+    if handler_type == 'redshift_handler':
+        redshift_handler(event, context)
+        
+    elif handler_type == 'show_version_handler':
+        show_version(event, context)
+        
+    elif handler_type == 'drizzle_handler':
+        from grizli.aws import aws_drizzler
+        aws_drizzler.handler(event, context)
+        
+def redshift_handler(event, context):
     import traceback
     
     print(event) #['s3_object_path'], event['verbose'])
     print(context)
-    #print('log_stream_name: {0}'.format(context.log_stream_name))
-    #context.log_stream_name = event['s3_object_path'].replace('/','_')
     
     try:
         run_grizli_fit(event)
@@ -365,27 +385,6 @@ def handler(event, context):
     beams_file = os.path.basename(event['s3_object_path'])
     root = beams_file.split('_')[0]
     clean(root=root, verbose=True)
-        
-    # # Clean out the log
-    # beams_file = os.path.basename(event['s3_object_path'])
-    # root = beams_file.split('_')[0]
-    # id = int(beams_file.split('_')[1].split('.')[0])
-    # 
-    # # Start log
-    # start_log = '{0}_{1:05d}.start.log'.format(root, id)
-    # full_start = 'Pipeline/{0}/Extractions/{1}'.format(root, start_log)
-    # 
-    # print('Failed on {0}, remove {1}.'.format(event['s3_object_path'], 
-    #                                           full_start))
-    # 
-    # if 'bucket' in event:
-    #     bucket = event['bucket']
-    # else:
-    #     bucket = 'aws-grivam'
-    # 
-    # s3 = boto3.resource('s3')
-    # bkt = s3.Bucket(bucket)
-    # res = bkt.delete_objects(Delete={'Objects':[{'Key':full_start}]})
         
 def show_version(event, context):
     import grizli

@@ -3932,7 +3932,7 @@ def make_rgb_thumbnails(root='j140814+565638', ids=None, maglim=21,
     """    
     import matplotlib.pyplot as plt
     import astropy.wcs as pywcs
-    from grizli_aws import aws_drizzler
+    from grizli.aws import aws_drizzler
     
     phot_cat = glob.glob('../Prep/{0}_phot.fits'.format(root))[0]
     cat = utils.read_catalog(phot_cat)
@@ -4059,12 +4059,13 @@ def make_rgb_thumbnails(root='j140814+565638', ids=None, maglim=21,
             
         aws_drizzler.drizzle_images(label=label,       
                          ra=cat['ra'][ix][0], dec=cat['dec'][ix][0],
-                         master='local', **args)
+                         master='local', single_output=True, 
+                         make_segmentation_figure=False, **args)
         
-        files = glob.glob('{0}*_dr[cz]*sci.fits'.format(label))
+        files = glob.glob('{0}.thumb.fits'.format(label))
         blot_seg = None
         if (make_segmentation_figure) & (len(files) > 0):
-            th = pyfits.open(files[0])
+            th = pyfits.open(files[0], mode='update')
             th_wcs = pywcs.WCS(th[0].header)
             blot_seg = utils.blot_nearest_exact(seg_data, seg_wcs, th_wcs, 
                                        stepsize=-1, scale_by_pixel_area=False)
@@ -4105,50 +4106,58 @@ def make_rgb_thumbnails(root='j140814+565638', ids=None, maglim=21,
             fig.savefig('{0}.seg.png'.format(label))
             plt.close(fig)
             
+            # Append to thumbs file
+            seg_hdu = pyfits.ImageHDU(data=np.cast[int](blot_seg), name='SEG')
+            th.append(seg_hdu)                            
+            th.writeto('{0}.thumb.fits'.format(label), overwrite=True, 
+                         output_verify='fix')
+            th.close()
+                    
         if remove_fits > 0:
             files = glob.glob('{0}*_dr[cz]*fits'.format(label))
             for file in files:
                 os.remove(file)
-        elif remove_fits < 0:
-            # Concatenate into a single FITS file
-            files = glob.glob('{0}*_dr[cz]_sci.fits'.format(label))
-            files.sort()
-            hdul = None
-            for file in files:
-                hdu_i = pyfits.open(file)
-                hdu_i[0].header['EXTNAME'] = 'SCI'
-                if 'vis_dr' in file:
-                    filt_i = 'VIS'
-                else:
-                    filt_i = utils.get_hst_filter(hdu_i[0].header)
-                
-                for h in hdu_i:
-                    h.header['EXTVER'] = filt_i
-                    if hdul is None:
-                        hdul = pyfits.HDUList([h])
-                    else:
-                        hdul.append(h)
-                
-                # Weight
-                hdu_i = pyfits.open(file.replace('_sci', '_wht'))
-                hdu_i[0].header['EXTNAME'] = 'WHT'
-                for h in hdu_i:
-                    h.header['EXTVER'] = filt_i
-                    if hdul is None:
-                        hdul = pyfits.HDUList([h])
-                    else:
-                        hdul.append(h)
-            
-            if blot_seg is not None:
-                hdul.append(pyfits.ImageHDU(data=np.cast[int](blot_seg),
-                                            name='SEG'))
-                                            
-            hdul.writeto('{0}.thumb.fits'.format(label), overwrite=True, 
-                         output_verify='fix')
-            
-            files = glob.glob('{0}*_dr[cz]*fits'.format(label))
-            for file in files:
-                os.remove(file)
+        
+        # elif remove_fits < 0:
+        #     # Concatenate into a single FITS file
+        #     files = glob.glob('{0}*_dr[cz]_sci.fits'.format(label))
+        #     files.sort()
+        #     hdul = None
+        #     for file in files:
+        #         hdu_i = pyfits.open(file)
+        #         hdu_i[0].header['EXTNAME'] = 'SCI'
+        #         if 'vis_dr' in file:
+        #             filt_i = 'VIS'
+        #         else:
+        #             filt_i = utils.get_hst_filter(hdu_i[0].header)
+        #         
+        #         for h in hdu_i:
+        #             h.header['EXTVER'] = filt_i
+        #             if hdul is None:
+        #                 hdul = pyfits.HDUList([h])
+        #             else:
+        #                 hdul.append(h)
+        #         
+        #         # Weight
+        #         hdu_i = pyfits.open(file.replace('_sci', '_wht'))
+        #         hdu_i[0].header['EXTNAME'] = 'WHT'
+        #         for h in hdu_i:
+        #             h.header['EXTVER'] = filt_i
+        #             if hdul is None:
+        #                 hdul = pyfits.HDUList([h])
+        #             else:
+        #                 hdul.append(h)
+        #     
+        #     if blot_seg is not None:
+        #         hdul.append(pyfits.ImageHDU(data=np.cast[int](blot_seg),
+        #                                     name='SEG'))
+        #                                     
+        #     hdul.writeto('{0}.thumb.fits'.format(label), overwrite=True, 
+        #                  output_verify='fix')
+        #     
+        #     files = glob.glob('{0}*_dr[cz]*fits'.format(label))
+        #     for file in files:
+        #         os.remove(file)
               
 def make_rgb_thumbnails_OLD(root='j140814+565638', HOME_PATH='./', maglim=23, cutout=12., figsize=[2,2], ids=None, close=True, skip=True, force_ir=False, add_grid=True, scl=1):
     """
