@@ -366,7 +366,7 @@ def handler(event, context):
     elif handler_type == 'show_version_handler':
         show_version(event, context)
         
-    elif handler_type == 'drizzle_handler':
+    elif (handler_type == 'drizzle_handler') | ('scale_ab' in event):
         from grizli.aws import aws_drizzler
         aws_drizzler.handler(event, context)
         
