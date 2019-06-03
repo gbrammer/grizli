@@ -353,7 +353,10 @@ def run_test(s3_object_path=TESTER):
 def handler(event, context):
     
     if 'handler_type' not in event:
-        handler_type = 'redshift_handler'
+        if 'scale_ab' in event:
+            handler_type = 'drizzle_handler'
+        else:
+            handler_type = 'redshift_handler'
     else:
         handler_type = event.pop('handler_type')
     
@@ -366,7 +369,7 @@ def handler(event, context):
     elif handler_type == 'show_version_handler':
         show_version(event, context)
         
-    elif (handler_type == 'drizzle_handler') | ('scale_ab' in event):
+    elif (handler_type == 'drizzle_handler'):
         from grizli.aws import aws_drizzler
         aws_drizzler.handler(event, context)
         
