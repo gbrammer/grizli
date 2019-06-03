@@ -53,11 +53,97 @@ def group_by_filter():
     
     np.save('{0}_filter_groups.npy'.format(master), [groups])
     
-RGB_PARAMS = {'xsize':4, 'rgb_min':-0.01, 'verbose':True, 'output_dpi': None, 'add_labels':False, 'output_format':'png', 'show_ir':False, 'scl':2, 'suffix':'.rgb', 'mask_empty':False}
+# RGB_PARAMS = {'xsize':4, 'rgb_min':-0.01, 'verbose':True, 'output_dpi': None, 'add_labels':False, 'output_format':'png', 'show_ir':False, 'scl':2, 'suffix':'.rgb', 'mask_empty':False}
 
+RGB_PARAMS = {'xsize':4, 
+              'output_dpi': None, 
+              'rgb_min':-0.01,
+              'add_labels':False, 
+              'output_format':'png', 
+              'show_ir':False, 
+              'scl':2, 
+              'suffix':'.rgb', 
+              'mask_empty':False,
+              'tick_interval':1,
+              'pl':1, # 1 for f_lambda, 2 for f_nu
+              }
+              
 #xsize=4, output_dpi=None, HOME_PATH=None, show_ir=False, pl=1, pf=1, scl=1, rgb_scl=[1, 1, 1], ds9=None, force_ir=False, filters=all_filters, add_labels=False, output_format='png', rgb_min=-0.01, xyslice=None, pure_sort=False, verbose=True, force_rgb=None, suffix='.rgb', scale_ab=scale_ab)
 
-def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixscale=0.06, size=10, wcs=None, pixfrac=0.8, kernel='square', theta=0, half_optical_pixscale=False, filters=['f160w', 'f140w', 'f125w', 'f105w', 'f110w', 'f098m', 'f850lp', 'f814w', 'f775w', 'f606w', 'f475w', 'f555w', 'f600lp', 'f390w', 'f350lp'], remove=True, rgb_params=RGB_PARAMS, master='grizli-jan2019', aws_bucket='s3://grizli/CutoutProducts/', scale_ab=21, thumb_height=2.0, sync_fits=True, subtract_median=True, include_saturated=True, include_ir_psf=False, show_filters=['visb', 'visr', 'y', 'j', 'h'], combine_similar_filters=True):
+def segmentation_figure(label, cat, segfile):
+    """
+    Make a figure showing a cutout of the segmentation file
+    """
+    import matplotlib.pyplot as plt
+    import numpy as np
+    
+    import astropy.io.fits as pyfits
+    import astropy.wcs as pywcs
+    from grizli import utils
+    
+    plt.ioff()
+    
+    seg = pyfits.open(segfile)
+    seg_data = seg[0].data
+    seg_wcs = pywcs.WCS(seg[0].header)
+        
+    # Randomize seg to get dispersion between neighboring objects 
+    np.random.seed(hash(label.split('_')[0]) % (10 ** 8))
+    rnd_ids = np.append([0], np.argsort(np.random.rand(len(cat)))+1)
+    
+    # Make cutout
+    th = pyfits.open('{0}.thumb.fits'.format(label), mode='update')
+    th_wcs = pywcs.WCS(th[0].header)
+    blot_seg = utils.blot_nearest_exact(seg_data, seg_wcs, th_wcs, 
+                               stepsize=-1, scale_by_pixel_area=False)
+    
+    rnd_seg = rnd_ids[np.cast[int](blot_seg)]*1.
+    th_ids = np.unique(blot_seg)
+    
+    sh = th[0].data.shape
+    yp, xp = np.indices(sh)
+    
+    thumb_height = 2.
+    fig = plt.figure(figsize=[thumb_height*sh[1]/sh[0], thumb_height])
+    ax = fig.add_subplot(111)
+    rnd_seg[rnd_seg == 0] = np.nan
+    
+    ax.imshow(rnd_seg, aspect='equal', cmap='terrain_r', 
+              vmin=-0.05*len(cat), vmax=1.05*len(cat))
+    ax.set_xticklabels([])
+    ax.set_yticklabels([])
+    
+    ix = utils.column_values_in_list(cat['number'], th_ids)  
+    xc, yc = th_wcs.all_world2pix(cat['ra'][ix], cat['dec'][ix], 0)
+    xc = np.clip(xc, 0.09*sh[1], 0.91*sh[1])
+    yc = np.clip(yc, 0.08*sh[0], 0.92*sh[0])
+    
+    for th_id, x_i, y_i in zip(cat['number'][ix], xc, yc):
+        if th_id == 0:
+            continue
+                        
+        ax.text(x_i, y_i, '{0:.0f}'.format(th_id), ha='center', va='center', fontsize=8,  color='w')
+        ax.text(x_i, y_i, '{0:.0f}'.format(th_id), ha='center', va='center', fontsize=8,  color='k', alpha=0.95)
+    
+    ax.set_xlim(0, sh[1]-1)
+    ax.set_ylim(0, sh[0]-1)
+    ax.set_axis_off() 
+    
+    fig.tight_layout(pad=0.01)
+    fig.savefig('{0}.seg.png'.format(label))
+    plt.close(fig)
+    
+    # Append to thumbs file
+    seg_hdu = pyfits.ImageHDU(data=np.cast[int](blot_seg), name='SEG')
+    if 'SEG' in th:
+        th.pop('SEG')
+    
+    th.append(seg_hdu)                            
+    th.writeto('{0}.thumb.fits'.format(label), overwrite=True, 
+                 output_verify='fix')
+    th.close()
+    
+def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixscale=0.1, size=10, wcs=None, pixfrac=0.33, kernel='square', theta=0, half_optical_pixscale=True, filters=['f160w', 'f140w', 'f125w', 'f105w', 'f110w', 'f098m', 'f850lp', 'f814w', 'f775w', 'f606w', 'f475w', 'f555w', 'f600lp', 'f390w', 'f350lp'], remove=True, rgb_params=RGB_PARAMS, master='grizli-jan2019', aws_bucket='s3://grizli/CutoutProducts/', scale_ab=21, thumb_height=2.0, sync_fits=True, subtract_median=True, include_saturated=True, include_ir_psf=False, show_filters=['visb', 'visr', 'y', 'j', 'h'], combine_similar_filters=True, single_output=True, aws_prep_dir=None, make_segmentation_figure=False):
     """
     label='cp561356'; ra=150.208875; dec=1.850241667; size=40; filters=['f160w','f814w', 'f140w','f125w','f105w','f606w','f475w']
     
@@ -74,8 +160,13 @@ def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixsca
     import astropy.units as u
     from drizzlepac.adrizzle import do_driz
     
-    import boto3
-    
+    try:
+        import boto3
+        s3 = boto3.resource('s3')
+        s3_client = boto3.client('s3')
+    except:
+        pass
+        
     from grizli import prep, utils
     from grizli.pipeline import auto_script
         
@@ -95,18 +186,11 @@ def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixsca
     
     if master == 'grizli-jan2019':
         parent = 's3://grizli/MosaicTools/'
-
-        s3 = boto3.resource('s3')
-        s3_client = boto3.client('s3')
         bkt = s3.Bucket('grizli')
     
     elif master == 'cosmos':
         parent = 's3://grizli-preprocess/CosmosMosaic/'
-
-        s3 = boto3.resource('s3')
-        s3_client = boto3.client('s3')
         bkt = s3.Bucket('grizli-preprocess')
-    
     else:
         # Run on local files, e.g., "Prep" directory
         parent = None
@@ -129,11 +213,39 @@ def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixsca
     if parent is not None:
         groups = np.load('{0}_filter_groups.npy'.format(master), allow_pickle=True)[0]
     else:
-        # Reformat local visits.npy into a groups file
-        groups_files = glob.glob('*filter_groups.npy')
         
-        if len(groups_files) == 0:
-            visit_file = glob.glob('*visits.npy')[0]
+        if aws_prep_dir is not None:
+            spl = aws_prep_dir.replace('s3://','').split('/')
+            prep_bucket = spl[0]
+            prep_root = spl[2]
+            
+            prep_bkt = s3.Bucket(prep_bucket)
+            
+            
+            s3_prep_path = 'Pipeline/{0}/Prep/'.format(prep_root)
+            s3_full_path = '{0}/{1}'.format(prep_bucket, s3_prep_path)
+            s3_file = '{0}_visits.npy'.format(prep_root)
+            
+            # Make output path Prep/../Thumbnails/
+            if aws_bucket is not None:
+                aws_bucket = 's3://'+s3_full_path.replace('/Prep/', '/Thumbnails/')
+            
+            print('{0}{1}'.format(s3_prep_path, s3_file))
+            if not os.path.exists(s3_file):
+                prep_bkt.download_file(os.path.join(s3_prep_path, s3_file),
+                            s3_file, ExtraArgs={"RequestPayer": "requester"})
+            
+            groups_files = glob.glob('{0}_filter_groups.npy'.format(prep_root))
+            visit_query = prep_root+'_'
+        else:
+            groups_files = glob.glob('*filter_groups.npy')
+            visit_query = '*'
+            
+        # Reformat local visits.npy into a groups file
+        if (len(groups_files) == 0):
+            
+            visit_file = glob.glob(visit_query+'visits.npy')[0]
+            
             visits, groups, info = np.load(visit_file)
             visit_root = visit_file.split('_visits')[0]
             
@@ -144,13 +256,20 @@ def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixsca
                 groups[filt]['filter'] = filt
                 groups[filt]['files'] = []
                 groups[filt]['footprints'] = []
-                groups[filt]['awspath'] = None
+                groups[filt]['awspath'] = []
                 
                 ix = np.where(visit_filters == filt)[0]
                 for i in ix:
                     groups[filt]['files'].extend(visits[i]['files'])
                     groups[filt]['footprints'].extend(visits[i]['footprints'])
                 
+                Nf = len(groups[filt]['files'])
+                print('{0:>6}: {1:>3} exposures'.format(filt, Nf))
+                
+                if aws_prep_dir is not None:
+                    groups[filt]['awspath'] = [s3_full_path 
+                                               for file in range(Nf)]
+
             np.save('{0}_filter_groups.npy'.format(visit_root), [groups])
                 
         else:
@@ -210,7 +329,13 @@ def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixsca
             sci, wht, outh = status
             
             if subtract_median:
-                med = np.median(sci[sci != 0])
+                #med = np.median(sci[sci != 0])
+                try:
+                    un_data = np.unique(sci[(sci != 0) & np.isfinite(sci)])
+                    med = utils.mode_statistic(un_data)
+                except:
+                    med = 0.
+                    
                 if not np.isfinite(med):
                     med = 0.
                 
@@ -258,28 +383,101 @@ def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixsca
                 #psf[1].header['EXTVER'] = filt
                 hdu.append(psf[1])
                 hdu.flush()
-                
-                #psf.writeto('{0}-{1}_drz_sci.fits'.format(label, filt), 
-                #            overwrite=True, output_verify='fix')
-                
-        #status = prep.drizzle_overlaps(visits, parse_visits=False, check_overlaps=True, pixfrac=pixfrac, skysub=False, final_wcs=True, final_wht_type='IVM', static=True, max_files=260, fix_wcs_system=True)
-        # 
-        # if len(glob.glob('{0}-{1}*sci.fits'.format(label, filt))):
-        #     has_filts.append(filt)
-        
-        if combine_similar_filters:
-            combine_filters(label=label)    
+
         if remove:
             os.system('rm *_fl*fits')
-         
+                
+        if combine_similar_filters:
+            combine_filters(label=label)    
+                 
     if len(has_filts) == 0:
         return []
     
     if rgb_params:
         #auto_script.field_rgb(root=label, HOME_PATH=None, filters=has_filts, **rgb_params)
-        
         show_all_thumbnails(label=label, thumb_height=thumb_height, scale_ab=scale_ab, close=True, rgb_params=rgb_params, filters=show_filters)
+    
+    if (single_output != 0):
+        # Concatenate into a single FITS file
+        files = glob.glob('{0}-f*_dr[cz]_sci.fits'.format(label))
+        files.sort()
+
+        if combine_similar_filters:
+            comb_files = glob.glob('{0}-[a-eg-z]*_dr[cz]_sci.fits'.format(label))
+            comb_files.sort()
+            files += comb_files
+            
+        hdul = None
+        for file in files:
+            hdu_i = pyfits.open(file)
+            hdu_i[0].header['EXTNAME'] = 'SCI'
+            if 'NCOMBINE' in hdu_i[0].header:
+                if hdu_i[0].header['NCOMBINE'] <= single_output:
+                    continue
+                                    
+                filt_i = file.split('-')[-1].split('_dr')[0]
+            else:
+                filt_i = utils.get_hst_filter(hdu_i[0].header)
+            
+            for h in hdu_i:
+                h.header['EXTVER'] = filt_i
+                if hdul is None:
+                    hdul = pyfits.HDUList([h])
+                else:
+                    hdul.append(h)
+            
+            print('Add to {0}.thumb.fits: {1}'.format(label, file))
+            
+            # Weight
+            hdu_i = pyfits.open(file.replace('_sci', '_wht'))
+            hdu_i[0].header['EXTNAME'] = 'WHT'
+            for h in hdu_i:
+                h.header['EXTVER'] = filt_i
+                if hdul is None:
+                    hdul = pyfits.HDUList([h])
+                else:
+                    hdul.append(h)
+                                                
+        hdul.writeto('{0}.thumb.fits'.format(label), overwrite=True, 
+                     output_verify='fix')
         
+        for file in files:
+            for f in [file, file.replace('_sci','_wht')]:
+                if os.path.exists(f):
+                    print('Remove {0}'.format(f))
+                    os.remove(f)
+    
+    # Segmentation figure
+    thumb_file = '{0}.thumb.fits'.format(label)
+    if (make_segmentation_figure) & (os.path.exists(thumb_file)) & (aws_prep_dir is not None):
+        
+        print('Make segmentation figure')
+                
+        # Fetch segmentation image and catalog
+        s3_prep_path = 'Pipeline/{0}/Prep/'.format(prep_root)
+        s3_full_path = '{0}/{1}'.format(prep_bucket, s3_prep_path)
+        s3_file = '{0}_visits.npy'.format(prep_root)
+
+        has_seg_files = True
+        seg_files = ['{0}-ir_seg.fits.gz'.format(prep_root), 
+                     '{0}_phot.fits'.format(prep_root)]
+                     
+        for s3_file in seg_files:
+            if not os.path.exists(s3_file):
+                remote_file = os.path.join(s3_prep_path, s3_file)
+                try:
+                    print('Fetch {0}'.format(remote_file))
+                    prep_bkt.download_file(remote_file, s3_file, 
+                                   ExtraArgs={"RequestPayer": "requester"})
+                except:
+                    has_seg_files = False
+                    print('Make segmentation figure failed: {0}'.format(remote_file))
+                    break
+                    
+        if has_seg_files:
+            s3_cat = utils.read_catalog(seg_files[1])
+            segmentation_figure(label, s3_cat, seg_files[0])        
+    
     if aws_bucket:   
         #aws_bucket = 's3://grizli-cosmos/CutoutProducts/'
         #aws_bucket = 's3://grizli/CutoutProducts/'
@@ -363,6 +561,7 @@ def handler(event, context):
     
     print(event) #['s3_object_path'], event['verbose'])
     drizzle_images(**event)
+    os.system('rm *')
 
 def combine_filters(label='j022708p4901_00273', verbose=True):
     """
@@ -475,13 +674,16 @@ def show_all_thumbnails(label='j022708p4901_00273', filters=['visb', 'visr', 'y'
     fig = plt.figure(figsize=[thumb_height*NX, thumb_height])
     ax = fig.add_subplot(1,NX,NX)
     ax.imshow(rgb, origin='upper', interpolation='nearest')
-    ax.text(0.05, 0.95, label, ha='left', va='top', transform=ax.transAxes, fontsize=7, color='w', bbox=dict(facecolor='k', edgecolor='None', alpha=0.8))
-    ax.text(0.05, 0.05, ' '.join(rgb_filts), ha='left', va='bottom', transform=ax.transAxes, fontsize=6, color='w', bbox=dict(facecolor='k', edgecolor='None', alpha=0.8))
+    # ax.text(0.05, 0.95, label, ha='left', va='top', transform=ax.transAxes, fontsize=7, color='w', bbox=dict(facecolor='k', edgecolor='None', alpha=0.8))
+    # ax.text(0.05, 0.05, ' '.join(rgb_filts), ha='left', va='bottom', transform=ax.transAxes, fontsize=6, color='w', bbox=dict(facecolor='k', edgecolor='None', alpha=0.8))
     
     for i, filter in enumerate(filters):
         if filter in ims:
             zp_i = utils.calc_header_zeropoint(ims[filter], ext=0)
             scl = 10**(-0.4*(zp_i-5-scale_ab))
+            pixscl = utils.get_wcs_pscale(ims[filter][0].header.copy())
+            scl *= (0.06/pixscl)**2
+            
             img = ims[filter][0].data*scl
 
             image = make_lupton_rgb(img, img, img, stretch=0.1, minimum=-0.01)
@@ -498,6 +700,7 @@ def show_all_thumbnails(label='j022708p4901_00273', filters=['visb', 'visr', 'y'
     fig.tight_layout(pad=0.1)
     
     # Add labels
+    xl, yl = 0.04, 0.98
     for i, filter in enumerate(filters):
         if filter in ims:
             if filter in ['uv', 'visb', 'visr', 'y', 'j', 'h']:
@@ -510,9 +713,12 @@ def show_all_thumbnails(label='j022708p4901_00273', filters=['visb', 'visr', 'y'
             else:
                 text_label = filter
                         
-            fig.text((i+0.5)/NX, 0.97, text_label, fontsize=7, 
-                     ha='center', va='top', transform=fig.transFigure, 
+            fig.text((i+xl)/NX, yl, text_label, fontsize=7, 
+                     ha='left', va='top', transform=fig.transFigure, 
                      bbox=dict(facecolor='w', edgecolor='None', alpha=0.9))
+    #
+    fig.text((i+1+xl)/NX, yl, label, ha='left', va='top', transform=fig.transFigure, fontsize=7, color='w', bbox=dict(facecolor='k', edgecolor='None', alpha=0.8))
+    fig.text((i+1+xl)/NX, 1-yl, ' '.join(rgb_filts), ha='left', va='bottom', transform=fig.transFigure, fontsize=6, color='w', bbox=dict(facecolor='k', edgecolor='None', alpha=0.8))
                      
     fig.savefig('{0}.thumb.png'.format(label))
     if close:
