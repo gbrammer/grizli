@@ -333,6 +333,35 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     
         if phot is not None:
             mb.set_photometry(**phot)
+    
+    # D4000
+    if (3700*(1+tfit['z']) > mb.wave_mask.min()) & (4200*(1+tfit['z']) < mb.wave_mask.max()):
+        if phot is not None:
+            mb.unset_photometry()
+        
+        # D4000
+        res = mb.compute_D4000(tfit['z'], fit_background=True,
+                               fit_type='D4000', fitter='lstsq')
+
+        _, _, _, d4000, d4000_sigma = res
+        fit_hdu.header['D4000'] = (d4000, 'Derived D4000 at Z_MAP')
+        fit_hdu.header['D4000_E'] = (d4000_sigma, 'Derived D4000 uncertainty')
+
+        res = mb.compute_D4000(tfit['z'], fit_background=True,
+                               fit_type='Dn4000', fitter='lstsq')
+
+        _, _, _, dn4000, dn4000_sigma = res
+        fit_hdu.header['DN4000'] = (dn4000, 'Derived Dn4000 at Z_MAP')
+        fit_hdu.header['DN4000_E'] = (dn4000_sigma, 'Derived Dn4000 uncertainty')
+        
+        if phot is not None:
+            mb.set_photometry(**phot)
+    
+    else:
+        fit_hdu.header['D4000'] = (-99, 'Derived D4000 at Z_MAP')
+        fit_hdu.header['D4000_E'] = (-99, 'Derived D4000 uncertainty')
+        fit_hdu.header['DN4000'] = (-99, 'Derived Dn4000 at Z_MAP')
+        fit_hdu.header['DN4000_E'] = (-99, 'Derived Dn4000 uncertainty')  
         
     # Best-fit template itself
     tfit_sp = utils.GTable()
@@ -1795,7 +1824,7 @@ class GroupFitter(object):
         fit.meta['kspl'] = (kspl, 'Parameters, k, of spline fit')
         
         # Evaluate spline at wavelengths for stars
-        xspline = np.array([8100, 9000, 1.27e4, 1.4e4])
+        xspline = np.array([6060, 8100, 9000, 1.27e4, 1.4e4])
         flux_spline = utils.eval_bspline_templates(xspline, tspline, coeffs_spline[self.N:])
         fluxerr_spline = utils.eval_bspline_templates(xspline, tspline, err_spline[self.N:])
         
@@ -2052,6 +2081,68 @@ class GroupFitter(object):
                 
             plt.plot(w[xclip]*(1+z), tdraw.T, alpha=0.05, color='r')
     
+    def compute_D4000(self, z, fit_background=True, fit_type='D4000', fitter='lstsq'):
+        """
+        Compute D4000 with step templates
+                
+        Parameters:
+        ----------
+        z : float
+            Redshift where to evaluate D4000
+        
+        fit_background : bool
+            Include background in step template fit
+        
+        fit_type : 'D4000', 'Dn4000'
+            Definition to use:
+                D4000  = f_nu(3750-3950) / f_nu(4050-4250)
+                Dn4000 = f_nu(3850-3950) / f_nu(4000-4100)
+        
+        fitter : str
+            Fitting algorithm, passed to `self.template_at_z`.
+            
+        Returns:
+        --------
+        w_d4000, t_d4000 : `~numpy.ndarray`, dict
+            Step wavelengths and template dictionary
+        
+        tfit : dict
+            Fit dictionary returned by `template_at_z`.
+            
+        d4000, d4000_sigma : float
+            D4000 estimate and uncertainty from simple error propagation and
+            step template fit covariance.
+        
+        """
+        w_d4000, t_d4000 = utils.step_templates(special=fit_type)
+        tfit = self.template_at_z(z, templates=t_d4000, fitter=fitter,
+                                fit_background=fit_background)
+
+        # elements for the D4000 bins                       
+        if fit_type == 'D4000':
+            to_fnu = 3850**2/4150**2
+            mask = np.array([c in ['rstep 3750-3950 0', 'rstep 4050-4250 0']  
+                         for c in tfit['cfit']])
+        elif fit_type == 'Dn4000':
+            to_fnu = 3900**2/4050**2
+            mask = np.array([c in ['rstep 3850-3950 0', 'rstep 4000-4100 0']  
+                         for c in tfit['cfit']])            
+        else:
+            print('compute_d4000: fit_type={0} not recognized'.format(fit_type))
+            return -np.inf, -np.inf, -np.inf, -np.inf, -np.inf
+                                           
+        blue, red = tfit['coeffs'][mask]
+        cov = tfit['covar'][mask,:][:,mask]              
+
+        # Error propagation
+        sb, sr = cov.diagonal()
+        sbr = cov[0,1]
+        d4000 = red/blue
+        d4000_sigma = d4000*np.sqrt(sb/blue**2+sr/red**2-2*sbr/blue/red)
+        
+        res = (w_d4000, t_d4000, tfit, d4000, d4000_sigma)
+        return res
+        
     def xmake_fit_plot(self, fit, tfit, show_beams=True, bin=1, minor=0.1,
                        scale_on_stacked_1d=True, loglam_1d=True, zspec=None):
         """TBD
@@ -2590,7 +2681,7 @@ class GroupFitter(object):
         # 
         #     return fig, sfit
     
-    def oned_figure(self, bin=1, show_beams=True, minor=0.1, tfit=None, axc=None, figsize=[6,4], fill=False, units='flam', min_sens_show=0.1, ylim_percentile=2, scale_on_stacked=False, show_individual_templates=False, apply_beam_mask=True, loglam_1d=True, trace_limits=None, show_contam=False):
+    def oned_figure(self, bin=1, wave=None, show_beams=True, minor=0.1, tfit=None, show_rest=False, axc=None, figsize=[6,4], fill=False, units='flam', min_sens_show=0.1, ylim_percentile=2, scale_on_stacked=False, show_individual_templates=False, apply_beam_mask=True, loglam_1d=True, trace_limits=None, show_contam=False):
         """
         1D figure
         1D figure
@@ -2646,7 +2737,10 @@ class GroupFitter(object):
         
         if not show_beams:
             scale_on_stacked=True
-            
+        
+        if wave is not None:
+            show_beams = False
+                
         if units.startswith('spline'):
             ran = ((tfit['cont1d'].wave >= self.wavef.min()) & 
                    (tfit['cont1d'].wave <= self.wavef.max()))
@@ -2680,13 +2774,18 @@ class GroupFitter(object):
             mspl = None
                                    
         # 1D Model
+        xlabel, zp1 = r'$\lambda$', 1.
         if tfit is not None:
             sp = tfit['line1d'].wave, tfit['line1d'].flux
             w = sp[0]
+            if show_rest:
+                zp1 = (1+tfit['z'])
+                xlabel = r'$\lambda_\mathrm{rest}$'+' (z={0:.2f})'.format(tfit['z'])
+                
         else:
             sp = None
             w = np.arange(self.wavef.min()-201, self.wavef.max()+201, 100)
-
+            
         spf = w, w*0+1
         
         for i in range(self.N):
@@ -2791,11 +2890,11 @@ class GroupFitter(object):
             if show_beams:
                 
                 if (show_beams == 1) & (f_alpha < 0.09):
-                    axc.errorbar(w[clip], fl[clip], er[clip], color='k', alpha=f_alpha, marker='.', linestyle='None', zorder=1)
+                    axc.errorbar(w[clip]/zp1, fl[clip], er[clip], color='k', alpha=f_alpha, marker='.', linestyle='None', zorder=1)
                 else:
-                    axc.errorbar(w[clip], fl[clip], er[clip], color=GRISM_COLORS[grism], alpha=f_alpha, marker='.', linestyle='None', zorder=1)
+                    axc.errorbar(w[clip]/zp1, fl[clip], er[clip], color=GRISM_COLORS[grism], alpha=f_alpha, marker='.', linestyle='None', zorder=1)
             if tfit is not None:
-                axc.plot(w[clip], flm[clip], color='r', alpha=f_alpha, linewidth=2, zorder=10) 
+                axc.plot(w[clip]/zp1, flm[clip], color='r', alpha=f_alpha, linewidth=2, zorder=10) 
 
                 # Plot limits 
                 ep = np.percentile(er[clip], ylim_percentile)        
@@ -2820,18 +2919,21 @@ class GroupFitter(object):
         wmax = np.max(lims)#*1.e4
         
         # Cleanup
-        axc.set_xlim(wmin, wmax)
+        axc.set_xlim(wmin/zp1, wmax/zp1)
         axc.semilogx(subsx=[wmax])
         #axc.set_xticklabels([])
-        axc.set_xlabel(r'$\lambda$')
+        axc.set_xlabel(xlabel)
         axc.set_ylabel(unit_label)
         #axc.xaxis.set_major_locator(MultipleLocator(0.1))
                                           
         for ax in [axc]: #[axa, axb, axc]:
             
-            labels = np.arange(np.ceil(wmin/minor), np.ceil(wmax/minor))*minor
+            labels = np.arange(np.ceil(wmin/minor/zp1), np.ceil(wmax/minor/zp1))*minor
             ax.set_xticks(labels)
-            ax.set_xticklabels(['{0:.1f}'.format(l) for l in labels])    
+            if minor < 0.1:
+                ax.set_xticklabels(['{0:.2f}'.format(l) for l in labels])    
+            else:
+                ax.set_xticklabels(['{0:.1f}'.format(l) for l in labels])    
         
         ### Binned spectrum by grism
         if (tfit is None) | (scale_on_stacked) | (not show_beams):
@@ -2839,14 +2941,15 @@ class GroupFitter(object):
             ymax = -1.e30
         
         if self.Nphot > 0:
-            sp_flat = self.optimal_extract(self.flat_flam[self.fit_mask[:-self.Nphotbands]], bin=bin, loglam=loglam_1d, trace_limits=trace_limits)
+            sp_flat = self.optimal_extract(self.flat_flam[self.fit_mask[:-self.Nphotbands]], bin=bin, wave=wave, loglam=loglam_1d, trace_limits=trace_limits)
         else:
-            sp_flat = self.optimal_extract(self.flat_flam[self.fit_mask], bin=bin, loglam=loglam_1d, trace_limits=trace_limits)
+            sp_flat = self.optimal_extract(self.flat_flam[self.fit_mask], bin=bin, wave=wave, loglam=loglam_1d, trace_limits=trace_limits)
         
         if tfit is not None:
             bg_model = self.get_flat_background(tfit['coeffs'], apply_mask=True)
             m2d = self.get_flat_model(sp, apply_mask=True, is_cgs=True)
-            sp_model = self.optimal_extract(m2d, bin=bin, loglam=loglam_1d, 
+            sp_model = self.optimal_extract(m2d, bin=bin, wave=wave, 
+                                           loglam=loglam_1d, 
                                            trace_limits=trace_limits)
         else:
             bg_model = 0.
@@ -2854,17 +2957,18 @@ class GroupFitter(object):
         
         if mspl is not None:
             m2d = self.get_flat_model(mspl, apply_mask=True, is_cgs=True)
-            sp_spline = self.optimal_extract(m2d, bin=bin, loglam=loglam_1d, 
+            sp_spline = self.optimal_extract(m2d, bin=bin, wave=wave, 
+                                             loglam=loglam_1d, 
                                              trace_limits=trace_limits)
             
         sp_data = self.optimal_extract(self.scif_mask[:self.Nspec]-bg_model, 
-                                       bin=bin, loglam=loglam_1d, 
+                                       bin=bin, wave=wave, loglam=loglam_1d, 
                                        trace_limits=trace_limits)
         
         # Contamination
         if show_contam:
             sp_contam = self.optimal_extract(self.contamf_mask[:self.Nspec], 
-                                       bin=bin, loglam=loglam_1d, 
+                                       bin=bin, wave=wave, loglam=loglam_1d, 
                                        trace_limits=trace_limits)
         
         for g in sp_data:
@@ -2899,13 +3003,13 @@ class GroupFitter(object):
             ep = np.percentile(err, ylim_percentile)
             
             if fill:
-                axc.fill_between(sp_data[g]['wave'][clip]/1.e4, flux-err, flux+err, color=GRISM_COLORS[g], alpha=0.8, zorder=1, label=g) 
+                axc.fill_between(sp_data[g]['wave'][clip]/zp1/1.e4, flux-err, flux+err, color=GRISM_COLORS[g], alpha=0.8, zorder=1, label=g) 
             else:
-                axc.errorbar(sp_data[g]['wave'][clip]/1.e4, flux, err, color=GRISM_COLORS[g], alpha=0.8, marker='.', linestyle='None', zorder=1, label=g) 
+                axc.errorbar(sp_data[g]['wave'][clip]/zp1/1.e4, flux, err, color=GRISM_COLORS[g], alpha=0.8, marker='.', linestyle='None', zorder=1, label=g) 
             
             if show_contam:
                 contam = (sp_contam[g]['flux']*unit_corr/pscale)[clip]
-                axc.plot(sp_data[g]['wave'][clip]/1.e4, contam,
+                axc.plot(sp_data[g]['wave'][clip]/zp1/1.e4, contam,
                          color='brown')
                 
             if ((tfit is None) & (clip.sum() > 0)) | (scale_on_stacked):
@@ -2922,7 +3026,7 @@ class GroupFitter(object):
         axc.grid()
         
         if (ymin-0.2*ymax < 0) & (1.2*ymax > 0):
-            axc.plot([wmin, wmax], [0,0], color='k', linestyle=':', alpha=0.8)
+            axc.plot([wmin/zp1, wmax/zp1], [0,0], color='k', linestyle=':', alpha=0.8)
         
         ### Individual templates
         if (tfit is not None) & (show_individual_templates > 0) & (units in ['flam', 'nJy','uJy']):
@@ -2947,16 +3051,16 @@ class GroupFitter(object):
                 spline_templ = tscl[:,is_spline].sum(axis=1)
                 axc.plot(xt/1.e4, spline_templ, color='k', alpha=0.5)
                 for ti in tscl[:,is_spline].T:
-                    axc.plot(xt/1.e4, ti, color='k', alpha=0.1)
+                    axc.plot(xt/zp1/1.e4, ti, color='k', alpha=0.1)
             
             for ci, ti, tn in zip(cfit[self.N:][~is_spline], tscl[:,~is_spline].T, t_names[~is_spline]):
                 if ci == 0:
                     continue
                 
                 if show_individual_templates > 1:
-                    axc.plot(xt/1.e4, ti, alpha=0.6, label=tn.strip('line '))
+                    axc.plot(xt/zp1/1.e4, ti, alpha=0.6, label=tn.strip('line '))
                 else:
-                    axc.plot(xt/1.e4, ti, alpha=0.6)
+                    axc.plot(xt/zp1/1.e4, ti, alpha=0.6)
             
             if show_individual_templates > 1:
                 axc.legend(fontsize=6)
