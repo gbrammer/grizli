@@ -2309,27 +2309,50 @@ def split_spline_template(templ, wavelength_range=[5000,2.4e4], Rspline=10, log=
     
     return stemp
 
-def step_templates(wlim=[5000, 1.8e4], R=30, round=10, rest=False):
+def step_templates(wlim=[5000, 1.8e4], bin_steps=None, R=30, round=10, rest=False, special=None, order=0):
     """
     Step-function templates for easy binning
     """
-    bin_steps = np.round(log_zgrid(wlim, 1./R)/round)*round
-    
+    if special == 'Dn4000':
+        rest = True
+        bin_steps = np.hstack([np.arange(850, 3849, 100), 
+                              [3850,3950,4000,4100], 
+                              np.arange(4200,1.7e4,100)])
+                              
+    elif special == 'D4000':
+        rest = True
+        bin_steps = np.hstack([np.arange(850, 3749, 200), 
+                              [3750,3950,4050,4250], 
+                              np.arange(4450,1.7e4,200)])
+    elif special not in ['D4000', 'Dn4000', None]:
+        print('step_templates: {0} not recognized (options are \'D4000\', \'Dn4000\', and None)'.format(special))
+        return {}
+        
+    if bin_steps is None:
+        bin_steps = np.round(log_zgrid(wlim, 1./R)/round)*round
+    else:
+        wlim = [bin_steps[0], bin_steps[-1]]
+        
     ds = np.diff(bin_steps)
+    
     xspec = np.arange(wlim[0]-ds[0], wlim[1]+ds[-1])
     
     bin_mid = bin_steps[:-1]+ds/2.
     
     step_templ = {}
     for i in range(len(bin_steps)-1):
-        label = 'step {0:.0f}'.format(bin_mid[i])
-        if rest:
-            label = 'r'+label
-            
+
         yspec = ((xspec >= bin_steps[i]) & (xspec < bin_steps[i+1]))*1        
-        step_templ[label] = SpectrumTemplate(wave=xspec, flux=yspec,
-                                             name=label)
-    
+
+        for o in range(order+1):
+            label = 'step {0:.0f}-{1:.0f} {2}'.format(bin_steps[i], bin_steps[i+1], o)
+            if rest:
+                label = 'r'+label
+            
+            flux = ((xspec-bin_mid[i])/ds[i])**o * (yspec > 0)
+            step_templ[label] = SpectrumTemplate(wave=xspec, flux=flux,
+                                                 name=label)
+                    
     return bin_steps, step_templ
     
 def polynomial_templates(wave, order=0, line=False):
@@ -5776,7 +5799,110 @@ def fix_flt_nan(flt_file, bad_bit=4096, verbose=True):
             im['DQ',ext].data[mask] |= bad_bit
     
     im.flush()
-         
+
+def dump_flt_dq(filename, replace=('.fits', '.dq.fits.gz'), verbose=True):
+    """Dump FLT/FLC header & DQ extensions to a compact file
+    
+    Parameters
+    ----------
+    filename : str
+        FLT/FLC filename.
+    
+    replace : (str, str)
+        Replace arguments for output filename:
+        
+        >>> output_filename = filename.replace(replace[0], replace[1])
+        
+    Returns
+    -------
+    Writes header and compact DQ array to `output_filename`.
+    
+    """
+    im = pyfits.open(filename)
+    hdus = []
+    for i in [1,2,3,4]:
+        if ('SCI',i) in im:
+            header = im['SCI',i].header
+            dq = im['DQ',i].data.flatten()
+            nz = np.where(dq > 0)[0]   
+            dq_data = np.array([nz, dq[nz]])
+            hdu = pyfits.ImageHDU(header=header, data=dq_data)
+            hdus.append(hdu)
+    
+    output_filename = filename.replace(replace[0], replace[1])
+
+    msg = '# dump_flt_dq: {0} > {1}'.format(filename, output_filename)
+    utils.log_comment(utils.LOGFILE, msg, verbose=verbose, show_date=True)
+        
+    pyfits.HDUList(hdus).writeto(output_filename, overwrite=True, 
+                                 output_verify='fix')
+
+def apply_flt_dq(filename, replace=('.fits', '.dq.fits.gz'), verbose=True, or_combine=False):
+    """
+    Read and apply the compact exposure information file
+    
+    Parameters
+    ----------
+    filename : str
+        FLT/FLC filename.
+    
+    replace : (str, str)
+        Replace arguments for output DQ filename:
+        
+        >>> output_filename = filename.replace(replace[0], replace[1])
+    
+    or_combine : bool
+        If True, then apply DQ data in `output_filename` with OR logic.  
+        
+        If False, then reset the DQ extensions to be exactly those in 
+        `output_filename`.
+        
+    Returns
+    -------
+    Writes header and compact DQ array to `output_filename`.
+    
+    """
+    
+    output_filename = filename.replace(replace[0], replace[1])
+    
+    if not os.path.exists(output_filename):
+        return False
+
+    im = pyfits.open(filename, mode='update')
+    
+    msg = '# apply_flt_dq: {1} > {0}'.format(filename, output_filename)
+    utils.log_comment(utils.LOGFILE, msg, verbose=verbose, show_date=True)
+    
+    dq = pyfits.open(output_filename)
+    for ext in [1,2,3,4]:
+        if (('SCI',ext) in im) & (('SCI',ext) in dq):
+            nz, dq_i = dq['SCI',ext].data
+            i,j = np.unravel_index(nz, im['SCI',ext].data.shape)
+            
+            # Apply DQ
+            if or_combine:
+                im['DQ',ext].data[i,j] != dq_i
+            else:
+                im['DQ',ext].data *= 0
+                im['DQ',ext].data[i,j] = dq_i
+            
+            # Copy header
+            has_blotsky = 'BLOTSKY' in im['SCI',ext].header
+            for k in dq['SCI',ext].header:
+                # test = dq['SCI',ext].header[k] == im['SCI',ext].header[k]
+                # if not test:
+                #     print(k, dq['SCI',ext].header[k], im['SCI',ext].header[k])
+                if k in ['BITPIX','NAXIS1','NAXIS2']:
+                    continue
+                
+                im['SCI',ext].header[k] = dq['SCI',ext].header[k]
+            
+            if (not has_blotsky) & ('BLOTSKY' in dq['SCI',ext].header):
+                im['SCI',ext].header['BLOTSKY'] = False
+                                
+    im.flush()
+    im.close()
+    
 def RGBtoHex(vals, rgbtype=1):
   """Converts RGB values in a variety of formats to Hex values.
 
