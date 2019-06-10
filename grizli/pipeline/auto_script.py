@@ -527,7 +527,7 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
     
     if (not os.path.exists(args_file)) | (overwrite_fit_params):
         msg = '# generate_fit_params: ' + args_file
-        utils.log_comment(utils.LOGFILE, msg, verbose=verbose, show_date=True)
+        utils.log_comment(utils.LOGFILE, msg, verbose=True, show_date=True)
 
         pline['pixscale'] = mosaic_args['wcs_params']['pixel_scale']
         pline['pixfrac'] = mosaic_args['mosaic_pixfrac']
