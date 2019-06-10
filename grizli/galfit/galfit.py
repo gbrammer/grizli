@@ -441,7 +441,7 @@ class Galfitter(object):
         return flt_files
     
     @staticmethod
-    def fit_arrays(sci, wht, seg, psf, id=None, platescale=0.06, exptime=0, path='/tmp/', galfit_exec='galfit', gaussian_guess=False, components=[GalfitSersic()], recenter=True, psf_sample=1):
+    def fit_arrays(sci, wht, seg, psf, id=None, platescale=0.06, exptime=0, path='/tmp', root='gf', galfit_exec='galfit', gaussian_guess=False, components=[GalfitSersic()], recenter=True, psf_sample=1):
         
         rms = 1/np.sqrt(wht)#*exptime
         if exptime > 0:
@@ -456,9 +456,19 @@ class Galfitter(object):
         
         sh = sci.shape[0]
         
-        fp = open(path+'galfit.feedme','w')
+        fp = open('{0}/{1}.feedme'.format(path, root),'w')
         
-        fp.write(GALFIT_IMAGES.format(input=path+'gf_sci.fits', output=path+'gf_out.fits', sigma=path+'gf_rms.fits', psf=path+'gf_psf.fits', mask=path+'gf_mask.fits', xmax=sh, ymax=sh, sh=sh, ps=platescale, psf_sample=psf_sample))
+        sci_file = '{0}/{1}_sci.fits'.format(path, root)
+        
+        cmd = GALFIT_IMAGES.format(input=sci_file,
+                                   output=sci_file.replace('_sci', '_out'), 
+                                   sigma=sci_file.replace('_sci', '_rms'), 
+                                   psf=sci_file.replace('_sci', '_psf'), 
+                                   mask=sci_file.replace('_sci', '_mask'), 
+                                   xmax=sh, ymax=sh, sh=sh, 
+                                   ps=platescale, psf_sample=psf_sample)
+        
+        fp.write(cmd)
         
         if gaussian_guess:
             fit, q, theta = fit_gauss(sci)
@@ -477,17 +487,41 @@ class Galfitter(object):
             
         fp.close()
         
-        pyfits.writeto(path+'gf_sci.fits', data=sci, overwrite=True)
-        pyfits.writeto(path+'gf_rms.fits', data=rms, overwrite=True)
-        pyfits.writeto(path+'gf_mask.fits', data=mask*1, overwrite=True)        
-        pyfits.writeto(path+'gf_psf.fits', data=psf, overwrite=True)
+        pyfits.writeto(sci_file, data=sci, overwrite=True)
+        pyfits.writeto(sci_file.replace('_sci', '_rms'), 
+                       data=rms, overwrite=True)
+        pyfits.writeto(sci_file.replace('_sci', '_mask'), 
+                       data=mask*1, overwrite=True)        
+        pyfits.writeto(sci_file.replace('_sci', '_psf'), 
+                       data=psf, overwrite=True)
         
         for ext in ['out', 'model']:
-            if os.path.exists(path+'gf_{0}.fits'.format(ext)):
-                os.remove(path+'gf_{0}.fits'.format(ext))
+            fi = sci_file.replace('_sci', '_'+ext)
+            if os.path.exists(fi):
+                os.remove(fi)
             
-        os.system('{0} {1}/galfit.feedme'.format(galfit_exec, path))
-            
+        os.system('{0} {1}/{2}.feedme'.format(galfit_exec, path, root))
+        
+        # Move galfit.[latest] to output file
+        gf_files = glob.glob('galfit.[0-9]*')
+        gf_files.sort()
+        gf_log = sci_file.replace('_sci.fits', '.gfmodel')
+        
+        os.system('mv {0} {1}'.format(gf_files[-1], gf_log))
+        lines = open(gf_log).readlines()
+        
+        # Results dictionary
+        res = {}
+        res['rms'] = rms
+        res['mask'] = mask*1
+        im = pyfits.open(sci_file.replace('_sci', '_out'))
+        res['model'] = im[2]
+        res['resid'] = im[3]
+        res['ascii'] = lines
+        
+        return res
+        
+        
     def fit_object(self, id=449, radec=(None, None), size=40, components=[GalfitSersic()], recenter=True, get_mosaic=True, gaussian_guess=False, get_extended=True):
         """
         Fit an object
