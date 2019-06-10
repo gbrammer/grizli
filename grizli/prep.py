@@ -872,6 +872,31 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
             
     return orig_wcs, drz_wcs, out_shift, out_rot/np.pi*180, out_scale
 
+def update_wcs_fits_log(file, wcs_ref, xyscale=[0,0,0,1], initialize=True, replace=('.fits', '.wcslog.fits'), wcsname='SHIFT'):
+    """
+    Make FITS log when updating WCS
+    """
+    new_hdu = wcs_ref.to_fits(relax=True)[0]
+    new_hdu.header['XSHIFT'] = xyscale[0]
+    new_hdu.header['YSHIFT'] = xyscale[1]
+    new_hdu.header['ROT'] = xyscale[2], 'WCS fit rotation, degrees'
+    new_hdu.header['SCALE'] = xyscale[3], 'WCS fit scale'
+    new_hdu.header['WCSNAME'] = wcsname
+    
+    wcs_logfile = file.replace(replace[0], replace[1])
+        
+    if os.path.exists(wcs_logfile):
+        if initialize:
+            os.remove(wcs_logfile)
+            hdu = pyfits.HDUList([pyfits.PrimaryHDU()])
+        else:
+            hdu = pyfits.open(wcs_logfile)
+    else:
+        hdu = pyfits.HDUList([pyfits.PrimaryHDU()])
+    
+    hdu.append(new_hdu)
+    hdu.writeto(wcs_logfile, overwrite=True, output_verify='fix')
+    
 def log_wcs(root, drz_wcs, shift, rot, scale, rms=0., n=-1, initialize=True, comment=[]):
     """Save WCS offset information to a file
     """
@@ -891,6 +916,15 @@ def log_wcs(root, drz_wcs, shift, rot, scale, rms=0., n=-1, initialize=True, com
         count = len(orig_hdul)
     
     hdu = drz_wcs.to_fits()[0]
+    hdu.header['XSHIFT'] = shift[0]
+    hdu.header['YSHIFT'] = shift[1]
+    
+    hdu.header['ROT'] = rot, 'WCS fit rotation, degrees'
+    hdu.header['SCALE'] = scale, 'WCS fit scale'
+
+    hdu.header['FIT_RMS'] = rot, 'WCS fit RMS'
+    hdu.header['FIT_N'] = n, 'Number of sources in WCS fit'
+    
     orig_hdul.append(hdu)
     orig_hdul.writeto('{0}_wcs.fits'.format(root), overwrite=True)
     
@@ -1967,8 +2001,15 @@ def blot_background(visit={'product': '', 'files':None},
             #                 sinscl=1.0, stepsize=10, wcsmap=None)
                         
             flt['SCI',ext].data -= blotted*tscale
-            flt['SCI',ext].header['BLOTSKY'] = (True, 'Sky blotted from {0}'.format(drz_file))
-        
+            flt['SCI',ext].header['BLOTSKY'] = (True, 'Sky blotted from SKYIMAGE')
+            flt['SCI',ext].header['SKYIMAGE'] = (drz_file, 'Source image for sky')
+            # bkg_params={'bw':64, 'bh':64, 'fw':3, 'fh':3, 'pixel_scale':0.06}
+            flt['SCI',ext].header['SKYBW'] = (bkg_params['bw'], 'Sky bkg_params')
+            flt['SCI',ext].header['SKYBH'] = (bkg_params['bh'], 'Sky bkg_params')
+            flt['SCI',ext].header['SKYFW'] = (bkg_params['fw'], 'Sky bkg_params')
+            flt['SCI',ext].header['SKYFH'] = (bkg_params['fh'], 'Sky bkg_params')
+            flt['SCI',ext].header['SKYPIX'] = (bkg_params['pixel_scale'], 'Sky bkg_params, pixel_scale')
+            
         flt.flush()
     
     return True
@@ -3088,6 +3129,14 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
         
         ### Update direct FLT WCS
         for file in direct['files']:
+            xyscale = [out_shift[0], out_shift[1], out_rot, out_scale]
+            
+            update_wcs_fits_log(file, orig_wcs,
+                                xyscale=xyscale,
+                                initialize=False,
+                                replace=('.fits', '.wcslog.fits'), 
+                                wcsname=ref_catalog)
+
             updatehdr.updatewcs_with_shift(file, 
                                 str('{0}_wcs.fits'.format(direct['product'])),
                                       xsh=out_shift[0], ysh=out_shift[1],
@@ -3685,6 +3734,11 @@ def apply_tweak_shifts(wcs_ref, shift_dict, grism_matches={}, verbose=True, log=
     tweak_file = '{0}_tweak_wcs.fits'.format(file0)
     hdu.writeto(tweak_file, overwrite=True)
     for file in shift_dict:
+        xyscale = shift_dict[file][:2]+[0., 1]
+        update_wcs_fits_log(file, wcs_ref, xyscale=xyscale, initialize=True,
+                            replace=('.fits', '.wcslog.fits'), 
+                            wcsname='SHIFT')
+        
         updatehdr.updatewcs_with_shift(file, tweak_file,
                                         xsh=shift_dict[file][0],
                                         ysh=shift_dict[file][1],
@@ -3702,6 +3756,12 @@ def apply_tweak_shifts(wcs_ref, shift_dict, grism_matches={}, verbose=True, log=
         # Update paired grism exposures
         if file in grism_matches:
             for grism_file in grism_matches[file]:
+                xyscale = shift_dict[file][:2]+[0., 1]
+                update_wcs_fits_log(grism_file, wcs_ref, xyscale=xyscale,
+                                    initialize=True,
+                                    replace=('.fits', '.wcslog.fits'), 
+                                    wcsname='SHIFT')
+
                 updatehdr.updatewcs_with_shift(grism_file, tweak_file,
                                               xsh=shift_dict[file][0],
                                               ysh=shift_dict[file][1],
@@ -3833,12 +3893,20 @@ def match_direct_grism_wcs(direct={}, grism={}, get_fresh_flt=True,
         # Use user-defined shifts
         xsh, ysh, rot, scale = xyscale
         
-        tmp_wcs = '/tmp/{0}_tmpwcs.fits'.format(str(direct['product']))
+        tmp_wcs_file = '/tmp/{0}_tmpwcs.fits'.format(str(direct['product']))
         ext = len(wcs_hdu)-1
-        wcs_hdu[ext].writeto(tmp_wcs, overwrite=True)
+        wcs_hdu[ext].writeto(tmp_wcs_file, overwrite=True)
+        tmp_wcs = pywcs.WCS(wcs_hdu[ext].header, relax=True)
         
         for file in grism['files']:
-            updatehdr.updatewcs_with_shift(file, tmp_wcs,
+            xyscale = [xsh, ysh, rot, scale]
+            update_wcs_fits_log(file, tmp_wcs,
+                                xyscale=xyscale,
+                                initialize=False,
+                                replace=('.fits', '.wcslog.fits'), 
+                                wcsname=ref_catalog)
+
+            updatehdr.updatewcs_with_shift(file, tmp_wcs_file,
                                       xsh=xsh,
                                       ysh=ysh,
                                       rot=rot, scale=scale,
@@ -3856,15 +3924,26 @@ def match_direct_grism_wcs(direct={}, grism={}, get_fresh_flt=True,
         
     #### Get from WCS log file
     for ext in wcs_log['ext']:
-        tmp_wcs = '/tmp/{0}_tmpwcs.fits'.format(str(direct['product']))
-        wcs_hdu[ext].writeto(tmp_wcs, overwrite=True)
+        tmp_wcs_file = '/tmp/{0}_tmpwcs.fits'.format(str(direct['product']))
+        wcs_hdu[ext].writeto(tmp_wcs_file, overwrite=True)
+        tmp_wcs = pywcs.WCS(wcs_hdu[ext].header, relax=True)
+        
         if 'scale' in wcs_log.colnames:
             scale = wcs_log['scale'][ext]
         else:
             scale = 1.
             
         for file in grism['files']:
-            updatehdr.updatewcs_with_shift(file, tmp_wcs,
+            xyscale = [wcs_log['xshift'][ext], wcs_log['yshift'][ext], 
+                       wcs_log['rot'][ext], scale]
+                       
+            update_wcs_fits_log(file, tmp_wcs,
+                                xyscale=xyscale,
+                                initialize=False,
+                                replace=('.fits', '.wcslog.fits'), 
+                                wcsname=ref_catalog)
+
+            updatehdr.updatewcs_with_shift(file, tmp_wcs_file,
                                       xsh=wcs_log['xshift'][ext],
                                       ysh=wcs_log['yshift'][ext],
                                       rot=wcs_log['rot'][ext], scale=scale,
@@ -3884,79 +3963,6 @@ def match_direct_grism_wcs(direct={}, grism={}, get_fresh_flt=True,
         im = pyfits.open(file, mode='update')
         im[0].header['MJD-OBS'] = im[0].header['EXPSTART']
         im.flush()
-            
-def align_multiple_drizzled(mag_limits=[16,23]):
-    """TBD
-    """
-    from stwcs import updatewcs
-    from drizzlepac import updatehdr
-    from drizzlepac.astrodrizzle import AstroDrizzle
-    
-    drz_files = ['j0800+4029-080.0-f140w_drz_sci.fits', 
-                 'j0800+4029-117.0-f140w_drz_sci.fits']
-    
-    for drz_file in drz_files:
-        #cat = make_drz_catalog(root=drz_file.split('_drz')[0], threshold=2)
-        cat = make_SEP_catalog(root=drz_file.split('_drz')[0], threshold=2)
-        
-    cref = utils.GTable.gread(drz_files[0].replace('_drz_sci.fits', '.cat.fits'))
-    
-    ok = (cref['MAG_AUTO'] > mag_limits[0]) & (cref['MAG_AUTO'] < mag_limits[1])
-    
-    rd_ref = np.array([cref['X_WORLD'][ok], cref['Y_WORLD'][ok]]).T
-    
-    for drz_file in drz_files[1:]:
-        root = drz_file.split('_drz')[0]
-        result = align_drizzled_image(root=root, mag_limits=mag_limits,
-                                      radec=rd_ref,
-                                      NITER=5, clip=20)
-
-        orig_wcs, drz_wcs, out_shift, out_rot, out_scale = result
-        
-        im = pyfits.open(drz_file)
-        files = []
-        for i in range(im[0].header['NDRIZIM']):
-          files.append(im[0].header['D{0:03d}DATA'.format(i+1)].split('[')[0])
-        
-        
-        for file in files:
-            updatehdr.updatewcs_with_shift(file, drz_files[0],
-                                      xsh=out_shift[0], ysh=out_shift[1],
-                                      rot=out_rot, scale=out_scale,
-                                      wcsname=ref_catalog, force=True,
-                                      reusename=True, verbose=True,
-                                      sciext='SCI')
-
-            im = pyfits.open(file, mode='update')
-            im[0].header['MJD-OBS'] = im[0].header['EXPSTART']
-            im.flush()
-
-        ### Second drizzle
-        if len(files) > 1:
-            AstroDrizzle(files, output=root, clean=True, context=False, preserve=False, skysub=True, driz_separate=False, driz_sep_wcs=False, median=False, blot=False, driz_cr=False, driz_cr_corr=False, driz_combine=True, final_bits=576, coeffs=True, resetbits=0, build=False, final_wht_type='IVM')        
-        else:
-            AstroDrizzle(files, output=root, clean=True, final_scale=None, final_pixfrac=1, context=False, final_bits=576, preserve=False, driz_separate=False, driz_sep_wcs=False, median=False, blot=False, driz_cr=False, driz_cr_corr=False, driz_combine=True, build=False, final_wht_type='IVM') 
-
-        #cat = make_drz_catalog(root=root, threshold=2)
-        cat = make_SEP_catalog(root=root, threshold=2)
-        
-    if False:
-        files0 = ['icou09fvq_flt.fits', 'icou09fyq_flt.fits', 'icou09gpq_flt.fits',
-               'icou09h3q_flt.fits']
-
-        files1 = ['icou10emq_flt.fits', 'icou10eqq_flt.fits', 'icou10euq_flt.fits',
-               'icou10frq_flt.fits']
-        
-        all_files = list(np.append(files0, files1))
-        AstroDrizzle(all_files, output='total', clean=True, context=False, preserve=False, skysub=True, driz_separate=False, driz_sep_wcs=False, median=False, blot=False, driz_cr=False, driz_cr_corr=False, driz_combine=True, final_bits=576, coeffs=True, resetbits=0, final_rot=0, build=False, final_wht_type='IVM')    
-        
-        AstroDrizzle(files0, output='group0', clean=True, context=False, preserve=False, skysub=True, driz_separate=False, driz_sep_wcs=False, median=False, blot=False, driz_cr=False, driz_cr_corr=False, driz_combine=True, final_bits=576, coeffs=True, resetbits=0, final_refimage='total_drz_sci.fits', build=False, final_wht_type='IVM')    
-        AstroDrizzle(files1, output='group1', clean=True, context=False, preserve=False, skysub=True, driz_separate=False, driz_sep_wcs=False, median=False, blot=False, driz_cr=False, driz_cr_corr=False, driz_combine=True, final_bits=576, coeffs=True, resetbits=0, final_refimage='total_drz_sci.fits', build=False, final_wht_type='IVM')    
-        
-        im0 = pyfits.open('group0_drz_sci.fits')
-        im1 = pyfits.open('group1_drz_sci.fits')
-        imt = pyfits.open('total_drz_sci.fits')
-
         
 def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext=1, sky_iter=10, iter_atol=1.e-4, use_spline=True, NXSPL=50):
     """Subtract sky background from grism exposures

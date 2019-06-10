@@ -523,8 +523,11 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
         pline = auto_script.DITHERED_PLINE.copy()
                 
     # Make script for parallel processing
-    if (not os.path.exists('fit_args.npy')) | (overwrite_fit_params):
-        print('# generate_fit_params: fit_args.npy')
+    args_file = '{0}_fit_args.npy'.format(root)
+    
+    if (not os.path.exists(args_file)) | (overwrite_fit_params):
+        msg = '# generate_fit_params: ' + args_file
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose, show_date=True)
 
         pline['pixscale'] = mosaic_args['wcs_params']['pixel_scale']
         pline['pixfrac'] = mosaic_args['mosaic_pixfrac']
@@ -543,8 +546,10 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
             min_sens = 0.01
             fit_trace_shift=False
             
-        auto_script.generate_fit_params(field_root=root, prior=None, MW_EBV=exptab.meta['MW_EBV'], pline=pline, fit_only_beams=True, run_fit=True, poly_order=7, fsps=True, min_sens=min_sens, sys_err=0.03, fcontam=0.2, zr=[0.05, 3.4], save_file='fit_args.npy', fit_trace_shift=fit_trace_shift, include_photometry=include_photometry_in_fit)
-    
+        auto_script.generate_fit_params(field_root=root, prior=None, MW_EBV=exptab.meta['MW_EBV'], pline=pline, fit_only_beams=True, run_fit=True, poly_order=7, fsps=True, min_sens=min_sens, sys_err=0.03, fcontam=0.2, zr=[0.05, 3.4], save_file=args_file, fit_trace_shift=fit_trace_shift, include_photometry=True, use_phot_obj=include_photometry_in_fit)
+        # Copy for now
+        os.system('cp {0} fit_args.npy'.format(args_file))
+        
     # Make PSF
     # print('Make field PSFs')
     # auto_script.field_psf(root=root, HOME_PATH=HOME_PATH)
@@ -2360,7 +2365,14 @@ def generate_fit_params(field_root='j142724+334246', fitter=['nnls', 'bounded'],
 
     args = fitting.run_all(0, t0=t0, t1=t1, fwhm=1200, zr=zr, dz=dz, fitter=fitter, group_name=field_root, fit_stacks=False, prior=prior,  fcontam=fcontam, pline=pline, min_sens=min_sens, mask_sn_limit=np.inf, fit_beams=False,  root=field_root, fit_trace_shift=fit_trace_shift, phot=phot, use_phot_obj=use_phot_obj, verbose=True, scale_photometry=False, show_beams=True, overlap_threshold=10, get_ir_psfs=True, fit_only_beams=fit_only_beams, MW_EBV=MW_EBV, sys_err=sys_err, get_dict=True)
     
-    if include_photometry:
+    # EAZY-py photometry object from HST photometry
+    try:
+        import eazy.photoz
+        HAS_EAZY = True
+    except:
+        HAS_EAZY = False
+    
+    if include_photometry & HAS_EAZY:
         aper_ix = include_photometry*1
         utils.set_warnings()
         
@@ -2877,6 +2889,8 @@ def update_wcs_headers_with_fine(field_root, backup=True):
     import glob
     
     import astropy.io.fits as pyfits
+    import astropy.wcs as pywcs
+    
     from drizzlepac import updatehdr
     
     #import grizli.prep
@@ -2922,9 +2936,20 @@ def update_wcs_headers_with_fine(field_root, backup=True):
             out_shift, out_rot = trans[ix,:2], trans[ix,2]
             out_scale = trans[ix,3]
             
+            xyscale = trans[ix,:4]
+            wcs_ref_file = str('{0}_wcs.fits'.format(direct['product']))
+            wcs_ref = pywcs.WCS(pyfits.open(wcs_ref_file)[0].header, 
+                                relax=True)
+            
             for file in direct['files']:
+                prep.update_wcs_fits_log(file, wcs_ref,
+                                    xyscale=xyscale,
+                                    initialize=False,
+                                    replace=('.fits', '.wcslog.fits'), 
+                                    wcsname='FINE')
+            
                 updatehdr.updatewcs_with_shift(file, 
-                                str('{0}_wcs.fits'.format(direct['product'])),
+                                      wcs_ref_file,
                                       xsh=out_shift[0], ysh=out_shift[1],
                                       rot=out_rot, scale=out_scale,
                                       wcsname='FINE', force=True,
@@ -3965,7 +3990,7 @@ def make_rgb_thumbnails(root='j140814+565638', ids=None, maglim=21,
             
         aws_drizzler.drizzle_images(label=label,       
                          ra=cat['ra'][ix][0], dec=cat['dec'][ix][0],
-                         master='local', single_output=True, remove=False, 
+                         master='local', single_output=True, 
                          make_segmentation_figure=False, **args)
         
         files = glob.glob('{0}.thumb.fits'.format(label))
@@ -4338,7 +4363,7 @@ def field_psf(root='j020924-044344', HOME_PATH='/Volumes/Pegasus/Grizli/Automati
     
     # For the line maps
     if get_line_maps:
-        if not os.path.join('../Extractions/fit_args.npy'):
+        if not os.path.join('../Extractions/{0}_fit_args.npy'.format(root)):
             err='fit_args.npy not found.'
             if raise_fault:
                 raise FileNotFoundError(err)
@@ -4349,7 +4374,7 @@ def field_psf(root='j020924-044344', HOME_PATH='/Volumes/Pegasus/Grizli/Automati
         default = DITHERED_PLINE
 
         # Parameters of the line maps
-        args = np.load('../Extractions/fit_args.npy')[0]
+        args = np.load('../Extractions/{0}_fit_args.npy'.format(root))[0]
     
         # Line images
         pline = args['pline']
