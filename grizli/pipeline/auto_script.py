@@ -79,7 +79,9 @@ def get_extra_data(root='j114936+222414', HOME_PATH='/Volumes/Pegasus/Grizli/Aut
     
     ra, dec = tab.meta['RA'], tab.meta['DEC']
 
-    fp = np.load(os.path.join(HOME_PATH, '{0}_footprint.npy'.format(root)))[0]
+    fp = np.load(os.path.join(HOME_PATH, '{0}_footprint.npy'.format(root)),
+                 allow_pickle=True)[0]
+                 
     radius = np.sqrt(fp.area*np.cos(dec/180*np.pi))*60/np.pi
     
     xy = np.array(fp.boundary.convex_hull.boundary.xy)
@@ -339,7 +341,7 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
                                           filters=filters, is_dash=is_dash, 
                                           **parse_visits_args) 
     else:
-        parsed = np.load('{0}_visits.npy'.format(root))
+        parsed = np.load('{0}_visits.npy'.format(root), allow_pickle=True)
     
     visits, all_groups, info = parsed
     run_has_grism = utils.column_string_operation(info['FILTER'], 
@@ -990,7 +992,7 @@ def get_visit_exposure_footprints(visit_file='j1000p0210_visits.npy', check_path
     visits : dict
     
     """
-    visits, all_groups, info = np.load(visit_file)
+    visits, all_groups, info = np.load(visit_file, allow_pickle=True)
     
     fps = {}
     
@@ -1041,7 +1043,8 @@ def manual_alignment(field_root='j151850-813028', HOME_PATH='/Volumes/Pegasus/Gr
         
     tab = utils.GTable.gread('{0}/{1}_footprint.fits'.format(HOME_PATH, field_root))
     
-    visits, all_groups, info = np.load('{0}_visits.npy'.format(field_root))
+    visits, all_groups, info = np.load('{0}_visits.npy'.format(field_root), 
+                                       allow_pickle=True)
     
     use_visits = []
     
@@ -1093,7 +1096,8 @@ def clean_prep(field_root='j142724+334246'):
     import glob
     import os
 
-    visits, all_groups, info = np.load('{0}_visits.npy'.format(field_root))
+    visits, all_groups, info = np.load('{0}_visits.npy'.format(field_root), 
+                                       allow_pickle=True)
 
     for visit in visits:
         for ext in ['_drz_wht', '_seg', '_bkg']:
@@ -1139,7 +1143,8 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
     import copy
         
     #files=glob.glob('../RAW/*fl[tc].fits')
-    visits, all_groups, info = np.load('{0}_visits.npy'.format(field_root))
+    visits, all_groups, info = np.load('{0}_visits.npy'.format(field_root), 
+                                       allow_pickle=True)
     
     # Grism visits
     master_footprint = None
@@ -1585,7 +1590,7 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
     if get_all_filters:
         filters = [file.split('_')[-3][len(field_root)+1:] for file in glob.glob('{0}-f*dr?_sci.fits'.format(field_root))]
     else:
-        visits, all_groups, info = np.load('{0}_visits.npy'.format(field_root))
+        visits, all_groups, info = np.load('{0}_visits.npy'.format(field_root), allow_pickle=True)
 
         if ONLY_F814W:
             info = info[((info['INSTRUME'] == 'WFC3') & (info['DETECTOR'] == 'IR')) | (info['FILTER'] == 'F814W')]
@@ -1982,7 +1987,7 @@ def grism_prep(field_root='j142724+334246', ds9=None, refine_niter=3, gris_ref_f
             try:
                 # Read footprint file created ealier
                 fp_file = '{0}-ir.npy'.format(field_root)
-                det_poly = np.load(fp_file)[0]['footprint']
+                det_poly = np.load(fp_file, allow_pickle=True)[0]['footprint']
                 for flt in grp.FLTs:
                     flt.mask_mosaic_edges(sky_poly=det_poly, verbose=True, 
                                           dq_mask=False, dq_value=1024,
@@ -2159,7 +2164,7 @@ def extract(field_root='j142724+334246', maglim=[13,24], prior=None, MW_EBV=0.00
     target = field_root
     
     try:
-        file_args = np.load(args_file)[0]
+        file_args = np.load(args_file, allow_pickle=True)[0]
         MW_EBV = file_args['MW_EBV']
         min_sens = file_args['min_sens']
         min_mask = file_args['min_mask']
@@ -2569,13 +2574,13 @@ def summary_catalog(field_root='', dzbin=0.01, use_localhost=True, filter_bandpa
     fig.tight_layout(pad=0.2)
     fig.savefig('{0}_zhist.png'.format(field_root))
 
-    cols = ['root', 'mtime', 'idx','ra', 'dec', 'mag_auto', 't_g800l', 't_g102', 't_g141', 'z_map', 'chinu', 'bic_diff', 'zwidth1', 'log_mass', 'ssfr', 'png_stack', 'png_full', 'png_rgb', 'png_line']
+    cols = ['root', 'mtime', 'idx','ra', 'dec', 'mag_auto', 't_g800l', 't_g102', 't_g141', 'z_map', 'chinu', 'bic_diff', 'zwidth1', 'd4000', 'ssfr', 'png_stack', 'png_full', 'png_rgb', 'png_line']
     
     for i in range(len(cols))[::-1]:
         if cols[i] not in fit.colnames:
             cols.pop(i)
     
-    filter_columns = ['ra', 'dec', 'mag_auto', 't_g800l', 't_g102', 't_g141', 'z_map', 'chinu', 'bic_diff', 'zwidth1', 'log_mass', 'ssfr']
+    filter_columns = ['ra', 'dec', 'mag_auto', 't_g800l', 't_g102', 't_g141', 'z_map', 'chinu', 'bic_diff', 'zwidth1', 'd4000', 'ssfr']
     
     fit[cols].write_sortable_html(field_root+'-fit.html', replace_braces=True, localhost=use_localhost, max_lines=50000, table_id=None, table_class='display compact', css=None, filter_columns=filter_columns, use_json=(not use_localhost))
         
@@ -2655,7 +2660,7 @@ def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Griz
     import copy
     
     if all_visits is None:
-        all_visits, all_groups, info = np.load('{0}_visits.npy'.format(field_root))
+        all_visits, all_groups, info = np.load('{0}_visits.npy'.format(field_root), allow_pickle=True)
     #all_visits, filters = utils.parse_flt_files(info=info, uniquename=True, get_footprint=False)
     
     failed_list = glob.glob('*failed')
@@ -2903,11 +2908,12 @@ def update_wcs_headers_with_fine(field_root, backup=True):
         if not os.path.exists('FineBkup'):
             os.mkdir('FineBkup')
 
-    visits, all_groups, info = np.load('{0}_visits.npy'.format(field_root))
+    visits, all_groups, info = np.load('{0}_visits.npy'.format(field_root),
+                                       allow_pickle=True)
     
     fit_files = glob.glob('{0}*fine.npy'.format(field_root))
     for fit_file in fit_files:
-        fine_visits, fine_fit = np.load(fit_file)
+        fine_visits, fine_fit = np.load(fit_file, allow_pickle=True)
     
         N = len(fine_visits)
     
@@ -3061,7 +3067,8 @@ def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140
     ##############
     ## Redrizzle
     
-    visits, all_groups, info = np.load('{0}_visits.npy'.format(field_root))
+    visits, all_groups, info = np.load('{0}_visits.npy'.format(field_root), 
+                                       allow_pickle=True)
     
     failed_list = glob.glob('*failed')
     
@@ -3169,7 +3176,7 @@ def make_combined_mosaics(root, fix_stars=False, mask_spikes=False, skip_single_
     """
     
     visits_file = '{0}_visits.npy'.format(root)
-    visits, groups, info = np.load(visits_file)
+    visits, groups, info = np.load(visits_file, allow_pickle=True)
     
     ## Mosaic WCS
     wcs_ref_file = '{0}_wcs-ref.fits'.format(root)
@@ -4374,7 +4381,8 @@ def field_psf(root='j020924-044344', HOME_PATH='/Volumes/Pegasus/Grizli/Automati
         default = DITHERED_PLINE
 
         # Parameters of the line maps
-        args = np.load('../Extractions/{0}_fit_args.npy'.format(root))[0]
+        args = np.load('../Extractions/{0}_fit_args.npy'.format(root), 
+                       allow_pickle=True)[0]
     
         # Line images
         pline = args['pline']
@@ -4416,7 +4424,7 @@ def field_psf(root='j020924-044344', HOME_PATH='/Volumes/Pegasus/Grizli/Automati
     if not os.path.exists(visits_file):
         parse_visits(field_root=root, HOME_PATH=HOME_PATH)
         
-    visits, groups, info = np.load(visits_file)
+    visits, groups, info = np.load(visits_file, allow_pickle=True)
     
     # Average PSF
     xp, yp = np.meshgrid(np.arange(0,sh[1],subsample), np.arange(0, sh[0], subsample))
@@ -4513,7 +4521,8 @@ def make_report(root, gzipped_links=True, xsize=18, output_dpi=None, make_rgb=Tr
     
     if len(filters) == 0:
         has_mosaics = False
-        visits, groups, info = np.load('{0}_visits.npy'.format(root))
+        visits, groups, info = np.load('{0}_visits.npy'.format(root), 
+                                       allow_pickle=True)
         filters = np.unique([v['product'].split('-')[-1] for v in visits])
     else:
         has_mosaics = True
@@ -4641,7 +4650,8 @@ def exposure_report(root, log=True):
     import json
     
     # Exposures
-    visits, all_groups, info = np.load('{0}_visits.npy'.format(root))
+    visits, all_groups, info = np.load('{0}_visits.npy'.format(root), 
+                                       allow_pickle=True)
     
     tab = utils.GTable(info)
     tab.add_index('FILE')

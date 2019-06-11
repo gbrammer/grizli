@@ -143,7 +143,7 @@ def eazy_photoz(root, force=False, object_only=True, apply_background=True, aper
     import mastquery.utils
     
     if (os.path.exists('{0}.eazypy.self.npy'.format(root))) & (not force):
-        self = np.load('{0}.eazypy.self.npy'.format(root))[0]
+        self = np.load('{0}.eazypy.self.npy'.format(root), allow_pickle=True)[0]
         zout = utils.read_catalog('{0}.eazypy.zout.fits'.format(root))
         cat = utils.read_catalog('{0}_phot_apcorr.fits'.format(root))
         return self, cat, zout
@@ -528,7 +528,7 @@ def select_objects():
     self, cat, zout = photoz.eazy_photoz(root, object_only=object_only, apply_prior=False, beta_prior=True, aper_ix=1, force=True, get_external_photometry=False, compute_residuals=False, total_flux=total_flux)
     
     if False:
-        args = np.load('fit_args.npy')[0]
+        args = np.load('fit_args.npy', allow_pickle=True)[0]
         phot_obj = photoz.EazyPhot(self, grizli_templates=args['t0'], zgrid=self.zgrid, apcorr=self.idx*0.+1)
         
     flux = self.cat[total_flux]*1.
