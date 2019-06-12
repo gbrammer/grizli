@@ -4594,7 +4594,11 @@ def make_report(root, gzipped_links=True, xsize=18, output_dpi=None, make_rgb=Tr
     else:
         grism_url = ''
     
-    catalog = glob.glob('{0}-*.cat.fits'.format(root))[0]
+    try:
+        catalog = glob.glob('{0}-*.cat.fits'.format(root))[0]
+    except:
+        catalog = 'xxx'
+        
     catroot = catalog.split('.cat.fits')[0]
     
     body="""
