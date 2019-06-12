@@ -2687,7 +2687,7 @@ def get_panstarrs_catalog(ra=0., dec=0., radius=3., max_records=500000, verbose=
     Get PS1 from Vizier
     """
     print('Query PanSTARRS catalog ({ra},{dec},{radius})'.format(ra=ra, dec=dec, radius=radius))
-    tab = query_tap_catalog(ra=ra, dec=dec, radius=radius*2, extra=extra, vizier=True, db='"II/349/ps1"', verbose=verbose)
+    tab = query_tap_catalog(ra=ra, dec=dec, radius=radius*2, extra=extra, vizier=True, db='"II/349/ps1"', verbose=verbose, max=max_records)
     return tab
     
 def get_panstarrs_catalog_old(ra=0., dec=0., radius=3, columns='objName,objID,raMean,decMean,raStack,decStack,raStackErr,decStackErr,rMeanKronMag,rMeanKronMagErr,iMeanKronMag,iMeanKronMagErr', max_records=10000):

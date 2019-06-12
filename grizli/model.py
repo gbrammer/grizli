@@ -1067,7 +1067,7 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         if not os.path.exists(ext_file):
             return False
             
-        bg_splines = np.load(ext_file)[0]
+        bg_splines = np.load(ext_file, allow_pickle=True)[0]
         spline_waves = np.array(list(bg_splines.keys()))
         spline_waves.sort()
         spl_ix = np.arange(len(spline_waves))
