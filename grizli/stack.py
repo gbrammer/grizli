@@ -758,7 +758,7 @@ class StackFitter(GroupFitter):
         
         from . import utils
         
-        t_complex, t_i = np.load(templates_file)
+        t_complex, t_i = np.load(templates_file, allow_pickle=True)
         
         z = utils.log_zgrid(zr=zr, dz=dz0)
         chi2 = z*0.
@@ -951,7 +951,7 @@ class StackFitter(GroupFitter):
         """
         TBD
         """
-        t_complex, t_i = np.load(templates_file)
+        t_complex, t_i = np.load(templates_file, allow_pickle=True)
         
         # Best-fit templates
         for i, te in enumerate(t_i):
