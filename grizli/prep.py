@@ -1103,7 +1103,7 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
                       detection_params=SEP_DETECT_PARAMS, bkg_mask=None,
                       pixel_scale=0.06, log=False, 
                       compute_auto_quantities=True,
-                      gain=2000., 
+                      gain=2000., include_wcs_extension=True,
                       **kwargs):
     """Make a catalog from drizzle products using the SEP implementation of SExtractor
     
@@ -1537,7 +1537,17 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
             
     if save_to_fits:
         tab.write('{0}.cat.fits'.format(root), format='fits', overwrite=True)
-
+        
+        if include_wcs_extension:
+            try:
+                hdul = pyfits.open('{0}.cat.fits'.format(root), mode='update')
+                wcs_hdu = pyfits.ImageHDU(header=wcs_header, data=None,
+                                          name='WCS')
+                hdul.append(wcs_hdu)
+                hdul.flush()
+            except:
+                pass
+                
     logstr = '# SEP {0}.cat.fits: {1:d} objects'.format(root, len(tab))
     utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
     
