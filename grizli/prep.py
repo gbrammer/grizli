@@ -1150,7 +1150,7 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
     if sci is not None:
         drz_file = sci
     else:
-        drz_file = glob.glob('{0}_dr[zc]_sci.fits'.format(root))[0]
+        drz_file = glob.glob('{0}_dr[zc]_sci.fits*'.format(root))[0]
 
     im = pyfits.open(drz_file)
     
