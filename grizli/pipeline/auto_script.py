@@ -299,9 +299,12 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
     ### Download data
     os.chdir(HOME_PATH)
     #auto_script.fetch_files(field_root=root, HOME_PATH=HOME_PATH, remove_bad=remove_bad, reprocess_parallel=reprocess_parallel, s3_sync=s3_sync, filters=filters)
-    auto_script.fetch_files(field_root=root, HOME_PATH=HOME_PATH,
+    if fetch_files_args is not None:
+        auto_script.fetch_files(field_root=root, HOME_PATH=HOME_PATH,
                             filters=filters, **fetch_files_args)
-    
+    else:
+        os.chdir(os.path.join(HOME_PATH, root, 'Prep'))
+        
     if is_dash:
         from wfc3dash import process_raw
         os.chdir(os.path.join(HOME_PATH, root, 'RAW'))
