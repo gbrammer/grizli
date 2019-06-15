@@ -1193,7 +1193,12 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
         wcs_header = drz_im[0].header.copy()
         pixel_scale = np.sqrt(wcs_header['CD1_1']**2+wcs_header['CD1_2']**2)
         pixel_scale *= 3600. # arcsec
-        
+    
+    # Add some header keywords to the wcs header
+    for k in ['EXPSTART', 'EXPEND', 'EXPTIME']:
+        if k in drz_im[0].header:
+            wcs_header[k] = drz_im[0].header[k]
+            
     if isinstance(phot_apertures, str):
         apertures = np.cast[float](phot_apertures.replace(',','').split())
     else:
