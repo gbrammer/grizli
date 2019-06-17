@@ -640,7 +640,7 @@ def make_directories(field_root='j142724+334246', HOME_PATH='./'):
             os.mkdir(dir)
             os.system('chmod ugoa+rwx {0}'.format(dir))
             
-def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', inst_products={'WFPC2/WFC': ['C0M', 'C1M'], 'WFPC2/PC': ['C0M', 'C1M'], 'ACS/WFC': ['FLC'], 'WFC3/IR': ['RAW'], 'WFC3/UVIS': ['FLC']}, remove_bad=True, reprocess_parallel=False, s3_sync=False, fetch_flt_calibs=['IDCTAB','PFLTFILE','NPOLFILE'], filters=VALID_FILTERS):
+def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', inst_products={'WFPC2/WFC': ['C0M', 'C1M'], 'WFPC2/PC': ['C0M', 'C1M'], 'ACS/WFC': ['FLC'], 'WFC3/IR': ['RAW'], 'WFC3/UVIS': ['FLC']}, remove_bad=True, reprocess_parallel=False, s3_sync=False, fetch_flt_calibs=['IDCTAB','PFLTFILE','NPOLFILE'], filters=VALID_FILTERS, min_bad_expflag=2):
     """
     Fully automatic script
     """
@@ -738,7 +738,7 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/
             os.system('mv {0} {1}'.format(file, file.split('.gz')[0]))
             
     if remove_bad:
-        remove_bad_expflag(field_root=field_root, HOME_PATH=HOME_PATH, min_bad=2)
+        remove_bad_expflag(field_root=field_root, HOME_PATH=HOME_PATH, min_bad=min_bad_expflag)
     
     #### Reprocess the RAWs into FLTs    
     if reprocess_parallel:

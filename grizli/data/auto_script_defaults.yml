@@ -9,7 +9,8 @@ filters: &filters
 # Arguments to grizli.pipeline.fetch_files
 fetch_files_args: 
     reprocess_parallel: False 
-    remove_bad: True 
+    remove_bad: True
+    min_bad_expflag: 2 
     s3_sync: True
     #filters: *filters
     fetch_flt_calibs: [IDCTAB, PFLTFILE, NPOLFILE]
