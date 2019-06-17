@@ -4296,7 +4296,8 @@ def fetch_config_files(ACS=False, get_sky=True, get_stars=True, get_epsf=True):
     if get_sky:
         tarfiles.append('{0}/grism_master_sky_v0.5.tar.gz'.format(ftpdir))
     
-    gURL = 'http://www.stsci.edu/~brammer/Grizli/Files'
+    #gURL = 'http://www.stsci.edu/~brammer/Grizli/Files'
+    gURL = 'https://s3.amazonaws.com/grizli/CONF'
     tarfiles.append('{0}/WFC3IR_extended_PSF.v1.tar.gz'.format(gURL))
     
     if ACS:
@@ -4313,7 +4314,8 @@ def fetch_config_files(ACS=False, get_sky=True, get_stars=True, get_epsf=True):
     
     if get_epsf:
         # ePSF files for fitting point sources
-        psf_path = 'http://www.stsci.edu/hst/wfc3/analysis/PSF/psf_downloads/wfc3_ir/'
+        #psf_path = 'http://www.stsci.edu/hst/wfc3/analysis/PSF/psf_downloads/wfc3_ir/'
+        psf_path = 'http://www.stsci.edu/~jayander/STDPSFs/WFC3IR/'
         files = ['{0}/PSFSTD_WFC3IR_{1}.fits'.format(psf_path, filt) 
                  for filt in ['F105W', 'F125W', 'F140W', 'F160W']]
              
@@ -4476,7 +4478,7 @@ class EffectivePSF(object):
             
             if not os.path.exists(file):
                 msg = 'Extended PSF file \'{0}\' not found.'.format(file)
-                msg += '\n                   Get the archive from http://www.stsci.edu/~brammer/Grizli/Files/WFC3IR_extended_PSF.v1.tar.gz'
+                msg += '\n                   Get the archive from https://s3.amazonaws.com/grizli/CONF/WFC3IR_extended_PSF.v1.tar.gz'
                 msg += '\n                   and unpack in ${GRIZLI}/CONF/' 
                 raise FileNotFoundError(msg)
                 
