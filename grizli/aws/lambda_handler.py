@@ -29,7 +29,42 @@ import time
 
 import numpy as np
 
-def extract_beams_from_flt(root, bucket, id):
+def check_object_in_footprint(id, wcs_fits, cat):
+    """
+    Check that a given object is within a WCS footprint
+    
+    Parameters
+    ----------
+    id : int
+        Integer id of the catalog objects
+    
+    wcs_fits : str
+        WCS filename, like 'ibfuw1psq_flt.01.wcs.fits'.
+    
+    cat : `~astropy.table.Table`
+        Table object of the "ir_cat.fits" source detection table, with 
+        SExtractor columns NUMBER, X_WORLD, Y_WORLD.
+        
+    """
+    import matplotlib.path
+    import astropy.wcs as pywcs
+    import astropy.io.fits as pyfits
+    
+    ix = cat['NUMBER'] == id
+    ra, dec = cat['X_WORLD'][ix][0], cat['Y_WORLD'][ix][0]
+    
+    im = pyfits.open(wcs_fits)
+    im[0].header['NAXIS'] = 2
+    im[0].header['NAXIS1'] = im[0].header['CRPIX1']*2
+    im[0].header['NAXIS2'] = im[0].header['CRPIX2']*2
+    
+    wcs = pywcs.WCS(im[0].header, relax=True)
+    fp = matplotlib.path.Path(wcs.calc_footprint())
+    has_point = fp.contains_point([ra, dec])
+    
+    return has_point
+    
+def extract_beams_from_flt(root, bucket, id, clean=True):
     """
     Download GrismFLT files and extract the beams file
     """
@@ -65,6 +100,9 @@ def extract_beams_from_flt(root, bucket, id):
         bkt.download_file(file, os.path.basename(file),
                           ExtraArgs={"RequestPayer": "requester"})
     
+    # Read the catalog
+    ircat = utils.read_catalog('{0}-ir.cat.fits'.format(root))
+     
     # One beam at a time
     beams = None
     
@@ -84,17 +122,30 @@ def extract_beams_from_flt(root, bucket, id):
         else:
             fl = 'flc'
         
-        out_files = ['{0}.{1}.GrismFLT.fits'.format(flt, ext), 
-                     '{0}.{1}.GrismFLT.pkl'.format(flt, ext), 
-                     '{0}_{2}.{1}.wcs.fits'.format(flt, ext, fl)]
+        out_files = ['{0}_{2}.{1}.wcs.fits'.format(flt, ext, fl), 
+                     '{0}.{1}.GrismFLT.fits'.format(flt, ext), 
+                     '{0}.{1}.GrismFLT.pkl'.format(flt, ext)]
         
-        for f_j in out_files:             
+        exp_has_id = False
+        
+        for j, f_j in enumerate(out_files):             
             aws_file = os.path.join(os.path.dirname(file), f_j)
             print('  ', aws_file)
             if not os.path.exists(f_j):
                 bkt.download_file(aws_file, f_j, 
                                   ExtraArgs={"RequestPayer": "requester"})
+            
+            # WCS file, check if object in footprint
+            if f_j.endswith('.wcs.fits'):
+                exp_has_id = check_object_in_footprint(id, f_j, ircat)
+                if not exp_has_id:
+                    if clean:
+                        os.remove(f_j)
+                        break
         
+        if not exp_has_id:
+            continue
+                
         beams_i =                           auto_script.extract(field_root=root, maglim=[13,24], prior=None, MW_EBV=0.00, ids=id, pline={}, fit_only_beams=True, run_fit=False, poly_order=7, master_files=[os.path.basename(file)], grp=None, bad_pa_threshold=None, fit_trace_shift=False, size=32, diff=True, min_sens=0.02, skip_complete=True, fit_args={}, args_file='fit_args.npy', get_only_beams=True)
         if beams is None:
             beams = beams_i
@@ -103,7 +154,7 @@ def extract_beams_from_flt(root, bucket, id):
         
         # Remove the GrismFLT file    
         for f_j in out_files:
-            if 'GrismFLT' in f_j:
+            if ('GrismFLT' in f_j) & clean:
                 os.remove(f_j)
                 
     if beams is None:
