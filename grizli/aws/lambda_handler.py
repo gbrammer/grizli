@@ -183,7 +183,10 @@ def extract_beams_from_flt(root, bucket, id, clean=True):
                                               tfit=tfit, wave=bin_steps)                     
         fig1.savefig(outroot+'.png')
         
-    return('{0}_{1:05d}.beams.fits'.format(root, id))
+    outfiles = ['{0}_{1:05d}.beams.fits'.format(root, id)]
+    outfiles += glob.glob(outroot+'*')
+    
+    return(outfiles)
     
 def run_grizli_fit(event):
     import boto3
@@ -275,15 +278,16 @@ def run_grizli_fit(event):
         if status is False:
             return False
         else:
-            beams_file = status
+            beams_file = status[0]
             
         put_beams = True
         
         # upload it now
         output_path = 'Pipeline/{0}/Extractions'.format(root)
-        aws_file = '{0}/{1}'.format(output_path, beams_file)
-        print(aws_file)
-        bkt.upload_file(beams_file, aws_file, 
+        for outfile in status:
+            aws_file = '{0}/{1}'.format(output_path, outfile)
+            print(aws_file)
+            bkt.upload_file(outfile, aws_file, 
                         ExtraArgs={'ACL': 'public-read'})
         
         if 'run_fit' in event:
@@ -326,7 +330,7 @@ def run_grizli_fit(event):
     if event_kwargs['quasar_fit']:
         
         # Quasar templates
-        uv_lines = zr[1] > 3.5
+        uv_lines = True #zr[1] > 3.5
         t0, t1 = utils.load_quasar_templates(uv_line_complex=uv_lines,
                                             broad_fwhm=2800, narrow_fwhm=1000,
                                             fixed_narrow_lines=True, 
