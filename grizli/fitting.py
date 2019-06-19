@@ -780,11 +780,7 @@ def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat',
     info['SFRv_rms'].format = '.1f'
     info['sSFR'].format = '.1e'
     info['stellar_mass'].format = '.1e'
-    
-    for col in info.colnames:
-        if ('d4000' in col) | ('dn4000' in col):
-            info[col].format = '.2f'
-    
+        
     if filter_bandpasses:
         arr = np.array(template_mags)
         for i, bp in enumerate(filter_bandpasses):
@@ -886,6 +882,10 @@ def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat',
     idx, dr = hcat.match_to_catalog_sky(info, self_radec=('x_world', 'y_world'), other_radec=None)
     for c in hcat.colnames:
         info.add_column(hcat[c][idx])
+    
+    for col in info.colnames:
+        if ('d4000' in col.lower()) | ('dn4000' in col.lower()):
+            info[col].format = '.2f'
         
     info.write('{0}.info.fits'.format(target), overwrite=True)
     return info
