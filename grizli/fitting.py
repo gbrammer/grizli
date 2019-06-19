@@ -864,6 +864,9 @@ def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat',
         
         if col in ['ra','dec']:
             info[col].format = '.6f'
+    
+        if ('d4000' in col.lower()) | ('dn4000' in col.lower()):
+            info[col].format = '.2f'
             
     ### Sextractor catalog
     if sextractor is None:
@@ -882,11 +885,7 @@ def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat',
     idx, dr = hcat.match_to_catalog_sky(info, self_radec=('x_world', 'y_world'), other_radec=None)
     for c in hcat.colnames:
         info.add_column(hcat[c][idx])
-    
-    for col in info.colnames:
-        if ('d4000' in col.lower()) | ('dn4000' in col.lower()):
-            info[col].format = '.2f'
-        
+            
     info.write('{0}.info.fits'.format(target), overwrite=True)
     return info
 
