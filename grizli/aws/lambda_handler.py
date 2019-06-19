@@ -141,7 +141,7 @@ def extract_beams_from_flt(root, bucket, id, clean=True):
                 if not exp_has_id:
                     if clean:
                         os.remove(f_j)
-                        break
+                    break
         
         if not exp_has_id:
             continue
