@@ -781,6 +781,9 @@ def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat',
     info['sSFR'].format = '.1e'
     info['stellar_mass'].format = '.1e'
     
+    for col in info.colnames:
+        if ('d4000' in col) | ('dn4000' in col):
+            info[col].format = '.2f'
     
     if filter_bandpasses:
         arr = np.array(template_mags)
