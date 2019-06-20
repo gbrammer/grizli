@@ -815,8 +815,9 @@ def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat',
             else:
                 info[col].format = '.1f'
         
-        info['sn_{0}'.format(line)] = info['flux_'+line]/info['err_'+line]
-        info['sn_{0}'.format(line)][info['err_'+line] == 0] = -99
+        if 'err_'+line in info.colnames:
+            info['sn_{0}'.format(line)] = info['flux_'+line]/info['err_'+line]
+            info['sn_{0}'.format(line)][info['err_'+line] == 0] = -99
         #info['sn_{0}'.format(line)].format = '.1f'
            
     info['chinu'] = info['chimin']/info['dof']
