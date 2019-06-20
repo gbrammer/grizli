@@ -2477,9 +2477,10 @@ def summary_catalog(field_root='', dzbin=0.01, use_localhost=True, filter_bandpa
     
     if os.path.exists('{0}.info.fits'.format(field_root)):
         orig = utils.read_catalog('{0}.info.fits'.format(field_root))
-        all_files = glob.glob('{0}*full.fits')
+        all_files = glob.glob('{0}*full.fits'.format(field_root))
         all_files.sort()
         
+        print('{0}.info.fits: {1} objects.  Found {2} full.fits files, checking modify dates.'.format(field_root, len(orig), len(all_files)))
         info_mtime = os.stat('{0}.info.fits'.format(field_root)).st_mtime
         keep = np.ones(len(orig), dtype=bool)
         
