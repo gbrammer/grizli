@@ -807,6 +807,9 @@ def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat',
             if old_col in info.colnames:
                 info.rename_column(old_col, col)
             
+            if col not in info.colnames:
+                continue
+                
             if root.startswith('ew'):
                 info[col].format = '.1f'
             else:
