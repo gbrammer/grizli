@@ -2578,13 +2578,13 @@ def summary_catalog(field_root='', dzbin=0.01, use_localhost=True, filter_bandpa
     fig.tight_layout(pad=0.2)
     fig.savefig('{0}_zhist.png'.format(field_root))
 
-    cols = ['root', 'mtime', 'idx','ra', 'dec', 'mag_auto', 't_g800l', 't_g102', 't_g141', 'z_map', 'chinu', 'bic_diff', 'zwidth1', 'd4000', 'd4000_e', 'ssfr', 'png_stack', 'png_full', 'png_rgb', 'png_line']
+    cols = ['root', 'mtime', 'idx','ra', 'dec', 'mag_auto', 't_g800l', 't_g102', 't_g141', 'z_map', 'chinu', 'bic_diff', 'zwidth1', 'd4000', 'd4000_e', 'png_stack', 'png_full', 'png_rgb', 'png_line']
     
     for i in range(len(cols))[::-1]:
         if cols[i] not in fit.colnames:
             cols.pop(i)
     
-    filter_columns = ['ra', 'dec', 'mag_auto', 't_g800l', 't_g102', 't_g141', 'z_map', 'chinu', 'bic_diff', 'zwidth1', 'd4000', 'd4000_e', 'ssfr']
+    filter_columns = ['ra', 'dec', 'mag_auto', 't_g800l', 't_g102', 't_g141', 'z_map', 'chinu', 'bic_diff', 'zwidth1', 'd4000', 'd4000_e']
     
     fit[cols].write_sortable_html(field_root+'-fit.html', replace_braces=True, localhost=use_localhost, max_lines=50000, table_id=None, table_class='display compact', css=None, filter_columns=filter_columns, use_json=(not use_localhost))
         
