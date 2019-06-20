@@ -803,7 +803,10 @@ def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat',
         
         for root in ['flux','err','ew50','ewhw']:
             col = '{0}_{1}'.format(root, line)
-            info.rename_column('{0}_{1:03d}'.format(root, i), col)
+            old_col = '{0}_{1:03d}'.format(root, i)
+            if old_col in info.colnames:
+                info.rename_column(old_col, col)
+            
             if root.startswith('ew'):
                 info[col].format = '.1f'
             else:
