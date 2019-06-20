@@ -794,7 +794,7 @@ def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat',
     #files=glob.glob('{0}*full.fits'.format(target))
     im = pyfits.open(files[0])
     h = im['COVAR'].header
-    for i in range(24):
+    for i in range(35):
         key = 'FLUX_{0:03d}'.format(i)
         if key not in h:
             continue

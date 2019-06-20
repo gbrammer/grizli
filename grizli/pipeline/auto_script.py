@@ -2477,7 +2477,7 @@ def summary_catalog(field_root='', dzbin=0.01, use_localhost=True, filter_bandpa
     
     if os.path.exists('{0}.info.fits'.format(field_root)):
         orig = utils.read_catalog('{0}.info.fits'.format(field_root))
-        all_files = glob.glob('*full.fits')
+        all_files = glob.glob('{0}*full.fits')
         all_files.sort()
         
         info_mtime = os.stat('{0}.info.fits'.format(field_root)).st_mtime
