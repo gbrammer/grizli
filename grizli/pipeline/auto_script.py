@@ -716,8 +716,11 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/
     
     use_filters = utils.column_string_operation(tab['filter'], filters, method='startswith', logical='or')
     
-    curl = fetch.make_curl_script(tab[(~badexp) & (~is_wfpc2) & use_filters], level=None, script_name='fetch_{0}.sh'.format(field_root), inst_products=inst_products, skip_existing=True, output_path='./', s3_sync=s3_sync)
-           
+    fetch_selection = (~badexp) & (~is_wfpc2) & use_filters
+    curl = fetch.make_curl_script(tab[fetch_selection], level=None, script_name='fetch_{0}.sh'.format(field_root), inst_products=inst_products, skip_existing=True, output_path='./', s3_sync=s3_sync)
+    
+    print('Fetch {0} files (s3_sync={1})'.format(fetch_selection.sum(), s3_sync))
+    
     # Ugly callout to shell
     os.system('sh fetch_{0}.sh'.format(field_root))
     
