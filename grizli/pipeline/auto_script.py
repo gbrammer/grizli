@@ -1620,7 +1620,7 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
             continue
                 
         if filt not in ['g102','g141','g800l']:
-            sci_files = glob.glob(('{0}-{1}_dr?_sci.fits'.format(field_root, filt)))
+            sci_files = glob.glob(('{0}-{1}_dr?_sci.fits*'.format(field_root, filt)))
             if len(sci_files) == 0:
                 continue
             
