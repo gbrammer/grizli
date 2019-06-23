@@ -144,6 +144,8 @@ multiband_catalog_args:
     threshold: 1.0
     detection_background: True
     detection_filter: ir
+    detection_root: null
+    output_root: null
     photometry_background: True
     get_all_filters: False
     run_detection: True
