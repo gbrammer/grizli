@@ -1556,6 +1556,9 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
     
     if detection_root is None:
         detection_root = '{0}-{1}'.format(field_root, detection_filter)
+    
+    if output_root is None:
+        output_root=field_root
         
     if run_detection:    
         if use_psf_filter:
@@ -1620,7 +1623,8 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
             if len(sci_files) == 0:
                 continue
             
-            root = '{0}-{1}'.format(field_root, filt)
+            root = sci_files[0].split('{0}_dr'.format(filt))[0]+filt
+            # root = '{0}-{1}'.format(field_root, filt)
             
             # Check for half-pixel optical images if using segmask
             if aper_segmask:
@@ -1667,10 +1671,7 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
     
     for c in tab.colnames:
         tab.rename_column(c, c.lower())
-    
-    if output_root is None:
-        output_root=field_root
-        
+            
     tab.write('{0}_phot.fits'.format(output_root), format='fits', overwrite=True)
     
     return tab   
