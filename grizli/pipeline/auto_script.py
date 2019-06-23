@@ -1517,7 +1517,7 @@ mag_lim=17, cat=None, cols=['mag_auto','ra','dec'], minR=8, dy=5, selection=None
             im['DQ',ext].data |= mask*2048
             im.flush()
             
-def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_background=True, photometry_background=True, get_all_filters=False, det_err_scale=-np.inf, rescale_weight=True, run_detection=True, detection_filter='ir', detection_root=None, output_root=None, use_psf_filter=True, detection_params=prep.SEP_DETECT_PARAMS,  phot_apertures=prep.SEXTRACTOR_PHOT_APERTURES_ARCSEC, master_catalog=None, bkg_mask=None, bkg_params={'bw':64, 'bh':64, 'fw':3, 'fh':3, 'pixel_scale':0.06}, use_bkg_err=False, aper_segmask=True):
+def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_background=True, photometry_background=True, get_all_filters=False, filters=None, det_err_scale=-np.inf, rescale_weight=True, run_detection=True, detection_filter='ir', detection_root=None, output_root=None, use_psf_filter=True, detection_params=prep.SEP_DETECT_PARAMS,  phot_apertures=prep.SEXTRACTOR_PHOT_APERTURES_ARCSEC, master_catalog=None, bkg_mask=None, bkg_params={'bw':64, 'bh':64, 'fw':3, 'fh':3, 'pixel_scale':0.06}, use_bkg_err=False, aper_segmask=True):
     """
     Make a detection catalog with SExtractor and then measure
     photometry with `~photutils`.
@@ -1589,7 +1589,7 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
     # Source positions
     #source_xy = tab['X_IMAGE'], tab['Y_IMAGE']
     if aper_segmask:
-        seg_data = pyfits.open('{0}-{1}_seg.fits'.format(field_root, detection_filter))[0].data
+        seg_data = pyfits.open('{0}_seg.fits'.format(detection_root))[0].data
         seg_data = np.cast[np.int32](seg_data)
         
         aseg, aseg_id = seg_data, tab['NUMBER']
@@ -1599,15 +1599,16 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
     else:
         source_xy = tab['X_WORLD'], tab['Y_WORLD']
     
-    if get_all_filters:
-        filters = [file.split('_')[-3][len(field_root)+1:] for file in glob.glob('{0}-f*dr?_sci.fits'.format(field_root))]
-    else:
-        visits, all_groups, info = np.load('{0}_visits.npy'.format(field_root), allow_pickle=True)
+    if filters is None:
+        if get_all_filters:
+            filters = [file.split('_')[-3][len(field_root)+1:] for file in glob.glob('{0}-f*dr?_sci.fits'.format(field_root))]
+        else:
+            visits, all_groups, info = np.load('{0}_visits.npy'.format(field_root), allow_pickle=True)
 
-        if ONLY_F814W:
-            info = info[((info['INSTRUME'] == 'WFC3') & (info['DETECTOR'] == 'IR')) | (info['FILTER'] == 'F814W')]
+            if ONLY_F814W:
+                info = info[((info['INSTRUME'] == 'WFC3') & (info['DETECTOR'] == 'IR')) | (info['FILTER'] == 'F814W')]
 
-        filters = [f.lower() for f in np.unique(info['FILTER'])]
+            filters = [f.lower() for f in np.unique(info['FILTER'])]
         
     #filters.insert(0, 'ir')
     
