@@ -1631,6 +1631,7 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
             if aper_segmask:
                 sci = pyfits.open(sci_files[0])
                 sci_shape = sci[0].data.shape
+                sci.close(); del(sci)
                 
                 if sci_shape[0] != aseg.shape[0]:
                     print('# filt={0}, need half-size segmentation image!'.format(filt), sci_shape, aseg.shape)

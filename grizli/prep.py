@@ -1277,7 +1277,11 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
             if err_scale < 0:
                 ratio = bkg.rms()/err
                 xerr_scale = np.median(ratio[(~mask) & np.isfinite(ratio)])
+                del(bkg)
                 return xerr_scale
+
+        del(bkg)
+                
     else:
         if err_scale is None:
             err_scale = 1.
