@@ -1269,12 +1269,13 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
 
             err = bkg.rms()
 
-        ratio = bkg.rms()/err
         if err_scale == -np.inf:
+            ratio = bkg.rms()/err
             err_scale = np.median(ratio[(~mask) & np.isfinite(ratio)])
         else:
             # Just return the error scale
             if err_scale < 0:
+                ratio = bkg.rms()/err
                 xerr_scale = np.median(ratio[(~mask) & np.isfinite(ratio)])
                 return xerr_scale
     else:
@@ -1997,6 +1998,11 @@ def blot_background(visit={'product': '', 'files':None},
             flt_wcs = pywcs.WCS(flt['SCI',ext].header, fobj=flt, relax=True)
             flt_wcs.pscale = utils.get_wcs_pscale(flt_wcs)
             
+            # if False:
+            #     # Compare drizzlepac blot
+            #     from drizzlepac.astrodrizzle import ablot
+            #     abl = ablot.do_blot(bkg_data.astype(np.float32), drz_wcs, flt_wcs, 1., coeffs=True, interp='poly5', sinscl=1.0, stepsize=stepsize, wcsmap=None)
+                
             blotted = utils.blot_nearest_exact(bkg_data.astype(np.float32),
                                                drz_wcs, flt_wcs,
                                                stepsize=stepsize,
