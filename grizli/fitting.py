@@ -172,9 +172,10 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
                 phot = phot_i
             else:
                 if 'pz' in phot_i:
-                    prior = phot_i['pz']
-                    sed_args['photometry_pz'] = phot_i['pz']
-                    
+                    if phot_i['pz'] is not None:
+                        prior = phot_i['pz']
+                        sed_args['photometry_pz'] = phot_i['pz']
+            
             if 'z_spec' in phot_i:
                 if phot_i['z_spec'] >= 0:
                     sed_args['zspec'] = phot_i['z_spec']*1
@@ -521,10 +522,10 @@ def full_sed_plot(mb, tfit, zfit=None, bin=1, minor=0.1, save='png', sed_resolut
     # Photometry 
     A_phot = mb._interpolate_photometry(z=tfit['z'], templates=t1)
     A_model = A_phot.T.dot(tfit['coeffs'])
-    A_model /= mb.photom_ext_corr
-    
+
     photom_mask = mb.photom_eflam > -98
-    
+    A_model /= mb.photom_ext_corr[photom_mask]
+
     ##########
     # Figure
 
@@ -2982,8 +2983,13 @@ class GroupFitter(object):
         
         for g in sp_data:
 
-            clip = sp_flat[g]['flux'] != 0
-
+            clip = (sp_flat[g]['flux'] != 0) & np.isfinite(sp_data[g]['flux']) & np.isfinite(sp_data[g]['err']) & np.isfinite(sp_flat[g]['flux'])
+            if tfit is not None:
+                clip &= np.isfinite(sp_model[g]['flux'])
+            
+            if clip.sum() == 0:
+                continue
+                
             pscale = 1.
             if hasattr(self, 'pscale'):
                 if (self.pscale is not None):
