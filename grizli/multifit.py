@@ -1235,9 +1235,85 @@ class GroupFLT():
         # Done!
         return outsci, outwht
             
+def replace_direct_image_cutouts(beams_file='', ref_image='gdn-100mas-f160w_drz_sci.fits', interp='poly5', cutout=200):
+    """
+    Replace "REF" extensions in a `beams.fits` file
+    
+    Parameters
+    ----------
+    beams_file : str
+        Filename of a "beams.fits" file.
+        
+    ref_image : str or `~astropy.io.fits.HDUList`
+       Filename or preloaded FITS file.
+        
+    interp : str
+        Interpolation function to use for `~drizzlepac.astrodrizzle.ablot.do_blot`.
+        
+    cutout : int
+        Make a slice of the `ref_image` with size [-cutout,+cutout] around
+        the center position of the desired object before passing to `blot`.
+        
+    Returns
+    -------
+    beams_image : `~astropy.io.fits.HDUList`
+        Image object with the "REF" extensions filled with the new blotted
+        image cutouts.
+        
+    """
+    from drizzlepac.astrodrizzle import ablot
+    
+    if isinstance(ref_image, pyfits.HDUList):
+        ref_im = ref_image
+        ref_image_filename = ref_image.filename()
+    else:
+        ref_im = pyfits.open(ref_image)
+        ref_image_filename = ref_image
+    
+    ref_wcs = pywcs.WCS(ref_im[0].header, relax=True)
+    ref_wcs.pscale = utils.get_wcs_pscale(ref_wcs)
+    
+    ref_photflam = ref_im[0].header['PHOTFLAM']
+    ref_data = ref_im[0].data
+    dummy_wht = np.ones_like(ref_im[0].data, dtype=np.float32)
+    
+    beams_image = pyfits.open(beams_file)
+    
+    beam_ra = beams_image[0].header['RA']
+    beam_dec = beams_image[0].header['DEC']
+
+    xy = np.cast[int](np.round(ref_wcs.all_world2pix([beam_ra], [beam_dec], 0))).flatten()
+    
+    slx = slice(xy[0]-cutout, xy[0]+cutout)
+    sly = slice(xy[1]-cutout, xy[1]+cutout)
+
+    for ext in beams_image:
+        if 'EXTNAME' not in ext.header:
+            continue
+        elif ext.header['EXTNAME'] == 'REF':
+            #break
+            
+            ext.header['REF_FILE'] = ref_image_filename
+            for k in ['PHOTFLAM', 'PHOTPLAM']:
+                ext.header[k] = ref_im[0].header[k]
+            
+            the_filter = utils.get_hst_filter(ref_im[0].header)
+            ext.header['FILTER'] = ext.header['DFILTER'] = the_filter
+            
+            ext_wcs = pywcs.WCS(ext.header, relax=True)
+            ext_wcs.pscale = utils.get_wcs_pscale(ext_wcs)
+            blotted = ablot.do_blot(ref_data[sly, slx], 
+                              ref_wcs.slice([sly, slx]), 
+                              ext_wcs, 1, coeffs=True, interp=interp, 
+                              sinscl=1.0, stepsize=10, wcsmap=None)
+            
+            ext.data = blotted*ref_photflam
+    
+    return beams_image
+    
     
 class MultiBeam(GroupFitter):
-    def __init__(self, beams, group_name=None, fcontam=0., psf=False, polyx=[0.3, 2.5], MW_EBV=0., min_mask=0.01, min_sens=0.08, sys_err=0.0, verbose=True, **kwargs):
+    def __init__(self, beams, group_name=None, fcontam=0., psf=False, polyx=[0.3, 2.5], MW_EBV=0., min_mask=0.01, min_sens=0.08, sys_err=0.0, verbose=True, replace_direct=None, **kwargs):
         """Tools for dealing with multiple `~.model.BeamCutout` instances 
         
         Parameters
@@ -1293,7 +1369,6 @@ class MultiBeam(GroupFitter):
         self.polyx = polyx
         self.min_mask = min_mask
         self.min_sens = min_sens
-        
         if isinstance(beams, str):
             self.load_master_fits(beams, verbose=verbose)    
             
