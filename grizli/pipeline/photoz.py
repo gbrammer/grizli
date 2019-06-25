@@ -62,11 +62,14 @@ def apply_catalog_corrections(root, total_flux='flux_auto', auto_corr=True, get_
             cat['apcorr_{0}'.format(i)] = cat[total_flux]/cat['flux_aper_{0}'.format(i)]
             for f in filters:
                 bkgc = '{0}_bkg_aper_{1}'.format(f, i)
-                if (bkgc in cat.colnames) & apply_background:
-                    bkg = cat[bkgc]
-                else:
-                    bkg = 0.
-                    
+                # if (bkgc in cat.colnames) & apply_background:
+                #     bkg = cat[bkgc]
+                # else:
+                #     bkg = 0.
+                
+                # background already subtracted from flux columns
+                bkg = 0.
+                
                 cat['{0}_corr_{1}'.format(f, i)] = (cat['{0}_flux_aper_{1}'.format(f, i)]-bkg)*cat['apcorr_{0}'.format(i)]
                 cat['{0}_ecorr_{1}'.format(f, i)] = cat['{0}_fluxerr_aper_{1}'.format(f, i)]*cat['apcorr_{0}'.format(i)]
                 
@@ -86,7 +89,7 @@ def apply_catalog_corrections(root, total_flux='flux_auto', auto_corr=True, get_
 
                     cat['{0}_tot_{1}'.format(f, i)][bad] = -99
                     cat['{0}_etot_{1}'.format(f, i)][bad] = -99
-                                    
+                                         
     cat.rename_column('number','id')
     cat['z_spec'] = cat['id']*0.-1
     
@@ -532,7 +535,7 @@ def select_objects():
         phot_obj = photoz.EazyPhot(self, grizli_templates=args['t0'], zgrid=self.zgrid, apcorr=self.idx*0.+1)
         
     flux = self.cat[total_flux]*1.
-    hmag = 23.9-2.5*np.log10(cat['f160w_tot_2'])
+    hmag = 23.9-2.5*np.log10(cat['f160w_tot_1'])
 
     # Reddest HST band
     lc_clip = self.lc*1
@@ -550,14 +553,14 @@ def select_objects():
     iz8 = np.where(self.zgrid > 8)[0][0]
     iz9 = np.where(self.zgrid > 9)[0][0]
 
-    highz_sel = (hmag < 27.5) & (self.cat['class_valid'] > 0.8)
+    highz_sel = (hmag < 27.5) #& (self.cat['class_valid'] > 0.8)
     #highz_sel |= (cumpz[:,iz6] < 0.3) & (self.cat['flux_radius'] > 2.5) 
     #highz_sel &= (self.cat['flux_radius'] > 2.5) 
     highz_sel &= chi2 < 3
     highz_sel &= (sn_red > 5)
     highz_sel &= self.nusefilt >= 3
     
-    flux_ratio = (cat['f160w_flux_aper_3'] - cat['f160w_bkg_aper_3'])/(cat['f160w_flux_aper_0'] - cat['f160w_bkg_aper_0'])
+    flux_ratio = cat['f160w_flux_aper_3']/cat['f160w_flux_aper_0']
     flux_ratio /= cat.meta['APER_3']**2/cat.meta['APER_0']**2
     
     if False:
