@@ -1183,7 +1183,7 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
 
     drz_im = pyfits.open(drz_file)
     data = drz_im[0].data.byteswap().newbyteorder()
-        
+    
     try:
         wcs = pywcs.WCS(drz_im[0].header)
         wcs_header = utils.to_header(wcs)
@@ -1221,10 +1221,18 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
         # True mask pixels are masked with sep
         mask = (~np.isfinite(err)) | (err == 0) | (~np.isfinite(data))
         err[mask] = 0
+        
+        wht_im.close(); del(wht_im)
+        
     else:
         # True mask pixels are masked with sep
         mask = (data == 0) | (~np.isfinite(data))
         err = None
+    
+    try:
+        drz_im.close(); del(drz_im)
+    except:
+        pass
     
     data_mask = np.cast[data.dtype](mask)
     
@@ -1540,7 +1548,13 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
     #     
     #     # "ISO" mag, integrated within the segment
     #     tab['mag_iso'] = 23.9-2.5*np.log10(tab['flux'])
-        
+    
+    try:
+        # Free memory objects explicitly
+        del(data_mask); del(data); del(err); del(data_mask)
+    except:
+        pass
+    
     #if uppercase_columns:
     for c in tab.colnames:
         tab.rename_column(c, column_case(c))
