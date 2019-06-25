@@ -3012,6 +3012,83 @@ def get_wcs_slice_header(wcs, slx, sly):
             h.rename_keyword(k, k.replace('PC', 'CD'))
     
     return h
+
+class WCSFootprint(object):
+    """
+    Helper functions for dealing with WCS footprints
+    """
+    def __init__(self, wcs, ext=1, label=None):
+        if isinstance(wcs, pywcs.WCS):
+            self.wcs = wcs.deepcopy()
+            if self.wcs.pixel_shape is None:
+                self.wcs.pixel_shape = [int(p*2) for p in self.wcs.wcs.crpix]     
+        elif isinstance(wcs, str):
+            hdu = pyfits.open(wcs)
+            if len(hdu) == 1:
+                ext = 0
+                            
+            self.add_naxis(hdu[ext].header)
+            the_wcs = pywcs.WCS(hdu[ext].header, fobj=hdu)
+            self.wcs = the_wcs
+        elif isinstance(wcs, pyfits.HDUList):
+            if len(wcs) == 1:
+                ext = 0
+            self.add_naxis(wcs[ext].header)
+            the_wcs = pywcs.WCS(wcs[ext].header, fobj=wcs)
+            self.wcs = the_wcs
+        else:
+            print('WCS class not recognized: {0}'.format(wcs.__class__))
+            raise ValueError
+
+        self.fp = self.wcs.calc_footprint()
+        self.cosdec = np.cos(self.fp[0,1]/180*np.pi)
+        self.label = label
+        self.pixel_scale = get_wcs_pscale(self.wcs)
+    
+    @property
+    def centroid(self):
+        return np.mean(self.fp, axis=0)
+             
+    @property 
+    def path(self):
+        """
+        `~matplotlib.path.Path` object
+        """
+        import matplotlib.path
+        return matplotlib.path.Path(self.fp)
+    
+    @property 
+    def polygon(self):
+        """
+        `~shapely.geometry.Polygon` object.
+        """
+        from shapely.geometry import Polygon
+        return Polygon(self.fp)
+    
+    def get_patch(self, **kwargs):
+        """
+        `~descartes.PolygonPatch` object
+        """
+        from descartes import PolygonPatch
+        return PolygonPatch(self.polygon, **kwargs)
+    
+    @property
+    def region(self):
+        """
+        Polygon string in DS9 region format
+        """
+        return 'polygon({0})'.format(','.join(['{0:.6f}'.format(c) for c in self.fp.flatten()]))
+        
+    @staticmethod
+    def add_naxis(header):
+        """
+        If NAXIS keywords not found in an image header, assume the parent 
+        image dimensions are 2*CRPIX
+        """
+        for i in [1,2]:
+            if 'NAXIS{0}'.format(i) not in header:
+                header['NAXIS{0}'.format(i)] = int(header['CRPIX{0}'.format(i)]*2)
+                
     
 def reproject_faster(input_hdu, output, pad=10, **kwargs):
     """Speed up `reproject` module with array slices of the input image
