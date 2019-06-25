@@ -29,7 +29,7 @@ import time
 
 import numpy as np
 
-def check_object_in_footprint(id, wcs_fits, cat):
+def check_object_in_footprint(id, wcs_fits, cat, rd=None):
     """
     Check that a given object is within a WCS footprint
     
@@ -50,17 +50,21 @@ def check_object_in_footprint(id, wcs_fits, cat):
     import astropy.wcs as pywcs
     import astropy.io.fits as pyfits
     
-    ix = cat['NUMBER'] == id
-    ra, dec = cat['X_WORLD'][ix][0], cat['Y_WORLD'][ix][0]
-    
+    if rd is None:
+        ix = cat['NUMBER'] == id
+        ra, dec = cat['X_WORLD'][ix][0], cat['Y_WORLD'][ix][0]
+    else:
+        ra, dec = rd
+        
     im = pyfits.open(wcs_fits)
     im[0].header['NAXIS'] = 2
     im[0].header['NAXIS1'] = im[0].header['CRPIX1']*2
     im[0].header['NAXIS2'] = im[0].header['CRPIX2']*2
     
-    wcs = pywcs.WCS(im[0].header, relax=True)
+    wcs = pywcs.WCS(im[0].header, fobj=im, relax=True)
     fp = matplotlib.path.Path(wcs.calc_footprint())
     has_point = fp.contains_point([ra, dec])
+    im.close()
     
     return has_point
     
@@ -102,7 +106,10 @@ def extract_beams_from_flt(root, bucket, id, clean=True):
     
     # Read the catalog
     ircat = utils.read_catalog('{0}-ir.cat.fits'.format(root))
-     
+    ix = ircat['NUMBER'] == id
+    object_rd = (ircat['X_WORLD'][ix], ircat['Y_WORLD'][ix])
+    del(ircat)
+    
     # One beam at a time
     beams = None
     
@@ -137,7 +144,8 @@ def extract_beams_from_flt(root, bucket, id, clean=True):
             
             # WCS file, check if object in footprint
             if f_j.endswith('.wcs.fits'):
-                exp_has_id = check_object_in_footprint(id, f_j, ircat)
+                #exp_has_id = check_object_in_footprint(id, f_j, ircat)
+                exp_has_id = check_object_in_footprint(None, f_j, None, rd=object_rd)
                 if not exp_has_id:
                     if clean:
                         os.remove(f_j)
@@ -147,17 +155,18 @@ def extract_beams_from_flt(root, bucket, id, clean=True):
             continue
                 
         beams_i =                           auto_script.extract(field_root=root, maglim=[13,24], prior=None, MW_EBV=0.00, ids=id, pline={}, fit_only_beams=True, run_fit=False, poly_order=7, master_files=[os.path.basename(file)], grp=None, bad_pa_threshold=None, fit_trace_shift=False, size=32, diff=True, min_sens=0.02, skip_complete=True, fit_args={}, args_file='fit_args.npy', get_only_beams=True)
-        if beams is None:
-            beams = beams_i
-        else:
-            beams.extend(beams_i)
         
         # Remove the GrismFLT file    
         for f_j in out_files:
             if ('GrismFLT' in f_j) & clean:
                 os.remove(f_j)
-                
-    if beams is None:
+
+        if beams is None:
+            beams = beams_i
+        else:
+            beams.extend(beams_i)
+        
+    if not beams:
         print('No beams found for {0} id={1}'.format(root, id))
         return False
     
