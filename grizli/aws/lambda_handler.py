@@ -200,6 +200,7 @@ def extract_beams_from_flt(root, bucket, id, clean=True):
 def run_grizli_fit(event):
     import boto3
     import json
+    import shutil
     
     import grizli
     from grizli import fitting, utils, multifit
@@ -236,6 +237,10 @@ def run_grizli_fit(event):
         
     print('Grizli version: ', grizli.__version__)
     
+    # Disk space
+    total, used, free = shutil.disk_usage("/")    
+    print('Disk info: Total = {0:.2f} / Used = {1:.2f} / Free = {2:.2f}'.format(total // (2**30) * 1000., used // (2**30) * 1000., free // (2**30) * 1000.))
+
     ## Output path
     if 'output_path' in event:
         output_path = event['output_path']
