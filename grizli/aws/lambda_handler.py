@@ -303,7 +303,16 @@ def run_grizli_fit(event):
         put_beams = False
     except:
         print('Extract from GrismFLT object!')
-        status = extract_beams_from_flt(root, event_kwargs['bucket'], id)
+        if 'clean' in event:
+            if isinstance(event['clean'], str):
+                run_clean = event['clean'].lower() in ['true', 'y', '1']
+            else:
+                run_clean = event['clean']
+        else:
+            run_clean = True
+            
+        status = extract_beams_from_flt(root, event_kwargs['bucket'], id, 
+                                        clean=run_clean)
         if status is False:
             return False
         else:
@@ -471,8 +480,18 @@ def redshift_handler(event, context):
     # Clean up
     beams_file = os.path.basename(event['s3_object_path'])
     root = beams_file.split('_')[0]
-    clean(root=root, verbose=True)
-        
+
+    if 'clean' in event:
+        if isinstance(event['clean'], str):
+            run_clean = event['clean'].lower() in ['true', 'y', '1']
+        else:
+            run_clean = event['clean']
+    else:
+        run_clean = True
+    
+    if run_clean:
+        clean(root=root, verbose=True)
+                
 def show_version(event, context):
     import grizli
     import eazy
