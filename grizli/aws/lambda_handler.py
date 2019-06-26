@@ -258,9 +258,13 @@ def run_grizli_fit(event):
         os.chdir('/tmp/')
     
     print('Working directory: {0}'.format(os.getcwd()))
-    
     files = glob.glob('*')
     files.sort()
+    
+    # Filenames, etc.
+    beams_file = os.path.basename(event['s3_object_path'])
+    root = beams_file.split('_')[0]
+    id = int(beams_file.split('_')[1].split('.')[0])
     
     # Initial log
     start_log = '{0}_{1:05d}.start.log'.format(root, id)
@@ -277,10 +281,6 @@ def run_grizli_fit(event):
     s3 = boto3.resource('s3')
     s3_client = boto3.client('s3')
     bkt = s3.Bucket(event_kwargs['bucket'])
-
-    beams_file = os.path.basename(event['s3_object_path'])
-    root = beams_file.split('_')[0]
-    id = int(beams_file.split('_')[1].split('.')[0])
         
     if event_kwargs['skip_started']:
         res = [r.key for r in bkt.objects.filter(Prefix=full_start)]
