@@ -1968,7 +1968,7 @@ def load_GroupFLT(field_root='j142724+334246', force_ref=None, force_seg=None, f
                 
         return [grp]
     
-def grism_prep(field_root='j142724+334246', ds9=None, refine_niter=3, gris_ref_filters=GRIS_REF_FILTERS, files=None, split_by_grism=True, refine_poly_order=1, refine_fcontam=0.5, mask_mosaic_edges=True):
+def grism_prep(field_root='j142724+334246', ds9=None, refine_niter=3, gris_ref_filters=GRIS_REF_FILTERS, files=None, split_by_grism=True, refine_poly_order=1, refine_fcontam=0.5, cpu_count=-1, mask_mosaic_edges=True):
     """
     Contamination model for grism exposures
     """
@@ -1990,7 +1990,7 @@ def grism_prep(field_root='j142724+334246', ds9=None, refine_niter=3, gris_ref_f
         
         ################
         # Compute preliminary model
-        grp.compute_full_model(fit_info=None, verbose=True, store=False, mag_limit=25, coeffs=[1.1, -0.5], cpu_count=4)
+        grp.compute_full_model(fit_info=None, verbose=True, store=False, mag_limit=25, coeffs=[1.1, -0.5], cpu_count=cpu_count)
     
         ##############
         # Save model to avoid having to recompute it again
