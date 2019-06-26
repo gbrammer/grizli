@@ -239,7 +239,7 @@ def run_grizli_fit(event):
     
     # Disk space
     total, used, free = shutil.disk_usage("/")    
-    print('Disk info: Total = {0:.2f} / Used = {1:.2f} / Free = {2:.2f}'.format(total // (2**30) * 1000., used // (2**30) * 1000., free // (2**30) * 1000.))
+    print('Disk info: Total = {0:.2f} / Used = {1:.2f} / Free = {2:.2f}'.format(total // (2**20), used // (2**20), free // (2**20)))
 
     ## Output path
     if 'output_path' in event:
@@ -253,6 +253,12 @@ def run_grizli_fit(event):
         event_kwargs['bucket'] = 'aws-grivam'
                         
     os.chdir('/tmp/')
+    files = glob.glob('*')
+    files.sort()
+    
+    for i, file in enumerate(files):
+        print('Initial file ({0}): {1}'.format(i+1, file))
+    
     os.system('cp {0}/matplotlibrc .'.format(grizli.GRIZLI_PATH))
     
     s3 = boto3.resource('s3')
