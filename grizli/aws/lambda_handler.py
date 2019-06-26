@@ -252,10 +252,23 @@ def run_grizli_fit(event):
     else:
         event_kwargs['bucket'] = 'aws-grivam'
                         
-    os.chdir('/tmp/')
+    if 'working_directory' in event:
+        os.chdir(event['working_directory'])
+    else:
+        os.chdir('/tmp/')
+    
+    print('Working directory: {0}'.format(os.getcwd()))
+    
     files = glob.glob('*')
     files.sort()
     
+    # Initial log
+    start_log = '{0}_{1:05d}.start.log'.format(root, id)
+    full_start = 'Pipeline/{0}/Extractions/{1}'.format(root, start_log)
+    if start_log in files:
+        print('Log file {0} found in {1}'.format(start_log, os.getcwd()))
+        return True
+        
     for i, file in enumerate(files):
         print('Initial file ({0}): {1}'.format(i+1, file))
     
@@ -268,11 +281,7 @@ def run_grizli_fit(event):
     beams_file = os.path.basename(event['s3_object_path'])
     root = beams_file.split('_')[0]
     id = int(beams_file.split('_')[1].split('.')[0])
-     
-    # Initial log
-    start_log = '{0}_{1:05d}.start.log'.format(root, id)
-    full_start = 'Pipeline/{0}/Extractions/{1}'.format(root, start_log)
-    
+        
     if event_kwargs['skip_started']:
         res = [r.key for r in bkt.objects.filter(Prefix=full_start)]
         if res:
