@@ -44,7 +44,8 @@ def fit_lambda(root='j100025+021706', beams=[], ids=[], newfunc=False, bucket_na
     
     # s3 object = s3://{bucket_name}/{s3_object_path}
     # e.g., 'Pipeline/sparcs0034/Extractions/sparcs0034_00441.beams.fits'
-     
+    all_events = []
+    
     NB = len(beams)
     for i, s3_object_path in enumerate(beams):
         print('{0:>5} / {1:>5} : {2}'.format(i+1, NB, s3_object_path))
@@ -87,16 +88,22 @@ def fit_lambda(root='j100025+021706', beams=[], ids=[], newfunc=False, bucket_na
             # if isinstance(event[k], dict):
             #     event[k] = json.dumps(event[k])
             
-        if show_event:
+        if show_event == 1:
             print('Event: \n\n', event.__str__().replace('\'', '"').replace(',', ',\n'))
-            
-        # Invoke Lambda function
-        response = client.invoke(
-            FunctionName=func,
-            InvocationType='Event', 
-            LogType='Tail',
-            Payload=json.dumps(event))
+            response = client.invoke(FunctionName=func, 
+                                     InvocationType='Event', LogType='Tail', 
+                                     Payload=json.dumps(event))
+        if show_event == 2:
+            all_events.append(event)
+        else:
+            # Invoke Lambda function
+            response = client.invoke(FunctionName=func, 
+                                     InvocationType='Event', LogType='Tail', 
+                                     Payload=json.dumps(event))
     
+    if show_event == 2:
+        return all_events
+        
     # Sleep for status check    
     beams, full, logs, start = get_needed_paths(root, bucket_name=bucket_name, skip_existing=True, get_lists=True)
     if (sleep) & (len(beams) > len(full)) & (len(beams) > 0):
