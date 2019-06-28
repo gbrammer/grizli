@@ -693,7 +693,7 @@ def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat',
     
     keys['ZFIT_BEAM'] = ['CHI2POLY','CHI2SPL','SPLF01','SPLE01','SPLF02','SPLE02','SPLF03','SPLE03','SPLF04','SPLE04', 'DOF','CHIMIN','CHIMAX','BIC_POLY','BIC_SPL','BIC_TEMP','Z02', 'Z16', 'Z50', 'Z84', 'Z97', 'ZWIDTH1', 'ZWIDTH2', 'Z_MAP', 'Z_RISK', 'MIN_RISK', 'VEL_BL','VEL_NL','VEL_Z','VEL_NFEV','VEL_FLAG', 'D4000','D4000_E','DN4000','DN4000_E']
     
-    keys['COVAR'] = ' '.join(['FLUX_{0:03d} ERR_{0:03d} EW50_{0:03d} EWHW_{0:03d}'.format(i) for i in range(24)]).split()
+    keys['COVAR'] = ' '.join(['FLUX_{0:03d} ERR_{0:03d} EW50_{0:03d} EWHW_{0:03d}'.format(i) for i in range(64)]).split()
     
     lines = []
     pdf_max = []
@@ -795,7 +795,7 @@ def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat',
     #files=glob.glob('{0}*full.fits'.format(target))
     im = pyfits.open(files[0])
     h = im['COVAR'].header
-    for i in range(35):
+    for i in range(64):
         key = 'FLUX_{0:03d}'.format(i)
         if key not in h:
             continue
