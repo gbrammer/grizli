@@ -1235,81 +1235,115 @@ class GroupFLT():
         # Done!
         return outsci, outwht
             
-def replace_direct_image_cutouts(beams_file='', ref_image='gdn-100mas-f160w_drz_sci.fits', interp='poly5', cutout=200):
-    """
-    Replace "REF" extensions in a `beams.fits` file
-    
-    Parameters
-    ----------
-    beams_file : str
-        Filename of a "beams.fits" file.
-        
-    ref_image : str or `~astropy.io.fits.HDUList`
-       Filename or preloaded FITS file.
-        
-    interp : str
-        Interpolation function to use for `~drizzlepac.astrodrizzle.ablot.do_blot`.
-        
-    cutout : int
-        Make a slice of the `ref_image` with size [-cutout,+cutout] around
-        the center position of the desired object before passing to `blot`.
-        
-    Returns
-    -------
-    beams_image : `~astropy.io.fits.HDUList`
-        Image object with the "REF" extensions filled with the new blotted
-        image cutouts.
-        
-    """
-    from drizzlepac.astrodrizzle import ablot
-    
-    if isinstance(ref_image, pyfits.HDUList):
-        ref_im = ref_image
-        ref_image_filename = ref_image.filename()
-    else:
-        ref_im = pyfits.open(ref_image)
-        ref_image_filename = ref_image
-    
-    ref_wcs = pywcs.WCS(ref_im[0].header, relax=True)
-    ref_wcs.pscale = utils.get_wcs_pscale(ref_wcs)
-    
-    ref_photflam = ref_im[0].header['PHOTFLAM']
-    ref_data = ref_im[0].data
-    dummy_wht = np.ones_like(ref_im[0].data, dtype=np.float32)
-    
-    beams_image = pyfits.open(beams_file)
-    
-    beam_ra = beams_image[0].header['RA']
-    beam_dec = beams_image[0].header['DEC']
-
-    xy = np.cast[int](np.round(ref_wcs.all_world2pix([beam_ra], [beam_dec], 0))).flatten()
-    
-    slx = slice(xy[0]-cutout, xy[0]+cutout)
-    sly = slice(xy[1]-cutout, xy[1]+cutout)
-
-    for ext in beams_image:
-        if 'EXTNAME' not in ext.header:
-            continue
-        elif ext.header['EXTNAME'] == 'REF':
-            #break
-            
-            ext.header['REF_FILE'] = ref_image_filename
-            for k in ['PHOTFLAM', 'PHOTPLAM']:
-                ext.header[k] = ref_im[0].header[k]
-            
-            the_filter = utils.get_hst_filter(ref_im[0].header)
-            ext.header['FILTER'] = ext.header['DFILTER'] = the_filter
-            
-            ext_wcs = pywcs.WCS(ext.header, relax=True)
-            ext_wcs.pscale = utils.get_wcs_pscale(ext_wcs)
-            blotted = ablot.do_blot(ref_data[sly, slx], 
-                              ref_wcs.slice([sly, slx]), 
-                              ext_wcs, 1, coeffs=True, interp=interp, 
-                              sinscl=1.0, stepsize=10, wcsmap=None)
-            
-            ext.data = blotted*ref_photflam
-    
-    return beams_image
+# def replace_direct_image_cutouts(beams_file='', ref_image='gdn-100mas-f160w_drz_sci.fits', interp='poly5', cutout=200, background_func=utils.mode_statistic):
+#     """
+#     Replace "REF" extensions in a `beams.fits` file
+#     
+#     Parameters
+#     ----------
+#     beams_file : str
+#         Filename of a "beams.fits" file.
+#         
+#     ref_image : str or `~astropy.io.fits.HDUList`
+#        Filename or preloaded FITS file.
+#         
+#     interp : str
+#         Interpolation function to use for `~drizzlepac.astrodrizzle.ablot.do_blot`.
+#         
+#     cutout : int
+#         Make a slice of the `ref_image` with size [-cutout,+cutout] around
+#         the center position of the desired object before passing to `blot`.
+#         
+#     Returns
+#     -------
+#     beams_image : `~astropy.io.fits.HDUList`
+#         Image object with the "REF" extensions filled with the new blotted
+#         image cutouts.
+#         
+#     """
+#     from drizzlepac.astrodrizzle import ablot
+#     
+#     if isinstance(ref_image, pyfits.HDUList):
+#         ref_im = ref_image
+#         ref_image_filename = ref_image.filename()
+#     else:
+#         ref_im = pyfits.open(ref_image)
+#         ref_image_filename = ref_image
+#     
+#     ref_wcs = pywcs.WCS(ref_im[0].header, relax=True)
+#     ref_wcs.pscale = utils.get_wcs_pscale(ref_wcs)
+#     
+#     ref_photflam = ref_im[0].header['PHOTFLAM']
+#     ref_data = ref_im[0].data
+#     dummy_wht = np.ones_like(ref_im[0].data, dtype=np.float32)
+#     
+#     beams_image = pyfits.open(beams_file)
+#     
+#     beam_ra = beams_image[0].header['RA']
+#     beam_dec = beams_image[0].header['DEC']
+# 
+#     xy = np.cast[int](np.round(ref_wcs.all_world2pix([beam_ra], [beam_dec], 0))).flatten()
+#     
+#     slx = slice(xy[0]-cutout, xy[0]+cutout)
+#     sly = slice(xy[1]-cutout, xy[1]+cutout)
+# 
+#     bkg_data = []
+#     
+#     for ie, ext in enumerate(beams_image):
+#         if 'EXTNAME' not in ext.header:
+#             continue
+#         elif ext.header['EXTNAME'] == 'REF':
+#             #break
+#             
+#             ext.header['REF_FILE'] = ref_image_filename
+#             for k in ['PHOTFLAM', 'PHOTPLAM']:
+#                 ext.header[k] = ref_im[0].header[k]
+#             
+#             the_filter = utils.get_hst_filter(ref_im[0].header)
+#             ext.header['FILTER'] = ext.header['DFILTER'] = the_filter
+#             
+#             wcs_file = ext.header['GPARENT'].replace('.fits', '.{0:02}.wcs.fits'.format(ext.header['SCI_EXTN']))
+#             if os.path.exists(wcs_file):
+#                 wcs_fobj = pyfits.open(wcs_file)
+#                 
+#                 ext_wcs = pywcs.WCS(ext.header, relax=True,
+#                                     fobj=wcs_fobj)
+#                 # ext_wcs.pixel_shape = (wcs_fobj[0].header['CRPIX1']*2, 
+#                 #                        wcs_fobj[0].header['CRPIX2']*2)
+#                 # try:
+#                 #     ext_wcs.wcs.cd = ext_wcs.wcs.pc
+#                 #     delattr(ext_wcs.wcs, 'pc')
+#                 # except:
+#                 #     pass
+#             else:
+#                 ext_wcs = pywcs.WCS(ext.header, relax=True)
+#             
+#             ext_wcs.pscale = utils.get_wcs_pscale(ext_wcs)
+#             blotted = ablot.do_blot(ref_data[sly, slx], 
+#                               ref_wcs.slice([sly, slx]), 
+#                               ext_wcs, 1, coeffs=True, interp=interp, 
+#                               sinscl=1.0, stepsize=10, wcsmap=None)
+#             
+#             if background_func is not None:
+#                 seg_data = beams_image[ie+1].data
+#                 msk = seg_data == 0
+#                 #print(msk.shape, blotted.shape, seg_data.shape, ie)
+#                 if msk.sum() > 0:
+#                     if bkg_data is None:
+#                         bkg_data = blotted[msk]
+#                     else:
+#                         bkg_data = np.append(bkg_data, blotted[msk])
+#                         
+#                 if msk.sum() > 0:
+#                     blotted -= background_func(blotted[msk])
+#                     
+#             ext.data = blotted*ref_photflam
+#         
+#         if bkg_data is not None:
+#             bkg_value = background_func(bkg_data)
+#             for i in range(self.N):
+#                 
+#     return beams_image
     
     
 class MultiBeam(GroupFitter):
@@ -1706,7 +1740,89 @@ class MultiBeam(GroupFitter):
                                     min_mask=self.min_mask, 
                                     min_sens=self.min_sens)
             self.beams.append(beam)
+    
+    def replace_direct_image_cutouts(self, ref_image='gdn-100mas-f160w_drz_sci.fits', interp='poly5', cutout=200, background_func=np.median):
+        """
+        Replace "REF" extensions in a `beams.fits` file
 
+        Parameters
+        ----------
+        ref_image : str or `~astropy.io.fits.HDUList`
+           Filename or preloaded FITS file.
+
+        interp : str
+            Interpolation function to use for `~drizzlepac.astrodrizzle.ablot.do_blot`.
+
+        cutout : int
+            Make a slice of the `ref_image` with size [-cutout,+cutout] around
+            the center position of the desired object before passing to `blot`.
+
+        Returns
+        -------
+        beams_image : `~astropy.io.fits.HDUList`
+            Image object with the "REF" extensions filled with the new blotted
+            image cutouts.
+
+        """
+        from drizzlepac.astrodrizzle import ablot
+
+        if isinstance(ref_image, pyfits.HDUList):
+            ref_im = ref_image
+            ref_image_filename = ref_image.filename()
+        else:
+            ref_im = pyfits.open(ref_image)
+            ref_image_filename = ref_image
+
+        ref_wcs = pywcs.WCS(ref_im[0].header, relax=True)
+        ref_wcs.pscale = utils.get_wcs_pscale(ref_wcs)
+
+        ref_photflam = ref_im[0].header['PHOTFLAM']
+        ref_photplam = ref_im[0].header['PHOTPLAM']
+        ref_filter = utils.get_hst_filter(ref_im[0].header)
+        
+        ref_data = ref_im[0].data
+
+        beam_ra, beam_dec = self.ra, self.dec
+
+        xy = np.cast[int](np.round(ref_wcs.all_world2pix([beam_ra], [beam_dec], 0))).flatten()
+
+        slx = slice(xy[0]-cutout, xy[0]+cutout)
+        sly = slice(xy[1]-cutout, xy[1]+cutout)
+        
+        bkg_data = None
+        
+        for ie in range(self.N):
+            
+            wcs_copy = self.beams[ie].direct.wcs
+            if hasattr(wcs_copy, 'idcscale'):
+                if wcs_copy.idcscale is None:
+                    delattr(wcs_copy, 'idcscale')
+                    
+            blotted = ablot.do_blot(ref_data[sly, slx], 
+                              ref_wcs.slice([sly, slx]), 
+                              wcs_copy, 1, coeffs=True, interp=interp, 
+                              sinscl=1.0, stepsize=10, wcsmap=None)
+
+            if background_func is not None:
+                msk = self.beams[ie].beam.seg == 0
+                #print(msk.shape, blotted.shape, ie)
+                if msk.sum() > 0:
+                    if bkg_data is None:
+                        bkg_data = blotted[msk]
+                    else:
+                        bkg_data = np.append(bkg_data, blotted[msk])
+
+            self.beams[ie].direct.data['REF'] = blotted*ref_photflam 
+            self.beams[ie].direct.ref_photflam = ref_photflam
+            self.beams[ie].direct.ref_photplam = ref_photplam
+            self.beams[ie].direct.ref_filter = ref_filter
+            #self.beams[ie].direct.ref_photflam
+        
+        if bkg_data is not None:
+            bkg_value = background_func(bkg_data)
+            for ie in range(self.N):
+                self.beams[ie].direct.data['REF'] -= bkg_value*ref_photflam
+                
     def reshape_flat(self, flat_array):
         """TBD
         """
