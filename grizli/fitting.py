@@ -126,7 +126,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
                 print('\nHas bad PA!  Final list: {0}\n{1}'.format(keep_dict,
                                                                    fit_log))
                 
-            hdu, fig = mb.drizzle_grisms_and_PAs(fcontam=0.5, flambda=False, kernel='point', size=32)
+            hdu, fig = mb.drizzle_grisms_and_PAs(fcontam=fcontam, flambda=False, kernel='point', size=32, diff=False)
             fig.savefig('{0}_{1:05d}.fix.stack.png'.format(group_name, id))
             good_PAs = []
             for k in keep_dict:
@@ -446,7 +446,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     if save_stack:
         hdu, fig = mb.drizzle_grisms_and_PAs(fcontam=fcontam, flambda=False, 
                                              kernel='point', size=32, 
-                                             zfit=tfit, diff=True)
+                                             zfit=tfit, diff=False)
 
         hdu[0].header['GRIZLIV'] = (grizli__version, 'Grizli version')
                                              
