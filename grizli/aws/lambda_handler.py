@@ -341,13 +341,24 @@ def run_grizli_fit(event):
     bkt.upload_file(start_log, full_start)
     
     # Download fit arguments
-    aws_args = 'Pipeline/{0}/Extractions/fit_args.npy'.format(root)
-    bkt.download_file(aws_args, './fit_args.npy', ExtraArgs={"RequestPayer": "requester"})
+    args_file = 'fit_args.npy'
+    needs_args = False
+    if not os.path.exists(args_file):
+        needs_args = True
+    else:
+        if 'force_args' in event:
+            needs_args = event['force_args'] in TRUE_OPTIONS
+    
+    if needs_args:
+        aws_args = 'Pipeline/{0}/Extractions/fit_args.npy'.format(root)
+        bkt.download_file(aws_args, './fit_args.npy',
+                          ExtraArgs={"RequestPayer": "requester"})
     
     # If no beams file in the bucket, try to generate it
     try:
-        bkt.download_file(event['s3_object_path'], './{0}'.format(beams_file), ExtraArgs={"RequestPayer": "requester"})
-        put_beams = False
+        if not os.path.exists(beams_file):
+            bkt.download_file(event['s3_object_path'], './{0}'.format(beams_file), ExtraArgs={"RequestPayer": "requester"})
+            put_beams = False
     except:
         print('Extract from GrismFLT object!')
         if 'clean' in event:
@@ -379,9 +390,9 @@ def run_grizli_fit(event):
             bkt.upload_file(outfile, aws_file, 
                         ExtraArgs={'ACL': 'public-read'})
         
-        if 'run_fit' in event:
-            if event['run_fit'] in FALSE_OPTIONS:
-                return True
+    if 'run_fit' in event:
+        if event['run_fit'] in FALSE_OPTIONS:
+            return True
     
     utils.fetch_acs_wcs_files(beams_file, bucket_name=event_kwargs['bucket'])
                 
