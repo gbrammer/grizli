@@ -80,6 +80,8 @@ def extract_beams_from_flt(root, bucket, id, clean=True):
     
     import grizli
     from grizli import fitting, utils, multifit
+    from grizli.version import __version__ as grizli__version
+    
     utils.set_warnings()
     from grizli.pipeline import auto_script
     
@@ -209,9 +211,9 @@ def extract_beams_from_flt(root, bucket, id, clean=True):
 
         hdu[0].header['GRIZLIV'] = (grizli__version, 'Grizli version')
                                              
-        fig.savefig('{0}_{1:05d}.stack.png'.format(group_name, id))
+        fig.savefig('{0}_{1:05d}.stack.png'.format(root, id))
 
-        hdu.writeto('{0}_{1:05d}.stack.fits'.format(group_name, id), 
+        hdu.writeto('{0}_{1:05d}.stack.fits'.format(root, id), 
                     overwrite=True)
         
         plt.close('all')
