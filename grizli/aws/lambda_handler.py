@@ -78,6 +78,8 @@ def extract_beams_from_flt(root, bucket, id, clean=True):
     import gc
     import boto3
     
+    import matplotlib.pyplot as plt
+    
     import grizli
     from grizli import fitting, utils, multifit
     from grizli.version import __version__ as grizli__version
@@ -258,7 +260,10 @@ def run_grizli_fit(event):
                 event_kwargs[k] = event[k]
                 
     # Defaults
-    for k in ['quasar_fit', 'skip_started', 'extract_from_flt']:
+    if 'skip_started' not in event_kwargs:
+        event_kwargs['skip_started'] = True
+        
+    for k in ['quasar_fit', 'extract_from_flt']:
         if k not in event_kwargs:
             event_kwargs[k] = False
         
@@ -296,7 +301,7 @@ def run_grizli_fit(event):
     # Initial log
     start_log = '{0}_{1:05d}.start.log'.format(root, id)
     full_start = 'Pipeline/{0}/Extractions/{1}'.format(root, start_log)
-    if start_log in files:
+    if (start_log in files) & event_kwargs['skip_started']:
         print('Log file {0} found in {1}'.format(start_log, os.getcwd()))
         return True
         
