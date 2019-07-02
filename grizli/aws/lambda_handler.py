@@ -202,8 +202,8 @@ def extract_beams_from_flt(root, bucket, id, clean=True):
         hdu = mb.oned_spectrum_to_hdu(outputfile=outroot+'.fits', 
                                               tfit=tfit, wave=bin_steps)                     
         
-        del(hdu)
         fig1.savefig(outroot+'.png')
+        del(hdu)
         
         # Drizzled spectrum
         hdu, fig = mb.drizzle_grisms_and_PAs(fcontam=args['fcontam'],
@@ -219,9 +219,11 @@ def extract_beams_from_flt(root, bucket, id, clean=True):
                     overwrite=True)
         
         plt.close('all')
+        del(hdu)
         
     outfiles = ['{0}_{1:05d}.beams.fits'.format(root, id)]
     outfiles += glob.glob(outroot+'*')
+    outfiles += glob.glob('{0}_{1:05d}.stack*'.format(root, id))
     
     return(outfiles)
     
@@ -511,6 +513,9 @@ def redshift_handler(event, context):
     """
     import matplotlib.pyplot as plt
     import traceback
+    import time
+    
+    t0 = time.time()
     
     print(event) #['s3_object_path'], event['verbose'])
     print(context)
@@ -531,6 +536,10 @@ def redshift_handler(event, context):
     
     if run_clean:
         clean(root=root, verbose=True)
+    
+    t1 = time.time()
+    
+    return (event['s3_object_path'], t0, t1)
     
          
 def show_version(event, context):
