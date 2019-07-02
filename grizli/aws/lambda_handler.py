@@ -71,7 +71,7 @@ def check_object_in_footprint(id, wcs_fits, cat, rd=None):
     
     return has_point
     
-def extract_beams_from_flt(root, bucket, id, clean=True):
+def extract_beams_from_flt(root, bucket, id, clean=True, silent=False):
     """
     Download GrismFLT files and extract the beams file
     """
@@ -126,10 +126,12 @@ def extract_beams_from_flt(root, bucket, id, clean=True):
         if 'GrismFLT.fits' in file:
             flt_files.append(file)
     
-    print('Read {0} GrismFLT files'.format(len(flt_files)))
+    if not silent:
+        print('Read {0} GrismFLT files'.format(len(flt_files)))
     
     for i, file in enumerate(flt_files):
-        print('# Read {0}/{1}'.format(i+1, len(flt_files)))
+        if not silent:
+            print('# Read {0}/{1}'.format(i+1, len(flt_files)))
 
         flt, ext, _, _ = os.path.basename(file).split('.')          
         if flt.startswith('i'):
@@ -145,7 +147,9 @@ def extract_beams_from_flt(root, bucket, id, clean=True):
         
         for j, f_j in enumerate(out_files):             
             aws_file = os.path.join(os.path.dirname(file), f_j)
-            print('  ', aws_file)
+            if not silent:
+                print('  ', aws_file)
+            
             if not os.path.exists(f_j):
                 bkt.download_file(aws_file, f_j, 
                                   ExtraArgs={"RequestPayer": "requester"})
@@ -239,6 +243,10 @@ def run_grizli_fit(event):
     
     #event = {'s3_object_path':'Pipeline/j001452+091221/Extractions/j001452+091221_00277.beams.fits'}
     
+    silent = False
+    if 'silent' in event:
+        silent = event['silent'] in TRUE_OPTIONS
+        
     ###
     ### Parse event arguments
     ### 
@@ -269,11 +277,13 @@ def run_grizli_fit(event):
         if k not in event_kwargs:
             event_kwargs[k] = False
         
-    print('Grizli version: ', grizli.__version__)
+    if not silent:
+        print('Grizli version: ', grizli.__version__)
     
     # Disk space
     total, used, free = shutil.disk_usage("/")    
-    print('Disk info: Total = {0:.2f} / Used = {1:.2f} / Free = {2:.2f}'.format(total // (2**20), used // (2**20), free // (2**20)))
+    if not silent:
+        print('Disk info: Total = {0:.2f} / Used = {1:.2f} / Free = {2:.2f}'.format(total // (2**20), used // (2**20), free // (2**20)))
 
     ## Output path
     if 'output_path' in event:
@@ -291,7 +301,9 @@ def run_grizli_fit(event):
     else:
         os.chdir('/tmp/')
     
-    print('Working directory: {0}'.format(os.getcwd()))
+    if not silent:
+        print('Working directory: {0}'.format(os.getcwd()))
+    
     files = glob.glob('*')
     files.sort()
     
@@ -307,8 +319,9 @@ def run_grizli_fit(event):
         print('Log file {0} found in {1}'.format(start_log, os.getcwd()))
         return True
         
-    for i, file in enumerate(files):
-        print('Initial file ({0}): {1}'.format(i+1, file))
+    if not silent:
+        for i, file in enumerate(files):
+            print('Initial file ({0}): {1}'.format(i+1, file))
     
     os.system('cp {0}/matplotlibrc .'.format(grizli.GRIZLI_PATH))
     
@@ -346,7 +359,7 @@ def run_grizli_fit(event):
             run_clean = True
             
         status = extract_beams_from_flt(root, event_kwargs['bucket'], id, 
-                                        clean=run_clean)
+                                        clean=run_clean, silent=silent)
         
         # Garbage collector
         gc.collect()
@@ -518,7 +531,7 @@ def redshift_handler(event, context):
     t0 = time.time()
     
     print(event) #['s3_object_path'], event['verbose'])
-    print(context)
+    #print(context)
     
     try:
         run_grizli_fit(event)
