@@ -29,6 +29,9 @@ import time
 
 import numpy as np
 
+FALSE_OPTIONS = [False, 'false', 'False', 0, '0', 'n', 'N']
+TRUE_OPTIONS  = [True,  'true',  'True',  1, '1', 'y', 'Y']
+
 def check_object_in_footprint(id, wcs_fits, cat, rd=None):
     """
     Check that a given object is within a WCS footprint
@@ -72,6 +75,7 @@ def extract_beams_from_flt(root, bucket, id, clean=True):
     """
     Download GrismFLT files and extract the beams file
     """
+    import gc
     import boto3
     
     import grizli
@@ -165,6 +169,9 @@ def extract_beams_from_flt(root, bucket, id, clean=True):
             beams = beams_i
         else:
             beams.extend(beams_i)
+    
+    # Garbage collector
+    gc.collect()
         
     if not beams:
         print('No beams found for {0} id={1}'.format(root, id))
@@ -190,7 +197,23 @@ def extract_beams_from_flt(root, bucket, id, clean=True):
         outroot='{0}_{1:05d}.R{2:.0f}'.format(root, id, 30)
         hdu = mb.oned_spectrum_to_hdu(outputfile=outroot+'.fits', 
                                               tfit=tfit, wave=bin_steps)                     
+        
+        del(hdu)
         fig1.savefig(outroot+'.png')
+        
+        # Drizzled spectrum
+        hdu, fig = mb.drizzle_grisms_and_PAs(fcontam=fcontam, flambda=False, 
+                                             kernel='point', size=32, 
+                                             zfit=tfit, diff=False)
+
+        hdu[0].header['GRIZLIV'] = (grizli__version, 'Grizli version')
+                                             
+        fig.savefig('{0}_{1:05d}.stack.png'.format(group_name, id))
+
+        hdu.writeto('{0}_{1:05d}.stack.fits'.format(group_name, id), 
+                    overwrite=True)
+        
+        plt.close('all')
         
     outfiles = ['{0}_{1:05d}.beams.fits'.format(root, id)]
     outfiles += glob.glob(outroot+'*')
@@ -201,7 +224,8 @@ def run_grizli_fit(event):
     import boto3
     import json
     import shutil
-    
+    import gc
+      
     import grizli
     from grizli import fitting, utils, multifit
     utils.set_warnings()
@@ -313,6 +337,10 @@ def run_grizli_fit(event):
             
         status = extract_beams_from_flt(root, event_kwargs['bucket'], id, 
                                         clean=run_clean)
+        
+        # Garbage collector
+        gc.collect()
+        
         if status is False:
             return False
         else:
@@ -329,7 +357,7 @@ def run_grizli_fit(event):
                         ExtraArgs={'ACL': 'public-read'})
         
         if 'run_fit' in event:
-            if event['run_fit'].lower() == 'false':
+            if event['run_fit'] in FALSE_OPTIONS:
                 return True
     
     utils.fetch_acs_wcs_files(beams_file, bucket_name=event_kwargs['bucket'])
@@ -400,7 +428,10 @@ def run_grizli_fit(event):
     
     # Remove start log now that done
     res = bkt.delete_objects(Delete={'Objects':[{'Key':full_start}]})
-
+    
+    # Garbage collector
+    gc.collect()
+    
 def clean(root='', verbose=True):
     import glob
     import os
@@ -467,6 +498,10 @@ def handler(event, context):
         aws_drizzler.handler(event, context)
         
 def redshift_handler(event, context):
+    """
+    Function for handling `run_grizli_fit` events
+    """
+    import matplotlib.pyplot as plt
     import traceback
     
     print(event) #['s3_object_path'], event['verbose'])
@@ -482,16 +517,14 @@ def redshift_handler(event, context):
     root = beams_file.split('_')[0]
 
     if 'clean' in event:
-        if isinstance(event['clean'], str):
-            run_clean = event['clean'].lower() in ['true', 'y', '1']
-        else:
-            run_clean = event['clean']
+        run_clean = event['clean'] in TRUE_OPTIONS            
     else:
         run_clean = True
     
     if run_clean:
         clean(root=root, verbose=True)
-                
+    
+         
 def show_version(event, context):
     import grizli
     import eazy
