@@ -202,7 +202,8 @@ def extract_beams_from_flt(root, bucket, id, clean=True):
         fig1.savefig(outroot+'.png')
         
         # Drizzled spectrum
-        hdu, fig = mb.drizzle_grisms_and_PAs(fcontam=fcontam, flambda=False, 
+        hdu, fig = mb.drizzle_grisms_and_PAs(fcontam=args['fcontam'],
+                                             flambda=False, 
                                              kernel='point', size=32, 
                                              zfit=tfit, diff=False)
 
