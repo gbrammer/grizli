@@ -2574,7 +2574,16 @@ def gen_tap_box_query(ra=165.86, dec=34.829694, radius=3., max=100000, db='ls_dr
     rmi = radius/60/2
     cosd = np.cos(dec/180*np.pi)
     
-    query =  """SELECT TOP {max} {output_columns} FROM {db}  WHERE {db}.{rc} > {left} AND {db}.{rc} < {right} AND {db}.{dc} > {bottom} AND {db}.{dc} < {top} """.format(rc=rd_colnames[0], dc=rd_colnames[1], left=ra-rmi/cosd, right=ra+rmi/cosd, top=dec+rmi, bottom=dec-rmi, max=max, db=db, output_columns=', '.join(columns))
+    if max is not None:
+        maxsel = 'TOP {0}'.format(max)
+    else:
+        maxsel = ''
+    
+    # print('MAXSEL', max, maxsel)
+    
+    #query =  """SELECT {maxsel} {output_columns} FROM {db}  WHERE {db}.{rc} > {left} AND {db}.{rc} < {right} AND {db}.{dc} > {bottom} AND {db}.{dc} < {top} """.format(rc=rd_colnames[0], dc=rd_colnames[1], left=ra-rmi/cosd, right=ra+rmi/cosd, top=dec+rmi, bottom=dec-rmi, maxsel=maxsel, db=db, output_columns=', '.join(columns))
+
+    query =  """SELECT {maxsel} {output_columns} FROM {db}  WHERE {rc} > {left} AND {rc} < {right} AND {dc} > {bottom} AND {dc} < {top} """.format(rc=rd_colnames[0], dc=rd_colnames[1], left=ra-rmi/cosd, right=ra+rmi/cosd, top=dec+rmi, bottom=dec-rmi, maxsel=maxsel, db=db, output_columns=', '.join(columns))
     
     return query
 
@@ -2582,8 +2591,9 @@ def query_tap_catalog(ra=165.86, dec=34.829694, radius=3., max_wait=20,
                     db='ls_dr7.tractor_primary', columns=['*'], extra='',
                     rd_colnames=['ra','dec'], 
                     tap_url='http://datalab.noao.edu/tap',
-                    max=100000, clean_xml=True, verbose=True,
-                    des=False, gaia=False, nsc=False, vizier=False):
+                    max=1000000, clean_xml=True, verbose=True,
+                    des=False, gaia=False, nsc=False, vizier=False, 
+                    hubble_source_catalog=False):
     """Query NOAO Catalog holdings
     
     Parameters
@@ -2621,6 +2631,12 @@ def query_tap_catalog(ra=165.86, dec=34.829694, radius=3., max_wait=20,
     
     vizier : bool
         Use the VizieR TAP server at  http://tapvizier.u-strasbg.fr/TAPVizieR/tap, see http://tapvizier.u-strasbg.fr/adql/about.html.
+    
+    hubble_source_catalog : bool
+        Query the Hubble Source Catalog (v3).  If no 'NumImages' criteria is
+        found in `extra`, then add an additional requirement: 
+            
+            >>> extra += 'AND NumImages > 1'
         
     Returns
     -------
@@ -2662,12 +2678,25 @@ def query_tap_catalog(ra=165.86, dec=34.829694, radius=3., max_wait=20,
 
         tap_url = 'http://tapvizier.u-strasbg.fr/TAPVizieR/tap'
         rd_colnames = ['RAJ2000','DEJ2000']
-        
+    
+    if hubble_source_catalog:
+        if db is None:
+            db = 'dbo.SumPropMagAutoCat'
+        elif 'dbo' not in db:
+            db = 'dbo.SumPropMagAutoCat'
+            
+        tap_url = 'http://vao.stsci.edu/HSCTAP/tapservice.aspx'
+        rd_colnames=['MatchRA','MatchDec']
+        if 'NumImages' not in extra:
+            extra += 'AND NumImages > 1'
+
     tap = TapPlus(url=tap_url)
     
     query =  gen_tap_box_query(ra=ra, dec=dec, radius=radius, max=max, 
                                db=db, columns=columns,
                                rd_colnames=rd_colnames)
+    
+    #print('XXX', query, extra)
     
     job = tap.launch_job(query+extra, dump_to_file=True, verbose=verbose)
     try:
@@ -2684,6 +2713,20 @@ def query_tap_catalog(ra=165.86, dec=34.829694, radius=3., max_wait=20,
         for c, cc in zip(rd_colnames, ['ra','dec']):
             if (c in table.colnames) & (cc not in table.colnames):
                 table[cc] = table[c]
+        
+        table.meta['TAPURL'] = tap_url, 'TAP URL'
+        table.meta['TAPDB'] = db, 'TAP database name'
+        table.meta['TAPQUERY'] = query+extra, 'TAP query'
+        table.meta['RAQUERY'] = ra, 'Query central RA'
+        table.meta['DECQUERY'] = dec, 'Query central Dec'
+        table.meta['RQUERY'] = radius, 'Query radius, arcmin'
+        
+        if hubble_source_catalog:
+            for col in table.colnames:
+                if table[col].dtype == 'object':
+                    print('Reformat column: {0}'.format(col))
+                    strcol = list(table[col])
+                    table[col] = strcol
             
     except:
         if hasattr(job, 'outputFile'):
@@ -2693,9 +2736,69 @@ def query_tap_catalog(ra=165.86, dec=34.829694, radius=3., max_wait=20,
             
         print('Query failed, check {0} for error messages'.format(jobFile))
         table = None
-                
+                    
     return table   
 
+# Limit Hubble Source Catalog query to brighter sources in limited bands
+HSCv3_FILTER_LIMITS = {'W3_F160W': 23.5,
+     'W3_F140W': 23.5,
+     'W3_F125W': 23.5,
+     'W3_F110W': 23.5,
+     'W3_F098M': 23.5,
+     'W3_F105W': 23.5,
+      'A_F814W': 23.5,
+     'W3_F814W': 23.5,
+      'A_F606W': 23.5,
+     'W3_F606W': 23.5,
+     'A_F850LP': 23.5,
+    'W3_F850LP': 23.5,
+      'A_F775W': 23.5,
+     'W3_F775W': 23.5}
+     
+def get_hubble_source_catalog(ra=0., dec=0., radius=3, max=int(1e7), extra=' AND NumImages > 0', kron_max=0.45, dsigma_max=100, clip_singles=10*u.arcsec, verbose=True, columns=['MatchRA', 'MatchDec', 'CI', 'CI_Sigma', 'KronRadius', 'KronRadius_Sigma', 'Extinction', 'TargetName', 'NumImages', 'NumFilters', 'NumVisits', 'DSigma'], filter_limits=HSCv3_FILTER_LIMITS):
+    """
+    Query NOAO Source Catalog, which is aligned to GAIA DR1.  
+    
+    The default `extra` query returns well-detected sources in red bands.
+    
+    filter_limits : query on individual HSC filter magnitudes
+    
+    """
+    import astropy.table
+    
+    print('Query NOAO Source Catalog ({ra:.5f},{dec:.5f},{radius:.1f}\')'.format(ra=ra, dec=dec, radius=radius))
+    
+    if kron_max is not None:
+        extra += ' AND KronRadius < {0}'.format(kron_max)
+    if dsigma_max is not None:
+        extra += ' AND DSigma < {0}'.format(dsigma_max)
+    
+    if filter_limits is not None:
+        limit_list = ['{0} < {1}'.format(f, filter_limits[f]) for f in filter_limits]
+        
+        filter_selection = ' AND ({0})'.format(' OR '.join(limit_list))
+        extra += filter_selection
+        
+        columns += [f for f in filter_limits]
+        
+        db = 'dbo.SumPropMagAutoCat p join dbo.SumMagAutoCat m on p.MatchID = m.MatchID'
+    else:
+        db = 'dbo.SumPropMagAutoCat'
+        
+    tab = query_tap_catalog(ra=ra, dec=dec, radius=radius, max=max, extra=extra, hubble_source_catalog=True, verbose=verbose, db=db, columns=columns)
+    
+    if clip_singles not in [None, False]:
+        rr = tab['NumImages'] > 1 
+        if (rr.sum() > 0) & ((~rr).sum() > 0):
+            r0, r1 = tab[rr], tab[~rr]
+            idx, dr = utils.GTable(r0).match_to_catalog_sky(r1)
+            new = dr > clip_singles
+            xtab = astropy.table.vstack([r0, r1[new]])  
+            if verbose:
+                print('HSCv3: Remove {0} NumImages == 1 sources with tolerance {1}'.format((~new).sum(), clip_singles))
+        
+    return tab
+    
 def get_nsc_catalog(ra=0., dec=0., radius=3, max=100000, extra=' AND (rerr < 0.08 OR ierr < 0.08 OR zerr < 0.08) AND raerr < 0.2 AND decerr < 0.2', verbose=True):
     """
     Query NOAO Source Catalog, which is aligned to GAIA DR1.  
@@ -2764,7 +2867,7 @@ def get_panstarrs_catalog_old(ra=0., dec=0., radius=3, columns='objName,objID,ra
     table['dec'] = table['decStack']
     return table[clip]
     
-def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, reference_catalogs = ['GAIA', 'PS1', 'NSC', 'SDSS', 'WISE', 'DES'], use_self_catalog=False, **kwargs):
+def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, reference_catalogs = ['GAIA', 'PS1', 'Hubble', 'NSC', 'SDSS', 'WISE', 'DES'], use_self_catalog=False, **kwargs):
     """Decide what reference astrometric catalog to use
     
     First search SDSS, then WISE looking for nearby matches.  
@@ -2786,7 +2889,7 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, ref
     reference_catalogs : list
         Order in which to query reference catalogs.  Options are 'GAIA',
         'PS1' (STScI PanSTARRS), 'SDSS', 'WISE', 'NSC' (NOAO Source Catalog), 
-        'DES' (Dark Energy Survey DR1).
+        'DES' (Dark Energy Survey DR1), 'Hubble' (Hubble Source Catalog v3).
         
     Returns
     -------
@@ -2804,7 +2907,8 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, ref
                        '2MASS':get_twomass_catalog,
                        'GAIA_Vizier':get_gaia_DR2_vizier,
                        'NSC':get_nsc_catalog,
-                       'DES':get_desdr1_catalog}
+                       'DES':get_desdr1_catalog,
+                       'Hubble':get_hubble_source_catalog}
       
     ### Try queries
     has_catalog = False
@@ -3044,7 +3148,7 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
         if (isACS) & (len(direct['files']) == 1) & single_image_CRs:
             find_single_image_CRs(direct, simple_mask=False, with_ctx_mask=False, run_lacosmic=True)
             
-        ### Get reference astrometry from SDSS or WISE
+        ### Get reference astrometry from GAIA, PS1, SDSS, WISE, etc.
         if radec is None:
             im = pyfits.open(direct['files'][0])
             radec, ref_catalog = get_radec_catalog(ra=im[1].header['CRVAL1'],
@@ -3054,13 +3158,13 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                             date=im[0].header['EXPSTART'],
                             date_format='mjd', 
                             use_self_catalog=use_self_catalog)
-        
+            
             if ref_catalog == 'VISIT':
                 align_mag_limits = [16,23]
             elif ref_catalog == 'SDSS':
                 align_mag_limits = [16,21]
             elif ref_catalog == 'PS1':
-                align_mag_limits = [16,24]
+                align_mag_limits = [16,23]
             elif ref_catalog == 'WISE':
                 align_mag_limits = [15,20]
         else:
