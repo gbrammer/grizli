@@ -3189,6 +3189,103 @@ def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140
     if drizzle_filters:        
         prep.drizzle_overlaps(keep, parse_visits=False, pixfrac=pixfrac, scale=scale, skysub=skysub, skymethod=skymethod, bits=bits, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False, context=context, static=static, include_saturated=include_saturated)
 
+FILTER_COMBINATIONS = {'ir':IR_M_FILTERS+IR_W_FILTERS,
+                       'opt':OPT_M_FILTERS+OPT_W_FILTERS}
+                       
+def make_filter_combinations(root, weight_fnu=True, filter_combinations=FILTER_COMBINATIONS):
+    """
+    Combine ir/opt mosaics manually scaling a specific zeropoint
+    """
+    
+    # Output normalization os F814W/F140W
+    ref_h = {}
+    ref_h['opt'] = {'INSTRUME': 'ACS', 'DETECTOR': 'WFC', 
+                    'PHOTFLAM': 7.0178627203125e-20, 
+                    'PHOTBW': 653.24393453125, 'PHOTZPT': -21.1, 
+                    'PHOTMODE': 'ACS WFC1 F814W MJD#56438.5725', 
+                    'PHOTPLAM': 8045.415190625002, 
+                    'FILTER1': 'CLEAR1L', 'FILTER2': 'F814W'}
+                    
+    ref_h['ir'] = {'INSTRUME': 'WFC3', 'DETECTOR': 'IR', 
+                   'PHOTFNU': 9.5291135e-08, 
+                   'PHOTFLAM': 1.4737148e-20, 
+                   'PHOTBW': 1132.39, 'PHOTZPT': -21.1, 
+                   'PHOTMODE': 'WFC3 IR F140W', 
+                   'PHOTPLAM': 13922.907, 'FILTER': 'F140W'}
+    
+    ####
+    num = {}
+    den = {}
+    for f in filter_combinations:
+        num[f] = None
+        den[f] = None
+        
+    output_sci = {}
+    head = {}
+    
+    sci_files = glob.glob('{0}-f*sci.fits*'.format(root))
+    for sci_file in sci_files:
+        filt_i = sci_file.split('_dr')[0].split('-')[-1]
+       
+        band = None
+        for f in filter_combinations:
+            if filt_i.upper() in filter_combinations[f]:
+                band = f
+                break
+        
+        if band is None:
+            continue
+        
+        # Which reference parameters to use?
+        if filt_i in OPT_W_FILTERS + OPT_M_FILTERS:
+            ref_h_i = ref_h['opt']
+        else:
+            ref_h_i = ref_h['ir']
+            
+        print(sci_file, band)
+        output_sci[band] = sci_file.replace(filt_i, band)
+        
+        im_i = pyfits.open(sci_file)
+        wht_i = pyfits.open(sci_file.replace('_sci','_wht'))
+        photflam = im_i[0].header['PHOTFLAM']
+        ref_photflam = ref_h_i['PHOTFLAM']
+
+        photplam = im_i[0].header['PHOTPLAM']
+        ref_photplam = ref_h_i['PHOTPLAM']
+        
+        head[band] = im_i[0].header.copy()
+        for k in ref_h_i:
+            head[band][k] = ref_h_i[k]
+            
+        if num[band] is None:
+            num[band] = im_i[0].data*0
+            den[band] = num[band]*0
+            
+        scl = photflam/ref_photflam
+        if weight_fnu:
+            scl_weight = photplam**2/ref_photplam**2
+        else:
+            scl_weight = 1.
+            
+        den_i = wht_i[0].data/scl**2*scl_weight
+        num[band] += im_i[0].data*scl*den_i
+        den[band] += den_i
+    
+    # Done, make outputs
+    for band in filter_combinations:
+        if num[band] is not None:
+            sci = num[band]/den[band]
+            wht = den[band]
+            
+            mask = (~np.isfinite(sci)) | (den == 0)
+            sci[mask] = 0
+            wht[mask] = 0
+
+            print('Write {0}'.format(output_sci[band]))
+            
+            pyfits.PrimaryHDU(data=sci, header=head[band]).writeto(output_sci[band], overwrite=True, output_verify='fix')
+            pyfits.PrimaryHDU(data=wht, header=head[band]).writeto(output_sci[band].replace('_sci', '_wht'), overwrite=True, output_verify='fix')
+    
 def make_combined_mosaics(root, fix_stars=False, mask_spikes=False, skip_single_optical_visits=True, mosaic_args=args['mosaic_args']):
     """
     Drizzle combined mosaics
@@ -3206,15 +3303,15 @@ def make_combined_mosaics(root, fix_stars=False, mask_spikes=False, skip_single_
     mosaic_pixfrac = mosaic_args['mosaic_pixfrac']
     combine_all_filters = mosaic_args['combine_all_filters']
     
-    # Combine all available filters?
-    if combine_all_filters:
-        all_filters = mosaic_args['ir_filters'] + mosaic_args['optical_filters']
-        auto_script.drizzle_overlaps(root, 
-                                 filters=all_filters, 
-                                 min_nexp=1, pixfrac=mosaic_pixfrac,
-                                 make_combined=True,
-                                 ref_image=wcs_ref_file,
-                                 drizzle_filters=False) 
+    # # Combine all available filters?
+    # if combine_all_filters:
+    #     all_filters = mosaic_args['ir_filters'] + mosaic_args['optical_filters']
+    #     auto_script.drizzle_overlaps(root, 
+    #                              filters=all_filters, 
+    #                              min_nexp=1, pixfrac=mosaic_pixfrac,
+    #                              make_combined=True,
+    #                              ref_image=wcs_ref_file,
+    #                              drizzle_filters=False) 
     
     ## IR filters
     # if 'fix_stars' in visit_prep_args:
@@ -3224,8 +3321,11 @@ def make_combined_mosaics(root, fix_stars=False, mask_spikes=False, skip_single_
         
     drizzle_overlaps(root, filters=mosaic_args['ir_filters'], min_nexp=1, 
                      pixfrac=mosaic_pixfrac,
-                     make_combined=(not combine_all_filters),
+                     make_combined=False,
                      ref_image=wcs_ref_file, include_saturated=fix_stars) 
+    
+    make_filter_combinations(root, weight_fnu=True, 
+                        filter_combinations={'ir':IR_M_FILTERS+IR_W_FILTERS})
     
     ## Mask diffraction spikes
     ir_mosaics = glob.glob('{0}-f*drz_sci.fits'.format(root))
@@ -3248,9 +3348,12 @@ def make_combined_mosaics(root, fix_stars=False, mask_spikes=False, skip_single_
         ## Remake mosaics
         drizzle_overlaps(root, filters=mosaic_args['ir_filters'], min_nexp=1, 
                          pixfrac=mosaic_pixfrac,
-                         make_combined=(not combine_all_filters),
+                         make_combined=False,
                          ref_image=wcs_ref_file, include_saturated=fix_stars) 
-            
+        
+        make_filter_combinations(root, weight_fnu=True, 
+                        filter_combinations={'ir':IR_M_FILTERS+IR_W_FILTERS})
+        
     ## Optical filters
     mosaics = glob.glob('{0}-ir_dr?_sci.fits'.format(root))
        
@@ -3276,20 +3379,21 @@ def make_combined_mosaics(root, fix_stars=False, mask_spikes=False, skip_single_
     else:
         wcs_ref_optical = wcs_ref_file
     
-    if combine_all_filters:
-        make_combined = False
+
+    if len(mosaics) == 0:
+        # Call a single combined mosaic "ir" for detection catalogs, etc.
+        make_combined_label = 'ir'
     else:
-        if len(mosaics) == 0:
-            # Call a single combined mosaic "ir" for detection catalogs, etc.
-            make_combined = 'ir'
-        else:
-            # Make a separate optical combined image
-            make_combined = 'opt'    
+        # Make a separate optical combined image
+        make_combined_label = 'opt'    
             
     drizzle_overlaps(root, filters=mosaic_args['optical_filters'], 
-        pixfrac=mosaic_pixfrac, make_combined=make_combined, 
+        pixfrac=mosaic_pixfrac, make_combined=False, 
         ref_image=wcs_ref_optical,
         min_nexp=1+skip_single_optical_visits*1) 
+    
+    make_filter_combinations(root, weight_fnu=True, 
+        filter_combinations={make_combined_label:OPT_M_FILTERS+OPT_W_FILTERS})
     
     # Fill IR filter mosaics with scaled combined data so they can be used 
     # as grism reference
