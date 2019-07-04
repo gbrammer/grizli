@@ -575,7 +575,7 @@ class GroupFLT():
                            is_cgs=False):
         """TBD
         """
-        if cpu_count == 0:
+        if cpu_count <= 0:
             cpu_count = mp.cpu_count()
         
         if fit_info is None:
