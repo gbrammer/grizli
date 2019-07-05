@@ -355,6 +355,7 @@ def run_grizli_fit(event):
                           ExtraArgs={"RequestPayer": "requester"})
     
     # If no beams file in the bucket, try to generate it
+    put_beams=False
     try:
         if not os.path.exists(beams_file):
             bkt.download_file(event['s3_object_path'], './{0}'.format(beams_file), ExtraArgs={"RequestPayer": "requester"})
