@@ -2596,7 +2596,8 @@ def query_tap_catalog(ra=165.86, dec=34.829694, radius=3., max_wait=20,
                     rd_colnames=['ra','dec'], 
                     tap_url='http://datalab.noao.edu/tap',
                     max=1000000, clean_xml=True, verbose=True,
-                    des=False, gaia=False, nsc=False, vizier=False, 
+                    des=False, gaia=False, nsc=False, vizier=False,
+                    skymapper=False, 
                     hubble_source_catalog=False):
     """Query NOAO Catalog holdings
     
@@ -2683,6 +2684,13 @@ def query_tap_catalog(ra=165.86, dec=34.829694, radius=3., max_wait=20,
         tap_url = 'http://tapvizier.u-strasbg.fr/TAPVizieR/tap'
         rd_colnames = ['RAJ2000','DEJ2000']
     
+    if skymapper:
+        if verbose:
+            print('Query {0} from VizieR TAP server'.format(db))
+
+        tap_url = 'http://tapvizier.u-strasbg.fr/TAPVizieR/tap'
+        rd_colnames = ['RAICRS','DEICRS']
+        
     if hubble_source_catalog:
         if db is None:
             db = 'dbo.SumPropMagAutoCat'
@@ -2812,7 +2820,7 @@ def get_nsc_catalog(ra=0., dec=0., radius=3, max=100000, extra=' AND (rerr < 0.0
     """
     print('Query NOAO Source Catalog ({ra:.5f},{dec:.5f},{radius:.1f}\')'.format(ra=ra, dec=dec, radius=radius))
     
-    tab = query_tap_catalog(ra=ra, dec=dec, radius=radius, extra=extra, nsc=True, verbose=verbose)
+    tab = query_tap_catalog(ra=ra, dec=dec, radius=radius, extra=extra, nsc=True, verbose=verbose, max=max)
     return tab
 
 def get_desdr1_catalog(ra=0., dec=0., radius=3, max=100000, extra=' AND (magerr_auto_r < 0.15 OR magerr_auto_i < 0.15)', verbose=True):
@@ -2825,7 +2833,15 @@ def get_desdr1_catalog(ra=0., dec=0., radius=3, max=100000, extra=' AND (magerr_
     """
     print('Query DES Source Catalog ({ra:.5f},{dec:.5f},{radius:.1f}\')'.format(ra=ra, dec=dec, radius=radius))
     
-    tab = query_tap_catalog(ra=ra, dec=dec, radius=radius, extra=extra, des=True, verbose=verbose)
+    tab = query_tap_catalog(ra=ra, dec=dec, radius=radius, extra=extra, des=True, verbose=verbose, max=max)
+    return tab
+
+def get_skymapper_catalog(ra=0., dec=0., radius=3., max_records=500000, verbose=True, extra=''):
+    """
+    Get Skymapper DR1 from Vizier
+    """
+    print('Query Skymapper DR1 catalog ({ra},{dec},{radius})'.format(ra=ra, dec=dec, radius=radius))
+    tab = query_tap_catalog(ra=ra, dec=dec, radius=radius*2, extra=extra, skymapper=True, db='"II/358/smss"', verbose=verbose, max=max_records)
     return tab
     
 def get_panstarrs_catalog(ra=0., dec=0., radius=3., max_records=500000, verbose=True, extra='AND "II/349/ps1".e_imag < 0.2 AND "II/349/ps1".e_RAJ2000 < 0.15 AND "II/349/ps1".e_DEJ2000 < 0.15'):
@@ -2912,7 +2928,8 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, ref
                        'GAIA_Vizier':get_gaia_DR2_vizier,
                        'NSC':get_nsc_catalog,
                        'DES':get_desdr1_catalog,
-                       'Hubble':get_hubble_source_catalog}
+                       'Hubble':get_hubble_source_catalog,
+                       'Skymapper':get_skymapper_catalog}
       
     ### Try queries
     has_catalog = False
