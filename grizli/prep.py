@@ -2305,6 +2305,9 @@ def get_gaia_radec_at_time(gaia_tbl, date=2015.5, format='decimalyear'):
     from astropy.time import Time
     from astropy.coordinates import SkyCoord
     
+    # Distance and radial_velocity are dummy numbers needed 
+    # to get the space motion correct
+    
     try:
         # Try to use pyia
         import pyia
@@ -2321,7 +2324,8 @@ def get_gaia_radec_at_time(gaia_tbl, date=2015.5, format='decimalyear'):
         coord = SkyCoord(ra=gaia_tbl['ra'], dec=gaia_tbl['dec'], 
                          pm_ra_cosdec=gaia_tbl['pmra'], 
                          pm_dec=gaia_tbl['pmdec'], 
-                         obstime=ref_epoch)
+                         obstime=ref_epoch, 
+                         distance=1*u.kpc, radial_velocity=0.*u.km/u.second)
         
     new_obstime = Time(date, format=format)
     coord_at_time = coord.apply_space_motion(new_obstime=new_obstime)
