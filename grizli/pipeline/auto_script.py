@@ -548,8 +548,8 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
             min_sens = 0.
             fit_trace_shift=True
         else:
-            min_sens = 0.01
-            fit_trace_shift=False
+            min_sens = 0.001
+            fit_trace_shift=True
             
         auto_script.generate_fit_params(field_root=root, prior=None, MW_EBV=exptab.meta['MW_EBV'], pline=pline, fit_only_beams=True, run_fit=True, poly_order=7, fsps=True, min_sens=min_sens, sys_err=0.03, fcontam=0.2, zr=[0.05, 3.4], save_file=args_file, fit_trace_shift=fit_trace_shift, include_photometry=True, use_phot_obj=include_photometry_in_fit)
         # Copy for now
@@ -1206,6 +1206,9 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
             best_overlap = 0
             fp = direct['footprint']
             for rdfile in radec_files:
+                if os.path.exists(rdfile.replace('cat.radec', 'wcs_failed')):
+                    continue
+                    
                 points = np.loadtxt(rdfile)
                 try:
                     hull = ConvexHull(points)
