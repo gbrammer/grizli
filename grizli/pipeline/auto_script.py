@@ -942,7 +942,7 @@ def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=
         # Account for timing
         split_list = []
         for o in visits:
-            split_list.extend(split_visit(o, max_dt=max_dt, 
+            split_list.extend(utils.split_visit(o, max_dt=max_dt, 
                               visit_split_shift=100))
         
         visits = split_list
