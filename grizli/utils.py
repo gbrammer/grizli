@@ -612,8 +612,13 @@ def split_visit(visit, visit_split_shift=1.5, max_dt=6./24, path='../RAW'):
         for i in range(len(un)):
             ix = keys == un[i]
             spl[-2] = 'abcdefghijklmnopqrsuvwxyz'[i]
-            visits.append({'files':list(np.array(visit['files'])[ix]), 
-                           'product':'-'.join(spl)})
+            new_visit = {'files':list(np.array(visit['files'])[ix]), 
+                         'product':'-'.join(spl)}
+            
+            if 'footprints' in visit:
+                new_visit['footprints'] = list(np.array(visit['footprints'])[ix])
+                
+            visits.append(new_visit)
     
     return visits               
     

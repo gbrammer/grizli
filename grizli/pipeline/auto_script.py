@@ -946,7 +946,16 @@ def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=
                               visit_split_shift=100))
         
         visits = split_list
-        
+        for visit in visits:
+            fp = None
+            for fp_i in visit['footprints']:
+                if fp is None:
+                    fp = fp_i.buffer(0.00001)
+                else:
+                    fp = fp.union(fp_i)
+            
+            visit['footprint'] = fp
+            
         print('** Combine same PA: **')
         for i, visit in enumerate(visits):
             print('{0} {1} {2}'.format(i, visit['product'], len(visit['files'])))
