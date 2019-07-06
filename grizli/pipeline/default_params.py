@@ -21,7 +21,8 @@ GRIS_REF_FILTERS = {'G141': ['F140W', 'F160W', 'F125W', 'F105W', 'F110W',
                     'G102': ['F105W', 'F098M', 'F110W', 'F125W', 'F140W', 
                              'F160W', 'F127M', 'F139M', 'F153M', 'F132N', 
                              'F130N', 'F128N', 'F126N', 'F164N', 'F167N'],
-                    'G800L': ['F814W', 'F850LP', 'F606W', 'F435W', 'F777W']}
+                    'G800L': ['F814W', 'F850LP', 'F606W', 'F435W', 'F775W',
+                              'F555W', 'opt']}
 
 def test_aws_availability():
     """
