@@ -334,8 +334,11 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
             if (parse_visits_args['combine_same_pa'] == -1):
                 if is_parallel_field:
                     parse_visits_args['combine_same_pa'] = True
+                    parse_visits_args['max_dt'] = 4/24
                 else:
                     parse_visits_args['combine_same_pa'] = False                    
+                    parse_visits_args['max_dt'] = 1e9
+
         else:
             parse_visits_args['combine_same_pa'] = is_parallel_field
             
@@ -838,7 +841,7 @@ def remove_bad_expflag(field_root='', HOME_PATH='./', min_bad=2):
             os.system('mv {0}* Expflag/'.format(visit))
             
 
-def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=True, combine_minexp=2, is_dash=False, filters=VALID_FILTERS):
+def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=True, combine_minexp=2, is_dash=False, filters=VALID_FILTERS, max_dt=1e9):
     """
     
     Try to combine visits at the same PA/filter with fewer than 
@@ -913,7 +916,7 @@ def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=
         np.save('{0}_visits.npy'.format(field_root), [visits, all_groups, info])
         return visits, all_groups, info
         
-    visits, filters = utils.parse_flt_files(info=info, uniquename=True, get_footprint=True, use_visit=use_visit)
+    visits, filters = utils.parse_flt_files(info=info, uniquename=True, get_footprint=True, use_visit=use_visit, max_dt=max_dt)
     
     # Don't run combine_minexp if have grism exposures
     grisms = ['G141', 'G102', 'G800L', 'G280']

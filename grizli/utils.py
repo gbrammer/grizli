@@ -320,7 +320,7 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
                                  'GNGRISM':'goodsn-', 
                                  'GOODS-SOUTH-':'goodss-', 
                                  'UDS-':'uds-'},
-                    visit_split_shift=1.5):
+                    visit_split_shift=1.5, max_dt=1e9):
     """Read header information from a list of exposures and parse out groups based on filter/target/orientation.
     
     Parameters
@@ -541,7 +541,7 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
     if visit_split_shift > 0:
         split_list = []
         for o in output_list:
-            split_list.extend(split_visit(o,
+            split_list.extend(split_visit(o, max_dt=max_dt, 
                               visit_split_shift=visit_split_shift))
         
         output_list = split_list
@@ -579,7 +579,7 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
             
     return output_list, filter_list
 
-def split_visit(visit, visit_split_shift=1.5, path='../RAW'):
+def split_visit(visit, visit_split_shift=1.5, max_dt=6./24, path='../RAW'):
     """
     Check if files in a visit have large shifts and split them otherwise
     
@@ -591,13 +591,17 @@ def split_visit(visit, visit_split_shift=1.5, path='../RAW'):
     ims = [pyfits.open(os.path.join(path, file)) for file in visit['files']]
     crval1 = np.array([im[1].header['CRVAL1'] for im in ims])
     crval2 = np.array([im[1].header['CRVAL2'] for im in ims])
+    expstart = np.array([im[0].header['EXPSTART'] for im in ims])
+    dt = np.cast[int]((expstart-expstart[0])/max_dt)
     
     dx = (crval1 - crval1[0])*60*np.cos(crval2[0]/180*np.pi)
     dy = (crval2 - crval2[0])*60
     
     dxi = np.cast[int](np.round(dx/visit_split_shift))
     dyi = np.cast[int](np.round(dy/visit_split_shift))
-    keys = dxi*100+dyi
+    keys = dxi*100+dyi+1000*dt
+    #print(keys)
+    
     un = np.unique(keys)
     if len(un) == 1:
         return [visit]
@@ -607,7 +611,7 @@ def split_visit(visit, visit_split_shift=1.5, path='../RAW'):
         visits = []
         for i in range(len(un)):
             ix = keys == un[i]
-            spl[-2] = 'abcdefghi'[i]
+            spl[-2] = 'abcdefghijklmnopqrsuvwxyz'[i]
             visits.append({'files':list(np.array(visit['files'])[ix]), 
                            'product':'-'.join(spl)})
     
