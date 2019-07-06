@@ -334,13 +334,16 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
             if (parse_visits_args['combine_same_pa'] == -1):
                 if is_parallel_field:
                     parse_visits_args['combine_same_pa'] = True
-                    parse_visits_args['max_dt'] = 4/24
                 else:
                     parse_visits_args['combine_same_pa'] = False                    
-                    parse_visits_args['max_dt'] = 1e9
-
+                    
         else:
             parse_visits_args['combine_same_pa'] = is_parallel_field
+        
+        if is_parallel_field:
+            parse_visits_args['max_dt'] = 4./24
+        else:
+            parse_visits_args['max_dt'] = 1e9
             
         parsed = auto_script.parse_visits(field_root=root, 
                                           HOME_PATH=HOME_PATH, 
@@ -935,6 +938,14 @@ def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=
             combined[key]['files'].extend(visit['files'])
         
         visits = [combined[k] for k in combined]
+        
+        # Account for timing
+        split_list = []
+        for o in visits:
+            split_list.extend(split_visit(o, max_dt=max_dt, 
+                              visit_split_shift=100))
+        
+        visits = split_list
         
         print('** Combine same PA: **')
         for i, visit in enumerate(visits):
