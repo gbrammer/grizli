@@ -632,7 +632,7 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
                          clip=20, log=True, outlier_threshold=5, 
                          verbose=True, guess=[0., 0., 0., 1], simple=True, 
                          rms_limit=2, use_guess=False, 
-                         triangle_size_limit=[5,1800], 
+                         triangle_size_limit=[5,1800], max_sources=200,
                          triangle_ba_max=0.9, max_err_percentile=99):
     """TBD
     """     
@@ -757,6 +757,14 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
             input, output = xy_drz+0.-drz_crpix, xy+0-drz_crpix
         #print np.sum(input) + np.sum(output)
         
+        if len(input) > max_sources:
+            ix = np.argsort(np.arange(len(input)))[:max_sources]
+            input = input[max_sources,:]
+        
+        if len(output) > max_sources:
+            ix = np.argsort(np.arange(len(output)))[:max_sources]
+            input = input[max_sources,:]
+            
         toler=5
         titer=0
         while (titer < 3):
