@@ -763,7 +763,7 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
         
         if len(output) > max_sources:
             ix = np.argsort(np.arange(len(output)))[:max_sources]
-            input = input[max_sources,:]
+            output = output[max_sources,:]
             
         toler=5
         titer=0
