@@ -758,12 +758,14 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
         #print np.sum(input) + np.sum(output)
         
         if len(input) > max_sources:
+            print('Clip input list ({0}) to {1} objects'.format(len(input), max_sources))
             ix = np.argsort(np.arange(len(input)))[:max_sources]
-            input = input[max_sources,:]
+            input = input[ix,:]
         
         if len(output) > max_sources:
+            print('Clip output list ({0}) to {1} objects'.format(len(input), max_sources))
             ix = np.argsort(np.arange(len(output)))[:max_sources]
-            output = output[max_sources,:]
+            output = output[ix,:]
             
         toler=5
         titer=0
