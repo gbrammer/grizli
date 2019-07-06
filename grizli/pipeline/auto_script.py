@@ -945,6 +945,7 @@ def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=
             split_list.extend(utils.split_visit(v, max_dt=max_dt, 
                               visit_split_shift=100))
         
+        visits = split_list
         get_visit_exposure_footprints(visits)
         
         print('** Combine same PA: **')
