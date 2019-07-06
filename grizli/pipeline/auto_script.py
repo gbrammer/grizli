@@ -3240,12 +3240,12 @@ def make_filter_combinations(root, weight_fnu=True, filter_combinations=FILTER_C
             continue
         
         # Which reference parameters to use?
-        if filt_i in OPT_W_FILTERS + OPT_M_FILTERS:
+        if filt_i.upper() in OPT_W_FILTERS + OPT_M_FILTERS:
             ref_h_i = ref_h['opt']
         else:
             ref_h_i = ref_h['ir']
             
-        print(sci_file, band)
+        print(sci_file, filt_i, band)
         output_sci[band] = sci_file.replace(filt_i, band)
         
         im_i = pyfits.open(sci_file)
