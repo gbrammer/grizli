@@ -169,9 +169,9 @@ grism_prep_args:
     gris_ref_filters: &gris_ref_filters
         G102: [F105W, F098M, F110W, F125W, F140W, F160W, F127M, F139M, 
                F153M, F132N, F130N, F128N, F126N, F164N, F167N]
-        G141: [F140W, F160W, F125W, F105W, F110W, F098M, F127M, F139M, 
+        G141: [ir, F140W, F160W, F125W, F105W, F110W, F098M, F127M, F139M, 
                F153M, F132N, F130N, F128N, F126N, F164N, F167N]
-        G800L: [F814W, F850LP, F606W, F435W, F777W]
+        G800L: [opt, ir, F814W, F850LP, F606W, F435W, F775W]
     files: null
     split_by_grism: True
     refine_niter: 3
