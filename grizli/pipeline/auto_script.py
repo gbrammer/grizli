@@ -941,21 +941,12 @@ def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=
         
         # Account for timing
         split_list = []
-        for o in visits:
-            split_list.extend(utils.split_visit(o, max_dt=max_dt, 
+        for v in visits:
+            split_list.extend(utils.split_visit(v, max_dt=max_dt, 
                               visit_split_shift=100))
         
-        visits = split_list
-        for visit in visits:
-            fp = None
-            for fp_i in visit['footprints']:
-                if fp is None:
-                    fp = fp_i.buffer(0.00001)
-                else:
-                    fp = fp.union(fp_i)
-            
-            visit['footprint'] = fp
-            
+        get_visit_exposure_footprints(visits)
+        
         print('** Combine same PA: **')
         for i, visit in enumerate(visits):
             print('{0} {1} {2}'.format(i, visit['product'], len(visit['files'])))
@@ -1006,8 +997,9 @@ def get_visit_exposure_footprints(visit_file='j1000p0210_visits.npy', check_path
     
     Parameters
     ----------
-    visit_file : str
-        File produced by `parse_visits` (`visits`, `all_groups`, `info`).
+    visit_file : str, list
+        File produced by `parse_visits` (`visits`, `all_groups`, `info`).  
+        If a list, just parse a list of visits and don't save the file.
         
     check_paths : list
         Look for the individual exposures in `visits[i]['files']` in these 
@@ -1021,8 +1013,12 @@ def get_visit_exposure_footprints(visit_file='j1000p0210_visits.npy', check_path
     visits : dict
     
     """
-    visits, all_groups, info = np.load(visit_file, allow_pickle=True)
     
+    if isinstance(visit_file, str):
+        visits, all_groups, info = np.load(visit_file, allow_pickle=True)
+    else:
+        visits = visit_file
+        
     fps = {}
     
     for visit in visits:
@@ -1053,7 +1049,8 @@ def get_visit_exposure_footprints(visit_file='j1000p0210_visits.npy', check_path
     ### ToDo: also update visits in all_groups with `fps`
     
     # Resave the file
-    np.save(visit_file, [visits, all_groups, info])
+    if isinstance(visit_file, str):
+        np.save(visit_file, [visits, all_groups, info])
     
     return visits
     
