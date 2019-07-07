@@ -917,7 +917,7 @@ def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=
         return visits, all_groups, info
         
     visits, filters = utils.parse_flt_files(info=info, uniquename=True, get_footprint=True, use_visit=use_visit, max_dt=max_dt)
-    
+        
     # Don't run combine_minexp if have grism exposures
     grisms = ['G141', 'G102', 'G800L', 'G280']
     has_grism = utils.column_string_operation(info['FILTER'], grisms, 
@@ -937,12 +937,14 @@ def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=
         visits = [combined[k] for k in combined]
         
         # Account for timing
+        print('xxx max_dt', max_dt, len(visits))
         split_list = []
         for v in visits:
             split_list.extend(utils.split_visit(v, max_dt=max_dt, 
-                              visit_split_shift=100))
-        
+                              visit_split_shift=1000))
+                
         visits = split_list
+        print('yyy max_dt', max_dt, len(visits))
         get_visit_exposure_footprints(visits)
         
         print('** Combine same PA: **')
