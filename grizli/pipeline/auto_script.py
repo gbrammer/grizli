@@ -334,17 +334,14 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
             if (parse_visits_args['combine_same_pa'] == -1):
                 if is_parallel_field:
                     parse_visits_args['combine_same_pa'] = True
+                    parse_visits_args['max_dt'] = 4./24
                 else:
                     parse_visits_args['combine_same_pa'] = False                    
+                    parse_visits_args['max_dt'] = 1.
                     
         else:
             parse_visits_args['combine_same_pa'] = is_parallel_field
         
-        if is_parallel_field:
-            parse_visits_args['max_dt'] = 6./24
-        else:
-            parse_visits_args['max_dt'] = 1e9
-            
         parsed = auto_script.parse_visits(field_root=root, 
                                           HOME_PATH=HOME_PATH, 
                                           filters=filters, is_dash=is_dash, 

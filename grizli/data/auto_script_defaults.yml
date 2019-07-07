@@ -38,7 +38,8 @@ parse_visits_args:
     #filters: *filters
     #is_dash: *is_dash
     use_visit: True
-
+    max_dt: 0.5
+    
 # Run manual alignment for each visit using prep.manual_alignment
 manual_alignment: False 
 manual_alignment_args: 
