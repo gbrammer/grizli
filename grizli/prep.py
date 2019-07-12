@@ -3044,6 +3044,8 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                                outlier_threshold=5, align_clip=30,
                                align_mag_limits=[14,23],
                                align_rms_limit=2,
+                               max_err_percentile=99,
+                               catalog_mask_pad=0.05,
                                column_average=True, 
                                sky_iter=10,
                                run_tweak_align=True,
@@ -3392,7 +3394,7 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
         clip = (cat['MAG_AUTO'] > align_mag_limits[0]) & (cat['MAG_AUTO'] < align_mag_limits[1])
         clip &= cat['MAGERR_AUTO'] < 0.05
         
-        clip &= utils.catalog_mask(cat, max_err_percentile=99, pad=0.05, pad_is_absolute=False, min_flux_radius=1.)
+        clip &= utils.catalog_mask(cat, max_err_percentile=max_err_percentile, pad=catalog_mask_pad, pad_is_absolute=False, min_flux_radius=1.)
                
         NMAX = 140
         so = np.argsort(cat['MAG_AUTO'][clip])

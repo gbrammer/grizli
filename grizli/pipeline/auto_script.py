@@ -1346,8 +1346,10 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
                 pfile = '../Persistence/'+file.replace('_flt', '_persist')
                 if os.path.exists(pfile):
                     prep.apply_persistence_mask(file, path='../Persistence',
-                                         dq_value=1024, err_threshold=0.6,
-                                         grow_mask=3, verbose=True)
+                                                **persistence_args)
+                    # prep.apply_persistence_mask(file, path='../Persistence',
+                    #                      dq_value=1024, err_threshold=0.6,
+                    #                      grow_mask=3, verbose=True)
 
                 # Fix NaNs
                 utils.fix_flt_nan(file, verbose=True)
