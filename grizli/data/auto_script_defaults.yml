@@ -66,6 +66,8 @@ preprocess_args:
 visit_prep_args: &prep_args
     align_rms_limit: 2
     align_mag_limits: [14, 24]
+    max_err_percentile: 99
+    catalog_mask_pad: 0.05
     drizzle_params: {}
     single_image_CRs: True
     run_tweak_align: True
@@ -122,7 +124,7 @@ mosaic_args:
     optical_filters:
         [F814W, F606W, F435W, F850LP, F702W, F555W, F438W, F475W, F625W,
           F775W, F225W, F275W, F300W, F390W, F350LP, F200LP, F410M, F450W,
-          F600LP, F475X]
+          F600LP, F475X, F435W]
     fill_mosaics: grism 
     half_optical_pixscale: False 
     mosaic_pixfrac: 0.75 
