@@ -984,9 +984,16 @@ def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=
     all_groups = utils.parse_grism_associations(visits)
     
     print('\n == Grism groups ==\n')
+    valid_groups = []
     for g in all_groups:
-        print(g['direct']['product'], len(g['direct']['files']), g['grism']['product'], len(g['grism']['files']))
-        
+        try:
+            print(g['direct']['product'], len(g['direct']['files']), g['grism']['product'], len(g['grism']['files']))
+            valid_groups.append(g)
+        except:
+            pass
+
+    all_groups = valid_groups
+    
     np.save('{0}_visits.npy'.format(field_root), [visits, all_groups, info])
     
     return visits, all_groups, info
