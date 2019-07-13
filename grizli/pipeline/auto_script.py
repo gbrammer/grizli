@@ -1854,7 +1854,7 @@ def load_GroupFLT(field_root='j142724+334246', force_ref=None, force_seg=None, f
     from .. import prep, utils, multifit
     
     if files is None:
-        files=glob.glob('../RAW/*fl[tc].fits')
+        files=glob.glob('../Prep/*fl[tc].fits')
         files.sort()
         
     info = utils.get_flt_info(files)
