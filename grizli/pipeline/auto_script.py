@@ -959,7 +959,7 @@ def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=
     elif (combine_minexp > 0) & (not has_grism):
         combined = []
         for visit in visits:
-            if len(visit['files']) > combine_minexp*1:
+            if len(visit['files']) >= combine_minexp*1:
                 combined.append(copy.deepcopy(visit))
             else:
                 filter_pa = '-'.join(visit['product'].split('-')[-2:])
