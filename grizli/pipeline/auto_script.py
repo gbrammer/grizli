@@ -1872,7 +1872,7 @@ def load_GroupFLT(field_root='j142724+334246', force_ref=None, force_seg=None, f
     grp_objects = []
      
     #grp = None
-    if g141.sum() > 0:
+    if (g141.sum() > 0) & ('G141' in gris_ref_filters):
         for f in gris_ref_filters['G141']:
             
             if os.path.exists('{0}-{1}_drz_sci.fits'.format(field_root, f.lower())):
@@ -1910,7 +1910,7 @@ def load_GroupFLT(field_root='j142724+334246', force_ref=None, force_seg=None, f
         
         grp_objects.append(grp)
         
-    if g102.sum() > 0:
+    if (g102.sum() > 0) & ('G102' in gris_ref_filters):
         for f in gris_ref_filters['G102']:
             if os.path.exists('{0}-{1}_drz_sci.fits'.format(field_root, f.lower())):
                 g102_ref = f
@@ -1949,7 +1949,7 @@ def load_GroupFLT(field_root='j142724+334246', force_ref=None, force_seg=None, f
         #del(grp_i)
     
     # ACS
-    if g800l.sum() > 0:
+    if (g800l.sum() > 0) & ('G800L' in gris_ref_filters):
         
         acs_grp = None
         
@@ -2005,7 +2005,7 @@ def load_GroupFLT(field_root='j142724+334246', force_ref=None, force_seg=None, f
                 
         return [grp]
     
-def grism_prep(field_root='j142724+334246', ds9=None, refine_niter=3, gris_ref_filters=GRIS_REF_FILTERS, files=None, split_by_grism=True, refine_poly_order=1, refine_fcontam=0.5, cpu_count=0, mask_mosaic_edges=True):
+def grism_prep(field_root='j142724+334246', ds9=None, refine_niter=3, gris_ref_filters=GRIS_REF_FILTERS, files=None, split_by_grism=True, refine_poly_order=1, refine_fcontam=0.5, cpu_count=0, mask_mosaic_edges=True, grisms_to_process=None):
     """
     Contamination model for grism exposures
     """
@@ -2020,7 +2020,12 @@ def grism_prep(field_root='j142724+334246', ds9=None, refine_niter=3, gris_ref_f
                                      'auto_script.grism_prep')
     except:
         from grizli import prep, utils, multifit
-        
+    
+    if grisms_to_process is not None:
+        for g in gris_ref_filters.copy():
+            if g not in grisms_to_process:
+                pg = gris_ref_filters.pop(g)
+                
     grp_objects = load_GroupFLT(field_root=field_root, gris_ref_filters=gris_ref_filters, files=files, split_by_grism=split_by_grism)
     
     for grp in grp_objects:

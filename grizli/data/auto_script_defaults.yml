@@ -176,6 +176,7 @@ grism_prep_args:
                F153M, F132N, F130N, F128N, F126N, F164N, F167N]
         G800L: [opt, ir, F814W, F850LP, F606W, F435W, F775W]
     files: null
+    grisms_to_process: null
     split_by_grism: True
     refine_niter: 3
     refine_poly_order: 3
