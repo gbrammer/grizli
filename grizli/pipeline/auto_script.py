@@ -3861,7 +3861,9 @@ def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', s
     else:
         PATH_TO = './'
         sci_files = glob.glob('./{1}-[fuvyjh]*sci.fits'.format(PATH_TO, root))
-        
+    
+    print('PATH: {0}, files:{1}'.format(PATH_TO, sci_files))   
+    
     if filters is None:
         filters = [file.split('_')[-3].split('-')[-1] for file in sci_files]
         if show_ir:
