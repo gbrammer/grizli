@@ -1114,6 +1114,7 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
                       pixel_scale=0.06, log=False, 
                       compute_auto_quantities=True,
                       gain=2000., include_wcs_extension=True,
+                      extract_pixstack=int(3e7),
                       **kwargs):
     """Make a catalog from drizzle products using the SEP implementation of SExtractor
     
@@ -1146,7 +1147,9 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
     import copy
     import astropy.units as u
     import sep 
-
+    
+    sep.set_extract_pixstack(extract_pixstack)
+    
     logstr = 'make_SEP_catalog: sep version = {0}'.format(sep.__version__)
     utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
     if sep.__version__ < '1.10.0':
