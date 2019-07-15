@@ -3705,6 +3705,24 @@ def get_rgb_filters(filter_list, force_ir=False, pure_sort=False):
     for_sort = OrderedDict()
     use_filters = []
     ir_filters = []
+    
+    ## Preferred combinations
+    filter_list_lower = [f.lower() for f in filter_list]
+    rpref = ['h', 'f160w', 'f140w']
+    gpref = ['j', 'f125w', 'f110w', 'f105w','f098m']
+    bpref = ['visr', 'visb', 'f814w', 'f606w', 'f775w','f850lp','f435w']
+    pref_list = [None, None, None]
+    has_pref = 0
+    for i, pref in enumerate([rpref, gpref, bpref]):
+        for f in pref:
+            if f in filter_list_lower:
+                pref_list[i] = f
+                has_pref += 1
+                break
+    
+    if has_pref == 3:
+        print('Use preferred r/g/b combination: {0}'.format(pref_list))
+        return pref_list
             
     for f in filter_list:            
         if f == 'ir':
