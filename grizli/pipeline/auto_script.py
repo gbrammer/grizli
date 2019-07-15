@@ -3873,7 +3873,11 @@ def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', s
     
     ims = {}
     for f in filters:
-        img = glob.glob('{0}/{1}-{2}_dr?_sci.fits'.format(PATH_TO, root, f))[0]
+        try:
+            img = glob.glob('{0}/{1}-{2}_dr?_sci.fits'.format(PATH_TO, root, f))[0]
+        except:
+            print('Failed: {0}/{1}-{2}_dr?_sci.fits'.format(PATH_TO, root, f))
+            
         try:
             ims[f] = pyfits.open(img)
             if 'IMGMED' in ims[f][0].header:
