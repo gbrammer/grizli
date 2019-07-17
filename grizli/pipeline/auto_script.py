@@ -385,10 +385,10 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
         print(comment)
         utils.log_comment(utils.LOGFILE, comment)
         
-        all_flt_files=glob.glob('*_flt.fits')
+        all_flt_files = glob.glob('*_flt.fits')
         all_flt_files.sort()
         
-        for file in flt_files:
+        for file in all_flt_files:
             print(file)
             pfile = '../Persistence/'+file.replace('_flt', '_persist')
             if os.path.exists(pfile):
