@@ -114,12 +114,21 @@ def get_yml_parameters(local_file=None, copy_defaults=False, verbose=True, skip_
         return False
         
     fp = open(path)
-    kwargs = yaml.load(fp)
+    try:
+        kwargs = yaml.load(fp, Loader=yaml.FullLoader)
+    except:
+        kwargs = yaml.load(fp)
+        
     fp.close()
     
     if local_file is not None:
         fp = open(local_file)
-        local_args = yaml.load(fp)
+
+        try:
+            local_args = yaml.load(fp, Loader=yaml.FullLoader)
+        except:
+            local_args = yaml.load(fp)
+        
         fp.close()
         
         for k in local_args:
