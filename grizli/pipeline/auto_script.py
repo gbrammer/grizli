@@ -942,14 +942,17 @@ def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=
         visits = [combined[k] for k in combined]
         
         # Account for timing
-        print('xxx max_dt', max_dt, len(visits))
+        print('Before max_dt={0:.2f} filter: {1} visits'.format(max_dt, 
+                                                                len(visits)))
+                                                                
         split_list = []
         for v in visits:
             split_list.extend(utils.split_visit(v, max_dt=max_dt, 
                               visit_split_shift=1000))
                 
         visits = split_list
-        print('yyy max_dt', max_dt, len(visits))
+        print('After  max_dt={0:.2f} filter: {1} visits'.format(max_dt,
+                                                                len(visits)))
         get_visit_exposure_footprints(visits)
         
         print('** Combine same PA: **')
@@ -4852,6 +4855,7 @@ def exposure_report(root, log=True):
     visit_product = ['']*len(info)
     ramp = ['']*len(info)
     trails = ['']*len(info)
+    persnpix = [-1]*len(info)
     
     tab['complete'] = False
     
@@ -4862,6 +4866,8 @@ def exposure_report(root, log=True):
 
         for file in visit['files']:
             
+            ix = tab.loc_indices[file]
+
             if os.path.exists(file):
                 fobj = pyfits.open(file)
                 fd = utils.flt_to_dict(fobj)
@@ -4869,7 +4875,9 @@ def exposure_report(root, log=True):
                 flt_dict[file] = fd
                 flt_dict['visit'] = visit['product']
                 
-            ix = tab.loc_indices[file]
+                if 'PERSNPIX' in fobj[0].header:
+                    persnpix[ix] = fobj[0].header['PERSNPIX']
+                    
             visit_product[ix] = visit['product']
             tab['complete'][ix] = not failed
             
@@ -4889,6 +4897,8 @@ def exposure_report(root, log=True):
             if os.path.exists(trails_file):
                 trails[ix] = '<a href="{0}"><img src="{0}" height=180 {1}></a>'.format(trails_file, extra)
             
+    tab['persnpix'] = persnpix
+    
     tab['product'] = visit_product
     tab['ramp'] = ramp
     tab['trails'] = trails
