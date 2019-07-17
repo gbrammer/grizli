@@ -92,6 +92,7 @@ persistence_args:
     err_threshold: 0.1
     grow_mask: 3
     verbose: True
+    reset: False
             
 # Fine alignment
 run_fine_alignment: True 
