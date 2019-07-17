@@ -330,7 +330,7 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
     
 def apply_persistence_mask(flt_file, path='../Persistence', dq_value=1024,
                            err_threshold=0.6, grow_mask=3, subtract=True,
-                           verbose=True):
+                           verbose=True, reset=False):
     """Make a mask for pixels flagged as being affected by persistence
     
     Persistence products can be downloaded from https://archive.stsci.edu/prepds/persist/search.php, specifically the 
@@ -357,6 +357,9 @@ def apply_persistence_mask(flt_file, path='../Persistence', dq_value=1024,
     
     subtract : bool
         Subtract the persistence model itself from the SCI extension.
+    
+    reset : bool
+        Unset `dq_value` bit.
         
     verbose : bool
         Print information to the terminal
@@ -397,6 +400,9 @@ def apply_persistence_mask(flt_file, path='../Persistence', dq_value=1024,
     flt[0].header['PERSNPIX'] = (NPERS, 'Number of persistence-flagged pixels')
     flt[0].header['PERSLEVL'] = (err_threshold, 'Perristence threshold err_threshold')
     flt[0].header['PERSGROW'] = (grow_mask, 'Perristence mask dilation grow_mask')
+    
+    if reset:
+        flt['DQ'].data -= (flt['DQ'].data & dq_value)
         
     if NPERS > 0:
         flt['DQ'].data[pers_mask > 0] |= dq_value
