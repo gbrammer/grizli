@@ -85,6 +85,8 @@ visit_prep_args: &prep_args
     # use_self_catalog: *is_parallel_field
 
 # Arguments to prep.apply_persistence_mask
+redo_persistence_mask: False
+
 persistence_args:
     dq_value: 1024
     err_threshold: 0.1
