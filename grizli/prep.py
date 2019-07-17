@@ -393,9 +393,14 @@ def apply_persistence_mask(flt_file, path='../Persistence', dq_value=1024,
     
     logstr = '# {0}: flagged {1:d} pixels affected by persistence (pers/err={2:.2f})'.format(pers_file, NPERS, err_threshold)
     utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
-    
+
+    flt[0].header['PERSNPIX'] = (NPERS, 'Number of persistence-flagged pixels')
+    flt[0].header['PERSLEVL'] = (err_threshold, 'Perristence threshold err_threshold')
+    flt[0].header['PERSGROW'] = (grow_mask, 'Perristence mask dilation grow_mask')
+        
     if NPERS > 0:
         flt['DQ'].data[pers_mask > 0] |= dq_value
+        
         if subtract:
             dont_subtract=False
             if 'SUBPERS' in flt[0].header:
@@ -408,8 +413,9 @@ def apply_persistence_mask(flt_file, path='../Persistence', dq_value=1024,
             flt['ERR'].data = np.sqrt(flt['ERR'].data**2+pers['SCI'].data**2)
             flt[0].header['SUBPERS'] = (True, 'Persistence model subtracted')
             
-        flt.flush()
-
+    flt.flush()
+    flt.close()
+    
 def apply_region_mask(flt_file, dq_value=1024, verbose=True):
     """Apply DQ mask from a DS9 region file
     
