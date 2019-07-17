@@ -198,6 +198,7 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
        preprocess_args=args['preprocess_args'],
        visit_prep_args=args['visit_prep_args'],
        persistence_args=args['persistence_args'],
+       redo_persistence_mask=False,
        run_fine_alignment=True,
        fine_backup=True,
        fine_alignment_args=args['fine_alignment_args'],
@@ -378,7 +379,22 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
             
     #auto_script.preprocess(field_root=root, HOME_PATH=HOME_PATH, make_combined=False, master_radec=master_radec, parent_radec=parent_radec, use_visit=True, min_overlap=align_min_overlap, visit_prep_args=visit_prep_args)
     auto_script.preprocess(field_root=root, HOME_PATH=HOME_PATH, visit_prep_args=visit_prep_args, persistence_args=persistence_args, **preprocess_args)
-       
+    
+    if redo_persistence_mask:
+        comment = '# Redo persistence masking: {0}'.format(persistence_args)
+        print(comment)
+        utils.log_comment(utils.LOGFILE, comment)
+        
+        all_flt_files=glob.glob('*_flt.fits')
+        all_flt_files.sort()
+        
+        for file in flt_files:
+            print(file)
+            pfile = '../Persistence/'+file.replace('_flt', '_persist')
+            if os.path.exists(pfile):
+                prep.apply_persistence_mask(file, path='../Persistence',
+                                            **persistence_args)
+                
     # Fine alignment
     if (len(glob.glob('{0}*fine.png'.format(root))) == 0) & (run_fine_alignment) & (len(visits) > 1):
         fine_catalogs = ['GAIA','PS1','DES','SDSS','WISE']
