@@ -1450,7 +1450,7 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
     # prep.drizzle_overlaps(keep, parse_visits=False, pixfrac=0.6, scale=0.06, skysub=False, bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False)
     
 def mask_IR_psf_spikes(visit={},
-mag_lim=17, cat=None, cols=['mag_auto','ra','dec'], minR=8, dy=5, selection=None, length_scale=1):
+mag_lim=17, cat=None, cols=['mag_auto','ra','dec'], minR=8, dy=5, selection=None, length_scale=1, dq_bit=2048):
     """
     Mask 45-degree diffraction spikes around bright stars
     
@@ -1570,7 +1570,7 @@ mag_lim=17, cat=None, cols=['mag_auto','ra','dec'], minR=8, dy=5, selection=None
                         
                         mask[xp[ok,1]+j, xp[ok,0]] = 1
             
-            im['DQ',ext].data |= mask*2048
+            im['DQ',ext].data |= mask*dq_bit
             im.flush()
             
 def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_background=True, photometry_background=True, get_all_filters=False, filters=None, det_err_scale=-np.inf, rescale_weight=True, run_detection=True, detection_filter='ir', detection_root=None, output_root=None, use_psf_filter=True, detection_params=prep.SEP_DETECT_PARAMS,  phot_apertures=prep.SEXTRACTOR_PHOT_APERTURES_ARCSEC, master_catalog=None, bkg_mask=None, bkg_params={'bw':64, 'bh':64, 'fw':3, 'fh':3, 'pixel_scale':0.06}, use_bkg_err=False, aper_segmask=True):
@@ -4763,8 +4763,13 @@ def make_report(root, gzipped_links=True, xsize=18, output_dpi=None, make_rgb=Tr
     rows = []
     for filter in filters:
         os.system('grep -e " 0 " -e "radec" *{0}*wcs.log > /tmp/{1}.log'.format(filter, root))
-        wcs = '<pre>'+''.join(open('/tmp/{0}.log'.format(root)).readlines())+'</pre>'
+        wcs_files = glob.glob('*{0}*wcs.log'.format(filter))
         
+        wcs = '<pre>'+''.join(open('/tmp/{0}.log'.format(root)).readlines())+'</pre>'
+        for file in wcs_files:
+            png_url = '<a href={0}>{1}</a>'.format(file, file.replace('.log', '.png'))
+            wcs = wcs.replace(file, png_url)
+            
         try:
             im = pyfits.open(glob.glob('{0}-{1}*sci.fits'.format(root, filter))[0])
             h = im[0].header
