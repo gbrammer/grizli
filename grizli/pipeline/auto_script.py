@@ -4767,7 +4767,7 @@ def make_report(root, gzipped_links=True, xsize=18, output_dpi=None, make_rgb=Tr
         
         wcs = '<pre>'+''.join(open('/tmp/{0}.log'.format(root)).readlines())+'</pre>'
         for file in wcs_files:
-            png_url = '<a href={0}>{1}</a>'.format(file, file.replace('.log', '.png'))
+            png_url = '<a href={1}>{0}</a>'.format(file, file.replace('.log', '.png').replace('+','%2B'))
             wcs = wcs.replace(file, png_url)
             
         try:
