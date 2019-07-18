@@ -151,7 +151,7 @@ def eazy_photoz(root, force=False, object_only=True, apply_background=True, aper
         cat = utils.read_catalog('{0}_phot_apcorr.fits'.format(root))
         return self, cat, zout
         
-    trans = {'f098m':201, 'f105w':202, 'f110w':241, 'f125w':203, 'f140w':204, 'f160w':205, 'f435w':233, 'f438w':211, 'f606w':236, 'f625w':237, 'f814w':239, 'f702w':15, 'f555w':235, 'f350lp':339, 'f475w':212, 'f775w':238, 'f850lp':240, 'f390w':210, 'f475x':242, 'f600lp':243}
+    trans = {'f098m':201, 'f105w':202, 'f110w':241, 'f125w':203, 'f140w':204, 'f160w':205, 'f435w':233, 'f475w':234, 'f555w':235, 'f606w':236, 'f625w':237, 'f775w':238, 'f814w':239, 'f850lp':240, 'f702w':15, 'f600lpu':243, 'f225wu':207, 'f275wu':208, 'f336w':209, 'f350lpu':339, 'f438wu':211, 'f475wu':212, 'f475xu':242, 'f555wu':213, 'f606wu':214, 'f625wu':215, 'f775wu':216, 'f814wu':217}
     
     #trans.pop('f814w')
     
