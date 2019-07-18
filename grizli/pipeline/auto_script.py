@@ -1657,13 +1657,19 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
     
     if filters is None:
         if get_all_filters:
-            filters = [file.split('_')[-3][len(field_root)+1:] for file in glob.glob('{0}-f*dr?_sci.fits'.format(field_root))]
+            filters = [file.split('_')[-3][len(field_root)+1:] for file in glob.glob('{0}-f*dr?_sci.fits*'.format(field_root))]
         else:
             visits, all_groups, info = np.load('{0}_visits.npy'.format(field_root), allow_pickle=True)
 
             if ONLY_F814W:
                 info = info[((info['INSTRUME'] == 'WFC3') & (info['DETECTOR'] == 'IR')) | (info['FILTER'] == 'F814W')]
-
+            
+            # UVIS
+            for i in range(len(info)):
+                file_i = info['FILE'][i]
+                if file_i.startswith('i') & ('_flc' in file_i):
+                    info['FILTER'][i] += 'U'
+                    
             filters = [f.lower() for f in np.unique(info['FILTER'])]
         
     #filters.insert(0, 'ir')
@@ -3184,9 +3190,17 @@ def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140
         
         # Not one of the desired filters    
         filt = visit['product'].split('-')[-1]
+        
         if filt.upper() not in filters:
             continue
         
+        # IS UVIS?
+        if visit['files'][0].startswith('i') & ('_flc' in visit['files'][0]):
+            filt += 'u'
+            is_uvis = True
+        else:
+            is_uvis = False
+                
         if len(match_str) > 0:
             has_match = False
             for m in match_str:
@@ -3207,8 +3221,9 @@ def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140
                     filter_groups[filt]['footprint'] = filter_groups[filt]['footprint'].union(fp)
                 else:
                     filter_groups[filt]['footprint'] = fp.buffer(0)
+        
                     
-        if filt.upper() in filters:
+        if (filt.upper() in filters) | (is_uvis & (filt.upper()[:-1] in filters)):
             wfc3ir['files'].extend(visit['files'])
             if 'footprint' in filter_groups[filt]:
                 fp_i = filter_groups[filt]['footprint']
@@ -3237,7 +3252,7 @@ def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140
     
     if ref_wcs is not None:
         pass
-                
+    
     if make_combined:
         
         # Figure out if we have more than one instrument
@@ -3248,6 +3263,7 @@ def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140
         np.save('{0}.npy'.format(wfc3ir['product']), [wfc3ir])
         
     if drizzle_filters:        
+        print('Drizzle mosaics in filters: {0}'.format(filter_groups.keys()))
         prep.drizzle_overlaps(keep, parse_visits=False, pixfrac=pixfrac, scale=scale, skysub=skysub, skymethod=skymethod, bits=bits, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False, context=context, static=static, include_saturated=include_saturated)
 
 FILTER_COMBINATIONS = {'ir':IR_M_FILTERS+IR_W_FILTERS,
@@ -3287,7 +3303,11 @@ def make_filter_combinations(root, weight_fnu=True, filter_combinations=FILTER_C
     sci_files = glob.glob('{0}-f*sci.fits*'.format(root))
     for sci_file in sci_files:
         filt_i = sci_file.split('_dr')[0].split('-')[-1]
-       
+        
+        # UVIS
+        if filt_i.startswith('f') & filt_i.endswith('u'):
+            filt_i = filt_i[:1]
+            
         band = None
         for f in filter_combinations:
             if filt_i.upper() in filter_combinations[f]:
