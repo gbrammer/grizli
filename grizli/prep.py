@@ -4960,6 +4960,9 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, m
         # All the same instrument?
         inst_keys = np.unique([os.path.basename(file)[0] for file in group['files']])
         
+        print('\n\n### drizzle_overlaps: {0} ({1})\n'.format(group['product'],
+                                                     len(group['files'])))
+        
         if fetch_flats:
             # PFL files needed for IVM weights
             for file in group['files']: 
