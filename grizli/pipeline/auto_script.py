@@ -3877,6 +3877,8 @@ def get_rgb_filters(filter_list, force_ir=False, pure_sort=False):
     for f in filter_list:            
         if f == 'ir':
             continue
+        elif f == 'opt':
+            continue
         
         if f == 'uv':
             val = 'f0300'
