@@ -3483,19 +3483,22 @@ def make_combined_mosaics(root, fix_stars=False, mask_spikes=False, skip_single_
         # Note: vry bright stars could still be saturated and the spikes
         # might not be big enough given their catalog mag
         
-        for visit in visits:
-            filt = visit['product'].split('-')[-1]
-            if filt[:2] in ['f0','f1']:
-                mask_IR_psf_spikes(visit=visit, selection=selection,
-                                   cat=cat, minR=8, dy=5)
+        if selection.sum() > 0:
+            for visit in visits:
+                filt = visit['product'].split('-')[-1]
+                if filt[:2] in ['f0','f1']:
+                    mask_IR_psf_spikes(visit=visit, selection=selection,
+                                       cat=cat, minR=8, dy=5)
         
-        ## Remake mosaics
-        drizzle_overlaps(root, filters=mosaic_args['ir_filters'], min_nexp=1, 
-                         pixfrac=mosaic_pixfrac,
-                         make_combined=False,
-                         ref_image=wcs_ref_file, include_saturated=fix_stars) 
+            ## Remake mosaics
+            drizzle_overlaps(root, filters=mosaic_args['ir_filters'], 
+                             min_nexp=1, 
+                             pixfrac=mosaic_pixfrac,
+                             make_combined=False,
+                             ref_image=wcs_ref_file, 
+                             include_saturated=fix_stars) 
         
-        make_filter_combinations(root, weight_fnu=True, 
+            make_filter_combinations(root, weight_fnu=True, 
                         filter_combinations={'ir':IR_M_FILTERS+IR_W_FILTERS})
         
     ## Optical filters
