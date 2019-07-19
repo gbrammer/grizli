@@ -3417,6 +3417,30 @@ def make_combined_mosaics(root, fix_stars=False, mask_spikes=False, skip_single_
         
         selection = (cat['mag_auto'] < 18) & (cat['flux_radius'] < 4.5)
         selection |= (cat['mag_auto'] < 15.2) & (cat['flux_radius'] < 20)
+        
+        # Bright GAIA stars to catch things with bad photometry
+        if True:
+            print('## Include GAIA stars in spike mask')
+
+            ra_center = np.median(cat['ra'])
+            dec_center = np.median(cat['dec'])
+            rad_arcmin = np.sqrt((cat['ra']-ra_center)**2*np.cos(cat['dec']/180*np.pi)**2+(cat['dec']-dec_center)**2)*60
+            
+            try:
+                gaia_tmp = prep.get_gaia_DR2_catalog(ra_center, dec_center,
+                               radius=rad_arcmin.max()*1.1, use_mirror=False)
+                idx, dr = utils.GTable(gaia_tmp).match_to_catalog_sky(cat)
+                
+                gaia_match = (dr.value < 0.5) 
+                gaia_match &= (gaia_tmp['phot_g_mean_mag'][idx] < 20) 
+                gaia_match &= (cat['mag_auto'] < 17.5)
+                
+                selection |= gaia_match
+                
+            except:
+                print('## Include GAIA stars in spike mask - failed')
+                pass
+                
         # Note: vry bright stars could still be saturated and the spikes
         # might not be big enough given their catalog mag
         
