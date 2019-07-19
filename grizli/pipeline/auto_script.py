@@ -416,7 +416,9 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
         for file in fine_files:
             print('rm {0}'.format(file))
             os.remove(file)
-    
+        
+        fine_files = []
+        
     if (len(fine_files) == 0) & (run_fine_alignment > 0) & (len(visits) > 1):
         fine_catalogs = ['GAIA','PS1','DES','SDSS','WISE']
         try:
