@@ -3817,7 +3817,7 @@ def get_rgb_filters(filter_list, force_ir=False, pure_sort=False):
     filter_list_lower = [f.lower() for f in filter_list]
     rpref = ['h', 'f160w', 'f140w']
     gpref = ['j', 'f125w', 'f110w', 'f105w','f098m']
-    bpref = ['visr', 'visb', 'f814w', 'f606w', 'f775w','f850lp','f435w']
+    bpref = ['opt', 'visr', 'visb', 'f814w', 'f606w', 'f775w','f850lp','f435w']
     pref_list = [None, None, None]
     has_pref = 0
     for i, pref in enumerate([rpref, gpref, bpref]):
