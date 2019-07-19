@@ -401,7 +401,7 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
     fine_files = glob.glob('{0}*fine.png'.format(root))
     if (run_fine_alignment == 2) & (len(fine_files) > 0) & (len(visits) > 1):
         
-        msg = '# Redo visit-level mosaics and catalogs for fine alignment'
+        msg = '\n\n### Redo visit-level mosaics and catalogs for fine alignment\n\n'
         utils.log_comment(utils.LOGFILE, msg, show_date=True, verbose=True)
         
         for visit in visits:
@@ -418,6 +418,7 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
                               final_rot=None,
                               include_saturated=True)
         
+        # Need wcs.fits files
         for visit in visits:
             thresh=2.5
             cat = prep.make_SEP_catalog(root=visit['product'],
@@ -3062,10 +3063,15 @@ def update_wcs_headers_with_fine(field_root, backup=True):
             out_scale = trans[ix,3]
             
             xyscale = trans[ix,:4]
-            wcs_ref_file = str('{0}_wcs.fits'.format(direct['product']))
-            wcs_ref = pywcs.WCS(pyfits.open(wcs_ref_file)[0].header, 
+            try:
+                wcs_ref_file = str('{0}.cat.fits'.format(direct['product']))
+                wcs_ref = pywcs.WCS(pyfits.open(wcs_ref_file)['WCS'].header, 
                                 relax=True)
-            
+            except:
+                wcs_ref_file = str('{0}_wcs.fits'.format(direct['product']))
+                wcs_ref = pywcs.WCS(pyfits.open(wcs_ref_file)[0].header, 
+                                relax=True)
+                
             for file in direct['files']:
                 prep.update_wcs_fits_log(file, wcs_ref,
                                     xyscale=xyscale,
