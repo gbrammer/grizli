@@ -426,6 +426,7 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
             visit_filter = visit['product'].split('-')[-1]
             is_single = len(visit['files']) == 1
             is_ACS = '_flc' in visit['files'][0]
+            is_WFPC2 = '_c0' in visit['files'][0]
             
             if visit_filter in ['g102','g141','g800l','g280']:
                 print('# Skip grism visit: {0}'.format(visit['product']))
@@ -440,7 +441,7 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
             prep.table_to_regions(cat, '{0}.cat.reg'.format(visit['product']))
             
             # New radec
-            if not (isACS & is_single):    
+            if not ((isACS | isWFPC2) & is_single):    
                 # 140 brightest or mag range
                 clip = (cat['MAG_AUTO'] > 18) & (cat['MAG_AUTO'] < 23)
                 clip &= cat['MAGERR_AUTO'] < 0.05
