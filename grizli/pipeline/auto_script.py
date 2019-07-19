@@ -1733,11 +1733,14 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
                 info = info[((info['INSTRUME'] == 'WFC3') & (info['DETECTOR'] == 'IR')) | (info['FILTER'] == 'F814W')]
             
             # UVIS
+            info_filters = [f for f in info['FILTER']]
             for i in range(len(info)):
                 file_i = info['FILE'][i]
                 if file_i.startswith('i') & ('_flc' in file_i):
-                    info['FILTER'][i] += 'U'
-                    
+                    info_filters[i] += 'U'
+            
+            info['FILTER'] = info_filters
+            
             filters = [f.lower() for f in np.unique(info['FILTER'])]
         
     #filters.insert(0, 'ir')
