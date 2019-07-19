@@ -425,8 +425,8 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
             
             visit_filter = visit['product'].split('-')[-1]
             is_single = len(visit['files']) == 1
-            is_ACS = '_flc' in visit['files'][0]
-            is_WFPC2 = '_c0' in visit['files'][0]
+            isACS = '_flc' in visit['files'][0]
+            isWFPC2 = '_c0' in visit['files'][0]
             
             if visit_filter in ['g102','g141','g800l','g280']:
                 print('# Skip grism visit: {0}'.format(visit['product']))
