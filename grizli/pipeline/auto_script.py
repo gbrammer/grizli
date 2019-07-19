@@ -3480,8 +3480,12 @@ def make_combined_mosaics(root, fix_stars=False, mask_spikes=False, skip_single_
                 print('## Include GAIA stars in spike mask - failed')
                 pass
                 
-        # Note: vry bright stars could still be saturated and the spikes
+        # Note: very bright stars could still be saturated and the spikes
         # might not be big enough given their catalog mag
+        
+        msg = '\n### mask_spikes: {0} stars\n\n'.format(selection.sum())
+        utils.log_comment(utils.LOGFILE, msg, show_date=True,
+                          verbose=True)
         
         if selection.sum() > 0:
             for visit in visits:
@@ -3500,7 +3504,10 @@ def make_combined_mosaics(root, fix_stars=False, mask_spikes=False, skip_single_
         
             make_filter_combinations(root, weight_fnu=True, 
                         filter_combinations={'ir':IR_M_FILTERS+IR_W_FILTERS})
-        
+
+
+            
+            
     ## Optical filters
     mosaics = glob.glob('{0}-ir_dr?_sci.fits'.format(root))
        
