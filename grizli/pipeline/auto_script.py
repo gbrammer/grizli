@@ -394,9 +394,30 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
             if os.path.exists(pfile):
                 prep.apply_persistence_mask(file, path='../Persistence',
                                             **persistence_args)
-                
+    
+    ##########            
     # Fine alignment
-    if (len(glob.glob('{0}*fine.png'.format(root))) == 0) & (run_fine_alignment) & (len(visits) > 1):
+    
+    fine_files = glob.glob('{0}*fine.png'.format(root))
+    if (run_fine_alignment == 2) & (len(fine_files) > 0):
+        
+        # Redrizzle visit-level mosaics and remake catalogs
+        prep.drizzle_overlaps(visits, check_overlaps=False, skysub=False,
+                              static=False, pixfrac=0.5, scale=None, 
+                              final_wcs=False, fetch_flats=False,
+                              final_rot=None,
+                              include_saturated=True)
+        
+        for visit in visits:
+            thresh=2.5
+            cat = prep.make_SEP_catalog(root=visit['product'],
+                                        threshold=thresh)
+        
+        for file in fine_files:
+            print('rm {0}'.format(file))
+            os.remove(file)
+    
+    if (len(fine_files) == 0) & (run_fine_alignment > 0) & (len(visits) > 1):
         fine_catalogs = ['GAIA','PS1','DES','SDSS','WISE']
         try:
             #out = auto_script.fine_alignment(field_root=root, HOME_PATH=HOME_PATH, min_overlap=0.2, stopme=False, ref_err=0.08, catalogs=fine_catalogs, NITER=1, maglim=[17,23], shift_only=True, method='Powell', redrizzle=False, radius=30, program_str=None, match_str=[], radec=fine_radec, gaia_by_date=gaia_by_date)
