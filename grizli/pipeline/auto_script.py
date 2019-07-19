@@ -440,7 +440,7 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
             prep.table_to_regions(cat, '{0}.cat.reg'.format(visit['product']))
             
             # New radec
-            if not ((isACS | isWFPC2) & is_single):    
+            if not (isACS & is_single):    
                 # 140 brightest or mag range
                 clip = (cat['MAG_AUTO'] > 18) & (cat['MAG_AUTO'] < 23)
                 clip &= cat['MAGERR_AUTO'] < 0.05
