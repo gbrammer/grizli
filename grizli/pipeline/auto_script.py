@@ -3962,12 +3962,12 @@ def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', s
             return False
     
         phot = utils.GTable.gread(phot_file)
-        sci_files = glob.glob('{0}/{1}/Prep/{1}-[fuvyjh]*sci.fits'.format(HOME_PATH, root))
+        sci_files = glob.glob('{0}/{1}/Prep/{1}-[ofuvyjh]*sci.fits'.format(HOME_PATH, root))
         
         PATH_TO = '{0}/{1}/Prep'.format(HOME_PATH, root)
     else:
         PATH_TO = './'
-        sci_files = glob.glob('./{1}-[fuvyjh]*sci.fits'.format(PATH_TO, root))
+        sci_files = glob.glob('./{1}-[fuvyjho]*sci.fits'.format(PATH_TO, root))
     
     print('PATH: {0}, files:{1}'.format(PATH_TO, sci_files))   
     
