@@ -399,7 +399,7 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
     # Fine alignment
     
     fine_files = glob.glob('{0}*fine.png'.format(root))
-    if (run_fine_alignment == 2) & (len(fine_files) > 0):
+    if (run_fine_alignment == 2) & (len(fine_files) > 0) & (len(visits) > 1):
         
         # Redrizzle visit-level mosaics and remake catalogs
         prep.drizzle_overlaps(visits, check_overlaps=False, skysub=False,
