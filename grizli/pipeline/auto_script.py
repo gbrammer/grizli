@@ -401,6 +401,16 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
     fine_files = glob.glob('{0}*fine.png'.format(root))
     if (run_fine_alignment == 2) & (len(fine_files) > 0) & (len(visits) > 1):
         
+        msg = '# Redo visit-level mosaics and catalogs for fine alignment'
+        utils.log_comment(utils.LOGFILE, msg, show_date=True, verbose=True)
+        
+        for visit in visits:
+            visit_files = glob.glob(visit['product']+'_dr*')
+            visit_files += glob.glob(visit['product']+'*.cat.*')
+            visit_files += glob.glob(visit['product']+'*seg.fits*')
+            for file in visit_files:
+                os.remove(file)
+                
         # Redrizzle visit-level mosaics and remake catalogs
         prep.drizzle_overlaps(visits, check_overlaps=False, skysub=False,
                               static=False, pixfrac=0.5, scale=None, 
