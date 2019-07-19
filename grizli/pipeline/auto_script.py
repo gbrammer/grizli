@@ -418,12 +418,45 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
                               final_rot=None,
                               include_saturated=True)
         
-        # Need wcs.fits files
+        # Make new catalogs
         for visit in visits:
+            if len(visit['files']) == 0:
+                continue
+            
+            visit_filter = visit['product'].split('-')[-1]
+            is_single = len(visit['files']) == 1
+            is_ACS = '_flc' in visit['files'][0]
+            
+            if visit_filter in ['g102','g141','g800l','g280']:
+                print('# Skip grism visit: {0}'.format(visit['product']))
+                continue
+            
+            # New catalog    
             thresh=2.5
             cat = prep.make_SEP_catalog(root=visit['product'],
                                         threshold=thresh)
-        
+            
+            # New region file
+            prep.table_to_regions(cat, '{0}.cat.reg'.format(visit['product']))
+            
+            # New radec
+            if not ((isACS | isWFPC2) & is_single):    
+                # 140 brightest or mag range
+                clip = (cat['MAG_AUTO'] > 18) & (cat['MAG_AUTO'] < 23)
+                clip &= cat['MAGERR_AUTO'] < 0.05
+                clip &= utils.catalog_mask(cat,
+                    max_err_percentile=visit_prep_args['max_err_percentile'],
+                         pad=visit_prep_args['catalog_mask_pad'],
+                         pad_is_absolute=False, min_flux_radius=1.)
+
+                NMAX = 140
+                so = np.argsort(cat['MAG_AUTO'][clip])
+                if clip.sum() > NMAX:
+                    so = so[:NMAX]
+
+                prep.table_to_radec(cat[clip][so], 
+                                    '{0}.cat.radec'.format(visit['product']))
+            
         for file in fine_files:
             print('rm {0}'.format(file))
             os.remove(file)
