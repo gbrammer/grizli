@@ -4062,12 +4062,7 @@ def match_direct_grism_wcs(direct={}, grism={}, get_fresh_flt=True,
     from drizzlepac import updatehdr
     from stwcs import updatewcs
     from drizzlepac.astrodrizzle import AstroDrizzle
-    
-    wcs_log = Table.read('{0}_wcs.log'.format(direct['product']),
-                         format='ascii.commented_header')
-                         
-    wcs_hdu = pyfits.open('{0}_wcs.fits'.format(direct['product']))
-        
+            
     if get_fresh_flt:
         for file in grism['files']:
             fresh_flt_file(file)
@@ -4122,6 +4117,11 @@ def match_direct_grism_wcs(direct={}, grism={}, get_fresh_flt=True,
         return True
         
     #### Get from WCS log file
+    wcs_log = Table.read('{0}_wcs.log'.format(direct['product']),
+                         format='ascii.commented_header')
+                         
+    wcs_hdu = pyfits.open('{0}_wcs.fits'.format(direct['product']))
+    
     for ext in wcs_log['ext']:
         tmp_wcs_file = '/tmp/{0}_tmpwcs.fits'.format(str(direct['product']))
         wcs_hdu[ext].writeto(tmp_wcs_file, overwrite=True)
