@@ -3345,8 +3345,6 @@ def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140
         prep.drizzle_overlaps(keep, parse_visits=False, pixfrac=pixfrac, scale=scale, skysub=skysub, skymethod=skymethod, bits=bits, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False, context=context, static=static, include_saturated=include_saturated)
 
 FILTER_COMBINATIONS = {'ir':IR_M_FILTERS+IR_W_FILTERS,
-                       'h':['F140W','F160W'],
-                       'yj':['F098M', 'F105W','F110W','F125W'],
                        'opt':OPT_M_FILTERS+OPT_W_FILTERS}
                        
 def make_filter_combinations(root, weight_fnu=True, filter_combinations=FILTER_COMBINATIONS, min_count=1):
@@ -3550,9 +3548,9 @@ def make_combined_mosaics(root, fix_stars=False, mask_spikes=False, skip_single_
                         filter_combinations={'ir':IR_M_FILTERS+IR_W_FILTERS})
 
     # More IR filter combinations for mosaics
-    if True:
+    if False:
         extra_combinations = {'h':['F140W','F160W'],
-                          'yj':['F098M', 'F105W','F110W','F125W']}
+                              'yj':['F098M', 'F105W','F110W','F125W']}
     
         make_filter_combinations(root, weight_fnu=True, min_count=2,
                             filter_combinations=extra_combinations)
