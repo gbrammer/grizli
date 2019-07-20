@@ -4242,7 +4242,9 @@ def fetch_hst_calib(file='iref$uc72113oi_pfl.fits',  ftpdir='https://hst-crds.st
     else:
         if verbose:
             print('{0} exists'.format(iref_file))
-        
+    
+    return iref_file
+    
 def fetch_hst_calibs(flt_file, ftpdir='https://hst-crds.stsci.edu/unchecked_get/references/hst/', calib_types=['BPIXTAB', 'CCDTAB', 'OSCNTAB', 'CRREJTAB', 'DARKFILE', 'NLINFILE', 'PFLTFILE', 'IMPHTTAB', 'IDCTAB', 'NPOLFILE'], verbose=True):
     """
     TBD
@@ -4265,6 +4267,8 @@ def fetch_hst_calibs(flt_file, ftpdir='https://hst-crds.stsci.edu/unchecked_get/
         print('No ${0} set!  Put it in ~/.bashrc or ~/.cshrc.'.format(ref_dir))
         return False
     
+    calib_paths = []
+    
     for ctype in calib_types:
         if ctype not in im[0].header:
             continue
@@ -4275,9 +4279,11 @@ def fetch_hst_calibs(flt_file, ftpdir='https://hst-crds.stsci.edu/unchecked_get/
         if im[0].header[ctype] == 'N/A':
             continue
         
-        fetch_hst_calib(im[0].header[ctype], ftpdir=ftpdir, verbose=verbose)
-            
-    return True
+        path = fetch_hst_calib(im[0].header[ctype], ftpdir=ftpdir, 
+                               verbose=verbose)
+        calib_paths.append(path)
+        
+    return calib_paths
     
 def fetch_default_calibs(ACS=False):
     
