@@ -4989,7 +4989,7 @@ def make_report(root, gzipped_links=True, xsize=18, output_dpi=None, make_rgb=Tr
     {grism}
     
     <a href="./{root}.rgb.jpg"><img src="./{root}.rgb.jpg" height=300px></a>
-    <a href="https://s3.amazonaws.com/aws-grivam/FullQuery/{root}_footprint.png"><img src="https://s3.amazonaws.com/aws-grivam/FullQuery/{root}_footprint.png" height=300px></a>
+    <a href="https://s3.amazonaws.com/grizli-v1/Master/{root}_footprint.png"><img src="https://s3.amazonaws.com/grizli-v1/Master/{root}_footprint.png" height=300px></a>
     <a href="./{root}_fine.png"><img src="./{root}_fine.png" height=200px></a>
     <br>
     
