@@ -4067,7 +4067,7 @@ def match_direct_grism_wcs(direct={}, grism={}, get_fresh_flt=True,
                          format='ascii.commented_header')
                          
     wcs_hdu = pyfits.open('{0}_wcs.fits'.format(direct['product']))
-    
+        
     if get_fresh_flt:
         for file in grism['files']:
             fresh_flt_file(file)
@@ -4085,7 +4085,15 @@ def match_direct_grism_wcs(direct={}, grism={}, get_fresh_flt=True,
         xsh, ysh, rot, scale = xyscale
         
         tmp_wcs_file = '/tmp/{0}_tmpwcs.fits'.format(str(direct['product']))
-        ext = len(wcs_hdu)-1
+        
+        try:
+            # Use WCS in catalog file
+            wcs_hdu = pyfits.open('{0}.cat.fits'.format(direct['product']))
+            ext = 'WCS'
+        except:
+            wcs_hdu = pyfits.open('{0}_wcs.fits'.format(direct['product']))
+            ext = len(wcs_hdu)-1
+        
         wcs_hdu[ext].writeto(tmp_wcs_file, overwrite=True)
         tmp_wcs = pywcs.WCS(wcs_hdu[ext].header, relax=True)
         
