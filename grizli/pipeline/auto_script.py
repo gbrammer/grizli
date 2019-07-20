@@ -4960,6 +4960,7 @@ def make_report(root, gzipped_links=True, xsize=18, output_dpi=None, make_rgb=Tr
     catroot = catalog.split('.cat.fits')[0]
     
     root_files = glob.glob('{0}-[ioyh]*fits*'.format(root))
+    root_files.sort()
     
     if gzipped_links:
         gzext = '.gz'
