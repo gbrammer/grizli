@@ -3383,6 +3383,7 @@ def make_filter_combinations(root, weight_fnu=True, filter_combinations=FILTER_C
     sci_files = glob.glob('{0}-f*sci.fits*'.format(root))
     for sci_file in sci_files:
         filt_i = sci_file.split('_dr')[0].split('-')[-1]
+        filt_ix = sci_file.split('_dr')[0].split('-')[-1]
         
         # UVIS
         if filt_i.startswith('f') & filt_i.endswith('u'):
@@ -3404,7 +3405,7 @@ def make_filter_combinations(root, weight_fnu=True, filter_combinations=FILTER_C
             ref_h_i = ref_h['ir']
             
         print(sci_file, filt_i, band)
-        output_sci[band] = sci_file.replace(filt_i, band)
+        output_sci[band] = sci_file.replace(filt_ix, band)
         
         im_i = pyfits.open(sci_file)
         wht_i = pyfits.open(sci_file.replace('_sci','_wht'))
