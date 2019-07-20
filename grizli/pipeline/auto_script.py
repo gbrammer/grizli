@@ -3421,7 +3421,6 @@ def make_filter_combinations(root, weight_fnu=True, filter_combinations=FILTER_C
         if num[band] is None:
             num[band] = im_i[0].data*0
             den[band] = num[band]*0
-        else:
             
         scl = photflam/ref_photflam
         if weight_fnu:
