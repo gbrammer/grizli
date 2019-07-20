@@ -3343,6 +3343,8 @@ def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140
         prep.drizzle_overlaps(keep, parse_visits=False, pixfrac=pixfrac, scale=scale, skysub=skysub, skymethod=skymethod, bits=bits, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False, context=context, static=static, include_saturated=include_saturated)
 
 FILTER_COMBINATIONS = {'ir':IR_M_FILTERS+IR_W_FILTERS,
+                       'h':['F140W','F160W'],
+                       'yj':['F098M', 'F105W','F110W','F125W'],
                        'opt':OPT_M_FILTERS+OPT_W_FILTERS}
                        
 def make_filter_combinations(root, weight_fnu=True, filter_combinations=FILTER_COMBINATIONS):
@@ -3863,7 +3865,7 @@ def get_rgb_filters(filter_list, force_ir=False, pure_sort=False):
     ## Preferred combinations
     filter_list_lower = [f.lower() for f in filter_list]
     rpref = ['h', 'f160w', 'f140w']
-    gpref = ['j', 'f125w', 'f110w', 'f105w','f098m']
+    gpref = ['j', 'yj', 'f125w', 'f110w', 'f105w','f098m']
     bpref = ['opt', 'visr', 'visb', 'f814w', 'f606w', 'f775w','f850lp','f435w']
     pref_list = [None, None, None]
     has_pref = 0
