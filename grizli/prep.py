@@ -329,7 +329,8 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
         apply_region_mask(local_file, dq_value=1024)
     
 def apply_persistence_mask(flt_file, path='../Persistence', dq_value=1024,
-                           err_threshold=0.6, grow_mask=3, subtract=True,
+                           err_threshold=0.6, sci_threshold=0.1, 
+                           grow_mask=3, subtract=True,
                            verbose=True, reset=False):
     """Make a mask for pixels flagged as being affected by persistence
     
@@ -348,9 +349,9 @@ def apply_persistence_mask(flt_file, path='../Persistence', dq_value=1024,
         DQ bit to flip for flagged pixels
         
     err_threshold : float
-        Threshold for defining affected pixels:
+        ERR array threshold for defining affected pixels:
         
-        flagged = persist > err_threshold*ERR
+            >>> flagged = persist > err_threshold*ERR
         
     grow_mask : int
         Factor by which to dilate the persistence mask.
@@ -386,6 +387,7 @@ def apply_persistence_mask(flt_file, path='../Persistence', dq_value=1024,
     pers = pyfits.open(pers_file)
     
     pers_mask = pers['SCI'].data > err_threshold*flt['ERR'].data
+    #pers_mask &= pers['SCI'].data > sci_threshold*flt['SCI'].data
     
     if grow_mask > 0:
         pers_mask = nd.maximum_filter(pers_mask*1, size=grow_mask)

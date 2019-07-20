@@ -4958,6 +4958,11 @@ def make_report(root, gzipped_links=True, xsize=18, output_dpi=None, make_rgb=Tr
         
     catroot = catalog.split('.cat.fits')[0]
     
+    root_files = glob.glob('{0}*fits'.format(root))
+    root_files += glob.glob('{0}*npy'.format(root))
+    
+    root_urls = '\n'.join(['<a href={0}>{0}</a>'.format(f) for f in root_files])
+    
     body="""
     
     <h4>{root} </h4>
@@ -4965,16 +4970,12 @@ def make_report(root, gzipped_links=True, xsize=18, output_dpi=None, make_rgb=Tr
     {now}<br>
     
     <a href={root}.exposures.html>Exposure report</a> 
+    / <a href={root}_expflag.txt>{root}_expflag.txt</a>
     / <a href={root}.auto_script.log.txt>{root}.auto_script.log.txt</a>
     / <a href={root}.auto_script.yml>{root}.auto_script.yml</a>
     
     <pre>
-    <a href={root}-ir_drz_sci.fits{gz}>{root}-ir_drz_sci.fits{gz}</a>
-    <a href={root}-ir_drz_wht.fits{gz}>{root}-ir_drz_wht.fits{gz}</a>
-    <a href={catroot}_seg.fits{gz}>{catroot}_seg.fits{gz}</a>
-    <a href={catroot}.cat.fits{gz}>{catroot}.cat.fits{gz}</a>
-    <a href={root}_phot.fits>{root}_phot.fits</a>
-    <a href={root}_visits.npy>{root}_visits.npy</a>
+    {root_urls}
     </pre>
     
     {column}
@@ -4985,7 +4986,7 @@ def make_report(root, gzipped_links=True, xsize=18, output_dpi=None, make_rgb=Tr
     <a href="./{root}_fine.png"><img src="./{root}_fine.png" height=200px></a>
     <br>
     
-    """.format(root=root, column=column_url, grism=grism_url, gz='.gz'*(gzipped_links), now=now, catroot=catroot)
+    """.format(root=root, column=column_url, grism=grism_url, gz='.gz'*(gzipped_links), now=now, catroot=catroot, root_urls=root_urls)
     
     lines = open('{0}.summary.html'.format(root)).readlines()
     for i in range(len(lines)):
