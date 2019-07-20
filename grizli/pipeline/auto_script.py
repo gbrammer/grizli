@@ -3386,7 +3386,7 @@ def make_filter_combinations(root, weight_fnu=True, filter_combinations=FILTER_C
         
         # UVIS
         if filt_i.startswith('f') & filt_i.endswith('u'):
-            filt_i = filt_i[:1]
+            filt_i = filt_i[:-1]
             
         band = None
         for f in filter_combinations:
