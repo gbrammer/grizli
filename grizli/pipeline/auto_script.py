@@ -3347,7 +3347,7 @@ FILTER_COMBINATIONS = {'ir':IR_M_FILTERS+IR_W_FILTERS,
                        'yj':['F098M', 'F105W','F110W','F125W'],
                        'opt':OPT_M_FILTERS+OPT_W_FILTERS}
                        
-def make_filter_combinations(root, weight_fnu=True, filter_combinations=FILTER_COMBINATIONS):
+def make_filter_combinations(root, weight_fnu=True, filter_combinations=FILTER_COMBINATIONS, min_count=1):
     """
     Combine ir/opt mosaics manually scaling a specific zeropoint
     """
@@ -3369,11 +3369,13 @@ def make_filter_combinations(root, weight_fnu=True, filter_combinations=FILTER_C
                    'PHOTPLAM': 13922.907, 'FILTER': 'F140W'}
     
     ####
+    count = {}
     num = {}
     den = {}
     for f in filter_combinations:
         num[f] = None
         den[f] = None
+        count[f] = 0
         
     output_sci = {}
     head = {}
@@ -3419,6 +3421,7 @@ def make_filter_combinations(root, weight_fnu=True, filter_combinations=FILTER_C
         if num[band] is None:
             num[band] = im_i[0].data*0
             den[band] = num[band]*0
+        else:
             
         scl = photflam/ref_photflam
         if weight_fnu:
@@ -3429,10 +3432,11 @@ def make_filter_combinations(root, weight_fnu=True, filter_combinations=FILTER_C
         den_i = wht_i[0].data/scl**2*scl_weight
         num[band] += im_i[0].data*scl*den_i
         den[band] += den_i
-    
+        count[band] += 1
+        
     # Done, make outputs
     for band in filter_combinations:
-        if num[band] is not None:
+        if (num[band] is not None) & (count[band] >= min_count):
             sci = num[band]/den[band]
             wht = den[band]
             
@@ -3483,7 +3487,7 @@ def make_combined_mosaics(root, fix_stars=False, mask_spikes=False, skip_single_
                      make_combined=False,
                      ref_image=wcs_ref_file, include_saturated=fix_stars) 
     
-    make_filter_combinations(root, weight_fnu=True, 
+    make_filter_combinations(root, weight_fnu=True, min_count=1, 
                         filter_combinations={'ir':IR_M_FILTERS+IR_W_FILTERS})
     
     ## Mask diffraction spikes
@@ -3541,12 +3545,17 @@ def make_combined_mosaics(root, fix_stars=False, mask_spikes=False, skip_single_
                              ref_image=wcs_ref_file, 
                              include_saturated=fix_stars) 
         
-            make_filter_combinations(root, weight_fnu=True, 
+            make_filter_combinations(root, weight_fnu=True, min_count=1, 
                         filter_combinations={'ir':IR_M_FILTERS+IR_W_FILTERS})
 
-
-            
-            
+    # More IR filter combinations for mosaics
+    if True:
+        extra_combinations = {'h':['F140W','F160W'],
+                          'yj':['F098M', 'F105W','F110W','F125W']}
+    
+        make_filter_combinations(root, weight_fnu=True, min_count=2,
+                            filter_combinations=extra_combinations)
+          
     ## Optical filters
     mosaics = glob.glob('{0}-ir_dr?_sci.fits'.format(root))
        
@@ -3585,7 +3594,7 @@ def make_combined_mosaics(root, fix_stars=False, mask_spikes=False, skip_single_
         ref_image=wcs_ref_optical,
         min_nexp=1+skip_single_optical_visits*1) 
     
-    make_filter_combinations(root, weight_fnu=True, 
+    make_filter_combinations(root, weight_fnu=True, min_count=1, 
         filter_combinations={make_combined_label:OPT_M_FILTERS+OPT_W_FILTERS})
     
     # Fill IR filter mosaics with scaled combined data so they can be used 
