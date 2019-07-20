@@ -845,9 +845,11 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/
     #### Fetch PFLAT reference files needed for optimal drizzled weight images
     if fetch_flt_calibs:
         flt_files = glob.glob('*_fl?.fits')
+        #calib_paths = []
         for file in flt_files:
-            utils.fetch_hst_calibs(file, calib_types=fetch_flt_calibs)
-        
+            paths = utils.fetch_hst_calibs(file, calib_types=fetch_flt_calibs)
+            #calib_paths.extend(paths)
+            
     #### Copy mask files generated from preprocessing
     os.system('cp *mask.reg ../Prep/')
     
@@ -3902,6 +3904,8 @@ def get_rgb_filters(filter_list, force_ir=False, pure_sort=False):
             val = 'f0814'
         elif f == 'y':
             val = 'f1000'
+        elif f == 'yj':
+            val = 'f1100'
         elif f == 'j':
             val = 'f1250'
         elif f == 'h':
