@@ -3874,7 +3874,7 @@ def get_rgb_filters(filter_list, force_ir=False, pure_sort=False):
     filter_list_lower = [f.lower() for f in filter_list]
     rpref = ['h', 'f160w', 'f140w']
     gpref = ['j', 'yj', 'f125w', 'f110w', 'f105w','f098m']
-    bpref = ['opt', 'visr', 'visb', 'f814w', 'f606w', 'f775w','f850lp','f435w']
+    bpref = ['opt', 'visr', 'visb', 'f814w', 'f814wu', 'f606w', 'f606wu' 'f775w','f850lp','f435w']
     pref_list = [None, None, None]
     has_pref = 0
     for i, pref in enumerate([rpref, gpref, bpref]):
@@ -4958,10 +4958,14 @@ def make_report(root, gzipped_links=True, xsize=18, output_dpi=None, make_rgb=Tr
         
     catroot = catalog.split('.cat.fits')[0]
     
-    root_files = glob.glob('{0}*fits'.format(root))
-    root_files += glob.glob('{0}*npy'.format(root))
+    root_files = glob.glob('{0}-[ioyh]*fits*'.format(root))
     
-    root_urls = '\n'.join(['<a href={0}>{0}</a>'.format(f) for f in root_files])
+    if gzipped_links:
+        gzext = '.gz'
+    else:
+        gzext = ''
+        
+    root_urls = '\n    '.join(['<a href={0}{1}>{0}{1}</a>'.format(f, gzext) for f in root_files])
     
     body="""
     
@@ -4976,6 +4980,7 @@ def make_report(root, gzipped_links=True, xsize=18, output_dpi=None, make_rgb=Tr
     
     <pre>
     {root_urls}
+    <a href="{root}_visits.npy">{root}_visits.npy</a>
     </pre>
     
     {column}
