@@ -3272,6 +3272,15 @@ def drizzle_overlaps(field_root, filters=['F098M','F105W','F110W', 'F125W','F140
         if filt.upper() not in filters:
             continue
         
+        # Are all of the exposures in ./?
+        has_exposures = True
+        for file in visit['files']:
+            has_exposures &= os.path.exists('../Prep/'+file)
+        
+        if not has_exposures:
+            print('Visit {0} missing exposures, skip'.format(visit['product']))
+            continue
+            
         # IS UVIS?
         if visit['files'][0].startswith('i') & ('_flc' in visit['files'][0]):
             filt += 'u'
