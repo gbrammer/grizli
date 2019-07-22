@@ -2794,6 +2794,7 @@ def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Griz
     """    
     import os
     import glob
+    import time
     
     try:
         from .. import prep, utils
@@ -3000,6 +3001,8 @@ def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Griz
     
     if match_str:
         extra_str += '.{0}'.format('.'.join(match_str))
+    
+    fig.text(0.97, 0.03, time.ctime(), ha='right', va='bottom', fontsize=5, transform=fig.transFigure)
         
     fig.savefig('{0}{1}_fine.png'.format(field_root, extra_str))
     np.save('{0}{1}_fine.npy'.format(field_root, extra_str), [visits, fit])
@@ -4012,13 +4015,14 @@ def get_rgb_filters(filter_list, force_ir=False, pure_sort=False):
         gfilt = use_filters[ix_g]
         return [rfilt, gfilt, bfilt]
         
-def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', show_ir=True, pl=1, pf=1, scl=1, scale_ab=None, rgb_scl=[1,1,1], ds9=None, force_ir=False, filters=None, add_labels=True, output_format='jpg', rgb_min=-0.01, xyslice=None, pure_sort=False, verbose=True, force_rgb=None, suffix='.field', mask_empty=False, tick_interval=60):
+def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', show_ir=True, pl=1, pf=1, scl=1, scale_ab=None, rgb_scl=[1,1,1], ds9=None, force_ir=False, filters=None, add_labels=True, output_format='jpg', rgb_min=-0.01, xyslice=None, pure_sort=False, verbose=True, force_rgb=None, suffix='.field', mask_empty=False, tick_interval=60, timestamp=False):
     """
     RGB image of the field mosaics
     """
     import os
     import glob
     import numpy as np
+    import time
     
     import matplotlib.pyplot as plt
     from matplotlib.ticker import MultipleLocator
@@ -4196,8 +4200,13 @@ def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', s
         ax.text(0.06, 0.02, bf, color='b', bbox=dict(facecolor='w', alpha=1), size=8, ha='center', va='bottom', transform=ax.transAxes)
     
     fig.tight_layout(pad=0.1)
+    if timestamp:
+        fig.text(0.97, 0.03, time.ctime(), ha='right', va='bottom', fontsize=5, transform=fig.transFigure, color='w')
+        
     fig.savefig('{0}{1}.{2}'.format(root, suffix, output_format))
     return xsl, ysl, (rf, gf, bf), fig
+
+#########
 
 THUMB_RGB_PARAMS = {'xsize':4, 
               'output_dpi': None, 
@@ -4897,9 +4906,9 @@ def make_report(root, gzipped_links=True, xsize=18, output_dpi=None, make_rgb=Tr
         has_mosaics = True
         
     if make_rgb & has_mosaics:
-        field_rgb(root, HOME_PATH=None, xsize=xsize, output_dpi=output_dpi, ds9=None, scl=2, suffix='.rgb')
+        field_rgb(root, HOME_PATH=None, xsize=xsize, output_dpi=output_dpi, ds9=None, scl=2, suffix='.rgb', timestamp=True)
         for filter in filters:
-            field_rgb(root, HOME_PATH=None, xsize=18, ds9=None, scl=2, force_rgb=[filter,'sum','sum'], suffix='.'+filter)
+            field_rgb(root, HOME_PATH=None, xsize=18, ds9=None, scl=2, force_rgb=[filter,'sum','sum'], suffix='.'+filter, timestamp=True)
     
     rows = []
     for filter in filters:
