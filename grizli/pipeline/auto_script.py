@@ -1578,6 +1578,12 @@ mag_lim=17, cat=None, cols=['mag_auto','ra','dec'], minR=8, dy=5, selection=None
             except:
                 cd = wcs.wcs.pc
             
+            footp = utils.WCSFootprint(wcs)
+            points = np.array([ra, dec]).T
+            selection &= footp.path.contains_points(points)
+            if selection.sum() == 0:
+                continue
+                
             sh = im['SCI',ext].data.shape
             mask = np.zeros(sh, dtype=int)
             iy, ix = np.indices(sh)
@@ -3002,7 +3008,7 @@ def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Griz
     if match_str:
         extra_str += '.{0}'.format('.'.join(match_str))
     
-    fig.text(0.97, 0.03, time.ctime(), ha='right', va='bottom', fontsize=5, transform=fig.transFigure)
+    fig.text(0.97, 0.02, time.ctime(), ha='right', va='bottom', fontsize=5, transform=fig.transFigure)
         
     fig.savefig('{0}{1}_fine.png'.format(field_root, extra_str))
     np.save('{0}{1}_fine.npy'.format(field_root, extra_str), [visits, fit])
