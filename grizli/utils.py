@@ -3029,6 +3029,9 @@ class WCSFootprint(object):
     def __init__(self, wcs, ext=1, label=None):
         if isinstance(wcs, pywcs.WCS):
             self.wcs = wcs.deepcopy()
+            if not hasattr(self.wcs, 'pixel_shape'):
+                self.wcs.pixel_shape = None
+            
             if self.wcs.pixel_shape is None:
                 self.wcs.pixel_shape = [int(p*2) for p in self.wcs.wcs.crpix]     
         elif isinstance(wcs, str):
