@@ -385,6 +385,11 @@ def apply_persistence_mask(flt_file, path='../Persistence', dq_value=1024,
         #return 0
     
     pers = pyfits.open(pers_file)
+    if pers['SCI'].data.min() < -40:
+        subtract=False
+
+    pers_data = pers['SCI'].data*1
+    pers_data = np.maximum(pers_data, 0)
     
     pers_mask = pers['SCI'].data > err_threshold*flt['ERR'].data
     #pers_mask &= pers['SCI'].data > sci_threshold*flt['SCI'].data
@@ -416,9 +421,9 @@ def apply_persistence_mask(flt_file, path='../Persistence', dq_value=1024,
                     dont_subtract = True
                     
             if not dont_subtract:
-                flt['SCI'].data -= pers['SCI'].data
+                flt['SCI'].data -= pers_data
             
-            flt['ERR'].data = np.sqrt(flt['ERR'].data**2+pers['SCI'].data**2)
+            flt['ERR'].data = np.sqrt(flt['ERR'].data**2+pers_data**2)
             flt[0].header['SUBPERS'] = (True, 'Persistence model subtracted')
             
     flt.flush()
