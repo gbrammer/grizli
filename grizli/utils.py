@@ -5069,8 +5069,8 @@ class GTable(astropy.table.Table):
         
         Parameters
         ----------
-        other : `~astropy.table.Table` or `GTable`
-            Other table to match positions from.
+        other : `~astropy.table.Table`, `GTable`, or `list`.
+            Other table to match positions from.  
         
         self_radec, other_radec : None or [str, str]
             Column names for RA and Dec.  If None, then try the following
