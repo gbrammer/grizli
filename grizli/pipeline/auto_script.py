@@ -915,6 +915,8 @@ def remove_bad_expflag(field_root='', HOME_PATH='./', min_bad=2):
     os.chdir(os.path.join(HOME_PATH, field_root, 'RAW'))
 
     files = glob.glob('*raw.fits')+glob.glob('*flc.fits')
+    files.sort()
+    
     if len(files) == 0:
         return False
     
