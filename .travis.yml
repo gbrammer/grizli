@@ -8,7 +8,7 @@ python:
 env: 
     global:
         - ASTROPY_VERSION=stable
-        - CONDA_DEPENDENCIES='pyyaml'
+        - CONDA_DEPENDENCIES='scipy pyyaml'
         
 # commands to install dependencies (astropy, conda)
 install: 
