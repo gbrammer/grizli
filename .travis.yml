@@ -7,9 +7,7 @@ python:
 
 env: 
     global:
-        - NUMPY_VERSION=stable
-        - ASTROPY_VERSION=stable
-        - CONDA_DEPENDENCIES='scipy matplotlib pyyaml'
+        - CONDA_DEPENDENCIES='pyyaml'
         
 # commands to install dependencies (astropy, conda)
 install: 
