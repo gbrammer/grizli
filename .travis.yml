@@ -10,7 +10,7 @@ env:
         - ASTROPY_VERSION=stable
         - SCIPY_VERSION=stable
         - MATPLOTLIB_VERSION=stable
-        - CONDA_DEPENDENCIES='pyyaml'
+        - CONDA_DEPENDENCIES='scipy matplotlib pyyaml'
         
 # commands to install dependencies (astropy, conda)
 install: 
