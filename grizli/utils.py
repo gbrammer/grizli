@@ -3831,10 +3831,11 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
                 bkt = s3.Bucket(bucket_name)
                 
             s3_path = '/'.join(visit['awspath'][i].split('/')[1:])
-            print('   (fetch from s3://{0}{1})'.format(visit['awspath'][i],
-                                      file))
+            remote_file = os.path.join(s3_path, file)
+            
+            print('  (fetch from s3://{0}/{1})'.format(bucket_i, remote_file))
                                       
-            bkt.download_file(os.path.join(s3_path, file), file,
+            bkt.download_file(remote_file, file,
                               ExtraArgs={"RequestPayer": "requester"})
         
         flt = pyfits.open(file)
