@@ -1,6 +1,39 @@
 #!/bin/env python
 import inspect
 
+def make_visit_fits():
+    import glob
+    import numpy as np
+    from grizli import utils
+    
+    visit_files = glob.glob('*visits.npy')
+    visit_files.sort()
+    all_visits = []
+    for file in visit_files:
+        visits, groups, info = np.load(file)
+        for v in visits:
+            if 'footprints' in v:
+                all_visits.append(v)
+            else:
+                print('No footprint: {0}'.format(v['product']))
+                
+    tab = utils.GTable()
+    
+    for visit in all_visits:
+        visit['filter'] = visit['product'].split('-')[-1]
+        
+    for k in ['product', 'filter']:
+        tab[k] = [visit[k] for visit in all_visits]
+        
+    coo = np.array([np.array(visit['footprint'].centroid.xy).flatten() for visit in all_visits])
+    tab['ra'] = coo[:,0]
+    tab['dec'] = coo[:,1]    
+    tab['nexp'] = [len(visit['files']) for visit in all_visits]
+    
+    tab.write('candels-july2019_visits.fits', overwrite=True)
+    np.save('candels-july2019_visits.npy', [all_visits])
+    os.system('aws s3 sync --exclude "*" --include "candels-july2019*" ./ s3://grizli-v1/Mosaics/ --acl public-read')
+    
 def group_by_filter():
     """
     aws s3 sync --exclude "*" --include "cosmos_visits*" s3://grizli-preprocess/CosmosMosaic/ ./ 
@@ -50,7 +83,7 @@ def group_by_filter():
         fp.write(fpstr[filt])
         fp.close()
     
-        print('{0} {1:>3d} {2:>4d}'.format(filt, mat.sum(), len(groups[filt]['files'])))
+        print('{0:6} {1:>3d} {2:>4d} ({3:>4d})'.format(filt, mat.sum(), len(groups[filt]['files']), len(np.unique(groups[filt]['files']))))
     
     np.save('{0}_filter_groups.npy'.format(master), [groups])
     
@@ -212,6 +245,10 @@ def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixsca
     elif master == 'cosmos':
         parent = 's3://grizli-preprocess/CosmosMosaic/'
         bkt = s3.Bucket('grizli-preprocess')
+    elif master == 'candels-july2019':
+        parent = 's3://grizli-v1/Mosaics/'
+        bkt = s3.Bucket('grizli-v1')
+        
     else:
         # Run on local files, e.g., "Prep" directory
         parent = None
