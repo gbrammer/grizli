@@ -217,6 +217,7 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
        make_thumbnails=True, 
        thumbnail_args=args['thumbnail_args'],
        get_dict=False,
+       kill='',
        **kwargs
        ):
     """
@@ -316,7 +317,11 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
         print('No FL[TC] files found!')
         utils.LOGFILE = '/tmp/grizli.log'
         return False
-        
+    
+    if kill == 'fetch_files':
+        print('kill=\'fetch_files\'')
+        return True
+            
     if inspect_ramps:
         # Inspect for CR trails
         os.chdir(os.path.join(HOME_PATH, root, 'RAW'))
@@ -350,6 +355,11 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
     else:
         parsed = np.load('{0}_visits.npy'.format(root), allow_pickle=True)
     
+    
+    if kill == 'parse_visits':
+        print('kill=\'parse_visits\'')
+        return True
+    
     visits, all_groups, info = parsed
     run_has_grism = utils.column_string_operation(info['FILTER'], 
                                                 ['G141','G102','G800L'], 
@@ -366,6 +376,10 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
         auto_script.manual_alignment(field_root=root, HOME_PATH=HOME_PATH,
                                      **manual_alignment_args)
 
+    if kill == 'manual_alignment':
+        print('kill=\'manual_alignment\'')
+        return True
+        
     #####################
     ### Alignment & mosaics    
     os.chdir(os.path.join(HOME_PATH, root, 'Prep'))
@@ -379,6 +393,10 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
             
     #auto_script.preprocess(field_root=root, HOME_PATH=HOME_PATH, make_combined=False, master_radec=master_radec, parent_radec=parent_radec, use_visit=True, min_overlap=align_min_overlap, visit_prep_args=visit_prep_args)
     auto_script.preprocess(field_root=root, HOME_PATH=HOME_PATH, visit_prep_args=visit_prep_args, persistence_args=persistence_args, **preprocess_args)
+    
+    if kill == 'preprocess':
+        print('kill=\'preprocess\'')
+        return True
     
     if redo_persistence_mask:
         comment = '# Redo persistence masking: {0}'.format(persistence_args)
