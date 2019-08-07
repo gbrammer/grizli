@@ -4797,7 +4797,7 @@ def find_single_image_CRs(visit, simple_mask=False, with_ctx_mask=True,
 
         flt.flush()
         
-def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, max_files=999, pixfrac=0.8, scale=0.06, skysub=True, skymethod='localmin', skyuser='MDRIZSKY', bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='EXP', final_wt_scl='exptime', context=False, static=True, use_group_footprint=False, fetch_flats=True, fix_wcs_system=False, include_saturated=False,log=False):
+def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, max_files=999, pixfrac=0.8, scale=0.06, skysub=True, skymethod='localmin', skyuser='MDRIZSKY', bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='EXP', final_wt_scl='exptime', context=False, static=True, use_group_footprint=False, fetch_flats=True, fix_wcs_system=False, include_saturated=False, run_driz_cr=False, driz_cr_snr=None, driz_cr_scale=None, resetbits=0, log=False):
     """Combine overlapping visits into single output mosaics
     
     Parameters
@@ -4963,8 +4963,21 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, m
             continue
             
         isACS = '_flc' in group['files'][0]
-        if bits is None:
+        isWFPC2 = '_c0' in group['files'][0]
+        
+        if (driz_cr_snr is None) | (driz_cr_scale is None):
             if isACS:
+                driz_cr_snr = '3.5 3.0'
+                driz_cr_scale = '1.2 0.7'
+            elif isWFPC2:
+                driz_cr_snr = '3.5 3.0'
+                driz_cr_scale = '1.2 0.7'
+            else:
+                driz_cr_snr = '8.0 5.0'
+                driz_cr_scale = '2.5 0.7'
+        
+        if bits is None:
+            if isACS | isWFPC2:
                 bits = 64+32
             else:
                 bits = 576
@@ -4982,7 +4995,15 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, m
             # PFL files needed for IVM weights
             for file in group['files']: 
                 try:
-                    utils.fetch_hst_calibs(file, calib_types=['PFLTFILE'],
+                    if isWFPC2:
+                        im = pyfits.open(file)
+                        flat_file = im[0].header['FLATFILE'].strip('uref$')
+                        utils.fetch_wfpc2_calib(file=flat_file,
+                                                path=os.getenv('uref'), 
+                                                use_mast=False, verbose=True, 
+                                                overwrite=True)                     
+                    else:
+                        utils.fetch_hst_calibs(file, calib_types=['PFLTFILE'],
                                        verbose=False)  
                 except:
                     utils.log_exception(utils.LOGFILE, traceback)
@@ -4992,22 +5013,27 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, m
             AstroDrizzle(group['files'], output=group['product'],
                      clean=True, context=context, preserve=False,
                      skysub=skysub, skyuser=skyuser, skymethod=skymethod,
-                     driz_separate=False, driz_sep_wcs=False,
-                     median=False, blot=False, driz_cr=False,
+                     driz_separate=run_driz_cr, driz_sep_wcs=run_driz_cr,
+                     median=run_driz_cr, blot=run_driz_cr,
+                     driz_cr=run_driz_cr,
+                     driz_cr_snr=driz_cr_snr, driz_cr_scale=driz_cr_scale,
                      driz_cr_corr=False, driz_combine=True,
                      final_bits=bits, coeffs=True, build=False, 
                      final_wht_type=final_wht_type,
                      final_wt_scl=final_wt_scl,
                      final_pixfrac=pixfrac,
                      final_wcs=True, final_refimage=group['reference'],
-                     resetbits=0, static=(static & (len(inst_keys) == 1)))
+                     resetbits=resetbits, 
+                     static=(static & (len(inst_keys) == 1)))
         else:
             AstroDrizzle(group['files'], output=group['product'],
                      clean=True, context=context, preserve=False,
                      skysub=skysub, skyuser=skyuser, skymethod=skymethod,
-                     driz_separate=False, driz_sep_wcs=False,
-                     median=False, blot=False, driz_cr=False,
-                     driz_cr_corr=False, driz_combine=True,
+                     driz_separate=run_driz_cr, driz_sep_wcs=run_driz_cr,
+                     median=run_driz_cr, blot=run_driz_cr,
+                     driz_cr=run_driz_cr,
+                     driz_cr_snr=driz_cr_snr, driz_cr_scale=driz_cr_scale,
+                     driz_cr_corr=False, driz_combine=run_driz_cr,
                      final_bits=bits, coeffs=True, build=False, 
                      final_wht_type=final_wht_type,
                      final_wt_scl=final_wt_scl,
@@ -5016,7 +5042,8 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, m
                      final_scale=scale, 
                      final_ra=final_ra, final_dec=final_dec,
                      final_outnx=final_outnx, final_outny=final_outny,
-                     resetbits=0, static=(static & (len(inst_keys) == 1)))
+                     resetbits=resetbits, 
+                     static=(static & (len(inst_keys) == 1)))
         
         clean_drizzle(group['product'], fix_wcs_system=fix_wcs_system)
 
