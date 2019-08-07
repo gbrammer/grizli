@@ -6,22 +6,32 @@ def make_visit_fits():
     import numpy as np
     from grizli import utils
     
-    visit_files = glob.glob('*visits.npy')
+    visit_files = glob.glob('[egu]*visits.npy')
     visit_files.sort()
     all_visits = []
+    products = []
     for file in visit_files:
         visits, groups, info = np.load(file)
         for v in visits:
-            if 'footprints' in v:
-                all_visits.append(v)
-            else:
+            has_fp = ('footprints' in v)
+            if not has_fp:
                 print('No footprint: {0}'.format(v['product']))
                 
-    tab = utils.GTable()
-    
+            if has_fp & (v['product'] not in products):
+                all_visits.append(v)
+                products.append(v['product'])
+                    
+    # WFC3/IR copied to "Exposures" paths
     for visit in all_visits:
         visit['filter'] = visit['product'].split('-')[-1]
-        
+    
+    for v in all_visits: 
+        if v['filter'].startswith('f0') | v['filter'].startswith('f1'): 
+            #print(v['product']) 
+            v['awspath'] = ['grizli-v1/Exposures/{0}/{1}'.format(f[:4], f.split('_')[0]) for f in v['files']] 
+                
+    tab = utils.GTable()
+            
     for k in ['product', 'filter']:
         tab[k] = [visit[k] for visit in all_visits]
         
@@ -32,6 +42,7 @@ def make_visit_fits():
     
     tab.write('candels-july2019_visits.fits', overwrite=True)
     np.save('candels-july2019_visits.npy', [all_visits])
+    os.system('echo "# In https://s3.amazonaws.com/grizli-v1/Mosaics/" > candels-july2019.files.txt; ls candels-july2019* |grep -v files.txt >>  candels-july2019.files.txt')
     os.system('aws s3 sync --exclude "*" --include "candels-july2019*" ./ s3://grizli-v1/Mosaics/ --acl public-read')
     
 def group_by_filter():
