@@ -4330,47 +4330,78 @@ For example,
     if not os.path.exists(pam):
         os.system('curl -o {0} http://www.stsci.edu/hst/wfc3/pam/ir_wfc3_map.fits'.format(pam))
 
-def fetch_wfpc2_calib(file='g6q1912hu_r4f.fits', path=os.getenv('uref')):
-
+def fetch_wfpc2_calib(file='g6q1912hu_r4f.fits', path=os.getenv('uref'), use_mast=False, verbose=True, overwrite=True, skip_existing=True):
+    """
+    Fetch static WFPC2 calibration file and run `stsci.tools.convertwaiveredfits` on it.
+    
+    path : str
+        Output path of the reference file (generally should be in $uref).
+    
+    use_mast : bool
+        If True, try to fetch from "mast.stsci.edu//api/v0/download/file?uri",
+        otherwise, fetch from a static directory 
+        "ssb.stsci.edu/cdbs_open/cdbs/uref_linux/".
+        
+    """
+    from stsci.tools import convertwaiveredfits
+    
     try: # Python 3.x
         import http.client as httplib 
     except ImportError:  # Python 2.x
         import httplib
-
-    from stsci.tools import convertwaiveredfits
     
-    server='mast.stsci.edu'
-    conn = httplib.HTTPSConnection(server)
+    if file.endswith('h'):
+        # File like "g6q1912hu.r4h"
+        file = file[:-1].replace('.','_')+'f.fits'
+    
     outPath = os.path.join(path, file)
-    uri = 'mast:HST/product/'+file
-    
-    conn.request("GET", "/api/v0/download/file?uri="+uri)
+    if os.path.exists(outPath) & skip_existing:
+        print("# fetch_wfpc2_calib: {0} exists".format(outPath))
+        return True
+        
+    if use_mast:
+        server='mast.stsci.edu'
+        uri = 'mast:HST/product/'+file
+        request_path="/api/v0/download/file?uri="+uri
+    else:
+        server='ssb.stsci.edu'
+        request_path = '/cdbs_open/cdbs/uref_linux/'+file
+        
+    if verbose:
+        print('# fetch_wfpc2_calib: "{0}" to {1}'.format(server+request_path, path))
+        
+    conn = httplib.HTTPSConnection(server)
+            
+    conn.request("GET", request_path)
     resp = conn.getresponse()
     fileContent = resp.read()
+    conn.close()
     
+    # check for file 
+    if len(fileContent) < 4096:
+        print('ERROR: "{0}" failed to download.  Try `use_mast={1}`.'.format(server+request_path, (use_mast is False)))
+        status = False
+        raise FileNotFoundError
+    else:
+        print("# fetch_wfpc2_calib: {0} (COMPLETE)".format(outPath))
+        status = True
+
     # save to file
     with open(outPath,'wb') as FLE:
         FLE.write(fileContent)
-
-    # check for file 
-    if not os.path.isfile(outPath):
-        print("ERROR: " + outPath + " failed to download.")
-        status = False
-    else:
-        print("COMPLETE: ", outPath)
-        status = True
-        
-    conn.close()
-    
+            
     if status:
+        # Convert to standard FITS
         try:
             hdu = convertwaiveredfits.convertwaiveredfits(outPath)
-            hdu.writeto(outPath.replace('.fits','_c0h.fits'))
+            while 'HISTORY' in hdu[0].header:
+                hdu[0].header.remove('HISTORY')
+
+            hdu.writeto(outPath.replace('.fits','_c0h.fits'),
+                        overwrite=overwrite, output_verify='fix')
         except:
             return True
             
-        while 'HISTORY' in hdu[0].header:
-            hdu[0].header.remove('HISTORY')
             
 def fetch_config_files(ACS=False, get_sky=True, get_stars=True, get_epsf=True):
     """
