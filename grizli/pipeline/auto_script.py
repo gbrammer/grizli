@@ -4134,7 +4134,7 @@ def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', s
     rimg = ims[rf][0].data * (ims[rf][0].header['PHOTFLAM']/5.e-20)**pf * (ims[rf][0].header['PHOTPLAM']/1.e4)**pl*scl*rgb_scl[0]
     
     if MW_F99 is not None:
-        rmw =  10**(0.4*(MW_F99(ims[rf][0].header['PHOTPLAM'])))
+        rmw =  10**(0.4*(MW_F99(np.array([ims[rf][0].header['PHOTPLAM']]))))[0]
         print('MW_EBV={0:.3f}, {1}: {2:.2f}'.format(mw_ebv, rf, rmw))
         rimg *= rmw
         
@@ -4143,7 +4143,7 @@ def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', s
     else:
         bimg = ims[bf][0].data * (ims[bf][0].header['PHOTFLAM']/5.e-20)**pf * (ims[bf][0].header['PHOTPLAM']/1.e4)**pl*scl*rgb_scl[2]
         if MW_F99 is not None:
-            bmw =  10**(0.4*(MW_F99(ims[bf][0].header['PHOTPLAM'])))
+            bmw =  10**(0.4*(MW_F99(np.array([ims[bf][0].header['PHOTPLAM']]))))[0]
             print('MW_EBV={0:.3f}, {1}: {2:.2f}'.format(mw_ebv, bf, bmw))
             bimg *= bmw
     
@@ -4158,7 +4158,7 @@ def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', s
     else:
         gimg = ims[gf][0].data * (ims[gf][0].header['PHOTFLAM']/5.e-20)**pf * (ims[gf][0].header['PHOTPLAM']/1.e4)**pl*scl*rgb_scl[1]#* 1.5
         if MW_F99 is not None:
-            gmw =  10**(0.4*(MW_F99(ims[gf][0].header['PHOTPLAM'])))
+            gmw =  10**(0.4*(MW_F99(np.array([ims[gf][0].header['PHOTPLAM']]))))[0]
             print('MW_EBV={0:.3f}, {1}: {2:.2f}'.format(mw_ebv, gf, gmw))
             gimg *= gmw
     
