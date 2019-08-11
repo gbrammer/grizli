@@ -10,13 +10,15 @@ import numpy as np
 import astropy.io.fits as pyfits
 
 from .. import prep, utils
-from .default_params import VALID_FILTERS, GRIS_REF_FILTERS
-from .default_params import IR_M_FILTERS, IR_W_FILTERS, IR_GRISMS
-from .default_params import OPT_M_FILTERS, OPT_W_FILTERS, OPT_GRISMS
-from .default_params import UV_GRISMS
+from .default_params import UV_N_FILTERS, UV_M_FILTERS, UV_W_FILTERS
+from .default_params import OPT_N_FILTERS, OPT_M_FILTERS, OPT_W_FILTERS 
+from .default_params import IR_N_FILTERS, IR_M_FILTERS, IR_W_FILTERS 
+from .default_params import ALL_IMAGING_FILTERS, VALID_FILTERS
+from .default_params import UV_GRISMS, OPT_GRISMS, IR_GRISMS, GRIS_REF_FILTERS
 
 from .default_params import get_yml_parameters, write_params_to_yml
 
+# needed for function definitions
 args = get_yml_parameters()
 
 if False:
@@ -1405,7 +1407,7 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
             imaging_visits.append(visit)
     
     filters = [v['product'].split('-')[-1] for v in visits]
-    fwave = np.cast[float]([f.replace('f1','f10').replace('f098m','f0980m').replace('lp','w')[1:-1] for f in filters])
+    fwave = np.cast[float]([f.replace('f1','f10').replace('f098m','f0980m').replace('lp','w').replace('fq','f')[1:-1] for f in filters])
     sort_idx = np.argsort(fwave)[::-1]
     
     for i in sort_idx:
@@ -4041,7 +4043,7 @@ def get_rgb_filters(filter_list, force_ir=False, pure_sort=False):
         gfilt = use_filters[ix_g]
         return [rfilt, gfilt, bfilt]
         
-def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', show_ir=True, pl=1, pf=1, scl=1, scale_ab=None, rgb_scl=[1,1,1], ds9=None, force_ir=False, filters=None, add_labels=True, output_format='jpg', rgb_min=-0.01, xyslice=None, pure_sort=False, verbose=True, force_rgb=None, suffix='.field', mask_empty=False, tick_interval=60, timestamp=False):
+def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', show_ir=True, pl=1, pf=1, scl=1, scale_ab=None, rgb_scl=[1,1,1], ds9=None, force_ir=False, filters=None, add_labels=True, output_format='jpg', rgb_min=-0.01, xyslice=None, pure_sort=False, verbose=True, force_rgb=None, suffix='.field', mask_empty=False, tick_interval=60, timestamp=False, mw_ebv=0):
     """
     RGB image of the field mosaics
     """
@@ -4124,12 +4126,26 @@ def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', s
     
     scl *= (0.06/pscale)**2
     
+    if mw_ebv > 0:
+        MW_F99 = utils.MW_F99(mw_ebv*utils.MW_RV, r_v=utils.MW_RV)
+    else:
+        MW_F99 = None
+    
     rimg = ims[rf][0].data * (ims[rf][0].header['PHOTFLAM']/5.e-20)**pf * (ims[rf][0].header['PHOTPLAM']/1.e4)**pl*scl*rgb_scl[0]
     
+    if MW_F99 is not None:
+        rmw =  10**(0.4*(MW_F99(ims[rf][0].header['PHOTPLAM'])))
+        print('MW_EBV={0:.3f}, {1}: {2:.2f}'.format(mw_ebv, rf, rmw))
+        rimg *= rmw
+        
     if bf == 'sum':
         bimg = rimg
     else:
         bimg = ims[bf][0].data * (ims[bf][0].header['PHOTFLAM']/5.e-20)**pf * (ims[bf][0].header['PHOTPLAM']/1.e4)**pl*scl*rgb_scl[2]
+        if MW_F99 is not None:
+            bmw =  10**(0.4*(MW_F99(ims[bf][0].header['PHOTPLAM'])))
+            print('MW_EBV={0:.3f}, {1}: {2:.2f}'.format(mw_ebv, bf, bmw))
+            bimg *= bmw
     
     # Double-acs
     if bimg.shape != rimg.shape:
@@ -4141,6 +4157,10 @@ def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', s
         gimg = (rimg+bimg)/2.
     else:
         gimg = ims[gf][0].data * (ims[gf][0].header['PHOTFLAM']/5.e-20)**pf * (ims[gf][0].header['PHOTPLAM']/1.e4)**pl*scl*rgb_scl[1]#* 1.5
+        if MW_F99 is not None:
+            gmw =  10**(0.4*(MW_F99(ims[gf][0].header['PHOTPLAM'])))
+            print('MW_EBV={0:.3f}, {1}: {2:.2f}'.format(mw_ebv, gf, gmw))
+            gimg *= gmw
     
     if gimg.shape != rimg.shape:
         import scipy.ndimage as nd
@@ -4902,7 +4922,7 @@ def field_psf(root='j020924-044344', HOME_PATH='/Volumes/Pegasus/Grizli/Automati
             
         hdu.writeto('{0}-{1}_psf.fits'.format(root, filter), overwrite=True)
         
-def make_report(root, gzipped_links=True, xsize=18, output_dpi=None, make_rgb=True):
+def make_report(root, gzipped_links=True, xsize=18, output_dpi=None, make_rgb=True, mw_ebv=0):
     """
     Make HTML report of the imaging and grism data products
     """
@@ -4932,7 +4952,7 @@ def make_report(root, gzipped_links=True, xsize=18, output_dpi=None, make_rgb=Tr
         has_mosaics = True
         
     if make_rgb & has_mosaics:
-        field_rgb(root, HOME_PATH=None, xsize=xsize, output_dpi=output_dpi, ds9=None, scl=2, suffix='.rgb', timestamp=True)
+        field_rgb(root, HOME_PATH=None, xsize=xsize, output_dpi=output_dpi, ds9=None, scl=2, suffix='.rgb', timestamp=True, mw_ebv=mw_ebv)
         for filter in filters:
             field_rgb(root, HOME_PATH=None, xsize=18, ds9=None, scl=2, force_rgb=[filter,'sum','sum'], suffix='.'+filter, timestamp=True)
     
