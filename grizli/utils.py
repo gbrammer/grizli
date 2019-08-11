@@ -1025,6 +1025,17 @@ def calc_header_zeropoint(im, ext=0):
         print('Couldn\'t find FILTER, PHOTFNU or PHOTPLAM/PHOTFLAM keywords, use ZP=25') 
         ZP = 25    
     
+    # If zeropoint infinite (e.g., PHOTFLAM = 0), then calculate from synphot
+    if not np.isfinite(ZP):
+        try:
+            import pysynphot as S
+            bp = S.ObsBandpass(im[0].header['PHOTMODE'].replace(' ',','))
+            spec = S.FlatSpectrum(0, fluxunits='ABMag')
+            obs = S.Observation(spec, bp)
+            ZP = 2.5*np.log10(obs.countrate())
+        except:
+            pass
+            
     return ZP
 
 DEFAULT_PRIMARY_KEYS = ['FILENAME','INSTRUME','INSTRUME','DETECTOR','FILTER','FILTER1','FILTER2','EXPSTART','DATE-OBS','EXPTIME','IDCTAB', 'NPOLFILE', 'D2IMFILE','PA_V3','FGSLOCK', 'GYROMODE', 'PROPOSID']
@@ -4443,8 +4454,13 @@ def fetch_config_files(ACS=False, get_sky=True, get_stars=True, get_epsf=True):
         # ePSF files for fitting point sources
         #psf_path = 'http://www.stsci.edu/hst/wfc3/analysis/PSF/psf_downloads/wfc3_ir/'
         psf_path = 'http://www.stsci.edu/~jayander/STDPSFs/WFC3IR/'
+        ir_psf_filters = ['F105W', 'F125W', 'F140W', 'F160W']
+        
+        # New PSFs
+        ir_psf_filters += ['F110W', 'F127M']
+        
         files = ['{0}/PSFSTD_WFC3IR_{1}.fits'.format(psf_path, filt) 
-                 for filt in ['F105W', 'F125W', 'F140W', 'F160W']]
+                 for filt in ir_psf_filters]
              
         for url in files:
             file=os.path.basename(url)
@@ -4558,9 +4574,12 @@ class EffectivePSF(object):
         Files should be located in ${GRIZLI}/CONF/ directory.
         """
         self.epsf = {}
-        for filter in ['F105W', 'F125W', 'F140W', 'F160W']:
+        for filter in ['F105W', 'F110W', 'F125W', 'F140W', 'F160W', 'F127M']:
             file = os.path.join(GRIZLI_PATH, 'CONF',
                                 'PSFSTD_WFC3IR_{0}.fits'.format(filter))
+            
+            if not os.path.exists(file):
+                continue
             
             data = pyfits.open(file)[0].data.T
             data[data < 0] = 0 
@@ -4595,7 +4614,9 @@ class EffectivePSF(object):
             
         # Dummy, use F105W ePSF for F098M and F110W
         self.epsf['F098M'] = self.epsf['F105W']
-        self.epsf['F110W'] = self.epsf['F105W']
+        self.epsf['F128N'] = self.epsf['F125W']
+        self.epsf['F130N'] = self.epsf['F125W']
+        self.epsf['F132N'] = self.epsf['F125W']
         
         # Extended
         self.extended_epsf = {}
@@ -4623,6 +4644,9 @@ class EffectivePSF(object):
             
         self.extended_epsf['F098M'] = self.extended_epsf['F105W']
         self.extended_epsf['F110W'] = self.extended_epsf['F105W']
+        self.extended_epsf['F128N'] = self.extended_epsf['F125W']
+        self.extended_epsf['F130N'] = self.extended_epsf['F125W']
+        self.extended_epsf['F132N'] = self.extended_epsf['F125W']
         
     def get_at_position(self, x=507, y=507, filter='F140W'):
         """Evaluate ePSF at detector coordinates
@@ -4817,7 +4841,7 @@ class EffectivePSF(object):
             chi2 = (resid**2).sum()
             #print(params, chi2)
             return chi2
-    
+            
     def fit_ePSF(self, sci, center=None, origin=[0,0], ivar=1, N=7, 
                  filter='F140W', tol=1.e-4, guess=None, get_extended=False,
                  method='lm', ds9=None, psf_params=None, only_centering=True):
@@ -4933,7 +4957,7 @@ class EffectivePSF(object):
         # 
         # return output_psf, psf_params
     
-    def get_ePSF(self, psf_params, origin=[0,0], shape=[20,20], filter='F140W', get_extended=False, get_background=False):
+    def get_ePSF(self, psf_params, sci=None, ivar=1, origin=[0,0], shape=[20,20], filter='F140W', get_extended=False, get_background=False):
         """
         Evaluate an Effective PSF
         """
@@ -4966,9 +4990,15 @@ class EffectivePSF(object):
         else:
             extended_data = None
         
-        ones = np.ones(sh, dtype=float)
-        args = (self, psf_xy, ones, ones, xp-x0, yp-y0, extended_data, 'model', None)
-        output_psf, bkg, _, _ = _objfun(psf_params, *args)
+        if sci is not None:
+            ivar_mask = np.ones_like(sci)
+            ivar_mask *= ivar
+        else:
+            sci = np.ones(sh, dtype=float)
+            ivar_mask = sci*1
+            
+        args = (self, psf_xy, sci, ivar_mask, xp-x0, yp-y0, extended_data, 'model', None)
+        output_psf, bkg, _a, _b = _objfun(psf_params, *args)
              
         #output_psf = self.eval_ePSF(psf_xy, dx, dy, extended_data=extended_data)*psf_params[0]
         
