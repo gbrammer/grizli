@@ -65,9 +65,10 @@ preprocess_args:
 # Arguments to grizli.prep.process_direct_grism_visit for each visit    
 visit_prep_args: &prep_args
     align_rms_limit: 2
-    align_mag_limits: [14, 24]
+    align_mag_limits: [14, 24, 0.05]
     max_err_percentile: 99
     catalog_mask_pad: 0.05
+    match_catalog_density: None
     drizzle_params: {}
     single_image_CRs: True
     run_tweak_align: True
@@ -78,7 +79,7 @@ visit_prep_args: &prep_args
     column_average: True
     sky_iter: 10
     iter_atol: 0.0001
-    imaging_bkg_params: {bh: 128, bw: 128, fh: 3, fw: 3, pixel_scale: 0.06}
+    imaging_bkg_params: {bh: 128, bw: 128, fh: 3, fw: 3, pixel_scale: 0.06, get_median: False}
     fix_stars: True
     reference_catalogs: [PS1, DES, DSC, SDSS, GAIA, WISE]
     outlier_threshold: 4
@@ -192,7 +193,7 @@ run_extractions: False
 include_photometry_in_fit: False
 
 # RGB thumbnails based on spectral extractions
-make_thumbnails: True
+make_thumbnails: False
 
 thumb_rgb_params: &thumb_rgb_params 
   add_labels: false
