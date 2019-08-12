@@ -3144,6 +3144,10 @@ def update_wcs_headers_with_fine(field_root, backup=True):
             out_scale = trans[ix,3]
             
             xyscale = trans[ix,:4]
+            
+            xyscale[2] *= -1
+            out_rot *= -1
+            
             try:
                 wcs_ref_file = str('{0}.cat.fits'.format(direct['product']))
                 wcs_ref = pywcs.WCS(pyfits.open(wcs_ref_file)['WCS'].header, 
