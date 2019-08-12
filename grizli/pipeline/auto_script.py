@@ -460,7 +460,11 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
                 continue
             
             # New catalog    
-            thresh=2.5
+            if visit_prep_args['align_thresh'] is None:
+                thresh = 2.5
+            else:
+                thresh = visit_prep_args['align_thresh']
+                
             cat = prep.make_SEP_catalog(root=visit['product'],
                                         threshold=thresh)
             
