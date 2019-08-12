@@ -74,6 +74,8 @@ visit_prep_args: &prep_args
     run_tweak_align: True
     tweak_threshold: 1.5
     tweak_fit_order: -1
+    tweak_max_dist: 100
+    tweak_n_min: 10
     align_simple: False
     align_clip: 120
     column_average: True

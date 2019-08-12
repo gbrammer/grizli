@@ -3187,7 +3187,7 @@ def update_wcs_headers_with_fine(field_root, backup=True):
                                                 get_fresh_flt=False, 
                                                 xyscale=trans[j,:])
                 
-def make_reference_wcs(info, output='mosaic_wcs-ref.fits', filters=['G800L', 'G102', 'G141'], pad_reference=90, pixel_scale=None, get_hdu=True):
+def make_reference_wcs(info, files=None, output='mosaic_wcs-ref.fits', filters=['G800L', 'G102', 'G141'], pad_reference=90, pixel_scale=None, get_hdu=True):
     """
     Make a reference image WCS based on the grism exposures
     
