@@ -19,8 +19,8 @@ import astropy.units as u
 ### Helper functions from a document written by Pirzkal, Brammer & Ryan 
 from . import grismconf
 from . import utils
-from .utils_c import disperse
-from .utils_c import interp
+# from .utils_c import disperse
+# from .utils_c import interp
 from . import GRIZLI_PATH
 
 # Would prefer 'nearest' but that occasionally segment faults out
@@ -285,6 +285,8 @@ class GrismDisperser(object):
         Sets attributes that define how the dispersion is computed.  See the 
         attributes list for `~grizli.model.GrismDisperser`.
         """        
+        from .utils_c import interp
+
         ### Get dispersion parameters at the reference position
         self.dx = self.conf.dxlam[self.beam] #+ xcenter #-xoff
         if self.grow > 1:
@@ -471,6 +473,8 @@ class GrismDisperser(object):
             If `in_place` is False, returns the 2D model spectrum.  Otherwise
             the result is stored in `self.model` and `self.modelf`.
         """
+        from .utils_c import disperse
+        from .utils_c import interp
         
         if id is None:
             id = self.id
@@ -987,6 +991,8 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         Integrate the sensitivity curve to the wavelengths for the 
         PSF model
         """
+        from .utils_c import interp
+
         so = np.argsort(self.lam_psf)
         s_i = interp.interp_conserve_c(self.lam_psf[so], wave, sensitivity, integrate=1)
         psf_sensitivity = s_i*0.
@@ -997,6 +1003,8 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         """
         Ensure normalization correct
         """
+        from .utils_c import interp
+ 
         if not hasattr(self, 'A_psf'):
             print('ePSF not initialized')
             return False
@@ -1091,6 +1099,11 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         self.ext_psf_data = np.maximum(spl_data, 0)
         
     def compute_model_psf(self, id=None, spectrum_1d=None, in_place=True, is_cgs=False):
+        """
+        Compute model with PSF morphology template
+        """
+        from .utils_c import interp
+        
         if spectrum_1d is None:
             #modelf = np.array(self.A_psf.sum(axis=1)).flatten()
             #model = model.reshape(self.sh_beam)
@@ -2550,6 +2563,7 @@ class GrismFLT(object):
             If `in_place` is False, return a full array including the model 
             for the single object.
         """               
+        from .utils_c import disperse
         
         # debug
         # x=None; y=None; size=10; mag=-1; spectrum_1d=None; compute_size=True; store=False; in_place=False; add=True; get_beams=['A']; verbose=True
@@ -2817,6 +2831,8 @@ class GrismFLT(object):
         -------
         Updated model stored in `self.model` attribute.
         """
+        from .utils_c import disperse
+
         if ids is None:
             ids = np.unique(self.seg)[1:]
         

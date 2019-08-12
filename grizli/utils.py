@@ -1822,8 +1822,10 @@ class SpectrumTemplate(object):
         INTEGRATOR = np.trapz
         
         try:
-            import grizli.utils_c
-            interp = grizli.utils_c.interp.interp_conserve_c
+            #import grizli.utils_c
+            #interp = grizli.utils_c.interp.interp_conserve_c
+            from .utils_c.interp import interp_conserve_c
+            interp = interp_conserve_c
         except ImportError:
             interp = np.interp
         
