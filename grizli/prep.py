@@ -3605,6 +3605,7 @@ def tweak_align(direct_group={}, grism_group={}, max_dist=1., n_min=10, key=' ',
         d = shift_dict[k]
         n_i = d[4]
         if (n_i < n_min) | (np.abs(d[:2]).max() > max_dist):
+            fp.write('# ! {0:s} {1:7.3f} {2:7.3f} {3:8.5f} {4:8.5f} {5:5d} {6:6.3f} {7:6.3f}\n'.format(k, d[0], d[1], d[2], d[3], d[4], d[5][0], d[5][1]))
             d[0] = d[1] = 0.
             
         fp.write('{0:s} {1:7.3f} {2:7.3f} {3:8.5f} {4:8.5f} {5:5d} {6:6.3f} {7:6.3f}\n'.format(k, d[0], d[1], d[2], d[3], d[4], d[5][0], d[5][1]))
