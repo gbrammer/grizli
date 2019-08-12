@@ -3,7 +3,7 @@ Reprocessing scripts for variable WFC3/IR backgrounds
 """
 from .. import utils
 
-def reprocess_wfc3ir(parallel=False, cpu_count=0):
+def reprocess_wfc3ir(parallel=False, cpu_count=0, clean_dark_refs=True):
     """
     Run reprocessing script to flatten IR backgrounds
     
@@ -15,7 +15,8 @@ def reprocess_wfc3ir(parallel=False, cpu_count=0):
 
     import glob
     import os
-        
+    import astropy.io.fits as pyfits
+    
     # https://github.com/gbrammer/wfc3
     try:
         from reprocess_wfc3 import reprocess_wfc3
@@ -37,22 +38,39 @@ def reprocess_wfc3ir(parallel=False, cpu_count=0):
     # Make ramp diagnostic images    
     if parallel:
         files=glob.glob('*raw.fits')
+        files.sort()
         reprocess_wfc3.show_ramps_parallel(files, cpu_count=cpu_count)
     
         # Reprocess all raw files
         files=glob.glob('*raw.fits')
+        files.sort()
         reprocess_wfc3.reprocess_parallel(files, cpu_count=cpu_count)
     else:
         files=glob.glob('*raw.fits')
+        files.sort()
+        
         for file in files:
             if not os.path.exists(file.replace('raw.fits','ramp.png')):
                 reprocess_wfc3.show_MultiAccum_reads(raw=file, stats_region=[[300,700], [300,700]])
         
-        
         for file in files:
             if not os.path.exists(file.replace('raw.fits','flt.fits')):
                 reprocess_wfc3.make_IMA_FLT(raw=file, stats_region=[[300,700], [300,700]])
+    
+    # Remove DRK reference files, which now proliferate
+    if clean_dark_refs:
+        files=glob.glob('*raw.fits')
+        files.sort()
+        for file in files:
+            im = pyfits.open(file)
+            dark_file = im[0].header['DARKFILE'].replace('iref$', '')
+            dark_file = os.path.join(os.getenv('iref'), dark_file)
+            im.close()
+            if os.path.exists(dark_file):
+                print('clean_dark: {0}'.format(dark_file))
+                os.remove(dark_file)
         
+            
 def inspect(root='grizli', force=False):
     """
     Run the GUI inspection tool on the `ramp.png` images to flag problematic
