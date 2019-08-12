@@ -3087,7 +3087,8 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                                tweak_fit_order=-1,
                                skip_direct=False,
                                fix_stars=True,
-                               tweak_max_dist=1.,
+                               tweak_max_dist=100.,
+                               tweak_n_min=10,
                                tweak_threshold=1.5, 
                                align_simple=True,
                                single_image_CRs=True,
@@ -3210,7 +3211,8 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
         if (not isACS) & (not isWFPC2) & run_tweak_align:
             #if run_tweak_align:
             tweak_align(direct_group=direct, grism_group=grism,
-                        max_dist=tweak_max_dist, key=' ', drizzle=False,
+                        max_dist=tweak_max_dist, n_min=tweak_n_min,
+                        key=' ', drizzle=False,
                         threshold=tweak_threshold, fit_order=tweak_fit_order)
         
         if (isACS) & (len(direct['files']) == 1) & single_image_CRs:
@@ -3270,7 +3272,8 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
         ## Now do tweak_align for ACS
         if (isACS) & run_tweak_align & (len(direct['files']) > 1):
             tweak_align(direct_group=direct, grism_group=grism,
-                    max_dist=tweak_max_dist, key=' ', drizzle=False,
+                    max_dist=tweak_max_dist, n_min=tweak_n_min, 
+                    key=' ', drizzle=False,
                     threshold=tweak_threshold)
             
             # Redrizzle with no CR rejection
@@ -3564,8 +3567,7 @@ def set_grism_dfilter(direct, grism):
                                               'Direct imaging filter')
         flt.flush()
     
-def tweak_align(direct_group={}, grism_group={}, max_dist=1., key=' ', 
-                threshold=3, drizzle=False, fit_order=-1):
+def tweak_align(direct_group={}, grism_group={}, max_dist=1., n_min=10, key=' ', threshold=3, drizzle=False, fit_order=-1):
     """
     Intra-visit shifts (WFC3/IR)
     """
@@ -3601,6 +3603,10 @@ def tweak_align(direct_group={}, grism_group={}, max_dist=1., key=' ',
     
     for k in shift_dict:
         d = shift_dict[k]
+        n_i = d[4]
+        if (n_i < n_min) | (np.abs(d[:2]).max() > max_dist):
+            d[0] = d[1] = 0.
+            
         fp.write('{0:s} {1:7.3f} {2:7.3f} {3:8.5f} {4:8.5f} {5:5d} {6:6.3f} {7:6.3f}\n'.format(k, d[0], d[1], d[2], d[3], d[4], d[5][0], d[5][1]))
     
     fp.close()
