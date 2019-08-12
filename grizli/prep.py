@@ -3438,12 +3438,8 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
             blot_background(visit=direct, bkg_params=bkg_params, 
                             verbose=True, skip_existing=True,
                             get_median=get_median)
-                            
-        if isWFPC2:
-            thresh = 8
-        else:
-            thresh = 1.6
         
+        #### Remake catalog                    
         #cat = make_drz_catalog(root=direct['product'], threshold=thresh)
         cat = make_SEP_catalog(root=direct['product'], threshold=thresh)
                 
