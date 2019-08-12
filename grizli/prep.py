@@ -3075,7 +3075,7 @@ BKG_PARAMS = {'bw': 128, 'bh': 128, 'fw': 3, 'fh': 3, 'pixel_scale':0.06}
     
 def process_direct_grism_visit(direct={}, grism={}, radec=None,
                                outlier_threshold=5, align_clip=30,
-                               align_thresn=None, 
+                               align_thresh=None, 
                                align_mag_limits=[14,23,0.05],
                                align_rms_limit=2,
                                align_triangle_ba_max=0.9,
