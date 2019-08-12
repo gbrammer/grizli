@@ -3075,6 +3075,7 @@ BKG_PARAMS = {'bw': 128, 'bh': 128, 'fw': 3, 'fh': 3, 'pixel_scale':0.06}
     
 def process_direct_grism_visit(direct={}, grism={}, radec=None,
                                outlier_threshold=5, align_clip=30,
+                               align_thresn=None, 
                                align_mag_limits=[14,23,0.05],
                                align_rms_limit=2,
                                align_triangle_ba_max=0.9,
@@ -3287,11 +3288,14 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                              final_wht_type='IVM', resetbits=0)
             
         ### Make catalog & segmentation image
-        if isWFPC2:
-            thresh = 8
+        if align_thresh is None:
+            if isWFPC2:
+                thresh = 8
+            else:
+                thresh = 2
         else:
-            thresh = 2
-        
+            thresh = align_thresh
+            
         #cat = make_drz_catalog(root=direct['product'], threshold=thresh)
         cat = make_SEP_catalog(root=direct['product'], threshold=thresh)
         
