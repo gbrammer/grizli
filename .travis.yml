@@ -25,19 +25,19 @@ matrix:
             - ASTROPY_VERSION=stable
             - CONDA_DEPENDENCIES='scipy matplotlib pyyaml'
 
-      - python: 3.6
-        os: windows
-        env:
-            - NUMPY_VERSION=stable
-            - ASTROPY_VERSION=stable
-            - CONDA_DEPENDENCIES='scipy matplotlib pyyaml'
+      # - python: 3.6
+      #   os: windows
+      #   env:
+      #       - NUMPY_VERSION=stable
+      #       - ASTROPY_VERSION=stable
+      #       - CONDA_DEPENDENCIES='scipy matplotlib pyyaml'
         
-      - python: 3.7
-        os: linux
-        env:
-            - NUMPY_VERSION=stable
-            - ASTROPY_VERSION=stable
-            - CONDA_DEPENDENCIES='scipy matplotlib cython pyyaml'
+      # - python: 3.7
+      #   os: linux
+      #   env:
+      #       - NUMPY_VERSION=stable
+      #       - ASTROPY_VERSION=stable
+      #       - CONDA_DEPENDENCIES='scipy matplotlib cython pyyaml'
         
 # commands to install dependencies (astropy, conda)
 install: 
