@@ -393,6 +393,7 @@ def run_grizli_fit(event):
         
     if 'run_fit' in event:
         if event['run_fit'] in FALSE_OPTIONS:
+            res = bkt.delete_objects(Delete={'Objects':[{'Key':full_start}]})
             return True
     
     utils.fetch_acs_wcs_files(beams_file, bucket_name=event_kwargs['bucket'])
