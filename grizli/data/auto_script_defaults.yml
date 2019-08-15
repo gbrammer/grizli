@@ -93,7 +93,7 @@ redo_persistence_mask: False
 
 persistence_args:
     dq_value: 1024
-    err_threshold: 0.1
+    err_threshold: 0.5
     grow_mask: 3
     verbose: True
     reset: False
