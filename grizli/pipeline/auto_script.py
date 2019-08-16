@@ -304,6 +304,7 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
     os.chdir(HOME_PATH)
     #auto_script.fetch_files(field_root=root, HOME_PATH=HOME_PATH, remove_bad=remove_bad, reprocess_parallel=reprocess_parallel, s3_sync=s3_sync, filters=filters)
     if fetch_files_args is not None:
+        fetch_files_args['reprocess_clean_darks'] &= (not is_dash)
         auto_script.fetch_files(field_root=root, HOME_PATH=HOME_PATH,
                             filters=filters, **fetch_files_args)
     else:
@@ -763,7 +764,7 @@ def make_directories(field_root='j142724+334246', HOME_PATH='./'):
             os.mkdir(dir)
             os.system('chmod ugoa+rwx {0}'.format(dir))
             
-def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', inst_products={'WFPC2/WFC': ['C0M', 'C1M'], 'WFPC2/PC': ['C0M', 'C1M'], 'ACS/WFC': ['FLC'], 'WFC3/IR': ['RAW'], 'WFC3/UVIS': ['FLC']}, remove_bad=True, reprocess_parallel=False, s3_sync=False, fetch_flt_calibs=['IDCTAB','PFLTFILE','NPOLFILE'], filters=VALID_FILTERS, min_bad_expflag=2):
+def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', inst_products={'WFPC2/WFC': ['C0M', 'C1M'], 'WFPC2/PC': ['C0M', 'C1M'], 'ACS/WFC': ['FLC'], 'WFC3/IR': ['RAW'], 'WFC3/UVIS': ['FLC']}, remove_bad=True, reprocess_parallel=False, reprocess_clean_darks=True, s3_sync=False, fetch_flt_calibs=['IDCTAB','PFLTFILE','NPOLFILE'], filters=VALID_FILTERS, min_bad_expflag=2):
     """
     Fully automatic script
     """
@@ -868,7 +869,7 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/
     
     #### Reprocess the RAWs into FLTs    
     if reprocess_parallel:
-        os.system("python -c 'from grizli.pipeline import reprocess; reprocess.reprocess_wfc3ir(parallel={0})'".format(reprocess_parallel))
+        os.system("python -c 'from grizli.pipeline import reprocess; reprocess.reprocess_wfc3ir(parallel={0},clean_dark_refs={1})'".format(reprocess_parallel, reprocess_clean_darks))
     else:
         from grizli.pipeline import reprocess
         reprocess.reprocess_wfc3ir(parallel=False)
