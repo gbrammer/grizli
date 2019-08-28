@@ -40,8 +40,11 @@ def make_visit_fits():
     tab['dec'] = coo[:,1]    
     tab['nexp'] = [len(visit['files']) for visit in all_visits]
     
-    tab.write('candels-july2019_visits.fits', overwrite=True)
-    np.save('candels-july2019_visits.npy', [all_visits])
+    root = 'candels-july2019'
+    
+    tab.write(root+'_visits.fits', overwrite=True)
+    np.save(root+'_visits.npy', [all_visits])
+    
     os.system('echo "# In https://s3.amazonaws.com/grizli-v1/Mosaics/" > candels-july2019.files.txt; ls candels-july2019* |grep -v files.txt >>  candels-july2019.files.txt')
     os.system('aws s3 sync --exclude "*" --include "candels-july2019*" ./ s3://grizli-v1/Mosaics/ --acl public-read')
     
