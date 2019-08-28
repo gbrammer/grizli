@@ -4433,6 +4433,8 @@ def fetch_config_files(ACS=False, get_sky=True, get_stars=True, get_epsf=True):
     # Test config files
     tarfiles = ['https://s3.amazonaws.com/grizli/CONF/WFC3.IR.G102.WD.V4.32.tar.gz', 'https://s3.amazonaws.com/grizli/CONF/WFC3.IR.G141.WD.V4.32.tar.gz'] 
     
+    tarfiles += ['https://s3.amazonaws.com/grizli/CONF/ACS.WFC.CHIP1.Stars.conf', 'https://s3.amazonaws.com/grizli/CONF/ACS.WFC.CHIP2.Stars.conf'] 
+    
     if get_sky:
         tarfiles.append('{0}/grism_master_sky_v0.5.tar.gz'.format(ftpdir))
     
@@ -4450,7 +4452,8 @@ def fetch_config_files(ACS=False, get_sky=True, get_stars=True, get_epsf=True):
             print('Get {0}'.format(file))
             os.system('curl -o {0} {1}'.format(file, url))
         
-        os.system('tar xzvf {0}'.format(file))
+        if 'tar' in file:
+            os.system('tar xzvf {0}'.format(file))
     
     if get_epsf:
         # ePSF files for fitting point sources

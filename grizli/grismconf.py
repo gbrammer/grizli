@@ -285,7 +285,7 @@ class aXeConf():
             if 'DYDX_{0:s}_{1:d}'.format(beam, i) in self.conf.keys():
                 coeffs = self.conf['DYDX_{0:s}_{1:d}'.format(beam, i)]
                 dydx[i] = self.field_dependent(xi, yi, coeffs)
-            
+        
         # $dy = dydx_0+dydx_1 dx+dydx_2 dx^2+$ ...
 
         dy = yoff_beam
@@ -298,6 +298,12 @@ class aXeConf():
             if 'DLDP_{0:s}_{1:d}'.format(beam, i) in self.conf.keys():
                 coeffs = self.conf['DLDP_{0:s}_{1:d}'.format(beam, i)]
                 dldp[i] = self.field_dependent(xi, yi, coeffs)
+        
+        self.eval_input = {'x':x, 'y':y, 'beam':beam, 'dx':dx,
+                           'fwcpos':fwcpos}
+        self.eval_output = {'xi':xi, 'yi':yi, 'dldp':dldp, 'dydx':dydx, 
+                            'xoff_beam':xoff_beam, 'yoff_beam':yoff_beam, 
+                            'dy':dy}
         
         dp = self.evaluate_dp(dx-xoff_beam, dydx)
         # ## dp is the arc length along the trace
@@ -489,8 +495,11 @@ def get_config_filename(instrume='WFC3', filter='F140W',
     """   
     if instrume == 'ACS':
         conf_file = os.path.join(GRIZLI_PATH, 
-                    'CONF/ACS.WFC.CHIP{0:d}.Cycle13.5.conf'.format(chip))
-                           
+                    'CONF/ACS.WFC.CHIP{0:d}.Stars.conf'.format(chip))
+        if not os.path.exists(conf_file):
+            conf_file = os.path.join(GRIZLI_PATH, 
+                        'CONF/ACS.WFC.CHIP{0:d}.Cycle13.5.conf'.format(chip))
+                              
     if instrume == 'WFC3':
         if grism == 'G280':
             conf_file = os.path.join(GRIZLI_PATH, 'CONF/G280/',
