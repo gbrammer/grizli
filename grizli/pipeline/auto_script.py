@@ -558,6 +558,16 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
             tab = auto_script.multiband_catalog(field_root=root,
                                                 **multiband_catalog_args)
             
+            try:
+                # Add columns indicating objects that fall in grism exposures
+                phot = utils.read_catalog('{0}_phot.fits'.format(root))
+                out = count_grism_exposures(phot, all_groups, 
+                                      grisms=['g800l', 'g102', 'g141'],
+                                      verbose=True)                                    
+                phot.write('{0}_phot.fits'.format(root), overwrite=True)
+            except:
+                pass
+            
         except:
             utils.log_exception(utils.LOGFILE, traceback)
             utils.log_comment(utils.LOGFILE, 
@@ -1848,11 +1858,47 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
     
     for c in tab.colnames:
         tab.rename_column(c, c.lower())
-            
+    
+    idcol = utils.GTable.Column(data=tab['number'], name='id')
+    tab.add_column(idcol, index=0)
+    
     tab.write('{0}_phot.fits'.format(output_root), format='fits', overwrite=True)
     
     return tab   
-          
+
+def count_grism_exposures(phot, groups, grisms=['g800l', 'g102', 'g141'], reset=True, verbose=False):
+    """
+    Count number of grism exposures that contain objects in a catalog
+    """
+    from matplotlib.path import Path
+    
+    points = np.array([phot['ra'], phot['dec']]).T
+    
+    for g in grisms:
+        if ('nexp_'+g not in phot.colnames) | reset:
+            phot['nexp_'+g] = np.zeros(len(phot), dtype=np.int32)
+            
+    for ig, g in enumerate(groups):
+        gri = g['grism']['product'].split('-')[-1]
+        if gri not in grisms:
+            continue
+        
+        if verbose:
+            print('{0:<4} {1:48} {2}'.format(ig, g['grism']['product'], gri))
+            
+        for fp in g['grism']['footprints']:
+            hull = Path(np.array(fp.convex_hull.boundary.xy).T)
+            phot['nexp_'+gri] += hull.contains_points(points)*1
+    
+    phot['has_grism'] = (phot['nexp_'+grisms[0]] > 0).astype(np.uint8)
+    
+    if len(grisms) > 1:
+        for ig, g in enumerate(grisms):
+            phot['has_grism'] |= (phot['nexp_'+g] > 0).astype(np.uint8)*2**ig
+            phot.meta[g+'bit'] = 2**ig
+            
+    return phot
+    
 def photutils_catalog(field_root='j142724+334246', threshold=1.8, subtract_bkg=True):
     """
     Make a detection catalog with SExtractor and then measure
