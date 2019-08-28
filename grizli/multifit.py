@@ -616,7 +616,7 @@ class GroupFLT():
         
     def get_beams(self, id, size=10, center_rd=None, beam_id='A',
                   min_overlap=0.1, min_valid_pix=10, min_mask=0.01, 
-                  min_sens=0.08, get_slice_header=True):
+                  min_sens=0.08, mask_resid=True, get_slice_header=True):
         """Extract 2D spectra "beams" from the GroupFLT exposures.
         
         Parameters
@@ -667,6 +667,7 @@ class GroupFLT():
                 out_beam = model.BeamCutout(flt=flt, beam=beam[beam_id],
                                         conf=flt.conf, min_mask=min_mask,
                                         min_sens=min_sens,
+                                        mask_resid=mask_resid,
                                         get_slice_header=get_slice_header)
             except:
                 #print('Except: get_beams')
@@ -794,12 +795,12 @@ class GroupFLT():
         """
         beams = self.get_beams(id, size=size, min_overlap=0.1,
                                get_slice_header=False, min_mask=0.01, 
-                               min_sens=0.01)
+                               min_sens=0.01, mask_resid=True)
         if len(beams) == 0:
             return True
         
         mb = MultiBeam(beams, fcontam=fcontam, min_sens=0.01, sys_err=0.03,
-                       min_mask=0.01)
+                       min_mask=0.01, mask_resid=True)
         
         if templates is None:
             wave = np.linspace(0.9*mb.wavef.min(),1.1*mb.wavef.max(),100)
@@ -1347,7 +1348,7 @@ class GroupFLT():
     
     
 class MultiBeam(GroupFitter):
-    def __init__(self, beams, group_name=None, fcontam=0., psf=False, polyx=[0.3, 2.5], MW_EBV=0., min_mask=0.01, min_sens=0.08, sys_err=0.0, verbose=True, replace_direct=None, **kwargs):
+    def __init__(self, beams, group_name=None, fcontam=0., psf=False, polyx=[0.3, 2.5], MW_EBV=0., min_mask=0.01, min_sens=0.08, sys_err=0.0, mask_resid=True, verbose=True, replace_direct=None, **kwargs):
         """Tools for dealing with multiple `~.model.BeamCutout` instances 
         
         Parameters
@@ -1403,6 +1404,8 @@ class MultiBeam(GroupFitter):
         self.polyx = polyx
         self.min_mask = min_mask
         self.min_sens = min_sens
+        self.mask_resid = mask_resid
+        
         if isinstance(beams, str):
             self.load_master_fits(beams, verbose=verbose)    
             
@@ -1418,7 +1421,7 @@ class MultiBeam(GroupFitter):
                     # Master beam files
                     self.load_master_fits(beams[0], verbose=verbose)            
                     for i in range(1, len(beams)):
-                        b_i = MultiBeam(beams[i], group_name=group_name, fcontam=fcontam, psf=psf, polyx=polyx, MW_EBV=np.maximum(MW_EBV, 0), sys_err=sys_err, verbose=verbose)
+                        b_i = MultiBeam(beams[i], group_name=group_name, fcontam=fcontam, psf=psf, polyx=polyx, MW_EBV=np.maximum(MW_EBV, 0), sys_err=sys_err, verbose=verbose, min_mask=min_mask, min_sens=min_sens, mask_resid=mask_resid)
                         self.extend(b_i)
                         
                 else:
@@ -1430,6 +1433,9 @@ class MultiBeam(GroupFitter):
         # minimum error
         self.sys_err = sys_err
         for beam in self.beams:
+            if hasattr(beam, 'xp_mask'):
+                delattr(beam, 'xp_mask')
+            
             beam.ivarf = 1./(1/beam.ivarf + (sys_err*beam.scif)**2)
             beam.ivarf[~np.isfinite(beam.ivarf)] = 0
             beam.ivar = beam.ivarf.reshape(beam.sh)
@@ -1478,14 +1484,18 @@ class MultiBeam(GroupFitter):
                 b.flat_flam = b.compute_model(in_place=False, is_cgs=True)
                 
     def _parse_beams(self, psf=False):
-        
+        """
+        Derive properties of the beam list (grism, PA) and initialize
+        data arrays.
+        """
         self.N = len(self.beams)
         self.Ngrism = {}
         for i in range(self.N):
-            if self.beams[i].grism.instrument == 'NIRISS':
-                grism = self.beams[i].grism.pupil
+            beam = self.beams[i]
+            if beam.grism.instrument == 'NIRISS':
+                grism = beam.grism.pupil
             else:
-                grism = self.beams[i].grism.filter
+                grism = beam.grism.filter
                 
             if grism in self.Ngrism:
                 self.Ngrism[grism] += 1
@@ -1551,6 +1561,10 @@ class MultiBeam(GroupFitter):
         self.Nflat = [np.product(shape) for shape in self.shapes]
         self.Ntot = np.sum(self.Nflat)
         
+        for b in self.beams:
+            if hasattr(b, 'xp_mask'):
+                delattr(b, 'xp_mask')
+            
         ### Big array of normalized wavelengths (wave / 1.e4 - 1)
         self.xpf = np.hstack([np.dot(np.ones((b.beam.sh_beam[0],1)),
                                     b.beam.lam[None,:]).flatten()/1.e4 
@@ -1567,7 +1581,9 @@ class MultiBeam(GroupFitter):
         self.fit_mask &= (self.ivarf >= 0) 
         
         self.scif = np.hstack([b.scif for b in self.beams])
-
+        self.idf = np.hstack([b.scif*0+ib for ib, b in enumerate(self.beams)])
+        self.idf = np.cast[int](self.idf)
+        
         #self.ivarf = 1./(1/self.ivarf + (self.sys_err*self.scif)**2)
         self.ivarf[~np.isfinite(self.ivarf)] = 0
         self.sivarf = np.sqrt(self.ivarf)
@@ -1600,7 +1616,12 @@ class MultiBeam(GroupFitter):
         self.ra, self.dec = self.beams[0].get_sky_coords()
     
     def compute_exptime(self):
+        """
+        Compute number of exposures and total exposure time for each grism
+        """
         exptime = {}
+        nexposures = {}
+        
         for beam in self.beams:
             if beam.grism.instrument == 'NIRISS':
                 grism = beam.grism.pupil
@@ -1609,10 +1630,12 @@ class MultiBeam(GroupFitter):
             
             if grism in exptime:
                 exptime[grism] += beam.grism.exptime
+                nexposures[grism] += 1
             else:
                 exptime[grism] = beam.grism.exptime
+                nexposures[grism] = 1
         
-        return exptime
+        return nexposures, exptime
         
     def extend(self, new, verbose=True):
         """Concatenate `~grizli.multifit.MultiBeam` objects
@@ -1704,7 +1727,8 @@ class MultiBeam(GroupFitter):
                 hducopy = pyfits.HDUList([hdu[i].__class__(data=hdu[i].data*1, header=copy.deepcopy(hdu[i].header), name=hdu[i].name) for i in range(i0, i0+Next_i)])
             
             beam = model.BeamCutout(fits_file=hducopy, min_mask=self.min_mask,
-                                    min_sens=self.min_sens) 
+                                    min_sens=self.min_sens, 
+                                    mask_resid=self.mask_resid) 
             
             self.beams.append(beam)
             if verbose:
@@ -1738,7 +1762,8 @@ class MultiBeam(GroupFitter):
             
             beam = model.BeamCutout(fits_file=file, conf=conf, 
                                     min_mask=self.min_mask, 
-                                    min_sens=self.min_sens)
+                                    min_sens=self.min_sens,
+                                    mask_resid=self.mask_resid)
             self.beams.append(beam)
     
     def replace_direct_image_cutouts(self, ref_image='gdn-100mas-f160w_drz_sci.fits', interp='poly5', cutout=200, background_func=np.median):
@@ -3376,7 +3401,8 @@ class MultiBeam(GroupFitter):
         for b in self.beams:
             #b._parse_from_data()
             b._parse_from_data(contam_sn_mask=b.contam_sn_mask,
-                                  min_mask=b.min_mask, min_sens=b.min_sens)
+                                  min_mask=b.min_mask, min_sens=b.min_sens,
+                                  mask_resid=b.mask_resid)
         
         self._parse_beam_arrays()
                 
@@ -3420,7 +3446,8 @@ class MultiBeam(GroupFitter):
         for b in self.beams:
             #b._parse_from_data()
             b._parse_from_data(contam_sn_mask=b.contam_sn_mask,
-                                  min_mask=b.min_mask, min_sens=b.min_sens)
+                                  min_mask=b.min_mask, min_sens=b.min_sens,
+                                  mask_resid=b.mask_resid)
             
             # Needed for background modeling
             if hasattr(b, 'xp'):
@@ -4037,7 +4064,9 @@ class MultiBeam(GroupFitter):
                 beams = [self.beams[i] for i in self.PA[g][pa]]
                 mb_i = MultiBeam(beams, fcontam=self.fcontam,
                                  sys_err=self.sys_err, min_sens=self.min_sens,
-                                 min_mask=self.min_mask, MW_EBV=self.MW_EBV)
+                                 min_mask=self.min_mask, 
+                                 mask_resid=self.mask_resid, 
+                                 MW_EBV=self.MW_EBV)
                               
                 try:
                     chi2, _, _, _ = mb_i.xfit_at_z(z=0,

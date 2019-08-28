@@ -78,7 +78,7 @@ def run_all_parallel(id, get_output_data=False, args_file='fit_args.npy', **kwar
     
     return id, status, t1-t0
     
-def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter='bounded', group_name='grism', fit_stacks=True, only_stacks=False, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=np.inf, fit_only_beams=False, fit_beams=True, root='*', fit_trace_shift=False, phot=None, use_phot_obj=True, phot_obj=None, verbose=True, scale_photometry=False, show_beams=True, scale_on_stacked_1d=True, loglam_1d=True, overlap_threshold=5, MW_EBV=0., sys_err=0.03, get_dict=False, bad_pa_threshold=1.6, units1d='flam', redshift_only=False, line_size=1.6, use_psf=False, get_line_width=False, sed_args={'bin':1, 'xlim':[0.3, 9]}, get_ir_psfs=True, min_mask=0.01, min_sens=0.02, save_stack=True,  bounded_kwargs=BOUNDED_DEFAULTS, **kwargs):
+def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter='bounded', group_name='grism', fit_stacks=True, only_stacks=False, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=np.inf, fit_only_beams=False, fit_beams=True, root='*', fit_trace_shift=False, phot=None, use_phot_obj=True, phot_obj=None, verbose=True, scale_photometry=False, show_beams=True, scale_on_stacked_1d=True, loglam_1d=True, overlap_threshold=5, MW_EBV=0., sys_err=0.03, get_dict=False, bad_pa_threshold=1.6, units1d='flam', redshift_only=False, line_size=1.6, use_psf=False, get_line_width=False, sed_args={'bin':1, 'xlim':[0.3, 9]}, get_ir_psfs=True, min_mask=0.01, min_sens=0.02, mask_resid=True, save_stack=True,  bounded_kwargs=BOUNDED_DEFAULTS, **kwargs):
     """Run the full procedure
     
     1) Load MultiBeam and stack files 
@@ -112,7 +112,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
         fitter = [fitter, fitter]
         
     if not only_stacks:
-        mb = MultiBeam(mb_files, fcontam=fcontam, group_name=group_name, MW_EBV=MW_EBV, sys_err=sys_err, verbose=verbose, psf=use_psf, min_mask=min_mask, min_sens=min_sens)
+        mb = MultiBeam(mb_files, fcontam=fcontam, group_name=group_name, MW_EBV=MW_EBV, sys_err=sys_err, verbose=verbose, psf=use_psf, min_mask=min_mask, min_sens=min_sens, mask_resid=mask_resid)
         # Check for PAs with unflagged contamination or otherwise discrepant
         # fit
         out = mb.check_for_bad_PAs(chi2_threshold=bad_pa_threshold,
@@ -284,8 +284,10 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
         mb_fit = fit
            
     #### Get best-fit template 
-    tfit = mb.template_at_z(z=mb_fit.meta['z_map'][0], templates=t1, fit_background=True, fitter=fitter[1], bounded_kwargs=bounded_kwargs)
-    
+    tfit = mb.template_at_z(z=mb_fit.meta['z_map'][0], templates=t1,
+                            fit_background=True, fitter=fitter[1], 
+                            bounded_kwargs=bounded_kwargs)
+        
     # Redrizzle? ... testing
     if False:
         hdu, fig = mb.drizzle_grisms_and_PAs(fcontam=fcontam,
@@ -298,6 +300,16 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     cov_hdu = pyfits.ImageHDU(data=tfit['covar'], name='COVAR')
     Next = mb_fit.meta['N']
     cov_hdu.header['N'] = Next
+    
+    # Get line deviations if multiple PAs/Grisms
+    # max_line, max_line_diff, compare = tfit_coeffs_res
+    tfit_coeffs_res = mb.check_tfit_coeffs(tfit, t1, fitter=fitter[1],
+                                           fit_background=True,
+                                           bounded_kwargs=bounded_kwargs, 
+                                           refit_others=True)
+    
+    cov_hdu.header['DLINEID'] = (tfit_coeffs_res[0], 'Line with maximum deviation')
+    cov_hdu.header['DLINESN'] = (tfit_coeffs_res[1], 'Maximum line deviation, sigmas')
     
     # Line EWs & fluxes
     coeffs_clip = tfit['coeffs'][mb.N:]
@@ -422,14 +434,23 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     if pline is None:
          pzfit, pspec2, pline = grizli.multifit.get_redshift_fit_defaults()
     
-    line_hdu = mb.drizzle_fit_lines(tfit, pline, force_line=utils.DEFAULT_LINE_LIST, save_fits=False, mask_lines=True, mask_sn_limit=mask_sn_limit, verbose=verbose, get_ir_psfs=get_ir_psfs)
+    line_hdu = mb.drizzle_fit_lines(tfit, pline,
+                                    force_line=utils.DEFAULT_LINE_LIST, 
+                                    save_fits=False, mask_lines=True, 
+                                    mask_sn_limit=mask_sn_limit, 
+                                    verbose=verbose, get_ir_psfs=get_ir_psfs)
     
     # Add beam exposure times
-    exptime = mb.compute_exptime()
+    nexposures, exptime = mb.compute_exptime()
+    line_hdu[0].header['GRIZLIV'] = (grizli__version, 'Grizli version')
+
     for k in exptime:
         line_hdu[0].header['T_{0}'.format(k)] = (exptime[k], 'Total exposure time [s]')
+        line_hdu[0].header['N_{0}'.format(k)] = (nexposures[k], 'Number of individual exposures')
     
-    line_hdu[0].header['GRIZLIV'] = (grizli__version, 'Grizli version')
+    for gr in mb.PA:
+        line_hdu[0].header['P_{0}'.format(gr)] = (len(mb.PA[gr]), 'Number of PAs')
+        
        
     line_hdu.insert(1, fit_hdu)
     line_hdu.insert(2, cov_hdu)
@@ -687,13 +708,15 @@ def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat',
     from grizli import utils
     
     keys = OrderedDict()
-    keys['PRIMARY'] = ['ID','RA','DEC','NINPUT','REDSHIFT','T_G102', 'T_G141', 'T_G800L', 'NUMLINES','HASLINES']
+    keys['PRIMARY'] = ['ID','RA','DEC','NINPUT','REDSHIFT','T_G102', 'T_G141', 'T_G800L', 'N_G102', 'N_G141', 'N_G800L', 'P_G102', 'P_G141', 'P_G800L', 'NUMLINES','HASLINES']
     
     keys['ZFIT_STACK'] = ['CHI2POLY','CHI2SPL','SPLF01','SPLE01','SPLF02','SPLE02','SPLF03','SPLE03','SPLF04','SPLE04', 'DOF','CHIMIN','CHIMAX','BIC_POLY','BIC_SPL','BIC_TEMP','Z02', 'Z16', 'Z50', 'Z84', 'Z97', 'ZWIDTH1', 'ZWIDTH2', 'Z_MAP', 'Z_RISK', 'MIN_RISK', 'VEL_BL','VEL_NL','VEL_Z','VEL_NFEV','VEL_FLAG', 'D4000','D4000_E','DN4000','DN4000_E']
     
+    # 
     keys['ZFIT_BEAM'] = ['CHI2POLY','CHI2SPL','SPLF01','SPLE01','SPLF02','SPLE02','SPLF03','SPLE03','SPLF04','SPLE04', 'DOF','CHIMIN','CHIMAX','BIC_POLY','BIC_SPL','BIC_TEMP','Z02', 'Z16', 'Z50', 'Z84', 'Z97', 'ZWIDTH1', 'ZWIDTH2', 'Z_MAP', 'Z_RISK', 'MIN_RISK', 'VEL_BL','VEL_NL','VEL_Z','VEL_NFEV','VEL_FLAG', 'D4000','D4000_E','DN4000','DN4000_E']
     
-    keys['COVAR'] = ' '.join(['FLUX_{0:03d} ERR_{0:03d} EW50_{0:03d} EWHW_{0:03d}'.format(i) for i in range(64)]).split()
+    keys['COVAR'] = ['DLINEID', 'DLINESN']
+    keys['COVAR'] += ' '.join(['FLUX_{0:03d} ERR_{0:03d} EW50_{0:03d} EWHW_{0:03d}'.format(i) for i in range(64)]).split()
     
     lines = []
     pdf_max = []
@@ -997,6 +1020,7 @@ def _loss(dz, gamma=0.15):
     """
     return 1-1/(1+(dz/gamma)**2)
 
+    
 def refit_beams(root='j012017+213343', append='x', id=708, keep_dict={'G141':[201, 291]}, poly_order=3, make_products=True, run_fit=True, **kwargs):
     """
     Regenerate a MultiBeam object selecting only certiain PAs
@@ -1281,6 +1305,7 @@ class GroupFitter(object):
         self.Nspec = self.Nmask - self.Nphot
         
         self.scif = np.hstack((self.scif, flam))
+        self.idf = np.hstack((self.idf, flam*0-1))
         
         self.DoF = int((self.weightf*self.fit_mask).sum())
         
@@ -1309,6 +1334,7 @@ class GroupFitter(object):
         self.fit_mask_spec = self.fit_mask & True
         
         self.scif = self.scif[:-Nbands]
+        self.idf = self.idf[:-Nbands]
         self.wavef = self.wavef[:-Nbands]
                         
         self.DoF = int((self.weightf*self.fit_mask).sum())
@@ -2091,6 +2117,98 @@ class GroupFitter(object):
                 
             plt.plot(w[xclip]*(1+z), tdraw.T, alpha=0.05, color='r')
     
+    def check_tfit_coeffs(self, tfit, templates, refit_others=True, fit_background=True, fitter='nnls', bounded_kwargs=BOUNDED_DEFAULTS):
+        """
+        Compare emission line fluxes fit at each grism/PA to the combined 
+        value. If `refit_others=True`, then compare the line fluxes to a fit
+        from a new object generated *excluding* that grism/PA.
+        
+        Returns
+        =======
+        max_line : str
+            Line species with the maximum deviation
+        
+        max_line_diff : float
+            The maximum deviation for `max_line` (sigmas).
+        
+        compare : dict
+            The full comparison dictionary
+            
+        """
+        from . import multifit
+        
+        count_grism_pas = 0
+        for gr in self.PA:
+            for pa in self.PA[gr]:
+                count_grism_pas += 1
+        
+        if count_grism_pas == 1:
+            return 0, '', {}
+            
+        weightf_orig = self.weightf*1
+
+        compare = {}
+        for t in templates:
+            compare[t] = 0, ''
+        
+        for gr in self.PA:
+            all_grism_ids = []
+            for pa in self.PA[gr]:
+                all_grism_ids.extend(self.PA[gr][pa])
+
+            for pa in self.PA[gr]:
+                beams = [self.beams[i] for i in self.PA[gr][pa]]
+                
+                this_weight = weightf_orig*0
+                for i in self.PA[gr][pa]:
+                    this_weight += (self.idf == i)
+                
+                self.weightf = weightf_orig*(this_weight + 1.e-10)
+                
+                tfit_i = self.template_at_z(tfit['z'], templates=templates, 
+                                            fit_background=fit_background,
+                                            fitter=fitter, 
+                                            bounded_kwargs=bounded_kwargs)
+                
+                tfit_i['dof'] = (self.weightf > 0).sum()
+
+                # Others
+                if (count_grism_pas) & (refit_others):
+
+                    self.weightf = weightf_orig*((this_weight == 0) + 1.e-10)
+
+                    tfit0 = self.template_at_z(tfit['z'], templates=templates,
+                                             fit_background=fit_background,
+                                             fitter=fitter, 
+                                             bounded_kwargs=bounded_kwargs)
+                    tfit0['dof'] = self.DoF
+
+                else:
+                    tfit0 = tfit
+
+                #beam_tfit[gr][pa] = tfit_i
+
+                for t in templates:
+                    cdiff = tfit_i['cfit'][t][0] - tfit0['cfit'][t][0] 
+                    cdiff_v = tfit_i['cfit'][t][1]**2 + tfit0['cfit'][t][1]**2
+                    diff_sn = cdiff/np.sqrt(cdiff_v)
+                    if diff_sn > compare[t][0]:
+                        compare[t] = diff_sn, (gr, pa)
+
+        max_line_diff, max_line = 0, ''
+
+        for t in compare:
+            if not t.startswith('line '):
+                continue
+
+            if compare[t][0] > max_line_diff:
+                max_line_diff = compare[t][0]
+                max_line = t
+        
+        self.weightf = weightf_orig
+        
+        return max_line, max_line_diff, compare
+        
     def compute_D4000(self, z, fit_background=True, fit_type='D4000', fitter='lstsq'):
         """
         Compute D4000 with step templates
@@ -3231,6 +3349,9 @@ class GroupFitter(object):
                 
             p = []
             for beam in self.beams:
+                if hasattr(beam, 'xp_mask'):
+                    delattr(beam, 'xp_mask')
+                    
                 beam.beam.init_optimal_profile()
                 p.append(beam.beam.optimal_profile.flatten()[beam.fit_mask])
             
