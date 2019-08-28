@@ -879,7 +879,10 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         self.psf_yoff = yoff
         self.psf_filter = psf_filter
         
-        self.psf = EPSF.get_ePSF(self.psf_params, origin=origin, shape=self.sh, filter=psf_filter, get_extended=get_extended)
+        self.psf = EPSF.get_ePSF(self.psf_params, sci=self.psf_sci,
+                                 ivar=self.psf_ivar, origin=origin, 
+                                 shape=self.sh, filter=psf_filter, 
+                                 get_extended=get_extended)
         #print('XXX', self.psf_params[0], self.psf.sum())
         
         # self.psf_params[0] /= self.psf.sum()
@@ -887,14 +890,18 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
                 
         # Center in detector coords
         y0, x0 = np.array(self.sh)/2.-1
-        xd = x0+self.psf_params[1] + origin[1]
-        yd = y0+self.psf_params[2] + origin[0] 
-
+        if len(self.psf_params) == 2:
+            xd = x0+self.psf_params[0] + origin[1]
+            yd = y0+self.psf_params[1] + origin[0] 
+        else:
+            xd = x0+self.psf_params[1] + origin[1]
+            yd = y0+self.psf_params[2] + origin[0] 
+            
         # Get wavelength array
         psf_xy_lam = []
         psf_ext_lam = []
         
-        for i, filter in enumerate(['F105W', 'F125W', 'F160W']):
+        for i, filter in enumerate(['F105W', 'F125W','F160W']):
             psf_xy_lam.append(EPSF.get_at_position(x=xd, y=yd, filter=filter))
             psf_ext_lam.append(EPSF.extended_epsf[filter])
         
@@ -913,15 +920,24 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         A_psf = []
         lam_psf = []
         
-        lam_offset = self.psf_params[1] #self.sh[1]/2 - self.psf_params[1] - 1
+        if len(self.psf_params) == 2:
+            lam_offset = self.psf_params[0] #self.sh[1]/2 - self.psf_params[1] - 1
+        else:
+            lam_offset = self.psf_params[1] #self.sh[1]/2 - self.psf_params[1] - 1
+        
         self.lam_offset = lam_offset
         
         for xi in xarr:
             yi = np.interp(xi, xbeam, self.ytrace_beam)
             li = np.interp(xi, xbeam, self.lam_beam) 
-            dx = xp_beam-self.psf_params[1]-xi-x0
-            dy = yp_beam-self.psf_params[2]-yi+yoff-y0
             
+            if len(self.psf_params) == 2:
+                dx = xp_beam-self.psf_params[0]-xi-x0
+                dy = yp_beam-self.psf_params[1]-yi+yoff-y0
+            else:
+                dx = xp_beam-self.psf_params[1]-xi-x0
+                dy = yp_beam-self.psf_params[2]-yi+yoff-y0
+                
             # wavelength-dependent
             ii = np.interp(li, filt_lam, filt_ix, left=-1, right=10)
             if ii == -1:
@@ -939,7 +955,10 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
             if not get_extended:
                 psf_ext_i = None
                 
-            psf = EPSF.eval_ePSF(psf_xy_i, dx, dy, extended_data=psf_ext_i)*self.psf_params[0]
+            psf = EPSF.eval_ePSF(psf_xy_i, dx, dy, extended_data=psf_ext_i)
+            if len(self.psf_params) > 2:
+                psf *= self.psf_params[0]
+                
             #print(xi, psf.sum())
             
             if seg_mask:
@@ -3414,7 +3433,8 @@ class GrismFLT(object):
 class BeamCutout(object):
     def __init__(self, flt=None, beam=None, conf=None, 
                  get_slice_header=True, fits_file=None, scale=1., 
-                 contam_sn_mask=[10,3], min_mask=0.01, min_sens=0.08):
+                 contam_sn_mask=[10,3], min_mask=0.01, min_sens=0.08,
+                 mask_resid=True):
         """Cutout spectral object from the full frame.
         
         Parameters
@@ -3492,12 +3512,14 @@ class BeamCutout(object):
         self.contam_sn_mask = contam_sn_mask
         self.min_mask = min_mask
         self.min_sens = min_sens
+        self.mask_resid = mask_resid
         
         self._parse_from_data(contam_sn_mask=contam_sn_mask,
-                              min_mask=min_mask, min_sens=min_sens)
+                              min_mask=min_mask, min_sens=min_sens,
+                              mask_resid=mask_resid)
         
     def _parse_from_data(self, contam_sn_mask=[10,3], min_mask=0.01, 
-                         min_sens=0.08):
+                         min_sens=0.08, mask_resid=True):
         """
         See parameter description for `~grizli.model.BeamCutout`.
         """
@@ -3550,10 +3572,15 @@ class BeamCutout(object):
         self.wavef = np.dot(np.ones((self.sh[0],1)), self.wave[None,:]).flatten()
         
         ### Mask large residuals where throughput is low
-        resid = np.abs(self.scif - self.flat_flam)*np.sqrt(self.ivarf)
-        bad_resid = (self.flat_flam < 0.05*self.flat_flam.max()) & (resid > 5)
-        self.fit_mask *= ~bad_resid
-        
+        if mask_resid:
+            resid = np.abs(self.scif - self.flat_flam)*np.sqrt(self.ivarf)
+            bad_resid = (self.flat_flam < 0.05*self.flat_flam.max()) 
+            bad_resid &= (resid > 5)
+            self.bad_resid = bad_resid
+            self.fit_mask *= ~bad_resid
+        else:
+            self.bad_resid = np.zeros_like(self.fit_mask)
+            
         ### Mask very contaminated
         contam_mask = ((self.contam*np.sqrt(self.ivar) > contam_sn_mask[0]) & 
                       (self.model*np.sqrt(self.ivar) < contam_sn_mask[1]))
@@ -4156,7 +4183,7 @@ class BeamCutout(object):
             
         return dispersion_PA
     
-    def init_epsf(self, center=None, tol=1.e-3, yoff=0., skip=1., flat_sensitivity=False, psf_params=None, N=4, get_extended=False):
+    def init_epsf(self, center=None, tol=1.e-3, yoff=0., skip=1., flat_sensitivity=False, psf_params=None, N=4, get_extended=False, only_centering=True):
         """Initialize ePSF fitting for point sources
         TBD
         """
@@ -4174,20 +4201,23 @@ class BeamCutout(object):
             
         origin = np.array(self.direct.origin) - np.array(self.direct.pad)
         if psf_params is None:
+            self.beam.psf_ivar = ivar*1
+            self.beam.psf_sci = self.direct['SCI']*1
             self.psf_params = EPSF.fit_ePSF(self.direct['SCI'], 
                                                   ivar=ivar, 
                                                   center=center, tol=tol,
                                                   N=N, origin=origin,
                                                   filter=self.direct.filter,
                                                   get_extended=get_extended,
-                                                  only_centering=False)
+                                                only_centering=only_centering)
         else:
             self.psf_params = psf_params
             
         self.beam.x_init_epsf(flat_sensitivity=False, psf_params=self.psf_params, psf_filter=self.direct.filter, yoff=yoff, skip=skip, get_extended=get_extended)
         
         self._parse_from_data(contam_sn_mask=self.contam_sn_mask,
-                              min_mask=self.min_mask, min_sens=self.min_sens)
+                              min_mask=self.min_mask, min_sens=self.min_sens,
+                              mask_resid=self.mask_resid)
         
         return None
         
