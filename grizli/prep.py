@@ -1616,7 +1616,7 @@ def make_SEP_catalog(root='',threshold=2., get_background=True,
     
     return tab
 
-def get_seg_iso_flux(data, seg, tab, err=None, verbose=0):
+def get_seg_iso_flux(data, seg, tab, err=None, fill=None, verbose=0):
     """
     Integrate flux within the segmentation regions.
     
@@ -1640,6 +1640,9 @@ def get_seg_iso_flux(data, seg, tab, err=None, verbose=0):
     ymin = np.clip(tab['ymin'], 0, sh[0])
     ymax = np.clip(tab['ymax'], 0, sh[0])
     
+    if fill is not None:
+        filled_data = np.cast[fill.dtype](seg*0)
+        
     for ii, id in enumerate(ids):
 
         if (verbose > 1):
@@ -1649,18 +1652,27 @@ def get_seg_iso_flux(data, seg, tab, err=None, verbose=0):
         slx = slice(xmin[ii], xmax[ii])
         sly = slice(ymin[ii], ymax[ii])
         
-        data_sub = data[sly, slx]
         seg_sub = seg[sly, slx]
         seg_mask = (seg_sub == id)
-
-        iso_flux[ii] = data_sub[seg_mask].sum()
-        iso_area[ii] = seg_mask.sum()
         
-        if err is not None:
-            err_sub = err[sly, slx]
-            iso_err[ii] = np.sqrt((err_sub[seg_mask]**2).sum())
+        if fill is not None:
+            #print(ii, seg_mask.sum())
+            filled_data[sly, slx][seg_mask] = fill[ii]
+        
+        else:
+                
+            data_sub = data[sly, slx]
+            iso_flux[ii] = data_sub[seg_mask].sum()
+            iso_area[ii] = seg_mask.sum()
+        
+            if err is not None:
+                err_sub = err[sly, slx]
+                iso_err[ii] = np.sqrt((err_sub[seg_mask]**2).sum())
     
-    return iso_flux, iso_err, iso_area
+    if fill is not None:
+        return filled_data
+    else:
+        return iso_flux, iso_err, iso_area
     
             
 def compute_SEP_auto_params(data, data_bkg, mask, pixel_scale=0.06, err=None, segmap=None, tab=None, autoparams=[2.5, 0.35*u.arcsec], flux_radii=[0.2, 0.5, 0.9], subpix=5, verbose=True):
