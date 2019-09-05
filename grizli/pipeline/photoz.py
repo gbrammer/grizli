@@ -90,7 +90,9 @@ def apply_catalog_corrections(root, total_flux='flux_auto', auto_corr=True, get_
                     cat['{0}_tot_{1}'.format(f, i)][bad] = -99
                     cat['{0}_etot_{1}'.format(f, i)][bad] = -99
                                          
-    cat.rename_column('number','id')
+    if 'id' not in cat.colnames:
+        cat.rename_column('number','id')
+    
     cat['z_spec'] = cat['id']*0.-1
     
     # Spurious sources, sklearn SVM model trained for a single field
