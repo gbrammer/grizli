@@ -1303,11 +1303,13 @@ class StackedSpectrum(object):
         """
         self.MW_F99 = None
         if MW_EBV > 0:
-            try:
-                from specutils.extinction import ExtinctionF99
-                self.MW_F99 = ExtinctionF99(MW_EBV*R_V, r_v=R_V)
-            except(ImportError):
-                print('Couldn\'t import `specutils.extinction`, MW extinction not implemented')
+            self.MW_F99 = utils.MW_F99(MW_EBV*R_V, r_v=R_V)
+            
+            # try:
+            #     from specutils.extinction import ExtinctionF99
+            #     self.MW_F99 = ExtinctionF99(MW_EBV*R_V, r_v=R_V)
+            # except(ImportError):
+            #     print('Couldn\'t import `specutils.extinction`, MW extinction not implemented')
                 
     @classmethod    
     def get_wavelength_from_header(self, h):
