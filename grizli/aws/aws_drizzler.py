@@ -41,6 +41,7 @@ def make_visit_fits():
     tab['nexp'] = [len(visit['files']) for visit in all_visits]
     
     root = 'candels-july2019'
+    root = 'candels-sep2019'
     
     tab.write(root+'_visits.fits', overwrite=True)
     np.save(root+'_visits.npy', [all_visits])
@@ -259,6 +260,9 @@ def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixsca
     elif master == 'cosmos':
         parent = 's3://grizli-preprocess/CosmosMosaic/'
         bkt = s3.Bucket('grizli-preprocess')
+    elif master == 'grizli-cosmos-v2':
+        parent = 's3://grizli-cosmos-v2/Mosaics/'
+        bkt = s3.Bucket('grizli-cosmos-v2')
     elif master == 'candels-july2019':
         parent = 's3://grizli-v1/Mosaics/'
         bkt = s3.Bucket('grizli-v1')
@@ -636,6 +640,7 @@ def handler(event, context):
     
     os.chdir('/tmp/')
     os.system('rm *')
+    os.system('rm -rf matplotlib*')
     
     print(event) #['s3_object_path'], event['verbose'])
     drizzle_images(**event)
