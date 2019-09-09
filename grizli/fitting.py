@@ -428,6 +428,17 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     # Save the figure
     fig.savefig('{0}_{1:05d}.full.png'.format(group_name, id))
     
+    if only_stacks:
+        # Need to make output with just the stack results
+        line_hdu = pyfits.HDUList([pyfits.PrimaryHDU(header=st.h0)])
+        line_hdu.insert(1, fit_hdu)
+        line_hdu.insert(2, cov_hdu)
+        if fit_beams:
+            line_hdu.insert(2, mb_fit_hdu)
+        line_hdu.insert(3, tfit_hdu)
+        
+        line_hdu.writeto('{0}_{1:05d}.sfull.fits'.format(group_name, id), overwrite=True, output_verify='fix')
+        
     if redshift_only:
         return mb, st, fit, tfit, None
         
