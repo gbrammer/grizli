@@ -2789,9 +2789,14 @@ def summary_catalog(field_root='', dzbin=0.01, use_localhost=True, filter_bandpa
         
     fit = set_column_formats(fit)
     
+    # Just return the table if dzbin parameter not specified
+    if dzbin is None:
+        os.remove('{0}.info.fits'.format(field_root))
+        return fit
+        
     # Overwrite with additional sextractor keywords
     fit.write('{0}.info.fits'.format(field_root), overwrite=True)
-    
+        
     clip = (fit['chinu'] < 2.0) & (fit['log_risk'] < -1)
     clip = (fit['chinu'] < 2.0) & (fit['zq'] < -3) & (fit['zwidth1']/(1+fit['z_map']) < 0.005)
     clip &= fit['bic_diff'] > 30 #-40
