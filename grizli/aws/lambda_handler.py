@@ -346,19 +346,23 @@ def run_grizli_fit(event):
     bkt.upload_file(start_log, full_start)
     
     # Download fit arguments
-    args_file = 'fit_args.npy'
-    needs_args = False
-    if not os.path.exists(args_file):
-        needs_args = True
+    if 'force_args' in event:
+        force_args = event['force_args'] in TRUE_OPTIONS
     else:
-        if 'force_args' in event:
-            needs_args = event['force_args'] in TRUE_OPTIONS
-    
-    if needs_args:
-        aws_args = 'Pipeline/{0}/Extractions/fit_args.npy'.format(root)
-        bkt.download_file(aws_args, './fit_args.npy',
-                          ExtraArgs={"RequestPayer": "requester"})
-    
+        force_args = False
+        
+    args_files = ['{0}_fit_args.npy'.format(root), 'fit_args.npy']
+    for args_file in args_files:
+        if (not os.path.exists(args_file)) | force_args:
+            aws_file = 'Pipeline/{0}/Extractions/{1}'.format(root, args_file)
+            try:
+                bkt.download_file(aws_file, './{1}'.format(args_file),
+                              ExtraArgs={"RequestPayer": "requester"})
+                print('Use args_file = {0}'.format(args_file))
+                break
+            except:
+                continue
+            
     # If no beams file in the bucket, try to generate it
     put_beams=False
     try:
@@ -445,7 +449,7 @@ def run_grizli_fit(event):
         
         fitting.run_all_parallel(id, t0=t0, t1=t1, fit_only_beams=True,
                                  fit_beams=False, phot_obj=None, 
-                                 **event_kwargs)
+                                 args_file=args_file, **event_kwargs)
         
         if output_path is None:
             output_path = 'Pipeline/QuasarFit'.format(root)
@@ -454,7 +458,7 @@ def run_grizli_fit(event):
         
         # Normal galaxy redshift fit
         fitting.run_all_parallel(id, fit_only_beams=True, fit_beams=False,  
-                                 **event_kwargs)
+                                 args_file=args_file, **event_kwargs)
         
         if output_path is None:
             output_path = 'Pipeline/{0}/Extractions'.format(root)
