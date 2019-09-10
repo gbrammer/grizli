@@ -50,7 +50,7 @@ def set_column_formats(fit):
         
     return fit
     
-def summary_catalog(field_root='', dzbin=0.01, use_localhost=True, filter_bandpasses=None, files=None, cdf_sigmas=None, strip_empty_columns=True, **kwargs):
+def summary_catalog(field_root='', dzbin=0.01, use_localhost=True, filter_bandpasses=None, files=None, cdf_sigmas=None, strip_empty_columns=False, **kwargs):
     """
     Make redshift histogram and summary catalog / HTML table
     """
