@@ -78,7 +78,7 @@ def run_all_parallel(id, get_output_data=False, args_file='fit_args.npy', **kwar
     
     return id, status, t1-t0
     
-def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter='bounded', group_name='grism', fit_stacks=True, only_stacks=False, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=np.inf, fit_only_beams=False, fit_beams=True, root='*', fit_trace_shift=False, phot=None, use_phot_obj=True, phot_obj=None, verbose=True, scale_photometry=False, show_beams=True, scale_on_stacked_1d=True, loglam_1d=True, overlap_threshold=5, MW_EBV=0., sys_err=0.03, get_dict=False, bad_pa_threshold=1.6, units1d='flam', redshift_only=False, line_size=1.6, use_psf=False, get_line_width=False, sed_args={'bin':1, 'xlim':[0.3, 9]}, get_ir_psfs=True, min_mask=0.01, min_sens=0.02, mask_resid=True, save_stack=True,  get_line_deviations=True, bounded_kwargs=BOUNDED_DEFAULTS, **kwargs):
+def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter='bounded', group_name='grism', fit_stacks=True, only_stacks=False, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=np.inf, fit_only_beams=False, fit_beams=True, root='*', fit_trace_shift=False, phot=None, use_phot_obj=True, phot_obj=None, verbose=True, scale_photometry=False, show_beams=True, scale_on_stacked_1d=True, loglam_1d=True, overlap_threshold=5, MW_EBV=0., sys_err=0.03, huber_delta=4, get_student_logpdf=False, get_dict=False, bad_pa_threshold=1.6, units1d='flam', redshift_only=False, line_size=1.6, use_psf=False, get_line_width=False, sed_args={'bin':1, 'xlim':[0.3, 9]}, get_ir_psfs=True, min_mask=0.01, min_sens=0.02, mask_resid=True, save_stack=True,  get_line_deviations=True, bounded_kwargs=BOUNDED_DEFAULTS, write_fits_files=True, save_figures=True, fig_type='png', **kwargs):
     """Run the full procedure
     
     1) Load MultiBeam and stack files 
@@ -93,6 +93,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     from grizli.multifit import MultiBeam
     
     from .version import __version__ as grizli__version
+    from .pipeline import summary
     
     if get_dict:
         frame = inspect.currentframe()
@@ -127,7 +128,12 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
                                                                    fit_log))
                 
             hdu, fig = mb.drizzle_grisms_and_PAs(fcontam=fcontam, flambda=False, kernel='point', size=32, diff=False)
-            fig.savefig('{0}_{1:05d}.fix.stack.png'.format(group_name, id))
+            if save_figures:
+                fig.savefig('{0}_{1:05d}.fix.stack.{2}'.format(group_name, 
+                                                             id, figure_type))
+            else:
+                plt.close(fig)
+                
             good_PAs = []
             for k in keep_dict:
                 good_PAs.extend(keep_dict[k])
@@ -236,7 +242,8 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
                     st.pscale = scl.x
     
     # First pass    
-    fit = fit_obj.xfit_redshift(templates=t0, zr=zr, dz=dz, prior=prior, fitter=fitter[0], verbose=verbose, bounded_kwargs=bounded_kwargs) 
+    fit = fit_obj.xfit_redshift(templates=t0, zr=zr, dz=dz, prior=prior, fitter=fitter[0], verbose=verbose, bounded_kwargs=bounded_kwargs, huber_delta=huber_delta, get_student_logpdf=get_student_logpdf)
+     
     fit_hdu = pyfits.table_to_hdu(fit)
     fit_hdu.header['EXTNAME'] = 'ZFIT_STACK'
     
@@ -277,7 +284,12 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
         width = 20*0.001*(1+z0)
         
         mb_zr = z0 + width*np.array([-1,1])
-        mb_fit = mb.xfit_redshift(templates=t0, zr=mb_zr, dz=[0.001, 0.0002], prior=prior, fitter=fitter[0], verbose=verbose, bounded_kwargs=bounded_kwargs) 
+        mb_fit = mb.xfit_redshift(templates=t0, zr=mb_zr, dz=[0.001, 0.0002],
+                                  prior=prior, fitter=fitter[0], 
+                                  verbose=verbose, huber_delta=huber_delta, 
+                                  get_student_logpdf=get_student_logpdf, 
+                                  bounded_kwargs=bounded_kwargs)
+                                   
         mb_fit_hdu = pyfits.table_to_hdu(mb_fit)
         mb_fit_hdu.header['EXTNAME'] = 'ZFIT_BEAM'
     else:
@@ -426,8 +438,9 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
         #fig.axes[1].plot(tfit['line1d'].wave/1.e4, tfit['line1d'].flux/1.e-19, color='k', alpha=0.2, zorder=100)
          
     # Save the figure
-    fig.savefig('{0}_{1:05d}.full.png'.format(group_name, id))
-    
+    if save_figures:
+        fig.savefig('{0}_{1:05d}.full.{2}'.format(group_name, id, fig_type))
+        
     if only_stacks:
         # Need to make output with just the stack results
         line_hdu = pyfits.HDUList([pyfits.PrimaryHDU(header=st.h0)])
@@ -437,10 +450,14 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
             line_hdu.insert(2, mb_fit_hdu)
         line_hdu.insert(3, tfit_hdu)
         
-        line_hdu.writeto('{0}_{1:05d}.sfull.fits'.format(group_name, id), overwrite=True, output_verify='fix')
+        if write_fits_files:
+            line_hdu.writeto('{0}_{1:05d}.sfull.fits'.format(group_name, id),
+                             overwrite=True, output_verify='fix')
+    else:
+        line_hdu = None
         
     if redshift_only:
-        return mb, st, fit, tfit, None
+        return mb, st, fit, tfit, line_hdu
         
     # Make the line maps
     if pline is None:
@@ -470,8 +487,17 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
         line_hdu.insert(2, mb_fit_hdu)
     line_hdu.insert(3, tfit_hdu)
     
-    line_hdu.writeto('{0}_{1:05d}.full.fits'.format(group_name, id), overwrite=True, output_verify='fix')
-    
+    if write_fits_files:
+        full_file = '{0}_{1:05d}.full.fits'.format(group_name, id)
+        line_hdu.writeto(full_file, overwrite=True, output_verify='fix')
+        
+        # Row for summary table
+        info = summary.summary_catalog(dzbin=None, filter_bandpasses=[],
+                                           files=[full_file]) 
+        
+        row_file = '{0}_{1:05d}.row.fits'.format(group_name, id)
+        info.write(row_file, overwrite=True)
+        
     # 1D spectrum
     oned_hdul = mb.oned_spectrum_to_hdu(tfit=tfit, bin=1, outputfile='{0}_{1:05d}.1D.fits'.format(group_name, id), loglam=loglam_1d)#, units=units1d)
     oned_hdul[0].header['GRIZLIV'] = (grizli__version, 'Grizli version')
@@ -483,13 +509,18 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
 
         hdu[0].header['GRIZLIV'] = (grizli__version, 'Grizli version')
                                              
-        fig.savefig('{0}_{1:05d}.stack.png'.format(group_name, id))
+        if save_figures:
+            fig.savefig('{0}_{1:05d}.stack.{2}'.format(group_name, id, 
+                                                       fig_type))
 
-        hdu.writeto('{0}_{1:05d}.stack.fits'.format(group_name, id), 
+        if write_fits_files:
+            hdu.writeto('{0}_{1:05d}.stack.fits'.format(group_name, id), 
                     overwrite=True)
-                    
-        #mb.write_master_fits(include_model=True, get_trace_table=True)
         
+        hdu_stack = hdu
+    else:
+        hdu_stack = None            
+    
     ######
     # Show the drizzled lines and direct image cutout, which are
     # extensions `DSCI`, `LINE`, etc.
@@ -502,14 +533,16 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     
     full_line_list = ['Lya', 'OII', 'Hb', 'OIII', 'Ha', 'Ha+NII', 'SII', 'SIII']
     fig = show_drizzled_lines(line_hdu, size_arcsec=si, cmap='plasma_r', scale=s, dscale=s, full_line_list=full_line_list)
-    fig.savefig('{0}_{1:05d}.line.png'.format(group_name, id))
+    if save_figures:
+        fig.savefig('{0}_{1:05d}.line.{2}'.format(group_name, id, fig_type))
     
     if phot is not None:
         out = mb, st, fit, tfit, line_hdu
         if 'pz' in phot:
-            full_sed_plot(mb, tfit, zfit=fit, photometry_pz=phot['pz'], **sed_args)
+            full_sed_plot(mb, tfit, zfit=fit, photometry_pz=phot['pz'],
+                          save=save_figures, **sed_args)
         else:
-            full_sed_plot(mb, tfit, zfit=fit, **sed_args)
+            full_sed_plot(mb, tfit, zfit=fit, save=save_figures, **sed_args)
         
     return mb, st, fit, tfit, line_hdu
 
@@ -705,8 +738,37 @@ def full_sed_plot(mb, tfit, zfit=None, bin=1, minor=0.1, save='png', sed_resolut
         fig.savefig('{0}_{1:05d}.sed.{2}'.format(mb.group_name, mb.id, save))
         
     return fig
+
+CDF_SIGMAS = np.linspace(-5, 5, 51)
+def compute_cdf_percentiles(fit, cdf_sigmas=CDF_SIGMAS):
+    """
+    Compute tabulated percentiles of the PDF
+    """
+    from scipy.interpolate import Akima1DInterpolator
+    from scipy.integrate import cumtrapz
+    import scipy.stats
     
-def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat', verbose=True, files=None, filter_bandpasses=[], get_sps=False):
+    if cdf_sigmas is None:
+        cdf_sigmas = CDF_SIGMAS
+    
+    cdf_y = scipy.stats.norm.cdf(cdf_sigmas)
+    
+    if len(fit['zgrid']) == 1:
+        return np.ones_like(cdf_y)*fit['zgrid'][0], cdf_y
+            
+    spl = Akima1DInterpolator(fit['zgrid'], np.log(fit['pdf']), axis=1)
+    zrfine = [fit['zgrid'].min(), fit['zgrid'].max()]
+    zfine = utils.log_zgrid(zr=zrfine, dz=0.0001)
+    ok = np.isfinite(spl(zfine))
+    pz_fine = np.exp(spl(zfine))
+    pz_fine[~ok] = 0
+    
+    cdf_fine = cumtrapz(pz_fine, x=zfine)
+    cdf_x = np.interp(cdf_y, cdf_fine/cdf_fine[-1], zfine[1:])
+    
+    return cdf_x, cdf_y
+    
+def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat', verbose=True, files=None, filter_bandpasses=[], get_sps=False, write_table=True, cdf_sigmas=CDF_SIGMAS):
     
     import glob
     import os
@@ -722,10 +784,16 @@ def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat',
     keys = OrderedDict()
     keys['PRIMARY'] = ['ID','RA','DEC','NINPUT','REDSHIFT','T_G102', 'T_G141', 'T_G800L', 'N_G102', 'N_G141', 'N_G800L', 'P_G102', 'P_G141', 'P_G800L', 'NUMLINES','HASLINES']
     
-    keys['ZFIT_STACK'] = ['CHI2POLY','CHI2SPL','SPLF01','SPLE01','SPLF02','SPLE02','SPLF03','SPLE03','SPLF04','SPLE04', 'DOF','CHIMIN','CHIMAX','BIC_POLY','BIC_SPL','BIC_TEMP','Z02', 'Z16', 'Z50', 'Z84', 'Z97', 'ZWIDTH1', 'ZWIDTH2', 'Z_MAP', 'Z_RISK', 'MIN_RISK', 'VEL_BL','VEL_NL','VEL_Z','VEL_NFEV','VEL_FLAG', 'D4000','D4000_E','DN4000','DN4000_E']
+    keys['ZFIT_STACK'] = ['CHI2POLY','CHI2SPL','SPLF01','SPLE01',
+                      'SPLF02','SPLE02','SPLF03','SPLE03','SPLF04','SPLE04',
+                      'HUBERDEL','ST_DF','ST_LOC','ST_SCL',
+                      'DOF','CHIMIN','CHIMAX','BIC_POLY','BIC_SPL','BIC_TEMP',
+                      'Z02', 'Z16', 'Z50', 'Z84', 'Z97', 'ZWIDTH1', 'ZWIDTH2', 
+                      'Z_MAP', 'Z_RISK', 'MIN_RISK', 
+                      'VEL_BL','VEL_NL','VEL_Z','VEL_NFEV','VEL_FLAG', 
+                      'D4000','D4000_E','DN4000','DN4000_E']
     
-    # 
-    keys['ZFIT_BEAM'] = ['CHI2POLY','CHI2SPL','SPLF01','SPLE01','SPLF02','SPLE02','SPLF03','SPLE03','SPLF04','SPLE04', 'DOF','CHIMIN','CHIMAX','BIC_POLY','BIC_SPL','BIC_TEMP','Z02', 'Z16', 'Z50', 'Z84', 'Z97', 'ZWIDTH1', 'ZWIDTH2', 'Z_MAP', 'Z_RISK', 'MIN_RISK', 'VEL_BL','VEL_NL','VEL_Z','VEL_NFEV','VEL_FLAG', 'D4000','D4000_E','DN4000','DN4000_E']
+    keys['ZFIT_BEAM'] = keys['ZFIT_STACK'].copy() 
     
     keys['COVAR'] = ['DLINEID', 'DLINESN']
     keys['COVAR'] += ' '.join(['FLUX_{0:03d} ERR_{0:03d} EW50_{0:03d} EWHW_{0:03d}'.format(i) for i in range(64)]).split()
@@ -741,7 +809,9 @@ def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat',
     template_mags = []
     sps_params = []
     
-    for file in files:
+    cdf_array = None
+    
+    for ii, file in enumerate(files):
         print(utils.NO_NEWLINE+file)
         line = []
         full = pyfits.open(file)
@@ -771,12 +841,19 @@ def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat',
             try:
                 sps = compute_sps_params(full)
             except:
-                sps = {'Lv':-1*u.solLum, 'MLv':-1*u.solMass/u.solLum, 'MLv_rms':-1*u.solMass/u.solLum, 'SFRv':-1*u.solMass/u.year, 'SFRv_rms':-1*u.solMass/u.year, 'templ':-1}
+                sps = {'Lv':np.nan*u.solLum, 'MLv':np.nan*u.solMass/u.solLum, 'MLv_rms':np.nan*u.solMass/u.solLum, 'SFRv':np.nan*u.solMass/u.year, 'SFRv_rms':np.nan*u.solMass/u.year, 'templ':np.nan}
         else:
-            sps = {'Lv':-1*u.solLum, 'MLv':-1*u.solMass/u.solLum, 'MLv_rms':-1*u.solMass/u.solLum, 'SFRv':-1*u.solMass/u.year, 'SFRv_rms':-1*u.solMass/u.year, 'templ':-1}
+            sps = {'Lv':np.nan*u.solLum, 'MLv':np.nan*u.solMass/u.solLum, 'MLv_rms':np.nan*u.solMass/u.solLum, 'SFRv':np.nan*u.solMass/u.year, 'SFRv_rms':np.nan*u.solMass/u.year, 'templ':np.nan}
 
         sps_params.append(sps)
-            
+        
+        cdf_x, cdf_y = compute_cdf_percentiles(tab, 
+                                           cdf_sigmas=np.linspace(-5, 5, 51))
+        if cdf_array is None:
+            cdf_array = np.zeros((len(files), len(cdf_x)), dtype=np.float32)
+        
+        cdf_array[ii,:] = cdf_x
+        
         lines.append(line)
         
         # Integrate best-fit template through filter bandpasses
@@ -794,9 +871,12 @@ def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat',
             columns.extend(['beam_{0}'.format(k) for k in keys[ext]])
         else:
             columns.extend(keys[ext])
-    
+        
     info = utils.GTable(rows=lines, names=columns)
     info['PDF_MAX'] = pdf_max
+    
+    info['CDF_Z'] = cdf_array
+    info.meta['NCDF'] = cdf_array.shape[1], 'cdf_sigmas = np.linspace(-5, 5, 51)'
     
     root_col = utils.GTable.Column(name='root', data=roots)
     info.add_column(root_col, index=0)
@@ -913,7 +993,8 @@ def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat',
             
     ### Sextractor catalog
     if sextractor is None:
-        info.write('{0}.info.fits'.format(target), overwrite=True)
+        if write_table:
+            info.write('{0}.info.fits'.format(target), overwrite=True)
         return info
         
     #sextractor = glob.glob('{0}-f*cat'.format(target))[0]
@@ -929,7 +1010,9 @@ def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat',
     for c in hcat.colnames:
         info.add_column(hcat[c][idx])
             
-    info.write('{0}.info.fits'.format(target), overwrite=True)
+    if write_table:
+        info.write('{0}.info.fits'.format(target), overwrite=True)
+    
     return info
 
 def compute_sps_params(full='j021820-051015_01276.full.fits', cosmology=Planck15):
@@ -1674,6 +1757,7 @@ class GroupFitter(object):
         from scipy import polyfit, polyval
         from scipy.stats import t as student_t
         from scipy.special import huber
+        import peakutils
         
         if zr is 0:
             stars = True
@@ -1682,7 +1766,17 @@ class GroupFitter(object):
         else:
             stars = False
             
-        zgrid = utils.log_zgrid(zr, dz=dz[0])
+        if len(zr) == 1:
+            zgrid = np.array([zr[0]])
+            zoom = False
+        elif len(zr) == 3:
+            # Range from zr[0] += zr[1]*zr[2]*(1+zr[0]) by zr[1]*(1+zr[0])
+            step = zr[1]*zr[2]*(1+zr[0])
+            zgrid = utils.log_zgrid(zr[0] + np.array([-1,1])*step, dz=zr[1])
+            zoom = False
+        else:
+            zgrid = utils.log_zgrid(zr, dz=dz[0])
+
         NZ = len(zgrid)
         
         #### Polynomial SED fit
@@ -1778,7 +1872,6 @@ class GroupFitter(object):
             print('First iteration: z_best={0:.4f}\n'.format(zgrid[iz]))
             
         ## Find peaks
-        import peakutils
         
         # Make "negative" chi2 for peak-finding
         #chi2_test = chi2_poly
@@ -1791,17 +1884,17 @@ class GroupFitter(object):
         else:
             chi2_rev = (chi2_test - chi2)/self.DoF
             
-        chi2_rev[chi2_rev < 0] = 0
-        indexes = peakutils.indexes(chi2_rev, thres=0.4, min_dist=8)
-        num_peaks = len(indexes)
-        
-        if False:
-            plt.plot(zgrid, (chi2-chi2.min())/ self.DoF)
-            plt.scatter(zgrid[indexes], (chi2-chi2.min())[indexes]/ self.DoF, color='r')
-        
+        if len(zgrid) > 1:
+            chi2_rev[chi2_rev < 0] = 0
+            indexes = peakutils.indexes(chi2_rev, thres=0.4, min_dist=8)
+            num_peaks = len(indexes)
+        else:
+            num_peaks = 1
+            zoom = False
+                
         # delta_chi2 = (chi2.max()-chi2.min())/self.DoF
         # if delta_chi2 > delta_chi2_threshold:      
-        if (num_peaks > 0) & (not stars) & zoom:
+        if (num_peaks > 0) & (not stars) & zoom & (len(dz) > 1):
             zgrid_zoom = []
             for ix in indexes:
                 if (ix > 0) & (ix < len(chi2)-1):
@@ -1869,8 +1962,10 @@ class GroupFitter(object):
         
         kspl = (coeffs_spline != 0).sum()
         fit.meta['chi2spl'] = (chi2_spline, 'Chi^2 of spline fit')
+        fit.meta['Rspline'] = (Rspline, 'R=lam/dlam of spline fit')
         fit.meta['kspl'] = (kspl, 'Parameters, k, of spline fit')
-        
+        fit.meta['huberdel'] = (huber_delta, 'Huber delta parameter, see scipy.special.huber')
+                
         # Evaluate spline at wavelengths for stars
         xspline = np.array([6060, 8100, 9000, 1.27e4, 1.4e4])
         flux_spline = utils.eval_bspline_templates(xspline, tspline, coeffs_spline[self.N:])
@@ -1896,7 +1991,7 @@ class GroupFitter(object):
         # Bayesian information criteria, normalized to template min_chi2
         # BIC = log(number of data points)*(number of params) + min(chi2) + C
         # https://en.wikipedia.org/wiki/Bayesian_information_criterion
-        
+                
         scale_chinu = self.DoF/chi2.min()
         scale_chinu = 1 # Don't rescale
         
@@ -1905,7 +2000,6 @@ class GroupFitter(object):
         fit.meta['bic_spl'] = np.log(self.DoF)*kspl + (chi2_spline-chi2.min())*scale_chinu, 'BIC of spline fit'
         
         fit.meta['bic_temp'] = np.log(self.DoF)*ktempl, 'BIC of template fit'
-        
         
         for i, tname in enumerate(templates):
             fit.meta['T{0:03d}NAME'.format(i+1)] = (templates[tname].name, 'Template name')
@@ -1918,9 +2012,10 @@ class GroupFitter(object):
         fit['chi2'] = np.cast[dtype](chi2)
         if get_student_logpdf:
             fit['student_logpdf'] = np.cast[dtype](logpdf)
-            fit.meta['t_df'] = student_t_pars[0], 'Student-t df'
-            fit.meta['t_loc'] = student_t_pars[1], 'Student-t loc'
-            fit.meta['t_scale'] = student_t_pars[2], 'Student-t scale'
+        
+        fit.meta['st_df'] = student_t_pars[0], 'Student-t df of spline fit'
+        fit.meta['st_loc'] = student_t_pars[1], 'Student-t loc of spline fit'
+        fit.meta['st_scl'] = student_t_pars[2], 'Student-t scale of spline fit'
 
         #fit['chi2poly'] = chi2_poly
         fit['coeffs'] = np.cast[dtype](coeffs)
@@ -1930,11 +2025,13 @@ class GroupFitter(object):
         
         return fit
     
-    def _parse_zfit_output(self, fit, prior=None):
+    def _parse_zfit_output(self, fit, risk_gamma=0.15, prior=None):
         """Parse best-fit redshift, etc.
         TBD
         """
         import scipy.interpolate
+        from scipy.interpolate import Akima1DInterpolator
+        from scipy.integrate import cumtrapz
         
         # Normalize to min(chi2)/DoF = 1.
         scl_nu = fit['chi2'].min()/self.DoF
@@ -1952,50 +2049,63 @@ class GroupFitter(object):
             fit.meta['hasprior'] = False, 'Prior applied to PDF'
 
         # Normalize PDF
-        pdf /= np.trapz(pdf, fit['zgrid'])
+        if len(pdf) > 1:
+            pdf /= np.trapz(pdf, fit['zgrid'])
         
-        pdf = np.maximum(pdf, 1.e-40)
+            pdf = np.maximum(pdf, 1.e-40)
         
-        # Interpolate pdf for more continuous measurement
-        spl = scipy.interpolate.Akima1DInterpolator(fit['zgrid'], np.log(pdf), axis=1)
-        zfine = utils.log_zgrid(zr=[fit['zgrid'].min(), fit['zgrid'].max()], dz=0.0001)
-        ok = np.isfinite(spl(zfine))
-        norm = np.trapz(np.exp(spl(zfine[ok])), zfine[ok])
-        
-        # Compute CDF and probability intervals
-        dz = np.gradient(zfine[ok])
-        cdf = np.cumsum(np.exp(spl(zfine[ok]))*dz/norm)
-        pz_percentiles = np.interp(np.array([2.5, 16, 50, 84, 97.5])/100., cdf, zfine[ok])
-
-        # Random draws, testing
-        #rnd = np.interp(np.random.rand(1000), cdf, fit['zgrid']+dz/2.)
-        
-        dz = np.gradient(fit['zgrid'])
-        
-        gamma = 0.15
-        zsq = np.dot(fit['zgrid'][:,None], np.ones_like(fit['zgrid'])[None,:])
-        L = _loss((zsq-fit['zgrid'])/(1+fit['zgrid']), gamma=gamma)
-        
-        risk = np.dot(pdf*L, dz)
-        zi = np.argmin(risk)
-        
-        #print('xxx', zi, len(risk))
-        
-        if (zi < len(risk)-1) & (zi > 0):
-            c = np.polyfit(fit['zgrid'][zi-1:zi+2], risk[zi-1:zi+2], 2)
-            z_risk = -c[1]/(2*c[0])
-        else:
-            z_risk = fit['zgrid'][zi]
+            # Interpolate pdf for more continuous measurement
+            spl = Akima1DInterpolator(fit['zgrid'], np.log(pdf), axis=1)
+            zrfine = [fit['zgrid'].min(), fit['zgrid'].max()]
+            zfine = utils.log_zgrid(zr=zrfine, dz=0.0001)
+            splz = spl(zfine)
+            ok = np.isfinite(splz)
+            pz_fine = np.exp(splz)
+            pz_fine[~ok] = 0
             
-        min_risk = np.trapz(pdf*_loss((z_risk-fit['zgrid'])/(1+fit['zgrid']), gamma=gamma), fit['zgrid'])
+            #norm = np.trapz(pzfine, zfine)
         
-        # MAP, maximum p(z)
-        zi = np.argmax(pdf)
-        if (zi < len(pdf)-1) & (zi > 0):
-            c = np.polyfit(fit['zgrid'][zi-1:zi+2], pdf[zi-1:zi+2], 2)
-            z_map = -c[1]/(2*c[0])
+            # Compute CDF and probability intervals
+            #dz = np.gradient(zfine[ok])
+            #cdf = np.cumsum(np.exp(spl(zfine[ok]))*dz/norm)
+            cdf = cumtrapz(pz_fine, x=zfine)            
+            percentiles = np.array([2.5, 16, 50, 84, 97.5])/100.
+            pz_percentiles = np.interp(percentiles, cdf/cdf[-1], zfine[1:])
+            
+            # Risk parameter 
+            dz = np.gradient(fit['zgrid'])
+        
+            zsq = np.dot(fit['zgrid'][:,None], 
+                         np.ones_like(fit['zgrid'])[None,:])
+            L = _loss((zsq-fit['zgrid'])/(1+fit['zgrid']), gamma=risk_gamma)
+        
+            risk = np.dot(pdf*L, dz)
+        
+            # Fit a parabolat around min(risk)
+            zi = np.argmin(risk)
+            if (zi < len(risk)-1) & (zi > 0):
+                c = np.polyfit(fit['zgrid'][zi-1:zi+2], risk[zi-1:zi+2], 2)
+                z_risk = -c[1]/(2*c[0])
+            else:
+                z_risk = fit['zgrid'][zi]
+            
+            risk_loss = _loss((z_risk-fit['zgrid'])/(1+fit['zgrid']),
+                              gamma=risk_gamma)
+            min_risk = np.trapz(pdf*risk_loss, fit['zgrid'])
+        
+            # MAP, maximum p(z) from parabola fit around tabulated maximum
+            zi = np.argmax(pdf)
+            if (zi < len(pdf)-1) & (zi > 0):
+                c = np.polyfit(fit['zgrid'][zi-1:zi+2], pdf[zi-1:zi+2], 2)
+                z_map = -c[1]/(2*c[0])
+            else:
+                z_map = fit['zgrid'][zi]
         else:
-            z_map = fit['zgrid'][zi]
+            risk = np.zeros_like(pdf)-1    
+            pz_percentiles = np.zeros(5)
+            z_map = fit['zgrid'][0]
+            min_risk = -1
+            z_risk = z_map
             
         # Store data in the fit table
         fit['pdf'] = pdf
@@ -2012,7 +2122,7 @@ class GroupFitter(object):
         
         fit.meta['z_risk'] = z_risk, 'Redshift at minimum risk'
         fit.meta['min_risk'] = min_risk, 'Minimum risk'
-        fit.meta['gam_loss'] = gamma, 'Gamma factor of the risk/loss function'
+        fit.meta['gam_loss'] = risk_gamma, 'Gamma factor of the risk/loss function'
         return fit
                         
     def template_at_z(self, z=0, templates=None, fwhm=1400, get_uncertainties=2, draws=0, **kwargs):
@@ -2215,7 +2325,7 @@ class GroupFitter(object):
                 
             if compare[t][0] > max_line_diff:
                 max_line_diff = compare[t][0]
-                max_line = t
+                max_line = t.strip('line ')
         
         self.weightf = weightf_orig
         
