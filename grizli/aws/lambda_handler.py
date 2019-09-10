@@ -356,7 +356,7 @@ def run_grizli_fit(event):
         if (not os.path.exists(args_file)) | force_args:
             aws_file = 'Pipeline/{0}/Extractions/{1}'.format(root, args_file)
             try:
-                bkt.download_file(aws_file, './{1}'.format(args_file),
+                bkt.download_file(aws_file, './{0}'.format(args_file),
                               ExtraArgs={"RequestPayer": "requester"})
                 print('Use args_file = {0}'.format(args_file))
                 break
