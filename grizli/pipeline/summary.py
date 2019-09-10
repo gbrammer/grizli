@@ -62,7 +62,6 @@ def summary_catalog(field_root='', dzbin=0.01, use_localhost=True, filter_bandpa
     import matplotlib.pyplot as plt
 
     import astropy.table
-    import pysynphot as S
     
     try:
         from .. import fitting, prep, utils
@@ -72,6 +71,7 @@ def summary_catalog(field_root='', dzbin=0.01, use_localhost=True, filter_bandpa
         from grizli.pipeline import auto_script
     
     if filter_bandpasses is None:
+        import pysynphot as S
         filter_bandpasses = [S.ObsBandpass(bpstr) for bpstr in ['acs,wfc1,f814w','wfc3,ir,f105w', 'wfc3,ir,f110w', 'wfc3,ir,f125w', 'wfc3,ir,f140w', 'wfc3,ir,f160w']]
     
     if os.path.exists('{0}.info.fits'.format(field_root)):
