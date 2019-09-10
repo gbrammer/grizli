@@ -1405,6 +1405,7 @@ class MultiBeam(GroupFitter):
         self.min_mask = min_mask
         self.min_sens = min_sens
         self.mask_resid = mask_resid
+        self.sys_err = sys_err
         
         if isinstance(beams, str):
             self.load_master_fits(beams, verbose=verbose)    
@@ -1423,30 +1424,20 @@ class MultiBeam(GroupFitter):
                     for i in range(1, len(beams)):
                         b_i = MultiBeam(beams[i], group_name=group_name, fcontam=fcontam, psf=psf, polyx=polyx, MW_EBV=np.maximum(MW_EBV, 0), sys_err=sys_err, verbose=verbose, min_mask=min_mask, min_sens=min_sens, mask_resid=mask_resid)
                         self.extend(b_i)
-                        
+                    
                 else:
                     # List of individual beam.fits files
                     self.load_beam_fits(beams)            
             else:
                 self.beams = beams
         
-        # minimum error
-        self.sys_err = sys_err
-        for beam in self.beams:
-            if hasattr(beam, 'xp_mask'):
-                delattr(beam, 'xp_mask')
-            
-            beam.ivarf = 1./(1/beam.ivarf + (sys_err*beam.scif)**2)
-            beam.ivarf[~np.isfinite(beam.ivarf)] = 0
-            beam.ivar = beam.ivarf.reshape(beam.sh)
-        
         self.ra, self.dec = self.beams[0].get_sky_coords()
         
         if MW_EBV < 0:
             ### Try to get MW_EBV from hsaquery.utils
             try:
-                import hsaquery.utils
-                MW_EBV = hsaquery.utils.get_irsa_dust(self.ra, self.dec)
+                import mastquery.utils
+                MW_EBV = mastquery.utils.get_irsa_dust(self.ra, self.dec)
             except:
                 MW_EBV = 0
         
@@ -1576,6 +1567,18 @@ class MultiBeam(GroupFitter):
                                       for b in self.beams])
                                                
         self.DoF = self.fit_mask.sum()
+        
+        # systematic error
+        for i, b in enumerate(self.beams):
+            if hasattr(b, 'has_sys_err'):
+                continue
+            
+            sciu = b.scif.reshape(b.sh)
+            ivar = 1./(1/b.ivar + (self.sys_err*sciu)**2)
+            ivar[~np.isfinite(ivar)] = 0
+            b.ivar = ivar*1
+            b.ivarf = b.ivar.flatten()
+        
         self.ivarf = np.hstack([b.ivarf for b in self.beams])
         
         self.fit_mask &= (self.ivarf >= 0) 
@@ -1699,12 +1702,18 @@ class MultiBeam(GroupFitter):
         hdu.writeto(outfile, overwrite=True)
     
     def load_master_fits(self, beam_file, verbose=True):
+        """
+        Load a "beams.fits" file.
+        """
         import copy
         
         try:
             utils.fetch_acs_wcs_files(beam_file)
         except:
             pass
+        
+        if verbose:
+            print('load_master_fits: {0}'.format(beam_file))
             
         hdu = pyfits.open(beam_file, lazy_load_hdus=False)
         N = hdu[0].header['COUNT']
@@ -3400,6 +3409,9 @@ class MultiBeam(GroupFitter):
         ### Reset model profile for optimal extractions
         for b in self.beams:
             #b._parse_from_data()
+            if hasattr(b, 'has_sys_err'):
+                delattr(b, 'has_sys_err')
+                
             b._parse_from_data(contam_sn_mask=b.contam_sn_mask,
                                   min_mask=b.min_mask, min_sens=b.min_sens,
                                   mask_resid=b.mask_resid)
