@@ -129,6 +129,11 @@ def extract_beams_from_flt(root, bucket, id, clean=True, silent=False):
     if not silent:
         print('Read {0} GrismFLT files'.format(len(flt_files)))
     
+    if os.path.exists('{0}_fit_args.npy'.format(root)):
+        args_file = '{0}_fit_args.npy'.format(root)
+    else:
+        args_file = 'fit_args.npy'
+        
     for i, file in enumerate(flt_files):
         if not silent:
             print('# Read {0}/{1}'.format(i+1, len(flt_files)))
@@ -166,7 +171,7 @@ def extract_beams_from_flt(root, bucket, id, clean=True, silent=False):
         if not exp_has_id:
             continue
                 
-        beams_i =                           auto_script.extract(field_root=root, maglim=[13,24], prior=None, MW_EBV=0.00, ids=id, pline={}, fit_only_beams=True, run_fit=False, poly_order=7, master_files=[os.path.basename(file)], grp=None, bad_pa_threshold=None, fit_trace_shift=False, size=32, diff=True, min_sens=0.02, skip_complete=True, fit_args={}, args_file='fit_args.npy', get_only_beams=True)
+        beams_i =                           auto_script.extract(field_root=root, maglim=[13,24], prior=None, MW_EBV=0.00, ids=id, pline={}, fit_only_beams=True, run_fit=False, poly_order=7, master_files=[os.path.basename(file)], grp=None, bad_pa_threshold=None, fit_trace_shift=False, size=32, diff=True, min_sens=0.02, skip_complete=True, fit_args={}, args_file=args_file, get_only_beams=True)
         
         # Remove the GrismFLT file    
         for f_j in out_files:
@@ -186,7 +191,7 @@ def extract_beams_from_flt(root, bucket, id, clean=True, silent=False):
         return False
     
     # Grism Object
-    args = np.load('fit_args.npy', allow_pickle=True)[0]
+    args = np.load(args_file, allow_pickle=True)[0]
     mb = multifit.MultiBeam(beams, **args)
     mb.write_master_fits()
     
