@@ -3796,9 +3796,10 @@ def header_keys_from_filelist(fits_files, keywords=[], ext=0, colname_case=str.l
     return tab     
     
 def drizzle_from_visit(visit, output, pixfrac=1., kernel='point', 
-                       clean=True, include_saturated=True):
+                       clean=True, include_saturated=True, keep_bits=None):
     """
     Make drizzle mosaic from exposures in a visit dictionary
+    
     """
     from shapely.geometry import Polygon
     import boto3
@@ -3861,7 +3862,10 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
         
         if include_saturated:
             bits |= 256
-            
+        
+        if keep_bits is not None:
+            bits |= keep_bits
+                
         keys = OrderedDict()
         for k in ['EXPTIME','FILTER', 'FILTER1', 'FILTER2', 'DETECTOR', 'INSTRUME', 'PHOTFLAM','PHOTPLAM','PHOTFNU', 'PHOTZPT', 'PHOTBW', 'PHOTMODE', 'EXPSTART','EXPEND','DATE-OBS','TIME-OBS']:
             if k in flt[0].header:
