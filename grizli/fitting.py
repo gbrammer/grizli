@@ -2155,7 +2155,7 @@ class GroupFitter(object):
                 count_grism_pas += 1
         
         if count_grism_pas == 1:
-            return 0, '', {}
+            return 'N/A', 0, {}
             
         weightf_orig = self.weightf*1
 
@@ -2207,12 +2207,12 @@ class GroupFitter(object):
                     if diff_sn > compare[t][0]:
                         compare[t] = diff_sn, (gr, pa)
 
-        max_line_diff, max_line = 0, ''
+        max_line_diff, max_line = 0, 'N/A'
 
         for t in compare:
             if not t.startswith('line '):
                 continue
-
+                
             if compare[t][0] > max_line_diff:
                 max_line_diff = compare[t][0]
                 max_line = t
