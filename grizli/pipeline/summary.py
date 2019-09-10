@@ -116,7 +116,7 @@ def summary_catalog(field_root='', dzbin=0.01, use_localhost=True, filter_bandpa
     if orig is not None:
         if len(fit) > 0:
             fit = astropy.table.vstack([orig, fit])
-            if zbin is not None:
+            if dzbin is not None:
                 fit.write('{0}.info.fits'.format(field_root), overwrite=True)
     
     mtime = []
