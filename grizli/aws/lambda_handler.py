@@ -507,14 +507,7 @@ def run_grizli_fit(event):
         
         if output_path is None:
             output_path = 'Pipeline/{0}/Extractions'.format(root)
-    
-    try:
-        rowfile = '{0}_{1:05d}.row.fits'.format(root, id)
-        if os.path.exists(rowfile):
-            grizli_db.add_redshift_fit_row(rowfile, verbose=True)
-    except:
-        pass
-        
+            
     # Output files
     files = glob.glob('{0}_{1:05d}*'.format(root, id))
     for file in files:
@@ -522,6 +515,14 @@ def run_grizli_fit(event):
             aws_file = '{0}/{1}'.format(output_path, file)
             print(aws_file)
             bkt.upload_file(file, aws_file, ExtraArgs={'ACL': 'public-read'})
+    
+    # Put data in the redshift_fit database table
+    try:
+        rowfile = '{0}_{1:05d}.row.fits'.format(root, id)
+        if os.path.exists(rowfile):
+            grizli_db.add_redshift_fit_row(rowfile, verbose=True)
+    except:
+        pass
     
     # Remove start log now that done
     res = bkt.delete_objects(Delete={'Objects':[{'Key':full_start}]})
