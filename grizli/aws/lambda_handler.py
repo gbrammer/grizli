@@ -244,8 +244,13 @@ def run_grizli_fit(event):
       
     import grizli
     from grizli import fitting, utils, multifit
-    from grizli.aws import db as grizli_db
     
+    try:
+        from grizli.aws import db as grizli_db
+        dbFLAGS = grizli_db.FLAGS
+    except:
+        pass
+        
     utils.set_warnings()
     
     #event = {'s3_object_path':'Pipeline/j001452+091221/Extractions/j001452+091221_00277.beams.fits'}
@@ -320,7 +325,7 @@ def run_grizli_fit(event):
     id = int(beams_file.split('_')[1].split('.')[0])
     
     try:
-        db_status = get_redshift_fit_status(root, id)
+        db_status = grizli_db.get_redshift_fit_status(root, id)
     except:
         db_status = -1
                 
