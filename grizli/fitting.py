@@ -495,6 +495,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
         info = summary.summary_catalog(dzbin=None, filter_bandpasses=[],
                                            files=[full_file]) 
         
+        info['grizli_version'] = grizli__version
         row_file = '{0}_{1:05d}.row.fits'.format(group_name, id)
         info.write(row_file, overwrite=True)
         
