@@ -244,6 +244,8 @@ def run_grizli_fit(event):
       
     import grizli
     from grizli import fitting, utils, multifit
+    from grizli.aws import db as grizli_db
+    
     utils.set_warnings()
     
     #event = {'s3_object_path':'Pipeline/j001452+091221/Extractions/j001452+091221_00277.beams.fits'}
@@ -317,13 +319,25 @@ def run_grizli_fit(event):
     root = beams_file.split('_')[0]
     id = int(beams_file.split('_')[1].split('.')[0])
     
+    try:
+        db_status = get_redshift_fit_status(root, id)
+    except:
+        db_status = -1
+                
     # Initial log
     start_log = '{0}_{1:05d}.start.log'.format(root, id)
     full_start = 'Pipeline/{0}/Extractions/{1}'.format(root, start_log)
-    if (start_log in files) & event_kwargs['skip_started']:
-        print('Log file {0} found in {1}'.format(start_log, os.getcwd()))
+    if ((start_log in files) | (db_status >= 0)) & event_kwargs['skip_started']:
+        print('Log file {0} found in {1} (db_status={2})'.format(start_log, os.getcwd(), db_status))
         return True
-        
+    
+    try:
+        # Starting
+        grizli_db.update_redshift_fit_status(root, id, 
+                                             status=dbFLAGS['init_lambda'])
+    except:
+        pass
+    
     if not silent:
         for i, file in enumerate(files):
             print('Initial file ({0}): {1}'.format(i+1, file))
@@ -378,6 +392,13 @@ def run_grizli_fit(event):
                 run_clean = event['clean']
         else:
             run_clean = True
+        
+        try:
+            # Extracting beams
+            grizli_db.update_redshift_fit_status(root, id, 
+                                                status=dbFLAGS['start_beams'])
+        except:
+            pass
             
         status = extract_beams_from_flt(root, event_kwargs['bucket'], id, 
                                         clean=run_clean, silent=silent)
@@ -389,6 +410,13 @@ def run_grizli_fit(event):
             return False
         else:
             beams_file = status[0]
+        
+        try:
+            # Beams are done
+            grizli_db.update_redshift_fit_status(root, id, 
+                                                 status=dbFLAGS['done_beams'])
+        except:
+            pass
             
         put_beams = True
         
@@ -403,6 +431,13 @@ def run_grizli_fit(event):
     if 'run_fit' in event:
         if event['run_fit'] in FALSE_OPTIONS:
             res = bkt.delete_objects(Delete={'Objects':[{'Key':full_start}]})
+            
+            try:
+                grizli_db.update_redshift_fit_status(root, id, 
+                                                 status=dbFLAGS['no_run_fit'])
+            except:
+                pass
+            
             return True
     
     utils.fetch_acs_wcs_files(beams_file, bucket_name=event_kwargs['bucket'])
@@ -437,6 +472,11 @@ def run_grizli_fit(event):
                 
     ###   
     ### Run the fit
+    try:
+        grizli_db.update_redshift_fit_status(root, id, 
+                            status=grizli_db.FLAGS['start_redshift_fit'])
+    except:
+        pass
     
     if event_kwargs['quasar_fit']:
         
@@ -462,6 +502,13 @@ def run_grizli_fit(event):
         
         if output_path is None:
             output_path = 'Pipeline/{0}/Extractions'.format(root)
+    
+    try:
+        rowfile = '{0}_{1:05d}.row.fits'.format(root, id)
+        if os.path.exists(rowfile):
+            grizli_db.add_redshift_fit_row(rowfile, verbose=True)
+    except:
+        pass
         
     # Output files
     files = glob.glob('{0}_{1:05d}*'.format(root, id))
