@@ -55,7 +55,7 @@ version = p.communicate()[0].decode("utf-8").strip()
 # version = "0.11.0" # Refactored parameter files
 # version = "0.12.0" # Increment to fix tag tar files
 # version = "0.13.0" # Various pipeline modifications, add aws scripts
-version = "1.0" # First production version
+# version = "1.0" # First production version
 
 version_str = """# git describe --tags
 __version__ = "{0}"\n""".format(version)
