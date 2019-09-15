@@ -253,7 +253,10 @@ def run_lambda_fits(root='j004404m2034', mag_limits=[15, 26], sn_limit=7, min_st
     
     fit_redshift_lambda.fit_lambda(root=root, beams=[], ids=ids, newfunc=False, bucket_name='grizli-v1', skip_existing=False, sleep=False, skip_started=False, quasar_fit=False, output_path=None, show_event=False, zr=[0.01,3.4], force_args=True)
     
+    print('Add photometry: {0}'.format(root))
     grizli_db.add_phot_to_db(root, delete=False, engine=engine)
+    
+    res = grizli_db.wait_on_db_update(root, dt=15, n_iter=120, engine=engine)
     
     if False:
         res = pd.read_sql_query("SELECT root, id, status, redshift, bic_diff, mtime FROM redshift_fit WHERE (root = '{0}')".format(root), engine)
@@ -261,6 +264,38 @@ def run_lambda_fits(root='j004404m2034', mag_limits=[15, 26], sn_limit=7, min_st
         # Get arguments
         args = fit_redshift_lambda.fit_lambda(root=root, beams=[], ids=ids, newfunc=False, bucket_name='grizli-v1', skip_existing=False, sleep=False, skip_started=False, quasar_fit=False, output_path=None, show_event=2, zr=[0.01,3.4], force_args=True)
 
+def wait_on_db_update(root, dt=30, n_iter=60, engine=None):
+    """
+    Wait for db to stop updating on root
+    """
+    import pandas as pd
+    from astropy.table import Table
+    from grizli.aws import db as grizli_db
+    import numpy as np
+    import time
+    
+    if engine is None:
+        engine = grizli_db.get_db_engine(echo=False)
+        
+    n_i, n6_i, checksum_i = -1, -1, -1
+        
+    for i in range(n_iter):
+        res = pd.read_sql_query("SELECT root, id, status FROM redshift_fit WHERE root = '{0}'".format(root), engine)
+        checksum = (2**res['status']).sum()
+        n = len(res)
+        n6 = (res['status'] == 6).sum()
+        if (n == n_i) & (checksum == checksum_i) & (n6 == n6_i):
+            break
+        
+        now = time.ctime()
+        print('{0}, {1}: n={2:<5d} n6={3:<5d} checksum={4}'.format(root, now, n, n6, checksum))
+        n_i, n6_i, checksum_i = n, n6, checksum
+        time.sleep(dt)
+        
+    return res
+    
+    
+    
 ########### Photometry table
 def set_filter_bits(phot):
     """
