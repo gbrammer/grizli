@@ -168,7 +168,7 @@ def add_redshift_fit_row(row_df, engine=None, verbose=True):
     row_df.to_sql('redshift_fit', engine, index=False, if_exists='append', method='multi')
 
 ###########
-def add_missing_rows(root='j004404m2034'):
+def add_missing_rows(root='j004404m2034', engine=None):
     """
     Add rows that were completed but that aren't in the table
     """
@@ -177,7 +177,8 @@ def add_missing_rows(root='j004404m2034'):
     
     from grizli.aws import db as grizli_db
     
-    engine = grizli_db.get_db_engine(echo=False)
+    if engine is None:
+        engine = grizli_db.get_db_engine(echo=False)
     
     os.system('aws s3 sync s3://grizli-v1/Pipeline/{0}/Extractions/ ./ --exclude "*" --include "*row.fits"'.format(root))
     
@@ -188,6 +189,9 @@ def add_missing_rows(root='j004404m2034'):
     
     res_ids = res['id'].to_list()
     tabs = []
+    
+    print('\n\n NROWS={0}, NRES={1}\n\n'.format(len(row_files), len(res)))
+    
     for row_file in row_files:
         id_i = int(row_file.split('.row.fits')[0][-5:])
         if id_i not in res_ids:
