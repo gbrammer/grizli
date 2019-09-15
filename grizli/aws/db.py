@@ -45,6 +45,9 @@ def get_db_engine(config=None, echo=False):
     return engine
     
 def get_redshift_fit_status(root, id, engine=None):
+    """
+    Get status value from the database for root_id object
+    """
     import pandas as pd
     
     if engine is None:
@@ -63,6 +66,8 @@ def update_redshift_fit_status(root, id, status=0, engine=None, verbose=True):
     """
     Set the status flag in the table
     """
+    import time
+    
     import pandas as pd
     from astropy.table import Table
     
@@ -76,6 +81,8 @@ def update_redshift_fit_status(root, id, status=0, engine=None, verbose=True):
         tab['root'] = [root]
         tab['id'] = [id]
         tab['status'] = [status]
+        tab['mtime'] = [time.ctime()]
+        
         row_df = tab.to_pandas()
         
         add_redshift_fit_row(row_df, engine=engine, verbose=verbose)
@@ -97,8 +104,11 @@ def get_row_data(rowfile='gds-g800l-j033236m2748_21181.row.fits', status_flag=FL
     import pandas as pd
     from astropy.table import Table
     
-    tab = Table.read(rowfile, character_as_bytes=False)
-    
+    if isinstance(rowfile, str):
+        tab = Table.read(rowfile, character_as_bytes=False)
+    else:
+        tab = rowfile
+        
     cdf_z = tab['cdf_z'].data
     tab.remove_column('cdf_z')
     tab['status'] = status_flag
@@ -158,5 +168,176 @@ def add_redshift_fit_row(row_df, engine=None, verbose=True):
         
     # Add the new data
     row_df.to_sql('redshift_fit', engine, index=False, if_exists='append', method='multi')
+
+###########
+def add_missing_rows(root='j004404m2034'):
+    """
+    Add rows that were completed but that aren't in the table
+    """
+    import glob
+    from astropy.table import vstack, Table
     
+    from grizli.aws import db as grizli_db
+    
+    engine = grizli_db.get_db_engine(echo=False)
+    
+    row_files = glob.glob('{0}*row.fits'.format(root))
+    row_files.sort()
+    
+    res = pd.read_sql_query("SELECT root, id, status FROM redshift_fit WHERE root = '{0}'".format(root), engine)
+    
+    res_ids = res['id'].to_list()
+    tabs = []
+    for row_file in row_files:
+        id_i = int(row_file.split('.row.fits')[0][-5:])
+        if id_i not in res_ids:
+            grizli_db.add_redshift_fit_row(row_file, engine=engine, verbose=True)
+        
+def run_lambda_fits(root='j004404m2034', mag_limits=[15, 26], sn_limit=7, min_status=None):
+    """
+    Run redshift fits on lambda for a given root
+    """
+    from grizli.aws import fit_redshift_lambda
+    from grizli import utils
+    from grizli.aws import db as grizli_db
+    engine = grizli_db.get_db_engine()
+    
+    import pandas as pd
+    import numpy as np
+    import glob
+    import os
+    
+    os.system('aws s3 sync s3://grizli-v1/Pipeline/{0}/Extractions/ ./ --exclude "*" --include "*_phot*.fits"'.format(root))
+
+    os.system('aws s3 sync s3://grizli-v1/Pipeline/{0}/Extractions/ ./ --exclude "*" --include "*_phot*.fits" --include "*wcs.fits"'.format(root))
+    
+    phot = utils.read_catalog('{0}_phot_apcorr.fits'.format(root))
+    phot['has_grism'] = 0
+    wcs_files = glob.glob('*wcs.fits')
+    for f in wcs_files:
+        w = utils.WCSFootprint(f, ext=0)
+        has = w.path.contains_points(np.array([phot['ra'], phot['dec']]).T)
+        print(f, has.sum())
+        phot['has_grism'] += has
+    
+    mag = phot['mag_auto']*np.nan
+    mag_filt = np.array(['     ']*len(phot))
+    sn = phot['mag_auto']*np.nan
+
+    for filt in ['f160w','f140w','f125w','f105w','f110w','f098m','f814w','f850lp','f606w','f775w']:
+        if '{0}_tot_1'.format(filt) in phot.colnames:
+            mag_i = 23.9-2.5*np.log10(phot['{0}_tot_1'.format(filt)])
+            fill = (~np.isfinite(mag)) & np.isfinite(mag_i)
+            mag[fill] = mag_i[fill]
+            mag_filt[fill] = filt
+            sn_i = phot['{0}_tot_1'.format(filt)]/phot['{0}_etot_1'.format(filt)]
+            sn[fill] = sn_i[fill]
+    
+
+    sel = np.isfinite(mag) & (mag >= mag_limits[0]) & (mag <= mag_limits[1]) & (phot['has_grism'] > 0)
+    sel &= phot['flux_radius'] > 1
+    sel &= sn > sn_limit
+        
+    if min_status is not None:
+        res = pd.read_sql_query("SELECT root, id, status FROM redshift_fit WHERE root = '{0}'".format(root), engine)
+    
+        status = phot['id']*0-100
+        status[res['id']-1] = res['status']
+        sel &= status < min_status
+        
+    ids = phot['id'][sel]
+    
+    fit_redshift_lambda.fit_lambda(root=root, beams=[], ids=ids, newfunc=False, bucket_name='grizli-v1', skip_existing=False, sleep=False, skip_started=False, quasar_fit=False, output_path=None, show_event=False, zr=[0.01,3.4], force_args=True)
+    
+    if False:
+        # Get arguments
+        args = fit_redshift_lambda.fit_lambda(root=root, beams=[], ids=ids, newfunc=False, bucket_name='grizli-v1', skip_existing=False, sleep=False, skip_started=False, quasar_fit=False, output_path=None, show_event=2, zr=[0.01,3.4], force_args=True)
+
+########### Photometry table
+def set_filter_bits(phot):
+    """
+    Set bits indicating available filters
+    """
+    filters = ['f160w','f140w','f125w','f110w','f105w','f098m','f850lp','f814w','f775w','f625w','f606w','f475w','f438w','f435w','f555w','f350lp', 'f390w','f336w','f275w','f225w'] 
+    bits = [np.uint32(2**i) for i in range(len(filters))]
+    
+    phot['filter_bit'] = np.zeros(len(phot), dtype=np.uint32)
+    phot['red_bit'] = np.zeros(len(phot), dtype=np.uint32)
+    
+    for i, filt in enumerate(filters):
+        col = '{0}_flux_aper_0'.format(filt)
+        if col in phot.colnames:
+            red = bits[i] * np.isfinite(phot[col]) * (phot['filter_bit'] == 0)
+            phot['filter_bit'] |= bits[i] * np.isfinite(phot[col])
+            phot['red_bit'] |= red
+            print(filt, i, bits[i], red.max())
+
+def phot_to_dataframe(phot, root):
+    """
+    Convert phot_apcorr.fits table to a pandas DataFrame
+    
+    - Add 'root' column
+    - remove "dummy" columns
+    - rename 'xmin', 'xmax', 'ymin', 'ymax' to 'image_xmin', ...
+    
+    """
+    phot['root'] = root
+    
+    set_filter_bits(phot)
+    
+    for c in ['dummy_flux','dummy_err']:
+        if c in phot.colnames:
+            phot.remove_column(c)
+    
+    for c in ['xmin','xmax','ymin','ymax']:
+        phot.rename_column(c, 'image_'+c)
+    
+    df = phot.to_pandas()
+    return df
+    
+def add_phot_to_db(root, delete=True, engine=None):
+    """
+    Read the table {root}_phot_apcorr.fits and append it to the grizli_db `photometry_apcorr` table
+    """
+    import pandas as pd
+    from astropy.table import Table
+    from grizli.aws import db as grizli_db
+    
+    if engine is None:
+        engine = grizli_db.get_db_engine(echo=False)
+        
+    res = pd.read_sql_query("SELECT root, id FROM photometry_apcorr WHERE root = '{0}'".format(root), engine)
+    if len(res) > 0:
+        if delete:
+            print('Delete rows where root={0}'.format(root))
+            res = engine.execute("DELETE from photometry_apcorr WHERE (root = '{0}')".format(root))
+        else:
+            print('Data found for root={0}, delete them if necessary'.format(root))
+            return False
+    
+    # Read the catalog
+    phot = Table.read('{0}_phot_apcorr.fits'.format(root), character_as_bytes=False)
+    
+    # Add new filter columns if necessary
+    empty = pd.read_sql_query("SELECT * FROM photometry_apcorr WHERE false", engine)        
+    
+    df = phot_to_dataframe(phot, root)
+    new_cols = []
+    for c in df.columns:
+        if c not in empty.columns:
+            new_cols.append(c)
+    
+    if len(new_cols) > 0:
+        for c in new_cols:
+            print('Add column {0} to `photometry_apcorr` table'.format(c))
+            sql = "ALTER TABLE photometry_apcorr ADD COLUMN {0} real;".format(c)
+            res = engine.execute(sql)
+    
+    # Add new table
+    df.to_sql('photometry_apcorr', engine, index=False, if_exists='append', method='multi')
+    
+def test_join():
+    import pandas as pd
+    res = pd.read_sql_query("SELECT p.root, p.id, mag_auto, z_map FROM photometry_apcorr AS p LEFT JOIN (SELECT root, id, z_map, bic_diff FROM redshift_fit) z ON (p.root = z.root AND p.id = z.id)", engine)        
+
         
