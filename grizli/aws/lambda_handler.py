@@ -336,12 +336,13 @@ def run_grizli_fit(event):
         print('Log file {0} found in {1} (db_status={2})'.format(start_log, os.getcwd(), db_status))
         return True
     
-    try:
-        # Starting
-        grizli_db.update_redshift_fit_status(root, id, 
-                                             status=dbFLAGS['init_lambda'])
-    except:
-        pass
+    # try:
+    #     # Starting
+    #     grizli_db.update_redshift_fit_status(root, id, 
+    #                                          status=dbFLAGS['init_lambda'])
+    # except:
+    #     print('Set DB flag failed: init_lambda')
+    #     pass
     
     if not silent:
         for i, file in enumerate(files):
@@ -403,6 +404,7 @@ def run_grizli_fit(event):
             grizli_db.update_redshift_fit_status(root, id, 
                                                 status=dbFLAGS['start_beams'])
         except:
+            print('Set DB flag failed: start_beams')
             pass
             
         status = extract_beams_from_flt(root, event_kwargs['bucket'], id, 
@@ -481,6 +483,7 @@ def run_grizli_fit(event):
         grizli_db.update_redshift_fit_status(root, id, 
                             status=grizli_db.FLAGS['start_redshift_fit'])
     except:
+        print('Set DB flag failed: start_redshift_fit')
         pass
     
     if event_kwargs['quasar_fit']:
@@ -522,6 +525,7 @@ def run_grizli_fit(event):
         if os.path.exists(rowfile):
             grizli_db.add_redshift_fit_row(rowfile, verbose=True)
     except:
+        print('Update row failed')
         pass
     
     # Remove start log now that done
