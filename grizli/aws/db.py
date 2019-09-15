@@ -53,8 +53,6 @@ def get_redshift_fit_status(root, id, engine=None):
     if engine is None:
         engine = get_db_engine(echo=False)
     
-    res = pd.read_sql_query("SELECT * FROM redshift_fit", engine)
-    
     res = pd.read_sql_query("SELECT status FROM redshift_fit WHERE (root = '{0}' AND id = {1})".format(root, id), engine)
     
     if len(res) == 0:
@@ -181,10 +179,12 @@ def add_missing_rows(root='j004404m2034'):
     
     engine = grizli_db.get_db_engine(echo=False)
     
+    os.system('aws s3 sync s3://grizli-v1/Pipeline/{0}/Extractions/ ./ --exclude "*" --include "*row.fits"'.format(root))
+    
     row_files = glob.glob('{0}*row.fits'.format(root))
     row_files.sort()
     
-    res = pd.read_sql_query("SELECT root, id, status FROM redshift_fit WHERE root = '{0}'".format(root), engine)
+    res = pd.read_sql_query("SELECT root, id, status FROM redshift_fit WHERE root = '{0}' AND status=6".format(root), engine)
     
     res_ids = res['id'].to_list()
     tabs = []
@@ -239,17 +239,21 @@ def run_lambda_fits(root='j004404m2034', mag_limits=[15, 26], sn_limit=7, min_st
     sel &= sn > sn_limit
         
     if min_status is not None:
-        res = pd.read_sql_query("SELECT root, id, status FROM redshift_fit WHERE root = '{0}'".format(root), engine)
-    
-        status = phot['id']*0-100
-        status[res['id']-1] = res['status']
-        sel &= status < min_status
+        res = pd.read_sql_query("SELECT root, id, status FROM redshift_fit WHERE root = '{0}' AND status < {1}".format(root, min_status), engine)
+        if len(res) > 0:
+            status = phot['id']*0-100
+            status[res['id']-1] = res['status']
+            sel &= status < min_status
         
     ids = phot['id'][sel]
     
     fit_redshift_lambda.fit_lambda(root=root, beams=[], ids=ids, newfunc=False, bucket_name='grizli-v1', skip_existing=False, sleep=False, skip_started=False, quasar_fit=False, output_path=None, show_event=False, zr=[0.01,3.4], force_args=True)
     
+    grizli_db.add_phot_to_db(root, delete=False, engine=engine)
+    
     if False:
+        res = pd.read_sql_query("SELECT root, id, status, redshift, bic_diff, mtime FROM redshift_fit WHERE (root = '{0}')".format(root), engine)
+        
         # Get arguments
         args = fit_redshift_lambda.fit_lambda(root=root, beams=[], ids=ids, newfunc=False, bucket_name='grizli-v1', skip_existing=False, sleep=False, skip_started=False, quasar_fit=False, output_path=None, show_event=2, zr=[0.01,3.4], force_args=True)
 
@@ -258,6 +262,7 @@ def set_filter_bits(phot):
     """
     Set bits indicating available filters
     """
+    import numpy as np
     filters = ['f160w','f140w','f125w','f110w','f105w','f098m','f850lp','f814w','f775w','f625w','f606w','f475w','f438w','f435w','f555w','f350lp', 'f390w','f336w','f275w','f225w'] 
     bits = [np.uint32(2**i) for i in range(len(filters))]
     
@@ -302,6 +307,7 @@ def add_phot_to_db(root, delete=True, engine=None):
     import pandas as pd
     from astropy.table import Table
     from grizli.aws import db as grizli_db
+    import numpy as np
     
     if engine is None:
         engine = grizli_db.get_db_engine(echo=False)
@@ -338,6 +344,12 @@ def add_phot_to_db(root, delete=True, engine=None):
     
 def test_join():
     import pandas as pd
-    res = pd.read_sql_query("SELECT p.root, p.id, mag_auto, z_map FROM photometry_apcorr AS p LEFT JOIN (SELECT root, id, z_map, bic_diff FROM redshift_fit) z ON (p.root = z.root AND p.id = z.id)", engine)        
+    
+    res = pd.read_sql_query("SELECT p.root, p.id, flux_radius, mag_auto, z_map, status, bic_diff, zwidth1, log_pdf_max, chinu FROM photometry_apcorr AS p JOIN (SELECT * FROM redshift_fit WHERE z_map > 0) z ON (p.root = z.root AND p.id = z.id)".format(root), engine)        
+
+    res = pd.read_sql_query("SELECT * FROM photometry_apcorr AS p JOIN (SELECT * FROM redshift_fit WHERE z_map > 0) z ON (p.root = z.root AND p.id = z.id)".format(root), engine)        
+    
+    # on root
+    res = pd.read_sql_query("SELECT p.root, p.id, mag_auto, z_map, status FROM photometry_apcorr AS p JOIN (SELECT * FROM redshift_fit WHERE root='{0}') z ON (p.root = z.root AND p.id = z.id)".format(root), engine)        
 
         
