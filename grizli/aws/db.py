@@ -244,7 +244,7 @@ def run_lambda_fits(root='j004404m2034', mag_limits=[15, 26], sn_limit=7, min_st
     sel &= sn > sn_limit
         
     if min_status is not None:
-        res = pd.read_sql_query("SELECT root, id, status FROM redshift_fit WHERE root = '{0}' AND status < {1}".format(root, min_status), engine)
+        res = pd.read_sql_query("SELECT root, id, status FROM redshift_fit WHERE root = '{0}'".format(root, min_status), engine)
         if len(res) > 0:
             status = phot['id']*0-100
             status[res['id']-1] = res['status']
