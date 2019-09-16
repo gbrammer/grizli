@@ -268,7 +268,7 @@ def run_lambda_fits(root='j004404m2034', mag_limits=[15, 26], sn_limit=7, min_st
         # Get arguments
         args = fit_redshift_lambda.fit_lambda(root=root, beams=[], ids=ids, newfunc=False, bucket_name='grizli-v1', skip_existing=False, sleep=False, skip_started=False, quasar_fit=False, output_path=None, show_event=2, zr=[0.01,3.4], force_args=True)
 
-def wait_on_db_update(root, t0=120, dt=30, n_iter=60, engine=None):
+def wait_on_db_update(root, t0=60, dt=30, n_iter=60, engine=None):
     """
     Wait for db to stop updating on root
     """
