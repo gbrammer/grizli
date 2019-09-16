@@ -197,14 +197,15 @@ def add_missing_rows(root='j004404m2034', engine=None):
         if id_i not in res_ids:
             grizli_db.add_redshift_fit_row(row_file, engine=engine, verbose=True)
         
-def run_lambda_fits(root='j004404m2034', mag_limits=[15, 26], sn_limit=7, min_status=None):
+def run_lambda_fits(root='j004404m2034', mag_limits=[15, 26], sn_limit=7, min_status=None, engine=None):
     """
     Run redshift fits on lambda for a given root
     """
     from grizli.aws import fit_redshift_lambda
     from grizli import utils
     from grizli.aws import db as grizli_db
-    engine = grizli_db.get_db_engine()
+    if engine is None:
+        engine = grizli_db.get_db_engine()
     
     import pandas as pd
     import numpy as np
@@ -258,13 +259,16 @@ def run_lambda_fits(root='j004404m2034', mag_limits=[15, 26], sn_limit=7, min_st
     
     res = grizli_db.wait_on_db_update(root, dt=15, n_iter=120, engine=engine)
     
+    res = pd.read_sql_query("SELECT root, id, flux_radius, mag_auto, z_map, status, bic_diff, zwidth1, log_pdf_max, chinu FROM photometry_apcorr AS p JOIN (SELECT * FROM redshift_fit WHERE z_map > 0 AND root = '{0}') z ON (p.p_root = z.root AND p.p_id = z.id)".format(root), engine)
+    return res
+    
     if False:
         res = pd.read_sql_query("SELECT root, id, status, redshift, bic_diff, mtime FROM redshift_fit WHERE (root = '{0}')".format(root), engine)
         
         # Get arguments
         args = fit_redshift_lambda.fit_lambda(root=root, beams=[], ids=ids, newfunc=False, bucket_name='grizli-v1', skip_existing=False, sleep=False, skip_started=False, quasar_fit=False, output_path=None, show_event=2, zr=[0.01,3.4], force_args=True)
 
-def wait_on_db_update(root, dt=30, n_iter=60, engine=None):
+def wait_on_db_update(root, t0=120, dt=30, n_iter=60, engine=None):
     """
     Wait for db to stop updating on root
     """
@@ -278,20 +282,51 @@ def wait_on_db_update(root, dt=30, n_iter=60, engine=None):
         engine = grizli_db.get_db_engine(echo=False)
         
     n_i, n6_i, checksum_i = -1, -1, -1
-        
+      
     for i in range(n_iter):
         res = pd.read_sql_query("SELECT root, id, status FROM redshift_fit WHERE root = '{0}'".format(root), engine)
         checksum = (2**res['status']).sum()
         n = len(res)
         n6 = (res['status'] == 6).sum()
+        n5 = (res['status'] == 5).sum()
         if (n == n_i) & (checksum == checksum_i) & (n6 == n6_i):
             break
         
         now = time.ctime()
-        print('{0}, {1}: n={2:<5d} n6={3:<5d} checksum={4}'.format(root, now, n, n6, checksum))
+        print('{0}, {1}: n={2:<5d} n5={5:<5d} n6={3:<5d} checksum={4}'.format(root, now, n, n6, checksum, n5))
         n_i, n6_i, checksum_i = n, n6, checksum
-        time.sleep(dt)
+        if i == 0:
+            time.sleep(t0)
+        else:
+            time.sleep(dt)
         
+    return res
+
+##
+def fit_timeouts(root='j004404m2034', mag_limits=[15, 26], sn_limit=7, min_status=None, engine=None):
+    """
+    Run redshift fits on lambda for a given root
+    """
+    from grizli.aws import fit_redshift_lambda
+    from grizli import utils
+    from grizli.aws import db as grizli_db
+    if engine is None:
+        engine = grizli_db.get_db_engine()
+    
+    import pandas as pd
+    import numpy as np
+    import glob
+    import os
+    
+    res = pd.read_sql_query("SELECT id, status FROM redshift_fit WHERE root = '{0}' AND status = 5".format(root), engine)
+    if len(res) == 0:
+        return True
+        
+    ids = res['id'].tolist()
+    
+    fit_redshift_lambda.fit_lambda(root=root, beams=[], ids=ids, newfunc=False, bucket_name='grizli-v1', skip_existing=False, sleep=False, skip_started=False, quasar_fit=False, output_path=None, show_event=False, zr=[0.01,2.4], force_args=True)
+    
+    res = grizli_db.wait_on_db_update(root, dt=15, n_iter=120, engine=engine)
     return res
     
     
@@ -336,10 +371,13 @@ def phot_to_dataframe(phot, root):
     for c in ['xmin','xmax','ymin','ymax']:
         phot.rename_column(c, 'image_'+c)
     
+    for c in ['root', 'id', 'ra', 'dec']:
+        phot.rename_column(c, 'p_'+c)
+         
     df = phot.to_pandas()
     return df
     
-def add_phot_to_db(root, delete=True, engine=None):
+def add_phot_to_db(root, delete=False, engine=None):
     """
     Read the table {root}_phot_apcorr.fits and append it to the grizli_db `photometry_apcorr` table
     """
@@ -351,7 +389,7 @@ def add_phot_to_db(root, delete=True, engine=None):
     if engine is None:
         engine = grizli_db.get_db_engine(echo=False)
         
-    res = pd.read_sql_query("SELECT root, id FROM photometry_apcorr WHERE root = '{0}'".format(root), engine)
+    res = pd.read_sql_query("SELECT p_root, p_id FROM photometry_apcorr WHERE root = '{0}'".format(root), engine)
     if len(res) > 0:
         if delete:
             print('Delete rows where root={0}'.format(root))
@@ -391,4 +429,58 @@ def test_join():
     # on root
     res = pd.read_sql_query("SELECT p.root, p.id, mag_auto, z_map, status FROM photometry_apcorr AS p JOIN (SELECT * FROM redshift_fit WHERE root='{0}') z ON (p.root = z.root AND p.id = z.id)".format(root), engine)        
 
+def add_spectroscopic_redshifts(tab):
+    """
+    Add spectroscopic redshifts to the photometry_apcorr table
+    
+    Input table needs (at least) columns: 
+       ['ra', 'dec', 'z_spec', 'z_spec_src', 'z_spec_qual_raw', 'z_spec_qual']
+    
+    """    
+    import glob
+    import pandas as pd
+    from astropy.table import vstack
+    
+    from grizli.aws import db as grizli_db
+    from grizli import utils
+    
+    for c in ['ra', 'dec', 'z_spec', 'z_spec_src', 'z_spec_qual_raw', 'z_spec_qual']:
+        if c not in tab:
+            print('Column {0} not found in input table'.format(c))
+            return False
+            
+    engine = grizli_db.get_db_engine(config=config)
+    
+    # Select master table
+    res = pd.read_sql_query("SELECT root, id, ra, dec, z_spec from photometry_apcorr".format(root), engine)
+    db = utils.GTable.from_pandas(res)
+    
+    idx, dr = db.match_to_catalog_sky(tab)
+    hasm = (dr.value < 1.0) & (tab['z_spec'] >= 0)
+    tab['z_spec_dr'] = dr.value
+    tab['z_spec_ra'] = tab['ra']
+    tab['z_spec_dec'] = tab['dec']
+    
+    tab['db_root'] = db['root'][idx]
+    tab['db_id'] = db['id'][idx]
+    
+    tabm = tab[hasm]['db_root', 'db_id', 'z_spec', 'z_spec_src', 'z_spec_dr', 'z_spec_ra', 'z_spec_dec', 'z_spec_qual_raw', 'z_spec_qual']
+    
+    df = tabm.to_pandas()
+    df.to_sql('z_spec_tmp', engine, index=False, if_exists='replace', method='multi')
+    
+    SQL = """UPDATE photometry_apcorr
+       SET z_spec = zt.z_spec,
+       z_spec_src = zt.z_spec_src,
+        z_spec_dr = zt.z_spec_dr,
+        z_spec_ra = zt.z_spec_ra,
+       z_spec_dec = zt.z_spec_dec,
+  z_spec_qual_raw = zt.z_spec_qual_raw,
+      z_spec_qual = zt.z_spec_qual
+     FROM z_spec_tmp as zt 
+     WHERE (zt.db_root = root AND zt.db_id = id);"""
+    
+    engine.execute(SQL)
+    
+    
         
