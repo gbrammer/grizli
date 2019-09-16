@@ -389,11 +389,11 @@ def add_phot_to_db(root, delete=False, engine=None):
     if engine is None:
         engine = grizli_db.get_db_engine(echo=False)
         
-    res = pd.read_sql_query("SELECT p_root, p_id FROM photometry_apcorr WHERE root = '{0}'".format(root), engine)
+    res = pd.read_sql_query("SELECT p_root, p_id FROM photometry_apcorr WHERE p_root = '{0}'".format(root), engine)
     if len(res) > 0:
         if delete:
             print('Delete rows where root={0}'.format(root))
-            res = engine.execute("DELETE from photometry_apcorr WHERE (root = '{0}')".format(root))
+            res = engine.execute("DELETE from photometry_apcorr WHERE (p_root = '{0}')".format(root))
         else:
             print('Data found for root={0}, delete them if necessary'.format(root))
             return False
@@ -422,12 +422,12 @@ def add_phot_to_db(root, delete=False, engine=None):
 def test_join():
     import pandas as pd
     
-    res = pd.read_sql_query("SELECT p.root, p.id, flux_radius, mag_auto, z_map, status, bic_diff, zwidth1, log_pdf_max, chinu FROM photometry_apcorr AS p JOIN (SELECT * FROM redshift_fit WHERE z_map > 0) z ON (p.root = z.root AND p.id = z.id)".format(root), engine)        
+    res = pd.read_sql_query("SELECT root, id, flux_radius, mag_auto, z_map, status, bic_diff, zwidth1, log_pdf_max, chinu FROM photometry_apcorr AS p JOIN (SELECT * FROM redshift_fit WHERE z_map > 0) z ON (p.p_root = z.root AND p.p_id = z.id)".format(root), engine)        
 
-    res = pd.read_sql_query("SELECT * FROM photometry_apcorr AS p JOIN (SELECT * FROM redshift_fit WHERE z_map > 0) z ON (p.root = z.root AND p.id = z.id)".format(root), engine)        
+    res = pd.read_sql_query("SELECT * FROM photometry_apcorr AS p JOIN (SELECT * FROM redshift_fit WHERE z_map > 0) z ON (p.p_root = z.root AND p.p_id = z.id)".format(root), engine)        
     
     # on root
-    res = pd.read_sql_query("SELECT p.root, p.id, mag_auto, z_map, status FROM photometry_apcorr AS p JOIN (SELECT * FROM redshift_fit WHERE root='{0}') z ON (p.root = z.root AND p.id = z.id)".format(root), engine)        
+    res = pd.read_sql_query("SELECT p.root, p.id, mag_auto, z_map, status FROM photometry_apcorr AS p JOIN (SELECT * FROM redshift_fit WHERE root='{0}') z ON (p.p_root = z.root AND p.p_id = z.id)".format(root), engine)        
 
 def add_spectroscopic_redshifts(tab):
     """
@@ -452,9 +452,11 @@ def add_spectroscopic_redshifts(tab):
     engine = grizli_db.get_db_engine(config=config)
     
     # Select master table
-    res = pd.read_sql_query("SELECT root, id, ra, dec, z_spec from photometry_apcorr".format(root), engine)
+    res = pd.read_sql_query("SELECT p_root, p_id, p_ra, p_dec, z_spec from photometry_apcorr", engine)
     db = utils.GTable.from_pandas(res)
-    
+    for c in ['p_root', 'p_id', 'p_ra', 'p_dec']:
+        db.rename_column(c, c[2:])
+        
     idx, dr = db.match_to_catalog_sky(tab)
     hasm = (dr.value < 1.0) & (tab['z_spec'] >= 0)
     tab['z_spec_dr'] = dr.value
@@ -478,7 +480,7 @@ def add_spectroscopic_redshifts(tab):
   z_spec_qual_raw = zt.z_spec_qual_raw,
       z_spec_qual = zt.z_spec_qual
      FROM z_spec_tmp as zt 
-     WHERE (zt.db_root = root AND zt.db_id = id);"""
+     WHERE (zt.db_root = p_root AND zt.db_id = p_id);"""
     
     engine.execute(SQL)
     
