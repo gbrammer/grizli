@@ -120,9 +120,60 @@ def fit_lambda(root='j100025+021706', beams=[], ids=[], newfunc=False, bucket_na
             iter += 1
             time.sleep(61)
             beams, full, logs, start = get_needed_paths(root, bucket_name=bucket_name, skip_existing=True, get_lists=True)
+
+BASE_EVENT = {'bucket': 'grizli-v1', 'skip_started': True, 'quasar_fit': False, 'zr': '0.01,3.2', 'force_args': True}
             
-            
+def generate_events(roots, ids, base=BASE_EVENT, send_to_lambda=False):
+    """
+    Generate many events with `s3_object_path` based on roots/ids
+    """
+    events = []
+    for root, id in zip(roots, ids):
+        event = base.copy()
+        event['s3_object_path'] = 'Pipeline/{0}/Extractions/{0}_{1:05d}.beams.fits'.format(root, id)
+        events.append(event)
+    
+    if send_to_lambda:
+        client = get_lambda_client()
+        for event in events:
+            send_event_lambda(event, verbose=True, client=client, func='GrizliLambda-0-12-0-41')
+                    
+    return events
+    
+def get_lambda_client(region_name='us-east-1'):
+    """
+    Get boto3 client in same region as HST public dataset
+    """
+    import boto3
+    session = boto3.Session()
+    client = session.client('lambda', region_name=region_name)
+    
+def send_event_lambda(event, verbose=True, client=None, func='GrizliLambda-0-12-0-41'):
+    """
+    Send a single event to AWS lambda
+    """     
+    import time
+    import os
+    import yaml
+    
+    import numpy as np
+    import boto3
+    import json
+
+    if client is None:
+        client = get_lambda_client(region_name='us-east-1')
         
+    if ('output_path' in event) & ('s3_object_path' in event):
+        if event['output_path'] == 'self':
+            event['output_path'] = os.path.dirname(event['s3_object_path'])
+    
+    if verbose:
+        print('Send event to {0}: {1}'.format(func, event))
+                
+    response = client.invoke(FunctionName=func, 
+                             InvocationType='Event', LogType='Tail', 
+                             Payload=json.dumps(event))
+    
 def get_needed_paths(root, get_string=False, bucket_name='aws-grivam', skip_existing=True, get_lists=False):
     """
     Get the S3 paths of the "beams.fits" files that still need to be fit.
