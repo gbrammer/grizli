@@ -197,7 +197,7 @@ def add_missing_rows(root='j004404m2034', engine=None):
         if id_i not in res_ids:
             grizli_db.add_redshift_fit_row(row_file, engine=engine, verbose=True)
         
-def run_lambda_fits(root='j004404m2034', mag_limits=[15, 26], sn_limit=7, min_status=None, engine=None):
+def run_lambda_fits(root='j004404m2034', mag_limits=[15, 26], sn_limit=7, min_status=None, engine=None, zr=[0.01,3.4]):
     """
     Run redshift fits on lambda for a given root
     """
@@ -252,7 +252,10 @@ def run_lambda_fits(root='j004404m2034', mag_limits=[15, 26], sn_limit=7, min_st
         
     ids = phot['id'][sel]
     
-    fit_redshift_lambda.fit_lambda(root=root, beams=[], ids=ids, newfunc=False, bucket_name='grizli-v1', skip_existing=False, sleep=False, skip_started=False, quasar_fit=False, output_path=None, show_event=False, zr=[0.01,3.4], force_args=True)
+    if sel.sum() == 0:
+        return False
+        
+    fit_redshift_lambda.fit_lambda(root=root, beams=[], ids=ids, newfunc=False, bucket_name='grizli-v1', skip_existing=False, sleep=False, skip_started=False, quasar_fit=False, output_path=None, show_event=False, zr=zr, force_args=True)
     
     print('Add photometry: {0}'.format(root))
     grizli_db.add_phot_to_db(root, delete=False, engine=engine)
@@ -428,8 +431,8 @@ def test_join():
     
     # on root
     res = pd.read_sql_query("SELECT p.root, p.id, mag_auto, z_map, status FROM photometry_apcorr AS p JOIN (SELECT * FROM redshift_fit WHERE root='{0}') z ON (p.p_root = z.root AND p.p_id = z.id)".format(root), engine)        
-
-def add_spectroscopic_redshifts(tab):
+     
+def add_spectroscopic_redshifts(tab, rmatch=1, engine=None):
     """
     Add spectroscopic redshifts to the photometry_apcorr table
     
@@ -445,11 +448,12 @@ def add_spectroscopic_redshifts(tab):
     from grizli import utils
     
     for c in ['ra', 'dec', 'z_spec', 'z_spec_src', 'z_spec_qual_raw', 'z_spec_qual']:
-        if c not in tab:
+        if c not in tab.colnames:
             print('Column {0} not found in input table'.format(c))
             return False
-            
-    engine = grizli_db.get_db_engine(config=config)
+    
+    if engine is None:            
+        engine = grizli_db.get_db_engine(echo=False)
     
     # Select master table
     res = pd.read_sql_query("SELECT p_root, p_id, p_ra, p_dec, z_spec from photometry_apcorr", engine)
@@ -458,7 +462,7 @@ def add_spectroscopic_redshifts(tab):
         db.rename_column(c, c[2:])
         
     idx, dr = db.match_to_catalog_sky(tab)
-    hasm = (dr.value < 1.0) & (tab['z_spec'] >= 0)
+    hasm = (dr.value < rmatch) & (tab['z_spec'] >= 0)
     tab['z_spec_dr'] = dr.value
     tab['z_spec_ra'] = tab['ra']
     tab['z_spec_dec'] = tab['dec']
@@ -467,6 +471,8 @@ def add_spectroscopic_redshifts(tab):
     tab['db_id'] = db['id'][idx]
     
     tabm = tab[hasm]['db_root', 'db_id', 'z_spec', 'z_spec_src', 'z_spec_dr', 'z_spec_ra', 'z_spec_dec', 'z_spec_qual_raw', 'z_spec_qual']
+    
+    print('Send zspec to photometry_apcorr (N={0})'.format(hasm.sum()))
     
     df = tabm.to_pandas()
     df.to_sql('z_spec_tmp', engine, index=False, if_exists='replace', method='multi')
@@ -480,9 +486,90 @@ def add_spectroscopic_redshifts(tab):
   z_spec_qual_raw = zt.z_spec_qual_raw,
       z_spec_qual = zt.z_spec_qual
      FROM z_spec_tmp as zt 
-     WHERE (zt.db_root = p_root AND zt.db_id = p_id);"""
+     WHERE (zt.db_root = p_root AND zt.db_id = p_id);
+     """
     
     engine.execute(SQL)
     
+def mtime_to_iso(ct):
+    """
+    Convert mtime values to ISO format suitable for sorting, etc.
+    """
+    months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+    spl = ct.split()
+    iso = '{yr}-{mo:02d}-{dy:02d} {time}'.format(dy=int(spl[2]), mo=int(months.index(spl[1])+1), yr=spl[-1], time=spl[-2])
+    return iso
     
+def various_selections():
+     res = make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','bic_diff','chinu','log_pdf_max'], where="AND status > 5 AND z_spec > 0 AND z_spec_qual = 1 AND z_spec_src ~ '^sdss-dr15'", table_root='sdss_zspec', sync='s3://grizli-v1/tables/')
+
+     res = make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','bic_diff','chinu','log_pdf_max'], where="AND status > 5 AND z_spec > 0 AND z_spec_qual = 1 AND z_spec_src ~ '^carla'", table_root='carla_zspec', sync='s3://grizli-v1/tables/')
+
+     res = make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','bic_diff','chinu','log_pdf_max','d4000','d4000_e'], where="AND status > 5 AND bic_diff > 500 AND chinu < 3", table_root='unamb', sync='s3://grizli-v1/tables/')
+
+     res = make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','bic_diff','chinu','log_pdf_max','d4000','d4000_e'], where="AND status > 5 AND chinu < 3 AND d4000 > 1 AND d4000 < 5 AND d4000_e > 0 AND d4000_e < 0.25 AND bic_diff > 5", table_root='d4000', sync='s3://grizli-v1/tables/')
+
+     res = make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','bic_diff','chinu','log_pdf_max'], where="AND status > 5 AND bic_diff > 100 AND chinu < 1.5 AND mag_auto < 24 AND sn_Ha > 20", table_root='star', sync='s3://grizli-v1/tables/')
+     
+def make_html_table(engine=None, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','bic_diff','chinu','log_pdf_max', 'd4000', 'd4000_e'], where="AND status >= 5 AND root='j163852p4039'", table_root='query', sync='s3://grizli-v1/tables/', png_ext=['stack','full','line'], verbose=True):
+    import pandas as pd
+    from grizli import utils
+    from grizli.aws import db as grizli_db
+    
+    if engine is None:
+        engine = get_db_engine(echo=False)
+    
+    query = "SELECT {0} FROM photometry_apcorr, redshift_fit WHERE root = p_root AND id = p_id {1};".format(','.join(columns), where)
+    
+    res = pd.read_sql_query(query, engine)
+    info = utils.GTable.from_pandas(res)
+    
+    if verbose:
+        print('Query: {0}\n Results N={1}'.format(query, len(res)))
+    if 'cdf_z' in info.colnames:
+        info.remove_column('cdf_z')
+    
+    for c in info.colnames:
+        if c.startswith('p_'):
+            try:
+                info.rename_column(c, c[2:])
+            except:
+                pass
+                
+    all_columns = info.colnames.copy()
         
+    idx = ['<a href="http://vizier.u-strasbg.fr/viz-bin/VizieR?-c={0:.6f}+{1:.6f}&-c.rs=2">#{2:05d}</a>'.format(info['ra'][i], info['dec'][i], info['id'][i]) for i in range(len(info))]
+    info['idx'] = idx
+    all_columns.insert(0, 'idx')
+    all_columns.pop(all_columns.index('id'))
+    
+    formats = {}
+    formats['ra'] = formats['dec'] = '.5f'
+    formats['mag_auto'] = '.2f'
+    formats['chinu'] = formats['bic_diff'] = formats['flux_radius'] = '.1f'
+    formats['log_pdf_max'] = formats['d4000'] = formats['d4000_e'] = '.1f'
+    formats['z_spec'] = formats['z_map'] = formats['reshift'] = '.3f'
+    
+    for c in info.colnames:
+        if c in formats:
+            info[c].format = formats[c]
+    
+    ### PNG columns  
+    AWS = 'https://s3.amazonaws.com/grizli-v1/Pipeline'  
+    for ext in png_ext:
+        png = ['{0}_{1:05d}.{2}.png'.format(root, id, ext) for root, id in zip(info['root'], info['id'])]
+        info['png_{0}'.format(ext)] = ['<a href="{0}/{1}/Extractions/{2}"><img src={0}/{1}/Extractions/{2} height=200></a>'.format(AWS, root, p) for root, p in zip(info['root'], png)]
+        all_columns.append('png_{0}'.format(ext))
+    
+    sortable = []
+    for c in all_columns:
+        if not hasattr(info[c][0], 'upper'):
+            sortable.append(c)
+    
+    info[all_columns].write_sortable_html('{0}.html'.format(table_root), replace_braces=True, localhost=False, max_lines=1e5, table_id=None, table_class='display compact', css=None, filter_columns=sortable, buttons=['csv'], toggle=True, use_json=True)
+    
+    if sync:
+        os.system('aws s3 sync ./ {0} --exclude "*" --include "{1}.html" --include "{1}.json" --acl public-read'.format(sync, table_root))
+    
+    return res
+    
