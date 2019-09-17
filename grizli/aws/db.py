@@ -511,7 +511,14 @@ def various_selections():
 
      res = make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','bic_diff','chinu','log_pdf_max'], where="AND status > 5 AND bic_diff > 100 AND chinu < 1.5 AND mag_auto < 24 AND sn_Ha > 20", table_root='star', sync='s3://grizli-v1/tables/')
      
-def make_html_table(engine=None, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','bic_diff','chinu','log_pdf_max', 'd4000', 'd4000_e'], where="AND status >= 5 AND root='j163852p4039'", table_root='query', sync='s3://grizli-v1/tables/', png_ext=['stack','full','line'], verbose=True):
+     # By root
+     root='j001420m3030'
+     res = make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','bic_diff','chinu','log_pdf_max'], where="AND status > 5 AND bic_diff > 30 AND chinu < 3 AND root = '{0}'".format(root), table_root=root+'-fit', sync='s3://grizli-v1/tables/')
+     
+def make_html_table(engine=None, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','bic_diff','chinu','log_pdf_max', 'd4000', 'd4000_e'], where="AND status >= 5 AND root='j163852p4039'", table_root='query', sync='s3://grizli-v1/tables/', png_ext=['stack','full','line'], sort_column=('bic_diff',-1), verbose=True, get_sql=False):
+    """
+    """
+    import numpy as np
     import pandas as pd
     from grizli import utils
     from grizli.aws import db as grizli_db
@@ -521,6 +528,9 @@ def make_html_table(engine=None, columns=['root','status','id','p_ra','p_dec','m
     
     query = "SELECT {0} FROM photometry_apcorr, redshift_fit WHERE root = p_root AND id = p_id {1};".format(','.join(columns), where)
     
+    if get_sql:
+        return query
+        
     res = pd.read_sql_query(query, engine)
     info = utils.GTable.from_pandas(res)
     
@@ -549,11 +559,18 @@ def make_html_table(engine=None, columns=['root','status','id','p_ra','p_dec','m
     formats['chinu'] = formats['bic_diff'] = formats['flux_radius'] = '.1f'
     formats['log_pdf_max'] = formats['d4000'] = formats['d4000_e'] = '.1f'
     formats['z_spec'] = formats['z_map'] = formats['reshift'] = '.3f'
+    formats['t_g141'] = formats['t_g102'] = formats['t_g800l'] = '.0f'
     
     for c in info.colnames:
         if c in formats:
             info[c].format = formats[c]
     
+    
+    print('Sort: ', sort_column, sort_column[0] in all_columns)
+    if sort_column[0] in all_columns:
+        so = np.argsort(info[sort_column[0]])
+        info = info[so[::sort_column[1]]]
+        
     ### PNG columns  
     AWS = 'https://s3.amazonaws.com/grizli-v1/Pipeline'  
     for ext in png_ext:
