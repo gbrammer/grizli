@@ -600,6 +600,8 @@ def make_html_table(engine=None, columns=['root','status','id','p_ra','p_dec','m
     formats['log_pdf_max'] = formats['d4000'] = formats['d4000_e'] = '.1f'
     formats['z_spec'] = formats['z_map'] = formats['reshift'] = '.3f'
     formats['t_g141'] = formats['t_g102'] = formats['t_g800l'] = '.0f'
+    formats['zwidth1'] = formats['zw1'] = '.3f'
+    formats['zwidth2'] = formats['zw2'] = '.3f'
     
     for c in info.colnames:
         if c in formats:
@@ -672,6 +674,7 @@ def show_all_fields():
     plt.ioff()
     res = pd.read_sql_query("select distinct root from redshift_fit;", engine)
     for root in res['root']:
-        res = grizli_db.make_html_table(engine=engine, columns=['mtime', 'root','status','id','p_ra','p_dec','mag_auto','flux_radius','t_g800l','t_g102', 't_g141', 'z_spec','z_map','bic_diff','chinu','log_pdf_max'], where="AND status > 5 AND root = '{0}'".format(root), table_root=root, sync='s3://grizli-v1/Pipeline/{0}/Extractions/'.format(root), png_ext=['R30', 'stack','full','line'], show_hist=True)
+        print('\n\n', root, '\n\n')
+        res = grizli_db.make_html_table(engine=engine, columns=['mtime', 'root','status','id','p_ra','p_dec','mag_auto','flux_radius','t_g800l','t_g102', 't_g141', 'z_spec','z_map','bic_diff','chinu','zwidth1/(1+z_map) as zw1'], where="AND status > 4 AND root = '{0}'".format(root), table_root=root, sync='s3://grizli-v1/Pipeline/{0}/Extractions/'.format(root), png_ext=['R30', 'stack','full','line'], show_hist=True)
         
         
