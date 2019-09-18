@@ -380,7 +380,7 @@ def phot_to_dataframe(phot, root):
     df = phot.to_pandas()
     return df
     
-def add_phot_to_db(root, delete=False, engine=None):
+def add_phot_to_db(root, delete=False, engine=None, nmax=500):
     """
     Read the table {root}_phot_apcorr.fits and append it to the grizli_db `photometry_apcorr` table
     """
@@ -427,7 +427,15 @@ def add_phot_to_db(root, delete=False, engine=None):
             res = engine.execute(sql)
     
     # Add new table
-    df.to_sql('photometry_apcorr', engine, index=False, if_exists='append', method='multi')
+    print('Send {0}_phot_apcorr.fits to `photometry_apcorr`.'.format(root))
+    if nmax > 0:
+        # Split
+        N = len(phot) // nmax
+        for i in range(N+1):
+            print('   add rows {0:>5}-{1:>5} ({2}/{3})'.format(i*nmax, (i+1)*nmax, i+1, N+1))
+            df[i*nmax:(i+1)*nmax].to_sql('photometry_apcorr', engine, index=False, if_exists='append', method='multi')
+    else:
+        df.to_sql('photometry_apcorr', engine, index=False, if_exists='append', method='multi')
     
 def test_join():
     import pandas as pd
@@ -567,9 +575,10 @@ def various_selections():
     import pandas as pd
     engine = grizli_db.get_db_engine()
     
+    # By grism
     res = pd.read_sql_query("select field_root, field_t_g800l, field_t_g102, field_t_g141, proposal_pi from charge_fields where (nassoc < 200 AND (field_t_g800l > 0 OR field_t_g141 > 0 OR  field_t_g102 > 0) AND log LIKE '%%inish%%');", engine)
     orig_roots = pd.read_sql_query('select distinct root from redshift_fit', engine)['root'].tolist()
-
+    
     count = 0
     for i, (root, ta, tb, tr, pi) in enumerate(zip(res['field_root'], res['field_t_g800l'], res['field_t_g102'], res['field_t_g141'], res['proposal_pi'])): 
         if root in orig_roots:
@@ -590,7 +599,29 @@ def various_selections():
             grizli_db.run_lambda_fits(root, min_status=6, zr=[0.01,zmax])  
         except:
             pass
+    
+    # Add missing photometry
+    import pandas as pd
+    from grizli.aws import db as grizli_db
+    engine = grizli_db.get_db_engine(echo=False)
+    
+    res = pd.read_sql_query("select distinct root from redshift_fit where root like 'j%%'", engine)['root'].tolist()
+    orig_roots = pd.read_sql_query('select distinct p_root as root from photometry_apcorr', engine)['root'].tolist()
+    for root in res:
+        if root not in orig_roots:
+            print(root)
+            os.system('aws s3 cp s3://grizli-v1/Pipeline/{0}/Extractions/{0}_phot_apcorr.fits .'.format(root))
+            grizli_db.add_phot_to_db(root, delete=False, engine=engine)
             
+    # 3D-HST
+    copy = """
+    aws s3 cp /Users/gbrammer/Research/HST/Mosaics/egs-mosaic_phot_apcorr.fits s3://grizli-v1/Pipeline/egs-grism-j141956p5255/Extractions/egs-grism-j141956p5255_phot_apcorr.fits --acl public-read
+    aws s3 cp /Users/gbrammer/Research/HST/Mosaics/egs-mosaic_phot.fits s3://grizli-v1/Pipeline/egs-grism-j141956p5255/Extractions/egs-grism-j141956p5255_phot.fits --acl public-read
+    """
+    grizli_db.run_lambda_fits('egs-grism-j141956p5255', min_status=6, zr=[0.01,3.2])  
+    
+    os.system('aws s3 ls s3://grizli-v1/Pipeline/{0}/Extractions/{0}_phot_apcorr.fits'.format(root))
+    
 def make_html_table(engine=None, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','bic_diff','chinu','log_pdf_max', 'd4000', 'd4000_e'], where="AND status >= 5 AND root='j163852p4039'", table_root='query', sync='s3://grizli-v1/tables/', png_ext=['stack','full','line'], sort_column=('bic_diff',-1), verbose=True, get_sql=False, show_hist=False):
     """
     """
