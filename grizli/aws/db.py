@@ -404,6 +404,13 @@ def add_phot_to_db(root, delete=False, engine=None):
     # Read the catalog
     phot = Table.read('{0}_phot_apcorr.fits'.format(root), character_as_bytes=False)
     
+    # remove columns
+    remove = []
+    for c in phot.colnames: 
+        if ('_corr_' in c) | ('_ecorr_' in c) | (c[-5:] in ['tot_4','tot_5', 'tot_6']): 
+            remove.append(c) 
+    phot.remove_columns(remove)
+    
     # Add new filter columns if necessary
     empty = pd.read_sql_query("SELECT * FROM photometry_apcorr WHERE false", engine)        
     
@@ -502,55 +509,88 @@ def mtime_to_iso(ct):
     
 def various_selections():
      
-     # sdss z_spec
-     res = make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','bic_diff','chinu','log_pdf_max'], where="AND status > 5 AND z_spec > 0 AND z_spec_qual = 1 AND z_spec_src ~ '^sdss-dr15'", table_root='sdss_zspec', sync='s3://grizli-v1/tables/')
+    # sdss z_spec
+    res = make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','bic_diff','chinu','log_pdf_max'], where="AND status > 5 AND z_spec > 0 AND z_spec_qual = 1 AND z_spec_src ~ '^sdss-dr15'", table_root='sdss_zspec', sync='s3://grizli-v1/tables/')
 
-     # objects with carla redshifts (radio loud)
-     res = make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','bic_diff','chinu','log_pdf_max'], where="AND status > 5 AND z_spec > 0 AND z_spec_qual = 1 AND z_spec_src ~ '^carla'", table_root='carla_zspec', sync='s3://grizli-v1/tables/')
+    # objects with carla redshifts (radio loud)
+    res = make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','bic_diff','chinu','log_pdf_max'], where="AND status > 5 AND z_spec > 0 AND z_spec_qual = 1 AND z_spec_src ~ '^carla'", table_root='carla_zspec', sync='s3://grizli-v1/tables/')
 
-     # z_spec with dz
-     res = grizli_db.make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','bic_diff','chinu','log_pdf_max', '(z_map-z_spec)/(1+z_spec) as delta_z'], where="AND status > 5 AND z_spec > 0 AND z_spec_qual = 1", table_root='zspec_delta', sync='s3://grizli-v1/tables/')
-     
-     # high bic_diff = unambiguous
-     res = grizli_db.make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','bic_diff','chinu','log_pdf_max','d4000','d4000_e', '-(bic_temp-bic_spl) as bic_diff_spl'], where="AND status > 5 AND ((bic_diff > 200 AND chinu < 2))", table_root='unamb', sync='s3://grizli-v1/tables/')
-     
-     # with d4000
-     res = make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','bic_diff','chinu','log_pdf_max','d4000','d4000_e'], where="AND status > 5 AND chinu < 3 AND d4000 > 1 AND d4000 < 5 AND d4000_e > 0 AND d4000_e < 0.25 AND bic_diff > 5", table_root='d4000', sync='s3://grizli-v1/tables/')
-     
-     # LBG?
-     res = grizli_db.make_html_table(engine=engine, columns=['mtime', 'root','status','id','p_ra','p_dec','mag_auto','flux_radius','t_g800l','z_spec','z_map','bic_diff','chinu','log_pdf_max','-(bic_temp-bic_spl) as bic_diff_spl', 'splf01/splf02 as r12', 'splf02/splf03 as r23', 'splf02/sple02 as sn02'], where="AND status > 5 AND mag_auto > 23 AND bic_diff > -50 AND splf01/splf02 < 0.3 AND splf02/sple02 > 2 AND splf01 != 0 AND splf02 != 0 AND splf03 != 0 ".format(root), table_root='lbg_g800l', sync='s3://grizli-v1/tables/', png_ext=['R30', 'stack','full','line'])
-     
-     # stars?
-     res = make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','bic_diff','chinu','log_pdf_max'], where="AND status > 5 AND bic_diff > 100 AND chinu < 1.5 AND mag_auto < 24 AND sn_Ha > 20", table_root='star', sync='s3://grizli-v1/tables/')
-     
-     # By root
-     root='j001420m3030'
-     res = grizli_db.make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','t_g800l','z_spec','z_map','bic_diff','chinu','log_pdf_max'], where="AND status > 5 AND root = '{0}' AND bic_diff > 5".format(root), table_root=root+'-fit', sync='s3://grizli-v1/tables/', png_ext=['R30', 'stack','full','line'])
-     
-     # G800L spec-zs
-     res = grizli_db.make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','t_g800l','z_spec','z_map','bic_diff','chinu','log_pdf_max','(z_map-z_spec)/(1+z_spec) as delta_z'], where="AND status > 5 AND z_spec > 0 AND z_spec_qual = 1 AND t_g800l > 0", table_root='zspec_g800l', sync='s3://grizli-v1/tables/')
-     
-     # Large G800L likely mismatch [OIII]/Ha
-     res = grizli_db.make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','a_image','flux_radius','t_g800l','z_spec','z_map','bic_diff','chinu','log_pdf_max','err_ha', 'ew50_oiii/(1+z_map) as ew_oiii_rest','sn_oiii'], where="AND status > 5 AND t_g800l > 0 AND sn_oiii > 3 AND mag_auto < 23 AND bic_diff > 5", table_root='g800l_oiii_mismatch', sync='s3://grizli-v1/tables/')
-     
-     # Potential Ly-a?
-     res = grizli_db.make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','a_image','flux_radius','t_g800l','z_spec','z_map','bic_diff','chinu','log_pdf_max','err_ha', 'ew50_oiii/(1+z_map) as ew_oiii_rest','sn_oiii'], where="AND status > 5 AND t_g800l > 0 AND sn_oiii > 5 AND sn_ha > 0 AND flux_oiii/flux_ha > 1.8", table_root='g800l_oiii_mismatch', sync='s3://grizli-v1/tables/')
-     
-     # Continuum resid
-     res = grizli_db.make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','t_g800l','z_spec','z_map','bic_diff','chinu','log_pdf_max', '23.9-2.5*log(splf01*8140*8140/3.e18*1.e29)-mag_auto as dmag'], where="AND status > 5 AND bic_diff > 5 AND splf01 > 0 AND bic_diff > 50".format(root), table_root='xxx', sync='s3://grizli-v1/tables/', png_ext=['R30', 'stack','full','line'])
-     
-     
-     res = grizli_db.make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','a_image','flux_radius','t_g800l','z_spec','z_map','bic_diff','chinu','log_pdf_max','err_ha','sn_oiii', 'f814w_tot_1*3.e18/8140/8140/splf01*1.e-29 as fresid', 'splf01/sple01 as sn01', '23.9-2.5*log(splf01*8140*8140/3.e18*1.e29)-mag_auto as dmag'], where="AND status > 5 AND t_g800l > 0 AND f814w_tot_1 > 0 AND splf01 != 0 AND splf01/sple01 > 1 AND f814w_tot_1*3.e18/8140/8140/splf01*1.e-29 > 0 AND (f814w_tot_1*3.e18/8140/8140/splf01*1.e-29 < 0.3 OR f814w_tot_1*3.e18/8140/8140/splf01*1.e-29 > 4)", table_root='g800l_oiii_mismatch', sync='s3://grizli-v1/tables/', png_ext=['R30', 'stack','full','line'])
+    # z_spec with dz
+    res = grizli_db.make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','z_spec_src','bic_diff','chinu','log_pdf_max', '(z_map-z_spec)/(1+z_spec) as delta_z'], where="AND status > 4 AND z_spec > 0 AND z_spec_qual = 1", table_root='zspec_delta', sync='s3://grizli-v1/tables/', png_ext=['R30', 'stack','full','line'])
 
-     sql = grizli_db.make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','a_image','flux_radius','t_g800l','z_spec','z_map','bic_diff','chinu','log_pdf_max','err_ha','sn_oiii', 'splf01', 'sple01', 'f814w_tot_1', 'f850lp_tot_1', 'flux_auto/flux_iso as flux_aper_corr', '23.9-2.5*log(splf01*8140*8140/3.e18*1.e29)-mag_auto as dmag'], where="AND status > 5 AND t_g800l > 0 AND splf01 > 0", table_root='g800l_oiii_mismatch', sync='s3://grizli-v1/tables/', png_ext=['R30', 'stack','full','line'], get_sql=True)
-     res = pd.read_sql_query(sql, engine) 
-     
-     splmag = 23.9-2.5*np.log10(np.maximum(res['splf01'], 1.e-22)*8140**2/3.e18*1.e29)
-     
-     sql = grizli_db.make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','a_image','flux_radius','t_g800l','z_spec','z_map','bic_diff','chinu','log_pdf_max','err_ha','sn_oiii', 'splf03', 'sple03', 'f140w_tot_1', 'f160w_tot_1', 'flux_auto/flux_iso as flux_aper_corr'], where="AND status > 5 AND t_g141 > 0 AND sple03 > 0", table_root='g800l_oiii_mismatch', sync='s3://grizli-v1/tables/', png_ext=['R30', 'stack','full','line'], get_sql=True)
-     res = pd.read_sql_query(sql, engine) 
-     splmag = 23.9-2.5*np.log10(np.maximum(res['splf03'], 1.e-22)*1.2e4**2/3.e18*1.e29)
-     
+    # high bic_diff = unambiguous
+    res = grizli_db.make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','bic_diff','chinu','log_pdf_max','d4000','d4000_e', '-(bic_temp-bic_spl) as bic_diff_spl'], where="AND status > 5 AND ((bic_diff > 200 AND chinu < 2))", table_root='unamb', sync='s3://grizli-v1/tables/')
+
+    # with d4000
+    res = make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','bic_diff','chinu','log_pdf_max','d4000','d4000_e'], where="AND status > 5 AND chinu < 3 AND d4000 > 1 AND d4000 < 5 AND d4000_e > 0 AND d4000_e < 0.25 AND bic_diff > 5", table_root='d4000', sync='s3://grizli-v1/tables/')
+
+    # LBG?
+    res = grizli_db.make_html_table(engine=engine, columns=['mtime', 'root','status','id','p_ra','p_dec','mag_auto','flux_radius','t_g800l','z_spec','z_map','bic_diff','chinu','log_pdf_max','-(bic_temp-bic_spl) as bic_diff_spl', 'splf01/splf02 as r12', 'splf02/splf03 as r23', 'splf02/sple02 as sn02'], where="AND status > 5 AND mag_auto > 23 AND bic_diff > -50 AND splf01/splf02 < 0.3 AND splf02/sple02 > 2 AND splf01 != 0 AND splf02 != 0 AND splf03 != 0 ".format(root), table_root='lbg_g800l', sync='s3://grizli-v1/tables/', png_ext=['R30', 'stack','full','line'])
+
+    # stars?
+    res = make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','bic_diff','chinu','log_pdf_max'], where="AND status > 5 AND bic_diff > 100 AND chinu < 1.5 AND mag_auto < 24 AND sn_Ha > 20", table_root='star', sync='s3://grizli-v1/tables/')
+
+    # By root
+    root='j001420m3030'
+    res = grizli_db.make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','t_g800l','z_spec','z_map','bic_diff','chinu','log_pdf_max'], where="AND status > 5 AND root = '{0}' AND bic_diff > 5".format(root), table_root=root+'-fit', sync='s3://grizli-v1/tables/', png_ext=['R30', 'stack','full','line'])
+
+    # G800L spec-zs
+    res = grizli_db.make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','t_g800l','z_spec','z_map','bic_diff','chinu','log_pdf_max','(z_map-z_spec)/(1+z_spec) as delta_z'], where="AND status > 5 AND z_spec > 0 AND z_spec_qual = 1 AND t_g800l > 0", table_root='zspec_g800l', sync='s3://grizli-v1/tables/')
+
+    # Large G800L likely mismatch [OIII]/Ha
+    res = grizli_db.make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','a_image','flux_radius','t_g800l','z_spec','z_map','bic_diff','chinu','log_pdf_max','err_ha', 'ew50_oiii/(1+z_map) as ew_oiii_rest','sn_oiii'], where="AND status > 5 AND t_g800l > 0 AND sn_oiii > 3 AND mag_auto < 23 AND bic_diff > 5", table_root='g800l_oiii_mismatch', sync='s3://grizli-v1/tables/')
+
+    # Potential Ly-a?
+    res = grizli_db.make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','a_image','flux_radius','t_g800l','z_spec','z_map','bic_diff','chinu','log_pdf_max','err_ha', 'ew50_oiii/(1+z_map) as ew_oiii_rest','sn_oiii'], where="AND status > 5 AND t_g800l > 0 AND sn_oiii > 5 AND sn_ha > 0 AND flux_oiii/flux_ha > 1.8", table_root='g800l_oiii_mismatch', sync='s3://grizli-v1/tables/')
+
+    # Continuum resid
+    res = grizli_db.make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','t_g800l','z_spec','z_map','bic_diff','chinu','log_pdf_max', '23.9-2.5*log(splf01*8140*8140/3.e18*1.e29)-mag_auto as dmag'], where="AND status > 5 AND bic_diff > 5 AND splf01 > 0 AND bic_diff > 50".format(root), table_root='xxx', sync='s3://grizli-v1/tables/', png_ext=['R30', 'stack','full','line'])
+
+
+    res = grizli_db.make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','a_image','flux_radius','t_g800l','z_spec','z_map','bic_diff','chinu','log_pdf_max','err_ha','sn_oiii', 'f814w_tot_1*3.e18/8140/8140/splf01*1.e-29 as fresid', 'splf01/sple01 as sn01', '23.9-2.5*log(splf01*8140*8140/3.e18*1.e29)-mag_auto as dmag'], where="AND status > 5 AND t_g800l > 0 AND f814w_tot_1 > 0 AND splf01 != 0 AND splf01/sple01 > 1 AND f814w_tot_1*3.e18/8140/8140/splf01*1.e-29 > 0 AND (f814w_tot_1*3.e18/8140/8140/splf01*1.e-29 < 0.3 OR f814w_tot_1*3.e18/8140/8140/splf01*1.e-29 > 4)", table_root='g800l_oiii_mismatch', sync='s3://grizli-v1/tables/', png_ext=['R30', 'stack','full','line'])
+
+    sql = grizli_db.make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','a_image','flux_radius','t_g800l','z_spec','z_map','bic_diff','chinu','log_pdf_max','err_ha','sn_oiii', 'splf01', 'sple01', 'f814w_tot_1', 'f850lp_tot_1', 'flux_auto/flux_iso as flux_aper_corr', '23.9-2.5*log(splf01*8140*8140/3.e18*1.e29)-mag_auto as dmag'], where="AND status > 5 AND t_g800l > 0 AND splf01 > 0", table_root='g800l_oiii_mismatch', sync='s3://grizli-v1/tables/', png_ext=['R30', 'stack','full','line'], get_sql=True)
+    res = pd.read_sql_query(sql, engine) 
+
+    splmag = 23.9-2.5*np.log10(np.maximum(res['splf01'], 1.e-22)*8140**2/3.e18*1.e29)
+
+    sql = grizli_db.make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','a_image','flux_radius','t_g800l','z_spec','z_map','bic_diff','chinu','log_pdf_max','err_ha','sn_oiii', 'splf03', 'sple03', 'f140w_tot_1', 'f160w_tot_1', 'flux_auto/flux_iso as flux_aper_corr'], where="AND status > 5 AND t_g141 > 0 AND sple03 > 0", table_root='g800l_oiii_mismatch', sync='s3://grizli-v1/tables/', png_ext=['R30', 'stack','full','line'], get_sql=True)
+    res = pd.read_sql_query(sql, engine) 
+    splmag = 23.9-2.5*np.log10(np.maximum(res['splf03'], 1.e-22)*1.2e4**2/3.e18*1.e29)
+
+    # Number of matches per field
+    counts = pd.read_sql_query("select root, COUNT(root) as n from redshift_fit, photometry_apcorr where root = p_root AND id = p_id AND bic_diff > 50 AND mag_auto < 24 group by root;", engine)
+    
+    ##############
+    # Run all
+    from grizli.aws import db as grizli_db
+    import pandas as pd
+    engine = grizli_db.get_db_engine()
+    
+    res = pd.read_sql_query("select field_root, field_t_g800l, field_t_g102, field_t_g141, proposal_pi from charge_fields where (nassoc < 200 AND (field_t_g800l > 0 OR field_t_g141 > 0 OR  field_t_g102 > 0) AND log LIKE '%%inish%%');", engine)
+    orig_roots = pd.read_sql_query('select distinct root from redshift_fit', engine)['root'].tolist()
+
+    count = 0
+    for i, (root, ta, tb, tr, pi) in enumerate(zip(res['field_root'], res['field_t_g800l'], res['field_t_g102'], res['field_t_g141'], res['proposal_pi'])): 
+        if root in orig_roots:
+            continue
+
+        count += 1
+        
+        zmax = 1.6
+        if tb > 0:
+            zmax = 2.2
+        
+        if tr > 0:
+            zmax = 3.2
+
+        print('\n\n', i, count, root, ta, tb, tr, pi, zmax, '\n\n')
+            
+        try: 
+            grizli_db.run_lambda_fits(root, min_status=6, zr=[0.01,zmax])  
+        except:
+            pass
+            
 def make_html_table(engine=None, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','bic_diff','chinu','log_pdf_max', 'd4000', 'd4000_e'], where="AND status >= 5 AND root='j163852p4039'", table_root='query', sync='s3://grizli-v1/tables/', png_ext=['stack','full','line'], sort_column=('bic_diff',-1), verbose=True, get_sql=False, show_hist=False):
     """
     """
@@ -672,9 +712,19 @@ def make_html_table(engine=None, columns=['root','status','id','p_ra','p_dec','m
 
 def show_all_fields():
     plt.ioff()
-    res = pd.read_sql_query("select distinct root from redshift_fit;", engine)
+    res = pd.read_sql_query("select distinct root from redshift_fit order by root;", engine)
     for root in res['root']:
         print('\n\n', root, '\n\n')
-        res = grizli_db.make_html_table(engine=engine, columns=['mtime', 'root','status','id','p_ra','p_dec','mag_auto','flux_radius','t_g800l','t_g102', 't_g141', 'z_spec','z_map','bic_diff','chinu','zwidth1/(1+z_map) as zw1'], where="AND status > 4 AND root = '{0}'".format(root), table_root=root, sync='s3://grizli-v1/Pipeline/{0}/Extractions/'.format(root), png_ext=['R30', 'stack','full','line'], show_hist=True)
-        
-        
+        if os.path.exists('{0}_zhist.png'.format(root)):
+            continue
+            
+        try:
+            if False:
+                res = pd.read_sql_query("select root,id,status from redshift_fit where root = '{0}';".format(root), engine)
+                res = pd.read_sql_query("select status, count(status) as n from redshift_fit where root = '{0}' group by status;".format(root), engine)
+            
+            res = grizli_db.make_html_table(engine=engine, columns=['mtime', 'root','status','id','p_ra','p_dec','mag_auto','flux_radius','t_g800l','t_g102', 't_g141', 'z_spec','z_map','bic_diff','chinu','zwidth1/(1+z_map) as zw1'], where="AND status > 4 AND root = '{0}'".format(root), table_root=root, sync='s3://grizli-v1/Pipeline/{0}/Extractions/'.format(root), png_ext=['R30', 'stack','full','line'], show_hist=True)
+        except:
+            continue
+            
+        os.system('aws s3 cp s3://grizli-v1/Pipeline/{0}/Extractions/{0}_zhist.png s3://grizli-v1/tables/'.format(root))
