@@ -98,7 +98,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     if get_dict:
         frame = inspect.currentframe()
         args = inspect.getargvalues(frame).locals
-        for k in ['id', 'get_dict', 'frame', 'glob', 'grizli', 'StackFitter', 'MultiBeam']:
+        for k in ['id', 'get_dict', 'frame', 'glob', 'grizli', 'summary','StackFitter', 'MultiBeam']:
             if k in args:
                 args.pop(k)
         

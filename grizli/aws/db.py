@@ -260,7 +260,7 @@ def run_lambda_fits(root='j004404m2034', mag_limits=[15, 26], sn_limit=7, min_st
     if min_status > 1000:
         if min_status > 10000:
             # Include mag constraints
-            res = pd.read_sql_query("SELECT root, id, status, mtime, mag_auto FROM redshift_fit,photometry_apcorr WHERE root = '{0}' AND status = {1}/10000 AND mag_auto > {2} AND mag_auto < {3} AND p.p_root = z.root AND p.p_id = z.id".format(root, min_status, mag_limits[0], mag_limits[1]), engine)
+            res = pd.read_sql_query("SELECT root, id, status, mtime, mag_auto FROM redshift_fit,photometry_apcorr WHERE root = '{0}' AND status = {1}/10000 AND mag_auto > {2} AND mag_auto < {3} AND p_root = root AND p_id = id".format(root, min_status, mag_limits[0], mag_limits[1]), engine)
         else:
             # just select on status
             res = pd.read_sql_query("SELECT root, id, status, mtime, mag_auto FROM redshift_fit WHERE root = '{0}' AND status = {1}/1000".format(root, min_status, mag_limits[0], mag_limits[1]), engine)
@@ -617,12 +617,33 @@ def run_all_redshift_fits():
             grizli_db.run_lambda_fits(root, min_status=6, zr=[0.01,zmax])  
         except:
             pass
+
+def count_sources_for_bad_persistence():
+    """
+    Count the number of extracted objects for each id and look for fields 
+    with few objects, which are usually problems with the persistence mask
+    """
     
+    import pandas as pd
+    from grizli.aws import db as grizli_db
+    from grizli import utils
+    engine = grizli_db.get_db_engine(echo=False)
+    
+    # Number of matches per field
+    counts = pd.read_sql_query("select root, COUNT(root) as n from redshift_fit, photometry_apcorr where root = p_root AND id = p_id AND bic_diff > 50 AND mag_auto < 24 group by root;", engine)
+    
+    counts = utils.GTable.from_pandas(counts)
+    so = np.argsort(counts['n'])
+    
+        
 def add_missing_photometry():
     
     # Add missing photometry
+    import os
     import pandas as pd
     from grizli.aws import db as grizli_db
+    from grizli.pipeline import photoz
+    
     engine = grizli_db.get_db_engine(echo=False)
     
     res = pd.read_sql_query("select distinct root from redshift_fit where root like 'j%%'", engine)['root'].tolist()
@@ -632,13 +653,39 @@ def add_missing_photometry():
     res = pd.read_sql_query("select field_root as root, field_t_g800l, field_t_g102, field_t_g141, proposal_pi from charge_fields where (field_t_g800l > 0 OR field_t_g141 > 0 OR  field_t_g102 > 0) AND log LIKE '%%inish%%';", engine)['root'].tolist()
     orig_roots = pd.read_sql_query('select distinct root from redshift_fit', engine)['root'].tolist()
     
+    # All photometry
+    res = pd.read_sql_query("select field_root as root, field_t_g800l, field_t_g102, field_t_g141, proposal_pi from charge_fields where nassoc < 200 AND log LIKE '%%inish%%' AND field_root LIKE 'j%%';", engine)['root'].tolist()
+    orig_roots = pd.read_sql_query('select distinct p_root as root from photometry_apcorr', engine)['root'].tolist()
+    
     for root in res:
         if root not in orig_roots:
             print(root)
             os.system('aws s3 cp s3://grizli-v1/Pipeline/{0}/Extractions/{0}_phot_apcorr.fits .'.format(root))
+            os.system('aws s3 cp s3://grizli-v1/Pipeline/{0}/Extractions/{0}_phot.fits .'.format(root))
+            
+            if not os.path.exists('{0}_phot_apcorr.fits'.format(root)):
+                os.system('aws s3 cp s3://grizli-v1/Pipeline/{0}/Prep/{0}_phot_apcorr.fits .'.format(root))
+                os.system('aws s3 cp s3://grizli-v1/Pipeline/{0}/Prep/{0}_phot.fits .'.format(root))
+                
             if os.path.exists('{0}_phot_apcorr.fits'.format(root)):
                 grizli_db.add_phot_to_db(root, delete=False, engine=engine)
-            
+            else:
+                if os.path.exists('{0}_phot.fits'.format(root)):
+                    # Make the apcorr file
+                    utils.set_warnings()
+
+                    total_flux = 'flux_auto' 
+                    obj = photoz.eazy_photoz(root, object_only=True,
+                              apply_prior=False, beta_prior=True, 
+                              aper_ix=1, 
+                              force=True,
+                              get_external_photometry=False, 
+                              compute_residuals=False, 
+                              total_flux=total_flux)
+                    #
+                    grizli_db.add_phot_to_db(root, delete=False, 
+                                             engine=engine)
+                    
     # 3D-HST
     copy = """
     aws s3 cp /Users/gbrammer/Research/HST/Mosaics/egs-mosaic_phot_apcorr.fits s3://grizli-v1/Pipeline/egs-grism-j141956p5255/Extractions/egs-grism-j141956p5255_phot_apcorr.fits --acl public-read
