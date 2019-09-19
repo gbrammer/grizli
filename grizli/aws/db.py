@@ -542,6 +542,9 @@ def various_selections():
     res = grizli_db.make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','z_spec_src','bic_diff','chinu','log_pdf_max', '(z_map-z_spec)/(1+z_spec) as delta_z'], where="AND status > 4 AND z_spec > 0 AND z_spec_qual = 1", table_root='zspec_delta', sync='s3://grizli-v1/tables/', png_ext=['R30', 'stack','full','line'])
 
     
+    # COSMOS test
+    root='cos-grism-j100012p0210'
+    res = grizli_db.make_html_table(engine=engine, columns=['mtime', 'root','status','id','p_ra','p_dec','mag_auto','flux_radius','t_g800l','t_g102', 't_g141', 'z_spec','z_map','bic_diff','chinu','zwidth1/(1+z_map) as zw1','dlinesn'], where="AND status > 4 AND bic_diff > 100 AND root = '{0}'".format(root), table_root=root, sync='s3://grizli-v1/Pipeline/{0}/Extractions/'.format(root), png_ext=['R30', 'stack','full','line'], show_hist=True)
     
     # high bic_diff = unambiguous
     res = grizli_db.make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','bic_diff','chinu','log_pdf_max','d4000','d4000_e', '-(bic_temp-bic_spl) as bic_diff_spl'], where="AND status > 5 AND ((bic_diff > 200 AND chinu < 2))", table_root='unamb', sync='s3://grizli-v1/tables/')
@@ -609,7 +612,7 @@ def overview_table():
     
     for count in [by_mag, by_nz]:
         new_col = count.colnames[1]
-        ch[new_col] = 0
+        ch[new_col] = -1
         for r, n in zip(count['root'], count[new_col]):
             ix = ch['field_root'] == r
             ch[new_col][ix] = n
@@ -665,6 +668,12 @@ def run_all_redshift_fits():
         except:
             pass
 
+    ####
+    # Redo fits on reprocessed fields
+    res = engine.execute("DELETE from redshift_fit WHERE (root = '{0}')".format(root), engine)
+    res = engine.execute("DELETE from photometry_apcorr WHERE (p_root = '{0}')".format(root), engine)
+    grizli_db.run_lambda_fits(root, min_status=6, zr=[0.01,zmax])  
+    
 def count_sources_for_bad_persistence():
     """
     Count the number of extracted objects for each id and look for fields 
@@ -762,12 +771,12 @@ def add_missing_photometry():
     
     aws s3 cp /Users/gbrammer/Research/HST/Mosaics/Cosmos/cos-cnd-mosaic_phot_apcorr.fits s3://grizli-cosmos-v2/Pipeline/cos-grism-j100012p0210/Extractions/cos-grism-j100012p0210_phot_apcorr.fits --acl public-read    
     """
-    grizli_db.run_lambda_fits('cos-grism-j100012p0210', min_status=6, zr=[0.01,3.2], mag_limits=[17,17.1])
+    grizli_db.run_lambda_fits('cos-grism-j100012p0210', min_status=6, zr=[0.01,3.2], mag_limits=[17,17.1], bucket='grizli-cosmos-v2')
     os.system('sudo halt')
     
 
     
-def make_html_table(engine=None, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','bic_diff','chinu','log_pdf_max', 'd4000', 'd4000_e'], where="AND status >= 5 AND root='j163852p4039'", table_root='query', sync='s3://grizli-v1/tables/', png_ext=['stack','full','line'], sort_column=('bic_diff',-1), verbose=True, get_sql=False, show_hist=False):
+def make_html_table(engine=None, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','bic_diff','chinu','log_pdf_max', 'd4000', 'd4000_e'], where="AND status >= 5 AND root='j163852p4039'", table_root='query', sync='s3://grizli-v1/tables/', png_ext=['R30','stack','full','line'], sort_column=('bic_diff',-1), verbose=True, get_sql=False, show_hist=False):
     """
     """
     import time
@@ -854,9 +863,11 @@ def make_html_table(engine=None, columns=['root','status','id','p_ra','p_dec','m
         
     ### PNG columns  
     AWS = 'https://s3.amazonaws.com/grizli-v1/Pipeline'  
+    bucket = ['grizli-cosmos-v2' if r.startswith('cos-') else 'grizli-v1' for r in info['root']]
+    
     for ext in png_ext:
         png = ['{0}_{1:05d}.{2}.png'.format(root, id, ext) for root, id in zip(info['root'], info['id'])]
-        info['png_{0}'.format(ext)] = ['<a href="{0}/{1}/Extractions/{2}"><img src={0}/{1}/Extractions/{2} height=200></a>'.format(AWS, root, p) for root, p in zip(info['root'], png)]
+        info['png_{0}'.format(ext)] = ['<a href="{0}/{1}/Extractions/{2}"><img src={0}/{1}/Extractions/{2} height=200></a>'.format(AWS.replace('grizli-v1',buck), root, p) for buck, root, p in zip(bucket, info['root'], png)]
         all_columns.append('png_{0}'.format(ext))
     
     sortable = []
