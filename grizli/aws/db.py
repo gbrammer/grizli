@@ -197,7 +197,7 @@ def add_missing_rows(root='j004404m2034', engine=None):
         if id_i not in res_ids:
             grizli_db.add_redshift_fit_row(row_file, engine=engine, verbose=True)
         
-def run_lambda_fits(root='j004404m2034', mag_limits=[15, 26], sn_limit=7, min_status=None, engine=None, zr=[0.01,3.4]):
+def run_lambda_fits(root='j004404m2034', mag_limits=[15, 26], sn_limit=7, min_status=None, engine=None, zr=[0.01,3.4], bucket='grizli-v1'):
     """
     Run redshift fits on lambda for a given root
     """
@@ -214,11 +214,11 @@ def run_lambda_fits(root='j004404m2034', mag_limits=[15, 26], sn_limit=7, min_st
     
     print('Sync phot catalog')
     
-    os.system('aws s3 sync s3://grizli-v1/Pipeline/{0}/Extractions/ ./ --exclude "*" --include "*_phot*.fits"'.format(root))
+    os.system('aws s3 sync s3://{1}/Pipeline/{0}/Extractions/ ./ --exclude "*" --include "*_phot*.fits"'.format(root, bucket))
 
     print('Sync wcs.fits')
 
-    os.system('aws s3 sync s3://grizli-v1/Pipeline/{0}/Extractions/ ./ --exclude "*" --include "*_phot*.fits" --include "*wcs.fits"'.format(root))
+    os.system('aws s3 sync s3://{1}/Pipeline/{0}/Extractions/ ./ --exclude "*" --include "*_phot*.fits" --include "*wcs.fits"'.format(root, bucket))
     
     phot = utils.read_catalog('{0}_phot_apcorr.fits'.format(root))
     phot['has_grism'] = 0
@@ -270,7 +270,7 @@ def run_lambda_fits(root='j004404m2034', mag_limits=[15, 26], sn_limit=7, min_st
     if len(ids) == 0:
         return False
         
-    fit_redshift_lambda.fit_lambda(root=root, beams=[], ids=ids, newfunc=False, bucket_name='grizli-v1', skip_existing=False, sleep=False, skip_started=False, show_event=False, zr=zr, force_args=True, quasar_fit=False, output_path=None)
+    fit_redshift_lambda.fit_lambda(root=root, beams=[], ids=ids, newfunc=False, bucket_name=bucket, skip_existing=False, sleep=False, skip_started=False, show_event=False, zr=zr, force_args=True, quasar_fit=False, output_path=None)
     
     print('Add photometry: {0}'.format(root))
     grizli_db.add_phot_to_db(root, delete=False, engine=engine)
@@ -585,7 +585,54 @@ def various_selections():
 
     # Number of matches per field
     counts = pd.read_sql_query("select root, COUNT(root) as n from redshift_fit, photometry_apcorr where root = p_root AND id = p_id AND bic_diff > 50 AND mag_auto < 24 group by root;", engine)
-   
+  
+def from_sql(query, engine):
+    import pandas as pd
+    from grizli import utils
+    res = pd.read_sql_query(query, engine) 
+    return utils.GTable.from_pandas(res)
+    
+def overview_table():
+    """
+    Generate a new overview table with the redshift histograms
+    """
+    from grizli.aws import db as grizli_db
+    import pandas as pd
+    from grizli import utils
+    
+    engine = grizli_db.get_db_engine()
+    
+    ch = from_sql("select * from charge_fields", engine) 
+    
+    by_mag = from_sql("select p_root as root, COUNT(p_root) as nmag from photometry_apcorr where mag_auto < 24 group by p_root;", engine)
+    by_nz = from_sql("select root, COUNT(root) as nz from redshift_fit where bic_diff > 30 group by root;", engine)
+    
+    for count in [by_mag, by_nz]:
+        new_col = count.colnames[1]
+        ch[new_col] = 0
+        for r, n in zip(count['root'], count[new_col]):
+            ix = ch['field_root'] == r
+            ch[new_col][ix] = n
+    
+    zhist = ['https://s3.amazonaws.com/grizli-v1/Pipeline/{0}/Extractions/{0}_zhist.png'.format(r) for r in ch['field_root']]
+    ch['zhist'] = ['<a href="{1}"><img src={0} height=300px></a>'.format(zh, zh.replace('_zhist.png','.html')) for zh in zhist]
+            
+    cols = ['field_root', 'field_ra', 'field_dec', 'mw_ebv', 'gaia5', 'nassoc', 'nfilt', 'filter', 'target', 'comment', 'proposal_id', 'proposal_pi', 'field_t_g800l', 'field_t_g102', 'field_t_g141', 'mast', 'footprint', 'rgb', 'nmag', 'nz', 'zhist', 'summary', 'log']
+    
+    sortable = []
+    for c in cols:
+        if not hasattr(ch[c][0], 'upper'):
+            sortable.append(c)
+    
+    #https://s3.amazonaws.com/grizli-v1/Master/CHArGE-July2019.html
+    
+    table_root = 'CHArGE-July2019.zhist'
+    
+    ch[cols].write_sortable_html('{0}.html'.format(table_root), replace_braces=True, localhost=False, max_lines=1e5, table_id=None, table_class='display compact', css=None, filter_columns=sortable, buttons=['csv'], toggle=True, use_json=True)
+    
+    os.system('aws s3 sync ./ s3://grizli-v1/Master/ --exclude "*" --include "{1}.html" --include "{1}.json" --acl public-read'.format('', table_root))
+    
+    
 def run_all_redshift_fits(): 
     ##############
     # Run all
@@ -630,12 +677,19 @@ def count_sources_for_bad_persistence():
     engine = grizli_db.get_db_engine(echo=False)
     
     # Number of matches per field
-    counts = pd.read_sql_query("select root, COUNT(root) as n from redshift_fit, photometry_apcorr where root = p_root AND id = p_id AND bic_diff > 50 AND mag_auto < 24 group by root;", engine)
+    counts = pd.read_sql_query("select root, COUNT(root) as n from redshift_fit, photometry_apcorr where root = p_root AND id = p_id AND bic_diff > 5 AND mag_auto < 24 group by root;", engine)
     
     counts = utils.GTable.from_pandas(counts)
     so = np.argsort(counts['n'])
     
-        
+    
+    sh = """
+    BUCKET=grizli-v
+    root=j113812m1134
+    
+    aws s3 rm --recursive s3://grizli-v1/Pipeline/${root}/ --include "*"
+    grism_run_single.sh ${root} --run_fine_alignment=True --extra_filters=g800l --bucket=grizli-v1 --preprocess_args.skip_single_optical_visits=True --mask_spikes=True --persistence_args.err_threshold=1
+    """
 def add_missing_photometry():
     
     # Add missing photometry
@@ -657,9 +711,11 @@ def add_missing_photometry():
     res = pd.read_sql_query("select field_root as root, field_t_g800l, field_t_g102, field_t_g141, proposal_pi from charge_fields where nassoc < 200 AND log LIKE '%%inish%%' AND field_root LIKE 'j%%';", engine)['root'].tolist()
     orig_roots = pd.read_sql_query('select distinct p_root as root from photometry_apcorr', engine)['root'].tolist()
     
+    count=0
     for root in res:
         if root not in orig_roots:
-            print(root)
+            count+=1
+            print(count, root)
             os.system('aws s3 cp s3://grizli-v1/Pipeline/{0}/Extractions/{0}_phot_apcorr.fits .'.format(root))
             os.system('aws s3 cp s3://grizli-v1/Pipeline/{0}/Extractions/{0}_phot.fits .'.format(root))
             
@@ -682,7 +738,7 @@ def add_missing_photometry():
                               get_external_photometry=False, 
                               compute_residuals=False, 
                               total_flux=total_flux)
-                    #
+                    
                     grizli_db.add_phot_to_db(root, delete=False, 
                                              engine=engine)
                     
@@ -699,6 +755,15 @@ def add_missing_photometry():
     grizli_db.run_lambda_fits('uds-grism-j021732m0512', min_status=6, zr=[0.01,3.2])
     os.system('sudo halt')
     
+    # Cosmos on oliveraws
+    copy = """
+    
+    aws s3 rm s3://grizli-cosmos-v2/Pipeline/cos-grism-j100012p0210/Extractions/ --recursive --exclude "*" --include "cos-grism-j100012p0210_[0-9]*"
+    
+    aws s3 cp /Users/gbrammer/Research/HST/Mosaics/Cosmos/cos-cnd-mosaic_phot_apcorr.fits s3://grizli-cosmos-v2/Pipeline/cos-grism-j100012p0210/Extractions/cos-grism-j100012p0210_phot_apcorr.fits --acl public-read    
+    """
+    grizli_db.run_lambda_fits('cos-grism-j100012p0210', min_status=6, zr=[0.01,3.2], mag_limits=[17,17.1])
+    os.system('sudo halt')
     
 
     
