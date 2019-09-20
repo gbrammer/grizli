@@ -130,7 +130,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
             hdu, fig = mb.drizzle_grisms_and_PAs(fcontam=fcontam, flambda=False, kernel='point', size=32, diff=False)
             if save_figures:
                 fig.savefig('{0}_{1:05d}.fix.stack.{2}'.format(group_name, 
-                                                             id, figure_type))
+                                                             id, fig_type))
             else:
                 plt.close(fig)
                 
@@ -541,9 +541,9 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
         out = mb, st, fit, tfit, line_hdu
         if 'pz' in phot:
             full_sed_plot(mb, tfit, zfit=fit, photometry_pz=phot['pz'],
-                          save=save_figures, **sed_args)
+                          save=fig_type, **sed_args)
         else:
-            full_sed_plot(mb, tfit, zfit=fit, save=save_figures, **sed_args)
+            full_sed_plot(mb, tfit, zfit=fit, save=fig_type, **sed_args)
         
     return mb, st, fit, tfit, line_hdu
 

@@ -197,7 +197,7 @@ def add_missing_rows(root='j004404m2034', engine=None):
         if id_i not in res_ids:
             grizli_db.add_redshift_fit_row(row_file, engine=engine, verbose=True)
         
-def run_lambda_fits(root='j004404m2034', mag_limits=[15, 26], sn_limit=7, min_status=None, engine=None, zr=[0.01,3.4], bucket='grizli-v1'):
+def run_lambda_fits(root='j004404m2034', mag_limits=[15, 26], sn_limit=7, min_status=None, engine=None, zr=[0.01,3.4], bucket='grizli-v1', verbose=True, extra={'bad_pa_threshold':10}):
     """
     Run redshift fits on lambda for a given root
     """
@@ -270,7 +270,7 @@ def run_lambda_fits(root='j004404m2034', mag_limits=[15, 26], sn_limit=7, min_st
     if len(ids) == 0:
         return False
         
-    fit_redshift_lambda.fit_lambda(root=root, beams=[], ids=ids, newfunc=False, bucket_name=bucket, skip_existing=False, sleep=False, skip_started=False, show_event=False, zr=zr, force_args=True, quasar_fit=False, output_path=None)
+    fit_redshift_lambda.fit_lambda(root=root, beams=[], ids=ids, newfunc=False, bucket_name=bucket, skip_existing=False, sleep=False, skip_started=False, show_event=False, zr=zr, force_args=True, quasar_fit=False, output_path=None, save_figures='png', verbose=verbose, **extra)
     
     print('Add photometry: {0}'.format(root))
     grizli_db.add_phot_to_db(root, delete=False, engine=engine)
