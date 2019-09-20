@@ -539,9 +539,43 @@ def various_selections():
     res = make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','bic_diff','chinu','log_pdf_max'], where="AND status > 5 AND z_spec > 0 AND z_spec_qual = 1 AND z_spec_src ~ '^carla'", table_root='carla_zspec', sync='s3://grizli-v1/tables/')
 
     # z_spec with dz
-    res = grizli_db.make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','z_spec_src','bic_diff','chinu','log_pdf_max', '(z_map-z_spec)/(1+z_spec) as delta_z'], where="AND status > 4 AND z_spec > 0 AND z_spec_qual = 1", table_root='zspec_delta', sync='s3://grizli-v1/tables/', png_ext=['R30', 'stack','full','line'])
+    res = grizli_db.make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','z_spec_src','bic_diff','chinu','log_pdf_max', 'zwidth1/(1+z_map) as zw1','(z_map-z_spec)/(1+z_spec) as dz'], where="AND status > 4 AND z_spec > 0 AND z_spec_qual = 1", table_root='zspec_delta', sync='s3://grizli-v1/tables/', png_ext=['R30', 'stack','full','line'])
 
-    
+    if False:
+        from matplotlib.ticker import FixedLocator, AutoLocator, MaxNLocator
+        xti = xt = np.arange(0,3.6,0.5)
+        loc = np.arange(0, 3.6, 0.1)
+        bins = utils.log_zgrid([0.03, 3.5], 0.01)
+        fig = plt.figure(figsize=[7,6])
+        ax = fig.add_subplot(111)
+        ax.scatter(np.log(1+res['z_spec']), np.log(1+res['z_map']), alpha=0.2, c=np.log10(res['zw1']), marker='.', vmin=-3.5, vmax=-0.5, cmap='plasma')
+
+        sc = ax.scatter(np.log([1]), np.log([1]), alpha=0.8, c=[0], marker='.', vmin=-3.5, vmax=-0.5, cmap='plasma')
+         
+        cb = plt.colorbar(sc, shrink=0.6)
+        cb.set_label(r'$(z_{84}-z_{16})/(1+z_{50})$')
+        cb.set_ticks([-3,-2,-1])
+        cb.set_ticklabels([0.001, 0.01, 0.1])
+        
+        xts = ax.set_xticks(np.log(1+xt))
+        xtl = ax.set_xticklabels(xti)
+        xts = ax.set_yticks(np.log(1+xt))
+        xtl = ax.set_yticklabels(xti)
+        
+        ax.set_xlim(0, np.log(1+3.5))
+        ax.set_ylim(0, np.log(1+3.5))
+        
+        ax.xaxis.set_minor_locator(FixedLocator(np.log(1+loc)))                                                                                                                                          
+        ax.yaxis.set_minor_locator(FixedLocator(np.log(1+loc)))                                                                                                                                          
+        ax.set_xlabel('z_spec')
+        ax.set_ylabel('z_MAP')
+        ax.set_aspect(1)
+        ax.grid()
+        ax.text(0.95, 0.05, r'$N={0}$'.format(len(res)), ha='right', va='bottom', transform=ax.transAxes)
+        ax.plot(ax.get_xlim(), ax.get_xlim(), color='k', alpha=0.2, linewidth=1, zorder=-10)
+        fig.tight_layout(pad=0.1)
+        fig.savefig('grizli_v1_literature_zspec.pdf')
+        
     # COSMOS test
     root='cos-grism-j100012p0210'
     res = grizli_db.make_html_table(engine=engine, columns=['mtime', 'root','status','id','p_ra','p_dec','mag_auto','flux_radius','t_g800l','t_g102', 't_g141', 'z_spec','z_map','bic_diff','chinu','zwidth1/(1+z_map) as zw1','dlinesn'], where="AND status > 4 AND bic_diff > 100 AND root = '{0}'".format(root), table_root=root, sync='s3://grizli-v1/Pipeline/{0}/Extractions/'.format(root), png_ext=['R30', 'stack','full','line'], show_hist=True)
@@ -593,7 +627,47 @@ def from_sql(query, engine):
     import pandas as pd
     from grizli import utils
     res = pd.read_sql_query(query, engine) 
-    return utils.GTable.from_pandas(res)
+    
+    tab = utils.GTable.from_pandas(res)
+    set_column_formats(tab)
+    
+    return tab
+    
+def render_for_notebook(tab, image_extensions=['stack','full','line'], bucket='grizli-v1', max_rows=20):
+    """
+    Render images for inline display in a notebook
+    
+    In [1]: from IPython.display import HTML
+    
+    In [2]: HTML(tab)
+    
+    """
+    rows = tab[:max_rows].copy()
+    rows['bucket'] = bucket
+    rows['ext'] = 'longstring' # longer than the longest extension
+    
+    s3url = 'https://s3.amazonaws.com/{bucket}/Pipeline/{root}/Extractions/{root}_{id:05d}.{ext}.png'
+
+    def href_root(root):
+        s3 = 'https://s3.amazonaws.com/'+bucket+'/Pipeline/{0}/Extractions/{0}.html'
+        return '<a href={0}>{1}</a>'.format(s3.format(root), root)
+        
+    def path_to_image_html(path):
+        return '<a href={0}><img src="{0}"/></a>'.format(path)
+    
+    # link for root
+    
+    fmt = {'root':href_root}
+    for ext in image_extensions:
+        rows['ext'] = ext
+        urls = [s3url.format(**row) for row in rows.to_pandas().to_dict(orient='records')]
+        rows[ext] = urls
+        fmt[ext] = path_to_image_html
+
+    rows.remove_columns(['bucket','ext'])
+    out = rows.to_pandas().to_html(escape=False, formatters=fmt)
+    return out
+    
     
 def overview_table():
     """
@@ -673,6 +747,11 @@ def run_all_redshift_fits():
     res = engine.execute("DELETE from redshift_fit WHERE (root = '{0}')".format(root), engine)
     res = engine.execute("DELETE from photometry_apcorr WHERE (p_root = '{0}')".format(root), engine)
     grizli_db.run_lambda_fits(root, min_status=6, zr=[0.01,zmax])  
+    
+    #for root in "j233844m5528 j105732p3620 j112416p1132 j113812m1134 j113848m1134 j122852p1046 j143200p0959 j152504p0423 j122056m0205 j122816m1132 j131452p2612".split():
+    res = grizli_db.make_html_table(engine=engine, columns=['mtime', 'root','status','id','p_ra','p_dec','mag_auto','flux_radius','t_g800l','t_g102', 't_g141', 'z_spec','z_map','bic_diff','chinu','zwidth1/(1+z_map) as zw1','dlinesn'], where="AND status > 4 AND root = '{0}'".format(root), table_root=root, sync='s3://grizli-v1/Pipeline/{0}/Extractions/'.format(root), png_ext=['R30', 'stack','full','line'], show_hist=True)
+        
+    os.system('aws s3 cp s3://grizli-v1/Pipeline/{0}/Extractions/{0}_zhist.png s3://grizli-v1/tables/'.format(root))
     
 def count_sources_for_bad_persistence():
     """
@@ -774,8 +853,45 @@ def add_missing_photometry():
     grizli_db.run_lambda_fits('cos-grism-j100012p0210', min_status=6, zr=[0.01,3.2], mag_limits=[17,17.1], bucket='grizli-cosmos-v2')
     os.system('sudo halt')
     
+def set_column_formats(info):
+    # Print formats
+    formats = {}
+    formats['ra'] = formats['dec'] = '.5f'
+    formats['mag_auto'] = formats['delta_z'] = '.2f'
+    formats['chinu'] =  formats['chimin'] = formats['chimax'] =  '.1f'
+    formats['bic_diff'] = formats['bic_temp'] = formats['bic_spl']  = '.1f'
+    formats['bic_poly'] = '.1f'
+    formats['dlinesn'] = formats['bic_spl'] = '.1f'
 
+    formats['flux_radius'] = formats['flux_radius_20'] = '.1f'      
+    formats['flux_radius_90'] = '.1f'
     
+    formats['log_pdf_max'] = formats['log_risk'] = '.1f'
+    formats['d4000'] = formats['d4000_e'] = '.2f'
+    formats['dn4000'] = formats['dn4000_e'] = '.2f'
+    formats['z_spec'] = formats['z_map'] = formats['reshift'] = '.3f'
+    formats['t_g141'] = formats['t_g102'] = formats['t_g800l'] = '.0f'
+    formats['zwidth1'] = formats['zw1'] = '.3f'
+    formats['zwidth2'] = formats['zw2'] = '.3f'
+    
+    for c in info.colnames:
+        if c in formats:
+            info[c].format = formats[c]
+        elif c.startswith('sn_'):
+            info[c].format = '.2f'
+        elif c.startswith('mag_'):
+            info[c].format = '.2f'
+        elif c.startswith('ew_'):
+            info[c].format = '.1f'
+        elif c.startswith('bic_'):
+            info[c].format = '.1f'
+        elif c in ['z02', 'z16', 'z50', 'z84', 'z97']:
+            info[c].format = '.3f'
+        elif c[:4] in ['splf','sple']:
+            info[c].format = '.1e'
+        elif c.startswith('flux_') | c.startswith('err_'):
+            info[c].format = '.1e'
+        
 def make_html_table(engine=None, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','bic_diff','chinu','log_pdf_max', 'd4000', 'd4000_e'], where="AND status >= 5 AND root='j163852p4039'", table_root='query', sync='s3://grizli-v1/tables/', png_ext=['R30','stack','full','line'], sort_column=('bic_diff',-1), verbose=True, get_sql=False, show_hist=False):
     """
     """
@@ -818,43 +934,7 @@ def make_html_table(engine=None, columns=['root','status','id','p_ra','p_dec','m
     all_columns.insert(0, 'idx')
     all_columns.pop(all_columns.index('id'))
     
-    # Print formats
-    formats = {}
-    formats['ra'] = formats['dec'] = '.5f'
-    formats['mag_auto'] = formats['delta_z'] = '.2f'
-    formats['chinu'] =  formats['chimin'] = formats['chimax'] =  '.1f'
-    formats['bic_diff'] = formats['bic_temp'] = formats['bic_spl']  = '.1f'
-    formats['bic_poly'] = '.1f'
-    formats['dlinesn'] = formats['bic_spl'] = '.1f'
-
-    formats['flux_radius'] = formats['flux_radius_20'] = '.1f'      
-    formats['flux_radius_90'] = '.1f'
-    
-    formats['log_pdf_max'] = formats['log_risk'] = '.1f'
-    formats['d4000'] = formats['d4000_e'] = '.2f'
-    formats['dn4000'] = formats['dn4000_e'] = '.2f'
-    formats['z_spec'] = formats['z_map'] = formats['reshift'] = '.3f'
-    formats['t_g141'] = formats['t_g102'] = formats['t_g800l'] = '.0f'
-    formats['zwidth1'] = formats['zw1'] = '.3f'
-    formats['zwidth2'] = formats['zw2'] = '.3f'
-    
-    for c in info.colnames:
-        if c in formats:
-            info[c].format = formats[c]
-        elif c.startswith('sn_'):
-            info[c].format = '.2f'
-        elif c.startswith('mag_'):
-            info[c].format = '.2f'
-        elif c.startswith('ew_'):
-            info[c].format = '.1f'
-        elif c.startswith('bic_'):
-            info[c].format = '.1f'
-        elif c in ['z02', 'z16', 'z50', 'z84', 'z97']:
-            info[c].format = '.3f'
-        elif c[:4] in ['splf','sple']:
-            info[c].format = '.1e'
-        elif c.startswith('flux_') | c.startswith('err_'):
-            info[c].format = '.1e'
+    set_column_formats(info)
     
     print('Sort: ', sort_column, sort_column[0] in all_columns)
     if sort_column[0] in all_columns:
