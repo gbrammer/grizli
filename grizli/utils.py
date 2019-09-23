@@ -141,48 +141,90 @@ def get_flt_info(files=[], columns=['FILE', 'FILTER', 'INSTRUME', 'DETECTOR', 'T
     tab = Table(rows=data, names=has_columns)
     return tab
 
-def radec_to_targname(ra=0, dec=0, header=None):
-    """Turn decimal degree coordinates into a string
-    
+def radec_to_targname(ra=0, dec=0, round_arcsec=(4, 60), precision=2, targstr='j{rah}{ram}{ras}{sign}{ded}{dem}', header=None):
+    """Turn decimal degree coordinates into a string with rounding.
+
     Example:
 
-        >>> from grizli.utils import radec_to_targname
-        >>> print(radec_to_targname(ra=10., dec=-10.))
-        j004000-100000
-    
+        # Test dec: -10d10m10.10s
+        >>> dec = -10. - 10./60. - 10.1/3600
+
+        # Test ra: 02h02m02.20s
+        >>> cosd = np.cos(dec/180*np.pi)
+        >>> ra = 2*15 + 2./60*15 + 2.2/3600.*15
+
+        # Round to nearest arcmin
+        >>> from mastquery.utils import radec_to_targname
+        >>> print(radec_to_targname(ra=ra, dec=dec, round_arcsec=(4,60),
+                               targstr='j{rah}{ram}{ras}{sign}{ded}{dem}'))
+        j020204m1010 # (rounded to 4 arcsec in RA)
+
+        # Full precision
+        >>> targstr = 'j{rah}{ram}{ras}.{rass}{sign}{ded}{dem}{des}.{dess}'
+        >>> print(radec_to_targname(ra, dec,round_arcsec=(0.0001, 0.0001),
+                                    precision=3, targstr=targstr))
+        j020202.200m101010.100
+
     Parameters
     -----------
     ra, dec : float
         Sky coordinates in decimal degrees
-    
-    header : `~astropy.io.fits.Header` or None
-        Optional FITS header with CRVAL or RA/DEC_TARG keywords.  If 
-        specified, read `ra`/`dec` from CRVAL1/CRVAL2 or RA_TARG/DEC_TARG
-        keywords, whichever are available
-    
+
+    round_arcsec : (scalar, scalar) 
+        Round the coordinates to nearest value of `round`, in arcseconds.
+
+    precision : int
+        Sub-arcsecond precision, in `~astropy.coordinates.SkyCoord.to_string`.
+
+    targstr : string
+        Build `targname` with this parent string.  Arguments 
+        `rah, ram, ras, rass, sign, ded, dem, des, dess` are computed from the 
+        (rounded) target coordinates (`ra`, `dec`) and passed to 
+        `targstr.format`.
+
+    header : `~astropy.io.fits.Header`, None
+        Try to get `ra`, `dec` from header keywords, first `CRVAL` and then
+        `RA_TARG`, `DEC_TARG`.
+
     Returns
     --------
     targname : str
-        Target name like jHHMMSS[+-]DDMMSS.
-    
+        Target string, see the example above.
+
     """
     import astropy.coordinates 
     import astropy.units as u
+
     import re
-    
+    import numpy as np
+
     if header is not None:
         if 'CRVAL1' in header:
             ra, dec = header['CRVAL1'], header['CRVAL2']
         else:
             if 'RA_TARG' in header:
                 ra, dec = header['RA_TARG'], header['DEC_TARG']
-    
-    coo = astropy.coordinates.SkyCoord(ra=ra*u.deg, dec=dec*u.deg)
-    
-    cstr = re.split('[hmsd.]', coo.to_string('hmsdms', precision=2))
-    targname = ('j{0}{1}'.format(''.join(cstr[0:3]), ''.join(cstr[4:7])))
-    targname = targname.replace(' ', '')
-    
+
+    cosd = np.cos(dec/180*np.pi)
+    scl = np.array(round_arcsec)/3600*np.array([360/24, 1])
+
+    dec_scl = int(np.round(dec/scl[1]))*scl[1]
+    ra_scl = int(np.round(ra/scl[0]))*scl[0]
+
+    coo = astropy.coordinates.SkyCoord(ra=ra_scl*u.deg, dec=dec_scl*u.deg)
+
+    cstr = re.split('[hmsd.]', coo.to_string('hmsdms', precision=precision))
+    # targname = ('j{0}{1}'.format(''.join(cstr[0:3]), ''.join(cstr[4:7])))
+    # targname = targname.replace(' ', '').replace('+','p').replace('-','m')
+
+    rah, ram, ras, rass = cstr[0:4]
+    ded, dem, des, dess = cstr[4:8]
+    sign = 'p' if ded[1] == '+' else 'm'
+
+    targname = targstr.format(rah=rah, ram=ram, ras=ras, rass=rass,
+                              ded=ded[2:], dem=dem, des=des, dess=dess,
+                              sign=sign)
+
     return targname
     
 def blot_nearest_exact(in_data, in_wcs, out_wcs, verbose=True, stepsize=-1, 
