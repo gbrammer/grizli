@@ -197,7 +197,7 @@ def add_missing_rows(root='j004404m2034', engine=None):
         if id_i not in res_ids:
             grizli_db.add_redshift_fit_row(row_file, engine=engine, verbose=True)
         
-def run_lambda_fits(root='j004404m2034', mag_limits=[15, 26], sn_limit=7, min_status=None, engine=None, zr=[0.01,3.4], bucket='grizli-v1', verbose=True, extra={'bad_pa_threshold':10}):
+def run_lambda_fits(root='j004404m2034', phot_root=None, mag_limits=[15, 26], sn_limit=7, min_status=None, engine=None, zr=[0.01,3.4], bucket='grizli-v1', verbose=True, extra={'bad_pa_threshold':10}):
     """
     Run redshift fits on lambda for a given root
     """
@@ -214,13 +214,16 @@ def run_lambda_fits(root='j004404m2034', mag_limits=[15, 26], sn_limit=7, min_st
     
     print('Sync phot catalog')
     
-    os.system('aws s3 sync s3://{1}/Pipeline/{0}/Extractions/ ./ --exclude "*" --include "*_phot*.fits"'.format(root, bucket))
+    if phot_root is None:
+        root=root
+        
+    os.system('aws s3 sync s3://{1}/Pipeline/{0}/Extractions/ ./ --exclude "*" --include "*_phot*.fits"'.format(phot_root, bucket))
 
     print('Sync wcs.fits')
 
     os.system('aws s3 sync s3://{1}/Pipeline/{0}/Extractions/ ./ --exclude "*" --include "*_phot*.fits" --include "*wcs.fits"'.format(root, bucket))
     
-    phot = utils.read_catalog('{0}_phot_apcorr.fits'.format(root))
+    phot = utils.read_catalog('{0}_phot_apcorr.fits'.format(phot_root))
     phot['has_grism'] = 0
     wcs_files = glob.glob('*wcs.fits')
     for f in wcs_files:
@@ -273,9 +276,12 @@ def run_lambda_fits(root='j004404m2034', mag_limits=[15, 26], sn_limit=7, min_st
     fit_redshift_lambda.fit_lambda(root=root, beams=[], ids=ids, newfunc=False, bucket_name=bucket, skip_existing=False, sleep=False, skip_started=False, show_event=False, zr=zr, force_args=True, quasar_fit=False, output_path=None, save_figures='png', verbose=verbose, **extra)
     
     print('Add photometry: {0}'.format(root))
-    grizli_db.add_phot_to_db(root, delete=False, engine=engine)
+    grizli_db.add_phot_to_db(phot_root, delete=False, engine=engine)
     
     res = grizli_db.wait_on_db_update(root, dt=15, n_iter=120, engine=engine)
+    
+    print('Set root > phot_root = {0} > {1}'.format(root, phot_root))
+    grizli_db.set_phot_root(root, phot_root, engine)
     
     res = pd.read_sql_query("SELECT root, id, flux_radius, mag_auto, z_map, status, bic_diff, zwidth1, log_pdf_max, chinu FROM photometry_apcorr AS p JOIN (SELECT * FROM redshift_fit WHERE z_map > 0 AND root = '{0}') z ON (p.p_root = z.root AND p.p_id = z.id)".format(root), engine)
     return res
@@ -286,6 +292,25 @@ def run_lambda_fits(root='j004404m2034', mag_limits=[15, 26], sn_limit=7, min_st
         # Get arguments
         args = fit_redshift_lambda.fit_lambda(root=root, beams=[], ids=ids, newfunc=False, bucket_name='grizli-v1', skip_existing=False, sleep=False, skip_started=False, quasar_fit=False, output_path=None, show_event=2, zr=[0.01,3.4], force_args=True)
 
+def set_phot_root(root, phot_root, engine):
+    """
+    """
+    SQL = """UPDATE redshift_fit
+     SET phot_root = '{phot_root}'
+    WHERE (root = '{root}');
+    """.format(phot_root=phot_root, root=root)
+
+    engine.execute(SQL)
+
+    if False:
+        # Check where phot_root not equal to root
+        res = pd.read_sql_query("SELECT root, id, status, phot_root FROM redshift_fit WHERE (phot_root != root)".format(root), engine)
+        
+        # update the one pointing where it should change in photometry_apcorr
+        engine.execute("UPDATE photometry_apcorr SET root = 'j214224m4420' WHERE root = 'j214224m4420gr01';")
+        
+        
+        
 def wait_on_db_update(root, t0=60, dt=30, n_iter=60, engine=None):
     """
     Wait for db to stop updating on root
@@ -485,6 +510,13 @@ def add_spectroscopic_redshifts(tab, rmatch=1, engine=None):
     if engine is None:            
         engine = grizli_db.get_db_engine(echo=False)
     
+    if False:
+        # duplicates
+        fit = grizli_db.from_sql("select root, ra, dec from redshift_fit", engine)
+
+        fit = grizli_db.from_sql("select root, ra, dec from redshift_fit where ra is null", engine)
+
+        
     # Select master table
     res = pd.read_sql_query("SELECT p_root, p_id, p_ra, p_dec, z_spec from photometry_apcorr", engine)
     db = utils.GTable.from_pandas(res)
@@ -521,6 +553,14 @@ def add_spectroscopic_redshifts(tab, rmatch=1, engine=None):
     
     engine.execute(SQL)
     
+    if False:
+        # Update redshift_fit ra/dec with photometry_table double prec.
+          SQL = """UPDATE redshift_fit
+             SET ra = p_ra
+                 dec = p_dec
+           FROM photometry_apcorr
+           WHERE (phot_root = p_root AND id = p_id AND root = 'j123556p6221');
+           """        
 def mtime_to_iso(ct):
     """
     Convert mtime values to ISO format suitable for sorting, etc.
@@ -621,7 +661,7 @@ def various_selections():
     splmag = 23.9-2.5*np.log10(np.maximum(res['splf03'], 1.e-22)*1.2e4**2/3.e18*1.e29)
 
     # Number of matches per field
-    counts = pd.read_sql_query("select root, COUNT(root) as n from redshift_fit, photometry_apcorr where root = p_root AND id = p_id AND bic_diff > 50 AND mag_auto < 24 group by root;", engine)
+    counts = pd.read_sql_query("select root, COUNT(root) as n from redshift_fit, photometry_apcorr where phot_root = p_root AND id = p_id AND bic_diff > 50 AND mag_auto < 24 group by root;", engine)
   
 def from_sql(query, engine):
     import pandas as pd
@@ -744,6 +784,11 @@ def run_all_redshift_fits():
 
     ####
     # Redo fits on reprocessed fields
+
+    # for i in range(2,11):
+    #     root = 'j214224m4420gr{0:02d}'.format(i)
+    #     print(root)
+    # 
     res = engine.execute("DELETE from redshift_fit WHERE (root = '{0}')".format(root), engine)
     res = engine.execute("DELETE from photometry_apcorr WHERE (p_root = '{0}')".format(root), engine)
     grizli_db.run_lambda_fits(root, min_status=6, zr=[0.01,zmax])  
@@ -765,7 +810,7 @@ def count_sources_for_bad_persistence():
     engine = grizli_db.get_db_engine(echo=False)
     
     # Number of matches per field
-    counts = pd.read_sql_query("select root, COUNT(root) as n from redshift_fit, photometry_apcorr where root = p_root AND id = p_id AND bic_diff > 5 AND mag_auto < 24 group by root;", engine)
+    counts = pd.read_sql_query("select root, COUNT(root) as n from redshift_fit, photometry_apcorr where phot_root = p_root AND id = p_id AND bic_diff > 5 AND mag_auto < 24 group by root;", engine)
     
     counts = utils.GTable.from_pandas(counts)
     so = np.argsort(counts['n'])
@@ -892,7 +937,7 @@ def set_column_formats(info):
         elif c.startswith('flux_') | c.startswith('err_'):
             info[c].format = '.1e'
         
-def make_html_table(engine=None, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','bic_diff','chinu','log_pdf_max', 'd4000', 'd4000_e'], where="AND status >= 5 AND root='j163852p4039'", table_root='query', sync='s3://grizli-v1/tables/', png_ext=['R30','stack','full','line'], sort_column=('bic_diff',-1), verbose=True, get_sql=False, show_hist=False):
+def make_html_table(engine=None, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','bic_diff','chinu','log_pdf_max', 'd4000', 'd4000_e'], where="AND status >= 5 AND root='j163852p4039'", tables=[], table_root='query', sync='s3://grizli-v1/tables/', png_ext=['R30','stack','full','line'], sort_column=('bic_diff',-1), verbose=True, get_sql=False, show_hist=False):
     """
     """
     import time
@@ -907,7 +952,12 @@ def make_html_table(engine=None, columns=['root','status','id','p_ra','p_dec','m
     if engine is None:
         engine = get_db_engine(echo=False)
     
-    query = "SELECT {0} FROM photometry_apcorr, redshift_fit WHERE root = p_root AND id = p_id {1};".format(','.join(columns), where)
+    if len(tables) > 0:
+        extra_tables = ','+','.join(tables)
+    else:
+        extra_tables = ''
+        
+    query = "SELECT {0} FROM photometry_apcorr, redshift_fit{1} WHERE phot_root = p_root AND id = p_id {2};".format(','.join(columns), extra_tables, where)
     
     if get_sql:
         return query
