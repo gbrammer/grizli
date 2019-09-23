@@ -147,6 +147,7 @@ def get_lambda_client(region_name='us-east-1'):
     import boto3
     session = boto3.Session()
     client = session.client('lambda', region_name=region_name)
+    return client
     
 def send_event_lambda(event, verbose=True, client=None, func='GrizliLambda-0-12-0-41'):
     """
