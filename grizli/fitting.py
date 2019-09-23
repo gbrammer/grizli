@@ -297,7 +297,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
            
     #### Get best-fit template 
     tfit = mb.template_at_z(z=mb_fit.meta['z_map'][0], templates=t1,
-                            fit_background=True, fitter=fitter[1], 
+                            fit_background=True, fitter=fitter[-1], 
                             bounded_kwargs=bounded_kwargs)
         
     # Redrizzle? ... testing
