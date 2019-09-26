@@ -10,7 +10,7 @@ FLAGS = {'init_lambda':1,
          'start_redshift_fit': 5, 
          'fit_complete': 6}
 
-COLUMNS = ['root', 'id', 'status', 'ra', 'dec', 'ninput', 'redshift', 't_g102', 'n_g102', 'p_g102', 't_g141', 'n_g141', 'p_g141', 't_g800l', 'n_g800l', 'p_g800l', 'numlines', 'haslines', 'chi2poly', 'chi2spl', 'splf01', 'sple01', 'splf02', 'sple02', 'splf03', 'sple03', 'splf04', 'sple04', 'huberdel', 'st_df', 'st_loc', 'st_scl', 'dof', 'chimin', 'chimax', 'bic_poly', 'bic_spl', 'bic_temp', 'z02', 'z16', 'z50', 'z84', 'z97', 'zwidth1', 'zwidth2', 'z_map', 'z_risk', 'min_risk', 'd4000', 'd4000_e', 'dn4000', 'dn4000_e', 'dlineid', 'dlinesn', 'flux_pab', 'err_pab', 'ew50_pab', 'ewhw_pab', 'flux_hei_1083', 'err_hei_1083', 'ew50_hei_1083', 'ewhw_hei_1083', 'flux_siii', 'err_siii', 'ew50_siii', 'ewhw_siii', 'flux_oii_7325', 'err_oii_7325', 'ew50_oii_7325', 'ewhw_oii_7325', 'flux_ariii_7138', 'err_ariii_7138', 'ew50_ariii_7138', 'ewhw_ariii_7138', 'flux_sii', 'err_sii', 'ew50_sii', 'ewhw_sii', 'flux_ha', 'err_ha', 'ew50_ha', 'ewhw_ha', 'flux_oi_6302', 'err_oi_6302', 'ew50_oi_6302', 'ewhw_oi_6302', 'flux_hei_5877', 'err_hei_5877', 'ew50_hei_5877', 'ewhw_hei_5877', 'flux_oiii', 'err_oiii', 'ew50_oiii', 'ewhw_oiii', 'flux_hb', 'err_hb', 'ew50_hb', 'ewhw_hb', 'flux_oiii_4363', 'err_oiii_4363', 'ew50_oiii_4363', 'ewhw_oiii_4363', 'flux_hg', 'err_hg', 'ew50_hg', 'ewhw_hg', 'flux_hd', 'err_hd', 'ew50_hd', 'ewhw_hd', 'flux_h7', 'err_h7', 'ew50_h7', 'ewhw_h7', 'flux_h8', 'err_h8', 'ew50_h8', 'ewhw_h8', 'flux_h9', 'err_h9', 'ew50_h9', 'ewhw_h9', 'flux_h10', 'err_h10', 'ew50_h10', 'ewhw_h10', 'flux_neiii_3867', 'err_neiii_3867', 'ew50_neiii_3867', 'ewhw_neiii_3867', 'flux_oii', 'err_oii', 'ew50_oii', 'ewhw_oii', 'flux_nevi_3426', 'err_nevi_3426', 'ew50_nevi_3426', 'ewhw_nevi_3426', 'flux_nev_3346', 'err_nev_3346', 'ew50_nev_3346', 'ewhw_nev_3346', 'flux_mgii', 'err_mgii', 'ew50_mgii', 'ewhw_mgii', 'flux_civ_1549', 'err_civ_1549', 'ew50_civ_1549', 'ewhw_civ_1549', 'flux_ciii_1908', 'err_ciii_1908', 'ew50_ciii_1908', 'ewhw_ciii_1908', 'flux_oiii_1663', 'err_oiii_1663', 'ew50_oiii_1663', 'ewhw_oiii_1663', 'flux_heii_1640', 'err_heii_1640', 'ew50_heii_1640', 'ewhw_heii_1640', 'flux_niii_1750', 'err_niii_1750', 'ew50_niii_1750', 'ewhw_niii_1750', 'flux_niv_1487', 'err_niv_1487', 'ew50_niv_1487', 'ewhw_niv_1487', 'flux_nv_1240', 'err_nv_1240', 'ew50_nv_1240', 'ewhw_nv_1240', 'flux_lya', 'err_lya', 'ew50_lya', 'ewhw_lya', 'pdf_max', 'cdf_z', 'sn_pab', 'sn_hei_1083', 'sn_siii', 'sn_oii_7325', 'sn_ariii_7138', 'sn_sii', 'sn_ha', 'sn_oi_6302', 'sn_hei_5877', 'sn_oiii', 'sn_hb', 'sn_oiii_4363', 'sn_hg', 'sn_hd', 'sn_h7', 'sn_h8', 'sn_h9', 'sn_h10', 'sn_neiii_3867', 'sn_oii', 'sn_nevi_3426', 'sn_nev_3346', 'sn_mgii', 'sn_civ_1549', 'sn_ciii_1908', 'sn_oiii_1663', 'sn_heii_1640', 'sn_niii_1750', 'sn_niv_1487', 'sn_nv_1240', 'sn_lya', 'chinu', 'bic_diff', 'log_risk', 'log_pdf_max', 'zq', 'mtime', 'vel_bl', 'vel_nl', 'vel_z', 'vel_nfev', 'vel_flag', 'grizli_version']
+COLUMNS = ['root', 'id', 'status', 'ra', 'dec', 'ninput', 'redshift', 't_g102', 'n_g102', 'p_g102', 't_g141', 'n_g141', 'p_g141', 't_g800l', 'n_g800l', 'p_g800l', 'numlines', 'haslines', 'chi2poly', 'chi2spl', 'splf01', 'sple01', 'splf02', 'sple02', 'splf03', 'sple03', 'splf04', 'sple04', 'huberdel', 'st_df', 'st_loc', 'st_scl', 'dof', 'chimin', 'chimax', 'bic_poly', 'bic_spl', 'bic_temp', 'z02', 'z16', 'z50', 'z84', 'z97', 'zwidth1', 'zwidth2', 'z_map', 'zrmin', 'zrmax', 'z_risk', 'min_risk', 'd4000', 'd4000_e', 'dn4000', 'dn4000_e', 'dlineid', 'dlinesn', 'flux_pab', 'err_pab', 'ew50_pab', 'ewhw_pab', 'flux_hei_1083', 'err_hei_1083', 'ew50_hei_1083', 'ewhw_hei_1083', 'flux_siii', 'err_siii', 'ew50_siii', 'ewhw_siii', 'flux_oii_7325', 'err_oii_7325', 'ew50_oii_7325', 'ewhw_oii_7325', 'flux_ariii_7138', 'err_ariii_7138', 'ew50_ariii_7138', 'ewhw_ariii_7138', 'flux_sii', 'err_sii', 'ew50_sii', 'ewhw_sii', 'flux_ha', 'err_ha', 'ew50_ha', 'ewhw_ha', 'flux_oi_6302', 'err_oi_6302', 'ew50_oi_6302', 'ewhw_oi_6302', 'flux_hei_5877', 'err_hei_5877', 'ew50_hei_5877', 'ewhw_hei_5877', 'flux_oiii', 'err_oiii', 'ew50_oiii', 'ewhw_oiii', 'flux_hb', 'err_hb', 'ew50_hb', 'ewhw_hb', 'flux_oiii_4363', 'err_oiii_4363', 'ew50_oiii_4363', 'ewhw_oiii_4363', 'flux_hg', 'err_hg', 'ew50_hg', 'ewhw_hg', 'flux_hd', 'err_hd', 'ew50_hd', 'ewhw_hd', 'flux_h7', 'err_h7', 'ew50_h7', 'ewhw_h7', 'flux_h8', 'err_h8', 'ew50_h8', 'ewhw_h8', 'flux_h9', 'err_h9', 'ew50_h9', 'ewhw_h9', 'flux_h10', 'err_h10', 'ew50_h10', 'ewhw_h10', 'flux_neiii_3867', 'err_neiii_3867', 'ew50_neiii_3867', 'ewhw_neiii_3867', 'flux_oii', 'err_oii', 'ew50_oii', 'ewhw_oii', 'flux_nevi_3426', 'err_nevi_3426', 'ew50_nevi_3426', 'ewhw_nevi_3426', 'flux_nev_3346', 'err_nev_3346', 'ew50_nev_3346', 'ewhw_nev_3346', 'flux_mgii', 'err_mgii', 'ew50_mgii', 'ewhw_mgii', 'flux_civ_1549', 'err_civ_1549', 'ew50_civ_1549', 'ewhw_civ_1549', 'flux_ciii_1908', 'err_ciii_1908', 'ew50_ciii_1908', 'ewhw_ciii_1908', 'flux_oiii_1663', 'err_oiii_1663', 'ew50_oiii_1663', 'ewhw_oiii_1663', 'flux_heii_1640', 'err_heii_1640', 'ew50_heii_1640', 'ewhw_heii_1640', 'flux_niii_1750', 'err_niii_1750', 'ew50_niii_1750', 'ewhw_niii_1750', 'flux_niv_1487', 'err_niv_1487', 'ew50_niv_1487', 'ewhw_niv_1487', 'flux_nv_1240', 'err_nv_1240', 'ew50_nv_1240', 'ewhw_nv_1240', 'flux_lya', 'err_lya', 'ew50_lya', 'ewhw_lya', 'pdf_max', 'cdf_z', 'sn_pab', 'sn_hei_1083', 'sn_siii', 'sn_oii_7325', 'sn_ariii_7138', 'sn_sii', 'sn_ha', 'sn_oi_6302', 'sn_hei_5877', 'sn_oiii', 'sn_hb', 'sn_oiii_4363', 'sn_hg', 'sn_hd', 'sn_h7', 'sn_h8', 'sn_h9', 'sn_h10', 'sn_neiii_3867', 'sn_oii', 'sn_nevi_3426', 'sn_nev_3346', 'sn_mgii', 'sn_civ_1549', 'sn_ciii_1908', 'sn_oiii_1663', 'sn_heii_1640', 'sn_niii_1750', 'sn_niv_1487', 'sn_nv_1240', 'sn_lya', 'chinu', 'bic_diff', 'log_risk', 'log_pdf_max', 'zq', 'mtime', 'vel_bl', 'vel_nl', 'vel_z', 'vel_nfev', 'vel_flag', 'grizli_version']
          
 def get_connection_info(config_file=None):
     """
@@ -196,6 +196,180 @@ def add_missing_rows(root='j004404m2034', engine=None):
         id_i = int(row_file.split('.row.fits')[0][-5:])
         if id_i not in res_ids:
             grizli_db.add_redshift_fit_row(row_file, engine=engine, verbose=True)
+
+def convert_1D_to_lists(file='j234420m4245_00615.1D.fits'):
+    """
+    Convert 1D spectral data to lists suitable for putting into dataframes
+    and sending to the databases.
+    """ 
+    from collections import OrderedDict
+    import astropy.io.fits as pyfits
+    from .. import utils
+    
+    if not os.path.exists(file):
+        print('Spectrum file not found')
+        return False
+    
+    im = pyfits.open(file)
+    obj_id = im[0].header['ID']
+    obj_root = im[0].header['TARGET']
+    
+    if '.R30.' in file:
+        skip_columns = ['line','cont']
+        pref = 'spec1d_r30'
+    else:
+        skip_columns = []
+        pref = 'spec1d'
+        
+    spectra = OrderedDict()
+    has_spectra = False
+    for gr in ['G102','G141','G800L']:
+        if gr in im:
+            has_spectra = True
+            sp = utils.GTable.read(file, hdu=gr)
+            prefix = '{0}_{1}_'.format(pref, gr.lower())
+            
+            spd = {prefix+'id':obj_id, prefix+'root':obj_root}
+            for c in sp.colnames:
+                if c in skip_columns:
+                    continue
+                    
+                spd[prefix+c] = sp[c].tolist()
+            
+            spectra[gr.lower()] = spd
+    
+    if has_spectra:
+        return spectra
+    else:
+        return False
+        
+def send_1D_to_database(files=[], engine=None):
+    """
+    Send a list of 1D spectra to the spectra databases
+    
+    ToDo: check for existing lines
+    
+    """
+    from collections import OrderedDict
+    import pandas as pd
+    
+    if engine is None:
+        engine = get_db_engine()
+    
+    tables = OrderedDict()
+    for file in files:
+        sp_i = convert_1D_to_lists(file=file)
+        print('Read spec1d file: {0}'.format(file))
+        for gr in sp_i:
+            
+            # Initialize the columns
+            if gr not in tables:
+                tables[gr] = OrderedDict()
+                for c in sp_i[gr]:
+                    tables[gr][c] = []
+            
+            # Add the data
+            for c in sp_i[gr]:                    
+                tables[gr][c].append(sp_i[gr][c])
+    
+    prefix = 'spec1d_r30' if '.R30.' in files[0] else 'spec1d'
+    
+    for gr in tables:
+        tablename = '{0}_{1}'.format(prefix, gr)
+        df = pd.DataFrame(tables[gr])
+                        
+        # Put wavelengths in their own tables to avoid massive duplication
+        wave_table = tablename+'_wave'
+        if wave_table not in engine.table_names():
+            print('Create wave table: '+wave_table)
+            wdf = pd.DataFrame(data=tables[gr][wave_table][0], 
+                               columns=[wave_table])
+
+            wdf.to_sql(wave_table, engine, if_exists='replace', 
+                       index=True, index_label = tablename+'_idx')
+            
+        # drop wave from spectra tables
+        df.drop('{0}_wave'.format(tablename), axis=1, inplace=True) 
+        
+        # Create table
+        if tablename not in engine.table_names():
+            print('Initialize table {0}'.format(tablename))
+            
+            SQL = "CREATE TABLE {0} (\n".format(tablename)
+            SQL += '    {0}_root   text,\n'.format(tablename)
+            SQL += '    {0}_id  integer,\n'.format(tablename)
+            for c in df.columns:
+                item = df[c][0]
+                if isinstance(item, list):
+                    SQL += '    {0} real[{1}],\n'.format(c, len(item))
+            
+            engine.execute(SQL[:-2]+')')
+            
+            try:
+                engine.execute("CREATE INDEX {0}_idx ON {0} ({0}_root, {0}_id);".format(tablename))
+            except:
+                pass
+                
+        # Delete existing duplicates
+        if tablename in engine.table_names():
+            SQL = """DELETE from {0} WHERE """.format(tablename)
+            mat = ["({0}_root = '{1}' AND {0}_id = {2})".format(tablename, r, i) for r, i in zip(df[tablename+'_root'], df[tablename+'_id'])]
+            SQL += 'OR '.join(mat)
+            rsp = engine.execute(SQL)
+        
+        # Send the table
+        print('Send {0} rows to {1}'.format(len(df), tablename))
+        df.to_sql(tablename, engine, index=False, if_exists='append',
+                  method='multi')
+
+def add_oned_spectra(root='j214224m4420gr01', bucket='grizli-v1'):
+    import os
+    import boto3
+   
+    # s3 = boto3.resource('s3')
+    # bkt = s3.Bucket(bucket)
+    # 
+    # files = [obj.key for obj in bkt.objects.filter(Prefix='Pipeline/{0}/Extractions/'.format(root))]
+    # 
+    # for file in files:
+    #     if (('.R30.fits' in file) | ('.1D.fits' in file)) & (not os.path.exists(file)):
+    #         local_file = os.path.basename(file)
+    #         print(local_file)
+    #         bkt.download_file(file, local_file,
+    #                           ExtraArgs={"RequestPayer": "requester"})
+    os.system('aws s3 sync s3://{0}/Pipeline/{1}/Extractions/ ./ --exclude "*" --include "*R30.fits" --include "*1D.fits"'.format(bucket, root))
+    
+    # 1D.fits
+    files = glob.glob('{0}_*1D.fits'.format(root)); files.sort()
+    grizli_db.send_1D_to_database(files=files, engine=engine)
+
+    files = glob.glob('{0}_*R30.fits'.format(root)); files.sort()
+    grizli_db.send_1D_to_database(files=files, engine=engine)
+    
+    os.system('rm {0}_*.1D.fits {0}_*.R30.fits'.format(root))
+    
+    if False:
+        tablename = 'spec1d_g141'
+
+        #tablename = 'spec1d_r30_g141'
+        
+        resp = pd.read_sql_query("SELECT root, id, z_map, q_z, sp.* from redshift_fit, {1} as sp WHERE {1}_root = root AND {1}_id = id AND root = '{0}' AND q_z > -0.7 ORDER BY z_map".format(root, tablename), engine)
+        
+        wave = pd.read_sql_query("SELECT * from {0}_wave".format(tablename),
+                                 engine)[tablename+'_wave'].values
+        
+        data = OrderedDict()
+        for c in resp.columns:
+            if c.startswith(tablename):
+                c_i = c.split(tablename+'_')[1]
+                try:
+                    data[c_i] = np.array(resp[c].values.tolist())  
+                except:
+                    pass
+                    
+        plt.imshow((data['flux'] - data['cont'])/data['flat']/1.e-19, vmin=-0.1, vmax=10)
+
+        plt.imshow((data['line'] - data['cont'])/data['flat']/1.e-19, vmin=-0.1, vmax=10)
         
 def run_lambda_fits(root='j004404m2034', phot_root=None, mag_limits=[15, 26], sn_limit=7, min_status=None, engine=None, zr=[0.01,3.4], bucket='grizli-v1', verbose=True, extra={'bad_pa_threshold':10}):
     """
@@ -266,7 +440,7 @@ def run_lambda_fits(root='j004404m2034', phot_root=None, mag_limits=[15, 26], sn
             res = pd.read_sql_query("SELECT root, id, status, mtime, mag_auto FROM redshift_fit,photometry_apcorr WHERE root = '{0}' AND status = {1}/10000 AND mag_auto > {2} AND mag_auto < {3} AND p_root = root AND p_id = id".format(root, min_status, mag_limits[0], mag_limits[1]), engine)
         else:
             # just select on status
-            res = pd.read_sql_query("SELECT root, id, status, mtime, mag_auto FROM redshift_fit WHERE root = '{0}' AND status = {1}/1000".format(root, min_status, mag_limits[0], mag_limits[1]), engine)
+            res = pd.read_sql_query("SELECT root, id, status, mtime FROM redshift_fit WHERE root = '{0}' AND status = {1}/1000".format(root, min_status, mag_limits[0], mag_limits[1]), engine)
             
         ids = res['id'].tolist()
         
@@ -280,7 +454,6 @@ def run_lambda_fits(root='j004404m2034', phot_root=None, mag_limits=[15, 26], sn
     
     res = grizli_db.wait_on_db_update(root, dt=15, n_iter=120, engine=engine)
     
-    print('Set root > phot_root = {0} > {1}'.format(root, phot_root))
     grizli_db.set_phot_root(root, phot_root, engine)
     
     res = pd.read_sql_query("SELECT root, id, flux_radius, mag_auto, z_map, status, bic_diff, zwidth1, log_pdf_max, chinu FROM photometry_apcorr AS p JOIN (SELECT * FROM redshift_fit WHERE z_map > 0 AND root = '{0}') z ON (p.p_root = z.root AND p.p_id = z.id)".format(root), engine)
@@ -295,6 +468,9 @@ def run_lambda_fits(root='j004404m2034', phot_root=None, mag_limits=[15, 26], sn
 def set_phot_root(root, phot_root, engine):
     """
     """
+    print('Set phot_root = {0} > {1}'.format(root, phot_root))
+    
+    
     SQL = """UPDATE redshift_fit
      SET phot_root = '{phot_root}'
     WHERE (root = '{root}');
@@ -309,6 +485,15 @@ def set_phot_root(root, phot_root, engine):
         # update the one pointing where it should change in photometry_apcorr
         engine.execute("UPDATE photometry_apcorr SET root = 'j214224m4420' WHERE root = 'j214224m4420gr01';")
         
+        
+    if False:
+        # Set 3D-HST fields
+        res = grizli_db.from_sql("select distinct root from redshift_fit where root like '%%-grism%%'", engine)
+        for root in res['root']:
+            grizli_db.set_phot_root(root, root, engine)
+            grizli_db.set_phot_root(root.replace('-grism', '-g800l'), root, engine)
+            xres = grizli_db.from_sql("select root, count(root) from redshift_fit where root like '{0}-%%' group by root".format(root.split('-')[0]), engine)
+            print(xres)
         
         
 def wait_on_db_update(root, t0=60, dt=30, n_iter=60, engine=None):
@@ -372,6 +557,21 @@ def fit_timeouts(root='j004404m2034', mag_limits=[15, 26], sn_limit=7, min_statu
     res = grizli_db.wait_on_db_update(root, dt=15, n_iter=120, engine=engine)
     return res
     
+    # All timeouts
+    events = fit_redshift_lambda.fit_lambda(root='egs-g800l-j141956p5255', beams=[], ids=[20667], newfunc=False, bucket_name='grizli-v1', skip_existing=False, sleep=False, skip_started=False, quasar_fit=False, output_path=None, show_event=2, zr=[0.01,2.4], force_args=True)
+    
+    res = pd.read_sql_query("SELECT root, id, status FROM redshift_fit WHERE status = 5 AND root NOT LIKE 'cos-grism%%' ORDER BY root".format(root), engine)
+    
+    base = {'bucket': 'grizli-v1', 'skip_started': False, 'quasar_fit': False, 'zr': '0.01,2.4', 'force_args': True, 'bad_pa_threshold': 10, 'use_phot_obj': False, 'save_figures':'png'}
+    
+    all_events = fit_redshift_lambda.generate_events(res['root'], res['id'], base=base, send_to_lambda=True)
+    
+    xres = pd.read_sql_query("SELECT root, p_ra as ra, p_dec as dec, id, status FROM redshift_fit WHERE status = 5 AND root LIKE 'gds-grism%%' ORDER BY root".format(root), engine)
+    
+    print(len(res), len(xres))
+
+    # show points
+    xres = pd.read_sql_query("SELECT root, p_ra as ra, p_dec as dec, id, status FROM redshift_fit WHERE status = 5 AND root LIKE 'gds-grism%%' ORDER BY root".format(root), engine)
     
     
 ########### Photometry table
@@ -487,7 +687,7 @@ def test_join():
     # on root
     res = pd.read_sql_query("SELECT p.root, p.id, mag_auto, z_map, status FROM photometry_apcorr AS p JOIN (SELECT * FROM redshift_fit WHERE root='{0}') z ON (p.p_root = z.root AND p.p_id = z.id)".format(root), engine)        
      
-def add_spectroscopic_redshifts(tab, rmatch=1, engine=None):
+def add_spectroscopic_redshifts(xtab, rmatch=1, engine=None, db=None):
     """
     Add spectroscopic redshifts to the photometry_apcorr table
     
@@ -503,12 +703,20 @@ def add_spectroscopic_redshifts(tab, rmatch=1, engine=None):
     from grizli import utils
     
     for c in ['ra', 'dec', 'z_spec', 'z_spec_src', 'z_spec_qual_raw', 'z_spec_qual']:
-        if c not in tab.colnames:
+        if c not in xtab.colnames:
             print('Column {0} not found in input table'.format(c))
             return False
     
     if engine is None:            
         engine = grizli_db.get_db_engine(echo=False)
+    
+    # Force data types
+    tab = xtab[xtab['z_spec'] >= 0]
+    if hasattr(tab['ra'], 'mask'):
+        tab = tab[~tab['ra'].mask]
+    
+    tab['z_spec_qual'] = tab['z_spec_qual']*1
+    tab['z_spec_qual_raw'] = tab['z_spec_qual_raw']*1
     
     if False:
         # duplicates
@@ -518,10 +726,11 @@ def add_spectroscopic_redshifts(tab, rmatch=1, engine=None):
 
         
     # Select master table
-    res = pd.read_sql_query("SELECT p_root, p_id, p_ra, p_dec, z_spec from photometry_apcorr", engine)
-    db = utils.GTable.from_pandas(res)
-    for c in ['p_root', 'p_id', 'p_ra', 'p_dec']:
-        db.rename_column(c, c[2:])
+    if db is None:
+        res = pd.read_sql_query("SELECT p_root, p_id, p_ra, p_dec, z_spec from photometry_apcorr", engine)
+        db = utils.GTable.from_pandas(res)
+        for c in ['p_root', 'p_id', 'p_ra', 'p_dec']:
+            db.rename_column(c, c[2:])
         
     idx, dr = db.match_to_catalog_sky(tab)
     hasm = (dr.value < rmatch) & (tab['z_spec'] >= 0)
@@ -577,9 +786,15 @@ def various_selections():
 
     # objects with carla redshifts (radio loud)
     res = make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','bic_diff','chinu','log_pdf_max'], where="AND status > 5 AND z_spec > 0 AND z_spec_qual = 1 AND z_spec_src ~ '^carla'", table_root='carla_zspec', sync='s3://grizli-v1/tables/')
+    
+    # Bright galaxies with q_z flag
+    res = grizli_db.make_html_table(engine=engine, columns=['mtime', 'root','status','id','p_ra','p_dec','mag_auto','flux_radius','t_g800l','t_g102', 't_g141', 'z_spec','z_map','bic_diff','chinu','zwidth1/(1+z_map) as zw1','q_z','q_z > -0.69 as q_z_TPR90','dlinesn'], where="AND status > 4 AND mag_auto < 22 AND z_map > 1.3", table_root='bright', sync='s3://grizli-v1/tables/', png_ext=['R30', 'stack','full','line'], show_hist=True)
 
+    # High-z compiliation
+    res = grizli_db.make_html_table(engine=engine, columns=['mtime', 'root','status','id','p_ra','p_dec','mag_auto','flux_radius','t_g800l','t_g102', 't_g141', 'z_spec','z_map','bic_diff','chinu','q_z','h_zphot', 'h_src'], where="AND status > 4 AND phot_root = h_root AND id = h_id", tables=['highz_2015'], table_root='bright', sync='s3://grizli-v1/tables/', png_ext=['R30', 'stack','full','line'], show_hist=True)
+    
     # z_spec with dz
-    res = grizli_db.make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','z_spec_src','bic_diff','chinu','log_pdf_max', 'zwidth1/(1+z_map) as zw1','(z_map-z_spec)/(1+z_spec) as dz'], where="AND status > 4 AND z_spec > 0 AND z_spec_qual = 1", table_root='zspec_delta', sync='s3://grizli-v1/tables/', png_ext=['R30', 'stack','full','line'])
+    res = grizli_db.make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','z_spec_src','bic_diff','chinu','log_pdf_max', 'zwidth1/(1+z_map) as zw1','(z_map-z_spec)/(1+z_spec) as dz', 'dlinesn'], where="AND status > 4 AND z_spec > 0 AND z_spec_qual = 1", table_root='zspec_delta', sync='s3://grizli-v1/tables/', png_ext=['R30', 'stack','full','line'])
 
     if False:
         from matplotlib.ticker import FixedLocator, AutoLocator, MaxNLocator
@@ -621,7 +836,7 @@ def various_selections():
     res = grizli_db.make_html_table(engine=engine, columns=['mtime', 'root','status','id','p_ra','p_dec','mag_auto','flux_radius','t_g800l','t_g102', 't_g141', 'z_spec','z_map','bic_diff','chinu','zwidth1/(1+z_map) as zw1','dlinesn'], where="AND status > 4 AND bic_diff > 100 AND root = '{0}'".format(root), table_root=root, sync='s3://grizli-v1/Pipeline/{0}/Extractions/'.format(root), png_ext=['R30', 'stack','full','line'], show_hist=True)
     
     # high bic_diff = unambiguous
-    res = grizli_db.make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','bic_diff','chinu','log_pdf_max','d4000','d4000_e', '-(bic_temp-bic_spl) as bic_diff_spl'], where="AND status > 5 AND ((bic_diff > 200 AND chinu < 2))", table_root='unamb', sync='s3://grizli-v1/tables/')
+    res = grizli_db.make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','bic_diff','chinu','log_pdf_max','d4000','d4000_e', '-(bic_temp-bic_spl) as bic_diff_spl'], where="AND status > 5 AND (((bic_diff > 50 OR  zwidth1/(1+z_map) < 0.01) AND chinu < 2))", table_root='unamb', sync='s3://grizli-v1/tables/')
 
     # with d4000
     res = make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','bic_diff','chinu','log_pdf_max','d4000','d4000_e'], where="AND status > 5 AND chinu < 3 AND d4000 > 1 AND d4000 < 5 AND d4000_e > 0 AND d4000_e < 0.25 AND bic_diff > 5", table_root='d4000', sync='s3://grizli-v1/tables/')
@@ -647,8 +862,7 @@ def various_selections():
 
     # Continuum resid
     res = grizli_db.make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','t_g800l','z_spec','z_map','bic_diff','chinu','log_pdf_max', '23.9-2.5*log(splf01*8140*8140/3.e18*1.e29)-mag_auto as dmag'], where="AND status > 5 AND bic_diff > 5 AND splf01 > 0 AND bic_diff > 50".format(root), table_root='xxx', sync='s3://grizli-v1/tables/', png_ext=['R30', 'stack','full','line'])
-
-
+    
     res = grizli_db.make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','a_image','flux_radius','t_g800l','z_spec','z_map','bic_diff','chinu','log_pdf_max','err_ha','sn_oiii', 'f814w_tot_1*3.e18/8140/8140/splf01*1.e-29 as fresid', 'splf01/sple01 as sn01', '23.9-2.5*log(splf01*8140*8140/3.e18*1.e29)-mag_auto as dmag'], where="AND status > 5 AND t_g800l > 0 AND f814w_tot_1 > 0 AND splf01 != 0 AND splf01/sple01 > 1 AND f814w_tot_1*3.e18/8140/8140/splf01*1.e-29 > 0 AND (f814w_tot_1*3.e18/8140/8140/splf01*1.e-29 < 0.3 OR f814w_tot_1*3.e18/8140/8140/splf01*1.e-29 > 4)", table_root='g800l_oiii_mismatch', sync='s3://grizli-v1/tables/', png_ext=['R30', 'stack','full','line'])
 
     sql = grizli_db.make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','a_image','flux_radius','t_g800l','z_spec','z_map','bic_diff','chinu','log_pdf_max','err_ha','sn_oiii', 'splf01', 'sple01', 'f814w_tot_1', 'f850lp_tot_1', 'flux_auto/flux_iso as flux_aper_corr', '23.9-2.5*log(splf01*8140*8140/3.e18*1.e29)-mag_auto as dmag'], where="AND status > 5 AND t_g800l > 0 AND splf01 > 0", table_root='g800l_oiii_mismatch', sync='s3://grizli-v1/tables/', png_ext=['R30', 'stack','full','line'], get_sql=True)
@@ -776,9 +990,12 @@ def run_all_redshift_fits():
             zmax = 3.2
 
         print('\n\n', i, count, root, ta, tb, tr, pi, zmax, '\n\n')
-            
+        
+        phot_root=None
+         
         try: 
-            grizli_db.run_lambda_fits(root, min_status=6, zr=[0.01,zmax])  
+            grizli_db.run_lambda_fits(root, phot_root=phot_root, 
+                                      min_status=6, zr=[0.01,zmax])  
         except:
             pass
 
@@ -794,8 +1011,8 @@ def run_all_redshift_fits():
     grizli_db.run_lambda_fits(root, min_status=6, zr=[0.01,zmax])  
     
     #for root in "j233844m5528 j105732p3620 j112416p1132 j113812m1134 j113848m1134 j122852p1046 j143200p0959 j152504p0423 j122056m0205 j122816m1132 j131452p2612".split():
-    res = grizli_db.make_html_table(engine=engine, columns=['mtime', 'root','status','id','p_ra','p_dec','mag_auto','flux_radius','t_g800l','t_g102', 't_g141', 'z_spec','z_map','bic_diff','chinu','zwidth1/(1+z_map) as zw1','dlinesn'], where="AND status > 4 AND root = '{0}'".format(root), table_root=root, sync='s3://grizli-v1/Pipeline/{0}/Extractions/'.format(root), png_ext=['R30', 'stack','full','line'], show_hist=True)
-        
+    res = grizli_db.make_html_table(engine=engine, columns=['mtime', 'root','status','id','p_ra','p_dec','mag_auto','flux_radius','t_g800l','t_g102', 't_g141', 'z_spec','z_map','bic_diff','chinu','zwidth1/(1+z_map) as zw1','q_z','q_z > -0.69 as q_z_TPR90','dlinesn'], where="AND status > 4 AND root = '{0}'".format(root), table_root=root, sync='s3://grizli-v1/Pipeline/{0}/Extractions/'.format(root), png_ext=['R30', 'stack','full','line'], show_hist=True)
+            
     os.system('aws s3 cp s3://grizli-v1/Pipeline/{0}/Extractions/{0}_zhist.png s3://grizli-v1/tables/'.format(root))
     
 def count_sources_for_bad_persistence():
@@ -886,7 +1103,53 @@ def add_missing_photometry():
     aws s3 cp /Users/gbrammer/Research/HST/Mosaics/uds-mosaic_phot_apcorr.fits s3://grizli-v1/Pipeline/uds-grism-j021732m0512/Extractions/uds-grism-j021732m0512_phot_apcorr.fits --acl public-read    
     """
     grizli_db.run_lambda_fits('uds-grism-j021732m0512', min_status=6, zr=[0.01,3.2])
-    os.system('sudo halt')
+
+    # GDS
+    copy = """
+    aws s3 rm s3://grizli-v1/Pipeline/gds-grism-j033236m2748/Extractions/ --recursive --exclude "*" --include "gds-grism-j033236m2748_[0-9]*"
+    aws s3 rm s3://grizli-v1/Pipeline/gds-g800l-j033236m2748/Extractions/ --recursive --exclude "*" --include "gds-g800l-j033236m2748_[0-9]*"
+    
+    aws s3 cp /Users/gbrammer/Research/HST/Mosaics/gds-mosaic_phot_apcorr.fits s3://grizli-v1/Pipeline/gds-grism-j033236m2748/Extractions/gds-grism-j033236m2748_phot_apcorr.fits --acl public-read
+    
+    aws s3 cp s3://grizli-v1/Pipeline/gds-grism-j033236m2748/Extractions/gds-grism-j033236m2748_phot_apcorr.fits s3://grizli-v1/Pipeline/gds-g800l-j033236m2748/Extractions/gds-g800l-j033236m2748_phot_apcorr.fits --acl public-read
+    """
+    grizli_db.run_lambda_fits('gds-grism-j033236m2748', phot_root='gds-grism-j033236m2748', min_status=6, zr=[0.01, 3.2], extra={'bad_pa_threshold':10, 'use_phot_obj':False})
+    grizli_db.run_lambda_fits('gds-g800l-j033236m2748', phot_root='gds-grism-j033236m2748', min_status=6, zr=[0.01, 1.6], extra={'bad_pa_threshold':10, 'use_phot_obj':False})
+    
+    # GDN
+    copy = """
+    #aws s3 rm s3://grizli-v1/Pipeline/gds-g800l-j033236m2748/Extractions/ --recursive --exclude "*" --include "gds-g800l-j033236m2748_[0-9]*"
+    aws s3 rm s3://grizli-v1/Pipeline/gdn-grism-j123656p6215/Extractions/ --recursive --exclude "*" --include "gdn-grism-j123656p6215_[0-9]*"
+    aws s3 rm s3://grizli-v1/Pipeline/gdn-g800l-j123656p6215/Extractions/ --recursive --exclude "*" --include "gdn-g800l-j123656p6215_[0-9]*"
+    
+    aws s3 cp /Users/gbrammer/Research/HST/Mosaics/gdn-mosaic_phot_apcorr.fits s3://grizli-v1/Pipeline/gdn-grism-j123656p6215/Extractions/gdn-grism-j123656p6215_phot_apcorr.fits --acl public-read
+    
+    aws s3 cp s3://grizli-v1/Pipeline/gdn-grism-j123656p6215/Extractions/gdn-grism-j123656p6215_phot_apcorr.fits s3://grizli-v1/Pipeline/gdn-g800l-j123656p6215/Extractions/gdn-g800l-j123656p6215_phot_apcorr.fits --acl public-read
+    """
+    grizli_db.run_lambda_fits('gdn-grism-j123656p6215', phot_root='gdn-grism-j123656p6215', min_status=6, zr=[0.01, 3.2], extra={'bad_pa_threshold':10, 'use_phot_obj':False})
+    grizli_db.run_lambda_fits('gdn-g800l-j123656p6215', phot_root='gdn-grism-j123656p6215', min_status=6, zr=[0.01, 1.6], extra={'bad_pa_threshold':10, 'use_phot_obj':False})
+    
+    # 3D-HST G800L
+    copy = """
+    aws s3 rm s3://grizli-v1/Pipeline/egs-g800l-j141956p5255/Extractions/ --recursive --exclude "*" --include "egs-g800l-j141956p5255_[0-9]*"
+    
+    aws s3 cp s3://grizli-v1/Pipeline/egs-grism-j141956p5255/Extractions/egs-grism-j141956p5255_phot_apcorr.fits s3://grizli-v1/Pipeline/egs-g800l-j141956p5255/Extractions/egs-g800l-j141956p5255_phot_apcorr.fits --acl public-read
+    """
+    grizli_db.run_lambda_fits('egs-g800l-j141956p5255', phot_root='egs-grism-j141956p5255', min_status=6, zr=[0.01, 1.6], extra={'bad_pa_threshold':10, 'use_phot_obj':False})
+    
+    res = grizli_db.wait_on_db_update('egs-g800l-j141956p5255', dt=15, n_iter=120, engine=engine)
+    res = grizli_db.wait_on_db_update('uds-g800l-j021732m0512', dt=15, n_iter=120, engine=engine)
+    
+    
+    # UDS
+    copy = """
+    aws s3 rm s3://grizli-v1/Pipeline/uds-g800l-j021732m0512/Extractions/ --recursive --exclude "*" --include "uds-g800l-j021732m0512_[0-9]*"
+    
+    aws s3 cp s3://grizli-v1/Pipeline/uds-grism-j021732m0512/Extractions/uds-grism-j021732m0512_phot_apcorr.fits s3://grizli-v1/Pipeline/uds-g800l-j021732m0512/Extractions/uds-g800l-j021732m0512_phot_apcorr.fits --acl public-read
+    """
+    grizli_db.run_lambda_fits('uds-g800l-j021732m0512', phot_root='uds-grism-j021732m0512', min_status=6, zr=[0.01, 1.6], extra={'bad_pa_threshold':10, 'use_phot_obj':False})
+    
+    grizli_db.run_lambda_fits('egs-g800l-j141956p5255', phot_root='egs-grism-j141956p5255', min_status=6, zr=[0.01, 1.6], extra={'bad_pa_threshold':10, 'use_phot_obj':False})
     
     # Cosmos on oliveraws
     copy = """
@@ -918,6 +1181,8 @@ def set_column_formats(info):
     formats['t_g141'] = formats['t_g102'] = formats['t_g800l'] = '.0f'
     formats['zwidth1'] = formats['zw1'] = '.3f'
     formats['zwidth2'] = formats['zw2'] = '.3f'
+    
+    formats['q_z'] = '.2f'
     
     for c in info.colnames:
         if c in formats:
@@ -1063,6 +1328,14 @@ def show_all_fields():
                 res = pd.read_sql_query("select status, count(status) as n from redshift_fit where root = '{0}' group by status;".format(root), engine)
             
             res = grizli_db.make_html_table(engine=engine, columns=['mtime', 'root','status','id','p_ra','p_dec','mag_auto','flux_radius','t_g800l','t_g102', 't_g141', 'z_spec','z_map','bic_diff','chinu','zwidth1/(1+z_map) as zw1','dlinesn'], where="AND status > 4 AND root = '{0}'".format(root), table_root=root, sync='s3://grizli-v1/Pipeline/{0}/Extractions/'.format(root), png_ext=['R30', 'stack','full','line'], show_hist=True)
+            
+            if False:
+                grizli_db.set_phot_root(root, phot_root, engine)
+                
+                res = grizli_db.make_html_table(engine=engine, columns=['mtime', 'root','status','id','p_ra','p_dec','mag_auto','flux_radius','t_g800l','t_g102', 't_g141', 'z_spec','z_map','bic_diff','chinu','zwidth1/(1+z_map) as zw1','dlinesn'], where="AND status > 4 AND root = '{0}' AND (bic_diff > 20 OR zwidth1/(1+z_map) < 0.01)".format(root), table_root=root, sync='s3://grizli-v1/tables/', png_ext=['R30', 'stack','full','line','sed'], show_hist=False)
+
+                res = grizli_db.make_html_table(engine=engine, columns=['mtime', 'root','status','id','p_ra','p_dec','mag_auto','flux_radius','t_g800l','t_g102', 't_g141', 'z_spec','z_map','bic_diff','chinu','zwidth1/(1+z_map) as zw1','dlinesn'], where="AND status > 4 AND phot_root = '{0}' AND bic_diff > 20".format(phot_root), table_root=phot_root, sync='s3://grizli-v1/tables/', png_ext=['R30', 'stack','full','line'], show_hist=False)
+                
         except:
             continue
             
