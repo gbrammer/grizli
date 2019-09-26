@@ -476,7 +476,15 @@ def run_grizli_fit(event):
     
     for i, file in enumerate(files):
         print('File ({0}): {1}'.format(i+1, file))
-                
+    
+    try:
+        files = glob.glob('{0}_{1:05d}*R30.fits'.format(root, id)) 
+        if len(files) > 0:
+            grizli_db.send_1D_to_database(files=files)
+    except:
+        print('Failed to send R30 to spec1d database')
+        pass
+                    
     ###   
     ### Run the fit
     try:
@@ -524,6 +532,12 @@ def run_grizli_fit(event):
         rowfile = '{0}_{1:05d}.row.fits'.format(root, id)
         if os.path.exists(rowfile):
             grizli_db.add_redshift_fit_row(rowfile, verbose=True)
+        
+        # Add 1D spectra
+        files = glob.glob('{0}_{1:05d}*1D.fits'.format(root, id))
+        if len(files) > 0:
+            grizli_db.send_1D_to_database(files=files)
+        
     except:
         print('Update row failed')
         pass
