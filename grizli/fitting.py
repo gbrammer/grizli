@@ -790,7 +790,7 @@ def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat',
                       'HUBERDEL','ST_DF','ST_LOC','ST_SCL',
                       'DOF','CHIMIN','CHIMAX','BIC_POLY','BIC_SPL','BIC_TEMP',
                       'Z02', 'Z16', 'Z50', 'Z84', 'Z97', 'ZWIDTH1', 'ZWIDTH2', 
-                      'Z_MAP', 'Z_RISK', 'MIN_RISK', 
+                      'ZRMIN','ZRMAX','Z_MAP', 'Z_RISK', 'MIN_RISK', 
                       'VEL_BL','VEL_NL','VEL_Z','VEL_NFEV','VEL_FLAG', 
                       'D4000','D4000_E','DN4000','DN4000_E']
     
@@ -2120,6 +2120,8 @@ class GroupFitter(object):
         fit.meta['ZWIDTH2'] = pz_percentiles[4]-pz_percentiles[0], 'Width between the 2.5th and 97.5th p(z) percentiles'
         
         fit.meta['z_map'] = z_map, 'Redshift at MAX(PDF)'
+        fit.meta['zrmin'] = fit['zgrid'].min(), 'z grid start'
+        fit.meta['zrmax'] = fit['zgrid'].max(), 'z grid end'
         
         fit.meta['z_risk'] = z_risk, 'Redshift at minimum risk'
         fit.meta['min_risk'] = min_risk, 'Minimum risk'
