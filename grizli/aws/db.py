@@ -327,7 +327,7 @@ def add_oned_spectra(root='j214224m4420gr01', bucket='grizli-v1', engine=None):
     import glob
     
     if engine is None:
-        engine = grizli_db.get_db_engine()
+        engine = get_db_engine()
         
     # import boto3
     # s3 = boto3.resource('s3')
