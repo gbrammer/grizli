@@ -322,6 +322,14 @@ def send_1D_to_database(files=[], engine=None):
         df.to_sql(tablename, engine, index=False, if_exists='append',
                   method='multi')
 
+def add_all_spectra():
+    
+    from grizli.aws import db as grizli_db
+    
+    roots = grizli_db.from_sql("select root,count(root) as n from redshift_fit group BY root order by n DESC", engine)
+    for root in roots['root']:
+        grizli_db.add_oned_spectra(root=root, engine=engine)
+        
 def add_oned_spectra(root='j214224m4420gr01', bucket='grizli-v1', engine=None):
     import os
     import glob
@@ -343,12 +351,17 @@ def add_oned_spectra(root='j214224m4420gr01', bucket='grizli-v1', engine=None):
     #                           ExtraArgs={"RequestPayer": "requester"})
     os.system('aws s3 sync s3://{0}/Pipeline/{1}/Extractions/ ./ --exclude "*" --include "*R30.fits" --include "*1D.fits"'.format(bucket, root))
     
+    nmax = 500
     # 1D.fits
-    files = glob.glob('{0}_*1D.fits'.format(root)); files.sort()
-    send_1D_to_database(files=files, engine=engine)
+    files = glob.glob('{0}_*1D.fits'.format(root))
+    files.sort()
+    for i in range(len(files)//nmax+1):
+        send_1D_to_database(files=files[i*nmax:(i+1)*nmax], engine=engine)
 
-    files = glob.glob('{0}_*R30.fits'.format(root)); files.sort()
-    send_1D_to_database(files=files, engine=engine)
+    files = glob.glob('{0}_*R30.fits'.format(root))
+    files.sort()
+    for i in range(len(files)//nmax+1):
+        send_1D_to_database(files=files[i*nmax:(i+1)*nmax], engine=engine)
     
     os.system('rm {0}_*.1D.fits {0}_*.R30.fits'.format(root))
     
