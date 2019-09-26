@@ -322,10 +322,14 @@ def send_1D_to_database(files=[], engine=None):
         df.to_sql(tablename, engine, index=False, if_exists='append',
                   method='multi')
 
-def add_oned_spectra(root='j214224m4420gr01', bucket='grizli-v1'):
+def add_oned_spectra(root='j214224m4420gr01', bucket='grizli-v1' engine=None):
     import os
-    import boto3
-   
+    import glob
+    
+    if engine is None:
+        engine = grizli_db.get_db_engine()
+        
+    # import boto3
     # s3 = boto3.resource('s3')
     # bkt = s3.Bucket(bucket)
     # 
@@ -341,10 +345,10 @@ def add_oned_spectra(root='j214224m4420gr01', bucket='grizli-v1'):
     
     # 1D.fits
     files = glob.glob('{0}_*1D.fits'.format(root)); files.sort()
-    grizli_db.send_1D_to_database(files=files, engine=engine)
+    send_1D_to_database(files=files, engine=engine)
 
     files = glob.glob('{0}_*R30.fits'.format(root)); files.sort()
-    grizli_db.send_1D_to_database(files=files, engine=engine)
+    send_1D_to_database(files=files, engine=engine)
     
     os.system('rm {0}_*.1D.fits {0}_*.R30.fits'.format(root))
     
