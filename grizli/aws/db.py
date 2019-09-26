@@ -322,7 +322,7 @@ def send_1D_to_database(files=[], engine=None):
         df.to_sql(tablename, engine, index=False, if_exists='append',
                   method='multi')
 
-def add_oned_spectra(root='j214224m4420gr01', bucket='grizli-v1' engine=None):
+def add_oned_spectra(root='j214224m4420gr01', bucket='grizli-v1', engine=None):
     import os
     import glob
     
