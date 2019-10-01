@@ -285,10 +285,17 @@ def run_grizli_fit(event):
     if 'skip_started' not in event_kwargs:
         event_kwargs['skip_started'] = True
         
-    for k in ['quasar_fit', 'extract_from_flt']:
+    for k in ['quasar_fit', 'extract_from_flt','fit_stars']:
         if k not in event_kwargs:
             event_kwargs[k] = False
-        
+    
+    if event_kwargs['quasar_fit'] in TRUE_OPTIONS:
+        dbtable = 'redshift_fit_quasar'
+    elif event_kwargs['fit_stars'] in TRUE_OPTIONS:
+        dbtable = 'stellar_fit'
+    else:
+        dbtable = 'redshift_fit'
+            
     if not silent:
         print('Grizli version: ', grizli.__version__)
     
@@ -325,7 +332,7 @@ def run_grizli_fit(event):
     id = int(beams_file.split('_')[1].split('.')[0])
     
     try:
-        db_status = grizli_db.get_redshift_fit_status(root, id)
+        db_status = grizli_db.get_redshift_fit_status(root, id, table=dbtable)
     except:
         db_status = -1
                 
@@ -335,15 +342,7 @@ def run_grizli_fit(event):
     if ((start_log in files) | (db_status >= 0)) & event_kwargs['skip_started']:
         print('Log file {0} found in {1} (db_status={2})'.format(start_log, os.getcwd(), db_status))
         return True
-    
-    # try:
-    #     # Starting
-    #     grizli_db.update_redshift_fit_status(root, id, 
-    #                                          status=dbFLAGS['init_lambda'])
-    # except:
-    #     print('Set DB flag failed: init_lambda')
-    #     pass
-    
+        
     if not silent:
         for i, file in enumerate(files):
             print('Initial file ({0}): {1}'.format(i+1, file))
@@ -402,7 +401,8 @@ def run_grizli_fit(event):
         try:
             # Extracting beams
             grizli_db.update_redshift_fit_status(root, id, 
-                                                status=dbFLAGS['start_beams'])
+                                                status=dbFLAGS['start_beams'],
+                                                table=dbtable)
         except:
             print('Set DB flag failed: start_beams')
             pass
@@ -421,7 +421,8 @@ def run_grizli_fit(event):
         try:
             # Beams are done
             grizli_db.update_redshift_fit_status(root, id, 
-                                                 status=dbFLAGS['done_beams'])
+                                                 status=dbFLAGS['done_beams'],
+                                                 table=dbtable)
         except:
             pass
             
@@ -441,7 +442,8 @@ def run_grizli_fit(event):
             
             try:
                 grizli_db.update_redshift_fit_status(root, id, 
-                                                 status=dbFLAGS['no_run_fit'])
+                                                 status=dbFLAGS['no_run_fit'],
+                                                 table=dbtable)
             except:
                 pass
             
@@ -479,7 +481,7 @@ def run_grizli_fit(event):
     
     try:
         files = glob.glob('{0}_{1:05d}*R30.fits'.format(root, id)) 
-        if len(files) > 0:
+        if (len(files) > 0) & (dbtable == 'redshift_fit'):
             grizli_db.send_1D_to_database(files=files)
     except:
         print('Failed to send R30 to spec1d database')
@@ -488,27 +490,90 @@ def run_grizli_fit(event):
     ###   
     ### Run the fit
     try:
-        grizli_db.update_redshift_fit_status(root, id, 
-                            status=grizli_db.FLAGS['start_redshift_fit'])
+        grizli_db.update_redshift_fit_status(root, id, table=dbtable,
+                            status=dbFLAGS['start_redshift_fit'])
     except:
         print('Set DB flag failed: start_redshift_fit')
         pass
     
-    if event_kwargs['quasar_fit']:
+    if event_kwargs['quasar_fit'] in TRUE_OPTIONS:
+                
+        # Don't recopy beams file
+        put_beams = False
         
-        # Quasar templates
-        uv_lines = True #zr[1] > 3.5
-        t0, t1 = utils.load_quasar_templates(uv_line_complex=uv_lines,
+        # Don't make line maps
+        if 'min_line_sn' not in event_kwargs:
+            event_kwargs['min_line_sn'] = np.inf
+        
+        # Don't make drizzled psfs
+        if 'get_ir_psfs' not in event_kwargs:
+            event_kwargs['get_ir_psfs'] = False
+        
+        # Fit line widths
+        if 'get_line_width' not in event_kwargs:
+            event_kwargs['get_line_width'] = True
+
+        # Don't use photometry
+        event_kwargs['phot_obj'] = None
+        event_kwargs['use_phot_obj'] = False
+    
+        event['fit_only_beams'] = True
+        event['fit_beams'] = False
+        
+        # Quasar templates with fixed line ratios
+        q0, q1 = utils.load_quasar_templates(uv_line_complex=True,
                                             broad_fwhm=2800, narrow_fwhm=1000,
                                             fixed_narrow_lines=True, 
-                                            nspline=13)
+                                            Rspline=15)
         
-        fitting.run_all_parallel(id, t0=t0, t1=t1, fit_only_beams=True,
-                                 fit_beams=False, phot_obj=None, 
-                                 args_file=args_file, **event_kwargs)
+        if 'zr' not in event_kwargs:
+            event_kwargs['zr'] = [0.03, 6.8]
+        if 'fitter' not in event_kwargs:
+            event_kwargs['fitter'] = ['lstsq', 'lstsq']
+            
+        fitting.run_all_parallel(id, t0=q0, t1=q1, args_file=args_file, 
+                                 **event_kwargs)
         
         if output_path is None:
-            output_path = 'Pipeline/QuasarFit'.format(root)
+            #output_path = 'Pipeline/QuasarFit'.format(root)
+            output_path = 'Pipeline/{0}/Extractions'.format(root)
+    
+    elif event_kwargs['fit_stars'] in TRUE_OPTIONS:
+        
+        if 'use_phoenix' in event_kwargs:
+            p = event_kwargs.pop('use_phoenix')
+            if p in TRUE_OPTIONS:
+                tstar = utils.load_phoenix_stars()
+            else:
+                tstar = utils.load_templates(stars=True)
+        else:
+            tstar = utils.load_phoenix_stars()
+            
+        args = np.load(args_file, allow_pickle=True)[0]
+        
+        if 'psf' in event_kwargs:
+            args['psf'] = event_kwargs['psf'] in TRUE_OPTIONS     
+            
+        mb = multifit.MultiBeam(beams_file, **args)
+        if 'fit_trace_shift' in args:
+            if args['fit_trace_shift']:
+                tr = mb.fit_trace_shift()
+         
+        if 'spline_correction' in event_kwargs:
+            spline_correction = event_kwargs['spline_correction'] in TRUE_OPTIONS     
+        # Fit the stellar templates
+        _res = mb.xfit_star(tstar=tstar, spline_correction=True,
+                            fitter='lstsq', fit_background=True, 
+                            spline_args={'Rspline': 5}, oned_args={})
+        
+        _res[0].savefig('{0}_{1:05d}.star.png'.format(root, id))
+        fp = open('{0}_{1:05d}.star.log'.format(root, id), 'w')
+        fp.write(_res[1])
+        fp.close()
+        
+        if output_path is None:
+            #output_path = 'Pipeline/QuasarFit'.format(root)
+            output_path = 'Pipeline/{0}/Extractions'.format(root)
         
     else:
         
@@ -524,18 +589,34 @@ def run_grizli_fit(event):
     for file in files:
         if ('beams.fits' not in file) | put_beams:
             aws_file = '{0}/{1}'.format(output_path, file)
-            print(aws_file)
+            
+            if event_kwargs['quasar_fit'] in TRUE_OPTIONS:
+                # Don't copy stack
+                if 'stack' in file:
+                    continue
+                
+                # Add qso extension on outputs
+                aws_file = aws_file.replace('_{0:05d}.'.format(id), 
+                                            '_{0:05d}.qso.'.format(id))
+                                            
+            print('Upload {0} -> {1}'.format(file, aws_file))
+            
             bkt.upload_file(file, aws_file, ExtraArgs={'ACL': 'public-read'})
     
     # Put data in the redshift_fit database table
     try:
-        rowfile = '{0}_{1:05d}.row.fits'.format(root, id)
+        if dbtable == 'stellar_fit':
+            rowfile = '{0}_{1:05d}.star.log'.format(root, id)
+        else:    
+            rowfile = '{0}_{1:05d}.row.fits'.format(root, id)
+        
         if os.path.exists(rowfile):
-            grizli_db.add_redshift_fit_row(rowfile, verbose=True)
+            grizli_db.add_redshift_fit_row(rowfile, table=dbtable, 
+                                           verbose=True)
         
         # Add 1D spectra
         files = glob.glob('{0}_{1:05d}*1D.fits'.format(root, id))
-        if len(files) > 0:
+        if (len(files) > 0) & (dbtable == 'redshift_fit'):
             grizli_db.send_1D_to_database(files=files)
         
     except:
