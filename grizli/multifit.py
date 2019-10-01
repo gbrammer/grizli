@@ -1407,6 +1407,8 @@ class MultiBeam(GroupFitter):
         self.mask_resid = mask_resid
         self.sys_err = sys_err
         
+        self.Asave = {}
+        
         if isinstance(beams, str):
             self.load_master_fits(beams, verbose=verbose)    
             
@@ -1610,6 +1612,8 @@ class MultiBeam(GroupFitter):
         
         self.slices = self._get_slices(masked=False)
         self.A_bg = self._init_background(masked=False)
+        
+        self.Asave = {}
         
         self._update_beam_mask()
         self.A_bgm = self._init_background(masked=True)
@@ -2947,7 +2951,7 @@ class MultiBeam(GroupFitter):
 
         return drizzled_segm
         
-    def drizzle_fit_lines(self, fit, pline, force_line=['Ha+NII', 'Ha', 'OIII', 'Hb', 'OII'], save_fits=True, mask_lines=True, mask_sn_limit=3, mask_4959=True, verbose=True, include_segmentation=True, get_ir_psfs=True):
+    def drizzle_fit_lines(self, fit, pline, force_line=['Ha+NII', 'Ha', 'OIII', 'Hb', 'OII'], save_fits=True, mask_lines=True, mask_sn_limit=3, mask_4959=True, verbose=True, include_segmentation=True, get_ir_psfs=True, min_line_sn=4):
         """
         TBD
         """
@@ -2998,7 +3002,11 @@ class MultiBeam(GroupFitter):
             if line_err == 0:
                 continue
 
-            if (line_flux/line_err > 4) | (line in force_line):
+            # Skip if min_line_sn = inf
+            if not np.isfinite(min_line_sn):
+                continue
+                
+            if (line_flux/line_err > min_line_sn) | (line in force_line):
                 if verbose:
                     print('Drizzle line -> {0:4s} ({1:.2f} {2:.2f})'.format(line, line_flux/1.e-17, line_err/1.e-17))
 
@@ -4055,6 +4063,28 @@ class MultiBeam(GroupFitter):
             hdul.writeto(outputfile, overwrite=True)
             return hdul
     
+    def make_simple_hdulist(self):
+        """
+        Make a`~astropy.io.fits.HDUList` object with just a simple 
+        PrimaryHDU
+        """
+        p = pyfits.PrimaryHDU()
+        p.header['ID'] = (self.id, 'Object ID')
+        p.header['RA'] = (self.ra, 'R.A.')
+        p.header['DEC'] = (self.dec, 'Decl.')
+        p.header['NINPUT'] = (len(self.beams), 'Number of drizzled beams')
+        p.header['HASLINES'] = ('', 'Lines in this file')
+        
+        for i, beam in enumerate(self.beams):
+            p.header['FILE{0:04d}'.format(i+1)] = (beam.grism.parent_file, 
+                                                 'Parent filename')
+            p.header['GRIS{0:04d}'.format(i+1)] = (beam.grism.filter, 
+                                                 'Beam grism element')
+            p.header['PA{0:04d}'.format(i+1)] = (beam.get_dispersion_PA(), 
+                                                 'PA of dispersion axis')
+        
+        return pyfits.HDUList(p)
+        
     def check_for_bad_PAs(self, poly_order=1, chi2_threshold=1.5, fit_background=True, reinit=True):
         """
         """

@@ -179,6 +179,8 @@ class StackFitter(GroupFitter):
         self.ra = self.h0['RA']
         self.dec = self.h0['DEC']
         
+        self.Asave = {}
+        
         ## Photometry
         self.is_spec = 1
         self.Nphot = 0
@@ -291,7 +293,8 @@ class StackFitter(GroupFitter):
         
         self.slices = self._get_slices(masked=False)
         self.A_bg = self._init_background(masked=False)
-
+        self.Asave = {}
+        
         self._update_beam_mask()
         self.A_bgm = self._init_background(masked=True)
         
