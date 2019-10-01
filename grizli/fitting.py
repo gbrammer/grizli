@@ -78,7 +78,7 @@ def run_all_parallel(id, get_output_data=False, args_file='fit_args.npy', **kwar
     
     return id, status, t1-t0
     
-def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter='bounded', group_name='grism', fit_stacks=True, only_stacks=False, prior=None, fcontam=0.2, pline=PLINE, mask_sn_limit=np.inf, fit_only_beams=False, fit_beams=True, root='*', fit_trace_shift=False, phot=None, use_phot_obj=True, phot_obj=None, verbose=True, scale_photometry=False, show_beams=True, scale_on_stacked_1d=True, loglam_1d=True, overlap_threshold=5, MW_EBV=0., sys_err=0.03, huber_delta=4, get_student_logpdf=False, get_dict=False, bad_pa_threshold=1.6, units1d='flam', redshift_only=False, line_size=1.6, use_psf=False, get_line_width=False, sed_args={'bin':1, 'xlim':[0.3, 9]}, get_ir_psfs=True, min_mask=0.01, min_sens=0.02, mask_resid=True, save_stack=True,  get_line_deviations=True, bounded_kwargs=BOUNDED_DEFAULTS, write_fits_files=True, save_figures=True, fig_type='png', **kwargs):
+def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter=['nnls','bounded'], group_name='grism', fit_stacks=True, only_stacks=False, prior=None, fcontam=0.2, pline=PLINE, min_line_sn=4, mask_sn_limit=np.inf, fit_only_beams=False, fit_beams=True, root='*', fit_trace_shift=False, phot=None, use_phot_obj=True, phot_obj=None, verbose=True, scale_photometry=False, show_beams=True, scale_on_stacked_1d=True, use_cached_templates=True, loglam_1d=True, overlap_threshold=5, MW_EBV=0., sys_err=0.03, huber_delta=4, get_student_logpdf=False, get_dict=False, bad_pa_threshold=1.6, units1d='flam', redshift_only=False, line_size=1.6, use_psf=False, get_line_width=False, sed_args={'bin':1, 'xlim':[0.3, 9]}, get_ir_psfs=True, min_mask=0.01, min_sens=0.02, mask_resid=True, save_stack=True,  get_line_deviations=True, bounded_kwargs=BOUNDED_DEFAULTS, write_fits_files=True, save_figures=True, fig_type='png', **kwargs):
     """Run the full procedure
     
     1) Load MultiBeam and stack files 
@@ -114,31 +114,37 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
         
     if not only_stacks:
         mb = MultiBeam(mb_files, fcontam=fcontam, group_name=group_name, MW_EBV=MW_EBV, sys_err=sys_err, verbose=verbose, psf=use_psf, min_mask=min_mask, min_sens=min_sens, mask_resid=mask_resid)
-        # Check for PAs with unflagged contamination or otherwise discrepant
-        # fit
-        out = mb.check_for_bad_PAs(chi2_threshold=bad_pa_threshold,
-                                                   poly_order=1, reinit=True, 
-                                                  fit_background=True)
+        
+        if bad_pa_threshold > 0:
+            # Check for PAs with unflagged contamination or otherwise 
+            # discrepant fit
+            out = mb.check_for_bad_PAs(chi2_threshold=bad_pa_threshold,
+                                       poly_order=1, reinit=True,
+                                       fit_background=True)
     
-        fit_log, keep_dict, has_bad = out
+            fit_log, keep_dict, has_bad = out
     
-        if has_bad:
-            if verbose:
-                print('\nHas bad PA!  Final list: {0}\n{1}'.format(keep_dict,
-                                                                   fit_log))
+            if has_bad:
+                if verbose:
+                    msg = '\nHas bad PA!  Final list: {0}\n{1}'
+                    print(msg.format(keep_dict, fit_log))
                 
-            hdu, fig = mb.drizzle_grisms_and_PAs(fcontam=fcontam, flambda=False, kernel='point', size=32, diff=False)
-            if save_figures:
-                fig.savefig('{0}_{1:05d}.fix.stack.{2}'.format(group_name, 
-                                                             id, fig_type))
+                hdu, fig = mb.drizzle_grisms_and_PAs(fcontam=fcontam,
+                                        flambda=False, kernel='point', 
+                                        size=32, diff=False)
+                if save_figures:
+                    fig.savefig('{0}_{1:05d}.fix.stack.{2}'.format(group_name, 
+                                                            id, fig_type))
+                else:
+                    plt.close(fig)
+                
+                good_PAs = []
+                for k in keep_dict:
+                    good_PAs.extend(keep_dict[k])
             else:
-                plt.close(fig)
-                
-            good_PAs = []
-            for k in keep_dict:
-                good_PAs.extend(keep_dict[k])
+                good_PAs = None # All good
         else:
-            good_PAs = None # All good
+            good_PAs = None
     else:
         good_PAs = None # All good
         redshift_only=True # can't drizzle line maps from stacks
@@ -241,7 +247,8 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
                 if st is not None:
                     st.pscale = scl.x
     
-    # First pass    
+    # First pass
+    fit_obj.Asave = {}
     fit = fit_obj.xfit_redshift(templates=t0, zr=zr, dz=dz, prior=prior, fitter=fitter[0], verbose=verbose, bounded_kwargs=bounded_kwargs, huber_delta=huber_delta, get_student_logpdf=get_student_logpdf)
      
     fit_hdu = pyfits.table_to_hdu(fit)
@@ -284,6 +291,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
         width = 20*0.001*(1+z0)
         
         mb_zr = z0 + width*np.array([-1,1])
+        mb.Asave = {}
         mb_fit = mb.xfit_redshift(templates=t0, zr=mb_zr, dz=[0.001, 0.0002],
                                   prior=prior, fitter=fitter[0], 
                                   verbose=verbose, huber_delta=huber_delta, 
@@ -296,6 +304,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
         mb_fit = fit
            
     #### Get best-fit template 
+    mb.Asave = {}
     tfit = mb.template_at_z(z=mb_fit.meta['z_map'][0], templates=t1,
                             fit_background=True, fitter=fitter[-1], 
                             bounded_kwargs=bounded_kwargs)
@@ -349,7 +358,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
         
         vel_width_res = mb.fit_line_width(z0=tfit['z'], bl=1.2, nl=1.2)
         if verbose:
-            print('Velocity width: BL/NL = {0:.0f}/{1:.0f}, z={2:.4f}'.format(vel_width_res[0]*1000, vel_width_res[1]*1000, vel_width_res[2]))
+            print('Velocity width: BL/NL = {0:.0f}/{1:.0f}, z={2:.4f}\n'.format(vel_width_res[0]*1000, vel_width_res[1]*1000, vel_width_res[2]))
         
         fit_hdu.header['VEL_BL'] = vel_width_res[0]*1000, 'Broad line FWHM'
         fit_hdu.header['VEL_NL'] = vel_width_res[1]*1000, 'Narrow line FWHM'
@@ -463,12 +472,16 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     if pline is None:
          pzfit, pspec2, pline = grizli.multifit.get_redshift_fit_defaults()
     
-    line_hdu = mb.drizzle_fit_lines(tfit, pline,
+    if np.isfinite(min_line_sn):
+        line_hdu = mb.drizzle_fit_lines(tfit, pline,
                                     force_line=utils.DEFAULT_LINE_LIST, 
                                     save_fits=False, mask_lines=True, 
+                                    min_line_sn=min_line_sn, 
                                     mask_sn_limit=mask_sn_limit, 
                                     verbose=verbose, get_ir_psfs=get_ir_psfs)
-    
+    else:
+        line_hdu = mb.make_simple_hdulist()
+        
     # Add beam exposure times
     nexposures, exptime = mb.compute_exptime()
     line_hdu[0].header['GRIZLIV'] = (grizli__version, 'Grizli version')
@@ -525,17 +538,21 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     ######
     # Show the drizzled lines and direct image cutout, which are
     # extensions `DSCI`, `LINE`, etc.
-    s, si = 1, line_size
-    
-    s = 4.e-19/np.max([beam.beam.total_flux for beam in mb.beams]) 
-    s = np.clip(s, 0.25, 4)
+    if 'DSCI' in line_hdu:
+        s, si = 1, line_size
+        s = 4.e-19/np.max([beam.beam.total_flux for beam in mb.beams]) 
+        s = np.clip(s, 0.25, 4)
 
-    s /= (pline['pixscale']/0.1)**2
+        s /= (pline['pixscale']/0.1)**2
     
-    full_line_list = ['Lya', 'OII', 'Hb', 'OIII', 'Ha', 'Ha+NII', 'SII', 'SIII']
-    fig = show_drizzled_lines(line_hdu, size_arcsec=si, cmap='plasma_r', scale=s, dscale=s, full_line_list=full_line_list)
-    if save_figures:
-        fig.savefig('{0}_{1:05d}.line.{2}'.format(group_name, id, fig_type))
+        full_line_list = ['Lya', 'OII', 'Hb', 'OIII', 'Ha', 
+                          'Ha+NII', 'SII', 'SIII']
+        fig = show_drizzled_lines(line_hdu, size_arcsec=si, cmap='plasma_r', 
+                                  scale=s, dscale=s, 
+                                  full_line_list=full_line_list)
+        if save_figures:
+            fig.savefig('{0}_{1:05d}.line.{2}'.format(group_name, id, 
+                        fig_type))
     
     if phot is not None:
         out = mb, st, fit, tfit, line_hdu
@@ -1474,7 +1491,7 @@ class GroupFitter(object):
             
         return A_phot[:,mask]
         
-    def xfit_at_z(self, z=0, templates=[], fitter='nnls', fit_background=True, get_uncertainties=False, get_design_matrix=False, pscale=None, COEFF_SCALE=1.e-19, get_components=False, huber_delta=4, get_residuals=False, include_photometry=True, bounded_kwargs=BOUNDED_DEFAULTS):
+    def xfit_at_z(self, z=0, templates=[], fitter='nnls', fit_background=True, get_uncertainties=False, get_design_matrix=False, pscale=None, COEFF_SCALE=1.e-19, get_components=False, huber_delta=4, get_residuals=False, include_photometry=True, use_cached_templates=False, bounded_kwargs=BOUNDED_DEFAULTS):
         """Fit the 2D spectra with a set of templates at a specified redshift.
         
         Parameters
@@ -1543,14 +1560,30 @@ class GroupFitter(object):
         
         # A = scipy.sparse.csr_matrix((self.N+NTEMP, self.Ntot))
         # bg_sp = scipy.sparse.csc_matrix(self.A_bg)
-                
+        
+        try:
+            obj_IGM_MINZ = np.maximum(IGM_MINZ, 
+                                  (self.wave_mask.min()-200)/1216.-1)
+        except:
+            obj_IGM_MINZ = np.maximum(IGM_MINZ, 
+                                  (self.wavef.min()-200)/1216.-1)
+            
         for i, t in enumerate(templates):
+            
+            if use_cached_templates:
+                if t in self.Asave:
+                    #print('\n\nUse saved: ',t)
+                    A[self.N+i,:] += self.Asave[t]
+                    continue
+                
             if t.startswith('line'):
                 lower_bound[self.N+i] = LINE_BOUNDS[0]/COEFF_SCALE
                 upper_bound[self.N+i] = LINE_BOUNDS[1]/COEFF_SCALE
                 
             ti = templates[t]
-            if z > IGM_MINZ:
+            rest_template = ti.name.split()[0] in ['bspl', 'step']
+            
+            if z > obj_IGM_MINZ:
                 if IGM is None:
                     igmz = 1.
                 else:
@@ -1561,7 +1594,7 @@ class GroupFitter(object):
                 igmz = 1.
             
             # Don't redshift spline templates
-            if ti.name.split()[0] in ['bspl', 'step']:
+            if rest_template:
                 s = [ti.wave, ti.flux]            
             else:
                 s = [ti.wave*(1+z), ti.flux/(1+z)*igmz]
@@ -1583,7 +1616,12 @@ class GroupFitter(object):
                     A[self.N+i, sl] = beam.compute_model(thumb=beam.thumbs[t], spectrum_1d=s, in_place=False, is_cgs=True)[beam.fit_mask]*COEFF_SCALE
                 else:
                     A[self.N+i, sl] = beam.compute_model(spectrum_1d=s, in_place=False, is_cgs=True)[beam.fit_mask]*COEFF_SCALE
-                    
+            
+            # Save step templates for faster computation
+            if rest_template and use_cached_templates:
+                print('Cache rest-frame template: ',t)
+                self.Asave[t] = A[self.N+i,:]*1
+                        
                 # if j == 0:
                 #     m = beam.compute_model(spectrum_1d=s, in_place=False, is_cgs=True)
                 #     ds9.frame(i)
@@ -1749,7 +1787,7 @@ class GroupFitter(object):
                      verbose=True, fit_background=True, fitter='nnls', 
                      delta_chi2_threshold=0.004, poly_order=3, zoom=True, 
                      line_complexes=True, templates={}, 
-                     figsize=[8,5],
+                     figsize=[8,5], use_cached_templates=True,
                      fsps_templates=False, get_uncertainties=True,
                      Rspline=30, huber_delta=4, get_student_logpdf=False,
                      bounded_kwargs=BOUNDED_DEFAULTS):
@@ -1789,7 +1827,8 @@ class GroupFitter(object):
                                            line=False)
         out = self.xfit_at_z(z=0., templates=tpoly, fitter='lstsq',
                             fit_background=True, get_uncertainties=False,
-                            include_photometry=False, huber_delta=huber_delta)
+                            include_photometry=False, huber_delta=huber_delta,
+                            use_cached_templates=False)
         
         chi2_poly, coeffs_poly, err_poly, cov = out
         
@@ -1801,7 +1840,8 @@ class GroupFitter(object):
         
         out = self.xfit_at_z(z=0., templates=tspline, fitter='lstsq',
                             fit_background=True, get_uncertainties=True,
-                            include_photometry=False, get_residuals=True)
+                            include_photometry=False, get_residuals=True,
+                            use_cached_templates=False)
         
         spline_resid, coeffs_spline, err_spline, cov = out
         
@@ -1833,7 +1873,8 @@ class GroupFitter(object):
         
         out = self.xfit_at_z(z=0., templates=templates, fitter=fitter,
                             fit_background=fit_background, 
-                            get_uncertainties=False)
+                            get_uncertainties=False, 
+                            use_cached_templates=use_cached_templates)
                             
         chi2, coeffs, coeffs_err, covar = out
         
@@ -1850,6 +1891,7 @@ class GroupFitter(object):
                                 fitter=fitter, fit_background=fit_background,
                                 get_uncertainties=get_uncertainties, 
                                 get_residuals=True, 
+                                use_cached_templates=use_cached_templates,
                                 bounded_kwargs=bounded_kwargs)
             
             fit_resid, coeffs[i,:], coeffs_err, covar[i,:,:] = out
@@ -1922,7 +1964,8 @@ class GroupFitter(object):
                                     fitter=fitter,
                                     fit_background=fit_background,
                                     get_uncertainties=get_uncertainties,
-                                    get_residuals=True,
+                                    get_residuals=True, 
+                                    use_cached_templates=use_cached_templates,
                                     bounded_kwargs=bounded_kwargs)
 
                 fit_resid, coeffs_zoom[i,:], e, covar_zoom[i,:,:] = out
@@ -2763,8 +2806,10 @@ class GroupFitter(object):
                 so = np.argsort(teff[ig])
                 axz.plot(teff[ig][so], chi2[ig][so]-chi2.min(), label='g{0:.1f}'.format(g))
             
-            
-            label = '{0} t{1:.0f} g{2:.1f}'.format(k.split('_')[0], teff[ixbest], logg[ixbest])
+            if logg[ixbest] == 0.:
+                label = 'carbon'
+            else:
+                label = '{0} t{1:.0f} g{2:.1f}'.format(k.split('_')[0], teff[ixbest], logg[ixbest])
         else:    
             hast = False
             axz.plot(chi2-chi2.min(), marker='.', color='k')
@@ -2910,8 +2955,12 @@ class GroupFitter(object):
 
         gs.tight_layout(fig, pad=0.1, w_pad=0.1)
         
+        best_templ = list(tstar.keys())[ixbest]
+        if best_templ == 'bt-settl_t05000_g0.0':
+            best_templ = 'carbon'
+            
         line = '# root id chi2 dof best_template\n'
-        line += '{0:16} {1:>5d} {2:10.3f} {3:>10d} {4:20s}'.format(self.group_name, self.id, chi2[ixbest], self.DoF, list(tstar.keys())[ixbest])
+        line += '{0:16} {1:>5d} {2:10.3f} {3:>10d} {4:20s}'.format(self.group_name, self.id, chi2[ixbest], self.DoF, best_templ)
         
         
         return fig, line, split_fits[ixbest]
