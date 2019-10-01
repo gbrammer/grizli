@@ -22,6 +22,15 @@ def get_connection_info(config_file=None):
         config_file = os.path.join(os.path.dirname(__file__),
                                    '../data/db.yml')
         
+        try:
+            local_file = os.path.join(os.getenv('HOME'), 'db.local.yml')
+        
+            if os.path.exists(local_file):
+                print('Use ~/db.local.yml')
+                config_file = local_file
+        except:
+            pass
+            
     fp = open(config_file)
     try:
         db_info = yaml.load(fp, Loader=yaml.FullLoader)
@@ -44,7 +53,7 @@ def get_db_engine(config=None, echo=False):
     engine = create_engine(db_string, echo=echo)
     return engine
     
-def get_redshift_fit_status(root, id, engine=None):
+def get_redshift_fit_status(root, id, table='redshift_fit', engine=None):
     """
     Get status value from the database for root_id object
     """
@@ -53,14 +62,45 @@ def get_redshift_fit_status(root, id, engine=None):
     if engine is None:
         engine = get_db_engine(echo=False)
     
-    res = pd.read_sql_query("SELECT status FROM redshift_fit WHERE (root = '{0}' AND id = {1})".format(root, id), engine)
+    res = pd.read_sql_query("SELECT status FROM {2} WHERE (root = '{0}' AND id = {1})".format(root, id, table), engine)
     
     if len(res) == 0:
         return -1
     else:
         return res['status'][0]
 
-def update_redshift_fit_status(root, id, status=0, engine=None, verbose=True):
+def update_jname():
+    
+    from grizli import utils
+    
+    res = grizli_db.from_sql("select p_root, p_id, p_ra, p_dec from photometry_apcorr", engine)
+    
+    jn = [utils.radec_to_targname( ra=ra, dec=dec, round_arcsec=(0.001, 0.001), precision=2, targstr='j{rah}{ram}{ras}.{rass}{sign}{ded}{dem}{des}.{dess}') for ra, dec in zip(res['p_ra'], res['p_dec'])]
+    
+    for c in res.colnames:
+        res.rename_column(c, c.replace('p_','j_'))
+    
+    zres = grizli_db.from_sql("select root, phot_root, id, ra, dec, z_map, q_z, t_g800l, t_g102, t_g141, status from redshift_fit where ra is not null and status > 5", engine)
+    
+    # Find duplicates
+    from scipy.spatial import cKDTree   
+    data = np.array([zres['ra'], zres['dec']]).T   
+    
+    ok = zres['q_z'].filled(-100) > -0.7
+      
+    tree = cKDTree(data[ok])   
+    dr, ix = tree.query(data[ok], k=2)
+    cosd = np.cos(data[:,1]/180*np.pi)
+    dup = (dr[:,1] < 0.01/3600) #& (zres['phot_root'][ix[:,0]] != zres['phot_root'][ix[:,1]])
+    
+    dup =  (dr[:,1] < 0.01/3600) & (zres['phot_root'][ok][ix[:,0]] == zres['phot_root'][ok][ix[:,1]]) &  (zres['id'][ok][ix[:,0]] == zres['id'][ok][ix[:,1]]) 
+    
+    # second is G800L
+    dup &= zres['t_g800l'].filled(0)[ok][ix[:,1]] > 10
+    
+    plt.scatter(zres['z_map'][ok][ix[dup,0]], zres['z_map'][ok][ix[dup,1]], marker='.', alpha=0.1)
+    
+def update_redshift_fit_status(root, id, status=0, table='redshift_fit', engine=None, verbose=True):
     """
     Set the status flag in the table
     """
@@ -72,7 +112,7 @@ def update_redshift_fit_status(root, id, status=0, engine=None, verbose=True):
     if engine is None:
         engine = get_db_engine(echo=False)
     
-    old_status = get_redshift_fit_status(root, id, engine=engine)
+    old_status = get_redshift_fit_status(root, id, table=table, engine=engine)
     if old_status < 0:
         # Need to add an empty row
         tab = Table()
@@ -83,15 +123,18 @@ def update_redshift_fit_status(root, id, status=0, engine=None, verbose=True):
         
         row_df = tab.to_pandas()
         
-        add_redshift_fit_row(row_df, engine=engine, verbose=verbose)
+        add_redshift_fit_row(row_df, engine=engine, table=table, 
+                             verbose=verbose)
         
     else:
-        sqlstr = """UPDATE redshift_fit
+        sqlstr = """UPDATE {3}
             SET status = {0}
-            WHERE (root = '{1}' AND id = {2});""".format(status, root, id)
+            WHERE (root = '{1}' AND id = {2});
+            """.format(status, root, id, table)
         
         if verbose:
-            print('Update status for {0} {1}: {2} -> {3}'.format(root, id, old_status, status))
+            msg = 'Update status for {0} {1}: {2} -> {3} on `{4}`'
+            print(msg.format(root, id, old_status, status, table))
             
         engine.execute(sqlstr)
     
@@ -103,12 +146,29 @@ def get_row_data(rowfile='gds-g800l-j033236m2748_21181.row.fits', status_flag=FL
     from astropy.table import Table
     
     if isinstance(rowfile, str):
-        tab = Table.read(rowfile, character_as_bytes=False)
+        if rowfile.endswith('.fits'):
+            tab = Table.read(rowfile, character_as_bytes=False)
+            allowed_columns = COLUMNS
+        else:
+            # Output of stellar fits
+            tab = Table.read(rowfile, format='ascii.commented_header')
+            try:
+                tab['chinu'] = tab['chi2']/tab['dof']
+                tab['phot_root'] = tab['root']
+            except:
+                pass
+            
+            allowed_columns = ['root','id','chi2','dof','chinu',
+                               'best_template','status','phot_root']
     else:
         tab = rowfile
         
-    cdf_z = tab['cdf_z'].data
-    tab.remove_column('cdf_z')
+    if 'cdf_z' in tab.colnames:
+        cdf_z = tab['cdf_z'].data
+        tab.remove_column('cdf_z')
+    else:
+        cdf_z = None
+    
     tab['status'] = status_flag
     remove_cols = []
     for c in tab.colnames:
@@ -121,26 +181,28 @@ def get_row_data(rowfile='gds-g800l-j033236m2748_21181.row.fits', status_flag=FL
     # Remove columns not in the database
     remove_cols = []
     for c in tab.colnames:
-        if c not in COLUMNS:
+        if c not in allowed_columns:
             remove_cols.append(c)
         
     if len(remove_cols) > 0:
         tab.remove_columns(remove_cols)        
 
     row_df = tab.to_pandas()
-    row_df['cdf_z'] = cdf_z.tolist()
+    if cdf_z is not None:
+        row_df['cdf_z'] = cdf_z.tolist()
+    
     return row_df
 
-def delete_redshift_fit_row(root, id, engine=None):
+def delete_redshift_fit_row(root, id, table='redshift_fit', engine=None):
     """
     Delete a row from the redshift fit table
     """
     if engine is None:
         engine = get_db_engine(echo=False)
 
-    res = engine.execute("DELETE from redshift_fit WHERE (root = '{0}' AND id = {1})".format(root, id))
+    res = engine.execute("DELETE from {2} WHERE (root = '{0}' AND id = {1})".format(root, id, table))
         
-def add_redshift_fit_row(row_df, engine=None, verbose=True):
+def add_redshift_fit_row(row_df, table='redshift_fit', engine=None, verbose=True):
     """
     Update the row in the redshift_fit table 
     """    
@@ -156,16 +218,17 @@ def add_redshift_fit_row(row_df, engine=None, verbose=True):
                 
     root = row_df['root'][0]
     id = row_df['id'][0]
-    status = get_redshift_fit_status(root, id, engine=engine)
+    status = get_redshift_fit_status(root, id, table=table, engine=engine)
     # Delete the old row?
     if status >= 0:
-        print('Delete and update row for root={0}, id={1}'.format(root, id))
-        delete_redshift_fit_row(root, id, engine=engine)
+        print('Delete and update row for {0}/{1} on `{2}`'.format(root, id, 
+                                                                  table))
+        delete_redshift_fit_row(root, id, table=table, engine=engine)
     else:
-        print('Add row for root={0}, id={1}'.format(root, id))
+        print('Add row for {0}/{1} on `{2}`'.format(root, id, table))
         
     # Add the new data
-    row_df.to_sql('redshift_fit', engine, index=False, if_exists='append', method='multi')
+    row_df.to_sql(table, engine, index=False, if_exists='append', method='multi')
 
 ###########
 def add_missing_rows(root='j004404m2034', engine=None):
@@ -327,9 +390,21 @@ def add_all_spectra():
     from grizli.aws import db as grizli_db
     
     roots = grizli_db.from_sql("select root,count(root) as n from redshift_fit group BY root order by n DESC", engine)
-    for root in roots['root']:
-        grizli_db.add_oned_spectra(root=root, engine=engine)
-        
+    
+    o = 1
+    
+    for root in roots['root'][::o]:
+        existing = open('log').readlines()
+        if root+'\n' in existing:
+            print('Skip', root)
+            continue
+            
+        fp = open('log','a'); fp.write(root+'\n'); fp.close()
+        try:
+            grizli_db.add_oned_spectra(root=root, engine=engine)
+        except:
+            pass
+            
 def add_oned_spectra(root='j214224m4420gr01', bucket='grizli-v1', engine=None):
     import os
     import glob
@@ -367,14 +442,52 @@ def add_oned_spectra(root='j214224m4420gr01', bucket='grizli-v1', engine=None):
     
     if False:
         tablename = 'spec1d_g141'
+        #tablename = 'spec1d_g102'
 
         #tablename = 'spec1d_r30_g141'
         
-        resp = pd.read_sql_query("SELECT root, id, z_map, q_z, sp.* from redshift_fit, {1} as sp WHERE {1}_root = root AND {1}_id = id AND root = '{0}' AND q_z > -0.7 ORDER BY z_map".format(root, tablename), engine)
-        
+        if 1:
+            # by root
+            resp = pd.read_sql_query("SELECT root, id, z_map, q_z, sp.* from redshift_fit, {1} as sp WHERE {1}_root = root AND {1}_id = id AND root = '{0}' AND q_z > -0.7 ORDER BY z_map".format(root, tablename), engine)
+        else:
+            # everything
+            resp = pd.read_sql_query("SELECT root, id, z_map, q_z, sp.* from redshift_fit, {1} as sp WHERE {1}_root = root AND {1}_id = id AND q_z > -0.7 ORDER BY z_map".format(root, tablename), engine)
+
+            # Halpha EW
+            resp = pd.read_sql_query("SELECT root, id, z_map, q_z, ew50_ha, flux_ha, err_ha, t_g141, sp.* from redshift_fit, {1} as sp WHERE {1}_root = root AND {1}_id = id AND q_z > -0.3 AND err_ha > 0 ORDER BY ew50_ha".format(root, tablename), engine)
+            
+            # Everything
+            fresp = pd.read_sql_query("SELECT root, id, z_map, q_z, ew50_ha, flux_ha, err_ha, ew50_oiii, ew50_hb, ew50_oii, d4000, d4000_e, t_g141, t_g102, t_g800l, sp.* from redshift_fit, {1} as sp WHERE {1}_root = root AND {1}_id = id AND q_z > -0.7 AND chinu < 2 ORDER BY z_map".format(root, tablename), engine)
+         
         wave = pd.read_sql_query("SELECT * from {0}_wave".format(tablename),
                                  engine)[tablename+'_wave'].values
         
+        resp = fresp
+        
+        sort_column = 'z_map'
+        bin_factor = 1
+        
+        wnorm = 6400
+        zref = 1.3e4/wnorm-1
+        
+        sel = np.isfinite(fresp[sort_column]) & (fresp[sort_column] != -99)
+
+        norm_ix = np.interp(wnorm*(1+fresp['z_map']), wave, np.arange(len(wave)), left=np.nan, right=np.nan)
+        sel &= np.isfinite(norm_ix)
+
+        resp = fresp[sel]
+        
+        norm_ix = np.cast[int](np.round(np.interp(wnorm*(1+resp['z_map']), wave, np.arange(len(wave)), left=np.nan, right=np.nan)))
+        
+        resp.sort_values(sort_column, inplace=True)
+
+        if tablename == 'spec1d_g141':
+            exptime = resp['t_g141'].values
+            wlim = [1.1e4, 1.65e4]
+        else:
+            exptime = resp['t_g102'].values
+            wlim = [8000, 1.1e4, 1.65e4]
+            
         data = OrderedDict()
         for c in resp.columns:
             if c.startswith(tablename):
@@ -383,9 +496,100 @@ def add_oned_spectra(root='j214224m4420gr01', bucket='grizli-v1', engine=None):
                     data[c_i] = np.array(resp[c].values.tolist())  
                 except:
                     pass
-                    
-        plt.imshow((data['flux'] - data['cont'])/data['flat']/1.e-19, vmin=-0.1, vmax=10)
+        
+        #plt.imshow((data['flux'] - data['cont'])/data['flat']/1.e-19, vmin=-0.1, vmax=10)
+        
+        # Rest-frame
+        dz = np.diff(wave)[10]/wave[10]
+        max_zshift = np.cast[int](np.log(1+resp['z_map'].max())/dz)
+        zshift = np.cast[int]((np.log(1+resp['z_map']) - np.log(1+zref))/dz) 
+        
+        err_max = 5
+        
+        # Continuum normalized        
+        #norm = data['cont'][:,100]/data['flat'][:,100]
+        norm = np.zeros(len(resp))
+        for i, ix in enumerate(norm_ix):
+            norm[i] = data['line'][i,ix]/data['flat'][i,ix]
+            
 
+        #norm = np.mean(data['cont'][:,50:120]/data['flat'][:,50:120], axis=1)
+        
+        # 2D arrays
+        normed = ((data['flux']/data['flat']).T/norm).T
+        cnormed = ((data['cont']/data['flat']).T/norm).T
+        lnormed = (((data['line']-data['cont'])/data['flat']).T/norm).T
+
+        err = ((data['err']/data['flat']).T/norm).T
+        
+        mask = np.isfinite(norm) & (norm > 0) & np.isfinite(norm_ix)
+        normed = normed[mask,:]
+        cnormed = cnormed[mask,:]
+        lnormed = lnormed[mask,:]
+        err = err[mask,:]
+        ivar = 1/err**2
+        ivar[err <= 0] = 0
+        
+        # Weight by exposure time
+        ivar = (ivar.T*0+(exptime[mask]/4000.)*norm[mask]).T
+        
+        zshift = zshift[mask]
+        
+        # Clip edges
+        wclip = (wave > wlim[0]) & (wave < wlim[1])
+        
+        mask_val = 1e10
+        
+        normed[:,~wclip] = -mask_val
+        cnormed[:,~wclip] = -mask_val
+        lnormed[:,~wclip] = -mask_val
+        sh = normed.shape
+        rest = np.zeros((sh[0], sh[1]+zshift.max()-zshift.min())) - mask_val
+        crest = np.zeros((sh[0], sh[1]+zshift.max()-zshift.min())) - mask_val
+        lrest = np.zeros((sh[0], sh[1]+zshift.max()-zshift.min())) - mask_val
+
+        rest[:,zshift.max():zshift.max()+sh[1]] = normed*1
+        crest[:,zshift.max():zshift.max()+sh[1]] = cnormed*1
+        lrest[:,zshift.max():zshift.max()+sh[1]] = lnormed*1
+
+        rest_ivar = np.zeros((sh[0], sh[1]+zshift.max()-zshift.min()))
+        rest_ivar[:,zshift.max():zshift.max()+sh[1]] = ivar*1
+
+        for i in range(sh[0]):
+            rest[i,:] = np.roll(rest[i,:], -zshift[i])
+            crest[i,:] = np.roll(crest[i,:], -zshift[i])
+            lrest[i,:] = np.roll(lrest[i,:], -zshift[i])
+            rest_ivar[i,:] = np.roll(rest_ivar[i,:], -zshift[i])
+        
+        ok = np.isfinite(rest) & np.isfinite(rest_ivar) & (rest > -0.8*mask_val)
+        rest_ivar[~ok] = 0
+        rest[~ok] = -mask_val
+        crest[~ok] = -mask_val
+        lrest[~ok] = -mask_val
+        
+        shr = rest.shape
+        nbin = int((shr[0]//shr[1])//2*bin_factor)*2
+        kernel = np.ones((1,nbin)).T
+        # npix = np.maximum(nd.convolve((rest > -0.8*mask_val)*1, kernel), 1)
+        # srest = nd.convolve(rest*(rest > -0.8*mask_val), kernel)
+        # sbin = (srest/npix)[::nbin,:]
+        # plt.imshow(sbin, vmin=0, vmax=5)
+        
+        num = nd.convolve(rest*rest_ivar, kernel)
+        cnum = nd.convolve(crest*rest_ivar, kernel)
+        lnum = nd.convolve(lrest*rest_ivar, kernel)
+        den = nd.convolve(rest_ivar, kernel)
+        wbin = (num/den)[::nbin,:]
+        wbin[~np.isfinite(wbin)] = 0
+
+        cwbin = (cnum/den)[::nbin,:]
+        cwbin[~np.isfinite(cwbin)] = 0
+
+        lwbin = (lnum/den)[::nbin,:]
+        lwbin[~np.isfinite(lwbin)] = 0
+
+        plt.imshow(wbin, vmin=0, vmax=5)
+        
         plt.imshow((data['line'] - data['cont'])/data['flat']/1.e-19, vmin=-0.1, vmax=10)
         
 def run_lambda_fits(root='j004404m2034', phot_root=None, mag_limits=[15, 26], sn_limit=7, min_status=None, engine=None, zr=[0.01,3.4], bucket='grizli-v1', verbose=True, extra={'bad_pa_threshold':10}):
@@ -808,10 +1012,30 @@ def various_selections():
     res = grizli_db.make_html_table(engine=engine, columns=['mtime', 'root','status','id','p_ra','p_dec','mag_auto','flux_radius','t_g800l','t_g102', 't_g141', 'z_spec','z_map','bic_diff','chinu','zwidth1/(1+z_map) as zw1','q_z','q_z > -0.69 as q_z_TPR90','dlinesn'], where="AND status > 4 AND mag_auto < 22 AND z_map > 1.3", table_root='bright', sync='s3://grizli-v1/tables/', png_ext=['R30', 'stack','full','line'], show_hist=True)
 
     # High-z compiliation
-    res = grizli_db.make_html_table(engine=engine, columns=['mtime', 'root','status','id','p_ra','p_dec','mag_auto','flux_radius','t_g800l','t_g102', 't_g141', 'z_spec','z_map','bic_diff','chinu','q_z','h_zphot', 'h_src'], where="AND status > 4 AND phot_root = h_root AND id = h_id", tables=['highz_2015'], table_root='bright', sync='s3://grizli-v1/tables/', png_ext=['R30', 'stack','full','line'], show_hist=True)
+    res = grizli_db.make_html_table(engine=engine, columns=['mtime', 'root','status','id','p_ra','p_dec','mag_auto','flux_radius','t_g800l','t_g102', 't_g141', 'z_spec','z_map','bic_diff','chinu','q_z','h_zphot', 'h_src', 'h_dr'], where="AND status > 4 AND phot_root = h_root AND id = h_id AND h_dr < 1", tables=['highz_2015'], table_root='highz', sync='s3://grizli-v1/tables/', png_ext=['R30', 'stack','full','line'], show_hist=True)
     
     # z_spec with dz
     res = grizli_db.make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','z_spec_src','bic_diff','chinu','log_pdf_max', 'zwidth1/(1+z_map) as zw1','(z_map-z_spec)/(1+z_spec) as dz', 'dlinesn'], where="AND status > 4 AND z_spec > 0 AND z_spec_qual = 1", table_root='zspec_delta', sync='s3://grizli-v1/tables/', png_ext=['R30', 'stack','full','line'])
+    
+    # Point sources
+    res = grizli_db.make_html_table(engine=engine, columns=['root','id','red_bit','status','p_ra','p_dec','t_g800l', 't_g102', 't_g141', 'mag_auto','flux_radius','z_map', 'z_spec','z_spec_src','z_spec_dr','bic_diff','chinu','log_pdf_max', 'q_z', 'zwidth1/(1+z_map) as zw1', 'dlinesn'], where="AND status > 4 AND mag_auto < 24 AND flux_radius < 1.6 AND ((flux_radius < 1.25 AND flux_radius > 0.75 AND red_bit > 32) OR (flux_radius < 1.6 AND flux_radius > 1.0 AND red_bit < 32))", table_root='point_sources', sync='s3://grizli-v1/tables/', png_ext=['R30', 'stack','full','line'])
+    
+    # brown dwarf?
+    tablename = 'spec1d_r30_g141'
+    wave = pd.read_sql_query("SELECT * from {0}_wave".format(tablename),
+                             engine)[tablename+'_wave'].values
+    
+    # 1.15, 1.25, 1.4
+    i0 = 25,28,29,32
+    res = grizli_db.make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_map', 'z_spec','z_spec_src','bic_diff','chinu','log_pdf_max', 'q_z', 'zwidth1/(1+z_map) as zw1', 'dlinesn','{0}_flux[25]/{0}_flux[28] as c1'.format(tablename), '{0}_flux[32]/{0}_flux[28] as c2'.format(tablename)], where="AND status > 4 AND flux_radius < 2 AND flux_radius > 1 AND mag_auto < 25 AND {0}_root = root AND {0}_id = id AND {0}_flux[28] > 0 AND {0}_flux[28]/{0}_err[28] > 5 AND {0}_flux[32] > 0 AND {0}_flux[25] > 0 AND {0}_flux[32]/{0}_flux[28] < 0.5".format(tablename), tables=[tablename], table_root='point_sources_colors', sync='s3://grizli-v1/tables/', png_ext=['R30', 'stack','full','line'])
+
+    res = grizli_db.make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_map', 'z_spec','z_spec_src','bic_diff','chinu','log_pdf_max', 'q_z', 'zwidth1/(1+z_map) as zw1', 'dlinesn','{0}_flux[25] as c25'.format(tablename), '{0}_flux[32] as c32'.format(tablename)], where="AND status > 4 AND z_spec = 0".format(tablename), tables=[tablename], table_root='point_sources_colors', sync='s3://grizli-v1/tables/', png_ext=['R30', 'stack','full','line'])
+    
+    
+    # with line ratios
+    err_lines = ' AND '.join('err_{0} > 0 AND err_{0} < 5e-17'.format(l) for l in ['hb','oiii','ha','sii'])
+    
+    res = grizli_db.make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','z_spec_src','bic_diff','chinu','log_pdf_max', 'zwidth1/(1+z_map) as zw1','(z_map-z_spec)/(1+z_spec) as dz', 'dlinesn','flux_hb/flux_ha as HbHa', 'flux_hb/flux_oiii as HbO3', 'flux_oiii/flux_ha as O3Ha'], where="AND status > 4 AND z_spec > 0 AND z_spec_qual = 1 AND sn_oiii > 3 AND sn_ha > 2 AND  {0}".format(err_lines), table_root='zspec_lines', sync='s3://grizli-v1/tables/', png_ext=['R30', 'stack','full','line'])
 
     if False:
         from matplotlib.ticker import FixedLocator, AutoLocator, MaxNLocator
@@ -1178,7 +1402,7 @@ def add_missing_photometry():
     grizli_db.run_lambda_fits('cos-grism-j100012p0210', min_status=6, zr=[0.01,3.2], mag_limits=[17,17.1], bucket='grizli-cosmos-v2')
     os.system('sudo halt')
     
-def set_column_formats(info):
+def set_column_formats(info, extra={}):
     # Print formats
     formats = {}
     formats['ra'] = formats['dec'] = '.5f'
@@ -1195,12 +1419,18 @@ def set_column_formats(info):
     formats['d4000'] = formats['d4000_e'] = '.2f'
     formats['dn4000'] = formats['dn4000_e'] = '.2f'
     formats['z_spec'] = formats['z_map'] = formats['reshift'] = '.3f'
+    formats['z_spec_dr'] = '.1f'
+    
     formats['t_g141'] = formats['t_g102'] = formats['t_g800l'] = '.0f'
     formats['zwidth1'] = formats['zw1'] = '.3f'
     formats['zwidth2'] = formats['zw2'] = '.3f'
     
     formats['q_z'] = '.2f'
+    formats['dz'] = '.3f'
     
+    for k in extra:
+        formats[k] = extra[k]
+        
     for c in info.colnames:
         if c in formats:
             info[c].format = formats[c]
@@ -1219,7 +1449,7 @@ def set_column_formats(info):
         elif c.startswith('flux_') | c.startswith('err_'):
             info[c].format = '.1e'
         
-def make_html_table(engine=None, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','bic_diff','chinu','log_pdf_max', 'd4000', 'd4000_e'], where="AND status >= 5 AND root='j163852p4039'", tables=[], table_root='query', sync='s3://grizli-v1/tables/', png_ext=['R30','stack','full','line'], sort_column=('bic_diff',-1), verbose=True, get_sql=False, show_hist=False):
+def make_html_table(engine=None, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','bic_diff','chinu','log_pdf_max', 'd4000', 'd4000_e'], where="AND status >= 5 AND root='j163852p4039'", tables=[], table_root='query', sync='s3://grizli-v1/tables/', png_ext=['R30','stack','full','line'], sort_column=('bic_diff',-1), verbose=True, get_sql=False, res=None, show_hist=False, extra_formats={}):
     """
     """
     import time
@@ -1244,42 +1474,49 @@ def make_html_table(engine=None, columns=['root','status','id','p_ra','p_dec','m
     if get_sql:
         return query
         
-    res = pd.read_sql_query(query, engine)
-    info = utils.GTable.from_pandas(res)
+    if res is not None:
+        info = res
+    else:
+        res = pd.read_sql_query(query, engine)
+        info = utils.GTable.from_pandas(res)
+        
+        if verbose:
+            print('Query: {0}\n Results N={1}'.format(query, len(res)))
+        if 'cdf_z' in info.colnames:
+            info.remove_column('cdf_z')
     
-    if verbose:
-        print('Query: {0}\n Results N={1}'.format(query, len(res)))
-    if 'cdf_z' in info.colnames:
-        info.remove_column('cdf_z')
-    
-    for c in info.colnames:
-        if c.startswith('p_'):
-            try:
-                info.rename_column(c, c[2:])
-            except:
-                pass
+        for c in info.colnames:
+            if c.startswith('p_'):
+                try:
+                    info.rename_column(c, c[2:])
+                except:
+                    pass
                 
     all_columns = info.colnames.copy()
         
-    idx = ['<a href="http://vizier.u-strasbg.fr/viz-bin/VizieR?-c={0:.6f}+{1:.6f}&-c.rs=2">#{2:05d}</a>'.format(info['ra'][i], info['dec'][i], info['id'][i]) for i in range(len(info))]
-    info['idx'] = idx
+    if 'idx' not in info.colnames:
+        idx = ['<a href="http://vizier.u-strasbg.fr/viz-bin/VizieR?-c={0:.6f}+{1:.6f}&-c.rs=2">#{2:05d}</a>'.format(info['ra'][i], info['dec'][i], info['id'][i]) for i in range(len(info))]
+        info['idx'] = idx
+    
     all_columns.insert(0, 'idx')
     all_columns.pop(all_columns.index('id'))
     
-    set_column_formats(info)
+    set_column_formats(info, extra=extra_formats)
     
     print('Sort: ', sort_column, sort_column[0] in all_columns)
     if sort_column[0] in all_columns:
-        so = np.argsort(info[sort_column[0]])
-        info = info[so[::sort_column[1]]]
+        so = np.argsort(info[sort_column[0]])[::sort_column[1]]
+        #info = info[so[::sort_column[1]]]
         
     ### PNG columns  
     AWS = 'https://s3.amazonaws.com/grizli-v1/Pipeline'  
     bucket = ['grizli-cosmos-v2' if r.startswith('cos-') else 'grizli-v1' for r in info['root']]
     
     for ext in png_ext:
-        png = ['{0}_{1:05d}.{2}.png'.format(root, id, ext) for root, id in zip(info['root'], info['id'])]
-        info['png_{0}'.format(ext)] = ['<a href="{0}/{1}/Extractions/{2}"><img src={0}/{1}/Extractions/{2} height=200></a>'.format(AWS.replace('grizli-v1',buck), root, p) for buck, root, p in zip(bucket, info['root'], png)]
+        if 'png_{0}'.format(ext) not in info.colnames:
+            png = ['{0}_{1:05d}.{2}.png'.format(root, id, ext) for root, id in zip(info['root'], info['id'])]
+            info['png_{0}'.format(ext)] = ['<a href="{0}/{1}/Extractions/{2}"><img src={0}/{1}/Extractions/{2} height=200></a>'.format(AWS.replace('grizli-v1',buck), root, p) for buck, root, p in zip(bucket, info['root'], png)]
+        
         all_columns.append('png_{0}'.format(ext))
     
     sortable = []
@@ -1287,7 +1524,7 @@ def make_html_table(engine=None, columns=['root','status','id','p_ra','p_dec','m
         if not hasattr(info[c][0], 'upper'):
             sortable.append(c)
     
-    info[all_columns].write_sortable_html('{0}.html'.format(table_root), replace_braces=True, localhost=False, max_lines=1e5, table_id=None, table_class='display compact', css=None, filter_columns=sortable, buttons=['csv'], toggle=True, use_json=True)
+    info[all_columns][so].write_sortable_html('{0}.html'.format(table_root), replace_braces=True, localhost=False, max_lines=1e5, table_id=None, table_class='display compact', css=None, filter_columns=sortable, buttons=['csv'], toggle=True, use_json=True)
     
     if show_hist:
         from matplotlib.ticker import FixedLocator, AutoLocator, MaxNLocator
