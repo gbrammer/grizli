@@ -1146,6 +1146,41 @@ def flt_to_dict(fobj, primary_keys=DEFAULT_PRIMARY_KEYS, extensions=[('SCI',i+1)
             flt_dict['extensions'][count] = d_i
     
     return flt_dict
+
+def get_set_bits(value):
+    """
+    Compute which binary bits are set for an integer
+    """
+    
+    if hasattr(value, '__iter__'):
+        values = value
+        single = False
+    else:
+        values = [value]
+        single = True
+    
+    result = []
+        
+    for v in values:
+        try:
+            bitstr = np.binary_repr(v)[::-1]
+        except:
+            result.append([])
+            
+        nset = bitstr.count('1')
+        setbits = []
+        
+        j = -1
+        for i in range(nset):
+            j = bitstr.index('1', j+1)
+            setbits.append(j)
+            
+        result.append(setbits)
+    
+    if single:
+        return result[0]
+    else:
+        return result
         
 def unset_dq_bits(value, okbits=32+64+512, verbose=False):
     """
@@ -1402,8 +1437,13 @@ def get_line_wavelengths():
     line_wavelengths['Balmer 10kK'] = [6564.61, 4862.68, 4341.68, 4101.73]
     line_ratios['Balmer 10kK'] = [2.86, 1.0, 0.468, 0.259]
 
-    line_wavelengths['Balmer 10kK + MgII'] = [6564.61, 4862.68, 4341.68, 4101.73, 2799.117]
-    line_ratios['Balmer 10kK + MgII'] = [2.86, 1.0, 0.468, 0.259, 1.]
+    line_wavelengths['Balmer 10kK + MgII'] = [6564.61, 4862.68, 4341.68, 4101.73, 3971.198, 2799.117]
+    line_ratios['Balmer 10kK + MgII'] = [2.86, 1.0, 0.468, 0.259, 0.16, 5.]
+    
+    # With Paschen lines & He 10830 from Glikman 2006
+    # https://iopscience.iop.org/article/10.1086/500098/pdf
+    line_wavelengths['Balmer 10kK + MgII'] = [6564.61, 4862.68, 4341.68, 4101.73, 3971.198, 2799.117, 12821.6, 10941.1]
+    line_ratios['Balmer 10kK + MgII'] = [2.86, 1.0, 0.468, 0.259, 0.16, 3., 2.86*4.8/100, 2.86*1.95/100]
     
     # Reddened with Kriek & Conroy dust, tau_V=0.5
     line_wavelengths['Balmer 10kK t0.5'] = [6564.61, 4862.68, 4341.68, 4101.73]
@@ -1508,7 +1548,13 @@ def get_line_wavelengths():
     line_ratios['QSO-UV-lines'] = [1., 0.5, 0.1, 0.008, 0.09, 0.1, 0.3]
 
     line_wavelengths['QSO-Narrow-lines'] = [line_wavelengths[k][0] for k in ['OII', 'OIII', 'SII', 'OI-6302', 'NeIII-3867', 'NeVI-3426', 'NeV-3346']]
-    line_ratios['QSO-Narrow-lines'] = [0.2, 1, 0.15, 0.01, 0.15, 0.1, 0.08]
+    line_ratios['QSO-Narrow-lines'] = [0.2, 1.6, 0.1, 0.01, 0.5, 0.2, 0.02]
+    
+    # redder lines
+    line_wavelengths['QSO-Narrow-lines'] += line_wavelengths['SIII']
+    line_ratios['QSO-Narrow-lines'] += [l*0.05 for l in line_ratios['SIII']]
+    line_wavelengths['QSO-Narrow-lines'] += line_wavelengths['HeI-1083']
+    line_ratios['QSO-Narrow-lines'] += [0.1]
     
     line_wavelengths['Lya+CIV'] = [1215.4, 1549.49]
     line_ratios['Lya+CIV'] = [1., 0.1]
@@ -2132,7 +2178,18 @@ def load_templates(fwhm=400, line_complexes=True, stars=False,
                                  
     return temp_list    
 
-def load_quasar_templates(broad_fwhm=2500, narrow_fwhm=1200, broad_lines=    ['HeI-5877', 'MgII', 'Lya', 'CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'SiIV+OIV-1398', 'NIV-1487', 'NV-1240'], narrow_lines=['OII', 'OIII', 'SII', 'OI-6302', 'NeIII-3867', 'NeVI-3426', 'NeV-3346'], include_feii=True, slopes=[-2.8, 0, 2.8], uv_line_complex=True, fixed_narrow_lines=False, t1_only=False, nspline=13):
+def load_beta_templates(wave=np.arange(400, 2.5e4), betas=[-2, -1, 0]):
+    """
+    Step-function templates with f_lambda ~ (wave/1216.)**beta
+    """
+    cont_wave = np.arange(400, 2.5e4)
+    t0 = {}
+    for beta in betas:
+        key = 'beta {0}'.format(beta)
+        t0[key] = SpectrumTemplate(wave=cont_wave, flux=(cont_wave/1216.)**beta)
+    return t0
+    
+def load_quasar_templates(broad_fwhm=2500, narrow_fwhm=1200, broad_lines=    ['HeI-5877', 'MgII', 'Lya', 'CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'SiIV+OIV-1398', 'NIV-1487', 'NV-1240','PaB','PaG'], narrow_lines=['OII', 'OIII', 'SII', 'OI-6302', 'NeIII-3867', 'NeVI-3426', 'NeV-3346','SIII','HeI-1083'], include_feii=True, slopes=[-2.8, 0, 2.8], uv_line_complex=True, fixed_narrow_lines=False, t1_only=False, nspline=13, Rspline=30, betas=None):
     """
     Make templates suitable for fitting broad-line quasars
     """
@@ -2191,34 +2248,91 @@ def load_quasar_templates(broad_fwhm=2500, narrow_fwhm=1200, broad_lines=    ['H
     # for slope in slopes:
     #     key = 'slope {0}'.format(slope)
     #     t0[key] = t1[key] = SpectrumTemplate(wave=cont_wave, flux=(cont_wave/6563.)**slope)
-
-    ### Spline continua
-    cont_wave = np.arange(5000, 2.4e4)
-    bsplines = bspline_templates(cont_wave, df=nspline, log=True)
-    for key in bsplines:
-        t0[key] = t1[key] = bsplines[key]
     
+    if Rspline is not None:
+        wspline = np.arange(4200, 2.5e4, 10)
+        df_spl = log_zgrid(zr=[wspline[0], wspline[-1]], dz=1./Rspline)
+        bsplines = bspline_templates(wspline, df=len(df_spl)+2, log=True, 
+                                     clip=0.0001)
+        
+        for key in bsplines:
+            t0[key] = t1[key] = bsplines[key]
+        
+    elif nspline > 0:
+        ### Spline continua
+        cont_wave = np.arange(5000, 2.4e4)
+        bsplines = bspline_templates(cont_wave, df=nspline, log=True)
+        for key in bsplines:
+            t0[key] = t1[key] = bsplines[key]
+    
+    elif betas is not None:
+        btemp = load_beta_templates(wave=np.arange(400, 2.5e4), betas=betas)
+        for key in btemp:
+            t0[key] = t1[key] = btemp[key]
+        
+    else:
+        ### Observed frame steps
+        onedR = -nspline
+        wlim = [5000, 18000.0]
+        bin_steps, step_templ = step_templates(wlim=wlim, R=onedR,
+                                               round=10)  
+        for key in step_templ:
+            t0[key] = t1[key] = step_templ[key]
+        
     # t0['blue'] = t1['blue'] = SpectrumTemplate(wave=cont_wave, flux=(cont_wave/6563.)**-2.8)
     # t0['mid'] = t1['mid'] = SpectrumTemplate(wave=cont_wave, flux=(cont_wave/6563.)**0)
     # t0['red'] = t1['mid'] = SpectrumTemplate(wave=cont_wave, flux=(cont_wave/6563.)**2.8)
     
     return t0, t1
     
-def load_phoenix_stars():
+PHOENIX_LOGG_FULL = [3.0, 3.5, 4.0, 4.5, 5.0, 5.5]
+PHOENIX_LOGG = [4.0, 4.5, 5.0, 5.5]
+
+PHOENIX_TEFF = [ 400.,  500.,  600.,  700.,  800.,  900., 1000., 1100., 1200.,
+       1300., 1400., 1500., 1600., 1700., 1800., 1900., 2000., 2100.,
+       2200., 2300., 2400., 2500., 2600., 2700., 2800., 2900., 3000.,
+       3100., 3200., 3300., 3400., 3500., 3600., 3700., 3800., 3900., 4000., 4500., 5000.] #, 5500., 6000., 6500., 7000.]
+       
+def load_phoenix_stars(logg_list=PHOENIX_LOGG, teff_list=PHOENIX_TEFF, add_carbon_star=True):
     """
     Load Phoenix stellar templates
     """
     from collections import OrderedDict
     
-    hdu = pyfits.open(os.path.join(GRIZLI_PATH, 'templates/stars/bt-settl_t400-3500_z0.0.fits'))
+    try:
+        hdu = pyfits.open(os.path.join(GRIZLI_PATH,
+                          'templates/stars/bt-settl_t400-3500_z0.0.fits'))
+    except:
+        file = 'bt-settl_t400-3500_z0.0.fits'
+        url = 'https://s3.amazonaws.com/grizli/CONF'
+        print('Fetch {0}/{1}'.format(url, file))
+        
+        os.system('wget -O /tmp/{1} {0}/{1}'.format(url, file))
+        
+        hdu = pyfits.open(os.path.join('/tmp/', file))
+        
     tab = GTable.gread(hdu[1])
     
     tstars = OrderedDict()
     N = tab['flux'].shape[1]
     for i in range(N):
-        label = 'bt-settl_t{0:05.0f}_g{1:3.1f}'.format(tab.meta['TEFF{0:03d}'.format(i)], tab.meta['LOGG{0:03d}'.format(i)])
-        tstars[label] = SpectrumTemplate(wave=tab['wave'], flux=tab['flux'][:,i], name=label)
+        teff = tab.meta['TEFF{0:03d}'.format(i)]
+        logg = tab.meta['LOGG{0:03d}'.format(i)]
+        
+        if (logg not in logg_list) | (teff not in teff_list):
+            #print('Skip {0} {1}'.format(logg, teff))
+            continue
+            
+        label = 'bt-settl_t{0:05.0f}_g{1:3.1f}'.format(teff, logg)
+        
+        tstars[label] = SpectrumTemplate(wave=tab['wave'],
+                                         flux=tab['flux'][:,i], name=label)
     
+    if add_carbon_star:
+        cfile = os.path.join(GRIZLI_PATH, 'templates/stars/carbon_star.txt')
+        sp = read_catalog(cfile)
+        tstars['bt-settl_t05000_g0.0'] = SpectrumTemplate(wave=sp['wave'], flux=sp['flux'], name='carbon-lancon2002')
+        
     return tstars
     
         
@@ -2283,6 +2397,8 @@ def bspline_templates(wave, degree=3, df=6, get_matrix=False, log=False, clip=1.
     coefs = np.identity(n_bases)
     basis = splev(xspl, (all_knots, coefs, degree))
     
+    wave_peak = np.round(wave[np.argmax(basis, axis=1)])
+    
     maxval = np.max(basis, axis=1)
     for i in range(n_bases):
         basis[i][basis[i] < clip*maxval[i]] = 0
@@ -2292,10 +2408,11 @@ def bspline_templates(wave, degree=3, df=6, get_matrix=False, log=False, clip=1.
         
     temp = OrderedDict()  
     for i in range(n_bases):
-        key = 'bspl {0}'.format(i)
+        key = 'bspl {0} {1:.0f}'.format(i, wave_peak[i])
         temp[key] = SpectrumTemplate(wave, basis[i])
         temp[key].name = key
-    
+        temp[key].wave_peak = wave_peak[i]
+        
     temp.knots = all_knots
     temp.degree = degree
     temp.xspl = xspl
