@@ -1445,6 +1445,33 @@ def get_line_wavelengths():
     line_wavelengths['Balmer 10kK + MgII'] = [6564.61, 4862.68, 4341.68, 4101.73, 3971.198, 2799.117, 12821.6, 10941.1]
     line_ratios['Balmer 10kK + MgII'] = [2.86, 1.0, 0.468, 0.259, 0.16, 3., 2.86*4.8/100, 2.86*1.95/100]
     
+    # Redden with Calzetti00
+    try:
+        from extinction import calzetti00
+        Av = 1.0
+        Rv = 3.1
+        
+        waves = line_wavelengths['Balmer 10kK + MgII']
+        ratios = line_ratios['Balmer 10kK + MgII']
+        
+        for Av in [0.5, 1.0, 2.0]:
+            mred = calzetti00(np.array(waves), Av, Rv)
+            fred = 10**(-0.4*mred)
+            
+            key = 'Balmer 10kK + MgII Av={0:.1f}'.format(Av)
+            line_wavelengths[key] = [w for w in waves]
+            line_ratios[key] = [ratios[i]*fred[i] for i in range(len(waves))]
+                
+    except:
+        line_wavelengths['Balmer 10kK + MgII Av=0.5'] = [6564.61, 4862.68, 4341.68, 4101.73, 3971.198, 2799.117, 12821.6, 10941.1]
+        line_ratios['Balmer 10kK + MgII Av=0.5'] = [2.009811938798515, 0.5817566641521459, 0.25176970824566913, 0.1338409369665902, 0.08079209880749984, 1.1739297839690317, 0.13092553990513178, 0.05033866127477651]
+        
+        line_wavelengths['Balmer 10kK + MgII Av=1.0'] = [6564.61, 4862.68, 4341.68, 4101.73, 3971.198, 2799.117, 12821.6, 10941.1]
+        line_ratios['Balmer 10kK + MgII Av=1.0'] = [1.4123580522157504, 0.33844081628543266, 0.13544441450878067, 0.0691636926953466, 0.04079602018575511, 0.4593703792298591, 0.12486521707058751, 0.045436270735820045]
+        
+        line_wavelengths['Balmer 10kK + MgII Av=2.0'] = [6564.61, 4862.68, 4341.68, 4101.73, 3971.198, 2799.117, 12821.6, 10941.1]
+        line_ratios['Balmer 10kK + MgII Av=2.0'] = [0.6974668768037302, 0.11454218612794999, 0.03919912269578289, 0.018469561340758073, 0.010401970393728362, 0.0703403817712615, 0.11357315292894044, 0.03701729780130422]
+    
     # Reddened with Kriek & Conroy dust, tau_V=0.5
     line_wavelengths['Balmer 10kK t0.5'] = [6564.61, 4862.68, 4341.68, 4101.73]
     line_ratios['Balmer 10kK t0.5'] = [2.86*0.68, 1.0*0.55, 0.468*0.51, 0.259*0.48]
@@ -2189,7 +2216,7 @@ def load_beta_templates(wave=np.arange(400, 2.5e4), betas=[-2, -1, 0]):
         t0[key] = SpectrumTemplate(wave=cont_wave, flux=(cont_wave/1216.)**beta)
     return t0
     
-def load_quasar_templates(broad_fwhm=2500, narrow_fwhm=1200, broad_lines=    ['HeI-5877', 'MgII', 'Lya', 'CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'SiIV+OIV-1398', 'NIV-1487', 'NV-1240','PaB','PaG'], narrow_lines=['OII', 'OIII', 'SII', 'OI-6302', 'NeIII-3867', 'NeVI-3426', 'NeV-3346','SIII','HeI-1083'], include_feii=True, slopes=[-2.8, 0, 2.8], uv_line_complex=True, fixed_narrow_lines=False, t1_only=False, nspline=13, Rspline=30, betas=None):
+def load_quasar_templates(broad_fwhm=2500, narrow_fwhm=1200, broad_lines=    ['HeI-5877', 'MgII', 'Lya', 'CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'SiIV+OIV-1398', 'NIV-1487', 'NV-1240','PaB','PaG'], narrow_lines=['OII', 'OIII', 'SII', 'OI-6302', 'NeIII-3867', 'NeVI-3426', 'NeV-3346','SIII','HeI-1083'], include_feii=True, slopes=[-2.8, 0, 2.8], uv_line_complex=True, fixed_narrow_lines=False, t1_only=False, nspline=13, Rspline=30, betas=None, include_dusty=True):
     """
     Make templates suitable for fitting broad-line quasars
     """
@@ -2217,10 +2244,20 @@ def load_quasar_templates(broad_fwhm=2500, narrow_fwhm=1200, broad_lines=    ['H
         broad0 = broad1
     else:
         if uv_line_complex:
-            broad0 = load_templates(fwhm=broad_fwhm, line_complexes=False, stars=False, full_line_list=['Balmer 10kK + MgII', 'QSO-UV-lines'], continuum_list=[], fsps_templates=False, alf_template=False, lorentz=True)
+            full_line_list=['Balmer 10kK + MgII', 'QSO-UV-lines']
+            #broad0 = load_templates(fwhm=broad_fwhm, line_complexes=False, stars=False, full_line_list=['Balmer 10kK + MgII', 'QSO-UV-lines'], continuum_list=[], fsps_templates=False, alf_template=False, lorentz=True)
         else:
+            full_line_list=['Balmer 10kK + MgII'] 
             #broad0 = load_templates(fwhm=broad_fwhm, line_complexes=False, stars=False, full_line_list=['Balmer 10kK'] + broad_lines, continuum_list=[], fsps_templates=False, alf_template=False, lorentz=True)
-            broad0 = load_templates(fwhm=broad_fwhm, line_complexes=False, stars=False, full_line_list=['Balmer 10kK + MgII'], continuum_list=[], fsps_templates=False, alf_template=False, lorentz=True)
+        
+        if include_dusty:
+            line_wavelengths, line_ratios = get_line_wavelengths()
+            if 'Balmer 10kK + MgII Av=1.0' in line_wavelengths:
+                full_line_list += ['Balmer 10kK + MgII Av=0.5'] 
+                full_line_list += ['Balmer 10kK + MgII Av=1.0'] 
+                full_line_list += ['Balmer 10kK + MgII Av=2.0'] 
+            
+        broad0 = load_templates(fwhm=broad_fwhm, line_complexes=False, stars=False, full_line_list=full_line_list, continuum_list=[], fsps_templates=False, alf_template=False, lorentz=True)
          
         for k in broad0:
             t0[k] = broad0[k]
@@ -2288,22 +2325,31 @@ def load_quasar_templates(broad_fwhm=2500, narrow_fwhm=1200, broad_lines=    ['H
 PHOENIX_LOGG_FULL = [3.0, 3.5, 4.0, 4.5, 5.0, 5.5]
 PHOENIX_LOGG = [4.0, 4.5, 5.0, 5.5]
 
-PHOENIX_TEFF = [ 400.,  500.,  600.,  700.,  800.,  900., 1000., 1100., 1200.,
+PHOENIX_TEFF_FULL = [400.0, 420.0, 450.0, 500.0, 550.0, 600.0, 650.0, 700.0, 750.0, 800.0, 850.0, 900.0, 950.0, 1000.0, 1050.0, 1100.0, 1150.0, 1200.0, 1250.0, 1300.0, 1350.0, 1400.0, 1450.0, 1500.0, 1550.0, 1600.0, 1650.0, 1700.0, 1750.0, 1800.0, 1850.0, 1900.0, 1950.0, 2000.0, 2100.0, 2200.0, 2300.0, 2400.0, 2500.0, 2600.0, 2700.0, 2800.0, 2900.0, 3000.0, 3100.0, 3200.0, 3300.0, 3400.0, 3500.0, 3600.0, 3700.0, 3800.0, 3900.0, 4000.0, 4100.0, 4200.0, 4300.0, 4400.0, 4500.0, 4600.0, 4700.0, 4800.0, 4900.0, 5000.0]
+
+PHOENIX_TEFF = [ 400.,  420., 450., 500.,  550., 600.,  650., 700.,  750., 
+       800.,  850., 900., 950., 1000., 1050., 1100., 1150., 1200.,
        1300., 1400., 1500., 1600., 1700., 1800., 1900., 2000., 2100.,
        2200., 2300., 2400., 2500., 2600., 2700., 2800., 2900., 3000.,
-       3100., 3200., 3300., 3400., 3500., 3600., 3700., 3800., 3900., 4000., 4500., 5000.] #, 5500., 6000., 6500., 7000.]
+       3100., 3200., 3300., 3400., 3500., 3600., 3700., 3800., 3900., 4000.,
+       4200., 4400., 4600., 4800., 5000., 5500., 5500, 6000., 6500., 7000.]
+
+PHOENIX_ZMET_FULL = [-2.5, -2.0, -1.5, -1.0, -0.5, -0., 0.5]
+PHOENIX_ZMET = [-1.0, -0.5, -0.]
        
-def load_phoenix_stars(logg_list=PHOENIX_LOGG, teff_list=PHOENIX_TEFF, add_carbon_star=True):
+def load_phoenix_stars(logg_list=PHOENIX_LOGG, teff_list=PHOENIX_TEFF, zmet_list=PHOENIX_ZMET, add_carbon_star=True, file='bt-settl_t400-7000_g4.5.fits'):
     """
     Load Phoenix stellar templates
     """
     from collections import OrderedDict
+
+    
+    #file='bt-settl_t400-5000_g4.5.fits'
+    #file='bt-settl_t400-3500_z0.0.fits'
     
     try:
-        hdu = pyfits.open(os.path.join(GRIZLI_PATH,
-                          'templates/stars/bt-settl_t400-3500_z0.0.fits'))
+        hdu = pyfits.open(os.path.join(GRIZLI_PATH, 'templates/stars/', file))
     except:
-        file = 'bt-settl_t400-3500_z0.0.fits'
         url = 'https://s3.amazonaws.com/grizli/CONF'
         print('Fetch {0}/{1}'.format(url, file))
         
@@ -2318,12 +2364,16 @@ def load_phoenix_stars(logg_list=PHOENIX_LOGG, teff_list=PHOENIX_TEFF, add_carbo
     for i in range(N):
         teff = tab.meta['TEFF{0:03d}'.format(i)]
         logg = tab.meta['LOGG{0:03d}'.format(i)]
-        
-        if (logg not in logg_list) | (teff not in teff_list):
+        try:
+            met = tab.meta['ZMET{0:03d}'.format(i)]
+        except:
+            met = 0.
+            
+        if (logg not in logg_list) | (teff not in teff_list) | (met not in zmet_list):
             #print('Skip {0} {1}'.format(logg, teff))
             continue
             
-        label = 'bt-settl_t{0:05.0f}_g{1:3.1f}'.format(teff, logg)
+        label = 'bt-settl_t{0:05.0f}_g{1:3.1f}_m{2:.1f}'.format(teff, logg, met)
         
         tstars[label] = SpectrumTemplate(wave=tab['wave'],
                                          flux=tab['flux'][:,i], name=label)
@@ -2331,7 +2381,7 @@ def load_phoenix_stars(logg_list=PHOENIX_LOGG, teff_list=PHOENIX_TEFF, add_carbo
     if add_carbon_star:
         cfile = os.path.join(GRIZLI_PATH, 'templates/stars/carbon_star.txt')
         sp = read_catalog(cfile)
-        tstars['bt-settl_t05000_g0.0'] = SpectrumTemplate(wave=sp['wave'], flux=sp['flux'], name='carbon-lancon2002')
+        tstars['bt-settl_t05000_g0.0_m0.0'] = SpectrumTemplate(wave=sp['wave'], flux=sp['flux'], name='carbon-lancon2002')
         
     return tstars
     
