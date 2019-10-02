@@ -2,6 +2,7 @@
 Interact with the grizli AWS database
 """
 import os
+import numpy as np
 
 FLAGS = {'init_lambda':1,
          'start_beams':2,
@@ -152,14 +153,27 @@ def get_row_data(rowfile='gds-g800l-j033236m2748_21181.row.fits', status_flag=FL
         else:
             # Output of stellar fits
             tab = Table.read(rowfile, format='ascii.commented_header')
+
+            tab['chinu'] = tab['chi2']/tab['dof']
+            tab['phot_root'] = tab['root']
+            tab.rename_column('best_template', 'stellar_template')
+            
             try:
                 tab['chinu'] = tab['chi2']/tab['dof']
                 tab['phot_root'] = tab['root']
+                
+                # BIC of spline-only and template fits    
+                bic_spl = np.log(tab['dof'])*(tab['nk']-1) + tab['chi2_flat'] 
+                bic_star = np.log(tab['dof'])*(tab['nk']) + tab['chi2']
+                tab['bic_diff_star'] = bic_spl - bic_star
+                
             except:
+                print('Parse {0} failed'.format(rowfile))
                 pass
             
-            allowed_columns = ['root','id','chi2','dof','chinu',
-                               'best_template','status','phot_root']
+            allowed_columns = ['root','id','ra','dec','chi2','nk','dof',
+                               'chinu','chi2_flat','bic_diff_star',
+                               'stellar_template','status','phot_root']
     else:
         tab = rowfile
         
@@ -182,6 +196,7 @@ def get_row_data(rowfile='gds-g800l-j033236m2748_21181.row.fits', status_flag=FL
     remove_cols = []
     for c in tab.colnames:
         if c not in allowed_columns:
+            #print('Remove column: ', c)
             remove_cols.append(c)
         
     if len(remove_cols) > 0:
@@ -1018,7 +1033,10 @@ def various_selections():
     res = grizli_db.make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','z_spec_src','bic_diff','chinu','log_pdf_max', 'zwidth1/(1+z_map) as zw1','(z_map-z_spec)/(1+z_spec) as dz', 'dlinesn'], where="AND status > 4 AND z_spec > 0 AND z_spec_qual = 1", table_root='zspec_delta', sync='s3://grizli-v1/tables/', png_ext=['R30', 'stack','full','line'])
     
     # Point sources
-    res = grizli_db.make_html_table(engine=engine, columns=['root','id','red_bit','status','p_ra','p_dec','t_g800l', 't_g102', 't_g141', 'mag_auto','flux_radius','z_map', 'z_spec','z_spec_src','z_spec_dr','bic_diff','chinu','log_pdf_max', 'q_z', 'zwidth1/(1+z_map) as zw1', 'dlinesn'], where="AND status > 4 AND mag_auto < 24 AND flux_radius < 1.6 AND ((flux_radius < 1.25 AND flux_radius > 0.75 AND red_bit > 32) OR (flux_radius < 1.6 AND flux_radius > 1.0 AND red_bit < 32))", table_root='point_sources', sync='s3://grizli-v1/tables/', png_ext=['R30', 'stack','full','line'])
+    res = grizli_db.make_html_table(engine=engine, columns=['root','id','red_bit','status','p_ra','p_dec','t_g800l', 't_g102', 't_g141', 'mag_auto','flux_radius','z_map', 'z_spec','z_spec_src','z_spec_dr','bic_diff','chinu','log_pdf_max', 'q_z', 'zwidth1/(1+z_map) as zw1', 'dlinesn'], where="AND status > 4 AND mag_auto < 24 AND flux_radius < 1.6 AND ((flux_radius < 1.25 AND flux_radius > 0.75 AND red_bit > 32) OR (flux_radius < 1.6 AND flux_radius > 1.0 AND red_bit < 32))", table_root='point_sources', sync='s3://grizli-v1/tables/', png_ext=['stack','full','qso.full', 'star'])
+    
+    # Strong lines
+    res = grizli_db.make_html_table(engine=engine, columns=['root','id','red_bit','status','p_ra','p_dec','t_g800l', 't_g102', 't_g141', 'mag_auto','flux_radius','z_map', 'z_spec','z_spec_src','z_spec_dr','bic_diff','chinu','log_pdf_max', 'q_z', 'zwidth1/(1+z_map) as zw1', 'dlinesn', 'sn_ha', 'sn_oiii', 'sn_oii'], where="AND status > 4 AND mag_auto < 24 AND (sn_ha > 10 OR sn_oiii > 10 OR sn_oii > 10) AND flux_radius >= 1.6", table_root='strong_lines', sync='s3://grizli-v1/tables/', png_ext=['stack','full','qso.full', 'star'])
     
     # brown dwarf?
     tablename = 'spec1d_r30_g141'
