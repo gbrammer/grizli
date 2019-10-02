@@ -1931,15 +1931,19 @@ class GroupFitter(object):
             chi2_rev[chi2_rev < 0] = 0
             indexes = peakutils.indexes(chi2_rev, thres=0.4, min_dist=8)
             num_peaks = len(indexes)
+            so = np.argsort(chi2_rev[indexes])
+            indexes = indexes[so[::-1]]
         else:
             num_peaks = 1
             zoom = False
+        
+        max_peaks = 3
                 
         # delta_chi2 = (chi2.max()-chi2.min())/self.DoF
         # if delta_chi2 > delta_chi2_threshold:      
         if (num_peaks > 0) & (not stars) & zoom & (len(dz) > 1):
             zgrid_zoom = []
-            for ix in indexes:
+            for ix in indexes[:max_peaks]:
                 if (ix > 0) & (ix < len(chi2)-1):
                     c = polyfit(zgrid[ix-1:ix+2], chi2[ix-1:ix+2], 2)
                     zi = -c[1]/(2*c[0])
