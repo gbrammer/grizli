@@ -2769,6 +2769,15 @@ class GroupFitter(object):
         split_templates = []
         split_fits = []
         
+        # Spline only
+        if spline_correction:
+            w0 = np.arange(3000, 2.e4, 100)
+            t0 = utils.SpectrumTemplate(wave=w0, flux=np.ones_like(w0))
+            ts = utils.split_spline_template(t0, **spline_args)
+            sfit0 = self.template_at_z(z=0, templates=ts, fit_background=fit_background, fitter=fitter, get_uncertainties=2)
+        else:
+            sfit0 = None
+            
         for ik, k in enumerate(tstar):
             if spline_correction:
                 ts = utils.split_spline_template(tstar[k], **spline_args)
@@ -2801,15 +2810,28 @@ class GroupFitter(object):
             hast = True
             teff = np.array([float(k.split('_')[1][1:]) for k in tstar])
             logg = np.array([float(k.split('_')[2][1:]) for k in tstar])
-            for g in np.unique(logg):
-                ig = logg == g
-                so = np.argsort(teff[ig])
-                axz.plot(teff[ig][so], chi2[ig][so]-chi2.min(), label='g{0:.1f}'.format(g))
+            met = np.array([float(k.split('_')[3][1:]) for k in tstar])
+            
+            if 'bt-settl_t04000_g4.5_m-1.0' in tstar:
+                # Order by metallicity
+                for g in np.unique(met):
+                    ig = met == g
+                    so = np.argsort(teff[ig])
+                    axz.plot(teff[ig][so], chi2[ig][so]-chi2.min(), label='m{0:.1f}'.format(g))
+                    
+            else:
+                # Order by log-g
+                for g in np.unique(logg):
+                    ig = logg == g
+                    so = np.argsort(teff[ig])
+                    axz.plot(teff[ig][so], chi2[ig][so]-chi2.min(), label='g{0:.1f}'.format(g))
             
             if logg[ixbest] == 0.:
                 label = 'carbon'
             else:
-                label = '{0} t{1:.0f} g{2:.1f}'.format(k.split('_')[0], teff[ixbest], logg[ixbest])
+                label = '{0} t{1:.0f} g{2:.1f} m{3:.1f}'
+                label = label.format(k.split('_')[0], teff[ixbest],
+                                     logg[ixbest], met[ixbest])
         else:    
             hast = False
             axz.plot(chi2-chi2.min(), marker='.', color='k')
@@ -2853,10 +2875,23 @@ class GroupFitter(object):
             xl = axc.get_xlim()
             
             y0 = np.interp(np.mean(xl), sfit['templates'].wspline/1.e4, spline_func)
-            spl,  = axc.plot(sfit['templates'].wspline/1.e4, spline_func/y0*yl[1]*0.8, color='k', linestyle='--', alpha=0.5, label='Spline correction')
-            axc.legend([spl], ['Spline correction'], loc='upper right', fontsize=8)
+            spl,  = axc.plot(sfit['templates'].wspline/1.e4, 
+                             spline_func/y0*yl[1]*0.8, color='k', 
+                             linestyle='--', alpha=0.5, 
+                             label='Spline correction')
             
+            # Spline-only
+            splt = sfit0['cont1d']
+            delta_chi = sfit0['chi2'] - sfit['chi2']
+            label2 = r'Spline only - $\Delta\chi^2$ = '
+            label2 += '{0:.1f}'.format(delta_chi)
             
+            spl2, = axc.plot(splt.wave/1.e4, splt.flux/1.e-19, 
+                     color='pink', alpha=0.8, label=label2)
+
+            axc.legend([spl, spl2], ['Spline correction', label2], 
+                       loc='upper right', fontsize=8)
+                     
         # ymin = 1.e30
         # ymax = -1.e30
         # wmin = 1.e30
@@ -2958,12 +2993,24 @@ class GroupFitter(object):
         best_templ = list(tstar.keys())[ixbest]
         if best_templ == 'bt-settl_t05000_g0.0':
             best_templ = 'carbon'
-            
-        line = '# root id chi2 dof best_template\n'
-        line += '{0:16} {1:>5d} {2:10.3f} {3:>10d} {4:20s}'.format(self.group_name, self.id, chi2[ixbest], self.DoF, best_templ)
         
+        tfit = split_fits[ixbest]
         
-        return fig, line, split_fits[ixbest]
+        # Non-zero templates
+        if fit_background:
+            nk = (tfit['coeffs'][self.N:] > 0).sum()
+        else:
+            nk = (tfit['coeffs'] > 0).sum()
+        
+        if sfit0 is not None:
+            chi2_flat = sfit0['chi2']
+        else:
+            chi2_flat = chi2[ixbest]    
+        line = '# root id ra dec chi2 chi2_flat dof nk best_template\n'
+        line += '{0:16} {1:>5d} {2:.6f} {3:.6f} {4:10.3f} {5:10.3f} {6:>10d} {7:>10d} {8:20s}'.format(self.group_name, self.id, self.ra, self.dec, chi2[ixbest], chi2_flat, self.DoF, nk, best_templ)
+        print('\n'+line+'\n')
+                
+        return fig, line, tfit
         
         # # Output TBD
         # if False:
