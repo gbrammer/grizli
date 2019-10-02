@@ -2347,8 +2347,11 @@ def load_phoenix_stars(logg_list=PHOENIX_LOGG, teff_list=PHOENIX_TEFF, zmet_list
     Load Phoenix stellar templates
     """
     from collections import OrderedDict
-
-    
+    try:
+        from urllib.request import urlretrieve
+    except:
+        from urllib import urlretrieve
+            
     #file='bt-settl_t400-5000_g4.5.fits'
     #file='bt-settl_t400-3500_z0.0.fits'
     
@@ -2358,7 +2361,9 @@ def load_phoenix_stars(logg_list=PHOENIX_LOGG, teff_list=PHOENIX_TEFF, zmet_list
         url = 'https://s3.amazonaws.com/grizli/CONF'
         print('Fetch {0}/{1}'.format(url, file))
         
-        os.system('wget -O /tmp/{1} {0}/{1}'.format(url, file))
+        #os.system('wget -O /tmp/{1} {0}/{1}'.format(url, file))
+        res = urlretrieve('{0}/{1}'.format(url, file), 
+                          filename=os.path.join('/tmp', file))
         
         hdu = pyfits.open(os.path.join('/tmp/', file))
         
