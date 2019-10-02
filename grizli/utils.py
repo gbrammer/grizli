@@ -1528,6 +1528,11 @@ def get_line_wavelengths():
     
     line_wavelengths['SII'] = [6718.29, 6732.67]
     line_ratios['SII'] = [1., 1.]   
+
+    line_wavelengths['SII-6717'] = [6718.29]
+    line_ratios['SII-6717'] = [1.]   
+    line_wavelengths['SII-6731'] = [6732.67]
+    line_ratios['SII-6731'] = [1.]
     
     line_wavelengths['HeII-4687'] = [4687.5]
     line_ratios['HeII-4687'] = [1.]
@@ -1574,8 +1579,8 @@ def get_line_wavelengths():
     line_wavelengths['QSO-UV-lines'] = [line_wavelengths[k][0] for k in ['Lya','CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'SiIV+OIV-1398', 'NV-1240']]
     line_ratios['QSO-UV-lines'] = [1., 0.5, 0.1, 0.008, 0.09, 0.1, 0.3]
 
-    line_wavelengths['QSO-Narrow-lines'] = [line_wavelengths[k][0] for k in ['OII', 'OIII', 'SII', 'OI-6302', 'NeIII-3867', 'NeVI-3426', 'NeV-3346']]
-    line_ratios['QSO-Narrow-lines'] = [0.2, 1.6, 0.1, 0.01, 0.5, 0.2, 0.02]
+    line_wavelengths['QSO-Narrow-lines'] = [line_wavelengths[k][0] for k in ['OII', 'OIII-5007', 'OIII-4959', 'SII-6717', 'SII-6731', 'OI-6302', 'NeIII-3867', 'NeVI-3426', 'NeV-3346']]
+    line_ratios['QSO-Narrow-lines'] = [0.2, 1.6, 1.6/2.98, 0.1, 0.1, 0.01, 0.5, 0.2, 0.02]
     
     # redder lines
     line_wavelengths['QSO-Narrow-lines'] += line_wavelengths['SIII']
@@ -1717,7 +1722,7 @@ class SpectrumTemplate(object):
         
     @staticmethod 
     def make_gaussian(central_wave, fwhm, max_sigma=5, step=0.1,
-                      wave_grid=None, velocity=False, clip=1.e-5,
+                      wave_grid=None, velocity=False, clip=1.e-6,
                       lorentz=False):
         """Make Gaussian template
         
@@ -2216,7 +2221,7 @@ def load_beta_templates(wave=np.arange(400, 2.5e4), betas=[-2, -1, 0]):
         t0[key] = SpectrumTemplate(wave=cont_wave, flux=(cont_wave/1216.)**beta)
     return t0
     
-def load_quasar_templates(broad_fwhm=2500, narrow_fwhm=1200, broad_lines=    ['HeI-5877', 'MgII', 'Lya', 'CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'SiIV+OIV-1398', 'NIV-1487', 'NV-1240','PaB','PaG'], narrow_lines=['OII', 'OIII', 'SII', 'OI-6302', 'NeIII-3867', 'NeVI-3426', 'NeV-3346','SIII','HeI-1083'], include_feii=True, slopes=[-2.8, 0, 2.8], uv_line_complex=True, fixed_narrow_lines=False, t1_only=False, nspline=13, Rspline=30, betas=None, include_dusty=True):
+def load_quasar_templates(broad_fwhm=2500, narrow_fwhm=1200, broad_lines=    ['HeI-5877', 'MgII', 'Lya', 'CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'SiIV+OIV-1398', 'NIV-1487', 'NV-1240','PaB','PaG'], narrow_lines=['OII', 'OIII', 'SII', 'OI-6302', 'OIII-4363', 'NeIII-3867', 'NeVI-3426', 'NeV-3346','SIII','HeI-1083'], include_feii=True, slopes=[-2.8, 0, 2.8], uv_line_complex=True, fixed_narrow_lines=False, t1_only=False, nspline=13, Rspline=30, betas=None, include_dusty=False):
     """
     Make templates suitable for fitting broad-line quasars
     """
@@ -2244,16 +2249,16 @@ def load_quasar_templates(broad_fwhm=2500, narrow_fwhm=1200, broad_lines=    ['H
         broad0 = broad1
     else:
         if uv_line_complex:
-            full_line_list=['Balmer 10kK + MgII', 'QSO-UV-lines']
+            full_line_list=['Balmer 10kK + MgII Av=0.5', 'QSO-UV-lines']
             #broad0 = load_templates(fwhm=broad_fwhm, line_complexes=False, stars=False, full_line_list=['Balmer 10kK + MgII', 'QSO-UV-lines'], continuum_list=[], fsps_templates=False, alf_template=False, lorentz=True)
         else:
-            full_line_list=['Balmer 10kK + MgII'] 
+            full_line_list=['Balmer 10kK + MgII Av=0.5'] 
             #broad0 = load_templates(fwhm=broad_fwhm, line_complexes=False, stars=False, full_line_list=['Balmer 10kK'] + broad_lines, continuum_list=[], fsps_templates=False, alf_template=False, lorentz=True)
         
         if include_dusty:
             line_wavelengths, line_ratios = get_line_wavelengths()
             if 'Balmer 10kK + MgII Av=1.0' in line_wavelengths:
-                full_line_list += ['Balmer 10kK + MgII Av=0.5'] 
+                full_line_list += ['Balmer 10kK + MgII'] 
                 full_line_list += ['Balmer 10kK + MgII Av=1.0'] 
                 full_line_list += ['Balmer 10kK + MgII Av=2.0'] 
             
