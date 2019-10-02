@@ -539,26 +539,24 @@ def run_grizli_fit(event):
             output_path = 'Pipeline/{0}/Extractions'.format(root)
     
     elif event_kwargs['fit_stars'] in TRUE_OPTIONS:
-        
-        if 'use_phoenix' in event_kwargs:
-            p = event_kwargs.pop('use_phoenix')
-            if p in TRUE_OPTIONS:
-                tstar = utils.load_phoenix_stars()
-            else:
-                tstar = utils.load_templates(stars=True)
-        else:
-            tstar = utils.load_phoenix_stars()
-            
+                    
         args = np.load(args_file, allow_pickle=True)[0]
         
         if 'psf' in event_kwargs:
             args['psf'] = event_kwargs['psf'] in TRUE_OPTIONS     
-            
+        
+        for k in ['fcontam', 'min_sens', 'sys_err']:
+            if k in event_kwargs:
+                print('Set arg {0}={1}'.format(k, event_kwargs[k]))
+                args[k] = event_kwargs[k]
+        
+        # Load MultiBeam    
         mb = multifit.MultiBeam(beams_file, **args)
+        
         if 'fit_trace_shift' in args:
             if args['fit_trace_shift']:
                 tr = mb.fit_trace_shift()
-         
+                         
         if 'spline_correction' in event_kwargs:
             spline_correction = event_kwargs['spline_correction'] in TRUE_OPTIONS     
         else:
@@ -573,6 +571,20 @@ def run_grizli_fit(event):
             Rspline = event_kwargs['Rspline']    
         else:
             Rspline = 15
+        
+        if Rspline == 15:
+            logg_list = [4.5]
+        else:
+            logg_list = utils.PHOENIX_LOGG
+            
+        if 'use_phoenix' in event_kwargs:
+            p = event_kwargs.pop('use_phoenix')
+            if p in TRUE_OPTIONS:
+                tstar = utils.load_phoenix_stars(logg_list=logg_list)
+            else:
+                tstar = utils.load_templates(stars=True)
+        else:
+            tstar = utils.load_phoenix_stars(logg_list=logg_list)
             
         # Fit the stellar templates
         _res = mb.xfit_star(tstar=tstar, spline_correction=spline_correction,
