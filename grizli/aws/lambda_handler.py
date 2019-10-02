@@ -561,10 +561,23 @@ def run_grizli_fit(event):
          
         if 'spline_correction' in event_kwargs:
             spline_correction = event_kwargs['spline_correction'] in TRUE_OPTIONS     
+        else:
+            spline_correction = True
+        
+        if 'fit_background' in event_kwargs:
+            fit_background = event_kwargs['fit_background'] in TRUE_OPTIONS     
+        else:
+            fit_background = True
+        
+        if 'Rspline' in event_kwargs:
+            Rspline = event_kwargs['Rspline']    
+        else:
+            Rspline = 15
+            
         # Fit the stellar templates
-        _res = mb.xfit_star(tstar=tstar, spline_correction=True,
-                            fitter='lstsq', fit_background=True, 
-                            spline_args={'Rspline': 5}, oned_args={})
+        _res = mb.xfit_star(tstar=tstar, spline_correction=spline_correction,
+                            fitter='lstsq', fit_background=fit_background, 
+                            spline_args={'Rspline': Rspline}, oned_args={})
         
         _res[0].savefig('{0}_{1:05d}.star.png'.format(root, id))
         fp = open('{0}_{1:05d}.star.log'.format(root, id), 'w')
