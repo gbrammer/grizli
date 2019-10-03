@@ -5,6 +5,7 @@ Created by Gabriel Brammer on 2017-05-19.
 
 """
 import os
+import time
 import glob
 import inspect
 
@@ -42,7 +43,6 @@ def run_all_parallel(id, get_output_data=False, args_file='fit_args.npy', **kwar
     import numpy as np
     from grizli.fitting import run_all
     from grizli import multifit
-    import time
     import traceback
     
     t0 = time.time()
@@ -308,7 +308,9 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     tfit = mb.template_at_z(z=mb_fit.meta['z_map'][0], templates=t1,
                             fit_background=True, fitter=fitter[-1], 
                             bounded_kwargs=bounded_kwargs)
-        
+    
+    fit_hdu.header['CHI2_MAP'] = tfit['chi2'], 'Chi2 at z=z_map'
+    
     # Redrizzle? ... testing
     if False:
         hdu, fig = mb.drizzle_grisms_and_PAs(fcontam=fcontam,
@@ -804,7 +806,7 @@ def make_summary_catalog(target='pg0117+213', sextractor='pg0117+213-f140w.cat',
     
     keys['ZFIT_STACK'] = ['CHI2POLY','CHI2SPL','SPLF01','SPLE01',
                       'SPLF02','SPLE02','SPLF03','SPLE03','SPLF04','SPLE04',
-                      'HUBERDEL','ST_DF','ST_LOC','ST_SCL',
+                      'HUBERDEL','ST_DF','ST_LOC','ST_SCL','AS_EPSF',
                       'DOF','CHIMIN','CHIMAX','BIC_POLY','BIC_SPL','BIC_TEMP',
                       'Z02', 'Z16', 'Z50', 'Z84', 'Z97', 'ZWIDTH1', 'ZWIDTH2', 
                       'ZRMIN','ZRMAX','Z_MAP', 'Z_RISK', 'MIN_RISK', 
@@ -2036,6 +2038,9 @@ class GroupFitter(object):
         fit.meta['chimax'] = (chi2.max(), 'Maximum chi2 of template fit')
         fit.meta['fitter'] = (fitter, 'Minimization algorithm')
         
+        fit.meta['as_epsf'] = ((self.psf_param_dict is not None)*1, 
+                               'Object fit with effective PSF morphology')
+                               
         # Bayesian information criteria, normalized to template min_chi2
         # BIC = log(number of data points)*(number of params) + min(chi2) + C
         # https://en.wikipedia.org/wiki/Bayesian_information_criterion
@@ -2509,7 +2514,8 @@ class GroupFitter(object):
         
         gs.tight_layout(fig, pad=0.1, w_pad=0.1)
         
-        fig.text(1-0.015*8./xsize, 0.02, time.ctime(), ha='right', va='bottom', transform=fig.transFigure, fontsize=5)
+        fig.text(1-0.015*8./xsize, 0.02, time.ctime(), ha='right', 
+                 va='bottom', transform=fig.transFigure, fontsize=5)
         
         return fig
         
@@ -2804,8 +2810,9 @@ class GroupFitter(object):
         gs = matplotlib.gridspec.GridSpec(1,2, 
                         width_ratios=[1,1.5+0.5*(Ng>1)],
                         hspace=0.)
-
-        fig = plt.figure(figsize=[8+4*(Ng>1), 3.5])
+        
+        figsize = [8+4*(Ng>1), 3.5]
+        fig = plt.figure(figsize=figsize)
 
         # p(z)
         axz = fig.add_subplot(gs[-1,0]) #121)
@@ -2896,103 +2903,9 @@ class GroupFitter(object):
             axc.legend([spl, spl2], ['Spline correction', label2], 
                        loc='upper right', fontsize=8)
                      
-        # ymin = 1.e30
-        # ymax = -1.e30
-        # wmin = 1.e30
-        # wmax = -1.e30
-        # 
-        # # 1D Model
-        # ix = np.argmin(chi2)
-        # tbest = types[ix]
-        # sp = tstar[tbest].wave, tstar[tbest].flux*coeffs[ix,-1]
-        # 
-        # for i in range(self.N):
-        #     beam = self.beams[i]
-        #     m_i = beam.compute_model(spectrum_1d=sp, is_cgs=True, in_place=False).reshape(beam.sh)
-        # 
-        #     #if isinstance(beam, grizli.model.BeamCutout):
-        #     if hasattr(beam, 'init_epsf'): # grizli.model.BeamCutout
-        #         grism = beam.grism.filter
-        #         clean = beam.grism['SCI'] - beam.contam - coeffs[ix,i]
-        # 
-        #         w, fl, er = beam.beam.optimal_extract(clean, ivar=beam.ivar)            
-        #         w, flm, erm = beam.beam.optimal_extract(m_i, ivar=beam.ivar)
-        #         sens = beam.beam.sensitivity                
-        #     else:
-        #         grism = beam.grism
-        #         clean = beam.sci - beam.contam - coeffs[ix,i]
-        #         w, fl, er = beam.optimal_extract(clean, ivar=beam.ivar)            
-        #         w, flm, erm = beam.optimal_extract(m_i, ivar=beam.ivar)
-        # 
-        #         sens = beam.sens
-        # 
-        #     w = w/1.e4
-        # 
-        #     unit_corr = 1./sens
-        #     clip = (sens > 0.1*sens.max()) 
-        #     clip &= (np.isfinite(flm)) & (er > 0)
-        #     if clip.sum() == 0:
-        #         continue
-        # 
-        #     fl *= unit_corr/1.e-19
-        #     er *= unit_corr/1.e-19
-        #     flm *= unit_corr/1.e-19
-        # 
-        #     f_alpha = 1./(self.Ngrism[grism.upper()])*0.8 #**0.5
-        # 
-        #     # Plot
-        #     pscale = 1.
-        #     if hasattr(self, 'pscale'):
-        #         if (self.pscale is not None):
-        #             pscale = self.compute_scale_array(self.pscale, w[clip])
-        #             
-        #     axc.errorbar(w[clip], fl[clip]/pscale, er[clip]/pscale, color=GRISM_COLORS[grism], alpha=f_alpha, marker='.', linestyle='None', zorder=1)
-        #     axc.plot(w[clip], flm[clip], color='r', alpha=f_alpha, linewidth=2, zorder=10) 
-        # 
-        #     # Plot limits         
-        #     ymax = np.maximum(ymax,
-        #                 np.percentile((flm+np.median(er[clip]))[clip], 98))
-        # 
-        #     ymin = np.minimum(ymin, np.percentile((flm-er*0.)[clip], 2))
-        # 
-        #     wmax = np.maximum(wmax, w[clip].max())
-        #     wmin = np.minimum(wmin, w[clip].min())
-        # 
-        # sp_flat = self.optimal_extract(self.flat_flam[self.fit_mask], bin=1)
-        # bg_model = self.get_flat_background(coeffs[ix,:], apply_mask=True)
-        # sp_data = self.optimal_extract(self.scif_mask-bg_model, bin=1)
-        # 
-        # for g in sp_data:
-        # 
-        #     clip = sp_flat[g]['flux'] != 0
-        # 
-        #     pscale = 1.
-        #     if hasattr(self, 'pscale'):
-        #         if (self.pscale is not None):
-        #             pscale = self.compute_scale_array(self.pscale, sp_data[g]['wave'])
-        # 
-        #     axc.errorbar(sp_data[g]['wave'][clip]/1.e4, (sp_data[g]['flux']/sp_flat[g]['flux']/1.e-19/pscale)[clip], (sp_data[g]['err']/sp_flat[g]['flux']/1.e-19/pscale)[clip], color=GRISM_COLORS[g], alpha=0.8, marker='.', linestyle='None', zorder=1)
-        # 
-        # # Cleanup
-        # axc.set_xlim(wmin, wmax)
-        # #axc.semilogx(subsx=[wmax])
-        # #axc.set_xticklabels([])
-        # axc.set_xlabel(r'$\lambda$')
-        # axc.set_ylabel(r'$f_\lambda \times 10^{-19}$')
-        # #axc.xaxis.set_major_locator(MultipleLocator(0.1))
-        # 
-        # axc.set_ylim(ymin-0.2*ymax, 1.2*ymax)
-        # axc.grid()
-        # 
-        # for ax in [axc]: #[axa, axb, axc]:
-        # 
-        #     labels = np.arange(np.ceil(wmin*10), np.ceil(wmax*10))/10.
-        #     ax.set_xticks(labels)
-        #     ax.set_xticklabels(labels)
-        #     #ax.set_xticklabels([])
-        #     #print(labels, wmin, wmax)
-
         gs.tight_layout(fig, pad=0.1, w_pad=0.1)
+        fig.text(1-0.015*12./figsize[0], 0.02, time.ctime(), ha='right', 
+                 va='bottom', transform=fig.transFigure, fontsize=5)
         
         best_templ = list(tstar.keys())[ixbest]
         if best_templ == 'bt-settl_t05000_g0.0':
@@ -3010,8 +2923,8 @@ class GroupFitter(object):
             chi2_flat = sfit0['chi2']
         else:
             chi2_flat = chi2[ixbest]    
-        line = '# root id ra dec chi2 chi2_flat dof nk best_template\n'
-        line += '{0:16} {1:>5d} {2:.6f} {3:.6f} {4:10.3f} {5:10.3f} {6:>10d} {7:>10d} {8:20s}'.format(self.group_name, self.id, self.ra, self.dec, chi2[ixbest], chi2_flat, self.DoF, nk, best_templ)
+        line = '# root id ra dec chi2 chi2_flat dof nk best_template as_epsf\n'
+        line += '{0:16} {1:>5d} {2:.6f} {3:.6f} {4:10.3f} {5:10.3f} {6:>10d} {7:>10d} {8:20s} {9:0d}'.format(self.group_name, self.id, self.ra, self.dec, chi2[ixbest], chi2_flat, self.DoF, nk, best_templ, (self.psf_param_dict is not None)*1)
         print('\n'+line+'\n')
                 
         return fig, line, tfit
@@ -3864,7 +3777,8 @@ def show_drizzled_lines(line_hdu, full_line_list=['OII', 'Hb', 'OIII', 'Ha+NII',
         ax.yaxis.set_major_locator(majorLocator)
 
     fig.tight_layout(pad=0.1, w_pad=0.5)
-    fig.text(1-0.015*12./xsize, 0.02, time.ctime(), ha='right', va='bottom', transform=fig.transFigure, fontsize=5)
+    fig.text(1-0.015*12./xsize, 0.02, time.ctime(), ha='right', va='bottom', 
+             transform=fig.transFigure, fontsize=5)
     
     return fig
 
