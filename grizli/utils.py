@@ -2391,7 +2391,13 @@ def load_phoenix_stars(logg_list=PHOENIX_LOGG, teff_list=PHOENIX_TEFF, zmet_list
     if add_carbon_star:
         cfile = os.path.join(GRIZLI_PATH, 'templates/stars/carbon_star.txt')
         sp = read_catalog(cfile)
-        tstars['bt-settl_t05000_g0.0_m0.0'] = SpectrumTemplate(wave=sp['wave'], flux=sp['flux'], name='carbon-lancon2002')
+        if add_carbon_star > 1:
+            import scipy.ndimage as nd
+            cflux = nd.gaussian_filter(sp['flux'], add_carbon_star)
+        else:
+            cflux = sp['flux']
+            
+        tstars['bt-settl_t05000_g0.0_m0.0'] = SpectrumTemplate(wave=sp['wave'], flux=cflux, name='carbon-lancon2002')
         
     return tstars
     
