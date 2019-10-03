@@ -241,7 +241,9 @@ def run_grizli_fit(event):
     import json
     import shutil
     import gc
-      
+    
+    import matplotlib.pyplot as plt
+    
     import grizli
     from grizli import fitting, utils, multifit
     
@@ -347,7 +349,8 @@ def run_grizli_fit(event):
         for i, file in enumerate(files):
             print('Initial file ({0}): {1}'.format(i+1, file))
     
-    os.system('cp {0}/matplotlibrc .'.format(grizli.GRIZLI_PATH))
+    if os.path.exists('{0}/matplotlibrc'.format(grizli.GRIZLI_PATH)):
+        os.system('cp {0}/matplotlibrc .'.format(grizli.GRIZLI_PATH))
     
     s3 = boto3.resource('s3')
     s3_client = boto3.client('s3')
@@ -512,24 +515,40 @@ def run_grizli_fit(event):
         # Fit line widths
         if 'get_line_width' not in event_kwargs:
             event_kwargs['get_line_width'] = True
-
+    
         # Don't use photometry
         event_kwargs['phot_obj'] = None
         event_kwargs['use_phot_obj'] = False
     
-        event['fit_only_beams'] = True
-        event['fit_beams'] = False
+        event_kwargs['fit_only_beams'] = True
+        event_kwargs['fit_beams'] = False
+        
+        templ_args = {'uv_line_complex': True, 
+                      'broad_fwhm':2800,
+                      'narrow_fwhm':1000,
+                      'fixed_narrow_lines':True,
+                      'Rspline':15,
+                      'include_reddened_balmer_lines':False}
+        
+        for k in templ_args:
+            if k in event_kwargs:
+                templ_args[k] = event_kwargs.pop(k)
+        
+        print('load_quasar_templates(**{0})'.format(templ_args))
+        q0, q1 = utils.load_quasar_templates(**templ_args)
         
         # Quasar templates with fixed line ratios
-        q0, q1 = utils.load_quasar_templates(uv_line_complex=True,
-                                            broad_fwhm=2800, narrow_fwhm=1000,
-                                            fixed_narrow_lines=True, 
-                                            Rspline=15)
+        # q0, q1 = utils.load_quasar_templates(uv_line_complex=True,
+        #                                     broad_fwhm=2800, narrow_fwhm=1000,
+        #                                     fixed_narrow_lines=True, 
+        #                                     Rspline=15)
         
         if 'zr' not in event_kwargs:
             event_kwargs['zr'] = [0.03, 6.8]
         if 'fitter' not in event_kwargs:
             event_kwargs['fitter'] = ['lstsq', 'lstsq']
+        
+        print('run_all_parallel: {0}'.format(event_kwargs))
             
         fitting.run_all_parallel(id, t0=q0, t1=q1, args_file=args_file, 
                                  **event_kwargs)
@@ -566,12 +585,17 @@ def run_grizli_fit(event):
             fit_background = event_kwargs['fit_background'] in TRUE_OPTIONS     
         else:
             fit_background = True
+
+        if 'fitter' in event_kwargs:
+            fitter = event_kwargs['fitter']    
+        else:
+            fitter = 'lstsq'
         
         if 'Rspline' in event_kwargs:
             Rspline = event_kwargs['Rspline']    
         else:
             Rspline = 15
-        
+            
         if Rspline == 15:
             logg_list = [4.5]
         else:
@@ -585,17 +609,24 @@ def run_grizli_fit(event):
                 tstar = utils.load_templates(stars=True)
         else:
             tstar = utils.load_phoenix_stars(logg_list=logg_list)
-            
+        
+        kws = {'spline_correction':spline_correction, 
+               'fit_background':fit_background,
+               'fitter':fitter,
+               'spline_args':{'Rspline':Rspline}}
+        
+        print('kwargs: {0}'.format(kws))
+                   
         # Fit the stellar templates
-        _res = mb.xfit_star(tstar=tstar, spline_correction=spline_correction,
-                            fitter='lstsq', fit_background=fit_background, 
-                            spline_args={'Rspline': Rspline}, oned_args={})
+        _res = mb.xfit_star(tstar=tstar, oned_args={}, **kws)
         
         _res[0].savefig('{0}_{1:05d}.star.png'.format(root, id))
+
+        # Save log info
         fp = open('{0}_{1:05d}.star.log'.format(root, id), 'w')
         fp.write(_res[1])
         fp.close()
-        
+                
         if output_path is None:
             #output_path = 'Pipeline/QuasarFit'.format(root)
             output_path = 'Pipeline/{0}/Extractions'.format(root)
@@ -657,14 +688,20 @@ def run_grizli_fit(event):
 def clean(root='', verbose=True):
     import glob
     import os
+    import matplotlib.pyplot as plt
+    import gc
+        
+    plt.close('all')
     
     files = glob.glob(root+'*')
     files += glob.glob('*wcs.fits')
     files.sort()
-    
+        
     for file in files:
         print('Cleanup: {0}'.format(file))
         os.remove(file)
+    
+    gc.collect()
         
 TESTER = 'Pipeline/j001452+091221/Extractions/j001452+091221_00277.beams.fits'
 def run_test(s3_object_path=TESTER):
