@@ -2221,7 +2221,7 @@ def load_beta_templates(wave=np.arange(400, 2.5e4), betas=[-2, -1, 0]):
         t0[key] = SpectrumTemplate(wave=cont_wave, flux=(cont_wave/1216.)**beta)
     return t0
     
-def load_quasar_templates(broad_fwhm=2500, narrow_fwhm=1200, broad_lines=    ['HeI-5877', 'MgII', 'Lya', 'CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'SiIV+OIV-1398', 'NIV-1487', 'NV-1240','PaB','PaG'], narrow_lines=['OII', 'OIII', 'SII', 'OI-6302', 'OIII-4363', 'NeIII-3867', 'NeVI-3426', 'NeV-3346','SIII','HeI-1083'], include_feii=True, slopes=[-2.8, 0, 2.8], uv_line_complex=True, fixed_narrow_lines=False, t1_only=False, nspline=13, Rspline=30, betas=None, include_dusty=False):
+def load_quasar_templates(broad_fwhm=2500, narrow_fwhm=1200, broad_lines=    ['HeI-5877', 'MgII', 'Lya', 'CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'SiIV+OIV-1398', 'NIV-1487', 'NV-1240', 'PaB', 'PaG'], narrow_lines=['NIII-1750','OII', 'OIII', 'SII', 'OI-6302', 'OIII-4363', 'NeIII-3867', 'NeVI-3426', 'NeV-3346', 'OII-7325', 'ArIII-7138', 'SIII', 'HeI-1083'], include_feii=True, slopes=[-2.8, 0, 2.8], uv_line_complex=True, fixed_narrow_lines=False, t1_only=False, nspline=13, Rspline=30, betas=None, include_reddened_balmer_lines=False):
     """
     Make templates suitable for fitting broad-line quasars
     """
@@ -2232,9 +2232,9 @@ def load_quasar_templates(broad_fwhm=2500, narrow_fwhm=1200, broad_lines=    ['H
     t0 = OrderedDict()
     t1 = OrderedDict()
     
-    broad1 = load_templates(fwhm=broad_fwhm, line_complexes=False, stars=False, full_line_list=['Ha', 'Hb', 'Hg', 'Hd', 'H7'] + broad_lines, continuum_list=[], fsps_templates=False, alf_template=False, lorentz=True)
+    broad1 = load_templates(fwhm=broad_fwhm, line_complexes=False, stars=False, full_line_list=['Ha', 'Hb', 'Hg', 'Hd', 'H7', 'H8', 'H9', 'H10'] + broad_lines, continuum_list=[], fsps_templates=False, alf_template=False, lorentz=True)
 
-    narrow1 = load_templates(fwhm=narrow_fwhm, line_complexes=False, stars=False, full_line_list=narrow_lines, continuum_list=[], fsps_templates=False, alf_template=False)
+    narrow1 = load_templates(fwhm=400, line_complexes=False, stars=False, full_line_list=narrow_lines, continuum_list=[], fsps_templates=False, alf_template=False)
     
     if fixed_narrow_lines:
         if t1_only:
@@ -2243,7 +2243,7 @@ def load_quasar_templates(broad_fwhm=2500, narrow_fwhm=1200, broad_lines=    ['H
             narrow0 = load_templates(fwhm=narrow_fwhm, line_complexes=False, stars=False, full_line_list=['QSO-Narrow-lines'], continuum_list=[], fsps_templates=False, alf_template=False)
         
     else:
-        narrow0 = narrow1
+        narrow0 = load_templates(fwhm=narrow_fwhm, line_complexes=False, stars=False, full_line_list=narrow_lines, continuum_list=[], fsps_templates=False, alf_template=False)
         
     if t1_only:
         broad0 = broad1
@@ -2255,7 +2255,7 @@ def load_quasar_templates(broad_fwhm=2500, narrow_fwhm=1200, broad_lines=    ['H
             full_line_list=['Balmer 10kK + MgII Av=0.5'] 
             #broad0 = load_templates(fwhm=broad_fwhm, line_complexes=False, stars=False, full_line_list=['Balmer 10kK'] + broad_lines, continuum_list=[], fsps_templates=False, alf_template=False, lorentz=True)
         
-        if include_dusty:
+        if include_reddened_balmer_lines:
             line_wavelengths, line_ratios = get_line_wavelengths()
             if 'Balmer 10kK + MgII Av=1.0' in line_wavelengths:
                 full_line_list += ['Balmer 10kK + MgII'] 
