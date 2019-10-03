@@ -2908,7 +2908,7 @@ class GroupFitter(object):
                  va='bottom', transform=fig.transFigure, fontsize=5)
         
         best_templ = list(tstar.keys())[ixbest]
-        if best_templ == 'bt-settl_t05000_g0.0':
+        if best_templ.startswith('bt-settl_t05000_g0.0'):
             best_templ = 'carbon'
         
         tfit = split_fits[ixbest]

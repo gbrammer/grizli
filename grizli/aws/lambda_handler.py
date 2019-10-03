@@ -600,15 +600,23 @@ def run_grizli_fit(event):
             logg_list = [4.5]
         else:
             logg_list = utils.PHOENIX_LOGG
+        
+        if 'add_carbon_star' in event_kwargs:
+            add_carbon_star = event_kwargs['add_carbon_star']    
+        else:
+            add_carbon_star = 25
             
         if 'use_phoenix' in event_kwargs:
             p = event_kwargs.pop('use_phoenix')
             if p in TRUE_OPTIONS:
-                tstar = utils.load_phoenix_stars(logg_list=logg_list)
+                tstar = utils.load_phoenix_stars(logg_list=logg_list, 
+                                             add_carbon_star=add_carbon_star)
             else:
-                tstar = utils.load_templates(stars=True)
+                tstar = utils.load_templates(stars=True,
+                                             add_carbon_star=add_carbon_star)
         else:
-            tstar = utils.load_phoenix_stars(logg_list=logg_list)
+            tstar = utils.load_phoenix_stars(logg_list=logg_list,
+                                             add_carbon_star=add_carbon_star)
         
         kws = {'spline_correction':spline_correction, 
                'fit_background':fit_background,
