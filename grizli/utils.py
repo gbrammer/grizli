@@ -1401,10 +1401,14 @@ def get_line_wavelengths():
     line_wavelengths = OrderedDict() ; line_ratios = OrderedDict()
     
     # Paschen: https://www.gemini.edu/sciops/instruments/nearir-resources/astronomical-lines/h-lines
+    line_wavelengths['PaA'] = [18751.0]
+    line_ratios['PaA'] = [1.]
     line_wavelengths['PaB'] = [12821.6]
     line_ratios['PaB'] = [1.]
     line_wavelengths['PaG'] = [10941.1]
     line_ratios['PaG'] = [1.]
+    line_wavelengths['PaD'] = [10049.0]
+    line_ratios['PaD'] = [1.]
     
     line_wavelengths['Ha'] = [6564.61]
     line_ratios['Ha'] = [1.]
@@ -1434,16 +1438,29 @@ def get_line_wavelengths():
     line_ratios['H12'] = [1.]
     
     # Groves et al. 2011, Table 1
-    line_wavelengths['Balmer 10kK'] = [6564.61, 4862.68, 4341.68, 4101.73]
-    line_ratios['Balmer 10kK'] = [2.86, 1.0, 0.468, 0.259]
-
-    line_wavelengths['Balmer 10kK + MgII'] = [6564.61, 4862.68, 4341.68, 4101.73, 3971.198, 2799.117]
-    line_ratios['Balmer 10kK + MgII'] = [2.86, 1.0, 0.468, 0.259, 0.16, 5.]
+    # Osterbrock table 4.4 for H7 to H10
+    # line_wavelengths['Balmer 10kK'] = [6564.61, 4862.68, 4341.68, 4101.73]
+    # line_ratios['Balmer 10kK'] = [2.86, 1.0, 0.468, 0.259]
+    
+    line_wavelengths['Balmer 10kK'] = [6564.61, 4862.68, 4341.68, 4101.73, 3971.198, 3890.166, 3836.485, 3798.987]
+    line_ratios['Balmer 10kK'] = [2.86, 1.0, 0.468, 0.259, 0.159, 0.105, 0.0731, 0.0530]
+    
+    # Paschen from Osterbrock, e.g., Pa-beta relative to H-gamma
+    line_wavelengths['Balmer 10kK'] += line_wavelengths['PaA'] + line_wavelengths['PaB'] + line_wavelengths['PaG'] + line_wavelengths['PaD']
+    line_ratios['Balmer 10kK'] += [0.348 * line_ratios['Balmer 10kK'][i] for i in [1,2,3,4]]
+    
+    # Osterbrock table 4.4 for H7 to H10
+    line_wavelengths['Balmer 10kK + MgII'] = line_wavelengths['Balmer 10kK'] + [2799.117]
+    line_ratios['Balmer 10kK + MgII'] = line_ratios['Balmer 10kK'] + [3.]
+    
+    # # Paschen from Osterbrock, e.g., Pa-beta relative to H-gamma
+    # line_wavelengths['Balmer 10kK + MgII'] += line_wavelengths['PaA'] + line_wavelengths['PaB'] + line_wavelengths['PaG']
+    # line_ratios['Balmer 10kK + MgII'] += [0.348 * line_ratios['Balmer 10kK + MgII'][i] for i in [1,2,3]]
     
     # With Paschen lines & He 10830 from Glikman 2006
     # https://iopscience.iop.org/article/10.1086/500098/pdf
-    line_wavelengths['Balmer 10kK + MgII'] = [6564.61, 4862.68, 4341.68, 4101.73, 3971.198, 2799.117, 12821.6, 10941.1]
-    line_ratios['Balmer 10kK + MgII'] = [2.86, 1.0, 0.468, 0.259, 0.16, 3., 2.86*4.8/100, 2.86*1.95/100]
+    #line_wavelengths['Balmer 10kK + MgII'] = [6564.61, 4862.68, 4341.68, 4101.73, 3971.198, 2799.117, 12821.6, 10941.1]
+    #line_ratios['Balmer 10kK + MgII'] = [2.86, 1.0, 0.468, 0.259, 0.16, 3., 2.86*4.8/100, 2.86*1.95/100]
     
     # Redden with Calzetti00
     try:
@@ -1542,8 +1559,13 @@ def get_line_wavelengths():
     line_ratios['HeI-5877'] = [1.]
     line_wavelengths['HeI-3889'] = [3889.5]
     line_ratios['HeI-3889'] = [1.]
-    line_wavelengths['HeI-1083'] = [10830.]
+    line_wavelengths['HeI-1083'] = [10833.2]
     line_ratios['HeI-1083'] = [1.]
+    
+    # Osterbrock Table 4.5
+    # -> N=4
+    line_wavelengths['HeI-series'] = [4472.7, 5877.2, 4027.3, 3820.7, 7067.1, 10833.2, 3889.7, 3188.7]
+    line_ratios['HeI-series'] = [1., 2.75, 0.474, 0.264, 0.330, 4.42, 2.26, 0.916]
     
     line_wavelengths['MgII'] = [2799.117]
     line_ratios['MgII'] = [1.]
@@ -1576,8 +1598,8 @@ def get_line_wavelengths():
     line_wavelengths['Lya'] = [1215.4]
     line_ratios['Lya'] = [1.]
 
-    line_wavelengths['QSO-UV-lines'] = [line_wavelengths[k][0] for k in ['Lya','CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'SiIV+OIV-1398', 'NV-1240']]
-    line_ratios['QSO-UV-lines'] = [1., 0.5, 0.1, 0.008, 0.09, 0.1, 0.3]
+    line_wavelengths['QSO-UV-lines'] = [line_wavelengths[k][0] for k in ['Lya','CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'SiIV+OIV-1398', 'NV-1240','NIII-1750']]
+    line_ratios['QSO-UV-lines'] = [1., 0.5, 0.1, 0.008, 0.09, 0.1, 0.3, 0.05]
 
     line_wavelengths['QSO-Narrow-lines'] = [line_wavelengths[k][0] for k in ['OII', 'OIII-5007', 'OIII-4959', 'SII-6717', 'SII-6731', 'OI-6302', 'NeIII-3867', 'NeVI-3426', 'NeV-3346']]
     line_ratios['QSO-Narrow-lines'] = [0.2, 1.6, 1.6/2.98, 0.1, 0.1, 0.01, 0.5, 0.2, 0.02]
@@ -1586,13 +1608,13 @@ def get_line_wavelengths():
     line_wavelengths['QSO-Narrow-lines'] += line_wavelengths['SIII']
     line_ratios['QSO-Narrow-lines'] += [l*0.05 for l in line_ratios['SIII']]
     line_wavelengths['QSO-Narrow-lines'] += line_wavelengths['HeI-1083']
-    line_ratios['QSO-Narrow-lines'] += [0.1]
+    line_ratios['QSO-Narrow-lines'] += [0.2]
     
     line_wavelengths['Lya+CIV'] = [1215.4, 1549.49]
     line_ratios['Lya+CIV'] = [1., 0.1]
     
-    line_wavelengths['Gal-UV-lines'] = [line_wavelengths[k][0] for k in ['Lya','CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'SiIV+OIV-1398', 'NV-1240', 'MgII']]
-    line_ratios['Gal-UV-lines'] = [1., 0.2, 0.1, 0.008, 0.09, 0.1, 0.3, 0.3]
+    line_wavelengths['Gal-UV-lines'] = [line_wavelengths[k][0] for k in ['Lya','CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'SiIV+OIV-1398', 'NV-1240', 'NIII-1750', 'MgII']]
+    line_ratios['Gal-UV-lines'] = [1., 0.2, 0.1, 0.008, 0.09, 0.1, 0.3, 0.05, 0.1]
     
     line_wavelengths['Ha+SII'] = [6564.61, 6718.29, 6732.67]
     line_ratios['Ha+SII'] = [1., 1./10, 1./10]
@@ -1606,6 +1628,9 @@ def get_line_wavelengths():
     line_wavelengths['Ha+NII+SII+SIII+He+PaB'] = [6564.61, 6549.86, 6585.27, 6718.29, 6732.67, 9068.6, 9530.6, 10830., 12821]
     line_ratios['Ha+NII+SII+SIII+He+PaB'] = [1., 1./(4.*4), 3./(4*4), 1./10, 1./10, 1./20, 2.44/20, 1./25., 1./10]
 
+    line_wavelengths['Ha+NII+SII+SIII+He+PaB+PaG'] = [6564.61, 6549.86, 6585.27, 6718.29, 6732.67, 9068.6, 9530.6, 10830., 12821, 10941.1]
+    line_ratios['Ha+NII+SII+SIII+He+PaB+PaG'] = [1., 1./(4.*4), 3./(4*4), 1./10, 1./10, 1./20, 2.44/20, 1./25., 1./10, 1./10/2.86]
+
     line_wavelengths['Ha+NII'] = [6564.61, 6549.86, 6585.27]
     n2ha = 1./4 # log NII/Ha ~ -0.6, Kewley 2013
     line_ratios['Ha+NII'] = [1., 1./4.*n2ha, 3/4.*n2ha]
@@ -1614,12 +1639,16 @@ def get_line_wavelengths():
     line_ratios['OIII+Hb'] = [2.98, 1, 3.98/6.]
 
     # Include more balmer lines
-    o3hb = 1./6
     line_wavelengths['OIII+Hb+Hg+Hd'] = line_wavelengths['OIII'] + line_wavelengths['Balmer 10kK'][1:] 
     line_ratios['OIII+Hb+Hg+Hd'] = line_ratios['OIII'] + line_ratios['Balmer 10kK'][1:] 
-    for i in range(2, len(line_ratios['Balmer 10kK'])-1):
-        line_ratios['OIII+Hb+Hg+Hd'][i] *= 3.98*o3hb
-    
+    # o3hb = 1./6
+    # for i in range(2, len(line_ratios['Balmer 10kK'])-1):
+    #         line_ratios['OIII+Hb+Hg+Hd'][i] *= 3.98*o3hb
+    # Compute as O3/Hb
+    o3hb = 6
+    for i in range(2):
+        line_ratios['OIII+Hb+Hg+Hd'][i] *= 1./3.98*o3hb
+     
     line_wavelengths['OIII+Hb+Ha'] = [5008.240, 4960.295, 4862.68, 6564.61]
     line_ratios['OIII+Hb+Ha'] = [2.98, 1, 3.98/10., 3.98/10.*2.86]
 
@@ -1631,6 +1660,65 @@ def get_line_wavelengths():
     
     line_wavelengths['OII+Ne'] = [3729.875, 3869]
     line_ratios['OII+Ne'] = [1, 1./5]
+    
+    # Groups of all lines
+    line_wavelengths['full'] = [w for w in line_wavelengths['Balmer 10kK']]
+    line_ratios['full'] = [w for w in line_ratios['Balmer 10kK']]
+
+    line_wavelengths['full'] += line_wavelengths['NII']
+    line_ratios['full'] += [1./5/3.*line_ratios['Balmer 10kK'][1]*r for r in line_ratios['NII']]
+        
+    line_wavelengths['full'] += line_wavelengths['SII']
+    line_ratios['full'] += [1./3.8/2*line_ratios['Balmer 10kK'][1]*r for r in line_ratios['SII']]
+
+
+    # Lines from Hegele 2006, low-Z HII galaxies
+    # SDSS J002101.03+005248.1    
+    line_wavelengths['full'] += line_wavelengths['SIII']
+    line_ratios['full'] += [401./1000/2.44*line_ratios['Balmer 10kK'][1]*r for r in line_ratios['SIII']]
+        
+    # HeI
+    line_wavelengths['full'] += line_wavelengths['HeI-series']
+    he5877_hb = 127./1000/line_ratios['HeI-series'][1]
+    line_ratios['full'] += [he5877_hb*r for r in line_ratios['HeI-series']]
+    
+    # NeIII
+    line_wavelengths['full'] += line_wavelengths['NeIII-3867']
+    line_ratios['full'] += [388./1000 for r in line_ratios['NeIII-3867']]
+    
+    line_wavelengths['full'] += line_wavelengths['NeIII-3968']
+    line_ratios['full'] += [290./1000 for r in line_ratios['NeIII-3968']]
+        
+    # Add UV lines: MgII/Hb = 3
+    line_wavelengths['full'] += line_wavelengths['Gal-UV-lines']
+    line_ratios['full'] += [r*3/line_ratios['Gal-UV-lines'][-1] for r in line_ratios['Gal-UV-lines']]
+    
+    # High O32 - low metallicity
+    o32, r23 = 4, 8
+    o3_hb = r23/(1+1/o32)
+    
+    line_wavelengths['highO32'] = [w for w in line_wavelengths['full']]
+    line_ratios['highO32'] = [r for r in line_ratios['full']]
+
+    line_wavelengths['highO32'] += line_wavelengths['OIII']
+    line_ratios['highO32'] += [r*o3_hb/3.98 for r in line_ratios['OIII']]
+
+    line_wavelengths['highO32'] += line_wavelengths['OII']
+    line_ratios['highO32'] += [r*o3_hb/2/o32 for r in line_ratios['OII']]
+
+    # Low O32 - low metallicity
+    o32, r23 = 0.3, 4
+    o3_hb = r23/(1+1/o32)
+    
+    line_wavelengths['lowO32'] = [w for w in line_wavelengths['full']]
+    line_ratios['lowO32'] = [r for r in line_ratios['full']]
+
+    line_wavelengths['lowO32'] += line_wavelengths['OIII']
+    line_ratios['lowO32'] += [r*o3_hb/3.98 for r in line_ratios['OIII']]
+
+    line_wavelengths['lowO32'] += line_wavelengths['OII']
+    line_ratios['lowO32'] += [r*o3_hb/2/o32 for r in line_ratios['OII']]
+    
     
     return line_wavelengths, line_ratios 
     
@@ -2192,12 +2280,19 @@ def load_templates(fwhm=400, line_complexes=True, stars=False,
     #     wave_grid = None   
     
     for li in line_list:
-        scl = line_ratios[li]/np.sum(line_ratios[li])
+        scl = line_ratios[li]/np.sum(line_ratios[li])            
         for i in range(len(scl)):
+            if ('O32' in li) & (np.abs(line_wavelengths[li][i]-2799) < 2):
+                fwhm_i = 2500
+                lorentz_i = True
+            else:
+                fwhm_i = fwhm
+                lorentz_i = lorentz
+                
             line_i = SpectrumTemplate(wave=wave_grid, 
                                       central_wave=line_wavelengths[li][i], 
-                                      flux=None, fwhm=fwhm, velocity=True,
-                                      lorentz=lorentz)
+                                      flux=None, fwhm=fwhm_i, velocity=True,
+                                      lorentz=lorentz_i)
                                       
             if i == 0:
                 line_temp = line_i*scl[i]
