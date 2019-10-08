@@ -515,7 +515,11 @@ def run_grizli_fit(event):
         # Fit line widths
         if 'get_line_width' not in event_kwargs:
             event_kwargs['get_line_width'] = True
-    
+        
+        # sys_err
+        if 'sys_err' not in event_kwargs:
+            event_kwargs['sys_err'] = 0.05
+        
         # Don't use photometry
         event_kwargs['phot_obj'] = None
         event_kwargs['use_phot_obj'] = False
@@ -534,9 +538,24 @@ def run_grizli_fit(event):
             if k in event_kwargs:
                 templ_args[k] = event_kwargs.pop(k)
         
+        if templ_args['broad_fwhm'] < 0:
+            use_simple_templates=True
+            templ_args['broad_fwhm'] *= -1
+        else:
+            use_simple_templates = False
+            
         print('load_quasar_templates(**{0})'.format(templ_args))
         q0, q1 = utils.load_quasar_templates(**templ_args)
         
+        if use_simple_templates:
+            x0 = utils.load_templates(full_line_list=['highO32'], continuum_list=['quasar_lines.txt', 'red_blue_continuum.txt'], line_complexes=False, fwhm=1000)
+             
+            for t in q0:
+                if 'bspl' in t:
+                    x0[t] = q0[t]
+            
+            q0 = x0
+            
         # Quasar templates with fixed line ratios
         # q0, q1 = utils.load_quasar_templates(uv_line_complex=True,
         #                                     broad_fwhm=2800, narrow_fwhm=1000,
