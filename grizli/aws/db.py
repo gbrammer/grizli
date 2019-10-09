@@ -725,10 +725,17 @@ def set_phot_root(root, phot_root, engine):
         res = pd.read_sql_query("SELECT root, id, status, phot_root FROM redshift_fit WHERE (phot_root != root)".format(root), engine)
         
         # update the one pointing where it should change in photometry_apcorr
-        engine.execute("UPDATE photometry_apcorr SET root = 'j214224m4420' WHERE root = 'j214224m4420gr01';")
+        engine.execute("UPDATE photometry_apcorr SET p_root = 'j214224m4420' WHERE root = 'j214224m4420gr01';")
+        engine.execute("UPDATE redshift_fit SET phot_root = 'j214224m4420' WHERE root LIKE 'j214224m4420g%%';")
+        engine.execute("UPDATE redshift_fit_quasar SET phot_root = 'j214224m4420' WHERE root = 'j214224m4420gr01';")
         
         
     if False:
+        # Replace in-place
+        engine.execute("update redshift_fit_quasar set phot_root = replace(root, 'g800l', 'grism')")
+
+        engine.execute("update redshift_fit_quasar set phot_root = replace(root, 'g800l', 'grism') where root like '%%g800l%%'")
+        
         # Set 3D-HST fields
         res = grizli_db.from_sql("select distinct root from redshift_fit where root like '%%-grism%%'", engine)
         for root in res['root']:
@@ -919,6 +926,121 @@ def add_phot_to_db(root, delete=False, engine=None, nmax=500):
     else:
         df.to_sql('photometry_apcorr', engine, index=False, if_exists='append', method='multi')
     
+def multibeam_to_database(beams_file, engine=None, Rspline=15, **kwargs):
+    """
+    Send statistics of the beams.fits file to the database
+    """
+    import pandas as pd
+    from astropy.time import Time
+    
+    from .. import multifit, utils
+    
+    if engine is None:            
+        engine = get_db_engine(echo=False)
+    
+    mb = multifit.MultiBeam(beams_file, **kwargs)
+    mtime = Time(os.stat(beams_file).st_mtime, format='unix').iso
+    
+    print('Update `multibeam` and `beam_geometry` tables for {0}.'.format(beams_file))
+    
+    # Dummy for loading the templates the same way as for the quasars
+    # for generating the spline fit
+    templ_args = {'uv_line_complex': True, 
+                  'broad_fwhm':2800,
+                  'narrow_fwhm':1000,
+                  'fixed_narrow_lines':True,
+                  'Rspline':Rspline,
+                  'include_reddened_balmer_lines':False}
+    
+    q0, q1 = utils.load_quasar_templates(**templ_args)
+    for t in list(q0.keys()):
+        if 'bspl' not in t:
+            q0.pop(t)
+    
+    tfit = mb.template_at_z(0, templates=q0, fitter='lstsq')
+    
+    sp = tfit['line1d'].wave, tfit['line1d'].flux
+    m2d = mb.get_flat_model(sp, apply_mask=True, is_cgs=True)
+
+    mb.initialize_masked_arrays()  
+    chi0 = (mb.scif_mask**2*mb.ivarf[mb.fit_mask]).sum()
+    
+    #### Percentiles of masked contam, sci, err and contam/sci 
+    pvals = np.arange(5, 96, 5)
+    mpos = m2d > 0
+    contam_percentiles = np.percentile(mb.contamf_mask, pvals)
+    sci_percentiles = np.percentile(mb.scif_mask, pvals)
+    err_percentiles = np.percentile(1/mb.sivarf[mb.fit_mask], pvals)
+    sn_percentiles = np.percentile(mb.scif_mask*mb.sivarf[mb.fit_mask], pvals)
+    fcontam_percentiles = np.percentile(mb.contamf_mask/mb.scif_mask, pvals)
+    
+    ######## multibeam dataframe
+    df = pd.DataFrame()
+    float_type = np.float
+    
+    df['root'] = [mb.group_name]
+    df['id'] = [mb.id]
+    df['objid'] = [-1]
+    df['mtime'] = [mtime]
+    df['status'] = [6]
+    df['scip'] = [list(sci_percentiles.astype(float_type))]
+    df['errp'] = [list(err_percentiles.astype(float_type))]
+    df['snp'] = [list(sn_percentiles.astype(float_type))]
+    df['snmax'] = [float_type((mb.scif_mask*mb.sivarf[mb.fit_mask]).max())]
+    df['contamp'] = [list(contam_percentiles.astype(float_type))]
+    df['fcontamp'] = [list(fcontam_percentiles.astype(float_type))]
+    df['chi0'] = [np.int32(chi0)]
+    df['rspline'] = [Rspline]
+    df['chispl'] = [np.int32(tfit['chi2'])]
+    df['mb_dof'] = [mb.DoF]
+    df['wmin'] = [np.int32(mb.wave_mask.min())]
+    df['wmax'] = [np.int32(mb.wave_mask.max())]
+    
+    # Input args
+    for a in ['fcontam','sys_err','min_sens','min_mask']:
+        df[a] = [getattr(mb, a)]
+    
+    # Send to DB        
+    res = engine.execute("DELETE from multibeam WHERE (root = '{0}' AND id = {1})".format(mb.group_name, mb.id), engine)
+    df.to_sql('multibeam', engine, index=False, if_exists='append', method='multi')
+    
+    ############## beams dataframe
+    d = {}
+    for k in ['root','id','objid','filter','pupil','pa','instrument','fwcpos','order', 'parent','parent_ext','ccdchip','sci_extn','exptime','origin_x','origin_y','pad','nx','ny','sregion']:
+        d[k] = []
+    
+    for beam in mb.beams:
+        d['root'].append(mb.group_name)
+        d['id'].append(mb.id)
+        d['objid'].append(-1)
+        
+        for a in ['filter', 'pupil', 'instrument', 'pad',
+                  'fwcpos', 'ccdchip', 'sci_extn','exptime']:
+            d[a].append(getattr(beam.grism, a))
+        
+        d['order'].append(beam.beam.beam)
+        
+        parent = beam.grism.parent_file.replace('.fits','').split('_')
+        d['parent'].append(parent[0])
+        d['parent_ext'].append(parent[1])
+        
+        d['origin_x'].append(beam.grism.origin[1])
+        d['origin_y'].append(beam.grism.origin[0])
+        
+        d['nx'].append(beam.sh[1])
+        d['ny'].append(beam.sh[0])
+        
+        f = beam.grism.wcs.calc_footprint().flatten()
+        fs = ','.join(['{0:.6f}'.format(c) for c in f])
+        d['sregion'].append('POLYGON({0})'.format(fs))
+        d['pa'].append(int(np.round(beam.get_dispersion_PA())))
+
+    df = pd.DataFrame.from_dict(d)
+        
+    # Send to database
+    res = engine.execute("DELETE from beam_geometry WHERE (root = '{0}' AND id = {1})".format(mb.group_name, mb.id), engine)
+    df.to_sql('beam_geometry', engine, index=False, if_exists='append', method='multi')
+    
 def test_join():
     import pandas as pd
     
@@ -928,7 +1050,36 @@ def test_join():
     
     # on root
     res = pd.read_sql_query("SELECT p.root, p.id, mag_auto, z_map, status FROM photometry_apcorr AS p JOIN (SELECT * FROM redshift_fit WHERE root='{0}') z ON (p.p_root = z.root AND p.p_id = z.id)".format(root), engine)        
-     
+    
+def column_comments():
+    
+    from collections import OrderedDict
+    import yaml
+    
+    tablename = 'redshift_fit'
+    
+    cols = pd.read_sql_query('select * from {0} where false'.format(tablename), engine)
+    
+    d = {} #OrderedDict{}
+    for c in cols.columns:
+        d[c] = '---'
+    
+    if not os.path.exists('{0}_comments.yml'.format(tablename)):
+        print('Init {0}_comments.yml'.format(tablename))
+        fp = open('{0}_comments.yml'.format(tablename), 'w')
+        yaml.dump(d, stream=fp, default_flow_style=False) 
+        fp.close()
+    
+    # Edit file
+    comments = yaml.load(open('{0}_comments.yml'.format(tablename)))
+    SQL = ""
+    upd = "COMMENT ON COLUMN {0}.{1} IS '{2}';\n"
+    for col in comments:
+        if comments[col] != '---':
+            SQL += upd.format(tablename, col, comments[col])
+        else:
+            print('Skip ',col)
+            
 def add_spectroscopic_redshifts(xtab, rmatch=1, engine=None, db=None):
     """
     Add spectroscopic redshifts to the photometry_apcorr table
@@ -1039,7 +1190,87 @@ def various_selections():
     res = grizli_db.make_html_table(engine=engine, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','z_spec_src','bic_diff','chinu','log_pdf_max', 'zwidth1/(1+z_map) as zw1','(z_map-z_spec)/(1+z_spec) as dz', 'dlinesn'], where="AND status > 4 AND z_spec > 0 AND z_spec_qual = 1", table_root='zspec_delta', sync='s3://grizli-v1/tables/', png_ext=['R30', 'stack','full','line'])
     
     # Point sources
-    res = grizli_db.make_html_table(engine=engine, columns=['root','id','red_bit','status','p_ra','p_dec','t_g800l', 't_g102', 't_g141', 'mag_auto','flux_radius','z_map', 'z_spec','z_spec_src','z_spec_dr','bic_diff','chinu','log_pdf_max', 'q_z', 'zwidth1/(1+z_map) as zw1', 'dlinesn'], where="AND status > 4 AND mag_auto < 24 AND flux_radius < 1.6 AND ((flux_radius < 1.25 AND flux_radius > 0.75 AND red_bit > 32) OR (flux_radius < 1.6 AND flux_radius > 1.0 AND red_bit < 32))", table_root='point_sources', sync='s3://grizli-v1/tables/', png_ext=['stack','full','qso.full', 'star'])
+    res = grizli_db.make_html_table(engine=engine, columns=['root','id','red_bit','status','p_ra','p_dec','t_g800l', 't_g102', 't_g141', 'mag_auto','flux_radius','z_map', 'z_spec','z_spec_src','z_spec_dr','bic_diff','chinu','log_pdf_max', 'q_z', 'zwidth1/(1+z_map) as zw1', 'dlinesn'], where="AND status > 4 AND mag_auto < 24 AND flux_radius < 1.9 AND ((flux_radius < 1.5 AND flux_radius > 0.75 AND red_bit > 32) OR (flux_radius < 1.9 AND flux_radius > 1.0 AND red_bit < 32))", table_root='point_sources', sync='s3://grizli-v1/tables/', png_ext=['stack','line', 'full', 'qso.full', 'star'], get_sql=False)
+    
+    # Reliable redshifts
+    res = grizli_db.make_html_table(engine=engine, columns=['root','id','status','p_ra','p_dec','t_g800l', 't_g102', 't_g141', 'mag_auto','flux_radius','(flux_radius < 1.7 AND ((flux_radius < 1.4 AND flux_radius > 0.75 AND red_bit > 32) OR (flux_radius < 1.7 AND flux_radius > 1.0 AND red_bit < 32)))::int as is_point', 'z_map', 'z_spec','z_spec_src','z_spec_dr', 'sn_siii', 'sn_ha', 'sn_oiii', 'sn_oii',  'ew50_ha', 'd4000', 'd4000_e','bic_diff','chinu','log_pdf_max', 'q_z', 'zwidth1/(1+z_map) as zw1', 'dlinesn'], where="AND status > 4 AND chinu < 30 AND q_z > -0.7 order by q_z", table_root='reliable_redshifts', sync='s3://grizli-v1/tables/', png_ext=['stack','line', 'full'], get_sql=False, sort_column=('q_z', -1))
+    
+    # stellar classification?
+#     sql = """SELECT root, id, ra, dec, status, z_map, q_z_map, bic_diff, 
+#        bic_diff_star, 
+#        chinu as t_chinu, s_chinu, q_chinu, 
+#        chinu - q_chinu as tq_chinu, q_chinu - s_chinu as qs_chinu, 
+#        chinu - s_chinu as ts_chinu, stellar_template
+# FROM redshift_fit, 
+#      (SELECT root as s_root, id as s_id, chinu as s_chinu, bic_diff_star,
+#              stellar_template
+#         FROM stellar_fit 
+#         WHERE status = 6
+#       ) as s, 
+#       (SELECT root as q_root, id as q_id, chinu as q_chinu, 
+#               bic_diff as q_bic_diff, z_map as q_z_map
+#          FROM redshift_fit_quasar 
+#          WHERE status = 6
+#        ) as q       
+# WHERE (root = s_root AND id = s_id) AND (root = q_root AND id = q_id)
+#     """
+    #res = grizli_db.make_html_table(engine=engine, res=cstar, table_root='carbon_stars', sync='s3://grizli-v1/tables/', png_ext=['stack','line', 'full', 'qso.full', 'star'], sort_column=('bic_diff_star', -1), get_sql=False)
+
+    sql = """SELECT root, id, status, ra, dec, t_g800l, t_g102, t_g141, 
+       z_map, q_z_map, bic_diff, 
+       bic_diff_star, (bic_diff_star > 10 AND q_chinu < 20 AND chinu - q_chinu > 0.05 AND q_chinu-s_chinu > 0 AND chinu-s_chinu > 0.1)::int as is_star,
+       chinu as t_chinu, s_chinu, q_chinu, 
+       bic_qso-bic_gal as bic_gq,
+       bic_gal-bic_star as bic_gs,
+       bic_qso-bic_star as bic_qs,
+       (bic_spl+chimin)-bic_gal as bic_gx,
+       bic_spl_qso-bic_qso as bic_qx,
+       q_vel_bl, qso_q_z, qso_zw1, stellar_template 
+FROM (SELECT *, bic_temp+chimin as bic_gal FROM redshift_fit z, 
+      (SELECT root as q_root, id as q_id, chinu as q_chinu, 
+              bic_diff as q_bic_diff, bic_temp+chimin as bic_qso,
+              bic_spl+chimin as bic_spl_qso,
+              z_map as qso_z_map, 
+              zwidth1/(1+z_map) as qso_zw1, vel_bl as q_vel_bl, 
+              q_z as qso_q_z
+         FROM redshift_fit_quasar 
+         WHERE status = 6
+       ) q       
+WHERE (root = q_root AND id = q_id)) c 
+    LEFT JOIN 
+     (SELECT root as s_root, id as s_id, chinu as s_chinu, 
+             LN(dof)*nk+chi2 as bic_star, 
+             LN(dof)*(nk-1)+chi2_flat as bic_spline,
+             bic_diff_star,
+             stellar_template
+        FROM stellar_fit 
+        WHERE status = 6
+      ) s ON (root = s_root AND id = s_id) WHERE chinu-q_chinu > 0.5
+    """
+    cstar = grizli_db.from_sql(sql, engine)
+    cstar['is_star'] = cstar['is_star'].filled(-1)
+    print('N={0}'.format(len(cstar)))
+    
+    res = grizli_db.make_html_table(engine=engine, res=cstar, table_root='quasars_and_stars', sync='s3://grizli-v1/tables/', png_ext=['stack','line', 'full', 'qso.full', 'star'], sort_column=('bic_diff_star', -1), get_sql=False)
+    
+    # best-fit as quasar
+    sql = """SELECT root, id, ra, dec, status, z_map, q_z_map, 
+       q_z, bic_diff, q_bic_diff, 
+       chinu as t_chinu, q_chinu, 
+       chinu - q_chinu as tq_chinu,
+       (q_bic_temp + q_chimin) - (bic_temp + chimin) as bic_diff_quasar,
+       q_vel_bl
+    FROM redshift_fit z JOIN 
+      (SELECT root as q_root, id as q_id, chinu as q_chinu, 
+              bic_diff as q_bic_diff, z_map as q_z_map, vel_bl, 
+              chimin as q_chimin, bic_temp as q_bic_temp, vel_bl as q_vel_bl
+         FROM redshift_fit_quasar 
+         WHERE status = 6
+       ) as q       
+    WHERE (root = q_root AND id = q_id) AND status = 6 AND q_z > -1
+    """
+    qq = grizli_db.from_sql(sql, engine)
+    res = grizli_db.make_html_table(engine=engine, res=qq, table_root='quasar_fit', sync='s3://grizli-v1/tables/', png_ext=['stack','line', 'full', 'qso.full', 'star'], get_sql=False)
     
     # Strong lines
     res = grizli_db.make_html_table(engine=engine, columns=['root','id','red_bit','status','p_ra','p_dec','t_g800l', 't_g102', 't_g141', 'mag_auto','flux_radius','z_map', 'z_spec','z_spec_src','z_spec_dr','bic_diff','chinu','log_pdf_max', 'q_z', 'zwidth1/(1+z_map) as zw1', 'dlinesn', 'sn_ha', 'sn_oiii', 'sn_oii'], where="AND status > 4 AND mag_auto < 24 AND (sn_ha > 10 OR sn_oiii > 10 OR sn_oii > 10) AND flux_radius >= 1.6", table_root='strong_lines', sync='s3://grizli-v1/tables/', png_ext=['stack','full','qso.full', 'star'])
@@ -1187,6 +1418,26 @@ def render_for_notebook(tab, image_extensions=['stack','full','line'], bucket='g
     out = rows.to_pandas().to_html(escape=False, formatters=fmt)
     return out
     
+def add_to_charge():
+    
+    engine = grizli_db.get_db_engine()
+    
+    p = pd.read_sql_query('select distinct p_root from photometry_apcorr', engine)
+    f = pd.read_sql_query('select distinct field_root from charge_fields', engine)
+    
+    new_fields = []
+    for root in p['p_root'].values:
+        if root not in f['field_root'].values:
+            print(root)
+            new_fields.append(root)
+    
+    df = pd.DataFrame()
+    df['field_root'] = new_fields
+    df['comment'] = 'CANDELS'
+    ix = df['field_root'] == 'j214224m4420'
+    df['comment'][ix] = 'Rafelski UltraDeep'
+    
+    df.to_sql('charge_fields', engine, index=False, if_exists='append', method='multi')
     
 def overview_table():
     """
@@ -1459,10 +1710,16 @@ def set_column_formats(info, extra={}):
         if c in formats:
             info[c].format = formats[c]
         elif c.startswith('sn_'):
-            info[c].format = '.2f'
+            info[c].format = '.1f'
         elif c.startswith('mag_'):
             info[c].format = '.2f'
         elif c.startswith('ew_'):
+            info[c].format = '.1f'
+        elif ('q_z' in c):
+            info[c].format = '.2f'
+        elif ('zw' in c) | ('z_map' in c):
+            info[c].format = '.3f'
+        elif ('chinu' in c):
             info[c].format = '.1f'
         elif c.startswith('bic_'):
             info[c].format = '.1f'
@@ -1473,7 +1730,7 @@ def set_column_formats(info, extra={}):
         elif c.startswith('flux_') | c.startswith('err_'):
             info[c].format = '.1e'
         
-def make_html_table(engine=None, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','bic_diff','chinu','log_pdf_max', 'd4000', 'd4000_e'], where="AND status >= 5 AND root='j163852p4039'", tables=[], table_root='query', sync='s3://grizli-v1/tables/', png_ext=['R30','stack','full','line'], sort_column=('bic_diff',-1), verbose=True, get_sql=False, res=None, show_hist=False, extra_formats={}):
+def make_html_table(engine=None, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','bic_diff','chinu','log_pdf_max', 'd4000', 'd4000_e'], where="AND status >= 5 AND root='j163852p4039'", tables=[], table_root='query', sync='s3://grizli-v1/tables/', png_ext=['R30','stack','full','line'], sort_column=('bic_diff',-1), fit_table='redshift_fit', verbose=True, get_sql=False, res=None, show_hist=False, extra_formats={}):
     """
     """
     import time
@@ -1493,7 +1750,7 @@ def make_html_table(engine=None, columns=['root','status','id','p_ra','p_dec','m
     else:
         extra_tables = ''
         
-    query = "SELECT {0} FROM photometry_apcorr, redshift_fit{1} WHERE phot_root = p_root AND id = p_id {2};".format(','.join(columns), extra_tables, where)
+    query = "SELECT {0} FROM photometry_apcorr, {3}{1} WHERE phot_root = p_root AND id = p_id {2};".format(','.join(columns), extra_tables, where, fit_table)
     
     if get_sql:
         return query

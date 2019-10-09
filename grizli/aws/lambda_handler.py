@@ -287,7 +287,7 @@ def run_grizli_fit(event):
     if 'skip_started' not in event_kwargs:
         event_kwargs['skip_started'] = True
         
-    for k in ['quasar_fit', 'extract_from_flt','fit_stars']:
+    for k in ['quasar_fit', 'extract_from_flt', 'fit_stars', 'beam_info_only']:
         if k not in event_kwargs:
             event_kwargs[k] = False
     
@@ -295,6 +295,8 @@ def run_grizli_fit(event):
         dbtable = 'redshift_fit_quasar'
     elif event_kwargs['fit_stars'] in TRUE_OPTIONS:
         dbtable = 'stellar_fit'
+    if event_kwargs['beam_info_only'] in TRUE_OPTIONS:
+        dbtable = 'multibeam'    
     else:
         dbtable = 'redshift_fit'
             
@@ -438,6 +440,20 @@ def run_grizli_fit(event):
             print(aws_file)
             bkt.upload_file(outfile, aws_file, 
                         ExtraArgs={'ACL': 'public-read'})
+    
+    # Update the multibeam/beam_geometry tables
+    if os.path.exists(beams_file):
+        args = np.load(args_file, allow_pickle=True)[0]
+        for arg in event_kwargs:
+            if arg in args:
+                args[arg] = event_kwargs[arg]
+                
+        grizli_db.multibeam_to_database(beams_file, Rspline=15, **args)
+        
+    if dbtable == 'multibeam':
+        ### Done
+        res = bkt.delete_objects(Delete={'Objects':[{'Key':full_start}]})
+        return True
         
     if 'run_fit' in event:
         if event['run_fit'] in FALSE_OPTIONS:
@@ -555,6 +571,7 @@ def run_grizli_fit(event):
                     x0[t] = q0[t]
             
             q0 = x0
+            q1['red_blue_continuum.txt'] = x0['red_blue_continuum.txt']
             
         # Quasar templates with fixed line ratios
         # q0, q1 = utils.load_quasar_templates(uv_line_complex=True,
