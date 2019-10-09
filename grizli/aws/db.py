@@ -727,7 +727,7 @@ def set_phot_root(root, phot_root, engine):
         # update the one pointing where it should change in photometry_apcorr
         engine.execute("UPDATE photometry_apcorr SET p_root = 'j214224m4420' WHERE root = 'j214224m4420gr01';")
         engine.execute("UPDATE redshift_fit SET phot_root = 'j214224m4420' WHERE root LIKE 'j214224m4420g%%';")
-        engine.execute("UPDATE redshift_fit_quasar SET phot_root = 'j214224m4420' WHERE root = 'j214224m4420gr01';")
+        engine.execute("UPDATE redshift_fit_quasar SET phot_root = 'j214224m4420' WHERE root LIKE 'j214224m4420g%%';")
         
         
     if False:
@@ -926,7 +926,7 @@ def add_phot_to_db(root, delete=False, engine=None, nmax=500):
     else:
         df.to_sql('photometry_apcorr', engine, index=False, if_exists='append', method='multi')
     
-def multibeam_to_database(beams_file, engine=None, Rspline=15, **kwargs):
+def multibeam_to_database(beams_file, engine=None, Rspline=15, force=False, **kwargs):
     """
     Send statistics of the beams.fits file to the database
     """
@@ -938,8 +938,18 @@ def multibeam_to_database(beams_file, engine=None, Rspline=15, **kwargs):
     if engine is None:            
         engine = get_db_engine(echo=False)
     
-    mb = multifit.MultiBeam(beams_file, **kwargs)
     mtime = Time(os.stat(beams_file).st_mtime, format='unix').iso
+    root = beams_file.split('_')[0]
+    id = int(beams_file.split('_')[1].split('.')[0])
+
+    res = pd.read_sql_query("SELECT mtime from multibeam WHERE (root = '{0}' AND id = {1})".format(root, id), engine)
+    if len(res) == 1:
+        if (res['mtime'][0] == mtime) & (not force):
+            print('{0} already in multibeam table'.format(beams_file))
+            return True
+            
+    mb = multifit.MultiBeam(beams_file, **kwargs)
+    
     
     print('Update `multibeam` and `beam_geometry` tables for {0}.'.format(beams_file))
     
@@ -978,8 +988,8 @@ def multibeam_to_database(beams_file, engine=None, Rspline=15, **kwargs):
     df = pd.DataFrame()
     float_type = np.float
     
-    df['root'] = [mb.group_name]
-    df['id'] = [mb.id]
+    df['root'] = [root]
+    df['id'] = [id]
     df['objid'] = [-1]
     df['mtime'] = [mtime]
     df['status'] = [6]
@@ -1010,8 +1020,8 @@ def multibeam_to_database(beams_file, engine=None, Rspline=15, **kwargs):
         d[k] = []
     
     for beam in mb.beams:
-        d['root'].append(mb.group_name)
-        d['id'].append(mb.id)
+        d['root'].append(root)
+        d['id'].append(id)
         d['objid'].append(-1)
         
         for a in ['filter', 'pupil', 'instrument', 'pad',
