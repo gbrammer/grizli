@@ -291,12 +291,12 @@ def run_grizli_fit(event):
         if k not in event_kwargs:
             event_kwargs[k] = False
     
-    if event_kwargs['quasar_fit'] in TRUE_OPTIONS:
+    if event_kwargs['beam_info_only'] in TRUE_OPTIONS:
+        dbtable = 'multibeam'        
+    elif event_kwargs['quasar_fit'] in TRUE_OPTIONS:
         dbtable = 'redshift_fit_quasar'
     elif event_kwargs['fit_stars'] in TRUE_OPTIONS:
         dbtable = 'stellar_fit'
-    if event_kwargs['beam_info_only'] in TRUE_OPTIONS:
-        dbtable = 'multibeam'    
     else:
         dbtable = 'redshift_fit'
             
@@ -448,7 +448,8 @@ def run_grizli_fit(event):
             if arg in args:
                 args[arg] = event_kwargs[arg]
                 
-        grizli_db.multibeam_to_database(beams_file, Rspline=15, **args)
+        grizli_db.multibeam_to_database(beams_file, Rspline=15, force=False, 
+                                        **args)
         
     if dbtable == 'multibeam':
         ### Done
