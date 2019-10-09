@@ -440,6 +440,21 @@ def run_grizli_fit(event):
             print(aws_file)
             bkt.upload_file(outfile, aws_file, 
                         ExtraArgs={'ACL': 'public-read'})
+            
+    if ('run_fit' in event) & (dbtable == 'redshift_fit'):
+        if event['run_fit'] in FALSE_OPTIONS:
+            res = bkt.delete_objects(Delete={'Objects':[{'Key':full_start}]})
+            
+            try:
+                grizli_db.update_redshift_fit_status(root, id, 
+                                                 status=dbFLAGS['no_run_fit'],
+                                                 table=dbtable)
+            except:
+                pass
+            
+            return True
+    
+    utils.fetch_acs_wcs_files(beams_file, bucket_name=event_kwargs['bucket'])
     
     # Update the multibeam/beam_geometry tables
     if os.path.exists(beams_file):
@@ -455,21 +470,6 @@ def run_grizli_fit(event):
         ### Done
         res = bkt.delete_objects(Delete={'Objects':[{'Key':full_start}]})
         return True
-        
-    if 'run_fit' in event:
-        if event['run_fit'] in FALSE_OPTIONS:
-            res = bkt.delete_objects(Delete={'Objects':[{'Key':full_start}]})
-            
-            try:
-                grizli_db.update_redshift_fit_status(root, id, 
-                                                 status=dbFLAGS['no_run_fit'],
-                                                 table=dbtable)
-            except:
-                pass
-            
-            return True
-    
-    utils.fetch_acs_wcs_files(beams_file, bucket_name=event_kwargs['bucket'])
                 
     # Download WCS files
     # if event_kwargs['check_wcs']:
