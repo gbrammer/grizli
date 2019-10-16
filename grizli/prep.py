@@ -981,10 +981,11 @@ def table_to_radec(table, output='coords.radec'):
     table[rc, dc].write(output, format='ascii.commented_header', 
                         overwrite=True)
     
-def table_to_regions(table, output='ds9.reg', comment=None):
+def table_to_regions(table, output='ds9.reg', comment=None, header='global color=green width=1', size=0.5):
     """Make a DS9 region file from a table object
     """
     fp = open(output,'w')
+    fp.write(header+'\n')
     fp.write('fk5\n')
     
     if 'X_WORLD' in table.colnames:
@@ -997,7 +998,7 @@ def table_to_regions(table, output='ds9.reg', comment=None):
         e = np.sqrt(table['ra_error']**2+table['dec_error']**2)/1000.
         e = np.maximum(e, 0.1)
     else:
-        e  = np.ones(len(table))*0.5
+        e  = np.ones(len(table))*size
     
     lines = ['circle({0:.7f}, {1:.7f}, {2:.3f}")\n'.format(table[rc][i],
                                                            table[dc][i], e[i])
