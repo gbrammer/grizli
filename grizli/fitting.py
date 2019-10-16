@@ -307,8 +307,20 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     mb.Asave = {}
     tfit = mb.template_at_z(z=mb_fit.meta['z_map'][0], templates=t1,
                             fit_background=True, fitter=fitter[-1], 
-                            bounded_kwargs=bounded_kwargs)
+                            bounded_kwargs=bounded_kwargs, 
+                            use_cached_templates=True)
     
+    has_spline = False
+    for t in t1:
+        if ' spline' in t:
+            has_spline = True
+    
+    if has_spline:
+        tfit = mb.template_at_z(z=mb_fit.meta['z_map'][0], templates=t1,
+                                fit_background=True, fitter=fitter[-1], 
+                                bounded_kwargs=bounded_kwargs, 
+                                use_cached_templates=True)
+        
     fit_hdu.header['CHI2_MAP'] = tfit['chi2'], 'Chi2 at z=z_map'
     
     # Redrizzle? ... testing
@@ -1569,21 +1581,41 @@ class GroupFitter(object):
         except:
             obj_IGM_MINZ = np.maximum(IGM_MINZ, 
                                   (self.wavef.min()-200)/1216.-1)
-            
+        
+        # compute IGM directly for spectrum wavelengths
+        if use_cached_templates & ('spline' not in fitter):
+            if z > obj_IGM_MINZ:
+                if IGM is None:
+                    wigmz = 1.
+                else:
+                    wavem = self.wavef[self.fit_mask]
+                    lylim = wavem/(1+z) < 1250
+                    wigmz = np.ones_like(wavem)
+                    wigmz[lylim] = IGM.full_IGM(z, wavem[lylim])   
+                    print('Use z-igm')      
+            else:
+                wigmz = 1.
+        else:
+            wigmz = 1.
+        
+        # Cached first    
         for i, t in enumerate(templates):
-            
             if use_cached_templates:
                 if t in self.Asave:
                     #print('\n\nUse saved: ',t)
-                    A[self.N+i,:] += self.Asave[t]
+                    A[self.N+i,:] += self.Asave[t]*wigmz                                           
+        
+        for i, t in enumerate(templates):
+            if use_cached_templates:
+                if t in self.Asave:
                     continue
-                
+                    
             if t.startswith('line'):
                 lower_bound[self.N+i] = LINE_BOUNDS[0]/COEFF_SCALE
                 upper_bound[self.N+i] = LINE_BOUNDS[1]/COEFF_SCALE
                 
             ti = templates[t]
-            rest_template = ti.name.split()[0] in ['bspl', 'step']
+            rest_template = ti.name.split()[0] in ['bspl', 'step', 'poly']
             
             if z > obj_IGM_MINZ:
                 if IGM is None:
@@ -1619,6 +1651,20 @@ class GroupFitter(object):
                 else:
                     A[self.N+i, sl] = beam.compute_model(spectrum_1d=s, in_place=False, is_cgs=True)[beam.fit_mask]*COEFF_SCALE
             
+            # Multiply spline templates by single continuum template
+            if ('spline' in t) & ('spline' in fitter):
+                ma = None
+                for k, t_i in enumerate(templates):
+                    if t_i in self.Asave:
+                        ma = A[self.N+k,:].sum()
+                        ma = ma if ma > 0 else 1                        
+                        A[self.N+k,:] *= A[self.N+i,:]/ma #COEFF_SCALE                                        
+                        templates[t_i].max_norm = ma
+                        
+                # print('spline, set to zero: ', t)
+                if ma is not None:
+                    A[self.N+i,:] *= 0
+                
             # Save step templates for faster computation
             if rest_template and use_cached_templates:
                 print('Cache rest-frame template: ',t)
@@ -1630,7 +1676,7 @@ class GroupFitter(object):
                 #     ds9.view(m.reshape(beam.sh))
                         
         if fit_background:
-            if fitter in ['nnls', 'lstsq']:
+            if fitter.split()[0] in ['nnls', 'lstsq']:
                 pedestal = 0.04
             else:
                 pedestal = 0.
@@ -1682,9 +1728,9 @@ class GroupFitter(object):
             return AxT, data
             
         # Run the minimization
-        if fitter == 'nnls':
+        if fitter.split()[0] == 'nnls':
             coeffs_i, rnorm = scipy.optimize.nnls(AxT, data)            
-        elif fitter == 'lstsq':
+        elif fitter.split()[0] == 'lstsq':
             coeffs_i, residuals, rank, s = np.linalg.lstsq(AxT, data,
                                                            rcond=None)
         else:
@@ -1922,13 +1968,22 @@ class GroupFitter(object):
         #chi2_test = chi2_poly
         chi2_test = chi2_spline
         
-        if chi2_test > (chi2.min()+100):
-            chi2_rev = (chi2.min() + 100 - chi2)/self.DoF
-        elif chi2_test < (chi2.min() + 9):
-            chi2_rev = (chi2.min() + 16 - chi2)/self.DoF
+        # Find peaks including the prior
+        if prior is not None:
+            pzi = np.interp(zgrid, prior[0], prior[1], left=0, right=0)
+            pzi /= np.maximum(np.trapz(pzi, zgrid), 1.e-10)
+            logpz = np.log(pzi)
+            chi2_i = chi2 - 2*logpz
         else:
-            chi2_rev = (chi2_test - chi2)/self.DoF
-            
+            chi2_i = chi2
+        
+        if chi2_test > (chi2_i.min()+100):
+            chi2_rev = (chi2_i.min() + 100 - chi2_i)/self.DoF
+        elif chi2_test < (chi2_i.min() + 9):
+            chi2_rev = (chi2_i.min() + 16 - chi2_i)/self.DoF
+        else:
+            chi2_rev = (chi2_test - chi2_i)/self.DoF
+                                       
         if len(zgrid) > 1:
             chi2_rev[chi2_rev < 0] = 0
             indexes = peakutils.indexes(chi2_rev, thres=0.4, min_dist=8)
@@ -2255,6 +2310,8 @@ class GroupFitter(object):
             
         return tfit #cont1d, line1d, cfit, covar
         
+        ##############################
+        
         ### Random draws
         # Unique wavelengths
         wfull = np.hstack([templates[key].wave for key in templates])
@@ -2265,7 +2322,7 @@ class GroupFitter(object):
         xclip = (w*(1+z) > 7000) & (w*(1+z) < 1.8e4)
         temp = []
         for key in templates:
-            if key.split()[0] in ['bspl', 'step']:
+            if key.split()[0] in ['bspl', 'step', 'poly']:
                 w_templ = w[xclip]/(1+z)
             else:
                 w_templ = w[xclip]
@@ -3302,7 +3359,8 @@ class GroupFitter(object):
         ### Individual templates
         if (tfit is not None) & (show_individual_templates > 0) & (units in ['flam', 'nJy','uJy']):
             
-            xt, yt, mt = utils.array_templates(tfit['templates'], z=tfit['z'])
+            xt, yt, mt = utils.array_templates(tfit['templates'], z=tfit['z'],
+                                            apply_igm=(tfit['z'] > IGM_MINZ))
             cfit = np.array([tfit['cfit'][t][0] for t in tfit['cfit']])
             
             xt *= (1+tfit['z'])
@@ -3316,7 +3374,7 @@ class GroupFitter(object):
             
             tscl = (yt.T*cfit[self.N:])/(1+tfit['z'])*unit_corr
             t_names = np.array(list(tfit['cfit'].keys()))[self.N:]
-            is_spline = np.array([t.split()[0] in ['bspl', 'step'] for t in tfit['cfit']][self.N:])
+            is_spline = np.array([t.split()[0] in ['bspl', 'step', 'poly'] for t in tfit['cfit']][self.N:])
             
             if is_spline.sum() > 0:
                 spline_templ = tscl[:,is_spline].sum(axis=1)

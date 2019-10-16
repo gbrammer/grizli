@@ -1614,7 +1614,7 @@ def get_line_wavelengths():
     line_ratios['Lya+CIV'] = [1., 0.1]
     
     line_wavelengths['Gal-UV-lines'] = [line_wavelengths[k][0] for k in ['Lya','CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'SiIV+OIV-1398', 'NV-1240', 'NIII-1750', 'MgII']]
-    line_ratios['Gal-UV-lines'] = [1., 0.2, 0.1, 0.008, 0.09, 0.1, 0.3, 0.05, 0.1]
+    line_ratios['Gal-UV-lines'] = [1., 0.15, 0.1, 0.008, 0.09, 0.1, 0.05, 0.05, 0.1]
     
     line_wavelengths['Ha+SII'] = [6564.61, 6718.29, 6732.67]
     line_ratios['Ha+SII'] = [1., 1./10, 1./10]
@@ -2697,22 +2697,69 @@ def step_templates(wlim=[5000, 1.8e4], bin_steps=None, R=30, round=10, rest=Fals
                     
     return bin_steps, step_templ
     
-def polynomial_templates(wave, order=0, line=False):
+def polynomial_templates(wave, ref_wave=1.e4, order=0, line=False):
     temp = OrderedDict()  
     if line:
         for sign in [1,-1]:
             key = 'poly {0}'.format(sign)
-            temp[key] = SpectrumTemplate(wave, sign*(wave/1.e4-1)+1)
+            temp[key] = SpectrumTemplate(wave, sign*(wave/ref_wave-1)+1)
             temp[key].name = key
             
         return temp
         
     for i in range(order+1):
         key = 'poly {0}'.format(i)
-        temp[key] = SpectrumTemplate(wave, (wave/1.e4-1)**i)
+        temp[key] = SpectrumTemplate(wave, (wave/ref_wave-1)**i)
         temp[key].name = key
-    
+        temp[key].ref_wave = ref_wave
+        
     return temp
+
+def split_poly_template(templ, ref_wave=1.e4, order=3):
+    """
+    Multiply a single template by polynomial bases to effectively generate a    
+    polynomial multiplicative correction that can be fit with linear least 
+    squares.
+    
+    Parameters
+    ==========
+    templ : `~grizli.utils.SpectrumTemplate`
+        Template to split.
+        
+    ref_wave : float
+       Wavelength where to normalize the polynomials.
+    
+    Order : int
+        Polynomial order.  Returns order+1 templates.
+            
+    Returns
+    =======
+    ptemp : dict
+    
+        Dictionary of polynomial-component templates, with additional
+        attributes:
+        
+            ref_wave = wavelength where polynomials normalized
+        
+    """
+    from collections import OrderedDict
+    from grizli import utils
+    
+    tspline = polynomial_templates(templ.wave, ref_wave=ref_wave, 
+                                   order=order, line=False)
+    
+    ptemp = OrderedDict()
+    
+    for i, t in enumerate(tspline):
+        name='{0} poly {1}'.format(templ.name, i)
+        ptemp[name] = utils.SpectrumTemplate(wave=templ.wave,
+                                 flux=templ.flux*tspline[t].flux, 
+                                 name=name)
+        ptemp[name].ref_wave = ref_wave
+    
+    ptemp.ref_wave = ref_wave
+
+    return ptemp
         
 def dot_templates(coeffs, templates, z=0, max_R=5000, apply_igm=True):
     """Compute template sum analogous to `np.dot(coeffs, templates)`.
@@ -2732,26 +2779,35 @@ def dot_templates(coeffs, templates, z=0, max_R=5000, apply_igm=True):
     #             tc += templates[te].zscale(z, scalar=coeffs[i])
     #            
     #         tl += templates[te].zscale(z, scalar=coeffs[i])
-    wave, flux_arr, is_line = array_templates(templates, max_R=max_R, z=z)
+    wave, flux_arr, is_line = array_templates(templates, max_R=max_R, z=z, 
+                                              apply_igm=apply_igm)
     
-    # IGM
-    if apply_igm:
-        try:
-            import eazy.igm
-            IGM = eazy.igm.Inoue14()
-        
-            lylim = wave < 1250
-            igmz = np.ones_like(wave)
-            igmz[lylim] = IGM.full_IGM(z, wave[lylim]*(1+z))    
-        except:
-            igmz = 1.
-    else:
-        igmz = 1.
-    
-    is_obsframe = np.array([t.split()[0] in ['bspl', 'step'] for t in templates])
-        
-    flux_arr[~is_obsframe,:] *= igmz
-    
+    # # IGM
+    # if apply_igm:
+    #     try:
+    #         import eazy.igm
+    #         IGM = eazy.igm.Inoue14()
+    #     
+    #         lylim = wave < 1250
+    #         igmz = np.ones_like(wave)
+    #         igmz[lylim] = IGM.full_IGM(z, wave[lylim]*(1+z))    
+    #     except:
+    #         igmz = 1.
+    # else:
+    #     igmz = 1.
+    # 
+    # is_obsframe = np.array([t.split()[0] in ['bspl', 'step'] for t in templates])
+    #     
+    # flux_arr[~is_obsframe,:] *= igmz
+    # 
+    # # Multiply spline?
+    # for i, t in enumerate(templates):
+    #     if 'spline' in t:
+    #         for j, tj in enumerate(templates):
+    #             if is_obsframe[j]:
+    #                 print('scale spline: {0} x {1}'.format(tj, t))
+    #                 flux_arr[j,:] *= flux_arr[i,:]
+                    
     # Continuum
     cont = np.dot(coeffs*(~is_line), flux_arr)
     tc = SpectrumTemplate(wave=wave, flux=cont).zscale(z, apply_igm=False)
@@ -2762,7 +2818,7 @@ def dot_templates(coeffs, templates, z=0, max_R=5000, apply_igm=True):
     
     return tc, tl
     
-def array_templates(templates, wave=None, max_R=5000, z=0):
+def array_templates(templates, wave=None, max_R=5000, z=0, apply_igm=False):
     """Return an array version of the templates that have all been interpolated to the same grid.
     
     
@@ -2797,7 +2853,7 @@ def array_templates(templates, wave=None, max_R=5000, z=0):
     if wave is None:
         wstack = []
         for t in templates:
-            if t.split()[0] in ['bspl', 'step']:
+            if t.split()[0] in ['bspl', 'step', 'poly']:
                 wstack.append(templates[t].wave/(1+z))
             else:
                 wstack.append(templates[t].wave)
@@ -2818,7 +2874,7 @@ def array_templates(templates, wave=None, max_R=5000, z=0):
     flux_arr = np.zeros((NTEMP, len(wave)))
     
     for i, t in enumerate(templates):
-        if t.split()[0] in ['bspl', 'step']:
+        if t.split()[0] in ['bspl', 'step', 'poly']:
             flux_arr[i,:] = interp_conserve_c(wave, templates[t].wave/(1+z),
                                           templates[t].flux*(1+z))
         else:
@@ -2826,6 +2882,35 @@ def array_templates(templates, wave=None, max_R=5000, z=0):
                                           templates[t].flux)
             
     is_line = np.array([t.startswith('line ') for t in templates])
+    
+    # IGM
+    if apply_igm:
+        try:
+            import eazy.igm
+            IGM = eazy.igm.Inoue14()
+        
+            lylim = wave < 1250
+            igmz = np.ones_like(wave)
+            igmz[lylim] = IGM.full_IGM(z, wave[lylim]*(1+z))    
+        except:
+            igmz = 1.
+    else:
+        igmz = 1.
+    
+    obsnames = ['bspl', 'step', 'poly']
+    is_obsframe = np.array([t.split()[0] in obsnames for t in templates])
+        
+    flux_arr[~is_obsframe,:] *= igmz
+    
+    # Multiply spline?
+    for i, t in enumerate(templates):
+        if 'spline' in t:
+            for j, tj in enumerate(templates):
+                if is_obsframe[j]:
+                    ma = flux_arr[j,:].sum()
+                    ma = ma if ma > 0 else 1
+                    
+                    flux_arr[j,:] *= flux_arr[i,:]/ma
     
     return wave, flux_arr, is_line
     
