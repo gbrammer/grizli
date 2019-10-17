@@ -2502,6 +2502,10 @@ class GroupFitter(object):
         d4000 = red/blue
         d4000_sigma = d4000*np.sqrt(sb/blue**2+sr/red**2-2*sbr/blue/red)
         
+        if (not np.isfinite(d4000)) | (not np.isfinite(d4000_sigma)):
+            d4000 = -99
+            d4000_sigma = -99
+            
         res = (w_d4000, t_d4000, tfit, d4000, d4000_sigma)
         return res
         
