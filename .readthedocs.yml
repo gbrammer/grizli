@@ -21,5 +21,3 @@ python:
    install:
       - requirements: docs/rtd-pip-requirements
       - method: pip
-        path: .
-   system_packages: true
