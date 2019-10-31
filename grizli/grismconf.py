@@ -202,7 +202,7 @@ class aXeConf():
         
         poly_order = len(dydx)-1
         if (poly_order == 2):
-            if dydx[2] == 0:
+            if np.abs(np.unique(dydx[2])).max() == 0:
                 poly_order = 1
                 
         if poly_order == 0:   ## dy=0
@@ -281,6 +281,8 @@ class aXeConf():
     
         ## y offset of trace (DYDX)
         dydx = np.zeros(NORDER) #0 #+1.e-80
+        dydx = [0]*NORDER
+        
         for i in range(NORDER):
             if 'DYDX_{0:s}_{1:d}'.format(beam, i) in self.conf.keys():
                 coeffs = self.conf['DYDX_{0:s}_{1:d}'.format(beam, i)]
@@ -294,6 +296,8 @@ class aXeConf():
         
         ## wavelength solution    
         dldp = np.zeros(NORDER)
+        dldp = [0]*NORDER
+        
         for i in range(NORDER):
             if 'DLDP_{0:s}_{1:d}'.format(beam, i) in self.conf.keys():
                 coeffs = self.conf['DLDP_{0:s}_{1:d}'.format(beam, i)]
