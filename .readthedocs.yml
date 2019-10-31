@@ -20,3 +20,5 @@ python:
    version: 3.6
    install:
       - requirements: docs/rtd-pip-requirements
+  - method: pip
+    path: .
