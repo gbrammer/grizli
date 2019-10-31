@@ -3,6 +3,8 @@
 from setuptools import setup
 from setuptools.extension import Extension
 
+import ah_bootstrap
+
 import subprocess
 
 import os
