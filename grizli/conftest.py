@@ -42,9 +42,7 @@ except KeyError:
 
 # This is to figure out the package version, rather than
 # using Astropy's
-from .version import __version__ as version #, astropy_helpers_version
-
-astropy_helpers_version = 0.0
+from .version import version, astropy_helpers_version
 
 packagename = os.path.basename(os.path.dirname(__file__))
 TESTED_VERSIONS[packagename] = version
