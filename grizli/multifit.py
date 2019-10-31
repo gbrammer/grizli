@@ -1911,12 +1911,13 @@ class MultiBeam(GroupFitter):
         yfull = np.polyval(scale_coeffs[::-1], xspec)
         return xspec, yfull
                                           
-    def compute_model(self, id=None, spectrum_1d=None, is_cgs=False):
+    def compute_model(self, id=None, spectrum_1d=None, is_cgs=False, apply_sensitivity=True):
         """TBD
         """
         for beam in self.beams:
             beam.beam.compute_model(id=id, spectrum_1d=spectrum_1d, 
-                                    is_cgs=is_cgs)
+                                    is_cgs=is_cgs,
+                                    apply_sensitivity=apply_sensitivity)
             
             beam.modelf = beam.beam.modelf 
             beam.model = beam.beam.modelf.reshape(beam.beam.sh_beam)
