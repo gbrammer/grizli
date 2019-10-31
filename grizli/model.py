@@ -437,7 +437,8 @@ class GrismDisperser(object):
         self.ytrace += yoffset
                 
     def compute_model(self, id=None, thumb=None, spectrum_1d=None,
-                      in_place=True, modelf=None, scale=None, is_cgs=False):
+                      in_place=True, modelf=None, scale=None, is_cgs=False,
+                      apply_sensitivity=True):
         """Compute a model 2D grism spectrum
 
         Parameters
@@ -523,13 +524,18 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
                 return False
 
         ### Now compute the dispersed spectrum using the C helper
-        nonz = (self.sensitivity_beam*scale_spec) != 0
+        if apply_sensitivity:
+            sens_curve = self.sensitivity_beam
+        else:
+            sens_curve = 1.
+        
+        nonz = (sens_curve*scale_spec) != 0
         
         if nonz.sum() > 0:
             status = disperse.disperse_grism_object(thumb, self.seg, 
                                  np.int32(id),
                                  self.flat_index[nonz], self.yfrac_beam[nonz],
-                                 (self.sensitivity_beam*scale_spec)[nonz],
+                                 (sens_curve*scale_spec)[nonz],
                                  modelf, self.x0, 
                                  np.array(self.sh, dtype=np.int64),
                                  self.x0, 
@@ -1117,7 +1123,7 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
                 
         self.ext_psf_data = np.maximum(spl_data, 0)
         
-    def compute_model_psf(self, id=None, spectrum_1d=None, in_place=True, is_cgs=False):
+    def compute_model_psf(self, id=None, spectrum_1d=None, in_place=True, is_cgs=False, apply_sensitivity=True):
         """
         Compute model with PSF morphology template
         """
@@ -1167,9 +1173,9 @@ class ImageData(object):
     """Container for image data with WCS, etc."""
     def __init__(self, sci=None, err=None, dq=None,
                  header=None, wcs=None, photflam=1., photplam=1.,
-                 origin=[0,0], pad=0,
+                 origin=[0,0], pad=0, process_jwst_header=True,
                  instrument='WFC3', filter='G141', pupil=None, hdulist=None,
-                 sci_extn=1):
+                 sci_extn=1, fwcpos=None):
         """
         Parameters
         ----------
@@ -1303,7 +1309,7 @@ class ImageData(object):
             
             if 'PUPIL' in h:
                 pupil = h['PUPIL']
-                
+
             if 'PHOTFLAM' in h:
                 photflam = h['PHOTFLAM']
             else:
@@ -1313,7 +1319,11 @@ class ImageData(object):
                 photplam = h['PHOTPLAM']
             else:
                 photplam = photplam_list[filter]
-                        
+            
+            # For NIRISS
+            if 'FWCPOS' in h:
+                fwcpos = h['FWCPOS']
+            
             self.mdrizsky = 0.
             if 'MDRIZSKY' in header:
                 #sci -= header['MDRIZSKY']
@@ -1385,7 +1395,7 @@ class ImageData(object):
         ### Array parameters
         self.pad = pad
         self.origin = origin
-        self.fwcpos = None
+        self.fwcpos = fwcpos # NIRISS
         self.MW_EBV = 0.
         
         self.data = OrderedDict()
@@ -1440,7 +1450,8 @@ class ImageData(object):
         self.wcs = None
         
         if instrument in ['NIRISS','NIRCAM']:
-            self.update_jwst_wcsheader(hdulist)
+            if process_jwst_header:
+                self.update_jwst_wcsheader(hdulist)
             
         if self.header is not None:
             if wcs is None:
@@ -1458,13 +1469,7 @@ class ImageData(object):
             self.ccdchip = self.header['CCDCHIP']
         else:
             self.ccdchip = 1
-            
-        # For NIRISS
-        if 'FWCPOS' in self.header:
-            self.fwcpos = self.header['FWCPOS']
-        else:
-            self.fwcpos = None
-        
+                    
         # Galactic extinction
         if 'MW_EBV' in self.header:
             self.MW_EBV = self.header['MW_EBV']
@@ -1532,7 +1537,7 @@ class ImageData(object):
                 if k in self.header:
                     self.header.remove(k)
                     
-    def get_wcs(self):
+    def get_wcs(self, pc2cd=False):
         """Get WCS from header"""
         import numpy.linalg
         import stwcs
@@ -1571,8 +1576,7 @@ class ImageData(object):
                 sly = slice(self.origin[0], self.origin[0]+self.sh[0])
                 
                 wcs = self.get_slice_wcs(wcs, slx=slx, sly=sly)
-
-                
+        
         else:
             fobj = None
             wcs = pywcs.WCS(self.header, relax=True, fobj=fobj)
@@ -2083,7 +2087,8 @@ class GrismFLT(object):
     """Scripts for modeling of individual grism FLT images"""
     def __init__(self, grism_file='', sci_extn=1, direct_file='',
                  pad=200, ref_file=None, ref_ext=0, seg_file=None,
-                 shrink_segimage=True, force_grism='G141', verbose=True):
+                 shrink_segimage=True, force_grism='G141', verbose=True,
+                 process_jwst_header=True):
         """Read FLT files and, optionally, reference/segmentation images.
         
         Parameters
@@ -2186,7 +2191,8 @@ class GrismFLT(object):
                 wcs = None
            
             self.grism = ImageData(hdulist=grism_im, sci_extn=sci_extn,
-                                   wcs=wcs)
+                                   wcs=wcs, 
+                                   process_jwst_header=process_jwst_header)
         else:
             if (grism_file is None) | (grism_file == ''):
                 self.grism = None
@@ -2204,7 +2210,8 @@ class GrismFLT(object):
                 wcs = None
                 
             self.direct = ImageData(hdulist=direct_im, sci_extn=sci_extn,
-                                    wcs=wcs)
+                                    wcs=wcs, 
+                                    process_jwst_header=process_jwst_header)
         else:
             if (direct_file is None) | (direct_file == ''):
                 self.direct = None
