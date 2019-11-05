@@ -204,6 +204,7 @@ else:
     version = _last_generated_version
     githash = _last_githash
 
+__version__ = version
 
 major = 1
 minor = 0
