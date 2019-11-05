@@ -2,8 +2,7 @@
 Pipeline for flexible modeling and extration of slitless spectroscopy
 """
 #__version__ = "0.1.1.dev" 
-#from .version import __version__
-from .version import version as __version__
+from .version import __version__
 
 import os
 
