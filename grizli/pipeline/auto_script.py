@@ -1602,6 +1602,10 @@ mag_lim=17, cat=None, cols=['mag_auto','ra','dec'], minR=8, dy=5, selection=None
         selection = mag < 17
     
     for file in visit['files']:
+        if not os.path.exists(file):
+            print('Mask diffraction spikes (skip file {0})'.format(file))
+            continue
+        
         im = pyfits.open(file, mode='update')
         print('Mask diffraction spikes ({0}), N={1} objects'.format(file, selection.sum()))
         
