@@ -77,7 +77,7 @@ def run_all_parallel(id, get_output_data=False, args_file='fit_args.npy', **kwar
     t1 = time.time()
     
     return id, status, t1-t0
-    
+        
 def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter=['nnls','bounded'], group_name='grism', fit_stacks=True, only_stacks=False, prior=None, fcontam=0.2, pline=PLINE, min_line_sn=4, mask_sn_limit=np.inf, fit_only_beams=False, fit_beams=True, root='*', fit_trace_shift=False, phot=None, use_phot_obj=True, phot_obj=None, verbose=True, scale_photometry=False, show_beams=True, scale_on_stacked_1d=True, use_cached_templates=True, loglam_1d=True, overlap_threshold=5, MW_EBV=0., sys_err=0.03, huber_delta=4, get_student_logpdf=False, get_dict=False, bad_pa_threshold=1.6, units1d='flam', redshift_only=False, line_size=1.6, use_psf=False, get_line_width=False, sed_args={'bin':1, 'xlim':[0.3, 9]}, get_ir_psfs=True, min_mask=0.01, min_sens=0.02, mask_resid=True, save_stack=True,  get_line_deviations=True, bounded_kwargs=BOUNDED_DEFAULTS, write_fits_files=True, save_figures=True, fig_type='png', **kwargs):
     """Run the full procedure
     
@@ -92,7 +92,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     from grizli.stack import StackFitter
     from grizli.multifit import MultiBeam
     
-    from .version import __version__ as grizli__version
+    from . import __version__ as grizli__version
     from .pipeline import summary
     
     if get_dict:
@@ -1505,7 +1505,7 @@ class GroupFitter(object):
             
         return A_phot[:,mask]
         
-    def xfit_at_z(self, z=0, templates=[], fitter='nnls', fit_background=True, get_uncertainties=False, get_design_matrix=False, pscale=None, COEFF_SCALE=1.e-19, get_components=False, huber_delta=4, get_residuals=False, include_photometry=True, use_cached_templates=False, bounded_kwargs=BOUNDED_DEFAULTS):
+    def xfit_at_z(self, z=0, templates=[], fitter='nnls', fit_background=True, get_uncertainties=False, get_design_matrix=False, pscale=None, COEFF_SCALE=1.e-19, get_components=False, huber_delta=4, get_residuals=False, include_photometry=True, use_cached_templates=False, bounded_kwargs=BOUNDED_DEFAULTS, apply_sensitivity=True):
         """Fit the 2D spectra with a set of templates at a specified redshift.
         
         Parameters
@@ -1647,9 +1647,9 @@ class GroupFitter(object):
                 sl = self.mslices[j]
                 if t in beam.thumbs:
                     #print('Use thumbnail!', t)
-                    A[self.N+i, sl] = beam.compute_model(thumb=beam.thumbs[t], spectrum_1d=s, in_place=False, is_cgs=True)[beam.fit_mask]*COEFF_SCALE
+                    A[self.N+i, sl] = beam.compute_model(thumb=beam.thumbs[t], spectrum_1d=s, in_place=False, is_cgs=True, apply_sensitivity=apply_sensitivity)[beam.fit_mask]*COEFF_SCALE
                 else:
-                    A[self.N+i, sl] = beam.compute_model(spectrum_1d=s, in_place=False, is_cgs=True)[beam.fit_mask]*COEFF_SCALE
+                    A[self.N+i, sl] = beam.compute_model(spectrum_1d=s, in_place=False, is_cgs=True, apply_sensitivity=apply_sensitivity)[beam.fit_mask]*COEFF_SCALE
             
             # Multiply spline templates by single continuum template
             if ('spline' in t) & ('spline' in fitter):
@@ -1657,8 +1657,15 @@ class GroupFitter(object):
                 for k, t_i in enumerate(templates):
                     if t_i in self.Asave:
                         ma = A[self.N+k,:].sum()
-                        ma = ma if ma > 0 else 1                        
-                        A[self.N+k,:] *= A[self.N+i,:]/ma #COEFF_SCALE                                        
+                        ma = ma if ma > 0 else 1    
+                        ma = 1
+                                            
+                        try:
+                            A[self.N+k,:] *= A[self.N+i,:]/self._A*COEFF_SCALE #COEFF_SCALE                                        
+                            print('Mult _A')
+                        except:
+                            A[self.N+k,:] *= A[self.N+i,:]/ma #COEFF_SCALE                                        
+                        
                         templates[t_i].max_norm = ma
                         
                 # print('spline, set to zero: ', t)
