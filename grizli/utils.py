@@ -4164,9 +4164,9 @@ def make_maximal_wcs(files, pixel_scale=0.1, get_hdu=True, pad=90, verbose=True,
     for i, (wcs, file, chip) in enumerate(wcs_list):
         p_i = Polygon(wcs.calc_footprint())
         if group_poly is None:
-            group_poly = p_i
+            group_poly = p_i.buffer(1./3600)
         else:
-            group_poly = group_poly.union(p_i)
+            group_poly = group_poly.union(p_i.buffer(1./3600))
             
         x0, y0 = np.cast[float](group_poly.centroid.xy)[:,0]
         if verbose:
