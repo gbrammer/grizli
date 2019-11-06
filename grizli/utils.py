@@ -613,9 +613,9 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
                     
                 fp_j = Polygon(wcs_j.calc_footprint())
                 if j == 0:
-                    fp_i = fp_j
+                    fp_i = fp_j.buffer(1./3600)
                 else:
-                    fp_i = fp_i.union(fp_j)
+                    fp_i = fp_i.union(fp_j.buffer(1./3600))
             
             output_list[i]['footprint'] = fp_i
             
@@ -1672,7 +1672,7 @@ def get_line_wavelengths():
     line_ratios['full'] += [1./3.8/2*line_ratios['Balmer 10kK'][1]*r for r in line_ratios['SII']]
 
 
-    # Lines from Hegele 2006, low-Z HII galaxies
+    # Lines from Hagele 2006, low-Z HII galaxies
     # SDSS J002101.03+005248.1    
     line_wavelengths['full'] += line_wavelengths['SIII']
     line_ratios['full'] += [401./1000/2.44*line_ratios['Balmer 10kK'][1]*r for r in line_ratios['SIII']]
@@ -1721,6 +1721,58 @@ def get_line_wavelengths():
     
     
     return line_wavelengths, line_ratios 
+    
+def emission_line_templates():
+    """
+    Testing FSPS line templates
+    """
+    import numpy as np
+    from grizli import utils
+    import fsps
+    sp = fsps.StellarPopulation(imf_type=1, zcontinuous=1)
+    
+    sp_params = {}
+    
+    sp_params['starburst'] = {'sfh':4, 'tau':0.3, 'tage':0.1,
+          'logzsol':-1, 'gas_logz':-1, 
+          'gas_logu':-2.5}
+    
+    sp_params['mature'] = {'sfh':4, 'tau':0.2, 'tage':0.9,
+        'logzsol':-0.2, 'gas_logz':-0.2, 
+        'gas_logu':-2.5}
+    
+    line_templates = {}
+                
+    for t in sp_params:
+        pset = sp_params[t]
+        header = 'wave flux\n\n'
+        for p in pset:
+            header += '{0} = {1}\n'.format(p, pset[p])
+            if p == 'tage':
+                continue
+            
+            print(p, pset[p])
+            sp.params[p] = pset[p]
+    
+        spec = {}
+        for neb in [True, False]:    
+            sp.params['add_neb_emission'] = neb
+            sp.params['add_neb_continuum'] = neb
+            wave, spec[neb] = sp.get_spectrum(tage=pset['tage'], peraa=True) 
+            #plt.plot(wave, spec[neb], alpha=0.5)
+        
+        neb_only = spec[True] - spec[False]
+        neb_only = neb_only / neb_only.max()
+        neb_only = spec[True] / spec[True].max()
+
+        plt.plot(wave, neb_only, label=t, alpha=0.5)
+    
+        neb_only[neb_only < 1.e-4] = 0
+        
+        np.savetxt('fsps_{0}_lines.txt'.format(t), np.array([wave, neb_only]).T, fmt='%.5e', header=header)
+        
+        line_templates[t] = utils.SpectrumTemplate(wave=wave, flux=neb_only, name='fsps_{0}_lines'.format(t))
+        
     
 class SpectrumTemplate(object):
     def __init__(self, wave=None, flux=None, central_wave=None, fwhm=None, velocity=False, fluxunits=FLAMBDA_CGS, waveunits=u.angstrom, name='template', lorentz=False, err=None):
@@ -2909,6 +2961,7 @@ def array_templates(templates, wave=None, max_R=5000, z=0, apply_igm=False):
                 if is_obsframe[j]:
                     ma = flux_arr[j,:].sum()
                     ma = ma if ma > 0 else 1
+                    ma = 1
                     
                     flux_arr[j,:] *= flux_arr[i,:]/ma
     
@@ -3402,8 +3455,13 @@ def transform_wcs(in_wcs, translation=[0.,0.], rotation=0., scale=1.):
     # Compute shift for crval, not crpix
     crval = in_wcs.all_pix2world([in_wcs.wcs.crpix-np.array(translation)], 
                                      1).flatten()
-    
-    out_wcs.wcs.crval = crval
+
+    # Compute shift at image center
+    refpix = np.array([in_wcs._naxis1/2., in_wcs._naxis2/2.])
+    c0 = in_wcs.all_pix2world([refpix], 1).flatten()
+    c1 = in_wcs.all_pix2world([refpix-np.array(translation)], 1).flatten()
+        
+    out_wcs.wcs.crval += c1-c0
     
     theta = -rotation
     _mat = np.array([[np.cos(theta), -np.sin(theta)],
