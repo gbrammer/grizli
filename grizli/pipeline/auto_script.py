@@ -1177,9 +1177,9 @@ def get_visit_exposure_footprints(visit_file='j1000p0210_visits.npy', check_path
                     fp_i = utils.get_flt_footprint(flt_file=pfile)
                     
                     if visit_fp is None:
-                        visit_fp = fp_i
+                        visit_fp = fp_i.buffer(1./3600)
                     else:
-                        visit_fp = visit_fp.union(fp_i).buffer(0.05/3600)
+                        visit_fp = visit_fp.union(fp_i.buffer(1./3600))
                     break
             
             visit['footprints'].append(fp_i)
