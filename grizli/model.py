@@ -208,13 +208,12 @@ class GrismDisperser(object):
         
         ### Segmentation image, defaults to all zeros
         if segmentation is None:
-            self.seg = np.zeros_like(self.direct, dtype=np.float32)
+            #self.seg = np.zeros_like(self.direct, dtype=np.float32)
+            empty = np.zeros_like(self.direct, dtype=np.float32)
+            self.set_segmentation(empty)
         else:
-            self.seg = segmentation
-            if self.seg.dtype is not np.float32:
-                self.seg = np.cast[np.float32](self.seg)
+            self.set_segmentation(segmentation.astype(np.float32))
         
-        self.total_flux = self.direct[self.seg == self.id].sum()
         
         ### Initialize attributes        
         self.spectrum_1d =  None
@@ -247,6 +246,19 @@ class GrismDisperser(object):
         if yoffset != 0:
             #print('yoffset!', yoffset)
             self.add_ytrace_offset(yoffset)
+    
+    def set_segmentation(self, seg_array):
+        """
+        Set Segmentation array and `total_flux`.
+        """
+        self.seg = seg_array*1
+        self.seg_ids = list(np.unique(self.seg))
+        try:
+            self.total_flux = self.direct[self.seg == self.id].sum()
+            if self.total_flux == 0:
+                self.total_flux = 1
+        except:
+            self.total_flux = 1.
             
     def init_galactic_extinction(self, MW_EBV=0., R_V=utils.MW_RV):
         """
@@ -438,7 +450,7 @@ class GrismDisperser(object):
                 
     def compute_model(self, id=None, thumb=None, spectrum_1d=None,
                       in_place=True, modelf=None, scale=None, is_cgs=False,
-                      apply_sensitivity=True):
+                      apply_sensitivity=True, reset=True):
         """Compute a model 2D grism spectrum
 
         Parameters
@@ -479,8 +491,10 @@ class GrismDisperser(object):
         
         if id is None:
             id = self.id
+            total_flux = self.total_flux
         else:
             self.id = id
+            total_flux = self.direct[self.seg == id].sum()
             
         ### Template (1D) spectrum interpolated onto the wavelength grid
         if in_place:
@@ -502,16 +516,16 @@ class GrismDisperser(object):
         
         self.is_cgs = is_cgs
         if is_cgs:
-            scale_spec /= self.total_flux
+            scale_spec /= total_flux
                
         ### Output data, fastest is to compute in place but doesn't zero-out
         ### previous result                    
         if in_place:
-            self.modelf *= 0
+            self.modelf *= (1-reset)
             modelf = self.modelf
         else:
             if modelf is None:
-                modelf = self.modelf*0
+                modelf = self.modelf*(1-reset)
                 
         ### Optionally use a different direct image
         if thumb is None:
@@ -531,9 +545,9 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         
         nonz = (sens_curve*scale_spec) != 0
         
-        if nonz.sum() > 0:
+        if (nonz.sum() > 0) & (id in self.seg_ids):
             status = disperse.disperse_grism_object(thumb, self.seg, 
-                                 np.int32(id),
+                                 np.float32(id),
                                  self.flat_index[nonz], self.yfrac_beam[nonz],
                                  (sens_curve*scale_spec)[nonz],
                                  modelf, self.x0, 
@@ -550,14 +564,27 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
             self.model = modelf.reshape(self.sh_beam)
             return True
     
-    def init_optimal_profile(self):
+    def init_optimal_profile(self, seg_ids=None):
         """Initilize optimal extraction profile
         """
-        if hasattr(self, 'psf_params'):
-            m = self.compute_model_psf(id=self.id, in_place=False)
+        if seg_ids is None:
+            ids = [self.id]
         else:
-            m = self.compute_model(id=self.id, in_place=False)
-        
+            ids = seg_ids
+            
+        for i, id in enumerate(ids):
+            if hasattr(self, 'psf_params'):
+                m_i = self.compute_model_psf(id=id, in_place=False)
+            else:
+                m_i = self.compute_model(id=id, in_place=False)
+            
+            #print('Add {0} to optimal profile'.format(id))
+            
+            if i == 0:
+                m = m_i
+            else:
+                m += m_i
+                
         m = m.reshape(self.sh_beam)
         m[m < 0] = 0
         self.optimal_profile = m/m.sum(axis=0)
@@ -3526,7 +3553,7 @@ class BeamCutout(object):
                               mask_resid=mask_resid)
         
     def _parse_from_data(self, contam_sn_mask=[10,3], min_mask=0.01, 
-                         min_sens=0.08, mask_resid=True):
+                         seg_ids=None, min_sens=0.08, mask_resid=True):
         """
         See parameter description for `~grizli.model.BeamCutout`.
         """
@@ -3552,8 +3579,17 @@ class BeamCutout(object):
         self.sh = self.beam.sh_beam
         
         ### Initialize for fits
-        self.flat_flam = self.compute_model(in_place=False, is_cgs=True) #/self.beam.total_flux
-        
+        if seg_ids is None:
+            self.flat_flam = self.compute_model(in_place=False, is_cgs=True) 
+        else:
+            for i, sid in enumerate(seg_ids):
+                flat_i = self.compute_model(id=sid, in_place=False, 
+                                            is_cgs=True) 
+                if i == 0:
+                    self.flat_flam = flat_i
+                else:
+                    self.flat_flam += flat_i
+                    
         ### OK data where the 2D model has non-zero flux
         self.fit_mask = (~self.mask.flatten()) & (self.ivar.flatten() != 0)
         self.fit_mask &= (self.flat_flam > min_mask*self.flat_flam.max())
@@ -3562,11 +3598,24 @@ class BeamCutout(object):
         ### Apply minimum sensitivity mask
         self.sens_mask = 1.        
         if min_sens > 0:
-            flux_min_sens = (self.beam.sensitivity < min_sens*self.beam.sensitivity.max())*1.
+            flux_min_sens = (self.beam.sensitivity <
+                             min_sens*self.beam.sensitivity.max())*1.
+                             
             if flux_min_sens.sum() > 0:
-                flat_sens = self.compute_model(in_place=False, is_cgs=True,
-                                  spectrum_1d=[self.beam.lam, flux_min_sens])
-                
+                test_spec = [self.beam.lam, flux_min_sens]
+                if seg_ids is None:
+                    flat_sens = self.compute_model(in_place=False,
+                                                   is_cgs=True,
+                                  spectrum_1d=test_spec)
+                else:
+                    for i, sid in enumerate(seg_ids):
+                        f_i = self.compute_model(id=sid, in_place=False,
+                                           is_cgs=True, spectrum_1d=test_spec)
+                        if i == 0:
+                            flat_sens = f_i
+                        else:
+                            flat_sens += f_i
+                            
                 # self.sens_mask = flat_sens == 0                
                 # Make mask along columns
                 is_masked = (flat_sens.reshape(self.sh) > 0).sum(axis=0)
@@ -3903,11 +3952,11 @@ class BeamCutout(object):
         else:
             result = self.beam.compute_model(**kwargs)
         
-        reset = True
+        reset_inplace = True
         if 'in_place' in kwargs:
-            reset = kwargs['in_place']
+            reset_inplace = kwargs['in_place']
                 
-        if reset:
+        if reset_inplace:
             self.modelf = self.beam.modelf #.flatten()
             self.model = self.beam.modelf.reshape(self.beam.sh_beam)
                 

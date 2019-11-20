@@ -228,7 +228,8 @@ def radec_to_targname(ra=0, dec=0, round_arcsec=(4, 60), precision=2, targstr='j
     return targname
     
 def blot_nearest_exact(in_data, in_wcs, out_wcs, verbose=True, stepsize=-1, 
-                       scale_by_pixel_area=False):
+                       scale_by_pixel_area=False, wcs_mask=True, 
+                       fill_value=0):
     """
     Own blot function for blotting exact pixels without rescaling for input 
     and output pixel size
@@ -249,6 +250,12 @@ def blot_nearest_exact(in_data, in_wcs, out_wcs, verbose=True, stepsize=-1,
     scale_by_pixel_area : bool
         If True, then scale the output image by the square of the image pixel
         scales (out**2/in**2), i.e., the pixel areas.
+    
+    wcs_mask : bool
+        Use fast WCS masking.  If False, use `pyregion`.
+    
+    fill_value : int/float
+        Value in `out_data` not covered by `in_data`.
         
     Returns
     -------
@@ -303,14 +310,26 @@ def blot_nearest_exact(in_data, in_wcs, out_wcs, verbose=True, stepsize=-1,
 
     olap = in_poly.intersection(out_poly)
     if olap.area == 0:
-        print('No overlap')
+        if verbose:
+            print('No overlap')
         return np.zeros(out_sh)
-        
+    
     # Region mask for speedup
-    olap_poly = np.array(olap.exterior.xy)
-    poly_reg = "fk5\npolygon("+','.join(['{0}'.format(p) for p in olap_poly.T.flatten()])+')\n'
-    reg = pyregion.parse(poly_reg)
-    mask = reg.get_mask(header=to_header(out_wcs), shape=out_sh)
+    if np.isclose(olap.area, out_poly.area, 0.01):
+        mask = np.ones(out_sh, dtype=bool)
+    elif wcs_mask:
+        # Use wcs / Path
+        from matplotlib.path import Path
+        out_xy = out_wcs.all_world2pix(np.array(in_poly.exterior.xy).T, 0)-0.5
+        out_xy_path = Path(out_xy)
+        yp, xp = np.indices(out_sh)
+        pts = np.array([xp.flatten(), yp.flatten()]).T
+        mask = out_xy_path.contains_points(pts).reshape(out_sh) 
+    else:
+        olap_poly = np.array(olap.exterior.xy)
+        poly_reg = "fk5\npolygon("+','.join(['{0}'.format(p) for p in olap_poly.T.flatten()])+')\n'
+        reg = pyregion.parse(poly_reg)
+        mask = reg.get_mask(header=to_header(out_wcs), shape=out_sh)
     
     #yp, xp = np.indices(in_data.shape)
     #xi, yi = xp[mask], yp[mask]
@@ -338,7 +357,7 @@ def blot_nearest_exact(in_data, in_wcs, out_wcs, verbose=True, stepsize=-1,
     m2 = (xi >= 0) & (yi >= 0) & (xi < in_sh[1]) & (yi < in_sh[0])
     xi, yi, xf, yf, xo, yo = xi[m2], yi[m2], xf[m2], yf[m2], xo[m2], yo[m2]
     
-    out_data = np.zeros(out_sh, dtype=np.float)
+    out_data = np.ones(out_sh, dtype=np.float)*fill_value
     status = pixel_map_c(np.cast[np.float](in_data), xi, yi, out_data, xo, yo)
         
     # Fill empty 
@@ -352,7 +371,7 @@ def blot_nearest_exact(in_data, in_wcs, out_wcs, verbose=True, stepsize=-1,
         out_scale  = get_wcs_pscale(out_wcs)
         out_data *= out_scale**2/in_scale**2
         
-    return out_data
+    return out_data.astype(in_data.dtype)
     
         
 def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
