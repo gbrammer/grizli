@@ -1779,6 +1779,52 @@ class MultiBeam(GroupFitter):
                                     mask_resid=self.mask_resid)
             self.beams.append(beam)
     
+    def replace_segmentation_image_cutouts(self, ref_image='gdn-100mas-f160w_seg.fits'):
+        """
+        Replace "REF" extensions in a `beams.fits` file
+
+        Parameters
+        ----------
+        ref_image : str, `~astropy.io.fits.HDUList`, `~astropy.io.fits.ImageHDU`
+           Filename or preloaded FITS file.
+
+        Returns
+        -------
+        beams_image : `~astropy.io.fits.HDUList`
+            Image object with the "REF" extensions filled with the new blotted
+            image cutouts.
+
+        """
+        if isinstance(ref_image, pyfits.HDUList):
+            ref_im = ref_image[0]
+            ref_image_filename = ref_image.filename()
+        elif (isinstance(ref_image, pyfits.ImageHDU) | 
+              isinstance(ref_image, pyfits.PrimaryHDU)):
+            ref_im = ref_image
+            ref_image_filename = 'HDU'
+        else:
+            ref_im = pyfits.open(ref_image)
+            ref_image_filename = ref_image
+
+        ref_wcs = pywcs.WCS(ref_im.header, relax=True)
+        ref_wcs.pscale = utils.get_wcs_pscale(ref_wcs)
+
+        ref_data = ref_im.data.astype(np.float32)
+
+        for ib in range(self.N):
+
+            wcs_copy = self.beams[ib].direct.wcs
+            if hasattr(wcs_copy, 'idcscale'):
+                if wcs_copy.idcscale is None:
+                    delattr(wcs_copy, 'idcscale')
+
+            in_data, in_wcs, out_wcs = ref_data, ref_wcs, wcs_copy
+            blot_seg = utils.blot_nearest_exact(ref_data, ref_wcs, wcs_copy, 
+                                           verbose=True, stepsize=-1, 
+                                           scale_by_pixel_area=False)
+
+            self.beams[ib].beam.set_segmentation(blot_seg)
+    
     def replace_direct_image_cutouts(self, ref_image='gdn-100mas-f160w_drz_sci.fits', interp='poly5', cutout=200, background_func=np.median):
         """
         Replace "REF" extensions in a `beams.fits` file
@@ -1793,8 +1839,13 @@ class MultiBeam(GroupFitter):
 
         cutout : int
             Make a slice of the `ref_image` with size [-cutout,+cutout] around
-            the center position of the desired object before passing to `blot`.
-
+            the center position of the desired object before passing to
+            `blot`.
+        
+        background_func : function, None
+            If not `None`, compute local background with value from 
+            `background_func(ref_image[cutout])`.
+            
         Returns
         -------
         beams_image : `~astropy.io.fits.HDUList`
@@ -1805,29 +1856,48 @@ class MultiBeam(GroupFitter):
         from drizzlepac.astrodrizzle import ablot
 
         if isinstance(ref_image, pyfits.HDUList):
-            ref_im = ref_image
+            ref_im = ref_image[0]
             ref_image_filename = ref_image.filename()
+        elif (isinstance(ref_image, pyfits.ImageHDU) | 
+              isinstance(ref_image, pyfits.PrimaryHDU)):
+            ref_im = ref_image
+            ref_image_filename = 'HDU'
         else:
             ref_im = pyfits.open(ref_image)
             ref_image_filename = ref_image
 
-        ref_wcs = pywcs.WCS(ref_im[0].header, relax=True)
+        ref_wcs = pywcs.WCS(ref_im.header, relax=True)
         ref_wcs.pscale = utils.get_wcs_pscale(ref_wcs)
 
-        ref_photflam = ref_im[0].header['PHOTFLAM']
-        ref_photplam = ref_im[0].header['PHOTPLAM']
-        ref_filter = utils.get_hst_filter(ref_im[0].header)
+        if 'PHOTPLAM' in ref_im.header:
+            ref_photplam = ref_im.header['PHOTPLAM']
+        else:
+            ref_photplam = 1.
         
-        ref_data = ref_im[0].data
+        if 'PHOTFLAM' in ref_im.header:
+            ref_photflam = ref_im.header['PHOTFLAM']
+        else:
+            ref_photflam = 1.
+            
+        try:
+            ref_filter = utils.get_hst_filter(ref_im.header)
+        except:
+            ref_filter = 'N/A'
+            
+        ref_data = ref_im.data
 
         beam_ra, beam_dec = self.ra, self.dec
 
         xy = np.cast[int](np.round(ref_wcs.all_world2pix([beam_ra], [beam_dec], 0))).flatten()
-
-        slx = slice(xy[0]-cutout, xy[0]+cutout)
-        sly = slice(xy[1]-cutout, xy[1]+cutout)
+        
+        sh = ref_data.shape
+        slx = slice(np.maximum(xy[0]-cutout, 0),  
+                    np.minimum(xy[0]+cutout, sh[1]))
+        sly = slice(np.maximum(xy[1]-cutout, 0), 
+                    np.minimum(xy[1]+cutout, sh[0]))
         
         bkg_data = None
+        #print('xxx', slx, sly, ref_data[sly, slx].shape, ref_data[sly, slx].max(), ref_photflam)
         
         for ie in range(self.N):
             
@@ -1840,7 +1910,8 @@ class MultiBeam(GroupFitter):
                               ref_wcs.slice([sly, slx]), 
                               wcs_copy, 1, coeffs=True, interp=interp, 
                               sinscl=1.0, stepsize=10, wcsmap=None)
-
+            
+            #print('xxx', blotted.max(), ref_data[sly, slx].max())
             if background_func is not None:
                 msk = self.beams[ie].beam.seg == 0
                 #print(msk.shape, blotted.shape, ie)
@@ -1855,7 +1926,9 @@ class MultiBeam(GroupFitter):
             self.beams[ie].direct.ref_photplam = ref_photplam
             self.beams[ie].direct.ref_filter = ref_filter
             #self.beams[ie].direct.ref_photflam
-        
+            
+            self.beams[ie].beam.direct = blotted*ref_photflam
+            
         if bkg_data is not None:
             bkg_value = background_func(bkg_data)
             for ie in range(self.N):
@@ -1911,12 +1984,13 @@ class MultiBeam(GroupFitter):
         yfull = np.polyval(scale_coeffs[::-1], xspec)
         return xspec, yfull
                                           
-    def compute_model(self, id=None, spectrum_1d=None, is_cgs=False, apply_sensitivity=True):
+    def compute_model(self, id=None, spectrum_1d=None, is_cgs=False, apply_sensitivity=True, scale=None, reset=True):
         """TBD
         """
         for beam in self.beams:
             beam.beam.compute_model(id=id, spectrum_1d=spectrum_1d, 
-                                    is_cgs=is_cgs,
+                                    is_cgs=is_cgs,  
+                                    scale=scale, reset=reset,
                                     apply_sensitivity=apply_sensitivity)
             
             beam.modelf = beam.beam.modelf 
@@ -3543,7 +3617,7 @@ class MultiBeam(GroupFitter):
         
         return chi2/self.DoF    
     
-    def drizzle_grisms_and_PAs(self, size=10, fcontam=0, flambda=False, scale=1, pixfrac=0.5, kernel='square', make_figure=True, usewcs=False, zfit=None, diff=True, grism_list=['G800L','G102','G141','F090W','F115W','F150W','F200W','F356W','F410M','F444W']):
+    def drizzle_grisms_and_PAs(self, size=10, fcontam=0, flambda=False, scale=1, pixfrac=0.5, kernel='square', make_figure=True, usewcs=False, zfit=None, diff=True, grism_list=['G800L','G102','G141','F090W','F115W','F150W','F200W','F356W','F410M','F444W'], mask_segmentation=True):
         """Make figure showing spectra at different orients/grisms
         
         TBD
@@ -3634,7 +3708,8 @@ class MultiBeam(GroupFitter):
                                           pixfrac=pixfrac,
                                           kernel=kernel,
                                           convert_to_flambda=flambda,
-                                          fcontam=0, ds9=None)
+                                          fcontam=0, ds9=None, 
+                                          mask_segmentation=mask_segmentation)
                 
                 hdu[0].header['RA'] = (self.ra, 'Right ascension')
                 hdu[0].header['DEC'] = (self.dec, 'Declination')
@@ -3656,7 +3731,8 @@ class MultiBeam(GroupFitter):
                                           pixfrac=pixfrac,
                                           kernel=kernel,
                                           convert_to_flambda=flambda,
-                                          fcontam=0, ds9=None)
+                                          fcontam=0, ds9=None, 
+                                          mask_segmentation=mask_segmentation)
                 
                 hdu_contam[1].header['EXTNAME'] = 'CONTAM'
                 hdu.append(hdu_contam[1])
@@ -3685,7 +3761,8 @@ class MultiBeam(GroupFitter):
                                           pixfrac=pixfrac,
                                           kernel=kernel,
                                           convert_to_flambda=flambda,
-                                          fcontam=0, ds9=None)
+                                          fcontam=0, ds9=None,
+                                          mask_segmentation=mask_segmentation)
                 
                 hdu_model[1].header['EXTNAME'] = 'MODEL'
                 if zfit is not None:
@@ -3722,7 +3799,8 @@ class MultiBeam(GroupFitter):
                                               kernel=kernel,
                                               convert_to_flambda=flambda,
                                               fcontam=0, fill_wht=True,
-                                              ds9=None)
+                                              ds9=None,
+                                        mask_segmentation=mask_segmentation)
                 
                     kern = h_kern[1].data[:,h['CRPIX1']-1-size:h['CRPIX1']-1+size]
                     #print('XXX', kern.max(), h_kern[1].data.max())
@@ -3751,7 +3829,8 @@ class MultiBeam(GroupFitter):
                                       pixfrac=pixfrac,
                                       kernel=kernel,
                                       convert_to_flambda=flambda,
-                                      fcontam=fcontam, ds9=None)
+                                      fcontam=fcontam, ds9=None,
+                                      mask_segmentation=mask_segmentation)
             
             hdu[0].header['RA'] = (self.ra, 'Right ascension')
             hdu[0].header['DEC'] = (self.dec, 'Declination')
@@ -3787,7 +3866,8 @@ class MultiBeam(GroupFitter):
                                       pixfrac=pixfrac,
                                       kernel=kernel,
                                       convert_to_flambda=flambda,
-                                      fcontam=fcontam, ds9=None)
+                                      fcontam=fcontam, ds9=None,
+                                      mask_segmentation=mask_segmentation)
             
             hdu_model[1].header['EXTNAME'] = 'MODEL'
             if zfit is not None:
@@ -3817,7 +3897,8 @@ class MultiBeam(GroupFitter):
                                       pixfrac=pixfrac,
                                       kernel=kernel,
                                       convert_to_flambda=flambda,
-                                      fcontam=0, fill_wht=True, ds9=None)
+                                      fcontam=0, fill_wht=True, ds9=None,
+                                      mask_segmentation=mask_segmentation)
             
             kern = h_kern[1].data[:,h['CRPIX1']-1-size:h['CRPIX1']-1+size]
             hdu_kern = pyfits.ImageHDU(data=kern, header=h_kern[1].header, name='KERNEL')
@@ -3915,7 +3996,7 @@ class MultiBeam(GroupFitter):
             self._parse_beams()
             self.initialize_masked_arrays()
             
-    def oned_spectrum(self, tfit=None, get_contam=True, **kwargs):
+    def oned_spectrum(self, tfit=None, get_contam=True, masked_model=None, **kwargs):
         """Compute full 1D spectrum with optional best-fit model
         
         Parameters
@@ -3956,6 +4037,9 @@ class MultiBeam(GroupFitter):
                                               
             sp_line = self.optimal_extract(line_model, **kwargs)
             sp_cont = self.optimal_extract(cont_model, **kwargs)
+        elif masked_model is not None:
+            bg_model = 0.
+            sp_model = self.optimal_extract(masked_model, **kwargs)
         else:
             bg_model = 0.
         
@@ -3986,6 +4070,10 @@ class MultiBeam(GroupFitter):
                 sp[k]['cont'] = sp_cont[k]['flux']
                 sp[k]['cont'].unit = u.count / u.s
             
+            if masked_model is not None:
+                sp[k]['model'] = sp_model[k]['flux']
+                sp[k]['model'].unit = u.count / u.s
+
             sp[k].meta['GRISM'] = (k, 'Grism name')
             
             # Metadata
@@ -4165,7 +4253,7 @@ def get_redshift_fit_defaults():
 def drizzle_2d_spectrum(beams, data=None, wlimit=[1.05, 1.75], dlam=50, 
                         spatial_scale=1, NY=10, pixfrac=0.6, kernel='square',
                         convert_to_flambda=True, fcontam=0.2, fill_wht=False,
-                        ds9=None):
+                        ds9=None, mask_segmentation=True):
     """Drizzle 2D spectrum from a list of beams
     
     Parameters
@@ -4684,7 +4772,7 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
 
     return pyfits.HDUList(HDUL)
 
-def show_drizzle_HDU(hdu, diff=True):
+def show_drizzle_HDU(hdu, diff=True, mask_segmentation=True):
     """Make a figure from the multiple extensions in the drizzled grism file.
     
     Parameters
@@ -4829,7 +4917,7 @@ def show_drizzle_HDU(hdu, diff=True):
 def drizzle_2d_spectrum_wcs(beams, data=None, wlimit=[1.05, 1.75], dlam=50, 
                         spatial_scale=1, NY=10, pixfrac=0.6, kernel='square',
                         convert_to_flambda=True, fcontam=0.2, fill_wht=False,
-                        ds9=None):
+                        ds9=None, mask_segmentation=True):
     """Drizzle 2D spectrum from a list of beams
     
     Parameters
@@ -5013,7 +5101,8 @@ def drizzle_2d_spectrum_wcs(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
             d_sci = beam.direct['REF']*1
             d_wht = d_sci*0.+1
             
-        d_sci *= (beam.beam.seg == beam.id)
+        if mask_segmentation:
+            d_sci *= (beam.beam.seg == beam.id)
         
         # Downweight contamination
         # wht = 1/beam.ivar + (fcontam*beam.contam)**2
