@@ -3316,12 +3316,20 @@ class GrismFLT(object):
                 rot = 2
             else:
                 rot = -1
-        elif self.grism.instrument == 'NIRCAM':
-            # Only module A
+                
+        elif self.grism.instrument in ['NIRCAM', 'NIRCAMA']:
+            #  Module A
             if self.grism.pupil == 'GRISMC':
                 rot = 1
             else:
+                # Do nothing, A+GRISMR disperses to +x
                 return True
+        
+        elif self.grism.instrument == 'NIRCAMB':
+            if self.grism.pupil == 'GRISMC':
+                rot = 1
+            else:
+                rot = 2
             
         if self.is_rotated:
             rot *= -1
