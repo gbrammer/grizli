@@ -138,7 +138,7 @@ def apply_catalog_corrections(root, total_flux='flux_auto', auto_corr=True, get_
     
     return cat
     
-def eazy_photoz(root, force=False, object_only=True, apply_background=True, aper_ix=1, apply_prior=False, beta_prior=True, get_external_photometry=False, external_limits=3, external_sys_err=0.3, external_timeout=300, sys_err=0.05, z_step=0.01, z_min=0.01, z_max=12, total_flux='flux_auto', auto_corr=True, compute_residuals=False, dummy_prior=False, extra_rf_filters=[]):
+def eazy_photoz(root, force=False, object_only=True, apply_background=True, aper_ix=1, apply_prior=False, beta_prior=True, get_external_photometry=False, external_limits=3, external_sys_err=0.3, external_timeout=300, sys_err=0.05, z_step=0.01, z_min=0.01, z_max=12, total_flux='flux_auto', auto_corr=True, compute_residuals=False, dummy_prior=False, extra_rf_filters=[], quiet=True):
     
     import os
     import eazy
@@ -153,7 +153,7 @@ def eazy_photoz(root, force=False, object_only=True, apply_background=True, aper
         cat = utils.read_catalog('{0}_phot_apcorr.fits'.format(root))
         return self, cat, zout
         
-    trans = {'f098m':201, 'f105w':202, 'f110w':241, 'f125w':203, 'f140w':204, 'f160w':205, 'f435w':233, 'f475w':234, 'f555w':235, 'f606w':236, 'f625w':237, 'f775w':238, 'f814w':239, 'f850lp':240, 'f702w':15, 'f600lpu':243, 'f225wu':207, 'f275wu':208, 'f336w':209, 'f350lpu':339, 'f438wu':211, 'f475wu':212, 'f475xu':242, 'f555wu':213, 'f606wu':214, 'f625wu':215, 'f775wu':216, 'f814wu':217}
+    trans = {'f098m':201, 'f105w':202, 'f110w':241, 'f125w':203, 'f140w':204, 'f160w':205, 'f435w':233, 'f475w':234, 'f555w':235, 'f606w':236, 'f625w':237, 'f775w':238, 'f814w':239, 'f850lp':240, 'f702w':15, 'f600lpu':243, 'f225wu':207, 'f275wu':208, 'f336w':209, 'f350lpu':339, 'f438wu':211, 'f475wu':212, 'f475xu':242, 'f555wu':213, 'f606wu':214, 'f625wu':215, 'f775wu':216, 'f814wu':217, 'f390wu':210, 'ch1':18, 'ch2':19}
     
     #trans.pop('f814w')
     
@@ -175,6 +175,9 @@ def eazy_photoz(root, force=False, object_only=True, apply_background=True, aper
     
     fp.write('irac_ch1_flux F18\n')
     fp.write('irac_ch1_err  E18\n')
+
+    fp.write('irac_ch2_flux F19\n')
+    fp.write('irac_ch2_err  E19\n')
     
     # For zeropoint
     if dummy_prior:
@@ -232,6 +235,9 @@ Run it with `path` pointing to the location of the `eazy-photoz` repository.""")
             
     self = eazy.photoz.PhotoZ(param_file=None, translate_file='zphot.translate', zeropoint_file=zpfile, params=params, load_prior=True, load_products=load_products)
     
+    if quiet:
+        self.param.params['VERBOSITY'] = 1.
+        
     if object_only:
         return self
         
@@ -530,7 +536,7 @@ def select_objects():
     total_flux = 'flux_auto' # new segmentation masked SEP catalogs
     object_only = False
     
-    self, cat, zout = photoz.eazy_photoz(root, object_only=object_only, apply_prior=False, beta_prior=True, aper_ix=1, force=True, get_external_photometry=False, compute_residuals=False, total_flux=total_flux)
+    self, cat, zout = photoz.eazy_photoz(root, object_only=object_only, apply_prior=False, beta_prior=True, aper_ix=2, force=True, get_external_photometry=False, compute_residuals=False, total_flux=total_flux)
     
     if False:
         args = np.load('fit_args.npy', allow_pickle=True)[0]
