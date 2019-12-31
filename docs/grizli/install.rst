@@ -114,6 +114,19 @@ images contains only a single file.
         cd lacosmicx
         python setup.py install
 
+.. note::
+    
+    The `lacosmicx` dependency was removed from `environment.yml` file
+    2019.12.31 because it was breaking on OSX Mojave 10.14.6 with a
+    compilation error like `unsupported option '-fopenmp'`. The workaround
+    below with the Homebrew version of `gcc` may work after verifying the
+    correct path to the `gcc-8` executable:
+    
+    .. code:: bash
+        
+        brew install gcc
+        CC=/usr/local/Cellar/gcc/8.3.0_2/bin/gcc-8 pip install git+https://github.com/cmccully/lacosmicx.git
+        
 `shapely <http://toblerity.org/shapely/manual.html>`__ - Tools for handling
 geometry calculations, e.g., overlapping polygons. Currently only used by
 `~grizli.utils.parse_visit_overlaps`. Installation used to be tricky to
