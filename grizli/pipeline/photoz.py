@@ -178,6 +178,12 @@ def eazy_photoz(root, force=False, object_only=True, apply_background=True, aper
 
     fp.write('irac_ch2_flux F19\n')
     fp.write('irac_ch2_err  E19\n')
+
+    fp.write('irac_ch3_flux F20\n')
+    fp.write('irac_ch3_err  E20\n')
+
+    fp.write('irac_ch4_flux F21\n')
+    fp.write('irac_ch4_err  E21\n')
     
     # For zeropoint
     if dummy_prior:
