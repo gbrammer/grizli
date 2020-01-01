@@ -565,14 +565,21 @@ def run_grizli_fit(event):
         q0, q1 = utils.load_quasar_templates(**templ_args)
         
         if use_simple_templates:
-            x0 = utils.load_templates(full_line_list=['highO32'], continuum_list=['quasar_lines.txt', 'red_blue_continuum.txt'], line_complexes=False, fwhm=1000)
-             
-            for t in q0:
-                if 'bspl' in t:
-                    x0[t] = q0[t]
+            x0 = utils.load_templates(full_line_list=['highO32'], continuum_list=['quasar_lines.txt', 'red_blue_continuum_noLya.txt'], line_complexes=False, fwhm=1000)
+
+            x0 = utils.load_templates(full_line_list=[], continuum_list=['quasar_lines.txt', 'red_blue_continuum_noLya.txt', 'fsps_starburst_lines.txt'], line_complexes=False, fwhm=1000)
+                        
+            # for t in q0:
+            #     if 'bspl' in t:
+            #         x0[t] = q0[t]
+            
+            # Rename templates
+            x0['continuum spline'] = x0.pop('red_blue_continuum_noLya.txt')
+            x0['quasar'] = x0.pop('quasar_lines.txt')
+            x0['fsps_starburst'] = x0.pop('fsps_starburst_lines.txt')
             
             q0 = x0
-            q1['red_blue_continuum.txt'] = x0['red_blue_continuum.txt']
+            q1['continuum spline'] = x0['continuum spline']
             
         # Quasar templates with fixed line ratios
         # q0, q1 = utils.load_quasar_templates(uv_line_complex=True,
