@@ -135,8 +135,13 @@ def combine_flt(files=[], output='exposures_cmb.fits', grow=1,
             for j in range(inter_wcs.sip.b_order+1):
                 inter_wcs.sip.b[i,j] /= grow**(i+j-1)
 
-        inter_wcs._naxis1 *= grow
-        inter_wcs._naxis2 *= grow
+        if hasattr(inter_wcs, '_naxis1'):
+            inter_wcs._naxis1 *= grow
+            inter_wcs._naxis2 *= grow
+        else:
+            for i in range(len(inter_wcs._naxis)):
+                inter_wcs._naxis[i] *= grow
+                
         inter_wcs.wcs.crpix *= grow
         inter_wcs.sip.crpix[0] *= grow
         inter_wcs.sip.crpix[1] *= grow
@@ -146,8 +151,13 @@ def combine_flt(files=[], output='exposures_cmb.fits', grow=1,
             inter_wcs.sip.crpix[0] += grow/2.
             inter_wcs.sip.crpix[1] += grow/2.
     
-    inter_wcs._naxis1 += pad
-    inter_wcs._naxis2 += pad
+    if hasattr(inter_wcs, '_naxis1'):
+        inter_wcs._naxis1 += pad
+        inter_wcs._naxis2 += pad
+    else:
+        for i in range(len(inter_wcs._naxis)):
+            inter_wcs._naxis[i] += pad
+            
     inter_wcs.wcs.crpix += pad
     inter_wcs.sip.crpix[0] += pad
     inter_wcs.sip.crpix[1] += pad
