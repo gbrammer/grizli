@@ -699,8 +699,8 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
     else:
         nx1, nx2 = drz_wcs._naxis
         
-    ref_cut = (ref_x > -100) & (ref_x < n1+100) 
-    ref_cut &= (ref_y > -100) & (ref_y < n2+100)
+    ref_cut = (ref_x > -100) & (ref_x < nx1+100) 
+    ref_cut &= (ref_y > -100) & (ref_y < nx2+100)
     
     if ref_cut.sum() == 0:
         print('{0}: no reference objects found in the DRZ footprint'.format(root))
