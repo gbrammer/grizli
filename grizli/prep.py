@@ -53,39 +53,7 @@ For example,
 
         """.format(os.getenv('iref')))
     
-    ### Sewpy
-#     try:
-#         import sewpy
-#     except:
-#         print("""
-# `sewpy` module needed for wrapping SExtractor within python.  
-# Get it from https://github.com/megalut/sewpy.
-# """)
-#         
-
 check_status()
- 
-def go_all():
-    """TBD
-    """
-    from stsci.tools import asnutil
-    info = Table.read('files.info', format='ascii.commented_header')
-        
-    # files=glob.glob('../RAW/i*flt.fits')
-    # info = utils.get_flt_info(files)
-    
-    for col in info.colnames:
-        if not col.islower():
-            info.rename_column(col, col.lower())
-    
-    output_list, filter_list = utils.parse_flt_files(info=info, uniquename=False)
-    
-    for key in output_list:
-        #files = [os.path.basename(file) for file in output_list[key]]
-        files = output_list[key]
-        asn = asnutil.ASNTable(files, output=key)
-        asn.create()
-        asn.write()
         
 def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_badpix=True, apply_grism_skysub=True, crclean=False, mask_regions=True):
     """Copy "fresh" unmodified version of a data file from some central location
@@ -3120,7 +3088,7 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
     utils.log_function_arguments(utils.LOGFILE, frame,
                                  'prep.process_direct_grism_visit')
     
-    from stsci.tools import asnutil
+    #from stsci.tools import asnutil
     from stwcs import updatewcs
     from drizzlepac import updatehdr
     from drizzlepac.astrodrizzle import AstroDrizzle

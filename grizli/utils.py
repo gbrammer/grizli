@@ -4498,8 +4498,8 @@ def drizzle_array_groups(sci_list, wht_list, wcs_list, outputwcs=None,
     from drizzlepac import adrizzle
     from drizzlepac import cdriz
     
-    from stsci.tools import logutil
-    log = logutil.create_logger(__name__)
+    #from stsci.tools import logutil
+    #log = logutil.create_logger(__name__)
     
     # Output header / WCS    
     if outputwcs is None:
@@ -4536,7 +4536,9 @@ def drizzle_array_groups(sci_list, wht_list, wcs_list, outputwcs=None,
     N = len(sci_list)
     for i in range(N):
         if verbose:
-            log.info('Drizzle array {0}/{1}'.format(i+1, N))
+            #log.info('Drizzle array {0}/{1}'.format(i+1, N))
+            msg = 'Drizzle array {0}/{1}'.format(i+1, N)
+            utils.log_comment(LOGFILE, msg, verbose=verbose, show_date=True)
         
         if calc_wcsmap > 1:
             wcsmap =  WCSMapAll#(wcs_list[i], outputwcs)
@@ -6494,7 +6496,7 @@ def dump_flt_dq(filename, replace=('.fits', '.dq.fits.gz'), verbose=True):
     output_filename = filename.replace(replace[0], replace[1])
 
     msg = '# dump_flt_dq: {0} > {1}'.format(filename, output_filename)
-    utils.log_comment(utils.LOGFILE, msg, verbose=verbose, show_date=True)
+    utils.log_comment(LOGFILE, msg, verbose=verbose, show_date=True)
         
     pyfits.HDUList(hdus).writeto(output_filename, overwrite=True, 
                                  output_verify='fix')
@@ -6533,7 +6535,7 @@ def apply_flt_dq(filename, replace=('.fits', '.dq.fits.gz'), verbose=True, or_co
     im = pyfits.open(filename, mode='update')
     
     msg = '# apply_flt_dq: {1} > {0}'.format(filename, output_filename)
-    utils.log_comment(utils.LOGFILE, msg, verbose=verbose, show_date=True)
+    utils.log_comment(LOGFILE, msg, verbose=verbose, show_date=True)
     
     dq = pyfits.open(output_filename)
     for ext in [1,2,3,4]:
