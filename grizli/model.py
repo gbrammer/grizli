@@ -1620,14 +1620,23 @@ class ImageData(object):
         """Pad the appropriate WCS keywords"""
         wcs = wcs_in.deepcopy()
         
+        is_new = True
         for attr in ['naxis1', '_naxis1', 'naxis2', '_naxis2']:
             if hasattr(wcs, attr):
+                is_new = False
                 value = wcs.__getattribute__(attr) 
                 if value is not None:
                     wcs.__setattr__(attr, value+2*pad)
         
-        wcs.naxis1 = wcs._naxis1
-        wcs.naxis2 = wcs._naxis2
+        # Handle changing astropy.wcs.WCS attributes
+        if is_new:
+            for i in range(len(wcs._naxis)):
+                wcs._naxis[i] += 2*pad
+                
+            wcs.naxis1, wcs.naxis2 = wcs._naxis
+        else:
+            wcs.naxis1 = wcs._naxis1
+            wcs.naxis2 = wcs._naxis2
         
         wcs.wcs.crpix[0] += pad
         wcs.wcs.crpix[1] += pad
@@ -1905,9 +1914,12 @@ class ImageData(object):
         NY = sly.stop - sly.start
         
         slice_wcs = wcs.slice((sly, slx))
-        slice_wcs.naxis1 = slice_wcs._naxis1 = NX
-        slice_wcs.naxis2 = slice_wcs._naxis2 = NY
-        
+        if hasattr(slice_wcs, '_naxis1'):
+            slice_wcs.naxis1 = slice_wcs._naxis1 = NX
+            slice_wcs.naxis2 = slice_wcs._naxis2 = NY
+        else:
+            slice_wcs._naxis = [NX, NY]
+            
         if hasattr(slice_wcs, 'sip'):
             if slice_wcs.sip is not None:
                 for c in [0,1]:

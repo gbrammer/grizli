@@ -306,11 +306,15 @@ def blot_nearest_exact(in_data, in_wcs, out_wcs, verbose=True, stepsize=-1,
     # Shapes, in numpy array convention (y, x)
     if hasattr(in_wcs, 'pixel_shape'):  
         in_sh = in_wcs.pixel_shape[::-1]
+    elif hasattr(in_wcs, 'array_shape'):
+        in_sh = in_wcs.array_shape
     else:
         in_sh = (in_wcs._naxis2, in_wcs._naxis1)
         
     if hasattr(out_wcs, 'pixel_shape'):
         out_sh = out_wcs.pixel_shape[::-1]
+    elif hasattr(out_wcs, 'array_shape'):
+        out_sh = out_wcs.array_shape
     else:
         out_sh = (out_wcs._naxis2, out_wcs._naxis1)
             
@@ -3488,7 +3492,11 @@ def transform_wcs(in_wcs, translation=[0.,0.], rotation=0., scale=1.):
                                      1).flatten()
 
     # Compute shift at image center
-    refpix = np.array([in_wcs._naxis1/2., in_wcs._naxis2/2.])
+    if hasattr(in_wcs, '_naxis1'):
+        refpix = np.array([in_wcs._naxis1/2., in_wcs._naxis2/2.])
+    else:
+        refpix = np.array(in_wcs._naxis)/2.
+
     c0 = in_wcs.all_pix2world([refpix], 1).flatten()
     c1 = in_wcs.all_pix2world([refpix-np.array(translation)], 1).flatten()
         
@@ -3508,7 +3516,7 @@ def transform_wcs(in_wcs, translation=[0.,0.], rotation=0., scale=1.):
     if hasattr(out_wcs, 'pixel_shape'):
         _naxis1 = int(np.round(out_wcs.pixel_shape[0]*scale))
         _naxis2 = int(np.round(out_wcs.pixel_shape[1]*scale))
-        out_wcs.pixel_shape = [_naxis1, _naxis2]
+        out_wcs._naxis = [_naxis1, _naxis2]
     elif hasattr(out_wcs, '_naxis1'):
         out_wcs._naxis1 = int(np.round(out_wcs._naxis1*scale))
         out_wcs._naxis2 = int(np.round(out_wcs._naxis2*scale))
@@ -5741,11 +5749,13 @@ class GTable(astropy.table.Table):
         else:
             other_xy = self_wcs.all_world2pix(other_radec, pixel_index)
             if hasattr(self_wcs, 'pixel_shape'):
-                _naxis1, _naxis2 = self_wcs.pixel_shape
+                _naxis1, _naxis2 = self_wcs._naxis
             else:
                 _naxis1, _naxis2 = self_wcs._naxis1, self_wcs._naxis2
                 
-            cut = (other_xy[:,0] > -pad) & (other_xy[:,0] < _naxis1+pad) & (other_xy[:,1] > -pad) & (other_xy[:,1] < _naxis2+pad)
+            cut = (other_xy[:,0] > -pad) & (other_xy[:,0] < _naxis1+pad) 
+            cut &= (other_xy[:,1] > -pad) & (other_xy[:,1] < _naxis2+pad)
+            
             other_xy = other_xy[cut,:]          
             xy_center = self_wcs.wcs.crpix*1
         

@@ -694,7 +694,14 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
     # Only include reference objects in the DRZ footprint
     pix_origin = 1
     ref_x, ref_y = drz_wcs.all_world2pix(rd_ref, pix_origin).T
-    ref_cut = (ref_x > -100) & (ref_x < drz_wcs._naxis1+100) & (ref_y > -100) & (ref_y < drz_wcs._naxis2+100)
+    if hasattr(drz_wcs, '_naxis1'):
+        nx1, nx2 = drz_wcs._naxis1, drz_wcs._naxis2
+    else:
+        nx1, nx2 = drz_wcs._naxis
+        
+    ref_cut = (ref_x > -100) & (ref_x < n1+100) 
+    ref_cut &= (ref_y > -100) & (ref_y < n2+100)
+    
     if ref_cut.sum() == 0:
         print('{0}: no reference objects found in the DRZ footprint'.format(root))
         return False
