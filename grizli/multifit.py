@@ -5018,8 +5018,18 @@ def drizzle_2d_spectrum_wcs(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
     
         d_output_wcs = d_undist_wcs.copy()
         # Make square
-        dx = d_output_wcs._naxis1-d_output_wcs._naxis2
-        d_output_wcs._naxis1 = d_output_wcs._naxis2
+        
+        if hasattr(d_output_wcs, '_naxis1'):
+            nx1, nx2 = d_output_wcs._naxis1, d_output_wcs._naxis2
+        else:
+            nx1, nx2 = d_output_wcs._naxis
+            
+        dx = nx1 - nx2
+        if hasattr(d_output_wcs, '_naxis1'):
+            d_output_wcs._naxis1 = d_output_wcs._naxis2
+        else:
+            d_output_wcs._naxis[0] = d_output_wcs._naxis[1]
+            
         d_output_wcs.wcs.crpix[0] -= dx/2.
         d_out_header = utils.to_header(d_output_wcs)
         
