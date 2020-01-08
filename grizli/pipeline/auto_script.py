@@ -1071,9 +1071,13 @@ def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=
         
         visits = [combined[k] for k in combined]
         
-        # Account for timing
-        print('Before max_dt={0:.2f} filter: {1} visits'.format(max_dt, 
-                                                                len(visits)))
+        # Account for timing to combine only exposures taken at an 
+        # epoch defined by `max_dt` days.
+        msg = f'parse_visits(combine_same_pa={combine_same_pa}), '
+        msg += 'max_dt={1:.1f}: {0} {2:>3} visits'
+        utils.log_comment(utils.LOGFILE, 
+                          msg.format('BEFORE', max_dt, len(visits)),
+                          verbose=True, show_date=True)
                                                                 
         split_list = []
         for v in visits:
@@ -1081,8 +1085,10 @@ def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=
                               visit_split_shift=1000))
                 
         visits = split_list
-        print('After  max_dt={0:.2f} filter: {1} visits'.format(max_dt,
-                                                                len(visits)))
+        utils.log_comment(utils.LOGFILE, 
+                          msg.format(' AFTER', max_dt, len(visits)),
+                          verbose=True, show_date=True)
+        
         get_visit_exposure_footprints(visits)
         
         print('** Combine same PA: **')
@@ -1780,6 +1786,10 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
         source_xy = tab['X_WORLD'], tab['Y_WORLD']
     
     if filters is None:
+        visits_file = '{0}_visits.npy'.format(field_root)
+        if not os.path.exists(visits_file):
+            get_all_filters=True
+        
         if get_all_filters:
             filters = [file.split('_')[-3][len(field_root)+1:] for file in glob.glob('{0}-f*dr?_sci.fits*'.format(field_root))]
         else:
@@ -4737,7 +4747,9 @@ def field_psf(root='j020924-044344', HOME_PATH='/Volumes/Pegasus/Grizli/Automati
             
             for ri, di in zip(ra.flatten(), dec.flatten()):
                 slice_h, wcs_slice = utils.make_wcsheader(ra=ri, dec=di, size=size, pixscale=scl, get_hdu=False, theta=0)
-                psf_i = GP.get_psf(ra=ri, dec=di, filter=filter.upper(), pixfrac=pf, kernel=kern, verbose=False, wcs_slice=wcs_slice, get_extended=True, get_weight=True)
+                
+                get_extended = (filter.upper() in ['F098M', 'F110W', 'F105W', 'F125W', 'F140W', 'F160W'])
+                psf_i = GP.get_psf(ra=ri, dec=di, filter=filter.upper(), pixfrac=pf, kernel=kern, verbose=False, wcs_slice=wcs_slice, get_extended=get_extended, get_weight=True)
                 if ix == 0:
                     msk_f = ((psf_i[1].data != 0) & np.isfinite(psf_i[1].data))*1
                     if msk_f.sum() == 0:
