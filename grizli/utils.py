@@ -6723,7 +6723,7 @@ def log_comment(LOGFILE, comment, verbose=False, show_date=False, mode='a'):
     
     if LOGFILE is not None:
         fp = open(LOGFILE, mode)
-        fp.write()
+        fp.write(msg)
         fp.close()
     
     if verbose:
