@@ -6674,7 +6674,22 @@ LOGFILE = '/tmp/grizli.log'
 
 def log_function_arguments(LOGFILE, frame, func='func', verbose=True):
     """
-    Log local variables to a file
+    Log local variables, e.g., parameter arguements to a file
+    
+    Parameters
+    ----------
+    LOGFILE : str or None
+        Output file.  If `None`, then force `verbose=True`.
+    
+    frame : `~inspect.currentframe()`
+        Namespace object.
+    
+    func : str
+        Function name to use
+        
+    verbose : bool
+        Print messaage to stdout.
+    
     """
     args = inspect.getargvalues(frame).locals
     args.pop('frame')
@@ -6688,28 +6703,64 @@ def log_function_arguments(LOGFILE, frame, func='func', verbose=True):
         logstr = '\n{1}'
         
     logstr = logstr.format(func, args)
-    log_comment(LOGFILE, logstr, verbose=verbose, show_date=True)
+    msg = log_comment(LOGFILE, logstr, verbose=verbose, show_date=True)
     
-def log_comment(LOGFILE, comment, verbose=False, show_date=False):
+    return msg
+    
+def log_comment(LOGFILE, comment, verbose=False, show_date=False, mode='a'):
+    """
+    Log a message to a file, optionally including a date tag
+    """
     import time
-    fp = open(LOGFILE,'a')
-    
+        
     if show_date:
-        fp.write('\n# ({0})\n'.format(time.ctime()))
+        msg = '\n# ({0})\n'.format(time.ctime())
+    else:
+        msg = ''
+        #fp.write('\n# ({0})\n'.format(time.ctime()))
     
-    fp.write('{0}\n'.format(comment))
-    fp.close()
+    msg += '{0}\n'.format(comment)
+    
+    if LOGFILE is not None:
+        fp = open(LOGFILE, mode)
+        fp.write()
+        fp.close()
     
     if verbose:
-        print(comment)
-        
-def log_exception(LOGFILE, traceback):
+        print(msg)
+    
+    return msg
+    
+def log_exception(LOGFILE, traceback, verbose=True, mode='a'):
+    """
+    Log exception information to a file, or print to screen
+    
+    Parameters
+    ----------
+    LOGFILE : str or None
+        Output file.  If `None`, then force `verbose=True`.
+    
+    traceback : builtin traceback module
+        Exception traceback, from global `import traceback`.
+    
+    verbose : bool
+        Print exception to stdout.
+    
+    mode : 'a', 'w'
+        File mode on `open(LOGFILE, mode)`, i.e., append or write.
+    
+    """
     import time
     
-    fp = open(LOGFILE,'a')
-    fp.write('\n########################################## \n# ! Exception ({0})\n'.format(time.ctime()))
     trace = traceback.format_exc(limit=2)
-    fp.write('#\n# !'+'\n# !'.join(trace.split('\n')))
-    fp.write('\n######################################### \n\n')
-    fp.close()
+    log = '\n########################################## \n# ! Exception ({0})\n'.format(time.ctime())
+    log += '#\n# !'+'\n# !'.join(trace.split('\n'))
+    log += '\n######################################### \n\n'
+    if verbose | (LOGFILE is None):
+        print(log)
+        
+    if LOGFILE is not None:
+        fp = open(LOGFILE, mode)
+        fp.write(log)
+        fp.close()
     
