@@ -146,7 +146,11 @@ class DrizzlePSF(object):
     
     @staticmethod
     def _get_empty_driz(wcs):
-        sh = (wcs._naxis2, wcs._naxis1)
+        if hasattr(wcs, 'pixel_shape'):
+            sh = wcs.pixel_shape
+        else:
+            sh = (wcs._naxis2, wcs._naxis1)
+        
         outsci = np.zeros(sh, dtype=np.float32)
         outwht = np.zeros(sh, dtype=np.float32)
         outctx = np.zeros(sh, dtype=np.int32)
