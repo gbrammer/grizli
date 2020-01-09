@@ -1073,8 +1073,8 @@ def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=
         
         # Account for timing to combine only exposures taken at an 
         # epoch defined by `max_dt` days.
-        msg = f'parse_visits(combine_same_pa={combine_same_pa}), '
-        msg += 'max_dt={1:.1f}: {0} {2:>3} visits'
+        msg = 'parse_visits(combine_same_pa={0}),'.format(combine_same_pa)
+        msg += ' max_dt={1:.1f}: {0} {2:>3} visits'
         utils.log_comment(utils.LOGFILE, 
                           msg.format('BEFORE', max_dt, len(visits)),
                           verbose=True, show_date=True)
