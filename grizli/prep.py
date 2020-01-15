@@ -2442,7 +2442,7 @@ def gaia_dr2_conesearch_query(ra=165.86, dec=34.829694, radius=3., max=100000):
     
 def get_gaia_DR2_catalog(ra=165.86, dec=34.829694, radius=3.,
                          use_mirror=True, max_wait=20,
-                         max=100000):
+                         max=100000, output_file='gaia.fits'):
     """Query GAIA DR2 astrometric catalog
     
     Parameters
@@ -2560,7 +2560,7 @@ def get_gaia_DR2_catalog(ra=165.86, dec=34.829694, radius=3.,
     connection.request("GET",pathinfo+"/"+jobid+"/results/result")
     response = connection.getresponse()
     data = response.read()
-    outputFileName = "gaia.fits" + (not use_mirror)*".gz"
+    outputFileName = output_file + (not use_mirror)*".gz"
     try:
         outputFile = open(outputFileName, "w")
         outputFile.write(data)
@@ -2576,13 +2576,13 @@ def get_gaia_DR2_catalog(ra=165.86, dec=34.829694, radius=3.,
     if not use_mirror:
         ## ESA archive returns gzipped
         try:
-            os.remove('gaia.fits')
+            os.remove(output_file)
         except:
             pass
     
-        os.system('gunzip gaia.fits.gz')
+        os.system(f'gunzip {output_file}.gz')
     
-    table = Table.read('gaia.fits', format='fits')
+    table = Table.read(output_file, format='fits')
     return table
 
 def gen_tap_box_query(ra=165.86, dec=34.829694, radius=3., max=100000, db='ls_dr7.tractor_primary', columns=['*'], rd_colnames=['ra','dec']):
