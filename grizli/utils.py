@@ -6726,7 +6726,7 @@ def log_comment(LOGFILE, comment, verbose=False, show_date=False, mode='a'):
     import time
         
     if show_date:
-        msg = '\n# ({0})\n'.format(time.ctime())
+        msg = '# ({0})\n'.format(time.ctime())
     else:
         msg = ''
         #fp.write('\n# ({0})\n'.format(time.ctime()))
@@ -6739,7 +6739,7 @@ def log_comment(LOGFILE, comment, verbose=False, show_date=False, mode='a'):
         fp.close()
     
     if verbose:
-        print(msg)
+        print(msg[:-1])
     
     return msg
     
