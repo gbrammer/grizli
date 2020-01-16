@@ -806,8 +806,11 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
         dx = input[input_ix] - tf_out
         rms = utils.nmad(np.sqrt((dx**2).sum(axis=1)))
         #outliers = outliers | (np.sqrt((dx**2).sum(axis=1)) > 4*rms)
-        outliers = (np.sqrt((dx**2).sum(axis=1)) > 4*rms)
-                                          
+        if len(outliers) > 20:
+            outliers = (np.sqrt((dx**2).sum(axis=1)) > 4*rms)
+        else:
+            outliers = (np.sqrt((dx**2).sum(axis=1)) > 10*rms)
+
         if outliers.sum() > 0:
             res2 = match_lists(output[output_ix][~outliers],
                               input[input_ix][~outliers], scl=1., 
