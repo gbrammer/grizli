@@ -6615,7 +6615,8 @@ def catalog_mask(cat, ecol='FLUXERR_APER_0', max_err_percentile=90, pad=0.05, pa
                               pad=pad, pad_is_absolute=pad_is_absolute)
     if ecol in cat.colnames:
         valid = np.isfinite(cat[ecol])
-        test &= cat[ecol] < np.percentile(cat[ecol][(~not_edge) & valid], 
+        if max_err_percentile < 100:
+            test &= cat[ecol] < np.percentile(cat[ecol][(~not_edge) & valid], 
                                           max_err_percentile)
     
     return test
