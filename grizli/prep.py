@@ -2583,7 +2583,7 @@ def get_gaia_DR2_catalog(ra=165.86, dec=34.829694, radius=3.,
         except:
             pass
     
-        os.system(f"gunzip {output_file}.gz")
+        os.system('gunzip {output_file}.gz'.format(output_file=output_file))
     
     table = Table.read(output_file, format='fits')
     return table
