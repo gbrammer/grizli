@@ -266,15 +266,23 @@ Run it with `path` pointing to the location of the `eazy-photoz` repository.""")
     
     return self, cat, zout
     
-def show_from_ds9(ds9, self, zout, **kwargs):
+def show_from_ds9(ds9, self, zout, use_sky=True, **kwargs):
     
     import numpy as np
     
-    xy = np.cast[float](ds9.get('pan image').split())
-    r = np.sqrt((self.cat['x_image']-xy[0])**2 + (self.cat['y_image']-xy[1])**2)
-    
+    if use_sky:
+        xy = np.cast[float](ds9.get('pan fk5').split())
+        cosd = np.cos(xy[1]/180*np.pi)
+        r = np.sqrt((self.cat['ra']-xy[0])**2*cosd**2 + (self.cat['dec']-xy[1])**2)*3600
+        runit = 'arcsec'
+        
+    if (not use_sky) | (xy.sum() == 0):
+        xy = np.cast[float](ds9.get('pan image').split())
+        r = np.sqrt((self.cat['x_image']-xy[0])**2 + (self.cat['y_image']-xy[1])**2)
+        runit = 'pix'
+        
     ix = np.argmin(r)
-    print('ID: {0}, r={1:.1f} pix'.format(self.cat['id'][ix], r[ix]))
+    print('ID: {0}, r={1:.1f} {2}'.format(self.cat['id'][ix], r[ix], runit))
     print('  z={0:.2f} logM={1:.2f}'.format(zout['z_phot'][ix], np.log10(zout['mass'][ix])))
     
     fig = self.show_fit(self.cat['id'][ix], **kwargs)
