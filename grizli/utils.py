@@ -4515,6 +4515,9 @@ def drizzle_array_groups(sci_list, wht_list, wcs_list, outputwcs=None,
     else:
         header = to_header(outputwcs)
     
+    header['DRIZKERN'] = kernel, "Drizzle kernel"
+    header['DRIZPIXF'] = pixfrac, "Drizzle pixfrac"
+    
     # Try to fix deprecated WCS
     for wcs_i in wcs_list:
         if not hasattr(wcs_i, 'pixel_shape'):
