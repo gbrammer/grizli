@@ -1580,16 +1580,23 @@ def get_line_wavelengths():
     
     line_wavelengths['SII'] = [6718.29, 6732.67]
     line_ratios['SII'] = [1., 1.]   
-
+    
     line_wavelengths['SII-6717'] = [6718.29]
     line_ratios['SII-6717'] = [1.]   
     line_wavelengths['SII-6731'] = [6732.67]
     line_ratios['SII-6731'] = [1.]
+
+    line_wavelengths['SII-4075'] = [4069.75, 4077.5]
+    line_ratios['SII-4075'] = [1.,1.]
+    line_wavelengths['SII-4070'] = [4069.75]
+    line_ratios['SII-4075'] = [1.]
+    line_wavelengths['SII-4078'] = [4077.5]
+    line_ratios['SII-4078'] = [1.]
     
     line_wavelengths['HeII-4687'] = [4687.5]
     line_ratios['HeII-4687'] = [1.]
     line_wavelengths['HeII-5412'] = [5412.5]
-    line_ratios['HeII-5410'] = [1.]
+    line_ratios['HeII-5412'] = [1.]
     line_wavelengths['HeI-5877'] = [5877.2]
     line_ratios['HeI-5877'] = [1.]
     line_wavelengths['HeI-3889'] = [3889.5]
@@ -5642,7 +5649,7 @@ class GTable(astropy.table.Table):
         
         return rd_pair
        
-    def match_to_catalog_sky(self, other, self_radec=None, other_radec=None):
+    def match_to_catalog_sky(self, other, self_radec=None, other_radec=None, nthneighbor=1):
         """Compute `~astropy.coordinates.SkyCoord` projected matches between two `GTable` tables.
         
         Parameters
@@ -5658,7 +5665,10 @@ class GTable(astropy.table.Table):
                 >>> rd_pairs['ra'] = 'dec'
                 >>> rd_pairs['ALPHA_J2000'] = 'DELTA_J2000'
                 >>> rd_pairs['X_WORLD'] = 'Y_WORLD'
-        
+            
+        nthneighbor : int
+            See `~astropy.coordinates.SkyCoord.coo.match_to_catalog_sky`.
+            
         Returns
         -------
         idx : int array
@@ -5712,7 +5722,14 @@ class GTable(astropy.table.Table):
             
         other_coo = SkyCoord(ra=other[rd[0]], dec=other[rd[1]])
                      
-        idx, d2d, d3d = other_coo.match_to_catalog_sky(self_coo)
+        try:
+            idx, d2d, d3d = other_coo.match_to_catalog_sky(self_coo, nthneighbor=nthneighbor)
+        except:
+            print('Couldn\'t run SkyCoord.match_to_catalog_sky with'
+                  'nthneighbor')
+            
+            idx, d2d, d3d = other_coo.match_to_catalog_sky(self_coo)
+            
         return idx, d2d.to(u.arcsec)
 
     def match_triangles(self, other, self_wcs=None, x_column='X_IMAGE', y_column='Y_IMAGE', mag_column='MAG_AUTO', other_ra='X_WORLD', other_dec='Y_WORLD', pixel_index=1, match_kwargs={}, pad=100, show_diagnostic=False, auto_keep=3, maxKeep=10, auto_limit=3, ba_max=0.99, scale_density=10):
