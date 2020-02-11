@@ -243,8 +243,7 @@ class GalfitObject(object):
         for k in keys:
             if k in self.pfree:
                 self.pfree[k] = keys[k]
-
-
+    
 class GalfitExpdisk(GalfitObject):
     def __init__(self, output=0, fix={}, **keys): 
         import copy
@@ -279,7 +278,16 @@ class GalfitExpdisk(GalfitObject):
         self.setfree(**fix)
                     
 class GalfitSersic(GalfitObject):
-    def __init__(self, output=0, disk=False, dev=False, fix={}, **keys): 
+    def __init__(self, output=0, disk=False, dev=False, gaussian=False, fix={}, **keys): 
+        """
+        Sersic profile.  
+        
+        Options to fix n for:
+                disk, n=1
+                 dev, n=4
+            gaussian, n=0.5
+            
+        """
         import copy
         
         self.pidx = OrderedDict([('pos', 1), 
@@ -315,6 +323,9 @@ class GalfitSersic(GalfitObject):
             self.setfree(n=0)
         elif dev:
             self.set(n=4)
+            self.setfree(n=0)
+        elif gaussian:
+            self.set(n=0.5)
             self.setfree(n=0)
 
 class GalfitKing(GalfitObject):
