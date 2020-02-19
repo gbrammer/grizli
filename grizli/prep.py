@@ -2959,11 +2959,12 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, ref
     
     """
     query_functions = {'SDSS':get_sdss_catalog, 
-                       'GAIA':get_gaia_DR2_catalog,
+                       'GAIA_TAP':get_gaia_DR2_catalog,
                        'PS1':get_panstarrs_catalog,
                        'WISE':get_irsa_catalog,
                        '2MASS':get_twomass_catalog,
                        'GAIA_Vizier':get_gaia_DR2_vizier,
+                       'GAIA':get_gaia_DR2_vizier,
                        'NSC':get_nsc_catalog,
                        'DES':get_desdr1_catalog,
                        'Hubble':get_hubble_source_catalog,
