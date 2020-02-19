@@ -520,7 +520,7 @@ def clip_lists(input, output, clip=20):
 
 def match_lists(input, output, transform=None, scl=3600., simple=True,
                 outlier_threshold=5, toler=5, triangle_size_limit=[5, 800],
-                triangle_ba_max=0.9):
+                triangle_ba_max=0.9, assume_close=False):
     """TBD
     
     Compute matched objects and transformation between two [x,y] lists.
@@ -621,7 +621,8 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
                          rms_limit=2, use_guess=False, 
                          triangle_size_limit=[5,1800], max_sources=200,
                          triangle_ba_max=0.9, max_err_percentile=99, 
-                         catalog_mask_pad=0.05, match_catalog_density=None):
+                         catalog_mask_pad=0.05, match_catalog_density=None,
+                         assume_close=False):
     """TBD
     """     
     frame = inspect.currentframe()
@@ -775,7 +776,8 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
                 res = match_lists(output, input, scl=1., simple=simple,
                           outlier_threshold=outlier_threshold, toler=toler,
                           triangle_size_limit=triangle_size_limit,
-                          triangle_ba_max=triangle_ba_max)
+                          triangle_ba_max=triangle_ba_max,
+                          assume_close=assume_close)
                           
                 output_ix, input_ix, outliers, tf = res
                 break
@@ -794,7 +796,8 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
                               outlier_threshold=outlier_threshold,
                               toler=toler,
                               triangle_size_limit=triangle_size_limit,
-                              triangle_ba_max=triangle_ba_max)
+                              triangle_ba_max=triangle_ba_max,
+                              assume_close=assume_close)
             except:
                 pass
                 
@@ -2404,6 +2407,7 @@ def get_gaia_DR2_vizier(ra=165.86, dec=34.829694, radius=3., max=100000,
         for i in range(len(keys)//N+1):
             v = Vizier(catalog=catalog, columns=['+_r']+keys[i*N:(i+1)*N])
             v.VIZIER_SERVER = server
+            v.ROW_LIMIT = max
             tab = v.query_region(coo, radius="{0}m".format(radius), catalog=catalog)[0]
             if i == 0:
                 result = tab
