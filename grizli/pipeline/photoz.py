@@ -93,7 +93,8 @@ def apply_catalog_corrections(root, total_flux='flux_auto', auto_corr=True, get_
     if 'id' not in cat.colnames:
         cat.rename_column('number','id')
     
-    cat['z_spec'] = cat['id']*0.-1
+    if 'z_spec' not in cat.colnames:
+        cat['z_spec'] = cat['id']*0.-1
     
     # Spurious sources, sklearn SVM model trained for a single field
     morph_model = os.path.join(os.path.dirname(utils.__file__),
@@ -138,7 +139,7 @@ def apply_catalog_corrections(root, total_flux='flux_auto', auto_corr=True, get_
     
     return cat
     
-def eazy_photoz(root, force=False, object_only=True, apply_background=True, aper_ix=1, apply_prior=False, beta_prior=True, get_external_photometry=False, external_limits=3, external_sys_err=0.3, external_timeout=300, sys_err=0.05, z_step=0.01, z_min=0.01, z_max=12, total_flux='flux_auto', auto_corr=True, compute_residuals=False, dummy_prior=False, extra_rf_filters=[], quiet=True, aperture_indices='all'):
+def eazy_photoz(root, force=False, object_only=True, apply_background=True, aper_ix=1, apply_prior=False, beta_prior=True, get_external_photometry=False, external_limits=3, external_sys_err=0.3, external_timeout=300, sys_err=0.05, z_step=0.01, z_min=0.01, z_max=12, total_flux='flux_auto', auto_corr=True, compute_residuals=False, dummy_prior=False, extra_rf_filters=[], quiet=True, aperture_indices='all', extra_params={}):
     
     import os
     import eazy
@@ -238,7 +239,10 @@ failed:
 
 Run it with `path` pointing to the location of the `eazy-photoz` repository.""")
             return False
-            
+    
+    for k in extra_params:
+        params[k] = extra_params[k]
+                
     self = eazy.photoz.PhotoZ(param_file=None, translate_file='zphot.translate', zeropoint_file=zpfile, params=params, load_prior=True, load_products=load_products)
     
     if quiet:
