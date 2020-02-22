@@ -1399,11 +1399,11 @@ def detect_with_photutils(sci, err=None, dq=None, seg=None, detect_thresh=2.,
     return catalog, seg
     
 def nmad(data):
-    """Normalized NMAD=1.48 * `~.astropy.stats.median_absolute_deviation`
+    """Normalized NMAD=1.4826022 * `~.astropy.stats.median_absolute_deviation`
     
     """
     import astropy.stats
-    return 1.48*astropy.stats.median_absolute_deviation(data)
+    return 1.4826022*astropy.stats.median_absolute_deviation(data)
 
 def get_line_wavelengths():
     """Get a dictionary of common emission line wavelengths and line ratios
