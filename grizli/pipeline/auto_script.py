@@ -5,9 +5,11 @@ import os
 import inspect
 import traceback
 import glob
+import time
 
 import numpy as np
 import astropy.io.fits as pyfits
+import astropy.wcs as pywcs
 
 from .. import prep, utils
 from .default_params import UV_N_FILTERS, UV_M_FILTERS, UV_W_FILTERS
@@ -79,6 +81,19 @@ def get_extra_data(root='j114936+222414', HOME_PATH='/Volumes/Pegasus/Grizli/Aut
     
     tab = utils.GTable.gread(os.path.join(HOME_PATH, '{0}_footprint.fits'.format(root)))
     
+    # Fix CLEAR filter names
+    for i, filt_i in enumerate(tab['filter']):
+        if 'clear' in filt_i.lower():
+            spl = filt_i.lower().split(';')
+            if len(spl) > 1:
+                for s in spl:
+                    if 'clear' not in s:
+                        #print(filt_i, s)
+                        filt_i = s.upper()
+                        break
+
+            tab['filter'][i] = filt_i.upper()
+    
     ra, dec = tab.meta['RA'], tab.meta['DEC']
 
     fp = np.load(os.path.join(HOME_PATH, '{0}_footprint.npy'.format(root)),
@@ -90,6 +105,19 @@ def get_extra_data(root='j114936+222414', HOME_PATH='/Volumes/Pegasus/Grizli/Aut
     dims = np.array([(xy[0].max()-xy[0].min())*np.cos(dec/180*np.pi), xy[1].max()-xy[1].min()])*60
         
     extra = query.run_query(box=[ra, dec, radius], proposid=[], instruments=instruments, extensions=['FLT'], filters=filters, extra=query.DEFAULT_EXTRA)
+    
+    # Fix CLEAR filter names
+    for i, filt_i in enumerate(extra['filter']):
+        if 'clear' in filt_i.lower():
+            spl = filt_i.lower().split(';')
+            if len(spl) > 1:
+                for s in spl:
+                    if 'clear' not in s:
+                        #print(filt_i, s)
+                        filt_i = s.upper()
+                        break
+
+            extra['filter'][i] = filt_i.upper()
     
     for k in tab.meta:
         extra.meta[k] = tab.meta[k]
@@ -291,6 +319,18 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
         HOME_PATH = os.getcwd()
     
     exptab = utils.GTable.gread(os.path.join(HOME_PATH, '{0}_footprint.fits'.format(root)))
+    # Fix CLEAR filter names
+    for i, filt_i in enumerate(exptab['filter']):
+        if 'clear' in filt_i.lower():
+            spl = filt_i.lower().split(';')
+            if len(spl) > 1:
+                for s in spl:
+                    if 'clear' not in s:
+                        #print(filt_i, s)
+                        filt_i = s.upper()
+                        break
+
+            exptab['filter'][i] = filt_i.upper()
     
     utils.LOGFILE = os.path.join(HOME_PATH, '{0}.auto_script.log.txt'.format(root))
     
@@ -826,6 +866,19 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/
     tab = utils.GTable.gread('{0}/{1}_footprint.fits'.format(HOME_PATH,
                              field_root))
     
+    # Fix CLEAR filter names
+    for i, filt_i in enumerate(tab['filter']):
+        if 'clear' in filt_i.lower():
+            spl = filt_i.lower().split(';')
+            if len(spl) > 1:
+                for s in spl:
+                    if 'clear' not in s:
+                        #print(filt_i, s)
+                        filt_i = s.upper()
+                        break
+
+            tab['filter'][i] = filt_i.upper()
+    
     use_filters = utils.column_string_operation(tab['filter'], filters, method='startswith', logical='or')
     tab = tab[use_filters]
     
@@ -983,13 +1036,7 @@ def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=
     `combine_minexp` exposures.
     
     """
-    import os
-    import glob
     import copy
-
-    import numpy as np
-    import astropy.io.fits as pyfits
-    import astropy.wcs as pywcs
 
     #import grizli.prep
     try:
@@ -1593,7 +1640,6 @@ mag_lim=17, cat=None, cols=['mag_auto','ra','dec'], minR=8, dy=5, selection=None
         
         
     """
-    import astropy.wcs as pywcs
     from scipy.interpolate import griddata    
     
     if cat is None:
@@ -1714,10 +1760,6 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
     given the image WCS/pixel size.
     
     """
-    import glob
-    import numpy as np
-    import astropy.io.fits as pyfits
-    import astropy.wcs as pywcs
     from photutils import segmentation, background
     import photutils.utils
     
@@ -1918,10 +1960,6 @@ def photutils_catalog(field_root='j142724+334246', threshold=1.8, subtract_bkg=T
     Make a detection catalog with SExtractor and then measure
     photometry with `~photutils`.
     """
-    import glob
-    import numpy as np
-    import astropy.io.fits as pyfits
-    import astropy.wcs as pywcs
     from photutils import segmentation, background
     import photutils.utils
     
@@ -2701,8 +2739,6 @@ def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Griz
     from drizzlepac import updatehdr
             
     import astropy.units as u
-    import astropy.io.fits as pyfits
-    import astropy.wcs as pywcs
     from scipy.optimize import minimize, fmin_powell
     
     import copy
@@ -3358,6 +3394,10 @@ def make_combined_mosaics(root, fix_stars=False, mask_spikes=False, skip_single_
     Drizzle combined mosaics
     """
     
+    # if False:
+    #     # j = 125+110w
+    #     auto_script.field_rgb('j013804m2156', HOME_PATH=None, show_ir=True, filters=['f160w','j','f105w'], xsize=16, rgb_scl=[1, 0.85, 1], rgb_min=-0.003)
+            
     visits_file = '{0}_visits.npy'.format(root)
     visits, groups, info = np.load(visits_file, allow_pickle=True)
     
@@ -3904,18 +3944,13 @@ def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', s
     """
     RGB image of the field mosaics
     """
-    import os
-    import glob
-    import numpy as np
-    import time
     
     import matplotlib.pyplot as plt
     from matplotlib.ticker import MultipleLocator
 
     #import montage_wrapper
     from astropy.visualization import make_lupton_rgb
-    import astropy.wcs as pywcs
-    import astropy.io.fits as pyfits
+
     
     try:
         from .. import utils
@@ -4036,18 +4071,20 @@ def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', s
         
         ds9.set('rgb')
         ds9.set('rgb channel red')
-        ds9.view(rimg, header=ims[rf][0].header)
+        wcs_header = utils.to_header(pywcs.WCS(ims[rf][0].header))
+        ds9.view(rimg, header=wcs_header)
         ds9.set_defaults(); ds9.set('cmap value 9.75 0.8455')
         
         ds9.set('rgb channel green')
-        ds9.view(gimg)#, header=ims[gf][0].header)
+        ds9.view(gimg, wcs_header)
         ds9.set_defaults(); ds9.set('cmap value 9.75 0.8455')
 
         ds9.set('rgb channel blue')
-        ds9.view(bimg)#, header=ims[bf][0].header)
+        ds9.view(bimg, wcs_header)
         ds9.set_defaults(); ds9.set('cmap value 9.75 0.8455')
 
         ds9.set('rgb channel red')
+        ds9.set('rgb lock colorbar')
         
         return False
     
