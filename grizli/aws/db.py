@@ -1643,11 +1643,13 @@ def run_all_redshift_fits():
     res = engine.execute("DELETE from redshift_fit_quasar WHERE (root = '{0}')".format(root), engine)
     res = engine.execute("DELETE from stellar_fit WHERE (root = '{0}')".format(root), engine)
     res = engine.execute("DELETE from photometry_apcorr WHERE (p_root = '{0}')".format(root), engine)
-    grizli_db.run_lambda_fits(root, min_status=6, zr=[0.01,zmax])  
+    grizli_db.run_lambda_fits(root, phot_root=root, min_status=2, zr=[0.01,zmax], mag_limits=[15,26], engine=engine)  
     
     #for root in "j233844m5528 j105732p3620 j112416p1132 j113812m1134 j113848m1134 j122852p1046 j143200p0959 j152504p0423 j122056m0205 j122816m1132 j131452p2612".split():
-    res = grizli_db.make_html_table(engine=engine, columns=['mtime', 'root','status','id','p_ra','p_dec','mag_auto','flux_radius','t_g800l','t_g102', 't_g141', 'z_spec','z_map','bic_diff','chinu','zwidth1/(1+z_map) as zw1','q_z','q_z > -0.69 as q_z_TPR90','dlinesn'], where="AND status > 4 AND root = '{0}'".format(root), table_root=root, sync='s3://grizli-v1/Pipeline/{0}/Extractions/'.format(root), png_ext=['R30', 'stack','full','line'], show_hist=True)
-            
+    res = grizli_db.make_html_table(engine=engine, columns=['mtime', 'root','status','id','p_ra','p_dec','mag_auto','flux_radius','t_g800l','t_g102', 't_g141', 'z_spec','z_map','bic_diff','chinu','zwidth1/(1+z_map) as zw1','q_z','q_z > -0.69 as q_z_TPR90','dlinesn'], where="AND status > 4 AND root = '{0}'".format(root), table_root=root, sync='s3://grizli-v1/Pipeline/{0}/Extractions/'.format(root), png_ext=['R30', 'stack','full','rgb','line'], show_hist=True)
+    
+    grizli_db.aws_rgb_thumbnails(root, engine=engine)
+    
     os.system('aws s3 cp s3://grizli-v1/Pipeline/{0}/Extractions/{0}_zhist.png s3://grizli-v1/tables/'.format(root))
     
 def aws_rgb_thumbnails(root, bucket='grizli-v1', engine=None, thumb_args={}, ids=None, verbose=True, res=None):
@@ -1662,8 +1664,11 @@ def aws_rgb_thumbnails(root, bucket='grizli-v1', engine=None, thumb_args={}, ids
     if res is None:
         res = from_sql(f"SELECT root, id, ra, dec FROM redshift_fit WHERE root = '{root}' AND ra > 0", engine)
     
+    aws_prep_dir = 's3://{0}/Pipeline/{1}/Prep/'.format(bucket, root)
+    aws_bucket = 's3://{0}/Pipeline/{1}/Thumbnails/'.format(bucket, root)
+    
     event = {'make_segmentation_figure': True, 
-             'aws_prep_dir': f's3://{bucket}/Pipeline/{root}/Prep/', 
+             'aws_prep_dir': aws_prep_dir, 
              'single_output': True, 
              'combine_similar_filters': True, 
              'show_filters': ['visb', 'visr', 'y', 'j', 'h'], 
@@ -1673,7 +1678,7 @@ def aws_rgb_thumbnails(root, bucket='grizli-v1', engine=None, thumb_args={}, ids
              'sync_fits': True, 
              'thumb_height': 2.0, 
              'scale_ab': 21, 
-             'aws_bucket': f's3://{bucket}/Pipeline/{root}/Thumbnails/', 
+             'aws_bucket': aws_bucket, 
              'master': None, 
              'rgb_params': {'xsize': 4, 'output_dpi': None, 
                             'rgb_min': -0.01, 'add_labels': False, 
@@ -1709,7 +1714,7 @@ def aws_rgb_thumbnails(root, bucket='grizli-v1', engine=None, thumb_args={}, ids
                 
         event['ra'] = ra
         event['dec'] = dec
-        event['label'] = f'{root_i}_{id:05d}'
+        event['label'] = '{0}_{1:05d}'.format(root_i, id)
         
         fit_redshift_lambda.send_event_lambda(event, verbose=verbose)
         
@@ -2196,14 +2201,14 @@ def get_exposure_info():
             df0 = df0.append(df)
         
         if (i % SKIP) == SKIP-1:
-            print(f'>>> to DB >>> ({i}, {len(df0)})')
+            print('>>> to DB >>> ({0}, {1})'.format(i, len(df0)))
             df0.to_sql('exposure_log', engine, index=False, if_exists='append', method='multi')
         
     
 def get_exposures_at_position(ra, dec, engine, dr=10):
     
     cosdec = np.cos(dec/180*np.pi)
-    res = db.from_sql(f'select * from exposure_log where (ABS(ra - {ra}) < {dr/cosdec}) AND (ABS(dec-{dec}) < {dr})', engine)
+    res = db.from_sql('select * from exposure_log where (ABS(ra - {0}) < {1}) AND (ABS(dec-{2}) < {3})'.format(ra, dr/cosdec, dec, dr), engine)
     return res
     
 def add_irac_table():
@@ -2282,7 +2287,8 @@ def add_irac_table():
     engine.execute('drop table exposure_log;')
     first.to_sql('spitzer_log', engine, index=False, if_exists='append', method='multi')
     for k in bkey:
-        engine.execute(f'alter table spitzer_log add column fp_{k} float [];')
+        cmd = 'alter table spitzer_log add column fp_{0} float [];'.format(k)
+        engine.execute(cmd)
     
     engine.execute('delete from spitzer_log where True;')
     df.to_sql('spitzer_log', engine, index=False, if_exists='append', method='multi')
