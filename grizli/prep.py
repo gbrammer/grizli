@@ -2387,7 +2387,8 @@ def get_gaia_DR2_vizier_columns():
     
     
 def get_gaia_DR2_vizier(ra=165.86, dec=34.829694, radius=3., max=100000,
-                    catalog="I/345/gaia2", server='vizier.cfa.harvard.edu'):
+                    catalog="I/345/gaia2", server='vizier.cfa.harvard.edu', 
+                    use_mirror=False):
     
     from astroquery.vizier import Vizier
     import astropy.units as u
