@@ -1650,7 +1650,7 @@ def run_all_redshift_fits():
             
     os.system('aws s3 cp s3://grizli-v1/Pipeline/{0}/Extractions/{0}_zhist.png s3://grizli-v1/tables/'.format(root))
     
-def aws_rgb_thumbnails(root, bucket='grizli-v1', engine=None, thumb_args={}, ids=None, verbose=True):
+def aws_rgb_thumbnails(root, bucket='grizli-v1', engine=None, thumb_args={}, ids=None, verbose=True, res=None):
     """
     Make thumbnails for everything that has an entry in the redshift_fit table
     """
@@ -1659,7 +1659,8 @@ def aws_rgb_thumbnails(root, bucket='grizli-v1', engine=None, thumb_args={}, ids
     if engine is None:
         engine = get_db_engine(echo=False)
     
-    res = from_sql(f"SELECT id, ra, dec FROM redshift_fit WHERE root = '{root}'", engine)
+    if res is None:
+        res = from_sql(f"SELECT root, id, ra, dec FROM redshift_fit WHERE root = '{root}' AND ra > 0", engine)
     
     event = {'make_segmentation_figure': True, 
              'aws_prep_dir': f's3://{bucket}/Pipeline/{root}/Prep/', 
@@ -1696,13 +1697,19 @@ def aws_rgb_thumbnails(root, bucket='grizli-v1', engine=None, thumb_args={}, ids
     
     N = len(res)
     for i in range(N):
+        
         id = res['id'][i]
         ra = res['ra'][i]
         dec = res['dec'][i]
-
+        root_i = res['root'][i]
+        
+        if ids is not None:
+            if id not in ids:
+                continue
+                
         event['ra'] = ra
         event['dec'] = dec
-        event['label'] = f'{root}_{id:05d}'
+        event['label'] = f'{root_i}_{id:05d}'
         
         fit_redshift_lambda.send_event_lambda(event, verbose=verbose)
         
