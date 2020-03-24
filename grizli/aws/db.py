@@ -699,6 +699,7 @@ def run_lambda_fits(root='j004404m2034', phot_root=None, mag_limits=[15, 26], sn
     grizli_db.set_phot_root(root, phot_root, engine)
     
     res = pd.read_sql_query("SELECT root, id, flux_radius, mag_auto, z_map, status, bic_diff, zwidth1, log_pdf_max, chinu FROM photometry_apcorr AS p JOIN (SELECT * FROM redshift_fit WHERE z_map > 0 AND root = '{0}') z ON (p.p_root = z.root AND p.p_id = z.id)".format(root), engine)
+    
     return res
     
     if False:
@@ -732,7 +733,10 @@ def set_phot_root(root, phot_root, engine):
         
     if False:
         # Replace in-place
-        engine.execute("update redshift_fit_quasar set phot_root = replace(root, 'g800l', 'grism')")
+        engine.execute("update redshift_fit set phot_root = replace(root, 'g800l', 'grism') WHERE root not like 'j214224m4420%%' AND root LIKE '%%-grism%%")
+
+        engine.execute("update redshift_fit set phot_root = replace(root, 'g800l', 'grism') WHERE root not like 'j214224m4420%%'")
+        engine.execute("update redshift_fit set phot_root = 'j214224m4420' WHERE root like 'j214224m4420gr%%'")
 
         engine.execute("update redshift_fit_quasar set phot_root = replace(root, 'g800l', 'grism') where root like '%%g800l%%'")
         
@@ -815,6 +819,45 @@ def fit_timeouts(root='j004404m2034', mag_limits=[15, 26], sn_limit=7, min_statu
     
     all_events = fit_redshift_lambda.generate_events(res['root'], res['id'], base=base, send_to_lambda=True)
     
+    #################
+    # Fit locally on EC2
+    
+    
+    i0=0
+    
+    import os
+    
+    import pandas as pd
+    import numpy as np
+    from grizli.aws import db as grizli_db
+    from grizli.aws import fit_redshift_lambda, lambda_handler
+    
+    engine = grizli_db.get_db_engine(echo=False)
+    
+    res = pd.read_sql_query("SELECT root, id, status FROM redshift_fit WHERE status = 5 AND root NOT LIKE 'cos-grism%%' AND root LIKE '%%-grism%%' ORDER BY root", engine)
+
+    res = pd.read_sql_query("SELECT root, id, status FROM redshift_fit WHERE status = 5 AND root NOT LIKE 'cos-grism%%' AND root NOT LIKE '%%-grism%%' AND root NOT LIKE '%%g800l%%' ORDER BY root", engine)
+    bucket = 'grizli-v1'
+
+    res = pd.read_sql_query("SELECT root, id, status FROM redshift_fit WHERE status = 5 AND root LIKE 'j114936p2222' ORDER BY id", engine)
+    bucket = 'grizli-v1'
+    
+    # res = pd.read_sql_query("SELECT root, id, status FROM redshift_fit WHERE status = 5 AND root LIKE 'cos-grism%%' order by id", engine)
+    # bucket = 'grizli-cosmos-v2'
+    
+    N = len(res)
+    np.random.seed(1)
+    so = np.argsort(np.random.normal(size=N))
+    
+    base = {'bucket': bucket, 'skip_started': False, 'quasar_fit': False, 'zr': '0.01,3.4', 'force_args': True, 'bad_pa_threshold': 10, 'use_phot_obj': False, 'save_figures':'png', 'verbose':True, 'working_directory':os.getcwd()}
+    
+    events = fit_redshift_lambda.generate_events(res['root'], res['id'], base=base, send_to_lambda=False)
+    
+    for event in events[i0::2]:
+        lambda_handler.handler(event, {}) 
+        
+    ########
+    
     xres = pd.read_sql_query("SELECT root, p_ra as ra, p_dec as dec, id, status FROM redshift_fit WHERE status = 5 AND root LIKE 'gds-grism%%' ORDER BY root".format(root), engine)
     
     print(len(res), len(xres))
@@ -886,6 +929,10 @@ def add_phot_to_db(root, delete=False, engine=None, nmax=500):
         if delete:
             print('Delete rows where root={0}'.format(root))
             res = engine.execute("DELETE from photometry_apcorr WHERE (p_root = '{0}')".format(root))
+            
+            if False:
+                res = engine.execute("DELETE from redshift_fit WHERE (root = '{0}')".format(root))
+                
         else:
             print('Data found for root={0}, delete them if necessary'.format(root))
             return False
@@ -896,7 +943,8 @@ def add_phot_to_db(root, delete=False, engine=None, nmax=500):
     # remove columns
     remove = []
     for c in phot.colnames: 
-        if ('_corr_' in c) | ('_ecorr_' in c) | (c[-5:] in ['tot_4','tot_5', 'tot_6']): 
+        if ('_corr_' in c) | ('_ecorr_' in c) | (c[-5:] in ['tot_4','tot_5', 'tot_6']) | ('dummy' in c):
+             
             remove.append(c) 
     phot.remove_columns(remove)
     
@@ -930,6 +978,7 @@ def multibeam_to_database(beams_file, engine=None, Rspline=15, force=False, **kw
     """
     Send statistics of the beams.fits file to the database
     """
+    import numpy as np
     import pandas as pd
     from astropy.time import Time
     
@@ -1051,6 +1100,46 @@ def multibeam_to_database(beams_file, engine=None, Rspline=15, force=False, **kw
     res = engine.execute("DELETE from beam_geometry WHERE (root = '{0}' AND id = {1})".format(mb.group_name, mb.id), engine)
     df.to_sql('beam_geometry', engine, index=False, if_exists='append', method='multi')
     
+    if False:
+        # Fix multibeam arrays
+        import pandas as pd
+        import numpy as np
+        from sqlalchemy import types
+        from grizli.aws import db as grizli_db
+        engine = grizli_db.get_db_engine()
+                
+        df = pd.read_sql_query('select id, root, scip, errp, snp, contamp, fcontamp from multibeam mb', engine)
+        c = 'snp'
+        
+        data = pd.DataFrame()
+        data['id'] = df['id']
+        data['root'] = df['root']
+        dtype = {'root':types.String, 'id':types.Integer}
+
+        for c in df.columns:
+            if c.endswith('p'):
+                print(c)
+
+                dtype[c[:-1]+'_p'] = types.ARRAY(types.FLOAT)
+                
+                data[c[:-1]+'_p'] = [list(np.cast[float](l.strip()[1:-1].split(','))) for l in df[c]]
+                
+        data.to_sql('multibeam_tmp', engine, index=False, if_exists='append', method='multi')
+                
+        from sqlalchemy import types
+        for c in df.columns:
+            if c.endswith('p'):
+                pass
+        
+        for c in df.columns:
+            if c.endswith('p'):
+                sql = "ALTER TABLE multibeam ADD COLUMN {0} real[];".format(c[:-1]+'_p')
+                print(sql)
+                sql = "UPDATE multibeam mb SET {new} = tmp.{new} FROM multibeam_tmp tmp WHERE tmp.id = mb.id AND tmp.root = mb.root;".format(new=c[:-1]+'_p')
+                print(sql)
+                
+        x = grizli_db.from_sql('select id, scip, errp, snp, contamp, fcontamp from multibeam mb', engine)
+        
 def test_join():
     import pandas as pd
     
@@ -1393,7 +1482,7 @@ def from_sql(query, engine):
     
     return tab
     
-def render_for_notebook(tab, image_extensions=['stack','full','line'], bucket='grizli-v1', max_rows=20):
+def render_for_notebook(tab, image_extensions=['stack','full','line'], bucket='grizli-v1', max_rows=20, link_root=True):
     """
     Render images for inline display in a notebook
     
@@ -1402,14 +1491,28 @@ def render_for_notebook(tab, image_extensions=['stack','full','line'], bucket='g
     In [2]: HTML(tab)
     
     """
+    import pandas as pd
+    pd.set_option('display.max_colwidth', -1)
+    
     rows = tab[:max_rows].copy()
-    rows['bucket'] = bucket
+    buckets = [bucket]*len(rows)
+    for i, r in enumerate(rows['root']):
+        if r.startswith('cos-g'):
+            buckets[i] = 'grizli-cosmos-v2'
+    
+    rows['bucket'] = buckets
+    
     rows['ext'] = 'longstring' # longer than the longest extension
     
     s3url = 'https://s3.amazonaws.com/{bucket}/Pipeline/{root}/Extractions/{root}_{id:05d}.{ext}.png'
 
     def href_root(root):
-        s3 = 'https://s3.amazonaws.com/'+bucket+'/Pipeline/{0}/Extractions/{0}.html'
+        if root.startswith('cos-g'):
+            bucket_i = 'grizli-cosmos-v2'
+        else:
+            bucket_i = bucket
+            
+        s3 = 'https://s3.amazonaws.com/'+bucket_i+'/Pipeline/{0}/Extractions/{0}.html'
         return '<a href={0}>{1}</a>'.format(s3.format(root), root)
         
     def path_to_image_html(path):
@@ -1417,7 +1520,11 @@ def render_for_notebook(tab, image_extensions=['stack','full','line'], bucket='g
     
     # link for root
     
-    fmt = {'root':href_root}
+    if link_root:
+        fmt = {'root':href_root}
+    else:
+        fmt = {}
+        
     for ext in image_extensions:
         rows['ext'] = ext
         urls = [s3url.format(**row) for row in rows.to_pandas().to_dict(orient='records')]
@@ -1533,6 +1640,8 @@ def run_all_redshift_fits():
     #     print(root)
     # 
     res = engine.execute("DELETE from redshift_fit WHERE (root = '{0}')".format(root), engine)
+    res = engine.execute("DELETE from redshift_fit_quasar WHERE (root = '{0}')".format(root), engine)
+    res = engine.execute("DELETE from stellar_fit WHERE (root = '{0}')".format(root), engine)
     res = engine.execute("DELETE from photometry_apcorr WHERE (p_root = '{0}')".format(root), engine)
     grizli_db.run_lambda_fits(root, min_status=6, zr=[0.01,zmax])  
     
@@ -1541,6 +1650,62 @@ def run_all_redshift_fits():
             
     os.system('aws s3 cp s3://grizli-v1/Pipeline/{0}/Extractions/{0}_zhist.png s3://grizli-v1/tables/'.format(root))
     
+def aws_rgb_thumbnails(root, bucket='grizli-v1', engine=None, thumb_args={}):
+    """
+    Make thumbnails for everything that has an entry in the redshift_fit table
+    """
+    from grizli.aws import aws_drizzler, fit_redshift_lambda
+    
+    if engine is None:
+        engine = get_db_engine(echo=False)
+    
+    res = from_sql(f"SELECT id, ra, dec FROM redshift_fit WHERE root = '{root}'", engine)
+    
+    event = {'make_segmentation_figure': False, 
+             'aws_prep_dir': f's3://{bucket}/Pipeline/{root}/Prep/', 
+             'single_output': True, 
+             'combine_similar_filters': True, 
+             'show_filters': ['visb', 'visr', 'y', 'j', 'h'], 
+             'include_ir_psf': False, 
+             'include_saturated': True, 
+             'subtract_median': True, 
+             'sync_fits': True, 
+             'thumb_height': 2.0, 
+             'scale_ab': 21, 
+             'aws_bucket': f's3://{bucket}/Pipeline/{root}/Thumbnails/', 
+             'master': None, 
+             'rgb_params': {'xsize': 4, 'output_dpi': None, 
+                            'rgb_min': -0.01, 'add_labels': False, 
+                            'output_format': 'png', 'show_ir': False, 
+                            'scl': 2, 'suffix': '.rgb', 'mask_empty': False, 
+                            'tick_interval': 1, 'pl': 1}, 
+             'remove': True, 
+             'filters': ['f160w', 'f140w', 'f125w', 'f105w', 'f110w', 'f098m',
+                         'f850lp', 'f814w', 'f775w', 'f606w', 'f475w', 
+                         'f555w', 'f600lp', 'f390w', 'f350lp'], 
+             'half_optical_pixscale': True, 
+             'theta': 0, 
+             'kernel': 'square', 
+             'pixfrac': 0.33, 
+             'wcs': None, 
+             'size': 6, 
+             'pixscale': 0.1}
+    
+    for k in thumb_args:
+        event[k] = thumb_args[k]
+    
+    N = len(res)
+    for i in range(N):
+        id = res['id'][i]
+        ra = res['ra'][i]
+        dec = res['dec'][i]
+
+        event['ra'] = ra
+        event['dec'] = dec
+        event['label'] = f'{root}_{id:05d}'
+        
+        fit_redshift_lambda.send_event_lambda(event, verbose=verbose)
+        
 def count_sources_for_bad_persistence():
     """
     Count the number of extracted objects for each id and look for fields 
@@ -1573,6 +1738,7 @@ def add_missing_photometry():
     import pandas as pd
     from grizli.aws import db as grizli_db
     from grizli.pipeline import photoz
+    from grizli import utils
     
     engine = grizli_db.get_db_engine(echo=False)
     
@@ -1598,7 +1764,7 @@ def add_missing_photometry():
             if not os.path.exists('{0}_phot_apcorr.fits'.format(root)):
                 os.system('aws s3 cp s3://grizli-v1/Pipeline/{0}/Prep/{0}_phot_apcorr.fits .'.format(root))
                 os.system('aws s3 cp s3://grizli-v1/Pipeline/{0}/Prep/{0}_phot.fits .'.format(root))
-                
+            
             if os.path.exists('{0}_phot_apcorr.fits'.format(root)):
                 grizli_db.add_phot_to_db(root, delete=False, engine=engine)
             else:
@@ -1607,14 +1773,17 @@ def add_missing_photometry():
                     utils.set_warnings()
 
                     total_flux = 'flux_auto' 
-                    obj = photoz.eazy_photoz(root, object_only=True,
+                    try:
+                        obj = photoz.eazy_photoz(root, object_only=True,
                               apply_prior=False, beta_prior=True, 
                               aper_ix=1, 
                               force=True,
                               get_external_photometry=False, 
                               compute_residuals=False, 
                               total_flux=total_flux)
-                    
+                    except:
+                        continue
+                        
                     grizli_db.add_phot_to_db(root, delete=False, 
                                              engine=engine)
                     
@@ -1723,6 +1892,8 @@ def set_column_formats(info, extra={}):
             info[c].format = '.1f'
         elif c.startswith('mag_'):
             info[c].format = '.2f'
+        elif '_ujy' in c:
+            info[c].format = '.2f'
         elif c.startswith('ew_'):
             info[c].format = '.1f'
         elif ('q_z' in c):
@@ -1740,7 +1911,7 @@ def set_column_formats(info, extra={}):
         elif c.startswith('flux_') | c.startswith('err_'):
             info[c].format = '.1e'
         
-def make_html_table(engine=None, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','bic_diff','chinu','log_pdf_max', 'd4000', 'd4000_e'], where="AND status >= 5 AND root='j163852p4039'", tables=[], table_root='query', sync='s3://grizli-v1/tables/', png_ext=['R30','stack','full','line'], sort_column=('bic_diff',-1), fit_table='redshift_fit', verbose=True, get_sql=False, res=None, show_hist=False, extra_formats={}):
+def make_html_table(engine=None, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','bic_diff','chinu','log_pdf_max', 'd4000', 'd4000_e'], where="AND status >= 5 AND root='j163852p4039'", tables=[], table_root='query', sync='s3://grizli-v1/tables/', png_ext=['R30','stack','full','line'], sort_column=('bic_diff',-1), fit_table='redshift_fit', verbose=True, get_sql=False, res=None, show_hist=False, extra_formats={}, use_join=False):
     """
     """
     import time
@@ -1760,7 +1931,11 @@ def make_html_table(engine=None, columns=['root','status','id','p_ra','p_dec','m
     else:
         extra_tables = ''
         
-    query = "SELECT {0} FROM photometry_apcorr, {3}{1} WHERE phot_root = p_root AND id = p_id {2};".format(','.join(columns), extra_tables, where, fit_table)
+    if use_join:
+        query = "SELECT {0} FROM {1} NATURAL JOIN photometry_apcorr WHERE {2};".format(','.join(columns), fit_table, where)
+        query = query.replace('WHERE AND', 'AND')
+    else:
+        query = "SELECT {0} FROM photometry_apcorr, {3}{1} WHERE phot_root = p_root AND id = p_id {2};".format(','.join(columns), extra_tables, where, fit_table)
     
     if get_sql:
         return query
@@ -1796,7 +1971,13 @@ def make_html_table(engine=None, columns=['root','status','id','p_ra','p_dec','m
     
     print('Sort: ', sort_column, sort_column[0] in all_columns)
     if sort_column[0] in all_columns:
-        so = np.argsort(info[sort_column[0]])[::sort_column[1]]
+        scol = info[sort_column[0]]
+        if hasattr(scol, 'mask'):
+            sdata = scol.filled(fill_value=-np.inf).data
+        else:
+            sdata = scol
+            
+        so = np.argsort(sdata)[::sort_column[1]]
         #info = info[so[::sort_column[1]]]
         
     ### PNG columns  
@@ -1804,11 +1985,32 @@ def make_html_table(engine=None, columns=['root','status','id','p_ra','p_dec','m
     bucket = ['grizli-cosmos-v2' if r.startswith('cos-') else 'grizli-v1' for r in info['root']]
     
     for ext in png_ext:
+        if ext == 'thumb':
+            subdir = 'Thumbnails'
+            print(ext, subdir)
+        elif ext == 'rgb':
+            subdir = 'Thumbnails'
+        else:
+            subdir = 'Extractions'
+            
         if 'png_{0}'.format(ext) not in info.colnames:
             png = ['{0}_{1:05d}.{2}.png'.format(root, id, ext) for root, id in zip(info['root'], info['id'])]
-            info['png_{0}'.format(ext)] = ['<a href="{0}/{1}/Extractions/{2}"><img src={0}/{1}/Extractions/{2} height=200></a>'.format(AWS.replace('grizli-v1',buck), root, p) for buck, root, p in zip(bucket, info['root'], png)]
-        
-        all_columns.append('png_{0}'.format(ext))
+                                 
+            if ext == 'rgb':
+                js = '<a href={0}/{2}><img src={0}/{1} onmouseover="this.src = this.src.replace(\'rgb.pn\', \'seg.pn\')" onmouseout="this.src = this.src.replace(\'seg.pn\', \'rgb.pn\')" height=200></a>'
+                
+                path = '{0}/{1}/{2}'.format(AWS, root, subdir)
+                info['png_{0}'.format('rgb')] = [js.format(
+                          path.replace('grizli-v1', buck), 
+                          p, 
+                          p.replace('.rgb.png', '.thumb.png')) 
+                               for buck, p in zip(bucket, png)]
+                               
+            else:
+                info['png_{0}'.format(ext)] = ['<a href="{0}/{1}/{2}/{3}"><img src={0}/{1}/{2}/{3} height=200></a>'.format(AWS.replace('grizli-v1',buck), root, subdir, p) for buck, root, p in zip(bucket, info['root'], png)]
+                
+                
+            all_columns.append('png_{0}'.format(ext))
     
     sortable = []
     for c in all_columns:
@@ -1857,6 +2059,224 @@ def make_html_table(engine=None, columns=['root','status','id','p_ra','p_dec','m
     
     return res
 
+def get_exposure_info():
+    """
+    Get exposure information from the MAST databases
+    """
+    import mastquery.query
+    
+    master = 'grizli-v1-19.12.04'
+    
+    tab = utils.read_catalog('{0}_visits.fits'.format(master))
+    all_visits = np.load('{0}_visits.npy'.format(master), allow_pickle=True)[0]
+    
+    all_files = []
+    for v in all_visits:
+        all_files.extend(v['files'])
+    
+    prog = [f[1:4] for f in all_files]
+    _res = np.unique(np.array(prog), return_counts=True)
+    t = utils.GTable(); t['prog'] = _res[0] ; t['count'] = _res[1]; so = np.argsort(t['count']); t = t[so[::-1]]   
+    for pr in t['prog']:
+        print(pr)
+        if os.path.exists('{0}_query.fits'.format(pr)):
+            continue
+        
+        try:
+            _q = mastquery.query.run_query(obs_id='[ij]{0}*'.format(pr)) 
+            _p = mastquery.query.get_products_table(_q)
+        except:
+            continue
+            
+        _q.write('{0}_query.fits'.format(pr))
+        _p.write('{0}_prod.fits'.format(pr))
+    
+    # Send to AWS
+    from grizli.aws import db    
+    import pandas as pd
+    from astropy.table import Table
+    
+    engine = db.get_db_engine() 
+
+    files = glob.glob('*query.fits')
+    files.sort()
+
+    cols = ['obs_id', 'target', 'ra', 'dec', 't_min', 't_max', 'exptime', 'wavelength_region', 'filter', 'em_min', 'em_max', 'target_classification', 'obs_title', 't_obs_release', 'instrument_name', 'proposal_pi', 'proposal_id', 'proposal_type', 'footprint', 'dataRights', 'mtFlag', 'obsid', 'objID', 'visit']
+    
+    for i, file in enumerate(files):
+        print(file)
+        _q = Table.read(file, character_as_bytes=False)
+        
+        _q['proposal_id'] = np.cast[np.int16](_q['proposal_id'])
+        _q['obsid'] = np.cast[np.int64](_q['obsid'])
+        _q['objID'] = np.cast[np.int64](_q['objID'])
+
+        df = _q[cols].to_pandas()
+        df.to_sql('mast_query', engine, index=False, if_exists='append', method='multi')
+    
+    files = glob.glob('*_prod.fits')
+    files.sort()
+
+    cols = ['obsid', 'dataset']
+    
+    for i, file in enumerate(files):
+        print(i, file)
+        _p = Table.read(file, character_as_bytes=False)
+        
+        _p['obsid'] = np.cast[np.int64](_p['obsid'])
+        _p['dataset'] = [d[:-1] for d in _p['observation_id']]
+        
+        df = _p[cols].to_pandas()
+        df.to_sql('mast_products', engine, index=False, if_exists='append', method='multi')
+    
+    ##########
+    # Exposure log
+    
+    # Initialize, adding an array column manually for the footprints
+    v = all_visits[0]
+    N = len(v['files'])
+    fps = [np.array(fp.convex_hull.boundary.xy)[:,:-1].tolist() for fp in v['footprints']]
+    df = pd.DataFrame()
+    df['file'] = [f.split('_')[0] for f in v['files']]
+    df['dataset'] = [f.split('_')[0][:-1] for f in v['files']]
+    df['extension'] = [f.split('_')[1][:3] for f in v['files']]
+    df['filter'] = v['filter']
+    df['parent'] = v['parent']
+    df['awspath'] = v['awspath']
+    df['product'] = v['product']
+    df['filter'] = v['product'].split('-')[-1]
+    
+    df['ra'] = [fp.centroid.xy[0][0] for fp in v['footprints']]
+    df['dec'] = [fp.centroid.xy[1][0] for fp in v['footprints']]
+    df['area'] = [fp.area*np.cos(df['dec'][i]/180*np.pi)*3600 for i, fp in enumerate(v['footprints'])]
+    
+    # Make table
+    engine.execute('drop table exposure_log;')
+    df.to_sql('exposure_log', engine, index=False, if_exists='append', method='multi')
+    engine.execute('alter table exposure_log add column footprint float [];')
+    engine.execute('delete from exposure_log where True;')
+    
+    SKIP = 1000
+    for i, v in enumerate(all_visits):
+        print(i, v['parent'], v['product'])
+        
+        N = len(v['files'])
+        
+        fps = [np.array(fp.convex_hull.boundary.xy)[:,:-1].tolist() for fp in v['footprints']]
+        
+        if (i % SKIP) == 0:
+            df0 = df[:0]
+        
+        df = pd.DataFrame()
+        df['file'] = [f.split('_')[0] for f in v['files']]
+        df['dataset'] = [f.split('_')[0][:-1] for f in v['files']]
+        df['extension'] = [f.split('_')[1][:3] for f in v['files']]
+        df['filter'] = v['filter']
+        df['parent'] = v['parent']
+        df['awspath'] = v['awspath']
+        df['product'] = v['product']
+        df['filter'] = v['product'].split('-')[-1]
+
+        df['ra'] = [fp.centroid.xy[0][0] for fp in v['footprints']]
+        df['dec'] = [fp.centroid.xy[1][0] for fp in v['footprints']]
+        df['area'] = [fp.area*np.cos(df['dec'][i]/180*np.pi)*3600 for i, fp in enumerate(v['footprints'])]
+        df['footprint'] = fps
+        
+        if (i % SKIP) > 0:
+            df0 = df0.append(df)
+        
+        if (i % SKIP) == SKIP-1:
+            print(f'>>> to DB >>> ({i}, {len(df0)})')
+            df0.to_sql('exposure_log', engine, index=False, if_exists='append', method='multi')
+        
+    
+def get_exposures_at_position(ra, dec, engine, dr=10):
+    
+    cosdec = np.cos(dec/180*np.pi)
+    res = db.from_sql(f'select * from exposure_log where (ABS(ra - {ra}) < {dr/cosdec}) AND (ABS(dec-{dec}) < {dr})', engine)
+    return res
+    
+def add_irac_table():
+    
+    from scipy.spatial import ConvexHull
+    
+    os.chdir('/Users/gbrammer/Research/HST/CHArGE/FieldsSummary')
+    files = glob.glob('*ipac.fits')
+    files.sort()
+    
+    bands = ['IRAC 3.6um', 'IRAC 4.5um', 'IRAC 5.8um', 'IRAC 8.0um', 'MIPS 24um']
+    bkey = {}
+    for b in bands:
+        key = b.replace(' ','').replace('.','')[:-2].lower()
+        bkey[key] = b
+        
+    N = 0
+    data = {'field_root':[]}
+    aor_data = {'field_root':[], 'reqkey':[]}
+    for k in bkey:
+        data['exp_'+k] = []
+        data['n_'+k] = []
+        data['fp_'+k] = []
+        
+    for i, file in enumerate(files):
+        tab = utils.read_catalog(file)
+        field = file.split('_ipac')[0]
+        if 'x' in tab.colnames:
+            data['field_root'].append(field)
+            for k in bkey:
+                data['exp_'+k].append(0)
+                data['n_'+k].append(0)
+                data['fp_'+k].append([])
+            
+            continue
+            
+        N += len(tab)
+        print(i, file, N)
+        
+        data['field_root'].append(field)
+        for k in bkey:
+            sel = tab['with_hst'] & (tab['wavelength'] == bkey[k])
+            data['exp_'+k].append(tab['exposuretime'][sel].sum()/3600)
+            data['n_'+k].append(sel.sum())
+            
+            if sel.sum() == 0:
+                data['fp_'+k].append([])
+                continue
+                
+            r, d = [], []
+            for j in range(4):
+                r.extend(tab['ra{0}'.format(j+1)][sel].data)
+                d.extend(tab['dec{0}'.format(j+1)][sel].data)
+            
+            pts = np.array([r, d]).T
+            vert = ConvexHull(pts).vertices
+            fp = pts[vert,:]
+            data['fp_'+k].append(fp.T.tolist())
+            
+        aors = np.unique(tab['reqkey'])
+        aor_data['field_root'].extend([field]*len(aors))
+        aor_data['reqkey'].extend(list(aors))
+        
+    #
+    import pandas as pd
+    df = pd.DataFrame(aor_data)
+    df.to_sql('spitzer_aors', engine, index=False, if_exists='append', method='multi')
+
+    df = pd.DataFrame(data)
+    
+    # First row to initialize table
+    first = df[0:1]
+    for k in bkey:
+        first.pop('fp_'+k)
+    
+    engine.execute('drop table exposure_log;')
+    first.to_sql('spitzer_log', engine, index=False, if_exists='append', method='multi')
+    for k in bkey:
+        engine.execute(f'alter table spitzer_log add column fp_{k} float [];')
+    
+    engine.execute('delete from spitzer_log where True;')
+    df.to_sql('spitzer_log', engine, index=False, if_exists='append', method='multi')
+    
 def show_all_fields():
     plt.ioff()
     res = pd.read_sql_query("select distinct root from redshift_fit order by root;", engine)
@@ -1872,7 +2292,7 @@ def show_all_fields():
                 res = pd.read_sql_query("select root,id,status from redshift_fit where root = '{0}';".format(root), engine)
                 res = pd.read_sql_query("select status, count(status) as n from redshift_fit where root = '{0}' group by status;".format(root), engine)
             
-            res = grizli_db.make_html_table(engine=engine, columns=['mtime', 'root','status','id','p_ra','p_dec','mag_auto','flux_radius','t_g800l','t_g102', 't_g141', 'z_spec','z_map','bic_diff','chinu','zwidth1/(1+z_map) as zw1','dlinesn'], where="AND status > 4 AND root = '{0}'".format(root), table_root=root, sync='s3://grizli-v1/Pipeline/{0}/Extractions/'.format(root), png_ext=['R30', 'stack','full','line'], show_hist=True)
+            res = grizli_db.make_html_table(engine=engine, columns=['mtime', 'root','status','id','p_ra','p_dec','mag_auto','flux_radius','t_g800l','t_g102', 't_g141', 'z_spec','z_map','bic_diff','chinu','zwidth1/(1+z_map) as zw1','dlinesn','q_z'], where="AND status > 4 AND root = '{0}'".format(root), table_root=root, sync='s3://grizli-v1/Pipeline/{0}/Extractions/'.format(root), png_ext=['R30', 'stack','full','line'], show_hist=True)
             
             if False:
                 grizli_db.set_phot_root(root, phot_root, engine)
