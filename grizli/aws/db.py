@@ -1650,7 +1650,7 @@ def run_all_redshift_fits():
             
     os.system('aws s3 cp s3://grizli-v1/Pipeline/{0}/Extractions/{0}_zhist.png s3://grizli-v1/tables/'.format(root))
     
-def aws_rgb_thumbnails(root, bucket='grizli-v1', engine=None, thumb_args={}):
+def aws_rgb_thumbnails(root, bucket='grizli-v1', engine=None, thumb_args={}, ids=None, verbose=True):
     """
     Make thumbnails for everything that has an entry in the redshift_fit table
     """
@@ -1661,7 +1661,7 @@ def aws_rgb_thumbnails(root, bucket='grizli-v1', engine=None, thumb_args={}):
     
     res = from_sql(f"SELECT id, ra, dec FROM redshift_fit WHERE root = '{root}'", engine)
     
-    event = {'make_segmentation_figure': False, 
+    event = {'make_segmentation_figure': True, 
              'aws_prep_dir': f's3://{bucket}/Pipeline/{root}/Prep/', 
              'single_output': True, 
              'combine_similar_filters': True, 
