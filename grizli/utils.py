@@ -4305,7 +4305,8 @@ def header_keys_from_filelist(fits_files, keywords=[], ext=0, colname_case=str.l
     return tab     
     
 def drizzle_from_visit(visit, output, pixfrac=1., kernel='point', 
-                       clean=True, include_saturated=True, keep_bits=None):
+                       clean=True, include_saturated=True, keep_bits=None, 
+                       skip=None):
     """
     Make drizzle mosaic from exposures in a visit dictionary
     
@@ -4326,6 +4327,9 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
     else:
         return None 
     
+    if not hasattr(outputwcs, '_naxis1'):
+        outputwcs._naxis1, outputwcs._naxis2 = outputwcs._naxis
+    
     outputwcs.pscale = get_wcs_pscale(outputwcs)
     
     output_poly = Polygon(outputwcs.calc_footprint())
@@ -4340,6 +4344,9 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
         if olap.area > 0:
             indices.append(i)
     
+    if skip is not None:
+        indices = indices[::skip]
+        
     NTOTAL = len(indices)
     
     for i in indices:
@@ -4433,7 +4440,10 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
                 #                wcskey=' ')
                 if not hasattr(wcs_i, 'pixel_shape'):
                     wcs_i.pixel_shape = wcs_i._naxis1, wcs_i._naxis2
-                    
+                
+                if not hasattr(wcs_i, '_naxis1'):
+                    wcs_i._naxis1, wcs_i._naxis2 = wcs_i._naxis
+                        
                 wcs_list.append(wcs_i)
                 
         if count == 0:
@@ -4525,10 +4535,16 @@ def drizzle_array_groups(sci_list, wht_list, wcs_list, outputwcs=None,
     header['DRIZKERN'] = kernel, "Drizzle kernel"
     header['DRIZPIXF'] = pixfrac, "Drizzle pixfrac"
     
+    if not hasattr(outputwcs, '_naxis1'):
+        outputwcs._naxis1, outputwcs._naxis2 = outputwcs._naxis
+    
     # Try to fix deprecated WCS
     for wcs_i in wcs_list:
         if not hasattr(wcs_i, 'pixel_shape'):
             wcs_i.pixel_shape = wcs_i._naxis1, wcs_i._naxis2
+        
+        if not hasattr(wcs_i, '_naxis1'):
+            wcs_i._naxis1, wcs_i._naxis2 = wcs_i._naxis
         
     # Output WCS requires full WCS map?
     if calc_wcsmap < 2:
@@ -4713,7 +4729,7 @@ def symlink_templates(force=False):
         else:
             print('File exists: {0}'.format(out_file))
 
-def fetch_acs_wcs_files(beams_file, bucket_name='aws-grivam'):
+def fetch_acs_wcs_files(beams_file, bucket_name='grizli-v1'):
     """
     Fetch wcs files for a given beams.fits files
     """   
