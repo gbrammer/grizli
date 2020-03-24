@@ -1592,7 +1592,7 @@ class GroupFitter(object):
                     lylim = wavem/(1+z) < 1250
                     wigmz = np.ones_like(wavem)
                     wigmz[lylim] = IGM.full_IGM(z, wavem[lylim])   
-                    print('Use z-igm')      
+                    #print('Use z-igm')      
             else:
                 wigmz = 1.
         else:
@@ -3374,6 +3374,10 @@ class GroupFitter(object):
         if (ymin < 0) & (ymax > 0):
             ymin = -0.1*ymax
         
+        if not np.isfinite(ymin+ymax):
+            ymin = 0.
+            ymax = 10.
+            
         axc.set_ylim(ymin-0.2*ymax, 1.2*ymax)            
         axc.grid()
         
