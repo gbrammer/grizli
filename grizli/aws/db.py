@@ -1662,7 +1662,7 @@ def aws_rgb_thumbnails(root, bucket='grizli-v1', engine=None, thumb_args={}, ids
         engine = get_db_engine(echo=False)
     
     if res is None:
-        res = from_sql(f"SELECT root, id, ra, dec FROM redshift_fit WHERE root = '{root}' AND ra > 0", engine)
+        res = from_sql("SELECT root, id, ra, dec FROM redshift_fit WHERE root = '{0}' AND ra > 0".format(root), engine)
     
     aws_prep_dir = 's3://{0}/Pipeline/{1}/Prep/'.format(bucket, root)
     aws_bucket = 's3://{0}/Pipeline/{1}/Thumbnails/'.format(bucket, root)
