@@ -1999,13 +1999,16 @@ def make_html_table(engine=None, columns=['root','status','id','p_ra','p_dec','m
             if ext == 'rgb':
                 js = '<a href={0}/{2}><img src={0}/{1} onmouseover="this.src = this.src.replace(\'rgb.pn\', \'seg.pn\')" onmouseout="this.src = this.src.replace(\'seg.pn\', \'rgb.pn\')" height=200></a>'
                 
-                path = '{0}/{1}/{2}'.format(AWS, root, subdir)
-                info['png_{0}'.format('rgb')] = [js.format(
-                          path.replace('grizli-v1', buck), 
-                          p, 
-                          p.replace('.rgb.png', '.thumb.png')) 
-                               for buck, p in zip(bucket, png)]
-                               
+                paths = ['{0}/{1}/{2}'.format(AWS.replace('grizli-v1', buck),
+                                              root, subdir)
+                         for buck, root in zip(bucket, info['root'])]
+                
+                png_url = [js.format(path, p, 
+                                     p.replace('.rgb.png', '.thumb.png')) 
+                           for path, p in zip(paths, png)]
+
+                info['png_{0}'.format('rgb')] = png_url
+
             else:
                 info['png_{0}'.format(ext)] = ['<a href="{0}/{1}/{2}/{3}"><img src={0}/{1}/{2}/{3} height=200></a>'.format(AWS.replace('grizli-v1',buck), root, subdir, p) for buck, root, p in zip(bucket, info['root'], png)]
                 
