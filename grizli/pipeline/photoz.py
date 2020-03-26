@@ -115,19 +115,28 @@ def apply_catalog_corrections(root, total_flux='flux_auto', auto_corr=True, get_
         if verbose:
             print('Apply morphological validity class')
         
-        from sklearn.externals import joblib
-        clf = joblib.load(morph_model)
-        X = np.hstack([[cat['peak']/cat['flux'], 
-                        cat['cpeak']/cat['peak']]]).T
-        
-        # Predict labels, which where generated for 
-        #    bad_bright, bad_faint, stars, big_galaxies, small_galaxies
-        pred = clf.predict_proba(X)
-        
-        # Should be >~ 0.9 for valid sources, stars & galaxies in "ir" image
-        cat['class_valid'] = pred[:,-3:].sum(axis=1) 
-        cat['class_valid'].format = '.2f'
-    
+        try:
+            from sklearn.externals import joblib
+            clf = joblib.load(morph_model)
+            X = np.hstack([[cat['peak']/cat['flux'], 
+                            cat['cpeak']/cat['peak']]]).T
+
+            # Predict labels, which where generated for 
+            #    bad_bright, bad_faint, stars, big_galaxies, small_galaxies
+            pred = clf.predict_proba(X)
+
+            # Should be >~ 0.9 for valid sources, stars & galaxies 
+            # in "ir" image
+            cat['class_valid'] = pred[:,-3:].sum(axis=1) 
+            cat['class_valid'].format = '.2f'
+
+        except:
+            cat['class_valid'] = 99.
+            cat['class_valid'].format = '.2f'
+            
+            msg = "Couldn't run morph classification from {0}"
+            print(msg.format(morph_model))
+                    
     cat['dummy_err'] =  10**(-0.4*(8-23.9))
     cat['dummy_flux'] = cat[total_flux] # detection band
     
