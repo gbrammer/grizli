@@ -5112,7 +5112,8 @@ class EffectivePSF(object):
         
         Files should be located in ${GRIZLI}/CONF/ directory.
         """
-        self.epsf = {}
+        self.epsf = OrderedDict()
+        
         for filter in ['F105W', 'F110W', 'F125W', 'F140W', 'F160W', 'F127M']:
             file = os.path.join(GRIZLI_PATH, 'CONF',
                                 'PSFSTD_WFC3IR_{0}.fits'.format(filter))
@@ -5126,30 +5127,24 @@ class EffectivePSF(object):
             self.epsf[filter] = data
         
         # UVIS
-        for filter in ['F275W', 'F336W', 'F438W', 'F606W', 'F814W', 'F850L']:
-            file = os.path.join(GRIZLI_PATH, 'CONF',
-                                'PSFSTD_WFC3UV_{0}.fits'.format(filter))
-            
-            if not os.path.exists(file):
-                continue
-            
+        filter_files = glob.glob(os.path.join(GRIZLI_PATH, 'CONF',
+                            'PSFSTD_WFC3UV*.fits'))
+        filter_files.sort()
+        for file in filter_files:
             data = pyfits.open(file, ignore_missing_end=True)[0].data.T
             data[data < 0] = 0 
-            
-            self.epsf[filter] = data
-        
+            filt = '_'.join(file.strip('.fits').split('_')[2:])
+            self.epsf[filt+'U'] = data
+                    
         # ACS
-        for filter in ['F606W', 'F814W']:
-            file = os.path.join(GRIZLI_PATH, 'CONF',
-                                'PSFSTD_ACSWFC_{0}.fits'.format(filter))
-            
-            if not os.path.exists(file):
-                continue
-            
+        filter_files = glob.glob(os.path.join(GRIZLI_PATH, 'CONF',
+                            'PSFSTD_ACSWFC*.fits'))
+        filter_files.sort()
+        for file in filter_files:
             data = pyfits.open(file, ignore_missing_end=True)[0].data.T
             data[data < 0] = 0 
-            
-            self.epsf[filter] = data
+            filt = '_'.join(file.strip('.fits').split('_')[2:])
+            self.epsf[filt] = data
             
         # Dummy, use F105W ePSF for F098M and F110W
         self.epsf['F098M'] = self.epsf['F105W']
