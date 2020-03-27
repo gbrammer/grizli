@@ -496,8 +496,9 @@ def run_grizli_fit(event):
     files = glob.glob('*')
     files.sort()
     
-    for i, file in enumerate(files):
-        print('File ({0}): {1}'.format(i+1, file))
+    if not silent:
+        for i, file in enumerate(files):
+            print('File ({0}): {1}'.format(i+1, file))
     
     try:
         files = glob.glob('{0}_{1:05d}*R30.fits'.format(root, id)) 
