@@ -35,15 +35,14 @@ class DrizzlePSF(object):
             
         """
         if info is None:
-            if beams is None:
+            if beams is not None:
+                info = self._get_wcs_from_beams(beams)
+            else:
                 if flt_files is None:
                     info = self._get_wcs_from_hdrtab(driz_image)
                 else:
                     info = self._get_flt_wcs(flt_files)
                 
-            else:
-                info = self._get_wcs_from_beams(beams)
-        
         self.flt_keys, self.wcs, self.footprint = info
         self.flt_files = list(np.unique([key[0] for key in self.flt_keys]))
 
@@ -88,7 +87,7 @@ class DrizzlePSF(object):
                     flt_keys.append(key)
                     
         return flt_keys, wcs, footprint
-    
+            
     @staticmethod
     def _get_wcs_from_beams(beams):
         """
@@ -134,6 +133,12 @@ class DrizzlePSF(object):
         
         flt_keys = []
         N = len(hdr)
+        
+        if 'CCDCHIP' in hdr.colnames:
+            ext_key = 'CCDCHIP'
+        else:
+            ext_key = 'EXTNAME'
+            
         for i in range(N):
             h = pyfits.Header()
             for c in hdr.colnames:
@@ -142,7 +147,7 @@ class DrizzlePSF(object):
                 except:
                     pass
                     
-            key = (h['ROOTNAME'], h['EXTNAME'])
+            key = (h['ROOTNAME'], h[ext_key])
             flt_keys.append(key)
             wcs[key] = pywcs.WCS(h, relax=True)
             wcs[key].pscale = utils.get_wcs_pscale(wcs[key])
@@ -186,8 +191,11 @@ class DrizzlePSF(object):
     @staticmethod
     def _get_empty_driz(wcs):
         if hasattr(wcs, 'pixel_shape'):
-            sh = wcs.pixel_shape
+            sh = wcs.pixel_shape[::-1]
         else:
+            if (not hasattr(wcs, '_naxis1')) & hasattr(wcs, '_naxis'):
+                wcs._naxis1, wcs._naxis2 = wcs._naxis
+                
             sh = (wcs._naxis2, wcs._naxis1)
         
         outsci = np.zeros(sh, dtype=np.float32)
@@ -246,6 +254,9 @@ class DrizzlePSF(object):
         pix = np.arange(-13,14)
         
         #wcs_slice = self.get_driz_cutout(ra=ra, dec=dec)
+        if wcs_slice is None:
+            wcs_slice = self.driz_wcs.copy()
+        
         outsci, outwht, outctx = self._get_empty_driz(wcs_slice)
         
         count = 1
@@ -284,14 +295,26 @@ class DrizzlePSF(object):
                     
                 N = 13
                 psf_wcs = model.ImageData.get_slice_wcs(self.wcs[key], slice(xyp[0]-N, xyp[0]+N+1), slice(xyp[1]-N, xyp[1]+N+1))
+                
                 psf_wcs.pscale = utils.get_wcs_pscale(self.wcs[key])
                 
-                adrizzle.do_driz(psf, psf_wcs, psf*0+flt_weight, wcs_slice, 
+                try:
+                    adrizzle.do_driz(psf, psf_wcs, psf*0+flt_weight, 
+                                 wcs_slice, 
                                  outsci, outwht, outctx, 1., 'cps', 1,
                                  wcslin_pscale=1., uniqid=1, 
                                  pixfrac=pixfrac, kernel=kernel, fillval=0, 
                                  stepsize=10, wcsmap=None)
-                
+                except:
+                    psf_wcs._naxis1, psf_wcs._naxis2 = psf_wcs._naxis
+                    
+                    adrizzle.do_driz(psf, psf_wcs, psf*0+flt_weight, 
+                                 wcs_slice, 
+                                 outsci, outwht, outctx, 1., 'cps', 1,
+                                 wcslin_pscale=1., uniqid=1, 
+                                 pixfrac=pixfrac, kernel=kernel, fillval=0, 
+                                 stepsize=10, wcsmap=None)
+                    
                 if False:
                     count += 1
                     hdu = pyfits.HDUList([pyfits.PrimaryHDU(), pyfits.ImageHDU(data=psf*100, header=utils.to_header(psf_wcs))])                 
