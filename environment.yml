@@ -3,7 +3,8 @@ channels:
 - defaults
 dependencies:
 - ipython>=6.1.0
-- python>=3.5.5
+- python>=3.6
+- pip>=19.0.0
 - matplotlib>=2.0.2
 - astropy>=3.0
 - scikit-image>=0.13.0
