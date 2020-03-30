@@ -1454,6 +1454,9 @@ class MultiBeam(GroupFitter):
         self.Nphot = 0
         self.is_spec = 1
         
+        if replace_direct is not None:
+            self.replace_direct_image_cutouts(**replace_direct)
+            
     def _set_MW_EBV(self, MW_EBV, R_V=utils.MW_RV):
         """
         Initialize Galactic extinction
@@ -1825,7 +1828,7 @@ class MultiBeam(GroupFitter):
 
             self.beams[ib].beam.set_segmentation(blot_seg)
     
-    def replace_direct_image_cutouts(self, ref_image='gdn-100mas-f160w_drz_sci.fits', interp='poly5', cutout=200, background_func=np.median):
+    def replace_direct_image_cutouts(self, ref_image='gdn-100mas-f160w_drz_sci.fits', ext=0, interp='poly5', cutout=200, background_func=np.median):
         """
         Replace "REF" extensions in a `beams.fits` file
 
@@ -1863,12 +1866,14 @@ class MultiBeam(GroupFitter):
             ref_im = ref_image
             ref_image_filename = 'HDU'
         else:
-            ref_im = pyfits.open(ref_image)
+            ref_im = pyfits.open(ref_image)[ext]
             ref_image_filename = ref_image
 
         ref_wcs = pywcs.WCS(ref_im.header, relax=True)
         ref_wcs.pscale = utils.get_wcs_pscale(ref_wcs)
-
+        if not hasattr(ref_wcs, '_naxis1') & hasattr(ref_wcs, '_naxis'):
+            ref_wcs._naxis1, ref_wcs._naxis2 = ref_wcs._naxis
+            
         if 'PHOTPLAM' in ref_im.header:
             ref_photplam = ref_im.header['PHOTPLAM']
         else:
@@ -4330,7 +4335,9 @@ def drizzle_2d_spectrum(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
                                  spatial_scale=spatial_scale, NY=NY)
                                  
     sh = (out_header['NAXIS2'], out_header['NAXIS1'])
-    
+    if not hasattr(output_wcs, '_naxis1'):
+        output_wcs._naxis2, output_wcs._naxis1 = sh
+        
     outsci = np.zeros(sh, dtype=np.float32)
     outwht = np.zeros(sh, dtype=np.float32)
     outctx = np.zeros(sh, dtype=np.int32)
@@ -4352,6 +4359,9 @@ def drizzle_2d_spectrum(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
         if not hasattr(beam_wcs, 'pixel_shape'):
             beam_wcs.pixel_shape = beam_wcs._naxis1, beam_wcs._naxis2
         
+        if not hasattr(beam_wcs, '_naxis1'):
+            beam_wcs._naxis1, beam_wcs._naxis2 = beam_wcs._naxis
+            
         # Downweight contamination
         # wht = 1/beam.ivar + (fcontam*beam.contam)**2
         # wht = np.cast[np.float32](1/wht)
@@ -4550,6 +4560,9 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
             output_wcs.pscale = utils.get_wcs_pscale(output_wcs)
             
         header = utils.to_header(output_wcs, relax=True)
+    
+    if not hasattr(output_wcs, '_naxis1'):
+        output_wcs._naxis1, output_wcs._naxis2 = output_wcs._naxis
         
     ### Initialize data
     sh = (header['NAXIS2'], header['NAXIS1'])
@@ -4597,6 +4610,9 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
         
         if not hasattr(beam_wcs, 'pixel_shape'):
             beam_wcs.pixel_shape = beam_wcs._naxis1, beam_wcs._naxis2
+        
+        if not hasattr(beam_wcs, '_naxis1'):
+            beam_wcs._naxis1, beam_wcs._naxis2 = beam_wcs._naxis
         
         ## Make sure CRPIX set correctly for the SIP header
         for j in [0,1]: 
@@ -4692,7 +4708,10 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
         
         if not hasattr(beam.direct.wcs, 'pixel_shape'):
             beam.direct.wcs.pixel_shape = beam.direct.wcs._naxis1, beam.direct.wcs._naxis2
-           
+        
+        if not hasattr(beam.direct.wcs, '_naxis1'):
+            beam.direct.wcs._naxis1, beam.direct.wcs._naxis2 = beam.direct.wcs._naxis
+        
         drizzler(thumb, beam.direct.wcs, thumb_wht, output_wcs, 
                          doutsci[filt_i], doutwht[filt_i], doutctx[filt_i], 
                          1., 'cps', 1, 
@@ -5023,13 +5042,15 @@ def drizzle_2d_spectrum_wcs(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
             nx1, nx2 = d_output_wcs._naxis1, d_output_wcs._naxis2
         else:
             nx1, nx2 = d_output_wcs._naxis
+            d_output_wcs._naxis1, d_output_wcs._naxis2 = nx1, nx2
             
         dx = nx1 - nx2
         if hasattr(d_output_wcs, '_naxis1'):
             d_output_wcs._naxis1 = d_output_wcs._naxis2
         else:
             d_output_wcs._naxis[0] = d_output_wcs._naxis[1]
-            
+            d_output_wcs._naxis1 = d_output_wcs._naxis2 = d_output_wcs._naxis[0]
+             
         d_output_wcs.wcs.crpix[0] -= dx/2.
         d_out_header = utils.to_header(d_output_wcs)
         
@@ -5101,7 +5122,10 @@ def drizzle_2d_spectrum_wcs(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
         
         if not hasattr(beam_wcs, 'pixel_shape'):
             beam_wcs.pixel_shape = beam_wcs._naxis1, beam_wcs._naxis2
-                
+        
+        if not hasattr(beam_wcs, '_naxis1'):
+            beam_wcs._naxis1, beam_wcs._naxis2 = beam_wcs._naxis
+        
         d_beam_wcs = beam.direct.wcs
         if beam.direct['REF'] is None:
             d_wht = 1./beam.direct['ERR']**2
