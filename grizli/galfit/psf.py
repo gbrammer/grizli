@@ -83,6 +83,8 @@ class DrizzlePSF(object):
                     
                     wcs[key].pscale = utils.get_wcs_pscale(wcs[key])
                     
+                    wcs[key].expweight = flt_j[0].header['EXPTIME']
+                    
                     footprint[key] = Polygon(wcs[key].calc_footprint())
                     flt_keys.append(key)
                     
@@ -110,6 +112,8 @@ class DrizzlePSF(object):
             
             wcs[key].pscale = utils.get_wcs_pscale(wcs[key])
             
+            wcs[key].expweight = beam.grism.exptime
+
             footprint[key] = Polygon(wcs[key].calc_footprint())
             flt_keys.append(key)
                     
@@ -145,13 +149,18 @@ class DrizzlePSF(object):
                 try:
                     h[c] = hdr[c][i]
                 except:
-                    pass
+                    h[c] = 1
                     
             key = (h['ROOTNAME'], h[ext_key])
             flt_keys.append(key)
             wcs[key] = pywcs.WCS(h, relax=True)
             wcs[key].pscale = utils.get_wcs_pscale(wcs[key])
             
+            if 'EXPTIME' in h:
+                wcs[key].expweight = h['EXPTIME']
+            else:
+                wcs[key].expweight = 1
+                 
             footprint[key] = Polygon(wcs[key].calc_footprint())
         
         return flt_keys, wcs, footprint
@@ -287,12 +296,13 @@ class DrizzlePSF(object):
                     
                 psf = self.ePSF.eval_ePSF(psf_xy, xp, yp, extended_data=extended_data)
                 
-                if get_weight:
-                    fltim = pyfits.open(file)
-                    flt_weight = fltim[0].header['EXPTIME']
-                else:
-                    flt_weight = 1
-                    
+                # if get_weight:
+                #     fltim = pyfits.open(file)
+                #     flt_weight = fltim[0].header['EXPTIME']
+                # else:
+                #     flt_weight = 1
+                flt_weight = self.wcs[key].expweight
+                
                 N = 13
                 psf_wcs = model.ImageData.get_slice_wcs(self.wcs[key], slice(xyp[0]-N, xyp[0]+N+1), slice(xyp[1]-N, xyp[1]+N+1))
                 
