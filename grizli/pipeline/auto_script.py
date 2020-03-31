@@ -935,7 +935,8 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/
         os.system("python -c 'from grizli.pipeline import reprocess; reprocess.reprocess_wfc3ir(parallel={0},clean_dark_refs={1})'".format(reprocess_parallel, reprocess_clean_darks))
     else:
         from grizli.pipeline import reprocess
-        reprocess.reprocess_wfc3ir(parallel=False)
+        reprocess.reprocess_wfc3ir(parallel=False, 
+                                   clean_dark_refs=reprocess_clean_darks)
     
     #### Fetch PFLAT reference files needed for optimal drizzled weight images
     if fetch_flt_calibs:
