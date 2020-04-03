@@ -48,7 +48,10 @@ class aXeConf():
         from collections import OrderedDict
     
         conf = OrderedDict()
-        lines = open(conf_file).readlines()
+        fp = open(conf_file)
+        lines = fp.readlines()
+        fp.close()
+        
         for line in lines:
             ## empty / commented lines
             if (line.startswith('#')) | (line.strip() == '') | ('"' in line):
