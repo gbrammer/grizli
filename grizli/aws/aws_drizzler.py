@@ -1,6 +1,66 @@
 #!/bin/env python
 import inspect
+from collections import OrderedDict
 
+"""
+# shell
+aws s3 ls s3://grizli-v1/Pipeline/j000200m5558/Prep/j000200m5558_visits.npy --request-payer requester
+
+# Python
+import boto3
+s3 = boto3.resource('s3')
+bkt = s3.Bucket('grizli-v1')
+field = 'j000200m5558'
+s3_file = '{0}_visits.npy'.format(field)
+s3_path = 'Pipeline/{0}/Prep'.format(field)
+bkt.download_file(s3_path+'/'+s3_file, s3_file,
+              ExtraArgs={"RequestPayer": "requester"})
+"""
+
+class FilterDict(OrderedDict):
+    meta = OrderedDict()
+    @property
+    def nfiles(self):
+        """
+        Count number of exposures
+        """
+        n = 0
+        for k in self:
+            n += len(self[k])
+        return n
+    
+    @property
+    def valid_filters(self):
+        """
+        Return a list of filters with N >= 1 files
+        """
+        valid = []
+        for k in self:
+            if len(self[k]) > 0:
+                valid.append(k)
+        return valid
+        
+def get_visit_files():
+    import boto3
+    from grizli.aws import db
+    
+    engine = db.get_db_engine() 
+    fields = db.from_sql("select field_root, a_wfc3 from charge_fields where log LIKE 'Finished%%'", engine=engine)
+    
+    s3 = boto3.resource('s3')
+    bkt = s3.Bucket('grizli-v1')
+    
+    for i, field in enumerate(fields['field_root']):
+        s3_file = '{0}_visits.npy'.format(field)
+        if not os.path.exists(s3_file):
+            s3_path = 'Pipeline/{0}/Prep'.format(field)
+            try:
+                bkt.download_file(s3_path+'/'+s3_file, s3_file,
+                              ExtraArgs={"RequestPayer": "requester"})
+                print(i, s3_file)
+            except:
+                print(i, 'Download failed: {0}'.format(field))
+            
 def make_visit_fits():
     import glob
     import numpy as np
@@ -8,47 +68,254 @@ def make_visit_fits():
     
     visit_files = glob.glob('[egu]*visits.npy')
     visit_files.sort()
+    
+    indiv_files = glob.glob('j*visits.npy')
+    indiv_files.sort()
+    
+    visit_files += indiv_files
+    
+    for p in ['grizli-v1-19.12.04_visits.npy', 'grizli-v1-19.12.05_visits.npy', 'grizli-cosmos-v2_visits.npy']:
+        if p in visit_files:
+            visit_files.pop(visit_files.index(p))
+        
     all_visits = []
     products = []
-    for file in visit_files:
+    
+    for extra in ['candels-july2019_visits.npy', 'grizli-cosmos-v2_visits.npy']:
+        
+        extra_visits = np.load(extra)[0]
+        extra_products = [v['product'] for v in extra_visits]
+        for i, p in enumerate(extra_products):
+            if p not in products:
+                parent = p.split('_')[0]
+                print(parent, p)
+                v = extra_visits[i]
+                v['parent'] = parent
+                v['parent_file'] = extra #'candels-july2019_visits.npy'
+                all_visits.append(v)
+                products.append(p)
+    
+    # COSMOS footprint
+    cosmos_fp = None
+    for i, v in enumerate(extra_visits):
+        if v['product'].endswith('f814w'):
+            print(v['product'])
+            if cosmos_fp is None:
+                cosmos_fp = v['footprint'].buffer(1.e-6)
+            else:
+                cosmos_fp = cosmos_fp.union(v['footprint'])
+    
+    for i, file in enumerate(visit_files):
         visits, groups, info = np.load(file)
+        print(file, len(visits))
         for v in visits:
             has_fp = ('footprints' in v)
             if not has_fp:
                 print('No footprint: {0}'.format(v['product']))
-                
+            
             if has_fp & (v['product'] not in products):
                 all_visits.append(v)
+                v['parent'] = file.split("_visits")[0].split('-')[-1]
+                v['first'] = v['files'][0]
+                v['parent_file'] = file
                 products.append(v['product'])
-                    
-    # WFC3/IR copied to "Exposures" paths
-    for visit in all_visits:
-        visit['filter'] = visit['product'].split('-')[-1]
+                                
+    for v in all_visits:
+        v['filter'] = v['product'].split('-')[-1]
+        v['first'] = v['files'][0]
+        
+    # File dictionary
+    all_files = []
+    file_products = []
     
+    for v in all_visits:
+        all_files.extend(v['files'])
+        file_products.extend([v['product']]*len(v['files']))
+    
+    # duplicates?? seem to be in GOODS-S.  
+    # Exclude them in all but the first product that contains them for now
+    if True:
+        _un = np.unique(all_files, return_counts=True, return_index=True, return_inverse=True)
+        un_file, un_index, un_inv, un_count = _un
+        dup = un_count > 1
+        dup_files = un_file[dup]
+        for file in dup_files:
+            prods = list(np.array(file_products)[np.array(all_files) == file])
+            for prod in prods[1:]:
+                i = products.index(prod)
+                v = all_visits[i]
+                j = v['files'].index(file)
+                print(file, v['parent'], prod, i, j)
+                pj = all_visits[i]['files'].pop(j)
+                pj = all_visits[i]['footprints'].pop(j)
+                if 'awspath' in all_visits[i]:
+                    pj = all_visits[i]['awspath'].pop(j)
+                    
+            #print(file, prods[-1])
+    
+    # WFC3/IR copied to "Exposures" paths in CANDELS fields
     for v in all_visits: 
+        if v['parent_file'] == 'grizli-cosmos-v2_visits.npy':
+            continue
+        
+        if v['parent_file'].startswith('j'):
+            v['awspath'] = ['grizli-v1/Pipeline/{0}/Prep'.format(v['parent']) for f in v['files']] 
+            
         if v['filter'].startswith('f0') | v['filter'].startswith('f1'): 
             #print(v['product']) 
             v['awspath'] = ['grizli-v1/Exposures/{0}/{1}'.format(f[:4], f.split('_')[0]) for f in v['files']] 
-                
+    
+    # Empty visits, seems to be from duplicates above and mostly in CANDELS
+    nexp = np.array([len(visit['files']) for visit in all_visits])
+    for i in np.where(nexp == 0)[0][::-1]:
+        v_i = all_visits.pop(i)
+        print(i, v_i['product'])
+        products.pop(i)
+        
     tab = utils.GTable()
             
-    for k in ['product', 'filter']:
+    for k in ['parent', 'product', 'filter', 'first']:
         tab[k] = [visit[k] for visit in all_visits]
         
     coo = np.array([np.array(visit['footprint'].centroid.xy).flatten() for visit in all_visits])
     tab['ra'] = coo[:,0]
     tab['dec'] = coo[:,1]    
     tab['nexp'] = [len(visit['files']) for visit in all_visits]
+    tab['bounds'] = [np.array(v['footprint'].bounds) for v in all_visits]
     
     root = 'candels-july2019'
     root = 'candels-sep2019'
+    root = 'grizli-v1-19.12.04'
+    root = 'grizli-v1-19.12.05'
     
     tab.write(root+'_visits.fits', overwrite=True)
     np.save(root+'_visits.npy', [all_visits])
     
-    os.system('echo "# In https://s3.amazonaws.com/grizli-v1/Mosaics/" > candels-july2019.files.txt; ls candels-july2019* |grep -v files.txt >>  candels-july2019.files.txt')
-    os.system('aws s3 sync --exclude "*" --include "candels-july2019*" ./ s3://grizli-v1/Mosaics/ --acl public-read')
+    #os.system('echo "# In https://s3.amazonaws.com/grizli-v1/Mosaics/" > candels-july2019.files.txt; ls candels-july2019* |grep -v files.txt >>  candels-july2019.files.txt')
+    #os.system('aws s3 sync --exclude "*" --include "candels-july2019*" --include "grizli-v1-19.12.04*" ./ s3://grizli-v1/Mosaics/ --acl public-read')
+    os.system('echo "# In https://s3.amazonaws.com/grizli-v1/Mosaics/" > {0}.files.txt; ls {0}* |grep -v files.txt >>  {0}.files.txt'.format(root))
     
+    os.system('aws s3 sync --exclude "*" --include "{0}*" ./ s3://grizli-v1/Mosaics/ --acl public-read'.format(root))
+        
+    if False:
+        from shapely.geometry import Point
+        candels = utils.column_values_in_list(tab['parent'], ['j141956p5255', 'j123656p6215', 'j033236m2748', 'j021732m0512', 'j100012p0210'])
+        cosmos = np.array([v['footprint'].intersection(cosmos_fp).area > 0 for v in all_visits])
+
+        extra = candels
+        extra = ~(candels | cosmos)
+        
+        # Area
+        filter_polys = {}
+        
+        filt = 'f160w'
+        for filt in np.unique(tab['filter']):
+            print(filt)
+            if filt in filter_polys:
+                print(filt)
+                continue
+                
+            poly = None
+            count=0
+        
+            # Dec strips
+            di = np.arange(-90, 91, 5)
+            strips = []
+            for i in range(len(di)-1):
+                strip = (tab['dec'] > di[i]) & (tab['dec'] <= di[i+1]) & (tab['filter'] == filt)
+                strip &= extra
+                
+                if strip.sum() == 0:
+                    continue
+            
+                indices = np.arange(len(tab))[strip]
+            
+                poly = None
+                for j in indices:
+                    v = all_visits[j]
+                    if v['filter'] != filt:
+                        continue
+            
+                    #for fp in v['footprints']:
+                    for fp in [v['footprint']]:
+                        count += 1
+                        #print(i, v['product'], count)
+                        if poly is None:
+                            poly = fp.buffer(1.e-6)
+                        else:
+                            poly = poly.union(fp.buffer(1.e-6))
+            
+                poly.dec = di[i]+2.5
+                strips.append(poly)
+            
+            if len(strips) == 0:
+                filter_polys[filt] = Point(0, 0).buffer(1.e-6)
+                continue
+                
+            full = strips[0].buffer(1.e-6)
+            for strip in strips[1:]:
+                full = full.union(strip.buffer(1.e-6))
+        
+            filter_polys[filt] = full
+        
+        optical = filter_polys['f606w'].union(filter_polys['f814w'])
+        optical = optical.union(filter_polys['f850lp'])
+        optical = optical.union(filter_polys['f775w'])
+        
+        yband = filter_polys['f098m'].union(filter_polys['f105w'])
+        
+        visy = optical.union(yband)
+        
+        jband = filter_polys['f125w']
+        jband = jband.union(filter_polys['f110w'])
+
+        hband = filter_polys['f140w'].union(filter_polys['f160w'])
+        
+        filter_polys[r'$\mathrm{opt} = i_{775} | i_{814} | z_{850}$'] = optical
+        filter_polys[r'$\mathrm{opty} = \mathrm{opt} | Y$'] = visy
+        filter_polys[r'$Y = y_{098 } | y_{105}$'] = yband
+        filter_polys[r'$J = j_{110} | j_{125}$'] = jband
+        filter_polys[r'$H = h_{140} | h_{160}$'] = hband
+                
+        ydrop = visy.intersection(jband)
+        ydrop = ydrop.intersection(hband)
+        filter_polys[r'$Y-\mathrm{drop} = (\mathrm{opt} | Y) + J + H$'] = ydrop
+        
+        yj = yband.union(jband)
+        jdrop = yj.intersection(hband)
+        filter_polys[r'$J-\mathrm{drop} = (Y | J) + H$'] = jdrop
+        
+        for filt in filter_polys:
+            full = filter_polys[filt]
+            try:
+                areas = [f.area*np.cos(np.array(f.centroid.xy).flatten()[1]/180*np.pi) for f in full] 
+            except:
+                try:
+                    areas = [f.area*np.cos(np.array(f.centroid.xy).flatten()[1]/180*np.pi) for f in [full]]
+                except:
+                    areas = [0]
+                    
+            full.total_area = np.sum(areas)
+            print(filt, filter_polys[filt].total_area)
+        
+        ta = utils.GTable()
+        ta['filter'] = [f.upper() for f in filter_polys]
+        ta['area'] = [filter_polys[f].total_area*3600 for f in filter_polys]
+        ta['area'].format = '.0f'
+                
+        # Compare areas
+        h = fields['a_wfc3_ir_f160w'] > 0
+        for root, aa in zip(fields['field_root'][h], fields['a_wfc3_ir_f160w'][h]):
+            sel = (tab['filter'] == 'f160w') & (tab['parent'] == root)
+            if sel.sum() > 0:
+                indices = np.where(sel)[0]
+                a = all_visits[indices[0]]['footprint'].buffer(1.e-6)
+                for i in indices:
+                    a = a.union(all_visits[i]['footprint'])
+                
+                a_i = a.area*3600*np.cos(tab['dec'][indices[0]]/180*np.pi)
+                print(root, aa, a_i, a_i/aa)
+                
 def group_by_filter():
     """
     aws s3 sync --exclude "*" --include "cosmos_visits*" s3://grizli-preprocess/CosmosMosaic/ ./ 
@@ -59,6 +326,7 @@ def group_by_filter():
     
     master='cosmos'
     master='grizli-jan2019'
+    master = 'grizli-v1-19.12.04'
     
     tab = utils.read_catalog('{0}_visits.fits'.format(master))
     all_visits = np.load('{0}_visits.npy'.format(master), allow_pickle=True)[0]
@@ -192,11 +460,18 @@ def segmentation_figure(label, cat, segfile):
                  output_verify='fix')
     th.close()
     
-def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixscale=0.1, size=10, wcs=None, pixfrac=0.33, kernel='square', theta=0, half_optical_pixscale=True, filters=['f160w', 'f140w', 'f125w', 'f105w', 'f110w', 'f098m', 'f850lp', 'f814w', 'f775w', 'f606w', 'f475w', 'f555w', 'f600lp', 'f390w', 'f350lp'], remove=True, rgb_params=RGB_PARAMS, master='grizli-jan2019', aws_bucket='s3://grizli/CutoutProducts/', scale_ab=21, thumb_height=2.0, sync_fits=True, subtract_median=True, include_saturated=True, include_ir_psf=False, show_filters=['visb', 'visr', 'y', 'j', 'h'], combine_similar_filters=True, single_output=True, aws_prep_dir=None, make_segmentation_figure=False, get_dict=False, **kwargs):
+def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixscale=0.1, size=10, wcs=None, pixfrac=0.33, kernel='square', theta=0, half_optical_pixscale=True, filters=['f160w', 'f140w', 'f125w', 'f105w', 'f110w', 'f098m', 'f850lp', 'f814w', 'f775w', 'f606w', 'f475w', 'f555w', 'f600lp', 'f390w', 'f350lp'], skip=None, remove=True, rgb_params=RGB_PARAMS, master='grizli-jan2019', aws_bucket='s3://grizli/CutoutProducts/', scale_ab=21, thumb_height=2.0, sync_fits=True, subtract_median=True, include_saturated=True, include_ir_psf=False, show_filters=['visb', 'visr', 'y', 'j', 'h'], combine_similar_filters=True, single_output=True, aws_prep_dir=None, make_segmentation_figure=False, get_dict=False, dryrun=False, **kwargs):
     """
     label='cp561356'; ra=150.208875; dec=1.850241667; size=40; filters=['f160w','f814w', 'f140w','f125w','f105w','f606w','f475w']
     
+    master: These are sets of large lists of available exposures
     
+        'cosmos': deprecated
+        'grizli-cosmos-v2': All imaging covering the COSMOS field
+        'candels-july2019': CANDELS fields other than COSMOS
+        'grizli-v1': First processing of the Grizli CHArGE dataset
+        'grizli-v1-19.12.04': Updated CHArGE fields
+        
     """
     import glob
     import copy
@@ -266,7 +541,9 @@ def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixsca
     elif master == 'candels-july2019':
         parent = 's3://grizli-v1/Mosaics/'
         bkt = s3.Bucket('grizli-v1')
-        
+    elif master == 'grizli-v1-19.12.04':
+        parent = 's3://grizli-v1/Mosaics/'
+        bkt = s3.Bucket('grizli-v1')        
     else:
         # Run on local files, e.g., "Prep" directory
         parent = None
@@ -297,14 +574,14 @@ def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixsca
             
             prep_bkt = s3.Bucket(prep_bucket)
             
-            
             s3_prep_path = 'Pipeline/{0}/Prep/'.format(prep_root)
             s3_full_path = '{0}/{1}'.format(prep_bucket, s3_prep_path)
             s3_file = '{0}_visits.npy'.format(prep_root)
             
             # Make output path Prep/../Thumbnails/
             if aws_bucket is not None:
-                aws_bucket = 's3://'+s3_full_path.replace('/Prep/', '/Thumbnails/')
+                aws_bucket = ('s3://' + 
+                              s3_full_path.replace('/Prep/', '/Thumbnails/'))
             
             print('{0}{1}'.format(s3_prep_path, s3_file))
             if not os.path.exists(s3_file):
@@ -353,6 +630,17 @@ def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixsca
         
     #filters = ['f160w','f814w', 'f110w', 'f098m', 'f140w','f125w','f105w','f606w', 'f475w']
     
+    filt_dict = FilterDict()
+    filt_dict.meta['label'] = label
+    filt_dict.meta['ra'] = ra
+    filt_dict.meta['dec'] = dec
+    filt_dict.meta['size'] = size
+    filt_dict.meta['master'] = master
+    filt_dict.meta['parent'] = parent
+
+    if filters is None:
+        filters = list(groups.keys())
+        
     has_filts = []
     lower_filters = [f.lower() for f in filters]
     for filt in lower_filters:
@@ -394,15 +682,19 @@ def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixsca
         print('\n\n###\nMake filter: {0}'.format(filt))
         
         
-        if (filt.upper() in ['F105W','F125W','F140W','F160W']) & include_ir_psf:
+        if (filt.upper() in ['F105W','F110W','F125W','F140W','F160W']) & include_ir_psf:
             clean_i = False
         else:
             clean_i = remove
             
-        status = utils.drizzle_from_visit(visits[0], h, pixfrac=pixfrac, kernel=kernel, clean=clean_i, include_saturated=include_saturated)
+        status = utils.drizzle_from_visit(visits[0], h, pixfrac=pixfrac, kernel=kernel, clean=clean_i, include_saturated=include_saturated, skip=skip, dryrun=dryrun)
         
-        if status is not None:
-            sci, wht, outh = status
+        if dryrun:
+            filt_dict[filt] = status
+            continue
+            
+        elif status is not None:
+            sci, wht, outh, filt_dict[filt] = status
             
             if subtract_median:
                 #med = np.median(sci[sci != 0])
@@ -431,7 +723,7 @@ def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixsca
             
             has_filts.append(filt)
             
-            if (filt.upper() in ['F105W','F125W','F140W','F160W']) & include_ir_psf:
+            if (filt.upper() in ['F105W','F110W','F125W','F140W','F160W']) & include_ir_psf:
                 from grizli.galfit.psf import DrizzlePSF
                 
                 hdu = pyfits.open('{0}-{1}_drz_sci.fits'.format(label, filt),
@@ -445,9 +737,11 @@ def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixsca
                     
                     flt_files.append(hdu[0].header[key])
                         
-                dp = DrizzlePSF(flt_files=flt_files, driz_hdu=hdu[0])
+                try:
+                    
+                    dp = DrizzlePSF(flt_files=flt_files, driz_hdu=hdu[0])
                 
-                psf = dp.get_psf(ra=dp.driz_wcs.wcs.crval[0],
+                    psf = dp.get_psf(ra=dp.driz_wcs.wcs.crval[0],
                                  dec=dp.driz_wcs.wcs.crval[1], 
                                  filter=filt.upper(), 
                                  pixfrac=dp.driz_header['PIXFRAC'], 
@@ -455,20 +749,28 @@ def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixsca
                                  wcs_slice=dp.driz_wcs, get_extended=True, 
                                  verbose=False, get_weight=False)
 
-                psf[1].header['EXTNAME'] = 'PSF'
-                #psf[1].header['EXTVER'] = filt
-                hdu.append(psf[1])
-                hdu.flush()
+                    psf[1].header['EXTNAME'] = 'PSF'
+                    #psf[1].header['EXTVER'] = filt
+                    hdu.append(psf[1])
+                    hdu.flush()
+
+                except:
+                    pass
 
         if remove:
             os.system('rm *_fl*fits')
+    
+    # Dry run, just return dictionary of the found exposure files
+    if dryrun:
+        return filt_dict
+    
+    # Nothing found
+    if len(has_filts) == 0:
+        return []
                 
     if combine_similar_filters:
         combine_filters(label=label)    
                  
-    if len(has_filts) == 0:
-        return []
-    
     if rgb_params:
         #auto_script.field_rgb(root=label, HOME_PATH=None, filters=has_filts, **rgb_params)
         show_all_thumbnails(label=label, thumb_height=thumb_height, scale_ab=scale_ab, close=True, rgb_params=rgb_params, filters=show_filters)

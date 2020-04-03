@@ -84,7 +84,7 @@ GRISM_LIMITS = {'G800L':[0.545, 1.02, 40.], # ACS/WFC
 #DEFAULT_LINE_LIST = ['PaB', 'HeI-1083', 'SIII', 'OII-7325', 'ArIII-7138', 'SII', 'Ha+NII', 'OI-6302', 'HeI-5877', 'OIII', 'Hb', 'OIII-4363', 'Hg', 'Hd', 'H8','H9','NeIII-3867', 'OII', 'NeVI-3426', 'NeV-3346', 'MgII','CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'NIII-1750', 'NIV-1487', 'NV-1240', 'Lya']
 
 # Line species for determining individual line fluxes.  See `load_templates`.
-DEFAULT_LINE_LIST = ['PaB', 'HeI-1083', 'SIII', 'OII-7325', 'ArIII-7138', 'SII', 'Ha', 'OI-6302', 'HeI-5877', 'OIII', 'Hb', 'OIII-4363', 'Hg', 'Hd', 'H7','H8','H9','H10','NeIII-3867','OII', 'NeVI-3426', 'NeV-3346', 'MgII','CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'NIII-1750', 'NIV-1487', 'NV-1240', 'Lya']
+DEFAULT_LINE_LIST = ['PaB', 'HeI-1083', 'SIII', 'OII-7325', 'ArIII-7138', 'SII', 'Ha', 'OI-6302', 'HeI-5877', 'OIII', 'Hb', 'OIII-4363', 'Hg', 'Hd', 'H7','H8','H9','H10','NeIII-3867','OII', 'NeVI-3426', 'NeV-3346', 'MgII','CIV-1549', 'CIII-1906', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'NIII-1750', 'NIV-1487', 'NV-1240', 'Lya']
 
 def set_warnings(numpy_level='ignore', astropy_level='ignore'):
     """
@@ -1614,6 +1614,8 @@ def get_line_wavelengths():
     
     line_wavelengths['CIV-1549'] = [1549.480]
     line_ratios['CIV-1549'] = [1.]
+    line_wavelengths['CIII-1906'] = [1906.683]
+    line_ratios['CIII-1906'] = [1.]
     line_wavelengths['CIII-1908'] = [1908.734]
     line_ratios['CIII-1908'] = [1.]
     line_wavelengths['OIII-1663'] = [1665.85]
@@ -1640,8 +1642,8 @@ def get_line_wavelengths():
     line_wavelengths['Lya'] = [1215.4]
     line_ratios['Lya'] = [1.]
 
-    line_wavelengths['QSO-UV-lines'] = [line_wavelengths[k][0] for k in ['Lya','CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'SiIV+OIV-1398', 'NV-1240','NIII-1750']]
-    line_ratios['QSO-UV-lines'] = [1., 0.5, 0.1, 0.008, 0.09, 0.1, 0.3, 0.05]
+    line_wavelengths['QSO-UV-lines'] = [line_wavelengths[k][0] for k in ['Lya','CIV-1549', 'CIII-1906', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'SiIV+OIV-1398', 'NV-1240','NIII-1750']]
+    line_ratios['QSO-UV-lines'] = [1., 0.5, 0.1, 0.1, 0.008, 0.09, 0.1, 0.3, 0.05]
 
     line_wavelengths['QSO-Narrow-lines'] = [line_wavelengths[k][0] for k in ['OII', 'OIII-5007', 'OIII-4959', 'SII-6717', 'SII-6731', 'OI-6302', 'NeIII-3867', 'NeVI-3426', 'NeV-3346']]
     line_ratios['QSO-Narrow-lines'] = [0.2, 1.6, 1.6/2.98, 0.1, 0.1, 0.01, 0.5, 0.2, 0.02]
@@ -1655,8 +1657,8 @@ def get_line_wavelengths():
     line_wavelengths['Lya+CIV'] = [1215.4, 1549.49]
     line_ratios['Lya+CIV'] = [1., 0.1]
     
-    line_wavelengths['Gal-UV-lines'] = [line_wavelengths[k][0] for k in ['Lya','CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'SiIV+OIV-1398', 'NV-1240', 'NIII-1750', 'MgII']]
-    line_ratios['Gal-UV-lines'] = [1., 0.15, 0.1, 0.008, 0.09, 0.1, 0.05, 0.05, 0.1]
+    line_wavelengths['Gal-UV-lines'] = [line_wavelengths[k][0] for k in ['Lya','CIV-1549', 'CIII-1906', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'SiIV+OIV-1398', 'NV-1240', 'NIII-1750', 'MgII']]
+    line_ratios['Gal-UV-lines'] = [1., 0.15, 0.1, 0.1, 0.008, 0.09, 0.1, 0.05, 0.05, 0.1]
     
     line_wavelengths['Ha+SII'] = [6564.61, 6718.29, 6732.67]
     line_ratios['Ha+SII'] = [1., 1./10, 1./10]
@@ -2410,7 +2412,7 @@ def load_beta_templates(wave=np.arange(400, 2.5e4), betas=[-2, -1, 0]):
         t0[key] = SpectrumTemplate(wave=cont_wave, flux=(cont_wave/1216.)**beta)
     return t0
     
-def load_quasar_templates(broad_fwhm=2500, narrow_fwhm=1200, broad_lines=    ['HeI-5877', 'MgII', 'Lya', 'CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'SiIV+OIV-1398', 'NIV-1487', 'NV-1240', 'PaB', 'PaG'], narrow_lines=['NIII-1750','OII', 'OIII', 'SII', 'OI-6302', 'OIII-4363', 'NeIII-3867', 'NeVI-3426', 'NeV-3346', 'OII-7325', 'ArIII-7138', 'SIII', 'HeI-1083'], include_feii=True, slopes=[-2.8, 0, 2.8], uv_line_complex=True, fixed_narrow_lines=False, t1_only=False, nspline=13, Rspline=30, betas=None, include_reddened_balmer_lines=False):
+def load_quasar_templates(broad_fwhm=2500, narrow_fwhm=1200, broad_lines=    ['HeI-5877', 'MgII', 'Lya', 'CIV-1549', 'CIII-1906', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'SiIV+OIV-1398', 'NIV-1487', 'NV-1240', 'PaB', 'PaG'], narrow_lines=['NIII-1750','OII', 'OIII', 'SII', 'OI-6302', 'OIII-4363', 'NeIII-3867', 'NeVI-3426', 'NeV-3346', 'OII-7325', 'ArIII-7138', 'SIII', 'HeI-1083'], include_feii=True, slopes=[-2.8, 0, 2.8], uv_line_complex=True, fixed_narrow_lines=False, t1_only=False, nspline=13, Rspline=30, betas=None, include_reddened_balmer_lines=False):
     """
     Make templates suitable for fitting broad-line quasars
     """
@@ -4306,7 +4308,7 @@ def header_keys_from_filelist(fits_files, keywords=[], ext=0, colname_case=str.l
     
 def drizzle_from_visit(visit, output, pixfrac=1., kernel='point', 
                        clean=True, include_saturated=True, keep_bits=None, 
-                       skip=None):
+                       dryrun=False, skip=None):
     """
     Make drizzle mosaic from exposures in a visit dictionary
     
@@ -4354,6 +4356,9 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
         file = visit['files'][i]
         print('\n({0:4d}/{1:4d}) Add exposure {2}\n'.format(count+1, NTOTAL, file))
         
+        if dryrun:
+            continue
+            
         if not os.path.exists(file):
             bucket_i = visit['awspath'][i].split('/')[0]
             if bucket_name != bucket_i:
@@ -4365,9 +4370,13 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
             
             print('  (fetch from s3://{0}/{1})'.format(bucket_i, remote_file))
                                       
-            bkt.download_file(remote_file, file,
+            try:
+                bkt.download_file(remote_file, file,
                               ExtraArgs={"RequestPayer": "requester"})
-        
+            except:
+                print('  (failed s3://{0}/{1})'.format(bucket_i, remote_file))
+                continue
+                
         flt = pyfits.open(file)
         sci_list, wht_list, wcs_list = [], [], []
         
@@ -4480,15 +4489,20 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
         
         #xfiles = glob.glob('*')
         #print('Clean: ', clean, xfiles)
-        
         if clean:
             os.remove(file)
     
-    if count == 0:
+    flist = ['{0}/{1}'.format(visit['awspath'][i], visit['files'][i]) 
+                for i in indices]
+    
+    if dryrun:
+        return flist
+                
+    elif count == 0:
         return None
-        
-    outwht  *= (wcs_i.pscale/outputwcs.pscale)**4
-    return outsci, outwht, header  
+    else:    
+        outwht  *= (wcs_i.pscale/outputwcs.pscale)**4
+        return outsci, outwht, header , flist 
     
 def drizzle_array_groups(sci_list, wht_list, wcs_list, outputwcs=None,
                          scale=0.1, kernel='point', pixfrac=1., 
