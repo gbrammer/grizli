@@ -325,8 +325,10 @@ def group_by_filter():
     import numpy as np
     
     master='cosmos'
+    master='grizli-cosmos-v2'
     master='grizli-jan2019'
     master = 'grizli-v1-19.12.04'
+    master = 'grizli-v1-19.12.05'
     
     tab = utils.read_catalog('{0}_visits.fits'.format(master))
     all_visits = np.load('{0}_visits.npy'.format(master), allow_pickle=True)[0]
@@ -335,6 +337,8 @@ def group_by_filter():
     
     # Exclude DASH
     dash = utils.column_string_operation(tab['product'], 'icxe', 'startswith')
+    dash |= utils.column_string_operation(tab['product'], '_icxe', 
+                                         'count','or')
     
     # Don't exclude DASH
     dash = utils.column_string_operation(tab['product'], 'xxxx', 'startswith')
@@ -531,7 +535,6 @@ def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixsca
     if master == 'grizli-jan2019':
         parent = 's3://grizli/MosaicTools/'
         bkt = s3.Bucket('grizli')
-    
     elif master == 'cosmos':
         parent = 's3://grizli-preprocess/CosmosMosaic/'
         bkt = s3.Bucket('grizli-preprocess')
@@ -542,6 +545,9 @@ def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixsca
         parent = 's3://grizli-v1/Mosaics/'
         bkt = s3.Bucket('grizli-v1')
     elif master == 'grizli-v1-19.12.04':
+        parent = 's3://grizli-v1/Mosaics/'
+        bkt = s3.Bucket('grizli-v1')        
+    elif master == 'grizli-v1-19.12.05':
         parent = 's3://grizli-v1/Mosaics/'
         bkt = s3.Bucket('grizli-v1')        
     else:
