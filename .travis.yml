@@ -17,13 +17,13 @@ matrix:
       - python: 3.5
         env:
             - ASTROPY_VERSION=stable
-            - CONDA_DEPENDENCIES='scipy matplotlib pyyaml'
+            - CONDA_DEPENDENCIES='scipy matplotlib pyyaml stwcs'
       
       - python: 3.6
         env:
             - NUMPY_VERSION=stable
             - ASTROPY_VERSION=stable
-            - CONDA_DEPENDENCIES='scipy matplotlib pyyaml'
+            - CONDA_DEPENDENCIES='scipy matplotlib pyyaml stwcs'
 
       # - python: 3.6
       #   os: windows
