@@ -1607,9 +1607,9 @@ def get_seg_iso_flux(data, seg, tab, err=None, fill=None, verbose=0):
     
     """
     if 'number' in tab.colnames:
-        ids = tab['number']
+        ids = np.array(tab['number'])
     else:
-        ids = tab['id']
+        ids = np.array(tab['id'])
     
     sh = data.shape
     
