@@ -4492,7 +4492,18 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
         if clean:
             os.remove(file)
     
-    flist = ['{0}/{1}'.format(visit['awspath'][i], visit['files'][i]) 
+    if 'awspath' in visit:
+        awspath = visit['awspath']
+    else:
+        awspath = ['.' for f in visit['files']]
+    
+    if len(awspath) == 1:
+        awspath = [awspath[0] for f in visit['files']]
+    elif isinstance(awspath, str):
+        _awspath = [awspath for f in visit['files']]
+        awspath = _awspath
+        
+    flist = ['{0}/{1}'.format(awspath, visit['files'][i]) 
                 for i in indices]
     
     if dryrun:
@@ -4792,7 +4803,9 @@ def fetch_acs_wcs_files(beams_file, bucket_name='grizli-v1'):
                 
                 print('Fetch WCS file: {0}'.format(url))
                 req = request.urlretrieve(url, wcsfile)
-                    
+        
+    im.close()
+    
 def fetch_hst_calib(file='iref$uc72113oi_pfl.fits',  ftpdir='https://hst-crds.stsci.edu/unchecked_get/references/hst/', verbose=True):
     """
     TBD
