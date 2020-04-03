@@ -83,7 +83,7 @@ visit_prep_args: &prep_args
     column_average: True
     sky_iter: 10
     iter_atol: 0.0001
-    imaging_bkg_params: {bh: 128, bw: 128, fh: 3, fw: 3, pixel_scale: 0.06, get_median: False}
+    imaging_bkg_params: {bh: 256, bw: 256, fh: 3, fw: 3, pixel_scale: 0.10, get_median: False}
     fix_stars: True
     reference_catalogs: [PS1, DES, DSC, SDSS, GAIA, WISE]
     outlier_threshold: 4
