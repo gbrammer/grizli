@@ -208,7 +208,18 @@ def eazy_photoz(root, force=False, object_only=True, apply_background=True, aper
     params['MAIN_OUTPUT_FILE'] = '{0}.eazypy'.format(root)
     
     params['Z_MAX'] = z_max
-    params['MW_EBV'] = mastquery.utils.get_irsa_dust(cat['ra'].mean(), cat['dec'].mean())
+    
+    try:
+        ebv = mastquery.utils.get_mw_dust(cat['ra'].mean(), cat['dec'].mean())
+    except:
+        try:
+            ebv = mastquery.utils.get_irsa_dust(cat['ra'].mean(),
+                                                cat['dec'].mean())
+        except:
+            print("Couldn't get EBV, fall back to ebv=0.0")
+            ebv = 0.
+        
+    params['MW_EBV'] = ebv
     params['PRIOR_ABZP'] = 23.9
     
     params['SYS_ERR'] = sys_err
@@ -224,12 +235,15 @@ def eazy_photoz(root, force=False, object_only=True, apply_background=True, aper
             
             mag = 23.9-2.5*np.log10(cat['{0}_corr_{1}'.format(f, aper_ix)])
             break
-    #
+    
     if os.path.exists('templates/fsps_full/tweak_fsps_QSF_11_v3_noRed.param.fits'):
         params['TEMPLATES_FILE'] = 'templates/fsps_full/tweak_fsps_QSF_11_v3_noRed.param'
     else:
         params['TEMPLATES_FILE'] = 'templates/fsps_full/tweak_fsps_QSF_12_v3.param'
-
+    
+    for k in extra_params:
+        params[k] = extra_params[k]
+    
     zpfile = None
     load_products = False
 
@@ -248,10 +262,7 @@ failed:
 
 Run it with `path` pointing to the location of the `eazy-photoz` repository.""")
             return False
-    
-    for k in extra_params:
-        params[k] = extra_params[k]
-                
+                    
     self = eazy.photoz.PhotoZ(param_file=None, translate_file='zphot.translate', zeropoint_file=zpfile, params=params, load_prior=True, load_products=load_products)
     
     if quiet:

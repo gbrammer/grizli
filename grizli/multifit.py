@@ -1436,12 +1436,15 @@ class MultiBeam(GroupFitter):
         self.ra, self.dec = self.beams[0].get_sky_coords()
         
         if MW_EBV < 0:
-            ### Try to get MW_EBV from hsaquery.utils
+            ### Try to get MW_EBV from mastquery.utils
+            import mastquery.utils
             try:
-                import mastquery.utils
-                MW_EBV = mastquery.utils.get_irsa_dust(self.ra, self.dec)
+                MW_EBV = mastquery.utils.get_mw_dust(self.ra, self.dec)
             except:
-                MW_EBV = 0
+                try:
+                    MW_EBV = mastquery.utils.get_irsa_dust(self.ra, self.dec)
+                except:
+                    MW_EBV = 0.
         
         self.MW_EBV = MW_EBV
         
