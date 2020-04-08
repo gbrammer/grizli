@@ -2388,7 +2388,7 @@ def get_gaia_DR2_vizier_columns():
     
 def get_gaia_DR2_vizier(ra=165.86, dec=34.829694, radius=3., max=100000,
                     catalog="I/345/gaia2", server='vizier.cfa.harvard.edu', 
-                    use_mirror=False):
+                    use_mirror=False, keys=None):
     
     from astroquery.vizier import Vizier
     import astropy.units as u
@@ -2398,9 +2398,10 @@ def get_gaia_DR2_vizier(ra=165.86, dec=34.829694, radius=3., max=100000,
                          frame='icrs')
         
     gdict = get_gaia_DR2_vizier_columns()
+    if keys is None:
+        keys = list(gdict.keys())
     
     try:
-        keys = list(gdict.keys())
         
         # Hack, Vizier object doesn't seem to allow getting all keys
         # simultaneously (astroquery v0.3.7)
