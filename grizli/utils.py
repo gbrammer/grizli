@@ -3444,12 +3444,15 @@ def log_zgrid(zr=[0.7,3.4], dz=0.01):
     zgrid = np.exp(np.arange(np.log(1+zr[0]), np.log(1+zr[1]), dz))-1
     return zgrid
 
-def get_wcs_pscale(wcs):
+def get_wcs_pscale(wcs, set_attribute=True):
     """Get correct pscale from a `~astropy.wcs.WCS` object
     
     Parameters
     ----------
     wcs : `~astropy.wcs.WCS` or `~astropy.io.fits.Header`
+    
+    set_attribute : bool
+        Set the `pscale` attribute on `wcs`, along with returning the value.
         
     Returns
     -------
@@ -3468,6 +3471,8 @@ def get_wcs_pscale(wcs):
         det = linalg.det(wcs.wcs.pc)
         
     pscale = np.sqrt(np.abs(det))*3600.
+    wcs.pscale = pscale
+    
     return pscale
     
 def transform_wcs(in_wcs, translation=[0.,0.], rotation=0., scale=1.):
