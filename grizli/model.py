@@ -1106,8 +1106,10 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
             return 1
             
         try:
-            pam_data = pyfits.open(os.getenv('iref')+'ir_wfc3_map.fits')[1].data
+            pam = pyfits.open(os.getenv('iref')+'ir_wfc3_map.fits')
+            pam_data = pam[1].data
             pam_value = pam_data[int(self.yc-self.pad), int(self.xc-self.pad)]
+            pam.close()
         except:
             pam_value = 1
             
@@ -1845,6 +1847,13 @@ class ImageData(object):
         
         ### Fix some wcs attributes that might not be set correctly
         for wcs in [ref_wcs, flt_wcs]:
+            
+            if hasattr(wcs, '_naxis1'):
+                wcs.naxis1 = wcs._naxis1
+                wcs.naxis2 = wcs._naxis2
+            else:
+                wcs._naxis1, wcs._naxis2 = wcs._naxis
+            
             if (not hasattr(wcs.wcs, 'cd')) & hasattr(wcs.wcs, 'pc'):
                 wcs.wcs.cd = wcs.wcs.pc
                 
@@ -1919,6 +1928,7 @@ class ImageData(object):
             slice_wcs.naxis2 = slice_wcs._naxis2 = NY
         else:
             slice_wcs._naxis = [NX, NY]
+            slice_wcs._naxis1, slice_wcs._naxis2 = NX, NY
             
         if hasattr(slice_wcs, 'sip'):
             if slice_wcs.sip is not None:
