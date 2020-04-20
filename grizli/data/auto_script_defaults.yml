@@ -149,6 +149,13 @@ mosaic_args:
 # Mask IR difraction spikes
 mask_spikes: False 
 
+# CR rejection for visit combinations
+# (mosaic_driz_cr_type & 1) : flag CRs on all IR combined
+# (mosaic_driz_cr_type & 2) : flag CRs on IR filter combinations
+# (mosaic_driz_cr_type & 4) : flag CRs on all OPT combined
+# (mosaic_driz_cr_type & 8) : flag CRs on OPT filter combinations
+mosaic_driz_cr_type: 0
+
 # Multiband photometric catalog
 make_phot: True 
 multiband_catalog_args: 
