@@ -148,7 +148,7 @@ def apply_catalog_corrections(root, total_flux='flux_auto', auto_corr=True, get_
     
     return cat
     
-def eazy_photoz(root, force=False, object_only=True, apply_background=True, aper_ix=1, apply_prior=False, beta_prior=True, get_external_photometry=False, external_limits=3, external_sys_err=0.3, external_timeout=300, sys_err=0.05, z_step=0.01, z_min=0.01, z_max=12, total_flux='flux_auto', auto_corr=True, compute_residuals=False, dummy_prior=False, extra_rf_filters=[], quiet=True, aperture_indices='all', extra_params={}):
+def eazy_photoz(root, force=False, object_only=True, apply_background=True, aper_ix=1, apply_prior=False, beta_prior=True, get_external_photometry=False, external_limits=3, external_sys_err=0.3, external_timeout=300, sys_err=0.05, z_step=0.01, z_min=0.01, z_max=12, total_flux='flux_auto', auto_corr=True, compute_residuals=False, dummy_prior=False, extra_rf_filters=[], quiet=True, aperture_indices='all', extra_params={}, extra_translate={}):
     
     import os
     import eazy
@@ -195,6 +195,9 @@ def eazy_photoz(root, force=False, object_only=True, apply_background=True, aper
     fp.write('irac_ch4_flux F21\n')
     fp.write('irac_ch4_err  E21\n')
     
+    for k in extra_translate:
+        fp.write('{0} {1}\n'.format(k, extra_translate[k]))
+        
     # For zeropoint
     if dummy_prior:
         fp.write('dummy_flux F205x\n')
