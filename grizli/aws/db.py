@@ -748,6 +748,21 @@ def set_phot_root(root, phot_root, engine):
             xres = grizli_db.from_sql("select root, count(root) from redshift_fit where root like '{0}-%%' group by root".format(root.split('-')[0]), engine)
             print(xres)
         
+        # Update OBJID for natural join
+        #for tab in ['redshift_fit', 'redshift_fit_quasar', 'multibeam']
+        SQL = """
+WITH sub AS (
+    SELECT objid as p_objid, p_root, p_id
+    FROM photometry_apcorr
+)
+UPDATE redshift_fit
+SET objid = p_objid
+FROM sub
+WHERE phot_root = p_root AND id = p_id;
+        """
+        db.from_sql(SQL, engine)
+        
+        engine.execute(SQL)
         
 def wait_on_db_update(root, t0=60, dt=30, n_iter=60, engine=None):
     """
@@ -1643,6 +1658,12 @@ def run_all_redshift_fits():
     res = engine.execute("DELETE from redshift_fit_quasar WHERE (root = '{0}')".format(root), engine)
     res = engine.execute("DELETE from stellar_fit WHERE (root = '{0}')".format(root), engine)
     res = engine.execute("DELETE from photometry_apcorr WHERE (p_root = '{0}')".format(root), engine)
+    
+    if False:
+        # Remove the whole thing 
+        res = engine.execute("DELETE from exposure_log WHERE (parent = '{0}')".format(root), engine)
+        res = engine.execute("DELETE from charge_fields WHERE (field_root = '{0}')".format(root), engine)
+        
     grizli_db.run_lambda_fits(root, phot_root=root, min_status=2, zr=[0.01,zmax], mag_limits=[15,26], engine=engine)  
     
     #for root in "j233844m5528 j105732p3620 j112416p1132 j113812m1134 j113848m1134 j122852p1046 j143200p0959 j152504p0423 j122056m0205 j122816m1132 j131452p2612".split():
@@ -1923,7 +1944,7 @@ def set_column_formats(info, extra={}):
         elif c.startswith('flux_') | c.startswith('err_'):
             info[c].format = '.1e'
         
-def make_html_table(engine=None, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','bic_diff','chinu','log_pdf_max', 'd4000', 'd4000_e'], where="AND status >= 5 AND root='j163852p4039'", tables=[], table_root='query', sync='s3://grizli-v1/tables/', png_ext=['R30','stack','full','line'], sort_column=('bic_diff',-1), fit_table='redshift_fit', verbose=True, get_sql=False, res=None, show_hist=False, extra_formats={}, use_join=False):
+def make_html_table(engine=None, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','bic_diff','chinu','log_pdf_max', 'd4000', 'd4000_e'], where="AND status >= 5 AND root='j163852p4039'", tables=[], table_root='query', sync='s3://grizli-v1/tables/', png_ext=['R30','stack','full','line'], sort_column=('bic_diff',-1), fit_table='redshift_fit', verbose=True, get_sql=False, res=None, show_hist=False, extra_formats={}, use_json=True, use_join=False):
     """
     """
     import time
@@ -2032,7 +2053,7 @@ def make_html_table(engine=None, columns=['root','status','id','p_ra','p_dec','m
         if not hasattr(info[c][0], 'upper'):
             sortable.append(c)
     
-    info[all_columns][so].write_sortable_html('{0}.html'.format(table_root), replace_braces=True, localhost=False, max_lines=1e5, table_id=None, table_class='display compact', css=None, filter_columns=sortable, buttons=['csv'], toggle=True, use_json=True)
+    info[all_columns][so].write_sortable_html('{0}.html'.format(table_root), replace_braces=True, localhost=False, max_lines=1e5, table_id=None, table_class='display compact', css=None, filter_columns=sortable, buttons=['csv'], toggle=True, use_json=use_json)
     
     if show_hist:
         from matplotlib.ticker import FixedLocator, AutoLocator, MaxNLocator
