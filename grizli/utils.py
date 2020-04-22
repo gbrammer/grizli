@@ -4064,13 +4064,13 @@ def make_wcsheader(ra=40.07293, dec=-1.6137748, size=2, pixscale=0.1, get_hdu=Fa
         cdelt = [pixscale[0]/3600., pixscale[1]/3600.]
         
     if np.isscalar(size):
-        npix = np.cast[int]([size/pixscale, size/pixscale])
+        npix = np.cast[int](np.round([size/pixscale, size/pixscale]))
     else:
-        npix = np.cast[int]([size[0]/pixscale, size[1]/pixscale])
+        npix = np.cast[int](np.round([size[0]/pixscale, size[1]/pixscale]))
         
     hout = pyfits.Header()
-    hout['CRPIX1'] = npix[0]//2
-    hout['CRPIX2'] = npix[1]//2
+    hout['CRPIX1'] = npix[0]/2
+    hout['CRPIX2'] = npix[1]/2
     hout['CRVAL1'] = ra
     hout['CRVAL2'] = dec
     hout['CD1_1'] = -cdelt[0]
