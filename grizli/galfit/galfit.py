@@ -19,11 +19,6 @@ except:
 
 # Constraints
 # see https://users.obs.carnegiescience.edu/peng/work/galfit/EXAMPLE.CONSTRAINTS
-SERSIC_CONSTRAINTS = """{comp} x   -3 3       # relative to initial guess
-{comp} re  0.2 to 10
-{comp} n   0.4 to 8
-{comp} q   0.15 to 1
-"""
 
 LINKED_CONSTRAINTS = """# small shifts, limited re, q
 # linked x, y, q, pa
@@ -47,6 +42,15 @@ LINKED_CONSTRAINTS = """# small shifts, limited re, q
 3_2 pa offset
 """
 
+SERSIC_CONSTRAINTS = """# Component {comp}
+{comp} x  -3 3
+{comp} y  -3 3
+{comp} mag  15 to 29
+{comp} re  0.2 to 30
+{comp} q   0.1 to 1.
+{comp} n   0.5 to 8
+
+"""
 
 GALFIT_IMAGES = """===============================================================================
 # IMAGE and GALFIT CONTROL PARAMETERS
@@ -59,7 +63,7 @@ F) {mask}                # Bad pixel mask (FITS image or ASCII coord list)
 G) {constraints}                # File with parameter constraints (ASCII file) 
 H) 1    {xmax}   1    {ymax}   # Image region to fit (xmin xmax ymin ymax)
 I) {sh}    {sh}          # Size of the convolution box (x y)
-J) 26.563              # Magnitude photometric zeropoint 
+J) {ab_zeropoint:.3f}       # Magnitude photometric zeropoint 
 K) {ps:.3f} {ps:.3f}        # Plate scale (dx dy)    [arcsec per pixel]
 O) regular             # Display type (regular, curses, both)
 P) 0                   # Choose: 0=optimize, 1=model, 2=imgblock, 3=subcomps
@@ -483,7 +487,13 @@ class Galfitter(object):
         return flt_files
     
     @staticmethod
-    def fit_arrays(sci, wht, seg, psf, id=None, platescale=0.06, exptime=0, path='/tmp', root='gf', galfit_exec='galfit', gaussian_guess=False, components=[GalfitSersic()], recenter=True, psf_sample=1):
+    def fit_arrays(sci, wht, seg, psf, id=None, platescale=0.06, exptime=0, path='/tmp', root='gf', galfit_exec='galfit', ab_zeropoint=26, gaussian_guess=False, components=[GalfitSersic()], recenter=True, psf_sample=1, write_constraints=True):
+        """
+        Fit array data with Galfit
+        
+        """
+        from astropy.coordinates import Angle
+        import astropy.units as u
         
         rms = 1/np.sqrt(wht)#*exptime
         if exptime > 0:
@@ -499,28 +509,30 @@ class Galfitter(object):
         sh = sci.shape[0]
         
         fp = open('{0}/{1}.feedme'.format(path, root),'w')
-        
         sci_file = '{0}/{1}_sci.fits'.format(path, root)
+        constraints_file = sci_file.replace('_sci.fits', '.constraints')
         
         cmd = GALFIT_IMAGES.format(input=sci_file,
                                    output=sci_file.replace('_sci', '_out'), 
                                    sigma=sci_file.replace('_sci', '_rms'), 
                                    psf=sci_file.replace('_sci', '_psf'), 
                                    mask=sci_file.replace('_sci', '_mask'), 
-                                   constraints=sci_file.replace('_sci.fits',
-                                                              '.constraints'),
+                                   constraints=constraints_file,
                                    xmax=sh, ymax=sh, sh=sh, 
-                                   ps=platescale, psf_sample=psf_sample)
+                                   ps=platescale, psf_sample=psf_sample, 
+                                   ab_zeropoint=ab_zeropoint)
         
         fp.write(cmd)
         
         if gaussian_guess:
             fit, q, theta = fit_gauss(sci)
         
-        from astropy.coordinates import Angle
-        import astropy.units as u
+        if (not os.path.exists(constraints_file)) & (write_constraints):
+            fpc = open(constraints_file, 'w')
+        else:
+            fpc = None
             
-        for comp in components:
+        for i, comp in enumerate(components):
             if recenter:
                 comp.set(pos=[sh/2., sh/2.])
             
@@ -529,8 +541,13 @@ class Galfitter(object):
                 
             fp.write(str(comp))
             
+            if fpc is not None:
+                fpc.write(SERSIC_CONSTRAINTS.format(comp=i+1))
+            
         fp.close()
-        
+        if fpc is not None:
+            fpc.close()
+            
         pyfits.writeto(sci_file, data=sci, overwrite=True)
         pyfits.writeto(sci_file.replace('_sci', '_rms'), 
                        data=rms, overwrite=True)
@@ -604,7 +621,7 @@ class Galfitter(object):
         
         fp = open(path+'galfit.feedme','w')
         
-        fp.write(GALFIT_IMAGES.format(input=path+'gf_sci.fits', output=path+'gf_out.fits', sigma=path+'gf_rms.fits', psf=psf_file, mask=path+'gf_mask.fits', xmax=sh, ymax=sh, sh=sh, ps=self.DPSF.driz_pscale, psf_sample=1, constraints='none'))
+        fp.write(GALFIT_IMAGES.format(input=path+'gf_sci.fits', output=path+'gf_out.fits', sigma=path+'gf_rms.fits', psf=psf_file, mask=path+'gf_mask.fits', xmax=sh, ymax=sh, sh=sh, ps=self.DPSF.driz_pscale, psf_sample=1, constraints='none', ab_zeropoint=26))
         
         if gaussian_guess:
             fit, q, theta = fit_gauss(sci)
