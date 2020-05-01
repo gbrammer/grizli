@@ -1546,9 +1546,9 @@ def get_line_wavelengths():
     line_wavelengths['OII'] = [3727.092, 3729.875]
     line_ratios['OII'] = [1, 1.] 
     
-    line_wavelengths['OI-6302'] = [6302.046, 6363.67]
+    line_wavelengths['OI-6302'] = [6302.046, 6365.535]
     line_ratios['OI-6302'] = [1, 0.33]
-    line_wavelengths['OI-5578'] = [5578.6]
+    line_wavelengths['OI-5578'] = [5578.89]
     line_ratios['OI-5578'] = [1]
     
     # Auroral OII
@@ -1557,25 +1557,25 @@ def get_line_wavelengths():
     line_ratios['OII-7325'] = [1.2, 1.] 
     
     # Weak Ar III in SF galaxies
-    line_wavelengths['ArIII-7138'] = [7138.0]
+    line_wavelengths['ArIII-7138'] = [7137.77]
     line_ratios['ArIII-7138'] = [1.] 
     
     line_wavelengths['NeIII-3867'] = [3869.87]
     line_ratios['NeIII-3867'] = [1.]
-    line_wavelengths['NeIII-3968'] = [3968.16]
+    line_wavelengths['NeIII-3968'] = [3968.59]
     line_ratios['NeIII-3968'] = [1.]
-    line_wavelengths['NeV-3346'] = [3346.8]
+    line_wavelengths['NeV-3346'] = [3343.5]
     line_ratios['NeV-3346'] = [1.]
     line_wavelengths['NeVI-3426'] = [3426.85]
     line_ratios['NeVI-3426'] = [1.]
     
-    line_wavelengths['SIII'] = [9068.6, 9530.6][::-1]
+    line_wavelengths['SIII'] = [9071.1, 9533.2][::-1]
     line_ratios['SIII'] = [1, 2.44][::-1]
     
     # Split doublet, if needed
-    line_wavelengths['SIII-9068'] = [9068.6]
+    line_wavelengths['SIII-9068'] = [9071.1]
     line_ratios['SIII-9068'] = [1]
-    line_wavelengths['SIII-9531'] = [9530.6]
+    line_wavelengths['SIII-9531'] = [9533.2]
     line_ratios['SIII-9531'] = [1]
     
     line_wavelengths['SII'] = [6718.29, 6732.67]
@@ -1597,12 +1597,12 @@ def get_line_wavelengths():
     line_ratios['HeII-4687'] = [1.]
     line_wavelengths['HeII-5412'] = [5412.5]
     line_ratios['HeII-5412'] = [1.]
-    line_wavelengths['HeI-5877'] = [5877.2]
+    line_wavelengths['HeI-5877'] = [5877.249]
     line_ratios['HeI-5877'] = [1.]
-    line_wavelengths['HeI-3889'] = [3889.5]
+    line_wavelengths['HeI-3889'] = [3889.75]
     line_ratios['HeI-3889'] = [1.]
-    line_wavelengths['HeI-1083'] = [10833.2]
-    line_ratios['HeI-1083'] = [1.]
+    line_wavelengths['HeI-1083'] = [10832.057, 10833.306]
+    line_ratios['HeI-1083'] = [1., 1.]
     
     # Osterbrock Table 4.5
     # -> N=4
@@ -1632,6 +1632,12 @@ def get_line_wavelengths():
     
     line_wavelengths['NII'] = [6549.86, 6585.27]
     line_ratios['NII'] = [1., 3]
+    
+    line_wavelengths['NII-6549'] = [6549.86]
+    line_ratios['NII-6549'] = [1.]
+    line_wavelengths['NII-6584'] = [6585.27]
+    line_ratios['NII-6584'] = [1.]
+    
     line_wavelengths['NIII-1750'] = [1750.]
     line_ratios['NIII-1750'] = [1.]
     line_wavelengths['NIV-1487'] = [1487.]
