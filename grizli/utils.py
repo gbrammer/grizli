@@ -4817,7 +4817,7 @@ def fetch_acs_wcs_files(beams_file, bucket_name='grizli-v1'):
         
     im.close()
     
-def fetch_hst_calib(file='iref$uc72113oi_pfl.fits',  ftpdir='https://hst-crds.stsci.edu/unchecked_get/references/hst/', verbose=True):
+def fetch_hst_calib(file='iref$uc72113oi_pfl.fits',  ftpdir='https://hst-crds.stsci.edu/unchecked_get/references/hst/', verbose=True, remove_corrupt=True):
     """
     TBD
     """
@@ -4828,6 +4828,18 @@ def fetch_hst_calib(file='iref$uc72113oi_pfl.fits',  ftpdir='https://hst-crds.st
     iref_file = os.path.join(os.getenv(ref_dir), cimg)
     if not os.path.exists(iref_file):
         os.system('curl -o {0} {1}/{2}'.format(iref_file, ftpdir, cimg))
+        if 'fits' in iref_file:
+            try:
+                pyfits.open(iref_file)
+            except:
+                msg = ('Downloaded file {0} appears to be corrupt.\n'
+                       'Check that {1}/{2} exists and is a valid file')
+                   
+                print(msg.format(iref_file, ftpdir, cimg))
+                if remove_corrupt:
+                    os.remove(iref_file)
+                
+                return False
     else:
         if verbose:
             print('{0} exists'.format(iref_file))
@@ -4873,6 +4885,25 @@ def fetch_hst_calibs(flt_file, ftpdir='https://hst-crds.stsci.edu/unchecked_get/
         calib_paths.append(path)
         
     return calib_paths
+
+def mast_query_from_file_list(files=[], os_open=True):
+    """
+    Generate a MAST query on datasets in a list.  
+    """
+    if len(files) == 0:
+        files = glob.glob('*raw.fits')
+    
+    if len(files) == 0:
+        print('No `files` specified.')
+        return False
+        
+    datasets = np.unique([file[:6]+'*' for file in files]).tolist()
+    URL = "http://archive.stsci.edu/hst/search.php?action=Search&"
+    URL += "sci_data_set_name="+','.join(datasets)
+    if os_open:
+        os.system('open "{0}"'.format(URL))
+    
+    return URL
     
 def fetch_default_calibs(ACS=False):
     
@@ -6835,7 +6866,8 @@ def log_exception(LOGFILE, traceback, verbose=True, mode='a'):
     import time
     
     trace = traceback.format_exc(limit=2)
-    log = '\n########################################## \n# ! Exception ({0})\n'.format(time.ctime())
+    log = '\n########################################## \n'
+    log += '# ! Exception ({0})\n'.format(time.ctime())
     log += '#\n# !'+'\n# !'.join(trace.split('\n'))
     log += '\n######################################### \n\n'
     if verbose | (LOGFILE is None):
