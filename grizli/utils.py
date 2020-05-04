@@ -4944,7 +4944,7 @@ For example,
     pam = os.path.join(os.getenv('iref'), 'ir_wfc3_map.fits')
     print('Pixel area map: {0}'.format(pam))
     if not os.path.exists(pam):
-        os.system('curl -o {0} http://www.stsci.edu/hst/wfc3/pam/ir_wfc3_map.fits'.format(pam))
+        os.system('curl -o {0} https://www.stsci.edu/files/live/sites/www/files/home/hst/instrumentation/wfc3/data-analysis/pixel-area-maps/_documents/ir_wfc3_map.fits'.format(pam))
 
 def fetch_wfpc2_calib(file='g6q1912hu_r4f.fits', path=os.getenv('uref'), use_mast=False, verbose=True, overwrite=True, skip_existing=True):
     """
