@@ -2630,7 +2630,7 @@ def load_sdss_pca_templates(file='spEigenQSO-55732.fits', smooth=3000):
     
     return temp_list
     
-def bspline_templates(wave, degree=3, df=6, get_matrix=False, log=False, clip=1.e-4):
+def bspline_templates(wave, degree=3, df=6, get_matrix=False, log=False, clip=1.e-4, minmax=None):
     """
     B-spline basis functions, modeled after `~patsy.splines`
     """
@@ -2649,8 +2649,12 @@ def bspline_templates(wave, degree=3, df=6, get_matrix=False, log=False, clip=1.
     else:
         xspl = wave*1
         
-    mi = xspl.min()
-    ma = xspl.max()
+    if minmax is None:
+        mi = xspl.min()
+        ma = xspl.max()
+    else:
+        mi, ma = minmax
+        
     width = ma-mi
     all_knots = norm_knots*width+mi
     
@@ -2659,6 +2663,10 @@ def bspline_templates(wave, degree=3, df=6, get_matrix=False, log=False, clip=1.
     
     coefs = np.identity(n_bases)
     basis = splev(xspl, (all_knots, coefs, degree))
+    
+    for i in range(n_bases):
+        out_of_range = (xspl < mi) | (xspl > ma)
+        basis[i][out_of_range] = 0
     
     wave_peak = np.round(wave[np.argmax(basis, axis=1)])
     
