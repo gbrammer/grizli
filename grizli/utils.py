@@ -1300,7 +1300,7 @@ def detect_with_photutils(sci, err=None, dq=None, seg=None, detect_thresh=2.,
     import scipy.ndimage as nd
     
     from photutils import detect_threshold, detect_sources, SegmentationImage
-    from photutils import source_properties, properties_table
+    from photutils import source_properties
     
     import astropy.io.fits as pyfits
     from astropy.table import Column
@@ -1348,7 +1348,7 @@ def detect_with_photutils(sci, err=None, dq=None, seg=None, detect_thresh=2.,
     props = source_properties(sci, segm, error=threshold/detect_thresh,
                               mask=mask, background=background, wcs=wcs)
                               
-    catalog = properties_table(props)
+    catalog = props.to_table()
     
     ### Mag columns
     mag = AB_zeropoint - 2.5*np.log10(catalog['source_sum'])
