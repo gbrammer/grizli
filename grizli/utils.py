@@ -1336,7 +1336,7 @@ def detect_with_photutils(sci, err=None, dq=None, seg=None, detect_thresh=2.,
         segm = detect_sources(sci*(~mask), threshold, npixels=npixels,
                               filter_kernel=kernel)
 
-        grow = nd.maximum_filter(segm.array, grow_seg)
+        grow = nd.maximum_filter(segm.data, grow_seg)
         seg = np.cast[np.float32](grow)
     else:
         ######## Use the supplied segmentation image
