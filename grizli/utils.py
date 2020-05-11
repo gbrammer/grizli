@@ -13,7 +13,6 @@ import astropy.table
 import numpy as np
 
 import astropy.units as u
-from grizli import model
 
 from . import GRIZLI_PATH
 
@@ -1054,6 +1053,8 @@ def calc_header_zeropoint(im, ext=0):
         AB zeropoint
 
     """
+    from grizli import model
+
     scale_exptime = 1.
 
     if isinstance(im, pyfits.Header):
