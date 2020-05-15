@@ -1943,7 +1943,47 @@ def set_column_formats(info, extra={}):
             info[c].format = '.1e'
         elif c.startswith('flux_') | c.startswith('err_'):
             info[c].format = '.1e'
-        
+
+def query_from_ds9(ds9, radius=5, engine=None, extra_cols=['mag_auto','z_map','bic_diff', 't_g800l', 't_g102', 't_g141'], extra_query='', table_root='/tmp/ds9_query'):
+    """
+    Make a table by running a query for objects based on a DS9 pan position
+    """
+    from grizli import utils, prep
+    
+    if engine is None:
+        engine = get_db_engine(echo=False)
+    
+    ra, dec = np.cast[float](ds9.get('pan fk5').split())
+    dd = radius/3600.
+    dr = dd/np.cos(dec/180*np.pi)
+    
+    min_cols = ['root','id','status','ra','dec']
+    colstr = ','.join(min_cols + extra_cols)
+    
+    q = from_sql(f'select {colstr} '
+                      f'from redshift_fit natural join photometry_apcorr '
+                      f'where ra > {ra-dr} AND ra < {ra+dr}'
+                      f' AND dec > {dec-dd} and dec < {dec+dd}' + extra_query,
+                      engine)
+    
+    tt = utils.GTable()
+    tt['ra'] = [ra]
+    tt['dec'] = [dec]
+    
+    _idx, _dr = tt.match_to_catalog_sky(q)
+    q['_dr'] = _dr
+    q['_dr'].format = '.2f'
+    so = np.argsort(q['_dr'])
+    
+    make_html_table(sync=None, res=q[so], use_json=False, table_root=table_root, sort_column=('_dr',1))
+    
+    comment = [f'{id}' for id in q['id'][so]]
+    
+    prep.table_to_regions(q[so], table_root+'.reg', comment=comment)
+    
+    return q[so]
+    
+    
 def make_html_table(engine=None, columns=['root','status','id','p_ra','p_dec','mag_auto','flux_radius','z_spec','z_map','bic_diff','chinu','log_pdf_max', 'd4000', 'd4000_e'], where="AND status >= 5 AND root='j163852p4039'", tables=[], table_root='query', sync='s3://grizli-v1/tables/', png_ext=['R30','stack','full','line'], sort_column=('bic_diff',-1), fit_table='redshift_fit', verbose=True, get_sql=False, res=None, show_hist=False, extra_formats={}, use_json=True, use_join=False):
     """
     """
