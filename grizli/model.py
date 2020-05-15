@@ -2131,7 +2131,33 @@ class ImageData(object):
             return self.data['DQ']
         else:
             return self.data[ext]/self.photflam
-            
+    
+    def get_common_slices(self, other, verify_parent=True):
+        """
+        Get slices of overlaps between two `ImageData` objects
+        """        
+        if verify_parent:
+            if self.parent_file != other.parent_file:
+                msg = ('Parent expodures don\'t match!\n' +
+                       '   self: {0}\n'.format(self.parent_file) + 
+                       '  other: {0}\n'.format(other.parent_file))
+                raise IOError(msg)
+        
+        ll = np.min([self.origin, other.origin], axis=0)
+        ur = np.max([self.origin+self.sh, other.origin+other.sh], axis=0)
+        
+        # other in self
+        lls = np.minimum(other.origin - ll, self.sh)
+        urs = np.clip(other.origin + self.sh - self.origin, [0,0], self.sh)
+
+        # self in other
+        llo = np.minimum(self.origin - ll, other.sh)
+        uro = np.clip(self.origin + other.sh - other.origin, [0,0], other.sh)
+        
+        self_slice = (slice(lls[0], urs[0]), slice(lls[1], urs[1]))
+        other_slice = (slice(llo[0], uro[0]), slice(llo[1], uro[1]))
+        return self_slice, other_slice
+        
 class GrismFLT(object):
     """Scripts for modeling of individual grism FLT images"""
     def __init__(self, grism_file='', sci_extn=1, direct_file='',
