@@ -1026,7 +1026,7 @@ def combine_filters(label='j022708p4901_00273', verbose=True):
     
     return grouped_filters
     
-def show_all_thumbnails(label='j022708p4901_00273', filters=['visb', 'visr', 'y', 'j', 'h'], scale_ab=21, close=True, thumb_height=2., rgb_params=RGB_PARAMS):
+def show_all_thumbnails(label='j022708p4901_00273', filters=['visb', 'visr', 'y', 'j', 'h'], scale_ab=21, close=True, thumb_height=2., rgb_params=RGB_PARAMS, ext='png', xl=0.04, yl=0.98, fs=7):
     """
     Show individual filter and RGB thumbnails
     """
@@ -1091,7 +1091,7 @@ def show_all_thumbnails(label='j022708p4901_00273', filters=['visb', 'visr', 'y'
     fig.tight_layout(pad=0.1)
     
     # Add labels
-    xl, yl = 0.04, 0.98
+    #xl, yl = 0.04, 0.98
     for i, filter in enumerate(filters):
         if filter in ims:
             if filter in ['uv', 'visb', 'visr', 'y', 'j', 'h']:
@@ -1104,17 +1104,19 @@ def show_all_thumbnails(label='j022708p4901_00273', filters=['visb', 'visr', 'y'
             else:
                 text_label = filter
                         
-            fig.text((i+xl)/NX, yl, text_label, fontsize=7, 
+            fig.text((i+xl)/NX, yl, text_label, fontsize=fs, 
                      ha='left', va='top', transform=fig.transFigure, 
                      bbox=dict(facecolor='w', edgecolor='None', alpha=0.9))
-    #
-    fig.text((i+1+xl)/NX, yl, label, ha='left', va='top', transform=fig.transFigure, fontsize=7, color='w', bbox=dict(facecolor='k', edgecolor='None', alpha=0.8))
-    fig.text((i+1+xl)/NX, 1-yl, ' '.join(rgb_filts), ha='left', va='bottom', transform=fig.transFigure, fontsize=6, color='w', bbox=dict(facecolor='k', edgecolor='None', alpha=0.8))
+    
+    fig.text((i+1+xl)/NX, yl, label, ha='left', va='top', transform=fig.transFigure, fontsize=fs, color='w', bbox=dict(facecolor='k', edgecolor='None', alpha=0.8))
+    fig.text((i+1+0.04)/NX, 1-yl, ' '.join(rgb_filts), ha='left', va='bottom', transform=fig.transFigure, fontsize=fs, color='w', bbox=dict(facecolor='k', edgecolor='None', alpha=0.8))
                      
-    fig.savefig('{0}.thumb.png'.format(label))
+    fig.savefig('{0}.thumb.{1}'.format(label, ext))
     if close:
         plt.close()
-        
+    
+    return fig
+    
 if __name__ == "__main__":
     import sys
     
