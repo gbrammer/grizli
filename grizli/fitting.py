@@ -1357,7 +1357,7 @@ class GroupFitter(object):
         filters = [FilterDefinition(bp=S.ObsBandpass('sdss,{0}'.format(b))) for b in bands]
         pivot = {}
         for ib, b in enumerate(bands):
-            pivot[b] = filters[ib].pivot()
+            pivot[b] = filters[ib].pivot
             
         #to_flam = 10**(-0.4*(22.5+48.6))*3.e18 # / pivot(Ang)**2
         #flam = np.array([xid['modelFlux_{0}'.format(b)][0]*to_flam/pivot[b]**2 for b in bands])
@@ -1439,7 +1439,7 @@ class GroupFitter(object):
         self.is_spec = np.isfinite(self.scif)
         self.is_spec[-len(flam):] = False
         
-        self.photom_pivot = np.array([filter.pivot() for filter in filters])
+        self.photom_pivot = np.array([filter.pivot for filter in filters])
         self.wavef = np.hstack((self.wavef, self.photom_pivot))
         
         # eazypy tempfilt for faster interpolation
