@@ -5298,7 +5298,7 @@ class EffectivePSF(object):
             
             if sh[2] == 90:
                 # ACS WFC
-                iX, iY = 9, 10
+                iX, iY = 10, 9 #9, 10
             else:
                 # UVIS
                 iX, iY = 7, 8
@@ -6712,6 +6712,10 @@ def RGBtoHex(vals, rgbtype=1):
 
 def catalog_mask(cat, ecol='FLUXERR_APER_0', max_err_percentile=90, pad=0.05, pad_is_absolute=False, min_flux_radius=1.):
     """
+    Compute a catalog mask for 
+      1) Objects within `pad` of the edge of the catalog convex hull
+      2) Uncertainties < `max_err_percentile`
+     
     """
     test = np.isfinite(cat['FLUX_AUTO'])
     if 'FLUX_RADIUS' in cat.colnames:
@@ -6721,12 +6725,15 @@ def catalog_mask(cat, ecol='FLUXERR_APER_0', max_err_percentile=90, pad=0.05, pa
 
     not_edge = hull_edge_mask(cat['X_IMAGE'], cat['Y_IMAGE'], 
                               pad=pad, pad_is_absolute=pad_is_absolute)
+    
+    test &= not_edge
+    
     if ecol in cat.colnames:
         valid = np.isfinite(cat[ecol])
         if max_err_percentile < 100:
             test &= cat[ecol] < np.percentile(cat[ecol][(~not_edge) & valid], 
                                           max_err_percentile)
-    
+        
     return test
     
 def hull_edge_mask(x, y, pad=100, pad_is_absolute=True, mask=None):
