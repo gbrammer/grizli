@@ -319,7 +319,8 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
     if HOME_PATH == '$PWD':
         HOME_PATH = os.getcwd()
     
-    exptab = utils.GTable.gread(os.path.join(HOME_PATH, '{0}_footprint.fits'.format(root)))
+    fpfile = os.path.join(HOME_PATH, '{0}_footprint.fits'.format(root))
+    exptab = utils.GTable.gread(fpfile)
     # Fix CLEAR filter names
     for i, filt_i in enumerate(exptab['filter']):
         if 'clear' in filt_i.lower():
@@ -881,44 +882,63 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/
 
             tab['filter'][i] = filt_i.upper()
     
-    use_filters = utils.column_string_operation(tab['filter'], filters, method='startswith', logical='or')
+    use_filters = utils.column_string_operation(tab['filter'], filters, 
+                                            method='startswith', logical='or')
     tab = tab[use_filters]
     
-    if MAST_QUERY:
-        tab = query.get_products_table(tab, extensions=['RAW','C1M'])
+    if len(tab) > 0:
+        if MAST_QUERY:
+            tab = query.get_products_table(tab, extensions=['RAW','C1M'])
                                  
-    tab = tab[(tab['filter'] != 'F218W')]
-    if ONLY_F814W:
-        tab = tab[(tab['filter'] == 'F814W') | (tab[instdet_key] == 'WFC3/IR')]
+        tab = tab[(tab['filter'] != 'F218W')]
+        if ONLY_F814W:
+            tab = tab[(tab['filter'] == 'F814W') | 
+                      (tab[instdet_key] == 'WFC3/IR')]
     
-    # Fetch and preprocess IR backgrounds
-    os.chdir(os.path.join(HOME_PATH, field_root, 'RAW'))
+        # Fetch and preprocess IR backgrounds
+        os.chdir(os.path.join(HOME_PATH, field_root, 'RAW'))
     
-    # Ignore files already moved to RAW/Expflag
-    bad_files = glob.glob('./Expflag/*')
-    badexp = np.zeros(len(tab), dtype=bool)
-    for file in bad_files:
-        root = os.path.basename(file).split('_')[0]
-        badexp |= tab['observation_id'] == root.lower()
+        # Ignore files already moved to RAW/Expflag
+        bad_files = glob.glob('./Expflag/*')
+        badexp = np.zeros(len(tab), dtype=bool)
+        for file in bad_files:
+            root = os.path.basename(file).split('_')[0]
+            badexp |= tab['observation_id'] == root.lower()
     
-    is_wfpc2 = utils.column_string_operation(tab['instrument_name'], 'WFPC2', method='startswith', logical='or')
+        is_wfpc2 = utils.column_string_operation(tab['instrument_name'],
+                                  'WFPC2', method='startswith', logical='or')
     
-    use_filters = utils.column_string_operation(tab['filter'], filters, method='startswith', logical='or')
+        use_filters = utils.column_string_operation(tab['filter'], 
+                                  filters, method='startswith', logical='or')
     
-    fetch_selection = (~badexp) & (~is_wfpc2) & use_filters
-    curl = fetch.make_curl_script(tab[fetch_selection], level=None, script_name='fetch_{0}.sh'.format(field_root), inst_products=inst_products, skip_existing=True, output_path='./', s3_sync=s3_sync)
-    
-    print('Fetch {0} files (s3_sync={1})'.format(fetch_selection.sum(), s3_sync))
-    
-    # Ugly callout to shell
-    os.system('sh fetch_{0}.sh'.format(field_root))
-    
-    if (is_wfpc2 & use_filters).sum() > 0:
-        ## Have to get WFPC2 from ESA
-        curl = fetch.make_curl_script(tab[(~badexp) & (is_wfpc2) & use_filters], level=None, script_name='fetch_wfpc2_{0}.sh'.format(field_root), inst_products=inst_products, skip_existing=True, output_path='./', s3_sync=False)
+        fetch_selection = (~badexp) & (~is_wfpc2) & use_filters
+        curl = fetch.make_curl_script(tab[fetch_selection], level=None, 
+                        script_name='fetch_{0}.sh'.format(field_root), 
+                        inst_products=inst_products, skip_existing=True, 
+                        output_path='./', s3_sync=s3_sync)
         
-        os.system('sh fetch_wfpc2_{0}.sh'.format(field_root))
+        msg = 'Fetch {0} files (s3_sync={1})'.format(fetch_selection.sum(), 
+                                                     s3_sync)
+        utils.log_comment(utils.LOGFILE, msg, verbose=True)
+    
+        # Ugly callout to shell
+        os.system('sh fetch_{0}.sh'.format(field_root))
+    
+        if (is_wfpc2 & use_filters).sum() > 0:
+            ## Have to get WFPC2 from ESA
+            wfpc2_files = (~badexp) & (is_wfpc2) & use_filters
+            curl = fetch.make_curl_script(tab[wfpc2_files], level=None, 
+                          script_name='fetch_wfpc2_{0}.sh'.format(field_root), 
+                          inst_products=inst_products, skip_existing=True, 
+                          output_path='./', s3_sync=False)
         
+            os.system('sh fetch_wfpc2_{0}.sh'.format(field_root))
+    
+    else:
+        msg = 'Warning: no files to fetch for filters={0}.'.format(filters)
+        utils.log_comment(utils.LOGFILE, msg, verbose=True)
+    
+    #### Gunzip if necessary
     files = glob.glob('*raw.fits.gz')
     files.extend(glob.glob('*fl?.fits.gz'))
     files.extend(glob.glob('*c[01]?.fits.gz')) # WFPC2
@@ -928,13 +948,17 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/
         print('gunzip '+file+'  # status="{0}"'.format(status))
         if status == 256:
             os.system('mv {0} {1}'.format(file, file.split('.gz')[0]))
-            
+    
+    #### Remove exposures with bad EXPFLAG
     if remove_bad:
-        remove_bad_expflag(field_root=field_root, HOME_PATH=HOME_PATH, min_bad=min_bad_expflag)
+        remove_bad_expflag(field_root=field_root, HOME_PATH=HOME_PATH, 
+                           min_bad=min_bad_expflag)
     
     #### Reprocess the RAWs into FLTs    
     if reprocess_parallel:
-        os.system("python -c 'from grizli.pipeline import reprocess; reprocess.reprocess_wfc3ir(parallel={0},clean_dark_refs={1})'".format(reprocess_parallel, reprocess_clean_darks))
+        rep = "python -c 'from grizli.pipeline import reprocess; "
+        rep += "reprocess.reprocess_wfc3ir(parallel={0},clean_dark_refs={1})'"
+        os.system(rep.format(reprocess_parallel, reprocess_clean_darks))
     else:
         from grizli.pipeline import reprocess
         reprocess.reprocess_wfc3ir(parallel=False, 
@@ -3515,13 +3539,18 @@ def make_combined_mosaics(root, fix_stars=False, mask_spikes=False, skip_single_
     ## Optical filters
     mosaics = glob.glob('{0}-ir_dr?_sci.fits'.format(root))
        
-    if (mosaic_args['half_optical_pixscale']) & (len(mosaics) > 0):
+    if (mosaic_args['half_optical_pixscale']):# & (len(mosaics) > 0):
         # Drizzle optical images to half the pixel scale determined for 
         # the IR mosaics.  The optical mosaics can be 2x2 block averaged
         # to match the IR images.
 
         ref = pyfits.open('{0}_wcs-ref.fits'.format(root))
-        h = ref[1].header.copy()
+        try:
+            h = ref[1].header.copy()
+            _ = h['CRPIX1']
+        except:
+            h = ref[0].header.copy()
+            
         for k in ['NAXIS1','NAXIS2','CRPIX1','CRPIX2']:
             h[k] *= 2
 
@@ -4190,7 +4219,9 @@ DRIZZLER_ARGS = {'aws_bucket':False,
                  'thumb_height':1.5,
                  'rgb_params':THUMB_RGB_PARAMS,
                  'remove':False,
-                 'include_ir_psf':True}
+                 'include_ir_psf':True, 
+                 'combine_similar_filters':False, 
+                 'single_output':True}
                
 def make_rgb_thumbnails(root='j140814+565638', ids=None, maglim=21,
                         drizzler_args=DRIZZLER_ARGS, use_line_wcs=False,
@@ -4664,7 +4695,7 @@ def test_psf():
     
     id=212; gfit, model = gf.fit_object(id=id, size=int(128*0.06), components=[galfit.GalfitSersic(), galfit.GalfitSersic()])
     
-def field_psf(root='j020924-044344', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/WISP/', factors=[1,2,4], get_drizzle_scale=True, subsample=256, size=6, get_line_maps=False, raise_fault=False, verbose=True, psf_filters=['F098M', 'F110W', 'F105W', 'F125W', 'F140W', 'F160W'], skip=False):
+def field_psf(root='j020924-044344', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/WISP/', factors=[1,2,4], get_drizzle_scale=True, subsample=256, size=6, get_line_maps=False, raise_fault=False, verbose=True, psf_filters=['F098M', 'F110W', 'F105W', 'F125W', 'F140W', 'F160W'], skip=False, make_fits=True):
     """
     Generate PSFs for the available filters in a given field
     """
@@ -4758,6 +4789,15 @@ def field_psf(root='j020924-044344', HOME_PATH='/Volumes/Pegasus/Grizli/Automati
         
     visits, groups, info = np.load(visits_file, allow_pickle=True)
     
+    # Append "U" to UVIS filters in info
+    if 'DETECTOR' in info.colnames:
+        uvis = np.where(info['DETECTOR'] == 'UVIS')[0]
+        filters = [f for f in info['FILTER']]
+        for i in uvis:
+            filters[i] += 'U'
+        
+        info['FILTER'] = filters
+        
     # Average PSF
     xp, yp = np.meshgrid(np.arange(0,sh[1],subsample), np.arange(0, sh[0], subsample))
     ra, dec = drz_wcs.all_pix2world(xp, yp, 0)
@@ -4767,6 +4807,8 @@ def field_psf(root='j020924-044344', HOME_PATH='/Volumes/Pegasus/Grizli/Automati
     
     if verbose:
         print(' ')
+    
+    hdus = []
         
     for file in files:
         filter = file.split(root+'-')[1].split('_')[0]
@@ -4776,15 +4818,24 @@ def field_psf(root='j020924-044344', HOME_PATH='/Volumes/Pegasus/Grizli/Automati
         if (os.path.exists('{0}-{1}_psf.fits'.format(root, filter))) & skip:
             continue
                 
-        flt_files = info['FILE'][info['FILTER'] == filter.upper()]
-        
-        GP = gpsf.DrizzlePSF(flt_files=list(flt_files), info=None, driz_image=drz_file)
+        flt_files = list(info['FILE'][info['FILTER'] == filter.upper()])
+        if len(flt_files) == 0:
+            # Try to use HDRTAB in drizzled image
+            flt_files = None
+            driz_image = file
+        else:
+            driz_image = drz_file
+            
+        driz_hdu = pyfits.open(file)        
+        GP = gpsf.DrizzlePSF(flt_files=flt_files, info=None, 
+                             driz_image=driz_image)
         
         hdu = pyfits.HDUList([pyfits.PrimaryHDU()])
         hdu[0].header['ROOT'] = root
         
         for scl, pf, kern_i, label in zip(scale, pixfrac, kernel, labels):
             ix = 0
+            psf_f = None
             
             if pf == 0:
                 kern = 'point'
@@ -4795,32 +4846,44 @@ def field_psf(root='j020924-044344', HOME_PATH='/Volumes/Pegasus/Grizli/Automati
             logstr = logstr.format(root, scl, pf, kern, filter, label)
             utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
             
-            
             for ri, di in zip(ra.flatten(), dec.flatten()):
                 slice_h, wcs_slice = utils.make_wcsheader(ra=ri, dec=di, size=size, pixscale=scl, get_hdu=False, theta=0)
                 
                 get_extended = (filter.upper() in ['F098M', 'F110W', 'F105W', 'F125W', 'F140W', 'F160W'])
-                psf_i = GP.get_psf(ra=ri, dec=di, filter=filter.upper(), pixfrac=pf, kernel=kern, verbose=False, wcs_slice=wcs_slice, get_extended=get_extended, get_weight=True)
+                try:
+                    psf_i = GP.get_psf(ra=ri, dec=di, filter=filter.upper(), 
+                                       pixfrac=pf, kernel=kern, verbose=False, 
+                                       wcs_slice=wcs_slice, 
+                                       get_extended=get_extended, 
+                                       get_weight=True)
+                except:
+                    continue
+                
+                msk_i = (psf_i[1].data != 0)
+                msk_i &= np.isfinite(psf_i[1].data)
+                if msk_i.sum() == 0:
+                    continue
+                
                 if ix == 0:
-                    msk_f = ((psf_i[1].data != 0) & np.isfinite(psf_i[1].data))*1
-                    if msk_f.sum() == 0:
-                        continue
-                    
-                    ix += 1
+                    # Initialize
+                    msk_f = msk_i*1
                     psf_f = psf_i
                     psf_f[1].data[msk_f == 0] = 0
-                    
-                else:
-                    msk_i = ((psf_i[1].data != 0) & np.isfinite(psf_i[1].data))*1
-                    if msk_i.sum() == 0:
-                        continue
-                        
-                    msk_f += msk_i
-                    psf_f[1].data[msk_i > 0] += psf_i[1].data[msk_i > 0]
-                    
                     ix += 1
-                    
-            msk = np.maximum(msk_f, 1)
+                else:
+                    # Add to existing
+                    msk_f += msk_i*1
+                    psf_f[1].data[msk_i > 0] += psf_i[1].data[msk_i > 0]
+                    ix += 1
+            
+            if psf_f is None:
+                msg = 'PSF for {0} (filter={1}) is empty'
+                print(msg.format(file, filter))
+                continue
+                
+            # Average
+            psf_f[1].data /= np.maximum(msk_f, 1)
+            
             psf_f[1].header['FILTER'] = filter, 'Filter'
             psf_f[1].header['PSCALE'] = scl, 'Pixel scale, arcsec'
             psf_f[1].header['PIXFRAC'] = pf, 'Pixfrac'
@@ -4830,7 +4893,13 @@ def field_psf(root='j020924-044344', HOME_PATH='/Volumes/Pegasus/Grizli/Automati
             
             hdu.append(psf_f[1])
             
-        hdu.writeto('{0}-{1}_psf.fits'.format(root, filter), overwrite=True)
+        if make_fits:
+            psf_file = '{0}-{1}_psf.fits'.format(root, filter)
+            hdu.writeto(psf_file, overwrite=True)
+            
+        hdus.append(hdu)
+        
+    return hdus
         
 def make_report(root, gzipped_links=True, xsize=18, output_dpi=None, make_rgb=True, mw_ebv=0):
     """
