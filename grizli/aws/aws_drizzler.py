@@ -632,6 +632,8 @@ def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixsca
             np.save('{0}_filter_groups.npy'.format(visit_root), [groups])
                 
         else:
+            print('Use groups file: {0}'.format(groups_files[0]))
+            
             groups = np.load(groups_files[0], allow_pickle=True)[0]
         
     #filters = ['f160w','f814w', 'f110w', 'f098m', 'f140w','f125w','f105w','f606w', 'f475w']
