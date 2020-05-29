@@ -10,9 +10,6 @@ https://iopscience.iop.org/article/10.1088/2041-8205/714/2/L244
 
 import numpy as np
 
-from scipy.special import beta, gamma, gammainc
-import scipy.ndimage as nd
-
 import astropy.io.fits as pyfits
 import astropy.stats
 import astropy.table
@@ -236,6 +233,7 @@ def kappa_func(kappa, n):
     """
     Function for getting Sersic kappa
     """
+    from scipy.special import gamma, gammainc
     f = gamma(2*n)-2*gammainc(2*n, kappa)*gamma(2*n)
     return f
 
@@ -243,12 +241,15 @@ def Rc(c0):
     """
     Shape parameter
     """
+    from scipy.special import beta
+    
     return np.pi*(c0+2)/(4*beta(1./(c0+2), 1+1./(c0+2)))
 
 def sigma_e(re, n, q, Ftot=1., c0=0.):
     """
     Surface brightess at the effective radius, re, given total flux
     """
+    from scipy.special import gamma
     kap = get_kappa(n)    
     return Ftot/(2*np.pi*re**2*np.exp(kap)*n*kap**(-2*n)*gamma(2*n)*q/Rc(c0)), kap
     
