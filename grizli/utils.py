@@ -3,7 +3,6 @@ import os
 import glob
 import inspect
 from collections import OrderedDict
-
 import warnings
 
 import astropy.io.fits as pyfits
@@ -4166,7 +4165,7 @@ def get_flt_footprint(flt_file, extensions=[1,2,3,4], patch_args=None):
     else:
         return fp
             
-def make_maximal_wcs(files, pixel_scale=0.1, get_hdu=True, pad=90, verbose=True, theta=0):
+def make_maximal_wcs(files, pixel_scale=0.1, get_hdu=True, pad=90, verbose=True, theta=0, nsci_extensions=4):
     """
     Compute an ImageHDU with a footprint that contains all of `files`
     
@@ -4183,6 +4182,12 @@ def make_maximal_wcs(files, pixel_scale=0.1, get_hdu=True, pad=90, verbose=True,
     
     pad : float
         Padding to add to the total image size, in `~astropy.units.arcsec`.
+    
+    theta : float
+        Position angle, degrees
+    
+    nsci_extensions : int
+        Number of 'SCI' extensions to try in the exposure files.
         
     Returns
     -------
@@ -4211,21 +4216,27 @@ def make_maximal_wcs(files, pixel_scale=0.1, get_hdu=True, pad=90, verbose=True,
             if not os.path.exists(file):
                 continue
         
-            im = pyfits.open(file)
+            with pyfits.open(file) as im:
+                #im = pyfits.open(file)
         
-            if im[0].header['INSTRUME'] == 'ACS':
-                chips = 2
-            elif im[0].header['INSTRUME'] == 'WFPC2':
-                chips = 4
-            else:
-                chips = 1
+                # if im[0].header['INSTRUME'] == 'ACS':
+                #     chips = 2
+                # elif im[0].header['INSTRUME'] == 'WFPC2':
+                #     chips = 4
+                # elif im[0].header['INSTRUME'] == 'WFC3':
+                #     if im[0].header['INSTRUME'] == 'IR':
+                #         chips = 1
+                #     else:
+                #         chips = 2
+                # else:
+                #     chips = 1
         
-            for chip in range(chips):
-                if ('SCI',chip+1) not in im:
-                    continue
+                for ext in range(nsci_extensions):
+                    if ('SCI', ext+1) not in im:
+                        continue
                 
-                wcs = pywcs.WCS(im['SCI',chip+1].header, fobj=im)
-                wcs_list.append((wcs, file, chip))
+                    wcs = pywcs.WCS(im['SCI', ext+1].header, fobj=im)
+                    wcs_list.append((wcs, file, ext))
         
     group_poly = None
     for i, (wcs, file, chip) in enumerate(wcs_list):
@@ -5661,6 +5672,8 @@ class GTable(astropy.table.Table):
                     format='fits'
                 elif file.endswith('.csv'):
                     format = 'csv'
+                elif file.endswith('.vot'):
+                    format = 'votable'
                 else:
                     format = 'ascii.commented_header'
                     
@@ -5717,6 +5730,7 @@ class GTable(astropy.table.Table):
             rd_pairs['ALPHA_J2000'] = 'DELTA_J2000'
             rd_pairs['X_WORLD'] = 'Y_WORLD'
             rd_pairs['ALPHA_SKY'] = 'DELTA_SKY'
+            rd_pairs['_RAJ2000'] = '_DEJ2000'
             
             for k in list(rd_pairs.keys()):
                 rd_pairs[k.lower()] = rd_pairs[k].lower()
