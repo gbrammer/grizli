@@ -676,8 +676,16 @@ def align_drizzled_image(root='', mag_limits=[14,23], radec=None, NITER=3,
                                                                  mag_limits))
         return False
     
+    # Edge and error mask
     ok &= utils.catalog_mask(cat, max_err_percentile=max_err_percentile, pad=catalog_mask_pad, pad_is_absolute=False, min_flux_radius=1.)
-    
+
+    if max_err_percentile >= 200:
+        med_err = np.median(cat['FLUXERR_APER_0'][ok])
+        max_err = med_err*np.sqrt(2)
+        ok_err = cat['FLUXERR_APER_0'] < max_err
+        if ok_err.sum() > 5:
+            ok &= ok_err
+
     xy_drz = np.array([cat['X_IMAGE'][ok], cat['Y_IMAGE'][ok]]).T
     
     drz_file = glob.glob('{0}_dr[zc]_sci.fits'.format(root))[0]
@@ -4876,7 +4884,7 @@ def find_single_image_CRs(visit, simple_mask=False, with_ctx_mask=True,
 
         flt.flush()
         
-def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, max_files=999, pixfrac=0.8, scale=0.06, skysub=True, skymethod='localmin', skyuser='MDRIZSKY', bits=None, build=False, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='EXP', final_wt_scl='exptime', final_kernel='square', context=False, static=True, use_group_footprint=False, fetch_flats=True, fix_wcs_system=False, include_saturated=False, run_driz_cr=False, driz_cr_snr=None, driz_cr_scale=None, resetbits=0, log=False):
+def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, max_files=999, pixfrac=0.8, scale=0.06, skysub=True, skymethod='localmin', skyuser='MDRIZSKY', bits=None, build=False, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='EXP', final_wt_scl='exptime', final_kernel='square', context=False, static=True, use_group_footprint=False, fetch_flats=True, fix_wcs_system=False, include_saturated=False, run_driz_cr=False, driz_cr_snr=None, driz_cr_scale=None, resetbits=0, log=False, **kwargs):
     """Combine overlapping visits into single output mosaics
     
     Parameters
@@ -5054,7 +5062,7 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, m
             else:
                 driz_cr_snr = '8.0 5.0'
                 driz_cr_scale = '2.5 0.7'
-        
+                
         if bits is None:
             if isACS | isWFPC2:
                 bits = 64+32
