@@ -553,11 +553,13 @@ def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixsca
     else:
         # Run on local files, e.g., "Prep" directory
         parent = None
+        bkt = None
         #remove = False
-        
+    
+    # Download summary files from S3    
     for ext in ['_visits.fits', '_visits.npy', '_filter_groups.npy'][-1:]:
-
-        if (not os.path.exists('{0}{1}'.format(master, ext))) & (parent is not None):
+        newfile = '{0}{1}'.format(master, ext)
+        if (not os.path.exists(newfile)) & (parent is not None):
             
             s3_path = parent.split('/')[-2]
             s3_file = '{0}{1}'.format(master, ext)
