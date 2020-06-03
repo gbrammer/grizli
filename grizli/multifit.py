@@ -1831,7 +1831,7 @@ class MultiBeam(GroupFitter):
 
             self.beams[ib].beam.set_segmentation(blot_seg)
     
-    def replace_direct_image_cutouts(self, ref_image='gdn-100mas-f160w_drz_sci.fits', ext=0, interp='poly5', cutout=200, background_func=np.median):
+    def replace_direct_image_cutouts(self, ref_image='gdn-100mas-f160w_drz_sci.fits', ext=0, interp='poly5', cutout=200, background_func=np.median, thumb_labels=None):
         """
         Replace "REF" extensions in a `beams.fits` file
 
@@ -1913,7 +1913,10 @@ class MultiBeam(GroupFitter):
             if hasattr(wcs_copy, 'idcscale'):
                 if wcs_copy.idcscale is None:
                     delattr(wcs_copy, 'idcscale')
-                    
+                
+            if not hasattr(wcs_copy, '_naxis1') & hasattr(wcs_copy, '_naxis'):
+                wcs_copy._naxis1, wcs_copy._naxis2 = wcs_copy._naxis
+                
             blotted = ablot.do_blot(ref_data[sly, slx], 
                               ref_wcs.slice([sly, slx]), 
                               wcs_copy, 1, coeffs=True, interp=interp, 
@@ -1928,20 +1931,28 @@ class MultiBeam(GroupFitter):
                         bkg_data = blotted[msk]
                     else:
                         bkg_data = np.append(bkg_data, blotted[msk])
-
-            self.beams[ie].direct.data['REF'] = blotted*ref_photflam 
-            self.beams[ie].direct.ref_photflam = ref_photflam
-            self.beams[ie].direct.ref_photplam = ref_photplam
-            self.beams[ie].direct.ref_filter = ref_filter
-            #self.beams[ie].direct.ref_photflam
             
-            self.beams[ie].beam.direct = blotted*ref_photflam
+            if thumb_labels is None:
+                self.beams[ie].direct.data['REF'] = blotted*ref_photflam 
+                self.beams[ie].direct.ref_photflam = ref_photflam
+                self.beams[ie].direct.ref_photplam = ref_photplam
+                self.beams[ie].direct.ref_filter = ref_filter
+                #self.beams[ie].direct.ref_photflam
             
+                self.beams[ie].beam.direct = blotted*ref_photflam
+            else:
+                for label in thumb_labels:
+                    self.beams[ie].thumbs[label] = blotted*ref_photflam
+                    
         if bkg_data is not None:
-            bkg_value = background_func(bkg_data)
             for ie in range(self.N):
-                self.beams[ie].direct.data['REF'] -= bkg_value*ref_photflam
-                
+                bkg_value = background_func(bkg_data)*ref_photflam
+                if thumb_labels is None:
+                    self.beams[ie].direct.data['REF'] -= bkg_value
+                else:
+                    for label in thumb_labels:
+                        self.beams[ie].thumbs[label] -= bkg_value
+                    
     def reshape_flat(self, flat_array):
         """TBD
         """
@@ -3625,7 +3636,7 @@ class MultiBeam(GroupFitter):
         
         return chi2/self.DoF    
     
-    def drizzle_grisms_and_PAs(self, size=10, fcontam=0, flambda=False, scale=1, pixfrac=0.5, kernel='square', make_figure=True, usewcs=False, zfit=None, diff=True, grism_list=['G800L','G102','G141','F090W','F115W','F150W','F200W','F356W','F410M','F444W'], mask_segmentation=True):
+    def drizzle_grisms_and_PAs(self, size=10, fcontam=0, flambda=False, scale=1, pixfrac=0.5, kernel='square', make_figure=True, usewcs=False, zfit=None, diff=True, grism_list=['G800L','G102','G141','F090W','F115W','F150W','F200W','F356W','F410M','F444W'], mask_segmentation=True, reset_model=True):
         """Make figure showing spectra at different orients/grisms
         
         TBD
@@ -3752,9 +3763,10 @@ class MultiBeam(GroupFitter):
                         beam.compute_model(spectrum_1d=[m.wave, m.flux],
                                            is_cgs=True)
                 else:
-                    # simple flat spectrum
-                    for beam in beams:
-                        beam.compute_model()
+                    if reset_model:
+                        # simple flat spectrum
+                        for beam in beams:
+                            beam.compute_model()
 
                 data = []
                 for beam in beams:
@@ -3781,7 +3793,7 @@ class MultiBeam(GroupFitter):
                 hdu.append(hdu_model[1])
                 
                 # Line kernel
-                if not usewcs:
+                if (not usewcs):
                     h = hdu[1].header
                     #gau = S.GaussianSource(1.e-17, h['CRVAL1'], h['CD1_1']*1)
                     
@@ -3793,9 +3805,11 @@ class MultiBeam(GroupFitter):
                     gau = utils.SpectrumTemplate(central_wave=h['CRVAL1']*toA, fwhm=h['CD1_1']*toA)
                     
                     #print('XXX', h['CRVAL1'], h['CD1_1'], h['CRPIX1'], toA, gau.wave[np.argmax(gau.flux)])
-                    for beam in beams:
-                        beam.compute_model(spectrum_1d=[gau.wave, gau.flux],
-                                           is_cgs=True)
+                    if reset_model:
+                        for beam in beams:
+                            beam.compute_model(spectrum_1d=[gau.wave, 
+                                                            gau.flux],
+                                              is_cgs=True)
                 
                     data = [beam.beam.model for beam in beams]
                 
@@ -3851,13 +3865,18 @@ class MultiBeam(GroupFitter):
                                      
             ## Full continuum model
             if zfit is not None:
-                m = zfit['cont1d']
+                if diff > 1:
+                    m = zfit['line1d']
+                else:
+                    m = zfit['cont1d']
+                    
                 for beam in all_beams:
                     beam.compute_model(spectrum_1d=[m.wave, m.flux],
                                        is_cgs=True)
             else:
-                for beam in all_beams:
-                    beam.compute_model()
+                if reset_model:
+                    for beam in all_beams:
+                        beam.compute_model()
 
             #data = [beam.beam.model for beam in all_beams]
                
@@ -3893,8 +3912,9 @@ class MultiBeam(GroupFitter):
             #gau = S.GaussianSource(1., h['CRVAL1']*toA, h['CD1_1']*toA)
             gau = utils.SpectrumTemplate(central_wave=h['CRVAL1']*toA, fwhm=h['CD1_1']*toA)
             
-            for beam in all_beams:
-                beam.compute_model(spectrum_1d=[gau.wave, gau.flux],
+            if reset_model:
+                for beam in all_beams:
+                    beam.compute_model(spectrum_1d=[gau.wave, gau.flux],
                                    is_cgs=True)
             
             data = [beam.beam.model for beam in all_beams]
