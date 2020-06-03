@@ -3052,7 +3052,7 @@ class GroupFitter(object):
         import matplotlib.pyplot as plt
         from scipy.interpolate import UnivariateSpline
         
-        if (tfit is None) & (units in ['resid', 'spline']):
+        if (tfit is None) & (units in ['resid', 'nresid', 'spline']):
             print('`tfit` not specified.  Can\'t plot units=\'{0}\'.'.format(units))
             return False
             
@@ -3204,8 +3204,11 @@ class GroupFitter(object):
                 unit_corr = 1.
                 unit_label = 'e/s'
             elif units == 'resid':
+                unit_corr = 1./sens
+                unit_label = r'resid ($f_\lambda$)'
+            elif units == 'nresid':
                 unit_corr = 1./flm
-                unit_label = 'resid'
+                unit_label = 'norm. resid'
             elif units.startswith('spline'):
                 unit_corr = 1./flspl
                 unit_label = 'spline resid'
@@ -3226,6 +3229,10 @@ class GroupFitter(object):
             if flm is not None:
                 flm *= unit_corr#/1.e-19
             
+            if units == 'resid':
+                fl -= flm
+                flm -= flm
+                
             f_alpha = 1./(self.Ngrism[grism.upper()])*0.8 #**0.5
             
             # Plot
@@ -3343,6 +3350,8 @@ class GroupFitter(object):
             elif units == 'eps':
                 unit_corr = 1.
             elif units == 'resid':
+                unit_corr = 1./sp_flat[g]['flux']
+            elif units == 'nresid':
                 unit_corr = 1./sp_model[g]['flux']
             elif units.startswith('spline'):
                 unit_corr = 1./sp_spline[g]['flux']
@@ -3351,7 +3360,10 @@ class GroupFitter(object):
             
             flux = (sp_data[g]['flux']*unit_corr/pscale)[clip]
             err = (sp_data[g]['err']*unit_corr/pscale)[clip]
-
+            
+            if units == 'resid':
+                flux -= (sp_model[g]['flux']*unit_corr)[clip]
+                
             ep = np.percentile(err, ylim_percentile)
             
             if fill:
