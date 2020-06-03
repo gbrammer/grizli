@@ -1,4 +1,7 @@
 import os
+import traceback
+import yaml
+
 import numpy as np
 from .. import prep, utils
 
@@ -101,7 +104,26 @@ def write_params_to_yml(kwargs, output_file='grizli.auto_script.yml', verbose=Tr
     
     if verbose:
         print('\n# Write parameters to {0}\n'.format(output_file))
-        
+
+def safe_yaml_loader(yamlfile, loaders=[yaml.FullLoader, yaml.Loader, None]):
+    """
+    Try different YAML loaders
+    """
+    args = None
+    for loader in loaders:        
+        with open(yamlfile) as fp:
+            try:
+                args = yaml.load(fp, Loader=loader)
+                break
+                print(loader)
+            except:
+                pass
+    
+    if args is None:
+        raise IOError('Failed to load {0} with {1}'.format(file, loaders))
+    
+    return args
+    
 def get_yml_parameters(local_file=None, copy_defaults=False, verbose=True, skip_unknown_parameters=True):
     """
     Read default parameters from the YAML file in `grizli/data`
@@ -112,7 +134,6 @@ def get_yml_parameters(local_file=None, copy_defaults=False, verbose=True, skip_
         Parameter dictionary (with nested sub dictionaries).
         
     """
-    import yaml
     import shutil
     
     default_yml = 'auto_script_defaults.yml'
@@ -128,25 +149,13 @@ def get_yml_parameters(local_file=None, copy_defaults=False, verbose=True, skip_
             print('Copied default parameter file to {0}'.format(local_file))
             
         return False
-        
-    fp = open(path)
-    try:
-        kwargs = yaml.load(fp, Loader=yaml.FullLoader)
-    except:
-        kwargs = yaml.load(fp)
-        
-    fp.close()
     
+    kwargs = safe_yaml_loader(path)
+            
     if local_file is not None:
-        fp = open(local_file)
-
-        try:
-            local_args = yaml.load(fp, Loader=yaml.FullLoader)
-        except:
-            local_args = yaml.load(fp)
         
-        fp.close()
-        
+        local_args = safe_yaml_loader(local_file)
+                
         for k in local_args:
             if (k not in kwargs) and skip_unknown_parameters:
                 print('Skipping user keyword {0}'.format(k))
