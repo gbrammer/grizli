@@ -29,7 +29,7 @@ def test():
     
     _ = galfit_deconvolve(model_hdu, residuals, rms=_x['rms'], imshow_args=imshow_args)
     
-def galfit_deconvolve(model_hdu, residuals, rms=None, mask=None, oversample=8, comp='1', xprof=np.append(0, np.arange(2,20)), y_func=np.mean, cumul_values=[0.5, 0.8], make_plot=True, imshow_args={'vmin':-5, 'vmax':5, 'cmap':'viridis'}, plt_kwargs={'linestyle':'steps-mid', 'color':'r', 'alpha':0.8}, psf_offset=[1,1]):
+def galfit_deconvolve(model_hdu, residuals, rms=None, mask=None, oversample=8, comp='1', xprof=np.append(0, np.arange(2,20)), y_func=np.mean, cumul_values=[0.5, 0.8], make_plot=True, imshow_args={'vmin':-5, 'vmax':5, 'cmap':'viridis'}, plt_kwargs={'linestyle':'steps-mid', 'color':'r', 'alpha':0.8}, npix=20, psf_offset=[1,1]):
     """
     Deconvolve an image using a galfit Sersic model
     
@@ -51,6 +51,7 @@ def galfit_deconvolve(model_hdu, residuals, rms=None, mask=None, oversample=8, c
         fig = optional figure if `make_plot=True`
         
     """
+    import matplotlib.pyplot as plt
     
     #model_hdu = _x['model']
     #residuals = _x['resid']
@@ -78,7 +79,9 @@ def galfit_deconvolve(model_hdu, residuals, rms=None, mask=None, oversample=8, c
     
     ##########
     # 1D averaged profiles
-
+    
+    integ = False
+    
     # Original data
     _, ydata, _, _ = running_median(Rso,
                 (data)[mask].flatten()[so].astype(np.float)-sky, 
@@ -171,8 +174,8 @@ def galfit_deconvolve(model_hdu, residuals, rms=None, mask=None, oversample=8, c
         ax4.errorbar(xpix, ydeconv, yrms, linestyle='None', 
                      color=pl[0].get_color(), alpha=0.5, marker='.')
         
-        ax4.vlines(params['re'], 30, 100, color=pl[0].get_color(), alpha=0.5)
-        ax4.vlines(Rcumul, 0.1, 10, color=pl[0].get_color(), alpha=0.5)
+        ax4.vlines(params['re'], 1e-10, 1e10, color=pl[0].get_color(), alpha=0.5)
+        ax4.vlines(Rcumul, 1e-10, 1e10, color=pl[0].get_color(), alpha=0.5, linewidth=3, linestyle='--')
     
         ax4.scatter(Rso, 
                 (prof + residuals)[mask].flatten()[so].astype(np.float)-sky, 
@@ -183,19 +186,22 @@ def galfit_deconvolve(model_hdu, residuals, rms=None, mask=None, oversample=8, c
         #        marker='.', color='r', alpha=0.1, zorder=-1000)
         
         ax4.legend()
-        print(ydeconv.min(), ydeconv.max())
+        
+        valid = np.isfinite(ydeconv) & np.isfinite(yprof)
+        
+        print(ydeconv[valid].min(), ydeconv[valid].max())
         
         try:
-            ax4.set_ylim(np.maximum(0.5*ydeconv.min(), 1e-3*ydeconv.max()),
-                     2*ydeconv.max())
+            ax4.set_ylim(np.maximum(0.5*yprof[valid].min(), 1e-5*ydeconv[valid].max()),
+                     2*ydeconv[valid].max())
         except:
             pass
             
-        ax4.set_xlim(0.8, xprof.max()+2)
+        ax4.set_xlim(0.05, xprof.max()+2)
     
         for a in [ax, ax2, ax3]:
-            a.set_xlim(xc-1-Np, xc-1+Np)
-            a.set_ylim(yc-1-Np, yc-1+Np)
+            a.set_xlim(xc-1-npix, xc-1+npix)
+            a.set_ylim(yc-1-npix, yc-1+npix)
             a.set_xticklabels([])
             a.set_yticklabels([])
             
