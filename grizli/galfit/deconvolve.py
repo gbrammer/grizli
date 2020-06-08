@@ -161,9 +161,9 @@ def galfit_deconvolve(model_hdu, residuals, rms=None, mask=None, oversample=8, c
         ax4.loglog()
         ax4.grid()
         
-        xc = float(_h[comp+'_XC'].split()[0])
-        yc = float(_h[comp+'_YC'].split()[0])
-    
+        xc = gf_header_key(_h, comp+'_XC')
+        yc = gf_header_key(_h, comp+'_YC')
+            
         ax.imshow(data/im_norm*mask, **imshow_args)    
         ax2.imshow(residuals/im_norm*mask, **imshow_args)    
         ax3.imshow(prof/im_norm*mask, **imshow_args)    
@@ -264,7 +264,7 @@ def gf_header_key(header, key='2_XC'):
     Get a header keyword from a GALFIT header, which may have [] and *
     in the keyword value
     """
-    return float(header[key].split()[0].strip('[]').strip('*'))
+    return float(header[key].split()[0].strip('[]').strip('*').strip('{').strip('}'))
     
 def sersic_profile(shape, mag=20., xc=[0., 0.], n=1., q=0.5, pa=0, re=1., ZP=26., gf_header=None, comp='2', verbose=True, oversample=8, psf_offset=[1,1]):
     """
@@ -284,11 +284,17 @@ def sersic_profile(shape, mag=20., xc=[0., 0.], n=1., q=0.5, pa=0, re=1., ZP=26.
         yy = gf_header_key(gf_header, comp+'_YC')
         xc = np.array([xx, yy])
         mag = gf_header_key(gf_header, comp+'_MAG')
-        n = gf_header_key(gf_header, comp+'_N')
-        q = gf_header_key(gf_header, comp+'_AR')
-        pa = gf_header_key(gf_header, comp+'_PA')
-        re = gf_header_key(gf_header, comp+'_RE')
-        
+        if comp+'_N' in gf_header:
+            n = gf_header_key(gf_header, comp+'_N')
+            q = gf_header_key(gf_header, comp+'_AR')
+            pa = gf_header_key(gf_header, comp+'_PA')
+            re = gf_header_key(gf_header, comp+'_RE')
+        else:
+            n = 1.
+            q = 1.
+            pa = 0.
+            re = 0.01
+            
         if verbose:
             print(f'xc:{xc}, q:{q}, pa:{pa}, n:{n}')
         
@@ -322,11 +328,19 @@ def r_ellipse(radius=5, xc=[0., 0.], q=0.5, pa=0, re=1., gf_header=None, comp='2
         xx = gf_header_key(gf_header, comp+'_XC')
         yy = gf_header_key(gf_header, comp+'_YC')
         xc = np.array([xx, yy])
-        n = gf_header_key(gf_header, comp+'_N')
         mag = gf_header_key(gf_header, comp+'_MAG')
-        q = gf_header_key(gf_header, comp+'_AR')
-        pa = gf_header_key(gf_header, comp+'_PA')
-        re = gf_header_key(gf_header, comp+'_RE')
+
+        if comp+'_N' in gf_header:
+            n = gf_header_key(gf_header, comp+'_N')
+            q = gf_header_key(gf_header, comp+'_AR')
+            pa = gf_header_key(gf_header, comp+'_PA')
+            re = gf_header_key(gf_header, comp+'_RE')
+        else:
+            n = 1.
+            q = 1.
+            pa = 0.
+            re = 0.01
+
         if verbose:
             print(f'xc:{xc}, q:{q}, pa:{pa}')
     
@@ -362,11 +376,19 @@ def pix_to_r(shape, xc=[0., 0.], q=0.5, pa=0, re=1., gf_header=None, comp='2', v
         xx = gf_header_key(gf_header, comp+'_XC')
         yy = gf_header_key(gf_header, comp+'_YC')
         xc = np.array([xx, yy])
-        n = gf_header_key(gf_header, comp+'_N')
         mag = gf_header_key(gf_header, comp+'_MAG')
-        q = gf_header_key(gf_header, comp+'_AR')
-        pa = gf_header_key(gf_header, comp+'_PA')
-        re = gf_header_key(gf_header, comp+'_RE')
+
+        if comp+'_N' in gf_header:
+            n = gf_header_key(gf_header, comp+'_N')
+            q = gf_header_key(gf_header, comp+'_AR')
+            pa = gf_header_key(gf_header, comp+'_PA')
+            re = gf_header_key(gf_header, comp+'_RE')
+        else:
+            n = 1.
+            q = 1.
+            pa = 0.
+            re = 0.01
+
         if verbose:
             print(f'xc:{xc}, q:{q}, pa:{pa}')
             
