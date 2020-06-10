@@ -1,16 +1,16 @@
 """
 Pipeline for flexible modeling and extration of slitless spectroscopy
 """
-#__version__ = "0.1.1.dev" 
+#__version__ = "0.1.1.dev"
 #from .version import __version__
 from .version import version as __version__
 
 import os
 
-## Will get ImportError: No module named disperse" if imported in the repo directory
+# Will get ImportError: No module named disperse" if imported in the repo directory
 # if os.path.exists('README.rst') & os.path.exists('LICENSE.txt'):
 #     print("""
-# Warning: `import grizli` will fail if the working directory is the place 
+# Warning: `import grizli` will fail if the working directory is the place
 # where the code repository was cloned and compiled!
 # """)
 
@@ -26,18 +26,18 @@ if os.getenv('GRIZLI') is None:
     GRIZLI_PATH = os.path.join(os.path.dirname(__file__), 'data/')
 
     print("""
-Warning: $GRIZLI system variable not set and will default to {0}. 
+Warning: $GRIZLI system variable not set and will default to {0}.
 Grizli will need to find the configuration files in $GRIZLI/CONF.
     """.format(GRIZLI_PATH))
     #GRIZLI_PATH = '/usr/local/share/grizli_home'
 else:
     GRIZLI_PATH = os.getenv('GRIZLI')
-    
+
 try:
     import sep
 except:
     print("""
-Couldn't `import sep`.  SExtractor replaced with SEP 
+Couldn't `import sep`.  SExtractor replaced with SEP
 in April 2018.  Install with `pip install sep`.
 """)
 
