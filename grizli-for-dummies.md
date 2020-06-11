@@ -13,7 +13,7 @@ Preface
 I never chose to write this book, it chose me. During my PhD and now
 during my first Postdoc, I have been forced to learn and grasp many
 intricate details regarding the usage of the *Grism redshift and line
-analysis software* (Grizli) written by Gabriel Brammer[^1]. The official
+analysis software* (Grizli) written by Gabriel Brammer<sup>[1](#Gabe_meeting)</sup>. The official
 documentation and software can be found
 [here](#https://grizli.readthedocs.io/en/master/).
 
@@ -32,6 +32,9 @@ lucky and find the solution here. Otherwise, the struggle is real.
 *Jasleen Matharu\
 4th May 2020\
 during the COVID-19 Pandemic[^2]*
+
+<a name="Gabe_meeting">1</a>: I still haven't met him in person.
+
 
 ---
 
@@ -780,9 +783,7 @@ Fitting in 1D
 Fitting in 2D
 -------------
 
-\backmatter
-\addcontentsline{toc}{chapter}{Index}
-\printindex
+
 
 [^1]: I still haven't met him in person.
 
