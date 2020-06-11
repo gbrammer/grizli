@@ -41,7 +41,9 @@ during the COVID-19 Pandemic[^2]*
     1. [Sub paragraph](#subparagraph1)
 3. [Another paragraph](#paragraph2)
 
-How to get the most out of this book <a name="get_from_book"></a>
+<a name="get_from_book"></a>
+
+How to get the most out of this book
 ====================================
 
 This book follows a particular format to help you get the most out of
