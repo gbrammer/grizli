@@ -76,7 +76,7 @@ during the COVID-19 Pandemic<a href="#covid" id="covid_1"><sup>2</sup></a>*
         1. [Deleting the Grizli environment](#deleting_the_grizli_environment)
 3. [Changes between Grizli versions](#grizli_versions)
     1. [Version 0.9 versus 1.0](#version_0.9_versus_1.0)
-    2. [Improvement in the grism/photometry scaling algorithm](#scaling_algorithm)
+        1. [Improvement in the grism/photometry scaling algorithm](#scaling_algorithm)
 4. [Accessing the public database of reduced grism data](#public_database)
 
 ---
