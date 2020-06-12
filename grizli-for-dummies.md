@@ -233,12 +233,11 @@ missing.\"*
 Accessing the public database of reduced grism data
 ===================================================
 
-0pt [Jasleen Matharu]{.smallcaps}
-
-0pt Grizli version: `1.0-76-g71853af`
+Author: [Jasleen Matharu](https://github.com/jkmatharu)
+Grizli version: `1.0-76-g71853af`
 
 The database of reduced public HST grism data can be accessed with the
-following information in `python`[^7]:
+following information in `python`<a href="#database" id="database_1"><sup>1</sup></a>:
 
         from grizli.aws import db
 
@@ -250,12 +249,14 @@ following information in `python`[^7]:
 
     engine = db.get_db_engine(config=config)
 
+<a id="database" href="#database_1"><sup>1</sup></a> You didn't honestly think I was going to publicise the login
+details, did you?
+
 Creating thumbnails that are not the standard $80\times80$ pixels in `full.fits`
 ================================================================================
 
-0pt [Jasleen Matharu]{.smallcaps}
-
-0pt Grizli version: `1.0-76-g71853af`
+Author: [Jasleen Matharu](https://github.com/jkmatharu)
+Grizli version: `1.0-76-g71853af`
 
 In this chapter, I will walk you through how to create thumbnails in
 your `full.fits` files with the dimensions of your choice.
