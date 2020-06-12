@@ -181,9 +181,9 @@ Within the `astroconda` environment, I ran:
 which deletes the `grizli-dev` environment and everything in it.
 
 
-<a id="anaconda" href="#anaconda_1"><sup>1</sup></a> Environment-ception.
-<a id="pip" href="#pip_1"><sup>2</sup></a> As spoken by the Grizli God himself, Gabe Brammer.
-<a id="wise" href="#wise_1"><sup>3</sup></a> You guessed it, it was the Grizli God himself, Gabe Brammer.
+<a id="anaconda" href="#anaconda_1"><sup>1</sup></a> Environment-ception.  
+<a id="pip" href="#pip_1"><sup>2</sup></a> As spoken by the Grizli God himself, Gabe Brammer.  
+<a id="wise" href="#wise_1"><sup>3</sup></a> You guessed it, it was the Grizli God himself, Gabe Brammer.  
 
 <a name="changes_between_grizli_versions"></a>
 
