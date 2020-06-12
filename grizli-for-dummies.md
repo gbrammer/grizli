@@ -33,7 +33,7 @@ lucky and find the solution here. Otherwise, the struggle is real.
 4th May 2020\
 during the COVID-19 Pandemic<sup>[2](#COVID)</sup>*
 
-<a name="Gabe_meeting">1</a>: I still haven't met him in person.
+<a name="Gabe_meeting">1</a>: I still haven't met him in person.  
 <a name="COVID">2</a>: No, I did not decide to write a book because I had lots of free
     time on my hands.
 
