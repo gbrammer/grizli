@@ -255,7 +255,7 @@ following information in `python`<a href="#database" id="database_1"><sup>1</sup
 <a id="database" href="#database_1"><sup>1</sup></a> You didn't honestly think I was going to publicise the login
 details, did you?
 
-Creating thumbnails that are not the standard $80\times80$ pixels in `full.fits`
+Creating thumbnails that are not the standard 80 x 80 pixels in `full.fits`
 ================================================================================
 
 Author: [Jasleen Matharu](https://github.com/jkmatharu)  
