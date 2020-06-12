@@ -3,7 +3,7 @@ Grizli for dummies
 =======
 ***I was scared I'd forget these details, so I put them in a book***
 
-Authors: Jasleen Matharu, Vicente Estrada-Carpenter
+Authors: <a href="https://github.com/jkmatharu" target="_blank">Jasleen Matharu</a>, <a href="https://github.com/Vince-ec" target="_blank">Vicente Estrada-Carpenter</a>
 
 **If you would like to contribute to Grizli for dummies, please read "Chapter 1: How to get the most out of this book" to understand the layout Grizli for dummies follows**
 
@@ -15,9 +15,8 @@ Preface
 I never chose to write this book, it chose me. During my PhD and now
 during my first Postdoc, I have been forced to learn and grasp many
 intricate details regarding the usage of the *Grism redshift and line
-analysis software* (Grizli) written by Gabriel Brammer<sup id="gabe_blah">[1](#Gabe_meeting)</sup>. The official<a href="#gabe" id="gabe_1"><sup>1</sup></a>
-documentation and software can be found
-[here](https://grizli.readthedocs.io/en/master/).
+analysis software* (Grizli) written by Gabriel Brammer<a href="#gabe" id="gabe_1"><sup>1</sup></a>. The official
+documentation and software can be found <a href="https://grizli.readthedocs.io/en/master/" target="_blank">here</a>.
 
 Out of sheer fear that I would forget all the details I have been forced
 to learn, or that I will waste away many hours frantically flipping
@@ -33,11 +32,10 @@ lucky and find the solution here. Otherwise, the struggle is real.
 
 *Jasleen Matharu\
 4th May 2020\
-during the COVID-19 Pandemic<sup>[2](#COVID)</sup>*
+during the COVID-19 Pandemic<a href="#covid" id="covid_1"><sup>2</sup></a>*
 
-<a id="gabe" href="#gabe_1"><sup>1</sup></a>Here is the footnote text.  
-<a name="Gabe_meeting">1</a>: I still haven't met him in person. [↩](#gabe)  
-<a name="COVID">2</a>: No, I did not decide to write a book because I had lots of free
+<a id="gabe" href="#gabe_1"><sup>1</sup></a> I still haven't met him in person.   
+<a id="covid" href="#covid_1"><sup>2</sup></a> No, I did not decide to write a book because I had lots of free
     time on my hands.
 
 ---
@@ -45,7 +43,7 @@ during the COVID-19 Pandemic<sup>[2](#COVID)</sup>*
 # Table of contents
 1. [How to get the most out of this book](#get_from_book)
 2. [Installing Grizli](#installing_grizli)
-    1. [Sub paragraph](#subparagraph1)
+    1. [Updating Grizli](#updating_grizli)
 3. [Another paragraph](#paragraph2)
 
 ---
@@ -80,17 +78,19 @@ though).
 Installing Grizli
 =================
 
-0pt [Jasleen Matharu]{.smallcaps}
+Author: <a href="https://github.com/jkmatharu" target="_blank">Jasleen Matharu</a>
 
-As you have probably seen from the official [installation
-page](#https://grizli.readthedocs.io/en/master/grizli/install.html),
-there are various ways you can install Grizli. I **highly** recommend
-installing it using the `conda` environment. This is because Grizli has
-many dependencies. Manual installation will just be a giant pain. It's
-better to just create an environment within which Grizli can work
-harmoniously. Remember, Grizli is designed to work *within* the
+As you have probably seen from the official <a href="https://grizli.readthedocs.io/en/master/grizli/install.html" target="_blank">installation page</a>, there is
+only one way to install Grizli: using the `conda` environment. Don't try to do
+it any other way if you want to ensure an environment within which Grizli will
+work harmoniously. Remember, Grizli is designed to work *within* the
 `astroconda` environment, which itself is a `conda` environment within
-`anaconda`[^3].
+`anaconda`<a href="#anaconda" id="anaconda_1"><sup>1</sup></a>.
+
+<a id="anaconda" href="#anaconda_1"><sup>1</sup></a> Environment-ception.
+
+
+<a name="updating_grizli"></a>
 
 Updating Grizli
 ---------------
@@ -793,10 +793,7 @@ Fitting in 2D
 
 
 
-[^2]: No, I did not decide to write a book because I had lots of free
-    time on my hands.
 
-[^3]: Environment-ception.
 
 [^4]: As spoken by the Grizli God himself, Gabe Brammer.
 
