@@ -15,7 +15,7 @@ Preface
 I never chose to write this book, it chose me. During my PhD and now
 during my first Postdoc, I have been forced to learn and grasp many
 intricate details regarding the usage of the *Grism redshift and line
-analysis software* (Grizli) written by Gabriel Brammer<sup id="gabe">[1](#Gabe_meeting)</sup>. The official<a href="#note1" id="note1ref"><sup>1</sup></a>
+analysis software* (Grizli) written by Gabriel Brammer<sup id="gabe">[1](#Gabe_meeting)</sup>. The official<a href="#gabe" id="gabe"><sup>1</sup></a>
 documentation and software can be found
 [here](https://grizli.readthedocs.io/en/master/).
 
@@ -35,7 +35,7 @@ lucky and find the solution here. Otherwise, the struggle is real.
 4th May 2020\
 during the COVID-19 Pandemic<sup>[2](#COVID)</sup>*
 
-<a id="note1" href="#note1ref"><sup>1</sup></a>Here is the footnote text.
+<a id="gabe" href="#gabe"><sup>1</sup></a>Here is the footnote text.
 <a name="Gabe_meeting">1</a>: I still haven't met him in person. [↩](#gabe)  
 <a name="COVID">2</a>: No, I did not decide to write a book because I had lots of free
     time on my hands.
