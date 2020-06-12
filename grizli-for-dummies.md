@@ -77,6 +77,7 @@ during the COVID-19 Pandemic<a href="#covid" id="covid_1"><sup>2</sup></a>*
 3. [Changes between Grizli versions](#grizli_versions)
     1. [Version 0.9 versus 1.0](#version_0.9_versus_1.0)
     2. [Improvement in the grism/photometry scaling algorithm](#scaling_algorithm)
+4. [Accessing the public database of reduced grism data](#public_database)
 
 ---
 
@@ -230,10 +231,12 @@ missing.\"*
 
 <a id="inc_photometry" href="#inc_photometry_1"><sup>1</sup></a> For example, you set `scale_photometry=1` when running the `grizli.fitting.run_all` function.
 
+<a name="public_database"></a>
+
 Accessing the public database of reduced grism data
 ===================================================
 
-Author: [Jasleen Matharu](https://github.com/jkmatharu)
+Author: [Jasleen Matharu](https://github.com/jkmatharu)  
 Grizli version: `1.0-76-g71853af`
 
 The database of reduced public HST grism data can be accessed with the
@@ -255,7 +258,7 @@ details, did you?
 Creating thumbnails that are not the standard $80\times80$ pixels in `full.fits`
 ================================================================================
 
-Author: [Jasleen Matharu](https://github.com/jkmatharu)
+Author: [Jasleen Matharu](https://github.com/jkmatharu)  
 Grizli version: `1.0-76-g71853af`
 
 In this chapter, I will walk you through how to create thumbnails in
