@@ -1,13 +1,39 @@
+<!---
+Hello there! If you want to contribute to Grizli for dummies, please follow the
+following format when adding a chapter to the book:
+
+1. Below the heading of each chapter, the name of the author who wrote that
+chapter is stated. It's more helpful if you can make your name a link to your
+GitHub page or personal website, such that if a reader is confused about
+something written in the chapter, they know how to contact you for further
+questions.
+
+2. Underneath the Author name for each chapter, please state the Grizli version
+you used for the task explained in that chapter (if relevant). Reasons for doing
+this are explained in Chapter 1 of Grizli for dummies.
+
+3. Since markdown sucks at automatically organising your footnotes for you,
+treat each chapter like its own document -- start with footnote numnber 1 when
+you start writing your chapter. Place your footnotes at the end of each chapter.
+When you start a new chapter, start from footnote number 1 again. See some
+existing chapters that are consecutive and have footnotes in each to see what I
+mean.
+
+4. Don't forget to add your chapter (and sub-sections) to the Table of contents.
+
+If you follow the above steps, it will really make the editing process easier
+for me -- thank you!
+
+Jasleen Matharu 11th June 2020
+-->
 
 Grizli for dummies
 =======
 ***I was scared I'd forget these details, so I put them in a book***
 
-Authors: [Jasleen Matharu](https://github.com/jkmatharu?target=_blank)
+Authors: [Jasleen Matharu](https://github.com/jkmatharu), [Vicente Estrada-Carpenter](https://github.com/Vince-ec)
 
-<a href="https://github.com/jkmatharu" target="_blank">Jasleen Matharu</a>, <a href="https://github.com/Vince-ec" target="_blank">Vicente Estrada-Carpenter</a>
-
-**If you would like to contribute to Grizli for dummies, please read "Chapter 1: How to get the most out of this book" to understand the layout Grizli for dummies follows**
+**If you would like to contribute to Grizli for dummies, please read the commented section before the Markdown document begins to understand the layout Grizli for dummies follows.**
 
 ---
 
@@ -18,7 +44,7 @@ I never chose to write this book, it chose me. During my PhD and now
 during my first Postdoc, I have been forced to learn and grasp many
 intricate details regarding the usage of the *Grism redshift and line
 analysis software* (Grizli) written by Gabriel Brammer<a href="#gabe" id="gabe_1"><sup>1</sup></a>. The official
-documentation and software can be found <a href="https://grizli.readthedocs.io/en/master/" target="_blank">here</a>.
+documentation and software can be found [here](https://grizli.readthedocs.io/en/master/).
 
 Out of sheer fear that I would forget all the details I have been forced
 to learn, or that I will waste away many hours frantically flipping
@@ -46,7 +72,11 @@ during the COVID-19 Pandemic<a href="#covid" id="covid_1"><sup>2</sup></a>*
 1. [How to get the most out of this book](#get_from_book)
 2. [Installing Grizli](#installing_grizli)
     1. [Updating Grizli](#updating_grizli)
-3. [Another paragraph](#paragraph2)
+    2. [Re-installing Grizli](#reinstalling_grizli)
+        1. [Deleting the Grizli environment](#deleting_the_grizli_environment)
+3. [Changes between Grizli versions](#grizli_versions)
+    1. [Version 0.9 versus 1.0](#version_0.9_versus_1.0)
+    2. [Improvement in the grism/photometry scaling algorithm](#scaling_algorithm)
 
 ---
 
@@ -80,16 +110,14 @@ though).
 Installing Grizli
 =================
 
-Author: <a href="https://github.com/jkmatharu" target="_blank">Jasleen Matharu</a>
+Author: [Jasleen Matharu](https://github.com/jkmatharu)
 
-As you have probably seen from the official <a href="https://grizli.readthedocs.io/en/master/grizli/install.html" target="_blank">installation page</a>, there is
+As you have probably seen from the official [installation page](https://grizli.readthedocs.io/en/master/grizli/install.html), there is
 only one way to install Grizli: using the `conda` environment. Don't try to do
 it any other way if you want to ensure an environment within which Grizli will
 work harmoniously. Remember, Grizli is designed to work *within* the
 `astroconda` environment, which itself is a `conda` environment within
 `anaconda`<a href="#anaconda" id="anaconda_1"><sup>1</sup></a>.
-
-<a id="anaconda" href="#anaconda_1"><sup>1</sup></a> Environment-ception.
 
 
 <a name="updating_grizli"></a>
@@ -97,11 +125,11 @@ work harmoniously. Remember, Grizli is designed to work *within* the
 Updating Grizli
 ---------------
 
-You can update Grizli using pip[^4]:
+You can update Grizli using pip<a href="#pip" id="pip_1"><sup>2</sup></a>:
 
 `pip install git+https://github.com/gbrammer/grizli.git`
 
-If that doesn't work, a wise person[^5] told me to:
+If that doesn't work, a wise person<a href="#wise" id="wise_1"><sup>3</sup></a> told me to:
 
 1.  Clone the environment to a local location.
 
@@ -127,6 +155,8 @@ You may also need to re-do:
 to get any new redshift fit templates that have been added to the
 repository.
 
+<a name="reinstalling_grizli"></a>
+
 Re-installing Grizli
 --------------------
 
@@ -139,6 +169,8 @@ For me, to accomplish this I had to remove Grizli and the `grizli-dev`
 environment and re-install from scratch using the `conda` environment
 method.
 
+<a name="deleting_the_grizli_environment"></a>
+
 ### Deleting the Grizli environment
 
 Within the `astroconda` environment, I ran:
@@ -147,17 +179,28 @@ Within the `astroconda` environment, I ran:
 
 which deletes the `grizli-dev` environment and everything in it.
 
+
+<a id="anaconda" href="#anaconda_1"><sup>1</sup></a> Environment-ception.
+<a id="pip" href="#pip_1"><sup>2</sup></a> As spoken by the Grizli God himself, Gabe Brammer.
+<a id="wise" href="#wise_1"><sup>3</sup></a> You guessed it, it was the Grizli God himself, Gabe Brammer.
+
+<a name="changes_between_grizli_versions"></a>
+
 Changes between Grizli versions
 ===============================
 
-0pt [Jasleen Matharu]{.smallcaps}
+Author: [Jasleen Matharu](https://github.com/jkmatharu)
+
+<a name="version_0.9_versus_1.0"></a>
 
 Version 0.9 versus 1.0
 ----------------------
 
+<a name="scaling_algorithm"></a>
+
 ### Improvement in the grism/photometry scaling algorithm
 
-If you happen to have processed some grism data including photometry[^6]
+If you happen to have processed some grism data including photometry<a href="#inc_photometry" id="inc_photometry_1"><sup>1</sup></a>
 with Grizli version 0.9 and then 1.0, you may have noticed that your 1.0
 extractions look more reliable. The one-dimensional model spectrum seems
 to follow the data much better in your `full.png` files.
@@ -184,6 +227,8 @@ less completely. One way around that could be defining an interpolated
 filter in the photometric catalog derived from the photo-z fit. Say,
 filling F140W with the template value for objects where it is otherwise
 missing.\"*
+
+<a id="inc_photometry" href="#inc_photometry_1"><sup>1</sup></a> For example, you set `scale_photometry=1` when running the `grizli.fitting.run_all` function.
 
 Accessing the public database of reduced grism data
 ===================================================
@@ -795,9 +840,6 @@ Fitting in 2D
 
 
 
-
-
-[^4]: As spoken by the Grizli God himself, Gabe Brammer.
 
 [^5]: You guessed it, it was the Grizli God himself, Gabe Brammer.
 
