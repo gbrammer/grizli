@@ -5,6 +5,8 @@ Grizli for dummies
 
 Authors: Jasleen Matharu, Vicente Estrada-Carpenter
 
+**If you would like to contribute to Grizli for dummies, please read "Chapter 1: How to get the most out of this book" to understand the layout Grizli for dummies follows**
+
 ---
 
 Preface
@@ -13,9 +15,9 @@ Preface
 I never chose to write this book, it chose me. During my PhD and now
 during my first Postdoc, I have been forced to learn and grasp many
 intricate details regarding the usage of the *Grism redshift and line
-analysis software* (Grizli) written by Gabriel Brammer<sup>[1](#Gabe_meeting)</sup>. The official
+analysis software* (Grizli) written by Gabriel Brammer<sup id="gabe">[1](#Gabe_meeting)</sup>. The official
 documentation and software can be found
-[here](#https://grizli.readthedocs.io/en/master/).
+[here](https://grizli.readthedocs.io/en/master/).
 
 Out of sheer fear that I would forget all the details I have been forced
 to learn, or that I will waste away many hours frantically flipping
@@ -33,7 +35,8 @@ lucky and find the solution here. Otherwise, the struggle is real.
 4th May 2020\
 during the COVID-19 Pandemic<sup>[2](#COVID)</sup>*
 
-<a name="Gabe_meeting">1</a>: I still haven't met him in person.  
+
+<a name="Gabe_meeting">1</a>: I still haven't met him in person. [↩](#gabe)  
 <a name="COVID">2</a>: No, I did not decide to write a book because I had lots of free
     time on my hands.
 
@@ -41,9 +44,11 @@ during the COVID-19 Pandemic<sup>[2](#COVID)</sup>*
 
 # Table of contents
 1. [How to get the most out of this book](#get_from_book)
-2. [Some paragraph](#paragraph1)
+2. [Installing Grizli](#installing_grizli)
     1. [Sub paragraph](#subparagraph1)
 3. [Another paragraph](#paragraph2)
+
+---
 
 <a name="get_from_book"></a>
 
@@ -69,6 +74,8 @@ you, it might be worth comparing your version of Grizli to the one used
 for that chapter and check whether perhaps an update or downgrade will
 solve your problem (I would recommend a downgrade as a last resort
 though).
+
+<a name="installing_grizli"></a>
 
 Installing Grizli
 =================
