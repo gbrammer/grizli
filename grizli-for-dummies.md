@@ -3,7 +3,9 @@ Grizli for dummies
 =======
 ***I was scared I'd forget these details, so I put them in a book***
 
-Authors: <a href="https://github.com/jkmatharu" target="_blank">Jasleen Matharu</a>, <a href="https://github.com/Vince-ec" target="_blank">Vicente Estrada-Carpenter</a>
+Authors: [Jasleen Matharu](https://github.com/jkmatharu?target=_blank)
+
+<a href="https://github.com/jkmatharu" target="_blank">Jasleen Matharu</a>, <a href="https://github.com/Vince-ec" target="_blank">Vicente Estrada-Carpenter</a>
 
 **If you would like to contribute to Grizli for dummies, please read "Chapter 1: How to get the most out of this book" to understand the layout Grizli for dummies follows**
 
