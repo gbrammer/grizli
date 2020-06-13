@@ -190,6 +190,12 @@ which deletes the `grizli-dev` environment and everything in it.
 <a id="pip" href="#pip_1"><sup>2</sup></a> As spoken by the Grizli God himself, Gabe Brammer.  
 <a id="wise" href="#wise_1"><sup>3</sup></a> You guessed it, it was the Grizli God himself, Gabe Brammer.  
 
+
+
+[<< Previous Chapter](#get_from_book) | [Table of Contents](URL) | [Next Chapter >>](#changes_between_grizli_versions)
+
+---
+
 <a name="changes_between_grizli_versions"></a>
 
 Changes between Grizli versions
