@@ -68,6 +68,8 @@ during the COVID-19 Pandemic<a href="#covid" id="covid_1"><sup>2</sup></a>*
 
 ---
 
+<a name="contents"></a>
+
 # Table of contents
 1. [How to get the most out of this book](#get_from_book)
 2. [Installing Grizli](#installing_grizli)
@@ -192,7 +194,7 @@ which deletes the `grizli-dev` environment and everything in it.
 
 
 
-[<< Previous Chapter](#get_from_book) | [Table of Contents](URL) | [Next Chapter >>](#changes_between_grizli_versions)
+[<< Previous Chapter](#get_from_book) | [Table of Contents](#contents) | [Next Chapter >>](#changes_between_grizli_versions)
 
 ---
 
