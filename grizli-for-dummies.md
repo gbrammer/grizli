@@ -83,7 +83,7 @@ during the COVID-19 Pandemic<a href="#covid" id="covid_1"><sup>2</sup></a>*
 5. [Creating thumbnails that are not the standard 80 x 80 pixels in `full.fits`](#change_dimensions)
     1. [Setting the thumbnail dimensions](#set_dimensions)
     2. [Running your new fits with Grizli](#running_dimensions)
-6. [Creating reliable direct image thumbnails][#reliable_thumbnails]
+6. [Creating reliable direct image thumbnails](#reliable_thumbnails)
 
 ---
 
