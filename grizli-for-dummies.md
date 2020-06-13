@@ -78,6 +78,9 @@ during the COVID-19 Pandemic<a href="#covid" id="covid_1"><sup>2</sup></a>*
     1. [Version 0.9 versus 1.0](#version_0.9_versus_1.0)
         1. [Improvement in the grism/photometry scaling algorithm](#scaling_algorithm)
 4. [Accessing the public database of reduced grism data](#public_database)
+5. [Creating thumbnails that are not the standard 80 x 80 pixels in `full.fits`](#change_dimensions)
+    1. [Setting the thumbnail dimensions](#set_dimensions)
+    2. [Running your new fits with Grizli](#running_dimensions)
 
 ---
 
@@ -254,6 +257,8 @@ following information in `python`<a href="#database" id="database_1"><sup>1</sup
 
 <a id="database" href="#database_1"><sup>1</sup></a> You didn't honestly think I was going to publicise the login details, did you? If you require access, you need to ask Gabe Brammer nicely. Perhaps throw in a "Please Sir" too.
 
+<a name="change_dimensions"></a>
+
 Creating thumbnails that are not the standard 80 x 80 pixels in `full.fits`
 ================================================================================
 
@@ -326,21 +331,25 @@ thumbnails from existing beams that were used to create the standard
                     ep = photoz.EazyPhot(ez, grizli_templates=templ0, zgrid=ez.zgrid)
 
 
-Setting the thumbnail dimensions {#thumbnail_dimensions}
+<a name="set_dimensions"></a>
+
+Setting the thumbnail dimensions
 --------------------------------
 
 The next line of code I'm going to show you is **the** line of the code.
 The line of code that will allow you to fiddle with the properties of
 your output thumbnails in `full.fits`. The default setting leads to
-thumbnails in `full.fits` with a pixel scale of $0.1"$ and dimensions of
-$80\times80$ pixels:
+thumbnails in `full.fits` with a pixel scale of 0.1" and dimensions of
+80 x 80 pixels:
 
         pline = {`kernel': `point', `pixfrac': 0.2, `pixscale': 0.1, `size': 8, `wcs': None}
 
 Now, for different thumbnail dimensions, all you need to do is change
-the value of `size`. With `pixscale=0.1`, an $8"\times8"$ thumbnail is
-$80\times80$ pixels. So, for example, if I wanted thumbnails with
-dimensions $189\times189$ pixels, I would set `size=18.9`.
+the value of `size`. With `pixscale=0.1`, an 8" x 8" thumbnail is
+80 x 80 pixels. So, for example, if I wanted thumbnails with
+dimensions 189 x 189 pixels, I would set `size=18.9`.
+
+<a name="running_dimensions"></a>
 
 Running your new fits with Grizli
 ---------------------------------
