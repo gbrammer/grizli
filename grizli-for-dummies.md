@@ -83,6 +83,7 @@ during the COVID-19 Pandemic<a href="#covid" id="covid_1"><sup>2</sup></a>*
 5. [Creating thumbnails that are not the standard 80 x 80 pixels in `full.fits`](#change_dimensions)
     1. [Setting the thumbnail dimensions](#set_dimensions)
     2. [Running your new fits with Grizli](#running_dimensions)
+6. [Creating reliable direct image thumbnails][#reliable_thumbnails]
 
 ---
 
@@ -112,6 +113,11 @@ you, it might be worth comparing your version of Grizli to the one used
 for that chapter and check whether perhaps an update or downgrade will
 solve your problem (I would recommend a downgrade as a last resort
 though).
+
+---
+[Table of Contents](#contents) | [Next Chapter >>](#installing_grizli)
+
+---
 
 <a name="installing_grizli"></a>
 
@@ -193,8 +199,8 @@ which deletes the `grizli-dev` environment and everything in it.
 <a id="wise" href="#wise_1"><sup>3</sup></a> You guessed it, it was the Grizli God himself, Gabe Brammer.  
 
 
-
-[<< Previous Chapter](#get_from_book) | [Table of Contents](#contents) | [Next Chapter >>](#changes_between_grizli_versions)
+---
+[<< Previous Chapter](#installing_grizli) | [Table of Contents](#contents) | [Next Chapter >>](#changes_between_grizli_versions)
 
 ---
 
@@ -244,6 +250,12 @@ missing.\"*
 
 <a id="inc_photometry" href="#inc_photometry_1"><sup>1</sup></a> For example, you set `scale_photometry=1` when running the `grizli.fitting.run_all` function.
 
+---
+[<< Previous Chapter](#get_from_book) | [Table of Contents](#contents) | [Next Chapter >>](#public_database)
+
+---
+
+
 <a name="public_database"></a>
 
 Accessing the public database of reduced grism data
@@ -265,7 +277,13 @@ following information in `python`<a href="#database" id="database_1"><sup>1</sup
 
     engine = db.get_db_engine(config=config)
 
-<a id="database" href="#database_1"><sup>1</sup></a> You didn't honestly think I was going to publicise the login details, did you? If you require access, you need to ask Gabe Brammer nicely. Perhaps throw in a "Please Sir" too.
+<a id="database" href="#database_1"><sup>1</sup></a> You didn't honestly think I was going to publicise the login details, did you? If you require access, you need to ask Gabe Brammer nicely.
+
+---
+[<< Previous Chapter](#changes_between_grizli_versions) | [Table of Contents](#contents) | [Next Chapter >>](#change_dimensions)
+
+---
+
 
 <a name="change_dimensions"></a>
 
@@ -341,6 +359,7 @@ thumbnails from existing beams that were used to create the standard
                     ep = photoz.EazyPhot(ez, grizli_templates=templ0, zgrid=ez.zgrid)
 
 
+
 <a name="set_dimensions"></a>
 
 Setting the thumbnail dimensions
@@ -371,6 +390,13 @@ Otherwise\...
 <a id="eazy" href="#eazy_1"><sup>1</sup></a> The values shown for the parameters are just examples. They may not be relevant to your particular data.  
 <a id="photcat" href="#photcat_1"><sup>2</sup></a> The values shown for the parameters are just examples. They may not be relevant to your particular data.
 
+
+---
+[<< Previous Chapter](#public_database) | [Table of Contents](#contents) | [Next Chapter >>](#reliable_thumbnails)
+
+---
+
+<a name="reliable_thumbnails"></a>
 
 Creating reliable direct image thumbnails
 =========================================
