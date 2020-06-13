@@ -401,18 +401,16 @@ Otherwise\...
 Creating reliable direct image thumbnails
 =========================================
 
-0pt [Jasleen Matharu]{.smallcaps}
-
-0pt Grizli version: `1.0-76-g71853afand 1.0.dev1458`
+Author: [Jasleen Matharu](https://github.com/jkmatharu)
+Grizli version: `1.0-76-g71853af` and `1.0.dev1458`
 
 The `full.fits` files
 ---------------------
 
 When one has run Grizli from end-to-end, perhaps following the
-[Grizli-Pipeline](#https://github.com/gbrammer/grizli/blob/master/examples/Grizli-Pipeline.ipynb)
-notebook, you will find that you will have `root_id.full.fits` files in
-your `root/Extractions/` folder. These contain thumbnails of the direct
-images, emission line maps and associated contamination, weight[^10],
+[Grizli-Pipeline](https://github.com/gbrammer/grizli/blob/master/examples/Grizli-Pipeline.ipynb) notebook, you will find that you will have `root_id.full.fits`
+files in your `root/Extractions/` folder. These contain thumbnails of the direct
+images, emission line maps and associated contamination, weight<a href="#weight" id="weight_1"><sup>1</sup></a>,
 PSFs and segmentation maps for the source in the field = `root` with
 Object ID = `id`. These have been designed to work with
 [GALFIT](#https://users.obs.carnegiescience.edu/peng/work/galfit/galfit.html).
@@ -791,6 +789,12 @@ local directory, with an example at the end of how to call it:
 
 Obviously change the default field name otherwise you're going to look
 like a right idiot.
+
+<a id="weight" href="#weight_1"><sup>1</sup></a> The `DWHT` and `LINEWHT` extensions are indeed inverse variance
+    maps, where <img src="https://latex.codecogs.com/svg.latex?\Large&space;\sigma = 1 / \sqrt{\mathrm{weight}}"/>. <img src="https://latex.codecogs.com/svg.latex?\Large&space;\sigma"/> can be
+    used as a sigma image with GALFIT.
+
+
 
 Notes about emission line map thumbnails
 ========================================
