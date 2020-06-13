@@ -93,7 +93,9 @@ This book follows a particular format to help you get the most out of
 the information presented. **Below the heading of each chapter, the name
 of the author who wrote that chapter will be stated**. This is so that
 in case you are confused about anything in that chapter, you know who to
-contact for queries or further questions. We're all relatively famous,
+contact for queries or further questions. In some cases, the author's name will
+be a link that will either take you to their GitHub page or a website of theirs
+with their contact details. Otherwise, we're all relatively famous,
 that I'm sure you can google or NASA ADS us and you'll find the most
 up-to-date email address for us, or physical address to send your
 telegram by pigeon.
