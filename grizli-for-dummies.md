@@ -252,8 +252,7 @@ following information in `python`<a href="#database" id="database_1"><sup>1</sup
 
     engine = db.get_db_engine(config=config)
 
-<a id="database" href="#database_1"><sup>1</sup></a> You didn't honestly think I was going to publicise the login
-details, did you?
+<a id="database" href="#database_1"><sup>1</sup></a> You didn't honestly think I was going to publicise the login details, did you? If you require access, you need to ask Gabe Brammer nicely. Perhaps throw in a "Please Sir" too.
 
 Creating thumbnails that are not the standard 80 x 80 pixels in `full.fits`
 ================================================================================
@@ -266,9 +265,9 @@ your `full.fits` files with the dimensions of your choice.
 
 If you already have existing `beams.fits` files you've generated, you do
 not need to recreate them for this task, unless your beams aren't tall
-enough. For reference, I successfully created $189\times189$ pixel
+enough. For reference, I successfully created 189 x 189 pixel
 thumbnails from existing beams that were used to create the standard
-$80\times80$ thumbnails in `full.fits`. What you will need is:
+80 x 80 thumbnails in `full.fits`. What you will need is:
 
 -   To load and initiate the relevant line templates for fitting the
     line fluxes:
@@ -285,9 +284,9 @@ $80\times80$ thumbnails in `full.fits`. What you will need is:
 -   **If you're including photometry in your fit, do the following steps
     before the above**:
 
-    1.  Install [`eazy-py`](#https://github.com/gbrammer/eazy-py) (and
+    1.  Install [`eazy-py`](https://github.com/gbrammer/eazy-py) (and
         import it in your `python` script with the line `import eazy`),
-        with the following parameters[^8] defined in your `python`
+        with the following parameters<a href="#eazy" id="eazy_1"><sup>1</sup></a> defined in your `python`
         script:
 
                     params = {}
@@ -301,7 +300,7 @@ $80\times80$ thumbnails in `full.fits`. What you will need is:
 
     2.  Acquire the `.translate` files for your field.
 
-    3.  Define the following parameters[^9] for your field:
+    3.  Define the following parameters<a href="#photcat" id="photcat_1"><sup>2</sup></a> for your field:
 
                     params[`CATALOG_FILE'] = my_photometric_catalogue.cat
                     params[`MAIN_OUTPUT_FILE'] = `{0}_3dhst.{1}.eazypy'.format(`goodss', `v4.4')
@@ -349,6 +348,10 @@ Running your new fits with Grizli
 If you're including photometry, then you must first do:
 
 Otherwise\...
+
+<a id="eazy" href="#eazy_1"><sup>1</sup></a> The values shown for the parameters are just examples. They may not be relevant to your particular data.  
+<a id="photcat" href="#photcat_1"><sup>2</sup></a> The values shown for the parameters are just examples. They may not be relevant to your particular data.
+
 
 Creating reliable direct image thumbnails
 =========================================
