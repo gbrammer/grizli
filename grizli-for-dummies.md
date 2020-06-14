@@ -19,7 +19,12 @@ When you start a new chapter, start from footnote number 1 again. See some
 existing chapters that are consecutive and have footnotes in each to see what I
 mean.
 
-4. Don't forget to add your chapter (and sub-sections) to the Table of contents.
+4. Again, because Markdown sucks at automatically sorting out your referencing,
+please add your new chapter at the end of the current document, not in between
+two existing chapters, since you'd have to update all the references and table
+of contents for your chapter AND subsequent chapters.
+
+5. Don't forget to add your chapter (and sub-sections) to the Table of contents.
 
 If you follow the above steps, it will really make the editing process easier
 for me -- thank you!
