@@ -93,7 +93,7 @@ during the COVID-19 Pandemic<a href="#covid" id="covid_1"><sup>2</sup></a>*
         2. [Generating direct image thumbnails when your photometric catalog is external to Grizli](#without_phot.fits)
             1. [Corresponding segmentation map thumbnails](#without_phot.fits_seg)
             2. [Tips](#tips)
-        3. [Creating your own `_groups.npy` file](#groups_file)
+        3. [Creating your own `_groups.npy` file](#create_groups_file)
 
 ---
 
@@ -480,8 +480,7 @@ it to work:
     such as those in 3D-HST/CANDELS). If you know you've added new
     `flt.fits` files since doing your Grizli run, you need to generate a
     new `root_groups.npy` file &mdash; go read
-    Section [6.3.3](#groups_file){reference-type="ref"
-    reference="groups_file"} NOW.**
+    Section [6.3.3](#create_groups_file) NOW.**
 
 -   The `root_phot.fits` file in the `root/Prep/` directory.
 
@@ -494,7 +493,7 @@ it to work:
 Reliable direct image thumbnails can be created with the function
 `auto_script.make_rgb_thumbnails`. An example of its usage can be seen
 in `In [40]:` of the
-[Grizli-Pipeline](#https://github.com/gbrammer/grizli/blob/master/examples/Grizli-Pipeline.ipynb)
+[Grizli-Pipeline](https://github.com/gbrammer/grizli/blob/master/examples/Grizli-Pipeline.ipynb)
 notebook. For a given field (or `root`), you will need to run this
 function in the `root/Prep/` directory. If you set the keyword
 `use_line_wcs=True`, the function will look in `root/Extractions/` for
@@ -506,7 +505,7 @@ doesn't do anything, since `skip=True` will skip over objects where a
 will be saved in the `root/Prep/` directory.
 
 For example, to make a single thumbnail for one of the objects in the
-[Grizli-Pipeline](#https://github.com/gbrammer/grizli/blob/master/examples/Grizli-Pipeline.ipynb)
+[Grizli-Pipeline](https://github.com/gbrammer/grizli/blob/master/examples/Grizli-Pipeline.ipynb)
 demo, run:
 
 ` auto_script.make_rgb_thumbnails(root=‘j033216m2743’, ids=[424], use_line_wcs=True)`[^15]
