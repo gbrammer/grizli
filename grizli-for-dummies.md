@@ -84,6 +84,13 @@ during the COVID-19 Pandemic<a href="#covid" id="covid_1"><sup>2</sup></a>*
     1. [Setting the thumbnail dimensions](#set_dimensions)
     2. [Running your new fits with Grizli](#running_dimensions)
 6. [Creating reliable direct image thumbnails](#reliable_thumbnails)
+    1. [The `full.fits` files](#full.fits_file)
+    2. [Direct image thumbnails in `full.fits`](#direct_image_full.fits)
+    3. [Generating reliable direct image thumbnails](#generating_thumbnails)
+        1. [Generating direct image thumbnails when your `_phot.fits` file is generated with Grizli](#with_phot.fits)
+            1. [Corresponding segmentation map thumbnails](#phot.fits_seg)
+            2. [Other important things to note](#phot.fits_important)
+        2. [Generating direct image thumbnails when your photometric catalog is external to Grizli](#without_phot.fits)
 
 ---
 
@@ -404,6 +411,8 @@ Creating reliable direct image thumbnails
 Author: [Jasleen Matharu](https://github.com/jkmatharu)  
 Grizli version: `1.0-76-g71853af` and `1.0.dev1458`
 
+<a name="full.fits_file"></a>
+
 The `full.fits` files
 ---------------------
 
@@ -414,6 +423,8 @@ images, emission line maps and associated contamination, weight<a href="#weight"
 PSFs and segmentation maps for the source in the field = `root` with
 Object ID = `id`. These have been designed to work with
 [GALFIT](https://users.obs.carnegiescience.edu/peng/work/galfit/galfit.html).
+
+<a name="direct_image_full.fits"></a>
 
 Direct image thumbnails in `full.fits`
 --------------------------------------
@@ -443,17 +454,21 @@ this.<a href="#drizzle" id="drizzle_1"><sup>3</sup></a>\"*
 The above is not as straightforward as the author of this chapter
 thought.
 
+<a name="generating_thumbnails"></a>
+
 Generating reliable direct image thumbnails
 -------------------------------------------
 
-### Generating direct image thumbnails when your `_phot.fits` file is generated with Grizli {#thumbnails_rgb}
+<a name="with_phot.fits"></a>
+
+### Generating direct image thumbnails when your `_phot.fits` file is generated with Grizli
 
 To accomplish this monumental task, you will need to run the
 `auto_script.make_rgb_thumbnails` function in the `root/Prep/` directory
 and you will need the following files in your `root/Prep/` directory for
 it to work:
 
--   The necessary[^13] `flt.fits`[^14] files in the `root/Prep/`
+-   The necessary<a href="#flt" id="flt_1"><sup>4</sup></a> `flt.fits`<a href="#flt2" id="flt2_1"><sup>5</sup></a> files in the `root/Prep/`
     directory. **If you are not sure about this, please check how you
     queried the HST archive when doing your Grizli extractions. For the
     most reliable direct image thumbnails, you need ALL the available
@@ -461,7 +476,7 @@ it to work:
     pertaining to your proposal ID (especially for well-studied fields
     such as those in 3D-HST/CANDELS). If you know you've added new
     `flt.fits` files since doing your Grizli run, you need to generate a
-    new `root_groups.npy` file -- go read
+    new `root_groups.npy` file &mdash; go read
     Section [6.3.3](#groups_file){reference-type="ref"
     reference="groups_file"} NOW.**
 
@@ -495,6 +510,8 @@ demo, run:
 
 However, the story does not end there.
 
+<a name="phot.fits_seg"></a>
+
 #### Corresponding segmentation map thumbnails
 
 You may suddenly realise you need corresponding segmentation maps for
@@ -505,12 +522,16 @@ explained above, but you need to set the keyword
 successfully generated, you need the `root-ir_seg.fits` file to be in
 your `root/Prep/` directory.
 
+<a name="phot.fits_important"></a>
+
 #### Other important things to note
 
 -   By default, the `min_filters` keyword is set to `2`. Sometimes, you
     only have imaging for the object in one filter. So if you want
     `auto_script.make_rgb_thumbnails` to work in that instance, you'll
     need to explicitly set `min_filters=1`.
+
+<a name="without_phot.fits"></a>
 
 ### Generating direct image thumbnails when your photometric catalog is external to Grizli {#thumbnails_external_photcat}
 
@@ -637,6 +658,8 @@ how I call the function:
 -   If you would like a corresponding PSF thumbnail, you should set
     `include_ir_psf=True`.
 
+<a name="without_phot.fits_seg"></a>
+
 #### Corresponding segmentation map thumbnails
 
 As mentioned above in
@@ -656,6 +679,9 @@ the function `grizli.aws.aws_drizzler.segmentation_figure` *after* I ran
 
 -   `seg_file` is the filename of your segmentation map `.fits` file. I
     put this file in my `root/Prep/` directory.
+
+
+<a name="tips"></a>
 
 #### Tips
 
@@ -686,6 +712,8 @@ code, I used the python `try` and `except` conditions like so:
 
         except:
             flag=True
+
+<a name="create_groups_file"></a>
 
 ### Creating your own `_groups.npy` file {#groups_file}
 
@@ -797,8 +825,9 @@ tangent point, leading to an undistorted mosaic. In `full.fits`, the `DSCI` imag
 you see has been taken from the undistorted mosaic and put back into a distorted frame.
 So basically, the pixel positions (and probably the pixel values) in the `DSCI`
 `full.fits` extension are not reliable. Still don't understand? Well don't shoot the messenger.  
-<a id="drizzle" href="#drizzle_1"><sup>3</sup></a> As spoken by the Grizli God himself, Gabe Brammer.
-
+<a id="drizzle" href="#drizzle_1"><sup>3</sup></a> As spoken by the Grizli God himself, Gabe Brammer.  
+<a id="flt" href="#flt_1"><sup>4</sup></a> At least the ones corresponding to the filter for which you want direct image thumbnail for. Note, in older (before ~May 2020) versions of Grizli, you would have needed ALL the `flt.fits` files for a particular field, otherwise the code would break.  
+<a id="flt2" href="#flt2_1"><sup>5</sup></a> These files contain images of each HST pointing/exposure.
 
 Notes about emission line map thumbnails
 ========================================
