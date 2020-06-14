@@ -91,6 +91,9 @@ during the COVID-19 Pandemic<a href="#covid" id="covid_1"><sup>2</sup></a>*
             1. [Corresponding segmentation map thumbnails](#phot.fits_seg)
             2. [Other important things to note](#phot.fits_important)
         2. [Generating direct image thumbnails when your photometric catalog is external to Grizli](#without_phot.fits)
+            1. [Corresponding segmentation map thumbnails](#without_phot.fits_seg)
+            2. [Tips](#tips)
+        3. [Creating your own `_groups.npy` file](#groups_file)
 
 ---
 
@@ -568,7 +571,7 @@ HST imaging external to grism programs -- this may be problematic. It
 all depends on how you queried the HST archive when you ran Grizli on
 your dataset (look at the section "Query the HST archive\" on `In [5]:`
 of the
-[Grizli-Pipeline](#https://github.com/gbrammer/grizli/blob/master/examples/Grizli-Pipeline.ipynb)
+[Grizli-Pipeline](https://github.com/gbrammer/grizli/blob/master/examples/Grizli-Pipeline.ipynb)
 notebook.). Did you just extract the data based on your Proposal ID? Did
 you use the overlap query and if you did, did you make sure you obtained
 ALL the possible relevant imaging for your objects of interest? If you
