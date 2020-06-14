@@ -401,7 +401,7 @@ Otherwise\...
 Creating reliable direct image thumbnails
 =========================================
 
-Author: [Jasleen Matharu](https://github.com/jkmatharu)
+Author: [Jasleen Matharu](https://github.com/jkmatharu)  
 Grizli version: `1.0-76-g71853af` and `1.0.dev1458`
 
 The `full.fits` files
