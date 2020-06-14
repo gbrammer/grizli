@@ -790,7 +790,7 @@ local directory, with an example at the end of how to call it:
 Obviously change the default field name otherwise you're going to look
 like a right idiot.
 
-<a id="weight" href="#weight_1"><sup>1</sup></a> The `DWHT` and `LINEWHT` extensions are indeed inverse variance maps, where <img src="https://latex.codecogs.com/svg.latex?\Large&space;\sigma=1\sqrt{\mathrm{weight}}"/>. <img src="https://latex.codecogs.com/svg.latex?\Large&space;\sigma"/> can be used as a sigma image with GALFIT.
+<a id="weight" href="#weight_1"><sup>1</sup></a> The `DWHT` and `LINEWHT` extensions are indeed inverse variance maps, where <img src="https://latex.codecogs.com/svg.latex?\Large&space;\sigma=1\sqrt{\mathrm{weight}}"/>. <img src="https://latex.codecogs.com/svg.latex?\Large&space;\sigma"/> can be used as a sigma image with GALFIT.  
 <a id="blot" href="#blot_1"><sup>2</sup></a> Going from the *undistorted* mosaic to a distorted mosaic is "blotting". Going in the opposite direction is "drizzling".
 The individual images that get spat out of the Telescope are drizzled to some
 tangent point, leading to an undistorted mosaic. In `full.fits`, the `DSCI` image
