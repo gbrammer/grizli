@@ -125,7 +125,7 @@ up-to-date email address for us, or physical address to send your
 telegram by pigeon.
 
 **Underneath the author, if relevant, the version of Grizli that was
-used for that chapter will be stated in small font**. This is
+used for that chapter will be stated**. This is
 particularly important, because there are differences between different
 versions of Grizli, which means Grizli may not behave the same way for
 the same task in different versions. If you're following a task outlined
