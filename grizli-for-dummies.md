@@ -64,7 +64,7 @@ did something, I've chosen to put all my notes in this book.
 The details in this book are not designed to help with the basics. This
 book was written selfishly for myself, with the added bonus that if
 there is anyone else out there that just can't seem to figure something
-out about Grizli from the documentation or source code, they might get
+out about Grizli from the official documentation or source code, they might get
 lucky and find the solution here. Otherwise, the struggle is real.
 
 
