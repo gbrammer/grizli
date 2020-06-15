@@ -26,7 +26,9 @@ write "Please refer to this chapter" or "Please refer to this section" where
 "this chapter" or "this section" are links to the chapter/section you are
 referencing.
 
-5. Don't forget to add your chapter (and sections, sub-sections, etc) to the
+5. Place a navigation bar at the end of your chapter (see existing examples).
+
+6. Don't forget to add your chapter (and sections, sub-sections, etc) to the
 Table of contents.
 
 If you follow the above steps, it will really make the editing process easier
