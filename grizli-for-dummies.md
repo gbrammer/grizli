@@ -20,11 +20,14 @@ existing chapters that are consecutive and have footnotes in each to see what I
 mean.
 
 4. Again, because Markdown sucks at automatically sorting out your referencing,
-please add your new chapter at the end of the current document, not in between
-two existing chapters, since you'd have to update all the references and table
-of contents for your chapter AND subsequent chapters.
+Do not refer to your chapters by their numbered section. For example, rather
+than writing: "Please refer to Chapter 6" or "Please refer to Section 6.3",
+write "Please refer to this chapter" or "Please refer to this section" where
+"this chapter" or "this section" are links to the chapter/section you are
+referencing.
 
-5. Don't forget to add your chapter (and sub-sections) to the Table of contents.
+5. Don't forget to add your chapter (and sections, sub-sections, etc) to the
+Table of contents.
 
 If you follow the above steps, it will really make the editing process easier
 for me -- thank you!
@@ -484,8 +487,8 @@ it to work:
     pertaining to your proposal ID (especially for well-studied fields
     such as those in 3D-HST/CANDELS). If you know you've added new
     `flt.fits` files since doing your Grizli run, you need to generate a
-    new `root_groups.npy` file &mdash; go read
-    Section [6.3.3](#create_groups_file) NOW.**
+    new `root_groups.npy` file &mdash; read [this section](#create_groups_file)
+    NOW.**
 
 -   The `root_phot.fits` file in the `root/Prep/` directory.
 
@@ -513,7 +516,7 @@ For example, to make a single thumbnail for one of the objects in the
 [Grizli-Pipeline](https://github.com/gbrammer/grizli/blob/master/examples/Grizli-Pipeline.ipynb)
 demo, run:
 
-` auto_script.make_rgb_thumbnails(root=‘j033216m2743’, ids=[424], use_line_wcs=True)`[^15]
+` auto_script.make_rgb_thumbnails(root=‘j033216m2743’, ids=[424], use_line_wcs=True)`<a href="#auto_script" id="auto_script_1"><sup>6</sup></a>
 
 However, the story does not end there.
 
@@ -522,7 +525,7 @@ However, the story does not end there.
 #### Corresponding segmentation map thumbnails
 
 You may suddenly realise you need corresponding segmentation maps for
-your newly-generated direct image thumbnails.[^16] Have no fear, you can
+your newly-generated direct image thumbnails<a href="#segmap" id="segmap_1"><sup>7</sup></a>. Have no fear, you can
 generate them when you run `auto_script.make_rgb_thumbnails` as
 explained above, but you need to set the keyword
 `make_segmentation_figure=True`. For a segmentation map to be
@@ -536,17 +539,17 @@ your `root/Prep/` directory.
 -   By default, the `min_filters` keyword is set to `2`. Sometimes, you
     only have imaging for the object in one filter. So if you want
     `auto_script.make_rgb_thumbnails` to work in that instance, you'll
-    need to explicitly set `min_filters=1`.
+    need to explicitly set `min_filters = 1`.
 
 <a name="without_phot.fits"></a>
 
-### Generating direct image thumbnails when your photometric catalog is external to Grizli {#thumbnails_external_photcat}
+### Generating direct image thumbnails when your photometric catalog is external to Grizli
 
 To accomplish this task, you will need to run the
 `grizli.aws.aws_drizzler.drizzle_images` in your `root/Prep/` directory
 and you will need the following files for it to work:
 
--   The necessary[^17] `flt.fits`[^18] files in the `root/Prep/`
+-   The necessary<a href="#necessary" id="necessary_1"><sup>8</sup></a> `flt.fits`<a href="#necessary2" id="necessary2_1"><sup>9</sup></a> files in the `root/Prep/`
     directory.
 
 -   The `_groups.npy` file in your `root/Prep/` directory.
@@ -834,7 +837,11 @@ So basically, the pixel positions (and probably the pixel values) in the `DSCI`
 `full.fits` extension are not reliable. Still don't understand? Well don't shoot the messenger.  
 <a id="drizzle" href="#drizzle_1"><sup>3</sup></a> As spoken by the Grizli God himself, Gabe Brammer.  
 <a id="flt" href="#flt_1"><sup>4</sup></a> At least the ones corresponding to the filter for which you want direct image thumbnail for. Note, in older (before ~May 2020) versions of Grizli, you would have needed ALL the `flt.fits` files for a particular field, otherwise the code would break.  
-<a id="flt2" href="#flt2_1"><sup>5</sup></a> These files contain images of each HST pointing/exposure.
+<a id="flt2" href="#flt2_1"><sup>5</sup></a> These files contain images of each HST pointing/exposure.  
+<a id="auto_script" href="#auto_script_1"><sup>6</sup></a> As spoken by the Grizli God himself, Gabe Brammer.  
+<a id="segmap" href="#segmap_1"><sup>7</sup></a> This most definitely was not me.  
+<a id="necessary" href="#necessary_1"><sup>8</sup></a> You only need the `flt.fits` files corresponding to the filter you want the direct image to be in.  
+<a id="necessary2" href="#necessary2_1"><sup>9</sup></a> These files contain images of each HST pointing/exposure.
 
 Notes about emission line map thumbnails
 ========================================
@@ -936,41 +943,6 @@ Fitting in 2D
 
 
 
-
-[^5]: You guessed it, it was the Grizli God himself, Gabe Brammer.
-
-[^6]: For example, you set `scale_photometry=1` when running the
-    `grizli.fitting.run_all` function.
-
-[^7]: You didn't honestly think I was going to publicise the login
-    details, did you?
-
-[^8]: The values shown for the parameters are just examples. They may
-    not be relevant to your particular data.
-
-[^9]: The values shown for the parameters are just examples. They may
-    not be relevant to your particular data.
-
-[^10]: The `DWHT` and `LINEWHT` extensions are indeed inverse variance
-    maps, where $\sigma = 1 / \sqrt{\mathrm{weight}}$. $\sigma$ can be
-    used as a sigma image with GALFIT.
-
-[^11]: Going from the *undistorted* mosaic to a distorted mosaic is
-    "blotting\". Going in the opposite direction is "drizzling\". Still
-    don't understand? Well don't shoot the messenger.
-
-[^12]: As spoken by the Grizli God himself, Gabe Brammer.
-
-[^13]: At least the ones corresponding to the filter for which you want
-    direct image thumbnail for. Note, in older (before $\sim$May 2020)
-    versions of Grizli, you would have needed ALL the `flt.fits` files
-    for a particular field, otherwise the code would break.
-
-[^14]: These files contain images of each HST pointing.
-
-[^15]: As spoken by the Grizli God himself, Gabe Brammer.
-
-[^16]: This most definitely was not me.
 
 [^17]: You only need the `flt.fits` files corresponding to the filter
     you want the direct image to be in.
