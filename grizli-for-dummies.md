@@ -29,7 +29,8 @@ referencing.
 5. Place a navigation bar at the end of your chapter (see existing examples).
 
 6. Don't forget to add your chapter (and sections, sub-sections, etc) to the
-Table of contents.
+Table of contents. Put your chapter title in bold typeface so it stands out in
+(what will probably become) the long table of contents.
 
 If you follow the above steps, it will really make the editing process easier
 for me -- thank you!
