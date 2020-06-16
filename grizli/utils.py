@@ -978,7 +978,25 @@ def get_hst_filter(header):
 
 EE_RADII = [0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.8, 1., 1.5, 2.]
 
-
+def get_filter_obsmode(filter='f160w', acs_chip='wfc1', uvis_chip='uvis2', aper=np.inf, case=str.lower):
+    """
+    Derive `~pysynphot` obsmode keyword from a filter name, where UVIS filters
+    end in 'u'
+    """
+    if filter.lower()[:2] in ['f0', 'f1']:
+        inst = 'wfc3,ir'
+    else:
+        if filter.lower().endswith('u'):
+            inst = f'wfc3,{uvis_chip}'
+        else:
+            inst = f'acs,{acs_chip}'
+        
+    obsmode = inst + ',' + filter.strip('u').lower()
+    if np.isfinite(aper):
+        obsmode += f',aper#{aper:4.2f}'
+        
+    return case(obsmode)
+    
 def tabulate_encircled_energy(aper_radii=EE_RADII, norm_radius=4.0):
 
     import pysynphot as S
@@ -995,13 +1013,18 @@ def tabulate_encircled_energy(aper_radii=EE_RADII, norm_radius=4.0):
     # IR
     for f in default_params.IR_M_FILTERS+default_params.IR_W_FILTERS:
         obsmode = 'wfc3,ir,'+f.lower()
+        
         print(obsmode)
         tab[obsmode] = synphot_encircled_energy(obsmode=obsmode, sp=sp, aper_radii=aper_radii, norm_radius=norm_radius)
         tab.meta['ZP_{0}'.format(obsmode)] = synphot_zeropoint(obsmode=obsmode, radius=norm_radius)
 
     # Optical.  Wrap in try/except to catch missing filters
     for inst in ['acs,wfc1,', 'wfc3,uvis2,']:
-        for f in default_params.OPT_M_FILTERS+default_params.OPT_W_FILTERS:
+        for f in (default_params.OPT_M_FILTERS + 
+                  default_params.OPT_W_FILTERS + 
+                  default_params.UV_M_FILTERS + 
+                  default_params.UV_W_FILTERS):
+
             obsmode = inst+f.lower()
 
             try:
@@ -1009,6 +1032,7 @@ def tabulate_encircled_energy(aper_radii=EE_RADII, norm_radius=4.0):
                 print(obsmode)
                 tab.meta['ZP_{0}'.format(obsmode)] = synphot_zeropoint(obsmode=obsmode, radius=norm_radius)
             except:
+                # Failed because obsmode not available in synphot
                 continue
 
     tab.meta['PSYNVER'] = S.__version__, 'Pysynphot version'
@@ -1022,7 +1046,13 @@ def synphot_zeropoint(obsmode='wfc3,ir,f160w', radius=4.0):
     """
     import pysynphot as S
     sp = S.FlatSpectrum(25, fluxunits='ABMag')
-    bp = S.ObsBandpass(obsmode+',aper#{0:.2f}'.format(radius))
+    
+    if np.isfinite(radius):
+        bp = S.ObsBandpass(obsmode+',aper#{0:.2f}'.format(radius))
+    else:
+        bp = S.ObsBandpass(obsmode)
+
+    # bp = S.ObsBandpass(obsmode+',aper#{0:.2f}'.format(radius))
     obs = S.Observation(sp, bp)
     ZP = 25 + 2.5*np.log10(obs.countrate())
     return ZP
@@ -1038,7 +1068,11 @@ def synphot_encircled_energy(obsmode='wfc3,ir,f160w', sp='default', aper_radii=E
         sp = S.FlatSpectrum(25, fluxunits='ABMag')
 
     # Normalization
-    bp = S.ObsBandpass(obsmode+',aper#{0:.2f}'.format(norm_radius))
+    if np.isfinite(norm_radius):
+        bp = S.ObsBandpass(obsmode+',aper#{0:.2f}'.format(norm_radius))
+    else:
+        bp = S.ObsBandpass(obsmode)
+
     obs = S.Observation(sp, bp)
     norm_counts = obs.countrate()
 
