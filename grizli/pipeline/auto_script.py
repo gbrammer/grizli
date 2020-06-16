@@ -1842,8 +1842,12 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
                 detection_params['filter_kernel'] = psf_kernel
 
         tab = prep.make_SEP_catalog(root=detection_root, threshold=threshold, get_background=detection_background, save_to_fits=True, rescale_weight=rescale_weight, err_scale=det_err_scale, phot_apertures=phot_apertures, detection_params=detection_params, bkg_mask=bkg_mask, bkg_params=bkg_params, use_bkg_err=use_bkg_err, aper_segmask=aper_segmask)
+        
+        cat_pixel_scale = tab.meta['asec_0'][0]/tab.meta['aper_0'][0]
+        
     else:
         tab = utils.GTable.gread(master_catalog)
+        cat_pixel_scale = tab.meta['ASEC_0']/tab.meta['APER_0']
 
     # Source positions
     #source_xy = tab['X_IMAGE'], tab['Y_IMAGE']
@@ -1936,8 +1940,15 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
                 tab[newc] = filter_tab[c]
 
             # Kron total correction from EE
-            ee_corr = prep.get_kron_tot_corr(tab, filter=filt.lower())
-            tab['{0}_tot_corr'.format(filt.upper())] = ee_corr
+            
+            filt_plam = tab.meta['{0}_PLAM'.format(filt.upper())]
+
+            tot_corr = prep.get_kron_tot_corr(tab, filt.lower(), 
+                                                pixel_scale=cat_pixel_scale, 
+                                                photplam=filt_plam)
+
+            #ee_corr = prep.get_kron_tot_corr(tab, filter=filt.lower())
+            tab['{0}_tot_corr'.format(filt.upper())] = tot_corr
 
         else:
             continue
