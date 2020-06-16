@@ -42,7 +42,7 @@ Grizli for dummies
 =======
 ***I was scared I'd forget these details, so I put them in a book***
 
-Authors: [Jasleen Matharu](https://github.com/jkmatharu), [Vicente Estrada-Carpenter](https://github.com/Vince-ec)
+Author: [Jasleen Matharu](https://github.com/jkmatharu)
 
 **If you would like to contribute to Grizli for dummies, please read the commented section before the Markdown document begins to understand the layout Grizli for dummies follows.**
 
@@ -876,73 +876,7 @@ Grizli does not fit for resolved lines in the grism spectra, so there is
 no parameter for the velocity line width. For all but broad-line AGN
 ($\gtrsim 1000$ km s$^{-1}$), the lines are unresolved[^28].
 
-Working with beams
-==================
 
-0pt [Vicente Estrada-Carpenter]{.smallcaps}
-
--   Beams are the most fundamental product from the Grizli reductions,
-    so working with these will give you the greatest control over your
-    data
-
--   Due to the complex nature of grism contamination subtraction  10$\%$
-    of galaxies will have residual contamination
-
--   Here I will explain how to clean and work with beams
-
-The MultiBeam object
---------------------
-
-The first thing you'll need to do is become familiar with the MultiBeam
-object. This function can be read in from grizli.multifit. A galaxies
-beams can be read in directly (with all the reduction info) using the
-output BEAM.fits files. Using MultiBeam you can fit for redshift, fit
-with templates, extract line and continuum fits, make plots, and in
-general manipulate the beams.
-
-working with multiple grisms
-----------------------------
-
-If a galaxy has multiple grism spectra then its best to split them up.
-This is because each of the spectra will be scaled differently and
-attempting to fit over both simultaneously doesn't work out well. By
-working with them separately different nuisance parameters can be
-applied to each spectra, generating better fits.
-
-The easiest way to split the data is to first identify which beam
-belongs to which instrument, this can be done with the MultiBeam. Once
-you've created a list of each spectra you can then generate a MultiBeam
-object for each spectra.
-
-How to clean beams
-------------------
-
-The easiest way to identify residual contamination is to plot each of
-the individual beams in 1D. Contamination will show itself as either a
-fake emission line that only shows up in few beams (likely only in
-ORIENT) or major offsets in the continuum (again only seen in a few
-beams. Some beams have extremely large offsets in a few data points. If
-this trend is only seen in one beam and not in an ORIENT set, then it
-will likely average out and it isn't necessary to remove (unless there
-only a few beams).
-
-Once you've identified the contamination it can be removed by setting
-the flux to 0 in the beams, or by just tossing the entire beam if the
-contamination is too much to deal with. I've done this by using a
-parameter file which identifies which beams are contaminated, whether
-the beam needs to have the contamination masked out or whether it needs
-to be omitted.
-
-Forward modelling with Grizli
-=============================
-
-0pt [Vicente Estrada-Carpenter]{.smallcaps}
-
-Fitting in 1D
--------------
-
-Fitting in 2D
--------------
 
 
 
