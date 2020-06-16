@@ -316,7 +316,7 @@ def sersic_profile(shape, mag=20., xc=[0., 0.], n=1., q=0.5, pa=0, re=1., ZP=26.
                          **params)
 
     if oversample > 1:
-        Ro, x, phi = pix_to_r(shape, oversample=oversample, verbose=verbose,
+        Ro, x, phio = pix_to_r(shape, oversample=oversample, verbose=verbose,
                               psf_offset=psf_offset, **params)
 
         sersic_large = norm*np.exp(-kap*((Ro/re)**(1./n)-1))
