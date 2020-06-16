@@ -1139,8 +1139,8 @@ def make_SEP_catalog(root='', threshold=2., get_background=True,
                       aper_segmask=False,
                       rescale_weight=True,
                       column_case=str.upper, save_to_fits=True,
-                      source_xy=None, autoparams=[2.5, 0.35*u.arcsec],
-                      flux_radii=[0.2, 0.5, 0.9],
+                      source_xy=None, autoparams=[2.5, 0.35*u.arcsec, 3.5],
+                      flux_radii=[0.2, 0.5, 0.9], subpix=0, 
                       mask_kron=False,
                       max_total_corr=2, err_scale=-np.inf, use_bkg_err=False,
                       detection_params=SEP_DETECT_PARAMS, bkg_mask=None,
@@ -1440,7 +1440,7 @@ def make_SEP_catalog(root='', threshold=2., get_background=True,
                                 pixel_scale=pixel_scale,
                                 err=err, segmap=seg, tab=tab,
                                 autoparams=autoparams, flux_radii=flux_radii,
-                                subpix=5, verbose=verbose)
+                                subpix=subpix, verbose=verbose)
 
             for k in auto.meta:
                 tab.meta[k] = auto.meta[k]
@@ -1458,7 +1458,10 @@ def make_SEP_catalog(root='', threshold=2., get_background=True,
             # tab = tab[~bad]
 
             # Correction for flux outside Kron aperture
-            tot_corr = get_wfc3ir_kron_tot_corr(tab, drz_filter, pixel_scale=pixel_scale, photplam=drz_photplam)
+            tot_corr = get_wfc3ir_kron_tot_corr(tab, drz_filter, 
+                                                pixel_scale=pixel_scale, 
+                                                photplam=drz_photplam)
+
             tab['tot_corr'] = tot_corr
             tab.meta['TOTCFILT'] = (drz_filter, 'Filter for tot_corr')
             tab.meta['TOTCWAVE'] = (drz_photplam, 'PLAM for tot_corr')
@@ -1530,7 +1533,7 @@ def make_SEP_catalog(root='', threshold=2., get_background=True,
             flux, fluxerr, flag = sep.sum_circle(data_bkg,
                                                  source_x, source_y,
                                                  aper/2, err=err,
-                                                 gain=gain, subpix=5,
+                                                 gain=gain, subpix=subpix,
                                                  segmap=aseg, seg_id=aseg_id,
                                                  mask=mask)
         else:
@@ -1538,7 +1541,7 @@ def make_SEP_catalog(root='', threshold=2., get_background=True,
             flux, fluxerr, flag = sep.sum_circle(data_bkg,
                                                  source_x, source_y,
                                                  aper/2, err=err,
-                                                 gain=gain, subpix=5,
+                                                 gain=gain, subpix=subpix,
                                                  mask=mask)
 
         tab.meta['GAIN'] = gain
@@ -1568,7 +1571,7 @@ def make_SEP_catalog(root='', threshold=2., get_background=True,
         flux, fluxerr, flag = sep.sum_circle(data_mask,
                                       source_x, source_y,
                                       aper/2, err=err,
-                                      gain=gain, subpix=5)
+                                      gain=gain, subpix=subpix)
 
         tab['mask_aper_{0}'.format(iap)] = flux
 
@@ -1688,11 +1691,17 @@ def get_seg_iso_flux(data, seg, tab, err=None, fill=None, verbose=0):
         return iso_flux, iso_err, iso_area
 
 
-def compute_SEP_auto_params(data, data_bkg, mask, pixel_scale=0.06, err=None, segmap=None, tab=None, autoparams=[2.5, 0.35*u.arcsec], flux_radii=[0.2, 0.5, 0.9], subpix=5, verbose=True):
+def compute_SEP_auto_params(data, data_bkg, mask, pixel_scale=0.06, err=None, segmap=None, tab=None, autoparams=[2.5, 0.35*u.arcsec, 0, 5], flux_radii=[0.2, 0.5, 0.9], subpix=0, verbose=True):
     """
     Compute AUTO params
     https://sep.readthedocs.io/en/v1.0.x/apertures.html#equivalent-of-flux-auto-e-g-mag-auto-in-source-extractor
-
+    
+    The parameter `autoparams` is provided as [k, MIN_APER, MIN_KRON,
+    MAX_KRON], where the usual SExtractor PHOT_AUTOPARAMS would be [k,
+    MIN_KRON]. Here k is the scale factor of the kron radius, and MIN_KRON is
+    the minimum scaled Kron radius to use. MIN_APER is then the smallest
+    *circular* Kron aperture to allow, which can be provided in arcsec.
+        
     """
     import sep
     logstr = 'compute_SEP_auto_params: sep version = {0}'.format(sep.__version__)
@@ -1740,9 +1749,23 @@ def compute_SEP_auto_params(data, data_bkg, mask, pixel_scale=0.06, err=None, se
         kronrad, krflag = sep.kron_radius(data_bkg, x, y, a, b, theta,
                                           6.0, mask=mask)
 
+    # This is like SExtractor PHOT_AUTOPARAMS[0]
     kronrad *= autoparams[0]
 
-    # Circularized Kron radius
+    # This is like SExtractor PHOT_AUTOPARAMS[1]
+    if len(autoparams) > 2:
+        clip_kron0 = autoparams[2]
+        kronrad = np.maximum(kronrad, clip_kron0)
+    else:
+        clip_kron0 = 0.
+    
+    if len(autoparams) > 3:
+        clip_kron1 = autoparams[3]
+        kronrad = np.minimum(kronrad, clip_kron1)
+    else:
+        clip_kron1 = 1000.
+    
+    # Circularized Kron radius (equivalent to kronrad * a * sqrt(b/a))
     kroncirc = kronrad * np.sqrt(a*b)
 
     # Minimum Kron radius
@@ -1828,6 +1851,8 @@ def compute_SEP_auto_params(data, data_bkg, mask, pixel_scale=0.06, err=None, se
 
     tab = utils.GTable()
     tab.meta['KRONFACT'] = (autoparams[0], 'Kron radius scale factor')
+    tab.meta['KRON0'] = (clip_kron0, 'Minimum scaled Kron radius')
+    tab.meta['KRON1'] = (clip_kron1, 'Maximum scaled Kron radius')
     tab.meta['MINKRON'] = (min_radius_pix, 'Minimum Kron aperture, pix')
 
     tab['kron_radius'] = kronrad*u.pixel
@@ -1850,43 +1875,96 @@ def compute_SEP_auto_params(data, data_bkg, mask, pixel_scale=0.06, err=None, se
     return tab
 
 
-def get_kron_tot_corr(tab, filter, inst=None, pixel_scale=0.06, photplam=None):
+def get_filter_ee_ratio(tab, filter, ref_filter='f160w'):
+    """
+    Relative EE correction within a specified aperture, in arcsec.  
+    """
+    pixel_scale = tab.meta['ASEC_0']/tab.meta['APER_0']
+    min_kron = tab.meta['MINKRON']*pixel_scale
+    
+    ee = utils.read_catalog((os.path.join(os.path.dirname(utils.__file__),
+                             'data', 'hst_encircled_energy.fits')))
+
+    # Reference filter
+    ref_obsmode = utils.get_filter_obsmode(filter=ref_filter, acs_chip='wfc1', 
+                                       uvis_chip='uvis2', aper=np.inf, 
+                                       case=str.lower)
+
+    # Target filter
+    obsmode = utils.get_filter_obsmode(filter=filter, acs_chip='wfc1', 
+                                       uvis_chip='uvis2', aper=np.inf, 
+                                       case=str.lower)
+
+    # Filter not available
+    if obsmode not in ee.colnames:
+        return 1.
+
+    # Ratio of photometric aperture to kron aperture
+    keys = list(tab.meta.keys())
+    for ka in keys:
+        if ka.startswith('APER_'):
+            ap = ka.split('_')[1]
+
+            aper_radius = tab.meta[f'ASEC_{ap}']/2.
+            kron_circ = np.maximum(tab['kron_rcirc']*pixel_scale, min_kron)
+            
+            filt_kron = np.interp(kron_circ, ee['radius'], ee[obsmode])
+            filt_aper = np.interp(aper_radius, ee['radius'], ee[obsmode])
+            
+            ref_kron = np.interp(kron_circ, ee['radius'], ee[ref_obsmode])
+            ref_aper = np.interp(aper_radius, ee['radius'], ee[ref_obsmode])
+            
+            filter_correction = (filt_kron/filt_aper) / (ref_kron/ref_aper)
+            tab[f'{filter}_ee_{ap}'] = filter_correction
+    
+    return tab
+
+
+def get_kron_tot_corr(tab, filter, inst=None, pixel_scale=0.06, photplam=None, rmax=5.0):
     """
     Compute total correction from tabulated EE curves
     """
     ee = utils.read_catalog((os.path.join(os.path.dirname(__file__),
                              'data', 'hst_encircled_energy.fits')))
+    
+    obsmode = utils.get_filter_obsmode(filter=filter, acs_chip='wfc1', 
+                                       uvis_chip='uvis2', aper=np.inf, 
+                                       case=str.lower)
 
-    if filter.lower()[:2] in ['f0', 'f1']:
-        inst = 'wfc3,ir'
-    else:
-        if inst is None:
-            inst = 'acs,wfc1'
-
-    try:
-        min_kron = tab.meta['MINKRON'][0]
-    except:
-        min_kron = tab.meta['MINKRON']
-
+    min_kron = float(np.atleast_1d(tab.meta['MINKRON'])[0])
+    
+    if pixel_scale is None:
+        try:
+            pixel_scale = tab.meta['ASEC_0']/tab.meta['APER_0']
+        except:
+            pixel_scale = tab.meta['asec_0'][0]/tab.meta['aper_0'][0]
+        
     if 'kron_rcirc' in tab.colnames:
         kron_raper = np.clip(tab['kron_rcirc']*pixel_scale,
-                             min_kron*pixel_scale, 2.1)
+                             min_kron*pixel_scale, rmax)
     else:
         kron_raper = np.clip(tab['KRON_RCIRC']*pixel_scale,
-                             min_kron*pixel_scale, 2.1)
+                             min_kron*pixel_scale, rmax)
 
-    obsmode = inst+','+filter.lower()
     # Filter not available
     if obsmode not in ee.colnames:
         return kron_raper*0.+1
     else:
-        ee_interp = np.interp(kron_raper, ee['radius'], ee[obsmode], left=0.01, right=1.)
+        ee_rad = np.append(ee['radius'], rmax)
+        ee_y = np.append(ee[obsmode], 1.)
+        
+        ee_interp = np.interp(kron_raper, ee_rad, ee_y, left=0.01, right=1.)
         return 1./ee_interp
 
 
-def get_wfc3ir_kron_tot_corr(tab, filter, pixel_scale=0.06, photplam=None):
+def get_wfc3ir_kron_tot_corr(tab, filter, pixel_scale=0.06, photplam=None, rmax=5.):
     """
-    Compute total correction from WFC3/IR EE curves
+    Compute total correction from WFC3/IR EE curves 
+    
+    .. note::
+        
+        Deprecated, use `~grizli.utils.get_kron_tot_corr`.
+        
     """
     ee_raw = np.loadtxt((os.path.join(os.path.dirname(__file__),
                             'data', 'wfc3ir_ee.txt')))
@@ -1895,7 +1973,7 @@ def get_wfc3ir_kron_tot_corr(tab, filter, pixel_scale=0.06, photplam=None):
     ee_rad = ee_raw[1:, 0]
 
     kron_raper = np.clip(tab['kron_rcirc']*pixel_scale,
-                         tab.meta['MINKRON'][0]*pixel_scale, 2.1)
+                         tab.meta['MINKRON'][0]*pixel_scale, rmax)
 
     if (filter.lower()[:2] not in ['f0', 'f1']) & (photplam is None):
         return kron_raper*0.+1
@@ -1911,6 +1989,9 @@ def get_wfc3ir_kron_tot_corr(tab, filter, pixel_scale=0.06, photplam=None):
     i0 = int(xi)
     fi = 1-(xi-i0)
     ee_y = ee_data[:, i0:i0+2].dot([fi, 1-fi])
+    ee_rad = np.append(ee_rad, rmax)
+    ee_y = np.append(ee_y, 1.)
+
     ee_interp = np.interp(kron_raper, ee_rad, ee_y, left=0.01, right=1.)
     return 1./ee_interp
 
