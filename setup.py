@@ -57,8 +57,7 @@ if 0:
     p = subprocess.Popen(args.split(), stdout=subprocess.PIPE)
     version = p.communicate()[0].decode("utf-8").strip()
 
-    version_str = """# git describe --tags
-    __version__ = "{0}"\n""".format(version)
+    version_str = """# git describe --tags\nversion = "{0}"\n""".format(version)
 
     fp = open('grizli/version.py','w')
     fp.write(version_str)
