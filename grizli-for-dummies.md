@@ -893,7 +893,7 @@ Grizli does not fit for resolved lines in the grism spectra, so there is
 no parameter for the velocity line width. For all but broad-line AGN
 (approximately &ge;1000 km s<sup>-1</sup>), the lines are unresolved<a id="unresolved" href="#unresolved_1"><sup>2</sup></a>.  
 
-<a id="catalogue" href="#catalogue_1"><sup>1</sup></a> Yes, I am British. The word 'catalogue' does not end at the 'g', obviously \*eye roll\*.
+<a id="catalogue" href="#catalogue_1"><sup>1</sup></a> Yes, I am British. The word 'catalogue' does not end at the 'g', obviously \*eye roll\*.  
 <a id="unresolved" href="#unresolved_1"><sup>2</sup></a> All of the above, as said by the Grizli God himself, Gabe Brammer.
 
 ---
