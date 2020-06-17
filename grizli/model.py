@@ -2711,9 +2711,14 @@ class GrismFLT(object):
                     if verbose:
                         print('ID {0:d} not found in segmentation image'.format(id))
                     return False
+                
+                if hasattr(self.catalog['x_flt'][ix][0], 'unit'):
+                    xcat = self.catalog['x_flt'][ix][0].value - 1
+                    ycat = self.catalog['y_flt'][ix][0].value - 1
+                else:
+                    xcat = self.catalog['x_flt'][ix][0] - 1
+                    ycat = self.catalog['y_flt'][ix][0] - 1
 
-                xcat = self.catalog['x_flt'][ix][0]-1
-                ycat = self.catalog['y_flt'][ix][0]-1
                 # print '!!! X, Y: ', xcat, ycat, self.direct.origin, size
 
                 # use x, y if defined
