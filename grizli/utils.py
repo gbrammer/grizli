@@ -1101,6 +1101,8 @@ def calc_header_zeropoint(im, ext=0):
         AB zeropoint
 
     """
+    from . import model
+
     scale_exptime = 1.
 
     if isinstance(im, pyfits.Header):
@@ -1353,7 +1355,7 @@ def detect_with_photutils(sci, err=None, dq=None, seg=None, detect_thresh=2.,
     import scipy.ndimage as nd
 
     from photutils import detect_threshold, detect_sources, SegmentationImage
-    from photutils import source_properties, properties_table
+    from photutils import source_properties
 
     import astropy.io.fits as pyfits
     from astropy.table import Column
@@ -1388,7 +1390,7 @@ def detect_with_photutils(sci, err=None, dq=None, seg=None, detect_thresh=2.,
         segm = detect_sources(sci*(~mask), threshold, npixels=npixels,
                               filter_kernel=kernel)
 
-        grow = nd.maximum_filter(segm.array, grow_seg)
+        grow = nd.maximum_filter(segm.data, grow_seg)
         seg = np.cast[np.float32](grow)
     else:
         # Use the supplied segmentation image
@@ -1401,7 +1403,7 @@ def detect_with_photutils(sci, err=None, dq=None, seg=None, detect_thresh=2.,
     props = source_properties(sci, segm, error=threshold/detect_thresh,
                               mask=mask, background=background, wcs=wcs)
 
-    catalog = properties_table(props)
+    catalog = props.to_table()
 
     # Mag columns
     mag = AB_zeropoint - 2.5*np.log10(catalog['source_sum'])
@@ -1998,6 +2000,7 @@ class SpectrumTemplate(object):
             Wavelength and flux of a Gaussian line
         """
         import astropy.constants as const
+        from astropy.modeling.models import Lorentz1D
 
         if hasattr(fwhm, 'unit'):
             rms = fwhm.value/2.35
@@ -2020,7 +2023,6 @@ class SpectrumTemplate(object):
             wave_grid = np.hstack([91., wave_grid, 1.e8])
 
         if lorentz:
-            from astropy.modeling.models import Lorentz1D
             if velocity:
                 use_fwhm = central_wave*(fwhm/const.c.to(KMS).value)
             else:
