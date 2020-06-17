@@ -216,6 +216,7 @@ Within the `astroconda` environment, I ran:
 
 which deletes the `grizli-dev` environment and everything in it.
 
+---
 
 <a id="anaconda" href="#anaconda_1"><sup>1</sup></a> Environment-ception.  
 <a id="pip" href="#pip_1"><sup>2</sup></a> As spoken by the Grizli God himself, Gabe Brammer.  
@@ -271,6 +272,8 @@ filter in the photometric catalog derived from the photo-z fit. Say,
 filling F140W with the template value for objects where it is otherwise
 missing.\"*
 
+
+---
 <a id="inc_photometry" href="#inc_photometry_1"><sup>1</sup></a> For example, you set `scale_photometry=1` when running the `grizli.fitting.run_all` function.
 
 ---
@@ -299,6 +302,8 @@ following information in `python`<a href="#database" id="database_1"><sup>1</sup
               `port':5432}
 
     engine = db.get_db_engine(config=config)
+
+---
 
 <a id="database" href="#database_1"><sup>1</sup></a> You didn't honestly think I was going to publicise the login details, did you? If you require access, you need to ask Gabe Brammer nicely.
 
@@ -409,6 +414,8 @@ Running your new fits with Grizli
 If you're including photometry, then you must first do:
 
 Otherwise\...
+
+---
 
 <a id="eazy" href="#eazy_1"><sup>1</sup></a> The values shown for the parameters are just examples. They may not be relevant to your particular data.  
 <a id="photcat" href="#photcat_1"><sup>2</sup></a> The values shown for the parameters are just examples. They may not be relevant to your particular data.
@@ -821,6 +828,8 @@ local directory, with an example at the end of how to call it:
 Obviously change the default field name otherwise you're going to look
 like a right idiot.
 
+---
+
 <a id="weight" href="#weight_1"><sup>1</sup></a> The `DWHT` and `LINEWHT` extensions are indeed inverse variance maps, where σ = 1 / &radic;weight. σ can be used as a sigma image with GALFIT.  
 <a id="blot" href="#blot_1"><sup>2</sup></a> Going from the *undistorted* mosaic to a distorted mosaic is "blotting". Going in the opposite direction is "drizzling".
 The individual images that get spat out of the Telescope are drizzled to some
@@ -867,7 +876,7 @@ Grizli version: `1.0-76-g71853af`
     contamination has already been removed<a id="contam" href="#contam_1"><sup>1</sup></a> from the `LINE`
     extensions.  
 
-
+---
 <a id="contam" href="#contam_1"><sup>1</sup></a> If there is residual contamination left in the `LINE` extension, this means Grizli failed to remove it. You may have to apply your
 own contamination removal techniques or if possible, see if you can use the associated `CONTAM` map to mask the problematic regions.
 
@@ -893,6 +902,7 @@ Grizli does not fit for resolved lines in the grism spectra, so there is
 no parameter for the velocity line width. For all but broad-line AGN
 (approximately &ge; 1000 km s<sup>-1</sup>), the lines are unresolved<a id="unresolved" href="#unresolved_1"><sup>2</sup></a>.  
 
+---
 <a id="catalogue" href="#catalogue_1"><sup>1</sup></a> Yes, I am British. The word 'catalogue' does not end at the 'g', obviously \*eye roll\*.  
 <a id="unresolved" href="#unresolved_1"><sup>2</sup></a> All of the above, as said by the Grizli God himself, Gabe Brammer.
 
