@@ -105,6 +105,8 @@ during the COVID-19 Pandemic<a href="#covid" id="covid_1"><sup>2</sup></a>*
             1. [Corresponding segmentation map thumbnails](#without_phot.fits_seg)
             2. [Tips](#tips)
         3. [Creating your own `_groups.npy` file](#create_groups_file)
+7. [**Notes about emission line map thumbnails**](#emission_line_maps)
+8. [**The output Grizli catalogue**](#Grizli_catalogue)
 
 ---
 
@@ -667,10 +669,8 @@ how I call the function:
 
 #### Corresponding segmentation map thumbnails
 
-As mentioned above in
-Section [6.3.2](#thumbnails_external_photcat){reference-type="ref"
-reference="thumbnails_external_photcat"}, setting
-`make_segmentation_figure=True` when running the function
+As mentioned in the [above section](#without_phot.fits), setting
+`make_segmentation_figure = True` when running the function
 `grizli.aws.aws_drizzler.drizzle_images` did not generate a segmentation
 map thumbnail for me. To generate my segmentation map thumbnails, I ran
 the function `grizli.aws.aws_drizzler.segmentation_figure` *after* I ran
@@ -680,7 +680,7 @@ the function `grizli.aws.aws_drizzler.segmentation_figure` *after* I ran
 
 -   `cat_phot` is your photometric catalog. Remember, **for your
     segmentation map thumbnail to be generated, the Object ID column
-    needs to have the title `‘number’`**[^23].
+    needs to have the title `number`**<a href="#number2" id="number2_1"><sup>15</sup></a>.
 
 -   `seg_file` is the filename of your segmentation map `.fits` file. I
     put this file in my `root/Prep/` directory.
@@ -720,35 +720,33 @@ code, I used the python `try` and `except` conditions like so:
 
 <a name="create_groups_file"></a>
 
-### Creating your own `_groups.npy` file {#groups_file}
+### Creating your own `_groups.npy` file
 
 If you are working on a well-studied field, like, I don't know, maybe
-one of the 3D-HST/CANDELS fields[^24], you may need to generate a new
+one of the 3D-HST/CANDELS fields<a href="#CANDELS" id="CANDELS_1"><sup>16</sup></a>, you may need to generate a new
 `_groups.npy` file to obtain the most reliable direct image thumbnails.
 This all depends on how you queried the HST archive for your Grizli run
 (look at the section "Query the HST archive\" on `In [5]:` of the
-[Grizli-Pipeline](#https://github.com/gbrammer/grizli/blob/master/examples/Grizli-Pipeline.ipynb)
+[Grizli-Pipeline](https://github.com/gbrammer/grizli/blob/master/examples/Grizli-Pipeline.ipynb)
 notebook.). Did you just extract the data based on your Proposal ID? Did
 you use the overlap query and if you did, did you make sure you obtained
 ALL the possible relevant imaging for your objects of interest? **The
-instructions in Section [6.3.1](#thumbnails_rgb){reference-type="ref"
-reference="thumbnails_rgb"} implicitly assume that if your `_phot.fits`
+instructions in [this chapter](#with_phot.fits) implicitly assume that if your `_phot.fits`
 file was generated with Grizli, it was generated using all the HST
 imaging available for that field in that filter.** This may not be the
 case, so I implore you, for what feels like the millionth time, to go
 back and check you have all the necessary `_flt.fits` files in existence
 for the filter within which you want to create reliable direct image
 postage stamps. If you are using the method outlined in
-Section [6.3.1](#thumbnails_rgb){reference-type="ref"
-reference="thumbnails_rgb"} to create your reliable direct image postage
+[this chapter](#with_phot.fits) to create your reliable direct image postage
 stamps, as far as I am aware, the `_groups.npy` can be used
-interchangeably with the `_visits.npy` file. So if you had to generate a
-new `_groups.npy` file, you should be able to use it instead of the
+interchangeably with the `_visits.npy` file. So if you have to generate a
+new `_groups.npy` file (as is about to be explained), you should be able to use it instead of the
 `_visits.npy` file. Just make sure you get rid of the old file, or move
 it into a different directory.
 
 Once you have downloaded all the necessary `_flt.fits` files, the
-`python` function below[^25] will generate your new `_groups.npy` in the
+`python` function below<a href="#groupcode" id="groupcode_1"><sup>17</sup></a> will generate your new `_groups.npy` in the
 local directory, with an example at the end of how to call it:
 
     import os
@@ -844,75 +842,61 @@ So basically, the pixel positions (and probably the pixel values) in the `DSCI`
 <a id="psfproblems" href="#psfproblems_1"><sup>14</sup></a> If a PSF thumbnail
 is not generated, check you have the relevant PSF files in your `grizli/CONF` directory and can open them. For example, when generating F105W reliable direct image thumbnails,
 I needed to be able to open the file `PSFSTD_WFC3IR_F105W.fits`. Mine for some reason was
-corrupt :( .
+corrupt :( .  
+<a id="number2" href="#number2_1"><sup>15</sup></a> Otherwise the segmentation map thumbnail will not be generated. It's just the way of the code, deal with it.  
+<a id="CANDELS" href="#CANDELS_1"><sup>16</sup></a> This most definitely did not happen to me.  
+<a id="groupcode" href="#groupcode_1"><sup>17</sup></a> As generously given to me (and then adapted by me) by our Grizli God, Gabe Brammer.
+
+---
+[<< Previous Chapter](#reliable_thumbnails) | [Table of Contents](#contents) | [Next Chapter >>](#emission_line_maps)
+
+---
+
+<a name="emission_line_maps"></a>
 
 Notes about emission line map thumbnails
 ========================================
 
-0pt [Jasleen Matharu]{.smallcaps}
+Author: [Jasleen Matharu](https://github.com/jkmatharu)  
+Grizli version: `1.0-76-g71853af`
 
-0pt Grizli version: `1.0-76-g71853af`
-
--   Pixel values are in units of
-    $\times10^{-17}$ ergs s$^{-1}$ cm$^{-2}$.
+-   Pixel values are in units of 10<sup>-17</sup> ergs s<sup>-1</sup> cm<sup>-2</sup>.
 
 -   You do not need to apply the associated contamination maps to them
     -- the `CONTAM` maps just show you where the contamination is. The
-    contamination has already been removed[^26] from the `LINE`
-    extensions.
+    contamination has already been removed<a id="contam" href="#contam_1"><sup>1</sup></a> from the `LINE`
+    extensions.  
 
-The output Grizli catalogue[^27]
+
+<a id="contam" href="#contam_1"><sup>1</sup></a> If there is residual contamination left in the `LINE` extension, this means Grizli failed to remove it. You may have to apply your
+own contamination removal techniques or if possible, see if you can use the associated `CONTAM` map to mask the problematic regions.
+
+---
+[<< Previous Chapter](#emission_line_maps) | [Table of Contents](#contents) | [Next Chapter >>](#Grizli_catalogue)
+
+---
+
+<a name="Grizli_catalogue"></a>
+
+The output Grizli catalogue<a id="catalogue" href="#catalogue_1"><sup>1</sup></a>
 ================================
 
-0pt [Jasleen Matharu]{.smallcaps}
+Author: [Jasleen Matharu](https://github.com/jkmatharu)  
 
--   `ew50_Ha` is the median of the H$\upalpha$ equivalent width
+-   `ew50_Ha` is the median of the Hα equivalent width
     Probability Density Function (PDF).
 
--   `ewhw_Ha` is the "half-width\", so something like the $1\sigma$
+-   `ewhw_Ha` is the "half-width\", so something like the 1σ
     uncertainty on `ew50_Ha`.
 
 Grizli does not fit for resolved lines in the grism spectra, so there is
 no parameter for the velocity line width. For all but broad-line AGN
-($\gtrsim 1000$ km s$^{-1}$), the lines are unresolved[^28].
+(approximately &ge;1000 km s<sup>-1</sup>), the lines are unresolved<a id="unresolved" href="#unresolved_1"><sup>2</sup></a>.  
 
+<a id="catalogue" href="#catalogue_1"><sup>1</sup></a> Yes, I am British. The word 'catalogue' does not end at the 'g', obviously \*eye roll\*.
+<a id="unresolved" href="#unresolved_1"><sup>2</sup></a> All of the above, as said by the Grizli God himself, Gabe Brammer.
 
+---
+[<< Previous Chapter](#Grizli_catalogue) | [Table of Contents](#contents) |
 
-
-
-
-[^17]: You only need the `flt.fits` files corresponding to the filter
-    you want the direct image to be in.
-
-[^18]: These files contain images of each HST pointing.
-
-[^19]: Otherwise the segmentation map thumbnail will not be generated.
-    It's just the way of the code, deal with it.
-
-[^20]: No, not a `python` pickle.
-
-[^21]: So that's what Gabe meant in
-    Section [6.2](#direct_full.fits){reference-type="ref"
-    reference="direct_full.fits"} !
-
-[^22]: A reminder that this book wasn't written by people who wrote
-    Grizli.
-
-[^23]: Otherwise the segmentation map thumbnail will not be generated.
-    It's just the way of the code, deal with it.
-
-[^24]: This most definitely did not happen to me.
-
-[^25]: as generously given to me (and then adapted by me) by our Grizli
-    God, Gabe Brammer.
-
-[^26]: If there is residual contamination left in the `LINE` extension,
-    this means Grizli failed to remove it. You may have to apply your
-    own contamination removal techniques or if possible, see if you can
-    use the associated `CONTAM` map to mask the problematic regions.
-
-[^27]: Yes, I am British. The word 'catalogue' does not end at the 'g',
-    obviously \*eye roll\*.
-
-[^28]: All of the above, as said by the Grizli God himself, Gabe
-    Brammer.
+---
