@@ -35,3 +35,8 @@
 - Fix bug on SEP `tot_corr` total correction that wasn't using the correct   
   pixel scale
 - Bug fixes
+
+1.1.1
+-----
+
+- Bug for tag version
