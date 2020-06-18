@@ -59,7 +59,7 @@ Preface
 I never chose to write this book, it chose me. During my PhD and now
 during my first Postdoc, I have been forced to learn and grasp many
 intricate details regarding the usage of the *Grism redshift and line
-analysis software* (Grizli) written by Gabriel Brammer1. The official
+analysis software* (Grizli) written by Gabriel Brammer [1]_. The official
 documentation and software can be found
 `here <https://grizli.readthedocs.io/en/master/>`__.
 
@@ -78,10 +78,10 @@ real.
 
 | *Jasleen Matharu*
 | *4th May 2020*
-| *during the COVID-19 Pandemic2*
+| *during the COVID-19 Pandemic [2]_*
 
-| 1 I still haven’t met him in person.
-| 2 No, I did not decide to write a book because I had lots of free time
+.. [1] I still haven’t met him in person.
+.. [2] No, I did not decide to write a book because I had lots of free time
   on my hands.
 
 --------------
