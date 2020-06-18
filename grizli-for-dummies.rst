@@ -394,7 +394,7 @@ Direct image thumbnails in ``full.fits``
 
 Note, the direct image thumbnails in ``full.fits`` are in units of
 electrons per second, but the emission line map thumbnails are in units
-of 10:sup:-17ergs s-1 cm-2. To convert the direct image thumbnails to the
+of 10\ :sup:`-17` ergs s\ :sup:`-1` cm\ :sup:`-2`. To convert the direct image thumbnails to the
 same units as the emission line maps, you need the relevant ``PHOTPLAM``
 and ``PHOTFLAM`` values. These can be found as keywords in the header of
 the direct image thumbnail extension (``DSCI``) in ``full.fits``. If
