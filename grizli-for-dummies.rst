@@ -384,7 +384,7 @@ When one has run Grizli from end-to-end, perhaps following the
 `Grizli-Pipeline <https://github.com/gbrammer/grizli/blob/master/examples/Grizli-Pipeline.ipynb>`__
 notebook, you will find that you will have ``root_id.full.fits`` files
 in your ``root/Extractions/`` folder. These contain thumbnails of the
-direct images, emission line maps and associated contamination, weight1,
+direct images, emission line maps and associated contamination, weight [#]_ ,
 PSFs and segmentation maps for the source in the field = ``root`` with
 Object ID = ``id``. These have been designed to work with
 `GALFIT <https://users.obs.carnegiescience.edu/peng/work/galfit/galfit.html>`__.
@@ -394,7 +394,7 @@ Direct image thumbnails in ``full.fits``
 
 Note, the direct image thumbnails in ``full.fits`` are in units of
 electrons per second, but the emission line map thumbnails are in units
-of 10-17ergs s-1 cm-2. To convert the direct image thumbnails to the
+of 10:sup:-17ergs s-1 cm-2. To convert the direct image thumbnails to the
 same units as the emission line maps, you need the relevant ``PHOTPLAM``
 and ``PHOTFLAM`` values. These can be found as keywords in the header of
 the direct image thumbnail extension (``DSCI``) in ``full.fits``. If
