@@ -48,7 +48,7 @@ Grizli for dummies
 Author: `Jasleen Matharu <https://github.com/jkmatharu>`__
 
 **If you would like to contribute to Grizli for dummies, please read the
-commented section before the Markdown document begins to understand the
+commented section before the reStructuredText document begins to understand the
 layout Grizli for dummies follows.**
 
 --------------
@@ -75,7 +75,7 @@ out about Grizli from the official documentation or source code, they
 might get lucky and find the solution here. Otherwise, the struggle is
 real.
 
-*Jasleen Matharu
+*Jasleen Matharu__
 4th May 2020
 during the COVID-19 Pandemic2*
 
