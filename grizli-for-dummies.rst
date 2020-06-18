@@ -76,8 +76,9 @@ might get lucky and find the solution here. Otherwise, the struggle is
 real.
 
 *Jasleen Matharu*
-| *4th May 2020*
-| *during the COVID-19 Pandemic2*
+
+| 4th May 2020
+| during the COVID-19 Pandemic2
 
 | 1 I still haven’t met him in person.
 | 2 No, I did not decide to write a book because I had lots of free time
