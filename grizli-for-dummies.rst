@@ -426,7 +426,7 @@ Generating direct image thumbnails when your ``_phot.fits`` file is generated wi
 To accomplish this monumental task, you will need to run the
 ``auto_script.make_rgb_thumbnails`` function in the ``root/Prep/``
 directory and you will need the following files in your ``root/Prep/``
-directory for it to work:
+directory for it to work :ref: `create-groups-file`:
 
 -  The necessary4 ``flt.fits``\ [#]_ files in the ``root/Prep/`` directory.
    **If you are not sure about this, please check how you queried the
@@ -671,8 +671,9 @@ Tips
            flag=True
 
 
-.. _create-groups-file:
 
+
+.. _create-groups-file:
 Creating your own ``_groups.npy`` file
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
