@@ -181,7 +181,7 @@ there is only one way to install Grizli: using the ``conda``
 environment. Don’t try to do it any other way if you want to ensure an
 environment within which Grizli will work harmoniously. Remember, Grizli
 is designed to work *within* the ``astroconda`` environment, which
-itself is a ``conda`` environment within ``anaconda``\ 1.
+itself is a ``conda`` environment within ``anaconda``\ [#]_ .
 
 Updating Grizli
 ---------------
@@ -245,7 +245,7 @@ which deletes the ``grizli-dev`` environment and everything in it.
 
 --------------
 
-| 1 Environment-ception.
+.. [#] Environment-ception.
 | 2 As spoken by the Grizli God himself, Gabe Brammer.
 | 3 You guessed it, it was the Grizli God himself, Gabe Brammer.
 
