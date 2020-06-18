@@ -436,7 +436,7 @@ directory for it to work:
    your proposal ID (especially for well-studied fields such as those in
    3D-HST/CANDELS). If you know you’ve added new** ``flt.fits`` **files
    since doing your Grizli run, you need to generate a new**
-   ``root_groups.npy`` **file — read** :ref: `create_groups_file` **NOW.**
+   ``root_groups.npy`` **file — read** :ref: `create-groups-file` **NOW.**
 
 -  The ``root_phot.fits`` file in the ``root/Prep/`` directory.
 
@@ -670,7 +670,8 @@ Tips
        except:
            flag=True
 
-.. _create_groups_file:
+
+.. _create-groups-file:
 
 Creating your own ``_groups.npy`` file
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
