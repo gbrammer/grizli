@@ -260,7 +260,7 @@ Version 0.9 versus 1.0
 Improvement in the grism/photometry scaling algorithm
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-If you happen to have processed some grism data including photometry1
+If you happen to have processed some grism data including photometry [#]_ 
 with Grizli version 0.9 and then 1.0, you may have noticed that your 1.0
 extractions look more reliable. The one-dimensional model spectrum seems
 to follow the data much better in your ``full.png`` files.
@@ -287,6 +287,8 @@ less completely. One way around that could be defining an interpolated
 filter in the photometric catalog derived from the photo-z fit. Say,
 filling F140W with the template value for objects where it is otherwise
 missing."*
+
+
 
 `<< Previous Chapter <#get_from_book>`__ \| `Table of
 Contents <#contents>`__ \| `Next Chapter >> <#public_database>`__
