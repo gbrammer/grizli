@@ -185,6 +185,8 @@ which deletes the ``grizli-dev`` environment and everything in it.
 .. [#] As spoken by the Grizli God himself, Gabe Brammer.
 .. [#] You guessed it, it was the Grizli God himself, Gabe Brammer.
 
+--------------
+
 Changes between Grizli versions
 ===============================
 
@@ -253,8 +255,7 @@ following information in ``python``\ [#]_ :
 
 --------------
 
-.. [#] You didn’t honestly think I was going to publicise the login details,
-did you? If you require access, you need to ask Gabe Brammer nicely.
+.. [#] You didn’t honestly think I was going to publicise the login details, did you? If you require access, you need to ask Gabe Brammer nicely.
 
 --------------
 
