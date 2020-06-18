@@ -92,6 +92,9 @@ real.
 Table of contents
 =================
 
+
+.. contents::
+
 1. `How to get the most out of this book <#get_from_book>`__
 2. `Installing Grizli <#installing_grizli>`__
 
@@ -287,6 +290,8 @@ less completely. One way around that could be defining an interpolated
 filter in the photometric catalog derived from the photo-z fit. Say,
 filling F140W with the template value for objects where it is otherwise
 missing."*
+
+
 
 .. [#] For example, you set ``scale_photometry=1`` when running the ``grizli.fitting.run_all`` function.
 
