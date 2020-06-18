@@ -235,9 +235,9 @@ Accessing the public database of reduced grism data
 
 | Author: `Jasleen Matharu <https://github.com/jkmatharu>`__
 | Grizli version: ``1.0-76-g71853af``
-
+|
 The database of reduced public HST grism data can be accessed with the
-following information in ``python``\ 1:
+following information in ``python``\ [#]_ :
 
 ::
 
@@ -253,7 +253,7 @@ following information in ``python``\ 1:
 
 --------------
 
-1 You didn’t honestly think I was going to publicise the login details,
+.. [#] You didn’t honestly think I was going to publicise the login details,
 did you? If you require access, you need to ask Gabe Brammer nicely.
 
 --------------
@@ -263,7 +263,7 @@ Creating thumbnails that are not the standard 80 x 80 pixels in ``full.fits``
 
 | Author: `Jasleen Matharu <https://github.com/jkmatharu>`__
 | Grizli version: ``1.0-76-g71853af``
-
+|
 In this chapter, I will walk you through how to create thumbnails in
 your ``full.fits`` files with the dimensions of your choice.
 
@@ -291,7 +291,7 @@ x 80 thumbnails in ``full.fits``. What you will need is:
 
    1. Install ```eazy-py`` <https://github.com/gbrammer/eazy-py>`__ (and
       import it in your ``python`` script with the line
-      ``import eazy``), with the following parameters1 defined in your
+      ``import eazy``), with the following parameters [#]_ defined in your
       ``python`` script:
 
       ::
@@ -306,7 +306,7 @@ x 80 thumbnails in ``full.fits``. What you will need is:
 
    2. Acquire the ``.translate`` files for your field.
 
-   3. Define the following parameters2 for your field:
+   3. Define the following parameters [#]_ for your field:
 
       ::
 
@@ -363,10 +363,12 @@ Otherwise...
 
 --------------
 
-| 1 The values shown for the parameters are just examples. They may not
+.. [#] The values shown for the parameters are just examples. They may not
   be relevant to your particular data.
-| 2 The values shown for the parameters are just examples. They may not
+.. [#] The values shown for the parameters are just examples. They may not
   be relevant to your particular data.
+
+--------------
 
 Creating reliable direct image thumbnails
 =========================================
