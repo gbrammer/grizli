@@ -23,10 +23,6 @@
    "this chapter" or "this section" are links to the chapter/section you are
    referencing.
 
-   5. Place a navigation bar at the end of your chapter (see existing examples).
-
-
-
    If you follow the above steps, it will really make the editing process easier
    for me -- thank you!
 
@@ -228,12 +224,9 @@ filter in the photometric catalog derived from the photo-z fit. Say,
 filling F140W with the template value for objects where it is otherwise
 missing."*
 
-
+--------------
 
 .. [#] For example, you set ``scale_photometry=1`` when running the ``grizli.fitting.run_all`` function.
-
-`<< Previous Chapter <#get_from_book>`__ \| `Table of
-Contents <#contents>`__ \| `Next Chapter >> <#public_database>`__
 
 --------------
 
@@ -262,6 +255,8 @@ following information in ``python``\ 1:
 
 1 You didn’t honestly think I was going to publicise the login details,
 did you? If you require access, you need to ask Gabe Brammer nicely.
+
+--------------
 
 Creating thumbnails that are not the standard 80 x 80 pixels in ``full.fits``
 =============================================================================
