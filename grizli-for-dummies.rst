@@ -288,7 +288,7 @@ filter in the photometric catalog derived from the photo-z fit. Say,
 filling F140W with the template value for objects where it is otherwise
 missing."*
 
-.. [#] For example, you set `scale_photometry=1` when running the `grizli.fitting.run_all` function.
+.. [#] For example, you set ``scale_photometry=1`` when running the ``grizli.fitting.run_all`` function.
 
 `<< Previous Chapter <#get_from_book>`__ \| `Table of
 Contents <#contents>`__ \| `Next Chapter >> <#public_database>`__
