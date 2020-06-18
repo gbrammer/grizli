@@ -14,12 +14,7 @@
    you used for the task explained in that chapter (if relevant). Reasons for doing
    this are explained in Chapter 1 of Grizli for dummies.
 
-   3. Since markdown sucks at automatically organising your footnotes for you,
-   treat each chapter like its own document -- start with footnote numnber 1 when
-   you start writing your chapter. Place your footnotes at the end of each chapter.
-   When you start a new chapter, start from footnote number 1 again. See some
-   existing chapters that are consecutive and have footnotes in each to see what I
-   mean.
+   3. Place your footnotes at the end of each chapter.
 
    4. Again, because Markdown sucks at automatically sorting out your referencing,
    Do not refer to your chapters by their numbered section. For example, rather
@@ -30,9 +25,7 @@
 
    5. Place a navigation bar at the end of your chapter (see existing examples).
 
-   6. Don't forget to add your chapter (and sections, sub-sections, etc) to the
-   Table of contents. Put your chapter title in bold typeface so it stands out in
-   (what will probably become) the long table of contents.
+
 
    If you follow the above steps, it will really make the editing process easier
    for me -- thank you!
@@ -89,63 +82,7 @@ real.
 
 --------------
 
-Table of contents
-=================
-
-
 .. contents::
-
-1. `How to get the most out of this book <#get_from_book>`__
-2. `Installing Grizli <#installing_grizli>`__
-
-   1. `Updating Grizli <#updating_grizli>`__
-   2. `Re-installing Grizli <#reinstalling_grizli>`__
-
-      1. `Deleting the Grizli
-         environment <#deleting_the_grizli_environment>`__
-
-3. `Changes between Grizli versions <#grizli_versions>`__
-
-   1. `Version 0.9 versus 1.0 <#version_0.9_versus_1.0>`__
-
-      1. `Improvement in the grism/photometry scaling
-         algorithm <#scaling_algorithm>`__
-
-4. `Accessing the public database of reduced grism
-   data <#public_database>`__
-5. `Creating thumbnails that are not the standard 80 x 80 pixels in
-   ``full.fits`` <#change_dimensions>`__
-
-   1. `Setting the thumbnail dimensions <#set_dimensions>`__
-   2. `Running your new fits with Grizli <#running_dimensions>`__
-
-6. `Creating reliable direct image thumbnails <#reliable_thumbnails>`__
-
-   1. `The ``full.fits`` files <#full.fits_file>`__
-   2. `Direct image thumbnails in
-      ``full.fits`` <#direct_image_full.fits>`__
-   3. `Generating reliable direct image
-      thumbnails <#generating_thumbnails>`__
-
-      1. `Generating direct image thumbnails when your ``_phot.fits``
-         file is generated with Grizli <#with_phot.fits>`__
-
-         1. `Corresponding segmentation map
-            thumbnails <#phot.fits_seg>`__
-         2. `Other important things to note <#phot.fits_important>`__
-
-      2. `Generating direct image thumbnails when your photometric
-         catalog is external to Grizli <#without_phot.fits>`__
-
-         1. `Corresponding segmentation map
-            thumbnails <#without_phot.fits_seg>`__
-         2. `Tips <#tips>`__
-
-      3. `Creating your own ``_groups.npy``
-         file <#create_groups_file>`__
-
-7. `Notes about emission line map thumbnails <#emission_line_maps>`__
-8. `The output Grizli catalogue <#Grizli_catalogue>`__
 
 --------------
 
