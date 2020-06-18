@@ -186,11 +186,11 @@ itself is a ``conda`` environment within ``anaconda``\ [#]_ .
 Updating Grizli
 ---------------
 
-You can update Grizli using pip2:
+You can update Grizli using pip [#]_ :
 
 ``pip install git+https://github.com/gbrammer/grizli.git``
 
-If that doesn’t work, a wise person3 told me to:
+If that doesn’t work, a wise person [#]_ told me to:
 
 1. Clone the environment to a local location.
 
@@ -246,8 +246,8 @@ which deletes the ``grizli-dev`` environment and everything in it.
 --------------
 
 .. [#] Environment-ception.
-| 2 As spoken by the Grizli God himself, Gabe Brammer.
-| 3 You guessed it, it was the Grizli God himself, Gabe Brammer.
+.. [#] As spoken by the Grizli God himself, Gabe Brammer.
+.. [#] You guessed it, it was the Grizli God himself, Gabe Brammer.
 
 Changes between Grizli versions
 ===============================
