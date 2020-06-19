@@ -504,7 +504,7 @@ directory and you will need the following files for it to work:
    (if you want a corresponding segmentation map thumbnail).
 
 -  The photometric catalog for your field, **with the Object ID column
-   named as ``‘number’``**\ [#]_ (if you want a corresponding segmentation
+   named as** ``‘number’`` [#]_ (if you want a corresponding segmentation
    map thumbnail).
 
 The method to create reliable direct image thumbnails outlined in `the
