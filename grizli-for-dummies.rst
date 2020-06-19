@@ -377,6 +377,8 @@ Creating reliable direct image thumbnails
 | Author: `Jasleen Matharu <https://github.com/jkmatharu>`__
 | Grizli version: ``1.0-76-g71853af`` and ``1.0.dev1458``
 
+.. _test-reference:
+
 The ``full.fits`` files
 -----------------------
 
@@ -391,6 +393,8 @@ Object ID = ``id``. These have been designed to work with
 
 Direct image thumbnails in ``full.fits``
 ----------------------------------------
+
+:ref:`test-reference`
 
 Note, the direct image thumbnails in ``full.fits`` are in units of
 electrons per second, but the emission line map thumbnails are in units
