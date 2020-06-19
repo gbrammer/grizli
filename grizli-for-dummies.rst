@@ -377,7 +377,6 @@ Creating reliable direct image thumbnails
 | Author: `Jasleen Matharu <https://github.com/jkmatharu>`__
 | Grizli version: ``1.0-76-g71853af`` and ``1.0.dev1458``
 
-.. _test-reference:
 
 The ``full.fits`` files
 -----------------------
@@ -393,8 +392,6 @@ Object ID = ``id``. These have been designed to work with
 
 Direct image thumbnails in ``full.fits``
 ----------------------------------------
-
-:ref: `test-reference`
 
 Note, the direct image thumbnails in ``full.fits`` are in units of
 electrons per second, but the emission line map thumbnails are in units
@@ -440,7 +437,7 @@ directory for it to work:
    your proposal ID (especially for well-studied fields such as those in
    3D-HST/CANDELS). If you know you’ve added new** ``flt.fits`` **files
    since doing your Grizli run, you need to generate a new**
-   ``root_groups.npy`` **file — read** `Creating your own ``_groups.npy`` file` **NOW.**
+   ``root_groups.npy`` **file — read** `Creating your own ``_groups.npy``_ file` **NOW.**
 
 -  The ``root_phot.fits`` file in the ``root/Prep/`` directory.
 
