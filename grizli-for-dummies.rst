@@ -453,11 +453,11 @@ in ``In [40]:`` of the
 `Grizli-Pipeline <https://github.com/gbrammer/grizli/blob/master/examples/Grizli-Pipeline.ipynb>`__
 notebook. For a given field (or ``root``), you will need to run this
 function in the ``root/Prep/`` directory. If you set the keyword
-``use_line_wcs=True``, the function will look in ``root/Extractions/``
+``use_line_wcs = True``, the function will look in ``root/Extractions/``
 for the ``full.fits`` files associated with the object IDs you request
 and match the WCS and drizzle parameters of the thumbnails to those of
-the ``LINE`` extensions. Also, set the keyword ``skip=False`` if the
-function doesn’t do anything, since ``skip=True`` will skip over objects
+the ``LINE`` extensions. Also, set the keyword ``skip = False`` if the
+function doesn’t do anything, since ``skip = True`` will skip over objects
 where a ``root_id.thumb.fits`` file already exists. The
 ``root_id.thumb.fits`` files will be saved in the ``root/Prep/``
 directory.
@@ -466,7 +466,7 @@ For example, to make a single thumbnail for one of the objects in the
 `Grizli-Pipeline <https://github.com/gbrammer/grizli/blob/master/examples/Grizli-Pipeline.ipynb>`__
 demo, run:
 
-``auto_script.make_rgb_thumbnails(root=‘j033216m2743’, ids=[424], use_line_wcs=True)``\ 6
+``auto_script.make_rgb_thumbnails(root=‘j033216m2743’, ids=[424], use_line_wcs=True)``\ [#]_ 
 
 However, the story does not end there.
 
@@ -474,7 +474,7 @@ Corresponding segmentation map thumbnails
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 You may suddenly realise you need corresponding segmentation maps for
-your newly-generated direct image thumbnails7. Have no fear, you can
+your newly-generated direct image thumbnails [#]_. Have no fear, you can
 generate them when you run ``auto_script.make_rgb_thumbnails`` as
 explained above, but you need to set the keyword
 ``make_segmentation_figure=True``. For a segmentation map to be
