@@ -429,7 +429,7 @@ To accomplish this monumental task, you will need to run the
 directory and you will need the following files in your ``root/Prep/``
 directory for it to work:
 
--  The necessary [#]_ ``flt.fits``\ [#]_ files in the ``root/Prep/`` directory.
+-  The necessary [#]_ ``flt.fits`` [#]_ files in the ``root/Prep/`` directory.
    **If you are not sure about this, please check how you queried the
    HST archive when doing your Grizli extractions. For the most reliable
    direct image thumbnails, you need ALL the available** ``flt.fits``
