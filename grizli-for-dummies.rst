@@ -689,7 +689,7 @@ notebook.). Did you just extract the data based on your Proposal ID? Did
 you use the overlap query and if you did, did you make sure you obtained
 ALL the possible relevant imaging for your objects of interest? **The
 instructions in**\ `this chapter <#with_phot.fits>`__\ **implicitly
-assume that if your ``_phot.fits`` file was generated with Grizli, it
+assume that if your** ``_phot.fits`` **file was generated with Grizli, it
 was generated using all the HST imaging available for that field in that
 filter.** This may not be the case, so I implore you, for what feels
 like the millionth time, to go back and check you have all the necessary
