@@ -428,7 +428,7 @@ To accomplish this monumental task, you will need to run the
 directory and you will need the following files in your ``root/Prep/``
 directory for it to work:
 
--  The necessary4 ``flt.fits``\ [#]_ files in the ``root/Prep/`` directory.
+-  The necessary [#]_ ``flt.fits``\ [#]_ files in the ``root/Prep/`` directory.
    **If you are not sure about this, please check how you queried the
    HST archive when doing your Grizli extractions. For the most reliable
    direct image thumbnails, you need ALL the available** ``flt.fits``
@@ -436,7 +436,7 @@ directory for it to work:
    your proposal ID (especially for well-studied fields such as those in
    3D-HST/CANDELS). If you know you’ve added new** ``flt.fits`` **files
    since doing your Grizli run, you need to generate a new**
-   ``root_groups.npy`` **file — read** Creating your own ``_groups.npy`` file **NOW.**
+   ``root_groups.npy`` **file — read** `Creating your own ``_groups.npy`` file` **NOW.**
 
 -  The ``root_phot.fits`` file in the ``root/Prep/`` directory.
 
