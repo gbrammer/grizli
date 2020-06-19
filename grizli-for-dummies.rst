@@ -426,7 +426,7 @@ Generating direct image thumbnails when your ``_phot.fits`` file is generated wi
 To accomplish this monumental task, you will need to run the
 ``auto_script.make_rgb_thumbnails`` function in the ``root/Prep/``
 directory and you will need the following files in your ``root/Prep/``
-directory for it to work :ref: `create-groups-file`:
+directory for it to work:
 
 -  The necessary4 ``flt.fits``\ [#]_ files in the ``root/Prep/`` directory.
    **If you are not sure about this, please check how you queried the
@@ -436,7 +436,7 @@ directory for it to work :ref: `create-groups-file`:
    your proposal ID (especially for well-studied fields such as those in
    3D-HST/CANDELS). If you know you’ve added new** ``flt.fits`` **files
    since doing your Grizli run, you need to generate a new**
-   ``root_groups.npy`` **file — read** :ref: `create-groups-file` **NOW.**
+   ``root_groups.npy`` **file — read** :ref:`create-groups-file` **NOW.**
 
 -  The ``root_phot.fits`` file in the ``root/Prep/`` directory.
 
@@ -674,6 +674,7 @@ Tips
 
 
 .. _create-groups-file:
+
 Creating your own ``_groups.npy`` file
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
