@@ -674,7 +674,6 @@ Tips
 
 
 .. _create-groups-file:
-
 Creating your own ``_groups.npy`` file
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
