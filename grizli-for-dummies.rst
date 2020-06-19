@@ -633,7 +633,7 @@ thumbnails, I ran the function
 
 -  ``cat_phot`` is your photometric catalog. Remember, **for your
    segmentation map thumbnail to be generated, the Object ID column
-   needs to have the title ``number``**\ [#]_ .
+   needs to have the title** ``number`` [#]_ .
 
 -  ``seg_file`` is the filename of your segmentation map ``.fits`` file.
    I put this file in my ``root/Prep/`` directory.
