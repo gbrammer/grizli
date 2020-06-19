@@ -394,7 +394,7 @@ Object ID = ``id``. These have been designed to work with
 Direct image thumbnails in ``full.fits``
 ----------------------------------------
 
-:ref:`test-reference`
+:ref: `test-reference`
 
 Note, the direct image thumbnails in ``full.fits`` are in units of
 electrons per second, but the emission line map thumbnails are in units
