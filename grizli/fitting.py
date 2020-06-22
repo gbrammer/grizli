@@ -1,7 +1,5 @@
 """
-fitting.py
-
-Created by Gabriel Brammer on 2017-05-19.
+Tools for fitting spectra with templates.
 
 """
 import os
@@ -1307,7 +1305,7 @@ class GroupFitter(object):
 
         Returns
         -------
-        A_bg : `~np.ndarray`
+        A_bg : `~numpy.ndarray`
 
         """
         if masked:
@@ -1532,8 +1530,9 @@ class GroupFitter(object):
               'lstsq'  - Standard least squares (`~numpy.linalg.lstsq`)
               'bounded' - Bounded least squares (`~scipy.optimize.lsq_linear`)
 
-            For the last option, the line flux limits are set by `LINE_BOUNDS`
-            and `bounded_kwargs` are passed to `~scipy.optimize.lsq_linear`.
+            For the last option, the line flux limits are set by 
+            ``LINE_BOUNDS`` and ``bounded_kwargs`` are passed to 
+            `~scipy.optimize.lsq_linear`.
 
         fit_background : bool
             Fit additive pedestal background offset.
@@ -1546,17 +1545,18 @@ class GroupFitter(object):
 
         huber_delta : float
             Use the Huber loss function (`~scipy.special.huber`) rather than
-            direct chi-squared.  If `huber_delta` < 0, then fall back to chi2.
+            direct chi-squared.  If ``huber_delta < 0``, then fall back to
+            chi-squared.
 
         Returns
         -------
         chi2 : float
             Chi-squared of the fit
 
-        coeffs, coeffs_err : `~np.ndarray`
+        coeffs, coeffs_err : `~numpy.ndarray`
             Template coefficients and uncertainties.
 
-        covariance : `~np.ndarray`
+        covariance : `~numpy.ndarray`
             Full covariance
 
         """
@@ -2371,16 +2371,16 @@ class GroupFitter(object):
     def check_tfit_coeffs(self, tfit, templates, refit_others=True, fit_background=True, fitter='nnls', bounded_kwargs=BOUNDED_DEFAULTS):
         """
         Compare emission line fluxes fit at each grism/PA to the combined
-        value. If `refit_others=True`, then compare the line fluxes to a fit
+        value. If ``refit_others=True``, then compare the line fluxes to a fit
         from a new object generated *excluding* that grism/PA.
 
         Returns
-        =======
+        -------
         max_line : str
             Line species with the maximum deviation
 
         max_line_diff : float
-            The maximum deviation for `max_line` (sigmas).
+            The maximum deviation for ``max_line`` (sigmas).
 
         compare : dict
             The full comparison dictionary
@@ -2461,10 +2461,9 @@ class GroupFitter(object):
         return max_line, max_line_diff, compare
 
     def compute_D4000(self, z, fit_background=True, fit_type='D4000', fitter='lstsq'):
-        """
-        Compute D4000 with step templates
+        """Compute D4000 with step templates
 
-        Parameters:
+        Parameters
         ----------
         z : float
             Redshift where to evaluate D4000
@@ -2478,15 +2477,15 @@ class GroupFitter(object):
                 Dn4000 = f_nu(3850-3950) / f_nu(4000-4100)
 
         fitter : str
-            Fitting algorithm, passed to `self.template_at_z`.
+            Fitting algorithm, passed to `~grizli.fitting.GroupFitter.template_at_z`.
 
-        Returns:
-        --------
+        Returns
+        -------
         w_d4000, t_d4000 : `~numpy.ndarray`, dict
             Step wavelengths and template dictionary
 
         tfit : dict
-            Fit dictionary returned by `template_at_z`.
+            Fit dictionary returned by `~grizli.fitting.GroupFitter.template_at_z`.
 
         d4000, d4000_sigma : float
             D4000 estimate and uncertainty from simple error propagation and
@@ -3466,9 +3465,9 @@ class GroupFitter(object):
         Parameters
         ----------
         data : `~numpy.ndarray`, None
-            Data array with same dimensions as `self.scif_mask`
-            (flattened & masked) 2D spectra of all beams.  If `None`, then
-            use `self.scif_mask`.
+            Data array with same dimensions as ``self.scif_mask``
+            (flattened & masked) 2D spectra of all beams.  If ``None``, then
+            use ``self.scif_mask``.
 
         bin : bool
             Binning factor relative to the grism-dependent resolution values,
@@ -3479,23 +3478,23 @@ class GroupFitter(object):
             `~grizli.utils.GRISM_LIMITS`.
 
         ivar : `~numpy.ndarray`, None
-            Inverse variance array with same dimensions as `self.scif_mask`
-            (flattened & masked) 2D spectra of all beams.  If `None`, then
-            use `self.weighted_sigma2_mask`.
+            Inverse variance array with same dimensions as ``self.scif_mask``
+            (flattened & masked) 2D spectra of all beams.  If ``None``, then
+            use ``self.weighted_sigma2_mask``.
 
         trace_limits : [float, float] or None
             If specified, perform a simple sum in cross-dispersion axis
-            between `trace_limits` relative to the central pixel of the trace
-            rather than the optimally-weighted sum. Similarly, the output
-            variances are the sum of the input variances in the trace
+            between ``trace_limits`` relative to the central pixel of the
+            trace rather than the optimally-weighted sum. Similarly, the
+            output variances are the sum of the input variances in the trace
             interval.
 
-            Note that the trace interval is evaluated with `< >`, as opposed
-            to `<= >=`, as the center of the trace is a float rather than an
+            Note that the trace interval is evaluated with ``< >``, as opposed
+            to ``<= >=``, as the center of the trace is a float rather than an
             integer pixel index.
 
         loglam : bool
-            If True and `wave` not specified (see above), then output
+            If True and ``wave`` not specified (see above), then output
             wavelength grid is log-spaced.
 
         Returns
@@ -3656,22 +3655,22 @@ class GroupFitter(object):
 
     def get_flat_model(self, spectrum_1d, id=None, apply_mask=True, is_cgs=True):
         """
-        Generate model array based on the model 1D spectrum in `spectrum_1d`
+        Generate model array based on the model 1D spectrum in ``spectrum_1d``
 
         Parameters
         ----------
 
         spectrum_1d : tuple, -1
-            Tuple of 1D arrays (wavelength, flux).  If `-1`, then use the
-            in_place `model` attributes of each beam.
+            Tuple of 1D arrays (wavelength, flux).  If ``-1``, then use the
+            in_place ``model`` attributes of each beam.
 
         is_cgs : bool
-            `spectrum_1d` flux array has CGS f-lambda flux density units.
+            ``spectrum_1d`` flux array has CGS f-lambda flux density units.
 
         Returns
         -------
 
-        model : Array with dimensions `(self.fit_mask.sum(),)`
+        model : Array with dimensions ``(self.fit_mask.sum(),)``
             Flattened, masked model array.
 
         """
@@ -3699,7 +3698,7 @@ class GroupFitter(object):
         ----------
         bg_params : array with shape (self.N) or (self.N, M)
 
-            Background parameters for each beam, where the `M` axis is
+            Background parameters for each beam, where the ``M`` axis is
             polynomial cofficients in the order expected by
             `~astropy.modeling.models.Polynomial2D`.  If the array is 1D,
             then provide a simple pedestal background.
@@ -3707,7 +3706,7 @@ class GroupFitter(object):
         Returns
         -------
 
-        bg_model : Array with dimensions `(self.fit_mask.sum(),)`
+        bg_model : Array with dimensions ``(self.fit_mask.sum(),)``
 
             Flattened, masked background array.
 
@@ -3804,8 +3803,10 @@ class GroupFitter(object):
 
 def show_drizzled_lines(line_hdu, full_line_list=['OII', 'Hb', 'OIII', 'Ha+NII', 'Ha', 'SII', 'SIII'], size_arcsec=2, cmap='cubehelix_r', scale=1., dscale=1, direct_filter=['F140W', 'F160W', 'F125W', 'F105W', 'F110W', 'F098M']):
     """TBD
-
-    `direct_filter` : list
+    
+    Parameters
+    ----------
+    direct_filter : list
         Filter preference to show in the direct image panel.  Step through
         and stop if the indicated filter is available.
 
