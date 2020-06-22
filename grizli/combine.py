@@ -378,7 +378,7 @@ def split_pixel_quadrant(dx, dy, figure='quadrants.png', show=False):
 
             ### This computes the quadrants and also generates the plot
             quad = grizli.combine.split_pixel_quadrant(dx, dy, show=True)
-            print quad
+            print(quad)
             # {0: array([0]), 1: array([2]), 2: array([1]), 3: array([3])}
             plt.show()
 
