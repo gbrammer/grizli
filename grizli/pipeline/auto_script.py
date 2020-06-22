@@ -4018,8 +4018,9 @@ def get_rgb_filters(filter_list, force_ir=False, pure_sort=False):
         gfilt = use_filters[ix_g]
         return [rfilt, gfilt, bfilt]
 
+TICKPARAMS = dict(axis='both', colors='w', which='both')
 
-def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', show_ir=True, pl=1, pf=1, scl=1, scale_ab=None, rgb_scl=[1, 1, 1], ds9=None, force_ir=False, filters=None, add_labels=True, output_format='jpg', rgb_min=-0.01, xyslice=None, pure_sort=False, verbose=True, force_rgb=None, suffix='.field', mask_empty=False, tick_interval=60, timestamp=False, mw_ebv=0):
+def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', show_ir=True, pl=1, pf=1, scl=1, scale_ab=None, rgb_scl=[1, 1, 1], ds9=None, force_ir=False, filters=None, add_labels=True, output_format='jpg', rgb_min=-0.01, xyslice=None, pure_sort=False, verbose=True, force_rgb=None, suffix='.field', mask_empty=False, tick_interval=60, timestamp=False, mw_ebv=0, use_background=False, tickparams=TICKPARAMS):
     """
     RGB image of the field mosaics
     """
@@ -4068,7 +4069,17 @@ def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', s
         try:
             ims[f] = pyfits.open(img)
             if 'IMGMED' in ims[f][0].header:
-                ims[f][0].data -= ims[f][0].header['IMGMED']
+                imgmed = ims[f][0].header['IMGMED']
+                ims[f][0].data -= imgmed
+            else:
+                imgmed = 0
+                
+            bkg_file = img.split('_dr')[0]+'_bkg.fits'
+            if use_background & os.path.exists(bkg_file):
+                print('Subtract background: '+bkg_file)
+                bkg = pyfits.open(bkg_file)
+                ims[f][0].data -= bkg[0].data - imgmed
+                
         except:
             continue
 
@@ -4209,8 +4220,10 @@ def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', s
     ax.xaxis.set_major_locator(minor)
     ax.yaxis.set_major_locator(minor)
 
-    ax.tick_params(axis='x', colors='w', which='both')
-    ax.tick_params(axis='y', colors='w', which='both')
+    #ax.tick_params(axis='x', colors='w', which='both')
+    #ax.tick_params(axis='y', colors='w', which='both')
+    if tickparams:
+        ax.tick_params(**tickparams)
 
     if add_labels:
         ax.text(0.03, 0.97, root, bbox=dict(facecolor='w', alpha=0.8), size=10, ha='left', va='top', transform=ax.transAxes)
