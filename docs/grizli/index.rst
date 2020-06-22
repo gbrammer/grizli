@@ -21,3 +21,15 @@ Spectrum Analysis
     :no-inheritance-diagram:
     :skip: OrderedDict, Planck15
    
+Pipeline tools
+==============
+.. automodapi:: grizli.pipeline.default_params
+    :no-inheritance-diagram:
+
+.. automodapi:: grizli.pipeline.auto_script
+    :no-inheritance-diagram:
+    :skip: get_yml_parameters, write_params_to_yml
+
+.. automodapi:: grizli.pipeline.photoz
+    :no-inheritance-diagram:
+

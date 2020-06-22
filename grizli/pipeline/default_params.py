@@ -1,3 +1,7 @@
+"""
+Parameter handling with YAML
+"""
+
 import os
 import traceback
 import yaml
