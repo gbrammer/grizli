@@ -41,7 +41,7 @@ commented section before the reStructuredText document begins to understand the
 layout Grizli for dummies follows.**
 
 Preface
--------
+=======
 
 I never chose to write this book, it chose me. During my PhD and now
 during my first Postdoc, I have been forced to learn and grasp many
@@ -77,7 +77,7 @@ real.
 
 
 How to get the most out of this book
-------------------------------------
+====================================
 
 This book follows a particular format to help you get the most out of
 the information presented. **Below the heading of each chapter, the name
@@ -101,7 +101,7 @@ and check whether perhaps an update or downgrade will solve your problem
 (I would recommend a downgrade as a last resort though).
 
 Installing Grizli
------------------
+=================
 
 Author: `Jasleen Matharu <https://github.com/jkmatharu>`__
 
@@ -114,7 +114,7 @@ is designed to work *within* the ``astroconda`` environment, which
 itself is a ``conda`` environment within ``anaconda``\ [#]_ .
 
 Updating Grizli
-~~~~~~~~~~~~~~~
+---------------
 
 You can update Grizli using pip [#]_ :
 
@@ -151,7 +151,7 @@ to get any new redshift fit templates that have been added to the
 repository.
 
 Re-installing Grizli
-~~~~~~~~~~~~~~~~~~~~
+--------------------
 
 Sometimes, something might get really screwed up on your computer that
 Grizli just won’t work. You don’t know why, but before you pull every
@@ -163,7 +163,7 @@ environment and re-install from scratch using the ``conda`` environment
 method.
 
 Deleting the Grizli environment
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-------------------------------
 
 Within the ``astroconda`` environment, I ran:
 
@@ -180,15 +180,15 @@ which deletes the ``grizli-dev`` environment and everything in it.
 --------------
 
 Changes between Grizli versions
--------------------------------
+===============================
 
 Author: `Jasleen Matharu <https://github.com/jkmatharu>`__
 
 Version 0.9 versus 1.0
-~~~~~~~~~~~~~~~~~~~~~~
+----------------------
 
 Improvement in the grism/photometry scaling algorithm
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 If you happen to have processed some grism data including photometry [#]_ 
 with Grizli version 0.9 and then 1.0, you may have noticed that your 1.0
@@ -223,7 +223,7 @@ missing."*
 --------------
 
 Accessing the public database of reduced grism data
----------------------------------------------------
+===================================================
 
 | Author: `Jasleen Matharu <https://github.com/jkmatharu>`__
 | Grizli version: ``1.0-76-g71853af``
@@ -246,7 +246,7 @@ following information in ``python``\ [#]_ :
 --------------
 
 Creating thumbnails that are not the standard 80 x 80 pixels in ``full.fits``
------------------------------------------------------------------------------
+=============================================================================
 
 | Author: `Jasleen Matharu <https://github.com/jkmatharu>`__
 | Grizli version: ``1.0-76-g71853af``
@@ -324,7 +324,7 @@ x 80 thumbnails in ``full.fits``. What you will need is:
                  ep = photoz.EazyPhot(ez, grizli_templates=templ0, zgrid=ez.zgrid)
 
 Setting the thumbnail dimensions
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--------------------------------
 
 The next line of code I’m going to show you is **the** line of the code.
 The line of code that will allow you to fiddle with the properties of
@@ -342,7 +342,7 @@ x 80 pixels. So, for example, if I wanted thumbnails with dimensions 189
 x 189 pixels, I would set ``size=18.9``.
 
 Running your new fits with Grizli
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+---------------------------------
 
 If you’re including photometry, then you must first do:
 
@@ -356,14 +356,14 @@ Otherwise...
 --------------
 
 Creating reliable direct image thumbnails
------------------------------------------
+=========================================
 
 | Author: `Jasleen Matharu <https://github.com/jkmatharu>`__
 | Grizli version: ``1.0-76-g71853af`` and ``1.0.dev1458``
 
 
 The ``full.fits`` files
-~~~~~~~~~~~~~~~~~~~~~~~
+-----------------------
 
 When one has run Grizli from end-to-end, perhaps following the
 `Grizli-Pipeline <https://github.com/gbrammer/grizli/blob/master/examples/Grizli-Pipeline.ipynb>`__
@@ -375,7 +375,7 @@ Object ID = ``id``. These have been designed to work with
 `GALFIT <https://users.obs.carnegiescience.edu/peng/work/galfit/galfit.html>`__.
 
 Direct image thumbnails in ``full.fits``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+----------------------------------------
 
 Note, the direct image thumbnails in ``full.fits`` are in units of
 electrons per second, but the emission line map thumbnails are in units
@@ -403,10 +403,10 @@ The above is not as straightforward as the author of this chapter
 thought.
 
 Generating reliable direct image thumbnails
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-------------------------------------------
 
 Generating direct image thumbnails when your ``_phot.fits`` file is generated with Grizli
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 To accomplish this monumental task, you will need to run the
 ``auto_script.make_rgb_thumbnails`` function in the ``root/Prep/``
@@ -455,7 +455,7 @@ demo, run:
 However, the story does not end there.
 
 Corresponding segmentation map thumbnails
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 You may suddenly realise you need corresponding segmentation maps for
 your newly-generated direct image thumbnails [#]_ . Have no fear, you can
@@ -466,7 +466,7 @@ successfully generated, you need the ``root-ir_seg.fits`` file to be in
 your ``root/Prep/`` directory.
 
 Other important things to note
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 -  By default, the ``min_filters`` keyword is set to ``2``. Sometimes,
    you only have imaging for the object in one filter. So if you want
@@ -474,7 +474,7 @@ Other important things to note
    need to explicitly set ``min_filters = 1``.
 
 Generating direct image thumbnails when your photometric catalog is external to Grizli
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+---------------------------------------------------------------------------------------
 
 To accomplish this task, you will need to run the
 ``grizli.aws.aws_drizzler.drizzle_images`` in your ``root/Prep/``
@@ -600,7 +600,7 @@ how I call the function:
 .. _corresponding-segmentation-map-thumbnails-1:
 
 Corresponding segmentation map thumbnails
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 As mentioned in the `above section <#without_phot.fits>`__, setting
 ``make_segmentation_figure = True`` when running the function
@@ -657,7 +657,7 @@ Tips
 .. _create_groups_file:
 
 Creating your own ``_groups.npy`` file
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--------------------------------------
 
 If you are working on a well-studied field, like, I don’t know, maybe
 one of the 3D-HST/CANDELS fields [#]_ , you may need to generate a new
@@ -807,7 +807,7 @@ like a right idiot.
 --------------
 
 Notes about emission line map thumbnails
-----------------------------------------
+========================================
 
 | Author: `Jasleen Matharu <https://github.com/jkmatharu>`__
 | Grizli version: ``1.0-76-g71853af``
@@ -823,7 +823,7 @@ Notes about emission line map thumbnails
 --------------
 
 The output Grizli catalogue [#]_ 
---------------------------------
+================================
 
 Author: `Jasleen Matharu <https://github.com/jkmatharu>`__
 
