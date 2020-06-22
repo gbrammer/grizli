@@ -1,6 +1,6 @@
 
 Spectrum Analysis
-=============
+=================
 
 .. automodapi:: grizli.utils
     :no-inheritance-diagram:
@@ -15,5 +15,9 @@ Spectrum Analysis
     
 .. automodapi:: grizli.multifit
     :no-inheritance-diagram:
-    :skip: Table, OrderedDict
+    :skip: Table, OrderedDict, GroupFitter
+
+.. automodapi:: grizli.fitting
+    :no-inheritance-diagram:
+    :skip: OrderedDict, Planck15
    
