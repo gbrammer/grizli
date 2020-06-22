@@ -127,3 +127,11 @@ API
    grizli/prep.rst
    grizli/index.rst
    changelog
+
+Grizli for Dummies
+==================
+
+.. toctree::
+   :maxdepth: 2
+
+   grizli-for-dummies
