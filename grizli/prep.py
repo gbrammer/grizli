@@ -76,8 +76,8 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
 
     extra_badpix : bool
         Apply extra bad pixel mask.  Currently this is hard-coded to look for
-        a file "badpix_spars200_Nov9.fits" in the directory specified by
-        the `$iref` environment variable.  The file can be downloaded from
+        a file ``badpix_spars200_Nov9.fits`` in the directory specified by
+        the ``$iref`` environment variable.  The file can be downloaded from
 
         https://github.com/gbrammer/wfc3/tree/master/data
 
@@ -88,11 +88,11 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
         Run LACosmicx on the exposure
 
     mask_regions : bool
-        Apply exposure region mask (like *_flt.01.mask.reg) if it exists.
+        Apply exposure region mask (like ``_flt.01.mask.reg``) if it exists.
 
     Returns
     -------
-    Nothing, but copies the file from `path` to `./`.
+    Nothing, but copies the file from ``path`` to ``./``.
 
     """
     import shutil
@@ -4900,8 +4900,8 @@ def find_single_image_CRs(visit, simple_mask=False, with_ctx_mask=True,
     """Use LACosmic to find CRs in parts of an ACS mosaic where only one
     exposure was available
 
-    Paramters
-    ---------
+    Parameters
+    ----------
     visit : dict
         List of visit information from `~grizli.utils.parse_flt_files`.
 

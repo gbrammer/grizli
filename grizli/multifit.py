@@ -4512,15 +4512,15 @@ def drizzle_2d_spectrum(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
 def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
                           pixscale=0.1, pixfrac=0.6, kernel='square',
                           direct_extension='REF', fcontam=0.2, ds9=None):
-    """Drizzle a cutout at a specific wavelength from a list of `BeamCutout`s
+    """Drizzle a cutout at a specific wavelength from a list of `~grizli.model.BeamCutout` objects
 
     Parameters
     ----------
     beams : list of `~.model.BeamCutout` objects.
 
     wcs : `~astropy.wcs.WCS` or None
-        Pre-determined WCS.  If not specified, generate one based on `ra`,
-        `dec`, `pixscale` and `pixscale`
+        Pre-determined WCS.  If not specified, generate one based on ``ra``,
+        ``dec``, ``pixscale`` and ``pixscale``.
 
     ra, dec, wave : float
         Sky coordinates and central wavelength
@@ -4532,13 +4532,13 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
         Pixel scale of the output thumbnail, in arcsec
 
     pixfrac : float
-        Drizzle PIXFRAC (for `kernel` = 'point')
+        Drizzle PIXFRAC (for ``kernel`` = 'point')
 
     kernel : str, ('square' or 'point')
         Drizzle kernel to use
 
     direct_extension : str, ('SCI' or 'REF')
-        Extension of `self.direct.data` do drizzle for the thumbnail
+        Extension of ``self.direct.data`` do drizzle for the thumbnail
 
     fcontam: float
         Factor by which to scale the contamination arrays and add to the

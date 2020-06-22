@@ -158,27 +158,6 @@ def get_flt_info(files=[], columns=['FILE', 'FILTER', 'INSTRUME', 'DETECTOR', 'T
 def radec_to_targname(ra=0, dec=0, round_arcsec=(4, 60), precision=2, targstr='j{rah}{ram}{ras}{sign}{ded}{dem}', header=None):
     """Turn decimal degree coordinates into a string with rounding.
 
-    Example:
-
-        # Test dec: -10d10m10.10s
-        >>> dec = -10. - 10./60. - 10.1/3600
-
-        # Test ra: 02h02m02.20s
-        >>> cosd = np.cos(dec/180*np.pi)
-        >>> ra = 2*15 + 2./60*15 + 2.2/3600.*15
-
-        # Round to nearest arcmin
-        >>> from mastquery.utils import radec_to_targname
-        >>> print(radec_to_targname(ra=ra, dec=dec, round_arcsec=(4,60),
-                               targstr='j{rah}{ram}{ras}{sign}{ded}{dem}'))
-        j020204m1010 # (rounded to 4 arcsec in RA)
-
-        # Full precision
-        >>> targstr = 'j{rah}{ram}{ras}.{rass}{sign}{ded}{dem}{des}.{dess}'
-        >>> print(radec_to_targname(ra, dec,round_arcsec=(0.0001, 0.0001),
-                                    precision=3, targstr=targstr))
-        j020202.200m101010.100
-
     Parameters
     -----------
     ra, dec : float
@@ -204,7 +183,26 @@ def radec_to_targname(ra=0, dec=0, round_arcsec=(4, 60), precision=2, targstr='j
     --------
     targname : str
         Target string, see the example above.
-
+    
+    Examples
+    --------
+    
+    >>> # Test dec: -10d10m10.10s
+    >>> dec = -10. - 10./60. - 10.1/3600
+    >>> # Test ra: 02h02m02.20s
+    >>> cosd = np.cos(dec/180*np.pi)
+    >>> ra = 2*15 + 2./60*15 + 2.2/3600.*15
+    >>> # Round to nearest arcmin
+    >>> from grizli.utils import radec_to_targname
+    >>> print(radec_to_targname(ra=ra, dec=dec, round_arcsec=(4,60),
+                           targstr='j{rah}{ram}{ras}{sign}{ded}{dem}'))
+    j020204m1010 # (rounded to 4 arcsec in RA)
+    >>> # Full precision
+    >>> targstr = 'j{rah}{ram}{ras}.{rass}{sign}{ded}{dem}{des}.{dess}'
+    >>> print(radec_to_targname(ra, dec,round_arcsec=(0.0001, 0.0001),
+                                precision=3, targstr=targstr))
+    j020202.200m101010.100
+    
     """
     import astropy.coordinates
     import astropy.units as u
@@ -408,14 +406,15 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
     files : list
         List of exposure filenames.  If not specified, use *flt.fits.
 
-    info : None or output from `~grizli.utils.get_flt_info`.
-
+    info : None or `~astropy.table.Table` 
+        ``None`` or output from `~grizli.utils.get_flt_info`.
+        
     uniquename : bool
         If True, then split everything by program ID and visit name.  If
         False, then just group by targname/filter/pa_v3.
 
     use_visit : bool
-        For parallel observations with `targname='ANY'`, use the filename
+        For parallel observations with ``targname='ANY'``, use the filename
         up to the visit ID as the target name.  For example:
 
             >>> flc = 'jbhj64d8q_flc.fits'
@@ -427,7 +426,8 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
         pointing coordinates using `radec_to_targname`.  Use this keyword
         for dithered parallels like 3D-HST / GLASS but set to False for
         undithered parallels like WISP.  Should also generally be used with
-        `uniquename=False` otherwise generates names that are a bit redundant:
+        ``uniquename=False`` otherwise generates names that are a bit 
+        redundant:
 
             +--------------+---------------------------+
             | `uniquename` | Output Targname           |
@@ -1922,7 +1922,7 @@ class SpectrumTemplate(object):
                 import matplotlib.pyplot as plt
                 from grizli.utils import SpectrumTemplate
 
-                ha = SpectrumTemplate(wave=6563., fwhm=10)
+                ha = SpectrumTemplate(central_wave=6563., fwhm=10)
                 plt.plot(ha.wave, ha.flux)
 
                 ha_z = ha.zscale(0.1)
@@ -1930,7 +1930,8 @@ class SpectrumTemplate(object):
 
                 plt.legend()
                 plt.xlabel(r'$\lambda$')
-
+                plt.xlim(6000, 7500)
+                
                 plt.show()
 
         """
@@ -2167,23 +2168,19 @@ class SpectrumTemplate(object):
 
         Examples
         --------
-
         Compute the WFC3/IR F140W AB magnitude of a pure emission line at the
         5-sigma 3D-HST line detection limit (5e-17 erg/s/cm2):
 
-            >>> from grizli.utils import SpectrumTemplate
-            >>> from eazy.filters import FilterDefinition
-            >>> import pysynphot as S
-
-            >>> line = SpectrumTemplate(central_wave=1.4e4, fwhm=150.,
-                                        velocity=True)*5.e-17
-
-            >>> filter = FilterDefinition(bp=S.ObsBandpass('wfc3,ir,f140w'))
-
-            >>> fnu = line.integrate_filter(filter)
-
-            >>> print('AB mag = {0:.3f}'.format(-2.5*np.log10(fnu)-48.6))
-            AB mag = 26.619
+        >>> import numpy as np
+        >>> from grizli.utils import SpectrumTemplate
+        >>> from eazy.filters import FilterDefinition
+        >>> import pysynphot as S
+        >>> line = SpectrumTemplate(central_wave=1.4e4, fwhm=150.,
+                                    velocity=True)*5.e-17
+        >>> filter = FilterDefinition(bp=S.ObsBandpass('wfc3,ir,f140w'))
+        >>> fnu = line.integrate_filter(filter)
+        >>> print('AB mag = {0:.3f}'.format(-2.5*np.log10(fnu)-48.6))
+        AB mag = 26.619
 
         """
         INTEGRATOR = np.trapz
@@ -3569,8 +3566,8 @@ def get_wcs_pscale(wcs, set_attribute=True):
 def transform_wcs(in_wcs, translation=[0., 0.], rotation=0., scale=1.):
     """Update WCS with shift, rotation, & scale
 
-    Paramters
-    ---------
+    Parameters
+    ----------
     in_wcs: `~astropy.wcs.WCS`
         Input WCS
 
@@ -3751,11 +3748,11 @@ def reproject_faster(input_hdu, output, pad=10, **kwargs):
     footprint : `~numpy.ndarray`
         Footprint of the input array in the output frame.
 
-    .. note::
+    Notes
+    -----
 
     `reproject' is an astropy-compatible module that can be installed with
     `pip`.  See https://reproject.readthedocs.io.
-
     """
     import reproject
 
@@ -5893,8 +5890,8 @@ class GTable(astropy.table.Table):
         dr : float array
             Projected separation of closest match.
 
-        Example
-        -------
+        Examples
+        --------
 
                 >>> import astropy.units as u
 
@@ -6392,31 +6389,32 @@ $.UpdateFilterURL = function () {{
 
 def column_string_operation(col, test, method='contains', logical='or'):
     """
-    Analogous to `string.contains` but for table column.
+    Analogous to ``str.contains`` but for table column.
 
     Parameters
     ----------
     col : iterable list of strings
-        List of strings to test.  Anything iterable, e.g., list or `~astropy.table.column.Column`.
+        List of strings to test.  Anything iterable, e.g., list or 
+        `~astropy.table.column.Column`.
 
     test : str, list of strings, None, or slice
 
-        If `test` is a string, or list of strings, then run the string
-        `method` on each entry of `col` with `test` as the argument or
-        each element of the `test` list as arguments.
+        If ``test`` is a string, or list of strings, then run the string
+        ``method`` on each entry of ``col`` with ``test`` as the argument or
+        each element of the ``test`` list as arguments.
 
-        If `test` is None, run `method` on each entry with no arguments, e.g.,
-        'upper'.
+        If ``test`` is None, run `method` on each entry with no arguments, 
+        e.g., 'upper'.
 
-        If `test` is a `slice`, return sliced strings for each entry.
+        If ``test`` is a ``slice``, return sliced strings for each entry.
 
     method : str
-        String method to apply to each entry of `col`.  E.g., 'contains',
+        String method to apply to each entry of ``col``.  E.g., 'contains',
         'startswith', 'endswith', 'index'.
 
     logical : ['or','and','not']
-        Logical test to use when `test` is a list of strings.  For example,
-        if you want to test if the column has values that match *either*
+        Logical test to use when ``test`` is a list of strings.  For example,
+        if you want to test if the column has values that match either
         'value1' or 'value2', then run with
 
             >>> res = column_to_string_operation(col, ['value1','value2'], method='contains', logical='or')
@@ -6424,8 +6422,8 @@ def column_string_operation(col, test, method='contains', logical='or'):
     Returns
     -------
     result : list
-        List of iterated results on the entries of `col`, e.g., list of `bool`
-        or `string`s.
+        List of iterated results on the entries of ``col``, e.g., list of 
+        ``bool`` or ``string``.
 
     """
     if isinstance(test, list):
@@ -6823,14 +6821,25 @@ def apply_flt_dq(filename, replace=('.fits', '.dq.fits.gz'), verbose=True, or_co
 def RGBtoHex(vals, rgbtype=1):
     """Converts RGB values in a variety of formats to Hex values.
 
-     @param  vals     An RGB/RGBA tuple
-     @param  rgbtype  Valid valus are:
+    Parameters
+    -----------
+    vals : tuple
+         An RGB/RGBA tuple
+
+    rgb_type : [1,256]
+        Valid valus are:
                           1 - Inputs are in the range 0 to 1
                         256 - Inputs are in the range 0 to 255
+ 
+    Returns
+    -------
+    hextstr : str
+        A hex string in the form '#RRGGBB' or '#RRGGBBAA'
 
-     @return A hex string in the form '#RRGGBB' or '#RRGGBBAA'
+    References
+    ----------
+    (credit: Rychard @ https://stackoverflow.com/a/48288173)
 
-     (Rychard @ https://stackoverflow.com/a/48288173)
     """
 
     msg = "RGB or RGBA inputs to RGBtoHex must have three or four elements!"
