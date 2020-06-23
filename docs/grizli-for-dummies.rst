@@ -282,7 +282,7 @@ following information in `python` [#]_ :
 
 --------------
 
-.. _dim-thumbs
+.. _dim-thumbs:
 
 **Creating thumbnails that are not the standard 80 x 80 pixels in** `full.fits`
 ===============================================================================
@@ -308,9 +308,9 @@ x 80 thumbnails in `full.fits`. What you will need is:
 		            stars=False, full_line_list=None,  continuum_list=None,
 		            fsps_templates=True)
 
-		>>> templ1 = grizli.utils.load_templates(fwhm=1200, line_complexes=False, stars=False,
-		                                 full_line_list=None, continuum_list=None,
-		                                 fsps_templates=True)
+		>>> templ1 = grizli.utils.load_templates(fwhm=1200, line_complexes=False, 
+			     stars=False, full_line_list=None, continuum_list=None,
+		             fsps_templates=True)
 
 -  **If you’re including photometry in your fit, do the following steps
    before the above**:
@@ -389,12 +389,20 @@ If you’re including photometry, then you must first do:
 
 Otherwise...
 
+--------------
+
 .. [#] The values shown for the parameters are just examples. They may not
   be relevant to your particular data.
 .. [#] The values shown for the parameters are just examples. They may not
   be relevant to your particular data.
 
 --------------
+
+< :ref:`Previous Chapter<dim-thumbs>` `|` :ref:`Table of Contents<fake-cont>` `|` :ref:`Next Chapter<reliable-thumbs>` >
+
+--------------
+
+.. _reliable-thumbs:
 
 **Creating reliable direct image thumbnails**
 =============================================
@@ -493,10 +501,12 @@ directory.
 
 For example, to make a single thumbnail for one of the objects in the
 `Grizli-Pipeline <https://github.com/gbrammer/grizli/blob/master/examples/Grizli-Pipeline.ipynb>`__
-demo, run:
+demo, run [#]_:
 
-.. code: python
-	auto_script.make_rgb_thumbnails(root=‘j033216m2743’, ids=[424], use_line_wcs=True) [#]_ 
+.. code:: python
+
+	auto_script.make_rgb_thumbnails(root=‘j033216m2743’, ids=[424], use_line_wcs=True) 
+ 
 
 However, the story does not end there.
 
@@ -651,8 +661,8 @@ Corresponding segmentation map thumbnails
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 As mentioned in the :ref:`above section <without-phot>`, setting
-`make_segmentation_figure = True`` when running the function
-``grizli.aws.aws_drizzler.drizzle_images` did not generate a
+`make_segmentation_figure = True` when running the function
+``grizli.aws.aws_drizzler.drizzle_images`` did not generate a
 segmentation map thumbnail for me. To generate my segmentation map
 thumbnails, I ran the function
 ``grizli.aws.aws_drizzler.segmentation_figure`` *after* I ran
@@ -704,7 +714,7 @@ Tips
 
 .. _create-groups-file:
 
-Creating your own ``_groups.npy`` file
+Creating your own `_groups.npy` file
 --------------------------------------
 
 If you are working on a well-studied field, like, I don’t know, maybe
@@ -717,7 +727,7 @@ of the
 notebook.). Did you just extract the data based on your Proposal ID? Did
 you use the overlap query and if you did, did you make sure you obtained
 ALL the possible relevant imaging for your objects of interest? **The
-instructions in**\ :ref:`this chapter <with-phot>`__\ **implicitly
+instructions in** :ref:`this chapter <with-phot>` **implicitly
 assume that if your** `_phot.fits` **file was generated with Grizli, it
 was generated using all the HST imaging available for that field in that
 filter.** This may not be the case, so I implore you, for what feels
@@ -810,6 +820,7 @@ the local directory, with an example at the end of how to call it:
 Obviously change the default field name otherwise you’re going to look
 like a right idiot.
 
+--------------
 
 .. [#] The `DWHT` and `LINEWHT` extensions are indeed inverse variance
   maps, where σ = 1 / √weight. σ can be used as a sigma image with
@@ -854,6 +865,12 @@ like a right idiot.
 
 --------------
 
+< :ref:`Previous Chapter<reliable-thumbs>` `|` :ref:`Table of Contents<fake-cont>` `|` :ref:`Next Chapter<emission-maps>` >
+
+--------------
+
+.. _emission-maps:
+
 Notes about emission line map thumbnails
 ========================================
 
@@ -866,9 +883,17 @@ Notes about emission line map thumbnails
    the `CONTAM` maps just show you where the contamination is. The
    contamination has already been removed [#]_ from the `LINE` extensions.
 
+--------------
+
 .. [#] If there is residual contamination left in the `LINE` extension, this means Grizli failed to remove it. You may have to apply your own contamination removal techniques or if possible, see if you can use the associated `CONTAM` map to mask the problematic regions.
 
 --------------
+
+< :ref:`Previous Chapter<emission-maps>` `|` :ref:`Table of Contents<fake-cont>` `|` :ref:`Next Chapter<output-catalog>` >
+
+--------------
+
+.. _output-catalog:
 
 The output Grizli catalogue [#]_ 
 ================================
@@ -881,11 +906,18 @@ Author: `Jasleen Matharu <https://github.com/jkmatharu>`__
 -  `ewhw_Ha` is the "half-width", so something like the 1σ uncertainty
    on `ew50_Ha`.
 
+
 Grizli does not fit for resolved lines in the grism spectra, so there is
 no parameter for the velocity line width. For all but broad-line AGN
 (approximately ≥ 1000 km s\ :sup:`-1`), the lines are unresolved [#]_ .
 
+--------------
+
 .. [#] Yes, I am British. The word 'catalogue' does not end at the 'g', obviously \*eye roll\*.  
 .. [#] All of the above, as said by the Grizli God himself, Gabe Brammer.
 
+--------------
 
+< :ref:`Previous Chapter<output-catalog>` `|` :ref:`Table of Contents<fake-cont>` `|`
+
+--------------
