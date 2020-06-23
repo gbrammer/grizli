@@ -284,7 +284,7 @@ following information in `python` [#]_ :
 
 .. _dim-thumbs
 
-**Creating thumbnails that are not the standard 80 x 80 pixels in `full.fits`**
+**Creating thumbnails that are not the standard 80 x 80 pixels in** `full.fits`
 ===============================================================================
 
 | Author: `Jasleen Matharu <https://github.com/jkmatharu>`__
