@@ -16,12 +16,7 @@
 
    3. Place your footnotes at the end of each chapter.
 
-   4. Again, because Markdown sucks at automatically sorting out your referencing,
-   Do not refer to your chapters by their numbered section. For example, rather
-   than writing: "Please refer to Chapter 6" or "Please refer to Section 6.3",
-   write "Please refer to this chapter" or "Please refer to this section" where
-   "this chapter" or "this section" are links to the chapter/section you are
-   referencing.
+   4. Put a navigation bar at the end of your chapter (see existing examples).
 
    If you follow the above steps, it will really make the editing process easier
    for me -- thank you!
@@ -32,13 +27,14 @@
 Grizli for dummies
 ==================
 
-**I was scared I’d forget these details, so I put them in a book**
+**I was scared I’d forget these details, so I put them in a book.**
 
 Author: `Jasleen Matharu <https://github.com/jkmatharu>`__
 
 **If you would like to contribute to Grizli for dummies, please read the
 commented section before the reStructuredText document begins to understand the
 layout Grizli for dummies follows.**
+
 
 Preface
 =======
@@ -82,7 +78,7 @@ real.
 .. _this-book:
 
 **How to get the most out of this book**
-====================================
+========================================
 
 This book follows a particular format to help you get the most out of
 the information presented. **Below the heading of each chapter, the name
@@ -114,7 +110,7 @@ and check whether perhaps an update or downgrade will solve your problem
 .. _installing-grizli:
 
 **Installing Grizli**
-=================
+=====================
 
 Author: `Jasleen Matharu <https://github.com/jkmatharu>`__
 
@@ -871,8 +867,8 @@ like a right idiot.
 
 .. _emission-maps:
 
-Notes about emission line map thumbnails
-========================================
+**Notes about emission line map thumbnails**
+============================================
 
 | Author: `Jasleen Matharu <https://github.com/jkmatharu>`__
 | Grizli version: `1.0-76-g71853af`
@@ -895,8 +891,8 @@ Notes about emission line map thumbnails
 
 .. _output-catalog:
 
-The output Grizli catalogue [#]_ 
-================================
+**The output Grizli catalogue** [#]_ 
+====================================
 
 Author: `Jasleen Matharu <https://github.com/jkmatharu>`__
 
