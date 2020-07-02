@@ -1919,7 +1919,23 @@ def get_filter_ee_ratio(tab, filter, ref_filter='f160w'):
     
     return tab
 
-
+def get_hst_aperture_correction(filter, raper=0.35, rmax=5.):
+    """
+    Get single aperture correction from tabulated EE curve
+    """
+    ee = utils.read_catalog((os.path.join(os.path.dirname(__file__),
+                             'data', 'hst_encircled_energy.fits')))
+    
+    obsmode = utils.get_filter_obsmode(filter=filter, acs_chip='wfc1', 
+                                       uvis_chip='uvis2', aper=np.inf, 
+                                       case=str.lower)
+    
+    
+    ee_rad = np.append(ee['radius'], rmax)
+    ee_y = np.append(ee[obsmode], 1.)
+    ee_interp = np.interp(raper, ee_rad, ee_y, left=0.01, right=1.)
+    return ee.meta['ZP_'+obsmode], ee_interp
+    
 def get_kron_tot_corr(tab, filter, inst=None, pixel_scale=0.06, photplam=None, rmax=5.0):
     """
     Compute total correction from tabulated EE curves
@@ -5008,6 +5024,164 @@ def find_single_image_CRs(visit, simple_mask=False, with_ctx_mask=True,
                 #sci[crmask & ctx_mask] = 0
 
         flt.flush()
+
+def clean_amplifier_residuals(files, extensions=[1,2], minpix=5e5, max_percentile=99, seg_hdu=None, skip=10, polynomial_degree=3, verbose=True, imsh_kwargs={'vmin':-1.e-3, 'vmax':1.e-3, 'cmap':'magma'}):
+    """
+    Fit and remove a 2D polynomial fit to the detector-frame UVIS/WFC images
+    
+    Parameters
+    ----------
+    files : list
+        List of FLC files
+
+    extensions : list
+        List of extensions to consider (ACS and UVIS have two).  Extensions
+        will be addressed as ``im['SCI',ext]``.
+
+    minpix : int
+        Minimum number of unmasked pixels required to perform the fit
+
+    seg_hdu : `~astropy.fits.ImageHDU`
+        Optional HDU defining a mask for the individual exposures.  Will 
+        be blotted to the FLC frame and valid pixels are taken to be where
+        seg_hdu.data == 0 (e.g., a segmentation image).
+
+    skip : int
+        Pass every ``skip`` (unmasked) pixel to the polynomial fit.
+
+    polynomial_degree : int
+        Order of the `~astropy.models.Polynomial2D` model to use.
+
+    verbose : bool
+        Print status information
+
+    imsh_kwargs : dict
+        Args to pass to `~matplotlib.pyplot.imshow` for the figure
+
+    """
+    from astropy.modeling.fitting import LinearLSQFitter
+    from astropy.modeling.models import Polynomial2D
+    from matplotlib.ticker import MultipleLocator
+    
+    if len(files) == 0:
+        print('No files specified')
+        return False
+        
+    if files[0].startswith('j'):
+        # ACS WFC
+        sh = (2048, 4096)
+    else:
+        sh = (2051, 4096)
+
+    yp, xp = np.indices(sh, dtype=np.float32)
+    yp /= sh[0]+1
+    xp /= sh[1]+1
+
+    num = np.zeros(sh, dtype=np.float32)
+    den = np.zeros(sh, dtype=np.float32)
+
+    if seg_hdu is not None:
+        seg_wcs = pywcs.WCS(seg_hdu.header)
+
+    ims = [pyfits.open(file, mode='update') for file in files]
+
+    n_ext = len(extensions)
+    fig, axes = plt.subplots(nrows=n_ext, ncols=1, figsize=(4, 2*n_ext), 
+                             sharex=True)
+
+    for ext in extensions:
+        for im in ims:
+            wht = 1/im['ERR',ext].data**2*(im['DQ',ext].data == 0)
+            valid = np.isfinite(wht) & np.isfinite(im['SCI',ext].data)
+
+            if verbose:
+                print(f'   Process {im.filename()}[{ext}]')
+
+            if seg_hdu is not None:
+                flc_wcs = pywcs.WCS(im['SCI',ext].header, fobj=im)
+                _blt = utils.blot_nearest_exact(seg_hdu.data, seg_wcs, 
+                                                flc_wcs, verbose=False, 
+                                                stepsize=-1, 
+                                                scale_by_pixel_area=False, 
+                                                wcs_mask=True, fill_value=0)
+
+                valid &= (_blt == 0)
+
+            wht[~valid] = 0
+            if 'MDRIZSKY' in im['SCI',ext].header:
+                bkg = im['SCI',ext].header['MDRIZSKY']
+            else:
+                bkg = np.median(im['SCI', ext].data[valid])
+
+            _sci = (im['SCI',ext].data - bkg)/im[0].header['EXPTIME']
+            num += _sci*wht
+            den += wht
+
+        avg = num/den
+        avg[den == 0] = 0
+
+        # Amps in detector middle
+        poly = Polynomial2D(polynomial_degree)
+        fitter = LinearLSQFitter()
+
+        quad_model = np.zeros(sh, dtype=np.float32)
+
+        _h = pyfits.Header()
+        _h['QORDER'] = polynomial_degree, 'Quad polynomial degree'
+
+        for q in [1,2]:
+            quad = (xp >= (q-1)/2.) & (xp < q/2.) 
+            clip = quad & (den > 0)
+            limit = np.percentile(avg[clip], max_percentile)
+            clip &= avg < limit
+            
+            if clip.sum() < minpix:
+                print('Warning: not enough pixels found for ext:{ext} q:{q}')
+                continue
+                
+            _fit = fitter(poly, xp[clip][::skip], yp[clip][::skip], 
+                          avg[clip][::skip]) 
+
+            quad_model[quad] = _fit(xp[quad], yp[quad])
+            for name, val in zip(_fit.param_names, _fit.parameters):
+                _h[f'Q{q}_{name}'] = (val, 'Quad polynomial component')
+
+        axes[::-1][ext-1].imshow(quad_model, **imsh_kwargs)
+        axes[::-1][ext-1].text(0.05, 0.95, f'Ext {ext}', ha='left', va='top', 
+                               color='w', fontsize=10, 
+                               transform=axes[::-1][ext-1].transAxes)
+
+        axes[::-1][ext-1].text(0.05, 0.05, f'Q1', ha='left', va='bottom', 
+                               color='w', fontsize=8, 
+                               transform=axes[::-1][ext-1].transAxes)
+
+        axes[::-1][ext-1].text(0.55, 0.05, f'Q2', ha='left', va='bottom', 
+                               color='w', fontsize=8, 
+                               transform=axes[::-1][ext-1].transAxes)
+
+        for im in ims:
+            expt = im[0].header['EXPTIME']
+            im['SCI',ext].data -= quad_model*expt
+            
+            for key, comment in zip(_h.keys(), _h.comments):
+                if key in im['SCI', ext].header:
+                    # Already exists, add polynomial component
+                    im['SCI',ext].header[key] += _h[key]
+                else:
+                    im['SCI',ext].header[key] = (_h[key], comment)
+
+    for ax in axes:
+        ax.xaxis.set_major_locator(MultipleLocator(1024))
+        ax.xaxis.set_minor_locator(MultipleLocator(256))
+        ax.yaxis.set_major_locator(MultipleLocator(1024))
+        ax.yaxis.set_minor_locator(MultipleLocator(256))
+
+    fig.tight_layout(pad=0.5)
+
+    for im in ims:
+        im.flush()
+
+    return fig
 
 
 def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, max_files=999, pixfrac=0.8, scale=0.06, skysub=True, skymethod='localmin', skyuser='MDRIZSKY', bits=None, build=False, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='EXP', final_wt_scl='exptime', final_kernel='square', context=False, static=True, use_group_footprint=False, fetch_flats=True, fix_wcs_system=False, include_saturated=False, run_driz_cr=False, driz_cr_snr=None, driz_cr_scale=None, resetbits=0, log=False, **kwargs):
