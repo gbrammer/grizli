@@ -6159,6 +6159,7 @@ td {font-size: 10pt;}
         ic_list = []
 
         filter_lines = ["<table>\n"]
+        descr_pad = ' <span style="display:inline-block; width:10;"></span> '
 
         for ic, col in enumerate(self.colnames):
             if col in filter_columns:
@@ -6173,15 +6174,37 @@ td {font-size: 10pt;}
                     ic_list.append(ic)
                     #lines[i] = lines[i].replace(col, '{0} <br> <input type="text" id="{0}_min" name="{0}_min" style="width:30px;"> <input type="text" id="{0}_max" name="{0}_max" style="width:30px;">'.format(col))
 
-                    filter_lines += '<tr> <td> <input type="text" id="{0}_min" name="{0}_min" style="width:40px;"> &#60; </td> <td> {0} </td> <td>  &#60; <input type="text" id="{0}_max" name="{0}_max" style="width:40px;">\n'.format(col)
-
+                    filter_lines += '<tr> <td> <input type="text" id="{0}_min" name="{0}_min" style="width:40px;"> &#60; </td> <td> {0} </td> <td>  &#60; <input type="text" id="{0}_max" name="{0}_max" style="width:40px;">'.format(col)
+                    
+                    descr = '\n'
+                    if hasattr(self.columns[col], 'description'):
+                        if self.columns[col].description is not None:
+                            descr = '{0} {1}\n'.format(descr_pad, 
+                                            self.columns[col].description)
+                                                        
+                    filter_lines += descr
+                    
         if ic_list:
             # Insert input lines
 
             for il, line in enumerate(lines):
                 if '} );  </script>' in line:
                     break
-
+            
+            filter_row = '<tr> <td> <input type="text" id="{0}_min" name="{0}_min" style="width:40px;"> &#60; </td> <td style="align:center;"> <tt>{0}</tt> </td> <td>  &#60; <input type="text" id="{0}_max" name="{0}_max" style="width:40px;">'
+            
+            filter_rows = []
+            for ic in ic_list:
+                col = self.colnames[ic]
+                row_i = filter_row.format(col)
+                descr = '\n'
+                if hasattr(self.columns[col], 'description'):
+                    if self.columns[col].description is not None:
+                        descr = '{0} {1}\n'.format(descr_pad, 
+                                        self.columns[col].description)
+                                                    
+                filter_rows.append(row_i + descr)
+                
             filter_input = """
 
 <div style="border:1px solid black; padding:10px; margin:10px">
@@ -6191,7 +6214,7 @@ td {font-size: 10pt;}
     </table>
 </div>
 
-""".format('\n'.join(['<tr> <td> <input type="text" id="{0}_min" name="{0}_min" style="width:40px;"> &#60; </td> <td style="align:center;"> <tt>{0}</tt> </td> <td>  &#60; <input type="text" id="{0}_max" name="{0}_max" style="width:40px;">\n'.format(self.colnames[ic]) for ic in ic_list]))
+""".format('\n'.join(filter_rows))
 
             lines.insert(il+1, filter_input)
 
