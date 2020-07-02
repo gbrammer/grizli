@@ -472,7 +472,7 @@ def segmentation_figure(label, cat, segfile):
     th.close()
 
 
-def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixscale=0.1, size=10, wcs=None, pixfrac=0.33, kernel='square', theta=0, half_optical_pixscale=True, filters=['f160w', 'f140w', 'f125w', 'f105w', 'f110w', 'f098m', 'f850lp', 'f814w', 'f775w', 'f606w', 'f475w', 'f555w', 'f600lp', 'f390w', 'f350lp'], skip=None, remove=True, rgb_params=RGB_PARAMS, master='grizli-jan2019', aws_bucket='s3://grizli/CutoutProducts/', scale_ab=21, thumb_height=2.0, sync_fits=True, subtract_median=True, include_saturated=True, include_ir_psf=False, show_filters=['visb', 'visr', 'y', 'j', 'h'], combine_similar_filters=True, single_output=True, aws_prep_dir=None, make_segmentation_figure=False, get_dict=False, dryrun=False, **kwargs):
+def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixscale=0.1, size=10, wcs=None, pixfrac=0.33, kernel='square', theta=0, half_optical_pixscale=True, filters=['f160w', 'f140w', 'f125w', 'f105w', 'f110w', 'f098m', 'f850lp', 'f814w', 'f775w', 'f606w', 'f475w', 'f555w', 'f600lp', 'f390w', 'f350lp'], skip=None, remove=True, rgb_params=RGB_PARAMS, master='grizli-jan2019', aws_bucket='s3://grizli/CutoutProducts/', scale_ab=21, thumb_height=2.0, sync_fits=True, subtract_median=True, include_saturated=True, include_ir_psf=False, show_filters=['visb', 'visr', 'y', 'j', 'h'], combine_similar_filters=True, single_output=True, aws_prep_dir=None, make_segmentation_figure=False, get_dict=False, dryrun=False, thumbnail_ext='png', **kwargs):
     """
     label='cp561356'; ra=150.208875; dec=1.850241667; size=40; filters=['f160w','f814w', 'f140w','f125w','f105w','f606w','f475w']
 
@@ -789,7 +789,7 @@ def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixsca
 
     if rgb_params:
         #auto_script.field_rgb(root=label, HOME_PATH=None, filters=has_filts, **rgb_params)
-        show_all_thumbnails(label=label, thumb_height=thumb_height, scale_ab=scale_ab, close=True, rgb_params=rgb_params, filters=show_filters)
+        show_all_thumbnails(label=label, thumb_height=thumb_height, scale_ab=scale_ab, close=True, rgb_params=rgb_params, filters=show_filters, ext=thumbnail_ext)
 
     if (single_output != 0):
         # Concatenate into a single FITS file
