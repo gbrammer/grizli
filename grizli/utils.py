@@ -85,6 +85,7 @@ GRISM_LIMITS = {'G800L': [0.545, 1.02, 40.],  # ACS/WFC
 # Line species for determining individual line fluxes.  See `load_templates`.
 DEFAULT_LINE_LIST = ['PaB', 'HeI-1083', 'SIII', 'OII-7325', 'ArIII-7138', 'SII', 'Ha', 'OI-6302', 'HeI-5877', 'OIII', 'Hb', 'OIII-4363', 'Hg', 'Hd', 'H7', 'H8', 'H9', 'H10', 'NeIII-3867', 'OII', 'NeVI-3426', 'NeV-3346', 'MgII', 'CIV-1549', 'CIII-1906', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'NIII-1750', 'NIV-1487', 'NV-1240', 'Lya']
 
+LSTSQ_RCOND = None
 
 def set_warnings(numpy_level='ignore', astropy_level='ignore'):
     """
@@ -5500,7 +5501,9 @@ class EffectivePSF(object):
         A = (np.array([psf_offset, np.ones_like(sci), ddx, ddy])*np.sqrt(ivar)).reshape((4, -1))
         scif = (sci*np.sqrt(ivar)).flatten()
         mask = (scif != 0)
-        coeffs, _resid, _rank, _s = lstsq(A[:, mask].T, scif[mask], rcond=-1)
+        coeffs, _resid, _rank, _s = lstsq(A[:, mask].T, scif[mask], 
+                                          rcond=LSTSQ_RCOND)
+                                          
         resid = (scif - np.dot(coeffs, A))
 
         if ds9:

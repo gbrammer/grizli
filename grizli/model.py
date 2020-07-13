@@ -5011,7 +5011,8 @@ class BeamCutout(object):
 
             A[:, -1] = self.model.flatten()
             if fitter == 'lstsq':
-                out = numpy.linalg.lstsq(A[ok_data, :], scif[ok_data])
+                out = np.linalg.lstsq(A[ok_data, :], scif[ok_data], 
+                                      rcond=utils.LSTSQ_RCOND)
                 lstsq_coeff, residuals, rank, s = out
                 coeffs[i, :] += lstsq_coeff
                 model = np.dot(A, lstsq_coeff)

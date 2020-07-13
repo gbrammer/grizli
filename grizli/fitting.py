@@ -1747,7 +1747,7 @@ class GroupFitter(object):
             coeffs_i, rnorm = scipy.optimize.nnls(AxT, data)
         elif fitter.split()[0] == 'lstsq':
             coeffs_i, residuals, rank, s = np.linalg.lstsq(AxT, data,
-                                                           rcond=None)
+                                                    rcond=utils.LSTSQ_RCOND)
         else:
             # Bounded Least Squares
             func = scipy.optimize.lsq_linear

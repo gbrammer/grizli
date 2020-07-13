@@ -239,7 +239,7 @@ class DrizzlePSF(object):
         _Ax = _A*np.sqrt(wht.flatten())
         _y = (sci*np.sqrt(wht)).flatten()
 
-        _res = np.linalg.lstsq(_Ax.T, _y, rcond=-1)
+        _res = np.linalg.lstsq(_Ax.T, _y, rcond=utils.LSTSQ_RCOND)
 
         model = _A.T.dot(_res[0]).reshape(sci.shape)
         chi2 = ((sci-model)**2*wht).sum()
