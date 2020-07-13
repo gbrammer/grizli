@@ -2105,7 +2105,7 @@ class MultiBeam(GroupFitter):
                 y *= np.sqrt(self.ivarf[self.fit_mask])
 
                 try:
-                    out = np.linalg.lstsq(Ax, y, rcond=None)
+                    out = np.linalg.lstsq(Ax, y, rcond=utils.LSTSQ_RCOND)
                 except:
                     print(A.min(), Ax.min(), self.fit_mask.sum(), y.min())
                     raise ValueError
@@ -3614,7 +3614,7 @@ class MultiBeam(GroupFitter):
         out_coeffs = np.zeros(A.shape[0])
 
         y = self.scif
-        out = np.linalg.lstsq(A.T, y, rcond=None)
+        out = np.linalg.lstsq(A.T, y, rcond=utils.LSTSQ_RCOND)
         lstsq_coeff, residuals, rank, s = out
         coeffs = lstsq_coeff
 

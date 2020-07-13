@@ -4530,7 +4530,8 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
         logstr = logstr.format(grism['product'], iter+1, obj_mask.sum()/Npix/Nimg*100, coeffs)
         utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
 
-        out = np.linalg.lstsq(A[mask & obj_mask, :], data[mask & obj_mask])
+        out = np.linalg.lstsq(A[mask & obj_mask, :], data[mask & obj_mask], 
+                              rcond=utils.LSTSQ_RCOND)
         coeffs = out[0]
 
         # Test for convergence
@@ -4658,7 +4659,8 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
                                            clip=0.0001)[1*NXSPL:-1*NXSPL, :]
 
             Ax = (Aspl.T/yrms).T
-            cspl, _, _, _ = np.linalg.lstsq(Ax, (yres+bg_sky)/yrms, rcond=-1)
+            cspl, _, _, _ = np.linalg.lstsq(Ax, (yres+bg_sky)/yrms, 
+                                            rcond=utils.LSTSQ_RCOND)
             y_pred = Aspl.dot(cspl)
 
             try:
