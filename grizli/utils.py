@@ -6762,9 +6762,9 @@ def dump_flt_dq(filename, replace=('.fits', '.dq.fits.gz'), verbose=True):
     for i in [1, 2, 3, 4]:
         if ('SCI', i) in im:
             header = im['SCI', i].header
-            dq = im['DQ', i].data.flatten()
-            nz = np.where(dq > 0)[0]
-            dq_data = np.array([nz, dq[nz]])
+            dq = im['DQ', i].data
+            nz = np.where(dq > 0)
+            dq_data = np.array([nz[0], nz[1], dq[dq > 0]], dtype=np.int16)
             hdu = pyfits.ImageHDU(header=header, data=dq_data)
             hdus.append(hdu)
 
@@ -6816,9 +6816,15 @@ def apply_flt_dq(filename, replace=('.fits', '.dq.fits.gz'), verbose=True, or_co
     dq = pyfits.open(output_filename)
     for ext in [1, 2, 3, 4]:
         if (('SCI', ext) in im) & (('SCI', ext) in dq):
-            nz, dq_i = dq['SCI', ext].data
-            i, j = np.unravel_index(nz, im['SCI', ext].data.shape)
-
+            sh = dq['SCI', ext].data.shape
+            if sh[0] == 3:
+                i, j, dq_i = dq['SCI', ext].data
+            elif sh[1] == 2:
+                nz, dq_i = dq['SCI', ext].data
+                i, j = np.unravel_index(nz, sh)
+            else:
+                raise IOError('dq[{0}] shape {1} not recognized'.format(ext, sh))
+                
             # Apply DQ
             if or_combine:
                 im['DQ', ext].data[i, j] != dq_i
@@ -6829,10 +6835,7 @@ def apply_flt_dq(filename, replace=('.fits', '.dq.fits.gz'), verbose=True, or_co
             # Copy header
             has_blotsky = 'BLOTSKY' in im['SCI', ext].header
             for k in dq['SCI', ext].header:
-                # test = dq['SCI',ext].header[k] == im['SCI',ext].header[k]
-                # if not test:
-                #     print(k, dq['SCI',ext].header[k], im['SCI',ext].header[k])
-                if k in ['BITPIX', 'NAXIS1', 'NAXIS2']:
+                if k in ['BITPIX', 'NAXIS1', 'NAXIS2', '', 'HISTORY']:
                     continue
 
                 im['SCI', ext].header[k] = dq['SCI', ext].header[k]
