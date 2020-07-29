@@ -2324,7 +2324,10 @@ def update_all_exposure_log():
     import glob
     import numpy as np
     from grizli.aws import db
-
+    
+    from importlib import reload
+    reload(db)
+    
     config = db.get_connection_info(config_file='/home/ec2-user/db_readonly.yml')
     engine = db.get_db_engine(config=config)
     
@@ -2403,22 +2406,7 @@ def update_exposure_log(event, context):
 
     awsfile = '/'.join(_q['awspath'][0].split('/')[1:])
     awsfile += '/'+local_file
-    
-    _files = [_obj.key for _obj in bkt.objects.filter(Prefix=awsfile)]
-    
-    if ('Exposures' in awsfile) & (len(_files) == 0):
-        bucket = 'grizli-v1'
-        bkt = s3.Bucket(bucket)
-        awsfile = 'Pipeline/{0}/Prep/'.format(_q['parent'][0])
-        awsfile += local_file
-        _files = [_obj.key for _obj in bkt.objects.filter(Prefix=awsfile)]
-        if len(_files) > 0:
-            kwvals['awspath'] = f'{bucket}/{os.path.dirname(awsfile)}'
-            
-    if len(_files) == 0:
-        print(f'File not found: s3://{bucket}/{awsfile}')
-        return False
-        
+                        
     print(f'{bucket}:{awsfile} > {local_file}')
 
     if not os.path.exists(local_file):
@@ -2427,17 +2415,35 @@ def update_exposure_log(event, context):
                       ExtraArgs={"RequestPayer": "requester"})
         except:
             print(f'Failed to download s3://{bucket}/{awsfile}')
-            return False
+            
+            # Try other bucket path
+            if 'Exposures' in awsfile:
+                bucket = 'grizli-v1'
+                bkt = s3.Bucket(bucket)
+                awsfile = 'Pipeline/{0}/Prep/'.format(_q['parent'][0])
+                awsfile += local_file
+
+                try:
+                    bkt.download_file(awsfile, local_file, 
+                              ExtraArgs={"RequestPayer": "requester"})
+                except:
+                    print(f'Failed to download s3://{bucket}/{awsfile}')
+                    return False
+
+                kwvals['awspath'] = f'{bucket}/{os.path.dirname(awsfile)}'
+
+            else:
+                return False
 
     ######### Update exposure_log table
     im = pyfits.open(local_file)
     kwvals['ndq'] = (im['DQ',1].data == 0).sum()
-    
+
     if 'MDRIZSKY' in im['SCI',1].header:
         kwvals['mdrizsky'] = im['SCI',1].header['MDRIZSKY']
     else:
         kwvals['mdrizsky'] = 0
-        
+
     for k in keywords:
         if (k in im[0].header) & (k.lower() in _q.colnames):
             kwvals[k.lower()] = im[0].header[k]
