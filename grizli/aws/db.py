@@ -2317,7 +2317,20 @@ def get_exposure_info():
             print('>>> to DB >>> ({0}, {1})'.format(i, len(df0)))
             df0.to_sql('exposure_log', engine, index=False, if_exists='append', method='multi')
 
+def update_all_exposure_log():
+    """
+    Run all
+    """
+    import numpy as np
+    from grizli.aws import db
 
+    config = db.get_connection_info(config_file='/home/ec2-user/db_readonly.yml')
+    engine = db.get_db_engine(config=config)
+    _files = db.from_sql("SELECT file from exposure_log WHERE mdrizsky is null AND file like 'icxe%%' LIMIT 10", engine)
+    idx = np.argsort(np.random.normal(size=len(_files)))
+    for file in _files['file'][idx]:
+        db.update_exposure_log({'file':file, 'engine':engine}, {})
+        
 def update_exposure_log(event, context):
     """
     Get exposure info from FITS file and put in database
@@ -2433,7 +2446,9 @@ def update_exposure_log(event, context):
     if remove:
         print('Remove '+local_file)
         os.remove(local_file)
-    
+        if dump_dq:
+            os.remove(local_file.replace(*repl))
+            
     return kwvals
     
 def get_exposures_at_position(ra, dec, engine, dr=10):
