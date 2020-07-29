@@ -2327,6 +2327,9 @@ def update_all_exposure_log():
     config = db.get_connection_info(config_file='/home/ec2-user/db_readonly.yml')
     engine = db.get_db_engine(config=config)
     _files = db.from_sql("SELECT file from exposure_log WHERE mdrizsky is null AND file like 'icxe%%' LIMIT 10", engine)
+
+    _files = db.from_sql("SELECT file from exposure_log WHERE mdrizsky is null AND file like 'icxe%%' LIMIT 10", engine)
+
     idx = np.argsort(np.random.normal(size=len(_files)))
     for file in _files['file'][idx]:
         db.update_exposure_log({'file':file, 'engine':engine}, {})
@@ -2424,10 +2427,11 @@ def update_exposure_log(event, context):
     im.close()
 
     ######### Compact DQ file
-    dump_dq = True
     if 'dump_dq' in event:
         dump_dq = event['dump_dq']
-
+    else:
+        dump_dq = True
+        
     if dump_dq:
         utils.dump_flt_dq(local_file)
         repl = ('.fits', '.dq.fits.gz')
@@ -2443,14 +2447,17 @@ def update_exposure_log(event, context):
     remove = True
     if 'remove' in event:
         remove = event['remove']    
+
     if remove:
         print('Remove '+local_file)
         os.remove(local_file)
         if dump_dq:
+            print('Remove '+local_file.replace(*repl))
             os.remove(local_file.replace(*repl))
-            
+
     return kwvals
-    
+
+
 def get_exposures_at_position(ra, dec, engine, dr=10):
 
     cosdec = np.cos(dec/180*np.pi)
