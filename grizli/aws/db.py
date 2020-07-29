@@ -2276,7 +2276,14 @@ def get_exposure_info():
     df.to_sql('exposure_log', engine, index=False, if_exists='append', method='multi')
     engine.execute('alter table exposure_log add column footprint float [];')
     engine.execute('delete from exposure_log where True;')
-
+    
+    engine.execute('ALTER TABLE exposure_log ADD COLUMN mdrizsky float;')
+    engine.execute('ALTER TABLE exposure_log ADD COLUMN exptime float;')
+    engine.execute('ALTER TABLE exposure_log ADD COLUMN expstart float;')
+    engine.execute('ALTER TABLE exposure_log ADD COLUMN ndq int;')
+    engine.execute('ALTER TABLE exposure_log ADD COLUMN expflag VARCHAR;')
+    engine.execute('ALTER TABLE exposure_log ADD COLUMN sunangle float;')
+    
     SKIP = 1000
     for i, v in enumerate(all_visits):
         print(i, v['parent'], v['product'])
@@ -2311,6 +2318,124 @@ def get_exposure_info():
             df0.to_sql('exposure_log', engine, index=False, if_exists='append', method='multi')
 
 
+def update_exposure_log(event, context):
+    """
+    Get exposure info from FITS file and put in database
+    
+    Recognized `event` keywords (default):
+        
+        'file' : file rootname in exposure_log, *required*
+        'keywords' : list of keywords to take from the Primary header
+                     (['EXPFLAG','EXPTIME','EXPSTART','SUNANGLE'])
+        'dump_dq' : generate a compact DQ file and upload to S3 (True)
+        'remove': Remove the downloaded exposure file (True)
+        'skip': Don't do anything if 'mdrizsky' populated in database
+        
+    """
+    import os
+    import boto3
+    import astropy.io.fits as pyfits
+    from grizli import utils
+    
+    if 'file' not in event:
+        print("'file' keyword not found in `event`")
+        return False
+
+    if 'keywords' in event:
+        keywords = event['keywords']
+    else:
+        keywords = ['EXPFLAG','EXPTIME','EXPSTART','SUNANGLE']
+
+    if 'engine' in event:
+        engine = event['engine']
+    else:
+        engine = get_db_engine(echo=False)
+
+    _q = from_sql("SELECT * from exposure_log where file LIKE '{0}'".format(event['file']), engine)
+    if len(_q) == 0:
+        print('File {0} not found in `exposure_log`'.format(event['file']))
+        return False
+
+    if 'skip' in event:
+        skip = event['skip']
+    else:
+        skip = True
+
+    if (not hasattr(_q['mdrizsky'], 'mask')) & skip:
+        print('Info for {0} found in `exposure_log`'.format(event['file']))
+        return True
+
+    s3 = boto3.resource('s3')
+    bucket = _q['awspath'][0].split('/')[0]
+    awsfile = '/'.join(_q['awspath'][0].split('/')[1:])
+
+    local_file = '{0}_{1}.fits'.format(_q['file'][0], _q['extension'][0])
+    awsfile += '/'+local_file
+
+    print(f'{bucket}:{awsfile} > {local_file}')
+
+    bkt = s3.Bucket(bucket)
+    if not os.path.exists(local_file):
+        try:
+            bkt.download_file(awsfile, local_file, 
+                      ExtraArgs={"RequestPayer": "requester"})
+        except:
+            print(f'Failed to download s3://{bucket}:{awsfile}')
+            return False
+
+    ######### Update exposure_log table
+    im = pyfits.open(local_file)
+    kwvals = {'ndq': (im['DQ',1].data == 0).sum()}
+    if 'MDRIZSKY' in im['SCI',1].header:
+        kwvals['mdrizsky'] = im['SCI',1].header['MDRIZSKY']
+    else:
+        kwvals['mdrizsky'] = 0
+        
+    for k in keywords:
+        if (k in im[0].header) & (k.lower() in _q.colnames):
+            kwvals[k.lower()] = im[0].header[k]
+
+    set_keys = []
+    for k in kwvals:
+        if isinstance(kwvals[k], str):
+            _set = 'x = \'{x}\''
+        else:
+            _set = 'x = {x}'
+        set_keys.append(_set.replace('x', k))
+        
+    sqlstr = ('UPDATE exposure_log SET ' + ', '.join(set_keys) + 
+              " WHERE file LIKE '{0}'".format(event['file']))
+
+    print(sqlstr.format(**kwvals))
+    engine.execute(sqlstr.format(**kwvals))
+    im.close()
+
+    ######### Compact DQ file
+    dump_dq = True
+    if 'dump_dq' in event:
+        dump_dq = event['dump_dq']
+
+    if dump_dq:
+        utils.dump_flt_dq(local_file)
+        repl = ('.fits', '.dq.fits.gz')
+        print(f'{local_file} > {bucket}:{awsfile}'.replace(*repl))
+
+        try:
+            bkt.upload_file(local_file.replace(*repl), 
+                            awsfile.replace(*repl), 
+                            ExtraArgs={'ACL':'public-read'})
+        except:
+            print(f'Failed to upload s3://{bucket}:{awsfile}'.replace(*repl))
+
+    remove = True
+    if 'remove' in event:
+        remove = event['remove']    
+    if remove:
+        print('Remove '+local_file)
+        os.remove(local_file)
+    
+    return kwvals
+    
 def get_exposures_at_position(ra, dec, engine, dr=10):
 
     cosdec = np.cos(dec/180*np.pi)
@@ -2391,7 +2516,7 @@ def add_irac_table():
     for k in bkey:
         first.pop('fp_'+k)
 
-    engine.execute('drop table exposure_log;')
+    engine.execute('drop table spitzer_log;')
     first.to_sql('spitzer_log', engine, index=False, if_exists='append', method='multi')
     for k in bkey:
         cmd = 'alter table spitzer_log add column fp_{0} float [];'.format(k)
