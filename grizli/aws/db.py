@@ -2321,18 +2321,29 @@ def update_all_exposure_log():
     """
     Run all
     """
+    import glob
     import numpy as np
     from grizli.aws import db
 
     config = db.get_connection_info(config_file='/home/ec2-user/db_readonly.yml')
     engine = db.get_db_engine(config=config)
-    _files = db.from_sql("SELECT file from exposure_log WHERE mdrizsky is null AND file like 'icxe%%' LIMIT 10", engine)
+    
+    # DASH
+    #_files = db.from_sql("SELECT file from exposure_log WHERE mdrizsky is null AND file like 'icxe%%'", engine)
+    
+    # COSMOS F160W
+    _files = db.from_sql("SELECT file, filter, awspath from exposure_log WHERE mdrizsky is null AND awspath like 'grizli-cosmos%%' AND filter like 'f160w'", engine)
+    _files = db.from_sql("SELECT file, filter from exposure_log WHERE mdrizsky is null AND filter like 'f1%%'", engine)
 
-    _files = db.from_sql("SELECT file from exposure_log WHERE mdrizsky is null AND file like 'icxe%%' LIMIT 10", engine)
-
-    idx = np.argsort(np.random.normal(size=len(_files)))
-    for file in _files['file'][idx]:
-        db.update_exposure_log({'file':file, 'engine':engine}, {})
+    #_files = db.from_sql("SELECT file, filter from exposure_log WHERE mdrizsky is null AND awspath like 'grizli-cosmos%%' AND filter like 'f814w' LIMIT 10", engine)
+    
+    N = len(_files)
+    idx = np.argsort(np.random.normal(size=N))
+    for i, file in enumerate(_files['file'][idx]):
+        print(f'\n {i+1} / {N}\n')
+        _ = glob.glob(f'{file}*')
+        if len(_) == 0:
+            db.update_exposure_log({'file':file, 'engine':engine}, {})
         
 def update_exposure_log(event, context):
     """
@@ -2361,7 +2372,9 @@ def update_exposure_log(event, context):
         keywords = event['keywords']
     else:
         keywords = ['EXPFLAG','EXPTIME','EXPSTART','SUNANGLE']
-
+    
+    kwvals = {}
+    
     if 'engine' in event:
         engine = event['engine']
     else:
@@ -2380,28 +2393,46 @@ def update_exposure_log(event, context):
     if (not hasattr(_q['mdrizsky'], 'mask')) & skip:
         print('Info for {0} found in `exposure_log`'.format(event['file']))
         return True
-
-    s3 = boto3.resource('s3')
-    bucket = _q['awspath'][0].split('/')[0]
-    awsfile = '/'.join(_q['awspath'][0].split('/')[1:])
-
+    #
     local_file = '{0}_{1}.fits'.format(_q['file'][0], _q['extension'][0])
-    awsfile += '/'+local_file
+    
+    s3 = boto3.resource('s3')
 
+    bucket = _q['awspath'][0].split('/')[0]
+    bkt = s3.Bucket(bucket)
+
+    awsfile = '/'.join(_q['awspath'][0].split('/')[1:])
+    awsfile += '/'+local_file
+    
+    _files = [_obj.key for _obj in bkt.objects.filter(Prefix=awsfile)]
+    
+    if ('Exposures' in awsfile) & (len(_files) == 0):
+        bucket = 'grizli-v1'
+        bkt = s3.Bucket(bucket)
+        awsfile = 'Pipeline/{0}/Prep/'.format(_q['parent'][0])
+        awsfile += local_file
+        _files = [_obj.key for _obj in bkt.objects.filter(Prefix=awsfile)]
+        if len(_files) > 0:
+            kwvals['awspath'] = f'{bucket}/{os.path.dirname(awsfile)}'
+            
+    if len(_files) == 0:
+        print(f'File not found: s3://{bucket}/{awsfile}')
+        return False
+        
     print(f'{bucket}:{awsfile} > {local_file}')
 
-    bkt = s3.Bucket(bucket)
     if not os.path.exists(local_file):
         try:
             bkt.download_file(awsfile, local_file, 
                       ExtraArgs={"RequestPayer": "requester"})
         except:
-            print(f'Failed to download s3://{bucket}:{awsfile}')
+            print(f'Failed to download s3://{bucket}/{awsfile}')
             return False
 
     ######### Update exposure_log table
     im = pyfits.open(local_file)
-    kwvals = {'ndq': (im['DQ',1].data == 0).sum()}
+    kwvals['ndq'] = (im['DQ',1].data == 0).sum()
+    
     if 'MDRIZSKY' in im['SCI',1].header:
         kwvals['mdrizsky'] = im['SCI',1].header['MDRIZSKY']
     else:
