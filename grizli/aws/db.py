@@ -2283,6 +2283,12 @@ def get_exposure_info():
     engine.execute('ALTER TABLE exposure_log ADD COLUMN ndq int;')
     engine.execute('ALTER TABLE exposure_log ADD COLUMN expflag VARCHAR;')
     engine.execute('ALTER TABLE exposure_log ADD COLUMN sunangle float;')
+
+    engine.execute('ALTER TABLE exposure_log ADD COLUMN gsky101 real;')
+    engine.execute('ALTER TABLE exposure_log ADD COLUMN gsky102 real;')
+    engine.execute('ALTER TABLE exposure_log ADD COLUMN gsky103 real;')
+    engine.execute('ALTER TABLE exposure_log ADD COLUMN persnpix integer;')
+    engine.execute('ALTER TABLE exposure_log ADD COLUMN perslevl real;')
     
     SKIP = 1000
     for i, v in enumerate(all_visits):
@@ -2336,7 +2342,15 @@ def update_all_exposure_log():
     
     # COSMOS F160W
     _files = db.from_sql("SELECT file, filter, awspath from exposure_log WHERE mdrizsky is null AND awspath like 'grizli-cosmos%%' AND filter like 'f160w'", engine)
-    _files = db.from_sql("SELECT file, filter from exposure_log WHERE mdrizsky is null AND filter like 'f1%%'", engine)
+    
+    # COSMOS F814W
+    #_files = db.from_sql("SELECT file, filter, awspath from exposure_log WHERE mdrizsky is null AND ABS(ra-150.1) < 0.6 AND ABS(dec-2.2) < 0.6 AND filter like 'f814w'", engine)
+    _files = db.from_sql("SELECT file, filter, awspath from exposure_log WHERE mdrizsky is null AND ABS(ra-150.1) < 0.6 AND ABS(dec-2.2) < 0.6", engine)
+    
+    # All IR
+    # _files = db.from_sql("SELECT file, filter from exposure_log WHERE mdrizsky is null AND filter like 'f0%%'", engine)
+    # 
+    # _files = db.from_sql("SELECT file, filter from exposure_log WHERE mdrizsky is null AND filter like 'f%%'", engine)
 
     #_files = db.from_sql("SELECT file, filter from exposure_log WHERE mdrizsky is null AND awspath like 'grizli-cosmos%%' AND filter like 'f814w' LIMIT 10", engine)
     
@@ -2375,7 +2389,8 @@ def update_exposure_log(event, context):
         keywords = event['keywords']
     else:
         keywords = ['EXPFLAG','EXPTIME','EXPSTART','SUNANGLE']
-    
+        keywords += ['GSKY101', 'GSKY102', 'GSKY103', 'PERSNPIX', 'PERSLEVL']
+        
     kwvals = {}
     
     if 'engine' in event:
@@ -2441,8 +2456,6 @@ def update_exposure_log(event, context):
 
     if 'MDRIZSKY' in im['SCI',1].header:
         kwvals['mdrizsky'] = im['SCI',1].header['MDRIZSKY']
-    else:
-        kwvals['mdrizsky'] = 0
 
     for k in keywords:
         if (k in im[0].header) & (k.lower() in _q.colnames):
