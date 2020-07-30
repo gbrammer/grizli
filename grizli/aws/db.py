@@ -2347,6 +2347,10 @@ def update_all_exposure_log():
     #_files = db.from_sql("SELECT file, filter, awspath from exposure_log WHERE mdrizsky is null AND ABS(ra-150.1) < 0.6 AND ABS(dec-2.2) < 0.6 AND filter like 'f814w'", engine)
     _files = db.from_sql("SELECT file, filter, awspath from exposure_log WHERE mdrizsky is null AND ABS(ra-150.1) < 0.6 AND ABS(dec-2.2) < 0.6", engine)
     
+    ### Grism test
+    _files = db.from_sql("SELECT file, filter, awspath from exposure_log WHERE mdrizsky is null AND ABS(ra-150.1) < 0.6 AND ABS(dec-2.2) < 0.6 AND filter like 'g141' limit 10", engine)
+    db.update_exposure_log({'file':_files['file'][0], 'engine':engine}, {})
+    
     # All IR
     # _files = db.from_sql("SELECT file, filter from exposure_log WHERE mdrizsky is null AND filter like 'f0%%'", engine)
     # 
