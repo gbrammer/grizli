@@ -2770,9 +2770,12 @@ def gen_tap_box_query(ra=165.86, dec=34.829694, radius=3., max=100000, db='ls_dr
     # print('MAXSEL', max, maxsel)
 
     #query =  """SELECT {maxsel} {output_columns} FROM {db}  WHERE {db}.{rc} > {left} AND {db}.{rc} < {right} AND {db}.{dc} > {bottom} AND {db}.{dc} < {top} """.format(rc=rd_colnames[0], dc=rd_colnames[1], left=ra-rmi/cosd, right=ra+rmi/cosd, top=dec+rmi, bottom=dec-rmi, maxsel=maxsel, db=db, output_columns=', '.join(columns))
-
-    query = """SELECT {maxsel} {output_columns} FROM {db}  WHERE {rc} > {left} AND {rc} < {right} AND {dc} > {bottom} AND {dc} < {top} """.format(rc=rd_colnames[0], dc=rd_colnames[1], left=ra-rmi/cosd, right=ra+rmi/cosd, top=dec+rmi, bottom=dec-rmi, maxsel=maxsel, db=db, output_columns=', '.join(columns))
-
+    
+    if not np.isfinite(ra+dec):
+        query = """SELECT {maxsel} {output_columns} FROM {db} """.format(rc=rd_colnames[0], dc=rd_colnames[1], left=ra-rmi/cosd, right=ra+rmi/cosd, top=dec+rmi, bottom=dec-rmi, maxsel=maxsel, db=db, output_columns=', '.join(columns))
+    else:
+        query = """SELECT {maxsel} {output_columns} FROM {db}  WHERE {rc} > {left} AND {rc} < {right} AND {dc} > {bottom} AND {dc} < {top} """.format(rc=rd_colnames[0], dc=rd_colnames[1], left=ra-rmi/cosd, right=ra+rmi/cosd, top=dec+rmi, bottom=dec-rmi, maxsel=maxsel, db=db, output_columns=', '.join(columns))
+        
     return query
 
 
@@ -2783,7 +2786,7 @@ def query_tap_catalog(ra=165.86, dec=34.829694, radius=3., max_wait=20,
                     max=1000000, clean_xml=True, verbose=True,
                     des=False, gaia=False, nsc=False, vizier=False,
                     skymapper=False,
-                    hubble_source_catalog=False):
+                    hubble_source_catalog=False, tap_kwargs={}):
     """Query NOAO Catalog holdings
 
     Parameters
@@ -2887,7 +2890,7 @@ def query_tap_catalog(ra=165.86, dec=34.829694, radius=3., max_wait=20,
         if 'NumImages' not in extra:
             extra += 'AND NumImages > 1'
 
-    tap = TapPlus(url=tap_url)
+    tap = TapPlus(url=tap_url, **tap_kwargs)
 
     query = gen_tap_box_query(ra=ra, dec=dec, radius=radius, max=max,
                                db=db, columns=columns,
