@@ -4020,7 +4020,7 @@ def get_rgb_filters(filter_list, force_ir=False, pure_sort=False):
 
 TICKPARAMS = dict(axis='both', colors='w', which='both')
 
-def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', show_ir=True, pl=1, pf=1, scl=1, scale_ab=None, rgb_scl=[1, 1, 1], ds9=None, force_ir=False, filters=None, add_labels=True, output_format='jpg', rgb_min=-0.01, xyslice=None, pure_sort=False, verbose=True, force_rgb=None, suffix='.field', mask_empty=False, tick_interval=60, timestamp=False, mw_ebv=0, use_background=False, tickparams=TICKPARAMS):
+def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', show_ir=True, pl=1, pf=1, scl=1, scale_ab=None, rgb_scl=[1, 1, 1], ds9=None, force_ir=False, filters=None, add_labels=True, output_format='jpg', rgb_min=-0.01, xyslice=None, pure_sort=False, verbose=True, force_rgb=None, suffix='.field', mask_empty=False, tick_interval=60, timestamp=False, mw_ebv=0, use_background=False, tickparams=TICKPARAMS, ref_spectrum=None):
     """
     RGB image of the field mosaics
     """
@@ -4126,7 +4126,7 @@ def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', s
             bmw = 10**(0.4*(MW_F99(np.array([ims[bf][0].header['PHOTPLAM']]))))[0]
             print('MW_EBV={0:.3f}, {1}: {2:.2f}'.format(mw_ebv, bf, bmw))
             bimg *= bmw
-
+    
     # Double-acs
     if bimg.shape != rimg.shape:
         import scipy.ndimage as nd
@@ -4136,7 +4136,10 @@ def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', s
     if gf == 'sum':
         gimg = (rimg+bimg)/2.
     else:
-        gimg = ims[gf][0].data * (ims[gf][0].header['PHOTFLAM']/5.e-20)**pf * (ims[gf][0].header['PHOTPLAM']/1.e4)**pl*scl*rgb_scl[1]  # * 1.5
+        gscl = (ims[gf][0].header['PHOTFLAM']/5.e-20)**pf
+        gscl *= (ims[gf][0].header['PHOTPLAM']/1.e4)**pl
+                    
+        gimg = ims[gf][0].data * gscl * scl * rgb_scl[1]  # * 1.5
         if MW_F99 is not None:
             gmw = 10**(0.4*(MW_F99(np.array([ims[gf][0].header['PHOTPLAM']]))))[0]
             print('MW_EBV={0:.3f}, {1}: {2:.2f}'.format(mw_ebv, gf, gmw))
@@ -4146,7 +4149,20 @@ def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', s
         import scipy.ndimage as nd
         kern = np.ones((2, 2))
         gimg = nd.convolve(gimg, kern)[::2, ::2]
-
+    
+    # Scale by reference synphot spectrum
+    if ref_spectrum is not None:
+        import pysynphot as S
+        try:
+            _obsm = [utils.get_filter_obsmode(filter=_f) for _f in [rf, gf, bf]]
+            _bp = [S.ObsBandpass(_m) for _m in _obsm]
+            _bpf = [ref_spectrum.integrate_filter(_b)/_b.pivot()**2 for _b in _bp]
+            gimg *= _bpf[0]/_bpf[1]
+            bimg *= _bpf[0]/_bpf[2]
+            print('ref_spectrum supplied: {0}*{1:.2f} {2}*{3:.2f}'.format(gf, _bpf[0]/_bpf[1], bf, _bpf[0]/_bpf[2]))
+        except:
+            pass
+            
     if mask_empty:
         mask = (rimg == 0) | (gimg == 0) | (bimg == 0)
         print('Mask empty pixels in any channel: {0}'.format(mask.sum()))
