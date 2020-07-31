@@ -1,15 +1,104 @@
+"""
+Helpers for working with ``eazy-py``.
+"""
 import numpy as np
 
 
-def apply_catalog_corrections(root, total_flux='flux_auto', auto_corr=True, get_external_photometry=False, aperture_indices='all', suffix='_apcorr', verbose=True, apply_background=True):
+def fix_aperture_corrections(tab, verbose=True, ref_filter=None):
+    """
+    June 2020: Reapply total corrections using fixed bug for the kron total 
+    corrections where the necessary pixel scale wasn't used.
+    """
+    from grizli import prep, utils
+    
+    pixel_scale = tab.meta['ASEC_0']/tab.meta['APER_0']
+    
+    if ('TOTCFILT' not in tab.meta) & (ref_filter is None):
+        raise IOError('No ref_filter specified and TOTCFILT not in tab.meta')
+
+    if ref_filter is None:
+        ref_filter = np.atleast_1d(tab.meta['TOTCFILT'])[0].lower()
+    
+    keys = list(tab.meta.keys())
+    
+    for k in keys:
+        if k.endswith('_PLAM'):
+            filt = k.split('_PLAM')[0].lower()
+            if verbose:
+                print('Fix aperture corrections: ', filt)
+
+            tot_corr = prep.get_kron_tot_corr(tab, filt, 
+                                        pixel_scale=pixel_scale)
+
+            rescale = tot_corr / tab[filt + '_tot_corr']
+            tab[f'{filt}_tot_corr'] = tot_corr
+
+            # Loop through apertures and fix corr and tot columns if found
+            for ka in keys:
+                if ka.startswith('APER_'):
+                    ap = ka.split('_')[1]
+
+                    if f'{filt}_tot_{ap}' in tab.colnames:
+                        aper_radius = tab.meta[f'ASEC_{ap}']/2.
+                        msg = f'   aper #{ap} (R={aper_radius:.2f}")'
+                        
+                        if f'EE_{filt}_{ap}' not in tab.meta:
+                            # compute filter EE correction if not in header
+                            ee_ratio = prep.get_filter_ee_ratio(filt, 
+                                        ref_filter=ref_filter,
+                                        aper_radius=aper_radius)
+
+                            tab.meta[f'EE_{filt}_{ap}'] = 1./ee_ratio
+                            msg += ' + ee_filter'
+                            
+                            for col in ['corr', 'ecorr', 'tot', 'etot']:
+                                tab[f'{filt}_{col}_{ap}'] *= 1./ee_ratio
+
+                        if verbose:
+                            print(msg)
+                            
+                        # Rescale total correction      
+                        tab[f'{filt}_tot_{ap}'] *= rescale
+                        tab[f'{filt}_etot_{ap}'] *= rescale
+
+    return tab
+
+
+def apply_catalog_corrections(root, total_flux='flux_auto', auto_corr=True, get_external_photometry=False, aperture_indices='all', suffix='_apcorr', verbose=True, apply_background=True, ee_correction=False):
     """
     Aperture and background corrections to photometric catalog
+    
+    First correct fluxes in individual filters scaled by the ratio of
+    ``total_flux`` / aper_flux in the detection band, where ``total_flux`` is
+    ``flux_auto`` by default.
+        
+        >>> apcorr = {total_flux} / flux_aper_{ap}
+        >>> {filt}_corr_{ap} = {filt}_flux_aper_{ap} * apcorr
+    
+    If ``ee_correction = True``, then apply an encircled energy correction for
+    the relative fraction for the relative flux between the target filter and
+    detection image for a *point source* flux within a photometric aperture.  
+    The correction function is `~grizli.prep.get_filter_ee_ratio`.
+        
+        >>> ee_{filt} = prep.get_filter_ee_ratio({filt}, 
+                                                 ref_filter=ref_filter,
+                                                 aper_radius={aper_arcsec})
+        >>> {filt}_corr_{ap} = {filt}_corr_{ap} / ee_{filt}
+        
+    If `auto_corr`, compute total fluxes with a correction for flux outside
+    the Kron aperture derived for point sources using 
+    `~grizli.prep.get_kron_tot_corr`.
+    
+        >>> {filt}_tot_{ap} = {filt}_corr_{ap} * {filt}_tot_corr
+        
+    Note that any background has already been subtracted from 
+    {filt}_flux_aper_{ap}.in the SEP catalog.
     """
     import os
     import eazy
     import numpy as np
 
-    from grizli import utils
+    from grizli import utils, prep
     import mastquery.utils
 
     cat = utils.read_catalog('{0}_phot.fits'.format(root))
@@ -54,6 +143,14 @@ def apply_catalog_corrections(root, total_flux='flux_auto', auto_corr=True, get_
     if aperture_indices == 'all':
         aperture_indices = range(NAPER)
 
+    # EE correction
+    cat.meta['EE_CORR'] = ee_correction
+    if ee_correction:
+        for f in filters:
+            ref_filter = np.atleast_1d(cat.meta['TOTCFILT'])[0]
+            _ = prep.get_filter_ee_ratio(cat, f.lower(), 
+                                         ref_filter=ref_filter.lower())
+    
     for i in aperture_indices:
 
         if verbose:
@@ -73,8 +170,14 @@ def apply_catalog_corrections(root, total_flux='flux_auto', auto_corr=True, get_
 
                 cat['{0}_corr_{1}'.format(f, i)] = (cat['{0}_flux_aper_{1}'.format(f, i)]-bkg)*cat['apcorr_{0}'.format(i)]
                 cat['{0}_ecorr_{1}'.format(f, i)] = cat['{0}_fluxerr_aper_{1}'.format(f, i)]*cat['apcorr_{0}'.format(i)]
-
-                # mask_thresh = np.percentile(cat['{0}_mask_aper_{1}'.format(f, i)], 95)
+                
+                if ee_correction:
+                    cat[f'{f}_corr_{i}'] *= cat[f'{f}_ee_{i}']
+                    
+                #cat.meta['EE_{0}_{1}'.format(f, i)] = 1./ee_ratio
+                #cat['{0}_corr_{1}'.format(f, i)] /= ee_ratio
+                #cat['{0}_ecorr_{1}'.format(f, i)] /= ee_ratio
+                    
                 aper_area = np.pi*(cat.meta['APER_{0}'.format(i)]/2)**2
                 mask_thresh = aper_area
 
@@ -262,13 +365,13 @@ def eazy_photoz(root, force=False, object_only=True, apply_background=True, aper
             eazy.symlink_eazy_inputs(path=None)
         except:
             print("""
-The filter file `FILTER.RES.latest` and `templates` directory were not
+The filter file ``FILTER.RES.latest`` and ``templates`` directory were not
 found in the working directory and the automatic command to retrieve them
 failed:
 
     >>> import eazy; eazy.symlink_eazy_inputs(path=None)
 
-Run it with `path` pointing to the location of the `eazy-photoz` repository.""")
+Run it with ``path`` pointing to the location of the ``eazy-photoz`` repository.""")
             return False
 
     self = eazy.photoz.PhotoZ(param_file=None, translate_file='zphot.translate', zeropoint_file=zpfile, params=params, load_prior=True, load_products=load_products)
@@ -318,16 +421,20 @@ def show_from_ds9(ds9, self, zout, use_sky=True, **kwargs):
     print('ID: {0}, r={1:.1f} {2}'.format(self.cat['id'][ix], r[ix], runit))
     print('  z={0:.2f} logM={1:.2f}'.format(zout['z_phot'][ix], np.log10(zout['mass'][ix])))
 
-    fig = self.show_fit(self.cat['id'][ix], **kwargs)
-    return fig, self.cat['id'][ix], zout['z_phot'][ix]
+    fig = self.show_fit(ix, id_is_idx=True, **kwargs)
+    return fig, self.cat['id'][ix], ix, zout['z_phot'][ix]
 
 
 class EazyPhot(object):
     def __init__(self, photoz, grizli_templates=None, zgrid=None, apcorr=None, include_photometry=True, include_pz=False, source_text='unknown'):
         """
+        Parameters
+        ----------
         photoz : `~eazypy.photoz.PhotoZ`
-
-        apcorr : array
+            Photoz object.
+            
+        apcorr : `~numpy.ndarray`
+        
             Aperture correction applied to the photometry to match the
             grism spectra.  For the internal grizli catalogs, this should
             generally be something like
