@@ -1829,6 +1829,7 @@ def add_missing_photometry():
     count = 0
     for root in res:
         if root not in orig_roots:
+            #break
             count += 1
             print(count, root)
             os.system('aws s3 cp s3://grizli-v1/Pipeline/{0}/Extractions/{0}_phot_apcorr.fits .'.format(root))
@@ -2345,16 +2346,19 @@ def update_all_exposure_log():
     
     # COSMOS F814W
     #_files = db.from_sql("SELECT file, filter, awspath from exposure_log WHERE mdrizsky is null AND ABS(ra-150.1) < 0.6 AND ABS(dec-2.2) < 0.6 AND filter like 'f814w'", engine)
-    _files = db.from_sql("SELECT file, filter, awspath from exposure_log WHERE mdrizsky is null AND ABS(ra-150.1) < 0.6 AND ABS(dec-2.2) < 0.6", engine)
+    #_files = db.from_sql("SELECT file, filter, awspath from exposure_log WHERE mdrizsky is null AND ABS(ra-150.1) < 0.6 AND ABS(dec-2.2) < 0.6", engine)
     
-    ### Grism test
-    _files = db.from_sql("SELECT file, filter, awspath from exposure_log WHERE mdrizsky is null AND ABS(ra-150.1) < 0.6 AND ABS(dec-2.2) < 0.6 AND filter like 'g141' limit 10", engine)
-    db.update_exposure_log({'file':_files['file'][0], 'engine':engine}, {})
+    ### COSMOS grism
+    #_files = db.from_sql("SELECT file, filter, awspath from exposure_log WHERE mdrizsky is null AND ABS(ra-150.1) < 0.6 AND ABS(dec-2.2) < 0.6 AND filter like 'g1%%'", engine)
+    ### All grism
+    #_files = db.from_sql("SELECT file, filter, awspath, mdrizsky from exposure_log WHERE mdrizsky is null AND filter like 'g1%%'", engine)
+
+    #db.update_exposure_log({'file':_files['file'][0], 'engine':engine, 'skip':False}, {})
     
     # All IR
     # _files = db.from_sql("SELECT file, filter from exposure_log WHERE mdrizsky is null AND filter like 'f0%%'", engine)
     # 
-    # _files = db.from_sql("SELECT file, filter from exposure_log WHERE mdrizsky is null AND filter like 'f%%'", engine)
+    _files = db.from_sql("SELECT file, filter from exposure_log WHERE mdrizsky is null AND filter like 'f%%'", engine)
 
     #_files = db.from_sql("SELECT file, filter from exposure_log WHERE mdrizsky is null AND awspath like 'grizli-cosmos%%' AND filter like 'f814w' LIMIT 10", engine)
     
@@ -2365,7 +2369,8 @@ def update_all_exposure_log():
         _ = glob.glob(f'{file}*')
         if len(_) == 0:
             db.update_exposure_log({'file':file, 'engine':engine}, {})
-        
+
+
 def update_exposure_log(event, context):
     """
     Get exposure info from FITS file and put in database
@@ -2504,12 +2509,96 @@ def update_exposure_log(event, context):
 
     if remove:
         print('Remove '+local_file)
-        os.remove(local_file)
+        if os.path.exists(local_file):
+            os.remove(local_file)
         if dump_dq:
             print('Remove '+local_file.replace(*repl))
-            os.remove(local_file.replace(*repl))
+            if os.path.exists(local_file.replace(*repl)):
+                os.remove(local_file.replace(*repl))
 
     return kwvals
+
+def run_shrink_ramps():
+    _q = db.from_sql("select file, awspath, parent from exposure_log where extension LIKE 'flt' AND parent LIKE 'j002836m3311' limit 5", engine)
+    for i, (file, awspath, parent) in enumerate(zip(_q['file'], _q['awspath'], _q['parent'])):
+        shrink_ramp_file(file, awspath, parent, engine=engine, MAX_SIZE=2*1024**2, convert_args='-scale 35% -quality 90', remove=True)
+        
+def shrink_ramp_file(file, awspath, parent, engine=None, MAX_SIZE=2*1024**2, convert_args='-scale 35% -quality 90', remove=True):
+    """
+    Make ramp.png files smaller with ImageMagick
+    """
+    import os
+    import subprocess
+    import shutil
+    
+    import boto3
+    import astropy.io.fits as pyfits
+    from grizli import utils
+    
+    if engine is None:
+        engine = get_db_engine(echo=False)
+
+    local_file = '{0}_ramp.png'.format(file)
+    
+    s3 = boto3.resource('s3')
+
+    bucket = awspath.split('/')[0]
+    bkt = s3.Bucket(bucket)
+
+    awsfile = '/'.join(awspath.split('/')[1:])
+    awsfile += '/'+local_file
+    awsfile = awsfile.replace('/Prep','/RAW')
+                
+    print(f'{bucket}/{awsfile} > {local_file}')
+
+    if not os.path.exists(local_file):
+        try:
+            bkt.download_file(awsfile, local_file, 
+                      ExtraArgs={"RequestPayer": "requester"})
+        except:
+            print(f'Failed to download s3://{bucket}/{awsfile}')
+            
+            # Try other bucket path
+            if 'Exposures' in awsfile:
+                bucket = 'grizli-v1'
+                bkt = s3.Bucket(bucket)
+                awsfile = 'Pipeline/{0}/RAW/'.format(parent)
+                awsfile += local_file
+
+                try:
+                    bkt.download_file(awsfile, local_file, 
+                              ExtraArgs={"RequestPayer": "requester"})
+                except:
+                    print(f'Failed to download s3://{bucket}/{awsfile}')
+                    return False
+
+            else:
+                return False
+
+    print(f'{local_file:>25} {os.stat(local_file).st_size/1024**2:.2f}') 
+    bw_file = local_file.replace('.png', '.sm.png')
+    
+    if os.stat(local_file).st_size > MAX_SIZE:
+        
+        subprocess.call(f"convert {convert_args}  {local_file} {bw_file}",
+                        shell=True)
+        
+        print(f'{bw_file:>25} {os.stat(bw_file).st_size/1024**2:.2f}') 
+        
+        try:
+            bkt.upload_file(bw_file, awsfile, ExtraArgs={'ACL':'public-read'})
+        except:
+            print(f'Failed to upload s3://{bucket}/{awsfile}'.replace(*repl))
+    else:
+        print('skip')
+        
+    if remove:
+        print('Remove '+local_file)
+        if os.path.exists(local_file):
+            os.remove(local_file)
+        
+        if os.path.exists(bw_file):
+            os.remove(bw_file)
 
 
 def get_exposures_at_position(ra, dec, engine, dr=10):
