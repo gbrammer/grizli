@@ -984,7 +984,7 @@ def get_filter_obsmode(filter='f160w', acs_chip='wfc1', uvis_chip='uvis2', aper=
     Derive `~pysynphot` obsmode keyword from a filter name, where UVIS filters
     end in 'u'
     """
-    if filter.lower()[:2] in ['f0', 'f1']:
+    if filter.lower()[:2] in ['f0', 'f1', 'g1']:
         inst = 'wfc3,ir'
     else:
         if filter.lower().endswith('u'):
