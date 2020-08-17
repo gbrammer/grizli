@@ -92,7 +92,8 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     from grizli.stack import StackFitter
     from grizli.multifit import MultiBeam
 
-    from . import __version__ as grizli__version
+    #from . import __version__ as grizli__version
+    from .version import version as grizli__version
     from .pipeline import summary
 
     if get_dict:
