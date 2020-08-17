@@ -866,6 +866,7 @@ def redshift_handler(event, context):
 
 
 def show_version(event, context):
+    import glob
     import grizli
     import eazy
 
@@ -876,7 +877,20 @@ def show_version(event, context):
 
     import matplotlib
     print('matplotlibrc: ', matplotlib.matplotlib_fname())
-
-
+    
+    if 'files' in event:
+        for file in event['files']:
+            print('\n\n === File {0} === \n\n'.format(file))
+            with open(file) as fp:
+                lines = fp.readlines()
+            
+            print(''.join(lines))
+    
+    if 'glob' in event:
+        _res = glob.glob(event['glob'])
+        print('\n\n === glob {0} === \n\n'.format(event['glob']))
+        for file in _res:
+            print(file)
+            
 if __name__ == "__main__":
     handler('', '')
