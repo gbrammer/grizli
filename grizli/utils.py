@@ -5158,8 +5158,9 @@ def fetch_config_files(ACS=False, get_sky=True, get_stars=True, get_epsf=True):
     tarfiles = ['https://s3.amazonaws.com/grizli/CONF/WFC3.IR.G102.WD.V4.32.tar.gz', 'https://s3.amazonaws.com/grizli/CONF/WFC3.IR.G141.WD.V4.32.tar.gz']
 
     tarfiles += ['https://s3.amazonaws.com/grizli/CONF/ACS.WFC.CHIP1.Stars.conf', 'https://s3.amazonaws.com/grizli/CONF/ACS.WFC.CHIP2.Stars.conf']
-
+    
     if get_sky:
+        ftpdir = 'https://s3.amazonaws.com/grizli/CONF'
         tarfiles.append('{0}/grism_master_sky_v0.5.tar.gz'.format(ftpdir))
 
     #gURL = 'http://www.stsci.edu/~brammer/Grizli/Files'
@@ -5182,7 +5183,7 @@ def fetch_config_files(ACS=False, get_sky=True, get_stars=True, get_epsf=True):
     if get_epsf:
         # ePSF files for fitting point sources
         #psf_path = 'http://www.stsci.edu/hst/wfc3/analysis/PSF/psf_downloads/wfc3_ir/'
-        psf_path = 'http://www.stsci.edu/~jayander/STDPSFs/WFC3IR/'
+        psf_path = 'https://www.stsci.edu/~jayander/STDPSFs/WFC3IR/'
         ir_psf_filters = ['F105W', 'F125W', 'F140W', 'F160W']
 
         # New PSFs
