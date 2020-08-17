@@ -84,8 +84,9 @@ def extract_beams_from_flt(root, bucket, id, clean=True, silent=False):
 
     import grizli
     from grizli import fitting, utils, multifit
-    from grizli.version import __version__ as grizli__version
-
+    #from grizli import __version__ as grizli__version
+    grizli__version = grizli.__version__
+    
     utils.set_warnings()
     from grizli.pipeline import auto_script
 
