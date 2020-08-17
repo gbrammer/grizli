@@ -5177,7 +5177,7 @@ def fetch_config_files(ACS=False, get_sky=True, get_stars=True, get_epsf=True):
             print('Get {0}'.format(file))
             os.system('curl -o {0} {1}'.format(file, url))
 
-        if 'tar' in file:
+        if '.tar' in file:
             os.system('tar xzvf {0}'.format(file))
 
     if get_epsf:
