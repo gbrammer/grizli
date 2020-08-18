@@ -35,6 +35,7 @@ def fit_lambda(root='j100025+021706', beams=[], ids=[], newfunc=False, bucket_na
     # Lambda Function names
     func = 'GrizliTestFunction'
     func = 'GrizliLambda-0-12-0-41'
+    func = 'GrizliLambda2020'
 
     print('Lambda function: {0} (newfunc={1})'.format(func, newfunc))
 
@@ -138,7 +139,7 @@ def generate_events(roots, ids, base=BASE_EVENT, send_to_lambda=False):
     if send_to_lambda:
         client = get_lambda_client()
         for event in events:
-            send_event_lambda(event, verbose=True, client=client, func='GrizliLambda-0-12-0-41')
+            send_event_lambda(event, verbose=True, client=client, func='GrizliLambda2020')
 
     return events
 
@@ -153,7 +154,7 @@ def get_lambda_client(region_name='us-east-1'):
     return client
 
 
-def send_event_lambda(event, verbose=True, client=None, func='GrizliLambda-0-12-0-41'):
+def send_event_lambda(event, verbose=True, client=None, func='GrizliLambda2020'):
     """
     Send a single event to AWS lambda
     """
