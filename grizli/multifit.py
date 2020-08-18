@@ -2031,7 +2031,12 @@ class MultiBeam(GroupFitter):
                  fit_background=True, poly_order=0):
         """TBD
         """
-        import sklearn.linear_model
+        try:
+            import sklearn.linear_model
+            HAS_SKLEARN = True
+        except:
+            HAS_SKLEARN = False
+            
         import numpy.linalg
         import scipy.optimize
 
@@ -2143,7 +2148,7 @@ class MultiBeam(GroupFitter):
             #
             #     out = scipy.optimize.minimize(self.eval_trace_shift, shifts, bounds=bounds, args=args, method='Powell', tol=tol)
 
-        else:
+        elif HAS_SKLEARN:
             Ax = A[:, self.fit_mask][ok_temp, :].T
             y = self.scif[self.fit_mask]
 
