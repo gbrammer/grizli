@@ -7075,3 +7075,101 @@ def log_exception(LOGFILE, traceback, verbose=True, mode='a'):
         fp = open(LOGFILE, mode)
         fp.write(log)
         fp.close()
+
+
+def argv_to_dict(argv, defaults={}, dot_dict=True):
+    """
+    Convert a list of (simple) command-line arguments to a dictionary.
+    
+    Parameters
+    ----------
+    argv : list of strings
+        E.g., ``sys.argv[1:]``.
+    
+    defaults : dict
+        Default dictionary
+    
+    dot_dict : bool
+        If true, then intepret keywords with '.' as nested dictionary keys, 
+        e.g., ``--d.key=val`` >> {'d': {'key': 'val'}}
+        
+    Examples:
+    ---------
+    
+        # $ myfunc arg1 --p1=1 --l1=1,2,3 --pdict.k1=1 -flag
+        >>> argv = 'arg1 --p1=1 --l1=1,2,3 --pdict.k1=1 -flag'.split()
+        >>> args, kwargs = argv_to_dict(argv)
+        >>> print(args)
+        ['arg1']
+        >>> print(kwargs)
+        {'p1': 1, 'l1': [1, 2, 3], 'pdict': {'k1': 1}, 'flag': True}
+        
+        # With defaults
+        defaults = {'pdict':{'k2':2.0}, 'p2':2.0}
+        >>> args, kwargs = argv_to_dict(argv, defaults=defaults)
+        >>> print(kwargs)
+        {'pdict': {'k2': 2.0, 'k1': 1}, 'p2': 2.0, 'p1': 1, 'l1': [1, 2, 3], 'flag': True}
+        
+    """
+    import copy
+    import json
+    
+    kwargs = copy.deepcopy(defaults)
+    args = []
+    
+    for i, arg in enumerate(argv):        
+        if not arg.startswith('-'):
+            # Arguments
+            try:
+                args.append(json.loads(arg))
+            except:
+                args.append(json.loads(f'"{arg}"'))
+                
+            continue
+            
+        spl = arg.strip('--').split('=')
+        if len(spl) > 1:
+            # Parameter values
+            key, val = spl
+            val = val.replace('True','true').replace('False','false')
+            val = val.replace('None','null')
+        else:
+            # Parameters, set to true, e.g., -set_flag
+            key, val = spl[0], 'true'
+            
+            # single -
+            if key.startswith('-'):
+                key = key[1:]
+        
+        # List values        
+        if ',' in val:
+            try:
+                # Try parsing with JSON
+                jval = json.loads(f'[{val}]')
+            except:
+                # Assume strings
+                str_val = ','.join([f'"{v}"' for v in val.split(',')])
+                jval = json.loads(f'[{str_val}]')
+        else:
+            try:
+                jval = json.loads(val)
+            except:
+                # String
+                jval = val
+        
+        # Dict keys, potentially nested        
+        if dot_dict & ('.' in key):
+            keys = key.split('.')
+            d = kwargs
+            for k in keys[:-1]:
+                if k not in d:
+                    d[k] = {}
+                
+                d = d[k]
+                    
+            d[keys[-1]] = jval
+        else:            
+            kwargs[key] = jval
+            
+    
+    return args, kwargs
