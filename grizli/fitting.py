@@ -746,7 +746,7 @@ def full_sed_plot(mb, tfit, zfit=None, bin=1, minor=0.1, save='png', sed_resolut
         ax3.set_xlabel(r'$z$')
         ax3.grid()
 
-    ax1.set_ylabel(r'$f_\lambda$ / $10^{-19}$')
+    ax1.set_ylabel(r'$f_\lambda$ [$10^{-19}$ erg/s/cm2/A]')
 
     axt = ax2
     axt.text(0.95, 0.95, r'$z_\mathrm{grism}$='+'{0:.3f}'.format(tfit['z']), ha='right', va='top', transform=axt.transAxes, color=sns_colors[0], size=10)  # , backgroundcolor='w')
@@ -3201,10 +3201,10 @@ class GroupFitter(object):
                 if (self.pscale is not None):
                     pscale = self.compute_scale_array(self.pscale, w)
 
-            if units == 'nJy':
+            if units.lower() == 'njy':
                 unit_corr = 1./sens*w**2/2.99e18/1.e-23/1.e-9  # /pscale
                 unit_label = r'$f_\nu$ (nJy)'
-            elif units == 'uJy':
+            elif units.lower() == 'ujy':
                 unit_corr = 1./sens*w**2/2.99e18/1.e-23/1.e-6  # /pscale
                 unit_label = r'$f_\nu$ ($\mu$Jy)'
             elif units == 'meps':
@@ -3214,8 +3214,8 @@ class GroupFitter(object):
                 unit_corr = 1.
                 unit_label = 'e/s'
             elif units == 'resid':
-                unit_corr = 1./sens
-                unit_label = r'resid ($f_\lambda$)'
+                unit_corr = 1./sens*1.e19
+                unit_label = r'resid ($f_\lambda \times 10^{19}$)'
             elif units == 'nresid':
                 unit_corr = 1./flm
                 unit_label = 'norm. resid'
@@ -3224,7 +3224,7 @@ class GroupFitter(object):
                 unit_label = 'spline resid'
             else:  # 'flam
                 unit_corr = 1./sens/1.e-19  # /pscale
-                unit_label = r'$f_\lambda \times 10^{-19}$'
+                unit_label = r'$f_\lambda$ [$10^{-19}$ erg/s/cm2/A]'
 
             w = w/1.e4
 
@@ -3349,10 +3349,10 @@ class GroupFitter(object):
                 if (self.pscale is not None):
                     pscale = self.compute_scale_array(self.pscale, sp_data[g]['wave'])
 
-            if units == 'nJy':
+            if units.lower() == 'njy':
                 unit_corr = sp_data[g]['wave']**2/sp_flat[g]['flux']
                 unit_corr *= 1/2.99e18/1.e-23/1.e-9  # /pscale
-            elif units == 'uJy':
+            elif units.lower() == 'ujy':
                 unit_corr = sp_data[g]['wave']**2/sp_flat[g]['flux']
                 unit_corr *= 1/2.99e18/1.e-23/1.e-6  # /pscale
             elif units == 'meps':
@@ -3407,7 +3407,8 @@ class GroupFitter(object):
             axc.plot([wmin/zp1, wmax/zp1], [0, 0], color='k', linestyle=':', alpha=0.8)
 
         # Individual templates
-        if (tfit is not None) & (show_individual_templates > 0) & (units in ['flam', 'nJy', 'uJy']):
+        if ((tfit is not None) & (show_individual_templates > 0) &
+            (units.lower() in ['flam', 'njy', 'ujy'])):
 
             xt, yt, mt = utils.array_templates(tfit['templates'], z=tfit['z'],
                                             apply_igm=(tfit['z'] > IGM_MINZ))
@@ -3415,24 +3416,24 @@ class GroupFitter(object):
 
             xt *= (1+tfit['z'])
 
-            if units == 'nJy':
+            if units.lower() == 'njy':
                 unit_corr = xt**2/2.99e18/1.e-23/1.e-9  # /pscale
-            elif units == 'uJy':
+            elif units.lower() == 'ujy':
                 unit_corr = xt**2/2.99e18/1.e-23/1.e-6  # /pscale
             else:  # 'flam
                 unit_corr = 1./1.e-19  # /pscale
 
-            tscl = (yt.T*cfit[self.N:])/(1+tfit['z'])*unit_corr
+            tscl = (yt.T*cfit[self.N:]).T/(1+tfit['z'])*unit_corr
             t_names = np.array(list(tfit['cfit'].keys()))[self.N:]
             is_spline = np.array([t.split()[0] in ['bspl', 'step', 'poly'] for t in tfit['cfit']][self.N:])
 
             if is_spline.sum() > 0:
-                spline_templ = tscl[:, is_spline].sum(axis=1)
+                spline_templ = tscl[is_spline,:].sum(axis=1)
                 axc.plot(xt/1.e4, spline_templ, color='k', alpha=0.5)
-                for ti in tscl[:, is_spline].T:
+                for ti in tscl[is_spline,:]:
                     axc.plot(xt/zp1/1.e4, ti, color='k', alpha=0.1)
 
-            for ci, ti, tn in zip(cfit[self.N:][~is_spline], tscl[:, ~is_spline].T, t_names[~is_spline]):
+            for ci, ti, tn in zip(cfit[self.N:][~is_spline], tscl[~is_spline,:], t_names[~is_spline]):
                 if ci == 0:
                     continue
 
