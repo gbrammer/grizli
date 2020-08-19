@@ -7076,7 +7076,17 @@ def log_exception(LOGFILE, traceback, verbose=True, mode='a'):
         fp.write(log)
         fp.close()
 
-
+def simple_LCDM(Om0=0.3, Ode0=0.7, H0=70, Ob0=0.0463, Tcmb0=2.725, name=None):
+    """
+    Simple LambdaCDM cosmology
+    
+    Parameters are defined as in `~astropy.cosmology.LambdaCDM`.
+    
+    """
+    from astropy.cosmology import LambdaCDM
+    cosmology = LambdaCDM(H0, Om0, Ode0, Tcmb0=Tcmb0, name=name)
+    return cosmology
+    
 def argv_to_dict(argv, defaults={}, dot_dict=True):
     """
     Convert a list of (simple) command-line arguments to a dictionary.
