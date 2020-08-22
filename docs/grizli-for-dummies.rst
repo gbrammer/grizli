@@ -407,6 +407,8 @@ Otherwise...
 | Grizli version: `1.0-76-g71853af` and `1.0.dev1458`
 
 
+.. _full-fits-files:
+
 The `full.fits` files
 -----------------------
 
@@ -885,7 +887,27 @@ like a right idiot.
 
 --------------
 
-< :ref:`Previous Chapter<emission-maps>` `|` :ref:`Table of Contents<fake-cont>` `|` :ref:`Next Chapter<output-catalog>` >
+< :ref:`Previous Chapter<emission-maps>` `|` :ref:`Table of Contents<fake-cont>` `|` :ref:`Next Chapter<fluxes-widths>` >
+
+--------------
+
+
+.. _fluxes-widths:
+
+
+**Emission line fluxes and equivalent widths**
+==============================================
+
+| Author: `Jasleen Matharu <https://github.com/jkmatharu>`__
+| Grizli version: `1.0-76-g71853af`
+
+In older versions of Grizli, Grizli used to spit out a catalog with line flux *and* equivalent width measurements. A description of the keywords for equivalent widths in such catalogs can be found in :ref:`this chapter <output-catalog>`. In newer versions, such as the one used for this chapter (yep, why don't you glance back up near the title of this chapter to check), only line fluxes and their errors are stated in the output catalog. The equivalent widths seem to have vanished. Gah!
+
+No they haven't. The rest-frame equivalent widths (including their 16th, 50th and 84th percentiles) along with their errors can be found in the header of the `COVAR` extension in `full.fits` (see :ref:`this section <full-fits-files>` for more on `full.fits` files). You will also find *all* the line fluxes and their errors there too for that particular source. Emission line fluxes and their errors can also be found in the headers of their corresponding `LINE` extensions in `full.fits`.
+
+--------------
+
+< :ref:`Previous Chapter<fluxes-widths>` `|` :ref:`Table of Contents<fake-cont>` `|` :ref:`Next Chapter<output-catalog>` >
 
 --------------
 
