@@ -905,6 +905,8 @@ In older versions of Grizli, Grizli used to spit out a catalog with line flux *a
 
 No they haven't. The rest-frame equivalent widths (including their 16th, 50th and 84th percentiles) along with their errors can be found in the header of the `COVAR` extension in `full.fits` (see :ref:`this section <full-fits-files>` for more on `full.fits` files). You will also find *all* the line fluxes and their errors there too for that particular source. Emission line fluxes and their errors can also be found in the headers of their corresponding `LINE` extensions in `full.fits`.
 
+For the same dataset, I have found that the same line has the same number in the `COVAR` header of `full.fits` for every object in that dataset. Check this is true for you of course, before you take my word for it.
+
 --------------
 
 < :ref:`Previous Chapter<fluxes-widths>` `|` :ref:`Table of Contents<fake-cont>` `|` :ref:`Next Chapter<output-catalog>` >
