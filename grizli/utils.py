@@ -3531,6 +3531,28 @@ def log_zgrid(zr=[0.7, 3.4], dz=0.01):
     zgrid = np.exp(np.arange(np.log(1+zr[0]), np.log(1+zr[1]), dz))-1
     return zgrid
 
+def trapz_dx(x):
+    """
+    Return trapezoid rule coefficients, useful for numerical integration 
+    using a dot product
+    
+    Parameters
+    ----------
+    x : array-like
+        Independent variable
+    
+    Returns
+    -------
+    dx : array_like
+        Coefficients for trapezoidal rule integration.
+        
+    """
+    dx = np.zeros_like(x)
+    diff = np.diff(x)/2.
+    dx[:-1] += diff
+    dx[1:] += diff
+    return dx
+
 
 def get_wcs_pscale(wcs, set_attribute=True):
     """Get correct pscale from a `~astropy.wcs.WCS` object
