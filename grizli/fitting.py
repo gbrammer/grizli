@@ -2199,15 +2199,15 @@ class GroupFitter(object):
             pz_percentiles = np.interp(percentiles, cdf/cdf[-1], zfine[1:])
 
             # Risk parameter
-            dz = np.gradient(fit['zgrid'])
-
+            #dz = np.gradient(fit['zgrid'])
+            trdz = utils.trapz_dx(fit['zgrid'])
             zsq = np.dot(fit['zgrid'][:, None],
                          np.ones_like(fit['zgrid'])[None, :])
             L = _loss((zsq-fit['zgrid'])/(1+fit['zgrid']), gamma=risk_gamma)
 
-            risk = np.dot(pdf*L, dz)
+            risk = np.dot(pdf*L, trdz)
 
-            # Fit a parabolat around min(risk)
+            # Fit a parabola around min(risk)
             zi = np.argmin(risk)
             if (zi < len(risk)-1) & (zi > 0):
                 c = np.polyfit(fit['zgrid'][zi-1:zi+2], risk[zi-1:zi+2], 2)
