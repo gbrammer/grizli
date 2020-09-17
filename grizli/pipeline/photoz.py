@@ -362,7 +362,7 @@ def eazy_photoz(root, force=False, object_only=True, apply_background=True, aper
          (not os.path.exists('templates'))):
         try:
             # should work with eazy-py >= 0.2.0
-            eazy.symlink_eazy_inputs(path=None)
+            eazy.symlink_eazy_inputs() #(path=None)
         except:
             print("""
 The filter file ``FILTER.RES.latest`` and ``templates`` directory were not
