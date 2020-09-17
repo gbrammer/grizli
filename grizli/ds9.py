@@ -61,7 +61,7 @@ class DS9(ds9_obj):
         From pysao
         """
         import astropy.wcs as pywcs
-        from ..utils import to_header
+        from .utils import to_header
         
         if hasattr(img, 'header'):
             # FITS HDU
