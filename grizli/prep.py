@@ -5189,7 +5189,7 @@ def clean_amplifier_residuals(files, extensions=[1,2], minpix=5e5, max_percentil
     return fig
 
 
-def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, max_files=999, pixfrac=0.8, scale=0.06, skysub=True, skymethod='localmin', skyuser='MDRIZSKY', bits=None, build=False, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='EXP', final_wt_scl='exptime', final_kernel='square', context=False, static=True, use_group_footprint=False, fetch_flats=True, fix_wcs_system=False, include_saturated=False, run_driz_cr=False, driz_cr_snr=None, driz_cr_scale=None, resetbits=0, log=False, **kwargs):
+def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, max_files=999, pixfrac=0.8, scale=0.06, skysub=True, skymethod='localmin', skyuser='MDRIZSKY', bits=None, build=False, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='EXP', final_wt_scl='exptime', final_kernel='square', context=False, static=True, use_group_footprint=False, fetch_flats=True, fix_wcs_system=False, include_saturated=False, run_driz_cr=False, driz_cr_snr=None, driz_cr_scale=None, resetbits=0, driz_cr_snr_grow=1, driz_cr_scale_grow=1, log=False, **kwargs):
     """Combine overlapping visits into single output mosaics
 
     Parameters
@@ -5367,7 +5367,17 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, m
             else:
                 driz_cr_snr = '8.0 5.0'
                 driz_cr_scale = '2.5 0.7'
-
+            
+            if driz_cr_snr_grow != 1:
+                spl = driz_cr_snr.split()
+                new_snr = np.cast[float](spl)*driz_cr_snr_grow
+                driz_cr_snr = ' '.join([f'{val:.2f}' for val in new_snr])
+            
+            if driz_cr_scale_grow != 1:
+                spl = driz_cr_scale.split()
+                new_scale = np.cast[float](spl)*driz_cr_scale_grow
+                driz_cr_scale = ' '.join([f'{val:.2f}' for val in new_scale])
+            
         if bits is None:
             if isACS | isWFPC2:
                 bits = 64+32
