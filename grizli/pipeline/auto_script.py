@@ -236,6 +236,7 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
        fine_alignment_args=args['fine_alignment_args'],
        make_mosaics=True,
        mosaic_args=args['mosaic_args'],
+       mosaic_drizzle_args=args['mosaic_drizzle_args'],
        mask_spikes=False,
        mosaic_driz_cr_type=0,
        make_phot=True,
@@ -569,16 +570,17 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
             fix_stars = False
 
         # For running at the command line
-        if False:
-            mos_args = {'mosaic_args': kwargs['mosaic_args'],
-                        'fix_stars': kwargs['visit_prep_args']['fix_stars'],
-                        'mask_spikes': kwargs['mask_spikes'], 'skip_single_optical_visits': kwargs['preprocess_args']['skip_single_optical_visits']}
-            auto_script.make_combined_mosaics(root, **mos_args)
+        # if False:
+        #     mos_args = {'mosaic_args': kwargs['mosaic_args'],
+        #                 'fix_stars': kwargs['visit_prep_args']['fix_stars'],
+        #                 'mask_spikes': kwargs['mask_spikes'], 'skip_single_optical_visits': kwargs['preprocess_args']['skip_single_optical_visits']}
+        #     auto_script.make_combined_mosaics(root, **mos_args)
 
         make_combined_mosaics(root, mosaic_args=mosaic_args,
                         fix_stars=fix_stars, mask_spikes=mask_spikes,
                         skip_single_optical_visits=skip_single,
-                        mosaic_driz_cr_type=mosaic_driz_cr_type)
+                        mosaic_driz_cr_type=mosaic_driz_cr_type, 
+                        mosaic_drizzle_args=mosaic_drizzle_args)
 
         # Make PSFs.  Always set get_line_maps=False since PSFs now
         # provided for each object.
