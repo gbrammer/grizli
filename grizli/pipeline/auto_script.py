@@ -3451,7 +3451,7 @@ def make_filter_combinations(root, weight_fnu=True, filter_combinations=FILTER_C
             pyfits.PrimaryHDU(data=wht, header=head[band]).writeto(output_sci[band].replace('_sci', '_wht'), overwrite=True, output_verify='fix')
 
 
-def make_combined_mosaics(root, fix_stars=False, mask_spikes=False, skip_single_optical_visits=True, mosaic_args=args['mosaic_args'], mosaic_driz_cr_type=0, **kwargs):
+def make_combined_mosaics(root, fix_stars=False, mask_spikes=False, skip_single_optical_visits=True, mosaic_args=args['mosaic_args'], mosaic_driz_cr_type=0, mosaic_drizzle_args=args['mosaic_drizzle_args'], **kwargs):
     """
     Drizzle combined mosaics
 
@@ -3499,7 +3499,8 @@ def make_combined_mosaics(root, fix_stars=False, mask_spikes=False, skip_single_
                      make_combined=False,
                      ref_image=wcs_ref_file, include_saturated=fix_stars,
                      multi_driz_cr=(mosaic_driz_cr_type & 1) > 0,
-                     filter_driz_cr=(mosaic_driz_cr_type & 2) > 0, **kwargs)
+                     filter_driz_cr=(mosaic_driz_cr_type & 2) > 0, 
+                     **mosaic_drizzle_args)
 
     make_filter_combinations(root, weight_fnu=True, min_count=1,
                         filter_combinations={'ir': IR_M_FILTERS+IR_W_FILTERS})
@@ -3557,7 +3558,8 @@ def make_combined_mosaics(root, fix_stars=False, mask_spikes=False, skip_single_
                              pixfrac=mosaic_pixfrac,
                              make_combined=False,
                              ref_image=wcs_ref_file,
-                             include_saturated=fix_stars, **kwargs)
+                             include_saturated=fix_stars, 
+                             **mosaic_drizzle_args)
 
             make_filter_combinations(root, weight_fnu=True, min_count=1,
                         filter_combinations={'ir': IR_M_FILTERS+IR_W_FILTERS})
@@ -3612,7 +3614,8 @@ def make_combined_mosaics(root, fix_stars=False, mask_spikes=False, skip_single_
         ref_image=wcs_ref_optical,
         min_nexp=1+skip_single_optical_visits*1,
         multi_driz_cr=(mosaic_driz_cr_type & 4) > 0,
-        filter_driz_cr=(mosaic_driz_cr_type & 8) > 0, **kwargs)
+        filter_driz_cr=(mosaic_driz_cr_type & 8) > 0,
+        **mosaic_drizzle_args)
 
     make_filter_combinations(root, weight_fnu=True, min_count=1,
         filter_combinations={make_combined_label: OPT_M_FILTERS+OPT_W_FILTERS})

@@ -149,6 +149,11 @@ mosaic_args:
 # Extra args to pass to mosaic drizzler
 mosaic_drizzle_args:
     skysub: False
+    skymethod: localmin
+    driz_cr_snr_grow: 1
+    driz_cr_scale_grow: 1
+    resetbits: 0
+    bits: null
     
 # Mask IR difraction spikes
 mask_spikes: False 
