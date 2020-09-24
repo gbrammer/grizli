@@ -253,7 +253,7 @@ def apply_catalog_corrections(root, total_flux='flux_auto', auto_corr=True, get_
     return cat
 
 
-def eazy_photoz(root, force=False, object_only=True, apply_background=True, aper_ix=1, apply_prior=False, beta_prior=True, get_external_photometry=False, external_limits=3, external_sys_err=0.3, external_timeout=300, sys_err=0.05, z_step=0.01, z_min=0.01, z_max=12, total_flux='flux_auto', auto_corr=True, compute_residuals=False, dummy_prior=False, extra_rf_filters=[], quiet=True, aperture_indices='all', zpfile='zphot.zeropoint', extra_params={}, extra_translate={}, **kwargs):
+def eazy_photoz(root, force=False, object_only=True, apply_background=True, aper_ix=1, apply_prior=False, beta_prior=True, get_external_photometry=False, external_limits=3, external_sys_err=0.3, external_timeout=300, sys_err=0.05, z_step=0.01, z_min=0.01, z_max=12, total_flux='flux_auto', auto_corr=True, compute_residuals=False, dummy_prior=False, extra_rf_filters=[], quiet=True, aperture_indices='all', zpfile='zphot.zeropoint', extra_params={}, extra_translate={}, force_apcorr=False, ebv=None, **kwargs):
 
     import os
     import eazy
@@ -273,7 +273,8 @@ def eazy_photoz(root, force=False, object_only=True, apply_background=True, aper
     # trans.pop('f814w')
 
     print('Apply catalog corrections')
-    apply_catalog_corrections(root, suffix='_apcorr', aperture_indices=aperture_indices)
+    if (not os.path.exists('{0}_phot_apcorr.fits'.format(root))) | force_apcorr:
+        apply_catalog_corrections(root, suffix='_apcorr', aperture_indices=aperture_indices)
 
     cat = utils.read_catalog('{0}_phot_apcorr.fits'.format(root))
     filters = []
@@ -317,15 +318,17 @@ def eazy_photoz(root, force=False, object_only=True, apply_background=True, aper
 
     params['Z_MAX'] = z_max
 
-    try:
-        ebv = mastquery.utils.get_mw_dust(cat['ra'].mean(), cat['dec'].mean())
-    except:
+    if ebv is None:
         try:
-            ebv = mastquery.utils.get_irsa_dust(cat['ra'].mean(),
-                                                cat['dec'].mean())
+            ebv = mastquery.utils.get_mw_dust(np.median(cat['ra']),
+                                              np.median(cat['dec']))
         except:
-            print("Couldn't get EBV, fall back to ebv=0.0")
-            ebv = 0.
+            try:
+                ebv = mastquery.utils.get_irsa_dust(np.median(cat['ra']),
+                                                    np.median(cat['dec']))
+            except:
+                print("Couldn't get EBV, fall back to ebv=0.0")
+                ebv = 0.
 
     params['MW_EBV'] = ebv
     params['PRIOR_ABZP'] = 23.9
@@ -386,7 +389,7 @@ Run it with ``path`` pointing to the location of the ``eazy-photoz`` repository.
 
     # sample = (mag < 27) #& (self.cat['star_flag'] != 1)
     #sample |= (self.cat['z_spec'] > 0)
-    sample = np.isfinite(self.cat['id'])  # mag)
+    sample = np.isfinite(self.cat['ra'])  # mag)
 
     for iter in range(1+(get_external_photometry & compute_residuals)*1):
         self.fit_parallel(idx[sample], n_proc=10)
