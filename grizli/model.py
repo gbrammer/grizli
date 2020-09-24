@@ -3608,14 +3608,18 @@ class BeamCutout(object):
             self.init_from_input(flt, beam, conf, get_slice_header)
 
         self.beam.scale = scale
-        self.contam_sn_mask = contam_sn_mask
-        self.min_mask = min_mask
-        self.min_sens = min_sens
-        self.mask_resid = mask_resid
+        
+        self._parse_params = {'contam_sn_mask':contam_sn_mask, 
+                              'min_mask':min_mask,
+                              'min_sens':min_sens,
+                              'mask_resid':mask_resid}
+                               
+        # self.contam_sn_mask = contam_sn_mask
+        # self.min_mask = min_mask
+        # self.min_sens = min_sens
+        # self.mask_resid = mask_resid
 
-        self._parse_from_data(contam_sn_mask=contam_sn_mask,
-                              min_mask=min_mask, min_sens=min_sens,
-                              mask_resid=mask_resid)
+        self._parse_from_data(**self._parse_params)
 
     def _parse_from_data(self, contam_sn_mask=[10, 3], min_mask=0.01,
                          seg_ids=None, min_sens=0.08, mask_resid=True):
@@ -4336,9 +4340,7 @@ class BeamCutout(object):
 
         self.beam.x_init_epsf(flat_sensitivity=False, psf_params=self.psf_params, psf_filter=self.direct.filter, yoff=yoff, skip=skip, get_extended=get_extended)
 
-        self._parse_from_data(contam_sn_mask=self.contam_sn_mask,
-                              min_mask=self.min_mask, min_sens=self.min_sens,
-                              mask_resid=self.mask_resid)
+        self._parse_from_data(**self._parse_params)
 
         return None
 

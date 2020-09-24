@@ -3518,9 +3518,7 @@ class MultiBeam(GroupFitter):
             if hasattr(b, 'has_sys_err'):
                 delattr(b, 'has_sys_err')
 
-            b._parse_from_data(contam_sn_mask=b.contam_sn_mask,
-                                  min_mask=b.min_mask, min_sens=b.min_sens,
-                                  mask_resid=b.mask_resid)
+            b._parse_from_data(**b._parse_params)
 
         self._parse_beam_arrays()
 
@@ -3563,9 +3561,7 @@ class MultiBeam(GroupFitter):
         # Reset model profile for optimal extractions
         for b in self.beams:
             # b._parse_from_data()
-            b._parse_from_data(contam_sn_mask=b.contam_sn_mask,
-                                  min_mask=b.min_mask, min_sens=b.min_sens,
-                                  mask_resid=b.mask_resid)
+            b._parse_from_data(**b._parse_params)
 
             # Needed for background modeling
             if hasattr(b, 'xp'):
@@ -4815,7 +4811,7 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
     return pyfits.HDUList(HDUL)
 
 
-def show_drizzle_HDU(hdu, diff=True, mask_segmentation=True):
+def show_drizzle_HDU(hdu, diff=True, mask_segmentation=True, average_only=False, cmap='viridis_r'):
     """Make a figure from the multiple extensions in the drizzled grism file.
 
     Parameters
@@ -4848,14 +4844,18 @@ def show_drizzle_HDU(hdu, diff=True, mask_segmentation=True):
         grisms[g] = h0['N'+g]
 
     NY += 1
-
-    fig = plt.figure(figsize=(5*NX, 1*NY))
-
+    
     widths = []
     for i in range(NX):
         widths.extend([0.2, 1])
-
-    gs = GridSpec(NY, NX*2, height_ratios=[1]*NY, width_ratios=widths)
+    
+    if average_only:
+        NY = 1
+        fig = plt.figure(figsize=(5*NX, 1*NY+0.33))
+        gs = GridSpec(NY, NX*2, width_ratios=widths)
+    else:    
+        fig = plt.figure(figsize=(5*NX, 1*NY))
+        gs = GridSpec(NY, NX*2, height_ratios=[1]*NY, width_ratios=widths)
 
     for ig, g in enumerate(grisms):
 
@@ -4881,7 +4881,7 @@ def show_drizzle_HDU(hdu, diff=True, mask_segmentation=True):
         extent = [0, sh[1], 0, sh[0]]
 
         ax.imshow(kern_i.data, origin='lower', interpolation='Nearest',
-                  vmin=-0.1*vmax_kern, vmax=vmax_kern, cmap=plt.cm.viridis_r,
+                  vmin=-0.1*vmax_kern, vmax=vmax_kern, cmap=cmap,
                   extent=extent, aspect='auto')
 
         ax.set_xticklabels([])
@@ -4903,14 +4903,19 @@ def show_drizzle_HDU(hdu, diff=True, mask_segmentation=True):
 
         ax.imshow(sci_i.data-m, origin='lower',
                   interpolation='Nearest', vmin=-0.1*vmax, vmax=vmax,
-                  extent=extent, cmap=plt.cm.viridis_r,
+                  extent=extent, cmap=cmap,
                   aspect='auto')
 
         ax.set_yticklabels([])
         ax.set_xlabel(r'$\lambda$ ($\mu$m) - '+g)
         ax.xaxis.set_major_locator(MultipleLocator(GRISM_MAJOR[g]))
-
-        for ip in range(grisms[g]):
+        
+        if average_only:
+            iters = []
+        else:
+            iters = range(grisms[g])
+            
+        for ip in iters:
             #print(ip, ig)
             pa = h0['{0}{1:02d}'.format(g, ip+1)]
 
@@ -4926,7 +4931,7 @@ def show_drizzle_HDU(hdu, diff=True, mask_segmentation=True):
 
             ax.imshow(kern_i.data, origin='lower', interpolation='Nearest',
                       vmin=-0.1*vmax_kern, vmax=vmax_kern, extent=extent,
-                      cmap=plt.cm.viridis_r, aspect='auto')
+                      cmap=cmap, aspect='auto')
 
             ax.set_xticklabels([])
             ax.set_yticklabels([])
@@ -4941,7 +4946,7 @@ def show_drizzle_HDU(hdu, diff=True, mask_segmentation=True):
 
             ax.imshow(sci_i.data, origin='lower',
                       interpolation='Nearest', vmin=-0.1*vmax, vmax=vmax,
-                      extent=extent, cmap=plt.cm.viridis_r,
+                      extent=extent, cmap=cmap,
                       aspect='auto')
 
             ax.set_yticklabels([])
@@ -4957,7 +4962,12 @@ def show_drizzle_HDU(hdu, diff=True, mask_segmentation=True):
                         ha='right', va='top', transform=ax.transAxes,
                         fontsize=8, backgroundcolor='w')
 
-    gs.tight_layout(fig, pad=0.1)
+    if average_only:
+        #pass
+        gs.tight_layout(fig, pad=0.01)
+    else:
+        gs.tight_layout(fig, pad=0.1)
+        
     return fig
 
 
