@@ -5885,7 +5885,7 @@ class GTable(astropy.table.Table):
 
         return rd_pair
 
-    def match_to_catalog_sky(self, other, self_radec=None, other_radec=None, nthneighbor=1):
+    def match_to_catalog_sky(self, other, self_radec=None, other_radec=None, nthneighbor=1, get_2d_offset=False):
         """Compute `~astropy.coordinates.SkyCoord` projected matches between two `GTable` tables.
 
         Parameters
@@ -5965,8 +5965,14 @@ class GTable(astropy.table.Table):
                   'nthneighbor')
 
             idx, d2d, d3d = other_coo.match_to_catalog_sky(self_coo)
-
-        return idx, d2d.to(u.arcsec)
+        
+        if get_2d_offset:
+            cosd = np.cos(self_coo.dec.deg/180*np.pi)
+            dra = (other_coo.ra.deg - self_coo.ra.deg[idx])*cosd[idx]
+            dde = (other_coo.dec.deg - self_coo.dec.deg[idx])
+            return idx, d2d.to(u.arcsec), dra*3600*u.arcsec, dde*3600*u.arcsec
+        else:
+            return idx, d2d.to(u.arcsec)
 
     def match_triangles(self, other, self_wcs=None, x_column='X_IMAGE', y_column='Y_IMAGE', mag_column='MAG_AUTO', other_ra='X_WORLD', other_dec='Y_WORLD', pixel_index=1, match_kwargs={}, pad=100, show_diagnostic=False, auto_keep=3, maxKeep=10, auto_limit=3, ba_max=0.99, scale_density=10):
         """
@@ -6540,10 +6546,16 @@ def fill_between_steps(x, y0, y1, ax=None, *args, **kwargs):
     Make `fill_between` work like linestyle='steps-mid'.
     """
     so = np.argsort(x)
-    mid = x[so][:-1] + np.diff(x[so])/2.
-    xfull = np.append(np.append(x, mid), mid+np.diff(x[so])/1.e6)
-    y0full = np.append(np.append(y0, y0[:-1]), y0[1:])
-    y1full = np.append(np.append(y1, y1[:-1]), y1[1:])
+    dx = np.diff(x[so])/2.
+    mid = x[so][:-1] + dx
+    
+    xfull = np.hstack([x[so][0]-dx[0], mid, mid+dx*2/1.e6, x[so][-1]+dx[-1]])
+    y0full = np.hstack([y0[0], y0[:-1], y0[1:], y0[-1]])
+    y1full = np.hstack([y1[0], y1[:-1], y1[1:], y1[-1]])
+    
+    # xfull = np.append(np.append(x, mid), mid+np.diff(x[so])/1.e6)
+    # y0full = np.append(np.append(y0, y0[:-1]), y0[1:])
+    # y1full = np.append(np.append(y1, y1[:-1]), y1[1:])
 
     so = np.argsort(xfull)
     if ax is None:
