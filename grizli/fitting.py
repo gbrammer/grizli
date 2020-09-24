@@ -85,7 +85,10 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     2) ... tbd
 
     fwhm=1200; zr=[0.65, 1.6]; dz=[0.004, 0.0002]; group_name='grism'; fit_stacks=True; prior=None; fcontam=0.2; mask_sn_limit=3; fit_beams=True; root=''
-
+    
+    Returns:
+    =======
+    mb, st, fit, tfit, line_hdu
     """
     import glob
     import grizli.multifit
@@ -3458,7 +3461,7 @@ class GroupFitter(object):
     ###
     # Generic functions for generating flat model and background arrays
     ###
-    def optimal_extract(self, data=None, bin=1, wave=None, ivar=None, trace_limits=None, loglam=True):
+    def optimal_extract(self, data=None, bin=1, wave=None, ivar=None, trace_limits=None, loglam=True, **kwargs):
         """
         Binned optimal extractions by grism.
 
@@ -3524,19 +3527,27 @@ class GroupFitter(object):
 
         if trace_limits is None:
             prof = self.optimal_profile_mask
-
+            
+            # Horne (1986) optimal extraction
+            # f_opt = Sum(P*D/V) / Sum(P**2/V)
             num = prof[:self.Nspec]*data[:self.Nspec]*ivar[:self.Nspec]
             den = prof[:self.Nspec]**2*ivar[:self.Nspec]
 
         else:
+            # Trace extraction, sum of fluxes and variances
             prof = np.isfinite(self.optimal_profile_mask)
-            trace_mask = ((self.yp_trace_mask > trace_limits[0]) & (self.yp_trace_mask < trace_limits[1]))[:self.Nspec]
+            trace_mask = ((self.yp_trace_mask > trace_limits[0]) &
+                          (self.yp_trace_mask < trace_limits[1]))[:self.Nspec]
 
             num = data[:self.Nspec]*trace_mask
-            den = ivar[:self.Nspec]*trace_mask
-
+            den = (1/ivar[:self.Nspec])*trace_mask
+            den[~np.isfinite(den)] = 0
+            dmask = den > 0
+            
         out = {}
         for grism in self.Ngrism:
+            Ng = self.Ngrism[grism]
+            
             lim = utils.GRISM_LIMITS[grism]
             if wave is None:
                 if loglam:
@@ -3552,14 +3563,16 @@ class GroupFitter(object):
             flux_bin = wave_bin[:-1]*0.
             var_bin = wave_bin[:-1]*0.
             n_bin = wave_bin[:-1]*0.
-
+            
+            gmask = self.grism_name_mask == grism
+            
             for j in range(len(wave_bin)-1):
                 #ix = np.abs(self.wave_mask-wave_bin[j]) < lim[2]*bin/2.
 
                 # Wavelength bin
                 ix = (self.wave_mask >= wave_bin[j])
-                ix *= (self.wave_mask < wave_bin[j+1])
-                ix &= self.grism_name_mask == grism
+                ix &= (self.wave_mask < wave_bin[j+1])
+                ix &= gmask
 
                 if ix.sum() > 0:
                     n_bin[j] = ix.sum()
@@ -3567,16 +3580,20 @@ class GroupFitter(object):
                         var_bin[j] = 1./den[ix].sum()
                         flux_bin[j] = num[ix].sum()*var_bin[j]
                     else:
-                        var_bin[j] = 1./den[ix].sum()
-                        flux_bin[j] = num[ix].sum()
+                        Nj = bin*Ng
+                        var_bin[j] = den[ix].sum()/Nj
+                        flux_bin[j] = num[ix].sum()/Nj
 
             binned_spectrum = utils.GTable()
-            binned_spectrum['wave'] = (wave_bin[:-1]+np.diff(wave_bin)/2)*u.Angstrom
+            w_g = (wave_bin[:-1]+np.diff(wave_bin)/2)*u.Angstrom
+            binned_spectrum['wave'] = w_g
             binned_spectrum['flux'] = flux_bin*(u.electron/u.second)
             binned_spectrum['err'] = np.sqrt(var_bin)*(u.electron/u.second)
             binned_spectrum['npix'] = np.cast[int](n_bin)
 
-            binned_spectrum.meta['BIN'] = (bin, 'Spectrum binning')
+            binned_spectrum.meta['GRISM'] = (grism, 'Grism name')
+            binned_spectrum.meta['BIN'] = (bin, 'Spectrum binning factor')
+            binned_spectrum.meta['NEXP'] = (Ng, 'Number of exposures')
 
             out[grism] = binned_spectrum
 
