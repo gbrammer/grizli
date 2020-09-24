@@ -145,7 +145,11 @@ mosaic_args:
             F814W, F850LP, G800L, F098M, F127M, F139M, F153M, F105W, F110W,
             F125W, F140W, F160W, G102, G141, F600LP, F475X]
         pixel_scale: null 
-        
+
+# Extra args to pass to mosaic drizzler
+mosaic_drizzle_args:
+    skysub: False
+    
 # Mask IR difraction spikes
 mask_spikes: False 
 
