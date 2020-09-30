@@ -155,11 +155,21 @@ def img_with_wcs(input):
     """
     from jwst.datamodels import util
     from jwst.assign_wcs import AssignWcsStep
-
+    import astropy.io.fits as pyfits
+    
     # from jwst.stpipe import crds_client
     # from jwst.assign_wcs import assign_wcs
 
     # HDUList -> jwst.datamodels.ImageModel
+    
+    # Generate WCS as image
+    if isinstance(input, pyfits.HDUList):
+        if input[0].header['INSTRUME'] == 'NIRISS':
+            if input[0].header['FILTER'].startswith('GR'):
+                input[0].header['FILTER'] = 'CLEAR'
+                input[0].header['EXP_TYPE'] = 'NIS_IMAGE'
+                #print(input[0].header)
+            
     img = util.open(input)
 
     # AssignWcs to pupulate img.meta.wcsinfo
@@ -209,8 +219,9 @@ def strip_telescope_header(header, simplify_wcs=True):
 
     return new_header
 
+LSQ_ARGS = dict(jac='2-point', bounds=(-np.inf, np.inf), method='trf', ftol=1e-08, xtol=1e-08, gtol=1e-08, x_scale=1.0, loss='soft_l1', f_scale=1.0, diff_step=None, tr_solver=None, tr_options={}, jac_sparsity=None, max_nfev=1000, verbose=0, kwargs={})
 
-def model_wcs_header(datamodel, get_sip=False, order=4, step=32):
+def model_wcs_header(datamodel, get_sip=False, order=4, step=32, lsq_args=LSQ_ARGS):
     """
     Make a header with approximate WCS for use in DS9.
 
@@ -290,9 +301,10 @@ def model_wcs_header(datamodel, get_sip=False, order=4, step=32):
     # Fit a SIP header to the gwcs transformed coordinates
     v, u = np.meshgrid(np.arange(1, sh[0]+1, step), np.arange(1, sh[1]+1, step))
     x, y = datamodel.meta.wcs.forward_transform(u, v)
-    y -= crval[1]
-    x = (x-crval[0])*np.cos(crval[1]/180*np.pi)
-
+    #y -= crval[1]
+    #x = (x-crval[0])*np.cos(crval[1]/180*np.pi)
+    
+      
     a_names = []
     b_names = []
     #order = 4
@@ -310,14 +322,50 @@ def model_wcs_header(datamodel, get_sip=False, order=4, step=32):
 
     p0 = np.zeros(4+len(a_names)+len(b_names))
     p0[:4] += cd.flatten()
-
-    args = (u.flatten(), v.flatten(), x.flatten(), y.flatten(), crpix, a_names, b_names, cd, 0)
+    
+    if datamodel.meta.instrument.name == 'NIRISS':
+        a0 = {'A_0_2': 3.8521180058449584e-08,
+         'A_0_3': -1.2910469982047994e-11,
+         'A_0_4': 3.642187826984494e-15,
+         'A_1_1': -8.156851592950884e-08,
+         'A_1_2': -1.2336474525621777e-10,
+         'A_1_3': 1.1169942988845159e-13,
+         'A_2_0': 3.5236920263776116e-07,
+         'A_2_1': -9.622992486408194e-11,
+         'A_2_2': -2.1150777639693208e-14,
+         'A_3_0': -3.517117816321703e-11,
+         'A_3_1': 1.252016786545716e-13,
+         'A_4_0': -2.5596007366022595e-14}
+        b0 = {'B_0_2': -6.478494215243917e-08,
+         'B_0_3': -4.2460992201562465e-10,
+         'B_0_4': 2.501714355762585e-13,
+         'B_1_1': 4.127407304584838e-07,
+         'B_1_2': -2.774351986369079e-11,
+         'B_1_3': 3.4947161649623674e-15,
+         'B_2_0': -7.509503977158588e-07,
+         'B_2_1': -2.1263593068617203e-10,
+         'B_2_2': 1.3621493497144034e-13,
+         'B_3_0': -2.099145095489808e-11,
+         'B_3_1': -1.613481283521298e-14,
+         'B_4_0': 2.38606562938391e-14}
+        
+        
+        for i, k in enumerate(a_names):
+            if k in a0:
+                p0[4+i] = a0[k]
+        
+        for i, k in enumerate(b_names):
+            if k in b0:
+                p0[4+len(b_names)+i] = b0[k]
+                
+    #args = (u.flatten(), v.flatten(), x.flatten(), y.flatten(), crpix, a_names, b_names, cd, 0)
+    args = (u.flatten(), v.flatten(), x.flatten(), y.flatten(), crval, crpix, a_names, b_names, cd, 0)
 
     # Fit the SIP coeffs
-    fit = least_squares(_objective_sip, p0, jac='2-point', bounds=(-np.inf, np.inf), method='lm', ftol=1e-08, xtol=1e-08, gtol=1e-08, x_scale=1.0, loss='linear', f_scale=1.0, diff_step=None, tr_solver=None, tr_options={}, jac_sparsity=None, max_nfev=1000, verbose=0, args=args, kwargs={})
+    fit = least_squares(_objective_sip, p0, args=args, **lsq_args)
 
     # Get the results
-    args = (u.flatten(), v.flatten(), x.flatten(), y.flatten(), crpix, a_names, b_names, cd, 1)
+    args = (u.flatten(), v.flatten(), x.flatten(), y.flatten(), crval, crpix, a_names, b_names, cd, 1)
 
     cd_fit, a_coeff, b_coeff = _objective_sip(fit.x, *args)
 
@@ -339,8 +387,67 @@ def model_wcs_header(datamodel, get_sip=False, order=4, step=32):
 
     return header
 
+def _objective_sip(params, u, v, ra, dec, crval, crpix, a_names, b_names, cd, ret):
+    """
+    Objective function for fitting SIP coefficients
+    """
+    from astropy.modeling import models, fitting
+    import astropy.io.fits as pyfits
+    import astropy.wcs as pywcs
+    
+    #u, v, x, y, crpix, a_names, b_names, cd = data
 
-def _objective_sip(params, u, v, x, y, crpix, a_names, b_names, cd, ret):
+    cdx = params[0:4].reshape((2, 2))
+    a_params = params[4:4+len(a_names)]
+    b_params = params[4+len(a_names):]
+
+    a_coeff = {}
+    for i in range(len(a_names)):
+        a_coeff[a_names[i]] = a_params[i]
+
+    b_coeff = {}
+    for i in range(len(b_names)):
+        b_coeff[b_names[i]] = b_params[i]
+    
+    if ret == 1:
+        return cdx, a_coeff, b_coeff
+    
+    # Build header
+    _h = pyfits.Header()
+    for i in [0,1]:
+        for j in [0,1]:
+            _h[f'CD{i+1}_{j+1}'] = cdx[i,j]
+    
+    _h['CRPIX1'] = crpix[0]
+    _h['CRPIX2'] = crpix[1]
+    _h['CRVAL1'] = crval[0]
+    _h['CRVAL2'] = crval[1]
+    
+    _h['A_ORDER'] = 4
+    for k in a_coeff:
+        _h[k] = a_coeff[k]
+    
+    _h['B_ORDER'] = 4
+    for k in b_coeff:
+        _h[k] = b_coeff[k]
+    
+    _h['RADESYS'] = 'ICRS    '                                                            
+    _h['CTYPE1']  = 'RA---TAN-SIP'                                                        
+    _h['CTYPE2']  = 'DEC--TAN-SIP'                                                        
+    _h['CUNIT1']  = 'deg     '                                                            
+    _h['CUNIT2']  = 'deg     '                                                            
+    
+    _w = pywcs.WCS(_h)
+    ro, do = _w.all_pix2world(u, v, 1)
+    
+    cosd = np.cos(ro/180*np.pi)
+    dr = np.append((ra-ro)*cosd, dec-do)*3600./0.065
+
+    #print(params, np.abs(dr).max())
+
+    return dr
+    
+def _xobjective_sip(params, u, v, x, y, crval, crpix, a_names, b_names, cd, ret):
     """
     Objective function for fitting SIP coefficients
     """
@@ -362,8 +469,10 @@ def _objective_sip(params, u, v, x, y, crpix, a_names, b_names, cd, ret):
 
     if ret == 1:
         return cdx, a_coeff, b_coeff
-
-    sip = models.SIP(crpix=crpix, a_order=4, b_order=4, a_coeff=a_coeff, b_coeff=b_coeff)
+    
+    off = 1
+    
+    sip = models.SIP(crpix=crpix-off, a_order=4, b_order=4, a_coeff=a_coeff, b_coeff=b_coeff)
 
     fuv, guv = sip(u, v)
     xo, yo = np.dot(cdx, np.array([u+fuv-crpix[0], v+guv-crpix[1]]))

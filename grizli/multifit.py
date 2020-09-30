@@ -164,6 +164,7 @@ def _loadFLT(grism_file, sci_extn, direct_file, pad, ref_file,
     save_file = save_file.replace('_flc.fits', new_root)
     save_file = save_file.replace('_cmb.fits', new_root)
     save_file = save_file.replace('_rate.fits', new_root)
+    save_file = save_file.replace('_elec.fits', new_root)
 
     if (grism_file.find('_') < 0) & ('GrismFLT' not in grism_file):
         save_file = 'xxxxxxxxxxxxxxxxxxx'
@@ -488,6 +489,7 @@ class GroupFLT():
             save_file = save_file.replace('_flc.fits', new_root)
             save_file = save_file.replace('_cmb.fits', new_root)
             save_file = save_file.replace('_rate.fits', new_root)
+            save_file = save_file.replace('_elec.fits', new_root)
             print('Save {0}'.format(save_file))
             self.FLTs[i].save_full_pickle()
 
