@@ -2016,7 +2016,8 @@ class ImageData(object):
                               header=slice_header, wcs=slice_wcs,
                               photflam=self.photflam, photplam=self.photplam,
                               origin=slice_origin, instrument=self.instrument,
-                              filter=self.filter, pupil=self.pupil)
+                              filter=self.filter, pupil=self.pupil, 
+                              process_jwst_header=False)
 
         slice_obj.ref_photflam = self.ref_photflam
         slice_obj.ref_photplam = self.ref_photplam
@@ -3208,7 +3209,8 @@ class GrismFLT(object):
             import pickle
 
         root = self.grism_file.split('_flt.fits')[0].split('_rate.fits')[0]
-
+        root = root.split('_elec.fits')[0]
+        
         h = pyfits.Header()
         h['GFILE'] = (self.grism_file, 'Grism exposure name')
         h['GFILTER'] = (self.grism.filter, 'Grism spectral element')
@@ -3263,6 +3265,7 @@ class GrismFLT(object):
 
         root = self.grism_file.split('_flt.fits')[0].split('_cmb.fits')[0]
         root = root.split('_flc.fits')[0].split('_rate.fits')[0]
+        root = root.split('_elec.fits')[0]
 
         hdu = pyfits.HDUList([pyfits.PrimaryHDU()])
         for key in self.direct.data.keys():
