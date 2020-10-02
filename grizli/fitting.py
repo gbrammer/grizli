@@ -1567,7 +1567,7 @@ class GroupFitter(object):
         import scipy.optimize
         #import scipy.sparse
         from scipy.special import huber
-
+        
         NTEMP = len(templates)
         if (self.Nphot > 0) & include_photometry:
             A = np.zeros((self.N+NTEMP, self.Nmask))
@@ -1805,7 +1805,8 @@ class GroupFitter(object):
         if get_uncertainties:
             try:
                 # Covariance is inverse of AT.A
-                covar_i = np.matrix(np.dot(AxT.T, AxT)).I.A
+                #covar_i = np.matrix(np.dot(AxT.T, AxT)).I.A
+                covar_i = utils.safe_invert(np.dot(AxT.T, AxT))
                 covar = utils.fill_masked_covar(covar_i, oktemp)
                 covard = np.sqrt(covar.diagonal())
 
@@ -1817,7 +1818,8 @@ class GroupFitter(object):
                         #mcoeffs_i, rnorm = scipy.optimize.nnls(AxTm, data)
                         #mcoeffs_i[:self.N] -= pedestal
 
-                        mcovar_i = np.matrix(np.dot(AxTm.T, AxTm)).I.A
+                        #mcovar_i = np.matrix(np.dot(AxTm.T, AxTm)).I.A
+                        mcovar_i = utils.safe_invert(np.dot(AxTm.T, AxTm))
                         mcovar = utils.fill_masked_covar(mcovar_i, nonzero)
                         mcovar = utils.fill_masked_covar(mcovar, oktemp)
                         mcovard = np.sqrt(mcovar.diagonal())

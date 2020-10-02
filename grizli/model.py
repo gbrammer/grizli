@@ -1100,21 +1100,24 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         """
         confp = self.conf.conf
         if ('INSTRUMENT' in confp) & ('CAMERA' in confp):
-            if '{0}-{1}'.format(confp['INSTRUMENT'], confp['CAMERA']) != 'WFC3-IR':
+            instr = '{0}-{1}'.format(confp['INSTRUMENT'], confp['CAMERA'])
+            if instr != 'WFC3-IR':
                 return 1
         else:
             return 1
 
         try:
-            pam = pyfits.open(os.getenv('iref')+'ir_wfc3_map.fits')
-            pam_data = pam[1].data
+            with pyfits.open(os.getenv('iref')+'ir_wfc3_map.fits') as pam:
+                pam_data = pam[1].data
+                
             pam_value = pam_data[int(self.yc-self.pad), int(self.xc-self.pad)]
             pam.close()
         except:
             pam_value = 1
 
         if verbose:
-            print('PAM correction at x={0}, y={1}: {2:.3f}'.format(self.xc-self.pad, self.yc-self.pad, pam_value))
+            msg = 'PAM correction at x={0}, y={1}: {2:.3f}'
+            print(msg.format(self.xc-self.pad, self.yc-self.pad, pam_value))
 
         return pam_value
 
@@ -1479,7 +1482,7 @@ class ImageData(object):
 
         self.wcs = None
 
-        if instrument in ['NIRISS', 'NIRCAM']:
+        if (instrument in ['NIRISS', 'NIRCAM']) & (~self.is_slice):
             if process_jwst_header:
                 self.update_jwst_wcsheader(hdulist)
 
@@ -1580,23 +1583,26 @@ class ImageData(object):
                 ext = self.header['EXTVER']
 
             if os.path.exists(self.parent_file):
-                fobj = pyfits.open(self.parent_file)
-                wcs = stwcs.wcsutil.hstwcs.HSTWCS(fobj=fobj, ext=('SCI', ext))
+                with pyfits.open(self.parent_file) as fobj:
+                    wcs = stwcs.wcsutil.hstwcs.HSTWCS(fobj=fobj, 
+                                                      ext=('SCI', ext))
                 if self.pad > 0:
                     wcs = self.add_padding_to_wcs(wcs, pad=self.pad)
 
             else:
                 # Get WCS from a stripped wcs.fits file (from self.save_wcs)
                 # already padded.
-                wcsfile = self.parent_file.replace('.fits', '.{0:02d}.wcs.fits'.format(ext))
-                fobj = pyfits.open(wcsfile)
-                fh = fobj[0].header
-                if fh['NAXIS'] == 0:
-                    fh['NAXIS'] = 2
-                    fh['NAXIS1'] = int(fh['CRPIX1']*2)
-                    fh['NAXIS2'] = int(fh['CRPIX2']*2)
+                wcsfile = self.parent_file.replace('.fits', 
+                                              '.{0:02d}.wcs.fits'.format(ext))
+                
+                with pyfits.open(wcsfile) as fobj:
+                    fh = fobj[0].header
+                    if fh['NAXIS'] == 0:
+                        fh['NAXIS'] = 2
+                        fh['NAXIS1'] = int(fh['CRPIX1']*2)
+                        fh['NAXIS2'] = int(fh['CRPIX2']*2)
 
-                wcs = stwcs.wcsutil.hstwcs.HSTWCS(fobj=fobj, ext=0)
+                    wcs = stwcs.wcsutil.hstwcs.HSTWCS(fobj=fobj, ext=0)
 
             #print('XXX WCS',wcs)
 
@@ -1812,7 +1818,11 @@ class ImageData(object):
         segmentation : bool, False
             If True, treat the reference image as a segmentation image and
             preserve the integer values in the blotting.
-
+            
+            If specified as number > 1, then use `~grizli.utils.blot_nearest_exact` 
+            rather than a hacky pixel area ratio method to blot integer 
+            segmentation maps.
+            
         grow : int, default=3
             Number of pixels to dilate the segmentation regions
 
@@ -1864,38 +1874,42 @@ class ImageData(object):
                 #wcs.idcscale = np.sqrt(np.sum(wcs.wcs.cd[0,:]**2))*3600.
                 wcs.idcscale = np.mean(np.sqrt(np.sum(wcs.wcs.cd**2, axis=0))*3600.)  # np.sqrt(np.sum(wcs.wcs.cd[0,:]**2))*3600.
 
-            # wcs.pscale = np.sqrt(wcs.wcs.cd[0,0]**2 +
-            #                      wcs.wcs.cd[1,0]**2)*3600.
-            #
             wcs.pscale = utils.get_wcs_pscale(wcs)
 
         if segmentation:
             # Handle segmentation images a bit differently to preserve
             # integers.
             # +1 here is a hack for some memory issues
-
-            seg_interp = 'nearest'
-
-            blotted_ones = astrodrizzle.ablot.do_blot(seg_ones+1, ref_wcs,
-                                flt_wcs, 1, coeffs=True,
-                                interp=seg_interp,
-                                sinscl=1.0, stepsize=10, wcsmap=None)
-
-            blotted_seg = astrodrizzle.ablot.do_blot(refdata*1., ref_wcs,
-                                flt_wcs, 1, coeffs=True,
-                                interp=seg_interp,
-                                sinscl=1.0, stepsize=10, wcsmap=None)
-
-            blotted_ones[blotted_ones == 0] = 1
-
-            #pixel_ratio = (flt_wcs.idcscale / ref_wcs.idcscale)**2
-            #in_seg = np.abs(blotted_ones - pixel_ratio) < 1.e-2
-
-            ratio = np.round(blotted_seg/blotted_ones)
-            seg = nd.maximum_filter(ratio, size=grow, mode='constant', cval=0)
-            ratio[ratio == 0] = seg[ratio == 0]
-            blotted = ratio
-
+            
+            if segmentation*1 == 1:
+                seg_interp = 'nearest'
+            
+                blotted_ones = astrodrizzle.ablot.do_blot(seg_ones+1, ref_wcs,
+                                    flt_wcs, 1, coeffs=True,
+                                    interp=seg_interp,
+                                    sinscl=1.0, stepsize=10, wcsmap=None)
+            
+                blotted_seg = astrodrizzle.ablot.do_blot(refdata*1., ref_wcs,
+                                    flt_wcs, 1, coeffs=True,
+                                    interp=seg_interp,
+                                    sinscl=1.0, stepsize=10, wcsmap=None)
+            
+                blotted_ones[blotted_ones == 0] = 1
+            
+                #pixel_ratio = (flt_wcs.idcscale / ref_wcs.idcscale)**2
+                #in_seg = np.abs(blotted_ones - pixel_ratio) < 1.e-2
+            
+                ratio = np.round(blotted_seg/blotted_ones)
+                seg = nd.maximum_filter(ratio, size=grow, 
+                                        mode='constant', cval=0)
+                ratio[ratio == 0] = seg[ratio == 0]
+                blotted = ratio
+            else:
+                blotted = utils.blot_nearest_exact(refdata, ref_wcs, flt_wcs, 
+                                               verbose=True, stepsize=-1,
+                                               scale_by_pixel_area=False, 
+                                               wcs_mask=True,
+                                               fill_value=0)
         else:
             # Floating point data
             blotted = astrodrizzle.ablot.do_blot(refdata, ref_wcs, flt_wcs, 1,
@@ -2078,6 +2092,7 @@ class ImageData(object):
         h = self.header.copy()
         h['EXTVER'] = extver  # self.filter #extver
         h['FILTER'] = self.filter, 'element selected from filter wheel'
+        h['PUPIL'] = self.pupil, 'element selected from pupil wheel'
         h['INSTRUME'] = (self.instrument,
                          'identifier for instrument used to acquire data')
 
@@ -2260,8 +2275,10 @@ class GrismFLT(object):
 
         # Read files
         self.grism_file = grism_file
+        _GRISM_OPEN = False
         if os.path.exists(grism_file):
             grism_im = pyfits.open(grism_file)
+            _GRISM_OPEN = True
 
             if grism_im[0].header['INSTRUME'] == 'ACS':
                 wcs = stwcs.wcsutil.HSTWCS(grism_im, ext=('SCI', sci_extn))
@@ -2279,9 +2296,10 @@ class GrismFLT(object):
                 raise IOError
 
         self.direct_file = direct_file
+        _DIRECT_OPEN = False
         if os.path.exists(direct_file):
             direct_im = pyfits.open(direct_file)
-
+            _DIRECT_OPEN = True
             if direct_im[0].header['INSTRUME'] == 'ACS':
                 wcs = stwcs.wcsutil.HSTWCS(direct_im, ext=('SCI', sci_extn))
             else:
@@ -2372,7 +2390,14 @@ class GrismFLT(object):
 
         self.is_rotated = False
         self.has_edge_mask = False
-
+        
+        # Cleanup
+        if _GRISM_OPEN:
+            grism_im.close()
+        
+        if _DIRECT_OPEN:
+            direct_im.close()
+            
     def process_ref_file(self, ref_file, ref_ext=0, shrink_segimage=True,
                          verbose=True):
         """Read and blot a reference image
@@ -2410,19 +2435,25 @@ class GrismFLT(object):
             self.ref_file = ref_file.fileinfo()['file'].name
             ref_str = ''
             ref_hdu = ref_file
-            refh = ref_hdu.header
+
+            _IS_OPEN = False
         else:
             self.ref_file = ref_file
             ref_str = '{0}[0]'.format(self.ref_file)
-            ref_hdu = pyfits.open(ref_file)[ref_ext]
-            refh = ref_hdu.header
-
+            
+            _IS_OPEN = True
+            ref_im = pyfits.open(ref_file, load_lazy_hdus=False)
+            ref_hdu = ref_im[ref_ext]
+        
+        refh = ref_hdu.header
+            
         if shrink_segimage:
             ref_hdu = self.direct.shrink_large_hdu(ref_hdu, extra=self.pad,
                                                    verbose=True)
 
         if verbose:
-            print('{0} / blot reference {1}'.format(self.direct_file, ref_str))
+            msg = '{0} / blot reference {1}'
+            print(msg.format(self.direct_file, ref_str))
 
         blotted_ref = self.grism.blot_from_hdu(hdu=ref_hdu,
                                       segmentation=False, interp='poly5')
@@ -2437,44 +2468,21 @@ class GrismFLT(object):
                 try:
                     header_values[key] = ref_hdu.header[key]*1.
                 except TypeError:
-                    print('Problem processing header keyword {0}: ** {1} **'.format(key, ref_hdu.header[key]))
+                    msg = 'Problem processing header keyword {0}: ** {1} **'
+                    print(msg.format(key, ref_hdu.header[key]))
                     raise TypeError
             else:
                 filt = self.direct.ref_filter
                 if filt in key_list[key]:
                     header_values[key] = key_list[key][filt]
                 else:
-                    print('Filter "{0}" not found in {1} tabulated list'.format(filt, key))
+                    msg = 'Filter "{0}" not found in {1} tabulated list'
+                    print(msg.format(filt, key))
                     raise IndexError
 
         # Found keywords
         self.direct.ref_photflam = header_values['PHOTFLAM']
         self.direct.ref_photplam = header_values['PHOTPLAM']
-
-        # if 'PHOTFLAM' in refh:
-        #     try:
-        #         self.direct.ref_photflam = ref_hdu.header['PHOTFLAM']*1.
-        #     except TypeError:
-        #         print 'Problem reading header keyword PHOTFLAM: ** %s **' %(ref_hdu.header['PHOTFLAM'])
-        #         raise TypeError
-        # else:
-        #     key = refh['FILTER'].upper()
-        #     if key in photflam_list:
-        #         self.direct.ref_photflam = photflam_list[key]
-        #     else:
-        #         print 'Filter "%s" not found in `photflam_list`' %(key)
-        #         raise IndexError
-        #
-        # if 'PHOTPLAM' in refh:
-        #     try:
-        #         self.direct.ref_photplam = ref_hdu.header['PHOTPLAM']*1.
-        #     except TypeError:
-        #         print 'Problem reading header keyword PHOTPLAM: ** %s **' %(ref_hdu.header['PHOTPLAM'])
-        #         raise TypeError
-        #
-        # else:
-        #     key = refh['FILTER'].upper()
-        #     self.direct.ref_photplam = photplam_list[refh['FILTER'].upper()]
 
         # TBD: compute something like a cross-correlation offset
         # between blotted reference and the direct image itself
@@ -2495,7 +2503,10 @@ class GrismFLT(object):
                       5*np.log10(self.direct.ref_photplam) + 18.6921)
 
         self.direct.thumb_extension = 'REF'
-
+        
+        if _IS_OPEN:
+            ref_im.close()
+            
         # refh['FILTER'].upper()
         return True
 
@@ -2527,11 +2538,13 @@ class GrismFLT(object):
                 seg_str = ''
                 seg_hdu = seg_file
                 segh = seg_hdu.header
+                _IS_OPEN = False
             else:
                 self.seg_file = seg_file
                 seg_str = '{0}[0]'.format(self.seg_file)
-                seg_hdu = pyfits.open(seg_file)[0]
-                segh = seg_hdu.header
+                seg_im = pyfits.open(seg_file)
+                seg_hdu = seg_im[0]
+                _IS_OPEN = True
 
             if shrink_segimage:
                 seg_hdu = self.direct.shrink_large_hdu(seg_hdu,
@@ -2542,13 +2555,17 @@ class GrismFLT(object):
                 seg_hdu = self.direct.expand_hdu(seg_hdu)
 
             if verbose:
-                print('{0} / blot segmentation {1}'.format(self.direct_file, seg_str))
+                msg = '{0} / blot segmentation {1}'
+                print(msg.format(self.direct_file, seg_str))
 
             blotted_seg = self.grism.blot_from_hdu(hdu=seg_hdu,
                                           segmentation=True, grow=3,
                                           interp='poly5')
             self.seg = blotted_seg
-
+            
+            if _IS_OPEN:
+                seg_im.close()
+                
         else:
             self.seg = np.zeros(self.direct.sh, dtype=np.float32)
 
@@ -2591,7 +2608,7 @@ class GrismFLT(object):
             dispersion_PA = np.round(dispersion_PA, decimals=decimals)
 
         self.dispersion_PA = dispersion_PA
-        return dispersion_PA
+        return float(dispersion_PA)
 
     def compute_model_orders(self, id=0, x=None, y=None, size=10, mag=-1,
                       spectrum_1d=None, is_cgs=False,
@@ -3186,8 +3203,9 @@ class GrismFLT(object):
         if not os.path.exists(seg_file):
             print('Segmentation image {0} not found'.format(segfile))
             return False
-
-        self.seg = np.cast[np.float32](pyfits.open(seg_file)[0].data)
+        
+        with pyfits.open(seg_file) as seg_im: 
+            self.seg = seg_im[0].data.astype(np.float32)
 
         if seg_cat is None:
             seg_cat = root + '.detect.cat'
@@ -3357,7 +3375,8 @@ class GrismFLT(object):
                     self.grism.data[key] = fits[ext].data*1
             else:
                 pass
-
+        
+        fits.close()
         del(fits)
 
         return True
@@ -3635,7 +3654,8 @@ class BeamCutout(object):
                      (self.grism.data['SCI'] == 0))
 
         self.var = self.grism.data['ERR']**2
-        self.ivar = 1/self.grism.data['ERR']**2
+        self.var[self.mask] = 1.e30
+        self.ivar = 1/self.var
         self.ivar[self.mask] = 0
 
         self.thumbs = {}
@@ -3791,7 +3811,9 @@ class BeamCutout(object):
         """
         if isinstance(file, str):
             hdu = pyfits.open(file)
+            file_is_open = True
         else:
+            file_is_open = False
             hdu = file
 
         self.direct = ImageData(hdulist=hdu, sci_extn=direct_extn)
@@ -3864,7 +3886,11 @@ class BeamCutout(object):
         self.direct.parent_file = h0['DPARENT']
         self.id = h0['ID']
         self.modelf = self.beam.modelf
-
+        
+        # Cleanup
+        if file_is_open:
+            hdu.close()
+            
     @property
     def trace_table(self):
         """
@@ -4309,7 +4335,7 @@ class BeamCutout(object):
         if decimals is not None:
             dispersion_PA = np.round(dispersion_PA, decimals=decimals)
 
-        return dispersion_PA
+        return float(dispersion_PA)
 
     def init_epsf(self, center=None, tol=1.e-3, yoff=0., skip=1., flat_sensitivity=False, psf_params=None, N=4, get_extended=False, only_centering=True):
         """Initialize ePSF fitting for point sources

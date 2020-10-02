@@ -536,7 +536,8 @@ class StackFitter(GroupFitter):
         # Uncertainties from covariance matrix
         if get_uncertainties:
             try:
-                covar = np.matrix(np.dot(AxT.T, AxT)).I
+                #covar = np.matrix(np.dot(AxT.T, AxT)).I
+                covar = utils.safe_invert(np.dot(AxT.T, AxT))
                 covard = np.sqrt(covar.diagonal()).A.flatten()
 
                 # covarf = np.matrix(np.dot(ATA.T, ATA)).I
@@ -698,7 +699,8 @@ class StackFitter(GroupFitter):
         # Uncertainties from covariance matrix
         if get_uncertainties:
             try:
-                covar = np.matrix(np.dot(AxT.T, AxT)).I
+                #covar = np.matrix(np.dot(AxT.T, AxT)).I
+                covar = utils.safe_invert(np.dot(AxT.T, AxT))
                 covard = np.sqrt(covar.diagonal()).A.flatten()
             except:
                 print('Except: covar!')
