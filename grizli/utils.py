@@ -1455,6 +1455,19 @@ def detect_with_photutils(sci, err=None, dq=None, seg=None, detect_thresh=2.,
     return catalog, seg
 
 
+def safe_invert(arr):
+    """
+    version-safe matrix inversion using np.linalg or np.matrix.I
+    """
+    try:
+        from numpy.linalg import inv
+        _inv = inv(arr)
+    except:
+        _inv = np.matrix(arr).I.A
+    
+    return _inv
+    
+
 def nmad(data):
     """Normalized NMAD=1.4826022 * `~.astropy.stats.median_absolute_deviation`
 

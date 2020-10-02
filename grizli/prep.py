@@ -4668,7 +4668,8 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
 
             try:
                 ND = 100
-                covar = np.matrix(np.dot(Ax.T, Ax)).I.A
+                #covar = np.matrix(np.dot(Ax.T, Ax)).I.A
+                covar = utils.safe_invert(np.dot(Ax.T, Ax))
                 draws = np.random.multivariate_normal(cspl, covar, ND)
                 gp_sigma = np.std(Aspl.dot(draws.T), axis=1)
             except:

@@ -342,9 +342,9 @@ class GroupFLT():
             Number of grism files (i.e., `len(FLTs)`.)
 
         """
-        self.N = len(grism_files)
+        N = len(grism_files)
         if len(direct_files) != len(grism_files):
-            direct_files = ['']*self.N
+            direct_files = ['']*N
 
         self.grism_files = grism_files
         self.direct_files = direct_files
@@ -376,22 +376,24 @@ class GroupFLT():
         if cpu_count == 0:
             cpu_count = mp.cpu_count()
 
+        self.FLTs = []
+
         if cpu_count < 0:
             # serial
-            self.FLTs = []
             t0_pool = time.time()
-            for i in range(self.N):
-                flt = _loadFLT(self.grism_files[i], sci_extn, self.direct_files[i], pad, ref_file, ref_ext, seg_file, verbose, self.catalog, i)
+            for i in range(N):
+                flt = _loadFLT(self.grism_files[i], sci_extn, 
+                               self.direct_files[i], pad, ref_file, ref_ext, 
+                               seg_file, verbose, self.catalog, i)
                 self.FLTs.append(flt)
 
             t1_pool = time.time()
         else:
             # Read files in parallel
-            self.FLTs = []
             t0_pool = time.time()
 
             pool = mp.Pool(processes=cpu_count)
-            results = [pool.apply_async(_loadFLT, (self.grism_files[i], sci_extn, self.direct_files[i], pad, ref_file, ref_ext, seg_file, verbose, self.catalog, i)) for i in range(self.N)]
+            results = [pool.apply_async(_loadFLT, (self.grism_files[i], sci_extn, self.direct_files[i], pad, ref_file, ref_ext, seg_file, verbose, self.catalog, i)) for i in range(N)]
 
             pool.close()
             pool.join()
@@ -409,40 +411,64 @@ class GroupFLT():
 
             t1_pool = time.time()
 
-        # Parse grisms & PAs
-        self.Ngrism = {}
-        for i in range(self.N):
-            if self.FLTs[i].grism.instrument == 'NIRISS':
-                grism = self.FLTs[i].grism.pupil
-            else:
-                grism = self.FLTs[i].grism.filter
-
-            if grism in self.Ngrism:
-                self.Ngrism[grism] += 1
-            else:
-                self.Ngrism[grism] = 1
-
-        self.grisms = list(self.Ngrism.keys())
-
-        self.PA = {}
-        for g in self.Ngrism:
-            self.PA[g] = {}
-
-        for i in range(self.N):
-            if self.FLTs[i].grism.instrument == 'NIRISS':
-                grism = self.FLTs[i].grism.pupil
-            else:
-                grism = self.FLTs[i].grism.filter
-
-            PA = self.FLTs[i].get_dispersion_PA(decimals=0)
-            if PA in self.PA[grism]:
-                self.PA[grism][PA].append(i)
-            else:
-                self.PA[grism][PA] = [i]
-
         if verbose:
             print('Files loaded - {0:.2f} sec.'.format(t1_pool - t0_pool))
+    
+    @property 
+    def N(self):
+        return len(self.FLTs)
+        
+    @property
+    def Ngrism(self):
+        """
+        dictionary containing number of exposures by grism
+        """
+        # Parse grisms & PAs
+        Ngrism = {}
+        for flt in self.FLTs:
+            if flt.grism.instrument == 'NIRISS':
+                grism = flt.grism.pupil
+            else:
+                grism = flt.grism.filter
 
+            if grism not in Ngrism:
+                Ngrism[grism] = 0
+                
+            Ngrism[grism] += 1
+        
+        return Ngrism
+    
+    @property 
+    def grisms(self):
+        """
+        Available grisms
+        """
+        grisms = list(self.Ngrism.keys())
+        return grisms
+        
+    @property
+    def PA(self):
+        """
+        Available PAs in each grism
+        """
+        _PA = {}
+        for g in self.Ngrism:
+            _PA[g] = {}
+
+        for i, flt in enumerate(self.FLTs):
+            if flt.grism.instrument == 'NIRISS':
+                grism = flt.grism.pupil
+            else:
+                grism = flt.grism.filter
+
+            PA_i = flt.get_dispersion_PA(decimals=0)
+            if PA_i not in _PA[grism]:
+                _PA[grism][PA_i] = []
+            
+            _PA[grism][PA_i].append(i)
+        
+        return _PA
+        
     def save_full_data(self, warn=True):
         """Save models and data files for fast regeneration.
 
@@ -476,14 +502,14 @@ class GroupFLT():
         have multiple `SCI` extensions in a single calibrated file
         (e.g., ACS and WFC3/UVIS).
         """
-        for i in range(self.N):
-            file = self.FLTs[i].grism_file
-            if self.FLTs[i].grism.data is None:
+        for _flt in self.FLTs:
+            file = _flt.grism_file
+            if _flt.grism.data is None:
                 if warn:
                     print('{0}: Looks like data already saved!'.format(file))
                     continue
 
-            new_root = '.{0:02d}.GrismFLT.fits'.format(self.FLTs[i].grism.sci_extn)
+            new_root = '.{0:02d}.GrismFLT.fits'.format(_flt.grism.sci_extn)
 
             save_file = file.replace('_flt.fits', new_root)
             save_file = save_file.replace('_flc.fits', new_root)
@@ -491,10 +517,10 @@ class GroupFLT():
             save_file = save_file.replace('_rate.fits', new_root)
             save_file = save_file.replace('_elec.fits', new_root)
             print('Save {0}'.format(save_file))
-            self.FLTs[i].save_full_pickle()
+            _flt.save_full_pickle()
 
             # Reload initialized data
-            self.FLTs[i].load_from_fits(save_file)
+            _flt.load_from_fits(save_file)
 
     def extend(self, new, verbose=True):
         """Add another `GroupFLT` instance to `self`
@@ -506,7 +532,6 @@ class GroupFLT():
         """
         import copy
         self.FLTs.extend(new.FLTs)
-        self.N = len(self.FLTs)
 
         direct_files = copy.copy(self.direct_files)
         direct_files.extend(new.direct_files)
@@ -1035,8 +1060,9 @@ class GroupFLT():
 
                 # Make figure
                 if make_figure:
-                    img = pyfits.open(outfile.replace('clean', 'sci'))
-                    im = img[0].data
+                    with pyfits.open(outfile.replace('clean', 'sci')) as img:
+                        im = img[0].data
+                    
                     im[im == 0] = np.nan
 
                     sh = im.shape
@@ -1050,11 +1076,15 @@ class GroupFLT():
 
                     xsl = slice(xmi, xma)
                     ysl = slice(ymi, yma)
+                    
+                    _dy = (ysl.stop - ysl.start)
+                    _dx = (xsl.stop - xsl.start)
+                    sh_aspect = _dy / _dx
 
-                    sh_aspect = (ysl.stop - ysl.start) / (xsl.stop - xsl.start)
                     vmi, vma = -0.05, 0.2
 
-                    fig = plt.figure(figsize=[fig_xsize, fig_xsize/2*sh_aspect])
+                    fig = plt.figure(figsize=[fig_xsize, 
+                                              fig_xsize/2*sh_aspect])
 
                     ax = fig.add_subplot(121)
                     ax.imshow(im[ysl, xsl], origin='lower', cmap='gray_r',
@@ -1062,7 +1092,9 @@ class GroupFLT():
 
                     # Clean
                     ax = fig.add_subplot(122)
-                    im = pyfits.open(outfile)[0].data
+                    with pyfits.open(outfile) as _im:
+                        im = im[0].data
+                        
                     im[im == 0] = np.nan
 
                     ax.imshow(im[ysl, xsl], origin='lower', cmap='gray_r',
@@ -1486,49 +1518,75 @@ class MultiBeam(GroupFitter):
                 beam.init_galactic_extinction(MW_EBV, R_V=R_V)
                 beam.process_config()
                 b.flat_flam = b.compute_model(in_place=False, is_cgs=True)
-
-    def _parse_beams(self, psf=False):
+    
+    @property 
+    def N(self):
+        return len(self.beams)
+    
+    @property
+    def Ngrism(self):
         """
-        Derive properties of the beam list (grism, PA) and initialize
-        data arrays.
+        dictionary containing number of exposures by grism
         """
-        self.N = len(self.beams)
-        self.Ngrism = {}
-        for i in range(self.N):
-            beam = self.beams[i]
+        # Parse grisms & PAs
+        Ngrism = {}
+        for beam in self.beams:
             if beam.grism.instrument == 'NIRISS':
                 grism = beam.grism.pupil
             else:
                 grism = beam.grism.filter
 
-            if grism in self.Ngrism:
-                self.Ngrism[grism] += 1
-            else:
-                self.Ngrism[grism] = 1
-
-        self.grisms = list(self.Ngrism.keys())
-
-        self.PA = {}
+            if grism not in Ngrism:
+                Ngrism[grism] = 0
+                
+            Ngrism[grism] += 1
+        
+        return Ngrism
+    
+    @property 
+    def grisms(self):
+        """
+        Available grisms
+        """
+        grisms = list(self.Ngrism.keys())
+        return grisms
+        
+    @property
+    def PA(self):
+        """
+        Available PAs in each grism
+        """
+        _PA = {}
         for g in self.Ngrism:
-            self.PA[g] = {}
+            _PA[g] = {}
 
-        for i in range(self.N):
-            if self.beams[i].grism.instrument == 'NIRISS':
-                grism = self.beams[i].grism.pupil
+        for i, beam in enumerate(self.beams):
+            if beam.grism.instrument == 'NIRISS':
+                grism = beam.grism.pupil
             else:
-                grism = self.beams[i].grism.filter
+                grism = beam.grism.filter
 
-            PA = self.beams[i].get_dispersion_PA(decimals=0)
-            if PA in self.PA[grism]:
-                self.PA[grism][PA].append(i)
+            PA_i = beam.get_dispersion_PA(decimals=0)
+            if PA_i in _PA[grism]:
+                _PA[grism][PA_i].append(i)
             else:
-                self.PA[grism][PA] = [i]
-
-        self.id = self.beams[0].id
+                _PA[grism][PA_i] = [i]
+        
+        return _PA
+    
+    @property 
+    def id(self):
+        return self.beams[0].id
+           
+    def _parse_beams(self, psf=False):
+        """
+        Derive properties of the beam list (grism, PA) and initialize
+        data arrays.
+        """
 
         # Use WFC3 ePSF for the fit
         self.psf_param_dict = None
-        if (psf > 0) & (self.beams[i].grism.instrument in ['WFC3', 'ACS']):
+        if (psf > 0) & (self.beams[0].grism.instrument in ['WFC3', 'ACS']):
 
             self.psf_param_dict = OrderedDict()
             for ib, beam in enumerate(self.beams):
@@ -1549,9 +1607,11 @@ class MultiBeam(GroupFitter):
                 #beam.modelf = beam.model.flatten()
                 #beam.model = beam.modelf.reshape(beam.beam.sh_beam)
 
-                beam.flat_flam = beam.compute_model(in_place=False, is_cgs=True)  # /self.beam.total_flux
+                beam.flat_flam = beam.compute_model(in_place=False, 
+                                                    is_cgs=True)
 
-                self.psf_param_dict[beam.grism.parent_file] = beam.beam.psf_params
+                _p = beam.grism.parent_file
+                self.psf_param_dict[_p] = beam.beam.psf_params
 
         self._parse_beam_arrays()
 
@@ -1606,8 +1666,9 @@ class MultiBeam(GroupFitter):
         self.wavef = np.hstack([b.wavef for b in self.beams])
         self.contamf = np.hstack([b.contam.flatten() for b in self.beams])
 
-        self.weightf = np.exp(-(self.fcontam*np.abs(self.contamf)*np.sqrt(self.ivarf)))
-        self.weightf[~np.isfinite(self.weightf)] = 0
+        weightf = np.exp(-(self.fcontam*np.abs(self.contamf)*self.sivarf))
+        weightf[~np.isfinite(weightf)] = 0
+        self.weightf = weightf
         self.fit_mask *= self.weightf > 0
 
         self.DoF = int((self.weightf*self.fit_mask).sum())
@@ -1806,20 +1867,28 @@ class MultiBeam(GroupFitter):
 
         """
         if isinstance(ref_image, pyfits.HDUList):
-            ref_im = ref_image[0]
+            ref_data = ref_image[0].data
+            ref_header = ref_image[0].header
+            
             ref_image_filename = ref_image.filename()
         elif (isinstance(ref_image, pyfits.ImageHDU) |
               isinstance(ref_image, pyfits.PrimaryHDU)):
-            ref_im = ref_image
+            
+            ref_data = ref_image.data
+            ref_header = ref_image.header
+            
             ref_image_filename = 'HDU'
         else:
-            ref_im = pyfits.open(ref_image)
+            with pyfits.open(ref_image) as ref_im:
+                ref_data = ref_im[0].data
+                ref_header = ref_im[0].header
+                
             ref_image_filename = ref_image
 
-        ref_wcs = pywcs.WCS(ref_im.header, relax=True)
+        ref_wcs = pywcs.WCS(ref_header, relax=True)
         ref_wcs.pscale = utils.get_wcs_pscale(ref_wcs)
 
-        ref_data = ref_im.data.astype(np.float32)
+        ref_data = ref_data.astype(np.float32)
 
         for ib in range(self.N):
 
@@ -1866,37 +1935,43 @@ class MultiBeam(GroupFitter):
         from drizzlepac.astrodrizzle import ablot
 
         if isinstance(ref_image, pyfits.HDUList):
-            ref_im = ref_image[0]
+            ref_data = ref_image[0].data
+            ref_header = ref_image[0].header
             ref_image_filename = ref_image.filename()
         elif (isinstance(ref_image, pyfits.ImageHDU) |
               isinstance(ref_image, pyfits.PrimaryHDU)):
-            ref_im = ref_image
+            ref_data = ref_image.data
+            ref_header = ref_image.header
             ref_image_filename = 'HDU'
         else:
-            ref_im = pyfits.open(ref_image)[ext]
-            ref_image_filename = ref_image
+            with pyfits.open(ref_image)[ext] as ref_im:
+                ref_data = ref_im.data
+                ref_header = ref_im.header
 
-        ref_wcs = pywcs.WCS(ref_im.header, relax=True)
+            ref_image_filename = ref_image
+        
+        if ref_data.dtype not in [np.float32, np.dtype('>f4')]:
+            ref_data = ref_data.astype(np.float32)
+            
+        ref_wcs = pywcs.WCS(ref_header, relax=True)
         ref_wcs.pscale = utils.get_wcs_pscale(ref_wcs)
         if not hasattr(ref_wcs, '_naxis1') & hasattr(ref_wcs, '_naxis'):
             ref_wcs._naxis1, ref_wcs._naxis2 = ref_wcs._naxis
 
-        if 'PHOTPLAM' in ref_im.header:
-            ref_photplam = ref_im.header['PHOTPLAM']
+        if 'PHOTPLAM' in ref_header:
+            ref_photplam = ref_header['PHOTPLAM']
         else:
             ref_photplam = 1.
 
-        if 'PHOTFLAM' in ref_im.header:
-            ref_photflam = ref_im.header['PHOTFLAM']
+        if 'PHOTFLAM' in ref_header:
+            ref_photflam = ref_header['PHOTFLAM']
         else:
             ref_photflam = 1.
 
         try:
-            ref_filter = utils.get_hst_filter(ref_im.header)
+            ref_filter = utils.get_hst_filter(ref_header)
         except:
             ref_filter = 'N/A'
-
-        ref_data = ref_im.data
 
         beam_ra, beam_dec = self.ra, self.dec
 
@@ -2214,14 +2289,15 @@ class MultiBeam(GroupFitter):
 
         """
         from collections import OrderedDict
-
+        
         # Covariance matrix for line flux uncertainties
         Ax = A[:, self.fit_mask]
         ok_temp = (np.sum(Ax, axis=1) > 0) & (coeffs_full != 0)
         Ax = Ax[ok_temp, :].T*1  # A[:, self.fit_mask][ok_temp,:].T
         Ax *= np.sqrt(self.ivarf[self.fit_mask][:, np.newaxis])
         try:
-            covar = np.matrix(np.dot(Ax.T, Ax)).I
+            #covar = np.matrix(np.dot(Ax.T, Ax)).I
+            covar = utils.safe_invert(np.dot(Ax.T, Ax))
             covard = np.sqrt(covar.diagonal())
         except:
             N = ok_temp.sum()
@@ -3638,7 +3714,7 @@ class MultiBeam(GroupFitter):
 
         return chi2/self.DoF
 
-    def drizzle_grisms_and_PAs(self, size=10, fcontam=0, flambda=False, scale=1, pixfrac=0.5, kernel='square', make_figure=True, usewcs=False, zfit=None, diff=True, grism_list=['G800L', 'G102', 'G141', 'F090W', 'F115W', 'F150W', 'F200W', 'F356W', 'F410M', 'F444W'], mask_segmentation=True, reset_model=True):
+    def drizzle_grisms_and_PAs(self, size=10, fcontam=0, flambda=False, scale=1, pixfrac=0.5, kernel='square', usewcs=False, zfit=None, diff=True, grism_list=['G800L', 'G102', 'G141', 'F090W', 'F115W', 'F150W', 'F200W', 'F356W', 'F410M', 'F444W'], mask_segmentation=True, reset_model=True, make_figure=True, fig_args=dict(mask_segmentation=True, average_only=False, scale_size=1, cmap='viridis_r')):
         """Make figure showing spectra at different orients/grisms
 
         TBD
@@ -3948,10 +4024,11 @@ class MultiBeam(GroupFitter):
             output_hdu.extend(hdu)
 
         if make_figure:
-            fig = show_drizzle_HDU(output_hdu, diff=diff)
+            fig = show_drizzle_HDU(output_hdu, diff=diff, **fig_args)
             return output_hdu, fig
         else:
             return output_hdu  # all_hdus
+
 
     def flag_with_drizzled(self, hdul, sigma=4, update=True, interp='nearest', verbose=True):
         """
@@ -4813,7 +4890,7 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
     return pyfits.HDUList(HDUL)
 
 
-def show_drizzle_HDU(hdu, diff=True, mask_segmentation=True, average_only=False, cmap='viridis_r'):
+def show_drizzle_HDU(hdu, diff=True, mask_segmentation=True, average_only=False, scale_size=1, cmap='viridis_r', **kwargs):
     """Make a figure from the multiple extensions in the drizzled grism file.
 
     Parameters
@@ -4853,10 +4930,10 @@ def show_drizzle_HDU(hdu, diff=True, mask_segmentation=True, average_only=False,
     
     if average_only:
         NY = 1
-        fig = plt.figure(figsize=(5*NX, 1*NY+0.33))
+        fig = plt.figure(figsize=(5*NX*scale_size, 1*NY*scale_size+0.33))
         gs = GridSpec(NY, NX*2, width_ratios=widths)
     else:    
-        fig = plt.figure(figsize=(5*NX, 1*NY))
+        fig = plt.figure(figsize=(5*NX*scale_size, 1*NY*scale_size))
         gs = GridSpec(NY, NX*2, height_ratios=[1]*NY, width_ratios=widths)
 
     for ig, g in enumerate(grisms):
