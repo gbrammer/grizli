@@ -16,7 +16,8 @@ import astropy.units as u
 from astropy.cosmology import Planck15
 import astropy.constants as const
 
-from . import utils
+from . import utils, model
+
 #from .model import BeamCutout
 from .utils import GRISM_COLORS
 
@@ -333,7 +334,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
                                          flambda=False,
                                          size=48, scale=1.,
                                          kernel='point', pixfrac=0.1,
-                                         zfit=tfit)
+                                         tfit=tfit)
 
     # Fit covariance
     cov_hdu = pyfits.ImageHDU(data=tfit['covar'], name='COVAR')
@@ -535,7 +536,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     if save_stack:
         hdu, fig = mb.drizzle_grisms_and_PAs(fcontam=fcontam, flambda=False,
                                              kernel='point', size=32,
-                                             zfit=tfit, diff=False)
+                                             tfit=tfit, diff=False)
 
         hdu[0].header['GRIZLIV'] = (grizli__version, 'Grizli version')
 
@@ -3575,14 +3576,19 @@ class GroupFitter(object):
                 ix = (self.wave_mask >= wave_bin[j])
                 ix &= (self.wave_mask < wave_bin[j+1])
                 ix &= gmask
-
+                                
                 if ix.sum() > 0:
                     n_bin[j] = ix.sum()
                     if trace_limits is None:
                         var_bin[j] = 1./den[ix].sum()
                         flux_bin[j] = num[ix].sum()*var_bin[j]
                     else:
-                        Nj = bin*Ng
+                        Nj = len(np.unique(self.exposure_id_mask[ix]))*bin
+                        #_ids, counts = np.unique(self.exposure_id_mask[ix], 
+                        #                         return_counts=True)
+                        #Nj = counts.sum()
+                        
+                        #Nj = bin*Ng
                         var_bin[j] = den[ix].sum()/Nj
                         flux_bin[j] = num[ix].sum()/Nj
 
@@ -3605,7 +3611,8 @@ class GroupFitter(object):
         """
         Initialize flat masked arrays for fast likelihood calculation
         """
-        try:
+        
+        if isinstance(self.beams[0], model.BeamCutout):
             # MultiBeam
             if self.Nphot > 0:
                 self.contamf_mask = self.contamf[self.fit_mask[:-self.Nphotbands]]
@@ -3614,9 +3621,10 @@ class GroupFitter(object):
 
             p = []
             for beam in self.beams:
-                if hasattr(beam, 'xp_mask'):
-                    delattr(beam, 'xp_mask')
-
+                for attr in ['xp','xp_mask']:
+                    if hasattr(beam, attr):
+                        delattr(beam, attr)
+                    
                 beam.beam.init_optimal_profile(seg_ids=seg_ids)
                 p.append(beam.beam.optimal_profile.flatten()[beam.fit_mask])
 
@@ -3637,7 +3645,10 @@ class GroupFitter(object):
             self.sens_mask = np.hstack([np.dot(np.ones(beam.sh[0])[:, None], beam.beam.sensitivity[None, :]).flatten()[beam.fit_mask] for beam in self.beams])
 
             self.grism_name_mask = np.hstack([[beam.grism.pupil]*beam.fit_mask.sum() if beam.grism.instrument == 'NIRISS' else [beam.grism.filter]*beam.fit_mask.sum() for beam in self.beams])
-        except:
+            
+            self.exposure_id_mask = np.hstack([[i]*beam.fit_mask.sum() for i, beam in enumerate(self.beams)])
+            
+        else:
             # StackFitter
             self.contamf_mask = np.hstack([beam.contamf[beam.fit_mask]
                                            for beam in self.beams])
@@ -3653,6 +3664,8 @@ class GroupFitter(object):
             self.sens_mask = np.hstack([np.dot(np.ones(beam.sh[0])[:, None], beam.sens[None, :]).flatten()[beam.fit_mask] for beam in self.beams])
 
             self.grism_name_mask = np.hstack([[beam.grism]*beam.fit_mask.sum() for beam in self.beams])
+
+            self.exposure_id_mask = np.hstack([[i]*beam.fit_mask.sum() for i, beam in enumerate(self.beams)])
 
         self.wave_mask = np.hstack([np.dot(np.ones(beam.sh[0])[:, None], beam.wave[None, :]).flatten()[beam.fit_mask] for beam in self.beams])
 
