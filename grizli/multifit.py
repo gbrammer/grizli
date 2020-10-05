@@ -1669,7 +1669,10 @@ class MultiBeam(GroupFitter):
         weightf = np.exp(-(self.fcontam*np.abs(self.contamf)*self.sivarf))
         weightf[~np.isfinite(weightf)] = 0
         self.weightf = weightf
-        self.fit_mask *= self.weightf > 0
+        self.fit_mask &= self.weightf > 0
+
+        self.slices = self._get_slices(masked=False)
+        self._update_beam_mask()
 
         self.DoF = int((self.weightf*self.fit_mask).sum())
         self.Nmask = np.sum([b.fit_mask.sum() for b in self.beams])
@@ -1681,12 +1684,10 @@ class MultiBeam(GroupFitter):
         #     self.A_bg[i, i0:i0+self.Nflat[i]] = 1.
         #     i0 += self.Nflat[i]
 
-        self.slices = self._get_slices(masked=False)
         self.A_bg = self._init_background(masked=False)
 
         self.Asave = {}
 
-        self._update_beam_mask()
         self.A_bgm = self._init_background(masked=True)
 
         self.init_poly_coeffs(poly_order=1)
@@ -3714,7 +3715,7 @@ class MultiBeam(GroupFitter):
 
         return chi2/self.DoF
 
-    def drizzle_grisms_and_PAs(self, size=10, fcontam=0, flambda=False, scale=1, pixfrac=0.5, kernel='square', usewcs=False, zfit=None, diff=True, grism_list=['G800L', 'G102', 'G141', 'F090W', 'F115W', 'F150W', 'F200W', 'F356W', 'F410M', 'F444W'], mask_segmentation=True, reset_model=True, make_figure=True, fig_args=dict(mask_segmentation=True, average_only=False, scale_size=1, cmap='viridis_r')):
+    def drizzle_grisms_and_PAs(self, size=10, fcontam=0, flambda=False, scale=1, pixfrac=0.5, kernel='square', usewcs=False, tfit=None, diff=True, grism_list=['G800L', 'G102', 'G141', 'F090W', 'F115W', 'F150W', 'F200W', 'F356W', 'F410M', 'F444W'], mask_segmentation=True, reset_model=True, make_figure=True, fig_args=dict(mask_segmentation=True, average_only=False, scale_size=1, cmap='viridis_r'), **kwargs):
         """Make figure showing spectra at different orients/grisms
 
         TBD
@@ -3726,7 +3727,10 @@ class MultiBeam(GroupFitter):
             drizzle_function = drizzle_2d_spectrum_wcs
         else:
             drizzle_function = drizzle_2d_spectrum
-
+        
+        if 'zfit' in kwargs:
+            tfit = kwargs['zfit']
+            
         NX = len(self.PA)
         NY = 0
         for g in self.PA:
@@ -3742,17 +3746,17 @@ class MultiBeam(GroupFitter):
             if key in self.PA:
                 keys.append(key)
 
-        if zfit is not None:
-            if 'coeffs_full' in zfit:
-                bg = zfit['coeffs_full'][:self.N]
-                z_cont = zfit['zbest']
+        if tfit is not None:
+            if 'coeffs_full' in tfit:
+                bg = tfit['coeffs_full'][:self.N]
+                z_cont = tfit['zbest']
             else:
                 # fitting.GroupFitter
-                z_cont = zfit['z']
+                z_cont = tfit['z']
                 bg = []
-                for k in zfit['cfit']:
+                for k in tfit['cfit']:
                     if k.startswith('bg '):
-                        bg.append(zfit['cfit'][k][0])
+                        bg.append(tfit['cfit'][k][0])
 
                 bg = np.array(bg)
         else:
@@ -3835,8 +3839,8 @@ class MultiBeam(GroupFitter):
                 hdu.append(hdu_contam[1])
 
                 # Continuum model
-                if zfit is not None:
-                    m = zfit['cont1d']
+                if tfit is not None:
+                    m = tfit['cont1d']
                     for beam in beams:
                         beam.compute_model(spectrum_1d=[m.wave, m.flux],
                                            is_cgs=True)
@@ -3863,7 +3867,7 @@ class MultiBeam(GroupFitter):
                                           mask_segmentation=mask_segmentation)
 
                 hdu_model[1].header['EXTNAME'] = 'MODEL'
-                if zfit is not None:
+                if tfit is not None:
                     hdu_model[1].header['CONTIN1D'] = (True, 'Model is fit continuum')
                     hdu_model[1].header['REDSHIFT'] = (z_cont, 'Redshift of the continuum spectrum')
                 else:
@@ -3941,11 +3945,11 @@ class MultiBeam(GroupFitter):
                                      'Native dispersion per pix')
 
             # Full continuum model
-            if zfit is not None:
+            if tfit is not None:
                 if diff > 1:
-                    m = zfit['line1d']
+                    m = tfit['line1d']
                 else:
-                    m = zfit['cont1d']
+                    m = tfit['cont1d']
 
                 for beam in all_beams:
                     beam.compute_model(spectrum_1d=[m.wave, m.flux],
@@ -3974,7 +3978,7 @@ class MultiBeam(GroupFitter):
                                       mask_segmentation=mask_segmentation)
 
             hdu_model[1].header['EXTNAME'] = 'MODEL'
-            if zfit is not None:
+            if tfit is not None:
                 hdu_model[1].header['CONTIN1D'] = (True, 'Model is fit continuum')
                 hdu_model[1].header['REDSHIFT'] = (z_cont, 'Redshift of the continuum spectrum')
             else:
