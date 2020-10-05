@@ -1061,9 +1061,8 @@ class GroupFLT():
                 # Make figure
                 if make_figure:
                     with pyfits.open(outfile.replace('clean', 'sci')) as img:
-                        im = img[0].data
-                    
-                    im[im == 0] = np.nan
+                        im = img[0].data*1
+                        im[im == 0] = np.nan
 
                     sh = im.shape
                     yp, xp = np.indices(sh)
@@ -1092,10 +1091,9 @@ class GroupFLT():
 
                     # Clean
                     ax = fig.add_subplot(122)
-                    with pyfits.open(outfile) as _im:
-                        im = im[0].data
-                        
-                    im[im == 0] = np.nan
+                    with pyfits.open(outfile) as img:
+                        im = img[0].data*1
+                        im[im == 0] = np.nan
 
                     ax.imshow(im[ysl, xsl], origin='lower', cmap='gray_r',
                               vmin=vmi, vmax=vma)
@@ -1881,8 +1879,8 @@ class MultiBeam(GroupFitter):
             ref_image_filename = 'HDU'
         else:
             with pyfits.open(ref_image) as ref_im:
-                ref_data = ref_im[0].data
-                ref_header = ref_im[0].header
+                ref_data = ref_im[0].data*1
+                ref_header = ref_im[0].header.copy()
                 
             ref_image_filename = ref_image
 
@@ -1946,8 +1944,8 @@ class MultiBeam(GroupFitter):
             ref_image_filename = 'HDU'
         else:
             with pyfits.open(ref_image)[ext] as ref_im:
-                ref_data = ref_im.data
-                ref_header = ref_im.header
+                ref_data = ref_im.data*1
+                ref_header = ref_im.header.copy()
 
             ref_image_filename = ref_image
         
