@@ -231,7 +231,7 @@ def extract_beams_from_flt(root, bucket, id, clean=True, silent=False):
         hdu, fig = mb.drizzle_grisms_and_PAs(fcontam=args['fcontam'],
                                              flambda=False,
                                              kernel='point', size=32,
-                                             zfit=tfit, diff=False)
+                                             tfit=tfit, diff=False)
 
         hdu[0].header['GRIZLIV'] = (grizli__version, 'Grizli version')
 
