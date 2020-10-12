@@ -2030,6 +2030,11 @@ class MultiBeam(GroupFitter):
                 else:
                     for label in thumb_labels:
                         self.beams[ie].thumbs[label] -= bkg_value
+        
+        ## Recompute total_flux attribute
+        for b in self.beams:
+            b.beam.set_segmentation(b.beam.seg)
+
 
     def reshape_flat(self, flat_array):
         """TBD
