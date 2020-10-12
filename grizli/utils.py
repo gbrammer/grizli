@@ -1703,7 +1703,7 @@ def get_line_wavelengths():
     line_ratios['NI-5199'] = [1., 1.]
 
     line_wavelengths['NII'] = [6549.86, 6585.27]
-    line_ratios['NII'] = [1., 3]
+    line_ratios['NII'] = [1.0, 3.0]
 
     line_wavelengths['NII-6549'] = [6549.86]
     line_ratios['NII-6549'] = [1.]
@@ -1754,8 +1754,8 @@ def get_line_wavelengths():
     line_ratios['Ha+NII+SII+SIII+He+PaB+PaG'] = [1., 1./(4.*4), 3./(4*4), 1./10, 1./10, 1./20, 2.44/20, 1./25., 1./10, 1./10/2.86]
 
     line_wavelengths['Ha+NII'] = [6564.61, 6549.86, 6585.27]
-    n2ha = 1./4  # log NII/Ha ~ -0.6, Kewley 2013
-    line_ratios['Ha+NII'] = [1., 1./4.*n2ha, 3/4.*n2ha]
+    n2ha = 1./3  # log NII/Ha ~ -0.6, Kewley 2013
+    line_ratios['Ha+NII'] = [1., 1./4.*n2ha, 3./4.*n2ha]
 
     line_wavelengths['OIII+Hb'] = [5008.240, 4960.295, 4862.68]
     line_ratios['OIII+Hb'] = [2.98, 1, 3.98/6.]
