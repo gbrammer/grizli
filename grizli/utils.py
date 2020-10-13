@@ -1702,8 +1702,8 @@ def get_line_wavelengths():
     line_wavelengths['NI-5199'] = [5199.4, 5201.76]
     line_ratios['NI-5199'] = [1., 1.]
 
-    line_wavelengths['NII'] = [6549.86, 6585.27]
-    line_ratios['NII'] = [1.0, 3.0]
+    line_wavelengths['NII'] = [6549.86, 6585.27][::-1]
+    line_ratios['NII'] = [1.0, 3.0][::-1]
 
     line_wavelengths['NII-6549'] = [6549.86]
     line_ratios['NII-6549'] = [1.]
