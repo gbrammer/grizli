@@ -169,7 +169,14 @@ def img_with_wcs(input):
                 input[0].header['FILTER'] = 'CLEAR'
                 input[0].header['EXP_TYPE'] = 'NIS_IMAGE'
                 #print(input[0].header)
-            
+        
+        elif input[0].header['INSTRUME'] == 'NIRCAM':
+            if input[0].header['PUPIL'].startswith('GR'):
+                input[0].header['PUPIL'] = 'CLEAR'
+                input[0].header['EXP_TYPE'] = 'NRC_IMAGE'
+                #print(input[0].header)
+        
+        
     img = util.open(input)
 
     # AssignWcs to pupulate img.meta.wcsinfo
@@ -257,15 +264,17 @@ def model_wcs_header(datamodel, get_sip=False, order=4, step=32, lsq_args=LSQ_AR
         pipe = datamodel.meta.wcs.pipeline[0][1]
         if 'offset_2' in pipe.param_names:
             # NIRISS WCS
-            c_x = pipe.offset_2.value
-            c_y = pipe.offset_3.value
+            c_x = pipe.offset_2.value + pipe.offset_0.value
+            c_y = pipe.offset_3.value + pipe.offset_1.value
+
         else:
             # Simple WCS
             c_x = pipe.offset_0.value
             c_y = pipe.offset_1.value
 
         crpix = np.array([-c_x+1, -c_y+1])
-
+        #print('xxx ', crpix)
+        
     except:
         crpix = np.array(sh)/2.+0.5
 
