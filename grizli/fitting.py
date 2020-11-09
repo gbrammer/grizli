@@ -1891,7 +1891,7 @@ class GroupFitter(object):
         NZ = len(zgrid)
 
         # Polynomial SED fit
-        wpoly = np.linspace(1000, 5.e4, 1000)
+        wpoly = np.linspace(1000, 5.2e4, 1000)
         # tpoly = utils.polynomial_templates(wpoly, line=True)
         # out = self.xfit_at_z(z=0., templates=tpoly, fitter='nnls',
         #                     fit_background=True, get_uncertainties=False)
