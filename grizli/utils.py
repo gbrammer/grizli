@@ -76,7 +76,7 @@ GRISM_LIMITS = {'G800L': [0.545, 1.02, 40.],  # ACS/WFC
            'F277W': [2.5, 3.2, 20.],  # NIRCAM
            'F356W': [3.05, 4.1, 20.],
            'F444W': [3.75, 5.05, 20],
-           'F410M': [3.7, 4.5, 20],
+           'F410M': [3.8, 4.38, 20],
            'BLUE': [0.8, 1.2, 10.],  # Euclid
            'RED': [1.1, 1.9, 14.]}
 
@@ -3676,7 +3676,143 @@ def get_wcs_slice_header(wcs, slx, sly):
 
     return h
 
+class SRegion(object):
+    """Helper class for parsing an S_REGION string
+    """
+    def __init__(self, inp, label=None, **kwargs):
+        if isinstance(inp, str):
+            self.polygons = self._parse_sregion(inp, **kwargs)
+        elif hasattr(inp, 'sum'):
+            # NDarray
+            self.polygons = [inp]
+        elif isinstance(inp, list):
+            self.polygons = inp
+        else:
+            raise IOError('input must be ``str``, ``list``, or ``np.array``')
+        
+        self.ds9_properties = ''
+        self.label = label
+        
+    @staticmethod   
+    def _parse_sregion(sregion, ncircle=32, wrap=False, **kwargs):
+        """
+        Parse an S_REGION string with CIRCLE or POLYGON
+        """
 
+        from astropy.coordinates import Angle
+        import astropy.units as u
+
+        if hasattr(sregion, 'decode'):
+            decoded = sregion.decode('utf-8').strip().upper()
+        else:
+            decoded = sregion.strip().upper()
+
+        polyspl = decoded.replace('POLYGON','xxx').replace('CIRCLE','xxx')
+        polyspl = polyspl.split('xxx')
+
+        poly = []
+        for pp in polyspl:
+            if not pp:
+                continue
+            
+            pp = pp.replace('(','').replace(')','')
+            
+            if ',' in pp:
+                spl = pp.strip().split(',')
+            else:
+                spl = pp.strip().split()
+            
+            for ip, p in enumerate(spl):
+                # Find index of first float
+                try:
+                    pf = float(p)
+                    break
+                except:
+                    continue
+                            
+            if len(spl[ip:]) == 3:
+                # Circle
+                x0, y0 = np.cast[float](spl[ip:-1])
+                cosd = np.cos(y0/180*np.pi)
+                
+                r0 = spl[-1]
+                if r0.endswith('"'):
+                    scl = float(r0[:-1])/3600
+                elif r0.endswith('\''):
+                    scl = float(r0[:-1])/60
+                else:
+                    scl = 1
+                    cosd = 1.
+                    
+                _theta = np.linspace(0, 2*np.pi, ncircle) 
+                _xc = np.cos(_theta)
+                _yc = np.sin(_theta)
+                
+                poly_i = np.array([_xc/cosd*scl+x0, _yc*scl+y0]).T
+            else:
+                poly_i = np.cast[float](spl[ip:]).reshape((-1,2))
+
+            if wrap:
+                ra = Angle(poly_i[:,0]*u.deg).wrap_at(360*u.deg).value
+                poly_i[:,0] = ra
+                
+            if len(poly_i) < 2:
+                continue
+
+            poly.append(poly_i)
+
+        return poly
+    
+    @property
+    def centroid(self):
+        return [np.mean(fp, axis=0) for fp in self.polygons]
+
+    @property
+    def path(self):
+        """
+        `~matplotlib.path.Path` object
+        """
+        import matplotlib.path
+        return [matplotlib.path.Path(fp) for fp in self.polygons]
+
+    @property
+    def shapely(self):
+        """
+        `~shapely.geometry.Polygon` object.
+        """
+        from shapely.geometry import Polygon
+        return [Polygon(fp) for fp in self.polygons]
+    
+    @property 
+    def area(self):
+        """
+        Area of shapely polygons
+        """
+        return [sh.area for sh in self.shapely]
+        
+    def get_patch(self, **kwargs):
+        """
+        `~descartes.PolygonPatch` object
+        """
+        from descartes import PolygonPatch
+        return [PolygonPatch(p, **kwargs) for p in self.shapely]
+    
+    @property
+    def region(self):
+        """
+        Polygon string in DS9 region format
+        """
+        pstr = 'polygon({0})'
+        tail = '{0}'.format(self.ds9_properties)
+        if self.label is not None:
+            tail += ' text={xx}'.replace(xx, self.label)
+        
+        if tail:
+            tail = ' # '+tail
+            
+        return [pstr.format(','.join([f'{c:.6f}' for c in fp.flatten()]))+tail
+                for fp in self.polygons]
+    
 class WCSFootprint(object):
     """
     Helper functions for dealing with WCS footprints
