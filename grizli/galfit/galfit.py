@@ -500,11 +500,12 @@ class Galfitter(object):
         return flt_files
 
     @staticmethod
-    def fit_arrays(sci, wht, seg, psf, id=None, platescale=0.06, exptime=0, path='/tmp', root='gf', galfit_exec='galfit', ab_zeropoint=26, gaussian_guess=False, components=[GalfitSersic()], recenter=True, psf_sample=1, write_constraints=True):
+    def fit_arrays(sci, wht, seg, psf, id=None, platescale=0.06, exptime=0, path='/tmp', root='gf', galfit_exec='galfit', use_subprocess=False, ab_zeropoint=26, gaussian_guess=False, components=[GalfitSersic()], recenter=True, psf_sample=1, write_constraints=True):
         """
         Fit array data with Galfit
 
         """
+        import subprocess
         from astropy.coordinates import Angle
         import astropy.units as u
 
@@ -574,15 +575,20 @@ class Galfitter(object):
             if os.path.exists(fi):
                 os.remove(fi)
 
-        os.system('{0} {1}/{2}.feedme'.format(galfit_exec, path, root))
+        call_string = '{0} {1}/{2}.feedme'.format(galfit_exec, path, root)
+        if use_subprocess:
+            p = subprocess.Popen(call_string.split(), stdout=subprocess.PIPE)
+            stdout_output = p.communicate()[0]
+            with open('{0}/{1}.stdout.txt'.format(path, root), 'w') as fp:
+                fp.write(stdout_output.decode('utf-8'))
+                
+        else:
+            os.system(call_string)
 
         # Move galfit.[latest] to output file
         gf_files = glob.glob('galfit.[0-9]*')
         gf_files.sort()
         gf_log = sci_file.replace('_sci.fits', '.gfmodel')
-
-        os.system('mv {0} {1}'.format(gf_files[-1], gf_log))
-        lines = open(gf_log).readlines()
 
         # Results dictionary
         res = {}
@@ -591,7 +597,11 @@ class Galfitter(object):
         im = pyfits.open(sci_file.replace('_sci', '_out'))
         res['model'] = im[2]
         res['resid'] = im[3]
-        res['ascii'] = lines
+        
+        if len(gf_files) > 0:
+            os.system('mv {0} {1}'.format(gf_files[-1], gf_log))
+            lines = open(gf_log).readlines()
+            res['ascii'] = lines
 
         return res
 
