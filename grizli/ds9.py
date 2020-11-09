@@ -80,7 +80,7 @@ class DS9(ds9_obj):
                 self.set("wcs replace", header.tostring())
                 
     def frame(self, id):
-        self.set(f'frame {frame}')
+        self.set(f'frame {id}')
 
     def scale(self, z1, z2):
         self.set(f'scale limits {z1} {z2}')
