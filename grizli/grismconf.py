@@ -457,7 +457,7 @@ class aXeConf():
 
 
 def get_config_filename(instrume='WFC3', filter='F140W',
-                        grism='G141', chip=1):
+                        grism='G141', module=None, chip=1):
     """Generate a config filename based on the instrument, filter & grism combination.
 
     Config files assumed to be found the directory specified by the `$GRIZLI`
@@ -534,15 +534,24 @@ def get_config_filename(instrume='WFC3', filter='F140W',
     # if instrume == 'NIRCam':
     #     conf_file = os.path.join(GRIZLI_PATH,
     #         'CONF/aXeSIM_NC_2016May/CONF/NIRCam_LWAR_{0}.conf'.format(grism))
-    if instrume in ['NIRCAM', 'NIRCAMA']:
+    if instrume in ['NIRCAM']:
         #conf_file = os.path.join(GRIZLI_PATH,
         #                         f'CONF/NIRCam.A.{filter}.{grism}.conf')
         
         fi = grism
         gr = filter[-1] # R, C
         conf_file = os.path.join(GRIZLI_PATH,
-                    f'CONF/GRISM_NIRCAM/gNIRCAM.{fi}.modA.{gr}.conf')
+                    f'CONF/GRISM_NIRCAM/gNIRCAM.{fi}.mod{module}.{gr}.conf')
     
+    elif instrume == 'NIRCAMA':
+        fi = grism
+        gr = filter[-1] # R, C
+        conf_file = os.path.join(GRIZLI_PATH,
+                    f'CONF/GRISM_NIRCAM/gNIRCAM.{fi}.modA.{gr}.conf')
+
+        #conf_file = os.path.join(GRIZLI_PATH,
+        #                         f'CONF/NIRCam.B.{filter}.{grism}.conf')
+
     elif instrume == 'NIRCAMB':
         fi = grism
         gr = filter[-1] # R, C

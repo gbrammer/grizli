@@ -196,7 +196,10 @@ def _loadFLT(grism_file, sci_extn, direct_file, pad, ref_file,
 
     else:
         flt.catalog = None
-
+    
+    if flt.grism.instrument in ['NIRCAM']:
+        flt.apply_POM()
+        
     if flt.grism.instrument in ['NIRISS', 'NIRCAM']:
         flt.transform_NIRISS()
 
@@ -4897,7 +4900,7 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
     return pyfits.HDUList(HDUL)
 
 
-def show_drizzle_HDU(hdu, diff=True, mask_segmentation=True, average_only=False, scale_size=1, cmap='viridis_r', **kwargs):
+def show_drizzle_HDU(hdu, diff=True, mask_segmentation=True, average_only=False, scale_size=1, cmap='viridis_r', show_labels=True, **kwargs):
     """Make a figure from the multiple extensions in the drizzled grism file.
 
     Parameters
@@ -5038,12 +5041,13 @@ def show_drizzle_HDU(hdu, diff=True, mask_segmentation=True, average_only=False,
             ax.set_yticklabels([])
             ax.set_xticklabels([])
             ax.xaxis.set_major_locator(MultipleLocator(GRISM_MAJOR[g]))
-            ax.text(0.015, 0.94, '{0:3.0f}'.format(pa), ha='left',
+            if show_labels:
+                ax.text(0.015, 0.94, '{0:3.0f}'.format(pa), ha='left',
                     va='top',
                     transform=ax.transAxes, fontsize=8,
                     backgroundcolor='w')
 
-            if (ig == (NX-1)) & (ip == 0):
+            if (ig == (NX-1)) & (ip == 0) & show_labels:
                 ax.text(0.98, 0.94, 'ID = {0}'.format(h0['ID']),
                         ha='right', va='top', transform=ax.transAxes,
                         fontsize=8, backgroundcolor='w')
