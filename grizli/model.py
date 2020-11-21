@@ -40,7 +40,8 @@ photflam_list = {'F098M': 6.0501324882418389e-20,
             'VISTAH': 1.9275637653833683e-20*0.95,
             'GRISM': 1.e-20,
             'G800L': 1.,
-            'G280':  1.}
+            'G280':  1., 
+            'F444W': 1.e-20}
 
 # Filter pivot wavelengths
 photplam_list = {'F098M': 9864.722728110915,
@@ -56,7 +57,8 @@ photplam_list = {'F098M': 9864.722728110915,
             'VISTAH': 1.6433e+04,
             'GRISM': 1.6e4,
             'G800L': 7.4737026e3,
-            'G280': 3651.}
+            'G280': 3651., 
+            'F444W':4.44e4}
 
 # character to skip clearing line on STDOUT printing
 #no_newline = '\x1b[1A\x1b[1M'
@@ -231,7 +233,7 @@ class GrismDisperser(object):
 
         # Config file
         if isinstance(conf, list):
-            conf_f = grismconf.get_config_filename(conf[0], conf[1], conf[2])
+            conf_f = grismconf.get_config_filename(*conf)
             self.conf = grismconf.load_grism_config(conf_f)
         else:
             self.conf = conf
@@ -1207,7 +1209,8 @@ class ImageData(object):
     def __init__(self, sci=None, err=None, dq=None,
                  header=None, wcs=None, photflam=1., photplam=1.,
                  origin=[0, 0], pad=0, process_jwst_header=True,
-                 instrument='WFC3', filter='G141', pupil=None, hdulist=None,
+                 instrument='WFC3', filter='G141', pupil=None, module=None, 
+                 hdulist=None,
                  sci_extn=1, fwcpos=None):
         """
         Parameters
@@ -1271,7 +1274,7 @@ class ImageData(object):
 
         """
         import copy
-
+        
         # Easy way, get everything from an image HDU list
         if isinstance(hdulist, pyfits.HDUList):
 
@@ -1342,7 +1345,12 @@ class ImageData(object):
 
             if 'PUPIL' in h:
                 pupil = h['PUPIL']
-
+            
+            if 'MODULE' in h:
+                module = h['MODULE']
+            else:
+                module = None
+                
             if 'PHOTFLAM' in h:
                 photflam = h['PHOTFLAM']
             else:
@@ -1439,7 +1447,16 @@ class ImageData(object):
         # Header-like parameters
         self.filter = filter
         self.pupil = pupil
-
+        
+        if (instrument == 'NIRCAM'):
+            # Fallback if module not specified
+            if module is None:
+                self.module = 'A'
+            else:
+                self.module = module
+        else:
+            self.module = module
+        
         self.instrument = instrument
         self.header = header
         if 'ISCUTOUT' in self.header:
@@ -2363,12 +2380,14 @@ class GrismFLT(object):
             direct_filter = self.grism.pupil
         else:
             direct_filter = self.direct.filter
-
-        self.conf_file = grismconf.get_config_filename(self.grism.instrument,
-                                                       direct_filter,
-                                                       self.grism.filter,
-                                                       self.grism.ccdchip)
-
+        
+        conf_args = dict(instrume=self.grism.instrument, 
+                         filter=direct_filter, 
+                         grism=self.grism.filter,
+                         module=self.grism.module,
+                         chip=self.grism.ccdchip)
+                      
+        self.conf_file = grismconf.get_config_filename(**conf_args)
         self.conf = grismconf.load_grism_config(self.conf_file)
 
         self.object_dispersers = OrderedDict()
@@ -3460,7 +3479,48 @@ class GrismFLT(object):
             #print('xx Rotate catalog {0}'.format(rot))
             self.catalog = self.blot_catalog(self.catalog,
                           sextractor=('X_WORLD' in self.catalog.colnames))
+    
+    def apply_POM(self, warn_if_too_small=True, verbose=True):
+        """
+        Apply pickoff mask to segmentation map to control sources that are dispersed onto the detector
+        """
+        if not self.grism.instrument.startswith('NIRCAM'):
+            print('POM only defined for NIRCam')
+            return True
+        
+        pom_file = os.path.join(GRIZLI_PATH,
+         f'CONF/GRISM_NIRCAM/V2/NIRCAM_LW_POM_Mod{self.grism.module}.fits')
+        
+        if not os.path.exists(pom_file):
+            print(f'Couldn\'t find POM reference file {pom_file}')
+            return False
+        
+        if verbose:
+            print(f'NIRCam: apply POM geometry from {pom_file}')
+            
+        pom = pyfits.open(pom_file)[-1]
+        pomh = pom.header
+        
+        if (self.pad < 790) & warn_if_too_small:
+            print('Warning: `pad` should be > 790 for NIRCam to catch '
+                  'all out-of-field sources within the POM coverage.')
+                  
+        # Slice geometry
+        a_origin = np.array([-self.pad, -self.pad])
+        a_shape = np.array(self.grism.sh)
 
+        b_origin = np.array([-pomh['NOMYSTRT'], -pomh['NOMXSTRT']])
+        b_shape = np.array(pom.data.shape)
+
+        self_sl, pom_sl = utils.get_common_slices(a_origin, a_shape, 
+                                                b_origin, b_shape)
+        
+        pom_data = self.seg*0
+        pom_data[self_sl] += pom.data[pom_sl]
+        self.pom_data = pom_data
+        self.seg *= (pom_data > 0)
+        return True
+        
     def mask_mosaic_edges(self, sky_poly=None, verbose=True, force=False, err_scale=10, dq_mask=False, dq_value=1024, resid_sn=7):
         """
         Mask edges of exposures that might not have modeled spectra
@@ -3623,7 +3683,8 @@ class BeamCutout(object):
             Order of the polynomial model
         """
         self.background = 0.
-
+        self.module = None
+        
         if fits_file is not None:
             self.load_fits(fits_file, conf)
         else:
@@ -3845,12 +3906,14 @@ class BeamCutout(object):
             direct_filter = self.direct.filter
 
         if conf is None:
-            conf_file = grismconf.get_config_filename(self.direct.instrument,
-                                                      direct_filter,
-                                                      self.grism.filter,
-                                                      chip=self.grism.ccdchip)
-
-            conf = grismconf.load_grism_config(conf_file)
+            conf_args = dict(instrume=self.grism.instrument, 
+                             filter=direct_filter, 
+                             grism=self.grism.filter,
+                             module=self.grism.module,
+                             chip=self.grism.ccdchip)
+            
+            self.conf_file = grismconf.get_config_filename(**conf_args)
+            conf = grismconf.load_grism_config(self.conf_file)
 
         if 'GROW' in self.grism.header:
             grow = self.grism.header['GROW']
