@@ -75,7 +75,7 @@ GRISM_LIMITS = {'G800L': [0.545, 1.02, 40.],  # ACS/WFC
            'CLEARP': [0.76, 2.3, 45.0],
            'F277W': [2.5, 3.2, 20.],  # NIRCAM
            'F356W': [3.05, 4.1, 20.],
-           'F444W': [3.75, 5.05, 20],
+           'F444W': [3.82, 5.08, 20],
            'F410M': [3.8, 4.38, 20],
            'BLUE': [0.8, 1.2, 10.],  # Euclid
            'RED': [1.1, 1.9, 14.]}
@@ -3676,17 +3676,39 @@ def get_wcs_slice_header(wcs, slx, sly):
 
     return h
 
+
+def get_common_slices(a_origin, a_shape, b_origin, b_shape):
+    """
+    Get slices of overlaps between two rectangular grids
+    """
+
+    ll = np.min([a_origin, b_origin], axis=0)
+    ur = np.max([a_origin+a_shape, b_origin+b_shape], axis=0)
+
+    # other in self
+    lls = np.minimum(b_origin - ll, a_shape)
+    urs = np.clip(b_origin + b_shape - a_origin, [0, 0], a_shape)
+
+    # self in other
+    llo = np.minimum(a_origin - ll, b_shape)
+    uro = np.clip(a_origin + a_shape - b_origin, [0, 0], b_shape)
+
+    a_slice = (slice(lls[0], urs[0]), slice(lls[1], urs[1]))
+    b_slice = (slice(llo[0], uro[0]), slice(llo[1], uro[1]))
+    return a_slice, b_slice
+
+    
 class SRegion(object):
     """Helper class for parsing an S_REGION string
     """
     def __init__(self, inp, label=None, **kwargs):
         if isinstance(inp, str):
-            self.polygons = self._parse_sregion(inp, **kwargs)
+            self.xy = self._parse_sregion(inp, **kwargs)
         elif hasattr(inp, 'sum'):
             # NDarray
-            self.polygons = [inp]
+            self.xy = [inp]
         elif isinstance(inp, list):
-            self.polygons = inp
+            self.xy = inp
         else:
             raise IOError('input must be ``str``, ``list``, or ``np.array``')
         
@@ -3741,7 +3763,11 @@ class SRegion(object):
                 elif r0.endswith('\''):
                     scl = float(r0[:-1])/60
                 else:
-                    scl = 1
+                    try:
+                        scl = float(r0[2])
+                    except:
+                        scl = 1.
+                        
                     cosd = 1.
                     
                 _theta = np.linspace(0, 2*np.pi, ncircle) 
@@ -3765,7 +3791,7 @@ class SRegion(object):
     
     @property
     def centroid(self):
-        return [np.mean(fp, axis=0) for fp in self.polygons]
+        return [np.mean(fp, axis=0) for fp in self.xy]
 
     @property
     def path(self):
@@ -3773,7 +3799,7 @@ class SRegion(object):
         `~matplotlib.path.Path` object
         """
         import matplotlib.path
-        return [matplotlib.path.Path(fp) for fp in self.polygons]
+        return [matplotlib.path.Path(fp) for fp in self.xy]
 
     @property
     def shapely(self):
@@ -3781,7 +3807,7 @@ class SRegion(object):
         `~shapely.geometry.Polygon` object.
         """
         from shapely.geometry import Polygon
-        return [Polygon(fp) for fp in self.polygons]
+        return [Polygon(fp) for fp in self.xy]
     
     @property 
     def area(self):
@@ -3803,15 +3829,20 @@ class SRegion(object):
         Polygon string in DS9 region format
         """
         pstr = 'polygon({0})'
-        tail = '{0}'.format(self.ds9_properties)
-        if self.label is not None:
-            tail += ' text={xx}'.replace(xx, self.label)
+        if hasattr(self, 'ds9_properties'):
+            tail = '{0}'.format(self.ds9_properties)
+        else:
+            tail = ''
+        
+        if hasattr(self, 'label'):    
+            if self.label is not None:
+                tail += ' text={xx}'.replace('xx', self.label)
         
         if tail:
             tail = ' # '+tail
             
         return [pstr.format(','.join([f'{c:.6f}' for c in fp.flatten()]))+tail
-                for fp in self.polygons]
+                for fp in self.xy]
     
 class WCSFootprint(object):
     """
