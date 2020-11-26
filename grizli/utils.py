@@ -3793,6 +3793,7 @@ class SRegion(object):
     def centroid(self):
         return [np.mean(fp, axis=0) for fp in self.xy]
 
+
     @property
     def path(self):
         """
@@ -3800,6 +3801,7 @@ class SRegion(object):
         """
         import matplotlib.path
         return [matplotlib.path.Path(fp) for fp in self.xy]
+
 
     @property
     def shapely(self):
@@ -3809,13 +3811,24 @@ class SRegion(object):
         from shapely.geometry import Polygon
         return [Polygon(fp) for fp in self.xy]
     
+
     @property 
     def area(self):
         """
         Area of shapely polygons
         """
         return [sh.area for sh in self.shapely]
-        
+
+
+    def sky_area(self, unit=u.arcmin**2):
+        """
+        Assuming coordinates provided are RA/Dec degrees, compute area
+        """
+        cosd = np.cos(self.centroid[0][1]/180*np.pi)
+        return [(sh.area*cosd*u.deg**2).to(unit)
+                for sh in self.shapely]
+
+
     def get_patch(self, **kwargs):
         """
         `~descartes.PolygonPatch` object
@@ -3823,6 +3836,7 @@ class SRegion(object):
         from descartes import PolygonPatch
         return [PolygonPatch(p, **kwargs) for p in self.shapely]
     
+
     @property
     def region(self):
         """
@@ -7180,7 +7194,22 @@ def hull_edge_mask(x, y, pad=100, pad_is_absolute=True, mask=None):
     return in_buff
 
 
-def hull_area(x, y):
+def convex_hull_wrapper(x, y):
+    """
+    Generate a convex hull from a list of points
+    
+    Returns:
+    
+    pxy : (array, array)
+        Tuple of hull vertices
+    
+    poly : `~shapely.geometry.Polygon`
+        Polygon object.
+    
+    hull : `~scipy.spatial.ConvexHull`
+        The hull object.
+        
+    """
     from scipy.spatial import ConvexHull
     from shapely.geometry import Polygon, Point
 
@@ -7188,10 +7217,32 @@ def hull_area(x, y):
     hull = ConvexHull(xy)
     pxy = xy[hull.vertices, :]
     poly = Polygon(pxy)
+    
+    return pxy, poly, hull
+
+
+def hull_area(x, y):
+    """
+    Return the area of a convex hull of a list of points
+    """
+    pxy, poly, hull = convex_hull_wrapper(x, y)
 
     return poly.area
+    
+    
+def remove_text_labels(fig):
+    """
+    Remove all Text annotations from ``fig.axes``.
+    """
+    import matplotlib
+    
+    for ax in fig.axes:
+        for child in ax.get_children():
+            if isinstance(child, matplotlib.text.Text):
+                if child.get_text(): # Don't remove empty labels
+                    child.set_visible(False)
 
-
+    
 LOGFILE = '/tmp/grizli.log'
 
 
