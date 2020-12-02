@@ -3588,12 +3588,16 @@ def get_wcs_pscale(wcs, set_attribute=True):
     if isinstance(wcs, pyfits.Header):
         wcs = pywcs.WCS(wcs, relax=True)
 
-    try:
+    if hasattr(wcs.wcs, 'cd'):
         det = linalg.det(wcs.wcs.cd)
-    except:
+    else:
         det = linalg.det(wcs.wcs.pc)
 
     pscale = np.sqrt(np.abs(det))*3600.
+    
+    if hasattr(wcs.wcs, 'cdelt'):
+        pscale *= wcs.wcs.cdelt[0]
+        
     wcs.pscale = pscale
 
     return pscale
@@ -5180,7 +5184,7 @@ def fetch_hst_calib(file='iref$uc72113oi_pfl.fits',  ftpdir='https://hst-crds.st
     return iref_file
 
 
-def fetch_hst_calibs(flt_file, ftpdir='https://hst-crds.stsci.edu/unchecked_get/references/hst/', calib_types=['BPIXTAB', 'CCDTAB', 'OSCNTAB', 'CRREJTAB', 'DARKFILE', 'NLINFILE', 'PFLTFILE', 'IMPHTTAB', 'IDCTAB', 'NPOLFILE'], verbose=True):
+def fetch_hst_calibs(flt_file, ftpdir='https://hst-crds.stsci.edu/unchecked_get/references/hst/', calib_types=['BPIXTAB', 'CCDTAB', 'OSCNTAB', 'CRREJTAB', 'DARKFILE', 'NLINFILE', 'DFLTFILE','PFLTFILE', 'IMPHTTAB', 'IDCTAB', 'NPOLFILE'], verbose=True):
     """
     TBD
     Fetch necessary calibration files needed for running calwf3 from STScI FTP
