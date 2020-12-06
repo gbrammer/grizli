@@ -4223,7 +4223,7 @@ def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', s
     image = make_lupton_rgb(rimg, gimg, bimg, stretch=0.1, minimum=rgb_min)
 
     sh = image.shape
-    ny, nx, _ = sh
+    nx, ny, _ = sh
 
     if output_dpi is not None:
         xsize = nx/output_dpi
