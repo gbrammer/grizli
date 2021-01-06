@@ -819,7 +819,7 @@ def make_directories(field_root='j142724+334246', HOME_PATH='./'):
             os.system('chmod ugoa+rwx {0}'.format(dir))
 
 
-def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', inst_products={'WFPC2/WFC': ['C0M', 'C1M'], 'WFPC2/PC': ['C0M', 'C1M'], 'ACS/WFC': ['FLC'], 'WFC3/IR': ['RAW'], 'WFC3/UVIS': ['FLC']}, remove_bad=True, reprocess_parallel=False, reprocess_clean_darks=True, s3_sync=False, fetch_flt_calibs=['IDCTAB', 'PFLTFILE', 'NPOLFILE'], filters=VALID_FILTERS, min_bad_expflag=2):
+def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', inst_products={'WFPC2/WFC': ['C0M', 'C1M'], 'WFPC2/PC': ['C0M', 'C1M'], 'ACS/WFC': ['FLC'], 'WFC3/IR': ['RAW'], 'WFC3/UVIS': ['FLC']}, remove_bad=True, reprocess_parallel=False, reprocess_clean_darks=True, s3_sync=False, fetch_flt_calibs=['IDCTAB', 'PFLTFILE', 'NPOLFILE'], filters=VALID_FILTERS, min_bad_expflag=2, fetch_only=False):
     """
     Fully automatic script
     """
@@ -949,7 +949,10 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/
         print('gunzip '+file+'  # status="{0}"'.format(status))
         if status == 256:
             os.system('mv {0} {1}'.format(file, file.split('.gz')[0]))
-
+    
+    if fetch_only:
+        return glob.glob('*raw.fits')
+        
     # Remove exposures with bad EXPFLAG
     if remove_bad:
         remove_bad_expflag(field_root=field_root, HOME_PATH=HOME_PATH,
@@ -4025,7 +4028,7 @@ def get_rgb_filters(filter_list, force_ir=False, pure_sort=False):
 
 TICKPARAMS = dict(axis='both', colors='w', which='both')
 
-def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', show_ir=True, pl=1, pf=1, scl=1, scale_ab=None, rgb_scl=[1, 1, 1], ds9=None, force_ir=False, filters=None, add_labels=True, output_format='jpg', rgb_min=-0.01, xyslice=None, pure_sort=False, verbose=True, force_rgb=None, suffix='.field', mask_empty=False, tick_interval=60, timestamp=False, mw_ebv=0, use_background=False, tickparams=TICKPARAMS, ref_spectrum=None):
+def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', show_ir=True, pl=1, pf=1, scl=1, scale_ab=None, rgb_scl=[1, 1, 1], ds9=None, force_ir=False, filters=None, add_labels=True, output_format='jpg', rgb_min=-0.01, xyslice=None, pure_sort=False, verbose=True, force_rgb=None, suffix='.field', mask_empty=False, tick_interval=60, timestamp=False, mw_ebv=0, use_background=False, tickparams=TICKPARAMS, fill_black=False, ref_spectrum=None):
     """
     RGB image of the field mosaics
     """
@@ -4149,12 +4152,17 @@ def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', s
             gmw = 10**(0.4*(MW_F99(np.array([ims[gf][0].header['PHOTPLAM']]))))[0]
             print('MW_EBV={0:.3f}, {1}: {2:.2f}'.format(mw_ebv, gf, gmw))
             gimg *= gmw
-
+    
+    rmsk = rimg == 0
+    gmsk = gimg == 0
+    bmsk = bimg == 0
+    
     if gimg.shape != rimg.shape:
         import scipy.ndimage as nd
         kern = np.ones((2, 2))
         gimg = nd.convolve(gimg, kern)[::2, ::2]
-    
+        gmsk = gmsk[::2,::2]
+        
     # Scale by reference synphot spectrum
     if ref_spectrum is not None:
         import pysynphot as S
@@ -4169,7 +4177,7 @@ def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', s
             pass
             
     if mask_empty:
-        mask = (rimg == 0) | (gimg == 0) | (bimg == 0)
+        mask = rmsk | gmsk | bmsk
         print('Mask empty pixels in any channel: {0}'.format(mask.sum()))
 
         rimg[mask] = 0
@@ -4213,6 +4221,12 @@ def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', s
         rimg = rimg[ysl, xsl]
         bimg = bimg[ysl, xsl]
         gimg = gimg[ysl, xsl]
+        
+        if fill_black:
+            rmsk = rmsk[ysl, xsl]
+            gmsk = gmsk[ysl, xsl]
+            bmsk = bmsk[ysl, xsl]
+        
     else:
         if xyslice is not None:
             xsl, ysl = xyslice
@@ -4220,8 +4234,18 @@ def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', s
             bimg = bimg[ysl, xsl]
             gimg = gimg[ysl, xsl]
 
+            if fill_black:
+                rmsk = rmsk[ysl, xsl]
+                gmsk = gmsk[ysl, xsl]
+                bmsk = bmsk[ysl, xsl]
+                
     image = make_lupton_rgb(rimg, gimg, bimg, stretch=0.1, minimum=rgb_min)
 
+    if fill_black:
+        image[rmsk,0] = 0
+        image[gmsk,1] = 0
+        image[bmsk,2] = 0
+        
     sh = image.shape
     ny, nx, _ = sh
 
