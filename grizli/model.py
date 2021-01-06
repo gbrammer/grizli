@@ -58,7 +58,37 @@ photplam_list = {'F098M': 9864.722728110915,
             'GRISM': 1.6e4,
             'G800L': 7.4737026e3,
             'G280': 3651., 
-            'F444W':4.44e4}
+            'F070W': 7.043e+03, # NIRCam
+            'F090W': 9.023e+03,
+            'F115W': 1.150e+04, # NIRISS
+            'F150W': 1.493e+04, # NIRISS
+            'F200W': 1.993e+04, # NIRISS
+            'F150W2': 1.658e+04,
+            'F140M': 1.405e+04,
+            'F158M': 1.582e+04, # NIRISS
+            'F162M': 1.627e+04,
+            'F182M': 1.845e+04,
+            'F210M': 2.096e+04,
+            'F164N': 1.645e+04,
+            'F187N': 1.874e+04,
+            'F212N': 2.121e+04,
+            'F277W': 2.758e+04,
+            'F356W': 3.568e+04,
+            'F444W': 4.404e+04,
+            'F322W2': 3.232e+04,
+            'F250M': 2.503e+04,
+            'F300M': 2.987e+04,
+            'F335M': 3.362e+04,
+            'F360M': 3.624e+04,
+            'F380M': 3.825e+04, # NIRISS
+            'F410M': 4.082e+04,
+            'F430M': 4.280e+04,
+            'F460M': 4.626e+04,
+            'F480M': 4.816e+04,
+            'F323N': 3.237e+04,
+            'F405N': 4.052e+04,
+            'F466N': 4.654e+04,
+            'F470N': 4.708e+04}
 
 # character to skip clearing line on STDOUT printing
 #no_newline = '\x1b[1A\x1b[1M'
@@ -1294,7 +1324,7 @@ class ImageData(object):
                 sci = np.cast[np.float32](hdulist['SCI', sci_extn].data)
                 err = np.cast[np.float32](hdulist['ERR', sci_extn].data)
                 dq = np.cast[np.int16](hdulist['DQ', sci_extn].data)
-
+                
                 base_extn = ('SCI', sci_extn)
 
             else:
@@ -1351,16 +1381,33 @@ class ImageData(object):
             else:
                 module = None
                 
-            if 'PHOTFLAM' in h:
-                photflam = h['PHOTFLAM']
-            else:
-                photflam = photflam_list[filter]
-
             if 'PHOTPLAM' in h:
                 photplam = h['PHOTPLAM']
-            else:
+            elif filter in photplam_list:
                 photplam = photplam_list[filter]
+            else:
+                photplam = 1
 
+            if 'PHOTFLAM' in h:
+                photflam = h['PHOTFLAM']
+            
+            elif filter in photflam_list:
+                photflam = photflam_list[filter]
+            
+            elif 'PHOTUJA2' in header:
+                # JWST calibrated products
+                per_pix = header['PIXAR_SR']
+                if header['BUNIT'].strip() == 'MJy/sr':
+                    photfnu = per_pix*1e6
+                else:
+                    photfnu = 1./(header['PHOTMJSR']*1.e6)*per_pix
+
+                photflam = photfnu/1.e23*3.e18/photplam**2
+                
+            else:
+                photflam = 1.
+                
+                
             # For NIRISS
             if 'FWCPOS' in h:
                 fwcpos = h['FWCPOS']
