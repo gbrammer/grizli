@@ -2702,6 +2702,53 @@ def load_sdss_pca_templates(file='spEigenQSO-55732.fits', smooth=3000):
     return temp_list
 
 
+def cheb_templates(wave, order=6, get_matrix=False, log=False, clip=1.e-4, minmax=None):
+    """
+    Chebyshev polynomial basis functions
+    """
+    from numpy.polynomial.chebyshev import chebval, chebvander
+
+    if minmax is None:
+        mi = wave.min()
+        ma = wave.max()
+    else:
+        mi, ma = np.squeeze(minmax)*1.
+
+    if log:
+        xi = np.log(wave)
+        mi = np.log(mi)
+        ma = np.log(ma)
+    else:
+        xi = wave*1
+    
+    x = (xi-mi)*2/(ma-mi)-1
+
+    n_bases = order+1
+    
+    basis = chebvander(x, order)
+    # basis = np.empty((x.shape[0], n_bases), dtype=float)
+    # 
+    # xr = np.arange(n_bases)
+    # for i in range(n_bases):
+    #     _c = (xr == i)*1
+    #     #print(_c, xr, i)
+    #     basis[:,i] = chebval(x, _c)
+        
+    #for i in range(n_bases):
+    out_of_range = (xi < mi) | (xi > ma)
+    basis[out_of_range,:] = 0
+
+    if get_matrix:
+        return basis
+
+    temp = OrderedDict()
+    for i in range(n_bases):
+        key = f'cheb o{i}'
+        temp[key] = SpectrumTemplate(wave, basis[:,i])
+        temp[key].name = key
+
+    return temp
+    
 def bspline_templates(wave, degree=3, df=6, get_matrix=False, log=False, clip=1.e-4, minmax=None):
     """
     B-spline basis functions, modeled after `~patsy.splines`
