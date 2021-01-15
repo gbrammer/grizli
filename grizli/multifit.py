@@ -4112,7 +4112,7 @@ class MultiBeam(GroupFitter):
             self._parse_beams()
             self.initialize_masked_arrays()
 
-    def oned_spectrum(self, tfit=None, get_contam=True, masked_model=None, **kwargs):
+    def oned_spectrum(self, tfit=None, get_contam=True, get_background=False, masked_model=None, **kwargs):
         """Compute full 1D spectrum with optional best-fit model
 
         Parameters
@@ -4164,7 +4164,13 @@ class MultiBeam(GroupFitter):
         if get_contam:
             spc = self.optimal_extract(self.contamf_mask[:self.Nspec],
                                        **kwargs)
-
+        
+        if (tfit is not None) & (get_background):
+            bgm = self.get_flat_background(tfit['coeffs'], apply_mask=True)
+            sp_bg = self.optimal_extract(bgm[:self.Nspec], **kwargs)
+        else:
+            sp_bg = None
+            
         # Loop through grisms, change units and add fit columns
         # NB: setting units to "count / s" to comply with FITS standard,
         #     where count / s = electron / s
@@ -4185,11 +4191,15 @@ class MultiBeam(GroupFitter):
                 sp[k]['line'].unit = u.count / u.s
                 sp[k]['cont'] = sp_cont[k]['flux']
                 sp[k]['cont'].unit = u.count / u.s
-
+                                    
             if masked_model is not None:
                 sp[k]['model'] = sp_model[k]['flux']
                 sp[k]['model'].unit = u.count / u.s
 
+            if sp_bg is not None:
+                sp[k]['background'] = sp_bg[k]['flux']
+                sp[k]['background'].unit = u.count / u.s
+            
             sp[k].meta['GRISM'] = (k, 'Grism name')
 
             # Metadata
@@ -4204,6 +4214,18 @@ class MultiBeam(GroupFitter):
             sp[k].meta['NEXP'] = (count, 'Number of exposures')
             sp[k].meta['EXPTIME'] = (exptime, 'Total exposure time')
             sp[k].meta['NPA'] = (len(self.PA[k]), 'Number of PAs')
+            
+            # PSCALE
+            if hasattr(self, 'pscale'):
+                if (self.pscale is not None):
+                    pscale = self.compute_scale_array(self.pscale, 
+                                                      sp[k]['wave'])
+                    sp[k]['pscale'] = pscale
+                    sp[k].meta['PSCALEN'] = (len(self.pscale)-1, 
+                                             'PSCALE order')
+                    for i, p in enumerate(self.pscale):
+                        sp[k].meta['PSCALE{0}'.format(i)] = (p, 
+                                             'PSCALE parameter {0}'.format(i))
 
         return sp
 
