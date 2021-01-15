@@ -630,7 +630,7 @@ def align_drizzled_image(root='', mag_limits=[14, 23], radec=None, NITER=3,
                          triangle_size_limit=[5, 1800], max_sources=200,
                          triangle_ba_max=0.9, max_err_percentile=99,
                          catalog_mask_pad=0.05, match_catalog_density=None,
-                         assume_close=False):
+                         assume_close=False, ref_border=100):
     """TBD
     """
     frame = inspect.currentframe()
@@ -716,8 +716,8 @@ def align_drizzled_image(root='', mag_limits=[14, 23], radec=None, NITER=3,
     else:
         nx1, nx2 = drz_wcs._naxis
 
-    ref_cut = (ref_x > -100) & (ref_x < nx1+100)
-    ref_cut &= (ref_y > -100) & (ref_y < nx2+100)
+    ref_cut = (ref_x > -ref_border) & (ref_x < nx1+ref_border)
+    ref_cut &= (ref_y > -ref_border) & (ref_y < nx2+ref_border)
 
     if ref_cut.sum() == 0:
         print('{0}: no reference objects found in the DRZ footprint'.format(root))
@@ -3238,6 +3238,7 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                                align_mag_limits=[14, 23, 0.05],
                                align_rms_limit=2,
                                align_triangle_ba_max=0.9,
+                               align_ref_border=100,
                                max_err_percentile=99,
                                catalog_mask_pad=0.05,
                                match_catalog_density=None,
@@ -3489,7 +3490,8 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                                       catalog_mask_pad=catalog_mask_pad,
                                       triangle_size_limit=[5, 2400*(1+isACS)],
                                       triangle_ba_max=align_triangle_ba_max,
-                                match_catalog_density=match_catalog_density)
+                                match_catalog_density=match_catalog_density,
+                                      ref_border=align_ref_border)
         except:
 
             utils.log_exception(utils.LOGFILE, traceback)
@@ -3509,7 +3511,8 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                                       rms_limit=align_rms_limit,
                                       max_err_percentile=max_err_percentile,
                                       catalog_mask_pad=catalog_mask_pad,
-                                match_catalog_density=match_catalog_density)
+                                match_catalog_density=match_catalog_density,
+                                      ref_border=align_ref_border)
 
         orig_wcs, drz_wcs, out_shift, out_rot, out_scale = result
 
