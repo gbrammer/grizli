@@ -221,7 +221,7 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
        filters=args['filters'],
        fetch_files_args=args['fetch_files_args'],
        inspect_ramps=False,
-       is_dash=False,
+       is_dash=False, run_prepare_dash=True,
        run_parse_visits=True,
        is_parallel_field=False,
        parse_visits_args=args['parse_visits_args'],
@@ -355,7 +355,7 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
     else:
         os.chdir(os.path.join(HOME_PATH, root, 'Prep'))
 
-    if is_dash:
+    if is_dash & run_prepare_dash:
         from wfc3dash import process_raw
         os.chdir(os.path.join(HOME_PATH, root, 'RAW'))
         process_raw.run_all()
@@ -943,7 +943,8 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/
     files = glob.glob('*raw.fits.gz')
     files.extend(glob.glob('*fl?.fits.gz'))
     files.extend(glob.glob('*c[01]?.fits.gz'))  # WFPC2
-
+    files.sort()
+    
     for file in files:
         status = os.system('gunzip {0}'.format(file))
         print('gunzip '+file+'  # status="{0}"'.format(status))
@@ -951,7 +952,10 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/
             os.system('mv {0} {1}'.format(file, file.split('.gz')[0]))
     
     if fetch_only:
-        return glob.glob('*raw.fits')
+        files = glob.glob('*raw.fits')
+        files.sort()
+        
+        return files
         
     # Remove exposures with bad EXPFLAG
     if remove_bad:
@@ -971,6 +975,8 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/
     # Fetch PFLAT reference files needed for optimal drizzled weight images
     if fetch_flt_calibs:
         flt_files = glob.glob('*_fl?.fits')
+        flt_files.sort()
+        
         #calib_paths = []
         for file in flt_files:
             paths = utils.fetch_hst_calibs(file, calib_types=fetch_flt_calibs)
