@@ -4034,7 +4034,7 @@ def get_rgb_filters(filter_list, force_ir=False, pure_sort=False):
 
 TICKPARAMS = dict(axis='both', colors='w', which='both')
 
-def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', show_ir=True, pl=1, pf=1, scl=1, scale_ab=None, rgb_scl=[1, 1, 1], ds9=None, force_ir=False, filters=None, add_labels=True, output_format='jpg', rgb_min=-0.01, xyslice=None, pure_sort=False, verbose=True, force_rgb=None, suffix='.field', mask_empty=False, tick_interval=60, timestamp=False, mw_ebv=0, use_background=False, tickparams=TICKPARAMS, fill_black=False, ref_spectrum=None):
+def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', show_ir=True, pl=1, pf=1, scl=1, scale_ab=None, rgb_scl=[1, 1, 1], ds9=None, force_ir=False, filters=None, add_labels=True, output_format='jpg', rgb_min=-0.01, xyslice=None, pure_sort=False, verbose=True, force_rgb=None, suffix='.field', mask_empty=False, tick_interval=60, timestamp=False, mw_ebv=0, use_background=False, tickparams=TICKPARAMS, fill_black=False, ref_spectrum=None, gzext=''):
     """
     RGB image of the field mosaics
     """
@@ -4057,12 +4057,12 @@ def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', s
             return False
 
         phot = utils.GTable.gread(phot_file)
-        sci_files = glob.glob('{0}/{1}/Prep/{1}-[ofuvyjh]*sci.fits'.format(HOME_PATH, root))
+        sci_files = glob.glob('{0}/{1}/Prep/{1}-[ofuvyjh]*sci.fits{2}'.format(HOME_PATH, root, gzext))
 
         PATH_TO = '{0}/{1}/Prep'.format(HOME_PATH, root)
     else:
         PATH_TO = './'
-        sci_files = glob.glob('./{1}-[fuvyjho]*sci.fits'.format(PATH_TO, root))
+        sci_files = glob.glob('./{1}-[fuvyjho]*sci.fits{2}'.format(PATH_TO, root, gzext))
 
     print('PATH: {0}, files:{1}'.format(PATH_TO, sci_files))
 
