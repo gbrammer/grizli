@@ -4076,9 +4076,9 @@ def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', s
     ims = {}
     for f in filters:
         try:
-            img = glob.glob('{0}/{1}-{2}_dr?_sci.fits'.format(PATH_TO, root, f))[0]
+            img = glob.glob('{0}/{1}-{2}_dr?_sci.fits{3}'.format(PATH_TO, root, f, gzext))[0]
         except:
-            print('Failed: {0}/{1}-{2}_dr?_sci.fits'.format(PATH_TO, root, f))
+            print('Failed: {0}/{1}-{2}_dr?_sci.fits{3}'.format(PATH_TO, root, f, gzext))
 
         try:
             ims[f] = pyfits.open(img)
