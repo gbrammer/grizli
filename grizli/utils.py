@@ -4,6 +4,7 @@ import glob
 import inspect
 from collections import OrderedDict
 import warnings
+import itertools
 
 import astropy.io.fits as pyfits
 import astropy.wcs as pywcs
@@ -7499,3 +7500,249 @@ def argv_to_dict(argv, defaults={}, dot_dict=True):
             
     
     return args, kwargs
+
+
+class Unique(object):
+    def __init__(self, array, verbose=True):
+        """
+        Helper for unique items in an array
+        """
+        _ = np.unique(array, return_counts=True, return_inverse=True)
+        self.dim = array.size
+        self.zeros = np.zeros(array.shape, dtype=bool)
+        
+        self.values = [l for l in _[0]]
+        self.indices = _[1]
+        self.counts = _[2]
+        if verbose:
+            self.info()
+    
+    @property
+    def n(self):
+        return len(self.values)
+    
+    def info(self):
+        print(f'{"value":10} {"N":>4}')
+        for v, c in zip(self.values, self.counts):
+            print(f'{v:10} {c:>4}')
+    
+    def count(self, key):
+        if key in self.values:
+            ix = self.values.index(key)
+            return self.counts[ix]
+        else:
+            return 0
+        
+    def __getitem__(self, key):
+        if key in self.values:
+            ix = self.values.index(key)
+            test = self.indices == ix
+            return test
+        else:
+            return self.zeros
+    
+    def __iter__(self):
+        for idx in itertools.count():
+            try:
+                yield self.values[idx]
+            except IndexError:
+                break
+
+
+class HubbleXYZ(object):
+    def __init__(self, spt_file='', param_dict={}):
+        """
+        Helper to compute HST geocentric coordinates from orbital parameters
+        
+        Based on http://articles.adsabs.harvard.edu//full/1995ASPC...77..464A/
+        """
+        if spt_file:
+            self.param_dict = self.parse_from_spt(spt_file)
+        
+        elif param_dict:
+            self.param_dict = param_dict
+        
+        else:
+            self.param_dict = {}
+        
+        self.computed = {}
+
+
+    @property 
+    def _t1985(self):
+        """
+        Reference time
+        """
+        import astropy.time
+        t0 = astropy.time.Time('1985-01-01T00:00:00Z')
+        return t0
+
+
+    def __call__(self, t_in, **kwargs):
+        """
+        Convert input time ``t_in`` to seconds since 1/1/85 and ``evaluate``.
+        """
+        import astropy.time
+        if not isinstance(t_in, astropy.time.Time):
+            raise ValueError('t_in must be astropy.time.Time object')
+
+        dt = t_in - self._t1985
+        xyz = self.evaluate(dt.sec, **kwargs)
+        if 'as_table' in kwargs:
+            if kwargs['as_table']:
+                xyz['time'] = t_in
+                
+        return xyz
+
+
+    def __getitem__(self, key):
+        return self.param_dict[key]
+
+
+    def evaluate(self, dt, unit=None, as_table=False):
+        """
+        Evaluate equations to get positions
+        
+        Returns
+        =======
+        x, y, z, r: float
+            Coordinates, in km or ``unit``.
+            
+        """
+        
+        if not self.param_dict:
+            raise ValueError('Orbital parameters not defined in '
+                             'self.param_dict')
+                    
+        p = self.param_dict
+        
+        t = np.atleast_1d(dt)
+        
+        # Eq. 1
+        bracket = p['M.']*(t-p['tau']) + 0.5*p['M..']*(t-p['tau'])**2
+        M = p['M0'] + 2*np.pi*bracket
+        
+        # Eq. 2
+        sinM = np.sin(M)
+        cosM = np.cos(M)
+        e = p['e']
+        nu = M + sinM*(2*e + 3*e**3*cosM**2 - 4./3*e**3*sinM**2 
+                       + 5./2*e**2*cosM)
+        
+        # Eq. 3
+        r = p['a(1-e**2)']/(1+e*np.cos(nu))
+        # To km
+        r /= 1000.
+        
+        # Eq. 4
+        Om = 2*np.pi*(p['Om0'] + p['Om.']*(t-p['tau']))
+        
+        # Eq. 5
+        w = 2*np.pi*(p['w0'] + p['w.']*(t-p['tau']))
+        
+        self.calc_dict = {'M':M, 'nu':nu, 
+                          'a':p['a'], 
+                          'i':np.arcsin(p['sini']), 
+                          'Om':Om,
+                          'w':w}
+        
+        # Eq. 6
+        cosOm = np.cos(Om)
+        sinOm = np.sin(Om)
+        coswv = np.cos(w+nu)
+        sinwv = np.sin(w+nu)
+        
+        if unit is not None:
+            r = (r*u.km).to(unit)
+            
+        x = r*(cosOm*coswv - p['cosi']*sinOm*sinwv)
+        y = r*(sinOm*coswv + p['cosi']*cosOm*sinwv)
+        z = r*p['sini']*sinwv
+        
+        if as_table:
+            tab = GTable()
+            tab['dt'] = t
+            tab['x'] = x
+            tab['y'] = y
+            tab['z'] = z
+            tab['r'] = r
+            return tab
+        else: 
+            return x, y, z, r
+
+
+    def from_flt(self, flt_file, **kwargs):
+        """
+        Compute positions at expstart, expmid, expend
+        """
+        import astropy.time
+        
+        flt = pyfits.open(flt_file)
+        expstart = flt[0].header['EXPSTART']
+        expend = flt[0].header['EXPEND']
+        expmid = (expstart+expend)/2.
+        
+        t_in = astropy.time.Time([expstart, expmid, expend], format='mjd')
+        return self(t_in, **kwargs)
+
+
+    def deltat(self, dt):
+        """
+        Convert a time ``t`` in seconds from 1/1/85 to an ISO time
+        """    
+        if not hasattr(dt, 'unit'):
+            dtsec = dt*u.second
+        else:
+            dtsec = dt
+            
+        t = self._t1985 + dtsec
+        return t
+
+
+    def parse_from_spt(self, spt_file):
+        """
+        Get orbital elements from SPT header
+        """
+        import astropy.io.fits as pyfits
+        import astropy.time
+        
+        spt = pyfits.open(spt_file)[0].header
+        
+        param_dict = {}
+        param_dict['tau'] = spt['EPCHTIME']
+        param_dict['M0'] = spt['MEANANOM']
+        param_dict['M.'] = spt['FDMEANAN']
+        param_dict['M..'] = spt['SDMEANAN']
+        param_dict['e'] = spt['ECCENTRY']
+        param_dict['a(1-e**2)'] = spt['SEMILREC']
+        param_dict['a'] = param_dict['a(1-e**2)'] / (1-param_dict['e']**2)
+        param_dict['Om0'] = spt['RASCASCN']
+        param_dict['Om.'] = spt['RCASCNRV']
+        param_dict['w0'] = spt['ARGPERIG']
+        param_dict['w.'] = spt['RCARGPER']
+        param_dict['cosi'] = spt['COSINCLI']
+        param_dict['sini'] = spt['SINEINCL']
+        param_dict['Vc'] = spt['CIRVELOC']
+        param_dict['timeffec'] = spt['TIMEFFEC']
+        param_dict['Torb'] = spt['HSTHORB']*2
+        param_dict['tstart'] = spt['OBSSTRTT']
+        
+        param_dict['tau_time'] = self.deltat(param_dict['tau'])
+        param_dict['tstart_time'] = self.deltat(param_dict['tstart'])
+        
+        return param_dict
+    
+    @staticmethod
+    def xyz_to_lonlat(self, x, y, z, radians=False):
+        """
+        Compute sublon, sublat, alt from xyz coords with pyproj
+        
+        xyz must be in meters
+        
+        """
+        import pyproj
+        ecef = pyproj.Proj(proj='geocent', ellps='WGS84', datum='WGS84')
+        lla = pyproj.Proj(proj='latlong', ellps='WGS84', datum='WGS84')
+        lon, lat, alt = pyproj.transform(ecef, lla, x, y, z, radians=radians)
+        return lon, lat, alt
+        
