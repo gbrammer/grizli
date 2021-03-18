@@ -1879,12 +1879,21 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
             get_all_filters = True
 
         if get_all_filters:
-            filters = [file.split('_')[-3][len(field_root)+1:] for file in glob.glob('{0}-f*dr?_sci.fits*'.format(field_root))]
+            mq = '{0}-f*dr?_sci.fits*'
+            mq = mq.format(field_root.replace('-100mas','-*mas'))
+            mosaic_files = glob.glob(mq)
+            mosaic_files.sort()
+            
+            filters = [file.split('_')[-3][len(field_root)+1:] 
+                       for file in mosaic_files]
         else:
-            visits, all_groups, info = np.load('{0}_visits.npy'.format(field_root), allow_pickle=True)
+            vfile = '{0}_visits.npy'.format(field_root)
+            visits, all_groups, info = np.load(vfile, allow_pickle=True)
 
             if ONLY_F814W:
-                info = info[((info['INSTRUME'] == 'WFC3') & (info['DETECTOR'] == 'IR')) | (info['FILTER'] == 'F814W')]
+                info = info[((info['INSTRUME'] == 'WFC3') & 
+                             (info['DETECTOR'] == 'IR')) | 
+                            (info['FILTER'] == 'F814W')]
 
             # UVIS
             info_filters = [f for f in info['FILTER']]
@@ -1901,13 +1910,16 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
 
     #segment_img = pyfits.open('{0}-ir_seg.fits'.format(field_root))[0].data
 
+    fq = '{0}-{1}_dr?_sci.fits*'
+    
     for ii, filt in enumerate(filters):
         print(filt)
         if filt.startswith('g'):
             continue
 
         if filt not in ['g102', 'g141', 'g800l']:
-            sci_files = glob.glob(('{0}-{1}_dr?_sci.fits*'.format(field_root, filt)))
+            sci_files = glob.glob(fq.format(field_root.replace('-100mas','-*mas'),
+                                          filt))
             if len(sci_files) == 0:
                 continue
 
