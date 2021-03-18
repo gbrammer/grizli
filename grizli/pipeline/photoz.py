@@ -288,18 +288,28 @@ def eazy_photoz(root, force=False, object_only=True, apply_background=True, aper
         if f in trans:
             fp.write('{0}_tot_{1} F{2}\n'.format(f, aper_ix, trans[f]))
             fp.write('{0}_etot_{1} E{2}\n'.format(f, aper_ix, trans[f]))
+    
+    extra_filters = {'hscg':314, 'hscr':315, 'hsci':316, 
+                     'hscz':317, 'hscy':318, 
+                     'irac_ch1':18, 'irac_ch2':19, 
+                     'irac_ch3':20, 'irac_ch4':21}
+    
+    for c in extra_filters:
+        if f'{c}_flux' in cat.colnames:
+            fp.write(f'{c}_flux F{extra_filters[c]}\n')
+            fp.write(f'{c}_err  E{extra_filters[c]}\n')
 
-    fp.write('irac_ch1_flux F18\n')
-    fp.write('irac_ch1_err  E18\n')
-
-    fp.write('irac_ch2_flux F19\n')
-    fp.write('irac_ch2_err  E19\n')
-
-    fp.write('irac_ch3_flux F20\n')
-    fp.write('irac_ch3_err  E20\n')
-
-    fp.write('irac_ch4_flux F21\n')
-    fp.write('irac_ch4_err  E21\n')
+    # fp.write('irac_ch1_flux F18\n')
+    # fp.write('irac_ch1_err  E18\n')
+    # 
+    # fp.write('irac_ch2_flux F19\n')
+    # fp.write('irac_ch2_err  E19\n')
+    # 
+    # fp.write('irac_ch3_flux F20\n')
+    # fp.write('irac_ch3_err  E20\n')
+    # 
+    # fp.write('irac_ch4_flux F21\n')
+    # fp.write('irac_ch4_err  E21\n')
 
     for k in extra_translate:
         fp.write('{0} {1}\n'.format(k, extra_translate[k]))
