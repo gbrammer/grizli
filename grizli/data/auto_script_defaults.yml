@@ -109,8 +109,8 @@ fine_alignment_args:
     stopme: False
     ref_err: 0.08
     radec: null 
-    catalogs: [GAIA,PS1,DES,SDSS]
-    radius: 30
+    catalogs: [GAIA]
+    radius: 5
     gaia_by_date: True
     NITER: 1
     maglim: [17,23]
@@ -124,6 +124,7 @@ fine_alignment_args:
     tol: null
     fit_options: null
     print_options: {precision: 3, sign: ' '}
+    include_internal_matches: True
     
 # Combined mosaics
 make_mosaics: True 
