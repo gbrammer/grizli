@@ -2785,7 +2785,7 @@ def summary_catalog(**kwargs):
     return res
 
 
-def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', min_overlap=0.2, stopme=False, ref_err=1.e-3, radec=None, redrizzle=True, shift_only=True, maglim=[17, 24], NITER=1, catalogs=['GAIA', 'PS1', 'NSC', 'SDSS', 'WISE'], method='Powell', radius=5., program_str=None, match_str=[], all_visits=None, date=None, gaia_by_date=False, tol=None, fit_options=None, print_options={'precision': 3, 'sign': ' '}):
+def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', min_overlap=0.2, stopme=False, ref_err=1.e-3, radec=None, redrizzle=True, shift_only=True, maglim=[17, 24], NITER=1, catalogs=['GAIA', 'PS1', 'NSC', 'SDSS', 'WISE'], method='Powell', radius=5., program_str=None, match_str=[], all_visits=None, date=None, gaia_by_date=False, tol=None, fit_options=None, print_options={'precision': 3, 'sign': ' '}, include_internal_matches=True):
     """
     Try fine alignment from visit-based SExtractor catalogs
     """
@@ -2916,18 +2916,19 @@ def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Griz
         # ci = tab[i]['cat']#[ix]
         # cj = ref_tab#[jx]
 
-    for i, file in enumerate(files):
-        for j in range(i+1, len(files)):
-            sidx = np.arange(len(tab[j]['cat']))
-            idx, dr = tab[i]['cat'].match_to_catalog_sky(tab[j]['cat'])
-            clip = dr < 0.3*u.arcsec
-            print(file, files[j], clip.sum())
+    if include_internal_matches:
+        for i, file in enumerate(files):
+            for j in range(i+1, len(files)):
+                sidx = np.arange(len(tab[j]['cat']))
+                idx, dr = tab[i]['cat'].match_to_catalog_sky(tab[j]['cat'])
+                clip = dr < 0.3*u.arcsec
+                print(file, files[j], clip.sum())
 
-            if clip.sum() < 5:
-                continue
+                if clip.sum() < 5:
+                    continue
 
-            if clip.sum() > 0:
-                tab[i]['match_idx'][j] = [idx[clip], sidx[clip]]
+                if clip.sum() > 0:
+                    tab[i]['match_idx'][j] = [idx[clip], sidx[clip]]
 
     #ref_err = 0.01
 
