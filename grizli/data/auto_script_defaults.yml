@@ -8,6 +8,7 @@ filters: &filters
 
 # Arguments to grizli.pipeline.fetch_files
 fetch_files_args: 
+    fetch_only: False
     reprocess_parallel: False 
     reprocess_clean_darks: True
     remove_bad: True
