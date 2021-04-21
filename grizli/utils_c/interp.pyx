@@ -280,7 +280,77 @@ def interp_conserve_c(np.ndarray[DTYPE_t, ndim=1] x, np.ndarray[DTYPE_t, ndim=1]
             outy[k] /= (templmid[k+1]-templmid[k]);
             
     return outy
+
+
+@cython.boundscheck(False)
+def rebin_weighted_c(np.ndarray[DTYPE_t, ndim=1] x, np.ndarray[DTYPE_t, ndim=1] tlam, np.ndarray[DTYPE_t, ndim=1] tf, np.ndarray[DTYPE_t, ndim=1] te, double left=0, double right=0, double integrate=0):
+    """
+    rebin_weighted_c(x, xp, fp, ep, left=0, right=0, integrate=0)
+
+    Rebin `xp`,`yp` array to the output x array, weighting by `1/ep**2`.  
+    `xp` can be irregularly spaced.
+    """
+    cdef np.ndarray[DTYPE_t, ndim=1] templmid
+    cdef np.ndarray[DTYPE_t, ndim=1] tempfmid
+    cdef np.ndarray[DTYPE_t, ndim=1] outx
+    cdef np.ndarray[DTYPE_t, ndim=1] outy
+    cdef np.ndarray[DTYPE_t, ndim=1] oute
+    cdef unsigned long i,k,istart,ntlam,NTEMPL
+    cdef DTYPE_t h, numsum, densum
+
+    NTEMPL = len(x)
+    ntlam = len(tlam)
+
+    outx = np.zeros(NTEMPL-1, dtype=DTYPE)
+    outy = np.zeros(NTEMPL-1, dtype=DTYPE)
+    oute = np.zeros(NTEMPL-1, dtype=DTYPE)
+
+    ###### Rebin template grid to master wavelength grid weighted by 1/e**2
+    i=0
+    k=0
+    while (x[k] < tlam[0]) & (k < NTEMPL):
+        outy[k] = left
+        oute[k] = left
+        k+=1
     
+    if k > 0:
+        k -= 1
+
+    for k in range(k, NTEMPL-1):
+        if x[k] > tlam[ntlam-1]:
+            break
+
+        xnumsum=0.;
+        numsum=0.;
+        densum=0.;
+        
+        #### Go to where tlam is greater than the x[k]
+        while (tlam[i] < x[k]) & (i < ntlam): 
+            i+=1;
+
+        # print(i, x[k], tlam[i])
+        
+        ####### Template points between master grid points
+        while (tlam[i] <= x[k+1]) & (i < ntlam):
+            xnumsum += (tlam[i]/te[i]**2);
+            numsum += (tf[i]/te[i]**2);
+            densum += (1./te[i]**2)
+            # count[i] += 1
+            if i == ntlam-1:
+                break
+
+            i+=1;
+
+        i-=1
+        
+        if densum > 0:
+            outx[k] = xnumsum/densum
+            outy[k] = numsum/densum
+            oute[k] = 1/densum**0.5
+
+    return outx, outy, oute
+
+
 def midpoint(x):
     mp = (x[1:]+x[:-1])/2.
     mp = np.append(mp, np.array([x[0],x[-1]]))
