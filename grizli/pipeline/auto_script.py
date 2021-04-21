@@ -1514,10 +1514,19 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
         filt = visit['product'].split('-')[-1]
         if (len(glob.glob(visit['product']+'_dr?_sci.fits')) == 0) & (not filt.startswith('g1')):
             imaging_visits.append(visit)
-
+    
+    # Run preprocessing in order of decreasing filter wavelength
     filters = [v['product'].split('-')[-1] for v in visits]
-    fwave = np.cast[float]([f.replace('f1', 'f10').replace('f098m', 'f0980m').replace('lp', 'w').replace('fq', 'f')[1:-1] for f in filters])
-    sort_idx = np.argsort(fwave)[::-1]
+    fwave = np.cast[float]([f.replace('f1', 'f10'). \
+                              replace('f098m', 'f0980m'). \
+                              replace('lp', 'w'). \
+                              replace('fq', 'f')[1:-1] 
+                            for f in filters])
+    
+    if len(np.unique(fwave)) > 1:
+        sort_idx = np.argsort(fwave)[::-1]
+    else:
+        sort_idx = np.arange(len(fwave), dtype=int)
 
     for i in sort_idx:
         direct = visits[i]
