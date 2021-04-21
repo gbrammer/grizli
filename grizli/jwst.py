@@ -277,10 +277,12 @@ def model_wcs_header(datamodel, get_sip=False, order=4, step=32, lsq_args=LSQ_AR
         
     except:
         crpix = np.array(sh)/2.+0.5
-
-    crval = datamodel.meta.wcs.forward_transform(crpix[0], crpix[1])
-    cdx = datamodel.meta.wcs.forward_transform(crpix[0]+1, crpix[1])
-    cdy = datamodel.meta.wcs.forward_transform(crpix[0], crpix[1]+1)
+    
+    crp0 = crpix-1
+    
+    crval = datamodel.meta.wcs.forward_transform(crp0[0], crp0[1])
+    cdx = datamodel.meta.wcs.forward_transform(crp0[0]+1, crp0[1])
+    cdy = datamodel.meta.wcs.forward_transform(crp0[0], crp0[1]+1)
 
     header = Header()
     header['RADESYS'] = 'ICRS'
@@ -308,12 +310,10 @@ def model_wcs_header(datamodel, get_sip=False, order=4, step=32, lsq_args=LSQ_AR
         return header
 
     # Fit a SIP header to the gwcs transformed coordinates
-    v, u = np.meshgrid(np.arange(1, sh[0]+1, step), np.arange(1, sh[1]+1, step))
+    u, v = np.meshgrid(np.arange(1, sh[1]-1, step), 
+                       np.arange(1, sh[0]-1, step))
     x, y = datamodel.meta.wcs.forward_transform(u, v)
-    #y -= crval[1]
-    #x = (x-crval[0])*np.cos(crval[1]/180*np.pi)
     
-      
     a_names = []
     b_names = []
     #order = 4
@@ -368,13 +368,15 @@ def model_wcs_header(datamodel, get_sip=False, order=4, step=32, lsq_args=LSQ_AR
                 p0[4+len(b_names)+i] = b0[k]
                 
     #args = (u.flatten(), v.flatten(), x.flatten(), y.flatten(), crpix, a_names, b_names, cd, 0)
-    args = (u.flatten(), v.flatten(), x.flatten(), y.flatten(), crval, crpix, a_names, b_names, cd, 0)
+    args = (u.flatten(), v.flatten(), x.flatten(), y.flatten(), crval, crpix, 
+            a_names, b_names, cd, 0)
 
     # Fit the SIP coeffs
     fit = least_squares(_objective_sip, p0, args=args, **lsq_args)
 
     # Get the results
-    args = (u.flatten(), v.flatten(), x.flatten(), y.flatten(), crval, crpix, a_names, b_names, cd, 1)
+    args = (u.flatten(), v.flatten(), x.flatten(), y.flatten(), crval, crpix, 
+            a_names, b_names, cd, 1)
 
     cd_fit, a_coeff, b_coeff = _objective_sip(fit.x, *args)
 
@@ -447,7 +449,7 @@ def _objective_sip(params, u, v, ra, dec, crval, crpix, a_names, b_names, cd, re
     _h['CUNIT2']  = 'deg     '                                                            
     
     _w = pywcs.WCS(_h)
-    ro, do = _w.all_pix2world(u, v, 1)
+    ro, do = _w.all_pix2world(u, v, 0)
     
     cosd = np.cos(ro/180*np.pi)
     dr = np.append((ra-ro)*cosd, dec-do)*3600./0.065
