@@ -1080,12 +1080,12 @@ def make_SEP_catalog_from_arrays(sci, err, mask, wcs=None, threshold=2., ZP=25, 
 
     logstr = 'make_SEP_catalog_from_arrays: sep version = {0}'.format(sep.__version__)
     utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
-    if sep.__version__ < '1.10.0':
+    if sep.__version__ < '1.1':
         print("""!!!!!!!!!!
-        !  SEP version = {0}
-        !  Get >= 1.10.0 to enable segmentation masking, e.g.,
-        !  $ pip install git+https://github.com/gbrammer/sep.git
-        !!!!!!!!!!
+!  SEP version = {0}
+!  Get >= 1.10.0 to enable segmentation masking, e.g.,
+!  $ pip install git+https://github.com/gbrammer/sep.git
+!!!!!!!!!!
         """.format(sep.__version__))
 
     uJy_to_dn = 1/(3631*1e6*10**(-0.4*ZP))
@@ -1185,12 +1185,12 @@ def make_SEP_catalog(root='', threshold=2., get_background=True,
 
     logstr = 'make_SEP_catalog: sep version = {0}'.format(sep.__version__)
     utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
-    if sep.__version__ < '1.10.0':
+    if sep.__version__ < '1.1':
         print("""!!!!!!!!!!
-        !  SEP version = {0}
-        !  Get >= 1.10.0 to enable segmentation masking, e.g.,
-        !  $ pip install git+https://github.com/gbrammer/sep.git
-        !!!!!!!!!!
+!  SEP version = {0}
+!  Get >= 1.10.0 to enable segmentation masking, e.g.,
+!  $ pip install git+https://github.com/gbrammer/sep.git
+!!!!!!!!!!
         """.format(sep.__version__))
 
     if sci is not None:
@@ -1706,12 +1706,12 @@ def compute_SEP_auto_params(data, data_bkg, mask, pixel_scale=0.06, err=None, se
     import sep
     logstr = 'compute_SEP_auto_params: sep version = {0}'.format(sep.__version__)
     utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
-    if sep.__version__ < '1.10.0':
+    if sep.__version__ < '1.1':
         print("""!!!!!!!!!!
-        !  SEP version = {0}
-        !  Get >= 1.10.0 to enable segmentation masking, e.g.,
-        !  $ pip install git+https://github.com/gbrammer/sep.git
-        !!!!!!!!!!
+!  SEP version = {0}
+!  Get >= 1.10.0 to enable segmentation masking, e.g.,
+!  $ pip install git+https://github.com/gbrammer/sep.git
+!!!!!!!!!!
         """.format(sep.__version__))
 
     logstr = 'compute_SEP_auto_params: autoparams={0}; pixel_scale={1}; subpix={2}; flux_radii={3}'.format(autoparams, pixel_scale, subpix, flux_radii)
