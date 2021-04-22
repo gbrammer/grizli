@@ -29,7 +29,11 @@ class FittingTools(unittest.TestCase):
             print(f'Download config and calib files to {conf_path}')
             grizli.utils.fetch_default_calibs(ACS=False)
             grizli.utils.fetch_config_files()
-        
+            files = glob.glob(f'{conf_path}/*')
+            print('Files: ', '\n'.join(files))
+
+        assert(os.path.exists(os.path.join(conf_path,
+                              'G141.F140W.V4.32.conf')))
         return True
             
     def test_multibeam(self):
