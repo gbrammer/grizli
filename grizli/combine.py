@@ -72,21 +72,6 @@ def combine_flt(files=[], output='exposures_cmb.fits', grow=1,
         if output == 'combined_flt.fits':
             output = '{0}_cmb.fits'.format(asn['output'])
 
-    if False:
-        files = glob.glob('ibhj3*flt.fits')
-        files.sort()
-        grism_files = files[1::2]
-
-        # FIGS
-        info = catIO.Table('info')
-        pas = np.cast[int](info['PA_V3']*10)/10.
-        pa_list = np.unique(pas)
-        grism_files = info['FILE'][(info['FILTER'] == 'G102') &
-                                   (pas == pa_list[0])]
-
-        files = grism_files
-        #utils = grizlidev.utils
-
     f0 = pyfits.open(files[0])
     h0 = f0[0].header.copy()
     h0['EXPTIME'] = 0.
