@@ -6,8 +6,8 @@ from setuptools import setup
 from setuptools.extension import Extension
 from setuptools.config import read_configuration
 
-import ah_bootstrap
-import builtins
+#import ah_bootstrap
+#import builtins
 
 import subprocess
 
@@ -51,23 +51,38 @@ else:
             libraries=["m"]),
     ] 
 
-if 0:      
+if 1:      
     #update version
     args = 'git describe --tags'
     p = subprocess.Popen(args.split(), stdout=subprocess.PIPE)
-    version = p.communicate()[0].decode("utf-8").strip()
+    long_version = p.communicate()[0].decode("utf-8").strip()
+    spl = long_version.split('-')
 
-    version_str = """# git describe --tags\nversion = "{0}"\n""".format(version)
+    if len(spl) == 3:
+        main_version = spl[0]
+        commit_number = spl[1]
+        version_hash = spl[2]
+        version = f'{main_version}.dev{commit_number}'
+    else:
+        version_hash = '---'
+        version = long_version
 
+    version_str =f"""# git describe --tags
+__version__ = "{version}"
+__long_version__ = "{long_version}"
+__version_hash__ = "{version_hash}" """
+    
     fp = open('grizli/version.py','w')
     fp.write(version_str)
     fp.close()
     print('Git version: {0}'.format(version))
+    
 else:
     from astropy_helpers.version_helpers import generate_version_py
     builtins._ASTROPY_PACKAGE_NAME_ = read_configuration('setup.cfg')['metadata']['name']
     version = generate_version_py()
     
+
 if USE_CYTHON:
     extensions = cythonize(extensions)
 
