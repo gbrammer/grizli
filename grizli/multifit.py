@@ -1475,11 +1475,12 @@ class MultiBeam(GroupFitter):
 
         if MW_EBV < 0:
             # Try to get MW_EBV from mastquery.utils
-            import mastquery.utils
             try:
+                import mastquery.utils
                 MW_EBV = mastquery.utils.get_mw_dust(self.ra, self.dec)
             except:
                 try:
+                    import mastquery.utils
                     MW_EBV = mastquery.utils.get_irsa_dust(self.ra, self.dec)
                 except:
                     MW_EBV = 0.
