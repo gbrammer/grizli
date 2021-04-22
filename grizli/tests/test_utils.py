@@ -13,6 +13,7 @@ class UtilsTester(unittest.TestCase):
                           
         np.testing.assert_allclose(utils.log_zgrid([0.1, 1], 0.1), value, rtol=1e-06, atol=0, equal_nan=False, err_msg='', verbose=True)
     
+    
     def test_arg_dict(self):
         """
         Argument parsing
@@ -24,6 +25,6 @@ class UtilsTester(unittest.TestCase):
         assert(args == ['arg1'])
         
         result = {'p1': 1, 'l1': [1, 2, 3], 'pdict': {'k1': 1}, 'flag': True}
-        assert(kwargs.__repr__ == result.__repr__)
+        assert(kwargs.__repr__() == result.__repr__())
                 
         
