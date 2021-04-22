@@ -1,24 +1,8 @@
 language: python
 
-# python:
-#   - 2.7
-#   - 3.5
-#   - 3.6
-
 # Something in astropy/numpy breaks 3.5
 matrix:
     include:
-      # - python: 2.7
-      #   env:
-      #       - NUMPY_VERSION=stable
-      #       - ASTROPY_VERSION=stable
-      #       - CONDA_DEPENDENCIES='scipy matplotlib pyyaml'
-      # 
-      # - python: 3.5
-      #   env:
-      #       - ASTROPY_VERSION=stable
-      #       - CONDA_DEPENDENCIES='scipy matplotlib pyyaml stwcs'
-      
       - python: 3.6
         env:
             - NUMPY_VERSION=stable
