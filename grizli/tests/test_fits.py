@@ -8,11 +8,30 @@ import glob
 import unittest
 
 import numpy as np
-from .. import utils, prep, multifit, fitting
+from .. import utils, prep, multifit, fitting, GRIZLI_PATH
 
 
 class FittingTools(unittest.TestCase):
     #pass
+    
+    def test_config(self):
+        """
+        Fetch config files if CONF not found
+        """
+        new = []
+        for subd in ['iref','jref','CONF']:
+            conf_path = os.path.join(GRIZLI_PATH, subd)
+            if not os.path.exists(conf_path):
+                new.append(subd)
+                os.mkdir(conf_path)
+        
+        if 'CONF' in new:
+            print(f'Download config and calib files to {conf_path}')
+            grizli.utils.fetch_default_calibs(ACS=False)
+            grizli.utils.fetch_config_files()
+        
+        return True
+            
     def test_multibeam(self):
         path = os.path.dirname(utils.__file__)
         print(path)
