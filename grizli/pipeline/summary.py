@@ -214,33 +214,33 @@ def summary_catalog(field_root='', dzbin=0.01, use_localhost=True, filter_bandpa
     zstr = ['{0:.3f}'.format(z) for z in fit['z_map'][clip]]
     prep.table_to_regions(fit[clip], output=field_root+'-fit.zq.reg', comment=zstr)
 
-    if False:
-
-        fit = utils.GTable.gread('{0}.info.fits'.format(root))
-        fit = auto_script.set_column_formats(fit)
-
-        cols = ['id', 'ra', 'dec', 'mag_auto', 't_g102', 't_g141', 'sn_Ha', 'sn_OIII', 'sn_Hb', 'z_map', 'log_risk', 'log_pdf_max', 'zq', 'chinu', 'bic_diff', 'zwidth1', 'png_stack', 'png_full', 'png_line']
-
-        #clip = ((fit['sn_Ha'] > 5) | (fit['sn_OIII'] > 5)) & (fit['bic_diff'] > 50) & (fit['chinu'] < 2)
-        #clip = (fit['sn_OIII'] > 5) & (fit['bic_diff'] > 100) & (fit['chinu'] < 3)
-
-        test_line = {}
-        for li in ['Ha', 'OIII', 'OII']:
-            test_line[l] = (fit['sn_'+li] > 5) & (fit['err_'+li] < 1.e-16)
-
-        clip = (test_line['Ha'] | test_line['OIII'] | test_line['OII']) & (fit['bic_diff'] > 50) & (fit['chinu'] < 2)
-
-        star = fit['flux_radius'] < 2.3
-        clip &= ~star
-
-        jh = fit['mag_wfc3,ir,f125w'] - fit['mag_wfc3,ir,f160w']
-        clip = (fit['chinu'] < 2) & (jh > 0.9) & (fit['mag_wfc3,ir,f160w'] < 23)
-        fit['jh'] = jh
-        fit['jh'].format = '.1f'
-
-        fit['dmag'] = fit['mag_wfc3,ir,f140w'] - fit['mag_auto']
-        fit['dmag'].format = '.1f'
-
-        cols = ['idx', 'ra', 'dec', 'mag_auto', 'jh', 'dmag', 't_g141', 'sn_Ha', 'sn_OIII', 'sn_Hb', 'z_map', 'log_risk', 'log_pdf_max', 'zq', 'chinu', 'bic_diff', 'zwidth1', 'png_stack', 'png_full', 'png_line']
-
-        fit[cols][clip].write_sortable_html(root+'-fit.lines.html', replace_braces=True, localhost=False, max_lines=50000, table_id=None, table_class='display compact', css=None)
+    # if False:
+    # 
+    #     fit = utils.GTable.gread('{0}.info.fits'.format(root))
+    #     fit = auto_script.set_column_formats(fit)
+    # 
+    #     cols = ['id', 'ra', 'dec', 'mag_auto', 't_g102', 't_g141', 'sn_Ha', 'sn_OIII', 'sn_Hb', 'z_map', 'log_risk', 'log_pdf_max', 'zq', 'chinu', 'bic_diff', 'zwidth1', 'png_stack', 'png_full', 'png_line']
+    # 
+    #     #clip = ((fit['sn_Ha'] > 5) | (fit['sn_OIII'] > 5)) & (fit['bic_diff'] > 50) & (fit['chinu'] < 2)
+    #     #clip = (fit['sn_OIII'] > 5) & (fit['bic_diff'] > 100) & (fit['chinu'] < 3)
+    # 
+    #     test_line = {}
+    #     for li in ['Ha', 'OIII', 'OII']:
+    #         test_line[l] = (fit['sn_'+li] > 5) & (fit['err_'+li] < 1.e-16)
+    # 
+    #     clip = (test_line['Ha'] | test_line['OIII'] | test_line['OII']) & (fit['bic_diff'] > 50) & (fit['chinu'] < 2)
+    # 
+    #     star = fit['flux_radius'] < 2.3
+    #     clip &= ~star
+    # 
+    #     jh = fit['mag_wfc3,ir,f125w'] - fit['mag_wfc3,ir,f160w']
+    #     clip = (fit['chinu'] < 2) & (jh > 0.9) & (fit['mag_wfc3,ir,f160w'] < 23)
+    #     fit['jh'] = jh
+    #     fit['jh'].format = '.1f'
+    # 
+    #     fit['dmag'] = fit['mag_wfc3,ir,f140w'] - fit['mag_auto']
+    #     fit['dmag'].format = '.1f'
+    # 
+    #     cols = ['idx', 'ra', 'dec', 'mag_auto', 'jh', 'dmag', 't_g141', 'sn_Ha', 'sn_OIII', 'sn_Hb', 'z_map', 'log_risk', 'log_pdf_max', 'zq', 'chinu', 'bic_diff', 'zwidth1', 'png_stack', 'png_full', 'png_line']
+    # 
+    #     fit[cols][clip].write_sortable_html(root+'-fit.lines.html', replace_braces=True, localhost=False, max_lines=50000, table_id=None, table_class='display compact', css=None)
