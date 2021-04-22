@@ -3643,8 +3643,12 @@ def get_wcs_pscale(wcs, set_attribute=True):
 
     pscale = np.sqrt(np.abs(det))*3600.
     
-    if hasattr(wcs.wcs, 'cdelt'):
-        pscale *= wcs.wcs.cdelt[0]
+    with warnings.catch_warnings():
+        warnings.filterwarnings('ignore', 
+                  'cdelt will be ignored since cd is present', RuntimeWarning)
+        
+        if hasattr(wcs.wcs, 'cdelt'):
+            pscale *= wcs.wcs.cdelt[0]
         
     wcs.pscale = pscale
 
