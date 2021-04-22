@@ -386,9 +386,10 @@ class GrismDisperser(object):
         self.NX = len(self.dx)
         self.sh_beam = (self.sh[0], self.sh[1]+self.NX)
 
-        self.modelf = np.zeros(np.product(self.sh_beam), dtype=np.float)
+        self.modelf = np.zeros(np.product(self.sh_beam), dtype=float)
         self.model = self.modelf.reshape(self.sh_beam)
-        self.idx = np.arange(self.modelf.size, dtype=np.int64).reshape(self.sh_beam)
+        self.idx = np.arange(self.modelf.size,
+                             dtype=np.int64).reshape(self.sh_beam)
 
         # Indices of the trace in the flattened array
         self.x0 = np.array(self.sh, dtype=np.int64) // 2
