@@ -1,0 +1,34 @@
+astropy
+scipy
+matplotlib
+scikit-image
+scikit-learn
+
+pyyaml
+cython
+
+# photutils=1.0 needed for drizzlepac, apparently
+photutils==1.0.2
+astroquery
+pyregion
+
+stwcs
+# hstcal (only with conda)
+wfc3tools
+crds
+drizzlepac
+
+shapely
+descartes
+boto3
+peakutils
+extinction
+
+sep
+# git+https://github.com/gbrammer/sep.git
+
+git+https://github.com/gbrammer/pyia.git
+git+https://github.com/gbrammer/reprocess_wfc3.git
+git+https://github.com/gbrammer/eazy-py.git
+git+https://github.com/gbrammer/tristars.git
+git+https://github.com/gbrammer/mastquery.git
