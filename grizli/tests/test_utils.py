@@ -25,6 +25,8 @@ class UtilsTester(unittest.TestCase):
         assert(args == ['arg1'])
         
         result = {'p1': 1, 'l1': [1, 2, 3], 'pdict': {'k1': 1}, 'flag': True}
+        
+        # Test that dictionaries are the same using __repr__ method
         assert(kwargs.__repr__() == result.__repr__())
                 
         
