@@ -39,7 +39,7 @@ except:
     IGM = None
 
 
-def run_all_parallel(id, get_output_data=False, args_file='fit_args.npy', **kwargs):
+def run_all_parallel(id, get_output_data=False, args_file='fit_args.npy', protect=True, **kwargs):
     import numpy as np
     from grizli.fitting import run_all
     from grizli import multifit
@@ -61,19 +61,25 @@ def run_all_parallel(id, get_output_data=False, args_file='fit_args.npy', **kwar
     fp.write('{0}_{1:05d}: {2}\n'.format(args['group_name'], id, time.ctime()))
     fp.close()
 
-    try:
-        #args['zr'] = [0.7, 1.0]
-        #mb = multifit.MultiBeam('j100025+021651_{0:05d}.beams.fits'.format(id))
+    if protect:
+        try:
+            #args['zr'] = [0.7, 1.0]
+            #mb = multifit.MultiBeam('j100025+021651_{0:05d}.beams.fits'.format(id))
+            out = run_all(id, **args)
+            if get_output_data:
+                return out
+            status = 1
+        except:
+            status = -1
+            trace = traceback.format_exc(limit=2)  # , file=fp)
+            if args['verbose']:
+                print(trace)
+    else:
         out = run_all(id, **args)
         if get_output_data:
             return out
         status = 1
-    except:
-        status = -1
-        trace = traceback.format_exc(limit=2)  # , file=fp)
-        if args['verbose']:
-            print(trace)
-
+        
     t1 = time.time()
 
     return id, status, t1-t0
@@ -1873,10 +1879,12 @@ class GroupFitter(object):
         from scipy.special import huber
         import peakutils
 
-        if zr in [0]:
-            stars = True
-            zr = [0, 0.01]
-            fitter = 'nnls'
+        if isinstance(zr, int):
+            if zr == 0:
+                stars = True
+                zr = [0, 0.01]
+                fitter = 'nnls'
+                
         else:
             stars = False
 
