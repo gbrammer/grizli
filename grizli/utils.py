@@ -5206,7 +5206,7 @@ def fetch_acs_wcs_files(beams_file, bucket_name='grizli-v1'):
     im.close()
 
 
-def fetch_hst_calib(file='iref$uc72113oi_pfl.fits',  ftpdir='https://hst-crds.stsci.edu/unchecked_get/references/hst/', verbose=True, remove_corrupt=True):
+def fetch_hst_calib(file='iref$uc72113oi_pfl.fits',  ftpdir='https://hst-crds.stsci.edu/unchecked_get/references/hst/', verbose=True, ref_paths={}, remove_corrupt=True):
     """
     TBD
     """
@@ -5214,7 +5214,13 @@ def fetch_hst_calib(file='iref$uc72113oi_pfl.fits',  ftpdir='https://hst-crds.st
 
     ref_dir = file.split('$')[0]
     cimg = file.split('{0}$'.format(ref_dir))[1]
-    iref_file = os.path.join(os.getenv(ref_dir), cimg)
+    
+    if ref_dir in ref_paths:
+        ref_path = ref_paths[ref_dir]
+    else:
+        ref_path = os.getenv(ref_dir)
+        
+    iref_file = os.path.join(ref_path, cimg)
     if not os.path.exists(iref_file):
         os.system('curl -o {0} {1}/{2}'.format(iref_file, ftpdir, cimg))
         if 'fits' in iref_file:
@@ -5236,7 +5242,7 @@ def fetch_hst_calib(file='iref$uc72113oi_pfl.fits',  ftpdir='https://hst-crds.st
     return iref_file
 
 
-def fetch_hst_calibs(flt_file, ftpdir='https://hst-crds.stsci.edu/unchecked_get/references/hst/', calib_types=['BPIXTAB', 'CCDTAB', 'OSCNTAB', 'CRREJTAB', 'DARKFILE', 'NLINFILE', 'DFLTFILE','PFLTFILE', 'IMPHTTAB', 'IDCTAB', 'NPOLFILE'], verbose=True):
+def fetch_hst_calibs(flt_file, ftpdir='https://hst-crds.stsci.edu/unchecked_get/references/hst/', calib_types=['BPIXTAB', 'CCDTAB', 'OSCNTAB', 'CRREJTAB', 'DARKFILE', 'NLINFILE', 'DFLTFILE','PFLTFILE', 'IMPHTTAB', 'IDCTAB', 'NPOLFILE'], verbose=True, ref_paths={}):
     """
     TBD
     Fetch necessary calibration files needed for running calwf3 from STScI FTP
@@ -5271,7 +5277,7 @@ def fetch_hst_calibs(flt_file, ftpdir='https://hst-crds.stsci.edu/unchecked_get/
             continue
 
         path = fetch_hst_calib(im[0].header[ctype], ftpdir=ftpdir,
-                               verbose=verbose)
+                               verbose=verbose, ref_paths=ref_paths)
         calib_paths.append(path)
 
     return calib_paths
@@ -5298,9 +5304,23 @@ def mast_query_from_file_list(files=[], os_open=True):
 
 
 def fetch_default_calibs(ACS=False):
-
+    """
+    Fetch a set of default HST calibration files 
+    """
+    paths = {}
+    
     for ref_dir in ['iref', 'jref']:
-        if not os.getenv(ref_dir):
+        has_dir = True
+        if not os.getenv(ref_dir):    
+            has_dir = False        
+            # Do directories exist in GRIZLI_PATH?
+            if os.path.exists(os.path.join(GRIZLI_PATH, ref_dir)):
+                has_dir = True
+                paths[ref_dir] = os.path.join(GRIZLI_PATH, ref_dir)
+        else:
+            paths[ref_dir] = os.getenv(ref_dir)
+            
+        if not has_dir:
             print("""
 No ${0} set!  Make a directory and point to it in ~/.bashrc or ~/.cshrc.
 For example,
@@ -5325,15 +5345,15 @@ For example,
                       'jref$v971826jj_npl.fits'])
 
     for file in files:
-        fetch_hst_calib(file)
+        fetch_hst_calib(file, ref_paths=paths)
 
-    badpix = os.path.join(os.getenv('iref'), 'badpix_spars200_Nov9.fits')
+    badpix = os.path.join(paths['iref'], 'badpix_spars200_Nov9.fits')
     print('Extra WFC3/IR bad pixels: {0}'.format(badpix))
     if not os.path.exists(badpix):
-        os.system('curl -o {0}/badpix_spars200_Nov9.fits https://raw.githubusercontent.com/gbrammer/wfc3/master/data/badpix_spars200_Nov9.fits'.format(os.getenv('iref')))
+        os.system('curl -o {0}/badpix_spars200_Nov9.fits https://raw.githubusercontent.com/gbrammer/wfc3/master/data/badpix_spars200_Nov9.fits'.format(paths['iref']))
 
     # Pixel area map
-    pam = os.path.join(os.getenv('iref'), 'ir_wfc3_map.fits')
+    pam = os.path.join(paths['iref'], 'ir_wfc3_map.fits')
     print('Pixel area map: {0}'.format(pam))
     if not os.path.exists(pam):
         os.system('curl -o {0} https://www.stsci.edu/files/live/sites/www/files/home/hst/instrumentation/wfc3/data-analysis/pixel-area-maps/_documents/ir_wfc3_map.fits'.format(pam))
