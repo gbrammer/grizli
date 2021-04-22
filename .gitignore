@@ -1,6 +1,5 @@
 # astropy*helpers
 grizli/data/db.local.yml
-grizli/version.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

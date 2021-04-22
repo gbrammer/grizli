@@ -31,7 +31,7 @@ jobs:
         python -m pip install flake8 pytest
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
         
-        # To generate version.py and c utils
+        # To generate version.py and compiled utils_c
         python setup.py build
         cp build/lib*/grizli/utils_c/*so grizli/utils_c/
         
