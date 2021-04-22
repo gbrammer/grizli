@@ -94,6 +94,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     mb, st, fit, tfit, line_hdu
     """
     import glob
+    import matplotlib.pyplot as plt
     import grizli.multifit
     from grizli.stack import StackFitter
     from grizli.multifit import MultiBeam
@@ -1202,10 +1203,12 @@ def refit_beams(root='j012017+213343', append='x', id=708, keep_dict={'G141': [2
     import numpy as np
 
     try:
-        from grizli import utils, fitting
+        from grizli import utils, fitting, multifit
     except:
-        from . import utils, fitting
-
+        from . import utils, fitting, multifit
+        
+    MultiBeam = multifit.MultiBeam
+    
     mb = MultiBeam('{0}_{1:05d}.beams.fits'.format(root, id), group_name=root)
 
     keep_beams = []
@@ -1229,7 +1232,7 @@ def refit_beams(root='j012017+213343', append='x', id=708, keep_dict={'G141': [2
     pfit = mb.template_at_z(z=0, templates=poly_templates, fit_background=True, fitter='lstsq', get_uncertainties=2)
 
     try:
-        fig1 = mb.oned_figure(figsize=[5, 3], tfit=pfit, loglam_1d=loglam_1d)
+        fig1 = mb.oned_figure(figsize=[5, 3], tfit=pfit, loglam_1d=True)
         fig1.savefig('{0}_{1:05d}.1D.png'.format(root+append, id))
     except:
         pass
@@ -2306,11 +2309,6 @@ class GroupFitter(object):
             i = j+self.N
             cfit[key] = coeffs[i], coeffs_err[i]
 
-        if False:
-            # Compare drizzled and beam fits (very close)
-            for j, key in enumerate(templates):
-                print('{key:<16s} {0:.2e} {1:.2e}  {2:.2e} {3:.2e}'.format(mb_cfit[key][0], mb_cfit[key][1], st_cfit[key][0], st_cfit[key][1], key=key))
-
         tfit = OrderedDict()
         tfit['cont1d'] = cont1d
         tfit['line1d'] = line1d
@@ -2334,46 +2332,6 @@ class GroupFitter(object):
 
         return tfit  # cont1d, line1d, cfit, covar
 
-        ##############################
-
-        # Random draws
-        # Unique wavelengths
-        wfull = np.hstack([templates[key].wave for key in templates])
-        w = np.unique(wfull)
-        so = np.argsort(w)
-        w = w[so]
-
-        xclip = (w*(1+z) > 7000) & (w*(1+z) < 1.8e4)
-        temp = []
-        for key in templates:
-            if key.split()[0] in ['bspl', 'step', 'poly']:
-                w_templ = w[xclip]/(1+z)
-            else:
-                w_templ = w[xclip]
-
-            temp.append(grizli.utils_c.interp.interp_conserve_c(w_templ,
-                              templates[key].wave, templates[key].flux))
-
-        temp = np.vstack(temp)
-        # array([) for key in templates])
-
-        clip = coeffs_err[self.N:] > 0
-        covar_clip = covar[self.N:, self.N:][clip, :][:, clip]
-        draws = np.random.multivariate_normal(coeffs[self.N:][clip], covar_clip, size=100)
-
-        tdraw = np.dot(draws, temp[clip, :])/(1+z)
-
-        for ib, beam in enumerate(self.beams):
-            ww, ff, ee = beam.optimal_extract(beam.sci - beam.contam - coeffs[ib])
-            plt.errorbar(ww, ff/beam.sens, ee/beam.sens, color='k', marker='.', linestyle='None', alpha=0.5)
-
-            for i in range(tdraw.shape[0]):
-                sp = [w[xclip]*(1+z), tdraw[i, :]]
-                m = beam.compute_model(spectrum_1d=sp, is_cgs=True, in_place=False).reshape(beam.sh)
-                ww, ff, ee = beam.optimal_extract(m)
-                plt.plot(ww, ff/beam.sens, color='r', alpha=0.05)
-
-            plt.plot(w[xclip]*(1+z), tdraw.T, alpha=0.05, color='r')
 
     def check_tfit_coeffs(self, tfit, templates, refit_others=True, fit_background=True, fitter='nnls', bounded_kwargs=BOUNDED_DEFAULTS):
         """
@@ -2603,68 +2561,6 @@ class GroupFitter(object):
 
         return fig
 
-    def process_zfit(self, zgrid, chi2, prior=None):
-        """Parse redshift fit"""
-
-        zbest = zgrid[np.argmin(chi2)]
-
-        ###############
-
-        if prior is not None:
-            #print('\n\nPrior!\n\n', chi2.min(), prior[1].min())
-            interp_prior = np.interp(zgrid, prior[0], prior[1])
-            chi2 += interp_prior
-        else:
-            interp_prior = None
-
-        print(' Zoom iteration: z_best={0:.4f}\n'.format(zgrid[np.argmin(chi2)]))
-
-        # Best redshift
-        if not stars:
-            templates = utils.load_templates(line_complexes=False, fwhm=fwhm, fsps_templates=fsps_templates)
-
-        zbest = zgrid[np.argmin(chi2)]
-        ix = np.argmin(chi2)
-        chibest = chi2.min()
-
-        # Fit parabola
-        if (ix > 0) & (ix < len(chi2)-1):
-            c = polyfit(zgrid[ix-1:ix+2], chi2[ix-1:ix+2], 2)
-            zbest = -c[1]/(2*c[0])
-            chibest = polyval(c, zbest)
-
-        out = self.fit_at_z(z=zbest, templates=templates,
-                            fitter=fitter, poly_order=poly_order,
-                            fit_background=fit_background)
-
-        A, coeffs_full, chi2_best, model_full = out
-
-        # Parse results
-        out2 = self.parse_fit_outputs(zbest, templates, coeffs_full, A)
-        line_flux, covar, cont1d, line1d, model1d, model_continuum = out2
-
-        # Output dictionary with fit parameters
-        fit_data = OrderedDict()
-        fit_data['poly_order'] = poly_order
-        fit_data['fwhm'] = fwhm
-        fit_data['zbest'] = zbest
-        fit_data['chibest'] = chibest
-        fit_data['chi_poly'] = chi2_poly
-        fit_data['zgrid'] = zgrid
-        fit_data['prior'] = interp_prior
-        fit_data['A'] = A
-        fit_data['coeffs'] = coeffs
-        fit_data['chi2'] = chi2
-        fit_data['DoF'] = self.DoF
-        fit_data['model_full'] = model_full
-        fit_data['coeffs_full'] = coeffs_full
-        fit_data['covar'] = covar
-        fit_data['line_flux'] = line_flux
-        #fit_data['templates_full'] = templates
-        fit_data['model_cont'] = model_continuum
-        fit_data['model1d'] = model1d
-        fit_data['cont1d'] = cont1d
-        fit_data['line1d'] = line1d
 
     def scale_to_photometry(self, tfit=None, tol=1.e-4, order=0, init=None, fit_background=True, Rspline=50, use_fit=True, **kwargs):
         """Compute scale factor between spectra and photometry

@@ -3268,7 +3268,7 @@ class GrismFLT(object):
             seg_file = root + '.detect_seg.fits'
 
         if not os.path.exists(seg_file):
-            print('Segmentation image {0} not found'.format(segfile))
+            print('Segmentation image {0} not found'.format(seg_file))
             return False
         
         with pyfits.open(seg_file) as seg_im: 

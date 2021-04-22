@@ -28,116 +28,6 @@ from .utils_c import interp
 from .utils import GRISM_COLORS, GRISM_MAJOR, GRISM_LIMITS, DEFAULT_LINE_LIST
 
 
-def test():
-
-    import glob
-    from grizlidev import utils
-    import grizlidev.multifit
-
-    reload(utils)
-    reload(grizlidev.model)
-    reload(grizlidev.multifit)
-
-    files = glob.glob('i*flt.fits')
-    output_list, filter_list = utils.parse_flt_files(files, uniquename=False)
-
-    # grism_files = filter_list['G141'][164]
-    # #grism_files.extend(filter_list['G141'][247])
-    #
-    # direct_files = filter_list['F140W'][164][:4]
-    # direct_files.extend(filter_list['F140W'][247][:4])
-
-    # grp = grizlidev.multifit.GroupFLT(grism_files=grism_files, direct_files=direct_files)
-    #
-    #
-    # grp = grizlidev.multifit.GroupFLT(grism_files=grism_files, direct_files=direct_files, ref_file=ref)
-
-    # ref = 'MACS0416-F140W_drz_sci_filled.fits'
-    # seg = 'hff_m0416_v0.1_bkg_detection_seg_grow.fits'
-    # catalog = 'hff_m0416_v0.1_f140w.cat'
-    #
-    # key = 'cl1301-11.3-122.5-g102'
-    # seg = 'cl1301-11.3-14-122-f105w_seg.fits'
-    # catalog = 'cl1301-11.3-14-122-f105w.cat'
-    # #ref = 'cl1301-11.3-14-122-f105w_drz_sci.fits'
-    # grism_files = output_list[key]
-    # direct_files = output_list[key.replace('f105w','g102')]
-
-    grism_files = filter_list['G141'][1]
-    grism_files.extend(filter_list['G141'][33])
-
-    grism_files = glob.glob('*cmb.fits')
-
-    ref = 'F160W_mosaic.fits'
-    seg = 'F160W_seg_blot.fits'
-    catalog = '/Users/brammer/3DHST/Spectra/Work/3DHST_Detection/GOODS-N_IR.cat'
-
-    direct_files = []
-
-    reload(utils)
-    reload(grizlidev.model)
-    reload(grizlidev.multifit)
-
-    grp = grizlidev.multifit.GroupFLT(grism_files=grism_files[:8], direct_files=direct_files, ref_file=ref, seg_file=seg, catalog=catalog)
-
-    self = grp
-
-    fit_info = {3286: {'mag': -99, 'spec': None},
-                3279: {'mag': -99, 'spec': None}}
-
-    fit_info = OrderedDict()
-
-    bright = self.catalog['MAG_AUTO'] < 25
-    ids = self.catalog['NUMBER'][bright]
-    mags = self.catalog['MAG_AUTO'][bright]
-    for id, mag in zip(ids, mags):
-        fit_info[id] = {'mag': mag, 'spec': None}
-
-    # Fast?
-    #fit_info = {3212: {'mag':-99, 'spec': None}}
-
-    # self.compute_single_model(3212)
-
-    # parallel
-    self.compute_full_model(fit_info, store=False)
-
-    # Refine
-    bright = (self.catalog['MAG_AUTO'] < 22) & (self.catalog['MAG_AUTO'] > 16)
-    ids = self.catalog['NUMBER'][bright]*1
-    mags = self.catalog['MAG_AUTO'][bright]*1
-    so = np.argsort(mags)
-
-    ids, mags = ids[so], mags[so]
-
-    self.refine_list(ids, mags, ds9=ds9, poly_order=1)
-
-    # bright = (self.catalog['MAG_AUTO'] < 22) & (self.catalog['MAG_AUTO'] > 16)
-    # ids = self.catalog['NUMBER'][bright]*1
-    # mags = self.catalog['MAG_AUTO'][bright]*1
-    # so = np.argsort(mags)
-    #
-    # self.refine_list(ids, mags, ds9=ds9, poly_order=5)
-
-    beams = self.get_beams(3212)
-
-    # serial
-    t0 = time.time()
-    out = _compute_model(0, self.FLTs[i], fit_info, False, False)
-    t1 = time.time()
-    # print t1-t0
-
-    id = 3219
-    fwhm = 1200
-    zr = [0.58, 2.4]
-
-    beams = grp.get_beams(id, size=30)
-    mb = grizlidev.multifit.MultiBeam(beams)
-    fit, fig = mb.fit_redshift(fwhm=fwhm, zr=zr, poly_order=3, dz=[0.003, 0.003])
-
-    A, out_coeffs, chi2, modelf = mb.fit_at_z(poly_order=1)
-    m2d = mb.reshape_flat(modelf)
-
-
 def _loadFLT(grism_file, sci_extn, direct_file, pad, ref_file,
                ref_ext, seg_file, verbose, catalog, ix):
     """Helper function for loading `.model.GrismFLT` objects with `multiprocessing`.
@@ -222,31 +112,31 @@ def _fit_at_z(self, zgrid, i, templates, fitter, fit_background, poly_order):
     #A, coeffs[i,:], chi2[i], model_2d = out
 
 
-def test_parallel():
-
-    zgrid = np.linspace(1.1, 1.3, 10)
-    templates = mb.load_templates(fwhm=800)
-    fitter = 'nnls'
-    fit_background = True
-    poly_order = 0
-
-    self.FLTs = []
-    t0_pool = time.time()
-
-    pool = mp.Pool(processes=4)
-    results = [pool.apply_async(_fit_at_z, (mb, zgrid, i, templates, fitter, fit_background, poly_order)) for i in range(len(zgrid))]
-
-    pool.close()
-    pool.join()
-
-    chi = zgrid*0.
-
-    for res in results:
-        data = res.get(timeout=1)
-        A, coeffs, chi[data['i']], model_2d = data['out']
-        #flt_i.catalog = cat_i
-
-    t1_pool = time.time()
+# def test_parallel():
+# 
+#     zgrid = np.linspace(1.1, 1.3, 10)
+#     templates = mb.load_templates(fwhm=800)
+#     fitter = 'nnls'
+#     fit_background = True
+#     poly_order = 0
+# 
+#     self.FLTs = []
+#     t0_pool = time.time()
+# 
+#     pool = mp.Pool(processes=4)
+#     results = [pool.apply_async(_fit_at_z, (mb, zgrid, i, templates, fitter, fit_background, poly_order)) for i in range(len(zgrid))]
+# 
+#     pool.close()
+#     pool.join()
+# 
+#     chi = zgrid*0.
+# 
+#     for res in results:
+#         data = res.get(timeout=1)
+#         A, coeffs, chi[data['i']], model_2d = data['out']
+#         #flt_i.catalog = cat_i
+# 
+#     t1_pool = time.time()
 
 
 def _compute_model(i, flt, fit_info, is_cgs, store):
@@ -2487,12 +2377,7 @@ class MultiBeam(GroupFitter):
         if dz is None:
             dz = [0.005, 0.0004]
 
-        # if True:
-        #     beams = grp.get_beams(id, size=30)
-        #     mb = grizlidev.multifit.MultiBeam(beams)
-        #     self = mb
-
-        if zr is 0:
+        if zr in [0]:
             stars = True
             zr = [0, 0.01]
             fitter = 'nnls'
@@ -3482,7 +3367,7 @@ class MultiBeam(GroupFitter):
         zfit_in['zoom'] = zoom
         zfit_in['verbose'] = verbose
 
-        if zfit_in['zr'] is 0:
+        if zfit_in['zr'] in [0]:
             fit, fig = self.fit_stars(**zfit_in)
         else:
             fit, fig = self.fit_redshift(**zfit_in)
@@ -3687,9 +3572,6 @@ class MultiBeam(GroupFitter):
                     # self.beams[i].compute_model(is_cgs=True)
                     beam.compute_model(use_psf=False)
 
-                if __name__ == '__main__':
-                    print(self.beams[i].beam.yoffset, shifts[il])
-                    ds9.view(self.beams[i].model)
 
         self.flat_flam = np.hstack([b.beam.model.flatten() for b in self.beams])
         self.poly_order = -1

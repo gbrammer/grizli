@@ -287,25 +287,7 @@ def blot_nearest_exact(in_data, in_wcs, out_wcs, verbose=True, stepsize=-1,
         from .utils_c.interp import pixel_map_c
     except:
         from grizli.utils_c.interp import pixel_map_c
-
-    if False:
-        # Testing
-        im = pyfits.open('jbhj40-bhj-40-000.0-f814w_drc_sci.fits')
-        out = pyfits.open('jbhj40hbq_flc.fits')
-
-        in_data = im[0].data
-        in_wcs = pywcs.WCS(im[0].header)
-
-        ext = 1
-        out_wcs = pywcs.WCS(out['SCI', ext].header, fobj=out)
-
-        out_data = utils.blot_nearest_exact(in_data, in_wcs, out_wcs)
-
-        # Try HSTWCS
-        from stwcs.wcsutil import HSTWCS
-        source_wcs = HSTWCS(fobj=out, ext=('SCI', ext), minerr=0.0, wcskey=' ')
-        blot_wcs = HSTWCS(fobj=im, ext=(0), minerr=0.0, wcskey=' ')
-
+    
     # Shapes, in numpy array convention (y, x)
     if hasattr(in_wcs, 'pixel_shape'):
         in_sh = in_wcs.pixel_shape[::-1]
@@ -1849,6 +1831,7 @@ def emission_line_templates():
     Testing FSPS line templates
     """
     import numpy as np
+    import matplotlib.pyplot as plt
     from grizli import utils
     import fsps
     sp = fsps.StellarPopulation(imf_type=1, zcontinuous=1)
@@ -3190,13 +3173,6 @@ def compute_equivalent_widths(templates, coeffs, covar, max_R=5000, Ndraw=1000, 
         Dictionary of [16, 50, 84th] percentiles of the line EW distributions.
 
     """
-
-    if False:
-        # Testing
-        templates = t1
-        chi2, coeffsx, coeffs_errx, covarx = mb.xfit_at_z(z=tfit['z'], templates=templates, fitter='nnls', fit_background=True, get_uncertainties=2)
-        covar = covarx[mb.N:, mb.N:]
-        coeffs = coeffsx[mb.N:]
 
     # Array versions of the templates
     wave, flux_arr, is_line = array_templates(templates, max_R=max_R, z=z)

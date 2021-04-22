@@ -445,7 +445,7 @@ def apply_region_mask(flt_file, dq_value=1024, verbose=True):
     return True
 
 
-def apply_saturated_mask(flt_file, dq_value=1024):
+def apply_saturated_mask(flt_file, dq_value=1024, verbose=True):
     """Saturated WFC3/IR pixels have some pulldown in the opposite amplifier
 
     Parameters
@@ -1605,7 +1605,6 @@ def make_SEP_catalog(root='', threshold=2., get_background=True,
         del(data_mask)
         del(data)
         del(err)
-        del(data_mask)
     except:
         pass
 
@@ -2314,14 +2313,6 @@ def add_external_sources(root='', maglim=20, fwhm=0.2, catalog='2mass'):
     wht.writeto(wht_file.replace('_drz', '_{0}_drz'.format(catalog)),
                 overwrite=True)
 
-    if False:
-        # Mask
-        kern = (np.arange(flt.conf.conf['BEAMA'][1]) > flt.conf.conf['BEAMA'][0])*1.
-        kern /= kern.sum()
-
-        mask = flt.direct['REF'] == 0
-        full_mask = nd.convolve(mask*1., kern.reshape((1, -1)), origin=(0, -kern.size//2+20))
-
 
 def asn_to_dict(input_asn):
     """Convert an ASN file to a dictionary
@@ -2339,7 +2330,7 @@ def asn_to_dict(input_asn):
     """
     from stsci.tools import asnutil
     # Already is a dict
-    if instance(input_asn, dict):
+    if isinstance(input_asn, dict):
         return input_asn
 
     # String / unicode
@@ -4530,12 +4521,6 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
         for j in range(Nexp):
             obj_j = nd.minimum_filter(obj_mask[j*Npix:(j+1)*Npix], size=30)
             obj_mask[j*Npix:(j+1)*Npix] = (obj_j > 0).flatten()
-
-        if False:
-            j = 1
-            mask_i = (obj_mask & mask)[j*Npix:(j+1)*Npix].reshape(sh)
-            r_i = (data-model)[j*Npix:(j+1)*Npix].reshape(sh)
-            ds9.view(r_i * mask_i)
 
         logstr = '# visit_grism_sky   {0} > Iter: {1:d}, masked: {2:2.0f}%, {3}'
         logstr = logstr.format(grism['product'], iter+1, obj_mask.sum()/Npix/Nimg*100, coeffs)
