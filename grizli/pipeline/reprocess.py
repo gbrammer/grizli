@@ -180,8 +180,9 @@ def make_masks(files=None, inspect='grizli_inspect.fits', ext=1):
     Make satellite trail masks
     """
     import os
+    import numpy as np
     import astropy.io.fits as pyfits
-
+    
     try:
         from .. import utils
         from ..ds9 import DS9

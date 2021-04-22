@@ -5938,16 +5938,16 @@ class EffectivePSF(object):
             psf_params[1] -= x0
             psf_params[2] -= y0
 
-        if False:
-
-            psf_fit = epsf.get_ePSF(psf_params, origin=origin,
-                                       filter=filter, shape=sh,
-                                       get_extended=get_extended)
-
-            xargs = (self, psf_xy, sci, ivar_mask, xp, yp, extended_data, 'lm', None)
-            lm = _objfun(out.x, *xargs)
-            cargs = (self, psf_xy, sci, ivar_mask, xp, yp, extended_data, 'chi2', None)
-            chi2 = _objfun(out.x, *cargs)
+        # if False:
+        # 
+        #     psf_fit = epsf.get_ePSF(psf_params, origin=origin,
+        #                                filter=filter, shape=sh,
+        #                                get_extended=get_extended)
+        # 
+        #     xargs = (self, psf_xy, sci, ivar_mask, xp, yp, extended_data, 'lm', None)
+        #     lm = _objfun(out.x, *xargs)
+        #     cargs = (self, psf_xy, sci, ivar_mask, xp, yp, extended_data, 'chi2', None)
+        #     chi2 = _objfun(out.x, *cargs)
 
         return psf_params
 
@@ -6791,6 +6791,8 @@ def fill_between_steps(x, y0, y1, ax=None, *args, **kwargs):
     """
     Make `fill_between` work like linestyle='steps-mid'.
     """
+    import matplotlib.pyplot as plt
+    
     so = np.argsort(x)
     dx = np.diff(x[so])/2.
     mid = x[so][:-1] + dx

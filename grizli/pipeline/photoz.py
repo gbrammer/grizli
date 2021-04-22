@@ -110,6 +110,9 @@ def apply_catalog_corrections(root, total_flux='flux_auto', auto_corr=True, get_
     if get_external_photometry:
         print('Get external photometry from Vizier')
         try:
+            external_limits = 3
+            external_timeout = 300
+            external_sys_err = 0.03
             ext = get_external_catalog(cat, external_limits=external_limits,
                                        timeout=external_timeout,
                                        sys_err=external_sys_err)
@@ -696,123 +699,124 @@ def get_external_catalog(phot, filter_file='/usr/local/share/eazy-photoz/filters
 
     return extern_phot
 
-# Selecting objects
+######## Selecting objects
 
-
-def select_objects():
-    from grizli.pipeline import photoz
-    import numpy as np
-
-    total_flux = 'flux_auto_fix'
-    total_flux = 'flux_auto'  # new segmentation masked SEP catalogs
-    object_only = False
-
-    self, cat, zout = photoz.eazy_photoz(root, object_only=object_only, apply_prior=False, beta_prior=True, aper_ix=2, force=True, get_external_photometry=False, compute_residuals=False, total_flux=total_flux)
-
-    if False:
-        args = np.load('fit_args.npy', allow_pickle=True)[0]
-        phot_obj = photoz.EazyPhot(self, grizli_templates=args['t0'], zgrid=self.zgrid, apcorr=self.idx*0.+1)
-
-    flux = self.cat[total_flux]*1.
-    hmag = 23.9-2.5*np.log10(cat['f160w_tot_1'])
-
-    # Reddest HST band
-    lc_clip = self.lc*1
-    lc_clip[self.lc > 1.55e4] = 0  # in case ground-based / WISE red band
-    ixb = np.argmax(lc_clip)
-    sn_red = self.cat[self.flux_columns[ixb]]/self.cat[self.err_columns[ixb]]
-
-    grad = np.gradient(self.zgrid)
-    cumpz = np.cumsum(self.pz*grad, axis=1)
-    cumpz = (cumpz.T/cumpz[:, -1]).T
-
-    chi2 = (self.chi_best / self.nusefilt)
-
-    iz6 = np.where(self.zgrid > 6.0)[0][0]
-    iz7 = np.where(self.zgrid > 7)[0][0]
-    iz8 = np.where(self.zgrid > 8)[0][0]
-    iz9 = np.where(self.zgrid > 9)[0][0]
-
-    highz_sel = (hmag < 27.5)  # & (self.cat['class_valid'] > 0.8)
-    #highz_sel |= (cumpz[:,iz6] < 0.3) & (self.cat['flux_radius'] > 2.5)
-    #highz_sel &= (self.cat['flux_radius'] > 2.5)
-    highz_sel &= chi2 < 3
-    highz_sel &= (sn_red > 5)
-    highz_sel &= self.nusefilt >= 3
-
-    flux_ratio = cat['f160w_flux_aper_3']/cat['f160w_flux_aper_0']
-    flux_ratio /= cat.meta['APER_3']**2/cat.meta['APER_0']**2
-
-    if False:
-        sel = highz_sel
-        so = np.argsort(cumpz[sel, iz7])
-        ids = self.cat['id'][sel][so]
-        i = -1
-        so = np.argsort(flux_ratio[sel])[::-1]
-        ids = self.cat['id'][sel][so]
-        i = -1
-
-    highz_sel &= (cumpz[:, iz6] > 0) & (flux_ratio < 0.45) & ((cumpz[:, iz6] < 0.3) | (cumpz[:, iz7] < 0.3) | (((cumpz[:, iz8] < 0.4) | (cumpz[:, iz9] < 0.5)) & (flux_ratio < 0.5)))
-
-    # Big objects likely diffraction spikes
-    # big = (self.cat['flux_radius'] > 10)
-    # highz_sel &= ~big
-    #flux_ratio = self.cat['flux_aper_0']/self.cat['flux_aper_2']
-
-    sel = highz_sel
-    so = np.argsort(hmag[sel])
-    ids = self.cat['id'][sel][so]
-    i = -1
-
-    # Red
-    uv = -2.5*np.log10(zout['restU']/zout['restV'])
-    red_sel = ((zout['z160'] > 1.) & (uv > 1.5)) | ((zout['z160'] > 1.5) & (uv > 1.1))
-    red_sel &= (self.zbest < 4) & (hmag < 22)  # & (~hmag.mask)
-    red_sel &= (zout['mass'] > 10**10.5)  # & (self.cat['class_valid'] > 0.8)
-    red_sel &= (self.cat['flux_radius'] > 2.5)
-    red_sel &= (zout['restV']/zout['restV_err'] > 3)
-    red_sel &= (chi2 < 3)
-    #red_sel &= (sn_red > 20)
-
-    sel = red_sel
-
-    so = np.argsort(hmag[sel])
-    ids = self.cat['id'][sel][so]
-    i = -1
-
-    ds9 = None
-
-    for j in self.idx[sel][so]:
-        id_j, ra, dec = self.cat['id', 'ra', 'dec'][j]
-
-        # Photo-z
-        fig, data = self.show_fit(id_j, ds9=ds9, show_fnu=True)  # highz_sel[j])
-        lab = '{0} {1}\n'.format(root, id_j)
-        lab += 'H={0:.1f} z={1:.1f}\n'.format(hmag[j], self.zbest[j])
-        lab += 'U-V={0:.1f}, logM={1:4.1f}'.format(uv[j], np.log10(zout['mass'][j]))
-
-        ax = fig.axes[0]
-        ax.text(0.95, 0.95, lab, ha='right', va='top', transform=ax.transAxes, fontsize=9, bbox=dict(facecolor='w', edgecolor='None', alpha=0.5))
-        yl = ax.get_ylim()
-        ax.set_ylim(yl[0], yl[1]*1.1)
-
-        fig.savefig('{0}_{1:05d}.eazy.png'.format(root, id_j), dpi=70)
-        plt.close()
-
-        # Cutout
-        #from grizli_aws.aws_drizzle import drizzle_images
-
-        #rgb_params = {'output_format': 'png', 'output_dpi': 75, 'add_labels': False, 'show_ir': False, 'suffix':'.rgb'}
-        rgb_params = None
-
-        #aws_bucket = 's3://grizli/SelectedObjects/'
-        aws_bucket = None
-
-        label = '{0}_{1:05d}'.format(root, id_j)
-        if not os.path.exists('{0}.rgb.png'.format(label)):
-            drizzle_images(label=label, ra=ra, dec=dec, pixscale=0.06, size=8, pixfrac=0.8, theta=0, half_optical_pixscale=False, filters=['f160w', 'f814w', 'f140w', 'f125w', 'f105w', 'f110w', 'f098m', 'f850lp', 'f775w', 'f606w', 'f475w'], remove=False, rgb_params=rgb_params, master='grizli-jan2019', aws_bucket=aws_bucket)
-
-        show_all_thumbnails(label=label, filters=['f775w', 'f814w', 'f098m', 'f105w', 'f110w', 'f125w', 'f140w', 'f160w'], scale_ab=np.clip(hmag[j], 19, 22), close=True)
+# def select_objects():
+#     import os
+#     
+#     from grizli.pipeline import photoz
+#     import numpy as np
+# 
+#     total_flux = 'flux_auto_fix'
+#     total_flux = 'flux_auto'  # new segmentation masked SEP catalogs
+#     object_only = False
+# 
+#     self, cat, zout = photoz.eazy_photoz(root, object_only=object_only, apply_prior=False, beta_prior=True, aper_ix=2, force=True, get_external_photometry=False, compute_residuals=False, total_flux=total_flux)
+# 
+#     if False:
+#         args = np.load('fit_args.npy', allow_pickle=True)[0]
+#         phot_obj = photoz.EazyPhot(self, grizli_templates=args['t0'], zgrid=self.zgrid, apcorr=self.idx*0.+1)
+# 
+#     flux = self.cat[total_flux]*1.
+#     hmag = 23.9-2.5*np.log10(cat['f160w_tot_1'])
+# 
+#     # Reddest HST band
+#     lc_clip = self.lc*1
+#     lc_clip[self.lc > 1.55e4] = 0  # in case ground-based / WISE red band
+#     ixb = np.argmax(lc_clip)
+#     sn_red = self.cat[self.flux_columns[ixb]]/self.cat[self.err_columns[ixb]]
+# 
+#     grad = np.gradient(self.zgrid)
+#     cumpz = np.cumsum(self.pz*grad, axis=1)
+#     cumpz = (cumpz.T/cumpz[:, -1]).T
+# 
+#     chi2 = (self.chi_best / self.nusefilt)
+# 
+#     iz6 = np.where(self.zgrid > 6.0)[0][0]
+#     iz7 = np.where(self.zgrid > 7)[0][0]
+#     iz8 = np.where(self.zgrid > 8)[0][0]
+#     iz9 = np.where(self.zgrid > 9)[0][0]
+# 
+#     highz_sel = (hmag < 27.5)  # & (self.cat['class_valid'] > 0.8)
+#     #highz_sel |= (cumpz[:,iz6] < 0.3) & (self.cat['flux_radius'] > 2.5)
+#     #highz_sel &= (self.cat['flux_radius'] > 2.5)
+#     highz_sel &= chi2 < 3
+#     highz_sel &= (sn_red > 5)
+#     highz_sel &= self.nusefilt >= 3
+# 
+#     flux_ratio = cat['f160w_flux_aper_3']/cat['f160w_flux_aper_0']
+#     flux_ratio /= cat.meta['APER_3']**2/cat.meta['APER_0']**2
+# 
+#     if False:
+#         sel = highz_sel
+#         so = np.argsort(cumpz[sel, iz7])
+#         ids = self.cat['id'][sel][so]
+#         i = -1
+#         so = np.argsort(flux_ratio[sel])[::-1]
+#         ids = self.cat['id'][sel][so]
+#         i = -1
+# 
+#     highz_sel &= (cumpz[:, iz6] > 0) & (flux_ratio < 0.45) & ((cumpz[:, iz6] < 0.3) | (cumpz[:, iz7] < 0.3) | (((cumpz[:, iz8] < 0.4) | (cumpz[:, iz9] < 0.5)) & (flux_ratio < 0.5)))
+# 
+#     # Big objects likely diffraction spikes
+#     # big = (self.cat['flux_radius'] > 10)
+#     # highz_sel &= ~big
+#     #flux_ratio = self.cat['flux_aper_0']/self.cat['flux_aper_2']
+# 
+#     sel = highz_sel
+#     so = np.argsort(hmag[sel])
+#     ids = self.cat['id'][sel][so]
+#     i = -1
+# 
+#     # Red
+#     uv = -2.5*np.log10(zout['restU']/zout['restV'])
+#     red_sel = ((zout['z160'] > 1.) & (uv > 1.5)) | ((zout['z160'] > 1.5) & (uv > 1.1))
+#     red_sel &= (self.zbest < 4) & (hmag < 22)  # & (~hmag.mask)
+#     red_sel &= (zout['mass'] > 10**10.5)  # & (self.cat['class_valid'] > 0.8)
+#     red_sel &= (self.cat['flux_radius'] > 2.5)
+#     red_sel &= (zout['restV']/zout['restV_err'] > 3)
+#     red_sel &= (chi2 < 3)
+#     #red_sel &= (sn_red > 20)
+# 
+#     sel = red_sel
+# 
+#     so = np.argsort(hmag[sel])
+#     ids = self.cat['id'][sel][so]
+#     i = -1
+# 
+#     ds9 = None
+# 
+#     for j in self.idx[sel][so]:
+#         id_j, ra, dec = self.cat['id', 'ra', 'dec'][j]
+# 
+#         # Photo-z
+#         fig, data = self.show_fit(id_j, ds9=ds9, show_fnu=True)  # highz_sel[j])
+#         lab = '{0} {1}\n'.format(root, id_j)
+#         lab += 'H={0:.1f} z={1:.1f}\n'.format(hmag[j], self.zbest[j])
+#         lab += 'U-V={0:.1f}, logM={1:4.1f}'.format(uv[j], np.log10(zout['mass'][j]))
+# 
+#         ax = fig.axes[0]
+#         ax.text(0.95, 0.95, lab, ha='right', va='top', transform=ax.transAxes, fontsize=9, bbox=dict(facecolor='w', edgecolor='None', alpha=0.5))
+#         yl = ax.get_ylim()
+#         ax.set_ylim(yl[0], yl[1]*1.1)
+# 
+#         fig.savefig('{0}_{1:05d}.eazy.png'.format(root, id_j), dpi=70)
+#         plt.close()
+# 
+#         # Cutout
+#         #from grizli_aws.aws_drizzle import drizzle_images
+# 
+#         #rgb_params = {'output_format': 'png', 'output_dpi': 75, 'add_labels': False, 'show_ir': False, 'suffix':'.rgb'}
+#         rgb_params = None
+# 
+#         #aws_bucket = 's3://grizli/SelectedObjects/'
+#         aws_bucket = None
+# 
+#         label = '{0}_{1:05d}'.format(root, id_j)
+#         if not os.path.exists('{0}.rgb.png'.format(label)):
+#             drizzle_images(label=label, ra=ra, dec=dec, pixscale=0.06, size=8, pixfrac=0.8, theta=0, half_optical_pixscale=False, filters=['f160w', 'f814w', 'f140w', 'f125w', 'f105w', 'f110w', 'f098m', 'f850lp', 'f775w', 'f606w', 'f475w'], remove=False, rgb_params=rgb_params, master='grizli-jan2019', aws_bucket=aws_bucket)
+# 
+#         show_all_thumbnails(label=label, filters=['f775w', 'f814w', 'f098m', 'f105w', 'f110w', 'f125w', 'f140w', 'f160w'], scale_ab=np.clip(hmag[j], 19, 22), close=True)
 
 ############
 
@@ -821,9 +825,13 @@ def show_all_thumbnails(label='j022708p4901_00273', filters=['f775w', 'f814w', '
     """
     Show individual filter and RGB thumbnails
     """
-    from astropy.visualization import make_lupton_rgb
+    import glob
     import matplotlib.pyplot as plt
-
+    from astropy.visualization import make_lupton_rgb
+    import astropy.io.fits as pyfits
+    
+    from grizli import utils
+    
     #from PIL import Image
 
     ims = {}
@@ -870,41 +878,3 @@ def show_all_thumbnails(label='j022708p4901_00273', filters=['f775w', 'f814w', '
     if close:
         plt.close()
 
-
-def iyj():
-
-    flux = 'corr'
-    err = 'ecorr'
-    ap = 0
-
-    iflux = np.maximum(self.cat['f814w_{0}_{1}'.format(flux, ap)], self.cat['f814w_{0}_{1}'.format(err, ap)])
-
-    iSN = self.cat['f814w_{0}_{1}'.format(flux, ap)]/self.cat['f814w_{0}_{1}'.format(flux, ap)]
-
-    yflux = self.cat['f105w_{0}_{1}'.format(flux, ap)]
-    jflux = self.cat['f125w_{0}_{1}'.format(flux, ap)]
-
-    iy = -2.5*np.log10(iflux/yflux)
-    yj = -2.5*np.log10(yflux/jflux)
-
-    sel = (hmag > 22) & (self.cat['f814w_{0}_{1}'.format(flux, ap)] > -90)
-    qso = self.cat['id'] == 1072
-    plt.scatter(yj[sel], iy[sel], marker='.', color='k', alpha=0.5)
-    plt.scatter(yj[highz_sel], iy[highz_sel], marker='s', color='r', alpha=0.5)
-    plt.scatter(yj[qso], iy[qso], marker='*', color='r')
-
-    red = (yj > 0.5) & (iy > 1.2) & (self.cat['f814w_{0}_{1}'.format(flux, ap)] > -90) & (iSN < 2)
-
-    red = (yj > -0.2) & (iy > 1.9) & (self.cat['f814w_{0}_{1}'.format(flux, ap)] > -90) & (iSN < 2)
-
-    plt.scatter(yj[red], iy[red], marker='.', color='pink')
-
-    tf = self.tempfilt.tempfilt
-    tiy = -2.5*np.log10(tf[:, :, 2]/tf[:, :, 0])
-    tyj = -2.5*np.log10(tf[:, :, 0]/tf[:, :, 1])
-    lowz = self.zgrid < 6
-    plt.plot(tyj[lowz, :], tiy[lowz, :], alpha=0.3, color='orange')
-    plt.plot(tyj[~lowz, :], tiy[~lowz, :], alpha=0.4, color='r')
-    plt.xlim(-1, 3)
-    plt.ylim(-1, 10)
-    plt.grid()

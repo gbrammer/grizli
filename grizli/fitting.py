@@ -1873,7 +1873,7 @@ class GroupFitter(object):
         from scipy.special import huber
         import peakutils
 
-        if zr is 0:
+        if zr in [0]:
             stars = True
             zr = [0, 0.01]
             fitter = 'nnls'
