@@ -27,7 +27,7 @@ matrix:
         env:
             - NUMPY_VERSION=stable
             - ASTROPY_VERSION=stable
-            - CONDA_DEPENDENCIES='scipy matplotlib cython pyyaml'
+            - CONDA_DEPENDENCIES='scipy matplotlib cython pyyaml stwcs'
         
 # commands to install dependencies (astropy, conda)
 install: 
