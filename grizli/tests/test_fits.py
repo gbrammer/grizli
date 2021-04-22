@@ -27,8 +27,8 @@ class FittingTools(unittest.TestCase):
         
         if 'CONF' in new:
             print(f'Download config and calib files to {conf_path}')
-            grizli.utils.fetch_default_calibs(ACS=False)
-            grizli.utils.fetch_config_files()
+            utils.fetch_default_calibs(ACS=False)
+            utils.fetch_config_files()
             files = glob.glob(f'{conf_path}/*')
             print('Files: ', '\n'.join(files))
 
@@ -37,6 +37,9 @@ class FittingTools(unittest.TestCase):
         return True
             
     def test_multibeam(self):
+        """
+        Can we initialize a multibeam file?
+        """
         path = os.path.dirname(utils.__file__)
         print(path)
         beams_file = path+'/tests/data/j033216m2743_00152.beams.fits'
@@ -54,6 +57,9 @@ class FittingTools(unittest.TestCase):
         spec = mb.oned_spectrum()
         
     def test_redshift_fit(self):
+        """
+        Can we run the full fit?
+        """
         path = os.path.dirname(utils.__file__)
         data_path = path +'/tests/data/'
     
