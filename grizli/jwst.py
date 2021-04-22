@@ -54,45 +54,6 @@ def hdu_to_imagemodel(in_hdu):
     return img
 
 
-def xxx(header):
-    """
-    """
-    ra, dec = 53.18118642, -27.79096316
-    hdu = utils.make_wcsheader(ra=ra, dec=dec, size=10, pixscale=0.06, get_hdu=True)
-    out = grizli.jwst.hdu_to_imagemodel(hdu)
-
-    from jwst.datamodels import ModelContainer, DrizProductModel
-
-    product = DrizProductModel(out.data.shape)
-    product.meta.wcs = out.meta.wcs
-
-    from jwst.resample import gwcs_blot, gwcs_drizzle
-    driz = gwcs_drizzle.GWCSDrizzle(product)  # , outwcs=out.meta.wcs)
-
-    driz.add_image(blot_data, wcs_model.meta.wcs, xmax=out.data.shape[1], ymax=out.data.shape[0])
-
-    from jwst.resample import resample_utils
-    from drizzle import util
-
-    input_wcs = wcs_model.meta.wcs
-    output_wcs = out.meta.wcs
-
-    fillval = 'INDEF'
-    insci = blot_data
-    inwht = None
-    xmin = xmax = ymin = ymax = 0
-    uniqid = 1
-    outsci = driz.outsci*1
-    outwht = driz.outwht*1
-    outcon = driz.outcon*1
-    in_units = 'cps'
-
-    from jwst.resample import resample
-
-    groups = ModelContainer([wcs_model])
-    sampler = resample.ResampleData(groups, output=driz)
-
-
 def change_header_pointing(header, ra_ref=0., dec_ref=0., pa_v3=0.):
     """
     Update a FITS header for a new pointing (center + roll).

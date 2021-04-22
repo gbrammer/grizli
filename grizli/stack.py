@@ -205,7 +205,7 @@ class StackFitter(GroupFitter):
         if isinstance(files, list):
             if len(files) > 1:
                 for file in files[1:]:
-                    extra = StackFitter(files=file, sys_err=sys_err, mask_min=mask_min, fit_stacks=fit_stacks, fcontam=fcontam, pas=pas, extensions=extensions, min_ivar=min_ivar, overlap_threshold=overlap_threshold, eazyp=eazyp, eazy_ix=eazy_ix, chi2_threshold=chi2_threshold, verbose=verbose)
+                    extra = StackFitter(files=file, sys_err=sys_err, mask_min=mask_min, fit_stacks=fit_stacks, fcontam=fcontam, pas=PAs, extensions=extensions, min_ivar=min_ivar, overlap_threshold=overlap_threshold, eazyp=eazyp, eazy_ix=eazy_ix, chi2_threshold=chi2_threshold, verbose=verbose)
                     self.extend(extra)
 
         self.idf = np.hstack([b.scif*0+ib for ib, b in enumerate(self.beams)])
