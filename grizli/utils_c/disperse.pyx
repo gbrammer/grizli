@@ -4,16 +4,15 @@ from __future__ import division
 import numpy as np
 cimport numpy as np
 
-DTYPE = np.double
+DTYPE = np.float64
 ITYPE = np.int64
-
-ctypedef np.double_t DTYPE_t
 
 ctypedef np.uint_t UINT_t
 ctypedef np.int_t INT_t
 ctypedef np.int64_t LINT_t
 ctypedef np.int32_t FINT_t
 ctypedef np.float32_t FTYPE_t
+ctypedef np.float64_t DTYPE_t
 
 import cython
 
@@ -30,7 +29,7 @@ def disperse_grism_object(np.ndarray[FTYPE_t, ndim=2] flam,
                           np.ndarray[LINT_t, ndim=1] idxl, 
                           np.ndarray[DTYPE_t, ndim=1] yfrac, 
                           np.ndarray[DTYPE_t, ndim=1] ysens, 
-                          np.ndarray[DTYPE_t, ndim=1] full, 
+                          np.ndarray[FTYPE_t, ndim=1] full, 
                           np.ndarray[LINT_t, ndim=1] x0, 
                           np.ndarray[LINT_t, ndim=1] shd, 
                           np.ndarray[LINT_t, ndim=1] sh_thumb, 
@@ -74,7 +73,10 @@ def disperse_grism_object(np.ndarray[FTYPE_t, ndim=2] flam,
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.embedsignature(True)
-def compute_segmentation_limits(np.ndarray[FTYPE_t, ndim=2] segm, int seg_id, np.ndarray[FTYPE_t, ndim=2] flam, np.ndarray[LINT_t, ndim=1] shd):
+def compute_segmentation_limits(np.ndarray[FTYPE_t, ndim=2] segm, 
+                                int seg_id, 
+                                np.ndarray[FTYPE_t, ndim=2] flam, 
+                                np.ndarray[LINT_t, ndim=1] shd):
     """Find pixel limits of a segmentation region
     
     Parameters
@@ -137,5 +139,5 @@ def compute_segmentation_limits(np.ndarray[FTYPE_t, ndim=2] segm, int seg_id, np
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.embedsignature(True)
-def seg_flux(np.ndarray[FTYPE_t, ndim=2] flam, np.ndarray[LINT_t, ndim=1] idxl, np.ndarray[DTYPE_t, ndim=1] yfrac, np.ndarray[DTYPE_t, ndim=1] ysens, np.ndarray[DTYPE_t, ndim=1] full, np.ndarray[LINT_t, ndim=1] x0, np.ndarray[LINT_t, ndim=1] shd, np.ndarray[LINT_t, ndim=1] shg):
+def seg_flux(np.ndarray[FTYPE_t, ndim=2] flam, np.ndarray[LINT_t, ndim=1] idxl, np.ndarray[FTYPE_t, ndim=1] yfrac, np.ndarray[FTYPE_t, ndim=1] ysens, np.ndarray[FTYPE_t, ndim=1] full, np.ndarray[LINT_t, ndim=1] x0, np.ndarray[LINT_t, ndim=1] shd, np.ndarray[LINT_t, ndim=1] shg):
     pass

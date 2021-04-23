@@ -386,7 +386,7 @@ class GrismDisperser(object):
         self.NX = len(self.dx)
         self.sh_beam = (self.sh[0], self.sh[1]+self.NX)
 
-        self.modelf = np.zeros(np.product(self.sh_beam), dtype=float)
+        self.modelf = np.zeros(np.product(self.sh_beam), dtype=np.float32)
         self.model = self.modelf.reshape(self.sh_beam)
         self.idx = np.arange(self.modelf.size,
                              dtype=np.int64).reshape(self.sh_beam)
@@ -1213,7 +1213,7 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
             if not is_cgs:
                 coeffs *= self.total_flux
 
-        modelf = self.A_psf.dot(coeffs*self.psf_sensitivity)
+        modelf = self.A_psf.dot(coeffs*self.psf_sensitivity).astype(np.float32)
         model = modelf.reshape(self.sh_beam)
 
         # if hasattr(self, 'ext_psf_data'):
@@ -3930,9 +3930,9 @@ class BeamCutout(object):
 
         self.contam = hdu['CONTAM'].data*1
         try:
-            self.modelf = hdu['MODEL'].data.flatten()*1
+            self.modelf = hdu['MODEL'].data.flatten().astype(np.float32)*1
         except:
-            self.modelf = self.grism['SCI'].flatten()*0.
+            self.modelf = self.grism['SCI'].flatten().astype(np.float32)*0.
 
         if ('REF', 1) in hdu:
             direct = hdu['REF', 1].data*1

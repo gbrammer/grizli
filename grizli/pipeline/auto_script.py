@@ -6,6 +6,7 @@ import inspect
 import traceback
 import glob
 import time
+import warnings
 
 import numpy as np
 import astropy.io.fits as pyfits
@@ -31,47 +32,7 @@ if False:
 ONLY_F814W = False
 
 
-def demo():
-    """
-    Test full pipeline, program #12471
-    """
-
-    import numpy as np
-    import os
-
-    from hsaquery import query, overlaps
-    from grizli.pipeline import auto_script
-
-    # "Parent" query is grism exposures from the WFC3 ERS program (11359)
-    parent = query.run_query(box=None, proposid=[11359], instruments=['WFC3', 'ACS'], extensions=['FLT'], filters=['G102', 'G141'], extra=[])
-
-    # Demo: match everything nearby, includes tons of things from GOODS-S
-    #extra = query.DEFAULT_EXTRA
-    #tabs = overlaps.find_overlaps(parent, buffer_arcmin=0.1, filters=[], proposid=[], instruments=['WFC3','ACS'], extra=extra, close=False)
-
-    # Match only the grism visit
-    extra = query.DEFAULT_EXTRA+["TARGET.TARGET_NAME LIKE 'WFC3-ERSII-G01'"]
-    tabs = overlaps.find_overlaps(parent, buffer_arcmin=0.1, filters=['F098M', 'F140W', 'G102', 'G141'], proposid=[11359], instruments=['WFC3'], extra=extra, close=False)
-
-    #HOME_PATH = '/Volumes/Pegasus/Grizli/DemoERS/'
-    import os
-    HOME_PATH = os.getcwd()
-
-    root = 'j033217-274236'
-    from grizli.pipeline import auto_script
-    auto_script.go(root=root, maglim=[19, 20], HOME_PATH=HOME_PATH, reprocess_parallel=True, s3_sync=False, run_fit=False, only_preprocess=False)
-
-    # Interactive session
-    from grizli.pipeline import auto_script
-    HOME_PATH = '/Volumes/Pegasus/Grizli/Automatic'
-    maglim = [19, 21]
-    inspect_ramps = True
-    manual_alignment = True
-    reprocess_parallel = True
-    is_parallel_field = False
-
-
-def get_extra_data(root='j114936+222414', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', instruments=['WFC3'], filters=['F160W', 'F140W', 'F098M', 'F105W'], radius=2, run_fetch=True, from_mast=True, reprocess_parallel=True, s3_sync=False):
+def get_extra_data(root='j114936+222414', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', PERSIST_PATH=None, instruments=['WFC3'], filters=['F160W', 'F140W', 'F098M', 'F105W'], radius=2, run_fetch=True, from_mast=True, reprocess_parallel=True, s3_sync=False):
 
     import os
     import glob
@@ -81,7 +42,11 @@ def get_extra_data(root='j114936+222414', HOME_PATH='/Volumes/Pegasus/Grizli/Aut
     from hsaquery import query, fetch, fetch_mast
     from hsaquery.fetch import DEFAULT_PRODUCTS
 
-    tab = utils.GTable.gread(os.path.join(HOME_PATH, '{0}_footprint.fits'.format(root)))
+    if PERSIST_PATH is None:
+        PERSIST_PATH = os.path.join(HOME_PATH, root, 'Persistence')
+
+    tab = utils.GTable.gread(os.path.join(HOME_PATH, 
+                             f'{root}_footprint.fits'))
 
     # Fix CLEAR filter names
     for i, filt_i in enumerate(tab['filter']):
@@ -104,9 +69,15 @@ def get_extra_data(root='j114936+222414', HOME_PATH='/Volumes/Pegasus/Grizli/Aut
     radius = np.sqrt(fp.area*np.cos(dec/180*np.pi))*60/np.pi
 
     xy = np.array(fp.boundary.convex_hull.boundary.xy)
-    dims = np.array([(xy[0].max()-xy[0].min())*np.cos(dec/180*np.pi), xy[1].max()-xy[1].min()])*60
+    dims = np.array([(xy[0].max()-xy[0].min())*np.cos(dec/180*np.pi),
+                      xy[1].max()-xy[1].min()])*60
 
-    extra = query.run_query(box=[ra, dec, radius], proposid=[], instruments=instruments, extensions=['FLT'], filters=filters, extra=query.DEFAULT_EXTRA)
+    extra = query.run_query(box=[ra, dec, radius],
+                            proposid=[],
+                            instruments=instruments,
+                            extensions=['FLT'], 
+                            filters=filters,
+                            extra=query.DEFAULT_EXTRA)
 
     # Fix CLEAR filter names
     for i, filt_i in enumerate(extra['filter']):
@@ -124,17 +95,31 @@ def get_extra_data(root='j114936+222414', HOME_PATH='/Volumes/Pegasus/Grizli/Aut
     for k in tab.meta:
         extra.meta[k] = tab.meta[k]
 
-    extra.write(os.path.join(HOME_PATH, root, 'extra_data.fits'), format='fits', overwrite=True)
+    extra.write(os.path.join(HOME_PATH, root, 'extra_data.fits'), 
+                format='fits', overwrite=True)
 
     CWD = os.getcwd()
     os.chdir(os.path.join(HOME_PATH, root, 'RAW'))
 
     if run_fetch:
         if from_mast:
-            out = fetch_mast.get_from_MAST(extra, inst_products=DEFAULT_PRODUCTS, direct=True, path=os.path.join(HOME_PATH, root, 'RAW'), skip_existing=True)
+            out = fetch_mast.get_from_MAST(extra, 
+                            inst_products=DEFAULT_PRODUCTS, 
+                            direct=True, 
+                            path=os.path.join(HOME_PATH, root, 'RAW'), 
+                            skip_existing=True)
         else:
 
-            curl = fetch.make_curl_script(extra, level=None, script_name='extra.sh', inst_products={'WFC3/UVIS': ['FLC'], 'WFPC2/PC': ['C0M', 'C1M'], 'WFC3/IR': ['RAW'], 'ACS/WFC': ['FLC']}, skip_existing=True, output_path=os.path.join(HOME_PATH, root, 'RAW'), s3_sync=s3_sync)
+            curl = fetch.make_curl_script(extra,
+                            level=None, 
+                            script_name='extra.sh',
+                            inst_products={'WFC3/UVIS': ['FLC'], 
+                                           'WFPC2/PC': ['C0M', 'C1M'],
+                                           'WFC3/IR': ['RAW'],
+                                           'ACS/WFC': ['FLC']}, 
+                            skip_existing=True,
+                            output_path=os.path.join(HOME_PATH, root, 'RAW'),
+                            s3_sync=s3_sync)
 
             os.system('sh extra.sh')
             files = glob.glob('*raw.fits.gz')
@@ -155,7 +140,7 @@ def get_extra_data(root='j114936+222414', HOME_PATH='/Volumes/Pegasus/Grizli/Aut
         reprocess.reprocess_wfc3ir(parallel=False)
 
     # Persistence products
-    os.chdir(os.path.join(HOME_PATH, root, 'Persistence'))
+    os.chdir(PERSIST_PATH)
     persist_files = fetch.persistence_products(extra)
     for file in persist_files:
         if not os.path.exists(os.path.basename(file)):
@@ -176,48 +161,76 @@ def get_extra_data(root='j114936+222414', HOME_PATH='/Volumes/Pegasus/Grizli/Aut
     os.chdir(CWD)
 
 
-# def go(root='j010311+131615', HOME_PATH='$PWD',
-#        s3_sync=False,
-#        inspect_ramps=False,
-#        reprocess_parallel=False,
-#        is_dash=False,
-#        remove_bad=True,
-#
-#        run_parse_visits=True,
-#        is_parallel_field=False,
-#        filters=VALID_FILTERS,
-#        combine_minexp=2,
-#        skip_single_optical_visits=True,
-#
-#        manual_alignment=False,
-#        align_min_overlap=0.2,
-#        master_radec=None,
-#        parent_radec=None,
-#        run_fine_alignment=True,
-#        fine_radec=None,
-#        gaia_by_date=True,
-#        fine_backup=True,
-#
-#        make_mosaics=True,
-#        reference_wcs_filters=['G800L', 'G102', 'G141'],
-#        combine_all_filters=False,
-#        fill_mosaics='grism',
-#        mosaic_pixel_scale=None,
-#        mosaic_pixfrac=0.75,
-#        half_optical_pixscale=False,
-#        mask_spikes=False,
-#        make_phot=True,
-#
-#        only_preprocess=False,
-#        run_extractions=False,
-#        extract_maglim=[17,26],
-#        run_fit=False,
-#
-#        get_dict=False,
-#        visit_prep_args=VISIT_PREP_ARGS,
-#        **kwargs):
+def create_path_dict(root='j142724+334246', home='$PWD', raw=None, prep=None, extract=None, persist=None, thumbs=None, paths={}):
+    """
+    Generate path dict.
+    
+    Default:
+        {home}
+        {home}/{root}
+        {home}/{root}/RAW
+        {home}/{root}/Prep
+        {home}/{root}/Persistence
+        {home}/{root}/Extractions
+        {home}/{root}/Thumbnails
+    
+    If ``home`` specified as '$PWD', then will be calculated from 
+    ``os.getcwd``.
+    
+    Only generates values for keys not already specified in ``paths``.
+    
+    """
+    import copy
+    
+    if home == '$PWD':
+        home = os.getcwd()
+    
+    base = os.path.join(home, root)
+    
+    if raw is None:
+        raw = os.path.join(home, root, 'RAW')
 
-def go(root='j010311+131615', HOME_PATH='$PWD',
+    if prep is None:
+        prep = os.path.join(home, root, 'Prep')
+    
+    if persist is None:
+        persist = os.path.join(home, root, 'Persistence')
+
+    if extract is None:
+        extract = os.path.join(home, root, 'Extractions')
+
+    if thumbs is None:
+        thumbs = os.path.join(home, root, 'Thumbnaails')
+    
+    xpaths = copy.deepcopy(paths)
+
+    if 'home' not in xpaths:
+        xpaths['home'] = home
+    
+    if 'base' not in xpaths:
+        xpaths['base'] = base
+        
+    if 'raw' not in xpaths:
+        xpaths['raw'] = raw
+
+    if 'prep' not in xpaths:
+        xpaths['prep'] = prep
+
+    if 'persist' not in xpaths:
+        xpaths['persist'] = persist
+
+    if 'extract' not in xpaths:
+        xpaths['extract'] = extract
+    
+    if 'thumbs' not in xpaths:
+        xpaths['thumbs'] = extract
+        
+    return xpaths
+
+
+def go(root='j010311+131615', 
+       HOME_PATH='$PWD',
+       RAW_PATH=None, PREP_PATH=None, PERSIST_PATH=None, EXTRACT_PATH=None,
        filters=args['filters'],
        fetch_files_args=args['fetch_files_args'],
        inspect_ramps=False,
@@ -318,11 +331,12 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
 
     # Silence numpy and astropy warnings
     utils.set_warnings()
-
-    if HOME_PATH == '$PWD':
-        HOME_PATH = os.getcwd()
-
-    fpfile = os.path.join(HOME_PATH, '{0}_footprint.fits'.format(root))
+    
+    PATHS = create_path_dict(field_root=root, home=HOME_PATH, 
+                             raw=RAW_PATH, prep=PREP_PATH, 
+                             persist=PERSIST_PATH, extract=EXTRACT_PATH)
+        
+    fpfile = os.path.join(PATHS['home'], '{0}_footprint.fits'.format(root))
     exptab = utils.GTable.gread(fpfile)
     # Fix CLEAR filter names
     for i, filt_i in enumerate(exptab['filter']):
@@ -337,30 +351,28 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
 
             exptab['filter'][i] = filt_i.upper()
 
-    utils.LOGFILE = os.path.join(HOME_PATH, '{0}.auto_script.log.txt'.format(root))
+    utils.LOGFILE = os.path.join(PATHS['home'], f'{root}.auto_script.log.txt')
 
     utils.log_comment(utils.LOGFILE, '### Pipeline start', show_date=True)
 
-    if False:
-        is_parallel_field = 'MALKAN' in [name.split()[0] for name in np.unique(exptab['pi_name'])]
-
     ######################
     # Download data
-    os.chdir(HOME_PATH)
-    #auto_script.fetch_files(field_root=root, HOME_PATH=HOME_PATH, remove_bad=remove_bad, reprocess_parallel=reprocess_parallel, s3_sync=s3_sync, filters=filters)
+    os.chdir(PATHS['home'])
     if fetch_files_args is not None:
         fetch_files_args['reprocess_clean_darks'] &= (not is_dash)
         auto_script.fetch_files(field_root=root, HOME_PATH=HOME_PATH,
-                            filters=filters, **fetch_files_args)
+                                paths=PATHS, 
+                                filters=filters, **fetch_files_args)
     else:
-        os.chdir(os.path.join(HOME_PATH, root, 'Prep'))
+        os.chdir(PATHS['prep'])
 
     if is_dash & run_prepare_dash:
         from wfc3dash import process_raw
-        os.chdir(os.path.join(HOME_PATH, root, 'RAW'))
+        os.chdir(PATHS['raw'])
         process_raw.run_all()
 
-    files = glob.glob('../RAW/*_fl*fits')+glob.glob('../RAW/*_c[01]m.fits')
+    files = glob.glob(os.path.join(PATHS['raw'], '*_fl*fits'))
+    files += glob.glob(os.path.join(PATHS['raw'], '*_c[01]m.fits'))
     if len(files) == 0:
         print('No FL[TC] files found!')
         utils.LOGFILE = '/tmp/grizli.log'
@@ -372,16 +384,14 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
 
     if inspect_ramps:
         # Inspect for CR trails
-        os.chdir(os.path.join(HOME_PATH, root, 'RAW'))
+        os.chdir(PATHS['raw'])
         status = os.system("python -c 'from grizli.pipeline.reprocess import inspect; inspect()'")
 
     ######################
     # Parse visit associations
-    os.chdir(os.path.join(HOME_PATH, root, 'Prep'))
+    os.chdir(PATHS['prep'])
 
-    if (not os.path.exists('{0}_visits.npy'.format(root))) | run_parse_visits:
-        #parsed = auto_script.parse_visits(field_root=root, HOME_PATH=HOME_PATH, use_visit=True, combine_same_pa=is_parallel_field, is_dash=is_dash, filters=filters, combine_minexp=combine_minexp)
-
+    if (not os.path.exists(f'{root}_visits.npy')) | run_parse_visits:
         # Parsing for parallel fields, where time-adjacent exposures
         # may have different visit IDs and should be combined
         if 'combine_same_pa' in parse_visits_args:
@@ -397,11 +407,11 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
             parse_visits_args['combine_same_pa'] = is_parallel_field
 
         parsed = auto_script.parse_visits(field_root=root,
-                                          HOME_PATH=HOME_PATH,
+                                          RAW_PATH=PATHS['raw'],
                                           filters=filters, is_dash=is_dash,
                                           **parse_visits_args)
     else:
-        parsed = np.load('{0}_visits.npy'.format(root), allow_pickle=True)
+        parsed = np.load(f'{root}_visits.npy', allow_pickle=True)
 
     if kill == 'parse_visits':
         print('kill=\'parse_visits\'')
@@ -418,9 +428,8 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
     #######################
     # Manual alignment
     if manual_alignment:
-        os.chdir(os.path.join(HOME_PATH, root, 'Prep'))
-        #auto_script.manual_alignment(field_root=root, HOME_PATH=HOME_PATH, skip=True, catalogs=['GAIA'], radius=15, visit_list=None)
-        auto_script.manual_alignment(field_root=root, HOME_PATH=HOME_PATH,
+        os.chdir(PATHS['prep'])
+        auto_script.manual_alignment(field_root=root, HOME_PATH=PATHS['home'],
                                      **manual_alignment_args)
 
     if kill == 'manual_alignment':
@@ -429,7 +438,7 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
 
     #####################
     # Alignment & mosaics
-    os.chdir(os.path.join(HOME_PATH, root, 'Prep'))
+    os.chdir(PATHS['prep'])
 
     tweak_max_dist = (5 if is_parallel_field else 1)
     if 'tweak_max_dist' not in visit_prep_args:
@@ -438,8 +447,11 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
     if 'use_self_catalog' not in visit_prep_args:
         visit_prep_args['use_self_catalog'] = is_parallel_field
 
-    #auto_script.preprocess(field_root=root, HOME_PATH=HOME_PATH, make_combined=False, master_radec=master_radec, parent_radec=parent_radec, use_visit=True, min_overlap=align_min_overlap, visit_prep_args=visit_prep_args)
-    auto_script.preprocess(field_root=root, HOME_PATH=HOME_PATH, visit_prep_args=visit_prep_args, persistence_args=persistence_args, **preprocess_args)
+    auto_script.preprocess(field_root=root, HOME_PATH=PATHS['home'], 
+                           PERSIST_PATH=PATHS['persist'],
+                           visit_prep_args=visit_prep_args, 
+                           persistence_args=persistence_args, 
+                           **preprocess_args)
 
     if kill == 'preprocess':
         print('kill=\'preprocess\'')
@@ -455,9 +467,10 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
 
         for file in all_flt_files:
             print(file)
-            pfile = '../Persistence/'+file.replace('_flt', '_persist')
+            pfile = os.path.join(PATHS['persist'], 
+                                 file.replace('_flt', '_persist'))
             if os.path.exists(pfile):
-                prep.apply_persistence_mask(file, path='../Persistence',
+                prep.apply_persistence_mask(file, path=PATHS['persist'],
                                             **persistence_args)
 
     ##########
@@ -542,8 +555,9 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
     if (len(fine_files) == 0) & (run_fine_alignment > 0) & (len(visits) > 1):
         fine_catalogs = ['GAIA', 'PS1', 'DES', 'SDSS', 'WISE']
         try:
-            #out = auto_script.fine_alignment(field_root=root, HOME_PATH=HOME_PATH, min_overlap=0.2, stopme=False, ref_err=0.08, catalogs=fine_catalogs, NITER=1, maglim=[17,23], shift_only=True, method='Powell', redrizzle=False, radius=30, program_str=None, match_str=[], radec=fine_radec, gaia_by_date=gaia_by_date)
-            out = auto_script.fine_alignment(field_root=root, HOME_PATH=HOME_PATH, **fine_alignment_args)
+            out = auto_script.fine_alignment(field_root=root, 
+                                             HOME_PATH=PATHS['home'], 
+                                             **fine_alignment_args)
 
             plt.close()
 
@@ -557,10 +571,11 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
     # Update the visits file with the new exposure footprints
     print('Update exposure footprints in {0}_visits.npy'.format(root))
     get_visit_exposure_footprints(visit_file='{0}_visits.npy'.format(root),
-                                  check_paths=['./', '../RAW'])
+                                  check_paths=['./', PATHS['raw'], '../RAW'])
 
     # Make combined mosaics
-    if (len(glob.glob('{0}-ir_dr?_sci.fits'.format(root))) == 0) & (make_mosaics):
+    no_mosaics_found = len(glob.glob(f'{root}-ir_dr?_sci.fits')) == 0
+    if no_mosaics_found & make_mosaics:
 
         skip_single = preprocess_args['skip_single_optical_visits']
 
@@ -588,27 +603,28 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
 
         if (not is_dash) & (len(mosaic_files) > 0):
             print('Make field PSFs')
-            auto_script.field_psf(root=root, HOME_PATH=HOME_PATH,
+            auto_script.field_psf(root=root, HOME_PATH=PATHS['home'],
+                                  RAW_PATH=PATHS['raw'], 
+                                  EXTRACT_PATH=PATHS['extract'], 
                                   get_line_maps=False, skip=False)
 
     # Are there full-field mosaics?
-    mosaic_files = glob.glob('{0}-f*sci.fits'.format(root))
+    mosaic_files = glob.glob(r'{root}-f*sci.fits')
 
     # Photometric catalog
-    if (not os.path.exists('{0}_phot.fits'.format(root))) & make_phot & (len(mosaic_files) > 0):
+    has_phot_file = os.path.exists(r'{root}_phot.fits')
+    if (not has_phot_file) & make_phot & (len(mosaic_files) > 0):
         try:
-            #tab = auto_script.multiband_catalog(field_root=root, threshold=threshold, detection_background=False, photometry_background=True, get_all_filters=False)
-
             tab = auto_script.multiband_catalog(field_root=root,
                                                 **multiband_catalog_args)
 
             try:
                 # Add columns indicating objects that fall in grism exposures
-                phot = utils.read_catalog('{0}_phot.fits'.format(root))
+                phot = utils.read_catalog(f'{root}_phot.fits')
                 out = count_grism_exposures(phot, all_groups,
                                       grisms=['g800l', 'g102', 'g141'],
                                       verbose=True)
-                phot.write('{0}_phot.fits'.format(root), overwrite=True)
+                phot.write(f'{root}_phot.fits', overwrite=True)
             except:
                 pass
 
@@ -633,34 +649,35 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
             if thumbnail_args['drizzler_args'] is None:
                 thumbnail_args['drizzler_args'] = DRIZZLER_ARGS.copy()
 
-            os.chdir(os.path.join(HOME_PATH, root, 'Prep'))
+            os.chdir(PATHS['prep'])
 
             #print('XXX ', thumbnail_args)
 
             auto_script.make_rgb_thumbnails(root=root, **thumbnail_args)
 
-            if not os.path.exists('../Thumbnails'):
-                os.mkdir('../Thumbnails/')
+            if not os.path.exists(PATHS['thumbs']):
+                os.mkdir(PATHS['thumbs'])
 
-            os.system('mv {0}_[0-9]*.png {0}_[0-9]*.fits ../Thumbnails/'.format(root))
+            os.system('mv {0}_[0-9]*.png {0}_[0-9]*.fits {1}'.format(root, 
+                                                           PATHS['thumbs']))
 
         utils.LOGFILE = '/tmp/grizli.log'
         return True
 
     ######################
     # Grism prep
-    files = glob.glob('../Prep/*GrismFLT.fits') + glob.glob('../Extractions/*GrismFLT.fits')
+    files = glob.glob(os.path.join(PATHS['prep'], '*GrismFLT.fits'))
+    files += glob.glob(os.path.join(PATHS['extract'], '*GrismFLT.fits'))
     if len(files) == 0:
-        os.chdir(os.path.join(HOME_PATH, root, 'Prep'))
-        #gris_ref_filters = GRIS_REF_FILTERS
-        # grp = auto_script.grism_prep(field_root=root, refine_niter=3,
-        #                              gris_ref_filters=GRIS_REF_FILTERS)
-        grp = auto_script.grism_prep(field_root=root, **grism_prep_args)
+        os.chdir(PATHS['prep'])
+        grp = auto_script.grism_prep(field_root=root, PREP_PATH=PATHS['prep'], 
+                                     EXTRACT_PATH=PATHS['extract'], 
+                                     **grism_prep_args)
         del(grp)
 
     ######################
     # Grism extractions
-    os.chdir(os.path.join(HOME_PATH, root, 'Extractions'))
+    os.chdir(PATHS['extract'])
 
     #####################
     # Update the contam model with the "full.fits"
@@ -672,17 +689,20 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
 
     # Drizzled grp objects
     # All files
-    if len(glob.glob('{0}*_grism*fits*'.format(root))) == 0:
+    if len(glob.glob(f'{root}*_grism*fits*')) == 0:
         grism_files = glob.glob('*GrismFLT.fits')
         grism_files.sort()
 
-        catalog = glob.glob('{0}-*.cat.fits'.format(root))[0]
+        catalog = glob.glob(f'{root}-*.cat.fits')[0]
         try:
-            seg_file = glob.glob('{0}-*_seg.fits'.format(root))[0]
+            seg_file = glob.glob(f'{root}-*_seg.fits')[0]
         except:
             seg_file = None
 
-        grp = multifit.GroupFLT(grism_files=grism_files, direct_files=[], ref_file=None, seg_file=seg_file, catalog=catalog, cpu_count=-1, sci_extn=1, pad=256)
+        grp = multifit.GroupFLT(grism_files=grism_files, direct_files=[], 
+                                ref_file=None, seg_file=seg_file, 
+                                catalog=catalog, cpu_count=-1, sci_extn=1, 
+                                pad=256)
 
         # Make drizzle model images
         grp.drizzle_grism_models(root=root, kernel='point', scale=0.15)
@@ -690,18 +710,13 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
         # Free grp object
         del(grp)
 
-    try:
-        test = extract_maglim
-    except:
-        extract_maglim = [17, 23]
-
     if is_parallel_field:
         pline = auto_script.PARALLEL_PLINE.copy()
     else:
         pline = auto_script.DITHERED_PLINE.copy()
 
     # Make script for parallel processing
-    args_file = '{0}_fit_args.npy'.format(root)
+    args_file = f'{root}_fit_args.npy'
 
     if (not os.path.exists(args_file)) | (overwrite_fit_params):
         msg = '# generate_fit_params: ' + args_file
@@ -731,11 +746,7 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
             auto_script.generate_fit_params(field_root=root, prior=None, MW_EBV=exptab.meta['MW_EBV'], pline=pline, fit_only_beams=True, run_fit=True, poly_order=7, fsps=True, min_sens=min_sens, sys_err=0.03, fcontam=0.2, zr=[0.05, 3.4], save_file=args_file, fit_trace_shift=fit_trace_shift, include_photometry=False, use_phot_obj=False)
 
         # Copy for now
-        os.system('cp {0} fit_args.npy'.format(args_file))
-
-    # Make PSF
-    # print('Make field PSFs')
-    # auto_script.field_psf(root=root, HOME_PATH=HOME_PATH)
+        os.system(f'cp {args_file} fit_args.npy')
 
     # Done?
     if (not run_extractions) | (run_has_grism == 0):
@@ -746,20 +757,21 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
             if thumbnail_args['drizzler_args'] is None:
                 thumbnail_args['drizzler_args'] = DRIZZLER_ARGS.copy()
 
-            os.chdir(os.path.join(HOME_PATH, root, 'Prep'))
+            os.chdir(PATHS['prep'])
 
             auto_script.make_rgb_thumbnails(root=root, **thumbnail_args)
 
-            if not os.path.exists('../Thumbnails'):
-                os.mkdir('../Thumbnails/')
+            if not os.path.exists(PATHS['thumbs']):
+                os.mkdir(PATHS['thumbs'])
 
-            os.system('mv {0}_[0-9]*.png {0}_[0-9]*.fits ../Thumbnails/'.format(root))
+            os.system('mv {0}_[0-9]*.png {0}_[0-9]*.fits {1}'.format(root,
+                                                            PATHS['thumbs']))
 
         utils.LOGFILE = '/tmp/grizli.log'
         return True
 
     # Run extractions (and fits)
-    auto_script.extract(field_root=root, **extract_args)  # maglim=extract_maglim, MW_EBV=exptab.meta['MW_EBV'], pline=pline, run_fit=run_fit)
+    auto_script.extract(field_root=root, **extract_args)
 
     # Make RGB thumbnails
     if make_thumbnails:
@@ -768,26 +780,30 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
         if thumbnail_args['drizzler_args'] is None:
             thumbnail_args['drizzler_args'] = DRIZZLER_ARGS.copy()
 
-        os.chdir(os.path.join(HOME_PATH, root, 'Prep'))
+        os.chdir(PATHS['prep'])
 
         auto_script.make_rgb_thumbnails(root=root, **thumbnail_args)
 
-        if not os.path.exists('../Thumbnails'):
-            os.mkdir('../Thumbnails/')
+        if not os.path.exists(PATHS['thumbs']):
+            os.mkdir(PATHS['thumbs'])
 
-        os.system('mv {0}_[0-9]*.png {0}_[0-9]*.fits ../Thumbnails/'.format(root))
+        os.system('mv {0}_[0-9]*.png {0}_[0-9]*.fits {1}'.format(root, 
+                                                        PATHS['thumbs']))
 
     if extract_args['run_fit']:
-        os.chdir(os.path.join(HOME_PATH, root, 'Extractions'))
+        os.chdir(PATHS['extract'])
 
         # Redrizzle grism models
         grism_files = glob.glob('*GrismFLT.fits')
         grism_files.sort()
 
-        catalog = glob.glob('{0}-*.cat.fits'.format(root))[0]
-        seg_file = glob.glob('{0}-*_seg.fits'.format(root))[0]
+        catalog = glob.glob(f'{root}-*.cat.fits')[0]
+        seg_file = glob.glob(f'{root}-*_seg.fits')[0]
 
-        grp = multifit.GroupFLT(grism_files=grism_files, direct_files=[], ref_file=None, seg_file=seg_file, catalog=catalog, cpu_count=-1, sci_extn=1, pad=256)
+        grp = multifit.GroupFLT(grism_files=grism_files, direct_files=[], 
+                                ref_file=None, seg_file=seg_file, 
+                                catalog=catalog, cpu_count=-1, sci_extn=1, 
+                                pad=256)
 
         # Make drizzle model images
         grp.drizzle_grism_models(root=root, kernel='point', scale=0.15)
@@ -802,24 +818,27 @@ def go(root='j010311+131615', HOME_PATH='$PWD',
                                     filter_bandpasses=None)
 
 
-def make_directories(field_root='j142724+334246', HOME_PATH='./'):
+def make_directories(root='j142724+334246', HOME_PATH='$PWD', paths={}):
     """
     Make RAW, Prep, Persistence, Extractions directories
     """
     import os
-
-    for dir in [os.path.join(HOME_PATH, field_root),
-                os.path.join(HOME_PATH, field_root, 'RAW'),
-                os.path.join(HOME_PATH, field_root, 'Prep'),
-                os.path.join(HOME_PATH, field_root, 'Persistence'),
-                os.path.join(HOME_PATH, field_root, 'Extractions')]:
-
+    
+    paths = create_path_dict(root=root, home=HOME_PATH, paths=paths)
+    
+    for k in paths:
+        if k in ['thumbs']:
+            continue
+            
+        dir = paths[k]
         if not os.path.exists(dir):
             os.mkdir(dir)
-            os.system('chmod ugoa+rwx {0}'.format(dir))
+            os.system(f'chmod ugoa+rwx {dir}')
+    
+    return paths
 
 
-def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', inst_products={'WFPC2/WFC': ['C0M', 'C1M'], 'WFPC2/PC': ['C0M', 'C1M'], 'ACS/WFC': ['FLC'], 'WFC3/IR': ['RAW'], 'WFC3/UVIS': ['FLC']}, remove_bad=True, reprocess_parallel=False, reprocess_clean_darks=True, s3_sync=False, fetch_flt_calibs=['IDCTAB', 'PFLTFILE', 'NPOLFILE'], filters=VALID_FILTERS, min_bad_expflag=2, fetch_only=False):
+def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_products={'WFPC2/WFC': ['C0M', 'C1M'], 'WFPC2/PC': ['C0M', 'C1M'], 'ACS/WFC': ['FLC'], 'WFC3/IR': ['RAW'], 'WFC3/UVIS': ['FLC']}, remove_bad=True, reprocess_parallel=False, reprocess_clean_darks=True, s3_sync=False, fetch_flt_calibs=['IDCTAB', 'PFLTFILE', 'NPOLFILE'], filters=VALID_FILTERS, min_bad_expflag=2, fetch_only=False):
     """
     Fully automatic script
     """
@@ -854,21 +873,15 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/
     """.format(ERR)
 
         raise(ImportError(warn))
+    
+    paths = create_path_dict(root=field_root, home=HOME_PATH, paths=paths)
+    if not os.path.exists(paths['raw']):
+        make_directories(root=field_root, HOME_PATH=HOME_PATH, 
+                         paths=paths)
 
-    if not os.path.exists(os.path.join(HOME_PATH, field_root, 'RAW')):
-        make_directories(field_root=field_root, HOME_PATH=HOME_PATH)
-
-    # for dir in [os.path.join(HOME_PATH, field_root),
-    #             os.path.join(HOME_PATH, field_root, 'RAW'),
-    #             os.path.join(HOME_PATH, field_root, 'Prep'),
-    #             os.path.join(HOME_PATH, field_root, 'Persistence'),
-    #             os.path.join(HOME_PATH, field_root, 'Extractions')]:
-    #
-    #     if not os.path.exists(dir):
-    #         os.mkdir(dir)
-
-    tab = utils.GTable.gread('{0}/{1}_footprint.fits'.format(HOME_PATH,
-                             field_root))
+    
+    tab = utils.read_catalog(os.path.join(paths['home'], 
+                                          f'{field_root}_footprint.fits'))
 
     # Fix CLEAR filter names
     for i, filt_i in enumerate(tab['filter']):
@@ -897,7 +910,7 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/
                       (tab[instdet_key] == 'WFC3/IR')]
 
         # Fetch and preprocess IR backgrounds
-        os.chdir(os.path.join(HOME_PATH, field_root, 'RAW'))
+        os.chdir(paths['raw'])
 
         # Ignore files already moved to RAW/Expflag
         bad_files = glob.glob('./Expflag/*')
@@ -979,14 +992,15 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/
         
         #calib_paths = []
         for file in flt_files:
-            paths = utils.fetch_hst_calibs(file, calib_types=fetch_flt_calibs)
+            cpaths = utils.fetch_hst_calibs(file, 
+                                            calib_types=fetch_flt_calibs)
             # calib_paths.extend(paths)
 
     # Copy mask files generated from preprocessing
-    os.system('cp *mask.reg ../Prep/')
+    os.system('cp *mask.reg {0}'.format(paths['prep']))
 
     # Persistence products
-    os.chdir(os.path.join(HOME_PATH, field_root, 'Persistence'))
+    os.chdir(paths['persist'])
     persist_files = fetch.persistence_products(tab)
     for file in persist_files:
         if not os.path.exists(os.path.basename(file)):
@@ -1067,7 +1081,7 @@ def remove_bad_expflag(field_root='', HOME_PATH='./', min_bad=2):
             os.system('mv {0}* Expflag/'.format(visit))
 
 
-def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=True, combine_minexp=2, is_dash=False, filters=VALID_FILTERS, max_dt=1e9):
+def parse_visits(field_root='', RAW_PATH='../RAW', use_visit=True, combine_same_pa=True, combine_minexp=2, is_dash=False, filters=VALID_FILTERS, max_dt=1e9):
     """
 
     Try to combine visits at the same PA/filter with fewer than
@@ -1088,9 +1102,9 @@ def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=
     from shapely.geometry import Polygon
     from scipy.spatial import ConvexHull
 
-    files = glob.glob('../RAW/*fl[tc].fits')
-    files.extend(glob.glob('../RAW/*c0m.fits'))
-    files.extend(glob.glob('../RAW/*c0f.fits'))
+    files = glob.glob(os.path.join(RAW_PATH, '*fl[tc].fits'))
+    files += glob.glob(os.path.join(RAW_PATH, '*c0m.fits'))
+    files += glob.glob(os.path.join(RAW_PATH, '*c0f.fits'))
 
     files.sort()
 
@@ -1101,12 +1115,13 @@ def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=
     if ONLY_F814W:
         info = info[((info['INSTRUME'] == 'WFC3') & (info['DETECTOR'] == 'IR')) | (info['FILTER'] == 'F814W')]
     elif filters is not None:
-        sel = utils.column_string_operation(info['FILTER'], filters, method='count', logical='OR')
+        sel = utils.column_string_operation(info['FILTER'], filters, 
+                                            method='count', logical='OR')
         info = info[sel]
 
     if is_dash:
         # DASH visits split by exposure
-        ima_files = glob.glob('../RAW/*ima.fits')
+        ima_files = glob.glob(os.path.join(RAW_PATH, '*ima.fits'))
         ima_files.sort()
 
         visits = []
@@ -1120,7 +1135,8 @@ def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=
 
             # q_flt.fits is the pipeline product.  will always be
             # fewer DASH-split files
-            files = glob.glob('../RAW/%s*[a-o]_flt.fits' % (root))
+            files = glob.glob(os.path.join(RAW_PATH, 
+                                           f'{root}*[a-o]_flt.fits'))
             files.sort()
 
             if len(files) == 0:
@@ -1133,7 +1149,9 @@ def parse_visits(field_root='', HOME_PATH='./', use_visit=True, combine_same_pa=
             visits.append(direct)
 
         all_groups = utils.parse_grism_associations(visits)
-        np.save('{0}_visits.npy'.format(field_root), [visits, all_groups, info])
+        np.save('{0}_visits.npy'.format(field_root), 
+                [visits, all_groups, info])
+                
         return visits, all_groups, info
 
     visits, filters = utils.parse_flt_files(info=info, uniquename=True, get_footprint=True, use_visit=use_visit, max_dt=max_dt)
@@ -1305,7 +1323,8 @@ def manual_alignment(field_root='j151850-813028', HOME_PATH='/Volumes/Pegasus/Gr
 
     files = glob.glob('*guess')
 
-    tab = utils.GTable.gread('{0}/{1}_footprint.fits'.format(HOME_PATH, field_root))
+    tab = utils.read_catalog(os.path.join(HOME_PATH, 
+                                          f'{field_root}_footprint.fits'))
 
     visits, all_groups, info = np.load('{0}_visits.npy'.format(field_root),
                                        allow_pickle=True)
@@ -1319,8 +1338,8 @@ def manual_alignment(field_root='j151850-813028', HOME_PATH='/Volumes/Pegasus/Gr
 
         filt = visit['product'].split('-')[-1]
         if (not filt.startswith('g')):
-
-            if os.path.exists('{0}.align_guess'.format(visit['product'])) & skip:
+            hasg = os.path.exists('{0}.align_guess'.format(visit['product']))
+            if hasg & skip:
                 continue
 
             use_visits.append(visit)
@@ -1337,7 +1356,8 @@ def manual_alignment(field_root='j151850-813028', HOME_PATH='/Volumes/Pegasus/Gr
     else:
         ref_catalog = catalogs[0]
 
-    reference = '{0}/{1}_{2}.reg'.format(os.getcwd(), field_root, ref_catalog.lower())
+    reference = '{0}/{1}_{2}.reg'.format(os.getcwd(), field_root,
+                                         ref_catalog.lower())
 
     ds9 = ds9.DS9()
     ds9.set('mode pan')
@@ -1382,7 +1402,7 @@ def clean_prep(field_root='j142724+334246'):
     #     utils.fix_flt_nan(flt_file, verbose=True)
 
 
-def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', min_overlap=0.2, make_combined=True, catalogs=['PS1', 'DES', 'NSC', 'SDSS', 'GAIA', 'WISE'], use_visit=True, master_radec=None, parent_radec=None, use_first_radec=False, skip_imaging=False, clean=True, skip_single_optical_visits=True, visit_prep_args=args['visit_prep_args'], persistence_args=args['persistence_args']):
+def preprocess(field_root='j142724+334246',  HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', PERSIST_PATH=None, min_overlap=0.2, make_combined=True, catalogs=['PS1', 'DES', 'NSC', 'SDSS', 'GAIA', 'WISE'], use_visit=True, master_radec=None, parent_radec=None, use_first_radec=False, skip_imaging=False, clean=True, skip_single_optical_visits=True, visit_prep_args=args['visit_prep_args'], persistence_args=args['persistence_args']):
     """
     master_radec: force use this radec file
 
@@ -1406,9 +1426,11 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
     from shapely.geometry import Polygon
     from scipy.spatial import ConvexHull
     import copy
-
-    # files=glob.glob('../RAW/*fl[tc].fits')
-    visits, all_groups, info = np.load('{0}_visits.npy'.format(field_root),
+    
+    if PERSIST_PATH is None:
+        PERSIST_PATH = os.path.join(HOME_PATH, field_root, 'Persistence')
+    
+    visits, all_groups, info = np.load(f'{field_root}_visits.npy',
                                        allow_pickle=True)
 
     # Grism visits
@@ -1416,11 +1438,11 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
     radec = None
 
     # Master table
-    visit_table = os.path.join(os.path.dirname(grizli.__file__), 'data/visit_alignment.txt')
-    if os.path.exists(visit_table):
-        visit_table = utils.GTable.gread(visit_table)
-    else:
-        visit_table = None
+    # visit_table = os.path.join(os.path.dirname(grizli.__file__), 'data/visit_alignment.txt')
+    # if os.path.exists(visit_table):
+    #     visit_table = utils.GTable.gread(visit_table)
+    # else:
+    #     visit_table = None
 
     for i in range(len(all_groups)):
         direct = all_groups[i]['direct']
@@ -1494,9 +1516,10 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
         # Persistence Masking
         for file in direct['files']+grism['files']:
             print(file)
-            pfile = '../Persistence/'+file.replace('_flt', '_persist')
+            pfile = os.path.join(PERSIST_PATH, 
+                                 file.replace('_flt', '_persist'))
             if os.path.exists(pfile):
-                prep.apply_persistence_mask(file, path='../Persistence',
+                prep.apply_persistence_mask(file, path=PERSIST_PATH,
                                             **persistence_args)
 
             # Fix NaNs
@@ -1591,13 +1614,11 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
             # Persistence Masking
             for file in direct['files']:
                 print(file)
-                pfile = '../Persistence/'+file.replace('_flt', '_persist')
+                pfile = os.path.join(PERSIST_PATH, 
+                                     file.replace('_flt', '_persist'))
                 if os.path.exists(pfile):
-                    prep.apply_persistence_mask(file, path='../Persistence',
+                    prep.apply_persistence_mask(file, path=PERSIST_PATH,
                                                 **persistence_args)
-                    # prep.apply_persistence_mask(file, path='../Persistence',
-                    #                      dq_value=1024, err_threshold=0.6,
-                    #                      grow_mask=3, verbose=True)
 
                 # Fix NaNs
                 utils.fix_flt_nan(file, verbose=True)
@@ -1605,16 +1626,6 @@ def preprocess(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/A
             fp = open('%s.failed' % (direct['product']), 'w')
             fp.write('\n')
             fp.close()
-
-    # ###################################
-    # # Persistence Masking
-    # for visit in visits:
-    #     for file in visit['files']:
-    #         print(file)
-    #         if os.path.exists('../Persistence/'+file.replace('_flt', '_persist')):
-    #             prep.apply_persistence_mask(file, path='../Persistence',
-    #                                  dq_value=1024, err_threshold=0.6,
-    #                                  grow_mask=3, verbose=True)
 
     ###################################
     # WFC3/IR Satellite trails
@@ -1802,8 +1813,8 @@ mag_lim=17, cat=None, cols=['mag_auto', 'ra', 'dec'], minR=8, dy=5, selection=No
 
 def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_background=True, photometry_background=True, get_all_filters=False, filters=None, det_err_scale=-np.inf, rescale_weight=True, run_detection=True, detection_filter='ir', detection_root=None, output_root=None, use_psf_filter=True, detection_params=prep.SEP_DETECT_PARAMS,  phot_apertures=prep.SEXTRACTOR_PHOT_APERTURES_ARCSEC, master_catalog=None, bkg_mask=None, bkg_params={'bw': 64, 'bh': 64, 'fw': 3, 'fh': 3, 'pixel_scale': 0.06}, use_bkg_err=False, aper_segmask=True):
     """
-    Make a detection catalog with SExtractor and then measure
-    photometry with `~photutils`.
+    Make a detection catalog and run aperture photometry with the 
+    SExtractor clone `~sep`.
 
     phot_apertures are aperture *diameters*.  If provided as a string, then
     apertures assumed to be in pixel units.  Can also provide a list of
@@ -1811,9 +1822,6 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
     given the image WCS/pixel size.
 
     """
-    from photutils import segmentation, background
-    import photutils.utils
-
     try:
         from .. import prep, utils
         frame = inspect.currentframe()
@@ -2034,10 +2042,14 @@ def photutils_catalog(field_root='j142724+334246', threshold=1.8, subtract_bkg=T
     """
     Make a detection catalog with SExtractor and then measure
     photometry with `~photutils`.
+
     """
     from photutils import segmentation, background
     import photutils.utils
-
+    import warnings
+    warnings.warn('photutils_catalog is deprecated, use ``sep`` catalog '
+                  'in multiband_catalog')
+                  
     try:
         from .. import prep, utils
     except:
@@ -2116,11 +2128,6 @@ def photutils_catalog(field_root='j142724+334246', threshold=1.8, subtract_bkg=T
 
         cat = segmentation.source_properties(sci[0].data, segment_img, error=total_error, mask=mask, background=bkg_obj, filter_kernel=None, wcs=pywcs.WCS(sci[0].header), labels=None)
 
-        if False:
-            obj = cat[0]
-            seg_cutout = obj.make_cutout(segment_img)
-            morph = statmorph.source_morphology(obj.data_cutout, segmap=(seg_cutout == obj.id)*1, variance=obj.error_cutout_ma**2)[0]  # , psf=psf)
-
         if filt == 'ir':
             cols = ['id', 'xcentroid', 'ycentroid', 'sky_centroid', 'sky_centroid_icrs', 'source_sum', 'source_sum_err', 'xmin', 'xmax', 'ymin', 'ymax', 'min_value', 'max_value', 'minval_xpos', 'minval_ypos', 'maxval_xpos', 'maxval_ypos', 'area', 'equivalent_radius', 'perimeter', 'semimajor_axis_sigma', 'semiminor_axis_sigma', 'eccentricity', 'orientation', 'ellipticity', 'elongation', 'covar_sigx2', 'covar_sigxy', 'covar_sigy2', 'cxx', 'cxy', 'cyy']
             tab = utils.GTable(cat.to_table(columns=cols))
@@ -2155,7 +2162,7 @@ def photutils_catalog(field_root='j142724+334246', threshold=1.8, subtract_bkg=T
     return tab
 
 
-def load_GroupFLT(field_root='j142724+334246', force_ref=None, force_seg=None, force_cat=None, galfit=False, pad=256, files=None, gris_ref_filters=GRIS_REF_FILTERS, split_by_grism=False):
+def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=None, force_seg=None, force_cat=None, galfit=False, pad=256, files=None, gris_ref_filters=GRIS_REF_FILTERS, split_by_grism=False):
     """
     Initialize a GroupFLT object
     """
@@ -2166,7 +2173,7 @@ def load_GroupFLT(field_root='j142724+334246', force_ref=None, force_seg=None, f
     from .. import prep, utils, multifit
 
     if files is None:
-        files = glob.glob('../Prep/*fl[tc].fits')
+        files = glob.glob(os.path.join(PREP_PATH, '*fl[tc].fits'))
         files.sort()
 
     info = utils.get_flt_info(files)
@@ -2186,13 +2193,9 @@ def load_GroupFLT(field_root='j142724+334246', force_ref=None, force_seg=None, f
     #grp = None
     if (g141.sum() > 0) & ('G141' in gris_ref_filters):
         for f in gris_ref_filters['G141']:
-
-            if os.path.exists('{0}-{1}_drz_sci.fits'.format(field_root, f.lower())):
+            if os.path.exists(f'{field_root}-{f.lower()}_drz_sci.fits'):
                 g141_ref = f
                 break
-            # if f in info['FILTER']:
-            #     g141_ref = f
-            #     break
 
         # Segmentation image
         if force_seg is None:
@@ -2318,13 +2321,14 @@ def load_GroupFLT(field_root='j142724+334246', force_ref=None, force_seg=None, f
         return [grp]
 
 
-def grism_prep(field_root='j142724+334246', ds9=None, refine_niter=3, gris_ref_filters=GRIS_REF_FILTERS, files=None, split_by_grism=True, refine_poly_order=1, refine_fcontam=0.5, cpu_count=0, mask_mosaic_edges=True, grisms_to_process=None):
+def grism_prep(field_root='j142724+334246', PREP_PATH='../Prep', EXTRACT_PATH='../Extractions', ds9=None, refine_niter=3, gris_ref_filters=GRIS_REF_FILTERS, files=None, split_by_grism=True, refine_poly_order=1, refine_fcontam=0.5, cpu_count=0, mask_mosaic_edges=True, prelim_mag_limit=25, refine_mag_limits=[18, 24], grisms_to_process=None):
     """
     Contamination model for grism exposures
     """
     import glob
     import os
     import numpy as np
+    import scipy.stats
 
     try:
         from .. import prep, utils, multifit
@@ -2339,13 +2343,17 @@ def grism_prep(field_root='j142724+334246', ds9=None, refine_niter=3, gris_ref_f
             if g not in grisms_to_process:
                 pg = gris_ref_filters.pop(g)
 
-    grp_objects = load_GroupFLT(field_root=field_root, gris_ref_filters=gris_ref_filters, files=files, split_by_grism=split_by_grism)
+    grp_objects = load_GroupFLT(field_root=field_root, PREP_PATH=PREP_PATH, 
+                                gris_ref_filters=gris_ref_filters, 
+                                files=files, split_by_grism=split_by_grism)
 
     for grp in grp_objects:
 
         ################
         # Compute preliminary model
-        grp.compute_full_model(fit_info=None, verbose=True, store=False, mag_limit=25, coeffs=[1.1, -0.5], cpu_count=cpu_count)
+        grp.compute_full_model(fit_info=None, verbose=True, store=False, 
+                               mag_limit=prelim_mag_limit, coeffs=[1.1, -0.5], 
+                               cpu_count=cpu_count)
 
         ##############
         # Save model to avoid having to recompute it again
@@ -2367,21 +2375,23 @@ def grism_prep(field_root='j142724+334246', ds9=None, refine_niter=3, gris_ref_f
 
         ################
         # Remove constant modal background
-        import scipy.stats
-
         for i in range(grp.N):
-            mask = (grp.FLTs[i].model < grp.FLTs[i].grism['ERR']*0.6) & (grp.FLTs[i].grism['SCI'] != 0)
+            mask = (grp.FLTs[i].model < grp.FLTs[i].grism['ERR']*0.6) 
+            mask &= (grp.FLTs[i].grism['SCI'] != 0)
 
             # Fit Gaussian to the masked pixel distribution
             clip = np.ones(mask.sum(), dtype=bool)
             for iter in range(3):
-                n = scipy.stats.norm.fit(grp.FLTs[i].grism.data['SCI'][mask][clip])
+                clip_data = grp.FLTs[i].grism.data['SCI'][mask][clip]
+                n = scipy.stats.norm.fit(clip_data)
                 clip = np.abs(grp.FLTs[i].grism.data['SCI'][mask]) < 3*n[1]
-
+            
+            del(clip_data)
             mode = n[0]
 
             logstr = '# grism_mode_bg {0} {1} {2:.4f}'
-            logstr = logstr.format(grp.FLTs[i].grism.parent_file, grp.FLTs[i].grism.filter, mode)
+            logstr = logstr.format(grp.FLTs[i].grism.parent_file, 
+                                   grp.FLTs[i].grism.filter, mode)
             utils.log_comment(utils.LOGFILE, logstr, verbose=True)
 
             try:
@@ -2399,7 +2409,8 @@ def grism_prep(field_root='j142724+334246', ds9=None, refine_niter=3, gris_ref_f
             ds9.view(grp.FLTs[i].grism['SCI'] - grp.FLTs[i].model)
             fr = ds9.get('frame')
 
-        utils.log_comment(utils.LOGFILE, '# Refine contamination', verbose=True, show_date=True)
+        utils.log_comment(utils.LOGFILE, '# Refine contamination', 
+                          verbose=True, show_date=True)
 
         for iter in range(refine_niter):
             print('\nRefine contamination model, iter # {0}\n'.format(iter))
@@ -2411,7 +2422,8 @@ def grism_prep(field_root='j142724+334246', ds9=None, refine_niter=3, gris_ref_f
             else:
                 refine_i = refine_fcontam
 
-            grp.refine_list(poly_order=refine_poly_order, mag_limits=[18, 24],
+            grp.refine_list(poly_order=refine_poly_order, 
+                            mag_limits=refine_mag_limits,
                             max_coeff=5, ds9=ds9, verbose=True,
                             fcontam=refine_i)
 
@@ -2420,12 +2432,12 @@ def grism_prep(field_root='j142724+334246', ds9=None, refine_niter=3, gris_ref_f
         grp.save_full_data()
 
     # Link minimal files to Extractions directory
-    os.chdir('../Extractions/')
-    os.system('ln -s ../Prep/*GrismFLT* .')
-    os.system('ln -s ../Prep/*_fl*wcs.fits .')
-    os.system('ln -s ../Prep/{0}-*.cat.fits .'.format(field_root))
-    os.system('ln -s ../Prep/{0}-*seg.fits .'.format(field_root))
-    os.system('ln -s ../Prep/*_phot.fits .')
+    os.chdir(EXTRACT_PATH)
+    os.system(f'ln -s {PREP_PATH}/*GrismFLT* .')
+    os.system(f'ln -s {PREP_PATH}/*_fl*wcs.fits .')
+    os.system(f'ln -s {PREP_PATH}/{field_root}-*.cat.fits .')
+    os.system(f'ln -s {PREP_PATH}/{field_root}-*seg.fits .')
+    os.system(f'ln -s {PREP_PATH}/*_phot.fits .')
 
     return grp
 
@@ -2436,6 +2448,8 @@ PARALLEL_PLINE = {'kernel': 'square', 'pixfrac': 1.0, 'pixscale': 0.1, 'size': 8
 
 def refine_model_with_fits(field_root='j142724+334246', grp=None, master_files=None, spectrum='continuum', clean=True, max_chinu=5):
     """
+    Refine the full-field grism models with the best fit spectra from 
+    individual extractions.
     """
     import glob
     import traceback
@@ -2450,9 +2464,9 @@ def refine_model_with_fits(field_root='j142724+334246', grp=None, master_files=N
             master_files = glob.glob('*GrismFLT.fits')
             master_files.sort()
 
-        catalog = glob.glob('{0}-*.cat.fits'.format(field_root))[0]
+        catalog = glob.glob(f'{field_root}-*.cat.fits')[0]
         try:
-            seg_file = glob.glob('{0}-*_seg.fits'.format(field_root))[0]
+            seg_file = glob.glob(f'{field_root}-*_seg.fits')[0]
         except:
             seg_file = None
 
@@ -2463,7 +2477,9 @@ def refine_model_with_fits(field_root='j142724+334246', grp=None, master_files=N
     N = len(fit_files)
     if N == 0:
         return False
-
+    
+    msg = 'Refine model ({0}/{1}): {2} / skip (chinu={3:.1f}, dof={4})'
+    
     for i, file in enumerate(fit_files):
         try:
             hdu = pyfits.open(file)
@@ -2472,7 +2488,7 @@ def refine_model_with_fits(field_root='j142724+334246', grp=None, master_files=N
             fith = hdu['ZFIT_STACK'].header
             chinu = fith['CHIMIN']/fith['DOF']
             if (chinu > max_chinu) | (fith['DOF'] < 10):
-                print('Refine model ({0}/{1}): {2} / skip (chinu={3:.1f}, dof={4})'.format(i, N, file, chinu, fith['DOF']))
+                print(msg.format(i, N, file, chinu, fith['DOF']))
                 continue
 
             sp = utils.GTable(hdu['TEMPL'].data)
@@ -2555,19 +2571,6 @@ def extract(field_root='j142724+334246', maglim=[13, 24], prior=None, MW_EBV=0.0
             del(grp)
 
         return(beams)
-
-    # if os.path.exists('{0}_phot.fits'.format(target)):
-    #     photom = utils.GTable.gread('{0}_phot.fits'.format(target))
-    #     photom_filters = []
-    #     for c in photom.colnames:
-    #         if c.endswith('_flux_aper_0'):
-    #             photom_filters.append(c.split('_flux_aper_0')[0])
-    #
-    #     photom_flux = np.vstack([photom['{0}_flux_aper_0'.format(f)].data for f in photom_filters])
-    #     photom_err = np.vstack([photom['{0}_fluxerr_aper_0'.format(f)].data for f in photom_filters])
-    #     photom_pivot = np.array([photom.meta['{0}_PLAM'.format(f.upper())] for f in photom_filters])
-    # else:
-    #     photom = None
 
     ###########
     # IDs to extract
@@ -2654,14 +2657,6 @@ def extract(field_root='j142724+334246', maglim=[13, 24], prior=None, MW_EBV=0.0
             tfit = mb.template_at_z(z=0, templates=init_templates, fit_background=True, fitter='lstsq', get_uncertainties=2)
         except:
             tfit = None
-
-        # if False:
-        #     # Use spline for first-pass continuum fit
-        #     wspline = np.arange(4200, 2.5e4)
-        #     Rspline = 10
-        #     df_spl = len(utils.log_zgrid(zr=[wspline[0], wspline[-1]], dz=1./Rspline))
-        #     tspline = utils.bspline_templates(wspline, df=df_spl+2, log=True, clip=0.0001)
-        #     pfit = mb.template_at_z(z=0, templates=tspline, fit_background=True, fitter='lstsq', get_uncertainties=2)
 
         try:
             fig1 = mb.oned_figure(figsize=[5, 3], tfit=tfit, show_beams=show_beams, scale_on_stacked=True, ylim_percentile=5)
@@ -2831,8 +2826,8 @@ def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Griz
     import copy
 
     if all_visits is None:
-        all_visits, all_groups, info = np.load('{0}_visits.npy'.format(field_root), allow_pickle=True)
-    #all_visits, filters = utils.parse_flt_files(info=info, uniquename=True, get_footprint=False)
+        _ = np.load(f'{field_root}_visits.npy', allow_pickle=True)
+        all_visits, all_groups, info = _
 
     failed_list = glob.glob('*failed')
 
@@ -2874,7 +2869,8 @@ def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Griz
                     reference_catalogs=catalogs, radius=radius)
 
     #ref = 'j152643+164738_sdss.radec'
-    ref_tab = utils.GTable(np.loadtxt(radec, unpack=True).T, names=['ra', 'dec'])
+    ref_tab = utils.GTable(np.loadtxt(radec, unpack=True).T, 
+                           names=['ra', 'dec'])
     ridx = np.arange(len(ref_tab))
 
     # Find matches
@@ -3014,51 +3010,6 @@ def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Griz
 
     return tab, fit, visits
 
-    # #########
-    # ## Update FLT files
-    # N = len(visits)
-    #
-    # trans = np.reshape(fit.x, (N,-1))/10.
-    # #trans[0,:] = [0,0,0,1]
-    # sh = trans.shape
-    # if sh[1] == 2:
-    #     trans = np.hstack([trans, np.zeros((N,1)), np.ones((N,1))])
-    # elif sh[1] == 3:
-    #     trans = np.hstack([trans, np.ones((N,1))])
-    #
-    # if ref_err > 0.1:
-    #     trans[0,:] = [0,0,0,1]
-    #
-    # if not os.path.exists('FineBkup'):
-    #     os.mkdir('FineBkup')
-    #
-    # for i in range(N):
-    #     direct = visits[i]
-    #     for file in direct['files']:
-    #         os.system('cp {0} FineBkup/'.format(file))
-    #         print(file)
-    #
-    # for ix, direct in enumerate(visits):
-    #     #direct = visits[ix]
-    #     out_shift, out_rot, out_scale = trans[ix,:2], trans[ix,2], trans[ix,3]
-    #     for file in direct['files']:
-    #         updatehdr.updatewcs_with_shift(file,
-    #                         str('{0}_wcs.fits'.format(direct['product'])),
-    #                               xsh=out_shift[0], ysh=out_shift[1],
-    #                               rot=out_rot, scale=out_scale,
-    #                               wcsname='FINE', force=True,
-    #                               reusename=True, verbose=True,
-    #                               sciext='SCI')
-    #
-    #     ### Bug in astrodrizzle? Dies if the FLT files don't have MJD-OBS
-    #     ### keywords
-    #     im = pyfits.open(file, mode='update')
-    #     im[0].header['MJD-OBS'] = im[0].header['EXPSTART']
-    #     im.flush()
-    #
-    # if redrizzle:
-    #     drizzle_overlaps(field_root)
-
 
 def update_wcs_headers_with_fine(field_root, backup=True):
     """
@@ -3083,7 +3034,7 @@ def update_wcs_headers_with_fine(field_root, backup=True):
         if not os.path.exists('FineBkup'):
             os.mkdir('FineBkup')
 
-    visits, all_groups, info = np.load('{0}_visits.npy'.format(field_root),
+    visits, all_groups, info = np.load(f'{field_root}_visits.npy',
                                        allow_pickle=True)
 
     fit_files = glob.glob('{0}*fine.npy'.format(field_root))
@@ -3096,7 +3047,7 @@ def update_wcs_headers_with_fine(field_root, backup=True):
             for i in range(N):
                 direct = fine_visits[i]
                 for file in direct['files']:
-                    os.system('cp {0} FineBkup/'.format(file))
+                    os.system(f'cp {file} FineBkup/')
                     print(file)
 
         trans = np.reshape(fine_fit.x, (N, -1))  # /10.
@@ -3162,7 +3113,7 @@ def update_wcs_headers_with_fine(field_root, backup=True):
 
                     if backup:
                         for file in grism['files']:
-                            os.system('cp {0} FineBkup/'.format(file))
+                            os.system(f'cp {file} FineBkup/')
                             print(file)
 
                     prep.match_direct_grism_wcs(direct=direct, grism=grism,
@@ -3222,12 +3173,15 @@ def make_reference_wcs(info, files=None, output='mosaic_wcs-ref.fits', filters=[
                                                   ['G800L', 'G102', 'G141'])
         acs_grism = (info['FILTER'] == 'G800L')
         only_acs = list(np.unique(info['INSTRUME'])) == ['ACS']
+        
         if ((acs_grism.sum() == any_grism.sum()) & (any_grism.sum() > 0)) | (only_acs):
             pixel_scale = 0.03
         else:
             pixel_scale = 0.06
 
-    ref_hdu = utils.make_maximal_wcs(files, pixel_scale=pixel_scale, get_hdu=get_hdu, pad=pad_reference, verbose=True)
+    ref_hdu = utils.make_maximal_wcs(files, pixel_scale=pixel_scale, 
+                                     get_hdu=get_hdu, pad=pad_reference, 
+                                     verbose=True)
 
     if get_hdu:
         ref_hdu.data = ref_hdu.data.astype(np.int16)
@@ -3675,6 +3629,8 @@ def make_mosaic_footprints(field_root):
     """
     Make region files where wht images nonzero
     """
+    import matplotlib.pyplot as plt
+    
     files = glob.glob('{0}-f*dr?_wht.fits'.format(field_root))
     files.sort()
 
@@ -4544,286 +4500,8 @@ def make_rgb_thumbnails(root='j140814+565638', ids=None, maglim=21,
             for file in files:
                 os.remove(file)
 
-        # elif remove_fits < 0:
-        #     # Concatenate into a single FITS file
-        #     files = glob.glob('{0}*_dr[cz]_sci.fits'.format(label))
-        #     files.sort()
-        #     hdul = None
-        #     for file in files:
-        #         hdu_i = pyfits.open(file)
-        #         hdu_i[0].header['EXTNAME'] = 'SCI'
-        #         if 'vis_dr' in file:
-        #             filt_i = 'VIS'
-        #         else:
-        #             filt_i = utils.get_hst_filter(hdu_i[0].header)
-        #
-        #         for h in hdu_i:
-        #             h.header['EXTVER'] = filt_i
-        #             if hdul is None:
-        #                 hdul = pyfits.HDUList([h])
-        #             else:
-        #                 hdul.append(h)
-        #
-        #         # Weight
-        #         hdu_i = pyfits.open(file.replace('_sci', '_wht'))
-        #         hdu_i[0].header['EXTNAME'] = 'WHT'
-        #         for h in hdu_i:
-        #             h.header['EXTVER'] = filt_i
-        #             if hdul is None:
-        #                 hdul = pyfits.HDUList([h])
-        #             else:
-        #                 hdul.append(h)
-        #
-        #     if blot_seg is not None:
-        #         hdul.append(pyfits.ImageHDU(data=np.cast[int](blot_seg),
-        #                                     name='SEG'))
-        #
-        #     hdul.writeto('{0}.thumb.fits'.format(label), overwrite=True,
-        #                  output_verify='fix')
-        #
-        #     files = glob.glob('{0}*_dr[cz]*fits'.format(label))
-        #     for file in files:
-        #         os.remove(file)
 
-
-def make_rgb_thumbnails_OLD(root='j140814+565638', HOME_PATH='./', maglim=23, cutout=12., figsize=[2, 2], ids=None, close=True, skip=True, force_ir=False, add_grid=True, scl=1):
-    """
-    Make RGB color cutouts
-    """
-    import os
-    import glob
-    import numpy as np
-
-    import matplotlib.pyplot as plt
-    from matplotlib.ticker import MultipleLocator
-
-    #import montage_wrapper
-    from astropy.visualization import make_lupton_rgb
-    import astropy.wcs as pywcs
-    import astropy.io.fits as pyfits
-
-    try:
-        from .. import utils
-    except:
-        from grizli import utils
-
-    phot_file = '{0}/{1}/Prep/{1}_phot.fits'.format(HOME_PATH, root)
-
-    if not os.path.exists(phot_file):
-        return False
-
-    #phot_file = '../Prep/{0}_phot.fits'.format(root)
-    phot = utils.GTable.gread(phot_file)
-    sci_files = glob.glob('{0}/{1}/Prep/{1}-f*sci.fits'.format(HOME_PATH, root))
-    filters = [file.split('_')[-3].split('-')[-1] for file in sci_files]
-
-    mag_auto = 23.9-2.5*np.log10(phot['flux_auto'])
-
-    if ids is None:
-        sel = mag_auto < maglim
-        ids = phot['number'][sel]
-    #
-    ims = {}
-    for f in filters + ['ir']:
-        img = glob.glob('{0}/{1}/Prep/{1}-{2}_dr?_sci.fits'.format(HOME_PATH, root, f))[0]
-        try:
-            ims[f] = pyfits.open(img)
-        except:
-            continue
-
-    filters = list(ims.keys())
-
-    wcs = pywcs.WCS(ims['ir'][0].header)
-    pscale = utils.get_wcs_pscale(wcs)
-    minor = MultipleLocator(1./pscale)
-
-    rf, gf, bf = get_rgb_filters(filters, force_ir=force_ir)
-
-    for f in [rf, gf, bf]:
-        try:
-            if ims[f][0].header['PHOTFLAM'] == 0:
-                ims[f][0].header['PHOTFLAM'] = model.photflam_list[f.upper()]
-                ims[f][0].header['PHOTPLAM'] = model.photplam_list[f.upper()]
-
-            print(f, ims[f][0].header['PHOTFLAM'], ims[f][0].header['PHOTPLAM'])
-        except:
-            pass
-
-    pf = 1
-    pl = 1
-    rimg = ims[rf][0].data * (ims[rf][0].header['PHOTFLAM']/5.e-20)**pf * (ims[rf][0].header['PHOTPLAM']/1.e4)**pl*scl
-
-    if bf == 'sum':
-        bimg = rimg
-    else:
-        bimg = ims[bf][0].data * (ims[bf][0].header['PHOTFLAM']/5.e-20)**pf * (ims[bf][0].header['PHOTPLAM']/1.e4)**pl*scl
-
-    if gf == 'sum':
-        gimg = (rimg+bimg)/2.
-    else:
-        gimg = ims[gf][0].data * (ims[gf][0].header['PHOTFLAM']/5.e-20)**pf * (ims[gf][0].header['PHOTPLAM']/1.e4)**pl*scl  # * 1.5
-
-    image = make_lupton_rgb(rimg, gimg, bimg, stretch=0.1, minimum=-0.01)
-
-    for id in ids:
-
-        ix = np.where(phot['number'] == id)[0][0]
-
-        name = '{0}_{1:05d}.rgb.png'.format(root, id)
-        print(name)
-
-        if False:
-            ims = {}
-            for f in filters + ['ir']:
-                #img = glob.glob('../Prep/{0}-{1}_dr?_sci.fits'.format(root, f))[0]
-                img = glob.glob('{0}/{1}/Prep/{1}-{2}_dr?_sci.fits'.format(HOME_PATH, root, f))[0]
-                try:
-                    montage_wrapper.mSubimage(img, '/tmp/cutout_{0}.fits'.format(f), phot['ra'][ix], phot['dec'][ix], cutout/3600, debug=False, all_pixels=False, hdu=None, status_file=None, ysize=None)
-                    ims[f] = pyfits.open('/tmp/cutout_{0}.fits'.format(f))
-                except:
-                    continue
-
-        # filters = list(ims.keys())
-        #
-        # wcs = pywcs.WCS(ims['ir'][0].header)
-        # pscale = utils.get_wcs_pscale(wcs)
-        # minor = MultipleLocator(1./pscale)
-        #
-        # rf, gf, bf = get_rgb_filters(filters, force_ir=force_ir)
-        #
-        # pf = 1
-        # pl = 1
-        # bimg = ims[bf][0].data * (ims[bf][0].header['PHOTFLAM']/5.e-20)**pf * (ims[bf][0].header['PHOTPLAM']/1.e4)**pl
-        # rimg = ims[rf][0].data * (ims[rf][0].header['PHOTFLAM']/5.e-20)**pf * (ims[rf][0].header['PHOTPLAM']/1.e4)**pl
-        #
-        # if gf == 'sum':
-        #     gimg = (rimg+bimg)/2.
-        # else:
-        #     gimg = ims[gf][0].data * (ims[gf][0].header['PHOTFLAM']/5.e-20)**pf * (ims[gf][0].header['PHOTPLAM']/1.e4)**pl#* 1.5
-        #
-        # image = make_lupton_rgb(rimg, gimg, bimg, stretch=0.1, minimum=-0.01)
-        #
-        #wcs = pywcs.WCS(ims['f110w'][0].header)
-
-        fig = plt.figure(figsize=figsize)
-        ax = fig.add_subplot(111)  # , projection=wcs)
-        sx = ims['ir'][0].data.shape[1]/2
-        sy = ims['ir'][0].data.shape[0]/2
-
-        x0, y0 = phot['x_image'][ix]-1, phot['y_image'][ix]-1
-        xy = wcs.all_world2pix([phot['x_world'][ix]], [phot['y_world'][ix]], 0)
-        x0, y0 = np.array(xy).flatten()
-
-        ax.imshow(image, origin='lower', extent=(-x0, -x0+2*sx, -y0, -y0+2*sy))
-        ax.set_xlim(-cutout/2/pscale, cutout/2/pscale)
-        ax.set_ylim(-cutout/2/pscale, cutout/2/pscale)
-
-        #ax.text(0.015, 0.99, r'{0} {1:5d}'.format(root, phot['number'][ix], mag_auto[ix]), ha='left', va='top', transform=ax.transAxes, backgroundcolor='w', size=10)
-
-        ax.xaxis.set_major_locator(minor)
-        ax.yaxis.set_major_locator(minor)
-
-        ax.tick_params(axis='x', colors='w', which='both')
-        ax.tick_params(axis='y', colors='w', which='both')
-
-        if add_grid:
-            ax.grid(alpha=0.2, linestyle='-', color='w')
-
-        ax.set_xticklabels([])
-        ax.set_yticklabels([])
-
-        bbox = {'facecolor': 'w', 'alpha': 0.8, 'ec': 'none'}
-
-        ax.text(0.45, 0.97, rf, color='r', bbox=bbox, size=5, ha='center', va='top', transform=ax.transAxes)
-        ax.text(0.45+0.08*5/figsize[0], 0.97, gf, color='g', bbox=bbox, size=5, ha='center', va='top', transform=ax.transAxes)
-        ax.text(0.45+0.08*2*5/figsize[0], 0.97, bf, color='b', bbox=bbox, size=5, ha='center', va='top', transform=ax.transAxes)
-
-        for j in range(3):
-            # time.sleep(0.5)
-            fig.tight_layout(pad=0.1)
-
-        fig.savefig(name)
-        if close:
-            plt.close()
-
-    return True
-
-
-def test_psf():
-    """
-    xxx
-    """
-    import statmorph
-    import astropy.io.fits as pyfits
-    import numpy as np
-    import scipy.ndimage as nd
-    import photutils
-    import os
-    import sep
-
-    root = 'j002746+261626'
-    filter = 'f140w'
-
-    im_sci = pyfits.open('{0}-{1}_drz_sci.fits'.format(root, filter))
-    im_wht = pyfits.open('{0}-{1}_drz_wht.fits'.format(root, filter))
-    im_psf = pyfits.open('{0}-{1}_psf.fits'.format(root, filter))
-    psf = im_psf['PSF', 'DRIZ1'].data*1
-
-    x0 = np.cast[int](np.round(np.cast[float](ds9.get('pan image').split())))
-    #x0 = [1885, 1193]
-
-    #N = 32
-    slx = slice(x0[0]-N, x0[0]+N)
-    sly = slice(x0[1]-N, x0[1]+N)
-
-    sci = im_sci[0].data[sly, slx].byteswap().newbyteorder()
-    wht = im_wht[0].data[sly, slx].byteswap().newbyteorder()
-    gain = im_sci[0].header['EXPTIME']
-
-    rms = 1/np.sqrt(wht)
-    mask = (wht <= 0)  # | ((segm.data > 0) & (segm.data != label))
-    rms[mask] = np.median(rms[~mask])
-
-    #cat, segm = sep.extract(sci, 1.5, err=rms, mask=mask, minarea=5, segmentation_map=True, gain=gain, clean=True)
-
-    threshold = photutils.detect_threshold(sci, snr=1.5)
-    npixels = 5  # minimum number of connected pixels
-    segm = photutils.detect_sources(sci, threshold, npixels)
-    label = np.argmax(segm.areas[1:]) + 1
-    segmap = segm.data == label
-
-    segmap_float = nd.uniform_filter(np.float64(segmap), size=10)
-    segmap = segmap_float > 0.5
-
-    source_morphs = statmorph.source_morphology(sci, segmap, weightmap=rms, gain=gain, psf=psf, mask=mask*1)
-    morph = source_morphs[0]
-
-    ny, nx = sci.shape
-    yp, xp = np.mgrid[0:ny, 0:nx]  # + 0.5
-    fitted_model = statmorph.statmorph.ConvolvedSersic2D(
-        amplitude=morph.sersic_amplitude,
-        r_eff=morph.sersic_rhalf,
-        n=morph.sersic_n,
-        x_0=morph.sersic_xc,
-        y_0=morph.sersic_yc,
-        ellip=morph.sersic_ellip,
-        theta=morph.sersic_theta)
-    #
-    fitted_model.set_psf(psf)  # always required when using ConvolvedSersic2D
-    image_model = fitted_model(xp, yp)
-
-    # Galfit, multiple components
-    from grizli.galfit import galfit
-    catfile = glob.glob('{0}-*.cat.fits'.format(root))[0]
-    segfile = glob.glob('{0}-*_seg.fits'.format(root))[0]
-
-    gf = galfit.Galfitter(root=root, filter=filter, segfile=segfile, catfile=catfile)
-
-    id = 212
-    gfit, model = gf.fit_object(id=id, size=int(128*0.06), components=[galfit.GalfitSersic(), galfit.GalfitSersic()])
-
-
-def field_psf(root='j020924-044344', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/WISP/', factors=[1, 2, 4], get_drizzle_scale=True, subsample=256, size=6, get_line_maps=False, raise_fault=False, verbose=True, psf_filters=['F098M', 'F110W', 'F105W', 'F125W', 'F140W', 'F160W'], skip=False, make_fits=True):
+def field_psf(root='j020924-044344', PREP_PATH='../Prep', RAW_PATH='../RAW', EXTRACT_PATH='../Extractions', factors=[1, 2, 4], get_drizzle_scale=True, subsample=256, size=6, get_line_maps=False, raise_fault=False, verbose=True, psf_filters=['F098M', 'F110W', 'F105W', 'F125W', 'F140W', 'F160W'], skip=False, make_fits=True):
     """
     Generate PSFs for the available filters in a given field
     """
@@ -4840,12 +4518,12 @@ def field_psf(root='j020924-044344', HOME_PATH='/Volumes/Pegasus/Grizli/Automati
         from grizli import utils
         from grizli.galfit import psf as gpsf
 
-    os.chdir(os.path.join(HOME_PATH, root, 'Prep'))
+    os.chdir(PREP_PATH)
 
     drz_str = '{0}-ir_dr?_sci.fits'.format(root)
     drz_file = glob.glob(drz_str)
     if len(drz_file) == 0:
-        err = 'Reference file {0} not found.'.format(drz_str)
+        err = f'Reference file {drz_str} not found.'
         if raise_fault:
             raise FileNotFoundError(err)
         else:
@@ -4861,7 +4539,8 @@ def field_psf(root='j020924-044344', HOME_PATH='/Volumes/Pegasus/Grizli/Automati
 
     # For the line maps
     if get_line_maps:
-        if not os.path.join('../Extractions/{0}_fit_args.npy'.format(root)):
+        args_file = os.path.join(EXTRACT_PATH, f'{root}_fit_args.npy')
+        if not os.path.exists(args_file):
             err = 'fit_args.npy not found.'
             if raise_fault:
                 raise FileNotFoundError(err)
@@ -4872,8 +4551,7 @@ def field_psf(root='j020924-044344', HOME_PATH='/Volumes/Pegasus/Grizli/Automati
         default = DITHERED_PLINE
 
         # Parameters of the line maps
-        args = np.load('../Extractions/{0}_fit_args.npy'.format(root),
-                       allow_pickle=True)[0]
+        args = np.load(args_file, allow_pickle=True)[0]
 
         # Line images
         pline = args['pline']
@@ -4913,7 +4591,7 @@ def field_psf(root='j020924-044344', HOME_PATH='/Volumes/Pegasus/Grizli/Automati
     # FITS info
     visits_file = '{0}_visits.npy'.format(root)
     if not os.path.exists(visits_file):
-        parse_visits(field_root=root, HOME_PATH=HOME_PATH)
+        parse_visits(field_root=root, RAW_PATH=RAW_PATH)
 
     visits, groups, info = np.load(visits_file, allow_pickle=True)
 
@@ -4927,7 +4605,8 @@ def field_psf(root='j020924-044344', HOME_PATH='/Volumes/Pegasus/Grizli/Automati
         info['FILTER'] = filters
 
     # Average PSF
-    xp, yp = np.meshgrid(np.arange(0, sh[1], subsample), np.arange(0, sh[0], subsample))
+    xp, yp = np.meshgrid(np.arange(0, sh[1], subsample), 
+                         np.arange(0, sh[0], subsample))
     ra, dec = drz_wcs.all_pix2world(xp, yp, 0)
 
     # Ref images
@@ -4975,9 +4654,13 @@ def field_psf(root='j020924-044344', HOME_PATH='/Volumes/Pegasus/Grizli/Automati
             utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
 
             for ri, di in zip(ra.flatten(), dec.flatten()):
-                slice_h, wcs_slice = utils.make_wcsheader(ra=ri, dec=di, size=size, pixscale=scl, get_hdu=False, theta=0)
-
-                get_extended = (filter.upper() in ['F098M', 'F110W', 'F105W', 'F125W', 'F140W', 'F160W'])
+                slice_h, wcs_slice = utils.make_wcsheader(ra=ri, dec=di, 
+                                              size=size, pixscale=scl, 
+                                              get_hdu=False, theta=0)
+                
+                # Filters with extended profiles
+                irext = ['F098M', 'F110W', 'F105W', 'F125W', 'F140W', 'F160W']
+                get_extended = filter.upper() in irext
                 try:
                     psf_i = GP.get_psf(ra=ri, dec=di, filter=filter.upper(),
                                        pixfrac=pf, kernel=kern, verbose=False,
