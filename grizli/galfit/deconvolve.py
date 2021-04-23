@@ -21,7 +21,7 @@ def test():
     model_hdu = im[2]
     residuals = im[3].data
 
-    _ = galfit_deconvolve(model_hdu, residuals, rms=None)
+    _x = galfit_deconvolve(model_hdu, residuals, rms=None)
 
     model_hdu = _x['model']
     residuals = _x['resid'].data
@@ -413,8 +413,6 @@ def pix_to_r(shape, xc=[0., 0.], q=0.5, pa=0, re=1., gf_header=None, comp='2', v
     phi = np.arctan2(xp[:, 1], xp[:, 0]).reshape(outshape)
 
     return R, re, phi
-
-    ds9.view(R)
 
 
 def running_median(xi, yi, NBIN=10, use_median=True, use_nmad=True, reverse=False, bins=None, x_func=astropy.stats.biweight_location, y_func=astropy.stats.biweight_location, std_func=astropy.stats.biweight_midvariance, integrate=False):

@@ -78,7 +78,7 @@ def galfit_model_image(root='j021737-051344', ids=[738], filter='f140w', ds9=Non
 
     if False:
         # Testing
-        reload(galfit)
+        #reload(galfit)
         filter = 'f140w'
 
         root = 'sdssj1723+3411'
