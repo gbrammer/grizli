@@ -1,6 +1,9 @@
 
 .. image:: examples/grizli_logo.png
 
+.. image:: https://github.com/gbrammer/grizli/actions/workflows/python-package.yml/badge.svg
+    :target: https://github.com/gbrammer/grizli/actions
+
 .. image:: https://badge.fury.io/py/grizli.svg
     :target: https://badge.fury.io/py/grizli
     
