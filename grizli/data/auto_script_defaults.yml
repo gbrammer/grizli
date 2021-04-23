@@ -1,5 +1,11 @@
 # Full Grizli pipeline arguments
 
+HOME_PATH: '$PWD'
+RAW_PATH: None
+PREP_PATH: None
+PERSIST_PATH: None
+EXTRACT_PATH: None
+
 filters: &filters 
     [F410M, F467M, F547M, F550M, F621M, F689M, F763M, F845M, F200LP, F350LP,
      F435W, F438W, F439W, F450W, F475W, F475X, F555W, F569W, F600LP, F606W,
@@ -36,6 +42,7 @@ is_parallel_field: &is_parallel_field False
 
 # Arguments to grizli.pipeline.fetch_files
 parse_visits_args: 
+    RAW_PATH: '../RAW'
     combine_minexp: 2 
     combine_same_pa: -1
     #filters: *filters
@@ -206,9 +213,11 @@ grism_prep_args:
     files: null
     grisms_to_process: null
     split_by_grism: True
+    prelim_mag_limit: 25
     refine_niter: 3
     refine_poly_order: 3
     refine_fcontam: 0.5
+    refine_mag_limits: [18, 24]
     ds9: null
     mask_mosaic_edges: True
 
@@ -281,7 +290,4 @@ extract_args:
     skip_complete: True
     run_fit: False
     args_file: fit_args.npy
-    
-extract_maglim: [17,26] 
-run_fit: False 
  
