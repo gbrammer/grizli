@@ -129,7 +129,7 @@ class DrizzlePSF(object):
         from shapely.geometry import Polygon, Point
         drz = pyfits.open(drz_file)
         if 'HDRTAB' not in drz:
-            print('No HDRTAB extension found in {0}'.format(file))
+            print('No HDRTAB extension found in {0}'.format(drz_file))
             return None
 
         hdr = utils.GTable(drz['HDRTAB'].data)
@@ -214,8 +214,12 @@ class DrizzlePSF(object):
         return outsci, outwht, outctx
 
     def go(self, ra=53.06967306, dec=-27.72333015):
+        """
+        Testing
+        """
         import scipy.optimize
-
+        wcs, footprint = None, None
+        
         self = DrizzlePSF(info=(wcs, footprint), driz_image='cosmos-full-v1.2.8-f160w_drz_sci.fits')
 
         slx, sly, wcs_slice = self.get_driz_cutout(ra=ra, dec=dec)
@@ -257,7 +261,7 @@ class DrizzlePSF(object):
         print(params, chi2)
         return chi2
 
-    def get_psf(self, ra=53.06967306, dec=-27.72333015, filter='F140W', pixfrac=0.1, kernel='point', verbose=True, wcs_slice=None, get_extended=True, get_weight=False):
+    def get_psf(self, ra=53.06967306, dec=-27.72333015, filter='F140W', pixfrac=0.1, kernel='point', verbose=True, wcs_slice=None, get_extended=True, get_weight=False, ds9=None):
         from drizzlepac import adrizzle
         from shapely.geometry import Polygon, Point
 
@@ -326,7 +330,7 @@ class DrizzlePSF(object):
                                  pixfrac=pixfrac, kernel=kernel, fillval=0,
                                  stepsize=10, wcsmap=None)
 
-                if False:
+                if ds9 is not None:
                     count += 1
                     hdu = pyfits.HDUList([pyfits.PrimaryHDU(), pyfits.ImageHDU(data=psf*100, header=utils.to_header(psf_wcs))])
                     ds9.set('frame {0}'.format(count+1))
@@ -335,7 +339,8 @@ class DrizzlePSF(object):
         #ss = 1000000/2
         ss = 1./outsci.sum()
         hdu = pyfits.HDUList([pyfits.PrimaryHDU(), pyfits.ImageHDU(data=outsci*ss, header=utils.to_header(wcs_slice))])
-        if False:
+       
+        if ds9 is not None:
             ds9.set('frame 2')
             ds9.set_pyfits(hdu)
 
