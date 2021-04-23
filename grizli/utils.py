@@ -358,8 +358,8 @@ def blot_nearest_exact(in_data, in_wcs, out_wcs, verbose=True, stepsize=-1,
     m2 = (xi >= 0) & (yi >= 0) & (xi < in_sh[1]) & (yi < in_sh[0])
     xi, yi, xf, yf, xo, yo = xi[m2], yi[m2], xf[m2], yf[m2], xo[m2], yo[m2]
 
-    out_data = np.ones(out_sh, dtype=np.float)*fill_value
-    status = pixel_map_c(np.cast[np.float](in_data), xi, yi, out_data, xo, yo)
+    out_data = np.ones(out_sh, dtype=np.float64)*fill_value
+    status = pixel_map_c(np.cast[np.float64](in_data), xi, yi, out_data, xo, yo)
 
     # Fill empty
     func = nd.maximum_filter
@@ -1301,8 +1301,12 @@ def detect_with_photutils(sci, err=None, dq=None, seg=None, detect_thresh=2.,
                                           'ra_icrs_centroid': 'ra',
                                           'dec_icrs_centroid': 'dec'},
                         overwrite=True, verbose=True):
-    """Use `photutils <https://photutils.readthedocs.io/>`__ to detect objects and make segmentation map
-
+    """
+    Use `~photutils` to detect objects and make segmentation map
+    
+    .. note:: 
+        Deprecated in favor of sep catalogs in `~grizli.prep`.
+    
     Parameters
     ----------
     sci : `~numpy.ndarray`
@@ -1553,7 +1557,7 @@ def get_line_wavelengths():
     #line_ratios['Balmer 10kK + MgII'] = [2.86, 1.0, 0.468, 0.259, 0.16, 3., 2.86*4.8/100, 2.86*1.95/100]
 
     # Redden with Calzetti00
-    try:
+    if False:
         from extinction import calzetti00
         Av = 1.0
         Rv = 3.1
@@ -1569,16 +1573,17 @@ def get_line_wavelengths():
             line_wavelengths[key] = [w for w in waves]
             line_ratios[key] = [ratios[i]*fred[i] for i in range(len(waves))]
 
-    except:
-        line_wavelengths['Balmer 10kK + MgII Av=0.5'] = [6564.61, 4862.68, 4341.68, 4101.73, 3971.198, 2799.117, 12821.6, 10941.1]
-        line_ratios['Balmer 10kK + MgII Av=0.5'] = [2.009811938798515, 0.5817566641521459, 0.25176970824566913, 0.1338409369665902, 0.08079209880749984, 1.1739297839690317, 0.13092553990513178, 0.05033866127477651]
+    line_wavelengths['Balmer 10kK + MgII Av=0.5'] = [6564.61, 4862.68, 4341.68, 4101.73, 3971.198, 2799.117, 12821.6, 10941.1]
+    line_ratios['Balmer 10kK + MgII Av=0.5'] = [2.009811938798515, 0.5817566641521459, 0.25176970824566913, 0.1338409369665902, 0.08079209880749984, 1.1739297839690317, 0.13092553990513178, 0.05033866127477651]
 
-        line_wavelengths['Balmer 10kK + MgII Av=1.0'] = [6564.61, 4862.68, 4341.68, 4101.73, 3971.198, 2799.117, 12821.6, 10941.1]
-        line_ratios['Balmer 10kK + MgII Av=1.0'] = [1.4123580522157504, 0.33844081628543266, 0.13544441450878067, 0.0691636926953466, 0.04079602018575511, 0.4593703792298591, 0.12486521707058751, 0.045436270735820045]
+    line_wavelengths['Balmer 10kK + MgII Av=1.0'] = [6564.61, 4862.68, 4341.68, 4101.73, 3971.198, 2799.117, 12821.6, 10941.1]
+    line_ratios['Balmer 10kK + MgII Av=1.0'] = [1.4123580522157504, 0.33844081628543266, 0.13544441450878067, 0.0691636926953466, 0.04079602018575511, 0.4593703792298591, 0.12486521707058751, 0.045436270735820045]
 
-        line_wavelengths['Balmer 10kK + MgII Av=2.0'] = [6564.61, 4862.68, 4341.68, 4101.73, 3971.198, 2799.117, 12821.6, 10941.1]
-        line_ratios['Balmer 10kK + MgII Av=2.0'] = [0.6974668768037302, 0.11454218612794999, 0.03919912269578289, 0.018469561340758073, 0.010401970393728362, 0.0703403817712615, 0.11357315292894044, 0.03701729780130422]
-
+    line_wavelengths['Balmer 10kK + MgII Av=2.0'] = [6564.61, 4862.68, 4341.68, 4101.73, 3971.198, 2799.117, 12821.6, 10941.1]
+    line_ratios['Balmer 10kK + MgII Av=2.0'] = [0.6974668768037302, 0.11454218612794999, 0.03919912269578289, 0.018469561340758073, 0.010401970393728362, 0.0703403817712615, 0.11357315292894044, 0.03701729780130422]
+    
+    ###########
+    
     # Reddened with Kriek & Conroy dust, tau_V=0.5
     line_wavelengths['Balmer 10kK t0.5'] = [6564.61, 4862.68, 4341.68, 4101.73]
     line_ratios['Balmer 10kK t0.5'] = [2.86*0.68, 1.0*0.55, 0.468*0.51, 0.259*0.48]
@@ -1935,14 +1940,14 @@ class SpectrumTemplate(object):
         """
         self.wave = wave
         if wave is not None:
-            self.wave = np.cast[np.float](wave)
+            self.wave = np.cast[np.float64](wave)
 
         self.flux = flux
         if flux is not None:
-            self.flux = np.cast[np.float](flux)
+            self.flux = np.cast[np.float64](flux)
 
         if err is not None:
-            self.err = np.cast[np.float](err)
+            self.err = np.cast[np.float64](err)
         else:
             self.err = None
 
@@ -2203,11 +2208,11 @@ class SpectrumTemplate(object):
             # Interpolate to filter wavelengths
             integrate_wave = filter.wave
 
-            integrate_templ = interp(filter.wave.astype(np.float), self.wave,
-                              self.flux_fnu, left=0, right=0)
+            integrate_templ = interp(filter.wave.astype(np.float64), 
+                                    self.wave, self.flux_fnu, left=0, right=0)
 
             if self.err is not None:
-                templ_ivar = 1./interp(filter.wave.astype(np.float),
+                templ_ivar = 1./interp(filter.wave.astype(np.float64),
                                        self.wave, self.err_fnu)**2
 
                 templ_ivar[~np.isfinite(templ_ivar)] = 0

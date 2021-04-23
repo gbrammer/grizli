@@ -3,8 +3,8 @@ Pythonic utilities ported to C [Cython] for speedup.
 """
 import numpy as np
 cimport numpy as np
-DTYPE = np.double
-ctypedef np.double_t DTYPE_t
+DTYPE = np.float64
+ctypedef np.float64_t DTYPE_t
 ctypedef np.int_t ITYPE_t
 ctypedef np.uint_t UINT_t
 

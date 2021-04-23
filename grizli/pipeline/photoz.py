@@ -831,6 +831,7 @@ def show_all_thumbnails(label='j022708p4901_00273', filters=['f775w', 'f814w', '
     import astropy.io.fits as pyfits
     
     from grizli import utils
+    from grizli.pipeline import auto_script
     
     #from PIL import Image
 

@@ -112,7 +112,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
     if get_dict:
         frame = inspect.currentframe()
         args = inspect.getargvalues(frame).locals
-        for k in ['id', 'get_dict', 'frame', 'glob', 'grizli', 'summary', 'StackFitter', 'MultiBeam']:
+        for k in ['id', 'get_dict', 'frame', 'glob', 'plt', 'grizli', 'summary', 'StackFitter', 'MultiBeam']:
             if k in args:
                 args.pop(k)
 
@@ -3194,7 +3194,11 @@ class GroupFitter(object):
 
         # Cleanup
         axc.set_xlim(wmin/zp1, wmax/zp1)
-        axc.semilogx(subsx=[wmax])
+        try:
+            axc.semilogx(subs=[wmax])
+        except:
+            axc.semilogx(subsx=[wmax])
+            
         # axc.set_xticklabels([])
         axc.set_xlabel(xlabel)
         axc.set_ylabel(unit_label)

@@ -127,7 +127,7 @@ def safe_yaml_loader(yamlfile, loaders=[yaml.FullLoader, yaml.Loader, None]):
                 pass
 
     if args is None:
-        raise IOError('Failed to load {0} with {1}'.format(file, loaders))
+        raise IOError(f'Failed to load {yamlfile} with {loaders}.')
 
     return args
 
