@@ -1,5 +1,7 @@
 #!/bin/env python
 import inspect
+import os
+
 from collections import OrderedDict
 
 """
@@ -78,7 +80,7 @@ def make_visit_fits():
 
     visit_files += indiv_files
 
-    for p in ['grizli-v1-19.12.04_visits.npy', 'grizli-v1-19.12.05_visits.npy', 'grizli-cosmos-v2_visits.npy']:
+    for p in ['grizli-v1-19.12.04_visits.npy', 'grizli-v1-19.12.05_visits.npy', 'grizli-v1-20.10.12_visits.npy', 'grizli-cosmos-v2_visits.npy']:
         if p in visit_files:
             visit_files.pop(visit_files.index(p))
 
@@ -87,7 +89,7 @@ def make_visit_fits():
 
     for extra in ['candels-july2019_visits.npy', 'grizli-cosmos-v2_visits.npy']:
 
-        extra_visits = np.load(extra)[0]
+        extra_visits = np.load(extra, allow_pickle=True)[0]
         extra_products = [v['product'] for v in extra_visits]
         for i, p in enumerate(extra_products):
             if p not in products:
@@ -95,6 +97,7 @@ def make_visit_fits():
                 print(parent, p)
                 v = extra_visits[i]
                 v['parent'] = parent
+                v['xproduct'] = v['product']
                 v['parent_file'] = extra  # 'candels-july2019_visits.npy'
                 all_visits.append(v)
                 products.append(p)
@@ -110,19 +113,25 @@ def make_visit_fits():
                 cosmos_fp = cosmos_fp.union(v['footprint'])
 
     for i, file in enumerate(visit_files):
-        visits, groups, info = np.load(file)
+        visits, groups, info = np.load(file, allow_pickle=True)
         print(file, len(visits))
         for v in visits:
             has_fp = ('footprints' in v)
             if not has_fp:
                 print('No footprint: {0}'.format(v['product']))
-
-            if has_fp & (v['product'] not in products):
-                all_visits.append(v)
+            
+            if file.startswith('j'):
+                vprod = v['product'] + v['files'][0]
+            else:
+                vprod = v['product']
+                
+            if has_fp & (vprod not in products):
                 v['parent'] = file.split("_visits")[0].split('-')[-1]
                 v['first'] = v['files'][0]
                 v['parent_file'] = file
-                products.append(v['product'])
+                v['xproduct'] = vprod
+                all_visits.append(v)
+                products.append(vprod)
 
     for v in all_visits:
         v['filter'] = v['product'].split('-')[-1]
@@ -134,7 +143,7 @@ def make_visit_fits():
 
     for v in all_visits:
         all_files.extend(v['files'])
-        file_products.extend([v['product']]*len(v['files']))
+        file_products.extend([v['xproduct']]*len(v['files']))
 
     # duplicates?? seem to be in GOODS-S.
     # Exclude them in all but the first product that contains them for now
@@ -164,10 +173,12 @@ def make_visit_fits():
 
         if v['parent_file'].startswith('j'):
             v['awspath'] = ['grizli-v1/Pipeline/{0}/Prep'.format(v['parent']) for f in v['files']]
-
-        if v['filter'].startswith('f0') | v['filter'].startswith('f1'):
-            # print(v['product'])
-            v['awspath'] = ['grizli-v1/Exposures/{0}/{1}'.format(f[:4], f.split('_')[0]) for f in v['files']]
+        else:
+            #print(v['parent_file'], v['awspath'][0])
+            
+            if v['filter'].startswith('f0') | v['filter'].startswith('f1'):
+                # print(v['product'])
+                v['awspath'] = ['grizli-v1/Exposures/{0}/{1}'.format(f[:4], f.split('_')[0]) for f in v['files']]
 
     # Empty visits, seems to be from duplicates above and mostly in CANDELS
     nexp = np.array([len(visit['files']) for visit in all_visits])
@@ -191,6 +202,7 @@ def make_visit_fits():
     root = 'candels-sep2019'
     root = 'grizli-v1-19.12.04'
     root = 'grizli-v1-19.12.05'
+    root = 'grizli-v1-20.10.12'
 
     tab.write(root+'_visits.fits', overwrite=True)
     np.save(root+'_visits.npy', [all_visits])
@@ -203,6 +215,11 @@ def make_visit_fits():
 
     if False:
         from shapely.geometry import Point
+        from grizli.aws import db
+        engine = db.get_db_engine() 
+        
+        fields = db.from_sql("select field_root, a_wfc3 from charge_fields where log LIKE 'Finished%%'", engine=engine)
+        
         candels = utils.column_values_in_list(tab['parent'], ['j141956p5255', 'j123656p6215', 'j033236m2748', 'j021732m0512', 'j100012p0210'])
         cosmos = np.array([v['footprint'].intersection(cosmos_fp).area > 0 for v in all_visits])
 
@@ -334,6 +351,7 @@ def group_by_filter():
     master = 'grizli-jan2019'
     master = 'grizli-v1-19.12.04'
     master = 'grizli-v1-19.12.05'
+    master = 'grizli-v1-20.10.12'
 
     tab = utils.read_catalog('{0}_visits.fits'.format(master))
     all_visits = np.load('{0}_visits.npy'.format(master), allow_pickle=True)[0]
