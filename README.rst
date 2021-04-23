@@ -1,9 +1,6 @@
 
 .. image:: examples/grizli_logo.png
 
-.. image:: https://travis-ci.org/gbrammer/grizli.svg?branch=master
-    :target: https://travis-ci.org/gbrammer/grizli
-
 .. image:: https://badge.fury.io/py/grizli.svg
     :target: https://badge.fury.io/py/grizli
     
