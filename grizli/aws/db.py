@@ -2,8 +2,16 @@
 Interact with the grizli AWS database
 """
 import os
+import glob
 import numpy as np
 
+try:
+    import pandas as pd
+except:
+    pd = None
+
+from .. import utils
+    
 FLAGS = {'init_lambda': 1,
          'start_beams': 2,
          'done_beams': 3,
@@ -13,6 +21,7 @@ FLAGS = {'init_lambda': 1,
 
 COLUMNS = ['root', 'id', 'status', 'ra', 'dec', 'ninput', 'redshift', 'as_epsf', 't_g102', 'n_g102', 'p_g102', 't_g141', 'n_g141', 'p_g141', 't_g800l', 'n_g800l', 'p_g800l', 'numlines', 'haslines', 'chi2poly', 'chi2spl', 'splf01', 'sple01', 'splf02', 'sple02', 'splf03', 'sple03', 'splf04', 'sple04', 'huberdel', 'st_df', 'st_loc', 'st_scl', 'dof', 'chimin', 'chimax', 'bic_poly', 'bic_spl', 'bic_temp', 'z02', 'z16', 'z50', 'z84', 'z97', 'zwidth1', 'zwidth2', 'z_map', 'zrmin', 'zrmax', 'z_risk', 'min_risk', 'd4000', 'd4000_e', 'dn4000', 'dn4000_e', 'dlineid', 'dlinesn', 'flux_pab', 'err_pab', 'ew50_pab', 'ewhw_pab', 'flux_hei_1083', 'err_hei_1083', 'ew50_hei_1083', 'ewhw_hei_1083', 'flux_siii', 'err_siii', 'ew50_siii', 'ewhw_siii', 'flux_oii_7325', 'err_oii_7325', 'ew50_oii_7325', 'ewhw_oii_7325', 'flux_ariii_7138', 'err_ariii_7138', 'ew50_ariii_7138', 'ewhw_ariii_7138', 'flux_sii', 'err_sii', 'ew50_sii', 'ewhw_sii', 'flux_ha', 'err_ha', 'ew50_ha', 'ewhw_ha', 'flux_oi_6302', 'err_oi_6302', 'ew50_oi_6302', 'ewhw_oi_6302', 'flux_hei_5877', 'err_hei_5877', 'ew50_hei_5877', 'ewhw_hei_5877', 'flux_oiii', 'err_oiii', 'ew50_oiii', 'ewhw_oiii', 'flux_hb', 'err_hb', 'ew50_hb', 'ewhw_hb', 'flux_oiii_4363', 'err_oiii_4363', 'ew50_oiii_4363', 'ewhw_oiii_4363', 'flux_hg', 'err_hg', 'ew50_hg', 'ewhw_hg', 'flux_hd', 'err_hd', 'ew50_hd', 'ewhw_hd', 'flux_h7', 'err_h7', 'ew50_h7', 'ewhw_h7', 'flux_h8', 'err_h8', 'ew50_h8', 'ewhw_h8', 'flux_h9', 'err_h9', 'ew50_h9', 'ewhw_h9', 'flux_h10', 'err_h10', 'ew50_h10', 'ewhw_h10', 'flux_neiii_3867', 'err_neiii_3867', 'ew50_neiii_3867', 'ewhw_neiii_3867', 'flux_oii', 'err_oii', 'ew50_oii', 'ewhw_oii', 'flux_nevi_3426', 'err_nevi_3426', 'ew50_nevi_3426', 'ewhw_nevi_3426', 'flux_nev_3346', 'err_nev_3346', 'ew50_nev_3346', 'ewhw_nev_3346', 'flux_mgii', 'err_mgii', 'ew50_mgii', 'ewhw_mgii', 'flux_civ_1549', 'err_civ_1549', 'ew50_civ_1549', 'ewhw_civ_1549', 'flux_ciii_1908', 'err_ciii_1908', 'ew50_ciii_1908', 'ewhw_ciii_1908', 'flux_oiii_1663', 'err_oiii_1663', 'ew50_oiii_1663', 'ewhw_oiii_1663', 'flux_heii_1640', 'err_heii_1640', 'ew50_heii_1640', 'ewhw_heii_1640', 'flux_niii_1750', 'err_niii_1750', 'ew50_niii_1750', 'ewhw_niii_1750', 'flux_niv_1487', 'err_niv_1487', 'ew50_niv_1487', 'ewhw_niv_1487', 'flux_nv_1240', 'err_nv_1240', 'ew50_nv_1240', 'ewhw_nv_1240', 'flux_lya', 'err_lya', 'ew50_lya', 'ewhw_lya', 'pdf_max', 'cdf_z', 'sn_pab', 'sn_hei_1083', 'sn_siii', 'sn_oii_7325', 'sn_ariii_7138', 'sn_sii', 'sn_ha', 'sn_oi_6302', 'sn_hei_5877', 'sn_oiii', 'sn_hb', 'sn_oiii_4363', 'sn_hg', 'sn_hd', 'sn_h7', 'sn_h8', 'sn_h9', 'sn_h10', 'sn_neiii_3867', 'sn_oii', 'sn_nevi_3426', 'sn_nev_3346', 'sn_mgii', 'sn_civ_1549', 'sn_ciii_1908', 'sn_oiii_1663', 'sn_heii_1640', 'sn_niii_1750', 'sn_niv_1487', 'sn_nv_1240', 'sn_lya', 'chinu', 'bic_diff', 'log_risk', 'log_pdf_max', 'zq', 'mtime', 'vel_bl', 'vel_nl', 'vel_z', 'vel_nfev', 'vel_flag', 'grizli_version']
 
+engine = None
 
 def get_connection_info(config_file=None):
     """
@@ -77,7 +86,8 @@ def get_redshift_fit_status(root, id, table='redshift_fit', engine=None):
 def update_jname():
 
     from grizli import utils
-
+    from grizli.aws import db as grizli_db
+    
     res = grizli_db.from_sql("select p_root, p_id, p_ra, p_dec from photometry_apcorr", engine)
 
     jn = [utils.radec_to_targname(ra=ra, dec=dec, round_arcsec=(0.001, 0.001), precision=2, targstr='j{rah}{ram}{ras}.{rass}{sign}{ded}{dem}{des}.{dess}') for ra, dec in zip(res['p_ra'], res['p_dec'])]
@@ -111,8 +121,8 @@ def update_jname():
     # second is G800L
     dup &= zres['t_g800l'].filled(0)[ok][ix1] > 10
 
-    plt.scatter(zres['z_map'][ok][ix0[dup]], zres['z_map'][ok][ix1[dup]],
-                marker='.', alpha=0.1)
+    # plt.scatter(zres['z_map'][ok][ix0[dup]], zres['z_map'][ok][ix1[dup]],
+    #            marker='.', alpha=0.1)
 
 
 def update_redshift_fit_status(root, id, status=0, table='redshift_fit', engine=None, verbose=True):
@@ -277,7 +287,8 @@ def add_missing_rows(root='j004404m2034', engine=None):
     """
     import glob
     from astropy.table import vstack, Table
-
+    import pandas as pd
+    
     from grizli.aws import db as grizli_db
 
     if engine is None:
@@ -454,7 +465,8 @@ def add_all_spectra():
 def add_oned_spectra(root='j214224m4420gr01', bucket='grizli-v1', engine=None):
     import os
     import glob
-
+    from collections import OrderedDict
+    
     if engine is None:
         engine = get_db_engine()
 
@@ -487,6 +499,9 @@ def add_oned_spectra(root='j214224m4420gr01', bucket='grizli-v1', engine=None):
     os.system('rm {0}_*.1D.fits {0}_*.R30.fits'.format(root))
 
     if False:
+        import scipy.ndimage as nd
+        import matplotlib.pyplot as plt
+        
         tablename = 'spec1d_g141'
         #tablename = 'spec1d_g102'
 
@@ -638,7 +653,7 @@ def add_oned_spectra(root='j214224m4420gr01', bucket='grizli-v1', engine=None):
         plt.imshow((data['line'] - data['cont'])/data['flat']/1.e-19, vmin=-0.1, vmax=10)
 
 
-def run_lambda_fits(root='j004404m2034', phot_root=None, mag_limits=[15, 26], sn_limit=7, min_status=None, engine=None, zr=[0.01, 3.4], bucket='grizli-v1', verbose=True, extra={'bad_pa_threshold': 10}):
+def run_lambda_fits(root='j004404m2034', phot_root=None, mag_limits=[15, 26], sn_limit=7, min_status=None, engine=None, zr=[0.01, 3.4], bucket='grizli-v1', verbose=True, extra={'bad_pa_threshold': 10}, ids=None):
     """
     Run redshift fits on lambda for a given root
     """
@@ -697,7 +712,8 @@ def run_lambda_fits(root='j004404m2034', phot_root=None, mag_limits=[15, 26], sn
             status[res['id']-1] = res['status']
             sel &= status < min_status
 
-    ids = phot['id'][sel]
+    if ids is None:
+        ids = phot['id'][sel]
 
     # Select just on min_status
     if min_status > 1000:
@@ -736,12 +752,12 @@ def run_lambda_fits(root='j004404m2034', phot_root=None, mag_limits=[15, 26], sn
 def set_phot_root(root, phot_root, engine):
     """
     """
-    print('Set phot_root = {0} > {1}'.format(root, phot_root))
+    print(f'Set phot_root = {root} > {phot_root}')
 
-    SQL = """UPDATE redshift_fit
+    SQL = f"""UPDATE redshift_fit
      SET phot_root = '{phot_root}'
     WHERE (root = '{root}');
-    """.format(phot_root=phot_root, root=root)
+    """
 
     engine.execute(SQL)
 
@@ -756,6 +772,8 @@ def set_phot_root(root, phot_root, engine):
 
     if False:
         # Replace in-place
+        from grizli.aws import db as grizli_db
+        
         engine.execute("update redshift_fit set phot_root = replace(root, 'g800l', 'grism') WHERE root not like 'j214224m4420%%' AND root LIKE '%%-grism%%")
 
         engine.execute("update redshift_fit set phot_root = replace(root, 'g800l', 'grism') WHERE root not like 'j214224m4420%%'")
@@ -783,7 +801,7 @@ SET objid = p_objid
 FROM sub
 WHERE phot_root = p_root AND id = p_id;
         """
-        db.from_sql(SQL, engine)
+        grizli_db.from_sql(SQL, engine)
 
         engine.execute(SQL)
 
@@ -988,6 +1006,7 @@ def add_phot_to_db(root, delete=False, engine=None, nmax=500):
         if ('_corr_' in c) | ('_ecorr_' in c) | (c[-5:] in ['tot_4', 'tot_5', 'tot_6']) | ('dummy' in c):
 
             remove.append(c)
+    
     phot.remove_columns(remove)
 
     # Add new filter columns if necessary
@@ -1185,12 +1204,14 @@ def multibeam_to_database(beams_file, engine=None, Rspline=15, force=False, **kw
 
 def test_join():
     import pandas as pd
+    
+    res = pd.read_sql_query("SELECT root, id, flux_radius, mag_auto, z_map, status, bic_diff, zwidth1, log_pdf_max, chinu FROM photometry_apcorr AS p JOIN (SELECT * FROM redshift_fit WHERE z_map > 0) z ON (p.p_root = z.root AND p.p_id = z.id)", engine)
 
-    res = pd.read_sql_query("SELECT root, id, flux_radius, mag_auto, z_map, status, bic_diff, zwidth1, log_pdf_max, chinu FROM photometry_apcorr AS p JOIN (SELECT * FROM redshift_fit WHERE z_map > 0) z ON (p.p_root = z.root AND p.p_id = z.id)".format(root), engine)
-
-    res = pd.read_sql_query("SELECT * FROM photometry_apcorr AS p JOIN (SELECT * FROM redshift_fit WHERE z_map > 0) z ON (p.p_root = z.root AND p.p_id = z.id)".format(root), engine)
+    res = pd.read_sql_query("SELECT * FROM photometry_apcorr AS p JOIN (SELECT * FROM redshift_fit WHERE z_map > 0) z ON (p.p_root = z.root AND p.p_id = z.id)", engine)
 
     # on root
+    root = 'xxx'
+    
     res = pd.read_sql_query("SELECT p.root, p.id, mag_auto, z_map, status FROM photometry_apcorr AS p JOIN (SELECT * FROM redshift_fit WHERE root='{0}') z ON (p.p_root = z.root AND p.p_id = z.id)".format(root), engine)
 
 
@@ -1319,7 +1340,8 @@ def mtime_to_iso(ct):
 
 
 def various_selections():
-
+    from grizli.aws import db as grizli_db
+    
     # sdss z_spec
     res = make_html_table(engine=engine, columns=['root', 'status', 'id', 'p_ra', 'p_dec', 'mag_auto', 'flux_radius', 'z_spec', 'z_map', 'bic_diff', 'chinu', 'log_pdf_max'], where="AND status > 5 AND z_spec > 0 AND z_spec_qual = 1 AND z_spec_src ~ '^sdss-dr15'", table_root='sdss_zspec', sync='s3://grizli-v1/tables/')
 
@@ -1441,6 +1463,8 @@ WHERE (root = q_root AND id = q_id)) c
 
     if False:
         from matplotlib.ticker import FixedLocator, AutoLocator, MaxNLocator
+        import matplotlib.pyplot as plt
+        
         xti = xt = np.arange(0, 3.6, 0.5)
         loc = np.arange(0, 3.6, 0.1)
         bins = utils.log_zgrid([0.03, 3.5], 0.01)
@@ -1587,15 +1611,15 @@ def render_for_notebook(tab, image_extensions=['stack', 'full', 'line'], bucket=
 
 
 def add_to_charge():
+    from grizli.aws import db
+    engine = db.get_db_engine()
 
-    engine = grizli_db.get_db_engine()
-
-    p = pd.read_sql_query('select distinct p_root from photometry_apcorr', engine)
-    f = pd.read_sql_query('select distinct field_root from charge_fields', engine)
+    p = db.from_sql('select distinct p_root from photometry_apcorr', engine)
+    f = db.from_sql('select distinct field_root from charge_fields', engine)
 
     new_fields = []
-    for root in p['p_root'].values:
-        if root not in f['field_root'].values:
+    for root in p['p_root']:
+        if root not in f['field_root']:
             print(root)
             new_fields.append(root)
 
@@ -1604,10 +1628,47 @@ def add_to_charge():
     df['comment'] = 'CANDELS'
     ix = df['field_root'] == 'j214224m4420'
     df['comment'][ix] = 'Rafelski UltraDeep'
-
+    
     df.to_sql('charge_fields', engine, index=False, if_exists='append', method='multi')
 
+def add_by_footprint(footprint_file='j141156p3415_footprint.fits'):
+    
+    import pandas as pd
+    from grizli.aws import db
+    
+    ## By footprint
+    engine = db.get_db_engine()
 
+    ch = pd.read_sql_query('select * from charge_fields', engine)
+    
+    f = pd.read_sql_query('select distinct field_root from charge_fields', engine)
+    
+    fp = utils.read_catalog(footprint_file)
+    
+    root = fp.meta['NAME']
+    if root in f['field_root']:
+        return False
+        
+    df = pd.DataFrame()
+    df['field_root'] = [root]
+    df['comment'] = 'manual'
+    df['field_xmin'] = fp.meta['XMIN']
+    df['field_xmax'] = fp.meta['XMAX']
+    df['field_ymin'] = fp.meta['YMIN']
+    df['field_ymax'] = fp.meta['YMAX']
+    df['field_ra'] = np.mean(fp['ra'])
+    df['field_dec'] = np.mean(fp['dec'])
+    df['mw_ebv'] = fp.meta['MW_EBV']
+    
+    fp.rename_column('filter','filters')
+    
+    for k in ['filters','target','proposal_id']:
+        df[k] = ' '.join([t for t in np.unique(fp[k])])
+    
+    #df['proposal_id'] = ' '.join([t for t in np.unique(fp['target'])])
+    
+    df.to_sql('charge_fields', engine, index=False, if_exists='append', method='multi')
+    
 def overview_table():
     """
     Generate a new overview table with the redshift histograms
@@ -1859,7 +1920,7 @@ def add_missing_photometry():
                         continue
 
                     grizli_db.add_phot_to_db(root, delete=False,
-                                             engine=engine)
+                                             engine=engine, nmax=500)
 
     # 3D-HST
     copy = """
@@ -2184,6 +2245,8 @@ def get_exposure_info():
     import mastquery.query
 
     master = 'grizli-v1-19.12.04'
+    master = 'grizli-v1-19.12.05'
+    master = 'grizli-v1-20.10.12'
 
     tab = utils.read_catalog('{0}_visits.fits'.format(master))
     all_visits = np.load('{0}_visits.npy'.format(master), allow_pickle=True)[0]
@@ -2200,9 +2263,11 @@ def get_exposure_info():
     so = np.argsort(t['count'])
     t = t[so[::-1]]
     for pr in t['prog']:
-        print(pr)
         if os.path.exists('{0}_query.fits'.format(pr)):
+            #print('Skip ', pr)
             continue
+
+        print(pr)
 
         try:
             _q = mastquery.query.run_query(obs_id='[ij]{0}*'.format(pr))
@@ -2223,7 +2288,7 @@ def get_exposure_info():
     files = glob.glob('*query.fits')
     files.sort()
 
-    cols = ['obs_id', 'target', 'ra', 'dec', 't_min', 't_max', 'exptime', 'wavelength_region', 'filter', 'em_min', 'em_max', 'target_classification', 'obs_title', 't_obs_release', 'instrument_name', 'proposal_pi', 'proposal_id', 'proposal_type', 'footprint', 'dataRights', 'mtFlag', 'obsid', 'objID', 'visit']
+    cols = ['obs_id', 'target', 'target_ra', 'target_dec', 't_min', 't_max', 'exptime', 'wavelength_region', 'filter', 'em_min', 'em_max', 'target_classification', 'obs_title', 't_obs_release', 'instrument_name', 'proposal_pi', 'proposal_id', 'proposal_type', 'sregion', 'dataRights', 'mtFlag', 'obsid', 'objID', 'visit']
 
     for i, file in enumerate(files):
         print(file)
@@ -2232,7 +2297,10 @@ def get_exposure_info():
         _q['proposal_id'] = np.cast[np.int16](_q['proposal_id'])
         _q['obsid'] = np.cast[np.int64](_q['obsid'])
         _q['objID'] = np.cast[np.int64](_q['objID'])
-
+        _q.rename_column('ra','target_ra')
+        _q.rename_column('dec','target_dec')
+        _q.rename_column('footprint', 'sregion')
+        
         df = _q[cols].to_pandas()
         df.to_sql('mast_query', engine, index=False, if_exists='append', method='multi')
 
@@ -2291,16 +2359,28 @@ def get_exposure_info():
     engine.execute('ALTER TABLE exposure_log ADD COLUMN persnpix integer;')
     engine.execute('ALTER TABLE exposure_log ADD COLUMN perslevl real;')
     
+    _exp = db.from_sql("select distinct(file) from exposure_log", engine)
+    db_files = np.unique(_exp['file'])
+    charge = db.from_sql("select * from charge_fields", engine)
+    
     SKIP = 1000
+    df0 = None
+    
     for i, v in enumerate(all_visits):
-        print(i, v['parent'], v['product'])
+        _count = np.sum([f.split('_')[0] in db_files for f in v['files']])
+        
+        if _count == len(v['files']):
+            continue
+    
+        if v['parent'] not in charge['field_root']:
+            print('Warning: {0} not in charge["field_root"]'.format(v['parent']))
+            continue
+            
+        print(i, v['parent'], v['product'], _count, len(v['files']))
 
         N = len(v['files'])
 
         fps = [np.array(fp.convex_hull.boundary.xy)[:, :-1].tolist() for fp in v['footprints']]
-
-        if (i % SKIP) == 0:
-            df0 = df[:0]
 
         df = pd.DataFrame()
         df['file'] = [f.split('_')[0] for f in v['files']]
@@ -2316,13 +2396,18 @@ def get_exposure_info():
         df['dec'] = [fp.centroid.xy[1][0] for fp in v['footprints']]
         df['area'] = [fp.area*np.cos(df['dec'][i]/180*np.pi)*3600 for i, fp in enumerate(v['footprints'])]
         df['footprint'] = fps
-
-        if (i % SKIP) > 0:
+        
+        if df0 is None:
+            df0 = df        
+        else:
             df0 = df0.append(df)
-
-        if (i % SKIP) == SKIP-1:
+         
+        if len(df0) > SKIP:
+            # Send to DB and reset append table
             print('>>> to DB >>> ({0}, {1})'.format(i, len(df0)))
             df0.to_sql('exposure_log', engine, index=False, if_exists='append', method='multi')
+            df0 = df[:0]
+
 
 def update_all_exposure_log():
     """
@@ -2358,8 +2443,14 @@ def update_all_exposure_log():
     # All IR
     # _files = db.from_sql("SELECT file, filter from exposure_log WHERE mdrizsky is null AND filter like 'f0%%'", engine)
     # 
-    _files = db.from_sql("SELECT file, filter from exposure_log WHERE mdrizsky is null AND filter like 'f%%'", engine)
+    _files = db.from_sql("SELECT file, filter, parent from exposure_log WHERE mdrizsky is null AND filter like 'f%%'", engine)
+    _files = db.from_sql("SELECT file, filter, parent, product from exposure_log WHERE mdrizsky is null AND gsky101 is null", engine)
 
+    # Skip 3DHST
+    keep = _files['parent'] != 'xx'
+    for p in ['j123656p6215','j141952p5255','j033236m2748','j021740m0512']:
+        keep &= _files['parent'] != p
+        
     #_files = db.from_sql("SELECT file, filter from exposure_log WHERE mdrizsky is null AND awspath like 'grizli-cosmos%%' AND filter like 'f814w' LIMIT 10", engine)
     
     N = len(_files)
@@ -2519,6 +2610,8 @@ def update_exposure_log(event, context):
     return kwvals
 
 def run_shrink_ramps():
+    from grizli.aws import db
+    
     _q = db.from_sql("select file, awspath, parent from exposure_log where extension LIKE 'flt' AND parent LIKE 'j002836m3311' limit 5", engine)
     for i, (file, awspath, parent) in enumerate(zip(_q['file'], _q['awspath'], _q['parent'])):
         shrink_ramp_file(file, awspath, parent, engine=engine, MAX_SIZE=2*1024**2, convert_args='-scale 35% -quality 90', remove=True)
@@ -2588,7 +2681,7 @@ def shrink_ramp_file(file, awspath, parent, engine=None, MAX_SIZE=2*1024**2, con
         try:
             bkt.upload_file(bw_file, awsfile, ExtraArgs={'ACL':'public-read'})
         except:
-            print(f'Failed to upload s3://{bucket}/{awsfile}'.replace(*repl))
+            print(f'Failed to upload s3://{bucket}/{awsfile}')
     else:
         print('skip')
         
@@ -2602,9 +2695,8 @@ def shrink_ramp_file(file, awspath, parent, engine=None, MAX_SIZE=2*1024**2, con
 
 
 def get_exposures_at_position(ra, dec, engine, dr=10):
-
     cosdec = np.cos(dec/180*np.pi)
-    res = db.from_sql('select * from exposure_log where (ABS(ra - {0}) < {1}) AND (ABS(dec-{2}) < {3})'.format(ra, dr/cosdec, dec, dr), engine)
+    res = from_sql('select * from exposure_log where (ABS(ra - {0}) < {1}) AND (ABS(dec-{2}) < {3})'.format(ra, dr/cosdec, dec, dr), engine)
     return res
 
 
@@ -2692,6 +2784,9 @@ def add_irac_table():
 
 
 def show_all_fields():
+    from grizli.aws import db as grizli_db
+    import matplotlib.pyplot as plt
+    
     plt.ioff()
     res = pd.read_sql_query("select distinct root from redshift_fit order by root;", engine)
     roots = res['root'].tolist()
@@ -2702,19 +2797,7 @@ def show_all_fields():
             continue
 
         try:
-            if False:
-                res = pd.read_sql_query("select root,id,status from redshift_fit where root = '{0}';".format(root), engine)
-                res = pd.read_sql_query("select status, count(status) as n from redshift_fit where root = '{0}' group by status;".format(root), engine)
-
             res = grizli_db.make_html_table(engine=engine, columns=['mtime', 'root', 'status', 'id', 'p_ra', 'p_dec', 'mag_auto', 'flux_radius', 't_g800l', 't_g102', 't_g141', 'z_spec', 'z_map', 'bic_diff', 'chinu', 'zwidth1/(1+z_map) as zw1', 'dlinesn', 'q_z'], where="AND status > 4 AND root = '{0}'".format(root), table_root=root, sync='s3://grizli-v1/Pipeline/{0}/Extractions/'.format(root), png_ext=['R30', 'stack', 'full', 'line'], show_hist=True)
-
-            if False:
-                grizli_db.set_phot_root(root, phot_root, engine)
-
-                res = grizli_db.make_html_table(engine=engine, columns=['mtime', 'root', 'status', 'id', 'p_ra', 'p_dec', 'mag_auto', 'flux_radius', 't_g800l', 't_g102', 't_g141', 'z_spec', 'z_map', 'bic_diff', 'chinu', 'zwidth1/(1+z_map) as zw1', 'dlinesn'], where="AND status > 4 AND root = '{0}' AND (bic_diff > 20 OR zwidth1/(1+z_map) < 0.01)".format(root), table_root=root, sync='s3://grizli-v1/tables/', png_ext=['R30', 'stack', 'full', 'line', 'sed'], show_hist=False)
-
-                res = grizli_db.make_html_table(engine=engine, columns=['mtime', 'root', 'status', 'id', 'p_ra', 'p_dec', 'mag_auto', 'flux_radius', 't_g800l', 't_g102', 't_g141', 'z_spec', 'z_map', 'bic_diff', 'chinu', 'zwidth1/(1+z_map) as zw1', 'dlinesn'], where="AND status > 4 AND phot_root = '{0}' AND bic_diff > 20".format(phot_root), table_root=phot_root, sync='s3://grizli-v1/tables/', png_ext=['R30', 'stack', 'full', 'line'], show_hist=False)
-
         except:
             continue
 
