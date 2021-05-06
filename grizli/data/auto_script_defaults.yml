@@ -42,7 +42,6 @@ is_parallel_field: &is_parallel_field False
 
 # Arguments to grizli.pipeline.fetch_files
 parse_visits_args: 
-    RAW_PATH: '../RAW'
     combine_minexp: 2 
     combine_same_pa: -1
     #filters: *filters
