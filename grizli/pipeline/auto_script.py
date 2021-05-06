@@ -203,7 +203,10 @@ def create_path_dict(root='j142724+334246', home='$PWD', raw=None, prep=None, ex
         thumbs = os.path.join(home, root, 'Thumbnaails')
     
     xpaths = copy.deepcopy(paths)
-
+    for k in xpaths:
+        if xpaths[k] is None:
+            _ = xpaths.pop(k)
+            
     if 'home' not in xpaths:
         xpaths['home'] = home
     
