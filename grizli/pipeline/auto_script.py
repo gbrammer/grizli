@@ -878,6 +878,8 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_pr
         raise(ImportError(warn))
     
     paths = create_path_dict(root=field_root, home=HOME_PATH, paths=paths)
+    print('paths: ', paths)
+    
     if not os.path.exists(paths['raw']):
         make_directories(root=field_root, HOME_PATH=HOME_PATH, 
                          paths=paths)
