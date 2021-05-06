@@ -332,7 +332,7 @@ def go(root='j010311+131615',
     # Silence numpy and astropy warnings
     utils.set_warnings()
     
-    PATHS = create_path_dict(field_root=root, home=HOME_PATH, 
+    PATHS = create_path_dict(root=root, home=HOME_PATH, 
                              raw=RAW_PATH, prep=PREP_PATH, 
                              persist=PERSIST_PATH, extract=EXTRACT_PATH)
         
