@@ -972,7 +972,7 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_pr
         
     # Remove exposures with bad EXPFLAG
     if remove_bad:
-        remove_bad_expflag(field_root=field_root, HOME_PATH=PATHS['home'],
+        remove_bad_expflag(field_root=field_root, HOME_PATH=paths['home'],
                            min_bad=min_bad_expflag)
 
     # Reprocess the RAWs into FLTs
