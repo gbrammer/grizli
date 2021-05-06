@@ -1,10 +1,10 @@
 # Full Grizli pipeline arguments
 
 HOME_PATH: '$PWD'
-RAW_PATH: None
-PREP_PATH: None
-PERSIST_PATH: None
-EXTRACT_PATH: None
+RAW_PATH: null
+PREP_PATH: null
+PERSIST_PATH: null
+EXTRACT_PATH: null
 
 filters: &filters 
     [F410M, F467M, F547M, F550M, F621M, F689M, F763M, F845M, F200LP, F350LP,
