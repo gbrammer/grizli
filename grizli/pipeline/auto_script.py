@@ -832,9 +832,12 @@ def make_directories(root='j142724+334246', HOME_PATH='$PWD', paths={}):
             
         dir = paths[k]
         if not os.path.exists(dir):
+            print(f'mkdir {dir}')
             os.mkdir(dir)
             os.system(f'chmod ugoa+rwx {dir}')
-    
+        else:
+            print(f'directory {dir} exists')
+            
     return paths
 
 
