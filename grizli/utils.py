@@ -5688,7 +5688,7 @@ class EffectivePSF(object):
 
             if sh[2] == 90:
                 # ACS WFC
-                iX, iY = 10, 9  # 9, 10
+                iX, iY = 9, 10  # 9, 10
             else:
                 # UVIS
                 iX, iY = 7, 8
@@ -5708,10 +5708,10 @@ class EffectivePSF(object):
             fx = rx-nx
             fy = ry-ny
 
-            psf_xy = (1-fx)*(1-fy)*epsf[:, :, nx+ny*iY]
-            psf_xy += fx*(1-fy)*epsf[:, :, (nx+1)+ny*iY]
-            psf_xy += (1-fx)*fy*epsf[:, :, nx+(ny+1)*iY]
-            psf_xy += fx*fy*epsf[:, :, (nx+1)+(ny+1)*iY]
+            psf_xy = (1-fx)*(1-fy)*epsf[:, :, nx+ny*iX]
+            psf_xy += fx*(1-fy)*epsf[:, :, (nx+1)+ny*iX]
+            psf_xy += (1-fx)*fy*epsf[:, :, nx+(ny+1)*iX]
+            psf_xy += fx*fy*epsf[:, :, (nx+1)+(ny+1)*iX]
 
             self.eval_filter = filter
 
