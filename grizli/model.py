@@ -581,9 +581,11 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         if (nonz.sum() > 0) & (id in self.seg_ids):
             status = disperse.disperse_grism_object(thumb, self.seg,
                                  np.float32(id),
-                                 self.flat_index[nonz], self.yfrac_beam[nonz],
-                                 (sens_curve*scale_spec)[nonz],
-                                 modelf, self.x0,
+                                 self.flat_index[nonz],
+                                 self.yfrac_beam[nonz].astype(np.float64),
+                            (sens_curve*scale_spec)[nonz].astype(np.float64),
+                                 modelf, 
+                                 self.x0,
                                  np.array(self.sh, dtype=np.int64),
                                  self.x0,
                                  np.array(self.sh_beam, dtype=np.int64))
