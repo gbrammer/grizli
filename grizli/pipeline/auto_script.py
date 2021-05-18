@@ -612,10 +612,10 @@ def go(root='j010311+131615',
                                   get_line_maps=False, skip=False)
 
     # Are there full-field mosaics?
-    mosaic_files = glob.glob(r'{root}-f*sci.fits')
+    mosaic_files = glob.glob(f'{root}-f*sci.fits')
 
     # Photometric catalog
-    has_phot_file = os.path.exists(r'{root}_phot.fits')
+    has_phot_file = os.path.exists(f'{root}_phot.fits')
     if (not has_phot_file) & make_phot & (len(mosaic_files) > 0):
         try:
             tab = auto_script.multiband_catalog(field_root=root,
@@ -2912,7 +2912,7 @@ def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Griz
             radec, ref_catalog = get_radec_catalog(ra=drz_im[0].header['CRVAL1'],
                     dec=drz_im[0].header['CRVAL2'],
                     product='-'.join(file.split('-')[:-1]),  date=drz_im[0].header['EXPSTART'], date_format='mjd',
-                    reference_catalogs=['GAIA'], radius=5.)
+                    reference_catalogs=['GAIA'], radius=radius)
 
             ref_tab = utils.GTable(np.loadtxt(radec, unpack=True).T, names=['ra', 'dec'])
             ridx = np.arange(len(ref_tab))
