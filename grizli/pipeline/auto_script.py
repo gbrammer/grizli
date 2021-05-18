@@ -606,7 +606,7 @@ def go(root='j010311+131615',
 
         if (not is_dash) & (len(mosaic_files) > 0):
             print('Make field PSFs')
-            auto_script.field_psf(root=root, HOME_PATH=PATHS['home'],
+            auto_script.field_psf(root=root, PREP_PATH=PATHS['prep'],
                                   RAW_PATH=PATHS['raw'], 
                                   EXTRACT_PATH=PATHS['extract'], 
                                   get_line_maps=False, skip=False)
@@ -4509,7 +4509,7 @@ def make_rgb_thumbnails(root='j140814+565638', ids=None, maglim=21,
                 os.remove(file)
 
 
-def field_psf(root='j020924-044344', PREP_PATH='../Prep', RAW_PATH='../RAW', EXTRACT_PATH='../Extractions', factors=[1, 2, 4], get_drizzle_scale=True, subsample=256, size=6, get_line_maps=False, raise_fault=False, verbose=True, psf_filters=['F098M', 'F110W', 'F105W', 'F125W', 'F140W', 'F160W'], skip=False, make_fits=True):
+def field_psf(root='j020924-044344', PREP_PATH='../Prep', RAW_PATH='../RAW', EXTRACT_PATH='../Extractions', factors=[1, 2, 4], get_drizzle_scale=True, subsample=256, size=6, get_line_maps=False, raise_fault=False, verbose=True, psf_filters=['F098M', 'F110W', 'F105W', 'F125W', 'F140W', 'F160W'], skip=False, make_fits=True, **kwargs):
     """
     Generate PSFs for the available filters in a given field
     """
