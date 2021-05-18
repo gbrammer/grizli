@@ -2516,13 +2516,14 @@ def get_gaia_DR2_vizier_columns():
 
 
 def get_gaia_DR2_vizier(ra=165.86, dec=34.829694, radius=3., max=100000,
-                    catalog="I/345/gaia2", server='vizier.cfa.harvard.edu',
+                    catalog="I/350/gaiaedr3", server='vizier.u-strasbg.fr',
                     use_mirror=False, keys=None):
     """
     Query GAIA catalog from Vizier
     
-    For DR3, use ``catalog='I/350/gaiaedr3'``.
-        
+    DR2: ``catalog="I/345/gaia2"``
+    DR3: ``catalog="I/350/gaiaedr3"``
+
     """
     from astroquery.vizier import Vizier
     import astropy.units as u
