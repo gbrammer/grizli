@@ -78,7 +78,7 @@ print('Git version: {0}'.format(version))
         
 
 if USE_CYTHON:
-    extensions = cythonize(extensions)
+    extensions = cythonize(extensions, language_level="3")
 
 # Utility function to read the README file.
 # Used for the long_description.  It's nice, because now 1) we have a top level
