@@ -13,6 +13,7 @@ import cython
 cdef extern from "math.h":
     double fabs(double)
 
+
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.cdivision(True)
@@ -34,7 +35,8 @@ def pixel_map_c(np.ndarray[DTYPE_t, ndim=2] in_data, np.ndarray[ITYPE_t, ndim=1]
         out_data[yo[i], xo[i]] = in_data[yi[i], xi[i]]
         
     return True
-    
+
+
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.cdivision(True)
@@ -104,9 +106,12 @@ def interp_c(np.ndarray[DTYPE_t, ndim=1] x, np.ndarray[DTYPE_t, ndim=1] xp, np.n
         j+=1
                 
     return f
-        
+
+
 def interp_conserve(x, xp, fp, left=0., right=0.):
     """
+    interp_conserve(x, xp, fp, left=0, right=0)
+    
     Interpolate `xp`,`yp` array to the output x array, conserving flux.  
     `xp` can be irregularly spaced.
     """
@@ -134,11 +139,17 @@ def interp_conserve(x, xp, fp, left=0., right=0.):
         
     return outy
 
+
 @cython.boundscheck(False)
 @cython.cdivision(True)
 @cython.embedsignature(True)
 def integral_cumsum_c(np.ndarray[DTYPE_t, ndim=1] xp, np.ndarray[DTYPE_t, ndim=1] fp, extrapolate=0.):
+    """
+    integral_cumsum_c(xp, fp, extrapolate=True)
     
+    Cumulative trapz integration
+    
+    """
     cdef np.ndarray[DTYPE_t, ndim=1] ycumsum
     cdef long Nxp, i
     cdef double x0, x1, old
@@ -158,12 +169,15 @@ def integral_cumsum_c(np.ndarray[DTYPE_t, ndim=1] xp, np.ndarray[DTYPE_t, ndim=1
         x0 = x1
     
     return ycumsum
-    
+
+
 @cython.boundscheck(False)
 @cython.cdivision(True)
 @cython.embedsignature(True)
 def new_interp_conserve_c(np.ndarray[DTYPE_t, ndim=1] x, np.ndarray[DTYPE_t, ndim=1] xp, np.ndarray[DTYPE_t, ndim=1] fp, extrapolate=0.):
     """
+    new_interp_conserve_c(x, xp, fp, extrapolate=0)
+    
     Interpolate `xp`,`yp` array to the output x array, conserving flux.  
     `xp` can be irregularly spaced.
     """
@@ -352,16 +366,27 @@ def rebin_weighted_c(np.ndarray[DTYPE_t, ndim=1] x, np.ndarray[DTYPE_t, ndim=1] 
 
 
 def midpoint(x):
+    """
+    midpoint(x)
+    
+    Get midpoints of an array
+    """
     mp = (x[1:]+x[:-1])/2.
     mp = np.append(mp, np.array([x[0],x[-1]]))
     mp = mp[np.argsort(mp)]
     return mp
+
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.cdivision(True)
 @cython.embedsignature(True)
 def midpoint_c(np.ndarray[DTYPE_t, ndim=1] x, long N):
+    """
+    midpoint_c(x, N)
+    
+    Get midpoints of array
+    """
     cdef long i
     cdef DTYPE_t xi,xi1
     # N = len(x)
@@ -378,7 +403,8 @@ def midpoint_c(np.ndarray[DTYPE_t, ndim=1] x, long N):
     midpoint[N] = 2*x[N-1]-midpoint[N-1]
     
     return midpoint
-    
+
+
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.cdivision(True)
@@ -415,7 +441,8 @@ def prepare_nmf_amatrix(np.ndarray[DTYPE_t, ndim=1] variance, np.ndarray[DTYPE_t
                 amatrix[i,j]+=templates[i,k]*templates[j,k]/variance[k]
             
     return amatrix
-    
+
+
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.cdivision(True)
@@ -486,8 +513,8 @@ def run_nmf(np.ndarray[DTYPE_t, ndim=1] flux, np.ndarray[DTYPE_t, ndim=1] varian
         print('Iter #{0:d}, tol={1:.2e}'.format(itcount, tol))
 
     return coeffs
-    
-#    
+
+
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.cdivision(True)
