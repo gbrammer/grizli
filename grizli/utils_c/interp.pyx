@@ -478,12 +478,12 @@ def run_nmf(np.ndarray[DTYPE_t, ndim=1] flux, np.ndarray[DTYPE_t, ndim=1] varian
         tol = tolnum/toldenom;
         
         if verbose & 2:
-            print 'Iter #%d, tol=%.2e' %(itcount, tol)
+            print('Iter #{0:d}, tol={1:.2e}'.format(itcount, tol))
         
         itcount+=1
     
     if verbose & 1:
-        print 'Iter #%d, tol=%.2e' %(itcount, tol)
+        print('Iter #{0:d}, tol={1:.2e}'.format(itcount, tol))
 
     return coeffs
     
