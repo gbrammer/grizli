@@ -2081,6 +2081,7 @@ class SpectrumTemplate(object):
         return SpectrumTemplate(wave=self.wave*(1+z),
                                 flux=self.flux*scalar/(1+z)*igmz)
 
+
     def __add__(self, spectrum):
         """Add two templates together
 
@@ -2104,6 +2105,7 @@ class SpectrumTemplate(object):
         out.fwhm = spectrum.fwhm
         return out
 
+
     def __mul__(self, scalar):
         """Multiply spectrum by a scalar value
 
@@ -2119,6 +2121,7 @@ class SpectrumTemplate(object):
         out = SpectrumTemplate(wave=self.wave, flux=self.flux*scalar)
         out.fwhm = self.fwhm
         return out
+
 
     def to_fnu(self, fnu_units=FNU_CGS):
         """Make fnu version of the template.
@@ -2151,6 +2154,7 @@ class SpectrumTemplate(object):
             self.err_fnu = err_fnu.value
         else:
             self.err_fnu = None
+
 
     def integrate_filter(self, filter, abmag=False, use_wave='filter'):
         """Integrate the template through an `~eazy.FilterDefinition` filter
@@ -3103,7 +3107,12 @@ def array_templates(templates, wave=None, max_R=5000, z=0, apply_igm=False):
             flux_arr[i, :] = interp_conserve_c(wave, templates[t].wave/(1+z),
                                           templates[t].flux*(1+z))
         else:
-            flux_arr[i, :] = interp_conserve_c(wave, templates[t].wave,
+            if hasattr(templates[t], 'flux_flam'):
+                # Redshift-dependent eazy-py Template
+                flux_arr[i, :] = interp_conserve_c(wave, templates[t].wave,
+                                          templates[t].flux_flam(z=z))
+            else:
+                flux_arr[i, :] = interp_conserve_c(wave, templates[t].wave,
                                           templates[t].flux)
 
     is_line = np.array([t.startswith('line ') for t in templates])

@@ -1653,7 +1653,11 @@ class GroupFitter(object):
             if rest_template:
                 s = [ti.wave, ti.flux]
             else:
-                s = [ti.wave*(1+z), ti.flux/(1+z)*igmz]
+                if hasattr(ti, 'flux_flam'):
+                    # eazy-py Template object
+                    s = [ti.wave*(1+z), ti.flux_flam(z=z)/(1+z)*igmz]
+                else:
+                    s = [ti.wave*(1+z), ti.flux/(1+z)*igmz]
 
             for j, beam in enumerate(self.beams):
                 mask_i = beam.fit_mask.reshape(beam.sh)
