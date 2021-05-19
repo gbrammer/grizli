@@ -2033,7 +2033,11 @@ class MultiBeam(GroupFitter):
         for i, key in enumerate(templates.keys()):
             NTEMP += 1
             temp = templates[key]  # .zscale(z, 1.)
-            spectrum_1d = [temp.wave*(1+z), temp.flux/(1+z)]
+            if hasattr(temp, 'flux_flam'):
+                # eazy-py Template object
+                spectrum_1d = [temp.wave*(1+z), temp.flux_flam(z=z)/(1+z)]
+            else:
+                spectrum_1d = [temp.wave*(1+z), temp.flux/(1+z)]
 
             if z > 4:
                 try:
