@@ -14,9 +14,7 @@ def test_flt():
     import numpy as np
     
     import grizli
-    
-    reload(grizli.model); reload(grizli)
-    
+        
     ### (demo on aligned, background-subtracted FLT images)
     
     #########
