@@ -24,6 +24,12 @@ boto3
 peakutils
 extinction
 
+tqdm
+
+# Needed for template smoothing, doesn't bring whole fsps distro
+astro-sedpy
+astro-prospector
+
 sep
 # git+https://github.com/gbrammer/sep.git
 
