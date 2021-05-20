@@ -8,10 +8,9 @@ Python Environment
 provides most of the required modules listed here, including general utilities
 like `numpy`, `scipy`, and `matplotlib`, as well as astronomy tools like
 `astropy` and specific software for dealing with space-telescope data
-(`stsci.tools`, `drizzlepac`, etc.). It has been tested to run in astroconda
-with Python version ``3.5.4``.  The basic build is tested in Python ``2.7``, 
-``3.5`` and ``3.6`` with `travis <https://travis-ci.org/gbrammer/grizli>`__, 
-but the current test suite does not test much actual functionality of the 
+(`stsci.tools`, `drizzlepac`, etc.). Most development is done in a python ``3.7`` environment.  The basic build is tested in Python ``3.6``, 
+``3.7`` and ``3.8`` with the GitHub actions functionality, 
+but the current test suite does not yet test much actual functionality of the 
 code.
 
 Installation with a Conda environment
@@ -21,25 +20,51 @@ provide an automatic way of installing the required dependencies, getting
 them from `conda`, `pip`, and directly from `github` as necessary.  To use 
 this file, do the following
 
-    .. code:: bash
+.. code:: bash
 
-        cd /usr/local/share/python # or some other location, even /tmp/
+    cd /usr/local/share/python # or some other location, even /tmp/
 
-        # Fetch the grizli repo
-        git clone https://github.com/gbrammer/grizli.git
-        cd grizli
-        
-        # Generate a conda environment named "grizli-dev"
-        # (Note environment_min.yml renamed to environment.yml for >0.10.0)
-        conda env create -f environment.yml -n grizli-dev
-                
-        # Activate the environment.  This needs to be done each time you 
-        # start a new terminal, or put it in ~/.bashrc
-        source activate grizli-dev
-        
-        # Compile and install the grizli module.  Only needs to be done
-        # once or after updating the repository.
-        python setup.py install 
+    # Fetch the grizli repo
+    git clone https://github.com/gbrammer/grizli.git
+    cd grizli
+    
+    # Generate a conda environment named "grizli-dev" or anything else
+    # (Note environment_min.yml renamed to environment.yml for >0.10.0)
+    conda env create -f environment.yml -n grizli-dev
+            
+    # Activate the environment.  This needs to be done each time you 
+    # start a new terminal, or put it in ~/.bashrc
+    source activate grizli-dev
+    
+    # Compile and install the grizli module.  Only needs to be done
+    # once or after updating the repository.
+    python setup.py install 
+
+The environment can also be installed with ``pip`` and the ``requirements.txt`` file, which was added in 2021 to enable the github actions testing environment.  Here are instructions for installing with that method *instead* of the conda method above
+
+.. code:: bash
+
+    cd /usr/local/share/python # or some other location, even /tmp/
+
+    # Fetch the grizli repo
+    git clone https://github.com/gbrammer/grizli.git
+    cd grizli
+    
+    # Generate a conda environment named "grizli-dev" or anything else
+    conda env create -n grizli-dev
+            
+    # Activate the environment.  This needs to be done each time you 
+    # start a new terminal, or put it in ~/.bashrc
+    source activate grizli-dev
+    
+    # Compile and install the grizli module.  Only needs to be done
+    # once or after updating the repository.
+    pip install . -r requirements.txt
+    
+    # One last dependency that doesn't install with pip and is needed
+    # for the WFC3/IR pipeline calwf3
+    conda install hstcal
+
 
 Once you've built the code, proceed to `Set up directories and fetch config files`_.
 
@@ -137,13 +162,12 @@ but now appears to be trivial under conda:
 
         conda install shapely
 
-`hsaquery <https://github.com/gbrammer/esa-hsaquery>`__ - Python tools for 
-querying exposure-level data in the 
-`ESA Hubble Science Archive <http://archives.esac.esa.int/ehst/#search>`__.:
+`mastquery <https://github.com/gbrammer/mastquery>`__ - Python tools for 
+querying exposure-level data from the MAST archive:
 
     .. code:: bash
 
-        pip install hsaquery
+        pip install git+https://github.com/gbrammer/mastquery
         
                 
 Build ``grizli``
