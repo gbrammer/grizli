@@ -50,7 +50,7 @@ def get_visit_files():
     from grizli.aws import db
 
     engine = db.get_db_engine()
-    fields = db.from_sql("select field_root, a_wfc3 from charge_fields where log LIKE 'Finished%%'", engine=engine)
+    fields = db.from_sql("select field_root from charge_fields where log LIKE 'Finished%%'", engine=engine)
 
     s3 = boto3.resource('s3')
     bkt = s3.Bucket('grizli-v1')
@@ -58,20 +58,22 @@ def get_visit_files():
     for i, field in enumerate(fields['field_root']):
         s3_file = '{0}_visits.npy'.format(field)
         if not os.path.exists(s3_file):
-            s3_path = 'Pipeline/{0}/Prep'.format(field)
+            s3_path = f'Pipeline/{field}/Prep'
             try:
                 bkt.download_file(s3_path+'/'+s3_file, s3_file,
                               ExtraArgs={"RequestPayer": "requester"})
                 print(i, s3_file)
             except:
-                print(i, 'Download failed: {0}'.format(field))
-
+                print(i, f'Download failed: {field}')
+        else:
+            print(f'Skip {field}')
+    
 
 def make_visit_fits():
     import glob
     import numpy as np
     from grizli import utils
-
+    
     visit_files = glob.glob('[egu]*visits.npy')
     visit_files.sort()
 
@@ -87,21 +89,31 @@ def make_visit_fits():
     all_visits = []
     products = []
 
-    for extra in ['candels-july2019_visits.npy', 'grizli-cosmos-v2_visits.npy']:
+    extra_visits = ['candels-july2019_visits.npy', 'grizli-cosmos-v2_visits.npy']
+    extra_visits = ['candels-july2019_visits.npy', 'cosmos-dash-apr20_visits.npy']
+    
+    for extra in extra_visits:
 
         extra_visits = np.load(extra, allow_pickle=True)[0]
-        extra_products = [v['product'] for v in extra_visits]
+        
+        if 'cosmos-dash' in extra:
+            extra_products = [v['product'] + '-'+v['files'][0][:6] for v in extra_visits]
+        else:
+            extra_products = [v['product'] for v in extra_visits]
+        
         for i, p in enumerate(extra_products):
             if p not in products:
                 parent = p.split('_')[0]
-                print(parent, p)
+                #print(parent, p)
                 v = extra_visits[i]
                 v['parent'] = parent
                 v['xproduct'] = v['product']
                 v['parent_file'] = extra  # 'candels-july2019_visits.npy'
                 all_visits.append(v)
                 products.append(p)
-
+            else:
+                print('Skip: ', p, v['parent'])
+                
     # COSMOS footprint
     cosmos_fp = None
     for i, v in enumerate(extra_visits):
@@ -121,7 +133,7 @@ def make_visit_fits():
                 print('No footprint: {0}'.format(v['product']))
             
             if file.startswith('j'):
-                vprod = v['product'] + v['files'][0]
+                vprod = v['product'] + '-' + v['files'][0]
             else:
                 vprod = v['product']
                 
@@ -168,7 +180,7 @@ def make_visit_fits():
 
     # WFC3/IR copied to "Exposures" paths in CANDELS fields
     for v in all_visits:
-        if v['parent_file'] == 'grizli-cosmos-v2_visits.npy':
+        if v['parent_file'] in ['grizli-cosmos-v2_visits.npy', 'cosmos-dash-apr20_visits.npy']:
             continue
 
         if v['parent_file'].startswith('j'):
@@ -203,6 +215,7 @@ def make_visit_fits():
     root = 'grizli-v1-19.12.04'
     root = 'grizli-v1-19.12.05'
     root = 'grizli-v1-20.10.12'
+    root = 'grizli-v1-21.05.20'
 
     tab.write(root+'_visits.fits', overwrite=True)
     np.save(root+'_visits.npy', [all_visits])
@@ -352,7 +365,8 @@ def group_by_filter():
     master = 'grizli-v1-19.12.04'
     master = 'grizli-v1-19.12.05'
     master = 'grizli-v1-20.10.12'
-
+    master = 'grizli-v1-21.05.20'
+    
     tab = utils.read_catalog('{0}_visits.fits'.format(master))
     all_visits = np.load('{0}_visits.npy'.format(master), allow_pickle=True)[0]
 
@@ -396,6 +410,8 @@ def group_by_filter():
         print('{0:6} {1:>3d} {2:>4d} ({3:>4d})'.format(filt, mat.sum(), len(groups[filt]['files']), len(np.unique(groups[filt]['files']))))
 
     np.save('{0}_filter_groups.npy'.format(master), [groups])
+
+    os.system('aws s3 sync --exclude "*" --include "{0}*" ./ s3://grizli-v1/Mosaics/ --acl public-read'.format(master))
 
 # RGB_PARAMS = {'xsize':4, 'rgb_min':-0.01, 'verbose':True, 'output_dpi': None, 'add_labels':False, 'output_format':'png', 'show_ir':False, 'scl':2, 'suffix':'.rgb', 'mask_empty':False}
 
@@ -490,7 +506,7 @@ def segmentation_figure(label, cat, segfile):
     th.close()
 
 
-def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixscale=0.1, size=10, wcs=None, pixfrac=0.33, kernel='square', theta=0, half_optical_pixscale=True, filters=['f160w', 'f140w', 'f125w', 'f105w', 'f110w', 'f098m', 'f850lp', 'f814w', 'f775w', 'f606w', 'f475w', 'f555w', 'f600lp', 'f390w', 'f350lp'], skip=None, remove=True, rgb_params=RGB_PARAMS, master='grizli-jan2019', aws_bucket='s3://grizli/CutoutProducts/', scale_ab=21, thumb_height=2.0, sync_fits=True, subtract_median=True, include_saturated=True, include_ir_psf=False, show_filters=['visb', 'visr', 'y', 'j', 'h'], combine_similar_filters=True, single_output=True, aws_prep_dir=None, make_segmentation_figure=False, get_dict=False, dryrun=False, thumbnail_ext='png', **kwargs):
+def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixscale=0.1, size=10, wcs=None, pixfrac=0.33, kernel='square', theta=0, half_optical_pixscale=True, filters=['f160w', 'f140w', 'f125w', 'f105w', 'f110w', 'f098m', 'f850lp', 'f814w', 'f775w', 'f606w', 'f475w', 'f555w', 'f600lp', 'f390w', 'f350lp'], skip=None, remove=True, rgb_params=RGB_PARAMS, master='grizli-v1-19.12.04', aws_bucket='s3://grizli/CutoutProducts/', scale_ab=21, thumb_height=2.0, sync_fits=True, subtract_median=True, include_saturated=True, include_ir_psf=False, show_filters=['visb', 'visr', 'y', 'j', 'h'], combine_similar_filters=True, single_output=True, aws_prep_dir=None, make_segmentation_figure=False, get_dict=False, dryrun=False, thumbnail_ext='png', **kwargs):
     """
     label='cp561356'; ra=150.208875; dec=1.850241667; size=40; filters=['f160w','f814w', 'f140w','f125w','f105w','f606w','f475w']
 
@@ -501,6 +517,10 @@ def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixsca
         'candels-july2019': CANDELS fields other than COSMOS
         'grizli-v1': First processing of the Grizli CHArGE dataset
         'grizli-v1-19.12.04': Updated CHArGE fields
+            ** this is now a copy from 21.05.20 so that the old lambda
+               function can catch it **
+
+        'grizli-v1-21.05.20': ACS fields + new cosmos
 
     """
     import glob
@@ -576,6 +596,9 @@ def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixsca
     elif master == 'grizli-v1-19.12.05':
         parent = 's3://grizli-v1/Mosaics/'
         bkt = s3.Bucket('grizli-v1')
+    elif master == 'grizli-v1-latest':
+        parent = 's3://grizli-v1/Mosaics/'
+        bkt = s3.Bucket('grizli-v1')        
     else:
         # Run on local files, e.g., "Prep" directory
         parent = None
