@@ -88,7 +88,12 @@ def galfit_deconvolve(model_hdu, residuals, rms=None, mask=None, oversample=8, c
     _, ydata, _, _ = running_median(Rso,
                 (data)[mask].flatten()[so].astype(np.float)-sky,
                 bins=xprof, use_median=False, y_func=y_func, integrate=integ)
-
+    
+    # Convolved model
+    _, ymodel, _, _ = running_median(Rso,
+                (model_hdu.data)[mask].flatten()[so].astype(np.float),
+                bins=xprof, use_median=False, y_func=y_func, integrate=integ)
+    
     # Sersic profile
     _, yprof, _, _ = running_median(Rso,
                 (prof)[mask].flatten()[so].astype(np.float),
@@ -112,10 +117,29 @@ def galfit_deconvolve(model_hdu, residuals, rms=None, mask=None, oversample=8, c
 
         yrms = np.sqrt(yv)/yn
         im_norm = rms
+        
+        # weighted
+        xmx, ynum_model, yvs, yn = running_median(Rso,
+                (model_hdu.data/rms**2)[mask].flatten()[so].astype(np.float),
+                bins=xprof, use_median=False, y_func=np.sum)
+
+        xmx, ynum, yvs, yn = running_median(Rso,
+                (data/rms**2)[mask].flatten()[so].astype(np.float),
+                bins=xprof, use_median=False, y_func=np.sum)
+                
+        xmx, yden, yvs, yn = running_median(Rso,
+                (1./rms**2)[mask].flatten()[so].astype(np.float),
+                bins=xprof, use_median=False, y_func=np.sum)
+        
+        yweight = ynum/yden
+        yweight_model = ynum_model/yden
+        yweight_err = 1./np.sqrt(yden)
+        
     else:
         yrms = ys
         im_norm = 1
-
+        yweight = None
+        
     dx = np.diff(xprof)
     xpix = xprof[1:]-dx/2.
 
@@ -142,7 +166,13 @@ def galfit_deconvolve(model_hdu, residuals, rms=None, mask=None, oversample=8, c
     tab['ydeconv'] = ydeconv
     tab['yrms'] = yrms
     tab['ydata'] = ydata
-
+    tab['ymodel'] = ymodel
+    
+    if yweight is not None:
+        tab['yweight'] = yweight
+        tab['yweight_model'] = yweight_model
+        tab['yweight_err'] = yweight_err
+        
     tab.meta['total_flux'] = total
     for k in params:
         tab.meta[k] = params[k]
