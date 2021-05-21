@@ -1631,22 +1631,24 @@ def add_to_charge():
     
     df.to_sql('charge_fields', engine, index=False, if_exists='append', method='multi')
 
-def add_by_footprint(footprint_file='j141156p3415_footprint.fits'):
+def add_by_footprint(footprint_file='j141156p3415_footprint.fits', engine=None):
     
     import pandas as pd
     from grizli.aws import db
     
     ## By footprint
-    engine = db.get_db_engine()
+    if engine is None:
+        engine = db.get_db_engine()
 
-    ch = pd.read_sql_query('select * from charge_fields', engine)
+    #ch = pd.read_sql_query('select * from charge_fields', engine)
     
     f = pd.read_sql_query('select distinct field_root from charge_fields', engine)
     
     fp = utils.read_catalog(footprint_file)
     
     root = fp.meta['NAME']
-    if root in f['field_root']:
+    if root in f['field_root'].tolist():
+        print(f'Field found: {root}')
         return False
         
     df = pd.DataFrame()
@@ -1666,9 +1668,44 @@ def add_by_footprint(footprint_file='j141156p3415_footprint.fits'):
         df[k] = ' '.join([t for t in np.unique(fp[k])])
     
     #df['proposal_id'] = ' '.join([t for t in np.unique(fp['target'])])
-    
+    print(f'Send {root} to db.charge_fields')
     df.to_sql('charge_fields', engine, index=False, if_exists='append', method='multi')
     
+def update_charge_fields():
+    """
+    """
+    from grizli.aws import db
+    
+    files = [f.replace('.png','.fits') for f in glob.glob('j*footprint.png')]
+    files.sort()
+    
+    for file in files:
+        db.add_by_footprint(file, engine=engine)
+    
+    orig = db.from_sql('select field_root, log from charge_fields', engine)
+    gtab = db.from_sql('select field_root, log from charge_fields', engine)
+    
+    bucket = 'grizli-v1'
+    
+    for st, dir in enumerate(['Start','Failed','Finished']):
+        print(dir)
+        os.system('aws s3 ls s3://{0}/Pipeline/Log/{1}/ | sed "s/.log//" > /tmp/{1}'.format(bucket, dir))
+        fin = utils.read_catalog(f'/tmp/{dir}', format='ascii')
+        print('{0} {1}'.format(dir, len(fin)))
+        for i, r in enumerate(fin['col4']):
+            ix = gtab['field_root'] == r
+            if ix.sum() > 0:
+                gtab['log'][ix] = '{0} {1}-{2}'.format(dir, fin['col1'][i], fin['col2'][i])
+    
+    # update the table
+    df = gtab[~gtab['log'].mask].to_pandas()
+    df.to_sql('log_tmp', engine, index=False, if_exists='replace', method='multi')
+    
+    sql = "UPDATE charge_fields ch SET log = tmp.log FROM log_tmp tmp WHERE tmp.field_root = ch.field_root"
+
+    engine.execute(sql)
+
+
 def overview_table():
     """
     Generate a new overview table with the redshift histograms
