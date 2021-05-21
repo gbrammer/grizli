@@ -175,9 +175,9 @@ def create_path_dict(root='j142724+334246', home='$PWD', raw=None, prep=None, ex
         {home}/{root}/Thumbnails
     
     If ``home`` specified as '$PWD', then will be calculated from 
-    ``os.getcwd``.
+    `os.getcwd`.
     
-    Only generates values for keys not already specified in ``paths``.
+    Only generates values for keys not already specified in `paths`.
     
     """
     import copy
@@ -266,6 +266,7 @@ def go(root='j010311+131615',
        extract_args=args['extract_args'],
        make_thumbnails=True,
        thumbnail_args=args['thumbnail_args'],
+       make_final_report=True,
        get_dict=False,
        kill='',
        **kwargs
@@ -276,7 +277,7 @@ def go(root='j010311+131615',
     Parameters
     ----------
     root : str
-        Rootname of the `~hsaquery` file.
+        Rootname of the `mastquery` file.
 
     extract_maglim : [min, max]
         Magnitude limits of objects to extract and fit.
@@ -800,9 +801,10 @@ def go(root='j010311+131615',
         grism_files = glob.glob('*GrismFLT.fits')
         grism_files.sort()
 
-        catalog = glob.glob(f'{root}-*.cat.fits')[0]
-        seg_file = glob.glob(f'{root}-*_seg.fits')[0]
-
+        seg_file = glob.glob(f'{root}-[fi]*_seg.fits')[0]
+        #catalog = glob.glob(f'{root}-*.cat.fits')[0]
+        catalog = seg_file.replace('_seg.fits','.cat.fits')
+        
         grp = multifit.GroupFLT(grism_files=grism_files, direct_files=[], 
                                 ref_file=None, seg_file=seg_file, 
                                 catalog=catalog, cpu_count=-1, sci_extn=1, 
@@ -819,6 +821,9 @@ def go(root='j010311+131615',
         auto_script.summary_catalog(field_root=root, dzbin=0.01,
                                     use_localhost=False,
                                     filter_bandpasses=None)
+
+    if make_final_report:
+        make_report(root, make_rgb=True)
 
 
 def make_directories(root='j142724+334246', HOME_PATH='$PWD', paths={}):
@@ -2192,7 +2197,7 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
 
     if force_cat is None:
         #catalog = '{0}-ir.cat.fits'.format(field_root)
-        catalog = glob.glob('{0}-*.cat.fits'.format(field_root))[0]
+        catalog = glob.glob('{0}-ir.cat.fits'.format(field_root))[0]
     else:
         catalog = force_cat
 
@@ -4754,7 +4759,10 @@ def make_report(root, gzipped_links=True, xsize=18, output_dpi=None, make_rgb=Tr
         field_rgb(root, HOME_PATH=None, xsize=xsize, output_dpi=output_dpi, ds9=None, scl=2, suffix='.rgb', timestamp=True, mw_ebv=mw_ebv)
         for filter in filters:
             field_rgb(root, HOME_PATH=None, xsize=18, ds9=None, scl=2, force_rgb=[filter, 'sum', 'sum'], suffix='.'+filter, timestamp=True)
-
+    
+    ##
+    ## Mosaic table
+    ##
     rows = []
     for filter in filters:
         os.system('grep -e " 0 " -e "radec" *{0}*wcs.log > /tmp/{1}.log'.format(filter, root))
@@ -4784,14 +4792,13 @@ def make_report(root, gzipped_links=True, xsize=18, output_dpi=None, make_rgb=Tr
             row = [filter, '--', '--', '--', 0., 0, wcs, '--']
 
         rows.append(row)
-
-    #
+        
     tab = utils.GTable(rows=rows, names=['filter', 'FITS', 'naxis', 'crval', 'exptime', 'ndrizim', 'wcs_log', 'img'], dtype=[str, str, str, str,  float, int, str, str])
     tab['exptime'].format = '.1f'
 
     tab.write_sortable_html('{0}.summary.html'.format(root), replace_braces=True, localhost=False, max_lines=500, table_id=None, table_class='display compact', css=None, filter_columns=[], buttons=['csv'], toggle=False, use_json=False)
 
-    # Grism
+    ## Grism figures
     column_files = glob.glob('*column.png')
     if len(column_files) > 0:
         column_files.sort()
