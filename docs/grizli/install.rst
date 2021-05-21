@@ -65,6 +65,20 @@ The environment can also be installed with ``pip`` and the ``requirements.txt`` 
     # for the WFC3/IR pipeline calwf3
     conda install hstcal
 
+If you are planning to run simultaneous fits to grism spectra plus photometry using the `eazy-py <https://github.com/gbrammer/eazy-py`_ connection, install ``eazy-py`` from the repository to ensure that you get its dependencies.
+
+.. code:: bash
+
+    cd /usr/local/share/python # location from above
+    source activate grizli-dev # or whatever was chosen above
+    
+    # Fetch the eazy-py repo
+    git clone https://github.com/gbrammer/eazy-py.git
+    cd eazy-py
+    
+    # Only needs to be done once or after updating the repository.
+    pip install . -r requirements.txt
+
 
 Once you've built the code, proceed to `Set up directories and fetch config files`_.
 
