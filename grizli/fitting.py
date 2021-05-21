@@ -40,6 +40,43 @@ except:
 
 
 def run_all_parallel(id, get_output_data=False, args_file='fit_args.npy', protect=True, **kwargs):
+    """
+    Wrapper function for `grizli.fitting.run_all` that preloads all 
+    keyword options from a stored file.
+    
+    Parameters
+    ----------
+    id : int
+        Object id
+    
+    get_output_data : bool
+        Return the data produced by `~grizli.fitting.run_all` rather than just 
+        a simple status indicator
+    
+    args_file : str
+        Name of the `numpy` file contaning the fit keywords.  These include 
+        `root` and `group_name` used for finding the "beams.fits" files for 
+        the given `id` (see `~grizli.fitting.run_all`).
+        
+        Any additional keywords passed to this function will override the 
+        defaults from `args_file`.
+    
+    protect : bool
+        Run the fitter in a ``try/except`` clause so that it doesn't kill 
+        the runtime execution for e.g. a list of `id`.  However, with this 
+        set it's much harder to figure out where a given fit failed, so turn 
+        it off to get the full exception traceback
+    
+    Returns
+    -------
+    id, status, t1-t0 : int, bool, float
+        The input `id`, status flag and execution time if
+        ``get_output_data=False``.
+    
+    If ``get_output_data==True``, then return everything output by 
+    `~grizli.fitting.run_all` (beams files, tables, etc.)
+    
+    """
     import numpy as np
     from grizli.fitting import run_all
     from grizli import multifit
@@ -84,20 +121,232 @@ def run_all_parallel(id, get_output_data=False, args_file='fit_args.npy', protec
 
     return id, status, t1-t0
 
+
 DEFAULT_LINELIST = ['Lya', 'OII', 'Hb', 'OIII', 'Ha',
                      'Ha+NII', 'SII', 'SIII']
                           
 def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter=['nnls', 'bounded'], group_name='grism', fit_stacks=True, only_stacks=False, prior=None, fcontam=0.2, pline=PLINE, min_line_sn=4, mask_sn_limit=np.inf, fit_only_beams=False, fit_beams=True, root='*', fit_trace_shift=False, phot=None, use_phot_obj=True, phot_obj=None, verbose=True, scale_photometry=False, show_beams=True, scale_on_stacked_1d=True, use_cached_templates=True, loglam_1d=True, overlap_threshold=5, MW_EBV=0., sys_err=0.03, huber_delta=4, get_student_logpdf=False, get_dict=False, bad_pa_threshold=1.6, units1d='flam', redshift_only=False, line_size=1.6, use_psf=False, get_line_width=False, sed_args={'bin': 1, 'xlim': [0.3, 9]}, get_ir_psfs=True, min_mask=0.01, min_sens=0.02, mask_resid=True, save_stack=True,     full_line_list=DEFAULT_LINELIST,  get_line_deviations=True, bounded_kwargs=BOUNDED_DEFAULTS, write_fits_files=True, save_figures=True, fig_type='png', **kwargs):
-    """Run the full procedure
+    """Run the full template-fitting procedure
 
     1) Load MultiBeam and stack files
     2) ... tbd
-
-    fwhm=1200; zr=[0.65, 1.6]; dz=[0.004, 0.0002]; group_name='grism'; fit_stacks=True; prior=None; fcontam=0.2; mask_sn_limit=3; fit_beams=True; root=''
     
-    Returns:
-    =======
-    mb, st, fit, tfit, line_hdu
+    Parameters
+    ----------
+    id : int
+        Object ID in the internal catalogs.  This is generally an `int`, but 
+        in principle could be a `str` or something else.
+    
+    t0 : dict
+        Dictionary of `~grizli.utils.SpectrumTemplate` objects used for the 
+        redshift fits.  Generally these will have fixed line ratios to avoid 
+        unphysical line degeneracies (e.g., very strong [SII] without 
+        H-alpha).
+    
+        If ``None``, then the templates are generated with 
+        
+        >>> t0 = grizli.utils.load_templates(line_complexes=True, fsps_templates=True, fwhm=fwhm)
+        
+    t1 : dict
+        Dictionary of `~grizli.utils.SpectrumTemplate` objects used for the 
+        final fit at the best-fit redshift.  Generally these will be 
+        separate continuum and individual line templates so that the line
+        fluxes are determined freely (which are then also needed if you 
+        want to make the drizzled narrowband emission line maps).
+                
+        If ``None``, then the templates are generated with 
+        
+        >>> t1 = grizli.utils.load_templates(line_complexes=False, fsps_templates=True, fwhm=fwhm)
+               
+        .. note:: As of `66a3ec5 <https://github.com/gbrammer/grizli/commit/588ad9e174aac5eb5607b78ae0268e3193e0d1f1>`_ all templates can be `eazy.templates.Template` objects.
+        
+    fwhm : float
+        Line FWHM passed to `~grizli.utils.load_templates` if `t0` or `t1` not
+        specified.
+    
+    zr : [float, float], [float], or 0
+        Redshift range to fit.
+        
+        - [z1, z2] - fit on a logarithmic grid between ``z1`` and ``z2`` with
+          steps specified in `dz`
+        - [zfix] - fit templates at a specified value
+        - 0 - fit stellar templates only
+        
+    dz : [float, float]
+        Logarithmic step size (1+z) of redshift grid.  See 
+        `~grizli.utils.log_zgrid`.
+   
+    fitter : [str, str]
+        Least squares optimization method ('nnls','lstsq','bounded'). 
+        The first option is used for the redshift fit with the `t0` templates
+        and the second is used for the final fit with the `t1` templates.
+        
+        - nnls:  Generally SPS continuum templates should be fit with ``nnls`` 
+          to enforce physical template combinations.  
+        - bounded: Enforces non-negative continuum templates but allows line
+          templates (with a name starting with ``line [space]``) to be 
+          negative.  The bounded fits are controlled with `bounded_kwargs`
+          and the flux limits set in the global parameter 
+          ``grizli.fitting.LINE_BOUNDS``.
+        - lstsq: Fit with regular least squares, e.g., for PCA templates that
+          can have negative coefficients (e.g., 
+          `~grizli.utils.load_sdss_pca_templates`).
+
+    bounded_kwargs : dict
+        Keywords passed to `scipy.optimize.lsq_linear` for 'bounded' fits.
+    
+    group_name : str
+        Passed to `~grizli.multifit.MultiBeam` on initialization
+    
+    root : str
+        Basename `~grizli.multifit.MultiBeam` FITS 
+        filenames to search for, e.g., to concatenate separate G141 and G102 
+        files of a single object:  
+        
+        >>> mb_files = glob.glob(f'{root}_{id:05d}.beams.fits')
+        
+    fit_stacks : bool
+        Fit redshifts on the stacked spectra, which can be much faster than 
+        for the separate "beams" fits, but where the model generation isn't
+        as robust.  *This is generally deprecated, but should still run*.
+        
+    only_stacks : bool
+        Only fit the stacks.
+        
+    prior : None, (array, array)
+        Redshift prior (z, pz) passed to 
+        `~grizli.fitting.GroupFitter.xfit_redshift`.
+        
+    fcontam, min_mask, min_sens, mask_resid : float, float, float, bool
+        Contamination weighting passed to `~grizli.multifit.MultiBeam`
+        
+    pline : dict
+        Parameters for drizzled line maps.
+        
+    min_line_sn : float
+        If finite, then pass to `~grizli.multifit.MultiBeam.drizzle_fit_lines` 
+        to determine which line maps to create.
+        
+    mask_sn_limit : float
+        SN limit to pass to `~grizli.multifit.MultiBeam.drizzle_fit_lines`
+        
+    fit_only_beams : bool
+        If True, only fit with `~grizli.multifit.MultiBeam` objects.
+        
+    fit_beams : bool
+        Fit with `~grizli.multifit.MultiBeam` objects.
+        
+    fit_trace_shift : bool
+        Fit for shifts of the traces fo each group oof beams.
+        
+    phot : None, dict
+        Photometry dictionary passed to 
+        `~grizli.fitting.GroupFitter.set_photometry`
+        
+    use_phot_obj : bool
+        Use `phot_obj` if it is available.  
+        
+    phot_obj : None, `~grizli.pipeline.photoz.EazyPhot`
+        Catalog object for automatically generating `phot` dictionaries 
+        
+    verbose : bool
+        Some control over the runtime verbosity
+        
+    scale_photometry : bool
+        If photometry is available, try to normalize the spectra and 
+        photometry.
+        
+    show_beams, scale_on_stacked_1d, loglam_1d : bool, bool
+        Passed to `~grizli.fitting.GroupFitter.xmake_fit_plot` for the final
+        redshift fit plot.
+            
+    use_cached_templates : bool
+        Passed to `~grizli.fitting.GroupFitter.xfit_at_z`
+        
+    overlap_threshold : float
+        Parameter for `~grizli.stack.StackFitter` when fitting on stacks.
+        
+    MW_EBV : float
+        Galactic extinction E(B-V) (mag)
+        
+    sys_err : float
+        Systematic error used for the spectra and photometry,  multiplied to 
+        the flux densities and added in quadrature to the nominal 
+        uncertainties.
+        
+    huber_delta : float
+        Passed to `~grizli.fitting.GroupFitter.xfit_at_z` for using a Huber
+        loss function.
+        
+    get_student_logpdf : bool
+        Use Student-t likelihood on `~grizli.fitting.GroupFitter.redshift_fit`
+        
+    get_dict : bool
+        Don't actually run anything, just return a dictionary with all of
+        the keyword parameters passed to the function
+        
+    bad_pa_threshold : float
+        Threshold for identifying bad PAs when using 
+        `~grizli.stack.StackFitter` objects (not beams)
+        
+    units1d : str
+        Not used
+        
+    redshift_only : bool
+        Just run the redshift fit, don't drizzle the line maps
+        
+    line_size : float
+        Cutout size in arcsec of the line map figures.
+        
+    use_psf : bool
+        Initialize the `~grizli.multifit.MultiBeam` objects with ``psf=True``
+        to fit the morphology using the `~grizli.utils.EffectivePSF` models.
+        
+    get_line_width : bool
+        Try to fit for emission line velocity widths (developmental)
+        
+    sed_args : dict
+        Keyword arguments passed to `~grizli.fitting.full_sed_plot` when 
+        photometry + spectra are available
+    
+    get_ir_psfs : bool
+        Include PSF extensions in the drizzled line maps derived from 
+        the `~grizli.utils.EffectivePSF` models.
+        
+    save_stack : bool
+        Generate a ``stack.fits`` file from the beams fit
+        
+    full_line_list : list
+        Line list passed to `~grizli.fitting.show_drizzled_lines` to determine
+        which lines are always included in the drizzled line maps.
+    
+    get_line_deviations : bool
+        Check plausibility of fit coefficients with
+        `~grizli.fitting.GroupFitter.check_tfit_coeffs`
+        
+    write_fits_files : bool
+        Save 'full.fits' and 'stack.fits' files 
+        
+    save_figures, fig_type : bool, str
+        Save diagnostic figure files with extension `fig_type` 
+
+    Returns
+    -------
+    mb : `~grizli.multifit.MultiBeam`
+        The beams object used for the redshift / template fits
+        
+    st : `~grizli.stack.StackFitter`
+        The stacked spectrum object generated from the 'beams'
+        
+    fit : `astropy.table.Table`
+        Table with the fit results
+        
+    tfit : dict
+        Various parameters of the template fit at the final redshift
+        
+    line_hdu : `~astropy.io.fits.HDUList`
+        Drizzled line maps
+        
     """
     import glob
     import matplotlib.pyplot as plt
@@ -594,10 +843,57 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
 def full_sed_plot(mb, tfit, zfit=None, bin=1, minor=0.1, save='png', sed_resolution=180, photometry_pz=None, zspec=None, spectrum_steps=False, xlim=[0.3, 9], **kwargs):
     """
     Make a separate plot showing photometry and the spectrum
+    
+    Parameters
+    ----------
+    mb : `~grizli.multifit.MultiBeam`
+        Object containing the beams spectra.
+    
+    tfit : dict
+        Dictionary of fit results (templates, coefficients, etc) from 
+        `~grizli.fitting.GroupFitter.template_at_z`
+    
+    zfit : `~astropy.table.Table`
+        Redshift fit information used to draw p(z) panel (this is `fit` 
+        as output by `~grizli.fitting.run_all`)
+    
+    bin : float
+        Binning factor relative to nominal spectral sampling of each grism
+    
+    minor : float
+        Ticks on wavelength axis (microns)
+    
+    save : str
+        Extension of figure file to save
+    
+    sed_resolution : float
+        Smooth the 1D template before plotting with resolution R = lam/dlam
+    
+    photometry_pz : (float, float)
+        p(z) for the photometry fit alone, as output by, e.g., `eazy`.
+    
+    zspec : float
+        (external) spectroscopic redshift that will be indicated on the plot
+    
+    spectrum_steps : bool
+        Plot grism spectra as steps rather than scatter points
+    
+    xlim : (float, float)
+        Wavelength limits (microns)
+    
+    Returns
+    -------
+    fig : `matplotlib.figure.Figure`
+        The figure object
+        
     """
     #import seaborn as sns
-    import prospect.utils.smoothing
-
+    try:
+        import prospect.utils.smoothing
+        has_prospect = True
+    except:
+        has_prospect = False
+        
     import matplotlib.pyplot as plt
     from matplotlib.ticker import MultipleLocator
     import matplotlib.gridspec as gridspec
@@ -661,8 +957,11 @@ def full_sed_plot(mb, tfit, zfit=None, bin=1, minor=0.1, save='png', sed_resolut
     # Photometry SED
     ax1.errorbar(np.log10(mb.photom_pivot[photom_mask]/1.e4), (mb.photom_flam/mb.photom_ext_corr)[photom_mask]/1.e-19, (mb.photom_eflam/mb.photom_ext_corr)[photom_mask]/1.e-19, color='k', alpha=0.6, marker='s', linestyle='None', zorder=30)
 
-    sm = prospect.utils.smoothing.smoothspec(tfit['line1d'].wave, tfit['line1d'].flux, resolution=sed_resolution, smoothtype='R')  # nsigma=10, inres=10)
-
+    if has_prospect:
+        sm = prospect.utils.smoothing.smoothspec(tfit['line1d'].wave, tfit['line1d'].flux, resolution=sed_resolution, smoothtype='R')  # nsigma=10, inres=10)
+    else:
+        sm = tfit['line1d']
+        
     ax1.scatter(np.log10(mb.photom_pivot[photom_mask]/1.e4), A_model/1.e-19, color='w', marker='s', s=80, zorder=10)
     ax1.scatter(np.log10(mb.photom_pivot[photom_mask]/1.e4), A_model/1.e-19, color=sns_colors[4], marker='s', s=20, zorder=11)
     yl1 = ax1.get_ylim()
@@ -688,7 +987,11 @@ def full_sed_plot(mb, tfit, zfit=None, bin=1, minor=0.1, save='png', sed_resolut
         ax2.errorbar(sp[g]['wave'][clip]/1.e4, (sp[g]['flux']/spf[g]['flux']/scale)[clip]/1.e-19, (sp[g]['err']/spf[g]['flux']/scale)[clip]/1.e-19, marker='.', color='k', alpha=0.5, linestyle='None', elinewidth=0.5, zorder=11)
 
         if spectrum_steps:
-            ax2.plot(sp[g]['wave']/1.e4, spm[g]['flux']/spf[g]['flux']/1.e-19, color=sns_colors[4], linewidth=2, alpha=0.8, zorder=10, linestyle='steps-mid')
+            try:
+                ax2.plot(sp[g]['wave']/1.e4, spm[g]['flux']/spf[g]['flux']/1.e-19, color=sns_colors[4], linewidth=2, alpha=0.8, zorder=10, linestyle='steps-mid')
+            except:
+                ax2.step(sp[g]['wave']/1.e4, spm[g]['flux']/spf[g]['flux']/1.e-19, color=sns_colors[4], linewidth=2, alpha=0.8, zorder=10)
+                
         else:
             ax2.plot(sp[g]['wave']/1.e4, spm[g]['flux']/spf[g]['flux']/1.e-19, color=sns_colors[4], linewidth=2, alpha=0.8, zorder=10, marker='.')
 
@@ -1181,11 +1484,11 @@ def refit_beams(root='j012017+213343', append='x', id=708, keep_dict={'G141': [2
     id : int
         Object ID.  The input filename is built like
 
-           >>> beams_file = '{0}_{1:05d}.beams.fits'.format(root, id)
+           >>> beams_file = f'{root}_{id:05d}.beams.fits'
 
     keep_dict : bool
         Dictionary of the PAs/grisms to keep.  (See the
-        `~grizli.multifit.MultiBeam.PA` attribute.)
+        `grizli.multifit.MultiBeam.PA` attribute.)
 
     poly_order : int
         Order of the polynomial to fit.
@@ -1253,15 +1556,9 @@ def refit_beams(root='j012017+213343', append='x', id=708, keep_dict={'G141': [2
 
 
 class GroupFitter(object):
-    """Combine stack.StackFitter and MultiBeam fitting into a single object
-
-    Will have to match the attributes between the different objects, which
-    is already close.
+    """Base class for `~grizli.stack.StackFitter` and `~grizli.multifit.MultiBeam` spectrum fitting objects
     """
-
-    def _test(self):
-        print(self.Ngrism)
-
+    
     def _get_slices(self, masked=False):
         """Precompute array slices for how the individual components map into the single combined arrays.
 
@@ -1296,6 +1593,7 @@ class GroupFitter(object):
 
         return slices
 
+
     def _update_beam_mask(self):
         """
         Compute versions of the masked arrays
@@ -1310,17 +1608,21 @@ class GroupFitter(object):
         else:
             self.Nspec = self.Nmask
 
+
     def _init_background(self, masked=True):
         """Initialize the (flat) background model components
 
         Parameters
         ----------
-        None :
+        masked : bool
+            If true, output array has size of unmasked pixels
 
         Returns
         -------
         A_bg : `~numpy.ndarray`
-
+            Array with dimensions (``N``, ``Nmask``) (masked=True) or 
+            (``N``, ``Ntot``) (masked=False) for fitting a background
+            component
         """
         if masked:
             A_bg = np.zeros((self.N, self.Nmask))
@@ -1333,7 +1635,13 @@ class GroupFitter(object):
 
         return A_bg
 
+
     def get_SDSS_photometry(self, bands='ugriz', templ=None, radius=2, SDSS_CATALOG='V/147/sdss12', get_panstarrs=False):
+        """
+        Try too get SDSS photometry from `astroquery`
+        
+        (developmental)
+        """
         #from astroquery.sdss import SDSS
         #from astropy import coordinates as coords
         import astropy.units as u
@@ -1351,13 +1659,6 @@ class GroupFitter(object):
         if get_panstarrs:
             SDSS_CATALOG = 'II/349'
             bands = 'grizy'
-
-        # pos = coords.SkyCoord(self.ra*u.deg, self.dec*u.deg, frame='icrs')
-        # fields = ['ra','dec','modelMag_r', 'modelMagErr_r']
-        # for b in bands:
-        #     fields.extend(['modelFlux_'+b, 'modelFluxIvar_'+b])
-        #
-        # xid = SDSS.query_region(pos, photoobj_fields=fields, spectro=False, radius=radius*u.arcsec)
 
         from astroquery.vizier import Vizier
         import astropy.units as u
@@ -1381,10 +1682,6 @@ class GroupFitter(object):
         for ib, b in enumerate(bands):
             pivot[b] = filters[ib].pivot
 
-        # to_flam = 10**(-0.4*(22.5+48.6))*3.e18 # / pivot(Ang)**2
-        #flam = np.array([xid['modelFlux_{0}'.format(b)][0]*to_flam/pivot[b]**2 for b in bands])
-        #eflam = np.array([np.sqrt(1/xid['modelFluxIvar_{0}'.format(b)][0])*to_flam/pivot[b]**2 for b in bands])
-
         to_flam = 10**(-0.4*(48.6))*3.e18  # / pivot(Ang)**2
         flam = np.array([10**(-0.4*(tab[b+'mag']))*to_flam/pivot[b]**2 for ib, b in enumerate(bands)])
         eflam = np.array([tab['e_{0}mag'.format(b)]*np.log(10)/2.5*flam[ib] for ib, b in enumerate(bands)])
@@ -1406,9 +1703,64 @@ class GroupFitter(object):
 
         # Vizier
 
+
     def set_photometry(self, flam=[], eflam=[], filters=[], ext_corr=1, lc=None, force=False, tempfilt=None, min_err=0.02, TEF=None, pz=None, source='unknown', **kwargs):
         """
-        Add photometry
+        Set photometry attributes
+        
+        Parameters
+        ----------
+        flam, eflam : array-like
+            Flux densities and uncertainties in f-lambda cgs units
+        
+        filters : list
+            List of `~eazy.filters.FilterDefinition` objects
+        
+        ext_corr : float or array-like
+            MW extinction correction
+        
+        lc : array-like
+            Precomputed filter central wavelengths.  Will automatically 
+            be computed from `filters` if not specified
+        
+        force : bool
+            Don't try to set if already specified (`Nphot` > 0)
+        
+        tempfilt : `eazy.photoz.TemplateGrid` 
+            Precomputed grid of templates integrated through the `filters` 
+            bandpasses
+        
+        min_err : float
+            minimum or systematic error to add in quadrature to `eflam`
+        
+        TEF : `eazy.templates.TemplateError`
+            Template error function
+        
+        pz : None, (array, array)
+            Precomputed (z, pz) pdf from, e.g., `eazy`
+        
+        source : str
+            String to indicate the provenance of the photometry
+        
+        Returns
+        -------
+        photom_flam : array_like
+            Flux densities from `flam`
+        
+        photom_eflam : array-like
+            Uncertainties including `min_err`
+        
+        photom_filters : list
+            `filters`
+        
+        Nphot : int
+            Number of photometry bandpasses
+            
+        The returned parameters above are not returned but are rather 
+        attributes that are set.  This function also updates the 
+        `sivarf`, `weightf`, `fit_mask` attributes to include the 
+        spectra + photometry
+        
         """
         if (self.Nphot > 0) & (not force):
             print('Photometry already set (Nphot={0})'.format(self.Nphot))
@@ -1467,7 +1819,11 @@ class GroupFitter(object):
 
         self.TEF = TEF
 
+
     def unset_photometry(self):
+        """
+        Unset photometry-related attributes
+        """
         if self.Nphot == 0:
             return True
 
@@ -1493,6 +1849,7 @@ class GroupFitter(object):
         self.Nspec = self.Nmask - self.Nphot
 
         self.tempfilt = None
+
 
     def _interpolate_photometry(self, z=0., templates=[]):
         """
@@ -1525,6 +1882,7 @@ class GroupFitter(object):
 
         return A_phot[:, mask]
 
+
     def xfit_at_z(self, z=0, templates=[], fitter='nnls', fit_background=True, get_uncertainties=False, get_design_matrix=False, pscale=None, COEFF_SCALE=1.e-19, get_components=False, huber_delta=4, get_residuals=False, include_photometry=True, use_cached_templates=False, bounded_kwargs=BOUNDED_DEFAULTS, apply_sensitivity=True):
         """Fit the 2D spectra with a set of templates at a specified redshift.
 
@@ -1540,25 +1898,28 @@ class GroupFitter(object):
             Minimization algorithm to compute template coefficients.
 
             Available options are:
-              'nnls'   - Non-negative least squares (`~scipy.optimize.nnls`)
-              'lstsq'  - Standard least squares (`~numpy.linalg.lstsq`)
-              'bounded' - Bounded least squares (`~scipy.optimize.lsq_linear`)
+            
+              - 'nnls', Non-negative least squares (`scipy.optimize.nnls`)
+              - 'lstsq', Standard least squares (`numpy.linalg.lstsq`)
+              - 'bounded', Bounded least squares (`scipy.optimize.lsq_linear`)
 
-            For the last option, the line flux limits are set by 
-            ``LINE_BOUNDS`` and ``bounded_kwargs`` are passed to 
-            `~scipy.optimize.lsq_linear`.
+            For the last option, the line flux limits are set by the limits in 
+            the global `grizli.fitting.LINE_BOUNDS` list and `bounded_kwargs` 
+            are passed to `~scipy.optimize.lsq_linear`.
 
         fit_background : bool
             Fit additive pedestal background offset.
 
-        get_uncertainties : bool
-            Compute coefficient uncertainties from the covariance matrix
+        get_uncertainties : bool, int
+            Compute coefficient uncertainties from the covariance matrix.  
+            If specified as an int > 1, then the covariance matrix is 
+            computed only for templates with non-zero coefficients
 
         get_design_matrix : bool
             Return design matrix and data, rather than nominal outputs.
 
         huber_delta : float
-            Use the Huber loss function (`~scipy.special.huber`) rather than
+            Use the Huber loss function (`scipy.special.huber`) rather than
             direct chi-squared.  If ``huber_delta < 0``, then fall back to
             chi-squared.
 
@@ -1567,10 +1928,10 @@ class GroupFitter(object):
         chi2 : float
             Chi-squared of the fit
 
-        coeffs, coeffs_err : `~numpy.ndarray`
+        coeffs, coeffs_err : `numpy.ndarray`
             Template coefficients and uncertainties.
 
-        covariance : `~numpy.ndarray`
+        covariance : `numpy.ndarray`
             Full covariance
 
         """
@@ -1867,16 +2228,198 @@ class GroupFitter(object):
 
         return chi2, coeffs, coeffs_err, covar
 
-    def xfit_redshift(self, prior=None, fwhm=1200,
-                     make_figure=True, zr=[0.65, 1.6], dz=[0.005, 0.0004],
-                     verbose=True, fit_background=True, fitter='nnls',
-                     delta_chi2_threshold=0.004, poly_order=3, zoom=True,
-                     line_complexes=True, templates={},
-                     figsize=[8, 5], use_cached_templates=True,
-                     fsps_templates=False, get_uncertainties=True,
-                     Rspline=30, huber_delta=4, get_student_logpdf=False,
-                     bounded_kwargs=BOUNDED_DEFAULTS):
-        """TBD
+
+    def xfit_redshift(self, prior=None,
+                     templates={},
+                     fwhm=1200, line_complexes=True, fsps_templates=False, 
+                     zr=[0.65, 1.6], dz=[0.005, 0.0004], zoom=True, 
+                     verbose=True, fit_background=True, 
+                     fitter='nnls', bounded_kwargs=BOUNDED_DEFAULTS, 
+                     delta_chi2_threshold=0.004, 
+                     poly_order=3,
+                     make_figure=True, figsize=[8, 5], 
+                     use_cached_templates=True,
+                     get_uncertainties=True,
+                     Rspline=30, huber_delta=4, get_student_logpdf=False):
+        """
+        Two-step procedure for fitting redshifts
+        
+        1. polynomial, spline template fits
+        2. redshift grids
+        3. ...
+        
+        Parameters
+        ----------
+        prior : None, (array, array)
+            Redshift prior (z, pz).  Will be interpolated to the redshift
+            fit grid
+
+        templates : dict
+            Dictionary the `~grizli.utils.SpectrumTemplate` objects to use
+            for the fits
+
+        fwhm, line_complexes, fsps_templates : float, bool, bool
+            Parameters passed to `~grizli.utils.utils.load_templates` if 
+            `templates` is empty.
+
+        make_figure, fig_size : bool, (float, float)
+            Make the diagnostic figure with dimensions `fig_size`
+
+        zr : (float, float)
+            Redshift limits of the logarithmic (1+z) redshift grid
+
+        dz : (float, float)
+            Step size of the grid.  The second value will be used to "zoom in"
+            on the peaks found in the coarse grid step from the first value.
+
+        zoom : bool
+            Do the second pass with the `dz[1]` step size
+
+        verbose : bool
+            Some verbosity control
+
+        fit_background : bool
+            Include contribution of additive background 
+
+        fitter, bounded_kwargs : str, dict
+            Least-squares optimization method.  See 
+            `~grizli.fitting.GroupFitter.xfit_at_z`
+
+        delta_chi2_threshold : float
+            *Not used*
+
+        poly_order : int
+            Order of polynomials for the "uninformative" polynomial fit.  
+            The parameters of the polynomial and full template fits are 
+            computed to evaluate the extent to which the galaxy / stellar 
+            templates improve the fit
+        
+        Rspline : float
+            Spectral resolution, ``R``, of spline templates for another 
+            "uninformative" fit.
+            
+        use_cached_templates : bool
+            Try to used cached versions of dispersed template models for 
+            templates that don't depend on redshift (polynomials, splines)
+        
+        get_uncertainties : bool
+            Get template fit coefficient uncertainties from the fit
+            covariance matrix
+                
+        huber_delta : float
+            Parameter for Huber loss function (see 
+            `~grizli.fitting.GroupFitter.xfit_at_z`)
+        
+        get_student_logpdf : bool
+            Get logpdf for likelihood assuming Student-t distribution rather 
+            than standard normal assumption
+        
+        Returns
+        -------
+        fit : `~astropy.table.Table`
+            Table with fit information on the redshift grid and metadata
+            on some fit characteristics.
+                    
+        **Table metadata**
+                
+            +----------------+-----------------------------------------------+
+            | Meta           | Description                                   |
+            +================+===============================================+
+            | N              | Number of spectrum extensions / beams         |
+            +----------------+-----------------------------------------------+
+            | polyord        | Order of the polynomial fit                   |
+            +----------------+-----------------------------------------------+
+            | chi2poly       | :math:`\chi^2` of the polynomial fit          |
+            +----------------+-----------------------------------------------+
+            | chi2spl        | :math:`\chi^2` of the spline fit              |
+            +----------------+-----------------------------------------------+
+            | Rspline        | Spectral resolution of the spline templates   |
+            +----------------+-----------------------------------------------+
+            | kspl           | Effective number of parameters of spline fit  |
+            +----------------+-----------------------------------------------+
+            | huberdel       | `huber_delta`                                 |
+            +----------------+-----------------------------------------------+
+            | `splf[i]`      | Flux of spline fit at fixed wavelengths       |
+            +----------------+-----------------------------------------------+
+            | `sple[i]`      | Unc. of spline fit at fixed wavelengths       |
+            +----------------+-----------------------------------------------+
+            | NTEMP          | Number of `templates`                         |
+            +----------------+-----------------------------------------------+
+            | DoF            | Degrees of freedom of the fit                 |
+            |                | (total number of unmasked pixels in all       |
+            |                | 2D beams)                                     |
+            +----------------+-----------------------------------------------+
+            | ktempl         | N parameters of the template fit              |
+            +----------------+-----------------------------------------------+
+            | chimin         | Minimum :math:`\chi^2` of the template fit    |
+            +----------------+-----------------------------------------------+
+            | chimax         | Maximum :math:`\chi^2` of the template fit    |
+            +----------------+-----------------------------------------------+
+            | `fitter`       | Least squares method                          |
+            +----------------+-----------------------------------------------+
+            | as_epsf        | Fit was done as `~grizli.utils.EffectivePSF`  |
+            +----------------+-----------------------------------------------+
+            | bic_poly       | Bayesian Information Criterion (BIC) of       |
+            |                | the **polynomial** fit.                       |
+            |                | ``BIC = log(DoF)*k + min(chi2) + C``          |
+            +----------------+-----------------------------------------------+
+            | bic_spl        | BIC of the **spline** fit                     |
+            +----------------+-----------------------------------------------+
+            | bic_temp       | BIC of the **template** (redshift) fit        |
+            +----------------+-----------------------------------------------+
+            | st_df          | Student-`~scipy.stats.t` df of spline fit     |
+            +----------------+-----------------------------------------------+
+            | st_loc         | Student-`~scipy.stats.t` loc of spline fit    |
+            +----------------+-----------------------------------------------+
+            | st_scl         | Student-`~scipy.stats.t` scale of spline fit  |
+            +----------------+-----------------------------------------------+
+            | Z02            | Integrated `cdf(<z) = 0.025`                  |
+            +----------------+-----------------------------------------------+
+            | Z16            | Integrated `cdf(<z) = 0.16`                   |
+            +----------------+-----------------------------------------------+
+            | Z50            | Integrated `cdf(<z) = 0.50`                   |
+            +----------------+-----------------------------------------------+
+            | Z84            | Integrated `cdf(<z) = 0.84`                   |
+            +----------------+-----------------------------------------------+
+            | Z97            | Integrated `cdf(<z) = 0.975`                  |
+            +----------------+-----------------------------------------------+
+            | ZWIDTH1        | ``Z84 - Z16``                                 |
+            +----------------+-----------------------------------------------+
+            | ZWIDTH2        | ``Z97 - Z02``                                 |
+            +----------------+-----------------------------------------------+
+            | z_map          | Redshift at ``Max(PDF)``                      |
+            +----------------+-----------------------------------------------+
+            | zrmin          | Start of the redshift grid `zr`               |
+            +----------------+-----------------------------------------------+
+            | zrmax          | End of the redshift grid `zr`                 |
+            +----------------+-----------------------------------------------+
+            | z_risk         | Redshift at minimum ``risk``                  |
+            +----------------+-----------------------------------------------+
+            | min_risk       | Minimum ``risk``                              |
+            +----------------+-----------------------------------------------+
+            | gam_loss       | ``gamma`` parameter of ``risk``               |
+            +----------------+-----------------------------------------------+
+
+            +----------------+-----------------------------------------------+
+            | Column         | Description                                   |
+            +================+===============================================+
+            | zgrid          | Redshift grid ``NZ``                          |
+            +----------------+-----------------------------------------------+
+            | chi2           | :math:`\chi^2(z)` ``NZ``                      |
+            +----------------+-----------------------------------------------+
+            | student_logpdf | log PDF of student-t likelihood ``NZ``        |
+            +----------------+-----------------------------------------------+
+            | coeffs         | Template coefficients ``(NZ,NTEMP)``          |
+            +----------------+-----------------------------------------------+
+            | covar          | Template covariance ``(NZ,NTEMP,NTEMP)``      |
+            +----------------+-----------------------------------------------+
+            | pdf            | Full likelihood including optional `prior`    |
+            +----------------+-----------------------------------------------+
+            | risk           | "Risk" parameter from                         | 
+            |                | Tanaka et al. (arXiv/1704.05988)              |
+            +----------------+-----------------------------------------------+
+            
+            
         """
         from numpy import polyfit, polyval
         from scipy.stats import t as student_t
@@ -1905,11 +2448,9 @@ class GroupFitter(object):
 
         NZ = len(zgrid)
 
-        # Polynomial SED fit
+        ############
+        # Polynomial template fit
         wpoly = np.linspace(1000, 5.2e4, 1000)
-        # tpoly = utils.polynomial_templates(wpoly, line=True)
-        # out = self.xfit_at_z(z=0., templates=tpoly, fitter='nnls',
-        #                     fit_background=True, get_uncertainties=False)
         tpoly = utils.polynomial_templates(wpoly, order=poly_order,
                                            line=False)
         out = self.xfit_at_z(z=0., templates=tpoly, fitter='lstsq',
@@ -1918,12 +2459,14 @@ class GroupFitter(object):
                             use_cached_templates=False)
 
         chi2_poly, coeffs_poly, err_poly, cov = out
-
-        # Spline SED fit
+        
+        ###########
+        # Spline template fit
         wspline = np.arange(4200, 2.5e4)
-        #Rspline = 30
-        df_spl = len(utils.log_zgrid(zr=[wspline[0], wspline[-1]], dz=1./Rspline))
-        tspline = utils.bspline_templates(wspline, df=df_spl+2, log=True, clip=0.0001)
+        df_spl = len(utils.log_zgrid(zr=[wspline[0], wspline[-1]],
+                                     dz=1./Rspline))
+        tspline = utils.bspline_templates(wspline, df=df_spl+2, log=True, 
+                                          clip=0.0001)
 
         out = self.xfit_at_z(z=0., templates=tspline, fitter='lstsq',
                             fit_background=True, get_uncertainties=True,
@@ -1939,19 +2482,11 @@ class GroupFitter(object):
 
         student_t_pars = student_t.fit(spline_resid)
 
-        #poly1d, xxx = utils.dot_templates(coeffs_poly[self.N:], tpoly, z=0)
-
-        # tpoly = utils.polynomial_templates(wpoly, order=3)
-        # out = self.xfit_at_z(z=0., templates=tpoly, fitter='lstsq',
-        #                     fit_background=True)
-        # chi2_poly, coeffs_poly, c, cov = out
-
-        # if True:
-        #     cp, lp = utils.dot_templates(coeffs_poly[self.N:], tpoly)
-
         # Set up for template fit
         if templates == {}:
-            templates = utils.load_templates(fwhm=fwhm, stars=stars, line_complexes=line_complexes, fsps_templates=fsps_templates)
+            templates = utils.load_templates(fwhm=fwhm, stars=stars,
+                                             line_complexes=line_complexes, 
+                                             fsps_templates=fsps_templates)
         else:
             if verbose:
                 print('User templates! N={0} \n'.format(len(templates)))
@@ -1964,7 +2499,8 @@ class GroupFitter(object):
                             use_cached_templates=use_cached_templates)
 
         chi2, coeffs, coeffs_err, covar = out
-
+        
+        # Set up arrays
         chi2 = np.zeros(NZ)
         logpdf = np.zeros(NZ)
 
@@ -1973,6 +2509,8 @@ class GroupFitter(object):
 
         chi2min = 1e30
         iz = 0
+        
+        # Now run the fit on the redshift grid
         for i in range(NZ):
             out = self.xfit_at_z(z=zgrid[i], templates=templates,
                                 fitter=fitter, fit_background=fit_background,
@@ -1996,18 +2534,20 @@ class GroupFitter(object):
                 chi2min = chi2[i]
 
             if verbose:
-                print(utils.NO_NEWLINE + '  {0:.4f} {1:9.1f} ({2:.4f}) {3:d}/{4:d}'.format(zgrid[i], chi2[i], zgrid[iz], i+1, NZ))
+                line = '  {0:.4f} {1:9.1f} ({2:.4f}) {3:d}/{4:d}'
+                print(utils.NO_NEWLINE + 
+                      line.format(zgrid[i], chi2[i], zgrid[iz], i+1, NZ))
 
         if verbose:
             print('First iteration: z_best={0:.4f}\n'.format(zgrid[iz]))
 
+        ##########
         # Find peaks
 
         # Make "negative" chi2 for peak-finding
-        #chi2_test = chi2_poly
         chi2_test = chi2_spline
 
-        # Find peaks including the prior
+        # Find peaks including the prior, if specified
         if prior is not None:
             pzi = np.interp(zgrid, prior[0], prior[1], left=0, right=0)
             pzi /= np.maximum(np.trapz(pzi, zgrid), 1.e-10)
@@ -2034,7 +2574,10 @@ class GroupFitter(object):
             zoom = False
 
         max_peaks = 3
-
+        
+        ###### 
+        # Now zoom in on the peaks found in the first iteration
+        
         # delta_chi2 = (chi2.max()-chi2.min())/self.DoF
         # if delta_chi2 > delta_chi2_threshold:
         if (num_peaks > 0) & (not stars) & zoom & (len(dz) > 1):
@@ -2047,9 +2590,6 @@ class GroupFitter(object):
                     zgrid_zoom.extend(np.arange(zi-2*dz[0],
                                       zi+2*dz[0]+dz[1]/10., dz[1]))
 
-            # zgrid_zoom = utils.zoom_zgrid(zgrid, chi2/self.DoF,
-            #                               threshold=delta_chi2_threshold,
-            #                               factor=dz[0]/dz[1])
             NZOOM = len(zgrid_zoom)
 
             chi2_zoom = np.zeros(NZOOM)
@@ -2084,21 +2624,27 @@ class GroupFitter(object):
                     iz = i
 
                 if verbose:
-                    print(utils.NO_NEWLINE+'- {0:.4f} {1:9.1f} ({2:.4f}) {3:d}/{4:d}'.format(zgrid_zoom[i], chi2_zoom[i], zgrid_zoom[iz], i+1, NZOOM))
-
+                    line = '- {0:.4f} {1:9.1f} ({2:.4f}) {3:d}/{4:d}'
+                    print(utils.NO_NEWLINE + 
+                          line.format(zgrid_zoom[i], chi2_zoom[i],
+                                      zgrid_zoom[iz], i+1, NZOOM))
+            
+            # Concatenate, will resort at the end
             zgrid = np.append(zgrid, zgrid_zoom)
             chi2 = np.append(chi2, chi2_zoom)
             logpdf = np.append(logpdf, logpdf_zoom)
             coeffs = np.append(coeffs, coeffs_zoom, axis=0)
             covar = np.vstack((covar, covar_zoom))
-
+        
+        # Resort the concatenated arrays
         so = np.argsort(zgrid)
         zgrid = zgrid[so]
         chi2 = chi2[so]
         logpdf = logpdf[so]
         coeffs = coeffs[so, :]
         covar = covar[so, :, :]
-
+        
+        # Make the output table
         fit = utils.GTable()
         fit.meta['N'] = (self.N, 'Number of spectrum extensions')
         fit.meta['polyord'] = (poly_order, 'Order polynomial fit')
@@ -2108,19 +2654,24 @@ class GroupFitter(object):
         fit.meta['chi2spl'] = (chi2_spline, 'Chi^2 of spline fit')
         fit.meta['Rspline'] = (Rspline, 'R=lam/dlam of spline fit')
         fit.meta['kspl'] = (kspl, 'Parameters, k, of spline fit')
-        fit.meta['huberdel'] = (huber_delta, 'Huber delta parameter, see scipy.special.huber')
+        fit.meta['huberdel'] = (huber_delta, 
+                            'Huber delta parameter, see scipy.special.huber')
 
         # Evaluate spline at wavelengths for stars
         xspline = np.array([6060, 8100, 9000, 1.27e4, 1.4e4])
-        flux_spline = utils.eval_bspline_templates(xspline, tspline, coeffs_spline[self.N:])
-        fluxerr_spline = utils.eval_bspline_templates(xspline, tspline, err_spline[self.N:])
+        flux_spline = utils.eval_bspline_templates(xspline, tspline,
+                                                   coeffs_spline[self.N:])
+        fluxerr_spline = utils.eval_bspline_templates(xspline, tspline, 
+                                                      err_spline[self.N:])
 
         for i in range(len(xspline)):
-            fit.meta['splf{0:02d}'.format(i+1)] = flux_spline[i], 'Spline flux at {0:.2f} um'.format(xspline[i]/1.e4)
-            fit.meta['sple{0:02d}'.format(i+1)] = fluxerr_spline[i], 'Spline flux err at {0:.2f} um'.format(xspline[i]/1.e4)
+            fit.meta['splf{0:02d}'.format(i+1)] = (flux_spline[i], 
+                          'Spline flux at {0:.2f} um'.format(xspline[i]/1.e4))
+            fit.meta['sple{0:02d}'.format(i+1)] = (fluxerr_spline[i], 
+                      'Spline flux err at {0:.2f} um'.format(xspline[i]/1.e4))
 
         izbest = np.argmin(chi2)
-        clip = coeffs[izbest, :] != 0
+        clip = coeffs[izbest,:] != 0
         ktempl = clip.sum()
 
         fit.meta['NTEMP'] = (len(templates), 'Number of fitting templates')
@@ -2135,6 +2686,7 @@ class GroupFitter(object):
         fit.meta['as_epsf'] = ((self.psf_param_dict is not None)*1,
                                'Object fit with effective PSF morphology')
 
+
         # Bayesian information criteria, normalized to template min_chi2
         # BIC = log(number of data points)*(number of params) + min(chi2) + C
         # https://en.wikipedia.org/wiki/Bayesian_information_criterion
@@ -2142,16 +2694,22 @@ class GroupFitter(object):
         scale_chinu = self.DoF/chi2.min()
         scale_chinu = 1  # Don't rescale
 
-        fit.meta['bic_poly'] = np.log(self.DoF)*(poly_order+1+self.N) + (chi2_poly-chi2.min())*scale_chinu, 'BIC of polynomial fit'
+        bic_poly = (np.log(self.DoF)*(poly_order+1+self.N) +
+                   (chi2_poly-chi2.min())*scale_chinu)
+        fit.meta['bic_poly'] = (bic_poly, 'BIC of polynomial fit')
 
-        fit.meta['bic_spl'] = np.log(self.DoF)*kspl + (chi2_spline-chi2.min())*scale_chinu, 'BIC of spline fit'
+        bic_spl = np.log(self.DoF)*kspl + (chi2_spline-chi2.min())*scale_chinu
+        fit.meta['bic_spl'] = (bic_spl, 'BIC of spline fit')
 
         fit.meta['bic_temp'] = np.log(self.DoF)*ktempl, 'BIC of template fit'
-
+        
+        # Template info
         for i, tname in enumerate(templates):
-            fit.meta['T{0:03d}NAME'.format(i+1)] = (templates[tname].name, 'Template name')
+            fit.meta['T{0:03d}NAME'.format(i+1)] = (templates[tname].name,
+                                                    'Template name')
             if tname.startswith('line '):
-                fit.meta['T{0:03d}FWHM'.format(i+1)] = (templates[tname].fwhm, 'FWHM, if emission line')
+                fit.meta['T{0:03d}FWHM'.format(i+1)] = (templates[tname].fwhm,
+                                                     'FWHM, if emission line')
 
         dtype = np.float64
 
@@ -2162,7 +2720,8 @@ class GroupFitter(object):
 
         fit.meta['st_df'] = student_t_pars[0], 'Student-t df of spline fit'
         fit.meta['st_loc'] = student_t_pars[1], 'Student-t loc of spline fit'
-        fit.meta['st_scl'] = student_t_pars[2], 'Student-t scale of spline fit'
+        fit.meta['st_scl'] = (student_t_pars[2], 
+                              'Student-t scale of spline fit')
 
         #fit['chi2poly'] = chi2_poly
         fit['coeffs'] = np.cast[dtype](coeffs)
@@ -2172,9 +2731,25 @@ class GroupFitter(object):
 
         return fit
 
+
     def _parse_zfit_output(self, fit, risk_gamma=0.15, prior=None):
         """Parse best-fit redshift, etc.
-        TBD
+        
+        Parameters
+        ----------
+        fit : `~astropy.table.Table`
+            Result of `xfit_redshift`
+        
+        risk_gamma : float
+            ``gamma`` parameter of the redshift "risk"
+        
+        prior : None, (array, array)
+            Optional redshift prior
+            
+        Returns
+        -------
+        Adds metadata and `pdf` and `risk` columns to `fit` table
+        
         """
         import scipy.interpolate
         from scipy.interpolate import Akima1DInterpolator
@@ -2262,8 +2837,10 @@ class GroupFitter(object):
         fit.meta['Z50'] = pz_percentiles[2], 'Integrated p(z) = 0.5'
         fit.meta['Z84'] = pz_percentiles[3], 'Integrated p(z) = 0.84'
         fit.meta['Z97'] = pz_percentiles[4], 'Integrated p(z) = 0.975'
-        fit.meta['ZWIDTH1'] = pz_percentiles[3]-pz_percentiles[1], 'Width between the 16th and 84th p(z) percentiles'
-        fit.meta['ZWIDTH2'] = pz_percentiles[4]-pz_percentiles[0], 'Width between the 2.5th and 97.5th p(z) percentiles'
+        fit.meta['ZWIDTH1'] = (pz_percentiles[3]-pz_percentiles[1], 
+                           'Width between the 16th and 84th p(z) percentiles')
+        fit.meta['ZWIDTH2'] = (pz_percentiles[4]-pz_percentiles[0], 
+                        'Width between the 2.5th and 97.5th p(z) percentiles')
 
         fit.meta['z_map'] = z_map, 'Redshift at MAX(PDF)'
         fit.meta['zrmin'] = fit['zgrid'].min(), 'z grid start'
@@ -2271,14 +2848,69 @@ class GroupFitter(object):
 
         fit.meta['z_risk'] = z_risk, 'Redshift at minimum risk'
         fit.meta['min_risk'] = min_risk, 'Minimum risk'
-        fit.meta['gam_loss'] = risk_gamma, 'Gamma factor of the risk/loss function'
+        fit.meta['gam_loss'] = (risk_gamma, 
+                                'Gamma factor of the risk/loss function')
         return fit
 
     def template_at_z(self, z=0, templates=None, fwhm=1400, get_uncertainties=2, draws=0, **kwargs):
-        """TBD
+        """
+        Get the best-fit template at a specified redshift
+        
+        Parameters
+        ----------
+        z : float
+            Redshift
+        
+        templates : dict
+            Dictionary of `~grizli.utils.SpectrumTemplate` objects
+        
+        fwhm : float
+            FWHM of line templates if `templates` generated in-place
+        
+        get_uncertainties : int
+            Get coefficient uncertainties from covariance matrix
+        
+        draws : int
+            Number of random draws from covariance matrix
+        
+        kwargs : dict
+            Any additional keywords are passed to 
+            `~grizli.fitting.GroupFitter.xfit_at_z`
+        
+        Returns
+        -------
+        tfit : dict
+            Dictionary of fit results, used in various other places like 
+            `oned_figure`, etc.
+            
+            +--------------+---------------------------------------------+
+            | Keyword      | Description                                 |
+            +==============+=============================================+
+            | cfit         | Dict of template normalizations and         |
+            |              | uncertainties                               |
+            +--------------+---------------------------------------------+
+            | cont1d       | `~grizli.utils.SpectrumTemplate` of         |
+            |              | best-fit *continuum*                        |
+            +--------------+---------------------------------------------+
+            | line1d       | `~grizli.utils.SpectrumTemplate` of         |
+            |              | best-fit *continuum + emission line*        |
+            +--------------+---------------------------------------------+
+            | coeffs       | Array of fit coefficients                   |
+            +--------------+---------------------------------------------+
+            | chi2         | (float) chi-squared of the fit              |
+            +--------------+---------------------------------------------+
+            | z            | (float) The input redshift                  |
+            +--------------+---------------------------------------------+
+            | templates    | Copy of the input `templates` dictionary    |
+            +--------------+---------------------------------------------+
+            | line1d_err   | If ``draws > 0``, this will be template     |
+            |              | draws with the same dimension as `line1d`   |
+            +--------------+---------------------------------------------+
+                 
         """
         if templates is None:
-            templates = utils.load_templates(line_complexes=False, fsps_templates=True, fwhm=fwhm)
+            templates = utils.load_templates(line_complexes=False, 
+                                             fsps_templates=True, fwhm=fwhm)
 
         kwargs['z'] = z
         kwargs['templates'] = templates
@@ -2290,26 +2922,26 @@ class GroupFitter(object):
         cont1d, line1d = utils.dot_templates(coeffs[self.N:], templates, z=z,
                                              apply_igm=(z > IGM_MINZ))
 
-        if False:
-            # Test draws from covariance matrix
-            NDRAW = 100
-            nonzero = coeffs[self.N:] != 0
-            covarx = covar[self.N:, self.N:][nonzero, :][:, nonzero]
-            draws = np.random.multivariate_normal(coeffs[self.N:][nonzero],
-                                                  covarx, NDRAW)
-
-            contarr = np.zeros((NDRAW, len(cont1d.flux)))
-            linearr = np.zeros((NDRAW, len(line1d.flux)))
-            for i in range(NDRAW):
-                print(i)
-                coeffs_i = np.zeros(len(nonzero))
-                coeffs_i[nonzero] = draws[i, :]
-                _out = utils.dot_templates(coeffs_i, templates, z=z,
-                                                     apply_igm=(z > IGM_MINZ))
-                contarr[i, :], linearr[i, :] = _out[0].flux, _out[1].flux
-
-            contrms = np.std(contarr, axis=0)
-            linerms = np.std(linearr, axis=0)
+        # if False:
+        #     # Test draws from covariance matrix
+        #     NDRAW = 100
+        #     nonzero = coeffs[self.N:] != 0
+        #     covarx = covar[self.N:, self.N:][nonzero, :][:, nonzero]
+        #     draws = np.random.multivariate_normal(coeffs[self.N:][nonzero],
+        #                                           covarx, NDRAW)
+        # 
+        #     contarr = np.zeros((NDRAW, len(cont1d.flux)))
+        #     linearr = np.zeros((NDRAW, len(line1d.flux)))
+        #     for i in range(NDRAW):
+        #         print(i)
+        #         coeffs_i = np.zeros(len(nonzero))
+        #         coeffs_i[nonzero] = draws[i, :]
+        #         _out = utils.dot_templates(coeffs_i, templates, z=z,
+        #                                              apply_igm=(z > IGM_MINZ))
+        #         contarr[i, :], linearr[i, :] = _out[0].flux, _out[1].flux
+        # 
+        #     contrms = np.std(contarr, axis=0)
+        #     linerms = np.std(linearr, axis=0)
 
         # Parse template coeffs
         cfit = OrderedDict()
@@ -2454,7 +3086,8 @@ class GroupFitter(object):
                 Dn4000 = f_nu(3850-3950) / f_nu(4000-4100)
 
         fitter : str
-            Fitting algorithm, passed to `~grizli.fitting.GroupFitter.template_at_z`.
+            Least-squares method passed to 
+            `~grizli.fitting.GroupFitter.template_at_z`.
 
         Returns
         -------
@@ -2462,7 +3095,8 @@ class GroupFitter(object):
             Step wavelengths and template dictionary
 
         tfit : dict
-            Fit dictionary returned by `~grizli.fitting.GroupFitter.template_at_z`.
+            Fit dictionary returned by 
+            `~grizli.fitting.GroupFitter.template_at_z`.
 
         d4000, d4000_sigma : float
             D4000 estimate and uncertainty from simple error propagation and
@@ -2483,7 +3117,7 @@ class GroupFitter(object):
             mask = np.array([c in ['rstep 3850-3950 0', 'rstep 4000-4100 0']
                          for c in tfit['cfit']])
         else:
-            print('compute_d4000: fit_type={0} not recognized'.format(fit_type))
+            print(f'compute_d4000: fit_type={fit_type} not recognized')
             return -np.inf, -np.inf, -np.inf, -np.inf, -np.inf
 
         blue, red = tfit['coeffs'][mask]
@@ -2502,9 +3136,46 @@ class GroupFitter(object):
         res = (w_d4000, t_d4000, tfit, d4000, d4000_sigma)
         return res
 
+
     def xmake_fit_plot(self, fit, tfit, show_beams=True, bin=1, minor=0.1,
                        scale_on_stacked_1d=True, loglam_1d=True, zspec=None):
-        """TBD
+        """
+        Make a diagnostic plot of the redshift fit
+        
+        Parameters
+        ----------
+        fit : `~astropy.table.Table`
+            Redshift fit results from 
+            `~grizli.fitting.GroupFitter.xfit_redshift`
+        
+        tfit : dict
+            Template fit at best redshift from 
+            `~grizli.fitting.GroupFitter.template_at_z`
+        
+        show_beams : bool
+            Show 1D spectra of all individual "beams"
+        
+        bin : float
+            Binning factor relative to nominal wavelength resolution (1 pix) 
+            of each grism
+        
+        minor : float
+            Minor axis ticks, microns
+        
+        scale_on_stacked_1d : bool
+            Set y limits based on stacked spectrum
+        
+        loglam_1d : bool
+            Show log wavelengths
+        
+        zspec : float, None
+            Spectroscopic redshift that will be indicated on the figure
+        
+        Returns
+        -------
+        fig : `~matplotlib.figure.Figure`
+            Figure object
+            
         """
         import time
         import matplotlib.pyplot as plt
@@ -2525,11 +3196,15 @@ class GroupFitter(object):
         # p(z)
         axz = fig.add_subplot(gs[-1, 0])  # 121)
 
-        axz.text(0.95, 0.96, self.group_name + '\n'+'ID={0:<5d}  z={1:.4f}'.format(self.id, fit.meta['z_map'][0]), ha='right', va='top', transform=axz.transAxes, fontsize=9)
+        label = (self.group_name + '\n' + 
+                'ID={0:<5d}  z={1:.4f}'.format(self.id, fit.meta['z_map'][0]))
+        axz.text(0.95, 0.96, label, ha='right', va='top', 
+                 transform=axz.transAxes, fontsize=9)
 
         if 'FeII-VC2004' in tfit['cfit']:
             # Quasar templates
-            axz.text(0.04, 0.96, 'quasar templ.', ha='left', va='top', transform=axz.transAxes, fontsize=5)
+            axz.text(0.04, 0.96, 'quasar templ.', ha='left', va='top', 
+                     transform=axz.transAxes, fontsize=5)
 
         zmi, zma = fit['zgrid'].min(), fit['zgrid'].max()
         if (zma-zmi) > 5:
@@ -2543,8 +3218,6 @@ class GroupFitter(object):
             axz.plot(fit['zgrid'], np.log10(fit['pdf']), color='k')
             axz.set_xlim(zmi, zma)
 
-        #axz.fill_between(z, (chi2-chi2.min())/scale_nu, 27, color='k', alpha=0.5)
-
         axz.set_xlabel(r'$z$')
         axz.set_ylabel(r'$\log\ p(z)$'+' / ' + r'$\chi^2=\frac{{{0:.0f}}}{{{1:d}}}={2:.2f}$'.format(fit.meta['chimin'][0], fit.meta['DoF'][0], fit.meta['chimin'][0]/fit.meta['DoF'][0]))
         # axz.set_yticks([1,4,9,16,25])
@@ -2555,16 +3228,19 @@ class GroupFitter(object):
         axz.yaxis.set_major_locator(MultipleLocator(base=1))
 
         if zspec is not None:
-            #axz.text(0.95, 0.96, self.group_name + '\n'+'ID={0:<5d}  z={1:.4f}'.format(self.id, fit.meta['z_map'][0]), ha='right', va='top', transform=axz.transAxes, fontsize=9)
-
-            axz.text(0.95, 0.95, '\n\n'+r'$z_\mathrm{spec}$='+'{0:.4f}'.format(zspec), ha='right', va='top', transform=axz.transAxes, color='r', fontsize=9)
+            label = '\n\n'+r'$z_\mathrm{spec}$='+'{0:.4f}'.format(zspec)
+            axz.text(0.95, 0.95, label, ha='right', va='top', 
+                     transform=axz.transAxes, color='r', fontsize=9)
 
             axz.scatter(zspec, pzmax+0.3, color='r', marker='v', zorder=-100)
 
         # Spectra
         axc = fig.add_subplot(gs[-1, 1])  # 224)
 
-        self.oned_figure(bin=bin, show_beams=show_beams, minor=minor, tfit=tfit, axc=axc, scale_on_stacked=scale_on_stacked_1d, loglam_1d=loglam_1d)
+        self.oned_figure(bin=bin, show_beams=show_beams, minor=minor, 
+                         tfit=tfit, axc=axc, 
+                         scale_on_stacked=scale_on_stacked_1d, 
+                         loglam_1d=loglam_1d)
 
         gs.tight_layout(fig, pad=0.1, w_pad=0.1)
 
@@ -2576,12 +3252,38 @@ class GroupFitter(object):
 
     def scale_to_photometry(self, tfit=None, tol=1.e-4, order=0, init=None, fit_background=True, Rspline=50, use_fit=True, **kwargs):
         """Compute scale factor between spectra and photometry
+        
+        Parameters
+        ----------
+        tfit : dict
+            Template fit info at a specific redshift from 
+            `~grizli.fitting.GroupFitter.template_at_z`.  If not specified, 
+            then makes and fits spline templates
+        
+        tol : float
+            Fit tolerance passed to the minimizer
+        
+        order : int
+            Order of the polynomial scaling to fit
+        
+        init : None
+            Initial parameters
+        
+        fit_background : bool
+            Include additive background
+        
+        Rspline : float
+            Spectral resolution ``R`` of spline templates
+        
+        use_spline : bool
+            Use spline templates 
 
-        method : 'Powell' or 'BFGS' work well, latter a bit faster but less robust
+        Returns
+        -------
+        res : object
+            Result from `scipy.optimize.least_squares`.  The coefficients
+            of the linear scaling are in ``res.x``.
 
-        New implementation of Levenberg-Markwardt minimization
-
-        TBD
         """
         from scipy.optimize import minimize, least_squares
 
@@ -2590,18 +3292,26 @@ class GroupFitter(object):
 
         if (tfit is None) & (fit_background):
             wspline = np.arange(4200, 2.5e4)
-            #Rspline = 50
-            df_spl = len(utils.log_zgrid(zr=[wspline[0], wspline[-1]], dz=1./Rspline))
-            tspline = utils.bspline_templates(wspline, df=df_spl+2, log=True, clip=0.0001)
-            tfit = self.template_at_z(z=0, templates=tspline, include_photometry=False, fit_background=fit_background, draws=1000)
+            df_spl = len(utils.log_zgrid(zr=[wspline[0], wspline[-1]], 
+                                         dz=1./Rspline))
+            tspline = utils.bspline_templates(wspline, df=df_spl+2, log=True, 
+                                              clip=0.0001)
+            tfit = self.template_at_z(z=0, templates=tspline, 
+                                      include_photometry=False, 
+                                      fit_background=fit_background, 
+                                      draws=1000)
 
         if use_fit:
             oned = self.oned_spectrum(tfit=tfit, loglam=False)
             wmi = np.min([oned[k]['wave'].min() for k in oned])
             wma = np.max([oned[k]['wave'].max() for k in oned])
 
-            clip = (tfit['line1d'].wave > wmi) & (tfit['line1d'].wave < wma) & (tfit['line1d_err'] > 0)
-            spl_temp = utils.SpectrumTemplate(wave=tfit['line1d'].wave[clip], flux=tfit['line1d'].flux[clip], err=tfit['line1d_err'][clip])
+            clip = (tfit['line1d'].wave > wmi) & (tfit['line1d'].wave < wma)
+            clip &= (tfit['line1d_err'] > 0)
+            
+            spl_temp = utils.SpectrumTemplate(wave=tfit['line1d'].wave[clip],
+                                              flux=tfit['line1d'].flux[clip], 
+                                              err=tfit['line1d_err'][clip])
             args = (self, {'spl': spl_temp})
         else:
             oned = self.oned_spectrum(tfit=tfit, loglam=False)
@@ -2611,50 +3321,50 @@ class GroupFitter(object):
             init = np.zeros(order+1)
             init[0] = 10.
 
-        scale_fit = least_squares(self._objective_scale_direct, init, jac='2-point', method='lm', ftol=tol, xtol=tol, gtol=tol, x_scale=1.0, loss='linear', f_scale=1.0, diff_step=None, tr_solver=None, tr_options={}, jac_sparsity=None, max_nfev=None, verbose=0, args=args, kwargs={})
+        scale_fit = least_squares(self._objective_scale_direct, init, 
+                                  jac='2-point', method='lm', ftol=tol, 
+                                  xtol=tol, gtol=tol, x_scale=1.0, 
+                                  loss='linear', f_scale=1.0, diff_step=None, 
+                                  tr_solver=None, tr_options={}, 
+                                  jac_sparsity=None, max_nfev=None, 
+                                  verbose=0, args=args, kwargs={})
 
         # pscale = scale_fit.x
         return scale_fit
 
-    def _old_scale_to_photometry(self, z=0, templates={}, tol=1.e-4, order=0, init=None, method='lm', fit_background=True):
-        """Compute scale factor between spectra and photometry
-
-        method : 'Powell' or 'BFGS' work well, latter a bit faster but less robust
-
-        New implementation of Levenberg-Markwardt minimization
-
-        TBD
-        """
-        from scipy.optimize import minimize, least_squares
-
-        if self.Nphot == 0:
-            return np.array([10.])
-
-        AxT, data = self.xfit_at_z(z=z, templates=templates, fitter='nnls',
-                                   fit_background=fit_background,
-                                   get_uncertainties=False,
-                                   get_design_matrix=True)
-
-        if init is None:
-            init = np.zeros(order+1)
-            init[0] = 10.
-
-        if method == 'lm':
-            scale_fit = least_squares(self.objfun_scale, init, jac='2-point', method='lm', ftol=tol, xtol=tol, gtol=tol, x_scale=1.0, loss='linear', f_scale=1.0, diff_step=None, tr_solver=None, tr_options={}, jac_sparsity=None, max_nfev=None, verbose=0, args=(AxT, data, self, 'resid'), kwargs={})
-        else:
-            scale_fit = minimize(self.objfun_scale, init, args=(AxT, data, self, 'chi2'), method=method, jac=None, hess=None, hessp=None, tol=tol, callback=None, options=None)
-
-        # pscale = scale_fit.x
-        return scale_fit
 
     @staticmethod
     def compute_scale_array(pscale, wave):
-        """Return the scale array given the input coefficients
-        TBD
+        """Return the scale array given the coefficients
+        
+        Parameters
+        ----------
+        pscale : array-like
+            Coefficients of the linear model normalized by factors of 10 per 
+            order, i.e, ``pscale = [10]`` is a constant unit scaling.  Note 
+            that parameter order is reverse that expected by 
+            `numpy.polyval`.
+        
+        wave : array-like
+            Wavelength grid in Angstroms.  Scaling is normalized to 
+            ``(wave - 1e4)/1000``.
+        
+        Returns
+        -------
+        wscale : array-like
+            Scale factor
+            
+            >>> pscale = [10]
+            >>> N = len(pscale)
+            >>> rescale = 10**(np.arange(N)+1)
+            >>> wscale = np.polyval((pscale/rescale)[::-1], (wave-1.e4)/1000.)
+
         """
         N = len(pscale)
         rescale = 10**(np.arange(N)+1)
-        return np.polyval((pscale/rescale)[::-1], (wave-1.e4)/1000.)
+        wscale = np.polyval((pscale/rescale)[::-1], (wave-1.e4)/1000.)
+        return wscale
+
 
     @staticmethod
     def objfun_scale(pscale, AxT, data, self, retval):
@@ -2689,9 +3399,12 @@ class GroupFitter(object):
         else:
             return chi2
 
+
     @staticmethod
     def _objective_scale_direct(pscale, self, oned):
-
+        """
+        Objective function for scaling spectra to photometry
+        """
         from eazy.filters import FilterDefinition
 
         flam = []
@@ -2714,25 +3427,33 @@ class GroupFitter(object):
 
             # Covered filters
             if isinstance(oned[k], utils.SpectrumTemplate):
-                spec1 = utils.SpectrumTemplate(wave=oned[k].wave, flux=3.e18/oned[k].wave**2)
+                spec1 = utils.SpectrumTemplate(wave=oned[k].wave, 
+                                               flux=3.e18/oned[k].wave**2)
             else:
-                spec1 = utils.SpectrumTemplate(wave=oned[k]['wave'], flux=3.e18/oned[k]['wave']**2)
+                spec1 = utils.SpectrumTemplate(wave=oned[k]['wave'], 
+                                               flux=3.e18/oned[k]['wave']**2)
 
-            flux1 = np.array([spec1.integrate_filter(filt, use_wave='filter') for filt in filters])
+            flux1 = np.array([spec1.integrate_filter(filt, use_wave='filter')
+                              for filt in filters])
             okfilt = flux1 > 0.98
 
             if okfilt.sum() == 0:
-                #print('scale_to_photometry: no filters overlap '+k)
                 continue
 
             if isinstance(oned[k], utils.SpectrumTemplate):
                 scale = 1./self.compute_scale_array(pscale, oned[k].wave)
-                spec = utils.SpectrumTemplate(wave=oned[k].wave, flux=oned[k].flux*scale, err=oned[k].err*scale)
+                spec = utils.SpectrumTemplate(wave=oned[k].wave, 
+                                              flux=oned[k].flux*scale, 
+                                              err=oned[k].err*scale)
             else:
                 scale = 1./self.compute_scale_array(pscale, oned[k]['wave'])
-                spec = utils.SpectrumTemplate(wave=oned[k]['wave'], flux=oned[k]['flux']*scale/np.maximum(oned[k]['flat'], 1), err=oned[k]['err']*scale/np.maximum(oned[k]['flat'], 1))
-
-            spec_flux.append((np.array([spec.integrate_filter(filt, use_wave='templ') for filt in filters[okfilt]]).T*3.e18/lc[okfilt]**2).T)
+                spec = utils.SpectrumTemplate(wave=oned[k]['wave'], 
+                    flux=oned[k]['flux']*scale/np.maximum(oned[k]['flat'], 1), 
+                    err=oned[k]['err']*scale/np.maximum(oned[k]['flat'], 1))
+            
+            filt_fnu = [spec.integrate_filter(filt, use_wave='templ') 
+                        for filt in filters[okfilt]]
+            spec_flux.append((np.array(filt_fnu).T*3.e18/lc[okfilt]**2).T)
 
             flam.append((self.photom_flam/self.photom_ext_corr)[okfilt])
             eflam.append((self.photom_eflam/self.photom_ext_corr)[okfilt])
@@ -2750,20 +3471,51 @@ class GroupFitter(object):
 
     def xfit_star(self, tstar=None, spline_correction=True, fitter='nnls', fit_background=True, spline_args={'Rspline': 5}, oned_args={}):
         """Fit stellar templates
+        
+        Parameters
+        ----------
+        tstar : dict
+            Dictionary of stellar `~grizli.utils.SpectrumTemplate` objects
+        
+        spline_correction : bool
+            Include spline scaling correction for template mismatch
+        
+        fitter : str
+            Least-squares method passed to 
+            `~grizli.fitting.GroupFitter.template_at_z`.
+        
+        fit_background : bool
+            Fit for additive background component
+        
+        spline_args : dict
+            Parameters passed to `~grizli.utils.split_spline_template` for 
+            generating the spline correction arrays
+        
+        oned_args : dict
+            Keywords passed to `oned_figure`
+        
+        Returns
+        -------
+        fig : `~matplotlib.figure.Figure`
+            Figure object
+            
+        line : str
+            Line of text describing the best fit
+        
+        tfit : dict
+            Fit information from `~grizli.fitting.GroupFitter.template_at_z`
+            
         """
         import matplotlib.pyplot as plt
         import matplotlib.gridspec
         from matplotlib.ticker import MultipleLocator
 
-        #self = grizli.multifit.MultiBeam('ers-grism_{0:05d}.beams.fits'.format(id), fcontam=0.2, psf=True)
-        #self.extend(grizli.multifit.MultiBeam('/Volumes/Pegasus/Grizli/ACS/goodss/Prep/ers-grism-pears_{0:05d}.beams.fits'.format(id), fcontam=0.2))
-
         if tstar is None:
-            tstar = utils.load_templates(fwhm=1200, line_complexes=True, fsps_templates=True, stars=True)
+            tstar = utils.load_templates(fwhm=1200, line_complexes=True, 
+                                         fsps_templates=True, stars=True)
 
         NTEMP = len(tstar)
-        #covar = np.zeros((NTEMP, self.N+1, self.N+1))
-        #coeffs = np.zeros((NTEMP, self.N+1))
+
         chi2 = np.zeros(NTEMP)
 
         types = np.array(list(tstar.keys()))
@@ -2776,10 +3528,14 @@ class GroupFitter(object):
             w0 = np.arange(3000, 2.e4, 100)
             t0 = utils.SpectrumTemplate(wave=w0, flux=np.ones_like(w0))
             ts = utils.split_spline_template(t0, **spline_args)
-            sfit0 = self.template_at_z(z=0, templates=ts, fit_background=fit_background, fitter=fitter, get_uncertainties=2)
+            sfit0 = self.template_at_z(z=0, templates=ts, 
+                                       fit_background=fit_background, 
+                                       fitter=fitter, get_uncertainties=2)
         else:
             sfit0 = None
-
+        
+        ########
+        # Loop over templates
         for ik, k in enumerate(tstar):
             if spline_correction:
                 ts = utils.split_spline_template(tstar[k], **spline_args)
@@ -2789,8 +3545,9 @@ class GroupFitter(object):
             split_templates.append(ts)
 
             print(k)
-            #chi2[ik], coeffs[ik,:], coeffs_err, covar[ik,:,:] = self.xfit_at_z(z=0, templates=ts, fitter='nnls', fit_background=True, get_uncertainties=True)
-            sfit = self.template_at_z(z=0, templates=ts, fit_background=fit_background, fitter=fitter, get_uncertainties=2)
+            sfit = self.template_at_z(z=0, templates=ts, 
+                                      fit_background=fit_background, 
+                                      fitter=fitter, get_uncertainties=2)
 
             split_fits.append(sfit)
 
@@ -2820,14 +3577,16 @@ class GroupFitter(object):
                 for g in np.unique(met):
                     ig = met == g
                     so = np.argsort(teff[ig])
-                    axz.plot(teff[ig][so], chi2[ig][so]-chi2.min(), label='m{0:.1f}'.format(g))
+                    axz.plot(teff[ig][so], chi2[ig][so]-chi2.min(), 
+                             label='m{0:.1f}'.format(g))
 
             else:
                 # Order by log-g
                 for g in np.unique(logg):
                     ig = logg == g
                     so = np.argsort(teff[ig])
-                    axz.plot(teff[ig][so], chi2[ig][so]-chi2.min(), label='g{0:.1f}'.format(g))
+                    axz.plot(teff[ig][so], chi2[ig][so]-chi2.min(), 
+                             label='g{0:.1f}'.format(g))
 
             if logg[ixbest] == 0.:
                 label = 'carbon'
@@ -2840,9 +3599,10 @@ class GroupFitter(object):
             axz.plot(chi2-chi2.min(), marker='.', color='k')
             label = types[np.argmin(chi2)].strip('stars/').strip('.txt')
 
-        #axz.fill_between(z, (chi2-chi2.min())/scale_nu, 27, color='k', alpha=0.5)
-
-        axz.text(0.95, 0.96, self.group_name + '\n'+'ID={0:<5d} {1:s}'.format(self.id, label), ha='right', va='top', transform=axz.transAxes, fontsize=9, bbox=dict(facecolor='w', alpha=0.8))
+        axz.text(0.95, 0.96, 
+                 self.group_name + '\n' + f'ID={self.id:<5d} {label:s}', 
+                 ha='right', va='top', transform=axz.transAxes, fontsize=9,
+                 bbox=dict(facecolor='w', alpha=0.8))
 
         if hast:
             axz.set_xlabel(r'Teff')
@@ -2851,7 +3611,6 @@ class GroupFitter(object):
             axz.set_xlabel(r'Sp. Type')
 
         axz.set_ylabel(r'$\chi^2_\nu$'+' ; ' + r'$\chi^2_\mathrm{{min}}=\frac{{{0:.0f}}}{{{1:d}}}={2:.2f}$'.format(chi2.min(), self.DoF, chi2.min()/self.DoF))
-        # axz.set_yticks([1,4,9,16,25])
 
         if len(tstar) < 30:
             tx = [t.strip('stars/').strip('.txt') for t in types]
@@ -2877,7 +3636,10 @@ class GroupFitter(object):
             yl = axc.get_ylim()
             xl = axc.get_xlim()
 
-            y0 = np.interp(np.mean(xl), sfit['templates'].wspline/1.e4, spline_func)
+            y0 = np.interp(np.mean(xl), 
+                           sfit['templates'].wspline/1.e4, 
+                           spline_func)
+                           
             spl,  = axc.plot(sfit['templates'].wspline/1.e4,
                              spline_func/y0*yl[1]*0.8, color='k',
                              linestyle='--', alpha=0.5,
@@ -2921,56 +3683,76 @@ class GroupFitter(object):
 
         return fig, line, tfit
 
-        # # Output TBD
-        # if False:
-        #     sfit = OrderedDict()
-        #
-        #     k = list(tstar.keys())[ix]
-        #     ts = {k:tstar[k]}
-        #     cont1d, line1d = utils.dot_templates(coeffs[ix,self.N:], ts, z=0.)
-        #
-        #     sfit['cfit'] = {}
-        #     sfit['coeffs'] = coeffs[ix,:]
-        #     sfit['covar'] = covar[ix,:,:]
-        #     sfit['z'] = 0.
-        #     sfit['templates'] = ts
-        #     sfit['cont1d'] = cont1d
-        #     sfit['line1d'] = line1d
-        #
-        #     return fig, sfit
 
     def oned_figure(self, bin=1, wave=None, show_beams=True, minor=0.1, tfit=None, show_rest=False, axc=None, figsize=[6, 4], fill=False, units='flam', min_sens_show=0.1, ylim_percentile=2, scale_on_stacked=False, show_individual_templates=False, apply_beam_mask=True, loglam_1d=True, trace_limits=None, show_contam=False, beam_models=None):
         """
-        1D figure
-        1D figure
-
+        Make a figure showing the 1D spectra 
+        
         Parameters
         ----------
-        bin : type
+        bin : float
+            Binning factor relative to nominal resolution (per pix) of each 
+            grism
+        
+        wave : None, array
+            Fixed wavelength array for the sampled spectra
+        
+        show_beams : bool
+            Show all individual beams
 
-        show_beams : type
+        minor : float
+            Minor axis tick interval (microns)
 
-        minor : type
+        tfit : dict
+            Fit information from `~grizli.fitting.GroupFitter.template_at_z`.
+            If provided, then will include the best-fit models in the figure
+        
+        show_rest : bool
+            Show rest-frame wavelengths
+            
+        acx : `~matplotlib.axes._subplots.AxesSubplot`
+            If provided, then draw into existing axis without making a new 
+            figure
 
-        tfit : type
+        figsize : (float, float)
+            Figure size (inches)
+            
+        fill : bool
+            plot filled spectra
+        
+        show_individual_templates : bool
+            Show each individual template with its scaling along with the 
+            best-fit combination
+            
+        units : str
+            Y-axis units
+            
+            - 'flam' = Scaled f-lambda cgs
+            - 'nJy' = nanoJansky
+            - 'mJy' = milliJansky
+            - 'eps' = native detector units of electrons per second
+            - 'meps' = "milli"-electrons per second
+            - 'spline[N]' = Divide out a spline continuum
+            - 'resid' = Residuals w.r.t. model in `tfit`
 
-        acx : type
-
-        figsize : type
-
-        fill : type
-
-        units : 'flam', 'nJy', 'mJy', 'eps', 'meps', 'spline[N]', 'resid'
-            Plot units.
-
-        min_sens_show : type
+        loglam_1d : bool
+            Plot as log wavelength
+        
+        trace_limits : (float, float)
+            If provided, extract spectra relative to the (tilted) spectral
+            trace
+        
+        show_contam : bool
+            Include curves for contamination model
+            
+        min_sens_show : float
 
         ylim_percentile : float
 
         Returns
         -------
-        fig : type
-
+        fig : `~matplotlib.figure.Figure`
+            Figure object
 
         """
         import matplotlib.pyplot as plt
@@ -3519,9 +4301,10 @@ class GroupFitter(object):
 
         return out
 
+
     def initialize_masked_arrays(self, seg_ids=None):
         """
-        Initialize flat masked arrays for fast likelihood calculation
+        Initialize flat masked arrays for faster likelihood calculation
         """
         
         if isinstance(self.beams[0], model.BeamCutout):
@@ -3599,13 +4382,13 @@ class GroupFitter(object):
         else:
             self.Nspec = self.Nmask
 
+
     def get_flat_model(self, spectrum_1d, id=None, apply_mask=True, is_cgs=True):
         """
         Generate model array based on the model 1D spectrum in ``spectrum_1d``
 
         Parameters
         ----------
-
         spectrum_1d : tuple, -1
             Tuple of 1D arrays (wavelength, flux).  If ``-1``, then use the
             in_place ``model`` attributes of each beam.
@@ -3615,7 +4398,6 @@ class GroupFitter(object):
 
         Returns
         -------
-
         model : Array with dimensions ``(self.fit_mask.sum(),)``
             Flattened, masked model array.
 
@@ -3634,6 +4416,7 @@ class GroupFitter(object):
                 mfull.append(model_i.flatten())
 
         return np.hstack(mfull)
+
 
     def get_flat_background(self, bg_params, apply_mask=True):
         """
@@ -3711,6 +4494,7 @@ class GroupFitter(object):
 
         return np.hstack(bg_full)
 
+
     @staticmethod
     def _objective_line_width(params, self, verbose):
         """
@@ -3725,6 +4509,7 @@ class GroupFitter(object):
             print(params, tfit['chi2'].sum())
 
         return tfit['chi2']
+
 
     def fit_line_width(self, bl=2.5, nl=1.1, z0=1.9367, max_nfev=100, tol=1.e-3, verbose=False):
         """
@@ -3748,14 +4533,37 @@ class GroupFitter(object):
 
 
 def show_drizzled_lines(line_hdu, full_line_list=['OII', 'Hb', 'OIII', 'Ha+NII', 'Ha', 'SII', 'SIII'], size_arcsec=2, cmap='cubehelix_r', scale=1., dscale=1, direct_filter=['F140W', 'F160W', 'F125W', 'F105W', 'F110W', 'F098M']):
-    """TBD
+    """Make a figure with the drizzled line maps
     
     Parameters
     ----------
+    line_hdu : `~astropy.io.fits.HDUList`
+        Result from `~grizli.multifit.MultiBeam.drizzle_fit_lines`
+    
+    full_line_list : list
+        Line species too always show
+    
+    size_arcsec : float
+        Thumbnail size in arcsec
+    
+    cmap : str
+        colormap string
+    
+    scale : float
+        Scale factor for line panels
+    
+    dscale : float
+        Scale factor for direct image panel
+        
     direct_filter : list
         Filter preference to show in the direct image panel.  Step through
         and stop if the indicated filter is available.
-
+    
+    Returns
+    -------
+    fig : `~matplotlib.figure.Figure`
+        Figure object
+        
     """
     import time
 
