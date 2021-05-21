@@ -386,12 +386,12 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
     """Read header information from a list of exposures and parse out groups based on filter/target/orientation.
 
     Parameters
-    -----------
+    ----------
     files : list
-        List of exposure filenames.  If not specified, use *flt.fits.
+        List of exposure filenames.  If not specified, will use ``*flt.fits``.
 
-    info : None or `~astropy.table.Table` 
-        ``None`` or output from `~grizli.utils.get_flt_info`.
+    info : None or `~astropy.table.Table`
+        Output from `~grizli.utils.get_flt_info`.
         
     uniquename : bool
         If True, then split everything by program ID and visit name.  If
@@ -7152,10 +7152,10 @@ def RGBtoHex(vals, rgbtype=1):
     vals : tuple
          An RGB/RGBA tuple
 
-    rgb_type : [1,256]
+    rgb_type : int
         Valid valus are:
-                          1 - Inputs are in the range 0 to 1
-                        256 - Inputs are in the range 0 to 255
+         - 1 = Inputs are in the range 0 to 1
+         - 256 = Inputs are in the range 0 to 255
  
     Returns
     -------
@@ -7436,8 +7436,8 @@ def argv_to_dict(argv, defaults={}, dot_dict=True):
         If true, then intepret keywords with '.' as nested dictionary keys, 
         e.g., ``--d.key=val`` >> {'d': {'key': 'val'}}
         
-    Examples:
-    ---------
+    Examples
+    --------
     
         # $ myfunc arg1 --p1=1 --l1=1,2,3 --pdict.k1=1 -flag
         >>> argv = 'arg1 --p1=1 --l1=1,2,3 --pdict.k1=1 -flag'.split()
