@@ -39,6 +39,7 @@ photflam_list = {'F098M': 6.0501324882418389e-20,
             'F814W': 7.0767633156044843e-20,
             'VISTAH': 1.9275637653833683e-20*0.95,
             'GRISM': 1.e-20,
+            'G150': 1.e-20,
             'G800L': 1.,
             'G280':  1., 
             'F444W': 1.e-20}
@@ -55,7 +56,8 @@ photplam_list = {'F098M': 9864.722728110915,
             'F775W': 7693.297933335407,
             'F814W': 8058.784799323767,
             'VISTAH': 1.6433e+04,
-            'GRISM': 1.6e4,
+            'GRISM': 1.6e4, # WFIRST/Roman
+            'G150': 1.46e4, # WFIRST/Roman
             'G800L': 7.4737026e3,
             'G280': 3651., 
             'F070W': 7.043e+03, # NIRCam
@@ -1583,12 +1585,15 @@ class ImageData(object):
 
             >>> okbits_instrument = {'WFC3': 32+64+512, # blob OK
                                      'NIRISS': 0,
-                                     'WFIRST': 0,}
+                                     'WFIRST': 0,
+                                     'WFI': 0}
         """
 
         okbits_instrument = {'WFC3': 32+64+512,  # blob OK
                              'NIRISS': 0,
-                             'WFIRST': 0, }
+                             'NIRCAM': 0,
+                             'WFIRST': 0, 
+                             'WFI': 0}
 
         if self.instrument not in okbits_instrument:
             okbits = 1
@@ -1596,6 +1601,7 @@ class ImageData(object):
             okbits = okbits_instrument[self.instrument]
 
         self.data['DQ'] = utils.unset_dq_bits(self.data['DQ'], okbits=okbits)
+
 
     def flag_negative(self, sigma=-3):
         """Flag negative data values with dq=4
@@ -3028,6 +3034,13 @@ class GrismFLT(object):
         -------
         Updated model stored in `self.model` attribute.
         """
+        try:
+            from tqdm import tqdm
+            has_tqdm = True
+        except:
+            has_tqdm = False
+            print('(`pip install tqdm` for a better verbose iterator)')
+            
         from .utils_c import disperse
 
         if ids is None:
@@ -3060,12 +3073,18 @@ class GrismFLT(object):
                     raise ValueError('`ids` and `mags` lists different sizes')
 
         # Now compute the full model
-        for id_i, mag_i in zip(ids, mags):
-            if verbose:
-                print(utils.NO_NEWLINE + 'compute model id={0:d}'.format(id_i))
+        if verbose & has_tqdm:
+            iterator = tqdm(zip(ids, mags))
+        else:
+            iterator = zip(ids, mags)
+            
+        for id_i, mag_i in iterator:
+            #if verbose:
+            #    print(utils.NO_NEWLINE + 'compute model id={0:d}'.format(id_i))
 
             self.compute_model_orders(id=id_i, compute_size=True, mag=mag_i,
                                       in_place=True, store=store)
+
 
     def smooth_mask(self, gaussian_width=4, threshold=2.5):
         """Compute a mask where smoothed residuals greater than some value
@@ -4205,7 +4224,8 @@ class BeamCutout(object):
         dl = np.interp(wavelength, self.beam.lam_beam[1:],
                                    np.diff(self.beam.lam_beam))
 
-        ysens = np.interp(wavelength, self.beam.lam_beam, self.beam.sensitivity_beam)
+        ysens = np.interp(wavelength, self.beam.lam_beam,
+                          self.beam.sensitivity_beam)
 
         # Update CRPIX
         dc = 0  # python array center to WCS pixel center

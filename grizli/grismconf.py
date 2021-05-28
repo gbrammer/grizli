@@ -564,6 +564,9 @@ def get_config_filename(instrume='WFC3', filter='F140W',
     if instrume == 'WFIRST':
         conf_file = os.path.join(GRIZLI_PATH, 'CONF/WFIRST.conf')
 
+    if instrume == 'WFI':
+        conf_file = os.path.join(GRIZLI_PATH, 'CONF/Roman.G150.conf')
+
     if instrume == 'SYN':
         conf_file = os.path.join(GRIZLI_PATH, 'CONF/syn.conf')
 

@@ -42,7 +42,7 @@ GRISM_COLORS = {'G800L': (0.0, 0.4470588235294118, 0.6980392156862745),
       'G102': (0.0, 0.6196078431372549, 0.45098039215686275),
       'G141': (0.8352941176470589, 0.3686274509803922, 0.0),
       'none': (0.8, 0.4745098039215686, 0.6549019607843137),
-      'GRISM': 'k',
+      'G150': 'k',
       'F277W': (0.0, 0.6196078431372549, 0.45098039215686275),
       'F356W': (0.8352941176470589, 0.3686274509803922, 0.0),
       'F444W': (0.8, 0.4745098039215686, 0.6549019607843137),
@@ -59,13 +59,22 @@ GRISM_COLORS = {'G800L': (0.0, 0.4470588235294118, 0.6980392156862745),
       'RED': '#d62728',
       'CLEARP': 'b'}
 
-GRISM_MAJOR = {'G102': 0.1, 'G141': 0.1, 'G800L': 0.1, 'F090W': 0.1, 'F115W': 0.1, 'F150W': 0.1, 'F140M': 0.1, 'F158M': 0.1, 'F200W': 0.1, 'F277W': 0.2, 'F356W': 0.2, 'F444W': 0.2, 'F410M': 0.2, 'BLUE': 0.1, 'RED': 0.1}
+GRISM_MAJOR = {'G102': 0.1, 'G141': 0.1, # WFC3/IR
+               'G800L': 0.1,  # ACS/WFC
+               'F090W': 0.1, 'F115W': 0.1, 'F150W': 0.1, # NIRISS
+               'F140M': 0.1, 'F158M': 0.1, 'F200W': 0.1, 
+               'F277W': 0.2, 'F356W': 0.2, 'F444W': 0.2, # NIRCam
+               'F410M': 0.2, 
+               'BLUE': 0.1, 'RED': 0.1, # Euclid
+               'GRISM':0.1, 'G150':0.1  # Roman
+               }
 
 GRISM_LIMITS = {'G800L': [0.545, 1.02, 40.],  # ACS/WFC
           'G280': [0.2, 0.4, 14],  # WFC3/UVIS
            'G102': [0.77, 1.18, 23.],  # WFC3/IR
            'G141': [1.06, 1.73, 46.0],
-           'GRISM': [0.98, 1.98, 11.],  # WFIRST
+           'GRISM': [0.98, 1.98, 11.],  # WFIRST/Roman
+           'G150': [0.98, 1.98, 11.],  
            'F090W': [0.76, 1.04, 45.0],  # NIRISS
            'F115W': [0.97, 1.32, 45.0],
            'F140M': [1.28, 1.52, 45.0],
@@ -84,7 +93,12 @@ GRISM_LIMITS = {'G800L': [0.545, 1.02, 40.],  # ACS/WFC
 #DEFAULT_LINE_LIST = ['PaB', 'HeI-1083', 'SIII', 'OII-7325', 'ArIII-7138', 'SII', 'Ha+NII', 'OI-6302', 'HeI-5877', 'OIII', 'Hb', 'OIII-4363', 'Hg', 'Hd', 'H8','H9','NeIII-3867', 'OII', 'NeVI-3426', 'NeV-3346', 'MgII','CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'NIII-1750', 'NIV-1487', 'NV-1240', 'Lya']
 
 # Line species for determining individual line fluxes.  See `load_templates`.
-DEFAULT_LINE_LIST = ['PaB', 'HeI-1083', 'SIII', 'OII-7325', 'ArIII-7138', 'SII', 'Ha', 'OI-6302', 'HeI-5877', 'OIII', 'Hb', 'OIII-4363', 'Hg', 'Hd', 'H7', 'H8', 'H9', 'H10', 'NeIII-3867', 'OII', 'NeVI-3426', 'NeV-3346', 'MgII', 'CIV-1549', 'CIII-1906', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'NIII-1750', 'NIV-1487', 'NV-1240', 'Lya']
+DEFAULT_LINE_LIST = ['PaB', 'HeI-1083', 'SIII', 'OII-7325', 'ArIII-7138',
+                     'SII', 'Ha', 'OI-6302', 'HeI-5877', 'OIII', 'Hb', 
+                     'OIII-4363', 'Hg', 'Hd', 'H7', 'H8', 'H9', 'H10', 
+                     'NeIII-3867', 'OII', 'NeVI-3426', 'NeV-3346', 'MgII', 
+                     'CIV-1549', 'CIII-1906', 'CIII-1908', 'OIII-1663', 
+                     'HeII-1640', 'NIII-1750', 'NIV-1487', 'NV-1240', 'Lya']
 
 LSTSQ_RCOND = None
 
@@ -3691,7 +3705,7 @@ def transform_wcs(in_wcs, translation=[0., 0.], rotation=0., scale=1.):
                      [np.sin(theta), np.cos(theta)]])
 
     try:
-        out_wcs.wcs.cd = np.dot(out_wcs.wcs.cd, _mat)/scale
+        out_wcs.wcs.cd[:2,:2] = np.dot(out_wcs.wcs.cd[:2,:2], _mat)/scale
     except:
         out_wcs.wcs.pc = np.dot(out_wcs.wcs.pc, _mat)/scale
 
@@ -7569,6 +7583,8 @@ class HubbleXYZ(object):
     def __init__(self, spt_file='', param_dict={}):
         """
         Helper to compute HST geocentric coordinates from orbital parameters
+        
+        (testing)
         
         Based on http://articles.adsabs.harvard.edu//full/1995ASPC...77..464A/
         """

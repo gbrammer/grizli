@@ -496,7 +496,34 @@ class GroupFLT():
     def compute_full_model(self, fit_info=None, verbose=True, store=False,
                            mag_limit=25, coeffs=[1.2, -0.5], cpu_count=0,
                            is_cgs=False):
-        """TBD
+        """Compute continuum models of all sources in an FLT
+        
+        Parameters
+        ----------
+        fit_info : dict
+        
+        verbose : bool
+        
+        store : bool
+        
+        mag_limit : float
+            Faint limit of objects to compute
+        
+        coeffs : list
+            Polynomial coefficients of the continuum model
+        
+        cpu_count : int
+            Number of CPUs to use for parallel processing.  If 0, then get
+            from `multiprocessing.cpu_count`.
+        
+        is_cgs : bool
+            Spectral models are in cgs units
+        
+        Returns
+        -------
+        Sets `object_dispersers` and `model` attributes on items in 
+        `self.FLTs`
+        
         """
         if cpu_count <= 0:
             cpu_count = mp.cpu_count()
@@ -523,12 +550,14 @@ class GroupFLT():
         t0_pool = time.time()
 
         pool = mp.Pool(processes=cpu_count)
-        results = [pool.apply_async(_compute_model, (i, self.FLTs[i], fit_info, is_cgs, store)) for i in range(self.N)]
+        jobs = [pool.apply_async(_compute_model, 
+                                 (i, self.FLTs[i], fit_info, is_cgs, store))
+                for i in range(self.N)]
 
         pool.close()
         pool.join()
 
-        for res in results:
+        for res in jobs:
             i, model, dispersers = res.get(timeout=1)
             self.FLTs[i].object_dispersers = dispersers
             self.FLTs[i].model = model
@@ -3335,35 +3364,41 @@ class MultiBeam(GroupFitter):
         if 'fwhm' in pzfit:
             fwhm = pzfit['fwhm']
             if pzfit['fwhm'] == 0:
-                fwhm = 700
                 if 'G141' in self.Ngrism:
+                    # WFC3/IR
                     fwhm = 1200
-                if 'G800L' in self.Ngrism:
+                elif 'G800L' in self.Ngrism:
+                    # ACS/WFC
                     fwhm = 1400
-                #
-                if 'G280' in self.Ngrism:
+                elif 'G280' in self.Ngrism:
+                    # UVIS
                     fwhm = 1500
-                # WFIRST
-                if 'GRISM' in self.Ngrism:
+                elif 'GRISM' in self.Ngrism:
+                    # WFIRST
                     fwhm = 350
-
+                elif 'G150' in self.Ngrism:
+                    # WFIRST
+                    fwhm = 350
+                else:
+                    fwhm = 700
+                    
         # Auto generate delta-wavelength of 2D spectrum
         if 'dlam' in pspec2:
             dlam = pspec2['dlam']
             if dlam == 0:
-                dlam = 25
                 if 'G141' in self.Ngrism:
                     dlam = 45
-
-                if 'G800L' in self.Ngrism:
+                elif 'G800L' in self.Ngrism:
                     dlam = 40
-
-                if 'G280' in self.Ngrism:
+                elif 'G280' in self.Ngrism:
                     dlam = 18
-
-                if 'GRISM' in self.Ngrism:
+                elif 'GRISM' in self.Ngrism:
                     dlam = 11
-
+                elif 'G150' in self.Ngrism:
+                    dlam = 11
+                else:
+                    dlam = 25 # G102
+                    
         # Redshift fit
         zfit_in = copy.copy(pzfit)
         zfit_in['fwhm'] = fwhm
