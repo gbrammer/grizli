@@ -20,9 +20,6 @@ Spectrum Analysis
 .. automodapi:: grizli.fitting
     :no-inheritance-diagram:
     :skip: OrderedDict, Planck15
-
-.. automodapi:: grizli.fake_image
-    :no-inheritance-diagram:
    
 Pipeline tools
 ==============
@@ -34,5 +31,12 @@ Pipeline tools
     :skip: get_yml_parameters, write_params_to_yml
 
 .. automodapi:: grizli.pipeline.photoz
+    :no-inheritance-diagram:
+
+Simulations
+===========
+Some basic tools for simulating HST/JWST/Roman grism data.  See `multimission_simulaation.ipynb <https://nbviewer.jupyter.org/github/gbrammer/grizli/blob/master/examples/multimission-simulation.ipynb>`__ for some examples.
+
+.. automodapi:: grizli.fake_image
     :no-inheritance-diagram:
 
