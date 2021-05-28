@@ -20,6 +20,10 @@ Spectrum Analysis
 .. automodapi:: grizli.fitting
     :no-inheritance-diagram:
     :skip: OrderedDict, Planck15
+
+.. automodapi:: grizli.fake_image
+    :no-inheritance-diagram:
+    :skip: OrderedDict, Planck15
    
 Pipeline tools
 ==============
