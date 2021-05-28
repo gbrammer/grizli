@@ -497,7 +497,7 @@ def make_fake_image(header, output='direct.fits', background=None, exptime=1.e4,
     return hdu
 
 
-def make_oman_config(save_to_conf=True):
+def make_roman_config(save_to_conf=True):
     """
     Use `pandeia` to calculate a Roman/G150 configuration file and sensitivity curve for `grizli`
     
