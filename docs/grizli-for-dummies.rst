@@ -503,7 +503,7 @@ demo, run [#]_:
 
 .. code:: python
 
-	auto_script.make_rgb_thumbnails(root=‘j033216m2743’, ids=[424], use_line_wcs=True) 
+	auto_script.make_rgb_thumbnails(root='j033216m2743', ids=[424], use_line_wcs=True) 
  
 
 However, the story does not end there.
