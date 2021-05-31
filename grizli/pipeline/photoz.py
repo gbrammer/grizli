@@ -275,8 +275,8 @@ def eazy_photoz(root, force=False, object_only=True, apply_background=True, aper
 
     # trans.pop('f814w')
 
-    print('Apply catalog corrections')
     if (not os.path.exists('{0}_phot_apcorr.fits'.format(root))) | force_apcorr:
+        print('Apply catalog corrections')
         apply_catalog_corrections(root, suffix='_apcorr', aperture_indices=aperture_indices)
 
     cat = utils.read_catalog('{0}_phot_apcorr.fits'.format(root))
@@ -284,7 +284,12 @@ def eazy_photoz(root, force=False, object_only=True, apply_background=True, aper
     for c in cat.meta:
         if c.endswith('_ZP'):
             filters.append(c.split('_ZP')[0].lower())
-
+    
+    if len(filters) == 0:
+        for f in trans:
+            if f'{f}_tot_{aper_ix}' in cat.colnames:
+                filters.append(f.lower())
+                
     # Translate
     fp = open('zphot.translate', 'w')
     for f in filters:
@@ -357,7 +362,7 @@ def eazy_photoz(root, force=False, object_only=True, apply_background=True, aper
             else:
                 params['PRIOR_FILTER'] = trans[f]
 
-            mag = 23.9-2.5*np.log10(cat['{0}_corr_{1}'.format(f, aper_ix)])
+            mag = 23.9-2.5*np.log10(cat['{0}_tot_{1}'.format(f, aper_ix)])
             break
 
     if os.path.exists('templates/fsps_full/tweak_fsps_QSF_11_v3_noRed.param.fits'):
