@@ -24,6 +24,10 @@ this file, do the following
 
     cd /usr/local/share/python # or some other location, even /tmp/
 
+    # Fetch the grizli repo
+    git clone https://github.com/gbrammer/grizli.git
+    cd grizli
+    
     # Generate a conda environment named "grizli-dev" or anything else
     # (Note environment_min.yml renamed to environment.yml for >0.10.0)
     conda env create -f environment.yml -n grizli-dev
@@ -31,10 +35,6 @@ this file, do the following
     # Activate the environment.  This needs to be done each time you 
     # start a new terminal, or put it in ~/.bashrc
     conda activate grizli-dev
-    
-    # Fetch the grizli repo
-    git clone https://github.com/gbrammer/grizli.git
-    cd grizli
     
     # Compile and install the grizli module.  Only needs to be done
     # once or after updating the repository.
@@ -46,17 +46,17 @@ The environment can also be installed with ``pip`` and the ``requirements.txt`` 
 
     cd /usr/local/share/python # or some other location, even /tmp/
 
-    # Fetch the grizli repo
-    git clone https://github.com/gbrammer/grizli.git
-    cd grizli
-    
     # Generate a conda environment named "grizli-dev" or anything else
     conda create -n grizli-dev python=3.7
             
     # Activate the environment.  This needs to be done each time you 
     # start a new terminal, or put it in ~/.bashrc
     conda activate grizli-dev
-    
+
+    # Fetch the grizli repo
+    git clone https://github.com/gbrammer/grizli.git
+    cd grizli
+        
     # Compile and install the grizli module.  Only needs to be done
     # once or after updating the repository.
     pip install . -r requirements.txt
