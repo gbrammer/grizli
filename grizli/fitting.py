@@ -1089,10 +1089,76 @@ def full_sed_plot(mb, tfit, zfit=None, bin=1, minor=0.1, save='png', sed_resolut
 
 CDF_SIGMAS = np.linspace(-5, 5, 51)
 
-
 def compute_cdf_percentiles(fit, cdf_sigmas=CDF_SIGMAS):
     """
-    Compute tabulated percentiles of the PDF
+    Compute tabulated percentiles of the CDF for a (lossy) compressed version
+    of the redshift PDF.
+    
+    The `pdf` values from the `fit` table are interpolated onto a fine
+    (``dz/(1+z) = 0.0001``) redshift grid before the full `cdf` is calculated 
+    and interpolated.
+    
+    The following shows an example including how to reconstruct the PDF
+    
+    .. plot::
+        :include-source:
+    
+        import numpy as np
+        import matplotlib.pyplot as plt
+        from scipy.stats import norm
+        
+        from grizli import utils
+        from grizli.fitting import compute_cdf_percentiles, CDF_SIGMAS
+        
+        # logarithmic redshift grid, but doesn't matter
+        zgrid = utils.log_zgrid([0.01, 3.4], 0.001)
+        
+        # Fake PDF from some Gaussians
+        peaks = [[1, 0.1], [1.5, 0.4]]
+        pdf = np.zeros_like(zgrid)
+        for p in peaks:
+            pdf += norm.pdf(zgrid, loc=p[0], scale=p[1])/len(peaks)
+            
+        # Put it in a table
+        fit = utils.GTable()
+        fit['zgrid'], fit['pdf'] = zgrid, pdf
+        
+        cdf_x, cdf_y = compute_cdf_percentiles(fit, cdf_sigmas=CDF_SIGMAS)
+        
+        # PDF is derivative of CDF
+        pdf_y = np.gradient(cdf_y)/np.gradient(cdf_x)
+        
+        fig, ax = plt.subplots(1,1,figsize=(6,4))
+        ax.plot(zgrid, pdf, label='input PDF')
+        ax.step(cdf_x, pdf_y, label='compressed from CDF', where='mid', color='0.5')
+        ax.grid()
+        ax.legend()
+        ax.set_xlabel('z')
+        ax.set_ylabel('p(z)')
+        
+    Parameters
+    ----------
+    fit : `~astropy.table.Table`
+        Table that contains, at a minimum, columns of ``zgrid`` and ``pdf``, 
+        e.g., as output from `grizli.fitting.GroupFitter.xfit_redshift`
+    
+    cdf_sigmas : array-like
+        Places to evaluate the CDF, in terms of "sigma" of a Normal (Gaussian)
+        distribution, i.e., 
+        
+        >>> import scipy.stats
+        >>> cdf_y = scipy.stats.norm.cdf(cdf_sigmas)
+        
+    
+    Returns
+    -------
+    cdf_x : array-like, size of `cdf_sigmas`
+        Redshifts where the CDF values correspond to the values `cdf_y` from 
+        `cdf_sigmas` of a Normal distribution.
+    
+    cdf_y : array-like
+        CDF values at `cdf_sigmas`
+                        
     """
     from scipy.interpolate import Akima1DInterpolator
     from scipy.integrate import cumtrapz
@@ -1860,25 +1926,20 @@ class GroupFitter(object):
 
         """
         NTEMP = len(templates)
-        A_phot = np.zeros((NTEMP+self.N, len(self.photom_flam)))  # self.Nphot))
+        A_phot = np.zeros((NTEMP+self.N, len(self.photom_flam)))
         mask = self.photom_eflam > 0
 
         if (self.tempfilt is not None):
             if (self.tempfilt.NTEMP == NTEMP):
-                #A_spl = self.tempfilt(z)
                 A_phot[self.N:, :] = self.tempfilt(z)
                 A_phot *= 3.e18/self.photom_pivot**2*(1+z)
                 A_phot[~np.isfinite(A_phot)] = 0
                 return A_phot[:, mask]
 
         for it, key in enumerate(templates):
-            # print(key)
             tz = templates[key].zscale(z, scalar=1)
             for ifilt, filt in enumerate(self.photom_filters):
-                A_phot[self.N+it, ifilt] = tz.integrate_filter(filt)*3.e18/self.photom_pivot[ifilt]**2  # *(1+z)
-
-            # pl = plt.plot(tz.wave, tz.flux)
-            # plt.scatter(self.photom_pivot, A_phot[self.N+it,:], color=pl[0].get_color())
+                A_phot[self.N+it, ifilt] = tz.integrate_filter(filt)*3.e18/self.photom_pivot[ifilt]**2
 
         return A_phot[:, mask]
 
@@ -2738,7 +2799,7 @@ class GroupFitter(object):
         Parameters
         ----------
         fit : `~astropy.table.Table`
-            Result of `xfit_redshift`
+            Result of `~grizli.fitting.GroupFitter.xfit_redshift`
         
         risk_gamma : float
             ``gamma`` parameter of the redshift "risk"
@@ -4160,10 +4221,21 @@ class GroupFitter(object):
     ###
     def optimal_extract(self, data=None, bin=1, wave=None, ivar=None, trace_limits=None, loglam=True, **kwargs):
         """
-        Binned optimal extractions by grism.
+        Binned optimal extractions by grism with algorithm from `Horne 1984 <http://adsabs.harvard.edu/full/1986PASP...98..609H>`_
 
-        TBD
-
+        The spatial profile for each beam is the 2D model spectrum generated 
+        using its attached direct image thumbnail.  The Horne (1984) algorithm
+        is essentially a least-squares fit of the spatial model to the 
+        observed 2D spectrum, weighted by the uncertainties.
+        
+        Along with the optimal extraction, this method also implements an 
+        option to extract an effective "aperture" within a specified region 
+        above and below the spectral trace. 
+        
+        While the traces may not be directly aligned with the `x` axis of the 
+        2D spectra, both the optimal and trace extractions extract along `y` 
+        pixels at a given `x`.  
+        
         Parameters
         ----------
         data : `~numpy.ndarray`, None
