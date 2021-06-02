@@ -297,7 +297,7 @@ def interp_conserve_c(np.ndarray[DTYPE_t, ndim=1] x, np.ndarray[DTYPE_t, ndim=1]
 
 
 @cython.boundscheck(False)
-def rebin_weighted_c(np.ndarray[DTYPE_t, ndim=1] x, np.ndarray[DTYPE_t, ndim=1] tlam, np.ndarray[DTYPE_t, ndim=1] tf, np.ndarray[DTYPE_t, ndim=1] te, double left=0, double right=0, double integrate=0):
+def rebin_weighted_c(np.ndarray[DTYPE_t, ndim=1] x, np.ndarray[DTYPE_t, ndim=1] tlam, np.ndarray[DTYPE_t, ndim=1] tf, np.ndarray[DTYPE_t, ndim=1] te, double left=0, double right=0, double integrate=0, int remove_missing=1):
     """
     rebin_weighted_c(x, xp, fp, ep, left=0, right=0, integrate=0)
 
@@ -361,8 +361,12 @@ def rebin_weighted_c(np.ndarray[DTYPE_t, ndim=1] x, np.ndarray[DTYPE_t, ndim=1] 
             outx[k] = xnumsum/densum
             outy[k] = numsum/densum
             oute[k] = 1/densum**0.5
-
-    return outx, outy, oute
+    
+    if remove_missing:
+        ok = outx != 0
+        return outx[ok], outy[ok], oute[ok]
+    else:
+        return outx, outy, oute
 
 
 def midpoint(x):
