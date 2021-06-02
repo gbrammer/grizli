@@ -56,6 +56,7 @@ The environment can also be installed with ``pip`` and the ``requirements.txt`` 
     cd /usr/local/share/python # or some other location, even /tmp/
 
     # Generate a conda environment named "grizli-dev" or anything else
+    # This will just provide the base python distribution (incl. pip)
     conda create -n grizli-dev python=3.7
             
     # Activate the environment.  This needs to be done each time you 
@@ -67,7 +68,8 @@ The environment can also be installed with ``pip`` and the ``requirements.txt`` 
     cd grizli
         
     # Compile and install the grizli module.  Only needs to be done
-    # once or after updating the repository.
+    # once or after updating the repository (e.g., with `git pull`).
+    # "--editable" builds the cython extensions needed for pytest
     pip install --editable . -r requirements.txt
     
     # One last dependency that doesn't install with pip and is needed
