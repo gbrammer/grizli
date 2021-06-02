@@ -34,7 +34,7 @@ this file, do the following
             
     # Activate the environment.  This needs to be done each time you 
     # start a new terminal, or put it in ~/.bashrc
-    source activate grizli-dev
+    conda activate grizli-dev
     
     # Compile and install the grizli module.  Only needs to be done
     # once or after updating the repository.
@@ -55,7 +55,7 @@ The environment can also be installed with ``pip`` and the ``requirements.txt`` 
             
     # Activate the environment.  This needs to be done each time you 
     # start a new terminal, or put it in ~/.bashrc
-    source activate grizli-dev
+    conda activate grizli-dev
     
     # Compile and install the grizli module.  Only needs to be done
     # once or after updating the repository.
