@@ -73,7 +73,7 @@ If you are planning to run simultaneous fits to grism spectra plus photometry us
     source activate grizli-dev # or whatever was chosen above
     
     # Fetch the eazy-py repo
-    git clone https://github.com/gbrammer/eazy-py.git
+    git clone --recurse-submodules https://github.com/gbrammer/eazy-py.git
     cd eazy-py
     
     # Only needs to be done once or after updating the repository.
