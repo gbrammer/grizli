@@ -15,6 +15,13 @@ code.
 
 Installation with a Conda environment
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. note:: 
+
+    As of May 2021 the conda/pip installation below is favored since the CI
+    tests were migrated from travis to GitHub actions, which are run on each
+    push to the repository.
+
 An `environment.yml <https://github.com/gbrammer/grizli/blob/master/environment.yml>`__ file is included with the `~grizli` distribution to 
 provide an automatic way of installing the required dependencies, getting
 them from `conda`, `pip`, and directly from `github` as necessary.  To use 
@@ -40,7 +47,9 @@ this file, do the following
     # once or after updating the repository.
     python setup.py install 
 
-The environment can also be installed with ``pip`` and the ``requirements.txt`` file, which was added in 2021 to enable the github actions testing environment.  Here are instructions for installing with that method *instead* of the conda method above
+Preferred installation with conda/pip
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The environment can also be installed with ``pip`` and the ``requirements.txt`` file, which was added in 2021 to enable the github "actions" testing environment.  Here are instructions for installing with that method *instead* of the conda method above
 
 .. code:: bash
 
@@ -59,12 +68,16 @@ The environment can also be installed with ``pip`` and the ``requirements.txt`` 
         
     # Compile and install the grizli module.  Only needs to be done
     # once or after updating the repository.
-    pip install . -r requirements.txt
+    pip install --editable . -r requirements.txt
     
     # One last dependency that doesn't install with pip and is needed
     # for the WFC3/IR pipeline calwf3
     conda install hstcal
-
+    
+    # Run basic tests with pytest
+    pip install pytest
+    pytest
+    
 If you are planning to run simultaneous fits to grism spectra plus photometry using the `eazy-py <https://github.com/gbrammer/eazy-py>`_ connection, install ``eazy-py`` from the repository to ensure that you get its dependencies.
 
 .. code:: bash
@@ -79,7 +92,10 @@ If you are planning to run simultaneous fits to grism spectra plus photometry us
     # Only needs to be done once or after updating the repository.
     pip install . -r requirements.txt
 
-
+    # Run basic tests with pytest
+    # (pysynphot failure is not critical)
+    pytest
+    
 Once you've built the code, proceed to `Set up directories and fetch config files`_.
 
 Manual installation of dependencies
