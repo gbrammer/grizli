@@ -51,7 +51,7 @@ The environment can also be installed with ``pip`` and the ``requirements.txt`` 
     cd grizli
     
     # Generate a conda environment named "grizli-dev" or anything else
-    conda env create -n grizli-dev
+    conda env create -n grizli-dev python=3.7
             
     # Activate the environment.  This needs to be done each time you 
     # start a new terminal, or put it in ~/.bashrc
