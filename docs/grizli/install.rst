@@ -3,22 +3,79 @@ Installation instructions
 Python Environment
 ------------------
 
-`Grizli` has been developed to work in the `astroconda
-<http://astroconda.readthedocs.io/en/latest/>`__ Python environment, which
-provides most of the required modules listed here, including general utilities
-like `numpy`, `scipy`, and `matplotlib`, as well as astronomy tools like
-`astropy` and specific software for dealing with space-telescope data
-(`stsci.tools`, `drizzlepac`, etc.). Most development is done in a python ``3.7`` environment.  The basic build is tested in Python ``3.6``, 
-``3.7`` and ``3.8`` with the GitHub actions functionality, 
-but the current test suite does not yet test much actual functionality of the 
-code.
+`Grizli` has been developed within a `miniconda
+<https://docs.conda.io/en/latest/miniconda.html>`_ Python environment. Module
+dependencies, including general utilities like `numpy`, `scipy`, and
+`matplotlib` and astronomy tools like `astropy` and specific software for
+dealing with space-telescope data (`stsci.tools`, `drizzlepac`, etc.) are
+installed using the provided ``requirements.txt`` file (see below). Most
+development is done in a ``python 3.7`` environment on a MacBook Pro running
+Mojave 10.14.6.  The basic build is tested in (Linux) python ``3.6``,
+``3.7`` and ``3.8`` with the `GitHub actions <https://github.com/gbrammer/grizli/actions>`_ continuous integration (CI)
+tools, but the current test suite does not yet test much of the full
+functionality of the code.
 
-Installation with a Conda environment
+Preferred installation with conda/pip
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The environment can be installed with ``pip`` and the `requirements.txt <https://github.com/gbrammer/grizli/blob/master/requirements.txt>`_ file, which was added in 2021 to enable the github "actions" CI testing environment (migrated from `travis-ci.org <https://travis-ci.org>`_).  The instructions below assume you have `conda` installed, e.g., with `miniconda
+<https://docs.conda.io/en/latest/miniconda.html>`_. 
+
+.. code:: bash
+    
+    # Generate a conda environment named "grizli-dev" or anything else
+    # This will just provide the base python distribution (incl. pip)
+    conda create -n grizli-dev python=3.7
+            
+    # Activate the environment.  This needs to be done each time you 
+    # start a new terminal, or put it in ~/.bashrc
+    conda activate grizli-dev
+
+    # or some other location, even /tmp/
+    cd /usr/local/share/python 
+
+    # Fetch the grizli repo
+    git clone https://github.com/gbrammer/grizli.git
+    cd grizli
+        
+    # Compile and install the grizli module.  Only needs to be done
+    # once or after updating the repository (e.g., with `git pull`).
+    # "--editable" builds the cython extensions needed for pytest
+    pip install --editable . -r requirements.txt
+    
+    # One last dependency that doesn't install with pip and is needed
+    # for the WFC3/IR pipeline calwf3
+    conda install hstcal
+    
+    # Run basic tests with pytest
+    pip install pytest
+    pytest
+    
+If you are planning to run simultaneous fits to grism spectra plus photometry using the `eazy-py <https://github.com/gbrammer/eazy-py>`_ connection, install `eazy-py` from the repository to ensure that you get its dependencies.
+
+.. code:: bash
+
+    cd /usr/local/share/python # location from above
+    conda activate grizli-dev # or whatever was chosen above
+    
+    # Fetch the eazy-py repo
+    git clone --recurse-submodules https://github.com/gbrammer/eazy-py.git
+    cd eazy-py
+    
+    # Only needs to be done once or after updating the repository.
+    pip install . -r requirements.txt
+
+    # Run basic tests with pytest
+    # (pysynphot failure is not critical)
+    pytest
+    
+Once you've built the code, proceed to `Set up directories and fetch config files`_.
+
+Installation with conda and `environment.yml`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. note:: 
 
-    As of May 2021 the conda/pip installation below is favored since the CI
+    As of May 2021 the conda/pip installation above is favored since the CI
     tests were migrated from travis to GitHub actions, which are run on each
     push to the repository.
 
@@ -47,119 +104,22 @@ this file, do the following
     # once or after updating the repository.
     python setup.py install 
 
-Preferred installation with conda/pip
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The environment can also be installed with ``pip`` and the `requirements.txt <https://github.com/gbrammer/grizli/blob/master/requirements.txt>`_ file, which was added in 2021 to enable the github "actions" testing environment.  Here are instructions for installing with that method *instead* of the conda method above
-
-.. code:: bash
-
-    cd /usr/local/share/python # or some other location, even /tmp/
-
-    # Generate a conda environment named "grizli-dev" or anything else
-    # This will just provide the base python distribution (incl. pip)
-    conda create -n grizli-dev python=3.7
-            
-    # Activate the environment.  This needs to be done each time you 
-    # start a new terminal, or put it in ~/.bashrc
-    conda activate grizli-dev
-
-    # Fetch the grizli repo
-    git clone https://github.com/gbrammer/grizli.git
-    cd grizli
-        
-    # Compile and install the grizli module.  Only needs to be done
-    # once or after updating the repository (e.g., with `git pull`).
-    # "--editable" builds the cython extensions needed for pytest
-    pip install --editable . -r requirements.txt
-    
-    # One last dependency that doesn't install with pip and is needed
-    # for the WFC3/IR pipeline calwf3
-    conda install hstcal
-    
-    # Run basic tests with pytest
-    pip install pytest
-    pytest
-    
-If you are planning to run simultaneous fits to grism spectra plus photometry using the `eazy-py <https://github.com/gbrammer/eazy-py>`_ connection, install ``eazy-py`` from the repository to ensure that you get its dependencies.
-
-.. code:: bash
-
-    cd /usr/local/share/python # location from above
-    source activate grizli-dev # or whatever was chosen above
-    
-    # Fetch the eazy-py repo
-    git clone --recurse-submodules https://github.com/gbrammer/eazy-py.git
-    cd eazy-py
-    
-    # Only needs to be done once or after updating the repository.
-    pip install . -r requirements.txt
-
-    # Run basic tests with pytest
-    # (pysynphot failure is not critical)
-    pytest
-    
-Once you've built the code, proceed to `Set up directories and fetch config files`_.
-
 Manual installation of dependencies
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-There are a number of additional required modules not provided with `astroconda`,
-summarized here.   `/usr/local/share/python` is a good place to download and
-compile Python modules not provided automatically with `astroconda`:
+There are a few additional modules that `grizli` may use but that aren't explicitly listed in the `requirements.txt <https://github.com/gbrammer/grizli/blob/master/requirements.txt>`_ file.   
+
+**Amazon Web Services** - If you're running the full *HST* reduction pipeline with `grizli`, the code can automatically pull FITS files from the public AWS S3 bucket mirror of the archive. This requires the AWS command line tools and the `boto3` module:
 
     .. code:: bash
 
-        cd /usr/local/share/python # or some other location, even /tmp/
-
-`scikit-learn <http://scikit-learn.org/>`__ - Machine learning tools. This is
-provided with a full anaconda/astroconda distribution but may not be supplied
-with a "`miniconda <http://conda.pydata.org/miniconda.html>`__" distribution.
-
-    .. code:: python
-    
-        >>> # test if it's installed
-        >>> import sklearn
-
-    .. code:: bash
-    
-        pip install scikit-learn
-        # or with anaconda
-        conda install scikit-learn
-        
-`peakutils <http://pythonhosted.org/PeakUtils/>`__ - detecting peaks in 1D data
-
-    .. code:: bash
-
-        pip install peakutils
-
-`sewpy <https://github.com/megalut/sewpy>`__ - Astropy-compatible wrapper for
-`SExtractor <http://www.astromatic.net/software/sextractor>`__. This is
-necessary for the `grizli.prep` image pre-processing and also requires that
-you have a working version of SExtractor installed (i.e., `sex`), which can be
-its own can of worms.
-
-    .. code:: bash
-
-        git clone https://github.com/megalut/sewpy.git
-        # For Python 3, get the fork below
-        # git clone https://github.com/gbrammer/sewpy.git
-        cd sewpy
-        python setup.py install
-
-`astroquery <https://astroquery.readthedocs.io>`__ - astropy affiliated
-package for querying astronomical databases. This is only necessary if you
-want to use the tools in `grizli.prep` for astrometric alignment to the SDSS
-and/or WISE source catalogs.
-
-    .. code:: bash
-
-        pip install astroquery
-        # or with anaconda
-        conda install -c astropy astroquery
+        # Put your AWS credentials, etc. in ~/.aws 
+        pip install awscli
+        pip install boto3    
 
 `lacosmicx <https://github.com/cmccully/lacosmicx>`__ - Fast Python
 implementation of Pieter van Dokkum's `L.A.Cosmic
-<http://www.astro.yale.edu/dokkum/lacosmic/>`__ (`ref
+<http://www.astro.yale.edu/dokkum/lacosmic/>`__ (`2001PASP..113.1420V
 <http://adsabs.harvard.edu/abs/2001PASP..113.1420V>`__) software for
 identifying cosmic rays in single images. The image preparation wrapper
 scripts in `grizli.prep` run `lacosmicx` if a supplied list of direct or grism
@@ -182,38 +142,8 @@ images contains only a single file.
     .. code:: bash
         
         brew install gcc
-        CC=/usr/local/Cellar/gcc/8.3.0_2/bin/gcc-8 pip install git+https://github.com/cmccully/lacosmicx.git
-        
-`shapely <http://toblerity.org/shapely/manual.html>`__ - Tools for handling
-geometry calculations, e.g., overlapping polygons. Currently only used by
-`~grizli.utils.parse_visit_overlaps`. Installation used to be tricky to
-compile the required associated `GEOS <http://trac.osgeo.org/geos/>`_ library,
-but now appears to be trivial under conda:
+        CC=/usr/local/Cellar/gcc/10.2.0/bin/gcc-10 pip install git+https://github.com/cmccully/lacosmicx.git
 
-    .. code:: bash
-
-        conda install shapely
-
-`mastquery <https://github.com/gbrammer/mastquery>`__ - Python tools for 
-querying exposure-level data from the MAST archive:
-
-    .. code:: bash
-
-        pip install git+https://github.com/gbrammer/mastquery
-        
-                
-Build ``grizli``
-----------------
-``grizli`` - The main code repository. There is an old version of `grizli`
-available to `pip`, but for now the code should be downloaded directly from
-the GitHub repository until the versioning and tagging is straightened out:
-
-    .. code:: bash
-
-        git clone https://github.com/gbrammer/grizli.git
-
-        cd grizli
-        python setup.py install
 
 Set up directories and fetch config files
 -----------------------------------------
