@@ -7,9 +7,6 @@
 .. image:: https://badge.fury.io/py/grizli.svg
     :target: https://badge.fury.io/py/grizli
     
-.. image:: https://coveralls.io/repos/github/gbrammer/grizli/badge.svg?branch=master
-    :target: https://coveralls.io/github/gbrammer/grizli?branch=master
-
 .. image:: https://zenodo.org/badge/55784299.svg
    :target: https://zenodo.org/badge/latestdoi/55784299
 
