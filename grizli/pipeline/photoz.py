@@ -413,7 +413,9 @@ Run it with ``path`` pointing to the location of the ``eazy-photoz`` repository.
         self.fit_parallel(idx[sample], n_proc=10)
         if compute_residuals:
             self.error_residuals()
-
+    
+    self.fit_phoenix_stars()
+    
     self.standard_output(prior=apply_prior, beta_prior=beta_prior, extra_rf_filters=extra_rf_filters)
 
     zout = utils.read_catalog('{0}.eazypy.zout.fits'.format(root))
