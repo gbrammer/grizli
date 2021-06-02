@@ -49,7 +49,7 @@ this file, do the following
 
 Preferred installation with conda/pip
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The environment can also be installed with ``pip`` and the ``requirements.txt`` file, which was added in 2021 to enable the github "actions" testing environment.  Here are instructions for installing with that method *instead* of the conda method above
+The environment can also be installed with ``pip`` and the `requirements.txt <https://github.com/gbrammer/grizli/blob/master/requirements.txt>`_ file, which was added in 2021 to enable the github "actions" testing environment.  Here are instructions for installing with that method *instead* of the conda method above
 
 .. code:: bash
 
