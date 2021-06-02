@@ -1556,7 +1556,7 @@ def from_sql(query, engine):
     return tab
 
 
-def render_for_notebook(tab, image_extensions=['stack', 'full', 'line'], bucket='grizli-v1', max_rows=20, link_root=True):
+def render_for_notebook(tab, image_extensions=['stack', 'full', 'line'], bucket='grizli-v1', max_rows=20, link_root=True, link_type='grism'):
     """
     Render images for inline display in a notebook
 
@@ -1566,6 +1566,8 @@ def render_for_notebook(tab, image_extensions=['stack', 'full', 'line'], bucket=
 
     """
     import pandas as pd
+    from eazy import utils as eu
+    
     pd.set_option('display.max_colwidth', -1)
 
     rows = tab[:max_rows].copy()
@@ -1588,25 +1590,46 @@ def render_for_notebook(tab, image_extensions=['stack', 'full', 'line'], bucket=
 
         s3 = 'https://s3.amazonaws.com/'+bucket_i+'/Pipeline/{0}/Extractions/{0}.html'
         return '<a href={0}>{1}</a>'.format(s3.format(root), root)
-
+    
     def path_to_image_html(path):
         return '<a href={0}><img src="{0}"/></a>'.format(path)
 
     # link for root
 
+    fmt = {}
+    cols = list(rows.colnames)
+    
     if link_root:
-        fmt = {'root': href_root}
-    else:
-        fmt = {}
-
+        if link_type == 'grism':
+            fmt = {'root': href_root}
+        elif (link_type in ['cds','eso','alma','mast']) & ('ra' in cols):
+            funcs = {'cds':eu.cds_query, 
+                     'eso':eu.eso_query,
+                     'alma':eu.alma_query,
+                     'mast':eu.mast_query}
+            
+            urls = [funcs[link_type](ra, dec) 
+                      for ra, dec in zip(tab['ra'], tab['dec'])]
+            href = [f'<a href="{u}"> {r} {i} </a>'
+                    for u, r, i in zip(urls, tab['root'], tab['id'])]
+            
+            rows['xroot'] = href
+            cols = ['xroot'] + cols
+            for c in ['root','id','ra','dec']:
+                cols.pop(cols.index(c))
+                
     for ext in image_extensions:
         rows['ext'] = ext
         urls = [s3url.format(**row) for row in rows.to_pandas().to_dict(orient='records')]
         rows[ext] = urls
         fmt[ext] = path_to_image_html
-
+        cols.append(ext)
+        
     rows.remove_columns(['bucket', 'ext'])
-    out = rows.to_pandas().to_html(escape=False, formatters=fmt)
+    for c in ['bucket','ext']:
+        cols.pop(cols.index(c))
+        
+    out = rows[cols].to_pandas().to_html(escape=False, formatters=fmt)
     return out
 
 
