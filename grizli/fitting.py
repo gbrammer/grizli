@@ -4464,7 +4464,15 @@ class GroupFitter(object):
         spectrum_1d : tuple, -1
             Tuple of 1D arrays (wavelength, flux).  If ``-1``, then use the
             in_place ``model`` attributes of each beam.
-
+        
+        id : int
+            Value that identifies pixels in the segmentation thumbnail with 
+            the desired object to model
+        
+        apply_mask : bool
+            Return the model pixels applying the `~grizli.model.BeamCutout` 
+            ``fit_mask`` attribute
+            
         is_cgs : bool
             ``spectrum_1d`` flux array has CGS f-lambda flux density units.
 
