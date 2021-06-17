@@ -97,8 +97,7 @@ setup(
     url = "https://github.com/gbrammer/grizli",
     download_url = "https://github.com/gbrammer/grizli/tarball/{0}".format(version),
     packages=['grizli', 'grizli/pipeline', 'grizli/utils_c', 'grizli/tests', 'grizli/galfit', 'grizli/aws'],
-    # requires=['numpy', 'scipy', 'astropy', 'drizzlepac', 'stwcs'],
-    # long_description=read('README.rst'),
+    install_requires = ['numpy','cython'], 
     classifiers=[
         "Development Status :: 1 - Planning",
         'Intended Audience :: Science/Research',
