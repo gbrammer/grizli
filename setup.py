@@ -76,7 +76,8 @@ __version_hash__ = "{version_hash}" """
     fp.write(version_str)
     fp.close()
     print('Git version: {0}'.format(version))
-        
+else:
+    version = 1.3.1
 
 if USE_CYTHON:
     extensions = cythonize(extensions, language_level="3")
