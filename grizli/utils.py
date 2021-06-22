@@ -7545,16 +7545,23 @@ class Unique(object):
         self.indices = _[1]
         self.counts = _[2]
         if verbose:
-            self.info()
+            self.info(sort_counts=verbose)
     
     @property
-    def n(self):
+    def N(self):
         return len(self.values)
     
-    def info(self):
-        print(f'{"value":10} {"N":>4}')
-        for v, c in zip(self.values, self.counts):
-            print(f'{v:10} {c:>4}')
+    def info(self, sort_counts=-1):
+        print(f'{"N":>4}  {"value":10}')
+        print('====  ==========')
+        if sort_counts:
+            so = np.argsort(self.counts)[::int(sort_counts)]
+        else:
+            so = np.arange(self.N)
+            
+        for i in so:
+            v, c = self.values[i], self.counts[i]
+            print(f'{c:>4}  {v:10}')
     
     def count(self, key):
         if key in self.values:
