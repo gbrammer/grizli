@@ -55,16 +55,17 @@ For example,
         """.format(os.getenv('iref')))
 
 
-check_status()
+# check_status()
 
 
 def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_badpix=True, apply_grism_skysub=True, crclean=False, mask_regions=True):
     """Copy "fresh" unmodified version of a data file from some central location
 
-    TBD
-
     Parameters
     ----------
+    file : str
+        Filename
+        
     preserve_dq : bool
         Preserve DQ arrays of files if they exist in './'
 
@@ -408,15 +409,22 @@ def apply_region_mask(flt_file, dq_value=1024, verbose=True):
     Parameters
     ----------
     flt_file : str
-        Filename of the FLT exposure
+        Filename of a FLT exposure. The function searches for region files
+        with filenames like 
+        
+        >>> mask_file = flt_file.replace('_flt.fits','.{ext}.mask.reg')
+        
+        where ``{ext}`` is an integer referring to the SCI extension in the 
+        FLT file (1 for WFC3/IR, 1 or 2 for ACS/WFC and WFC3/UVIS).
 
     dq_value : int
         DQ bit to flip for affected pixels
-
-    Searches for region files with filenames like
-    `flt_file.replace('_flt.fits','.[ext].mask.reg')`, where `[ext]` is an
-    integer referring to the SCI extension in the FLT file.
-
+    
+    Returns
+    -------
+    Nothing, but updates the ``DQ`` extension of `flt_file` if a mask file
+    is found
+    
     """
     import pyregion
 
@@ -488,10 +496,24 @@ def apply_saturated_mask(flt_file, dq_value=1024, verbose=True):
 
 
 def clip_lists(input, output, clip=20):
-    """TBD
-
-    Clip [x,y] arrays of objects that don't have a match within `clip` pixels
-    in either direction
+    """Clip [x,y] arrays of objects that don't have a match within `clip` pixels in either direction
+    
+    Parameters
+    ----------
+    input : (array, array)
+        Input pixel/array coordinates
+    
+    output : (array, array)
+        Output pixel/array coordinates
+    
+    clip : float
+        Matching distance
+    
+    Returns
+    -------
+    in_clip, out_clip : (array, array)
+        Clipped coordinate lists
+        
     """
     import scipy.spatial
 
@@ -505,13 +527,13 @@ def clip_lists(input, output, clip=20):
                                     distance_upper_bound=np.inf)
 
     ok = dist < clip
-    out_arr = output[ok]
+    out_clip = output[ok]
     if ok.sum() == 0:
         print('No matches within `clip={0:f}`'.format(clip))
         return False
 
     # Backward
-    tree = scipy.spatial.cKDTree(out_arr, 10)
+    tree = scipy.spatial.cKDTree(out_clip, 10)
 
     N = input.shape[0]
     dist, ix = np.zeros(N), np.zeros(N, dtype=int)
@@ -520,19 +542,62 @@ def clip_lists(input, output, clip=20):
                                     distance_upper_bound=np.inf)
 
     ok = dist < clip
-    in_arr = input[ok]
+    in_clip = input[ok]
 
-    return in_arr, out_arr
+    return in_clip, out_clip
 
 
 def match_lists(input, output, transform=None, scl=3600., simple=True,
                 outlier_threshold=5, toler=5, triangle_size_limit=[5, 800],
                 triangle_ba_max=0.9, assume_close=False):
-    """TBD
-
-    Compute matched objects and transformation between two [x,y] lists.
-
-    If `transform` is None, use Similarity transform (shift, scale, rot)
+    """Compute matched objects and transformation between two (x,y) lists.
+    
+    Parameters
+    ----------
+    input : (array, array)
+        Input pixel/array coordinates
+    
+    output : (array, array)
+        Output pixel/array coordinates
+    
+    transform : None, `skimage.transform` object
+        Coordinate transformation model.  If None, use S
+        `skimage.transform.SimilarityTransform`, i.e., (shift, scale, rot)
+    
+    scl : float
+        Not used
+    
+    simple : bool
+        Find matches manually within `outlier_threshold`.  If False, find 
+        matches with `skimage.measure.ransac` and the specified `transform`
+    
+    outlier_threshold : float
+        Match threshold for ``simple=False`
+        
+    triangle_size_limit : (float, float)
+        Size limit of matching triangles, generally set to something of order
+        of the detector size
+    
+    triangle_ba_max : float
+        Maximum length/height ratio of matching triangles
+    
+    assume_close : bool
+        Not used
+    
+    Returns
+    -------
+    input_ix : (array, array)
+        Array indices of matches from `input` 
+    
+    output_ix : (array, array)
+        Array indices of matches from `output` 
+    
+    outliers : (array, array)
+        Array indices of outliers
+    
+    model : transform
+        Instance of the `transform` object based on the matches
+        
     """
     import copy
     from astropy.table import Table
@@ -541,6 +606,14 @@ def match_lists(input, output, transform=None, scl=3600., simple=True,
     from skimage.measure import ransac
 
     import stsci.stimage
+
+    try:
+        import tristars
+        from tristars.match import match_catalog_tri
+    except ImportError:
+        print("""
+    Couldn't `import tristars`.  Get it from https://github.com/gbrammer/tristars to enable improved blind astrometric matching with triangle asterisms.
+    """)
 
     if transform is None:
         transform = skimage.transform.SimilarityTransform
@@ -551,22 +624,25 @@ def match_lists(input, output, transform=None, scl=3600., simple=True,
         return input, output, None, transform()
 
     try:
-        from tristars import match
-        pair_ix = match.match_catalog_tri(input, output, maxKeep=10, auto_keep=3, auto_transform=transform, auto_limit=outlier_threshold, size_limit=triangle_size_limit, ignore_rot=False, ignore_scale=True, ba_max=triangle_ba_max)
+        pair_ix = match_catalog_tri(input, output, maxKeep=10, auto_keep=3, 
+                                    auto_transform=transform, 
+                                    auto_limit=outlier_threshold, 
+                                    size_limit=triangle_size_limit, 
+                                    ignore_rot=False, ignore_scale=True, 
+                                    ba_max=triangle_ba_max)
 
         input_ix = pair_ix[:, 0]
         output_ix = pair_ix[:, 1]
+        
+        msg = '  tristars.match: Nin={0}, Nout={1}, match={2}'
+        print(msg.format(len(input), len(output), len(output_ix)))
 
-        print('  tristars.match: Nin={0}, Nout={1}, match={2}'.format(len(input), len(output), len(output_ix)))
-
-        #print('xxx Match from tristars!')
-
-        if False:
-            fig = match.match_diagnostic_plot(input, output, pair_ix, tf=None, new_figure=True)
-            fig.savefig('/tmp/xtristars.png')
-            plt.close(fig)
-
-            tform = match.get_transform(input, output, pair_ix, transform=transform, use_ransac=True)
+        # if False:
+        #     fig = match.match_diagnostic_plot(input, output, pair_ix, tf=None, new_figure=True)
+        #     fig.savefig('/tmp/xtristars.png')
+        #     plt.close(fig)
+        # 
+        #     tform = get_transform(input, output, pair_ix, transform=transform, use_ransac=True)
 
     except:
 
@@ -577,8 +653,10 @@ def match_lists(input, output, transform=None, scl=3600., simple=True,
                                         origin=np.median(input, axis=0),
                                         mag=(1.0, 1.0), rotation=(0.0, 0.0),
                                         ref_origin=np.median(input, axis=0),
-                                        algorithm='tolerance', tolerance=toler,
-                                        separation=0.5, nmatch=10, maxratio=10.0,
+                                        algorithm='tolerance', 
+                                        tolerance=toler,
+                                        separation=0.5, nmatch=10, 
+                                        maxratio=10.0,
                                         nreject=10)
 
         m = Table(match)
@@ -598,7 +676,8 @@ def match_lists(input, output, transform=None, scl=3600., simple=True,
 
         # Iterate
         if inliers.sum() > 2:
-            m_i, in_i = ransac((input[input_ix[inliers], :], output[output_ix[inliers], :]),
+            m_i, in_i = ransac((input[input_ix[inliers], :], 
+                                output[output_ix[inliers], :]),
                                    transform, min_samples=3,
                                    residual_threshold=3, max_trials=100)
             if in_i.sum() > 2:
@@ -623,15 +702,124 @@ def match_lists(input, output, transform=None, scl=3600., simple=True,
     return input_ix, output_ix, outliers, model
 
 
-def align_drizzled_image(root='', mag_limits=[14, 23], radec=None, NITER=3,
-                         clip=20, log=True, outlier_threshold=5,
-                         verbose=True, guess=[0., 0., 0., 1], simple=True,
-                         rms_limit=2, use_guess=False,
-                         triangle_size_limit=[5, 1800], max_sources=200,
-                         triangle_ba_max=0.9, max_err_percentile=99,
-                         catalog_mask_pad=0.05, match_catalog_density=None,
-                         assume_close=False, ref_border=100):
-    """TBD
+def align_drizzled_image(root='',
+                         mag_limits=[14, 23],
+                         radec=None,
+                         NITER=3,
+                         clip=20,
+                         log=True,
+                         outlier_threshold=5,
+                         verbose=True,
+                         guess=[0., 0., 0., 1],
+                         simple=True,
+                         rms_limit=2,
+                         use_guess=False,
+                         triangle_size_limit=[5, 1800],
+                         max_sources=200,
+                         triangle_ba_max=0.9,
+                         max_err_percentile=99,
+                         catalog_mask_pad=0.05,
+                         match_catalog_density=None,
+                         assume_close=False,
+                         ref_border=100):
+    """Pipeline for astrometric alignment of drizzled image products
+    
+    1. Generate source catalog from image mosaics
+    2. Trim catalog lists
+    3. Find matches and compute (shift, rot, scale) transform
+    
+    Parameters
+    ----------
+    root : str
+        Image product rootname, passed to `~grizli.prep.make_SEP_catalog`
+    
+    mag_limits : (float, float)
+        AB magnitude limits of objects in the image catalog to use for 
+        the alignment
+        
+    radec : str or (array, array)
+        Reference catalog positions (ra, dec).  If `str`, will read from a
+        file with `np.loadtxt`, assuming just two columns
+        
+    NITER : int
+        Number of matching/transform iterations to perform
+
+    clip : float
+        If positive, then coordinate arrays will be clipped with 
+        `~grizli.prep.clip_lists`.
+    
+    log : bool
+        Write results to `wcs.log` file and make a diagnostic figure
+        
+    verbose : bool
+        Print status message to console
+        
+    guess : list
+        Initial guess for alignment: 
+        
+        >>> guess = [0., 0., 0., 1]
+        >>> guess = [xshift, yshift, rot, scale]
+        
+    use_guess : bool
+        Use the `guess`
+    
+    rms_limit : float
+        If transform RMS exceeds this threshold, use null [0,0,0,1] transform
+        
+    simple : bool
+        Parameter for `~grizli.prep.match_lists`
+        
+    outlier_threshold : float
+        Parameter for `~grizli.prep.match_lists`
+    
+    triangle_size_limit : (float, float)
+        Parameter for `~grizli.prep.match_lists`
+        
+    triangle_ba_max : float
+        Parameter for `~grizli.prep.match_lists`
+    
+    max_sources : int
+        Maximum number of sources to use for the matches.  Triangle matching
+        combinatorics become slow for hundreds of sources
+         
+    max_err_percentile : float
+        Only use sources where weight image is greater than this percentile
+        to try to limit spurious sources in low-weight regions 
+        (`~grizli.utils.catalog_mask`)
+        
+    catalog_mask_pad : float
+        Mask sources outside of this fractional size of the image dimensions
+        to try to limit spurius sources (`~grizli.utils.catalog_mask`)
+    
+    match_catalog_density : bool, None
+        Try to roughly match the surface density of the reference and target
+        source lists, where the latter is sorted by brightness to try to 
+        reduce spurious triangle matches
+        
+    assume_close : bool
+        not used
+        
+    ref_border : float
+        Only include reference sources within `ref_border` pixels of the 
+        target image, as calculated from the original image WCS
+    
+    Returns
+    -------
+    orig_wcs : `~astropy.wcs.WCS`
+        Original WCS
+    
+    drz_wcs : `~astropy.wcs.WCS`
+        Transformed WCS
+    
+    out_shift : (float, float)
+        Translation, pixels
+    
+    out_rot : float
+        Rotation (degrees)
+    
+    out_scale : float
+        Scale 
+        
     """
     frame = inspect.currentframe()
     utils.log_function_arguments(utils.LOGFILE, frame,
@@ -685,7 +873,9 @@ def align_drizzled_image(root='', mag_limits=[14, 23], radec=None, NITER=3,
         return False
 
     # Edge and error mask
-    ok &= utils.catalog_mask(cat, max_err_percentile=max_err_percentile, pad=catalog_mask_pad, pad_is_absolute=False, min_flux_radius=1.)
+    ok &= utils.catalog_mask(cat, max_err_percentile=max_err_percentile,
+                             pad=catalog_mask_pad, pad_is_absolute=False, 
+                             min_flux_radius=1.)
 
     if max_err_percentile >= 200:
         med_err = np.median(cat['FLUXERR_APER_0'][ok])
@@ -720,7 +910,7 @@ def align_drizzled_image(root='', mag_limits=[14, 23], radec=None, NITER=3,
     ref_cut &= (ref_y > -ref_border) & (ref_y < nx2+ref_border)
 
     if ref_cut.sum() == 0:
-        print('{0}: no reference objects found in the DRZ footprint'.format(root))
+        print(f'{root}: no reference objects found in the DRZ footprint')
         return False
 
     rd_ref = rd_ref[ref_cut, :]
@@ -733,12 +923,14 @@ def align_drizzled_image(root='', mag_limits=[14, 23], radec=None, NITER=3,
         # aref = utils.hull_area(rd_ref[:,0], rd_ref[:,1])
 
         cut = np.argsort(cat['MAG_AUTO'][ok])[:icut]
-        xy_drz = np.array([cat['X_IMAGE'][ok][cut], cat['Y_IMAGE'][ok][cut]]).T
+        xy_drz = np.array([cat['X_IMAGE'][ok][cut],
+                           cat['Y_IMAGE'][ok][cut]]).T
     else:
         # Limit to brightest X objects
         icut = 400
         cut = np.argsort(cat['MAG_AUTO'][ok])[:icut]
-        xy_drz = np.array([cat['X_IMAGE'][ok][cut], cat['Y_IMAGE'][ok][cut]]).T
+        xy_drz = np.array([cat['X_IMAGE'][ok][cut],
+                           cat['Y_IMAGE'][ok][cut]]).T
 
     logstr = '# wcs {0} radec="{1}"; Ncat={2}; Nref={3}'
     logstr = logstr.format(root, radec, xy_drz.shape[0], rd_ref.shape[0])
@@ -748,7 +940,9 @@ def align_drizzled_image(root='', mag_limits=[14, 23], radec=None, NITER=3,
     out_shift, out_rot, out_scale = guess[:2], guess[2], guess[3]
     drz_wcs = utils.transform_wcs(drz_wcs, out_shift, out_rot, out_scale)
 
-    logstr = '# wcs {0} (guess)   : {1:6.2f} {2:6.2f} {3:7.3f} {4:7.3f}'.format(root, guess[0], guess[1], guess[2]/np.pi*180, 1./guess[3])
+    logstr = '# wcs {0} (guess)   : {1:6.2f} {2:6.2f} {3:7.3f} {4:7.3f}'
+    logstr = logstr.format(root, guess[0], guess[1], guess[2]/np.pi*180, 
+                           1./guess[3])
     utils.log_comment(utils.LOGFILE, logstr, verbose=True)
 
     drz_crpix = drz_wcs.wcs.crpix
@@ -773,15 +967,16 @@ def align_drizzled_image(root='', mag_limits=[14, 23], radec=None, NITER=3,
             input, output = status
         else:
             input, output = xy_drz+0.-drz_crpix, xy+0-drz_crpix
-        # print np.sum(input) + np.sum(output)
 
         if len(input) > max_sources:
-            print('Clip input list ({0}) to {1} objects'.format(len(input), max_sources))
+            msg = 'Clip input list ({0}) to {1} objects'
+            print(msg.format(len(input), max_sources))
             ix = np.argsort(np.arange(len(input)))[:max_sources]
             input = input[ix, :]
 
         if len(output) > max_sources:
-            print('Clip output list ({0}) to {1} objects'.format(len(input), max_sources))
+            msg = 'Clip output list ({0}) to {1} objects'
+            print(msg.format(len(input), max_sources))
             ix = np.argsort(np.arange(len(output)))[:max_sources]
             output = output[ix, :]
 
@@ -824,7 +1019,7 @@ def align_drizzled_image(root='', mag_limits=[14, 23], radec=None, NITER=3,
         tf_out = tf(output[output_ix])
         dx = input[input_ix] - tf_out
         rms = utils.nmad(np.sqrt((dx**2).sum(axis=1)))
-        #outliers = outliers | (np.sqrt((dx**2).sum(axis=1)) > 4*rms)
+
         if len(outliers) > 20:
             outliers = (np.sqrt((dx**2).sum(axis=1)) > 4*rms)
         else:
@@ -934,7 +1129,7 @@ def update_wcs_fits_log(file, wcs_ref, xyscale=[0, 0, 0, 1], initialize=True, re
 
 
 def log_wcs(root, drz_wcs, shift, rot, scale, rms=0., n=-1, initialize=True, comment=[]):
-    """Save WCS offset information to a file
+    """Save WCS offset information to an ascii file
     """
     if (not os.path.exists('{0}_wcs.log'.format(root))) | initialize:
         print('Initialize {0}_wcs.log'.format(root))
@@ -971,7 +1166,7 @@ def log_wcs(root, drz_wcs, shift, rot, scale, rms=0., n=-1, initialize=True, com
 
 
 def table_to_radec(table, output='coords.radec'):
-    """Make a DS9 region file from a table object
+    """Make a "radec" ascii file with ra, dec columns from a table object
     """
 
     if 'X_WORLD' in table.colnames:
@@ -1047,6 +1242,11 @@ SEP_DETECT_PARAMS = {'minarea': 9, 'filter_kernel': GAUSS_3_7x7,
 
 
 def make_SEP_FLT_catalog(flt_file, ext=1, column_case=str.upper, **kwargs):
+    """
+    Make a catalog from a FLT file
+    
+    (Not used)
+    """
     import astropy.io.fits as pyfits
     import astropy.wcs as pywcs
 
@@ -1074,9 +1274,60 @@ def make_SEP_FLT_catalog(flt_file, ext=1, column_case=str.upper, **kwargs):
 
 
 def make_SEP_catalog_from_arrays(sci, err, mask, wcs=None, threshold=2., ZP=25, get_background=True, detection_params=SEP_DETECT_PARAMS, segmentation_map=False, verbose=True):
+    """
+    Make a catalog from arrays using `sep`
+    
+    Parameters
+    ----------
+    sci : 2D array
+        Data array
+    
+    err : 2D array
+        Uncertainties in same units as `sci`
+    
+    mask : bool array
+        `sep` masks values where ``mask > 0``
+    
+    wcs : `~astropy.wcs.WCS`
+        WCS associated with data arrays
+    
+    thresh : float
+        Detection threshold for `sep.extract`
+    
+    ZP : float
+        AB magnitude zeropoint of data arrays
+    
+    get_background : bool
+        not used
+    
+    detection_params : dict
+        Keyword arguments for `sep.extract`
+    
+    segmentation_map : bool
+        Also create a segmentation map
+    
+    verbose : bool
+        Print status messages
+    
+    Returns
+    -------
+    tab : `~astropy.table.Table`
+        Source catalog
+    
+    seg : array, None
+        Segmentation map, if requested
+        
+    """
     import copy
     import astropy.units as u
-    import sep
+
+    try:
+        import sep
+    except ImportError:
+        print("""
+    Couldn't `import sep`.  SExtractor replaced with SEP
+    in April 2018.  Install with `pip install sep`.
+    """)
 
     logstr = 'make_SEP_catalog_from_arrays: sep version = {0}'.format(sep.__version__)
     utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
@@ -1120,57 +1371,195 @@ def make_SEP_catalog_from_arrays(sci, err, mask, wcs=None, threshold=2., ZP=25, 
 
 
 def get_SEP_flag_dict():
+    """Get dictionary of SEP integer flags
+    
+    Returns
+    -------
+    flags : dict
+        Dictionary of the integer `sep` detection flags, which are set as 
+        attributes on the `sep` module
+        
     """
-    Get dictionary of SEP integer flags
-    """
-    import sep
-    d = OrderedDict()
-    for f in ['OBJ_MERGED', 'OBJ_TRUNC', 'OBJ_DOVERFLOW', 'OBJ_SINGU', 'APER_TRUNC', 'APER_HASMASKED', 'APER_ALLMASKED', 'APER_NONPOSITIVE']:
-        d[f] = getattr(sep, f)
+    try:
+        import sep
+    except ImportError:
+        print("""
+    Couldn't `import sep`.  SExtractor replaced with SEP
+    in April 2018.  Install with `pip install sep`.
+    """)
 
-    return d
+    flags = OrderedDict()
+    for f in ['OBJ_MERGED', 'OBJ_TRUNC', 'OBJ_DOVERFLOW', 'OBJ_SINGU',
+              'APER_TRUNC', 'APER_HASMASKED', 'APER_ALLMASKED', 
+              'APER_NONPOSITIVE']:
+        flags[f] = getattr(sep, f)
+
+    return flags
 
 
-def make_SEP_catalog(root='', threshold=2., get_background=True,
-                      bkg_only=False,
-                      bkg_params={'bw': 32, 'bh': 32, 'fw': 3, 'fh': 3},
-                      verbose=True, sci=None, wht=None,
-                      phot_apertures=SEXTRACTOR_PHOT_APERTURES,
-                      aper_segmask=False,
-                      rescale_weight=True,
-                      column_case=str.upper, save_to_fits=True,
-                      source_xy=None, autoparams=[2.5, 0.35*u.arcsec, 3.5],
-                      flux_radii=[0.2, 0.5, 0.9], subpix=0, 
-                      mask_kron=False,
-                      max_total_corr=2, err_scale=-np.inf, use_bkg_err=False,
-                      detection_params=SEP_DETECT_PARAMS, bkg_mask=None,
-                      pixel_scale=0.06, log=False,
-                      compute_auto_quantities=True,
-                      gain=2000., include_wcs_extension=True,
-                      extract_pixstack=int(3e7),
-                      **kwargs):
-    """Make a catalog from drizzle products using the SEP implementation of SExtractor
+def make_SEP_catalog(root='', 
+                     sci=None,
+                     wht=None,
+                     threshold=2., 
+                     get_background=True,
+                     bkg_only=False,
+                     bkg_params={'bw': 32, 'bh': 32, 'fw': 3, 'fh': 3},
+                     verbose=True,
+                     phot_apertures=SEXTRACTOR_PHOT_APERTURES,
+                     aper_segmask=False,
+                     rescale_weight=True,
+                     err_scale=-np.inf,
+                     use_bkg_err=False,
+                     column_case=str.upper,
+                     save_to_fits=True,
+                     include_wcs_extension=True,
+                     source_xy=None, 
+                     compute_auto_quantities=True,
+                     autoparams=[2.5, 0.35*u.arcsec, 3.5],
+                     flux_radii=[0.2, 0.5, 0.9],
+                     subpix=0,
+                     mask_kron=False,
+                     max_total_corr=2,
+                     detection_params=SEP_DETECT_PARAMS,
+                     bkg_mask=None,
+                     pixel_scale=0.06,
+                     log=False,
+                     gain=2000., 
+                     extract_pixstack=int(3e7),
+                     **kwargs):
+    """Make a catalog from drizzle products using the SEP implementation of SourceExtractor
+    
+    Parameters
+    ----------
+    root : str
+        Rootname of the FITS images to use for source extraction.  This
+        function is designed to work with the single-image products from 
+        `drizzlepac`, so the default data/science image is searched by 
+        
+        >>> drz_file = glob.glob(f'{root}_dr[zc]_sci.fits*')[0]
+        
+        Note that this will find and use gzipped versions of the images, 
+        if necessary.
+        
+        The associated weight image filename is then assumed to be
+        
+        >>> weight_file = drz_file.replace('_sci.fits', '_wht.fits')
+        >>> weight_file = weight_file.replace('_drz.fits', '_wht.fits')
+        
+    sci, wht : str
+        Filenames to override `drz_file` and `weight_file` derived from the
+        ``root`` parameter.
 
-    phot_apertures are aperture *diameters*. If given as a string then assume
-    units of pixels. If an array or list, can have units (e.g.,
-    `~astropy.units.arcsec`).
+    threshold : float
+        Detection threshold for `sep.extract`
+    
+    get_background : bool
+        Compute the background with `sep.Background`
+    
+    bkg_only : bool
+        If `True`, then just return the background data array and don't run
+        the source detection
+    
+    bkg_params : dict
+        Keyword arguments for `sep.Background`.  Note that this can include
+        a separate optional keyword ``pixel_scale`` that indicates that the 
+        background sizes `bw`, `bh` are set for a paraticular pixel size.  
+        They will be scaled to the pixel dimensions of the target images using
+        the pixel scale derived from the image WCS.
+    
+    verbose : bool
+        Print status messages
+            
+    phot_apertures : str or array-like
+        Photometric aperture *diameters*. If given as a string then assume
+        units of pixels. If an array or list, can have units, e.g.,
+        `astropy.units.arcsec`.
 
     aper_segmask : bool
         If true, then run SEP photometry with segmentation masking.  This
-        requires the sep fork at https://github.com/gbrammer/sep.git, which
-        should be included if you installed with the "environment.yml"
-        conda environment file.
-
+        requires the sep fork at https://github.com/gbrammer/sep.git, 
+        or `sep >= 1.10.0`.
+    
+    rescale_weight : bool
+        If true, then a scale factor is calculated from the ratio of the 
+        weight image to the variance estimated by `sep.Background`.  
+    
+    err_scale : float
+        Explicit value to use for the weight scaling, rather than calculating
+        with `rescale_weight`.  Only used if ``err_scale > 0``
+    
+    use_bkg_err : bool
+        If true, then use the full error array derived by `sep.Background`.
+        This is turned off by default in order to preserve the pixel-to-pixel 
+        variation in the drizzled weight maps.
+        
+    column_case : func
+        Function to apply to the catalog column names.  E.g., the default 
+        `str.upper` results in uppercase column names
+    
+    save_to_fits : bool
+        Save catalog FITS file ``{root}.cat.fits``
+    
+    include_wcs_extension : bool
+        An extension will be added to the FITS catalog with the detection 
+        image WCS
+    
     source_xy : (x, y) or (ra, dec) arrays
         Force extraction positions.  If the arrays have units, then pass them
         through the header WCS.  If no units, positions are *zero indexed*
         array coordinates.
 
-        To run with segmentation masking, also provide aseg and aseg_id
-        arrays with source_xy, like
+        To run with segmentation masking (`1sep > 1.10``), also provide 
+        `aseg` and `aseg_id` arrays with `source_xy`, like
 
-            `source_xy = ra, dec, aseg, aseg_id`
+            >>> source_xy = ra, dec, aseg, aseg_id
+    
+    compute_auto_quantities : bool
+        Compute Kron/auto-like quantities with 
+        `~grizli.prep.compute_SEP_auto_params`
 
+    autoparams : list
+        Parameters of Kron/AUTO calculations with 
+        `~grizli.prep.compute_SEP_auto_params`.
+        
+    flux_radii : list
+        Light fraction radii to compute with 
+        `~grizli.prep.compute_SEP_auto_params`, e.g., ``[0.5]`` will calculate
+        the half-light radius (``FLUX_RADIUS``)
+    
+    subpix : int
+        Pixel oversampling
+        
+    mask_kron : bool
+        Not used
+        
+    max_total_corr : float
+        Not used
+    
+    detection_params : dict
+        Parameters passed to `sep.extract`
+    
+    bkg_mask : array
+        Additional mask to apply to `sep.Background` calculation
+        
+    pixel_scale : float
+        Not used
+    
+    log : bool
+        Send log message to `grizli.utils.LOGFILE`
+    
+    gain : float
+        Gain value passed to `sep.sum_circle`
+        
+    extract_pixstack : int
+        See `sep.set_extract_pixstack`
+    
+    Returns
+    -------
+    tab : `~astropy.table.Table`
+        Source catalog
+    
+    
     """
     if log:
         frame = inspect.currentframe()
@@ -1179,7 +1568,14 @@ def make_SEP_catalog(root='', threshold=2., get_background=True,
 
     import copy
     import astropy.units as u
-    import sep
+    
+    try:
+        import sep
+    except ImportError:
+        print("""
+    Couldn't `import sep`.  SExtractor replaced with SEP
+    in April 2018.  Install with `pip install sep`.
+    """)
 
     sep.set_extract_pixstack(extract_pixstack)
 
@@ -1196,7 +1592,7 @@ def make_SEP_catalog(root='', threshold=2., get_background=True,
     if sci is not None:
         drz_file = sci
     else:
-        drz_file = glob.glob('{0}_dr[zc]_sci.fits*'.format(root))[0]
+        drz_file = glob.glob(f'{root}_dr[zc]_sci.fits*')[0]
 
     im = pyfits.open(drz_file)
 
@@ -1219,7 +1615,8 @@ def make_SEP_catalog(root='', threshold=2., get_background=True,
     if wht is not None:
         weight_file = wht
     else:
-        weight_file = drz_file.replace('_sci.fits', '_wht.fits').replace('_drz.fits', '_wht.fits')
+        weight_file = drz_file.replace('_sci.fits', '_wht.fits')
+        weight_file = weight_file.replace('_drz.fits', '_wht.fits')
 
     if (weight_file == drz_file) | (not os.path.exists(weight_file)):
         WEIGHT_TYPE = "NONE"
@@ -1613,11 +2010,11 @@ def make_SEP_catalog(root='', threshold=2., get_background=True,
         tab.rename_column(c, column_case(c))
 
     if save_to_fits:
-        tab.write('{0}.cat.fits'.format(root), format='fits', overwrite=True)
+        tab.write(f'{root}.cat.fits', format='fits', overwrite=True)
 
         if include_wcs_extension:
             try:
-                hdul = pyfits.open('{0}.cat.fits'.format(root), mode='update')
+                hdul = pyfits.open(f'{root}.cat.fits', mode='update')
                 wcs_hdu = pyfits.ImageHDU(header=wcs_header, data=None,
                                           name='WCS')
                 hdul.append(wcs_hdu)
@@ -1634,10 +2031,46 @@ def make_SEP_catalog(root='', threshold=2., get_background=True,
 def get_seg_iso_flux(data, seg, tab, err=None, fill=None, verbose=0):
     """
     Integrate flux within the segmentation regions.
-
-    `tab` is the detection catalog with columns (at least):
-        'number' / 'id',  'xmin', 'xmax', 'ymin', 'ymax'.
-
+    
+    Parameters
+    ----------
+    data : 2D array
+        Image data
+    
+    seg : 2D array
+        Segmentation image defining the ISO contours
+    
+    tab : `~astropy.table.Table`
+        Detection catalog with columns (at least) ``number / id``,  
+        ``xmin``, ``xmax``, ``ymin``, ``ymax``.  The ``id`` column matches the
+        values in `seg`.
+    
+    err : 2D array
+        Optional uncertainty array
+    
+    fill : None, array
+        If specified, create an image where the image segments are filled
+        with scalar values for a given object rather than computing the ISO 
+        fluxes
+    
+    verbose : bool/int
+        Status messages
+    
+    Returns
+    -------
+    iso_flux : array
+        Summed image flux within the contours defined by the `seg` map
+    
+    iso_err : array
+        Uncertainty if `err` specified
+    
+    iso_area : array
+        Area of the segments, in pixels
+    
+    filled_data : 2D array
+        If `fill` specified, return an image with values filled within the 
+        segments, e.g., for a binned image
+        
     """
     if 'number' in tab.colnames:
         ids = np.array(tab['number'])
@@ -1691,15 +2124,69 @@ def get_seg_iso_flux(data, seg, tab, err=None, fill=None, verbose=0):
 
 
 def compute_SEP_auto_params(data, data_bkg, mask, pixel_scale=0.06, err=None, segmap=None, tab=None, autoparams=[2.5, 0.35*u.arcsec, 0, 5], flux_radii=[0.2, 0.5, 0.9], subpix=0, verbose=True):
-    """
-    Compute AUTO params
+    """Compute SourceExtractor-like AUTO params with `sep`
     https://sep.readthedocs.io/en/v1.0.x/apertures.html#equivalent-of-flux-auto-e-g-mag-auto-in-source-extractor
     
-    The parameter `autoparams` is provided as [k, MIN_APER, MIN_KRON,
-    MAX_KRON], where the usual SExtractor PHOT_AUTOPARAMS would be [k,
-    MIN_KRON]. Here k is the scale factor of the kron radius, and MIN_KRON is
-    the minimum scaled Kron radius to use. MIN_APER is then the smallest
-    *circular* Kron aperture to allow, which can be provided in arcsec.
+    Parameters
+    ----------
+    data : 2D array
+        Image data
+    
+    data_bkg : 2D array
+        Background-subtracted image data
+    
+    mask : 2D array
+        Pixel mask 
+    
+    pixel_scale : float
+        Pixel scale, arcsec
+    
+    err : 2D array
+        Uncertainty array
+    
+    segmap : 2D array
+        Associated segmentation map
+    
+    tab : `~astropy.table.Table`
+        Table from, e.g., `sep.extract`.
+    
+    autoparams : list
+        Provided as ``[k, MIN_APER, MIN_KRON, MAX_KRON]``, where the usual
+        SourceExtractor ``PHOT_AUTOPARAMS`` would be ``[k, MIN_KRON]``. Here,
+        ``k`` is the scale factor of the Kron radius, and ``MIN_KRON`` is the
+        minimum scaled Kron radius to use. ``MIN_APER`` is then the smallest
+        *circular* Kron aperture to allow, which can be provided with attached
+        units (e.g. ``arcsec``).
+    
+    flux_radii : list
+        Light fraction radii, e.g., ``[0.5]`` will calculate the half-light 
+        radius (``FLUX_RADIUS``)
+        
+    subpix : int
+        Pixel oversampling with the `sep` aperture functions
+    
+    Returns
+    -------
+    auto : `~astropy.table.Table`
+        Table with the derived parameters
+                
+        +--------------------------+----------------------------------------+
+        | Column                   | Description                            |
+        +==========================+========================================+
+        | `kron_radius`            | Kron radius, pixels                    |
+        +--------------------------+----------------------------------------+
+        | `kron_rcirc`             | Circularized Kron radius, pixels       |
+        +--------------------------+----------------------------------------+
+        | `flux_auto`              | Flux within AUTO aperture              |
+        +--------------------------+----------------------------------------+
+        | `fluxerr_auto`           | Uncertainty within AUTO aperture       |
+        +--------------------------+----------------------------------------+
+        | `bkg_auto`               | Background within AUTO aperture        |
+        +--------------------------+----------------------------------------+
+        | `flag_auto`              | `sep` flags for AUTO aperture          |
+        +--------------------------+----------------------------------------+
+        | `area_auto`              | Pixel area of AUTO aperture            |
+        +--------------------------+----------------------------------------+
         
     """
     import sep
@@ -1848,30 +2335,30 @@ def compute_SEP_auto_params(data, data_bkg, mask, pixel_scale=0.06, err=None, se
         fr, fr_flag = sep.flux_radius(data_bkg, x, y, a*6, flux_radii,
                                   normflux=kron_flux, mask=mask)
 
-    tab = utils.GTable()
-    tab.meta['KRONFACT'] = (autoparams[0], 'Kron radius scale factor')
-    tab.meta['KRON0'] = (clip_kron0, 'Minimum scaled Kron radius')
-    tab.meta['KRON1'] = (clip_kron1, 'Maximum scaled Kron radius')
-    tab.meta['MINKRON'] = (min_radius_pix, 'Minimum Kron aperture, pix')
+    auto = utils.GTable()
+    auto.meta['KRONFACT'] = (autoparams[0], 'Kron radius scale factor')
+    auto.meta['KRON0'] = (clip_kron0, 'Minimum scaled Kron radius')
+    auto.meta['KRON1'] = (clip_kron1, 'Maximum scaled Kron radius')
+    auto.meta['MINKRON'] = (min_radius_pix, 'Minimum Kron aperture, pix')
 
-    tab['kron_radius'] = kronrad*u.pixel
-    tab['kron_rcirc'] = kroncirc*u.pixel
+    auto['kron_radius'] = kronrad*u.pixel
+    auto['kron_rcirc'] = kroncirc*u.pixel
 
-    tab['flux_auto'] = kron_flux
-    tab['fluxerr_auto'] = kron_fluxerr
-    tab['bkg_auto'] = kron_bkg
-    tab['flag_auto'] = kron_flag
-    tab['area_auto'] = kron_area
+    auto['flux_auto'] = kron_flux
+    auto['fluxerr_auto'] = kron_fluxerr
+    auto['bkg_auto'] = kron_bkg
+    auto['flag_auto'] = kron_flag
+    auto['area_auto'] = kron_area
 
-    tab['flux_radius_flag'] = fr_flag
+    auto['flux_radius_flag'] = fr_flag
     for i, r_i in enumerate(flux_radii):
         c = 'flux_radius_{0:02d}'.format(int(np.round(r_i*100)))
         if c.endswith('_50'):
             c = 'flux_radius'
 
-        tab[c] = fr[:, i]
+        auto[c] = fr[:, i]
 
-    return tab
+    return auto
 
 
 def get_filter_ee_ratio(tab, filter, ref_filter='f160w'):
@@ -1918,6 +2405,7 @@ def get_filter_ee_ratio(tab, filter, ref_filter='f160w'):
     
     return tab
 
+
 def get_hst_aperture_correction(filter, raper=0.35, rmax=5.):
     """
     Get single aperture correction from tabulated EE curve
@@ -1934,7 +2422,8 @@ def get_hst_aperture_correction(filter, raper=0.35, rmax=5.):
     ee_y = np.append(ee[obsmode], 1.)
     ee_interp = np.interp(raper, ee_rad, ee_y, left=0.01, right=1.)
     return ee.meta['ZP_'+obsmode], ee_interp
-    
+
+
 def get_kron_tot_corr(tab, filter, inst=None, pixel_scale=0.06, photplam=None, rmax=5.0):
     """
     Compute total correction from tabulated EE curves
@@ -2018,7 +2507,9 @@ def make_drz_catalog(root='', sexpath='sex', threshold=2., get_background=True,
                      column_case=str.upper):
     """Make a SExtractor catalog from drizzle products
 
-    TBD
+    .. note::
+        
+        Deprecated, use `~grizli.utils.make_SEP_catalog`.
     """
     import copy
     import sewpy
@@ -2130,7 +2621,39 @@ def blot_background(visit={'product': '', 'files': None},
                     verbose=True, skip_existing=True, get_median=False,
                     log=True, stepsize=10, **kwargs):
     """
-    Blot SEP background of drizzled image back to component FLTs
+    Blot SEP background of drizzled image back to component FLT images
+    
+    Parameters
+    ----------
+    visit : dict
+        Dictionary defining the drizzle product ('product' key) and 
+        associated FLT files that contribute to the drizzled mosaic ('files'
+        list)
+    
+    bkg_params : dict
+        Parameters for `sep.Background`
+    
+    verbose : bool
+        Status messages
+    
+    skip_existing : bool
+        Don't run if ``BLOTSKY`` keyword found in the FLT header
+    
+    get_median : bool
+        Don't use full background but rather just use (masked) median value
+        of the drizzled mosaic
+    
+    log : bool
+        Write log information to `grizli.utils.LOGFILE`
+    
+    stepsize : int
+        Parameter for `blot`
+    
+    Returns
+    -------
+    Nothing returned but subtracts the transformed background image directly
+    from the FLT files and updates header keywords
+    
     """
     if log:
         frame = inspect.currentframe()
@@ -2174,7 +2697,7 @@ def blot_background(visit={'product': '', 'files': None},
                 continue
 
             if ('BLOTSKY' in flt['SCI', ext].header) & (skip_existing):
-                print('\'BLOTSKY\' keyword found in {0}.  Skipping....'.format(file))
+                print(f'\'BLOTSKY\' keyword found in {file}.  Skipping....')
                 continue
 
             logstr = '#   Blot background: {0}[SCI,{1}]'.format(file, ext)
@@ -3230,7 +3753,8 @@ BKG_PARAMS = {'bw': 128, 'bh': 128, 'fw': 3, 'fh': 3, 'pixel_scale': 0.06}
 
 
 def process_direct_grism_visit(direct={}, grism={}, radec=None,
-                               outlier_threshold=5, align_clip=30,
+                               outlier_threshold=5, 
+                               align_clip=30,
                                align_thresh=None,
                                align_mag_limits=[14, 23, 0.05],
                                align_rms_limit=2,
@@ -3253,12 +3777,37 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                                drizzle_params={},
                                iter_atol=1.e-4,
                                imaging_bkg_params=None,
-                              reference_catalogs=['GAIA', 'PS1', 'SDSS', 'WISE'],
+                               reference_catalogs=['GAIA', 'PS1', 'SDSS', 'WISE'],
                                use_self_catalog=False):
-    """Full processing of a direct + grism image visit.
-
-    TBD
-
+    """Full processing of a direct (+ grism) image visit.
+    
+    For *imaging* exposures, 
+    
+    1. Copies of individual exposures with `~grizli.prep.fresh_flt_file`
+        * Run `stwcs.updatewcs.updatewcs` on each FLT
+    2. "tweak" shfit alignment of individual FLTs 
+        * If ACS or UVIS, do preliminary `AstroDrizzle` run to flag CRs
+    3. Run `AstroDrizzle` to create first-pass mosaic
+    4. Astrometric alignment of the drizzled image reference catalogs with 
+       `~grizli.prep.align_drizzled_image`
+        * Propagate alignment back to FLT exposures
+    5. Redrizzle visit mosaic with updated astrometry
+    6. (optional) Subtract mosaic background from exposures with 
+       `~grizl.prep.blot_background`
+    7. Make final visit catalog 
+    8. (optional) Fill saturated stars with ePSF models with 
+       `~grizli.prep.fix_star_centers`
+    
+    If *grism* exposures are specified, first do the above for the direct 
+    images and then, 
+    
+    1. Assign (refined) WCS of associated direct image to each grism exposure
+       (`~grizli.prep.match_direct_grism_wcs`)
+    2. Run `AstroDrizzle` to flag additional CRs, bad pixels
+    3. Subtract 2D sky background (`~grizli.prep.visit_grism_sky`)
+        * Optional additional column-average grism background 
+    4. Redrizzle grism mosaic
+    
     """
     frame = inspect.currentframe()
     utils.log_function_arguments(utils.LOGFILE, frame,
@@ -3622,7 +4171,8 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
             table_to_radec(cat[clip][so], '{0}.cat.radec'.format(direct['product']))
 
         if (fix_stars) & (not isACS) & (not isWFPC2):
-            fix_star_centers(root=direct['product'], drizzle=False, mag_lim=19.5)
+            fix_star_centers(root=direct['product'], drizzle=False, 
+                             mag_lim=19.5)
 
     #################
     # Grism image processing
@@ -3728,8 +4278,33 @@ def set_grism_dfilter(direct, grism):
 
 
 def tweak_align(direct_group={}, grism_group={}, max_dist=1., n_min=10, key=' ', threshold=3, drizzle=False, fit_order=-1):
-    """
-    Intra-visit shifts (WFC3/IR)
+    """Intra-visit shift alignment
+    
+    Parameters
+    ----------
+    direct_group : dict
+        Visit info (`product`, `files`) for direct images
+    
+    grism_group : dict
+        Visit info (`product`, `files`) for grism images
+    
+    max_dist, threshold : float
+        Passed to `~grizli.prep.tweak_flt` 
+    
+    n_min : int
+        Minimum number of sources for a valid fit.  
+    
+    drizzle : bool
+        Run `AstroDrizzle` after performing the alignment
+    
+    fit_order : int
+        If > 0, then fit a polynomial to the derived shifts rather than 
+        using the shifts themselves, e.g., for DASH imaging
+    
+    Returns
+    -------
+    Nothing, but updates WCS of direct and (optionally) grism exposures
+    
     """
     frame = inspect.currentframe()
     utils.log_function_arguments(utils.LOGFILE, frame,
@@ -3843,6 +4418,8 @@ def drizzle_footprint(weight_image, shrink=10, ext=0, outfile=None, label=None):
     """
     Footprint of image pixels where values > 0.  Works best with drizzled
     weight images.
+    
+    (not used)
     """
     from scipy.spatial import ConvexHull
 
@@ -3947,20 +4524,61 @@ def clean_drizzle(root, context=False, fix_wcs_system=False):
 
     sci.flush()
 
-
-def tweak_flt(files=[], max_dist=0.4, threshold=3, verbose=True, use_sewpy=False):
-    """TBD
-
-    Refine shifts of FLT files
+MATCH_KWS = dict(maxKeep=10, auto_keep=3, auto_transform=None, auto_limit=3,
+                 size_limit=[5, 1800], ignore_rot=True, ignore_scale=True, 
+                 ba_max=0.9)
+                                
+def tweak_flt(files=[], max_dist=0.4, threshold=3, verbose=True, tristars_kwargs=MATCH_KWS, use_sewpy=False):
+    """Refine shifts of FLT files
+    
+    Parameters
+    ----------
+    files : list
+        List of flt filenames
+    
+    max_dist : float
+        Maximum shift distance to allow
+    
+    threshold : float
+        Source detection threshold for `sep.extract`
+    
+    verbose : bool
+        Status messages
+    
+    tristars_kwargs : dict
+        Keyword arguments for `tristars.match.match_catalog_tri`
+        
+    use_sewpy : bool
+        Use `sewpy` for source detection (deprecated)
+    
+    Returns
+    -------
+    ref_wcs : `~astropy.wcs.WCS`
+        Reference WCS (WCS of the first file in `files`)
+    
+    shift_dict : dict
+        Shift dictionary with keys from `files` and values like
+        ``[xshift, yshift, rot, scale, N, rms]``.  Note that only shifts are 
+        fit, so `rot = 0.` and `scale = 1.`.  ``N`` is the number of sources
+        used for the fit.
+        
     """
     import scipy.spatial
+
+    try:
+        import tristars
+        from tristars.match import match_catalog_tri, match_diagnostic_plot
+    except:
+        print("""
+    Couldn't `import tristars`.  Get it from https://github.com/gbrammer/tristars to enable improved blind astrometric matching with triangle asterisms.
+    """)
 
     try:
         # https://github.com/megalut/sewpy
         import sewpy
     except:
+        sewpy = None
         use_sewpy = False
-    #use_sewpy = False
 
     # Make FLT catalogs
     cats = []
@@ -4044,7 +4662,6 @@ def tweak_flt(files=[], max_dist=0.4, threshold=3, verbose=True, use_sewpy=False
     tree = scipy.spatial.cKDTree(xy_0, 10)
 
     try:
-        import tristars.match
         # Use Tristars for matching
 
         # First 100
@@ -4053,7 +4670,7 @@ def tweak_flt(files=[], max_dist=0.4, threshold=3, verbose=True, use_sewpy=False
             so = np.argsort(c0['MAG_AUTO'])
             xy_0 = xy_0[so[:NMAX], :]
 
-        d = OrderedDict()
+        shift_dict = OrderedDict()
         for i in range(0, len(files)):
             c_ii, wcs_i = cats[i]
 
@@ -4068,47 +4685,34 @@ def tweak_flt(files=[], max_dist=0.4, threshold=3, verbose=True, use_sewpy=False
                 so = np.argsort(c_i['MAG_AUTO'])
                 xy = xy[so[:NMAX], :]
 
-            pair_ix = tristars.match.match_catalog_tri(xy, xy_0, maxKeep=10, auto_keep=3, auto_transform=None, auto_limit=3, size_limit=[5, 1800], ignore_rot=True, ignore_scale=True, ba_max=0.9)
+            pair_ix = match_catalog_tri(xy, xy_0, **tristars_kwargs)
 
-            if False:
-                tristars.match.match_diagnostic_plot(xy, xy_0, pair_ix, tf=None, new_figure=False)
-
-            # N = xy.shape[0]
-            # dist, ix = np.zeros(N), np.zeros(N, dtype=int)
-            # for j in range(N):
-            #     dist[j], ix[j] = tree.query(xy[j,:], k=1,
-            #                                 distance_upper_bound=np.inf)
-            #
-            # ok = dist < max_dist
-            # if ok.sum() == 0:
-            #     d[files[i]] = [0.0, 0.0, 0.0, 1.0]
-            #     if verbose:
-            #         print(files[i], '! no match')
-            #
-            #     continue
+            # if False:
+            #     match_diagnostic_plot(xy, xy_0, pair_ix, tf=None, 
+            #                           new_figure=False)
 
             dr = xy[pair_ix[:, 0], :] - xy_0[pair_ix[:, 1], :]
             ok = dr.max(axis=1) < 1000
             dx = np.median(dr[ok, :], axis=0)
             rms = np.std(dr[ok, :], axis=0)/np.sqrt(ok.sum())
 
-            d[files[i]] = [dx[0], dx[1], 0.0, 1.0, ok.sum(), rms]
+            shift_dict[files[i]] = [dx[0], dx[1], 0.0, 1.0, ok.sum(), rms]
 
-            logstr = "# tw {0} [{1:6.3f}, {2:6.3f}]  [{3:6.3f}, {4:6.3f}] N={5}"
-            logstr = logstr.format(files[i], dx[0], dx[1], rms[0], rms[1],
+            lstr = "# tw {0} [{1:6.3f}, {2:6.3f}]  [{3:6.3f}, {4:6.3f}] N={5}"
+            lstr = lstr.format(files[i], dx[0], dx[1], rms[0], rms[1],
                                    ok.sum())
-            utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
+            utils.log_comment(utils.LOGFILE, lstr, verbose=verbose)
 
     except:
         utils.log_exception(utils.LOGFILE, traceback)
         utils.log_comment(utils.LOGFILE, "# !! `tweak_flt` tristars failed")
 
-        d = OrderedDict()
+        shift_dict = OrderedDict()
         for i in range(0, len(files)):
             c_i, wcs_i = cats[i]
             # SExtractor doesn't do SIP WCS?
-            rd = np.array(wcs_i.all_pix2world(c_i['X_IMAGE'], c_i['Y_IMAGE'], 1))
-            xy = np.array(wcs_0.all_world2pix(rd.T, 1))
+            rd = wcs_i.all_pix2world(c_i['X_IMAGE'], c_i['Y_IMAGE'], 1)
+            xy = np.array(wcs_0.all_world2pix(np.array(rd).T, 1))
             N = xy.shape[0]
             dist, ix = np.zeros(N), np.zeros(N, dtype=int)
             for j in range(N):
@@ -4117,7 +4721,7 @@ def tweak_flt(files=[], max_dist=0.4, threshold=3, verbose=True, use_sewpy=False
 
             ok = dist < max_dist
             if ok.sum() == 0:
-                d[files[i]] = [0.0, 0.0, 0.0, 1.0]
+                shift_dict[files[i]] = [0.0, 0.0, 0.0, 1.0]
                 logstr = '# tw {0}'.format(files[i], '! no match')
                 utils.log_comment(utils.LOGFILE, logstr, verbose=True)
 
@@ -4127,19 +4731,43 @@ def tweak_flt(files=[], max_dist=0.4, threshold=3, verbose=True, use_sewpy=False
             dx = np.median(dr[ok, :], axis=0)
             rms = np.std(dr[ok, :], axis=0)/np.sqrt(ok.sum())
 
-            d[files[i]] = [dx[0], dx[1], 0.0, 1.0, ok.sum(), rms]
+            shift_dict[files[i]] = [dx[0], dx[1], 0.0, 1.0, ok.sum(), rms]
 
-            logstr = '# tw {0} {1} {2} {3}'
-            logstr = logstr.format(files[i], dx, rms, 'N={0:d}'.format(ok.sum()))
+            lstr = '# tw {0} {1} {2} N={3}'
+            lstr = logstr.format(files[i], dx, rms, ok.sum())
             utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
 
     wcs_ref = cats[0][1]
-    return wcs_ref, d
+    return wcs_ref, shift_dict
 
 
 def apply_tweak_shifts(wcs_ref, shift_dict, grism_matches={}, verbose=True, log=True):
     """
-
+    Apply derived shifts to exposure WCS
+    
+    Parameters
+    ----------
+    wcs_ref : `~astropy.wcs.WCS`
+        Reference WCS against where shifts were computed
+    
+    shift_dict : dict
+        Dictionary of shift information
+        
+        >>> shift_dict[file] = [xshift, yshift, rot, scale]
+        
+    grism_matches : dict
+        Dictionary defining associated grism / direct image exposures
+    
+    verbose : bool
+        Print status information to the console
+    
+    log : bool
+        Log arguments to `grizli.utils.LOGFILE`
+    
+    Returns
+    -------
+    Nothing, FLT image WCS are modified in place
+    
     """
     from drizzlepac import updatehdr
 
@@ -4199,10 +4827,43 @@ def apply_tweak_shifts(wcs_ref, shift_dict, grism_matches={}, verbose=True, log=
 
 def find_direct_grism_pairs(direct={}, grism={}, check_pixel=[507, 507],
                             toler=0.1, key='A', same_visit=True, log=True):
-    """
+    """Compute pairs of direct and grism exposures
+    
     For each grism exposure, check if there is a direct exposure
     that matches the WCS to within `toler` pixels.  If so, copy that WCS
     directly.
+    
+    Parameters
+    ----------
+    direct : dict
+        Direct image visit dictionary (`product`, `files`)
+    
+    grism : dict
+        Grism image visit dictionary (`product`, `files`)
+    
+    check_pixel : (float, float)
+        Reference pixel to use for comparing WCS
+    
+    toler : float
+        Tolerance in pixels for assigning matched exposure pairs
+    
+    key : str
+        WCS key of the direct image WCS
+    
+    same_visit : bool
+        Require that matches are from same program / visit as defined by the 
+        first 6 characters in the image filenames
+    
+    log : bol
+        Write function call to `grizli.utils.LOGFILE`
+    
+    Returns
+    -------
+    grism_matches : dict
+        Dictionary of the matched exposures, where the keys are filenames 
+        of direct images and the values are lists of the computed associated
+        grism exposures
+        
     """
     if log:
         frame = inspect.currentframe()
@@ -4269,7 +4930,30 @@ def match_direct_grism_wcs(direct={}, grism={}, get_fresh_flt=True,
                            run_drizzle=True, xyscale=None):
     """Match WCS of grism exposures to corresponding direct images
 
-    TBD
+    Parameters
+    ----------
+    direct : dict
+        Direct image visit dictionary (`product`, `files`)
+    
+    grism : dict
+        Grism image visit dictionary (`product`, `files`)
+    
+    get_fresh_flt : bool
+        Get fresh versions of the grism exposures without any subsequent 
+        modifications
+    
+    run_drizzle : bool
+        Not used
+    
+    xyscale : None, list
+        Transformation parameters ``[xshift, yshift, rot, scale]``.  If not 
+        specified, then get from the `wcs.log` file associated with the 
+        direct images
+    
+    Returns
+    -------
+    Nothing, WCS headers updated in the grism FLT files
+        
     """
     from drizzlepac import updatehdr
     from stwcs import updatewcs
@@ -4379,9 +5063,9 @@ def match_direct_grism_wcs(direct={}, grism={}, get_fresh_flt=True,
 def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext=1, sky_iter=10, iter_atol=1.e-4, use_spline=True, NXSPL=50):
     """Subtract sky background from grism exposures
 
-    Implementation of grism sky subtraction from ISR 2015-17
+    Implementation of the multi-component grism sky subtraction from 
+    `WFC3/ISR 2015-17 <https://ui.adsabs.harvard.edu/abs/2015wfc..rept...17B>`_
 
-    TBD
 
     """
     import numpy.ma
@@ -4747,9 +5431,7 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
 def fix_star_centers(root='macs1149.6+2223-rot-ca5-22-032.0-f105w',
                      mag_lim=22, verbose=True, drizzle=False,
                      cutout_size=16):
-    """Unset CR bit (4096) in the centers of bright objects
-
-    TBD
+    """Unset the CR bit (4096) in the centers of bright objects
 
     Parameters
     ----------
@@ -5543,6 +6225,9 @@ def manual_alignment(visit, ds9, reference=None, reference_catalogs=['SDSS', 'PS
 
 
 def extract_fits_log(file='idk106ckq_flt.fits', get_dq=True):
+    """
+    not used
+    """
     log = OrderedDict()
     im = pyfits.open(file)
 
