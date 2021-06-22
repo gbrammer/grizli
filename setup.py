@@ -52,29 +52,30 @@ else:
     ] 
 
 #update version
-args = 'git describe --tags'
-p = subprocess.Popen(args.split(), stdout=subprocess.PIPE)
-long_version = p.communicate()[0].decode("utf-8").strip()
-spl = long_version.split('-')
+if os.path.exists('.git'):
+    args = 'git describe --tags'
+    p = subprocess.Popen(args.split(), stdout=subprocess.PIPE)
+    long_version = p.communicate()[0].decode("utf-8").strip()
+    spl = long_version.split('-')
 
-if len(spl) == 3:
-    main_version = spl[0]
-    commit_number = spl[1]
-    version_hash = spl[2]
-    version = f'{main_version}.dev{commit_number}'
-else:
-    version_hash = '---'
-    version = long_version
+    if len(spl) == 3:
+        main_version = spl[0]
+        commit_number = spl[1]
+        version_hash = spl[2]
+        version = f'{main_version}.dev{commit_number}'
+    else:
+        version_hash = '---'
+        version = long_version
 
-version_str =f"""# git describe --tags
+    version_str =f"""# git describe --tags
 __version__ = "{version}"
 __long_version__ = "{long_version}"
 __version_hash__ = "{version_hash}" """
 
-fp = open('grizli/version.py','w')
-fp.write(version_str)
-fp.close()
-print('Git version: {0}'.format(version))
+    fp = open('grizli/version.py','w')
+    fp.write(version_str)
+    fp.close()
+    print('Git version: {0}'.format(version))
         
 
 if USE_CYTHON:

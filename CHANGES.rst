@@ -40,3 +40,7 @@
 -----
 
 - Bug for tag version
+
+1.3
+---
+Tagged version
