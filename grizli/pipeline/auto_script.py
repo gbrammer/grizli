@@ -4025,7 +4025,7 @@ def get_rgb_filters(filter_list, force_ir=False, pure_sort=False):
 
 TICKPARAMS = dict(axis='both', colors='w', which='both')
 
-def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', show_ir=True, pl=1, pf=1, scl=1, scale_ab=None, rgb_scl=[1, 1, 1], ds9=None, force_ir=False, filters=None, add_labels=True, output_format='jpg', rgb_min=-0.01, xyslice=None, pure_sort=False, verbose=True, force_rgb=None, suffix='.field', mask_empty=False, tick_interval=60, timestamp=False, mw_ebv=0, use_background=False, tickparams=TICKPARAMS, fill_black=False, ref_spectrum=None, gzext=''):
+def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', show_ir=True, pl=1, pf=1, scl=1, scale_ab=None, rgb_scl=[1, 1, 1], ds9=None, force_ir=False, filters=None, add_labels=True, output_format='jpg', rgb_min=-0.01, xyslice=None, pure_sort=False, verbose=True, force_rgb=None, suffix='.field', mask_empty=False, tick_interval=60, timestamp=False, mw_ebv=0, use_background=False, tickparams=TICKPARAMS, fill_black=False, ref_spectrum=None, gzext='', full_dimensions=False, invert=False):
     """
     RGB image of the field mosaics
     """
@@ -4207,7 +4207,7 @@ def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', s
 
     xsl = ysl = None
 
-    if show_ir:
+    if show_ir & (not full_dimensions):
         # Show only area where IR is available
         yp, xp = np.indices(ims[rf][0].data.shape)
         wht = pyfits.open(ims[rf].filename().replace('_sci', '_wht'))
@@ -4237,7 +4237,9 @@ def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', s
                 bmsk = bmsk[ysl, xsl]
                 
     image = make_lupton_rgb(rimg, gimg, bimg, stretch=0.1, minimum=rgb_min)
-
+    if invert:
+        image = 255-image
+        
     if fill_black:
         image[rmsk,0] = 0
         image[gmsk,1] = 0
@@ -4246,13 +4248,17 @@ def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', s
     sh = image.shape
     ny, nx, _ = sh
 
-    if output_dpi is not None:
+    if full_dimensions:
+        dpi = int(nx/xsize)
+        xsize = nx/dpi
+        print('xsize: ', xsize, ny, nx, dpi)
+        
+    elif (output_dpi is not None):
         xsize = nx/output_dpi
 
     dim = [xsize, xsize/nx*ny]
 
-    fig = plt.figure(figsize=dim)
-    ax = fig.add_subplot(111)
+    fig, ax = plt.subplots(1,1,figsize=dim)
 
     ax.imshow(image, origin='lower', extent=(-nx/2, nx/2, -ny/2, ny/2))
 
@@ -4273,12 +4279,19 @@ def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', s
         ax.text(0.06+0.08*2, 0.02, rf, color='r', bbox=dict(facecolor='w', alpha=1), size=8, ha='center', va='bottom', transform=ax.transAxes)
         ax.text(0.06+0.08, 0.02, gf, color='g', bbox=dict(facecolor='w', alpha=1), size=8, ha='center', va='bottom', transform=ax.transAxes)
         ax.text(0.06, 0.02, bf, color='b', bbox=dict(facecolor='w', alpha=1), size=8, ha='center', va='bottom', transform=ax.transAxes)
-
-    fig.tight_layout(pad=0.1)
+    
     if timestamp:
         fig.text(0.97, 0.03, time.ctime(), ha='right', va='bottom', fontsize=5, transform=fig.transFigure, color='w')
 
-    fig.savefig('{0}{1}.{2}'.format(root, suffix, output_format))
+    if full_dimensions:
+        ax.axis('off')
+        fig.tight_layout(pad=0)
+        dpi = int(nx/xsize/full_dimensions)
+        fig.savefig('{0}{1}.{2}'.format(root, suffix, output_format), dpi=dpi)
+    else:
+        fig.tight_layout(pad=0.1)
+        fig.savefig('{0}{1}.{2}'.format(root, suffix, output_format))
+    
     return xsl, ysl, (rf, gf, bf), fig
 
 #########
