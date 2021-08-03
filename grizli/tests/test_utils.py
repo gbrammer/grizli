@@ -10,10 +10,10 @@ class UtilsTester(unittest.TestCase):
         """
         value = np.array([0.1,  0.21568801,  0.34354303,  
                           0.48484469,  0.64100717, 0.8135934])
-                          
+
         np.testing.assert_allclose(utils.log_zgrid([0.1, 1], 0.1), value, rtol=1e-06, atol=0, equal_nan=False, err_msg='', verbose=True)
-    
-    
+
+
     def test_arg_dict(self):
         """
         Argument parsing
@@ -28,5 +28,16 @@ class UtilsTester(unittest.TestCase):
         
         # Test that dictionaries are the same using __repr__ method
         assert(kwargs.__repr__() == result.__repr__())
-                
+
+
+    def test_ctime(self):
+        """
+        ctime conversion
+        """
+        mtime = 'Mon Sep 16 11:23:27 2019'
+        iso = utils.ctime_to_iso(mtime, strip_decimal=True)
+        assert(iso == '2019-09-16 11:23:27')
+
+        iso = utils.ctime_to_iso(mtime, strip_decimal=False)
+        assert(iso == '2019-09-16 11:23:27.000')
         

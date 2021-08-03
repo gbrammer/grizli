@@ -830,7 +830,7 @@ def wait_on_db_update(root, t0=60, dt=30, n_iter=60, engine=None):
         if (n == n_i) & (checksum == checksum_i) & (n6 == n6_i):
             break
 
-        now = time.ctime()
+        now = utils.nowtime()
         print('{0}, {1}: n={2:<5d} n5={5:<5d} n6={3:<5d} checksum={4}'.format(root, now, n, n6, checksum, n5))
         n_i, n6_i, checksum_i = n, n6, checksum
         if i == 0:
@@ -1545,13 +1545,13 @@ WHERE (root = q_root AND id = q_id)) c
     counts = pd.read_sql_query("select root, COUNT(root) as n from redshift_fit, photometry_apcorr where phot_root = p_root AND id = p_id AND bic_diff > 50 AND mag_auto < 24 group by root;", engine)
 
 
-def from_sql(query, engine):
+def from_sql(query, engine, **kwargs):
     import pandas as pd
     from grizli import utils
     res = pd.read_sql_query(query, engine)
 
     tab = utils.GTable.from_pandas(res)
-    set_column_formats(tab)
+    set_column_formats(tab, **kwargs)
 
     return tab
 
@@ -2051,7 +2051,23 @@ def add_missing_photometry():
     os.system('sudo halt')
 
 
-def set_column_formats(info, extra={}):
+def set_column_formats(info, extra={}, convert_mtime=True, **kwargs):
+    """
+    Set predefined format strings of table columns
+
+    Parameters
+    ----------
+    info : `astropy.table.Table`
+        Data table, updated in place
+
+    extra : dict
+        Dictionary with extra format codes as values and column names as keys
+
+    convert_mtime : bool
+        If ``'mtime'`` column found in `info`, convert all time strings to 
+        sortable ISO format with `~grizli.utils.ctime_to_iso`.
+
+    """
     # Print formats
     formats = {}
     formats['ra'] = formats['dec'] = '.5f'
@@ -2105,6 +2121,12 @@ def set_column_formats(info, extra={}):
             info[c].format = '.1e'
         elif c.startswith('flux_') | c.startswith('err_'):
             info[c].format = '.1e'
+    
+    if convert_mtime & ('mtime' in info.colnames):
+        iso_times = [utils.ctime_to_iso(m, verbose=False, strip_decimal=True) 
+                     for m in info['mtime']]
+
+        info['mtime'] = iso_times
 
 
 def query_from_ds9(ds9, radius=5, engine=None, extra_cols=['mag_auto', 'z_map', 'bic_diff', 't_g800l', 't_g102', 't_g141'], extra_query='', table_root='/tmp/ds9_query'):
@@ -2288,7 +2310,8 @@ def make_html_table(engine=None, columns=['root', 'status', 'id', 'p_ra', 'p_dec
         ax.legend(loc='upper right')
 
         fig.tight_layout(pad=0.1)
-        fig.text(1-0.02, 0.02, time.ctime(), ha='right', va='bottom', transform=fig.transFigure, fontsize=5)
+        fig.text(1-0.02, 0.02, utils.nowtime(), ha='right', va='bottom', 
+                 transform=fig.transFigure, fontsize=5)
 
         fig.savefig('{0}_zhist.png'.format(table_root))
 

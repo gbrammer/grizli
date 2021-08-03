@@ -4529,7 +4529,7 @@ def get_flt_footprint(flt_file, extensions=[1, 2, 3, 4], patch_args=None):
         return fp
 
 
-def make_maximal_wcs(files, pixel_scale=0.1, get_hdu=True, pad=90, verbose=True, theta=0, nsci_extensions=4):
+def make_maximal_wcs(files, pixel_scale=0.1, get_hdu=True, pad=90, verbose=True, theta=0, poly_buffer=1./3600, nsci_extensions=4):
     """
     Compute an ImageHDU with a footprint that contains all of `files`
 
@@ -4606,10 +4606,16 @@ def make_maximal_wcs(files, pixel_scale=0.1, get_hdu=True, pad=90, verbose=True,
     for i, (wcs, file, chip) in enumerate(wcs_list):
         p_i = Polygon(wcs.calc_footprint())
         if group_poly is None:
-            group_poly = p_i.buffer(1./3600)
+            if poly_buffer > 0:
+                group_poly = p_i.buffer(1./3600)
+            else:
+                group_poly = p_i
         else:
-            group_poly = group_poly.union(p_i.buffer(1./3600))
-
+            if poly_buffer > 0:
+                group_poly = group_poly.union(p_i.buffer(1./3600))
+            else:
+                group_poly = group_poly.union(p_i)
+                 
         x0, y0 = np.cast[float](group_poly.centroid.xy)[:, 0]
         if verbose:
             print('{0:>3d}/{1:>3d}: {2}[SCI,{3}]  {4:>6.2f}'.format(i, len(files), file, chip+1, group_poly.area*3600*np.cos(y0/180*np.pi)))
@@ -7364,6 +7370,79 @@ def log_function_arguments(LOGFILE, frame, func='func', verbose=True):
     return msg
 
 
+def ctime_to_iso(mtime, format='%a %b %d %H:%M:%S %Y', strip_decimal=True, verbose=True):
+    """
+    Convert `time.ctime` strings to ISO dates
+
+    Parameters
+    ----------
+    mtime : str
+        Time string, generally as output from `time.ctime`, e.g., 
+        ``'Mon Sep 16 11:23:27 2019'``
+
+    format : str
+        `datetime.strptime` format string, codes at 
+        https://www.programiz.com/python-programming/datetime/strptime
+
+    strip_decimal : bool
+        Strip decimal seconds from end of ISO string
+
+    verbose : bool
+        Print a message if conversion fails
+
+    Returns 
+    -------
+    iso : str
+        String in (sortable) ISO format, e.g., ``'2019-09-16 11:23:27.000'``
+
+    """
+    from astropy.time import Time
+    from datetime import datetime
+
+    # Is already ISO format
+    if mtime.count('-') == 2:
+        iso = mtime + ''
+
+    else:
+        try:
+            iso = Time(datetime.strptime(mtime, format), 
+                       format='datetime').iso
+        except ValueError:
+            if verbose:
+                print(f'Couldn\'t convert \'{mtime}\' with '
+                      f'format \'{format}\'')
+
+            iso = mtime + ''
+
+    if strip_decimal:
+        iso = iso.split('.')[0]
+
+    return iso
+
+
+def nowtime(iso=True):
+    """
+    Wrapper for `astropy.time.now`
+
+    Parameters
+    ----------
+    iso : bool
+        If True, return time in ISO string, else return Time object
+
+    Returns
+    -------
+    tnow : str
+        See `iso`
+
+    """
+    from astropy.time import Time
+    tnow = Time.now()
+    if iso:
+        return tnow.iso
+    else:
+        return tnow
+
+
 def log_comment(LOGFILE, comment, verbose=False, show_date=False, mode='a'):
     """
     Log a message to a file, optionally including a date tag
@@ -7371,10 +7450,9 @@ def log_comment(LOGFILE, comment, verbose=False, show_date=False, mode='a'):
     import time
 
     if show_date:
-        msg = '# ({0})\n'.format(time.ctime())
+        msg = '# ({0})\n'.format(nowtime())
     else:
         msg = ''
-        # fp.write('\n# ({0})\n'.format(time.ctime()))
 
     msg += '{0}\n'.format(comment)
 
@@ -7412,7 +7490,7 @@ def log_exception(LOGFILE, traceback, verbose=True, mode='a'):
 
     trace = traceback.format_exc(limit=2)
     log = '\n########################################## \n'
-    log += '# ! Exception ({0})\n'.format(time.ctime())
+    log += '# ! Exception ({0})\n'.format(nowtime())
     log += '#\n# !'+'\n# !'.join(trace.split('\n'))
     log += '\n######################################### \n\n'
     if verbose | (LOGFILE is None):
