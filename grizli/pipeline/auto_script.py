@@ -152,11 +152,26 @@ def get_extra_data(root='j114936+222414', HOME_PATH='/Volumes/Pegasus/Grizli/Aut
         if os.path.exists(root):
             print('Skip', root)
             continue
-
+        
+        if not os.path.exists(file):
+            print('Persistence tar file {0} not found'.format(file))
+            continue
+            
         # Ugly callout to shell
         os.system('tar xzvf {0}.tar.gz'.format(root))
-        os.system('rm {0}/*extper.fits {0}/*flt_cor.fits'.format(root))
-        os.system('ln -sf {0}/*persist.fits ./'.format(root))
+        
+        # Clean unneeded files
+        clean_files = glob.glob('{0}/*extper.fits'.format(root))
+        clean_files += glob.glob('{0}/*flt_cor.fits'.format(root))
+        for f in clean_files:
+            os.remove(f)
+        
+        # Symlink to ./
+        pfiles = glob.glob('{0}/*persist.fits'.format(root))
+        if len(pfiles) > 0:
+            for f in pfiles:
+                if not os.path.exists(os.path.basename(f)):
+                    os.system('ln -sf {0} ./'.format(f))
 
     os.chdir(CWD)
 
