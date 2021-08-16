@@ -313,7 +313,10 @@ def run_grizli_fit(event):
         dbtable = 'stellar_fit'
     else:
         dbtable = 'redshift_fit'
-
+    
+    if 'dbtable' in event_kwargs:
+        dbtable = event_kwargs['dbtable']
+        
     if not silent:
         print('Grizli version: ', grizli.__version__)
 
@@ -371,9 +374,15 @@ def run_grizli_fit(event):
     s3 = boto3.resource('s3')
     s3_client = boto3.client('s3')
     bkt = s3.Bucket(event_kwargs['bucket'])
-
+    
+    ubkt = bkt
+    if 'up_bucket' in event_kwargs:
+        if event_kwargs['up_bucket'] != event_kwargs['bucket']:
+            print('Set upload bucket: ' + event_kwargs['up_bucket'])
+            ubkt = s3.Bucket(event_kwargs['up_bucket'])
+            
     if event_kwargs['skip_started']:
-        res = [r.key for r in bkt.objects.filter(Prefix=full_start)]
+        res = [r.key for r in ubkt.objects.filter(Prefix=full_start)]
         if res:
             print('Already started ({0}), aborting.'.format(start_log))
             return True
@@ -381,7 +390,7 @@ def run_grizli_fit(event):
     fp = open(start_log, 'w')
     fp.write(time.ctime()+'\n')
     fp.close()
-    bkt.upload_file(start_log, full_start)
+    ubkt.upload_file(start_log, full_start)
 
     # Download fit arguments
     if 'force_args' in event:
@@ -457,7 +466,8 @@ def run_grizli_fit(event):
 
     if ('run_fit' in event) & (dbtable == 'redshift_fit'):
         if event['run_fit'] in FALSE_OPTIONS:
-            res = bkt.delete_objects(Delete={'Objects': [{'Key': full_start}]})
+            res = ubkt.delete_objects(Delete={'Objects': 
+                                               [{'Key': full_start}]})
 
             try:
                 grizli_db.update_redshift_fit_status(root, id,
@@ -482,7 +492,7 @@ def run_grizli_fit(event):
 
     if dbtable == 'multibeam':
         # Done
-        res = bkt.delete_objects(Delete={'Objects': [{'Key': full_start}]})
+        res = ubkt.delete_objects(Delete={'Objects': [{'Key': full_start}]})
         return True
 
     # Download WCS files
@@ -530,7 +540,28 @@ def run_grizli_fit(event):
     except:
         print('Set DB flag failed: start_redshift_fit')
         pass
-
+    
+    # Extra args from numpy file on s3
+    if 's3_argsfile' in event_kwargs:
+        if os.path.exists(event_kwargs['s3_argsfile']):
+            result = (event_kwargs['s3_argsfile'], 1)
+        else:
+            result = utils.fetch_s3_url(url=event_kwargs['s3_argsfile'],
+                                    file_func=lambda x : os.path.join('./',x), 
+                                    skip_existing=True, verbose=True)
+        
+        s3_argsfile_local, status = result
+        if os.path.exists(s3_argsfile_local):
+            try:
+                extra_args = np.load(s3_argsfile_local, allow_pickle=True)[0]
+                
+                for k in extra_args:
+                    print(f'{s3_argsfile_local} {k}')
+                    event_kwargs[k] = extra_args[k]
+                
+            except OSError:
+                print(f'Failed to get keywords from {s3_argsfile_local}')
+                
     if event_kwargs['quasar_fit'] in TRUE_OPTIONS:
 
         # Don't recopy beams file
@@ -709,6 +740,7 @@ def run_grizli_fit(event):
 
     # Output files
     files = glob.glob('{0}_{1:05d}*'.format(root, id))
+    
     for file in files:
         if ('beams.fits' not in file) | put_beams:
             aws_file = '{0}/{1}'.format(output_path, file)
@@ -747,7 +779,7 @@ def run_grizli_fit(event):
         pass
 
     # Remove start log now that done
-    res = bkt.delete_objects(Delete={'Objects': [{'Key': full_start}]})
+    res = ubkt.delete_objects(Delete={'Objects': [{'Key': full_start}]})
 
     # Garbage collector
     gc.collect()
