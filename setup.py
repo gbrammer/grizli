@@ -67,17 +67,19 @@ if os.path.exists('.git'):
         version_hash = '---'
         version = long_version
 
-    version_str =f"""# git describe --tags
+    print('Git version: {0}'.format(version))
+else:
+    # e.g., on pip
+    version = long_version = version_hash = '1.3.2'
+
+version_str =f"""# git describe --tags
 __version__ = "{version}"
 __long_version__ = "{long_version}"
 __version_hash__ = "{version_hash}" """
 
-    fp = open('grizli/version.py','w')
-    fp.write(version_str)
-    fp.close()
-    print('Git version: {0}'.format(version))
-else:
-    version = '1.3.2'
+fp = open('grizli/version.py','w')
+fp.write(version_str)
+fp.close()
 
 if USE_CYTHON:
     extensions = cythonize(extensions, language_level="3")
