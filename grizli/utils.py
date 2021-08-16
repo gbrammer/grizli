@@ -4708,6 +4708,97 @@ def header_keys_from_filelist(fits_files, keywords=[], ext=0, colname_case=str.l
     return tab
 
 
+def parse_s3_url(url='s3://bucket/path/to/file.txt'):
+    """
+    Parse s3 path string
+    
+    Parameters
+    ----------
+    url : str
+        Full S3 path, e.g., ``[s3://]{bucket_name}/{s3_object}``
+    
+    Returns
+    -------
+    bucket_name : str
+        Bucket name
+    
+    s3_object : str
+        Full path of the S3 file object
+    
+    filename : str
+        File name of the object, e.g. ``os.path.basename(s3_object)``
+        
+    """
+    surl = url.strip('s3://')
+    spl = surl.split('/')
+    if len(spl) < 2:
+        print(f"bucket / path not found in {url}")
+        return None, None, None
+        
+    bucket_name = spl[0]
+    s3_object = '/'.join(spl[1:])
+    filename = os.path.basename(s3_object)
+    return bucket_name, s3_object, filename
+
+
+def fetch_s3_url(url='s3://bucket/path/to/file.txt', file_func=lambda x : os.path.join('./',x), skip_existing=True, verbose=True):
+    """
+    Fetch file from an S3 bucket
+    
+    Parameters
+    ----------
+    url : str
+        S3 url of a file to download
+    
+    file_func : function
+        Function applied to the file name extracted from `url`, e.g., to 
+        set output directory, rename files, set a prefix, etc.
+    
+    Returns
+    -------
+    local_file : str
+        Name of local file or `None` if failed to parse `url`
+    
+    status : int
+        Bit flag of results: **1** == file found, **2** = download successful
+        
+    """
+    import boto3
+    import botocore.exceptions
+    
+    s3 = boto3.resource('s3')
+    bucket_name, s3_object, filename = parse_s3_url(url=url)
+    if bucket_name is None:
+        return url, os.path.exists(url)
+        
+    bkt = s3.Bucket(bucket_name)
+    local_file = file_func(filename)
+    status = os.path.exists(local_file)*1
+    
+    if (status > 0) & skip_existing:
+        print(f'{local_file} exists, skipping.')
+    else:
+
+        try:
+            bkt.download_file(s3_object, local_file,
+                      ExtraArgs={"RequestPayer": "requester"})
+            status += 2
+            if verbose:
+                print(f'{url} > {local_file}')
+                
+        except botocore.exceptions.ClientError:
+            trace = traceback.format_exc(limit=2)
+            msg = trace.split('\n')[-2].split('ClientError: ')[1]
+            if verbose:
+                print(f'Failed {url}: {msg}')
+                
+            # Download failed due to a ClientError
+            # Forbidden probably means insufficient bucket access privileges
+            pass
+            
+    return local_file, status
+
+
 def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
                        clean=True, include_saturated=True, keep_bits=None,
                        dryrun=False, skip=None):
