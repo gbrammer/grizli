@@ -4763,6 +4763,7 @@ def fetch_s3_url(url='s3://bucket/path/to/file.txt', file_func=lambda x : os.pat
         Bit flag of results: **1** == file found, **2** = download successful
         
     """
+    import traceback
     import boto3
     import botocore.exceptions
     
