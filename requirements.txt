@@ -7,13 +7,13 @@ scikit-learn
 pyyaml
 cython
 
-# photutils=1.0 needed for drizzlepac, apparently
+# photutils<1.1 needed for drizzlepac==3.2.1
 photutils==1.0.2
 astroquery
 pyregion
 
 stwcs
-# hstcal (only with conda)
+# hstcal (only works with conda)
 wfc3tools
 crds
 drizzlepac
@@ -33,7 +33,9 @@ astro-prospector
 sep
 # git+https://github.com/gbrammer/sep.git
 
-git+https://github.com/gbrammer/pyia.git
+# coord routines work without pyia
+#git+https://github.com/gbrammer/pyia.git
+
 git+https://github.com/gbrammer/reprocess_wfc3.git
 git+https://github.com/gbrammer/eazy-py.git
 git+https://github.com/gbrammer/tristars.git
