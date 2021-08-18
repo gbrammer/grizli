@@ -46,7 +46,7 @@ The environment can be installed with ``pip`` and the `requirements.txt <https:/
     # for the WFC3/IR pipeline calwf3
     conda install hstcal
     
-    # Run basic tests with pytest
+    # Run basic tests with pytest *after downloading config files as below*
     pip install pytest
     pytest
     
