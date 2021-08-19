@@ -55,11 +55,16 @@ def _loadFLT(grism_file, sci_extn, direct_file, pad, ref_file,
     save_file = save_file.replace('_cmb.fits', new_root)
     save_file = save_file.replace('_rate.fits', new_root)
     save_file = save_file.replace('_elec.fits', new_root)
-
-    if (grism_file.find('_') < 0) | ('GrismFLT' not in grism_file):
+    
+    if (save_file == grism_file) & ('GrismFLT' not in grism_file):
+        # couldn't build new filename based on the extensions
+        # so just insert at the end
+        save_file = grism_file.replace('.fits', new_root)
+        
+    if (grism_file.find('_') < 0) & ('GrismFLT' not in grism_file):
         save_file = 'xxxxxxxxxxxxxxxxxxx'
 
-    if os.path.exists(save_file):
+    if os.path.exists(save_file) & ('GrismFLT' in save_file):
         print('Load {0}!'.format(save_file))
 
         fp = open(save_file.replace('GrismFLT.fits', 'GrismFLT.pkl'), 'rb')
@@ -409,6 +414,12 @@ class GroupFLT():
             save_file = save_file.replace('_cmb.fits', new_root)
             save_file = save_file.replace('_rate.fits', new_root)
             save_file = save_file.replace('_elec.fits', new_root)
+            
+            if (save_file == file) & ('GrismFLT' not in file):
+                # couldn't build new filename based on the extensions
+                # so just insert at the end
+                save_file = file.replace('.fits', new_root)
+                
             print('Save {0}'.format(save_file))
             _flt.save_full_pickle()
 

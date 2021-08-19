@@ -3372,7 +3372,11 @@ class GrismFLT(object):
         root = self.grism_file.split('_flt.fits')[0].split('_cmb.fits')[0]
         root = root.split('_flc.fits')[0].split('_rate.fits')[0]
         root = root.split('_elec.fits')[0]
-
+        
+        if root == self.grism_file:
+            # unexpected extension, so just insert before '.fits'
+            root = self.grism_file.split('.fits')[0]
+            
         hdu = pyfits.HDUList([pyfits.PrimaryHDU()])
         for key in self.direct.data.keys():
             hdu.append(pyfits.ImageHDU(data=self.direct.data[key],
