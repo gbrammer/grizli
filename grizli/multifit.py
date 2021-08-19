@@ -56,7 +56,7 @@ def _loadFLT(grism_file, sci_extn, direct_file, pad, ref_file,
     save_file = save_file.replace('_rate.fits', new_root)
     save_file = save_file.replace('_elec.fits', new_root)
 
-    if (grism_file.find('_') < 0) & ('GrismFLT' not in grism_file):
+    if (grism_file.find('_') < 0) | ('GrismFLT' not in grism_file):
         save_file = 'xxxxxxxxxxxxxxxxxxx'
 
     if os.path.exists(save_file):
