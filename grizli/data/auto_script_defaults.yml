@@ -164,6 +164,8 @@ mosaic_drizzle_args:
     driz_cr_scale_grow: 1
     resetbits: 0
     bits: null
+    static: True
+    context: False
     
 # Mask IR difraction spikes
 mask_spikes: False 
