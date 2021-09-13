@@ -5713,7 +5713,7 @@ class EffectivePSF(object):
             data[data < 0] = 0
 
             self.epsf[filter] = data
-
+        
         # UVIS
         filter_files = glob.glob(os.path.join(GRIZLI_PATH, 'CONF',
                             'PSFSTD_WFC3UV*.fits'))
@@ -5739,7 +5739,11 @@ class EffectivePSF(object):
         self.epsf['F128N'] = self.epsf['F125W']
         self.epsf['F130N'] = self.epsf['F125W']
         self.epsf['F132N'] = self.epsf['F125W']
-
+        
+        # Dummy filters for IR grisms
+        self.epsf['G141'] = self.epsf['F140W']
+        self.epsf['G102'] = self.epsf['F105W']
+        
         # Extended
         self.extended_epsf = {}
         for filter in ['F105W', 'F125W', 'F140W', 'F160W']:
@@ -5769,6 +5773,9 @@ class EffectivePSF(object):
         self.extended_epsf['F128N'] = self.extended_epsf['F125W']
         self.extended_epsf['F130N'] = self.extended_epsf['F125W']
         self.extended_epsf['F132N'] = self.extended_epsf['F125W']
+        self.extended_epsf['G102'] = self.extended_epsf['F105W']
+        self.extended_epsf['G141'] = self.extended_epsf['F140W']
+
 
     def get_at_position(self, x=507, y=507, filter='F140W'):
         """Evaluate ePSF at detector coordinates
@@ -5776,7 +5783,8 @@ class EffectivePSF(object):
         """
         epsf = self.epsf[filter]
 
-        if filter in ['F098M', 'F110W', 'F105W', 'F125W', 'F140W', 'F160W']:
+        if filter in ['F098M', 'F110W', 'F105W', 'F125W', 'F140W', 'F160W',
+                      'G102','G141','F128N','F130N','F132N']:
             isir = True
         else:
             isir = False
