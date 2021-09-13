@@ -1839,7 +1839,7 @@ mag_lim=17, cat=None, cols=['mag_auto', 'ra', 'dec'], minR=8, dy=5, selection=No
             im.flush()
 
 
-def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_background=True, photometry_background=True, get_all_filters=False, filters=None, det_err_scale=-np.inf, rescale_weight=True, run_detection=True, detection_filter='ir', detection_root=None, output_root=None, use_psf_filter=True, detection_params=prep.SEP_DETECT_PARAMS,  phot_apertures=prep.SEXTRACTOR_PHOT_APERTURES_ARCSEC, master_catalog=None, bkg_mask=None, bkg_params={'bw': 64, 'bh': 64, 'fw': 3, 'fh': 3, 'pixel_scale': 0.06}, use_bkg_err=False, aper_segmask=True):
+def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_background=True, photometry_background=True, get_all_filters=False, filters=None, det_err_scale=-np.inf, phot_err_scale=-np.inf, rescale_weight=True, run_detection=True, detection_filter='ir', detection_root=None, output_root=None, use_psf_filter=True, detection_params=prep.SEP_DETECT_PARAMS,  phot_apertures=prep.SEXTRACTOR_PHOT_APERTURES_ARCSEC, master_catalog=None, bkg_mask=None, bkg_params={'bw': 64, 'bh': 64, 'fw': 3, 'fh': 3, 'pixel_scale': 0.06}, use_bkg_err=False, aper_segmask=True):
     """
     Make a detection catalog and run aperture photometry with the 
     SExtractor clone `~sep`.
@@ -1993,7 +1993,7 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
             filter_tab = prep.make_SEP_catalog(root=root,
                       threshold=threshold,
                       rescale_weight=rescale_weight,
-                      err_scale=det_err_scale,
+                      err_scale=phot_err_scale,
                       get_background=photometry_background,
                       save_to_fits=False, source_xy=source_xy,
                       phot_apertures=phot_apertures, bkg_mask=bkg_mask,
@@ -2817,9 +2817,16 @@ def summary_catalog(**kwargs):
     return res
 
 
-def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', min_overlap=0.2, stopme=False, ref_err=1.e-3, radec=None, redrizzle=True, shift_only=True, maglim=[17, 24], NITER=1, catalogs=['GAIA', 'PS1', 'NSC', 'SDSS', 'WISE'], method='Powell', radius=5., program_str=None, match_str=[], all_visits=None, date=None, gaia_by_date=False, tol=None, fit_options=None, print_options={'precision': 3, 'sign': ' '}, include_internal_matches=True):
+def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', min_overlap=0.2, stopme=False, ref_err=1.e-3, radec=None, redrizzle=True, shift_only=True, maglim=[17, 24], NITER=1, catalogs=['GAIA', 'PS1', 'NSC', 'SDSS', 'WISE'], method='Powell', radius=5., program_str=None, match_str=[], all_visits=None, date=None, gaia_by_date=False, tol=None, fit_options=None, print_options={'precision': 3, 'sign': ' '}, include_internal_matches=True, master_gaia_catalog=None):
     """
     Try fine alignment from visit-based SExtractor catalogs
+    
+    Parameters
+    ----------
+    
+    Returns
+    -------
+    
     """
     import os
     import glob
@@ -2827,7 +2834,7 @@ def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Griz
 
     try:
         from .. import prep, utils
-        from ..prep import get_radec_catalog
+        from ..prep import get_radec_catalog, get_gaia_radec_at_time
         from ..utils import transform_wcs
 
         frame = inspect.currentframe()
@@ -2900,7 +2907,45 @@ def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Griz
     ref_tab = utils.GTable(np.loadtxt(radec, unpack=True).T, 
                            names=['ra', 'dec'])
     ridx = np.arange(len(ref_tab))
+    
+    # Global GAIA DR2 catalog
+    if gaia_by_date:
+        if master_gaia_catalog is not None:
+            msg = (f'Master gaia catalog: {master_gaia_catalog}')                   
+            utils.log_comment(utils.LOGFILE, msg, show_date=True,
+                              verbose=True)
 
+            gaia_tab = utils.read_catalog(master_gaia_catalog)
+            
+        else:
+            
+            dra = np.max(np.abs(info['RA_TARG']-ra_i))
+            dde = np.max(np.abs(info['DEC_TARG']-dec_i))
+            drad = np.sqrt((dra*np.cos(dec_i/180*np.pi))**2+(dde**2))*60+2
+        
+            msg = (f'Get field GAIA catalog ({ra_i:.6f}, {dec_i:.6f})' +
+                   f' r={drad:.1f}arcmin')
+                   
+            utils.log_comment(utils.LOGFILE, msg, show_date=True,
+                              verbose=True)
+                          
+            gaia_tab = prep.get_gaia_DR2_vizier(ra=ra_i, dec=dec_i, 
+                                                radius=drad)
+        
+        # Done
+        msg = f'GAIA catalog: {len(gaia_tab)} objects'
+        utils.log_comment(utils.LOGFILE, msg, show_date=True,
+                          verbose=True)
+        
+        if len(gaia_tab) == 0:
+            msg = f'!No GAIA objects found, will run without absolute frame'
+            utils.log_comment(utils.LOGFILE, msg, show_date=True,
+                              verbose=True)
+            
+            gaia_tab = None
+    else:
+        gaia_tab = None
+    
     # Find matches
     tab = {}
     for i, file in enumerate(files):
@@ -2925,16 +2970,33 @@ def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Griz
 
         tab[i]['match_idx'] = {}
 
-        if gaia_by_date:
-            drz_file = glob.glob(file.replace('.cat.fits', '*dr?_sci.fits'))[0]
+        if gaia_by_date & (gaia_tab is not None):
+            drz_file = glob.glob(file.replace('.cat.fits',
+                                              '*dr?_sci.fits'))[0]
             drz_im = pyfits.open(drz_file)
-
-            radec, ref_catalog = get_radec_catalog(ra=drz_im[0].header['CRVAL1'],
-                    dec=drz_im[0].header['CRVAL2'],
-                    product='-'.join(file.split('-')[:-1]),  date=drz_im[0].header['EXPSTART'], date_format='mjd',
-                    reference_catalogs=['GAIA'], radius=radius)
-
-            ref_tab = utils.GTable(np.loadtxt(radec, unpack=True).T, names=['ra', 'dec'])
+            
+            coo = get_gaia_radec_at_time(gaia_tab, 
+                                         date=drz_im[0].header['EXPSTART'],
+                                         format='mjd')
+            
+            ok = np.isfinite(coo.ra+coo.dec)
+            ref_tab = utils.GTable()
+            if ok.sum() == 0:
+                ref_tab['ra'] = [0.]
+                ref_tab['dec'] = [-89.]
+            else:
+                ref_tab['ra'] = coo.ra[ok].value
+                ref_tab['dec'] = coo.dec[ok].value
+            
+            prod = '-'.join(file.split('-')[:-1])
+            prep.table_to_radec(ref_tab, f'{prod}_gaia.radec')
+            
+            # radec, ref_catalog = get_radec_catalog(ra=drz_im[0].header['CRVAL1'],
+            #         dec=drz_im[0].header['CRVAL2'],
+            #         product='-'.join(file.split('-')[:-1]),  date=drz_im[0].header['EXPSTART'], date_format='mjd',
+            #         reference_catalogs=['GAIA'], radius=radius)
+            # 
+            # ref_tab = utils.GTable(np.loadtxt(radec, unpack=True).T, names=['ra', 'dec'])
             ridx = np.arange(len(ref_tab))
 
         tab[i]['ref_tab'] = ref_tab
@@ -2942,9 +3004,13 @@ def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Griz
         clip = dr < 0.6*u.arcsec
         if clip.sum() > 1:
             tab[i]['match_idx'][-1] = [idx[clip], ridx[clip]]
-
-        print('{0} Ncat={1} Nref={2}'.format(sci_file, mclip.sum(), clip.sum()))
-
+        
+        msg = '{0} Ncat={1} Nref={2}'
+        utils.log_comment(utils.LOGFILE, 
+                          msg.format(sci_file, mclip.sum(), clip.sum()), 
+                          show_date=False,
+                          verbose=True)
+                          
         # ix, jx = tab[i]['match_idx'][-1]
         # ci = tab[i]['cat']#[ix]
         # cj = ref_tab#[jx]
@@ -4040,7 +4106,7 @@ def get_rgb_filters(filter_list, force_ir=False, pure_sort=False):
 
 TICKPARAMS = dict(axis='both', colors='w', which='both')
 
-def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', show_ir=True, pl=1, pf=1, scl=1, scale_ab=None, rgb_scl=[1, 1, 1], ds9=None, force_ir=False, filters=None, add_labels=True, output_format='jpg', rgb_min=-0.01, xyslice=None, pure_sort=False, verbose=True, force_rgb=None, suffix='.field', mask_empty=False, tick_interval=60, timestamp=False, mw_ebv=0, use_background=False, tickparams=TICKPARAMS, fill_black=False, ref_spectrum=None, gzext='', full_dimensions=False, invert=False):
+def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', show_ir=True, pl=1, pf=1, scl=1, scale_ab=None, rgb_scl=[1, 1, 1], ds9=None, force_ir=False, filters=None, add_labels=True, output_format='jpg', rgb_min=-0.01, xyslice=None, pure_sort=False, verbose=True, force_rgb=None, suffix='.field', mask_empty=False, tick_interval=60, timestamp=False, mw_ebv=0, use_background=False, tickparams=TICKPARAMS, fill_black=False, ref_spectrum=None, gzext='', full_dimensions=False, invert=False, get_images=False):
     """
     RGB image of the field mosaics
     """
@@ -4140,6 +4206,8 @@ def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', s
 
     if bf == 'sum':
         bimg = rimg
+    elif bf == rf:
+        bimg = rimg
     else:
         bimg = ims[bf][0].data * (ims[bf][0].header['PHOTFLAM']/5.e-20)**pf * (ims[bf][0].header['PHOTPLAM']/1.e4)**pl*scl*rgb_scl[2]
         if MW_F99 is not None:
@@ -4155,6 +4223,10 @@ def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', s
 
     if gf == 'sum':
         gimg = (rimg+bimg)/2.
+    elif gf == rf:
+        gimg = rimg
+    elif gf == bf:
+        gimg = bimg
     else:
         gscl = (ims[gf][0].header['PHOTFLAM']/5.e-20)**pf
         gscl *= (ims[gf][0].header['PHOTPLAM']/1.e4)**pl
@@ -4250,7 +4322,10 @@ def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', s
                 rmsk = rmsk[ysl, xsl]
                 gmsk = gmsk[ysl, xsl]
                 bmsk = bmsk[ysl, xsl]
-                
+    
+    if get_images:
+        return (rimg, gimg, bimg), (rf, gf, bf)
+                    
     image = make_lupton_rgb(rimg, gimg, bimg, stretch=0.1, minimum=rgb_min)
     if invert:
         image = 255-image
