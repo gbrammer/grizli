@@ -4502,6 +4502,8 @@ class BeamCutout(object):
                                                   get_extended=get_extended,
                                                 only_centering=only_centering)
         else:
+            self.beam.psf_ivar = ivar*1
+            self.beam.psf_sci = self.direct['SCI']*1
             self.psf_params = psf_params
 
         self.beam.x_init_epsf(flat_sensitivity=False, psf_params=self.psf_params, psf_filter=self.direct.filter, yoff=yoff, skip=skip, get_extended=get_extended)
