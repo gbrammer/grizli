@@ -584,10 +584,9 @@ def get_gaia_DR2_catalog(ra=165.86, dec=34.829694, radius=3.,
     return table
 
 
-def gen_tap_box_query(ra=165.86, dec=34.829694, radius=3., max=100000, db='ls_dr7.tractor_primary', columns=['*'], rd_colnames=['ra', 'dec']):
+def gen_tap_box_query(ra=165.86, dec=34.829694, radius=3., corners=None, max=100000, db='ls_dr7.tractor_primary', columns=['*'], rd_colnames=['ra', 'dec'], wcs_pad=0.5):
     """
     Generate a query string for the NOAO Legacy Survey TAP server
-    TBD
 
     Parameters
     ----------
@@ -596,7 +595,12 @@ def gen_tap_box_query(ra=165.86, dec=34.829694, radius=3., max=100000, db='ls_dr
 
     radius : float
         Search radius, in arc-minutes.
-
+    
+    corners : 4-tuple, `~astropy.wcs.WCS` or None
+        ra_min, ra_max, dec_min, dec_max of a query box to use instead of 
+        `radius`.  Or if a `~astropy.wcs.WCS` object, get limits from the 
+        `~astropy.wcs.WCS.calc_footprint` method
+        
     Returns
     -------
     query : str
@@ -611,23 +615,61 @@ def gen_tap_box_query(ra=165.86, dec=34.829694, radius=3., max=100000, db='ls_dr
         maxsel = 'TOP {0}'.format(max)
     else:
         maxsel = ''
-
-    if not np.isfinite(ra+dec):
-        query = """SELECT {maxsel} {output_columns} FROM {db} """.format(rc=rd_colnames[0], dc=rd_colnames[1], left=ra-rmi/cosd, right=ra+rmi/cosd, top=dec+rmi, bottom=dec-rmi, maxsel=maxsel, db=db, output_columns=', '.join(columns))
+    
+    if corners is not None:
+        if hasattr(corners, 'calc_footprint'):
+            foot = corners.calc_footprint()
+            
+            left = foot[:,0].min()
+            right = foot[:,0].max()
+            bottom = foot[:,1].min()
+            top = foot[:,1].max()
+            
+            dx = (right-left)
+            dy = (top-bottom)
+            left -= wcs_pad*dx
+            right += wcs_pad*dx
+            bottom -= wcs_pad*dy
+            top += wcs_pad*dy
+                        
+        elif len(corners) != 4:
+            msg = 'corners needs 4 values (ra_min, ra_max, dec_min, dec_max)'
+            raise ValueError(msg)    
+        else:
+            left, right, bottom, top = corners
     else:
-        query = """SELECT {maxsel} {output_columns} FROM {db}  WHERE {rc} > {left} AND {rc} < {right} AND {dc} > {bottom} AND {dc} < {top} """.format(rc=rd_colnames[0], dc=rd_colnames[1], left=ra-rmi/cosd, right=ra+rmi/cosd, top=dec+rmi, bottom=dec-rmi, maxsel=maxsel, db=db, output_columns=', '.join(columns))
+        left = ra - rmi / cosd
+        right = ra + rmi / cosd
+        bottom = dec - rmi
+        top = dec + rmi
+    
+    fmt = dict(rc=rd_colnames[0], dc=rd_colnames[1],
+               left=left, right=right,
+               top=top, bottom=bottom,
+               maxsel=maxsel,
+               db=db,
+               output_columns=', '.join(columns))
+               
+    if not np.isfinite(ra+dec):
+        query = "SELECT {maxsel} {output_columns} FROM {db} "
+    else:
+        query = ("SELECT {maxsel} {output_columns} FROM {db} WHERE " +
+                 "{rc} > {left} AND {rc} < {right} AND " +
+                 "{dc} > {bottom} AND {dc} < {top} ")
         
-    return query
+    return query.format(**fmt)
 
 
-def query_tap_catalog(ra=165.86, dec=34.829694, radius=3., max_wait=20,
-                    db='ls_dr7.tractor_primary', columns=['*'], extra='',
+def query_tap_catalog(ra=165.86, dec=34.829694, radius=3., corners=None, 
+                    max_wait=20,
+                    db='ls_dr9.tractor', columns=['*'], extra='',
                     rd_colnames=['ra', 'dec'],
                     tap_url='http://datalab.noao.edu/tap',
                     max=1000000, clean_xml=True, verbose=True,
                     des=False, gaia=False, nsc=False, vizier=False,
                     skymapper=False,
-                    hubble_source_catalog=False, tap_kwargs={}):
+                    hubble_source_catalog=False, tap_kwargs={}, 
+                    **kwargs):
     """Query NOAO Catalog holdings
 
     Parameters
@@ -637,6 +679,11 @@ def query_tap_catalog(ra=165.86, dec=34.829694, radius=3., max_wait=20,
 
     radius : float
         Radius of the query, in arcmin
+
+    corners : 4-tuple, `~astropy.wcs.WCS` or None
+        ra_min, ra_max, dec_min, dec_max of a query box to use instead of 
+        `radius`.  Or if a `WCS` object, get limits from the 
+        `~astropy.wcs.WCS.calc_footprint` method
 
     db : str
         Parent database (https://datalab.noao.edu/query.php).
@@ -735,7 +782,8 @@ def query_tap_catalog(ra=165.86, dec=34.829694, radius=3., max_wait=20,
 
     query = gen_tap_box_query(ra=ra, dec=dec, radius=radius, max=max,
                                db=db, columns=columns,
-                               rd_colnames=rd_colnames)
+                               rd_colnames=rd_colnames, 
+                               corners=corners)
 
     job = tap.launch_job(query+extra, dump_to_file=True, verbose=verbose)
     try:
@@ -800,7 +848,7 @@ HSCv3_COLUMNS = ['MatchRA', 'MatchDec', 'CI', 'CI_Sigma',
                  'TargetName', 'NumImages', 'NumFilters', 'NumVisits', 
                  'DSigma']
 
-def get_hubble_source_catalog(ra=0., dec=0., radius=3, max=int(1e7), extra=' AND NumImages > 0', kron_max=0.45, dsigma_max=100, clip_singles=10*u.arcsec, verbose=True, columns=HSCv3_COLUMNS, filter_limits=HSCv3_FILTER_LIMITS):
+def get_hubble_source_catalog(ra=0., dec=0., radius=3, corners=None, max=int(1e7), extra=' AND NumImages > 0', kron_max=0.45, dsigma_max=100, clip_singles=10*u.arcsec, verbose=True, columns=HSCv3_COLUMNS, filter_limits=HSCv3_FILTER_LIMITS):
     """
     Query NOAO Source Catalog, which is aligned to GAIA DR1.
 
@@ -832,7 +880,8 @@ def get_hubble_source_catalog(ra=0., dec=0., radius=3, max=int(1e7), extra=' AND
     else:
         db = 'dbo.SumPropMagAutoCat'
 
-    tab = query_tap_catalog(ra=ra, dec=dec, radius=radius, max=max, 
+    tab = query_tap_catalog(ra=ra, dec=dec, radius=radius, 
+                            corners=corners, max=max, 
                             extra=extra, hubble_source_catalog=True, 
                             verbose=verbose, db=db, columns=columns)
 
@@ -851,7 +900,7 @@ def get_hubble_source_catalog(ra=0., dec=0., radius=3, max=int(1e7), extra=' AND
     return tab
 
 
-def get_nsc_catalog(ra=0., dec=0., radius=3, max=100000, extra=' AND (rerr < 0.08 OR ierr < 0.08 OR zerr < 0.08) AND raerr < 0.2 AND decerr < 0.2', verbose=True):
+def get_nsc_catalog(ra=0., dec=0., radius=3, corners=None, max=100000, extra=' AND (rerr < 0.08 OR ierr < 0.08 OR zerr < 0.08) AND raerr < 0.2 AND decerr < 0.2', verbose=True):
     """
     Query NOAO Source Catalog, which is aligned to GAIA DR1.
 
@@ -861,12 +910,12 @@ def get_nsc_catalog(ra=0., dec=0., radius=3, max=100000, extra=' AND (rerr < 0.0
     msg = 'Query NOAO Source Catalog ({ra:.5f},{dec:.5f},{radius:.1f}\')'
     print(msg.format(ra=ra, dec=dec, radius=radius))
 
-    tab = query_tap_catalog(ra=ra, dec=dec, radius=radius, extra=extra, 
-                            nsc=True, verbose=verbose, max=max)
+    tab = query_tap_catalog(ra=ra, dec=dec, radius=radius, corners=corners, 
+                            extra=extra, nsc=True, verbose=verbose, max=max)
     return tab
 
 
-def get_desdr1_catalog(ra=0., dec=0., radius=3, max=100000, extra=' AND (magerr_auto_r < 0.15 OR magerr_auto_i < 0.15)', verbose=True):
+def get_desdr1_catalog(ra=0., dec=0., radius=3, corners=None, max=100000, extra=' AND (magerr_auto_r < 0.15 OR magerr_auto_i < 0.15)', verbose=True):
     """
     Query DES DR1 Catalog.
 
@@ -877,34 +926,50 @@ def get_desdr1_catalog(ra=0., dec=0., radius=3, max=100000, extra=' AND (magerr_
     msg = 'Query DES Source Catalog ({ra:.5f},{dec:.5f},{radius:.1f}\')'
     print(msg.format(ra=ra, dec=dec, radius=radius))
 
-    tab = query_tap_catalog(ra=ra, dec=dec, radius=radius, extra=extra, 
-                            des=True, verbose=verbose, max=max)
+    tab = query_tap_catalog(ra=ra, dec=dec, radius=radius, corners=corners,
+                            extra=extra, des=True, verbose=verbose, max=max)
     return tab
 
 
-def get_skymapper_catalog(ra=0., dec=0., radius=3., max_records=500000, verbose=True, extra=''):
+def get_skymapper_catalog(ra=0., dec=0., radius=3., corners=None, max_records=500000, verbose=True, extra=''):
     """
     Get Skymapper DR1 from Vizier
     """
     msg = 'Query Skymapper DR1 catalog ({ra},{dec},{radius})'
     print(msg.format(ra=ra, dec=dec, radius=radius))
-    tab = query_tap_catalog(ra=ra, dec=dec, radius=radius*2, extra=extra, 
+    tab = query_tap_catalog(ra=ra, dec=dec, radius=radius*2,
+                            corners=corners, extra=extra, 
                             skymapper=True, db='"II/358/smss"', 
                             verbose=verbose, max=max_records)
     return tab
 
 
-def get_panstarrs_catalog(ra=0., dec=0., radius=3., max_records=500000, verbose=True, extra='AND "II/349/ps1".e_imag < 0.2 AND "II/349/ps1".e_RAJ2000 < 0.15 AND "II/349/ps1".e_DEJ2000 < 0.15'):
+def get_legacysurveys_catalog(ra=0., dec=0., radius=3., verbose=True, db='ls_dr9.tractor', **kwargs):
+    """
+    Query LegacySurveys TAP catalog
+    """
+    if verbose:
+        msg = 'Query LegacySurveys ({db}) catalog ({ra},{dec},{radius:.2f})'
+        print(msg.format(ra=ra, dec=dec, radius=radius, db=db))
+    
+    tab = query_tap_catalog(ra=ra, dec=dec, radius=radius, db=db, **kwargs)
+    return tab
+
+
+def get_panstarrs_catalog(ra=0., dec=0., radius=3., corners=None, max_records=500000, verbose=True, extra='AND "II/349/ps1".e_imag < 0.2 AND "II/349/ps1".e_RAJ2000 < 0.15 AND "II/349/ps1".e_DEJ2000 < 0.15'):
     """
     Get PS1 from Vizier
     """
     msg = 'Query PanSTARRS catalog ({ra},{dec},{radius})'
     print(msg.format(ra=ra, dec=dec, radius=radius))
-    tab = query_tap_catalog(ra=ra, dec=dec, radius=radius*2, extra=extra, vizier=True, db='"II/349/ps1"', verbose=verbose, max=max_records)
+    tab = query_tap_catalog(ra=ra, dec=dec, radius=radius*2,
+                            corners=corners, extra=extra, 
+                            vizier=True, db='"II/349/ps1"', verbose=verbose, 
+                            max=max_records)
     return tab
 
 
-def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, reference_catalogs=['GAIA', 'PS1', 'Hubble', 'NSC', 'SDSS', 'WISE', 'DES'], use_self_catalog=False, **kwargs):
+def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, reference_catalogs=['GAIA', 'LS_DR9', 'PS1', 'Hubble', 'NSC', 'SDSS', 'WISE', 'DES'], use_self_catalog=False, **kwargs):
     """Decide what reference astrometric catalog to use
 
     First search SDSS, then WISE looking for nearby matches.
@@ -926,7 +991,8 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, ref
     reference_catalogs : list
         Order in which to query reference catalogs.  Options are 'GAIA',
         'PS1' (STScI PanSTARRS), 'SDSS', 'WISE', 'NSC' (NOAO Source Catalog),
-        'DES' (Dark Energy Survey DR1), 'Hubble' (Hubble Source Catalog v3).
+        'DES' (Dark Energy Survey DR1), 'Hubble' (Hubble Source Catalog v3), 
+        'LS_DR9' (LegacySurveys DR9).
 
     Returns
     -------
@@ -947,7 +1013,8 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, ref
                        'NSC': get_nsc_catalog,
                        'DES': get_desdr1_catalog,
                        'Hubble': get_hubble_source_catalog,
-                       'Skymapper': get_skymapper_catalog}
+                       'Skymapper': get_skymapper_catalog, 
+                       'LS_DR9': get_legacysurveys_catalog}
 
     # Try queries
     has_catalog = False
@@ -978,6 +1045,9 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, ref
             # ref_cat = query_functions[ref_src](ra=ra, dec=dec,
             #                                    radius=radius)
 
+            valid = np.isfinite(ref_cat['ra']+ref_cat['dec'])
+            ref_cat = ref_cat[valid]
+            
             if len(ref_cat) < 2:
                 raise ValueError
 
