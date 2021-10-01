@@ -449,7 +449,8 @@ class GrismDisperser(object):
             Y-offset to apply
 
         """
-
+        from .utils_c.interp import interp_conserve_c
+        
         self.ytrace_beam, self.lam_beam = self.conf.get_beam_trace(
                             x=(self.xc+self.xcenter-self.pad)/self.grow,
                             y=(self.yc+self.ycenter-self.pad)/self.grow,
@@ -494,7 +495,7 @@ class GrismDisperser(object):
         else:
             MWext = 1.
 
-        ysens[so] = interp.interp_conserve_c(self.lam_beam[so],
+        ysens[so] = interp_conserve_c(self.lam_beam[so],
                                              conf_sens['WAVELENGTH'],
                                              conf_sens['SENSITIVITY']*MWext,
                                              integrate=1, left=0, right=0)
@@ -504,7 +505,7 @@ class GrismDisperser(object):
         # Full array
         ysens = self.lam*0
         so = np.argsort(self.lam)
-        ysens[so] = interp.interp_conserve_c(self.lam[so],
+        ysens[so] = interp_conserve_c(self.lam[so],
                                              conf_sens['WAVELENGTH'],
                                              conf_sens['SENSITIVITY']*MWext,
                                              integrate=1, left=0, right=0)
