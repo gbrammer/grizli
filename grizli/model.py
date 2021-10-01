@@ -281,6 +281,7 @@ class GrismDisperser(object):
             #print('yoffset!', yoffset)
             self.add_ytrace_offset(yoffset)
 
+
     def set_segmentation(self, seg_array):
         """
         Set Segmentation array and `total_flux`.
@@ -482,6 +483,34 @@ class GrismDisperser(object):
 
         self.ytrace *= self.grow
         self.ytrace += yoffset
+        
+        # Reset sensitivity
+        ysens = self.lam_beam*0
+        so = np.argsort(self.lam_beam)
+
+        conf_sens = self.conf.sens[self.beam]
+        if self.MW_F99 is not None:
+            MWext = 10**(-0.4*(self.MW_F99(conf_sens['WAVELENGTH']*u.AA)))
+        else:
+            MWext = 1.
+
+        ysens[so] = interp.interp_conserve_c(self.lam_beam[so],
+                                             conf_sens['WAVELENGTH'],
+                                             conf_sens['SENSITIVITY']*MWext,
+                                             integrate=1, left=0, right=0)
+        self.lam_sort = so
+        self.sensitivity_beam = ysens
+
+        # Full array
+        ysens = self.lam*0
+        so = np.argsort(self.lam)
+        ysens[so] = interp.interp_conserve_c(self.lam[so],
+                                             conf_sens['WAVELENGTH'],
+                                             conf_sens['SENSITIVITY']*MWext,
+                                             integrate=1, left=0, right=0)
+
+        self.sensitivity = ysens
+
 
     def compute_model(self, id=None, thumb=None, spectrum_1d=None,
                       in_place=True, modelf=None, scale=None, is_cgs=False,
@@ -1269,7 +1298,29 @@ class ImageData(object):
 
         origin : [int, int]
             Origin of lower left pixel in detector coordinates
+        
+        pad : int
+            Padding to apply to the image dimensions
+        
+        process_jwst_header : bool
+            If the image is detected as coming from JWST NIRISS or NIRCAM, 
+            generate the necessary header WCS keywords
+        
+        instrument : str
+            Instrument where the image came from
+        
+        filter : str
+            Filter from the image header.  For WFC3 and NIRISS this is the 
+            dispersing element
 
+        pupil : str
+            Pupil from the image header (JWST instruments).  For NIRISS this 
+            is the blocking filter and for NIRCAM this is the dispersing 
+            element
+        
+        module : str
+            Instrument module for NIRCAM ('A' or 'B')
+            
         hdulist : `~astropy.io.fits.HDUList`, optional
             If specified, read `sci`, `err`, `dq` from the HDU list from a
             FITS file, e.g., WFC3 FLT.
@@ -1277,7 +1328,10 @@ class ImageData(object):
         sci_extn : int
             Science EXTNAME to read from the HDUList, for example,
             `sci` = hdulist['SCI',`sci_extn`].
-
+        
+        fwcpos : float
+            Filter wheel encoder position (NIRISS)
+            
         Attributes
         ----------
         parent_file : str
@@ -1625,14 +1679,29 @@ class ImageData(object):
         self.data['DQ'][bad] |= 4
         return bad.sum()
 
-    def update_jwst_wcsheader(self, hdulist):
+    def update_jwst_wcsheader(self, hdulist, force=False):
         """
-        For now generate an approximate SIP header for NIRISS
+        For now generate an approximate SIP header for NIRISS/NIRCam
+        
+        Parameters
+        ----------
+        hdulist : `~astropy.io.fits.HDUList`
+            FITS HDU list
+        
+        force : bool
+            
+        
         """
+        import jwst
         from . import jwst as _jwst
 
         datamodel = _jwst.img_with_wcs(hdulist)
-        sip_header = _jwst.model_wcs_header(datamodel, get_sip=True)
+        if (jwst.__version__ < '1.3.2') | force:
+            # Need to compute own transformed header
+            sip_header = _jwst.model_wcs_header(datamodel, get_sip=True)
+        else:
+            sip_header = utils.to_header(datamodel.wcs)
+            
         for k in sip_header:
             self.header[k] = sip_header[k]
 
@@ -3427,9 +3496,9 @@ class GrismFLT(object):
             wcsfile = base.parent_file.replace('.fits', '.{0:02d}.wcs.fits'.format(ext))
 
             try:
-                hwcs.writeto(wcsfile, clobber=overwrite)
-            except:
                 hwcs.writeto(wcsfile, overwrite=overwrite)
+            except:
+                hwcs.writeto(wcsfile, clobber=overwrite)
 
             if verbose:
                 print(wcsfile)
