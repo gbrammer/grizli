@@ -117,6 +117,21 @@ def _fit_at_z(self, zgrid, i, templates, fitter, fit_background, poly_order):
     #A, coeffs[i,:], chi2[i], model_2d = out
 
 
+def _beam_compute_model(beam, id, spectrum_1d, is_cgs, apply_sensitivity, scale, reset):
+    """
+    wrapper function for multiprocessing
+    """
+    beam.beam.compute_model(id=id, spectrum_1d=spectrum_1d,
+                            is_cgs=is_cgs,
+                            scale=scale, reset=reset,
+                            apply_sensitivity=apply_sensitivity)
+
+    beam.modelf = beam.beam.modelf
+    beam.model = beam.beam.modelf.reshape(beam.beam.sh_beam)
+
+    return True
+
+
 # def test_parallel():
 # 
 #     zgrid = np.linspace(1.1, 1.3, 10)
@@ -144,15 +159,15 @@ def _fit_at_z(self, zgrid, i, templates, fitter, fit_background, poly_order):
 #     t1_pool = time.time()
 
 
-def _compute_model(i, flt, fit_info, is_cgs, store):
+def _compute_model(i, flt, fit_info, is_cgs, store, model_kwargs):
     """Helper function for computing model orders.
     """
     for id in fit_info:
         try:
-            status = flt.compute_model_orders(id=id, compute_size=True,
+            status = flt.compute_model_orders(id=id,
                           mag=fit_info[id]['mag'], in_place=True, store=store,
                           spectrum_1d=fit_info[id]['spec'], is_cgs=is_cgs,
-                          verbose=False)
+                          verbose=False, **model_kwargs)
         except:
             print('Failed: {0} {1}'.format(flt.grism.parent_file, id))
             continue
@@ -506,7 +521,7 @@ class GroupFLT():
 
     def compute_full_model(self, fit_info=None, verbose=True, store=False,
                            mag_limit=25, coeffs=[1.2, -0.5], cpu_count=0,
-                           is_cgs=False):
+                           is_cgs=False, model_kwargs={'compute_size':True}):
         """Compute continuum models of all sources in an FLT
         
         Parameters
@@ -530,6 +545,11 @@ class GroupFLT():
         is_cgs : bool
             Spectral models are in cgs units
         
+        model_kwargs : dict
+            Keywords to pass to the 
+            `~grizli.model.GrismFLT.compute_model_orders` method of the 
+            `~grizli.model.GrismFLT` objects.  
+            
         Returns
         -------
         Sets `object_dispersers` and `model` attributes on items in 
@@ -537,7 +557,7 @@ class GroupFLT():
         
         """
         if cpu_count <= 0:
-            cpu_count = mp.cpu_count()
+            cpu_count = np.maximum(mp.cpu_count() - 4, 1)
 
         if fit_info is None:
             bright = self.catalog['MAG_AUTO'] < mag_limit
@@ -562,7 +582,8 @@ class GroupFLT():
 
         pool = mp.Pool(processes=cpu_count)
         jobs = [pool.apply_async(_compute_model, 
-                                 (i, self.FLTs[i], fit_info, is_cgs, store))
+                                 (i, self.FLTs[i], fit_info, 
+                                  is_cgs, store, model_kwargs))
                 for i in range(self.N)]
 
         pool.close()
@@ -2019,10 +2040,21 @@ class MultiBeam(GroupFitter):
         #yspec = [xspec**o*scale_coeffs[o] for o in range(self.poly_order+1)]
         yfull = np.polyval(scale_coeffs[::-1], xspec)
         return xspec, yfull
-
+    
+    
     def compute_model(self, id=None, spectrum_1d=None, is_cgs=False, apply_sensitivity=True, scale=None, reset=True):
-        """TBD
         """
+        Compute the dispersed 2D model for an assumed input spectrum
+        
+        This is a wrapper around the 
+        `grizli.model.GrismDisperser.compute_model` method, where the 
+        parameters are described.
+
+        Nothing returned, but the `model` and `modelf` attributes are 
+        updated on the `~grizli.model.GrismDisperser` subcomponents of the
+        `beams` list.
+        """
+
         for beam in self.beams:
             beam.beam.compute_model(id=id, spectrum_1d=spectrum_1d,
                                     is_cgs=is_cgs,
@@ -2032,8 +2064,19 @@ class MultiBeam(GroupFitter):
             beam.modelf = beam.beam.modelf
             beam.model = beam.beam.modelf.reshape(beam.beam.sh_beam)
 
+
     def compute_model_psf(self, id=None, spectrum_1d=None, is_cgs=False):
-        """TBD
+        """
+        Compute the dispersed 2D model for an assumed input spectrum and for 
+        ePSF morphologies
+        
+        This is a wrapper around the 
+        `grizli.model.GrismDisperser.compute_model_psf` method, where the 
+        parameters are described.
+
+        Nothing returned, but the `model` and `modelf` attributes are 
+        updated on the `~grizli.model.GrismDisperser` subcomponents of the
+        `beams` list.
         """
         for beam in self.beams:
             beam.beam.compute_model_psf(id=id, spectrum_1d=spectrum_1d,
@@ -2041,6 +2084,7 @@ class MultiBeam(GroupFitter):
 
             beam.modelf = beam.beam.modelf
             beam.model = beam.beam.modelf.reshape(beam.beam.sh_beam)
+
 
     def fit_at_z(self, z=0., templates={}, fitter='nnls',
                  fit_background=True, poly_order=0):
