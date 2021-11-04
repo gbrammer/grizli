@@ -40,4 +40,32 @@ class UtilsTester(unittest.TestCase):
 
         iso = utils.ctime_to_iso(mtime, strip_decimal=False)
         assert(iso == '2019-09-16 11:23:27.000')
+
+
+    def test_unique(self):
+        """
+        Test ``Unique`` helper
+        """
         
+        data = [1,1,1,2,2,9]
+        
+        for d in [data, np.array(data)]:
+            un = utils.Unique(d, verbose=False)
+            
+            # Unique values
+            assert(len(un.values) == 3)
+            assert(np.allclose(un.values, [1,2,9]))
+            
+            # Array indices
+            assert(np.allclose(un.indices, [0, 0, 0, 1, 1, 2]))
+            
+            # Missing key 
+            assert(un[-1].sum() == 0)
+            
+            # Existing key
+            assert(un[1].sum() == 3)
+            
+            # __iter__ and __get__ methods
+            for v in un:
+                #print(v)
+                assert(np.allclose(un.array[un[v]], v))

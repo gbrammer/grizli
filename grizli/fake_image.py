@@ -25,8 +25,8 @@ def rotate_CD_matrix(cd, pa_aper):
     cd_rot : (2,2) array
         Rotated CD matrix
 
-    Comments
-    --------
+    Notes
+    -----
     `astropy.wcs.WCS.rotateCD` doesn't work for non-square pixels in that it
     doesn't preserve the pixel scale!  The bug seems to come from the fact
     that `rotateCD` assumes a transposed version of its own CD matrix.
@@ -88,8 +88,8 @@ def niriss_header(ra=53.1592277508136, dec=-27.782056346146, pa_aper=128.589,
     wcs : `astropy.wcs.WCS`
         WCS specification (computed from keywords in ``h``).
 
-    Comments
-    --------
+    Notes
+    -----
     NIRISS: 0.065"/pix, requires filter & grism specification
     """
     naxis = 2048, 2048
@@ -169,8 +169,8 @@ def nircam_header(ra=53.1592277508136, dec=-27.782056346146, pa_aper=128.589,
     wcs : `astropy.wcs.WCS`
         WCS specification (computed from keywords in ``h``).
 
-    Comments
-    --------
+    Notes
+    -----
     NIRCAM, 0.0648"/pix, requires filter specification
     """
     naxis = 2048, 2048
@@ -251,9 +251,8 @@ def wfc3ir_header(ra=53.1592277508136, dec=-27.782056346146, pa_aper=128.589,
     wcs : `astropy.wcs.WCS`
         WCS specification (computed from keywords in ``h``).
 
-    Comments
-    --------
-
+    Notes
+    -----
     WFC3 IR, requires reference FLT file for the SIP header
     """
     import numpy as np
@@ -326,8 +325,8 @@ def roman_header(ra=53.1592277508136, dec=-27.782056346146, pa_aper=128.589, nax
     wcs : `astropy.wcs.WCS`
         WCS specification (computed from keywords in `h`).
 
-    Comments
-    --------
+    Notes
+    -----
     WFIRST/Roman G150 Grism
 
     Current config file has no field dependence, so field size can be
