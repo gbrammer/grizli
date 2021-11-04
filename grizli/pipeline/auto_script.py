@@ -1109,12 +1109,42 @@ def remove_bad_expflag(field_root='', HOME_PATH='./', min_bad=2):
             os.system('mv {0}* Expflag/'.format(visit))
 
 
-def parse_visits(field_root='', RAW_PATH='../RAW', use_visit=True, combine_same_pa=True, combine_minexp=2, is_dash=False, filters=VALID_FILTERS, max_dt=1e9):
+def parse_visits(field_root='', RAW_PATH='../RAW', use_visit=True, combine_same_pa=True, combine_minexp=2, is_dash=False, filters=VALID_FILTERS, max_dt=1e9, visit_split_shift=1.5):
     """
-
-    Try to combine visits at the same PA/filter with fewer than
-    `combine_minexp` exposures.
-
+    Organize exposures into "visits" by filter / position / PA / epoch
+    
+    Parameters
+    ----------
+    field_root : str
+        Rootname of the ``{field_root}_visits.npy`` file to create.
+    
+    RAW_PATH : str
+        Path to raw exposures, relative to working directory
+        
+    use_visit, max_dt, visit_split_shift : bool, float, float
+        See `~grizli.utils.parse_flt_files`.
+    
+    combine_same_pa : bool
+        Combine exposures taken at same PA/orient + filter across visits
+    
+    combine_minexp : int
+        Try to concatenate visits with fewer than this number of exposures
+    
+    filters : list
+        Filters to consider
+    
+    Returns
+    -------
+    visits : list
+        List of "visit" dicts with keys ``product``, ``files``, ``footprint``, 
+        etc.
+    
+    groups : list
+        Visit groups for direct / grism
+    
+    info : `~astropy.table.Table`
+        Exposure summary table
+        
     """
     import copy
 
@@ -1182,7 +1212,10 @@ def parse_visits(field_root='', RAW_PATH='../RAW', use_visit=True, combine_same_
                 
         return visits, all_groups, info
 
-    visits, filters = utils.parse_flt_files(info=info, uniquename=True, get_footprint=True, use_visit=use_visit, max_dt=max_dt)
+    visits, filters = utils.parse_flt_files(info=info, 
+                                  uniquename=True, get_footprint=True, 
+                                  use_visit=use_visit, max_dt=max_dt, 
+                                  visit_split_shift=visit_split_shift)
 
     # Don't run combine_minexp if have grism exposures
     grisms = ['G141', 'G102', 'G800L', 'G280']
