@@ -6,3 +6,4 @@ scipy
 astropy
 sphinx_astropy
 pyyaml
+docutils<0.18
