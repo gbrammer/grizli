@@ -944,7 +944,7 @@ def get_skymapper_catalog(ra=0., dec=0., radius=3., corners=None, max_records=50
     return tab
 
 
-def get_legacysurveys_catalog(ra=0., dec=0., radius=3., verbose=True, db='ls_dr9.tractor', **kwargs):
+def get_legacysurveys_catalog(ra=0., dec=0., radius=3., verbose=True, db='ls_dr9.tractor', sn_lim=('r',7), **kwargs):
     """
     Query LegacySurveys TAP catalog
     """
@@ -952,7 +952,24 @@ def get_legacysurveys_catalog(ra=0., dec=0., radius=3., verbose=True, db='ls_dr9
         msg = 'Query LegacySurveys ({db}) catalog ({ra},{dec},{radius:.2f})'
         print(msg.format(ra=ra, dec=dec, radius=radius, db=db))
     
+    if (sn_lim is not None):
+        if len(sn_lim) >= 2:
+            b = sn_lim[0]
+            extra = f' AND flux_{b}*SQRT(flux_ivar_{b}) > {sn_lim[1]}'
+            if 'extra' in kwargs:
+                kwargs['extra'] += extra
+            else:
+                kwargs['extra'] = extra
+                
     tab = query_tap_catalog(ra=ra, dec=dec, radius=radius, db=db, **kwargs)
+    # if (sn_lim is not None) & (len(tab) > 1):
+    #     if len(sn_lim) >= 2:
+    #         sn = tab[f'flux_{sn_lim[0]}']
+    #         sn *= np.sqrt(tab[f'flux_ivar_{sn_lim[0]}'])
+    #         
+    #         valid = sn > sn_lim[1]
+    #         return tab[valid]
+            
     return tab
 
 
