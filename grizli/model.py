@@ -2758,7 +2758,7 @@ class GrismFLT(object):
     def compute_model_orders(self, id=0, x=None, y=None, size=10, mag=-1,
                       spectrum_1d=None, is_cgs=False,
                       compute_size=False, max_size=None, store=True,
-                      in_place=True, add=True, get_beams=None,
+                      in_place=True, get_beams=None,
                       psf_params=None,
                       verbose=True):
         """Compute dispersed spectrum for a given object id
@@ -2815,7 +2815,18 @@ class GrismFLT(object):
             If True, add the computed spectral orders into `self.model`.
             Otherwise, make a clean array with only the orders of the given
             object.
-
+        
+        get_beams : list or None
+            Spectral orders to retrieve with names as defined in the 
+            configuration files, e.g., ['A'] generally for the +1st order of 
+            HST grisms.  If `None`, then get all orders listed in the 
+            `beams` attribute of the `~grizli.grismconf.aXeConf`
+            configuration object.
+        
+        psf_params : list
+            Optional parameters for generating an `~grizli.utils.EffectivePSF`
+            object for the spatial morphology.
+            
         Returns
         -------
         output : bool or `numpy.array`
@@ -2960,7 +2971,7 @@ class GrismFLT(object):
                                                         np.array(thumb.shape))
             if test[-2] == 0:
                 if verbose:
-                    print('ID {0:d} not found in segmentation image'.format(id))
+                    print(f'ID {id} not found in segmentation image')
                 return False
 
             # # Get precomputed dispersers
@@ -3017,7 +3028,9 @@ class GrismFLT(object):
                     else:
                         psf_filter = self.direct.ref_filter
 
-                    beam.x_init_epsf(flat_sensitivity=False, psf_params=psf_params, psf_filter=psf_filter, yoff=0.)
+                    beam.x_init_epsf(flat_sensitivity=False, 
+                                     psf_params=psf_params, 
+                                     psf_filter=psf_filter, yoff=0.)
 
                 beams[b] = beam
 
