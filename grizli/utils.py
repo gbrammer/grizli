@@ -445,7 +445,11 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
             >>>     targname = targname.replace(k, translate[k])
             >>> print(targname)
             goodss-10
-
+    
+    visit_split_shift : float
+        Separation in ``arcmin`` beyond which exposures in a group are split 
+        into separate visits.
+        
     Returns
     --------
     output_list : dict
