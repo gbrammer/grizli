@@ -7718,10 +7718,46 @@ class Unique(object):
     def __init__(self, array, verbose=True):
         """
         Helper for unique items in an array
+        
+        Parameters
+        ----------
+        array : array-like
+            Data to parse, generally strings but can be anything that can 
+            be parsed by `numpy.unique`
+
+
+        Attributes
+        ----------
+        dim : int
+            ``size`` of input ``array``
+        
+        values : list
+            Unique elements of ``array``
+        
+        indices : list
+            Integer list length of ``array`` with the indices of ``values``
+            for each element
+        
+        counts : list
+            Counts of each element of ``values``
+        
+
+        Methods
+        -------
+        The ``__get__(key)`` method returns a bool array with length of 
+        ``array`` where the values match the specified ``key``.
+        
+        The ``__iter__`` method iterates over ``values``
+        
         """
-        _ = np.unique(array, return_counts=True, return_inverse=True)
-        self.dim = array.size
-        self.zeros = np.zeros(array.shape, dtype=bool)
+        if isinstance(array, list):
+            self.array = np.array(array)
+        else:
+            self.array = array
+        
+        _ = np.unique(self.array, return_counts=True, return_inverse=True)
+        self.dim = self.array.size
+        self.zeros = np.zeros(self.array.shape, dtype=bool)
         
         self.values = [l for l in _[0]]
         self.indices = _[1]
@@ -7731,9 +7767,16 @@ class Unique(object):
     
     @property
     def N(self):
+        """
+        Number of unique ``values``
+        """
         return len(self.values)
-    
+
+
     def info(self, sort_counts=-1):
+        """
+        Print a summary
+        """
         print(f'{"N":>4}  {"value":10}')
         print('====  ==========')
         if sort_counts:
@@ -7744,14 +7787,19 @@ class Unique(object):
         for i in so:
             v, c = self.values[i], self.counts[i]
             print(f'{c:>4}  {v:10}')
-    
+
+
     def count(self, key):
+        """
+        Get occurrences count of a particular ``value``
+        """
         if key in self.values:
             ix = self.values.index(key)
             return self.counts[ix]
         else:
             return 0
-        
+
+
     def __getitem__(self, key):
         if key in self.values:
             ix = self.values.index(key)
@@ -7759,13 +7807,17 @@ class Unique(object):
             return test
         else:
             return self.zeros
-    
+
+
     def __iter__(self):
         for idx in itertools.count():
             try:
                 yield self.values[idx]
             except IndexError:
                 break
+
+    def __len__(self):
+        return self.N
 
 
 class HubbleXYZ(object):

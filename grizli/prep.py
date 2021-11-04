@@ -574,7 +574,7 @@ def match_lists(input, output, transform=None, scl=3600., simple=True,
         matches with `skimage.measure.ransac` and the specified `transform`
     
     outlier_threshold : float
-        Match threshold for ``simple=False`
+        Match threshold for ``simple=False``
         
     triangle_size_limit : (float, float)
         Size limit of matching triangles, generally set to something of order
@@ -2841,7 +2841,9 @@ def asn_to_dict(input_asn):
 BKG_PARAMS = {'bw': 128, 'bh': 128, 'fw': 3, 'fh': 3, 'pixel_scale': 0.06}
 
 
-def process_direct_grism_visit(direct={}, grism={}, radec=None,
+def process_direct_grism_visit(direct={},
+                               grism={},
+                               radec=None,
                                outlier_threshold=5, 
                                align_clip=30,
                                align_thresh=None,
@@ -2868,34 +2870,53 @@ def process_direct_grism_visit(direct={}, grism={}, radec=None,
                                imaging_bkg_params=None,
                                reference_catalogs=['GAIA', 'PS1', 'SDSS', 'WISE'],
                                use_self_catalog=False):
-    """Full processing of a direct (+ grism) image visit.
+    """Full processing of a direct (+grism) image visit.
     
-    For *imaging* exposures, 
+    Notes
+    -----
     
-    1. Copies of individual exposures with `~grizli.prep.fresh_flt_file`
-        * Run `stwcs.updatewcs.updatewcs` on each FLT
-    2. "tweak" shfit alignment of individual FLTs 
-        * If ACS or UVIS, do preliminary `AstroDrizzle` run to flag CRs
-    3. Run `AstroDrizzle` to create first-pass mosaic
-    4. Astrometric alignment of the drizzled image reference catalogs with 
-       `~grizli.prep.align_drizzled_image`
-        * Propagate alignment back to FLT exposures
-    5. Redrizzle visit mosaic with updated astrometry
-    6. (optional) Subtract mosaic background from exposures with 
-       `~grizl.prep.blot_background`
-    7. Make final visit catalog 
-    8. (optional) Fill saturated stars with ePSF models with 
+    For **imaging** exposures:
+
+    1) Copies of individual exposures with `~grizli.prep.fresh_flt_file`
+        
+      * Run `stwcs.updatewcs.updatewcs` on each FLT
+    
+    #) "tweak" shift alignment of individual FLTs 
+    
+      * If ACS or UVIS, do preliminary `AstroDrizzle` run to flag CRs
+    
+    #) Run `AstroDrizzle` to create first-pass mosaic
+    
+    #) Astrometric alignment of the drizzled image reference catalogs with
+       `~grizli.prep.align_drizzled_image` 
+        
+      * Propagate alignment back to FLT exposures
+        
+    #) Redrizzle visit mosaic with updated astrometry
+    
+    #) *optional* Subtract mosaic background from exposures with 
+       `~grizli.prep.blot_background`
+    
+    #) Make final visit catalog 
+    
+    #) *optional* Fill saturated stars with ePSF models with 
        `~grizli.prep.fix_star_centers`
+    
+    For **grism** exposures:
     
     If *grism* exposures are specified, first do the above for the direct 
     images and then, 
     
-    1. Assign (refined) WCS of associated direct image to each grism exposure
+    1) Assign (refined) WCS of associated direct image to each grism exposure
        (`~grizli.prep.match_direct_grism_wcs`)
-    2. Run `AstroDrizzle` to flag additional CRs, bad pixels
-    3. Subtract 2D sky background (`~grizli.prep.visit_grism_sky`)
-        * Optional additional column-average grism background 
-    4. Redrizzle grism mosaic
+    
+    #) Run `AstroDrizzle` to flag additional CRs, bad pixels
+    
+    #) Subtract 2D sky background (`~grizli.prep.visit_grism_sky`)
+    
+      * *optional* additional column-average grism background 
+    
+    #) Redrizzle grism mosaic
     
     """
     frame = inspect.currentframe()
