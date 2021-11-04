@@ -7744,10 +7744,12 @@ class Unique(object):
 
         Methods
         -------
-        The ``__get__(key)`` method returns a bool array with length of 
-        ``array`` where the values match the specified ``key``.
+        __get__(key)
+            Return a `bool` array where entries of ``array`` match the 
+            specified ``key``
         
-        The ``__iter__`` method iterates over ``values``
+        __iter__
+            Iterator over ``values``
         
         """
         if isinstance(array, list):
