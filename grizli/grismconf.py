@@ -410,7 +410,7 @@ class aXeConf():
 
         return dy, lam
 
-    def show_beams(self, beams=['E', 'D', 'C', 'B', 'A']):
+    def show_beams(self, xy=None, beams=['E', 'D', 'C', 'B', 'A']):
         """
         Make a demo plot of the beams of a given configuration file
         """
@@ -425,10 +425,13 @@ class aXeConf():
         if 'G800L' in self.conf_file:
             x0, x1 = 2124, 1024
             dx = np.arange(-1200, 1200)
-
+        
+        if xy is not None:
+            x0, x1 = xy
+            
         s = 200  # marker size
-        fig = plt.figure(figsize=[10, 3])
-        plt.scatter(0, 0, marker='s', s=s, color='black', edgecolor='0.8',
+        fig, ax = plt.subplots(figsize=[10, 3])
+        ax.scatter(0, 0, marker='s', s=s, color='black', edgecolor='0.8',
                     label='Direct')
 
         for beam in beams:
@@ -439,22 +442,24 @@ class aXeConf():
             dy, lam = self.get_beam_trace(x0, x1, dx=dx, beam=beam)
             xlim = self.conf['BEAM{0}'.format(beam)]
             ok = (dx >= xlim[0]) & (dx <= xlim[1])
-            plt.scatter(dx[ok]+xoff, dy[ok], c=lam[ok]/1.e4, marker='s', s=s,
+            sc = ax.scatter(dx[ok]+xoff, dy[ok], c=lam[ok]/1.e4, marker='s', s=s,
                         alpha=0.5, edgecolor='None')
-            plt.text(np.median(dx[ok]), np.median(dy[ok])+1, beam,
+            ax.text(np.median(dx[ok]), np.median(dy[ok])+1, beam,
                      ha='center', va='center', fontsize=14)
             print('Beam {0}, lambda=({1:.1f} - {2:.1f})'.format(beam, lam[ok].min(), lam[ok].max()))
 
-        plt.grid()
-        plt.xlabel(r'$\Delta x$')
-        plt.ylabel(r'$\Delta y$')
+        ax.grid()
+        ax.set_xlabel(r'$\Delta x$' + f' (x0={x0})')
+        ax.set_ylabel(r'$\Delta y$' + f' (y0={x1})')
 
-        cb = plt.colorbar(pad=0.01, fraction=0.05)
+        cb = plt.colorbar(sc, pad=0.01, fraction=0.05)
         cb.set_label(r'$\lambda\,(\mu\mathrm{m})$')
-        plt.title(self.conf_file)
-        plt.tight_layout()
-        plt.savefig('{0}.pdf'.format(self.conf_file))
-
+        ax.set_title(self.conf_file)
+        fig.tight_layout(pad=0.1)
+        #plt.savefig('{0}.pdf'.format(self.conf_file))
+        
+        return fig
+        
 
 def get_config_filename(instrume='WFC3', filter='F140W',
                         grism='G141', module=None, chip=1):
