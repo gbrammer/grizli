@@ -1,4 +1,6 @@
-"""General utilities"""
+"""
+Dumping ground for general utilities
+"""
 import os
 import glob
 import inspect
@@ -388,6 +390,214 @@ def blot_nearest_exact(in_data, in_wcs, out_wcs, verbose=True, stepsize=-1,
 
     return out_data.astype(in_data.dtype)
 
+
+def _slice_ndfilter(data, filter_func, slices, args, size, footprint, kwargs):
+    """
+    Helper function passing image slices to `scipy.ndimage` filters that is
+    pickleable for threading with `multiprocessing`
+    
+    Parameters
+    ----------
+    data, filter_func, args, size, footprint : 
+        See `multiprocessing_ndfilter`
+    
+    slices : (slice, slice, slice, slice)
+        Array slices for insert a cutout back into a larger parent array
+        
+    Returns
+    -------
+    filtered : array-like
+        Filtered data
+    
+    slices : tuple
+        `slices` as input
+        
+    """
+    filtered = filter_func(data, *args, 
+                           size=size, footprint=footprint,
+                           **kwargs)
+                           
+    return filtered, slices
+
+
+def multiprocessing_ndfilter(data, filter_func, filter_args=(), size=None, footprint=None, cutout_size=256, n_proc=4, timeout=90, mask=None, verbose=True, **kwargs):
+    """
+    Cut up a large array and send slices to `scipy.ndimage` filters
+    
+    Parameters
+    ----------
+    
+    data : array-like
+        Main image array
+        
+    filter_func : function
+        Filtering function, e.g., `scipy.ndimage.median_filter`
+    
+    filter_args : tuple
+        Arguments to pass to `filter_func`
+    
+    size, footprint : int, array-like
+        Filter size or footprint, see, e.g., `scipy.ndimage.median_filter`
+    
+    cutout_size : int
+        Size of subimage cutouts
+    
+    n_proc : int
+        Number of `multiprocessing` processes to use
+    
+    timeout : float
+        `multiprocessing` timeout (seconds)
+    
+    mask : array-like
+        Array multiplied to `data` that can zero-out regions to ignore
+    
+    verbose : bool
+        Print status messages
+        
+    kwargs : dict
+        Keyword arguments passed through to `filter_func`
+        
+    Returns
+    -------
+    filtered : array-like
+        Filtered version of `data`
+    
+    Examples
+    --------
+
+        >>> import time
+        >>> import numpy as np
+        >>> import scipy.ndimage as nd
+        >>> from grizli.utils import multiprocessing_ndfilter
+        >>> rnd = np.random.normal(size=(512,512))
+        >>> t0 = time.time()
+        >>> f_serial = nd.median_filter(rnd, size=10)
+        >>> t1 = time.time()
+        >>> f_mp = multiprocessing_ndfilter(rnd, nd.median_filter, size=10,
+        >>>                                 cutout_size=256, n_proc=4)
+        >>> t2 = time.time()
+        >>> np.allclose(f_serial, f_mp)
+        True
+        >>> print(f'  serial: {(t1-t0)*1000:.1f} ms')
+        >>> print(f'parallel: {(t2-t1)*1000:.1f} ms')
+          serial: 573.9 ms
+        parallel: 214.8 ms
+                                            
+    """
+    
+    import multiprocessing as mp
+    
+    try:
+        from tqdm import tqdm
+    except ImportError:
+        verbose = False
+        
+    sh = data.shape
+    
+    msg = None
+    
+    if cutout_size > np.max(sh):
+        msg = f'cutout_size={cutout_size} greater than image dimensions, run '
+        msg += f'`{filter_func}` directly'
+    elif n_proc == 0:
+        msg = f'n_proc = 0, run in a single command'
+    
+    if msg is not None:
+        if verbose:
+            print(msg)
+            
+        filtered = filter_func(data, *filter_args, 
+                               size=size, footprint=footprint)
+        return filtered
+    
+    # Grid size
+    nx = data.shape[1]//cutout_size+1
+    ny = data.shape[0]//cutout_size+1
+
+    # Padding
+    if footprint is not None:
+        fpsh = footprint.shape
+        pad = np.max(fpsh)
+    elif size is not None:
+        pad = size
+    else:
+        raise ValueError('Either size or footprint must be specified')
+        
+    if n_proc < 0:
+        n_proc = mp.cpu_count()
+
+    n_proc = np.minimum(n_proc, mp.cpu_count())
+
+    pool = mp.Pool(processes=n_proc)
+    jobs = []
+    
+    if mask is not None:
+        data_mask = data*mask
+    else:
+        data_mask = data
+        
+    # Make image slices
+    for i in range(nx):
+        xmi = np.maximum(0, i*cutout_size-pad)
+        xma = np.minimum(sh[1], (i+1)*cutout_size+pad)
+        
+        #print(i, xmi, xma)
+        if i == 0:
+            slx = slice(0, cutout_size)
+            x0 = 0
+        elif i < nx-1:
+            slx = slice(pad, cutout_size + pad)
+            x0 = i*cutout_size
+        else:
+            slx = slice(pad, cutout_size + 1)
+            x0 = xmi+pad
+
+        nxs = slx.stop - slx.start
+        oslx = slice(x0, x0+nxs)
+        
+        for j in range(ny):
+            ymi = np.maximum(0, j*cutout_size - pad)
+            yma = np.minimum(sh[0], (j+1)*cutout_size + pad)
+            
+            if j == 0:
+                sly = slice(0, cutout_size)
+                y0 = 0
+            elif j < ny-1:
+                sly = slice(pad, cutout_size + pad)
+                y0 = j*cutout_size
+            else:
+                sly = slice(pad, cutout_size + 1)
+                y0 = ymi+pad
+            
+            nys = sly.stop - sly.start
+            osly = slice(y0, y0+nys)
+        
+            cut = data_mask[ymi:yma, xmi:xma]
+            if cut.max() == 0:
+                #print(f'Skip {xmi} {xma} {ymi} {yma}')
+                continue
+                
+            # Make jobs for filtering the image slices
+            slices = (osly, oslx, sly, slx)
+            _args = (cut, filter_func, slices, 
+                     filter_args, size, footprint, kwargs)
+            jobs.append(pool.apply_async(_slice_ndfilter, _args))
+            
+    # Collect results
+    pool.close()
+
+    filtered = np.zeros_like(data)
+    
+    if verbose:
+        _iter = tqdm(jobs)
+    else:
+        _iter = jobs
+        
+    for res in _iter:
+        filtered_i, slices = res.get(timeout=timeout)
+        filtered[slices[:2]] += filtered_i[slices[2:]]
+
+    return filtered
 
 def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
                     get_footprint=False,
