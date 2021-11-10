@@ -42,6 +42,59 @@ class UtilsTester(unittest.TestCase):
         assert(iso == '2019-09-16 11:23:27.000')
 
 
+    def test_multiprocessing_ndfilter(self):
+        """
+        Test the multiprocessing filter
+        """
+        import scipy.ndimage as nd
+        
+        rnd = np.random.normal(size=(512,512))
+        
+        fsize = 3
+        f_serial = nd.median_filter(rnd, size=fsize)
+        
+        for n_proc in [-1, 0, 4, 20]:
+            for cutout_size in [128, 256, 1024]:
+                f_mp = utils.multiprocessing_ndfilter(rnd,
+                                                      nd.median_filter,
+                                                      size=fsize,
+                                                      cutout_size=cutout_size,
+                                                      n_proc=n_proc,
+                                                      verbose=False)
+
+                assert(np.allclose(f_serial, f_mp))
+        
+        footprint = np.ones((fsize,fsize), dtype=bool)
+        
+        for n_proc in [-1, 0, 4, 20]:
+            for cutout_size in [128, 256, 1024]:
+                f_mp = utils.multiprocessing_ndfilter(rnd,
+                                                      nd.median_filter,
+                                                      size=None,
+                                                      footprint=footprint,
+                                                      cutout_size=cutout_size,
+                                                      n_proc=n_proc,
+                                                      verbose=False)
+
+                assert(np.allclose(f_serial, f_mp))
+        
+        # Passing arguments
+        filter_args = (50,)
+        n_proc = 4
+        cutout_size = 128
+        
+        f_mp = utils.multiprocessing_ndfilter(rnd,
+                                              nd.percentile_filter,
+                                              filter_args=filter_args,
+                                              size=None,
+                                              footprint=footprint,
+                                              cutout_size=cutout_size,
+                                              n_proc=n_proc,
+                                              verbose=False)
+
+        assert(np.allclose(f_serial, f_mp))
+
+
     def test_unique(self):
         """
         Test ``Unique`` helper
