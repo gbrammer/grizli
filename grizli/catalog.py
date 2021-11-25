@@ -55,7 +55,7 @@ def table_to_radec(table, output='coords.radec'):
                         overwrite=True)
 
 
-def table_to_regions(table, output='ds9.reg', comment=None, header='global color=green width=1', size=0.5, use_ellipse=False, use_world=True, verbose=True, unit_offset_colums=['x'], scale_major=1):
+def table_to_regions(table, output='ds9.reg', comment=None, header='global color=green width=1', size=0.5, use_ellipse=False, use_world=True, verbose=True, unit_offset_colums=['x'], scale_major=1, extra=None):
     """Make a DS9 region file from a table object
     """
     fp = open(output, 'w')
@@ -124,21 +124,31 @@ def table_to_regions(table, output='ds9.reg', comment=None, header='global color
         print(f'{output}: x = {xc}, y={yc}, ellipse={use_ellipse}')
                             
     if use_ellipse:
-        regstr = 'ellipse({x:.7f}, {y:.7f}, {a:.3f}{sec}, {b:.3f}{sec}, {theta:.1f})\n'
+        regstr = 'ellipse({x:.7f}, {y:.7f}, {a:.3f}{sec}, {b:.3f}{sec}, {theta:.1f})'
         lines = [regstr.format(x=xdata[i], y=ydata[i], 
                                a=amaj[i], b=amin[i], 
                                sec=sec, theta=etheta[i])
                  for i in range(len(table))] 
         
     else:
-        regstr = 'circle({0:.7f}, {1:.7f}, {2:.3f}{3})\n'
+        regstr = 'circle({0:.7f}, {1:.7f}, {2:.3f}{3})'
         lines = [regstr.format(xdata[i], ydata[i], e[i], sec)
                  for i in range(len(table))]
 
     if comment is not None:
         for i in range(len(table)):
-            lines[i] = '{0} # text={{{1}}}\n'.format(lines[i].strip(), comment[i])
-
+            lines[i] += ' # text={{{1}}}'.format(comment[i])
+    
+    if extra is not None:
+        for i, li in enumerate(lines):
+            if '#' not in li:
+                lines[i] += ' #'
+            
+            lines[i] += ' '+extra[i]
+    
+    # newline            
+    lines = [l+'\n' for l in lines]
+    
     fp.writelines(lines)
     fp.close()
 
