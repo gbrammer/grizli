@@ -2196,6 +2196,7 @@ def compute_SEP_auto_params(data, data_bkg, mask, pixel_scale=0.06, err=None, se
         kronrad, krflag = sep.kron_radius(data_bkg, x, y, a, b, theta,
                                           6.0, mask=mask,
                                           segmap=segb, seg_id=seg_id)
+        kronrad[~np.isfinite(kronrad)] = 0
     except:
         logstr = 'sep.kron_radius: ! Warning ! couldn\'t run with seg mask'
         utils.log_comment(utils.LOGFILE, logstr, verbose=True)
