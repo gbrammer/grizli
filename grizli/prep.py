@@ -1886,6 +1886,10 @@ def make_SEP_catalog(root='',
     tab.meta['WHT_FILE'] = (weight_file, 'WHT file')
 
     tab.meta['GET_BACK'] = (get_background, 'Background computed')
+    for k in bkg_params:
+        tab.meta[f'BACK_{k.upper()}'] = (bkg_params[k],
+                                         f'Background param {k}')
+        
     tab.meta['ERR_SCALE'] = (err_scale, 'Scale factor applied to weight image (like MAP_WEIGHT)')
     tab.meta['RESCALEW'] = (rescale_weight, 'Was the weight applied?')
 
