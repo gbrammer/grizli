@@ -20,6 +20,8 @@ import astropy.units as u
 import astropy.coordinates as coord
 from astropy.table import Table
 
+from . import jwst_utils
+
 from . import utils
 from . import model
 from . import GRIZLI_PATH
@@ -2948,7 +2950,9 @@ def process_direct_grism_visit(direct={},
             try:
                 updatewcs.updatewcs(file, verbose=False, use_db=False)
             except:
-                updatewcs.updatewcs(file, verbose=False)
+                #updatewcs.updatewcs(file, verbose=False)
+                img = jwst_utils.img_with_wcs(file)
+                img.save(file)
 
         # ### Make ASN
         # if not isWFPC2:
@@ -2961,7 +2965,6 @@ def process_direct_grism_visit(direct={},
     if not skip_grism:
         for file in grism['files']:
             fresh_flt_file(file)
-
             # Need to force F814W filter for updatewcs
             if isACS:
                 flc = pyfits.open(file, mode='update')
@@ -2981,7 +2984,9 @@ def process_direct_grism_visit(direct={},
             try:
                 updatewcs.updatewcs(file, verbose=False, use_db=False)
             except:
-                updatewcs.updatewcs(file, verbose=False)
+                #updatewcs.updatewcs(file, verbose=False)
+                img = jwst_utils.img_with_wcs(file)
+                img.save(file)
 
             # Change back
             if changed_filter:
@@ -3020,6 +3025,29 @@ def process_direct_grism_visit(direct={},
     if 'bits' in drizzle_params:
         bits = drizzle_params['bits']
         drizzle_params.pop('bits')
+
+    # for jwst images, change header info
+    #for file in direct['files']:
+    #    hdu = pyfits.open(file, mode='update')
+    #    hdu[0].header['INSTRUME'] = 'WFC3'
+    #    hdu[0].header['DETECTOR'] = 'IR'
+    #    hdu[1].header['NGOODPIX'] = -99
+    #    hdu[1].header['EXPNAME'] = hdu[0].header['EXPOSURE']
+    #    hdu[1].header['MEANDARK'] = -99
+    #    hdu[1].header['IDCSCALE'] = 0.065 ## how can I get this automatically?
+    #    hdu[0].header['PFLTFILE'] = '/Users/victoriastrait/Downloads/jwst_niriss_flat_0193.fits'
+    #    hdu.flush()
+#
+    #for file in grism['files']:
+    #    hdu = pyfits.open(file, mode='update')
+    #    hdu[0].header['INSTRUME'] = 'WFC3'
+    #    hdu[0].header['DETECTOR'] = 'IR'
+    #    hdu[1].header['NGOODPIX'] = -99
+    #    hdu[1].header['EXPNAME'] = hdu[0].header['EXPOSURE']
+    #    hdu[1].header['MEANDARK'] = -99
+    #    hdu[1].header['IDCSCALE'] = 0.1 ## how can I get this automatically?
+    #    hdu[0].header['PFLTFILE'] = '/Users/victoriastrait/Downloads/jwst_niriss_flat_0202.fits'
+    #    hdu.flush()
 
     # Relax CR rejection for first-pass ACS
     if isACS:
@@ -3074,14 +3102,14 @@ def process_direct_grism_visit(direct={},
         # First drizzle
         if len(direct['files']) > 1:
             AstroDrizzle(direct['files'], output=direct['product'],
-                         clean=True, context=False, preserve=False,
+                         clean=True, context=False, preserve=False, 
                          skysub=True, driz_separate=True, driz_sep_wcs=True,
                          median=True, blot=True, driz_cr=True,
                          driz_cr_snr=driz_cr_snr_first,
                          driz_cr_scale=driz_cr_scale_first,
                          driz_cr_corr=False, driz_combine=True,
                          final_bits=bits, coeffs=True, build=False,
-                         final_wht_type='IVM', **drizzle_params)
+                         final_wht_type='IVM', gain='-99', rdnoise='-99', **drizzle_params)
         else:
             AstroDrizzle(direct['files'], output=direct['product'],
                          clean=True, final_scale=None, final_pixfrac=1,
@@ -3089,7 +3117,7 @@ def process_direct_grism_visit(direct={},
                          driz_separate=False, driz_sep_wcs=False,
                          median=False, blot=False, driz_cr=False,
                          driz_cr_corr=False, driz_combine=True,
-                         build=False, final_wht_type='IVM', **drizzle_params)
+                         build=False, final_wht_type='IVM', gain='-99', rdnoise='-99', **drizzle_params)
 
         # Now do tweak_align for ACS
         if (isACS) & run_tweak_align & (len(direct['files']) > 1):
@@ -3106,7 +3134,7 @@ def process_direct_grism_visit(direct={},
                              median=False, blot=False, driz_cr=False,
                              driz_cr_corr=False, driz_combine=True,
                              final_bits=bits, coeffs=True, build=False,
-                             final_wht_type='IVM', resetbits=0)
+                             final_wht_type='IVM', gain='-99', rdnoise='-99', resetbits=0)
 
         # Make catalog & segmentation image
         if align_thresh is None:
@@ -3214,7 +3242,7 @@ def process_direct_grism_visit(direct={},
                          driz_cr_scale=driz_cr_scale, driz_separate=False,
                          driz_sep_wcs=False, median=False, blot=False,
                          driz_cr=False, driz_cr_corr=False,
-                         build=False, final_wht_type='IVM', **drizzle_params)
+                         build=False, final_wht_type='IVM', gain='-99', rdnoise='-99', **drizzle_params)
         else:
             if 'par' in direct['product']:
                 pixfrac = 1.0
@@ -3227,7 +3255,7 @@ def process_direct_grism_visit(direct={},
                          resetbits=4096, final_bits=bits, driz_sep_bits=bits,
                          preserve=False, driz_cr_snr=driz_cr_snr,
                          driz_cr_scale=driz_cr_scale, build=False,
-                         final_wht_type='IVM', **drizzle_params)
+                         final_wht_type='IVM', gain='-99', rdnoise='-99', **drizzle_params)
 
         # Flag areas of ACS images covered by a single image, where
         # CRs aren't appropriately masked
@@ -3308,7 +3336,7 @@ def process_direct_grism_visit(direct={},
                  blot=gris_cr_corr, driz_cr=gris_cr_corr, driz_cr_corr=gris_cr_corr,
                  driz_cr_snr=driz_cr_snr, driz_cr_scale=driz_cr_scale,
                  driz_combine=True, final_bits=bits, coeffs=True,
-                 resetbits=4096, build=False, final_wht_type='IVM')
+                 resetbits=4096, build=False, final_wht_type='IVM', gain='-99', rdnoise='-99')
 
     # Subtract grism sky
     status = visit_grism_sky(grism=grism, apply=True, sky_iter=sky_iter,
@@ -3354,7 +3382,7 @@ def process_direct_grism_visit(direct={},
                  driz_cr_snr=driz_cr_snr, driz_cr_scale=driz_cr_scale,
                  driz_combine=True, driz_sep_bits=bits, final_bits=bits,
                  coeffs=True, resetbits=4096, final_pixfrac=pixfrac,
-                 build=False, final_wht_type='IVM')
+                 build=False, gain='-99', rdnoise='-99', final_wht_type='IVM')
 
     clean_drizzle(grism['product'])
 
@@ -4215,6 +4243,12 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
         isACS = True
         flat = 1.
 
+    elif grism_element == 'GR150C':
+        bg_fixed = ['jwst_niriss_wfssbkg_0002.fits']# need to update
+        bg_vary = ['jwst_niriss_wfssbkg_0002.fits'] # need to update
+        isACS = False
+        flat = 1.
+
     elif grism_element == 'G800L':
         bg_fixed = ['ACS.WFC.CHIP{0:d}.msky.1.smooth.fits'.format({1: 2, 2: 1}[ext])]
         bg_vary = ['ACS.WFC.flat.fits']
@@ -4238,20 +4272,21 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
     data_fixed = []
     for file in bg_fixed:
         im = pyfits.open('{0}/CONF/{1}'.format(GRIZLI_PATH, file))
-        sh = im[0].data.shape
-        data = im[0].data.flatten()/flat
+        sh = im[1].data.shape
+        data = im[1].data.flatten()/flat
         data_fixed.append(data)
 
     data_vary = []
     for file in bg_vary:
         im = pyfits.open('{0}/CONF/{1}'.format(GRIZLI_PATH, file))
-        data_vary.append(im[0].data.flatten()*1)
-        sh = im[0].data.shape
+        data_vary.append(im[1].data.flatten()*1)
+        sh = im[1].data.shape
 
     yp, xp = np.indices(sh)
 
-    # Hard-coded (1014,1014) WFC3/IR images
+    # Hard-coded (1014,1014) WFC3/IR images (changed to 2048, 2048 for jwst)
     Npix = sh[0]*sh[1]
+    print(Npix)
     Nexp = len(grism['files'])
     Nfix = len(data_fixed)
     Nvary = len(data_vary)
@@ -4276,6 +4311,9 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
         dq_mask = dq == 0
 
         # Data
+        print(ext)
+        print(len((flt['SCI', ext].data).flatten()))
+        print(Npix)
         data[i*Npix:(i+1)*Npix] = (flt['SCI', ext].data*dq_mask).flatten()
         mask[i*Npix:(i+1)*Npix] &= dq_mask.flatten()  # == 0
         wht[i*Npix:(i+1)*Npix] = 1./(flt['ERR', ext].data**2*dq_mask).flatten()
@@ -4399,7 +4437,7 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
     fig = plt.figure(figsize=[6., 6.])
     ax = fig.add_subplot(111)
 
-    im_shape = (1014, 1014)
+    im_shape = (2048, 2048)# (1014, 1014)
 
     for j in range(Nexp):
 
@@ -4510,7 +4548,7 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
 
         if apply:
             # Subtract the column average in 2D & log header keywords
-            gp_res = np.dot(y_pred[:, None]-bg_sky, np.ones((1014, 1)).T).T
+            gp_res = np.dot(y_pred[:, None]-bg_sky, np.ones((2048, 1)).T).T # changed from 1014
             flt = pyfits.open(file, mode='update')
             flt['SCI', 1].data -= gp_res
             flt[0].header['GSKYCOL'] = (True, 'Subtract column average')
@@ -4593,7 +4631,7 @@ def fix_star_centers(root='macs1149.6+2223-rot-ca5-22-032.0-f105w',
         wcs.append(pywcs.WCS(flt[1], relax=True))
         images.append(flt)
 
-    yp, xp = np.indices((1014, 1014))
+    yp, xp = np.indices((2048, 2048))#(1014, 1014))
     use = cat['MAG_AUTO'] < mag_lim
     so = np.argsort(cat['MAG_AUTO'][use])
 
@@ -5358,7 +5396,7 @@ def extract_fits_log(file='idk106ckq_flt.fits', get_dq=True):
     log['chips'] = []
 
     if get_dq:
-        idx = np.arange(1014**2, dtype=np.int32).reshape((1014, 1014))
+        idx = np.arange(2048**2, dtype=np.int32).reshape((2048, 2048))
 
     for chip in [1, 2, 3, 4]:
         key = 'SCI{0}'.format(chip)

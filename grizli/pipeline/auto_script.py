@@ -1218,7 +1218,7 @@ def parse_visits(field_root='', RAW_PATH='../RAW', use_visit=True, combine_same_
                                   visit_split_shift=visit_split_shift)
 
     # Don't run combine_minexp if have grism exposures
-    grisms = ['G141', 'G102', 'G800L', 'G280']
+    grisms = ['G141', 'G102', 'G800L', 'G280', 'GR150C']
     has_grism = utils.column_string_operation(info['FILTER'], grisms,
                                               'count', 'or').sum()
 
@@ -1567,7 +1567,6 @@ def preprocess(field_root='j142724+334246',  HOME_PATH='/Volumes/Pegasus/Grizli/
             master_radec = radec
 
         print('\n\n\n{0} radec: {1}\n\n\n'.format(direct['product'], radec))
-
         ###########################
         # Preprocessing script, background subtraction, etc.
         status = prep.process_direct_grism_visit(direct=direct, grism=grism,
@@ -1604,6 +1603,7 @@ def preprocess(field_root='j142724+334246',  HOME_PATH='/Volumes/Pegasus/Grizli/
     fwave = np.cast[float]([f.replace('f1', 'f10'). \
                               replace('f098m', 'f0980m'). \
                               replace('lp', 'w'). \
+                              replace('gr','g'). \
                               replace('fq', 'f')[1:-1] 
                             for f in filters])
     
