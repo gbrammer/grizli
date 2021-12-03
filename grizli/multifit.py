@@ -23,7 +23,7 @@ from . import model
 #from . import stack
 from .fitting import GroupFitter
 #from .utils_c import disperse
-from .utils_c import interp
+#from .utils_c import interp
 
 from .utils import GRISM_COLORS, GRISM_MAJOR, GRISM_LIMITS, DEFAULT_LINE_LIST
 
