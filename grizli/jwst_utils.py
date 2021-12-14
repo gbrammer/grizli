@@ -218,7 +218,9 @@ def model_wcs_header(datamodel, get_sip=False, order=4, step=32, lsq_args=LSQ_AR
     """
     from astropy.io.fits import Header
     from scipy.optimize import least_squares
+    import jwst.datamodels
 
+    datamodel = jwst.datamodels.open(datamodel)
     sh = datamodel.data.shape
 
     try:
@@ -245,6 +247,7 @@ def model_wcs_header(datamodel, get_sip=False, order=4, step=32, lsq_args=LSQ_AR
     cdx = datamodel.meta.wcs.forward_transform(crp0[0]+1, crp0[1])
     cdy = datamodel.meta.wcs.forward_transform(crp0[0], crp0[1]+1)
 
+    # use utils.to_header in grizli to replace the below (from datamodel.wcs)
     header = Header()
     header['RADESYS'] = 'ICRS'
     header['CTYPE1'] = 'RA---TAN'

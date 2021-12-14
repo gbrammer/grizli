@@ -1694,7 +1694,7 @@ class ImageData(object):
         
         """
         import jwst
-        from . import jwst as _jwst
+        from . import jwst_utils as _jwst
 
         datamodel = _jwst.img_with_wcs(hdulist)
         if (jwst.__version__ < '1.3.2') | force:
@@ -2512,7 +2512,7 @@ class GrismFLT(object):
                          grism=self.grism.filter,
                          module=self.grism.module,
                          chip=self.grism.ccdchip)
-                      
+        
         self.conf_file = grismconf.get_config_filename(**conf_args)
         self.conf = grismconf.load_grism_config(self.conf_file)
 

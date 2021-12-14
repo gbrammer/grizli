@@ -262,7 +262,7 @@ class GroupFLT():
         self.grism_files = grism_files
         self.direct_files = direct_files
         self.group_name = group_name
-
+        
         # Wavelengths for polynomial fits
         self.polyx = polyx
 
@@ -294,6 +294,7 @@ class GroupFLT():
         if cpu_count < 0:
             # serial
             t0_pool = time.time()
+            
             for i in range(N):
                 flt = _loadFLT(self.grism_files[i], sci_extn, 
                                self.direct_files[i], pad, ref_file, ref_ext, 

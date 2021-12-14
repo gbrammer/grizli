@@ -123,7 +123,7 @@ def set_warnings(numpy_level='ignore', astropy_level='ignore'):
     warnings.simplefilter(astropy_level, category=AstropyWarning)
 
 
-def get_flt_info(files=[], columns=['FILE', 'FILTER', 'INSTRUME', 'DETECTOR', 'TARGNAME', 'DATE-OBS', 'TIME-OBS', 'EXPSTART', 'EXPTIME', 'PA_V3', 'RA_TARG', 'DEC_TARG', 'POSTARG1', 'POSTARG2']):
+def get_flt_info(files=[], columns=['FILE', 'FILTER', 'PUPIL', 'INSTRUME', 'DETECTOR', 'TARGNAME', 'DATE-OBS', 'TIME-OBS', 'EXPSTART', 'EXPTIME', 'PA_V3', 'RA_TARG', 'DEC_TARG', 'POSTARG1', 'POSTARG2']):
     """Extract header information from a list of FLT files
 
     Parameters
@@ -608,6 +608,7 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
                                  'UDS-': 'uds-'},
                     visit_split_shift=1.5, max_dt=1e9):
     """Read header information from a list of exposures and parse out groups based on filter/target/orientation.
+    For JWST the groups need to include the pupil.
 
     Parameters
     ----------
@@ -737,19 +738,23 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
     output_list = []  # OrderedDict()
     filter_list = OrderedDict()
 
-    for filter in np.unique(info['filter']):
-        filter_list[filter] = OrderedDict()
 
-        angles = np.unique(pa_v3[(info['filter'] == filter)])
-        for angle in angles:
-            filter_list[filter][angle] = []
+    for filter in info['filter']:
+        filter_list[filter] = OrderedDict()
+        pupils = np.unique(info['pupil'][(info['filter'] == filter)])
+        for pupil in pupils:
+            filter_list[filter][pupil] = OrderedDict()
+            angles = np.unique(pa_v3[(info['filter'] == filter)])
+            for angle in angles:
+                filter_list[filter][pupil][angle] = []
+
 
     for target in targets:
-        # 3D-HST targname translations
+        ## 3D-HST targname translations
         target_use = target
         for key in translate.keys():
             target_use = target_use.replace(key, translate[key])
-
+#
         # pad i < 10 with zero
         for key in translate.keys():
             if translate[key] in target_use:
@@ -761,73 +766,76 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
                 except:
                     pass
 
-        for filter in np.unique(info['filter'][(target_list == target)]):
-            angles = np.unique(pa_v3[(info['filter'] == filter) &
+        for filter in np.unique(info['filter'][(target_list == target)]): 
+            pupils = np.unique(info['pupil'][(info['filter'] == filter)])
+            for pupil in pupils:
+                angles = np.unique(pa_v3[(info['filter'] == filter) &
                               (target_list == target)])
+                #pupil = filter_list[filter][pupil]
 
-            for angle in angles:
-                exposure_list = []
-                exposure_start = []
-                product = '{0}-{1:05.1f}-{2}'.format(target_use, angle, filter)
+                for angle in angles:
+                    exposure_list = []
+                    exposure_start = []
+                    product = '{0}-{1:05.1f}-{2}-{3}'.format(target_use, angle, filter, pupil)
 
-                visit_match = np.unique(visits[(target_list == target) &
-                                               (info['filter'] == filter)])
+                    visit_match = np.unique(visits[(target_list == target) &
+                                                  (info['filter'] == filter) & (info['pupil'] == pupil)])
 
-                this_progs = []
-                this_visits = []
+                    this_progs = []
+                    this_visits = []
 
-                for visit in visit_match:
-                    ix = (visits == visit) & (target_list == target) & (info['filter'] == filter)
-                    # this_progs.append(info['progIDs'][ix][0])
-                    # print visit, ix.sum(), np.unique(info['progIDs'][ix])
-                    new_progs = list(np.unique(info['progIDs'][ix]))
-                    this_visits.extend([visit]*len(new_progs))
-                    this_progs.extend(new_progs)
+                    for visit in visit_match:
+                        ix = (visits == visit) & (target_list == target) & (info['filter'] == filter) & (info['pupil'] == pupil)
+                        # this_progs.append(info['progIDs'][ix][0])
+                        # print visit, ix.sum(), np.unique(info['progIDs'][ix])
+                        new_progs = list(np.unique(info['progIDs'][ix]))
+                        this_visits.extend([visit]*len(new_progs))
+                        this_progs.extend(new_progs)
 
-                for visit, prog in zip(this_visits, this_progs):
-                    visit_list = []
-                    visit_start = []
-                    visit_product = '{0}-{1}-{2}-{3:05.1f}-{4}'.format(target_use, prog, visit, angle, filter)
+                    for visit, prog in zip(this_visits, this_progs):
+                        visit_list = []
+                        visit_start = []
+                        visit_product = '{0}-{1}-{2}-{3:05.1f}-{4}-{5}'.format(target_use, prog, visit, angle, filter, pupil)
 
-                    use = ((target_list == target) &
-                           (info['filter'] == filter) &
-                           (visits == visit) & (pa_v3 == angle) &
-                           (info['progIDs'] == prog))
+                        use = ((target_list == target) &
+                               (info['filter'] == filter) &
+                               (visits == visit) & (pa_v3 == angle) &
+                               (info['progIDs'] == prog)) & (info['pupil'] == pupil)
 
-                    if use.sum() == 0:
-                        continue
+                        if use.sum() == 0:
+                            continue
 
-                    for tstart, file in zip(info['expstart'][use],
-                                            info['file'][use]):
+                        for tstart, file in zip(info['expstart'][use],
+                                                info['file'][use]):
 
-                        f = file.split('.gz')[0]
-                        if f not in exposure_list:
-                            visit_list.append(str(f))
-                            visit_start.append(tstart)
+                            f = file.split('.gz')[0]
+                            if f not in exposure_list:
+                                visit_list.append(str(f))
+                                visit_start.append(tstart)
 
-                    exposure_list = np.append(exposure_list, visit_list)
-                    exposure_start.extend(visit_start)
+                        exposure_list = np.append(exposure_list, visit_list)
+                        exposure_start.extend(visit_start)
 
-                    filter_list[filter][angle].extend(visit_list)
+                        filter_list[filter][pupil][angle].extend(visit_list)
 
-                    if uniquename:
-                        print(visit_product, len(visit_list))
-                        so = np.argsort(visit_start)
-                        exposure_list = np.array(visit_list)[so]
-                        #output_list[visit_product.lower()] = visit_list
+                        if uniquename:
+                            print(visit_product, len(visit_list))
+                            so = np.argsort(visit_start)
+                            exposure_list = np.array(visit_list)[so]
+                            #output_list[visit_product.lower()] = visit_list
 
-                        d = OrderedDict(product=str(visit_product.lower()),
-                                        files=list(np.array(visit_list)[so]))
+                            d = OrderedDict(product=str(visit_product.lower()),
+                                            files=list(np.array(visit_list)[so]))
+                            output_list.append(d)
+
+                    if not uniquename:
+                        print(product, len(exposure_list))
+                        so = np.argsort(exposure_start)
+                        exposure_list = np.array(exposure_list)[so]
+                        #output_list[product.lower()] = exposure_list
+                        d = OrderedDict(product=str(product.lower()),
+                                        files=list(np.array(exposure_list)[so]))
                         output_list.append(d)
-
-                if not uniquename:
-                    print(product, len(exposure_list))
-                    so = np.argsort(exposure_start)
-                    exposure_list = np.array(exposure_list)[so]
-                    #output_list[product.lower()] = exposure_list
-                    d = OrderedDict(product=str(product.lower()),
-                                    files=list(np.array(exposure_list)[so]))
-                    output_list.append(d)
 
     # Split large shifts
     if visit_split_shift > 0:
@@ -882,6 +890,7 @@ def split_visit(visit, visit_split_shift=1.5, max_dt=6./24, path='../RAW'):
     """
 
     ims = [pyfits.open(os.path.join(path, file)) for file in visit['files']]
+
     crval1 = np.array([im[1].header['CRVAL1'] for im in ims])
     crval2 = np.array([im[1].header['CRVAL2'] for im in ims])
     expstart = np.array([im[0].header['EXPSTART'] for im in ims])
@@ -893,7 +902,8 @@ def split_visit(visit, visit_split_shift=1.5, max_dt=6./24, path='../RAW'):
     dxi = np.cast[int](np.round(dx/visit_split_shift))
     dyi = np.cast[int](np.round(dy/visit_split_shift))
     keys = dxi*100+dyi+1000*dt
-    # print(keys)
+
+    
 
     un = np.unique(keys)
     if len(un) == 1:
@@ -1035,17 +1045,17 @@ def parse_visit_overlaps(visits, buffer=15.):
         f_i = exposure_groups[i]['product'].split('-')[-1]
         product += '-'+f_i
         exposure_groups[i]['product'] = product
-
     return exposure_groups
 
 
 DIRECT_ORDER = {'G102': ['F105W', 'F110W', 'F098M', 'F125W', 'F140W', 'F160W', 'F127M', 'F139M', 'F153M', 'F132N', 'F130N', 'F128N', 'F126N', 'F164N', 'F167N'],
                 'G141': ['F140W', 'F160W', 'F125W', 'F105W', 'F110W', 'F098M', 'F127M', 'F139M', 'F153M', 'F132N', 'F130N', 'F128N', 'F126N', 'F164N', 'F167N'],
                 'G800L': ['F814W', 'F606W', 'F850LP', 'F775W', 'F435W', 'F105W', 'F110W', 'F098M', 'F125W', 'F140W', 'F160W', 'F127M', 'F139M', 'F153M', 'F132N', 'F130N', 'F128N', 'F126N', 'F164N', 'F167N'],
-                'GR150C': ['F115W']}
+                'GR150C': ['F115W', 'F150W', 'F200W'], 
+                'GR150R': ['F115W', 'F150W']}
 
 
-def parse_grism_associations(exposure_groups,
+def parse_grism_associations(exposure_groups, info,
                              best_direct=DIRECT_ORDER,
                              get_max_overlap=True):
     """Get associated lists of grism and direct exposures
@@ -1067,15 +1077,15 @@ def parse_grism_associations(exposure_groups,
 
     """
     N = len(exposure_groups)
-
     grism_groups = []
     for i in range(N):
-        f_i = exposure_groups[i]['product'].split('-')[-1]
-        root_i = exposure_groups[i]['product'][:-len('-'+f_i)]
-
+        pupil = exposure_groups[i]['product'].split('-')[-1]
+        f_i = exposure_groups[i]['product'].split('-')[-2]
+        root_i = exposure_groups[i]['product'].split('-')[0]#[:-len('-'+f_i)]
         if f_i.startswith('g'):
             group = OrderedDict(grism=exposure_groups[i],
                                 direct=None)
+
         else:
             continue
 
@@ -1084,37 +1094,38 @@ def parse_grism_associations(exposure_groups,
         d_i = f_i
 
         # print('\nx\n')
-        d_idx = 10
+        #d_idx = 10
         for j in range(N):
-            f_j = exposure_groups[j]['product'].split('-')[-1]
+            f_j = exposure_groups[j]['product'].split('-')[-2]
             if f_j.startswith('g'):
                 continue
-
+#
             fp_j = exposure_groups[j]['footprint']
             olap = fp_i.intersection(fp_j)
-            root_j = exposure_groups[j]['product'][:-len('-'+f_j)]
-
+            root_j = exposure_groups[j]['product'].split('-')[0]#[:-len('-'+f_j)]
             #print(root_j, root_i, root_j == root_i)
             if (root_j == root_i):
                 # if (group['direct'] is not None):
                 #     pass
                 #     if (group['direct']['product'].startswith(root_i)) & (d_i.upper() == best_direct[f_i.upper()]):
                 #         continue
-
-                if f_j.upper() not in best_direct[f_i.upper()]:
-                    # print(f_j.upper())
-                    continue
-
-                if best_direct[f_i.upper()].index(f_j.upper()) < d_idx:
-                    d_idx = best_direct[f_i.upper()].index(f_j.upper())
+                if f_j == pupil: #not in best_direct[f_i.upper()]:
                     group['direct'] = exposure_groups[j]
-                    olap_i = olap.area
-                    d_i = f_j
+#
+                else:
+                    continue
+#
+                #if best_direct[f_i.upper()].index(f_j.upper()) < d_idx:
+                #    d_idx = best_direct[f_i.upper()].index(f_j.upper())
+                #    print('d_idx: ' + str(d_idx))
+                #    group['direct'] = exposure_groups[j]
+                #    olap_i = olap.area
+                #    d_i = f_j
                 #print(0,group['grism']['product'], group['direct']['product'])
             #     continue
-
+#
             #print(exposure_groups[i]['product'], exposure_groups[j]['product'], olap.area*3600.)
-
+#
             # #print(exposure_groups[j]['product'], olap_i, olap.area)
             # if olap.area > 0:
             #     if group['direct'] is None:
