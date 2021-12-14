@@ -2951,15 +2951,19 @@ def process_direct_grism_visit(direct={},
                 updatewcs.updatewcs(file, verbose=False, use_db=False)
             except:
                 #updatewcs.updatewcs(file, verbose=False)
+                #hdr = jwst_utils.model_wcs_header(file,get_sip=True)
+                #data = pyfits.getdata(file)
+                #pyfits.append(file,data=data,header=hdr)
                 img = jwst_utils.img_with_wcs(file)
                 img.save(file)
-
+        
         # ### Make ASN
         # if not isWFPC2:
         #     asn = asnutil.ASNTable(inlist=direct['files'], output=direct['product'])
         #     asn.create()
         #     asn.write()
 
+        
     # Initial grism processing
     skip_grism = (grism == {}) | (grism is None) | (len(grism) == 0)
     if not skip_grism:
@@ -2985,6 +2989,9 @@ def process_direct_grism_visit(direct={},
                 updatewcs.updatewcs(file, verbose=False, use_db=False)
             except:
                 #updatewcs.updatewcs(file, verbose=False)
+                #hdr = jwst_utils.model_wcs_header(file,get_sip=True)
+                #data = pyfits.getdata(file)
+                #pyfits.append(file,data=data,header=hdr)
                 img = jwst_utils.img_with_wcs(file)
                 img.save(file)
 
@@ -3010,9 +3017,9 @@ def process_direct_grism_visit(direct={},
         driz_cr_snr = '3.5 3.0'
         driz_cr_scale = '1.2 0.7'
     else:
-        bits = 576+256
-        driz_cr_snr = '8.0 5.0'
-        driz_cr_scale = '2.5 0.7'
+        bits  = 4 #576+256
+        driz_cr_snr = '35 1.0' #'8.0 5.0'
+        driz_cr_scale = '10.0 0.7' #'2.5 1.2'
 
     if 'driz_cr_scale' in drizzle_params:
         driz_cr_scale = drizzle_params['driz_cr_scale']
@@ -3027,28 +3034,48 @@ def process_direct_grism_visit(direct={},
         drizzle_params.pop('bits')
 
     # for jwst images, change header info
-    #for file in direct['files']:
-    #    hdu = pyfits.open(file, mode='update')
-    #    hdu[0].header['INSTRUME'] = 'WFC3'
-    #    hdu[0].header['DETECTOR'] = 'IR'
-    #    hdu[1].header['NGOODPIX'] = -99
-    #    hdu[1].header['EXPNAME'] = hdu[0].header['EXPOSURE']
-    #    hdu[1].header['MEANDARK'] = -99
-    #    hdu[1].header['IDCSCALE'] = 0.065 ## how can I get this automatically?
-    #    hdu[0].header['PFLTFILE'] = '/Users/victoriastrait/Downloads/jwst_niriss_flat_0193.fits'
-    #    hdu.flush()
+    for file in direct['files']:
+        hdu = pyfits.open(file, mode='update')
+        hdu[0].header['INSTRUME'] = 'WFC3'
+        hdu[0].header['DETECTOR'] = 'IR'
+        hdu[1].header['NGOODPIX'] = -99
+        hdu[1].header['EXPNAME'] = hdu[0].header['EXPOSURE']
+        hdu[1].header['MEANDARK'] = -99
+        hdu[1].header['IDCSCALE'] = 0.065 ## how can I get this automatically?
+        if hdu[0].header['FILTER'] == 'F115W':
+            hdu[0].header['PFLTFILE'] = '/Users/victoriastrait/Downloads/jwst_niriss_flat_0193.fits'
+        if hdu[0].header['FILTER'] == 'F150W':
+            hdu[0].header['PFLTFILE'] = '/Users/victoriastrait/Downloads/jwst_niriss_flat_0007.fits'
+        if hdu[0].header['FILTER'] == 'F200W':
+            hdu[0].header['PFLTFILE'] = '/Users/victoriastrait/Downloads/jwst_niriss_flat_0189.fits'
+        
+        hdu.flush()
 #
-    #for file in grism['files']:
-    #    hdu = pyfits.open(file, mode='update')
-    #    hdu[0].header['INSTRUME'] = 'WFC3'
-    #    hdu[0].header['DETECTOR'] = 'IR'
-    #    hdu[1].header['NGOODPIX'] = -99
-    #    hdu[1].header['EXPNAME'] = hdu[0].header['EXPOSURE']
-    #    hdu[1].header['MEANDARK'] = -99
-    #    hdu[1].header['IDCSCALE'] = 0.1 ## how can I get this automatically?
-    #    hdu[0].header['PFLTFILE'] = '/Users/victoriastrait/Downloads/jwst_niriss_flat_0202.fits'
-    #    hdu.flush()
-
+    for file in grism['files']:
+        hdu = pyfits.open(file, mode='update')
+        hdu[0].header['INSTRUME'] = 'WFC3'
+        hdu[0].header['DETECTOR'] = 'IR'
+        hdu[1].header['NGOODPIX'] = -99
+        hdu[1].header['EXPNAME'] = hdu[0].header['EXPOSURE']
+        hdu[1].header['MEANDARK'] = -99
+        hdu[1].header['IDCSCALE'] = 0.065 ## how can I get this automatically?
+        if (hdu[0].header['FILTER'] == 'GR150C') & (hdu[0].header['PUPIL'] == 'F115W'):        
+            hdu[0].header['PFLTFILE'] = '/Users/victoriastrait/Downloads/jwst_niriss_flat_0202.fits'
+        if (hdu[0].header['FILTER'] == 'GR150C') & (hdu[0].header['PUPIL'] == 'F150W'):        
+            hdu[0].header['PFLTFILE'] = '/Users/victoriastrait/Downloads/jwst_niriss_flat_0187.fits'
+        if (hdu[0].header['FILTER'] == 'GR150C') & (hdu[0].header['PUPIL'] == 'F200W'):        
+            hdu[0].header['PFLTFILE'] = '/Users/victoriastrait/Downloads/jwst_niriss_flat_0204.fits'
+        if (hdu[0].header['FILTER'] == 'GR150R') & (hdu[0].header['PUPIL'] == 'F115W'):        
+            hdu[0].header['PFLTFILE'] = '/Users/victoriastrait/Downloads/jwst_niriss_flat_0200.fits'
+        if (hdu[0].header['FILTER'] == 'GR150R') & (hdu[0].header['PUPIL'] == 'F150W'):        
+            hdu[0].header['PFLTFILE'] = '/Users/victoriastrait/Downloads/jwst_niriss_flat_0188.fits'
+        hdu.flush()
+    # Flat field correction
+    for file in direct['files']:
+        im = pyfits.open(file,mode='update')
+        flat = pyfits.open(im[0].header['PFLTFILE'])
+        im[1].data = np.divide(im[1].data, flat[1].data, im[1].data, where=flat[1].data!=0)
+        im.flush()
     # Relax CR rejection for first-pass ACS
     if isACS:
         driz_cr_snr_first = '15. 10.0'
@@ -3098,9 +3125,16 @@ def process_direct_grism_visit(direct={},
             file = '{0}_wcs.{1}'.format(direct['product'], ext)
             if os.path.exists(file):
                 os.remove(file)
+        # I think I need to cast all of the values in the dq extension to be numpy.int16 
+        #(as opposed to numpy.uint32 which they apparently currently are)
+        
 
         # First drizzle
         if len(direct['files']) > 1:
+            for file in direct['files']:
+                hdu = pyfits.open(file,mode='update')
+                hdu[3].data = hdu[3].data.astype(np.int16)
+                hdu.flush()
             AstroDrizzle(direct['files'], output=direct['product'],
                          clean=True, context=False, preserve=False, 
                          skysub=True, driz_separate=True, driz_sep_wcs=True,
@@ -3136,6 +3170,7 @@ def process_direct_grism_visit(direct={},
                              final_bits=bits, coeffs=True, build=False,
                              final_wht_type='IVM', gain='-99', rdnoise='-99', resetbits=0)
 
+        
         # Make catalog & segmentation image
         if align_thresh is None:
             if isWFPC2:
@@ -3256,7 +3291,7 @@ def process_direct_grism_visit(direct={},
                          preserve=False, driz_cr_snr=driz_cr_snr,
                          driz_cr_scale=driz_cr_scale, build=False,
                          final_wht_type='IVM', gain='-99', rdnoise='-99', **drizzle_params)
-
+        
         # Flag areas of ACS images covered by a single image, where
         # CRs aren't appropriately masked
         is_single = (len(direct['files']) == 1)
@@ -3329,7 +3364,10 @@ def process_direct_grism_visit(direct={},
 
     # First drizzle to flag CRs
     gris_cr_corr = len(grism['files']) > 1
-
+    for file in grism['files']:
+                hdu = pyfits.open(file,mode='update')
+                hdu[3].data = hdu[3].data.astype(np.int16)
+                hdu.flush()
     AstroDrizzle(grism['files'], output=grism['product'], clean=True,
                  context=False, preserve=False, skysub=True,
                  driz_separate=gris_cr_corr, driz_sep_wcs=gris_cr_corr, median=gris_cr_corr,
@@ -3515,9 +3553,9 @@ def tweak_align(direct_group={}, grism_group={}, max_dist=1., n_min=10, key=' ',
         return True
 
     # Redrizzle
-    bits = 576
-    driz_cr_snr = '8.0 5.0'
-    driz_cr_scale = '2.5 0.7'
+    bits  = 4#576
+    driz_cr_snr = '35 1.0' #'8.0 5.0'
+    driz_cr_scale = '10.0 0.7' #'2.5 0.7'
     if 'par' in direct_group['product']:
         pixfrac = 1.0
     else:
@@ -4225,6 +4263,7 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
     # Figure out which grism
     im = pyfits.open(grism['files'][0])
     grism_element = utils.get_hst_filter(im[0].header)
+    pupil = im[0].header['PUPIL']
 
     flat = 1.
     if grism_element == 'G141':
@@ -4243,9 +4282,33 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
         isACS = True
         flat = 1.
 
-    elif grism_element == 'GR150C':
-        bg_fixed = ['jwst_niriss_wfssbkg_0002.fits']# need to update
-        bg_vary = ['jwst_niriss_wfssbkg_0002.fits'] # need to update
+    elif (grism_element == 'GR150C') & (pupil == 'F115W'):
+        bg_fixed = ['jwst_niriss_wfssbkg_0002_corrflat.fits'] # should be normalized background (changing to _corrflat causes astrodrizzle "zero valid pixels error")
+        bg_vary = [] 
+        isACS = False
+        flat = 1.
+    
+    elif (grism_element == 'GR150C') & (pupil == 'F150W'):
+        bg_fixed = ['jwst_niriss_wfssbkg_0009_corrflat.fits'] # should be normalized background (changing to _corrflat causes astrodrizzle "zero valid pixels error")
+        bg_vary = [] 
+        isACS = False
+        flat = 1.
+
+    elif (grism_element == 'GR150C') & (pupil == 'F200W'):
+        bg_fixed = ['jwst_niriss_wfssbkg_0012_corrflat.fits'] # should be normalized background (changing to _corrflat causes astrodrizzle "zero valid pixels error")
+        bg_vary = [] 
+        isACS = False
+        flat = 1.
+
+    elif (grism_element == 'GR150R') & (pupil == 'F115W'):
+        bg_fixed = ['jwst_niriss_wfssbkg_0004_corrflat.fits'] # should be normalized background (changing to _corrflat causes astrodrizzle "zero valid pixels error")
+        bg_vary = [] 
+        isACS = False
+        flat = 1.
+
+    elif (grism_element == 'GR150R') & (pupil == 'F150W'):
+        bg_fixed = ['jwst_niriss_wfssbkg_0003_corrflat.fits'] # should be normalized background (changing to _corrflat causes astrodrizzle "zero valid pixels error")
+        bg_vary = [] 
         isACS = False
         flat = 1.
 
@@ -4303,7 +4366,7 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
     if isACS:
         bits = 64+32
     else:
-        bits = 576
+        bits =  4 #576
 
     for i in range(Nexp):
         flt = pyfits.open(grism['files'][i])
@@ -4722,7 +4785,7 @@ def fix_star_centers(root='macs1149.6+2223-rot-ca5-22-032.0-f105w',
     if drizzle:
         files = [flt.filename() for flt in images]
 
-        bits = 576
+        bits  = 4 #576
 
         if root.startswith('par'):
             pixfrac = 1.0
@@ -5195,8 +5258,8 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, m
                 driz_cr_snr = '3.5 3.0'
                 driz_cr_scale = '1.2 0.7'
             else:
-                driz_cr_snr = '8.0 5.0'
-                driz_cr_scale = '2.5 0.7'
+                driz_cr_snr = '35 1.0' #'8.0 5.0'
+                driz_cr_scale = '10.0 0.7' #'2.5 0.7'
             
             if driz_cr_snr_grow != 1:
                 spl = driz_cr_snr.split()
@@ -5212,7 +5275,7 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, m
             if isACS | isWFPC2:
                 bits = 64+32
             else:
-                bits = 576
+                bits  = 4#576
 
             if include_saturated:
                 bits |= 256

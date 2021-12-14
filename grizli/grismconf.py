@@ -506,6 +506,7 @@ def get_config_filename(instrume='WFC3', filter='F140W',
         String path of the configuration file.
 
     """
+
     if instrume == 'ACS':
         conf_file = os.path.join(GRIZLI_PATH,
                     'CONF/ACS.WFC.CHIP{0:d}.Stars.conf'.format(chip))

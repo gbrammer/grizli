@@ -14,7 +14,7 @@ IR_N_FILTERS = ['F126N', 'F128N', 'F130N', 'F132N', 'F164N', 'F167N']
 IR_M_FILTERS = ['F098M', 'F127M', 'F139M', 'F153M']
 IR_W_FILTERS = ['F105W', 'F110W', 'F125W', 'F140W', 'F160W']
 
-JW_FILTERS = ['F115W']
+JW_FILTERS = ['F115W', 'F150W', 'F200W']
 
 OPT_N_FILTERS = ['F469N', 'F487N', 'F502N']
 OPT_N_FILTERS += ['FQ436N', 'FQ437N', 'FQ492N', 'FQ508N', 'FQ575N']
@@ -33,7 +33,7 @@ IR_GRISMS = ['G102', 'G141']
 OPT_GRISMS = ['G800L']
 UV_GRISMS = ['G280']
 
-JW_GRISMS = ['GR150C']
+JW_GRISMS = ['GR150C', 'GR150R']
 
 VALID_FILTERS = OPT_M_FILTERS + OPT_W_FILTERS + OPT_GRISMS  # + UV_GRISMS
 VALID_FILTERS += IR_M_FILTERS + IR_W_FILTERS + IR_GRISMS
@@ -50,7 +50,9 @@ GRIS_REF_FILTERS = {'G141': ['F140W', 'F160W', 'F125W', 'F105W', 'F110W',
                              'F160W', 'F127M', 'F139M', 'F153M', 'F132N',
                              'F130N', 'F128N', 'F126N', 'F164N', 'F167N'],
                     'G800L': ['F814W', 'F850LP', 'F606W', 'F435W', 'F775W',
-                              'F555W', 'opt']}
+                              'F555W', 'opt'], 
+                    'GR150C': ['F115W', 'F150W', 'F200W'], 
+                    'GR150R': ['F115W', 'F150W', 'F200W']}
 
 
 def test_aws_availability():
