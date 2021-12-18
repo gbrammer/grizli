@@ -806,7 +806,8 @@ def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixsca
                                  filter=filt.upper(),
                                  pixfrac=dp.driz_header['PIXFRAC'],
                                  kernel=dp.driz_header['KERNEL'],
-                                 wcs_slice=dp.driz_wcs, get_extended=True,
+                                 wcs_slice=dp.driz_wcs, 
+                                 get_extended=filt.lower()[:2] in ['f1','f0'],
                                  verbose=False, get_weight=False)
 
                     psf[1].header['EXTNAME'] = 'PSF'
