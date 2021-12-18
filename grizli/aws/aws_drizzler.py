@@ -82,7 +82,7 @@ def make_visit_fits():
 
     visit_files += indiv_files
 
-    for p in ['grizli-v1-19.12.04_visits.npy', 'grizli-v1-19.12.05_visits.npy', 'grizli-v1-20.10.12_visits.npy', 'grizli-cosmos-v2_visits.npy']:
+    for p in ['grizli-v1-19.12.04_visits.npy', 'grizli-v1-19.12.05_visits.npy', 'grizli-v1-20.10.12_visits.npy', 'grizli-cosmos-v2_visits.npy','grizli-v1-21.05.20_visits.npy']:
         if p in visit_files:
             visit_files.pop(visit_files.index(p))
 
@@ -90,7 +90,8 @@ def make_visit_fits():
     products = []
 
     extra_visits = ['candels-july2019_visits.npy', 'grizli-cosmos-v2_visits.npy']
-    extra_visits = ['candels-july2019_visits.npy', 'cosmos-dash-apr20_visits.npy']
+    #extra_visits = ['candels-july2019_visits.npy', 'cosmos-dash-apr20_visits.npy']
+    extra_visits = ['candels-july2019_visits.npy', 'cosmos-dash-dec06_visits.npy']
     
     for extra in extra_visits:
 
@@ -180,7 +181,7 @@ def make_visit_fits():
 
     # WFC3/IR copied to "Exposures" paths in CANDELS fields
     for v in all_visits:
-        if v['parent_file'] in ['grizli-cosmos-v2_visits.npy', 'cosmos-dash-apr20_visits.npy']:
+        if v['parent_file'] in ['grizli-cosmos-v2_visits.npy', 'cosmos-dash-apr20_visits.npy', 'cosmos-dash-dec06_visits.npy']:
             continue
 
         if v['parent_file'].startswith('j'):
@@ -216,6 +217,7 @@ def make_visit_fits():
     root = 'grizli-v1-19.12.05'
     root = 'grizli-v1-20.10.12'
     root = 'grizli-v1-21.05.20'
+    root = 'grizli-v1-21.12.18'
 
     tab.write(root+'_visits.fits', overwrite=True)
     np.save(root+'_visits.npy', [all_visits])
@@ -366,6 +368,7 @@ def group_by_filter():
     master = 'grizli-v1-19.12.05'
     master = 'grizli-v1-20.10.12'
     master = 'grizli-v1-21.05.20'
+    master = 'grizli-v1-21.12.18'
     
     tab = utils.read_catalog('{0}_visits.fits'.format(master))
     all_visits = np.load('{0}_visits.npy'.format(master), allow_pickle=True)[0]
@@ -739,7 +742,7 @@ def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixsca
 
         print('\n\n###\nMake filter: {0}'.format(filt))
 
-        if (filt.upper() in ['F105W', 'F110W', 'F125W', 'F140W', 'F160W']) & include_ir_psf:
+        if include_ir_psf:
             clean_i = False
         else:
             clean_i = remove
@@ -780,7 +783,7 @@ def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixsca
 
             has_filts.append(filt)
 
-            if (filt.upper() in ['F105W', 'F110W', 'F125W', 'F140W', 'F160W']) & include_ir_psf:
+            if include_ir_psf:
                 from grizli.galfit.psf import DrizzlePSF
 
                 hdu = pyfits.open('{0}-{1}_drz_sci.fits'.format(label, filt),
