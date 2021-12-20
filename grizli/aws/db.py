@@ -2536,6 +2536,9 @@ def update_all_exposure_log():
         
     #_files = db.from_sql("SELECT file, filter from exposure_log WHERE mdrizsky is null AND awspath like 'grizli-cosmos%%' AND filter like 'f814w' LIMIT 10", engine)
     
+    # latest cosmos
+    _files = db.from_sql("SELECT file, filter, awspath from exposure_log WHERE mdrizsky is null AND awspath like 'cosmos-dash%%' AND filter like 'f160w'", engine)
+    
     N = len(_files)
     idx = np.argsort(np.random.normal(size=N))
     for i, file in enumerate(_files['file'][idx]):
@@ -2602,9 +2605,9 @@ def update_exposure_log(event, context):
     bucket = _q['awspath'][0].split('/')[0]
     bkt = s3.Bucket(bucket)
 
-    awsfile = '/'.join(_q['awspath'][0].split('/')[1:])
+    awsfile = '/'.join(_q['awspath'][0].split('/')[1:]).strip('/')
     awsfile += '/'+local_file
-                        
+                       
     print(f'{bucket}:{awsfile} > {local_file}')
 
     if not os.path.exists(local_file):
