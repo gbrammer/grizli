@@ -42,7 +42,10 @@ photflam_list = {'F098M': 6.0501324882418389e-20,
             'G150': 1.e-20,
             'G800L': 1.,
             'G280':  1., 
-            'F444W': 1.e-20}
+            'F444W': 1.e-20, 
+            'F115W': 1., 
+            'F150W': 1.,
+            'F200W': 1.}
 
 # Filter pivot wavelengths
 photplam_list = {'F098M': 9864.722728110915,
@@ -1645,7 +1648,7 @@ class ImageData(object):
         """
 
         okbits_instrument = {'WFC3': 32+64+512,  # blob OK
-                             'NIRISS': 0,
+                             'NIRISS': 1+2+1027+5+3+4 + 4096,
                              'NIRCAM': 0,
                              'WFIRST': 0, 
                              'WFI': 0}
