@@ -3017,9 +3017,9 @@ def process_direct_grism_visit(direct={},
         driz_cr_snr = '3.5 3.0'
         driz_cr_scale = '1.2 0.7'
     else:
-        bits  = 4 #576+256
-        driz_cr_snr = '35 1.0' #'8.0 5.0'
-        driz_cr_scale = '10.0 0.7' #'2.5 1.2'
+        bits  = 6 #576+256
+        driz_cr_snr = '8.0 5.0'
+        driz_cr_scale = '2.5 1.2'
 
     if 'driz_cr_scale' in drizzle_params:
         driz_cr_scale = drizzle_params['driz_cr_scale']
@@ -3553,9 +3553,9 @@ def tweak_align(direct_group={}, grism_group={}, max_dist=1., n_min=10, key=' ',
         return True
 
     # Redrizzle
-    bits  = 4#576
-    driz_cr_snr = '35 1.0' #'8.0 5.0'
-    driz_cr_scale = '10.0 0.7' #'2.5 0.7'
+    bits  = 4 #576
+    driz_cr_snr = '8.0 5.0'
+    driz_cr_scale = '2.5 0.7'
     if 'par' in direct_group['product']:
         pixfrac = 1.0
     else:
@@ -4283,31 +4283,31 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
         flat = 1.
 
     elif (grism_element == 'GR150C') & (pupil == 'F115W'):
-        bg_fixed = ['jwst_niriss_wfssbkg_0002_corrflat.fits'] # should be normalized background (changing to _corrflat causes astrodrizzle "zero valid pixels error")
+        bg_fixed = ['jwst_niriss_wfssbkg_0002.fits'] # should be normalized background (changing to _corrflat causes astrodrizzle "zero valid pixels error")
         bg_vary = [] 
         isACS = False
         flat = 1.
     
     elif (grism_element == 'GR150C') & (pupil == 'F150W'):
-        bg_fixed = ['jwst_niriss_wfssbkg_0009_corrflat.fits'] # should be normalized background (changing to _corrflat causes astrodrizzle "zero valid pixels error")
+        bg_fixed = ['jwst_niriss_wfssbkg_0009.fits'] # should be normalized background (changing to _corrflat causes astrodrizzle "zero valid pixels error")
         bg_vary = [] 
         isACS = False
         flat = 1.
 
     elif (grism_element == 'GR150C') & (pupil == 'F200W'):
-        bg_fixed = ['jwst_niriss_wfssbkg_0012_corrflat.fits'] # should be normalized background (changing to _corrflat causes astrodrizzle "zero valid pixels error")
+        bg_fixed = ['jwst_niriss_wfssbkg_0012.fits'] # should be normalized background (changing to _corrflat causes astrodrizzle "zero valid pixels error")
         bg_vary = [] 
         isACS = False
         flat = 1.
 
     elif (grism_element == 'GR150R') & (pupil == 'F115W'):
-        bg_fixed = ['jwst_niriss_wfssbkg_0004_corrflat.fits'] # should be normalized background (changing to _corrflat causes astrodrizzle "zero valid pixels error")
+        bg_fixed = ['jwst_niriss_wfssbkg_0004.fits'] # should be normalized background (changing to _corrflat causes astrodrizzle "zero valid pixels error")
         bg_vary = [] 
         isACS = False
         flat = 1.
 
     elif (grism_element == 'GR150R') & (pupil == 'F150W'):
-        bg_fixed = ['jwst_niriss_wfssbkg_0003_corrflat.fits'] # should be normalized background (changing to _corrflat causes astrodrizzle "zero valid pixels error")
+        bg_fixed = ['jwst_niriss_wfssbkg_0003.fits'] # should be normalized background (changing to _corrflat causes astrodrizzle "zero valid pixels error")
         bg_vary = [] 
         isACS = False
         flat = 1.
@@ -5258,8 +5258,8 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, m
                 driz_cr_snr = '3.5 3.0'
                 driz_cr_scale = '1.2 0.7'
             else:
-                driz_cr_snr = '35 1.0' #'8.0 5.0'
-                driz_cr_scale = '10.0 0.7' #'2.5 0.7'
+                driz_cr_snr = '8.0 5.0'
+                driz_cr_scale = '2.5 0.7'
             
             if driz_cr_snr_grow != 1:
                 spl = driz_cr_snr.split()
@@ -5275,7 +5275,7 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, m
             if isACS | isWFPC2:
                 bits = 64+32
             else:
-                bits  = 4#576
+                bits  = 4 #576
 
             if include_saturated:
                 bits |= 256

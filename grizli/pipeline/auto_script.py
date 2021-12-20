@@ -2256,8 +2256,11 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
     g141 = info['FILTER'] == 'G141'
     g102 = info['FILTER'] == 'G102'
     g800l = info['FILTER'] == 'G800L'
-    gr150c = info['FILTER'] == 'GR150C'
-    gr150r = info['FILTER'] == 'GR150R'
+    gr150cf115w = (info['PUPIL'] == 'F115W') & (info['FILTER'] == 'GR150C')
+    gr150cf150w = (info['PUPIL'] == 'F150W') & (info['FILTER'] == 'GR150C')
+    gr150cf200w = (info['PUPIL'] == 'F200W') & (info['FILTER'] == 'GR150C')
+    gr150rf115w = (info['PUPIL'] == 'F115W') & (info['FILTER'] == 'GR150R')
+    gr150rf150w = (info['PUPIL'] == 'F150W') & (info['FILTER'] == 'GR150R')
 
     if force_cat is None:
         #catalog = '{0}-ir.cat.fits'.format(field_root)
@@ -2340,36 +2343,37 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
 
         # del(grp_i)
 
-    if (gr150c.sum() > 0) & ('GR150C' in gris_ref_filters):
-        for f in gris_ref_filters['GR150C']:
-            if os.path.exists('{0}-{1}_drz_sci.fits'.format(field_root, f.lower())):
-                gr150c_ref = f
-                break
+    if (gr150cf115w.sum() > 0) & ('GR150C' in gris_ref_filters):
+        gr150cf115w_ref = 'F115W'
+        #for f in gris_ref_filters['GR150C']:
+        #    if os.path.exists('{0}-{1}_drz_sci.fits'.format(field_root, f.lower())):
+        #        gr150c_ref = f
+        #        break
 
         # Segmentation image
         if force_seg is None:
             if galfit == 'clean':
-                seg_file = '{0}-{1}_galfit_orig_seg.fits'.format(field_root, gr150c_ref.lower())
+                seg_file = '{0}-{1}_galfit_orig_seg.fits'.format(field_root, gr150cf115w_ref.lower())
             elif galfit == 'model':
-                seg_file = '{0}-{1}_galfit_seg.fits'.format(field_root, gr150c_ref.lower())
+                seg_file = '{0}-{1}_galfit_seg.fits'.format(field_root, gr150cf115w_ref.lower())
             else:
                 seg_file = glob.glob('{0}-*_seg.fits'.format(field_root))[0]
         else:
             seg_file = force_seg
-
         # Reference image
         if force_ref is None:
             if galfit == 'clean':
-                ref_file = '{0}-{1}_galfit_clean.fits'.format(field_root, gr150c_ref.lower())
+                ref_file = '{0}-{1}_galfit_clean.fits'.format(field_root, gr150cf115w_ref.lower())
             elif galfit == 'model':
-                ref_file = '{0}-{1}_galfit.fits'.format(field_root, gr150c_ref.lower())
+                ref_file = '{0}-{1}_galfit.fits'.format(field_root, gr150cf115w_ref.lower())
             else:
-                ref_file = '{0}-{1}_drz_sci.fits'.format(field_root, gr150c_ref.lower())
-
+                ref_file = '{0}-{1}_drz_sci.fits'.format(field_root, gr150cf115w_ref.lower())
+        
         else:
             ref_file = force_ref
-        print(list(info['FILE'][gr150c]))
-        grp_i = multifit.GroupFLT(grism_files=list(info['FILE'][gr150c]), direct_files=[], ref_file=ref_file, seg_file=seg_file, catalog=catalog, cpu_count=-1, sci_extn=1, pad=pad)
+
+        print(list(info['FILE'][gr150cf115w]))
+        grp_i = multifit.GroupFLT(grism_files=list(info['FILE'][gr150cf115w]), direct_files=[], ref_file=ref_file, seg_file=seg_file, catalog=catalog, cpu_count=-1, sci_extn=1, pad=pad)
         # if g141.sum() > 0:
         #    grp.extend(grp_i)
         # else:
@@ -2377,19 +2381,19 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
         grp_objects.append(grp_i)
 
         # del(grp_i)
-
-    if (gr150r.sum() > 0) & ('GR150R' in gris_ref_filters):
-        for f in gris_ref_filters['GR150R']:
-            if os.path.exists('{0}-{1}_drz_sci.fits'.format(field_root, f.lower())):
-                gr150r_ref = f
-                break
+        if (gr150cf150w.sum() > 0) & ('GR150C' in gris_ref_filters):
+            gr150cf150w_ref = 'F150W'
+        #for f in gris_ref_filters['GR150C']:
+        #    if os.path.exists('{0}-{1}_drz_sci.fits'.format(field_root, f.lower())):
+        #        gr150c_ref = f
+        #        break
 
         # Segmentation image
         if force_seg is None:
             if galfit == 'clean':
-                seg_file = '{0}-{1}_galfit_orig_seg.fits'.format(field_root, gr150r_ref.lower())
+                seg_file = '{0}-{1}_galfit_orig_seg.fits'.format(field_root, gr150cf150w_ref.lower())
             elif galfit == 'model':
-                seg_file = '{0}-{1}_galfit_seg.fits'.format(field_root, gr150r_ref.lower())
+                seg_file = '{0}-{1}_galfit_seg.fits'.format(field_root, gr150cf150w_ref.lower())
             else:
                 seg_file = glob.glob('{0}-*_seg.fits'.format(field_root))[0]
         else:
@@ -2398,16 +2402,128 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
         # Reference image
         if force_ref is None:
             if galfit == 'clean':
-                ref_file = '{0}-{1}_galfit_clean.fits'.format(field_root, gr150r_ref.lower())
+                ref_file = '{0}-{1}_galfit_clean.fits'.format(field_root, gr150cf150w_ref.lower())
             elif galfit == 'model':
-                ref_file = '{0}-{1}_galfit.fits'.format(field_root, gr150r_ref.lower())
+                ref_file = '{0}-{1}_galfit.fits'.format(field_root, gr150cf150w_ref.lower())
             else:
-                ref_file = '{0}-{1}_drz_sci.fits'.format(field_root, gr150r_ref.lower())
+                ref_file = '{0}-{1}_drz_sci.fits'.format(field_root, gr150cf150w_ref.lower())
+
+        else:
+            ref_file = force_ref
+        print(list(info['FILE'][gr150cf150w]))
+        grp_i = multifit.GroupFLT(grism_files=list(info['FILE'][gr150cf150w]), direct_files=[], ref_file=ref_file, seg_file=seg_file, catalog=catalog, cpu_count=-1, sci_extn=1, pad=pad)
+        # if g141.sum() > 0:
+        #    grp.extend(grp_i)
+        # else:
+        #    grp = grp_i
+        grp_objects.append(grp_i)
+
+    if (gr150cf200w.sum() > 0) & ('GR150C' in gris_ref_filters):
+        gr150cf200w_ref = 'F200W'
+        #for f in gris_ref_filters['GR150C']:
+        #    if os.path.exists('{0}-{1}_drz_sci.fits'.format(field_root, f.lower())):
+        #        gr150c_ref = f
+        #        break
+
+        # Segmentation image
+        if force_seg is None:
+            if galfit == 'clean':
+                seg_file = '{0}-{1}_galfit_orig_seg.fits'.format(field_root, gr150cf200w_ref.lower())
+            elif galfit == 'model':
+                seg_file = '{0}-{1}_galfit_seg.fits'.format(field_root, gr150cf200w_ref.lower())
+            else:
+                seg_file = glob.glob('{0}-*_seg.fits'.format(field_root))[0]
+        else:
+            seg_file = force_seg
+
+        # Reference image
+        if force_ref is None:
+            if galfit == 'clean':
+                ref_file = '{0}-{1}_galfit_clean.fits'.format(field_root, gr150cf200w_ref.lower())
+            elif galfit == 'model':
+                ref_file = '{0}-{1}_galfit.fits'.format(field_root, gr150cf200w_ref.lower())
+            else:
+                ref_file = '{0}-{1}_drz_sci.fits'.format(field_root, gr150cf200w_ref.lower())
+
+        else:
+            ref_file = force_ref
+        print(list(info['FILE'][gr150cf200w]))
+        grp_i = multifit.GroupFLT(grism_files=list(info['FILE'][gr150cf200w]), direct_files=[], ref_file=ref_file, seg_file=seg_file, catalog=catalog, cpu_count=-1, sci_extn=1, pad=pad)
+        # if g141.sum() > 0:
+        #    grp.extend(grp_i)
+        # else:
+        #    grp = grp_i
+        grp_objects.append(grp_i)
+
+    if (gr150rf115w.sum() > 0) & ('GR150R' in gris_ref_filters):
+        gr150rf115w_ref = 'F115W'
+        #for f in gris_ref_filters['GR150R']:
+        #    if os.path.exists('{0}-{1}_drz_sci.fits'.format(field_root, f.lower())):
+        #        gr150r_ref = f
+        #        break
+
+        # Segmentation image
+        if force_seg is None:
+            if galfit == 'clean':
+                seg_file = '{0}-{1}_galfit_orig_seg.fits'.format(field_root, gr150rf115w_ref.lower())
+            elif galfit == 'model':
+                seg_file = '{0}-{1}_galfit_seg.fits'.format(field_root, gr150rf115w_ref.lower())
+            else:
+                seg_file = glob.glob('{0}-*_seg.fits'.format(field_root))[0]
+        else:
+            seg_file = force_seg
+
+        # Reference image
+        if force_ref is None:
+            if galfit == 'clean':
+                ref_file = '{0}-{1}_galfit_clean.fits'.format(field_root, gr150rf115w_ref.lower())
+            elif galfit == 'model':
+                ref_file = '{0}-{1}_galfit.fits'.format(field_root, gr150rf115w_ref.lower())
+            else:
+                ref_file = '{0}-{1}_drz_sci.fits'.format(field_root, gr150rf115w_ref.lower())
 
         else:
             ref_file = force_ref
 
-        grp_i = multifit.GroupFLT(grism_files=list(info['FILE'][gr150r]), direct_files=[], ref_file=ref_file, seg_file=seg_file, catalog=catalog, cpu_count=-1, sci_extn=1, pad=pad)
+        grp_i = multifit.GroupFLT(grism_files=list(info['FILE'][gr150rf115w]), direct_files=[], ref_file=ref_file, seg_file=seg_file, catalog=catalog, cpu_count=-1, sci_extn=1, pad=pad)
+        # if g141.sum() > 0:
+        #    grp.extend(grp_i)
+        # else:
+        #    grp = grp_i
+        grp_objects.append(grp_i)
+
+
+    if (gr150rf150w.sum() > 0) & ('GR150R' in gris_ref_filters):
+        gr150rf150w_ref = 'F150W'
+        #for f in gris_ref_filters['GR150R']:
+        #    if os.path.exists('{0}-{1}_drz_sci.fits'.format(field_root, f.lower())):
+        #        gr150r_ref = f
+        #        break
+
+        # Segmentation image
+        if force_seg is None:
+            if galfit == 'clean':
+                seg_file = '{0}-{1}_galfit_orig_seg.fits'.format(field_root, gr150rf150w_ref.lower())
+            elif galfit == 'model':
+                seg_file = '{0}-{1}_galfit_seg.fits'.format(field_root, gr150rf150w_ref.lower())
+            else:
+                seg_file = glob.glob('{0}-*_seg.fits'.format(field_root))[0]
+        else:
+            seg_file = force_seg
+
+        # Reference image
+        if force_ref is None:
+            if galfit == 'clean':
+                ref_file = '{0}-{1}_galfit_clean.fits'.format(field_root, gr150rf150w_ref.lower())
+            elif galfit == 'model':
+                ref_file = '{0}-{1}_galfit.fits'.format(field_root, gr150rf150w_ref.lower())
+            else:
+                ref_file = '{0}-{1}_drz_sci.fits'.format(field_root, gr150rf150w_ref.lower())
+
+        else:
+            ref_file = force_ref
+
+        grp_i = multifit.GroupFLT(grism_files=list(info['FILE'][gr150rf150w]), direct_files=[], ref_file=ref_file, seg_file=seg_file, catalog=catalog, cpu_count=-1, sci_extn=1, pad=pad)
         # if g141.sum() > 0:
         #    grp.extend(grp_i)
         # else:
