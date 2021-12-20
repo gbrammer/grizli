@@ -509,7 +509,7 @@ def segmentation_figure(label, cat, segfile):
     th.close()
 
 
-def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixscale=0.1, size=10, wcs=None, pixfrac=0.33, kernel='square', theta=0, half_optical_pixscale=True, filters=['f160w', 'f140w', 'f125w', 'f105w', 'f110w', 'f098m', 'f850lp', 'f814w', 'f775w', 'f606w', 'f475w', 'f555w', 'f600lp', 'f390w', 'f350lp'], skip=None, remove=True, rgb_params=RGB_PARAMS, master='grizli-v1-19.12.04', aws_bucket='s3://grizli/CutoutProducts/', scale_ab=21, thumb_height=2.0, sync_fits=True, subtract_median=True, include_saturated=True, include_ir_psf=False, show_filters=['visb', 'visr', 'y', 'j', 'h'], combine_similar_filters=True, single_output=True, aws_prep_dir=None, make_segmentation_figure=False, get_dict=False, dryrun=False, thumbnail_ext='png', **kwargs):
+def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixscale=0.1, size=10, wcs=None, pixfrac=0.33, kernel='square', theta=0, half_optical_pixscale=True, filters=['f160w', 'f140w', 'f125w', 'f105w', 'f110w', 'f098m', 'f850lp', 'f814w', 'f775w', 'f606w', 'f475w', 'f555w', 'f600lp', 'f390w', 'f350lp'], skip=None, remove=True, rgb_params=RGB_PARAMS, master='grizli-v1-19.12.04', aws_bucket='s3://grizli/CutoutProducts/', scale_ab=21, thumb_height=2.0, sync_fits=True, subtract_median=True, include_saturated=True, include_ir_psf=False, oversample_psf=False, show_filters=['visb', 'visr', 'y', 'j', 'h'], combine_similar_filters=True, single_output=True, aws_prep_dir=None, make_segmentation_figure=False, get_dict=False, dryrun=False, thumbnail_ext='png', **kwargs):
     """
     label='cp561356'; ra=150.208875; dec=1.850241667; size=40; filters=['f160w','f814w', 'f140w','f125w','f105w','f606w','f475w']
 
@@ -800,19 +800,46 @@ def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixsca
                 try:
 
                     dp = DrizzlePSF(flt_files=flt_files, driz_hdu=hdu[0])
-
-                    psf = dp.get_psf(ra=dp.driz_wcs.wcs.crval[0],
+                    
+                    if oversample_psf:
+                        oN = oversample_psf*2+1
+                        cosd = np.cos(dp.driz_wcs.wcs.crval[1]/180*np.pi)
+                        dde = 1./(oversample_psf*2)*pixscale/3600
+                        dra = dde*cosd
+                        sh = sci.shape
+                        psfd = np.zeros((oN*sh[0], oN*sh[1]), 
+                                        dtype=np.float32)
+                        for i in range(oN):
+                            for j in range(oN):
+                                ra_i = (dp.driz_wcs.wcs.crval[0] +
+                                        dra*(i-oversample_psf))
+                                de_i = (dp.driz_wcs.wcs.crval[1] - 
+                                        dde*(j-oversample_psf))
+                                psf_i = dp.get_psf(ra=ra_i, dec=de_i,
+                                         filter=filt.upper(),
+                                         pixfrac=dp.driz_header['PIXFRAC'],
+                                         kernel=dp.driz_header['KERNEL'],
+                                         wcs_slice=dp.driz_wcs, 
+                                get_extended=filt.lower()[:2] in ['f1','f0'],
+                                         verbose=False, get_weight=False)
+                                psfd[j::oN,i::oN] += psf_i[1].data
+                        
+                        psf = pyfits.ImageHDU(data=psfd)
+                    else:
+                        psf = dp.get_psf(ra=dp.driz_wcs.wcs.crval[0],
                                  dec=dp.driz_wcs.wcs.crval[1],
                                  filter=filt.upper(),
                                  pixfrac=dp.driz_header['PIXFRAC'],
                                  kernel=dp.driz_header['KERNEL'],
                                  wcs_slice=dp.driz_wcs, 
                                  get_extended=filt.lower()[:2] in ['f1','f0'],
-                                 verbose=False, get_weight=False)
-
-                    psf[1].header['EXTNAME'] = 'PSF'
+                                 verbose=False, get_weight=False)[1]
+                    
+                    psf.header['OVERSAMP'] = oversample_psf
+                    
+                    psf.header['EXTNAME'] = 'PSF'
                     #psf[1].header['EXTVER'] = filt
-                    hdu.append(psf[1])
+                    hdu.append(psf)
                     hdu.flush()
 
                 except:
