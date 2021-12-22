@@ -98,7 +98,7 @@ class DrizzlePSF(object):
                     if (('ERR',ext) in flt_j) & full_flt_weight:
                         wht = (1./flt_j['ERR',ext].data**2).astype(np.float32)
                         wht[~np.isfinite(wht)] = 0
-                        wcs[key].expweight = wht
+                        wcs[key].expweight = np.pad(wht, 32)
                     else:
                         wcs[key].expweight = flt_j[0].header['EXPTIME']
                         
@@ -377,7 +377,9 @@ class DrizzlePSF(object):
                 sly = slice(xyp[1]-N, xyp[1]+N+1)
                 
                 if hasattr(flt_weight, 'shape'):
-                    flt_weight = self.wcs[key].expweight[sly, slx]
+                    wslx = slice(xyp[0]-N+32, xyp[0]+N+1+32)
+                    wsly = slice(xyp[1]-N+32, xyp[1]+N+1+32)
+                    flt_weight = self.wcs[key].expweight[wsly, wslx]
                     
                 psf_wcs = model.ImageData.get_slice_wcs(self.wcs[key], 
                                                         slx, sly)
