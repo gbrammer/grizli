@@ -2875,6 +2875,7 @@ def process_direct_grism_visit(direct={},
                                drizzle_params={},
                                iter_atol=1.e-4,
                                imaging_bkg_params=None,
+                               isJWST=False,
                                reference_catalogs=['GAIA', 'PS1', 'SDSS', 'WISE'],
                                use_self_catalog=False):
     """Full processing of a direct (+grism) image visit.
@@ -3013,13 +3014,14 @@ def process_direct_grism_visit(direct={},
         driz_cr_snr = '3.5 3.0'
         driz_cr_scale = '1.2 0.7'
     elif isWFPC2:
-        bits = 64+32
+        bits = 64+32 
         driz_cr_snr = '3.5 3.0'
         driz_cr_scale = '1.2 0.7'
     else:
-        bits  = 6 #576+256
+        bits  = 576+256
         driz_cr_snr = '8.0 5.0'
-        driz_cr_scale = '2.5 1.2'
+        driz_cr_scale = '2.5 0.7'
+        
 
     if 'driz_cr_scale' in drizzle_params:
         driz_cr_scale = drizzle_params['driz_cr_scale']
@@ -3032,6 +3034,8 @@ def process_direct_grism_visit(direct={},
     if 'bits' in drizzle_params:
         bits = drizzle_params['bits']
         drizzle_params.pop('bits')
+
+    print('bits info: ' + str(bits))
 
     # for jwst images, change header info
     for file in direct['files']:
@@ -3224,7 +3228,6 @@ def process_direct_grism_visit(direct={},
             fp = open('{0}.wcs_failed'.format(direct['product']), 'w')
             fp.write(guess.__str__())
             fp.close()
-
             # Does nothing but moves forward
             result = align_drizzled_image(root=direct['product'],
                                       mag_limits=align_mag_limits,
@@ -3283,7 +3286,9 @@ def process_direct_grism_visit(direct={},
                 pixfrac = 1.0
             else:
                 pixfrac = 0.8
-
+            if isJWST == True:
+                driz_cr_scale = '1.2 0.7'
+                driz_cr_snr = '40.0 15.0'
             AstroDrizzle(direct['files'], output=direct['product'],
                          clean=True, final_pixfrac=pixfrac,
                          context=(isACS | isWFPC2),
@@ -3364,6 +3369,9 @@ def process_direct_grism_visit(direct={},
 
     # First drizzle to flag CRs
     gris_cr_corr = len(grism['files']) > 1
+    if isJWST == True:
+        driz_cr_scale = '1.2 0.7'
+        driz_cr_snr = '35.0 15.0'
     for file in grism['files']:
                 hdu = pyfits.open(file,mode='update')
                 hdu[3].data = hdu[3].data.astype(np.int16)
@@ -3553,7 +3561,7 @@ def tweak_align(direct_group={}, grism_group={}, max_dist=1., n_min=10, key=' ',
         return True
 
     # Redrizzle
-    bits  = 4 #576
+    bits  = 576
     driz_cr_snr = '8.0 5.0'
     driz_cr_scale = '2.5 0.7'
     if 'par' in direct_group['product']:
@@ -4365,8 +4373,10 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
     # Build combined arrays
     if isACS:
         bits = 64+32
+    elif isJWST==True:
+        bits = 4+6+32768+16777200+1049600+26232800+9438210+9438220
     else:
-        bits =  4 #576
+        bits =  576
 
     for i in range(Nexp):
         flt = pyfits.open(grism['files'][i])
@@ -4785,7 +4795,7 @@ def fix_star_centers(root='macs1149.6+2223-rot-ca5-22-032.0-f105w',
     if drizzle:
         files = [flt.filename() for flt in images]
 
-        bits  = 4 #576
+        bits  = 576
 
         if root.startswith('par'):
             pixfrac = 1.0
@@ -5275,7 +5285,7 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, m
             if isACS | isWFPC2:
                 bits = 64+32
             else:
-                bits  = 4 #576
+                bits  =  576
 
             if include_saturated:
                 bits |= 256
