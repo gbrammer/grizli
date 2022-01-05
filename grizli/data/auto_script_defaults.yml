@@ -79,6 +79,7 @@ visit_prep_args: &prep_args
     align_mag_limits: [14, 24, 0.05]
     align_ref_border: 100
     max_err_percentile: 99
+    align_min_flux_radius: 1.
     catalog_mask_pad: 0.05
     match_catalog_density: None
     drizzle_params: {}

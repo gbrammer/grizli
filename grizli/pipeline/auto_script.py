@@ -3322,6 +3322,9 @@ def make_reference_wcs(info, files=None, output='mosaic_wcs-ref.fits', filters=[
 
 
 def drizzle_overlaps(field_root, filters=['F098M', 'F105W', 'F110W', 'F125W', 'F140W', 'F160W'], ref_image=None, ref_wcs=None, bits=None, pixfrac=0.75, scale=0.06, make_combined=False, drizzle_filters=True, skysub=False, skymethod='localmin', match_str=[], context=False, pad_reference=60, min_nexp=2, static=True, skip_products=[], include_saturated=False, multi_driz_cr=False, filter_driz_cr=False, **kwargs):
+    """
+    Drizzle filter groups based on precomputed image associations
+    """
     import numpy as np
     import glob
 
