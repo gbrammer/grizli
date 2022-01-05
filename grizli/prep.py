@@ -721,6 +721,7 @@ def align_drizzled_image(root='',
                          triangle_ba_max=0.9,
                          max_err_percentile=99,
                          catalog_mask_pad=0.05,
+                         min_flux_radius=1.,
                          match_catalog_density=None,
                          assume_close=False,
                          ref_border=100):
@@ -877,7 +878,7 @@ def align_drizzled_image(root='',
     # Edge and error mask
     ok &= utils.catalog_mask(cat, max_err_percentile=max_err_percentile,
                              pad=catalog_mask_pad, pad_is_absolute=False, 
-                             min_flux_radius=1.)
+                             min_flux_radius=min_flux_radius)
 
     if max_err_percentile >= 200:
         med_err = np.median(cat['FLUXERR_APER_0'][ok])
@@ -2861,6 +2862,7 @@ def process_direct_grism_visit(direct={},
                                align_rms_limit=2,
                                align_triangle_ba_max=0.9,
                                align_ref_border=100,
+                               align_min_flux_radius=1., 
                                max_err_percentile=99,
                                catalog_mask_pad=0.05,
                                match_catalog_density=None,
@@ -3157,7 +3159,8 @@ def process_direct_grism_visit(direct={},
                                       triangle_size_limit=[5, 2400*(1+isACS)],
                                       triangle_ba_max=align_triangle_ba_max,
                                 match_catalog_density=match_catalog_density,
-                                      ref_border=align_ref_border)
+                                      ref_border=align_ref_border, 
+                                      min_flux_radius=align_min_flux_radius)
         except:
 
             utils.log_exception(utils.LOGFILE, traceback)
@@ -3178,7 +3181,8 @@ def process_direct_grism_visit(direct={},
                                       max_err_percentile=max_err_percentile,
                                       catalog_mask_pad=catalog_mask_pad,
                                 match_catalog_density=match_catalog_density,
-                                      ref_border=align_ref_border)
+                                      ref_border=align_ref_border,
+                                      min_flux_radius=align_min_flux_radius)
 
         orig_wcs, drz_wcs, out_shift, out_rot, out_scale = result
 
@@ -3278,7 +3282,10 @@ def process_direct_grism_visit(direct={},
         else:
             clip &= cat['MAGERR_AUTO'] < 0.05
 
-        clip &= utils.catalog_mask(cat, max_err_percentile=max_err_percentile, pad=catalog_mask_pad, pad_is_absolute=False, min_flux_radius=1.)
+        clip &= utils.catalog_mask(cat, max_err_percentile=max_err_percentile, 
+                                   pad=catalog_mask_pad, 
+                                   pad_is_absolute=False, 
+                                   min_flux_radius=align_min_flux_radius)
 
         NMAX = 140
         so = np.argsort(cat['MAG_AUTO'][clip])
