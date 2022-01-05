@@ -1373,7 +1373,7 @@ def make_SEP_catalog(root='',
                      include_wcs_extension=True,
                      source_xy=None, 
                      compute_auto_quantities=True,
-                     autoparams=[2.5, 0.35*u.arcsec, 3.5],
+                     autoparams=[2.5, 0.35*u.arcsec, 2.4, 3.8],
                      flux_radii=[0.2, 0.5, 0.9],
                      subpix=0,
                      mask_kron=False,
@@ -2095,7 +2095,7 @@ def get_seg_iso_flux(data, seg, tab, err=None, fill=None, verbose=0):
         return iso_flux, iso_err, iso_area
 
 
-def compute_SEP_auto_params(data, data_bkg, mask, pixel_scale=0.06, err=None, segmap=None, tab=None, autoparams=[2.5, 0.35*u.arcsec, 0, 5], flux_radii=[0.2, 0.5, 0.9], subpix=0, verbose=True):
+def compute_SEP_auto_params(data, data_bkg, mask, pixel_scale=0.06, err=None, segmap=None, tab=None, grow_kron=6.0, autoparams=[2.5, 0.35*u.arcsec, 2.4, 3.8], flux_radii=[0.2, 0.5, 0.9], subpix=0, verbose=True):
     """Compute SourceExtractor-like AUTO params with `sep`
     https://sep.readthedocs.io/en/v1.0.x/apertures.html#equivalent-of-flux-auto-e-g-mag-auto-in-source-extractor
     
@@ -2122,6 +2122,11 @@ def compute_SEP_auto_params(data, data_bkg, mask, pixel_scale=0.06, err=None, se
     tab : `~astropy.table.Table`
         Table from, e.g., `sep.extract`.
     
+    grow_kron : float
+        Scale by which semimajor and semiminor axes are multiplied for 
+        calculating the Kron moment.  This is hard-coded as `grow_kron=6.0`
+        in `SourceExtractor <https://sextractor.readthedocs.io/en/latest/Photom.html>`_.
+        
     autoparams : list
         Provided as ``[k, MIN_APER, MIN_KRON, MAX_KRON]``, where the usual
         SourceExtractor ``PHOT_AUTOPARAMS`` would be ``[k, MIN_KRON]``. Here,
@@ -2198,7 +2203,7 @@ def compute_SEP_auto_params(data, data_bkg, mask, pixel_scale=0.06, err=None, se
     try:
         # Try with seg mask (sep > v1.0.4)
         kronrad, krflag = sep.kron_radius(data_bkg, x, y, a, b, theta,
-                                          6.0, mask=mask,
+                                          grow_kron, mask=mask,
                                           segmap=segb, seg_id=seg_id)
         kronrad[~np.isfinite(kronrad)] = 0
     except:
@@ -2206,7 +2211,7 @@ def compute_SEP_auto_params(data, data_bkg, mask, pixel_scale=0.06, err=None, se
         utils.log_comment(utils.LOGFILE, logstr, verbose=True)
 
         kronrad, krflag = sep.kron_radius(data_bkg, x, y, a, b, theta,
-                                          6.0, mask=mask)
+                                          grow_kron, mask=mask)
 
     # This is like SExtractor PHOT_AUTOPARAMS[0]
     kronrad *= autoparams[0]
@@ -2301,11 +2306,11 @@ def compute_SEP_auto_params(data, data_bkg, mask, pixel_scale=0.06, err=None, se
     #############
     # Flux radius
     try:
-        fr, fr_flag = sep.flux_radius(data_bkg, x, y, a*6, flux_radii,
+        fr, fr_flag = sep.flux_radius(data_bkg, x, y, a*grow_kron, flux_radii,
                                   normflux=kron_flux, mask=mask,
                                   segmap=segb, seg_id=seg_id)
     except:
-        fr, fr_flag = sep.flux_radius(data_bkg, x, y, a*6, flux_radii,
+        fr, fr_flag = sep.flux_radius(data_bkg, x, y, a*grow_kron, flux_radii,
                                   normflux=kron_flux, mask=mask)
 
     auto = utils.GTable()
