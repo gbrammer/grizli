@@ -142,7 +142,7 @@ mosaic_args:
         [F105W, F110W, F125W, F140W, F160W, F098M, F139M, F127M, F153M]
     optical_filters:
         [F814W, F606W, F435W, F850LP, F702W, F555W, F438W, F475W, F625W,
-          F775W, F225W, F275W, F300W, F390W, F350LP, F200LP, F410M, F450W,
+          F775W, F225W, F275W, F336W, F390W, F350LP, F200LP, F410M, F450W,
           F600LP, F475X, F435W]
     fill_mosaics: grism 
     half_optical_pixscale: False 
