@@ -137,7 +137,7 @@ def table_to_regions(table, output='ds9.reg', comment=None, header='global color
 
     if comment is not None:
         for i in range(len(table)):
-            lines[i] += ' # text={{{1}}}'.format(comment[i])
+            lines[i] += ' # text={{{0}}}'.format(comment[i])
     
     if extra is not None:
         for i, li in enumerate(lines):
