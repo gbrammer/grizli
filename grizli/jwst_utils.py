@@ -126,7 +126,8 @@ def img_with_wcs(input):
     # if input is a string, open it/make it an HDUList
 
     # Generate WCS as image
-    input = pyfits.open(input)
+    if not isinstance(input, pyfits.HDUList):
+        input = pyfits.open(input)
     if isinstance(input, pyfits.HDUList):
         if input[0].header['INSTRUME'] == 'NIRISS':
             if input[0].header['FILTER'].startswith('GR'):
