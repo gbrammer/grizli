@@ -122,11 +122,16 @@ def img_with_wcs(input):
     # from jwst.assign_wcs import assign_wcs
 
     # HDUList -> jwst.datamodels.ImageModel
-    
+
+    # if input is a string, open it/make it an HDUList
+
     # Generate WCS as image
+    input = pyfits.open(input)
     if isinstance(input, pyfits.HDUList):
         if input[0].header['INSTRUME'] == 'NIRISS':
             if input[0].header['FILTER'].startswith('GR'):
+                input[0].header['FILTER_INFO'] = input[0].header['FILTER'] # just to save it so we can change it back at the end
+                input[0].header['EXPTYPE_INFO'] = input[0].header['EXP_TYPE']
                 input[0].header['FILTER'] = 'CLEAR'
                 input[0].header['EXP_TYPE'] = 'NIS_IMAGE'
                 #print(input[0].header)
@@ -148,7 +153,6 @@ def img_with_wcs(input):
     #dist_file = crds_client.get_reference_file(img, 'distortion')
     #reference_files = {'distortion': dist_file}
     #with_wcs = assign_wcs.load_wcs(img, reference_files=reference_files)
-
     return with_wcs
 
 

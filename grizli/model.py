@@ -1648,7 +1648,7 @@ class ImageData(object):
         """
 
         okbits_instrument = {'WFC3': 32+64+512,  # blob OK
-                             'NIRISS': 1+2+1027+5+3+4 + 4096,
+                             'NIRISS': 2+4+4096, #+4096+4100+18432+18436+1024+16384+1,
                              'NIRCAM': 0,
                              'WFIRST': 0, 
                              'WFI': 0}
@@ -3791,7 +3791,7 @@ class BeamCutout(object):
     def __init__(self, flt=None, beam=None, conf=None,
                  get_slice_header=True, fits_file=None, scale=1.,
                  contam_sn_mask=[10, 3], min_mask=0.01, min_sens=0.08,
-                 mask_resid=True):
+                 mask_resid=True, isJWST=False):
         """Cutout spectral object from the full frame.
 
         Parameters
@@ -3878,17 +3878,18 @@ class BeamCutout(object):
         # self.min_sens = min_sens
         # self.mask_resid = mask_resid
 
-        self._parse_from_data(**self._parse_params)
+        self._parse_from_data(isJWST=False, **self._parse_params)
 
     def _parse_from_data(self, contam_sn_mask=[10, 3], min_mask=0.01,
-                         seg_ids=None, min_sens=0.08, mask_resid=True):
+                         seg_ids=None, min_sens=0.08, mask_resid=True, isJWST=False):
         """
         See parameter description for `~grizli.model.BeamCutout`.
         """
         # bad pixels or problems with uncertainties
-        self.mask = ((self.grism.data['DQ'] > 0) |
-                     (self.grism.data['ERR'] == 0) |
-                     (self.grism.data['SCI'] == 0))
+        self.mask = ((self.grism.data['DQ'] > 0) | 
+                    (self.grism.data['ERR'] == 0) |
+                    (self.grism.data['SCI'] == 0))
+        
 
         self.var = self.grism.data['ERR']**2
         self.var[self.mask] = 1.e30
