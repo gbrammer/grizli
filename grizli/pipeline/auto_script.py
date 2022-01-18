@@ -298,7 +298,7 @@ def go(root='j010311+131615',
         Magnitude limits of objects to extract and fit.
 
     """
-
+    isJWST = visit_prep_args['isJWST']
     # Function defaults
     if get_dict:
         if get_dict <= 2:
@@ -613,7 +613,7 @@ def go(root='j010311+131615',
         make_combined_mosaics(root, mosaic_args=mosaic_args,
                         fix_stars=fix_stars, mask_spikes=mask_spikes,
                         skip_single_optical_visits=skip_single,
-                        mosaic_driz_cr_type=mosaic_driz_cr_type, 
+                        mosaic_driz_cr_type=mosaic_driz_cr_type, isJWST=isJWST, 
                         mosaic_drizzle_args=mosaic_drizzle_args)
 
         # Make PSFs.  Always set get_line_maps=False since PSFs now
@@ -3528,7 +3528,7 @@ def make_reference_wcs(info, files=None, output='mosaic_wcs-ref.fits', filters=[
         return ref_hdu[1]
 
 
-def drizzle_overlaps(field_root, filters=['F098M', 'F105W', 'F110W', 'F115W', 'F125W', 'F140W', 'F150W', 'F160W', 'F200W'], ref_image=None, ref_wcs=None, bits=None, pixfrac=0.75, scale=0.06, make_combined=False, drizzle_filters=True, skysub=False, skymethod='localmin', match_str=[], context=False, pad_reference=60, min_nexp=2, static=True, skip_products=[], include_saturated=False, multi_driz_cr=False, filter_driz_cr=False, **kwargs):
+def drizzle_overlaps(field_root, isJWST=False, filters=['F098M', 'F105W', 'F110W', 'F115W', 'F125W', 'F140W', 'F150W', 'F160W', 'F200W'], ref_image=None, ref_wcs=None, bits=None, pixfrac=0.75, scale=0.06, make_combined=False, drizzle_filters=True, skysub=False, skymethod='localmin', match_str=[], context=False, pad_reference=60, min_nexp=2, static=True, skip_products=[], include_saturated=False, multi_driz_cr=False, filter_driz_cr=False, **kwargs):
     import numpy as np
     import glob
 
@@ -3659,13 +3659,13 @@ def drizzle_overlaps(field_root, filters=['F098M', 'F105W', 'F110W', 'F115W', 'F
         # Figure out if we have more than one instrument
         inst_keys = np.unique([os.path.basename(file)[0] for file in wfc3ir['files']])
 
-        prep.drizzle_overlaps([wfc3ir], parse_visits=False, pixfrac=pixfrac, scale=scale, skysub=False, bits=bits, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False, context=context, static=(static & (len(inst_keys) == 1)), include_saturated=include_saturated, run_driz_cr=multi_driz_cr, **kwargs)
+        prep.drizzle_overlaps([wfc3ir], parse_visits=False, pixfrac=pixfrac, scale=scale, skysub=False, bits=bits, isJWST=isJWST, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False, context=context, static=(static & (len(inst_keys) == 1)), include_saturated=include_saturated, run_driz_cr=multi_driz_cr, **kwargs)
 
         np.save('{0}.npy'.format(wfc3ir['product']), [wfc3ir])
 
     if drizzle_filters:
         print('Drizzle mosaics in filters: {0}'.format(filter_groups.keys()))
-        prep.drizzle_overlaps(keep, parse_visits=False, pixfrac=pixfrac, scale=scale, skysub=skysub, skymethod=skymethod, bits=bits, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False, context=context, static=static, include_saturated=include_saturated, run_driz_cr=filter_driz_cr, **kwargs)
+        prep.drizzle_overlaps(keep, parse_visits=False, pixfrac=pixfrac, scale=scale, skysub=skysub, skymethod=skymethod, bits=bits, isJWST=isJWST, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False, context=context, static=static, include_saturated=include_saturated, run_driz_cr=filter_driz_cr, **kwargs)
 
 
 FILTER_COMBINATIONS = {'ir': IR_M_FILTERS+IR_W_FILTERS,
@@ -3775,7 +3775,7 @@ def make_filter_combinations(root, weight_fnu=True, filter_combinations=FILTER_C
             pyfits.PrimaryHDU(data=wht, header=head[band]).writeto(output_sci[band].replace('_sci', '_wht'), overwrite=True, output_verify='fix')
 
 
-def make_combined_mosaics(root, fix_stars=False, mask_spikes=False, skip_single_optical_visits=True, mosaic_args=args['mosaic_args'], mosaic_driz_cr_type=0, mosaic_drizzle_args=args['mosaic_drizzle_args'], **kwargs):
+def make_combined_mosaics(root, fix_stars=False, mask_spikes=False, isJWST = False, skip_single_optical_visits=True, mosaic_args=args['mosaic_args'], mosaic_driz_cr_type=0, mosaic_drizzle_args=args['mosaic_drizzle_args'], **kwargs):
     """
     Drizzle combined mosaics
 
@@ -3823,7 +3823,7 @@ def make_combined_mosaics(root, fix_stars=False, mask_spikes=False, skip_single_
                      make_combined=False,
                      ref_image=wcs_ref_file, include_saturated=fix_stars,
                      multi_driz_cr=(mosaic_driz_cr_type & 1) > 0,
-                     filter_driz_cr=(mosaic_driz_cr_type & 2) > 0, 
+                     filter_driz_cr=(mosaic_driz_cr_type & 2) > 0, isJWST=isJWST, 
                      **mosaic_drizzle_args)
 
     make_filter_combinations(root, weight_fnu=True, min_count=1,
