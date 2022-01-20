@@ -1648,7 +1648,7 @@ class ImageData(object):
         """
 
         okbits_instrument = {'WFC3': 32+64+512,  # blob OK
-                             'NIRISS': 2+4+4096, #+4096+4100+18432+18436+1024+16384+1,
+                             'NIRISS': 1+2+4+4096, #+4096+4100+18432+18436+1024+16384+1,
                              'NIRCAM': 0,
                              'WFIRST': 0, 
                              'WFI': 0}
