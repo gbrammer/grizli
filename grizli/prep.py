@@ -2948,15 +2948,16 @@ def process_direct_grism_visit(direct={},
         for file in direct['files']:
             crclean = isACS & (len(direct['files']) == 1)
             fresh_flt_file(file, crclean=crclean)
-            try:
-                updatewcs.updatewcs(file, verbose=False, use_db=False)
-            except:
-                #updatewcs.updatewcs(file, verbose=False)
-                #hdr = jwst_utils.model_wcs_header(file,get_sip=True)
-                #data = pyfits.getdata(file)
-                #pyfits.append(file,data=data,header=hdr)
+            if isJWST:
                 img = jwst_utils.img_with_wcs(file)
                 img.save(file)
+            else:
+                try:
+                    updatewcs.updatewcs(file, verbose=False, use_db=False)
+                except:
+                    updatewcs.updatewcs(file, verbose=False)
+
+                
         
         # ### Make ASN
         # if not isWFPC2:
@@ -2986,19 +2987,19 @@ def process_direct_grism_visit(direct={},
                 changed_filter = False
 
             # Run updatewcs
-            try:
-                updatewcs.updatewcs(file, verbose=False, use_db=False)
-            except:
-                #updatewcs.updatewcs(file, verbose=False)
-                #hdr = jwst_utils.model_wcs_header(file,get_sip=True)
-                #data = pyfits.getdata(file)
-                #pyfits.append(file,data=data,header=hdr)
+            if isJWST:
                 img = jwst_utils.img_with_wcs(file)
                 img.save(file)
                 temp_hdu = pyfits.open(file,mode='update')
                 temp_hdu[0].header['FILTER'] = temp_hdu[0].header['FILTER_INFO']
                 temp_hdu[0].header['EXP_TYPE'] = temp_hdu[0].header['EXPTYPE_INFO']
                 temp_hdu.flush()
+            else:
+                try:
+                    updatewcs.updatewcs(file, verbose=False, use_db=False)
+                except:
+                    updatewcs.updatewcs(file, verbose=False)
+                
 
             # Change back
             if changed_filter:
@@ -3117,16 +3118,16 @@ def process_direct_grism_visit(direct={},
                             use_self_catalog=use_self_catalog)
 
             if ref_catalog == 'VISIT':
-                align_mag_limits = [-30,30,0.05] # change me
+                align_mag_limits = [-30,-28,0.05] # change me
                 #align_mag_limits = [16, 23, 0.05]
             elif ref_catalog == 'SDSS':
-                align_mag_limits = [-30,30,0.05]# change me
+                align_mag_limits = [-30,-28,0.05]# change me
                 #align_mag_limits = [16, 21, 0.05]
             elif ref_catalog == 'PS1':
-                align_mag_limits = [-30,30,0.05]# change me
+                align_mag_limits = [-30,-28,0.05]# change me
                 #align_mag_limits = [16, 23, 0.05]
             elif ref_catalog == 'WISE':
-                align_mag_limits = [-30,30,0.05]# change me
+                align_mag_limits = [-30,-28,0.05]# change me
                 #align_mag_limits = [15, 20, 0.05]
         else:
             ref_catalog = 'USER'
@@ -3365,7 +3366,7 @@ def process_direct_grism_visit(direct={},
 
         if (fix_stars) & (not isACS) & (not isWFPC2):
             fix_star_centers(root=direct['product'], drizzle=False, 
-                             mag_lim=19.5)
+                             mag_lim=-29)#19.5) #changeme
 
     #################
     # Grism image processing
@@ -4389,7 +4390,7 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
     if isACS:
         bits = 64+32
     elif isJWST:
-        bits = 4+6+32768+16777200+1049600+26232800+9438210+9438220
+        bits = 1+4+6+32768+16777200+1049600+26232800+9438210+9438220
     else:
         bits =  576
 

@@ -1219,6 +1219,7 @@ def parse_visits(field_root='', RAW_PATH='../RAW', use_visit=True, combine_same_
                                   use_visit=use_visit, max_dt=max_dt, 
                                   visit_split_shift=visit_split_shift)
 
+
     # Don't run combine_minexp if have grism exposures
     grisms = ['G141', 'G102', 'G800L', 'G280', 'GR150C', 'GR150R']
     has_grism = utils.column_string_operation(info['FILTER'], grisms,
@@ -2381,8 +2382,8 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
         grp_objects.append(grp_i)
 
         # del(grp_i)
-        if (gr150cf150w.sum() > 0) & ('GR150C' in gris_ref_filters):
-            gr150cf150w_ref = 'F150W'
+    if (gr150cf150w.sum() > 0) & ('GR150C' in gris_ref_filters):
+        gr150cf150w_ref = 'F150W'
         #for f in gris_ref_filters['GR150C']:
         #    if os.path.exists('{0}-{1}_drz_sci.fits'.format(field_root, f.lower())):
         #        gr150c_ref = f
