@@ -680,6 +680,9 @@ def go(root='j010311+131615',
             os.system('mv {0}_[0-9]*.png {0}_[0-9]*.fits {1}'.format(root, 
                                                            PATHS['thumbs']))
 
+        if make_final_report:
+            make_report(root, make_rgb=True)
+        
         utils.LOGFILE = '/tmp/grizli.log'
         return True
 
