@@ -4906,8 +4906,9 @@ def make_report(root, gzipped_links=True, xsize=18, output_dpi=None, make_rgb=Tr
     ## Mosaic table
     ##
     rows = []
+    line = 'grep -e " 0 " -e "radec" *{0}*wcs.log > /tmp/{1}.log'
     for filter in filters:
-        os.system('grep -e " 0 " -e "radec" *{0}*wcs.log > /tmp/{1}.log'.format(filter, root))
+        os.system(line.format(filter.strip('u'), root))
         wcs_files = glob.glob('*{0}*wcs.log'.format(filter))
 
         wcs = '<pre>'+''.join(open('/tmp/{0}.log'.format(root)).readlines())+'</pre>'
