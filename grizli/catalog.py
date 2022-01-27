@@ -937,7 +937,8 @@ def get_desdr1_catalog(ra=0., dec=0., radius=3, corners=None, max=100000, extra=
     print(msg.format(ra=ra, dec=dec, radius=radius))
 
     tab = query_tap_catalog(ra=ra, dec=dec, radius=radius, corners=corners,
-                            extra=extra, db='"II/357/des_dr1"',
+                            extra=extra, db='"II/357/des_dr1"', 
+                            vizier=True, 
                             verbose=verbose, max=max)
     return tab
 
