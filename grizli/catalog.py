@@ -925,7 +925,24 @@ def get_nsc_catalog(ra=0., dec=0., radius=3, corners=None, max=100000, extra=' A
     return tab
 
 
-def get_desdr1_catalog(ra=0., dec=0., radius=3, corners=None, max=100000, extra=' AND (magerr_auto_r < 0.15 OR magerr_auto_i < 0.15)', verbose=True):
+def get_desdr1_catalog(ra=0., dec=0., radius=3, corners=None, max=100000, extra=' AND (e_rmag < 0.15 OR e_imag < 0.15)', verbose=True):
+    """
+    Query DES DR1 Catalog from Vizier
+
+    The default `extra` query returns well-detected sources in one or more
+    red bands.
+
+    """
+    msg = 'Query DES Source Catalog ({ra:.5f},{dec:.5f},{radius:.1f}\')'
+    print(msg.format(ra=ra, dec=dec, radius=radius))
+
+    tab = query_tap_catalog(ra=ra, dec=dec, radius=radius, corners=corners,
+                            extra=extra, db='"II/357/des_dr1"',
+                            verbose=verbose, max=max)
+    return tab
+
+
+def get_desdr1_catalog_old(ra=0., dec=0., radius=3, corners=None, max=100000, extra=' AND (magerr_auto_r < 0.15 OR magerr_auto_i < 0.15)', verbose=True):
     """
     Query DES DR1 Catalog.
 
