@@ -8270,7 +8270,7 @@ but expected
                            photutils.utils.NoDetectionsWarning
 
 
-    """.format(i, i+2, the_file, ''.join(bad[::-1]))
+    """.format(i, i+2, the_file, lines[i:i+3])
         
             raise ValueError(msg)
         
