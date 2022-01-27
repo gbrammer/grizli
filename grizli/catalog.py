@@ -696,7 +696,7 @@ def query_tap_catalog(ra=165.86, dec=34.829694, radius=3., corners=None,
         `~astropy.wcs.WCS.calc_footprint` method
 
     db : str
-        Parent database (https://datalab.noao.edu/query.php).
+        Parent database (https://datalab.noirlab.edu/query.php).
 
     columns : list of str
         List of columns to output.  Default ['*'] returns all columns.
@@ -743,7 +743,7 @@ def query_tap_catalog(ra=165.86, dec=34.829694, radius=3., corners=None,
             print('Query DES DR1 from NOAO')
 
         db = 'des_dr1.main'
-        tap_url = 'http://datalab.noao.edu/tap'
+        tap_url = 'https://datalab.noirlab.edu/tap'
 
     # NOAO source catalog, seems to have some junk
     if nsc:
@@ -751,7 +751,7 @@ def query_tap_catalog(ra=165.86, dec=34.829694, radius=3., corners=None,
             print('Query NOAO source catalog')
 
         db = 'nsc_dr1.object'
-        tap_url = 'http://datalab.noao.edu/tap'
+        tap_url = 'https://datalab.noirlab.edu/tap'
         extra += ' AND nsc_dr1.object.flags = 0'
 
     # GAIA DR2
