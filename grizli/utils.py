@@ -5278,7 +5278,7 @@ def drizzle_array_groups(sci_list, wht_list, wcs_list, outputwcs=None,
             wcs_i.pixel_shape = wcs_i._naxis1, wcs_i._naxis2
 
         if not hasattr(wcs_i, '_naxis1'):
-            wcs_i._naxis1, wcs_i._naxis2 = wcs_i._naxis
+            wcs_i._naxis1, wcs_i._naxis2 = wcs_i._naxis[:2]
 
     # Output WCS requires full WCS map?
     if calc_wcsmap < 2:
@@ -8230,4 +8230,57 @@ class HubbleXYZ(object):
         lla = pyproj.Proj(proj='latlong', ellps='WGS84', datum='WGS84')
         lon, lat, alt = pyproj.transform(ecef, lla, x, y, z, radians=radians)
         return lon, lat, alt
+
+
+def patch_photutils():
+    """
+    Patch to fix inconsistency with drizzlepac=3.2.1 and photutils>1.0, where 
+    The latter is needed for jwst=1.3.2
+    """
+    import os
+
+    try:
+        import drizzlepac
+    except AttributeError:
+    
+        import photutils
+        site_packages = os.path.dirname(photutils.__file__)
+        # manual apply patch
+        the_file = f'{site_packages}/../drizzlepac/haputils/align_utils.py'
+        with open(the_file,'r') as fp:
+            lines = fp.readlines()
+    
+        print(site_packages, len(lines))
+        for i, line in enumerate(lines):
+            if line.startswith('NoDetectionsWarning'):
+                break
+    
+        if 'hasattr(photutils.findstars' in lines[i+1]:
+            print(f'I found the problem on lines {i}-{i+2}: ')
+        else:
+            msg = """
+Lines {0}-{1} in {2} importing photutils were not as expected.  I found 
+
+{3}
+
+but expected 
+
+   NoDetectionsWarning = photutils.findstars.NoDetectionsWarning if \\
+                           hasattr(photutils.findstars, 'NoDetectionsWarning') else \\
+                           photutils.utils.NoDetectionsWarning
+
+
+    """.format(i, i+2, the_file, ''.join(bad[::-1]))
         
+            raise ValueError(msg)
+        
+        bad = ['   '+lines.pop(i+2-j) for j in range(3)]
+        print(''.join(bad[::-1]))
+
+        # Insert the fix
+        lines[i] = 'from photutils.utils.exceptions import NoDetectionsWarning\n\n'
+        # Rewrite the fie
+        with open(f'{site_packages}/../drizzlepac/haputils/align_utils.py','w') as fp:
+            fp.writelines(lines)
+    
+        print(f'Patch applied to {the_file}!')
