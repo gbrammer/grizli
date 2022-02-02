@@ -5085,7 +5085,12 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
                 print('  (failed s3://{0}/{1})'.format(bucket_i, remote_file))
                 continue
 
-        flt = pyfits.open(file)
+        try:
+            flt = pyfits.open(file)
+        except OSError:
+            print(f'open({file}) failed!')
+            continue
+            
         sci_list, wht_list, wcs_list = [], [], []
 
         if flt[0].header['DETECTOR'] == 'IR':
