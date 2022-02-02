@@ -5023,6 +5023,7 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
     """
     from shapely.geometry import Polygon
     import boto3
+    from botocore.exceptions import ClientError
 
     bucket_name = None
     s3 = boto3.resource('s3')
@@ -5081,7 +5082,7 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
             try:
                 bkt.download_file(remote_file, file,
                               ExtraArgs={"RequestPayer": "requester"})
-            except:
+            except ClientError:
                 print('  (failed s3://{0}/{1})'.format(bucket_i, remote_file))
                 continue
 
@@ -5146,6 +5147,14 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
 
                     phot_scale *= to_per_sec
 
+                try:
+                    wcs_i = pywcs.WCS(header=flt[('SCI', ext)].header, 
+                                      fobj=flt)
+                    wcs_i.pscale = get_wcs_pscale(wcs_i)
+                except KeyError:
+                    print(f'Failed to initialize WCS on {file}[SCI,{ext}]')
+                    continue
+
                 sci_list.append((flt[('SCI', ext)].data - sky)*phot_scale)
 
                 err = flt[('ERR', ext)].data*phot_scale
@@ -5154,9 +5163,6 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
                 wht[(err == 0) | (dq > 0)] = 0
 
                 wht_list.append(wht)
-
-                wcs_i = pywcs.WCS(header=flt[('SCI', ext)].header, fobj=flt)
-                wcs_i.pscale = get_wcs_pscale(wcs_i)
 
                 # wcs_i = HSTWCS(fobj=flt, ext=('SCI',ext), minerr=0.0,
                 #                wcskey=' ')
