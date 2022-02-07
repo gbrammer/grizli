@@ -2847,7 +2847,9 @@ def load_phoenix_stars(logg_list=PHOENIX_LOGG, teff_list=PHOENIX_TEFF, zmet_list
     try:
         hdu = pyfits.open(os.path.join(GRIZLI_PATH, 'templates/stars/', file))
     except:
-        url = 'https://s3.amazonaws.com/grizli/CONF'
+        #url = 'https://s3.amazonaws.com/grizli/CONF'
+        url = 'https://erda.ku.dk/vgrid/Gabriel%20Brammer/CONF'
+        
         print('Fetch {0}/{1}'.format(url, file))
 
         #os.system('wget -O /tmp/{1} {0}/{1}'.format(url, file))
@@ -5774,16 +5776,23 @@ def fetch_config_files(ACS=False, get_sky=True, get_stars=True, get_epsf=True):
                 '{0}/WFC3.IR.G141.cal.V4.32.tar.gz'.format(ftpdir)]
 
     # Test config files
-    tarfiles = ['https://s3.amazonaws.com/grizli/CONF/WFC3.IR.G102.WD.V4.32.tar.gz', 'https://s3.amazonaws.com/grizli/CONF/WFC3.IR.G141.WD.V4.32.tar.gz']
+    # BASEURL = 'https://s3.amazonaws.com/grizli/CONF/'
+    BASEURL = 'https://erda.ku.dk/vgrid/Gabriel%20Brammer/CONF/'
+    
+    tarfiles = [f'{BASEURL}/WFC3.IR.G102.WD.V4.32.tar.gz', 
+                f'{BASEURL}/WFC3.IR.G141.WD.V4.32.tar.gz']
 
-    tarfiles += ['https://s3.amazonaws.com/grizli/CONF/ACS.WFC.CHIP1.Stars.conf', 'https://s3.amazonaws.com/grizli/CONF/ACS.WFC.CHIP2.Stars.conf']
+    tarfiles += [f'{BASEURL}/ACS.WFC.CHIP1.Stars.conf', 
+                 f'{BASEURL}/ACS.WFC.CHIP2.Stars.conf']
     
     if get_sky:
-        ftpdir = 'https://s3.amazonaws.com/grizli/CONF'
+        ftpdir = BASEURL
         tarfiles.append('{0}/grism_master_sky_v0.5.tar.gz'.format(ftpdir))
 
     #gURL = 'http://www.stsci.edu/~brammer/Grizli/Files'
-    gURL = 'https://s3.amazonaws.com/grizli/CONF'
+    #gURL = 'https://s3.amazonaws.com/grizli/CONF'
+    gURL = BASEURL
+    
     tarfiles.append('{0}/WFC3IR_extended_PSF.v1.tar.gz'.format(gURL))
 
     if ACS:
@@ -5976,9 +5985,11 @@ class EffectivePSF(object):
                                 'extended_PSF_{0}.fits'.format(filter))
 
             if not os.path.exists(file):
+                BASEURL = 'https://erda.ku.dk/vgrid/Gabriel%20Brammer/CONF/'
                 msg = 'Extended PSF file \'{0}\' not found.'.format(file)
-                msg += '\n                   Get the archive from https://s3.amazonaws.com/grizli/CONF/WFC3IR_extended_PSF.v1.tar.gz'
-                msg += '\n                   and unpack in ${GRIZLI}/CONF/'
+                msg += 'Get the archive from '
+                msg += f' {BASEURL}WFC3IR_extended_PSF.v1.tar.gz'
+                msg += ' and unpack in ${GRIZLI}/CONF/'
                 raise FileNotFoundError(msg)
 
             data = pyfits.open(file)[0].data  # .T
