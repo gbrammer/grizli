@@ -5775,7 +5775,7 @@ def fetch_config_files(ACS=False, get_sky=True, get_stars=True, get_epsf=True):
     tarfiles = ['{0}/WFC3.IR.G102.cal.V4.32.tar.gz'.format(ftpdir),
                 '{0}/WFC3.IR.G141.cal.V4.32.tar.gz'.format(ftpdir)]
 
-    # Test config files
+    # Config files
     # BASEURL = 'https://s3.amazonaws.com/grizli/CONF/'
     BASEURL = 'https://erda.ku.dk/vgrid/Gabriel%20Brammer/CONF/'
     
