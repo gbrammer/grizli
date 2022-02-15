@@ -21,6 +21,8 @@ import astropy.coordinates as coord
 from astropy.table import Table
 
 from . import jwst_utils
+import jwst
+from jwst.pipeline import Detector1Pipeline
 
 from . import utils
 from . import model
@@ -3044,7 +3046,22 @@ def process_direct_grism_visit(direct={},
 
 
     # for jwst images, change header info
+    # band: [photflam, photfnu, pivot_wave]
+    phot_keywords = {'F090W': [1.098934e-20, 2.985416e-31, 0.9025],
+                    'F115W': [6.291060e-21, 2.773018e-31, 1.1495],
+                    'F140M': [9.856255e-21, 6.481079e-31, 1.4040],
+                    'F150W': [4.198384e-21, 3.123540e-31, 1.4935],
+                    'F158M': [7.273483e-21, 6.072128e-31, 1.5820],
+                    'F200W': [2.173398e-21, 2.879494e-31, 1.9930],
+                    'F277W': [1.109150e-21, 2.827052e-31, 2.7643],
+                    'F356W': [6.200034e-22, 2.669862e-31, 3.5930],
+                    'F380M': [2.654520e-21, 1.295626e-30, 3.8252],
+                    'F430M': [2.636528e-21, 1.613895e-30, 4.2838],
+                    'F444W': [4.510426e-22, 2.949531e-31, 4.4277],
+                    'F480M': [1.879639e-21, 1.453752e-30, 4.8152]}
     if isJWST:
+        JWST_PIPELINE = os.path.dirname(jwst.__file__) + '/pipeline/'
+        steps_det1 = Detector1Pipeline.from_config_file(config_file=JWST_PIPELINE + 'calwebb_detector1.cfg')
         for file in direct['files']:
             hdu = pyfits.open(file, mode='update')
             hdu[0].header['INSTRUME'] = 'WFC3'
@@ -3053,6 +3070,18 @@ def process_direct_grism_visit(direct={},
             hdu[1].header['EXPNAME'] = hdu[0].header['EXPOSURE']
             hdu[1].header['MEANDARK'] = -99
             hdu[1].header['IDCSCALE'] = 0.065 ## how can I get this automatically?
+            hdu[0].header['PHOTFLAM'] = phot_keywords[hdu[0].header['FILTER']][0]
+            hdu[0].header['PHOTFNU'] = phot_keywords[hdu[0].header['FILTER']][1]
+            hdu[0].header['PHOTPLAM'] = phot_keywords[hdu[0].header['FILTER']][2] * 10000 # microns to angstroms
+            gain_file = steps_det1.gain_scale.get_reference_file(file, 'gain')
+            gain_im = pyfits.open(gain_file)
+            im = pyfits.open(file)
+            im['SCI'].data *= gain_im['SCI'].data
+            im['SCI'].header['BUNIT'] = 'ELECTRONS/s'
+            im['ERR'].data *= gain_im['SCI'].data
+            im['ERR'].header['BUNIT'] = 'ELECTRONS/s'
+            gain_im.close()
+            im.close()
             if hdu[0].header['FILTER'] == 'F115W':
                 hdu[0].header['PFLTFILE'] = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0193.fits')#'/Users/victoriastrait/Downloads/jwst_niriss_flat_0193.fits'
             if hdu[0].header['FILTER'] == 'F150W':
@@ -3070,6 +3099,17 @@ def process_direct_grism_visit(direct={},
             hdu[1].header['EXPNAME'] = hdu[0].header['EXPOSURE']
             hdu[1].header['MEANDARK'] = -99
             hdu[1].header['IDCSCALE'] = 0.065 ## get this automatically when pixelscale is in image headers
+            hdu[0].header['PHOTFLAM'] = phot_keywords[hdu[0].header['PUPIL']][0]
+            hdu[0].header['PHOTFNU'] = phot_keywords[hdu[0].header['PUPIL']][1]
+            hdu[0].header['PHOTPLAM'] = phot_keywords[hdu[0].header['PUPIL']][2] * 10000 # microns to angstroms
+            gain_file = steps_det1.gain_scale.get_reference_file(file, 'gain')
+            gain_im = pyfits.open(gain_file)
+            im = pyfits.open(file)
+            im['SCI'].data *= gain_im['SCI'].data
+            im['SCI'].header['BUNIT'] = 'ELECTRONS/s'
+            im['ERR'].data *= gain_im['SCI'].data
+            im['ERR'].header['BUNIT'] = 'ELECTRONS/s'
+            gain_im.close()
             if (hdu[0].header['FILTER'] == 'GR150C') & (hdu[0].header['PUPIL'] == 'F115W'):        
                 hdu[0].header['PFLTFILE'] = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0202.fits')#'/Users/victoriastrait/Downloads/jwst_niriss_flat_0202.fits'
             if (hdu[0].header['FILTER'] == 'GR150C') & (hdu[0].header['PUPIL'] == 'F150W'):        
@@ -3118,17 +3158,17 @@ def process_direct_grism_visit(direct={},
                             use_self_catalog=use_self_catalog)
 
             if ref_catalog == 'VISIT':
-                align_mag_limits = [-30,-28,0.05] # change me
-                #align_mag_limits = [16, 23, 0.05]
+                #align_mag_limits = [-30,-28,0.05] # change me
+                align_mag_limits = [16, 23, 0.05]
             elif ref_catalog == 'SDSS':
-                align_mag_limits = [-30,-28,0.05]# change me
-                #align_mag_limits = [16, 21, 0.05]
+                #align_mag_limits = [-30,-28,0.05]# change me
+                align_mag_limits = [16, 21, 0.05]
             elif ref_catalog == 'PS1':
-                align_mag_limits = [-30,-28,0.05]# change me
-                #align_mag_limits = [16, 23, 0.05]
+                #align_mag_limits = [-30,-28,0.05]# change me
+                align_mag_limits = [16, 23, 0.05]
             elif ref_catalog == 'WISE':
-                align_mag_limits = [-30,-28,0.05]# change me
-                #align_mag_limits = [15, 20, 0.05]
+                #align_mag_limits = [-30,-28,0.05]# change me
+                align_mag_limits = [15, 20, 0.05]
         else:
             ref_catalog = 'USER'
 

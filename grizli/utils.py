@@ -1357,14 +1357,16 @@ def calc_header_zeropoint(im, ext=0):
         fi = None
 
     # Get AB zeropoint
-    if 'PHOTFNU' in header:
-        ZP = -2.5*np.log10(header['PHOTFNU'])+8.90
-        ZP += 2.5*np.log10(scale_exptime)
-    elif 'PHOTFLAM' in header:
+    if 'PHOTFLAM' in header:
         ZP = (-2.5*np.log10(header['PHOTFLAM']) - 21.10 -
               5*np.log10(header['PHOTPLAM']) + 18.6921)
 
         ZP += 2.5*np.log10(scale_exptime)
+        print(np.log10(header['PHOTFLAM']), np.log10(header['PHOTPLAM']), scale_exptime)
+    elif 'PHOTFNU' in header:
+        ZP = -2.5*np.log10(header['PHOTFNU'])+8.90
+        ZP += 2.5*np.log10(scale_exptime)
+    
     elif (fi is not None):
         if fi in model.photflam_list:
             ZP = (-2.5*np.log10(model.photflam_list[fi]) - 21.10 -
