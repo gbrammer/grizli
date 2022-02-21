@@ -474,6 +474,12 @@ def go(root='j010311+131615',
 
     if kill == 'preprocess':
         print('kill=\'preprocess\'')
+        
+        print(f'Update exposure footprints in {root}_visits.npy')
+        get_visit_exposure_footprints(visit_file=f'{root}_visits.npy',
+                                      check_paths=['./', PATHS['raw'], 
+                                      '../RAW'])
+        
         return True
 
     if redo_persistence_mask:
