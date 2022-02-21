@@ -96,7 +96,7 @@ visit_prep_args: &prep_args
     iter_atol: 0.0001
     imaging_bkg_params: {bh: 256, bw: 256, fh: 3, fw: 3, pixel_scale: 0.10, get_median: False}
     fix_stars: True
-    reference_catalogs: [PS1, DES, DSC, SDSS, GAIA, WISE]
+    reference_catalogs: [LS_DR9, PS1, DES, DSC, SDSS, GAIA, WISE]
     outlier_threshold: 4
     # use_self_catalog: *is_parallel_field
 
