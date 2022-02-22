@@ -476,6 +476,18 @@ def reset_old():
         update_assoc_status(assoc, status=0, verbose=True)
 
 
+def show_recent_assoc(limit=50):
+    import astropy.time
+    from grizli.aws import db
+    engine = db.get_db_engine()
+    
+    last = db.from_sql(f'SELECT assoc_name, status, modtime FROM assoc_table ORDER BY modtime DESC LIMIT {limit}', engine)
+    
+    time = astropy.time.Time(last['modtime'], format='mjd')
+    last['iso'] = time.iso
+    return last
+
+
 def update_visit_results():
     """
     Idea: make a table which is all of the (bright) sources detected 
@@ -781,7 +793,7 @@ def set_private_iref(assoc):
     utils.fetch_default_calibs()
     
     
-def make_mosaic(jname='', ds9=None, skip_existing=True, ir_scale=0.1, half_optical=False, pad=16, kernel='point', pixfrac=0.33):
+def make_mosaic(jname='', ds9=None, skip_existing=True, ir_scale=0.1, half_optical=False, pad=16, kernel='point', pixfrac=0.33, sync=True):
     """
     Make mosaics from all exposures in a group of associations
     """
@@ -793,7 +805,12 @@ def make_mosaic(jname='', ds9=None, skip_existing=True, ir_scale=0.1, half_optic
     import astropy.wcs as pywcs
     from grizli import utils
     import numpy as np
-        
+    
+    if jname:
+        dirs = glob.glob(f'{jname}*/Prep')
+        if len(dirs) == 0:
+            os.system(f'aws s3 sync s3://grizli-v2/HST/Pipeline/ ./ --exclude "*" --include "{jname}*/Prep/*"')
+            
     all_visits = []
     products = []
     visit_files = glob.glob(f'{jname}*/Prep/*visits.npy')
@@ -959,13 +976,16 @@ def make_mosaic(jname='', ds9=None, skip_existing=True, ir_scale=0.1, half_optic
                       overwrite=True)
     
     if ds9 is not None:
-        auto_script.field_rgb(base, HOME_PATH=None, xsize=12, output_dpi=150, 
+        auto_script.field_rgb(base, HOME_PATH=None, xsize=12, output_dpi=300, 
               ds9=ds9, scl=2, suffix='.rgb', timestamp=True, mw_ebv=0)
     
-    auto_script.field_rgb(base, HOME_PATH=None, xsize=12, output_dpi=150, 
+    auto_script.field_rgb(base, HOME_PATH=None, xsize=12, output_dpi=72, 
           ds9=None, scl=1, suffix='.rgb', timestamp=True, mw_ebv=0, 
           show_ir=False)
     
+    if (jname) & (sync):
+        os.system(f'aws s3 sync ./ s3://grizli-v2/HST/Pipeline/Mosaic/ --exclude "*" --include "{jname}-f*fits" --include "{jname}*jpg"')
+        
     x = """
     aws s3 sync ./ s3://grizli-v2/HST/Pipeline/ --exclude "*" --include "*/Prep/*_fl*fits" --include "*yml" --include "*/Prep/*s.log" --include "*log.txt" --include "*/Prep/*npy" --include "local*reg" --include "*fail*"
     
@@ -1001,8 +1021,7 @@ def run_all():
             print(f'========= {time.ctime()} ==========')
             
             process_visit(assoc, clean=True)
-    
-    
+
 
 def run_one(clean=2, sync=True):
     """
