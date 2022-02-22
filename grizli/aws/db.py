@@ -63,8 +63,8 @@ def get_db_engine(config=None, echo=False):
     import psycopg2
     import boto3
     
-    # With IAM auth
-    iam_file = os.path.join(os.getenv('HOME'), 'db.iam.yaml')
+    # With IAM auth on EC2
+    iam_file = '/home/ec2-user/db.iam.yaml'
     
     if os.path.exists(iam_file):
         config = get_connection_info(config_file=iam_file)
