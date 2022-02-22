@@ -58,6 +58,8 @@ def get_db_engine(config=None, echo=False):
     Generate an SQLAlchemy engine for the grizli database
     """
     from sqlalchemy import create_engine
+    import sqlalchemy.pool as pool
+    
     import psycopg2
     import boto3
     
@@ -74,12 +76,24 @@ def get_db_engine(config=None, echo=False):
                                               DBUsername=config['username'], 
                                               Region=config['region'])
         
-        engine = psycopg2.connect(host=config['hostname'],
-                                port=config['port'], 
-                                database=config['database'],
-                                user=config['username'],
-                                password=token,
-                                sslrootcert="SSLCERTIFICATE")
+        # conn = psycopg2.connect(host=config['hostname'],
+        #                         port=config['port'], 
+        #                         database=config['database'],
+        #                         user=config['username'],
+        #                         password=token,
+        #                         sslrootcert="SSLCERTIFICATE")
+        # 
+        # engine = create_engine('postgresql+psycopg2://', creator=POOL.getconn)
+        
+        connect_args = dict(host=config['hostname'],
+                            port=config['port'], 
+                            database=config['database'],
+                            user=config['username'],
+                            password=token,
+                            sslrootcert="SSLCERTIFICATE")
+                                
+        engine = create_engine('postgresql+psycopg2://', 
+                               connect_args=connect_args)
         
         return engine
         
