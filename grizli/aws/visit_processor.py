@@ -85,10 +85,7 @@ def setup_log_table():
 def all_visit_exp_info(all_visits):
     
     from grizli.aws import db
-    
-    db_yml = os.path.join(os.getenv('HOME'), 'db.local.yml')
-    config = db.get_connection_info(config_file=db_yml)
-    engine = db.get_db_engine(config=config)
+    engine = db.get_db_engine()
         
     for i, v in enumerate(all_visits):
         assoc = v['files'][0].split('/')[0]
@@ -103,9 +100,7 @@ def exposure_info_from_visit(visit, assoc='', engine=None):
     from grizli.aws import db
     
     if engine is None:
-        db_yml = os.path.join(os.getenv('HOME'), 'db.local.yml')
-        config = db.get_connection_info(config_file=db_yml)
-        engine = db.get_db_engine(config=config)
+        engine = db.get_db_engine()
             
     for file in visit['files']:
         s3_put_exposure(file, visit['product'], assoc, remove_old=True, 
@@ -124,9 +119,7 @@ def s3_put_exposure(flt_file, product, assoc, remove_old=True, verbose=True, eng
     import astropy.wcs as pywcs
     
     if engine is None:
-        db_yml = os.path.join(os.getenv('HOME'), 'db.local.yml')
-        config = db.get_connection_info(config_file=db_yml)
-        engine = db.get_db_engine(config=config)
+        engine = db.get_db_engine()
         
     hdul = pyfits.open(flt_file)
     modtime = astropy.time.Time(os.path.getmtime(flt_file), format='unix').mjd
@@ -291,9 +284,7 @@ def add_shifts_log(files=None, remove_old=True, verbose=True):
     import astropy.time
     
     from grizli.aws import db
-    db_yml = os.path.join(os.getenv('HOME'), 'db.local.yml')
-    config = db.get_connection_info(config_file=db_yml)
-    engine = db.get_db_engine(config=config)
+    engine = db.get_db_engine()
     
     if files is None:
         files = glob.glob('*shifts.log')
@@ -343,9 +334,7 @@ def add_wcs_log(files=None, remove_old=True, verbose=True):
     import astropy.time
     
     from grizli.aws import db
-    db_yml = os.path.join(os.getenv('HOME'), 'db.local.yml')
-    config = db.get_connection_info(config_file=db_yml)
-    engine = db.get_db_engine(config=config)
+    engine = db.get_db_engine()
     
     if files is None:
         files = glob.glob('*wcs.log')
@@ -397,9 +386,7 @@ def get_random_visit(extra=''):
     Find a visit that needs processing
     """
     from grizli.aws import db
-    db_yml = os.path.join(os.getenv('HOME'), 'db.local.yml')
-    config = db.get_connection_info(config_file=db_yml)
-    engine = db.get_db_engine(config=config)
+    engine = db.get_db_engine()
         
     all_assocs = db.from_sql('SELECT DISTINCT(assoc_name) FROM assoc_table' 
                              ' WHERE status=0 ' + extra, engine)
@@ -414,10 +401,7 @@ def get_random_visit(extra=''):
 def update_assoc_status(assoc, status=1, verbose=True):
     import astropy.time
     from grizli.aws import db
-    
-    db_yml = os.path.join(os.getenv('HOME'), 'db.local.yml')
-    config = db.get_connection_info(config_file=db_yml)
-    engine = db.get_db_engine(config=config)
+    engine = db.get_db_engine()
         
     NOW = astropy.time.Time.now().mjd
     
@@ -439,10 +423,7 @@ def clear_failed():
     import os
     
     from grizli.aws import db
-    db_yml = os.path.join(os.getenv('HOME'), 'db.local.yml')
-    config = db.get_connection_info(config_file=db_yml)
-    engine = db.get_db_engine(config=config)
-    
+    engine = db.get_db_engine()
     
     files = glob.glob('*/Prep/*fail*')
     
@@ -459,11 +440,9 @@ def reset_failed_assoc(failed_status='status != 2', reset=True, remove_files=Tru
     """
     import astropy.time
     import numpy as np
-    from grizli.aws import db
     
-    db_yml = os.path.join(os.getenv('HOME'), 'db.local.yml')
-    config = db.get_connection_info(config_file=db_yml)
-    engine = db.get_db_engine(config=config)
+    from grizli.aws import db
+    engine = db.get_db_engine()
     
     failed_assoc = db.from_sql('select * from assoc_table '
                                f'where {failed_status}', engine)
@@ -480,9 +459,7 @@ def reset_failed_assoc(failed_status='status != 2', reset=True, remove_files=Tru
 def reset_old():
     import astropy.time
     from grizli.aws import db
-    db_yml = os.path.join(os.getenv('HOME'), 'db.local.yml')
-    config = db.get_connection_info(config_file=db_yml)
-    engine = db.get_db_engine(config=config)
+    engine = db.get_db_engine()
         
     now = astropy.time.Time.now().mjd
     
@@ -686,13 +663,11 @@ def process_visit(assoc, clean=True, sync=True):
     import os
     import glob
     
-    from grizli.aws import db
     from grizli.pipeline import auto_script
     from grizli import utils, prep
-    
-    db_yml = os.path.join(os.getenv('HOME'), 'db.local.yml')
-    config = db.get_connection_info(config_file=db_yml)
-    engine = db.get_db_engine(config=config)
+
+    from grizli.aws import db
+    engine = db.get_db_engine()
      
     os.chdir('/GrizliImaging/')
     
@@ -704,11 +679,7 @@ def process_visit(assoc, clean=True, sync=True):
     set_private_iref(assoc)
 
     update_assoc_status(assoc, status=1)
-    
-    db_yml = os.path.join(os.getenv('HOME'), 'db.local.yml')
-    config = db.get_connection_info(config_file=db_yml)
-    engine = db.get_db_engine(config=config)
-    
+        
     tab = db.from_sql("SELECT * FROM assoc_table WHERE "
                       f"assoc_name='{assoc}'", engine)
     
@@ -1007,12 +978,10 @@ def run_all():
     Process all assoc with status=0
     """
     import os
-    from grizli.aws import db
     import time
+    from grizli.aws import db
     
-    db_yml = os.path.join(os.getenv('HOME'), 'db.local.yml')
-    config = db.get_connection_info(config_file=db_yml)
-    engine = db.get_db_engine(config=config)
+    engine = db.get_db_engine()
     
     nassoc = db.from_sql('select count(distinct(assoc_name)) '
                          ' from assoc_table', 
