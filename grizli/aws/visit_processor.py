@@ -1001,7 +1001,8 @@ def run_all():
             print(f'========= {time.ctime()} ==========')
             
             process_visit(assoc, clean=True)
-
+    
+    
 
 def run_one(clean=2, sync=True):
     """
@@ -1018,7 +1019,8 @@ def run_one(clean=2, sync=True):
     
     assoc = get_random_visit()
     if assoc is None:
-        raise ValueError
+        with open('/GrizliImaging/finished.txt','w') as fp:
+            fp.write(time.ctime() + '\n')
     else:
         print(f'============  Run association  ==============')
         print(f'{assoc}')
