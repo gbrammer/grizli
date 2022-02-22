@@ -972,7 +972,7 @@ def get_skymapper_catalog(ra=0., dec=0., radius=3., corners=None, max_records=50
     return tab
 
 
-def get_legacysurveys_catalog(ra=0., dec=0., radius=3., verbose=True, db='ls_dr9.tractor', sn_lim=('r',7), **kwargs):
+def get_legacysurveys_catalog(ra=0., dec=0., radius=3., verbose=True, db='ls_dr9.tractor', sn_lim=('r',10), **kwargs):
     """
     Query LegacySurveys TAP catalog
     """
