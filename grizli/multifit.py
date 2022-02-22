@@ -95,8 +95,8 @@ def _loadFLT(grism_file, sci_extn, direct_file, pad, ref_file,
     if flt.grism.instrument in ['NIRCAM']:
         flt.apply_POM()
         
-    #if flt.grism.instrument in ['NIRISS', 'NIRCAM']:
-     #   flt.transform_NIRISS()
+    if flt.grism.instrument in ['NIRISS', 'NIRCAM']:
+        flt.transform_NIRISS()
 
     return flt  # , out_cat
 
