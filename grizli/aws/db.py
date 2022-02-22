@@ -28,7 +28,7 @@ def get_connection_info(config_file=None):
     Read the database connection info
     """
     import yaml
-
+            
     if config_file is None:
         config_file = os.path.join(os.path.dirname(__file__),
                                    '../data/db.yml')
@@ -37,7 +37,7 @@ def get_connection_info(config_file=None):
             local_file = os.path.join(os.getenv('HOME'), 'db.local.yml')
 
             if os.path.exists(local_file):
-                print('Use ~/db.local.yml')
+                # print('Use ~/db.local.yml')
                 config_file = local_file
         except:
             pass
@@ -58,10 +58,39 @@ def get_db_engine(config=None, echo=False):
     Generate an SQLAlchemy engine for the grizli database
     """
     from sqlalchemy import create_engine
+    import psycopg2
+    import boto3
+    
+    # With IAM auth
+    iam_file = os.path.join(os.getenv('HOME'), 'db.iam.yaml')
+    
+    if os.path.exists(iam_file):
+        config = get_connection_info(config_file=iam_file)
+        session = boto3.Session()
+        client = session.client('rds', region_name=config['region'])
+        
+        token = client.generate_db_auth_token(DBHostname=config['hostname'],
+                                              Port=config['port'], 
+                                              DBUsername=config['username'], 
+                                              Region=config['region'])
+        
+        engine = psycopg2.connect(host=config['hostname'],
+                                port=config['port'], 
+                                database=config['database'],
+                                user=config['username'],
+                                password=token,
+                                sslrootcert="SSLCERTIFICATE")
+        
+        return engine
+        
     if config is None:
         config = get_connection_info()
-
-    db_string = "postgresql://{0}:{1}@{2}:{3}/{4}".format(config['username'], config['password'], config['hostname'], config['port'], config['database'])
+    
+    db_string = "postgresql://{0}:{1}@{2}:{3}/{4}"
+    db_string = db_string.format(config['username'], config['password'], 
+                                 config['hostname'], config['port'], 
+                                 config['database'])
+                                 
     engine = create_engine(db_string, echo=echo)
     return engine
 
