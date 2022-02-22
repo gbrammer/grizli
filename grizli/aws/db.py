@@ -192,6 +192,21 @@ def update_redshift_fit_status(root, id, status=0, table='redshift_fit', engine=
             msg = 'Update status for {0} {1}: {2} -> {3} on `{4}` ({5})'
             print(msg.format(root, id, old_status, status, table, NOW))
 
+        if hasattr(engine, 'cursor'):
+            with engine.cursor() as cur:
+                cur.execute(sqlstr)
+        else:
+            engine.execute(sqlstr)
+
+
+def execute_helper(sqlstr, engine):
+    """
+    Different behaviour for psycopg2.connection and sqlalchemy.engine
+    """
+    if hasattr(engine, 'cursor'):
+        with engine.cursor() as cur:
+            cur.execute(sqlstr)
+    else:
         engine.execute(sqlstr)
 
 

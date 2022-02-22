@@ -207,9 +207,8 @@ def s3_put_exposure(flt_file, product, assoc, remove_old=True, verbose=True, eng
         rows.append(row)
     
     if remove_old:
-        engine.execute('DELETE FROM exposure_files WHERE '
-                       f"file='{file}'",
-                       "AND extension='{extension}'",
+        db.execute_helper('DELETE FROM exposure_files WHERE '
+                       f"file='{file}' AND extension='{extension}'",
                        engine)
     
     #df = pd.DataFrame(data=rows, columns=names)
@@ -221,13 +220,13 @@ def s3_put_exposure(flt_file, product, assoc, remove_old=True, verbose=True, eng
     # Set footprint
     # ('(' || latitude || ', ' || longitude || ')')::point
     
-    engine.execute('UPDATE exposure_files '
+    db.execute_helper('UPDATE exposure_files '
                "SET footprint= ("
                "'((' || ra1 || ', ' || dec1 || '),"
                "(' || ra2 || ', ' || dec2 || '),"
                "(' || ra3 || ', ' || dec3 || '),"
                "(' || ra4 || ', ' || dec4 || '))')::path"
-               f" WHERE file='{file}' AND extension='{extension}'")
+               f" WHERE file='{file}' AND extension='{extension}'", engine)
     
     if verbose:
         print(f'Add {file}_{extension} ({len(rows)}) to exposure_files table')
@@ -310,7 +309,7 @@ def add_shifts_log(files=None, remove_old=True, verbose=True):
             dataset = '_'.join(spl[0].split('_')[:-1])
             
             if remove_old:
-                engine.execute('DELETE FROM shifts_log WHERE '
+                db.execute_helper('DELETE FROM shifts_log WHERE '
                                f"shift_dataset='{dataset}'", engine)
             
             row = [dataset, float(spl[1]), float(spl[2]), int(spl[5]), 
@@ -354,8 +353,8 @@ def add_wcs_log(files=None, remove_old=True, verbose=True):
         
         parent = os.path.basename(file).split('_wcs.log')[0]
         if remove_old:
-            engine.execute('DELETE FROM wcs_log WHERE '
-                           f"wcs_parent='{parent}'", engine)
+            db.execute_helper('DELETE FROM wcs_log WHERE '
+                              f"wcs_parent='{parent}'", engine)
         rows = []
         
         for line in lines:
@@ -416,7 +415,8 @@ def update_assoc_status(assoc, status=1, verbose=True):
         msg = 'Update status = {1} for assoc={0} on `{2}` ({3})'
         print(msg.format(assoc, status, table, NOW))
 
-    engine.execute(sqlstr)
+    db.execute_helper(sqlstr, engine)
+
 
 def clear_failed():
     import glob
