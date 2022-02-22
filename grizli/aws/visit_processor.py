@@ -751,10 +751,13 @@ def process_visit(assoc, clean=True, sync=True):
     os.chdir('/GrizliImaging/')
     
     if sync:
-        cmd = f"""aws s3 sync ./ s3://grizli-v2/HST/Pipeline/ --exclude "*" --include "{assoc}/Prep/*_fl*fits" --include "{assoc}*yml" --include "{assoc}/Prep/*s.log" --include "{assoc}*log.txt" --include "{assoc}/Prep/*npy" --include "{assoc}*fail*" """
+        cmd = f"""aws s3 sync ./ s3://grizli-v2/HST/Pipeline/ --exclude "*" --include "{assoc}/Prep/*_fl*fits" --include "{assoc}*yml" --include "{assoc}/Prep/*s.log" --include "{assoc}*log.txt" --include "{assoc}/Prep/*npy" --include "{assoc}*fail*" --include "{assoc}/RAW/*[nx][tg]" """
         os.system(cmd)
 
-
+    if (clean & 2) > 0:
+        print(f'rm -rf {assoc}*')
+        os.system(f'rm -rf {assoc}*')
+        
 def set_private_iref(assoc):
     """
     Set reference file directories within a particular association to 
@@ -1000,5 +1003,29 @@ def run_all():
             process_visit(assoc, clean=True)
 
 
+def run_one(clean=2, sync=True):
+    """
+    Run a single random visit
+    """
+    import os
+    import time
+    from grizli.aws import db
+    
+    engine = db.get_db_engine()
+    nassoc = db.from_sql('select count(distinct(assoc_name)) '
+                         ' from assoc_table', 
+                         engine)['count'][0]
+    
+    assoc = get_random_visit()
+    if assoc is None:
+        raise ValueError
+    else:
+        print(f'============  Run association  ==============')
+        print(f'{j}: {assoc}')
+        print(f'========= {time.ctime()} ==========')
+        
+        process_visit(assoc, clean=clean, sync=sync)
+    
+    
 if __name__ == '__main__':
     run_all()
