@@ -738,6 +738,7 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
     output_list = []  # OrderedDict()
     filter_list = OrderedDict()
 
+    
 
     for filter in info['filter']:
         filter_list[filter] = OrderedDict()
@@ -747,7 +748,6 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
             angles = np.unique(pa_v3[(info['filter'] == filter)])
             for angle in angles:
                 filter_list[filter][pupil][angle] = []
-
 
     for target in targets:
         ## 3D-HST targname translations
@@ -780,7 +780,6 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
 
                     visit_match = np.unique(visits[(target_list == target) &
                                                   (info['filter'] == filter) & (info['pupil'] == pupil)])
-
                     this_progs = []
                     this_visits = []
 

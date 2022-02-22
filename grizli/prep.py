@@ -1,6 +1,7 @@
 """
 Align direct images & make mosaics
 """
+from codecs import ignore_errors
 import os
 import inspect
 
@@ -354,7 +355,7 @@ def apply_persistence_mask(flt_file, path='../Persistence', dq_value=1024,
     flt = pyfits.open(flt_file, mode='update')
 
     pers_file = os.path.join(path,
-             os.path.basename(flt_file).replace('_flt.fits', '_persist.fits'))
+             os.path.basename(flt_file).replace('_flt.fits', '_persist.fits').replace('_rate.fits', '_persist.fits'))
 
     if not os.path.exists(pers_file):
 
@@ -434,7 +435,7 @@ def apply_region_mask(flt_file, dq_value=1024, verbose=True):
     """
     import pyregion
 
-    mask_files = glob.glob(flt_file.replace('_flt.fits', '.*.mask.reg').replace('_flc.fits', '.*.mask.reg').replace('_c0m.fits', '.*.mask.reg').replace('_c0f.fits', '.*.mask.reg'))
+    mask_files = glob.glob(flt_file.replace('_flt.fits', '.*.mask.reg').replace('_flc.fits', '.*.mask.reg').replace('_c0m.fits', '.*.mask.reg').replace('_c0f.fits', '.*.mask.reg').replace('_rate.fits','.*.mask.reg'))
     if len(mask_files) == 0:
         return True
 
@@ -3070,9 +3071,9 @@ def process_direct_grism_visit(direct={},
             hdu[1].header['EXPNAME'] = hdu[0].header['EXPOSURE']
             hdu[1].header['MEANDARK'] = -99
             hdu[1].header['IDCSCALE'] = 0.065 ## how can I get this automatically?
-            hdu[0].header['PHOTFLAM'] = phot_keywords[hdu[0].header['FILTER']][0]
-            hdu[0].header['PHOTFNU'] = phot_keywords[hdu[0].header['FILTER']][1]
-            hdu[0].header['PHOTPLAM'] = phot_keywords[hdu[0].header['FILTER']][2] * 10000 # microns to angstroms
+            hdu[0].header['PHOTFLAM'] = phot_keywords[hdu[0].header['PUPIL']][0]
+            hdu[0].header['PHOTFNU'] = phot_keywords[hdu[0].header['PUPIL']][1]
+            hdu[0].header['PHOTPLAM'] = phot_keywords[hdu[0].header['PUPIL']][2] * 10000 # microns to angstroms
             gain_file = steps_det1.gain_scale.get_reference_file(file, 'gain')
             gain_im = pyfits.open(gain_file)
             im = pyfits.open(file)
@@ -3082,11 +3083,11 @@ def process_direct_grism_visit(direct={},
             im['ERR'].header['BUNIT'] = 'ELECTRONS/s'
             gain_im.close()
             im.close()
-            if hdu[0].header['FILTER'] == 'F115W':
+            if hdu[0].header['PUPIL'] == 'F115W':
                 hdu[0].header['PFLTFILE'] = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0193.fits')#'/Users/victoriastrait/Downloads/jwst_niriss_flat_0193.fits'
-            if hdu[0].header['FILTER'] == 'F150W':
+            if hdu[0].header['PUPIL'] == 'F150W':
                 hdu[0].header['PFLTFILE'] = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0007.fits')#'/Users/victoriastrait/Downloads/jwst_niriss_flat_0007.fits'
-            if hdu[0].header['FILTER'] == 'F200W':
+            if hdu[0].header['PUPIL'] == 'F200W':
                 hdu[0].header['PFLTFILE'] = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0189.fits')#'/Users/victoriastrait/Downloads/jwst_niriss_flat_0189.fits'
             
             hdu.flush()
@@ -4670,7 +4671,7 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
                         label=grism['files'][j].split('_fl')[0])
 
         # result
-        fp = open(file.replace('_flt.fits', '_column.dat'), 'wb')
+        fp = open(file.replace('_flt.fits', '_column.dat').replace('_rate.fits', '_column.dat'), 'wb')
         fp.write(b'# column obs_resid ok resid uncertainty\n')
         np.savetxt(fp, np.array([xmsk, yres, yok*1, y_pred-bg_sky, gp_sigma]).T, fmt='%.5f')
         fp.close()
@@ -4678,6 +4679,7 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
         if apply:
             # Subtract the column average in 2D & log header keywords
             gp_res = np.dot(y_pred[:, None]-bg_sky, np.ones((2048, 1)).T).T # changed from 1014
+            print(file)
             flt = pyfits.open(file, mode='update')
             flt['SCI', 1].data -= gp_res
             flt[0].header['GSKYCOL'] = (True, 'Subtract column average')

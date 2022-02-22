@@ -3,6 +3,7 @@ Automatic processing scripts for grizli
 """
 import os
 import inspect
+from this import d
 import traceback
 import glob
 import time
@@ -1109,7 +1110,7 @@ def remove_bad_expflag(field_root='', HOME_PATH='./', min_bad=2):
             os.system('mv {0}* Expflag/'.format(visit))
 
 
-def parse_visits(field_root='', RAW_PATH='../RAW', use_visit=True, combine_same_pa=True, combine_minexp=2, is_dash=False, filters=VALID_FILTERS, max_dt=1e9, visit_split_shift=1.5):
+def parse_visits(field_root='', RAW_PATH='../RAW', use_visit=True, combine_same_pa=True, combine_minexp=2, is_dash=False, isJWST=False, filters=VALID_FILTERS, max_dt=1e9, visit_split_shift=1.5):
     """
     Organize exposures into "visits" by filter / position / PA / epoch
     
@@ -1160,16 +1161,22 @@ def parse_visits(field_root='', RAW_PATH='../RAW', use_visit=True, combine_same_
     from shapely.geometry import Polygon
     from scipy.spatial import ConvexHull
 
-    files = glob.glob(os.path.join(RAW_PATH, '*fl[tc].fits'))
-    files += glob.glob(os.path.join(RAW_PATH, '*c0m.fits'))
-    files += glob.glob(os.path.join(RAW_PATH, '*c0f.fits'))
+
+    if isJWST:
+        files = glob.glob(os.path.join(RAW_PATH, '*rate.fits'))
+    else:
+        files = glob.glob(os.path.join(RAW_PATH, '*fl[tc].fits'))
+        files += glob.glob(os.path.join(RAW_PATH, '*c0m.fits'))
+        files += glob.glob(os.path.join(RAW_PATH, '*c0f.fits'))
 
     files.sort()
 
     info = utils.get_flt_info(files)
-
+    # if niriss, need to set the filter equal to the pupil
+    for idx, instrument in enumerate(info['INSTRUME']):
+        if (instrument == 'NIRISS') & (info['FILTER'][idx]=='CLEAR'):
+            info['FILTER'][idx] = info['PUPIL'][idx]
     #info = info[(info['FILTER'] != 'G141') & (info['FILTER'] != 'G102')]
-
     # Only F814W on ACS
     if ONLY_F814W:
         info = info[((info['INSTRUME'] == 'WFC3') & (info['DETECTOR'] == 'IR')) | (info['FILTER'] == 'F814W')]
@@ -1218,7 +1225,7 @@ def parse_visits(field_root='', RAW_PATH='../RAW', use_visit=True, combine_same_
                                   uniquename=True, get_footprint=True, 
                                   use_visit=use_visit, max_dt=max_dt, 
                                   visit_split_shift=visit_split_shift)
-
+    print(visits, filters)
 
     # Don't run combine_minexp if have grism exposures
     grisms = ['G141', 'G102', 'G800L', 'G280', 'GR150C', 'GR150R']
