@@ -1026,6 +1026,9 @@ def run_one(clean=2, sync=True):
         print(f'{assoc}')
         print(f'========= {time.ctime()} ==========')
         
+        with open('/GrizliImaging/visit_history.txt','a') as fp:
+            fp.write(f'{time.ctime()} {assoc}\n')
+        
         process_visit(assoc, clean=clean, sync=sync)
     
     
