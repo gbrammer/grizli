@@ -983,7 +983,7 @@ def make_mosaic(jname='', ds9=None, skip_existing=True, ir_scale=0.1, half_optic
           ds9=None, scl=1, suffix='.rgb', timestamp=True, mw_ebv=0, 
           show_ir=False)
     
-    if (jname) & (sync):
+    if (len(jname) > 0) & (sync):
         os.system(f'aws s3 sync ./ s3://grizli-v2/HST/Pipeline/Mosaic/ --exclude "*" --include "{jname}-f*fits" --include "{jname}*jpg"')
         
     x = """
