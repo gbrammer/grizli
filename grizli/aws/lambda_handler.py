@@ -95,12 +95,16 @@ def extract_beams_from_flt(root, bucket, id, clean=True, silent=False):
     bkt = s3.Bucket(bucket)
 
     # WCS files for ACS
-    files = [obj.key for obj in bkt.objects.filter(Prefix='Pipeline/{0}/Extractions/j'.format(root))]
-    files += [obj.key for obj in bkt.objects.filter(Prefix='Pipeline/{0}/Extractions/i'.format(root))]
+    files = [obj.key for obj in 
+             bkt.objects.filter(Prefix=f'Pipeline/{root}/Extractions/j')]
+    files += [obj.key for obj in 
+              bkt.objects.filter(Prefix=f'Pipeline/{root}/Extractions/i')]
 
-    files += [obj.key for obj in bkt.objects.filter(Prefix='Pipeline/{0}/Extractions/{0}-ir.cat.fits'.format(root))]
+    prefix = f'Pipeline/{root}/Extractions/{root}-ir.cat.fits'
+    files += [obj.key for obj in bkt.objects.filter(Prefix=prefix)]
 
-    files += [obj.key for obj in bkt.objects.filter(Prefix='Pipeline/{0}/Extractions/fit_args.npy'.format(root))]
+    prefix = f'Pipeline/{root}/Extractions/fit_args.npy'
+    files += [obj.key for obj in bkt.objects.filter(Prefix=prefix)]
 
     download_files = []
     for file in np.unique(files):
