@@ -499,7 +499,7 @@ def get_assoc_yaml_from_s3(assoc, s_region=None, bucket='grizli-v2', prefix='HST
     from grizli.pipeline import auto_script
     from grizli import utils
     
-    LOGFILE = '/GrizliImaging/{assoc}.auto_script.log.txt'
+    LOGFILE = f'/GrizliImaging/{assoc}.auto_script.log.txt'
     
     s3 = boto3.resource('s3')
     s3_client = boto3.client('s3')
