@@ -1021,7 +1021,7 @@ def run_one(clean=2, sync=True):
         raise ValueError
     else:
         print(f'============  Run association  ==============')
-        print(f'{j}: {assoc}')
+        print(f'{assoc}')
         print(f'========= {time.ctime()} ==========')
         
         process_visit(assoc, clean=clean, sync=sync)
