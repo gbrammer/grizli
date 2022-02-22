@@ -1158,7 +1158,11 @@ def get_hst_filter(header):
         >>> h['FILTER2'] = 'CLEAR2L'
         >>> print(get_hst_filter(h))
         G800L
-
+    
+    For JWST/NIRISS, return ``{PUPIL}-{FILTER}``
+    
+    For JWST/NIRCAM, return ``{FILTER}-{PUPIL}``
+    
     Parameters
     -----------
     header : `~astropy.io.fits.Header`
@@ -1169,10 +1173,13 @@ def get_hst_filter(header):
     filter : str
 
     """
-    if 'FILTER' in header:
-        return header['FILTER'].upper()
-
-    if header['INSTRUME'].strip() == 'ACS':
+    
+    if 'INSTRUME' not in header:
+        instrume = 'N/A'
+    else:
+        instrume = header['INSTRUME']
+        
+    if instrume.strip() == 'ACS':
         for i in [1, 2]:
             filter_i = header['FILTER{0:d}'.format(i)]
             if 'CLEAR' in filter_i:
@@ -1180,10 +1187,17 @@ def get_hst_filter(header):
             else:
                 filter = filter_i
 
-    elif header['INSTRUME'] == 'WFPC2':
+    elif instrume == 'WFPC2':
         filter = header['FILTNAM1']
+    elif instrume == 'NIRISS':
+        filter = '{0}-{1}'.format(header['PUPIL'], header['FILTER'])
+    elif instrume == 'NIRCAM':
+        filter = '{0}-{1}'.format(header['FILTER'], header['PUPIL'])
+    elif 'FILTER' in header:
+        filter = header['FILTER'].upper()
     else:
-        raise KeyError('Filter keyword not found for instrument {0}'.format(header['INSTRUME']))
+        msg = 'Failed to parse FILTER keyword for INSTRUMEnt {0}'
+        raise KeyError(msg.format(instrume))
 
     return filter.upper()
 
@@ -4863,6 +4877,55 @@ def make_maximal_wcs(files, pixel_scale=0.1, get_hdu=True, pad=90, verbose=True,
     out = make_wcsheader(ra=x0[0], dec=x0[1], size=(sx+pad*2, sy+pad*2), pixscale=pixel_scale, get_hdu=get_hdu, theta=theta/np.pi*180)
 
     return out
+
+
+def half_pixel_scale(wcs):
+    """
+    Create a new WCS with half the pixel scale of another that can be 
+    block-averaged 2x2
+    
+    Parameters
+    ----------
+    wcs : `~astropy.wcs.WCS`
+        Input WCS
+    
+    Returns
+    -------
+    half_wcs : `~astropy.wcs.WCS`
+        New WCS with smaller pixels
+    """
+    h = to_header(wcs)
+    
+    for k in ['NAXIS1', 'NAXIS2']: #, 'CRPIX1', 'CRPIX2']:
+        h[k] *= 2
+
+    for k in ['CRPIX1', 'CRPIX2']:
+        h[k] = h[k]*2 - 0.5
+        
+    for k in ['CD1_1', 'CD2_2']:
+        h[k] /= 2
+    
+    if 0:
+        # Test
+        new = pywcs.WCS(h)
+        sh = new.pixel_shape
+        
+        wcorner = wcs.all_world2pix(new.all_pix2world([[-0.5, -0.5], 
+                                             [sh[0]-0.5, sh[1]-0.5]], 0),0)
+        print('small > large')
+        print(', '.join([f'{w:.2f}' for w in wcorner[0]]))
+        print(', '.join([f'{w:.2f}' for w in wcorner[1]]), wcs.pixel_shape)
+        
+        sh = wcs.pixel_shape
+        wcorner = new.all_world2pix(wcs.all_pix2world([[-0.5, -0.5], 
+                                             [sh[0]-0.5, sh[1]-0.5]], 0),0)
+        print('large > small')
+        print(', '.join([f'{w:.2f}' for w in wcorner[0]]))
+        print(', '.join([f'{w:.2f}' for w in wcorner[1]]), new.pixel_shape)
+        
+    new_wcs = pywcs.WCS(h, relax=True)
+    
+    return new_wcs
 
 
 def header_keys_from_filelist(fits_files, keywords=[], ext=0, colname_case=str.lower):
