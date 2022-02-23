@@ -808,9 +808,31 @@ def set_private_iref(assoc):
     os.environ['jref'] = f'{os.getcwd()}/{assoc}/jref/'
     
     utils.fetch_default_calibs()
+
+
+def cutout_mosaic(ra=53.1615666, dec=-27.7910651, size=5*60, filters=['F160W'], ir_scale=0.1, half_optical=True, kernel='point', pixfrac=0.33, **kwargs):
+    """
+    """
+    from grizli import utils
+    from grizli.aws import db
+    engine = db.get_db_engine()
     
+    out_h, out_wcs = utils.make_wcsheader(ra=ra, dec=dec, size=size, 
+                                          pixscale=ir_scale, get_hdu=False)
     
-def make_mosaic(jname='', ds9=None, skip_existing=True, ir_scale=0.1, half_optical=False, pad=16, kernel='point', pixfrac=0.33, sync=True):
+    fp = out_wcs.calc_footprint()
+    
+    SQL = """
+    SELECT distinct(dataset), extension, assoc, status
+    FROM exposure_files e, assoc_table a
+    WHERE e.assoc = a.assoc_name
+    AND a.status = 2 AND a.assoc_name LIKE 'j033%%'
+    AND a.filter = 'F160W'
+    """
+    res = db.from_sql(SQL, engine)
+    
+
+def make_mosaic(jname='', ds9=None, skip_existing=True, ir_scale=0.1, half_optical=False, pad=16, kernel='point', pixfrac=0.33, sync=True, ir_wcs=None):
     """
     Make mosaics from all exposures in a group of associations
     """
@@ -952,8 +974,10 @@ def make_mosaic(jname='', ds9=None, skip_existing=True, ir_scale=0.1, half_optic
         del(opt_im)
     
     else:
-        h, ir_wcs = utils.make_maximal_wcs(all_files, pixel_scale=ir_scale, 
-                                     get_hdu=False, pad=pad)
+        if ir_wcs is None:
+            h, ir_wcs = utils.make_maximal_wcs(all_files, 
+                                               pixel_scale=ir_scale, 
+                                               get_hdu=False, pad=pad)
         
         opt_wcs = ir_wcs  
         if half_optical:
@@ -1002,7 +1026,7 @@ def make_mosaic(jname='', ds9=None, skip_existing=True, ir_scale=0.1, half_optic
           show_ir=False)
     
     if (len(jname) > 0) & (sync):
-        os.system('gzip --force {jname}-f*fits')
+        os.system(f'gzip --force {jname}-f*fits')
         
         os.system(f'aws s3 sync ./ s3://grizli-v2/HST/Pipeline/Mosaic/ --exclude "*" --include "{jname}-f*fits.gz" --include "{jname}*jpg"')
         
