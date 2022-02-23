@@ -412,6 +412,7 @@ def get_random_visit(extra=''):
     return random_assoc
 
 
+
 def update_assoc_status(assoc, status=1, verbose=True):
     import astropy.time
     from grizli.aws import db
@@ -501,6 +502,33 @@ def show_recent_assoc(limit=50):
     time = astropy.time.Time(last['modtime'], format='mjd')
     last['iso'] = time.iso
     return last
+
+
+def launch_ec2_instances(nmax=50):
+    """
+    Launch EC2 instances from a launch template that run through all 
+    status=0 associations and then terminate
+    """
+    
+    from grizli.aws import db
+    engine = db.get_db_engine()
+    
+    assoc = db.from_sql('select assoc_name from assoc_table where status = 0', 
+                        engine)
+    
+    count = np.minimum(nmax, len(assoc))
+    
+    templ = 'lt-0e8c2b8611c9029eb,Version=9'
+    
+    if count == 0:
+        print('No associations to run, abort.')
+        return True
+    else:
+        print(f'# Launch {count} instances with LaunchTemplateId={templ}: ')
+        cmd = f'aws ec2 run-instances --count {count}'
+        cmd += f' --launch-template LaunchTemplateId={templ}'
+        print(cmd)
+        os.system(cmd)
 
 
 def update_visit_results():
@@ -679,7 +707,7 @@ def get_master_radec(s_region, bucket='grizli-v2', prefix='HST/Pipeline/Astromet
 
 
 blue_align_params={}
-blue_align_params['align_mag_limits'] = [18,26,0.15]
+blue_align_params['align_mag_limits'] = [20,25,0.12]
 blue_align_params['align_simple'] = False
 blue_align_params['max_err_percentile'] = 80
 blue_align_params['catalog_mask_pad'] = 0.05
@@ -687,7 +715,7 @@ blue_align_params['match_catalog_density'] = False
 blue_align_params['align_ref_border'] = 8
 blue_align_params['align_min_flux_radius'] = 1.7
 blue_align_params['tweak_n_min'] = 5
-    
+
 
 ALL_FILTERS = ['F410M', 'F467M', 'F547M', 'F550M', 'F621M', 'F689M', 'F763M', 'F845M', 'F200LP', 'F350LP', 'F435W', 'F438W', 'F439W', 'F450W', 'F475W', 'F475X', 'F555W', 'F569W', 'F600LP', 'F606W', 'F622W', 'F625W', 'F675W', 'F702W', 'F775W', 'F791W', 'F814W', 'F850LP', 'G800L', 'F098M', 'F127M', 'F139M', 'F153M', 'F105W', 'F110W', 'F125W', 'F140W', 'F160W', 'G102', 'G141']
 
@@ -713,7 +741,7 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, visit_split_shift=1.2,
      
     os.chdir('/GrizliImaging/')
     
-    if os.path.exists(assoc) & clean:
+    if os.path.exists(assoc) & (clean > 0):
         os.system(f'rm -rf {assoc}*')
         
     os.environ['orig_iref'] = os.environ.get('iref')
@@ -1202,7 +1230,7 @@ def run_all():
             print(f'{j}: {assoc}')
             print(f'========= {time.ctime()} ==========')
             
-            process_visit(assoc, clean=True)
+            process_visit(assoc, clean=2)
 
 
 def run_one(clean=2, sync=True):
