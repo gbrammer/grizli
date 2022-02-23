@@ -257,6 +257,7 @@ def setup_astrometry_tables():
     engine.execute('DROP TABLE wcs_log')
 
     SQL = f"""CREATE TABLE IF NOT EXISTS wcs_log (
+        wcs_assoc varchar, 
         wcs_parent varchar,
         wcs_radec varchar,
         wcs_iter int,
@@ -273,6 +274,15 @@ def setup_astrometry_tables():
     engine.execute('CREATE INDEX on wcs_log (wcs_parent)')
     engine.execute('CREATE INDEX on exposure_files (dataset)')
     engine.execute('CREATE INDEX on exposure_files (parent)')
+    
+    # Add assoc to shifts, wcs
+    engine.execute('ALTER TABLE wcs_log ADD COLUMN wcs_assoc VARCHAR')
+    
+    engine.execute("""UPDATE wcs_log
+SET wcs_assoc = exposure_files.assoc
+FROM exposure_files
+WHERE wcs_log.wcs_parent = exposure_files.parent;
+""")
 
 
 def add_shifts_log(files=None, remove_old=True, verbose=True):
@@ -767,6 +777,8 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, visit_split_shift=1.2,
     os.chdir('/GrizliImaging/')
     
     if sync:
+        os.system(f'aws s3 rm --recursive s3://grizli-v2/HST/Pipeline/{assoc}')
+        
         cmd = f"""aws s3 sync ./ s3://grizli-v2/HST/Pipeline/ --exclude "*" --include "{assoc}/Prep/*_fl*fits" --include "{assoc}*yml" --include "{assoc}/Prep/*s.log" --include "{assoc}*log.txt" --include "{assoc}/Prep/*npy" --include "{assoc}*fail*" --include "{assoc}/RAW/*[nx][tg]" """
         os.system(cmd)
 
