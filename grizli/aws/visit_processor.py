@@ -679,7 +679,7 @@ def get_master_radec(s_region, bucket='grizli-v2', prefix='HST/Pipeline/Astromet
 
 
 blue_align_params={}
-blue_align_params['align_mag_limits'] = [17,24,0.1]
+blue_align_params['align_mag_limits'] = [18,26,0.15]
 blue_align_params['align_simple'] = False
 blue_align_params['max_err_percentile'] = 80
 blue_align_params['catalog_mask_pad'] = 0.05
@@ -688,15 +688,18 @@ blue_align_params['align_ref_border'] = 8
 blue_align_params['align_min_flux_radius'] = 1.7
 blue_align_params['tweak_n_min'] = 5
     
+
 ALL_FILTERS = ['F410M', 'F467M', 'F547M', 'F550M', 'F621M', 'F689M', 'F763M', 'F845M', 'F200LP', 'F350LP', 'F435W', 'F438W', 'F439W', 'F450W', 'F475W', 'F475X', 'F555W', 'F569W', 'F600LP', 'F606W', 'F622W', 'F625W', 'F675W', 'F702W', 'F775W', 'F791W', 'F814W', 'F850LP', 'G800L', 'F098M', 'F127M', 'F139M', 'F153M', 'F105W', 'F110W', 'F125W', 'F140W', 'F160W', 'G102', 'G141']
+
 
 def process_visit(assoc, clean=True, sync=True, max_dt=4, visit_split_shift=1.2, blue_align_params=blue_align_params, ref_catalogs=['LS_DR9', 'PS1', 'DES', 'GAIA'], filters=None, **kwargs):
     """
     `assoc_table.status`
     
-    1 = start
-    2 = finished
-    9 = has failed files
+     1 = start
+     2 = finished
+     9 = has failed files
+    10 = no wcs.log files found, so probably nothing was done?
     
     """
     import os
@@ -766,6 +769,8 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, visit_split_shift=1.2,
     
     if len(failed) > 0:
         update_assoc_status(assoc, status=9)
+    elif len(glob.glob('*wcs.log')) == 0:
+        update_assoc_status(assoc, status=10)
     else:
         update_assoc_status(assoc, status=2)
         
@@ -857,8 +862,9 @@ def cutout_mosaic(rootname='gds', ra=53.1615666, dec=-27.7910651, size=5*60, fil
     AND polygon(e.footprint) && polygon(box '(({x1},{y1}),({x2},{y2}))')    
     """
     
-    filter_sql = ' OR '.join([f"a.filter = '{f}'" for f in filters])
-    SQL += f'AND ({filter_sql})'
+    if filters is not None:
+        filter_sql = ' OR '.join([f"a.filter = '{f}'" for f in filters])
+        SQL += f'AND ({filter_sql})'
     
     SQL += ' ORDER BY e.filter'
     res = db.from_sql(SQL, engine)
@@ -952,7 +958,7 @@ def cutout_mosaic(rootname='gds', ra=53.1615666, dec=-27.7910651, size=5*60, fil
 
     if s3output:
         files = []
-        for f in filters:
+        for f in np.unique(res['filter']):
             print(f'gzip --force {rootname}-{f.lower()}*fits')
 
             os.system(f'gzip --force {rootname}-{f.lower()}*fits')
