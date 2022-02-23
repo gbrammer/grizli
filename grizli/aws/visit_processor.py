@@ -683,7 +683,9 @@ blue_align_params['align_ref_border'] = 8
 blue_align_params['align_min_flux_radius'] = 1.7
 blue_align_params['tweak_n_min'] = 5
     
-def process_visit(assoc, clean=True, sync=True, max_dt=4, visit_split_shift=1.2, blue_align_params=blue_align_params, **kwargs):
+ALL_FILTERS = ['F410M', 'F467M', 'F547M', 'F550M', 'F621M', 'F689M', 'F763M', 'F845M', 'F200LP', 'F350LP', 'F435W', 'F438W', 'F439W', 'F450W', 'F475W', 'F475X', 'F555W', 'F569W', 'F600LP', 'F606W', 'F622W', 'F625W', 'F675W', 'F702W', 'F775W', 'F791W', 'F814W', 'F850LP', 'G800L', 'F098M', 'F127M', 'F139M', 'F153M', 'F105W', 'F110W', 'F125W', 'F140W', 'F160W', 'G102', 'G141']
+
+def process_visit(assoc, clean=True, sync=True, max_dt=4, visit_split_shift=1.2, blue_align_params=blue_align_params, ref_catalogs=['LS_DR9', 'PS1', 'DES', 'GAIA'], filters=ALL_FILTERS, **kwargs):
     """
     `assoc_table.status`
     
@@ -735,8 +737,8 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, visit_split_shift=1.2,
                                  prefix='HST/Pipeline/Input', 
                                  s_region=tab['footprint'][0])
             
-    kws['visit_prep_args']['reference_catalogs'] = ['LS_DR9', 'PS1', 
-                                                    'DES', 'GAIA']
+    kws['visit_prep_args']['reference_catalogs'] = ref_catalogs
+    kws['filters'] = filters
     
     if '_':
         kws['parse_visits_args']['max_dt'] = max_dt
@@ -810,27 +812,142 @@ def set_private_iref(assoc):
     utils.fetch_default_calibs()
 
 
-def cutout_mosaic(ra=53.1615666, dec=-27.7910651, size=5*60, filters=['F160W'], ir_scale=0.1, half_optical=True, kernel='point', pixfrac=0.33, **kwargs):
+def cutout_mosaic(rootname='gds', ra=53.1615666, dec=-27.7910651, size=5*60, filters=['F160W'], ir_scale=0.1, half_optical=True, kernel='point', pixfrac=0.33, make_figure=True, skip_existing=True, clean_flt=True, s3output='s3://grizli-v2/HST/Pipeline/Mosaic/', **kwargs):
     """
+    Make mosaic from exposures defined in the exposure database
+    
+        
     """
+    import os
+    import glob
+    import matplotlib.pyplot as plt
+    import astropy.io.fits as pyfits
+    
     from grizli import utils
+    from mastquery import overlaps
     from grizli.aws import db
     engine = db.get_db_engine()
     
-    out_h, out_wcs = utils.make_wcsheader(ra=ra, dec=dec, size=size, 
+    out_h, ir_wcs = utils.make_wcsheader(ra=ra, dec=dec, size=size, 
                                           pixscale=ir_scale, get_hdu=False)
     
-    fp = out_wcs.calc_footprint()
+    fp = ir_wcs.calc_footprint()
+    opt_wcs = ir_wcs  
+    if half_optical:
+        opt_wcs = utils.half_pixel_scale(ir_wcs)
+        
+    x1, y1 = fp[0]
+    x2, y2 = fp[2]
     
-    SQL = """
-    SELECT distinct(dataset), extension, assoc, status
+    # Database query
+    SQL = f"""
+    SELECT dataset, extension, sciext, assoc, 
+           e.filter, e.exptime, e.footprint
     FROM exposure_files e, assoc_table a
     WHERE e.assoc = a.assoc_name
-    AND a.status = 2 AND a.assoc_name LIKE 'j033%%'
-    AND a.filter = 'F160W'
+    AND a.status = 2
+    AND polygon(e.footprint) && polygon(box '(({x1},{y1}),({x2},{y2}))')    
     """
+    
+    filter_sql = ' OR '.join([f"a.filter = '{f}'" for f in filters])
+    SQL += f'AND ({filter_sql})'
+    
+    SQL += ' ORDER BY e.filter'
     res = db.from_sql(SQL, engine)
     
+    for f in np.unique(res['filter']):
+        
+        visit = {'product':f'{rootname}-{f.lower()}'}
+        
+        if (len(glob.glob(visit['product'] + '*fits*')) > 0) & skip_existing:
+            print('Skip ' + visit['product'])
+            continue
+            
+        print('============', visit['product'], '============')
+        
+        if f[1] > '1':
+            visit['reference'] = opt_wcs
+        else:
+            visit['reference'] = ir_wcs
+        
+        fi = res['filter'] == f
+        un = utils.Unique(res['dataset'][fi], verbose=False)
+        
+        ds = res[fi]['dataset']
+        ex = res[fi]['extension']
+        assoc = res[fi]['assoc']
+        ffp = res[fi]['footprint']
+        expt = res[fi]['exptime'].sum()
+        
+        if make_figure:
+            fig, ax = plt.subplots(1,1,figsize=(6,6))
+            ax.scatter(*fp.T, marker='.', color='r')
+            sr = utils.SRegion(fp)
+            for p in sr.get_patch(alpha=0.8, ec='r', fc='None',zorder=100):
+                ax.add_patch(p)
+
+            for f in ffp:
+                sr = utils.SRegion(f)
+                for p in sr.get_patch(alpha=0.03, ec='k', zorder=-100):
+                    ax.add_patch(p)
+
+            ax.grid()
+            ax.set_xlim(ax.get_xlim()[::-1])
+            ax.set_title(visit['product'])
+            overlaps.draw_axis_labels(ax=ax)
+            ax.text(0.95, 0.95, f'N={fi.sum()}\nexpt = {expt:.1f}', 
+                    ha='right', va='top', transform=ax.transAxes)
+            
+            fig.savefig(visit['product']+'_fp.png')
+            plt.close('all')
+            
+        visit['files'] = [f"{ds[un[v]][0]}_{ex[un[v]][0]}.fits"
+                          for v in un.values]
+        
+        visit['awspath'] = [f"grizli-v2/HST/Pipeline/{assoc[un[v]][0]}/Prep"
+                          for v in un.values]
+        
+        visit['footprints'] = []
+        for v in un.values:
+            fps = ffp[un[v]]
+            fp_i = None
+            for fpi in fps:
+                sr = utils.SRegion(fpi)
+                for p in sr.shapely:
+                    if fp_i is None:
+                        fp_i = p
+                    else:
+                        fp_i = fp_i.union(p)
+            
+            visit['footprints'].append(fp_i)
+                           
+        _ = utils.drizzle_from_visit(visit, visit['reference'], 
+                                     pixfrac=pixfrac, 
+                                     kernel=kernel, clean=clean_flt)
+                             
+        outsci, outwht, header, flist = _
+    
+        pyfits.writeto(visit['product']+'_drz_sci.fits',
+                       data=outsci, header=header, 
+                       overwrite=True)
+    
+        pyfits.writeto(visit['product']+'_drz_wht.fits',
+                      data=outwht, header=header, 
+                      overwrite=True)
+        
+    if s3output:
+        files = []
+        for f in filters:
+            print(f'gzip --force {rootname}-{f.lower()}*fits')
+
+            os.system(f'gzip --force {rootname}-{f.lower()}*fits')
+
+            files += glob.glob(f'{rootname}-{f.lower()}*fits.gz')
+            files += glob.glob(f'{rootname}-{f.lower()}*_fp.png')
+
+        for file in files:
+            os.system(f'aws s3 cp {file} {s3output}')
+
 
 def make_mosaic(jname='', ds9=None, skip_existing=True, ir_scale=0.1, half_optical=False, pad=16, kernel='point', pixfrac=0.33, sync=True, ir_wcs=None):
     """
