@@ -278,11 +278,16 @@ def setup_astrometry_tables():
     # Add assoc to shifts, wcs
     engine.execute('ALTER TABLE wcs_log ADD COLUMN wcs_assoc VARCHAR')
     
+    ###### Run this to update wcs_log.wcs_assoc column and pop out 
+    ### reprocessed visits
+    engine.execute("""UPDATE wcs_log
+    SET wcs_assoc = NULL""")
     engine.execute("""UPDATE wcs_log
 SET wcs_assoc = exposure_files.assoc
 FROM exposure_files
 WHERE wcs_log.wcs_parent = exposure_files.parent;
 """)
+    engine.execute('DELETE FROM wcs_log where wcs_assoc IS NULL')
 
 
 def add_shifts_log(files=None, remove_old=True, verbose=True):
@@ -685,7 +690,7 @@ blue_align_params['tweak_n_min'] = 5
     
 ALL_FILTERS = ['F410M', 'F467M', 'F547M', 'F550M', 'F621M', 'F689M', 'F763M', 'F845M', 'F200LP', 'F350LP', 'F435W', 'F438W', 'F439W', 'F450W', 'F475W', 'F475X', 'F555W', 'F569W', 'F600LP', 'F606W', 'F622W', 'F625W', 'F675W', 'F702W', 'F775W', 'F791W', 'F814W', 'F850LP', 'G800L', 'F098M', 'F127M', 'F139M', 'F153M', 'F105W', 'F110W', 'F125W', 'F140W', 'F160W', 'G102', 'G141']
 
-def process_visit(assoc, clean=True, sync=True, max_dt=4, visit_split_shift=1.2, blue_align_params=blue_align_params, ref_catalogs=['LS_DR9', 'PS1', 'DES', 'GAIA'], filters=ALL_FILTERS, **kwargs):
+def process_visit(assoc, clean=True, sync=True, max_dt=4, visit_split_shift=1.2, blue_align_params=blue_align_params, ref_catalogs=['LS_DR9', 'PS1', 'DES', 'GAIA'], filters=None, **kwargs):
     """
     `assoc_table.status`
     
@@ -738,7 +743,10 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, visit_split_shift=1.2,
                                  s_region=tab['footprint'][0])
             
     kws['visit_prep_args']['reference_catalogs'] = ref_catalogs
-    kws['filters'] = filters
+    if filters is None:
+        kws['filters'] = np.unique(tab['filter']).tolist()
+    else:
+        kws['filters'] = filters
     
     if '_':
         kws['parse_visits_args']['max_dt'] = max_dt
@@ -867,9 +875,11 @@ def cutout_mosaic(rootname='gds', ra=53.1615666, dec=-27.7910651, size=5*60, fil
         
         if f[1] > '1':
             visit['reference'] = opt_wcs
+            is_optical = True
         else:
             visit['reference'] = ir_wcs
-        
+            is_optical = False
+            
         fi = res['filter'] == f
         un = utils.Unique(res['dataset'][fi], verbose=False)
         
@@ -926,15 +936,20 @@ def cutout_mosaic(rootname='gds', ra=53.1615666, dec=-27.7910651, size=5*60, fil
                                      kernel=kernel, clean=clean_flt)
                              
         outsci, outwht, header, flist = _
-    
-        pyfits.writeto(visit['product']+'_drz_sci.fits',
+        
+        if is_optical:
+            drz = 'drc'
+        else:
+            drz = 'drz'
+            
+        pyfits.writeto('{0}_{1}_sci.fits'.format(visit['product'], drz),
                        data=outsci, header=header, 
                        overwrite=True)
     
-        pyfits.writeto(visit['product']+'_drz_wht.fits',
+        pyfits.writeto('{0}_{1}_wht.fits'.format(visit['product'], drz),
                       data=outwht, header=header, 
                       overwrite=True)
-        
+
     if s3output:
         files = []
         for f in filters:
