@@ -661,9 +661,19 @@ def get_master_radec(s_region, bucket='grizli-v2', prefix='HST/Pipeline/Astromet
         return f's3://{bucket}/{prefix}/{radec_match}'
     else:
         return None
+
+
+blue_align_params={}
+blue_align_params['align_mag_limits'] = [17,24,0.1]
+blue_align_params['align_simple'] = False
+blue_align_params['max_err_percentile'] = 80
+blue_align_params['catalog_mask_pad'] = 0.05
+blue_align_params['match_catalog_density'] = False
+blue_align_params['align_ref_border'] = 8
+blue_align_params['align_min_flux_radius'] = 1.7
+blue_align_params['tweak_n_min'] = 5
     
-    
-def process_visit(assoc, clean=True, sync=True):
+def process_visit(assoc, clean=True, sync=True, max_dt=4, visit_split_shift=1.2, blue_align_params=blue_align_params, **kwargs):
     """
     `assoc_table.status`
     
@@ -719,19 +729,13 @@ def process_visit(assoc, clean=True, sync=True):
                                                     'DES', 'GAIA']
     
     if '_':
-        kws['parse_visits_args']['max_dt'] = 4
-        kws['parse_visits_args']['visit_split_shift'] = 1.2
+        kws['parse_visits_args']['max_dt'] = max_dt
+        kws['parse_visits_args']['visit_split_shift'] = visit_split_shift
         
-    if ('_f4' in assoc) | ('_f3' in assoc) | ('_f2' in assoc):
-        kws['visit_prep_args']['align_mag_limits'] = [17,24,0.1]
-        kws['visit_prep_args']['align_simple'] = False
-        kws['visit_prep_args']['max_err_percentile'] = 80
-        kws['visit_prep_args']['catalog_mask_pad'] = 0.05
-        kws['visit_prep_args']['match_catalog_density'] = False
-        kws['visit_prep_args']['align_ref_border'] = 8
-        #kws['visit_prep_args']['align_min_flux_radius'] = 1.7
-        kws['visit_prep_args']['tweak_n_min'] = 5
-    
+    if ('_f4' in assoc) | ('_f3' in assoc) | ('_f2' in assoc) & (blue_align_params is not None):        
+        for k in blue_align_params:
+            kws['visit_prep_args'][k] = blue_align_params[k]
+            
     kws['kill'] = 'preprocess'
         
     ######## 
@@ -769,7 +773,8 @@ def process_visit(assoc, clean=True, sync=True):
     if (clean & 2) > 0:
         print(f'rm -rf {assoc}*')
         os.system(f'rm -rf {assoc}*')
-        
+
+
 def set_private_iref(assoc):
     """
     Set reference file directories within a particular association to 
@@ -894,6 +899,7 @@ def make_mosaic(jname='', ds9=None, skip_existing=True, ir_scale=0.1, half_optic
                 fps = fp
             else:
                 fps = [fp]
+                
             for fp in fps:
                 xy = fp.boundary.xy
                 pstr = 'polygon('+','.join(['{0:.6f}'.format(i) for i in np.array([xy[0].tolist(), xy[1].tolist()]).T.flatten()])+') # text={{{0}}}\n'.format(all_visits[ix]['product'])
