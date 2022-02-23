@@ -720,7 +720,7 @@ def process_visit(assoc, clean=True, sync=True):
     
     if '_':
         kws['parse_visits_args']['max_dt'] = 4
-        kws['parse_visits_args']['visit_split_shift'] = 0.5
+        kws['parse_visits_args']['visit_split_shift'] = 1.2
         
     if ('_f4' in assoc) | ('_f3' in assoc) | ('_f2' in assoc):
         kws['visit_prep_args']['align_mag_limits'] = [17,24,0.1]
@@ -984,7 +984,9 @@ def make_mosaic(jname='', ds9=None, skip_existing=True, ir_scale=0.1, half_optic
           show_ir=False)
     
     if (len(jname) > 0) & (sync):
-        os.system(f'aws s3 sync ./ s3://grizli-v2/HST/Pipeline/Mosaic/ --exclude "*" --include "{jname}-f*fits" --include "{jname}*jpg"')
+        os.system('gzip --force {jname}-f*fits')
+        
+        os.system(f'aws s3 sync ./ s3://grizli-v2/HST/Pipeline/Mosaic/ --exclude "*" --include "{jname}-f*fits.gz" --include "{jname}*jpg"')
         
     x = """
     aws s3 sync ./ s3://grizli-v2/HST/Pipeline/ --exclude "*" --include "*/Prep/*_fl*fits" --include "*yml" --include "*/Prep/*s.log" --include "*log.txt" --include "*/Prep/*npy" --include "local*reg" --include "*fail*"
