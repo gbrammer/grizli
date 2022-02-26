@@ -28,7 +28,19 @@ def get_connection_info(config_file=None):
     Read the database connection info
     """
     import yaml
-            
+    
+    if 'DB_USER' in os.environ:
+        db_info = {'username': os.environ['DB_USER'], 
+                   'password': os.environ['DB_PASS'], 
+                   'hostname': os.environ['DB_HOST'], 
+                   'database': os.environ['DB_NAME'], 
+                   'port': 5432}
+        
+        if 'DB_PORT' in os.environ:
+            db_info['port'] = os.environ['DB_PORT']
+        
+        return db_info
+        
     if config_file is None:
         config_file = os.path.join(os.path.dirname(__file__),
                                    '../data/db.yml')
@@ -76,15 +88,6 @@ def get_db_engine(config=None, echo=False):
                                               DBUsername=config['username'], 
                                               Region=config['region'])
         
-        # conn = psycopg2.connect(host=config['hostname'],
-        #                         port=config['port'], 
-        #                         database=config['database'],
-        #                         user=config['username'],
-        #                         password=token,
-        #                         sslrootcert="SSLCERTIFICATE")
-        # 
-        # engine = create_engine('postgresql+psycopg2://', creator=POOL.getconn)
-        
         connect_args = dict(host=config['hostname'],
                             port=config['port'], 
                             database=config['database'],
@@ -96,7 +99,7 @@ def get_db_engine(config=None, echo=False):
                                connect_args=connect_args)
         
         return engine
-        
+     
     if config is None:
         config = get_connection_info()
     
