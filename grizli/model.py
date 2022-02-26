@@ -2504,10 +2504,10 @@ class GrismFLT(object):
         self.model = np.zeros_like(self.direct.data['SCI'])
 
         # Grism configuration
-        if 'DFILTER' in self.grism.header:
-            direct_filter = self.grism.header['DFILTER']
-        elif self.grism.instrument in ['NIRCAM', 'NIRISS']:
+        if self.grism.instrument in ['NIRCAM', 'NIRISS']:
             direct_filter = self.grism.pupil
+        elif 'DFILTER' in self.grism.header:
+            direct_filter = self.grism.header['DFILTER']
         else:
             direct_filter = self.direct.filter
         

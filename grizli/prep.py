@@ -150,6 +150,30 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
                                calib_types=calib_types,
                                verbose=False)
 
+    if filter in ['GR150C', 'GR150R']: 
+        if (head['FILTER'] == 'GR150C') & (head['PUPIL'] == 'F115W'):        
+            flat_file = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0202.fits')
+        if (head['FILTER'] == 'GR150C') & (head['PUPIL'] == 'F150W'):        
+            flat_file = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0187.fits')
+        if (head['FILTER'] == 'GR150C') & (head['PUPIL'] == 'F200W'):        
+            flat_file = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0204.fits')
+        if (head['FILTER'] == 'GR150R') & (head['PUPIL'] == 'F115W'):        
+            flat_file = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0200.fits')
+        if (head['FILTER'] == 'GR150R') & (head['PUPIL'] == 'F150W'):        
+            flat_file = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0188.fits')
+        if (head['FILTER'] == 'GR150R') & (head['PUPIL'] == 'F200W'):        
+            flat_file = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0195.fits')
+
+        extra_msg = ' / flat: {0}'.format(flat_file)
+
+        flat_im = pyfits.open(os.path.join(os.getenv('jref'), flat_file))
+        flat = flat_im['SCI'].data #[5:-5, 5:-5]
+        flat_dq = (flat < 0.2)
+
+        #orig_file['DQ'].data |= 4*flat_dq
+        orig_file['SCI'].data = np.divide(orig_file['SCI'].data, flat, where=flat!=0)
+
+    
     if filter in ['G102', 'G141']:
         flat_files = {'G102': 'uc72113oi_pfl.fits',
                       'G141': 'uc721143i_pfl.fits'}
@@ -158,7 +182,7 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
         extra_msg = ' / flat: {0}'.format(flat_file)
 
         flat_im = pyfits.open(os.path.join(os.getenv('iref'), flat_file))
-        flat = flat_im['SCI'].data[5:-5, 5:-5]
+        flat = flat_im['SCI'].data [5:-5, 5:-5]
         flat_dq = (flat < 0.2)
 
         # Grism FLT from IR amplifier gain
@@ -1828,7 +1852,7 @@ def make_SEP_catalog(root='',
             # tab = tab[~bad]
 
             # Correction for flux outside Kron aperture
-            tot_corr = get_wfc3ir_kron_tot_corr(tab, drz_filter, 
+            tot_corr = get_kron_tot_corr(tab, drz_filter, 
                                                 pixel_scale=pixel_scale, 
                                                 photplam=drz_photplam)
 
@@ -3077,18 +3101,19 @@ def process_direct_grism_visit(direct={},
             gain_file = steps_det1.gain_scale.get_reference_file(file, 'gain')
             gain_im = pyfits.open(gain_file)
             im = pyfits.open(file)
-            im['SCI'].data *= gain_im['SCI'].data
+            gain_median = np.median(gain_im[1].data)
+            im['SCI'].data *= gain_median #gain_im['SCI'].data
             im['SCI'].header['BUNIT'] = 'ELECTRONS/s'
-            im['ERR'].data *= gain_im['SCI'].data
+            im['ERR'].data *= gain_median #gain_im['SCI'].data
             im['ERR'].header['BUNIT'] = 'ELECTRONS/s'
             gain_im.close()
             im.close()
             if hdu[0].header['PUPIL'] == 'F115W':
-                hdu[0].header['PFLTFILE'] = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0193.fits')#'/Users/victoriastrait/Downloads/jwst_niriss_flat_0193.fits'
+                hdu[0].header['PFLTFILE'] = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0193.fits')
             if hdu[0].header['PUPIL'] == 'F150W':
-                hdu[0].header['PFLTFILE'] = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0007.fits')#'/Users/victoriastrait/Downloads/jwst_niriss_flat_0007.fits'
+                hdu[0].header['PFLTFILE'] = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0007.fits')
             if hdu[0].header['PUPIL'] == 'F200W':
-                hdu[0].header['PFLTFILE'] = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0189.fits')#'/Users/victoriastrait/Downloads/jwst_niriss_flat_0189.fits'
+                hdu[0].header['PFLTFILE'] = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0189.fits')
             
             hdu.flush()
     #
@@ -3105,22 +3130,25 @@ def process_direct_grism_visit(direct={},
             hdu[0].header['PHOTPLAM'] = phot_keywords[hdu[0].header['PUPIL']][2] * 10000 # microns to angstroms
             gain_file = steps_det1.gain_scale.get_reference_file(file, 'gain')
             gain_im = pyfits.open(gain_file)
+            if (hdu[0].header['FILTER'] == 'GR150C') & (hdu[0].header['PUPIL'] == 'F115W'):        
+                hdu[0].header['PFLTFILE'] = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0202.fits')
+            if (hdu[0].header['FILTER'] == 'GR150C') & (hdu[0].header['PUPIL'] == 'F150W'):        
+                hdu[0].header['PFLTFILE'] = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0187.fits')
+            if (hdu[0].header['FILTER'] == 'GR150C') & (hdu[0].header['PUPIL'] == 'F200W'):        
+                hdu[0].header['PFLTFILE'] = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0204.fits')
+            if (hdu[0].header['FILTER'] == 'GR150R') & (hdu[0].header['PUPIL'] == 'F115W'):        
+                hdu[0].header['PFLTFILE'] = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0200.fits')
+            if (hdu[0].header['FILTER'] == 'GR150R') & (hdu[0].header['PUPIL'] == 'F150W'):        
+                hdu[0].header['PFLTFILE'] = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0188.fits')
+            if (hdu[0].header['FILTER'] == 'GR150R') & (hdu[0].header['PUPIL'] == 'F200W'):        
+                hdu[0].header['PFLTFILE'] = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0195.fits')
             im = pyfits.open(file)
             im['SCI'].data *= gain_im['SCI'].data
             im['SCI'].header['BUNIT'] = 'ELECTRONS/s'
             im['ERR'].data *= gain_im['SCI'].data
             im['ERR'].header['BUNIT'] = 'ELECTRONS/s'
             gain_im.close()
-            if (hdu[0].header['FILTER'] == 'GR150C') & (hdu[0].header['PUPIL'] == 'F115W'):        
-                hdu[0].header['PFLTFILE'] = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0202.fits')#'/Users/victoriastrait/Downloads/jwst_niriss_flat_0202.fits'
-            if (hdu[0].header['FILTER'] == 'GR150C') & (hdu[0].header['PUPIL'] == 'F150W'):        
-                hdu[0].header['PFLTFILE'] = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0187.fits')#'/Users/victoriastrait/Downloads/jwst_niriss_flat_0187.fits'
-            if (hdu[0].header['FILTER'] == 'GR150C') & (hdu[0].header['PUPIL'] == 'F200W'):        
-                hdu[0].header['PFLTFILE'] = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0204.fits')#'/Users/victoriastrait/Downloads/jwst_niriss_flat_0204.fits'
-            if (hdu[0].header['FILTER'] == 'GR150R') & (hdu[0].header['PUPIL'] == 'F115W'):        
-                hdu[0].header['PFLTFILE'] = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0200.fits')#'/Users/victoriastrait/Downloads/jwst_niriss_flat_0200.fits'
-            if (hdu[0].header['FILTER'] == 'GR150R') & (hdu[0].header['PUPIL'] == 'F150W'):        
-                hdu[0].header['PFLTFILE'] = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0188.fits')#'/Users/victoriastrait/Downloads/jwst_niriss_flat_0188.fits'
+            
             hdu.flush()
         # Flat field correction
         for file in direct['files']:
@@ -4348,31 +4376,37 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
         flat = 1.
 
     elif (grism_element == 'GR150C') & (pupil == 'F115W'):
-        bg_fixed = ['jwst_niriss_wfssbkg_0002.fits'] # should be normalized background (changing to _corrflat causes astrodrizzle "zero valid pixels error")
+        bg_fixed = ['jwst_niriss_wfssbkg_0002_corrflat.fits'] # bg_fixed should be normalized background with flat divided out
         bg_vary = [] 
         isACS = False
         flat = 1.
     
     elif (grism_element == 'GR150C') & (pupil == 'F150W'):
-        bg_fixed = ['jwst_niriss_wfssbkg_0009.fits'] # should be normalized background (changing to _corrflat causes astrodrizzle "zero valid pixels error")
+        bg_fixed = ['jwst_niriss_wfssbkg_0009_corrflat.fits'] 
         bg_vary = [] 
         isACS = False
         flat = 1.
 
     elif (grism_element == 'GR150C') & (pupil == 'F200W'):
-        bg_fixed = ['jwst_niriss_wfssbkg_0012.fits'] # should be normalized background (changing to _corrflat causes astrodrizzle "zero valid pixels error")
+        bg_fixed = ['jwst_niriss_wfssbkg_0012_corrflat.fits']
         bg_vary = [] 
         isACS = False
         flat = 1.
 
     elif (grism_element == 'GR150R') & (pupil == 'F115W'):
-        bg_fixed = ['jwst_niriss_wfssbkg_0004.fits'] # should be normalized background (changing to _corrflat causes astrodrizzle "zero valid pixels error")
+        bg_fixed = ['jwst_niriss_wfssbkg_0004_corrflat.fits'] 
         bg_vary = [] 
         isACS = False
         flat = 1.
 
     elif (grism_element == 'GR150R') & (pupil == 'F150W'):
-        bg_fixed = ['jwst_niriss_wfssbkg_0003.fits'] # should be normalized background (changing to _corrflat causes astrodrizzle "zero valid pixels error")
+        bg_fixed = ['jwst_niriss_wfssbkg_0003_corrflat.fits'] 
+        bg_vary = [] 
+        isACS = False
+        flat = 1.
+
+    elif (grism_element == 'GR150R') & (pupil == 'F200W'):
+        bg_fixed = ['jwst_niriss_wfssbkg_0012_corrflat.fits']
         bg_vary = [] 
         isACS = False
         flat = 1.

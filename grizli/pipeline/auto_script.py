@@ -2257,6 +2257,7 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
 
     if files is None:
         files = glob.glob(os.path.join(PREP_PATH, '*fl[tc].fits'))
+        files += glob.glob(os.path.join(PREP_PATH, '*rate.fits'))
         files.sort()
 
     info = utils.get_flt_info(files)
