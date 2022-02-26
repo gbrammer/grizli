@@ -256,7 +256,7 @@ def apply_catalog_corrections(root, total_flux='flux_auto', auto_corr=True, get_
     return cat
 
 
-def eazy_photoz(root, force=False, object_only=True, apply_background=True, aper_ix=1, apply_prior=False, beta_prior=True, get_external_photometry=False, external_limits=3, external_sys_err=0.3, external_timeout=300, sys_err=0.05, z_step=0.01, z_min=0.01, z_max=12, total_flux='flux_auto', auto_corr=True, compute_residuals=False, dummy_prior=False, extra_rf_filters=[], quiet=True, aperture_indices='all', zpfile='zphot.zeropoint', extra_params={}, extra_translate={}, force_apcorr=False, ebv=None, **kwargs):
+def eazy_photoz(root, force=False, object_only=True, apply_background=True, aper_ix=1, apply_prior=False, beta_prior=True, get_external_photometry=False, external_limits=3, external_sys_err=0.3, external_timeout=300, sys_err=0.05, z_step=0.01, z_min=0.01, z_max=12, total_flux='flux_auto', auto_corr=True, compute_residuals=False, dummy_prior=False, extra_rf_filters=[], quiet=True, aperture_indices='all', zpfile='zphot.zeropoint', extra_params={}, extra_translate={}, force_apcorr=False, ebv=None, absmag_filters=[], **kwargs):
 
     import os
     import eazy
@@ -271,7 +271,7 @@ def eazy_photoz(root, force=False, object_only=True, apply_background=True, aper
         cat = utils.read_catalog('{0}_phot_apcorr.fits'.format(root))
         return self, cat, zout
 
-    trans = {'f098m': 201, 'f105w': 202, 'f110w': 241, 'f125w': 203, 'f140w': 204, 'f160w': 205, 'f435w': 233, 'f475w': 234, 'f555w': 235, 'f606w': 236, 'f625w': 237, 'f775w': 238, 'f814w': 239, 'f850lp': 240, 'f702w': 15, 'f600lpu': 243, 'f225wu': 207, 'f275wu': 208, 'f336wu': 209, 'f350lpu': 339, 'f438wu': 211, 'f475wu': 212, 'f475xu': 242, 'f555wu': 213, 'f606wu': 214, 'f625wu': 215, 'f775wu': 216, 'f814wu': 217, 'f390wu': 210, 'ch1': 18, 'ch2': 19}
+    trans = {'f098m': 201, 'f105w': 202, 'f110w': 241, 'f125w': 203, 'f140w': 204, 'f160w': 205, 'f435w': 233, 'f475w': 234, 'f555w': 235, 'f606w': 236, 'f625w': 237, 'f775w': 238, 'f814w': 239, 'f850lp': 240, 'f702w': 15, 'f600lpu': 243, 'f225wu': 207, 'f275wu': 208, 'f336wu': 209, 'f350lpu': 339, 'f438wu': 211, 'f475wu': 212, 'f475xu': 242, 'f555wu': 213, 'f606wu': 214, 'f625wu': 215, 'f775wu': 216, 'f814wu': 217, 'f390wu': 210, 'ch1': 18, 'ch2': 19, 'f336w':209, 'f350lp':339}
 
     # trans.pop('f814w')
 
@@ -410,13 +410,15 @@ Run it with ``path`` pointing to the location of the ``eazy-photoz`` repository.
     sample = np.isfinite(self.cat['ra'])  # mag)
 
     for iter in range(1+(get_external_photometry & compute_residuals)*1):
-        self.fit_parallel(idx[sample], n_proc=10)
+        self.fit_catalog(idx[sample], n_proc=10)
         if compute_residuals:
             self.error_residuals()
     
     self.fit_phoenix_stars()
     
-    self.standard_output(prior=apply_prior, beta_prior=beta_prior, extra_rf_filters=extra_rf_filters)
+    self.standard_output(prior=apply_prior, beta_prior=beta_prior, 
+                         extra_rf_filters=extra_rf_filters,
+                         absmag_filters=absmag_filters)
 
     zout = utils.read_catalog('{0}.eazypy.zout.fits'.format(root))
 
