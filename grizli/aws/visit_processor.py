@@ -610,7 +610,11 @@ def get_assoc_yaml_from_s3(assoc, s_region=None, bucket='grizli-v2', prefix='HST
                                   'file not found on s3', verbose=True)
 
                 kws['preprocess_args'][k] = None
-            
+    
+    if ('_cxe_cos' in assoc) | ('_edw_cos' in assoc):
+        utils.log_comment(LOGFILE, f'Process {assoc} as DASH', verbose=True)
+        kws['is_dash'] = True
+                 
     return kws
 
 
