@@ -896,10 +896,11 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, visit_split_shift=1.2,
         
         if os.path.exists(assoc):
             os.chdir(assoc)
-            cmd = f"""aws s3 sync ./ s3://grizli-v2/HST/Pipeline/{assoc} \
-                  --exclude "*" --include "./Prep/*_fl*fits" \
-                  --include "./Prep/*s.log" \
-                  --include "./Prep/*npy" \
+            cmd = f"""aws s3 sync ./ s3://grizli-v2/HST/Pipeline/{assoc}/ \
+                  --exclude "*" \
+                  --include "Prep/*_fl*fits" \
+                  --include "Prep/*s.log" \
+                  --include "Prep/*npy" \
                   --include "*fail*" \
                   --include "RAW/*[nx][tg]" """
         
