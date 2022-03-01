@@ -431,7 +431,6 @@ def get_random_visit(extra=''):
     return random_assoc
 
 
-
 def update_assoc_status(assoc, status=1, verbose=True):
     import astropy.time
     from grizli.aws import db
@@ -881,7 +880,7 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, visit_split_shift=1.2,
                 exposure_info_from_visit(v, assoc=assoc, engine=engine)
     
     add_shifts_log(assoc=assoc, remove_old=True, verbose=True)
-    add_wcs_log()
+    add_wcs_log(assoc=assoc, remove_old=True, verbose=True)
     
     os.environ['iref'] = os.environ['orig_iref']
     os.environ['jref'] = os.environ['orig_jref']
