@@ -513,8 +513,8 @@ def launch_ec2_instances(nmax=50):
     from grizli.aws import db
     engine = db.get_db_engine()
     
-    assoc = db.from_sql('select assoc_name from assoc_table where status = 0', 
-                        engine)
+    assoc = db.from_sql('select distinct(assoc_name) from assoc_table'
+                        ' where status = 0', engine)
     
     count = np.minimum(nmax, len(assoc))
     
@@ -691,7 +691,15 @@ def get_master_radec(s_region, bucket='grizli-v2', prefix='HST/Pipeline/Astromet
                                      [151.32535471,   0.67056198],
                                      [151.70028664,   1.01865704],
                                      [151.84607046,   1.49990913]])
-                                            
+    
+    precomputed_radec['egs_i24_221366.radec'] = np.array([                                
+                                     [214.76998667,  52.60002448],
+                                     [215.39474476,  52.60208779],
+                                     [215.39792003,  53.01921821],
+                                     [215.20241417,  53.13964003],
+                                     [214.6017278 ,  53.14890739],
+                                     [214.60297439,  52.60618651],
+                                     [214.76998667,  52.60002448]]))                         
     sr = utils.SRegion(s_region)
     radec_match = None
     for k in precomputed_radec:
@@ -853,6 +861,39 @@ def set_private_iref(assoc):
     utils.fetch_default_calibs()
 
 
+def make_parent_mosaic(parent='j191436m5928', **kwargs):
+    """
+    Get the full footprint of all exposure in the database for a given 'parent'
+    """
+    from grizli import utils
+    from grizli.aws import db
+    from grizli.aws.visit_processor import cutout_mosaic
+    
+    engine = db.get_db_engine()
+    
+    fps = db.from_sql(f"""
+         SELECT  a.parent, e.filter, e.footprint from exposure_files e, assoc_table a
+         WHERE e.assoc = a.assoc_name AND a.parent = '{parent}'
+         """, engine)
+         
+    fp = None
+    for f in fps['footprint']:
+        fp_i = utils.SRegion(f)
+        for fs in fp_i.shapely:
+            if fp is None:
+                fp = fs
+            else:
+                fp = fp.union(fs)
+    
+    ra, dec = np.squeeze(fp.centroid.xy)
+    bx, by = fp.convex_hull.boundary.xy
+    cosd = np.cos(dec/180*np.pi)
+    size = ((np.max(bx) - np.min(bx))*cosd*3600+10., 
+            (np.max(by) - np.min(by))*3600+10.)
+    
+    cutout_mosaic(rootname=parent, ra=ra, dec=dec, size=size, **kwargs)
+    
+    
 def cutout_mosaic(rootname='gds', ra=53.1615666, dec=-27.7910651, size=5*60, filters=['F160W'], ir_scale=0.1, half_optical=True, kernel='point', pixfrac=0.33, make_figure=True, skip_existing=True, clean_flt=True, s3output='s3://grizli-v2/HST/Pipeline/Mosaic/', **kwargs):
     """
     Make mosaic from exposures defined in the exposure database
