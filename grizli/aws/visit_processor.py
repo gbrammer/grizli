@@ -699,7 +699,7 @@ def get_master_radec(s_region, bucket='grizli-v2', prefix='HST/Pipeline/Astromet
                                      [215.20241417,  53.13964003],
                                      [214.6017278 ,  53.14890739],
                                      [214.60297439,  52.60618651],
-                                     [214.76998667,  52.60002448]]))                         
+                                     [214.76998667,  52.60002448]])                         
     sr = utils.SRegion(s_region)
     radec_match = None
     for k in precomputed_radec:
