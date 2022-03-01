@@ -905,7 +905,7 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, visit_split_shift=1.2,
                   --include "RAW/*[nx][tg]" """
         
             os.system(cmd)
-            print('\n# Sync\n' + cmd.replace('     ', ''))
+            print('\n# Sync\n' + cmd.replace('     ', '') + '\n')
             os.chdir('/GrizliImaging')
             
         files = glob.glob(f'{assoc}*.*')
@@ -974,7 +974,7 @@ def make_parent_mosaic(parent='j191436m5928', **kwargs):
     cutout_mosaic(rootname=parent, ra=ra, dec=dec, size=size, **kwargs)
     
     
-def cutout_mosaic(rootname='gds', ra=53.1615666, dec=-27.7910651, size=5*60, filters=['F160W'], ir_scale=0.1, half_optical=True, kernel='point', pixfrac=0.33, make_figure=True, skip_existing=True, clean_flt=True, s3output='s3://grizli-v2/HST/Pipeline/Mosaic/', **kwargs):
+def cutout_mosaic(rootname='gds', ra=53.1615666, dec=-27.7910651, size=5*60, filters=['F160W'], ir_scale=0.1, ir_wcs=None, half_optical=True, kernel='point', pixfrac=0.33, make_figure=True, skip_existing=True, clean_flt=True, s3output='s3://grizli-v2/HST/Pipeline/Mosaic/', **kwargs):
     """
     Make mosaic from exposures defined in the exposure database
     
@@ -990,7 +990,8 @@ def cutout_mosaic(rootname='gds', ra=53.1615666, dec=-27.7910651, size=5*60, fil
     from grizli.aws import db
     engine = db.get_db_engine()
     
-    out_h, ir_wcs = utils.make_wcsheader(ra=ra, dec=dec, size=size, 
+    if ir_wcs is None:
+        out_h, ir_wcs = utils.make_wcsheader(ra=ra, dec=dec, size=size, 
                                           pixscale=ir_scale, get_hdu=False)
     
     fp = ir_wcs.calc_footprint()
