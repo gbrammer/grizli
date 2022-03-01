@@ -582,7 +582,7 @@ def update_visit_results():
     pass
 
 
-def get_assoc_yaml_from_s3(assoc, s_region=None, bucket='grizli-v2', prefix='HST/Pipeline/Input'):
+def get_assoc_yaml_from_s3(assoc, s_region=None, bucket='grizli-v2', prefix='HST/Pipeline/Input', write_file=True):
     """
     Get presets from yaml file on s3, if found
     """
@@ -665,6 +665,9 @@ def get_assoc_yaml_from_s3(assoc, s_region=None, bucket='grizli-v2', prefix='HST
         kws['visit_prep_args']['tweak_fit_order'] = -1
         kws['visit_prep_args']['tweak_max_dist'] = 200
         kws['visit_prep_args']['tweak_n_min'] = 4
+        
+    if write_file:
+        auto_script.write_params_to_yml(kws, output_file=f'{assoc}.run.yaml')
         
     return kws
 
@@ -888,11 +891,26 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, visit_split_shift=1.2,
     os.chdir('/GrizliImaging/')
     
     if sync:
-        os.system(f'aws s3 rm --recursive s3://grizli-v2/HST/Pipeline/{assoc}')
+        os.system(f'aws s3 rm --recursive ' + 
+                  f' s3://grizli-v2/HST/Pipeline/{assoc}')
         
-        cmd = f"""aws s3 sync ./ s3://grizli-v2/HST/Pipeline/ --exclude "*" --include "{assoc}/Prep/*_fl*fits" --include "{assoc}*yml" --include "{assoc}/Prep/*s.log" --include "{assoc}*log.txt" --include "{assoc}/Prep/*npy" --include "{assoc}*fail*" --include "{assoc}/RAW/*[nx][tg]" """
-        os.system(cmd)
-
+        if os.path.exists(assoc):
+            os.chdir(assoc)
+            cmd = f"""aws s3 sync ./ s3://grizli-v2/HST/Pipeline/{assoc} \
+                  --exclude "*" --include "./Prep/*_fl*fits" \
+                  --include "./Prep/*s.log" \
+                  --include "./Prep/*npy" \
+                  --include "*fail*" \
+                  --include "RAW/*[nx][tg]" """
+        
+            os.system(cmd)
+            os.chdir('/GrizliImaging')
+            
+        files = glob.glob(f'{assoc}*.*')
+        for file in files:
+            os.system(f'aws s3 cp {file} ' + 
+                      f' s3://grizli-v2/HST/Pipeline/{assoc}/')
+    
     if (clean & 2) > 0:
         print(f'rm -rf {assoc}*')
         os.system(f'rm -rf {assoc}*')
