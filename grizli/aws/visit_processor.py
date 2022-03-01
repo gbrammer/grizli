@@ -243,6 +243,8 @@ def setup_astrometry_tables():
     
     SQL = f"""CREATE TABLE IF NOT EXISTS shifts_log (
         shift_dataset varchar,
+        shift_parent varchar,
+        shift_assoc varchar,
         shift_dx real,
         shift_dy real, 
         shift_n int,
@@ -253,6 +255,9 @@ def setup_astrometry_tables():
     engine.execute(SQL)
     
     engine.execute('CREATE INDEX on shifts_log (shift_dataset)')
+    engine.execute('ALTER TABLE shifts_log ADD COLUMN shift_parent VARCHAR;')
+    engine.execute('CREATE INDEX on shifts_log (shift_parent)')
+    engine.execute('ALTER TABLE shifts_log ADD COLUMN shift_assoc VARCHAR;')
     
     engine.execute('DROP TABLE wcs_log')
 
@@ -290,7 +295,7 @@ WHERE wcs_log.wcs_parent = exposure_files.parent;
     engine.execute('DELETE FROM wcs_log where wcs_assoc IS NULL')
 
 
-def add_shifts_log(files=None, remove_old=True, verbose=True):
+def add_shifts_log(files=None, assoc=None, remove_old=True, verbose=True):
     """
     """
     import glob
@@ -306,16 +311,21 @@ def add_shifts_log(files=None, remove_old=True, verbose=True):
     for ifile, file in enumerate(files):
         if not file.endswith('_shifts.log'):
             continue
-            
+        
+        parent = os.path.basename(file).split('_shifts.log')[0]
+        
         with open(file) as fp:
             lines = fp.readlines()
         
         modtime = astropy.time.Time(os.path.getmtime(file), format='unix').mjd
         
         rows = []
-        names = ['shift_dataset','shift_dx','shift_dy','shift_n',
-                 'shift_xrms','shift_yrms','shift_modtime']
-                 
+        names = ['shift_dataset','shift_parent', 'shift_dx', 'shift_dy',
+                 'shift_n', 'shift_xrms','shift_yrms','shift_modtime']
+        
+        if assoc is not None:
+            names.append('shift_assoc')
+            
         for line in lines:
             if line.startswith('#'):
                 continue
@@ -327,8 +337,11 @@ def add_shifts_log(files=None, remove_old=True, verbose=True):
                 db.execute_helper('DELETE FROM shifts_log WHERE '
                                f"shift_dataset='{dataset}'", engine)
             
-            row = [dataset, float(spl[1]), float(spl[2]), int(spl[5]), 
+            row = [dataset, parent, float(spl[1]), float(spl[2]), int(spl[5]), 
                    float(spl[6]), float(spl[7]), modtime]
+            if assoc is not None:
+                row.append(assoc)
+                
             rows.append(row)
         
         if len(rows) > 0:
@@ -340,7 +353,7 @@ def add_shifts_log(files=None, remove_old=True, verbose=True):
                       method='multi')
 
 
-def add_wcs_log(files=None, remove_old=True, verbose=True):
+def add_wcs_log(files=None, assoc=None, remove_old=True, verbose=True):
     """
     """
     import glob
@@ -366,6 +379,9 @@ def add_wcs_log(files=None, remove_old=True, verbose=True):
         names = ['wcs_parent', 'wcs_radec', 'wcs_iter', 'wcs_dx', 'wcs_dy', 
                  'wcs_rot', 'wcs_scale', 'wcs_rms', 'wcs_n', 'wcs_modtime']
         
+        if assoc is not None:
+            names.append('wcs_assoc')
+            
         parent = os.path.basename(file).split('_wcs.log')[0]
         if remove_old:
             db.execute_helper('DELETE FROM wcs_log WHERE '
@@ -384,6 +400,9 @@ def add_wcs_log(files=None, remove_old=True, verbose=True):
             row = [parent, radec, int(spl[0]), float(spl[1]), float(spl[2]),
                    float(spl[3]), float(spl[4]), float(spl[5]), int(spl[6]), 
                    modtime]
+            if assoc is not None:
+                row.append(assoc)
+                
             rows.append(row)
             
         if len(rows) > 0:
@@ -432,6 +451,24 @@ def update_assoc_status(assoc, status=1, verbose=True):
         print(msg.format(assoc, status, table, NOW))
 
     db.execute_helper(sqlstr, engine)
+
+
+def delete_all_assoc_data(assoc):
+    """
+    Remove files from S3 and database
+    """
+    import os
+    from grizli.aws import db
+    engine = db.get_db_engine()
+    
+    vis = db.from_sql(f"select obsid, assoc_name, obs_id from assoc_table where assoc_name = '{assoc}'", engine)
+    vis_root = np.unique([v[:6] for v in vis['obs_id']])
+    for r in vis_root:
+        print(f'Remove {r} from shifts_log')
+        engine.execute(f"DELETE from shifts_log " + 
+                       f"WHERE shift_dataset like '{r}%%'")
+    
+    os.system(f'aws s3 rm --recursive s3://grizli-v2/HST/Pipeline/{assoc}')
 
 
 def clear_failed():
@@ -568,7 +605,8 @@ def get_assoc_yaml_from_s3(assoc, s_region=None, bucket='grizli-v2', prefix='HST
         bkt.download_file(s3_prefix, local_file,
                           ExtraArgs={"RequestPayer": "requester"})
         
-        utils.log_comment(LOGFILE, f'Fetch params from {bucket}/{s3_prefix}', 
+        utils.log_comment(LOGFILE,
+                          f'Fetch params from s3://{bucket}/{s3_prefix}', 
                           verbose=True)
     else:
         local_file = None
@@ -610,11 +648,25 @@ def get_assoc_yaml_from_s3(assoc, s_region=None, bucket='grizli-v2', prefix='HST
                                   'file not found on s3', verbose=True)
 
                 kws['preprocess_args'][k] = None
+
+    kws['visit_prep_args']['fix_stars'] = False
+    kws['mask_spikes'] = False
     
+    # params for DASH processing
     if ('_cxe_cos' in assoc) | ('_edw_cos' in assoc):
         utils.log_comment(LOGFILE, f'Process {assoc} as DASH', verbose=True)
+        
         kws['is_dash'] = True
-                 
+
+        kws['visit_prep_args']['align_mag_limits'] = [14,24,0.8]
+        kws['visit_prep_args']['align_ref_border'] = 600
+        kws['visit_prep_args']['match_catalog_density'] = False
+        kws['visit_prep_args']['tweak_threshold'] = 1.3
+        
+        kws['visit_prep_args']['tweak_fit_order'] = -1
+        kws['visit_prep_args']['tweak_max_dist'] = 200
+        kws['visit_prep_args']['tweak_n_min'] = 4
+        
     return kws
 
 
@@ -828,7 +880,7 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, visit_split_shift=1.2,
                 print('File exposure info: ', v['files'][0], assoc)
                 exposure_info_from_visit(v, assoc=assoc, engine=engine)
     
-    add_shifts_log()
+    add_shifts_log(assoc=assoc, remove_old=True, verbose=True)
     add_wcs_log()
     
     os.environ['iref'] = os.environ['orig_iref']
