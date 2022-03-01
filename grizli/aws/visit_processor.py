@@ -905,7 +905,7 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, visit_split_shift=1.2,
                   --include "RAW/*[nx][tg]" """
         
             os.system(cmd)
-            print(cmd)
+            print('\n# Sync\n' + cmd.replace('     ', ''))
             os.chdir('/GrizliImaging')
             
         files = glob.glob(f'{assoc}*.*')
