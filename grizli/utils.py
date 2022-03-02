@@ -3999,12 +3999,15 @@ class SRegion(object):
             self.xy = [inp]
         elif isinstance(inp, list):
             self.xy = inp
+        elif isinstance(inp, pywcs.WCS):
+            self.xy = self.wcs.calc_footprint()
         else:
             raise IOError('input must be ``str``, ``list``, or ``np.array``')
         
         self.ds9_properties = ''
         self.label = label
-        
+
+
     @staticmethod   
     def _parse_sregion(sregion, ncircle=32, wrap=False, **kwargs):
         """
@@ -4100,7 +4103,7 @@ class SRegion(object):
         """
         from shapely.geometry import Polygon
         return [Polygon(fp) for fp in self.xy]
-    
+
 
     @property 
     def area(self):
@@ -4119,13 +4122,49 @@ class SRegion(object):
                 for sh in self.shapely]
 
 
-    def get_patch(self, **kwargs):
+    def patch(self, **kwargs):
         """
         `~descartes.PolygonPatch` object
         """
         from descartes import PolygonPatch
         return [PolygonPatch(p, **kwargs) for p in self.shapely]
-    
+
+
+    def get_patch(self, **kwargs):
+        """
+        `~descartes.PolygonPatch` object
+        
+        ** Deprecated, use patch **
+        """
+        from descartes import PolygonPatch
+        return self.patch(**kwargs)
+
+
+    def union(self, shape=None):
+        """
+        Union of self and `shape` object.  If no `shape` provided, then 
+        return union of (optional) multiple components of self
+        """
+        if shape is None:
+            un = self.shapely[0]
+        
+        un = shape.union(shape)
+        for s in self.shapely:
+            un = un.union(s)
+        
+        return s
+
+
+    def intersects(self, shape):
+        """
+        Union of self and `shape` object
+        """
+        test = False
+        for s in self.shapely:
+            test |= s.intersects(shape)
+
+        return test
+
 
     @property
     def region(self):
@@ -4147,7 +4186,8 @@ class SRegion(object):
             
         return [pstr.format(','.join([f'{c:.6f}' for c in fp.flatten()]))+tail
                 for fp in self.xy]
-    
+
+
 class WCSFootprint(object):
     """
     Helper functions for dealing with WCS footprints
@@ -4188,6 +4228,7 @@ class WCSFootprint(object):
     def centroid(self):
         return np.mean(self.fp, axis=0)
 
+
     @property
     def path(self):
         """
@@ -4195,6 +4236,7 @@ class WCSFootprint(object):
         """
         import matplotlib.path
         return matplotlib.path.Path(self.fp)
+
 
     @property
     def polygon(self):
@@ -4204,6 +4246,7 @@ class WCSFootprint(object):
         from shapely.geometry import Polygon
         return Polygon(self.fp)
 
+
     def get_patch(self, **kwargs):
         """
         `~descartes.PolygonPatch` object
@@ -4211,12 +4254,14 @@ class WCSFootprint(object):
         from descartes import PolygonPatch
         return PolygonPatch(self.polygon, **kwargs)
 
+
     @property
     def region(self):
         """
         Polygon string in DS9 region format
         """
         return 'polygon({0})'.format(','.join(['{0:.6f}'.format(c) for c in self.fp.flatten()]))
+
 
     @staticmethod
     def add_naxis(header):
