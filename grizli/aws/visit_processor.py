@@ -111,12 +111,15 @@ def s3_put_exposure(flt_file, product, assoc, remove_old=True, verbose=True, eng
     """
     """
     import os
+    from tqdm import tqdm
     import pandas as pd
     import astropy.time
     from grizli.aws import db
     from grizli import utils
     import astropy.io.fits as pyfits
     import astropy.wcs as pywcs
+    
+    from .tile_mosaic import add_exposure_to_tile_db
     
     if engine is None:
         engine = db.get_db_engine()
@@ -228,6 +231,23 @@ def s3_put_exposure(flt_file, product, assoc, remove_old=True, verbose=True, eng
                "(' || ra4 || ', ' || dec4 || '))')::path"
                f" WHERE file='{file}' AND extension='{extension}'", engine)
     
+    # Update tile_db
+    tiles = db.from_sql('select * from mosaic_tiles', engine)
+    
+    db.execute_helper(f"""
+                DELETE from mosaic_tiles_exposures t
+                USING exposure_files e
+                WHERE t.expid = e.eid
+                AND file='{file}' AND extension='{extension}'
+                """, engine)
+    
+    exp = db.from_sql(f"""SELECT * FROM exposure_files
+                      WHERE file='{file}' AND extension='{extension}'
+                      """, engine)
+    
+    res = [add_exposure_to_tile_db(row=exp[i:i+1], tiles=tiles, engine=engine)
+           for i in tqdm(range(len(exp)))]
+                             
     if verbose:
         print(f'Add {file}_{extension} ({len(rows)}) to exposure_files table')
 
@@ -974,7 +994,7 @@ def make_parent_mosaic(parent='j191436m5928', **kwargs):
     cutout_mosaic(rootname=parent, ra=ra, dec=dec, size=size, **kwargs)
     
     
-def cutout_mosaic(rootname='gds', ra=53.1615666, dec=-27.7910651, size=5*60, filters=['F160W'], ir_scale=0.1, ir_wcs=None, half_optical=True, kernel='point', pixfrac=0.33, make_figure=True, skip_existing=True, clean_flt=True, s3output='s3://grizli-v2/HST/Pipeline/Mosaic/', **kwargs):
+def cutout_mosaic(rootname='gds', ra=53.1615666, dec=-27.7910651, size=5*60, filters=['F160W'], ir_scale=0.1, ir_wcs=None, res=None, half_optical=True, kernel='point', pixfrac=0.33, make_figure=True, skip_existing=True, clean_flt=True, gzip_output=True, s3output='s3://grizli-v2/HST/Pipeline/Mosaic/', **kwargs):
     """
     Make mosaic from exposures defined in the exposure database
     
@@ -1017,7 +1037,8 @@ def cutout_mosaic(rootname='gds', ra=53.1615666, dec=-27.7910651, size=5*60, fil
         SQL += f'AND ({filter_sql})'
     
     SQL += ' ORDER BY e.filter'
-    res = db.from_sql(SQL, engine)
+    if res is None:
+        res = db.from_sql(SQL, engine)
     
     for f in np.unique(res['filter']):
         
@@ -1109,11 +1130,11 @@ def cutout_mosaic(rootname='gds', ra=53.1615666, dec=-27.7910651, size=5*60, fil
     if s3output:
         files = []
         for f in np.unique(res['filter']):
-            print(f'gzip --force {rootname}-{f.lower()}*fits')
+            if gzip_output:
+                print(f'gzip --force {rootname}-{f.lower()}*fits')
+                os.system(f'gzip --force {rootname}-{f.lower()}*fits')
 
-            os.system(f'gzip --force {rootname}-{f.lower()}*fits')
-
-            files += glob.glob(f'{rootname}-{f.lower()}*fits.gz')
+            files += glob.glob(f'{rootname}-{f.lower()}*fits*')
             files += glob.glob(f'{rootname}-{f.lower()}*_fp.png')
 
         for file in files:
