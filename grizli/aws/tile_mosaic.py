@@ -543,6 +543,7 @@ def tile_subregion_wcs(tile, subx, suby, engine=None):
 def drizzle_tile_subregion(tile, subx, suby, filter='F160W', engine=None, s3output=None, ir_wcs=None, make_figure=False, skip_existing=False, verbose=True, gzip_output=False, **kwargs):
     """
     """
+    import os
     import astropy.table
     import astropy.units as u
     import astropy.wcs as pywcs
@@ -574,7 +575,7 @@ def drizzle_tile_subregion(tile, subx, suby, filter='F160W', engine=None, s3outp
     sci_file = f'{root}.{filter.lower()}_drz_sci.fits'
     if skip_existing & os.path.exists(sci_file):
         print(f'Skip file {sci_file}')
-        continue
+        return True
         
     if ir_wcs is None:
         ir_wcs = tile_subregion_wcs(tile, subx, suby, engine=engine)
@@ -615,6 +616,7 @@ def build_mosaic_from_subregions():
     import numpy as np
     import astropy.io.fits as pyfits
     import astropy.wcs as pywcs
+    import os
     
     tile = 2530
     filter = 'f140w'
@@ -657,5 +659,6 @@ def build_mosaic_from_subregions():
         
     pyfits.writeto(f'mos.{tile}.{filter}_sci.fits', data=img, 
                    header=h, overwrite=True)
-
+    os.system(f'aws s3 cp mos.{tile}.{filter}_sci.fits s3://grizli-v2/Scratch/')
+    
     
