@@ -243,6 +243,7 @@ def s3_put_exposure(flt_file, product, assoc, remove_old=True, verbose=True, eng
     
     exp = db.from_sql(f"""SELECT eid, assoc, dataset, extension, filter, 
                           sciext, crval1 as ra, crval2 as dec, footprint
+                          FROM exposure_files
                       WHERE file='{file}' AND extension='{extension}'
                       """, engine)
     
