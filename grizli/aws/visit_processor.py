@@ -1013,7 +1013,7 @@ def make_parent_mosaic(parent='j191436m5928', **kwargs):
     cutout_mosaic(rootname=parent, ra=ra, dec=dec, size=size, **kwargs)
     
     
-def cutout_mosaic(rootname='gds', product='{rootname}-{f.lower()}', ra=53.1615666, dec=-27.7910651, size=5*60, filters=['F160W'], ir_scale=0.1, ir_wcs=None, res=None, half_optical=True, kernel='point', pixfrac=0.33, make_figure=True, skip_existing=True, clean_flt=True, gzip_output=True, s3output='s3://grizli-v2/HST/Pipeline/Mosaic/', **kwargs):
+def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-27.7910651, size=5*60, filters=['F160W'], ir_scale=0.1, ir_wcs=None, res=None, half_optical=True, kernel='point', pixfrac=0.33, make_figure=True, skip_existing=True, clean_flt=True, gzip_output=True, s3output='s3://grizli-v2/HST/Pipeline/Mosaic/', **kwargs):
     """
     Make mosaic from exposures defined in the exposure database
     
@@ -1061,7 +1061,7 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f.lower()}', ra=53.161566
     
     for f in np.unique(res['filter']):
         
-        visit = {'product':product.format(rootname=rootname, f=f)}
+        visit = {'product':product.format(rootname=rootname, f=f).lower()}
         
         if (len(glob.glob(visit['product'] + '*fits*')) > 0) & skip_existing:
             print('Skip ' + visit['product'])
