@@ -3997,7 +3997,13 @@ class SRegion(object):
         
         Parameters
         ----------
-        inp : str, [M,2] array, 
+        inp : str, [M,2] array, `~astropy.wcs.WCS`
+            
+            Can be a "S_REGION" string, an array, or an 
+            `~astropy.wcs.WCS` object that will 
+            from which the corners will be extracted with 
+            `~astropy.wcs.WCS.calc_footprint`.
+            
         """
         if isinstance(inp, str):
             self.xy = self._parse_sregion(inp, **kwargs)
@@ -4155,8 +4161,9 @@ class SRegion(object):
         """
         if shape is None:
             un = self.shapely[0]
-        
-        un = shape.union(shape)
+        else:
+            un = shape
+            
         for s in self.shapely:
             un = un.union(s)
         
