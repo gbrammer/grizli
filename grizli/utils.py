@@ -3989,9 +3989,16 @@ def get_common_slices(a_origin, a_shape, b_origin, b_shape):
 
     
 class SRegion(object):
-    """Helper class for parsing an S_REGION string
-    """
+
     def __init__(self, inp, label=None, **kwargs):
+        """
+        Helper class for parsing an S_REGION strings and general polygon 
+        tools
+        
+        Parameters
+        ----------
+        inp : str, [M,2] array, 
+        """
         if isinstance(inp, str):
             self.xy = self._parse_sregion(inp, **kwargs)
         elif hasattr(inp, 'sum'):
@@ -4000,10 +4007,11 @@ class SRegion(object):
         elif isinstance(inp, list):
             self.xy = inp
         elif isinstance(inp, pywcs.WCS):
-            self.xy = self.wcs.calc_footprint()
+            self.xy = [inp.calc_footprint()]
         else:
             raise IOError('input must be ``str``, ``list``, or ``np.array``')
         
+        self.inp = inp
         self.ds9_properties = ''
         self.label = label
 
