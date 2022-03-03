@@ -249,6 +249,23 @@ def s3_put_exposure(flt_file, product, assoc, remove_old=True, verbose=True, eng
     
     res = [add_exposure_to_tile_db(row=exp[i:i+1], tiles=tiles, engine=engine)
            for i in tqdm(range(len(exp)))]
+    
+    for j in range(len(res))[::-1]:
+        if res[j] is None:
+            res.pop(j)
+            
+    if len(res) > 0:
+        tab = astropy.table.vstack(res)
+        engine.execute(f"""
+                DELETE from mosaic_tiles_exposures t
+                USING exposure_files e
+                WHERE t.expid = e.eid
+                AND file='{file}' AND extension='{extension}'
+                """, engine)
+         
+        df = tab.to_pandas()
+        df.to_sql('mosaic_tiles_exposures', engine, index=False, 
+                  if_exists='append', method='multi')
                              
     if verbose:
         print(f'Add {file}_{extension} ({len(rows)}) to exposure_files table')
