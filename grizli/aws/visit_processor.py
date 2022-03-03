@@ -1149,12 +1149,14 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
     if s3output:
         files = []
         for f in np.unique(res['filter']):
+            prod = product.format(rootname=rootname, f=f).lower()
+            
             if gzip_output:
-                print(f'gzip --force {rootname}-{f.lower()}*fits')
-                os.system(f'gzip --force {rootname}-{f.lower()}*fits')
+                print(f'gzip --force {prod}*fits')
+                os.system(f'gzip --force {prod}*fits')
 
-            files += glob.glob(f'{rootname}-{f.lower()}*fits*')
-            files += glob.glob(f'{rootname}-{f.lower()}*_fp.png')
+            files += glob.glob(f'{prod}*fits*')
+            files += glob.glob(f'{prod}*_fp.png')
 
         for file in files:
             os.system(f'aws s3 cp {file} {s3output}')
