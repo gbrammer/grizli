@@ -288,14 +288,20 @@ def add_exposure_batch():
     
     engine = db.get_db_engine()
     
-    filters = db.from_sql('select filter, count(filter) from exposure_files group by filter order by count(filter)', engine)
+    filters = db.from_sql("""
+    select filter, count(filter) 
+    from exposure_files 
+    group by filter 
+    order by count(filter)""", engine)
     
-    for filt in filters['filter'][-3:]:
+    for ii, filt in enumerate(filters['filter']):
+        print(f"{ii} / {len(filters)} {filt} {filters['count'][ii]}")
+        
         exp = db.from_sql(f"""
                     select eid, assoc, dataset, extension, filter, sciext, 
                            crval1 as ra, crval2 as dec, footprint
                     FROM exposure_files
-                    WHERE filter = '{filt}'
+                    WHERE filter = '{filt}' 
                     """, engine)
     
         tiles = db.from_sql('select * from mosaic_tiles', engine)
@@ -564,6 +570,11 @@ def drizzle_tile_subregion(tile, subx, suby, filter='F160W', engine=None, s3outp
             print(f'{root} {filter} ! No exposures found')
             
         return True
+    
+    sci_file = f'{root}.{filter.lower()}_drz_sci.fits'
+    if skip_existing & os.path.exists(sci_file):
+        print(f'Skip file {sci_file}')
+        continue
         
     if ir_wcs is None:
         ir_wcs = tile_subregion_wcs(tile, subx, suby, engine=engine)
@@ -600,14 +611,18 @@ def build_mosaic_from_subregions():
     TBD
     """
     from tqdm import tqdm
+    import glob
+    import numpy as np
+    import astropy.io.fits as pyfits
+    import astropy.wcs as pywcs
     
     tile = 2530
-    filter = 'f160w'
+    filter = 'f140w'
     
     files = glob.glob(f'*{tile:04d}.*_drz_sci.fits')
     files.sort()
     tx = np.array([int(f.split('.')[2]) for f in files])
-    ty = np.array([int(f.split('.')[3].split('-')[0]) for f in files])
+    ty = np.array([int(f.split('.')[3]) for f in files])
     
     txm, tym = tx.min(), ty.min()
     nx = tx.max() - txm + 1
@@ -640,6 +655,7 @@ def build_mosaic_from_subregions():
             img[sly, slx] += im[0].data
 
         
-    pyfits.writeto(f'test-{filter}.fits', data=img, header=h, overwrite=True)
+    pyfits.writeto(f'mos.{tile}.{filter}_sci.fits', data=img, 
+                   header=h, overwrite=True)
 
     
