@@ -210,6 +210,13 @@ def s3_put_exposure(flt_file, product, assoc, remove_old=True, verbose=True, eng
         rows.append(row)
     
     if remove_old:
+        db.execute_helper(f"""DELETE FROM mosaic_tiles_exposures t
+                             USING exposure_files e 
+                             WHERE t.expid = e.eid
+                             AND file='{file}'
+                             AND extension='{extension}'""",
+                             engine)
+
         db.execute_helper('DELETE FROM exposure_files WHERE '
                        f"file='{file}' AND extension='{extension}'",
                        engine)
