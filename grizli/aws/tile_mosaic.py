@@ -278,36 +278,45 @@ def add_exposure_batch():
     Add a bunch of exposures to the `mosaic_tiles_exposures` table
     """    
     import astropy.table
-    from grizli.aws import db
     import astropy.table
     from tqdm import tqdm
     
+    from grizli.aws.tile_mosaic import add_exposure_to_tile_db
+    from grizli.aws import db
+    
     engine = db.get_db_engine()
     
-    exp = db.from_sql("""
-                select eid, assoc, dataset, extension, filter, sciext, 
-                       crval1 as ra, crval2 as dec, footprint
-                FROM exposure_files
-                WHERE filter = 'F814W'
-                AND assoc LIKE 'j100%%'
+    filters = db.from_sql('select filter, count(filter) from exposure_files group by filter order by count(filter)', engine)
+    
+    for filt in filters['filter'][-3:]:
+        exp = db.from_sql(f"""
+                    select eid, assoc, dataset, extension, filter, sciext, 
+                           crval1 as ra, crval2 as dec, footprint
+                    FROM exposure_files
+                    WHERE filter = '{filt}'
+                    """, engine)
+    
+        tiles = db.from_sql('select * from mosaic_tiles', engine)
+    
+        res = [add_exposure_to_tile_db(row=exp[i:i+1], tiles=tiles, 
+               engine=engine)
+               for i in tqdm(range(len(exp)))]
+        
+        for j in range(len(res))[::-1]:
+            if res[j] is None:
+                res.pop(j)
+                
+        tab = astropy.table.vstack(res)
+        engine.execute(f"""
+                DELETE from mosaic_tiles_exposures t
+                USING exposure_files e
+                WHERE t.expid = e.eid
+                AND filter = '{filt}'
                 """, engine)
-    
-    tiles = db.from_sql('select * from mosaic_tiles', engine)
-    
-    res = [add_exposure_to_tile_db(row=exp[i:i+1], tiles=tiles, engine=engine)
-           for i in tqdm(range(len(exp)))]
-    
-    tab = astropy.table.vstack(res)
-    engine.execute("""
-            DELETE from mosaic_tiles_exposures t
-            USING exposure_files e
-            WHERE t.expid = e.eid
-            AND filter = 'F160W'
-            """, engine)
              
-    df = tab.to_pandas()
-    df.to_sql('mosaic_tiles_exposures', engine, index=False, 
-              if_exists='append', method='multi')
+        df = tab.to_pandas()
+        df.to_sql('mosaic_tiles_exposures', engine, index=False, 
+                  if_exists='append', method='multi')
     
     
     # Exposure map
@@ -316,14 +325,17 @@ def add_exposure_batch():
         from matplotlib import pyplot as plt
         from astropy.coordinates import SkyCoord
         
-        res = db.from_sql("""
+        filt = 'F105W'
+        
+        res = db.from_sql(f"""
                 SELECT tile, subx, suby, subra, subdec, filter, 
                        COUNT(filter) as nexp, 
                        SUM(exptime) as exptime, MIN(expstart) as tmin, 
                        MAX(expstart) as tmax 
                 FROM mosaic_tiles_exposures t, exposure_files e
                 WHERE t.expid = e.eid
-                AND filter = 'F814W'
+                AND assoc like 'j12%%' AND tile = 2530
+                AND filter = '{filt}'
                 GROUP BY tile, subx, suby, subra, subdec, filter
                 """, engine)
 
@@ -333,7 +345,10 @@ def add_exposure_batch():
 
         kw = dict(projection='astro degrees zoom',
                       center='53.2d -27.6d', radius='1 deg')
-
+        
+        kw = dict(projection='astro degrees zoom',
+                      center='189.2d 62.25d', radius='20 arcmin')
+        
         #kw = dict(projection='astro degrees zoom',
         #            center='0h 0d', radius='6 deg')
 
@@ -346,8 +361,17 @@ def add_exposure_batch():
         coo = SkyCoord(res['subra'], res['subdec'], unit=('deg','deg'))
         ax.scatter_coord(coo, c=np.log10(res['exptime']), marker='s')
         
+        for t in np.unique(res['tile']):
+            twcs = tile_wcs(t, engine=engine)
+            coo = SkyCoord(*twcs.calc_footprint().T, unit=('deg','deg'))
+            ax.plot_coord(coo, color='r', linewidth=1.2, alpha=0.5)
+            
     if 0:
         engine.execute('ALTER TABLE exposure_files ADD COLUMN eid SERIAL PRIMARY KEY;')
+        
+        engine.execute('GRANT ALL PRIVILEGES ON ALL TABLEs IN SCHEMA public TO db_iam_user')
+        engine.execute('GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO db_iam_user')
+        
         engine.execute('ALTER TABLE assoc_table ADD COLUMN aid SERIAL PRIMARY KEY;')
         engine.execute('CREATE INDEX on exposure_files (eid)')
         engine.execute('CREATE INDEX on mosaic_tiles_exposures (expid)')
@@ -463,24 +487,21 @@ def add_exposure_to_tile_db(dataset='ibev8xubq', sciext=1, tiles=None, row=None,
         return None
 
 
-def tile_subregion_wcs(tile, subx, suby, engine=None):
+def tile_wcs(tile, engine=None):
     """
-    Compute WCS for a tile subregion
+    Compute tile WCS
     """
-    import astropy.table
-    import astropy.units as u
     import astropy.wcs as pywcs
-    
-    import numpy as np
     from grizli import utils
-    
     from grizli.aws import db
+    
     if engine is None:
         engine = db.get_db_engine()
         
-    
-    row = db.from_sql(f"select * from mosaic_tiles WHERE tile={tile}", 
-                        engine)
+    row = db.from_sql(f"""SELECT crval1, crval2, npix
+                          FROM mosaic_tiles
+                          WHERE tile={tile}""", 
+                      engine)
 
     t = 0
     h, w = utils.make_wcsheader(ra=row['crval1'][t], 
@@ -492,11 +513,23 @@ def tile_subregion_wcs(tile, subx, suby, engine=None):
     h['CRPIX2'] += 0.5
     h['LATPOLE'] = 0.
     
-    w = pywcs.WCS(h)
-    wsl = w.slice((slice(suby*512, (suby+1)*512), 
-                   slice(subx*512, (subx+1)*512)))
-    wsl.pscale = 0.1
-    return wsl
+    wcs = pywcs.WCS(h)
+    wcs.pscale = 0.1
+    
+    return wcs
+    
+    
+def tile_subregion_wcs(tile, subx, suby, engine=None):
+    """
+    Compute WCS for a tile subregion
+    """
+    
+    twcs = tile_wcs(tile, engine=engine)
+    
+    sub_wcs = twcs.slice((slice(suby*512, (suby+1)*512), 
+                          slice(subx*512, (subx+1)*512)))
+    sub_wcs.pscale = 0.1
+    return sub_wcs
 
 
 def drizzle_tile_subregion(tile, subx, suby, filter='F160W', engine=None, s3output=None, ir_wcs=None, make_figure=False, skip_existing=False, verbose=True, gzip_output=False, **kwargs):
@@ -523,7 +556,7 @@ def drizzle_tile_subregion(tile, subx, suby, filter='F160W', engine=None, s3outp
             AND subx={subx} AND suby={suby}
             """, engine)
     
-    root = f'{filter.lower()}.{tile:04d}.{subx:03d}.{suby:03d}'
+    root = f'tile.{tile:04d}.{subx:03d}.{suby:03d}'
     if len(exp) == 0:
         if verbose:
             print(f'{root} {filter} ! No exposures found')
@@ -563,65 +596,47 @@ def build_mosaic_from_subregions():
     """
     TBD
     """
-    pass
+    from tqdm import tqdm
     
-from astropy.coordinates import SkyCoord, BaseCoordinateFrame
-from astropy.coordinates import SkyCoord
-import astropy.units as u
+    tile = 2530
+    filter = 'f160w'
+    
+    files = glob.glob(f'*{tile:04d}.*_drz_sci.fits')
+    files.sort()
+    tx = np.array([int(f.split('.')[2]) for f in files])
+    ty = np.array([int(f.split('.')[3].split('-')[0]) for f in files])
+    
+    txm, tym = tx.min(), ty.min()
+    nx = tx.max() - txm + 1
+    ny = ty.max() - tym + 1
+    
+    if '_drc' in files[0]:
+        npix = 1024
+    else:
+        npix = 512
+        
+    img = np.zeros((ny*npix, nx*npix), dtype=np.float32)
+    
+    h = None
+    for f, xi, yi in tqdm(zip(files, tx, ty)):
+                    
+        im = pyfits.open(f)
+        
+        if h is None:
+            h = im[0].header
+        
+        if xi == txm:
+            h['CRPIX1'] = im[0].header['CRPIX1']
+        
+        if yi == tym:
+            h['CRPIX2'] = im[0].header['CRPIX2']
+        
+        if filter in f:
+            slx = slice((xi-txm)*npix, (xi-txm+1)*npix)
+            sly = slice((yi-tym)*npix, (yi-tym+1)*npix)
+            img[sly, slx] += im[0].data
 
-def scatter_coord(self, *args, **kwargs):
-    """
-    Plot `~astropy.coordinates.SkyCoord` or
-    `~astropy.coordinates.BaseCoordinateFrame` objects onto the axes.
+        
+    pyfits.writeto(f'test-{filter}.fits', data=img, header=h, overwrite=True)
 
-    The first argument to
-    :meth:`~astropy.visualization.wcsaxes.WCSAxes.plot_coord` should be a
-    coordinate, which will then be converted to the first two parameters to
-    `matplotlib.axes.Axes.plot`. All other arguments are the same as
-    `matplotlib.axes.Axes.plot`. If not specified a ``transform`` keyword
-    argument will be created based on the coordinate.
-
-    Parameters
-    ----------
-    coordinate : `~astropy.coordinates.SkyCoord` or `~astropy.coordinates.BaseCoordinateFrame`
-        The coordinate object to plot on the axes. This is converted to the
-        first two arguments to `matplotlib.axes.Axes.plot`.
-
-    See Also
-    --------
-
-    matplotlib.axes.Axes.plot : This method is called from this function with all arguments passed to it.
-
-    """
-
-    if isinstance(args[0], (SkyCoord, BaseCoordinateFrame)):
-
-        # Extract the frame from the first argument.
-        frame0 = args[0]
-        if isinstance(frame0, SkyCoord):
-            frame0 = frame0.frame
-
-        native_frame = self._transform_pixel2world.frame_out
-        # Transform to the native frame of the plot
-        frame0 = frame0.transform_to(native_frame)
-
-        plot_data = []
-        for coord in self.coords:
-            if coord.coord_type == 'longitude':
-                plot_data.append(frame0.spherical.lon.to_value(u.deg))
-            elif coord.coord_type == 'latitude':
-                plot_data.append(frame0.spherical.lat.to_value(u.deg))
-            else:
-                raise NotImplementedError("Coordinates cannot be plotted with this "
-                                          "method because the WCS does not represent longitude/latitude.")
-
-        if 'transform' in kwargs.keys():
-            raise TypeError("The 'transform' keyword argument is not allowed,"
-                            " as it is automatically determined by the input coordinate frame.")
-
-        transform = self.get_transform(native_frame)
-        kwargs.update({'transform': transform})
-
-        args = tuple(plot_data) + args[1:]
-
-    return super().scatter(*args, **kwargs)
+    
