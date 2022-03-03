@@ -573,6 +573,7 @@ def drizzle_tile_subregion(tile, subx, suby, filter='F160W', engine=None, s3outp
         s3output = f's3://grizli-v2/HST/Pipeline/Tiles/{tile}/'
     
     visit_processor.cutout_mosaic(rootname=root,
+                                  product='{rootname}.{f.lower()}'
                                   ir_wcs=ir_wcs,
                                   res=exp, 
                                   s3output=s3output, 
