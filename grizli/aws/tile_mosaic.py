@@ -4,6 +4,8 @@ Drizzled mosaics in tiles and subregions
 Here the sky is tesselated in 4 degree patches with sizes that are 
 increased slightly to be integer multiples of 512 0.1" pixels
 
+Individual subtiles are 256 x 0.1" = 25.6"
+
 """
 from tqdm import tqdm
 import numpy as np
@@ -208,11 +210,11 @@ def define_tile_grid(a=4., phase=0.6):
             if (j == 42) & (ir == 1):
                 for ik in range(5):
                     for jk in range(5):
-                        slx = slice(ik*512, (ik+1)*512)
-                        sly = slice(jk*512, (jk+1)*512)
+                        slx = slice(ik*256, (ik+1)*256)
+                        sly = slice(jk*256, (jk+1)*256)
                         
                         wsl = w.slice((sly, slx))
-                        fpx, fpy = wsl.all_pix2world(px*512, py*512, 0)
+                        fpx, fpy = wsl.all_pix2world(px*256, py*256, 0)
                         pl = ax.plot_coord(SkyCoord(fpx, fpy, 
                                                     unit=('deg','deg')), 
                                   color='k', alpha=0.5, linewidth=1)
@@ -440,12 +442,12 @@ def add_exposure_to_tile_db(dataset='ibev8xubq', sciext=1, tiles=None, row=None,
         if not sr.shapely[0].intersects(srt.shapely[0]):
             continue
         
-        nsub = tiles['npix'][t]//512
+        nsub = tiles['npix'][t]//256
         step = np.arange(nsub)
         px, py = np.meshgrid(step, step)
         px = px.flatten()
         py = py.flatten()
-        rd = w.all_pix2world(px*512+256, py*512+256, 0)
+        rd = w.all_pix2world(px*256+128, py*256+128, 0)
         pts = np.array([rd[0], rd[1]]).T
         test = sbuff.path[0].contains_points(pts)
         tw = np.where(test)[0]
@@ -453,8 +455,8 @@ def add_exposure_to_tile_db(dataset='ibev8xubq', sciext=1, tiles=None, row=None,
             continue
         
         for j, xi, yi in zip(tw, px[tw], py[tw]):
-            wsl = w.slice((slice(yi*512, (yi+1)*512), 
-                           slice(xi*512, (xi+1)*512)))
+            wsl = w.slice((slice(yi*256, (yi+1)*256), 
+                           slice(xi*256, (xi+1)*256)))
             sw = utils.SRegion(wsl.calc_footprint())
             test[j] = sw.shapely[0].intersects(exp_poly)
         
@@ -526,8 +528,8 @@ def tile_subregion_wcs(tile, subx, suby, engine=None):
     
     twcs = tile_wcs(tile, engine=engine)
     
-    sub_wcs = twcs.slice((slice(suby*512, (suby+1)*512), 
-                          slice(subx*512, (subx+1)*512)))
+    sub_wcs = twcs.slice((slice(suby*256, (suby+1)*256), 
+                          slice(subx*256, (subx+1)*256)))
     sub_wcs.pscale = 0.1
     return sub_wcs
 
@@ -612,9 +614,9 @@ def build_mosaic_from_subregions():
     ny = ty.max() - tym + 1
     
     if '_drc' in files[0]:
-        npix = 1024
-    else:
         npix = 512
+    else:
+        npix = 256
         
     img = np.zeros((ny*npix, nx*npix), dtype=np.float32)
     
