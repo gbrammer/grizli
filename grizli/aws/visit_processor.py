@@ -10,6 +10,8 @@ import os
 import glob
 import numpy as np
 
+from . import db
+
 def s3_object_path(dataset, product='raw', ext='fits', base_path='hst/public/'):
     """
     S3 path for an HST ``dataset``
@@ -27,11 +29,9 @@ def setup_log_table():
     """
     Set up exposure_files table
     """
-    from grizli.aws import db
-    engine = db.get_db_engine()
     
     if 0:
-        engine.execute('DROP TABLE exposure_files')
+        db.execute('DROP TABLE exposure_files')
     
     SQL = f"""CREATE TABLE IF NOT EXISTS exposure_files (
         file varchar,
@@ -79,35 +79,31 @@ def setup_log_table():
         modtime real
     );
     """
-    engine.execute(SQL)
+    db.execute(SQL)
 
 
 def all_visit_exp_info(all_visits):
-    
-    from grizli.aws import db
-    engine = db.get_db_engine()
-        
+    """
+    Run `exposure_info_from_visit` for a list of visits
+    """
     for i, v in enumerate(all_visits):
         assoc = v['files'][0].split('/')[0]
         print(f'=======================\n     {i+1} / {len(all_visits)}')
         print(v['files'][0], assoc)
         print('========================')
-        exposure_info_from_visit(v, assoc=assoc, engine=engine)
+        exposure_info_from_visit(v, assoc=assoc)
 
 
-def exposure_info_from_visit(visit, assoc='', engine=None):
-    
-    from grizli.aws import db
-    
-    if engine is None:
-        engine = db.get_db_engine()
-            
+def exposure_info_from_visit(visit, assoc=''):
+    """
+    Run `s3_put_exposure` for each file in visit['files']
+    """
+
     for file in visit['files']:
-        s3_put_exposure(file, visit['product'], assoc, remove_old=True, 
-                        engine=engine)
+        s3_put_exposure(file, visit['product'], assoc, remove_old=True)
 
 
-def s3_put_exposure(flt_file, product, assoc, remove_old=True, verbose=True, engine=None):
+def s3_put_exposure(flt_file, product, assoc, remove_old=True, verbose=True):
     """
     """
     import os
@@ -121,9 +117,6 @@ def s3_put_exposure(flt_file, product, assoc, remove_old=True, verbose=True, eng
     
     from .tile_mosaic import add_exposure_to_tile_db
     
-    if engine is None:
-        engine = db.get_db_engine()
-        
     hdul = pyfits.open(flt_file)
     modtime = astropy.time.Time(os.path.getmtime(flt_file), format='unix').mjd
     
@@ -210,44 +203,41 @@ def s3_put_exposure(flt_file, product, assoc, remove_old=True, verbose=True, eng
         rows.append(row)
     
     if remove_old:
-        db.execute_helper(f"""DELETE FROM mosaic_tiles_exposures t
+        db.execute(f"""DELETE FROM mosaic_tiles_exposures t
                              USING exposure_files e 
                              WHERE t.expid = e.eid
                              AND file='{file}'
-                             AND extension='{extension}'""",
-                             engine)
+                             AND extension='{extension}'""")
 
-        db.execute_helper('DELETE FROM exposure_files WHERE '
-                       f"file='{file}' AND extension='{extension}'",
-                       engine)
+        db.execute(f"""DELETE FROM exposure_files
+                       WHERE file='{file}' AND extension='{extension}'""")
     
     #df = pd.DataFrame(data=rows, columns=names)
     t = utils.GTable(rows=rows, names=names)
     df = t.to_pandas()
-    df.to_sql('exposure_files', engine, index=False, if_exists='append', 
+    df.to_sql('exposure_files', db._ENGINE, index=False, if_exists='append', 
               method='multi')
          
     # Set footprint
     # ('(' || latitude || ', ' || longitude || ')')::point
     
-    db.execute_helper('UPDATE exposure_files '
-               "SET footprint= ("
-               "'((' || ra1 || ', ' || dec1 || '),"
-               "(' || ra2 || ', ' || dec2 || '),"
-               "(' || ra3 || ', ' || dec3 || '),"
-               "(' || ra4 || ', ' || dec4 || '))')::path"
-               f" WHERE file='{file}' AND extension='{extension}'", engine)
+    db.execute(f"""UPDATE exposure_files
+                   SET footprint= (
+                    '((' || ra1 || ', ' || dec1 || '),
+                      (' || ra2 || ', ' || dec2 || '),
+                      (' || ra3 || ', ' || dec3 || '),
+                      (' || ra4 || ', ' || dec4 || '))')::path
+                   WHERE file='{file}' AND extension='{extension}'""")
     
     # Update tile_db
-    tiles = db.from_sql('select * from mosaic_tiles', engine)
+    tiles = db.SQL('select * from mosaic_tiles')
         
-    exp = db.from_sql(f"""SELECT eid, assoc, dataset, extension, filter, 
+    exp = db.SQL(f"""SELECT eid, assoc, dataset, extension, filter, 
                           sciext, crval1 as ra, crval2 as dec, footprint
                           FROM exposure_files
-                      WHERE file='{file}' AND extension='{extension}'
-                      """, engine)
+                     WHERE file='{file}' AND extension='{extension}'""")
     
-    res = [add_exposure_to_tile_db(row=exp[i:i+1], tiles=tiles, engine=engine)
+    res = [add_exposure_to_tile_db(row=exp[i:i+1], tiles=tiles)
            for i in tqdm(range(len(exp)))]
     
     for j in range(len(res))[::-1]:
@@ -256,15 +246,13 @@ def s3_put_exposure(flt_file, product, assoc, remove_old=True, verbose=True, eng
             
     if len(res) > 0:
         tab = astropy.table.vstack(res)
-        engine.execute(f"""
-                DELETE from mosaic_tiles_exposures t
-                USING exposure_files e
-                WHERE t.expid = e.eid
-                AND file='{file}' AND extension='{extension}'
-                """, engine)
+        db.execute(f"""DELETE from mosaic_tiles_exposures t
+                       USING exposure_files e
+                       WHERE t.expid = e.eid
+                       AND file='{file}' AND extension='{extension}'""")
          
         df = tab.to_pandas()
-        df.to_sql('mosaic_tiles_exposures', engine, index=False, 
+        df.to_sql('mosaic_tiles_exposures', db._ENGINE, index=False, 
                   if_exists='append', method='multi')
                              
     if verbose:
@@ -276,9 +264,8 @@ def setup_astrometry_tables():
     Initialize shifts_log and wcs_log tables
     """
     from grizli.aws import db
-    engine = db.get_db_engine()
     
-    engine.execute('DROP TABLE shifts_log')
+    db.execute('DROP TABLE shifts_log')
     
     SQL = f"""CREATE TABLE IF NOT EXISTS shifts_log (
         shift_dataset varchar,
@@ -291,14 +278,14 @@ def setup_astrometry_tables():
         shift_yrms real,
         shift_modtime real);
     """
-    engine.execute(SQL)
+    db.execute(SQL)
     
-    engine.execute('CREATE INDEX on shifts_log (shift_dataset)')
-    engine.execute('ALTER TABLE shifts_log ADD COLUMN shift_parent VARCHAR;')
-    engine.execute('CREATE INDEX on shifts_log (shift_parent)')
-    engine.execute('ALTER TABLE shifts_log ADD COLUMN shift_assoc VARCHAR;')
+    db.execute('CREATE INDEX on shifts_log (shift_dataset)')
+    db.execute('ALTER TABLE shifts_log ADD COLUMN shift_parent VARCHAR;')
+    db.execute('CREATE INDEX on shifts_log (shift_parent)')
+    db.execute('ALTER TABLE shifts_log ADD COLUMN shift_assoc VARCHAR;')
     
-    engine.execute('DROP TABLE wcs_log')
+    db.execute('DROP TABLE wcs_log')
 
     SQL = f"""CREATE TABLE IF NOT EXISTS wcs_log (
         wcs_assoc varchar, 
@@ -313,25 +300,24 @@ def setup_astrometry_tables():
         wcs_n int, 
         wcs_modtime real);
     """
-    engine.execute(SQL)
+    db.execute(SQL)
 
-    engine.execute('CREATE INDEX on wcs_log (wcs_parent)')
-    engine.execute('CREATE INDEX on exposure_files (dataset)')
-    engine.execute('CREATE INDEX on exposure_files (parent)')
+    db.execute('CREATE INDEX on wcs_log (wcs_parent)')
+    db.execute('CREATE INDEX on exposure_files (dataset)')
+    db.execute('CREATE INDEX on exposure_files (parent)')
     
     # Add assoc to shifts, wcs
-    engine.execute('ALTER TABLE wcs_log ADD COLUMN wcs_assoc VARCHAR')
+    db.execute('ALTER TABLE wcs_log ADD COLUMN wcs_assoc VARCHAR')
     
     ###### Run this to update wcs_log.wcs_assoc column and pop out 
     ### reprocessed visits
-    engine.execute("""UPDATE wcs_log
-    SET wcs_assoc = NULL""")
-    engine.execute("""UPDATE wcs_log
-SET wcs_assoc = exposure_files.assoc
-FROM exposure_files
-WHERE wcs_log.wcs_parent = exposure_files.parent;
-""")
-    engine.execute('DELETE FROM wcs_log where wcs_assoc IS NULL')
+    db.execute("""UPDATE wcs_log SET wcs_assoc = NULL""")
+    db.execute("""UPDATE wcs_log
+                      SET wcs_assoc = exposure_files.assoc
+                      FROM exposure_files
+                      WHERE wcs_log.wcs_parent = exposure_files.parent;""")
+                      
+    db.execute('DELETE FROM wcs_log where wcs_assoc IS NULL')
 
 
 def add_shifts_log(files=None, assoc=None, remove_old=True, verbose=True):
@@ -340,10 +326,7 @@ def add_shifts_log(files=None, assoc=None, remove_old=True, verbose=True):
     import glob
     import pandas as pd
     import astropy.time
-    
-    from grizli.aws import db
-    engine = db.get_db_engine()
-    
+
     if files is None:
         files = glob.glob('*shifts.log')
         
@@ -373,8 +356,8 @@ def add_shifts_log(files=None, assoc=None, remove_old=True, verbose=True):
             dataset = '_'.join(spl[0].split('_')[:-1])
             
             if remove_old:
-                db.execute_helper('DELETE FROM shifts_log WHERE '
-                               f"shift_dataset='{dataset}'", engine)
+                db.execute(f"""DELETE FROM shifts_log
+                               WHERE shift_dataset='{dataset}'""")
             
             row = [dataset, parent, float(spl[1]), float(spl[2]), int(spl[5]), 
                    float(spl[6]), float(spl[7]), modtime]
@@ -388,8 +371,8 @@ def add_shifts_log(files=None, assoc=None, remove_old=True, verbose=True):
             if verbose:
                 print(f'{ifile+1} / {len(files)}: Send {file} > `shifts_log` table')
                 
-            df.to_sql('shifts_log', engine, index=False, if_exists='append', 
-                      method='multi')
+            df.to_sql('shifts_log', db._ENGINE, index=False, 
+                      if_exists='append', method='multi')
 
 
 def add_wcs_log(files=None, assoc=None, remove_old=True, verbose=True):
@@ -398,10 +381,7 @@ def add_wcs_log(files=None, assoc=None, remove_old=True, verbose=True):
     import glob
     import pandas as pd
     import astropy.time
-    
-    from grizli.aws import db
-    engine = db.get_db_engine()
-    
+
     if files is None:
         files = glob.glob('*wcs.log')
         
@@ -423,8 +403,8 @@ def add_wcs_log(files=None, assoc=None, remove_old=True, verbose=True):
             
         parent = os.path.basename(file).split('_wcs.log')[0]
         if remove_old:
-            db.execute_helper('DELETE FROM wcs_log WHERE '
-                              f"wcs_parent='{parent}'", engine)
+            db.execute(f"DELETE FROM wcs_log WHERE wcs_parent='{parent}'")
+            
         rows = []
         
         for line in lines:
@@ -449,7 +429,7 @@ def add_wcs_log(files=None, assoc=None, remove_old=True, verbose=True):
             if verbose:
                 print(f'{ifile+1} / {len(files)}: Send {file} > `wcs_log` table')
                 
-            df.to_sql('wcs_log', engine, index=False, if_exists='append', 
+            df.to_sql('wcs_log', db._ENGINE, index=False, if_exists='append', 
                       method='multi')
 
 
@@ -457,11 +437,10 @@ def get_random_visit(extra=''):
     """
     Find a visit that needs processing
     """
-    from grizli.aws import db
-    engine = db.get_db_engine()
-        
-    all_assocs = db.from_sql('SELECT DISTINCT(assoc_name) FROM assoc_table' 
-                             ' WHERE status=0 ' + extra, engine)
+
+    all_assocs = db.SQL(f"""SELECT DISTINCT(assoc_name) 
+                           FROM assoc_table
+                           WHERE status=0 {extra}""")
     
     if len(all_assocs) == 0:
         return None
@@ -471,10 +450,11 @@ def get_random_visit(extra=''):
 
 
 def update_assoc_status(assoc, status=1, verbose=True):
+    """
+    Update `status` for `assoc_name` = assoc in `assoc_table`
+    """
     import astropy.time
-    from grizli.aws import db
-    engine = db.get_db_engine()
-        
+
     NOW = astropy.time.Time.now().mjd
     
     table = 'assoc_table'
@@ -488,7 +468,7 @@ def update_assoc_status(assoc, status=1, verbose=True):
         msg = 'Update status = {1} for assoc={0} on `{2}` ({3})'
         print(msg.format(assoc, status, table, NOW))
 
-    db.execute_helper(sqlstr, engine)
+    db.execute(sqlstr)
 
 
 def delete_all_assoc_data(assoc):
@@ -497,25 +477,27 @@ def delete_all_assoc_data(assoc):
     """
     import os
     from grizli.aws import db
-    engine = db.get_db_engine()
     
-    vis = db.from_sql(f"select obsid, assoc_name, obs_id from assoc_table where assoc_name = '{assoc}'", engine)
+    vis = db.SQL(f"""SELECT obsid, assoc_name, obs_id
+                     FROM assoc_table
+                     WHERE assoc_name = '{assoc}'""")
+                     
     vis_root = np.unique([v[:6] for v in vis['obs_id']])
     for r in vis_root:
         print(f'Remove {r} from shifts_log')
-        engine.execute(f"DELETE from shifts_log " + 
-                       f"WHERE shift_dataset like '{r}%%'")
+        db._ENGINE.execute(f"""DELETE from shifts_log
+                               WHERE shift_dataset like '{r}%%'""")
     
     os.system(f'aws s3 rm --recursive s3://grizli-v2/HST/Pipeline/{assoc}')
 
 
 def clear_failed():
+    """
+    Reset status for assoc with 'failed' files
+    """
     import glob
     import os
-    
-    from grizli.aws import db
-    engine = db.get_db_engine()
-    
+
     files = glob.glob('*/Prep/*fail*')
     
     failed_assoc = np.unique([file.split('/')[0] for file in files])
@@ -533,10 +515,9 @@ def reset_failed_assoc(failed_status='status != 2', reset=True, remove_files=Tru
     import numpy as np
     
     from grizli.aws import db
-    engine = db.get_db_engine()
     
-    failed_assoc = db.from_sql('select * from assoc_table '
-                               f'where {failed_status}', engine)
+    failed_assoc = db.SQL(f"""SELECT * FROM assoc_table 
+                              WHERE {failed_status}""")
     
     if reset:
         for assoc in np.unique(failed_assoc['assoc_name']):
@@ -548,31 +529,36 @@ def reset_failed_assoc(failed_status='status != 2', reset=True, remove_files=Tru
     
     
 def reset_old():
+    """
+    Reset status on old runs
+    """
     import astropy.time
-    from grizli.aws import db
-    engine = db.get_db_engine()
-        
+
     now = astropy.time.Time.now().mjd
     
-    old_assoc = db.from_sql('select distinct(assoc_name), '
-                            f'(modtime - {now})*24 as dt from assoc_table'
-                      f' where modtime < {now-0.2} AND status > 0'
-                      " AND assoc_name LIKE '%%f435%%'", engine)
+    old_assoc = db.SQL(f"""SELECT distinct(assoc_name),
+                                  (modtime - {now})*24 AS dt 
+                           FROM assoc_table
+                           WHERE modtime < {now-0.2} AND status > 0
+                           AND assoc_name LIKE '%%f435%%'""")
     
-    old_assoc = db.from_sql('select distinct(assoc_name), '
-                            f'(modtime - {now})*24 as dt from assoc_table'
-                      f" where assoc_name NOT LIKE '%%f435%%'", engine)
+    old_assoc = db.SQL(f"""SELECT distinct(assoc_name),
+                                  (modtime - {now})*24 AS dt
+                           FROM assoc_table
+                           WHERE assoc_name NOT LIKE '%%f435%%'""")
     
     for assoc in old_assoc['assoc_name']:
         update_assoc_status(assoc, status=0, verbose=True)
 
 
 def show_recent_assoc(limit=50):
+    """
+    Show recently-processed associations
+    """
     import astropy.time
-    from grizli.aws import db
-    engine = db.get_db_engine()
-    
-    last = db.from_sql(f'SELECT assoc_name, status, modtime FROM assoc_table ORDER BY modtime DESC LIMIT {limit}', engine)
+
+    last = db.SQL(f"""SELECT assoc_name, status, modtime 
+                      FROM assoc_table ORDER BY modtime DESC LIMIT {limit}""")
     
     time = astropy.time.Time(last['modtime'], format='mjd')
     last['iso'] = time.iso
@@ -584,12 +570,10 @@ def launch_ec2_instances(nmax=50):
     Launch EC2 instances from a launch template that run through all 
     status=0 associations and then terminate
     """
-    
-    from grizli.aws import db
-    engine = db.get_db_engine()
-    
-    assoc = db.from_sql('select distinct(assoc_name) from assoc_table'
-                        ' where status = 0', engine)
+
+    assoc = db.SQL("""SELECT distinct(assoc_name)
+                      FROM assoc_table
+                      WHERE status = 0""")
     
     count = np.minimum(nmax, len(assoc))
     
@@ -846,9 +830,6 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, visit_split_shift=1.2,
     from grizli.pipeline import auto_script
     from grizli import utils, prep
 
-    from grizli.aws import db
-    engine = db.get_db_engine()
-     
     os.chdir('/GrizliImaging/')
     
     if os.path.exists(assoc) & (clean > 0):
@@ -860,8 +841,8 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, visit_split_shift=1.2,
 
     update_assoc_status(assoc, status=1)
         
-    tab = db.from_sql("SELECT * FROM assoc_table WHERE "
-                      f"assoc_name='{assoc}'", engine)
+    tab = db.SQL(f"""SELECT * FROM assoc_table
+                     WHERE assoc_name='{assoc}'""")
     
     if len(tab) == 0:
         print(f"assoc_name='{assoc}' not found in assoc_table")
@@ -919,7 +900,7 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, visit_split_shift=1.2,
         
             for i, v in enumerate(visits):
                 print('File exposure info: ', v['files'][0], assoc)
-                exposure_info_from_visit(v, assoc=assoc, engine=engine)
+                exposure_info_from_visit(v, assoc=assoc)
     
     add_shifts_log(assoc=assoc, remove_old=True, verbose=True)
     add_wcs_log(assoc=assoc, remove_old=True, verbose=True)
@@ -985,16 +966,13 @@ def make_parent_mosaic(parent='j191436m5928', **kwargs):
     Get the full footprint of all exposure in the database for a given 'parent'
     """
     from grizli import utils
-    from grizli.aws import db
     from grizli.aws.visit_processor import cutout_mosaic
-    
-    engine = db.get_db_engine()
-    
-    fps = db.from_sql(f"""
-         SELECT  a.parent, e.filter, e.footprint from exposure_files e, assoc_table a
-         WHERE e.assoc = a.assoc_name AND a.parent = '{parent}'
-         """, engine)
-         
+
+    fps = db.SQL(f"""SELECT  a.parent, e.filter, e.footprint
+                     FROM exposure_files e, assoc_table a
+                     WHERE e.assoc = a.assoc_name
+                       AND a.parent = '{parent}'""")
+
     fp = None
     for f in fps['footprint']:
         fp_i = utils.SRegion(f)
@@ -1027,9 +1005,7 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
     
     from grizli import utils
     from mastquery import overlaps
-    from grizli.aws import db
-    engine = db.get_db_engine()
-    
+
     if ir_wcs is None:
         out_h, ir_wcs = utils.make_wcsheader(ra=ra, dec=dec, size=size, 
                                           pixscale=ir_scale, get_hdu=False)
@@ -1058,7 +1034,7 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
     
     SQL += ' ORDER BY e.filter'
     if res is None:
-        res = db.from_sql(SQL, engine)
+        res = db.SQL(SQL)
     
     for f in np.unique(res['filter']):
         
@@ -1384,12 +1360,9 @@ def run_all():
     import os
     import time
     from grizli.aws import db
-    
-    engine = db.get_db_engine()
-    
-    nassoc = db.from_sql('select count(distinct(assoc_name)) '
-                         ' from assoc_table', 
-                         engine)['count'][0]
+
+    nassoc = db.SQL('select count(distinct(assoc_name)) '
+                         ' from assoc_table')['count'][0]
                          
     assoc = -1
     j = 0
@@ -1410,12 +1383,9 @@ def run_one(clean=2, sync=True):
     """
     import os
     import time
-    from grizli.aws import db
-    
-    engine = db.get_db_engine()
-    nassoc = db.from_sql('select count(distinct(assoc_name)) '
-                         ' from assoc_table', 
-                         engine)['count'][0]
+
+    nassoc = db.SQL("""SELECT count(distinct(assoc_name))
+                       FROM assoc_table""")['count'][0] 
     
     assoc = get_random_visit()
     if assoc is None:

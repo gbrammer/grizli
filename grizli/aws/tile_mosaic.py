@@ -10,6 +10,8 @@ Individual subtiles are 256 x 0.1" = 25.6"
 from tqdm import tqdm
 import numpy as np
 
+from . import db
+
 def define_tile_grid(a=4., phase=0.6):
     """
     Define the tile grid following the PS1 tesselation algorithm from 
@@ -35,11 +37,7 @@ def define_tile_grid(a=4., phase=0.6):
     import astropy.wcs as pywcs
     
     from grizli import utils
-    from grizli.aws import db
-    
-    
-    engine = db.get_db_engine()
-    
+
     # bottom of first decl row at d=0
     dn = [a/2./180*np.pi]
     
@@ -225,19 +223,32 @@ def define_tile_grid(a=4., phase=0.6):
     
     ###### Checking
     df = tab.to_pandas()
-    df.to_sql('mosaic_tiles', engine, index=False, if_exists='fail', 
+    df.to_sql('mosaic_tiles', db._ENGINE, index=False, if_exists='fail', 
               method='multi')
     
     # Look at HST fields
     
-    avg_coo = db.from_sql('select parent, count(parent), avg(ra) as ra, avg(dec) as dec from assoc_table where ra > 0 GROUP by parent order by count(parent)', engine)
+    avg_coo = db.SQL("""SELECT parent, count(parent), 
+                               avg(ra) as ra, avg(dec) as dec
+                        FROM assoc_table where ra > 0
+                        GROUP by parent order by count(parent)""")
     
-    exp = db.from_sql('select assoc, crval1, crval2, footprint from exposure_files', engine)
+    exp = db.SQL('SELECT assoc, crval1, crval2, footprint FROM exposure_files')
     coo = SkyCoord(exp['crval1'], exp['crval2'], unit=('deg','deg'))
     
     # old
-    avg_coo = db.from_sql("select parent, count(parent), avg(ra) as ra, avg(dec) as dec from exposure_log where ra > 0 and awspath not like '%%grizli-cosmos-v2%%' GROUP by parent order by count(parent)", engine)
-    exp = db.from_sql("select parent, ra, dec from exposure_log where ra > 0 and awspath not like '%%grizli-cosmos-v2%%'", engine)
+    avg_coo = db.SQL("""SELECT parent, count(parent), 
+                               avg(ra) AS ra, avg(dec) as dec 
+                        FROM exposure_log
+                        WHERE ra > 0 
+                          AND awspath not like '%%grizli-cosmos-v2%%'
+                        GROUP by parent order by count(parent)""")
+                        
+    exp = db.SQL("""SELECT parent, ra, dec 
+                    FROM exposure_log 
+                    WHERE ra > 0 
+                      AND awspath NOT LIKE '%%grizli-cosmos-v2%%'""")
+                      
     coo = SkyCoord(exp['ra'], exp['dec'], unit=('deg','deg'))
     
     ra, dec = 150.1, 2.2 # cosmos
@@ -284,108 +295,115 @@ def add_exposure_batch():
     from tqdm import tqdm
     
     from grizli.aws.tile_mosaic import add_exposure_to_tile_db
-    from grizli.aws import db
     
-    engine = db.get_db_engine()
+    filters = db.SQL("""SELECT filter, count(filter) 
+                          FROM exposure_files 
+                        GROUP BY filter 
+                        ORDER BY count(filter)""")
     
-    filters = db.from_sql("""
-    select filter, count(filter) 
-    from exposure_files 
-    group by filter 
-    order by count(filter)""", engine)
+    ii = len(filters)-1
+    filt = 'F814W'
     
     for ii, filt in enumerate(filters['filter']):
         print(f"{ii} / {len(filters)} {filt} {filters['count'][ii]}")
         
-        exp = db.from_sql(f"""
-                    select eid, assoc, dataset, extension, filter, sciext, 
-                           crval1 as ra, crval2 as dec, footprint
-                    FROM exposure_files
-                    WHERE filter = '{filt}' 
-                    """, engine)
+        exp = db.SQL(f"""SELECT eid, assoc, dataset, extension, filter, 
+                                sciext, crval1 as ra, crval2 as dec, footprint
+                           FROM exposure_files
+                           WHERE filter = '{filt}'""")
     
-        tiles = db.from_sql('select * from mosaic_tiles', engine)
+        tiles = db.SQL('select * from mosaic_tiles')
     
-        res = [add_exposure_to_tile_db(row=exp[i:i+1], tiles=tiles, 
-               engine=engine)
-               for i in tqdm(range(len(exp)))]
+        res = [add_exposure_to_tile_db(row=exp[i:i+1], tiles=tiles)
+                  for i in tqdm(range(len(exp)))]
         
         for j in range(len(res))[::-1]:
             if res[j] is None:
+                print(f"Pop {exp['assoc'][j]} {j}")
                 res.pop(j)
                 
-        tab = astropy.table.vstack(res)
-        engine.execute(f"""
-                DELETE from mosaic_tiles_exposures t
+        db.execute(f"""DELETE from mosaic_tiles_exposures t
                 USING exposure_files e
                 WHERE t.expid = e.eid
                 AND filter = '{filt}'
-                """, engine)
+                """)
+        
+        N = 100
+        for j in tqdm(range(len(res)//N+1)):
+            sl = slice(j*N, (j+1)*N)
+            #print(j, sl.start, sl.stop)
+            
+            tab = astropy.table.vstack(res[sl])
              
-        df = tab.to_pandas()
-        df.to_sql('mosaic_tiles_exposures', engine, index=False, 
-                  if_exists='append', method='multi')
-    
+            df = tab.to_pandas()
+            df.to_sql('mosaic_tiles_exposures', db._ENGINE, index=False, 
+                      if_exists='append', method='multi')
     
     # Exposure map
     if 0:
         import ligo.skymap.plot
         from matplotlib import pyplot as plt
         from astropy.coordinates import SkyCoord
+        from grizli.aws import tile_mosaic
         
-        filt = 'F105W'
+        filt = 'F160W'
         
-        res = db.from_sql(f"""
-                SELECT tile, subx, suby, subra, subdec, filter, 
-                       COUNT(filter) as nexp, 
-                       SUM(exptime) as exptime, MIN(expstart) as tmin, 
-                       MAX(expstart) as tmax 
+        # CDFS
+        ra, dec, rsize, name = 53.14,-27.78, 20, 'gds'
+        ra, dec, rsize, name = 189.28, 62.25, 20, 'gdn'
+        #ra, dec, rsize, name = 150.0, 2.0, 90, 'cos'
+        
+        cosd = np.cos(dec/180*np.pi)
+        
+        res = db.SQL(f"""SELECT tile, subx, suby, subra, subdec, filter, 
+                                COUNT(filter) as nexp, 
+                                SUM(exptime) as exptime,
+                                MIN(expstart) as tmin, 
+                                MAX(expstart) as tmax 
                 FROM mosaic_tiles_exposures t, exposure_files e
                 WHERE t.expid = e.eid
-                AND assoc like 'j12%%' AND tile = 2530
                 AND filter = '{filt}'
+                AND ABS(subra - {ra})*{cosd} < {rsize/60}
+                AND ABS(subdec - {dec}) < {rsize/60}
                 GROUP BY tile, subx, suby, subra, subdec, filter
-                """, engine)
+                """)
 
-        kw = {'projection':'astro aitoff'}
-        kw = dict(projection='astro degrees zoom',
-                      center='150.0d 2.0d', radius='1 deg')
-
-        kw = dict(projection='astro degrees zoom',
-                      center='53.2d -27.6d', radius='1 deg')
+        kw = dict(projection='astro hours zoom',
+                  center=f'{ra}d {dec}d', radius=f'{rsize} arcmin')
         
-        kw = dict(projection='astro degrees zoom',
-                      center='189.2d 62.25d', radius='20 arcmin')
+        s = np.maximum(28*18/rsize, 1)
         
-        #kw = dict(projection='astro degrees zoom',
-        #            center='0h 0d', radius='6 deg')
-
-        plt.close('all')
-        fig, ax = plt.subplots(1,1,figsize=(8,8), 
+        fig, ax = plt.subplots(1,1,figsize=(6,6), 
                                subplot_kw=kw)
         
         ax.grid()
         
         coo = SkyCoord(res['subra'], res['subdec'], unit=('deg','deg'))
-        ax.scatter_coord(coo, c=np.log10(res['exptime']), marker='s')
+        ax.scatter_coord(coo, c=np.log10(res['exptime']), marker='s', s=s)
         
         for t in np.unique(res['tile']):
-            twcs = tile_wcs(t, engine=engine)
+            twcs = tile_mosaic.tile_wcs(t)
             coo = SkyCoord(*twcs.calc_footprint().T, unit=('deg','deg'))
             ax.plot_coord(coo, color='r', linewidth=1.2, alpha=0.5)
-            
+        
+        ax.set_xlabel('R.A.')
+        ax.set_ylabel('Dec.')
+        ax.set_title(f'{name} - {filt}')
+        
+        fig.tight_layout(pad=1)
+        
     if 0:
-        engine.execute('ALTER TABLE exposure_files ADD COLUMN eid SERIAL PRIMARY KEY;')
+        db.execute('ALTER TABLE exposure_files ADD COLUMN eid SERIAL PRIMARY KEY;')
         
-        engine.execute('GRANT ALL PRIVILEGES ON ALL TABLEs IN SCHEMA public TO db_iam_user')
-        engine.execute('GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO db_iam_user')
+        db.execute('GRANT ALL PRIVILEGES ON ALL TABLEs IN SCHEMA public TO db_iam_user')
+        db.execute('GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO db_iam_user')
         
-        engine.execute('ALTER TABLE assoc_table ADD COLUMN aid SERIAL PRIMARY KEY;')
-        engine.execute('CREATE INDEX on exposure_files (eid)')
-        engine.execute('CREATE INDEX on mosaic_tiles_exposures (expid)')
+        db.execute('ALTER TABLE assoc_table ADD COLUMN aid SERIAL PRIMARY KEY;')
+        db.execute('CREATE INDEX on exposure_files (eid)')
+        db.execute('CREATE INDEX on mosaic_tiles_exposures (expid)')
         
                     
-def add_exposure_to_tile_db(dataset='ibev8xubq', sciext=1, tiles=None, row=None, engine=None):
+def add_exposure_to_tile_db(dataset='ibev8xubq', sciext=1, tiles=None, row=None):
     """
     Find subtiles that overlap with an exposure in the `exposure_files`
     table
@@ -397,15 +415,16 @@ def add_exposure_to_tile_db(dataset='ibev8xubq', sciext=1, tiles=None, row=None,
     import numpy as np
     from grizli import utils
     
-    from grizli.aws import db
-    if engine is None:
-        engine = db.get_db_engine()
-        
     if tiles is None:
-        tiles = db.from_sql('select * from mosaic_tiles', engine)
+        tiles = db.SQL('select * from mosaic_tiles')
 
     if row is None:
-        row = db.from_sql(f"select eid, assoc, dataset, extension, filter, sciext, crval1 as ra, crval2 as dec, footprint from exposure_files where filter = 'F160W' and dataset = '{dataset}' AND sciext={sciext}", engine)
+        row = db.SQL(f"""SELECT eid, assoc, dataset, extension, filter, 
+                                sciext, crval1 as ra, crval2 as dec, footprint 
+                           from exposure_files
+                           where filter = 'F160W' 
+                             and dataset = '{dataset}' 
+                             AND sciext={sciext}""")
     
     if len(row) == 0:
         print(f'No exposure data found for dataset={dataset} sciext={sciext}')
@@ -484,18 +503,12 @@ def add_exposure_to_tile_db(dataset='ibev8xubq', sciext=1, tiles=None, row=None,
         
     if len(tabs) > 0:
         tmatch = astropy.table.vstack(tabs)
-        
-        # engine.execute()
-        # df = tmatch.to_pandas()
-        # df.to_sql('mosaic_tiles_exposures', engine, index=False, 
-        #           if_exists='append', method='multi')
-        
         return tmatch
     else:
         return None
 
 
-def tile_wcs(tile, engine=None):
+def tile_wcs(tile):
     """
     Compute tile WCS
     """
@@ -503,19 +516,13 @@ def tile_wcs(tile, engine=None):
     from grizli import utils
     from grizli.aws import db
     
-    if engine is None:
-        engine = db.get_db_engine()
-        
-    row = db.from_sql(f"""SELECT crval1, crval2, npix
-                          FROM mosaic_tiles
-                          WHERE tile={tile}""", 
-                      engine)
+    row = db.SQL(f"""SELECT crval1, crval2, npix
+                       FROM mosaic_tiles
+                      WHERE tile={tile}""")
 
     t = 0
-    h, w = utils.make_wcsheader(ra=row['crval1'][t], 
-                                dec=row['crval2'][t],
-                                size=row['npix'][t]*0.1, 
-                                pixscale=0.1)
+    h, w = utils.make_wcsheader(ra=row['crval1'][t], dec=row['crval2'][t],
+                                size=row['npix'][t]*0.1, pixscale=0.1)
     
     h['CRPIX1'] += 0.5
     h['CRPIX2'] += 0.5
@@ -527,12 +534,12 @@ def tile_wcs(tile, engine=None):
     return wcs
     
     
-def tile_subregion_wcs(tile, subx, suby, engine=None):
+def tile_subregion_wcs(tile, subx, suby):
     """
     Compute WCS for a tile subregion
     """
     
-    twcs = tile_wcs(tile, engine=engine)
+    twcs = tile_wcs(tile)
     
     sub_wcs = twcs.slice((slice(suby*256, (suby+1)*256), 
                           slice(subx*256, (subx+1)*256)))
@@ -574,26 +581,71 @@ def send_event_lambda(event, verbose=True, client=None, func='grizli-mosaic_tile
                              Payload=json.dumps(event))
 
 
+def count_locked():
+    """
+    Count number of distinct locked tiles that could still be runing
+    on aws lambda
+    """
+    tiles = db.SQL("""SELECT tile, subx, suby, filter, count(filter)
+                      FROM mosaic_tiles_exposures t, exposure_files e
+                               WHERE t.expid = e.eid AND tile != 1183
+                               AND in_mosaic=9
+                               GROUP BY tile, subx, suby, filter
+                               ORDER BY filter DESC""")
+    
+    return len(tiles)
+
+
+def get_subtile_status(tile=2530, subx=522, suby=461, **kwargs):
+    """
+    `in_mosaic` status of all entries of a subtile
+    """
+    resp = db.SQL(f"""SELECT tile, subx, suby, filter, 
+                             in_mosaic, count(filter)
+                FROM mosaic_tiles_exposures t, exposure_files e
+                WHERE t.expid = e.eid
+                AND tile={tile} AND subx={subx} AND suby={suby}
+                GROUP BY tile, subx, suby, filter, in_mosaic
+                ORDER BY (filter, in_mosaic)
+                """)
+    return resp
+
+
 def send_all_tiles():
     
     import time
     import os
     from grizli.aws.tile_mosaic import drizzle_tile_subregion
     
-    from grizli.aws import db
-    engine = db.get_db_engine()
+    tiles = []
     
     client = get_lambda_client()
     
-    tiles = db.from_sql("""select tile, subx, suby, filter, count(filter)
+    nt0 = len(tiles)
+    tiles = db.SQL("""SELECT tile, subx, suby, filter, count(filter)
        FROM mosaic_tiles_exposures t, exposure_files e
                 WHERE t.expid = e.eid AND in_mosaic = 0 AND tile != 1183
                 GROUP BY tile, subx, suby, filter
                 ORDER BY filter DESC
-                """, engine)
-    print(len(tiles))
+                """)
+                
+    nt1 = len(tiles)
+    print(nt1, nt1-nt0)
     
-    for i in range(len(tiles)):
+    istart = i = -1
+    step = 150 - count_locked()
+    
+    #for i in range(len(tiles)):
+    while i < len(tiles):
+        i+=1 
+        
+        if i-istart == step:
+            istart = i
+            print(f'{time.ctime()}: Pause for 60s')
+            time.sleep(60)
+            skip = 150 - count_locked()
+            print(f'{time.ctime()}: Run {skip} more')
+        
         if tiles['tile'][i] == 1183:
             continue
             
@@ -609,7 +661,7 @@ def send_all_tiles():
         
         else:
             drizzle_tile_subregion(**event, 
-                                   engine=engine, s3output=None,
+                                   s3output=None,
                                    ir_wcs=None, make_figure=False, 
                                    skip_existing=False, verbose=True, 
                                    gzip_output=False)
@@ -617,27 +669,23 @@ def send_all_tiles():
             files='tile.{tile:04d}.{subx:03d}.{suby:03d}.{fx}*fits'
             os.system('rm {files}'.format(fx=event['filter'].lower(), 
                                              **event))
-        if (i+1) % 100 == 0:
-            break
+        
+        # if (i+1) % 300 == 0:
+        #     break
             #time.sleep(10)
 
 
-def get_tile_status(tile, subx, suby, filter, engine=None):
+def get_tile_status(tile, subx, suby, filter):
     """
     Is a tile "locked" with all exposures set with in_mosaic = 9?
     """
-    from grizli.aws import db
-    if engine is None:
-        engine = db.get_db_engine()
-    
-    exp = db.from_sql(f"""
-            SELECT dataset, extension, assoc, filter, exptime, footprint,
-                   in_mosaic
-            FROM mosaic_tiles_exposures t, exposure_files e
-            WHERE t.expid = e.eid
-            AND filter='{filter}' AND tile={tile}
-            AND subx={subx} AND suby={suby}
-            """, engine)
+
+    exp = db.SQL(f"""SELECT dataset, extension, assoc, filter, 
+                            exptime, footprint, in_mosaic
+                      FROM mosaic_tiles_exposures t, exposure_files e
+                      WHERE t.expid = e.eid
+                      AND filter='{filter}' AND tile={tile}
+                      AND subx={subx} AND suby={suby}""")
     
     if len(exp) == 0:
         status = 'empty'
@@ -651,7 +699,7 @@ def get_tile_status(tile, subx, suby, filter, engine=None):
     return exp, status
 
 
-def drizzle_tile_subregion(tile=2530, subx=522, suby=461, filter='F160W', engine=None, s3output=None, ir_wcs=None, make_figure=False, skip_existing=False, verbose=True, gzip_output=False, **kwargs):
+def drizzle_tile_subregion(tile=2530, subx=522, suby=461, filter='F160W', s3output=None, ir_wcs=None, make_figure=False, skip_existing=False, verbose=True, gzip_output=False, **kwargs):
     """
     """
     import os
@@ -664,11 +712,7 @@ def drizzle_tile_subregion(tile=2530, subx=522, suby=461, filter='F160W', engine
     from grizli import utils
     from grizli.aws import visit_processor
     
-    from grizli.aws import db
-    if engine is None:
-        engine = db.get_db_engine()
-    
-    exp, status = get_tile_status(tile, subx, suby, filter, engine=None)
+    exp, status = get_tile_status(tile, subx, suby, filter) 
     
     root = f'tile.{tile:04d}.{subx:03d}.{suby:03d}'
     
@@ -692,17 +736,15 @@ def drizzle_tile_subregion(tile=2530, subx=522, suby=461, filter='F160W', engine
         return True
     
     # Lock
-    engine.execute(f"""
-          UPDATE mosaic_tiles_exposures t
+    db.execute(f"""UPDATE mosaic_tiles_exposures t
           SET in_mosaic = 9
           FROM exposure_files w
           WHERE t.expid = w.eid
           AND w.filter='{filter}' AND tile={tile}
-          AND subx={subx} AND suby={suby}
-           """)
+          AND subx={subx} AND suby={suby}""")
         
     if ir_wcs is None:
-        ir_wcs = tile_subregion_wcs(tile, subx, suby, engine=engine)
+        ir_wcs = tile_subregion_wcs(tile, subx, suby)
     
     if verbose:
         print(f'{root} {filter} {len(exp)}')
@@ -721,8 +763,7 @@ def drizzle_tile_subregion(tile=2530, subx=522, suby=461, filter='F160W', engine
                                   **kwargs)
     
     # Update subtile status
-    engine.execute(f"""
-          UPDATE mosaic_tiles_exposures t
+    db.execute(f"""UPDATE mosaic_tiles_exposures t
           SET in_mosaic = 1
           FROM exposure_files w
           WHERE t.expid = w.eid
@@ -731,17 +772,13 @@ def drizzle_tile_subregion(tile=2530, subx=522, suby=461, filter='F160W', engine
            """)
 
 
-def query_cutout(output='cutout', ra=189.0243001, dec=62.1966953, size=10, filter='F160W', engine=None):
+def query_cutout(output='cutout', ra=189.0243001, dec=62.1966953, size=10, filter='F160W'):
     """
     """
-    from grizli.aws import db
     from tqdm import tqdm
     import matplotlib.pyplot as plt
     from grizli import utils
     from grizli.aws import tile_mosaic
-    
-    if engine is None:
-        engine = db.get_db_engine()
     
     dd = size/3600
     dr = dd/np.cos(dec/180*np.pi)
@@ -797,20 +834,7 @@ def query_cutout(output='cutout', ra=189.0243001, dec=62.1966953, size=10, filte
                 && ('((0,0),{rc})')::circle
             GROUP BY tile, subx, suby, subra, subdec"""
     
-    # SQL = f"""SELECT tile, subx, suby, subra, subdec
-    #             FROM mosaic_tiles_exposures t, exposure_files e
-    #             WHERE in_mosaic = 1 AND filter = '{filter.upper()}'
-    #             AND t.expid = e.eid 
-    #             AND point '(' || subra || ',' || subdec || ')'
-    #                 <@
-    #                 polygon (
-    #                  ('(( {ra - dd}  , {dec - dr}), 
-    #                    ( {ra - dd}  , {dec + dr}), 
-    #                    ( {ra + dd}  , {dec + dr}), 
-    #                    ( {ra + dd}  , {dec - dr}))')::path )
-    #             GROUP BY tile, subx, subx"""
-    
-    res = db.from_sql(SQL, engine) 
+    res = db.SQL(SQL) 
     
     fig, ax = plt.subplots(1,1,figsize=(8,8))
     ax.scatter(res['subra'], res['subdec'])
@@ -818,9 +842,6 @@ def query_cutout(output='cutout', ra=189.0243001, dec=62.1966953, size=10, filte
     from shapely.geometry.point import Point
     import shapely.affinity
     from descartes import PolygonPatch
-    # Note: download figures.py manually from shapely github repo, put it in shapely install directory
-    #from shapely.figures import SIZE, GREEN, GRAY, set_limits
-
 
     # Let create a circle of radius 1 around center point:
     circ = shapely.geometry.Point((ra, dec)).buffer(rc)
@@ -829,7 +850,7 @@ def query_cutout(output='cutout', ra=189.0243001, dec=62.1966953, size=10, filte
     ax.add_patch(PolygonPatch(ell, color='r', alpha=0.5))
     
     for tile, subx, suby in tqdm(zip(res['tile'], res['subx'], res['suby'])):
-        tw = tile_mosaic.tile_subregion_wcs(tile, subx, suby, engine=engine)
+        tw = tile_mosaic.tile_subregion_wcs(tile, subx, suby)
         sr = utils.SRegion(tw)
         ax.add_patch(sr.get_patch(alpha=0.5)[0])
         
