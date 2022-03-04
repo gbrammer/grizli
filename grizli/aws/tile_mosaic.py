@@ -338,71 +338,162 @@ def add_exposure_batch():
             df = tab.to_pandas()
             df.to_sql('mosaic_tiles_exposures', db._ENGINE, index=False, 
                       if_exists='append', method='multi')
-    
-    # Exposure map
-    if 0:
-        import ligo.skymap.plot
-        from matplotlib import pyplot as plt
-        from astropy.coordinates import SkyCoord
-        from grizli.aws import tile_mosaic
-        
-        filt = 'F160W'
-        
-        # CDFS
-        ra, dec, rsize, name = 53.14,-27.78, 20, 'gds'
-        ra, dec, rsize, name = 189.28, 62.25, 20, 'gdn'
-        #ra, dec, rsize, name = 150.0, 2.0, 90, 'cos'
-        
-        cosd = np.cos(dec/180*np.pi)
-        
-        res = db.SQL(f"""SELECT tile, subx, suby, subra, subdec, filter, 
-                                COUNT(filter) as nexp, 
-                                SUM(exptime) as exptime,
-                                MIN(expstart) as tmin, 
-                                MAX(expstart) as tmax 
-                FROM mosaic_tiles_exposures t, exposure_files e
-                WHERE t.expid = e.eid
-                AND filter = '{filt}'
-                AND ABS(subra - {ra})*{cosd} < {rsize/60}
-                AND ABS(subdec - {dec}) < {rsize/60}
-                GROUP BY tile, subx, suby, subra, subdec, filter
-                """)
+        #
+        # Table updates
+        if 0:
+            db.execute('ALTER TABLE exposure_files ADD COLUMN eid SERIAL PRIMARY KEY;')
 
-        kw = dict(projection='astro hours zoom',
-                  center=f'{ra}d {dec}d', radius=f'{rsize} arcmin')
+            db.execute('GRANT ALL PRIVILEGES ON ALL TABLEs IN SCHEMA public TO db_iam_user')
+            db.execute('GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO db_iam_user')
+
+            db.execute('ALTER TABLE assoc_table ADD COLUMN aid SERIAL PRIMARY KEY;')
+            db.execute('CREATE INDEX on exposure_files (eid)')
+            db.execute('CREATE INDEX on mosaic_tiles_exposures (expid)')
         
-        s = np.maximum(28*18/rsize, 1)
+def make_exposure_maps():
+    """
+    """
+    from grizli import utils
+    
+    filt = 'F160W'
+    
+    ra, dec, rsize, name =  53.14628, -27.814, 20, 'gds'
+    #ra, dec, rsize, name = 189.22592,  62.24586, 20, 'gdn'
+    # ra, dec, rsize, name = 214.95, 52.9, 20, 'egs'
+    # ra, dec, rsize, name = 150.11322, 2.24068, 48, 'cos'
+    #ra, dec, rsize, name = 34.34984, -5.18390, 20, 'uds'
+    
+    fig = exposure_map(ra, dec, rsize, name, filt=filt, s0=18)
+    fig.tight_layout(pad=0.5)
+    fig.savefig('/tmp/map.png')
+    fig.tight_layout(pad=0.5)
+    fig.savefig('/tmp/map.png')
+    
+    
+    ###############
+    
+def find_mosaic_segments(bs=16):
+    """
+    
+    Find "segments" of connected subimages within a tile
+    
+    bs : bin size relative to 256*0.1" subimages
+    
+    """
+    from grizli import utils
+    
+    cells = db.SQL(f"""SELECT tile, subx, suby, subra, subdec, filter, 
+                              assoc, dataset, exptime
+            FROM mosaic_tiles_exposures t, exposure_files e
+            WHERE t.expid = e.eid
+            """)
+    
+    cells['segment'] = 0
+    
+    un = utils.Unique(cells['tile'])
+    ns = 0
+    
+    for t in un.values:
+        uni = np.where(un[t])[0]
         
-        fig, ax = plt.subplots(1,1,figsize=(6,6), 
-                               subplot_kw=kw)
+        # img = np.zeros((cells['suby'][uni].max()+1, 
+        #                 cells['subx'][uni].max()+1), dtype=bool)
+        # img[cells['suby'][uni], cells['subx'][uni]] = True
+    
+        bs = 16
+    
+        img = np.zeros((cells['suby'][uni].max()//bs+1, 
+                        cells['subx'][uni].max()//bs+1), dtype=bool)
+        img[cells['suby'][uni]//bs, cells['subx'][uni]//bs] = True
+    
+        from scipy.ndimage import label
+        labeled_array, num_features = label(img)
+    
+        cells['segment'][uni] = labeled_array[cells['suby'][uni]//bs, 
+                                              cells['subx'][uni]//bs] + ns
         
-        ax.grid()
+        print(f'tile: {t}  npatch: {num_features}')
         
-        coo = SkyCoord(res['subra'], res['subdec'], unit=('deg','deg'))
-        ax.scatter_coord(coo, c=np.log10(res['exptime']), marker='s', s=s)
+        ns += num_features
+
+
+def exposure_map(ra, dec, rsize, name, filt='F160W', s0=16):
+    """
+    Make an exposure map from a database query
+    """
+    import ligo.skymap.plot
+    from matplotlib import pyplot as plt
+    import numpy as np
+    
+    from astropy.coordinates import SkyCoord
+    from grizli.aws import tile_mosaic
+    from grizli import utils
+    
+    cosd = np.cos(dec/180*np.pi)
+    
+    res = db.SQL(f"""SELECT tile, subx, suby, subra, subdec, filter, 
+                            COUNT(filter) as nexp, 
+                            SUM(exptime) as exptime,
+                            MIN(expstart) as tmin, 
+                            MAX(expstart) as tmax 
+            FROM mosaic_tiles_exposures t, exposure_files e
+            WHERE t.expid = e.eid
+            AND filter = '{filt}'
+            AND ABS(subra - {ra})*{cosd} < {rsize/60}
+            AND ABS(subdec - {dec}) < {rsize/60}
+            GROUP BY tile, subx, suby, subra, subdec, filter
+            """)
+
+    kw = dict(projection='astro hours zoom',
+              center=f'{ra}d {dec}d', radius=f'{rsize} arcmin')
+    
+    s = np.maximum(s0*18/rsize, 1)
+    
+    fig, ax = plt.subplots(1,1,figsize=(6,6), 
+                           subplot_kw=kw)
+    
+    ax.grid()
+    
+    coo = SkyCoord(res['subra'], res['subdec'], unit=('deg','deg'))
+    ax.scatter_coord(coo, c=np.log10(res['exptime']), marker='s', s=s)
+    
+    for t in np.unique(res['tile']):
+        twcs = tile_mosaic.tile_wcs(t)
+        coo = SkyCoord(*twcs.calc_footprint().T, unit=('deg','deg'))
+        ax.plot_coord(coo, color='r', linewidth=1.2, alpha=0.5)
+    
+    # Tile labels
+    un = utils.Unique(res['tile'], verbose=False)
+    
+    dp = 512*0.1/3600
+    rp = dp/cosd
+    
+    for t in un.values:
+        c = (res['subra'][un[t]].min(), res['subdec'][un[t]].min(), 
+             res['subra'][un[t]].max(), res['subdec'][un[t]].max())
+        #
+        cp = (res['subx'][un[t]].min(), res['suby'][un[t]].min(), 
+             res['subx'][un[t]].max(), res['suby'][un[t]].max())
         
-        for t in np.unique(res['tile']):
-            twcs = tile_mosaic.tile_wcs(t)
-            coo = SkyCoord(*twcs.calc_footprint().T, unit=('deg','deg'))
-            ax.plot_coord(coo, color='r', linewidth=1.2, alpha=0.5)
+        rc = np.array([c[0]-rp, c[0]-rp, c[2]+rp, c[2]+rp, c[0]-rp])
+        dc = np.array([c[1]-dp, c[3]+dp, c[3]+dp, c[1]-dp, c[1]-dp])
         
-        ax.set_xlabel('R.A.')
-        ax.set_ylabel('Dec.')
-        ax.set_title(f'{name} - {filt}')
+        label = f'{t:04d}: {cp[0]:03d} - {cp[2]:03d}, {cp[1]:03d} - {cp[3]:03d}'
         
-        fig.tight_layout(pad=1)
-        
-    if 0:
-        db.execute('ALTER TABLE exposure_files ADD COLUMN eid SERIAL PRIMARY KEY;')
-        
-        db.execute('GRANT ALL PRIVILEGES ON ALL TABLEs IN SCHEMA public TO db_iam_user')
-        db.execute('GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO db_iam_user')
-        
-        db.execute('ALTER TABLE assoc_table ADD COLUMN aid SERIAL PRIMARY KEY;')
-        db.execute('CREATE INDEX on exposure_files (eid)')
-        db.execute('CREATE INDEX on mosaic_tiles_exposures (expid)')
-        
-                    
+        ax.plot_coord(SkyCoord(rc, dc, unit=('deg','deg')),
+                      alpha=0.8, label=label, linewidth=1.2)
+    
+    ax.legend()
+    
+    ax.set_xlabel('R.A.')
+    ax.set_ylabel('Dec.')
+    ax.set_title(f'{name} - {filt}')
+    
+    #fig.tight_layout(pad=0.8)
+    
+    return fig
+
+
 def add_exposure_to_tile_db(dataset='ibev8xubq', sciext=1, tiles=None, row=None):
     """
     Find subtiles that overlap with an exposure in the `exposure_files`
@@ -593,7 +684,17 @@ def count_locked():
                                GROUP BY tile, subx, suby, filter
                                ORDER BY filter DESC""")
     
-    return len(tiles)
+    return len(tiles), tiles
+
+
+def reset_locked():
+    """
+    Reset in_mosaic 9 > 0 for tiles that may have timed out
+    """
+    cmd = """UPDATE mosaic_tiles_exposures
+             SET in_mosaic = 0 WHERE in_mosaic = 9"""
+             
+    db.execute(cmd)
 
 
 def get_subtile_status(tile=2530, subx=522, suby=461, **kwargs):
@@ -615,7 +716,10 @@ def send_all_tiles():
     
     import time
     import os
-    from grizli.aws.tile_mosaic import drizzle_tile_subregion
+    from grizli.aws.tile_mosaic import (drizzle_tile_subregion, 
+                      get_lambda_client, send_event_lambda, count_locked)
+    
+    from grizli.aws import db
     
     tiles = []
     
@@ -626,29 +730,34 @@ def send_all_tiles():
        FROM mosaic_tiles_exposures t, exposure_files e
                 WHERE t.expid = e.eid AND in_mosaic = 0 AND tile != 1183
                 GROUP BY tile, subx, suby, filter
-                ORDER BY filter DESC
+                ORDER BY filter ASC
                 """)
                 
     nt1 = len(tiles)
-    print(nt1, nt1-nt0)
+    print(nt1, nt0-nt1)
     
+    NMAX = len(tiles)
+
     istart = i = -1
-    step = 150 - count_locked()
     
-    #for i in range(len(tiles)):
-    while i < len(tiles):
+    max_locked = 280
+    timeout = 60
+    
+    step = max_locked - count_locked()[0]
+    
+    while i < NMAX:
         i+=1 
+        if tiles['tile'][i] == 1183:
+            continue
         
         if i-istart == step:
             istart = i
-            print(f'{time.ctime()}: Pause for 60s')
-            time.sleep(60)
-            skip = 150 - count_locked()
-            print(f'{time.ctime()}: Run {skip} more')
-        
-        if tiles['tile'][i] == 1183:
-            continue
+            print(f'\n ############### \n {time.ctime()}: Pause for 60s')
+            time.sleep(timeout)
             
+            step = np.maximum(max_locked - count_locked()[0], 1)
+            print(f'{time.ctime()}: Run {step} more \n ############## \n')
+                    
         event = dict(tile=int(tiles['tile'][i]), 
                      subx=int(tiles['subx'][i]),
                      suby=int(tiles['suby'][i]),
