@@ -540,7 +540,118 @@ def tile_subregion_wcs(tile, subx, suby, engine=None):
     return sub_wcs
 
 
-def drizzle_tile_subregion(tile, subx, suby, filter='F160W', engine=None, s3output=None, ir_wcs=None, make_figure=False, skip_existing=False, verbose=True, gzip_output=False, **kwargs):
+#
+def get_lambda_client(region_name='us-east-1'):
+    """
+    Get boto3 client in same region as HST public dataset
+    """
+    import boto3
+    session = boto3.Session()
+    client = session.client('lambda', region_name=region_name)
+    return client
+
+
+def send_event_lambda(event, verbose=True, client=None, func='grizli-mosaic_tile'):
+    """
+    Send a single event to AWS lambda
+    """
+    import time
+    import os
+    import yaml
+
+    import numpy as np
+    import boto3
+    import json
+
+    if client is None:
+        client = get_lambda_client(region_name='us-east-1')
+
+    if verbose:
+        print('Send event to {0}: {1}'.format(func, event))
+
+    response = client.invoke(FunctionName=func,
+                             InvocationType='Event', LogType='Tail',
+                             Payload=json.dumps(event))
+
+
+def send_all_tiles():
+    
+    import time
+    import os
+    from grizli.aws.tile_mosaic import drizzle_tile_subregion
+    
+    from grizli.aws import db
+    engine = db.get_db_engine()
+    
+    client = get_lambda_client()
+    
+    tiles = db.from_sql("""select tile, subx, suby, filter, count(filter)
+       FROM mosaic_tiles_exposures t, exposure_files e
+                WHERE t.expid = e.eid AND in_mosaic = 0 AND tile != 1183
+                GROUP BY tile, subx, suby, filter
+                ORDER BY filter DESC
+                """, engine)
+    print(len(tiles))
+    
+    for i in range(len(tiles)):
+        if tiles['tile'][i] == 1183:
+            continue
+            
+        event = dict(tile=int(tiles['tile'][i]), 
+                     subx=int(tiles['subx'][i]),
+                     suby=int(tiles['suby'][i]),
+                     filter=tiles['filter'][i], 
+                     counter=i, 
+                     time=time.ctime())
+        
+        if 1:
+            send_event_lambda(event, client=client, func='grizli-mosaic-tile')
+        
+        else:
+            drizzle_tile_subregion(**event, 
+                                   engine=engine, s3output=None,
+                                   ir_wcs=None, make_figure=False, 
+                                   skip_existing=False, verbose=True, 
+                                   gzip_output=False)
+            
+            files='tile.{tile:04d}.{subx:03d}.{suby:03d}.{fx}*fits'
+            os.system('rm {files}'.format(fx=event['filter'].lower(), 
+                                             **event))
+        if (i+1) % 100 == 0:
+            break
+            #time.sleep(10)
+
+
+def get_tile_status(tile, subx, suby, filter, engine=None):
+    """
+    Is a tile "locked" with all exposures set with in_mosaic = 9?
+    """
+    from grizli.aws import db
+    if engine is None:
+        engine = db.get_db_engine()
+    
+    exp = db.from_sql(f"""
+            SELECT dataset, extension, assoc, filter, exptime, footprint,
+                   in_mosaic
+            FROM mosaic_tiles_exposures t, exposure_files e
+            WHERE t.expid = e.eid
+            AND filter='{filter}' AND tile={tile}
+            AND subx={subx} AND suby={suby}
+            """, engine)
+    
+    if len(exp) == 0:
+        status = 'empty'
+    elif (exp['in_mosaic'] == 9).sum() == len(exp):
+        status = 'locked'
+    elif (exp['in_mosaic'] == 1).sum() == len(exp):
+        status = 'completed'
+    else:
+        status = 'go'
+    
+    return exp, status
+
+
+def drizzle_tile_subregion(tile=2530, subx=522, suby=461, filter='F160W', engine=None, s3output=None, ir_wcs=None, make_figure=False, skip_existing=False, verbose=True, gzip_output=False, **kwargs):
     """
     """
     import os
@@ -556,26 +667,39 @@ def drizzle_tile_subregion(tile, subx, suby, filter='F160W', engine=None, s3outp
     from grizli.aws import db
     if engine is None:
         engine = db.get_db_engine()
-        
-    exp = db.from_sql(f"""
-            SELECT dataset, extension, assoc, filter, exptime, footprint
-            FROM mosaic_tiles_exposures t, exposure_files e
-            WHERE t.expid = e.eid
-            AND filter='{filter}' AND tile={tile}
-            AND subx={subx} AND suby={suby}
-            """, engine)
+    
+    exp, status = get_tile_status(tile, subx, suby, filter, engine=None)
     
     root = f'tile.{tile:04d}.{subx:03d}.{suby:03d}'
-    if len(exp) == 0:
+    
+    if status in ['empty']:
         if verbose:
             print(f'{root} {filter} ! No exposures found')
             
         return True
     
+    elif status in ['locked']:
+        print(f'{root} {filter} tile locked')
+        return True
+    
+    elif (status in ['completed']) & (skip_existing):
+        print(f'{root} {filter} tile already completed')
+        return True
+        
     sci_file = f'{root}.{filter.lower()}_drz_sci.fits'
     if skip_existing & os.path.exists(sci_file):
         print(f'Skip file {sci_file}')
         return True
+    
+    # Lock
+    engine.execute(f"""
+          UPDATE mosaic_tiles_exposures t
+          SET in_mosaic = 9
+          FROM exposure_files w
+          WHERE t.expid = w.eid
+          AND w.filter='{filter}' AND tile={tile}
+          AND subx={subx} AND suby={suby}
+           """)
         
     if ir_wcs is None:
         ir_wcs = tile_subregion_wcs(tile, subx, suby, engine=engine)
@@ -612,6 +736,9 @@ def query_cutout(output='cutout', ra=189.0243001, dec=62.1966953, size=10, filte
     """
     from grizli.aws import db
     from tqdm import tqdm
+    import matplotlib.pyplot as plt
+    from grizli import utils
+    from grizli.aws import tile_mosaic
     
     if engine is None:
         engine = db.get_db_engine()
