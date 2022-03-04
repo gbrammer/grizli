@@ -5,6 +5,9 @@ import os
 import glob
 import numpy as np
 
+import astropy.time
+import astropy.units as u
+
 try:
     import pandas as pd
 except:
@@ -65,12 +68,17 @@ def get_connection_info(config_file=None):
     return db_info
 
 
+# DB connection engine
+_ENGINE = None
+
 def get_db_engine(config=None, echo=False, iam_file='/home/ec2-user/db.iam.yaml'):
     """
     Generate an SQLAlchemy engine for the grizli database
     """
     from sqlalchemy import create_engine
-    import sqlalchemy.pool as pool
+    from sqlalchemy.pool import NullPool
+    
+    global _ENGINE
     
     import psycopg2
     import boto3
@@ -92,10 +100,17 @@ def get_db_engine(config=None, echo=False, iam_file='/home/ec2-user/db.iam.yaml'
                             user=config['username'],
                             password=token,
                             sslrootcert="SSLCERTIFICATE")
-                                
-        engine = create_engine('postgresql+psycopg2://', 
-                               connect_args=connect_args)
         
+        args = ('postgresql+psycopg2://',)
+        kws = dict(connect_args=connect_args, poolclass=NullPool)
+        
+        engine = create_engine(*args, **kws)
+        
+        engine._init_time = astropy.time.Time.now()
+        engine._init_args = args
+        engine._init_kws = kws
+        
+        _ENGINE = engine
         return engine
      
     if config is None:
@@ -105,9 +120,36 @@ def get_db_engine(config=None, echo=False, iam_file='/home/ec2-user/db.iam.yaml'
     db_string = db_string.format(config['username'], config['password'], 
                                  config['hostname'], config['port'], 
                                  config['database'])
-                                 
-    engine = create_engine(db_string, echo=echo)
+    
+    args = (db_string,)
+    kws = dict(echo=echo, poolclass=NullPool)
+                               
+    engine = create_engine(*args, **kws)
+    engine._init_time = astropy.time.Time.now()
+    engine._init_args = args
+    engine._init_kws = kws
+    
+    _ENGINE = engine
     return engine
+
+
+ENGINE_REFRESH_DT = 10*u.minute
+
+def refresh_engine():
+    """
+    Refresh the DB engine
+    """
+    from sqlalchemy import create_engine
+    
+    global _ENGINE
+    
+    now = astropy.time.Time.now()
+    if (now - _ENGINE._init_time) > ENGINE_REFRESH_DT:
+        args, kws = _ENGINE._init_args, _ENGINE._init_kws
+        _ENGINE = create_engine(*args, **kws)
+        _ENGINE._init_time = astropy.time.Time.now()
+        _ENGINE._init_args = args
+        _ENGINE._init_kws = kws
 
 
 def upload_file(file_name, bucket, object_name=None):
@@ -405,7 +447,6 @@ def convert_1D_to_lists(file='j234420m4245_00615.1D.fits'):
     """
     from collections import OrderedDict
     import astropy.io.fits as pyfits
-    from .. import utils
 
     if not os.path.exists(file):
         print('Spectrum file not found')
@@ -1130,7 +1171,7 @@ def multibeam_to_database(beams_file, engine=None, Rspline=15, force=False, **kw
     import pandas as pd
     from astropy.time import Time
 
-    from .. import multifit, utils
+    from .. import multifit
 
     if engine is None:
         engine = get_db_engine(echo=False)
@@ -1631,15 +1672,113 @@ WHERE (root = q_root AND id = q_id)) c
     counts = pd.read_sql_query("select root, COUNT(root) as n from redshift_fit, photometry_apcorr where phot_root = p_root AND id = p_id AND bic_diff > 50 AND mag_auto < 24 group by root;", engine)
 
 
-def from_sql(query, engine, **kwargs):
-    import pandas as pd
-    from grizli import utils
-    res = pd.read_sql_query(query, engine)
+def from_sql(query_text, engine=None, **kwargs):
+    """
+    Deprecated, see `grizli.aws.db.SQL`.
+    """
+    tab = SQL(query_text, engine=engine, **kwargs)
+    return tab
 
+
+def SQL(query_text, engine=None, pd_kwargs={}, **kwargs):
+    """
+    Send a query to a database through `pandas.read_sql_query`
+    
+    Parameters
+    ----------
+    query_text : str
+        Query text, e.g., 'SELECT count(*) FROM table;'.
+    
+    engine : `sqlalchemy.engine.Engine`
+        DB connection engine initialized with `~grizli.aws.db.get_db_engine`.  
+        The query is sent through 
+        ``pandas.read_sql_query(query_text, engine)``.
+    
+    kwargs : dict
+        Column formatting keywords passed to 
+        `~grizli.aws.db.set_column_formats`
+    
+    Returns
+    -------
+    tab : `~grizli.utils.GTable`
+        Table object
+        
+    """
+    import pandas as pd
+    
+    global _ENGINE
+    if engine is not None:
+        _ENGINE = engine
+    
+    if _ENGINE is None:
+        _ENGINE = get_db_engine()
+    
+    refresh_engine()
+    
+    res = pd.read_sql_query(query_text, _ENGINE)
+    _ENGINE.dispose()
+    
     tab = utils.GTable.from_pandas(res)
+    tab.meta['query'] = (query_text, 'SQL query text')
+    tab.meta['qtime'] = (utils.nowtime(), 'Query timestamp')
+    
     set_column_formats(tab, **kwargs)
 
     return tab
+
+
+def execute(sql_text):
+    """
+    Wrapper around engine.execute()
+    """
+    global _ENGINE
+    
+    if _ENGINE is None:
+        _ENGINE = get_db_engine()
+    else:
+        refresh_engine()
+    
+    resp = _ENGINE.execute(sql_text)
+    return resp
+
+
+def send_to_database(tab, index=False, if_exists='append', method='multi', **kwargs):
+    """
+    Send table object to remote database with `pandas.DataFrame.to_sql`
+    
+    Parameters
+    ----------
+    tab : `~astropy.table.Table` or `~pandas.DataFrame`
+        Input table.  If an `~astropy.table.Table`, then convert to 
+        `~pandas.DataFrame` with `tab.to_pandas()`
+        
+    kwargs : dict
+        See `pandas.DataFrame.to_sql`
+        
+    Returns
+    -------
+    resp : object
+        Response from `pandas.DataFrame.to_sql`
+        
+    """
+    import pandas as pd
+    
+    global _ENGINE
+    
+    if _ENGINE is None:
+        _ENGINE = get_db_engine()
+    else:
+        refresh_engine()
+    
+    if isinstance(tab, pd.DataFrame):
+        df = tab
+    else:
+        df = tab.to_pandas()
+        
+    resp = df.to_sql('exposure_files', _ENGINE, index=index, 
+                     if_exists=if_exists, method=method)
+    
+    return resp
 
 
 def render_for_notebook(tab, image_extensions=['stack', 'full', 'line'], bucket='grizli-v1', max_rows=20, link_root=True, link_type='grism'):
