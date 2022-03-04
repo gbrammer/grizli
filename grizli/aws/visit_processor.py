@@ -1012,7 +1012,6 @@ def make_parent_mosaic(parent='j191436m5928', **kwargs):
     
     cutout_mosaic(rootname=parent, ra=ra, dec=dec, size=size, **kwargs)
     
-    
 def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-27.7910651, size=5*60, filters=['F160W'], ir_scale=0.1, ir_wcs=None, res=None, half_optical=True, kernel='point', pixfrac=0.33, make_figure=True, skip_existing=True, clean_flt=True, gzip_output=True, s3output='s3://grizli-v2/HST/Pipeline/Mosaic/', **kwargs):
     """
     Make mosaic from exposures defined in the exposure database
@@ -1023,6 +1022,8 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
     import glob
     import matplotlib.pyplot as plt
     import astropy.io.fits as pyfits
+    
+    import boto3
     
     from grizli import utils
     from mastquery import overlaps
@@ -1157,9 +1158,15 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
 
             files += glob.glob(f'{prod}*fits*')
             files += glob.glob(f'{prod}*_fp.png')
-
+        
+        
         for file in files:
-            os.system(f'aws s3 cp {file} {s3output}')
+            #os.system(f'aws s3 cp {file} {s3output}')
+            bucket = s3output.split('s3://')[-1].split('/')[0]
+            path = '/'.join(s3output.split('s3://')[-1].strip('/').split('/')[1:])
+            object_name = f'{path}/{file}'
+            print(f'{file} > s3://{bucket}/{object_name}')
+            db.upload_file(file, bucket, object_name=object_name)
 
 
 def make_mosaic(jname='', ds9=None, skip_existing=True, ir_scale=0.1, half_optical=False, pad=16, kernel='point', pixfrac=0.33, sync=True, ir_wcs=None):

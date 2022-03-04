@@ -607,7 +607,107 @@ def drizzle_tile_subregion(tile, subx, suby, filter='F160W', engine=None, s3outp
            """)
 
 
-def build_mosaic_from_subregions():
+def query_cutout(output='cutout', ra=189.0243001, dec=62.1966953, size=10, filter='F160W', engine=None):
+    """
+    """
+    from grizli.aws import db
+    from tqdm import tqdm
+    
+    if engine is None:
+        engine = db.get_db_engine()
+    
+    dd = size/3600
+    dr = dd/np.cos(dec/180*np.pi)
+    
+    bd = 256*0.1/3600
+    br = bd/np.cos(dec/180*np.pi)
+    
+    ss = size/3600/np.cos(dec/180*np.pi)
+    
+    SQL = f"""SELECT tile, subx, suby, subra, subdec
+              FROM mosaic_tiles_exposures t, exposure_files e
+              WHERE in_mosaic = 1 AND filter = '{filter.upper()}'
+              AND t.expid = e.eid 
+              AND polygon ( (
+                '((' || subra - {bd} || ', ' || subdec - {br} || '),
+                  (' || subra - {bd} || ', ' || subdec + {br} || '),
+                  (' || subra + {bd} || ', ' || subdec + {br} || '),
+                  (' || subra + {bd} || ', ' || subdec - {br} || '))')::path )
+                  ?#
+                  polygon (
+                   ('(( {ra - dd}  , {dec - dr}), 
+                     ( {ra - dd}  , {dec + dr}), 
+                     ( {ra + dd}  , {dec + dr}), 
+                     ( {ra + dd}  , {dec - dr}))')::path )
+              GROUP BY tile, subx, subx"""
+
+    SQL = f"""SELECT tile, subx, suby, subra, subdec
+            FROM mosaic_tiles_exposures t, exposure_files e
+            WHERE in_mosaic = 1 AND filter = '{filter.upper()}'
+            AND t.expid = e.eid 
+            AND (
+              '((' || subra - {bd} || ', ' || subdec - {br} || '),
+                (' || subra - {bd} || ', ' || subdec + {br} || '),
+                (' || subra + {bd} || ', ' || subdec + {br} || '),
+                (' || subra + {bd} || ', ' || subdec - {br} || '))')::polygon
+                && ('(( {ra - dd}  , {dec - dr}), 
+                     ( {ra - dd}  , {dec + dr}), 
+                     ( {ra + dd}  , {dec + dr}), 
+                     ( {ra + dd}  , {dec - dr}))')::polygon
+            GROUP BY tile, subx, suby, subra, subdec"""
+    #
+    cosd = np.cos(dec/180*np.pi)
+    rc = size/3600
+    rtile = np.sqrt(2)*128*0.1/3600
+    
+    SQL = f"""SELECT tile, subx, suby, subra, subdec
+            FROM mosaic_tiles_exposures t, exposure_files e
+            WHERE in_mosaic = 1 AND filter = '{filter.upper()}'
+            AND t.expid = e.eid 
+            AND ('((' || (subra - {ra})*{cosd} || 
+                    ', ' || subdec - {dec} || '),
+                    {rtile})')::circle
+                && ('((0,0),{rc})')::circle
+            GROUP BY tile, subx, suby, subra, subdec"""
+    
+    # SQL = f"""SELECT tile, subx, suby, subra, subdec
+    #             FROM mosaic_tiles_exposures t, exposure_files e
+    #             WHERE in_mosaic = 1 AND filter = '{filter.upper()}'
+    #             AND t.expid = e.eid 
+    #             AND point '(' || subra || ',' || subdec || ')'
+    #                 <@
+    #                 polygon (
+    #                  ('(( {ra - dd}  , {dec - dr}), 
+    #                    ( {ra - dd}  , {dec + dr}), 
+    #                    ( {ra + dd}  , {dec + dr}), 
+    #                    ( {ra + dd}  , {dec - dr}))')::path )
+    #             GROUP BY tile, subx, subx"""
+    
+    res = db.from_sql(SQL, engine) 
+    
+    fig, ax = plt.subplots(1,1,figsize=(8,8))
+    ax.scatter(res['subra'], res['subdec'])
+    
+    from shapely.geometry.point import Point
+    import shapely.affinity
+    from descartes import PolygonPatch
+    # Note: download figures.py manually from shapely github repo, put it in shapely install directory
+    #from shapely.figures import SIZE, GREEN, GRAY, set_limits
+
+
+    # Let create a circle of radius 1 around center point:
+    circ = shapely.geometry.Point((ra, dec)).buffer(rc)
+    # Let create the ellipse along x and y:
+    ell  = shapely.affinity.scale(circ, 1./cosd, 1.)
+    ax.add_patch(PolygonPatch(ell, color='r', alpha=0.5))
+    
+    for tile, subx, suby in tqdm(zip(res['tile'], res['subx'], res['suby'])):
+        tw = tile_mosaic.tile_subregion_wcs(tile, subx, suby, engine=engine)
+        sr = utils.SRegion(tw)
+        ax.add_patch(sr.get_patch(alpha=0.5)[0])
+        
+                
+def build_mosaic_from_subregions(tile=2530, files=None, filter='f140w'):
     """
     TBD
     """
@@ -618,11 +718,17 @@ def build_mosaic_from_subregions():
     import astropy.wcs as pywcs
     import os
     
-    tile = 2530
-    filter = 'f140w'
+    if 0:
+        for filt in ['f105w','f140w','f160w']:
+            build_mosaic_from_subregions(tile=2530, files=None, filter=filt)
+            
+    #tile = 2530
+    #filter = 'f140w'
     
-    files = glob.glob(f'*{tile:04d}.*_drz_sci.fits')
-    files.sort()
+    if files is None:
+        files = glob.glob(f'*{tile:04d}.*_drz_sci.fits')
+        files.sort()
+        
     tx = np.array([int(f.split('.')[2]) for f in files])
     ty = np.array([int(f.split('.')[3]) for f in files])
     
@@ -659,6 +765,7 @@ def build_mosaic_from_subregions():
         
     pyfits.writeto(f'mos.{tile}.{filter}_sci.fits', data=img, 
                    header=h, overwrite=True)
+    
     os.system(f'aws s3 cp mos.{tile}.{filter}_sci.fits s3://grizli-v2/Scratch/')
     
     
