@@ -65,7 +65,7 @@ def get_connection_info(config_file=None):
     return db_info
 
 
-def get_db_engine(config=None, echo=False):
+def get_db_engine(config=None, echo=False, iam_file='/home/ec2-user/db.iam.yaml'):
     """
     Generate an SQLAlchemy engine for the grizli database
     """
@@ -76,8 +76,6 @@ def get_db_engine(config=None, echo=False):
     import boto3
     
     # With IAM auth on EC2
-    iam_file = '/home/ec2-user/db.iam.yaml'
-    
     if os.path.exists(iam_file):
         config = get_connection_info(config_file=iam_file)
         session = boto3.Session()
