@@ -1137,6 +1137,8 @@ def query_cutout(output='mos-{tile}-{filter}_{drz}', ra=189.0243001, dec=62.1966
         msg = f'Nothing found for ({ra:.6f}, {dec:.6f}, {size}") {filters}'
         return 'empty filter', None
     
+    res = res[res['keep']]
+    
     if make_mosaics:
         make_mosaic_from_table(res, output=output, **kwargs)
         
