@@ -1168,7 +1168,7 @@ def make_mosaic_from_table(tab, output='mos-{tile}-{filter}_{drz}', clean_subtil
                                          tile=t, files=None, filter=filt, 
                                          ll=ll, ur=ur,
                                          clean_subtiles=clean_subtiles, 
-                                         send_to_s3=False)
+                                         send_to_s3=send_to_s3)
         
         if 0:
             from grizli.pipeline import auto_script
@@ -1277,10 +1277,14 @@ def build_mosaic_from_subregions(root='mos-{tile}-{filter}_{drz}', tile=2530, fi
                 if os.path.exists(wfile):
                     imw = pyfits.open(file)
                     imgw[sly, slx] += imw[0].data                                    
+            else:
+                wfile = None
                 
             if clean_subtiles:
                 os.remove(file)
-                
+                if wfile is not None:
+                    os.remove(wfile)
+                    
     llh['NDRIZIM'] = len(exposures)
     for j, exp in enumerate(exposures):
         llh[f'FLT{j+1:05d}'] = exp
