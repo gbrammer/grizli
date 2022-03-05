@@ -7,6 +7,7 @@ increased slightly to be integer multiples of 512 0.1" pixels
 Individual subtiles are 256 x 0.1" = 25.6"
 
 """
+import os
 from tqdm import tqdm
 import numpy as np
 
@@ -380,7 +381,10 @@ def find_mosaic_segments(bs=16):
     bs : bin size relative to 256*0.1" subimages
     
     """
+    from scipy.ndimage import label
+
     from grizli import utils
+    from grizli.aws import db
     
     cells = db.SQL(f"""SELECT tile, subx, suby, subra, subdec, filter, 
                               assoc, dataset, exptime
@@ -406,7 +410,6 @@ def find_mosaic_segments(bs=16):
                         cells['subx'][uni].max()//bs+1), dtype=bool)
         img[cells['suby'][uni]//bs, cells['subx'][uni]//bs] = True
     
-        from scipy.ndimage import label
         labeled_array, num_features = label(img)
     
         cells['segment'][uni] = labeled_array[cells['suby'][uni]//bs, 
@@ -416,7 +419,53 @@ def find_mosaic_segments(bs=16):
         
         ns += num_features
 
+    
+    names = ['tile','patch','ra','dec','jname','count','filter',
+             'xmin','xmax','ymin','ymax',
+             'rmin','rmax','dmin','dmax','status','mtime']
+    
+    un = utils.Unique(cells['segment'])
+    rows = []
+    
+    import astropy.time
+    from tqdm import tqdm
+    
+    for s in tqdm(un.values):
+        uni = np.where(un[s])[0]
+        
+        unf = utils.Unique(cells['filter'][uni], verbose=False)
+        ra = np.mean(cells['subra'][uni])
+        dec = np.mean(cells['subdec'][uni])
+        jname = utils.radec_to_targname(ra=ra, dec=dec)
+        for f in unf.values:
+            unfi = cells[uni][unf[f]]
+            
+            row = [unfi['tile'][0], unfi['segment'][0], 
+                   ra, dec, jname, len(unfi), f, 
+                   unfi['subx'].min(), unfi['subx'].max(), 
+                   unfi['suby'].min(), unfi['suby'].max(), 
+                   unfi['subra'].min(), unfi['subra'].max(), 
+                   unfi['subdec'].min(), unfi['subdec'].max(),
+                   0, astropy.time.Time.now().mjd]
+            rows.append(row)
+    
+    patches = utils.GTable(names=names, rows=rows)
+    
+    i = 0
+    t0 = 0
+    
+    for i in range(30):
+        t = patches['tile'][i]
 
+        os.system(f"""aws s3 sync s3://grizli-v2/HST/Pipeline/Tiles/{t}/ ./  --exclude "*" --include "*{patches['filter'][i].lower()}*sci.fits"  """)
+    
+        build_mosaic_from_subregions(root=patches['jname'][i], tile=t, 
+                                     files=None, 
+                                     filter=patches['filter'][i].lower())
+        #
+        os.system(f'rm tile.{t0:04d}*')
+        
+    
 def exposure_map(ra, dec, rsize, name, filt='F160W', s0=16):
     """
     Make an exposure map from a database query
@@ -494,6 +543,8 @@ def exposure_map(ra, dec, rsize, name, filt='F160W', s0=16):
     return fig
 
 
+TILES = None
+
 def add_exposure_to_tile_db(dataset='ibev8xubq', sciext=1, tiles=None, row=None):
     """
     Find subtiles that overlap with an exposure in the `exposure_files`
@@ -506,8 +557,13 @@ def add_exposure_to_tile_db(dataset='ibev8xubq', sciext=1, tiles=None, row=None)
     import numpy as np
     from grizli import utils
     
+    global TILES
+    
+    if TILES is None:
+        TILES = db.SQL('select * from mosaic_tiles')
+        
     if tiles is None:
-        tiles = db.SQL('select * from mosaic_tiles')
+        tiles = TILES
 
     if row is None:
         row = db.SQL(f"""SELECT eid, assoc, dataset, extension, filter, 
@@ -607,9 +663,19 @@ def tile_wcs(tile):
     from grizli import utils
     from grizli.aws import db
     
-    row = db.SQL(f"""SELECT crval1, crval2, npix
-                       FROM mosaic_tiles
-                      WHERE tile={tile}""")
+    global TILES
+    if TILES is None:
+        TILES = db.SQL('select * from mosaic_tiles')
+    
+    if tile not in TILES['tile']:
+        print(f'{tile} not in `mosaic_tiles`')
+        return None
+        
+    row = TILES[TILES['tile'] == tile]
+        
+    # row = db.SQL(f"""SELECT crval1, crval2, npix
+    #                    FROM mosaic_tiles
+    #                   WHERE tile={tile}""")
 
     t = 0
     h, w = utils.make_wcsheader(ra=row['crval1'][t], dec=row['crval2'][t],
@@ -682,7 +748,7 @@ def count_locked():
                                WHERE t.expid = e.eid AND tile != 1183
                                AND in_mosaic=9
                                GROUP BY tile, subx, suby, filter
-                               ORDER BY filter DESC""")
+                               ORDER BY count(filter) DESC""")
     
     return len(tiles), tiles
 
@@ -716,23 +782,31 @@ def send_all_tiles():
     
     import time
     import os
+    import numpy as np
     from grizli.aws.tile_mosaic import (drizzle_tile_subregion, 
                       get_lambda_client, send_event_lambda, count_locked)
     
     from grizli.aws import db
+    from grizli import utils
     
     tiles = []
     
     client = get_lambda_client()
     
     nt0 = len(tiles)
-    tiles = db.SQL("""SELECT tile, subx, suby, filter, count(filter)
-       FROM mosaic_tiles_exposures t, exposure_files e
+    
+    tiles = db.SQL(f"""SELECT tile, subx, suby, filter, count(filter)
+                FROM mosaic_tiles_exposures t, exposure_files e
                 WHERE t.expid = e.eid AND in_mosaic = 0 AND tile != 1183
                 GROUP BY tile, subx, suby, filter
                 ORDER BY filter ASC
                 """)
-                
+    
+    skip = (tiles['filter'] > 'F1') & (tiles['count'] > 400)
+    skip |= (tiles['filter'] < 'F1') & (tiles['count'] > 300)
+    
+    tiles = tiles[~skip]
+    
     nt1 = len(tiles)
     print(nt1, nt0-nt1)
     
@@ -752,7 +826,7 @@ def send_all_tiles():
         
         if i-istart == step:
             istart = i
-            print(f'\n ############### \n {time.ctime()}: Pause for 60s')
+            print(f'\n ############### \n {time.ctime()}: Pause for {timeout} s')
             time.sleep(timeout)
             
             step = np.maximum(max_locked - count_locked()[0], 1)
@@ -776,14 +850,75 @@ def send_all_tiles():
                                    gzip_output=False)
             
             files='tile.{tile:04d}.{subx:03d}.{suby:03d}.{fx}*fits'
-            os.system('rm {files}'.format(fx=event['filter'].lower(), 
+            os.system('rm '+ files.format(fx=event['filter'].lower(), 
                                              **event))
         
         # if (i+1) % 300 == 0:
         #     break
             #time.sleep(10)
 
+    ### Run locally
+    tiles = db.SQL(f"""SELECT tile, subx, suby, filter, MAX(in_mosaic) as in_mosaic, count(filter)
+                FROM mosaic_tiles_exposures t, exposure_files e
+                WHERE t.expid = e.eid AND tile != 1183
+                GROUP BY tile, subx, suby, filter
+                ORDER BY (tile, filter)
+                """)
+    
+    keep = (tiles['filter'] > 'F199') & (tiles['count'] > 100)
+    utils.Unique(tiles['in_mosaic'][keep])
+    
+    tiles = db.SQL(f"""SELECT tile, subx, suby, filter, count(filter)
+                FROM mosaic_tiles_exposures t, exposure_files e
+                WHERE t.expid = e.eid AND in_mosaic = 0 AND tile != 1183
+                GROUP BY tile, subx, suby, filter
+                ORDER BY (tile, filter)
+                """)
 
+    skip = (tiles['filter'] > 'F1') & (tiles['count'] < 100)
+    skip |= (tiles['filter'] < 'F1') & (tiles['count'] > 300)
+
+    tiles = tiles[~skip]
+    
+    NMAX = len(tiles)
+
+    istart = i = -1
+    
+    tile_filt = (0, 0)
+    
+    while i < NMAX:
+        i+=1 
+        if tiles['tile'][i] == 1183:
+            continue
+        
+        event = dict(tile=int(tiles['tile'][i]), 
+                     subx=int(tiles['subx'][i]),
+                     suby=int(tiles['suby'][i]),
+                     filter=tiles['filter'][i], 
+                     counter=i, 
+                     time=time.ctime())
+        
+        if (event['tile'], event['filter']) != tile_filt:
+            print('Next filter, remove flc.fits')
+            os.system('rm *flc.fits')
+            tile_filt = (event['tile'], event['filter'])
+            
+        if 0:
+            send_event_lambda(event, client=client, func='grizli-mosaic-tile')
+        
+        else:
+            status = drizzle_tile_subregion(**event, 
+                                   s3output=None,
+                                   ir_wcs=None, make_figure=False, 
+                                   clean_flt=False,
+                                   skip_existing=True, verbose=True, 
+                                   gzip_output=False)
+            
+            files='tile.{tile:04d}.{subx:03d}.{suby:03d}.{fx}*fits'
+            os.system('rm '+ files.format(fx=event['filter'].lower(), 
+                                             **event))
+    
+    
 def get_tile_status(tile, subx, suby, filter):
     """
     Is a tile "locked" with all exposures set with in_mosaic = 9?
@@ -808,8 +943,46 @@ def get_tile_status(tile, subx, suby, filter):
     return exp, status
 
 
-def drizzle_tile_subregion(tile=2530, subx=522, suby=461, filter='F160W', s3output=None, ir_wcs=None, make_figure=False, skip_existing=False, verbose=True, gzip_output=False, **kwargs):
+def drizzle_tile_subregion(tile=2530, subx=522, suby=461, filter='F160W', s3output=None, ir_wcs=None, make_figure=False, skip_existing=True, verbose=True, gzip_output=False, **kwargs):
     """
+    Drizzle a subtile
+    
+    Parameters
+    ----------
+    tile, subx, suby : int
+        Identifiers of subtile
+    
+    filter : str
+        Filter bandpass
+    
+    s3output : str
+        Output S3 path, defaults to 
+        ``s3://grizli-v2/HST/Pipeline/Tiles/{tile}/``
+    
+    ir_wcs : `~astropy.wcs.WCS`
+        Override subtile WCS
+    
+    skip_existing : bool
+        Skip if output already exists or `in_mosaic` is 0 or 9 in the 
+        database
+    
+    gzip_output : bool
+        Gzip the drizzle products
+    
+    kwargs : dict
+        Arguments passed through to `grizli.aws.visit_processor.cutout_mosaic`
+        
+    Returns
+    -------
+    status : str
+        - ``skip completed`` = `tile.subx.suby.filter` has `in_mosaic = 1` 
+           in database
+        - ``skip locked`` = `tile.subx.suby.filter` has `in_mosaic = 9` 
+           in database
+        - ``skip empty`` = no exposures found for `tile.subx.suby.filter`
+        - ``skip local`` = `tile.subx.suby.filter` found in local directory
+        - ``tile.{tile}.{subx}.{suby}.{filter}`` = rootname of created file
+        
     """
     import os
     import astropy.table
@@ -829,20 +1002,20 @@ def drizzle_tile_subregion(tile=2530, subx=522, suby=461, filter='F160W', s3outp
         if verbose:
             print(f'{root} {filter} ! No exposures found')
             
-        return True
+        return 'skip empty'
     
     elif status in ['locked']:
         print(f'{root} {filter} tile locked')
-        return True
+        return 'skip locked'
     
     elif (status in ['completed']) & (skip_existing):
         print(f'{root} {filter} tile already completed')
-        return True
+        return 'skip completed'
         
     sci_file = f'{root}.{filter.lower()}_drz_sci.fits'
     if skip_existing & os.path.exists(sci_file):
         print(f'Skip file {sci_file}')
-        return True
+        return 'skip local'
     
     # Lock
     db.execute(f"""UPDATE mosaic_tiles_exposures t
@@ -879,101 +1052,139 @@ def drizzle_tile_subregion(tile=2530, subx=522, suby=461, filter='F160W', s3outp
           AND w.filter='{filter}' AND tile={tile}
           AND subx={subx} AND suby={suby}
            """)
+    
+    status = '{root}.{f}'
+    return status
 
 
-def query_cutout(output='cutout', ra=189.0243001, dec=62.1966953, size=10, filter='F160W'):
+def query_cutout(output='mos-{tile}-{filter}_{drz}', ra=189.0243001, dec=62.1966953, size=10, filters=['F160W'], theta=0, make_figure=False, make_mosaics=False, **kwargs):
     """
     """
     from tqdm import tqdm
     import matplotlib.pyplot as plt
     from grizli import utils
-    from grizli.aws import tile_mosaic
+    from grizli.aws import tile_mosaic, db
     
-    dd = size/3600
-    dr = dd/np.cos(dec/180*np.pi)
-    
-    bd = 256*0.1/3600
-    br = bd/np.cos(dec/180*np.pi)
-    
-    ss = size/3600/np.cos(dec/180*np.pi)
-    
-    SQL = f"""SELECT tile, subx, suby, subra, subdec
-              FROM mosaic_tiles_exposures t, exposure_files e
-              WHERE in_mosaic = 1 AND filter = '{filter.upper()}'
-              AND t.expid = e.eid 
-              AND polygon ( (
-                '((' || subra - {bd} || ', ' || subdec - {br} || '),
-                  (' || subra - {bd} || ', ' || subdec + {br} || '),
-                  (' || subra + {bd} || ', ' || subdec + {br} || '),
-                  (' || subra + {bd} || ', ' || subdec - {br} || '))')::path )
-                  ?#
-                  polygon (
-                   ('(( {ra - dd}  , {dec - dr}), 
-                     ( {ra - dd}  , {dec + dr}), 
-                     ( {ra + dd}  , {dec + dr}), 
-                     ( {ra + dd}  , {dec - dr}))')::path )
-              GROUP BY tile, subx, subx"""
-
-    SQL = f"""SELECT tile, subx, suby, subra, subdec
-            FROM mosaic_tiles_exposures t, exposure_files e
-            WHERE in_mosaic = 1 AND filter = '{filter.upper()}'
-            AND t.expid = e.eid 
-            AND (
-              '((' || subra - {bd} || ', ' || subdec - {br} || '),
-                (' || subra - {bd} || ', ' || subdec + {br} || '),
-                (' || subra + {bd} || ', ' || subdec + {br} || '),
-                (' || subra + {bd} || ', ' || subdec - {br} || '))')::polygon
-                && ('(( {ra - dd}  , {dec - dr}), 
-                     ( {ra - dd}  , {dec + dr}), 
-                     ( {ra + dd}  , {dec + dr}), 
-                     ( {ra + dd}  , {dec - dr}))')::polygon
-            GROUP BY tile, subx, suby, subra, subdec"""
-    #
     cosd = np.cos(dec/180*np.pi)
-    rc = size/3600
+    rc = size/3600*np.sqrt(2)
     rtile = np.sqrt(2)*128*0.1/3600
     
-    SQL = f"""SELECT tile, subx, suby, subra, subdec
+    SQL = f"""SELECT tile, subx, suby, subra, subdec, filter
             FROM mosaic_tiles_exposures t, exposure_files e
-            WHERE in_mosaic = 1 AND filter = '{filter.upper()}'
+            WHERE in_mosaic = 1
             AND t.expid = e.eid 
             AND ('((' || (subra - {ra})*{cosd} || 
                     ', ' || subdec - {dec} || '),
                     {rtile})')::circle
                 && ('((0,0),{rc})')::circle
-            GROUP BY tile, subx, suby, subra, subdec"""
+            GROUP BY tile, subx, suby, subra, subdec, filter"""
     
     res = db.SQL(SQL) 
-    
-    fig, ax = plt.subplots(1,1,figsize=(8,8))
-    ax.scatter(res['subra'], res['subdec'])
-    
-    from shapely.geometry.point import Point
-    import shapely.affinity
-    from descartes import PolygonPatch
-
-    # Let create a circle of radius 1 around center point:
-    circ = shapely.geometry.Point((ra, dec)).buffer(rc)
-    # Let create the ellipse along x and y:
-    ell  = shapely.affinity.scale(circ, 1./cosd, 1.)
-    ax.add_patch(PolygonPatch(ell, color='r', alpha=0.5))
-    
-    for tile, subx, suby in tqdm(zip(res['tile'], res['subx'], res['suby'])):
-        tw = tile_mosaic.tile_subregion_wcs(tile, subx, suby)
-        sr = utils.SRegion(tw)
-        ax.add_patch(sr.get_patch(alpha=0.5)[0])
+    if len(res) == 0:
+        msg = f'Nothing found for ({ra:.6f}, {dec:.6f}, {size}")'
+        return 'empty nothing found', None
         
+    if filters is None:
+        filters = np.unique(res['filter']).tolist()
+    else:
+        keep = utils.column_values_in_list(res['filter'], filters)
+        res = res[keep]
+    
+    if len(res) == 0:
+        msg = f'Nothing found for ({ra:.6f}, {dec:.6f}, {size}") {filters}'
+        return 'empty filter', None
+        
+    if make_figure:
+        fig, ax = plt.subplots(1,1,figsize=(8,8))
+        ax.scatter(res['subra'], res['subdec'], marker='x', alpha=0.)
+    
+    oh, ow = utils.make_wcsheader(ra=ra, dec=dec, size=size*2, 
+                                  pixscale=0.1, theta=theta)
+    
+    sh = utils.SRegion(ow)
+    if make_figure:
+        ax.add_patch(sh.get_patch(alpha=0.2, color='r')[0])
+    
+    res['keep'] = False
+                           
+    iters = zip(res['tile'], res['subx'], res['suby'])
+    
+    keys = [res['tile'][i]*1e6+res['subx'][i]*1000+res['suby'][i]
+            for i in range(len(res))]
+    
+    un = utils.Unique(keys, verbose=False)        
+    for k in un.values:
+        unk = un[k]
+        rk = res[unk][0]
+        tw = tile_subregion_wcs(rk['tile'], rk['subx'], rk['suby'])
+        sr = utils.SRegion(tw)
+        isect = sr.intersects(sh.union())
+        res['keep'][unk] = isect
+        
+        if make_figure:
+            if isect:
+                ec = 'b'
+                fc = 'b'
+                alpha=0.2
+            else:
+                ec = '0.8'
+                fc = 'None'
+                alpha=0.3
                 
-def build_mosaic_from_subregions(tile=2530, files=None, filter='f140w'):
+            ax.add_patch(sr.get_patch(alpha=alpha, fc=fc, ec=ec, zorder=-10)[0])
+    
+    if res['keep'].sum() == 0:
+        msg = f'Nothing found for ({ra:.6f}, {dec:.6f}, {size}") {filters}'
+        return 'empty filter', None
+    
+    if make_mosaics:
+        make_mosaic_from_table(res, output=output, **kwargs)
+        
+    return 'ok', res
+
+
+def make_mosaic_from_table(tab, output='mos-{tile}-{filter}_{drz}', clean_subtiles=False, send_to_s3=False, **kwargs):
+    """
+    """
+    from grizli import utils
+    un = utils.Unique(tab['tile'], verbose=False)
+    for t in un.values:
+        unt = tab[un[t]]
+        
+        xmi = unt['subx'].min()
+        ymi = unt['suby'].min()
+        xma = unt['subx'].max()
+        yma = unt['suby'].max()
+        
+        filts = [f.lower() for f in np.unique(unt['filter'])]
+        
+        ll = (xmi, ymi)
+        ur = (xma, yma)
+        
+        for filt in filts:
+            build_mosaic_from_subregions(root=output, 
+                                         tile=t, files=None, filter=filt, 
+                                         ll=ll, ur=ur,
+                                         clean_subtiles=clean_subtiles, 
+                                         send_to_s3=False)
+        
+        if 0:
+            from grizli.pipeline import auto_script
+            ds9 = None
+            auto_script.field_rgb(root=f'mos-{t}',  HOME_PATH=None, scl=1, ds9=ds9)
+
+
+def build_mosaic_from_subregions(root='mos-{tile}-{filter}_{drz}', tile=2530, files=None, filter='f140w', ll=None, ur=None, clean_subtiles=False, send_to_s3=False, make_weight=True):
     """
     TBD
     """
+    import os
     from tqdm import tqdm
     import glob
     import numpy as np
     import astropy.io.fits as pyfits
     import astropy.wcs as pywcs
-    import os
+    from grizli import utils
     
     if 0:
         for filt in ['f105w','f140w','f160w']:
@@ -983,46 +1194,117 @@ def build_mosaic_from_subregions(tile=2530, files=None, filter='f140w'):
     #filter = 'f140w'
     
     if files is None:
-        files = glob.glob(f'*{tile:04d}.*_drz_sci.fits')
+        files = glob.glob(f'tile.{tile:04d}.*_dr?_sci.fits')
         files.sort()
         
-    tx = np.array([int(f.split('.')[2]) for f in files])
-    ty = np.array([int(f.split('.')[3]) for f in files])
+    if len(files) > 0:
+        tx = np.array([int(f.split('.')[2]) for f in files])
+        ty = np.array([int(f.split('.')[3]) for f in files])
     
-    txm, tym = tx.min(), ty.min()
-    nx = tx.max() - txm + 1
-    ny = ty.max() - tym + 1
+        txm, tym = tx.min(), ty.min()
+        
+    if ll is None:
+        ll = [txm, tym]
     
-    if '_drc' in files[0]:
+    if ur is None:
+        ur = [tx.max(), ty.max()]
+           
+    nx = ur[0] - ll[0] + 1
+    ny = ur[1] - ll[1] + 1
+    
+    llw = tile_subregion_wcs(tile, ll[0], ll[1])
+    
+    if filter > 'f199':
         npix = 512
+        llw = utils.half_pixel_scale(llw)
+        drz = 'drc'
     else:
         npix = 256
+        drz = 'drz'
         
     img = np.zeros((ny*npix, nx*npix), dtype=np.float32)
+    if make_weight:
+        imgw = np.zeros_like(img)
+        
+    llh = utils.to_header(llw)
+    llh['NAXIS1'] = nx*npix
+    llh['NAXIS2'] = ny*npix
+    llh['FILTER'] = filter.upper()
     
-    h = None
-    for f, xi, yi in tqdm(zip(files, tx, ty)):
+    ###### and check difference between opt / ir
+    ###### and change drizzle params!
+    
+    exposures = []
+    
+    llh['EXPSTART'] = 1e10
+    llh['EXPEND'] = 0
+    
+    for xi in range(ll[0], ur[0]+1):
+        for yi in range(ll[1], ur[1]+1):
+            file = f'tile.{tile:04d}.{xi:03d}.{yi:03d}'
+            file += f'.{filter}_{drz}_sci.fits'
+            
+            s3 = f's3://grizli-v2/HST/Pipeline/Tiles/{tile}/'
+            db.download_s3_file(s3+file, overwrite=False, verbose=False)
+            
+            if not os.path.exists(file):
+                #print('Skip', file)
+                continue
+        
+            print(file)
+            im = pyfits.open(file)
+                            
+            if llh['EXPSTART'] > im[0].header['EXPSTART']:
+                llh['EXPSTART'] = im[0].header['EXPSTART']
+            
+            if llh['EXPEND'] < im[0].header['EXPEND']:
+                llh['EXPEND'] = im[0].header['EXPEND']
+                
+            for j in range(im[0].header['NDRIZIM']):
+                exp = im[0].header[f'FLT{j+1:05d}']
+                if exp not in exposures:
+                    exposures.append(exp)
                     
-        im = pyfits.open(f)
-        
-        if h is None:
-            h = im[0].header
-        
-        if xi == txm:
-            h['CRPIX1'] = im[0].header['CRPIX1']
-        
-        if yi == tym:
-            h['CRPIX2'] = im[0].header['CRPIX2']
-        
-        if filter in f:
-            slx = slice((xi-txm)*npix, (xi-txm+1)*npix)
-            sly = slice((yi-tym)*npix, (yi-tym+1)*npix)
+            slx = slice((xi-ll[0])*npix, (xi-ll[0]+1)*npix)
+            sly = slice((yi-ll[1])*npix, (yi-ll[1]+1)*npix)
             img[sly, slx] += im[0].data
-
+            
+            if make_weight:
+                wfile = file.replace('_sci','_wht')
+                db.download_s3_file(s3+wfile, overwrite=False, verbose=False)
+                if os.path.exists(wfile):
+                    imw = pyfits.open(file)
+                    imgw[sly, slx] += imw[0].data                                    
+                
+            if clean_subtiles:
+                os.remove(file)
+                
+    llh['NDRIZIM'] = len(exposures)
+    for j, exp in enumerate(exposures):
+        llh[f'FLT{j+1:05d}'] = exp
         
-    pyfits.writeto(f'mos.{tile}.{filter}_sci.fits', data=img, 
-                   header=h, overwrite=True)
+    for k in im[0].header:
+        if (k not in llh) & (k not in ['SIMPLE','BITPIX','DATE-OBS','TIME-OBS']):
+            llh[k] = im[0].header[k]
+            #print(k, im[0].header[k])    
+            
+    outfile = root.format(tile=tile, filter=filter, drz=drz) + '_sci.fits'
+    pyfits.writeto(outfile, data=img, 
+                   header=llh, overwrite=True)
     
-    os.system(f'aws s3 cp mos.{tile}.{filter}_sci.fits s3://grizli-v2/Scratch/')
+    if make_weight:
+        wfile = root.format(tile=tile, filter=filter, drz=drz) + '_wht.fits'
+        pyfits.writeto(wfile, data=imgw, header=llh, overwrite=True)
+    else:
+        wfile = None
+        
+    if send_to_s3:
+        db.upload_file(outfile, 'grizli-v2', object_name='Scratch/'+outfile)
+        if make_weight:
+            db.upload_file(wfile, 'grizli-v2', object_name='Scratch/'+wfile)
+    
+    return outfile, wfile
+            
+    #os.system(f'aws s3 cp {root}.{tile:04d}-{filter}_drz_sci.fits s3://grizli-v2/Scratch/')
     
     
