@@ -179,6 +179,40 @@ def upload_file(file_name, bucket, object_name=None):
     return True
 
 
+def download_s3_file(path='s3://grizli-v2/HST/Pipeline/Tiles/2529/tile.2529.010.492.f160w_drz_sci.fits', output_dir='./', ExtraArgs={"RequestPayer": "requester"}, overwrite=True, verbose=True):
+    """
+    """
+    import boto3
+    
+    s3 = boto3.resource('s3')
+    
+    path_split = path.split('s3://')[1].split('/')
+    file_bucket = path_split[0]
+    file_bkt = s3.Bucket(file_bucket)
+    file_prefix = '/'.join(path_split[1:])
+    
+    local_file = os.path.join(output_dir, os.path.basename(file_prefix))
+    if os.path.exists(local_file) & (not overwrite):
+        if verbose:
+            print(f'{local_file} exists')
+        
+        return local_file
+        
+    files = [obj.key for obj in
+             file_bkt.objects.filter(Prefix=file_prefix)]
+    
+    if len(files) > 0:                
+        if verbose:
+            print(f'{path} > {local_file}')
+            
+        file_bkt.download_file(file_prefix, local_file,
+                      ExtraArgs=ExtraArgs)
+        return local_file
+    else:
+        print(f'{path} not found')
+        return None
+
+
 def get_redshift_fit_status(root, id, table='redshift_fit', engine=None):
     """
     Get status value from the database for root_id object
