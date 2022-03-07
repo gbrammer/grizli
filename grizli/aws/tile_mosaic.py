@@ -1375,6 +1375,12 @@ def build_mosaic_from_subregions(root='mos-{tile}-{filter}_{drz}', tile=2530, fi
             if (k not in llh) & (k not in ['SIMPLE','BITPIX','DATE-OBS','TIME-OBS']):
                 llh[k] = im[0].header[k]
                 #print(k, im[0].header[k])    
+    
+    # Empty
+    if 'PHOTFLAM' not in llh:
+        llh['PHOTFLAM'] = 0.
+        llh['PHOTFNU'] = 0.
+        llh['PHOTPLAM'] = 1.
             
     outfile = root.format(tile=tile, filter=filter, drz=drz) + '_sci.fits'
     pyfits.writeto(outfile, data=img, 
