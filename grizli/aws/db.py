@@ -183,6 +183,7 @@ def download_s3_file(path='s3://grizli-v2/HST/Pipeline/Tiles/2529/tile.2529.010.
     """
     """
     import boto3
+    from botocore.exceptions import ClientError
     
     s3 = boto3.resource('s3')
     
@@ -197,20 +198,31 @@ def download_s3_file(path='s3://grizli-v2/HST/Pipeline/Tiles/2529/tile.2529.010.
             print(f'{local_file} exists')
         
         return local_file
-        
-    files = [obj.key for obj in
-             file_bkt.objects.filter(Prefix=file_prefix)]
     
-    if len(files) > 0:                
+    try:
         if verbose:
             print(f'{path} > {local_file}')
             
         file_bkt.download_file(file_prefix, local_file,
                       ExtraArgs=ExtraArgs)
         return local_file
-    else:
+    except ClientError:
         print(f'{path} not found')
         return None
+        
+    # files = [obj.key for obj in
+    #          file_bkt.objects.filter(Prefix=file_prefix)]
+    # 
+    # if len(files) > 0:                
+    #     if verbose:
+    #         print(f'{path} > {local_file}')
+    #         
+    #     file_bkt.download_file(file_prefix, local_file,
+    #                   ExtraArgs=ExtraArgs)
+    #     return local_file
+    # else:
+    #     print(f'{path} not found')
+    #     return None
 
 
 def get_redshift_fit_status(root, id, table='redshift_fit', engine=None):
