@@ -73,7 +73,7 @@ else:
     version = long_version = version_hash = '1.3.2'
 
 # Manual version tag
-version = '1.4.0' # New aws tools
+# version = '1.4.0' # New aws tools
 
 version_str =f"""# git describe --tags
 __version__ = "{version}"
