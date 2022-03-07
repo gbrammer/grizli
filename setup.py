@@ -72,6 +72,9 @@ else:
     # e.g., on pip
     version = long_version = version_hash = '1.3.2'
 
+# Manual version tag
+version = '1.4.0' # New aws tools
+
 version_str =f"""# git describe --tags
 __version__ = "{version}"
 __long_version__ = "{long_version}"
@@ -101,7 +104,7 @@ setup(
     url = "https://github.com/gbrammer/grizli",
     download_url = "https://github.com/gbrammer/grizli/tarball/{0}".format(version),
     packages=['grizli', 'grizli/pipeline', 'grizli/utils_c', 'grizli/tests', 'grizli/galfit', 'grizli/aws'],
-    install_requires = ['numpy','cython'], 
+    install_requires = ['numpy','cython','astropy'], 
     classifiers=[
         "Development Status :: 1 - Planning",
         'Intended Audience :: Science/Research',
