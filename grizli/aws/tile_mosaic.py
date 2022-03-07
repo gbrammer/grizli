@@ -550,22 +550,34 @@ def coords_to_subtile(ra=189.0243001, dec=62.19669, size=0):
     """
     Get tile/subtile associated with sky coordinates
     """
+    from grizli import utils
+    from astropy.coordinates import SkyCoord
+    import astropy.units as u
+    
     global TILES, TILE_WCS
     
     if TILES is None:
         print('Initialize TILES')
-        TILES = db.SQL('select * from mosaic_tiles')
-        TILES['nsub'] = TILES['npix'] // 256
         
-    if TILE_WCS is None:
-        print('Initialize TILE_WCS')
-        TILE_WCS = [tile_wcs(t) for t in TILES['tile']]
+        if os.path.exists('TILES.csv'):
+            TILES = utils.read_catalog('TILES.csv')
+        else:
+            TILES = db.SQL('select * from mosaic_tiles')
+        
+        TILES['nsub'] = TILES['npix'] // 256
+        TILES['coo'] = SkyCoord(TILES['crval1'], TILES['crval2'], 
+                                unit=('deg','deg'))
     
-    tp = np.array([np.squeeze(w.all_world2pix([ra], [dec], 0)).flatten() 
-                   for w in TILE_WCS]).T
-
-    in_tile = ((tp > 0) & (tp < TILES['npix'])).sum(axis=0) == 2
-    subt = TILES[in_tile]
+    dr = TILES['coo'].separation(SkyCoord(ra, dec, unit=('deg','deg')))
+    in_tile = dr < (2*np.sqrt(2)*u.deg)
+    xTILES = TILES[in_tile]
+    
+    tp = np.array([np.squeeze(tile_wcs(t).all_world2pix([ra], [dec], 
+                                                        0)).flatten() 
+                   for t in xTILES['tile']]).T
+                   
+    in_tile = ((tp > 0) & (tp < xTILES['npix'])).sum(axis=0) == 2
+    subt = xTILES[in_tile]
     
     subt['fsubx'], subt['fsuby'] = tp[:,in_tile] / 256
     subt['subx'] = subt['fsubx'].astype(int)
