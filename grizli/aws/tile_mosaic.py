@@ -544,6 +544,66 @@ def exposure_map(ra, dec, rsize, name, filt='F160W', s0=16):
 
 
 TILES = None
+TILE_WCS = None
+
+def coords_to_subtile(ra=189.0243001, dec=62.19669, size=0):
+    """
+    Get tile/subtile associated with sky coordinates
+    """
+    global TILES, TILE_WCS
+    
+    if TILES is None:
+        print('Initialize TILES')
+        TILES = db.SQL('select * from mosaic_tiles')
+        TILES['nsub'] = TILES['npix'] // 256
+        
+    if TILE_WCS is None:
+        print('Initialize TILE_WCS')
+        TILE_WCS = [tile_wcs(t) for t in TILES['tile']]
+    
+    tp = np.array([np.squeeze(w.all_world2pix([ra], [dec], 0)).flatten() 
+                   for w in TILE_WCS]).T
+
+    in_tile = ((tp > 0) & (tp < TILES['npix'])).sum(axis=0) == 2
+    subt = TILES[in_tile]
+    
+    subt['fsubx'], subt['fsuby'] = tp[:,in_tile] / 256
+    subt['subx'] = subt['fsubx'].astype(int)
+    subt['suby'] = subt['fsuby'].astype(int)
+    
+    ds = size/0.1/256
+    subt['xmin'] = np.clip(subt['fsubx'] - ds, 0, subt['npix']).astype(int)
+    subt['xmax'] = np.clip(subt['fsubx'] + ds, 0, subt['npix']).astype(int)
+    subt['ymin'] = np.clip(subt['fsuby'] - ds, 0, subt['npix']).astype(int)
+    subt['ymax'] = np.clip(subt['fsuby'] + ds, 0, subt['npix']).astype(int)
+    
+    subt['ncut'] = (subt['xmax'] - subt['xmin'] + 1)
+    subt['ncut'] *= (subt['ymax'] - subt['ymin'] + 1)
+    so = np.argsort(subt['ncut'])
+    
+    return subt[so]
+
+
+def cutout_from_coords(output='mos-{tile}-{filter}_{drz}', ra=189.0243001, dec=62.1966953, size=10, filters=['F160W'], theta=0, clean_subtiles=False, send_to_s3=False, make_weight=True, **kwargs): 
+    
+    subt = coords_to_subtile(ra=ra, dec=dec, size=size)[0]
+    
+    ll = (subt['xmin'], subt['ymin'])
+    ur = (subt['xmax'], subt['ymax'])
+    
+    resp = []
+    for filt in filters:
+        ri = build_mosaic_from_subregions(root=output, 
+                                     tile=subt['tile'], files=None, 
+                                     filter=filt, 
+                                     ll=ll, ur=ur,
+                                     clean_subtiles=clean_subtiles, 
+                                     make_weight=make_weight,
+                                     send_to_s3=send_to_s3)
+        resp.append(ri)
+        
+    return resp
+
 
 def add_exposure_to_tile_db(dataset='ibev8xubq', sciext=1, tiles=None, row=None):
     """
@@ -1057,7 +1117,7 @@ def drizzle_tile_subregion(tile=2530, subx=522, suby=461, filter='F160W', s3outp
     return status
 
 
-def query_cutout(output='mos-{tile}-{filter}_{drz}', ra=189.0243001, dec=62.1966953, size=10, filters=['F160W'], theta=0, make_figure=False, make_mosaics=False, **kwargs):
+def query_cutout(output='mos-{tile}-{filter}_{drz}', ra=189.0243001, dec=62.1966953, size=10, filters=['F160W'], theta=0, make_figure=False, make_mosaics=False, all_tiles=True, **kwargs):
     """
     """
     from tqdm import tqdm
@@ -1140,17 +1200,24 @@ def query_cutout(output='mos-{tile}-{filter}_{drz}', ra=189.0243001, dec=62.1966
     res = res[res['keep']]
     
     if make_mosaics:
-        make_mosaic_from_table(res, output=output, **kwargs)
+        make_mosaic_from_table(res, output=output, all_tiles=all_tiles,
+                               **kwargs)
         
     return 'ok', res
 
 
-def make_mosaic_from_table(tab, output='mos-{tile}-{filter}_{drz}', clean_subtiles=False, send_to_s3=False, **kwargs):
+def make_mosaic_from_table(tab, output='mos-{tile}-{filter}_{drz}', clean_subtiles=False, send_to_s3=False, all_tiles=True, **kwargs):
     """
     """
     from grizli import utils
     un = utils.Unique(tab['tile'], verbose=False)
-    for t in un.values:
+    if all_tiles:
+        tiles = un.values
+    else:
+        tiles = [un.values[np.argmin(un.count)]]
+        
+    for t in tiles:
+        
         unt = tab[un[t]]
         
         xmi = unt['subx'].min()
@@ -1216,7 +1283,7 @@ def build_mosaic_from_subregions(root='mos-{tile}-{filter}_{drz}', tile=2530, fi
     
     llw = tile_subregion_wcs(tile, ll[0], ll[1])
     
-    if filter > 'f199':
+    if (filter > 'f199') & (filter not in ['g102','g141']):
         npix = 512
         llw = utils.half_pixel_scale(llw)
         drz = 'drc'
@@ -1240,6 +1307,8 @@ def build_mosaic_from_subregions(root='mos-{tile}-{filter}_{drz}', tile=2530, fi
     
     llh['EXPSTART'] = 1e10
     llh['EXPEND'] = 0
+    
+    im = None
     
     for xi in range(ll[0], ur[0]+1):
         for yi in range(ll[1], ur[1]+1):
@@ -1288,11 +1357,12 @@ def build_mosaic_from_subregions(root='mos-{tile}-{filter}_{drz}', tile=2530, fi
     llh['NDRIZIM'] = len(exposures)
     for j, exp in enumerate(exposures):
         llh[f'FLT{j+1:05d}'] = exp
-        
-    for k in im[0].header:
-        if (k not in llh) & (k not in ['SIMPLE','BITPIX','DATE-OBS','TIME-OBS']):
-            llh[k] = im[0].header[k]
-            #print(k, im[0].header[k])    
+    
+    if im is not None:    
+        for k in im[0].header:
+            if (k not in llh) & (k not in ['SIMPLE','BITPIX','DATE-OBS','TIME-OBS']):
+                llh[k] = im[0].header[k]
+                #print(k, im[0].header[k])    
             
     outfile = root.format(tile=tile, filter=filter, drz=drz) + '_sci.fits'
     pyfits.writeto(outfile, data=img, 
