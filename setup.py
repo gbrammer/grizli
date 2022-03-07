@@ -12,8 +12,13 @@ from setuptools.config import read_configuration
 import subprocess
 
 import os
-import numpy
 
+try:
+    import numpy 
+    include_dirs = [numpy.get_include()]
+except ImportError:
+    include_dirs = []
+    
 try:
     from Cython.Build import cythonize
     USE_CYTHON = True
@@ -34,20 +39,20 @@ if os.name == 'nt':
     # Windows
     extensions = [
         Extension("grizli.utils_c.interp", ["grizli/utils_c/interp"+cext],
-            include_dirs = [numpy.get_include()]),
+            include_dirs = include_dirs),
         
         Extension("grizli.utils_c.disperse", ["grizli/utils_c/disperse"+cext],
-            include_dirs = [numpy.get_include()]),
+            include_dirs = include_dirs),
     ]
 else:
     # Not windows
     extensions = [
         Extension("grizli.utils_c.interp", ["grizli/utils_c/interp"+cext],
-            include_dirs = [numpy.get_include()],
+            include_dirs = include_dirs,
             libraries=["m"]),
         
         Extension("grizli.utils_c.disperse", ["grizli/utils_c/disperse"+cext],
-            include_dirs = [numpy.get_include()],
+            include_dirs = include_dirs,
             libraries=["m"]),
     ] 
 
