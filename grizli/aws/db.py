@@ -1792,12 +1792,15 @@ def execute(sql_text):
     return resp
 
 
-def send_to_database(tab, index=False, if_exists='append', method='multi', **kwargs):
+def send_to_database(table_name, tab, index=False, if_exists='append', method='multi', **kwargs):
     """
     Send table object to remote database with `pandas.DataFrame.to_sql`
     
     Parameters
     ----------
+    table_name : str
+        Name of table to create/append
+        
     tab : `~astropy.table.Table` or `~pandas.DataFrame`
         Input table.  If an `~astropy.table.Table`, then convert to 
         `~pandas.DataFrame` with `tab.to_pandas()`
@@ -1825,7 +1828,7 @@ def send_to_database(tab, index=False, if_exists='append', method='multi', **kwa
     else:
         df = tab.to_pandas()
         
-    resp = df.to_sql('exposure_files', _ENGINE, index=index, 
+    resp = df.to_sql(table_name, _ENGINE, index=index, 
                      if_exists=if_exists, method=method)
     
     return resp
