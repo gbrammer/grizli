@@ -457,7 +457,7 @@ def find_mosaic_segments(bs=16):
     for i in range(30):
         t = patches['tile'][i]
 
-        os.system(f"""aws s3 sync s3://grizli-v2/HST/Pipeline/Tiles/{t}/ ./  --exclude "*" --include "*{patches['filter'][i].lower()}*sci.fits"  """)
+        os.system(f"""aws s3 sync s3://grizli-mosaic-tiles/Tiles/{t}/ ./  --exclude "*" --include "*{patches['filter'][i].lower()}*sci.fits"  """)
     
         build_mosaic_from_subregions(root=patches['jname'][i], tile=t, 
                                      files=None, 
@@ -874,9 +874,17 @@ def send_all_tiles():
                 ORDER BY filter ASC
                 """)
     
-    skip = (tiles['filter'] > 'F1') & (tiles['count'] > 400)
-    skip |= (tiles['filter'] < 'F1') & (tiles['count'] > 300)
+    if 1:
     
+        # Skip all optical
+        skip = (tiles['filter'] > 'F18') #& (tiles['count'] > 100)
+        skip |= (tiles['filter'] < 'F18') & (tiles['count'] > 100)
+        timeout = 60
+    
+        skip = (tiles['filter'] > 'F18') & (tiles['count'] > 100)
+        skip |= (tiles['filter'] < 'F18') & (tiles['count'] > 300)
+        timeout = 60
+        
     tiles = tiles[~skip]
     
     nt1 = len(tiles)
@@ -887,7 +895,6 @@ def send_all_tiles():
     istart = i = -1
     
     max_locked = 280
-    timeout = 60
     
     step = max_locked - count_locked()[0]
     
@@ -898,7 +905,7 @@ def send_all_tiles():
         
         if i-istart == step:
             istart = i
-            print(f'\n ############### \n {time.ctime()}: Pause for {timeout} s')
+            print(f'\n ############### \n {time.ctime()}: Pause for {timeout} s  / {step} run previously')
             time.sleep(timeout)
             
             step = np.maximum(max_locked - count_locked()[0], 1)
@@ -1029,7 +1036,7 @@ def drizzle_tile_subregion(tile=2530, subx=522, suby=461, filter='F160W', s3outp
     
     s3output : str
         Output S3 path, defaults to 
-        ``s3://grizli-v2/HST/Pipeline/Tiles/{tile}/``
+        ``s3://grizli-mosaic-tiles/Tiles/{tile}/``
     
     ir_wcs : `~astropy.wcs.WCS`
         Override subtile WCS
@@ -1104,7 +1111,7 @@ def drizzle_tile_subregion(tile=2530, subx=522, suby=461, filter='F160W', s3outp
         print(f'{root} {filter} {len(exp)}')
         
     if s3output is None:
-        s3output = f's3://grizli-v2/HST/Pipeline/Tiles/{tile}/'
+        s3output = f's3://grizli-mosaic-tiles/Tiles/{tile}/'
     
     visit_processor.cutout_mosaic(rootname=root,
                                   product='{rootname}.{f}',
@@ -1327,7 +1334,7 @@ def build_mosaic_from_subregions(root='mos-{tile}-{filter}_{drz}', tile=2530, fi
             file = f'tile.{tile:04d}.{xi:03d}.{yi:03d}'
             file += f'.{filter}_{drz}_sci.fits'
             
-            s3 = f's3://grizli-v2/HST/Pipeline/Tiles/{tile}/'
+            s3 = f's3://grizli-mosaic-tiles/Tiles/{tile}/'
             db.download_s3_file(s3+file, overwrite=False, verbose=False)
             
             if not os.path.exists(file):
