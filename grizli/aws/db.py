@@ -146,7 +146,7 @@ def refresh_engine():
     now = astropy.time.Time.now()
     if _ENGINE is None:
         get_db_engine()
-    elif 'Signature' in _ENGINE._init_kws["connect_args"]["password"]:
+    elif 'connect_args' in _ENGINE._init_kws:
         get_db_engine()
     elif (now - _ENGINE._init_time) > ENGINE_REFRESH_DT:
         args, kws = _ENGINE._init_args, _ENGINE._init_kws
