@@ -142,9 +142,13 @@ def refresh_engine():
     from sqlalchemy import create_engine
     
     global _ENGINE
-    
+            
     now = astropy.time.Time.now()
-    if (now - _ENGINE._init_time) > ENGINE_REFRESH_DT:
+    if _ENGINE is None:
+        get_db_engine()
+    elif 'Signature' in _ENGINE._init_kws["connect_args"]["password"]:
+        get_db_engine()
+    elif (now - _ENGINE._init_time) > ENGINE_REFRESH_DT:
         args, kws = _ENGINE._init_args, _ENGINE._init_kws
         _ENGINE = create_engine(*args, **kws)
         _ENGINE._init_time = astropy.time.Time.now()
