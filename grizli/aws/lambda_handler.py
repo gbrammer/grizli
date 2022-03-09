@@ -73,7 +73,7 @@ def check_object_in_footprint(id, wcs_fits, cat, rd=None):
     return has_point
 
 
-def extract_beams_from_flt(root, bucket, id, clean=True, silent=False, align_dash=False):
+def extract_beams_from_flt(root, bucket, id, clean=True, silent=False):
     """
     Download GrismFLT files and extract the beams file
     """
@@ -209,7 +209,7 @@ def extract_beams_from_flt(root, bucket, id, clean=True, silent=False, align_das
 
     # Grism Object
     args = np.load(args_file, allow_pickle=True)[0]
-    if align_dash:
+    if '_ehn_' in root:
         try:
             import wfc3dash.grism.grism
             mb = wfc3dash.grism.grism.run_align_dash(beams, args)
@@ -448,7 +448,8 @@ def run_grizli_fit(event):
             pass
 
         status = extract_beams_from_flt(root, event_kwargs['bucket'], id,
-                                        clean=run_clean, silent=silent)
+                                        clean=run_clean, silent=silent, 
+                                        **event)
 
         # Garbage collector
         gc.collect()
