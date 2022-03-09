@@ -73,7 +73,7 @@ def check_object_in_footprint(id, wcs_fits, cat, rd=None):
     return has_point
 
 
-def extract_beams_from_flt(root, bucket, id, clean=True, silent=False):
+def extract_beams_from_flt(root, bucket, id, clean=True, silent=False, align_dash=False):
     """
     Download GrismFLT files and extract the beams file
     """
@@ -96,14 +96,14 @@ def extract_beams_from_flt(root, bucket, id, clean=True, silent=False):
 
     # WCS files for ACS
     files = [obj.key for obj in 
-             bkt.objects.filter(Prefix=f'Pipeline/{root}/Extractions/j')]
+             bkt.objects.filter(Prefix=f'HST/Pipeline/{root}/Extractions/j')]
     files += [obj.key for obj in 
-              bkt.objects.filter(Prefix=f'Pipeline/{root}/Extractions/i')]
+              bkt.objects.filter(Prefix=f'HST/Pipeline/{root}/Extractions/i')]
 
-    prefix = f'Pipeline/{root}/Extractions/{root}-ir.cat.fits'
+    prefix = f'HST/Pipeline/{root}/Extractions/{root}-ir.cat.fits'
     files += [obj.key for obj in bkt.objects.filter(Prefix=prefix)]
 
-    prefix = f'Pipeline/{root}/Extractions/fit_args.npy'
+    prefix = f'HST/Pipeline/{root}/Extractions/fit_args.npy'
     files += [obj.key for obj in bkt.objects.filter(Prefix=prefix)]
 
     download_files = []
@@ -363,7 +363,7 @@ def run_grizli_fit(event):
 
     # Initial log
     start_log = '{0}_{1:05d}.start.log'.format(root, id)
-    full_start = 'Pipeline/{0}/Extractions/{1}'.format(root, start_log)
+    full_start = 'HST/Pipeline/{0}/Extractions/{1}'.format(root, start_log)
     if ((start_log in files) | (db_status >= 0)) & event_kwargs['skip_started']:
         print('Log file {0} found in {1} (db_status={2})'.format(start_log, os.getcwd(), db_status))
         return True
@@ -405,7 +405,7 @@ def run_grizli_fit(event):
     args_files = ['{0}_fit_args.npy'.format(root), 'fit_args.npy']
     for args_file in args_files:
         if (not os.path.exists(args_file)) | force_args:
-            aws_file = 'Pipeline/{0}/Extractions/{1}'.format(root, args_file)
+            aws_file = 'HST/Pipeline/{0}/Extractions/{1}'.format(root, args_file)
             try:
                 bkt.download_file(aws_file, './{0}'.format(args_file),
                               ExtraArgs={"RequestPayer": "requester"})
@@ -461,7 +461,7 @@ def run_grizli_fit(event):
         put_beams = True
 
         # upload it now
-        output_path = 'Pipeline/{0}/Extractions'.format(root)
+        output_path = 'HST/Pipeline/{0}/Extractions'.format(root)
         for outfile in status:
             aws_file = '{0}/{1}'.format(output_path, outfile)
             print(aws_file)
@@ -649,7 +649,7 @@ def run_grizli_fit(event):
 
         if output_path is None:
             #output_path = 'Pipeline/QuasarFit'.format(root)
-            output_path = 'Pipeline/{0}/Extractions'.format(root)
+            output_path = 'HST/Pipeline/{0}/Extractions'.format(root)
 
     elif event_kwargs['fit_stars'] in TRUE_OPTIONS:
 
@@ -731,7 +731,7 @@ def run_grizli_fit(event):
 
         if output_path is None:
             # output_path = 'Pipeline/QuasarFit'.format(root)
-            output_path = 'Pipeline/{0}/Extractions'.format(root)
+            output_path = 'HST/Pipeline/{0}/Extractions'.format(root)
 
     else:
 
@@ -740,7 +740,7 @@ def run_grizli_fit(event):
                                  args_file=args_file, **event_kwargs)
 
         if output_path is None:
-            output_path = 'Pipeline/{0}/Extractions'.format(root)
+            output_path = 'HST/Pipeline/{0}/Extractions'.format(root)
 
     # Output files
     files = glob.glob('{0}_{1:05d}*'.format(root, id))
@@ -808,7 +808,7 @@ def clean(root='', verbose=True):
     gc.collect()
 
 
-TESTER = 'Pipeline/j001452+091221/Extractions/j001452+091221_00277.beams.fits'
+TESTER = 'HST/Pipeline/j001452+091221/Extractions/j001452+091221_00277.beams.fits'
 
 
 def run_test(s3_object_path=TESTER):
@@ -826,7 +826,7 @@ def run_test(s3_object_path=TESTER):
 
     bucket = 'grizli'
     root, id = obj.split('_')
-    s3_object_path = 'Pipeline/{0}/Extractions/{0}_{1:05d}.beams.fits'.format(root, int(id))
+    s3_object_path = 'HST/Pipeline/{0}/Extractions/{0}_{1:05d}.beams.fits'.format(root, int(id))
     event = {'s3_object_path': s3_object_path,
              'bucket': bucket,
              'verbose': 'True',
