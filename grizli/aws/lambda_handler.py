@@ -281,7 +281,7 @@ def run_grizli_fit(event):
 
     utils.set_warnings()
 
-    #event = {'s3_object_path':'Pipeline/j001452+091221/Extractions/j001452+091221_00277.beams.fits'}
+    #event = {'s3_object_path':'HST/Pipeline/j001452+091221/Extractions/j001452+091221_00277.beams.fits'}
 
     silent = False
     if 'silent' in event:
@@ -361,8 +361,8 @@ def run_grizli_fit(event):
 
     # Filenames, etc.
     beams_file = os.path.basename(event['s3_object_path'])
-    root = beams_file.split('_')[0]
-    id = int(beams_file.split('_')[1].split('.')[0])
+    root = '_'.join(beams_file.split('_')[:-1])
+    id = int(beams_file.split('_')[-1].split('.')[0])
 
     try:
         db_status = grizli_db.get_redshift_fit_status(root, id, table=dbtable)
@@ -834,6 +834,10 @@ def run_test(s3_object_path=TESTER):
 
     bucket = 'grizli'
     root, id = obj.split('_')
+    
+    root = '_'.join(obj.split('_')[:-1])
+    id = int(obj.split('_')[-1].split('.')[0])
+    
     s3_object_path = 'HST/Pipeline/{0}/Extractions/{0}_{1:05d}.beams.fits'.format(root, int(id))
     event = {'s3_object_path': s3_object_path,
              'bucket': bucket,
@@ -845,7 +849,7 @@ def run_test(s3_object_path=TESTER):
     run_grizli_fit(event)
 
     beams_file = os.path.basename(event['s3_object_path'])
-    root = beams_file.split('_')[0]
+    #root = beams_file.split('_')[0]
     clean(root=root, verbose=True)
 
 
@@ -894,7 +898,7 @@ def redshift_handler(event, context):
 
     # Clean up
     beams_file = os.path.basename(event['s3_object_path'])
-    root = beams_file.split('_')[0]
+    root = '_'.join(beams_file.split('_')[:-1])
 
     if 'clean' in event:
         run_clean = event['clean'] in TRUE_OPTIONS
