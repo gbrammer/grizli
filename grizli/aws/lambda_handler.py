@@ -346,7 +346,7 @@ def run_grizli_fit(event):
     if 'bucket' in event:
         event_kwargs['bucket'] = event['bucket']
     else:
-        event_kwargs['bucket'] = 'aws-grivam'
+        event_kwargs['bucket'] = 'grizli-v2' #'aws-grivam'
 
     if 'working_directory' in event:
         os.chdir(event['working_directory'])
