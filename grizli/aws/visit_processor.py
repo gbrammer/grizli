@@ -488,6 +488,13 @@ def delete_all_assoc_data(assoc):
         db._ENGINE.execute(f"""DELETE from shifts_log
                                WHERE shift_dataset like '{r}%%'""")
     
+    res = db.execute(f"""DELETE from mosaic_tiles_exposures t
+                 USING exposure_files e
+                WHERE t.expid = e.eid AND e.assoc = '{assoc}'""")
+    
+    res = db.execute(f"""DELETE from exposure_files
+                    WHERE assoc = '{assoc}'""")
+                    
     os.system(f'aws s3 rm --recursive s3://grizli-v2/HST/Pipeline/{assoc}')
 
 
