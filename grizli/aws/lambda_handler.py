@@ -209,7 +209,15 @@ def extract_beams_from_flt(root, bucket, id, clean=True, silent=False, align_das
 
     # Grism Object
     args = np.load(args_file, allow_pickle=True)[0]
-    mb = multifit.MultiBeam(beams, **args)
+    if align_dash:
+        try:
+            import wfc3dash.grism.grism
+            mb = wfc3dash.grism.grism.run_align_dash(beams, args)
+        except ImportError:
+            mb = multifit.MultiBeam(beams, **args)
+    else:
+        mb = multifit.MultiBeam(beams, **args)
+        
     mb.write_master_fits()
 
     # 1D spectrum with R=30 fit
