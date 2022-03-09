@@ -448,8 +448,7 @@ def run_grizli_fit(event):
             pass
 
         status = extract_beams_from_flt(root, event_kwargs['bucket'], id,
-                                        clean=run_clean, silent=silent, 
-                                        **event)
+                                        clean=run_clean, silent=silent)
 
         # Garbage collector
         gc.collect()
