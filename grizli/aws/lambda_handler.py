@@ -473,7 +473,8 @@ def run_grizli_fit(event):
         for outfile in status:
             aws_file = '{0}/{1}'.format(output_path, outfile)
             print(aws_file)
-            bkt.upload_file(outfile, aws_file) #, ExtraArgs={'ACL': 'public-read'})
+            bkt.upload_file(outfile, aws_file, 
+                            ExtraArgs={'ACL': 'public-read'})
 
     if ('run_fit' in event) & (dbtable == 'redshift_fit'):
         if event['run_fit'] in FALSE_OPTIONS:
@@ -767,7 +768,7 @@ def run_grizli_fit(event):
 
             print('Upload {0} -> {1}'.format(file, aws_file))
 
-            bkt.upload_file(file, aws_file) #, ExtraArgs={'ACL': 'public-read'})
+            bkt.upload_file(file, aws_file, ExtraArgs={'ACL': 'public-read'})
 
     # Put data in the redshift_fit database table
     try:
