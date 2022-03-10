@@ -154,9 +154,11 @@ def get_lambda_client(region_name='us-east-1'):
     return client
 
 
-def send_event_lambda(event, verbose=True, client=None, func='GrizliLambda2020'):
+def send_event_lambda(event, verbose=True, client=None, func='grizli-redshift-fit'):
     """
     Send a single event to AWS lambda
+    
+    GrizliLambda2020
     """
     import time
     import os
