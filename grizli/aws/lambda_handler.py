@@ -318,13 +318,13 @@ def run_grizli_fit(event):
             event_kwargs[k] = False
 
     if event_kwargs['beam_info_only'] in TRUE_OPTIONS:
-        dbtable = 'multibeam'
+        dbtable = 'multibeam_v2'
     elif event_kwargs['quasar_fit'] in TRUE_OPTIONS:
-        dbtable = 'redshift_fit_quasar'
+        dbtable = 'redshift_fit_v2_quasar'
     elif event_kwargs['fit_stars'] in TRUE_OPTIONS:
-        dbtable = 'stellar_fit'
+        dbtable = 'stellar_fit_v2'
     else:
-        dbtable = 'redshift_fit'
+        dbtable = 'redshift_fit_v2'
     
     if 'dbtable' in event_kwargs:
         dbtable = event_kwargs['dbtable']
@@ -476,7 +476,7 @@ def run_grizli_fit(event):
             bkt.upload_file(outfile, aws_file, 
                             ExtraArgs={'ACL': 'public-read'})
 
-    if ('run_fit' in event) & (dbtable == 'redshift_fit'):
+    if ('run_fit' in event) & (dbtable == 'redshift_fit_v2'):
         if event['run_fit'] in FALSE_OPTIONS:
             res = ubkt.delete_objects(Delete={'Objects': 
                                                [{'Key': full_start}]})
@@ -502,7 +502,7 @@ def run_grizli_fit(event):
         grizli_db.multibeam_to_database(beams_file, Rspline=15, force=False,
                                         **args)
 
-    if dbtable == 'multibeam':
+    if dbtable == 'multibeam_v2':
         # Done
         res = ubkt.delete_objects(Delete={'Objects': [{'Key': full_start}]})
         return True
@@ -538,7 +538,7 @@ def run_grizli_fit(event):
 
     try:
         files = glob.glob('{0}_{1:05d}*R30.fits'.format(root, id))
-        if (len(files) > 0) & (dbtable == 'redshift_fit'):
+        if (len(files) > 0) & (dbtable == 'redshift_fit_v2'):
             grizli_db.send_1D_to_database(files=files)
     except:
         print('Failed to send R30 to spec1d database')
@@ -783,7 +783,7 @@ def run_grizli_fit(event):
 
         # Add 1D spectra
         files = glob.glob('{0}_{1:05d}*1D.fits'.format(root, id))
-        if (len(files) > 0) & (dbtable == 'redshift_fit'):
+        if (len(files) > 0) & (dbtable == 'redshift_fit_v2'):
             grizli_db.send_1D_to_database(files=files)
 
     except:
