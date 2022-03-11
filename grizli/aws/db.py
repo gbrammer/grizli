@@ -84,7 +84,7 @@ def get_db_engine(config=None, echo=False, iam_file='/home/ec2-user/db.iam.yaml'
     import boto3
     
     # With IAM auth on EC2
-    if os.path.exists(iam_file):
+    if os.path.exists(iam_file) & (config is None):
         config = get_connection_info(config_file=iam_file)
         session = boto3.Session()
         client = session.client('rds', region_name=config['region'])
