@@ -1929,7 +1929,7 @@ def render_for_notebook(tab, image_extensions=['stack', 'full', 'line'], bucket=
         cols.pop(cols.index(c))
     
     if get_table:
-        return rows
+        return rows, fmt
         
     out = rows[cols].to_pandas().to_html(escape=False, formatters=fmt)
     return out
