@@ -540,24 +540,17 @@ def make_v2_tables():
     
     from grizli.aws import db
     
-    db.execute("""DROP TABLE redshift_fit_v2;""")
-    db.execute("""CREATE TABLE redshift_fit_v2 AS 
-    SELECT
-    *
-    FROM
-        redshift_fit
-    WHERE
-        root like '%%_ehn_%%';
-        """)
+    db.execute("""CREATE TABLE redshift_fit_v2 AS TABLE redshift_fit WITH NO DATA;""")
     
     db.execute("""CREATE TABLE redshift_fit_quasar_v2 AS TABLE redshift_fit_quasar WITH NO DATA;""")
+    
     db.execute("""CREATE TABLE stellar_fit_v2 AS TABLE stellar_fit_v2 WITH NO DATA;""")
     db.execute("""CREATE TABLE stellar_fit_v2 AS TABLE stellar_fit WITH NO DATA;""")
     db.execute("""CREATE TABLE multibeam_v2 AS TABLE multibeam WITH NO DATA;""")
     db.execute("""CREATE TABLE beam_geometry_v2 AS TABLE beam_geometry WITH NO DATA;""")
 
     for t in ['spec1d_r30_g141', 'spec1d_r30_g102', 'spec1d_g141', 'spec1d_g102']:
-        db.execute(f"""CREATE TABLE {t}_v2 AS TABLE {t} WITH NO DATA;""")
+        db.execute(f"""CREATE TABLE {t}_v2_wave AS TABLE {t}_wave;""")
     
 
 def send_1D_to_database(files=[], engine=None):
@@ -606,7 +599,7 @@ def send_1D_to_database(files=[], engine=None):
                        index=True, index_label=tablename+'_idx')
 
         # drop wave from spectra tables
-        df.drop('{0}_wave'.format(tablename), axis=1, inplace=True)
+        df.drop('{0}_{1}_wave'.format(prefix, gr), axis=1, inplace=True)
 
         # Create table
         if tablename not in engine.table_names():
