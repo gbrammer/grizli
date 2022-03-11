@@ -585,7 +585,8 @@ def send_1D_to_database(files=[], engine=None):
     prefix = 'spec1d_r30' if '.R30.' in files[0] else 'spec1d'
 
     for gr in tables:
-        tablename = '{0}_{1}_v2'.format(prefix, gr)
+        tablepref = '{0}_{1}'.format(prefix, gr)
+        tablename = '{0}_v2'.format(tablepref)
         df = pd.DataFrame(tables[gr])
 
         # Put wavelengths in their own tables to avoid massive duplication
@@ -623,7 +624,10 @@ def send_1D_to_database(files=[], engine=None):
         # Delete existing duplicates
         if tablename in engine.table_names():
             SQL = """DELETE from {0} WHERE """.format(tablename)
-            mat = ["({0}_root = '{1}' AND {0}_id = {2})".format(tablename, r, i) for r, i in zip(df[tablename+'_root'], df[tablename+'_id'])]
+            cmd = "({0}_root = '{1}' AND {0}_id = {2})"
+            mat = [cmd.format(tablepref, r, i) 
+                   for r, i in zip(df[tablepref+'_root'], 
+                                   df[tablepref+'_id'])]
             SQL += 'OR '.join(mat)
             rsp = engine.execute(SQL)
 
