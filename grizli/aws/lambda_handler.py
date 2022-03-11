@@ -833,8 +833,8 @@ def run_test(s3_object_path=TESTER):
     obj = 'j224916m4432_02983'
 
     bucket = 'grizli'
-    root, id = obj.split('_')
-    
+    #root, id = obj.split('_')
+
     root = '_'.join(obj.split('_')[:-1])
     id = int(obj.split('_')[-1].split('.')[0])
     
