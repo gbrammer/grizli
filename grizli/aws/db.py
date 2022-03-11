@@ -1855,7 +1855,7 @@ def send_to_database(table_name, tab, index=False, if_exists='append', method='m
     return resp
 
 
-def render_for_notebook(tab, image_extensions=['stack', 'full', 'line'], bucket='grizli-v2', max_rows=20, link_root=True, link_type='grism'):
+def render_for_notebook(tab, image_extensions=['stack', 'full', 'line'], bucket='grizli-v2', max_rows=20, link_root=True, link_type='grism', get_table=False):
     """
     Render images for inline display in a notebook
 
@@ -1927,6 +1927,9 @@ def render_for_notebook(tab, image_extensions=['stack', 'full', 'line'], bucket=
     rows.remove_columns(['bucket', 'ext'])
     for c in ['bucket','ext']:
         cols.pop(cols.index(c))
+    
+    if get_table:
+        return rows
         
     out = rows[cols].to_pandas().to_html(escape=False, formatters=fmt)
     return out
