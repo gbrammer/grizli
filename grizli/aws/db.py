@@ -538,6 +538,8 @@ def convert_1D_to_lists(file='j234420m4245_00615.1D.fits'):
 
 def make_v2_tables():
     
+    from grizli.aws import db
+    
     db.execute("""DROP TABLE redshift_fit_v2;""")
     db.execute("""CREATE TABLE redshift_fit_v2 AS 
     SELECT
