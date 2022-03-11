@@ -1249,8 +1249,8 @@ def multibeam_to_database(beams_file, engine=None, Rspline=15, force=False, **kw
         engine = get_db_engine(echo=False)
 
     mtime = Time(os.stat(beams_file).st_mtime, format='unix').iso
-    root = beams_file.split('_')[0]
-    id = int(beams_file.split('_')[1].split('.')[0])
+    root = '_'.join(beams_file.split('_')[:-1])
+    id = int(beams_file.split('_')[-1].split('.')[0])
 
     res = pd.read_sql_query("SELECT mtime from multibeam_v2 WHERE (root = '{0}' AND id = {1})".format(root, id), engine)
     if len(res) == 1:
