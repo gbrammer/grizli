@@ -381,8 +381,9 @@ class GroupFLT():
             _PA[grism][PA_i].append(i)
         
         return _PA
-        
-    def save_full_data(self, warn=True):
+
+
+    def save_full_data(self, warn=True, verbose=False):
         """Save models and data files for fast regeneration.
 
         The filenames of the outputs are generated from the input grism
@@ -429,17 +430,27 @@ class GroupFLT():
             save_file = save_file.replace('_cmb.fits', new_root)
             save_file = save_file.replace('_rate.fits', new_root)
             save_file = save_file.replace('_elec.fits', new_root)
-            
+
             if (save_file == file) & ('GrismFLT' not in file):
                 # couldn't build new filename based on the extensions
                 # so just insert at the end
                 save_file = file.replace('.fits', new_root)
-                
+            
+            # Rotate back to detector frame if needed
+            if _flt.grism.instrument in ['NIRISS', 'NIRCAM']:
+                _flt.transform_NIRISS(verbose=verbose)
+            
+            # Save the files
             print('Save {0}'.format(save_file))
             _flt.save_full_pickle()
 
             # Reload initialized data
             _flt.load_from_fits(save_file)
+            
+            # Rotate to "GrismFLT" frame if needed
+            if _flt.grism.instrument in ['NIRISS', 'NIRCAM']:
+                _flt.transform_NIRISS(verbose=verbose)
+
 
     def extend(self, new, verbose=True):
         """Add another `GroupFLT` instance to `self`
