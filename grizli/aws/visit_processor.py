@@ -901,7 +901,7 @@ blue_align_params['tweak_n_min'] = 5
 ALL_FILTERS = ['F410M', 'F467M', 'F547M', 'F550M', 'F621M', 'F689M', 'F763M', 'F845M', 'F200LP', 'F350LP', 'F435W', 'F438W', 'F439W', 'F450W', 'F475W', 'F475X', 'F555W', 'F569W', 'F600LP', 'F606W', 'F622W', 'F625W', 'F675W', 'F702W', 'F775W', 'F791W', 'F814W', 'F850LP', 'G800L', 'F098M', 'F127M', 'F139M', 'F153M', 'F105W', 'F110W', 'F125W', 'F140W', 'F160W', 'G102', 'G141']
 
 
-def process_visit(assoc, clean=True, sync=True, max_dt=4, visit_split_shift=1.2, blue_align_params=blue_align_params, ref_catalogs=['LS_DR9', 'PS1', 'DES', 'GAIA'], filters=None, prep_args={}, **kwargs):
+def process_visit(assoc, clean=True, sync=True, max_dt=4, visit_split_shift=1.2, blue_align_params=blue_align_params, ref_catalogs=['LS_DR9', 'PS1', 'DES', 'GAIA'], filters=None, prep_args={}, get_wcs_guess_from_table=True, **kwargs):
     """
     `assoc_table.status`
     
@@ -919,6 +919,13 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, visit_split_shift=1.2,
 
     os.chdir('/GrizliImaging/')
     
+    tab = db.SQL(f"""SELECT * FROM assoc_table
+                     WHERE assoc_name='{assoc}'""")
+    
+    if len(tab) == 0:
+        print(f"assoc_name='{assoc}' not found in assoc_table")
+        return False
+        
     if os.path.exists(assoc) & (clean > 0):
         os.system(f'rm -rf {assoc}*')
         
@@ -927,14 +934,10 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, visit_split_shift=1.2,
     set_private_iref(assoc)
 
     update_assoc_status(assoc, status=1)
-        
-    tab = db.SQL(f"""SELECT * FROM assoc_table
-                     WHERE assoc_name='{assoc}'""")
     
-    if len(tab) == 0:
-        print(f"assoc_name='{assoc}' not found in assoc_table")
-        return False
-        
+    if get_wcs_guess_from_table:
+        get_wcs_guess(assoc)
+      
     keep = []
     for c in tab.colnames:
         if tab[c].dtype not in [object]:
@@ -1051,6 +1054,41 @@ def set_private_iref(assoc):
     utils.fetch_default_calibs()
 
 
+def get_wcs_guess(assoc, verbose=True):
+    """
+    Get visit wcs alignment from the database and use it as a "guess"
+    """
+    from grizli import utils
+    
+    wcs = db.from_sql(f"select * from wcs_log where wcs_assoc = '{assoc}'")
+    
+    LOGFILE = f'/GrizliImaging/{assoc}.auto_script.log.txt'
+    
+    if len(wcs) == 0:
+        msg = f"# get_wcs_guess : No entries found in wcs_log for wcs_assoc='{assoc}'"
+        utils.log_comment(LOGFILE, msg, verbose=verbose, show_date=True)
+        return True
+        
+    if not os.path.exists(assoc+'/Prep'):
+        os.mkdir(assoc+'/Prep')
+    
+    msg = f"# get_wcs_guess : '{assoc}'"
+    utils.log_comment(LOGFILE, msg, verbose=verbose, show_date=True)
+        
+    for i in range(len(wcs)):
+        p = wcs['wcs_parent'][i]
+        dx = wcs['wcs_dx'][i]
+        dy = wcs['wcs_dy'][i]
+        guess_file = f'{assoc}/Prep/{p}.align_guess'
+        guess = f"{dx:.2f} {dy:.2f} 0.0 1.0\n"
+        
+        msg = f"{guess_file} : {guess}"
+        utils.log_comment(LOGFILE, msg, verbose=verbose, show_date=False)
+        
+        with open(guess_file,'w') as fp:
+            fp.write(guess)        
+        
+            
 def make_parent_mosaic(parent='j191436m5928', **kwargs):
     """
     Get the full footprint of all exposure in the database for a given 'parent'
