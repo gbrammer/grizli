@@ -349,27 +349,50 @@ def add_exposure_batch():
 
             db.execute('ALTER TABLE assoc_table ADD COLUMN aid SERIAL PRIMARY KEY;')
             db.execute('CREATE INDEX on exposure_files (eid)')
+            db.execute('CREATE INDEX on exposure_files (eid,filter)')
             db.execute('CREATE INDEX on mosaic_tiles_exposures (expid)')
+
+            db.execute('CREATE INDEX on mosaic_tiles_exposures (tile, subx, suby)')
         
 def make_exposure_maps():
     """
     """
+
     from grizli import utils
+    from grizli.aws import tile_mosaic
+    from grizli.aws import db
     
     filt = 'F160W'
     
     ra, dec, rsize, name =  53.14628, -27.814, 20, 'gds'
     #ra, dec, rsize, name = 189.22592,  62.24586, 20, 'gdn'
     # ra, dec, rsize, name = 214.95, 52.9, 20, 'egs'
-    # ra, dec, rsize, name = 150.11322, 2.24068, 48, 'cos'
-    #ra, dec, rsize, name = 34.34984, -5.18390, 20, 'uds'
+    ra, dec, rsize, name = 150.11322, 2.24068, 48, 'cos'
+    ra, dec, rsize, name = 34.34984, -5.18390, 30, 'uds'
     
-    fig = exposure_map(ra, dec, rsize, name, filt=filt, s0=18)
+    ra, dec, rsize, name = 177.40124999999998, 22.39947222222, 12, 'macs1149'
+    ra, dec, rsize, name = 157.30641, 26.39197, 12, 'sdss1029'
+    
+    fig, tab = tile_mosaic.exposure_map(ra, dec, rsize, name, filt=filt, s0=18)
     fig.tight_layout(pad=0.5)
     fig.savefig('/tmp/map.png')
     fig.tight_layout(pad=0.5)
     fig.savefig('/tmp/map.png')
     
+    from grizli.aws import db
+    mf = db.SQL("""
+    SELECT * from mosfire_extractions natural join mosfire_datemask
+    """)
+    
+    # MF with HST
+    # SQL = f"""SELECT m.file, count(m.file)
+    #         FROM mosfire_extractions m, exposure_files e
+    #         WHERE ('(' || ra_targ || 
+    #                 ', ' || dec_targ || ')')::point
+    #                 <@ polygon(e.footprint)
+    #         GROUP BY m.file"""
+    # 
+    # res = db.SQL(SQL) 
     
     ###############
     
@@ -466,7 +489,7 @@ def find_mosaic_segments(bs=16):
         os.system(f'rm tile.{t0:04d}*')
         
     
-def exposure_map(ra, dec, rsize, name, filt='F160W', s0=16):
+def exposure_map(ra, dec, rsize, name, filt='F160W', s0=16, cmap='viridis', figsize=(6,6), show_tiles=True, res=None, alpha=1., ec='None', vmin=None, vmax=None, extra=''):
     """
     Make an exposure map from a database query
     """
@@ -480,7 +503,8 @@ def exposure_map(ra, dec, rsize, name, filt='F160W', s0=16):
     
     cosd = np.cos(dec/180*np.pi)
     
-    res = db.SQL(f"""SELECT tile, subx, suby, subra, subdec, filter, 
+    if res is None:
+        res = db.SQL(f"""SELECT tile, subx, suby, subra, subdec, filter, 
                             COUNT(filter) as nexp, 
                             SUM(exptime) as exptime,
                             MIN(expstart) as tmin, 
@@ -488,6 +512,7 @@ def exposure_map(ra, dec, rsize, name, filt='F160W', s0=16):
             FROM mosaic_tiles_exposures t, exposure_files e
             WHERE t.expid = e.eid
             AND filter = '{filt}'
+            {extra}
             AND ABS(subra - {ra})*{cosd} < {rsize/60}
             AND ABS(subdec - {dec}) < {rsize/60}
             GROUP BY tile, subx, suby, subra, subdec, filter
@@ -498,41 +523,43 @@ def exposure_map(ra, dec, rsize, name, filt='F160W', s0=16):
     
     s = np.maximum(s0*18/rsize, 1)
     
-    fig, ax = plt.subplots(1,1,figsize=(6,6), 
+    fig, ax = plt.subplots(1,1,figsize=figsize, 
                            subplot_kw=kw)
     
     ax.grid()
     
     coo = SkyCoord(res['subra'], res['subdec'], unit=('deg','deg'))
-    ax.scatter_coord(coo, c=np.log10(res['exptime']), marker='s', s=s)
-    
-    for t in np.unique(res['tile']):
-        twcs = tile_mosaic.tile_wcs(t)
-        coo = SkyCoord(*twcs.calc_footprint().T, unit=('deg','deg'))
-        ax.plot_coord(coo, color='r', linewidth=1.2, alpha=0.5)
-    
-    # Tile labels
-    un = utils.Unique(res['tile'], verbose=False)
-    
-    dp = 512*0.1/3600
-    rp = dp/cosd
-    
-    for t in un.values:
-        c = (res['subra'][un[t]].min(), res['subdec'][un[t]].min(), 
-             res['subra'][un[t]].max(), res['subdec'][un[t]].max())
-        #
-        cp = (res['subx'][un[t]].min(), res['suby'][un[t]].min(), 
-             res['subx'][un[t]].max(), res['suby'][un[t]].max())
+    ax.scatter_coord(coo, c=np.log10(res['exptime']), marker='s', s=s, 
+                     cmap=cmap, alpha=alpha, ec=ec, vmin=vmin, vmax=vmax)
         
-        rc = np.array([c[0]-rp, c[0]-rp, c[2]+rp, c[2]+rp, c[0]-rp])
-        dc = np.array([c[1]-dp, c[3]+dp, c[3]+dp, c[1]-dp, c[1]-dp])
-        
-        label = f'{t:04d}: {cp[0]:03d} - {cp[2]:03d}, {cp[1]:03d} - {cp[3]:03d}'
-        
-        ax.plot_coord(SkyCoord(rc, dc, unit=('deg','deg')),
-                      alpha=0.8, label=label, linewidth=1.2)
+    if show_tiles:
+        for t in np.unique(res['tile']):
+            twcs = tile_mosaic.tile_wcs(t)
+            coo = SkyCoord(*twcs.calc_footprint().T, unit=('deg','deg'))
+            ax.plot_coord(coo, color='r', linewidth=1.2, alpha=0.5)
+
+        # Tile labels
+        un = utils.Unique(res['tile'], verbose=False)
+
+        dp = 512*0.1/3600
+        rp = dp/cosd
     
-    ax.legend()
+        for t in un.values:
+            c = (res['subra'][un[t]].min(), res['subdec'][un[t]].min(), 
+                 res['subra'][un[t]].max(), res['subdec'][un[t]].max())
+            #
+            cp = (res['subx'][un[t]].min(), res['suby'][un[t]].min(), 
+                 res['subx'][un[t]].max(), res['suby'][un[t]].max())
+        
+            rc = np.array([c[0]-rp, c[0]-rp, c[2]+rp, c[2]+rp, c[0]-rp])
+            dc = np.array([c[1]-dp, c[3]+dp, c[3]+dp, c[1]-dp, c[1]-dp])
+        
+            label = f'{t:04d}: {cp[0]:03d} - {cp[2]:03d}, {cp[1]:03d} - {cp[3]:03d}'
+        
+            ax.plot_coord(SkyCoord(rc, dc, unit=('deg','deg')),
+                          alpha=0.8, label=label, linewidth=1.2)
+    
+        ax.legend()
     
     ax.set_xlabel('R.A.')
     ax.set_ylabel('Dec.')
@@ -540,7 +567,7 @@ def exposure_map(ra, dec, rsize, name, filt='F160W', s0=16):
     
     #fig.tight_layout(pad=0.8)
     
-    return fig
+    return fig, res
 
 
 TILES = None
@@ -850,6 +877,28 @@ def get_subtile_status(tile=2530, subx=522, suby=461, **kwargs):
     return resp
 
 
+def delete_empty_exposures():
+    """
+    Delete exposures from tiles where exptime = 0
+    """
+    SQL = f"""SELECT tile, subx, suby, filter, in_mosaic
+                FROM mosaic_tiles_exposures t, exposure_files e
+                WHERE t.expid = e.eid
+                AND e.exptime < 1.
+                """
+    res = db.SQL(SQL)
+    
+    if len(res) > 0:
+        SQL = f"""DELETE
+                    FROM mosaic_tiles_exposures t
+                    USING exposure_files e
+                    WHERE t.expid = e.eid
+                    AND e.exptime < 1.
+                    """
+    
+        db.execute(SQL)
+
+
 def send_all_tiles():
     
     import time
@@ -867,9 +916,16 @@ def send_all_tiles():
     
     nt0 = len(tiles)
     
+    progs = f'AND tile != 1183 AND tile != 1392'
+    progs = f'AND tile != 1183'
+    progs = ''
+    
     tiles = db.SQL(f"""SELECT tile, subx, suby, filter, count(filter)
                 FROM mosaic_tiles_exposures t, exposure_files e
-                WHERE t.expid = e.eid AND in_mosaic = 0 AND tile != 1183
+                WHERE t.expid = e.eid AND in_mosaic = 0
+                {progs}
+                AND filter < 'G0'
+                AND e.assoc !=  'j100028p0215_0529_edw_cosmos-f160w-8-cosmos-f160w-9_wfc3ir_f160w'
                 GROUP BY tile, subx, suby, filter
                 ORDER BY filter ASC
                 """)
@@ -885,8 +941,12 @@ def send_all_tiles():
         skip |= (tiles['filter'] < 'F18') & (tiles['count'] > 300)
         timeout = 60
         
-    tiles = tiles[~skip]
-    
+        tiles = tiles[~skip]
+    else:
+        # Randomize order for running locally
+        ix = np.argsort(np.random.rand(len(tiles)))
+        tiles = tiles[ix]
+        
     nt1 = len(tiles)
     print(nt1, nt0-nt1)
     
@@ -894,14 +954,14 @@ def send_all_tiles():
 
     istart = i = -1
     
-    max_locked = 280
+    max_locked = 400
     
     step = max_locked - count_locked()[0]
     
     while i < NMAX:
         i+=1 
-        if tiles['tile'][i] == 1183:
-            continue
+        # if tiles['tile'][i] == 1183:
+        #     continue
         
         if i-istart == step:
             istart = i
@@ -915,18 +975,19 @@ def send_all_tiles():
                      subx=int(tiles['subx'][i]),
                      suby=int(tiles['suby'][i]),
                      filter=tiles['filter'][i], 
+                     exposure_count=int(tiles['count'][i]),
                      counter=i, 
                      time=time.ctime())
         
         if 1:
-            send_event_lambda(event, client=client, func='grizli-mosaic-tile')
+            send_event_lambda(event, client=client, func='grizli-redshift-fit')
         
         else:
             drizzle_tile_subregion(**event, 
                                    s3output=None,
                                    ir_wcs=None, make_figure=False, 
-                                   skip_existing=False, verbose=True, 
-                                   gzip_output=False)
+                                   skip_existing=True, verbose=True, 
+                                   gzip_output=False, clean_flt=False)
             
             files='tile.{tile:04d}.{subx:03d}.{suby:03d}.{fx}*fits'
             os.system('rm '+ files.format(fx=event['filter'].lower(), 
@@ -1113,7 +1174,8 @@ def drizzle_tile_subregion(tile=2530, subx=522, suby=461, filter='F160W', s3outp
     if s3output is None:
         s3output = f's3://grizli-mosaic-tiles/Tiles/{tile}/'
     
-    visit_processor.cutout_mosaic(rootname=root,
+    try:
+        visit_processor.cutout_mosaic(rootname=root,
                                   product='{rootname}.{f}',
                                   ir_wcs=ir_wcs,
                                   res=exp, 
@@ -1123,15 +1185,23 @@ def drizzle_tile_subregion(tile=2530, subx=522, suby=461, filter='F160W', s3outp
                                   gzip_output=gzip_output,
                                   **kwargs)
     
-    # Update subtile status
-    db.execute(f"""UPDATE mosaic_tiles_exposures t
-          SET in_mosaic = 1
-          FROM exposure_files w
-          WHERE t.expid = w.eid
-          AND w.filter='{filter}' AND tile={tile}
-          AND subx={subx} AND suby={suby}
-           """)
-    
+        # Update subtile status
+        db.execute(f"""UPDATE mosaic_tiles_exposures t
+              SET in_mosaic = 1
+              FROM exposure_files w
+              WHERE t.expid = w.eid
+              AND w.filter='{filter}' AND tile={tile}
+              AND subx={subx} AND suby={suby}
+               """)
+    except TypeError:
+        db.execute(f"""UPDATE mosaic_tiles_exposures t
+              SET in_mosaic = 8
+              FROM exposure_files w
+              WHERE t.expid = w.eid
+              AND w.filter='{filter}' AND tile={tile}
+              AND subx={subx} AND suby={suby}
+               """)
+        
     status = '{root}.{f}'
     return status
 
