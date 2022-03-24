@@ -765,7 +765,7 @@ def get_assoc_yaml_from_s3(assoc, s_region=None, bucket='grizli-v2', prefix='HST
         
         kws['is_dash'] = True
 
-        kws['visit_prep_args']['align_mag_limits'] = [14,24,0.08]
+        kws['visit_prep_args']['align_mag_limits'] = [14,23,0.08]
         kws['visit_prep_args']['align_ref_border'] = 600
         kws['visit_prep_args']['match_catalog_density'] = False
         kws['visit_prep_args']['tweak_threshold'] = 1.3
@@ -778,6 +778,39 @@ def get_assoc_yaml_from_s3(assoc, s_region=None, bucket='grizli-v2', prefix='HST
         auto_script.write_params_to_yml(kws, output_file=f'{assoc}.run.yaml')
         
     return kws
+
+
+def cdfs_hsc_catalog():
+    """
+    """
+    from grizli import utils
+    from grizli.aws import db
+    from grizli import prep
+    
+    import numpy as np
+    
+    os.system('wget https://zenodo.org/record/2225161/files/WCDFS_CATALOGS.tar.gz?download=1')
+    os.system('tar xzvf WCDFS_CATALOGS.tar.gz?download=1 WCDFS_CATALOGS/wcdfs_hsc_forcedsrc_v01.fits')
+    
+    hsc = utils.read_catalog('WCDFS_CATALOGS/wcdfs_hsc_forcedsrc_v01.fits')
+    
+    pat = db.SQL("select * from sky_patches where parent like 'j033%%m27%%' and nassoc > 100")[0]
+    
+    sel = (hsc['coord_ra'] > pat['ramin']) & (hsc['coord_ra'] < pat['ramax'])
+    sel &= (hsc['coord_dec'] > pat['demin']) & (hsc['coord_dec'] < pat['demax'])
+    
+    imag = 23.9-2.5*np.log10(hsc['i_modelfit_CModel_flux'])
+    sel &= (~hsc['i_modelfit_CModel_flux'].mask) & (imag < 24)
+    
+    hsc = hsc[sel]
+    cosd = np.cos(hsc['coord_dec']/180*np.pi)
+    
+    hsc['ra'] = hsc['coord_ra'] + 0.013/3600/cosd
+    hsc['dec'] = hsc['coord_dec'] - 0.002/3600.
+    
+    prep.table_to_radec(hsc, 'Ni2009_WCDFS_i24.radec')
+    
+    os.system('aws s3 cp Ni2009_WCDFS_i24.radec ')
 
 
 def get_master_radec(s_region, bucket='grizli-v2', prefix='HST/Pipeline/Astrometry'):
@@ -866,6 +899,13 @@ def get_master_radec(s_region, bucket='grizli-v2', prefix='HST/Pipeline/Astromet
                                      [214.6017278 ,  53.14890739],
                                      [214.60297439,  52.60618651],
                                      [214.76998667,  52.60002448]])
+    
+    precomputed_radec['Ni2009_WCDFS_i24.radec'] = np.array([                                
+                                     [52.7477183304,  -28.10178662313],
+                                     [52.7477183304,  -27.52393888889],
+                                     [53.44379136796,  -27.52393888889],
+                                     [53.44379136796,  -28.10178662313],
+                                     [52.7477183304 ,  -28.10178662313]])
                                                               
     sr = utils.SRegion(s_region)
     if sr.centroid[0][0] < 0:
