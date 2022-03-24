@@ -909,6 +909,10 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, visit_split_shift=1.2,
      2 = finished
      9 = has failed files
     10 = no wcs.log files found, so probably nothing was done?
+         This is most often the case when visits were ignored due to 
+         abnormal EXPFLAG keywords
+    12 = Don't redo ever 
+    
     
     """
     import os
@@ -1153,6 +1157,7 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
     FROM exposure_files e, assoc_table a
     WHERE e.assoc = a.assoc_name
     AND a.status = 2
+    AND e.exptime > 0
     AND polygon(e.footprint) && polygon(box '(({x1},{y1}),({x2},{y2}))')    
     """
     
