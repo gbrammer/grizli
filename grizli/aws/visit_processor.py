@@ -664,7 +664,7 @@ def launch_ec2_instances(nmax=50):
     
     count = np.minimum(nmax, len(assoc))
     
-    templ = 'lt-0e8c2b8611c9029eb,Version=9'
+    templ = 'lt-0e8c2b8611c9029eb,Version=11'
     
     if count == 0:
         print('No associations to run, abort.')
