@@ -235,7 +235,9 @@ def s3_put_exposure(flt_file, product, assoc, remove_old=True, verbose=True):
     exp = db.SQL(f"""SELECT eid, assoc, dataset, extension, filter, 
                           sciext, crval1 as ra, crval2 as dec, footprint
                           FROM exposure_files
-                     WHERE file='{file}' AND extension='{extension}'""")
+                     WHERE file='{file}' 
+                     AND extension='{extension}'
+                     AND exptime > 0.0""")
     
     res = [add_exposure_to_tile_db(row=exp[i:i+1], tiles=tiles)
            for i in tqdm(range(len(exp)))]
@@ -259,6 +261,80 @@ def s3_put_exposure(flt_file, product, assoc, remove_old=True, verbose=True):
         print(f'Add {file}_{extension} ({len(rows)}) to exposure_files table')
 
 
+def check_missing_files():
+    """
+    check for files that are in exposure_files but not on S3
+    """
+    from grizli.aws import db
+    import boto3
+    from tqdm import tqdm
+    from grizli import utils
+    
+    s3 = boto3.resource('s3')
+    s3_client = boto3.client('s3')
+    bkt = s3.Bucket('grizli-v2')
+    
+    files = db.SQL("select assoc, file,extension from exposure_files group by assoc, file,extension order by assoc")
+    
+    exists = []
+    for a, f, e in tqdm(zip(files['assoc'], files['file'], files['extension'])):
+        s3_prefix = f'HST/Pipeline/{a}/Prep/{f}_{e}.fits'
+        xfiles = [obj.key for obj in bkt.objects.filter(Prefix=s3_prefix)]
+        exists.append(len(xfiles))
+        if len(xfiles) == 0:
+            print(a, f, e)
+            
+    exists = np.array(exists)
+    
+    miss = exists == 0
+    
+    m = utils.GTable()
+    m['miss_file'] = files['file'][miss]
+    m['miss_assoc'] = files['assoc'][miss]
+    
+    db.send_to_database('missing_files', m)
+        
+    db.execute("""UPDATE exposure_files e
+                  set modtime = 99999
+                  from missing_files m
+                  where assoc = m.miss_assoc
+    """)
+    
+    db.execute("""UPDATE assoc_table e
+                  set status = 0
+                  from missing_files m
+                  where assoc_name = m.miss_assoc
+    """)
+
+    db.SQL(f"""SELECT count(*) 
+         FROM mosaic_tiles_exposures t, exposure_files e
+                WHERE t.expid = e.eid AND e.modtime > 90000""")
+    
+    db.execute(f"""DELETE FROM mosaic_tiles_exposures t
+                USING exposure_files e
+                WHERE t.expid = e.eid AND e.modtime > 90000""")
+    
+    db.execute(f"""DELETE FROM exposure_files
+                WHERE modtime > 90000""")
+    
+    db.execute(f"""DELETE FROM shifts_log 
+                 USING missing_files m
+                WHERE shift_dataset = m.miss_file""")
+    
+    db.execute(f"""DELETE FROM wcs_log 
+                 USING missing_files m
+                WHERE wcs_assoc = m.miss_assoc""")
+    
+    db.execute('DROP TABLE missing_files')
+    
+    # EXPTIME= 0
+    db.execute(f"""DELETE FROM mosaic_tiles_exposures t
+                USING exposure_files e
+                WHERE t.expid = e.eid AND e.exptime <= 0.""")
+    
+    db.execute(f"""DELETE FROM exposure_files
+                WHERE exptime <= 0""")
+    
 def setup_astrometry_tables():
     """
     Initialize shifts_log and wcs_log tables
@@ -485,7 +561,7 @@ def delete_all_assoc_data(assoc):
     vis_root = np.unique([v[:6] for v in vis['obs_id']])
     for r in vis_root:
         print(f'Remove {r} from shifts_log')
-        db._ENGINE.execute(f"""DELETE from shifts_log
+        db.execute(f"""DELETE from shifts_log
                                WHERE shift_dataset like '{r}%%'""")
     
     res = db.execute(f"""DELETE from mosaic_tiles_exposures t
@@ -496,6 +572,10 @@ def delete_all_assoc_data(assoc):
                     WHERE assoc = '{assoc}'""")
                     
     os.system(f'aws s3 rm --recursive s3://grizli-v2/HST/Pipeline/{assoc}')
+
+    res = db.execute(f"""UPDATE assoc_table
+              SET status=12
+                    WHERE assoc_name = '{assoc}'""")
 
 
 def clear_failed():
@@ -687,7 +767,7 @@ def get_assoc_yaml_from_s3(assoc, s_region=None, bucket='grizli-v2', prefix='HST
         
         kws['is_dash'] = True
 
-        kws['visit_prep_args']['align_mag_limits'] = [14,24,0.8]
+        kws['visit_prep_args']['align_mag_limits'] = [14,24,0.08]
         kws['visit_prep_args']['align_ref_border'] = 600
         kws['visit_prep_args']['match_catalog_density'] = False
         kws['visit_prep_args']['tweak_threshold'] = 1.3
