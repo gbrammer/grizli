@@ -652,7 +652,7 @@ def show_recent_assoc(limit=50):
     return last
 
 
-def launch_ec2_instances(nmax=50):
+def launch_ec2_instances(nmax=50, templ='lt-0e8c2b8611c9029eb,Version=11'):
     """
     Launch EC2 instances from a launch template that run through all 
     status=0 associations and then terminate
@@ -663,9 +663,7 @@ def launch_ec2_instances(nmax=50):
                       WHERE status = 0""")
     
     count = np.minimum(nmax, len(assoc))
-    
-    templ = 'lt-0e8c2b8611c9029eb,Version=11'
-    
+
     if count == 0:
         print('No associations to run, abort.')
         return True
