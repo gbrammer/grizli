@@ -373,7 +373,8 @@ def make_exposure_maps():
     ra, dec, rsize, name = 177.40124999999998, 22.39947222222, 12, 'macs1149'
     ra, dec, rsize, name = 157.30641, 26.39197, 12, 'sdss1029'
     
-    fig, tab = tile_mosaic.exposure_map(ra, dec, rsize, name, filt=filt, s0=18)
+    fig, tab = tile_mosaic.exposure_map(ra, dec, rsize, name, 
+                                        filt=filt.upper(), s0=18)
     fig.tight_layout(pad=0.5)
     fig.savefig('/tmp/map.png')
     fig.tight_layout(pad=0.5)
@@ -904,7 +905,7 @@ def send_all_tiles():
     import time
     import os
     import numpy as np
-    from grizli.aws.tile_mosaic import (drizzle_tile_subregion, 
+    from grizli.aws.tile_mosaic import (drizzle_tile_subregion, reset_locked,
                       get_lambda_client, send_event_lambda, count_locked)
     
     from grizli.aws import db
@@ -946,6 +947,7 @@ def send_all_tiles():
         # Randomize order for running locally
         ix = np.argsort(np.random.rand(len(tiles)))
         tiles = tiles[ix]
+        timeout = 60
         
     nt1 = len(tiles)
     print(nt1, nt0-nt1)
@@ -954,11 +956,11 @@ def send_all_tiles():
 
     istart = i = -1
     
-    max_locked = 400
+    max_locked = 800
     
     step = max_locked - count_locked()[0]
     
-    while i < NMAX:
+    while i < NMAX-1:
         i+=1 
         # if tiles['tile'][i] == 1183:
         #     continue
@@ -976,7 +978,7 @@ def send_all_tiles():
                      suby=int(tiles['suby'][i]),
                      filter=tiles['filter'][i], 
                      exposure_count=int(tiles['count'][i]),
-                     counter=i, 
+                     counter=i+2, 
                      time=time.ctime())
         
         if 1:
