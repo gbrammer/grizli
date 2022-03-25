@@ -81,7 +81,7 @@ visit_prep_args: &prep_args
     max_err_percentile: 99
     align_min_flux_radius: 1.
     catalog_mask_pad: 0.05
-    match_catalog_density: None
+    match_catalog_density: False
     drizzle_params: {}
     single_image_CRs: True
     run_tweak_align: True
