@@ -1000,6 +1000,17 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_pr
         print('gunzip '+file+'  # status="{0}"'.format(status))
         if status == 256:
             os.system('mv {0} {1}'.format(file, file.split('.gz')[0]))
+                
+    if fetch_only:
+        files = glob.glob('*raw.fits')
+        files.sort()
+        
+        return files
+        
+    # Remove exposures with bad EXPFLAG
+    if remove_bad:
+        remove_bad_expflag(field_root=field_root, HOME_PATH=paths['home'],
+                           min_bad=min_bad_expflag)
     
     # EXPTIME = 0
     files = glob.glob('*raw.fits')
@@ -1020,23 +1031,12 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_pr
             if badexp == 2:
                 msg = f'# fetch_files : Failed to get EXPTIME from {file}[0]'
             else:
-                msg = f'# fetch_files EXPTIME = 0 for {file}'
+                msg = f'# fetch_files : EXPTIME = 0 for {file}'
                 
             utils.log_comment(utils.LOGFILE, msg, verbose=True)
             
             os.system(f'mv {file} Expflag/')
-            
-    if fetch_only:
-        files = glob.glob('*raw.fits')
-        files.sort()
-        
-        return files
-        
-    # Remove exposures with bad EXPFLAG
-    if remove_bad:
-        remove_bad_expflag(field_root=field_root, HOME_PATH=paths['home'],
-                           min_bad=min_bad_expflag)
-
+    
     # Reprocess the RAWs into FLTs
     if reprocess_parallel:
         rep = "python -c 'from grizli.pipeline import reprocess; "
