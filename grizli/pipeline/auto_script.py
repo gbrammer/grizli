@@ -1001,6 +1001,31 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_pr
         if status == 256:
             os.system('mv {0} {1}'.format(file, file.split('.gz')[0]))
     
+    # EXPTIME = 0
+    files = glob.glob('*raw.fits')
+    files.extend(glob.glob('*fl?.fits'))
+    files.extend(glob.glob('*c[01]?.fits'))  # WFPC2
+    files.sort()
+    for file in files:
+        try:
+            im = pyfits.open(file)
+            badexp = (im[0].header['EXPTIME'] < 0.1)*1
+        except:
+            badexp = 2
+        
+        if badexp > 0:
+            if not os.path.exists('Expflag'):
+                os.mkdir('Expflag')
+            
+            if badexp == 2:
+                msg = f'# fetch_files : Failed to get EXPTIME from {file}[0]'
+            else:
+                msg = f'# fetch_files EXPTIME = 0 for {file}'
+                
+            utils.log_comment(utils.LOGFILE, msg, verbose=True)
+            
+            os.system(f'mv {file} Expflag/')
+            
     if fetch_only:
         files = glob.glob('*raw.fits')
         files.sort()
