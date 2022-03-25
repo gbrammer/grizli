@@ -759,6 +759,8 @@ def get_assoc_yaml_from_s3(assoc, s_region=None, bucket='grizli-v2', prefix='HST
     kws['visit_prep_args']['fix_stars'] = False
     kws['mask_spikes'] = False
     
+    kws['fetch_files_args']['reprocess_clean_darks'] = False
+    
     # params for DASH processing
     if ('_cxe_cos' in assoc) | ('_edw_cos' in assoc):
         utils.log_comment(LOGFILE, f'Process {assoc} as DASH', verbose=True)
@@ -796,11 +798,18 @@ def cdfs_hsc_catalog():
     
     pat = db.SQL("select * from sky_patches where parent like 'j033%%m27%%' and nassoc > 100")[0]
     
-    sel = (hsc['coord_ra'] > pat['ramin']) & (hsc['coord_ra'] < pat['ramax'])
-    sel &= (hsc['coord_dec'] > pat['demin']) & (hsc['coord_dec'] < pat['demax'])
+    dx = 10/60
+    sel = (hsc['coord_ra'] > pat['ramin']-dx) & (hsc['coord_ra'] < pat['ramax']+dx)
+    sel &= (hsc['coord_dec'] > pat['demin']-dx) & (hsc['coord_dec'] < pat['demax']+dx)
     
     imag = 23.9-2.5*np.log10(hsc['i_modelfit_CModel_flux'])
     sel &= (~hsc['i_modelfit_CModel_flux'].mask) & (imag < 24)
+    sel &= hsc['i_modelfit_CModel_flag'] == 'False'
+    #sel &= hsc['base_Blendedness_flag'] == 'False'
+    #sel &= hsc['base_SdssCentroid_flag'] == 'False'
+    sel &= hsc['flag_clean'] == 'True'
+    sel &= hsc['detect_isPatchInner'] == 'True'
+    sel &= hsc['detect_isTractInner'] == 'True'
     
     hsc = hsc[sel]
     cosd = np.cos(hsc['coord_dec']/180*np.pi)
@@ -810,7 +819,7 @@ def cdfs_hsc_catalog():
     
     prep.table_to_radec(hsc, 'Ni2009_WCDFS_i24.radec')
     
-    os.system('aws s3 cp Ni2009_WCDFS_i24.radec ')
+    os.system('aws s3 cp Ni2009_WCDFS_i24.radec s3://grizli-v2/HST/Pipeline/Astrometry/')
 
 
 def get_master_radec(s_region, bucket='grizli-v2', prefix='HST/Pipeline/Astrometry'):
@@ -939,7 +948,7 @@ blue_align_params['tweak_n_min'] = 5
 ALL_FILTERS = ['F410M', 'F467M', 'F547M', 'F550M', 'F621M', 'F689M', 'F763M', 'F845M', 'F200LP', 'F350LP', 'F435W', 'F438W', 'F439W', 'F450W', 'F475W', 'F475X', 'F555W', 'F569W', 'F600LP', 'F606W', 'F622W', 'F625W', 'F675W', 'F702W', 'F775W', 'F791W', 'F814W', 'F850LP', 'G800L', 'F098M', 'F127M', 'F139M', 'F153M', 'F105W', 'F110W', 'F125W', 'F140W', 'F160W', 'G102', 'G141']
 
 
-def process_visit(assoc, clean=True, sync=True, max_dt=4, visit_split_shift=1.2, blue_align_params=blue_align_params, ref_catalogs=['LS_DR9', 'PS1', 'DES', 'GAIA'], filters=None, prep_args={'align_mag_limits':[14,23,0.1]}, get_wcs_guess_from_table=True, **kwargs):
+def process_visit(assoc, clean=True, sync=True, max_dt=4, visit_split_shift=1.2, blue_align_params=blue_align_params, ref_catalogs=['LS_DR9', 'PS1', 'DES', 'GAIA'], filters=None, prep_args={'align_mag_limits':[14,23,0.1]}, get_wcs_guess_from_table=True, master_radec=None, **kwargs):
     """
     `assoc_table.status`
     
@@ -995,14 +1004,14 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, visit_split_shift=1.2,
     kws = get_assoc_yaml_from_s3(assoc, bucket='grizli-v2', 
                                  prefix='HST/Pipeline/Input', 
                                  s_region=tab['footprint'][0])
-            
+           
     kws['visit_prep_args']['reference_catalogs'] = ref_catalogs
     if filters is None:
         kws['filters'] = np.unique(tab['filter']).tolist()
     else:
         kws['filters'] = filters
     
-    if '_':
+    if True:
         kws['parse_visits_args']['max_dt'] = max_dt
         kws['parse_visits_args']['visit_split_shift'] = visit_split_shift
         
@@ -1014,7 +1023,10 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, visit_split_shift=1.2,
         kws['visit_prep_args'][k] = prep_args[k]
                 
     kws['kill'] = 'preprocess'
-        
+    
+    if master_radec is not None:
+        kws['preprocess_args']['master_radec'] = master_radec
+         
     ######## 
     auto_script.go(assoc, **kws)
     ########
