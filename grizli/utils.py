@@ -1141,7 +1141,7 @@ def parse_grism_associations(exposure_groups,
     return grism_groups
 
 
-def get_hst_filter(header):
+def get_hst_filter(header, filter_only=False):
     """Get simple filter name out of an HST image header.
 
     ACS has two keywords for the two filter wheels, so just return the
@@ -1158,6 +1158,8 @@ def get_hst_filter(header):
         >>> h['FILTER2'] = 'CLEAR2L'
         >>> print(get_hst_filter(h))
         G800L
+    
+    If `filter_only` then just get JWST ``FILTER``, otherwise
     
     For JWST/NIRISS, return ``{PUPIL}-{FILTER}``
     
@@ -1189,12 +1191,22 @@ def get_hst_filter(header):
 
     elif instrume == 'WFPC2':
         filter = header['FILTNAM1']
+        
     elif instrume == 'NIRISS':
-        filter = '{0}-{1}'.format(header['PUPIL'], header['FILTER'])
+        if filter_only:
+            filter = header['FILTER']
+        else:
+            filter = '{0}-{1}'.format(header['PUPIL'], header['FILTER'])
+            
     elif instrume == 'NIRCAM':
-        filter = '{0}-{1}'.format(header['FILTER'], header['PUPIL'])
+        if filter_only:
+            filter = header['FILTER']
+        else:
+            filter = '{0}-{1}'.format(header['FILTER'], header['PUPIL'])
+            
     elif 'FILTER' in header:
-        filter = header['FILTER'].upper()
+        filter = header['FILTER']
+        
     else:
         msg = 'Failed to parse FILTER keyword for INSTRUMEnt {0}'
         raise KeyError(msg.format(instrume))
