@@ -685,6 +685,12 @@ def add_exposure_to_tile_db(dataset='ibev8xubq', sciext=1, tiles=None, row=None)
     exp_poly = None
     for fp in row['footprint']:
         sr = utils.SRegion(fp)
+        sra = sr.xy[0][:,0]
+        if (sra.min() < 10) & (sra.max() > 350):
+            sra[sra > 350] -= 360
+            
+        sr.xy[0][:,0] = sra
+        
         for p, s in zip(sr.get_patch(alpha=0.5, color='k'), sr.shapely):
             if exp_poly is None:
                 exp_poly = s
@@ -709,8 +715,18 @@ def add_exposure_to_tile_db(dataset='ibev8xubq', sciext=1, tiles=None, row=None)
         h['LATPOLE'] = 0.
         
         w = pywcs.WCS(h)
-            
-        srt = utils.SRegion(w.calc_footprint())
+        wfp = w.calc_footprint()
+        wra = wfp[:,0]
+        if (wra.min() < 10) & (wra.max() > 350):
+            if sr.centroid[0][0] < 10:
+                wra[wra > 350] -= 360
+            else:
+                wra[wra < 10] += 360
+                
+        wfp[:,0] = wra
+        
+        srt = utils.SRegion(wfp)
+        
         if not sr.shapely[0].intersects(srt.shapely[0]):
             continue
         
