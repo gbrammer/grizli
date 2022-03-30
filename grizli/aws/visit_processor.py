@@ -916,7 +916,7 @@ def get_master_radec(s_region, bucket='grizli-v2', prefix='HST/Pipeline/Astromet
                                      [53.61045392, -28.26843991],
                                      [52.58105818 , -28.26843991]])
     
-    precomputed_radec['j041732m1154.ps1.radec'] = np.array([
+    precomputed_radec['j041732m1154.ls_dr9.radec'] = np.array([
                                      [64.27799225, -11.97970169],
                                      [64.27799225, -11.78052877],
                                      [64.48217567, -11.78052877],
