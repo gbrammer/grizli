@@ -3053,6 +3053,7 @@ def process_direct_grism_visit(direct={},
                                align_triangle_ba_max=0.9,
                                align_ref_border=100,
                                align_min_flux_radius=1., 
+                               align_assume_close=False,
                                max_err_percentile=99,
                                catalog_mask_pad=0.05,
                                match_catalog_density=None,
@@ -3353,7 +3354,8 @@ def process_direct_grism_visit(direct={},
                                       triangle_ba_max=align_triangle_ba_max,
                                 match_catalog_density=match_catalog_density,
                                       ref_border=align_ref_border, 
-                                      min_flux_radius=align_min_flux_radius)
+                                      min_flux_radius=align_min_flux_radius, 
+                                      assume_close=align_assume_close)
         except:
 
             utils.log_exception(utils.LOGFILE, traceback)

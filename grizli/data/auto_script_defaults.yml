@@ -77,6 +77,7 @@ visit_prep_args: &prep_args
     align_thresh: null
     align_rms_limit: 2
     align_mag_limits: [14, 24, 0.05]
+    align_assume_close: False
     align_ref_border: 100
     max_err_percentile: 99
     align_min_flux_radius: 1.
