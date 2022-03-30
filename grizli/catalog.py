@@ -35,6 +35,7 @@ __all__ = ["table_to_radec",
            "get_nsc_catalog",
            "get_desdr1_catalog",
            "get_skymapper_catalog",
+           "get_vexas_catalog",
            "get_panstarrs_catalog",
            "get_radec_catalog"]
 
@@ -959,6 +960,25 @@ def get_desdr1_catalog_old(ra=0., dec=0., radius=3, corners=None, max=100000, ex
     return tab
 
 
+def get_vexas_catalog(ra=0., dec=0., radius=3., corners=None, max_records=500000, verbose=True, extra='', table='vexasdes'):
+    """
+    VEXAS DR2 from vizier
+    
+    https://vizier.cds.unistra.fr/viz-bin/VizieR?-source=II/369
+    
+    table: 'vexasds', 'vexasps', 'vexassm'
+    
+    """
+    msg = 'Query VEXAS DR2 {table} catalog ({ra},{dec},{radius})'
+    print(msg.format(table=table, ra=ra, dec=dec, radius=radius))
+    tab = query_tap_catalog(ra=ra, dec=dec, radius=radius*2,
+                            corners=corners, extra=extra, 
+                            vizier=True, 
+                            db=f'"II/369/{table}"', 
+                            verbose=verbose, max=max_records)
+    return tab
+
+
 def get_skymapper_catalog(ra=0., dec=0., radius=3., corners=None, max_records=500000, verbose=True, extra=''):
     """
     Get Skymapper DR1 from Vizier
@@ -1059,6 +1079,7 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, ref
                        'DES': get_desdr1_catalog,
                        'Hubble': get_hubble_source_catalog,
                        'Skymapper': get_skymapper_catalog, 
+                       'VEXAS': get_vexas_catalog, 
                        'LS_DR9': get_legacysurveys_catalog}
 
     # Try queries
