@@ -1180,8 +1180,9 @@ def make_parent_mosaic(parent='j191436m5928', **kwargs):
             (np.max(by) - np.min(by))*3600+10.)
     
     cutout_mosaic(rootname=parent, ra=ra, dec=dec, size=size, **kwargs)
-    
-def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-27.7910651, size=5*60, filters=['F160W'], ir_scale=0.1, ir_wcs=None, res=None, half_optical=True, kernel='point', pixfrac=0.33, make_figure=True, skip_existing=True, clean_flt=True, gzip_output=True, s3output='s3://grizli-v2/HST/Pipeline/Mosaic/', **kwargs):
+
+
+def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-27.7910651, size=5*60, filters=['F160W'], ir_scale=0.1, ir_wcs=None, res=None, half_optical=True, kernel='point', pixfrac=0.33, make_figure=True, skip_existing=True, clean_flt=True, gzip_output=True, s3output='s3://grizli-v2/HST/Pipeline/Mosaic/', extra_wfc3ir_badpix=True, **kwargs):
     """
     Make mosaic from exposures defined in the exposure database
     
@@ -1298,7 +1299,8 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
                            
         _ = utils.drizzle_from_visit(visit, visit['reference'], 
                                      pixfrac=pixfrac, 
-                                     kernel=kernel, clean=clean_flt)
+                                     kernel=kernel, clean=clean_flt, 
+                                     extra_wfc3ir_badpix=extra_wfc3ir_badpix)
                              
         outsci, outwht, header, flist = _
         

@@ -5188,7 +5188,7 @@ def fetch_s3_url(url='s3://bucket/path/to/file.txt', file_func=lambda x : os.pat
 
 def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
                        clean=True, include_saturated=True, keep_bits=None,
-                       dryrun=False, skip=None):
+                       dryrun=False, skip=None, extra_wfc3ir_badpix=True):
     """
     Make drizzle mosaic from exposures in a visit dictionary
 
@@ -5268,9 +5268,18 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
 
         if flt[0].header['DETECTOR'] == 'IR':
             bits = 576
+            if extra_wfc3ir_badpix:
+                bpfile = os.path.join(os.path.dirname(__file__), 
+                               'data/wfc3ir_badpix_spars200_22.03.31.fits.gz')
+                bpdata = pyfits.open(bpfile)[0].data
+                msg = f'Use extra badpix in {bpfile}'
+                log_comment(LOGFILE, msg, verbose=True)
+            else:
+                bpdata = 0
         else:
             bits = 64+32
-
+            bpdata = 0
+            
         if include_saturated:
             bits |= 256
 
@@ -5330,7 +5339,7 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
                 sci_list.append((flt[('SCI', ext)].data - sky)*phot_scale)
 
                 err = flt[('ERR', ext)].data*phot_scale
-                dq = unset_dq_bits(flt[('DQ', ext)].data, bits)
+                dq = unset_dq_bits(flt[('DQ', ext)].data, bits) | bpdata
                 wht = 1/err**2
                 wht[(err == 0) | (dq > 0)] = 0
 
