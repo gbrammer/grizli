@@ -3333,9 +3333,45 @@ def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Griz
     fig.text(0.97, 0.02, time.ctime(), ha='right', va='bottom', fontsize=5, transform=fig.transFigure)
 
     fig.savefig('{0}{1}_fine.png'.format(field_root, extra_str))
-    np.save('{0}{1}_fine.npy'.format(field_root, extra_str), [visits, fit])
+    fine_file = '{0}{1}_fine.yaml'.format(field_root, extra_str)
+    save_fine_yaml(visits, fit, yaml_file=fine_file)
+    #np.save('{0}{1}_fine.npy'.format(field_root, extra_str), [visits, fit])
 
     return tab, fit, visits
+
+
+def save_fine_yaml(visits, fit, yaml_file='fit_fine.yaml'):
+    """
+    Save results from fine_alignment
+    """
+    vis = [visit_dict_to_strings(v) for v in visits]
+    
+    fit_res = {}
+    for k in fit:
+        if k in ['direc','x']:
+            fit_res[k] = fit[k].tolist()
+        else:
+            fit_res[k] = fit[k]
+    
+    fit_res['fun'] = float(fit['fun'])
+    
+    with open(yaml_file, 'w') as fp:
+        yaml.dump([vis, fit_res], stream=fp, Dumper=yaml.Dumper)
+
+
+def load_fine_yaml(yaml_file='fit_fine.yaml'):
+    """
+    Load fine_alignment result
+    """
+    
+    with open(yaml_file) as fp:
+        vis, fit = yaml.load(fp, Loader=yaml.Loader)
+    
+    visits = [visit_dict_from_strings(v) for v in vis]
+    for k in ['direc','x']:
+        fit[k] = np.array(fit[k])
+    
+    return visits, fit
 
 
 def update_wcs_headers_with_fine(field_root, backup=True):
@@ -3365,10 +3401,12 @@ def update_wcs_headers_with_fine(field_root, backup=True):
     #                                   allow_pickle=True)
     visits, all_groups, info = load_visit_info(field_root, verbose=False)
 
-    fit_files = glob.glob('{0}*fine.npy'.format(field_root))
+    fit_files = glob.glob('{0}*fine.yaml'.format(field_root))
+    
     for fit_file in fit_files:
-        fine_visits, fine_fit = np.load(fit_file, allow_pickle=True)
-
+        #fine_visits, fine_fit = np.load(fit_file, allow_pickle=True)
+        fine_visits, fine_fit = load_fine_yaml(yaml_file=fit_file)
+        
         N = len(fine_visits)
 
         if backup:
@@ -3378,7 +3416,7 @@ def update_wcs_headers_with_fine(field_root, backup=True):
                     os.system(f'cp {file} FineBkup/')
                     print(file)
 
-        trans = np.reshape(fine_fit.x, (N, -1))  # /10.
+        trans = np.reshape(fine_fit['x'], (N, -1))  # /10.
         sh = trans.shape
         if sh[1] == 2:
             pscl = np.array([10., 10.])
