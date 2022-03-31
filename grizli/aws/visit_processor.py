@@ -1050,7 +1050,7 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=True, 
         
         # Exposure info database table
         vis_files = glob.glob('*visits.yaml')
-        if len(visits_file) > 0:
+        if len(vis_files) > 0:
             #visits, groups, info = np.load(visits_file[0], allow_pickle=True)
             visits, groups, info = auto_script.load_visits_yaml(vis_files[0])
             
