@@ -4009,7 +4009,7 @@ class SRegion(object):
         
         Parameters
         ----------
-        inp : str, [M,2] array, `~astropy.wcs.WCS`
+        inp : str, (M,2) array, `~astropy.wcs.WCS`, `shapely.geometry.polygon.Polygon`
             
             Can be a "S_REGION" string, an array, or an 
             `~astropy.wcs.WCS` object that will 
@@ -4019,13 +4019,31 @@ class SRegion(object):
         """
         if isinstance(inp, str):
             self.xy = self._parse_sregion(inp, **kwargs)
+            
         elif hasattr(inp, 'sum'):
             # NDarray
+            sh = inp.shape
+            if inp.ndim != 2:
+                raise ValueError(f'Input shape {sh} is not (M,2)')
+            else:
+                if inp.shape[1] != 2:
+                    raise ValueError(f'Input shape {sh} is not (M,2)')
+                    
             self.xy = [inp]
+            
         elif isinstance(inp, list):
             self.xy = inp
+            
         elif isinstance(inp, pywcs.WCS):
             self.xy = [inp.calc_footprint()]
+            
+        elif hasattr(inp, 'buffer'):
+            # Shapely polygon
+            if hasattr(inp, '__len__'):
+                self.xy = [np.array(p.boundary.xy).T for p in inp]
+            else:
+                self.xy = [np.array(inp.boundary.xy).T]
+                
         else:
             raise IOError('input must be ``str``, ``list``, or ``np.array``')
         
@@ -4179,7 +4197,7 @@ class SRegion(object):
         for s in self.shapely:
             un = un.union(s)
         
-        return s
+        return SRegion(un)
 
 
     def intersects(self, shape):
@@ -4213,6 +4231,17 @@ class SRegion(object):
             
         return [pstr.format(','.join([f'{c:.6f}' for c in fp.flatten()]))+tail
                 for fp in self.xy]
+
+
+    @property
+    def s_region(self):
+        """
+        Polygon as VO s_region
+        """
+        pstr = 'POLYGON {0}'
+        polys = [pstr.format(' '.join([f'{c:.6f}' for c in fp.flatten()]))
+                for fp in self.xy]
+        return ' '.join(polys)
 
 
 class WCSFootprint(object):
