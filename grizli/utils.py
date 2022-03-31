@@ -4027,7 +4027,10 @@ class SRegion(object):
                 raise ValueError(f'Input shape {sh} is not (M,2)')
             else:
                 if inp.shape[1] != 2:
-                    raise ValueError(f'Input shape {sh} is not (M,2)')
+                    if inp.shape[0] != 2:
+                        raise ValueError(f'Input shape {sh} is not (M,2)')
+                    else:
+                        inp = inp.T
                     
             self.xy = [inp]
             
@@ -4184,7 +4187,7 @@ class SRegion(object):
         return self.patch(**kwargs)
 
 
-    def union(self, shape=None):
+    def union(self, shape=None, as_polygon=False):
         """
         Union of self and `shape` object.  If no `shape` provided, then 
         return union of (optional) multiple components of self
@@ -4197,7 +4200,10 @@ class SRegion(object):
         for s in self.shapely:
             un = un.union(s)
         
-        return SRegion(un)
+        if as_polygon:
+            return un
+        else:
+            return SRegion(un)
 
 
     def intersects(self, shape):
