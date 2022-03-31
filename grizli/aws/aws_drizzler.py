@@ -2,6 +2,8 @@
 import inspect
 import os
 
+import yaml
+
 from collections import OrderedDict
 
 """
@@ -352,7 +354,27 @@ def make_visit_fits():
                 a_i = a.area*3600*np.cos(tab['dec'][indices[0]]/180*np.pi)
                 print(root, aa, a_i, a_i/aa)
 
-
+def update_s3_paths():
+    """
+    Update paths to COSMOS data, eventually everything else
+    """
+    import numpy as np
+    import os
+    from tqdm import tqdm
+    
+    os.chdir(os.path.join(os.getenv('HOME'),
+                     'Research/HST/CHArGE/Cutouts/VisitFiles'))
+    
+    groups = np.load('grizli-v1-21.12.18_filter_groups.npy', allow_pickle=True)
+    
+    for f in groups[0]:
+        print(f)
+        for j, aws in tqdm(enumerate(groups[0][f]['awspath'])):
+            groups[0][f]['awspath'][j] = aws.replace('cosmos-dash',
+                                                     'cosmos-dash-2021')
+    
+    np.save('grizli-v2-22.02.02_filter_groups.npy', groups)
+                                     
 def group_by_filter():
     """
     aws s3 sync --exclude "*" --include "cosmos_visits*" s3://grizli-preprocess/CosmosMosaic/ ./
@@ -651,45 +673,58 @@ def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixsca
             groups_files = glob.glob('{0}_filter_groups.npy'.format(prep_root))
             visit_query = prep_root+'_'
         else:
-            groups_files = glob.glob('*filter_groups.npy')
+            groups_files = glob.glob('*filter_groups.*')
             visit_query = '*'
 
         # Reformat local visits.npy into a groups file
         if (len(groups_files) == 0):
 
-            visit_file = glob.glob(visit_query+'visits.npy')[0]
-
-            visits, groups, info = np.load(visit_file, allow_pickle=True)
+            visit_file = glob.glob(visit_query+'visits.*')[0]
             visit_root = visit_file.split('_visits')[0]
+            visits, groups, info = auto_script.load_visit_info(visit_root, 
+                                                               verbose=False)
 
-            visit_filters = np.array([v['product'].split('-')[-1] for v in visits])
+            #visits, groups, info = np.load(visit_file, allow_pickle=True)
+            visit_filters = np.array([v['product'].split('-')[-1]
+                                      for v in visits])
+                                      
             groups = {}
+            sgroups = {}
+            
             for filt in np.unique(visit_filters):
-                groups[filt] = {}
-                groups[filt]['filter'] = filt
-                groups[filt]['files'] = []
-                groups[filt]['footprints'] = []
-                groups[filt]['awspath'] = []
+                _v = {}
+                _v['filter'] = str(filt)
+                _v['files'] = []
+                _v['footprints'] = []
+                _v['awspath'] = []
 
                 ix = np.where(visit_filters == filt)[0]
                 for i in ix:
-                    groups[filt]['files'].extend(visits[i]['files'])
-                    groups[filt]['footprints'].extend(visits[i]['footprints'])
+                    _v['files'].extend(visits[i]['files'])
+                    _v['footprints'].extend(visits[i]['footprints'])
 
-                Nf = len(groups[filt]['files'])
+                Nf = len(_v['files'])
                 print('{0:>6}: {1:>3} exposures'.format(filt, Nf))
 
                 if aws_prep_dir is not None:
-                    groups[filt]['awspath'] = [s3_full_path
-                                               for file in range(Nf)]
-
-            np.save('{0}_filter_groups.npy'.format(visit_root), [groups])
-
+                    _v['awspath'] = [s3_full_path for file in range(Nf)]
+            
+                groups[filt] = _v 
+                sgroups[str(filt)] = auto_script.visit_dict_to_strings(_v)
+                
+            #np.save('{0}_filter_groups.npy'.format(visit_root), [groups])
+            with open('{0}_filter_groups.yaml'.format(visit_root), 'w') as fp:
+                yaml.dump(sgroups, stream=fp, Dumper=yaml.Dumper)
         else:
             print('Use groups file: {0}'.format(groups_files[0]))
 
-            groups = np.load(groups_files[0], allow_pickle=True)[0]
-
+            #groups = np.load(groups_files[0], allow_pickle=True)[0]
+            with open(groups_files[0]) as fp:
+                groups = yaml.load(fp, Loader=yaml.Loader)
+                for filt in groups:
+                    _v = groups[filt]
+                    groups[filt] = auto_script.visit_dict_from_strings(_v)
+                    
     #filters = ['f160w','f814w', 'f110w', 'f098m', 'f140w','f125w','f105w','f606w', 'f475w']
 
     filt_dict = FilterDict()

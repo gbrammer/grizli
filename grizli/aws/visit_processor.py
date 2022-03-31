@@ -1049,10 +1049,11 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=True, 
         update_assoc_status(assoc, status=2)
         
         # Exposure info database table
-        visits_file = glob.glob('*visits.npy')
+        vis_files = glob.glob('*visits.yaml')
         if len(visits_file) > 0:
-            visits, groups, info = np.load(visits_file[0], allow_pickle=True)
-        
+            #visits, groups, info = np.load(visits_file[0], allow_pickle=True)
+            visits, groups, info = auto_script.load_visits_yaml(vis_files[0])
+            
             for i, v in enumerate(visits):
                 print('File exposure info: ', v['files'][0], assoc)
                 exposure_info_from_visit(v, assoc=assoc)
