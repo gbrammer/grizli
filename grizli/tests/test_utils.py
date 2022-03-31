@@ -122,3 +122,44 @@ class UtilsTester(unittest.TestCase):
             for v in un:
                 #print(v)
                 assert(np.allclose(un.array[un[v]], v))
+
+
+    def test_sregion(self):
+        """
+        Test SRegion object
+        """
+        x = np.array([0,0,1,1])
+        y = np.array([0,1,1,0])
+        sr = utils.SRegion(np.array([x, y]).T)
+        assert(np.allclose(sr.centroid[0], 0.5, rtol=1.e-3))
+        
+        assert(sr.area[0] == 1.0)
+        
+        snew = utils.SRegion(sr.s_region)
+        assert(snew.area[0] == 1.0)
+
+        snew = utils.SRegion(sr.shapely[0])
+        assert(snew.area[0] == 1.0)
+        
+        x2 = np.array([0,0,1,1]) + 2
+        y2 = np.array([0,1,1,0]) + 2
+        s2 = utils.SRegion(np.array([x2, y2]).T)
+        
+        un = sr.union(s2.shapely[0], as_polygon=True)
+        
+        assert(un.area == 2.0)
+        
+        # CIRCLE string
+        circ = utils.SRegion('CIRCLE 5. 5. 1', ncircle=256)
+        assert(np.allclose(circ.area, np.pi, rtol=1.e-3))
+        assert(np.allclose(circ.centroid[0], 5., rtol=1.e-3))
+        
+        # Multiple string
+        comp = utils.SRegion(' '.join([sr.s_region, s2.s_region]))
+        assert(np.allclose(comp.area, 1.0, rtol=1.e-3))
+        
+        un = comp.union(as_polygon=True)
+        assert(un.area == 2.0)
+        
+        
+        
