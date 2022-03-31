@@ -128,6 +128,8 @@ class UtilsTester(unittest.TestCase):
         """
         Test SRegion object
         """
+        
+        # From arrays
         x = np.array([0,0,1,1])
         y = np.array([0,1,1,0])
         sr = utils.SRegion(np.array([x, y]).T)
@@ -135,12 +137,15 @@ class UtilsTester(unittest.TestCase):
         
         assert(sr.area[0] == 1.0)
         
+        # From s_region string
         snew = utils.SRegion(sr.s_region)
         assert(snew.area[0] == 1.0)
-
+        
+        # From polygon
         snew = utils.SRegion(sr.shapely[0])
         assert(snew.area[0] == 1.0)
         
+        # Compound regions
         x2 = np.array([0,0,1,1]) + 2
         y2 = np.array([0,1,1,0]) + 2
         s2 = utils.SRegion(np.array([x2, y2]).T)
