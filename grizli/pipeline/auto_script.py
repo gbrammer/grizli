@@ -1292,7 +1292,7 @@ def load_visit_info(root='j033216m2743', path='./', verbose=True):
     return visits, groups, info
 
 
-def parse_visits(field_root='', RAW_PATH='../RAW', use_visit=True, combine_same_pa=True, combine_minexp=2, is_dash=False, filters=VALID_FILTERS, max_dt=1e9, visit_split_shift=1.5):
+def parse_visits(field_root='', RAW_PATH='../RAW', use_visit=True, combine_same_pa=True, combine_minexp=2, is_dash=False, filters=VALID_FILTERS, max_dt=1e9, visit_split_shift=1.5, file_query='*'):
     """
     Organize exposures into "visits" by filter / position / PA / epoch
     
@@ -1343,9 +1343,9 @@ def parse_visits(field_root='', RAW_PATH='../RAW', use_visit=True, combine_same_
     from shapely.geometry import Polygon
     from scipy.spatial import ConvexHull
 
-    files = glob.glob(os.path.join(RAW_PATH, '*fl[tc].fits'))
-    files += glob.glob(os.path.join(RAW_PATH, '*c0m.fits'))
-    files += glob.glob(os.path.join(RAW_PATH, '*c0f.fits'))
+    files = glob.glob(os.path.join(RAW_PATH, file_query+'fl[tc].fits'))
+    files += glob.glob(os.path.join(RAW_PATH, file_query+'c0m.fits'))
+    files += glob.glob(os.path.join(RAW_PATH, file_query+'c0f.fits'))
 
     files.sort()
 
@@ -1430,7 +1430,8 @@ def parse_visits(field_root='', RAW_PATH='../RAW', use_visit=True, combine_same_
         split_list = []
         for v in visits:
             split_list.extend(utils.split_visit(v, max_dt=max_dt,
-                              visit_split_shift=1.5))
+                                          visit_split_shift=visit_split_shift, 
+                                          path=RAW_PATH))
 
         visits = split_list
         utils.log_comment(utils.LOGFILE,
@@ -4998,13 +4999,20 @@ def field_psf(root='j020924-044344', PREP_PATH='../Prep', RAW_PATH='../RAW', EXT
     sh = im[0].data.shape
 
     if get_drizzle_scale:
-        rounded = int(np.round(im[0].header['D001SCAL']*1000))/1000.
-
+        #rounded = int(np.round(im[0].header['D001SCAL']*1000))/1000.
+        rounded = int(np.round(pscale*1000))/1000.
+        if 'D001KERN' in im[0].header:
+            kern = im[0].header['D001KERN']
+            pixf = im[0].header['D001PIXF']
+        else:
+            kern = im[0].header['KERNEL']
+            pixf = im[0].header['PIXFRAC']
+            
         for factor in factors:
             scale.append(rounded/factor)
             labels.append('DRIZ{0}'.format(factor))
-            kernel.append(im[0].header['D001KERN'])
-            pixfrac.append(im[0].header['D001PIXF'])
+            kernel.append(kern)
+            pixfrac.append(pixf)
 
     # FITS info
     #visits_file = '{0}_visits.npy'.format(root)
