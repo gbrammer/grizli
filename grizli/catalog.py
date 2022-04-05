@@ -35,6 +35,7 @@ __all__ = ["table_to_radec",
            "get_nsc_catalog",
            "get_desdr1_catalog",
            "get_skymapper_catalog",
+           "get_vexas_catalog",
            "get_panstarrs_catalog",
            "get_radec_catalog"]
 
@@ -137,7 +138,7 @@ def table_to_regions(table, output='ds9.reg', comment=None, header='global color
 
     if comment is not None:
         for i in range(len(table)):
-            lines[i] += ' # text={{{1}}}'.format(comment[i])
+            lines[i] += ' # text={{{0}}}'.format(comment[i])
     
     if extra is not None:
         for i, li in enumerate(lines):
@@ -674,7 +675,7 @@ def query_tap_catalog(ra=165.86, dec=34.829694, radius=3., corners=None,
                     max_wait=20,
                     db='ls_dr9.tractor', columns=['*'], extra='',
                     rd_colnames=['ra', 'dec'],
-                    tap_url='http://datalab.noao.edu/tap',
+                    tap_url='https://datalab.noirlab.edu/tap',
                     max=1000000, clean_xml=True, verbose=True,
                     des=False, gaia=False, nsc=False, vizier=False,
                     skymapper=False,
@@ -696,7 +697,7 @@ def query_tap_catalog(ra=165.86, dec=34.829694, radius=3., corners=None,
         `~astropy.wcs.WCS.calc_footprint` method
 
     db : str
-        Parent database (https://datalab.noao.edu/query.php).
+        Parent database (https://datalab.noirlab.edu/query.php).
 
     columns : list of str
         List of columns to output.  Default ['*'] returns all columns.
@@ -743,7 +744,7 @@ def query_tap_catalog(ra=165.86, dec=34.829694, radius=3., corners=None,
             print('Query DES DR1 from NOAO')
 
         db = 'des_dr1.main'
-        tap_url = 'http://datalab.noao.edu/tap'
+        tap_url = 'https://datalab.noirlab.edu/tap'
 
     # NOAO source catalog, seems to have some junk
     if nsc:
@@ -751,7 +752,7 @@ def query_tap_catalog(ra=165.86, dec=34.829694, radius=3., corners=None,
             print('Query NOAO source catalog')
 
         db = 'nsc_dr1.object'
-        tap_url = 'http://datalab.noao.edu/tap'
+        tap_url = 'https://datalab.noirlab.edu/tap'
         extra += ' AND nsc_dr1.object.flags = 0'
 
     # GAIA DR2
@@ -925,7 +926,25 @@ def get_nsc_catalog(ra=0., dec=0., radius=3, corners=None, max=100000, extra=' A
     return tab
 
 
-def get_desdr1_catalog(ra=0., dec=0., radius=3, corners=None, max=100000, extra=' AND (magerr_auto_r < 0.15 OR magerr_auto_i < 0.15)', verbose=True):
+def get_desdr1_catalog(ra=0., dec=0., radius=3, corners=None, max=100000, extra=' AND (e_rmag < 0.15 OR e_imag < 0.15)', verbose=True):
+    """
+    Query DES DR1 Catalog from Vizier
+
+    The default `extra` query returns well-detected sources in one or more
+    red bands.
+
+    """
+    msg = 'Query DES Source Catalog ({ra:.5f},{dec:.5f},{radius:.1f}\')'
+    print(msg.format(ra=ra, dec=dec, radius=radius))
+
+    tab = query_tap_catalog(ra=ra, dec=dec, radius=radius, corners=corners,
+                            extra=extra, db='"II/357/des_dr1"', 
+                            vizier=True, 
+                            verbose=verbose, max=max)
+    return tab
+
+
+def get_desdr1_catalog_old(ra=0., dec=0., radius=3, corners=None, max=100000, extra=' AND (magerr_auto_r < 0.15 OR magerr_auto_i < 0.15)', verbose=True):
     """
     Query DES DR1 Catalog.
 
@@ -938,6 +957,25 @@ def get_desdr1_catalog(ra=0., dec=0., radius=3, corners=None, max=100000, extra=
 
     tab = query_tap_catalog(ra=ra, dec=dec, radius=radius, corners=corners,
                             extra=extra, des=True, verbose=verbose, max=max)
+    return tab
+
+
+def get_vexas_catalog(ra=0., dec=0., radius=3., corners=None, max_records=500000, verbose=True, extra='', table='vexasdes'):
+    """
+    VEXAS DR2 from vizier
+    
+    https://vizier.cds.unistra.fr/viz-bin/VizieR?-source=II/369
+    
+    table: 'vexasds', 'vexasps', 'vexassm'
+    
+    """
+    msg = 'Query VEXAS DR2 {table} catalog ({ra},{dec},{radius})'
+    print(msg.format(table=table, ra=ra, dec=dec, radius=radius))
+    tab = query_tap_catalog(ra=ra, dec=dec, radius=radius*2,
+                            corners=corners, extra=extra, 
+                            vizier=True, 
+                            db=f'"II/369/{table}"', 
+                            verbose=verbose, max=max_records)
     return tab
 
 
@@ -954,7 +992,7 @@ def get_skymapper_catalog(ra=0., dec=0., radius=3., corners=None, max_records=50
     return tab
 
 
-def get_legacysurveys_catalog(ra=0., dec=0., radius=3., verbose=True, db='ls_dr9.tractor', sn_lim=('r',7), **kwargs):
+def get_legacysurveys_catalog(ra=0., dec=0., radius=3., verbose=True, db='ls_dr9.tractor', sn_lim=('r',10), **kwargs):
     """
     Query LegacySurveys TAP catalog
     """
@@ -1041,6 +1079,7 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, ref
                        'DES': get_desdr1_catalog,
                        'Hubble': get_hubble_source_catalog,
                        'Skymapper': get_skymapper_catalog, 
+                       'VEXAS': get_vexas_catalog, 
                        'LS_DR9': get_legacysurveys_catalog}
 
     # Try queries

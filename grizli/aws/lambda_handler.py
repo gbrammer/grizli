@@ -95,12 +95,16 @@ def extract_beams_from_flt(root, bucket, id, clean=True, silent=False):
     bkt = s3.Bucket(bucket)
 
     # WCS files for ACS
-    files = [obj.key for obj in bkt.objects.filter(Prefix='Pipeline/{0}/Extractions/j'.format(root))]
-    files += [obj.key for obj in bkt.objects.filter(Prefix='Pipeline/{0}/Extractions/i'.format(root))]
+    files = [obj.key for obj in 
+             bkt.objects.filter(Prefix=f'HST/Pipeline/{root}/Extractions/j')]
+    files += [obj.key for obj in 
+              bkt.objects.filter(Prefix=f'HST/Pipeline/{root}/Extractions/i')]
 
-    files += [obj.key for obj in bkt.objects.filter(Prefix='Pipeline/{0}/Extractions/{0}-ir.cat.fits'.format(root))]
+    prefix = f'HST/Pipeline/{root}/Extractions/{root}-ir.cat.fits'
+    files += [obj.key for obj in bkt.objects.filter(Prefix=prefix)]
 
-    files += [obj.key for obj in bkt.objects.filter(Prefix='Pipeline/{0}/Extractions/fit_args.npy'.format(root))]
+    prefix = f'HST/Pipeline/{root}/Extractions/fit_args.npy'
+    files += [obj.key for obj in bkt.objects.filter(Prefix=prefix)]
 
     download_files = []
     for file in np.unique(files):
@@ -205,7 +209,15 @@ def extract_beams_from_flt(root, bucket, id, clean=True, silent=False):
 
     # Grism Object
     args = np.load(args_file, allow_pickle=True)[0]
-    mb = multifit.MultiBeam(beams, **args)
+    if '_ehn_' in root:
+        try:
+            import wfc3dash.grism.grism
+            mb = wfc3dash.grism.grism.run_align_dash(beams, args)
+        except ImportError:
+            mb = multifit.MultiBeam(beams, **args)
+    else:
+        mb = multifit.MultiBeam(beams, **args)
+        
     mb.write_master_fits()
 
     # 1D spectrum with R=30 fit
@@ -269,7 +281,7 @@ def run_grizli_fit(event):
 
     utils.set_warnings()
 
-    #event = {'s3_object_path':'Pipeline/j001452+091221/Extractions/j001452+091221_00277.beams.fits'}
+    #event = {'s3_object_path':'HST/Pipeline/j001452+091221/Extractions/j001452+091221_00277.beams.fits'}
 
     silent = False
     if 'silent' in event:
@@ -306,13 +318,13 @@ def run_grizli_fit(event):
             event_kwargs[k] = False
 
     if event_kwargs['beam_info_only'] in TRUE_OPTIONS:
-        dbtable = 'multibeam'
+        dbtable = 'multibeam_v2'
     elif event_kwargs['quasar_fit'] in TRUE_OPTIONS:
-        dbtable = 'redshift_fit_quasar'
+        dbtable = 'redshift_fit_v2_quasar'
     elif event_kwargs['fit_stars'] in TRUE_OPTIONS:
-        dbtable = 'stellar_fit'
+        dbtable = 'stellar_fit_v2'
     else:
-        dbtable = 'redshift_fit'
+        dbtable = 'redshift_fit_v2'
     
     if 'dbtable' in event_kwargs:
         dbtable = event_kwargs['dbtable']
@@ -334,7 +346,7 @@ def run_grizli_fit(event):
     if 'bucket' in event:
         event_kwargs['bucket'] = event['bucket']
     else:
-        event_kwargs['bucket'] = 'aws-grivam'
+        event_kwargs['bucket'] = 'grizli-v2' #'aws-grivam'
 
     if 'working_directory' in event:
         os.chdir(event['working_directory'])
@@ -349,8 +361,8 @@ def run_grizli_fit(event):
 
     # Filenames, etc.
     beams_file = os.path.basename(event['s3_object_path'])
-    root = beams_file.split('_')[0]
-    id = int(beams_file.split('_')[1].split('.')[0])
+    root = '_'.join(beams_file.split('_')[:-1])
+    id = int(beams_file.split('_')[-1].split('.')[0])
 
     try:
         db_status = grizli_db.get_redshift_fit_status(root, id, table=dbtable)
@@ -359,7 +371,7 @@ def run_grizli_fit(event):
 
     # Initial log
     start_log = '{0}_{1:05d}.start.log'.format(root, id)
-    full_start = 'Pipeline/{0}/Extractions/{1}'.format(root, start_log)
+    full_start = 'HST/Pipeline/{0}/Extractions/{1}'.format(root, start_log)
     if ((start_log in files) | (db_status >= 0)) & event_kwargs['skip_started']:
         print('Log file {0} found in {1} (db_status={2})'.format(start_log, os.getcwd(), db_status))
         return True
@@ -401,7 +413,7 @@ def run_grizli_fit(event):
     args_files = ['{0}_fit_args.npy'.format(root), 'fit_args.npy']
     for args_file in args_files:
         if (not os.path.exists(args_file)) | force_args:
-            aws_file = 'Pipeline/{0}/Extractions/{1}'.format(root, args_file)
+            aws_file = 'HST/Pipeline/{0}/Extractions/{1}'.format(root, args_file)
             try:
                 bkt.download_file(aws_file, './{0}'.format(args_file),
                               ExtraArgs={"RequestPayer": "requester"})
@@ -457,14 +469,14 @@ def run_grizli_fit(event):
         put_beams = True
 
         # upload it now
-        output_path = 'Pipeline/{0}/Extractions'.format(root)
+        output_path = 'HST/Pipeline/{0}/Extractions'.format(root)
         for outfile in status:
             aws_file = '{0}/{1}'.format(output_path, outfile)
             print(aws_file)
-            bkt.upload_file(outfile, aws_file,
-                        ExtraArgs={'ACL': 'public-read'})
+            bkt.upload_file(outfile, aws_file, 
+                            ExtraArgs={'ACL': 'public-read'})
 
-    if ('run_fit' in event) & (dbtable == 'redshift_fit'):
+    if ('run_fit' in event) & (dbtable == 'redshift_fit_v2'):
         if event['run_fit'] in FALSE_OPTIONS:
             res = ubkt.delete_objects(Delete={'Objects': 
                                                [{'Key': full_start}]})
@@ -490,7 +502,7 @@ def run_grizli_fit(event):
         grizli_db.multibeam_to_database(beams_file, Rspline=15, force=False,
                                         **args)
 
-    if dbtable == 'multibeam':
+    if dbtable == 'multibeam_v2':
         # Done
         res = ubkt.delete_objects(Delete={'Objects': [{'Key': full_start}]})
         return True
@@ -526,7 +538,7 @@ def run_grizli_fit(event):
 
     try:
         files = glob.glob('{0}_{1:05d}*R30.fits'.format(root, id))
-        if (len(files) > 0) & (dbtable == 'redshift_fit'):
+        if (len(files) > 0) & (dbtable == 'redshift_fit_v2'):
             grizli_db.send_1D_to_database(files=files)
     except:
         print('Failed to send R30 to spec1d database')
@@ -645,7 +657,7 @@ def run_grizli_fit(event):
 
         if output_path is None:
             #output_path = 'Pipeline/QuasarFit'.format(root)
-            output_path = 'Pipeline/{0}/Extractions'.format(root)
+            output_path = 'HST/Pipeline/{0}/Extractions'.format(root)
 
     elif event_kwargs['fit_stars'] in TRUE_OPTIONS:
 
@@ -727,7 +739,7 @@ def run_grizli_fit(event):
 
         if output_path is None:
             # output_path = 'Pipeline/QuasarFit'.format(root)
-            output_path = 'Pipeline/{0}/Extractions'.format(root)
+            output_path = 'HST/Pipeline/{0}/Extractions'.format(root)
 
     else:
 
@@ -736,7 +748,7 @@ def run_grizli_fit(event):
                                  args_file=args_file, **event_kwargs)
 
         if output_path is None:
-            output_path = 'Pipeline/{0}/Extractions'.format(root)
+            output_path = 'HST/Pipeline/{0}/Extractions'.format(root)
 
     # Output files
     files = glob.glob('{0}_{1:05d}*'.format(root, id))
@@ -771,7 +783,7 @@ def run_grizli_fit(event):
 
         # Add 1D spectra
         files = glob.glob('{0}_{1:05d}*1D.fits'.format(root, id))
-        if (len(files) > 0) & (dbtable == 'redshift_fit'):
+        if (len(files) > 0) & (dbtable == 'redshift_fit_v2'):
             grizli_db.send_1D_to_database(files=files)
 
     except:
@@ -804,7 +816,7 @@ def clean(root='', verbose=True):
     gc.collect()
 
 
-TESTER = 'Pipeline/j001452+091221/Extractions/j001452+091221_00277.beams.fits'
+TESTER = 'HST/Pipeline/j001452+091221/Extractions/j001452+091221_00277.beams.fits'
 
 
 def run_test(s3_object_path=TESTER):
@@ -821,8 +833,12 @@ def run_test(s3_object_path=TESTER):
     obj = 'j224916m4432_02983'
 
     bucket = 'grizli'
-    root, id = obj.split('_')
-    s3_object_path = 'Pipeline/{0}/Extractions/{0}_{1:05d}.beams.fits'.format(root, int(id))
+    #root, id = obj.split('_')
+
+    root = '_'.join(obj.split('_')[:-1])
+    id = int(obj.split('_')[-1].split('.')[0])
+    
+    s3_object_path = 'HST/Pipeline/{0}/Extractions/{0}_{1:05d}.beams.fits'.format(root, int(id))
     event = {'s3_object_path': s3_object_path,
              'bucket': bucket,
              'verbose': 'True',
@@ -833,7 +849,7 @@ def run_test(s3_object_path=TESTER):
     run_grizli_fit(event)
 
     beams_file = os.path.basename(event['s3_object_path'])
-    root = beams_file.split('_')[0]
+    #root = beams_file.split('_')[0]
     clean(root=root, verbose=True)
 
 
@@ -882,7 +898,7 @@ def redshift_handler(event, context):
 
     # Clean up
     beams_file = os.path.basename(event['s3_object_path'])
-    root = beams_file.split('_')[0]
+    root = '_'.join(beams_file.split('_')[:-1])
 
     if 'clean' in event:
         run_clean = event['clean'] in TRUE_OPTIONS

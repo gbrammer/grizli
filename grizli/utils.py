@@ -1239,7 +1239,7 @@ def parse_grism_associations(exposure_groups, info,
     return grism_groups
 
 
-def get_hst_filter(header):
+def get_hst_filter(header, filter_only=False):
     """Get simple filter name out of an HST image header.
 
     ACS has two keywords for the two filter wheels, so just return the
@@ -1256,7 +1256,13 @@ def get_hst_filter(header):
         >>> h['FILTER2'] = 'CLEAR2L'
         >>> print(get_hst_filter(h))
         G800L
-
+    
+    If `filter_only` then just get JWST ``FILTER``, otherwise
+    
+    For JWST/NIRISS, return ``{PUPIL}-{FILTER}``
+    
+    For JWST/NIRCAM, return ``{FILTER}-{PUPIL}``
+    
     Parameters
     -----------
     header : `~astropy.io.fits.Header`
@@ -1267,10 +1273,13 @@ def get_hst_filter(header):
     filter : str
 
     """
-    if 'FILTER' in header:
-        return header['FILTER'].upper()
-
-    if header['INSTRUME'].strip() == 'ACS':
+    
+    if 'INSTRUME' not in header:
+        instrume = 'N/A'
+    else:
+        instrume = header['INSTRUME']
+        
+    if instrume.strip() == 'ACS':
         for i in [1, 2]:
             filter_i = header['FILTER{0:d}'.format(i)]
             if 'CLEAR' in filter_i:
@@ -1278,10 +1287,27 @@ def get_hst_filter(header):
             else:
                 filter = filter_i
 
-    elif header['INSTRUME'] == 'WFPC2':
+    elif instrume == 'WFPC2':
         filter = header['FILTNAM1']
+        
+    elif instrume == 'NIRISS':
+        if filter_only:
+            filter = header['FILTER']
+        else:
+            filter = '{0}-{1}'.format(header['PUPIL'], header['FILTER'])
+            
+    elif instrume == 'NIRCAM':
+        if filter_only:
+            filter = header['FILTER']
+        else:
+            filter = '{0}-{1}'.format(header['FILTER'], header['PUPIL'])
+            
+    elif 'FILTER' in header:
+        filter = header['FILTER']
+        
     else:
-        raise KeyError('Filter keyword not found for instrument {0}'.format(header['INSTRUME']))
+        msg = 'Failed to parse FILTER keyword for INSTRUMEnt {0}'
+        raise KeyError(msg.format(instrume))
 
     return filter.upper()
 
@@ -2947,7 +2973,9 @@ def load_phoenix_stars(logg_list=PHOENIX_LOGG, teff_list=PHOENIX_TEFF, zmet_list
     try:
         hdu = pyfits.open(os.path.join(GRIZLI_PATH, 'templates/stars/', file))
     except:
-        url = 'https://s3.amazonaws.com/grizli/CONF'
+        #url = 'https://s3.amazonaws.com/grizli/CONF'
+        url = 'https://erda.ku.dk/vgrid/Gabriel%20Brammer/CONF'
+        
         print('Fetch {0}/{1}'.format(url, file))
 
         #os.system('wget -O /tmp/{1} {0}/{1}'.format(url, file))
@@ -4073,22 +4101,60 @@ def get_common_slices(a_origin, a_shape, b_origin, b_shape):
 
     
 class SRegion(object):
-    """Helper class for parsing an S_REGION string
-    """
+
     def __init__(self, inp, label=None, **kwargs):
+        """
+        Helper class for parsing an S_REGION strings and general polygon 
+        tools
+        
+        Parameters
+        ----------
+        inp : str, (M,2) array, `~astropy.wcs.WCS`, `shapely.geometry.polygon.Polygon`
+            
+            Can be a "S_REGION" string, an array, or an 
+            `~astropy.wcs.WCS` object that will 
+            from which the corners will be extracted with 
+            `~astropy.wcs.WCS.calc_footprint`.
+            
+        """
         if isinstance(inp, str):
             self.xy = self._parse_sregion(inp, **kwargs)
+            
         elif hasattr(inp, 'sum'):
             # NDarray
+            sh = inp.shape
+            if inp.ndim != 2:
+                raise ValueError(f'Input shape {sh} is not (M,2)')
+            else:
+                if inp.shape[1] != 2:
+                    if inp.shape[0] != 2:
+                        raise ValueError(f'Input shape {sh} is not (M,2)')
+                    else:
+                        inp = inp.T
+                    
             self.xy = [inp]
+            
         elif isinstance(inp, list):
             self.xy = inp
+            
+        elif isinstance(inp, pywcs.WCS):
+            self.xy = [inp.calc_footprint()]
+            
+        elif hasattr(inp, 'buffer'):
+            # Shapely polygon
+            if hasattr(inp, '__len__'):
+                self.xy = [np.array(p.boundary.xy).T for p in inp]
+            else:
+                self.xy = [np.array(inp.boundary.xy).T]
+                
         else:
             raise IOError('input must be ``str``, ``list``, or ``np.array``')
         
+        self.inp = inp
         self.ds9_properties = ''
         self.label = label
-        
+
+
     @staticmethod   
     def _parse_sregion(sregion, ncircle=32, wrap=False, **kwargs):
         """
@@ -4184,7 +4250,7 @@ class SRegion(object):
         """
         from shapely.geometry import Polygon
         return [Polygon(fp) for fp in self.xy]
-    
+
 
     @property 
     def area(self):
@@ -4203,13 +4269,53 @@ class SRegion(object):
                 for sh in self.shapely]
 
 
-    def get_patch(self, **kwargs):
+    def patch(self, **kwargs):
         """
         `~descartes.PolygonPatch` object
         """
         from descartes import PolygonPatch
         return [PolygonPatch(p, **kwargs) for p in self.shapely]
-    
+
+
+    def get_patch(self, **kwargs):
+        """
+        `~descartes.PolygonPatch` object
+        
+        ** Deprecated, use patch **
+        """
+        from descartes import PolygonPatch
+        return self.patch(**kwargs)
+
+
+    def union(self, shape=None, as_polygon=False):
+        """
+        Union of self and `shape` object.  If no `shape` provided, then 
+        return union of (optional) multiple components of self
+        """
+        if shape is None:
+            un = self.shapely[0]
+        else:
+            un = shape
+            
+        for s in self.shapely:
+            un = un.union(s)
+        
+        if as_polygon:
+            return un
+        else:
+            return SRegion(un)
+
+
+    def intersects(self, shape):
+        """
+        Union of self and `shape` object
+        """
+        test = False
+        for s in self.shapely:
+            test |= s.intersects(shape)
+
+        return test
+
 
     @property
     def region(self):
@@ -4231,7 +4337,19 @@ class SRegion(object):
             
         return [pstr.format(','.join([f'{c:.6f}' for c in fp.flatten()]))+tail
                 for fp in self.xy]
-    
+
+
+    @property
+    def s_region(self):
+        """
+        Polygon as VO s_region
+        """
+        pstr = 'POLYGON {0}'
+        polys = [pstr.format(' '.join([f'{c:.6f}' for c in fp.flatten()]))
+                for fp in self.xy]
+        return ' '.join(polys)
+
+
 class WCSFootprint(object):
     """
     Helper functions for dealing with WCS footprints
@@ -4272,6 +4390,7 @@ class WCSFootprint(object):
     def centroid(self):
         return np.mean(self.fp, axis=0)
 
+
     @property
     def path(self):
         """
@@ -4279,6 +4398,7 @@ class WCSFootprint(object):
         """
         import matplotlib.path
         return matplotlib.path.Path(self.fp)
+
 
     @property
     def polygon(self):
@@ -4288,6 +4408,7 @@ class WCSFootprint(object):
         from shapely.geometry import Polygon
         return Polygon(self.fp)
 
+
     def get_patch(self, **kwargs):
         """
         `~descartes.PolygonPatch` object
@@ -4295,12 +4416,14 @@ class WCSFootprint(object):
         from descartes import PolygonPatch
         return PolygonPatch(self.polygon, **kwargs)
 
+
     @property
     def region(self):
         """
         Polygon string in DS9 region format
         """
         return 'polygon({0})'.format(','.join(['{0:.6f}'.format(c) for c in self.fp.flatten()]))
+
 
     @staticmethod
     def add_naxis(header):
@@ -4963,6 +5086,55 @@ def make_maximal_wcs(files, pixel_scale=0.1, get_hdu=True, pad=90, verbose=True,
     return out
 
 
+def half_pixel_scale(wcs):
+    """
+    Create a new WCS with half the pixel scale of another that can be 
+    block-averaged 2x2
+    
+    Parameters
+    ----------
+    wcs : `~astropy.wcs.WCS`
+        Input WCS
+    
+    Returns
+    -------
+    half_wcs : `~astropy.wcs.WCS`
+        New WCS with smaller pixels
+    """
+    h = to_header(wcs)
+    
+    for k in ['NAXIS1', 'NAXIS2']: #, 'CRPIX1', 'CRPIX2']:
+        h[k] *= 2
+
+    for k in ['CRPIX1', 'CRPIX2']:
+        h[k] = h[k]*2 - 0.5
+        
+    for k in ['CD1_1', 'CD2_2']:
+        h[k] /= 2
+    
+    if 0:
+        # Test
+        new = pywcs.WCS(h)
+        sh = new.pixel_shape
+        
+        wcorner = wcs.all_world2pix(new.all_pix2world([[-0.5, -0.5], 
+                                             [sh[0]-0.5, sh[1]-0.5]], 0),0)
+        print('small > large')
+        print(', '.join([f'{w:.2f}' for w in wcorner[0]]))
+        print(', '.join([f'{w:.2f}' for w in wcorner[1]]), wcs.pixel_shape)
+        
+        sh = wcs.pixel_shape
+        wcorner = new.all_world2pix(wcs.all_pix2world([[-0.5, -0.5], 
+                                             [sh[0]-0.5, sh[1]-0.5]], 0),0)
+        print('large > small')
+        print(', '.join([f'{w:.2f}' for w in wcorner[0]]))
+        print(', '.join([f'{w:.2f}' for w in wcorner[1]]), new.pixel_shape)
+        
+    new_wcs = pywcs.WCS(h, relax=True)
+    
+    return new_wcs
+
+
 def header_keys_from_filelist(fits_files, keywords=[], ext=0, colname_case=str.lower):
     """Dump header keywords to a `~astropy.table.Table`
 
@@ -5116,13 +5288,14 @@ def fetch_s3_url(url='s3://bucket/path/to/file.txt', file_func=lambda x : os.pat
 
 def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
                        clean=True, include_saturated=True, keep_bits=None,
-                       dryrun=False, skip=None):
+                       dryrun=False, skip=None, extra_wfc3ir_badpix=True):
     """
     Make drizzle mosaic from exposures in a visit dictionary
 
     """
     from shapely.geometry import Polygon
     import boto3
+    from botocore.exceptions import ClientError
 
     bucket_name = None
     s3 = boto3.resource('s3')
@@ -5181,18 +5354,32 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
             try:
                 bkt.download_file(remote_file, file,
                               ExtraArgs={"RequestPayer": "requester"})
-            except:
+            except ClientError:
                 print('  (failed s3://{0}/{1})'.format(bucket_i, remote_file))
                 continue
 
-        flt = pyfits.open(file)
+        try:
+            flt = pyfits.open(file)
+        except OSError:
+            print(f'open({file}) failed!')
+            continue
+            
         sci_list, wht_list, wcs_list = [], [], []
 
         if flt[0].header['DETECTOR'] == 'IR':
             bits = 576
+            if extra_wfc3ir_badpix:
+                bpfile = os.path.join(os.path.dirname(__file__), 
+                               'data/wfc3ir_badpix_spars200_22.03.31.fits.gz')
+                bpdata = pyfits.open(bpfile)[0].data
+                msg = f'Use extra badpix in {bpfile}'
+                log_comment(LOGFILE, msg, verbose=True)
+            else:
+                bpdata = 0
         else:
             bits = 64+32
-
+            bpdata = 0
+            
         if include_saturated:
             bits |= 256
 
@@ -5241,17 +5428,22 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
 
                     phot_scale *= to_per_sec
 
+                try:
+                    wcs_i = pywcs.WCS(header=flt[('SCI', ext)].header, 
+                                      fobj=flt)
+                    wcs_i.pscale = get_wcs_pscale(wcs_i)
+                except KeyError:
+                    print(f'Failed to initialize WCS on {file}[SCI,{ext}]')
+                    continue
+
                 sci_list.append((flt[('SCI', ext)].data - sky)*phot_scale)
 
                 err = flt[('ERR', ext)].data*phot_scale
-                dq = unset_dq_bits(flt[('DQ', ext)].data, bits)
+                dq = unset_dq_bits(flt[('DQ', ext)].data, bits) | bpdata
                 wht = 1/err**2
                 wht[(err == 0) | (dq > 0)] = 0
 
                 wht_list.append(wht)
-
-                wcs_i = pywcs.WCS(header=flt[('SCI', ext)].header, fobj=flt)
-                wcs_i.pscale = get_wcs_pscale(wcs_i)
 
                 # wcs_i = HSTWCS(fobj=flt, ext=('SCI',ext), minerr=0.0,
                 #                wcskey=' ')
@@ -5378,7 +5570,7 @@ def drizzle_array_groups(sci_list, wht_list, wcs_list, outputwcs=None,
             wcs_i.pixel_shape = wcs_i._naxis1, wcs_i._naxis2
 
         if not hasattr(wcs_i, '_naxis1'):
-            wcs_i._naxis1, wcs_i._naxis2 = wcs_i._naxis
+            wcs_i._naxis1, wcs_i._naxis2 = wcs_i._naxis[:2]
 
     # Output WCS requires full WCS map?
     if calc_wcsmap < 2:
@@ -5862,17 +6054,24 @@ def fetch_config_files(ACS=False, get_sky=True, get_stars=True, get_epsf=True):
     tarfiles = ['{0}/WFC3.IR.G102.cal.V4.32.tar.gz'.format(ftpdir),
                 '{0}/WFC3.IR.G141.cal.V4.32.tar.gz'.format(ftpdir)]
 
-    # Test config files
-    tarfiles = ['https://s3.amazonaws.com/grizli/CONF/WFC3.IR.G102.WD.V4.32.tar.gz', 'https://s3.amazonaws.com/grizli/CONF/WFC3.IR.G141.WD.V4.32.tar.gz']
+    # Config files
+    # BASEURL = 'https://s3.amazonaws.com/grizli/CONF/'
+    BASEURL = 'https://erda.ku.dk/vgrid/Gabriel%20Brammer/CONF/'
+    
+    tarfiles = [f'{BASEURL}/WFC3.IR.G102.WD.V4.32.tar.gz', 
+                f'{BASEURL}/WFC3.IR.G141.WD.V4.32.tar.gz']
 
-    tarfiles += ['https://s3.amazonaws.com/grizli/CONF/ACS.WFC.CHIP1.Stars.conf', 'https://s3.amazonaws.com/grizli/CONF/ACS.WFC.CHIP2.Stars.conf']
+    tarfiles += [f'{BASEURL}/ACS.WFC.CHIP1.Stars.conf', 
+                 f'{BASEURL}/ACS.WFC.CHIP2.Stars.conf']
     
     if get_sky:
-        ftpdir = 'https://s3.amazonaws.com/grizli/CONF'
+        ftpdir = BASEURL
         tarfiles.append('{0}/grism_master_sky_v0.5.tar.gz'.format(ftpdir))
 
     #gURL = 'http://www.stsci.edu/~brammer/Grizli/Files'
-    gURL = 'https://s3.amazonaws.com/grizli/CONF'
+    #gURL = 'https://s3.amazonaws.com/grizli/CONF'
+    gURL = BASEURL
+    
     tarfiles.append('{0}/WFC3IR_extended_PSF.v1.tar.gz'.format(gURL))
 
     if ACS:
@@ -6065,9 +6264,11 @@ class EffectivePSF(object):
                                 'extended_PSF_{0}.fits'.format(filter))
 
             if not os.path.exists(file):
+                BASEURL = 'https://erda.ku.dk/vgrid/Gabriel%20Brammer/CONF/'
                 msg = 'Extended PSF file \'{0}\' not found.'.format(file)
-                msg += '\n                   Get the archive from https://s3.amazonaws.com/grizli/CONF/WFC3IR_extended_PSF.v1.tar.gz'
-                msg += '\n                   and unpack in ${GRIZLI}/CONF/'
+                msg += 'Get the archive from '
+                msg += f' {BASEURL}WFC3IR_extended_PSF.v1.tar.gz'
+                msg += ' and unpack in ${GRIZLI}/CONF/'
                 raise FileNotFoundError(msg)
 
             data = pyfits.open(file)[0].data  # .T
@@ -8330,4 +8531,57 @@ class HubbleXYZ(object):
         lla = pyproj.Proj(proj='latlong', ellps='WGS84', datum='WGS84')
         lon, lat, alt = pyproj.transform(ecef, lla, x, y, z, radians=radians)
         return lon, lat, alt
+
+
+def patch_photutils():
+    """
+    Patch to fix inconsistency with drizzlepac=3.2.1 and photutils>1.0, where 
+    The latter is needed for jwst=1.3.2
+    """
+    import os
+
+    try:
+        import drizzlepac
+    except AttributeError:
+    
+        import photutils
+        site_packages = os.path.dirname(photutils.__file__)
+        # manual apply patch
+        the_file = f'{site_packages}/../drizzlepac/haputils/align_utils.py'
+        with open(the_file,'r') as fp:
+            lines = fp.readlines()
+    
+        print(site_packages, len(lines))
+        for i, line in enumerate(lines):
+            if line.startswith('NoDetectionsWarning'):
+                break
+    
+        if 'hasattr(photutils.findstars' in lines[i+1]:
+            print(f'I found the problem on lines {i}-{i+2}: ')
+        else:
+            msg = """
+Lines {0}-{1} in {2} importing photutils were not as expected.  I found 
+
+{3}
+
+but expected 
+
+   NoDetectionsWarning = photutils.findstars.NoDetectionsWarning if \\
+                           hasattr(photutils.findstars, 'NoDetectionsWarning') else \\
+                           photutils.utils.NoDetectionsWarning
+
+
+    """.format(i, i+2, the_file, lines[i:i+3])
         
+            raise ValueError(msg)
+        
+        bad = ['   '+lines.pop(i+2-j) for j in range(3)]
+        print(''.join(bad[::-1]))
+
+        # Insert the fix
+        lines[i] = 'from photutils.utils.exceptions import NoDetectionsWarning\n\n'
+        # Rewrite the fie
+        with open(f'{site_packages}/../drizzlepac/haputils/align_utils.py','w') as fp:
+            fp.writelines(lines)
+    
+        print(f'Patch applied to {the_file}!')

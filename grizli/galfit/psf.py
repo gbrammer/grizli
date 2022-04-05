@@ -22,7 +22,7 @@ except:
 
 
 class DrizzlePSF(object):
-    def __init__(self, flt_files=DEMO_LIST, info=None, driz_image=DEMO_IMAGE, driz_hdu=None, beams=None):
+    def __init__(self, flt_files=DEMO_LIST, info=None, driz_image=DEMO_IMAGE, driz_hdu=None, beams=None, full_flt_weight=True):
         """
         Object for making drizzled PSFs
 
@@ -42,7 +42,8 @@ class DrizzlePSF(object):
                 if flt_files is None:
                     info = self._get_wcs_from_hdrtab(driz_image)
                 else:
-                    info = self._get_flt_wcs(flt_files)
+                    info = self._get_flt_wcs(flt_files, 
+                                             full_flt_weight=full_flt_weight)
 
         self.flt_keys, self.wcs, self.footprint = info
         self.flt_files = list(np.unique([key[0] for key in self.flt_keys]))
@@ -62,10 +63,20 @@ class DrizzlePSF(object):
 
         self.driz_wcs.pscale = self.driz_pscale
 
+
     @staticmethod
-    def _get_flt_wcs(flt_files):
+    def _get_flt_wcs(flt_files, full_flt_weight=True):
         """
-        TBD
+        Get WCS info from FLT FITS files
+        
+        Parameters
+        ----------
+        flt_files : list
+            List of filenames
+        
+        full_flt_weight : bool
+            If True, set `expweight` from 'ERR' extension of the FITS files, 
+            else weight by EXPTIME keyword
         """
         from shapely.geometry import Polygon, Point
 
@@ -84,12 +95,18 @@ class DrizzlePSF(object):
 
                     wcs[key].pscale = utils.get_wcs_pscale(wcs[key])
 
-                    wcs[key].expweight = flt_j[0].header['EXPTIME']
-
+                    if (('ERR',ext) in flt_j) & full_flt_weight:
+                        wht = (1./flt_j['ERR',ext].data**2).astype(np.float32)
+                        wht[~np.isfinite(wht)] = 0
+                        wcs[key].expweight = np.pad(wht, 32)
+                    else:
+                        wcs[key].expweight = flt_j[0].header['EXPTIME']
+                        
                     footprint[key] = Polygon(wcs[key].calc_footprint())
                     flt_keys.append(key)
 
         return flt_keys, wcs, footprint
+
 
     @staticmethod
     def _get_wcs_from_beams(beams):
@@ -237,7 +254,10 @@ class DrizzlePSF(object):
     @staticmethod
     def objfun_center(params, self, ra, dec, wcs_slice, filter, _Abg, sci, wht, ret):
         xoff, yoff = params[:2]
-        psf_offset = self.get_psf(ra=ra+xoff/3600./10., dec=dec+yoff/3600./10., filter=filter, wcs_slice=wcs_slice, verbose=False)
+        
+        psf_offset = self.get_psf(ra=ra+xoff/3600./10., 
+                                  dec=dec+yoff/3600./10.,
+                                  filter=filter, wcs_slice=wcs_slice, verbose=False)
 
         _A = np.vstack([_Abg, psf_offset[1].data.flatten()])
         _Ax = _A*np.sqrt(wht.flatten())
@@ -252,6 +272,45 @@ class DrizzlePSF(object):
             return params, _res, model, chi2
         else:
             return chi2
+    
+    
+    @staticmethod
+    def xobjfun_center(params, self, ra, dec, _Abg, sci, wht, ret):
+        """
+        Objective function for fitting the PSF model to a drizzled cutout
+        """
+        xoff, yoff = params[:2]
+        
+        filt = self.driz_header['FILTER']
+        
+        psf_offset = self.get_psf(ra=ra+xoff/3600./10., 
+                                  dec=dec+yoff/3600./10.,
+                                  filter=filt.upper(),
+                                  pixfrac=self.driz_header['PIXFRAC'],
+                                  kernel=self.driz_header['KERNEL'],
+                                  wcs_slice=self.driz_wcs, 
+                                 get_extended=filt.lower()[:2] in ['f1','f0'],
+                                   verbose=False)
+
+        if _Abg is not None:
+            _A = np.vstack([_Abg, psf_offset[1].data.flatten()])
+        else:
+            _A = np.atleast_2d(psf_offset[1].data.flatten())
+            
+        _Ax = _A*np.sqrt(wht.flatten())
+        _y = (sci*np.sqrt(wht)).flatten()
+
+        _res = np.linalg.lstsq(_Ax.T, _y, rcond=utils.LSTSQ_RCOND)
+
+        model = _A.T.dot(_res[0]).reshape(sci.shape)
+        #chi2 = ((sci-model)**2*wht).sum()
+        chi2 = _res[1][0]
+        print(params, chi2)
+        if ret == 1:
+            return params, _res, model, chi2
+        else:
+            return chi2
+
 
     @staticmethod
     def objfun(params, self, ra, dec, wcs_slice, filter, drz_cutout):
@@ -281,9 +340,9 @@ class DrizzlePSF(object):
                     print('{0}[SCI,{1}]'.format(file, ext))
 
                 xy = self.wcs[key].all_world2pix(np.array([[ra, dec]]), 0)[0]
-                xyp = np.cast[int](xy)  # +1
-                dx = xy[0]-int(xy[0])
-                dy = xy[1]-int(xy[1])
+                xyp = np.cast[int](xy) #np.round(xy))  # +1
+                dx = xy[0]-int(xy[0])#-0.5
+                dy = xy[1]-int(xy[1])#-0.5
 
                 if ext == 2:
                     # UVIS
@@ -292,10 +351,15 @@ class DrizzlePSF(object):
                 else:
                     chip_offset = 0
 
-                psf_xy = self.ePSF.get_at_position(xy[0], xy[1]+chip_offset, filter=filter)
-                yp, xp = np.meshgrid(pix-dy, pix-dx, sparse=False, indexing='ij')
+                psf_xy = self.ePSF.get_at_position(xy[0], xy[1]+chip_offset,
+                                                   filter=filter)
+                yp, xp = np.meshgrid(pix-dy, pix-dx, sparse=False, 
+                                     indexing='ij')
                 if get_extended:
-                    extended_data = self.ePSF.extended_epsf[filter]
+                    if filter in self.ePSF.extended_epsf:
+                        extended_data = self.ePSF.extended_epsf[filter]
+                    else:
+                        extended_data = None
                 else:
                     extended_data = None
 
@@ -309,7 +373,16 @@ class DrizzlePSF(object):
                 flt_weight = self.wcs[key].expweight
 
                 N = 13
-                psf_wcs = model.ImageData.get_slice_wcs(self.wcs[key], slice(xyp[0]-N, xyp[0]+N+1), slice(xyp[1]-N, xyp[1]+N+1))
+                slx = slice(xyp[0]-N, xyp[0]+N+1)
+                sly = slice(xyp[1]-N, xyp[1]+N+1)
+                
+                if hasattr(flt_weight, 'shape'):
+                    wslx = slice(xyp[0]-N+32, xyp[0]+N+1+32)
+                    wsly = slice(xyp[1]-N+32, xyp[1]+N+1+32)
+                    flt_weight = self.wcs[key].expweight[wsly, wslx]
+                    
+                psf_wcs = model.ImageData.get_slice_wcs(self.wcs[key], 
+                                                        slx, sly)
 
                 psf_wcs.pscale = utils.get_wcs_pscale(self.wcs[key])
 

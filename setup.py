@@ -12,8 +12,13 @@ from setuptools.config import read_configuration
 import subprocess
 
 import os
-import numpy
 
+try:
+    import numpy 
+    include_dirs = [numpy.get_include()]
+except ImportError:
+    include_dirs = []
+    
 try:
     from Cython.Build import cythonize
     USE_CYTHON = True
@@ -34,20 +39,20 @@ if os.name == 'nt':
     # Windows
     extensions = [
         Extension("grizli.utils_c.interp", ["grizli/utils_c/interp"+cext],
-            include_dirs = [numpy.get_include()]),
+            include_dirs = include_dirs),
         
         Extension("grizli.utils_c.disperse", ["grizli/utils_c/disperse"+cext],
-            include_dirs = [numpy.get_include()]),
+            include_dirs = include_dirs),
     ]
 else:
     # Not windows
     extensions = [
         Extension("grizli.utils_c.interp", ["grizli/utils_c/interp"+cext],
-            include_dirs = [numpy.get_include()],
+            include_dirs = include_dirs,
             libraries=["m"]),
         
         Extension("grizli.utils_c.disperse", ["grizli/utils_c/disperse"+cext],
-            include_dirs = [numpy.get_include()],
+            include_dirs = include_dirs,
             libraries=["m"]),
     ] 
 
@@ -71,6 +76,9 @@ if os.path.exists('.git'):
 else:
     # e.g., on pip
     version = long_version = version_hash = '1.3.2'
+
+# Manual version tag
+# version = '1.4.0' # New aws tools
 
 version_str =f"""# git describe --tags
 __version__ = "{version}"
@@ -101,7 +109,7 @@ setup(
     url = "https://github.com/gbrammer/grizli",
     download_url = "https://github.com/gbrammer/grizli/tarball/{0}".format(version),
     packages=['grizli', 'grizli/pipeline', 'grizli/utils_c', 'grizli/tests', 'grizli/galfit', 'grizli/aws'],
-    install_requires = ['numpy','cython'], 
+    install_requires = ['numpy','cython','astropy'], 
     classifiers=[
         "Development Status :: 1 - Planning",
         'Intended Audience :: Science/Research',

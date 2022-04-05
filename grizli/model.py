@@ -1434,7 +1434,7 @@ class ImageData(object):
                 raise KeyError(msg)
 
             instrument = h['INSTRUME']
-            filter = utils.get_hst_filter(h)
+            filter = utils.get_hst_filter(h, filter_only=True)
 
             if 'PUPIL' in h:
                 pupil = h['PUPIL']
