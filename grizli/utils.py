@@ -6023,19 +6023,21 @@ def fetch_config_files(ACS=False, get_sky=True, get_stars=True, get_epsf=True):
         # ePSF files for fitting point sources
         #psf_path = 'http://www.stsci.edu/hst/wfc3/analysis/PSF/psf_downloads/wfc3_ir/'
         #psf_path = 'https://www.stsci.edu/~jayander/STDPSFs/WFC3IR/'
+        #psf_root = 'PSFSTD'
         psf_path = 'https://www.stsci.edu/~jayander/HST1PASS/'
         psf_path += 'PSFs/STDPSFs/WFC3IR/'
+        psf_root = 'STDPSF'
         
         ir_psf_filters = ['F105W', 'F125W', 'F140W', 'F160W']
 
         # New PSFs
         ir_psf_filters += ['F110W', 'F127M']
 
-        files = ['{0}/PSFSTD_WFC3IR_{1}.fits'.format(psf_path, filt)
+        files = ['{0}/{1}_WFC3IR_{2}.fits'.format(psf_path, psf_root, filt)
                  for filt in ir_psf_filters]
 
         for url in files:
-            file = os.path.basename(url)
+            file = os.path.basename(url).replace('STDPSF', 'PSFSTD')
             if not os.path.exists(file):
                 print('Get {0}'.format(file))
                 os.system('curl -o {0} {1}'.format(file, url))
