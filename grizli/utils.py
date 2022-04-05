@@ -1051,7 +1051,7 @@ DIRECT_ORDER = {'G102': ['F105W', 'F110W', 'F098M', 'F125W', 'F140W', 'F160W', '
                 'G141': ['F140W', 'F160W', 'F125W', 'F105W', 'F110W', 'F098M', 'F127M', 'F139M', 'F153M', 'F132N', 'F130N', 'F128N', 'F126N', 'F164N', 'F167N'],
                 'G800L': ['F814W', 'F606W', 'F850LP', 'F775W', 'F435W', 'F105W', 'F110W', 'F098M', 'F125W', 'F140W', 'F160W', 'F127M', 'F139M', 'F153M', 'F132N', 'F130N', 'F128N', 'F126N', 'F164N', 'F167N'],
                 'GR150C': ['F115W', 'F150W', 'F200W'], 
-                'GR150R': ['F115W', 'F150W']}
+                'GR150R': ['F115W', 'F150W', 'F200W']}
 
 
 def parse_grism_associations(exposure_groups, info,
