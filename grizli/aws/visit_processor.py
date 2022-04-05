@@ -1302,7 +1302,9 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
                                      kernel=kernel, clean=clean_flt, 
                                      extra_wfc3ir_badpix=extra_wfc3ir_badpix)
                              
-        outsci, outwht, header, flist = _
+        outsci, outwht, header, flist, wcs_tab = _
+        
+        wcs_tab.write('{0}_wcs.csv'.format(visit['product']), overwrite=True)
         
         if is_optical:
             drz = 'drc'
@@ -1514,7 +1516,7 @@ def make_mosaic(jname='', ds9=None, skip_existing=True, ir_scale=0.1, half_optic
                                      pixfrac=pixfrac, 
                                      kernel=kernel, clean=False)
                              
-        outsci, outwht, header, flist = _
+        outsci, outwht, header, flist, wcs_tab = _
     
         pyfits.writeto(groups[f]['product']+'_drz_sci.fits',
                        data=outsci, header=header, 
