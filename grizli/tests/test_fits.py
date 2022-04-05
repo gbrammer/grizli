@@ -66,7 +66,8 @@ class FittingTools(unittest.TestCase):
         res = fitting.run_all_parallel(152, zr=[1.7, 1.8], verbose=True,
                                  root=data_path+'j033216m2743',
                                  args_file=data_path+'fit_args.npy', 
-                                 get_output_data=True)
+                                 get_output_data=True, 
+                                 protect=False)
         
         if len(res) > 3:
              assert(np.allclose(res[2].meta['z_map'][0], 1.7429, rtol=1.e-2))
