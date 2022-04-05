@@ -1338,7 +1338,7 @@ class GroupFLT():
 
 
 class MultiBeam(GroupFitter):
-    def __init__(self, beams, group_name=None, fcontam=0., psf=False, polyx=[0.3, 2.5], MW_EBV=0., min_mask=0.01, min_sens=0.08, sys_err=0.0, mask_resid=True, verbose=True, replace_direct=None, **kwargs):
+    def __init__(self, beams, group_name=None, fcontam=0., psf=False, polyx=[0.3, 2.5], MW_EBV=0., isJWST=False, min_mask=0.01, min_sens=0.08, sys_err=0.0, mask_resid=True, verbose=True, replace_direct=None, **kwargs):
         """Tools for dealing with multiple `~.model.BeamCutout` instances
 
         Parameters
@@ -1400,7 +1400,7 @@ class MultiBeam(GroupFitter):
         self.Asave = {}
 
         if isinstance(beams, str):
-            self.load_master_fits(beams, verbose=verbose)
+            self.load_master_fits(beams, isJWST=isJWST, verbose=verbose)
 
             # Auto-generate group_name from filename, e.g.,
             # j100140p0130_00237.beams.fits > j100140p0130
@@ -1412,9 +1412,9 @@ class MultiBeam(GroupFitter):
                 # `beams` is list of strings
                 if 'beams.fits' in beams[0]:
                     # Master beam files
-                    self.load_master_fits(beams[0], verbose=verbose)
+                    self.load_master_fits(beams[0], isJWST=isJWST, verbose=verbose)
                     for i in range(1, len(beams)):
-                        b_i = MultiBeam(beams[i], group_name=group_name, fcontam=fcontam, psf=psf, polyx=polyx, MW_EBV=np.maximum(MW_EBV, 0), sys_err=sys_err, verbose=verbose, min_mask=min_mask, min_sens=min_sens, mask_resid=mask_resid)
+                        b_i = MultiBeam(beams[i], group_name=group_name, isJWST=isJWST, fcontam=fcontam, psf=psf, polyx=polyx, MW_EBV=np.maximum(MW_EBV, 0), sys_err=sys_err, verbose=verbose, min_mask=min_mask, min_sens=min_sens, mask_resid=mask_resid)
                         self.extend(b_i)
 
                 else:
@@ -1731,7 +1731,7 @@ class MultiBeam(GroupFitter):
 
         hdu.writeto(outfile, overwrite=True)
 
-    def load_master_fits(self, beam_file, verbose=True):
+    def load_master_fits(self, beam_file, isJWST=False, verbose=True):
         """
         Load a "beams.fits" file.
         """
@@ -1767,7 +1767,7 @@ class MultiBeam(GroupFitter):
 
             beam = model.BeamCutout(fits_file=hducopy, min_mask=self.min_mask,
                                     min_sens=self.min_sens,
-                                    mask_resid=self.mask_resid)
+                                    mask_resid=self.mask_resid, isJWST=isJWST)
 
             self.beams.append(beam)
             if verbose:
@@ -3699,7 +3699,7 @@ class MultiBeam(GroupFitter):
 
         return chi2/self.DoF
 
-    def drizzle_grisms_and_PAs(self, size=10, fcontam=0, flambda=False, scale=1, pixfrac=0.5, kernel='square', usewcs=False, tfit=None, diff=True, grism_list=['G800L', 'G102', 'G141', 'F090W', 'F115W', 'F150W', 'F200W', 'F356W', 'F410M', 'F444W'], mask_segmentation=True, reset_model=True, make_figure=True, fig_args=dict(mask_segmentation=True, average_only=False, scale_size=1, cmap='viridis_r'), **kwargs):
+    def drizzle_grisms_and_PAs(self, size=10, fcontam=0, flambda=False, scale=1, pixfrac=0.5, kernel='square', usewcs=False, tfit=None, diff=True, grism_list=['G800L', 'G102', 'GR150C', 'GR150R', 'G141', 'F090W', 'F115W', 'F150W', 'F200W', 'F356W', 'F410M', 'F444W'], mask_segmentation=True, reset_model=True, make_figure=True, fig_args=dict(mask_segmentation=True, average_only=False, scale_size=1, cmap='viridis_r'), **kwargs):
         """Make figure showing spectra at different orients/grisms
 
         TBD
@@ -3723,8 +3723,6 @@ class MultiBeam(GroupFitter):
         NY += 1
 
         # keys = list(self.PA)
-        # keys.sort()
-
         keys = []
         for key in grism_list:
             if key in self.PA:
@@ -3993,7 +3991,7 @@ class MultiBeam(GroupFitter):
                                       fcontam=0, fill_wht=True, ds9=None,
                                       mask_segmentation=mask_segmentation)
 
-            kern = h_kern[1].data[:, h['CRPIX1']-1-size:h['CRPIX1']-1+size]
+            kern = h_kern[1].data[:, int(h['CRPIX1'])-1-size:int(h['CRPIX1'])-1+size]
             hdu_kern = pyfits.ImageHDU(data=kern, header=h_kern[1].header, name='KERNEL')
             hdu.append(hdu_kern)
 
