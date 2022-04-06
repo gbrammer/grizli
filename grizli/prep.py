@@ -22,9 +22,14 @@ import astropy.coordinates as coord
 from astropy.table import Table
 
 from . import jwst_utils
-import jwst
-from jwst.pipeline import Detector1Pipeline
 
+try:
+    import jwst
+    from jwst.pipeline import Detector1Pipeline
+except ImportError:
+    jwst = None
+    print('`import jwst` failed so JWST processing will not work!')
+    
 from . import utils
 from . import model
 from . import GRIZLI_PATH
