@@ -22,7 +22,8 @@ crds
 drizzlepac
 
 shapely
-descartes
+# descartes
+git+https://github.com/benjimin/descartes.git
 boto3
 peakutils
 extinction
