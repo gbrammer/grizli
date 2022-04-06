@@ -5376,7 +5376,13 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
         indices = indices[::skip]
 
     NTOTAL = len(indices)
-
+    
+    wcs_rows = []
+    wcs_colnames = None
+    wcs_keys = {}
+    
+    bpdata = 0
+    
     for i in indices:
 
         file = visit['files'][i]
@@ -5414,13 +5420,13 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
         if flt[0].header['DETECTOR'] == 'IR':
             bits = 576
             if extra_wfc3ir_badpix:
-                bpfile = os.path.join(os.path.dirname(__file__), 
+                if (i == indices[0]) | (not hasattr(bpdata, 'shape')):
+                    bpfile = os.path.join(os.path.dirname(__file__), 
                                'data/wfc3ir_badpix_spars200_22.03.31.fits.gz')
-                bpdata = pyfits.open(bpfile)[0].data
+                    bpdata = pyfits.open(bpfile)[0].data
+                    
                 msg = f'Use extra badpix in {bpfile}'
                 log_comment(LOGFILE, msg, verbose=True)
-            else:
-                bpdata = 0
         else:
             bits = 64+32
             bpdata = 0
@@ -5480,7 +5486,30 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
                 except KeyError:
                     print(f'Failed to initialize WCS on {file}[SCI,{ext}]')
                     continue
-
+                
+                wcsh = to_header(wcs_i)
+                row = [file, ext, keys['EXPTIME']]
+                
+                if wcs_colnames is None:
+                    wcs_colnames = ['file','ext','exptime']
+                    for k in wcsh:
+                        wcs_colnames.append(k.lower())
+                        wcs_keys[k.lower()] = wcsh[k]
+                        
+                for k in wcs_colnames[3:]:
+                    ku = k.upper()
+                    if ku not in wcsh:
+                        print(f'Keyword {ku} not found in WCS header')
+                        row.append(wcs_keys[k]*0)
+                    else:
+                        row.append(wcsh[ku])
+                        
+                for k in wcsh:
+                    if k.lower() not in wcs_colnames:
+                        print(f'Extra keyword {ku} found in WCS header')
+                
+                wcs_rows.append(row)
+                
                 sci_list.append((flt[('SCI', ext)].data - sky)*phot_scale)
 
                 err = flt[('ERR', ext)].data*phot_scale
@@ -5550,15 +5579,18 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
 
     flist = ['{0}/{1}'.format(awspath, visit['files'][i])
                 for i in indices]
-
+    
     if dryrun:
         return flist
 
     elif count == 0:
         return None
-    else:
+
+    else:        
+        wcs_tab = GTable(names=wcs_colnames, rows=wcs_rows)
+        
         outwht *= (wcs_i.pscale/outputwcs.pscale)**4
-        return outsci, outwht, header, flist
+        return outsci, outwht, header, flist, wcs_tab
 
 
 def drizzle_array_groups(sci_list, wht_list, wcs_list, outputwcs=None,
@@ -6135,17 +6167,22 @@ def fetch_config_files(ACS=False, get_sky=True, get_stars=True, get_epsf=True):
     if get_epsf:
         # ePSF files for fitting point sources
         #psf_path = 'http://www.stsci.edu/hst/wfc3/analysis/PSF/psf_downloads/wfc3_ir/'
-        psf_path = 'https://www.stsci.edu/~jayander/STDPSFs/WFC3IR/'
+        #psf_path = 'https://www.stsci.edu/~jayander/STDPSFs/WFC3IR/'
+        #psf_root = 'PSFSTD'
+        psf_path = 'https://www.stsci.edu/~jayander/HST1PASS/'
+        psf_path += 'PSFs/STDPSFs/WFC3IR/'
+        psf_root = 'STDPSF'
+        
         ir_psf_filters = ['F105W', 'F125W', 'F140W', 'F160W']
 
         # New PSFs
         ir_psf_filters += ['F110W', 'F127M']
 
-        files = ['{0}/PSFSTD_WFC3IR_{1}.fits'.format(psf_path, filt)
+        files = ['{0}/{1}_WFC3IR_{2}.fits'.format(psf_path, psf_root, filt)
                  for filt in ir_psf_filters]
 
         for url in files:
-            file = os.path.basename(url)
+            file = os.path.basename(url).replace('STDPSF', 'PSFSTD')
             if not os.path.exists(file):
                 print('Get {0}'.format(file))
                 os.system('curl -o {0} {1}'.format(file, url))
