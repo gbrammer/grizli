@@ -1434,7 +1434,7 @@ class ImageData(object):
                 raise KeyError(msg)
 
             instrument = h['INSTRUME']
-            if instrument == 'NIRISS':
+            if instrument in ['NIRISS']:
                 filter = h['FILTER']
             else:
                 filter = utils.get_hst_filter(h, filter_only=True)
@@ -2180,8 +2180,8 @@ class ImageData(object):
                               header=slice_header, wcs=slice_wcs,
                               photflam=self.photflam, photplam=self.photplam,
                               origin=slice_origin, instrument=self.instrument,
-                              filter=self.filter, pupil=self.pupil, 
-                              process_jwst_header=False)
+                              filter=self.filter,  pupil=self.pupil, 
+                              process_jwst_header=False) 
 
         slice_obj.ref_photflam = self.ref_photflam
         slice_obj.ref_photplam = self.ref_photplam
@@ -2507,6 +2507,7 @@ class GrismFLT(object):
         self.model = np.zeros_like(self.direct.data['SCI'])
 
         # Grism configuration
+        
         if self.grism.instrument in ['NIRCAM', 'NIRISS']:
             direct_filter = self.grism.pupil
         elif 'DFILTER' in self.grism.header:
@@ -2851,6 +2852,7 @@ class GrismFLT(object):
 
         # debug
         # x=None; y=None; size=10; mag=-1; spectrum_1d=None; compute_size=True; store=False; in_place=False; add=True; get_beams=['A']; verbose=True
+        
         if id in self.object_dispersers:
             object_in_model = True
             beams = self.object_dispersers[id]
@@ -2872,6 +2874,7 @@ class GrismFLT(object):
             ext = 'SCI'
         else:
             ext = 'REF'
+
 
         # set up the beams to extract
         if get_beams is None:
@@ -3882,7 +3885,7 @@ class BeamCutout(object):
         # self.min_sens = min_sens
         # self.mask_resid = mask_resid
 
-        self._parse_from_data(isJWST=False, **self._parse_params)
+        self._parse_from_data(isJWST=isJWST, **self._parse_params)
 
     def _parse_from_data(self, contam_sn_mask=[10, 3], min_mask=0.01,
                          seg_ids=None, min_sens=0.08, mask_resid=True, isJWST=False):
@@ -4006,13 +4009,12 @@ class BeamCutout(object):
         self.id = beam.id
         if conf is None:
             conf = grismconf.load_grism_config(flt.conf_file)
-
         self.beam = GrismDisperser(id=beam.id, direct=beam.direct*1,
                            segmentation=beam.seg*1, origin=beam.origin,
                            pad=beam.pad, grow=beam.grow,
                            beam=beam.beam, conf=conf, xcenter=beam.xcenter,
                            ycenter=beam.ycenter, fwcpos=flt.grism.fwcpos,
-                           MW_EBV=flt.grism.MW_EBV)
+                           MW_EBV=flt.grism.MW_EBV) #
 
         if hasattr(beam, 'psf_params'):
             self.beam.x_init_epsf(psf_params=beam.psf_params, psf_filter=beam.psf_filter, yoff=beam.psf_yoff)
@@ -4087,6 +4089,7 @@ class BeamCutout(object):
             direct_filter = self.direct.filter
 
         if conf is None:
+            
             conf_args = dict(instrume=self.grism.instrument, 
                              filter=direct_filter, 
                              grism=self.grism.filter,
@@ -4210,6 +4213,7 @@ class BeamCutout(object):
 
         h0['MW_EBV'] = (self.grism.MW_EBV,
                          'Milky Way exctinction E(B-V)')
+
 
         hdu = pyfits.HDUList([pyfits.PrimaryHDU(header=h0)])
         hdu.extend(self.direct.get_HDUList(extver=1))
