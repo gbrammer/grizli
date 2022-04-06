@@ -1397,17 +1397,10 @@ def parse_visits(field_root='', RAW_PATH='../RAW', use_visit=True, combine_same_
                       'files': files, 'footprint': fp}
 
             visits.append(direct)
-<<<<<<< HEAD
-        
-        all_groups = utils.parse_grism_associations(visits, info, isJWST=isJWST)
-        np.save('{0}_visits.npy'.format(field_root), 
-                [visits, all_groups, info])
-=======
 
         all_groups = utils.parse_grism_associations(visits, info, isJWST-isJWST)
 
         write_visit_info(visits, all_groups, info, root=field_root, path='./')
->>>>>>> dc2e9c9ffcb22f4428de4460342a4fde94ffeeff
                 
         return visits, all_groups, info
 
