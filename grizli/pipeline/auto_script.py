@@ -473,7 +473,7 @@ def go(root='j010311+131615',
 
     auto_script.preprocess(field_root=root, HOME_PATH=PATHS['home'], 
                            PERSIST_PATH=PATHS['persist'],
-                           visit_prep_args=visit_prep_args, 
+                           visit_prep_args=visit_prep_args, isJWST=isJWST,
                            persistence_args=persistence_args, 
                            **preprocess_args)
 
@@ -1397,18 +1397,25 @@ def parse_visits(field_root='', RAW_PATH='../RAW', use_visit=True, combine_same_
                       'files': files, 'footprint': fp}
 
             visits.append(direct)
+<<<<<<< HEAD
+        
+        all_groups = utils.parse_grism_associations(visits, info, isJWST=isJWST)
+        np.save('{0}_visits.npy'.format(field_root), 
+                [visits, all_groups, info])
+=======
 
         all_groups = utils.parse_grism_associations(visits, info)
 
         write_visit_info(visits, all_groups, info, root=field_root, path='./')
+>>>>>>> dc2e9c9ffcb22f4428de4460342a4fde94ffeeff
                 
         return visits, all_groups, info
 
     visits, filters = utils.parse_flt_files(info=info, 
-                                  uniquename=True, get_footprint=True, 
+                                  uniquename=True, get_footprint=True, isJWST=isJWST, 
                                   use_visit=use_visit, max_dt=max_dt, 
                                   visit_split_shift=visit_split_shift)
-    print(visits, filters)
+    
 
     # Don't run combine_minexp if have grism exposures
     grisms = ['G141', 'G102', 'G800L', 'G280', 'GR150C', 'GR150R']
@@ -1483,8 +1490,7 @@ def parse_visits(field_root='', RAW_PATH='../RAW', use_visit=True, combine_same_
         print('** Combine Singles: **')
         for i, visit in enumerate(visits):
             print('{0} {1} {2}'.format(i, visit['product'], len(visit['files'])))
-
-    all_groups = utils.parse_grism_associations(visits, info)
+    all_groups = utils.parse_grism_associations(visits, info, isJWST=isJWST)
     print('\n == Grism groups ==\n')
     valid_groups = []
     for g in all_groups:
@@ -1663,7 +1669,7 @@ def clean_prep(field_root='j142724+334246'):
     #     utils.fix_flt_nan(flt_file, verbose=True)
 
 
-def preprocess(field_root='j142724+334246',  HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', PERSIST_PATH=None, min_overlap=0.2, make_combined=True, catalogs=['PS1', 'DES', 'NSC', 'SDSS', 'GAIA', 'WISE'], use_visit=True, master_radec=None, parent_radec=None, use_first_radec=False, skip_imaging=False, clean=True, skip_single_optical_visits=True, visit_prep_args=args['visit_prep_args'], persistence_args=args['persistence_args']):
+def preprocess(field_root='j142724+334246',  HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', PERSIST_PATH=None, min_overlap=0.2, make_combined=True, isJWST=False, catalogs=['PS1', 'DES', 'NSC', 'SDSS', 'GAIA', 'WISE'], use_visit=True, master_radec=None, parent_radec=None, use_first_radec=False, skip_imaging=False, clean=True, skip_single_optical_visits=True, visit_prep_args=args['visit_prep_args'], persistence_args=args['persistence_args']):
     """
     master_radec: force use this radec file
 
@@ -1904,14 +1910,15 @@ def preprocess(field_root='j142724+334246',  HOME_PATH='/Volumes/Pegasus/Grizli/
         clean_prep(field_root=field_root)
     # Rename instrument back to JWST stuff
     # add an if statement later for this
-    for file in direct['files']:
-        hdu = pyfits.open(file, mode='update')
-        hdu[0].header['INSTRUME'] = 'NIRISS'
-        hdu.flush()
-    for file in grism['files']:
-        hdu = pyfits.open(file, mode='update')
-        hdu[0].header['INSTRUME'] = 'NIRISS'
-        hdu.flush()
+    if isJWST:
+        for file in direct['files']:
+            hdu = pyfits.open(file, mode='update')
+            hdu[0].header['INSTRUME'] = 'NIRISS'
+            hdu.flush()
+        for file in grism['files']:
+            hdu = pyfits.open(file, mode='update')
+            hdu[0].header['INSTRUME'] = 'NIRISS'
+            hdu.flush()
 
 
     ###################################
@@ -2574,7 +2581,6 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
         else:
             ref_file = force_ref
 
-        print(list(info['FILE'][gr150cf115w]))
         grp_i = multifit.GroupFLT(grism_files=list(info['FILE'][gr150cf115w]), direct_files=[], ref_file=ref_file, seg_file=seg_file, catalog=catalog, cpu_count=-1, sci_extn=1, pad=pad)
         # if g141.sum() > 0:
         #    grp.extend(grp_i)
@@ -2993,7 +2999,7 @@ def refine_model_with_fits(field_root='j142724+334246', grp=None, master_files=N
     del(grp)
 
 
-def extract(field_root='j142724+334246', maglim=[13, 24], prior=None, MW_EBV=0.00, ids=[], pline=DITHERED_PLINE, fit_only_beams=True, run_fit=True, poly_order=7, oned_R=30, master_files=None, grp=None, bad_pa_threshold=None, fit_trace_shift=False, size=32, diff=True, min_sens=0.02, fcontam=0.2, min_mask=0.01, sys_err=0.03, skip_complete=True, fit_args={}, args_file='fit_args.npy', get_only_beams=False):
+def extract(field_root='j142724+334246', maglim=[13, 24], prior=None, MW_EBV=0.00, ids=[], pline=DITHERED_PLINE, fit_only_beams=True, run_fit=True, isJWST=False, poly_order=7, oned_R=30, master_files=None, grp=None, bad_pa_threshold=None, fit_trace_shift=False, size=32, diff=True, min_sens=0.02, fcontam=0.2, min_mask=0.01, sys_err=0.03, skip_complete=True, fit_args={}, args_file='fit_args.npy', get_only_beams=False):
     import glob
     import os
 
@@ -3104,7 +3110,7 @@ def extract(field_root='j142724+334246', maglim=[13, 24], prior=None, MW_EBV=0.0
 
         #mb = multifit.MultiBeam(beams, fcontam=fcontam, group_name=target, psf=False, MW_EBV=MW_EBV, min_sens=min_sens)
 
-        mb = multifit.MultiBeam(beams, fcontam=fcontam, group_name=target, psf=False, MW_EBV=MW_EBV, sys_err=sys_err, min_mask=min_mask, min_sens=min_sens)
+        mb = multifit.MultiBeam(beams, fcontam=fcontam, group_name=target, psf=False, isJWST=isJWST, MW_EBV=MW_EBV, sys_err=sys_err, min_mask=min_mask, min_sens=min_sens)
 
         if bad_pa_threshold is not None:
             out = mb.check_for_bad_PAs(chi2_threshold=bad_pa_threshold,

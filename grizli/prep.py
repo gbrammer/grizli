@@ -171,7 +171,7 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
         flat_dq = (flat < 0.2)
 
         #orig_file['DQ'].data |= 4*flat_dq
-        orig_file['SCI'].data = np.divide(orig_file['SCI'].data, flat, where=flat!=0)
+        orig_file['SCI'].data = np.divide(orig_file['SCI'].data,flat,orig_file['SCI'].data,where=(flat!=0))
 
     
     if filter in ['G102', 'G141']:
@@ -3268,7 +3268,6 @@ def process_direct_grism_visit(direct={},
         bits = drizzle_params['bits']
         drizzle_params.pop('bits')
 
-    print('bits info: ' + str(bits))
 
 
     # for jwst images, change header info
@@ -3388,16 +3387,12 @@ def process_direct_grism_visit(direct={},
                             use_self_catalog=use_self_catalog)
 
             if ref_catalog == 'VISIT':
-                #align_mag_limits = [-30,-28,0.05] # change me
                 align_mag_limits = [16, 23, 0.05]
             elif ref_catalog == 'SDSS':
-                #align_mag_limits = [-30,-28,0.05]# change me
                 align_mag_limits = [16, 21, 0.05]
             elif ref_catalog == 'PS1':
-                #align_mag_limits = [-30,-28,0.05]# change me
                 align_mag_limits = [16, 23, 0.05]
             elif ref_catalog == 'WISE':
-                #align_mag_limits = [-30,-28,0.05]# change me
                 align_mag_limits = [15, 20, 0.05]
         else:
             ref_catalog = 'USER'
@@ -3647,7 +3642,7 @@ def process_direct_grism_visit(direct={},
             table_to_radec(cat[clip][so], '{0}.cat.radec'.format(direct['product']))
 
         if (fix_stars) & (not isACS) & (not isWFPC2):
-            fix_star_centers(root=direct['product'], drizzle=False, 
+            fix_star_centers(root=direct['product'], drizzle=False, isJWST=isJWST, 
                              mag_lim=-29)#19.5) #changeme
 
     #################
@@ -3727,6 +3722,7 @@ def process_direct_grism_visit(direct={},
 
     # Add direct filter to grism FLT headers
     set_grism_dfilter(direct, grism)
+
 
     return True
 
@@ -4569,7 +4565,10 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
     # Figure out which grism
     im = pyfits.open(grism['files'][0])
     grism_element = utils.get_hst_filter(im[0].header)
-    pupil = im[0].header['PUPIL']
+    if isJWST:
+        pupil = im[0].header['PUPIL']
+    else:
+        pupil = ''
 
     flat = 1.
     if grism_element == 'G141':
@@ -4589,37 +4588,37 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
         flat = 1.
 
     elif (grism_element == 'GR150C') & (pupil == 'F115W'):
-        bg_fixed = ['jwst_niriss_wfssbkg_0002_corrflat.fits'] # bg_fixed should be normalized background with flat divided out
+        bg_fixed = ['jwst_niriss_wfssbkg_0002.fits'] # bg_fixed should be normalized background with flat divided out
         bg_vary = [] 
         isACS = False
         flat = 1.
     
     elif (grism_element == 'GR150C') & (pupil == 'F150W'):
-        bg_fixed = ['jwst_niriss_wfssbkg_0009_corrflat.fits'] 
+        bg_fixed = ['jwst_niriss_wfssbkg_0009.fits'] 
         bg_vary = [] 
         isACS = False
         flat = 1.
 
     elif (grism_element == 'GR150C') & (pupil == 'F200W'):
-        bg_fixed = ['jwst_niriss_wfssbkg_0012_corrflat.fits']
+        bg_fixed = ['jwst_niriss_wfssbkg_0012.fits']
         bg_vary = [] 
         isACS = False
         flat = 1.
 
     elif (grism_element == 'GR150R') & (pupil == 'F115W'):
-        bg_fixed = ['jwst_niriss_wfssbkg_0004_corrflat.fits'] 
+        bg_fixed = ['jwst_niriss_wfssbkg_0004.fits'] 
         bg_vary = [] 
         isACS = False
         flat = 1.
 
     elif (grism_element == 'GR150R') & (pupil == 'F150W'):
-        bg_fixed = ['jwst_niriss_wfssbkg_0003_corrflat.fits'] 
+        bg_fixed = ['jwst_niriss_wfssbkg_0003.fits'] 
         bg_vary = [] 
         isACS = False
         flat = 1.
 
     elif (grism_element == 'GR150R') & (pupil == 'F200W'):
-        bg_fixed = ['jwst_niriss_wfssbkg_0012_corrflat.fits']
+        bg_fixed = ['jwst_niriss_wfssbkg_0012.fits']
         bg_vary = [] 
         isACS = False
         flat = 1.
@@ -4647,21 +4646,28 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
     data_fixed = []
     for file in bg_fixed:
         im = pyfits.open('{0}/CONF/{1}'.format(GRIZLI_PATH, file))
-        sh = im[1].data.shape
-        data = im[1].data.flatten()/flat
+        if isJWST:
+            sh = im[1].data.shape
+            data = im[1].data.flatten()/flat
+        else:
+            sh = im[0].data.shape
+            data = im[0].data.flatten()/flat
         data_fixed.append(data)
 
     data_vary = []
     for file in bg_vary:
         im = pyfits.open('{0}/CONF/{1}'.format(GRIZLI_PATH, file))
-        data_vary.append(im[1].data.flatten()*1)
-        sh = im[1].data.shape
+        if isJWST:
+            data_vary.append(im[1].data.flatten()*1)
+            sh = im[1].data.shape
+        else:
+            data_vary.append(im[0].data.flatten()*1)
+            sh = im[0].data.shape
 
     yp, xp = np.indices(sh)
 
     # Hard-coded (1014,1014) WFC3/IR images (changed to 2048, 2048 for jwst)
     Npix = sh[0]*sh[1]
-    print(Npix)
     Nexp = len(grism['files'])
     Nfix = len(data_fixed)
     Nvary = len(data_vary)
@@ -4814,7 +4820,10 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
     fig = plt.figure(figsize=[6., 6.])
     ax = fig.add_subplot(111)
 
-    im_shape = (2048, 2048)# (1014, 1014)
+    if isJWST:
+        im_shape = (2048, 2048)
+    else:
+        im_shape = (1014, 1014)
 
     for j in range(Nexp):
 
@@ -4925,7 +4934,10 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
 
         if apply:
             # Subtract the column average in 2D & log header keywords
-            gp_res = np.dot(y_pred[:, None]-bg_sky, np.ones((2048, 1)).T).T # changed from 1014
+            if isJWST:
+                gp_res = np.dot(y_pred[:, None]-bg_sky, np.ones((2048, 1)).T).T # changed from 1014
+            else:
+                gp_res = np.dot(y_pred[:, None]-bg_sky, np.ones((1014, 1)).T).T 
             print(file)
             flt = pyfits.open(file, mode='update')
             flt['SCI', 1].data -= gp_res
@@ -4960,7 +4972,7 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
 
 
 def fix_star_centers(root='macs1149.6+2223-rot-ca5-22-032.0-f105w',
-                     mag_lim=22, verbose=True, drizzle=False,
+                     mag_lim=22, verbose=True, isJWST=False, drizzle=False,
                      cutout_size=16):
     """Unset the CR bit (4096) in the centers of bright objects
 
@@ -5008,8 +5020,10 @@ def fix_star_centers(root='macs1149.6+2223-rot-ca5-22-032.0-f105w',
         #     flt = pyfits.open('../RAW/'+sci[0].header['D{0:03d}DATA'.format(i+1)].split('[')[0], mode='update')
         wcs.append(pywcs.WCS(flt[1], relax=True))
         images.append(flt)
-
-    yp, xp = np.indices((2048, 2048))#(1014, 1014))
+    if isJWST:
+        yp, xp = np.indices((2048, 2048))#(1014, 1014))
+    else:
+        yp, xp = np.indices((1014, 1014))
     use = cat['MAG_AUTO'] < mag_lim
     so = np.argsort(cat['MAG_AUTO'][use])
 
