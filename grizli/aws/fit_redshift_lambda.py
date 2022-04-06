@@ -15,7 +15,7 @@ def fit_lambda(root='j100025+021706', beams=[], ids=[], newfunc=False, bucket_na
         beams, files = get_needed_paths(root, bucket_name=bucket_name, skip_existing=skip_existing)
     elif len(ids) > 0:
         # ids key takes precedence over beams
-        beams = ['Pipeline/{0}/Extractions/{0}_{1:05d}.beams.fits'.format(root, int(id)) for id in ids]
+        beams = ['HST/Pipeline/{0}/Extractions/{0}_{1:05d}.beams.fits'.format(root, int(id)) for id in ids]
         if sleep == 1:
             sleep = False
     else:
@@ -123,7 +123,7 @@ def fit_lambda(root='j100025+021706', beams=[], ids=[], newfunc=False, bucket_na
             beams, full, logs, start = get_needed_paths(root, bucket_name=bucket_name, skip_existing=True, get_lists=True)
 
 
-BASE_EVENT = {'bucket': 'grizli-v1', 'skip_started': True, 'quasar_fit': False, 'zr': '0.01,3.2', 'force_args': True}
+BASE_EVENT = {'bucket': 'grizli-v2', 'skip_started': True, 'quasar_fit': False, 'zr': '0.01,3.2', 'force_args': True}
 
 
 def generate_events(roots, ids, base=BASE_EVENT, send_to_lambda=False):
@@ -133,7 +133,7 @@ def generate_events(roots, ids, base=BASE_EVENT, send_to_lambda=False):
     events = []
     for root, id in zip(roots, ids):
         event = base.copy()
-        event['s3_object_path'] = 'Pipeline/{0}/Extractions/{0}_{1:05d}.beams.fits'.format(root, id)
+        event['s3_object_path'] = 'HST/Pipeline/{0}/Extractions/{0}_{1:05d}.beams.fits'.format(root, id)
         events.append(event)
 
     if send_to_lambda:
@@ -154,9 +154,11 @@ def get_lambda_client(region_name='us-east-1'):
     return client
 
 
-def send_event_lambda(event, verbose=True, client=None, func='GrizliLambda2020'):
+def send_event_lambda(event, verbose=True, client=None, func='grizli-redshift-fit'):
     """
     Send a single event to AWS lambda
+    
+    GrizliLambda2020
     """
     import time
     import os
@@ -192,7 +194,7 @@ def get_needed_paths(root, get_string=False, bucket_name='aws-grivam', skip_exis
     s3_client = boto3.client('s3')
     bkt = s3.Bucket(bucket_name)
 
-    files = [obj.key for obj in bkt.objects.filter(Prefix='Pipeline/{0}/Extractions/'.format(root))]
+    files = [obj.key for obj in bkt.objects.filter(Prefix='HST/Pipeline/{0}/Extractions/'.format(root))]
 
     beams = []
     logs = []
@@ -284,7 +286,7 @@ if __name__ == "__main__":
 
             # List of ids associated with {root}
             elif keypair[0] == 'ids':
-                kwargs['beams'] = ['Pipeline/{0}/Extractions/{0}_{1:05d}.beams.fits'.format(root, int(id)) for id in keypair[1].split(',')]
+                kwargs['beams'] = ['HST/Pipeline/{0}/Extractions/{0}_{1:05d}.beams.fits'.format(root, int(id)) for id in keypair[1].split(',')]
 
             # don't run the script
             elif keypair[0] == 'dryrun':

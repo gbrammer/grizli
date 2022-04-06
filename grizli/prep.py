@@ -750,6 +750,7 @@ def align_drizzled_image(root='',
                          triangle_ba_max=0.9,
                          max_err_percentile=99,
                          catalog_mask_pad=0.05,
+                         min_flux_radius=1.,
                          match_catalog_density=None,
                          assume_close=False,
                          ref_border=100):
@@ -906,7 +907,7 @@ def align_drizzled_image(root='',
     # Edge and error mask
     ok &= utils.catalog_mask(cat, max_err_percentile=max_err_percentile,
                              pad=catalog_mask_pad, pad_is_absolute=False, 
-                             min_flux_radius=1.)
+                             min_flux_radius=min_flux_radius)
 
     if max_err_percentile >= 200:
         med_err = np.median(cat['FLUXERR_APER_0'][ok])
@@ -1402,7 +1403,7 @@ def make_SEP_catalog(root='',
                      include_wcs_extension=True,
                      source_xy=None, 
                      compute_auto_quantities=True,
-                     autoparams=[2.5, 0.35*u.arcsec, 3.5],
+                     autoparams=[2.5, 0.35*u.arcsec, 2.4, 3.8],
                      flux_radii=[0.2, 0.5, 0.9],
                      subpix=0,
                      mask_kron=False,
@@ -2124,7 +2125,7 @@ def get_seg_iso_flux(data, seg, tab, err=None, fill=None, verbose=0):
         return iso_flux, iso_err, iso_area
 
 
-def compute_SEP_auto_params(data, data_bkg, mask, pixel_scale=0.06, err=None, segmap=None, tab=None, autoparams=[2.5, 0.35*u.arcsec, 0, 5], flux_radii=[0.2, 0.5, 0.9], subpix=0, verbose=True):
+def compute_SEP_auto_params(data, data_bkg, mask, pixel_scale=0.06, err=None, segmap=None, tab=None, grow_kron=6.0, autoparams=[2.5, 0.35*u.arcsec, 2.4, 3.8], flux_radii=[0.2, 0.5, 0.9], subpix=0, verbose=True):
     """Compute SourceExtractor-like AUTO params with `sep`
     https://sep.readthedocs.io/en/v1.0.x/apertures.html#equivalent-of-flux-auto-e-g-mag-auto-in-source-extractor
     
@@ -2151,6 +2152,11 @@ def compute_SEP_auto_params(data, data_bkg, mask, pixel_scale=0.06, err=None, se
     tab : `~astropy.table.Table`
         Table from, e.g., `sep.extract`.
     
+    grow_kron : float
+        Scale by which semimajor and semiminor axes are multiplied for 
+        calculating the Kron moment.  This is hard-coded as `grow_kron=6.0`
+        in `SourceExtractor <https://sextractor.readthedocs.io/en/latest/Photom.html>`_.
+        
     autoparams : list
         Provided as ``[k, MIN_APER, MIN_KRON, MAX_KRON]``, where the usual
         SourceExtractor ``PHOT_AUTOPARAMS`` would be ``[k, MIN_KRON]``. Here,
@@ -2227,7 +2233,7 @@ def compute_SEP_auto_params(data, data_bkg, mask, pixel_scale=0.06, err=None, se
     try:
         # Try with seg mask (sep > v1.0.4)
         kronrad, krflag = sep.kron_radius(data_bkg, x, y, a, b, theta,
-                                          6.0, mask=mask,
+                                          grow_kron, mask=mask,
                                           segmap=segb, seg_id=seg_id)
         kronrad[~np.isfinite(kronrad)] = 0
     except:
@@ -2235,7 +2241,7 @@ def compute_SEP_auto_params(data, data_bkg, mask, pixel_scale=0.06, err=None, se
         utils.log_comment(utils.LOGFILE, logstr, verbose=True)
 
         kronrad, krflag = sep.kron_radius(data_bkg, x, y, a, b, theta,
-                                          6.0, mask=mask)
+                                          grow_kron, mask=mask)
 
     # This is like SExtractor PHOT_AUTOPARAMS[0]
     kronrad *= autoparams[0]
@@ -2330,11 +2336,11 @@ def compute_SEP_auto_params(data, data_bkg, mask, pixel_scale=0.06, err=None, se
     #############
     # Flux radius
     try:
-        fr, fr_flag = sep.flux_radius(data_bkg, x, y, a*6, flux_radii,
+        fr, fr_flag = sep.flux_radius(data_bkg, x, y, a*grow_kron, flux_radii,
                                   normflux=kron_flux, mask=mask,
                                   segmap=segb, seg_id=seg_id)
     except:
-        fr, fr_flag = sep.flux_radius(data_bkg, x, y, a*6, flux_radii,
+        fr, fr_flag = sep.flux_radius(data_bkg, x, y, a*grow_kron, flux_radii,
                                   normflux=kron_flux, mask=mask)
 
     auto = utils.GTable()
@@ -2683,7 +2689,8 @@ def blot_background(visit={'product': '', 'files': None},
     drz_wcs.pscale = utils.get_wcs_pscale(drz_wcs)
 
     # Get SEP background
-    bkg_data = make_SEP_catalog(root=visit['product'], bkg_only=True, bkg_params=bkg_params, verbose=False)
+    bkg_data = make_SEP_catalog(root=visit['product'], bkg_only=True, 
+                                bkg_params=bkg_params, verbose=False)
     if get_median:
         mask = drz_im[0].data != 0
         bkg_data = bkg_data*0.+np.median(np.median(bkg_data[mask]))
@@ -2708,11 +2715,6 @@ def blot_background(visit={'product': '', 'files': None},
             flt_wcs = pywcs.WCS(flt['SCI', ext].header, fobj=flt, relax=True)
             flt_wcs.pscale = utils.get_wcs_pscale(flt_wcs)
 
-            # if False:
-            #     # Compare drizzlepac blot
-            #     from drizzlepac.astrodrizzle import ablot
-            #     abl = ablot.do_blot(bkg_data.astype(np.float32), drz_wcs, flt_wcs, 1., coeffs=True, interp='poly5', sinscl=1.0, stepsize=stepsize, wcsmap=None)
-
             blotted = utils.blot_nearest_exact(bkg_data.astype(np.float32),
                                                drz_wcs, flt_wcs,
                                                stepsize=stepsize,
@@ -2726,23 +2728,212 @@ def blot_background(visit={'product': '', 'files': None},
             else:
                 tscale = 1.
 
-            # blotted = astrodrizzle.ablot.do_blot(bkg_data.astype(np.float32),
-            #                 drz_wcs,
-            #                 flt_wcs, 1, coeffs=True, interp='nearest',
-            #                 sinscl=1.0, stepsize=10, wcsmap=None)
-
             flt['SCI', ext].data -= blotted*tscale
-            flt['SCI', ext].header['BLOTSKY'] = (True, 'Sky blotted from SKYIMAGE')
-            flt['SCI', ext].header['SKYIMAGE'] = (drz_file, 'Source image for sky')
-            # bkg_params={'bw':64, 'bh':64, 'fw':3, 'fh':3, 'pixel_scale':0.06}
-            flt['SCI', ext].header['SKYBW'] = (bkg_params['bw'], 'Sky bkg_params')
-            flt['SCI', ext].header['SKYBH'] = (bkg_params['bh'], 'Sky bkg_params')
-            flt['SCI', ext].header['SKYFW'] = (bkg_params['fw'], 'Sky bkg_params')
-            flt['SCI', ext].header['SKYFH'] = (bkg_params['fh'], 'Sky bkg_params')
-            flt['SCI', ext].header['SKYPIX'] = (bkg_params['pixel_scale'], 'Sky bkg_params, pixel_scale')
+            flt['SCI', ext].header['BLOTSKY'] = (True,
+                                                 'Sky blotted from SKYIMAGE')
+            flt['SCI', ext].header['SKYIMAGE'] = (drz_file,
+                                                  'Source image for sky')
+            flt['SCI', ext].header['SKYBW'] = (bkg_params['bw'], 
+                                               'Sky bkg_params')
+            flt['SCI', ext].header['SKYBH'] = (bkg_params['bh'],
+                                               'Sky bkg_params')
+            flt['SCI', ext].header['SKYFW'] = (bkg_params['fw'],
+                                               'Sky bkg_params')
+            flt['SCI', ext].header['SKYFH'] = (bkg_params['fh'],
+                                               'Sky bkg_params')
+            flt['SCI', ext].header['SKYPIX'] = (bkg_params['pixel_scale'], 
+                                                'Sky bkg_params, pixel_scale')
 
         flt.flush()
 
+    return True
+
+
+def separate_chip_sky(visit, filters=['F200LP','F350LP','F600LP','F390W'], stepsize=10, statistic=np.nanmedian, by_amp=True, only_flc=True, row_average=True, average_order=11, seg_dilate=16, **kwargs):
+    """
+    Get separate background values for each chip.  Updates 'CHIPSKY' header
+    keyword for each SCI extension of the visit exposure files.
+    
+    Parameters
+    ----------
+    visit : dict
+        List of visit information from `~grizli.utils.parse_flt_files`.
+    
+    filters : list
+        Only run if the exposures in `visit['files']` use a filter in this
+        list, e.g., less-common WFC3/UVIS filters
+    
+    stepsize : int
+        Parameter for blot
+    
+    statistic : func
+        Test statistic on (masked) image data from each extension
+    
+    by_amp : bool
+        Compute stats by amp (half-chip) subregions (*not implemented*)
+    
+    only_flc : True
+        Only run if `visit['files'][0]` has "flc" extension
+    
+    Returns
+    -------
+    status : bool
+        Runtime status, True if executed 
+        
+    """
+    frame = inspect.currentframe()
+    utils.log_function_arguments(utils.LOGFILE, frame,
+                                 'prep.separate_chip_sky')
+
+    import astropy.io.fits as pyfits
+    import astropy.wcs as pywcs
+    from drizzlepac import astrodrizzle
+    import scipy.ndimage as nd
+    
+    if ('flc' not in visit['files'][0]) & only_flc:
+        return False
+    
+    flt = pyfits.open(visit['files'][0])
+    filt_i = utils.get_hst_filter(flt[0].header)
+    if filt_i not in filters:
+        logstr = f'# separate_chip_sky: {filt_i} not in {filters} for '
+        logstr += "'{0}'".format(visit['product'])
+        utils.log_comment(utils.LOGFILE, logstr, verbose=True)
+        return False
+    
+    seg_files = glob.glob('{0}_seg.fits*'.format(visit['product']))
+
+    if len(seg_files) == 0:
+        logstr = '# separate_chip_sky: No segimage found {0}_seg.fits'
+        logstr = logstr.format(visit['product'])
+        utils.log_comment(utils.LOGFILE, logstr, verbose=True)
+
+    seg_file = seg_files[0]
+    seg_im = pyfits.open(seg_file)
+    seg_mask = nd.binary_dilation(seg_im[0].data > 0, iterations=seg_dilate)*1
+    
+    seg_wcs = pywcs.WCS(seg_im[0].header)
+    seg_wcs.pscale = utils.get_wcs_pscale(seg_wcs)
+    
+    if row_average:
+        row_num = {}
+        row_den = {}
+        make_fig = True
+        if make_fig:
+            fig, axes = plt.subplots(2,1,figsize=(8,8))
+        
+    for file in visit['files']:
+        flt = pyfits.open(file, mode='update')
+
+        for ext in range(1, 5):
+            if ('SCI', ext) not in flt:
+                continue
+
+            flt_wcs = pywcs.WCS(flt['SCI', ext].header, fobj=flt, relax=True)
+            flt_wcs.pscale = utils.get_wcs_pscale(flt_wcs)
+
+            blotted = utils.blot_nearest_exact(seg_mask,
+                                               seg_wcs, flt_wcs,
+                                               stepsize=stepsize,
+                                               scale_by_pixel_area=False)    
+            
+            nonzero = flt['SCI',ext].data != 0
+            ok = (flt['DQ',ext].data == 0) & (blotted <= 0)
+            ok &= nonzero
+            
+            stat = statistic(flt['SCI',ext].data[ok])
+            
+            if row_average:
+                print(file, ext, stat)
+                wht = 1/(flt['ERR',ext].data)**2
+                wht[~ok] = 0
+                                    
+                filled = (flt['SCI',ext].data - stat)/stat
+                filled[~(ok & nonzero)] = np.nan
+                rows = np.nanmedian(filled, axis=1)
+                rows[~np.isfinite(rows)] = 0
+                
+                if ext not in row_num:
+                    row_num[ext] = rows
+                    row_den[ext] = (rows != 0)*1
+                else:
+                    row_num[ext] += rows
+                    row_den[ext] += (rows != 0)*1
+                
+                if make_fig:
+                    axes[ext-1].plot(rows, alpha=0.5)
+                    fig.tight_layout(pad=0.5)
+                    fig.savefig('/tmp/rows.png')
+                
+            ###############
+            
+            if 'MDRIZSKY' in flt['SCI',ext].header:
+                stat -= flt['SCI',ext].header['MDRIZSKY']
+            
+            logstr = f'# separate_chip_sky {filt_i}: '
+            logstr += f'{file}[SCI,{ext}] = {stat:6.2f}'
+            utils.log_comment(utils.LOGFILE, logstr, verbose=True)
+            
+            if 'CHIPSKY' in flt['SCI',ext].header:
+                flt['SCI',ext].header['CHIPSKY'] += stat
+            else:
+                flt['SCI',ext].header['CHIPSKY'] = (stat, 'Chip-level sky')
+                
+            flt['SCI',ext].data -= nonzero*stat
+        
+                
+        flt.flush()
+    
+    if row_average:
+        row_avg = {}
+        row_model = {}
+        for ext in row_num:
+            row_avg[ext] = row_num[ext]/row_den[ext]
+            row_avg[ext][row_den[ext] <= 0] = np.nan
+
+            if make_fig:
+                axes[ext-1].plot(row_avg[ext], alpha=0.5, color='k')
+                fig.tight_layout(pad=0.5)
+            
+            msk = np.isfinite(row_avg[ext])
+            xi = np.linspace(0,1,row_avg[ext].size)
+            #deg = 11
+            
+            for _iter in range(5):
+                cc = np.polynomial.chebyshev.chebfit(xi[msk],
+                                                     row_avg[ext][msk],
+                                                     average_order, 
+                                                     rcond=None,
+                                                     full=False, w=None)
+                                                     
+                row_model[ext] = np.polynomial.chebyshev.chebval(xi, cc)
+                msk = np.isfinite(row_avg[ext]) 
+                msk &= np.abs(row_avg[ext] - row_model[ext]) < 3*utils.nmad(row_avg[ext][msk])
+            
+            if make_fig:
+                axes[ext-1].plot(row_model[ext], color='r')
+                fig.savefig('/tmp/rows.png')
+        
+        for file in visit['files']:
+            flt = pyfits.open(file, mode='update')
+
+            for ext in range(1, 5):
+                if ('SCI', ext) not in flt:
+                    continue
+
+                nonzero = flt['SCI',ext].data != 0
+                
+                stat = flt['SCI',ext].header['CHIPSKY']*1
+                if 'MDRIZSKY' in flt['SCI',ext].header:
+                    stat += flt['SCI',ext].header['MDRIZSKY']
+                
+                row_avg_ext = nonzero * row_avg[ext][:,None] * stat
+                flt['SCI',ext].data -= row_avg_ext
+                flt['SCI',ext].header['ROWSKY'] = (True, 
+                                                   'Row-averaged sky removed')
+                                                   
+        flt.flush()
+        
     return True
 
 
@@ -2874,6 +3065,11 @@ def asn_to_dict(input_asn):
 # Visit-level ackground subtraction parameters for blot_background
 BKG_PARAMS = {'bw': 128, 'bh': 128, 'fw': 3, 'fh': 3, 'pixel_scale': 0.06}
 
+SEPARATE_CHIP_KWARGS = {'filters': ['F200LP','F350LP','F600LP','F390W'], 
+                        'stepsize': 10,
+                        'statistic': np.median, 
+                        'by_amp':True, 
+                        'only_flc':True}
 
 def process_direct_grism_visit(direct={},
                                grism={},
@@ -2885,6 +3081,8 @@ def process_direct_grism_visit(direct={},
                                align_rms_limit=2,
                                align_triangle_ba_max=0.9,
                                align_ref_border=100,
+                               align_min_flux_radius=1., 
+                               align_assume_close=False,
                                max_err_percentile=99,
                                catalog_mask_pad=0.05,
                                match_catalog_density=None,
@@ -2903,7 +3101,10 @@ def process_direct_grism_visit(direct={},
                                iter_atol=1.e-4,
                                imaging_bkg_params=None,
                                isJWST=False,
-                               reference_catalogs=['GAIA', 'PS1', 'SDSS', 'WISE'],
+                               run_separate_chip_sky=True,
+                               separate_chip_kwargs={},
+                               reference_catalogs=['GAIA', 'PS1', 
+                                                   'SDSS', 'WISE'],
                                use_self_catalog=False):
     """Full processing of a direct (+grism) image visit.
     
@@ -3294,7 +3495,9 @@ def process_direct_grism_visit(direct={},
                                       triangle_size_limit=[5, 2400*(1+isACS)],
                                       triangle_ba_max=align_triangle_ba_max,
                                 match_catalog_density=match_catalog_density,
-                                      ref_border=align_ref_border)
+                                      ref_border=align_ref_border, 
+                                      min_flux_radius=align_min_flux_radius, 
+                                      assume_close=align_assume_close)
         except:
 
             utils.log_exception(utils.LOGFILE, traceback)
@@ -3314,7 +3517,8 @@ def process_direct_grism_visit(direct={},
                                       max_err_percentile=max_err_percentile,
                                       catalog_mask_pad=catalog_mask_pad,
                                 match_catalog_density=match_catalog_density,
-                                      ref_border=align_ref_border)
+                                      ref_border=align_ref_border,
+                                      min_flux_radius=align_min_flux_radius)
 
         orig_wcs, drz_wcs, out_shift, out_rot, out_scale = result
 
@@ -3404,7 +3608,13 @@ def process_direct_grism_visit(direct={},
             blot_background(visit=direct, bkg_params=bkg_params,
                             verbose=True, skip_existing=True,
                             get_median=get_median)
-
+        
+        if run_separate_chip_sky:
+            separate_chip_sky(direct, **separate_chip_kwargs)
+            
+        # Chip-level background for some UVIS filters
+        #  uvis_chip_background(visit=direct)
+        
         # Remake catalog
         #cat = make_drz_catalog(root=direct['product'], threshold=thresh)
         cat = make_SEP_catalog(root=direct['product'], threshold=thresh)
@@ -3416,7 +3626,10 @@ def process_direct_grism_visit(direct={},
         else:
             clip &= cat['MAGERR_AUTO'] < 0.05
 
-        clip &= utils.catalog_mask(cat, max_err_percentile=max_err_percentile, pad=catalog_mask_pad, pad_is_absolute=False, min_flux_radius=1.)
+        clip &= utils.catalog_mask(cat, max_err_percentile=max_err_percentile, 
+                                   pad=catalog_mask_pad, 
+                                   pad_is_absolute=False, 
+                                   min_flux_radius=align_min_flux_radius)
 
         NMAX = 140
         so = np.argsort(cat['MAG_AUTO'][clip])
