@@ -1178,7 +1178,6 @@ def parse_grism_associations(exposure_groups, info,
 
             else:
                 continue
-<<<<<<< HEAD
 
             fp_i = exposure_groups[i]['footprint']
             olap_i = 0.
@@ -1209,38 +1208,6 @@ def parse_grism_associations(exposure_groups, info,
                 group = OrderedDict(grism=exposure_groups[i],
                                     direct=None)
 
-=======
-
-            fp_i = exposure_groups[i]['footprint']
-            olap_i = 0.
-            d_i = f_i
-
-            for j in range(N):
-                f_j = exposure_groups[j]['product'].split('-')[-2]
-                if f_j.startswith('g'):
-                    continue
-    
-                fp_j = exposure_groups[j]['footprint']
-                olap = fp_i.intersection(fp_j)
-                root_j = exposure_groups[j]['product'].split('-')[0]#[:-len('-'+f_j)]
-
-                if (root_j == root_i):
-
-                    if f_j == pupil: #not in best_direct[f_i.upper()]:
-                        group['direct'] = exposure_groups[j]
-    
-                    else:
-                        continue
-            grism_groups.append(group)
-    else:
-        for i in range(N):
-            f_i = exposure_groups[i]['product'].split('-')[-1]
-            root_i = exposure_groups[i]['product'][:-len('-'+f_i)]
-            if f_i.startswith('g'):
-                group = OrderedDict(grism=exposure_groups[i],
-                                    direct=None)
-
->>>>>>> dc2e9c9ffcb22f4428de4460342a4fde94ffeeff
             else:
                 continue
 
@@ -1259,7 +1226,6 @@ def parse_grism_associations(exposure_groups, info,
                 root_j = exposure_groups[j]['product'][:-len('-'+f_j)]
 
                 if (root_j == root_i):
-<<<<<<< HEAD
 
                     if f_j.upper() not in best_direct[f_i.upper()]:
                         continue
@@ -1269,17 +1235,6 @@ def parse_grism_associations(exposure_groups, info,
                         olap_i = olap.area
                         d_i = f_j
 
-=======
-
-                    if f_j.upper() not in best_direct[f_i.upper()]:
-                        continue
-                    if best_direct[f_i.upper()].index(f_j.upper()) < d_idx:
-                        d_idx = best_direct[f_i.upper()].index(f_j.upper())
-                        group['direct'] = exposure_groups[j]
-                        olap_i = olap.area
-                        d_i = f_j
-
->>>>>>> dc2e9c9ffcb22f4428de4460342a4fde94ffeeff
             grism_groups.append(group)
     return grism_groups
 
