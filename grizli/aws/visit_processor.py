@@ -1076,7 +1076,7 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=True, 
                   --exclude "*" \
                   --include "Prep/*_fl*fits" \
                   --include "Prep/*s.log" \
-                  --include "Prep/*npy" \
+                  --include "Prep/*visits.*" \
                   --include "*fail*" \
                   --include "RAW/*[nx][tg]" """
         
