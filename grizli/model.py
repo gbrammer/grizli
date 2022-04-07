@@ -1434,10 +1434,7 @@ class ImageData(object):
                 raise KeyError(msg)
 
             instrument = h['INSTRUME']
-            if instrument in ['NIRISS']:
-                filter = h['FILTER']
-            else:
-                filter = utils.get_hst_filter(h, filter_only=True)
+            filter = utils.get_hst_filter(h, filter_only=True)
 
             if 'PUPIL' in h:
                 pupil = h['PUPIL']
