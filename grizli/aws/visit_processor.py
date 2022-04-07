@@ -552,7 +552,7 @@ def delete_all_assoc_data(assoc):
     Remove files from S3 and database
     """
     import os
-    from grizli.aws import db
+    from grizli.aws import db, tile_mosaic
     
     vis = db.SQL(f"""SELECT obsid, assoc_name, obs_id
                      FROM assoc_table
@@ -564,6 +564,15 @@ def delete_all_assoc_data(assoc):
         db.execute(f"""DELETE from shifts_log
                                WHERE shift_dataset like '{r}%%'""")
     
+    print('Remove from wcs_log')
+    db.execute(f"DELETE from wcs_log where wcs_assoc = '{assoc}'")
+    
+    print('Remove from tile_exposures')
+    
+    # Reset tiles of deleted exposures potentially from other exposures
+    tile_mosaic.reset_tiles_in_assoc(assoc)
+    
+    # Remove deleted exposure from mosaic_tiles_exposures
     res = db.execute(f"""DELETE from mosaic_tiles_exposures t
                  USING exposure_files e
                 WHERE t.expid = e.eid AND e.assoc = '{assoc}'""")
