@@ -3710,7 +3710,7 @@ class MultiBeam(GroupFitter):
 
         return chi2/self.DoF
 
-    def drizzle_grisms_and_PAs(self, size=10, fcontam=0, flambda=False, scale=1, pixfrac=0.5, kernel='square', usewcs=False, tfit=None, diff=True, grism_list=['G800L', 'G102', 'GR150C', 'GR150R', 'G141', 'F090W', 'F115W', 'F150W', 'F200W', 'F356W', 'F410M', 'F444W'], mask_segmentation=True, reset_model=True, make_figure=True, fig_args=dict(mask_segmentation=True, average_only=False, scale_size=1, cmap='viridis_r'), **kwargs):
+    def drizzle_grisms_and_PAs(self, size=10, fcontam=0, flambda=False, scale=1, pixfrac=0.5, kernel='square', usewcs=False, tfit=None, diff=True, grism_list=['G800L', 'G102', 'G141', 'GR150C', 'GR150R', 'F090W', 'F115W', 'F150W', 'F200W', 'F356W', 'F410M', 'F444W'], mask_segmentation=True, reset_model=True, make_figure=True, fig_args=dict(mask_segmentation=True, average_only=False, scale_size=1, cmap='viridis_r'), **kwargs):
         """Make figure showing spectra at different orients/grisms
 
         TBD
