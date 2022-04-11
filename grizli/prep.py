@@ -4681,7 +4681,7 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
     elif isJWST:
         bits = 1+4+6+32768+16777200+1049600+26232800+9438210+9438220
     else:
-        bits =  576
+        bits = 576
 
     for i in range(Nexp):
         flt = pyfits.open(grism['files'][i])
