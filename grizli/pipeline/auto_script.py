@@ -3819,22 +3819,30 @@ def drizzle_overlaps(field_root, isJWST=False, filters=['F098M', 'F105W', 'F110W
     filter_groups = {}
 
     for visit in visits:
-        print(visit)
+        msg = (visit)                   
+        utils.log_comment(utils.LOGFILE, msg, show_date=True,
+                              verbose=True)
         # Visit failed for some reason
         if (visit['product']+'.wcs_failed' in failed_list) | (visit['product']+'.failed' in failed_list) | (visit['product'] in skip_products):
-            print('visit failed')
+            msg = ('visit failed')                   
+            utils.log_comment(utils.LOGFILE, msg, show_date=True,
+                              verbose=True)
             continue
 
         # Too few exposures (i.e., one with unreliable CR flags)
         if len(visit['files']) < min_nexp:
-            print('visit hs too few exposures')
+            msg = ('visit has too few exposures')                   
+            utils.log_comment(utils.LOGFILE, msg, show_date=True,
+                              verbose=True)
             continue
 
         # Not one of the desired filters
         filt = visit['product'].split('-')[-1]
 
         if filt.upper() not in filters:
-            print('filt.upper not in filters')
+            msg = ('filt.upper not in filters')                   
+            utils.log_comment(utils.LOGFILE, msg, show_date=True,
+                              verbose=True)
             continue
 
         # Are all of the exposures in ./?
@@ -3862,7 +3870,6 @@ def drizzle_overlaps(field_root, isJWST=False, filters=['F098M', 'F105W', 'F110W
                 continue
 
         if filt not in filter_groups:
-            print('filter not in filter groups')
             filter_groups[filt] = {'product': '{0}-{1}'.format(field_root, filt), 'files': [], 'reference': ref_image, 'reference_wcs': ref_wcs}
 
         filter_groups[filt]['files'].extend(visit['files'])
