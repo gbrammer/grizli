@@ -3255,8 +3255,7 @@ def process_direct_grism_visit(direct={},
     else:
         bits = 576+256
         driz_cr_snr = '8.0 5.0'
-        driz_cr_scale = '2.5 0.7'
-        
+        driz_cr_scale = '2.5 0.7' 
 
     if 'driz_cr_scale' in drizzle_params:
         driz_cr_scale = drizzle_params['driz_cr_scale']
