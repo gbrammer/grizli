@@ -3643,7 +3643,7 @@ def process_direct_grism_visit(direct={},
             table_to_radec(cat[clip][so], '{0}.cat.radec'.format(direct['product']))
 
         if (fix_stars) & (not isACS) & (not isWFPC2):
-            fix_star_centers(root=direct['product'], drizzle=False, isJWST=isJWST, 
+            fix_star_centers(root=direct['product'], drizzle=False, 
                              mag_lim=-29)#19.5) #changeme
 
     #################
@@ -4973,7 +4973,7 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
 
 
 def fix_star_centers(root='macs1149.6+2223-rot-ca5-22-032.0-f105w',
-                     mag_lim=22, verbose=True, isJWST=False, drizzle=False,
+                     mag_lim=22, verbose=True, drizzle=False,
                      cutout_size=16):
     """Unset the CR bit (4096) in the centers of bright objects
 
