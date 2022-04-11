@@ -186,7 +186,7 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
         extra_msg = ' / flat: {0}'.format(flat_file)
 
         flat_im = pyfits.open(os.path.join(os.getenv('iref'), flat_file))
-        flat = flat_im['SCI'].data [5:-5, 5:-5]
+        flat = flat_im['SCI'].data
         flat_dq = (flat < 0.2)
 
         # Grism FLT from IR amplifier gain
