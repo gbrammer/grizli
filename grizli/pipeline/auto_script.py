@@ -2816,7 +2816,6 @@ def grism_prep(field_root='j142724+334246', PREP_PATH='../Prep', EXTRACT_PATH='.
                                 gris_ref_filters=gris_ref_filters, 
                                 files=files, split_by_grism=split_by_grism)
 
-
     for grp in grp_objects:
 
         ################
