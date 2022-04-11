@@ -1398,7 +1398,7 @@ def parse_visits(field_root='', RAW_PATH='../RAW', use_visit=True, combine_same_
 
             visits.append(direct)
 
-        all_groups = utils.parse_grism_associations(visits, info, isJWST-isJWST)
+        all_groups = utils.parse_grism_associations(visits, info, isJWST=isJWST)
 
         write_visit_info(visits, all_groups, info, root=field_root, path='./')
                 
