@@ -1,7 +1,6 @@
 """
 Align direct images & make mosaics
 """
-from codecs import ignore_errors
 import os
 import inspect
 
