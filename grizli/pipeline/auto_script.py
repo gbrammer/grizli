@@ -2463,6 +2463,7 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
     gr150cf200w = (info['PUPIL'] == 'F200W') & (info['FILTER'] == 'GR150C')
     gr150rf115w = (info['PUPIL'] == 'F115W') & (info['FILTER'] == 'GR150R')
     gr150rf150w = (info['PUPIL'] == 'F150W') & (info['FILTER'] == 'GR150R')
+    gr150rf200w = (info['PUPIL'] == 'F200W') & (info['FILTER'] == 'GR150R')
 
     if force_cat is None:
         #catalog = '{0}-ir.cat.fits'.format(field_root)
