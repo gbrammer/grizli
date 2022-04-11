@@ -4689,9 +4689,6 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
         dq_mask = dq == 0
 
         # Data
-        print(ext)
-        print(len((flt['SCI', ext].data).flatten()))
-        print(Npix)
         data[i*Npix:(i+1)*Npix] = (flt['SCI', ext].data*dq_mask).flatten()
         mask[i*Npix:(i+1)*Npix] &= dq_mask.flatten()  # == 0
         wht[i*Npix:(i+1)*Npix] = 1./(flt['ERR', ext].data**2*dq_mask).flatten()
