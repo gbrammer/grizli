@@ -5780,7 +5780,10 @@ def extract_fits_log(file='idk106ckq_flt.fits', get_dq=True):
     log['chips'] = []
 
     if get_dq:
-        idx = np.arange(2048**2, dtype=np.int32).reshape((2048, 2048))
+        if isJWST: 
+            idx = np.arange(2048**2, dtype=np.int32).reshape((2048, 2048))
+        else:
+            idx = np.arange(1014**2, dtype=np.int32).reshape((1014, 1014))
 
     for chip in [1, 2, 3, 4]:
         key = 'SCI{0}'.format(chip)
