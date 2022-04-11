@@ -3249,7 +3249,7 @@ def process_direct_grism_visit(direct={},
         driz_cr_snr = '3.5 3.0'
         driz_cr_scale = '1.2 0.7'
     elif isWFPC2:
-        bits = 64+32 
+        bits = 64+32
         driz_cr_snr = '3.5 3.0'
         driz_cr_scale = '1.2 0.7'
     else:
