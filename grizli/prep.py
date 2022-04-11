@@ -3566,9 +3566,6 @@ def process_direct_grism_visit(direct={},
                 pixfrac = 1.0
             else:
                 pixfrac = 0.8
-            if isJWST:
-                driz_cr_scale = '20. 10.'
-                driz_cr_snr = '100.0 20.0'
             AstroDrizzle(direct['files'], output=direct['product'],
                          clean=True, final_pixfrac=pixfrac,
                          context=(isACS | isWFPC2),
@@ -3658,9 +3655,8 @@ def process_direct_grism_visit(direct={},
 
     # First drizzle to flag CRs
     gris_cr_corr = len(grism['files']) > 1
-    if isJWST:
-        driz_cr_scale = '1.2 0.7'
-        driz_cr_snr = '35.0 15.0'
+    driz_cr_snr = '8.0 5.0'
+    driz_cr_scale = '2.5 0.7'
     for file in grism['files']:
                 hdu = pyfits.open(file,mode='update')
                 hdu[3].data = hdu[3].data.astype(np.int16)
@@ -3853,12 +3849,10 @@ def tweak_align(direct_group={}, grism_group={}, max_dist=1., n_min=10, key=' ',
     # Redrizzle
     if isJWST:
         bits = 1
-        driz_cr_snr = '20.0 10.0'
-        driz_cr_scale = '100.0 20.0'
     else:
         bits  = 576
-        driz_cr_snr = '8.0 5.0'
-        driz_cr_scale = '2.5 0.7'
+    driz_cr_snr = '8.0 5.0'
+    driz_cr_scale = '2.5 0.7'
     if 'par' in direct_group['product']:
         pixfrac = 1.0
     else:
@@ -5587,9 +5581,6 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, m
             elif isWFPC2:
                 driz_cr_snr = '3.5 3.0'
                 driz_cr_scale = '1.2 0.7'
-            elif isJWST:
-                driz_cr_snr = '20.0 10.0'
-                driz_cr_scale = '50.0 20.0'
             else:
                 driz_cr_snr = '8.0 5.0'
                 driz_cr_scale = '2.5 0.7'
