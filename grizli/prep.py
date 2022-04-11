@@ -3190,14 +3190,12 @@ def process_direct_grism_visit(direct={},
                     updatewcs.updatewcs(file, verbose=False)
 
                 
-        
         # ### Make ASN
         # if not isWFPC2:
         #     asn = asnutil.ASNTable(inlist=direct['files'], output=direct['product'])
         #     asn.create()
         #     asn.write()
 
-        
     # Initial grism processing
     skip_grism = (grism == {}) | (grism is None) | (len(grism) == 0)
     if not skip_grism:
