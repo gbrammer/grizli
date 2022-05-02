@@ -119,9 +119,11 @@ class UtilsTester(unittest.TestCase):
             assert(un[1].sum() == 3)
             
             # __iter__ and __get__ methods
-            for v in un:
+            for (v, vs) in un:
                 #print(v)
                 assert(np.allclose(un.array[un[v]], v))
+                assert(np.allclose(un[v], vs))
+                assert(np.allclose(un.array[vs], v))
 
 
     def test_sregion(self):

@@ -4129,9 +4129,31 @@ class SRegion(object):
 
         return poly
     
+    @property 
+    def N(self):
+        return len(self.xy)
+
+
     @property
     def centroid(self):
         return [np.mean(fp, axis=0) for fp in self.xy]
+
+    
+    def sky_buffer(self, buffer_deg):
+        """
+        Buffer polygons accounting for cos(dec)
+        """
+        from shapely.geometry import Polygon
+        
+        new_xy = []
+        for xy, c in zip(self.xy, self.centroid):
+            cosd = np.array([1, np.cos(c[1]/180*np.pi)])
+            p = Polygon((xy - c)*cosd).convex_hull.buffer(buffer_deg)
+            #p = Polygon(np.array(p.boundary.xy).T).buffer(buffer_deg)
+            xyp = np.array(p.boundary.xy).T
+            new_xy.append((xyp/cosd)+c)
+        
+        self.xy = new_xy
 
 
     @property
@@ -4149,7 +4171,7 @@ class SRegion(object):
         `~shapely.geometry.Polygon` object.
         """
         from shapely.geometry import Polygon
-        return [Polygon(fp) for fp in self.xy]
+        return [Polygon(fp).convex_hull for fp in self.xy]
 
 
     @property 
@@ -8250,6 +8272,20 @@ class Unique(object):
             return 0
 
 
+    def __iter__(self):
+        """
+        Iterable over `values` attribute
+        
+        Returns a tuple of the value and the boolean selection array for that 
+        value.
+        """
+        i = 0
+        while i < self.N:
+            vi = self.values[i]
+            yield (vi, self[vi])
+            i += 1
+
+
     def __getitem__(self, key):
         if key in self.values:
             ix = self.values.index(key)
@@ -8259,12 +8295,12 @@ class Unique(object):
             return self.zeros
 
 
-    def __iter__(self):
-        for idx in itertools.count():
-            try:
-                yield self.values[idx]
-            except IndexError:
-                break
+    # def __iter__(self):
+    #     for idx in itertools.count():
+    #         try:
+    #             yield self.values[idx]
+    #         except IndexError:
+    #             break
 
     def __len__(self):
         return self.N
