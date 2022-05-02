@@ -1341,7 +1341,7 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
 
     if s3output:
         files = []
-        for f in np.unique(res['filter']):
+        for f in uniq_filts.values:
             prod = product.format(rootname=rootname, f=f).lower()
             
             if gzip_output:
