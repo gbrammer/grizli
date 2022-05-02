@@ -1239,6 +1239,11 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
     if res is None:
         res = db.SQL(SQL)
     
+    if len(res) == 0:
+        print('No exposures found overlapping output wcs with '+
+              f'corners = ({x1:.6f},{y1:.6f}), ({x2:.6f},{y2:.6f})')
+        return None
+        
     file_filters = [f for f in res['filter']]
     if split_uvis:
         # UVIS filters
@@ -1359,7 +1364,9 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
             object_name = f'{path}/{file}'
             print(f'{file} > s3://{bucket}/{object_name}')
             db.upload_file(file, bucket, object_name=object_name)
-
+    
+    return res
+    
 
 def make_mosaic(jname='', ds9=None, skip_existing=True, ir_scale=0.1, half_optical=False, pad=16, kernel='point', pixfrac=0.33, sync=True, ir_wcs=None):
     """
