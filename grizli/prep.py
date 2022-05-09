@@ -5807,3 +5807,20 @@ def extract_fits_log(file='idk106ckq_flt.fits', get_dq=True):
                 log['DQv{0}'.format(chip)] = list(dq[mask].astype(str))
 
     return log
+
+
+def check_isJWST(infile=''):
+    '''
+    Check if a file or list of files is JWST image. 
+    Parameters:
+    - infile: fits file
+    
+    Returns:
+    - True or False
+    '''
+
+    hdu = pyfits.open(infile)
+    if hdu[0]['TELESCOP'] == 'JWST':
+        return True
+    else:
+        return False
