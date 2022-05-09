@@ -1293,7 +1293,7 @@ def load_visit_info(root='j033216m2743', path='./', verbose=True):
     return visits, groups, info
 
 
-def parse_visits(field_root='', RAW_PATH='../RAW', use_visit=True, combine_same_pa=True, combine_minexp=2, is_dash=False, isJWST=False, filters=VALID_FILTERS, max_dt=1e9, visit_split_shift=1.5, file_query='*'):
+def parse_visits(field_root='', RAW_PATH='../RAW', use_visit=True, combine_same_pa=True, combine_minexp=2, is_dash=False, filters=VALID_FILTERS, max_dt=1e9, visit_split_shift=1.5, file_query='*'):
 
     """
     Organize exposures into "visits" by filter / position / PA / epoch
@@ -1345,12 +1345,15 @@ def parse_visits(field_root='', RAW_PATH='../RAW', use_visit=True, combine_same_
     from shapely.geometry import Polygon
     from scipy.spatial import ConvexHull
 
-    if isJWST:
+    
+    files = glob.glob(os.path.join(RAW_PATH, file_query+'fl[tc].fits'))
+    files += glob.glob(os.path.join(RAW_PATH, file_query+'c0m.fits'))
+    files += glob.glob(os.path.join(RAW_PATH, file_query+'c0f.fits'))
+
+    # check if we're processing JWST files
+    if len(files) == 0:
         files = glob.glob(os.path.join(RAW_PATH, file_query+'rate.fits'))
-    else:
-        files = glob.glob(os.path.join(RAW_PATH, file_query+'fl[tc].fits'))
-        files += glob.glob(os.path.join(RAW_PATH, file_query+'c0m.fits'))
-        files += glob.glob(os.path.join(RAW_PATH, file_query+'c0f.fits'))
+        isJWST = True # if there are only rate files, then it must be JWST    
 
     files.sort()
 
