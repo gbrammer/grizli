@@ -1359,9 +1359,9 @@ def parse_visits(field_root='', RAW_PATH='../RAW', use_visit=True, combine_same_
 
     info = utils.get_flt_info(files)
     # if niriss, need to set the filter equal to the pupil
-    for idx, instrument in enumerate(info['INSTRUME']):
-        if (instrument == 'NIRISS') & (info['FILTER'][idx]=='CLEAR'):
-            info['FILTER'][idx] = info['PUPIL'][idx]
+    #for idx, instrument in enumerate(info['INSTRUME']):
+    #    if (instrument == 'NIRISS') & (info['FILTER'][idx]=='CLEAR'):
+    #        info['FILTER'][idx] = info['PUPIL'][idx]
     #info = info[(info['FILTER'] != 'G141') & (info['FILTER'] != 'G102')]
     # Only F814W on ACS
     if ONLY_F814W:

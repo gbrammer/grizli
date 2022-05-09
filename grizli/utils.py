@@ -1185,6 +1185,7 @@ def parse_grism_associations(exposure_groups, info,
 
             for j in range(N):
                 f_j = exposure_groups[j]['product'].split('-')[-2]
+                pupil_j = exposure_groups[j]['product'].split('-')[-1]
                 if f_j.startswith('g'):
                     continue
     
@@ -1194,7 +1195,7 @@ def parse_grism_associations(exposure_groups, info,
 
                 if (root_j == root_i):
 
-                    if f_j == pupil: #not in best_direct[f_i.upper()]:
+                    if pupil_j == pupil: #not in best_direct[f_i.upper()]:
                         group['direct'] = exposure_groups[j]
     
                     else:
