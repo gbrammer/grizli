@@ -1705,7 +1705,7 @@ class ImageData(object):
             # Need to compute own transformed header
             sip_header = _jwst.model_wcs_header(datamodel, get_sip=True)
         else:
-            sip_header = utils.to_header(datamodel.wcs)
+            sip_header = utils.to_header(datamodel.get_fits_wcs())
             
         for k in sip_header:
             self.header[k] = sip_header[k]
