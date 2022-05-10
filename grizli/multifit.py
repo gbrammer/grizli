@@ -6,6 +6,7 @@ import time
 import glob
 from collections import OrderedDict
 import multiprocessing as mp
+from . import prep
 
 import scipy.ndimage as nd
 import numpy as np
@@ -1349,7 +1350,7 @@ class GroupFLT():
 
 
 class MultiBeam(GroupFitter):
-    def __init__(self, beams, group_name=None, fcontam=0., psf=False, polyx=[0.3, 2.5], MW_EBV=0., isJWST=False, min_mask=0.01, min_sens=0.08, sys_err=0.0, mask_resid=True, verbose=True, replace_direct=None, **kwargs):
+    def __init__(self, beams, group_name=None, fcontam=0., psf=False, polyx=[0.3, 2.5], MW_EBV=0., min_mask=0.01, min_sens=0.08, sys_err=0.0, mask_resid=True, verbose=True, replace_direct=None, **kwargs):
         """Tools for dealing with multiple `~.model.BeamCutout` instances
 
         Parameters
@@ -1411,8 +1412,9 @@ class MultiBeam(GroupFitter):
         self.Asave = {}
 
         if isinstance(beams, str):
-            self.load_master_fits(beams, isJWST=isJWST, verbose=verbose)
-
+            self.load_master_fits(beams, verbose=verbose)
+            # check if isJWST
+            isJWST = prep.check_isJWST(beams)
             # Auto-generate group_name from filename, e.g.,
             # j100140p0130_00237.beams.fits > j100140p0130
             if group_name is None:
@@ -1423,9 +1425,11 @@ class MultiBeam(GroupFitter):
                 # `beams` is list of strings
                 if 'beams.fits' in beams[0]:
                     # Master beam files
-                    self.load_master_fits(beams[0], isJWST=isJWST, verbose=verbose)
+                    # check if isJWST
+                    isJWST = prep.check_isJWST(beams[0])
+                    self.load_master_fits(beams[0], verbose=verbose)
                     for i in range(1, len(beams)):
-                        b_i = MultiBeam(beams[i], group_name=group_name, isJWST=isJWST, fcontam=fcontam, psf=psf, polyx=polyx, MW_EBV=np.maximum(MW_EBV, 0), sys_err=sys_err, verbose=verbose, min_mask=min_mask, min_sens=min_sens, mask_resid=mask_resid)
+                        b_i = MultiBeam(beams[i], group_name=group_name, fcontam=fcontam, psf=psf, polyx=polyx, MW_EBV=np.maximum(MW_EBV, 0), sys_err=sys_err, verbose=verbose, min_mask=min_mask, min_sens=min_sens, mask_resid=mask_resid)
                         self.extend(b_i)
 
                 else:
@@ -1742,7 +1746,7 @@ class MultiBeam(GroupFitter):
 
         hdu.writeto(outfile, overwrite=True)
 
-    def load_master_fits(self, beam_file, isJWST=False, verbose=True):
+    def load_master_fits(self, beam_file, verbose=True):
         """
         Load a "beams.fits" file.
         """
@@ -1755,6 +1759,9 @@ class MultiBeam(GroupFitter):
 
         if verbose:
             print('load_master_fits: {0}'.format(beam_file))
+
+        # check if isJWST
+        isJWST = prep.check_isJWST(beam_file)
 
         hdu = pyfits.open(beam_file, lazy_load_hdus=False)
         N = hdu[0].header['COUNT']
@@ -1778,7 +1785,7 @@ class MultiBeam(GroupFitter):
 
             beam = model.BeamCutout(fits_file=hducopy, min_mask=self.min_mask,
                                     min_sens=self.min_sens,
-                                    mask_resid=self.mask_resid, isJWST=isJWST)
+                                    mask_resid=self.mask_resid)
 
             self.beams.append(beam)
             if verbose:
