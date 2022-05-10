@@ -1293,7 +1293,7 @@ def load_visit_info(root='j033216m2743', path='./', verbose=True):
     return visits, groups, info
 
 
-def parse_visits(field_root='', RAW_PATH='../RAW', use_visit=True, combine_same_pa=True, combine_minexp=2, is_dash=False, filters=VALID_FILTERS, max_dt=1e9, visit_split_shift=1.5, file_query='*'):
+def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, combine_same_pa=True, combine_minexp=2, is_dash=False, filters=VALID_FILTERS, max_dt=1e9, visit_split_shift=1.5, file_query='*'):
 
     """
     Organize exposures into "visits" by filter / position / PA / epoch
@@ -1346,14 +1346,15 @@ def parse_visits(field_root='', RAW_PATH='../RAW', use_visit=True, combine_same_
     from scipy.spatial import ConvexHull
 
     
-    files = glob.glob(os.path.join(RAW_PATH, file_query+'fl[tc].fits'))
-    files += glob.glob(os.path.join(RAW_PATH, file_query+'c0m.fits'))
-    files += glob.glob(os.path.join(RAW_PATH, file_query+'c0f.fits'))
-
-    # check if we're processing JWST files
     if len(files) == 0:
-        files = glob.glob(os.path.join(RAW_PATH, file_query+'rate.fits'))
-        isJWST = True # if there are only rate files, then it must be JWST    
+        files = glob.glob(os.path.join(RAW_PATH, file_query+'fl[tc].fits'))
+        files += glob.glob(os.path.join(RAW_PATH, file_query+'c0m.fits'))
+        files += glob.glob(os.path.join(RAW_PATH, file_query+'c0f.fits'))
+
+        # check if we're processing JWST files
+        if len(files) == 0:
+            files = glob.glob(os.path.join(RAW_PATH, file_query+'rate.fits'))
+            isJWST = True # if there are only rate files, then it must be JWST    
 
     files.sort()
 
@@ -2457,6 +2458,9 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
         files.sort()
 
     info = utils.get_flt_info(files)
+    for idx, filter in enumerate(info['FILTER']):
+        if '-' in filter:
+            info['FILTER'][idx] = filter.split('-')[-1]
 
     g141 = info['FILTER'] == 'G141'
     g102 = info['FILTER'] == 'G102'
@@ -2467,6 +2471,7 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
     gr150rf115w = (info['PUPIL'] == 'F115W') & (info['FILTER'] == 'GR150R')
     gr150rf150w = (info['PUPIL'] == 'F150W') & (info['FILTER'] == 'GR150R')
     gr150rf200w = (info['PUPIL'] == 'F200W') & (info['FILTER'] == 'GR150R')
+
 
     if force_cat is None:
         #catalog = '{0}-ir.cat.fits'.format(field_root)

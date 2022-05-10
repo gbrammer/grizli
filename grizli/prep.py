@@ -6,6 +6,7 @@ import inspect
 
 from collections import OrderedDict
 import glob
+from tabnanny import check
 import traceback
 
 import numpy as np
@@ -3104,7 +3105,6 @@ def process_direct_grism_visit(direct={},
                                drizzle_params={},
                                iter_atol=1.e-4,
                                imaging_bkg_params=None,
-                               isJWST=False,
                                run_separate_chip_sky=True,
                                separate_chip_kwargs={},
                                reference_catalogs=['GAIA', 'PS1', 
@@ -3180,6 +3180,7 @@ def process_direct_grism_visit(direct={},
         for file in direct['files']:
             crclean = isACS & (len(direct['files']) == 1)
             fresh_flt_file(file, crclean=crclean)
+            isJWST = check_isJWST(file)
             if isJWST:
                 img = jwst_utils.img_with_wcs(file)
                 img.save(file)
@@ -3641,7 +3642,7 @@ def process_direct_grism_visit(direct={},
 
         if (fix_stars) & (not isACS) & (not isWFPC2):
             fix_star_centers(root=direct['product'], drizzle=False, 
-                             mag_lim=-29)#19.5) #changeme
+                             mag_lim=-19.5)
 
     #################
     # Grism image processing
@@ -5820,7 +5821,6 @@ def check_isJWST(infile=''):
     '''
 
     hdu = pyfits.open(infile)
-    if hdu[0]['TELESCOP'] == 'JWST':
-        return True
-    else:
-        return False
+    isJWST = (hdu[0].header['TELESCOP'] == 'JWST')
+    hdu.close()
+    return isJWST
