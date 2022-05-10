@@ -2874,7 +2874,8 @@ def load_phoenix_stars(logg_list=PHOENIX_LOGG, teff_list=PHOENIX_TEFF, zmet_list
         hdu = pyfits.open(os.path.join(GRIZLI_PATH, 'templates/stars/', file))
     except:
         #url = 'https://s3.amazonaws.com/grizli/CONF'
-        url = 'https://erda.ku.dk/vgrid/Gabriel%20Brammer/CONF'
+        #url = 'https://erda.ku.dk/vgrid/Gabriel%20Brammer/CONF'
+        url = 'https://github.com/gbrammer/grizli-config/raw/main/'
         
         print('Fetch {0}/{1}'.format(url, file))
 
@@ -6010,7 +6011,8 @@ def fetch_config_files(ACS=False, get_sky=True, get_stars=True, get_epsf=True):
 
     # Config files
     # BASEURL = 'https://s3.amazonaws.com/grizli/CONF/'
-    BASEURL = 'https://erda.ku.dk/vgrid/Gabriel%20Brammer/CONF/'
+    # BASEURL = 'https://erda.ku.dk/vgrid/Gabriel%20Brammer/CONF/'
+    BASEURL = 'https://github.com/gbrammer/grizli-config/raw/main/'
     
     tarfiles = [f'{BASEURL}/WFC3.IR.G102.WD.V4.32.tar.gz', 
                 f'{BASEURL}/WFC3.IR.G141.WD.V4.32.tar.gz']
@@ -6223,7 +6225,10 @@ class EffectivePSF(object):
                                 'extended_PSF_{0}.fits'.format(filter))
 
             if not os.path.exists(file):
-                BASEURL = 'https://erda.ku.dk/vgrid/Gabriel%20Brammer/CONF/'
+                #BASEURL = 'https://erda.ku.dk/vgrid/Gabriel%20Brammer/CONF/'
+                BASEURL = ('https://github.com/gbrammer/' + 
+                           'grizli-config/raw/main/')
+                           
                 msg = 'Extended PSF file \'{0}\' not found.'.format(file)
                 msg += 'Get the archive from '
                 msg += f' {BASEURL}WFC3IR_extended_PSF.v1.tar.gz'
