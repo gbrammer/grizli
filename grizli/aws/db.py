@@ -1825,6 +1825,13 @@ def send_to_database(table_name, tab, index=False, if_exists='append', method='m
     tab : `~astropy.table.Table` or `~pandas.DataFrame`
         Input table.  If an `~astropy.table.Table`, then convert to 
         `~pandas.DataFrame` with `tab.to_pandas()`
+    
+    index : bool
+        Add index column (`pandas.DataFrame.to_sql` keyword)
+    
+    if_exists : 'fail', 'replace', 'append'
+        Action to take if `table_name` already exists in the database
+        (`pandas.DataFrame.to_sql` keyword). 
         
     kwargs : dict
         See `pandas.DataFrame.to_sql`
