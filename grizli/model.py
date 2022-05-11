@@ -3891,8 +3891,8 @@ class BeamCutout(object):
         """
         # bad pixels or problems with uncertainties
         self.mask = ((self.grism.data['DQ'] > 0) | 
-                    (self.grism.data['ERR'] == 0) |
-                    (self.grism.data['SCI'] == 0))
+                     (self.grism.data['ERR'] == 0) |
+                     (self.grism.data['SCI'] == 0))
         
 
         self.var = self.grism.data['ERR']**2
