@@ -6050,7 +6050,8 @@ def fetch_config_files(ACS=False, get_sky=True, get_stars=True, get_epsf=True):
         #psf_path = 'http://www.stsci.edu/hst/wfc3/analysis/PSF/psf_downloads/wfc3_ir/'
         #psf_path = 'https://www.stsci.edu/~jayander/STDPSFs/WFC3IR/'
         #psf_root = 'PSFSTD'
-        psf_path = 'https://www.stsci.edu/~jayander/HST1PASS/'
+        #psf_path = 'https://www.stsci.edu/~jayander/HST1PASS/'
+        psf_path = 'https://www.stsci.edu/~jayander/HST1PASS/LIBRARIES/'
         psf_path += 'PSFs/STDPSFs/WFC3IR/'
         psf_root = 'STDPSF'
         
