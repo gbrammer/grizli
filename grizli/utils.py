@@ -738,143 +738,65 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
     output_list = []  # OrderedDict()
     filter_list = OrderedDict()
 
-    if isJWST:
-
-        for filter in info['filter']:
-            filter_list[filter] = OrderedDict()
+    for filter in np.unique(info['filter']):
+        filter_list[filter] = OrderedDict()
+        if isJWST:
             pupils = np.unique(info['pupil'][(info['filter'] == filter)])
             for pupil in pupils:
                 filter_list[filter][pupil] = OrderedDict()
                 angles = np.unique(pa_v3[(info['filter'] == filter)])
                 for angle in angles:
                     filter_list[filter][pupil][angle] = []
-
-        for target in targets:
-            ## 3D-HST targname translations
-            target_use = target
-            for key in translate.keys():
-                target_use = target_use.replace(key, translate[key])
-    #
-            # pad i < 10 with zero
-            for key in translate.keys():
-                if translate[key] in target_use:
-                    spl = target_use.split('-')
-                    try:
-                        if (int(spl[-1]) < 10) & (len(spl[-1]) == 1):
-                            spl[-1] = '{0:02d}'.format(int(spl[-1]))
-                            target_use = '-'.join(spl)
-                    except:
-                        pass
-
-            for filter in np.unique(info['filter'][(target_list == target)]): 
-                pupils = np.unique(info['pupil'][(info['filter'] == filter)])
-                for pupil in pupils:
-                    angles = np.unique(pa_v3[(info['filter'] == filter) &
-                                (target_list == target)])
-                    #pupil = filter_list[filter][pupil]
-
-                    for angle in angles:
-                        exposure_list = []
-                        exposure_start = []
-                        product = '{0}-{1:05.1f}-{2}-{3}'.format(target_use, angle, filter, pupil)
-
-                        visit_match = np.unique(visits[(target_list == target) &
-                                                    (info['filter'] == filter) & (info['pupil'] == pupil)])
-                        this_progs = []
-                        this_visits = []
-
-                        for visit in visit_match:
-                            ix = (visits == visit) & (target_list == target) & (info['filter'] == filter) & (info['pupil'] == pupil)
-                            # this_progs.append(info['progIDs'][ix][0])
-                            # print visit, ix.sum(), np.unique(info['progIDs'][ix])
-                            new_progs = list(np.unique(info['progIDs'][ix]))
-                            this_visits.extend([visit]*len(new_progs))
-                            this_progs.extend(new_progs)
-
-                        for visit, prog in zip(this_visits, this_progs):
-                            visit_list = []
-                            visit_start = []
-                            visit_product = '{0}-{1}-{2}-{3:05.1f}-{4}-{5}'.format(target_use, prog, visit, angle, filter, pupil)
-
-                            use = ((target_list == target) &
-                                (info['filter'] == filter) &
-                                (visits == visit) & (pa_v3 == angle) &
-                                (info['progIDs'] == prog)) & (info['pupil'] == pupil)
-
-                            if use.sum() == 0:
-                                continue
-
-                            for tstart, file in zip(info['expstart'][use],
-                                                    info['file'][use]):
-
-                                f = file.split('.gz')[0]
-                                if f not in exposure_list:
-                                    visit_list.append(str(f))
-                                    visit_start.append(tstart)
-
-                            exposure_list = np.append(exposure_list, visit_list)
-                            exposure_start.extend(visit_start)
-
-                            filter_list[filter][pupil][angle].extend(visit_list)
-
-                            if uniquename:
-                                print(visit_product, len(visit_list))
-                                so = np.argsort(visit_start)
-                                exposure_list = np.array(visit_list)[so]
-                                #output_list[visit_product.lower()] = visit_list
-
-                                d = OrderedDict(product=str(visit_product.lower()),
-                                                files=list(np.array(visit_list)[so]))
-                                output_list.append(d)
-
-                        if not uniquename:
-                            print(product, len(exposure_list))
-                            so = np.argsort(exposure_start)
-                            exposure_list = np.array(exposure_list)[so]
-                            #output_list[product.lower()] = exposure_list
-                            d = OrderedDict(product=str(product.lower()),
-                                            files=list(np.array(exposure_list)[so]))
-                            output_list.append(d)
-
-    else:
-        for filter in np.unique(info['filter']):
-            filter_list[filter] = OrderedDict()
+        else:
             angles = np.unique(pa_v3[(info['filter'] == filter)])
             for angle in angles:
                 filter_list[filter][angle] = []
 
-        for target in targets:
-            ## 3D-HST targname translations
-            target_use = target
-            for key in translate.keys():
-                target_use = target_use.replace(key, translate[key])
-    #
-            # pad i < 10 with zero
-            for key in translate.keys():
-                if translate[key] in target_use:
-                    spl = target_use.split('-')
-                    try:
-                        if (int(spl[-1]) < 10) & (len(spl[-1]) == 1):
-                            spl[-1] = '{0:02d}'.format(int(spl[-1]))
-                            target_use = '-'.join(spl)
-                    except:
-                        pass
+    for target in targets:
+        ## 3D-HST targname translations
+        target_use = target
+        for key in translate.keys():
+            target_use = target_use.replace(key, translate[key])
 
-            for filter in np.unique(info['filter'][(target_list == target)]): 
-                angles = np.unique(pa_v3[(info['filter'] == filter) &
-                                (target_list == target)])
-                for angle in angles:
+        # pad i < 10 with zero
+        for key in translate.keys():
+            if translate[key] in target_use:
+                spl = target_use.split('-')
+                try:
+                    if (int(spl[-1]) < 10) & (len(spl[-1]) == 1):
+                        spl[-1] = '{0:02d}'.format(int(spl[-1]))
+                        target_use = '-'.join(spl)
+                except:
+                    pass
+
+        for filter in np.unique(info['filter'][(target_list == target)]): 
+            angles = np.unique(pa_v3[(info['filter'] == filter) &
+                            (target_list == target)])
+            for angle in angles:
+                if isJWST:
+                    pupils = np.unique(info['pupil'][(info['filter'] == filter)])
+                else:
+                    pupils = [''] 
+                for pupil in pupils:
                     exposure_list = []
                     exposure_start = []
-                    product = '{0}-{1:05.1f}-{2}'.format(target_use, angle, filter)
-
-                    visit_match = np.unique(visits[(target_list == target) &
+                    if isJWST:
+                        product = '{0}-{1:05.1f}-{2}-{3}'.format(target_use, angle, filter, pupil)
+                        visit_match = np.unique(visits[(target_list == target) &
+                                                (info['filter'] == filter) & (info['pupil'] == pupil)])
+                    else:
+                        product = '{0}-{1:05.1f}-{2}'.format(target_use, angle, filter)
+                        visit_match = np.unique(visits[(target_list == target) &
                                                 (info['filter'] == filter)])
+                    
                     this_progs = []
                     this_visits = []
 
                     for visit in visit_match:
-                        ix = (visits == visit) & (target_list == target) & (info['filter'] == filter)
+                        if isJWST:
+                            ix = (visits == visit) & (target_list == target) & (info['filter'] == filter) & (info['pupil'] == pupil)
+                        else:
+                            ix = (visits == visit) & (target_list == target) & (info['filter'] == filter)
                         # this_progs.append(info['progIDs'][ix][0])
                         # print visit, ix.sum(), np.unique(info['progIDs'][ix])
                         new_progs = list(np.unique(info['progIDs'][ix]))
@@ -884,12 +806,20 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
                     for visit, prog in zip(this_visits, this_progs):
                         visit_list = []
                         visit_start = []
-                        visit_product = '{0}-{1}-{2}-{3:05.1f}-{4}'.format(target_use, prog, visit, angle, filter)
+                        if isJWST:
+                            visit_product = '{0}-{1}-{2}-{3:05.1f}-{4}-{5}'.format(target_use, prog, visit, angle, filter, pupil)
 
-                        use = ((target_list == target) &
-                            (info['filter'] == filter) &
-                            (visits == visit) & (pa_v3 == angle) &
-                            (info['progIDs'] == prog)) 
+                            use = ((target_list == target) &
+                                (info['filter'] == filter) &
+                                (visits == visit) & (pa_v3 == angle) &
+                                (info['progIDs'] == prog)) & (info['pupil'] == pupil)
+                        else:
+                            visit_product = '{0}-{1}-{2}-{3:05.1f}-{4}'.format(target_use, prog, visit, angle, filter)
+
+                            use = ((target_list == target) &
+                                (info['filter'] == filter) &
+                                (visits == visit) & (pa_v3 == angle) &
+                                (info['progIDs'] == prog))
 
                         if use.sum() == 0:
                             continue
@@ -905,7 +835,10 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
                         exposure_list = np.append(exposure_list, visit_list)
                         exposure_start.extend(visit_start)
 
-                        filter_list[filter][angle].extend(visit_list)
+                        if isJWST:
+                            filter_list[filter][pupil][angle].extend(visit_list)
+                        else:
+                            filter_list[filter][angle].extend(visit_list)
 
                         if uniquename:
                             print(visit_product, len(visit_list))
