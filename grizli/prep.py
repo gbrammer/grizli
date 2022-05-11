@@ -187,7 +187,7 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
         extra_msg = ' / flat: {0}'.format(flat_file)
 
         flat_im = pyfits.open(os.path.join(os.getenv('iref'), flat_file))
-        flat = flat_im['SCI'].data
+        flat = flat_im['SCI'].data[5:-5, 5:-5]
         flat_dq = (flat < 0.2)
 
         # Grism FLT from IR amplifier gain
@@ -4927,12 +4927,10 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
 
         if apply:
             # Subtract the column average in 2D & log header keywords
-            if isJWST:
-                gp_res = np.dot(y_pred[:, None]-bg_sky, np.ones((2048, 1)).T).T # changed from 1014
-            else:
-                gp_res = np.dot(y_pred[:, None]-bg_sky, np.ones((1014, 1)).T).T 
             print(file)
             flt = pyfits.open(file, mode='update')
+            imshape = flt[1].data.shape[0]
+            gp_res = np.dot(y_pred[:, None]-bg_sky, np.ones((imshape, 1)).T).T 
             flt['SCI', 1].data -= gp_res
             flt[0].header['GSKYCOL'] = (True, 'Subtract column average')
             flt.flush()
@@ -5013,10 +5011,9 @@ def fix_star_centers(root='macs1149.6+2223-rot-ca5-22-032.0-f105w',
         #     flt = pyfits.open('../RAW/'+sci[0].header['D{0:03d}DATA'.format(i+1)].split('[')[0], mode='update')
         wcs.append(pywcs.WCS(flt[1], relax=True))
         images.append(flt)
-    if isJWST:
-        yp, xp = np.indices((2048, 2048))#(1014, 1014))
-    else:
-        yp, xp = np.indices((1014, 1014))
+    imshape = sci[0].data.shape
+    print(imshape)
+    yp, xp = np.indices(imshape)
     use = cat['MAG_AUTO'] < mag_lim
     so = np.argsort(cat['MAG_AUTO'][use])
 
@@ -5780,11 +5777,9 @@ def extract_fits_log(file='idk106ckq_flt.fits', get_dq=True):
 
     log['chips'] = []
 
+    imshape = im[1].data.shape
     if get_dq:
-        if isJWST: 
-            idx = np.arange(2048**2, dtype=np.int32).reshape((2048, 2048))
-        else:
-            idx = np.arange(1014**2, dtype=np.int32).reshape((1014, 1014))
+        idx = np.arange(imshape[0]**2, dtype=np.int32).reshape(imshape)
 
     for chip in [1, 2, 3, 4]:
         key = 'SCI{0}'.format(chip)
