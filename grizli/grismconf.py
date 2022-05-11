@@ -49,8 +49,6 @@ class aXeConf():
 
         Parameters are stored in an OrderedDict in `self.conf`.
         """
-        from collections import OrderedDict
-
         conf = OrderedDict()
         fp = open(conf_file)
         lines = fp.readlines()
@@ -94,7 +92,6 @@ class aXeConf():
         """Get beam parameters and read sensitivity curves
         """
         import os
-        from collections import OrderedDict
         from astropy.table import Table, Column
 
         self.dxlam = OrderedDict()
@@ -766,11 +763,15 @@ class TransformGrismconf(object):
         self.dxlam = OrderedDict()
         self.nx = OrderedDict()
         self.sens = OrderedDict()
+        
+        self.xoff = 0.0
+        self.yoff = 0.0
 
 
     @property
     def orders(self):
         """
+        GRISMCONF order names, like '+1', '0', '+2', etc.
         """
         return self.conf.orders
 
@@ -778,6 +779,7 @@ class TransformGrismconf(object):
     @property
     def beams(self):
         """
+        aXe beam names like 'A','B','C', etc.
         """
         beams = [self.beam_names[k] for k in self.orders]
         return beams
@@ -863,7 +865,6 @@ class TransformGrismconf(object):
         
         """
         import os
-        from collections import OrderedDict
         from astropy.table import Table, Column
 
         t = np.linspace(0, 1, nt)
