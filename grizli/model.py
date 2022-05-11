@@ -4211,7 +4211,6 @@ class BeamCutout(object):
         h0['MW_EBV'] = (self.grism.MW_EBV,
                          'Milky Way exctinction E(B-V)')
 
-
         hdu = pyfits.HDUList([pyfits.PrimaryHDU(header=h0)])
         hdu.extend(self.direct.get_HDUList(extver=1))
         hdu.append(pyfits.ImageHDU(data=np.cast[np.int32](self.beam.seg),
