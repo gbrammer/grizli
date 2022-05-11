@@ -1167,67 +1167,50 @@ def parse_grism_associations(exposure_groups, info,
     """
     N = len(exposure_groups)
     grism_groups = []
-    if isJWST:
-        for i in range(N):
+    for i in range(N):
+        if isJWST:
             pupil = exposure_groups[i]['product'].split('-')[-1]
             f_i = exposure_groups[i]['product'].split('-')[-2]
-            root_i = exposure_groups[i]['product'].split('-')[0]#[:-len('-'+f_i)]
-            if f_i.startswith('g'):
-                group = OrderedDict(grism=exposure_groups[i],
-                                    direct=None)
-
-            else:
-                continue
-
-            fp_i = exposure_groups[i]['footprint']
-            olap_i = 0.
-            d_i = f_i
-
-            for j in range(N):
-                f_j = exposure_groups[j]['product'].split('-')[-2]
-                pupil_j = exposure_groups[j]['product'].split('-')[-1]
-                if f_j.startswith('g'):
-                    continue
-    
-                fp_j = exposure_groups[j]['footprint']
-                olap = fp_i.intersection(fp_j)
-                root_j = exposure_groups[j]['product'].split('-')[0]#[:-len('-'+f_j)]
-
-                if (root_j == root_i):
-
-                    if pupil_j == pupil: #not in best_direct[f_i.upper()]:
-                        group['direct'] = exposure_groups[j]
-    
-                    else:
-                        continue
-            grism_groups.append(group)
-    else:
-        for i in range(N):
+            root_i = exposure_groups[i]['product'].split('-')[0]
+        else:
             f_i = exposure_groups[i]['product'].split('-')[-1]
             root_i = exposure_groups[i]['product'][:-len('-'+f_i)]
-            if f_i.startswith('g'):
-                group = OrderedDict(grism=exposure_groups[i],
-                                    direct=None)
+        if f_i.startswith('g'):
+            group = OrderedDict(grism=exposure_groups[i],
+                                direct=None)
 
+        else:
+            continue
+
+        fp_i = exposure_groups[i]['footprint']
+        olap_i = 0.
+        d_i = f_i
+
+        for j in range(N):
+            if isJWST:
+                f_j = exposure_groups[j]['product'].split('-')[-2]
+                pupil_j = exposure_groups[j]['product'].split('-')[-1]
             else:
+                f_j = exposure_groups[j]['product'].split('-')[-1]
+            if f_j.startswith('g'):
                 continue
 
-            fp_i = exposure_groups[i]['footprint']
-            olap_i = 0.
-            d_i = f_i
-
-            d_idx = 10
-            for j in range(N):
-                f_j = exposure_groups[j]['product'].split('-')[-1]
-                if f_j.startswith('g'):
-                    continue
-    
-                fp_j = exposure_groups[j]['footprint']
-                olap = fp_i.intersection(fp_j)
+            fp_j = exposure_groups[j]['footprint']
+            olap = fp_i.intersection(fp_j)
+            if isJWST:
+                root_j = exposure_groups[j]['product'].split('-')[0]#[:-len('-'+f_j)]
+            else:
                 root_j = exposure_groups[j]['product'][:-len('-'+f_j)]
 
-                if (root_j == root_i):
+            if (root_j == root_i):
 
+                if isJWST:
+                    if pupil_j == pupil: #not in best_direct[f_i.upper()]:
+                        group['direct'] = exposure_groups[j]
+
+                    else:
+                        continue
+                else:
                     if f_j.upper() not in best_direct[f_i.upper()]:
                         continue
                     if best_direct[f_i.upper()].index(f_j.upper()) < d_idx:
@@ -1236,7 +1219,8 @@ def parse_grism_associations(exposure_groups, info,
                         olap_i = olap.area
                         d_i = f_j
 
-            grism_groups.append(group)
+        grism_groups.append(group)
+    
     return grism_groups
 
 
