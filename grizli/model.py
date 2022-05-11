@@ -4011,7 +4011,7 @@ class BeamCutout(object):
                            pad=beam.pad, grow=beam.grow,
                            beam=beam.beam, conf=conf, xcenter=beam.xcenter,
                            ycenter=beam.ycenter, fwcpos=flt.grism.fwcpos,
-                           MW_EBV=flt.grism.MW_EBV) #
+                           MW_EBV=flt.grism.MW_EBV)
 
         if hasattr(beam, 'psf_params'):
             self.beam.x_init_epsf(psf_params=beam.psf_params, psf_filter=beam.psf_filter, yoff=beam.psf_yoff)
