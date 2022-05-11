@@ -424,7 +424,7 @@ def go(root='j010311+131615',
                     parse_visits_args['max_dt'] = 4./24
                 else:
                     parse_visits_args['combine_same_pa'] = False
-                    parse_visits_args['max_dt'] = 1. 
+                    parse_visits_args['max_dt'] = 1.
 
         else:
             parse_visits_args['combine_same_pa'] = is_parallel_field
