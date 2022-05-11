@@ -1118,7 +1118,7 @@ def parse_grism_associations(exposure_groups, info,
         fp_i = exposure_groups[i]['footprint']
         olap_i = 0.
         d_i = f_i
-
+        d_idx = 10
         for j in range(N):
             if isJWST:
                 f_j = exposure_groups[j]['product'].split('-')[-2]
