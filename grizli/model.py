@@ -4086,7 +4086,6 @@ class BeamCutout(object):
             direct_filter = self.direct.filter
 
         if conf is None:
-            
             conf_args = dict(instrume=self.grism.instrument, 
                              filter=direct_filter, 
                              grism=self.grism.filter,
