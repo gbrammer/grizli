@@ -1353,7 +1353,9 @@ def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, com
         # check if we're processing JWST files
         if len(files) == 0:
             files = glob.glob(os.path.join(RAW_PATH, file_query+'rate.fits'))
-            isJWST = True # if there are only rate files, then it must be JWST    
+            isJWST = True # if there are only rate files, then it must be JWST 
+        else:
+            isJWST = False
 
     files.sort()
 
@@ -2482,83 +2484,15 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
 
     grp = None
 
-    # I will uncomment the following after testing on HST data
-    #if (g141.sum() > 0) & ('G141' in gris_ref_filters):
-    #    for f in gris_ref_filters['G141']:
-    #        if os.path.exists(f'{field_root}-{f.lower()}_drz_sci.fits'):
-    #            g141_ref = f
-    #            break
-#
-    #    # Segmentation image
-    #    if force_seg is None:
-    #        if galfit == 'clean':
-    #            seg_file = '{0}-{1}_galfit_orig_seg.fits'.format(field_root, g141_ref.lower())
-    #        elif galfit == 'model':
-    #            seg_file = '{0}-{1}_galfit_seg.fits'.format(field_root, g141_ref.lower())
-    #        else:
-    #            seg_file = glob.glob('{0}-*_seg.fits'.format(field_root))[0]
-    #            #seg_file = '{0}-ir_seg.fits'.format(field_root)
-    #    else:
-    #        seg_file = force_seg
-#
-    #    # Reference image
-    #    if force_ref is None:
-    #        if galfit == 'clean':
-    #            ref_file = '{0}-{1}_galfit_clean.fits'.format(field_root, g141_ref.lower())
-    #        elif galfit == 'model':
-    #            ref_file = '{0}-{1}_galfit.fits'.format(field_root, g141_ref.lower())
-    #        else:
-    #            ref_file = '{0}-{1}_drz_sci.fits'.format(field_root, g141_ref.lower())
-#
-    #    else:
-    #        ref_file = force_ref
-#
-    #    grp = multifit.GroupFLT(grism_files=list(info['FILE'][g141]), direct_files=[], ref_file=ref_file, seg_file=seg_file, catalog=catalog, cpu_count=-1, sci_extn=1, pad=pad)
-#
-    #    grp_objects.append(grp)
-#
-    #if (g102.sum() > 0) & ('G102' in gris_ref_filters):
-    #    for f in gris_ref_filters['G102']:
-    #        if os.path.exists('{0}-{1}_drz_sci.fits'.format(field_root, f.lower())):
-    #            g102_ref = f
-    #            break
-#
-    #    # Segmentation image
-    #    if force_seg is None:
-    #        if galfit == 'clean':
-    #            seg_file = '{0}-{1}_galfit_orig_seg.fits'.format(field_root, g102_ref.lower())
-    #        elif galfit == 'model':
-    #            seg_file = '{0}-{1}_galfit_seg.fits'.format(field_root, g102_ref.lower())
-    #        else:
-    #            seg_file = glob.glob('{0}-*_seg.fits'.format(field_root))[0]
-    #    else:
-    #        seg_file = force_seg
-#
-    #    # Reference image
-    #    if force_ref is None:
-    #        if galfit == 'clean':
-    #            ref_file = '{0}-{1}_galfit_clean.fits'.format(field_root, g102_ref.lower())
-    #        elif galfit == 'model':
-    #            ref_file = '{0}-{1}_galfit.fits'.format(field_root, g102_ref.lower())
-    #        else:
-    #            ref_file = '{0}-{1}_drz_sci.fits'.format(field_root, g102_ref.lower())
-#
-    #    else:
-    #        ref_file = force_ref
-#
-    #    grp_i = multifit.GroupFLT(grism_files=list(info['FILE'][g102]), direct_files=[], ref_file=ref_file, seg_file=seg_file, catalog=catalog, cpu_count=-1, sci_extn=1, pad=pad)
-    #    # if g141.sum() > 0:
-    #    #    grp.extend(grp_i)
-    #    # else:
-    #    #    grp = grp_i
-    #    grp_objects.append(grp_i)
-#
-    #    # del(grp_i)
-#
-    #
     for mask in masks:
         if (masks[mask][0].sum() > 0) & (masks[mask][1] in gris_ref_filters):
-            ref = masks[mask][2]
+            if len(masks[mask]) == 3:
+                ref = masks[mask][2]
+            else:
+                for f in gris_ref_filters[masks[mask][1]]:
+                    if os.path.exists('{0}-{1}_drz_sci.fits'.format(field_root, f.lower())):
+                        ref = f
+                        break
         else:
             continue
         # Segmentation image
