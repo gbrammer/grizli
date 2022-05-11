@@ -3,7 +3,6 @@ Automatic processing scripts for grizli
 """
 import os
 import inspect
-from this import d
 import traceback
 import glob
 import time
