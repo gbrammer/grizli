@@ -4,7 +4,10 @@ Demonstrate aXe trace polynomials.
 Initial code taken from `(Brammer, Pirzkal, & Ryan 2014) <https://github.com/WFC3Grism/CodeDescription>`_, which contains a detailed
 explanation how the grism configuration parameters and coefficients are defined and evaluated.
 """
+
 import os
+from collections import OrderedDict
+
 import numpy as np
 
 from . import GRIZLI_PATH
@@ -585,6 +588,316 @@ def get_config_filename(instrume='WFC3', filter='F140W',
             conf_file = os.path.join(GRIZLI_PATH, 'CONF/Euclid.Gred.0.conf')
 
     return conf_file
+
+
+class JwstDispersionTransform(object):
+    """
+    Rotate NIRISS and NIRCam coordinates such that slitless dispersion has
+    wavelength increasing towards +x.  Also works for HST, but does nothing.
+    """
+    def __init__(self, instrument='NIRCAM', module='A', grism='R', conf_file=None):
+        self.instrument = instrument
+        self.module = module
+        self.grism = grism
+        
+        if conf_file is not None:
+            if 'NIRISS' in conf_file:
+                # NIRISS_F200W_GR150R.conf
+                self.instrument = 'NIRISS'
+                self.grism = conf_file.split('.conf')[0][-1]
+                self.module = 'A'
+            elif 'NIRCAM' in conf_file:
+                # NIRCAM_F444W_modA_R.conf
+                self.instrument = 'NIRCAM'
+                self.grism = conf_file.split('.conf')[0][-1]
+                self.module = conf_file.split('.conf')[0][-3]
+            else:
+                # NIRCAM_F444W_modA_R.conf
+                self.instrument = 'HST'
+                self.grism = 'G141'
+                self.module = 'A'
+
+
+    @property
+    def array_center(self):
+        """
+        Center of rotation
+        
+        Maybe this is 1020 for NIRISS?
+        """
+        if self.instrument == 'HST':
+            return np.array([507, 507])
+        else:
+            return np.array([1024, 1024])
+
+
+    @property
+    def rotation(self):
+        """
+        Clockwise rotation (degrees) from detector to wavelength increasing
+        towards +x direction
+        """
+        if self.instrument == 'NIRCAM':
+            if self.module == 'A':
+                if self.grism == 'R':
+                    rotation = 0.
+                else:
+                    rotation = 90.
+            else:
+                if self.grism == 'R':
+                    rotation = 180.
+                else:
+                    rotation = 90.
+        elif self.instrument == 'NIRISS':
+            if self.grism == 'R':
+                rotation = 270.
+            else:
+                rotation = 180.
+        else:
+            # e.g., WFC3, ACS
+            rotation = 0.
+            
+        return rotation
+
+
+    @property
+    def rot90(self):
+        """
+        Rotations are all multiples of 90 for now, so 
+        compute values that can be passed to `numpy.rot90` for rotating
+        2D image arrays
+        """
+        return int(np.round(self.rotation/90))
+
+
+    @property 
+    def trace_axis(self):
+        """Which detector axis corresponds to increasing wavelength
+        """
+        if self.instrument == 'NIRCAM':
+            if self.module == 'A':
+                if self.grism == 'R':
+                    axis = '+x'
+                else:
+                    axis = '+y'
+            else:
+                if self.grism == 'R':
+                    axis = '-x'
+                else:
+                    axis = '+y'
+
+        elif self.instrument == 'NIRISS':
+            if self.grism == 'R':
+                axis = '-y'
+            else:
+                axis = '-x'
+        else:
+            # e.g., WFC3, ACS
+            axis = '+x'
+            
+        return axis
+
+
+    @staticmethod
+    def rotate_coordinates(x, y, theta, center):
+        """
+        Rotate cartesian coordinates ``x`` and ``y`` by angle ``theta`` 
+        (radians) about ``center``
+        """
+        _mat = np.array([[np.cos(theta), -np.sin(theta)],
+                         [np.sin(theta), np.cos(theta)]])
+        
+        x1 = np.atleast_1d(x)
+        y1 = np.atleast_1d(y)
+        
+        return ((np.array([x1, y1]).T-center).dot(_mat)+center).T
+
+
+    def forward(self, x, y):
+        """
+        Forward transform, detector to +x
+        """
+        theta = self.rotation/180*np.pi
+        return self.rotate_coordinates(x, y, theta, self.array_center)
+
+
+    def reverse(self, x, y):
+        """
+        Reverse transform, +x to detector
+        """
+        theta = -self.rotation/180*np.pi
+        return self.rotate_coordinates(x, y, theta, self.array_center)
+
+
+class TransformGrismconf(object):
+    """
+    Transform GRISMCONF-format configuration files to grizli convention of
+    wavelength increasing towards +x 
+
+    See https://github.com/npirzkal/GRISMCONF and config files at, e.g., 
+    https://github.com/npirzkal/GRISM_NIRCAM.
+
+    """
+    def __init__(self, conf_file=''):
+        """
+        Parameters
+        ----------
+        conf_file : str
+            Configuration filename
+        
+        """
+        import grismconf
+        
+        self.conf_file = conf_file
+        self.conf = grismconf.Config(conf_file)
+        self.transform = JwstDispersionTransform(conf_file=conf_file)
+
+        self.order_names = {'A':'+1',
+                           'B':'0',
+                           'C':'+2',
+                           'D':'+3',
+                           'E':'-1',
+                           'F':'+4'}
+        
+        self.beam_names = {}
+        for k in self.order_names:
+            self.beam_names[self.order_names[k]] = k
+
+        self.dxlam = OrderedDict()
+        self.nx = OrderedDict()
+        self.sens = OrderedDict()
+
+
+    @property
+    def orders(self):
+        """
+        """
+        return self.conf.orders
+
+
+    @property
+    def beams(self):
+        """
+        """
+        beams = [self.beam_names[k] for k in self.orders]
+        return beams
+
+
+    def get_beam_trace(self, x=1024, y=1024, dx=0., beam='A', fwcpos=None):
+        """
+        Function analogous to `grizli.grismconf.aXeConf.get_beam_trace` but
+        that accounts for the different dispersion axes of JWST grisms
+        
+        Parameters
+        ----------
+        x, y : float
+            Reference position in the rotated frame
+
+        dx : array-like
+            Offset in pixels along the trace
+
+        beam : str
+            Grism order, translated from +1, 0, +2, +3, -1 = A, B, C, D, E
+
+        fwcpos : float
+            NIRISS rotation *(not implemented)*
+
+        Returns
+        -------
+        dy : float or array-like
+            Center of the trace in y pixels offset from `(x,y)` evaluated at
+            `dx`.
+
+        lam : float or array-like
+            Effective wavelength along the trace evaluated at `dx`.
+
+        """
+        x0 = np.squeeze(self.transform.reverse(x, y))
+        
+        if self.transform.trace_axis == '+x':
+            t_func = self.conf.INVDISPX
+            trace_func = self.conf.DISPY
+            delta = 1*dx
+        elif self.transform.trace_axis == '-x':
+            t_func = self.conf.INVDISPX
+            trace_func = self.conf.DISPY
+            delta = -1*dx
+        elif self.transform.trace_axis == '+y':
+            t_func = self.conf.INVDISPY
+            trace_func = self.conf.DISPX
+            delta = 1*dx
+        else: # -y
+            t_func = self.conf.INVDISPY
+            trace_func = self.conf.DISPX
+            delta = -1*dx
+
+        #print('xref: ', self.conf_file, self.transform.trace_axis)
+        #print(x0, t_func)
+
+        t = t_func(self.order_names[beam], *x0, delta)
+        tdx = self.conf.DISPX(self.order_names[beam], *x0, t)
+        tdy = self.conf.DISPY(self.order_names[beam], *x0, t)
+
+        rev = self.transform.forward(x0[0]+tdx, x0[1]+tdy)
+        trace_dy = rev[1,:] - y
+
+        wave = self.conf.DISPL(self.order_names[beam], *x0, t)
+        if self.transform.instrument != 'HST':
+            wave *= 1.e4
+
+        return trace_dy, wave
+
+
+    def get_beams(self, nt=512):
+        """
+        Get beam parameters and read sensitivity curves
+        
+        Parameters
+        ----------
+        nt : int
+            Number of points to sample the GRISMCONF `t` parameter
+        
+        Returns
+        -------
+        sets `dxlam`, `nx`, `sens`, attributes
+        
+        """
+        import os
+        from collections import OrderedDict
+        from astropy.table import Table, Column
+
+        t = np.linspace(0, 1, nt)
+
+        for beam in self.beams:
+            order = self.order_names[beam]
+            dx = self.conf.DISPX(order, *self.transform.array_center, t)
+            dy = self.conf.DISPY(order, *self.transform.array_center, t)
+            lam = self.conf.DISPL(order, *self.transform.array_center, t)
+
+            trace_axis = self.transform.trace_axis
+
+            if trace_axis == '+x':
+                xarr = 1*dx
+            elif trace_axis == '-x':
+                xarr = -1*dx
+            elif trace_axis == '+y':
+                xarr = 1*dy
+            elif trace_axis == '-y':
+                xarr = -1*dy
+
+            xarr = np.cast[int](np.round(xarr))
+
+            #self.beams.append(beam)
+            self.dxlam[beam] = np.arange(xarr[0], xarr[-1], dtype=int)
+            self.nx[beam] = xarr[-1] - xarr[0]+1
+
+            sens = Table()
+            sens['WAVELENGTH'] = lam.astype(np.double)
+            sens['SENSITIVITY'] = self.conf.SENS[order](lam).astype(np.double)
+            if lam.max() < 100:
+                sens['WAVELENGTH'] *= 1.e4
+
+            self.sens[beam] = sens
 
 
 def load_grism_config(conf_file):
