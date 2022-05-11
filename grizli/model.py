@@ -2177,7 +2177,7 @@ class ImageData(object):
                               header=slice_header, wcs=slice_wcs,
                               photflam=self.photflam, photplam=self.photplam,
                               origin=slice_origin, instrument=self.instrument,
-                              filter=self.filter,  pupil=self.pupil, 
+                              filter=self.filter, pupil=self.pupil, 
                               process_jwst_header=False) 
 
         slice_obj.ref_photflam = self.ref_photflam
