@@ -5813,14 +5813,21 @@ def extract_fits_log(file='idk106ckq_flt.fits', get_dq=True):
 def check_isJWST(infile=''):
     '''
     Check if a file or list of files is JWST image. 
-    Parameters:
-    - infile: fits file
+    Parameters
+    ----------
+    infile : fits file
+        File to test
     
-    Returns:
-    - True or False
+    Returns
+    -------
+    isJWST : bool
     '''
 
     hdu = pyfits.open(infile)
-    isJWST = (hdu[0].header['TELESCOP'] == 'JWST')
-    hdu.close()
+    try:
+        isJWST = (hdu[0].header['TELESCOP'] == 'JWST')
+        hdu.close()
+    except:
+        isJWST = False
+    
     return isJWST
