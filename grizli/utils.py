@@ -600,7 +600,7 @@ def multiprocessing_ndfilter(data, filter_func, filter_args=(), size=None, footp
     return filtered
 
 def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
-                    get_footprint=False, isJWST=False, 
+                    get_footprint=False, isJWST=False,
                     translate={'AEGIS-': 'aegis-',
                                  'COSMOS-': 'cosmos-',
                                  'GNGRISM': 'goodsn-',
@@ -608,7 +608,6 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
                                  'UDS-': 'uds-'},
                     visit_split_shift=1.5, max_dt=1e9):
     """Read header information from a list of exposures and parse out groups based on filter/target/orientation.
-    For JWST the groups need to include the pupil.
 
     Parameters
     ----------
@@ -753,7 +752,7 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
                 filter_list[filter][angle] = []
 
     for target in targets:
-        ## 3D-HST targname translations
+        # 3D-HST targname translations
         target_use = target
         for key in translate.keys():
             target_use = target_use.replace(key, translate[key])
@@ -769,9 +768,9 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
                 except:
                     pass
 
-        for filter in np.unique(info['filter'][(target_list == target)]): 
+        for filter in np.unique(info['filter'][(target_list == target)]):
             angles = np.unique(pa_v3[(info['filter'] == filter) &
-                            (target_list == target)])
+                                (target_list == target)])
             for angle in angles:
                 if isJWST:
                     pupils = np.unique(info['pupil'][(info['filter'] == filter)])
@@ -912,7 +911,6 @@ def split_visit(visit, visit_split_shift=1.5, max_dt=6./24, path='../RAW'):
     """
 
     ims = [pyfits.open(os.path.join(path, file)) for file in visit['files']]
-
     crval1 = np.array([im[1].header['CRVAL1'] for im in ims])
     crval2 = np.array([im[1].header['CRVAL2'] for im in ims])
     expstart = np.array([im[0].header['EXPSTART'] for im in ims])
@@ -924,8 +922,6 @@ def split_visit(visit, visit_split_shift=1.5, max_dt=6./24, path='../RAW'):
     dxi = np.cast[int](np.round(dx/visit_split_shift))
     dyi = np.cast[int](np.round(dy/visit_split_shift))
     keys = dxi*100+dyi+1000*dt
-
-    
 
     un = np.unique(keys)
     if len(un) == 1:
@@ -1067,6 +1063,7 @@ def parse_visit_overlaps(visits, buffer=15.):
         f_i = exposure_groups[i]['product'].split('-')[-1]
         product += '-'+f_i
         exposure_groups[i]['product'] = product
+    
     return exposure_groups
 
 
@@ -1099,6 +1096,7 @@ def parse_grism_associations(exposure_groups, info,
 
     """
     N = len(exposure_groups)
+
     grism_groups = []
     for i in range(N):
         if isJWST:
@@ -1111,7 +1109,6 @@ def parse_grism_associations(exposure_groups, info,
         if f_i.startswith('g'):
             group = OrderedDict(grism=exposure_groups[i],
                                 direct=None)
-
         else:
             continue
 
@@ -1153,7 +1150,7 @@ def parse_grism_associations(exposure_groups, info,
                         d_i = f_j
 
         grism_groups.append(group)
-    
+
     return grism_groups
 
 

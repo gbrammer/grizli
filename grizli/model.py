@@ -4002,7 +4002,7 @@ class BeamCutout(object):
         self.id = beam.id
         if conf is None:
             conf = grismconf.load_grism_config(flt.conf_file)
-            
+
         self.beam = GrismDisperser(id=beam.id, direct=beam.direct*1,
                            segmentation=beam.seg*1, origin=beam.origin,
                            pad=beam.pad, grow=beam.grow,
@@ -4077,7 +4077,7 @@ class BeamCutout(object):
         # #
         if 'DFILTER' in self.grism.header:
             direct_filter = self.grism.header['DFILTER']
-        elif self.grism.instrument in ['NIRCAM', 'NIRISS']:
+        if self.grism.instrument in ['NIRCAM', 'NIRISS']:
             direct_filter = self.grism.pupil
         else:
             direct_filter = self.direct.filter

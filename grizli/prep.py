@@ -3184,10 +3184,6 @@ def process_direct_grism_visit(direct={},
             if isJWST:
                 img = jwst_utils.img_with_wcs(file)
                 img.save(file)
-                temp_hdu = pyfits.open(file,mode='update')
-                temp_hdu[0].header['FILTER'] = temp_hdu[0].header['FILTER_INFO']
-                temp_hdu[0].header['EXP_TYPE'] = temp_hdu[0].header['EXPTYPE_INFO']
-                temp_hdu.flush()
             else:
                 try:
                     updatewcs.updatewcs(file, verbose=False, use_db=False)
