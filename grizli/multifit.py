@@ -24,7 +24,7 @@ from . import model
 #from . import stack
 from .fitting import GroupFitter
 #from .utils_c import disperse
-#from .utils_c import interp
+from .utils_c import interp
 
 from .utils import GRISM_COLORS, GRISM_MAJOR, GRISM_LIMITS, DEFAULT_LINE_LIST
 
@@ -263,7 +263,7 @@ class GroupFLT():
         self.grism_files = grism_files
         self.direct_files = direct_files
         self.group_name = group_name
-        
+
         # Wavelengths for polynomial fits
         self.polyx = polyx
 
@@ -295,7 +295,6 @@ class GroupFLT():
         if cpu_count < 0:
             # serial
             t0_pool = time.time()
-            
             for i in range(N):
                 flt = _loadFLT(self.grism_files[i], sci_extn, 
                                self.direct_files[i], pad, ref_file, ref_ext, 

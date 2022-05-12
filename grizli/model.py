@@ -2870,7 +2870,6 @@ class GrismFLT(object):
         else:
             ext = 'REF'
 
-
         # set up the beams to extract
         if get_beams is None:
             beam_names = self.conf.beams
@@ -3888,11 +3887,10 @@ class BeamCutout(object):
         See parameter description for `~grizli.model.BeamCutout`.
         """
         # bad pixels or problems with uncertainties
-        self.mask = ((self.grism.data['DQ'] > 0) | 
+        self.mask = ((self.grism.data['DQ'] > 0) |
                      (self.grism.data['ERR'] == 0) |
                      (self.grism.data['SCI'] == 0))
         
-
         self.var = self.grism.data['ERR']**2
         self.var[self.mask] = 1.e30
         self.ivar = 1/self.var
@@ -4004,6 +4002,7 @@ class BeamCutout(object):
         self.id = beam.id
         if conf is None:
             conf = grismconf.load_grism_config(flt.conf_file)
+            
         self.beam = GrismDisperser(id=beam.id, direct=beam.direct*1,
                            segmentation=beam.seg*1, origin=beam.origin,
                            pad=beam.pad, grow=beam.grow,
