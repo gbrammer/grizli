@@ -3202,6 +3202,7 @@ def process_direct_grism_visit(direct={},
     if not skip_grism:
         for file in grism['files']:
             fresh_flt_file(file)
+
             # Need to force F814W filter for updatewcs
             if isACS:
                 flc = pyfits.open(file, mode='update')
@@ -3256,7 +3257,7 @@ def process_direct_grism_visit(direct={},
     else:
         bits = 576+256
         driz_cr_snr = '8.0 5.0'
-        driz_cr_scale = '2.5 0.7' 
+        driz_cr_scale = '2.5 0.7'
 
     if 'driz_cr_scale' in drizzle_params:
         driz_cr_scale = drizzle_params['driz_cr_scale']
@@ -3372,7 +3373,7 @@ def process_direct_grism_visit(direct={},
             tweak_align(direct_group=direct, grism_group=grism,
                         max_dist=tweak_max_dist, n_min=tweak_n_min,
                         key=' ', drizzle=False,
-                        threshold=tweak_threshold, isJWST=isJWST, fit_order=tweak_fit_order)
+                        threshold=tweak_threshold, fit_order=tweak_fit_order)
 
         if (isACS) & (len(direct['files']) == 1) & single_image_CRs:
             find_single_image_CRs(direct, simple_mask=False, with_ctx_mask=False, run_lacosmic=True)
@@ -3418,7 +3419,7 @@ def process_direct_grism_visit(direct={},
                 hdu[3].data = hdu[3].data.astype(np.int16)
                 hdu.flush()
             AstroDrizzle(direct['files'], output=direct['product'],
-                         clean=True, context=False, preserve=False, 
+                         clean=True, context=False, preserve=False,
                          skysub=True, driz_separate=True, driz_sep_wcs=True,
                          median=True, blot=True, driz_cr=True,
                          driz_cr_snr=driz_cr_snr_first,
@@ -3451,7 +3452,6 @@ def process_direct_grism_visit(direct={},
                              driz_cr_corr=False, driz_combine=True,
                              final_bits=bits, coeffs=True, build=False,
                              final_wht_type='IVM', gain='-99', rdnoise='-99', resetbits=0)
-
         
         # Make catalog & segmentation image
         if align_thresh is None:
@@ -3508,6 +3508,7 @@ def process_direct_grism_visit(direct={},
             fp = open('{0}.wcs_failed'.format(direct['product']), 'w')
             fp.write(guess.__str__())
             fp.close()
+
             # Does nothing but moves forward
             result = align_drizzled_image(root=direct['product'],
                                       mag_limits=align_mag_limits,
@@ -3567,6 +3568,7 @@ def process_direct_grism_visit(direct={},
                 pixfrac = 1.0
             else:
                 pixfrac = 0.8
+
             AstroDrizzle(direct['files'], output=direct['product'],
                          clean=True, final_pixfrac=pixfrac,
                          context=(isACS | isWFPC2),
@@ -3574,7 +3576,6 @@ def process_direct_grism_visit(direct={},
                          preserve=False, driz_cr_snr=driz_cr_snr,
                          driz_cr_scale=driz_cr_scale, build=False,
                          final_wht_type='IVM', gain='-99', rdnoise='-99', **drizzle_params)
-        
         # Flag areas of ACS images covered by a single image, where
         # CRs aren't appropriately masked
         is_single = (len(direct['files']) == 1)
@@ -3642,7 +3643,7 @@ def process_direct_grism_visit(direct={},
 
         if (fix_stars) & (not isACS) & (not isWFPC2):
             fix_star_centers(root=direct['product'], drizzle=False, 
-                             mag_lim=-19.5)
+                             mag_lim=19.5)
 
     #################
     # Grism image processing
@@ -3673,7 +3674,7 @@ def process_direct_grism_visit(direct={},
     # Subtract grism sky
     status = visit_grism_sky(grism=grism, apply=True, sky_iter=sky_iter,
                           column_average=column_average, verbose=True, ext=1,
-                          iter_atol=iter_atol, isJWST=isJWST)
+                          iter_atol=iter_atol)
 
     # Run on second chip (also for UVIS/G280)
     if isACS:
@@ -3721,7 +3722,6 @@ def process_direct_grism_visit(direct={},
     # Add direct filter to grism FLT headers
     set_grism_dfilter(direct, grism)
 
-
     return True
 
 
@@ -3753,7 +3753,7 @@ def set_grism_dfilter(direct, grism):
         flt.flush()
 
 
-def tweak_align(direct_group={}, grism_group={}, max_dist=1., n_min=10, key=' ', threshold=3, drizzle=False, isJWST=False, fit_order=-1):
+def tweak_align(direct_group={}, grism_group={}, max_dist=1., n_min=10, key=' ', threshold=3, drizzle=False, fit_order=-1):
     """Intra-visit shift alignment
     
     Parameters
@@ -3848,10 +3848,7 @@ def tweak_align(direct_group={}, grism_group={}, max_dist=1., n_min=10, key=' ',
         return True
 
     # Redrizzle
-    if isJWST:
-        bits = 1
-    else:
-        bits  = 576
+    bits = 576
     driz_cr_snr = '8.0 5.0'
     driz_cr_scale = '2.5 0.7'
     if 'par' in direct_group['product']:
@@ -4539,7 +4536,7 @@ def match_direct_grism_wcs(direct={}, grism={}, get_fresh_flt=True,
         im.flush()
 
 
-def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext=1, sky_iter=10, iter_atol=1.e-4, use_spline=True, NXSPL=50, isJWST=False):
+def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext=1, sky_iter=10, iter_atol=1.e-4, use_spline=True, NXSPL=50):
     """Subtract sky background from grism exposures
 
     Implementation of the multi-component grism sky subtraction from 
@@ -4561,6 +4558,7 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
     # Figure out which grism
     im = pyfits.open(grism['files'][0])
     grism_element = utils.get_hst_filter(im[0].header)
+    isJWST = check_isJWST(grism['files'][0])
     if isJWST:
         pupil = im[0].header['PUPIL']
     else:
@@ -4662,7 +4660,6 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
 
     yp, xp = np.indices(sh)
 
-    # Hard-coded (1014,1014) WFC3/IR images (changed to 2048, 2048 for jwst)
     Npix = sh[0]*sh[1]
     Nexp = len(grism['files'])
     Nfix = len(data_fixed)
@@ -4927,7 +4924,6 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
 
         if apply:
             # Subtract the column average in 2D & log header keywords
-            print(file)
             flt = pyfits.open(file, mode='update')
             imshape = flt[1].data.shape[0]
             gp_res = np.dot(y_pred[:, None]-bg_sky, np.ones((imshape, 1)).T).T 
@@ -5012,7 +5008,6 @@ def fix_star_centers(root='macs1149.6+2223-rot-ca5-22-032.0-f105w',
         wcs.append(pywcs.WCS(flt[1], relax=True))
         images.append(flt)
     imshape = sci[0].data.shape
-    print(imshape)
     yp, xp = np.indices(imshape)
     use = cat['MAG_AUTO'] < mag_lim
     so = np.argsort(cat['MAG_AUTO'][use])
@@ -5104,7 +5099,7 @@ def fix_star_centers(root='macs1149.6+2223-rot-ca5-22-032.0-f105w',
     if drizzle:
         files = [flt.filename() for flt in images]
 
-        bits  = 576
+        bits = 576
 
         if root.startswith('par'):
             pixfrac = 1.0
@@ -5401,7 +5396,7 @@ def clean_amplifier_residuals(files, extensions=[1,2], minpix=5e5, max_percentil
     return fig
 
 
-def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, max_files=999, isJWST=False, pixfrac=0.8, scale=0.06, skysub=True, skymethod='localmin', skyuser='MDRIZSKY', bits=None, build=False, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='EXP', final_wt_scl='exptime', final_kernel='square', context=False, static=True, use_group_footprint=False, fetch_flats=True, fix_wcs_system=False, include_saturated=False, run_driz_cr=False, driz_cr_snr=None, driz_cr_scale=None, resetbits=0, driz_cr_snr_grow=1, driz_cr_scale_grow=1, log=False, **kwargs):
+def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, max_files=999, pixfrac=0.8, scale=0.06, skysub=True, skymethod='localmin', skyuser='MDRIZSKY', bits=None, build=False, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='EXP', final_wt_scl='exptime', final_kernel='square', context=False, static=True, use_group_footprint=False, fetch_flats=True, fix_wcs_system=False, include_saturated=False, run_driz_cr=False, driz_cr_snr=None, driz_cr_scale=None, resetbits=0, driz_cr_snr_grow=1, driz_cr_scale_grow=1, log=False, **kwargs):
     """Combine overlapping visits into single output mosaics
 
     Parameters

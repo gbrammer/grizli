@@ -472,7 +472,7 @@ def go(root='j010311+131615',
 
     auto_script.preprocess(field_root=root, HOME_PATH=PATHS['home'], 
                            PERSIST_PATH=PATHS['persist'],
-                           visit_prep_args=visit_prep_args, isJWST=isJWST,
+                           visit_prep_args=visit_prep_args,
                            persistence_args=persistence_args, 
                            **preprocess_args)
 
@@ -624,7 +624,7 @@ def go(root='j010311+131615',
         make_combined_mosaics(root, mosaic_args=mosaic_args,
                         fix_stars=fix_stars, mask_spikes=mask_spikes,
                         skip_single_optical_visits=skip_single,
-                        mosaic_driz_cr_type=mosaic_driz_cr_type, isJWST=isJWST, 
+                        mosaic_driz_cr_type=mosaic_driz_cr_type,
                         mosaic_drizzle_args=mosaic_drizzle_args)
 
         # Make PSFs.  Always set get_line_maps=False since PSFs now
@@ -1369,7 +1369,6 @@ def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, com
                                             method='count', logical='OR')
         info = info[sel]
 
-
     if is_dash:
         # DASH visits split by exposure
         ima_files = glob.glob(os.path.join(RAW_PATH, '*ima.fits'))
@@ -1406,7 +1405,7 @@ def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, com
         return visits, all_groups, info
 
     visits, filters = utils.parse_flt_files(info=info, 
-                                  uniquename=True, get_footprint=True, isJWST=isJWST, 
+                                  uniquename=True, get_footprint=True,
                                   use_visit=use_visit, max_dt=max_dt, 
                                   visit_split_shift=visit_split_shift)
     
@@ -1421,7 +1420,6 @@ def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, com
         for visit in visits:
             filter_pa = '-'.join(visit['product'].split('-')[-2:])
             prog = '-'.join(visit['product'].split('-')[-4:-3])
-            #print(visit,filter_pa, prog)
             key = 'i{0}-{1}'.format(prog, filter_pa)
             if key not in combined:
                 combined[key] = {'product': key, 'files': [], 'footprint': visit['footprint']}
@@ -1484,11 +1482,10 @@ def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, com
         print('** Combine Singles: **')
         for i, visit in enumerate(visits):
             print('{0} {1} {2}'.format(i, visit['product'], len(visit['files'])))
-    all_groups = utils.parse_grism_associations(visits, info, isJWST=isJWST)
+    all_groups = utils.parse_grism_associations(visits, info)
     print('\n == Grism groups ==\n')
     valid_groups = []
     for g in all_groups:
-
         try:
             print(g['direct']['product'], len(g['direct']['files']), g['grism']['product'], len(g['grism']['files']))
             valid_groups.append(g)
@@ -1771,6 +1768,7 @@ def preprocess(field_root='j142724+334246',  HOME_PATH='/Volumes/Pegasus/Grizli/
             master_radec = radec
 
         print('\n\n\n{0} radec: {1}\n\n\n'.format(direct['product'], radec))
+        
         ###########################
         # Preprocessing script, background subtraction, etc.
         status = prep.process_direct_grism_visit(direct=direct, grism=grism,
@@ -2734,7 +2732,7 @@ def refine_model_with_fits(field_root='j142724+334246', grp=None, master_files=N
     del(grp)
 
 
-def extract(field_root='j142724+334246', maglim=[13, 24], prior=None, MW_EBV=0.00, ids=[], pline=DITHERED_PLINE, fit_only_beams=True, run_fit=True, isJWST=False, poly_order=7, oned_R=30, master_files=None, grp=None, bad_pa_threshold=None, fit_trace_shift=False, size=32, diff=True, min_sens=0.02, fcontam=0.2, min_mask=0.01, sys_err=0.03, skip_complete=True, fit_args={}, args_file='fit_args.npy', get_only_beams=False):
+def extract(field_root='j142724+334246', maglim=[13, 24], prior=None, MW_EBV=0.00, ids=[], pline=DITHERED_PLINE, fit_only_beams=True, run_fit=True, poly_order=7, oned_R=30, master_files=None, grp=None, bad_pa_threshold=None, fit_trace_shift=False, size=32, diff=True, min_sens=0.02, fcontam=0.2, min_mask=0.01, sys_err=0.03, skip_complete=True, fit_args={}, args_file='fit_args.npy', get_only_beams=False):
     import glob
     import os
 
@@ -3517,7 +3515,7 @@ def make_reference_wcs(info, files=None, output='mosaic_wcs-ref.fits', filters=[
         return ref_hdu[1]
 
 
-def drizzle_overlaps(field_root, isJWST=False, filters=['F098M', 'F105W', 'F110W', 'F115W', 'F125W', 'F140W', 'F150W', 'F160W', 'F200W'], ref_image=None, ref_wcs=None, bits=None, pixfrac=0.75, scale=0.06, make_combined=False, drizzle_filters=True, skysub=False, skymethod='localmin', match_str=[], context=False, pad_reference=60, min_nexp=2, static=True, skip_products=[], include_saturated=False, multi_driz_cr=False, filter_driz_cr=False, **kwargs):
+def drizzle_overlaps(field_root, filters=['F098M', 'F105W', 'F110W', 'F115W', 'F125W', 'F140W', 'F150W', 'F160W', 'F200W'], ref_image=None, ref_wcs=None, bits=None, pixfrac=0.75, scale=0.06, make_combined=False, drizzle_filters=True, skysub=False, skymethod='localmin', match_str=[], context=False, pad_reference=60, min_nexp=2, static=True, skip_products=[], include_saturated=False, multi_driz_cr=False, filter_driz_cr=False, **kwargs):
     """
     Drizzle filter groups based on precomputed image associations
     """
@@ -3663,7 +3661,7 @@ def drizzle_overlaps(field_root, isJWST=False, filters=['F098M', 'F105W', 'F110W
 
         prep.drizzle_overlaps([wfc3ir], parse_visits=False, 
                               pixfrac=pixfrac, scale=scale, skysub=False,
-                              bits=bits, isJWST=isJWST, final_wcs=True, final_rot=0,
+                              bits=bits, final_wcs=True, final_rot=0,
                               final_outnx=None, final_outny=None,
                               final_ra=None, final_dec=None,
                               final_wht_type='IVM', final_wt_scl='exptime',
@@ -3681,7 +3679,7 @@ def drizzle_overlaps(field_root, isJWST=False, filters=['F098M', 'F105W', 'F110W
         print('Drizzle mosaics in filters: {0}'.format(filter_groups.keys()))
         prep.drizzle_overlaps(keep, parse_visits=False,
                               pixfrac=pixfrac, scale=scale, skysub=skysub,
-                              skymethod=skymethod, bits=bits, isJWST=isJWST, final_wcs=True,
+                              skymethod=skymethod, bits=bits, final_wcs=True,
                               final_rot=0, final_outnx=None, final_outny=None,
                               final_ra=None, final_dec=None,
                               final_wht_type='IVM', final_wt_scl='exptime',
@@ -3798,7 +3796,7 @@ def make_filter_combinations(root, weight_fnu=True, filter_combinations=FILTER_C
             pyfits.PrimaryHDU(data=wht, header=head[band]).writeto(output_sci[band].replace('_sci', '_wht'), overwrite=True, output_verify='fix')
 
 
-def make_combined_mosaics(root, fix_stars=False, mask_spikes=False, isJWST = False, skip_single_optical_visits=True, mosaic_args=args['mosaic_args'], mosaic_driz_cr_type=0, mosaic_drizzle_args=args['mosaic_drizzle_args'], **kwargs):
+def make_combined_mosaics(root, fix_stars=False, mask_spikes=False, skip_single_optical_visits=True, mosaic_args=args['mosaic_args'], mosaic_driz_cr_type=0, mosaic_drizzle_args=args['mosaic_drizzle_args'], **kwargs):
     """
     Drizzle combined mosaics
 
@@ -3847,7 +3845,7 @@ def make_combined_mosaics(root, fix_stars=False, mask_spikes=False, isJWST = Fal
                      make_combined=False,
                      ref_image=wcs_ref_file, include_saturated=fix_stars,
                      multi_driz_cr=(mosaic_driz_cr_type & 1) > 0,
-                     filter_driz_cr=(mosaic_driz_cr_type & 2) > 0, isJWST=isJWST, 
+                     filter_driz_cr=(mosaic_driz_cr_type & 2) > 0, 
                      **mosaic_drizzle_args)
 
     make_filter_combinations(root, weight_fnu=True, min_count=1,
