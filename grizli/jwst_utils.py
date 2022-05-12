@@ -123,8 +123,6 @@ def img_with_wcs(input):
 
     # HDUList -> jwst.datamodels.ImageModel
 
-    # if input is a string, open it/make it an HDUList
-
     # Generate WCS as image
     if not isinstance(input, pyfits.HDUList):
         input = pyfits.open(input)
@@ -154,6 +152,7 @@ def img_with_wcs(input):
     #dist_file = crds_client.get_reference_file(img, 'distortion')
     #reference_files = {'distortion': dist_file}
     #with_wcs = assign_wcs.load_wcs(img, reference_files=reference_files)
+    
     return with_wcs
 
 
