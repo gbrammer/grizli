@@ -1612,7 +1612,6 @@ class ImageData(object):
         if (instrument in ['NIRISS', 'NIRCAM']) & (~self.is_slice):
             if process_jwst_header:
                 self.update_jwst_wcsheader(hdulist)
-        
 
         if self.header is not None:
             if wcs is None:
@@ -2178,7 +2177,7 @@ class ImageData(object):
                               photflam=self.photflam, photplam=self.photplam,
                               origin=slice_origin, instrument=self.instrument,
                               filter=self.filter, pupil=self.pupil, 
-                              process_jwst_header=False) 
+                              process_jwst_header=False)
 
         slice_obj.ref_photflam = self.ref_photflam
         slice_obj.ref_photplam = self.ref_photplam
@@ -2849,7 +2848,6 @@ class GrismFLT(object):
 
         # debug
         # x=None; y=None; size=10; mag=-1; spectrum_1d=None; compute_size=True; store=False; in_place=False; add=True; get_beams=['A']; verbose=True
-        
         if id in self.object_dispersers:
             object_in_model = True
             beams = self.object_dispersers[id]
