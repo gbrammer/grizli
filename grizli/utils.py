@@ -6051,7 +6051,7 @@ def fetch_config_files(ACS=False, get_sky=True, get_stars=True, get_epsf=True):
         #psf_path = 'https://www.stsci.edu/~jayander/STDPSFs/WFC3IR/'
         #psf_root = 'PSFSTD'
         #psf_path = 'https://www.stsci.edu/~jayander/HST1PASS/'
-        psf_path = 'https://www.stsci.edu/~jayander/HST1PASS/LIBRARIES/'
+        psf_path = 'https://www.stsci.edu/~jayander/HST1PASS/LIB/'
         psf_path += 'PSFs/STDPSFs/WFC3IR/'
         psf_root = 'STDPSF'
         
