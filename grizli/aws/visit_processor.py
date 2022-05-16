@@ -671,7 +671,7 @@ def launch_ec2_instances(nmax=50, templ='lt-0e8c2b8611c9029eb,Version=11'):
                       FROM assoc_table
                       WHERE status = 0""")
     
-    count = np.minimum(nmax, len(assoc)/2)
+    count = int(np.minimum(nmax, len(assoc)/2))
 
     if count == 0:
         print('No associations to run, abort.')
