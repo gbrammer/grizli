@@ -1413,8 +1413,6 @@ def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, com
 
     # Don't run combine_minexp if have grism exposures
     grisms = ['G141', 'G102', 'G800L', 'G280', 'GR150C', 'GR150R']
-    has_grism = utils.column_string_operation(info['FILTER'], grisms,
-                                              'count', 'or').sum()
     has_grism = np.in1d(info['FILTER'], grisms).sum() > 0
     # is PUPIL in info?
     has_grism |= np.in1d(info['PUPIL'], ['GRISMR', 'GRISMC']).sum() > 0
