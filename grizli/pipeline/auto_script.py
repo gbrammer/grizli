@@ -1909,11 +1909,11 @@ def preprocess(field_root='j142724+334246',  HOME_PATH='/Volumes/Pegasus/Grizli/
     if isJWST:
         for file in direct['files']:
             hdu = pyfits.open(file, mode='update')
-            hdu[0].header['INSTRUME'] = 'NIRISS'
+            hdu[0].header['INSTRUME'] = hdu[0].header['OINSTRUME']
             hdu.flush()
         for file in grism['files']:
             hdu = pyfits.open(file, mode='update')
-            hdu[0].header['INSTRUME'] = 'NIRISS'
+            hdu[0].header['INSTRUME'] = hdu[0].header['OINSTRUME']
             hdu.flush()
 
 
