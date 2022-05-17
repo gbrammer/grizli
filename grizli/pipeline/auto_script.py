@@ -1416,6 +1416,7 @@ def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, com
     has_grism = np.in1d(info['FILTER'], grisms).sum() > 0
     # is PUPIL in info?
     has_grism |= np.in1d(info['PUPIL'], ['GRISMR', 'GRISMC']).sum() > 0
+    info.meta['HAS_GRISM'] = has_grism
 
     if combine_same_pa:
         combined = {}
@@ -3973,9 +3974,7 @@ def make_combined_mosaics(root, fix_stars=False, mask_spikes=False, skip_single_
     if fill_mosaics:
         if fill_mosaics == 'grism':
             # Only fill mosaics if grism filters exist
-            has_grism = utils.column_string_operation(info['FILTER'],
-                                     ['G141', 'G102', 'G800L', 'GR150C', 'GR150R'],
-                                     'count', 'or').sum() > 0
+            has_grism = info.meta['HAS_GRISM']
             if has_grism:
                 fill_filter_mosaics(root)
         else:
