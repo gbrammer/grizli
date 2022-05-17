@@ -3290,6 +3290,7 @@ def process_direct_grism_visit(direct={},
         steps_det1 = Detector1Pipeline.from_config_file(config_file=JWST_PIPELINE + 'calwebb_detector1.cfg')
         for file in direct['files']:
             hdu = pyfits.open(file, mode='update')
+            hdu[0].header['OINSTRUME'] = hdu[0].header['INSTRUME'] # save the original instrument name 
             hdu[0].header['INSTRUME'] = 'WFC3'
             hdu[0].header['DETECTOR'] = 'IR'
             hdu[1].header['NGOODPIX'] = -99
@@ -3320,6 +3321,7 @@ def process_direct_grism_visit(direct={},
     #
         for file in grism['files']:
             hdu = pyfits.open(file, mode='update')
+            hdu[0].header['OINSTRUME'] = hdu[0].header['INSTRUME']
             hdu[0].header['INSTRUME'] = 'WFC3'
             hdu[0].header['DETECTOR'] = 'IR'
             hdu[1].header['NGOODPIX'] = -99
