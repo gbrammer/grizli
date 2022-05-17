@@ -129,8 +129,8 @@ def img_with_wcs(input):
     if isinstance(input, pyfits.HDUList):
         if input[0].header['INSTRUME'] == 'NIRISS':
             if input[0].header['FILTER'].startswith('GR'):
-                input[0].header['FILTER_INFO'] = input[0].header['FILTER'] # just to save it so we can change it back at the end
-                input[0].header['EXPTYPE_INFO'] = input[0].header['EXP_TYPE']
+                input[0].header['OFILTER'] = input[0].header['FILTER'] # just to save it so we can change it back at the end
+                input[0].header['OEXPTYPE'] = input[0].header['EXP_TYPE']
                 input[0].header['FILTER'] = 'CLEAR'
                 input[0].header['EXP_TYPE'] = 'NIS_IMAGE'
                 #print(input[0].header)
