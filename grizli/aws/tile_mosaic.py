@@ -1545,7 +1545,7 @@ def build_mosaic_from_subregions(root='mos-{tile}-{filter}_{drz}', tile=2530, fi
                 wfile = file.replace('_sci','_wht')
                 db.download_s3_file(s3+wfile, overwrite=False, verbose=False)
                 if os.path.exists(wfile):
-                    imw = pyfits.open(file)
+                    imw = pyfits.open(wfile)
                     imgw[sly, slx] += imw[0].data                                    
             else:
                 wfile = None
