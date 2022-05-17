@@ -441,9 +441,9 @@ def go(root='j010311+131615',
         return True
 
     visits, all_groups, info = parsed
-    run_has_grism = utils.column_string_operation(info['FILTER'],
-                                                ['G141', 'G102', 'G800L', 'GR150C', 'GR150R'],
-                                              'count', 'or').sum()
+    run_has_grism = np.in1d(info['FILTER'], ['G141', 'G102', 'G800L', 'GR150C', 'GR150R']).sum() > 0
+    # is PUPIL in info?
+    run_has_grism |= np.in1d(info['PUPIL'], ['GRISMR', 'GRISMC']).sum() > 0
 
     # Alignment catalogs
     #catalogs = ['PS1','SDSS','GAIA','WISE']
