@@ -1389,7 +1389,6 @@ def calc_header_zeropoint(im, ext=0):
               5*np.log10(header['PHOTPLAM']) + 18.6921)
 
         ZP += 2.5*np.log10(scale_exptime)
-        print(np.log10(header['PHOTFLAM']), np.log10(header['PHOTPLAM']), scale_exptime)
     elif 'PHOTFNU' in header:
         ZP = -2.5*np.log10(header['PHOTFNU'])+8.90
         ZP += 2.5*np.log10(scale_exptime)
