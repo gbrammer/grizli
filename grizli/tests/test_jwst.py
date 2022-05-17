@@ -17,7 +17,7 @@ class JWSTFittingTools(unittest.TestCase):
         """
         path = os.path.dirname(utils.__file__)
         print(path)
-        beams_file = '/Users/victoriastrait/Desktop/grizli_test_data/jw01324001001_01243.beams.fits'
+        beams_file = '/Users/victoriastrait/grizli/grizli/tests/data/niriss_jw01324001001_test.beams.fits'
         mb = multifit.MultiBeam(beams_file, group_name='jw01324001001',
                                 MW_EBV=-1, fcontam=0.1, sys_err=0.03)
     
