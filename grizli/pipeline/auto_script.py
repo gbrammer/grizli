@@ -2461,17 +2461,14 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
         if '-' in filter:
             info['FILTER'][idx] = filter.split('-')[-1]
 
-    masks = {'g141' : [info['FILTER'] == 'G141', 'G141'],
-    'g102' : [info['FILTER'] == 'G102', 'G102'],
-    'g800l' : [info['FILTER'] == 'G800L', 'G800L'],
-    'gr150cf115w' : [(info['PUPIL'] == 'F115W') & (info['FILTER'] == 'GR150C'), 'GR150C', 'F115W'],
-    'gr150cf150w' : [(info['PUPIL'] == 'F150W') & (info['FILTER'] == 'GR150C'), 'GR150C', 'F150W'],
-    'gr150cf200w' : [(info['PUPIL'] == 'F200W') & (info['FILTER'] == 'GR150C'), 'GR150C', 'F200W'],
-    'gr150rf115w' : [(info['PUPIL'] == 'F115W') & (info['FILTER'] == 'GR150R'), 'GR150R', 'F115W'],
-    'gr150rf150w' : [(info['PUPIL'] == 'F150W') & (info['FILTER'] == 'GR150R'), 'GR150R', 'F150W'],
-    'gr150rf200w' : [(info['PUPIL'] == 'F200W') & (info['FILTER'] == 'GR150R'), 'GR150R', 'F200W']}
-    
+    masks = {}
+    for gr in ['G141', 'G102', 'G800L']:
+        masks[gr.lower()] = [info['FILTER'] == gr, gr, '']
 
+    for gr in ['GR150R', 'GR150C']:
+        for filt in ['F090W', 'F115W', 'F150W', 'F200W']:
+            key = f'{gr.lower()}-{filt.lower()}'
+            masks[key] = [(info['PUPIL'] == filt) & (info['FILTER'] == gr), gr, filt]
 
     if force_cat is None:
         #catalog = '{0}-ir.cat.fits'.format(field_root)
