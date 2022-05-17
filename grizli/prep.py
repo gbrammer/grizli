@@ -3186,7 +3186,7 @@ def process_direct_grism_visit(direct={},
             else:
                 try:
                     updatewcs.updatewcs(file, verbose=False, use_db=False)
-                except:
+                except TypeError:
                     updatewcs.updatewcs(file, verbose=False)
 
                 
@@ -3228,7 +3228,7 @@ def process_direct_grism_visit(direct={},
             else:
                 try:
                     updatewcs.updatewcs(file, verbose=False, use_db=False)
-                except:
+                except TypeError:
                     updatewcs.updatewcs(file, verbose=False)
                 
             # Change back
@@ -4438,7 +4438,7 @@ def match_direct_grism_wcs(direct={}, grism={}, get_fresh_flt=True,
             fresh_flt_file(file)
             try:
                 updatewcs.updatewcs(file, verbose=False, use_db=False)
-            except:
+            except TypeError:
                 updatewcs.updatewcs(file, verbose=False)
 
     direct_flt = pyfits.open(direct['files'][0])
