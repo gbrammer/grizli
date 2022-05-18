@@ -1359,6 +1359,22 @@ def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, com
 
     files.sort()
 
+    if isJWST:
+        # JWST files have slightly different naming conventions for the header
+        for file in files:
+            hdu = pyfits.open(file, mode='update')
+            hdu[0].header['ra_targ'] = hdu[0].header['targ_ra']
+            hdu[0].header['exptime'] = hdu[0].header['effexptm']
+            hdu[0].header['pa_v3'] = hdu[1].header['pa_v3']
+            if hdu[0].header['FILTER'] != 'CLEAR':
+                hdu[0].header['FILTER_INFO'] = hdu[0].header['FILTER']
+                hdu[0].header['EXPTYPE_INFO'] = hdu[0].header['EXP_TYPE']
+            if 'NRIMDTPT' in hdu[0].header:
+                hdu[0].header['NRIMDTPT'] = int(hdu[0].header['NRIMDTPT'])
+            if 'NDITHPTS' in hdu[0].header:
+                hdu[0].header['NRIMDTPT'] = int(hdu[0].header['NDITHPTS'])
+            hdu.flush()
+
     info = utils.get_flt_info(files)
 
     # Only F814W on ACS
