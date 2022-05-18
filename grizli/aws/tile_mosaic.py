@@ -346,7 +346,9 @@ def add_exposure_batch():
 
             db.execute('GRANT ALL PRIVILEGES ON ALL TABLEs IN SCHEMA public TO db_iam_user')
             db.execute('GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO db_iam_user')
-
+            db.execute('GRANT SELECT ON ALL TABLEs IN SCHEMA public TO readonly')
+            db.execute('GRANT SELECT ON ALL SEQUENCES IN SCHEMA public TO readonly')
+            
             db.execute('ALTER TABLE assoc_table ADD COLUMN aid SERIAL PRIMARY KEY;')
             db.execute('CREATE INDEX on exposure_files (eid)')
             db.execute('CREATE INDEX on exposure_files (eid,filter)')
@@ -372,9 +374,14 @@ def make_exposure_maps():
     
     ra, dec, rsize, name = 177.40124999999998, 22.39947222222, 12, 'macs1149'
     ra, dec, rsize, name = 157.30641, 26.39197, 12, 'sdss1029'
+    ra, dec, rsize, name = 215.93, 24.07, 15, 'macs1423'
+    ra, dec, rsize, name = 64.39, -11.91, 15, 'macs0417'
+    ra, dec, rsize, name = 3.5301941, -30.3854942, 15, 'abell2744'
+    extra = ''
     
     fig, tab = tile_mosaic.exposure_map(ra, dec, rsize, name, 
-                                        filt=filt.upper(), s0=18)
+                                        filt=filt.upper(), s0=18, 
+                                        extra=extra)
     fig.tight_layout(pad=0.5)
     fig.savefig('/tmp/map.png')
     fig.tight_layout(pad=0.5)
@@ -489,6 +496,32 @@ def find_mosaic_segments(bs=16):
         #
         os.system(f'rm tile.{t0:04d}*')
         
+
+
+def get_axis_center_coord(ax):
+    """
+    Get sky coords at the center of symap axis
+    """
+    
+    tr = ax.get_transform('world').inverted()
+    return tr.transform((np.mean(ax.get_xlim()), np.mean(ax.get_ylim())))
+
+
+def exposures_in_axis(ax, extra_where=""):
+    """
+    Query exposure_files
+    """
+    coo = get_axis_center_coord(ax)
+    
+    point = f"point '({coo[0]}, {coo[1]})'"
+    
+    res = db.SQL(f"""SELECT file, filter, assoc from exposure_files 
+    WHERE polygon(footprint) @> {point}
+    {extra_where}
+    ORDER BY assoc
+    """)
+    return res
+    
     
 def exposure_map(ra, dec, rsize, name, filt='F160W', s0=16, cmap='viridis', figsize=(6,6), show_tiles=True, res=None, alpha=1., ec='None', vmin=None, vmax=None, extra=''):
     """
@@ -530,8 +563,15 @@ def exposure_map(ra, dec, rsize, name, filt='F160W', s0=16, cmap='viridis', figs
     ax.grid()
     
     coo = SkyCoord(res['subra'], res['subdec'], unit=('deg','deg'))
-    ax.scatter_coord(coo, c=np.log10(res['exptime']), marker='s', s=s, 
-                     cmap=cmap, alpha=alpha, ec=ec, vmin=vmin, vmax=vmax)
+    ax.scatter(coo.ra, coo.dec, 
+               c=np.log10(res['exptime']),
+               marker='s', s=s, 
+               cmap=cmap, alpha=alpha, ec=ec, 
+               vmin=vmin, vmax=vmax, 
+               transform=ax.get_transform('world'))
+               
+    #ax.scatter_coord(coo, c=np.log10(res['exptime']), marker='s', s=s, 
+    #                 cmap=cmap, alpha=alpha, ec=ec, vmin=vmin, vmax=vmax)
         
     if show_tiles:
         for t in np.unique(res['tile']):
@@ -894,6 +934,61 @@ def get_subtile_status(tile=2530, subx=522, suby=461, **kwargs):
     return resp
 
 
+def reset_tiles_in_assoc(assoc):
+    """
+    Set in_mosaic status to all subtiles overlapping with an assoc
+    """
+    res = db.execute(f"""UPDATE mosaic_tiles_exposures
+     SET in_mosaic = 0
+     FROM (select tile, subx, suby
+      from mosaic_tiles_exposures ti, exposure_files e
+      where ti.expid = e.eid AND e.assoc = '{assoc}'
+      group by tile, subx, suby) subt
+     WHERE mosaic_tiles_exposures.tile = subt.tile 
+          AND mosaic_tiles_exposures.subx = subt.subx
+          AND mosaic_tiles_exposures.suby = subt.suby
+    """)
+
+
+def get_tiles_containing_point(point=(150.24727,2.04512), radius=0.01):
+    """
+    reset in_mosaic status for subtiles overlapping with a point
+    """
+    
+    circle = f"circle '<({point[0]}, {point[1]}), {radius}>'"
+    
+    res = db.SQL(f"""SELECT tile, subx, suby, filter, count(filter) as nexp
+      from mosaic_tiles_exposures ti, exposure_files e
+      where ti.expid = e.eid
+      AND polygon(e.footprint) && polygon({circle})    
+      group by tile, subx, suby, filter
+      """)
+
+    return res
+
+
+def reset_tiles_containing_point(point=(150.24727,2.04512), radius=0.01):
+    """
+    reset in_mosaic status for subtiles overlapping with a point
+    """
+    
+    circle = f"circle '<({point[0]}, {point[1]}), {radius}>'"
+    
+    res = db.execute(f"""UPDATE mosaic_tiles_exposures
+     SET in_mosaic = 0
+     FROM (select tile, subx, suby
+      from mosaic_tiles_exposures ti, exposure_files e
+      where ti.expid = e.eid
+      AND polygon(e.footprint) && polygon({circle})    
+      group by tile, subx, suby) subt
+      WHERE mosaic_tiles_exposures.tile = subt.tile 
+           AND mosaic_tiles_exposures.subx = subt.subx
+           AND mosaic_tiles_exposures.suby = subt.suby      
+      """)
+
+    return res
+
+
 def delete_empty_exposures():
     """
     Delete exposures from tiles where exptime = 0
@@ -942,7 +1037,6 @@ def send_all_tiles():
                 WHERE t.expid = e.eid AND in_mosaic = 0
                 {progs}
                 AND filter < 'G0'
-                AND e.assoc !=  'j100028p0215_0529_edw_cosmos-f160w-8-cosmos-f160w-9_wfc3ir_f160w'
                 GROUP BY tile, subx, suby, filter
                 ORDER BY filter ASC
                 """)
@@ -1451,7 +1545,7 @@ def build_mosaic_from_subregions(root='mos-{tile}-{filter}_{drz}', tile=2530, fi
                 wfile = file.replace('_sci','_wht')
                 db.download_s3_file(s3+wfile, overwrite=False, verbose=False)
                 if os.path.exists(wfile):
-                    imw = pyfits.open(file)
+                    imw = pyfits.open(wfile)
                     imgw[sly, slx] += imw[0].data                                    
             else:
                 wfile = None

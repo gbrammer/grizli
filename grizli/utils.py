@@ -16,6 +16,8 @@ import numpy as np
 
 import astropy.units as u
 
+from sregion import SRegion
+
 from . import GRIZLI_PATH
 
 KMS = u.km/u.s
@@ -2888,8 +2890,10 @@ def load_phoenix_stars(logg_list=PHOENIX_LOGG, teff_list=PHOENIX_TEFF, zmet_list
         hdu = pyfits.open(os.path.join(GRIZLI_PATH, 'templates/stars/', file))
     except:
         #url = 'https://s3.amazonaws.com/grizli/CONF'
-        url = 'https://erda.ku.dk/vgrid/Gabriel%20Brammer/CONF'
-        
+        #url = 'https://erda.ku.dk/vgrid/Gabriel%20Brammer/CONF'
+        url = ('https://raw.githubusercontent.com/gbrammer/' +
+               'grizli-config/master')
+
         print('Fetch {0}/{1}'.format(url, file))
 
         #os.system('wget -O /tmp/{1} {0}/{1}'.format(url, file))
@@ -4012,256 +4016,6 @@ def get_common_slices(a_origin, a_shape, b_origin, b_shape):
     a_slice = (slice(lls[0], urs[0]), slice(lls[1], urs[1]))
     b_slice = (slice(llo[0], uro[0]), slice(llo[1], uro[1]))
     return a_slice, b_slice
-
-    
-class SRegion(object):
-
-    def __init__(self, inp, label=None, **kwargs):
-        """
-        Helper class for parsing an S_REGION strings and general polygon 
-        tools
-        
-        Parameters
-        ----------
-        inp : str, (M,2) array, `~astropy.wcs.WCS`, `shapely.geometry.polygon.Polygon`
-            
-            Can be a "S_REGION" string, an array, or an 
-            `~astropy.wcs.WCS` object that will 
-            from which the corners will be extracted with 
-            `~astropy.wcs.WCS.calc_footprint`.
-            
-        """
-        if isinstance(inp, str):
-            self.xy = self._parse_sregion(inp, **kwargs)
-            
-        elif hasattr(inp, 'sum'):
-            # NDarray
-            sh = inp.shape
-            if inp.ndim != 2:
-                raise ValueError(f'Input shape {sh} is not (M,2)')
-            else:
-                if inp.shape[1] != 2:
-                    if inp.shape[0] != 2:
-                        raise ValueError(f'Input shape {sh} is not (M,2)')
-                    else:
-                        inp = inp.T
-                    
-            self.xy = [inp]
-            
-        elif isinstance(inp, list):
-            self.xy = inp
-            
-        elif isinstance(inp, pywcs.WCS):
-            self.xy = [inp.calc_footprint()]
-            
-        elif hasattr(inp, 'buffer'):
-            # Shapely polygon
-            if hasattr(inp, '__len__'):
-                self.xy = [np.array(p.boundary.xy).T for p in inp]
-            else:
-                self.xy = [np.array(inp.boundary.xy).T]
-                
-        else:
-            raise IOError('input must be ``str``, ``list``, or ``np.array``')
-        
-        self.inp = inp
-        self.ds9_properties = ''
-        self.label = label
-
-
-    @staticmethod   
-    def _parse_sregion(sregion, ncircle=32, wrap=False, **kwargs):
-        """
-        Parse an S_REGION string with CIRCLE or POLYGON
-        """
-
-        from astropy.coordinates import Angle
-        import astropy.units as u
-
-        if hasattr(sregion, 'decode'):
-            decoded = sregion.decode('utf-8').strip().upper()
-        else:
-            decoded = sregion.strip().upper()
-
-        polyspl = decoded.replace('POLYGON','xxx').replace('CIRCLE','xxx')
-        polyspl = polyspl.split('xxx')
-
-        poly = []
-        for pp in polyspl:
-            if not pp:
-                continue
-            
-            pp = pp.replace('(','').replace(')','')
-            
-            if ',' in pp:
-                spl = pp.strip().split(',')
-            else:
-                spl = pp.strip().split()
-            
-            for ip, p in enumerate(spl):
-                # Find index of first float
-                try:
-                    pf = float(p)
-                    break
-                except:
-                    continue
-                            
-            if len(spl[ip:]) == 3:
-                # Circle
-                x0, y0 = np.cast[float](spl[ip:-1])
-                cosd = np.cos(y0/180*np.pi)
-                
-                r0 = spl[-1]
-                if r0.endswith('"'):
-                    scl = float(r0[:-1])/3600
-                elif r0.endswith('\''):
-                    scl = float(r0[:-1])/60
-                else:
-                    try:
-                        scl = float(r0[2])
-                    except:
-                        scl = 1.
-                        
-                    cosd = 1.
-                    
-                _theta = np.linspace(0, 2*np.pi, ncircle) 
-                _xc = np.cos(_theta)
-                _yc = np.sin(_theta)
-                
-                poly_i = np.array([_xc/cosd*scl+x0, _yc*scl+y0]).T
-            else:
-                poly_i = np.cast[float](spl[ip:]).reshape((-1,2))
-
-            if wrap:
-                ra = Angle(poly_i[:,0]*u.deg).wrap_at(360*u.deg).value
-                poly_i[:,0] = ra
-                
-            if len(poly_i) < 2:
-                continue
-
-            poly.append(poly_i)
-
-        return poly
-    
-    @property
-    def centroid(self):
-        return [np.mean(fp, axis=0) for fp in self.xy]
-
-
-    @property
-    def path(self):
-        """
-        `~matplotlib.path.Path` object
-        """
-        import matplotlib.path
-        return [matplotlib.path.Path(fp) for fp in self.xy]
-
-
-    @property
-    def shapely(self):
-        """
-        `~shapely.geometry.Polygon` object.
-        """
-        from shapely.geometry import Polygon
-        return [Polygon(fp) for fp in self.xy]
-
-
-    @property 
-    def area(self):
-        """
-        Area of shapely polygons
-        """
-        return [sh.area for sh in self.shapely]
-
-
-    def sky_area(self, unit=u.arcmin**2):
-        """
-        Assuming coordinates provided are RA/Dec degrees, compute area
-        """
-        cosd = np.cos(self.centroid[0][1]/180*np.pi)
-        return [(sh.area*cosd*u.deg**2).to(unit)
-                for sh in self.shapely]
-
-
-    def patch(self, **kwargs):
-        """
-        `~descartes.PolygonPatch` object
-        """
-        from descartes import PolygonPatch
-        return [PolygonPatch(p, **kwargs) for p in self.shapely]
-
-
-    def get_patch(self, **kwargs):
-        """
-        `~descartes.PolygonPatch` object
-        
-        ** Deprecated, use patch **
-        """
-        from descartes import PolygonPatch
-        return self.patch(**kwargs)
-
-
-    def union(self, shape=None, as_polygon=False):
-        """
-        Union of self and `shape` object.  If no `shape` provided, then 
-        return union of (optional) multiple components of self
-        """
-        if shape is None:
-            un = self.shapely[0]
-        else:
-            un = shape
-            
-        for s in self.shapely:
-            un = un.union(s)
-        
-        if as_polygon:
-            return un
-        else:
-            return SRegion(un)
-
-
-    def intersects(self, shape):
-        """
-        Union of self and `shape` object
-        """
-        test = False
-        for s in self.shapely:
-            test |= s.intersects(shape)
-
-        return test
-
-
-    @property
-    def region(self):
-        """
-        Polygon string in DS9 region format
-        """
-        pstr = 'polygon({0})'
-        if hasattr(self, 'ds9_properties'):
-            tail = '{0}'.format(self.ds9_properties)
-        else:
-            tail = ''
-        
-        if hasattr(self, 'label'):    
-            if self.label is not None:
-                tail += ' text={xx}'.replace('xx', self.label)
-        
-        if tail:
-            tail = ' # '+tail
-            
-        return [pstr.format(','.join([f'{c:.6f}' for c in fp.flatten()]))+tail
-                for fp in self.xy]
-
-
-    @property
-    def s_region(self):
-        """
-        Polygon as VO s_region
-        """
-        pstr = 'POLYGON {0}'
-        polys = [pstr.format(' '.join([f'{c:.6f}' for c in fp.flatten()]))
-                for fp in self.xy]
-        return ' '.join(polys)
 
 
 class WCSFootprint(object):
@@ -6002,8 +5756,10 @@ def fetch_config_files(ACS=False, get_sky=True, get_stars=True, get_epsf=True):
 
     # Config files
     # BASEURL = 'https://s3.amazonaws.com/grizli/CONF/'
-    BASEURL = 'https://erda.ku.dk/vgrid/Gabriel%20Brammer/CONF/'
-    
+    # BASEURL = 'https://erda.ku.dk/vgrid/Gabriel%20Brammer/CONF/'
+    BASEURL = ('https://raw.githubusercontent.com/gbrammer/' +
+               'grizli-config/master')
+
     tarfiles = [f'{BASEURL}/WFC3.IR.G102.WD.V4.32.tar.gz', 
                 f'{BASEURL}/WFC3.IR.G141.WD.V4.32.tar.gz']
 
@@ -6038,7 +5794,8 @@ def fetch_config_files(ACS=False, get_sky=True, get_stars=True, get_epsf=True):
         #psf_path = 'http://www.stsci.edu/hst/wfc3/analysis/PSF/psf_downloads/wfc3_ir/'
         #psf_path = 'https://www.stsci.edu/~jayander/STDPSFs/WFC3IR/'
         #psf_root = 'PSFSTD'
-        psf_path = 'https://www.stsci.edu/~jayander/HST1PASS/'
+        #psf_path = 'https://www.stsci.edu/~jayander/HST1PASS/'
+        psf_path = 'https://www.stsci.edu/~jayander/HST1PASS/LIB/'
         psf_path += 'PSFs/STDPSFs/WFC3IR/'
         psf_root = 'STDPSF'
         
@@ -6215,10 +5972,13 @@ class EffectivePSF(object):
                                 'extended_PSF_{0}.fits'.format(filter))
 
             if not os.path.exists(file):
-                BASEURL = 'https://erda.ku.dk/vgrid/Gabriel%20Brammer/CONF/'
+                #BASEURL = 'https://erda.ku.dk/vgrid/Gabriel%20Brammer/CONF/'
+                BASEURL = ('https://raw.githubusercontent.com/gbrammer/' +
+                           'grizli-config/master')
+
                 msg = 'Extended PSF file \'{0}\' not found.'.format(file)
                 msg += 'Get the archive from '
-                msg += f' {BASEURL}WFC3IR_extended_PSF.v1.tar.gz'
+                msg += f' {BASEURL}/WFC3IR_extended_PSF.v1.tar.gz'
                 msg += ' and unpack in ${GRIZLI}/CONF/'
                 raise FileNotFoundError(msg)
 
@@ -8264,6 +8024,20 @@ class Unique(object):
             return 0
 
 
+    def __iter__(self):
+        """
+        Iterable over `values` attribute
+        
+        Returns a tuple of the value and the boolean selection array for that 
+        value.
+        """
+        i = 0
+        while i < self.N:
+            vi = self.values[i]
+            yield (vi, self[vi])
+            i += 1
+
+
     def __getitem__(self, key):
         if key in self.values:
             ix = self.values.index(key)
@@ -8273,12 +8047,12 @@ class Unique(object):
             return self.zeros
 
 
-    def __iter__(self):
-        for idx in itertools.count():
-            try:
-                yield self.values[idx]
-            except IndexError:
-                break
+    # def __iter__(self):
+    #     for idx in itertools.count():
+    #         try:
+    #             yield self.values[idx]
+    #         except IndexError:
+    #             break
 
     def __len__(self):
         return self.N
