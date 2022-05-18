@@ -789,7 +789,7 @@ def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixsca
             continue
 
         elif status is not None:
-            sci, wht, outh, filt_dict[filt] = status
+            sci, wht, outh, filt_dict[filt], wcs_tab = status
 
             if subtract_median:
                 #med = np.median(sci[sci != 0])

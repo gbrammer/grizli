@@ -552,7 +552,7 @@ def delete_all_assoc_data(assoc):
     Remove files from S3 and database
     """
     import os
-    from grizli.aws import db
+    from grizli.aws import db, tile_mosaic
     
     vis = db.SQL(f"""SELECT obsid, assoc_name, obs_id
                      FROM assoc_table
@@ -564,6 +564,15 @@ def delete_all_assoc_data(assoc):
         db.execute(f"""DELETE from shifts_log
                                WHERE shift_dataset like '{r}%%'""")
     
+    print('Remove from wcs_log')
+    db.execute(f"DELETE from wcs_log where wcs_assoc = '{assoc}'")
+    
+    print('Remove from tile_exposures')
+    
+    # Reset tiles of deleted exposures potentially from other exposures
+    tile_mosaic.reset_tiles_in_assoc(assoc)
+    
+    # Remove deleted exposure from mosaic_tiles_exposures
     res = db.execute(f"""DELETE from mosaic_tiles_exposures t
                  USING exposure_files e
                 WHERE t.expid = e.eid AND e.assoc = '{assoc}'""")
@@ -662,7 +671,7 @@ def launch_ec2_instances(nmax=50, templ='lt-0e8c2b8611c9029eb,Version=11'):
                       FROM assoc_table
                       WHERE status = 0""")
     
-    count = np.minimum(nmax, len(assoc)/2)
+    count = int(np.minimum(nmax, len(assoc)/2))
 
     if count == 0:
         print('No associations to run, abort.')
@@ -1076,7 +1085,7 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=True, 
                   --exclude "*" \
                   --include "Prep/*_fl*fits" \
                   --include "Prep/*s.log" \
-                  --include "Prep/*npy" \
+                  --include "Prep/*visits.*" \
                   --include "*fail*" \
                   --include "RAW/*[nx][tg]" """
         
@@ -1182,7 +1191,7 @@ def make_parent_mosaic(parent='j191436m5928', **kwargs):
     cutout_mosaic(rootname=parent, ra=ra, dec=dec, size=size, **kwargs)
 
 
-def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-27.7910651, size=5*60, filters=['F160W'], ir_scale=0.1, ir_wcs=None, res=None, half_optical=True, kernel='point', pixfrac=0.33, make_figure=True, skip_existing=True, clean_flt=True, gzip_output=True, s3output='s3://grizli-v2/HST/Pipeline/Mosaic/', extra_wfc3ir_badpix=True, **kwargs):
+def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-27.7910651, size=5*60, filters=['F160W'], ir_scale=0.1, ir_wcs=None, res=None, half_optical=True, kernel='point', pixfrac=0.33, make_figure=True, skip_existing=True, clean_flt=True, gzip_output=True, s3output='s3://grizli-v2/HST/Pipeline/Mosaic/', split_uvis=True, extra_query='', extra_wfc3ir_badpix=True, **kwargs):
     """
     Make mosaic from exposures defined in the exposure database
     
@@ -1213,23 +1222,39 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
     # Database query
     SQL = f"""
     SELECT dataset, extension, sciext, assoc, 
-           e.filter, e.exptime, e.footprint
+           e.filter, e.pupil, e.exptime, e.footprint, e.detector
     FROM exposure_files e, assoc_table a
     WHERE e.assoc = a.assoc_name
     AND a.status = 2
     AND e.exptime > 0
-    AND polygon(e.footprint) && polygon(box '(({x1},{y1}),({x2},{y2}))')    
+    AND polygon(e.footprint) && polygon(box '(({x1},{y1}),({x2},{y2}))') 
+    {extra_query}   
     """
     
     if filters is not None:
-        filter_sql = ' OR '.join([f"a.filter = '{f}'" for f in filters])
+        filter_sql = ' OR '.join([f"e.filter = '{f}'" for f in filters])
         SQL += f'AND ({filter_sql})'
     
     SQL += ' ORDER BY e.filter'
     if res is None:
         res = db.SQL(SQL)
     
-    for f in np.unique(res['filter']):
+    if len(res) == 0:
+        print('No exposures found overlapping output wcs with '+
+              f'corners = ({x1:.6f},{y1:.6f}), ({x2:.6f},{y2:.6f})')
+        return None
+        
+    file_filters = [f for f in res['filter']]
+    if split_uvis:
+        # UVIS filters
+        uvis = res['detector'] == 'UVIS'
+        if uvis.sum() > 0:
+            for j in np.where(uvis)[0]:
+                file_filters[j] += 'u'
+    
+    uniq_filts = utils.Unique(file_filters, verbose=False)
+    
+    for f in uniq_filts.values:
         
         visit = {'product':product.format(rootname=rootname, f=f).lower()}
         
@@ -1246,7 +1271,7 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
             visit['reference'] = ir_wcs
             is_optical = False
             
-        fi = res['filter'] == f
+        fi = uniq_filts[f] # res['filter'] == f
         un = utils.Unique(res['dataset'][fi], verbose=False)
         
         ds = res[fi]['dataset']
@@ -1321,7 +1346,7 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
 
     if s3output:
         files = []
-        for f in np.unique(res['filter']):
+        for f in uniq_filts.values:
             prod = product.format(rootname=rootname, f=f).lower()
             
             if gzip_output:
@@ -1339,7 +1364,9 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
             object_name = f'{path}/{file}'
             print(f'{file} > s3://{bucket}/{object_name}')
             db.upload_file(file, bucket, object_name=object_name)
-
+    
+    return res
+    
 
 def make_mosaic(jname='', ds9=None, skip_existing=True, ir_scale=0.1, half_optical=False, pad=16, kernel='point', pixfrac=0.33, sync=True, ir_wcs=None):
     """

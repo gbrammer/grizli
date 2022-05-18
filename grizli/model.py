@@ -123,7 +123,7 @@ class GrismDisperser(object):
                        segmentation=None, origin=[500, 500],
                        xcenter=0., ycenter=0., pad=0, grow=1, beam='A',
                        conf=['WFC3', 'F140W', 'G141'], scale=1.,
-                       fwcpos=None, MW_EBV=0., yoffset=0):
+                       fwcpos=None, MW_EBV=0., yoffset=0, xoffset=None):
         """Object for computing dispersed model spectra
 
         Parameters
@@ -178,7 +178,10 @@ class GrismDisperser(object):
 
         yoffset : float
             Cross-dispersion offset to apply to the trace
-
+        
+        xoffset : float
+            Dispersion offset to apply to the trace
+            
         Attributes
         ----------
         sh : 2-tuple
@@ -280,7 +283,11 @@ class GrismDisperser(object):
         self.process_config()
 
         self.yoffset = yoffset
-        if yoffset != 0:
+        
+        if xoffset is not None:
+            self.xoffset = xoffset
+            
+        if (yoffset != 0) | (xoffset is not None):
             #print('yoffset!', yoffset)
             self.add_ytrace_offset(yoffset)
 
@@ -338,23 +345,23 @@ class GrismDisperser(object):
         from .utils_c import interp
 
         # Get dispersion parameters at the reference position
-        self.dx = self.conf.dxlam[self.beam]  # + xcenter #-xoff
+        self.dx = self.conf.dxlam[self.beam]  # + xcenter #-xoffset
         if self.grow > 1:
             self.dx = np.arange(self.dx[0]*self.grow, self.dx[-1]*self.grow)
 
-        xoff = 0.
+        xoffset = 0.
 
         if ('G14' in self.conf.conf_file) & (self.beam == 'A'):
-            xoff = -0.5  # necessary for WFC3/IR G141, v4.32
+            xoffset = -0.5  # necessary for WFC3/IR G141, v4.32
 
-        # xoff = 0. # suggested by ACS
-        # xoff = -2.5 # test
+        # xoffset = 0. # suggested by ACS
+        # xoffset = -2.5 # test
 
-        self.xoff = xoff
+        self.xoffset = xoffset
         self.ytrace_beam, self.lam_beam = self.conf.get_beam_trace(
                             x=(self.xc+self.xcenter-self.pad)/self.grow,
                             y=(self.yc+self.ycenter-self.pad)/self.grow,
-                            dx=(self.dx+self.xcenter*0+self.xoff)/self.grow,
+                        dx=(self.dx+self.xcenter*0+self.xoffset)/self.grow,
                             beam=self.beam, fwcpos=self.fwcpos)
 
         self.ytrace_beam *= self.grow
@@ -418,7 +425,7 @@ class GrismDisperser(object):
         self.ytrace, self.lam = self.conf.get_beam_trace(
                                 x=(self.xc+self.xcenter-self.pad)/self.grow,
                                 y=(self.yc+self.ycenter-self.pad)/self.grow,
-                                dx=(self.dxfull+self.xcenter+xoff)/self.grow,
+                            dx=(self.dxfull+self.xcenter+xoffset)/self.grow,
                                 beam=self.beam, fwcpos=self.fwcpos)
 
         self.ytrace *= self.grow
@@ -457,7 +464,7 @@ class GrismDisperser(object):
         self.ytrace_beam, self.lam_beam = self.conf.get_beam_trace(
                             x=(self.xc+self.xcenter-self.pad)/self.grow,
                             y=(self.yc+self.ycenter-self.pad)/self.grow,
-                            dx=(self.dx+self.xcenter*0+self.xoff)/self.grow,
+                     dx=(self.dx+self.xcenter*0+self.xoffset)/self.grow,
                             beam=self.beam, fwcpos=self.fwcpos)
 
         self.ytrace_beam *= self.grow
@@ -482,7 +489,7 @@ class GrismDisperser(object):
         self.ytrace, self.lam = self.conf.get_beam_trace(
                             x=(self.xc+self.xcenter-self.pad)/self.grow,
                             y=(self.yc+self.ycenter-self.pad)/self.grow,
-                            dx=(self.dxfull+self.xcenter+self.xoff)/self.grow,
+                   dx=(self.dxfull+self.xcenter+self.xoffset)/self.grow,
                             beam=self.beam, fwcpos=self.fwcpos)
 
         self.ytrace *= self.grow
@@ -4110,7 +4117,12 @@ class BeamCutout(object):
             yoffset = h0['TYOFFSET']
         else:
             yoffset = 0.
-
+        
+        if 'TXOFFSET' in h0:
+            xoffset = h0['TXOFFSET']
+        else:
+            xoffset = None
+            
         self.beam = GrismDisperser(id=h0['ID'], direct=direct,
                                    segmentation=hdu['SEG'].data*1,
                                    origin=self.direct.origin,
@@ -4120,7 +4132,7 @@ class BeamCutout(object):
                                    ycenter=h0['YCENTER'],
                                    conf=conf, fwcpos=self.grism.fwcpos,
                                    MW_EBV=self.grism.MW_EBV,
-                                   yoffset=yoffset)
+                                   yoffset=yoffset, xoffset=xoffset)
 
         self.grism.parent_file = h0['GPARENT']
         self.direct.parent_file = h0['DPARENT']
@@ -4194,7 +4206,11 @@ class BeamCutout(object):
         if hasattr(self.beam, 'yoffset'):
             h0['TYOFFSET'] = (self.beam.yoffset,
                          'Cross dispersion offset of the trace')
-
+        
+        if hasattr(self.beam, 'xoffset'):
+            h0['TXOFFSET'] = (self.beam.xoffset,
+                         'Dispersion offset of the trace')
+        
         h0['GPARENT'] = (self.grism.parent_file,
                          'Parent grism file')
 
