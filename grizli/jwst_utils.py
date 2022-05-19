@@ -133,13 +133,11 @@ def img_with_wcs(input):
                 input[0].header['OEXPTYPE'] = input[0].header['EXP_TYPE']
                 input[0].header['FILTER'] = 'CLEAR'
                 input[0].header['EXP_TYPE'] = 'NIS_IMAGE'
-                #print(input[0].header)
         
         elif input[0].header['INSTRUME'] == 'NIRCAM':
             if input[0].header['PUPIL'].startswith('GR'):
                 input[0].header['PUPIL'] = 'CLEAR'
                 input[0].header['EXP_TYPE'] = 'NRC_IMAGE'
-                #print(input[0].header)
         
         
     img = util.open(input)
