@@ -5740,7 +5740,7 @@ def fetch_wfpc2_calib(file='g6q1912hu_r4f.fits', path=os.getenv('uref'), use_mas
             return True
 
 
-def fetch_config_files(ACS=False, get_sky=True, get_stars=True, get_epsf=True):
+def fetch_config_files(ACS=False, get_sky=True, get_stars=True, get_epsf=True, get_jwst=False):
     """
     Config files needed for Grizli
     """
@@ -5765,6 +5765,9 @@ def fetch_config_files(ACS=False, get_sky=True, get_stars=True, get_epsf=True):
 
     tarfiles += [f'{BASEURL}/ACS.WFC.CHIP1.Stars.conf', 
                  f'{BASEURL}/ACS.WFC.CHIP2.Stars.conf']
+
+    if get_jwst:
+        tarfiles += [f'{BASEURL}/jwst-grism-conf.tar.gz']
     
     if get_sky:
         ftpdir = BASEURL

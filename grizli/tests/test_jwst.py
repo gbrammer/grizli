@@ -11,6 +11,28 @@ from .. import utils, prep, multifit, fitting, GRIZLI_PATH
 
 class JWSTFittingTools(unittest.TestCase):
     
+    def test_config(self):
+        """
+        Fetch config files if CONF not found
+        """
+        new = []
+        for subd in ['iref','jref','CONF']:
+            conf_path = os.path.join(GRIZLI_PATH, subd)
+            if not os.path.exists(conf_path):
+                new.append(subd)
+                os.mkdir(conf_path)
+        
+        if 'CONF' in new:
+            print(f'Download config and calib files to {conf_path}')
+            utils.fetch_default_calibs(ACS=False)
+            utils.fetch_config_files(get_epsf=True, get_jwst=True)
+            files = glob.glob(f'{conf_path}/*')
+            print('Files: ', '\n'.join(files))
+
+        assert(os.path.exists(os.path.join(conf_path,
+                              'GR150C.F115W.conf')))
+        return True
+    
     def test_multibeam(self):
         """
         Can we initialize a multibeam file?
