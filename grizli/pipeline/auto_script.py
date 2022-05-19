@@ -1343,9 +1343,9 @@ def parse_visits(field_root='', RAW_PATH='../RAW', use_visit=True, combine_same_
     from shapely.geometry import Polygon
     from scipy.spatial import ConvexHull
 
-    files = glob.glob(os.path.join(RAW_PATH, file_query+'fl[tc].fits'))
-    files += glob.glob(os.path.join(RAW_PATH, file_query+'c0m.fits'))
-    files += glob.glob(os.path.join(RAW_PATH, file_query+'c0f.fits'))
+    files = glob.glob(os.path.join(RAW_PATH, file_query+'fl[tc].fits*'))
+    files += glob.glob(os.path.join(RAW_PATH, file_query+'c0m.fits*'))
+    files += glob.glob(os.path.join(RAW_PATH, file_query+'c0f.fits*'))
 
     files.sort()
 
