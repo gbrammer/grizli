@@ -3292,6 +3292,7 @@ def process_direct_grism_visit(direct={},
             hdu = pyfits.open(file, mode='update')
             hdu[0].header['OINSTRUME'] = hdu[0].header['INSTRUME'] # save the original instrument name 
             hdu[0].header['INSTRUME'] = 'WFC3'
+            hdu[0].header['ODETECTOR'] = hdu[0].header['DETECTOR']
             hdu[0].header['DETECTOR'] = 'IR'
             hdu[1].header['NGOODPIX'] = -99
             hdu[1].header['EXPNAME'] = hdu[0].header['EXPOSURE']
@@ -3304,9 +3305,9 @@ def process_direct_grism_visit(direct={},
             gain_im = pyfits.open(gain_file)
             im = pyfits.open(file)
             gain_median = np.median(gain_im[1].data)
-            im['SCI'].data *= gain_median #gain_im['SCI'].data
+            im['SCI'].data *= gain_median 
             im['SCI'].header['BUNIT'] = 'ELECTRONS/s'
-            im['ERR'].data *= gain_median #gain_im['SCI'].data
+            im['ERR'].data *= gain_median 
             im['ERR'].header['BUNIT'] = 'ELECTRONS/s'
             gain_im.close()
             im.close()
@@ -3323,6 +3324,7 @@ def process_direct_grism_visit(direct={},
             hdu = pyfits.open(file, mode='update')
             hdu[0].header['OINSTRUME'] = hdu[0].header['INSTRUME']
             hdu[0].header['INSTRUME'] = 'WFC3'
+            hdu[0].header['ODETECTOR'] = hdu[0].header['DETECTOR']
             hdu[0].header['DETECTOR'] = 'IR'
             hdu[1].header['NGOODPIX'] = -99
             hdu[1].header['EXPNAME'] = hdu[0].header['EXPOSURE']
