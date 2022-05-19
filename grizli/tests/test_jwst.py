@@ -15,16 +15,14 @@ class JWSTFittingTools(unittest.TestCase):
         """
         Fetch config files if CONF not found
         """
-        new = []
-        for subd in ['iref','jref','CONF']:
-            conf_path = os.path.join(GRIZLI_PATH, subd)
-            if not os.path.exists(conf_path):
-                new.append(subd)
-                os.mkdir(conf_path)
+        conf_path = os.path.join(GRIZLI_PATH, 'CONF')
+        if not os.path.exists(conf_path): # if CONF dir doesn't already exist, create it
+            os.mkdir(conf_path)
         
-        if 'CONF' in new:
+        if not os.path.exists(os.path.join(conf_path,
+                              'GR150C.F115W.conf')):
             print(f'Download config and calib files to {conf_path}')
-            utils.fetch_default_calibs(ACS=False)
+            #utils.fetch_default_calibs(ACS=False)
             utils.fetch_config_files(get_epsf=True, get_jwst=True)
             files = glob.glob(f'{conf_path}/*')
             print('Files: ', '\n'.join(files))
