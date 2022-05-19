@@ -5740,10 +5740,13 @@ def fetch_wfpc2_calib(file='g6q1912hu_r4f.fits', path=os.getenv('uref'), use_mas
             return True
 
 
-def fetch_config_files(ACS=False, get_sky=True, get_stars=True, get_epsf=True, get_jwst=False):
+def fetch_config_files(get_acs=False, get_sky=True, get_stars=True, get_epsf=True, get_jwst=False, get_wfc3=True, **kwargs):
     """
     Config files needed for Grizli
     """
+    if 'ACS' in kwargs:
+        get_acs = kwargs['ACS']
+
     cwd = os.getcwd()
 
     print('Config directory: {0}/CONF'.format(GRIZLI_PATH))
@@ -5751,8 +5754,7 @@ def fetch_config_files(ACS=False, get_sky=True, get_stars=True, get_epsf=True, g
     os.chdir(os.path.join(GRIZLI_PATH, 'CONF'))
 
     ftpdir = 'ftp://ftp.stsci.edu/cdbs/wfc3_aux/'
-    tarfiles = ['{0}/WFC3.IR.G102.cal.V4.32.tar.gz'.format(ftpdir),
-                '{0}/WFC3.IR.G141.cal.V4.32.tar.gz'.format(ftpdir)]
+    tarfiles = []
 
     # Config files
     # BASEURL = 'https://s3.amazonaws.com/grizli/CONF/'
@@ -5760,11 +5762,11 @@ def fetch_config_files(ACS=False, get_sky=True, get_stars=True, get_epsf=True, g
     BASEURL = ('https://raw.githubusercontent.com/gbrammer/' +
                'grizli-config/master')
 
-    tarfiles = [f'{BASEURL}/WFC3.IR.G102.WD.V4.32.tar.gz', 
-                f'{BASEURL}/WFC3.IR.G141.WD.V4.32.tar.gz']
-
-    tarfiles += [f'{BASEURL}/ACS.WFC.CHIP1.Stars.conf', 
-                 f'{BASEURL}/ACS.WFC.CHIP2.Stars.conf']
+    if get_wfc3:
+        tarfiles = ['{0}/WFC3.IR.G102.cal.V4.32.tar.gz'.format(ftpdir),
+                '{0}/WFC3.IR.G141.cal.V4.32.tar.gz'.format(ftpdir)]
+        tarfiles += [f'{BASEURL}/WFC3.IR.G102.WD.V4.32.tar.gz', 
+                    f'{BASEURL}/WFC3.IR.G141.WD.V4.32.tar.gz']
 
     if get_jwst:
         tarfiles += [f'{BASEURL}/jwst-grism-conf.tar.gz']
@@ -5779,7 +5781,9 @@ def fetch_config_files(ACS=False, get_sky=True, get_stars=True, get_epsf=True, g
     
     tarfiles.append('{0}/WFC3IR_extended_PSF.v1.tar.gz'.format(gURL))
 
-    if ACS:
+    if get_acs:
+        tarfiles += [f'{BASEURL}/ACS.WFC.CHIP1.Stars.conf', 
+                    f'{BASEURL}/ACS.WFC.CHIP2.Stars.conf']
         tarfiles.append('{0}/ACS.WFC.sky.tar.gz'.format(gURL))
         tarfiles.append('{0}/ACS_CONFIG.tar.gz'.format(gURL))
 
