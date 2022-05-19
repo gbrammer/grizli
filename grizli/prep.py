@@ -21,6 +21,7 @@ import astropy.coordinates as coord
 from astropy.table import Table
 
 from . import jwst_utils
+from . import grismconf
 
 try:
     import jwst
@@ -4928,7 +4929,12 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
             # Subtract the column average in 2D & log header keywords
             flt = pyfits.open(file, mode='update')
             imshape = flt[1].data.shape[0]
-            gp_res = np.dot(y_pred[:, None]-bg_sky, np.ones((imshape, 1)).T).T 
+            # if rot90 is even, keep this the same. if not, subtract "row" average instead
+            rot90 = grismconf.JwstDispersionTransform(flt).rot90
+            if rot90 % 2 == 0:
+                gp_res = np.dot(y_pred[:, None]-bg_sky, np.ones((imshape, 1)).T).T 
+            else:
+                gp_res = np.dot(y_pred[None, :]-bg_sky, np.ones((1, imshape)).T).T
             flt['SCI', 1].data -= gp_res
             flt[0].header['GSKYCOL'] = (True, 'Subtract column average')
             flt.flush()
