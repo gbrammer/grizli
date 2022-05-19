@@ -1501,7 +1501,7 @@ def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, com
         print('** Combine Singles: **')
         for i, visit in enumerate(visits):
             print('{0} {1} {2}'.format(i, visit['product'], len(visit['files'])))
-    all_groups = utils.parse_grism_associations(visits, info, isJWST=True)
+    all_groups = utils.parse_grism_associations(visits, info, isJWST=isJWST)
     print('\n == Grism groups ==\n')
     valid_groups = []
     for g in all_groups:
