@@ -174,8 +174,10 @@ files that are currently hard-coded:
     .. code:: python
     
         >>> import grizli.utils
-        >>> # set ACS=True below to get files necessary for G800L processing
-        >>> grizli.utils.fetch_default_calibs(ACS=False) # to iref/iref
+        >>> # set get_acs=True below to get files necessary for G800L processing
+        >>> grizli.utils.fetch_default_calibs(get_acs=False) # to iref/iref
+        >>> # set get_jwst=True to get files for jwst processing
+        >>> grizli.utils.fetch_default_calibs(get_jwst=False) 
         >>> grizli.utils.fetch_config_files()            # to $GRIZLI/CONF
     
 The grism redshift fits require galaxy SED templates that are provided with
