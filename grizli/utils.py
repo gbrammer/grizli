@@ -876,9 +876,12 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
         for i in range(N):
             for j in range(len(output_list[i]['files'])):
                 flt_file = output_list[i]['files'][j]
-                if (not os.path.exists(flt_file)) & os.path.exists('../RAW/'+flt_file):
-                    flt_file = '../RAW/'+flt_file
-
+                if (not os.path.exists(flt_file)):
+                    for gzext in ['', '.gz']:
+                        if os.path.exists('../RAW/'+flt_file+gzext):
+                            flt_file = '../RAW/'+flt_file+gzext
+                            break
+                    
                 flt_j = pyfits.open(flt_file)
                 h = flt_j[0].header
                 if (h['INSTRUME'] == 'WFC3'):
@@ -910,8 +913,16 @@ def split_visit(visit, visit_split_shift=1.5, max_dt=6./24, path='../RAW'):
 
     visit_split_shift : split if shifts larger than `visit_split_shift` arcmin
     """
-
-    ims = [pyfits.open(os.path.join(path, file)) for file in visit['files']]
+    
+    ims = []
+    for file in visit['files']:
+        for gzext in ['', '.gz']:
+            _file = os.path.join(path, file) + gzext
+            if os.path.exists(_file):
+                ims.append(pyfits.open(_file))
+                break
+        
+    #ims = [pyfits.open(os.path.join(path, file)) for file in visit['files']]
     crval1 = np.array([im[1].header['CRVAL1'] for im in ims])
     crval2 = np.array([im[1].header['CRVAL2'] for im in ims])
     expstart = np.array([im[0].header['EXPSTART'] for im in ims])
