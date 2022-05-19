@@ -816,7 +816,6 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
                                 (info['progIDs'] == prog)) & (info['pupil'] == pupil)
                         else:
                             visit_product = '{0}-{1}-{2}-{3:05.1f}-{4}'.format(target_use, prog, visit, angle, filter)
-
                             use = ((target_list == target) &
                                 (info['filter'] == filter) &
                                 (visits == visit) & (pa_v3 == angle) &
@@ -5764,7 +5763,7 @@ def fetch_config_files(get_acs=False, get_sky=True, get_stars=True, get_epsf=Tru
 
     if get_wfc3:
         tarfiles = ['{0}/WFC3.IR.G102.cal.V4.32.tar.gz'.format(ftpdir),
-                '{0}/WFC3.IR.G141.cal.V4.32.tar.gz'.format(ftpdir)]
+                    '{0}/WFC3.IR.G141.cal.V4.32.tar.gz'.format(ftpdir)]
         tarfiles += [f'{BASEURL}/WFC3.IR.G102.WD.V4.32.tar.gz', 
                     f'{BASEURL}/WFC3.IR.G141.WD.V4.32.tar.gz']
 
