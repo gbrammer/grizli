@@ -42,7 +42,10 @@ photflam_list = {'F098M': 6.0501324882418389e-20,
             'G150': 1.e-20,
             'G800L': 1.,
             'G280':  1., 
-            'F444W': 1.e-20}
+            'F444W': 1.e-20, 
+            'F115W': 1., 
+            'F150W': 1.,
+            'F200W': 1.}
 
 # Filter pivot wavelengths
 photplam_list = {'F098M': 9864.722728110915,
@@ -120,7 +123,7 @@ class GrismDisperser(object):
                        segmentation=None, origin=[500, 500],
                        xcenter=0., ycenter=0., pad=0, grow=1, beam='A',
                        conf=['WFC3', 'F140W', 'G141'], scale=1.,
-                       fwcpos=None, MW_EBV=0., yoffset=0):
+                       fwcpos=None, MW_EBV=0., yoffset=0, xoffset=None):
         """Object for computing dispersed model spectra
 
         Parameters
@@ -175,7 +178,10 @@ class GrismDisperser(object):
 
         yoffset : float
             Cross-dispersion offset to apply to the trace
-
+        
+        xoffset : float
+            Dispersion offset to apply to the trace
+            
         Attributes
         ----------
         sh : 2-tuple
@@ -277,7 +283,11 @@ class GrismDisperser(object):
         self.process_config()
 
         self.yoffset = yoffset
-        if yoffset != 0:
+        
+        if xoffset is not None:
+            self.xoffset = xoffset
+            
+        if (yoffset != 0) | (xoffset is not None):
             #print('yoffset!', yoffset)
             self.add_ytrace_offset(yoffset)
 
@@ -335,23 +345,23 @@ class GrismDisperser(object):
         from .utils_c import interp
 
         # Get dispersion parameters at the reference position
-        self.dx = self.conf.dxlam[self.beam]  # + xcenter #-xoff
+        self.dx = self.conf.dxlam[self.beam]  # + xcenter #-xoffset
         if self.grow > 1:
             self.dx = np.arange(self.dx[0]*self.grow, self.dx[-1]*self.grow)
 
-        xoff = 0.
+        xoffset = 0.
 
         if ('G14' in self.conf.conf_file) & (self.beam == 'A'):
-            xoff = -0.5  # necessary for WFC3/IR G141, v4.32
+            xoffset = -0.5  # necessary for WFC3/IR G141, v4.32
 
-        # xoff = 0. # suggested by ACS
-        # xoff = -2.5 # test
+        # xoffset = 0. # suggested by ACS
+        # xoffset = -2.5 # test
 
-        self.xoff = xoff
+        self.xoffset = xoffset
         self.ytrace_beam, self.lam_beam = self.conf.get_beam_trace(
                             x=(self.xc+self.xcenter-self.pad)/self.grow,
                             y=(self.yc+self.ycenter-self.pad)/self.grow,
-                            dx=(self.dx+self.xcenter*0+self.xoff)/self.grow,
+                        dx=(self.dx+self.xcenter*0+self.xoffset)/self.grow,
                             beam=self.beam, fwcpos=self.fwcpos)
 
         self.ytrace_beam *= self.grow
@@ -415,7 +425,7 @@ class GrismDisperser(object):
         self.ytrace, self.lam = self.conf.get_beam_trace(
                                 x=(self.xc+self.xcenter-self.pad)/self.grow,
                                 y=(self.yc+self.ycenter-self.pad)/self.grow,
-                                dx=(self.dxfull+self.xcenter+xoff)/self.grow,
+                            dx=(self.dxfull+self.xcenter+xoffset)/self.grow,
                                 beam=self.beam, fwcpos=self.fwcpos)
 
         self.ytrace *= self.grow
@@ -454,7 +464,7 @@ class GrismDisperser(object):
         self.ytrace_beam, self.lam_beam = self.conf.get_beam_trace(
                             x=(self.xc+self.xcenter-self.pad)/self.grow,
                             y=(self.yc+self.ycenter-self.pad)/self.grow,
-                            dx=(self.dx+self.xcenter*0+self.xoff)/self.grow,
+                     dx=(self.dx+self.xcenter*0+self.xoffset)/self.grow,
                             beam=self.beam, fwcpos=self.fwcpos)
 
         self.ytrace_beam *= self.grow
@@ -479,7 +489,7 @@ class GrismDisperser(object):
         self.ytrace, self.lam = self.conf.get_beam_trace(
                             x=(self.xc+self.xcenter-self.pad)/self.grow,
                             y=(self.yc+self.ycenter-self.pad)/self.grow,
-                            dx=(self.dxfull+self.xcenter+self.xoff)/self.grow,
+                   dx=(self.dxfull+self.xcenter+self.xoffset)/self.grow,
                             beam=self.beam, fwcpos=self.fwcpos)
 
         self.ytrace *= self.grow
@@ -1431,7 +1441,7 @@ class ImageData(object):
                 raise KeyError(msg)
 
             instrument = h['INSTRUME']
-            filter = utils.get_hst_filter(h)
+            filter = utils.get_hst_filter(h, filter_only=True)
 
             if 'PUPIL' in h:
                 pupil = h['PUPIL']
@@ -1645,7 +1655,7 @@ class ImageData(object):
         """
 
         okbits_instrument = {'WFC3': 32+64+512,  # blob OK
-                             'NIRISS': 0,
+                             'NIRISS': 1+2+4+4096, #+4096+4100+18432+18436+1024+16384+1,
                              'NIRCAM': 0,
                              'WFIRST': 0, 
                              'WFI': 0}
@@ -1694,14 +1704,14 @@ class ImageData(object):
         
         """
         import jwst
-        from . import jwst as _jwst
+        from . import jwst_utils as _jwst
 
         datamodel = _jwst.img_with_wcs(hdulist)
         if (jwst.__version__ < '1.3.2') | force:
             # Need to compute own transformed header
             sip_header = _jwst.model_wcs_header(datamodel, get_sip=True)
         else:
-            sip_header = utils.to_header(datamodel.wcs)
+            sip_header = utils.to_header(datamodel.get_fits_wcs())
             
         for k in sip_header:
             self.header[k] = sip_header[k]
@@ -2500,10 +2510,11 @@ class GrismFLT(object):
         self.model = np.zeros_like(self.direct.data['SCI'])
 
         # Grism configuration
-        if 'DFILTER' in self.grism.header:
-            direct_filter = self.grism.header['DFILTER']
-        elif self.grism.instrument in ['NIRCAM', 'NIRISS']:
+        
+        if self.grism.instrument in ['NIRCAM', 'NIRISS']:
             direct_filter = self.grism.pupil
+        elif 'DFILTER' in self.grism.header:
+            direct_filter = self.grism.header['DFILTER']
         else:
             direct_filter = self.direct.filter
         
@@ -2512,7 +2523,7 @@ class GrismFLT(object):
                          grism=self.grism.filter,
                          module=self.grism.module,
                          chip=self.grism.ccdchip)
-                      
+        
         self.conf_file = grismconf.get_config_filename(**conf_args)
         self.conf = grismconf.load_grism_config(self.conf_file)
 
@@ -3788,7 +3799,7 @@ class BeamCutout(object):
     def __init__(self, flt=None, beam=None, conf=None,
                  get_slice_header=True, fits_file=None, scale=1.,
                  contam_sn_mask=[10, 3], min_mask=0.01, min_sens=0.08,
-                 mask_resid=True):
+                 mask_resid=True, isJWST=False):
         """Cutout spectral object from the full frame.
 
         Parameters
@@ -3875,10 +3886,10 @@ class BeamCutout(object):
         # self.min_sens = min_sens
         # self.mask_resid = mask_resid
 
-        self._parse_from_data(**self._parse_params)
+        self._parse_from_data(isJWST=isJWST, **self._parse_params)
 
     def _parse_from_data(self, contam_sn_mask=[10, 3], min_mask=0.01,
-                         seg_ids=None, min_sens=0.08, mask_resid=True):
+                         seg_ids=None, min_sens=0.08, mask_resid=True, isJWST=False):
         """
         See parameter description for `~grizli.model.BeamCutout`.
         """
@@ -3886,7 +3897,7 @@ class BeamCutout(object):
         self.mask = ((self.grism.data['DQ'] > 0) |
                      (self.grism.data['ERR'] == 0) |
                      (self.grism.data['SCI'] == 0))
-
+        
         self.var = self.grism.data['ERR']**2
         self.var[self.mask] = 1.e30
         self.ivar = 1/self.var
@@ -4073,7 +4084,7 @@ class BeamCutout(object):
         # #
         if 'DFILTER' in self.grism.header:
             direct_filter = self.grism.header['DFILTER']
-        elif self.grism.instrument in ['NIRCAM', 'NIRISS']:
+        if self.grism.instrument in ['NIRCAM', 'NIRISS']:
             direct_filter = self.grism.pupil
         else:
             direct_filter = self.direct.filter
@@ -4106,7 +4117,12 @@ class BeamCutout(object):
             yoffset = h0['TYOFFSET']
         else:
             yoffset = 0.
-
+        
+        if 'TXOFFSET' in h0:
+            xoffset = h0['TXOFFSET']
+        else:
+            xoffset = None
+            
         self.beam = GrismDisperser(id=h0['ID'], direct=direct,
                                    segmentation=hdu['SEG'].data*1,
                                    origin=self.direct.origin,
@@ -4116,7 +4132,7 @@ class BeamCutout(object):
                                    ycenter=h0['YCENTER'],
                                    conf=conf, fwcpos=self.grism.fwcpos,
                                    MW_EBV=self.grism.MW_EBV,
-                                   yoffset=yoffset)
+                                   yoffset=yoffset, xoffset=xoffset)
 
         self.grism.parent_file = h0['GPARENT']
         self.direct.parent_file = h0['DPARENT']
@@ -4190,7 +4206,11 @@ class BeamCutout(object):
         if hasattr(self.beam, 'yoffset'):
             h0['TYOFFSET'] = (self.beam.yoffset,
                          'Cross dispersion offset of the trace')
-
+        
+        if hasattr(self.beam, 'xoffset'):
+            h0['TXOFFSET'] = (self.beam.xoffset,
+                         'Dispersion offset of the trace')
+        
         h0['GPARENT'] = (self.grism.parent_file,
                          'Parent grism file')
 

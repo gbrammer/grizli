@@ -8,6 +8,8 @@ import glob
 import time
 import warnings
 
+import yaml
+
 import numpy as np
 import astropy.io.fits as pyfits
 import astropy.wcs as pywcs
@@ -298,7 +300,7 @@ def go(root='j010311+131615',
         Magnitude limits of objects to extract and fit.
 
     """
-
+    isJWST = visit_prep_args['isJWST']
     # Function defaults
     if get_dict:
         if get_dict <= 2:
@@ -409,8 +411,9 @@ def go(root='j010311+131615',
     ######################
     # Parse visit associations
     os.chdir(PATHS['prep'])
-
-    if (not os.path.exists(f'{root}_visits.npy')) | run_parse_visits:
+    visit_file = auto_script.find_visit_file(root=root)
+    
+    if (visit_file is None) | run_parse_visits:
         # Parsing for parallel fields, where time-adjacent exposures
         # may have different visit IDs and should be combined
         if 'combine_same_pa' in parse_visits_args:
@@ -430,16 +433,17 @@ def go(root='j010311+131615',
                                           filters=filters, is_dash=is_dash,
                                           **parse_visits_args)
     else:
-        parsed = np.load(f'{root}_visits.npy', allow_pickle=True)
+        #parsed = np.load(f'{root}_visits.npy', allow_pickle=True)
+        parsed = load_visit_info(root, verbose=False)
 
     if kill == 'parse_visits':
         print('kill=\'parse_visits\'')
         return True
 
     visits, all_groups, info = parsed
-    run_has_grism = utils.column_string_operation(info['FILTER'],
-                                                ['G141', 'G102', 'G800L'],
-                                              'count', 'or').sum()
+    run_has_grism = np.in1d(info['FILTER'], ['G141', 'G102', 'G800L', 'GR150C', 'GR150R']).sum() > 0
+    # is PUPIL in info?
+    run_has_grism |= np.in1d(info['PUPIL'], ['GRISMR', 'GRISMC']).sum() > 0
 
     # Alignment catalogs
     #catalogs = ['PS1','SDSS','GAIA','WISE']
@@ -468,12 +472,18 @@ def go(root='j010311+131615',
 
     auto_script.preprocess(field_root=root, HOME_PATH=PATHS['home'], 
                            PERSIST_PATH=PATHS['persist'],
-                           visit_prep_args=visit_prep_args, 
+                           visit_prep_args=visit_prep_args,
                            persistence_args=persistence_args, 
                            **preprocess_args)
 
     if kill == 'preprocess':
         print('kill=\'preprocess\'')
+        
+        visit_file = find_visit_file(root=root)
+        print(f'Update exposure footprints in {visit_file}')
+        check_paths = ['./', PATHS['raw'], '../RAW']
+        get_visit_exposure_footprints(root=root, check_paths=check_paths)
+        
         return True
 
     if redo_persistence_mask:
@@ -588,9 +598,10 @@ def go(root='j010311+131615',
             utils.log_comment(utils.LOGFILE, "# !! Fine alignment failed")
 
     # Update the visits file with the new exposure footprints
-    print('Update exposure footprints in {0}_visits.npy'.format(root))
-    get_visit_exposure_footprints(visit_file='{0}_visits.npy'.format(root),
-                                  check_paths=['./', PATHS['raw'], '../RAW'])
+    visit_file = auto_script.find_visit_file(root=root)
+    print('Update exposure footprints in {0}'.format(visit_file))
+    check_paths = ['./', PATHS['raw'], '../RAW']
+    get_visit_exposure_footprints(root=root, check_paths=check_paths)
 
     # Make combined mosaics
     no_mosaics_found = len(glob.glob(f'{root}-ir_dr?_sci.fits')) == 0
@@ -613,7 +624,7 @@ def go(root='j010311+131615',
         make_combined_mosaics(root, mosaic_args=mosaic_args,
                         fix_stars=fix_stars, mask_spikes=mask_spikes,
                         skip_single_optical_visits=skip_single,
-                        mosaic_driz_cr_type=mosaic_driz_cr_type, 
+                        mosaic_driz_cr_type=mosaic_driz_cr_type,
                         mosaic_drizzle_args=mosaic_drizzle_args)
 
         # Make PSFs.  Always set get_line_maps=False since PSFs now
@@ -641,7 +652,7 @@ def go(root='j010311+131615',
                 # Add columns indicating objects that fall in grism exposures
                 phot = utils.read_catalog(f'{root}_phot.fits')
                 out = count_grism_exposures(phot, all_groups,
-                                      grisms=['g800l', 'g102', 'g141'],
+                                      grisms=['g800l', 'g102', 'g141', 'gr150c', 'gr150r'],
                                       verbose=True)
                 phot.write(f'{root}_phot.fits', overwrite=True)
             except:
@@ -680,6 +691,9 @@ def go(root='j010311+131615',
             os.system('mv {0}_[0-9]*.png {0}_[0-9]*.fits {1}'.format(root, 
                                                            PATHS['thumbs']))
 
+        if make_final_report:
+            make_report(root, make_rgb=True)
+        
         utils.LOGFILE = '/tmp/grizli.log'
         return True
 
@@ -991,7 +1005,7 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_pr
         print('gunzip '+file+'  # status="{0}"'.format(status))
         if status == 256:
             os.system('mv {0} {1}'.format(file, file.split('.gz')[0]))
-    
+                
     if fetch_only:
         files = glob.glob('*raw.fits')
         files.sort()
@@ -1002,7 +1016,32 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_pr
     if remove_bad:
         remove_bad_expflag(field_root=field_root, HOME_PATH=paths['home'],
                            min_bad=min_bad_expflag)
-
+    
+    # EXPTIME = 0
+    files = glob.glob('*raw.fits')
+    files.extend(glob.glob('*fl?.fits'))
+    files.extend(glob.glob('*c[01]?.fits'))  # WFPC2
+    files.sort()
+    for file in files:
+        try:
+            im = pyfits.open(file)
+            badexp = (im[0].header['EXPTIME'] < 0.1)*1
+        except:
+            badexp = 2
+        
+        if badexp > 0:
+            if not os.path.exists('Expflag'):
+                os.mkdir('Expflag')
+            
+            if badexp == 2:
+                msg = f'# fetch_files : Failed to get EXPTIME from {file}[0]'
+            else:
+                msg = f'# fetch_files : EXPTIME = 0 for {file}'
+                
+            utils.log_comment(utils.LOGFILE, msg, verbose=True)
+            
+            os.system(f'mv {file} Expflag/')
+    
     # Reprocess the RAWs into FLTs
     if reprocess_parallel:
         rep = "python -c 'from grizli.pipeline import reprocess; "
@@ -1109,14 +1148,159 @@ def remove_bad_expflag(field_root='', HOME_PATH='./', min_bad=2):
             os.system('mv {0}* Expflag/'.format(visit))
 
 
-def parse_visits(field_root='', RAW_PATH='../RAW', use_visit=True, combine_same_pa=True, combine_minexp=2, is_dash=False, filters=VALID_FILTERS, max_dt=1e9, visit_split_shift=1.5):
+def visit_dict_to_strings(v):
+    """
+    Make visit dictionary cleaner for writing to YAML
+    """
+    newv = {}
+
+    if 'files' in v:
+        newv['files'] = [str(f) for f in v['files']]
+        
+    if 'footprint' in v:
+        newv['footprint'] = utils.SRegion(v['footprint']).s_region
+    
+    if 'footprints' in v:
+        newv['footprints'] = [utils.SRegion(fp).s_region 
+                              for fp in v['footprints']]
+    
+    for k in v:
+        if k not in newv:
+            newv[k] = v[k]
+            
+    return newv
+
+
+def visit_dict_from_strings(v):
+    """
+    Make visit dictionary cleaner for writing to YAML
+    """
+    newv = {}
+    
+    if 'files' in v:
+        newv['files'] = [str(f) for f in v['files']]
+        
+    if 'footprint' in v:
+        newv['footprint'] = utils.SRegion(v['footprint']).shapely[0]
+    
+    if 'footprints' in v:
+        newv['footprints'] = [utils.SRegion(fp).shapely[0]
+                              for fp in v['footprints']]
+    
+    for k in v:
+        if k not in newv:
+            newv[k] = v[k]
+            
+    return newv
+
+
+def write_visit_info(visits, groups, info, root='j033216m2743', path='./'):
+    """
+    Write visit association files
+    """
+    
+    new_visits = [visit_dict_to_strings(v) for v in visits]
+    
+    new_groups = []
+    for g in groups:
+        gn = {}
+        for k in g:
+            gn[k] = visit_dict_to_strings(g[k])
+        
+        new_groups.append(gn)
+        
+    data = {'visits':new_visits, 'groups': new_groups}
+    data['info'] = {}
+    for c in info.colnames:
+        data['info'][c] = info[c].tolist()
+        
+    with open(os.path.join(path, f'{root}_visits.yaml'), 'w') as fp:
+        yaml.dump(data, stream=fp, Dumper=yaml.Dumper)
+
+
+def convert_visits_npy_to_yaml(npy_file):
+    """
+    """
+    root = npy_file.split('_visits.npy')[0]
+    visits, groups, info = np.load(npy_file, allow_pickle=True)
+    write_visit_info(visits, groups, info, root=root)
+
+
+def find_visit_file(root='j033216m2743', path='./'):
+    """
+    Find the yaml or npy visits file, return None if neither found
+    """
+    yaml_file = os.path.join(path, f'{root}_visits.yaml')
+    npy_file = os.path.join(path, f'{root}_visits.npy')
+    
+    if os.path.exists(yaml_file):
+        return yaml_file
+    elif os.path.exists(npy_file):
+        return npy_file
+    else:
+        return None
+
+
+def load_visits_yaml(file):
+    """
+    Load a {root}_visits.yaml file
+    
+    Returns
+    -------
+    visits, groups, info
+    
+    """
+    with open(file) as fp:
+        data = yaml.load(fp, Loader=yaml.Loader)
+    
+    visits = [visit_dict_from_strings(v) for v in data['visits']]
+
+    groups = []
+    for g in data['groups']:
+        gn = {}
+        for k in g:
+            gn[k] = visit_dict_from_strings(g[k])
+
+        groups.append(gn)
+    
+    info = utils.GTable(data['info'])
+    return visits, groups, info
+
+
+def load_visit_info(root='j033216m2743', path='./', verbose=True):
+    """
+    Load visit info from a visits.npy or visits.yaml file
+    """
+    
+    yaml_file = os.path.join(path, f'{root}_visits.yaml')
+    npy_file = os.path.join(path, f'{root}_visits.npy')
+
+    if os.path.exists(yaml_file):
+        msg = f'Load visit information from {yaml_file}'
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+        visits, groups, info = load_visits_yaml(yaml_file)
+        
+    elif os.path.exists(npy_file):
+        msg = f'Load visit information from {npy_file}'
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+        visits, groups, info = np.load(npy_file, allow_pickle=True)
+    
+    else:
+        msg = f'Could not find {root}_visits.yaml/npy in {path}'
+        raise IOError(msg)
+    
+    return visits, groups, info
+
+
+def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, combine_same_pa=True, combine_minexp=2, is_dash=False, filters=VALID_FILTERS, max_dt=1e9, visit_split_shift=1.5, file_query='*'):
+
     """
     Organize exposures into "visits" by filter / position / PA / epoch
     
     Parameters
     ----------
     field_root : str
-        Rootname of the ``{field_root}_visits.npy`` file to create.
+        Rootname of the ``{field_root}_visits.yaml`` file to create.
     
     RAW_PATH : str
         Path to raw exposures, relative to working directory
@@ -1160,14 +1344,37 @@ def parse_visits(field_root='', RAW_PATH='../RAW', use_visit=True, combine_same_
     from shapely.geometry import Polygon
     from scipy.spatial import ConvexHull
 
-    files = glob.glob(os.path.join(RAW_PATH, '*fl[tc].fits'))
-    files += glob.glob(os.path.join(RAW_PATH, '*c0m.fits'))
-    files += glob.glob(os.path.join(RAW_PATH, '*c0f.fits'))
+    if len(files) == 0:
+        files = glob.glob(os.path.join(RAW_PATH, file_query+'fl[tc].fits*'))
+        files += glob.glob(os.path.join(RAW_PATH, file_query+'c0m.fits*'))
+        files += glob.glob(os.path.join(RAW_PATH, file_query+'c0f.fits*'))
+
+        # check if we're processing JWST files
+        if len(files) == 0:
+            files = glob.glob(os.path.join(RAW_PATH, file_query+'rate.fits*'))
+            isJWST = True # if there are only rate files, then it must be JWST 
+        else:
+            isJWST = False
 
     files.sort()
 
+    if isJWST:
+        # JWST files have slightly different naming conventions for the header
+        for file in files:
+            hdu = pyfits.open(file, mode='update')
+            hdu[0].header['ra_targ'] = hdu[0].header['targ_ra']
+            hdu[0].header['exptime'] = hdu[0].header['effexptm']
+            hdu[0].header['pa_v3'] = hdu[1].header['pa_v3']
+            if hdu[0].header['FILTER'] != 'CLEAR':
+                hdu[0].header['FILTER_INFO'] = hdu[0].header['FILTER']
+                hdu[0].header['EXPTYPE_INFO'] = hdu[0].header['EXP_TYPE']
+            if 'NRIMDTPT' in hdu[0].header:
+                hdu[0].header['NRIMDTPT'] = int(hdu[0].header['NRIMDTPT'])
+            if 'NDITHPTS' in hdu[0].header:
+                hdu[0].header['NRIMDTPT'] = int(hdu[0].header['NDITHPTS'])
+            hdu.flush()
+
     info = utils.get_flt_info(files)
-    #info = info[(info['FILTER'] != 'G141') & (info['FILTER'] != 'G102')]
 
     # Only F814W on ACS
     if ONLY_F814W:
@@ -1206,21 +1413,25 @@ def parse_visits(field_root='', RAW_PATH='../RAW', use_visit=True, combine_same_
 
             visits.append(direct)
 
-        all_groups = utils.parse_grism_associations(visits)
-        np.save('{0}_visits.npy'.format(field_root), 
-                [visits, all_groups, info])
+        all_groups = utils.parse_grism_associations(visits, info, isJWST=isJWST)
+
+        write_visit_info(visits, all_groups, info, root=field_root, path='./')
                 
         return visits, all_groups, info
 
     visits, filters = utils.parse_flt_files(info=info, 
-                                  uniquename=True, get_footprint=True, 
+                                  uniquename=True, get_footprint=True,
                                   use_visit=use_visit, max_dt=max_dt, 
-                                  visit_split_shift=visit_split_shift)
+                                  visit_split_shift=visit_split_shift,
+                                  isJWST=isJWST)
+    
 
     # Don't run combine_minexp if have grism exposures
-    grisms = ['G141', 'G102', 'G800L', 'G280']
-    has_grism = utils.column_string_operation(info['FILTER'], grisms,
-                                              'count', 'or').sum()
+    grisms = ['G141', 'G102', 'G800L', 'G280', 'GR150C', 'GR150R']
+    has_grism = np.in1d(info['FILTER'], grisms).sum() > 0
+    # is PUPIL in info?
+    has_grism |= np.in1d(info['PUPIL'], ['GRISMR', 'GRISMC']).sum() > 0
+    info.meta['HAS_GRISM'] = has_grism
 
     if combine_same_pa:
         combined = {}
@@ -1246,7 +1457,8 @@ def parse_visits(field_root='', RAW_PATH='../RAW', use_visit=True, combine_same_
         split_list = []
         for v in visits:
             split_list.extend(utils.split_visit(v, max_dt=max_dt,
-                              visit_split_shift=1.5))
+                                          visit_split_shift=visit_split_shift, 
+                                          path=RAW_PATH))
 
         visits = split_list
         utils.log_comment(utils.LOGFILE,
@@ -1288,9 +1500,7 @@ def parse_visits(field_root='', RAW_PATH='../RAW', use_visit=True, combine_same_
         print('** Combine Singles: **')
         for i, visit in enumerate(visits):
             print('{0} {1} {2}'.format(i, visit['product'], len(visit['files'])))
-
-    all_groups = utils.parse_grism_associations(visits)
-
+    all_groups = utils.parse_grism_associations(visits, info, isJWST=isJWST)
     print('\n == Grism groups ==\n')
     valid_groups = []
     for g in all_groups:
@@ -1302,12 +1512,13 @@ def parse_visits(field_root='', RAW_PATH='../RAW', use_visit=True, combine_same_
 
     all_groups = valid_groups
 
-    np.save('{0}_visits.npy'.format(field_root), [visits, all_groups, info])
+    #np.save('{0}_visits.npy'.format(field_root), [visits, all_groups, info])
+    write_visit_info(visits, all_groups, info, root=field_root, path='./')
 
     return visits, all_groups, info
 
 
-def get_visit_exposure_footprints(visit_file='j1000p0210_visits.npy', check_paths=['./', '../RAW'], simplify=1.e-6):
+def get_visit_exposure_footprints(root='j1000p0210', check_paths=['./', '../RAW'], simplify=1.e-6):
     """
     Add exposure-level footprints to the visit dictionary
 
@@ -1330,10 +1541,11 @@ def get_visit_exposure_footprints(visit_file='j1000p0210_visits.npy', check_path
 
     """
 
-    if isinstance(visit_file, str):
-        visits, all_groups, info = np.load(visit_file, allow_pickle=True)
+    if isinstance(root, str):
+        #visits, all_groups, info = np.load(visit_file, allow_pickle=True)
+        visits, all_groups, info = load_visit_info(root, verbose=False)
     else:
-        visits = visit_file
+        visits = root
 
     fps = {}
 
@@ -1365,8 +1577,9 @@ def get_visit_exposure_footprints(visit_file='j1000p0210_visits.npy', check_path
     # ToDo: also update visits in all_groups with `fps`
 
     # Resave the file
-    if isinstance(visit_file, str):
-        np.save(visit_file, [visits, all_groups, info])
+    if isinstance(root, str):
+        write_visit_info(visits, all_groups, info, root=root, path='./')
+        #np.save(visit_file, [visits, all_groups, info])
 
     return visits
 
@@ -1387,9 +1600,10 @@ def manual_alignment(field_root='j151850-813028', HOME_PATH='/Volumes/Pegasus/Gr
     tab = utils.read_catalog(os.path.join(HOME_PATH, 
                                           f'{field_root}_footprint.fits'))
 
-    visits, all_groups, info = np.load('{0}_visits.npy'.format(field_root),
-                                       allow_pickle=True)
-
+    #visits, all_groups, info = np.load('{0}_visits.npy'.format(field_root),
+    #                                   allow_pickle=True)
+    visits, all_groups, info = load_visit_info(field_root, verbose=False)
+    
     use_visits = []
 
     for visit in visits:
@@ -1441,8 +1655,9 @@ def clean_prep(field_root='j142724+334246'):
     import glob
     import os
 
-    visits, all_groups, info = np.load('{0}_visits.npy'.format(field_root),
-                                       allow_pickle=True)
+    #visits, all_groups, info = np.load('{0}_visits.npy'.format(field_root),
+    #                                   allow_pickle=True)
+    visits, all_groups, info = load_visit_info(field_root, verbose=False)
 
     for visit in visits:
         for ext in ['_drz_wht', '_seg', '_bkg']:
@@ -1491,8 +1706,12 @@ def preprocess(field_root='j142724+334246',  HOME_PATH='/Volumes/Pegasus/Grizli/
     if PERSIST_PATH is None:
         PERSIST_PATH = os.path.join(HOME_PATH, field_root, 'Persistence')
     
-    visits, all_groups, info = np.load(f'{field_root}_visits.npy',
-                                       allow_pickle=True)
+    #visits, all_groups, info = np.load(f'{field_root}_visits.npy',
+    #                                   allow_pickle=True)
+    visits, all_groups, info = load_visit_info(field_root, verbose=False)
+
+    # check if isJWST
+    isJWST = prep.check_isJWST('../RAW/' + all_groups[0]['direct']['files'][0])
 
     # Grism visits
     master_footprint = None
@@ -1567,7 +1786,7 @@ def preprocess(field_root='j142724+334246',  HOME_PATH='/Volumes/Pegasus/Grizli/
             master_radec = radec
 
         print('\n\n\n{0} radec: {1}\n\n\n'.format(direct['product'], radec))
-
+        
         ###########################
         # Preprocessing script, background subtraction, etc.
         status = prep.process_direct_grism_visit(direct=direct, grism=grism,
@@ -1604,6 +1823,7 @@ def preprocess(field_root='j142724+334246',  HOME_PATH='/Volumes/Pegasus/Grizli/
     fwave = np.cast[float]([f.replace('f1', 'f10'). \
                               replace('f098m', 'f0980m'). \
                               replace('lp', 'w'). \
+                              replace('gr','g'). \
                               replace('fq', 'f')[1:-1] 
                             for f in filters])
     
@@ -1701,7 +1921,7 @@ def preprocess(field_root='j142724+334246',  HOME_PATH='/Volumes/Pegasus/Grizli/
     # Clean up
     if clean:
         clean_prep(field_root=field_root)
-
+    
     ###################################
     # Drizzle by filter
     # failed = [f.split('.failed')[0] for f in glob.glob('*failed')]
@@ -1872,7 +2092,7 @@ mag_lim=17, cat=None, cols=['mag_auto', 'ra', 'dec'], minR=8, dy=5, selection=No
             im.flush()
 
 
-def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_background=True, photometry_background=True, get_all_filters=False, filters=None, det_err_scale=-np.inf, phot_err_scale=-np.inf, rescale_weight=True, run_detection=True, detection_filter='ir', detection_root=None, output_root=None, use_psf_filter=True, detection_params=prep.SEP_DETECT_PARAMS,  phot_apertures=prep.SEXTRACTOR_PHOT_APERTURES_ARCSEC, master_catalog=None, bkg_mask=None, bkg_params={'bw': 64, 'bh': 64, 'fw': 3, 'fh': 3, 'pixel_scale': 0.06}, use_bkg_err=False, aper_segmask=True):
+def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_background=True, photometry_background=True, get_all_filters=False, filters=None, det_err_scale=-np.inf, phot_err_scale=-np.inf, rescale_weight=True, run_detection=True, detection_filter='ir', detection_root=None, output_root=None, use_psf_filter=True, detection_params=prep.SEP_DETECT_PARAMS,  phot_apertures=prep.SEXTRACTOR_PHOT_APERTURES_ARCSEC, master_catalog=None, bkg_mask=None, bkg_params={'bw': 64, 'bh': 64, 'fw': 3, 'fh': 3, 'pixel_scale': 0.06}, use_bkg_err=False, aper_segmask=True, sci_image=None):
     """
     Make a detection catalog and run aperture photometry with the 
     SExtractor clone `~sep`.
@@ -1930,7 +2150,7 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
 
                 detection_params['filter_kernel'] = psf_kernel
 
-        tab = prep.make_SEP_catalog(root=detection_root, threshold=threshold, get_background=detection_background, save_to_fits=True, rescale_weight=rescale_weight, err_scale=det_err_scale, phot_apertures=phot_apertures, detection_params=detection_params, bkg_mask=bkg_mask, bkg_params=bkg_params, use_bkg_err=use_bkg_err, aper_segmask=aper_segmask)
+        tab = prep.make_SEP_catalog(sci=sci_image,root=detection_root, threshold=threshold, get_background=detection_background, save_to_fits=True, rescale_weight=rescale_weight, err_scale=det_err_scale, phot_apertures=phot_apertures, detection_params=detection_params, bkg_mask=bkg_mask, bkg_params=bkg_params, use_bkg_err=use_bkg_err, aper_segmask=aper_segmask)
         
         cat_pixel_scale = tab.meta['asec_0'][0]/tab.meta['aper_0'][0]
         
@@ -1952,8 +2172,9 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
         source_xy = tab['X_WORLD'], tab['Y_WORLD']
 
     if filters is None:
-        visits_file = '{0}_visits.npy'.format(field_root)
-        if not os.path.exists(visits_file):
+        #visits_file = '{0}_visits.yaml'.format(field_root)
+        visits_file = find_visit_file(root=field_root)
+        if visits_file is None:
             get_all_filters = True
 
         if get_all_filters:
@@ -1965,8 +2186,10 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
             filters = [file.split('_')[-3][len(field_root)+1:] 
                        for file in mosaic_files]
         else:
-            vfile = '{0}_visits.npy'.format(field_root)
-            visits, all_groups, info = np.load(vfile, allow_pickle=True)
+            #vfile = '{0}_visits.npy'.format(field_root)
+            #visits, all_groups, info = np.load(vfile, allow_pickle=True)
+            visits, all_groups, info = load_visit_info(field_root, 
+                                                       verbose=False)
 
             if ONLY_F814W:
                 info = info[((info['INSTRUME'] == 'WFC3') & 
@@ -2030,7 +2253,7 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
                       get_background=photometry_background,
                       save_to_fits=False, source_xy=source_xy,
                       phot_apertures=phot_apertures, bkg_mask=bkg_mask,
-                      bkg_params=bkg_params, use_bkg_err=use_bkg_err)
+                      bkg_params=bkg_params, use_bkg_err=use_bkg_err, sci=sci_image)
 
             for k in filter_tab.meta:
                 newk = '{0}_{1}'.format(filt.upper(), k)
@@ -2065,7 +2288,7 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
     return tab
 
 
-def count_grism_exposures(phot, groups, grisms=['g800l', 'g102', 'g141'], reset=True, verbose=False):
+def count_grism_exposures(phot, groups, grisms=['g800l', 'g102', 'g141', 'gr150c', 'gr150r'], reset=True, verbose=False):
     """
     Count number of grism exposures that contain objects in a catalog
     """
@@ -2235,13 +2458,22 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
 
     if files is None:
         files = glob.glob(os.path.join(PREP_PATH, '*fl[tc].fits'))
+        files += glob.glob(os.path.join(PREP_PATH, '*rate.fits'))
         files.sort()
 
     info = utils.get_flt_info(files)
+    for idx, filter in enumerate(info['FILTER']):
+        if '-' in filter:
+            info['FILTER'][idx] = filter.split('-')[-1]
 
-    g141 = info['FILTER'] == 'G141'
-    g102 = info['FILTER'] == 'G102'
-    g800l = info['FILTER'] == 'G800L'
+    masks = {}
+    for gr in ['G141', 'G102', 'G800L']:
+        masks[gr.lower()] = [info['FILTER'] == gr, gr, '']
+
+    for gr in ['GR150R', 'GR150C']:
+        for filt in ['F090W', 'F115W', 'F150W', 'F200W']:
+            key = f'{gr.lower()}-{filt.lower()}'
+            masks[key] = [(info['PUPIL'] == filt) & (info['FILTER'] == gr), gr, filt]
 
     if force_cat is None:
         #catalog = '{0}-ir.cat.fits'.format(field_root)
@@ -2251,124 +2483,43 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
 
     grp_objects = []
 
-    #grp = None
-    if (g141.sum() > 0) & ('G141' in gris_ref_filters):
-        for f in gris_ref_filters['G141']:
-            if os.path.exists(f'{field_root}-{f.lower()}_drz_sci.fits'):
-                g141_ref = f
-                break
+    grp = None
 
+    for mask in masks:
+        if (masks[mask][0].sum() > 0) & (masks[mask][1] in gris_ref_filters):
+            if masks[mask][2] != '':
+                ref = masks[mask][2]
+            else:
+                for f in gris_ref_filters[masks[mask][1]]:
+                    if os.path.exists('{0}-{1}_drz_sci.fits'.format(field_root, f.lower())):
+                        ref = f
+                        break
+        else:
+            continue
         # Segmentation image
         if force_seg is None:
-            if galfit == 'clean':
-                seg_file = '{0}-{1}_galfit_orig_seg.fits'.format(field_root, g141_ref.lower())
-            elif galfit == 'model':
-                seg_file = '{0}-{1}_galfit_seg.fits'.format(field_root, g141_ref.lower())
-            else:
-                seg_file = glob.glob('{0}-*_seg.fits'.format(field_root))[0]
-                #seg_file = '{0}-ir_seg.fits'.format(field_root)
+            if force_seg is None:
+                if galfit == 'clean':
+                    seg_file = '{0}-{1}_galfit_orig_seg.fits'.format(field_root, ref.lower())
+                elif galfit == 'model':
+                    seg_file = '{0}-{1}_galfit_seg.fits'.format(field_root, ref.lower())
+                else:
+                    seg_file = glob.glob('{0}-*_seg.fits'.format(field_root))[0]
         else:
             seg_file = force_seg
-
         # Reference image
         if force_ref is None:
             if galfit == 'clean':
-                ref_file = '{0}-{1}_galfit_clean.fits'.format(field_root, g141_ref.lower())
+                ref_file = '{0}-{1}_galfit_clean.fits'.format(field_root, ref.lower())
             elif galfit == 'model':
-                ref_file = '{0}-{1}_galfit.fits'.format(field_root, g141_ref.lower())
+                ref_file = '{0}-{1}_galfit.fits'.format(field_root, ref.lower())
             else:
-                ref_file = '{0}-{1}_drz_sci.fits'.format(field_root, g141_ref.lower())
-
+                ref_file = '{0}-{1}_drz_sci.fits'.format(field_root, ref.lower())
         else:
             ref_file = force_ref
-
-        grp = multifit.GroupFLT(grism_files=list(info['FILE'][g141]), direct_files=[], ref_file=ref_file, seg_file=seg_file, catalog=catalog, cpu_count=-1, sci_extn=1, pad=pad)
-
-        grp_objects.append(grp)
-
-    if (g102.sum() > 0) & ('G102' in gris_ref_filters):
-        for f in gris_ref_filters['G102']:
-            if os.path.exists('{0}-{1}_drz_sci.fits'.format(field_root, f.lower())):
-                g102_ref = f
-                break
-
-        # Segmentation image
-        if force_seg is None:
-            if galfit == 'clean':
-                seg_file = '{0}-{1}_galfit_orig_seg.fits'.format(field_root, g102_ref.lower())
-            elif galfit == 'model':
-                seg_file = '{0}-{1}_galfit_seg.fits'.format(field_root, g102_ref.lower())
-            else:
-                seg_file = glob.glob('{0}-*_seg.fits'.format(field_root))[0]
-        else:
-            seg_file = force_seg
-
-        # Reference image
-        if force_ref is None:
-            if galfit == 'clean':
-                ref_file = '{0}-{1}_galfit_clean.fits'.format(field_root, g102_ref.lower())
-            elif galfit == 'model':
-                ref_file = '{0}-{1}_galfit.fits'.format(field_root, g102_ref.lower())
-            else:
-                ref_file = '{0}-{1}_drz_sci.fits'.format(field_root, g102_ref.lower())
-
-        else:
-            ref_file = force_ref
-
-        grp_i = multifit.GroupFLT(grism_files=list(info['FILE'][g102]), direct_files=[], ref_file=ref_file, seg_file=seg_file, catalog=catalog, cpu_count=-1, sci_extn=1, pad=pad)
-        # if g141.sum() > 0:
-        #    grp.extend(grp_i)
-        # else:
-        #    grp = grp_i
+        
+        grp_i = multifit.GroupFLT(grism_files=list(info['FILE'][masks[mask][0]]), direct_files=[], ref_file=ref_file, seg_file=seg_file, catalog=catalog, cpu_count=-1, sci_extn=1, pad=pad)
         grp_objects.append(grp_i)
-
-        # del(grp_i)
-
-    # ACS
-    if (g800l.sum() > 0) & ('G800L' in gris_ref_filters):
-
-        acs_grp = None
-
-        for f in gris_ref_filters['G800L']:
-            if os.path.exists('{0}-{1}_drc_sci.fits'.format(field_root, f.lower())):
-                g800l_ref = f
-                break
-
-        # Segmentation image
-        if force_seg is None:
-            if galfit == 'clean':
-                seg_file = '{0}-{1}_galfit_orig_seg.fits'.format(field_root, g800l_ref.lower())
-            elif galfit == 'model':
-                seg_file = '{0}-{1}_galfit_seg.fits'.format(field_root, g800l_ref.lower())
-            else:
-                #seg_file = '{0}-ir_seg.fits'.format(field_root)
-                seg_file = glob.glob('{0}-*_seg.fits'.format(field_root))[0]
-        else:
-            seg_file = force_seg
-
-        # Reference image
-        if force_ref is None:
-            if galfit == 'clean':
-                ref_file = '{0}-{1}_galfit_clean.fits'.format(field_root, g800l_ref.lower())
-            elif galfit == 'model':
-                ref_file = '{0}-{1}_galfit.fits'.format(field_root, g800l_ref.lower())
-            else:
-                ref_file = '{0}-{1}_drc_sci.fits'.format(field_root, g800l_ref.lower())
-
-        else:
-            ref_file = force_ref
-
-        for sci_extn in [1, 2]:
-            grp_i = multifit.GroupFLT(grism_files=list(info['FILE'][g800l]), direct_files=[], ref_file=ref_file, seg_file=seg_file, catalog=catalog, cpu_count=-1, sci_extn=sci_extn, pad=0, shrink_segimage=False)
-
-            if acs_grp is not None:
-                acs_grp.extend(grp_i)
-                del(grp_i)
-            else:
-                acs_grp = grp_i
-
-        if acs_grp is not None:
-            grp_objects.append(acs_grp)
 
     if split_by_grism:
         return grp_objects
@@ -2425,13 +2576,18 @@ def grism_prep(field_root='j142724+334246', PREP_PATH='../Prep', EXTRACT_PATH='.
         if mask_mosaic_edges:
             try:
                 # Read footprint file created ealier
-                fp_file = '{0}-ir.npy'.format(field_root)
-                det_poly = np.load(fp_file, allow_pickle=True)[0]['footprint']
+                fp_file = '{0}-ir.yaml'.format(field_root)
+                with open(fp_file) as fp:
+                    fp_data = yaml.load(fp, Loader=yaml.Loader)
+                    
+                det_poly = utils.SRegion(fp_data[0]['footprint']).shapely[0]
+                
                 for flt in grp.FLTs:
                     flt.mask_mosaic_edges(sky_poly=det_poly, verbose=True,
                                           dq_mask=False, dq_value=1024,
                                           err_scale=10, resid_sn=-1)
             except:
+                utils.log_exception(utils.LOGFILE, traceback)
                 pass
 
         ################
@@ -2595,6 +2751,8 @@ def extract(field_root='j142724+334246', maglim=[13, 24], prior=None, MW_EBV=0.0
     if master_files is None:
         master_files = glob.glob('*GrismFLT.fits')
         master_files.sort()
+    
+    isJWST = prep.check_isJWST(master_files[0])
 
     if grp is None:
         init_grp = True
@@ -2690,7 +2848,7 @@ def extract(field_root='j142724+334246', maglim=[13, 24], prior=None, MW_EBV=0.0
 
         #mb = multifit.MultiBeam(beams, fcontam=fcontam, group_name=target, psf=False, MW_EBV=MW_EBV, min_sens=min_sens)
 
-        mb = multifit.MultiBeam(beams, fcontam=fcontam, group_name=target, psf=False, MW_EBV=MW_EBV, sys_err=sys_err, min_mask=min_mask, min_sens=min_sens)
+        mb = multifit.MultiBeam(beams, fcontam=fcontam, group_name=target, psf=False, isJWST=isJWST, MW_EBV=MW_EBV, sys_err=sys_err, min_mask=min_mask, min_sens=min_sens)
 
         if bad_pa_threshold is not None:
             out = mb.check_for_bad_PAs(chi2_threshold=bad_pa_threshold,
@@ -2894,8 +3052,10 @@ def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Griz
     import copy
 
     if all_visits is None:
-        _ = np.load(f'{field_root}_visits.npy', allow_pickle=True)
-        all_visits, all_groups, info = _
+        #_ = np.load(f'{field_root}_visits.npy', allow_pickle=True)
+        all_visits, all_groups, info = load_visit_info(field_root, 
+                                                       verbose=False)
+        #all_visits, all_groups, info = _
 
     failed_list = glob.glob('*failed')
 
@@ -3133,9 +3293,45 @@ def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Griz
     fig.text(0.97, 0.02, time.ctime(), ha='right', va='bottom', fontsize=5, transform=fig.transFigure)
 
     fig.savefig('{0}{1}_fine.png'.format(field_root, extra_str))
-    np.save('{0}{1}_fine.npy'.format(field_root, extra_str), [visits, fit])
+    fine_file = '{0}{1}_fine.yaml'.format(field_root, extra_str)
+    save_fine_yaml(visits, fit, yaml_file=fine_file)
+    #np.save('{0}{1}_fine.npy'.format(field_root, extra_str), [visits, fit])
 
     return tab, fit, visits
+
+
+def save_fine_yaml(visits, fit, yaml_file='fit_fine.yaml'):
+    """
+    Save results from fine_alignment
+    """
+    vis = [visit_dict_to_strings(v) for v in visits]
+    
+    fit_res = {}
+    for k in fit:
+        if k in ['direc','x']:
+            fit_res[k] = fit[k].tolist()
+        else:
+            fit_res[k] = fit[k]
+    
+    fit_res['fun'] = float(fit['fun'])
+    
+    with open(yaml_file, 'w') as fp:
+        yaml.dump([vis, fit_res], stream=fp, Dumper=yaml.Dumper)
+
+
+def load_fine_yaml(yaml_file='fit_fine.yaml'):
+    """
+    Load fine_alignment result
+    """
+    
+    with open(yaml_file) as fp:
+        vis, fit = yaml.load(fp, Loader=yaml.Loader)
+    
+    visits = [visit_dict_from_strings(v) for v in vis]
+    for k in ['direc','x']:
+        fit[k] = np.array(fit[k])
+    
+    return visits, fit
 
 
 def update_wcs_headers_with_fine(field_root, backup=True):
@@ -3161,13 +3357,16 @@ def update_wcs_headers_with_fine(field_root, backup=True):
         if not os.path.exists('FineBkup'):
             os.mkdir('FineBkup')
 
-    visits, all_groups, info = np.load(f'{field_root}_visits.npy',
-                                       allow_pickle=True)
+    #visits, all_groups, info = np.load(f'{field_root}_visits.npy',
+    #                                   allow_pickle=True)
+    visits, all_groups, info = load_visit_info(field_root, verbose=False)
 
-    fit_files = glob.glob('{0}*fine.npy'.format(field_root))
+    fit_files = glob.glob('{0}*fine.yaml'.format(field_root))
+    
     for fit_file in fit_files:
-        fine_visits, fine_fit = np.load(fit_file, allow_pickle=True)
-
+        #fine_visits, fine_fit = np.load(fit_file, allow_pickle=True)
+        fine_visits, fine_fit = load_fine_yaml(yaml_file=fit_file)
+        
         N = len(fine_visits)
 
         if backup:
@@ -3177,7 +3376,7 @@ def update_wcs_headers_with_fine(field_root, backup=True):
                     os.system(f'cp {file} FineBkup/')
                     print(file)
 
-        trans = np.reshape(fine_fit.x, (N, -1))  # /10.
+        trans = np.reshape(fine_fit['x'], (N, -1))  # /10.
         sh = trans.shape
         if sh[1] == 2:
             pscl = np.array([10., 10.])
@@ -3248,7 +3447,7 @@ def update_wcs_headers_with_fine(field_root, backup=True):
                                                 xyscale=trans[j, :])
 
 
-def make_reference_wcs(info, files=None, output='mosaic_wcs-ref.fits', filters=['G800L', 'G102', 'G141'], pad_reference=90, pixel_scale=None, get_hdu=True):
+def make_reference_wcs(info, files=None, output='mosaic_wcs-ref.fits', filters=['G800L', 'G102', 'G141','GR150C', 'GR150R'], pad_reference=90, pixel_scale=None, get_hdu=True):
     """
     Make a reference image WCS based on the grism exposures
 
@@ -3297,7 +3496,7 @@ def make_reference_wcs(info, files=None, output='mosaic_wcs-ref.fits', filters=[
     if pixel_scale is None:
         # Auto determine pixel size, 0.03" pixels if only ACS, otherwise 0.06
         any_grism = utils.column_values_in_list(info['FILTER'],
-                                                  ['G800L', 'G102', 'G141'])
+                                                  ['G800L', 'G102', 'G141', 'GR150C', 'GR150R'])
         acs_grism = (info['FILTER'] == 'G800L')
         only_acs = list(np.unique(info['INSTRUME'])) == ['ACS']
         
@@ -3321,7 +3520,11 @@ def make_reference_wcs(info, files=None, output='mosaic_wcs-ref.fits', filters=[
         return ref_hdu[1]
 
 
-def drizzle_overlaps(field_root, filters=['F098M', 'F105W', 'F110W', 'F125W', 'F140W', 'F160W'], ref_image=None, ref_wcs=None, bits=None, pixfrac=0.75, scale=0.06, make_combined=False, drizzle_filters=True, skysub=False, skymethod='localmin', match_str=[], context=False, pad_reference=60, min_nexp=2, static=True, skip_products=[], include_saturated=False, multi_driz_cr=False, filter_driz_cr=False, **kwargs):
+def drizzle_overlaps(field_root, filters=['F098M', 'F105W', 'F110W', 'F115W', 'F125W', 'F140W', 'F150W', 'F160W', 'F200W'], ref_image=None, ref_wcs=None, bits=None, pixfrac=0.75, scale=0.06, make_combined=False, drizzle_filters=True, skysub=False, skymethod='localmin', match_str=[], context=False, pad_reference=60, min_nexp=2, static=True, skip_products=[], include_saturated=False, multi_driz_cr=False, filter_driz_cr=False, **kwargs):
+    """
+    Drizzle filter groups based on precomputed image associations
+    """
+
     import numpy as np
     import glob
 
@@ -3333,8 +3536,9 @@ def drizzle_overlaps(field_root, filters=['F098M', 'F105W', 'F110W', 'F125W', 'F
     ##############
     # Redrizzle
 
-    visits, all_groups, info = np.load('{0}_visits.npy'.format(field_root),
-                                       allow_pickle=True)
+    #visits, all_groups, info = np.load('{0}_visits.npy'.format(field_root),
+    #                                   allow_pickle=True)
+    visits, all_groups, info = load_visit_info(field_root, verbose=False)
 
     failed_list = glob.glob('*failed')
 
@@ -3358,20 +3562,32 @@ def drizzle_overlaps(field_root, filters=['F098M', 'F105W', 'F110W', 'F125W', 'F
         wfc3ir['reference_wcs'] = ref_wcs
 
     filter_groups = {}
-    for visit in visits:
 
+    for visit in visits:
+        msg = (visit)                   
+        utils.log_comment(utils.LOGFILE, msg, show_date=True,
+                              verbose=True)
         # Visit failed for some reason
         if (visit['product']+'.wcs_failed' in failed_list) | (visit['product']+'.failed' in failed_list) | (visit['product'] in skip_products):
+            msg = ('visit failed')                   
+            utils.log_comment(utils.LOGFILE, msg, show_date=True,
+                              verbose=True)
             continue
 
         # Too few exposures (i.e., one with unreliable CR flags)
         if len(visit['files']) < min_nexp:
+            msg = ('visit has too few exposures')                   
+            utils.log_comment(utils.LOGFILE, msg, show_date=True,
+                              verbose=True)
             continue
 
         # Not one of the desired filters
         filt = visit['product'].split('-')[-1]
 
         if filt.upper() not in filters:
+            msg = ('filt.upper not in filters')                   
+            utils.log_comment(utils.LOGFILE, msg, show_date=True,
+                              verbose=True)
             continue
 
         # Are all of the exposures in ./?
@@ -3407,7 +3623,8 @@ def drizzle_overlaps(field_root, filters=['F098M', 'F105W', 'F110W', 'F125W', 'F
         if 'footprints' in visit:
             for fp in visit['footprints']:
                 if 'footprint' in filter_groups[filt]:
-                    filter_groups[filt]['footprint'] = filter_groups[filt]['footprint'].union(fp)
+                    fpun = filter_groups[filt]['footprint'].union(fp)
+                    filter_groups[filt]['footprint'] = fpun
                 else:
                     filter_groups[filt]['footprint'] = fp.buffer(0)
 
@@ -3447,13 +3664,34 @@ def drizzle_overlaps(field_root, filters=['F098M', 'F105W', 'F110W', 'F125W', 'F
         # Figure out if we have more than one instrument
         inst_keys = np.unique([os.path.basename(file)[0] for file in wfc3ir['files']])
 
-        prep.drizzle_overlaps([wfc3ir], parse_visits=False, pixfrac=pixfrac, scale=scale, skysub=False, bits=bits, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False, context=context, static=(static & (len(inst_keys) == 1)), include_saturated=include_saturated, run_driz_cr=multi_driz_cr, **kwargs)
+        prep.drizzle_overlaps([wfc3ir], parse_visits=False, 
+                              pixfrac=pixfrac, scale=scale, skysub=False,
+                              bits=bits, final_wcs=True, final_rot=0,
+                              final_outnx=None, final_outny=None,
+                              final_ra=None, final_dec=None,
+                              final_wht_type='IVM', final_wt_scl='exptime',
+                              check_overlaps=False, context=context,
+                              static=(static & (len(inst_keys) == 1)),
+                              include_saturated=include_saturated,
+                              run_driz_cr=multi_driz_cr, **kwargs)
 
-        np.save('{0}.npy'.format(wfc3ir['product']), [wfc3ir])
+        # np.save('{0}.npy'.format(wfc3ir['product']), [wfc3ir])
+        wout = visit_dict_to_strings(wfc3ir)
+        with open('{0}.yaml'.format(wfc3ir['product']), 'w') as fp:
+            yaml.dump([wout], stream=fp, Dumper=yaml.Dumper)
 
     if drizzle_filters:
         print('Drizzle mosaics in filters: {0}'.format(filter_groups.keys()))
-        prep.drizzle_overlaps(keep, parse_visits=False, pixfrac=pixfrac, scale=scale, skysub=skysub, skymethod=skymethod, bits=bits, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False, context=context, static=static, include_saturated=include_saturated, run_driz_cr=filter_driz_cr, **kwargs)
+        prep.drizzle_overlaps(keep, parse_visits=False,
+                              pixfrac=pixfrac, scale=scale, skysub=skysub,
+                              skymethod=skymethod, bits=bits, final_wcs=True,
+                              final_rot=0, final_outnx=None, final_outny=None,
+                              final_ra=None, final_dec=None,
+                              final_wht_type='IVM', final_wt_scl='exptime',
+                              check_overlaps=False, context=context,
+                              static=static,
+                              include_saturated=include_saturated,
+                              run_driz_cr=filter_driz_cr, **kwargs)
 
 
 FILTER_COMBINATIONS = {'ir': IR_M_FILTERS+IR_W_FILTERS,
@@ -3578,8 +3816,9 @@ def make_combined_mosaics(root, fix_stars=False, mask_spikes=False, skip_single_
     #     # j = 125+110w
     #     auto_script.field_rgb('j013804m2156', HOME_PATH=None, show_ir=True, filters=['f160w','j','f105w'], xsize=16, rgb_scl=[1, 0.85, 1], rgb_min=-0.003)
 
-    visits_file = '{0}_visits.npy'.format(root)
-    visits, groups, info = np.load(visits_file, allow_pickle=True)
+    #visits_file = '{0}_visits.npy'.format(root)
+    #visits, groups, info = np.load(visits_file, allow_pickle=True)
+    visits, groups, info = load_visit_info(root, verbose=False)
 
     # Mosaic WCS
     wcs_ref_file = '{0}_wcs-ref.fits'.format(root)
@@ -3738,9 +3977,7 @@ def make_combined_mosaics(root, fix_stars=False, mask_spikes=False, skip_single_
     if fill_mosaics:
         if fill_mosaics == 'grism':
             # Only fill mosaics if grism filters exist
-            has_grism = utils.column_string_operation(info['FILTER'],
-                                     ['G141', 'G102', 'G800L'],
-                                     'count', 'or').sum() > 0
+            has_grism = info.meta['HAS_GRISM']
             if has_grism:
                 fill_filter_mosaics(root)
         else:
@@ -4139,7 +4376,7 @@ def get_rgb_filters(filter_list, force_ir=False, pure_sort=False):
 
 TICKPARAMS = dict(axis='both', colors='w', which='both')
 
-def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', show_ir=True, pl=1, pf=1, scl=1, scale_ab=None, rgb_scl=[1, 1, 1], ds9=None, force_ir=False, filters=None, add_labels=True, output_format='jpg', rgb_min=-0.01, xyslice=None, pure_sort=False, verbose=True, force_rgb=None, suffix='.field', mask_empty=False, tick_interval=60, timestamp=False, mw_ebv=0, use_background=False, tickparams=TICKPARAMS, fill_black=False, ref_spectrum=None, gzext='', full_dimensions=False, invert=False, get_images=False):
+def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', show_ir=True, pl=1, pf=1, scl=1, scale_ab=None, rgb_scl=[1, 1, 1], ds9=None, force_ir=False, filters=None, add_labels=True, output_format='jpg', rgb_min=-0.01, xyslice=None, pure_sort=False, verbose=True, force_rgb=None, suffix='.field', mask_empty=False, tick_interval=60, timestamp=False, mw_ebv=0, use_background=False, tickparams=TICKPARAMS, fill_black=False, ref_spectrum=None, gzext='', full_dimensions=False, invert=False, get_rgb_array=False, get_images=False):
     """
     RGB image of the field mosaics
     """
@@ -4368,9 +4605,12 @@ def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', s
         image[gmsk,1] = 0
         image[bmsk,2] = 0
         
+    if get_rgb_array:
+        return image
+    
     sh = image.shape
     ny, nx, _ = sh
-
+            
     if full_dimensions:
         dpi = int(nx/xsize)
         xsize = nx/dpi
@@ -4729,20 +4969,29 @@ def field_psf(root='j020924-044344', PREP_PATH='../Prep', RAW_PATH='../RAW', EXT
     sh = im[0].data.shape
 
     if get_drizzle_scale:
-        rounded = int(np.round(im[0].header['D001SCAL']*1000))/1000.
-
+        #rounded = int(np.round(im[0].header['D001SCAL']*1000))/1000.
+        rounded = int(np.round(pscale*1000))/1000.
+        if 'D001KERN' in im[0].header:
+            kern = im[0].header['D001KERN']
+            pixf = im[0].header['D001PIXF']
+        else:
+            kern = im[0].header['KERNEL']
+            pixf = im[0].header['PIXFRAC']
+            
         for factor in factors:
             scale.append(rounded/factor)
             labels.append('DRIZ{0}'.format(factor))
-            kernel.append(im[0].header['D001KERN'])
-            pixfrac.append(im[0].header['D001PIXF'])
+            kernel.append(kern)
+            pixfrac.append(pixf)
 
     # FITS info
-    visits_file = '{0}_visits.npy'.format(root)
-    if not os.path.exists(visits_file):
+    #visits_file = '{0}_visits.npy'.format(root)
+    visits_file = find_visit_file(root=root)
+    if visits_file is None:
         parse_visits(field_root=root, RAW_PATH=RAW_PATH)
-
-    visits, groups, info = np.load(visits_file, allow_pickle=True)
+    
+    visits, groups, info = load_visit_info(root, verbose=False)
+    #visits, groups, info = np.load(visits_file, allow_pickle=True)
 
     # Append "U" to UVIS filters in info
     if 'DETECTOR' in info.colnames:
@@ -4885,8 +5134,10 @@ def make_report(root, gzipped_links=True, xsize=18, output_dpi=None, make_rgb=Tr
 
     if len(filters) == 0:
         has_mosaics = False
-        visits, groups, info = np.load('{0}_visits.npy'.format(root),
-                                       allow_pickle=True)
+        #visits, groups, info = np.load('{0}_visits.npy'.format(root),
+        #                               allow_pickle=True)
+        visits, groups, info = load_visit_info(root, verbose=False)
+        
         filters = np.unique([v['product'].split('-')[-1] for v in visits])
     else:
         has_mosaics = True
@@ -4900,8 +5151,9 @@ def make_report(root, gzipped_links=True, xsize=18, output_dpi=None, make_rgb=Tr
     ## Mosaic table
     ##
     rows = []
+    line = 'grep -e " 0 " -e "radec" *{0}*wcs.log > /tmp/{1}.log'
     for filter in filters:
-        os.system('grep -e " 0 " -e "radec" *{0}*wcs.log > /tmp/{1}.log'.format(filter, root))
+        os.system(line.format(filter.strip('u'), root))
         wcs_files = glob.glob('*{0}*wcs.log'.format(filter))
 
         wcs = '<pre>'+''.join(open('/tmp/{0}.log'.format(root)).readlines())+'</pre>'
@@ -4994,7 +5246,7 @@ def make_report(root, gzipped_links=True, xsize=18, output_dpi=None, make_rgb=Tr
 
     <pre>
     {root_urls}
-    <a href="{root}_visits.npy">{root}_visits.npy</a>
+    <a href="{root}_visits.yaml">{root}_visits.yaml</a>
     </pre>
 
     {column}
@@ -5032,8 +5284,9 @@ def exposure_report(root, log=True):
     import json
 
     # Exposures
-    visits, all_groups, info = np.load('{0}_visits.npy'.format(root),
-                                       allow_pickle=True)
+    #visits, all_groups, info = np.load('{0}_visits.npy'.format(root),
+    #                                   allow_pickle=True)
+    visits, all_groups, info = load_visit_info(root, verbose=False)
 
     tab = utils.GTable(info)
     tab.add_index('FILE')

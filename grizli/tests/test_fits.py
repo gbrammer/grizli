@@ -28,7 +28,7 @@ class FittingTools(unittest.TestCase):
         if 'CONF' in new:
             print(f'Download config and calib files to {conf_path}')
             utils.fetch_default_calibs(ACS=False)
-            utils.fetch_config_files()
+            utils.fetch_config_files(get_epsf=True)
             files = glob.glob(f'{conf_path}/*')
             print('Files: ', '\n'.join(files))
 
@@ -66,7 +66,8 @@ class FittingTools(unittest.TestCase):
         res = fitting.run_all_parallel(152, zr=[1.7, 1.8], verbose=True,
                                  root=data_path+'j033216m2743',
                                  args_file=data_path+'fit_args.npy', 
-                                 get_output_data=True)
+                                 get_output_data=True, 
+                                 protect=False)
         
         if len(res) > 3:
              assert(np.allclose(res[2].meta['z_map'][0], 1.7429, rtol=1.e-2))
