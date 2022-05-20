@@ -20,6 +20,16 @@ import astropy.units as u
 import astropy.coordinates as coord
 from astropy.table import Table
 
+from . import jwst_utils
+from . import grismconf
+
+try:
+    import jwst
+    from jwst.pipeline import Detector1Pipeline
+except ImportError:
+    jwst = None
+    print('`import jwst` failed so JWST processing will not work!')
+    
 from . import utils
 from . import model
 from . import GRIZLI_PATH
@@ -145,6 +155,30 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
                                calib_types=calib_types,
                                verbose=False)
 
+    if filter in ['GR150C', 'GR150R']: 
+        if (head['FILTER'] == 'GR150C') & (head['PUPIL'] == 'F115W'):        
+            flat_file = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0202.fits')
+        if (head['FILTER'] == 'GR150C') & (head['PUPIL'] == 'F150W'):        
+            flat_file = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0187.fits')
+        if (head['FILTER'] == 'GR150C') & (head['PUPIL'] == 'F200W'):        
+            flat_file = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0204.fits')
+        if (head['FILTER'] == 'GR150R') & (head['PUPIL'] == 'F115W'):        
+            flat_file = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0200.fits')
+        if (head['FILTER'] == 'GR150R') & (head['PUPIL'] == 'F150W'):        
+            flat_file = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0188.fits')
+        if (head['FILTER'] == 'GR150R') & (head['PUPIL'] == 'F200W'):        
+            flat_file = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0195.fits')
+
+        extra_msg = ' / flat: {0}'.format(flat_file)
+
+        flat_im = pyfits.open(os.path.join(os.getenv('jref'), flat_file))
+        flat = flat_im['SCI'].data #[5:-5, 5:-5]
+        flat_dq = (flat < 0.2)
+
+        #orig_file['DQ'].data |= 4*flat_dq
+        orig_file['SCI'].data = np.divide(orig_file['SCI'].data,flat,orig_file['SCI'].data,where=(flat!=0))
+
+    
     if filter in ['G102', 'G141']:
         flat_files = {'G102': 'uc72113oi_pfl.fits',
                       'G141': 'uc721143i_pfl.fits'}
@@ -350,7 +384,7 @@ def apply_persistence_mask(flt_file, path='../Persistence', dq_value=1024,
     flt = pyfits.open(flt_file, mode='update')
 
     pers_file = os.path.join(path,
-             os.path.basename(flt_file).replace('_flt.fits', '_persist.fits'))
+             os.path.basename(flt_file).replace('_flt.fits', '_persist.fits').replace('_rate.fits', '_persist.fits'))
 
     if not os.path.exists(pers_file):
 
@@ -430,7 +464,7 @@ def apply_region_mask(flt_file, dq_value=1024, verbose=True):
     """
     import pyregion
 
-    mask_files = glob.glob(flt_file.replace('_flt.fits', '.*.mask.reg').replace('_flc.fits', '.*.mask.reg').replace('_c0m.fits', '.*.mask.reg').replace('_c0f.fits', '.*.mask.reg'))
+    mask_files = glob.glob('_'.join(flt_file.split('_')[:-1]) + '.*.mask.reg')
     if len(mask_files) == 0:
         return True
 
@@ -1824,7 +1858,7 @@ def make_SEP_catalog(root='',
             # tab = tab[~bad]
 
             # Correction for flux outside Kron aperture
-            tot_corr = get_wfc3ir_kron_tot_corr(tab, drz_filter, 
+            tot_corr = get_kron_tot_corr(tab, drz_filter, 
                                                 pixel_scale=pixel_scale, 
                                                 photplam=drz_photplam)
 
@@ -3146,11 +3180,17 @@ def process_direct_grism_visit(direct={},
         for file in direct['files']:
             crclean = isACS & (len(direct['files']) == 1)
             fresh_flt_file(file, crclean=crclean)
-            try:
-                updatewcs.updatewcs(file, verbose=False, use_db=False)
-            except:
-                updatewcs.updatewcs(file, verbose=False)
+            isJWST = check_isJWST(file)
+            if isJWST:
+                img = jwst_utils.img_with_wcs(file)
+                img.save(file)
+            else:
+                try:
+                    updatewcs.updatewcs(file, verbose=False, use_db=False)
+                except TypeError:
+                    updatewcs.updatewcs(file, verbose=False)
 
+                
         # ### Make ASN
         # if not isWFPC2:
         #     asn = asnutil.ASNTable(inlist=direct['files'], output=direct['product'])
@@ -3179,11 +3219,19 @@ def process_direct_grism_visit(direct={},
                 changed_filter = False
 
             # Run updatewcs
-            try:
-                updatewcs.updatewcs(file, verbose=False, use_db=False)
-            except:
-                updatewcs.updatewcs(file, verbose=False)
-
+            if isJWST:
+                img = jwst_utils.img_with_wcs(file)
+                img.save(file)
+                temp_hdu = pyfits.open(file,mode='update')
+                temp_hdu[0].header['FILTER'] = temp_hdu[0].header['OFILTER']
+                temp_hdu[0].header['EXP_TYPE'] = temp_hdu[0].header['OEXPTYPE']
+                temp_hdu.flush()
+            else:
+                try:
+                    updatewcs.updatewcs(file, verbose=False, use_db=False)
+                except TypeError:
+                    updatewcs.updatewcs(file, verbose=False)
+                
             # Change back
             if changed_filter:
                 flc = pyfits.open(file, mode='update')
@@ -3222,6 +3270,98 @@ def process_direct_grism_visit(direct={},
         bits = drizzle_params['bits']
         drizzle_params.pop('bits')
 
+
+
+    # for jwst images, change header info
+    # band: [photflam, photfnu, pivot_wave]
+    phot_keywords = {'F090W': [1.098934e-20, 2.985416e-31, 0.9025],
+                    'F115W': [6.291060e-21, 2.773018e-31, 1.1495],
+                    'F140M': [9.856255e-21, 6.481079e-31, 1.4040],
+                    'F150W': [4.198384e-21, 3.123540e-31, 1.4935],
+                    'F158M': [7.273483e-21, 6.072128e-31, 1.5820],
+                    'F200W': [2.173398e-21, 2.879494e-31, 1.9930],
+                    'F277W': [1.109150e-21, 2.827052e-31, 2.7643],
+                    'F356W': [6.200034e-22, 2.669862e-31, 3.5930],
+                    'F380M': [2.654520e-21, 1.295626e-30, 3.8252],
+                    'F430M': [2.636528e-21, 1.613895e-30, 4.2838],
+                    'F444W': [4.510426e-22, 2.949531e-31, 4.4277],
+                    'F480M': [1.879639e-21, 1.453752e-30, 4.8152]}
+    if isJWST:
+        JWST_PIPELINE = os.path.dirname(jwst.__file__) + '/pipeline/'
+        steps_det1 = Detector1Pipeline.from_config_file(config_file=JWST_PIPELINE + 'calwebb_detector1.cfg')
+        for file in direct['files']:
+            hdu = pyfits.open(file, mode='update')
+            hdu[0].header['OINSTRUME'] = hdu[0].header['INSTRUME'] # save the original instrument name 
+            hdu[0].header['INSTRUME'] = 'WFC3'
+            hdu[0].header['ODETECTOR'] = hdu[0].header['DETECTOR']
+            hdu[0].header['DETECTOR'] = 'IR'
+            hdu[1].header['NGOODPIX'] = -99
+            hdu[1].header['EXPNAME'] = hdu[0].header['EXPOSURE']
+            hdu[1].header['MEANDARK'] = -99
+            hdu[1].header['IDCSCALE'] = 0.065 ## how can I get this automatically?
+            hdu[0].header['PHOTFLAM'] = phot_keywords[hdu[0].header['PUPIL']][0]
+            hdu[0].header['PHOTFNU'] = phot_keywords[hdu[0].header['PUPIL']][1]
+            hdu[0].header['PHOTPLAM'] = phot_keywords[hdu[0].header['PUPIL']][2] * 10000 # microns to angstroms
+            gain_file = steps_det1.gain_scale.get_reference_file(file, 'gain')
+            gain_im = pyfits.open(gain_file)
+            im = pyfits.open(file)
+            gain_median = np.median(gain_im[1].data)
+            im['SCI'].data *= gain_median 
+            im['SCI'].header['BUNIT'] = 'ELECTRONS/s'
+            im['ERR'].data *= gain_median 
+            im['ERR'].header['BUNIT'] = 'ELECTRONS/s'
+            gain_im.close()
+            im.close()
+            if hdu[0].header['PUPIL'] == 'F115W':
+                hdu[0].header['PFLTFILE'] = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0193.fits')
+            if hdu[0].header['PUPIL'] == 'F150W':
+                hdu[0].header['PFLTFILE'] = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0007.fits')
+            if hdu[0].header['PUPIL'] == 'F200W':
+                hdu[0].header['PFLTFILE'] = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0189.fits')
+            
+            hdu.flush()
+    #
+        for file in grism['files']:
+            hdu = pyfits.open(file, mode='update')
+            hdu[0].header['OINSTRUME'] = hdu[0].header['INSTRUME']
+            hdu[0].header['INSTRUME'] = 'WFC3'
+            hdu[0].header['ODETECTOR'] = hdu[0].header['DETECTOR']
+            hdu[0].header['DETECTOR'] = 'IR'
+            hdu[1].header['NGOODPIX'] = -99
+            hdu[1].header['EXPNAME'] = hdu[0].header['EXPOSURE']
+            hdu[1].header['MEANDARK'] = -99
+            hdu[1].header['IDCSCALE'] = 0.065 ## get this automatically when pixelscale is in image headers
+            hdu[0].header['PHOTFLAM'] = phot_keywords[hdu[0].header['PUPIL']][0]
+            hdu[0].header['PHOTFNU'] = phot_keywords[hdu[0].header['PUPIL']][1]
+            hdu[0].header['PHOTPLAM'] = phot_keywords[hdu[0].header['PUPIL']][2] * 10000 # microns to angstroms
+            gain_file = steps_det1.gain_scale.get_reference_file(file, 'gain')
+            gain_im = pyfits.open(gain_file)
+            if (hdu[0].header['FILTER'] == 'GR150C') & (hdu[0].header['PUPIL'] == 'F115W'):        
+                hdu[0].header['PFLTFILE'] = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0202.fits')
+            if (hdu[0].header['FILTER'] == 'GR150C') & (hdu[0].header['PUPIL'] == 'F150W'):        
+                hdu[0].header['PFLTFILE'] = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0187.fits')
+            if (hdu[0].header['FILTER'] == 'GR150C') & (hdu[0].header['PUPIL'] == 'F200W'):        
+                hdu[0].header['PFLTFILE'] = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0204.fits')
+            if (hdu[0].header['FILTER'] == 'GR150R') & (hdu[0].header['PUPIL'] == 'F115W'):        
+                hdu[0].header['PFLTFILE'] = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0200.fits')
+            if (hdu[0].header['FILTER'] == 'GR150R') & (hdu[0].header['PUPIL'] == 'F150W'):        
+                hdu[0].header['PFLTFILE'] = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0188.fits')
+            if (hdu[0].header['FILTER'] == 'GR150R') & (hdu[0].header['PUPIL'] == 'F200W'):        
+                hdu[0].header['PFLTFILE'] = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0195.fits')
+            im = pyfits.open(file)
+            im['SCI'].data *= gain_im['SCI'].data
+            im['SCI'].header['BUNIT'] = 'ELECTRONS/s'
+            im['ERR'].data *= gain_im['SCI'].data
+            im['ERR'].header['BUNIT'] = 'ELECTRONS/s'
+            gain_im.close()
+            
+            hdu.flush()
+        # Flat field correction
+        for file in direct['files']:
+            im = pyfits.open(file,mode='update')
+            flat = pyfits.open(im[0].header['PFLTFILE'])
+            im[1].data = np.divide(im[1].data, flat[1].data, im[1].data, where=flat[1].data!=0)
+            im.flush()
     # Relax CR rejection for first-pass ACS
     if isACS:
         driz_cr_snr_first = '15. 10.0'
@@ -3271,9 +3411,16 @@ def process_direct_grism_visit(direct={},
             file = '{0}_wcs.{1}'.format(direct['product'], ext)
             if os.path.exists(file):
                 os.remove(file)
+        # I think I need to cast all of the values in the dq extension to be numpy.int16 
+        #(as opposed to numpy.uint32 which they apparently currently are)
+        
 
         # First drizzle
         if len(direct['files']) > 1:
+            for file in direct['files']:
+                hdu = pyfits.open(file,mode='update')
+                hdu[3].data = hdu[3].data.astype(np.int16)
+                hdu.flush()
             AstroDrizzle(direct['files'], output=direct['product'],
                          clean=True, context=False, preserve=False,
                          skysub=True, driz_separate=True, driz_sep_wcs=True,
@@ -3282,7 +3429,7 @@ def process_direct_grism_visit(direct={},
                          driz_cr_scale=driz_cr_scale_first,
                          driz_cr_corr=False, driz_combine=True,
                          final_bits=bits, coeffs=True, build=False,
-                         final_wht_type='IVM', **drizzle_params)
+                         final_wht_type='IVM', gain='-99', rdnoise='-99', **drizzle_params)
         else:
             AstroDrizzle(direct['files'], output=direct['product'],
                          clean=True, final_scale=None, final_pixfrac=1,
@@ -3290,7 +3437,7 @@ def process_direct_grism_visit(direct={},
                          driz_separate=False, driz_sep_wcs=False,
                          median=False, blot=False, driz_cr=False,
                          driz_cr_corr=False, driz_combine=True,
-                         build=False, final_wht_type='IVM', **drizzle_params)
+                         build=False, final_wht_type='IVM', gain='-99', rdnoise='-99', **drizzle_params)
 
         # Now do tweak_align for ACS
         if (isACS) & run_tweak_align & (len(direct['files']) > 1):
@@ -3307,8 +3454,8 @@ def process_direct_grism_visit(direct={},
                              median=False, blot=False, driz_cr=False,
                              driz_cr_corr=False, driz_combine=True,
                              final_bits=bits, coeffs=True, build=False,
-                             final_wht_type='IVM', resetbits=0)
-
+                             final_wht_type='IVM', gain='-99', rdnoise='-99', resetbits=0)
+        
         # Make catalog & segmentation image
         if align_thresh is None:
             if isWFPC2:
@@ -3418,7 +3565,7 @@ def process_direct_grism_visit(direct={},
                          driz_cr_scale=driz_cr_scale, driz_separate=False,
                          driz_sep_wcs=False, median=False, blot=False,
                          driz_cr=False, driz_cr_corr=False,
-                         build=False, final_wht_type='IVM', **drizzle_params)
+                         build=False, final_wht_type='IVM', gain='-99', rdnoise='-99', **drizzle_params)
         else:
             if 'par' in direct['product']:
                 pixfrac = 1.0
@@ -3431,8 +3578,7 @@ def process_direct_grism_visit(direct={},
                          resetbits=4096, final_bits=bits, driz_sep_bits=bits,
                          preserve=False, driz_cr_snr=driz_cr_snr,
                          driz_cr_scale=driz_cr_scale, build=False,
-                         final_wht_type='IVM', **drizzle_params)
-
+                         final_wht_type='IVM', gain='-99', rdnoise='-99', **drizzle_params)
         # Flag areas of ACS images covered by a single image, where
         # CRs aren't appropriately masked
         is_single = (len(direct['files']) == 1)
@@ -3514,14 +3660,19 @@ def process_direct_grism_visit(direct={},
 
     # First drizzle to flag CRs
     gris_cr_corr = len(grism['files']) > 1
-
+    driz_cr_snr = '8.0 5.0'
+    driz_cr_scale = '2.5 0.7'
+    for file in grism['files']:
+                hdu = pyfits.open(file,mode='update')
+                hdu[3].data = hdu[3].data.astype(np.int16)
+                hdu.flush()
     AstroDrizzle(grism['files'], output=grism['product'], clean=True,
                  context=False, preserve=False, skysub=True,
                  driz_separate=gris_cr_corr, driz_sep_wcs=gris_cr_corr, median=gris_cr_corr,
                  blot=gris_cr_corr, driz_cr=gris_cr_corr, driz_cr_corr=gris_cr_corr,
                  driz_cr_snr=driz_cr_snr, driz_cr_scale=driz_cr_scale,
                  driz_combine=True, final_bits=bits, coeffs=True,
-                 resetbits=4096, build=False, final_wht_type='IVM')
+                 resetbits=4096, build=False, final_wht_type='IVM', gain='-99', rdnoise='-99')
 
     # Subtract grism sky
     status = visit_grism_sky(grism=grism, apply=True, sky_iter=sky_iter,
@@ -3567,12 +3718,28 @@ def process_direct_grism_visit(direct={},
                  driz_cr_snr=driz_cr_snr, driz_cr_scale=driz_cr_scale,
                  driz_combine=True, driz_sep_bits=bits, final_bits=bits,
                  coeffs=True, resetbits=4096, final_pixfrac=pixfrac,
-                 build=False, final_wht_type='IVM')
+                 build=False, gain='-99', rdnoise='-99', final_wht_type='IVM')
 
     clean_drizzle(grism['product'])
 
     # Add direct filter to grism FLT headers
     set_grism_dfilter(direct, grism)
+
+    # Rename instrument back to JWST stuff
+    # add an if statement later for this
+    if isJWST: # put original header keywords back
+        for file in direct['files']:
+            print('cwd is {}'.format(os.getcwd))
+            hdu = pyfits.open(file, mode='update') 
+            hdu[0].header['INSTRUME'] = hdu[0].header['OINSTRUME']
+            hdu[0].header['DETECTOR'] = hdu[0].header['ODETECTOR']
+            hdu.flush()
+        for file in grism['files']:
+            hdu = pyfits.open(file, mode='update')
+            hdu[0].header['INSTRUME'] = hdu[0].header['OINSTRUME']
+            hdu[0].header['DETECTOR'] = hdu[0].header['ODETECTOR']
+            hdu.flush()
+            print('cwd is {}'.format(os.getcwd))
 
     return True
 
@@ -4292,7 +4459,7 @@ def match_direct_grism_wcs(direct={}, grism={}, get_fresh_flt=True,
             fresh_flt_file(file)
             try:
                 updatewcs.updatewcs(file, verbose=False, use_db=False)
-            except:
+            except TypeError:
                 updatewcs.updatewcs(file, verbose=False)
 
     direct_flt = pyfits.open(direct['files'][0])
@@ -4410,6 +4577,11 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
     # Figure out which grism
     im = pyfits.open(grism['files'][0])
     grism_element = utils.get_hst_filter(im[0].header)
+    isJWST = check_isJWST(grism['files'][0])
+    if isJWST:
+        pupil = im[0].header['PUPIL']
+    else:
+        pupil = ''
 
     flat = 1.
     if grism_element == 'G141':
@@ -4426,6 +4598,42 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
         bg_fixed = ['UVIS.G280.flat.fits']
         bg_vary = ['UVIS.G280.ext{0:d}.sky.fits'.format(ext)]
         isACS = True
+        flat = 1.
+
+    elif (grism_element == 'GR150C') & (pupil == 'F115W'):
+        bg_fixed = ['jwst_niriss_wfssbkg_0002.fits'] # bg_fixed should be normalized background with flat divided out
+        bg_vary = [] 
+        isACS = False
+        flat = 1.
+    
+    elif (grism_element == 'GR150C') & (pupil == 'F150W'):
+        bg_fixed = ['jwst_niriss_wfssbkg_0009.fits'] 
+        bg_vary = [] 
+        isACS = False
+        flat = 1.
+
+    elif (grism_element == 'GR150C') & (pupil == 'F200W'):
+        bg_fixed = ['jwst_niriss_wfssbkg_0012.fits']
+        bg_vary = [] 
+        isACS = False
+        flat = 1.
+
+    elif (grism_element == 'GR150R') & (pupil == 'F115W'):
+        bg_fixed = ['jwst_niriss_wfssbkg_0004.fits'] 
+        bg_vary = [] 
+        isACS = False
+        flat = 1.
+
+    elif (grism_element == 'GR150R') & (pupil == 'F150W'):
+        bg_fixed = ['jwst_niriss_wfssbkg_0003.fits'] 
+        bg_vary = [] 
+        isACS = False
+        flat = 1.
+
+    elif (grism_element == 'GR150R') & (pupil == 'F200W'):
+        bg_fixed = ['jwst_niriss_wfssbkg_0012.fits']
+        bg_vary = [] 
+        isACS = False
         flat = 1.
 
     elif grism_element == 'G800L':
@@ -4451,19 +4659,26 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
     data_fixed = []
     for file in bg_fixed:
         im = pyfits.open('{0}/CONF/{1}'.format(GRIZLI_PATH, file))
-        sh = im[0].data.shape
-        data = im[0].data.flatten()/flat
+        if isJWST:
+            sh = im[1].data.shape
+            data = im[1].data.flatten()/flat
+        else:
+            sh = im[0].data.shape
+            data = im[0].data.flatten()/flat
         data_fixed.append(data)
 
     data_vary = []
     for file in bg_vary:
         im = pyfits.open('{0}/CONF/{1}'.format(GRIZLI_PATH, file))
-        data_vary.append(im[0].data.flatten()*1)
-        sh = im[0].data.shape
+        if isJWST:
+            data_vary.append(im[1].data.flatten()*1)
+            sh = im[1].data.shape
+        else:
+            data_vary.append(im[0].data.flatten()*1)
+            sh = im[0].data.shape
 
     yp, xp = np.indices(sh)
 
-    # Hard-coded (1014,1014) WFC3/IR images
     Npix = sh[0]*sh[1]
     Nexp = len(grism['files'])
     Nfix = len(data_fixed)
@@ -4480,6 +4695,8 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
     # Build combined arrays
     if isACS:
         bits = 64+32
+    elif isJWST:
+        bits = 1+4+6+32768+16777200+1049600+26232800+9438210+9438220
     else:
         bits = 576
 
@@ -4612,7 +4829,10 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
     fig = plt.figure(figsize=[6., 6.])
     ax = fig.add_subplot(111)
 
-    im_shape = (1014, 1014)
+    if isJWST:
+        im_shape = (2048, 2048)
+    else:
+        im_shape = (1014, 1014)
 
     for j in range(Nexp):
 
@@ -4621,13 +4841,18 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
         resid = (data[j*Npix:(j+1)*Npix] - sky[j, :]).reshape(im_shape)
         m = (mask & obj_mask)[j*Npix:(j+1)*Npix].reshape(im_shape)
 
+        rot90 = grismconf.JwstDispersionTransform(header=flt[0].header).rot90
+        if rot90 % 2 == 0:
+            avg_axis = 0
+        else:
+            avg_axis = 1
         # Statistics of masked arrays
         ma = np.ma.masked_array(resid, mask=(~m))
-        med = np.ma.median(ma, axis=0)
+        med = np.ma.median(ma, axis=avg_axis)
 
         bg_sky = 0
-        yrms = np.ma.std(ma, axis=0)/np.sqrt(np.sum(m, axis=0))
-        xmsk = np.arange(im_shape[0])
+        yrms = np.ma.std(ma, axis=avg_axis)/np.sqrt(np.sum(m, axis=avg_axis))
+        xmsk = np.arange(im_shape[avg_axis])
         yres = med
         yok = (~yrms.mask) & np.isfinite(yrms) & np.isfinite(xmsk) & np.isfinite(yres)
 
@@ -4660,10 +4885,10 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
             # Fit with Spline basis functions
 
             #NXSPL = 50
-            xpad = np.arange(-1*NXSPL, im_shape[0]+1*NXSPL)
+            xpad = np.arange(-1*NXSPL, im_shape[avg_axis]+1*NXSPL)
 
             Aspl = utils.bspline_templates(xpad, degree=3,
-                                           df=4+im_shape[0]//NXSPL,
+                                           df=4+im_shape[avg_axis]//NXSPL,
                                            get_matrix=True, log=False,
                                            clip=0.0001)[1*NXSPL:-1*NXSPL, :]
 
@@ -4716,23 +4941,26 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
                         label=grism['files'][j].split('_fl')[0])
 
         # result
-        fp = open(file.replace('_flt.fits', '_column.dat'), 'wb')
+        fp = open(file.replace('_flt.fits', '_column.dat').replace('_rate.fits', '_column.dat'), 'wb')
         fp.write(b'# column obs_resid ok resid uncertainty\n')
         np.savetxt(fp, np.array([xmsk, yres, yok*1, y_pred-bg_sky, gp_sigma]).T, fmt='%.5f')
         fp.close()
 
         if apply:
             # Subtract the column average in 2D & log header keywords
-            gp_res = np.dot(y_pred[:, None]-bg_sky, np.ones((1014, 1)).T).T
             flt = pyfits.open(file, mode='update')
+            imshape = flt[1].data.shape[0]
+            gp_res = np.dot(y_pred[:, None]-bg_sky, np.ones((imshape, 1)).T).T             
+            if rot90 % 2 == 1:
+                gp_res = np.rot90(gp_res, 1) # test this to see if it looks correct, if not try 3
             flt['SCI', 1].data -= gp_res
             flt[0].header['GSKYCOL'] = (True, 'Subtract column average')
             flt.flush()
 
     # Finish plot
     ax.legend(loc='lower left', fontsize=10)
-    ax.plot([-10, 1024], [0, 0], color='k')
-    ax.set_xlim(-10, 1024)
+    ax.plot([-10, im_shape[0]+10], [0, 0], color='k')
+    ax.set_xlim(-10, im_shape[0]+10)
     ax.set_xlabel(r'pixel column ($x$)')
     ax.set_ylabel(r'column average (e-/s)')
     ax.set_title(grism['product'])
@@ -4805,8 +5033,12 @@ def fix_star_centers(root='macs1149.6+2223-rot-ca5-22-032.0-f105w',
         #     flt = pyfits.open('../RAW/'+sci[0].header['D{0:03d}DATA'.format(i+1)].split('[')[0], mode='update')
         wcs.append(pywcs.WCS(flt[1], relax=True))
         images.append(flt)
-
-    yp, xp = np.indices((1014, 1014))
+    isJWST = check_isJWST('{0}_drz_sci.fits'.format(root))
+    if isJWST:
+        im_shape = (2048, 2048)
+    else:
+        im_shape = (1014, 1014)
+    yp, xp = np.indices(im_shape)
     use = cat['MAG_AUTO'] < mag_lim
     so = np.argsort(cat['MAG_AUTO'][use])
 
@@ -5570,8 +5802,9 @@ def extract_fits_log(file='idk106ckq_flt.fits', get_dq=True):
 
     log['chips'] = []
 
+    imshape = im[1].data.shape
     if get_dq:
-        idx = np.arange(1014**2, dtype=np.int32).reshape((1014, 1014))
+        idx = np.arange(imshape[0]**2, dtype=np.int32).reshape(imshape)
 
     for chip in [1, 2, 3, 4]:
         key = 'SCI{0}'.format(chip)
@@ -5595,3 +5828,26 @@ def extract_fits_log(file='idk106ckq_flt.fits', get_dq=True):
                 log['DQv{0}'.format(chip)] = list(dq[mask].astype(str))
 
     return log
+
+
+def check_isJWST(infile=''):
+    '''
+    Check if a file or list of files is JWST image. 
+    Parameters
+    ----------
+    infile : fits file
+        File to test
+    
+    Returns
+    -------
+    isJWST : bool
+    '''
+
+    hdu = pyfits.open(infile)
+    try:
+        isJWST = (hdu[0].header['TELESCOP'] == 'JWST')
+        hdu.close()
+    except:
+        isJWST = False
+    
+    return isJWST

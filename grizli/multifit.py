@@ -6,6 +6,7 @@ import time
 import glob
 from collections import OrderedDict
 import multiprocessing as mp
+from . import prep
 
 import scipy.ndimage as nd
 import numpy as np
@@ -1411,7 +1412,8 @@ class MultiBeam(GroupFitter):
 
         if isinstance(beams, str):
             self.load_master_fits(beams, verbose=verbose)
-
+            # check if isJWST
+            isJWST = prep.check_isJWST(beams)
             # Auto-generate group_name from filename, e.g.,
             # j100140p0130_00237.beams.fits > j100140p0130
             if group_name is None:
@@ -1422,6 +1424,8 @@ class MultiBeam(GroupFitter):
                 # `beams` is list of strings
                 if 'beams.fits' in beams[0]:
                     # Master beam files
+                    # check if isJWST
+                    isJWST = prep.check_isJWST(beams[0])
                     self.load_master_fits(beams[0], verbose=verbose)
                     for i in range(1, len(beams)):
                         b_i = MultiBeam(beams[i], group_name=group_name, fcontam=fcontam, psf=psf, polyx=polyx, MW_EBV=np.maximum(MW_EBV, 0), sys_err=sys_err, verbose=verbose, min_mask=min_mask, min_sens=min_sens, mask_resid=mask_resid)
@@ -1754,6 +1758,9 @@ class MultiBeam(GroupFitter):
 
         if verbose:
             print('load_master_fits: {0}'.format(beam_file))
+
+        # check if isJWST
+        isJWST = prep.check_isJWST(beam_file)
 
         hdu = pyfits.open(beam_file, lazy_load_hdus=False)
         N = hdu[0].header['COUNT']
@@ -3709,7 +3716,7 @@ class MultiBeam(GroupFitter):
 
         return chi2/self.DoF
 
-    def drizzle_grisms_and_PAs(self, size=10, fcontam=0, flambda=False, scale=1, pixfrac=0.5, kernel='square', usewcs=False, tfit=None, diff=True, grism_list=['G800L', 'G102', 'G141', 'F090W', 'F115W', 'F150W', 'F200W', 'F356W', 'F410M', 'F444W'], mask_segmentation=True, reset_model=True, make_figure=True, fig_args=dict(mask_segmentation=True, average_only=False, scale_size=1, cmap='viridis_r'), **kwargs):
+    def drizzle_grisms_and_PAs(self, size=10, fcontam=0, flambda=False, scale=1, pixfrac=0.5, kernel='square', usewcs=False, tfit=None, diff=True, grism_list=['G800L', 'G102', 'G141', 'GR150C', 'GR150R', 'F090W', 'F115W', 'F150W', 'F200W', 'F356W', 'F410M', 'F444W'], mask_segmentation=True, reset_model=True, make_figure=True, fig_args=dict(mask_segmentation=True, average_only=False, scale_size=1, cmap='viridis_r'), **kwargs):
         """Make figure showing spectra at different orients/grisms
 
         TBD
@@ -3733,8 +3740,6 @@ class MultiBeam(GroupFitter):
         NY += 1
 
         # keys = list(self.PA)
-        # keys.sort()
-
         keys = []
         for key in grism_list:
             if key in self.PA:
@@ -4003,7 +4008,7 @@ class MultiBeam(GroupFitter):
                                       fcontam=0, fill_wht=True, ds9=None,
                                       mask_segmentation=mask_segmentation)
 
-            kern = h_kern[1].data[:, h['CRPIX1']-1-size:h['CRPIX1']-1+size]
+            kern = h_kern[1].data[:, int(h['CRPIX1'])-1-size:int(h['CRPIX1'])-1+size]
             hdu_kern = pyfits.ImageHDU(data=kern, header=h_kern[1].header, name='KERNEL')
             hdu.append(hdu_kern)
 
