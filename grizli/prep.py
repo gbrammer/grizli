@@ -5015,8 +5015,12 @@ def fix_star_centers(root='macs1149.6+2223-rot-ca5-22-032.0-f105w',
         #     flt = pyfits.open('../RAW/'+sci[0].header['D{0:03d}DATA'.format(i+1)].split('[')[0], mode='update')
         wcs.append(pywcs.WCS(flt[1], relax=True))
         images.append(flt)
-    imshape = sci[0].data.shape
-    yp, xp = np.indices(imshape)
+    isJWST = check_isJWST('{0}_drz_sci.fits'.format(root))
+    if isJWST:
+        im_shape = (2048, 2048)
+    else:
+        im_shape = (1014, 1014)
+    yp, xp = np.indices(im_shape)
     use = cat['MAG_AUTO'] < mag_lim
     so = np.argsort(cat['MAG_AUTO'][use])
 
