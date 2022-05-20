@@ -592,7 +592,8 @@ class JwstDispersionTransform(object):
     Rotate NIRISS and NIRCam coordinates such that slitless dispersion has
     wavelength increasing towards +x.  Also works for HST, but does nothing.
     """
-    def __init__(self, instrument='NIRCAM', module='A', grism='R', conf_file=None):
+    def __init__(self, instrument='NIRCAM', module='A', grism='R', conf_file=None, header=None):
+        
         self.instrument = instrument
         self.module = module
         self.grism = grism
@@ -613,6 +614,19 @@ class JwstDispersionTransform(object):
                 self.instrument = 'HST'
                 self.grism = 'G141'
                 self.module = 'A'
+        elif header is not None:
+            if 'INSTRUME' in header:
+                self.instrument = header['INSTRUME']
+            
+            if 'MODULE' in header:
+                self.module = module
+            
+            if self.instrument == 'NIRCAM':
+                if 'PUPIL' in header:
+                    self.grism = header['PUPIL']
+            else:
+                if 'FILTER' in header:
+                    self.grism = header['FILTER']
 
 
     @property
