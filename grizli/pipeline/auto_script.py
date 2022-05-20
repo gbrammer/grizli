@@ -300,7 +300,7 @@ def go(root='j010311+131615',
         Magnitude limits of objects to extract and fit.
 
     """
-
+    isJWST = visit_prep_args['isJWST']
     # Function defaults
     if get_dict:
         if get_dict <= 2:
@@ -441,9 +441,9 @@ def go(root='j010311+131615',
         return True
 
     visits, all_groups, info = parsed
-    run_has_grism = utils.column_string_operation(info['FILTER'],
-                                                ['G141', 'G102', 'G800L'],
-                                              'count', 'or').sum()
+    run_has_grism = np.in1d(info['FILTER'], ['G141', 'G102', 'G800L', 'GR150C', 'GR150R']).sum() > 0
+    # is PUPIL in info?
+    run_has_grism |= np.in1d(info['PUPIL'], ['GRISMR', 'GRISMC']).sum() > 0
 
     # Alignment catalogs
     #catalogs = ['PS1','SDSS','GAIA','WISE']
@@ -472,7 +472,7 @@ def go(root='j010311+131615',
 
     auto_script.preprocess(field_root=root, HOME_PATH=PATHS['home'], 
                            PERSIST_PATH=PATHS['persist'],
-                           visit_prep_args=visit_prep_args, 
+                           visit_prep_args=visit_prep_args,
                            persistence_args=persistence_args, 
                            **preprocess_args)
 
@@ -624,7 +624,7 @@ def go(root='j010311+131615',
         make_combined_mosaics(root, mosaic_args=mosaic_args,
                         fix_stars=fix_stars, mask_spikes=mask_spikes,
                         skip_single_optical_visits=skip_single,
-                        mosaic_driz_cr_type=mosaic_driz_cr_type, 
+                        mosaic_driz_cr_type=mosaic_driz_cr_type,
                         mosaic_drizzle_args=mosaic_drizzle_args)
 
         # Make PSFs.  Always set get_line_maps=False since PSFs now
@@ -652,7 +652,7 @@ def go(root='j010311+131615',
                 # Add columns indicating objects that fall in grism exposures
                 phot = utils.read_catalog(f'{root}_phot.fits')
                 out = count_grism_exposures(phot, all_groups,
-                                      grisms=['g800l', 'g102', 'g141'],
+                                      grisms=['g800l', 'g102', 'g141', 'gr150c', 'gr150r'],
                                       verbose=True)
                 phot.write(f'{root}_phot.fits', overwrite=True)
             except:
@@ -1292,7 +1292,8 @@ def load_visit_info(root='j033216m2743', path='./', verbose=True):
     return visits, groups, info
 
 
-def parse_visits(field_root='', RAW_PATH='../RAW', use_visit=True, combine_same_pa=True, combine_minexp=2, is_dash=False, filters=VALID_FILTERS, max_dt=1e9, visit_split_shift=1.5, file_query='*'):
+def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, combine_same_pa=True, combine_minexp=2, is_dash=False, filters=VALID_FILTERS, max_dt=1e9, visit_split_shift=1.5, file_query='*'):
+
     """
     Organize exposures into "visits" by filter / position / PA / epoch
     
@@ -1343,14 +1344,37 @@ def parse_visits(field_root='', RAW_PATH='../RAW', use_visit=True, combine_same_
     from shapely.geometry import Polygon
     from scipy.spatial import ConvexHull
 
-    files = glob.glob(os.path.join(RAW_PATH, file_query+'fl[tc].fits*'))
-    files += glob.glob(os.path.join(RAW_PATH, file_query+'c0m.fits*'))
-    files += glob.glob(os.path.join(RAW_PATH, file_query+'c0f.fits*'))
+    if len(files) == 0:
+        files = glob.glob(os.path.join(RAW_PATH, file_query+'fl[tc].fits*'))
+        files += glob.glob(os.path.join(RAW_PATH, file_query+'c0m.fits*'))
+        files += glob.glob(os.path.join(RAW_PATH, file_query+'c0f.fits*'))
+
+        # check if we're processing JWST files
+        if len(files) == 0:
+            files = glob.glob(os.path.join(RAW_PATH, file_query+'rate.fits*'))
+            isJWST = True # if there are only rate files, then it must be JWST 
+        else:
+            isJWST = False
 
     files.sort()
 
+    if isJWST:
+        # JWST files have slightly different naming conventions for the header
+        for file in files:
+            hdu = pyfits.open(file, mode='update')
+            hdu[0].header['ra_targ'] = hdu[0].header['targ_ra']
+            hdu[0].header['exptime'] = hdu[0].header['effexptm']
+            hdu[0].header['pa_v3'] = hdu[1].header['pa_v3']
+            if hdu[0].header['FILTER'] != 'CLEAR':
+                hdu[0].header['FILTER_INFO'] = hdu[0].header['FILTER']
+                hdu[0].header['EXPTYPE_INFO'] = hdu[0].header['EXP_TYPE']
+            if 'NRIMDTPT' in hdu[0].header:
+                hdu[0].header['NRIMDTPT'] = int(hdu[0].header['NRIMDTPT'])
+            if 'NDITHPTS' in hdu[0].header:
+                hdu[0].header['NRIMDTPT'] = int(hdu[0].header['NDITHPTS'])
+            hdu.flush()
+
     info = utils.get_flt_info(files)
-    #info = info[(info['FILTER'] != 'G141') & (info['FILTER'] != 'G102')]
 
     # Only F814W on ACS
     if ONLY_F814W:
@@ -1389,22 +1413,25 @@ def parse_visits(field_root='', RAW_PATH='../RAW', use_visit=True, combine_same_
 
             visits.append(direct)
 
-        all_groups = utils.parse_grism_associations(visits)
-        #np.save('{0}_visits.npy'.format(field_root), 
-        #        [visits, all_groups, info])
+        all_groups = utils.parse_grism_associations(visits, info, isJWST=isJWST)
+
         write_visit_info(visits, all_groups, info, root=field_root, path='./')
                 
         return visits, all_groups, info
 
     visits, filters = utils.parse_flt_files(info=info, 
-                                  uniquename=True, get_footprint=True, 
+                                  uniquename=True, get_footprint=True,
                                   use_visit=use_visit, max_dt=max_dt, 
-                                  visit_split_shift=visit_split_shift)
+                                  visit_split_shift=visit_split_shift,
+                                  isJWST=isJWST)
+    
 
     # Don't run combine_minexp if have grism exposures
-    grisms = ['G141', 'G102', 'G800L', 'G280']
-    has_grism = utils.column_string_operation(info['FILTER'], grisms,
-                                              'count', 'or').sum()
+    grisms = ['G141', 'G102', 'G800L', 'G280', 'GR150C', 'GR150R']
+    has_grism = np.in1d(info['FILTER'], grisms).sum() > 0
+    # is PUPIL in info?
+    has_grism |= np.in1d(info['PUPIL'], ['GRISMR', 'GRISMC']).sum() > 0
+    info.meta['HAS_GRISM'] = has_grism
 
     if combine_same_pa:
         combined = {}
@@ -1473,9 +1500,7 @@ def parse_visits(field_root='', RAW_PATH='../RAW', use_visit=True, combine_same_
         print('** Combine Singles: **')
         for i, visit in enumerate(visits):
             print('{0} {1} {2}'.format(i, visit['product'], len(visit['files'])))
-
-    all_groups = utils.parse_grism_associations(visits)
-
+    all_groups = utils.parse_grism_associations(visits, info, isJWST=isJWST)
     print('\n == Grism groups ==\n')
     valid_groups = []
     for g in all_groups:
@@ -1685,6 +1710,9 @@ def preprocess(field_root='j142724+334246',  HOME_PATH='/Volumes/Pegasus/Grizli/
     #                                   allow_pickle=True)
     visits, all_groups, info = load_visit_info(field_root, verbose=False)
 
+    # check if isJWST
+    isJWST = prep.check_isJWST('../RAW/' + all_groups[0]['direct']['files'][0])
+
     # Grism visits
     master_footprint = None
     radec = None
@@ -1758,7 +1786,7 @@ def preprocess(field_root='j142724+334246',  HOME_PATH='/Volumes/Pegasus/Grizli/
             master_radec = radec
 
         print('\n\n\n{0} radec: {1}\n\n\n'.format(direct['product'], radec))
-
+        
         ###########################
         # Preprocessing script, background subtraction, etc.
         status = prep.process_direct_grism_visit(direct=direct, grism=grism,
@@ -1795,6 +1823,7 @@ def preprocess(field_root='j142724+334246',  HOME_PATH='/Volumes/Pegasus/Grizli/
     fwave = np.cast[float]([f.replace('f1', 'f10'). \
                               replace('f098m', 'f0980m'). \
                               replace('lp', 'w'). \
+                              replace('gr','g'). \
                               replace('fq', 'f')[1:-1] 
                             for f in filters])
     
@@ -1892,7 +1921,7 @@ def preprocess(field_root='j142724+334246',  HOME_PATH='/Volumes/Pegasus/Grizli/
     # Clean up
     if clean:
         clean_prep(field_root=field_root)
-
+    
     ###################################
     # Drizzle by filter
     # failed = [f.split('.failed')[0] for f in glob.glob('*failed')]
@@ -2063,7 +2092,7 @@ mag_lim=17, cat=None, cols=['mag_auto', 'ra', 'dec'], minR=8, dy=5, selection=No
             im.flush()
 
 
-def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_background=True, photometry_background=True, get_all_filters=False, filters=None, det_err_scale=-np.inf, phot_err_scale=-np.inf, rescale_weight=True, run_detection=True, detection_filter='ir', detection_root=None, output_root=None, use_psf_filter=True, detection_params=prep.SEP_DETECT_PARAMS,  phot_apertures=prep.SEXTRACTOR_PHOT_APERTURES_ARCSEC, master_catalog=None, bkg_mask=None, bkg_params={'bw': 64, 'bh': 64, 'fw': 3, 'fh': 3, 'pixel_scale': 0.06}, use_bkg_err=False, aper_segmask=True):
+def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_background=True, photometry_background=True, get_all_filters=False, filters=None, det_err_scale=-np.inf, phot_err_scale=-np.inf, rescale_weight=True, run_detection=True, detection_filter='ir', detection_root=None, output_root=None, use_psf_filter=True, detection_params=prep.SEP_DETECT_PARAMS,  phot_apertures=prep.SEXTRACTOR_PHOT_APERTURES_ARCSEC, master_catalog=None, bkg_mask=None, bkg_params={'bw': 64, 'bh': 64, 'fw': 3, 'fh': 3, 'pixel_scale': 0.06}, use_bkg_err=False, aper_segmask=True, sci_image=None):
     """
     Make a detection catalog and run aperture photometry with the 
     SExtractor clone `~sep`.
@@ -2121,7 +2150,7 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
 
                 detection_params['filter_kernel'] = psf_kernel
 
-        tab = prep.make_SEP_catalog(root=detection_root, threshold=threshold, get_background=detection_background, save_to_fits=True, rescale_weight=rescale_weight, err_scale=det_err_scale, phot_apertures=phot_apertures, detection_params=detection_params, bkg_mask=bkg_mask, bkg_params=bkg_params, use_bkg_err=use_bkg_err, aper_segmask=aper_segmask)
+        tab = prep.make_SEP_catalog(sci=sci_image,root=detection_root, threshold=threshold, get_background=detection_background, save_to_fits=True, rescale_weight=rescale_weight, err_scale=det_err_scale, phot_apertures=phot_apertures, detection_params=detection_params, bkg_mask=bkg_mask, bkg_params=bkg_params, use_bkg_err=use_bkg_err, aper_segmask=aper_segmask)
         
         cat_pixel_scale = tab.meta['asec_0'][0]/tab.meta['aper_0'][0]
         
@@ -2224,7 +2253,7 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
                       get_background=photometry_background,
                       save_to_fits=False, source_xy=source_xy,
                       phot_apertures=phot_apertures, bkg_mask=bkg_mask,
-                      bkg_params=bkg_params, use_bkg_err=use_bkg_err)
+                      bkg_params=bkg_params, use_bkg_err=use_bkg_err, sci=sci_image)
 
             for k in filter_tab.meta:
                 newk = '{0}_{1}'.format(filt.upper(), k)
@@ -2259,7 +2288,7 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
     return tab
 
 
-def count_grism_exposures(phot, groups, grisms=['g800l', 'g102', 'g141'], reset=True, verbose=False):
+def count_grism_exposures(phot, groups, grisms=['g800l', 'g102', 'g141', 'gr150c', 'gr150r'], reset=True, verbose=False):
     """
     Count number of grism exposures that contain objects in a catalog
     """
@@ -2429,13 +2458,22 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
 
     if files is None:
         files = glob.glob(os.path.join(PREP_PATH, '*fl[tc].fits'))
+        files += glob.glob(os.path.join(PREP_PATH, '*rate.fits'))
         files.sort()
 
     info = utils.get_flt_info(files)
+    for idx, filter in enumerate(info['FILTER']):
+        if '-' in filter:
+            info['FILTER'][idx] = filter.split('-')[-1]
 
-    g141 = info['FILTER'] == 'G141'
-    g102 = info['FILTER'] == 'G102'
-    g800l = info['FILTER'] == 'G800L'
+    masks = {}
+    for gr in ['G141', 'G102', 'G800L']:
+        masks[gr.lower()] = [info['FILTER'] == gr, gr, '']
+
+    for gr in ['GR150R', 'GR150C']:
+        for filt in ['F090W', 'F115W', 'F150W', 'F200W']:
+            key = f'{gr.lower()}-{filt.lower()}'
+            masks[key] = [(info['PUPIL'] == filt) & (info['FILTER'] == gr), gr, filt]
 
     if force_cat is None:
         #catalog = '{0}-ir.cat.fits'.format(field_root)
@@ -2445,124 +2483,43 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
 
     grp_objects = []
 
-    #grp = None
-    if (g141.sum() > 0) & ('G141' in gris_ref_filters):
-        for f in gris_ref_filters['G141']:
-            if os.path.exists(f'{field_root}-{f.lower()}_drz_sci.fits'):
-                g141_ref = f
-                break
+    grp = None
 
+    for mask in masks:
+        if (masks[mask][0].sum() > 0) & (masks[mask][1] in gris_ref_filters):
+            if masks[mask][2] != '':
+                ref = masks[mask][2]
+            else:
+                for f in gris_ref_filters[masks[mask][1]]:
+                    if os.path.exists('{0}-{1}_drz_sci.fits'.format(field_root, f.lower())):
+                        ref = f
+                        break
+        else:
+            continue
         # Segmentation image
         if force_seg is None:
-            if galfit == 'clean':
-                seg_file = '{0}-{1}_galfit_orig_seg.fits'.format(field_root, g141_ref.lower())
-            elif galfit == 'model':
-                seg_file = '{0}-{1}_galfit_seg.fits'.format(field_root, g141_ref.lower())
-            else:
-                seg_file = glob.glob('{0}-*_seg.fits'.format(field_root))[0]
-                #seg_file = '{0}-ir_seg.fits'.format(field_root)
+            if force_seg is None:
+                if galfit == 'clean':
+                    seg_file = '{0}-{1}_galfit_orig_seg.fits'.format(field_root, ref.lower())
+                elif galfit == 'model':
+                    seg_file = '{0}-{1}_galfit_seg.fits'.format(field_root, ref.lower())
+                else:
+                    seg_file = glob.glob('{0}-*_seg.fits'.format(field_root))[0]
         else:
             seg_file = force_seg
-
         # Reference image
         if force_ref is None:
             if galfit == 'clean':
-                ref_file = '{0}-{1}_galfit_clean.fits'.format(field_root, g141_ref.lower())
+                ref_file = '{0}-{1}_galfit_clean.fits'.format(field_root, ref.lower())
             elif galfit == 'model':
-                ref_file = '{0}-{1}_galfit.fits'.format(field_root, g141_ref.lower())
+                ref_file = '{0}-{1}_galfit.fits'.format(field_root, ref.lower())
             else:
-                ref_file = '{0}-{1}_drz_sci.fits'.format(field_root, g141_ref.lower())
-
+                ref_file = '{0}-{1}_drz_sci.fits'.format(field_root, ref.lower())
         else:
             ref_file = force_ref
-
-        grp = multifit.GroupFLT(grism_files=list(info['FILE'][g141]), direct_files=[], ref_file=ref_file, seg_file=seg_file, catalog=catalog, cpu_count=-1, sci_extn=1, pad=pad)
-
-        grp_objects.append(grp)
-
-    if (g102.sum() > 0) & ('G102' in gris_ref_filters):
-        for f in gris_ref_filters['G102']:
-            if os.path.exists('{0}-{1}_drz_sci.fits'.format(field_root, f.lower())):
-                g102_ref = f
-                break
-
-        # Segmentation image
-        if force_seg is None:
-            if galfit == 'clean':
-                seg_file = '{0}-{1}_galfit_orig_seg.fits'.format(field_root, g102_ref.lower())
-            elif galfit == 'model':
-                seg_file = '{0}-{1}_galfit_seg.fits'.format(field_root, g102_ref.lower())
-            else:
-                seg_file = glob.glob('{0}-*_seg.fits'.format(field_root))[0]
-        else:
-            seg_file = force_seg
-
-        # Reference image
-        if force_ref is None:
-            if galfit == 'clean':
-                ref_file = '{0}-{1}_galfit_clean.fits'.format(field_root, g102_ref.lower())
-            elif galfit == 'model':
-                ref_file = '{0}-{1}_galfit.fits'.format(field_root, g102_ref.lower())
-            else:
-                ref_file = '{0}-{1}_drz_sci.fits'.format(field_root, g102_ref.lower())
-
-        else:
-            ref_file = force_ref
-
-        grp_i = multifit.GroupFLT(grism_files=list(info['FILE'][g102]), direct_files=[], ref_file=ref_file, seg_file=seg_file, catalog=catalog, cpu_count=-1, sci_extn=1, pad=pad)
-        # if g141.sum() > 0:
-        #    grp.extend(grp_i)
-        # else:
-        #    grp = grp_i
+        
+        grp_i = multifit.GroupFLT(grism_files=list(info['FILE'][masks[mask][0]]), direct_files=[], ref_file=ref_file, seg_file=seg_file, catalog=catalog, cpu_count=-1, sci_extn=1, pad=pad)
         grp_objects.append(grp_i)
-
-        # del(grp_i)
-
-    # ACS
-    if (g800l.sum() > 0) & ('G800L' in gris_ref_filters):
-
-        acs_grp = None
-
-        for f in gris_ref_filters['G800L']:
-            if os.path.exists('{0}-{1}_drc_sci.fits'.format(field_root, f.lower())):
-                g800l_ref = f
-                break
-
-        # Segmentation image
-        if force_seg is None:
-            if galfit == 'clean':
-                seg_file = '{0}-{1}_galfit_orig_seg.fits'.format(field_root, g800l_ref.lower())
-            elif galfit == 'model':
-                seg_file = '{0}-{1}_galfit_seg.fits'.format(field_root, g800l_ref.lower())
-            else:
-                #seg_file = '{0}-ir_seg.fits'.format(field_root)
-                seg_file = glob.glob('{0}-*_seg.fits'.format(field_root))[0]
-        else:
-            seg_file = force_seg
-
-        # Reference image
-        if force_ref is None:
-            if galfit == 'clean':
-                ref_file = '{0}-{1}_galfit_clean.fits'.format(field_root, g800l_ref.lower())
-            elif galfit == 'model':
-                ref_file = '{0}-{1}_galfit.fits'.format(field_root, g800l_ref.lower())
-            else:
-                ref_file = '{0}-{1}_drc_sci.fits'.format(field_root, g800l_ref.lower())
-
-        else:
-            ref_file = force_ref
-
-        for sci_extn in [1, 2]:
-            grp_i = multifit.GroupFLT(grism_files=list(info['FILE'][g800l]), direct_files=[], ref_file=ref_file, seg_file=seg_file, catalog=catalog, cpu_count=-1, sci_extn=sci_extn, pad=0, shrink_segimage=False)
-
-            if acs_grp is not None:
-                acs_grp.extend(grp_i)
-                del(grp_i)
-            else:
-                acs_grp = grp_i
-
-        if acs_grp is not None:
-            grp_objects.append(acs_grp)
 
     if split_by_grism:
         return grp_objects
@@ -2794,6 +2751,8 @@ def extract(field_root='j142724+334246', maglim=[13, 24], prior=None, MW_EBV=0.0
     if master_files is None:
         master_files = glob.glob('*GrismFLT.fits')
         master_files.sort()
+    
+    isJWST = prep.check_isJWST(master_files[0])
 
     if grp is None:
         init_grp = True
@@ -2889,7 +2848,7 @@ def extract(field_root='j142724+334246', maglim=[13, 24], prior=None, MW_EBV=0.0
 
         #mb = multifit.MultiBeam(beams, fcontam=fcontam, group_name=target, psf=False, MW_EBV=MW_EBV, min_sens=min_sens)
 
-        mb = multifit.MultiBeam(beams, fcontam=fcontam, group_name=target, psf=False, MW_EBV=MW_EBV, sys_err=sys_err, min_mask=min_mask, min_sens=min_sens)
+        mb = multifit.MultiBeam(beams, fcontam=fcontam, group_name=target, psf=False, isJWST=isJWST, MW_EBV=MW_EBV, sys_err=sys_err, min_mask=min_mask, min_sens=min_sens)
 
         if bad_pa_threshold is not None:
             out = mb.check_for_bad_PAs(chi2_threshold=bad_pa_threshold,
@@ -3488,7 +3447,7 @@ def update_wcs_headers_with_fine(field_root, backup=True):
                                                 xyscale=trans[j, :])
 
 
-def make_reference_wcs(info, files=None, output='mosaic_wcs-ref.fits', filters=['G800L', 'G102', 'G141'], pad_reference=90, pixel_scale=None, get_hdu=True):
+def make_reference_wcs(info, files=None, output='mosaic_wcs-ref.fits', filters=['G800L', 'G102', 'G141','GR150C', 'GR150R'], pad_reference=90, pixel_scale=None, get_hdu=True):
     """
     Make a reference image WCS based on the grism exposures
 
@@ -3537,7 +3496,7 @@ def make_reference_wcs(info, files=None, output='mosaic_wcs-ref.fits', filters=[
     if pixel_scale is None:
         # Auto determine pixel size, 0.03" pixels if only ACS, otherwise 0.06
         any_grism = utils.column_values_in_list(info['FILTER'],
-                                                  ['G800L', 'G102', 'G141'])
+                                                  ['G800L', 'G102', 'G141', 'GR150C', 'GR150R'])
         acs_grism = (info['FILTER'] == 'G800L')
         only_acs = list(np.unique(info['INSTRUME'])) == ['ACS']
         
@@ -3561,10 +3520,11 @@ def make_reference_wcs(info, files=None, output='mosaic_wcs-ref.fits', filters=[
         return ref_hdu[1]
 
 
-def drizzle_overlaps(field_root, filters=['F098M', 'F105W', 'F110W', 'F125W', 'F140W', 'F160W'], ref_image=None, ref_wcs=None, bits=None, pixfrac=0.75, scale=0.06, make_combined=False, drizzle_filters=True, skysub=False, skymethod='localmin', match_str=[], context=False, pad_reference=60, min_nexp=2, static=True, skip_products=[], include_saturated=False, multi_driz_cr=False, filter_driz_cr=False, **kwargs):
+def drizzle_overlaps(field_root, filters=['F098M', 'F105W', 'F110W', 'F115W', 'F125W', 'F140W', 'F150W', 'F160W', 'F200W'], ref_image=None, ref_wcs=None, bits=None, pixfrac=0.75, scale=0.06, make_combined=False, drizzle_filters=True, skysub=False, skymethod='localmin', match_str=[], context=False, pad_reference=60, min_nexp=2, static=True, skip_products=[], include_saturated=False, multi_driz_cr=False, filter_driz_cr=False, **kwargs):
     """
     Drizzle filter groups based on precomputed image associations
     """
+
     import numpy as np
     import glob
 
@@ -3602,20 +3562,32 @@ def drizzle_overlaps(field_root, filters=['F098M', 'F105W', 'F110W', 'F125W', 'F
         wfc3ir['reference_wcs'] = ref_wcs
 
     filter_groups = {}
-    for visit in visits:
 
+    for visit in visits:
+        msg = (visit)                   
+        utils.log_comment(utils.LOGFILE, msg, show_date=True,
+                              verbose=True)
         # Visit failed for some reason
         if (visit['product']+'.wcs_failed' in failed_list) | (visit['product']+'.failed' in failed_list) | (visit['product'] in skip_products):
+            msg = ('visit failed')                   
+            utils.log_comment(utils.LOGFILE, msg, show_date=True,
+                              verbose=True)
             continue
 
         # Too few exposures (i.e., one with unreliable CR flags)
         if len(visit['files']) < min_nexp:
+            msg = ('visit has too few exposures')                   
+            utils.log_comment(utils.LOGFILE, msg, show_date=True,
+                              verbose=True)
             continue
 
         # Not one of the desired filters
         filt = visit['product'].split('-')[-1]
 
         if filt.upper() not in filters:
+            msg = ('filt.upper not in filters')                   
+            utils.log_comment(utils.LOGFILE, msg, show_date=True,
+                              verbose=True)
             continue
 
         # Are all of the exposures in ./?
@@ -4005,9 +3977,7 @@ def make_combined_mosaics(root, fix_stars=False, mask_spikes=False, skip_single_
     if fill_mosaics:
         if fill_mosaics == 'grism':
             # Only fill mosaics if grism filters exist
-            has_grism = utils.column_string_operation(info['FILTER'],
-                                     ['G141', 'G102', 'G800L'],
-                                     'count', 'or').sum() > 0
+            has_grism = info.meta['HAS_GRISM']
             if has_grism:
                 fill_filter_mosaics(root)
         else:

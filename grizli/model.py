@@ -42,7 +42,10 @@ photflam_list = {'F098M': 6.0501324882418389e-20,
             'G150': 1.e-20,
             'G800L': 1.,
             'G280':  1., 
-            'F444W': 1.e-20}
+            'F444W': 1.e-20, 
+            'F115W': 1., 
+            'F150W': 1.,
+            'F200W': 1.}
 
 # Filter pivot wavelengths
 photplam_list = {'F098M': 9864.722728110915,
@@ -1652,7 +1655,7 @@ class ImageData(object):
         """
 
         okbits_instrument = {'WFC3': 32+64+512,  # blob OK
-                             'NIRISS': 0,
+                             'NIRISS': 1+2+4+4096, #+4096+4100+18432+18436+1024+16384+1,
                              'NIRCAM': 0,
                              'WFIRST': 0, 
                              'WFI': 0}
@@ -1701,14 +1704,14 @@ class ImageData(object):
         
         """
         import jwst
-        from . import jwst as _jwst
+        from . import jwst_utils as _jwst
 
         datamodel = _jwst.img_with_wcs(hdulist)
         if (jwst.__version__ < '1.3.2') | force:
             # Need to compute own transformed header
             sip_header = _jwst.model_wcs_header(datamodel, get_sip=True)
         else:
-            sip_header = utils.to_header(datamodel.wcs)
+            sip_header = utils.to_header(datamodel.get_fits_wcs())
             
         for k in sip_header:
             self.header[k] = sip_header[k]
@@ -2507,10 +2510,11 @@ class GrismFLT(object):
         self.model = np.zeros_like(self.direct.data['SCI'])
 
         # Grism configuration
-        if 'DFILTER' in self.grism.header:
-            direct_filter = self.grism.header['DFILTER']
-        elif self.grism.instrument in ['NIRCAM', 'NIRISS']:
+        
+        if self.grism.instrument in ['NIRCAM', 'NIRISS']:
             direct_filter = self.grism.pupil
+        elif 'DFILTER' in self.grism.header:
+            direct_filter = self.grism.header['DFILTER']
         else:
             direct_filter = self.direct.filter
         
@@ -2519,7 +2523,7 @@ class GrismFLT(object):
                          grism=self.grism.filter,
                          module=self.grism.module,
                          chip=self.grism.ccdchip)
-                      
+        
         self.conf_file = grismconf.get_config_filename(**conf_args)
         self.conf = grismconf.load_grism_config(self.conf_file)
 
@@ -3795,7 +3799,7 @@ class BeamCutout(object):
     def __init__(self, flt=None, beam=None, conf=None,
                  get_slice_header=True, fits_file=None, scale=1.,
                  contam_sn_mask=[10, 3], min_mask=0.01, min_sens=0.08,
-                 mask_resid=True):
+                 mask_resid=True, isJWST=False):
         """Cutout spectral object from the full frame.
 
         Parameters
@@ -3882,10 +3886,10 @@ class BeamCutout(object):
         # self.min_sens = min_sens
         # self.mask_resid = mask_resid
 
-        self._parse_from_data(**self._parse_params)
+        self._parse_from_data(isJWST=isJWST, **self._parse_params)
 
     def _parse_from_data(self, contam_sn_mask=[10, 3], min_mask=0.01,
-                         seg_ids=None, min_sens=0.08, mask_resid=True):
+                         seg_ids=None, min_sens=0.08, mask_resid=True, isJWST=False):
         """
         See parameter description for `~grizli.model.BeamCutout`.
         """
@@ -3893,7 +3897,7 @@ class BeamCutout(object):
         self.mask = ((self.grism.data['DQ'] > 0) |
                      (self.grism.data['ERR'] == 0) |
                      (self.grism.data['SCI'] == 0))
-
+        
         self.var = self.grism.data['ERR']**2
         self.var[self.mask] = 1.e30
         self.ivar = 1/self.var
@@ -4080,7 +4084,7 @@ class BeamCutout(object):
         # #
         if 'DFILTER' in self.grism.header:
             direct_filter = self.grism.header['DFILTER']
-        elif self.grism.instrument in ['NIRCAM', 'NIRISS']:
+        if self.grism.instrument in ['NIRCAM', 'NIRISS']:
             direct_filter = self.grism.pupil
         else:
             direct_filter = self.direct.filter
