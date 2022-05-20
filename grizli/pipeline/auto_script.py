@@ -1921,21 +1921,7 @@ def preprocess(field_root='j142724+334246',  HOME_PATH='/Volumes/Pegasus/Grizli/
     # Clean up
     if clean:
         clean_prep(field_root=field_root)
-    # Rename instrument back to JWST stuff
-    # add an if statement later for this
-    if isJWST: # put original header keywords back
-        for file in direct['files']:
-            hdu = pyfits.open(file, mode='update')
-            hdu[0].header['INSTRUME'] = hdu[0].header['OINSTRUME']
-            hdu[0].header['DETECTOR'] = hdu[0].header['ODETECTOR']
-            hdu.flush()
-        for file in grism['files']:
-            hdu = pyfits.open(file, mode='update')
-            hdu[0].header['INSTRUME'] = hdu[0].header['OINSTRUME']
-            hdu[0].header['DETECTOR'] = hdu[0].header['ODETECTOR']
-            hdu.flush()
-
-
+    
     ###################################
     # Drizzle by filter
     # failed = [f.split('.failed')[0] for f in glob.glob('*failed')]

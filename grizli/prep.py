@@ -3725,6 +3725,22 @@ def process_direct_grism_visit(direct={},
     # Add direct filter to grism FLT headers
     set_grism_dfilter(direct, grism)
 
+    # Rename instrument back to JWST stuff
+    # add an if statement later for this
+    if isJWST: # put original header keywords back
+        for file in direct['files']:
+            print('cwd is {}'.format(os.getcwd))
+            hdu = pyfits.open(file, mode='update') 
+            hdu[0].header['INSTRUME'] = hdu[0].header['OINSTRUME']
+            hdu[0].header['DETECTOR'] = hdu[0].header['ODETECTOR']
+            hdu.flush()
+        for file in grism['files']:
+            hdu = pyfits.open(file, mode='update')
+            hdu[0].header['INSTRUME'] = hdu[0].header['OINSTRUME']
+            hdu[0].header['DETECTOR'] = hdu[0].header['ODETECTOR']
+            hdu.flush()
+            print('cwd is {}'.format(os.getcwd))
+
     return True
 
 
