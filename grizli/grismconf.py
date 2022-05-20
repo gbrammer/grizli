@@ -650,20 +650,31 @@ class JwstDispersionTransform(object):
         """
         if self.instrument == 'NIRCAM':
             if self.module == 'A':
-                if self.grism == 'R':
+                if self.grism in ['R', 'GRISMR']:
                     rotation = 0.
-                else:
+                elif self.grism in ['C', 'GRISMC']:
                     rotation = 90.
-            else:
-                if self.grism == 'R':
+                else:
+                    raise ValueError(f'NIRCAM {self.grism} must be GRISMR/C')
+                    
+            elif self.module == 'B':
+                if self.grism in ['R', 'GRISMR']:
                     rotation = 180.
-                else:
+                elif self.grism in ['C', 'GRISMC']:
                     rotation = 90.
-        elif self.instrument == 'NIRISS':
-            if self.grism == 'R':
-                rotation = 270.
+                else:
+                    raise ValueError(f'NIRCAM {self.grism} must be GRISMR/C')
             else:
+                raise ValueError(f'NIRCAM {self.module} must be A/B')
+                
+        elif self.instrument == 'NIRISS':
+            if self.grism in ['GR150R','R']:
+                rotation = 270.
+            elif self.grism in ['GR150C','C']:
                 rotation = 180.
+            else:
+                raise ValueError(f'NIRISS {self.grism} must be GR150R/C')
+            
         else:
             # e.g., WFC3, ACS
             rotation = 0.

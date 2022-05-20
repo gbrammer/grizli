@@ -10,6 +10,7 @@ def test_transform():
     """
     Test JWST transforms
     """
+    import astropy.io.fits as pyfits
     
     for instrument in ['NIRISS','NIRCAM','WFC3']:
         for grism in 'RC':
@@ -27,6 +28,23 @@ def test_transform():
                 fro = np.squeeze(tr.reverse(*to))
                 
                 assert(np.allclose(x0-fro, 0.))
+
+    # From header
+    nis = pyfits.Header()
+    nis['INSTRUME'] = 'NIRISS'
+
+    rot90 = {'GR150C':2,  # 180 degrees
+             'GR150R':3,   # 270 degrees CW
+             }
+
+    for gr in rot90:
+        nis['FILTER'] = gr
+        nis['PUPIL'] = 'F150W'
+
+        tr = grismconf.JwstDispersionTransform(header=nis)
+        assert(tr.instrument == nis['INSTRUME'])
+        assert(tr.grism == nis['FILTER'])
+        assert(tr.rot90 == rot90[gr])
 
 
 def test_read():
