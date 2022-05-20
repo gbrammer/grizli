@@ -1344,15 +1344,14 @@ def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, com
     from shapely.geometry import Polygon
     from scipy.spatial import ConvexHull
 
-    
     if len(files) == 0:
-        files = glob.glob(os.path.join(RAW_PATH, file_query+'fl[tc].fits'))
-        files += glob.glob(os.path.join(RAW_PATH, file_query+'c0m.fits'))
-        files += glob.glob(os.path.join(RAW_PATH, file_query+'c0f.fits'))
+        files = glob.glob(os.path.join(RAW_PATH, file_query+'fl[tc].fits*'))
+        files += glob.glob(os.path.join(RAW_PATH, file_query+'c0m.fits*'))
+        files += glob.glob(os.path.join(RAW_PATH, file_query+'c0f.fits*'))
 
         # check if we're processing JWST files
         if len(files) == 0:
-            files = glob.glob(os.path.join(RAW_PATH, file_query+'rate.fits'))
+            files = glob.glob(os.path.join(RAW_PATH, file_query+'rate.fits*'))
             isJWST = True # if there are only rate files, then it must be JWST 
         else:
             isJWST = False
