@@ -37,7 +37,7 @@ class UtilsTester(unittest.TestCase):
         
         assert(len(_visits) == 4)
         
-        _groups = utils.parse_grism_associations(_visits)
+        _groups = utils.parse_grism_associations(_visits, info)
         assert(len(_groups) == 2)
         
         ### From auto_script
