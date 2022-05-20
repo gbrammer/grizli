@@ -2502,7 +2502,7 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
 
     for mask in masks:
         if (masks[mask][0].sum() > 0) & (masks[mask][1] in gris_ref_filters):
-            if len(masks[mask]) == 3:
+            if masks[mask][2] != '':
                 ref = masks[mask][2]
             else:
                 for f in gris_ref_filters[masks[mask][1]]:
