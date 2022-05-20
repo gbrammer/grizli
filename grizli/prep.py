@@ -3224,7 +3224,7 @@ def process_direct_grism_visit(direct={},
                 img.save(file)
                 temp_hdu = pyfits.open(file,mode='update')
                 temp_hdu[0].header['FILTER'] = temp_hdu[0].header['OFILTER']
-                temp_hdu[0].header['EXP_TYPE'] = temp_hdu[0].header['OEXPTYPE']
+                temp_hdu[0].header['EXP_TYPE'] = temp_hdu[0].header['OEXPTYP']
                 temp_hdu.flush()
             else:
                 try:

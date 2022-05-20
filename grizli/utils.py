@@ -602,7 +602,7 @@ def multiprocessing_ndfilter(data, filter_func, filter_args=(), size=None, footp
     return filtered
 
 def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
-                    get_footprint=False, isJWST=False,
+                    get_footprint=False,
                     translate={'AEGIS-': 'aegis-',
                                  'COSMOS-': 'cosmos-',
                                  'GNGRISM': 'goodsn-',
@@ -727,12 +727,26 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
             target_list.append(info['targname'][i])
 
     target_list = np.array(target_list)
-
-    info['progIDs'] = [file[1:4] for file in info['file']]
+    
+    _prog_ids = []
+    visits = []
+    
+    for file in info['file']:
+        bfile = os.path.basename(file)
+        if bfile.startswith('jw'):
+            _prog_ids.append(bfile[2:7])
+            visits.append(bfile[7:10])
+        else:
+            _prog_ids.append(bfile[1:4])
+            visits.append(bfile[4:6])
+    
+    visits = np.array(visits)
+    
+    info['progIDs'] = _prog_ids
 
     progIDs = np.unique(info['progIDs'])
-    visits = np.array([os.path.basename(file)[4:6] for file in info['file']])
-    dates = np.array([''.join(date.split('-')[1:]) for date in info['date-obs']])
+    dates = np.array([''.join(date.split('-')[1:])
+                      for date in info['date-obs']])
 
     targets = np.unique(target_list)
 
@@ -741,17 +755,9 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
 
     for filter in np.unique(info['filter']):
         filter_list[filter] = OrderedDict()
-        if isJWST:
-            pupils = np.unique(info['pupil'][(info['filter'] == filter)])
-            for pupil in pupils:
-                filter_list[filter][pupil] = OrderedDict()
-                angles = np.unique(pa_v3[(info['filter'] == filter)])
-                for angle in angles:
-                    filter_list[filter][pupil][angle] = []
-        else:
-            angles = np.unique(pa_v3[(info['filter'] == filter)])
-            for angle in angles:
-                filter_list[filter][angle] = []
+        angles = np.unique(pa_v3[(info['filter'] == filter)])
+        for angle in angles:
+            filter_list[filter][angle] = []
 
     for target in targets:
         # 3D-HST targname translations
@@ -774,90 +780,74 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
             angles = np.unique(pa_v3[(info['filter'] == filter) &
                                 (target_list == target)])
             for angle in angles:
-                if isJWST:
-                    pupils = np.unique(info['pupil'][(info['filter'] == filter)])
-                else:
-                    pupils = [''] 
-                for pupil in pupils:
-                    exposure_list = []
-                    exposure_start = []
-                    if isJWST:
-                        product = '{0}-{1:05.1f}-{2}-{3}'.format(target_use, angle, filter, pupil)
-                        visit_match = np.unique(visits[(target_list == target) &
-                                                (info['filter'] == filter) & (info['pupil'] == pupil)])
-                    else:
-                        product = '{0}-{1:05.1f}-{2}'.format(target_use, angle, filter)
-                        visit_match = np.unique(visits[(target_list == target) &
-                                                (info['filter'] == filter)])
+
+                exposure_list = []
+                exposure_start = []
+                product = '{0}-{1:05.1f}-{2}'.format(target_use, angle, filter)
+                visit_match = np.unique(visits[(target_list == target) &
+                                               (info['filter'] == filter)])
+
+                this_progs = []
+                this_visits = []
+
+                for visit in visit_match:
+                    ix = (visits == visit) & (target_list == target)
+                    ix &= (info['filter'] == filter)
                     
-                    this_progs = []
-                    this_visits = []
+                    # this_progs.append(info['progIDs'][ix][0])
+                    # print visit, ix.sum(), np.unique(info['progIDs'][ix])
+                    new_progs = list(np.unique(info['progIDs'][ix]))
+                    this_visits.extend([visit]*len(new_progs))
+                    this_progs.extend(new_progs)
 
-                    for visit in visit_match:
-                        if isJWST:
-                            ix = (visits == visit) & (target_list == target) & (info['filter'] == filter) & (info['pupil'] == pupil)
-                        else:
-                            ix = (visits == visit) & (target_list == target) & (info['filter'] == filter)
-                        # this_progs.append(info['progIDs'][ix][0])
-                        # print visit, ix.sum(), np.unique(info['progIDs'][ix])
-                        new_progs = list(np.unique(info['progIDs'][ix]))
-                        this_visits.extend([visit]*len(new_progs))
-                        this_progs.extend(new_progs)
+                for visit, prog in zip(this_visits, this_progs):
+                    visit_list = []
+                    visit_start = []
+                    
+                    _vstr = '{0}-{1}-{2}-{3:05.1f}-{4}'
+                    visit_product = _vstr.format(target_use, prog, visit, 
+                                                 angle, filter)
 
-                    for visit, prog in zip(this_visits, this_progs):
-                        visit_list = []
-                        visit_start = []
-                        if isJWST:
-                            visit_product = '{0}-{1}-{2}-{3:05.1f}-{4}-{5}'.format(target_use, prog, visit, angle, filter, pupil)
+                    use = (target_list == target)
+                    use &= (info['filter'] == filter)
+                    use &= (visits == visit)
+                    use &= (pa_v3 == angle)
+                    use &= (info['progIDs'] == prog)
+                    
+                    if use.sum() == 0:
+                        continue
 
-                            use = ((target_list == target) &
-                                (info['filter'] == filter) &
-                                (visits == visit) & (pa_v3 == angle) &
-                                (info['progIDs'] == prog)) & (info['pupil'] == pupil)
-                        else:
-                            visit_product = '{0}-{1}-{2}-{3:05.1f}-{4}'.format(target_use, prog, visit, angle, filter)
-                            use = ((target_list == target) &
-                                (info['filter'] == filter) &
-                                (visits == visit) & (pa_v3 == angle) &
-                                (info['progIDs'] == prog))
+                    for tstart, file in zip(info['expstart'][use],
+                                            info['file'][use]):
 
-                        if use.sum() == 0:
-                            continue
+                        f = file.split('.gz')[0]
+                        if f not in exposure_list:
+                            visit_list.append(str(f))
+                            visit_start.append(tstart)
 
-                        for tstart, file in zip(info['expstart'][use],
-                                                info['file'][use]):
+                    exposure_list = np.append(exposure_list, visit_list)
+                    exposure_start.extend(visit_start)
 
-                            f = file.split('.gz')[0]
-                            if f not in exposure_list:
-                                visit_list.append(str(f))
-                                visit_start.append(tstart)
+                    filter_list[filter][angle].extend(visit_list)
 
-                        exposure_list = np.append(exposure_list, visit_list)
-                        exposure_start.extend(visit_start)
+                    if uniquename:
+                        print(visit_product, len(visit_list))
+                        so = np.argsort(visit_start)
+                        exposure_list = np.array(visit_list)[so]
+                        #output_list[visit_product.lower()] = visit_list
 
-                        if isJWST:
-                            filter_list[filter][pupil][angle].extend(visit_list)
-                        else:
-                            filter_list[filter][angle].extend(visit_list)
-
-                        if uniquename:
-                            print(visit_product, len(visit_list))
-                            so = np.argsort(visit_start)
-                            exposure_list = np.array(visit_list)[so]
-                            #output_list[visit_product.lower()] = visit_list
-
-                            d = OrderedDict(product=str(visit_product.lower()),
-                                            files=list(np.array(visit_list)[so]))
-                            output_list.append(d)
-
-                    if not uniquename:
-                        print(product, len(exposure_list))
-                        so = np.argsort(exposure_start)
-                        exposure_list = np.array(exposure_list)[so]
-                        #output_list[product.lower()] = exposure_list
-                        d = OrderedDict(product=str(product.lower()),
-                                        files=list(np.array(exposure_list)[so]))
+                        d = OrderedDict(product=str(visit_product.lower()),
+                                        files=list(np.array(visit_list)[so]))
                         output_list.append(d)
+
+                if not uniquename:
+                    print(product, len(exposure_list))
+                    so = np.argsort(exposure_start)
+                    exposure_list = np.array(exposure_list)[so]
+                    #output_list[product.lower()] = exposure_list
+                    d = OrderedDict(product=str(product.lower()),
+                                    files=list(np.array(exposure_list)[so]))
+                    output_list.append(d)
 
     # Split large shifts
     if visit_split_shift > 0:
@@ -1087,7 +1077,7 @@ DIRECT_ORDER = {'G102': ['F105W', 'F110W', 'F098M', 'F125W', 'F140W', 'F160W', '
 
 
 def parse_grism_associations(exposure_groups, info,
-                             best_direct=DIRECT_ORDER, isJWST=False,
+                             best_direct=DIRECT_ORDER,
                              get_max_overlap=True):
     """Get associated lists of grism and direct exposures
 
@@ -1111,45 +1101,49 @@ def parse_grism_associations(exposure_groups, info,
 
     grism_groups = []
     for i in range(N):
-        if isJWST:
-            pupil = exposure_groups[i]['product'].split('-')[-1]
-            f_i = exposure_groups[i]['product'].split('-')[-2]
-            root_i = exposure_groups[i]['product'].split('-')[0]
+        _espi = exposure_groups[i]['product'].split('-')
+        
+        if _espi[-2][0] in 'fg':
+            pupil_i = _espi[-2]
+            f_i = _espi[-1]
+            root_i = '-'.join(_espi[:-2])
         else:
-            f_i = exposure_groups[i]['product'].split('-')[-1]
-            root_i = exposure_groups[i]['product'][:-len('-'+f_i)]
+            pupil_i = None
+            f_i = _espi[-1]
+            root_i = '-'.join(_espi[:-1])
+            
         if f_i.startswith('g'):
             group = OrderedDict(grism=exposure_groups[i],
                                 direct=None)
         else:
             continue
-
+        
         fp_i = exposure_groups[i]['footprint']
         olap_i = 0.
         d_i = f_i
         d_idx = 10
         for j in range(N):
-            if isJWST:
-                f_j = exposure_groups[j]['product'].split('-')[-2]
-                pupil_j = exposure_groups[j]['product'].split('-')[-1]
+            _espj = exposure_groups[j]['product'].split('-')
+            if _espj[-2][0] in 'fg':
+                pupil_j = _espj[-2]
+                f_j = _espj[-1]
+                root_j = '-'.join(_espj[:-2])
             else:
-                f_j = exposure_groups[j]['product'].split('-')[-1]
+                f_j = _espj[-1]
+                root_j = '-'.join(_espj[:-1])
+                pupil_j = None
+                
             if f_j.startswith('g'):
                 continue
 
             fp_j = exposure_groups[j]['footprint']
             olap = fp_i.intersection(fp_j)
-            if isJWST:
-                root_j = exposure_groups[j]['product'].split('-')[0]#[:-len('-'+f_j)]
-            else:
-                root_j = exposure_groups[j]['product'][:-len('-'+f_j)]
 
             if (root_j == root_i):
 
-                if isJWST:
-                    if pupil_j == pupil: #not in best_direct[f_i.upper()]:
+                if pupil_i is not None:
+                    if pupil_j == pupil_i:
                         group['direct'] = exposure_groups[j]
-
                     else:
                         continue
                 else:

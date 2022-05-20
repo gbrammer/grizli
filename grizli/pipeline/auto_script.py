@@ -1348,32 +1348,35 @@ def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, com
         files = glob.glob(os.path.join(RAW_PATH, file_query+'fl[tc].fits*'))
         files += glob.glob(os.path.join(RAW_PATH, file_query+'c0m.fits*'))
         files += glob.glob(os.path.join(RAW_PATH, file_query+'c0f.fits*'))
-
-        # check if we're processing JWST files
-        if len(files) == 0:
-            files = glob.glob(os.path.join(RAW_PATH, file_query+'rate.fits*'))
-            isJWST = True # if there are only rate files, then it must be JWST 
-        else:
-            isJWST = False
-
+        files += glob.glob(os.path.join(RAW_PATH, file_query+'rate.fits*'))
+        
+    if len(files) == 0:
+        raise ValueError(f'No exposure files found in {RAW_PATH}')
+        
     files.sort()
 
-    if isJWST:
+    for file in files:
         # JWST files have slightly different naming conventions for the header
-        for file in files:
+        if os.path.basename(file).startswith('jw'):
             hdu = pyfits.open(file, mode='update')
-            hdu[0].header['ra_targ'] = hdu[0].header['targ_ra']
-            hdu[0].header['exptime'] = hdu[0].header['effexptm']
-            hdu[0].header['pa_v3'] = hdu[1].header['pa_v3']
+            hdu[0].header['RA_TARG'] = hdu[0].header['targ_ra']
+            hdu[0].header['DEC_TARG'] = hdu[0].header['targ_dec']
+            hdu[0].header['EXPTIME'] = hdu[0].header['effexptm']
+            hdu[0].header['PA_V3'] = hdu[1].header['pa_v3']
+
             if hdu[0].header['FILTER'] != 'CLEAR':
-                hdu[0].header['FILTER_INFO'] = hdu[0].header['FILTER']
-                hdu[0].header['EXPTYPE_INFO'] = hdu[0].header['EXP_TYPE']
+                hdu[0].header['OFILTER'] = hdu[0].header['FILTER']
+                hdu[0].header['OEXPTYP'] = hdu[0].header['EXP_TYPE']
+
             if 'NRIMDTPT' in hdu[0].header:
                 hdu[0].header['NRIMDTPT'] = int(hdu[0].header['NRIMDTPT'])
+
             if 'NDITHPTS' in hdu[0].header:
                 hdu[0].header['NRIMDTPT'] = int(hdu[0].header['NDITHPTS'])
-            hdu.flush()
 
+            hdu.flush()
+            hdu.close()
+            
     info = utils.get_flt_info(files)
 
     # Only F814W on ACS
@@ -1413,7 +1416,7 @@ def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, com
 
             visits.append(direct)
 
-        all_groups = utils.parse_grism_associations(visits, info, isJWST=isJWST)
+        all_groups = utils.parse_grism_associations(visits, info)
 
         write_visit_info(visits, all_groups, info, root=field_root, path='./')
                 
@@ -1421,10 +1424,8 @@ def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, com
 
     visits, filters = utils.parse_flt_files(info=info, 
                                   uniquename=True, get_footprint=True,
-                                  use_visit=use_visit, max_dt=max_dt, 
-                                  visit_split_shift=visit_split_shift,
-                                  isJWST=isJWST)
-    
+                                  use_visit=use_visit, max_dt=max_dt,
+                                  visit_split_shift=visit_split_shift)
 
     # Don't run combine_minexp if have grism exposures
     grisms = ['G141', 'G102', 'G800L', 'G280', 'GR150C', 'GR150R']
@@ -1436,11 +1437,20 @@ def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, com
     if combine_same_pa:
         combined = {}
         for visit in visits:
-            filter_pa = '-'.join(visit['product'].split('-')[-2:])
-            prog = '-'.join(visit['product'].split('-')[-4:-3])
-            key = 'i{0}-{1}'.format(prog, filter_pa)
+            vspl = visit['product'].split('-')
+            if vspl[-2][0].upper() in 'FG':
+                # pupil-filter
+                filter_pa = '-'.join(vspl[-3:])
+                prog = '-'.join(visit['product'].split('-')[-5:-4])
+                key = 'jw{0}-{1}'.format(prog, filter_pa)
+            else:
+                filter_pa = '-'.join(vspl[-2:])
+                prog = '-'.join(visit['product'].split('-')[-4:-3])
+                key = 'i{0}-{1}'.format(prog, filter_pa)
+                
             if key not in combined:
-                combined[key] = {'product': key, 'files': [], 'footprint': visit['footprint']}
+                combined[key] = {'product': key, 'files': [],
+                                 'footprint': visit['footprint']}
 
             combined[key]['files'].extend(visit['files'])
 
@@ -1500,7 +1510,7 @@ def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, com
         print('** Combine Singles: **')
         for i, visit in enumerate(visits):
             print('{0} {1} {2}'.format(i, visit['product'], len(visit['files'])))
-    all_groups = utils.parse_grism_associations(visits, info, isJWST=isJWST)
+    all_groups = utils.parse_grism_associations(visits, info)
     print('\n == Grism groups ==\n')
     valid_groups = []
     for g in all_groups:
