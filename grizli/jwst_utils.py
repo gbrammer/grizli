@@ -122,20 +122,22 @@ def img_with_wcs(input):
     # from jwst.assign_wcs import assign_wcs
 
     # HDUList -> jwst.datamodels.ImageModel
-    
+
     # Generate WCS as image
+    if not isinstance(input, pyfits.HDUList):
+        input = pyfits.open(input)
     if isinstance(input, pyfits.HDUList):
         if input[0].header['INSTRUME'] == 'NIRISS':
             if input[0].header['FILTER'].startswith('GR'):
+                input[0].header['OFILTER'] = input[0].header['FILTER'] # just to save it so we can change it back at the end
+                input[0].header['OEXPTYPE'] = input[0].header['EXP_TYPE']
                 input[0].header['FILTER'] = 'CLEAR'
                 input[0].header['EXP_TYPE'] = 'NIS_IMAGE'
-                #print(input[0].header)
         
         elif input[0].header['INSTRUME'] == 'NIRCAM':
             if input[0].header['PUPIL'].startswith('GR'):
                 input[0].header['PUPIL'] = 'CLEAR'
                 input[0].header['EXP_TYPE'] = 'NRC_IMAGE'
-                #print(input[0].header)
         
         
     img = util.open(input)
@@ -148,7 +150,7 @@ def img_with_wcs(input):
     #dist_file = crds_client.get_reference_file(img, 'distortion')
     #reference_files = {'distortion': dist_file}
     #with_wcs = assign_wcs.load_wcs(img, reference_files=reference_files)
-
+    
     return with_wcs
 
 
@@ -218,7 +220,9 @@ def model_wcs_header(datamodel, get_sip=False, order=4, step=32, lsq_args=LSQ_AR
     """
     from astropy.io.fits import Header
     from scipy.optimize import least_squares
+    import jwst.datamodels
 
+    datamodel = jwst.datamodels.open(datamodel)
     sh = datamodel.data.shape
 
     try:
@@ -245,6 +249,7 @@ def model_wcs_header(datamodel, get_sip=False, order=4, step=32, lsq_args=LSQ_AR
     cdx = datamodel.meta.wcs.forward_transform(crp0[0]+1, crp0[1])
     cdy = datamodel.meta.wcs.forward_transform(crp0[0], crp0[1]+1)
 
+    # use utils.to_header in grizli to replace the below (from datamodel.wcs)
     header = Header()
     header['RADESYS'] = 'ICRS'
     header['CTYPE1'] = 'RA---TAN'

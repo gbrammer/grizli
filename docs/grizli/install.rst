@@ -24,7 +24,7 @@ The environment can be installed with ``pip`` and the `requirements.txt <https:/
     
     # Generate a conda environment named "grizli-dev" or anything else
     # This will just provide the base python distribution (incl. pip)
-    conda create -n grizli-dev python=3.7
+    conda create -n grizli-dev python=3.7 numpy cython
             
     # Activate the environment.  This needs to be done each time you 
     # start a new terminal, or put it in ~/.bashrc
@@ -174,8 +174,10 @@ files that are currently hard-coded:
     .. code:: python
     
         >>> import grizli.utils
-        >>> # set ACS=True below to get files necessary for G800L processing
-        >>> grizli.utils.fetch_default_calibs(ACS=False) # to iref/iref
+        >>> # set get_acs=True below to get files necessary for G800L processing
+        >>> grizli.utils.fetch_default_calibs(get_acs=False) # to iref/iref
+        >>> # set get_jwst=True to get files for jwst processing
+        >>> grizli.utils.fetch_default_calibs(get_jwst=False) 
         >>> grizli.utils.fetch_config_files()            # to $GRIZLI/CONF
     
 The grism redshift fits require galaxy SED templates that are provided with

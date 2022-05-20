@@ -2,6 +2,8 @@
 import inspect
 import os
 
+import yaml
+
 from collections import OrderedDict
 
 """
@@ -82,7 +84,7 @@ def make_visit_fits():
 
     visit_files += indiv_files
 
-    for p in ['grizli-v1-19.12.04_visits.npy', 'grizli-v1-19.12.05_visits.npy', 'grizli-v1-20.10.12_visits.npy', 'grizli-cosmos-v2_visits.npy']:
+    for p in ['grizli-v1-19.12.04_visits.npy', 'grizli-v1-19.12.05_visits.npy', 'grizli-v1-20.10.12_visits.npy', 'grizli-cosmos-v2_visits.npy','grizli-v1-21.05.20_visits.npy']:
         if p in visit_files:
             visit_files.pop(visit_files.index(p))
 
@@ -90,7 +92,8 @@ def make_visit_fits():
     products = []
 
     extra_visits = ['candels-july2019_visits.npy', 'grizli-cosmos-v2_visits.npy']
-    extra_visits = ['candels-july2019_visits.npy', 'cosmos-dash-apr20_visits.npy']
+    #extra_visits = ['candels-july2019_visits.npy', 'cosmos-dash-apr20_visits.npy']
+    extra_visits = ['candels-july2019_visits.npy', 'cosmos-dash-dec06_visits.npy']
     
     for extra in extra_visits:
 
@@ -180,7 +183,7 @@ def make_visit_fits():
 
     # WFC3/IR copied to "Exposures" paths in CANDELS fields
     for v in all_visits:
-        if v['parent_file'] in ['grizli-cosmos-v2_visits.npy', 'cosmos-dash-apr20_visits.npy']:
+        if v['parent_file'] in ['grizli-cosmos-v2_visits.npy', 'cosmos-dash-apr20_visits.npy', 'cosmos-dash-dec06_visits.npy']:
             continue
 
         if v['parent_file'].startswith('j'):
@@ -216,6 +219,7 @@ def make_visit_fits():
     root = 'grizli-v1-19.12.05'
     root = 'grizli-v1-20.10.12'
     root = 'grizli-v1-21.05.20'
+    root = 'grizli-v1-21.12.18'
 
     tab.write(root+'_visits.fits', overwrite=True)
     np.save(root+'_visits.npy', [all_visits])
@@ -350,7 +354,27 @@ def make_visit_fits():
                 a_i = a.area*3600*np.cos(tab['dec'][indices[0]]/180*np.pi)
                 print(root, aa, a_i, a_i/aa)
 
-
+def update_s3_paths():
+    """
+    Update paths to COSMOS data, eventually everything else
+    """
+    import numpy as np
+    import os
+    from tqdm import tqdm
+    
+    os.chdir(os.path.join(os.getenv('HOME'),
+                     'Research/HST/CHArGE/Cutouts/VisitFiles'))
+    
+    groups = np.load('grizli-v1-21.12.18_filter_groups.npy', allow_pickle=True)
+    
+    for f in groups[0]:
+        print(f)
+        for j, aws in tqdm(enumerate(groups[0][f]['awspath'])):
+            groups[0][f]['awspath'][j] = aws.replace('cosmos-dash',
+                                                     'cosmos-dash-2021')
+    
+    np.save('grizli-v2-22.02.02_filter_groups.npy', groups)
+                                     
 def group_by_filter():
     """
     aws s3 sync --exclude "*" --include "cosmos_visits*" s3://grizli-preprocess/CosmosMosaic/ ./
@@ -366,6 +390,7 @@ def group_by_filter():
     master = 'grizli-v1-19.12.05'
     master = 'grizli-v1-20.10.12'
     master = 'grizli-v1-21.05.20'
+    master = 'grizli-v1-21.12.18'
     
     tab = utils.read_catalog('{0}_visits.fits'.format(master))
     all_visits = np.load('{0}_visits.npy'.format(master), allow_pickle=True)[0]
@@ -506,7 +531,7 @@ def segmentation_figure(label, cat, segfile):
     th.close()
 
 
-def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixscale=0.1, size=10, wcs=None, pixfrac=0.33, kernel='square', theta=0, half_optical_pixscale=True, filters=['f160w', 'f140w', 'f125w', 'f105w', 'f110w', 'f098m', 'f850lp', 'f814w', 'f775w', 'f606w', 'f475w', 'f555w', 'f600lp', 'f390w', 'f350lp'], skip=None, remove=True, rgb_params=RGB_PARAMS, master='grizli-v1-19.12.04', aws_bucket='s3://grizli/CutoutProducts/', scale_ab=21, thumb_height=2.0, sync_fits=True, subtract_median=True, include_saturated=True, include_ir_psf=False, show_filters=['visb', 'visr', 'y', 'j', 'h'], combine_similar_filters=True, single_output=True, aws_prep_dir=None, make_segmentation_figure=False, get_dict=False, dryrun=False, thumbnail_ext='png', **kwargs):
+def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixscale=0.1, size=10, wcs=None, pixfrac=0.33, kernel='square', theta=0, half_optical_pixscale=True, filters=['f160w', 'f140w', 'f125w', 'f105w', 'f110w', 'f098m', 'f850lp', 'f814w', 'f775w', 'f606w', 'f475w', 'f555w', 'f600lp', 'f390w', 'f350lp'], skip=None, remove=True, rgb_params=RGB_PARAMS, master='grizli-v1-19.12.04', aws_bucket='s3://grizli/CutoutProducts/', scale_ab=21, thumb_height=2.0, sync_fits=True, subtract_median=True, include_saturated=True, include_ir_psf=False, oversample_psf=False, show_filters=['visb', 'visr', 'y', 'j', 'h'], combine_similar_filters=True, single_output=True, aws_prep_dir=None, make_segmentation_figure=False, get_dict=False, dryrun=False, thumbnail_ext='png', **kwargs):
     """
     label='cp561356'; ra=150.208875; dec=1.850241667; size=40; filters=['f160w','f814w', 'f140w','f125w','f105w','f606w','f475w']
 
@@ -648,45 +673,58 @@ def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixsca
             groups_files = glob.glob('{0}_filter_groups.npy'.format(prep_root))
             visit_query = prep_root+'_'
         else:
-            groups_files = glob.glob('*filter_groups.npy')
+            groups_files = glob.glob('*filter_groups.*')
             visit_query = '*'
 
         # Reformat local visits.npy into a groups file
         if (len(groups_files) == 0):
 
-            visit_file = glob.glob(visit_query+'visits.npy')[0]
-
-            visits, groups, info = np.load(visit_file, allow_pickle=True)
+            visit_file = glob.glob(visit_query+'visits.*')[0]
             visit_root = visit_file.split('_visits')[0]
+            visits, groups, info = auto_script.load_visit_info(visit_root, 
+                                                               verbose=False)
 
-            visit_filters = np.array([v['product'].split('-')[-1] for v in visits])
+            #visits, groups, info = np.load(visit_file, allow_pickle=True)
+            visit_filters = np.array([v['product'].split('-')[-1]
+                                      for v in visits])
+                                      
             groups = {}
+            sgroups = {}
+            
             for filt in np.unique(visit_filters):
-                groups[filt] = {}
-                groups[filt]['filter'] = filt
-                groups[filt]['files'] = []
-                groups[filt]['footprints'] = []
-                groups[filt]['awspath'] = []
+                _v = {}
+                _v['filter'] = str(filt)
+                _v['files'] = []
+                _v['footprints'] = []
+                _v['awspath'] = []
 
                 ix = np.where(visit_filters == filt)[0]
                 for i in ix:
-                    groups[filt]['files'].extend(visits[i]['files'])
-                    groups[filt]['footprints'].extend(visits[i]['footprints'])
+                    _v['files'].extend(visits[i]['files'])
+                    _v['footprints'].extend(visits[i]['footprints'])
 
-                Nf = len(groups[filt]['files'])
+                Nf = len(_v['files'])
                 print('{0:>6}: {1:>3} exposures'.format(filt, Nf))
 
                 if aws_prep_dir is not None:
-                    groups[filt]['awspath'] = [s3_full_path
-                                               for file in range(Nf)]
-
-            np.save('{0}_filter_groups.npy'.format(visit_root), [groups])
-
+                    _v['awspath'] = [s3_full_path for file in range(Nf)]
+            
+                groups[filt] = _v 
+                sgroups[str(filt)] = auto_script.visit_dict_to_strings(_v)
+                
+            #np.save('{0}_filter_groups.npy'.format(visit_root), [groups])
+            with open('{0}_filter_groups.yaml'.format(visit_root), 'w') as fp:
+                yaml.dump(sgroups, stream=fp, Dumper=yaml.Dumper)
         else:
             print('Use groups file: {0}'.format(groups_files[0]))
 
-            groups = np.load(groups_files[0], allow_pickle=True)[0]
-
+            #groups = np.load(groups_files[0], allow_pickle=True)[0]
+            with open(groups_files[0]) as fp:
+                groups = yaml.load(fp, Loader=yaml.Loader)
+                for filt in groups:
+                    _v = groups[filt]
+                    groups[filt] = auto_script.visit_dict_from_strings(_v)
+                    
     #filters = ['f160w','f814w', 'f110w', 'f098m', 'f140w','f125w','f105w','f606w', 'f475w']
 
     filt_dict = FilterDict()
@@ -739,7 +777,7 @@ def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixsca
 
         print('\n\n###\nMake filter: {0}'.format(filt))
 
-        if (filt.upper() in ['F105W', 'F110W', 'F125W', 'F140W', 'F160W']) & include_ir_psf:
+        if include_ir_psf:
             clean_i = False
         else:
             clean_i = remove
@@ -751,7 +789,7 @@ def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixsca
             continue
 
         elif status is not None:
-            sci, wht, outh, filt_dict[filt] = status
+            sci, wht, outh, filt_dict[filt], wcs_tab = status
 
             if subtract_median:
                 #med = np.median(sci[sci != 0])
@@ -780,7 +818,7 @@ def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixsca
 
             has_filts.append(filt)
 
-            if (filt.upper() in ['F105W', 'F110W', 'F125W', 'F140W', 'F160W']) & include_ir_psf:
+            if include_ir_psf:
                 from grizli.galfit.psf import DrizzlePSF
 
                 hdu = pyfits.open('{0}-{1}_drz_sci.fits'.format(label, filt),
@@ -797,18 +835,46 @@ def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixsca
                 try:
 
                     dp = DrizzlePSF(flt_files=flt_files, driz_hdu=hdu[0])
-
-                    psf = dp.get_psf(ra=dp.driz_wcs.wcs.crval[0],
+                    
+                    if oversample_psf:
+                        oN = oversample_psf*2+1
+                        cosd = np.cos(dp.driz_wcs.wcs.crval[1]/180*np.pi)
+                        dde = 1./(oversample_psf*2)*pixscale/3600
+                        dra = dde*cosd
+                        sh = sci.shape
+                        psfd = np.zeros((oN*sh[0], oN*sh[1]), 
+                                        dtype=np.float32)
+                        for i in range(oN):
+                            for j in range(oN):
+                                ra_i = (dp.driz_wcs.wcs.crval[0] +
+                                        dra*(i-oversample_psf))
+                                de_i = (dp.driz_wcs.wcs.crval[1] - 
+                                        dde*(j-oversample_psf))
+                                psf_i = dp.get_psf(ra=ra_i, dec=de_i,
+                                         filter=filt.upper(),
+                                         pixfrac=dp.driz_header['PIXFRAC'],
+                                         kernel=dp.driz_header['KERNEL'],
+                                         wcs_slice=dp.driz_wcs, 
+                                get_extended=filt.lower()[:2] in ['f1','f0'],
+                                         verbose=False, get_weight=False)
+                                psfd[j::oN,i::oN] += psf_i[1].data
+                        
+                        psf = pyfits.ImageHDU(data=psfd)
+                    else:
+                        psf = dp.get_psf(ra=dp.driz_wcs.wcs.crval[0],
                                  dec=dp.driz_wcs.wcs.crval[1],
                                  filter=filt.upper(),
                                  pixfrac=dp.driz_header['PIXFRAC'],
                                  kernel=dp.driz_header['KERNEL'],
-                                 wcs_slice=dp.driz_wcs, get_extended=True,
-                                 verbose=False, get_weight=False)
-
-                    psf[1].header['EXTNAME'] = 'PSF'
+                                 wcs_slice=dp.driz_wcs, 
+                                 get_extended=filt.lower()[:2] in ['f1','f0'],
+                                 verbose=False, get_weight=False)[1]
+                    
+                    psf.header['OVERSAMP'] = oversample_psf
+                    
+                    psf.header['EXTNAME'] = 'PSF'
                     #psf[1].header['EXTVER'] = filt
-                    hdu.append(psf[1])
+                    hdu.append(psf)
                     hdu.flush()
 
                 except:

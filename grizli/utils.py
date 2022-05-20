@@ -16,6 +16,8 @@ import numpy as np
 
 import astropy.units as u
 
+from sregion import SRegion
+
 from . import GRIZLI_PATH
 
 KMS = u.km/u.s
@@ -123,7 +125,7 @@ def set_warnings(numpy_level='ignore', astropy_level='ignore'):
     warnings.simplefilter(astropy_level, category=AstropyWarning)
 
 
-def get_flt_info(files=[], columns=['FILE', 'FILTER', 'INSTRUME', 'DETECTOR', 'TARGNAME', 'DATE-OBS', 'TIME-OBS', 'EXPSTART', 'EXPTIME', 'PA_V3', 'RA_TARG', 'DEC_TARG', 'POSTARG1', 'POSTARG2']):
+def get_flt_info(files=[], columns=['FILE', 'FILTER', 'PUPIL', 'INSTRUME', 'DETECTOR', 'TARGNAME', 'DATE-OBS', 'TIME-OBS', 'EXPSTART', 'EXPTIME', 'PA_V3', 'RA_TARG', 'DEC_TARG', 'POSTARG1', 'POSTARG2']):
     """Extract header information from a list of FLT files
 
     Parameters
@@ -600,7 +602,7 @@ def multiprocessing_ndfilter(data, filter_func, filter_args=(), size=None, footp
     return filtered
 
 def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
-                    get_footprint=False,
+                    get_footprint=False, isJWST=False,
                     translate={'AEGIS-': 'aegis-',
                                  'COSMOS-': 'cosmos-',
                                  'GNGRISM': 'goodsn-',
@@ -739,10 +741,17 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
 
     for filter in np.unique(info['filter']):
         filter_list[filter] = OrderedDict()
-
-        angles = np.unique(pa_v3[(info['filter'] == filter)])
-        for angle in angles:
-            filter_list[filter][angle] = []
+        if isJWST:
+            pupils = np.unique(info['pupil'][(info['filter'] == filter)])
+            for pupil in pupils:
+                filter_list[filter][pupil] = OrderedDict()
+                angles = np.unique(pa_v3[(info['filter'] == filter)])
+                for angle in angles:
+                    filter_list[filter][pupil][angle] = []
+        else:
+            angles = np.unique(pa_v3[(info['filter'] == filter)])
+            for angle in angles:
+                filter_list[filter][angle] = []
 
     for target in targets:
         # 3D-HST targname translations
@@ -763,71 +772,92 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
 
         for filter in np.unique(info['filter'][(target_list == target)]):
             angles = np.unique(pa_v3[(info['filter'] == filter) &
-                              (target_list == target)])
-
+                                (target_list == target)])
             for angle in angles:
-                exposure_list = []
-                exposure_start = []
-                product = '{0}-{1:05.1f}-{2}'.format(target_use, angle, filter)
+                if isJWST:
+                    pupils = np.unique(info['pupil'][(info['filter'] == filter)])
+                else:
+                    pupils = [''] 
+                for pupil in pupils:
+                    exposure_list = []
+                    exposure_start = []
+                    if isJWST:
+                        product = '{0}-{1:05.1f}-{2}-{3}'.format(target_use, angle, filter, pupil)
+                        visit_match = np.unique(visits[(target_list == target) &
+                                                (info['filter'] == filter) & (info['pupil'] == pupil)])
+                    else:
+                        product = '{0}-{1:05.1f}-{2}'.format(target_use, angle, filter)
+                        visit_match = np.unique(visits[(target_list == target) &
+                                                (info['filter'] == filter)])
+                    
+                    this_progs = []
+                    this_visits = []
 
-                visit_match = np.unique(visits[(target_list == target) &
-                                               (info['filter'] == filter)])
+                    for visit in visit_match:
+                        if isJWST:
+                            ix = (visits == visit) & (target_list == target) & (info['filter'] == filter) & (info['pupil'] == pupil)
+                        else:
+                            ix = (visits == visit) & (target_list == target) & (info['filter'] == filter)
+                        # this_progs.append(info['progIDs'][ix][0])
+                        # print visit, ix.sum(), np.unique(info['progIDs'][ix])
+                        new_progs = list(np.unique(info['progIDs'][ix]))
+                        this_visits.extend([visit]*len(new_progs))
+                        this_progs.extend(new_progs)
 
-                this_progs = []
-                this_visits = []
+                    for visit, prog in zip(this_visits, this_progs):
+                        visit_list = []
+                        visit_start = []
+                        if isJWST:
+                            visit_product = '{0}-{1}-{2}-{3:05.1f}-{4}-{5}'.format(target_use, prog, visit, angle, filter, pupil)
 
-                for visit in visit_match:
-                    ix = (visits == visit) & (target_list == target) & (info['filter'] == filter)
-                    # this_progs.append(info['progIDs'][ix][0])
-                    # print visit, ix.sum(), np.unique(info['progIDs'][ix])
-                    new_progs = list(np.unique(info['progIDs'][ix]))
-                    this_visits.extend([visit]*len(new_progs))
-                    this_progs.extend(new_progs)
+                            use = ((target_list == target) &
+                                (info['filter'] == filter) &
+                                (visits == visit) & (pa_v3 == angle) &
+                                (info['progIDs'] == prog)) & (info['pupil'] == pupil)
+                        else:
+                            visit_product = '{0}-{1}-{2}-{3:05.1f}-{4}'.format(target_use, prog, visit, angle, filter)
+                            use = ((target_list == target) &
+                                (info['filter'] == filter) &
+                                (visits == visit) & (pa_v3 == angle) &
+                                (info['progIDs'] == prog))
 
-                for visit, prog in zip(this_visits, this_progs):
-                    visit_list = []
-                    visit_start = []
-                    visit_product = '{0}-{1}-{2}-{3:05.1f}-{4}'.format(target_use, prog, visit, angle, filter)
+                        if use.sum() == 0:
+                            continue
 
-                    use = ((target_list == target) &
-                           (info['filter'] == filter) &
-                           (visits == visit) & (pa_v3 == angle) &
-                           (info['progIDs'] == prog))
+                        for tstart, file in zip(info['expstart'][use],
+                                                info['file'][use]):
 
-                    if use.sum() == 0:
-                        continue
+                            f = file.split('.gz')[0]
+                            if f not in exposure_list:
+                                visit_list.append(str(f))
+                                visit_start.append(tstart)
 
-                    for tstart, file in zip(info['expstart'][use],
-                                            info['file'][use]):
+                        exposure_list = np.append(exposure_list, visit_list)
+                        exposure_start.extend(visit_start)
 
-                        f = file.split('.gz')[0]
-                        if f not in exposure_list:
-                            visit_list.append(str(f))
-                            visit_start.append(tstart)
+                        if isJWST:
+                            filter_list[filter][pupil][angle].extend(visit_list)
+                        else:
+                            filter_list[filter][angle].extend(visit_list)
 
-                    exposure_list = np.append(exposure_list, visit_list)
-                    exposure_start.extend(visit_start)
+                        if uniquename:
+                            print(visit_product, len(visit_list))
+                            so = np.argsort(visit_start)
+                            exposure_list = np.array(visit_list)[so]
+                            #output_list[visit_product.lower()] = visit_list
 
-                    filter_list[filter][angle].extend(visit_list)
+                            d = OrderedDict(product=str(visit_product.lower()),
+                                            files=list(np.array(visit_list)[so]))
+                            output_list.append(d)
 
-                    if uniquename:
-                        print(visit_product, len(visit_list))
-                        so = np.argsort(visit_start)
-                        exposure_list = np.array(visit_list)[so]
-                        #output_list[visit_product.lower()] = visit_list
-
-                        d = OrderedDict(product=str(visit_product.lower()),
-                                        files=list(np.array(visit_list)[so]))
+                    if not uniquename:
+                        print(product, len(exposure_list))
+                        so = np.argsort(exposure_start)
+                        exposure_list = np.array(exposure_list)[so]
+                        #output_list[product.lower()] = exposure_list
+                        d = OrderedDict(product=str(product.lower()),
+                                        files=list(np.array(exposure_list)[so]))
                         output_list.append(d)
-
-                if not uniquename:
-                    print(product, len(exposure_list))
-                    so = np.argsort(exposure_start)
-                    exposure_list = np.array(exposure_list)[so]
-                    #output_list[product.lower()] = exposure_list
-                    d = OrderedDict(product=str(product.lower()),
-                                    files=list(np.array(exposure_list)[so]))
-                    output_list.append(d)
 
     # Split large shifts
     if visit_split_shift > 0:
@@ -846,9 +876,12 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
         for i in range(N):
             for j in range(len(output_list[i]['files'])):
                 flt_file = output_list[i]['files'][j]
-                if (not os.path.exists(flt_file)) & os.path.exists('../RAW/'+flt_file):
-                    flt_file = '../RAW/'+flt_file
-
+                if (not os.path.exists(flt_file)):
+                    for gzext in ['', '.gz']:
+                        if os.path.exists('../RAW/'+flt_file+gzext):
+                            flt_file = '../RAW/'+flt_file+gzext
+                            break
+                    
                 flt_j = pyfits.open(flt_file)
                 h = flt_j[0].header
                 if (h['INSTRUME'] == 'WFC3'):
@@ -880,8 +913,16 @@ def split_visit(visit, visit_split_shift=1.5, max_dt=6./24, path='../RAW'):
 
     visit_split_shift : split if shifts larger than `visit_split_shift` arcmin
     """
-
-    ims = [pyfits.open(os.path.join(path, file)) for file in visit['files']]
+    
+    ims = []
+    for file in visit['files']:
+        for gzext in ['', '.gz']:
+            _file = os.path.join(path, file) + gzext
+            if os.path.exists(_file):
+                ims.append(pyfits.open(_file))
+                break
+        
+    #ims = [pyfits.open(os.path.join(path, file)) for file in visit['files']]
     crval1 = np.array([im[1].header['CRVAL1'] for im in ims])
     crval2 = np.array([im[1].header['CRVAL2'] for im in ims])
     expstart = np.array([im[0].header['EXPSTART'] for im in ims])
@@ -893,7 +934,6 @@ def split_visit(visit, visit_split_shift=1.5, max_dt=6./24, path='../RAW'):
     dxi = np.cast[int](np.round(dx/visit_split_shift))
     dyi = np.cast[int](np.round(dy/visit_split_shift))
     keys = dxi*100+dyi+1000*dt
-    # print(keys)
 
     un = np.unique(keys)
     if len(un) == 1:
@@ -1035,17 +1075,19 @@ def parse_visit_overlaps(visits, buffer=15.):
         f_i = exposure_groups[i]['product'].split('-')[-1]
         product += '-'+f_i
         exposure_groups[i]['product'] = product
-
+    
     return exposure_groups
 
 
 DIRECT_ORDER = {'G102': ['F105W', 'F110W', 'F098M', 'F125W', 'F140W', 'F160W', 'F127M', 'F139M', 'F153M', 'F132N', 'F130N', 'F128N', 'F126N', 'F164N', 'F167N'],
                 'G141': ['F140W', 'F160W', 'F125W', 'F105W', 'F110W', 'F098M', 'F127M', 'F139M', 'F153M', 'F132N', 'F130N', 'F128N', 'F126N', 'F164N', 'F167N'],
-                'G800L': ['F814W', 'F606W', 'F850LP', 'F775W', 'F435W', 'F105W', 'F110W', 'F098M', 'F125W', 'F140W', 'F160W', 'F127M', 'F139M', 'F153M', 'F132N', 'F130N', 'F128N', 'F126N', 'F164N', 'F167N']}
+                'G800L': ['F814W', 'F606W', 'F850LP', 'F775W', 'F435W', 'F105W', 'F110W', 'F098M', 'F125W', 'F140W', 'F160W', 'F127M', 'F139M', 'F153M', 'F132N', 'F130N', 'F128N', 'F126N', 'F164N', 'F167N'],
+                'GR150C': ['F115W', 'F150W', 'F200W'], 
+                'GR150R': ['F115W', 'F150W', 'F200W']}
 
 
-def parse_grism_associations(exposure_groups,
-                             best_direct=DIRECT_ORDER,
+def parse_grism_associations(exposure_groups, info,
+                             best_direct=DIRECT_ORDER, isJWST=False,
                              get_max_overlap=True):
     """Get associated lists of grism and direct exposures
 
@@ -1069,9 +1111,13 @@ def parse_grism_associations(exposure_groups,
 
     grism_groups = []
     for i in range(N):
-        f_i = exposure_groups[i]['product'].split('-')[-1]
-        root_i = exposure_groups[i]['product'][:-len('-'+f_i)]
-
+        if isJWST:
+            pupil = exposure_groups[i]['product'].split('-')[-1]
+            f_i = exposure_groups[i]['product'].split('-')[-2]
+            root_i = exposure_groups[i]['product'].split('-')[0]
+        else:
+            f_i = exposure_groups[i]['product'].split('-')[-1]
+            root_i = exposure_groups[i]['product'][:-len('-'+f_i)]
         if f_i.startswith('g'):
             group = OrderedDict(grism=exposure_groups[i],
                                 direct=None)
@@ -1081,67 +1127,46 @@ def parse_grism_associations(exposure_groups,
         fp_i = exposure_groups[i]['footprint']
         olap_i = 0.
         d_i = f_i
-
-        # print('\nx\n')
         d_idx = 10
         for j in range(N):
-            f_j = exposure_groups[j]['product'].split('-')[-1]
+            if isJWST:
+                f_j = exposure_groups[j]['product'].split('-')[-2]
+                pupil_j = exposure_groups[j]['product'].split('-')[-1]
+            else:
+                f_j = exposure_groups[j]['product'].split('-')[-1]
             if f_j.startswith('g'):
                 continue
 
             fp_j = exposure_groups[j]['footprint']
             olap = fp_i.intersection(fp_j)
-            root_j = exposure_groups[j]['product'][:-len('-'+f_j)]
+            if isJWST:
+                root_j = exposure_groups[j]['product'].split('-')[0]#[:-len('-'+f_j)]
+            else:
+                root_j = exposure_groups[j]['product'][:-len('-'+f_j)]
 
-            #print(root_j, root_i, root_j == root_i)
             if (root_j == root_i):
-                # if (group['direct'] is not None):
-                #     pass
-                #     if (group['direct']['product'].startswith(root_i)) & (d_i.upper() == best_direct[f_i.upper()]):
-                #         continue
 
-                if f_j.upper() not in best_direct[f_i.upper()]:
-                    # print(f_j.upper())
-                    continue
+                if isJWST:
+                    if pupil_j == pupil: #not in best_direct[f_i.upper()]:
+                        group['direct'] = exposure_groups[j]
 
-                if best_direct[f_i.upper()].index(f_j.upper()) < d_idx:
-                    d_idx = best_direct[f_i.upper()].index(f_j.upper())
-                    group['direct'] = exposure_groups[j]
-                    olap_i = olap.area
-                    d_i = f_j
-                #print(0,group['grism']['product'], group['direct']['product'])
-            #     continue
-
-            #print(exposure_groups[i]['product'], exposure_groups[j]['product'], olap.area*3600.)
-
-            # #print(exposure_groups[j]['product'], olap_i, olap.area)
-            # if olap.area > 0:
-            #     if group['direct'] is None:
-            #         group['direct'] = exposure_groups[j]
-            #         olap_i = olap.area
-            #         d_i = f_j
-            #         #print(1,group['grism']['product'], group['direct']['product'])
-            #     else:
-            #         #if (f_j.upper() == best_direct[f_i.upper()]):
-            #         if get_max_overlap:
-            #             if olap.area < olap_i:
-            #                 continue
-            #
-            #             if d_i.upper() == best_direct[f_i.upper()]:
-            #                 continue
-            #
-            #         group['direct'] = exposure_groups[j]
-            #         #print(exposure_groups[j]['product'])
-            #         olap_i = olap.area
-            #         d_i = f_j
-            #         #print(2,group['grism']['product'], group['direct']['product'])
+                    else:
+                        continue
+                else:
+                    if f_j.upper() not in best_direct[f_i.upper()]:
+                        continue
+                    if best_direct[f_i.upper()].index(f_j.upper()) < d_idx:
+                        d_idx = best_direct[f_i.upper()].index(f_j.upper())
+                        group['direct'] = exposure_groups[j]
+                        olap_i = olap.area
+                        d_i = f_j
 
         grism_groups.append(group)
 
     return grism_groups
 
 
-def get_hst_filter(header):
+def get_hst_filter(header, filter_only=False):
     """Get simple filter name out of an HST image header.
 
     ACS has two keywords for the two filter wheels, so just return the
@@ -1158,7 +1183,13 @@ def get_hst_filter(header):
         >>> h['FILTER2'] = 'CLEAR2L'
         >>> print(get_hst_filter(h))
         G800L
-
+    
+    If `filter_only` then just get JWST ``FILTER``, otherwise
+    
+    For JWST/NIRISS, return ``{PUPIL}-{FILTER}``
+    
+    For JWST/NIRCAM, return ``{FILTER}-{PUPIL}``
+    
     Parameters
     -----------
     header : `~astropy.io.fits.Header`
@@ -1169,10 +1200,13 @@ def get_hst_filter(header):
     filter : str
 
     """
-    if 'FILTER' in header:
-        return header['FILTER'].upper()
-
-    if header['INSTRUME'].strip() == 'ACS':
+    
+    if 'INSTRUME' not in header:
+        instrume = 'N/A'
+    else:
+        instrume = header['INSTRUME']
+        
+    if instrume.strip() == 'ACS':
         for i in [1, 2]:
             filter_i = header['FILTER{0:d}'.format(i)]
             if 'CLEAR' in filter_i:
@@ -1180,10 +1214,27 @@ def get_hst_filter(header):
             else:
                 filter = filter_i
 
-    elif header['INSTRUME'] == 'WFPC2':
+    elif instrume == 'WFPC2':
         filter = header['FILTNAM1']
+        
+    elif instrume == 'NIRISS':
+        if filter_only:
+            filter = header['FILTER']
+        else:
+            filter = '{0}-{1}'.format(header['PUPIL'], header['FILTER'])
+            
+    elif instrume == 'NIRCAM':
+        if filter_only:
+            filter = header['FILTER']
+        else:
+            filter = '{0}-{1}'.format(header['FILTER'], header['PUPIL'])
+            
+    elif 'FILTER' in header:
+        filter = header['FILTER']
+        
     else:
-        raise KeyError('Filter keyword not found for instrument {0}'.format(header['INSTRUME']))
+        msg = 'Failed to parse FILTER keyword for INSTRUMEnt {0}'
+        raise KeyError(msg.format(instrume))
 
     return filter.upper()
 
@@ -1345,14 +1396,15 @@ def calc_header_zeropoint(im, ext=0):
         fi = None
 
     # Get AB zeropoint
-    if 'PHOTFNU' in header:
-        ZP = -2.5*np.log10(header['PHOTFNU'])+8.90
-        ZP += 2.5*np.log10(scale_exptime)
-    elif 'PHOTFLAM' in header:
+    if 'PHOTFLAM' in header:
         ZP = (-2.5*np.log10(header['PHOTFLAM']) - 21.10 -
               5*np.log10(header['PHOTPLAM']) + 18.6921)
 
         ZP += 2.5*np.log10(scale_exptime)
+    elif 'PHOTFNU' in header:
+        ZP = -2.5*np.log10(header['PHOTFNU'])+8.90
+        ZP += 2.5*np.log10(scale_exptime)
+    
     elif (fi is not None):
         if fi in model.photflam_list:
             ZP = (-2.5*np.log10(model.photflam_list[fi]) - 21.10 -
@@ -2847,7 +2899,11 @@ def load_phoenix_stars(logg_list=PHOENIX_LOGG, teff_list=PHOENIX_TEFF, zmet_list
     try:
         hdu = pyfits.open(os.path.join(GRIZLI_PATH, 'templates/stars/', file))
     except:
-        url = 'https://s3.amazonaws.com/grizli/CONF'
+        #url = 'https://s3.amazonaws.com/grizli/CONF'
+        #url = 'https://erda.ku.dk/vgrid/Gabriel%20Brammer/CONF'
+        url = ('https://raw.githubusercontent.com/gbrammer/' +
+               'grizli-config/master')
+
         print('Fetch {0}/{1}'.format(url, file))
 
         #os.system('wget -O /tmp/{1} {0}/{1}'.format(url, file))
@@ -3971,167 +4027,7 @@ def get_common_slices(a_origin, a_shape, b_origin, b_shape):
     b_slice = (slice(llo[0], uro[0]), slice(llo[1], uro[1]))
     return a_slice, b_slice
 
-    
-class SRegion(object):
-    """Helper class for parsing an S_REGION string
-    """
-    def __init__(self, inp, label=None, **kwargs):
-        if isinstance(inp, str):
-            self.xy = self._parse_sregion(inp, **kwargs)
-        elif hasattr(inp, 'sum'):
-            # NDarray
-            self.xy = [inp]
-        elif isinstance(inp, list):
-            self.xy = inp
-        else:
-            raise IOError('input must be ``str``, ``list``, or ``np.array``')
-        
-        self.ds9_properties = ''
-        self.label = label
-        
-    @staticmethod   
-    def _parse_sregion(sregion, ncircle=32, wrap=False, **kwargs):
-        """
-        Parse an S_REGION string with CIRCLE or POLYGON
-        """
 
-        from astropy.coordinates import Angle
-        import astropy.units as u
-
-        if hasattr(sregion, 'decode'):
-            decoded = sregion.decode('utf-8').strip().upper()
-        else:
-            decoded = sregion.strip().upper()
-
-        polyspl = decoded.replace('POLYGON','xxx').replace('CIRCLE','xxx')
-        polyspl = polyspl.split('xxx')
-
-        poly = []
-        for pp in polyspl:
-            if not pp:
-                continue
-            
-            pp = pp.replace('(','').replace(')','')
-            
-            if ',' in pp:
-                spl = pp.strip().split(',')
-            else:
-                spl = pp.strip().split()
-            
-            for ip, p in enumerate(spl):
-                # Find index of first float
-                try:
-                    pf = float(p)
-                    break
-                except:
-                    continue
-                            
-            if len(spl[ip:]) == 3:
-                # Circle
-                x0, y0 = np.cast[float](spl[ip:-1])
-                cosd = np.cos(y0/180*np.pi)
-                
-                r0 = spl[-1]
-                if r0.endswith('"'):
-                    scl = float(r0[:-1])/3600
-                elif r0.endswith('\''):
-                    scl = float(r0[:-1])/60
-                else:
-                    try:
-                        scl = float(r0[2])
-                    except:
-                        scl = 1.
-                        
-                    cosd = 1.
-                    
-                _theta = np.linspace(0, 2*np.pi, ncircle) 
-                _xc = np.cos(_theta)
-                _yc = np.sin(_theta)
-                
-                poly_i = np.array([_xc/cosd*scl+x0, _yc*scl+y0]).T
-            else:
-                poly_i = np.cast[float](spl[ip:]).reshape((-1,2))
-
-            if wrap:
-                ra = Angle(poly_i[:,0]*u.deg).wrap_at(360*u.deg).value
-                poly_i[:,0] = ra
-                
-            if len(poly_i) < 2:
-                continue
-
-            poly.append(poly_i)
-
-        return poly
-    
-    @property
-    def centroid(self):
-        return [np.mean(fp, axis=0) for fp in self.xy]
-
-
-    @property
-    def path(self):
-        """
-        `~matplotlib.path.Path` object
-        """
-        import matplotlib.path
-        return [matplotlib.path.Path(fp) for fp in self.xy]
-
-
-    @property
-    def shapely(self):
-        """
-        `~shapely.geometry.Polygon` object.
-        """
-        from shapely.geometry import Polygon
-        return [Polygon(fp) for fp in self.xy]
-    
-
-    @property 
-    def area(self):
-        """
-        Area of shapely polygons
-        """
-        return [sh.area for sh in self.shapely]
-
-
-    def sky_area(self, unit=u.arcmin**2):
-        """
-        Assuming coordinates provided are RA/Dec degrees, compute area
-        """
-        cosd = np.cos(self.centroid[0][1]/180*np.pi)
-        return [(sh.area*cosd*u.deg**2).to(unit)
-                for sh in self.shapely]
-
-
-    def get_patch(self, **kwargs):
-        """
-        `~descartes.PolygonPatch` object
-        """
-        from descartes import PolygonPatch
-        return [PolygonPatch(p, **kwargs) for p in self.shapely]
-    
-
-    @property
-    def region(self):
-        """
-        Polygon string in DS9 region format
-        """
-        pstr = 'polygon({0})'
-        if hasattr(self, 'ds9_properties'):
-            tail = '{0}'.format(self.ds9_properties)
-        else:
-            tail = ''
-        
-        if hasattr(self, 'label'):    
-            if self.label is not None:
-                tail += ' text={xx}'.replace('xx', self.label)
-        
-        if tail:
-            tail = ' # '+tail
-            
-        return [pstr.format(','.join([f'{c:.6f}' for c in fp.flatten()]))+tail
-                for fp in self.xy]
-    
 class WCSFootprint(object):
     """
     Helper functions for dealing with WCS footprints
@@ -4172,6 +4068,7 @@ class WCSFootprint(object):
     def centroid(self):
         return np.mean(self.fp, axis=0)
 
+
     @property
     def path(self):
         """
@@ -4179,6 +4076,7 @@ class WCSFootprint(object):
         """
         import matplotlib.path
         return matplotlib.path.Path(self.fp)
+
 
     @property
     def polygon(self):
@@ -4188,6 +4086,7 @@ class WCSFootprint(object):
         from shapely.geometry import Polygon
         return Polygon(self.fp)
 
+
     def get_patch(self, **kwargs):
         """
         `~descartes.PolygonPatch` object
@@ -4195,12 +4094,14 @@ class WCSFootprint(object):
         from descartes import PolygonPatch
         return PolygonPatch(self.polygon, **kwargs)
 
+
     @property
     def region(self):
         """
         Polygon string in DS9 region format
         """
         return 'polygon({0})'.format(','.join(['{0:.6f}'.format(c) for c in self.fp.flatten()]))
+
 
     @staticmethod
     def add_naxis(header):
@@ -4863,6 +4764,55 @@ def make_maximal_wcs(files, pixel_scale=0.1, get_hdu=True, pad=90, verbose=True,
     return out
 
 
+def half_pixel_scale(wcs):
+    """
+    Create a new WCS with half the pixel scale of another that can be 
+    block-averaged 2x2
+    
+    Parameters
+    ----------
+    wcs : `~astropy.wcs.WCS`
+        Input WCS
+    
+    Returns
+    -------
+    half_wcs : `~astropy.wcs.WCS`
+        New WCS with smaller pixels
+    """
+    h = to_header(wcs)
+    
+    for k in ['NAXIS1', 'NAXIS2']: #, 'CRPIX1', 'CRPIX2']:
+        h[k] *= 2
+
+    for k in ['CRPIX1', 'CRPIX2']:
+        h[k] = h[k]*2 - 0.5
+        
+    for k in ['CD1_1', 'CD2_2']:
+        h[k] /= 2
+    
+    if 0:
+        # Test
+        new = pywcs.WCS(h)
+        sh = new.pixel_shape
+        
+        wcorner = wcs.all_world2pix(new.all_pix2world([[-0.5, -0.5], 
+                                             [sh[0]-0.5, sh[1]-0.5]], 0),0)
+        print('small > large')
+        print(', '.join([f'{w:.2f}' for w in wcorner[0]]))
+        print(', '.join([f'{w:.2f}' for w in wcorner[1]]), wcs.pixel_shape)
+        
+        sh = wcs.pixel_shape
+        wcorner = new.all_world2pix(wcs.all_pix2world([[-0.5, -0.5], 
+                                             [sh[0]-0.5, sh[1]-0.5]], 0),0)
+        print('large > small')
+        print(', '.join([f'{w:.2f}' for w in wcorner[0]]))
+        print(', '.join([f'{w:.2f}' for w in wcorner[1]]), new.pixel_shape)
+        
+    new_wcs = pywcs.WCS(h, relax=True)
+    
+    return new_wcs
+
+
 def header_keys_from_filelist(fits_files, keywords=[], ext=0, colname_case=str.lower):
     """Dump header keywords to a `~astropy.table.Table`
 
@@ -5016,13 +4966,14 @@ def fetch_s3_url(url='s3://bucket/path/to/file.txt', file_func=lambda x : os.pat
 
 def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
                        clean=True, include_saturated=True, keep_bits=None,
-                       dryrun=False, skip=None):
+                       dryrun=False, skip=None, extra_wfc3ir_badpix=True):
     """
     Make drizzle mosaic from exposures in a visit dictionary
 
     """
     from shapely.geometry import Polygon
     import boto3
+    from botocore.exceptions import ClientError
 
     bucket_name = None
     s3 = boto3.resource('s3')
@@ -5058,7 +5009,13 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
         indices = indices[::skip]
 
     NTOTAL = len(indices)
-
+    
+    wcs_rows = []
+    wcs_colnames = None
+    wcs_keys = {}
+    
+    bpdata = 0
+    
     for i in indices:
 
         file = visit['files'][i]
@@ -5081,18 +5038,32 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
             try:
                 bkt.download_file(remote_file, file,
                               ExtraArgs={"RequestPayer": "requester"})
-            except:
+            except ClientError:
                 print('  (failed s3://{0}/{1})'.format(bucket_i, remote_file))
                 continue
 
-        flt = pyfits.open(file)
+        try:
+            flt = pyfits.open(file)
+        except OSError:
+            print(f'open({file}) failed!')
+            continue
+            
         sci_list, wht_list, wcs_list = [], [], []
 
         if flt[0].header['DETECTOR'] == 'IR':
             bits = 576
+            if extra_wfc3ir_badpix:
+                if (i == indices[0]) | (not hasattr(bpdata, 'shape')):
+                    bpfile = os.path.join(os.path.dirname(__file__), 
+                               'data/wfc3ir_badpix_spars200_22.03.31.fits.gz')
+                    bpdata = pyfits.open(bpfile)[0].data
+                    
+                msg = f'Use extra badpix in {bpfile}'
+                log_comment(LOGFILE, msg, verbose=True)
         else:
             bits = 64+32
-
+            bpdata = 0
+            
         if include_saturated:
             bits |= 256
 
@@ -5141,17 +5112,45 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
 
                     phot_scale *= to_per_sec
 
+                try:
+                    wcs_i = pywcs.WCS(header=flt[('SCI', ext)].header, 
+                                      fobj=flt)
+                    wcs_i.pscale = get_wcs_pscale(wcs_i)
+                except KeyError:
+                    print(f'Failed to initialize WCS on {file}[SCI,{ext}]')
+                    continue
+                
+                wcsh = to_header(wcs_i)
+                row = [file, ext, keys['EXPTIME']]
+                
+                if wcs_colnames is None:
+                    wcs_colnames = ['file','ext','exptime']
+                    for k in wcsh:
+                        wcs_colnames.append(k.lower())
+                        wcs_keys[k.lower()] = wcsh[k]
+                        
+                for k in wcs_colnames[3:]:
+                    ku = k.upper()
+                    if ku not in wcsh:
+                        print(f'Keyword {ku} not found in WCS header')
+                        row.append(wcs_keys[k]*0)
+                    else:
+                        row.append(wcsh[ku])
+                        
+                for k in wcsh:
+                    if k.lower() not in wcs_colnames:
+                        print(f'Extra keyword {ku} found in WCS header')
+                
+                wcs_rows.append(row)
+                
                 sci_list.append((flt[('SCI', ext)].data - sky)*phot_scale)
 
                 err = flt[('ERR', ext)].data*phot_scale
-                dq = unset_dq_bits(flt[('DQ', ext)].data, bits)
+                dq = unset_dq_bits(flt[('DQ', ext)].data, bits) | bpdata
                 wht = 1/err**2
                 wht[(err == 0) | (dq > 0)] = 0
 
                 wht_list.append(wht)
-
-                wcs_i = pywcs.WCS(header=flt[('SCI', ext)].header, fobj=flt)
-                wcs_i.pscale = get_wcs_pscale(wcs_i)
 
                 # wcs_i = HSTWCS(fobj=flt, ext=('SCI',ext), minerr=0.0,
                 #                wcskey=' ')
@@ -5213,15 +5212,18 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
 
     flist = ['{0}/{1}'.format(awspath, visit['files'][i])
                 for i in indices]
-
+    
     if dryrun:
         return flist
 
     elif count == 0:
         return None
-    else:
+
+    else:        
+        wcs_tab = GTable(names=wcs_colnames, rows=wcs_rows)
+        
         outwht *= (wcs_i.pscale/outputwcs.pscale)**4
-        return outsci, outwht, header, flist
+        return outsci, outwht, header, flist, wcs_tab
 
 
 def drizzle_array_groups(sci_list, wht_list, wcs_list, outputwcs=None,
@@ -5278,7 +5280,7 @@ def drizzle_array_groups(sci_list, wht_list, wcs_list, outputwcs=None,
             wcs_i.pixel_shape = wcs_i._naxis1, wcs_i._naxis2
 
         if not hasattr(wcs_i, '_naxis1'):
-            wcs_i._naxis1, wcs_i._naxis2 = wcs_i._naxis
+            wcs_i._naxis1, wcs_i._naxis2 = wcs_i._naxis[:2]
 
     # Output WCS requires full WCS map?
     if calc_wcsmap < 2:
@@ -5748,10 +5750,13 @@ def fetch_wfpc2_calib(file='g6q1912hu_r4f.fits', path=os.getenv('uref'), use_mas
             return True
 
 
-def fetch_config_files(ACS=False, get_sky=True, get_stars=True, get_epsf=True):
+def fetch_config_files(get_acs=False, get_sky=True, get_stars=True, get_epsf=True, get_jwst=False, get_wfc3=True, **kwargs):
     """
     Config files needed for Grizli
     """
+    if 'ACS' in kwargs:
+        get_acs = kwargs['ACS']
+
     cwd = os.getcwd()
 
     print('Config directory: {0}/CONF'.format(GRIZLI_PATH))
@@ -5759,23 +5764,36 @@ def fetch_config_files(ACS=False, get_sky=True, get_stars=True, get_epsf=True):
     os.chdir(os.path.join(GRIZLI_PATH, 'CONF'))
 
     ftpdir = 'ftp://ftp.stsci.edu/cdbs/wfc3_aux/'
-    tarfiles = ['{0}/WFC3.IR.G102.cal.V4.32.tar.gz'.format(ftpdir),
-                '{0}/WFC3.IR.G141.cal.V4.32.tar.gz'.format(ftpdir)]
+    tarfiles = []
 
-    # Test config files
-    tarfiles = ['https://s3.amazonaws.com/grizli/CONF/WFC3.IR.G102.WD.V4.32.tar.gz', 'https://s3.amazonaws.com/grizli/CONF/WFC3.IR.G141.WD.V4.32.tar.gz']
+    # Config files
+    # BASEURL = 'https://s3.amazonaws.com/grizli/CONF/'
+    # BASEURL = 'https://erda.ku.dk/vgrid/Gabriel%20Brammer/CONF/'
+    BASEURL = ('https://raw.githubusercontent.com/gbrammer/' +
+               'grizli-config/master')
 
-    tarfiles += ['https://s3.amazonaws.com/grizli/CONF/ACS.WFC.CHIP1.Stars.conf', 'https://s3.amazonaws.com/grizli/CONF/ACS.WFC.CHIP2.Stars.conf']
+    if get_wfc3:
+        tarfiles = ['{0}/WFC3.IR.G102.cal.V4.32.tar.gz'.format(ftpdir),
+                    '{0}/WFC3.IR.G141.cal.V4.32.tar.gz'.format(ftpdir)]
+        tarfiles += [f'{BASEURL}/WFC3.IR.G102.WD.V4.32.tar.gz', 
+                    f'{BASEURL}/WFC3.IR.G141.WD.V4.32.tar.gz']
+
+    if get_jwst:
+        tarfiles += [f'{BASEURL}/jwst-grism-conf.tar.gz']
     
     if get_sky:
-        ftpdir = 'https://s3.amazonaws.com/grizli/CONF'
+        ftpdir = BASEURL
         tarfiles.append('{0}/grism_master_sky_v0.5.tar.gz'.format(ftpdir))
 
     #gURL = 'http://www.stsci.edu/~brammer/Grizli/Files'
-    gURL = 'https://s3.amazonaws.com/grizli/CONF'
+    #gURL = 'https://s3.amazonaws.com/grizli/CONF'
+    gURL = BASEURL
+    
     tarfiles.append('{0}/WFC3IR_extended_PSF.v1.tar.gz'.format(gURL))
 
-    if ACS:
+    if get_acs:
+        tarfiles += [f'{BASEURL}/ACS.WFC.CHIP1.Stars.conf', 
+                    f'{BASEURL}/ACS.WFC.CHIP2.Stars.conf']
         tarfiles.append('{0}/ACS.WFC.sky.tar.gz'.format(gURL))
         tarfiles.append('{0}/ACS_CONFIG.tar.gz'.format(gURL))
 
@@ -5791,17 +5809,23 @@ def fetch_config_files(ACS=False, get_sky=True, get_stars=True, get_epsf=True):
     if get_epsf:
         # ePSF files for fitting point sources
         #psf_path = 'http://www.stsci.edu/hst/wfc3/analysis/PSF/psf_downloads/wfc3_ir/'
-        psf_path = 'https://www.stsci.edu/~jayander/STDPSFs/WFC3IR/'
+        #psf_path = 'https://www.stsci.edu/~jayander/STDPSFs/WFC3IR/'
+        #psf_root = 'PSFSTD'
+        #psf_path = 'https://www.stsci.edu/~jayander/HST1PASS/'
+        psf_path = 'https://www.stsci.edu/~jayander/HST1PASS/LIB/'
+        psf_path += 'PSFs/STDPSFs/WFC3IR/'
+        psf_root = 'STDPSF'
+        
         ir_psf_filters = ['F105W', 'F125W', 'F140W', 'F160W']
 
         # New PSFs
         ir_psf_filters += ['F110W', 'F127M']
 
-        files = ['{0}/PSFSTD_WFC3IR_{1}.fits'.format(psf_path, filt)
+        files = ['{0}/{1}_WFC3IR_{2}.fits'.format(psf_path, psf_root, filt)
                  for filt in ir_psf_filters]
 
         for url in files:
-            file = os.path.basename(url)
+            file = os.path.basename(url).replace('STDPSF', 'PSFSTD')
             if not os.path.exists(file):
                 print('Get {0}'.format(file))
                 os.system('curl -o {0} {1}'.format(file, url))
@@ -5965,9 +5989,14 @@ class EffectivePSF(object):
                                 'extended_PSF_{0}.fits'.format(filter))
 
             if not os.path.exists(file):
+                #BASEURL = 'https://erda.ku.dk/vgrid/Gabriel%20Brammer/CONF/'
+                BASEURL = ('https://raw.githubusercontent.com/gbrammer/' +
+                           'grizli-config/master')
+
                 msg = 'Extended PSF file \'{0}\' not found.'.format(file)
-                msg += '\n                   Get the archive from https://s3.amazonaws.com/grizli/CONF/WFC3IR_extended_PSF.v1.tar.gz'
-                msg += '\n                   and unpack in ${GRIZLI}/CONF/'
+                msg += 'Get the archive from '
+                msg += f' {BASEURL}/WFC3IR_extended_PSF.v1.tar.gz'
+                msg += ' and unpack in ${GRIZLI}/CONF/'
                 raise FileNotFoundError(msg)
 
             data = pyfits.open(file)[0].data  # .T
@@ -8012,6 +8041,20 @@ class Unique(object):
             return 0
 
 
+    def __iter__(self):
+        """
+        Iterable over `values` attribute
+        
+        Returns a tuple of the value and the boolean selection array for that 
+        value.
+        """
+        i = 0
+        while i < self.N:
+            vi = self.values[i]
+            yield (vi, self[vi])
+            i += 1
+
+
     def __getitem__(self, key):
         if key in self.values:
             ix = self.values.index(key)
@@ -8021,12 +8064,12 @@ class Unique(object):
             return self.zeros
 
 
-    def __iter__(self):
-        for idx in itertools.count():
-            try:
-                yield self.values[idx]
-            except IndexError:
-                break
+    # def __iter__(self):
+    #     for idx in itertools.count():
+    #         try:
+    #             yield self.values[idx]
+    #         except IndexError:
+    #             break
 
     def __len__(self):
         return self.N
@@ -8230,4 +8273,57 @@ class HubbleXYZ(object):
         lla = pyproj.Proj(proj='latlong', ellps='WGS84', datum='WGS84')
         lon, lat, alt = pyproj.transform(ecef, lla, x, y, z, radians=radians)
         return lon, lat, alt
+
+
+def patch_photutils():
+    """
+    Patch to fix inconsistency with drizzlepac=3.2.1 and photutils>1.0, where 
+    The latter is needed for jwst=1.3.2
+    """
+    import os
+
+    try:
+        import drizzlepac
+    except AttributeError:
+    
+        import photutils
+        site_packages = os.path.dirname(photutils.__file__)
+        # manual apply patch
+        the_file = f'{site_packages}/../drizzlepac/haputils/align_utils.py'
+        with open(the_file,'r') as fp:
+            lines = fp.readlines()
+    
+        print(site_packages, len(lines))
+        for i, line in enumerate(lines):
+            if line.startswith('NoDetectionsWarning'):
+                break
+    
+        if 'hasattr(photutils.findstars' in lines[i+1]:
+            print(f'I found the problem on lines {i}-{i+2}: ')
+        else:
+            msg = """
+Lines {0}-{1} in {2} importing photutils were not as expected.  I found 
+
+{3}
+
+but expected 
+
+   NoDetectionsWarning = photutils.findstars.NoDetectionsWarning if \\
+                           hasattr(photutils.findstars, 'NoDetectionsWarning') else \\
+                           photutils.utils.NoDetectionsWarning
+
+
+    """.format(i, i+2, the_file, lines[i:i+3])
         
+            raise ValueError(msg)
+        
+        bad = ['   '+lines.pop(i+2-j) for j in range(3)]
+        print(''.join(bad[::-1]))
+
+        # Insert the fix
+        lines[i] = 'from photutils.utils.exceptions import NoDetectionsWarning\n\n'
+        # Rewrite the fie
+        with open(f'{site_packages}/../drizzlepac/haputils/align_utils.py','w') as fp:
+            fp.writelines(lines)
+    
+        print(f'Patch applied to {the_file}!')
