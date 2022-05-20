@@ -4841,13 +4841,18 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
         resid = (data[j*Npix:(j+1)*Npix] - sky[j, :]).reshape(im_shape)
         m = (mask & obj_mask)[j*Npix:(j+1)*Npix].reshape(im_shape)
 
+        rot90 = grismconf.JwstDispersionTransform(header=flt[0].header).rot90
+        if rot90 % 2 == 0:
+            avg_axis = 0
+        else:
+            avg_axis = 1
         # Statistics of masked arrays
         ma = np.ma.masked_array(resid, mask=(~m))
-        med = np.ma.median(ma, axis=0)
+        med = np.ma.median(ma, axis=avg_axis)
 
         bg_sky = 0
-        yrms = np.ma.std(ma, axis=0)/np.sqrt(np.sum(m, axis=0))
-        xmsk = np.arange(im_shape[0])
+        yrms = np.ma.std(ma, axis=avg_axis)/np.sqrt(np.sum(m, axis=avg_axis))
+        xmsk = np.arange(im_shape[avg_axis])
         yres = med
         yok = (~yrms.mask) & np.isfinite(yrms) & np.isfinite(xmsk) & np.isfinite(yres)
 
@@ -4880,10 +4885,10 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
             # Fit with Spline basis functions
 
             #NXSPL = 50
-            xpad = np.arange(-1*NXSPL, im_shape[0]+1*NXSPL)
+            xpad = np.arange(-1*NXSPL, im_shape[avg_axis]+1*NXSPL)
 
             Aspl = utils.bspline_templates(xpad, degree=3,
-                                           df=4+im_shape[0]//NXSPL,
+                                           df=4+im_shape[avg_axis]//NXSPL,
                                            get_matrix=True, log=False,
                                            clip=0.0001)[1*NXSPL:-1*NXSPL, :]
 
@@ -4945,20 +4950,17 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
             # Subtract the column average in 2D & log header keywords
             flt = pyfits.open(file, mode='update')
             imshape = flt[1].data.shape[0]
-            # if rot90 is even, keep this the same. if not, subtract "row" average instead
-            rot90 = grismconf.JwstDispersionTransform(flt).rot90
-            if rot90 % 2 == 0:
-                gp_res = np.dot(y_pred[:, None]-bg_sky, np.ones((imshape, 1)).T).T 
-            else:
-                gp_res = np.dot(y_pred[None, :]-bg_sky, np.ones((1, imshape)).T).T
+            gp_res = np.dot(y_pred[:, None]-bg_sky, np.ones((imshape, 1)).T).T             
+            if rot90 % 2 == 1:
+                gp_res = np.rot90(gp_res, 1) # test this to see if it looks correct, if not try 3
             flt['SCI', 1].data -= gp_res
             flt[0].header['GSKYCOL'] = (True, 'Subtract column average')
             flt.flush()
 
     # Finish plot
     ax.legend(loc='lower left', fontsize=10)
-    ax.plot([-10, 1024], [0, 0], color='k')
-    ax.set_xlim(-10, 1024)
+    ax.plot([-10, im_shape[0]+10], [0, 0], color='k')
+    ax.set_xlim(-10, im_shape[0]+10)
     ax.set_xlabel(r'pixel column ($x$)')
     ax.set_ylabel(r'column average (e-/s)')
     ax.set_title(grism['product'])
