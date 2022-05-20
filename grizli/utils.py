@@ -5621,7 +5621,7 @@ def mast_query_from_file_list(files=[], os_open=True):
     return URL
 
 
-def fetch_default_calibs(ACS=False):
+def fetch_default_calibs(get_acs=False, **kwargs):
     """
     Fetch a set of default HST calibration files 
     """
@@ -5656,8 +5656,11 @@ For example,
              'iref$u4m1335mi_pfl.fits',  # G141 flat
              'iref$w3m18525i_idc.fits',  # IDCTAB distortion table}
              ]
-
-    if ACS:
+    
+    if 'ACS' in kwargs:
+        get_acs = kwargs['ACS']
+        
+    if get_acs:
         files.extend(['jref$n6u12592j_pfl.fits',  # F814 Flat
                       'jref$o841350mj_pfl.fits',  # G800L flat])
                       'jref$v971826jj_npl.fits'])
