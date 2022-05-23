@@ -41,3 +41,4 @@ jobs:
       run: |
         conda install pytest
         pytest
+        pytest test_pipeline_hst.py

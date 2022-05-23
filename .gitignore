@@ -3,6 +3,7 @@ grizli/data/db.local.yml
 grizli/utils_c/*.c
 
 *notes
+PipelineTest/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -27,7 +27,7 @@ class FittingTools(unittest.TestCase):
         
         if 'CONF' in new:
             print(f'Download config and calib files to {conf_path}')
-            utils.fetch_default_calibs(ACS=False)
+            utils.fetch_default_calibs(get_acs=False)
             utils.fetch_config_files(get_epsf=True)
             files = glob.glob(f'{conf_path}/*')
             print('Files: ', '\n'.join(files))
