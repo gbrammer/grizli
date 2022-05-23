@@ -178,6 +178,8 @@ def test_make_mosaics():
 
     os.chdir(os.path.join(HOME_PATH, root, 'Prep'))
 
+    preprocess_args = kwargs['preprocess_args']
+
     combine_all_filters=True
     
     if len(glob.glob('{0}-ir_dr?_sci.fits'.format(root))) == 0:
