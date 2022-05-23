@@ -9,8 +9,8 @@ import matplotlib.pyplot as plt
 
 import mastquery
 
-from .. import utils, prep, multifit, GRIZLI_PATH
-from ..pipeline import auto_script
+from grizli import utils, prep, multifit, GRIZLI_PATH
+from grizli.pipeline import auto_script
 
 TEST_HOME = os.getcwd()
 
