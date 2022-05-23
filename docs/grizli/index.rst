@@ -40,7 +40,7 @@ Pipeline tools
 
 Simulations
 ===========
-Some basic tools for simulating HST/JWST/Roman grism data.  See `multimission_simulaation.ipynb <https://nbviewer.jupyter.org/github/gbrammer/grizli/blob/master/examples/multimission-simulation.ipynb>`__ for some examples.
+Some basic tools for simulating HST/JWST/Roman grism data.  See `multimission_simulaation.ipynb <https://nbviewer.jupyter.org/github/gbrammer/grizli-notebooks/blob/main/multimission-simulation.ipynb>`__ for some examples.
 
 .. automodapi:: grizli.fake_image
     :no-inheritance-diagram:
