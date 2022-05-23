@@ -24,7 +24,7 @@ The environment can be installed with ``pip`` and the `requirements.txt <https:/
     
     # Generate a conda environment named "grizli-dev" or anything else
     # This will just provide the base python distribution (incl. pip)
-    conda create -n grizli-dev python=3.7 numpy cython
+    conda create -n grizli-dev python=3.8 pip numpy cython
             
     # Activate the environment.  This needs to be done each time you 
     # start a new terminal, or put it in ~/.bashrc
