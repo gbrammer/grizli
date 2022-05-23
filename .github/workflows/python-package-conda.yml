@@ -20,7 +20,13 @@ jobs:
         echo $CONDA/bin >> $GITHUB_PATH
     - name: Install dependencies
       run: |
-        conda env update --file environment.yml --name base
+        # conda env update --file environment.yml --name base
+        # ugly, install with pip requirements
+        conda install pip cython numpy --name base
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        conda config --add channels http://ssb.stsci.edu/astroconda
+        conda install hstcal
+        
         python setup.py build
         cp build/lib*/grizli/utils_c/*so grizli/utils_c/
         
