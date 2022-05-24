@@ -1829,7 +1829,14 @@ def preprocess(field_root='j142724+334246',  HOME_PATH='/Volumes/Pegasus/Grizli/
             imaging_visits.append(visit)
     
     # Run preprocessing in order of decreasing filter wavelength
-    filters = [v['product'].split('-')[-1] for v in visits]
+    filters = []
+    for v in visits:
+        vspl = v['product'].split('-')
+        if vspl[-1] == 'clear':
+            filters.append(vspl[-2])
+        else:
+            filters.append(vspl[-1])
+
     fwave = np.cast[float]([f.replace('f1', 'f10'). \
                               replace('f098m', 'f0980m'). \
                               replace('lp', 'w'). \
