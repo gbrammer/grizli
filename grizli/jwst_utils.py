@@ -4,8 +4,11 @@ Utilities for handling JWST file/data formats.
 Requires https://github.com/spacetelescope/jwst
 
 """
+import os
+import inspect
 
 import numpy as np
+from . import utils
 
 
 def hdu_to_imagemodel(in_hdu):
@@ -99,7 +102,46 @@ def change_header_pointing(header, ra_ref=0., dec_ref=0., pa_v3=0.):
     return new_header
 
 
-def img_with_wcs(input):
+def img_with_flat(input, verbose=True, overwrite=True):
+    """
+    Apply flat-field correction if nessary
+    """
+    import astropy.io.fits as pyfits
+    from jwst.datamodels import util
+    from jwst.flatfield import FlatFieldStep
+    from jwst.gain_scale import GainScaleStep
+    
+    if not isinstance(input, pyfits.HDUList):
+        _hdu = pyfits.open(input)
+    else:
+        _hdu = input
+        
+    img = util.open(_hdu)
+    
+    skip = False
+    if 'S_FLAT' in _hdu[0].header:
+        if _hdu[0].header['S_FLAT'] == 'COMPLETE':
+            skip = True
+    
+    if not skip:        
+        if verbose:
+            utils.log_comment(utils.LOGFILE,
+                              'jwst.flatfield.FlatFieldStep', 
+                              verbose=verbose, show_date=False)
+                              
+        flat_step = FlatFieldStep()
+        with_flat = flat_step.process(img)
+        output = with_flat
+    else:
+        output = img
+    
+    if isinstance(input, str) & overwrite:
+        output.write(input, overwrite=overwrite)
+        
+    return output
+
+
+def img_with_wcs(input, overwrite=True):
     """
     Open a JWST exposure and apply the distortion model.
 
@@ -113,10 +155,11 @@ def img_with_wcs(input):
     with_wcs : `jwst.datamodels.ImageModel`
         Image model with full `~gwcs` in `with_wcs.meta.wcs`.
 
-    """
+    """    
+    import astropy.io.fits as pyfits
+    
     from jwst.datamodels import util
     from jwst.assign_wcs import AssignWcsStep
-    import astropy.io.fits as pyfits
     
     # from jwst.stpipe import crds_client
     # from jwst.assign_wcs import assign_wcs
@@ -125,33 +168,213 @@ def img_with_wcs(input):
 
     # Generate WCS as image
     if not isinstance(input, pyfits.HDUList):
-        input = pyfits.open(input)
-    if isinstance(input, pyfits.HDUList):
-        if input[0].header['INSTRUME'] == 'NIRISS':
-            if input[0].header['FILTER'].startswith('GR'):
-                input[0].header['OFILTER'] = input[0].header['FILTER'] # just to save it so we can change it back at the end
-                input[0].header['OEXPTYPE'] = input[0].header['EXP_TYPE']
-                input[0].header['FILTER'] = 'CLEAR'
-                input[0].header['EXP_TYPE'] = 'NIS_IMAGE'
+        _hdu = pyfits.open(input)
+    
+    if _hdu[0].header['OINSTRUM'] == 'NIRISS':
+        if _hdu[0].header['OFILTER'].startswith('GR'):
+            _hdu[0].header['FILTER'] = 'CLEAR'
+            _hdu[0].header['EXP_TYPE'] = 'NIS_IMAGE'
+    
+    elif _hdu[0].header['OINSTRUM'] == 'NIRCAM':
+        if _hdu[0].header['OPUPIL'].startswith('GR'):
+            _hdu[0].header['PUPIL'] = 'CLEAR'
+            _hdu[0].header['EXP_TYPE'] = 'NRC_IMAGE'
         
-        elif input[0].header['INSTRUME'] == 'NIRCAM':
-            if input[0].header['PUPIL'].startswith('GR'):
-                input[0].header['PUPIL'] = 'CLEAR'
-                input[0].header['EXP_TYPE'] = 'NRC_IMAGE'
-        
-        
-    img = util.open(input)
+    img = util.open(_hdu)
 
     # AssignWcs to pupulate img.meta.wcsinfo
     step = AssignWcsStep()
     with_wcs = step.process(img)
-
-    # Above should be more robust to get all of the necessary ref files
-    #dist_file = crds_client.get_reference_file(img, 'distortion')
-    #reference_files = {'distortion': dist_file}
-    #with_wcs = assign_wcs.load_wcs(img, reference_files=reference_files)
+    output = with_wcs
     
-    return with_wcs
+    # Write to a file
+    if isinstance(input, str) & overwrite:
+        output.write(input, overwrite=overwrite)
+            
+    return output
+
+ORIG_KEYS = ['TELESCOP','INSTRUME','DETECTOR','FILTER','PUPIL','EXP_TYPE']
+
+def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_KEYS):
+    """
+    Make copies of some header keywords to make the headers look like 
+    and HST instrument
+    
+    1) Apply gain correction
+    2) Clip DQ bits
+    3) Copy header keywords
+    4) Apply flat field if necessary
+    5) Initalize WCS
+    
+    """
+    frame = inspect.currentframe()
+    utils.log_function_arguments(utils.LOGFILE, frame,
+                                 'jwst_utils.initialize_jwst_image')
+    
+    import astropy.io.fits as pyfits
+    from jwst.flatfield import FlatFieldStep
+    from jwst.gain_scale import GainScaleStep
+    
+    img = pyfits.open(filename, mode='update')
+    
+    if 'OTELESCO' in img[0].header:
+        tel = img[0].header['OTELESCO']
+    elif 'TELESCOP' in img[0].header:
+        tel = img[0].header['TELESCOP']
+    else:
+        tel = None
+        
+    if tel not in ['JWST']:
+        msg = f'TELESCOP keyword ({tel}) not "JWST"'
+        #utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+        raise ValueError(msg)
+    
+    if img['SCI'].header['BUNIT'].upper() == 'DN/S':
+        gain_file = GainScaleStep().get_reference_file(img, 'gain')
+        
+        with pyfits.open(gain_file) as gain_im:
+            gain_median = np.median(gain_im[1].data)
+        
+        img[0].header['GAINFILE'] = gain_file
+        img[0].header['GAINCORR'] = True, 'Manual gain correction applied'
+        img[0].header['GAINVAL'] = gain_median, 'Gain value applied'
+        
+        msg = f'GAINVAL = {gain_median:.2f}\n'
+        msg += f'GAINFILE = {gain_file}'
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+        
+        img['SCI'].data *= gain_median 
+        img['SCI'].header['BUNIT'] = 'ELECTRONS/S'
+        img['ERR'].data *= gain_median 
+        img['ERR'].header['BUNIT'] = 'ELECTRONS/S'
+        
+        for k in ['VAR_POISSON','VAR_RNOISE','VAR_FLAT']:
+            if k in img:
+                img[k].data *= 1./gain_median**2
+                
+    for k in orig_keys:
+        newk = 'O'+k[:7]
+        if newk not in img[0].header:
+            img[0].header[newk] = img[0].header[k]
+            msg = f'{newk} = {k} {img[0].header[k]}'
+            utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+                
+    # Get flat field ref file
+    _flatfile = FlatFieldStep().get_reference_file(img, 'flat')    
+    img[0].header['PFLTFILE'] = os.path.basename(_flatfile)
+    msg = f'PFLTFILE = {_flatfile}'
+    utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+    
+    # Clip DQ keywords
+    img[0].header['MAXDQBIT'] = max_dq_bit, 'Max DQ bit allowed'
+    msg = f'Clip MAXDQBIT = {max_dq_bit}'
+    utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+    
+    dq = np.zeros_like(img['DQ'].data)
+    dq[img['DQ'].data >= 2**(max_dq_bit+1)] = 2**max_dq_bit
+    dqm = img['DQ'].data > 0    
+    
+    for bit in range(max_dq_bit+1):
+        dq[dqm] |= img['DQ'].data[dqm] & 2**bit
+    
+    dq[img['DQ'].data < 0] = 2**bit    
+    img['DQ'].data = dq
+    
+    img[0].header['EXPTIME'] = img[0].header['EFFEXPTM']
+    
+    img[1].header['NGOODPIX'] = (dq == 0).sum()
+    img[1].header['EXPNAME'] = img[0].header['EXPOSURE']
+    img[1].header['MEANDARK'] = 0.0
+    img[1].header['IDCSCALE'] = 0.065 # Set from WCS
+    
+    if 'TIME' not in img:
+        time = pyfits.ImageHDU()
+        time.header['EXTNAME'] = 'TIME'
+        time.header['EXTVER'] = 1
+        time.header['PIXVALUE'] = img[0].header['EXPTIME']
+        time.header['BUNIT'] = 'SECONDS'
+        time.header['NPIX1'] = 2048
+        time.header['NPIX2'] = 2048
+        time.header['INHERIT'] = True
+        
+        img.append(time)
+        
+    img.flush()
+    
+    _ = img_with_flat(filename, overwrite=True)
+    
+    _ = img_with_wcs(filename, overwrite=True)
+    
+    img = pyfits.open(filename)
+    
+    return img
+
+
+# for NIRISS images; NIRCam,MIRI TBD
+# band: [photflam, photfnu, pivot_wave]
+NIS_PHOT_KEYS = {'F090W': [1.098934e-20, 2.985416e-31, 0.9025],
+                 'F115W': [6.291060e-21, 2.773018e-31, 1.1495],
+                 'F140M': [9.856255e-21, 6.481079e-31, 1.4040],
+                 'F150W': [4.198384e-21, 3.123540e-31, 1.4935],
+                 'F158M': [7.273483e-21, 6.072128e-31, 1.5820],
+                 'F200W': [2.173398e-21, 2.879494e-31, 1.9930],
+                 'F277W': [1.109150e-21, 2.827052e-31, 2.7643],
+                 'F356W': [6.200034e-22, 2.669862e-31, 3.5930],
+                 'F380M': [2.654520e-21, 1.295626e-30, 3.8252],
+                 'F430M': [2.636528e-21, 1.613895e-30, 4.2838],
+                 'F444W': [4.510426e-22, 2.949531e-31, 4.4277],
+                 'F480M': [1.879639e-21, 1.453752e-30, 4.8152]}
+
+
+def set_jwst_to_hst_keywords(input, reset=False, verbose=True, orig_keys=ORIG_KEYS):
+    """
+    Make primary header look like an HST instrument
+    """
+    frame = inspect.currentframe()
+    utils.log_function_arguments(utils.LOGFILE, frame,
+                                 'jwst_utils.set_jwst_to_hst_keywords')
+                                 
+    import astropy.io.fits as pyfits
+    
+    if isinstance(input, str):
+        img = pyfits.open(input, mode='update')
+    else:
+        img = input
+    
+    HST_KEYS = {'TELESCOP':'HST',
+           'INSTRUME':'WFC3',
+           'DETECTOR':'IR'}
+    
+    if 'OTELESCO' not in img[0].header:
+        img = initialize_jwst_image(input, verbose=verbose)
+        
+    if reset:
+        for k in orig_keys:
+            newk = 'O'+k[:7]
+            img[0].header[k] = img[0].header[newk]
+            msg = f'Reset: {k} > {img[0].header[newk]} ({newk})'
+            utils.log_comment(utils.LOGFILE, msg, verbose=verbose)            
+    else:
+        for k in HST_KEYS:
+            img[0].header[k] = HST_KEYS[k]
+            msg = f'  Set: {k} > {HST_KEYS[k]}'
+            utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+    
+    if img[0].header['OINSTRUM'] == 'NIRISS':
+        _filter = img[0].header['OPUPIL']
+        if _filter in NIS_PHOT_KEYS:
+            img[0].header['PHOTFLAM'] = NIS_PHOT_KEYS[_filter][0]
+            img[0].header['PHOTFNU'] = NIS_PHOT_KEYS[_filter][1]
+            img[0].header['PHOTPLAM'] = NIS_PHOT_KEYS[_filter][2] * 1.e4
+    else:
+        img[0].header['PHOTFLAM'] = 1.e-21
+        img[0].header['PHOTFNU'] = 1.e-31
+        img[0].header['PHOTPLAM'] = 1.5e4  
+        
+    if isinstance(input, str):
+        img.flush()
+    
+    return img
 
 
 def strip_telescope_header(header, simplify_wcs=True):
