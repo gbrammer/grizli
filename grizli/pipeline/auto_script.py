@@ -1355,27 +1355,27 @@ def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, com
         
     files.sort()
 
-    for file in files:
-        # JWST files have slightly different naming conventions for the header
-        if os.path.basename(file).startswith('jw'):
-            hdu = pyfits.open(file, mode='update')
-            hdu[0].header['RA_TARG'] = hdu[0].header['targ_ra']
-            hdu[0].header['DEC_TARG'] = hdu[0].header['targ_dec']
-            hdu[0].header['EXPTIME'] = hdu[0].header['effexptm']
-            hdu[0].header['PA_V3'] = hdu[1].header['pa_v3']
-
-            if hdu[0].header['FILTER'] != 'CLEAR':
-                hdu[0].header['OFILTER'] = hdu[0].header['FILTER']
-                hdu[0].header['OEXPTYP'] = hdu[0].header['EXP_TYPE']
-
-            if 'NRIMDTPT' in hdu[0].header:
-                hdu[0].header['NRIMDTPT'] = int(hdu[0].header['NRIMDTPT'])
-
-            if 'NDITHPTS' in hdu[0].header:
-                hdu[0].header['NRIMDTPT'] = int(hdu[0].header['NDITHPTS'])
-
-            hdu.flush()
-            hdu.close()
+    # for file in files:
+    #     # JWST files have slightly different naming conventions for the header
+    #     if os.path.basename(file).startswith('jw'):
+    #         hdu = pyfits.open(file, mode='update')
+    #         hdu[0].header['RA_TARG'] = hdu[0].header['targ_ra']
+    #         hdu[0].header['DEC_TARG'] = hdu[0].header['targ_dec']
+    #         hdu[0].header['EXPTIME'] = hdu[0].header['effexptm']
+    #         hdu[0].header['PA_V3'] = hdu[1].header['pa_v3']
+    # 
+    #         if hdu[0].header['FILTER'] != 'CLEAR':
+    #             hdu[0].header['OFILTER'] = hdu[0].header['FILTER']
+    #             hdu[0].header['OEXPTYP'] = hdu[0].header['EXP_TYPE']
+    # 
+    #         if 'NRIMDTPT' in hdu[0].header:
+    #             hdu[0].header['NRIMDTPT'] = int(hdu[0].header['NRIMDTPT'])
+    # 
+    #         if 'NDITHPTS' in hdu[0].header:
+    #             hdu[0].header['NRIMDTPT'] = int(hdu[0].header['NDITHPTS'])
+    # 
+    #         hdu.flush()
+    #         hdu.close()
             
     info = utils.get_flt_info(files)
 
@@ -1721,7 +1721,7 @@ def preprocess(field_root='j142724+334246',  HOME_PATH='/Volumes/Pegasus/Grizli/
     visits, all_groups, info = load_visit_info(field_root, verbose=False)
 
     # check if isJWST
-    isJWST = prep.check_isJWST('../RAW/' + all_groups[0]['direct']['files'][0])
+    #isJWST = prep.check_isJWST('../RAW/' + all_groups[0]['direct']['files'][0])
 
     # Grism visits
     master_footprint = None
