@@ -125,7 +125,12 @@ def set_warnings(numpy_level='ignore', astropy_level='ignore'):
     warnings.simplefilter(astropy_level, category=AstropyWarning)
 
 
-def get_flt_info(files=[], columns=['FILE', 'FILTER', 'PUPIL', 'INSTRUME', 'DETECTOR', 'TARGNAME', 'DATE-OBS', 'TIME-OBS', 'EXPSTART', 'EXPTIME', 'PA_V3', 'RA_TARG', 'DEC_TARG', 'POSTARG1', 'POSTARG2']):
+JWST_TRANSLATE = {'RA_TARG':'TARG_RA', 
+                  'DEC_TARG':'TARG_DEC',
+                  'EXPTIME':'EFFEXPTM',
+                  'PA_V3':'ROLL_REF'}
+
+def get_flt_info(files=[], columns=['FILE', 'FILTER', 'PUPIL', 'INSTRUME', 'DETECTOR', 'TARGNAME', 'DATE-OBS', 'TIME-OBS', 'EXPSTART', 'EXPTIME', 'PA_V3', 'RA_TARG', 'DEC_TARG', 'POSTARG1', 'POSTARG2'], translate=JWST_TRANSLATE, defaults={'PUPIL':'---', 'PA_V3':0.0}):
     """Extract header information from a list of FLT files
 
     Parameters
@@ -148,7 +153,11 @@ def get_flt_info(files=[], columns=['FILE', 'FILTER', 'PUPIL', 'INSTRUME', 'DETE
     N = len(files)
 
     data = []
-
+    
+    for c in columns[2:]:
+        if c not in translate:
+            translate[c] = 'xxxxxxxxxxxxxx'
+            
     for i in range(N):
         line = [os.path.basename(files[i]).split('.gz')[0]]
         if files[i].endswith('.gz'):
@@ -156,7 +165,13 @@ def get_flt_info(files=[], columns=['FILE', 'FILTER', 'PUPIL', 'INSTRUME', 'DETE
             h = im[0].header
         else:
             h = pyfits.Header().fromfile(files[i])
-
+        
+        if os.path.basename(files[i]).startswith('jw0'):
+            with pyfits.open(files[i]) as _im:
+                h1 = _im['SCI'].header
+                if 'PA_V3' in h1:
+                    h['PA_V3'] = h1['PA_V3']
+            
         filt = get_hst_filter(h)
         line.append(filt)
         has_columns = ['FILE', 'FILTER']
@@ -165,8 +180,14 @@ def get_flt_info(files=[], columns=['FILE', 'FILTER', 'PUPIL', 'INSTRUME', 'DETE
             has_columns.append(key)
             if key in h:
                 line.append(h[key])
+            elif translate[key] in h:
+                line.append(h[translate[key]])
             else:
-                line.append(np.nan)
+                if key in defaults:
+                    line.append(defaults[key])
+                else:
+                    line.append(np.nan)
+                    
                 continue
 
         data.append(line)
