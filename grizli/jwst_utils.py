@@ -106,6 +106,8 @@ def img_with_flat(input, verbose=True, overwrite=True):
     """
     Apply flat-field correction if nessary
     """
+    import gc
+    
     import astropy.io.fits as pyfits
     from jwst.datamodels import util
     from jwst.flatfield import FlatFieldStep
@@ -137,7 +139,10 @@ def img_with_flat(input, verbose=True, overwrite=True):
     
     if isinstance(input, str) & overwrite:
         output.write(input, overwrite=overwrite)
-        
+        _hdu.close()
+    
+    gc.collect()
+    
     return output
 
 
@@ -169,7 +174,9 @@ def img_with_wcs(input, overwrite=True):
     # Generate WCS as image
     if not isinstance(input, pyfits.HDUList):
         _hdu = pyfits.open(input)
-    
+    else:
+        _hdu = input
+        
     if _hdu[0].header['OINSTRUM'] == 'NIRISS':
         if _hdu[0].header['OFILTER'].startswith('GR'):
             _hdu[0].header['FILTER'] = 'CLEAR'
@@ -179,6 +186,9 @@ def img_with_wcs(input, overwrite=True):
         if _hdu[0].header['OPUPIL'].startswith('GR'):
             _hdu[0].header['PUPIL'] = 'CLEAR'
             _hdu[0].header['EXP_TYPE'] = 'NRC_IMAGE'
+    else:
+        # MIRI
+        pass
         
     img = util.open(_hdu)
 
@@ -194,7 +204,7 @@ def img_with_wcs(input, overwrite=True):
     return output
 
 ORIG_KEYS = ['TELESCOP','INSTRUME','DETECTOR','FILTER','PUPIL','EXP_TYPE']
-
+    
 def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_KEYS):
     """
     Make copies of some header keywords to make the headers look like 
@@ -206,10 +216,17 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
     4) Apply flat field if necessary
     5) Initalize WCS
     
+    Returns
+    -------
+    status : bool
+        True if finished successfully
+        
     """
     frame = inspect.currentframe()
     utils.log_function_arguments(utils.LOGFILE, frame,
                                  'jwst_utils.initialize_jwst_image')
+    
+    import gc
     
     import astropy.io.fits as pyfits
     from jwst.flatfield import FlatFieldStep
@@ -242,7 +259,7 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
         msg = f'GAINVAL = {gain_median:.2f}\n'
         msg += f'GAINFILE = {gain_file}'
         utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
-        
+                    
         img['SCI'].data *= gain_median 
         img['SCI'].header['BUNIT'] = 'ELECTRONS/S'
         img['ERR'].data *= gain_median 
@@ -255,9 +272,10 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
     for k in orig_keys:
         newk = 'O'+k[:7]
         if newk not in img[0].header:
-            img[0].header[newk] = img[0].header[k]
-            msg = f'{newk} = {k} {img[0].header[k]}'
-            utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+            if k in img[0].header:
+                img[0].header[newk] = img[0].header[k]
+                msg = f'{newk} = {k} {img[0].header[k]}'
+                utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
                 
     # Get flat field ref file
     _flatfile = FlatFieldStep().get_reference_file(img, 'flat')    
@@ -280,34 +298,45 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
     dq[img['DQ'].data < 0] = 2**bit    
     img['DQ'].data = dq
     
-    img[0].header['EXPTIME'] = img[0].header['EFFEXPTM']
+    img[0].header['EXPTIME'] = img[0].header['EFFEXPTM']*1
     
     img[1].header['NGOODPIX'] = (dq == 0).sum()
     img[1].header['EXPNAME'] = img[0].header['EXPOSURE']
     img[1].header['MEANDARK'] = 0.0
     img[1].header['IDCSCALE'] = 0.065 # Set from WCS
     
+    # AstroDrizzle needs a time extension, which can be empty 
+    # but with a PIXVALUE keyword.
+    # The header below is designed after WFC3/IR
+            
+    img.flush()
+    img.close()
+    
+    _ = img_with_flat(filename, overwrite=True)
+
+    _ = img_with_wcs(filename, overwrite=True)
+    
+    # Add TIME
     if 'TIME' not in img:
-        time = pyfits.ImageHDU()
+        img = pyfits.open(filename, mode='update')
+        
+        time = pyfits.ImageHDU(data=img['SCI',1].data)
+        #np.ones_like(img['SCI',1].data)*img[0].header['EXPTIME'])
+        time.data = None
         time.header['EXTNAME'] = 'TIME'
         time.header['EXTVER'] = 1
-        time.header['PIXVALUE'] = img[0].header['EXPTIME']
+        time.header['PIXVALUE'] = img[0].header['EXPTIME']*1.
         time.header['BUNIT'] = 'SECONDS'
-        time.header['NPIX1'] = 2048
-        time.header['NPIX2'] = 2048
+        time.header['NPIX1'] = img['SCI'].header['NAXIS1']*1
+        time.header['NPIX2'] = img['SCI'].header['NAXIS2']*1
         time.header['INHERIT'] = True
         
         img.append(time)
+        img.flush()
+        img.close()
         
-    img.flush()
-    
-    _ = img_with_flat(filename, overwrite=True)
-    
-    _ = img_with_wcs(filename, overwrite=True)
-    
-    img = pyfits.open(filename)
-    
-    return img
+    gc.collect()
+    return True
 
 
 # for NIRISS images; NIRCam,MIRI TBD
@@ -351,14 +380,24 @@ def set_jwst_to_hst_keywords(input, reset=False, verbose=True, orig_keys=ORIG_KE
     if reset:
         for k in orig_keys:
             newk = 'O'+k[:7]
-            img[0].header[k] = img[0].header[newk]
-            msg = f'Reset: {k} > {img[0].header[newk]} ({newk})'
-            utils.log_comment(utils.LOGFILE, msg, verbose=verbose)            
+            if newk in img[0].header:
+                img[0].header[k] = img[0].header[newk]
+                msg = f'Reset: {k} > {img[0].header[newk]} ({newk})'
+                utils.log_comment(utils.LOGFILE, msg, verbose=verbose)            
     else:
         for k in HST_KEYS:
             img[0].header[k] = HST_KEYS[k]
             msg = f'  Set: {k} > {HST_KEYS[k]}'
             utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+    
+    # for x in 'ABCD':
+    #     if 'GAINVAL' in img[0].header:
+    #         gain = img[0].header['GAINVAL']
+    #     else:
+    #         gain = 1.0
+    #         
+    #     img[0].header[f'ATODGN{x}'] = gain 
+    #     img[0].header[f'READNSE{x}'] = 12.9
     
     if img[0].header['OINSTRUM'] == 'NIRISS':
         _filter = img[0].header['OPUPIL']

@@ -255,8 +255,8 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
     if 'TELESCOP' in orig_file[0].header:
         if orig_file[0].header['TELESCOP'] == 'JWST':
             orig_file.writeto(local_file, overwrite=True)
-            orig_file = jwst_utils.initialize_jwst_image(local_file)            
-            
+            status = jwst_utils.initialize_jwst_image(local_file)            
+            orig_file = pyfits.open(local_file)
             
     # if filter in ['GR150C', 'GR150R']: 
     #     if (head['FILTER'] == 'GR150C') & (head['PUPIL'] == 'F115W'):        
@@ -3248,6 +3248,11 @@ def process_direct_grism_visit(direct={},
         bits = 64+32
         driz_cr_snr = '3.5 3.0'
         driz_cr_scale = '1.2 0.7'
+    elif isJWST:
+        # Placeholder
+        bits = 576+256
+        driz_cr_snr = '8.0 5.0'
+        driz_cr_scale = '2.5 0.7'        
     else:
         bits = 576+256
         driz_cr_snr = '8.0 5.0'
@@ -4802,8 +4807,12 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
         rot90 = grismconf.JwstDispersionTransform(header=flt[0].header).rot90
         if rot90 % 2 == 0:
             avg_axis = 0
+            col_text = 'column'
+            
         else:
             avg_axis = 1
+            col_label = 'row'
+            
         # Statistics of masked arrays
         ma = np.ma.masked_array(resid, mask=(~m))
         med = np.ma.median(ma, axis=avg_axis)
@@ -4912,15 +4921,20 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
             if rot90 % 2 == 1:
                 gp_res = np.rot90(gp_res, 1) # test this to see if it looks correct, if not try 3
             flt['SCI', 1].data -= gp_res
-            flt[0].header['GSKYCOL'] = (True, 'Subtract column average')
+            flt[0].header['GSKYCOL'] = (True, f'Subtract {col_label} average')
+            flt[0].header['GSKYCAX'] = (avg_axis, 'Array axis for average')
             flt.flush()
 
     # Finish plot
     ax.legend(loc='lower left', fontsize=10)
     ax.plot([-10, im_shape[0]+10], [0, 0], color='k')
     ax.set_xlim(-10, im_shape[0]+10)
-    ax.set_xlabel(r'pixel column ($x$)')
-    ax.set_ylabel(r'column average (e-/s)')
+    if avg_axis == 0:
+        ax.set_xlabel(r'pixel column ($x$)')
+    else:
+        ax.set_xlabel(r'pixel row ($y$)')
+        
+    ax.set_ylabel(f'{col_label} average (e-/s)')
     ax.set_title(grism['product'])
     ax.grid()
 
@@ -5551,7 +5565,8 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, m
 
         isACS = '_flc' in group['files'][0]
         isWFPC2 = '_c0' in group['files'][0]
-
+        isJWST = os.path.basename(group['files'][0]).startswith('jw')
+        
         if (driz_cr_snr is None) | (driz_cr_scale is None):
             if isACS:
                 driz_cr_snr = '3.5 3.0'
@@ -5576,6 +5591,8 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, m
         if bits is None:
             if isACS | isWFPC2:
                 bits = 64+32
+            elif isJWST:
+                bits = 1
             else:
                 bits = 576
 
@@ -5583,7 +5600,8 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, m
                 bits |= 256
 
         # All the same instrument?
-        inst_keys = np.unique([os.path.basename(file)[0] for file in group['files']])
+        inst_keys = np.unique([os.path.basename(file)[0]
+                               for file in group['files']])
 
         print('\n\n### drizzle_overlaps: {0} ({1})\n'.format(group['product'],
                                                      len(group['files'])))
@@ -5599,12 +5617,30 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, m
                                                 path=os.getenv('uref'),
                                                 use_mast=False, verbose=True,
                                                 overwrite=True)
+                    elif isJWST:
+                        for file in group['files']:
+                            _ = jwst_utils.set_jwst_to_hst_keywords(file, 
+                                                                  reset=False)
                     else:
                         utils.fetch_hst_calibs(file, calib_types=['PFLTFILE'],
                                        verbose=False)
                 except:
                     utils.log_exception(utils.LOGFILE, traceback)
-
+        
+        if 'gain' in kwargs:
+            gain = kwargs['gain']
+        elif isJWST:
+            gain = '1.0'
+        else:
+            gain = None
+            
+        if 'rdnoise' in kwargs:
+            rdnoise = kwargs['rdnoise']
+        elif isJWST:
+            rdnoise = '0.0'
+        else:
+            rdnoise = None
+            
         # Fetch files from aws
         if 'reference' in group:
             AstroDrizzle(group['files'], output=group['product'],
@@ -5622,7 +5658,8 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, m
                      final_wcs=True, final_refimage=group['reference'],
                      final_kernel=final_kernel,
                      resetbits=resetbits,
-                     static=(static & (len(inst_keys) == 1)))
+                     static=(static & (len(inst_keys) == 1)), 
+                     gain=gain, rdnoise=rdnoise)
         else:
             AstroDrizzle(group['files'], output=group['product'],
                      clean=True, context=context, preserve=False,
@@ -5642,7 +5679,8 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, m
                      final_outnx=final_outnx, final_outny=final_outny,
                      final_kernel=final_kernel,
                      resetbits=resetbits,
-                     static=(static & (len(inst_keys) == 1)))
+                     static=(static & (len(inst_keys) == 1)),
+                     gain=gain, rdnoise=rdnoise)
 
         clean_drizzle(group['product'], fix_wcs_system=fix_wcs_system)
 
