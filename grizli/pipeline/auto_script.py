@@ -3600,7 +3600,9 @@ def drizzle_overlaps(field_root, filters=['F098M', 'F105W', 'F110W', 'F115W', 'F
 
         # Not one of the desired filters
         filt = visit['product'].split('-')[-1]
-
+        if filt == 'clear':
+            filt = visit['product'].split('-')[-2]
+            
         if filt.upper() not in filters:
             msg = ('filt.upper not in filters')                   
             utils.log_comment(utils.LOGFILE, msg, show_date=True,
@@ -3632,7 +3634,10 @@ def drizzle_overlaps(field_root, filters=['F098M', 'F105W', 'F110W', 'F115W', 'F
                 continue
 
         if filt not in filter_groups:
-            filter_groups[filt] = {'product': '{0}-{1}'.format(field_root, filt), 'files': [], 'reference': ref_image, 'reference_wcs': ref_wcs}
+            filter_groups[filt] = {'product': f'{field_root}-{filt}',
+                                   'files': [],
+                                   'reference': ref_image,
+                                   'reference_wcs': ref_wcs}
 
         filter_groups[filt]['files'].extend(visit['files'])
 
@@ -3663,7 +3668,11 @@ def drizzle_overlaps(field_root, filters=['F098M', 'F105W', 'F110W', 'F115W', 'F
     if (ref_image is None) & (ref_wcs is None):
         print('\nCompute mosaic WCS: {0}_wcs-ref.fits\n'.format(field_root))
 
-        ref_hdu = utils.make_maximal_wcs(wfc3ir['files'], pixel_scale=scale, get_hdu=True, pad=pad_reference, verbose=True)
+        ref_hdu = utils.make_maximal_wcs(wfc3ir['files'],
+                                         pixel_scale=scale,
+                                         get_hdu=True,
+                                         pad=pad_reference,
+                                         verbose=True)
 
         ref_hdu.writeto('{0}_wcs-ref.fits'.format(field_root), overwrite=True,
                         output_verify='fix')
@@ -3675,11 +3684,11 @@ def drizzle_overlaps(field_root, filters=['F098M', 'F105W', 'F110W', 'F115W', 'F
     if ref_wcs is not None:
         pass
 
-    #
     if make_combined:
 
         # Figure out if we have more than one instrument
-        inst_keys = np.unique([os.path.basename(file)[0] for file in wfc3ir['files']])
+        inst_keys = np.unique([os.path.basename(file)[0]
+                               for file in wfc3ir['files']])
 
         prep.drizzle_overlaps([wfc3ir], parse_visits=False, 
                               pixfrac=pixfrac, scale=scale, skysub=False,
