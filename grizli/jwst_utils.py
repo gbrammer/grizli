@@ -162,6 +162,7 @@ def img_with_wcs(input, overwrite=True):
 
     """    
     import astropy.io.fits as pyfits
+    import astropy.wcs as pywcs
     
     from jwst.datamodels import util
     from jwst.assign_wcs import AssignWcsStep
@@ -176,6 +177,9 @@ def img_with_wcs(input, overwrite=True):
         _hdu = pyfits.open(input)
     else:
         _hdu = input
+    
+    if 'OINSTRUM' not in _hdu[0].header:
+        copy_jwst_keywords(_hdu[0].header)
         
     if _hdu[0].header['OINSTRUM'] == 'NIRISS':
         if _hdu[0].header['OFILTER'].startswith('GR'):
@@ -200,11 +204,76 @@ def img_with_wcs(input, overwrite=True):
     # Write to a file
     if isinstance(input, str) & overwrite:
         output.write(input, overwrite=overwrite)
-            
+        
+        _hdu = pyfits.open(input, mode='update')
+        
+        wcs = pywcs.WCS(_hdu['SCI'].header, relax=True)
+        pscale = utils.get_wcs_pscale(wcs)
+        
+        _hdu[1].header['IDCSCALE'] = pscale, 'Pixel scale calculated from WCS'
+        _hdu[0].header['PIXSCALE'] = pscale, 'Pixel scale calculated from WCS'
+        _hdu.flush()
+        
     return output
 
-ORIG_KEYS = ['TELESCOP','INSTRUME','DETECTOR','FILTER','PUPIL','EXP_TYPE']
+
+def convert_cal_to_electrons(filename):
+    """
+    Convert cal image in MJy/sr to uJy/pix with ABZP = 0.0
+    """
+    import astropy.units as u
+    import astropy.io.fits as pyfits
+    import astropy.wcs as pywcs
     
+    img = pyfits.open(filename, mode='update')
+    if img['SCI'].header['BUNIT'].upper() != 'MJy/sr'.upper():
+        img.close()
+        return None
+    
+    if 'PIXAR_SR' in img['SCI'].header:
+        to_ujy_pix = img['SCI'].header['PIXAR_SR']*1.e12
+    else:
+        in_unit = u.MJy/u.sr
+        pixel_area = (img[0].header['PIXSCALE']*u.arcsec)**2
+        to_ujy_pix = (1*in_unit).to(u.uJy/pixel_area).value
+    
+    for e in [0, 'SCI']:
+        img[e].header['PHOTFNU'] = 1.e-6
+        img[e].header['PHOTPLAM'] = 5.6e4 # get this from somewhere
+        img[e].header['PHOTFLAM'] = 2.99e-11/img[e].header['PHOTPLAM']**2
+        img[e].header['UJYPIX'] = to_ujy_pix
+    
+    for e in ['SCI','ERR']:
+        if e in img:
+            img[e].header['BUNIT'] = 'ELECTRONS/S'
+            img[e].data *= to_ujy_pix
+    
+    for e in ['VAR_POISSON','VAR_RNOISE','VAR_FLAT']:
+        if e in img:
+            img[e].data *= to_ujy_pix**2
+    
+    img.flush()
+    return to_ujy_pix
+
+
+ORIG_KEYS = ['TELESCOP','INSTRUME','DETECTOR','FILTER','PUPIL','EXP_TYPE']
+
+def copy_jwst_keywords(header, orig_keys=ORIG_KEYS, verbose=True):
+    """
+    Make copies of some header keywords that may need to be modified to 
+    force the pipeline / astrodrizzle to interpret the images in different
+    ways
+    
+    """
+    for k in orig_keys:
+        newk = 'O'+k[:7]
+        if newk not in header:
+            if k in header:
+                header[newk] = header[k]
+                msg = f'{newk} = {k} {header[k]}'
+                utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+
+
 def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_KEYS):
     """
     Make copies of some header keywords to make the headers look like 
@@ -267,16 +336,11 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
         
         for k in ['VAR_POISSON','VAR_RNOISE','VAR_FLAT']:
             if k in img:
-                img[k].data *= 1./gain_median**2
+                img[k].data *= gain_median**2
                 
-    for k in orig_keys:
-        newk = 'O'+k[:7]
-        if newk not in img[0].header:
-            if k in img[0].header:
-                img[0].header[newk] = img[0].header[k]
-                msg = f'{newk} = {k} {img[0].header[k]}'
-                utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
-                
+    copy_jwst_keywords(img[0].header, orig_keys=orig_keys, verbose=verbose)
+    img[0].header['PA_V3'] = img[1].header['PA_V3']
+    
     # Get flat field ref file
     _flatfile = FlatFieldStep().get_reference_file(img, 'flat')    
     img[0].header['PFLTFILE'] = os.path.basename(_flatfile)
@@ -296,6 +360,18 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
         dq[dqm] |= img['DQ'].data[dqm] & 2**bit
     
     dq[img['DQ'].data < 0] = 2**bit    
+    
+    if img[0].header['OINSTRUM'] == 'MIRI':
+        dq4 = (dq & 4 > 0).sum()
+        if dq4 / dq.size > 0.9:
+            msg = f'Unset MIRI DQ bit=4'
+            utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+            dq -= dq & 4
+        
+        msg = f'Mask left side of MIRI'
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+        dq[:,:302] |= 1
+        
     img['DQ'].data = dq
     
     img[0].header['EXPTIME'] = img[0].header['EFFEXPTM']*1
@@ -303,7 +379,6 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
     img[1].header['NGOODPIX'] = (dq == 0).sum()
     img[1].header['EXPNAME'] = img[0].header['EXPOSURE']
     img[1].header['MEANDARK'] = 0.0
-    img[1].header['IDCSCALE'] = 0.065 # Set from WCS
     
     # AstroDrizzle needs a time extension, which can be empty 
     # but with a PIXVALUE keyword.
@@ -315,6 +390,8 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
     _ = img_with_flat(filename, overwrite=True)
 
     _ = img_with_wcs(filename, overwrite=True)
+    
+    convert_cal_to_electrons(filename)
     
     # Add TIME
     if 'TIME' not in img:
@@ -405,7 +482,8 @@ def set_jwst_to_hst_keywords(input, reset=False, verbose=True, orig_keys=ORIG_KE
             img[0].header['PHOTFLAM'] = NIS_PHOT_KEYS[_filter][0]
             img[0].header['PHOTFNU'] = NIS_PHOT_KEYS[_filter][1]
             img[0].header['PHOTPLAM'] = NIS_PHOT_KEYS[_filter][2] * 1.e4
-    else:
+    
+    elif 'PHOTFNU' not in img[0].header:
         img[0].header['PHOTFLAM'] = 1.e-21
         img[0].header['PHOTFNU'] = 1.e-31
         img[0].header['PHOTPLAM'] = 1.5e4  
@@ -453,7 +531,7 @@ def strip_telescope_header(header, simplify_wcs=True):
 
 LSQ_ARGS = dict(jac='2-point', bounds=(-np.inf, np.inf), method='trf', ftol=1e-08, xtol=1e-08, gtol=1e-08, x_scale=1.0, loss='soft_l1', f_scale=1.0, diff_step=None, tr_solver=None, tr_options={}, jac_sparsity=None, max_nfev=1000, verbose=0, kwargs={})
 
-def model_wcs_header(datamodel, get_sip=False, order=4, step=32, lsq_args=LSQ_ARGS):
+def model_wcs_header(datamodel, get_sip=False, order=4, step=32, crpix=None,  lsq_args=LSQ_ARGS):
     """
     Make a header with approximate WCS for use in DS9.
 
@@ -473,7 +551,10 @@ def model_wcs_header(datamodel, get_sip=False, order=4, step=32, lsq_args=LSQ_AR
         For fitting the SIP model, generate a grid of detector pixels every
         `step` pixels in both axes for passing through
         `datamodel.meta.wcs.forward_transform`.
-
+    
+    crpix : (float, float)
+        Refernce pixel.  If `None` set to the array center
+        
     Returns
     -------
     header : '~astropy.io.fits.Header`
@@ -487,24 +568,27 @@ def model_wcs_header(datamodel, get_sip=False, order=4, step=32, lsq_args=LSQ_AR
     datamodel = jwst.datamodels.open(datamodel)
     sh = datamodel.data.shape
 
-    try:
-        pipe = datamodel.meta.wcs.pipeline[0][1]
-        if 'offset_2' in pipe.param_names:
-            # NIRISS WCS
-            c_x = pipe.offset_2.value + pipe.offset_0.value
-            c_y = pipe.offset_3.value + pipe.offset_1.value
+    if crpix is None:
+        try:
+            pipe = datamodel.meta.wcs.pipeline[0][1]
+            if 'offset_2' in pipe.param_names:
+                # NIRISS WCS
+                c_x = pipe.offset_2.value + pipe.offset_0.value
+                c_y = pipe.offset_3.value + pipe.offset_1.value
 
-        else:
-            # Simple WCS
-            c_x = pipe.offset_0.value
-            c_y = pipe.offset_1.value
+            else:
+                # Simple WCS
+                c_x = pipe.offset_0.value
+                c_y = pipe.offset_1.value
 
-        crpix = np.array([-c_x+1, -c_y+1])
-        #print('xxx ', crpix)
+            crpix = np.array([-c_x+1, -c_y+1])
+            #print('xxx ', crpix)
         
-    except:
-        crpix = np.array(sh)/2.+0.5
-    
+        except:
+            crpix = np.array(sh)[::-1]/2.+0.5
+    else:
+        crpix = np.array(crpix)
+        
     crp0 = crpix-1
     
     crval = datamodel.meta.wcs.forward_transform(crp0[0], crp0[1])
