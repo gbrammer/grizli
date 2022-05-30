@@ -5681,8 +5681,13 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, m
                      resetbits=resetbits,
                      static=(static & (len(inst_keys) == 1)),
                      gain=gain, rdnoise=rdnoise)
-
+        
         clean_drizzle(group['product'], fix_wcs_system=fix_wcs_system)
+        
+        # Reset JWST headers
+        if isJWST:
+            for file in group['files']:
+                _ = jwst_utils.set_jwst_to_hst_keywords(file, reset=True)
 
 
 def manual_alignment(visit, ds9, reference=None, reference_catalogs=['SDSS', 'PS1', 'GAIA', 'WISE'], use_drz=False):
