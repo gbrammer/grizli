@@ -7,6 +7,9 @@ Requires https://github.com/spacetelescope/jwst
 import os
 import inspect
 
+import astropy.io.fits as pyfits
+import astropy.wcs as pywcs
+
 import numpy as np
 from . import utils
 
@@ -146,7 +149,7 @@ def img_with_flat(input, verbose=True, overwrite=True):
     return output
 
 
-def img_with_wcs(input, overwrite=True):
+def img_with_wcs(input, overwrite=True, fit_sip_header=True):
     """
     Open a JWST exposure and apply the distortion model.
 
@@ -161,9 +164,6 @@ def img_with_wcs(input, overwrite=True):
         Image model with full `~gwcs` in `with_wcs.meta.wcs`.
 
     """    
-    import astropy.io.fits as pyfits
-    import astropy.wcs as pywcs
-    
     from jwst.datamodels import util
     from jwst.assign_wcs import AssignWcsStep
     
@@ -207,7 +207,29 @@ def img_with_wcs(input, overwrite=True):
         
         _hdu = pyfits.open(input, mode='update')
         
-        wcs = pywcs.WCS(_hdu['SCI'].header, relax=True)
+        #wcs = pywcs.WCS(_hdu['SCI'].header, relax=True)
+        if fit_sip_header:
+            hsip = pipeline_model_wcs_header(output,
+                                             set_diff_step=False,
+                                             step=64,
+                                             degrees=[3,4,5,5], 
+                                             initial_header=None)
+                                             
+            wcs = pywcs.WCS(hsip, relax=True)
+            for k in hsip:
+                if k in hsip.comments:
+                    _hdu[1].header[k] = hsip[k], hsip.comments[k]
+                else:
+                    _hdu[1].header[k] = hsip[k]
+            
+            # Remove WCS inverse
+            for k in list(_hdu[1].header.keys()):
+                if k[:3] in ['AP_','BP_']:
+                    _hdu[1].header.remove(k)
+                    
+        else:
+            wcs = utils.wcs_from_header(_hdu['SCI'].header, relax=True)
+            
         pscale = utils.get_wcs_pscale(wcs)
         
         _hdu[1].header['IDCSCALE'] = pscale, 'Pixel scale calculated from WCS'
@@ -217,43 +239,214 @@ def img_with_wcs(input, overwrite=True):
     return output
 
 
-def convert_cal_to_electrons(filename):
+def match_gwcs_to_sip(img, step=64, transform=None, verbose=True):
     """
-    Convert cal image in MJy/sr to uJy/pix with ABZP = 0.0
+    Calculate transformation of gwcs to match SIP header, which may have been 
+    realigned (shift, rotation, scale)
+    
+    Parameters
+    ----------
+    img : `~pyfits.io.fits.HDUList`
+        HDU list from FITS files, where SIP wcs information stored in the
+        first extension
+    
+    step : int
+        Step size of the pixel grid for calculating the tranformation
+    
+    transform : `skimage.transform`
+        Transform object, e.g., `skimage.transform.SimilarityTransform`
+        or `skimage.transform.Euclideanransform`
+        
+    verbose : bool
+        Verbose messages
+    
+    Returns
+    -------
+    obj : `jwst.datamodels.image.ImageModel`
+        Datamodel with updated WCS object.  The `REF` keywords are updated in
+        `img[1].header`.
+         
+    Notes
+    -----
+    The scale factor of transformation is applied by multiplying the 
+    scale to the last parameters of the `distortion` WCS pipeline.  These
+    might not necessarily be scale coefficients for all instrument WCS
+    pipelines
+    
+    """
+    from skimage.transform import SimilarityTransform
+    
+    if transform is None:
+        transform = SimilarityTransform
+        
+    if img[0].header['TELESCOP'] not in ['JWST']:
+        img = set_jwst_to_hst_keywords(img, reset=True)
+
+    obj = img_with_wcs(img)
+    # this should be put into `img_with_wcs` with more checks that it's being
+    # applied correctly
+    if 'SCL_REF' in img[1].header:
+        tr = obj.meta.wcs.pipeline[0].transform
+        for i in range(-8,-2):
+            setattr(tr, tr.param_names[i], 
+                    tr.parameters[i]*img[1].header['SCL_REF'])
+    else:
+        if hasattr(transform, 'scale'):
+            img[1].header['SCL_REF'] = (1.0, 'Transformation scale factor')
+        
+    wcs = pywcs.WCS(img[1].header, relax=True)
+    
+    sh = obj.data.shape
+    
+    if obj.meta.instrument.name in ['MIRI']:
+        xmin = 300
+    else:
+        xmin = step
+    
+    ymin = step
+    
+    xx = np.arange(xmin, sh[1]-1, step)
+    yy = np.arange(ymin, sh[0]-1, step)
+    
+    yp, xp = np.meshgrid(yy, xx)
+    
+    rdg = obj.meta.wcs.forward_transform(xp, yp)
+    rdw = wcs.all_pix2world(xp, yp, 0)
+    
+    Vg = np.array([rdg[0].flatten(), rdg[1].flatten()])
+    Vw = np.array([rdw[0].flatten(), rdw[1].flatten()])
+
+    r0 = np.median(Vw, axis=1)
+    Vg = (Vg.T - r0).T
+    Vw = (Vw.T - r0).T
+
+    cosd = np.cos(r0[1]/180*np.pi)
+    Vg[0,:] *= cosd
+    Vw[0,:] *= cosd
+
+    tf = transform()
+    tf.estimate(Vg.T, Vw.T)
+    
+    asec = np.array(tf.translation)*np.array([1./cosd, 1.])*3600
+    rot_deg = tf.rotation/np.pi*180
+    
+    Vt = tf(Vg.T).T
+    resid = Vt - Vw
+    
+    if 'PIXSCALE' in img[0].header:
+        pscale = img[0].header['PIXSCALE']
+    else:
+        pscale = utils.get_wcs_pscale(wcs)
+
+    rms = [utils.nmad(resid[i,:])*3600/pscale for i in [0,1]]
+    
+    if hasattr(tf, 'scale'):
+        img[1].header['SCL_REF'] *= tf.scale
+        _tfscale = tf.scale
+    else:
+        _tfscale = 1.
+        
+    msg = f'Align to wcs: ({asec[0]:6.3f} {asec[1]:6.3f}) {_tfscale:7.5f}'
+    msg += f' {rot_deg:7.5f} ; rms = {rms[0]:6.1e} {rms[1]:6.1e} pix'
+    utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+    
+    img[1].header['RA_REF'] += tf.translation[0]/cosd
+    img[1].header['DEC_REF'] += tf.translation[1]
+    img[1].header['ROLL_REF'] -= rot_deg
+    
+    obj = img_with_wcs(img)
+    
+    # Update scale parameters in transform, but parameters
+    # might not be in correct order
+    if 'SCL_REF' in img[1].header:
+        tr = obj.meta.wcs.pipeline[0].transform
+        for i in range(-8,-2):
+            setattr(tr, tr.param_names[i], 
+                    tr.parameters[i]*img[1].header['SCL_REF'])
+    
+    return obj
+
+
+def get_phot_keywords(input):
+    """Calculate conversions between JWST ``MJy/sr`` units and PHOTFLAM/PHOTFNU
+    
+    Parameters
+    ----------
+    input : str, `~astropy.io.fits.HDUList`
+        FITS filename of a `cal`ibrated JWST image or a previously-opened 
+        `~astropy.io.fits.HDUList`
+    
+    Returns
+    -------
+    info : dict
+        Photometric information
+        
     """
     import astropy.units as u
-    import astropy.io.fits as pyfits
-    import astropy.wcs as pywcs
     
-    img = pyfits.open(filename, mode='update')
-    if img['SCI'].header['BUNIT'].upper() != 'MJy/sr'.upper():
-        img.close()
-        return None
+    if isinstance(input, str):
+        img = pyfits.open(input, mode='update')
+    elif isinstance(input, pyfits.HDUList):
+        img = input
     
-    if 'PIXAR_SR' in img['SCI'].header:
-        to_ujy_pix = img['SCI'].header['PIXAR_SR']*1.e12
+    # Get tabulated filter info
+    filter_info = get_jwst_filter_info(img[0].header)
+            
+    # Get pixel area
+    if 'PIXAR_A2' in img['SCI'].header:
+        pscale = np.sqrt(img['SCI'].header['PIXAR_A2'])
+    elif 'PIXSCALE' in img['SCI'].header:
+        pscale = img['SCI'].header['PIXSCALE']
     else:
+        _wcs = pywcs.WCS(img['SCI'].header, relax=True)
+        pscale = utils.get_wcs_pscale(_wcs)
+    
+    # Check image units
+    if img['SCI'].header['BUNIT'].upper() == 'MJy/sr'.upper():
         in_unit = u.MJy/u.sr
-        pixel_area = (img[0].header['PIXSCALE']*u.arcsec)**2
-        to_ujy_pix = (1*in_unit).to(u.uJy/pixel_area).value
+        to_mjysr = 1.0
+    else:
+        if filter_info is None:
+            in_unit = u.MJy/u.sr
+            to_mjysr = -1.
+        else:
+            if 'photmjsr' in filter_info:
+                in_unit = 1.*filter_info['photmjsr']*u.MJy/u.sr
+                to_mjysr = filter_info['photmjsr']
+            else:
+                in_unit = u.MJy/u.sr
+                to_mjysr = 1.0
+                
+    # Conversion factor
+    pixel_area = (pscale*u.arcsec)**2
+    tojy = (1*in_unit).to(u.Jy/pixel_area).value
     
-    for e in [0, 'SCI']:
-        img[e].header['PHOTFNU'] = 1.e-6
-        img[e].header['PHOTPLAM'] = 5.6e4 # get this from somewhere
-        img[e].header['PHOTFLAM'] = 2.99e-11/img[e].header['PHOTPLAM']**2
-        img[e].header['UJYPIX'] = to_ujy_pix
+    # Pivot wavelength
+    if filter_info is not None:
+        plam = filter_info['pivot']*1.e4
+    else:
+        plam = 5.0e4
     
-    for e in ['SCI','ERR']:
-        if e in img:
-            img[e].header['BUNIT'] = 'ELECTRONS/S'
-            img[e].data *= to_ujy_pix
+    # Set header keywords
+    for e in [0, 'SCI']:        
+        img[e].header['PHOTFNU'] = tojy, 'Scale factor to Janskys'
+        img[e].header['PHOTPLAM'] = (plam, 'Bandpass pivot wavelength, A')
+        img[e].header['PHOTFLAM'] = (tojy*2.99e-5/plam**2,
+                                     'Scale to erg/s/cm2/A')
+        img[e].header['ZP'] = -2.5*np.log10(tojy)+8.9, 'AB mag zeropoint'
+        img[e].header['TO_MJYSR'] = (to_mjysr, 'Scale to MJy/sr')
+        
+    # Write FITS file if filename provided as input
+    if isinstance(input, str):
+        img.flush()
     
-    for e in ['VAR_POISSON','VAR_RNOISE','VAR_FLAT']:
-        if e in img:
-            img[e].data *= to_ujy_pix**2
-    
-    img.flush()
-    return to_ujy_pix
+    info = {'photfnu':tojy,
+            'photplam':plam,
+            'photflam':img[0].header['PHOTFLAM'], 
+            'zp':img[0].header['ZP'],
+            'tomjysr':to_mjysr}
+            
+    return info
 
 
 ORIG_KEYS = ['TELESCOP','INSTRUME','DETECTOR','FILTER','PUPIL','EXP_TYPE']
@@ -279,7 +472,7 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
     Make copies of some header keywords to make the headers look like 
     and HST instrument
     
-    1) Apply gain correction
+    1) Apply gain correction [x remove]
     2) Clip DQ bits
     3) Copy header keywords
     4) Apply flat field if necessary
@@ -315,28 +508,28 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
         #utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
         raise ValueError(msg)
     
-    if img['SCI'].header['BUNIT'].upper() == 'DN/S':
-        gain_file = GainScaleStep().get_reference_file(img, 'gain')
-        
-        with pyfits.open(gain_file) as gain_im:
-            gain_median = np.median(gain_im[1].data)
-        
-        img[0].header['GAINFILE'] = gain_file
-        img[0].header['GAINCORR'] = True, 'Manual gain correction applied'
-        img[0].header['GAINVAL'] = gain_median, 'Gain value applied'
-        
-        msg = f'GAINVAL = {gain_median:.2f}\n'
-        msg += f'GAINFILE = {gain_file}'
-        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
-                    
-        img['SCI'].data *= gain_median 
-        img['SCI'].header['BUNIT'] = 'ELECTRONS/S'
-        img['ERR'].data *= gain_median 
-        img['ERR'].header['BUNIT'] = 'ELECTRONS/S'
-        
-        for k in ['VAR_POISSON','VAR_RNOISE','VAR_FLAT']:
-            if k in img:
-                img[k].data *= gain_median**2
+    # if img['SCI'].header['BUNIT'].upper() == 'DN/S':
+    #     gain_file = GainScaleStep().get_reference_file(img, 'gain')
+    #     
+    #     with pyfits.open(gain_file) as gain_im:
+    #         gain_median = np.median(gain_im[1].data)
+    #     
+    #     img[0].header['GAINFILE'] = gain_file
+    #     img[0].header['GAINCORR'] = True, 'Manual gain correction applied'
+    #     img[0].header['GAINVAL'] = gain_median, 'Gain value applied'
+    #     
+    #     msg = f'GAINVAL = {gain_median:.2f}\n'
+    #     msg += f'GAINFILE = {gain_file}'
+    #     utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+    #                 
+    #     img['SCI'].data *= gain_median 
+    #     img['SCI'].header['BUNIT'] = 'ELECTRONS/S'
+    #     img['ERR'].data *= gain_median 
+    #     img['ERR'].header['BUNIT'] = 'ELECTRONS/S'
+    #     
+    #     for k in ['VAR_POISSON','VAR_RNOISE','VAR_FLAT']:
+    #         if k in img:
+    #             img[k].data *= gain_median**2
                 
     copy_jwst_keywords(img[0].header, orig_keys=orig_keys, verbose=verbose)
     img[0].header['PA_V3'] = img[1].header['PA_V3']
@@ -391,7 +584,7 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
 
     _ = img_with_wcs(filename, overwrite=True)
     
-    convert_cal_to_electrons(filename)
+    get_phot_keywords(filename)
     
     # Add TIME
     if 'TIME' not in img:
@@ -416,21 +609,21 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
     return True
 
 
-# for NIRISS images; NIRCam,MIRI TBD
-# band: [photflam, photfnu, pivot_wave]
-NIS_PHOT_KEYS = {'F090W': [1.098934e-20, 2.985416e-31, 0.9025],
-                 'F115W': [6.291060e-21, 2.773018e-31, 1.1495],
-                 'F140M': [9.856255e-21, 6.481079e-31, 1.4040],
-                 'F150W': [4.198384e-21, 3.123540e-31, 1.4935],
-                 'F158M': [7.273483e-21, 6.072128e-31, 1.5820],
-                 'F200W': [2.173398e-21, 2.879494e-31, 1.9930],
-                 'F277W': [1.109150e-21, 2.827052e-31, 2.7643],
-                 'F356W': [6.200034e-22, 2.669862e-31, 3.5930],
-                 'F380M': [2.654520e-21, 1.295626e-30, 3.8252],
-                 'F430M': [2.636528e-21, 1.613895e-30, 4.2838],
-                 'F444W': [4.510426e-22, 2.949531e-31, 4.4277],
-                 'F480M': [1.879639e-21, 1.453752e-30, 4.8152]}
-
+# # for NIRISS images; NIRCam,MIRI TBD
+# # band: [photflam, photfnu, pivot_wave]
+# NIS_PHOT_KEYS = {'F090W': [1.098934e-20, 2.985416e-31, 0.9025],
+#                  'F115W': [6.291060e-21, 2.773018e-31, 1.1495],
+#                  'F140M': [9.856255e-21, 6.481079e-31, 1.4040],
+#                  'F150W': [4.198384e-21, 3.123540e-31, 1.4935],
+#                  'F158M': [7.273483e-21, 6.072128e-31, 1.5820],
+#                  'F200W': [2.173398e-21, 2.879494e-31, 1.9930],
+#                  'F277W': [1.109150e-21, 2.827052e-31, 2.7643],
+#                  'F356W': [6.200034e-22, 2.669862e-31, 3.5930],
+#                  'F380M': [2.654520e-21, 1.295626e-30, 3.8252],
+#                  'F430M': [2.636528e-21, 1.613895e-30, 4.2838],
+#                  'F444W': [4.510426e-22, 2.949531e-31, 4.4277],
+#                  'F480M': [1.879639e-21, 1.453752e-30, 4.8152]}
+# 
 
 def set_jwst_to_hst_keywords(input, reset=False, verbose=True, orig_keys=ORIG_KEYS):
     """
@@ -476,17 +669,18 @@ def set_jwst_to_hst_keywords(input, reset=False, verbose=True, orig_keys=ORIG_KE
     #     img[0].header[f'ATODGN{x}'] = gain 
     #     img[0].header[f'READNSE{x}'] = 12.9
     
-    if img[0].header['OINSTRUM'] == 'NIRISS':
-        _filter = img[0].header['OPUPIL']
-        if _filter in NIS_PHOT_KEYS:
-            img[0].header['PHOTFLAM'] = NIS_PHOT_KEYS[_filter][0]
-            img[0].header['PHOTFNU'] = NIS_PHOT_KEYS[_filter][1]
-            img[0].header['PHOTPLAM'] = NIS_PHOT_KEYS[_filter][2] * 1.e4
-    
-    elif 'PHOTFNU' not in img[0].header:
-        img[0].header['PHOTFLAM'] = 1.e-21
-        img[0].header['PHOTFNU'] = 1.e-31
-        img[0].header['PHOTPLAM'] = 1.5e4  
+    ##### This now done in get_phot_keywords
+    # if img[0].header['OINSTRUM'] == 'NIRISS':
+    #     _filter = img[0].header['OPUPIL']
+    #     if _filter in NIS_PHOT_KEYS:
+    #         img[0].header['PHOTFLAM'] = NIS_PHOT_KEYS[_filter][0]
+    #         img[0].header['PHOTFNU'] = NIS_PHOT_KEYS[_filter][1]
+    #         img[0].header['PHOTPLAM'] = NIS_PHOT_KEYS[_filter][2] * 1.e4
+    # 
+    # elif 'PHOTFNU' not in img[0].header:
+    #     img[0].header['PHOTFLAM'] = 1.e-21
+    #     img[0].header['PHOTFNU'] = 1.e-31
+    #     img[0].header['PHOTPLAM'] = 1.5e4  
         
     if isinstance(input, str):
         img.flush()
@@ -504,8 +698,6 @@ def strip_telescope_header(header, simplify_wcs=True):
         Input FITS header.
 
     """
-    import astropy.wcs as pywcs
-
     new_header = header.copy()
 
     if 'TELESCOP' in new_header:
@@ -529,9 +721,57 @@ def strip_telescope_header(header, simplify_wcs=True):
 
     return new_header
 
-LSQ_ARGS = dict(jac='2-point', bounds=(-np.inf, np.inf), method='trf', ftol=1e-08, xtol=1e-08, gtol=1e-08, x_scale=1.0, loss='soft_l1', f_scale=1.0, diff_step=None, tr_solver=None, tr_options={}, jac_sparsity=None, max_nfev=1000, verbose=0, kwargs={})
 
-def model_wcs_header(datamodel, get_sip=False, order=4, step=32, crpix=None,  lsq_args=LSQ_ARGS):
+def wcs_from_datamodel(datamodel, **kwargs):
+    """
+    Initialize `~astropy.wcs.WCS` object from `wcsinfo` parameters, accounting
+    for the aperture reference position that sets the tangent point
+    
+    Parameters
+    ----------
+    datamodel : `jwst.datamodels.image.ImageModel`
+    
+    kwargs : dict
+        Keyword arguments passed to `~grizli.utils.wcs_from_header`
+        
+    Returns
+    -------
+    wcs : `~astropy.wcs.WCS`
+    """
+    header = pyfits.Header(datamodel.meta.wcsinfo.instance)
+    header['NAXIS'] = 2
+    
+    sh = datamodel.data.shape
+    
+    header['NAXIS1'] = sh[1]
+    header['NAXIS2'] = sh[0]
+    
+    # header['SIPCRPX1'] = header['siaf_xref_sci']
+    # header['SIPCRPX2'] = header['siaf_yref_sci']
+    
+    wcs = utils.wcs_from_header(header, **kwargs)
+    
+    return wcs
+
+
+LSQ_ARGS = dict(jac='2-point',
+                bounds=(-np.inf, np.inf),
+                method='trf',
+                ftol=1e-12,
+                xtol=1e-12,
+                gtol=1e-12,
+                x_scale=1.0,
+                loss='soft_l1',
+                f_scale=1000.,
+                diff_step=1.e-6,
+                tr_solver=None,
+                tr_options={},
+                jac_sparsity=None,
+                max_nfev=100,
+                verbose=0,
+                kwargs={})
+
+def model_wcs_header(datamodel, get_sip=False, degree=4, step=32, crpix=None,  lsq_args=LSQ_ARGS, get_guess=True, set_diff_step=True, initial_header=None, **kwargs):
     """
     Make a header with approximate WCS for use in DS9.
 
@@ -544,8 +784,8 @@ def model_wcs_header(datamodel, get_sip=False, order=4, step=32, crpix=None,  ls
         If True, fit a `astropy.modeling.models.SIP` distortion model to the
         image WCS.
 
-    order : int
-        Order of the SIP polynomial model.
+    degree : int
+        Degree of the SIP polynomial model.
 
     step : int
         For fitting the SIP model, generate a grid of detector pixels every
@@ -567,7 +807,12 @@ def model_wcs_header(datamodel, get_sip=False, order=4, step=32, crpix=None,  ls
 
     datamodel = jwst.datamodels.open(datamodel)
     sh = datamodel.data.shape
-
+    
+    if 'order' in kwargs:
+        msg = 'WARNING: Keyword `order` has been renamed to `degree`'
+        print(msg)
+        degree = kwargs['order']
+        
     if crpix is None:
         try:
             pipe = datamodel.meta.wcs.pipeline[0][1]
@@ -622,17 +867,29 @@ def model_wcs_header(datamodel, get_sip=False, order=4, step=32, crpix=None,  ls
         return header
 
     # Fit a SIP header to the gwcs transformed coordinates
-    u, v = np.meshgrid(np.arange(1, sh[1]-1, step), 
-                       np.arange(1, sh[0]-1, step))
+    if datamodel.meta.instrument.name in ['MIRI']:
+        xmin = 300
+        ymin = step
+    else:
+        xmin = step
+        ymin = step
+        
+    u, v = np.meshgrid(np.arange(xmin, sh[1]-1, step), 
+                       np.arange(ymin, sh[0]-1, step))
     x, y = datamodel.meta.wcs.forward_transform(u, v)
     
     a_names = []
     b_names = []
-    #order = 4
-    for i in range(order+1):
-        for j in range(order+1):
+    
+    a_rand = []
+    b_rand = []
+    
+    sip_step = []
+    
+    for i in range(degree+1):
+        for j in range(degree+1):
             ext = '{0}_{1}'.format(i, j)
-            if (i+j) > order:
+            if (i+j) > degree:
                 continue
 
             if ext in ['0_0', '0_1', '1_0']:
@@ -640,10 +897,20 @@ def model_wcs_header(datamodel, get_sip=False, order=4, step=32, crpix=None,  ls
 
             a_names.append('A_'+ext)
             b_names.append('B_'+ext)
-
+            sip_step.append(1.e-3**(i+j))
+            
     p0 = np.zeros(4+len(a_names)+len(b_names))
     p0[:4] += cd.flatten()
     
+    sip_step = np.array(sip_step)
+    #p0[4:len(a_names)+4] = np.random.normal(size=len(a_names))*sip_step
+    #p0[4+len(a_names):] = np.random.normal(size=len(a_names))*sip_step
+    
+    if set_diff_step:
+        diff_step = np.hstack([np.ones(4)*0.01/3600, sip_step, sip_step])
+        lsq_args['diff_step'] = diff_step
+        print('xxx', len(p0), len(diff_step))
+        
     if datamodel.meta.instrument.name == 'NIRISS':
         a0 = {'A_0_2': 3.8521180058449584e-08,
          'A_0_3': -1.2910469982047994e-11,
@@ -679,6 +946,60 @@ def model_wcs_header(datamodel, get_sip=False, order=4, step=32, crpix=None,  ls
             if k in b0:
                 p0[4+len(b_names)+i] = b0[k]
                 
+    elif get_guess:
+        
+        if datamodel.meta.instrument.name in ['MIRI']:
+            xmin = 300
+        else:
+            xmin = step
+            
+        h = datamodel.meta.wcs.to_fits_sip(degree=degree, crpix=crpix, 
+                                           bounding_box=((xmin, sh[1]-step), 
+                                                         (step, sh[0]-step))
+                                           )
+                                           
+        cd = np.array([[h['CD1_1'], h['CD1_2']], [h['CD2_1'], h['CD2_2']]])
+        p0[:4] = cd.flatten()*1
+        
+        a0 = {}
+        b0 = {}
+        
+        for k in h:
+            if k.startswith('A_') & ('ORDER' not in k):
+                a0[k] = h[k]
+            elif k.startswith('B_') & ('ORDER' not in k):
+                b0[k] = h[k]
+        
+        for i, k in enumerate(a_names):
+            if k in a0:
+                p0[4+i] = a0[k]
+        
+        for i, k in enumerate(b_names):
+            if k in b0:
+                p0[4+len(b_names)+i] = b0[k]
+        
+    elif initial_header is not None:
+        h = initial_header
+        cd = np.array([[h['CD1_1'], h['CD1_2']], [h['CD2_1'], h['CD2_2']]])
+        p0[:4] = cd.flatten()*1
+        
+        a0 = {}
+        b0 = {}
+        
+        for k in h:
+            if k.startswith('A_') & ('ORDER' not in k):
+                a0[k] = h[k]
+            elif k.startswith('B_') & ('ORDER' not in k):
+                b0[k] = h[k]
+        
+        for i, k in enumerate(a_names):
+            if k in a0:
+                p0[4+i] = a0[k]
+        
+        for i, k in enumerate(b_names):
+            if k in b0:
+                p0[4+len(b_names)+i] = b0[k]
+        
     #args = (u.flatten(), v.flatten(), x.flatten(), y.flatten(), crpix, a_names, b_names, cd, 0)
     args = (u.flatten(), v.flatten(), x.flatten(), y.flatten(), crval, crpix, 
             a_names, b_names, cd, 0)
@@ -690,7 +1011,7 @@ def model_wcs_header(datamodel, get_sip=False, order=4, step=32, crpix=None,  ls
     args = (u.flatten(), v.flatten(), x.flatten(), y.flatten(), crval, crpix, 
             a_names, b_names, cd, 1)
 
-    cd_fit, a_coeff, b_coeff = _objective_sip(fit.x, *args)
+    cd_fit, a_coeff, b_coeff, ra_nmad, dec_nmad = _objective_sip(fit.x, *args)
 
     # Put in the header
     for i in range(2):
@@ -699,25 +1020,122 @@ def model_wcs_header(datamodel, get_sip=False, order=4, step=32, crpix=None,  ls
 
     header['CTYPE1'] = 'RA---TAN-SIP'
     header['CTYPE2'] = 'DEC--TAN-SIP'
-
-    header['A_ORDER'] = order
+    
+    header['NAXIS'] = 2
+    sh = datamodel.data.shape
+    header['NAXIS1'] = sh[1]
+    header['NAXIS2'] = sh[0]
+    
+    header['A_ORDER'] = degree
     for k in a_coeff:
         header[k] = a_coeff[k]
 
-    header['B_ORDER'] = order
+    header['B_ORDER'] = degree
     for k in b_coeff:
         header[k] = b_coeff[k]
+    
+    header['PIXSCALE'] = utils.get_wcs_pscale(header), 'Derived pixel scale'
+    
+    header['SIPSTATU'] = fit.status, 'least_squares result status'
+    header['SIPCOST'] = fit.cost, 'least_squares result cost'
+    header['SIPNFEV'] = fit.nfev, 'least_squares result nfev'
+    header['SIPNJEV'] = fit.njev, 'least_squares result njev'
+    header['SIPOPTIM'] = fit.optimality, 'least_squares result optimality'
+    header['SIPSUCSS'] = fit.success, 'least_squares result success'
+    header['SIPRAMAD'] = ra_nmad/header['PIXSCALE'], 'RA NMAD, pix'
+    header['SIPDEMAD'] = dec_nmad/header['PIXSCALE'], 'Dec NMAD, pix'
+    
+    header['CRDS_CTX'] = (datamodel.meta.ref_file.crds.context_used,
+                          'CRDS context file')
+    
+    bn = os.path.basename                      
+    header['DISTFILE'] = (bn(datamodel.meta.ref_file.distortion.name),
+                          'Distortion reference file')
 
+    header['FOFFFILE'] = (bn(datamodel.meta.ref_file.filteroffset.name),
+                          'Filter offset reference file')
+                                               
     return header
+
+
+def pipeline_model_wcs_header(datamodel, step=64, degrees=[3,4,5,5], lsq_args=LSQ_ARGS, crpix=None, verbose=True, initial_header=None, max_rms=1.e-4, set_diff_step=False, get_guess=False):
+    """
+    Iterative pipeline to refine the SIP headers
+    """
+    
+    frame = inspect.currentframe()
+    utils.log_function_arguments(utils.LOGFILE, frame,
+                                 'jwst_utils.pipeline_model_wcs_header')
+    
+    filter_offset = None
+    
+    if datamodel.meta.instrument.name in ['MIRI']:
+        crpix = [516.5, 512.5]
+        get_guess = True
+        degrees = [4]
+        
+    if crpix is None:
+        meta = datamodel.meta.wcsinfo
+        if meta.siaf_xref_sci is None:
+            crpix = [meta.crpix1*1, meta.crpix2*1]
+        else:
+            crpix = [meta.siaf_xref_sci*1, meta.siaf_yref_sci*1]
+        
+        # Get filter offset
+        tr = datamodel.meta.wcs.pipeline[0].transform
+        if hasattr(tr, 'offset_0'):
+            # not crpix itself
+            if np.abs(tr.offset_0) < 100:
+                filter_offset = [tr.offset_0.value, tr.offset_1.value]
+                
+                crpix[0] -= filter_offset[0]
+                crpix[1] -= filter_offset[1]
+    
+    ndeg = len(degrees)
+            
+    for i, deg in enumerate(degrees):
+        if i == 0:
+            h = initial_header
+        
+        h = model_wcs_header(datamodel,
+                             step=step, 
+                             lsq_args=lsq_args,
+                             initial_header=h,
+                             degree=deg,
+                             get_sip=True,
+                             get_guess=get_guess, 
+                             crpix=crpix,
+                             set_diff_step=set_diff_step)
+        
+        xrms = h['SIPRAMAD']
+        yrms = h['SIPDEMAD']
+        msg = f'Fit SIP degree={deg} rms= {xrms:.2e}, {yrms:.2e} pix'
+        utils.log_comment(utils.LOGFILE, msg, verbose=True)
+        
+        if xrms < max_rms:
+            break
+        
+        if (i+1 < ndeg) & (deg == 5):
+            ## add a delta so that fits are updated
+            if h['A_5_0'] == 0:
+                h['A_5_0'] = 1.e-16
+            
+            if h['B_0_5'] == 0:
+                h['B_0_5'] = 1.e-16
+                
+    if filter_offset is not None:
+        h['SIPFXOFF'] = filter_offset[0], 'Filter offset, x pix'
+        h['SIPFYOFF'] = filter_offset[1], 'Filter offset, y pix'
+        
+    return h
+
 
 def _objective_sip(params, u, v, ra, dec, crval, crpix, a_names, b_names, cd, ret):
     """
     Objective function for fitting SIP coefficients
     """
     from astropy.modeling import models, fitting
-    import astropy.io.fits as pyfits
-    import astropy.wcs as pywcs
-    
+
     #u, v, x, y, crpix, a_names, b_names, cd = data
 
     cdx = params[0:4].reshape((2, 2))
@@ -731,10 +1149,7 @@ def _objective_sip(params, u, v, ra, dec, crval, crpix, a_names, b_names, cd, re
     b_coeff = {}
     for i in range(len(b_names)):
         b_coeff[b_names[i]] = b_params[i]
-    
-    if ret == 1:
-        return cdx, a_coeff, b_coeff
-    
+        
     # Build header
     _h = pyfits.Header()
     for i in [0,1]:
@@ -746,11 +1161,11 @@ def _objective_sip(params, u, v, ra, dec, crval, crpix, a_names, b_names, cd, re
     _h['CRVAL1'] = crval[0]
     _h['CRVAL2'] = crval[1]
     
-    _h['A_ORDER'] = 4
+    _h['A_ORDER'] = 5
     for k in a_coeff:
         _h[k] = a_coeff[k]
     
-    _h['B_ORDER'] = 4
+    _h['B_ORDER'] = 5
     for k in b_coeff:
         _h[k] = b_coeff[k]
     
@@ -760,13 +1175,20 @@ def _objective_sip(params, u, v, ra, dec, crval, crpix, a_names, b_names, cd, re
     _h['CUNIT1']  = 'deg     '                                                            
     _h['CUNIT2']  = 'deg     '                                                            
     
-    _w = pywcs.WCS(_h)
+    #_w = pywcs.WCS(_h)
+    _w = utils.wcs_from_header(_h, relax=True)
+    
     ro, do = _w.all_pix2world(u, v, 0)
     
-    cosd = np.cos(ro/180*np.pi)
-    dr = np.append((ra-ro)*cosd, dec-do)*3600./0.065
-
+    cosd = np.cos(ro/180*np.pi)    
+    if ret == 1:
+        ra_nmad = utils.nmad((ra-ro)*cosd*3600)
+        dec_nmad = utils.nmad((dec-do)*3600)
+        
+        return cdx, a_coeff, b_coeff, ra_nmad, dec_nmad
+    
     #print(params, np.abs(dr).max())
+    dr = np.append((ra-ro)*cosd, dec-do)*3600.
 
     return dr
     
@@ -805,3 +1227,182 @@ def _xobjective_sip(params, u, v, x, y, crval, crpix, a_names, b_names, cd, ret)
     #print(params, np.abs(dr).max())
 
     return dr
+
+
+def load_jwst_filter_info():
+    """
+    Load the filter info in `grizli/data/jwst_bp_info.yml`
+    
+    Returns
+    -------
+    bp : dict
+        Full filter information dictionary for JWST instruments
+    """
+    import yaml
+    path = os.path.join(os.path.dirname(__file__),
+                            'data', 'jwst_bp_info.yml')
+    
+    with open(path) as fp:
+        bp = yaml.load(fp, yaml.SafeLoader)
+    
+    return bp
+
+
+def get_jwst_filter_info(header):
+    """
+    Retrieve filter info from tabulated file for INSTRUME/FILTER/PUPIL
+    combination in a primary FITS header
+    
+    Parameters
+    ----------
+    header : `~astropy.io.fits.Header`
+        Primary header with INSTRUME, FILTER, [PUPIL] keywords
+    
+    Returns
+    -------
+    info : dict
+        Filter information
+        
+    """
+    #from grizli.jwst_utils import __file__
+    import yaml
+    
+    if 'INSTRUME' not in header:
+        print(f'Keyword INSTRUME not in header')
+        return None
+        
+    bp = load_jwst_filter_info()
+    
+    inst = header['INSTRUME']
+    if inst not in bp:
+        print(f'INSTRUME={inst} not in jwst_bp_info.yml table')
+        return None
+    
+    info = None
+    
+    for k in ['PUPIL','FILTER']:
+        if k in header:
+            if header[k] in bp[inst]:
+                info = bp[inst][header[k]]
+                info['name'] = header[k]
+                info['keyword'] = k
+                info['meta'] = bp['meta']
+                break
+
+    return info
+
+
+def calc_jwst_filter_info():
+    """
+    Calculate JWST filter properties from tabulated `eazy` filter file and 
+    photom reference files
+    
+    Calculated attributes:
+    
+        - ``pivot`` = Filter pivot wavelength, microns
+        - ``rectwidth`` = Filter rectangular width, microns
+        - ``ebv0.1`` = Milky way extinction, mag for E(B-V) = 0.1, Rv=3.1
+        - ``ab_vega`` = AB - Vega mag conversion
+        - ``eazy_fnumber`` = Filter number in the `eazy` filter file
+        - ``photmjsr`` = Photometric conversion if ref files available
+        
+    """
+    import yaml
+    import glob
+    import eazy.filters
+    import astropy.time
+    
+    res = eazy.filters.FilterFile(path=None)
+    
+    bp = {'meta':{'created':astropy.time.Time.now().iso.split()[0], 
+                  'wave_unit':'micron', 
+                  'description': {
+                     'pivot':'Filter pivot wavelength', 
+                     'rectwith':'Filter rectangular width', 
+                     'ebv0.1': 'Milky Way extinction, mag for E(B-V)=0.1, Rv=3.1',
+                     'ab_vega': 'AB - Vega mag conversion',
+                     'eazy_fnumber': 'Filter number in the eazy filter file',
+                     'photmjsr': 'Photometric conversion if ref files available',
+                     'photfile': 'Photom reference file'
+                     }
+                  }
+         }
+    
+    for inst in ['NIRCAM','NIRISS','MIRI']:
+        bp[inst] = {}
+        fn = res.search(f'jwst_{inst}', verbose=False)
+        print(f'\n{inst}\n=====')
+        
+        # photometry calib
+        phot_files = glob.glob(f"{os.getenv('CRDS_PATH')}/references/"+
+                              f"jwst/{inst.lower()}/*photom*fits")
+        
+        if len(phot_files) > 0:
+            phot_files.sort()
+            phot_files = phot_files[::-1]
+            phots = [utils.read_catalog(file) for file in phot_files]            
+        else:
+            phots = None
+            
+        for j in fn:
+            fi = res[j+1]
+            key = fi.name.split()[0].split('_')[-1].upper()
+            if inst == 'MIRI':
+                key = key.replace('F0','F')
+                if key.endswith('C'):
+                    continue
+                    
+            bp[inst][key] = {'pivot':float(fi.pivot/1.e4), 
+                             'ab_vega':float(fi.ABVega), 
+                            'ebv0.1':float(fi.extinction_correction(EBV=0.1)), 
+                             'rectwidth':float(fi.rectwidth/1.e4), 
+                             'eazy_fnumber':int(j+1)}
+            
+            if phots is not None:
+                ix = None
+                if inst == 'MIRI':
+                    for k, phot in enumerate(phots):
+                        ix = phot['filter'] == key
+                        if ix.sum() > 0:
+                            break
+                            
+                elif inst == 'NIRISS':
+                    for k, phot in enumerate(phots):
+                        ix = phot['filter'] == key
+                        ix |= phot['pupil'] == key
+                        if ix.sum() > 0:
+                            break
+                                            
+                elif inst == 'NIRCAM':
+                    for k, phot in enumerate(phots):
+                        if key in phot['pupil']:
+                            ix = phot['pupil'] == key
+                        else:
+                            ix = (phot['filter'] == key) 
+                            ix &= (phot['pupil'] == 'CLEAR')
+                    
+                        if ix.sum() > 0:
+                            break
+                
+                if ix is not None:
+                    _d = bp[inst][key]
+                    if ix.sum() > 0:
+                        _d['photmjsr'] = float(phot['photmjsr'][ix][0])
+                        _d['photfile'] = os.path.basename(phot_files[k])
+                    else:
+                        _d['photmjsr'] = None
+                        _d['photfile'] = None
+                        
+                        print(f'{inst} {key} not found in {phot_files}')
+            else:
+                _d = bp[inst][key]
+                _d['photmjsr'] = None
+                _d['photfile'] = None
+                                
+            print(f"{key} {_d['pivot']:.3f} {_d['photmjsr']}")
+
+    with open('jwst_bp_info.yml','w') as fp:
+        yaml.dump(bp, fp)
+        
+    return bp
+    

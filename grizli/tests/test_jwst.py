@@ -4,9 +4,32 @@ Tests for JWST imaging and spectra, including
 import os
 import glob
 import unittest
+import numpy as np
 
-from .. import utils, multifit, GRIZLI_PATH
+from .. import utils, multifit, GRIZLI_PATH, jwst_utils
 from ..pipeline import auto_script
+
+class JWSTUtils(unittest.TestCase):
+    
+    def test_filter_info(self):
+        """
+        Read the info file and get filter data
+        """
+        import astropy.io.fits as pyfits
+        
+        bp = jwst_utils.load_jwst_filter_info()
+        assert('meta' in bp)
+
+        header = pyfits.Header()
+        header['TELESCOP'] = 'JWST'
+        header['INSTRUME'] = 'NIRCAM'
+        header['FILTER'] = 'F200W'
+        header['PUPIL'] = 'CLEAR'
+        
+        info = jwst_utils.get_jwst_filter_info(header)
+        
+        assert(info['name'] == 'F200W')
+        assert(np.allclose(info['pivot'], 1.988647))
 
 
 class JWSTFittingTools(unittest.TestCase):
