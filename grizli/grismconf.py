@@ -10,7 +10,7 @@ from collections import OrderedDict
 
 import numpy as np
 
-from . import GRIZLI_PATH
+from . import GRIZLI_PATH, utils
 
 
 class aXeConf():
@@ -942,4 +942,19 @@ def load_grism_config(conf_file):
     """
     conf = aXeConf(conf_file)
     conf.get_beams()
+    
+    # hack to remove GAIN correction from niriss
+    if 'GR150' in conf_file:
+        hack_niriss = 1./1.8
+        msg = f"""
+ ! Scale NIRISS sensitivity by {hack_niriss:.3f} to hack gain correction
+ ! and match GLASS MIRAGE simulations. Sensitivity will be updated when
+ ! on-sky data available
+ """
+        utils.log_comment(utils.LOGFILE, msg, verbose=True)
+        
+        for b in conf.sens:
+            conf.sens[b]['SENSITIVITY'] *= hack_niriss
+            conf.sens[b]['ERROR'] *= hack_niriss
+            
     return conf
