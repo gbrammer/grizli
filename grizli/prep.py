@@ -604,8 +604,8 @@ def match_lists(input, output, transform=None, scl=3600., simple=True,
         Output pixel/array coordinates
     
     transform : None, `skimage.transform` object
-        Coordinate transformation model.  If None, use S
-        `skimage.transform.SimilarityTransform`, i.e., (shift, scale, rot)
+        Coordinate transformation model.  If None, use
+        `skimage.transform.EuclideanTransform`, i.e., shift & rotation
     
     scl : float
         Not used
@@ -659,7 +659,7 @@ def match_lists(input, output, transform=None, scl=3600., simple=True,
     """)
 
     if transform is None:
-        transform = skimage.transform.SimilarityTransform
+        transform = skimage.transform.EuclideanTransform
 
     # print 'xyxymatch'
     if (len(output) == 0) | (len(input) == 0):
@@ -765,7 +765,8 @@ def align_drizzled_image(root='',
                          min_flux_radius=1.,
                          match_catalog_density=None,
                          assume_close=False,
-                         ref_border=100):
+                         ref_border=100, 
+                         transform=None):
     """Pipeline for astrometric alignment of drizzled image products
     
     1. Generate source catalog from image mosaics
@@ -847,6 +848,9 @@ def align_drizzled_image(root='',
         Only include reference sources within `ref_border` pixels of the 
         target image, as calculated from the original image WCS
     
+    transform : None, `skimage.transform` object
+            Coordinate transformation model.  If None, use
+            `skimage.transform.EuclideanTransform`, i.e., shift & rotation
     Returns
     -------
     orig_wcs : `~astropy.wcs.WCS`
@@ -1028,11 +1032,14 @@ def align_drizzled_image(root='',
         titer = 0
         while (titer < 3):
             try:
-                res = match_lists(output, input, scl=1., simple=simple,
-                          outlier_threshold=outlier_threshold, toler=toler,
-                          triangle_size_limit=triangle_size_limit,
-                          triangle_ba_max=triangle_ba_max,
-                          assume_close=assume_close)
+                res = match_lists(output, input, scl=1.,
+                                  simple=simple,
+                                  outlier_threshold=outlier_threshold,
+                                  toler=toler,
+                                  triangle_size_limit=triangle_size_limit,
+                                  triangle_ba_max=triangle_ba_max,
+                                  assume_close=assume_close,
+                                  transform=transform)
 
                 output_ix, input_ix, outliers, tf = res
                 break
@@ -1047,12 +1054,14 @@ def align_drizzled_image(root='',
             titer += 1
             toler += 5
             try:
-                res = match_lists(output, input, scl=1., simple=simple,
-                              outlier_threshold=outlier_threshold,
-                              toler=toler,
-                              triangle_size_limit=triangle_size_limit,
-                              triangle_ba_max=triangle_ba_max,
-                              assume_close=assume_close)
+                res = match_lists(output, input, scl=1.,
+                                  simple=simple,
+                                  outlier_threshold=outlier_threshold,
+                                  toler=toler,
+                                  triangle_size_limit=triangle_size_limit,
+                                  triangle_ba_max=triangle_ba_max,
+                                  assume_close=assume_close,
+                                  transform=transform)
             except:
                 pass
 
@@ -1076,25 +1085,32 @@ def align_drizzled_image(root='',
                               outlier_threshold=outlier_threshold,
                               toler=toler,
                               triangle_size_limit=triangle_size_limit,
-                              triangle_ba_max=triangle_ba_max)
+                              triangle_ba_max=triangle_ba_max,
+                              transform=transform)
 
             output_ix2, input_ix2, outliers2, tf = res2
 
         # Log
         shift = tf.translation
+        if hasattr(tf, 'scale'):
+            _tfscale = tf.scale
+        else:
+            _tfscale = 1.0
+        
         NGOOD = (~outliers).sum()
         logstr = '# wcs {0} ({1:d}) {2:d}: {3:6.2f} {4:6.2f} {5:7.3f} {6:7.3f}'
         logstr = logstr.format(root, iter, NGOOD, shift[0], shift[1],
-                               tf.rotation/np.pi*180, 1./tf.scale)
+                               tf.rotation/np.pi*180, 1./_tfscale)
 
         utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
 
         out_shift += tf.translation
+            
         out_rot -= tf.rotation
-        out_scale *= tf.scale
+        out_scale *= _tfscale
 
         drz_wcs = utils.transform_wcs(drz_wcs, tf.translation, tf.rotation,
-                                      tf.scale)
+                                      _tfscale)
 
         # drz_wcs.wcs.crpix += tf.translation
         # theta = -tf.rotation
@@ -1916,11 +1932,11 @@ def make_SEP_catalog(root='',
     # Info
     tab.meta['ZP'] = (ZP, 'AB zeropoint')
     if 'PHOTPLAM' in im[0].header:
-        tab.meta['PLAM'] = (im[0].header['PHOTPLAM'], 'AB zeropoint')
+        tab.meta['PLAM'] = (im[0].header['PHOTPLAM'], 'Filter pivot wave')
         if 'PHOTFNU' in im[0].header:
-            tab.meta['FNU'] = (im[0].header['PHOTFNU'], 'AB zeropoint')
+            tab.meta['FNU'] = (im[0].header['PHOTFNU'], 'Scale to Jy')
 
-        tab.meta['FLAM'] = (im[0].header['PHOTFLAM'], 'AB zeropoint')
+        tab.meta['FLAM'] = (im[0].header['PHOTFLAM'], 'Scale to flam')
 
     tab.meta['uJy2dn'] = (uJy_to_dn, 'Convert uJy fluxes to image DN')
 
@@ -2541,22 +2557,24 @@ def make_drz_catalog(root='', sexpath='sex', threshold=2., get_background=True,
 
     im = pyfits.open(drz_file)
 
-    if 'PHOTFNU' in im[0].header:
-        ZP = -2.5*np.log10(im[0].header['PHOTFNU'])+8.90
-    elif 'PHOTFLAM' in im[0].header:
-        ZP = (-2.5*np.log10(im[0].header['PHOTFLAM']) - 21.10 -
-                 5*np.log10(im[0].header['PHOTPLAM']) + 18.6921)
-    elif 'FILTER' in im[0].header:
-        fi = im[0].header['FILTER'].upper()
-        if fi in model.photflam_list:
-            ZP = (-2.5*np.log10(model.photflam_list[fi]) - 21.10 -
-                     5*np.log10(model.photplam_list[fi]) + 18.6921)
-        else:
-            print('Couldn\'t find PHOTFNU or PHOTPLAM/PHOTFLAM keywords, use ZP=25')
-            ZP = 25
-    else:
-        print('Couldn\'t find FILTER, PHOTFNU or PHOTPLAM/PHOTFLAM keywords, use ZP=25')
-        ZP = 25
+    ZP = calc_header_zeropoint(im[0].header)
+    
+    # if 'PHOTFNU' in im[0].header:
+    #     ZP = -2.5*np.log10(im[0].header['PHOTFNU'])+8.90
+    # elif 'PHOTFLAM' in im[0].header:
+    #     ZP = (-2.5*np.log10(im[0].header['PHOTFLAM']) - 21.10 -
+    #              5*np.log10(im[0].header['PHOTPLAM']) + 18.6921)
+    # elif 'FILTER' in im[0].header:
+    #     fi = im[0].header['FILTER'].upper()
+    #     if fi in model.photflam_list:
+    #         ZP = (-2.5*np.log10(model.photflam_list[fi]) - 21.10 -
+    #                  5*np.log10(model.photplam_list[fi]) + 18.6921)
+    #     else:
+    #         print('Couldn\'t find PHOTFNU or PHOTPLAM/PHOTFLAM keywords, use ZP=25')
+    #         ZP = 25
+    # else:
+    #     print('Couldn\'t find FILTER, PHOTFNU or PHOTPLAM/PHOTFLAM keywords, use ZP=25')
+    #     ZP = 25
 
     if verbose:
         print('Image AB zeropoint: {0:.3f}'.format(ZP))
@@ -3095,6 +3113,7 @@ def process_direct_grism_visit(direct={},
                                align_ref_border=100,
                                align_min_flux_radius=1., 
                                align_assume_close=False,
+                               align_transform=None,
                                max_err_percentile=99,
                                catalog_mask_pad=0.05,
                                match_catalog_density=None,
@@ -3413,7 +3432,8 @@ def process_direct_grism_visit(direct={},
                                 match_catalog_density=match_catalog_density,
                                       ref_border=align_ref_border, 
                                       min_flux_radius=align_min_flux_radius, 
-                                      assume_close=align_assume_close)
+                                      assume_close=align_assume_close,
+                                      transform=align_transform)
         except:
 
             utils.log_exception(utils.LOGFILE, traceback)
@@ -3435,7 +3455,8 @@ def process_direct_grism_visit(direct={},
                                       catalog_mask_pad=catalog_mask_pad,
                                 match_catalog_density=match_catalog_density,
                                       ref_border=align_ref_border,
-                                      min_flux_radius=align_min_flux_radius)
+                                      min_flux_radius=align_min_flux_radius,
+                                      transform=align_transform)
 
         orig_wcs, drz_wcs, out_shift, out_rot, out_scale = result
 
@@ -4807,8 +4828,7 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
         rot90 = grismconf.JwstDispersionTransform(header=flt[0].header).rot90
         if rot90 % 2 == 0:
             avg_axis = 0
-            col_text = 'column'
-            
+            col_label = 'column'
         else:
             avg_axis = 1
             col_label = 'row'
@@ -5681,8 +5701,13 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, m
                      resetbits=resetbits,
                      static=(static & (len(inst_keys) == 1)),
                      gain=gain, rdnoise=rdnoise)
-
+        
         clean_drizzle(group['product'], fix_wcs_system=fix_wcs_system)
+        
+        # Reset JWST headers
+        if isJWST:
+            for file in group['files']:
+                _ = jwst_utils.set_jwst_to_hst_keywords(file, reset=True)
 
 
 def manual_alignment(visit, ds9, reference=None, reference_catalogs=['SDSS', 'PS1', 'GAIA', 'WISE'], use_drz=False):

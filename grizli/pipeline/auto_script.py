@@ -2668,7 +2668,7 @@ def grism_prep(field_root='j142724+334246', PREP_PATH='../Prep', EXTRACT_PATH='.
     # Link minimal files to Extractions directory
     os.chdir(EXTRACT_PATH)
     os.system(f'ln -s {PREP_PATH}/*GrismFLT* .')
-    os.system(f'ln -s {PREP_PATH}/*_fl*wcs.fits .')
+    os.system(f'ln -s {PREP_PATH}/*.0?.wcs.fits .')
     os.system(f'ln -s {PREP_PATH}/{field_root}-*.cat.fits .')
     os.system(f'ln -s {PREP_PATH}/{field_root}-*seg.fits .')
     os.system(f'ln -s {PREP_PATH}/*_phot.fits .')

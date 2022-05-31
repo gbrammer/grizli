@@ -1,0 +1,414 @@
+MIRI:
+  F1000W:
+    ab_vega: 4.905053935983853
+    eazy_fnumber: 397
+    ebv0.1: 0.0
+    photfile: jwst_miri_photom_0073.fits
+    photmjsr: 0.8495230078697205
+    pivot: 9.9471092583611
+    rectwidth: 1.8150435977353758
+  F1130W:
+    ab_vega: 5.195159820992248
+    eazy_fnumber: 398
+    ebv0.1: 0.0
+    photfile: jwst_miri_photom_0073.fits
+    photmjsr: 2.5494699478149414
+    pivot: 11.309234333432665
+    rectwidth: 0.7305097428332569
+  F1280W:
+    ab_vega: 5.440609143915109
+    eazy_fnumber: 399
+    ebv0.1: 0.0
+    photfile: jwst_miri_photom_0073.fits
+    photmjsr: 0.9969329833984375
+    pivot: 12.809358773603089
+    rectwidth: 2.460415101840471
+  F1500W:
+    ab_vega: 5.782663866689976
+    eazy_fnumber: 400
+    ebv0.1: 0.0
+    photfile: jwst_miri_photom_0073.fits
+    photmjsr: 0.8826910257339478
+    pivot: 15.048155266467099
+    rectwidth: 2.923025456772075
+  F1800W:
+    ab_vega: 6.17214348658878
+    eazy_fnumber: 401
+    ebv0.1: 0.0
+    photfile: jwst_miri_photom_0073.fits
+    photmjsr: 1.2419899702072144
+    pivot: 17.96967355627891
+    rectwidth: 2.8670426669246867
+  F2100W:
+    ab_vega: 6.474077692471623
+    eazy_fnumber: 402
+    ebv0.1: 0.0
+    photfile: jwst_miri_photom_0073.fits
+    photmjsr: 0.9672409892082214
+    pivot: 20.801389910583502
+    rectwidth: 4.583602546001584
+  F2550W:
+    ab_vega: 6.900496585427175
+    eazy_fnumber: 403
+    ebv0.1: 0.0
+    photfile: jwst_miri_photom_0073.fits
+    photmjsr: 1.9824199676513672
+    pivot: 25.22966374735404
+    rectwidth: 3.4220462555243882
+  F560W:
+    ab_vega: 3.7144754200582386
+    eazy_fnumber: 395
+    ebv0.1: 0.0
+    photfile: jwst_miri_photom_0073.fits
+    photmjsr: 1.1270099878311157
+    pivot: 5.632612445203548
+    rectwidth: 1.0065393876223423
+  F770W:
+    ab_vega: 4.329347421098616
+    eazy_fnumber: 396
+    ebv0.1: 0.0
+    photfile: jwst_miri_photom_0073.fits
+    photmjsr: 0.5927879810333252
+    pivot: 7.636411731877862
+    rectwidth: 1.9674106390415116
+NIRCAM:
+  F070W:
+    ab_vega: 0.28818353530759633
+    eazy_fnumber: 362
+    ebv0.1: -0.2135733349211823
+    photfile: jwst_nircam_photom_0089.fits
+    photmjsr: 4.860785484313965
+    pivot: 0.7043221966873889
+    rectwidth: 0.1326629272152203
+  F090W:
+    ab_vega: 0.5159678259126521
+    eazy_fnumber: 363
+    ebv0.1: -0.14159054258003095
+    photfile: jwst_nircam_photom_0089.fits
+    photmjsr: 3.3771445751190186
+    pivot: 0.9022922169659542
+    rectwidth: 0.19425846850043202
+  F115W:
+    ab_vega: 0.7759321641966053
+    eazy_fnumber: 364
+    ebv0.1: -0.09254774154653818
+    photfile: jwst_nircam_photom_0089.fits
+    photmjsr: 2.974543571472168
+    pivot: 1.154300926930138
+    rectwidth: 0.22460795554808455
+  F140M:
+    ab_vega: 1.1076936997365074
+    eazy_fnumber: 368
+    ebv0.1: -0.06591852926069822
+    photfile: jwst_nircam_photom_0089.fits
+    photmjsr: 5.300120830535889
+    pivot: 1.4053733062516323
+    rectwidth: 0.1427602182560621
+  F150W:
+    ab_vega: 1.2042573366105531
+    eazy_fnumber: 365
+    ebv0.1: -0.05999451597075152
+    photfile: jwst_nircam_photom_0089.fits
+    photmjsr: 2.385913372039795
+    pivot: 1.5007454908178013
+    rectwidth: 0.3198620380691303
+  F150W2:
+    ab_vega: 1.1389861533225094
+    eazy_fnumber: 367
+    ebv0.1: -0.05998038494936772
+    photfile: jwst_nircam_photom_0089.fits
+    photmjsr: 0.6736560463905334
+    pivot: 1.6579555105925448
+    rectwidth: 1.1789870218960645
+  F162M:
+    ab_vega: 1.356629591362868
+    eazy_fnumber: 369
+    ebv0.1: -0.05240589072005913
+    photfile: jwst_nircam_photom_0089.fits
+    photmjsr: 5.033522129058838
+    pivot: 1.6272458370690417
+    rectwidth: 0.16900998767070385
+  F164N:
+    ab_vega: 1.3978350945909002
+    eazy_fnumber: 372
+    ebv0.1: -0.05142571577860651
+    photfile: jwst_nircam_photom_0089.fits
+    photmjsr: 43.95996856689453
+    pivot: 1.6445854009565803
+    rectwidth: 0.02021855608632381
+  F182M:
+    ab_vega: 1.5613959704243334
+    eazy_fnumber: 370
+    ebv0.1: -0.043522608266899354
+    photfile: jwst_nircam_photom_0089.fits
+    photmjsr: 3.693331718444824
+    pivot: 1.8452206451099955
+    rectwidth: 0.23997527701141502
+  F187N:
+    ab_vega: 1.6300206793188554
+    eazy_fnumber: 373
+    ebv0.1: -0.04238517888863779
+    photfile: jwst_nircam_photom_0089.fits
+    photmjsr: 39.897613525390625
+    pivot: 1.8738864366894519
+    rectwidth: 0.023671972431313474
+  F200W:
+    ab_vega: 1.6736352132713173
+    eazy_fnumber: 366
+    ebv0.1: -0.039421401098098274
+    photfile: jwst_nircam_photom_0089.fits
+    photmjsr: 2.010988712310791
+    pivot: 1.9886478139793544
+    rectwidth: 0.45705677823975277
+  F210M:
+    ab_vega: 1.7847944448607536
+    eazy_fnumber: 371
+    ebv0.1: -0.03625306172148157
+    photfile: jwst_nircam_photom_0089.fits
+    photmjsr: 4.754210472106934
+    pivot: 2.095530780611204
+    rectwidth: 0.20848304161920855
+  F212N:
+    ab_vega: 1.8071256986205373
+    eazy_fnumber: 374
+    ebv0.1: -0.035574193249874715
+    photfile: jwst_nircam_photom_0089.fits
+    photmjsr: 36.208072662353516
+    pivot: 2.1211831936185708
+    rectwidth: 0.027476331379904694
+  F250M:
+    ab_vega: 2.1219355680177228
+    eazy_fnumber: 379
+    ebv0.1: -0.02851120688911921
+    photfile: jwst_nircam_photom_0095.fits
+    photmjsr: 1.8272408246994019
+    pivot: 2.502573180435017
+    rectwidth: 0.18028934315843068
+  F277W:
+    ab_vega: 2.2855235295973637
+    eazy_fnumber: 375
+    ebv0.1: -0.0254291201371696
+    photfile: jwst_nircam_photom_0095.fits
+    photmjsr: 0.5215780735015869
+    pivot: 2.7577958764384802
+    rectwidth: 0.6824481077040923
+  F300M:
+    ab_vega: 2.4574653574425733
+    eazy_fnumber: 380
+    ebv0.1: -0.02283171334543076
+    photfile: jwst_nircam_photom_0095.fits
+    photmjsr: 1.2490369081497192
+    pivot: 2.987323442369741
+    rectwidth: 0.31548006083109886
+  F322W2:
+    ab_vega: 2.4965382198740564
+    eazy_fnumber: 378
+    ebv0.1: -0.021707427588161264
+    photfile: jwst_nircam_photom_0095.fits
+    photmjsr: 0.2277407944202423
+    pivot: 3.2316879770931566
+    rectwidth: 1.3576093738362995
+  F323N:
+    ab_vega: 2.6125238981467636
+    eazy_fnumber: 387
+    ebv0.1: -0.020693799590802087
+    photfile: jwst_nircam_photom_0095.fits
+    photmjsr: 13.208301544189453
+    pivot: 3.2369196521406005
+    rectwidth: 0.03864357526559588
+  F335M:
+    ab_vega: 2.6861342006766717
+    eazy_fnumber: 381
+    ebv0.1: -0.019824945173819167
+    photfile: jwst_nircam_photom_0095.fits
+    photmjsr: 1.0946526527404785
+    pivot: 3.362287905037259
+    rectwidth: 0.3533379937327616
+  F356W:
+    ab_vega: 2.783504572129279
+    eazy_fnumber: 376
+    ebv0.1: -0.01862680380985718
+    photfile: jwst_nircam_photom_0095.fits
+    photmjsr: 0.4345223903656006
+    pivot: 3.568227763839694
+    rectwidth: 0.7811651476473094
+  F360M:
+    ab_vega: 2.8357500951446024
+    eazy_fnumber: 382
+    ebv0.1: -0.018159740881044502
+    photfile: jwst_nircam_photom_0095.fits
+    photmjsr: 0.9860653281211853
+    pivot: 3.624208265175199
+    rectwidth: 0.3703888171547362
+  F405N:
+    ab_vega: 3.087869390589371
+    eazy_fnumber: 388
+    ebv0.1: -0.015958287378913374
+    photfile: jwst_nircam_photom_0095.fits
+    photmjsr: 9.906220436096191
+    pivot: 4.051697263814701
+    rectwidth: 0.04577474652795823
+  F410M:
+    ab_vega: 3.0765326539571385
+    eazy_fnumber: 383
+    ebv0.1: -0.015855299940669504
+    photfile: jwst_nircam_photom_0095.fits
+    photmjsr: 0.9272487759590149
+    pivot: 4.082057324627222
+    rectwidth: 0.43805498106149743
+  F430M:
+    ab_vega: 3.17629307843295
+    eazy_fnumber: 384
+    ebv0.1: -0.015009494658410573
+    photfile: jwst_nircam_photom_0095.fits
+    photmjsr: 1.7922990322113037
+    pivot: 4.280406169822821
+    rectwidth: 0.22783766526049648
+  F444W:
+    ab_vega: 3.204274874888016
+    eazy_fnumber: 377
+    ebv0.1: -0.014679941529834619
+    photfile: jwst_nircam_photom_0095.fits
+    photmjsr: 0.38998839259147644
+    pivot: 4.403671097714713
+    rectwidth: 1.0314434054189994
+  F460M:
+    ab_vega: 3.3388872651384234
+    eazy_fnumber: 385
+    ebv0.1: -0.013763397699644353
+    photfile: jwst_nircam_photom_0095.fits
+    photmjsr: 2.2877941131591797
+    pivot: 4.626222838425127
+    rectwidth: 0.22909531022868082
+  F466N:
+    ab_vega: 3.38197467755736
+    eazy_fnumber: 389
+    ebv0.1: -0.013678324120253958
+    photfile: jwst_nircam_photom_0095.fits
+    photmjsr: 14.410465240478516
+    pivot: 4.65440219568314
+    rectwidth: 0.0536718016571823
+  F470N:
+    ab_vega: 3.370803904216218
+    eazy_fnumber: 390
+    ebv0.1: -0.01350829578167297
+    photfile: jwst_nircam_photom_0095.fits
+    photmjsr: 14.320897102355957
+    pivot: 4.707790413430345
+    rectwidth: 0.051185552861473235
+  F480M:
+    ab_vega: 3.4119414049496166
+    eazy_fnumber: 386
+    ebv0.1: -0.013189385090825546
+    photfile: jwst_nircam_photom_0095.fits
+    photmjsr: 1.6411021947860718
+    pivot: 4.815523593549772
+    rectwidth: 0.30377992522766634
+NIRISS:
+  F090W:
+    ab_vega: 0.5160765009048276
+    eazy_fnumber: 350
+    ebv0.1: -0.14170616112327308
+    photfile: jwst_niriss_photom_0038.fits
+    photmjsr: 0.37283509969711304
+    pivot: 0.9024675692574968
+    rectwidth: 0.18321477998393115
+  F115W:
+    ab_vega: 0.7692119567046667
+    eazy_fnumber: 351
+    ebv0.1: -0.09321755510585866
+    photfile: jwst_niriss_photom_0038.fits
+    photmjsr: 0.3300777077674866
+    pivot: 1.1495456463766047
+    rectwidth: 0.2500420414413561
+  F140M:
+    ab_vega: 1.1056794024337948
+    eazy_fnumber: 354
+    ebv0.1: -0.06604038131527243
+    photfile: jwst_niriss_photom_0038.fits
+    photmjsr: 0.7764005064964294
+    pivot: 1.4040159763708964
+    rectwidth: 0.14238440072318734
+  F150W:
+    ab_vega: 1.195187287201415
+    eazy_fnumber: 352
+    ebv0.1: -0.06048574230741759
+    photfile: jwst_niriss_photom_0038.fits
+    photmjsr: 0.37078890204429626
+    pivot: 1.493448043997472
+    rectwidth: 0.3162435571455304
+  F158M:
+    ab_vega: 1.2955114789815956
+    eazy_fnumber: 355
+    ebv0.1: -0.055363828059932285
+    photfile: jwst_niriss_photom_0038.fits
+    photmjsr: 0.6962990760803223
+    pivot: 1.5817992861266001
+    rectwidth: 0.19905971881576806
+  F200W:
+    ab_vega: 1.6766443812555791
+    eazy_fnumber: 353
+    ebv0.1: -0.039322006418050774
+    photfile: jwst_niriss_photom_0038.fits
+    photmjsr: 0.34278640151023865
+    pivot: 1.9929589138848633
+    rectwidth: 0.4228740040954827
+  F277W:
+    ab_vega: 2.260183782313279
+    eazy_fnumber: 356
+    ebv0.1: -0.02562535588061217
+    photfile: jwst_niriss_photom_0038.fits
+    photmjsr: 1.5750579833984375
+    pivot: 2.7642260137521504
+    rectwidth: 0.6926706953372831
+  F356W:
+    ab_vega: 2.781586085893478
+    eazy_fnumber: 357
+    ebv0.1: -0.018554030128368038
+    photfile: jwst_niriss_photom_0038.fits
+    photmjsr: 0.26499199867248535
+    pivot: 3.5930046741596118
+    rectwidth: 0.9093105011990319
+  F380M:
+    ab_vega: 2.910082828110169
+    eazy_fnumber: 359
+    ebv0.1: -0.01716860867840539
+    photfile: jwst_niriss_photom_0038.fits
+    photmjsr: 7.3604350090026855
+    pivot: 3.824942095736629
+    rectwidth: 0.2054154176394431
+  F430M:
+    ab_vega: 3.1657369102215145
+    eazy_fnumber: 360
+    ebv0.1: -0.015022503733125803
+    photfile: jwst_niriss_photom_0038.fits
+    photmjsr: 9.185256004333496
+    pivot: 4.281684172704966
+    rectwidth: 0.20135071592404016
+  F444W:
+    ab_vega: 3.2097070476573193
+    eazy_fnumber: 358
+    ebv0.1: -0.01460863884795536
+    photfile: jwst_niriss_photom_0038.fits
+    photmjsr: 0.2931137979030609
+    pivot: 4.427697061100139
+    rectwidth: 1.0921486602734922
+  F480M:
+    ab_vega: 3.382818572261269
+    eazy_fnumber: 361
+    ebv0.1: -0.013232763695635287
+    photfile: jwst_niriss_photom_0038.fits
+    photmjsr: 8.240961074829102
+    pivot: 4.815190220745452
+    rectwidth: 0.2966849192800114
+meta:
+  created: '2022-05-31'
+  description:
+    ab_vega: AB - Vega mag conversion
+    eazy_fnumber: Filter number in the eazy filter file
+    ebv0.1: Milky Way extinction, mag for E(B-V)=0.1, Rv=3.1
+    photfile: Photom reference file
+    photmjsr: Photometric conversion if ref files available
+    pivot: Filter pivot wavelength
+    rectwith: Filter rectangular width
+  wave_unit: micron

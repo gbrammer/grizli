@@ -1616,9 +1616,9 @@ class ImageData(object):
 
         self.wcs = None
 
-        if (instrument in ['NIRISS', 'NIRCAM']) & (~self.is_slice):
-            if process_jwst_header:
-                self.update_jwst_wcsheader(hdulist)
+        # if (instrument in ['NIRISS', 'NIRCAM']) & (~self.is_slice):
+        #     if process_jwst_header:
+        #         self.update_jwst_wcsheader(hdulist)
 
         if self.header is not None:
             if wcs is None:

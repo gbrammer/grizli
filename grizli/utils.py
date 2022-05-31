@@ -1411,13 +1411,17 @@ def calc_header_zeropoint(im, ext=0):
         fi = None
 
     # Get AB zeropoint
-    if 'PHOTFLAM' in header:
+    if 'APZP' in header:
+        ZP = header['ABZP']
+    
+    elif 'PHOTFNU' in header:
+        ZP = -2.5*np.log10(header['PHOTFNU'])+8.90
+        ZP += 2.5*np.log10(scale_exptime)
+        
+    elif 'PHOTFLAM' in header:
         ZP = (-2.5*np.log10(header['PHOTFLAM']) - 21.10 -
               5*np.log10(header['PHOTPLAM']) + 18.6921)
 
-        ZP += 2.5*np.log10(scale_exptime)
-    elif 'PHOTFNU' in header:
-        ZP = -2.5*np.log10(header['PHOTFNU'])+8.90
         ZP += 2.5*np.log10(scale_exptime)
     
     elif (fi is not None):
@@ -4452,6 +4456,37 @@ def strip_header_keys(header, comment=True, history=True, drizzle_keys=DRIZZLE_K
     return h
 
 
+def wcs_from_header(header, relax=True, **kwargs):
+    """
+    Initialize `~astropy.wcs.WCS` from a `~astropy.io.fits.Header`
+    
+    Parameters
+    ----------
+    header : `~astropy.io.fits.Header`
+        FITS header with optional ``SIPCRPX1`` and ``SIPCRPX2`` keywords that
+        define a separate reference pixel for a SIP header
+    
+    relax, kwargs : bool, dict
+        Keywords passed to `astropy.wcs.WCS`
+    
+    Returns
+    -------
+    wcs : `~astropy.wcs.WCS`
+        WCS object
+        
+    """
+    wcs = pywcs.WCS(header, relax=relax)
+    
+    if ('SIPCRPX1' in header) & hasattr(wcs, 'sip'):
+        wcs.sip.crpix[0] = header['SIPCRPX1']
+        wcs.sip.crpix[1] = header['SIPCRPX2']
+    elif ('SIAF_XREF_SCI' in header) & hasattr(wcs, 'sip'):
+        wcs.sip.crpix[0] = header['SIAF_XREF_SCI']
+        wcs.sip.crpix[1] = header['SIAF_YREF_SCI']
+        
+    return wcs
+
+
 def to_header(wcs, add_naxis=True, relax=True, key=None):
     """Modify `astropy.wcs.WCS.to_header` to produce more keywords
 
@@ -4492,7 +4527,11 @@ def to_header(wcs, add_naxis=True, relax=True, key=None):
         if k.startswith('PC'):
             cd = k.replace('PC', 'CD')
             header.rename_keyword(k, cd)
-
+    
+    if hasattr(wcs, 'sip'):
+        if hasattr(wcs.sip, 'crpix'):
+            header['SIPCRPX1'], header['SIPCRPX2'] = wcs.sip.crpix
+            
     return header
 
 
