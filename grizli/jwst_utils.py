@@ -367,7 +367,7 @@ def match_gwcs_to_sip(img, step=64, transform=None, verbose=True):
     return obj
 
 
-def get_phot_keywords(input):
+def get_phot_keywords(input, verbose=True):
     """Calculate conversions between JWST ``MJy/sr`` units and PHOTFLAM/PHOTFNU
     
     Parameters
@@ -402,7 +402,12 @@ def get_phot_keywords(input):
         pscale = utils.get_wcs_pscale(_wcs)
     
     # Check image units
-    if img['SCI'].header['BUNIT'].upper() == 'MJy/sr'.upper():
+    if 'OBUNIT' in img['SCI'].header:
+        unit_key = 'OBUNIT'
+    else:
+        unit_key = 'BUNIT'
+        
+    if img['SCI'].header[unit_key].upper() == 'MJy/sr'.upper():
         in_unit = u.MJy/u.sr
         to_mjysr = 1.0
     else:
@@ -427,15 +432,33 @@ def get_phot_keywords(input):
     else:
         plam = 5.0e4
     
+    photflam = tojy*2.99e-5/plam**2
+    _ZP = -2.5*np.log10(tojy)+8.9
+    
+    if verbose:
+        msg = '# photometry keywords\n'
+        msg += f'PHOTFNU = {tojy:.4e}\n'
+        msg += f'PHOTPLAM = {plam:.1f}\n'
+        msg += f'PHOTFLAM = {photflam:.4e}\n'
+        msg += f'ZP = {_ZP:.2f}\n'
+        msg += f'TO_MJYSR = {to_mjysr:.3f}\n'
+        utils.log_comment(utils.LOGFILE, msg, verbose=True)
+        
     # Set header keywords
     for e in [0, 'SCI']:        
         img[e].header['PHOTFNU'] = tojy, 'Scale factor to Janskys'
         img[e].header['PHOTPLAM'] = (plam, 'Bandpass pivot wavelength, A')
-        img[e].header['PHOTFLAM'] = (tojy*2.99e-5/plam**2,
-                                     'Scale to erg/s/cm2/A')
-        img[e].header['ZP'] = -2.5*np.log10(tojy)+8.9, 'AB mag zeropoint'
+        img[e].header['PHOTFLAM'] = (photflam, 'Scale to erg/s/cm2/A')
+        img[e].header['ZP'] = _ZP, 'AB mag zeropoint'
         img[e].header['TO_MJYSR'] = (to_mjysr, 'Scale to MJy/sr')
+    
+    # Drizzlepac needs ELECTRONS/S
+    if 'OBUNIT' not in img['SCI'].header:
+        img['SCI'].header['OBUNIT'] = (img['SCI'].header['BUNIT'], 
+                                      'Original image units')
         
+    img['SCI'].header['BUNIT'] = 'ELECTRONS/S'
+    
     # Write FITS file if filename provided as input
     if isinstance(input, str):
         img.flush()
@@ -653,7 +676,7 @@ def set_jwst_to_hst_keywords(input, reset=False, verbose=True, orig_keys=ORIG_KE
             if newk in img[0].header:
                 img[0].header[k] = img[0].header[newk]
                 msg = f'Reset: {k} > {img[0].header[newk]} ({newk})'
-                utils.log_comment(utils.LOGFILE, msg, verbose=verbose)            
+                utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
     else:
         for k in HST_KEYS:
             img[0].header[k] = HST_KEYS[k]
