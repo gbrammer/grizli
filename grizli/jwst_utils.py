@@ -578,12 +578,14 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
     dq[img['DQ'].data < 0] = 2**bit    
     
     if img[0].header['OINSTRUM'] == 'MIRI':
-        dq4 = (dq & 4 > 0).sum()
-        if dq4 / dq.size > 0.9:
-            msg = f'Unset MIRI DQ bit=4'
-            utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
-            dq -= dq & 4
-        
+        for b in [2,4]:
+            dq4 = (dq & b > 0).sum()
+            if dq4 / dq.size > 0.4:
+                msg = f'Unset MIRI DQ bit={b}'
+                utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+                dq -= dq & b
+                #dq -= dq & 2
+            
         msg = f'Mask left side of MIRI'
         utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
         dq[:,:302] |= 1

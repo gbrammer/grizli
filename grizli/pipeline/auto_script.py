@@ -300,7 +300,7 @@ def go(root='j010311+131615',
         Magnitude limits of objects to extract and fit.
 
     """
-    isJWST = visit_prep_args['isJWST']
+    #isJWST = visit_prep_args['isJWST']
     # Function defaults
     if get_dict:
         if get_dict <= 2:

@@ -3269,7 +3269,7 @@ def process_direct_grism_visit(direct={},
         driz_cr_scale = '1.2 0.7'
     elif isJWST:
         # Placeholder
-        bits = 576+256
+        bits = 256
         driz_cr_snr = '8.0 5.0'
         driz_cr_scale = '2.5 0.7'        
     else:
