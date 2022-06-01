@@ -3296,7 +3296,17 @@ def process_direct_grism_visit(direct={},
     else:
         driz_cr_snr_first = driz_cr_snr
         driz_cr_scale_first = driz_cr_scale
-
+    
+    # GAIN for AstroDrizzle
+    if isJWST:
+        # I guess this means ignore these values?
+        _gain = '-99'
+        _rdnoise = '-99'
+    else:
+        # Will be derived from header keywords for HST
+        _gain = None
+        _rdnoise = None
+        
     if not skip_direct:
         if (not isACS) & (not isWFPC2) & run_tweak_align:
             # if run_tweak_align:
@@ -3339,11 +3349,6 @@ def process_direct_grism_visit(direct={},
             if os.path.exists(file):
                 os.remove(file)        
         
-        # if isJWST:
-        #     # Set HST header
-        #     for file in direct['files']:
-        #         _ = jwst_utils.set_jwst_to_hst_keywords(file, reset=False)
-                        
         # First drizzle
         if len(direct['files']) > 1:
             for file in direct['files']:
@@ -3353,13 +3358,17 @@ def process_direct_grism_visit(direct={},
             
             AstroDrizzle(direct['files'], output=direct['product'],
                          clean=True, context=False, preserve=False,
-                         skysub=True, driz_separate=True, driz_sep_wcs=True,
+                         skysub=True,
+                         driz_separate=True, driz_sep_wcs=True,
                          median=True, blot=True, driz_cr=True,
                          driz_cr_snr=driz_cr_snr_first,
                          driz_cr_scale=driz_cr_scale_first,
                          driz_cr_corr=False, driz_combine=True,
                          final_bits=bits, coeffs=True, build=False,
-                         final_wht_type='IVM', gain='-99', rdnoise='-99', **drizzle_params)
+                         resetbits=4096,
+                         final_wht_type='IVM',
+                         gain=_gain,
+                         rdnoise=_rdnoise, **drizzle_params)
         else:
             AstroDrizzle(direct['files'], output=direct['product'],
                          clean=True, final_scale=None, final_pixfrac=1,
@@ -3367,7 +3376,10 @@ def process_direct_grism_visit(direct={},
                          driz_separate=False, driz_sep_wcs=False,
                          median=False, blot=False, driz_cr=False,
                          driz_cr_corr=False, driz_combine=True,
-                         build=False, final_wht_type='IVM', gain='-99', rdnoise='-99', **drizzle_params)
+                         build=False, final_wht_type='IVM',
+                         gain=_gain,
+                         rdnoise=_rdnoise,
+                         **drizzle_params)
 
         # Now do tweak_align for ACS
         if (isACS) & run_tweak_align & (len(direct['files']) > 1):
@@ -3384,7 +3396,10 @@ def process_direct_grism_visit(direct={},
                              median=False, blot=False, driz_cr=False,
                              driz_cr_corr=False, driz_combine=True,
                              final_bits=bits, coeffs=True, build=False,
-                             final_wht_type='IVM', gain='-99', rdnoise='-99', resetbits=0)
+                             final_wht_type='IVM',
+                             gain=_gain,
+                             rdnoise=_rdnoise,
+                             resetbits=0)
         
         # Make catalog & segmentation image
         if align_thresh is None:
@@ -3497,7 +3512,9 @@ def process_direct_grism_visit(direct={},
                          driz_cr_scale=driz_cr_scale, driz_separate=False,
                          driz_sep_wcs=False, median=False, blot=False,
                          driz_cr=False, driz_cr_corr=False,
-                         build=False, final_wht_type='IVM', gain='-99', rdnoise='-99', **drizzle_params)
+                         build=False, final_wht_type='IVM',
+                         gain=_gain, rdnoise=_rdnoise,
+                         **drizzle_params)
         else:
             if 'par' in direct['product']:
                 pixfrac = 1.0
@@ -3510,7 +3527,10 @@ def process_direct_grism_visit(direct={},
                          resetbits=4096, final_bits=bits, driz_sep_bits=bits,
                          preserve=False, driz_cr_snr=driz_cr_snr,
                          driz_cr_scale=driz_cr_scale, build=False,
-                         final_wht_type='IVM', gain='-99', rdnoise='-99', **drizzle_params)
+                         final_wht_type='IVM',
+                         gain=_gain, rdnoise=_rdnoise,
+                         **drizzle_params)
+                         
         # Flag areas of ACS images covered by a single image, where
         # CRs aren't appropriately masked
         is_single = (len(direct['files']) == 1)
@@ -3571,10 +3591,12 @@ def process_direct_grism_visit(direct={},
         if clip.sum() > NMAX:
             so = so[:NMAX]
 
-        table_to_regions(cat[clip][so], '{0}.cat.reg'.format(direct['product']))
+        table_to_regions(cat[clip][so], 
+                         '{0}.cat.reg'.format(direct['product']))
 
         if not ((isACS | isWFPC2) & is_single):
-            table_to_radec(cat[clip][so], '{0}.cat.radec'.format(direct['product']))
+            table_to_radec(cat[clip][so], 
+                           '{0}.cat.radec'.format(direct['product']))
 
         if (fix_stars) & (not isACS) & (not isWFPC2) & (not isJWST):
             fix_star_centers(root=direct['product'], drizzle=False, 
@@ -3618,7 +3640,7 @@ def process_direct_grism_visit(direct={},
                  driz_cr_snr=driz_cr_snr, driz_cr_scale=driz_cr_scale,
                  driz_combine=True, final_bits=bits, coeffs=True,
                  resetbits=4096, build=False, final_wht_type='IVM',
-                 gain='-99', rdnoise='-99')
+                 gain=_gain, rdnoise=_rdnoise)
     
     if isJWST:
         # Set keywords back
@@ -3676,7 +3698,9 @@ def process_direct_grism_visit(direct={},
                  driz_cr_snr=driz_cr_snr, driz_cr_scale=driz_cr_scale,
                  driz_combine=True, driz_sep_bits=bits, final_bits=bits,
                  coeffs=True, resetbits=4096, final_pixfrac=pixfrac,
-                 build=False, gain='-99', rdnoise='-99', final_wht_type='IVM')
+                 build=False,
+                 gain=_gain, rdnoise=_rdnoise,
+                 final_wht_type='IVM')
 
     clean_drizzle(grism['product'])
 
@@ -3688,22 +3712,6 @@ def process_direct_grism_visit(direct={},
         for file in grism['files']:
             _ = jwst_utils.set_jwst_to_hst_keywords(file, reset=True)
     
-    # # Rename instrument back to JWST stuff
-    # # add an if statement later for this
-    # if isJWST: # put original header keywords back
-    #     for file in direct['files']:
-    #         print('cwd is {}'.format(os.getcwd))
-    #         hdu = pyfits.open(file, mode='update') 
-    #         hdu[0].header['INSTRUME'] = hdu[0].header['OINSTRUME']
-    #         hdu[0].header['DETECTOR'] = hdu[0].header['ODETECTOR']
-    #         hdu.flush()
-    #     for file in grism['files']:
-    #         hdu = pyfits.open(file, mode='update')
-    #         hdu[0].header['INSTRUME'] = hdu[0].header['OINSTRUME']
-    #         hdu[0].header['DETECTOR'] = hdu[0].header['ODETECTOR']
-    #         hdu.flush()
-    #         print('cwd is {}'.format(os.getcwd))
-
     return True
 
 
