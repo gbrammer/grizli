@@ -932,7 +932,7 @@ def split_visit(visit, visit_split_shift=1.5, max_dt=6./24, path='../RAW'):
             if os.path.exists(_file):
                 ims.append(pyfits.open(_file))
                 break
-        
+    
     #ims = [pyfits.open(os.path.join(path, file)) for file in visit['files']]
     crval1 = np.array([im[1].header['CRVAL1'] for im in ims])
     crval2 = np.array([im[1].header['CRVAL2'] for im in ims])
@@ -951,11 +951,21 @@ def split_visit(visit, visit_split_shift=1.5, max_dt=6./24, path='../RAW'):
         return [visit]
     else:
         spl = visit['product'].split('-')
-        spl.insert(-1, '')
+        isJWST = spl[-1].lower().startswith('clear')
+        isJWST |= spl[-1].lower() in ['gr150r','gr150c','grismr','grismc']
+        if isJWST:
+            spl.insert(-2, '')
+        else:
+            spl.insert(-1, '')
+            
         visits = []
         for i in range(len(un)):
             ix = keys == un[i]
-            spl[-2] = 'abcdefghijklmnopqrsuvwxyz'[i]
+            if isJWST:
+                spl[-3] = 'abcdefghijklmnopqrsuvwxyz'[i]
+            else:
+                spl[-2] = 'abcdefghijklmnopqrsuvwxyz'[i]
+                
             new_visit = {'files': list(np.array(visit['files'])[ix]),
                          'product': '-'.join(spl)}
 
