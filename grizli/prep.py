@@ -1046,7 +1046,7 @@ def align_drizzled_image(root='',
             except:
                 toler += 5
                 titer += 1
-
+        
         #print(output.shape, output_ix.shape, output_ix.min(), output_ix.max(), titer, toler, input_ix.shape, input.shape)
 
         titer = 0
@@ -1089,7 +1089,17 @@ def align_drizzled_image(root='',
                               transform=transform)
 
             output_ix2, input_ix2, outliers2, tf = res2
-
+        
+        # print('xxx')
+        # import tristars.match
+        # pair_ix = np.zeros((len(output_ix), 2), dtype=int)
+        # pair_ix[:,0] = output_ix
+        # pair_ix[:,1] = input_ix
+        # print(output_ix, input_ix, len(output), len(input))
+        # 
+        # fig = tristars.match.match_diagnostic_plot(output, input, pair_ix, tf=tf, new_figure=True)
+        # fig.savefig('xxx.png')
+                                              
         # Log
         shift = tf.translation
         if hasattr(tf, 'scale'):
@@ -1215,7 +1225,10 @@ def log_wcs(root, drz_wcs, shift, rot, scale, rms=0., n=-1, initialize=True, com
 
     hdu.header['FIT_RMS'] = rot, 'WCS fit RMS'
     hdu.header['FIT_N'] = n, 'Number of sources in WCS fit'
-
+    hdu.header['EXTNAME'] = 'WCS'
+    for i, e in enumerate(orig_hdul):
+        orig_hdul[e].header['EXTNAME'] = f'WCS{i}'
+        
     orig_hdul.append(hdu)
     orig_hdul.writeto('{0}_wcs.fits'.format(root), overwrite=True)
 
@@ -4060,7 +4073,7 @@ def tweak_flt(files=[], max_dist=0.4, threshold=3, verbose=True, tristars_kwargs
         except:
             ok = np.isfinite(im['SCI', 1].data)
 
-        sci = im['SCI', 1].data*ok - np.median(im['SCI', 1].data[ok])
+        sci = im['SCI', 1].data*ok - np.nanmedian(im['SCI', 1].data[ok])
 
         header = im['SCI', 1].header.copy()
 
