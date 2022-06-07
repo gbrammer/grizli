@@ -183,8 +183,8 @@ class GroupFLT():
                  pad=200, group_name='group',
                  ref_file=None, ref_ext=0, seg_file=None,
                  shrink_segimage=True, verbose=True, cpu_count=0,
-                 catalog='', polyx=[0.3, 2.35],
-                 MW_EBV=0.):
+                 catalog='', polyx=[0.3, 5.1],
+                 MW_EBV=0., bits=None):
         """Main container for handling multiple grism exposures together
 
         Parameters
@@ -266,7 +266,7 @@ class GroupFLT():
 
         # Wavelengths for polynomial fits
         self.polyx = polyx
-
+        
         # Read catalog
         if catalog:
             if isinstance(catalog, str):
