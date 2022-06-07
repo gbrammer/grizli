@@ -1834,6 +1834,10 @@ def preprocess(field_root='j142724+334246',  HOME_PATH='/Volumes/Pegasus/Grizli/
         vspl = v['product'].split('-')
         if vspl[-1] == 'clear':
             filters.append(vspl[-2])
+        elif vspl[-1].startswith('grism'):
+            filters.append(vspl[-2])
+        elif vspl[-1].startswith('gr150'):
+            filters.append(vspl[-2])            
         else:
             filters.append(vspl[-1])
 
@@ -1841,6 +1845,7 @@ def preprocess(field_root='j142724+334246',  HOME_PATH='/Volumes/Pegasus/Grizli/
                               replace('f098m', 'f0980m'). \
                               replace('lp', 'w'). \
                               replace('gr','g'). \
+                              replace('grism','g410'). \
                               replace('fq', 'f')[1:-1] 
                             for f in filters])
     
@@ -2481,17 +2486,30 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
     info = utils.get_flt_info(files)
     for idx, filter in enumerate(info['FILTER']):
         if '-' in filter:
-            info['FILTER'][idx] = filter.split('-')[-1]
+            spl = filter.split('-')
+            info['FILTER'][idx] = spl[-1]
+            if len(spl) == 2:
+                info['PUPIL'][idx] = filter.split('-')[-2]
 
     masks = {}
     for gr in ['G141', 'G102', 'G800L']:
         masks[gr.lower()] = [info['FILTER'] == gr, gr, '']
-
+    
     for gr in ['GR150R', 'GR150C']:
         for filt in ['F090W', 'F115W', 'F150W', 'F200W']:
             key = f'{gr.lower()}-{filt.lower()}'
-            masks[key] = [(info['PUPIL'] == filt) & (info['FILTER'] == gr), gr, filt]
-
+            masks[key] = [(info['PUPIL'] == filt) & (info['FILTER'] == gr), 
+                          gr, filt]
+    
+    # NIRCam
+    has_nircam = False
+    for gr in ['GRISMR','GRISMC']:
+        for filt in ['F277W', 'F356W', 'F410M', 'F444W']:
+            key = f'{gr.lower()}-{filt.lower()}'
+            masks[key] = [(info['PUPIL'] == filt) & (info['FILTER'] == gr), 
+                          gr, filt]
+            has_nircam |= masks[key][0].sum() > 0
+            
     if force_cat is None:
         #catalog = '{0}-ir.cat.fits'.format(field_root)
         catalog = glob.glob('{0}-ir.cat.fits'.format(field_root))[0]
@@ -2535,7 +2553,19 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
         else:
             ref_file = force_ref
         
-        grp_i = multifit.GroupFLT(grism_files=list(info['FILE'][masks[mask][0]]), direct_files=[], ref_file=ref_file, seg_file=seg_file, catalog=catalog, cpu_count=-1, sci_extn=1, pad=pad)
+        _grism_files=list(info['FILE'][masks[mask][0]])
+        polyx = [0.3, 5.1]
+        
+        grp_i = multifit.GroupFLT(grism_files=_grism_files,
+                                  direct_files=[],
+                                  ref_file=ref_file,
+                                  seg_file=seg_file,
+                                  catalog=catalog,
+                                  cpu_count=-1,
+                                  sci_extn=1,
+                                  pad=pad, 
+                                  polyx=polyx)
+                                  
         grp_objects.append(grp_i)
 
     if split_by_grism:
@@ -2550,7 +2580,7 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
         return [grp]
 
 
-def grism_prep(field_root='j142724+334246', PREP_PATH='../Prep', EXTRACT_PATH='../Extractions', ds9=None, refine_niter=3, gris_ref_filters=GRIS_REF_FILTERS, files=None, split_by_grism=True, refine_poly_order=1, refine_fcontam=0.5, cpu_count=0, mask_mosaic_edges=True, prelim_mag_limit=25, refine_mag_limits=[18, 24], grisms_to_process=None):
+def grism_prep(field_root='j142724+334246', PREP_PATH='../Prep', EXTRACT_PATH='../Extractions', ds9=None, refine_niter=3, gris_ref_filters=GRIS_REF_FILTERS, files=None, split_by_grism=True, refine_poly_order=1, refine_fcontam=0.5, cpu_count=0, mask_mosaic_edges=True, prelim_mag_limit=25, refine_mag_limits=[18, 24], init_coeffs=[1.1, -0.5], grisms_to_process=None, pad=256):
     """
     Contamination model for grism exposures
     """
@@ -2572,16 +2602,19 @@ def grism_prep(field_root='j142724+334246', PREP_PATH='../Prep', EXTRACT_PATH='.
             if g not in grisms_to_process:
                 pg = gris_ref_filters.pop(g)
 
-    grp_objects = load_GroupFLT(field_root=field_root, PREP_PATH=PREP_PATH, 
-                                gris_ref_filters=gris_ref_filters, 
-                                files=files, split_by_grism=split_by_grism)
+    grp_objects = load_GroupFLT(field_root=field_root,
+                                PREP_PATH=PREP_PATH, 
+                                gris_ref_filters=gris_ref_filters,
+                                files=files,
+                                split_by_grism=split_by_grism, 
+                                pad=pad)
 
     for grp in grp_objects:
 
         ################
         # Compute preliminary model
         grp.compute_full_model(fit_info=None, verbose=True, store=False, 
-                               mag_limit=prelim_mag_limit, coeffs=[1.1, -0.5], 
+                               mag_limit=prelim_mag_limit, coeffs=init_coeffs, 
                                cpu_count=cpu_count)
 
         ##############
@@ -2659,7 +2692,8 @@ def grism_prep(field_root='j142724+334246', PREP_PATH='../Prep', EXTRACT_PATH='.
             grp.refine_list(poly_order=refine_poly_order, 
                             mag_limits=refine_mag_limits,
                             max_coeff=5, ds9=ds9, verbose=True,
-                            fcontam=refine_i)
+                            fcontam=refine_i,
+                            wave=np.linspace(*grp.polyx, 100)*1.e4)
 
         ##############
         # Save model to avoid having to recompute it again
