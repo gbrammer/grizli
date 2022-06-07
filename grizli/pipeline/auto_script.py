@@ -1832,12 +1832,20 @@ def preprocess(field_root='j142724+334246',  HOME_PATH='/Volumes/Pegasus/Grizli/
     filters = []
     for v in visits:
         vspl = v['product'].split('-')
-        if vspl[-1] == 'clear':
-            filters.append(vspl[-2])
-        elif vspl[-1].startswith('grism'):
-            filters.append(vspl[-2])
-        elif vspl[-1].startswith('gr150'):
-            filters.append(vspl[-2])            
+        if (vspl[-1] == 'clear') | (vspl[-1][:-1] in ['grism','gr150']):
+            fi = vspl[-2]
+            if fi.endswith('w2'):
+                fi = fi[:-1]
+                
+            if fi[1] in '0':
+                filt = 'f0' + fi[1:]
+            elif fi[1] > '1':
+                filt = fi[:-1] + '0w'
+            else:
+                filt = fi        
+            
+            filters.append(filt)
+            
         else:
             filters.append(vspl[-1])
 
@@ -3992,20 +4000,24 @@ def make_combined_mosaics(root, fix_stars=False, mask_spikes=False, skip_single_
         # to match the IR images.
 
         ref = pyfits.open('{0}_wcs-ref.fits'.format(root))
-        try:
-            h = ref[1].header.copy()
-            _ = h['CRPIX1']
-        except:
-            h = ref[0].header.copy()
-
-        for k in ['NAXIS1', 'NAXIS2', 'CRPIX1', 'CRPIX2']:
-            h[k] *= 2
-
-        h['CRPIX1'] -= 0.5
-        h['CRPIX2'] -= 0.5
-
-        for k in ['CD1_1', 'CD2_2']:
-            h[k] /= 2
+        ref_wcs = pywcs.WCS(ref[1].header)
+        half_wcs = utils.half_pixel_scale(ref_wcs)
+        h = utils.to_header(half_wcs)
+        
+        # try:
+        #     h = ref[1].header.copy()
+        #     _ = h['CRPIX1']
+        # except:
+        #     h = ref[0].header.copy()
+        # 
+        # for k in ['NAXIS1', 'NAXIS2', 'CRPIX1', 'CRPIX2']:
+        #     h[k] *= 2
+        # 
+        # h['CRPIX1'] -= 0.5
+        # h['CRPIX2'] -= 0.5
+        # 
+        # for k in ['CD1_1', 'CD2_2']:
+        #     h[k] /= 2
 
         wcs_ref_optical = '{0}-opt_wcs-ref.fits'.format(root)
         data = np.zeros((h['NAXIS2'], h['NAXIS1']), dtype=np.int16)
