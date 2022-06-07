@@ -4605,36 +4605,6 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
         flat = 1.
         isJWST = True
         
-    # elif (grism_element == 'GR150C') & (pupil == 'F150W'):
-    #     bg_fixed = ['jwst_niriss_wfssbkg_0009.fits'] 
-    #     bg_vary = [] 
-    #     isACS = False
-    #     flat = 1.
-    # 
-    # elif (grism_element == 'GR150C') & (pupil == 'F200W'):
-    #     bg_fixed = ['jwst_niriss_wfssbkg_0012.fits']
-    #     bg_vary = [] 
-    #     isACS = False
-    #     flat = 1.
-    # 
-    # elif (grism_element == 'GR150R') & (pupil == 'F115W'):
-    #     bg_fixed = ['jwst_niriss_wfssbkg_0004.fits'] 
-    #     bg_vary = [] 
-    #     isACS = False
-    #     flat = 1.
-    # 
-    # elif (grism_element == 'GR150R') & (pupil == 'F150W'):
-    #     bg_fixed = ['jwst_niriss_wfssbkg_0003.fits'] 
-    #     bg_vary = [] 
-    #     isACS = False
-    #     flat = 1.
-    # 
-    # elif (grism_element == 'GR150R') & (pupil == 'F200W'):
-    #     bg_fixed = ['jwst_niriss_wfssbkg_0012.fits']
-    #     bg_vary = [] 
-    #     isACS = False
-    #     flat = 1.
-
     elif grism_element == 'G800L':
         bg_fixed = ['ACS.WFC.CHIP{0:d}.msky.1.smooth.fits'.format({1: 2, 2: 1}[ext])]
         bg_vary = ['ACS.WFC.flat.fits']
@@ -4666,6 +4636,7 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
         if isJWST:
             sh = im[1].data.shape
             data = im[1].data.flatten()/flat
+            data /= np.nanmedian(data)
         else:
             sh = im[0].data.shape
             data = im[0].data.flatten()/flat
@@ -4701,7 +4672,7 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
     if isACS:
         bits = 64+32
     elif isJWST:
-        bits = 1+4+6+32768+16777200+1049600+26232800+9438210+9438220
+        bits = 1+4+6+32768 #+16777200+1049600+26232800+9438210+9438220
     else:
         bits = 576
 
