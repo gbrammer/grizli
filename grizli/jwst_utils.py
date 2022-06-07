@@ -670,8 +670,14 @@ def set_jwst_to_hst_keywords(input, reset=False, verbose=True, orig_keys=ORIG_KE
            'DETECTOR':'IR'}
     
     if 'OTELESCO' not in img[0].header:
-        img = initialize_jwst_image(input, verbose=verbose)
+        _status = initialize_jwst_image(input, verbose=verbose)
         
+        # Reopen
+        if isinstance(input, str):
+            img = pyfits.open(input, mode='update')
+        else:
+            img = input
+            
     if reset:
         for k in orig_keys:
             newk = 'O'+k[:7]
@@ -796,7 +802,7 @@ LSQ_ARGS = dict(jac='2-point',
                 verbose=0,
                 kwargs={})
 
-def model_wcs_header(datamodel, get_sip=False, degree=4, step=32, crpix=None,  lsq_args=LSQ_ARGS, get_guess=True, set_diff_step=True, initial_header=None, **kwargs):
+def model_wcs_header(datamodel, get_sip=True, degree=4, fit_crval=True, fit_rot=True, fit_scale=True, step=32, crpix=None,  lsq_args=LSQ_ARGS, get_guess=True, set_diff_step=True, initial_header=None, fast_coeffs=True, **kwargs):
     """
     Make a header with approximate WCS for use in DS9.
 
@@ -819,6 +825,12 @@ def model_wcs_header(datamodel, get_sip=False, degree=4, step=32, crpix=None,  l
     
     crpix : (float, float)
         Refernce pixel.  If `None` set to the array center
+    
+    fast_coeffs : bool
+        tbd
+    
+    fit_crval, fit_rot, fit_scale : bool
+        tbd
         
     Returns
     -------
@@ -839,23 +851,23 @@ def model_wcs_header(datamodel, get_sip=False, degree=4, step=32, crpix=None,  l
         degree = kwargs['order']
         
     if crpix is None:
-        try:
-            pipe = datamodel.meta.wcs.pipeline[0][1]
-            if 'offset_2' in pipe.param_names:
-                # NIRISS WCS
-                c_x = pipe.offset_2.value + pipe.offset_0.value
-                c_y = pipe.offset_3.value + pipe.offset_1.value
-
-            else:
-                # Simple WCS
-                c_x = pipe.offset_0.value
-                c_y = pipe.offset_1.value
-
-            crpix = np.array([-c_x+1, -c_y+1])
-            #print('xxx ', crpix)
-        
-        except:
-            crpix = np.array(sh)[::-1]/2.+0.5
+        # try:
+        #     pipe = datamodel.meta.wcs.pipeline[0][1]
+        #     if 'offset_2' in pipe.param_names:
+        #         # NIRISS WCS
+        #         c_x = pipe.offset_2.value + pipe.offset_0.value
+        #         c_y = pipe.offset_3.value + pipe.offset_1.value
+        # 
+        #     else:
+        #         # Simple WCS
+        #         c_x = pipe.offset_0.value
+        #         c_y = pipe.offset_1.value
+        # 
+        #     crpix = np.array([-c_x+1, -c_y+1])
+        #     #print('xxx ', crpix)
+        # 
+        # except:
+        crpix = np.array(sh)[::-1]/2.+0.5
     else:
         crpix = np.array(crpix)
         
@@ -887,7 +899,9 @@ def model_wcs_header(datamodel, get_sip=False, degree=4, step=32, crpix=None,  l
     header['CD2_1'] = cdx[1]-crval[1]
     header['CD2_2'] = cdy[1]-crval[1]
 
-    cd = np.array([[header['CD1_1'], header['CD1_2']], [header['CD2_1'], header['CD2_2']]])
+    cd = np.array([[header['CD1_1'], header['CD1_2']],
+                   [header['CD2_1'], header['CD2_2']]])
+
     if not get_sip:
         return header
 
@@ -923,16 +937,19 @@ def model_wcs_header(datamodel, get_sip=False, degree=4, step=32, crpix=None,  l
             a_names.append('A_'+ext)
             b_names.append('B_'+ext)
             sip_step.append(1.e-3**(i+j))
-            
-    p0 = np.zeros(4+len(a_names)+len(b_names))
-    p0[:4] += cd.flatten()
+    
+    Npre = fit_rot*1 + fit_scale*1 + fit_crval*2
+    Nparam = Npre+len(a_names)+len(b_names)
+
+    p0 = np.zeros(Nparam)
+    # p0[:4] += cd.flatten()
     
     sip_step = np.array(sip_step)
     #p0[4:len(a_names)+4] = np.random.normal(size=len(a_names))*sip_step
     #p0[4+len(a_names):] = np.random.normal(size=len(a_names))*sip_step
     
     if set_diff_step:
-        diff_step = np.hstack([np.ones(4)*0.01/3600, sip_step, sip_step])
+        diff_step = np.hstack([np.ones(Npre)*0.01/3600, sip_step, sip_step])
         lsq_args['diff_step'] = diff_step
         print('xxx', len(p0), len(diff_step))
         
@@ -965,11 +982,11 @@ def model_wcs_header(datamodel, get_sip=False, degree=4, step=32, crpix=None,  l
         
         for i, k in enumerate(a_names):
             if k in a0:
-                p0[4+i] = a0[k]
+                p0[Npre+i] = a0[k]
         
         for i, k in enumerate(b_names):
             if k in b0:
-                p0[4+len(b_names)+i] = b0[k]
+                p0[Npre+len(b_names)+i] = b0[k]
                 
     elif get_guess:
         
@@ -984,7 +1001,7 @@ def model_wcs_header(datamodel, get_sip=False, degree=4, step=32, crpix=None,  l
                                            )
                                            
         cd = np.array([[h['CD1_1'], h['CD1_2']], [h['CD2_1'], h['CD2_2']]])
-        p0[:4] = cd.flatten()*1
+        #p0[:Npre] = cd.flatten()*1
         
         a0 = {}
         b0 = {}
@@ -997,16 +1014,16 @@ def model_wcs_header(datamodel, get_sip=False, degree=4, step=32, crpix=None,  l
         
         for i, k in enumerate(a_names):
             if k in a0:
-                p0[4+i] = a0[k]
+                p0[Npre+i] = a0[k]
         
         for i, k in enumerate(b_names):
             if k in b0:
-                p0[4+len(b_names)+i] = b0[k]
+                p0[Npre+len(b_names)+i] = b0[k]
         
     elif initial_header is not None:
         h = initial_header
         cd = np.array([[h['CD1_1'], h['CD1_2']], [h['CD2_1'], h['CD2_2']]])
-        p0[:4] = cd.flatten()*1
+        #p0[:Npre] = cd.flatten()*1
         
         a0 = {}
         b0 = {}
@@ -1019,25 +1036,40 @@ def model_wcs_header(datamodel, get_sip=False, degree=4, step=32, crpix=None,  l
         
         for i, k in enumerate(a_names):
             if k in a0:
-                p0[4+i] = a0[k]
+                p0[Npre+i] = a0[k]
         
         for i, k in enumerate(b_names):
             if k in b0:
-                p0[4+len(b_names)+i] = b0[k]
+                p0[Npre+len(b_names)+i] = b0[k]
         
     #args = (u.flatten(), v.flatten(), x.flatten(), y.flatten(), crpix, a_names, b_names, cd, 0)
+    fit_type = fit_rot*1 + fit_scale*2 + fit_crval*4
+    
     args = (u.flatten(), v.flatten(), x.flatten(), y.flatten(), crval, crpix, 
-            a_names, b_names, cd, 0)
+            a_names, b_names, cd, fit_type, 0)
 
     # Fit the SIP coeffs
-    fit = least_squares(_objective_sip, p0, args=args, **lsq_args)
+    if fast_coeffs:
+        _func = _objective_lstsq_sip
+        p0 = p0[:Npre]
+        #lsq_args['diff_step'] = 0.01
+        
+    else:
+        _func = _objective_sip
+        #lsq_args['diff_step'] = 1.e-6
+            
+    fit = least_squares(_func, p0, args=args, **lsq_args)
 
     # Get the results
     args = (u.flatten(), v.flatten(), x.flatten(), y.flatten(), crval, crpix, 
-            a_names, b_names, cd, 1)
+            a_names, b_names, cd, fit_type, 1)
 
-    cd_fit, a_coeff, b_coeff, ra_nmad, dec_nmad = _objective_sip(fit.x, *args)
-
+    _ = _func(fit.x, *args)
+    pp, cd_fit, crval_fit, a_coeff, b_coeff, ra_nmad, dec_nmad = _
+                    
+    header['CRVAL1'] = crval_fit[0]
+    header['CRVAL2'] = crval_fit[1]
+    
     # Put in the header
     for i in range(2):
         for j in range(2):
@@ -1061,14 +1093,28 @@ def model_wcs_header(datamodel, get_sip=False, degree=4, step=32, crpix=None,  l
     
     header['PIXSCALE'] = utils.get_wcs_pscale(header), 'Derived pixel scale'
     
+    header['SIP_ROT'] = pp[0], 'SIP fit CD rotation, deg'
+    header['SIP_SCL'] = pp[1], 'SIP fit CD scale'
+    header['SIP_DRA'] = pp[2][0], 'SIP fit CRVAL1 offset, arcsec'
+    header['SIP_DDE'] = pp[2][1], 'SIP fit CRVAL1 offset, arcsec'
+    
     header['SIPSTATU'] = fit.status, 'least_squares result status'
     header['SIPCOST'] = fit.cost, 'least_squares result cost'
     header['SIPNFEV'] = fit.nfev, 'least_squares result nfev'
     header['SIPNJEV'] = fit.njev, 'least_squares result njev'
     header['SIPOPTIM'] = fit.optimality, 'least_squares result optimality'
     header['SIPSUCSS'] = fit.success, 'least_squares result success'
-    header['SIPRAMAD'] = ra_nmad/header['PIXSCALE'], 'RA NMAD, pix'
-    header['SIPDEMAD'] = dec_nmad/header['PIXSCALE'], 'Dec NMAD, pix'
+    header['SIPFAST'] = fast_coeffs, 'SIP fit with fast least squares'
+    
+    if fast_coeffs:
+        _xnmad = ra_nmad
+        _ynmad = dec_nmad
+    else:
+        _xnmad = ra_nmad/header['PIXSCALE']
+        _ynmad = dec_nmad/header['PIXSCALE']
+    
+    header['SIPRAMAD'] = _xnmad, 'RA NMAD, pix'
+    header['SIPDEMAD'] = _ynmad, 'Dec NMAD, pix'
     
     header['CRDS_CTX'] = (datamodel.meta.ref_file.crds.context_used,
                           'CRDS context file')
@@ -1083,7 +1129,7 @@ def model_wcs_header(datamodel, get_sip=False, degree=4, step=32, crpix=None,  l
     return header
 
 
-def pipeline_model_wcs_header(datamodel, step=64, degrees=[3,4,5,5], lsq_args=LSQ_ARGS, crpix=None, verbose=True, initial_header=None, max_rms=1.e-4, set_diff_step=False, get_guess=False):
+def pipeline_model_wcs_header(datamodel, step=64, degrees=[3,4,5,5], lsq_args=LSQ_ARGS, crpix=None, verbose=True, initial_header=None, max_rms=1.e-4, set_diff_step=False, get_guess=False, fast_coeffs=True):
     """
     Iterative pipeline to refine the SIP headers
     """
@@ -1155,7 +1201,7 @@ def pipeline_model_wcs_header(datamodel, step=64, degrees=[3,4,5,5], lsq_args=LS
     return h
 
 
-def _objective_sip(params, u, v, ra, dec, crval, crpix, a_names, b_names, cd, ret):
+def _objective_sip(params, u, v, ra, dec, crval, crpix, a_names, b_names, cd, fit_type, ret):
     """
     Objective function for fitting SIP coefficients
     """
@@ -1163,9 +1209,37 @@ def _objective_sip(params, u, v, ra, dec, crval, crpix, a_names, b_names, cd, re
 
     #u, v, x, y, crpix, a_names, b_names, cd = data
 
-    cdx = params[0:4].reshape((2, 2))
-    a_params = params[4:4+len(a_names)]
-    b_params = params[4+len(a_names):]
+    #cdx = params[0:4].reshape((2, 2))
+    # fit_type = fit_rot*1 + fit_scale*2 + fit_crval*4
+    i0 = 0
+    if (fit_type & 1) > 0:
+        rotation = params[0]
+        i0 += 1
+    else:
+        rotation = 0
+        
+    if (fit_type & 2) > 0:
+        scale = 10**params[i0]
+        i0 += 1
+    else:
+        scale = 1.
+    
+    theta = -rotation
+    _mat = np.array([[np.cos(theta), -np.sin(theta)],
+                     [np.sin(theta), np.cos(theta)]])
+
+    cd_i = np.dot(cd, _mat)/scale
+        
+    if (fit_type & 4) > 0:
+        crval_offset = params[i0:i0+2]
+        i0 += 2
+    else:
+        crval_offset = np.zeros(2)
+    
+    crval_i = crval + crval_offset
+        
+    a_params = params[i0:i0+len(a_names)]
+    b_params = params[i0+len(a_names):]
 
     a_coeff = {}
     for i in range(len(a_names)):
@@ -1179,12 +1253,12 @@ def _objective_sip(params, u, v, ra, dec, crval, crpix, a_names, b_names, cd, re
     _h = pyfits.Header()
     for i in [0,1]:
         for j in [0,1]:
-            _h[f'CD{i+1}_{j+1}'] = cdx[i,j]
+            _h[f'CD{i+1}_{j+1}'] = cd_i[i,j]
     
     _h['CRPIX1'] = crpix[0]
     _h['CRPIX2'] = crpix[1]
-    _h['CRVAL1'] = crval[0]
-    _h['CRVAL2'] = crval[1]
+    _h['CRVAL1'] = crval_i[0]
+    _h['CRVAL2'] = crval_i[1]
     
     _h['A_ORDER'] = 5
     for k in a_coeff:
@@ -1210,13 +1284,141 @@ def _objective_sip(params, u, v, ra, dec, crval, crpix, a_names, b_names, cd, re
         ra_nmad = utils.nmad((ra-ro)*cosd*3600)
         dec_nmad = utils.nmad((dec-do)*3600)
         
-        return cdx, a_coeff, b_coeff, ra_nmad, dec_nmad
+        pp = (rotation/np.pi*180, scale, crval_offset*3600)
+        print('xxx', params, ra_nmad, dec_nmad, pp)
+        
+        return pp, cd_i, crval_i, a_coeff, b_coeff, ra_nmad, dec_nmad
     
     #print(params, np.abs(dr).max())
     dr = np.append((ra-ro)*cosd, dec-do)*3600.
 
     return dr
     
+    
+def _objective_lstsq_sip(params, u, v, ra, dec, crval, crpix, a_names, b_names, cd, fit_type, ret):
+    """
+    Objective function for fitting SIP header with coefficients determined 
+    with lst squares
+    """
+    from astropy.modeling.fitting import LinearLSQFitter
+    from astropy.modeling.polynomial import Polynomial2D
+    
+    #u, v, x, y, crpix, a_names, b_names, cd = data
+
+    #cdx = params[0:4].reshape((2, 2))
+    # fit_type = fit_rot*1 + fit_scale*2 + fit_crval*4
+    i0 = 0
+    if (fit_type & 1) > 0:
+        rotation = params[0]
+        i0 += 1
+    else:
+        rotation = 0
+        
+    if (fit_type & 2) > 0:
+        scale = 10**params[i0]
+        i0 += 1
+    else:
+        scale = 1.
+    
+    theta = -rotation
+    _mat = np.array([[np.cos(theta), -np.sin(theta)],
+                     [np.sin(theta), np.cos(theta)]])
+
+    cd_i = np.dot(cd, _mat)/scale
+        
+    if (fit_type & 4) > 0:
+        crval_offset = params[i0:i0+2]
+        i0 += 2
+    else:
+        crval_offset = np.zeros(2)
+    
+    crval_i = crval + crval_offset
+                
+    # Build header
+    _h = pyfits.Header()
+    for i in [0,1]:
+        for j in [0,1]:
+            _h[f'CD{i+1}_{j+1}'] = cd_i[i,j]
+    
+    _h['CRPIX1'] = crpix[0]
+    _h['CRPIX2'] = crpix[1]
+    _h['CRVAL1'] = crval_i[0]
+    _h['CRVAL2'] = crval_i[1]
+        
+    _h['RADESYS'] = 'ICRS    '                                                            
+    _h['CTYPE1']  = 'RA---TAN-SIP'                                                        
+    _h['CTYPE2']  = 'DEC--TAN-SIP'                                                        
+    _h['CUNIT1']  = 'deg     '                                                            
+    _h['CUNIT2']  = 'deg     '                                                            
+    
+    a_params = params[i0:i0+len(a_names)]
+    b_params = params[i0+len(a_names):]
+
+    a_coeff = {}
+    for i in range(len(a_names)):
+        a_coeff[a_names[i]] = 0. #a_params[i]
+
+    b_coeff = {}
+    for i in range(len(b_names)):
+        b_coeff[b_names[i]] = 0. #b_params[i]
+    
+    _h['A_ORDER'] = 5
+    _h['B_ORDER'] = 5
+    
+    # Zero SIP coeffs
+    for k in a_coeff:
+        _h[k] = 0.0
+        
+    for k in b_coeff:
+        _h[k] = 0.0
+    
+    #_w = pywcs.WCS(_h)
+    _w = utils.wcs_from_header(_h, relax=True)
+    
+    # Calculate pixel offsets in empty SIP WCS
+    up, vp = _w.all_world2pix(ra, dec, 0)
+    uv = np.array([u.flatten(), v.flatten()]).T
+    uvi = uv - (crpix-1)
+    
+    uvp = np.array([up.flatten(), vp.flatten()]).T
+    fg =  uvp - uv
+    
+    poly = Polynomial2D(degree=5)
+    for p in poly.fixed:
+        key = 'A_' + p[1:]
+        if (key not in a_names) | (p in ['c0_0','c0_1','c1_0']):
+            poly.fixed[p] = True
+    
+    fitter = LinearLSQFitter()
+    afit = fitter(poly, *uvi.T, fg[:,0])
+    bfit = fitter(poly, *uvi.T, fg[:,1])
+    fgm = np.array([afit(*uvi.T), bfit(*uvi.T)]).T
+    
+    a_coeff = {}
+    b_coeff = {}
+    
+    for p, _a, _b in zip(afit.param_names, afit.parameters, bfit.parameters):
+        key = 'A_' + p[1:]
+        if key in a_names:
+            a_coeff[key] = _a
+            b_coeff[key.replace('A_','B_')] = _b
+    
+    if ret == 1:
+        dx = fg - fgm
+        x_nmad = utils.nmad(dx[:,0])
+        y_nmad = utils.nmad(dx[:,1])
+        
+        pp = (rotation/np.pi*180, scale, crval_offset*3600)
+                
+        return pp, cd_i, crval_i, a_coeff, b_coeff, x_nmad, y_nmad
+    
+    # Residual is in x,y pixels
+    dr = (fgm - fg).flatten()
+    
+    #print(params, (dr**2).sum())
+    
+    return dr
+
 def _xobjective_sip(params, u, v, x, y, crval, crpix, a_names, b_names, cd, ret):
     """
     Objective function for fitting SIP coefficients
@@ -1250,7 +1452,7 @@ def _xobjective_sip(params, u, v, x, y, crval, crpix, a_names, b_names, cd, ret)
     dr = np.append(x-xo, y-yo)*3600./0.065
 
     #print(params, np.abs(dr).max())
-
+        
     return dr
 
 
