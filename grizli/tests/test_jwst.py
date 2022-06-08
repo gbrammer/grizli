@@ -20,7 +20,11 @@ def set_crds(path='crds_data'):
         logging.warn("Set CRDS_SERVER_URL = 'https://jwst-crds.stsci.edu'")
         
     if os.getenv('CRDS_PATH') is None:
+        if not path.startswith('/'):
+            path = os.path.join(os.getcwd(), path)
+        
         os.environ['CRDS_PATH'] = path
+            
         logging.warn(f"Set CRDS_PATH = '{path}'")
         if not os.path.exists(path):
             os.mkdir(path)
