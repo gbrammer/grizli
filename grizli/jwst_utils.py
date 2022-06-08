@@ -6,12 +6,25 @@ Requires https://github.com/spacetelescope/jwst
 """
 import os
 import inspect
+import logging
 
 import astropy.io.fits as pyfits
 import astropy.wcs as pywcs
 
 import numpy as np
 from . import utils
+
+QUIET_LEVEL = logging.INFO
+
+def set_quiet_logging(level=QUIET_LEVEL):
+    """
+    Silence the verbose logs set by `stpipe`
+    """
+    try:
+        import jwst
+        logging.disable(level)
+    except ImportError:
+        pass
 
 
 def hdu_to_imagemodel(in_hdu):
@@ -26,11 +39,9 @@ def hdu_to_imagemodel(in_hdu):
     ----------
     in_hdu : `astropy.io.fits.ImageHDU`
 
-
     Returns
     -------
     img : `jwst.datamodels.ImageModel`
-
 
     """
     from astropy.io.fits import ImageHDU, HDUList
@@ -38,7 +49,9 @@ def hdu_to_imagemodel(in_hdu):
 
     from jwst.datamodels import util
     import gwcs
-
+    
+    set_quiet_logging(QUIET_LEVEL)
+    
     hdu = ImageHDU(data=in_hdu.data, header=in_hdu.header)
 
     new_header = strip_telescope_header(hdu.header)
@@ -83,7 +96,9 @@ def change_header_pointing(header, ra_ref=0., dec_ref=0., pa_v3=0.):
 
     """
     from jwst.lib.set_telescope_pointing import compute_local_roll
-
+    
+    set_quiet_logging(QUIET_LEVEL)
+    
     v2_ref = header['V2_REF']
     v3_ref = header['V3_REF']
 
@@ -112,9 +127,12 @@ def img_with_flat(input, verbose=True, overwrite=True):
     import gc
     
     import astropy.io.fits as pyfits
+    
     from jwst.datamodels import util
     from jwst.flatfield import FlatFieldStep
     from jwst.gain_scale import GainScaleStep
+    
+    set_quiet_logging(QUIET_LEVEL)
     
     if not isinstance(input, pyfits.HDUList):
         _hdu = pyfits.open(input)
@@ -167,9 +185,8 @@ def img_with_wcs(input, overwrite=True, fit_sip_header=True):
     from jwst.datamodels import util
     from jwst.assign_wcs import AssignWcsStep
     
-    # from jwst.stpipe import crds_client
-    # from jwst.assign_wcs import assign_wcs
-
+    set_quiet_logging(QUIET_LEVEL)
+    
     # HDUList -> jwst.datamodels.ImageModel
 
     # Generate WCS as image
@@ -205,7 +222,7 @@ def img_with_wcs(input, overwrite=True, fit_sip_header=True):
     if isinstance(input, str) & overwrite:
         output.write(input, overwrite=overwrite)
         
-        _hdu = pyfits.open(input, mode='update')
+        _hdu = pyfits.open(input)
         
         #wcs = pywcs.WCS(_hdu['SCI'].header, relax=True)
         if fit_sip_header:
@@ -234,18 +251,23 @@ def img_with_wcs(input, overwrite=True, fit_sip_header=True):
         
         _hdu[1].header['IDCSCALE'] = pscale, 'Pixel scale calculated from WCS'
         _hdu[0].header['PIXSCALE'] = pscale, 'Pixel scale calculated from WCS'
-        _hdu.flush()
-        
+        _hdu.writeto(input, overwrite=True)
+
     return output
 
 
-def match_gwcs_to_sip(img, step=64, transform=None, verbose=True):
+def match_gwcs_to_sip(input, step=64, transform=None, verbose=True, overwrite=True):
     """
     Calculate transformation of gwcs to match SIP header, which may have been 
     realigned (shift, rotation, scale)
     
     Parameters
     ----------
+    input : str, `~astropy.io.fits.HDUList`
+        FITS filename of a JWST image or a previously-opened
+        `~astropy.io.fits.HDUList` with SIP wcs information stored in the
+        first extension.
+
     img : `~pyfits.io.fits.HDUList`
         HDU list from FITS files, where SIP wcs information stored in the
         first extension
@@ -260,6 +282,9 @@ def match_gwcs_to_sip(img, step=64, transform=None, verbose=True):
     verbose : bool
         Verbose messages
     
+    overwrite : bool
+        If True and ``input`` is a string, re-write to file
+        
     Returns
     -------
     obj : `jwst.datamodels.image.ImageModel`
@@ -278,6 +303,11 @@ def match_gwcs_to_sip(img, step=64, transform=None, verbose=True):
     
     if transform is None:
         transform = SimilarityTransform
+    
+    if isinstance(input, str):
+        img = pyfits.open(input)
+    elif isinstance(input, pyfits.HDUList):
+        img = input
         
     if img[0].header['TELESCOP'] not in ['JWST']:
         img = set_jwst_to_hst_keywords(img, reset=True)
@@ -364,6 +394,9 @@ def match_gwcs_to_sip(img, step=64, transform=None, verbose=True):
             setattr(tr, tr.param_names[i], 
                     tr.parameters[i]*img[1].header['SCL_REF'])
     
+    if overwrite:
+        img.writeto(img.filename(), overwrite=True)
+        
     return obj
 
 
@@ -461,7 +494,8 @@ def get_phot_keywords(input, verbose=True):
     
     # Write FITS file if filename provided as input
     if isinstance(input, str):
-        img.flush()
+        img.writeto(input, overwrite=True)
+        img.close()
     
     info = {'photfnu':tojy,
             'photplam':plam,
@@ -517,7 +551,9 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
     from jwst.flatfield import FlatFieldStep
     from jwst.gain_scale import GainScaleStep
     
-    img = pyfits.open(filename, mode='update')
+    set_quiet_logging(QUIET_LEVEL)
+    
+    img = pyfits.open(filename)
     
     if 'OTELESCO' in img[0].header:
         tel = img[0].header['OTELESCO']
@@ -602,7 +638,7 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
     # but with a PIXVALUE keyword.
     # The header below is designed after WFC3/IR
             
-    img.flush()
+    img.writeto(filename, overwrite=True)
     img.close()
     
     _ = img_with_flat(filename, overwrite=True)
@@ -613,7 +649,7 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
     
     # Add TIME
     if 'TIME' not in img:
-        img = pyfits.open(filename, mode='update')
+        img = pyfits.open(filename)
         
         time = pyfits.ImageHDU(data=img['SCI',1].data)
         #np.ones_like(img['SCI',1].data)*img[0].header['EXPTIME'])
@@ -627,7 +663,7 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
         time.header['INHERIT'] = True
         
         img.append(time)
-        img.flush()
+        img.writeto(filename, overwrite=True)
         img.close()
         
     gc.collect()
@@ -661,7 +697,7 @@ def set_jwst_to_hst_keywords(input, reset=False, verbose=True, orig_keys=ORIG_KE
     import astropy.io.fits as pyfits
     
     if isinstance(input, str):
-        img = pyfits.open(input, mode='update')
+        img = pyfits.open(input)
     else:
         img = input
     
@@ -714,7 +750,7 @@ def set_jwst_to_hst_keywords(input, reset=False, verbose=True, orig_keys=ORIG_KE
     #     img[0].header['PHOTPLAM'] = 1.5e4  
         
     if isinstance(input, str):
-        img.flush()
+        img.writeto(input, overwrite=True)
     
     return img
 
@@ -841,6 +877,7 @@ def model_wcs_header(datamodel, get_sip=True, degree=4, fit_crval=True, fit_rot=
     from astropy.io.fits import Header
     from scipy.optimize import least_squares
     import jwst.datamodels
+    set_quiet_logging()
 
     datamodel = jwst.datamodels.open(datamodel)
     sh = datamodel.data.shape
@@ -1120,12 +1157,18 @@ def model_wcs_header(datamodel, get_sip=True, degree=4, fit_crval=True, fit_rot=
                           'CRDS context file')
     
     bn = os.path.basename                      
-    header['DISTFILE'] = (bn(datamodel.meta.ref_file.distortion.name),
+    try:
+        header['DISTFILE'] = (bn(datamodel.meta.ref_file.distortion.name),
                           'Distortion reference file')
-
-    header['FOFFFILE'] = (bn(datamodel.meta.ref_file.filteroffset.name),
+    except TypeError:
+        header['DISTFILE'] = 'N/A', 'Distortion reference file (failed)'
+        
+    try:
+        header['FOFFFILE'] = (bn(datamodel.meta.ref_file.filteroffset.name),
                           'Filter offset reference file')
-                                               
+    except TypeError:
+        header['FOFFFILE'] = 'N/A', 'Filter offset reference file (failed)'
+                                                   
     return header
 
 

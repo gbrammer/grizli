@@ -1161,8 +1161,14 @@ def visit_dict_to_strings(v):
         newv['footprint'] = utils.SRegion(v['footprint']).s_region
     
     if 'footprints' in v:
-        newv['footprints'] = [utils.SRegion(fp).s_region 
-                              for fp in v['footprints']]
+        newv['footprints'] = []
+        for fp in v['footprints']:
+            try:
+                newv['footprints'].append(utils.SRegion(fp).s_region)
+            except:
+                print(fp)
+                print(v['footprints'])
+                raise ValueError
     
     for k in v:
         if k not in newv:
@@ -1349,10 +1355,22 @@ def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, com
         files += glob.glob(os.path.join(RAW_PATH, file_query+'c0m.fits*'))
         files += glob.glob(os.path.join(RAW_PATH, file_query+'c0f.fits*'))
         files += glob.glob(os.path.join(RAW_PATH, file_query+'rate.fits*'))
+        files += glob.glob(os.path.join(RAW_PATH, file_query+'cal.fits*'))
         
     if len(files) == 0:
         raise ValueError(f'No exposure files found in {RAW_PATH}')
-        
+    
+    # Remove rate files where cal exist
+    rate_files = []
+    for file in files:
+        if '_rate.fits' in file:
+            rate_files.append(file)
+    
+    for file in rate_files:
+        if file.replace('_rate.fits', '_cal.fits') in files:
+            print(f'cal found for {file}')
+            _ = files.pop(files.index(file))
+            
     files.sort()
 
     # for file in files:
@@ -1422,7 +1440,7 @@ def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, com
                 
         return visits, all_groups, info
 
-    visits, filters = utils.parse_flt_files(info=info, 
+    visits, filters = utils.parse_flt_files(info=info, path=RAW_PATH,
                                   uniquename=True, get_footprint=True,
                                   use_visit=use_visit, max_dt=max_dt,
                                   visit_split_shift=visit_split_shift)
@@ -1475,7 +1493,8 @@ def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, com
                           msg.format(' AFTER', max_dt, len(visits)),
                           verbose=True, show_date=True)
 
-        get_visit_exposure_footprints(visits)
+        get_visit_exposure_footprints(visits, 
+                                      check_paths=['./', '../RAW', RAW_PATH])
 
         print('** Combine same PA: **')
         for i, visit in enumerate(visits):
@@ -1566,6 +1585,9 @@ def get_visit_exposure_footprints(root='j1000p0210', check_paths=['./', '../RAW'
             fp_i = None
             for path in check_paths:
                 pfile = os.path.join(path, file)
+                if not os.path.exists(pfile):
+                    pfile = os.path.join(path, file + '.gz')
+                    
                 if os.path.exists(pfile):
                     fp_i = utils.get_flt_footprint(flt_file=pfile)
 

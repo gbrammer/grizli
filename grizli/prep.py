@@ -132,7 +132,9 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
         orig_file = pyfits.open(glob.glob(os.path.join(path, file)+'*')[0])
     else:
         orig_file = pyfits.open(file)
-
+    
+    local_file = local_file.split('.gz')[0]
+    
     if dq is not None:
         orig_file['DQ'] = dq
 

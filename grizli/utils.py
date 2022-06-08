@@ -629,7 +629,8 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
                                  'GNGRISM': 'goodsn-',
                                  'GOODS-SOUTH-': 'goodss-',
                                  'UDS-': 'uds-'},
-                    visit_split_shift=1.5, max_dt=1e9):
+                    visit_split_shift=1.5, max_dt=1e9, 
+                    path='../RAW'):
     """Read header information from a list of exposures and parse out groups based on filter/target/orientation.
 
     Parameters
@@ -682,7 +683,10 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
     visit_split_shift : float
         Separation in ``arcmin`` beyond which exposures in a group are split 
         into separate visits.
-        
+    
+    path : str
+        PATH to search for `flt` files if ``info`` not provided
+    
     Returns
     --------
     output_list : dict
@@ -711,7 +715,7 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
 
     if info is None:
         if not files:
-            files = glob.glob('*flt.fits')
+            files = glob.glob(os.path.join(path), '*flt.fits')
 
         if len(files) == 0:
             return False
@@ -874,8 +878,11 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
     if visit_split_shift > 0:
         split_list = []
         for o in output_list:
-            split_list.extend(split_visit(o, max_dt=max_dt,
-                              visit_split_shift=visit_split_shift))
+            _spl = split_visit(o, path=path, 
+                               max_dt=max_dt,
+                               visit_split_shift=visit_split_shift)
+                               
+            split_list.extend(_spl)
 
         output_list = split_list
 
@@ -889,22 +896,32 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
                 flt_file = output_list[i]['files'][j]
                 if (not os.path.exists(flt_file)):
                     for gzext in ['', '.gz']:
-                        if os.path.exists('../RAW/'+flt_file+gzext):
-                            flt_file = '../RAW/'+flt_file+gzext
+                        _flt_file = os.path.join(path, flt_file + gzext)
+                        if os.path.exists(_flt_file):
+                            flt_file = _flt_file
                             break
                     
                 flt_j = pyfits.open(flt_file)
                 h = flt_j[0].header
+                _ext = 0
                 if (h['INSTRUME'] == 'WFC3'):
+                    _ext = 1
                     if (h['DETECTOR'] == 'IR'):
                         wcs_j = pywcs.WCS(flt_j['SCI', 1])
                     else:
                         wcs_j = pywcs.WCS(flt_j['SCI', 1], fobj=flt_j)
                 elif (h['INSTRUME'] == 'WFPC2'):
+                    _ext = 1
                     wcs_j = pywcs.WCS(flt_j['SCI', 1])
                 else:
+                    _ext = 1
                     wcs_j = pywcs.WCS(flt_j['SCI', 1], fobj=flt_j)
-
+                
+                if ((wcs_j.pixel_shape is None) & 
+                    ('NPIX1' in flt_j['SCI',1].header)):
+                    _h = flt_j['SCI',1].header
+                    wcs_j.pixel_shape = (_h['NPIX1'], _h['NPIX2'])
+                    
                 fp_j = Polygon(wcs_j.calc_footprint())
                 if j == 0:
                     fp_i = fp_j.buffer(1./3600)
