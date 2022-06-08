@@ -11,7 +11,7 @@ import logging
 from .. import prep, utils, multifit, GRIZLI_PATH, jwst_utils
 from ..pipeline import auto_script
 
-def set_crds(path='crds_data'):
+def set_crds(path='crds_cache'):
     """
     Set CRDS environment variables if not already set
     """
@@ -28,6 +28,8 @@ def set_crds(path='crds_data'):
         logging.warn(f"Set CRDS_PATH = '{path}'")
         if not os.path.exists(path):
             os.mkdir(path)
+            os.mkdir(os.path.join(path, 'config'))
+            os.mkdir(os.path.join(path, 'config', 'jwst'))
             
 set_crds()
 

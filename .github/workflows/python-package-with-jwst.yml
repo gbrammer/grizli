@@ -3,6 +3,9 @@
 
 name: Python package with JWST
 
+env:
+  CRDS_SERVER_URL: https://jwst-crds.stsci.edu
+  
 on:
   push:
     branches: [ master ]
