@@ -5,9 +5,97 @@ import os
 import glob
 import unittest
 import numpy as np
+import astropy.io.fits as pyfits
+import logging
 
-from .. import utils, multifit, GRIZLI_PATH, jwst_utils
+from .. import prep, utils, multifit, GRIZLI_PATH, jwst_utils
 from ..pipeline import auto_script
+
+def set_crds(path='crds_data'):
+    """
+    Set CRDS environment variables if not already set
+    """
+    if os.getenv('CRDS_SERVER_URL') is None:
+        os.environ['CRDS_SERVER_URL'] = 'https://jwst-crds.stsci.edu'
+        logging.warn("Set CRDS_SERVER_URL = 'https://jwst-crds.stsci.edu'")
+        
+    if os.getenv('CRDS_PATH') is None:
+        os.environ['CRDS_PATH'] = path
+        logging.warn(f"Set CRDS_PATH = '{path}'")
+        if not os.path.exists(path):
+            os.mkdir(path)
+            
+set_crds()
+
+class JWSTHeaders(unittest.TestCase):
+    
+    def get_test_data_path(self):
+        path = os.path.dirname(utils.__file__)
+        path_to_files = os.path.join(path, 'tests/data/jwst-headers/')
+        return path_to_files
+        
+    def test_process_headers(self, clean=True):
+        """
+        """
+        try:
+            import jwst
+        except ImportError:
+            return True
+                
+        file_path = self.get_test_data_path()
+        
+        files = glob.glob(os.path.join(file_path, '*fits.gz'))
+        files.sort()
+        
+        assert(len(files) == 5)
+        
+        test_dir = 'JwstHeaderTest'
+        orig_dir = os.getcwd()
+        
+        if not os.path.exists(test_dir):
+            os.mkdir(test_dir)
+        
+        os.chdir(test_dir)
+        
+        # fresh_flt_file
+        gz_file = os.path.basename(files[0])
+        prep.fresh_flt_file(gz_file, path=file_path)
+        
+        local_file = gz_file.split('.gz')[0]
+        prep.fresh_flt_file(local_file, path=file_path)
+        
+        # Multiple modes
+        for file in files:
+            gz_file = os.path.basename(file)
+            local_file = gz_file.split('.gz')[0]
+            prep.fresh_flt_file(local_file, path=file_path)
+            im = pyfits.open(local_file)
+            
+            assert('SIPRAMAD' in im['SCI'].header)
+            assert(im['SCI'].header['SIPRAMAD'] < 1.e-2)
+            assert(im['SCI'].header['SIPDEMAD'] < 1.e-2)
+            
+        # Parse visits
+        visits, groups, info = auto_script.parse_visits(field_root='jwst', 
+                                                        RAW_PATH=file_path, 
+                                                        visit_split_shift=1.2)
+        
+        assert(os.path.exists('jwst_visits.yaml'))
+        
+        assert(len(visits) == 5)
+        assert(len(groups) == 1)
+        
+        # Clean up
+        if clean:
+            files = glob.glob('*')
+            for file in files:
+                os.remove(file)
+            
+            os.chdir(orig_dir)
+            os.rmdir(test_dir)
+            
+        os.chdir(orig_dir)
+
 
 class JWSTUtils(unittest.TestCase):
     
@@ -19,17 +107,46 @@ class JWSTUtils(unittest.TestCase):
         
         bp = jwst_utils.load_jwst_filter_info()
         assert('meta' in bp)
-
+        
+        # NIRISS
+        header = pyfits.Header()
+        header['TELESCOP'] = 'JWST'
+        header['INSTRUME'] = 'NIRISS'
+        header['PUPIL'] = 'F200W'
+        header['FILTER'] = 'CLEAR'
+        
+        assert(utils.get_hst_filter(header) == 'F200W-CLEAR')
+                
+        info = jwst_utils.get_jwst_filter_info(header)
+        
+        assert(info['name'] == 'F200W')
+        assert(np.allclose(info['pivot'], 1.992959))
+        
+        # NIRCam
         header = pyfits.Header()
         header['TELESCOP'] = 'JWST'
         header['INSTRUME'] = 'NIRCAM'
         header['FILTER'] = 'F200W'
         header['PUPIL'] = 'CLEAR'
         
+        assert(utils.get_hst_filter(header) == 'F200W-CLEAR')
+                
         info = jwst_utils.get_jwst_filter_info(header)
         
         assert(info['name'] == 'F200W')
         assert(np.allclose(info['pivot'], 1.988647))
+        
+        # MIRI
+        header = pyfits.Header()
+        header['TELESCOP'] = 'JWST'
+        header['INSTRUME'] = 'MIRI'
+        header['FILTER'] = 'F560W'
+        
+        assert(utils.get_hst_filter(header) == 'F560W')
+        
+        info = jwst_utils.get_jwst_filter_info(header)
+        assert(info['name'] == 'F560W')
+        assert(np.allclose(info['pivot'], 5.632612))
 
 
 class JWSTFittingTools(unittest.TestCase):
