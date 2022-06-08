@@ -4,7 +4,8 @@ import os
 
 import numpy as np
 
-from .. import grismconf, GRIZLI_PATH
+from .. import grismconf as grizliconf
+from .. import GRIZLI_PATH
 
 def test_transform():
     """
@@ -16,7 +17,7 @@ def test_transform():
         for grism in 'RC':
             for module in 'AB':
                 
-                tr = grismconf.JwstDispersionTransform(instrument=instrument, 
+                tr = grizliconf.JwstDispersionTransform(instrument=instrument,
                                             grism=grism, module=module)
                 
                 #print(instrument, grism, module, tr.forward(1024, 1024))
@@ -41,7 +42,7 @@ def test_transform():
         nis['FILTER'] = gr
         nis['PUPIL'] = 'F150W'
 
-        tr = grismconf.JwstDispersionTransform(header=nis)
+        tr = grizliconf.JwstDispersionTransform(header=nis)
         assert(tr.instrument == nis['INSTRUME'])
         assert(tr.grism == nis['FILTER'])
         assert(tr.rot90 == rot90[gr])
@@ -53,9 +54,15 @@ def test_read():
     
     wfc3_file = os.path.join(CONF_PATH, 'G141.F140W.V4.32.conf')
     if os.path.exists(wfc3_file):
-        conf = grismconf.aXeConf(wfc3_file)
+        conf = grizliconf.aXeConf(wfc3_file)
         
+    try:
+        import grismconf
+        has_grismconf = True
+    except ImportError:
+        has_grismconf = False
+    
     wfc3_gc = os.path.join(CONF_PATH, 'GRISM_WFC3/IR/G141.conf')
-    if os.path.exists(wfc3_gc):
-        conf = grismconf.TransformGrismconf(conf_file=wfc3_gc)
+    if os.path.exists(wfc3_gc) & has_grismconf:
+        conf = grizliconf.TransformGrismconf(conf_file=wfc3_gc)
         
