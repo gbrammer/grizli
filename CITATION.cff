@@ -1,0 +1,17 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: >-
+  Grizli: The grism redshift and line analysis
+  software
+message: Please cite this software using these metadata.
+type: software
+authors:
+  - given-names: Gabriel
+    family-names: Brammer
+    email: gbrammer@gmail.com
+    affiliation: >-
+      Cosmic Dawn Center, Niels Bohr Institute,
+      University of Copenhagen
+    orcid: 'https://orcid.org/0000-0003-2680-0055'
