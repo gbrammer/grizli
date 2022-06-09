@@ -5,7 +5,7 @@ cff-version: 1.2.0
 title: grizli
 abstract: >-
   Grizli is a grism redshift and line analysis
-  software.Grizli produces quantitative and comprehensive 
+  software. Grizli produces quantitative and comprehensive 
   modeling and fitting of slitless spectroscopic observations, 
   which typically involve overlapping spectra of hundreds or 
   thousands of objects in exposures taken with one or more separate 
