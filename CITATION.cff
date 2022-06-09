@@ -7,6 +7,10 @@ title: >-
   software
 message: Please cite this software using these metadata.
 type: software
+url: https://github.com/gbrammer/grizli
+publisher: GitHub
+keywords: 
+  - Astronomy software (1855)
 authors:
   - given-names: Gabriel
     family-names: Brammer
