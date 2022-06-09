@@ -1499,6 +1499,93 @@ def _xobjective_sip(params, u, v, x, y, crval, crpix, a_names, b_names, cd, ret)
     return dr
 
 
+def compare_gwcs_sip(file, save=False, step=32, use_gwcs_func=False, func_kwargs={'degree':5, 'crpix':None, 'max_pix_error':0.01}):
+    """
+    Make a figure comparing the `gwcs` and SIP WCS of a JWST exposure with
+    the round trip transformation ``pixel -> gwcs_RaDec -> sip_pixel``
+    
+    Parameters
+    ----------
+    file : str
+        Filename, e.g., ``jw...._cal.fits``
+    
+    save : bool
+        Save the figure to ``file.replace('.fits', '.sip.png')``
+    
+    step : int
+        Step size for the test pixel grid
+    
+    Returns
+    -------
+    fig : `matplotlib.figure.Figure`
+        Figure object
+    
+    """
+    import matplotlib.pyplot as plt
+    
+    im = pyfits.open(file)
+    
+    obj = img_with_wcs(im)
+
+    if use_gwcs_func:
+        if 'npoints' not in func_kwargs:
+            func_kwargs['npoints'] = step
+            
+        h = obj.meta.wcs.to_fits_sip(**func_kwargs)
+        wcs = pywcs.WCS(h, relax=True)
+    else:
+        wcs = pywcs.WCS(im['SCI'].header, relax=True)
+    
+    sh = im['SCI'].data.shape
+    
+    xarr = np.arange(0, sh[0], step)
+    
+    # Round-trip of pixel > gwcs_RaDec > sip_pixel
+    u, v = np.meshgrid(xarr, xarr)
+    rd = obj.meta.wcs.forward_transform(u, v)
+    up, vp = wcs.all_world2pix(*rd, 0)
+    
+    fig, axes = plt.subplots(1,2,figsize=(8, 4))
+    
+    axes[0].scatter(u, up-u, alpha=0.5,
+                    label=r'$\Delta x$' + f' rms={utils.nmad(up-u):.1e}')
+    axes[0].scatter(v, vp-v, alpha=0.5,
+                    label=r'$\Delta y$' + f' rms={utils.nmad(vp-v):.1e}')
+                    
+    axes[0].legend(loc='lower center')
+    axes[0].grid()
+    axes[0].set_xlabel('pixel')
+    axes[0].set_ylabel(r'$\Delta$ pixel')
+    
+    axes[0].text(0.5, 0.98, file, ha='center', va='top', 
+                 transform=axes[0].transAxes, fontsize=6)
+                 
+    label = f"{im[0].header['INSTRUME']} {utils.get_hst_filter(im[0].header)}"
+    axes[0].text(0.5, 0.94, label, ha='center', va='top', 
+                 transform=axes[0].transAxes, fontsize=8)
+                 
+    scl = sh[1]/axes[0].get_ylim()[1]*4
+    axes[0].set_xticks(np.arange(0, sh[1]+1, 512))
+    
+    axes[1].quiver(u, v, up-u, vp-v, alpha=0.4, units='x', scale=step/scl)
+    
+    axes[1].set_xticks(np.arange(0, sh[1]+1, 512))
+    axes[1].set_yticks(np.arange(0, sh[0]+1, 512))
+    axes[1].set_xticklabels([])
+    axes[1].set_yticklabels([])
+    axes[1].grid()
+    
+    fig.tight_layout(pad=0.5)
+    
+    if save:
+        figfile = file.replace('.fits','.sip.png').split('.gz')[0]
+        print(figfile)
+        
+        fig.savefig(figfile)
+        
+    return fig
+
+
 def load_jwst_filter_info():
     """
     Load the filter info in `grizli/data/jwst_bp_info.yml`
