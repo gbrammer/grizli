@@ -6,13 +6,13 @@ title: >-
   Grizli: The grism redshift and line analysis
   software
 message: Please cite this software using these metadata.
-type: misc
-url: https://github.com/gbrammer/grizli
-publisher: GitHub
 version: 1.3.2
 year: 2022
+url: https://github.com/gbrammer/grizli
+publisher: GitHub
 keywords: 
   - Astronomy software (1855)
+type: misc
 authors:
   - given-names: Gabriel
     family-names: Brammer
