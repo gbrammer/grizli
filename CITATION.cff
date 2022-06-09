@@ -9,6 +9,8 @@ message: Please cite this software using these metadata.
 type: software
 url: https://github.com/gbrammer/grizli
 publisher: GitHub
+version: 1.3.2
+year: 2022
 keywords: 
   - Astronomy software (1855)
 authors:
