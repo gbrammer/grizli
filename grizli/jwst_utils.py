@@ -357,7 +357,7 @@ def match_gwcs_to_sip(input, step=64, transform=None, verbose=True, overwrite=Tr
     tf = transform()
     tf.estimate(Vg.T, Vw.T)
     
-    asec = np.array(tf.translation)*np.array([1./cosd, 1.])*3600
+    asec = np.array(tf.translation)*np.array([1., 1.])*3600
     rot_deg = tf.rotation/np.pi*180
     
     Vt = tf(Vg.T).T
