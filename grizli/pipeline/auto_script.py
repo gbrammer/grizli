@@ -2518,7 +2518,7 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
         if '-' in filter:
             spl = filter.split('-')
             info['FILTER'][idx] = spl[-1]
-            if len(spl) == 2:
+            if len(spl) in [2,3]:
                 info['PUPIL'][idx] = filter.split('-')[-2]
 
     masks = {}
