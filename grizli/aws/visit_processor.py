@@ -136,7 +136,7 @@ def s3_put_exposure(flt_file, product, assoc, remove_old=True, verbose=True):
         expflag, sunangle = None, None
         
     else:
-        filt = utils.get_hst_filter(h0)
+        filt = utils.parse_filter_from_header(h0)
         pupil = ''
         exptime = h0['EXPTIME']
         expflag = h0['EXPFLAG']

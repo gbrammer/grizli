@@ -1301,7 +1301,7 @@ class GroupFLT():
 #             for k in ['PHOTFLAM', 'PHOTPLAM']:
 #                 ext.header[k] = ref_im[0].header[k]
 #
-#             the_filter = utils.get_hst_filter(ref_im[0].header)
+#             the_filter = utils.parse_filter_from_header(ref_im[0].header)
 #             ext.header['FILTER'] = ext.header['DFILTER'] = the_filter
 #
 #             wcs_file = ext.header['GPARENT'].replace('.fits', '.{0:02}.wcs.fits'.format(ext.header['SCI_EXTN']))
@@ -1941,7 +1941,7 @@ class MultiBeam(GroupFitter):
             ref_photflam = 1.
 
         try:
-            ref_filter = utils.get_hst_filter(ref_header)
+            ref_filter = utils.parse_filter_from_header(ref_header)
         except:
             ref_filter = 'N/A'
 
