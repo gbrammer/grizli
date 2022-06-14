@@ -918,7 +918,7 @@ def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixsca
 
                 filt_i = file.split('-')[-1].split('_dr')[0]
             else:
-                filt_i = utils.get_hst_filter(hdu_i[0].header)
+                filt_i = utils.parse_filter_from_header(hdu_i[0].header)
 
             for h in hdu_i:
                 h.header['EXTVER'] = filt_i
@@ -1122,14 +1122,14 @@ def combine_filters(label='j022708p4901_00273', verbose=True):
                     num = sci*wht[0].data
                     den = wht[0].data
                     drz_ref = drz
-                    drz_ref[0].header['CFILT{0}'.format(i+1)] = utils.get_hst_filter(drz[0].header)
+                    drz_ref[0].header['CFILT{0}'.format(i+1)] = utils.parse_filter_from_header(drz[0].header)
                     drz_ref[0].header['NCOMBINE'] = (len(drz_files), 'Number of combined filters')
                 else:
                     scl = drz[0].header['PHOTFLAM']/photflam
                     num += sci*scl*(wht[0].data/scl**2)
                     den += wht[0].data/scl**2
 
-                    drz_ref[0].header['CFILT{0}'.format(i+1)] = utils.get_hst_filter(drz[0].header)
+                    drz_ref[0].header['CFILT{0}'.format(i+1)] = utils.parse_filter_from_header(drz[0].header)
                     drz_ref[0].header['NDRIZIM'] += drz[0].header['NDRIZIM']
 
             sci = num/den

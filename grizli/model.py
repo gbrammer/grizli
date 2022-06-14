@@ -1441,7 +1441,7 @@ class ImageData(object):
                 raise KeyError(msg)
 
             instrument = h['INSTRUME']
-            filter = utils.get_hst_filter(h, filter_only=True)
+            filter = utils.parse_filter_from_header(h, filter_only=True)
 
             if 'PUPIL' in h:
                 pupil = h['PUPIL']
@@ -2616,7 +2616,7 @@ class GrismFLT(object):
                                       segmentation=False, interp='poly5')
 
         header_values = {}
-        self.direct.ref_filter = utils.get_hst_filter(refh)
+        self.direct.ref_filter = utils.parse_filter_from_header(refh)
         self.direct.ref_file = ref_str
 
         key_list = {'PHOTFLAM': photflam_list, 'PHOTPLAM': photplam_list}

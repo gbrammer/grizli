@@ -1560,7 +1560,7 @@ def compare_gwcs_sip(file, save=False, step=32, use_gwcs_func=False, func_kwargs
     axes[0].text(0.5, 0.98, file, ha='center', va='top', 
                  transform=axes[0].transAxes, fontsize=6)
                  
-    label = f"{im[0].header['INSTRUME']} {utils.get_hst_filter(im[0].header)}"
+    label = f"{im[0].header['INSTRUME']} {utils.parse_filter_from_header(im[0].header)}"
     axes[0].text(0.5, 0.94, label, ha='center', va='top', 
                  transform=axes[0].transAxes, fontsize=8)
                  

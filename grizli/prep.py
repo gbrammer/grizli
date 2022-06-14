@@ -144,7 +144,7 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
     # G102 -> F105W, uc72113oi_pfl.fits
     # G141 -> F140W, uc72113oi_pfl.fits
     flat, extra_msg = 1., ''
-    filter = utils.get_hst_filter(head)
+    filter = utils.parse_filter_from_header(head)
 
     # Copy calibs for ACS/UVIS files
     if '_flc' in file:
@@ -1295,7 +1295,7 @@ def make_SEP_FLT_catalog(flt_file, ext=1, column_case=str.upper, **kwargs):
 
     tab, seg = make_SEP_catalog_from_arrays(sci, err, mask, wcs=wcs, ZP=ZP, **kwargs)
     tab.meta['ABZP'] = ZP
-    tab.meta['FILTER'] = utils.get_hst_filter(im[0].header)
+    tab.meta['FILTER'] = utils.parse_filter_from_header(im[0].header)
     tab['mag_auto'] = ZP - 2.5*np.log10(tab['flux'])
 
     for c in tab.colnames:
@@ -1628,7 +1628,7 @@ def make_SEP_catalog(root='',
     im = pyfits.open(drz_file)
 
     # Filter
-    drz_filter = utils.get_hst_filter(im[0].header)
+    drz_filter = utils.parse_filter_from_header(im[0].header)
     if 'PHOTPLAM' in im[0].header:
         drz_photplam = im[0].header['PHOTPLAM']
     else:
@@ -2839,7 +2839,7 @@ def separate_chip_sky(visit, filters=['F200LP','F350LP','F600LP','F390W'], steps
         return False
     
     flt = pyfits.open(visit['files'][0])
-    filt_i = utils.get_hst_filter(flt[0].header)
+    filt_i = utils.parse_filter_from_header(flt[0].header)
     if filt_i not in filters:
         logstr = f'# separate_chip_sky: {filt_i} not in {filters} for '
         logstr += "'{0}'".format(visit['product'])
@@ -3743,7 +3743,7 @@ def set_grism_dfilter(direct, grism):
 
     """
     d_im = pyfits.open(direct['files'][0])
-    direct_filter = utils.get_hst_filter(d_im[0].header)
+    direct_filter = utils.parse_filter_from_header(d_im[0].header)
     for file in grism['files']:
         if '_flc' in file:
             ext = [1, 2]
@@ -4083,7 +4083,7 @@ def tweak_flt(files=[], max_dist=0.4, threshold=3, verbose=True, tristars_kwargs
             if k in im[0].header:
                 header[k] = im[0].header[k]
 
-        hst_filter = utils.get_hst_filter(im[0].header)
+        hst_filter = utils.parse_filter_from_header(im[0].header)
         header['FILTER'] = hst_filter
 
         pyfits.writeto('{0}_xsci.fits'.format(root), data=sci,
@@ -4571,7 +4571,7 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
     #     pupil = ''
     
     im = pyfits.open(grism['files'][0])
-    grism_element = utils.get_hst_filter(im[0].header)
+    grism_element = utils.parse_filter_from_header(im[0].header)
     
     isJWST = False
     isACS = False
@@ -5619,7 +5619,12 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, m
 
         print('\n\n### drizzle_overlaps: {0} ({1})\n'.format(group['product'],
                                                      len(group['files'])))
-
+        
+        if isJWST:
+            # Make sure HST-like keywords are set for JWST
+            for file in group['files']:
+                _ = jwst_utils.set_jwst_to_hst_keywords(file, reset=False)
+                                                             
         if fetch_flats:
             # PFL files needed for IVM weights
             for file in group['files']:
@@ -5632,9 +5637,7 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, m
                                                 use_mast=False, verbose=True,
                                                 overwrite=True)
                     elif isJWST:
-                        for file in group['files']:
-                            _ = jwst_utils.set_jwst_to_hst_keywords(file, 
-                                                                  reset=False)
+                        pass
                     else:
                         utils.fetch_hst_calibs(file, calib_types=['PFLTFILE'],
                                        verbose=False)

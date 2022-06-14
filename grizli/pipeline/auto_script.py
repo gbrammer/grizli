@@ -1415,7 +1415,7 @@ def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, com
             # Build from IMA filename
             root = os.path.basename(file).split("_ima")[0][:-1]
             im = pyfits.open(file)
-            filt = utils.get_hst_filter(im[0].header).lower()
+            filt = utils.parse_filter_from_header(im[0].header).lower()
             wcs = pywcs.WCS(im['SCI'].header)
             fp = Polygon(wcs.calc_footprint())
 
