@@ -139,12 +139,33 @@ def img_with_flat(input, verbose=True, overwrite=True):
     else:
         _hdu = input
         
-    img = util.open(_hdu)
-    
     skip = False
     if 'S_FLAT' in _hdu[0].header:
         if _hdu[0].header['S_FLAT'] == 'COMPLETE':
             skip = True
+    
+    if 'OINSTRUM' not in _hdu[0].header:
+        copy_jwst_keywords(_hdu[0].header)
+        
+    # if _hdu[0].header['OINSTRUM'] == 'NIRISS':
+    #     if _hdu[0].header['OFILTER'].startswith('GR'):
+    #         _hdu[0].header['FILTER'] = 'CLEAR'
+    #         _hdu[0].header['EXP_TYPE'] = 'NIS_IMAGE'
+    
+    # NIRCam grism flats are empty
+    # NIRISS has slitless flats that include the mask spots
+    if _hdu[0].header['OINSTRUM'] == 'NIRCAM':
+        if _hdu[0].header['OPUPIL'].startswith('GR'):
+            _opup = _hdu[0].header['OPUPIL']
+            msg = f'Set NIRCAM slitless PUPIL {_opup} -> CLEAR for flat'
+            utils.log_comment(utils.LOGFILE, msg, verbose=True)
+            _hdu[0].header['PUPIL'] = 'CLEAR'
+            _hdu[0].header['EXP_TYPE'] = 'NRC_IMAGE'
+    else:
+        # MIRI, NIRISS
+        pass
+    
+    img = util.open(_hdu)
     
     if not skip:        
         if verbose:
