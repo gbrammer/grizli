@@ -4092,6 +4092,7 @@ def sip_rot90(input, rot, reverse=False, verbose=False, compare=False):
     import copy
     import astropy.io.fits
     import astropy.wcs
+    import matplotlib.pyplot as plt
     
     if isinstance(input, astropy.io.fits.Header):
         orig = copy.deepcopy(input)
