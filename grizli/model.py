@@ -2772,12 +2772,22 @@ class GrismFLT(object):
         self.dispersion_PA = dispersion_PA
         return float(dispersion_PA)
 
-    def compute_model_orders(self, id=0, x=None, y=None, size=10, mag=-1,
-                      spectrum_1d=None, is_cgs=False,
-                      compute_size=False, max_size=None, store=True,
-                      in_place=True, get_beams=None,
-                      psf_params=None,
-                      verbose=True):
+    def compute_model_orders(self,
+                             id=0,
+                             x=None,
+                             y=None,
+                             size=10,
+                             mag=-1,
+                             spectrum_1d=None,
+                             is_cgs=False,
+                             compute_size=False,
+                             max_size=None,
+                             min_size=26,
+                             store=True,
+                             in_place=True,
+                             get_beams=None,
+                             psf_params=None,
+                             verbose=True):
         """Compute dispersed spectrum for a given object id
 
         Parameters
@@ -2859,8 +2869,6 @@ class GrismFLT(object):
         """
         from .utils_c import disperse
 
-        # debug
-        # x=None; y=None; size=10; mag=-1; spectrum_1d=None; compute_size=True; store=False; in_place=False; add=True; get_beams=['A']; verbose=True
         if id in self.object_dispersers:
             object_in_model = True
             beams = self.object_dispersers[id]
@@ -2900,7 +2908,7 @@ class GrismFLT(object):
                 ix = self.catalog['id'] == id
                 if ix.sum() == 0:
                     if verbose:
-                        print('ID {0:d} not found in segmentation image'.format(id))
+                        print(f'ID {id} not found in segmentation image')
                     return False
                 
                 if hasattr(self.catalog['x_flt'][ix][0], 'unit'):
@@ -2950,7 +2958,7 @@ class GrismFLT(object):
 
                     # Enforce minimum size
                     # size = np.maximum(size, 16)
-                    size = np.maximum(size, 26)
+                    size = np.maximum(size, min_size)
                     
                     # To do: enforce a larger minimum cutout size for grisms 
                     # that need it, e.g., UVIS/G280L
@@ -3132,7 +3140,7 @@ class GrismFLT(object):
             return beams, output
 
 
-    def compute_full_model(self, ids=None, mags=None, mag_limit=22, store=True, verbose=False, size=10, compute_size=True):
+    def compute_full_model(self, ids=None, mags=None, mag_limit=22, store=True, verbose=False, size=10, min_size=26, compute_size=True):
         """Compute flat-spectrum model for multiple objects.
 
         Parameters
@@ -3201,7 +3209,8 @@ class GrismFLT(object):
         for id_i, mag_i in iterator:
             self.compute_model_orders(id=id_i, compute_size=compute_size,
                                       mag=mag_i, size=size,
-                                      in_place=True, store=store)
+                                      in_place=True, store=store, 
+                                      min_size=min_size)
 
 
     def smooth_mask(self, gaussian_width=4, threshold=2.5):
@@ -3631,28 +3640,35 @@ class GrismFLT(object):
             print('Transform JWST WFSS: flip={0}'.format(self.is_rotated))
 
         # Compute new CRPIX coordinates
-        center = np.array(self.grism.sh)/2.+0.5
-        crpix = self.grism.wcs.wcs.crpix
-
-        rad = np.deg2rad(-90*rot)
-        mat = np.zeros((2, 2))
-        mat[0, :] = np.array([np.cos(rad), -np.sin(rad)])
-        mat[1, :] = np.array([np.sin(rad), np.cos(rad)])
+        # center = np.array(self.grism.sh)/2.+0.5
+        # crpix = self.grism.wcs.wcs.crpix
+        # 
+        # rad = np.deg2rad(-90*rot)
+        # mat = np.zeros((2, 2))
+        # mat[0, :] = np.array([np.cos(rad), -np.sin(rad)])
+        # mat[1, :] = np.array([np.sin(rad), np.cos(rad)])
+        # 
+        # crpix_new = np.dot(mat, crpix-center)+center
         
-        crpix_new = np.dot(mat, crpix-center)+center
-
+        # Full rotated SIP header
+        orig_header = utils.to_header(self.grism.wcs)
+        hrot, wrot, desc = utils.sip_rot90(orig_header, rot)
+        
         for obj in [self.grism, self.direct]:
-
-            obj.header['CRPIX1'] = crpix_new[0]
-            obj.header['CRPIX2'] = crpix_new[1]
-
-            # Get rotated CD
-            out_wcs = utils.transform_wcs(obj.wcs, translation=[0., 0.], rotation=rad, scale=1.)
-            new_cd = out_wcs.wcs.cd
-
-            for i in range(2):
-                for j in range(2):
-                    obj.header['CD{0}_{1}'.format(i+1, j+1)] = new_cd[i, j]
+            
+            for k in hrot:
+                obj.header[k] = hrot[k]
+                
+            # obj.header['CRPIX1'] = crpix_new[0]
+            # obj.header['CRPIX2'] = crpix_new[1]
+            # 
+            # # Get rotated CD
+            # out_wcs = utils.transform_wcs(obj.wcs, translation=[0., 0.], rotation=rad, scale=1.)
+            # new_cd = out_wcs.wcs.cd
+            # 
+            # for i in range(2):
+            #     for j in range(2):
+            #         obj.header['CD{0}_{1}'.format(i+1, j+1)] = new_cd[i, j]
 
             # Update wcs
             obj.get_wcs()
@@ -3674,6 +3690,7 @@ class GrismFLT(object):
             #print('xx Rotate catalog {0}'.format(rot))
             self.catalog = self.blot_catalog(self.catalog,
                           sextractor=('X_WORLD' in self.catalog.colnames))
+    
     
     def apply_POM(self, warn_if_too_small=True, verbose=True):
         """
@@ -3992,6 +4009,7 @@ class BeamCutout(object):
         self.contam_mask = ~nd.maximum_filter(contam_mask, size=5).flatten()
         self.poly_order = None
         # self.init_poly_coeffs(poly_order=1)
+
 
     def init_from_input(self, flt, beam, conf=None, get_slice_header=True):
         """Initialize from data objects
