@@ -4,6 +4,7 @@ Model grism spectra in individual FLTs
 import os
 from collections import OrderedDict
 import copy
+import traceback
 
 import numpy as np
 import scipy.ndimage as nd
@@ -1175,7 +1176,7 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
 
         http://www.stsci.edu/hst/wfc3/pam/pixel_area_maps
         """
-        confp = self.conf.conf
+        confp = self.conf.conf_dict
         if ('INSTRUMENT' in confp) & ('CAMERA' in confp):
             instr = '{0}-{1}'.format(confp['INSTRUMENT'], confp['CAMERA'])
             if instr != 'WFC3-IR':
@@ -2745,7 +2746,11 @@ class GrismFLT(object):
         import astropy.units as u
 
         # extra tilt of the 1st order grism spectra
-        x0 = self.conf.conf['BEAMA']
+        if 'BEAMA' in self.conf.conf_dict:
+            x0 = self.conf.conf_dict['BEAMA']
+        else:
+            x0 = np.array([10,30])
+        
         dy_trace, lam_trace = self.conf.get_beam_trace(x=507, y=507, dx=x0,
                                                        beam='A')
 
@@ -3011,7 +3016,7 @@ class GrismFLT(object):
 
             for b in beam_names:
                 # Only compute order if bright enough
-                if mag > self.conf.conf['MMAG_EXTRACT_{0}'.format(b)]:
+                if mag > self.conf.conf_dict['MMAG_EXTRACT_{0}'.format(b)]:
                     continue
 
                 try:
@@ -3027,7 +3032,9 @@ class GrismFLT(object):
                                           conf=self.conf,
                                           fwcpos=self.grism.fwcpos,
                                           MW_EBV=self.grism.MW_EBV)
-                except:
+                except: 
+                    utils.log_exception(utils.LOGFILE, traceback)
+                    
                     continue
 
                 # Set PSF model if necessary
@@ -3585,9 +3592,12 @@ class GrismFLT(object):
 
         return True
 
-    def transform_NIRISS(self, verbose=True):
+    def transform_JWST_WFSS(self, verbose=True):
         """
         Rotate data & wcs so that spectra are increasing to +x
+        
+        # ToDo - do this correctly for the SIP WCS / CRPIX keywords
+        
         """
 
         if self.grism.instrument not in ['NIRCAM', 'NIRISS']:
@@ -3615,10 +3625,10 @@ class GrismFLT(object):
 
         if self.is_rotated:
             rot *= -1
-
+        
         self.is_rotated = not self.is_rotated
         if verbose:
-            print('Transform NIRISS: flip={0}'.format(self.is_rotated))
+            print('Transform JWST WFSS: flip={0}'.format(self.is_rotated))
 
         # Compute new CRPIX coordinates
         center = np.array(self.grism.sh)/2.+0.5
@@ -3628,7 +3638,7 @@ class GrismFLT(object):
         mat = np.zeros((2, 2))
         mat[0, :] = np.array([np.cos(rad), -np.sin(rad)])
         mat[1, :] = np.array([np.sin(rad), np.cos(rad)])
-
+        
         crpix_new = np.dot(mat, crpix-center)+center
 
         for obj in [self.grism, self.direct]:
@@ -3674,7 +3684,7 @@ class GrismFLT(object):
             return True
         
         pom_file = os.path.join(GRIZLI_PATH,
-         f'CONF/GRISM_NIRCAM/V2/NIRCAM_LW_POM_Mod{self.grism.module}.fits')
+            f'CONF/GRISM_NIRCAM/V3/NIRCAM_LW_POM_Mod{self.grism.module}.fits')
         
         if not os.path.exists(pom_file):
             print(f'Couldn\'t find POM reference file {pom_file}')
@@ -3780,7 +3790,7 @@ class GrismFLT(object):
         if (self.has_edge_mask) & (force is False):
             return True
 
-        kern = (np.arange(self.conf.conf['BEAMA'][1]) > self.conf.conf['BEAMA'][0])*1.
+        kern = (np.arange(self.conf.conf_dict['BEAMA'][1]) > self.conf.conf_dict['BEAMA'][0])*1.
         kern /= kern.sum()
 
         if self.direct['REF'] is not None:
@@ -4574,7 +4584,11 @@ class BeamCutout(object):
         import astropy.units as u
 
         # extra tilt of the 1st order grism spectra
-        x0 = self.beam.conf.conf['BEAMA']
+        if 'BEAMA' in self.beam.conf.conf_dict:
+            x0 = self.beam.conf.conf_dict['BEAMA']
+        else:
+            x0 = np.array([10,30])
+            
         dy_trace, lam_trace = self.beam.conf.get_beam_trace(x=507, y=507,
                                                          dx=x0, beam='A')
 
