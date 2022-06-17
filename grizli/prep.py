@@ -4571,7 +4571,8 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
     #     pupil = ''
     
     im = pyfits.open(grism['files'][0])
-    grism_element = utils.parse_filter_from_header(im[0].header)
+    grism_element = utils.parse_filter_from_header(im[0].header, 
+                                                   jwst_detector=True)
     
     isJWST = False
     isACS = False
@@ -4592,7 +4593,7 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
         isACS = True
         flat = 1.
 
-    elif len(grism_element.split('-')) == 2:
+    elif len(grism_element.split('-')) > 1:
         # JWST grism_element like F115W-GR150R
         #(grism_element == 'GR150C') & (pupil == 'F115W'):
         from jwst.wfss_contam import WfssContamStep
@@ -4600,6 +4601,23 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
         wfss_ref =  WfssContamStep().get_reference_file(grism['files'][0], 
                                                         'wfssbkg')
         
+        # GRISM_NIRCAM
+        if 'GRISM' in grism_element:
+            # Grism background files in GRISM_NIRCAM
+            
+            _bgpath = os.path.join(GRIZLI_PATH, 'CONF/GRISM_NIRCAM/V2')
+            # 'NRCA5-F356W-GRISMR'
+            gr = grism_element[-1]
+            mod = grism_element[3]
+            fi = grism_element.split('-')[-2]
+            _bgfile = os.path.join(_bgpath, 
+                                   f'{fi}_mod{mod}_{gr}_back.norm.fits.gz')
+                        
+            if os.path.exists(_bgfile):
+                wfss_ref = _bgfile
+                
+            # TBD
+            
         bg_fixed = [wfss_ref]
                                                         
         #bg_fixed = ['jwst_niriss_wfssbkg_0002.fits'] # bg_fixed should be normalized background with flat divided out
