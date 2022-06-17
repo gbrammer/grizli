@@ -25,6 +25,7 @@ class aXeConf():
         """
         if conf_file is not None:
             self.conf = self.read_conf_file(conf_file)
+            self.conf_dict = self.conf
             self.conf_file = conf_file
             self.count_beam_orders()
 
@@ -547,7 +548,10 @@ def get_config_filename(instrume='WFC3', filter='F140W',
         gr = filter[-1] # R, C
         conf_file = os.path.join(GRIZLI_PATH,
                     f'CONF/GRISM_NIRCAM/gNIRCAM.{fi}.mod{module}.{gr}.conf')
-    
+        #
+        conf_file = os.path.join(GRIZLI_PATH,
+                    f'CONF/GRISM_NIRCAM/V2/NIRCAM_{fi}_mod{module}_{gr}.conf')
+        
     elif instrume == 'NIRCAMA':
         fi = grism
         gr = filter[-1] # R, C
@@ -772,6 +776,7 @@ class TransformGrismconf(object):
         
         self.conf_file = conf_file
         self.conf = grismconf.Config(conf_file)
+        
         self.transform = JwstDispersionTransform(conf_file=conf_file)
 
         self.order_names = {'A':'+1',
@@ -791,6 +796,8 @@ class TransformGrismconf(object):
         
         self.xoff = 0.0
         self.yoff = 0.0
+
+        self.conf_dict = {}
 
 
     @property
@@ -867,6 +874,7 @@ class TransformGrismconf(object):
 
         rev = self.transform.forward(x0[0]+tdx, x0[1]+tdy)
         trace_dy = rev[1,:] - y
+        #trace_dy = y - rev[1,:]
 
         wave = self.conf.DISPL(self.order_names[beam], *x0, t)
         if self.transform.instrument != 'HST':
@@ -924,6 +932,9 @@ class TransformGrismconf(object):
                 sens['WAVELENGTH'] *= 1.e4
 
             self.sens[beam] = sens
+            
+            self.conf_dict[f'BEAM{beam}'] = np.array([xarr[0], xarr[-1]])
+            self.conf_dict[f'MMAG_EXTRACT_{beam}'] = 29
 
 
 def load_grism_config(conf_file):
@@ -940,8 +951,15 @@ def load_grism_config(conf_file):
         Configuration file object.  Runs `conf.get_beams()` to read the
         sensitivity curves.
     """
-    conf = aXeConf(conf_file)
-    conf.get_beams()
+    if 'V3/NIRCAM' in conf_file:
+        conf = TransformGrismconf(conf_file)
+        conf.get_beams()
+    elif 'V2/NIRCAM' in conf_file:
+        conf = TransformGrismconf(conf_file)
+        conf.get_beams()
+    else:
+        conf = aXeConf(conf_file)
+        conf.get_beams()
     
     # hack to remove GAIN correction from niriss
     if 'GR150' in conf_file:
@@ -956,5 +974,6 @@ def load_grism_config(conf_file):
         for b in conf.sens:
             conf.sens[b]['SENSITIVITY'] *= hack_niriss
             conf.sens[b]['ERROR'] *= hack_niriss
-            
+    
+                
     return conf
