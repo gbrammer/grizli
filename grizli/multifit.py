@@ -97,7 +97,7 @@ def _loadFLT(grism_file, sci_extn, direct_file, pad, ref_file,
         flt.apply_POM()
         
     if flt.grism.instrument in ['NIRISS', 'NIRCAM']:
-        flt.transform_NIRISS()
+        flt.transform_JWST_WFSS()
 
     return flt  # , out_cat
 
@@ -439,7 +439,7 @@ class GroupFLT():
             
             # Rotate back to detector frame if needed
             if _flt.grism.instrument in ['NIRISS', 'NIRCAM']:
-                _flt.transform_NIRISS(verbose=verbose)
+                _flt.transform_JWST_WFSS(verbose=verbose)
             
             # Save the files
             print('Save {0}'.format(save_file))
@@ -450,7 +450,7 @@ class GroupFLT():
             
             # Rotate to "GrismFLT" frame if needed
             if _flt.grism.instrument in ['NIRISS', 'NIRCAM']:
-                _flt.transform_NIRISS(verbose=verbose)
+                _flt.transform_JWST_WFSS(verbose=verbose)
 
 
     def extend(self, new, verbose=True):
