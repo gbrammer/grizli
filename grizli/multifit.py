@@ -478,7 +478,7 @@ class GroupFLT():
         if verbose:
             print('Now we have {0:d} FLTs'.format(self.N))
 
-    def compute_single_model(self, id, center_rd=None, mag=-99, size=-1, store=False, spectrum_1d=None, is_cgs=False, get_beams=None, in_place=True, psf_param_dict={}):
+    def compute_single_model(self, id, center_rd=None, mag=-99, size=-1, store=False, spectrum_1d=None, is_cgs=False, get_beams=None, in_place=True, min_size=26, psf_param_dict={}):
         """Compute model spectrum in all exposures
         TBD
 
@@ -522,7 +522,8 @@ class GroupFLT():
                           size=size, compute_size=(size < 0),
                           mag=mag, in_place=in_place, store=store,
                           spectrum_1d=spectrum_1d, is_cgs=is_cgs,
-                          get_beams=get_beams, psf_params=psf_params)
+                          get_beams=get_beams, psf_params=psf_params,
+                          min_size=min_size)
 
             out_beams.append(status)
 
@@ -655,7 +656,11 @@ class GroupFLT():
             List of `~grizli.model.BeamCutout` objects.
 
         """
-        beams = self.compute_single_model(id, center_rd=center_rd, size=size, store=False, get_beams=[beam_id])
+        beams = self.compute_single_model(id,
+                                         center_rd=center_rd,
+                                         size=size,
+                                         store=False,
+                                         get_beams=[beam_id])
 
         out_beams = []
         for flt, beam in zip(self.FLTs, beams):
