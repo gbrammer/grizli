@@ -4,6 +4,7 @@ Model grism spectra in individual FLTs
 import os
 from collections import OrderedDict
 import copy
+import traceback
 
 import numpy as np
 import scipy.ndimage as nd
@@ -1175,7 +1176,7 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
 
         http://www.stsci.edu/hst/wfc3/pam/pixel_area_maps
         """
-        confp = self.conf.conf
+        confp = self.conf.conf_dict
         if ('INSTRUMENT' in confp) & ('CAMERA' in confp):
             instr = '{0}-{1}'.format(confp['INSTRUMENT'], confp['CAMERA'])
             if instr != 'WFC3-IR':
@@ -1441,7 +1442,7 @@ class ImageData(object):
                 raise KeyError(msg)
 
             instrument = h['INSTRUME']
-            filter = utils.get_hst_filter(h, filter_only=True)
+            filter = utils.parse_filter_from_header(h, filter_only=True)
 
             if 'PUPIL' in h:
                 pupil = h['PUPIL']
@@ -2616,7 +2617,7 @@ class GrismFLT(object):
                                       segmentation=False, interp='poly5')
 
         header_values = {}
-        self.direct.ref_filter = utils.get_hst_filter(refh)
+        self.direct.ref_filter = utils.parse_filter_from_header(refh)
         self.direct.ref_file = ref_str
 
         key_list = {'PHOTFLAM': photflam_list, 'PHOTPLAM': photplam_list}
@@ -2745,7 +2746,11 @@ class GrismFLT(object):
         import astropy.units as u
 
         # extra tilt of the 1st order grism spectra
-        x0 = self.conf.conf['BEAMA']
+        if 'BEAMA' in self.conf.conf_dict:
+            x0 = self.conf.conf_dict['BEAMA']
+        else:
+            x0 = np.array([10,30])
+        
         dy_trace, lam_trace = self.conf.get_beam_trace(x=507, y=507, dx=x0,
                                                        beam='A')
 
@@ -2767,12 +2772,22 @@ class GrismFLT(object):
         self.dispersion_PA = dispersion_PA
         return float(dispersion_PA)
 
-    def compute_model_orders(self, id=0, x=None, y=None, size=10, mag=-1,
-                      spectrum_1d=None, is_cgs=False,
-                      compute_size=False, max_size=None, store=True,
-                      in_place=True, get_beams=None,
-                      psf_params=None,
-                      verbose=True):
+    def compute_model_orders(self,
+                             id=0,
+                             x=None,
+                             y=None,
+                             size=10,
+                             mag=-1,
+                             spectrum_1d=None,
+                             is_cgs=False,
+                             compute_size=False,
+                             max_size=None,
+                             min_size=26,
+                             store=True,
+                             in_place=True,
+                             get_beams=None,
+                             psf_params=None,
+                             verbose=True):
         """Compute dispersed spectrum for a given object id
 
         Parameters
@@ -2854,8 +2869,6 @@ class GrismFLT(object):
         """
         from .utils_c import disperse
 
-        # debug
-        # x=None; y=None; size=10; mag=-1; spectrum_1d=None; compute_size=True; store=False; in_place=False; add=True; get_beams=['A']; verbose=True
         if id in self.object_dispersers:
             object_in_model = True
             beams = self.object_dispersers[id]
@@ -2895,7 +2908,7 @@ class GrismFLT(object):
                 ix = self.catalog['id'] == id
                 if ix.sum() == 0:
                     if verbose:
-                        print('ID {0:d} not found in segmentation image'.format(id))
+                        print(f'ID {id} not found in segmentation image')
                     return False
                 
                 if hasattr(self.catalog['x_flt'][ix][0], 'unit'):
@@ -2945,7 +2958,7 @@ class GrismFLT(object):
 
                     # Enforce minimum size
                     # size = np.maximum(size, 16)
-                    size = np.maximum(size, 26)
+                    size = np.maximum(size, min_size)
                     
                     # To do: enforce a larger minimum cutout size for grisms 
                     # that need it, e.g., UVIS/G280L
@@ -3011,7 +3024,7 @@ class GrismFLT(object):
 
             for b in beam_names:
                 # Only compute order if bright enough
-                if mag > self.conf.conf['MMAG_EXTRACT_{0}'.format(b)]:
+                if mag > self.conf.conf_dict['MMAG_EXTRACT_{0}'.format(b)]:
                     continue
 
                 try:
@@ -3027,7 +3040,9 @@ class GrismFLT(object):
                                           conf=self.conf,
                                           fwcpos=self.grism.fwcpos,
                                           MW_EBV=self.grism.MW_EBV)
-                except:
+                except: 
+                    utils.log_exception(utils.LOGFILE, traceback)
+                    
                     continue
 
                 # Set PSF model if necessary
@@ -3125,7 +3140,7 @@ class GrismFLT(object):
             return beams, output
 
 
-    def compute_full_model(self, ids=None, mags=None, mag_limit=22, store=True, verbose=False, size=10, compute_size=True):
+    def compute_full_model(self, ids=None, mags=None, mag_limit=22, store=True, verbose=False, size=10, min_size=26, compute_size=True):
         """Compute flat-spectrum model for multiple objects.
 
         Parameters
@@ -3194,7 +3209,8 @@ class GrismFLT(object):
         for id_i, mag_i in iterator:
             self.compute_model_orders(id=id_i, compute_size=compute_size,
                                       mag=mag_i, size=size,
-                                      in_place=True, store=store)
+                                      in_place=True, store=store, 
+                                      min_size=min_size)
 
 
     def smooth_mask(self, gaussian_width=4, threshold=2.5):
@@ -3585,9 +3601,12 @@ class GrismFLT(object):
 
         return True
 
-    def transform_NIRISS(self, verbose=True):
+    def transform_JWST_WFSS(self, verbose=True):
         """
         Rotate data & wcs so that spectra are increasing to +x
+        
+        # ToDo - do this correctly for the SIP WCS / CRPIX keywords
+        
         """
 
         if self.grism.instrument not in ['NIRCAM', 'NIRISS']:
@@ -3615,34 +3634,41 @@ class GrismFLT(object):
 
         if self.is_rotated:
             rot *= -1
-
+        
         self.is_rotated = not self.is_rotated
         if verbose:
-            print('Transform NIRISS: flip={0}'.format(self.is_rotated))
+            print('Transform JWST WFSS: flip={0}'.format(self.is_rotated))
 
         # Compute new CRPIX coordinates
-        center = np.array(self.grism.sh)/2.+0.5
-        crpix = self.grism.wcs.wcs.crpix
-
-        rad = np.deg2rad(-90*rot)
-        mat = np.zeros((2, 2))
-        mat[0, :] = np.array([np.cos(rad), -np.sin(rad)])
-        mat[1, :] = np.array([np.sin(rad), np.cos(rad)])
-
-        crpix_new = np.dot(mat, crpix-center)+center
-
+        # center = np.array(self.grism.sh)/2.+0.5
+        # crpix = self.grism.wcs.wcs.crpix
+        # 
+        # rad = np.deg2rad(-90*rot)
+        # mat = np.zeros((2, 2))
+        # mat[0, :] = np.array([np.cos(rad), -np.sin(rad)])
+        # mat[1, :] = np.array([np.sin(rad), np.cos(rad)])
+        # 
+        # crpix_new = np.dot(mat, crpix-center)+center
+        
+        # Full rotated SIP header
+        orig_header = utils.to_header(self.grism.wcs)
+        hrot, wrot, desc = utils.sip_rot90(orig_header, rot)
+        
         for obj in [self.grism, self.direct]:
-
-            obj.header['CRPIX1'] = crpix_new[0]
-            obj.header['CRPIX2'] = crpix_new[1]
-
-            # Get rotated CD
-            out_wcs = utils.transform_wcs(obj.wcs, translation=[0., 0.], rotation=rad, scale=1.)
-            new_cd = out_wcs.wcs.cd
-
-            for i in range(2):
-                for j in range(2):
-                    obj.header['CD{0}_{1}'.format(i+1, j+1)] = new_cd[i, j]
+            
+            for k in hrot:
+                obj.header[k] = hrot[k]
+                
+            # obj.header['CRPIX1'] = crpix_new[0]
+            # obj.header['CRPIX2'] = crpix_new[1]
+            # 
+            # # Get rotated CD
+            # out_wcs = utils.transform_wcs(obj.wcs, translation=[0., 0.], rotation=rad, scale=1.)
+            # new_cd = out_wcs.wcs.cd
+            # 
+            # for i in range(2):
+            #     for j in range(2):
+            #         obj.header['CD{0}_{1}'.format(i+1, j+1)] = new_cd[i, j]
 
             # Update wcs
             obj.get_wcs()
@@ -3665,6 +3691,7 @@ class GrismFLT(object):
             self.catalog = self.blot_catalog(self.catalog,
                           sextractor=('X_WORLD' in self.catalog.colnames))
     
+    
     def apply_POM(self, warn_if_too_small=True, verbose=True):
         """
         Apply pickoff mask to segmentation map to control sources that are dispersed onto the detector
@@ -3674,7 +3701,7 @@ class GrismFLT(object):
             return True
         
         pom_file = os.path.join(GRIZLI_PATH,
-         f'CONF/GRISM_NIRCAM/V2/NIRCAM_LW_POM_Mod{self.grism.module}.fits')
+            f'CONF/GRISM_NIRCAM/V3/NIRCAM_LW_POM_Mod{self.grism.module}.fits')
         
         if not os.path.exists(pom_file):
             print(f'Couldn\'t find POM reference file {pom_file}')
@@ -3780,7 +3807,7 @@ class GrismFLT(object):
         if (self.has_edge_mask) & (force is False):
             return True
 
-        kern = (np.arange(self.conf.conf['BEAMA'][1]) > self.conf.conf['BEAMA'][0])*1.
+        kern = (np.arange(self.conf.conf_dict['BEAMA'][1]) > self.conf.conf_dict['BEAMA'][0])*1.
         kern /= kern.sum()
 
         if self.direct['REF'] is not None:
@@ -3982,6 +4009,7 @@ class BeamCutout(object):
         self.contam_mask = ~nd.maximum_filter(contam_mask, size=5).flatten()
         self.poly_order = None
         # self.init_poly_coeffs(poly_order=1)
+
 
     def init_from_input(self, flt, beam, conf=None, get_slice_header=True):
         """Initialize from data objects
@@ -4574,7 +4602,11 @@ class BeamCutout(object):
         import astropy.units as u
 
         # extra tilt of the 1st order grism spectra
-        x0 = self.beam.conf.conf['BEAMA']
+        if 'BEAMA' in self.beam.conf.conf_dict:
+            x0 = self.beam.conf.conf_dict['BEAMA']
+        else:
+            x0 = np.array([10,30])
+            
         dy_trace, lam_trace = self.beam.conf.get_beam_trace(x=507, y=507,
                                                          dx=x0, beam='A')
 

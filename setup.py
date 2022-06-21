@@ -79,6 +79,7 @@ else:
 
 # Manual version tag
 # version = '1.4.0' # New aws tools
+version = '1.5.1' # bump for JWST
 
 version_str =f"""# git describe --tags
 __version__ = "{version}"

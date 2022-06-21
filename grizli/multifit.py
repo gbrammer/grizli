@@ -97,7 +97,7 @@ def _loadFLT(grism_file, sci_extn, direct_file, pad, ref_file,
         flt.apply_POM()
         
     if flt.grism.instrument in ['NIRISS', 'NIRCAM']:
-        flt.transform_NIRISS()
+        flt.transform_JWST_WFSS()
 
     return flt  # , out_cat
 
@@ -439,7 +439,7 @@ class GroupFLT():
             
             # Rotate back to detector frame if needed
             if _flt.grism.instrument in ['NIRISS', 'NIRCAM']:
-                _flt.transform_NIRISS(verbose=verbose)
+                _flt.transform_JWST_WFSS(verbose=verbose)
             
             # Save the files
             print('Save {0}'.format(save_file))
@@ -450,7 +450,7 @@ class GroupFLT():
             
             # Rotate to "GrismFLT" frame if needed
             if _flt.grism.instrument in ['NIRISS', 'NIRCAM']:
-                _flt.transform_NIRISS(verbose=verbose)
+                _flt.transform_JWST_WFSS(verbose=verbose)
 
 
     def extend(self, new, verbose=True):
@@ -478,7 +478,7 @@ class GroupFLT():
         if verbose:
             print('Now we have {0:d} FLTs'.format(self.N))
 
-    def compute_single_model(self, id, center_rd=None, mag=-99, size=-1, store=False, spectrum_1d=None, is_cgs=False, get_beams=None, in_place=True, psf_param_dict={}):
+    def compute_single_model(self, id, center_rd=None, mag=-99, size=-1, store=False, spectrum_1d=None, is_cgs=False, get_beams=None, in_place=True, min_size=26, psf_param_dict={}):
         """Compute model spectrum in all exposures
         TBD
 
@@ -522,7 +522,8 @@ class GroupFLT():
                           size=size, compute_size=(size < 0),
                           mag=mag, in_place=in_place, store=store,
                           spectrum_1d=spectrum_1d, is_cgs=is_cgs,
-                          get_beams=get_beams, psf_params=psf_params)
+                          get_beams=get_beams, psf_params=psf_params,
+                          min_size=min_size)
 
             out_beams.append(status)
 
@@ -655,7 +656,11 @@ class GroupFLT():
             List of `~grizli.model.BeamCutout` objects.
 
         """
-        beams = self.compute_single_model(id, center_rd=center_rd, size=size, store=False, get_beams=[beam_id])
+        beams = self.compute_single_model(id,
+                                         center_rd=center_rd,
+                                         size=size,
+                                         store=False,
+                                         get_beams=[beam_id])
 
         out_beams = []
         for flt, beam in zip(self.FLTs, beams):
@@ -1301,7 +1306,7 @@ class GroupFLT():
 #             for k in ['PHOTFLAM', 'PHOTPLAM']:
 #                 ext.header[k] = ref_im[0].header[k]
 #
-#             the_filter = utils.get_hst_filter(ref_im[0].header)
+#             the_filter = utils.parse_filter_from_header(ref_im[0].header)
 #             ext.header['FILTER'] = ext.header['DFILTER'] = the_filter
 #
 #             wcs_file = ext.header['GPARENT'].replace('.fits', '.{0:02}.wcs.fits'.format(ext.header['SCI_EXTN']))
@@ -1941,7 +1946,7 @@ class MultiBeam(GroupFitter):
             ref_photflam = 1.
 
         try:
-            ref_filter = utils.get_hst_filter(ref_header)
+            ref_filter = utils.parse_filter_from_header(ref_header)
         except:
             ref_filter = 'N/A'
 

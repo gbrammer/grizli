@@ -120,8 +120,9 @@ class JWSTUtils(unittest.TestCase):
         header['INSTRUME'] = 'NIRISS'
         header['PUPIL'] = 'F200W'
         header['FILTER'] = 'CLEAR'
+        header['DETECTOR'] = 'NIS'
         
-        assert(utils.get_hst_filter(header) == 'F200W-CLEAR')
+        assert(utils.parse_filter_from_header(header) == 'F200W-CLEAR')
                 
         info = jwst_utils.get_jwst_filter_info(header)
         
@@ -134,8 +135,9 @@ class JWSTUtils(unittest.TestCase):
         header['INSTRUME'] = 'NIRCAM'
         header['FILTER'] = 'F200W'
         header['PUPIL'] = 'CLEAR'
+        header['DETECTOR'] = 'NRCA1'
         
-        assert(utils.get_hst_filter(header) == 'F200W-CLEAR')
+        assert(utils.parse_filter_from_header(header) == 'F200W-CLEAR')
                 
         info = jwst_utils.get_jwst_filter_info(header)
         
@@ -148,7 +150,7 @@ class JWSTUtils(unittest.TestCase):
         header['INSTRUME'] = 'MIRI'
         header['FILTER'] = 'F560W'
         
-        assert(utils.get_hst_filter(header) == 'F560W')
+        assert(utils.parse_filter_from_header(header) == 'F560W')
         
         info = jwst_utils.get_jwst_filter_info(header)
         assert(info['name'] == 'F560W')

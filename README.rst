@@ -7,8 +7,8 @@
 .. image:: https://badge.fury.io/py/grizli.svg
     :target: https://badge.fury.io/py/grizli
     
-.. image:: https://zenodo.org/badge/55784299.svg
-   :target: https://zenodo.org/badge/latestdoi/55784299
+.. image:: https://zenodo.org/badge/DOI/10.5281/zenodo.1146904.svg
+   :target: https://doi.org/10.5281/zenodo.1146904
 
 *Grism redshift & line* analysis software for space-based slitless spectroscopy
 ========================================================================================

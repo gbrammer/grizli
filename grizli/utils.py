@@ -7,6 +7,7 @@ import inspect
 from collections import OrderedDict
 import warnings
 import itertools
+import logging
 
 import astropy.io.fits as pyfits
 import astropy.wcs as pywcs
@@ -130,7 +131,7 @@ JWST_TRANSLATE = {'RA_TARG':'TARG_RA',
                   'EXPTIME':'EFFEXPTM',
                   'PA_V3':'ROLL_REF'}
 
-def get_flt_info(files=[], columns=['FILE', 'FILTER', 'PUPIL', 'INSTRUME', 'DETECTOR', 'TARGNAME', 'DATE-OBS', 'TIME-OBS', 'EXPSTART', 'EXPTIME', 'PA_V3', 'RA_TARG', 'DEC_TARG', 'POSTARG1', 'POSTARG2'], translate=JWST_TRANSLATE, defaults={'PUPIL':'---', 'PA_V3':0.0}):
+def get_flt_info(files=[], columns=['FILE', 'FILTER', 'PUPIL', 'INSTRUME', 'DETECTOR', 'TARGNAME', 'DATE-OBS', 'TIME-OBS', 'EXPSTART', 'EXPTIME', 'PA_V3', 'RA_TARG', 'DEC_TARG', 'POSTARG1', 'POSTARG2'], translate=JWST_TRANSLATE, defaults={'PUPIL':'---', 'PA_V3':0.0}, jwst_detector=True):
     """Extract header information from a list of FLT files
 
     Parameters
@@ -172,7 +173,7 @@ def get_flt_info(files=[], columns=['FILE', 'FILTER', 'PUPIL', 'INSTRUME', 'DETE
                 if 'PA_V3' in h1:
                     h['PA_V3'] = h1['PA_V3']
             
-        filt = get_hst_filter(h)
+        filt = parse_filter_from_header(h, jwst_detector=jwst_detector)
         line.append(filt)
         has_columns = ['FILE', 'FILTER']
 
@@ -1208,8 +1209,17 @@ def parse_grism_associations(exposure_groups, info,
     return grism_groups
 
 
-def get_hst_filter(header, filter_only=False):
-    """Get simple filter name out of an HST image header.
+def get_hst_filter(header, **kwargs):
+    """
+    Deprecated: use `grizli.utils.parse_filter_from_header`
+    """
+    
+    result = parse_filter_from_header(header, **kwargs)
+    return result
+
+
+def parse_filter_from_header(header, filter_only=False, jwst_detector=False, **kwargs):
+    """Get simple filter name out of an HST/JWST image header.
 
     ACS has two keywords for the two filter wheels, so just return the
     non-CLEAR filter. For example,
@@ -1218,25 +1228,29 @@ def get_hst_filter(header, filter_only=False):
         >>> h['INSTRUME'] = 'ACS'
         >>> h['FILTER1'] = 'CLEAR1L'
         >>> h['FILTER2'] = 'F814W'
-        >>> from grizli.utils import get_hst_filter
-        >>> print(get_hst_filter(h))
+        >>> from grizli.utils import parse_filter_from_header
+        >>> print(parse_filter_from_header(h))
         F814W
         >>> h['FILTER1'] = 'G800L'
         >>> h['FILTER2'] = 'CLEAR2L'
-        >>> print(get_hst_filter(h))
+        >>> print(parse_filter_from_header(h))
         G800L
-    
-    If `filter_only` then just get JWST ``FILTER``, otherwise
-    
-    For JWST/NIRISS, return ``{PUPIL}-{FILTER}``
-    
-    For JWST/NIRCAM, return ``{FILTER}-{PUPIL}``
-    
+            
     Parameters
     -----------
     header : `~astropy.io.fits.Header`
         Image header with FILTER or FILTER1,FILTER2,...,FILTERN keywords
-
+    
+    filter_only : bool
+        If true, don't do any special handling with JWST but just return the
+        ``FILTER`` keyword itself. Otherwise, for JWST/NIRISS, return 
+        ``{PUPIL}-{FILTER}`` and for JWST/NIRCAM, return ``{FILTER}-{PUPIL}``
+        
+    jwst_detector : bool
+        If True, prepend ``DETECTOR`` to output for JWST NIRCam and NIRISS
+        to distinguish NIRCam detectors and filter names common between 
+        these instruments.
+        
     Returns
     --------
     filter : str
@@ -1264,12 +1278,18 @@ def get_hst_filter(header, filter_only=False):
             filter = header['FILTER']
         else:
             filter = '{0}-{1}'.format(header['PUPIL'], header['FILTER'])
+        
+        if jwst_detector:
+            filter = '{0}-{1}'.format(header['DETECTOR'], filter)
             
     elif instrume == 'NIRCAM':
         if filter_only:
             filter = header['FILTER']
         else:
             filter = '{0}-{1}'.format(header['FILTER'], header['PUPIL'])
+        if jwst_detector:
+            filter = '{0}-{1}'.format(header['DETECTOR'], filter)
+            filter = filter.replace('LONG','5')
             
     elif 'FILTER' in header:
         filter = header['FILTER']
@@ -1433,7 +1453,7 @@ def calc_header_zeropoint(im, ext=0):
         header = im[ext].header
 
     try:
-        fi = get_hst_filter(im[0].header).upper()
+        fi = parse_filter_from_header(im[0].header).upper()
     except:
         fi = None
 
@@ -4038,6 +4058,184 @@ def transform_wcs(in_wcs, translation=[0., 0.], rotation=0., scale=1.):
     return out_wcs
 
 
+def sip_rot90(input, rot, reverse=False, verbose=False, compare=False):
+    """
+    Rotate a SIP WCS by increments of 90 degrees using direct transformations
+    between x / y coordinates
+    
+    Parameters
+    ----------
+    input : `~astropy.io.fits.Header` or `~astropy.wcs.WCS`
+        Header or WCS
+    
+    rot : int
+        Number of times to rotate the WCS 90 degrees *clockwise*, analogous
+        to `numpy.rot90`
+    
+    reverse : bool
+        If `input` is a header and includes a keyword ``ROT90``, then undo 
+        the rotation and remove the keyword from the output header
+        
+    Returns
+    -------
+    header : `~astropy.io.fits.Header`
+        Rotated WCS header
+        
+    wcs : `~astropy.wcs.WCS`
+        Rotated WCS
+    
+    desc : str
+        Description of the transform associated with ``rot``, e.g, 
+        ``x=nx-x, y=ny-y`` for ``rot=±2``.
+        
+    """
+    import copy
+    import astropy.io.fits
+    import astropy.wcs
+    import matplotlib.pyplot as plt
+    
+    if isinstance(input, astropy.io.fits.Header):
+        orig = copy.deepcopy(input)
+        new = copy.deepcopy(input)
+        
+        if ('ROT90' in input):
+            if reverse:
+                rot = -orig['ROT90']
+                new.remove('ROT90')
+            else:
+                new['ROT90'] = orig['ROT90'] + rot
+        else:
+            new['ROT90'] = rot
+    else:
+        orig = to_header(input)
+        new = to_header(input)
+
+    orig_wcs = pywcs.WCS(orig, relax=True)
+
+    ### CD = [[dra/dx, dra/dy], [dde/dx, dde/dy]]
+    ### x = a_i_j * u**i * v**j
+    ### y = b_i_j * u**i * v**j
+    
+    ix = 1
+    
+    if compare:
+        xarr = np.arange(0,2048,64)
+        xp, yp = np.meshgrid(xarr, xarr)
+        rd = orig_wcs.all_pix2world(xp, yp, ix)
+
+    if rot % 4 == 1:
+        # CW 90 deg : x = y, y = (nx - x), u=v, v=-u
+        desc = 'x=y, y=nx-x'
+        
+        new['CRPIX1'] = orig['CRPIX2']
+        new['CRPIX2'] = orig['NAXIS1'] - orig['CRPIX1'] + 1
+
+        new['CD1_1'] = orig['CD1_2']
+        new['CD1_2'] = -orig['CD1_1']
+        new['CD2_1'] = orig['CD2_2']
+        new['CD2_2'] = -orig['CD2_1']
+
+        for i in range(new['A_ORDER']+1):
+            for j in range(new['B_ORDER']+1):
+                Aij  = f'A_{i}_{j}'
+                if Aij not in new:
+                    continue
+
+                new[f'A_{i}_{j}'] = orig[f'B_{j}_{i}']*(-1)**j
+                new[f'B_{i}_{j}'] = orig[f'A_{j}_{i}']*(-1)**j*-1
+
+        new_wcs = astropy.wcs.WCS(new, relax=True)
+        
+        if compare:
+            xr, yr = new_wcs.all_world2pix(*rd, ix)
+            xo = yp
+            yo = orig['NAXIS1'] - xp
+
+    elif rot % 4 == 3:
+        # CW 270 deg : y = x, x = (ny - u), u=-v, v=u
+        desc = 'x=ny-y, y=x'
+
+        new['CRPIX1'] = orig['NAXIS2'] - orig['CRPIX2'] + 1
+        new['CRPIX2'] = orig['CRPIX1']
+
+        new['CD1_1'] = -orig['CD1_2']
+        new['CD1_2'] = orig['CD1_1']
+        new['CD2_1'] = -orig['CD2_2']
+        new['CD2_2'] = orig['CD2_1']
+
+        for i in range(new['A_ORDER']+1):
+            for j in range(new['B_ORDER']+1):
+                Aij  = f'A_{i}_{j}'
+                if Aij not in new:
+                    continue
+
+                new[f'A_{i}_{j}'] = orig[f'B_{j}_{i}']*(-1)**i*-1
+                new[f'B_{i}_{j}'] = orig[f'A_{j}_{i}']*(-1)**i
+
+        new_wcs = astropy.wcs.WCS(new, relax=True)
+        
+        if compare:
+            xr, yr = new_wcs.all_world2pix(*rd, ix)
+            xo = orig['NAXIS2'] - yp
+            yo = xp
+
+
+    elif rot % 4 == 2:
+        # CW 180 deg : x=nx-x, y=ny-y, u=-u, v=-v
+        desc = 'x=nx-x, y=ny-y'
+
+        new['CRPIX1'] = orig['NAXIS1'] - orig['CRPIX1'] + 1
+        new['CRPIX2'] = orig['NAXIS2'] - orig['CRPIX2'] + 1
+
+        new['CD1_1'] = -orig['CD1_1']
+        new['CD1_2'] = -orig['CD1_2']
+        new['CD2_1'] = -orig['CD2_1']
+        new['CD2_2'] = -orig['CD2_2']
+
+        for i in range(new['A_ORDER']+1):
+            for j in range(new['B_ORDER']+1):
+                Aij  = f'A_{i}_{j}'
+                if Aij not in new:
+                    continue
+
+                new[f'A_{i}_{j}'] = orig[f'A_{i}_{j}']*(-1)**j*(-1)**i*-1
+                new[f'B_{i}_{j}'] = orig[f'B_{i}_{j}']*(-1)**j*(-1)**i*-1
+
+        new_wcs = astropy.wcs.WCS(new, relax=True)
+        
+        if compare:
+            xr, yr = new_wcs.all_world2pix(*rd, ix)
+            xo = orig['NAXIS1'] - xp
+            yo = orig['NAXIS2'] - yp
+    else:
+        # rot=0, do nothing
+        desc = 'x=x, y=y'
+        new_wcs = orig_wcs
+        if compare:
+            xo = xp
+            yo = yp
+            xr, yr = new_wcs.all_world2pix(*rd, ix)
+        
+    if verbose:
+        if compare:
+            xrms = nmad(xr-xo)
+            yrms = nmad(yr-yo)
+            print(f'Rot90: {rot} rms={xrms:.2e} {yrms:.2e}')
+            
+    if compare:
+        fig, axes = plt.subplots(1,2,figsize=(10,5), sharex=True, sharey=True)
+        axes[0].scatter(xp, xr-xo)
+        axes[0].set_xlabel('dx')
+        axes[1].scatter(yp, yr-yo)
+        axes[1].set_xlabel('dy')
+        for ax in axes:
+            ax.grid()
+        
+        fig.tight_layout(pad=0.5)
+    
+    return new, new_wcs, desc
+
+
 def get_wcs_slice_header(wcs, slx, sly):
     """TBD
     """
@@ -4455,7 +4653,7 @@ def strip_header_keys(header, comment=True, history=True, drizzle_keys=DRIZZLE_K
 
         if 'FILTER' in keep_with_wcs:
             try:
-                h['FILTER'] = (get_hst_filter(header),
+                h['FILTER'] = (parse_filter_from_header(header),
                                'element selected from filter wheel')
             except:
                 pass

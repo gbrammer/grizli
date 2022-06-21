@@ -139,12 +139,33 @@ def img_with_flat(input, verbose=True, overwrite=True):
     else:
         _hdu = input
         
-    img = util.open(_hdu)
-    
     skip = False
     if 'S_FLAT' in _hdu[0].header:
         if _hdu[0].header['S_FLAT'] == 'COMPLETE':
             skip = True
+    
+    if 'OINSTRUM' not in _hdu[0].header:
+        copy_jwst_keywords(_hdu[0].header)
+        
+    # if _hdu[0].header['OINSTRUM'] == 'NIRISS':
+    #     if _hdu[0].header['OFILTER'].startswith('GR'):
+    #         _hdu[0].header['FILTER'] = 'CLEAR'
+    #         _hdu[0].header['EXP_TYPE'] = 'NIS_IMAGE'
+    
+    # NIRCam grism flats are empty
+    # NIRISS has slitless flats that include the mask spots
+    if _hdu[0].header['OINSTRUM'] == 'NIRCAM':
+        if _hdu[0].header['OPUPIL'].startswith('GR'):
+            _opup = _hdu[0].header['OPUPIL']
+            msg = f'Set NIRCAM slitless PUPIL {_opup} -> CLEAR for flat'
+            utils.log_comment(utils.LOGFILE, msg, verbose=True)
+            _hdu[0].header['PUPIL'] = 'CLEAR'
+            _hdu[0].header['EXP_TYPE'] = 'NRC_IMAGE'
+    else:
+        # MIRI, NIRISS
+        pass
+    
+    img = util.open(_hdu)
     
     if not skip:        
         if verbose:
@@ -357,7 +378,7 @@ def match_gwcs_to_sip(input, step=64, transform=None, verbose=True, overwrite=Tr
     tf = transform()
     tf.estimate(Vg.T, Vw.T)
     
-    asec = np.array(tf.translation)*np.array([1./cosd, 1.])*3600
+    asec = np.array(tf.translation)*np.array([1., 1.])*3600
     rot_deg = tf.rotation/np.pi*180
     
     Vt = tf(Vg.T).T
@@ -1497,6 +1518,93 @@ def _xobjective_sip(params, u, v, x, y, crval, crpix, a_names, b_names, cd, ret)
     #print(params, np.abs(dr).max())
         
     return dr
+
+
+def compare_gwcs_sip(file, save=False, step=32, use_gwcs_func=False, func_kwargs={'degree':5, 'crpix':None, 'max_pix_error':0.01}):
+    """
+    Make a figure comparing the `gwcs` and SIP WCS of a JWST exposure with
+    the round trip transformation ``pixel -> gwcs_RaDec -> sip_pixel``
+    
+    Parameters
+    ----------
+    file : str
+        Filename, e.g., ``jw...._cal.fits``
+    
+    save : bool
+        Save the figure to ``file.replace('.fits', '.sip.png')``
+    
+    step : int
+        Step size for the test pixel grid
+    
+    Returns
+    -------
+    fig : `matplotlib.figure.Figure`
+        Figure object
+    
+    """
+    import matplotlib.pyplot as plt
+    
+    im = pyfits.open(file)
+    
+    obj = img_with_wcs(im)
+
+    if use_gwcs_func:
+        if 'npoints' not in func_kwargs:
+            func_kwargs['npoints'] = step
+            
+        h = obj.meta.wcs.to_fits_sip(**func_kwargs)
+        wcs = pywcs.WCS(h, relax=True)
+    else:
+        wcs = pywcs.WCS(im['SCI'].header, relax=True)
+    
+    sh = im['SCI'].data.shape
+    
+    xarr = np.arange(0, sh[0], step)
+    
+    # Round-trip of pixel > gwcs_RaDec > sip_pixel
+    u, v = np.meshgrid(xarr, xarr)
+    rd = obj.meta.wcs.forward_transform(u, v)
+    up, vp = wcs.all_world2pix(*rd, 0)
+    
+    fig, axes = plt.subplots(1,2,figsize=(8, 4))
+    
+    axes[0].scatter(u, up-u, alpha=0.5,
+                    label=r'$\Delta x$' + f' rms={utils.nmad(up-u):.1e}')
+    axes[0].scatter(v, vp-v, alpha=0.5,
+                    label=r'$\Delta y$' + f' rms={utils.nmad(vp-v):.1e}')
+                    
+    axes[0].legend(loc='lower center')
+    axes[0].grid()
+    axes[0].set_xlabel('pixel')
+    axes[0].set_ylabel(r'$\Delta$ pixel')
+    
+    axes[0].text(0.5, 0.98, file, ha='center', va='top', 
+                 transform=axes[0].transAxes, fontsize=6)
+                 
+    label = f"{im[0].header['INSTRUME']} {utils.parse_filter_from_header(im[0].header)}"
+    axes[0].text(0.5, 0.94, label, ha='center', va='top', 
+                 transform=axes[0].transAxes, fontsize=8)
+                 
+    scl = sh[1]/axes[0].get_ylim()[1]*4
+    axes[0].set_xticks(np.arange(0, sh[1]+1, 512))
+    
+    axes[1].quiver(u, v, up-u, vp-v, alpha=0.4, units='x', scale=step/scl)
+    
+    axes[1].set_xticks(np.arange(0, sh[1]+1, 512))
+    axes[1].set_yticks(np.arange(0, sh[0]+1, 512))
+    axes[1].set_xticklabels([])
+    axes[1].set_yticklabels([])
+    axes[1].grid()
+    
+    fig.tight_layout(pad=0.5)
+    
+    if save:
+        figfile = file.replace('.fits','.sip.png').split('.gz')[0]
+        print(figfile)
+        
+        fig.savefig(figfile)
+        
+    return fig
 
 
 def load_jwst_filter_info():
