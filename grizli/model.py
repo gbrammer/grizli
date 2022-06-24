@@ -1387,7 +1387,9 @@ class ImageData(object):
                 ref_file = ref_h['REF_FILE']
                 ref_photflam = 1.
                 ref_photplam = ref_h['PHOTPLAM']
-                ref_filter = ref_h['FILTER']
+                #ref_filter = ref_h['FILTER']
+                ref_filter = utils.parse_filter_from_header(ref_h)
+                
             else:
                 ref_data = None
 
