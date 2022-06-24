@@ -9,10 +9,10 @@ dependencies, including general utilities like `numpy`, `scipy`, and
 `matplotlib` and astronomy tools like `astropy` and specific software for
 dealing with space-telescope data (`stsci.tools`, `drizzlepac`, etc.) are
 installed using the provided ``requirements.txt`` file (see below). Most
-development is done in a ``python 3.7`` environment on a MacBook Pro running
-Mojave 10.14.6.  The basic build is tested in (Linux) python ``3.6``,
-``3.7`` and ``3.8`` with the `GitHub actions <https://github.com/gbrammer/grizli/actions>`_ continuous integration (CI)
-tools, but the current test suite does not yet test much of the full
+development is done in a ``python 3.9`` environment on a MacBook Pro running
+Mojave 10.14.6.  The basic build is tested in (Linux) python ``3.7``,
+``3.8`` and ``3.9`` with the `GitHub actions <https://github.com/gbrammer/grizli/actions>`_ continuous integration (CI)
+tools, but the current test suite does not yet test all of the full
 functionality of the code.
 
 Preferred installation with conda/pip
@@ -22,13 +22,13 @@ The environment can be installed with ``pip`` and the `requirements.txt <https:/
 
 .. code:: bash
     
-    # Generate a conda environment named "grizli-dev" or anything else
+    # Generate a conda environment named "grizli39" or anything else
     # This will just provide the base python distribution (incl. pip)
-    conda create -n grizli-dev python=3.8 pip numpy cython
+    conda create -n grizli39 python=3.9 pip numpy cython
             
     # Activate the environment.  This needs to be done each time you 
     # start a new terminal, or put it in ~/.bashrc
-    conda activate grizli-dev
+    conda activate grizli39
 
     # or some other location, even /tmp/
     cd /usr/local/share/python 
@@ -55,7 +55,7 @@ If you are planning to run simultaneous fits to grism spectra plus photometry us
 .. code:: bash
 
     cd /usr/local/share/python # location from above
-    conda activate grizli-dev # or whatever was chosen above
+    conda activate grizli39 # or whatever was chosen above
     
     # Fetch the eazy-py repo
     git clone --recurse-submodules https://github.com/gbrammer/eazy-py.git
@@ -92,13 +92,13 @@ this file, do the following
     git clone https://github.com/gbrammer/grizli.git
     cd grizli
     
-    # Generate a conda environment named "grizli-dev" or anything else
+    # Generate a conda environment named "grizli39" or anything else
     # (Note environment_min.yml renamed to environment.yml for >0.10.0)
-    conda env create -f environment.yml -n grizli-dev
+    conda env create -f environment.yml -n grizli39
             
     # Activate the environment.  This needs to be done each time you 
     # start a new terminal, or put it in ~/.bashrc
-    conda activate grizli-dev
+    conda activate grizli39
     
     # Compile and install the grizli module.  Only needs to be done
     # once or after updating the repository.
