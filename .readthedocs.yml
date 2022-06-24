@@ -5,6 +5,12 @@
 # Required
 version: 2
 
+# Set the version of Python and other tools you might need
+build:
+  os: ubuntu-20.04
+  tools:
+    python: "3.9"
+    
 # Build documentation in the docs/ directory with Sphinx
 sphinx:
   configuration: docs/conf.py
@@ -17,7 +23,6 @@ sphinx:
 formats: all
 
 python:
-   version: 3.6
    install:
       - requirements: docs/rtd-pip-requirements
       - method: setuptools
