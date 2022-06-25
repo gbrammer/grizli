@@ -10,6 +10,10 @@
 .. image:: https://zenodo.org/badge/DOI/10.5281/zenodo.1146904.svg
    :target: https://doi.org/10.5281/zenodo.1146904
 
+.. image:: https://readthedocs.org/projects/grizli/badge/?version=latest
+   :target: https://grizli.readthedocs.io/en/latest/?badge=latest
+   :alt: Documentation Status
+   
 *Grism redshift & line* analysis software for space-based slitless spectroscopy
 ========================================================================================
 
