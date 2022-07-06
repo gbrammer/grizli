@@ -23,6 +23,8 @@ from astropy.table import Table
 from . import jwst_utils
 from . import grismconf
 
+# adding a comment to test a change
+
 try:
     import jwst
     from jwst.pipeline import Detector1Pipeline
