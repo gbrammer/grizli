@@ -2525,34 +2525,46 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
     for gr in ['G141', 'G102', 'G800L']:
         masks[gr.lower()] = [info['FILTER'] == gr, gr, '']
     
+    ## NIRISS
     for gr in ['GR150R', 'GR150C']:
         for filt in ['F090W', 'F115W', 'F150W', 'F200W']:
-            key = f'{gr.lower()}-{filt.lower()}'
-            masks[key] = [(info['PUPIL'] == filt) & (info['FILTER'] == gr), 
-                          gr, filt]
+            #key = f'{gr.lower()}-{filt.lower()}'
+            key = filt.lower()
+
+            if key in masks:
+                masks[key][0] |= ((info['PUPIL'] == filt) & 
+                                  (info['FILTER'] == gr))
+            else:
+                masks[key] = [(info['PUPIL'] == filt) & 
+                              (info['FILTER'] == gr), 
+                              gr, filt]
+    
+    # for gr in ['GR150R', 'GR150C']:
+    #     for filt in ['F090W', 'F115W', 'F150W', 'F200W']:
+    #         key = f'{gr.lower()}-{filt.lower()}'
+    #         masks[key] = [(info['PUPIL'] == filt) & (info['FILTER'] == gr), 
+    #                       gr, filt]
     
     # NIRCam
-    # has_nircam = False
-    # for filt in ['F277W', 'F356W', 'F410M', 'F444W']:
-    #     for ig, gr in enumerate(['GRISMR','GRISMC']):
-    #         #key = f'{gr.lower()}-{filt.lower()}'
-    #         key = f'nircam-{filt.lower()}'
-    #         if ig == 0:
-    #             masks[key] = [((info['PUPIL'] == filt) & 
-    #                            (info['FILTER'] == gr)), gr, filt]
-    #         else:
-    #             masks[key][0] != ((info['PUPIL'] == filt) &
-    #                               (info['FILTER'] == gr))
-    #                               
-    #         has_nircam |= masks[key][0].sum() > 0
-    
-    has_nircam = False
-    for gr in ['GRISMR','GRISMC']:
+    for ig, gr in enumerate(['GRISMR','GRISMC']):
         for filt in ['F277W', 'F356W', 'F410M', 'F444W']:
-            key = f'{gr.lower()}-{filt.lower()}'
-            masks[key] = [(info['PUPIL'] == filt) & (info['FILTER'] == gr), 
-                          gr, filt]
-            has_nircam |= masks[key][0].sum() > 0
+            #key = f'{gr.lower()}-{filt.lower()}'
+            key = filt.lower()
+            if key in masks:
+                masks[key][0] != ((info['PUPIL'] == filt) &
+                                  (info['FILTER'] == gr))
+            else:
+                masks[key] = [((info['PUPIL'] == filt) & 
+                               (info['FILTER'] == gr)),
+                               gr, filt]
+                                      
+    # has_nircam = False
+    # for gr in ['GRISMR','GRISMC']:
+    #     for filt in ['F277W', 'F356W', 'F410M', 'F444W']:
+    #         key = f'{gr.lower()}-{filt.lower()}'
+    #         masks[key] = [(info['PUPIL'] == filt) & (info['FILTER'] == gr), 
+    #                       gr, filt]
+    #         has_nircam |= masks[key][0].sum() > 0
             
     if force_cat is None:
         #catalog = '{0}-ir.cat.fits'.format(field_root)
@@ -2579,7 +2591,7 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
         if force_seg is None:
             if force_seg is None:
                 if galfit == 'clean':
-                    seg_file = '{0}-{1}_galfit_orig_seg.fits'.format(field_root, ref.lower())
+                    seg_file = '{0}-{1}_galfit_orig_seg.fits'.format(field_root,ref.lower())
                 elif galfit == 'model':
                     seg_file = '{0}-{1}_galfit_seg.fits'.format(field_root, ref.lower())
                 else:
@@ -2599,6 +2611,16 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
         
         _grism_files=list(info['FILE'][masks[mask][0]])
         polyx = [0.3, 5.1]
+        
+        msg = f"auto_script.grism_prep: group = {mask}"
+        msg += f"\nauto_script.grism_prep: N = {len(_grism_files)}"
+        for _i, _f in enumerate(_grism_files):
+            msg += f'\nauto_script.grism_prep: file {_i} = {_f}'
+            
+        msg += f'\nauto_script.grism_prep: ref_file = {ref_file}' 
+        msg += f'\nauto_script.grism_prep: seg_file = {seg_file}' 
+        msg += f'\nauto_script.grism_prep: catalog  = {catalog}' 
+        utils.log_comment(utils.LOGFILE, msg, verbose=True)
         
         grp_i = multifit.GroupFLT(grism_files=_grism_files,
                                   direct_files=[],
@@ -2721,24 +2743,25 @@ def grism_prep(field_root='j142724+334246', PREP_PATH='../Prep', EXTRACT_PATH='.
             ds9.view(grp.FLTs[i].grism['SCI'] - grp.FLTs[i].model)
             fr = ds9.get('frame')
 
-        utils.log_comment(utils.LOGFILE, '# Refine contamination', 
+        if refine_niter > 0:
+            utils.log_comment(utils.LOGFILE, '# Refine contamination', 
                           verbose=True, show_date=True)
 
-        for iter in range(refine_niter):
-            print('\nRefine contamination model, iter # {0}\n'.format(iter))
-            if ds9:
-                ds9.set('frame {0}'.format(int(fr)+iter+1))
+            for iter in range(refine_niter):
+                print(f'\nRefine contamination model, iter # {iter}\n')
+                if ds9:
+                    ds9.set('frame {0}'.format(int(fr)+iter+1))
 
-            if (iter == 0) & (refine_niter > 0):
-                refine_i = 1
-            else:
-                refine_i = refine_fcontam
+                if (iter == 0) & (refine_niter > 0):
+                    refine_i = 1
+                else:
+                    refine_i = refine_fcontam
 
-            grp.refine_list(poly_order=refine_poly_order, 
-                            mag_limits=refine_mag_limits,
-                            max_coeff=5, ds9=ds9, verbose=True,
-                            fcontam=refine_i,
-                            wave=np.linspace(*grp.polyx, 100)*1.e4)
+                grp.refine_list(poly_order=refine_poly_order, 
+                                mag_limits=refine_mag_limits,
+                                max_coeff=5, ds9=ds9, verbose=True,
+                                fcontam=refine_i,
+                                wave=np.linspace(*grp.polyx, 100)*1.e4)
 
         ##############
         # Save model to avoid having to recompute it again
@@ -3860,7 +3883,6 @@ def make_filter_combinations(root, weight_fnu=True, filter_combinations=FILTER_C
         else:
             ref_h_i = ref_h['ir']
 
-        print(sci_file, filt_i, band)
         output_sci[band] = sci_file.replace(filt_ix, band)
 
         im_i = pyfits.open(sci_file)
@@ -3885,6 +3907,7 @@ def make_filter_combinations(root, weight_fnu=True, filter_combinations=FILTER_C
         else:
             scl_weight = 1.
 
+        print(sci_file, filt_i, band, scl, scl_weight)
         den_i = wht_i[0].data/scl**2*scl_weight
         num[band] += im_i[0].data*scl*den_i
         den[band] += den_i
