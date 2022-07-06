@@ -769,7 +769,11 @@ def set_jwst_to_hst_keywords(input, reset=False, verbose=True, orig_keys=ORIG_KE
     #     img[0].header['PHOTFLAM'] = 1.e-21
     #     img[0].header['PHOTFNU'] = 1.e-31
     #     img[0].header['PHOTPLAM'] = 1.5e4  
-        
+    
+    # TIME keyword seems to get corrupted?
+    if 'TIME' in img:
+        img['TIME'].header['PIXVALUE'] = img[0].header['EXPTIME']
+            
     if isinstance(input, str):
         img.writeto(input, overwrite=True)
     
