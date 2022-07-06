@@ -6253,7 +6253,25 @@ class EffectivePSF(object):
             data[data < 0] = 0
             filt = '_'.join(file.strip('.fits').split('_')[2:])
             self.epsf[filt] = data
-
+        
+        # JWST
+        filter_files = glob.glob(os.path.join(GRIZLI_PATH, 'CONF/JWSTePSF',
+                            'nircam*.fits'))
+        filter_files += glob.glob(os.path.join(GRIZLI_PATH, 'CONF/JWSTePSF',
+                            'niriss*.fits'))
+        filter_files += glob.glob(os.path.join(GRIZLI_PATH, 'CONF/JWSTePSF',
+                            'miri*.fits'))
+        filter_files.sort()
+        for file in filter_files:
+            im = pyfits.open(file, ignore_missing_end=True)
+            data = im[0].data
+            data[data < 0] = 0
+            filt = '{0}-{1}'.format(im[0].header['INSTRUME'].upper(), 
+                                    im[0].header['FILTER'])
+                                    
+            self.epsf[filt] = data
+        
+        
         # Dummy, use F105W ePSF for F098M and F110W
         self.epsf['F098M'] = self.epsf['F105W']
         self.epsf['F128N'] = self.epsf['F125W']
@@ -6307,14 +6325,23 @@ class EffectivePSF(object):
         TBD
         """
         epsf = self.epsf[filter]
-
+        
+        psf_type = 'HST/Optical'
+        
         if filter in ['F098M', 'F110W', 'F105W', 'F125W', 'F140W', 'F160W',
                       'G102','G141','F128N','F130N','F132N']:
-            isir = True
-        else:
-            isir = False
-
-        if isir:
+            psf_type = 'WFC3/IR'
+            
+        elif filter.startswith('NIR'):
+            # NIRISS, NIRCam 2K
+            psf_type = 'JWST/2K'
+            
+        elif filter.startswith('MIRI'):
+            psf_type = 'JWST/MIRI'
+        
+        self.eval_psf_type = psf_type
+        
+        if psf_type == 'WFC3/IR':
             #  IR detector
             rx = 1+(np.clip(x, 1, 1013)-0)/507.
             ry = 1+(np.clip(y, 1, 1013)-0)/507.
@@ -6335,8 +6362,62 @@ class EffectivePSF(object):
             psf_xy += fx*(1-fy)*epsf[:, :, (nx+1)+ny*3]
             psf_xy += (1-fx)*fy*epsf[:, :, nx+(ny+1)*3]
             psf_xy += fx*fy*epsf[:, :, (nx+1)+(ny+1)*3]
+            
             self.eval_filter = filter
-        else:
+        
+        if psf_type == 'JWST/MIRI':
+            #  IR detector
+            rx = 1+(np.clip(x, 1, 1023)-0)/512.
+            ry = 1+(np.clip(y, 1, 1023)-0)/512.
+
+            # zero index
+            rx -= 1
+            ry -= 1
+
+            nx = np.clip(int(rx), 0, 2)
+            ny = np.clip(int(ry), 0, 2)
+
+            # print x, y, rx, ry, nx, ny
+
+            fx = rx-nx
+            fy = ry-ny
+
+            psf_xy = (1-fx)*(1-fy)*epsf[:, :, nx+ny*3]
+            psf_xy += fx*(1-fy)*epsf[:, :, (nx+1)+ny*3]
+            psf_xy += (1-fx)*fy*epsf[:, :, nx+(ny+1)*3]
+            psf_xy += fx*fy*epsf[:, :, (nx+1)+(ny+1)*3]
+            
+            psf_xy = np.rot90(psf_xy.T, 2)
+            
+            self.eval_filter = filter
+        
+        if psf_type == 'JWST/2K':
+            #  IR detector
+            rx = 1+(np.clip(x, 1, 2047)-0)/1024.
+            ry = 1+(np.clip(y, 1, 2047)-0)/1024.
+
+            # zero index
+            rx -= 1
+            ry -= 1
+
+            nx = np.clip(int(rx), 0, 2)
+            ny = np.clip(int(ry), 0, 2)
+
+            # print x, y, rx, ry, nx, ny
+
+            fx = rx-nx
+            fy = ry-ny
+
+            psf_xy = (1-fx)*(1-fy)*epsf[:, :, nx+ny*3]
+            psf_xy += fx*(1-fy)*epsf[:, :, (nx+1)+ny*3]
+            psf_xy += (1-fx)*fy*epsf[:, :, nx+(ny+1)*3]
+            psf_xy += fx*fy*epsf[:, :, (nx+1)+(ny+1)*3]
+            
+            psf_xy = np.rot90(psf_xy.T, 2)
+            
+            self.eval_filter = filter
+        
+        elif psf_type == 'HST/Optical':
 
             sh = epsf.shape
 
@@ -6380,8 +6461,13 @@ class EffectivePSF(object):
         from scipy.ndimage.interpolation import map_coordinates
 
         # ePSF only defined to 12.5 pixels
-        ok = (np.abs(dx) <= 12.5) & (np.abs(dy) <= 12.5)
-        coords = np.array([50+4*dx[ok], 50+4*dy[ok]])
+        if self.eval_psf_type in ['WFC3/IR','HST/Optical']:
+            ok = (np.abs(dx) <= 12.5) & (np.abs(dy) <= 12.5)
+            coords = np.array([50+4*dx[ok], 50+4*dy[ok]])
+        else:
+            # JWST are +/- 32 pixels
+            ok = (np.abs(dx) <= 32) & (np.abs(dy) <= 32)
+            coords = np.array([130+4*dx[ok], 130+4*dy[ok]])
 
         # Do the interpolation
         interp_map = map_coordinates(psf_xy, coords, order=3)
@@ -6392,7 +6478,9 @@ class EffectivePSF(object):
 
         # Extended PSF
         if extended_data is not None:
-            ok = (np.abs(dx) < self.extended_N) & (np.abs(dy) < self.extended_N)
+            ok = (np.abs(dx) < self.extended_N) 
+            ok &= (np.abs(dy) < self.extended_N)
+            
             x0 = self.extended_N
             coords = np.array([x0+dy[ok]+0, x0+dx[ok]])
             interp_map = map_coordinates(extended_data, coords, order=0)
