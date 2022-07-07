@@ -1023,7 +1023,8 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=True, 
            
     kws['visit_prep_args']['reference_catalogs'] = ref_catalogs
     if filters is None:
-        kws['filters'] = np.unique(tab['filter']).tolist()
+        kws['filters'] = [f.split('-')[0] 
+                          for f in np.unique(tab['filter']).tolist()]            
     else:
         kws['filters'] = filters
     
