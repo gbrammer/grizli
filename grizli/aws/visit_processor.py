@@ -558,7 +558,14 @@ def delete_all_assoc_data(assoc):
                      FROM assoc_table
                      WHERE assoc_name = '{assoc}'""")
                      
-    vis_root = np.unique([v[:6] for v in vis['obs_id']])
+    obs_id = []
+    for v in vis['obs_id']:
+        if v.startswith('jw'):
+            obs_id.append(v)
+        else:
+            obs_id.append(v[:6])
+            
+    vis_root = np.unique(obs_id)
     for r in vis_root:
         print(f'Remove {r} from shifts_log')
         db.execute(f"""DELETE from shifts_log
