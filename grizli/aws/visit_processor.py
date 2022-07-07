@@ -1084,6 +1084,8 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=True, 
             cmd = f"""aws s3 sync ./ s3://grizli-v2/HST/Pipeline/{assoc}/ \
                   --exclude "*" \
                   --include "Prep/*_fl*fits" \
+                  --include "Prep/*_cal.fits" \
+                  --include "Prep/*_rate.fits" \
                   --include "Prep/*s.log" \
                   --include "Prep/*visits.*" \
                   --include "*fail*" \
