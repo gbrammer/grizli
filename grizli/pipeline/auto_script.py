@@ -942,7 +942,8 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_pr
                                             method='startswith', logical='or')
     
     # Allow all JWST for now xxx
-    jw = np.in1d(tab['instrument_name'], ['NIRISS','NIRCAM','MIRI'])
+    instr = [str(inst) for inst in tab['instrument_name']]
+    jw = np.in1d(instr, ['NIRISS','NIRCAM','MIRI'])
     use_filters |= jw
     
     tab = tab[use_filters]
