@@ -899,13 +899,15 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_pr
     try:
         try:
             from mastquery import query, fetch
+            import mastquery.utils
+            
             MAST_QUERY = True
             instdet_key = 'instrument_name'
         except:
             from hsaquery import query, fetch
             MAST_QUERY = False
             instdet_key = 'instdet'
-
+            
     except ImportError as ERR:
         warn = """{0}
 
@@ -956,11 +958,26 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_pr
         print(f'Fetch {jw.sum()} JWST files!')
         
         os.chdir(paths['raw'])
-        # Get dummy files xxx
-        for f in tab['dataURL'][jw]:
-            _file = os.path.basename(f).replace('nis_cal','nis_rate')
-            if not os.path.exists(_file):
-                os.system(f'aws s3 cp s3://grizli-v2/JwstDummy/{_file} .')
+            
+        if 0:
+            ## Download from MAST API when data available xxx
+            _url = [f.replace('nis_cal','nis_rate')
+                   for f in tab['dataURL']]
+            
+            tab['dataURL'] = _url
+            tab['dataURI'] = tab['dataURL']
+
+            tab['filename'] = [os.path.basename(f)
+                               for f in tab['dataURL']]
+            
+            mastquery.utils.download_from_mast(tab[jw])
+            
+        else:
+            # Get dummy files copied to AWS
+            for f in tab['dataURL'][jw]:
+                _file = os.path.basename(f).replace('nis_cal','nis_rate')
+                if not os.path.exists(_file):
+                    os.system(f'aws s3 cp s3://grizli-v2/JwstDummy/{_file} .')
             
         tab = tab[~jw]
         
