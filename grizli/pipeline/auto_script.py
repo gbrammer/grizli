@@ -940,8 +940,26 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_pr
 
     use_filters = utils.column_string_operation(tab['filter'], filters,
                                             method='startswith', logical='or')
+    
+    # Allow all JWST for now xxx
+    jw = np.in1d(tab['instrument_name'], ['NIRISS','NIRCAM','MIRI'])
+    use_filters |= jw
+    
     tab = tab[use_filters]
-
+    
+    # JWST
+    if jw.sum() > 0:
+        print(f'Fetch {jw.sum()} JWST files!')
+        
+        os.chdir(paths['raw'])
+        # Get dummy files xxx
+        for f in tab['dataURL'][jw]:
+            _file = os.path.basename(f).replace('nis_cal','nis_rate')
+            if not os.path.exists(_file):
+                os.system(f'aws s3 cp s3://grizli-v2/JwstDummy/{_file} .')
+            
+        tab = tab[~jw]
+        
     if len(tab) > 0:
         if MAST_QUERY:
             tab = query.get_products_table(tab, extensions=['RAW', 'C1M'])
