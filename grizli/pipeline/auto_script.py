@@ -394,6 +394,8 @@ def go(root='j010311+131615',
 
     files = glob.glob(os.path.join(PATHS['raw'], '*_fl*fits'))
     files += glob.glob(os.path.join(PATHS['raw'], '*_c[01]m.fits'))
+    files += glob.glob(os.path.join(PATHS['raw'], '*_rate.fits'))
+    files += glob.glob(os.path.join(PATHS['raw'], '*_cal.fits'))
     if len(files) == 0:
         print('No FL[TC] files found!')
         utils.LOGFILE = '/tmp/grizli.log'
