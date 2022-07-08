@@ -2532,7 +2532,9 @@ def photutils_catalog(field_root='j142724+334246', threshold=1.8, subtract_bkg=T
     """
     Make a detection catalog with SourceExtractor and then measure
     photometry with `~photutils`.
-
+    
+    [deprecated, use `~grizli.pipeline.auto_script.multiband_catalog`.]
+    
     """
     from photutils import segmentation, background
     import photutils.utils
@@ -2654,7 +2656,33 @@ def photutils_catalog(field_root='j142724+334246', threshold=1.8, subtract_bkg=T
 
 def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=None, force_seg=None, force_cat=None, galfit=False, pad=256, files=None, gris_ref_filters=GRIS_REF_FILTERS, split_by_grism=False):
     """
-    Initialize a GroupFLT object
+    Initialize a GroupFLT object from exposures in a working directory.  The 
+    script tries to match mosaic images with grism exposures based on the 
+    filter combinations listed in `gris_ref_filters`
+    
+    Parameters
+    ----------
+    field_root : str
+        Rootname of catalog and imaging mosaics, e.g., 
+        ``'{field_root}-ir.cat.fits'``, ``'{field_root}-f160w_drz_sci.fits'``.
+    
+    PREP_PATH : str
+        Path to search for the files
+    
+    force_ref : str, 'clean', 'model'
+        Force filename of the reference image.
+    
+    force_seg : str
+        Force filename of segmentation image
+    
+    galfit : bool
+        Not used recently
+        
+    Returns
+    -------
+    grp : `~grizli.multifit.GroupFLT` or a list of them
+        `~grizli.multifit.GroupFLT` object[s]
+        
     """
     import glob
     import os
@@ -2736,30 +2764,39 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
                 ref = masks[mask][2]
             else:
                 for f in gris_ref_filters[masks[mask][1]]:
-                    if os.path.exists('{0}-{1}_drz_sci.fits'.format(field_root, f.lower())):
+                    _fstr = '{0}-{1}_drz_sci.fits'
+                    if os.path.exists(_fstr.format(field_root, f.lower())):
                         ref = f
                         break
         else:
             continue
+        
         # Segmentation image
         if force_seg is None:
             if force_seg is None:
                 if galfit == 'clean':
-                    seg_file = '{0}-{1}_galfit_orig_seg.fits'.format(field_root,ref.lower())
+                    _fstr = '{0}-{1}_galfit_orig_seg.fits'
+                    seg_file = _fstr.format(field_root,ref.lower())
                 elif galfit == 'model':
-                    seg_file = '{0}-{1}_galfit_seg.fits'.format(field_root, ref.lower())
+                    _fstr = '{0}-{1}_galfit_seg.fits'
+                    seg_file = _fstr.format(field_root, ref.lower())
                 else:
-                    seg_file = glob.glob('{0}-*_seg.fits'.format(field_root))[0]
+                    _fstr = '{0}-*_seg.fits'
+                    seg_file = glob.glob(_fstr.format(field_root))[0]
         else:
             seg_file = force_seg
+            
         # Reference image
         if force_ref is None:
             if galfit == 'clean':
-                ref_file = '{0}-{1}_galfit_clean.fits'.format(field_root, ref.lower())
+                _fstr = '{0}-{1}_galfit_clean.fits'
+                ref_file = _fstr.format(field_root, ref.lower())
             elif galfit == 'model':
-                ref_file = '{0}-{1}_galfit.fits'.format(field_root, ref.lower())
+                _fstr = '{0}-{1}_galfit.fits'
+                ref_file = _fstr.format(field_root, ref.lower())
             else:
-                ref_file = '{0}-{1}_drz_sci.fits'.format(field_root, ref.lower())
+                _fstr = '{0}-{1}_drz_sci.fits'
+                ref_file = _fstr.format(field_root, ref.lower())
         else:
             ref_file = force_ref
         
