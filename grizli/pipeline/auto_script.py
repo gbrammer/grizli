@@ -967,17 +967,7 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_pr
                     os.system(f'aws s3 cp s3://grizli-v2/JwstDummy/{_file} .')
             
         else:
-
-            ## Download from MAST API when data available xxx
-            _url = [f.replace('nis_cal','nis_rate')
-                   for f in tab['dataURL']]
-            
-            tab['dataURL'] = _url
-            tab['dataURI'] = tab['dataURL']
-
-            tab['filename'] = [os.path.basename(f)
-                               for f in tab['dataURL']]
-            
+            ## Download from MAST API when data available xxx            
             mastquery.utils.download_from_mast(tab[jw])
             
         tab = tab[~jw]
