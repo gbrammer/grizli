@@ -394,6 +394,9 @@ def go(root='j010311+131615',
 
     files = glob.glob(os.path.join(PATHS['raw'], '*_fl*fits'))
     files += glob.glob(os.path.join(PATHS['raw'], '*_c[01]m.fits'))
+    files += glob.glob(os.path.join(PATHS['raw'], '*_rate.fits'))
+    files += glob.glob(os.path.join(PATHS['raw'], '*_cal.fits'))
+    
     if len(files) == 0:
         print('No FL[TC] files found!')
         utils.LOGFILE = '/tmp/grizli.log'
@@ -896,13 +899,15 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_pr
     try:
         try:
             from mastquery import query, fetch
+            import mastquery.utils
+            
             MAST_QUERY = True
             instdet_key = 'instrument_name'
         except:
             from hsaquery import query, fetch
             MAST_QUERY = False
             instdet_key = 'instdet'
-
+            
     except ImportError as ERR:
         warn = """{0}
 
@@ -940,8 +945,33 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_pr
 
     use_filters = utils.column_string_operation(tab['filter'], filters,
                                             method='startswith', logical='or')
+    
+    # Allow all JWST for now xxx
+    instr = [str(inst) for inst in tab['instrument_name']]
+    jw = np.in1d(instr, ['NIRISS','NIRCAM','MIRI','NIRSPEC','FGS'])
+    use_filters |= jw
+    
     tab = tab[use_filters]
-
+    
+    # JWST
+    if jw.sum() > 0:
+        print(f'Fetch {jw.sum()} JWST files!')
+        
+        os.chdir(paths['raw'])
+            
+        if 'dummy' in field_root:
+            # Get dummy files copied to AWS
+            for f in tab['dataURL'][jw]:
+                _file = os.path.basename(f).replace('nis_cal','nis_rate')
+                if not os.path.exists(_file):
+                    os.system(f'aws s3 cp s3://grizli-v2/JwstDummy/{_file} .')
+            
+        else:
+            ## Download from MAST API when data available xxx            
+            mastquery.utils.download_from_mast(tab[jw])
+            
+        tab = tab[~jw]
+        
     if len(tab) > 0:
         if MAST_QUERY:
             tab = query.get_products_table(tab, extensions=['RAW', 'C1M'])
@@ -2146,14 +2176,114 @@ mag_lim=17, cat=None, cols=['mag_auto', 'ra', 'dec'], minR=8, dy=5, selection=No
 
 def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_background=True, photometry_background=True, get_all_filters=False, filters=None, det_err_scale=-np.inf, phot_err_scale=-np.inf, rescale_weight=True, run_detection=True, detection_filter='ir', detection_root=None, output_root=None, use_psf_filter=True, detection_params=prep.SEP_DETECT_PARAMS,  phot_apertures=prep.SEXTRACTOR_PHOT_APERTURES_ARCSEC, master_catalog=None, bkg_mask=None, bkg_params={'bw': 64, 'bh': 64, 'fw': 3, 'fh': 3, 'pixel_scale': 0.06}, use_bkg_err=False, aper_segmask=True, sci_image=None):
     """
-    Make a detection catalog and run aperture photometry with the 
-    SExtractor clone `~sep`.
-
-    phot_apertures are aperture *diameters*.  If provided as a string, then
-    apertures assumed to be in pixel units.  Can also provide a list of
-    elements with astropy.unit attributes, which are converted to pixels
-    given the image WCS/pixel size.
-
+    Make a detection catalog and run aperture photometry on all available
+    filter images with the SourceExtractor clone `~sep`.
+    
+    Parameters
+    ----------
+    field_root : str
+        Rootname of detection images and individual filter images (and 
+        weights).
+        
+    threshold : float
+        Detection threshold,  see `~grizli.prep.make_SEP_catalog`.
+        
+    detection_background : bool
+        Background subtraction on detection image, see `get_background` on  
+        `~grizli.prep.make_SEP_catalog`.
+        
+    photometry_background : bool
+        Background subtraction when doing photometry on filter images, 
+        see `get_background` on `~grizli.prep.make_SEP_catalog`.
+        
+    get_all_filters : bool
+        Find all filter images available for `field_root`
+        
+    filters : list, None
+        Explicit list of filters to include, rather than all available
+        
+    det_err_scale : float
+        Uncertainty scaling for detection image, see `err_scale` on 
+        `~grizli.prep.make_SEP_catalog`.
+        
+    phot_err_scale : float
+        Uncertainty scaling for filter images, see `err_scale` on 
+        `~grizli.prep.make_SEP_catalog`.
+        
+    rescale_weight : bool
+        Rescale the weight images based on `sep.Background.rms` for both 
+        detection and filter images, see `grizli.prep.make_SEP_catalog`.
+        
+    run_detection : bool
+        Run the source detection.  Can be False if the detection catalog file
+        (`master_catalog`) and segmentation image 
+        (``{field_root}-{detection_filter}_seg.fits``) already exist, i.e., 
+        from a separate call to `~grizli.prep.make_SEP_catalog`.
+        
+    detection_filter : str
+        Filter image to use for the source detection.  The default ``ir`` is
+        the product of `grizli.pipeline.auto_script.make_filter_combinations`.
+        The detection image filename will be 
+        ``{field_root}-{detection_filter}_drz_sci.fits`` and with associated 
+        weight image ``{field_root}-{detection_filter}_drz_wht.fits``.
+        
+    detection_root : str, None
+        Alternative rootname to use for the detection (and weight) image,
+        i.e., ``{detection_root}_drz_sci.fits``.
+        Note that the ``_drz_sci.fits`` suffixes are currently required by 
+        `~grizli.prep.make_SEP_catalog`.
+        
+    output_root : str, None
+        Rootname of the output catalog file to use, if desired other than 
+        `field_root`.
+        
+    use_psf_filter : bool
+        For HST, try to use the PSF as the convolution filter for source 
+        detection
+        
+    detection_params : dict
+        Source detection parameters, see `~grizli.prep.make_SEP_catalog`.  
+        Many of these are analogous to SourceExtractor parameters.
+        
+    phot_apertures : list
+        Aperture *diameters*. If provided as a string, then apertures assumed
+        to be in pixel units. Can also provide a list of elements with
+        astropy.unit attributes, which are converted to pixels given the image
+        WCS/pixel size.  See `~grizli.prep.make_SEP_catalog`.
+    
+    master_catalog : str, None
+        Filename of the detection catalog, if None then build as 
+        ``{field_root}-{detection_filter}.cat.fits``
+        
+    bkg_mask : array-like, None
+        Mask to use for the detection and photometry background determination,
+        see `~grizli.prep.make_SEP_catalog`.  This has to be the same 
+        dimensions as the images themselves.
+        
+    bkg_params : dict
+        Background parameters, analogous to SourceExtractor, see
+        `~grizli.prep.make_SEP_catalog`.
+        
+    use_bkg_err : bool
+        Use the background rms array determined by `sep` for the uncertainties
+        (see `sep.Background.rms`).
+        
+    aper_segmask : bool
+        Use segmentation masking for the aperture photometry, see
+        `~grizli.prep.make_SEP_catalog`.
+        
+    sci_image : array-like, None
+        Array itself to use for source detection, see
+        `~grizli.prep.make_SEP_catalog`.
+        
+    Returns
+    -------
+    tab : `~astropy.table.Table`
+        Catalog with detection parameters and aperture photometry.  This 
+        is essentially the same as the output for 
+        `~grizli.prep.make_SEP_catalog` but with separate photometry columns 
+        for each multi-wavelength filter image found.
+    
     """
     try:
         from .. import prep, utils
@@ -2165,7 +2295,8 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
 
     # Make catalog
     if master_catalog is None:
-        master_catalog = '{0}-{1}.cat.fits'.format(field_root, detection_filter)
+        master_catalog = '{0}-{1}.cat.fits'.format(field_root, 
+                                                   detection_filter)
     else:
         if not os.path.exists(master_catalog):
             print('Master catalog {0} not found'.format(master_catalog))
@@ -2202,7 +2333,19 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
 
                 detection_params['filter_kernel'] = psf_kernel
 
-        tab = prep.make_SEP_catalog(sci=sci_image,root=detection_root, threshold=threshold, get_background=detection_background, save_to_fits=True, rescale_weight=rescale_weight, err_scale=det_err_scale, phot_apertures=phot_apertures, detection_params=detection_params, bkg_mask=bkg_mask, bkg_params=bkg_params, use_bkg_err=use_bkg_err, aper_segmask=aper_segmask)
+        tab = prep.make_SEP_catalog(sci=sci_image, 
+                                    root=detection_root,
+                                    threshold=threshold,
+                                    get_background=detection_background,
+                                    save_to_fits=True,
+                                    rescale_weight=rescale_weight,
+                                    err_scale=det_err_scale,
+                                    phot_apertures=phot_apertures,
+                                    detection_params=detection_params,
+                                    bkg_mask=bkg_mask,
+                                    bkg_params=bkg_params,
+                                    use_bkg_err=use_bkg_err,
+                                    aper_segmask=aper_segmask)
         
         cat_pixel_scale = tab.meta['asec_0'][0]/tab.meta['aper_0'][0]
         
@@ -2271,8 +2414,8 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
             continue
 
         if filt not in ['g102', 'g141', 'g800l']:
-            sci_files = glob.glob(fq.format(field_root.replace('-100mas','-*mas'),
-                                          filt))
+            _fstr = fq.format(field_root.replace('-100mas','-*mas'), filt)
+            sci_files = glob.glob(_fstr)
             if len(sci_files) == 0:
                 continue
 
@@ -2287,25 +2430,34 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
                 del(sci)
 
                 if sci_shape[0] != aseg.shape[0]:
-                    print('# filt={0}, need half-size segmentation image!'.format(filt), sci_shape, aseg.shape)
+                    msg = '# filt={0}, need half-size segmentation image'
+                    msg += ', shapes sci:{1} seg:{2}'
+                    print(msg.format(filt, sci_shape, aseg.shape))
+                    
                     if aseg_half is None:
                         aseg_half = np.zeros(sci_shape, dtype=aseg.dtype)
                         for i in [0, 1]:
                             for j in [0, 1]:
                                 aseg_half[i::2, j::2] += aseg
 
-                    source_xy = tab['X_WORLD'], tab['Y_WORLD'], aseg_half, aseg_id
+                    source_xy = (tab['X_WORLD'], tab['Y_WORLD'],
+                                 aseg_half, aseg_id)
                 else:
-                    source_xy = tab['X_WORLD'], tab['Y_WORLD'], aseg, aseg_id
+                    source_xy = (tab['X_WORLD'], tab['Y_WORLD'],
+                                 aseg, aseg_id)
 
             filter_tab = prep.make_SEP_catalog(root=root,
-                      threshold=threshold,
-                      rescale_weight=rescale_weight,
-                      err_scale=phot_err_scale,
-                      get_background=photometry_background,
-                      save_to_fits=False, source_xy=source_xy,
-                      phot_apertures=phot_apertures, bkg_mask=bkg_mask,
-                      bkg_params=bkg_params, use_bkg_err=use_bkg_err, sci=sci_image)
+                                    threshold=threshold,
+                                    rescale_weight=rescale_weight,
+                                    err_scale=phot_err_scale,
+                                    get_background=photometry_background,
+                                    save_to_fits=False,
+                                    source_xy=source_xy,
+                                    phot_apertures=phot_apertures,
+                                    bkg_mask=bkg_mask,
+                                    bkg_params=bkg_params,
+                                    use_bkg_err=use_bkg_err,
+                                    sci=sci_image)
 
             for k in filter_tab.meta:
                 newk = '{0}_{1}'.format(filt.upper(), k)
@@ -2335,7 +2487,9 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
     idcol = utils.GTable.Column(data=tab['number'], name='id')
     tab.add_column(idcol, index=0)
 
-    tab.write('{0}_phot.fits'.format(output_root), format='fits', overwrite=True)
+    tab.write('{0}_phot.fits'.format(output_root),
+              format='fits',
+              overwrite=True)
 
     return tab
 
@@ -2376,7 +2530,7 @@ def count_grism_exposures(phot, groups, grisms=['g800l', 'g102', 'g141', 'gr150c
 
 def photutils_catalog(field_root='j142724+334246', threshold=1.8, subtract_bkg=True):
     """
-    Make a detection catalog with SExtractor and then measure
+    Make a detection catalog with SourceExtractor and then measure
     photometry with `~photutils`.
 
     """
@@ -3129,7 +3283,7 @@ def summary_catalog(**kwargs):
 
 def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', min_overlap=0.2, stopme=False, ref_err=1.e-3, radec=None, redrizzle=True, shift_only=True, maglim=[17, 24], NITER=1, catalogs=['GAIA', 'PS1', 'NSC', 'SDSS', 'WISE'], method='Powell', radius=5., program_str=None, match_str=[], all_visits=None, date=None, gaia_by_date=False, tol=None, fit_options=None, print_options={'precision': 3, 'sign': ' '}, include_internal_matches=True, master_gaia_catalog=None):
     """
-    Try fine alignment from visit-based SExtractor catalogs
+    Try fine alignment from visit-based SourceExtractor catalogs
     
     Parameters
     ----------

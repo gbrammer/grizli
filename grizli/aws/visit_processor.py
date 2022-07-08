@@ -130,7 +130,7 @@ def s3_put_exposure(flt_file, product, assoc, remove_old=True, verbose=True):
     h0 = hdul[0].header
     
     if flt_file.startswith('jw'):
-        filt = h0['FILTER']
+        filt = utils.parse_filter_from_header(h0) #h0['FILTER']
         pupil = h0['PUPIL']
         exptime = h0['EFFEXPTM']
         expflag, sunangle = None, None
@@ -558,7 +558,14 @@ def delete_all_assoc_data(assoc):
                      FROM assoc_table
                      WHERE assoc_name = '{assoc}'""")
                      
-    vis_root = np.unique([v[:6] for v in vis['obs_id']])
+    obs_id = []
+    for v in vis['obs_id']:
+        if v.startswith('jw'):
+            obs_id.append(v)
+        else:
+            obs_id.append(v[:6])
+            
+    vis_root = np.unique(obs_id)
     for r in vis_root:
         print(f'Remove {r} from shifts_log')
         db.execute(f"""DELETE from shifts_log
@@ -1023,7 +1030,8 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=True, 
            
     kws['visit_prep_args']['reference_catalogs'] = ref_catalogs
     if filters is None:
-        kws['filters'] = np.unique(tab['filter']).tolist()
+        kws['filters'] = [f.split('-')[0] 
+                          for f in np.unique(tab['filter']).tolist()]            
     else:
         kws['filters'] = filters
     
@@ -1084,6 +1092,8 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=True, 
             cmd = f"""aws s3 sync ./ s3://grizli-v2/HST/Pipeline/{assoc}/ \
                   --exclude "*" \
                   --include "Prep/*_fl*fits" \
+                  --include "Prep/*_cal.fits" \
+                  --include "Prep/*_rate.fits" \
                   --include "Prep/*s.log" \
                   --include "Prep/*visits.*" \
                   --include "*fail*" \
