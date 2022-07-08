@@ -948,7 +948,7 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_pr
     
     # Allow all JWST for now xxx
     instr = [str(inst) for inst in tab['instrument_name']]
-    jw = np.in1d(instr, ['NIRISS','NIRCAM','MIRI'])
+    jw = np.in1d(instr, ['NIRISS','NIRCAM','MIRI','NIRSPEC','FGS'])
     use_filters |= jw
     
     tab = tab[use_filters]
@@ -959,7 +959,15 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_pr
         
         os.chdir(paths['raw'])
             
-        if 0:
+        if 'dummy' in field_root:
+            # Get dummy files copied to AWS
+            for f in tab['dataURL'][jw]:
+                _file = os.path.basename(f).replace('nis_cal','nis_rate')
+                if not os.path.exists(_file):
+                    os.system(f'aws s3 cp s3://grizli-v2/JwstDummy/{_file} .')
+            
+        else:
+
             ## Download from MAST API when data available xxx
             _url = [f.replace('nis_cal','nis_rate')
                    for f in tab['dataURL']]
@@ -971,13 +979,6 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_pr
                                for f in tab['dataURL']]
             
             mastquery.utils.download_from_mast(tab[jw])
-            
-        else:
-            # Get dummy files copied to AWS
-            for f in tab['dataURL'][jw]:
-                _file = os.path.basename(f).replace('nis_cal','nis_rate')
-                if not os.path.exists(_file):
-                    os.system(f'aws s3 cp s3://grizli-v2/JwstDummy/{_file} .')
             
         tab = tab[~jw]
         
