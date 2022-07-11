@@ -1177,7 +1177,7 @@ def get_tile_status(tile, subx, suby, filter):
     """
 
     exp = db.SQL(f"""SELECT dataset, extension, assoc, filter, 
-                            exptime, footprint, in_mosaic
+                            exptime, footprint, in_mosaic, detector
                       FROM mosaic_tiles_exposures t, exposure_files e
                       WHERE t.expid = e.eid
                       AND filter='{filter}' AND tile={tile}
