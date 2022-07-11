@@ -1274,13 +1274,31 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
             
         print('============', visit['product'], '============')
         
-        if f[1] > '1':
-            visit['reference'] = opt_wcs
+        if 'clear' in f:
+            ftest = f.lower().replace('clear-','').replace('-clear','')
+        else:
+            ftest = f.lower()
+        
+        if ftest in ['f098m','f105w','f110w','f125w',
+                       'f128n','f130n','f132n','f127m','f139m','f153m',
+                       'f140w','f160w','g102','g141']:
+            # WFC3/IR
+            is_optical = False
+        elif ftest in ['f0560w','f0770w','f560w','f770w','f1000w',
+                       'f1130w','f1280w','f1500w','f1800w','f2100w','f2550w']:
+            # MIRI
+            is_optical = False
+        else:
+            # Drizzle ACS, NIRCam to smaller pixels
             is_optical = True
+                
+        if is_optical:
+            visit['reference'] = opt_wcs
+            #is_optical = True
         else:
             visit['reference'] = ir_wcs
-            is_optical = False
-            
+            #is_optical = False
+        
         fi = uniq_filts[f] # res['filter'] == f
         un = utils.Unique(res['dataset'][fi], verbose=False)
         
