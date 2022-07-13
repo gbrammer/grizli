@@ -569,6 +569,8 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
     import gc
     
     import astropy.io.fits as pyfits
+    import scipy.ndimage as nd
+    
     from jwst.flatfield import FlatFieldStep
     from jwst.gain_scale import GainScaleStep
     
@@ -645,7 +647,13 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
             
         msg = f'Mask left side of MIRI'
         utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
-        dq[:,:302] |= 1
+        dq[:,:302] |= 1024
+        
+        # Dilate MIRI mask
+        msg = f'Dilate MIRI window mask'
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+        edge = nd.binary_dilation(((dq & 2**9) > 0), iterations=6)
+        dq[edge] |= 1024
         
     img['DQ'].data = dq
     
