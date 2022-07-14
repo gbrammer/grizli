@@ -897,7 +897,7 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_pr
         from grizli import utils
     
     try:
-        import jwst_utils
+        from . import jwst_utils
     except ImportError:
         jwst_utils = None
         

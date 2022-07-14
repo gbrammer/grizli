@@ -188,7 +188,7 @@ def img_with_flat(input, verbose=True, overwrite=True):
     return output
 
 
-def img_with_wcs(input, overwrite=True, fit_sip_header=True):
+def img_with_wcs(input, overwrite=True, fit_sip_header=True, skip_completed=True):
     """
     Open a JWST exposure and apply the distortion model.
 
@@ -215,7 +215,7 @@ def img_with_wcs(input, overwrite=True, fit_sip_header=True):
         _hdu = pyfits.open(input)
     else:
         _hdu = input
-    
+            
     if 'OINSTRUM' not in _hdu[0].header:
         copy_jwst_keywords(_hdu[0].header)
         
@@ -245,6 +245,10 @@ def img_with_wcs(input, overwrite=True, fit_sip_header=True):
         
         _hdu = pyfits.open(input)
         
+        if 'GRIZLWCS' in _hdu[0].header:
+            if (_hdu[0].header['GRIZLWCS']) & (skip_completed):
+                fit_sip_header=False
+        
         #wcs = pywcs.WCS(_hdu['SCI'].header, relax=True)
         if fit_sip_header:
             hsip = pipeline_model_wcs_header(output,
@@ -272,6 +276,8 @@ def img_with_wcs(input, overwrite=True, fit_sip_header=True):
         
         _hdu[1].header['IDCSCALE'] = pscale, 'Pixel scale calculated from WCS'
         _hdu[0].header['PIXSCALE'] = pscale, 'Pixel scale calculated from WCS'
+        _hdu[0].header['GRIZLWCS'] = True, 'WCS modified by grizli'
+        
         _hdu.writeto(input, overwrite=True)
 
     return output
