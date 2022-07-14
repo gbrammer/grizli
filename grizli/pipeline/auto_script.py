@@ -4260,7 +4260,11 @@ def make_combined_mosaics(root, fix_stars=False, mask_spikes=False, skip_single_
         # to match the IR images.
 
         ref = pyfits.open('{0}_wcs-ref.fits'.format(root))
-        ref_wcs = pywcs.WCS(ref[1].header)
+        if len(ref) > 1:
+            ref_wcs = pywcs.WCS(ref[1].header)
+        else:
+            ref_wcs = pywcs.WCS(ref[0].header)
+            
         half_wcs = utils.half_pixel_scale(ref_wcs)
         h = utils.to_header(half_wcs)
         
