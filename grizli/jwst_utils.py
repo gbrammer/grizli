@@ -617,11 +617,18 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
     copy_jwst_keywords(img[0].header, orig_keys=orig_keys, verbose=verbose)
     img[0].header['PA_V3'] = img[1].header['PA_V3']
     
-    if img[0].header['ENGQLPTG'] == 'CALCULATED_TRACK_TR_202111':
-        msg = f'ENGQLPTG = CALCULATED_TR_202105'
-        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
-        img[0].header['ENGQLPTG'] = 'CALCULATED_TR_202105'
+    if 'ENGQLPTG' in img[0].header:
+        if img[0].header['ENGQLPTG'] == 'CALCULATED_TRACK_TR_202111':
+            msg = f'ENGQLPTG = CALCULATED_TR_202105'
+            utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+            img[0].header['ENGQLPTG'] = 'CALCULATED_TR_202105'
     
+    for k in ['TARGET','TARGNAME']:
+        if k in img[0].header:
+            targ = img[0].header[k].replace(' ','-')
+            targ = targ.replace(';','-')
+            img[0].header[k] = targ
+            
     # Get flat field ref file
     _flatfile = FlatFieldStep().get_reference_file(img, 'flat')    
     img[0].header['PFLTFILE'] = os.path.basename(_flatfile)
