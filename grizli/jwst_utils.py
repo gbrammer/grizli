@@ -627,6 +627,8 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
         if k in img[0].header:
             targ = img[0].header[k].replace(' ','-')
             targ = targ.replace(';','-')
+            msg = f'{k} > {targ} (no spaces)'
+            utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
             img[0].header[k] = targ
             
     # Get flat field ref file
