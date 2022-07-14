@@ -895,7 +895,12 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_pr
                                      'auto_script.fetch_files')
     except:
         from grizli import utils
-
+    
+    try:
+        import jwst_utils
+    except ImportError:
+        jwst_utils = None
+        
     try:
         try:
             from mastquery import query, fetch
@@ -968,8 +973,12 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_pr
             
         else:
             ## Download from MAST API when data available xxx            
-            mastquery.utils.download_from_mast(tab[jw])
-            
+            _resp = mastquery.utils.download_from_mast(tab[jw])
+            # update targname
+            for im in _rep:
+                if os.path.exists(_resp) & (jwst_utils is not None):
+                    jwst_utils.initialize_jwst_image(_resp)
+                    
         tab = tab[~jw]
         
     if len(tab) > 0:
