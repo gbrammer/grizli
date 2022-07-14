@@ -975,7 +975,7 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_pr
             ## Download from MAST API when data available xxx            
             _resp = mastquery.utils.download_from_mast(tab[jw])
             # update targname
-            for im in _rep:
+            for im in _resp:
                 if os.path.exists(_resp) & (jwst_utils is not None):
                     jwst_utils.initialize_jwst_image(_resp)
                     
