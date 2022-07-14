@@ -255,8 +255,9 @@ def apply_catalog_corrections(root, total_flux='flux_auto', auto_corr=True, get_
 
     return cat
 
-
-def eazy_photoz(root, force=False, object_only=True, apply_background=True, aper_ix=1, apply_prior=False, beta_prior=True, get_external_photometry=False, external_limits=3, external_sys_err=0.3, external_timeout=300, sys_err=0.05, z_step=0.01, z_min=0.01, z_max=12, total_flux='flux_auto', auto_corr=True, compute_residuals=False, dummy_prior=False, extra_rf_filters=[], quiet=True, aperture_indices='all', zpfile='zphot.zeropoint', extra_params={}, extra_translate={}, force_apcorr=False, ebv=None, absmag_filters=[], **kwargs):
+FILTER_TRANS = {'f098m': 201, 'f105w': 202, 'f110w': 241, 'f125w': 203, 'f140w': 204, 'f160w': 205, 'f435w': 233, 'f475w': 234, 'f555w': 235, 'f606w': 236, 'f625w': 237, 'f775w': 238, 'f814w': 239, 'f850lp': 240, 'f702w': 15, 'f600lpu': 243, 'f225wu': 207, 'f275wu': 208, 'f336wu': 209, 'f350lpu': 339, 'f438wu': 211, 'f475wu': 212, 'f475xu': 242, 'f555wu': 213, 'f606wu': 214, 'f625wu': 215, 'f775wu': 216, 'f814wu': 217, 'f390wu': 210, 'ch1': 18, 'ch2': 19, 'f336w':209, 'f350lp':339, 'f115w': 309, 'f150w': 310, 'f200w': 311}
+    
+def eazy_photoz(root, force=False, object_only=True, apply_background=True, aper_ix=1, apply_prior=False, beta_prior=True, get_external_photometry=False, external_limits=3, external_sys_err=0.3, external_timeout=300, sys_err=0.05, z_step=0.01, z_min=0.01, z_max=12, total_flux='flux_auto', auto_corr=True, compute_residuals=False, dummy_prior=False, extra_rf_filters=[], quiet=True, aperture_indices='all', zpfile='zphot.zeropoint', extra_params={}, filter_trans=FILTER_TRANS, extra_translate={}, force_apcorr=False, ebv=None, absmag_filters=[],  **kwargs):
 
     import os
     import eazy
@@ -271,8 +272,6 @@ def eazy_photoz(root, force=False, object_only=True, apply_background=True, aper
         cat = utils.read_catalog('{0}_phot_apcorr.fits'.format(root))
         return self, cat, zout
 
-    trans = {'f098m': 201, 'f105w': 202, 'f110w': 241, 'f125w': 203, 'f140w': 204, 'f160w': 205, 'f435w': 233, 'f475w': 234, 'f555w': 235, 'f606w': 236, 'f625w': 237, 'f775w': 238, 'f814w': 239, 'f850lp': 240, 'f702w': 15, 'f600lpu': 243, 'f225wu': 207, 'f275wu': 208, 'f336wu': 209, 'f350lpu': 339, 'f438wu': 211, 'f475wu': 212, 'f475xu': 242, 'f555wu': 213, 'f606wu': 214, 'f625wu': 215, 'f775wu': 216, 'f814wu': 217, 'f390wu': 210, 'ch1': 18, 'ch2': 19, 'f336w':209, 'f350lp':339, 'f115w': 309, 'f150w': 310, 'f200w': 311}
-
     # trans.pop('f814w')
 
     if (not os.path.exists('{0}_phot_apcorr.fits'.format(root))) | force_apcorr:
@@ -286,16 +285,16 @@ def eazy_photoz(root, force=False, object_only=True, apply_background=True, aper
             filters.append(c.split('_ZP')[0].lower())
     
     if len(filters) == 0:
-        for f in trans:
+        for f in filter_trans:
             if f'{f}_tot_{aper_ix}' in cat.colnames:
                 filters.append(f.lower())
                 
     # Translate
     fp = open('zphot.translate', 'w')
     for f in filters:
-        if f in trans:
-            fp.write('{0}_tot_{1} F{2}\n'.format(f, aper_ix, trans[f]))
-            fp.write('{0}_etot_{1} E{2}\n'.format(f, aper_ix, trans[f]))
+        if f in filter_trans:
+            fp.write('{0}_tot_{1} F{2}\n'.format(f, aper_ix, filter_trans[f]))
+            fp.write('{0}_etot_{1} E{2}\n'.format(f, aper_ix, filter_trans[f]))
     
     extra_filters = {'hscg':314, 'hscr':315, 'hsci':316, 
                      'hscz':317, 'hscy':318, 
@@ -355,12 +354,12 @@ def eazy_photoz(root, force=False, object_only=True, apply_background=True, aper
     params['CAT_HAS_EXTCORR'] = False
 
     # Pick prior filter, starting from reddest
-    for f in ['f435w', 'f606w', 'f814w', 'f105w', 'f110w', 'f125w', 'f140w', 'f160w'][::-1]:
+    for f in ['f435w', 'f606w', 'f814w', 'f105w', 'f110w', 'f125w', 'f140w', 'f160w','f150w','f200w','f277w'][::-1]:
         if f in filters:
             if dummy_prior:
                 params['PRIOR_FILTER'] = 'dummy_flux'
             else:
-                params['PRIOR_FILTER'] = trans[f]
+                params['PRIOR_FILTER'] = filter_trans[f]
 
             mag = 23.9-2.5*np.log10(cat['{0}_tot_{1}'.format(f, aper_ix)])
             break
