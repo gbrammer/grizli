@@ -629,12 +629,12 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
             utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
             img[0].header['ENGQLPTG'] = 'CALCULATED_TR_202105'
     
-    if 'PATTTYPE' in _hdu[0].header:
-        if _hdu[0].header['PATTTYPE'].endswith('WITH-NIRCAM'):
-            patt = _hdu[0].header['PATTTYPE']
+    if 'PATTTYPE' in img[0].header:
+        if img[0].header['PATTTYPE'].endswith('WITH-NIRCAM'):
+            patt = img[0].header['PATTTYPE']
             new_patt = patt.replace('NIRCAM','NIRCam')
             msg = f'PATTTYPE {patt} > {new_patt}'
-            _hdu[0].header['PATTTYPE'] = new_patt
+            img[0].header['PATTTYPE'] = new_patt
     
     for k in ['TARGET','TARGNAME']:
         if k in img[0].header:
