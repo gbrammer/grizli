@@ -1055,7 +1055,21 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=False,
     
     if master_radec is not None:
         kws['preprocess_args']['master_radec'] = master_radec
-         
+    
+    for fi in ['f1000w','f1130w','f1280w',
+               'f1500w','f1800w','f2100w','f2550w']:
+        
+        if fi in assoc:
+            # Don't run tweak align for MIRI long filters
+            prep_args=dict(run_tweak_align=False,
+                           align_mag_limits=[14,28,0.2],
+                           align_clip=5)
+            for k in prep_args:
+                if k not in kws['preprocess_args']:
+                    kws['preprocess_args'][k] = prep_args[k]
+                    
+            break
+               
     ######## 
     auto_script.go(assoc, **kws)
     ########
