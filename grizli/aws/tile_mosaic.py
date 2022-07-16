@@ -1484,7 +1484,14 @@ def build_mosaic_from_subregions(root='mos-{tile}-{filter}_{drz}', tile=2530, fi
     
     llw = tile_subregion_wcs(tile, ll[0], ll[1])
     
-    if (filter > 'f199') & (filter not in ['g102','g141']):
+    if ('clear' in filter) | (filter in ['f560w','f770w',
+                                         'f1000w','f1280W',
+                                         'f1500w','f1800w',
+                                         'f2100w','f2550w']):
+        npix = 512
+        llw = utils.half_pixel_scale(llw)
+        drz = 'drc'
+    elif (filter > 'f199') & (filter not in ['g102','g141']):
         npix = 512
         llw = utils.half_pixel_scale(llw)
         drz = 'drc'
