@@ -248,7 +248,7 @@ def img_with_wcs(input, overwrite=True, fit_sip_header=True, skip_completed=True
         if 'GRIZLWCS' in _hdu[0].header:
             if (_hdu[0].header['GRIZLWCS']) & (skip_completed):
                 fit_sip_header=False
-        
+                        
         #wcs = pywcs.WCS(_hdu['SCI'].header, relax=True)
         if fit_sip_header:
             hsip = pipeline_model_wcs_header(output,
@@ -628,6 +628,13 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
             msg = f'ENGQLPTG = CALCULATED_TR_202105'
             utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
             img[0].header['ENGQLPTG'] = 'CALCULATED_TR_202105'
+    
+    if 'PATTTYPE' in _hdu[0].header:
+        if 'NIRCAM' in _hdu[0].header['PATTTYPE']:
+            patt = _hdu[0].header['PATTTYPE']
+            new_patt = patt.replace('NIRCAM','NIRCam')
+            msg = f'PATTTYPE {patt} > {new_patt}'
+            _hdu[0].header['PATTTYPE'] = new_patt
     
     for k in ['TARGET','TARGNAME']:
         if k in img[0].header:
