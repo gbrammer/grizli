@@ -971,7 +971,7 @@ blue_align_params['tweak_n_min'] = 5
 ALL_FILTERS = ['F410M', 'F467M', 'F547M', 'F550M', 'F621M', 'F689M', 'F763M', 'F845M', 'F200LP', 'F350LP', 'F435W', 'F438W', 'F439W', 'F450W', 'F475W', 'F475X', 'F555W', 'F569W', 'F600LP', 'F606W', 'F622W', 'F625W', 'F675W', 'F702W', 'F775W', 'F791W', 'F814W', 'F850LP', 'G800L', 'F098M', 'F127M', 'F139M', 'F153M', 'F105W', 'F110W', 'F125W', 'F140W', 'F160W', 'G102', 'G141']
 
 
-def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=True, visit_split_shift=1.2, blue_align_params=blue_align_params, ref_catalogs=['LS_DR9', 'PS1', 'DES', 'NSC', 'GAIA'], filters=None, prep_args={}, get_wcs_guess_from_table=True, master_radec=None, **kwargs):
+def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=False, visit_split_shift=1.2, blue_align_params=blue_align_params, ref_catalogs=['LS_DR9', 'PS1', 'DES', 'NSC', 'GAIA'], filters=None, prep_args={}, get_wcs_guess_from_table=True, master_radec=None, **kwargs):
     """
     `assoc_table.status`
     
@@ -1562,7 +1562,11 @@ def make_mosaic(jname='', ds9=None, skip_existing=True, ir_scale=0.1, half_optic
             
         print('============', groups[f]['product'], '============')
         
-        if f[1] > '1':
+        if 'clear' in f:
+            groups[f]['reference'] = opt_wcs
+        elif clear in ['f560w','f770w','f1000w','f1500w','f1800w']:
+            groups[f]['reference'] = opt_wcs            
+        elif f[1] > '1':
             groups[f]['reference'] = opt_wcs
         else:
             groups[f]['reference'] = ir_wcs
