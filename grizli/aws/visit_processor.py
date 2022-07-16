@@ -1061,12 +1061,12 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=False,
         
         if fi in assoc:
             # Don't run tweak align for MIRI long filters
-            prep_args=dict(run_tweak_align=False,
+            miri_prep = dict(run_tweak_align=False,
                            align_mag_limits=[14,28,0.2],
                            align_clip=5)
-            for k in prep_args:
-                if k not in kws['preprocess_args']:
-                    kws['preprocess_args'][k] = prep_args[k]
+            for k in miri_prep:
+                if k not in kws['visit_prep_args']:
+                    kws['visit_prep_args'][k] = miri_prep[k]
                     
             break
                
