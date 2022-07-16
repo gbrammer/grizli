@@ -1056,7 +1056,7 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=False,
     if master_radec is not None:
         kws['preprocess_args']['master_radec'] = master_radec
     
-    for fi in ['f1000w','f1130w','f1280w',
+    for fi in ['f560w','f770w','f1000w','f1130w','f1280w',
                'f1500w','f1800w','f2100w','f2550w']:
         
         if fi in assoc:
