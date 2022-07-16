@@ -630,7 +630,7 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
             img[0].header['ENGQLPTG'] = 'CALCULATED_TR_202105'
     
     if 'PATTTYPE' in _hdu[0].header:
-        if 'NIRCAM' in _hdu[0].header['PATTTYPE']:
+        if _hdu[0].header['PATTTYPE'].endswith('WITH-NIRCAM'):
             patt = _hdu[0].header['PATTTYPE']
             new_patt = patt.replace('NIRCAM','NIRCam')
             msg = f'PATTTYPE {patt} > {new_patt}'
