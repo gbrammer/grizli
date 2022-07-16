@@ -1582,7 +1582,7 @@ def make_mosaic(jname='', ds9=None, skip_existing=True, ir_scale=0.1, half_optic
         
         if 'clear' in f:
             groups[f]['reference'] = opt_wcs
-        elif clear in ['f560w','f770w','f1000w','f1500w','f1800w']:
+        elif f in ['f560w','f770w','f1000w','f1500w','f1800w']:
             groups[f]['reference'] = opt_wcs            
         elif f[1] > '1':
             groups[f]['reference'] = opt_wcs
