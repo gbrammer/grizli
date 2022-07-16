@@ -1065,7 +1065,7 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=False,
                            align_mag_limits=[14,28,0.2],
                            align_clip=5)
             for k in miri_prep:
-                if k not in kws['visit_prep_args']:
+                if k not in prep_args:
                     kws['visit_prep_args'][k] = miri_prep[k]
                     
             break
