@@ -131,7 +131,11 @@ def s3_put_exposure(flt_file, product, assoc, remove_old=True, verbose=True):
     
     if flt_file.startswith('jw'):
         filt = utils.parse_filter_from_header(h0) #h0['FILTER']
-        pupil = h0['PUPIL']
+        if 'PUPIL' in h0:
+            pupil = h0['PUPIL']
+        else:
+            pupil = ''
+            
         exptime = h0['EFFEXPTM']
         expflag, sunangle = None, None
         
