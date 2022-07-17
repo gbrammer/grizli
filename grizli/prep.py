@@ -2664,6 +2664,180 @@ def make_drz_catalog(root='', sexpath='sex', threshold=2., get_background=True,
     return cat
 
 
+def oneoverf_column_correction(visit, thresholds=[10,1.5], dilate_iter=[10,2], image_sn_cut=-1, **kwargs):
+    """
+    Masked column/row correction for 1/f noise in JWST exposures
+    
+    Parameters
+    ----------
+    visit : dict
+        Visit definition dictionary (keys `product`, `files` at at minimum)
+    
+    thresholds, dilate_iter : [float, float], [int, int]
+        Detection threshold and binary dilation iterations for dilated 
+        segmentation masks from the drizzle-combined mosaic of the exposures
+        in `visit`
+    
+    Returns
+    -------
+    Updates exposures in `visit['files']` in place
+    
+    """
+    frame = inspect.currentframe()
+    utils.log_function_arguments(utils.LOGFILE, frame,
+                                 'prep.oneoverf_column_correction')
+    
+    import scipy.ndimage as nd
+    
+    msg = f"Column correction {visit['product']}: thresholds={thresholds}"
+    msg += f" dilate_iter:{dilate_iter}"
+    utils.log_comment(utils.LOGFILE, msg, verbose=True)
+
+    cat = make_SEP_catalog(visit['product'], threshold=thresholds[0])
+    seg0 = pyfits.open(visit['product']+ '_seg.fits')
+    seg_wcs = pywcs.WCS(seg0[0].header, relax=True)
+
+    cat = make_SEP_catalog(visit['product'], threshold=thresholds[1])
+    seg1 = pyfits.open(visit['product']+ '_seg.fits')
+
+    seg_mask = nd.binary_dilation(seg0[0].data > 0, iterations=dilate_iter[0])
+    seg_mask |= nd.binary_dilation(seg1[0].data > 0, 
+                                   iterations=dilate_iter[1])
+    
+    # pyfits.writeto('oneoverf_mask.fits', data=seg_mask*1, header=seg0[0].header)
+    
+    for _file in visit['files']:
+        with pyfits.open(_file, mode='update') as _im:
+            if _im[0].header['OTELESCO'] not in ['JWST']:
+                continue
+            
+            if 'LONG' in _im[0].header['ODETECTO']:
+                continue
+                
+            _sci = _im['SCI'].data
+            _wcs = pywcs.WCS(_im['SCI'].header, relax=True)
+
+            _blotted = utils.blot_nearest_exact((seg_mask*1), seg_wcs, _wcs)
+            msk = _blotted > 0
+            msk |= _im['ERR'].data <= 0
+            _sn = (_sci - _im['SCI'].header['MDRIZSKY']) / _im['ERR'].data
+            if image_sn_cut > 0:
+                msk |= np.abs(_sn) > image_sn_cut
+            
+            dq4 = _im['DQ'].data - (_im['DQ'].data & 4)
+            msk |= dq4 > 0
+            
+            _scim = _sci*1
+            _scim[msk] = np.nan
+
+            pedestal = np.nanmedian(_scim)
+            _im['SCI'].header['MDRIZSKY'] = pedestal
+
+            if _im[0].header['OINSTRUM'] in ['NIRCAM']:
+                col_axis = 1
+            else:
+                col_axis = 0
+
+            msg = f'Column correction for {_file} (axis={col_axis})'
+            utils.log_comment(utils.LOGFILE, msg, verbose=True)
+
+            cols = np.nanmedian(_scim - pedestal, axis=col_axis)
+            cols[~np.isfinite(cols)] = 0
+            
+            if col_axis:
+                _im['SCI'].data = (_im['SCI'].data.T - cols).T
+            else:
+                _im['SCI'].data -= cols
+
+            _im['SCI'].header['COLCORR'] = (True, 'Column correction applied')
+            _im['SCI'].header['COLMFRAC'] = (msk.sum() / msk.size,
+                                             'Fraction of masked pixels')
+            _im['SCI'].header['COLTHRS0'] = (thresholds[0],
+                                          'First column correction threshold')
+            _im['SCI'].header['COLTHRS1'] = (thresholds[1],
+                                         'Second column correction threshold')
+            _im['SCI'].header['COLNDIL0'] = (dilate_iter[0],
+                                             'First dilation iterations')
+            _im['SCI'].header['COLNDIL1'] = (dilate_iter[1],
+                                             'Second dilation iterations')
+            _im['SCI'].header['COLIAXIS'] = (col_axis,
+                                             'Axis for column average')
+
+            _im.flush()
+
+
+def mask_snowballs(visit, snowball_erode=3, snowball_dilate=18, mask_bit=1024, instruments=['NIRCAM','NIRISS'], **kwargs):
+    """
+    Mask JWST IR snowballs
+    
+    Parameters
+    ----------
+    visit : dict
+        Visit definition dictionary (keys `product`, `files` at at minimum)
+    
+    snowball_erode : int
+        First pass binary erosion on DQ=4 mask
+    
+    snowball_dilate : int
+        Subsequent binary dilation on the eroded DQ=4 mask
+    
+    mask_bit : int
+        Bit to set for identified snowballs
+    
+    instruments : list
+        Instruments where mask is calculated
+
+    Returns
+    -------
+    Updates `DQ` extension of files in ``visit['files']`` and sets some
+    status keywords
+    
+    """
+    frame = inspect.currentframe()
+    utils.log_function_arguments(utils.LOGFILE, frame,
+                                 'prep.mask_snowballs')
+    
+    import scipy.ndimage as nd
+    
+    for _file in visit['files']:
+        with pyfits.open(_file, mode='update') as _im:
+            if _im[0].header['OINSTRUM'] not in instruments:
+                continue
+                
+            crs = (_im['DQ'].data & 4)
+            
+            _erode = nd.binary_erosion(crs > 0, iterations=snowball_erode)
+            snowball_mask = nd.binary_dilation(_erode, 
+                                               iterations=snowball_dilate)
+            
+            label, num_labels = nd.label(snowball_mask)
+            
+            _im['DQ'].data |= snowball_mask*mask_bit
+            
+            _im['SCI'].header['SNOWMASK'] = (True, 'Snowball mask applied')
+            _im['SCI'].header['SNOWEROD'] = (snowball_erode,
+                                             'CR bit=4 erosion for snowballs')
+            _im['SCI'].header['SNOWDILA'] = (snowball_dilate,
+                                            'CR bit=4 dilation for snowballs')
+            _im['SCI'].header['SNOWMBIT'] = (mask_bit, 'Snowball bit ')
+            _im['SCI'].header['SNOWBALN'] = (num_labels,
+                                'Number of labeled features in snowball mask')
+            
+            _maskfrac = snowball_mask.sum() / snowball_mask.size
+            _im['SCI'].header['SNOWBALF'] = (_maskfrac,
+                                 'Fraction of masked pixels in snowball mask')
+            
+            msg = f"Snowball mask: {_file} "
+            msg += f" N={_im['SCI'].header['SNOWBALN']:>3}"
+            msg += f"(f={_im['SCI'].header['SNOWBALF']*100:.2f}%)"
+            
+            utils.log_comment(utils.LOGFILE, msg, verbose=True)
+
+            _im.flush()
+    
+    return True
+
+
 # bin widths defined in pixels with scale `pixel_scale
 BLOT_BACKGROUND_PARAMS = {'bw': 64, 'bh': 64, 'fw': 3, 'fh': 3,
                           'pixel_scale': 0.06}
@@ -3150,7 +3324,9 @@ def process_direct_grism_visit(direct={},
                                separate_chip_kwargs={},
                                reference_catalogs=['GAIA', 'PS1', 
                                                    'SDSS', 'WISE'],
-                               use_self_catalog=False):
+                               use_self_catalog=False, 
+                               oneoverf_kwargs={},
+                               snowball_kwargs={}):
     """Full processing of a direct (+grism) image visit.
     
     Notes
@@ -3561,7 +3737,28 @@ def process_direct_grism_visit(direct={},
 
         # Make DRZ catalog again with updated DRZWCS
         clean_drizzle(direct['product'])
-
+        
+        if isJWST:
+            if oneoverf_kwargs is not None:
+                oneoverf_column_correction(direct, **oneoverf_kwargs)
+            
+            if snowball_kwargs is not None:
+                mask_snowballs(direct, **snowball_kwargs)
+            
+            # Redrizzle before background
+            AstroDrizzle(direct['files'], output=direct['product'],
+                         clean=True, final_pixfrac=0.8, context=False,
+                         resetbits=0, final_bits=bits, driz_sep_bits=bits,
+                         preserve=False, driz_cr_snr=driz_cr_snr,
+                         driz_cr_scale=driz_cr_scale, driz_separate=False,
+                         driz_sep_wcs=False, median=False, blot=False,
+                         driz_cr=False, driz_cr_corr=False,
+                         build=False, final_wht_type='IVM',
+                         gain=_gain, rdnoise=_rdnoise,
+                         **drizzle_params)
+             
+            clean_drizzle(direct['product'])
+            
         # Subtract visit-level background based on the drizzled mosaic
         if imaging_bkg_params is not None:
             logstr = '# Imaging background: {0}'.format(imaging_bkg_params)
