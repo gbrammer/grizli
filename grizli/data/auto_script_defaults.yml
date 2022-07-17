@@ -105,6 +105,12 @@ visit_prep_args: &prep_args
     fix_stars: True
     reference_catalogs: [LS_DR9, PS1, DES, DSC, SDSS, GAIA, WISE]
     outlier_threshold: 4
+    oneoverf_kwargs: {thresholds: [10,1.5], dilate_iter: [24,2], image_sn_cut:-1}
+    snowball_kwargs: {snowball_erode: 4,
+                      snowball_dilate: 18,
+                      mask_bit: 1024,
+                      instruments: ['NIRCAM','NIRISS']}
+    
     # use_self_catalog: *is_parallel_field
 
 # Arguments to prep.apply_persistence_mask
