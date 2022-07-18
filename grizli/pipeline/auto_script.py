@@ -4059,11 +4059,15 @@ def make_filter_combinations(root, weight_fnu=True, filter_combinations=FILTER_C
     output_sci = {}
     head = {}
 
-    sci_files = glob.glob('{0}-f*sci.fits*'.format(root))
+    sci_files = glob.glob('{0}-[cf]*sci.fits*'.format(root))
+    sci_files.sort()
+    
     for sci_file in sci_files:
-        filt_i = sci_file.split('_dr')[0].split('-')[-1]
-        filt_ix = sci_file.split('_dr')[0].split('-')[-1]
-
+        #filt_i = sci_file.split('_dr')[0].split('-')[-1]
+        #filt_ix = sci_file.split('_dr')[0].split('-')[-1]
+        filt_i = sci_file.split(root+'-')[1].split('_dr')[0]
+        filt_ix = sci_file.split(root+'-')[1].split('_dr')[0]
+        
         # UVIS
         if filt_i.startswith('f') & filt_i.endswith('u'):
             filt_i = filt_i[:-1]
@@ -4080,6 +4084,8 @@ def make_filter_combinations(root, weight_fnu=True, filter_combinations=FILTER_C
         # Which reference parameters to use?
         if filt_i.upper() in OPT_W_FILTERS + OPT_M_FILTERS:
             ref_h_i = ref_h['opt']
+        elif 'clear' in filt_i:
+            ref_h_i = ref_h['ir']      
         else:
             ref_h_i = ref_h['ir']
 
