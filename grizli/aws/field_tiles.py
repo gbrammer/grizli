@@ -347,7 +347,7 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
     if make_opt_filters:
         # Optical, 2X pix
         files = glob.glob(f'{root}-f[2-8]*sci.fits*')
-        files = glob.glob(f'{root}-f*clear*sci.fits*')
+        files += glob.glob(f'{root}-f*clear*sci.fits*')
         files.sort()
         filts = [file.split(f'{root}-')[1].split('_')[0] for file in files]
         for filt in filts:
@@ -379,7 +379,7 @@ TILE_FILTERS = ['F336W', 'F350LP', 'F390W', 'F435W', 'F438W', 'F475W',
                 'F2100W','F2550W'][1:]
 
 
-def process_tile(field='cos', tile='01.01', filters=TILE_FILTERS, fetch_existing=True, cleanup=True, make_catalog=False, clean_flt=True, pixfrac=0.33):
+def process_tile(field='cos', tile='01.01', filters=TILE_FILTERS, fetch_existing=True, cleanup=True, make_catalog=False, clean_flt=True, pixfrac=0.33, make_tile_images=False):
     """
     """
     import numpy as np
@@ -526,21 +526,28 @@ def process_tile(field='cos', tile='01.01', filters=TILE_FILTERS, fetch_existing
         pyfits.writeto(f'{root}-ir_seg.fits', data=seg[0].data, 
                        header=seg[0].header, overwrite=True)
     
-    ### Make subtiles
-    ref_tiles = {'cos': (16,16), 
-                 'uds': (11, 10)}
+    if make_tile_images:
+        ### Make subtiles
+        ref_tiles = {'cos': (16,16), 
+                     'uds': (11, 10),
+                     'abell2744': (8, 8), 
+                     'egs': (10,14),
+                     'gds': (9,9), 
+                     'gdn': (9,9),
+                     'sgas1723': (4,4),
+                     'sgas1226': (2,2)}
     
-    if field in ref_tiles:
-        ref_tile = ref_tiles[field]
-    else:
-        ref_tile = (9, 9)
+        if field in ref_tiles:
+            ref_tile = ref_tiles[field]
+        else:
+            ref_tile = (9, 9)
         
-    make_all_tile_images(root, force=False, ref_tile=ref_tile,
-                         rgb_filts=['h','j','visr'],
-                         brgb_filts=['visr','visb','uv'],
-                         blue_is_opt=(field not in ['j013804m2156']), 
-                         make_ir_filters=True, 
-                         make_opt_filters=True)
+        make_all_tile_images(root, force=False, ref_tile=ref_tile,
+                             rgb_filts=['h','j','visr'],
+                             brgb_filts=['visr','visb','uv'],
+                             blue_is_opt=(field not in ['j013804m2156']), 
+                             make_ir_filters=True, 
+                             make_opt_filters=True)
     
     print(f'Sync ./{root}-tiles/ >> s3://grizli-v2/ClusterTiles/Map/{field}/')
     
