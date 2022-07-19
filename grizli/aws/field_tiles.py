@@ -655,8 +655,8 @@ def run_one(own_directory=True, **kwargs):
         with open('/GrizliImaging/tile_finished.txt','w') as fp:
             fp.write(time.ctime() + '\n')
     else:
-        print(f'============  Run cosmos tile  ==============')
-        print(f'{tile}')
+        print(f'============  Run tile  ==============')
+        print(f'{field} {tile}')
         print(f'========= {time.ctime()} ==========')
         
         with open('/GrizliImaging/tile_history.txt','a') as fp:
