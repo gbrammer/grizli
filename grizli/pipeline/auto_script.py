@@ -4817,8 +4817,8 @@ def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', s
             rgb_scl = [1.4, 1., 0.35]
             
     logstr = '# field_rgb {0}: r {1} / g {2} / b {3}\n'
-    logstr += '# rgb_scale {0}: r {4:.2f} / g {5:.2f} / b {6:.2f}'
-    logstr = logstr.format(root, *_rgbf, *rgb_scl)
+    logstr += '# field_rgb scl={7:.2f} / r {4:.2f} / g {5:.2f} / b {6:.2f}'
+    logstr = logstr.format(root, *_rgbf, *rgb_scl, scl)
     utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
 
     #pf = 1
