@@ -365,7 +365,12 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
         files = []
         for ir_filt in ['f098m','f105w','f110w','f125w','f140w','f160w']:
             files += glob.glob(f'{root}-{ir_filt}*sci.fits*')
-            
+        
+        # MIRI on 80mas 
+        for ir_filt in ['f560w','f770w','f1000w','f1130w',
+                        'f1280w','f1500w','f1800w','f2100w','f2550w']:
+            files += glob.glob(f'{root}-{ir_filt}*sci.fits*')
+        
         files.sort()
         filts = [('-'.join(file.split(f'{root}-')[1:])).split('_')[0]
                  for file in files]
