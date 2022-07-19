@@ -435,7 +435,7 @@ def process_tile(field='cos', tile='01.01', filters=TILE_FILTERS, fetch_existing
     
     utils.LOGFILE = 'mosaic.log'
     
-    print(f'Set status=1 in {combined_tiles} for {field} {tile}')
+    print(f'Set status=1 in `combined_tiles` for {field} {tile}')
     db.execute(f"update combined_tiles set status=1 where tile = '{tile}' and field='{field}'")
     
     row = db.SQL(f"select * from combined_tiles where tile = '{tile}' and field='{field}'")
@@ -472,7 +472,7 @@ def process_tile(field='cos', tile='01.01', filters=TILE_FILTERS, fetch_existing
     files = glob.glob(f'{root}*dr*fits')
     if len(files) == 0:
         db.execute(f"update combined_tiles set status=4 where tile = '{tile}'")
-        print(f'No images found, set status=4 in {combined_tiles} for {field} {tile}')
+        print(f'No images found, set status=4 in `combined_tiles` for {field} {tile}')
         
         return True
     
@@ -617,7 +617,7 @@ def process_tile(field='cos', tile='01.01', filters=TILE_FILTERS, fetch_existing
               f' --include "*fp.png"')
     
     db.execute(f"update combined_tiles set status=2 where tile = '{tile}' AND field = '{field}'")
-    print(f'Set status=2 in {combined_tiles} for {field} {tile}')
+    print(f'Set status=2 in `combined_tiles` for {field} {tile}')
     
     if cleanup:
         print(f'rm -rf {root}-tiles')
