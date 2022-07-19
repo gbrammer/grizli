@@ -422,7 +422,7 @@ TILE_FILTERS = ['F336W', 'F350LP', 'F390W', 'F435W', 'F438W', 'F475W',
                 'F2100W','F2550W'][1:]
 
 
-def process_tile(field='cos', tile='01.01', filters=TILE_FILTERS, fetch_existing=True, cleanup=True, make_catalog=False, clean_flt=True, pixfrac=0.33, make_tile_images=True):
+def process_tile(field='cos', tile='01.01', filters=TILE_FILTERS, fetch_existing=True, cleanup=True, make_catalog=False, clean_flt=True, pixfrac=0.75, make_tile_images=True):
     """
     """
     import numpy as np
