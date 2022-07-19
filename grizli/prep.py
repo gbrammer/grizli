@@ -2766,7 +2766,7 @@ def oneoverf_column_correction(visit, thresholds=[10,1.5], dilate_iter=[10,2], i
             _im.flush()
 
 
-def mask_snowballs(visit, snowball_erode=3, snowball_dilate=18, mask_bit=1024, instruments=['NIRCAM','NIRISS'], **kwargs):
+def mask_snowballs(visit, snowball_erode=3, snowball_dilate=18, mask_bit=1024, instruments=['NIRCAM','NIRISS'], unset4=False, **kwargs):
     """
     Mask JWST IR snowballs
     
@@ -2786,7 +2786,10 @@ def mask_snowballs(visit, snowball_erode=3, snowball_dilate=18, mask_bit=1024, i
     
     instruments : list
         Instruments where mask is calculated
-
+    
+    unset4 : bool
+        Unset DQ=4 bit for flagged CRs
+        
     Returns
     -------
     Updates `DQ` extension of files in ``visit['files']`` and sets some
@@ -2812,8 +2815,11 @@ def mask_snowballs(visit, snowball_erode=3, snowball_dilate=18, mask_bit=1024, i
             
             label, num_labels = nd.label(snowball_mask)
             
-            _im['DQ'].data |= snowball_mask*mask_bit
+            _im['DQ'].data |= (snowball_mask*mask_bit).astype(_im['DQ'].data.dtype)
             
+            if unset4:
+                _im['DQ'].data -= (_im['DQ'].data & 4)
+                
             _im['SCI'].header['SNOWMASK'] = (True, 'Snowball mask applied')
             _im['SCI'].header['SNOWEROD'] = (snowball_erode,
                                              'CR bit=4 erosion for snowballs')
@@ -3460,7 +3466,7 @@ def process_direct_grism_visit(direct={},
         driz_cr_scale = '1.2 0.7'
     elif isJWST:
         # Placeholder
-        bits = 256
+        bits = 4
         driz_cr_snr = '8.0 5.0'
         driz_cr_scale = '2.5 0.7'        
     else:
@@ -3499,6 +3505,10 @@ def process_direct_grism_visit(direct={},
         _rdnoise = None
         
     if not skip_direct:
+        if isJWST:
+            if snowball_kwargs is not None:
+                mask_snowballs(direct, **snowball_kwargs)
+            
         if (not isACS) & (not isWFPC2) & run_tweak_align:
             # if run_tweak_align:
             tweak_align(direct_group=direct, grism_group=grism,
@@ -3741,10 +3751,7 @@ def process_direct_grism_visit(direct={},
         if isJWST:
             if oneoverf_kwargs is not None:
                 oneoverf_column_correction(direct, **oneoverf_kwargs)
-            
-            if snowball_kwargs is not None:
-                mask_snowballs(direct, **snowball_kwargs)
-            
+                        
             # Redrizzle before background
             AstroDrizzle(direct['files'], output=direct['product'],
                          clean=True, final_pixfrac=0.8, context=False,
@@ -3828,7 +3835,11 @@ def process_direct_grism_visit(direct={},
 
     # Match grism WCS to the direct images
     match_direct_grism_wcs(direct=direct, grism=grism, get_fresh_flt=False)
-
+    
+    if isJWST:
+        if snowball_kwargs is not None:
+            mask_snowballs(grism, **snowball_kwargs)
+        
     # First drizzle to flag CRs
     gris_cr_corr = len(grism['files']) > 1
     driz_cr_snr = '8.0 5.0'
