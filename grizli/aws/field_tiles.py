@@ -417,6 +417,7 @@ TILE_FILTERS = ['F336W', 'F350LP', 'F390W', 'F435W', 'F438W', 'F475W',
                 'F098M', 'F105W', 'F110W', 'F125W', 'F140W', 'F160W',
                 'F070W-CLEAR','F090W-CLEAR','F115W-CLEAR','F150W-CLEAR',
                 'F200W-CLEAR','F277W-CLEAR','F356W-CLEAR','F444W-CLEAR',
+                'CLEAR-F115W','CLEAR-F150W','CLEAR-F200W',
                 ]#'F560W','F770W','F1000W','F1280W','F1500W','F1800W',
                 #'F2100W','F2550W'][1:]
 
