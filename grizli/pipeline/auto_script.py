@@ -4593,9 +4593,15 @@ def get_rgb_filters(filter_list, force_ir=False, pure_sort=False):
 
     # Preferred combinations
     filter_list_lower = [f.lower() for f in filter_list]
-    rpref = ['h', 'f160w', 'f140w']
-    gpref = ['j', 'yj', 'f125w', 'f110w', 'f105w', 'f098m']
-    bpref = ['opt', 'visr', 'visb', 'f814w', 'f814wu', 'f606w', 'f606wu' 'f775w', 'f850lp', 'f435w']
+    rpref = ['h', 'f160w', 'f140w','f444w-clear','f200w-clear','f410m-clear']
+    gpref = ['j', 'yj', 'f125w', 'f110w', 'f105w', 'f098m','f356w-clear',
+             'f150w-clear','f300m-clear']
+    bpref = ['opt', 'visr', 'visb', 'f814w', 'f814wu', 'f606w', 'f606wu',
+             'f775w', 'f850lp', 'f435w',
+             'f090w-clear','f070w-clear','f115w-clear',
+             'f277w-clear',
+             ]
+             
     pref_list = [None, None, None]
     has_pref = 0
     for i, pref in enumerate([rpref, gpref, bpref]):
@@ -4616,23 +4622,31 @@ def get_rgb_filters(filter_list, force_ir=False, pure_sort=False):
             continue
 
         if f == 'uv':
-            val = 'f0300'
+            val = 'f00300'
         elif f == 'visb':
-            val = 'f0435'
+            val = 'f00435'
         elif f == 'visr':
-            val = 'f0814'
+            val = 'f00814'
         elif f == 'y':
-            val = 'f1000'
+            val = 'f01000'
         elif f == 'yj':
-            val = 'f1100'
+            val = 'f01100'
         elif f == 'j':
-            val = 'f1250'
+            val = 'f01250'
         elif f == 'h':
-            val = 'f1500'
-        elif f[1] in '01':
-            val = f[:4]+'0'
-        else:
+            val = 'f01500'
+        elif 'clear' in f:
+            val = 'f0'+f[1:4]+'0'
+        elif f in ['f560w','f770w']:
             val = 'f0'+f[1:4]
+            
+        elif f in ['f1000w','f1130w','f1280w','f1500w','f1800w',
+                   'f2100w','f2550w']:
+            val = f[:5]+'0'
+        elif f[1] in '01':
+            val = 'f0'+f[1:4]+'0'
+        else:
+            val = 'f00'+f[1:4]
 
         # Red filters (>6000)
         if val > 'f07':
@@ -4645,9 +4659,9 @@ def get_rgb_filters(filter_list, force_ir=False, pure_sort=False):
     pop_indices = []
 
     joined = {'uv': '23', 'visb': '45', 'visr': '678',
-               'y': ['f098m', 'f105w'],
-               'j': ['f110w', 'f125w'],
-               'h': ['f140w', 'f160w']}
+               'y': ['f098m', 'f105w', 'f070w','f090w'],
+               'j': ['f110w', 'f125w','f115w'],
+               'h': ['f140w', 'f160w','f150w']}
 
     for j in joined:
         if j in use_filters:
@@ -4791,8 +4805,20 @@ def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', s
         rf, gf, bf = get_rgb_filters(filters, force_ir=force_ir, pure_sort=pure_sort)
     else:
         rf, gf, bf = force_rgb
-
-    logstr = '# field_rgb {0}: r {1} / g {2} / b {3}'.format(root, rf, gf, bf)
+    
+    _rgbf = [rf, gf, bf]
+    _rgb_auto = False
+    if rgb_scl == [1, 1, 1]:
+        if (_rgbf == ['f444w-clear', 'f356w-clear', 'f277w-clear']):
+            rgb_scl = [2.7, 2.0, 1.0]
+        elif _rgbf == ['f200w-clear', 'f150w-clear', 'f115w-clear']:
+            rgb_scl = [1.1, 1., 1.0]
+        elif _rgbf == ['f444w-clear', 'f356w-clear', 'f115w-clear']:
+            rgb_scl = [1.4, 1., 0.35]
+            
+    logstr = '# field_rgb {0}: r {1} / g {2} / b {3}\n'
+    logstr += '# rgb_scale {0}: r {4:.2f} / g {5:.2f} / b {6:.2f}'
+    logstr = logstr.format(root, *_rgbf, *rgb_scl)
     utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
 
     #pf = 1

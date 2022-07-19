@@ -313,7 +313,44 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
                     force=force, rgb_scl=[1., 1.2, 1.4], rgb_min=-0.018)
 
         plt.close('all')
-        
+    
+    # JWST SW
+    if len(glob.glob(f'{root}*.swrgb.png')) == 0:
+        split_tiles(root, ref_tile=ref_tile, 
+                    filters=[f.lower() for f in ['F070W-CLEAR','F090W-CLEAR',
+                          'F115W-CLEAR','F150W-CLEAR',
+                          'F200W-CLEAR']],
+                    zoom_levels=zoom_levels,
+                    optical=True, suffix='.swrgb', xsize=6, scl=2,
+                    force=force, rgb_scl=[1,1,1], rgb_min=-0.018)
+
+        plt.close('all')
+    
+    # JWST LW
+    if len(glob.glob(f'{root}*.lwrgb.png')) == 0:
+        split_tiles(root, ref_tile=ref_tile, 
+                    filters=[f.lower() for f in ['F277W-CLEAR','F356W-CLEAR',
+                          'F410M-CLEAR','F444W-CLEAR']],
+                    zoom_levels=zoom_levels,
+                    optical=True, suffix='.lwrgb', xsize=6, scl=2,
+                    force=force, rgb_scl=[1,1,1], rgb_min=-0.018)
+
+        plt.close('all')
+    
+    # All NIRCam
+    if len(glob.glob(f'{root}*.ncrgb.png')) == 0:
+        split_tiles(root, ref_tile=ref_tile, 
+                    filters=[f.lower() for f in ['F070W-CLEAR','F090W-CLEAR',
+                                                 'F115W-CLEAR','F150W-CLEAR',
+                                                 'F200W-CLEAR',
+                                                 'F277W-CLEAR','F356W-CLEAR',
+                                                'F410M-CLEAR','F444W-CLEAR']],
+                    zoom_levels=zoom_levels,
+                    optical=True, suffix='.ncrgb', xsize=6, scl=2,
+                    force=force, rgb_scl=[1,1,1], rgb_min=-0.018)
+
+        plt.close('all')
+    
     if root.startswith('cos'):
         if len(glob.glob(f'{root}*.vi.png')) == 0:
             split_tiles(root, ref_tile=ref_tile, 
