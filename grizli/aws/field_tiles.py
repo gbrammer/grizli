@@ -321,7 +321,7 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
                           'F115W-CLEAR','F150W-CLEAR',
                           'F200W-CLEAR']],
                     zoom_levels=zoom_levels,
-                    optical=True, suffix='.swrgb', xsize=6, scl=2,
+                    optical=True, suffix='.swrgb', xsize=6, scl=4,
                     force=force, rgb_scl=[1,1,1], rgb_min=-0.018)
 
         plt.close('all')
@@ -332,7 +332,7 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
                     filters=[f.lower() for f in ['F277W-CLEAR','F356W-CLEAR',
                           'F410M-CLEAR','F444W-CLEAR']],
                     zoom_levels=zoom_levels,
-                    optical=True, suffix='.lwrgb', xsize=6, scl=2,
+                    optical=True, suffix='.lwrgb', xsize=6, scl=4,
                     force=force, rgb_scl=[1,1,1], rgb_min=-0.018)
 
         plt.close('all')
@@ -346,7 +346,7 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
                                                  'F277W-CLEAR','F356W-CLEAR',
                                                 'F410M-CLEAR','F444W-CLEAR']],
                     zoom_levels=zoom_levels,
-                    optical=True, suffix='.ncrgb', xsize=6, scl=2,
+                    optical=True, suffix='.ncrgb', xsize=6, scl=4,
                     force=force, rgb_scl=[1,1,1], rgb_min=-0.018)
 
         plt.close('all')
