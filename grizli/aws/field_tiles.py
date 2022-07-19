@@ -664,7 +664,9 @@ def run_one(own_directory=True, **kwargs):
         
         if own_directory:
             path = f'/GrizliImaging/{field}-{tile}'
-            os.makedirs(path)
+            if not os.path.exists(path):
+                os.makedirs(path)
+                
             os.chdir(path)
             
         #process_visit(tile, clean=clean, sync=sync)
