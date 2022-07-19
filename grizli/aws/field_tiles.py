@@ -577,7 +577,8 @@ def process_tile(field='cos', tile='01.01', filters=TILE_FILTERS, fetch_existing
                      'gds': (9,9), 
                      'gdn': (9,9),
                      'sgas1723': (4,4),
-                     'sgas1226': (2,2)}
+                     'sgas1226': (2,2),
+                     'smacs0723': (4,4)}
     
         if field in ref_tiles:
             ref_tile = ref_tiles[field]
