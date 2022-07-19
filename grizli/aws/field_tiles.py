@@ -638,7 +638,7 @@ def get_random_tile():
     return tile, field
 
 
-def run_one():
+def run_one(own_directory=True, **kwargs):
     """
     Run a single random visit
     """
@@ -662,8 +662,13 @@ def run_one():
         with open('/GrizliImaging/tile_history.txt','a') as fp:
             fp.write(f'{time.ctime()} {tile}\n')
         
+        if own_directory:
+            path = f'/GrizliImaging/{field}-{tile}'
+            os.makedirs(path)
+            os.chdir(path)
+            
         #process_visit(tile, clean=clean, sync=sync)
-        process_tile(tile=tile, field=field)
+        process_tile(tile=tile, field=field, **kwargs)
 
 
 def create_mosaic_from_tiles(assoc, filt='ir', clean=True):
