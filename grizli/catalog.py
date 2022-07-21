@@ -36,6 +36,7 @@ __all__ = ["table_to_radec",
            "get_desdr1_catalog",
            "get_skymapper_catalog",
            "get_vexas_catalog",
+           "get_vhs_catalog",
            "get_panstarrs_catalog",
            "get_radec_catalog"]
 
@@ -957,6 +958,25 @@ def get_desdr1_catalog_old(ra=0., dec=0., radius=3, corners=None, max=100000, ex
 
     tab = query_tap_catalog(ra=ra, dec=dec, radius=radius, corners=corners,
                             extra=extra, des=True, verbose=verbose, max=max)
+    return tab
+
+
+def get_vhs_catalog(ra=0., dec=0., radius=3., corners=None, max_records=500000, verbose=True, extra='', table='vhs_dr4'):
+    """
+    VEXAS DR2 from vizier
+
+    https://vizier.cds.unistra.fr/viz-bin/VizieR?-source=II/369
+
+    table: 'vexasds', 'vexasps', 'vexassm'
+
+    """
+    msg = 'Query VHS DR4 {table} catalog ({ra},{dec},{radius})'
+    print(msg.format(table=table, ra=ra, dec=dec, radius=radius))
+    tab = query_tap_catalog(ra=ra, dec=dec, radius=radius*2,
+                            corners=corners, extra=extra, 
+                            vizier=True, 
+                            db=f'"II/359/{table}"', 
+                            verbose=verbose, max=max_records)
     return tab
 
 
