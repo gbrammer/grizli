@@ -1953,11 +1953,24 @@ def preprocess(field_root='j142724+334246',  HOME_PATH='/Volumes/Pegasus/Grizli/
         else:
             print(direct['product'])
 
+        # if master_radec is not None:
+        #     radec = master_radec
+        #     best_overlap = 0
+        #     fp = direct['footprint']
+        radec = None
+        
         if master_radec is not None:
             radec = master_radec
-            best_overlap = 0
-            fp = direct['footprint']
-        else:
+            best_overlap = 0.
+            
+            if master_radec == 'astrometry_db':
+                radec = prep.get_visit_radec_from_database(direct)
+                # if radec is None:
+                #     master_radec = None
+                if radec is not None:
+                    fp = direct['footprint']
+                    
+        if radec is None:
             radec_files = glob.glob('*cat.radec')
             radec = parent_radec
             best_overlap = 0
