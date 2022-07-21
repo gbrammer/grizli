@@ -44,6 +44,7 @@ sep
 
 git+https://github.com/gbrammer/reprocess_wfc3.git
 git+https://github.com/gbrammer/eazy-py.git
-git+https://github.com/gbrammer/sregion.git
+# git+https://github.com/gbrammer/sregion.git
+sregion>=1.0
 git+https://github.com/gbrammer/tristars.git
 git+https://github.com/gbrammer/mastquery.git
