@@ -5328,8 +5328,21 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
             continue
             
         sci_list, wht_list, wcs_list = [], [], []
-
-        if flt[0].header['DETECTOR'] == 'IR':
+        
+        keys = OrderedDict()
+        for k in ['EXPTIME', 'TELESCOP', 'FILTER','FILTER1', 'FILTER2', 
+                  'PUPIL', 'DETECTOR', 'INSTRUME', 'PHOTFLAM', 'PHOTPLAM', 
+                  'PHOTFNU', 'PHOTZPT', 'PHOTBW', 'PHOTMODE', 'EXPSTART', 
+                  'EXPEND', 'DATE-OBS', 'TIME-OBS',
+                  'CRDS_CTX', 'R_DISTOR', 'R_PHOTOM', 'R_FLAT']:
+            if k in flt[0].header:
+                keys[k] = flt[0].header[k]
+        
+        if flt[0].header['TELESCOP'] in ['JWST']:
+            bits = 4
+            include_saturated = False
+            
+        elif flt[0].header['DETECTOR'] == 'IR':
             bits = 576
             if extra_wfc3ir_badpix:
                 if (i == indices[0]) | (not hasattr(bpdata, 'shape')):
@@ -5348,14 +5361,6 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
 
         if keep_bits is not None:
             bits |= keep_bits
-
-        keys = OrderedDict()
-        for k in ['EXPTIME', 'TELESCOP', 'FILTER','FILTER1', 'FILTER2', 
-                  'PUPIL', 'DETECTOR', 'INSTRUME', 'PHOTFLAM', 'PHOTPLAM', 
-                  'PHOTFNU', 'PHOTZPT', 'PHOTBW', 'PHOTMODE', 'EXPSTART', 
-                  'EXPEND', 'DATE-OBS', 'TIME-OBS']:
-            if k in flt[0].header:
-                keys[k] = flt[0].header[k]
 
         if 'PHOTFLAM' in keys:
             print('  0    PHOTFLAM={0:.2e}, scale={1:.1f}'.format(keys['PHOTFLAM'], 1.))
