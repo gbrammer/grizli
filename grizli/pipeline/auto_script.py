@@ -978,6 +978,7 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_pr
             for _file in _resp:
                 if os.path.exists(_file) & (jwst_utils is not None):
                     jwst_utils.initialize_jwst_image(_file)
+                    jwst_utils.set_jwst_to_hst_keywords(_file, reset=True)
                     
         tab = tab[~jw]
         
