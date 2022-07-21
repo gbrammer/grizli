@@ -1829,10 +1829,22 @@ def preprocess(field_root='j142724+334246',  HOME_PATH='/Volumes/Pegasus/Grizli/
         #         guess.write('{0}.align_guess'.format(direct['product']),
         #                     format='ascii.commented_header')
 
+        radec = None
+        
+        print('xxxxxx', master_radec, radec)
+        
         if master_radec is not None:
             radec = master_radec
             best_overlap = 0.
-        else:
+            
+            if master_radec == 'astrometry_db':
+                radec = prep.get_visit_radec_from_database(direct)
+                # if radec is None:
+                #     master_radec = None
+        
+        print('yyyyyy', master_radec, radec)
+              
+        if radec is None:
             radec_files = glob.glob('*cat.radec')
             radec = parent_radec
             best_overlap = 0

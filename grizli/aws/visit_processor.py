@@ -842,7 +842,36 @@ def cdfs_hsc_catalog():
     os.system('aws s3 cp Ni2009_WCDFS_i24.radec s3://grizli-v2/HST/Pipeline/Astrometry/')
 
 
-def get_master_radec(s_region, bucket='grizli-v2', prefix='HST/Pipeline/Astrometry'):
+def get_master_radec(s_region, nmax=200):
+    """
+    Get overlapping reference sources from the `astrometry_reference` table
+    in the grizli database
+    """
+    # Do it in prep
+    return None
+    
+    
+    # from grizli.aws import db
+    # 
+    # sr = utils.SRegion(s_region)
+    # 
+    # srcs = db.SQL(f"""select src, count(src) from astrometry_reference
+    # where polygon('{sr.polystr()}') @> point(ra, dec)
+    # order by src
+    # """)
+    # if len(srcs) == 0:
+    #     return None
+    # 
+    # _src = src['src'][np.argmax(src['count'])]
+    # 
+    # pts = db.SQL(f"""select * from astrometry_reference
+    # where polygon('{sr.polystr()}') @> point(ra, dec)
+    # AND src = '{_src}'
+    # order by mag limit {nmax}
+    # """)
+    
+    
+def old_get_master_radec(s_region, bucket='grizli-v2', prefix='HST/Pipeline/Astrometry'):
     """
     See if an assoc footprint overlaps with some precomputed astrometric 
     reference
@@ -970,7 +999,46 @@ def get_master_radec(s_region, bucket='grizli-v2', prefix='HST/Pipeline/Astromet
                                      [110.609213, -73.484384],
                                      [110.64198 , -73.497214],
                                      [110.646436, -73.498917]])
-                                     
+    
+    precomputed_radec['abell2744_ip_2008_20220620_g3sw.radec'] = np.array([
+                                      [3.382855, -30.158365],
+                                      [3.287974, -30.160039],
+                                      [3.283219, -30.163239],
+                                      [3.274886, -30.169153],
+                                      [3.25321 , -30.186363],
+                                      [3.242435, -30.205177],
+                                      [3.237953, -30.217099],
+                                      [3.237638, -30.23572 ],
+                                      [3.236802, -30.343877],
+                                      [3.236131, -30.431126],
+                                      [3.236052, -30.444164],
+                                      [3.236112, -30.476929],
+                                      [3.236585, -30.55128 ],
+                                      [3.238121, -30.567037],
+                                      [3.271421, -30.625737],
+                                      [3.280073, -30.632062],
+                                      [3.289894, -30.637195],
+                                      [3.303426, -30.639061],
+                                      [3.314717, -30.640257],
+                                      [3.556417, -30.641503],
+                                      [3.615938, -30.64173 ],
+                                      [3.771419, -30.640564],
+                                      [3.834617, -30.639879],
+                                      [3.911254, -30.638888],
+                                      [3.916556, -30.638332],
+                                      [3.920868, -30.63479 ],
+                                      [3.927549, -30.628326],
+                                      [3.929028, -30.616425],
+                                      [3.929714, -30.528361],
+                                      [3.92942 , -30.341083],
+                                      [3.928447, -30.27237 ],
+                                      [3.894966, -30.172395],
+                                      [3.881937, -30.163145],
+                                      [3.850611, -30.159172],
+                                      [3.777518, -30.158458],
+                                      [3.685884, -30.157784],
+                                      [3.550749, -30.157794]])
+    
                                      
     sr = utils.SRegion(s_region)
     if sr.centroid[0][0] < 0:
@@ -1004,7 +1072,7 @@ blue_align_params['tweak_n_min'] = 5
 ALL_FILTERS = ['F410M', 'F467M', 'F547M', 'F550M', 'F621M', 'F689M', 'F763M', 'F845M', 'F200LP', 'F350LP', 'F435W', 'F438W', 'F439W', 'F450W', 'F475W', 'F475X', 'F555W', 'F569W', 'F600LP', 'F606W', 'F622W', 'F625W', 'F675W', 'F702W', 'F775W', 'F791W', 'F814W', 'F850LP', 'G800L', 'F098M', 'F127M', 'F139M', 'F153M', 'F105W', 'F110W', 'F125W', 'F140W', 'F160W', 'G102', 'G141']
 
 
-def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=False, visit_split_shift=1.2, blue_align_params=blue_align_params, ref_catalogs=['LS_DR9', 'PS1', 'DES', 'NSC', 'GAIA'], filters=None, prep_args={}, get_wcs_guess_from_table=True, master_radec=None, **kwargs):
+def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=False, visit_split_shift=1.2, blue_align_params=blue_align_params, ref_catalogs=['LS_DR9', 'PS1', 'DES', 'NSC', 'GAIA'], filters=None, prep_args={}, get_wcs_guess_from_table=True, master_radec='astrometry_db', **kwargs):
     """
     `assoc_table.status`
     

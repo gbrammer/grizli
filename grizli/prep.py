@@ -3632,6 +3632,10 @@ def process_direct_grism_visit(direct={},
             guess = np.loadtxt(guess_file)
         else:
             guess = [0., 0., 0., 1]
+        
+        # Database radec?
+        if radec == 'astrometry_db':
+            radec = get_visit_radec_from_database(direct)
 
         try:
             result = align_drizzled_image(root=direct['product'],
@@ -4103,6 +4107,62 @@ def tweak_align(direct_group={}, grism_group={}, max_dist=1., n_min=10, key=' ',
     return True
 
 
+def get_visit_radec_from_database(visit, nmax=200):
+    """
+    Get reference astrometry from grizli database
+    
+    Parameters
+    ----------
+    visit : dict
+        Visit dictionary, with `product`, `files`, `footprint` keys
+    
+    nmax : 200
+        Maximum number of alignment sources to return
+        
+    Returns
+    -------
+    radec_file : str
+        Creates radec file from the database and returns the filename, or None
+        if not overlapping reference sources found
+        
+    """
+    from grizli.aws import db
+
+    if 'footprint' not in visit:
+        msg = f"'footprint' not found in visit dictionary {visit['product']}"
+        utils.log_comment(utils.LOGFILE, msg, verbose=True)
+        return None
+
+    sr = utils.SRegion(visit['footprint'])
+
+    try:
+        srcs = db.SQL(f"""select src, count(src) from astrometry_reference
+    where polygon('{sr.polystr()[0]}') @> point(ra, dec)
+    group by src
+    """)
+    except:
+        msg = f"Failed to query astrometry database for {visit['product']}"
+        utils.log_comment(utils.LOGFILE, msg, verbose=True)
+        return None
+        
+    if len(srcs) == 0:
+        return None
+
+    _src = srcs['src'][np.argmax(srcs['count'])]
+
+    pts = db.SQL(f"""select * from astrometry_reference
+    where polygon('{sr.polystr()[0]}') @> point(ra, dec)
+    AND src = '{_src}'
+    order by mag limit {nmax}
+    """)
+
+    msg = f"master_radec for {visit['product']}: {_src} N={len(pts)}"
+    utils.log_comment(utils.LOGFILE, msg, verbose=True)
+
+    table_to_radec(pts, _src+'.radec')
+    return _src+'.radec'
+    
+    
 def drizzle_footprint(weight_image, shrink=10, ext=0, outfile=None, label=None):
     """
     Footprint of image pixels where values > 0.  Works best with drizzled
