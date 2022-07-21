@@ -4841,6 +4841,12 @@ def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', s
             rgb_scl = [1.1, 1., 1.0]
         elif _rgbf == ['f444w-clear', 'f356w-clear', 'f115w-clear']:
             rgb_scl = [1.4, 1., 0.35]
+        elif _rgbf == ['f444w-clear', 'f356w-clear', 'f090w-clear']:
+            rgb_scl = [1.4, 1., 0.35]
+        elif _rgbf == ['f444w-clear', 'f356w-clear', 'f150w-clear']:
+            rgb_scl = [1.4, 1., 0.35]
+        elif _rgbf == ['f444w-clear', 'f356w-clear', 'f200w-clear']:
+            rgb_scl = [1.4, 1., 0.35]
             
     logstr = '# field_rgb {0}: r {1} / g {2} / b {3}\n'
     logstr += '# field_rgb scl={7:.2f} / r {4:.2f} / g {5:.2f} / b {6:.2f}'
