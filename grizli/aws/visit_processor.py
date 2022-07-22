@@ -672,17 +672,22 @@ def show_recent_assoc(limit=50):
     return last
 
 
-def launch_ec2_instances(nmax=50, templ='lt-0e8c2b8611c9029eb,Version=11'):
+def launch_ec2_instances(nmax=50, count=None, templ='lt-0e8c2b8611c9029eb,Version=19'):
     """
     Launch EC2 instances from a launch template that run through all 
-    status=0 associations and then terminate
+    status=0 associations/tiles and then terminate
+    
+    Version 19 is the latest run_all_visits.sh
+    Version 20 is the latest run_all_tiles.sh
+    
     """
 
-    assoc = db.SQL("""SELECT distinct(assoc_name)
+    if count is None:
+        assoc = db.SQL("""SELECT distinct(assoc_name)
                       FROM assoc_table
                       WHERE status = 0""")
     
-    count = int(np.minimum(nmax, len(assoc)/2))
+        count = int(np.minimum(nmax, len(assoc)/2))
 
     if count == 0:
         print('No associations to run, abort.')
