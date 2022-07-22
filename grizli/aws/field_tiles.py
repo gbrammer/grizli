@@ -613,8 +613,9 @@ def process_tile(field='cos', tile='01.01', filters=TILE_FILTERS, fetch_existing
         os.system(cmd)
         
     os.system(f'aws s3 sync ./ s3://grizli-v2/ClusterTiles/{field}/' + 
-              f' --exclude "*" --include "{root}*gz" --include "*wcs.csv"' + 
-              f' --include "*fp.png"')
+              f' --exclude "*" --include "{root}*gz"' +
+              f' --include "{root}*wcs.csv"' +
+              f' --include "{root}*fp.png"')
     
     db.execute(f"update combined_tiles set status=2 where tile = '{tile}' AND field = '{field}'")
     print(f'Set status=2 in `combined_tiles` for {field} {tile}')
