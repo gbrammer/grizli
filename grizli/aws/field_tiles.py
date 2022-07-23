@@ -421,8 +421,9 @@ TILE_FILTERS = ['F336W', 'F350LP', 'F390W', 'F435W', 'F438W', 'F475W',
                 'F277W-CLEAR','F356W-CLEAR','F444W-CLEAR',
                 'F300M-CLEAR','F360M-CLEAR','F410M-CLEAR', 'F480M-CLEAR',
                 'CLEAR-F115W','CLEAR-F150W','CLEAR-F200W', # NIS
-                'F560W','F770W','F1000W','F1280W','F1500W','F1800W', # MIR
-                'F2100W','F2550W'][1:]
+                'F560W','F770W','F1000W','F1280W','F1500W', # MIR
+                'F1800W','F2100W','F2550W',
+                ][1:]
 
 
 def process_tile(field='cos', tile='01.01', filters=TILE_FILTERS, fetch_existing=True, cleanup=True, make_catalog=False, clean_flt=True, pixfrac=0.75, make_tile_images=True):
