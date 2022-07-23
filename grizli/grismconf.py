@@ -961,9 +961,10 @@ def load_grism_config(conf_file):
         conf = aXeConf(conf_file)
         conf.get_beams()
     
-    # hack to remove GAIN correction from niriss
+    # Preliminary hacks for on-sky NIRISS
     if 'GR150' in conf_file:
-        hack_niriss = 1./1.8
+        hack_niriss = 1./1.8 * 1.1
+        
         msg = f"""
  ! Scale NIRISS sensitivity by {hack_niriss:.3f} to hack gain correction
  ! and match GLASS MIRAGE simulations. Sensitivity will be updated when
@@ -974,6 +975,30 @@ def load_grism_config(conf_file):
         for b in conf.sens:
             conf.sens[b]['SENSITIVITY'] *= hack_niriss
             conf.sens[b]['ERROR'] *= hack_niriss
-    
+        
+        if 'F115W' in conf_file:
+            _w = conf.sens['A']['WAVELENGTH']
+            _w0 = (_w*conf.sens['A']['SENSITIVITY']).sum()
+            _w0 /=  conf.sens['A']['SENSITIVITY'].sum()
+            slope = 1.05 + 0.2 * (_w - _w0)/3000
+            # print('xxx', conf_file, _w0)
+            conf.sens['A']['SENSITIVITY'] *= slope
+        
+        elif 'F150W' in conf_file:
+            conf.sens['A']['SENSITIVITY'] *= 1.08
+            
+        # Grow 0th orders in F200W
+        if 'F200W' in conf_file:
+            msg = f""" ! Scale 0th order (B) by an additional x 1.5"""
+            utils.log_comment(utils.LOGFILE, msg, verbose=True)
+            conf.sens['B']['SENSITIVITY'] *= 1.5
+            conf.sens['B']['ERROR'] *= 1.5
+            
+        # Shift x by 1 px
+        msg = f""" ! Shift NIRISS by 0.5 pix along dispersion direction"""
+        utils.log_comment(utils.LOGFILE, msg, verbose=True)
+        
+        for b in conf.beams:
+            conf.conf[f'DLDP_{b}_0'] -= conf.conf[f'DLDP_{b}_1']*0.5
                 
     return conf
