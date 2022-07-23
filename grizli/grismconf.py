@@ -937,7 +937,7 @@ class TransformGrismconf(object):
             self.conf_dict[f'MMAG_EXTRACT_{beam}'] = 29
 
 
-def load_grism_config(conf_file):
+def load_grism_config(conf_file, warnings=True):
     """Load parameters from an aXe configuration file
 
     Parameters
@@ -970,7 +970,7 @@ def load_grism_config(conf_file):
  ! and match GLASS MIRAGE simulations. Sensitivity will be updated when
  ! on-sky data available
  """
-        utils.log_comment(utils.LOGFILE, msg, verbose=True)
+        utils.log_comment(utils.LOGFILE, msg, verbose=warnings)
         
         for b in conf.sens:
             conf.sens[b]['SENSITIVITY'] *= hack_niriss
@@ -987,16 +987,16 @@ def load_grism_config(conf_file):
         elif 'F150W' in conf_file:
             conf.sens['A']['SENSITIVITY'] *= 1.08
             
-        # Grow 0th orders in F200W
-        if 'F200W' in conf_file:
+        # Grow 0th orders in F150W,F200W
+        if ('F150W' in conf_file) | ('F200W' in conf_file):
             msg = f""" ! Scale 0th order (B) by an additional x 1.5"""
-            utils.log_comment(utils.LOGFILE, msg, verbose=True)
+            utils.log_comment(utils.LOGFILE, msg, verbose=warnings)
             conf.sens['B']['SENSITIVITY'] *= 1.5
             conf.sens['B']['ERROR'] *= 1.5
             
         # Shift x by 1 px
         msg = f""" ! Shift NIRISS by 0.5 pix along dispersion direction"""
-        utils.log_comment(utils.LOGFILE, msg, verbose=True)
+        utils.log_comment(utils.LOGFILE, msg, verbose=warnings)
         
         for b in conf.beams:
             conf.conf[f'DLDP_{b}_0'] -= conf.conf[f'DLDP_{b}_1']*0.5
