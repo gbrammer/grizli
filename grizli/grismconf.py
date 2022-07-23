@@ -993,7 +993,13 @@ def load_grism_config(conf_file, warnings=True):
             utils.log_comment(utils.LOGFILE, msg, verbose=warnings)
             conf.sens['B']['SENSITIVITY'] *= 1.5
             conf.sens['B']['ERROR'] *= 1.5
-            
+        
+        # Another shift from 0723, 2744
+        if ('GR150C.F200W' in conf_file):
+            for b in conf.beams:
+                conf.conf[f'DYDX_{b}_0'][0] -= 0.5
+                conf.conf[f'DLDP_{b}_0'] -= conf.conf[f'DLDP_{b}_1']*0.5
+        
         # Shift x by 1 px
         msg = f""" ! Shift NIRISS by 0.5 pix along dispersion direction"""
         utils.log_comment(utils.LOGFILE, msg, verbose=warnings)
