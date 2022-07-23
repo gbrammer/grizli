@@ -1832,7 +1832,7 @@ def preprocess(field_root='j142724+334246',  HOME_PATH='/Volumes/Pegasus/Grizli/
 
         radec = None
         
-        print('xxxxxx', master_radec, radec)
+        #print('xxxxxx', master_radec, radec)
         
         if master_radec is not None:
             radec = master_radec
@@ -1843,7 +1843,7 @@ def preprocess(field_root='j142724+334246',  HOME_PATH='/Volumes/Pegasus/Grizli/
                 # if radec is None:
                 #     master_radec = None
         
-        print('yyyyyy', master_radec, radec)
+        #print('yyyyyy', master_radec, radec)
               
         if radec is None:
             radec_files = glob.glob('*cat.radec')
