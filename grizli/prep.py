@@ -4809,6 +4809,80 @@ def match_direct_grism_wcs(direct={}, grism={}, get_fresh_flt=True,
         im.flush()
 
 
+def get_jwst_wfssbkg_file(file, valid_flat=[0.6, 1.3], make_figure=False):
+    """
+    Divide flat-field from NIRISS wfssbkg file
+    
+    Parameters
+    ----------
+    file : str
+        Exposure filename
+    
+    valid_flat : [float,float]
+        Range of valid files in the flat-field reference
+        
+    Returns
+    -------
+    bkg_file : str
+        Path to ``wfssbkg`` file, which may have been corrected by dividing by
+        the flat for the given CTX
+        
+    """
+    from jwst.wfss_contam import WfssContamStep
+    from jwst.flatfield import FlatFieldStep
+    
+    bkg_file = WfssContamStep().get_reference_file(file, 'wfssbkg')
+    
+    # Not a FITS file?  e.g., N/A for imaging exposures
+    if 'fits' not in bkg_file:
+        return bkg_file
+    
+    _im = pyfits.open(file)
+    
+    # Only run for NIRISS, seems like NIRCam provides wfssbkg without
+    # the flat?
+    if _im[0].header['INSTRUME'] != 'NIRISS':
+        return bkg_file
+
+    flat_file = FlatFieldStep().get_reference_file(file, 'flat')
+    
+    wf = pyfits.open(bkg_file, mode='update')
+    key = f"{wf[0].header['FILTER']} {wf[0].header['PUPIL']}"
+        
+    if 'FIXFLAT' in wf[0].header:
+        msg = f'Flat {flat_file} already removed from wfssbkg file'
+        msg += f' {bkg_file}'
+        utils.log_comment(utils.LOGFILE, msg, verbose=True)
+        wf.close()
+        return bkg_file
+    else:
+        msg = f'Divide flat {flat_file} from wfssbkg file {bkg_file}'
+        utils.log_comment(utils.LOGFILE, msg, verbose=True)
+
+    fl = pyfits.open(flat_file)
+
+    fix = (wf[1].data - 0.) / (fl[1].data**1)
+    bad = (fl[1].data < valid_flat[0]) | (fl[1].data > valid_flat[1])
+
+    fix /= np.nanmedian(fix)
+    bad |= ~np.isfinite(fix)
+    fix[bad] = 1
+    
+    wf[0].header['FIXFLAT'] = True
+    wf[0].header['FLATFILE'] = (flat_file,
+                                'Flat-field file divided from CRDS file')
+    wf[1].data = fix
+    wf.flush()
+    
+    if make_figure:
+        fig, ax = plt.subplots(1,1,figsize=(8,8))
+        ax.imshow(fix, vmin=0.9, vmax=1.1, origin='lower')
+        ax.text(0.1, 0.1, key,
+            transform=ax.transAxes)
+
+    return bkg_file
+
+
 def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext=1, sky_iter=10, iter_atol=1.e-4, use_spline=True, NXSPL=50):
     """Subtract sky background from grism exposures
 
@@ -4864,10 +4938,13 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
     elif len(grism_element.split('-')) > 1:
         # JWST grism_element like F115W-GR150R
         #(grism_element == 'GR150C') & (pupil == 'F115W'):
-        from jwst.wfss_contam import WfssContamStep
+        # from jwst.wfss_contam import WfssContamStep
+        # 
+        # wfss_ref =  WfssContamStep().get_reference_file(grism['files'][0], 
+        #                                                 'wfssbkg')
         
-        wfss_ref =  WfssContamStep().get_reference_file(grism['files'][0], 
-                                                        'wfssbkg')
+        # Get the background file, perhaps after correcting it for the flat
+        wfss_ref = get_jwst_wfssbkg_file(grism['files'][0])
         
         # GRISM_NIRCAM
         if 'GRISM' in grism_element:
@@ -4885,7 +4962,7 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
                 wfss_ref = _bgfile
                 
             # TBD
-            
+                
         bg_fixed = [wfss_ref]
                                                         
         #bg_fixed = ['jwst_niriss_wfssbkg_0002.fits'] # bg_fixed should be normalized background with flat divided out
