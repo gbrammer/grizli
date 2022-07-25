@@ -5969,7 +5969,7 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, m
             if isACS | isWFPC2:
                 bits = 64+32
             elif isJWST:
-                bits = 1
+                bits = 1+4
             else:
                 bits = 576
 
