@@ -152,18 +152,18 @@ class aXeConf():
         """
         # number of coefficients for a given polynomial order
         # 1:1, 2:3, 3:6, 4:10, order:order*(order+1)/2
-        if isinstance(coeffs, float):
-            order = 1
-        else:
+        if hasattr(coeffs, '__len__'):
             order = int(-1+np.sqrt(1+8*len(coeffs))) // 2
+        else:
+            order = 1
 
         # Build polynomial terms array
         # $a = a_0+a_1x_i+a_2y_i+a_3x_i^2+a_4x_iy_i+a_5yi^2+$ ...
         xy = []
-        for p in range(order):
-            for px in range(p+1):
-                # print 'x**%d y**%d' %(p-px, px)
-                xy.append(xi**(p-px)*yi**(px))
+        for _p in range(order):
+            for _py in range(_p+1):
+                # print 'x**%d y**%d' %(p-py, px)
+                xy.append(xi**(_p - _py) * yi**(_py))
 
         # Evaluate the polynomial, allowing for N-dimensional inputs
         a = np.sum((np.array(xy).T*coeffs).T, axis=0)
@@ -280,8 +280,10 @@ class aXeConf():
         NORDER = self.orders[beam]+1
 
         xi, yi = x-self.xoff, y-self.yoff
-        xoff_beam = self.field_dependent(xi, yi, self.conf['XOFF_{0}'.format(beam)])
-        yoff_beam = self.field_dependent(xi, yi, self.conf['YOFF_{0}'.format(beam)])
+        xoff_beam = self.field_dependent(xi, yi, 
+                                         self.conf['XOFF_{0}'.format(beam)])
+        yoff_beam = self.field_dependent(xi, yi, 
+                                         self.conf['YOFF_{0}'.format(beam)])
 
         # y offset of trace (DYDX)
         dydx = np.zeros(NORDER)  # 0 #+1.e-80
@@ -530,12 +532,24 @@ def get_config_filename(instrume='WFC3', filter='F140W',
                                  'CONF/{0}.{1}.V4.32.conf'.format(grism, 'F140W'))
 
     if instrume == 'NIRISS':
-        conf_file = os.path.join(GRIZLI_PATH,
-                                 'CONF/{0}.{1}.conf'.format(grism, filter))
-        if not os.path.exists(conf_file):
-            print('CONF/{0}.{1}.conf'.format(grism, filter))
-            conf_file = os.path.join(GRIZLI_PATH,
-                                 'CONF/NIRISS.{0}.conf'.format(filter))
+        
+        conf_files = []
+        conf_files.append(os.path.join(GRIZLI_PATH,
+                            'CONF/{0}.{1}.220725.conf'.format(grism, filter)))
+        conf_files.append(os.path.join(GRIZLI_PATH,
+                            'CONF/{0}.{1}.conf'.format(grism, filter)))
+        conf_files.append(os.path.join(GRIZLI_PATH,
+                             'CONF/NIRISS.{0}.conf'.format(filter)))
+        
+        for conf_file in conf_files:
+            if os.path.exists(conf_file):
+                #print(f'NIRISS: {conf_file}')
+                break
+                
+        # if not os.path.exists(conf_file):
+        #     print('CONF/{0}.{1}.conf'.format(grism, filter))
+        #     conf_file = os.path.join(GRIZLI_PATH,
+        #                          'CONF/NIRISS.{0}.conf'.format(filter))
 
     # if instrume == 'NIRCam':
     #     conf_file = os.path.join(GRIZLI_PATH,
@@ -970,6 +984,7 @@ def load_grism_config(conf_file, warnings=True):
  ! and match GLASS MIRAGE simulations. Sensitivity will be updated when
  ! on-sky data available
  """
+        msg = f' ! Scale NIRISS sensitivity by {hack_niriss:.3f} prelim flux correction'
         utils.log_comment(utils.LOGFILE, msg, verbose=warnings)
         
         for b in conf.sens:
@@ -977,17 +992,30 @@ def load_grism_config(conf_file, warnings=True):
             conf.sens[b]['ERROR'] *= hack_niriss
         
         if 'F115W' in conf_file:
-            _w = conf.sens['A']['WAVELENGTH']
-            _w0 = (_w*conf.sens['A']['SENSITIVITY']).sum()
-            _w0 /=  conf.sens['A']['SENSITIVITY'].sum()
-            slope = 1.05 + 0.2 * (_w - _w0)/3000
-            # print('xxx', conf_file, _w0)
-            conf.sens['A']['SENSITIVITY'] *= slope
+            pass
+            # msg = f""" !! Shift F115W along dispersion"""
+            # utils.log_comment(utils.LOGFILE, msg, verbose=warnings)
+            # for b in conf.beams:
+            #     #conf.conf[f'DYDX_{b}_0'][0] += 0.25
+            #     conf.conf[f'DLDP_{b}_0'] -= conf.conf[f'DLDP_{b}_1']*0.5
+        else:
+            msg = f""" !! Shift {os.path.basename(conf_file)} along dispersion"""
+            utils.log_comment(utils.LOGFILE, msg, verbose=warnings)
+            for b in conf.beams:                    
+                #conf.conf[f'DYDX_{b}_0'][0] += 0.25
+                conf.conf[f'DLDP_{b}_0'] += conf.conf[f'DLDP_{b}_1']*0.5
+            
+        #     _w = conf.sens['A']['WAVELENGTH']
+        #     _w0 = (_w*conf.sens['A']['SENSITIVITY']).sum()
+        #     _w0 /=  conf.sens['A']['SENSITIVITY'].sum()
+        #     slope = 1.05 + 0.2 * (_w - _w0)/3000
+        #     # print('xxx', conf_file, _w0)
+        #     conf.sens['A']['SENSITIVITY'] *= slope
         
-        elif 'F150W' in conf_file:
+        if 'F150W' in conf_file:
             conf.sens['A']['SENSITIVITY'] *= 1.08
             
-        # Grow 0th orders in F150W,F200W
+        # Scale 0th orders in F150W,F200W
         if ('F150W' in conf_file) | ('F200W' in conf_file):
             msg = f""" ! Scale 0th order (B) by an additional x 1.5"""
             utils.log_comment(utils.LOGFILE, msg, verbose=warnings)
@@ -995,18 +1023,19 @@ def load_grism_config(conf_file, warnings=True):
             conf.sens['B']['ERROR'] *= 1.5
         
         # Another shift from 0723, 2744
-        if ('GR150C.F200W' in conf_file):
-            msg = f""" ! Extra shift for GR150C.F200W"""
-            utils.log_comment(utils.LOGFILE, msg, verbose=warnings)
-            for b in conf.beams:
-                conf.conf[f'DYDX_{b}_0'][0] -= 0.5
-                conf.conf[f'DLDP_{b}_0'] -= conf.conf[f'DLDP_{b}_1']*0.5
+        # if ('GR150C.F200W' in conf_file):
+        #     msg = f""" !! Extra shift for GR150C.F200W"""
+        #     utils.log_comment(utils.LOGFILE, msg, verbose=warnings)
+        #     for b in conf.beams:
+        #         pass
+        #         #conf.conf[f'DYDX_{b}_0'][0] += 0.25
+        #         # conf.conf[f'DLDP_{b}_0'] -= conf.conf[f'DLDP_{b}_1']*0.5
         
         # Shift x by 1 px
-        msg = f""" ! Shift NIRISS by 0.5 pix along dispersion direction"""
-        utils.log_comment(utils.LOGFILE, msg, verbose=warnings)
-        
-        for b in conf.beams:
-            conf.conf[f'DLDP_{b}_0'] -= conf.conf[f'DLDP_{b}_1']*0.5
+        # msg = f""" ! Shift NIRISS by 0.5 pix along dispersion direction"""
+        # utils.log_comment(utils.LOGFILE, msg, verbose=warnings)
+        # 
+        # for b in conf.beams:
+        #     conf.conf[f'DLDP_{b}_0'] -= conf.conf[f'DLDP_{b}_1']*0.5
                 
     return conf

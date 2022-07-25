@@ -6084,7 +6084,8 @@ def fetch_config_files(get_acs=False, get_sky=True, get_stars=True, get_epsf=Tru
                     f'{BASEURL}/WFC3.IR.G141.WD.V4.32.tar.gz']
 
     if get_jwst:
-        tarfiles += [f'{BASEURL}/jwst-grism-conf.tar.gz']
+        tarfiles += [f'{BASEURL}/jwst-grism-conf.tar.gz', 
+                     f'{BASEURL}/niriss.conf.220725.tar.gz']
     
     if get_sky:
         ftpdir = BASEURL
