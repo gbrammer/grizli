@@ -330,7 +330,8 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
     if len(glob.glob(f'{root}*.lwrgb.png')) == 0:
         split_tiles(root, ref_tile=ref_tile, 
                     filters=[f.lower() for f in ['F277W-CLEAR','F356W-CLEAR',
-                          'F410M-CLEAR','F444W-CLEAR']],
+                          'F360M-CLEAR','F410M-CLEAR','F444W-CLEAR',
+                          'F480M-CLEAR']],
                     zoom_levels=zoom_levels,
                     optical=True, suffix='.lwrgb', xsize=6, scl=4,
                     force=force, rgb_scl=[1,1,1], rgb_min=-0.018)
@@ -351,6 +352,36 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
 
         plt.close('all')
     
+    if 'dracoii' in root:
+        
+        split_tiles(root, ref_tile=ref_tile, 
+                    filters=[f.lower() for f in ['F090W-CLEAR',
+                             'F150W-CLEAR']],
+                    zoom_levels=zoom_levels,
+                    optical=True, suffix='.swrgb', xsize=6, scl=4,
+                    force=force, rgb_scl=[1,1,1], rgb_min=-0.018)
+
+        plt.close('all')
+
+        split_tiles(root, ref_tile=ref_tile, 
+                    filters=[f.lower() for f in ['F360M-CLEAR',
+                             'F480M-CLEAR']],
+                    zoom_levels=zoom_levels,
+                    optical=True, suffix='.lwrgb', xsize=6, scl=4,
+                    force=force, rgb_scl=[1,1,1], rgb_min=-0.018)
+
+        plt.close('all')
+
+        split_tiles(root, ref_tile=ref_tile, 
+                    filters=[f.lower() for f in ['F090W-CLEAR','F150W-CLEAR',
+                                                 'F480M-CLEAR',
+                                                ]],
+                    zoom_levels=zoom_levels,
+                    optical=True, suffix='.ncrgb', xsize=6, scl=4,
+                    force=force, rgb_scl=[1.4, 0.6, 0.35], rgb_min=-0.018)
+
+        plt.close('all')
+        
     if root.startswith('cos'):
         if len(glob.glob(f'{root}*.vi.png')) == 0:
             split_tiles(root, ref_tile=ref_tile, 
