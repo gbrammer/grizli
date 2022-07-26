@@ -194,6 +194,17 @@ def get_flt_info(files=[], columns=['FILE', 'FILTER', 'PUPIL', 'INSTRUME', 'DETE
         data.append(line)
 
     tab = Table(rows=data, names=has_columns)
+    
+    if 'TARGNAME' in tab.colnames:
+        miss = tab['TARGNAME'] == ''
+        targs = [t.replace(' ', '-') for t in tab['TARGNAME']]
+        
+        if miss.sum() > 0:
+            for i in np.where(miss)[0]:
+                targs[i] = 'xxx'
+        
+        tab['TARGNAME'] = targs
+            
     return tab
 
 
