@@ -201,7 +201,7 @@ def get_flt_info(files=[], columns=['FILE', 'FILTER', 'PUPIL', 'INSTRUME', 'DETE
         
         if miss.sum() > 0:
             for i in np.where(miss)[0]:
-                targs[i] = 'xxx'
+                targs[i] = 'indef'
         
         tab['TARGNAME'] = targs
             
