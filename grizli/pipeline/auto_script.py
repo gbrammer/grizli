@@ -3792,7 +3792,7 @@ def update_wcs_headers_with_fine(field_root, backup=True):
                                                 xyscale=trans[j, :])
 
 
-def make_reference_wcs(info, files=None, output='mosaic_wcs-ref.fits', filters=['G800L', 'G102', 'G141','GR150C', 'GR150R'], pad_reference=90, pixel_scale=None, get_hdu=True):
+def make_reference_wcs(info, files=None, output='mosaic_wcs-ref.fits', filters=['G800L', 'G102', 'G141','GR150C', 'GR150R'], force_wcs=None, pad_reference=90, pixel_scale=None, get_hdu=True):
     """
     Make a reference image WCS based on the grism exposures
 
@@ -3807,7 +3807,10 @@ def make_reference_wcs(info, files=None, output='mosaic_wcs-ref.fits', filters=[
     filters : list or None
         List of filters to consider for the output mosaic.  If None, then
         use all exposures in the `info` list.
-
+    
+    force_wcs : `~astropy.wcs.WCS` or None
+        Explicit WCS to use, rather than deriving from a list of files
+        
     pad_reference : float
         Image padding, in `~astropy.units.arcsec`.
 
@@ -3826,6 +3829,16 @@ def make_reference_wcs(info, files=None, output='mosaic_wcs-ref.fits', filters=[
 
 
     """
+    
+    if isinstance(force_wcs, pywcs.WCS):
+        _h = utils.to_header(force_wcs)
+        _data = np.zeros((_h['NAXIS2'], _h['NAXIS1']), dtype=np.int16)
+        ref_hdu = pyfits.PrimaryHDU(header=_h, data=_data)
+        if output is not None:
+            ref_hdu.writeto(output, overwrite=True, output_verify='fix')
+        
+        return ref_hdu
+        
     if filters is not None:
         use = utils.column_values_in_list(info['FILTER'], filters)
         if use.sum() == 0:
@@ -3841,7 +3854,7 @@ def make_reference_wcs(info, files=None, output='mosaic_wcs-ref.fits', filters=[
     if pixel_scale is None:
         # Auto determine pixel size, 0.03" pixels if only ACS, otherwise 0.06
         any_grism = utils.column_values_in_list(info['FILTER'],
-                                                  ['G800L', 'G102', 'G141', 'GR150C', 'GR150R'])
+                            ['G800L', 'G102', 'G141', 'GR150C', 'GR150R'])
         acs_grism = (info['FILTER'] == 'G800L')
         only_acs = list(np.unique(info['INSTRUME'])) == ['ACS']
         
@@ -3912,8 +3925,13 @@ def drizzle_overlaps(field_root, filters=['F098M', 'F105W', 'F110W', 'F115W', 'F
         msg = (visit)                   
         utils.log_comment(utils.LOGFILE, msg, show_date=True,
                               verbose=True)
+        
         # Visit failed for some reason
-        if (visit['product']+'.wcs_failed' in failed_list) | (visit['product']+'.failed' in failed_list) | (visit['product'] in skip_products):
+        _failed = (visit['product']+'.wcs_failed' in failed_list)
+        _failed |= (visit['product']+'.failed' in failed_list)
+        _failed |= (visit['product'] in skip_products)
+        
+        if _failed:
             msg = ('visit failed')                   
             utils.log_comment(utils.LOGFILE, msg, show_date=True,
                               verbose=True)
@@ -4161,7 +4179,7 @@ def make_filter_combinations(root, weight_fnu=True, filter_combinations=FILTER_C
             pyfits.PrimaryHDU(data=wht, header=head[band]).writeto(output_sci[band].replace('_sci', '_wht'), overwrite=True, output_verify='fix')
 
 
-def make_combined_mosaics(root, fix_stars=False, mask_spikes=False, skip_single_optical_visits=True, ref_wcs=None, mosaic_args=args['mosaic_args'], mosaic_driz_cr_type=0, mosaic_drizzle_args=args['mosaic_drizzle_args'], **kwargs):
+def make_combined_mosaics(root, fix_stars=False, mask_spikes=False, skip_single_optical_visits=True, ir_wcsref_file=None, ir_wcs=None, mosaic_args=args['mosaic_args'], mosaic_driz_cr_type=0, mosaic_drizzle_args=args['mosaic_drizzle_args'], **kwargs):
     """
     Drizzle combined mosaics
 
@@ -4172,47 +4190,28 @@ def make_combined_mosaics(root, fix_stars=False, mask_spikes=False, skip_single_
         (mosaic_driz_cr_type & 8) : flag CRs on OPT filter combinations
     """
 
-    # if False:
-    #     # j = 125+110w
-    #     auto_script.field_rgb('j013804m2156', HOME_PATH=None, show_ir=True, filters=['f160w','j','f105w'], xsize=16, rgb_scl=[1, 0.85, 1], rgb_min=-0.003)
-
-    #visits_file = '{0}_visits.npy'.format(root)
-    #visits, groups, info = np.load(visits_file, allow_pickle=True)
+    # Load visits info
     visits, groups, info = load_visit_info(root, verbose=False)
 
     # Mosaic WCS
-    if ref_wcs is None:
-        wcs_ref_file = '{0}_wcs-ref.fits'.format(root)
-        if (not os.path.exists(wcs_ref_file)):
-            make_reference_wcs(info, output=wcs_ref_file, get_hdu=True,
+    if ir_wcsref_file is None:
+        ir_wcsref_file = f'{root}_wcs-ref.fits'
+        
+    if (not os.path.exists(ir_wcsref_file)):
+        make_reference_wcs(info, output=ir_wcsref_file, get_hdu=True,
+                           force_wcs=ir_wcs,
                            **mosaic_args['wcs_params'])
-    else:
-        wcs_ref_file = None
 
     mosaic_pixfrac = mosaic_args['mosaic_pixfrac']
     combine_all_filters = mosaic_args['combine_all_filters']
 
-    # # Combine all available filters?
-    # if combine_all_filters:
-    #     all_filters = mosaic_args['ir_filters'] + mosaic_args['optical_filters']
-    #     auto_script.drizzle_overlaps(root,
-    #                              filters=all_filters,
-    #                              min_nexp=1, pixfrac=mosaic_pixfrac,
-    #                              make_combined=True,
-    #                              ref_image=wcs_ref_file,
-    #                              drizzle_filters=False)
-
-    # IR filters
-    # if 'fix_stars' in visit_prep_args:
-    #     fix_stars = visit_prep_args['fix_stars']
-    # else:
-    #     fix_stars = False
-
-    drizzle_overlaps(root, filters=mosaic_args['ir_filters'], min_nexp=1,
+    drizzle_overlaps(root,
+                     filters=mosaic_args['ir_filters'],
+                     min_nexp=1,
                      pixfrac=mosaic_pixfrac,
                      make_combined=False,
-                     ref_image=wcs_ref_file,
-                     ref_wcs=ref_wcs,
+                     ref_image=ir_wcsref_file,
+                     ref_wcs=None,
                      include_saturated=fix_stars,
                      multi_driz_cr=(mosaic_driz_cr_type & 1) > 0,
                      filter_driz_cr=(mosaic_driz_cr_type & 2) > 0, 
@@ -4273,12 +4272,13 @@ def make_combined_mosaics(root, fix_stars=False, mask_spikes=False, skip_single_
                              min_nexp=1,
                              pixfrac=mosaic_pixfrac,
                              make_combined=False,
-                             ref_image=wcs_ref_file,
+                             ref_image=ir_wcsref_file,
+                             ref_wcs=None,
                              include_saturated=fix_stars, 
                              **mosaic_drizzle_args)
 
             make_filter_combinations(root, weight_fnu=True, min_count=1,
-                        filter_combinations={'ir': IR_M_FILTERS+IR_W_FILTERS})
+                        filter_combinations={'ir':IR_M_FILTERS+IR_W_FILTERS})
 
     # More IR filter combinations for mosaics
     if False:
@@ -4296,26 +4296,20 @@ def make_combined_mosaics(root, fix_stars=False, mask_spikes=False, skip_single_
         # the IR mosaics.  The optical mosaics can be 2x2 block averaged
         # to match the IR images.
 
-        if ref_wcs is None:
-            ref = pyfits.open('{0}_wcs-ref.fits'.format(root))
-            if len(ref) > 1:
-                ref_wcs = pywcs.WCS(ref[1].header)
-            else:
-                ref_wcs = pywcs.WCS(ref[0].header)
-            
-        optical_wcs = utils.half_pixel_scale(ref_wcs)
-        h = utils.to_header(optical_wcs)
-        
-        wcs_ref_optical = '{0}-opt_wcs-ref.fits'.format(root)
-        data = np.zeros((h['NAXIS2'], h['NAXIS1']), dtype=np.int16)
-        pyfits.writeto(wcs_ref_optical, header=h, data=data, overwrite=True)
-    else:
-        if ref_wcs is None:
-            wcs_ref_optical = wcs_ref_file
-            optical_wcs = None
+        ref = pyfits.open(ir_wcsref_file)
+        if len(ref) > 1:
+            _ir_wcs = pywcs.WCS(ref[1].header)
         else:
-            wcs_ref_optical = None
-            optical_wcs = ref_wcs
+            _ir_wcs = pywcs.WCS(ref[0].header)
+        
+        opt_wcs = utils.half_pixel_scale(_ir_wcs)
+        h = utils.to_header(opt_wcs)
+        
+        opt_wcsref_file = f'{root}-opt_wcs-ref.fits'
+        data = np.zeros((h['NAXIS2'], h['NAXIS1']), dtype=np.int16)
+        pyfits.writeto(opt_wcsref_file, header=h, data=data, overwrite=True)
+    else:
+        opt_wcsref_file = ir_wcsref_file
             
     if len(mosaics) == 0:
         # Call a single combined mosaic "ir" for detection catalogs, etc.
@@ -4324,18 +4318,20 @@ def make_combined_mosaics(root, fix_stars=False, mask_spikes=False, skip_single_
         # Make a separate optical combined image
         make_combined_label = 'opt'
 
-    drizzle_overlaps(root, filters=mosaic_args['optical_filters'],
-        pixfrac=mosaic_pixfrac, make_combined=False,
-        ref_image=wcs_ref_optical,
-        ref_wcs=optical_wcs,
-        min_nexp=1+skip_single_optical_visits*1,
-        multi_driz_cr=(mosaic_driz_cr_type & 4) > 0,
-        filter_driz_cr=(mosaic_driz_cr_type & 8) > 0,
-        **mosaic_drizzle_args)
+    drizzle_overlaps(root,
+                     filters=mosaic_args['optical_filters'],
+                     pixfrac=mosaic_pixfrac,
+                     make_combined=False,
+                     ref_image=opt_wcsref_file,
+                     ref_wcs=None,
+                     min_nexp=1+skip_single_optical_visits*1,
+                     multi_driz_cr=(mosaic_driz_cr_type & 4) > 0,
+                     filter_driz_cr=(mosaic_driz_cr_type & 8) > 0,
+                     **mosaic_drizzle_args)
 
     make_filter_combinations(root, weight_fnu=True, min_count=1,
-        filter_combinations={make_combined_label:
-                             OPT_M_FILTERS+OPT_W_FILTERS})
+                            filter_combinations={make_combined_label:
+                                                 OPT_M_FILTERS+OPT_W_FILTERS})
 
     # Fill IR filter mosaics with scaled combined data so they can be used
     # as grism reference
@@ -4350,9 +4346,10 @@ def make_combined_mosaics(root, fix_stars=False, mask_spikes=False, skip_single_
             fill_filter_mosaics(root)
 
     # Remove the WCS reference files
-    for file in [wcs_ref_optical, wcs_ref_file]:
-        if os.path.exists(file):
-            os.remove(file)
+    for file in [opt_wcsref_file, ir_wcsref_file]:
+        if file is not None:
+            if os.path.exists(file):
+                os.remove(file)
 
 
 def make_mosaic_footprints(field_root):
