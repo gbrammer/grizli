@@ -41,6 +41,8 @@ class DrizzlePSF(object):
             else:
                 if flt_files is None:
                     info = self._get_wcs_from_hdrtab(driz_image)
+                    if info is None:
+                        info = self._get_wcs_from_csv(driz_image)
                 else:
                     info = self._get_flt_wcs(flt_files, 
                                              full_flt_weight=full_flt_weight)
@@ -137,6 +139,50 @@ class DrizzlePSF(object):
 
         return flt_keys, wcs, footprint
 
+
+    @staticmethod
+    def _get_wcs_from_csv(drz_file):
+        """
+        Read the attached CSV file that contains exposure WCS info
+        """
+        import glob
+
+        csv_file = drz_file.split('_drz_sci')[0].split('_drc_sci')[0]
+        csv_file += '_wcs.csv'
+        
+        if  not os.path.exists(csv_file):
+            print(f'No WCS CSV file {csv_file} found for {drz_file}')
+            return None
+        else:
+            print(f'Get exposure WCS from {csv_file}')
+            
+        csv = utils.read_catalog(csv_file)
+        flt_keys = []
+        wcs = {}
+        footprint = {}
+        
+        for row in csv:
+            key = row['file'], row['ext']
+            _h = pyfits.Header()
+            for c in row.colnames:
+                _h[c] = row[c]
+            
+            flt_keys.append(key)
+            wcs[key] = pywcs.WCS(_h, relax=True)
+            
+            wcs[key].pscale = utils.get_wcs_pscale(wcs[key])
+            
+            if 'EXPTIME' in _h:
+                wcs[key].expweight = _h['EXPTIME']
+            else:
+                wcs[key].expweight = 1
+            
+            sr = utils.SRegion(wcs[key])
+            footprint[key] = sr.shapely[0]
+            
+        return flt_keys, wcs, footprint
+
+
     @staticmethod
     def _get_wcs_from_hdrtab(drz_file):
         """
@@ -144,6 +190,7 @@ class DrizzlePSF(object):
         extension of an AstroDrizzle output file
         """
         from shapely.geometry import Polygon, Point
+        
         drz = pyfits.open(drz_file)
         if 'HDRTAB' not in drz:
             print('No HDRTAB extension found in {0}'.format(drz_file))
@@ -320,11 +367,11 @@ class DrizzlePSF(object):
         print(params, chi2)
         return chi2
 
-    def get_psf(self, ra=53.06967306, dec=-27.72333015, filter='F140W', pixfrac=0.1, kernel='point', verbose=True, wcs_slice=None, get_extended=True, get_weight=False, ds9=None):
+    def get_psf(self, ra=53.06967306, dec=-27.72333015, filter='F140W', pixfrac=0.1, kernel='point', verbose=True, wcs_slice=None, get_extended=True, get_weight=False, ds9=None, npix=13):
         from drizzlepac import adrizzle
         from shapely.geometry import Polygon, Point
 
-        pix = np.arange(-13, 14)
+        pix = np.arange(-npix, npix+1)
 
         #wcs_slice = self.get_driz_cutout(ra=ra, dec=dec)
         if wcs_slice is None:
@@ -363,7 +410,8 @@ class DrizzlePSF(object):
                 else:
                     extended_data = None
 
-                psf = self.ePSF.eval_ePSF(psf_xy, xp, yp, extended_data=extended_data)
+                psf = self.ePSF.eval_ePSF(psf_xy, xp, yp, 
+                                          extended_data=extended_data)
 
                 # if get_weight:
                 #     fltim = pyfits.open(file)
@@ -372,14 +420,15 @@ class DrizzlePSF(object):
                 #     flt_weight = 1
                 flt_weight = self.wcs[key].expweight
 
-                N = 13
+                N = npix
                 slx = slice(xyp[0]-N, xyp[0]+N+1)
                 sly = slice(xyp[1]-N, xyp[1]+N+1)
                 
-                if hasattr(flt_weight, 'shape'):
-                    wslx = slice(xyp[0]-N+32, xyp[0]+N+1+32)
-                    wsly = slice(xyp[1]-N+32, xyp[1]+N+1+32)
-                    flt_weight = self.wcs[key].expweight[wsly, wslx]
+                if hasattr(flt_weight, 'ndim'):
+                    if flt_weight.ndim == 2:
+                        wslx = slice(xyp[0]-N+32, xyp[0]+N+1+32)
+                        wsly = slice(xyp[1]-N+32, xyp[1]+N+1+32)
+                        flt_weight = self.wcs[key].expweight[wsly, wslx]
                     
                 psf_wcs = model.ImageData.get_slice_wcs(self.wcs[key], 
                                                         slx, sly)
