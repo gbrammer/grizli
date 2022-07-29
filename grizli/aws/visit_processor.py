@@ -1322,7 +1322,7 @@ def make_parent_mosaic(parent='j191436m5928', **kwargs):
     cutout_mosaic(rootname=parent, ra=ra, dec=dec, size=size, **kwargs)
 
 
-def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-27.7910651, size=5*60, filters=['F160W'], ir_scale=0.1, ir_wcs=None, res=None, half_optical=True, kernel='point', pixfrac=0.33, make_figure=True, skip_existing=True, clean_flt=True, gzip_output=True, s3output='s3://grizli-v2/HST/Pipeline/Mosaic/', split_uvis=True, extra_query='', extra_wfc3ir_badpix=True, fix_niriss=True, scale_nanojy=10, **kwargs):
+def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-27.7910651, size=5*60, filters=['F160W'], ir_scale=0.1, ir_wcs=None, res=None, half_optical=True, kernel='point', pixfrac=0.33, make_figure=True, skip_existing=True, clean_flt=True, gzip_output=True, s3output='s3://grizli-v2/HST/Pipeline/Mosaic/', split_uvis=True, extra_query='', extra_wfc3ir_badpix=True, fix_niriss=True, scale_nanojy=10, verbose=True, niriss_ghost_kwargs={}, **kwargs):
     """
     Make mosaic from exposures defined in the exposure database
     
@@ -1389,7 +1389,8 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
             for j in np.where(nis)[0]:
                 file_filters[j] = file_filters[j].replace('-CLEAR','N-CLEAR')
             
-            print('FIX NIRISS', np.unique(file_filters))
+            msg = 'Fix NIRISS: filters=', np.unique(file_filters)
+            utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
             
     uniq_filts = utils.Unique(file_filters, verbose=False)
     
@@ -1453,7 +1454,7 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
             ax.set_xlim(ax.get_xlim()[::-1])
             ax.set_title(visit['product'])
             overlaps.draw_axis_labels(ax=ax)
-            ax.text(0.95, 0.95, f'N={fi.sum()}\nexpt = {expt:.1f}', 
+            ax.text(0.95, 0.95, f'N={un.N}\nexpt = {expt:.1f}', 
                     ha='right', va='top', transform=ax.transAxes)
             
             fig.savefig(visit['product']+'_fp.png')
@@ -1482,7 +1483,9 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
         _ = utils.drizzle_from_visit(visit, visit['reference'], 
                                      pixfrac=pixfrac, 
                                      kernel=kernel, clean=clean_flt, 
-                                     extra_wfc3ir_badpix=extra_wfc3ir_badpix)
+                                     extra_wfc3ir_badpix=extra_wfc3ir_badpix,
+                                     verbose=verbose,
+                                     niriss_ghost_kwargs=niriss_ghost_kwargs)
                              
         outsci, outwht, header, flist, wcs_tab = _
         
@@ -1501,7 +1504,9 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
             
         if scale_nanojy is not None:
             to_njy = scale_nanojy/(header['PHOTFNU']*1.e9)
-            print(f'Scale PHOTFNU x {to_njy:.3f} to {scale_nanojy:.1f} nJy')
+            msg = f'Scale PHOTFNU x {to_njy:.3f} to {scale_nanojy:.1f} nJy'
+            utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+            
             header['PHOTFNU'] *= to_njy
             header['PHOTFLAM'] *= to_njy
             header['BUNIT'] = f'{scale_nanojy:.1f}*nanoJansky'

@@ -5263,9 +5263,77 @@ def fetch_s3_url(url='s3://bucket/path/to/file.txt', file_func=lambda x : os.pat
     return local_file, status
 
 
+def niriss_ghost_mask(im, init_thresh=0.05, init_sigma=3, final_thresh=0.01, final_sigma=3, erosions=0, dilations=9, verbose=True, **kwargs):
+    """
+    Make a mask for NIRISS imaging ghosts
+    
+    See also Martel. JWST-STScI-004877 and
+    https://github.com/spacetelescope/niriss_ghost
+    
+    Here
+    """
+    import scipy.ndimage as nd
+    
+    if im[0].header['PUPIL'] not in ['F115W','F150W','F200W']:
+        return False
+    
+    if im[0].header['PUPIL'] == 'F115W':
+        xgap, ygap = 1156, 927
+    elif im[0].header['PUPIL'] == 'F115W':
+        xgap, ygap = 1162, 938
+    else:
+        xgap, ygap = 1156, 944-2
+        
+    yp, xp = np.indices((2048, 2048))
+    
+    yg = 2*(ygap-1) - yp
+    xg = 2*(xgap-1) - xp
+
+    dx = (xp - xgap)
+    dy = (yp - ygap)
+
+    in_img = (xg >= 0) & (xg < 2048)
+    in_img &= (yg >= 0) & (yg < 2048)
+
+    in_img &= np.abs(dx) < 400
+    in_img &= np.abs(dy) < 400
+    
+    if 'MDRIZSKY' in im['SCI'].header:
+        bkg = im['SCI'].header['MDRIZSKY']
+    else:
+        bkg = np.nanmedian(im['SCI'].data[im['DQ'].data == 0])
+        
+    thresh = (im['SCI'].data - bkg)*init_thresh > init_sigma*im['ERR'].data
+    thresh &= in_img
+
+    _reflected = np.zeros_like(im['SCI'].data)
+    for xpi, ypi, xgi, ygi in zip(xp[thresh], yp[thresh],
+                                  xg[thresh], yg[thresh]):
+                                  
+        _reflected[ygi, xgi] = im['SCI'].data[ypi, xpi] - bkg
+
+    ghost_mask = _reflected*final_thresh > final_sigma*im['ERR'].data
+    
+    if erosions > 0:
+        ghost_mask = nd.binary_erosion(ghost_mask, iterations=erosions)
+        
+    ghost_mask = nd.binary_dilation(ghost_mask, iterations=dilations)
+    
+    im[0].header['GHOSTMSK'] = True, 'NIRISS ghost mask applied'
+    im[0].header['GHOSTNPX'] = ghost_mask.sum(), 'Pixels in NIRISS ghost mask'
+    
+    msg = 'NIRISS ghost mask {0} Npix: {1}\n'.format(im[0].header['PUPIL'], 
+                                                    ghost_mask.sum())
+    log_comment(LOGFILE, msg, verbose=verbose)
+    
+    return ghost_mask
+
+
 def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
                        clean=True, include_saturated=True, keep_bits=None,
-                       dryrun=False, skip=None, extra_wfc3ir_badpix=True):
+                       dryrun=False, skip=None, extra_wfc3ir_badpix=True,
+                       verbose=True,
+                       niriss_ghost_kwargs={}):
     """
     Make drizzle mosaic from exposures in a visit dictionary
 
@@ -5319,7 +5387,10 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
     for i in indices:
 
         file = visit['files'][i]
-        print('\n({0:4d}/{1:4d}) Add exposure {2}\n'.format(count+1, NTOTAL, file))
+
+        msg = '\n({0:4d}/{1:4d}) Add exposure {2}\n'
+        msg = msg.format(count+1, NTOTAL, file)
+        log_comment(LOGFILE, msg, verbose=verbose)
 
         if dryrun:
             continue
@@ -5374,8 +5445,16 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
                     bpdata = pyfits.open(bpfile)[0].data
                     bpdata = nd.binary_dilation(bpdata > 0, iterations=2)*1024
                     msg = f'Use extra badpix in {bpfile}'
-                    log_comment(LOGFILE, msg, verbose=True)
+                    log_comment(LOGFILE, msg, verbose=verbose)
             
+            # NIRISS ghost mask
+            if (_inst in ['NIRISS']) & (niriss_ghost_kwargs is not None):
+                if 'verbose' not in niriss_ghost_kwargs:
+                    niriss_ghost_kwargs['verbose'] = verbose
+                
+                _ghost = niriss_ghost_mask(flt, **niriss_ghost_kwargs)
+                bpdata |= _ghost*1024
+                
         elif flt[0].header['DETECTOR'] == 'IR':
             bits = 576
             if extra_wfc3ir_badpix:
@@ -5385,7 +5464,7 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
                     bpdata = pyfits.open(bpfile)[0].data
                     
                 msg = f'Use extra badpix in {bpfile}'
-                log_comment(LOGFILE, msg, verbose=True)
+                log_comment(LOGFILE, msg, verbose=verbose)
         else:
             bits = 64+32
             bpdata = 0
@@ -5397,7 +5476,10 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
             bits |= keep_bits
 
         if 'PHOTFLAM' in keys:
-            print('  0    PHOTFLAM={0:.2e}, scale={1:.1f}'.format(keys['PHOTFLAM'], 1.))
+            msg = '  0    PHOTFLAM={0:.2e}, scale={1:.1f}'
+            msg = msg.format(keys['PHOTFLAM'], 1.)
+            log_comment(LOGFILE, msg, verbose=verbose)
+            
             if ref_photflam is None:
                 ref_photflam = keys['PHOTFLAM']
 
@@ -5410,8 +5492,9 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
                 else:
                     sky = 0
 
-                print('  ext (SCI,{0}), sky={1:.3f}'.format(ext, sky))
-
+                msg = '  ext (SCI,{0}), sky={1:.3f}'.format(ext, sky)
+                log_comment(LOGFILE, msg, verbose=verbose)
+                
                 if h['BUNIT'] == 'ELECTRONS':
                     to_per_sec = 1./keys['EXPTIME']
                 else:
@@ -5430,7 +5513,10 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
                                                              h['PHOTPLAM']), 
                                         'Inverse sensitivity, Jy/DN')
                                                              
-                    print('       PHOTFLAM={0:.2e}, scale={1:.1f}'.format(h['PHOTFLAM'], phot_scale))
+                    msg = '       PHOTFLAM={0:.2e}, scale={1:.1f}'
+                    msg = msg.format(h['PHOTFLAM'], phot_scale)
+                    log_comment(LOGFILE, msg, verbose=verbose)
+                    
                     keys['PHOTFLAM'] = h['PHOTFLAM']
                     for k in ['PHOTFLAM', 'PHOTPLAM', 'PHOTFNU',
                               'PHOTZPT', 'PHOTBW', 'PHOTMODE']:
@@ -5494,7 +5580,7 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
                                      outputwcs=outputwcs,
                                      scale=0.1, kernel=kernel,
                                      pixfrac=pixfrac, calc_wcsmap=False,
-                                     verbose=True, data=None)
+                                     verbose=verbose, data=None)
 
             outsci, outwht, outctx, header, xoutwcs = res
             header['EXPTIME'] = flt[0].header['EXPTIME']
@@ -5512,7 +5598,7 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
                                      outputwcs=outputwcs,
                                      scale=0.1, kernel=kernel,
                                      pixfrac=pixfrac, calc_wcsmap=False,
-                                     verbose=True, data=data)
+                                     verbose=verbose, data=data)
 
             outsci, outwht, outctx = res[:3]
             header['EXPTIME'] += flt[0].header['EXPTIME']
