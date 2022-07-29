@@ -1337,7 +1337,9 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
     
     from grizli import utils
     from mastquery import overlaps
-
+    
+    utils.set_warnings()
+    
     if ir_wcs is None:
         out_h, ir_wcs = utils.make_wcsheader(ra=ra, dec=dec, size=size, 
                                           pixscale=ir_scale, get_hdu=False)
@@ -1389,7 +1391,8 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
             for j in np.where(nis)[0]:
                 file_filters[j] = file_filters[j].replace('-CLEAR','N-CLEAR')
             
-            msg = 'Fix NIRISS: filters=', np.unique(file_filters)
+            msg = 'Fix NIRISS: filters = '
+            msg += ' '.join(np.unique(file_filters).tolist())
             utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
             
     uniq_filts = utils.Unique(file_filters, verbose=False)
