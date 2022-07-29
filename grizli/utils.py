@@ -1422,6 +1422,15 @@ def synphot_encircled_energy(obsmode='wfc3,ir,f160w', sp='default', aper_radii=E
     return counts / norm_counts
 
 
+def photfnu_from_photflam(photflam, photplam):
+    """
+    Compute PHOTFNU from PHOTFLAM+PHOTPLAM, e.g., for ACS/WFC
+    """
+    ZP = -2.5*np.log10(photflam) - 21.10 - 5*np.log10(photplam) + 18.6921
+    photfnu = 10**(-0.4*(ZP-23.9))*1.e-6
+    return photfnu
+
+
 def calc_header_zeropoint(im, ext=0):
     """
     Determine AB zeropoint from image header
@@ -4849,8 +4858,8 @@ def make_wcsheader(ra=40.07293, dec=-1.6137748, size=2, pixscale=0.1, get_hdu=Fa
         npix = np.cast[int](np.round([size[0]/pixscale, size[1]/pixscale]))
 
     hout = pyfits.Header()
-    hout['CRPIX1'] = npix[0]/2
-    hout['CRPIX2'] = npix[1]/2
+    hout['CRPIX1'] = npix[0]/2+1
+    hout['CRPIX2'] = npix[1]/2+1
     hout['CRVAL1'] = ra
     hout['CRVAL2'] = dec
     hout['CD1_1'] = -cdelt[0]
@@ -5415,7 +5424,12 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
                         ref_photflam = h['PHOTFLAM']
 
                     phot_scale = h['PHOTFLAM']/ref_photflam
-
+                    
+                    if 'PHOTFNU' not in h:
+                        h['PHOTFNU'] = (photfnu_from_photflam(h['PHOTFLAM'],
+                                                             h['PHOTPLAM']), 
+                                        'Inverse sensitivity, Jy/DN')
+                                                             
                     print('       PHOTFLAM={0:.2e}, scale={1:.1f}'.format(h['PHOTFLAM'], phot_scale))
                     keys['PHOTFLAM'] = h['PHOTFLAM']
                     for k in ['PHOTFLAM', 'PHOTPLAM', 'PHOTFNU',
@@ -5424,7 +5438,7 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
                             keys[k] = h[k]
 
                     phot_scale *= to_per_sec
-
+                    
                 try:
                     wcs_i = pywcs.WCS(header=flt[('SCI', ext)].header, 
                                       fobj=flt)
@@ -6299,9 +6313,9 @@ class EffectivePSF(object):
         filter_files.sort()
         for file in filter_files:
             im = pyfits.open(file, ignore_missing_end=True)
-            data = im[0].data
+            data = im[0].data*1 # [::-1,:,:]#[:,::-1,:]
             data[data < 0] = 0
-            filt = '{0}-{1}'.format(im[0].header['INSTRUME'].upper(), 
+            filt = '{0}-{1}'.format(im[0].header['DETECTOR'].upper(),
                                     im[0].header['FILTER'])
                                     
             self.epsf[filt] = data
@@ -6367,7 +6381,7 @@ class EffectivePSF(object):
                       'G102','G141','F128N','F130N','F132N']:
             psf_type = 'WFC3/IR'
             
-        elif filter.startswith('NIR'):
+        elif filter.startswith('NRC') | filter.startswith('NIS'):
             # NIRISS, NIRCam 2K
             psf_type = 'JWST/2K'
             
