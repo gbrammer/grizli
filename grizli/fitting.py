@@ -3745,7 +3745,7 @@ class GroupFitter(object):
         return fig, line, tfit
 
 
-    def oned_figure(self, bin=1, wave=None, show_beams=True, minor=0.1, tfit=None, show_rest=False, axc=None, figsize=[6, 4], fill=False, units='flam', min_sens_show=0.1, ylim_percentile=2, scale_on_stacked=False, show_individual_templates=False, apply_beam_mask=True, loglam_1d=True, trace_limits=None, show_contam=False, beam_models=None):
+    def oned_figure(self, bin=1, wave=None, show_beams=True, minor=0.1, tfit=None, show_rest=False, axc=None, figsize=[6, 4], fill=False, units='flam', min_sens_show=0.1, ylim_percentile=2, scale_on_stacked=False, show_individual_templates=False, apply_beam_mask=True, loglam_1d=True, trace_limits=None, show_contam=False, add_label=True, beam_models=None):
         """
         Make a figure showing the 1D spectra 
         
@@ -3881,7 +3881,7 @@ class GroupFitter(object):
             w = sp[0]
             if show_rest:
                 zp1 = (1+tfit['z'])
-                xlabel = r'$\lambda_\mathrm{rest}$'+' (z={0:.2f})'.format(tfit['z'])
+                xlabel = r'$\lambda_\mathrm{rest}$'+' (z={0:.3f})'.format(tfit['z'])
 
         else:
             sp = None
@@ -4209,7 +4209,11 @@ class GroupFitter(object):
         # Photometry?
 
         if newfigure:
-            axc.text(0.95, 0.95, '{0}  {1:>5d}'.format(self.group_name, self.id), ha='right', va='top', transform=axc.transAxes)
+            if add_label:
+                axc.text(0.95, 0.95,
+                    '{0}  {1:>5d}'.format(self.group_name, self.id), 
+                     ha='right', va='top', transform=axc.transAxes)
+                     
             fig.tight_layout(pad=0.2)
             return fig
 
