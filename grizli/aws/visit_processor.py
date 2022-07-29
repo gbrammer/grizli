@@ -9,6 +9,7 @@ Process space telescope visits
 import os
 import glob
 import numpy as np
+import astropy.units as u
 
 from . import db
 
@@ -1321,7 +1322,7 @@ def make_parent_mosaic(parent='j191436m5928', **kwargs):
     cutout_mosaic(rootname=parent, ra=ra, dec=dec, size=size, **kwargs)
 
 
-def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-27.7910651, size=5*60, filters=['F160W'], ir_scale=0.1, ir_wcs=None, res=None, half_optical=True, kernel='point', pixfrac=0.33, make_figure=True, skip_existing=True, clean_flt=True, gzip_output=True, s3output='s3://grizli-v2/HST/Pipeline/Mosaic/', split_uvis=True, extra_query='', extra_wfc3ir_badpix=True, **kwargs):
+def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-27.7910651, size=5*60, filters=['F160W'], ir_scale=0.1, ir_wcs=None, res=None, half_optical=True, kernel='point', pixfrac=0.33, make_figure=True, skip_existing=True, clean_flt=True, gzip_output=True, s3output='s3://grizli-v2/HST/Pipeline/Mosaic/', split_uvis=True, extra_query='', extra_wfc3ir_badpix=True, fix_niriss=True, scale_nanojy=10, **kwargs):
     """
     Make mosaic from exposures defined in the exposure database
     
@@ -1382,6 +1383,14 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
             for j in np.where(uvis)[0]:
                 file_filters[j] += 'u'
     
+    if fix_niriss:
+        nis = res['detector'] == 'NIS'
+        if nis.sum() > 0:
+            for j in np.where(nis)[0]:
+                file_filters[j] = file_filters[j].replace('-CLEAR','N-CLEAR')
+            
+            print('FIX NIRISS', np.unique(file_filters))
+            
     uniq_filts = utils.Unique(file_filters, verbose=False)
     
     for f in uniq_filts.values:
@@ -1483,6 +1492,25 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
             drz = 'drc'
         else:
             drz = 'drz'
+        
+        # if ('PHOTFNU' not in header) & ('PHOTFLAM' in header):
+        #     photfnu = utils.photfnu_from_photflam(header['photflam'],
+        #                                           header['photplam'])
+        #     header['PHOTFNU'] = (photfnu,
+        #                          'Inverse sensitivity from PHOTFLAM, Jy/DN')
+            
+        if scale_nanojy is not None:
+            to_njy = scale_nanojy/(header['PHOTFNU']*1.e9)
+            print(f'Scale PHOTFNU x {to_njy:.3f} to {scale_nanojy:.1f} nJy')
+            header['PHOTFNU'] *= to_njy
+            header['PHOTFLAM'] *= to_njy
+            header['BUNIT'] = f'{scale_nanojy:.1f}*nanoJansky'
+            outsci *= 1./to_njy
+            outwht *= to_njy**2
+        else:
+            #pass
+            to_njy = header['PHOTFNU']*1.e9
+            header['BUNIT'] = f'{to_njy:.3f}*nanoJansky'
             
         pyfits.writeto('{0}_{1}_sci.fits'.format(visit['product'], drz),
                        data=outsci, header=header, 
