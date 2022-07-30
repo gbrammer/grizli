@@ -621,6 +621,7 @@ def process_tile(field='cos', tile='01.01', filters=TILE_FILTERS, fetch_existing
                      'dracoii':(5,4),
                      'egs-v2': (10,14),
                      'j1235':(6,4),
+                     'whl0137':(5,5),
                      }
     
         if field in ref_tiles:
