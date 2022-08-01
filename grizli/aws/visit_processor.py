@@ -1322,6 +1322,72 @@ def make_parent_mosaic(parent='j191436m5928', **kwargs):
     cutout_mosaic(rootname=parent, ra=ra, dec=dec, size=size, **kwargs)
 
 
+def res_query_from_local(files=None, filters=None):
+    """
+    Immitate a query from exposure_files for files in a local working 
+    directory that can be passed to `grizli.aws.visit_processor.cuotut_mosaic`
+    
+    Parameters
+    ----------
+    files : list
+        File list.  If `None`, then finds all ``flt``, ``flc``, ``rate``, 
+        ``cal`` files in the current working directory
+    
+    filters : list
+        Subset of filters to consider
+    
+    Returns
+    -------
+    res : `astropy.table.Table`
+        Table of exposure info
+        
+    """
+    if files is None:
+        files = glob.glob('*_flt.fits')
+        files += glob.glob('*_flc.fits')
+        files += glob.glob('*_rate.fits')
+        files += glob.glob('*_cal.fits')
+        files.sort()
+
+    rows = []
+    for file in files:
+        im = pyfits.open(file)
+        
+        filt = utils.parse_filter_from_header(im[0].header)
+        if filters is not None:
+            if filt not in filters:
+                continue
+        
+        ds = '_'.join(os.path.basename(file).split('_')[:-1])
+        ext = file.split('_')[-1].split('.fits')[0]
+        if 'EXPTIME' in im[0].header:
+            expt = im[0].header['EXPTIME']
+        elif 'EFFEXPTM' in im[0].header:
+            expt = im[0].header['EFFEXPTM']
+        else:
+            expt = 0.
+        
+        assoc = 'manual'
+
+        if 'PUPIL' in im[0].header:
+            pup = im[0].header['PUPIL']
+        else:
+            pup = '-'
+                        
+        det = im[0].header['DETECTOR']
+        wcs = pywcs.WCS(im['SCI',1].header)
+        sr = utils.SRegion(wcs)
+        fp = sr.polystr()[0]
+        
+        rows.append([ds, ext, 1, assoc, filt, pup, expt, fp, det])
+    
+    res = utils.GTable(names=['dataset','extension','sciext','assoc',
+                              'filter','pupil','exptime','footprint',
+                              'detector'],
+                       rows=rows)
+    return res
+
+
 def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-27.7910651, size=5*60, filters=['F160W'], ir_scale=0.1, ir_wcs=None, res=None, half_optical=True, kernel='point', pixfrac=0.33, make_figure=True, skip_existing=True, clean_flt=True, gzip_output=True, s3output='s3://grizli-v2/HST/Pipeline/Mosaic/', split_uvis=True, extra_query='', extra_wfc3ir_badpix=True, fix_niriss=True, scale_nanojy=10, verbose=True, niriss_ghost_kwargs={}, **kwargs):
     """
     Make mosaic from exposures defined in the exposure database
