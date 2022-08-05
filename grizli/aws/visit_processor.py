@@ -12,6 +12,7 @@ import numpy as np
 import astropy.units as u
 
 from . import db
+from .. import utils
 
 def s3_object_path(dataset, product='raw', ext='fits', base_path='hst/public/'):
     """
@@ -1342,6 +1343,9 @@ def res_query_from_local(files=None, filters=None):
         Table of exposure info
         
     """
+    import astropy.io.fits as pyfits
+    import astropy.wcs as pywcs
+    
     if files is None:
         files = glob.glob('*_flt.fits')
         files += glob.glob('*_flc.fits')
