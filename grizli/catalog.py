@@ -377,7 +377,7 @@ def get_gaia_DR2_vizier_columns():
 
 def get_gaia_DR2_vizier(ra=165.86, dec=34.829694, radius=3., max=100000,
                     catalog="I/350/gaiaedr3", server='vizier.u-strasbg.fr',
-                    use_mirror=False, keys=None):
+                    use_mirror=False, keys=None, mjd=None, clean_mjd=True):
     """
     Query GAIA catalog from Vizier
     
@@ -420,7 +420,16 @@ def get_gaia_DR2_vizier(ra=165.86, dec=34.829694, radius=3., max=100000,
     except:
         utils.log_exception(utils.LOGFILE, traceback)
         return False
-
+    
+    if mjd is not None:
+        rd = get_gaia_radec_at_time(result, date=mjd, format='mjd')
+        result['ra_time'] = rd.ra.deg
+        result['dec_time'] = rd.dec.deg
+        result.meta['cootime'] = mjd, 'Specified MJD for ra/dec_time'
+        if clean_mjd:
+            ok = np.isfinite(rd.ra.deg + rd.dec.deg)
+            result = result[ok]
+            
     return result
 
 
