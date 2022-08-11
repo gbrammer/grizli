@@ -26,6 +26,7 @@ fetch_files_args:
     s3_sync: True
     #filters: *filters
     fetch_flt_calibs: [IDCTAB, PFLTFILE, NPOLFILE]
+    force_rate: True
     inst_products: 
         ACS/WFC: [FLC]
         WFC3/IR: [RAW]
