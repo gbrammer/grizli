@@ -617,16 +617,21 @@ class JwstDispersionTransform(object):
         self.grism = grism
         
         if conf_file is not None:
+            self.base = os.path.basename(conf_file.split('.conf')[0])
+        else:
+            self.base = None
+            
+        if conf_file is not None:
             if 'NIRISS' in conf_file:
                 # NIRISS_F200W_GR150R.conf
                 self.instrument = 'NIRISS'
-                self.grism = conf_file.split('.conf')[0][-1]
+                self.grism = self.base.split('_')[2][-1]
                 self.module = 'A'
             elif 'NIRCAM' in conf_file:
                 # NIRCAM_F444W_modA_R.conf
                 self.instrument = 'NIRCAM'
-                self.grism = conf_file.split('.conf')[0][-1]
-                self.module = conf_file.split('.conf')[0][-3]
+                self.grism = self.base[-1]
+                self.module = self.base[-3]
             else:
                 # NIRCAM_F444W_modA_R.conf
                 self.instrument = 'HST'
@@ -989,7 +994,8 @@ def load_grism_config(conf_file, warnings=True):
         
         for b in conf.sens:
             conf.sens[b]['SENSITIVITY'] *= hack_niriss
-            conf.sens[b]['ERROR'] *= hack_niriss
+            if 'ERROR' in conf.sens[b].colnames:
+                conf.sens[b]['ERROR'] *= hack_niriss
         
         if 'F115W' in conf_file:
             pass
@@ -1004,7 +1010,13 @@ def load_grism_config(conf_file, warnings=True):
             for b in conf.beams:                    
                 #conf.conf[f'DYDX_{b}_0'][0] += 0.25
                 conf.conf[f'DLDP_{b}_0'] += conf.conf[f'DLDP_{b}_1']*0.5
-            
+                
+                # For red galaxy
+                conf.conf[f'DLDP_{b}_0'] += conf.conf[f'DLDP_{b}_1']*0.5                
+                # if 'F200W' in conf_file:
+                #     conf.conf[f'DLDP_{b}_0'] += conf.conf[f'DLDP_{b}_1']*0.5
+
+                
         #     _w = conf.sens['A']['WAVELENGTH']
         #     _w0 = (_w*conf.sens['A']['SENSITIVITY']).sum()
         #     _w0 /=  conf.sens['A']['SENSITIVITY'].sum()
@@ -1020,7 +1032,8 @@ def load_grism_config(conf_file, warnings=True):
             msg = f""" ! Scale 0th order (B) by an additional x 1.5"""
             utils.log_comment(utils.LOGFILE, msg, verbose=warnings)
             conf.sens['B']['SENSITIVITY'] *= 1.5
-            conf.sens['B']['ERROR'] *= 1.5
+            if 'ERROR' in conf.sens['B'].colnames:
+                conf.sens['B']['ERROR'] *= 1.5
         
         # Another shift from 0723, 2744
         # if ('GR150C.F200W' in conf_file):
