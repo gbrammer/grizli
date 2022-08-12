@@ -80,6 +80,7 @@ else:
 # Manual version tag
 # version = '1.4.0' # New aws tools
 # version = '1.5.1' # bump for JWST
+version = '1.6.0' # with MIRI sky flats and nircam wisp correction
 
 version_str =f"""# git describe --tags
 __version__ = "{version}"
@@ -110,7 +111,8 @@ setup(
     url = "https://github.com/gbrammer/grizli",
     download_url = "https://github.com/gbrammer/grizli/tarball/{0}".format(version),
     packages=['grizli', 'grizli/pipeline', 'grizli/utils_c', 'grizli/tests', 'grizli/galfit', 'grizli/aws'],
-    install_requires = ['numpy','cython','astropy','sregion>=1.0'], 
+    install_requires = ['numpy', 'cython', 'astropy',
+                        'sregion>=1.0', 'mastquery>=1.4'], 
     classifiers=[
         "Development Status :: 1 - Planning",
         'Intended Audience :: Science/Research',
