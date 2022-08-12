@@ -773,9 +773,9 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
                 dq -= dq & b
                 #dq -= dq & 2
             
-        msg = f'Mask left side of MIRI'
-        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
-        dq[:,:302] |= 1024
+        # msg = f'Mask left side of MIRI'
+        # utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+        # dq[:,:302] |= 1024
         
         # Dilate MIRI mask
         msg = f'Dilate MIRI window mask'
