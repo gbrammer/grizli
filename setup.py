@@ -80,7 +80,7 @@ else:
 # Manual version tag
 # version = '1.4.0' # New aws tools
 # version = '1.5.1' # bump for JWST
-version = '1.6.0' # with MIRI sky flats and nircam wisp correction
+# version = '1.6.0' # with MIRI sky flats and nircam wisp correction
 
 version_str =f"""# git describe --tags
 __version__ = "{version}"
