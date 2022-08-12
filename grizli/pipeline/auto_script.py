@@ -2500,6 +2500,7 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
 
             for k in filter_tab.meta:
                 newk = '{0}_{1}'.format(filt.upper(), k)
+                newk = newk.replace('-CLEAR','')
                 tab.meta[newk] = filter_tab.meta[k]
 
             for c in filter_tab.colnames:
