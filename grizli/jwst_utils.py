@@ -355,15 +355,16 @@ def img_with_wcs(input, overwrite=True, fit_sip_header=True, skip_completed=True
                     _hdu[1].header[k] = hsip[k], hsip.comments[k]
                 else:
                     _hdu[1].header[k] = hsip[k]
-            
-            # Remove WCS inverse
-            for k in list(_hdu[1].header.keys()):
-                if k[:3] in ['AP_','BP_']:
-                    _hdu[1].header.remove(k)
-                    
+                                
         else:
             wcs = utils.wcs_from_header(_hdu['SCI'].header, relax=True)
-            
+        
+        # Remove WCS inverse keywords
+        for _ext in [0, 'SCI']:
+            for k in list(_hdu[_ext].header.keys()):
+                if k[:3] in ['AP_','BP_']:
+                    _hdu[_ext].header.remove(k)
+        
         pscale = utils.get_wcs_pscale(wcs)
         
         _hdu[1].header['IDCSCALE'] = pscale, 'Pixel scale calculated from WCS'
@@ -804,10 +805,15 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
     img[1].header['EXPNAME'] = img[0].header['EXPOSURE']
     img[1].header['MEANDARK'] = 0.0
     
+    for _ext in [0, 'SCI']:
+        for k in list(img[_ext].header.keys()):
+            if k[:3] in ['AP_','BP_']:
+                img[_ext].header.remove(k)
+    
     # AstroDrizzle needs a time extension, which can be empty 
     # but with a PIXVALUE keyword.
     # The header below is designed after WFC3/IR
-            
+    
     img.writeto(filename, overwrite=True)
     img.close()
     
