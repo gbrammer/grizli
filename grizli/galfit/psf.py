@@ -367,7 +367,7 @@ class DrizzlePSF(object):
         print(params, chi2)
         return chi2
 
-    def get_psf(self, ra=53.06967306, dec=-27.72333015, filter='F140W', pixfrac=0.1, kernel='point', verbose=True, wcs_slice=None, get_extended=True, get_weight=False, ds9=None, npix=13):
+    def get_psf(self, ra=53.06967306, dec=-27.72333015, filter='F140W', pixfrac=0.1, kernel='point', verbose=True, wcs_slice=None, get_extended=True, get_weight=False, ds9=None, npix=13, renormalize=True):
         from drizzlepac import adrizzle
         from shapely.geometry import Polygon, Point
 
@@ -459,7 +459,11 @@ class DrizzlePSF(object):
                     ds9.set_pyfits(hdu)
 
         #ss = 1000000/2
-        ss = 1./outsci.sum()
+        if renormalize:
+            ss = 1./outsci.sum()*psf.sum()
+        else:
+            ss = 1.
+            
         hdu = pyfits.HDUList([pyfits.PrimaryHDU(), pyfits.ImageHDU(data=outsci*ss, header=utils.to_header(wcs_slice))])
        
         if ds9 is not None:
