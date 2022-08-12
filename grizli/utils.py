@@ -5426,7 +5426,7 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
                   'PUPIL', 'DETECTOR', 'INSTRUME', 'PHOTFLAM', 'PHOTPLAM', 
                   'PHOTFNU', 'PHOTZPT', 'PHOTBW', 'PHOTMODE', 'EXPSTART', 
                   'EXPEND', 'DATE-OBS', 'TIME-OBS',
-                  'CRDS_CTX', 'R_DISTOR', 'R_PHOTOM', 'R_FLAT']:
+                  'UPDA_CTX', 'CRDS_CTX', 'R_DISTOR', 'R_PHOTOM', 'R_FLAT']:
             if k in flt[0].header:
                 keys[k] = flt[0].header[k]
         
@@ -5454,7 +5454,16 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
                 
                 _ghost = niriss_ghost_mask(flt, **niriss_ghost_kwargs)
                 bpdata |= _ghost*1024
-                
+            
+            # Negative
+            if 'MDRIZSKY' in flt['SCI'].header:
+                _low = ((flt['SCI'].data - flt['SCI'].header['MDRIZSKY']) < 
+                      -5*flt['ERR'].data)
+                msg = f'Extra -5 sigma low pixels: N= {_low.sum()} '
+                msg += f' ( {_low.sum()/_low.size*100:.1} %)'
+                log_comment(LOGFILE, msg, verbose=verbose)
+                bpdata |= _low*1024
+            
         elif flt[0].header['DETECTOR'] == 'IR':
             bits = 576
             if extra_wfc3ir_badpix:
@@ -5491,7 +5500,7 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
                     sky = h['MDRIZSKY']
                 else:
                     sky = 0
-
+                
                 msg = '  ext (SCI,{0}), sky={1:.3f}'.format(ext, sky)
                 log_comment(LOGFILE, msg, verbose=verbose)
                 
@@ -5519,7 +5528,8 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
                     
                     keys['PHOTFLAM'] = h['PHOTFLAM']
                     for k in ['PHOTFLAM', 'PHOTPLAM', 'PHOTFNU',
-                              'PHOTZPT', 'PHOTBW', 'PHOTMODE']:
+                              'PHOTZPT', 'PHOTBW', 'PHOTMODE',
+                              'PHOTMJSR', 'PIXAR_SR']:
                         if k in h:
                             keys[k] = h[k]
 
@@ -6196,7 +6206,8 @@ def fetch_config_files(get_acs=False, get_sky=True, get_stars=True, get_epsf=Tru
 
     if get_jwst:
         tarfiles += [f'{BASEURL}/jwst-grism-conf.tar.gz', 
-                     f'{BASEURL}/niriss.conf.220725.tar.gz']
+                     f'{BASEURL}/niriss.conf.220725.tar.gz',
+                     f'{BASEURL}/nircam-wisp-aug2022.tar.gz']
     
     if get_sky:
         ftpdir = BASEURL
@@ -6455,7 +6466,7 @@ class EffectivePSF(object):
         self.extended_epsf['G141'] = self.extended_epsf['F140W']
 
 
-    def get_at_position(self, x=507, y=507, filter='F140W'):
+    def get_at_position(self, x=507, y=507, filter='F140W', rot90=0):
         """Evaluate ePSF at detector coordinates
         TBD
         """
@@ -6522,11 +6533,14 @@ class EffectivePSF(object):
             psf_xy += (1-fx)*fy*epsf[:, :, nx+(ny+1)*3]
             psf_xy += fx*fy*epsf[:, :, (nx+1)+(ny+1)*3]
             
-            psf_xy = np.rot90(psf_xy.T, 2)
+            # psf_xy = np.rot90(psf_xy.T, 2)
             
             self.eval_filter = filter
         
         if psf_type == 'JWST/2K':
+            
+            NDET = int(np.sqrt(epsf.shape[2]))
+            
             #  IR detector
             rx = 1+(np.clip(x, 1, 2047)-0)/1024.
             ry = 1+(np.clip(y, 1, 2047)-0)/1024.
@@ -6535,20 +6549,24 @@ class EffectivePSF(object):
             rx -= 1
             ry -= 1
 
-            nx = np.clip(int(rx), 0, 2)
-            ny = np.clip(int(ry), 0, 2)
+            nx = np.clip(int(rx), 0, NDET-1)
+            ny = np.clip(int(ry), 0, NDET-1)
 
             # print x, y, rx, ry, nx, ny
 
             fx = rx-nx
             fy = ry-ny
-
-            psf_xy = (1-fx)*(1-fy)*epsf[:, :, nx+ny*3]
-            psf_xy += fx*(1-fy)*epsf[:, :, (nx+1)+ny*3]
-            psf_xy += (1-fx)*fy*epsf[:, :, nx+(ny+1)*3]
-            psf_xy += fx*fy*epsf[:, :, (nx+1)+(ny+1)*3]
             
-            psf_xy = np.rot90(psf_xy.T, 2)
+            if NDET == 1:
+                psf_xy = epsf[:,:,0]
+            else:
+                psf_xy = (1-fx)*(1-fy)*epsf[:, :, nx+ny*NDET]
+                psf_xy += fx*(1-fy)*epsf[:, :, (nx+1)+ny*NDET]
+                psf_xy += (1-fx)*fy*epsf[:, :, nx+(ny+1)*NDET]
+                psf_xy += fx*fy*epsf[:, :, (nx+1)+(ny+1)*NDET]
+            
+            psf_xy = psf_xy.T
+            # psf_xy = np.rot90(psf_xy.T, 2)
             
             self.eval_filter = filter
         
@@ -6584,10 +6602,14 @@ class EffectivePSF(object):
             psf_xy += fx*fy*epsf[:, :, (nx+1)+(ny+1)*iX]
 
             self.eval_filter = filter
-
+        
+        if rot90 != 0:
+            self.psf_xy_rot90 = rot90
+            psf_xy = np.rot90(psf_xy, rot90)
+            
         return psf_xy
 
-    def eval_ePSF(self, psf_xy, dx, dy, extended_data=None):
+    def eval_ePSF(self, psf_xy, dx, dy, rot90=0, extended_data=None):
         """Evaluate PSF at dx,dy coordinates
 
         TBD
@@ -6601,8 +6623,12 @@ class EffectivePSF(object):
             coords = np.array([50+4*dx[ok], 50+4*dy[ok]])
         else:
             # JWST are +/- 32 pixels
-            ok = (np.abs(dx) <= 32) & (np.abs(dy) <= 32)
-            coords = np.array([130+4*dx[ok], 130+4*dy[ok]])
+            sh = psf_xy.shape
+            _size = (sh[0]-1)//4
+            _x0 = _size*2
+            _cen = (_x0-1)//2
+            ok = (np.abs(dx) <= _cen) & (np.abs(dy) <= _cen)
+            coords = np.array([_x0+4*dx[ok], _x0+4*dy[ok]])
 
         # Do the interpolation
         interp_map = map_coordinates(psf_xy, coords, order=3)
@@ -6724,7 +6750,8 @@ class EffectivePSF(object):
 
     def fit_ePSF(self, sci, center=None, origin=[0, 0], ivar=1, N=7,
                  filter='F140W', tol=1.e-4, guess=None, get_extended=False,
-                 method='lm', ds9=None, psf_params=None, only_centering=True):
+                 method='lm', ds9=None, psf_params=None, only_centering=True, 
+                 rot90=0):
         """Fit ePSF to input data
         TBD
         """
@@ -6741,7 +6768,7 @@ class EffectivePSF(object):
 
         xc, yc = int(x0), int(y0)
 
-        psf_xy = self.get_at_position(x=xd, y=yd, filter=filter)
+        psf_xy = self.get_at_position(x=xd, y=yd, filter=filter, rot90=rot90)
 
         yp, xp = np.indices(sh)
 
@@ -6839,7 +6866,7 @@ class EffectivePSF(object):
         #
         # return output_psf, psf_params
 
-    def get_ePSF(self, psf_params, sci=None, ivar=1, origin=[0, 0], shape=[20, 20], filter='F140W', get_extended=False, get_background=False):
+    def get_ePSF(self, psf_params, sci=None, ivar=1, origin=[0, 0], shape=[20, 20], filter='F140W', get_extended=False, get_background=False, rot90=0):
         """
         Evaluate an Effective PSF
         """
@@ -6851,7 +6878,7 @@ class EffectivePSF(object):
 
         xc, yc = int(x0), int(y0)
 
-        psf_xy = self.get_at_position(x=xd, y=yd, filter=filter)
+        psf_xy = self.get_at_position(x=xd, y=yd, filter=filter, rot90=rot90)
 
         yp, xp = np.indices(sh)
 

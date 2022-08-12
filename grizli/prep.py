@@ -2737,6 +2737,129 @@ def make_miri_average_flat(visit, clip_max=1, apply=True, verbose=True):
                 _imi.flush()
 
 
+def nircam_wisp_correction(calibrated_file, niter=3, update=True, verbose=True, **kwargs):
+    """
+    Fit the NIRCam wisp template and subtract
+    
+    See https://jwst-docs.stsci.edu/jwst-near-infrared-camera/nircam-features-and-caveats/nircam-claws-and-wisps.
+    
+    Wisp template files at https://stsci.app.box.com/s/1bymvf1lkrqbdn9rnkluzqk30e8o2bne?sortColumn=name&sortDirection=ASC.
+    
+    Parameters
+    ----------
+    calibrated_file : str
+        Filename of a flat-fielded file (either `cal` or a processed `rate` file)
+    
+    niter : int
+        Number of mask iterations
+    
+    update : bool
+        Subtract the wisp model from the 'SCI' extension of ``calibrated_file``
+        
+    verbose : bool
+        verbosity
+        
+    """
+    if not os.path.exists(calibrated_file):
+        msg = f'nircam_wisp_correction - {calibrated_file} not found'
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+        return None
+        
+    im = pyfits.open(calibrated_file)
+    sh = im['SCI'].data.shape
+    
+    if 'OFILTER' in im[0].header:
+        _filt = im[0].header['OFILTER']
+        _inst = im[0].header['OINSTRUM']
+        _det = im[0].header['ODETECTO']
+    else:
+        _filt = im[0].header['FILTER']
+        _inst = im[0].header['INSTRUME']
+        _det = im[0].header['DETECTOR']
+
+    if _inst not in ['NIRCAM']:
+        msg = f'nircam_wisp_correction - {calibrated_file}: '
+        msg += f'Instrument {_inst} not supported'
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+        return None
+    
+    if _filt not in ['F150W','F200W']:
+        msg = f'nircam_wisp_correction - {calibrated_file}: '
+        msg += f'NIRCam filter {_filt} not supported'
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+        return None
+    
+    if _det not in ['NRCA3','NRCB3','NRCB4']:
+        msg = f'nircam_wisp_correction - {calibrated_file}: '
+        msg += f'NIRCam detector {_det} not supported'
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+        return None
+    
+    _path = os.path.join(GRIZLI_PATH, 'CONF', 'NircamWisp')
+    wisp_file = os.path.join(_path, f"wisps_{_det}_{_filt}.fits".lower())
+    if not os.path.exists(wisp_file):
+        msg = f'nircam_wisp_correction - {calibrated_file}: '
+        msg += f'{wisp_file} not found'
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+        return None
+        
+    wisp = pyfits.open(wisp_file)
+    
+    yp, xp = np.indices((2048,2048))
+
+    if _det in ['NRCA3']:
+        xc, yc = 623, 1680
+        Rmax = 275
+    elif _det in ['NRCB4']:
+        xc, yc = 1261, 1558
+        Rmax = 480
+    elif _det in ['NRCB3']:
+        xc, yc = 1229, 204
+        Rmax = 470
+        
+    wispr = np.sqrt((xp-xc)**2+(yp-yc)**2)
+
+    wisp_msk = np.exp(-(wispr - Rmax)**2/2/80**2)
+    wisp_msk[wispr < Rmax] = 1
+
+    wisp[0].data[~np.isfinite(wisp[0].data)] = 0
+    
+    sci = im['SCI'].data.flatten()
+    dq = im['DQ'].data.flatten()
+    err = im['ERR'].data.flatten()
+
+    A = np.array([np.ones_like(sci), (wisp[0].data*wisp_msk).flatten()])
+    _model = np.nanmedian(sci[dq == 0])
+
+    for _iter in range(niter):
+        ok = (err > 0) & np.isfinite(sci + A[1,:] + err) 
+        ok &= (sci - _model < 10*err) & (dq == 0)
+
+        _x = np.linalg.lstsq((A[:,ok]/err[ok]).T, (sci[ok]/err[ok]),
+                             rcond=None)
+
+        msg = f'nircam_wisp_correction - {calibrated_file}: '
+        msg += f'iter {_iter} Npix={ok.sum()} '
+        msg += f'bg={_x[0][0]:.2f} wisp={_x[0][1]:.2f}'
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+
+        #print(ok.sum(), _x[0])
+        _model = A.T.dot(_x[0])
+
+    # Take background out of model
+    _model -= _x[0][0]
+    im.close()
+
+    if update:
+        with pyfits.open(calibrated_file, mode='update') as im:
+            im[0].header['WISPBKG'] = _x[0][0], 'Wisp fit, background'
+            im[0].header['WISPNORM'] = _x[0][1], 'Wisp fit, model norm'
+            im['SCI'].data -= _model.reshape(im['SCI'].data.shape)
+            im.flush()
+            
+    return sci.reshape(sh), (_model.reshape(sh))
+
+
 def oneoverf_column_correction(visit, thresholds=[10,1.5], dilate_iter=[10,2], image_sn_cut=-1, **kwargs):
     """
     Masked column/row correction for 1/f noise in JWST exposures
@@ -3403,7 +3526,8 @@ def process_direct_grism_visit(direct={},
                                separate_chip_kwargs={},
                                reference_catalogs=['GAIA', 'PS1', 
                                                    'SDSS', 'WISE'],
-                               use_self_catalog=False, 
+                               use_self_catalog=False,
+                               nircam_wisp_kwargs={},
                                oneoverf_kwargs={},
                                snowball_kwargs={},
                                miri_skyflat=True):
@@ -3830,6 +3954,10 @@ def process_direct_grism_visit(direct={},
         clean_drizzle(direct['product'])
         
         if isJWST:
+            if nircam_wisp_kwargs is not None:
+                for _file in direct['files']:
+                    nircam_wisp_correction(_file, **nircam_wisp_kwargs)
+                
             if oneoverf_kwargs is not None:
                 oneoverf_column_correction(direct, **oneoverf_kwargs)
                         
