@@ -2741,6 +2741,10 @@ def nircam_wisp_correction(calibrated_file, niter=3, update=True, verbose=True, 
     """
     Fit the NIRCam wisp template and subtract
     
+    See https://jwst-docs.stsci.edu/jwst-near-infrared-camera/nircam-features-and-caveats/nircam-claws-and-wisps.
+    
+    Wisp template files at https://stsci.app.box.com/s/1bymvf1lkrqbdn9rnkluzqk30e8o2bne?sortColumn=name&sortDirection=ASC.
+    
     Parameters
     ----------
     calibrated_file : str
