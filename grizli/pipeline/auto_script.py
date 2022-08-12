@@ -2499,6 +2499,7 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
                                     sci=sci_image)
 
             for k in filter_tab.meta:
+                
                 newk = '{0}_{1}'.format(filt.upper(), k)
                 newk = newk.replace('-CLEAR','')
                 tab.meta[newk] = filter_tab.meta[k]
@@ -2508,8 +2509,9 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
                 tab[newc] = filter_tab[c]
 
             # Kron total correction from EE
-            
-            filt_plam = tab.meta['{0}_PLAM'.format(filt.upper())]
+            newk = '{0}_PLAM'.format(filt.upper())
+            newk = newk.replace('-CLEAR','')
+            filt_plam = tab.meta[newk]
 
             tot_corr = prep.get_kron_tot_corr(tab, filt.lower(), 
                                                 pixel_scale=cat_pixel_scale, 
