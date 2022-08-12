@@ -2796,7 +2796,7 @@ def nircam_wisp_correction(calibrated_file, niter=3, update=True, verbose=True, 
         return None
     
     _path = os.path.join(GRIZLI_PATH, 'CONF', 'NircamWisp')
-    wisp_file = os.path.join(_path, f"wisps_{_det}_{_filt}.fits".lower())
+    wisp_file = os.path.join(_path, f"wisps_{_det.lower()}_{_filt.upper()}.fits")
     if not os.path.exists(wisp_file):
         msg = f'nircam_wisp_correction - {calibrated_file}: '
         msg += f'{wisp_file} not found'
