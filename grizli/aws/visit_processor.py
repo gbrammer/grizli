@@ -1115,7 +1115,8 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=False,
     os.environ['orig_jref'] = os.environ.get('jref')
     set_private_iref(assoc)
 
-    update_assoc_status(assoc, status=1)
+    if sync:
+        update_assoc_status(assoc, status=1)
     
     if get_wcs_guess_from_table:
         get_wcs_guess(assoc)
@@ -1166,8 +1167,10 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=False,
         if fi in assoc:
             # Don't run tweak align for MIRI long filters
             miri_prep = dict(run_tweak_align=False,
-                           align_mag_limits=[14,28,0.2],
-                           align_clip=5)
+                             align_mag_limits=[14,28,0.2],
+                             align_clip=20, 
+                             align_simple=True)
+                           
             for k in miri_prep:
                 if k not in prep_args:
                     kws['visit_prep_args'][k] = miri_prep[k]
@@ -1181,11 +1184,14 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=False,
     failed = glob.glob('*failed')
     
     if len(failed) > 0:
-        update_assoc_status(assoc, status=9)
+        if sync:
+            update_assoc_status(assoc, status=9)
     elif len(glob.glob('*wcs.log')) == 0:
-        update_assoc_status(assoc, status=10)
+        if sync:
+            update_assoc_status(assoc, status=10)
     else:
-        update_assoc_status(assoc, status=2)
+        if sync:
+            update_assoc_status(assoc, status=2)
         
         # Exposure info database table
         vis_files = glob.glob('*visits.yaml')
@@ -1194,11 +1200,13 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=False,
             visits, groups, info = auto_script.load_visits_yaml(vis_files[0])
             
             for i, v in enumerate(visits):
-                print('File exposure info: ', v['files'][0], assoc)
-                exposure_info_from_visit(v, assoc=assoc)
+                if sync:
+                    print('File exposure info: ', v['files'][0], assoc)
+                    exposure_info_from_visit(v, assoc=assoc)
     
-    add_shifts_log(assoc=assoc, remove_old=True, verbose=True)
-    add_wcs_log(assoc=assoc, remove_old=True, verbose=True)
+    if sync:
+        add_shifts_log(assoc=assoc, remove_old=True, verbose=True)
+        add_wcs_log(assoc=assoc, remove_old=True, verbose=True)
     
     os.environ['iref'] = os.environ['orig_iref']
     os.environ['jref'] = os.environ['orig_jref']
@@ -1218,6 +1226,7 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=False,
                   --include "Prep/*_rate.fits" \
                   --include "Prep/*s.log" \
                   --include "Prep/*visits.*" \
+                  --include "Prep/*skyflat.*" \
                   --include "*fail*" \
                   --include "RAW/*[nx][tg]" """
         

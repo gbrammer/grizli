@@ -26,6 +26,7 @@ fetch_files_args:
     s3_sync: True
     #filters: *filters
     fetch_flt_calibs: [IDCTAB, PFLTFILE, NPOLFILE]
+    force_rate: True
     inst_products: 
         ACS/WFC: [FLC]
         WFC3/IR: [RAW]
@@ -110,7 +111,7 @@ visit_prep_args: &prep_args
                       snowball_dilate: 18,
                       mask_bit: 1024,
                       instruments: ['NIRCAM','NIRISS']}
-    
+    miri_skyflat: True
     # use_self_catalog: *is_parallel_field
 
 # Arguments to prep.apply_persistence_mask

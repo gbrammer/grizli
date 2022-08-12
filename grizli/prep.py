@@ -2664,6 +2664,79 @@ def make_drz_catalog(root='', sexpath='sex', threshold=2., get_background=True,
     return cat
 
 
+def make_miri_average_flat(visit, clip_max=1, apply=True, verbose=True):
+    """
+    Make an average MIRI "skyflat" for exposures in a visit
+    """
+    _im = pyfits.open(visit['files'][0])
+    
+    if 'OINSTRUM' in _im[0].header:
+        instrument = _im[0].header['OINSTRUM']
+    else:
+        instrument = _im[0].header['INSTRUME']
+        
+    if instrument not in ['MIRI']:
+        msg = f"make_miri_average_flat: Instrument for {visit['product']} "
+        msg += f"is {instrument}, skip flat"
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+        
+        return None
+        
+    sci = np.array([pyfits.open(file)['SCI'].data
+                    for file in visit['files']])
+    dq = np.array([pyfits.open(file)['DQ'].data
+                    for file in visit['files']])
+    
+    scim = sci*1.
+    for _iter in range(clip_max):
+        ma = np.nanmax(scim, axis=0)
+        scim[scim >= ma] = np.nan
+    
+    bkg = np.array([np.nanmedian(s[q == 0])
+                    for s, q in zip(scim, dq)])
+    
+    N = sci.shape[0]
+    scif = scim*1.
+    for i in range(N):
+        scif[i] /= bkg[i]
+        
+    flat = np.nanmedian(scif, axis=0)
+    flat_mask = ~np.isfinite(flat) | (flat <= 0.05)
+    flat[flat_mask] = 1
+    
+    flath = pyfits.Header()
+    for k in ['CRDS_CTX','UPD_CTX', 'R_FLAT', 'R_DARK',
+              'FILTER', 'DETECTOR','EXPSTART','EFFEXPTM']:
+        if k in _im[0].header:
+            flath[k] = _im[0].header[k]
+            
+    flath['CLIP_MAX'] = clip_max, 'Max clip iterations'
+    flath['NFILES'] = len(visit['files'])
+    for i, file in enumerate(visit['files']):
+        flath[f'FILE{i+1:04d}'] = file
+    
+    _hdu = pyfits.PrimaryHDU(data=flat, header=flath)
+    skyfile = f"{visit['product']}_skyflat.fits"
+    _hdu.writeto(skyfile, overwrite=True)
+    
+    msg = f"make_miri_average_flat: {skyfile} N={len(visit['files'])}"
+    msg += f" clip_max={clip_max}"
+    utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+    
+    if apply:
+        for file in visit['files']:
+            msg = f"make_miri_average_flat: apply {skyfile} to {file}"
+            utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+            
+            with pyfits.open(file, mode='update') as _imi:
+                _imi['SCI'].data /= flat
+                _imi['ERR'].data /= flat
+                _imi['DQ'].data[flat_mask] |= 1024
+                _imi[0].header['SKYFLAT'] = True, 'Sky flat applied'
+                _imi[0].header['SKYFLATF'] = skyfile, 'Sky flat file'
+                _imi.flush()
+
+
 def oneoverf_column_correction(visit, thresholds=[10,1.5], dilate_iter=[10,2], image_sn_cut=-1, **kwargs):
     """
     Masked column/row correction for 1/f noise in JWST exposures
@@ -3332,7 +3405,8 @@ def process_direct_grism_visit(direct={},
                                                    'SDSS', 'WISE'],
                                use_self_catalog=False, 
                                oneoverf_kwargs={},
-                               snowball_kwargs={}):
+                               snowball_kwargs={},
+                               miri_skyflat=True):
     """Full processing of a direct (+grism) image visit.
     
     Notes
@@ -3414,7 +3488,10 @@ def process_direct_grism_visit(direct={},
                     updatewcs.updatewcs(file, verbose=False, use_db=False)
                 except TypeError:
                     updatewcs.updatewcs(file, verbose=False)
-
+        
+        if isJWST & miri_skyflat:
+            make_miri_average_flat(direct)
+    
     # Initial grism processing
     skip_grism = (grism == {}) | (grism is None) | (len(grism) == 0)
     if not skip_grism:

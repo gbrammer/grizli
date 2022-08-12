@@ -16,6 +16,45 @@ from . import utils
 
 QUIET_LEVEL = logging.INFO
 
+CRDS_CONTEXT = 'jwst_0942.pmap' # July 29, 2022 with updated NIRCAM ZPs
+
+def set_crds_context(fits_file=None, override_environ=False, verbose=True):
+    """
+    Set CRDS_CONTEXT
+    
+    Parameters
+    ----------
+    fits_file : str
+        If provided, try to get CRDS_CONTEXT from header
+    
+    override_environ : bool
+        Override environment variable if True, otherwise will not change
+        the value of an already-set CRDS_CONTEXT environment variable.
+    
+    Returns
+    -------
+    crds_context : str
+        The value of the CRDS_CONTEXT environment variable
+        
+    """
+    
+    _CTX = CRDS_CONTEXT
+    
+    if fits_file is not None:
+        with pyfits.open(fits_file) as im:
+            if 'CRDS_CONTEXT' in im[0].header:
+                _CTX = im[0].header['CRDS_CTX']
+            
+    if os.getenv('CRDS_CONTEXT') is None:
+        os.environ['CRDS_CONTEXT'] = _CTX
+    elif override_environ:
+        os.environ['CRDS_CONTEXT'] = _CTX
+        
+    msg = f"ENV CRDS_CONTEXT = {os.environ['CRDS_CONTEXT']}"
+    utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+    return os.environ['CRDS_CONTEXT']
+
+
 def set_quiet_logging(level=QUIET_LEVEL):
     """
     Silence the verbose logs set by `stpipe`
@@ -120,9 +159,9 @@ def change_header_pointing(header, ra_ref=0., dec_ref=0., pa_v3=0.):
     return new_header
 
 
-def img_with_flat(input, verbose=True, overwrite=True):
+def img_with_flat(input, verbose=True, overwrite=True, apply_photom=True):
     """
-    Apply flat-field correction if nessary
+    Apply flat-field and photom corrections if nessary
     """
     import gc
     
@@ -131,8 +170,11 @@ def img_with_flat(input, verbose=True, overwrite=True):
     from jwst.datamodels import util
     from jwst.flatfield import FlatFieldStep
     from jwst.gain_scale import GainScaleStep
+    from jwst.photom import PhotomStep
     
     set_quiet_logging(QUIET_LEVEL)
+    
+    _ = set_crds_context()
     
     if not isinstance(input, pyfits.HDUList):
         _hdu = pyfits.open(input)
@@ -168,35 +210,77 @@ def img_with_flat(input, verbose=True, overwrite=True):
     img = util.open(_hdu)
     
     if not skip:        
-        if verbose:
-            utils.log_comment(utils.LOGFILE,
-                              'jwst.flatfield.FlatFieldStep', 
-                              verbose=verbose, show_date=False)
-                              
+                                          
         flat_step = FlatFieldStep()
+        _flatfile = flat_step.get_reference_file(img, 'flat')
+        utils.log_comment(utils.LOGFILE,
+                          f'jwst.flatfield.FlatFieldStep: {_flatfile}', 
+                          verbose=verbose, show_date=False)
+
         with_flat = flat_step.process(img)
-        output = with_flat
+        
+        # Photom
+        if 'OPUPIL' in _hdu[0].header:
+            _opup = _hdu[0].header['OPUPIL']
+        else:
+            _opup = ''
+            
+        _ofilt = _hdu[0].header['OFILTER']
+        if _opup.startswith('GR') | _ofilt.startswith('GR'):
+            output = with_flat
+            _photfile = None
+        else:
+            photom_step = PhotomStep()
+            with_phot = photom_step.process(with_flat)
+            output = with_phot
+            _photfile = photom_step.get_reference_file(img, 'photom')
+            utils.log_comment(utils.LOGFILE,
+                              f'jwst.flatfield.PhotomStep: {_photfile}', 
+                              verbose=verbose, show_date=False)
+        
     else:
+        
         output = img
     
     if isinstance(input, str) & overwrite:
         output.write(input, overwrite=overwrite)
         _hdu.close()
-    
+        
+        # Add reference files
+        if not skip:
+            with pyfits.open(input, mode='update') as _hdu:
+                
+                _hdu[0].header['UPDA_CTX'] = (os.environ['CRDS_CONTEXT'], 
+                                              'CRDS_CTX for modified files')
+                
+                _hdu[0].header['R_FLAT'] = (os.path.basename(_flatfile),
+                                            'Applied flat')
+                if _photfile is not None:
+                    _hdu[0].header['R_PHOTOM'] = (os.path.basename(_photfile),
+                                        'Applied photom')
+                
+                _hdu.flush()
+                
     gc.collect()
     
     return output
 
 
-def img_with_wcs(input, overwrite=True, fit_sip_header=True, skip_completed=True):
+def img_with_wcs(input, overwrite=True, fit_sip_header=True, skip_completed=True, verbose=True):
     """
     Open a JWST exposure and apply the distortion model.
 
     Parameters
     ----------
-    input : type
+    input : object
         Anything `jwst.datamodels.util.open` can accept for initialization.
-
+    
+    overwrite : bool
+        Overwrite FITS file
+    
+    fit_sip_header : bool
+        Run `pipeline_model_wcs_header` to rederive SIP distortion header
+        
     Returns
     -------
     with_wcs : `jwst.datamodels.ImageModel`
@@ -207,6 +291,8 @@ def img_with_wcs(input, overwrite=True, fit_sip_header=True, skip_completed=True
     from jwst.assign_wcs import AssignWcsStep
     
     set_quiet_logging(QUIET_LEVEL)
+    
+    _ = set_crds_context()
     
     # HDUList -> jwst.datamodels.ImageModel
 
@@ -236,7 +322,13 @@ def img_with_wcs(input, overwrite=True, fit_sip_header=True, skip_completed=True
 
     # AssignWcs to pupulate img.meta.wcsinfo
     step = AssignWcsStep()
+    _distor_file = step.get_reference_file(img, 'distortion')
+    utils.log_comment(utils.LOGFILE,
+                      f'jwst.assign_wcs.AssignWcsStep: {_distor_file}', 
+                      verbose=verbose, show_date=False)
+
     with_wcs = step.process(img)
+    
     output = with_wcs
     
     # Write to a file
@@ -263,21 +355,28 @@ def img_with_wcs(input, overwrite=True, fit_sip_header=True, skip_completed=True
                     _hdu[1].header[k] = hsip[k], hsip.comments[k]
                 else:
                     _hdu[1].header[k] = hsip[k]
-            
-            # Remove WCS inverse
-            for k in list(_hdu[1].header.keys()):
-                if k[:3] in ['AP_','BP_']:
-                    _hdu[1].header.remove(k)
-                    
+                                
         else:
             wcs = utils.wcs_from_header(_hdu['SCI'].header, relax=True)
-            
+        
+        # Remove WCS inverse keywords
+        for _ext in [0, 'SCI']:
+            for k in list(_hdu[_ext].header.keys()):
+                if k[:3] in ['AP_','BP_']:
+                    _hdu[_ext].header.remove(k)
+        
         pscale = utils.get_wcs_pscale(wcs)
         
         _hdu[1].header['IDCSCALE'] = pscale, 'Pixel scale calculated from WCS'
         _hdu[0].header['PIXSCALE'] = pscale, 'Pixel scale calculated from WCS'
         _hdu[0].header['GRIZLWCS'] = True, 'WCS modified by grizli'
         
+        _hdu[0].header['UPDA_CTX'] = (os.environ['CRDS_CONTEXT'], 
+                                      'CRDS_CTX for modified files')
+                                      
+        _hdu[0].header['R_DISTOR'] = (os.path.basename(_distor_file), 
+                                      'Distortion reference file')
+                                      
         _hdu.writeto(input, overwrite=True)
 
     return output
@@ -516,7 +615,7 @@ def get_phot_keywords(input, verbose=True):
     if 'OBUNIT' not in img['SCI'].header:
         img['SCI'].header['OBUNIT'] = (img['SCI'].header['BUNIT'], 
                                       'Original image units')
-        
+    
     img['SCI'].header['BUNIT'] = 'ELECTRONS/S'
     
     # Write FITS file if filename provided as input
@@ -581,6 +680,8 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
     from jwst.gain_scale import GainScaleStep
     
     set_quiet_logging(QUIET_LEVEL)
+    
+    _ = set_crds_context()
     
     img = pyfits.open(filename)
     
@@ -673,15 +774,28 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
                 dq -= dq & b
                 #dq -= dq & 2
             
-        msg = f'Mask left side of MIRI'
-        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
-        dq[:,:302] |= 1024
+        # msg = f'Mask left side of MIRI'
+        # utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+        # dq[:,:302] |= 1024
         
         # Dilate MIRI mask
         msg = f'Dilate MIRI window mask'
         utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
         edge = nd.binary_dilation(((dq & 2**9) > 0), iterations=6)
         dq[edge] |= 1024
+        
+    elif img[0].header['OINSTRUM'] == 'NIRCAM':
+        _det = img[0].header['DETECTOR']
+        bpfile = os.path.join(os.path.dirname(__file__), 
+                   f'data/nrc_lowpix_0916_{_det}.fits.gz')
+        
+        if os.path.exists(bpfile):
+            bpdata = pyfits.open(bpfile)[0].data
+            bpdata = nd.binary_dilation(bpdata > 0, iterations=2)*1024
+            dq |= bpdata.astype(dq.dtype)
+            
+            msg = f'Use extra badpix in {bpfile}'
+            utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
         
     img['DQ'].data = dq
     
@@ -691,10 +805,15 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
     img[1].header['EXPNAME'] = img[0].header['EXPOSURE']
     img[1].header['MEANDARK'] = 0.0
     
+    for _ext in [0, 'SCI']:
+        for k in list(img[_ext].header.keys()):
+            if k[:3] in ['AP_','BP_']:
+                img[_ext].header.remove(k)
+    
     # AstroDrizzle needs a time extension, which can be empty 
     # but with a PIXVALUE keyword.
     # The header below is designed after WFC3/IR
-            
+    
     img.writeto(filename, overwrite=True)
     img.close()
     
@@ -1786,6 +1905,14 @@ def calc_jwst_filter_info():
                             
                 elif inst == 'NIRISS':
                     for k, phot in enumerate(phots):
+                        try:
+                            filt = [f.strip() for f in phot['filter']]
+                            pupil = [f.strip() for f in phot['pupil']]
+                            phot['filter'] = filt
+                            phot['pupil'] = pupil
+                        except:
+                            continue
+                            
                         ix = phot['filter'] == key
                         ix |= phot['pupil'] == key
                         if ix.sum() > 0:

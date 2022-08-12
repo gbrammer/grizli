@@ -47,4 +47,5 @@ git+https://github.com/gbrammer/eazy-py.git
 # git+https://github.com/gbrammer/sregion.git
 sregion>=1.0
 git+https://github.com/gbrammer/tristars.git
-git+https://github.com/gbrammer/mastquery.git
+# git+https://github.com/gbrammer/mastquery.git
+mastquery>=1.4
