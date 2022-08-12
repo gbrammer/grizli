@@ -1970,7 +1970,10 @@ def preprocess(field_root='j142724+334246',  HOME_PATH='/Volumes/Pegasus/Grizli/
                 #     master_radec = None
                 if radec is not None:
                     fp = direct['footprint']
-                    
+            else:
+                if radec is not None:
+                    fp = direct['footprint']
+                
         if radec is None:
             radec_files = glob.glob('*cat.radec')
             radec = parent_radec
