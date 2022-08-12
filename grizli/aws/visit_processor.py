@@ -1618,6 +1618,7 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
 
             files += glob.glob(f'{prod}*fits*')
             files += glob.glob(f'{prod}*_fp.png')
+            files += glob.glob(f'{prod}*wcs.csv')
         
         
         for file in files:
