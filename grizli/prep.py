@@ -2724,17 +2724,34 @@ def make_miri_average_flat(visit, clip_max=1, apply=True, verbose=True):
     utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
     
     if apply:
-        for file in visit['files']:
-            msg = f"make_miri_average_flat: apply {skyfile} to {file}"
-            utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
-            
-            with pyfits.open(file, mode='update') as _imi:
-                _imi['SCI'].data /= flat
-                _imi['ERR'].data /= flat
-                _imi['DQ'].data[flat_mask] |= 1024
-                _imi[0].header['SKYFLAT'] = True, 'Sky flat applied'
-                _imi[0].header['SKYFLATF'] = skyfile, 'Sky flat file'
-                _imi.flush()
+        apply_miri_skyflat(visit, skyfile=skyfile)
+
+
+def apply_miri_skyflat(visit, skyfile=None, verbose=True):
+    """
+    Apply the MIRI skyflat
+    """
+    
+    if not os.path.exists(skyfile):
+        msg = f"apply_miri_skyflat: MIRI skyflat {skyfile} not found"
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+        return None
+    
+    flat = pyfits.open(skyfile)[0].data
+    flat_mask = (flat == 1) | (~np.isfinite(flat))
+    flat[flat_mask] = 1
+    
+    for file in visit['files']:
+        msg = f"make_miri_average_flat: apply {skyfile} to {file}"
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+        
+        with pyfits.open(file, mode='update') as _imi:
+            _imi['SCI'].data /= flat
+            _imi['ERR'].data /= flat
+            _imi['DQ'].data[flat_mask] |= 1024
+            _imi[0].header['SKYFLAT'] = True, 'Sky flat applied'
+            _imi[0].header['SKYFLATF'] = skyfile, 'Sky flat file'
+            _imi.flush()
 
 
 def nircam_wisp_correction(calibrated_file, niter=3, update=True, verbose=True, **kwargs):
@@ -3519,6 +3536,7 @@ def process_direct_grism_visit(direct={},
                                tweak_threshold=1.5,
                                align_simple=True,
                                single_image_CRs=True,
+                               skymethod='localmin',
                                drizzle_params={},
                                iter_atol=1.e-4,
                                imaging_bkg_params=None,
@@ -3530,7 +3548,8 @@ def process_direct_grism_visit(direct={},
                                nircam_wisp_kwargs={},
                                oneoverf_kwargs={},
                                snowball_kwargs={},
-                               miri_skyflat=True):
+                               miri_skyflat=True,
+                               miri_skyfile=None):
     """Full processing of a direct (+grism) image visit.
     
     Notes
@@ -3613,8 +3632,11 @@ def process_direct_grism_visit(direct={},
                 except TypeError:
                     updatewcs.updatewcs(file, verbose=False)
         
-        if isJWST & miri_skyflat:
-            make_miri_average_flat(direct)
+        if isJWST:
+            if miri_skyflat:
+                make_miri_average_flat(direct)
+            elif miri_skyfile is not None:
+                apply_miri_skyflat(direct, skyfile=miri_skyfile)
     
     # Initial grism processing
     skip_grism = (grism == {}) | (grism is None) | (len(grism) == 0)
@@ -3761,6 +3783,7 @@ def process_direct_grism_visit(direct={},
             AstroDrizzle(direct['files'], output=direct['product'],
                          clean=True, context=False, preserve=False,
                          skysub=True,
+                         skymethod=skymethod,
                          driz_separate=True, driz_sep_wcs=True,
                          median=True, blot=True, driz_cr=True,
                          driz_cr_snr=driz_cr_snr_first,
@@ -3930,6 +3953,7 @@ def process_direct_grism_visit(direct={},
             AstroDrizzle(direct['files'], output=direct['product'],
                          clean=True, final_pixfrac=pixfrac,
                          context=(isACS | isWFPC2),
+                         skysub=True, skymethod=skymethod,
                          resetbits=4096, final_bits=bits, driz_sep_bits=bits,
                          preserve=False, driz_cr_snr=driz_cr_snr,
                          driz_cr_scale=driz_cr_scale, build=False,
@@ -3964,6 +3988,7 @@ def process_direct_grism_visit(direct={},
             # Redrizzle before background
             AstroDrizzle(direct['files'], output=direct['product'],
                          clean=True, final_pixfrac=0.8, context=False,
+                         skysub=True, skymethod=skymethod,
                          resetbits=0, final_bits=bits, driz_sep_bits=bits,
                          preserve=False, driz_cr_snr=driz_cr_snr,
                          driz_cr_scale=driz_cr_scale, driz_separate=False,

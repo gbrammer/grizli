@@ -89,6 +89,7 @@ visit_prep_args: &prep_args
     align_min_flux_radius: 1.
     catalog_mask_pad: 0.05
     match_catalog_density: False
+    skymethod: localmin
     drizzle_params: {}
     single_image_CRs: True
     run_tweak_align: True
@@ -101,18 +102,31 @@ visit_prep_args: &prep_args
     column_average: True
     sky_iter: 10
     iter_atol: 0.0001
-    imaging_bkg_params: {bh: 256, bw: 256, fh: 3, fw: 3, pixel_scale: 0.10, get_median: False}
+    imaging_bkg_params:
+        bh: 256
+        bw: 256
+        fh: 3
+        fw: 3
+        pixel_scale: 0.10
+        get_median: False
     run_separate_chip_sky: True
     fix_stars: True
     reference_catalogs: [LS_DR9, PS1, DES, DSC, SDSS, GAIA, WISE]
     outlier_threshold: 4
-    nircam_wisp_kwargs: {niter:3, update:True}
-    oneoverf_kwargs: {thresholds: [10,1.5], dilate_iter: [24,2], image_sn_cut:-1}
-    snowball_kwargs: {snowball_erode: 4,
-                      snowball_dilate: 18,
-                      mask_bit: 1024,
-                      instruments: ['NIRCAM','NIRISS']}
+    nircam_wisp_kwargs:
+        niter: 3
+        update: True
+    oneoverf_kwargs: 
+        thresholds: [10, 1.5]
+        dilate_iter: [24, 2]
+        image_sn_cut: -1
+    snowball_kwargs:
+        snowball_erode: 4
+        snowball_dilate: 18
+        mask_bit: 1024
+        instruments: [NIRCAM, NIRISS]
     miri_skyflat: True
+    miri_skyfile: null
     # use_self_catalog: *is_parallel_field
 
 # Arguments to prep.apply_persistence_mask
@@ -147,7 +161,9 @@ fine_alignment_args:
     date: null
     tol: null
     fit_options: null
-    print_options: {precision: 3, sign: ' '}
+    print_options:
+        precision: 3
+        sign: ' '
     include_internal_matches: True
     
 # Combined mosaics
@@ -209,7 +225,12 @@ multiband_catalog_args:
     detection_params: null
     phot_apertures: null
     bkg_mask: null
-    bkg_params: {bw: 64, bh: 64, fw: 3, fh: 3, pixel_scale: 0.06}
+    bkg_params:
+        bw: 64
+        bh: 64
+        fw: 3
+        fh: 3
+        pixel_scale: 0.06
     use_bkg_err: False
     aper_segmask: True
     rescale_weight: False
