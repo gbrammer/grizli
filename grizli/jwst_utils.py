@@ -174,7 +174,7 @@ def get_nircam_skyflat(header, verbose=True, valid_flat=(0.7, 1.4)):
         skyfile = os.path.join(conf_path, f'{key}_skyflat_smooth.fits')
 
     if not os.path.exists(skyfile):
-        msg = f'get_nircam_skyflat: {skyfile} not found'
+        msg = f'jwst_utils.get_nircam_skyflat: {skyfile} not found'
         utils.log_comment(utils.LOGFILE, msg, verbose=True)
         return None, None, None
 
@@ -192,9 +192,10 @@ def get_nircam_skyflat(header, verbose=True, valid_flat=(0.7, 1.4)):
     bad |= skyflat > valid_flat[1]
     dq = bad*1024
 
-    msg = f'get_nircam_skyflat: pipeline flat = {crds_path}\n'
-    msg += f'get_nircam_skyflat: new sky flat = {skyfile}\n'
-    msg += f'get_nircam_skyflat: valid_flat={valid_flat} nmask={bad.sum()}'
+    msg = f'jwst_utils.get_nircam_skyflat: pipeline flat = {crds_path}\n'
+    msg += f'jwst_utils.get_nircam_skyflat: new sky flat = {skyfile}\n'
+    msg += f'jwst_utils.get_nircam_skyflat: valid_flat={valid_flat}'
+    msg += f' nmask={bad.sum()}'
     utils.log_comment(utils.LOGFILE, msg, verbose=True)
 
     return skyfile, flat_corr, dq
@@ -319,8 +320,8 @@ def img_with_flat(input, verbose=True, overwrite=True, apply_photom=True, use_sk
                         
                         _hdu.flush()
                 else:
-                    utils.log_comment(utils.LOGFILE,
-                                      f'get_nircam_skyflat: FIXFLAT found', 
+                    msg = f'jwst_utils.get_nircam_skyflat: FIXFLAT found'
+                    utils.log_comment(utils.LOGFILE, msg, 
                                       verbose=verbose, show_date=False)
                     
     gc.collect()
