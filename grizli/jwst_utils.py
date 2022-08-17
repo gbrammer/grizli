@@ -192,8 +192,9 @@ def get_nircam_skyflat(header, verbose=True, valid_flat=(0.7, 1.4)):
     bad |= skyflat > valid_flat[1]
     dq = bad*1024
 
-    msg = f'get_nircam_skyflat: old={crds_path} new={skyfile}'
-    msg += f' nmask={bad.sum()}'
+    msg = f'get_nircam_skyflat: pipeline flat = {crds_path}\n'
+    msg += f'get_nircam_skyflat: new sky flat = {skyfile}\n'
+    msg += f'get_nircam_skyflat: valid_flat={valid_flat} nmask={bad.sum()}'
     utils.log_comment(utils.LOGFILE, msg, verbose=True)
 
     return skyfile, flat_corr, dq
@@ -279,6 +280,9 @@ def img_with_flat(input, verbose=True, overwrite=True, apply_photom=True, use_sk
                               verbose=verbose, show_date=False)
         
     else:
+        utils.log_comment(utils.LOGFILE,
+                          f'jwst_utils.img_with_flat: Flat already applied', 
+                          verbose=verbose, show_date=False)
         
         output = img
     
@@ -310,10 +314,15 @@ def img_with_flat(input, verbose=True, overwrite=True, apply_photom=True, use_sk
                                                  'Skyflat correction applied')
                         _hdu[0].header['FIXFLATF'] = _sky[0], 'Skyflat file'
                         _hdu['SCI'].data *= _sky[1]
-                        _hdu['DQ'].data |= _sky[2]
+                        _dt = _hdu['DQ'].data.dtype
+                        _hdu['DQ'].data |= _sky[2].astype(_dt)
                         
                         _hdu.flush()
-                
+                else:
+                    utils.log_comment(utils.LOGFILE,
+                                      f'get_nircam_skyflat: FIXFLAT found', 
+                                      verbose=verbose, show_date=False)
+                    
     gc.collect()
     
     return output
