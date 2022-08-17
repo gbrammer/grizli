@@ -2754,6 +2754,66 @@ def apply_miri_skyflat(visit, skyfile=None, verbose=True):
             _imi.flush()
 
 
+def get_nircam_wisp_filename(header):
+    """
+    Get the path to an appropriate NIRCam wisp template file, assuming the 
+    templates are stored in `[GRIZLI_PATH]/CONF/NircamWisp`
+    
+    Parameters
+    ----------
+    header : `astropy.io.fits.Header`
+        Primary header
+    
+    Returns
+    -------
+    wisp_file : str
+        Filename of the wisp reference, or `None` if the header isn't for a 
+        NIRCam exposure in F150W or F200W
+    
+    _filt : str
+        FILTER from header
+    
+    _inst : str
+        INSTRUME from header
+    
+    _det : str
+        DETECTOR from header
+    
+    msg : str
+        Status message
+        
+    """
+    if 'OFILTER' in header:
+        _filt = header['OFILTER']
+        _inst = header['OINSTRUM']
+        _det = header['ODETECTO']
+    else:
+        _filt = header['FILTER']
+        _inst = header['INSTRUME']
+        _det = header['DETECTOR']
+
+    if _inst not in ['NIRCAM']:
+        msg = f'nircam_wisp_correction - {calibrated_file}: '
+        msg += f'Instrument {_inst} not supported'
+        return None, _filt, _inst, _det, msg
+
+    if _filt not in ['F150W','F200W']:
+        msg = f'nircam_wisp_correction - {calibrated_file}: '
+        msg += f'NIRCam filter {_filt} not supported'
+        return None, _filt, _inst, _det, msg
+
+    if _det not in ['NRCA3','NRCB3','NRCB4']:
+        msg = f'nircam_wisp_correction - {calibrated_file}: '
+        msg += f'NIRCam detector {_det} not supported'
+        return None, _filt, _inst, _det, msg
+
+    _path = os.path.join(GRIZLI_PATH, 'CONF', 'NircamWisp')
+    wisp_file = f"wisps_{_det.lower()}_{_filt.upper()}.fits"
+    wisp_file = os.path.join(_path, wisp_file)
+    
+    return wisp_file, _filt, _inst, _det, msg
+
+
 def nircam_wisp_correction(calibrated_file, niter=3, update=True, verbose=True, force=False, **kwargs):
     """
     Fit the NIRCam wisp template and subtract
@@ -2795,35 +2855,13 @@ def nircam_wisp_correction(calibrated_file, niter=3, update=True, verbose=True, 
         utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
         return _bkg
 
-    if 'OFILTER' in im[0].header:
-        _filt = im[0].header['OFILTER']
-        _inst = im[0].header['OINSTRUM']
-        _det = im[0].header['ODETECTO']
-    else:
-        _filt = im[0].header['FILTER']
-        _inst = im[0].header['INSTRUME']
-        _det = im[0].header['DETECTOR']
-
-    if _inst not in ['NIRCAM']:
-        msg = f'nircam_wisp_correction - {calibrated_file}: '
-        msg += f'Instrument {_inst} not supported'
+    _ = get_nircam_wisp_filename(im[0].header)
+    wisp_file, _filt, _inst, _det, msg = _
+    
+    if wisp_file is None:
         utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
         return None
-    
-    if _filt not in ['F150W','F200W']:
-        msg = f'nircam_wisp_correction - {calibrated_file}: '
-        msg += f'NIRCam filter {_filt} not supported'
-        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
-        return None
-    
-    if _det not in ['NRCA3','NRCB3','NRCB4']:
-        msg = f'nircam_wisp_correction - {calibrated_file}: '
-        msg += f'NIRCam detector {_det} not supported'
-        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
-        return None
-    
-    _path = os.path.join(GRIZLI_PATH, 'CONF', 'NircamWisp')
-    wisp_file = os.path.join(_path, f"wisps_{_det.lower()}_{_filt.upper()}.fits")
+        
     if not os.path.exists(wisp_file):
         msg = f'nircam_wisp_correction - {calibrated_file}: '
         msg += f'{wisp_file} not found'
