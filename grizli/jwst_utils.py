@@ -311,9 +311,10 @@ def img_with_flat(input, verbose=True, overwrite=True, apply_photom=True, use_sk
                 if 'FIXFLAT' not in _hdu[0].header:
                     _sky = get_nircam_skyflat(_hdu[0].header)
                     if _sky[0] is not None:
+                        _skyf = os.path.basename(_sky[0])
                         _hdu[0].header['FIXFLAT'] = (True,
                                                  'Skyflat correction applied')
-                        _hdu[0].header['FIXFLATF'] = _sky[0], 'Skyflat file'
+                        _hdu[0].header['FIXFLATF'] = _skyf, 'Skyflat file'
                         _hdu['SCI'].data *= _sky[1]
                         _dt = _hdu['DQ'].data.dtype
                         _hdu['DQ'].data |= _sky[2].astype(_dt)
