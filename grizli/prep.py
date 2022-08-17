@@ -2754,7 +2754,7 @@ def apply_miri_skyflat(visit, skyfile=None, verbose=True):
             _imi.flush()
 
 
-def nircam_wisp_correction(calibrated_file, niter=3, update=True, verbose=True, **kwargs):
+def nircam_wisp_correction(calibrated_file, niter=3, update=True, verbose=True, force=False, **kwargs):
     """
     Fit the NIRCam wisp template and subtract
     
@@ -2775,6 +2775,9 @@ def nircam_wisp_correction(calibrated_file, niter=3, update=True, verbose=True, 
         
     verbose : bool
         verbosity
+      
+    force : bool
+        Force wisp fit, even if 'WISPBKG' keyword already found in header
         
     """
     if not os.path.exists(calibrated_file):
@@ -2785,6 +2788,13 @@ def nircam_wisp_correction(calibrated_file, niter=3, update=True, verbose=True, 
     im = pyfits.open(calibrated_file)
     sh = im['SCI'].data.shape
     
+    if ('WISPBKG' in im[0].header) & (not force):
+        msg = f'nircam_wisp_correction - {calibrated_file}: '
+        _bkg = im[0].header['WISPBKG']
+        msg += f"WISPBKG = {_bkg:.2f}"
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+        return _bkg
+
     if 'OFILTER' in im[0].header:
         _filt = im[0].header['OFILTER']
         _inst = im[0].header['OINSTRUM']
