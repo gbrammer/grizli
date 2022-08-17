@@ -6176,6 +6176,19 @@ def fetch_wfpc2_calib(file='g6q1912hu_r4f.fits', path=os.getenv('uref'), use_mas
             return True
 
 
+def fetch_nircam_skyflats():
+    """
+    Download skyflat files
+    """
+    conf_path = os.path.join(GRIZLI_PATH, 'CONF', 'NircamSkyFlat')
+    os.system(f'aws s3 sync s3://grizli-v2/NircamSkyflats/ {conf_path} --exclude "*" --include "nrc*fits"')
+    
+    _files = glob.glob(conf_path+'/*fits')
+    _files.sort()
+    
+    return _files
+
+
 def fetch_config_files(get_acs=False, get_sky=True, get_stars=True, get_epsf=True, get_jwst=False, get_wfc3=True, **kwargs):
     """
     Config files needed for Grizli
