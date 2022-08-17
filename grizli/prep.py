@@ -2793,20 +2793,19 @@ def get_nircam_wisp_filename(header):
         _det = header['DETECTOR']
 
     if _inst not in ['NIRCAM']:
-        msg = f'nircam_wisp_correction - {calibrated_file}: '
-        msg += f'Instrument {_inst} not supported'
+        msg = f'Instrument {_inst} not supported'
         return None, _filt, _inst, _det, msg
 
     if _filt not in ['F150W','F200W']:
-        msg = f'nircam_wisp_correction - {calibrated_file}: '
-        msg += f'NIRCam filter {_filt} not supported'
+        msg = f'NIRCam filter {_filt} not supported'
         return None, _filt, _inst, _det, msg
 
     if _det not in ['NRCA3','NRCB3','NRCB4']:
-        msg = f'nircam_wisp_correction - {calibrated_file}: '
-        msg += f'NIRCam detector {_det} not supported'
+        msg = f'NIRCam detector {_det} not supported'
         return None, _filt, _inst, _det, msg
-
+    
+    msg = 'OK'
+    
     _path = os.path.join(GRIZLI_PATH, 'CONF', 'NircamWisp')
     wisp_file = f"wisps_{_det.lower()}_{_filt.upper()}.fits"
     wisp_file = os.path.join(_path, wisp_file)
@@ -2856,10 +2855,11 @@ def nircam_wisp_correction(calibrated_file, niter=3, update=True, verbose=True, 
         return _bkg
 
     _ = get_nircam_wisp_filename(im[0].header)
-    wisp_file, _filt, _inst, _det, msg = _
+    wisp_file, _filt, _inst, _det, _msg = _
     
     if wisp_file is None:
-        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+        msg = f'nircam_wisp_correction - {calibrated_file}: '
+        utils.log_comment(utils.LOGFILE, msg + _msg, verbose=verbose)
         return None
         
     if not os.path.exists(wisp_file):
