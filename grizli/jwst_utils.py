@@ -303,6 +303,7 @@ def img_with_flat(input, verbose=True, overwrite=True, apply_photom=True, use_sk
         
         if use_skyflats:
             with pyfits.open(input, mode='update') as _hdu:
+                if 'FIXFLAT' not in _hdu[0].header:
                     _sky = get_nircam_skyflat(_hdu[0].header)
                     if _sky[0] is not None:
                         _hdu[0].header['FIXFLAT'] = (True,
@@ -311,7 +312,7 @@ def img_with_flat(input, verbose=True, overwrite=True, apply_photom=True, use_sk
                         _hdu['SCI'].data *= _sky[1]
                         _hdu['DQ'].data |= _sky[2]
                         
-                _hdu.flush()
+                    _hdu.flush()
                 
     gc.collect()
     
