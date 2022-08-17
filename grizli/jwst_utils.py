@@ -13,6 +13,7 @@ import astropy.wcs as pywcs
 
 import numpy as np
 from . import utils
+from . import GRIZLI_PATH
 
 QUIET_LEVEL = logging.INFO
 
@@ -159,7 +160,46 @@ def change_header_pointing(header, ra_ref=0., dec_ref=0., pa_v3=0.):
     return new_header
 
 
-def img_with_flat(input, verbose=True, overwrite=True, apply_photom=True):
+def get_nircam_skyflat(header, verbose=True, valid_flat=(0.7, 1.4)):
+    """
+    Get NIRCam skyflat
+    """
+    filt = utils.parse_filter_from_header(header)
+
+    key = ('{0}-{1}'.format(header['detector'], filt)).lower()
+    conf_path = os.path.join(GRIZLI_PATH, 'CONF', 'NircamSkyFlat')
+    if 'nrcb4' in key:
+        skyfile = os.path.join(conf_path, f'{key}_skyflat.fits')
+    else:
+        skyfile = os.path.join(conf_path, f'{key}_skyflat_smooth.fits')
+
+    if not os.path.exists(skyfile):
+        msg = f'get_nircam_skyflat: {skyfile} not found'
+        utils.log_comment(utils.LOGFILE, msg, verbose=True)
+        return None, None, None
+
+    skyflat = pyfits.open(skyfile)[0].data
+
+    oflat = os.path.basename(header['R_FLAT'])
+    crds_path = os.getenv('CRDS_PATH')
+    crds_path = os.path.join(crds_path, 'references/jwst', 
+                             header['instrume'].lower(), oflat)
+
+    oim = pyfits.open(crds_path)
+    flat_corr = oim['SCI'].data / skyflat
+
+    bad = skyflat < valid_flat[0]
+    bad |= skyflat > valid_flat[1]
+    dq = bad*1024
+
+    msg = f'get_nircam_skyflat: old={crds_path} new={skyfile}'
+    msg += f' nmask={bad.sum()}'
+    utils.log_comment(utils.LOGFILE, msg, verbose=True)
+
+    return skyfile, flat_corr, dq
+
+
+def img_with_flat(input, verbose=True, overwrite=True, apply_photom=True, use_skyflats=True):
     """
     Apply flat-field and photom corrections if nessary
     """
@@ -259,6 +299,15 @@ def img_with_flat(input, verbose=True, overwrite=True, apply_photom=True):
                     _hdu[0].header['R_PHOTOM'] = (os.path.basename(_photfile),
                                         'Applied photom')
                 
+                if use_skyflats:
+                    _sky = get_nircam_skyflat(_hdu[0].header)
+                    if _sky[0] is not None:
+                        _hdu[0].header['FIXFLAT'] = (True,
+                                                 'Skyflat correction applied')
+                        _hdu[0].header['FIXFLATF'] = _sky[0], 'Skyflat file'
+                        _hdu['SCI'].data *= _sky[1]
+                        _hdu['DQ'].data |= _sky[2]
+                        
                 _hdu.flush()
                 
     gc.collect()
