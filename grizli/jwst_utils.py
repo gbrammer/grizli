@@ -160,9 +160,9 @@ def change_header_pointing(header, ra_ref=0., dec_ref=0., pa_v3=0.):
     return new_header
 
 
-def get_nircam_skyflat(header, verbose=True, valid_flat=(0.7, 1.4)):
+def get_jwst_skyflat(header, verbose=True, valid_flat=(0.7, 1.4)):
     """
-    Get NIRCam skyflat
+    Get sky flat for JWST instruments
     """
     filt = utils.parse_filter_from_header(header)
 
@@ -174,7 +174,7 @@ def get_nircam_skyflat(header, verbose=True, valid_flat=(0.7, 1.4)):
         skyfile = os.path.join(conf_path, f'{key}_skyflat_smooth.fits')
 
     if not os.path.exists(skyfile):
-        msg = f'jwst_utils.get_nircam_skyflat: {skyfile} not found'
+        msg = f'jwst_utils.get_jwst_skyflat: {skyfile} not found'
         utils.log_comment(utils.LOGFILE, msg, verbose=True)
         return None, None, None
 
@@ -192,9 +192,9 @@ def get_nircam_skyflat(header, verbose=True, valid_flat=(0.7, 1.4)):
     bad |= skyflat > valid_flat[1]
     dq = bad*1024
 
-    msg = f'jwst_utils.get_nircam_skyflat: pipeline flat = {crds_path}\n'
-    msg += f'jwst_utils.get_nircam_skyflat: new sky flat = {skyfile}\n'
-    msg += f'jwst_utils.get_nircam_skyflat: valid_flat={valid_flat}'
+    msg = f'jwst_utils.get_jwst_skyflat: pipeline flat = {crds_path}\n'
+    msg += f'jwst_utils.get_jwst_skyflat: new sky flat = {skyfile}\n'
+    msg += f'jwst_utils.get_jwst_skyflat: valid_flat={valid_flat}'
     msg += f' nmask={bad.sum()}'
     utils.log_comment(utils.LOGFILE, msg, verbose=True)
 
@@ -309,7 +309,7 @@ def img_with_flat(input, verbose=True, overwrite=True, apply_photom=True, use_sk
         if use_skyflats:
             with pyfits.open(input, mode='update') as _hdu:
                 if 'FIXFLAT' not in _hdu[0].header:
-                    _sky = get_nircam_skyflat(_hdu[0].header)
+                    _sky = get_jwst_skyflat(_hdu[0].header)
                     if _sky[0] is not None:
                         _skyf = os.path.basename(_sky[0])
                         _hdu[0].header['FIXFLAT'] = (True,
@@ -321,7 +321,7 @@ def img_with_flat(input, verbose=True, overwrite=True, apply_photom=True, use_sk
                         
                         _hdu.flush()
                 else:
-                    msg = f'jwst_utils.get_nircam_skyflat: FIXFLAT found'
+                    msg = f'jwst_utils.get_jwst_skyflat: FIXFLAT found'
                     utils.log_comment(utils.LOGFILE, msg, 
                                       verbose=verbose, show_date=False)
                     
