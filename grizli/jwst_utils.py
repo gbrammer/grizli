@@ -170,6 +170,10 @@ def get_jwst_skyflat(header, verbose=True, valid_flat=(0.7, 1.4)):
     conf_path = os.path.join(GRIZLI_PATH, 'CONF', 'NircamSkyFlat')
     if 'nrcb4' in key:
         skyfile = os.path.join(conf_path, f'{key}_skyflat.fits')
+    elif key.startswith('nis-'):
+        skyfile = os.path.join(conf_path, f'{key}_skyflat.fits')
+    elif key.startswith('mirimage-'):
+        skyfile = os.path.join(conf_path, f'{key}_skyflat.fits')
     else:
         skyfile = os.path.join(conf_path, f'{key}_skyflat_smooth.fits')
 
