@@ -222,7 +222,7 @@ def get_jwst_skyflat(header, verbose=True, valid_flat=(0.7, 1.4)):
     bad = skyflat < valid_flat[0]
     bad |= skyflat > valid_flat[1]
     bad |= ~np.isfinite(skyflat)
-    skyflat[bad] = 1
+    flat_corr[bad] = 1
     
     dq = bad*1024
 
