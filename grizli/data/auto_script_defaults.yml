@@ -125,7 +125,7 @@ visit_prep_args: &prep_args
         snowball_dilate: 18
         mask_bit: 1024
         instruments: [NIRCAM, NIRISS]
-    miri_skyflat: True
+    miri_skyflat: False
     miri_skyfile: null
     # use_self_catalog: *is_parallel_field
 
