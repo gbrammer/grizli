@@ -1302,7 +1302,7 @@ def get_wcs_guess(assoc, verbose=True):
             fp.write(guess)        
         
             
-def make_parent_mosaic(parent='j191436m5928', **kwargs):
+def make_parent_mosaic(parent='j191436m5928', root=None, **kwargs):
     """
     Get the full footprint of all exposure in the database for a given 'parent'
     """
@@ -1329,7 +1329,10 @@ def make_parent_mosaic(parent='j191436m5928', **kwargs):
     size = ((np.max(bx) - np.min(bx))*cosd*3600+10., 
             (np.max(by) - np.min(by))*3600+10.)
     
-    cutout_mosaic(rootname=parent, ra=ra, dec=dec, size=size, **kwargs)
+    if root is None:
+        root = parent
+        
+    cutout_mosaic(rootname=root, ra=ra, dec=dec, size=size, **kwargs)
 
 
 def res_query_from_local(files=None, filters=None):
