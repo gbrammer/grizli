@@ -200,6 +200,7 @@ def get_jwst_skyflat(header, verbose=True, valid_flat=(0.7, 1.4)):
     elif key.startswith('nis-'):
         skyfile = os.path.join(conf_path, f'{key}_skyflat.fits')
     elif key.startswith('mirimage-'):
+        key += '-'+header['readpatt'].lower()
         skyfile = os.path.join(conf_path, f'{key}_skyflat.fits')
     else:
         skyfile = os.path.join(conf_path, f'{key}_skyflat_smooth.fits')
