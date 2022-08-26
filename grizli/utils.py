@@ -5329,14 +5329,127 @@ def niriss_ghost_mask(im, init_thresh=0.05, init_sigma=3, final_thresh=0.01, fin
     return ghost_mask
 
 
+def get_photom_scale(header):
+    """
+    Get tabulated scale factor
+    
+    Parameters
+    ----------
+    header : `~astropy.io.fits.Header`
+        Image header
+    
+    Returns
+    -------
+    key : str
+        Detector + filter key
+    
+    scale : float
+        Scale value.  If `key` not found in the ``data/photom_correction.yml``
+        table or if the CTX is newer than that indicated in the correction
+        table then return 1.0.
+        
+    """
+    import yaml
+    if 'TELESCOP' in header:
+        if header['TELESCOP'] not in ['JWST']:
+            return header['TELESCOP'], 1.0
+    else:
+        return None, 1.0
+        
+    corr_file = os.path.join(os.path.dirname(__file__), 
+                             'data/photom_correction.yml')
+    
+    if not os.path.exists(corr_file):
+        return None, 1
+    
+    with open(corr_file) as fp:
+        corr = yaml.load(fp, Loader=yaml.SafeLoader)
+    
+    print(header['CRDS_CTX'], corr['CRDS_CTX_MAX'], corr_file)
+    
+    if 'CRDS_CTX' in header:
+        if header['CRDS_CTX'] > corr['CRDS_CTX_MAX']:
+            return header['CRDS_CTX'], 1.0
+            
+    key = '{0}-{1}'.format(header['DETECTOR'], header['FILTER'])
+    if 'PUPIL' in header:
+        key += '-{0}'.format(header['PUPIL'])
+    
+    if key not in corr:
+        return key, 1.0
+    
+    else:
+        return key, 1./corr[key]
+
+
 def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
                        clean=True, include_saturated=True, keep_bits=None,
                        dryrun=False, skip=None, extra_wfc3ir_badpix=True,
                        verbose=True,
+                       scale_photom=True,
                        niriss_ghost_kwargs={}):
     """
     Make drizzle mosaic from exposures in a visit dictionary
-
+    
+    Parameters
+    ----------
+    visit : dict
+        Visit dictionary with 'product' and 'files' keys
+    
+    output : `~astropy.wcs.WCS`, `~astropy.io.fits.Header`, `~astropy.io.ImageHDU`
+        Output frame definition.  Can be a WCS object, header, or FITS HDU
+    
+    pixfrac : float
+        Drizzle `pixfrac`
+    
+    kernel : str
+        Drizzle `kernel` (e.g., 'point', 'square')
+    
+    clean : bool
+        Remove exposure files after adding to the mosaic
+    
+    include_saturated : bool
+        Include pixels with saturated DQ flag
+    
+    keep_bits : int, None
+        Extra DQ bits to keep as valid
+    
+    dryrun : bool
+        If True, don't actually produce the output
+    
+    skip : int
+        Slice skip to drizzle a subset of exposures
+    
+    extra_wfc3ir_badpix : bool
+        Apply extra WFC3/IR bad pix to DQ
+    
+    verbose : bool
+        Some verbose message printing
+    
+    scale_photom : bool
+        For JWST, apply photometry scale corrections from the  
+        `grizli/data/photom_correction.yml` table
+    
+    niriss_ghost_kwargs : dict
+        Keyword arguments for `~grizli.utils.niriss_ghost_mask`
+    
+    Returns
+    -------
+    outsci : array-like
+        SCI array
+    
+    outwht : array-like
+        Inverse variance WHT array
+    
+    header : `~astropy.io.fits.Header`
+        Image header
+    
+    flist : list
+        List of files that were drizzled to the mosaic
+        
+    wcs_tab : `~astropy.table.Table`
+        Table of WCS parameters of individual exposures
+    
     """
     from shapely.geometry import Polygon
     import boto3
@@ -5483,15 +5596,20 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
 
         if keep_bits is not None:
             bits |= keep_bits
-
+        
+        if scale_photom:
+            _key, _scale_photom = get_photom_scale(flt[0].header)
+        else:
+            _scale_photom = 1.0
+        
         if 'PHOTFLAM' in keys:
-            msg = '  0    PHOTFLAM={0:.2e}, scale={1:.1f}'
-            msg = msg.format(keys['PHOTFLAM'], 1.)
+            msg = '  0    PHOTFLAM={0:.2e}, scale={1:.3f}'
+            msg = msg.format(keys['PHOTFLAM'], _scale_photom)
             log_comment(LOGFILE, msg, verbose=verbose)
             
             if ref_photflam is None:
                 ref_photflam = keys['PHOTFLAM']
-
+                    
         for ext in [1, 2, 3, 4]:
             if ('SCI', ext) in flt:
 
@@ -5509,20 +5627,20 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
                 else:
                     to_per_sec = 1.
 
-                phot_scale = to_per_sec
+                phot_scale = to_per_sec * _scale_photom
 
                 if 'PHOTFLAM' in h:
                     if ref_photflam is None:
                         ref_photflam = h['PHOTFLAM']
 
-                    phot_scale = h['PHOTFLAM']/ref_photflam
+                    phot_scale = h['PHOTFLAM'] / ref_photflam * _scale_photom
                     
                     if 'PHOTFNU' not in h:
                         h['PHOTFNU'] = (photfnu_from_photflam(h['PHOTFLAM'],
                                                              h['PHOTPLAM']), 
                                         'Inverse sensitivity, Jy/DN')
                                                              
-                    msg = '       PHOTFLAM={0:.2e}, scale={1:.1f}'
+                    msg = '       PHOTFLAM={0:.2e}, scale={1:.3f}'
                     msg = msg.format(h['PHOTFLAM'], phot_scale)
                     log_comment(LOGFILE, msg, verbose=verbose)
                     
@@ -5598,7 +5716,8 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
             header['PIXFRAC'] = pixfrac
             header['KERNEL'] = kernel
             header['OKBITS'] = (bits, "FLT bits treated as valid")
-
+            header['PHOTSCAL'] = _scale_photom, 'Scale factor applied'
+            
             for k in keys:
                 header[k] = keys[k]
 
@@ -6425,11 +6544,13 @@ class EffectivePSF(object):
             im = pyfits.open(file, ignore_missing_end=True)
             data = im[0].data*1 # [::-1,:,:]#[:,::-1,:]
             data[data < 0] = 0
-            filt = '{0}-{1}'.format(im[0].header['DETECTOR'].upper(),
+            key = '{0}-{1}'.format(im[0].header['DETECTOR'].upper(),
                                     im[0].header['FILTER'])
-                                    
-            self.epsf[filt] = data
-        
+            
+            if 'LABEL' in im[0].header:
+                key += '-'+im[0].header['LABEL']
+                
+            self.epsf[key] = data
         
         # Dummy, use F105W ePSF for F098M and F110W
         self.epsf['F098M'] = self.epsf['F105W']

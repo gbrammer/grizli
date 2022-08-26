@@ -1404,7 +1404,7 @@ def res_query_from_local(files=None, filters=None):
     return res
 
 
-def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-27.7910651, size=5*60, filters=['F160W'], ir_scale=0.1, ir_wcs=None, res=None, half_optical=True, kernel='point', pixfrac=0.33, make_figure=True, skip_existing=True, clean_flt=True, gzip_output=True, s3output='s3://grizli-v2/HST/Pipeline/Mosaic/', split_uvis=True, extra_query='', extra_wfc3ir_badpix=True, fix_niriss=True, scale_nanojy=10, verbose=True, niriss_ghost_kwargs={}, **kwargs):
+def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-27.7910651, size=5*60, filters=['F160W'], ir_scale=0.1, ir_wcs=None, res=None, half_optical=True, kernel='point', pixfrac=0.33, make_figure=True, skip_existing=True, clean_flt=True, gzip_output=True, s3output='s3://grizli-v2/HST/Pipeline/Mosaic/', split_uvis=True, extra_query='', extra_wfc3ir_badpix=True, fix_niriss=True, scale_nanojy=10, verbose=True, niriss_ghost_kwargs={}, scale_photom=True, **kwargs):
     """
     Make mosaic from exposures defined in the exposure database
     
@@ -1570,6 +1570,7 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
                                      kernel=kernel, clean=clean_flt, 
                                      extra_wfc3ir_badpix=extra_wfc3ir_badpix,
                                      verbose=verbose,
+                                     scale_photom=scale_photom,
                                      niriss_ghost_kwargs=niriss_ghost_kwargs)
                              
         outsci, outwht, header, flist, wcs_tab = _
