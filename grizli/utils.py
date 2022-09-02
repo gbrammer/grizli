@@ -5087,7 +5087,8 @@ def half_pixel_scale(wcs):
         h[k] = h[k]*2 - 0.5
         
     for k in ['CD1_1', 'CD1_2', 'CD2_1', 'CD2_2']:
-        h[k] /= 2
+        if k in h:
+            h[k] /= 2
     
     if 0:
         # Test
