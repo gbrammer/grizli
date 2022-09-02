@@ -97,6 +97,7 @@ visit_prep_args: &prep_args
     tweak_fit_order: -1
     tweak_max_dist: 100
     tweak_n_min: 10
+    tweak_ref_exp: 0
     align_simple: False
     align_clip: 120
     column_average: True

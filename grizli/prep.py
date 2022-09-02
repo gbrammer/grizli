@@ -3582,6 +3582,7 @@ def process_direct_grism_visit(direct={},
                                tweak_max_dist=100.,
                                tweak_n_min=10,
                                tweak_threshold=1.5,
+                               tweak_ref_exp=0,
                                align_simple=True,
                                single_image_CRs=True,
                                skymethod='localmin',
@@ -3782,9 +3783,13 @@ def process_direct_grism_visit(direct={},
             
         if (not isACS) & (not isWFPC2) & run_tweak_align:
             # if run_tweak_align:
-            tweak_align(direct_group=direct, grism_group=grism,
-                        max_dist=tweak_max_dist, n_min=tweak_n_min,
-                        key=' ', drizzle=False,
+            tweak_align(direct_group=direct,
+                        grism_group=grism,
+                        max_dist=tweak_max_dist,
+                        n_min=tweak_n_min,
+                        key=' ',
+                        drizzle=False,
+                        ref_exp=tweak_ref_exp,
                         threshold=tweak_threshold, fit_order=tweak_fit_order)
 
         if (isACS) & (len(direct['files']) == 1) & single_image_CRs:
@@ -4248,7 +4253,7 @@ def set_grism_dfilter(direct, grism):
         flt.flush()
 
 
-def tweak_align(direct_group={}, grism_group={}, max_dist=1., n_min=10, key=' ', threshold=3, drizzle=False, fit_order=-1):
+def tweak_align(direct_group={}, grism_group={}, max_dist=1., n_min=10, key=' ', threshold=3, drizzle=False, fit_order=-1, ref_exp=0):
     """Intra-visit shift alignment
     
     Parameters
@@ -4272,6 +4277,9 @@ def tweak_align(direct_group={}, grism_group={}, max_dist=1., n_min=10, key=' ',
         If > 0, then fit a polynomial to the derived shifts rather than 
         using the shifts themselves, e.g., for DASH imaging
     
+    ref_exp : int
+        Index of the exposure to use as the reference for the tweak shifts
+        
     Returns
     -------
     Nothing, but updates WCS of direct and (optionally) grism exposures
@@ -4293,7 +4301,7 @@ def tweak_align(direct_group={}, grism_group={}, max_dist=1., n_min=10, key=' ',
 
     wcs_ref, shift_dict = tweak_flt(files=direct_group['files'],
                                     max_dist=max_dist, threshold=threshold,
-                                    verbose=True)
+                                    verbose=True, ref_exp=ref_exp)
 
     grism_matches = find_direct_grism_pairs(direct=direct_group, grism=grism_group, check_pixel=[507, 507], toler=0.1, key=key)
     logstr = '\ngrism_matches = {0}\n'.format(grism_matches)
@@ -4555,7 +4563,7 @@ MATCH_KWS = dict(maxKeep=10, auto_keep=3, auto_transform=None, auto_limit=3,
                  size_limit=[5, 1800], ignore_rot=True, ignore_scale=True, 
                  ba_max=0.9)
                                 
-def tweak_flt(files=[], max_dist=0.4, threshold=3, verbose=True, tristars_kwargs=MATCH_KWS, use_sewpy=False):
+def tweak_flt(files=[], max_dist=0.4, threshold=3, verbose=True, tristars_kwargs=MATCH_KWS, ref_exp=0, use_sewpy=False):
     """Refine shifts of FLT files
     
     Parameters
@@ -4574,7 +4582,10 @@ def tweak_flt(files=[], max_dist=0.4, threshold=3, verbose=True, tristars_kwargs
     
     tristars_kwargs : dict
         Keyword arguments for `tristars.match.match_catalog_tri`
-        
+    
+    ref_exp : int
+        Index of the exposure to use as the reference for the tweak shifts
+    
     use_sewpy : bool
         Use `sewpy` for source detection (deprecated)
     
@@ -4680,11 +4691,14 @@ def tweak_flt(files=[], max_dist=0.4, threshold=3, verbose=True, tristars_kwargs
             if os.path.exists(file):
                 os.remove(file)
 
-    c0 = cats[0][0]
+    if ref_exp < len(cats):
+        c0, wcs_0 = cats[ref_exp]
+    else:
+        c0, wcs_0 = cats[0]
+    
     not_CR = c0['FLUX_RADIUS'] > 1.5
     c0 = c0[not_CR]
 
-    wcs_0 = cats[0][1]
     xy_0 = np.array([c0['X_IMAGE'], c0['Y_IMAGE']]).T
     tree = scipy.spatial.cKDTree(xy_0, 10)
 
