@@ -4798,7 +4798,7 @@ def make_wcsheader(ra=40.07293, dec=-1.6137748, size=2, pixscale=0.1, get_hdu=Fa
         Return a `~astropy.io.fits.ImageHDU` rather than header/wcs.
 
     theta : float
-        Position angle of the output thumbnail
+        Position angle of the output thumbnail (degrees)
 
     Returns
     -------
@@ -5086,7 +5086,7 @@ def half_pixel_scale(wcs):
     for k in ['CRPIX1', 'CRPIX2']:
         h[k] = h[k]*2 - 0.5
         
-    for k in ['CD1_1', 'CD2_2']:
+    for k in ['CD1_1', 'CD1_2', 'CD2_1', 'CD2_2']:
         h[k] /= 2
     
     if 0:
