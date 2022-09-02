@@ -1431,8 +1431,8 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
     if half_optical:
         opt_wcs = utils.half_pixel_scale(ir_wcs)
         
-    x1, y1 = fp[0]
-    x2, y2 = fp[2]
+    x1, y1 = fp.min(axis=0)
+    x2, y2 = fp.max(axis=0)
     
     # Database query
     SQL = f"""
