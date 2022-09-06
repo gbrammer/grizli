@@ -5457,6 +5457,8 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
     from botocore.exceptions import ClientError
     import scipy.ndimage as nd
     
+    from .version import __version__ as grizli__version
+    
     bucket_name = None
     s3 = boto3.resource('s3')
     s3_client = boto3.client('s3')
@@ -5720,6 +5722,8 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
             header['KERNEL'] = kernel
             header['OKBITS'] = (bits, "FLT bits treated as valid")
             header['PHOTSCAL'] = _scale_photom, 'Scale factor applied'
+            
+            header['GRIZLIV'] = grizli__version, 'Grizli code version'
             
             for k in keys:
                 header[k] = keys[k]
