@@ -218,7 +218,12 @@ def get_jwst_skyflat(header, verbose=True, valid_flat=(0.7, 1.4)):
                              header['instrume'].lower(), oflat)
 
     oim = pyfits.open(crds_path)
-    flat_corr = oim['SCI'].data / skyflat
+    try:
+        flat_corr = oim['SCI'].data / skyflat
+    except ValueError:
+        msg = f'jwst_utils.get_jwst_skyflat: flat_corr failed'
+        utils.log_comment(utils.LOGFILE, msg, verbose=True)
+        return None, None, None
 
     bad = skyflat < valid_flat[0]
     bad |= skyflat > valid_flat[1]
@@ -346,15 +351,18 @@ def img_with_flat(input, verbose=True, overwrite=True, apply_photom=True, use_sk
                 if 'FIXFLAT' not in _hdu[0].header:
                     _sky = get_jwst_skyflat(_hdu[0].header)
                     if _sky[0] is not None:
-                        _skyf = os.path.basename(_sky[0])
-                        _hdu[0].header['FIXFLAT'] = (True,
-                                                 'Skyflat correction applied')
-                        _hdu[0].header['FIXFLATF'] = _skyf, 'Skyflat file'
-                        _hdu['SCI'].data *= _sky[1]
-                        _dt = _hdu['DQ'].data.dtype
-                        _hdu['DQ'].data |= _sky[2].astype(_dt)
+                        if _hdu['SCI'].data.shape == _sky[1].shape:
+                            
+                            _hdu['SCI'].data *= _sky[1]
+
+                            _skyf = os.path.basename(_sky[0])
+                            _hdu[0].header['FIXFLAT'] = (True,
+                                               'Skyflat correction applied')
+                            _hdu[0].header['FIXFLATF'] = _skyf, 'Skyflat file'
+                            _dt = _hdu['DQ'].data.dtype
+                            _hdu['DQ'].data |= _sky[2].astype(_dt)
                         
-                        _hdu.flush()
+                            _hdu.flush()
                 else:
                     msg = f'jwst_utils.get_jwst_skyflat: FIXFLAT found'
                     utils.log_comment(utils.LOGFILE, msg, 
@@ -891,10 +899,11 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
         if os.path.exists(bpfile):
             bpdata = pyfits.open(bpfile)[0].data
             bpdata = nd.binary_dilation(bpdata > 0, iterations=2)*1024
-            dq |= bpdata.astype(dq.dtype)
+            if dq.shape == bpdata.shape:
+                dq |= bpdata.astype(dq.dtype)
             
-            msg = f'Use extra badpix in {bpfile}'
-            utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+                msg = f'Use extra badpix in {bpfile}'
+                utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
         
     img['DQ'].data = dq
     

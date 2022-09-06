@@ -5560,7 +5560,9 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
                     bpdata = nd.binary_dilation(bpdata > 0, iterations=2)*1024
                     msg = f'Use extra badpix in {bpfile}'
                     log_comment(LOGFILE, msg, verbose=verbose)
-            
+            else:
+                bpdata = np.zeros(flt['SCI'].data.shape, dtype=int)
+                
             # NIRISS ghost mask
             if (_inst in ['NIRISS']) & (niriss_ghost_kwargs is not None):
                 if 'verbose' not in niriss_ghost_kwargs:
