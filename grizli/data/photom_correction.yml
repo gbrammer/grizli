@@ -93,7 +93,9 @@ NRCALONG-F300M-CLEAR: 0.944
 
 # No absolute value.  A/B roughly interpolated between 356 and 444
 NRCBLONG-F410M-CLEAR: 1.0
-NRCALONG-F410M-CLEAR: 0.95
+#NRCALONG-F410M-CLEAR: 0.95
+# From slight overlap in Primer: relative 1.0
+NRCALONG-F410M-CLEAR: 1.01
 
 # F444W BLONG absolute measured from the flux standard
 # B/A relative = 0.965 from the LMC astrometric field
