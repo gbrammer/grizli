@@ -1955,8 +1955,8 @@ def make_SEP_catalog(root='',
 
     tab.meta['uJy2dn'] = (uJy_to_dn, 'Convert uJy fluxes to image DN')
 
-    tab.meta['DRZ_FILE'] = (drz_file[:40], 'SCI file')
-    tab.meta['WHT_FILE'] = (weight_file[:40], 'WHT file')
+    tab.meta['DRZ_FILE'] = (drz_file[:36], 'SCI file')
+    tab.meta['WHT_FILE'] = (weight_file[:36], 'WHT file')
 
     tab.meta['GET_BACK'] = (get_background, 'Background computed')
     for k in bkg_params:
