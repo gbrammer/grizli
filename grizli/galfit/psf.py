@@ -230,7 +230,7 @@ class DrizzlePSF(object):
 
         return flt_keys, wcs, footprint
 
-    def get_driz_cutout(self, ra=53.06967306, dec=-27.72333015, size=15, get_cutout=False, N=None):
+    def get_driz_cutout(self, ra=53.06967306, dec=-27.72333015, size=15, get_cutout=False, N=None, odd=True):
         """
         TBD
         """
@@ -239,8 +239,8 @@ class DrizzlePSF(object):
         if N is None:
             N = int(np.round(size*self.wcs[self.flt_keys[0]].pscale/self.driz_pscale))
 
-        slx = slice(xyp[0]-N, xyp[0]+N)
-        sly = slice(xyp[1]-N, xyp[1]+N)
+        slx = slice(xyp[0]-N, xyp[0]+N+odd)
+        sly = slice(xyp[1]-N, xyp[1]+N+odd)
 
         wcs_slice = model.ImageData.get_slice_wcs(self.driz_wcs, slx, sly)
 
