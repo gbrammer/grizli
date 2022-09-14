@@ -950,6 +950,8 @@ def exposure_oneoverf_correction(file, axis=None, thresholds=[5,4,3], erode_mask
         im[0].header['ONEFEXP'] = True, 'Exposure 1/f correction applied'
         im[0].header['ONEFAXIS'] = axis, 'Axis for 1/f correction'
         
+        model[~np.isfinite(model)] = 0
+        
         im['SCI'].data -= model
         im.flush()
         
