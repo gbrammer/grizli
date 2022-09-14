@@ -40,6 +40,12 @@ class JWSTHeaders(unittest.TestCase):
         path_to_files = os.path.join(path, 'tests/data/jwst-headers/')
         return path_to_files
         
+    def fetch_test_data(self):
+        """
+        Fetch test data from MAST
+        """
+        pass
+        
     def test_process_headers(self, clean=True):
         """
         """

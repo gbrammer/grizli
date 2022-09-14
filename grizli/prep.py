@@ -70,7 +70,7 @@ For example,
 # check_status()
 
 
-def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_badpix=True, apply_grism_skysub=True, crclean=False, mask_regions=True):
+def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_badpix=True, apply_grism_skysub=True, crclean=False, mask_regions=True, oneoverf_correction=True, oneoverf_kwargs={}):
     """Copy "fresh" unmodified version of a data file from some central location
 
     Parameters
@@ -257,7 +257,9 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
     if 'TELESCOP' in orig_file[0].header:
         if orig_file[0].header['TELESCOP'] == 'JWST':
             orig_file.writeto(local_file, overwrite=True)
-            status = jwst_utils.initialize_jwst_image(local_file)            
+            status = jwst_utils.initialize_jwst_image(local_file, 
+                                      oneoverf_correction=oneoverf_correction,
+                                      oneoverf_kwargs=oneoverf_kwargs)            
             orig_file = pyfits.open(local_file)
             
     # if filter in ['GR150C', 'GR150R']: 
@@ -3669,7 +3671,10 @@ def process_direct_grism_visit(direct={},
         for file in direct['files']:
             crclean = isACS & (len(direct['files']) == 1)
             
-            fresh_flt_file(file, crclean=crclean)
+            fresh_flt_file(file, crclean=crclean,
+                           oneoverf_correction=(oneoverf_kwargs is not None), 
+                           oneoverf_kwargs=oneoverf_kwargs)
+                           
             isJWST = check_isJWST(file)
             if isJWST:
                 isACS = isWFPC2 = False
@@ -3691,7 +3696,9 @@ def process_direct_grism_visit(direct={},
     skip_grism = (grism == {}) | (grism is None) | (len(grism) == 0)
     if not skip_grism:
         for file in grism['files']:
-            fresh_flt_file(file)
+            fresh_flt_file(file, 
+                           oneoverf_correction=(oneoverf_kwargs is not None), 
+                           oneoverf_kwargs=oneoverf_kwargs)
 
             # Need to force F814W filter for updatewcs
             if isACS:
@@ -4035,8 +4042,8 @@ def process_direct_grism_visit(direct={},
                 for _file in direct['files']:
                     nircam_wisp_correction(_file, **nircam_wisp_kwargs)
                 
-            if oneoverf_kwargs is not None:
-                oneoverf_column_correction(direct, **oneoverf_kwargs)
+            # if oneoverf_kwargs is not None:
+            #     oneoverf_column_correction(direct, **oneoverf_kwargs)
                         
             # Redrizzle before background
             AstroDrizzle(direct['files'], output=direct['product'],
