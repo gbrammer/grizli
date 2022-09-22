@@ -357,12 +357,14 @@ class GrismDisperser(object):
         if self.grow > 1:
             self.dx = np.arange(self.dx[0]*self.grow, self.dx[-1]*self.grow)
 
+        # ---Zihao modified---
         xoffset = 0
         yoffset = 0
         if filt=='F356W':
             if (mod=='A') & (pupil=='R'):
-                yoffset = -0.8
+                yoffset = -3
             elif (mod=='B') & (pupil=='R'):
+                # The current tracing doesn't work properly with module B
                 yoffset = -3
                 # xoffset = 0
 
@@ -372,6 +374,7 @@ class GrismDisperser(object):
         if filt=='F444W':
             if (mod=='A'):
                 yoffset = -1
+
         if ('G14' in self.conf.conf_file) & (self.beam == 'A'):
             xoffset = -0.5  # necessary for WFC3/IR G141, v4.32
 
