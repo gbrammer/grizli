@@ -862,6 +862,8 @@ def exposure_oneoverf_correction(file, axis=None, thresholds=[5,4,3], erode_mask
     if erode_mask is None:
         if im[0].header['FILTER'].startswith('GR150'):
             erode_mask = False
+        elif im[0].header['PUPIL'].startswith('GRISM'):
+            erode_mask = False
         else:
             erode_mask = True
             
