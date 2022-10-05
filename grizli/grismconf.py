@@ -560,11 +560,14 @@ def get_config_filename(instrume='WFC3', filter='F140W',
         
         fi = grism
         gr = filter[-1] # R, C
-        conf_file = os.path.join(GRIZLI_PATH,
-                    f'CONF/GRISM_NIRCAM/gNIRCAM.{fi}.mod{module}.{gr}.conf')
+        # conf_file = os.path.join(GRIZLI_PATH,
+        #             f'CONF/GRISM_NIRCAM/gNIRCAM.{fi}.mod{module}.{gr}.conf')
         #
+        # conf_file = os.path.join(GRIZLI_PATH,
+        #             f'CONF/GRISM_NIRCAM/V2/NIRCAM_{fi}_mod{module}_{gr}.conf')
+
         conf_file = os.path.join(GRIZLI_PATH,
-                    f'CONF/GRISM_NIRCAM/V2/NIRCAM_{fi}_mod{module}_{gr}.conf')
+                    f'CONF/GRISM_NIRCAM/V4/NIRCAM_{fi}_mod{module}_{gr}.conf')
         
     elif instrume == 'NIRCAMA':
         fi = grism
@@ -894,7 +897,13 @@ class TransformGrismconf(object):
         rev = self.transform.forward(x0[0]+tdx, x0[1]+tdy)
         trace_dy = rev[1,:] - y
         #trace_dy = y - rev[1,:]
-
+        
+        # Trace offsets for NIRCam
+        if os.path.basename(self.conf_file) == 'NIRCAM_F444W_modA_R.conf':
+            trace_dy += -2.5
+        elif os.path.basename(self.conf_file) == 'NIRCAM_F444W_modA_C.conf':
+            trace_dy += -0.1
+            
         wave = self.conf.DISPL(self.order_names[beam], *x0, t)
         if self.transform.instrument != 'HST':
             wave *= 1.e4
@@ -976,22 +985,28 @@ def load_grism_config(conf_file, warnings=True):
     elif 'V2/NIRCAM' in conf_file:
         conf = TransformGrismconf(conf_file)
         conf.get_beams()
+    elif 'V4/NIRCAM' in conf_file:
+        conf = TransformGrismconf(conf_file)
+        conf.get_beams()
     else:
         conf = aXeConf(conf_file)
         conf.get_beams()
     
     # Preliminary hacks for on-sky NIRISS
     if 'GR150' in conf_file:
-        hack_niriss = 1./1.8 * 1.1
+        if 0:
+            hack_niriss = 1./1.8 * 1.1
         
-        msg = f"""
- ! Scale NIRISS sensitivity by {hack_niriss:.3f} to hack gain correction
- ! and match GLASS MIRAGE simulations. Sensitivity will be updated when
- ! on-sky data available
- """
-        msg = f' ! Scale NIRISS sensitivity by {hack_niriss:.3f} prelim flux correction'
-        utils.log_comment(utils.LOGFILE, msg, verbose=warnings)
-        
+            msg = f"""
+     ! Scale NIRISS sensitivity by {hack_niriss:.3f} to hack gain correction
+     ! and match GLASS MIRAGE simulations. Sensitivity will be updated when
+     ! on-sky data available
+     """
+            msg = f' ! Scale NIRISS sensitivity by {hack_niriss:.3f} prelim flux correction'
+            utils.log_comment(utils.LOGFILE, msg, verbose=warnings)
+        else:
+            hack_niriss = 1.0
+            
         for b in conf.sens:
             conf.sens[b]['SENSITIVITY'] *= hack_niriss
             if 'ERROR' in conf.sens[b].colnames:
@@ -1024,7 +1039,7 @@ def load_grism_config(conf_file, warnings=True):
         #     # print('xxx', conf_file, _w0)
         #     conf.sens['A']['SENSITIVITY'] *= slope
         
-        if 'F150W' in conf_file:
+        if ('F150W' in conf_file) & (hack_niriss > 1.01):
             conf.sens['A']['SENSITIVITY'] *= 1.08
             
         # Scale 0th orders in F150W,F200W
