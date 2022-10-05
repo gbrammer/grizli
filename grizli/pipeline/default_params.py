@@ -66,8 +66,15 @@ GRIS_REF_FILTERS = {'G141': ['F140W', 'F160W', 'F125W', 'F105W', 'F110W',
                              'F130N', 'F128N', 'F126N', 'F164N', 'F167N'],
                     'G800L': ['F814W', 'F850LP', 'F606W', 'F435W', 'F775W',
                               'F555W', 'opt'], 
-                    'GR150C': ['F115W', 'F150W', 'F200W'], 
-                    'GR150R': ['F115W', 'F150W', 'F200W']}
+                    'GR150C': ['F115W', 'F150W', 'F200W', 
+                               'CLEAR-F115W', 'CLEAR-F150W', 'CLEAR-F200W'], 
+                    'GR150R': ['F115W', 'F150W', 'F200W',
+                               'CLEAR-F115W', 'CLEAR-F150W', 'CLEAR-F200W'],
+                    'GRISMR': ['F277W-CLEAR','F356W-CLEAR','F410M-CLEAR',
+                               'F444W-CLEAR','F277W','F356W','F410M','F444W'],
+                    'GRISMC': ['F277W-CLEAR','F356W-CLEAR','F410M-CLEAR',
+                               'F444W-CLEAR','F277W','F356W','F410M','F444W']
+                    }
 
 
 def test_aws_availability():

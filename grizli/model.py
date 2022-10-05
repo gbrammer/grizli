@@ -2,6 +2,8 @@
 Model grism spectra in individual FLTs
 """
 import os
+import glob
+
 from collections import OrderedDict
 import copy
 import traceback
@@ -2181,9 +2183,14 @@ class ImageData(object):
             slice_header = pyfits.Header()
 
         # Generate new object
-        slice_obj = ImageData(sci=self.data['SCI'][sly, slx]/self.photflam,
-                              err=self.data['ERR'][sly, slx]/self.photflam,
-                              dq=self.data['DQ'][sly, slx]*1,
+        if (self.data['REF'] is not None) & (self.data['SCI'] is None):
+            _sci = _err = _dq = None
+        else:
+            _sci = self.data['SCI'][sly, slx]/self.photflam
+            _err = self.data['ERR'][sly, slx]/self.photflam
+            _dq = self.data['DQ'][sly, slx]*1
+            
+        slice_obj = ImageData(sci=_sci, err=_err, dq=_dq,
                               header=slice_header, wcs=slice_wcs,
                               photflam=self.photflam, photplam=self.photplam,
                               origin=slice_origin, instrument=self.instrument,
@@ -2653,9 +2660,9 @@ class GrismFLT(object):
 
         # Fill empty pixels in the reference image from the SCI image,
         # but don't do it if direct['SCI'] is just a copy from the grism
-        if not self.direct.filter.startswith('G'):
-            empty = self.direct.data['REF'] == 0
-            self.direct.data['REF'][empty] += self.direct['SCI'][empty]
+        # if not self.direct.filter.startswith('G'):
+        #     empty = self.direct.data['REF'] == 0
+        #     self.direct.data['REF'][empty] += self.direct['SCI'][empty]
 
         # self.direct.data['ERR'] *= 0.
         # self.direct.data['DQ'] *= 0
@@ -3508,8 +3515,20 @@ class GrismFLT(object):
             root = self.grism_file.split('.fits')[0]
             
         hdu = pyfits.HDUList([pyfits.PrimaryHDU()])
+        
+        # Remove dummy extensions if REF found
+        skip_direct_extensions  = []
+        if 'REF' in self.direct.data:
+            if self.direct.data['REF'] is not None:
+                skip_direct_extensions = ['SCI','ERR','DQ']
+                
         for key in self.direct.data.keys():
-            hdu.append(pyfits.ImageHDU(data=self.direct.data[key],
+            if key in skip_direct_extensions:
+                hdu.append(pyfits.ImageHDU(data=None,
+                                       header=self.direct.header,
+                                       name='D'+key))
+            else:
+                hdu.append(pyfits.ImageHDU(data=self.direct.data[key],
                                        header=self.direct.header,
                                        name='D'+key))
 
@@ -3531,7 +3550,8 @@ class GrismFLT(object):
         # zero out large data objects
         self.direct.data = self.grism.data = self.seg = self.model = None
 
-        fp = open('{0}.{1:02d}.GrismFLT.pkl'.format(root, self.grism.sci_extn), 'wb')
+        fp = open('{0}.{1:02d}.GrismFLT.pkl'.format(root, 
+                                                self.grism.sci_extn), 'wb')
         pickle.dump(self, fp)
         fp.close()
 
@@ -3590,6 +3610,7 @@ class GrismFLT(object):
                     self.direct.data[key] = None
                 else:
                     self.direct.data[key] = fits[ext].data*1
+                    
             elif fits[ext].header['EXTNAME'].startswith('G'):
                 if fits[ext].data is None:
                     self.grism.data[key] = None
@@ -3702,12 +3723,17 @@ class GrismFLT(object):
             print('POM only defined for NIRCam')
             return True
         
-        pom_file = os.path.join(GRIZLI_PATH,
-            f'CONF/GRISM_NIRCAM/V3/NIRCAM_LW_POM_Mod{self.grism.module}.fits')
+        pom_path = os.path.join(GRIZLI_PATH,
+            f'CONF/GRISM_NIRCAM/V*/NIRCAM_LW_POM_Mod{self.grism.module}.fits')
         
-        if not os.path.exists(pom_file):
-            print(f'Couldn\'t find POM reference file {pom_file}')
+        pom_files = glob.glob(pom_path)
+        
+        if len(pom_files) == 0:
+            print(f'Couldn\'t find POM reference files {pom_path}')
             return False
+        
+        pom_files.sort()
+        pom_file = pom_files[-1]
         
         if verbose:
             print(f'NIRCam: apply POM geometry from {pom_file}')
