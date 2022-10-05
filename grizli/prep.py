@@ -2666,10 +2666,39 @@ def make_drz_catalog(root='', sexpath='sex', threshold=2., get_background=True,
     return cat
 
 
-def make_miri_average_flat(visit, clip_max=1, apply=True, verbose=True):
+def make_visit_average_flat(visit, clip_max=0, threshold=5, dilate=3, apply=True, instruments=['MIRI'], verbose=True):
     """
-    Make an average MIRI "skyflat" for exposures in a visit
+    Make an average "skyflat" for exposures in a visit, e.g., for MIRI
+    
+    Parameters
+    ----------
+    visit : dict
+        Visit dictionary with, at a minimum, keys of ``product`` and ``files``
+    
+    clip_max : int
+        Number of max clipping iterations
+    
+    threshold : float
+        If specified, run `sep` source detection on each exposure
+    
+    dilate : int
+        Number of `scipy.ndimage.binary_dilation` iterations to run on the 
+        segmentation mask
+    
+    apply : bool
+        Apply the flat to the exposures 
+    
+    instruments : list
+        Only run for these instruments (from INSTRUME header keyword)
+        
+    verbose : bool
+        Print status messages
+        
     """
+    from tqdm import tqdm
+    import scipy.ndimage as nd
+    import sep
+    
     _im = pyfits.open(visit['files'][0])
     
     if 'OINSTRUM' in _im[0].header:
@@ -2677,17 +2706,40 @@ def make_miri_average_flat(visit, clip_max=1, apply=True, verbose=True):
     else:
         instrument = _im[0].header['INSTRUME']
         
-    if instrument not in ['MIRI']:
-        msg = f"make_miri_average_flat: Instrument for {visit['product']} "
+    if instrument not in instruments:
+        msg = f"make_visit_average_flat: Instrument for {visit['product']} "
         msg += f"is {instrument}, skip flat"
         utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
         
         return None
         
-    sci = np.array([pyfits.open(file)['SCI'].data
+    sci = np.array([pyfits.open(file)['SCI'].data.astype(np.float32)
                     for file in visit['files']])
     dq = np.array([pyfits.open(file)['DQ'].data
                     for file in visit['files']])
+
+    if threshold is not None:
+        
+        msg = f"make_visit_average_flat: Source detection on individual"
+        msg += f" exposures with threshold={threshold} dilate={dilate}"
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+        
+        err = np.array([pyfits.open(file)['ERR'].data.astype(np.float32)
+                        for file in visit['files']])
+        
+        #mask = im['DQ'].data > 0
+        for i in tqdm(range(len(visit['files']))):
+            _sci = sci[i,:,:]
+            _err = err[i,:,:]
+            _mask = dq[i,:,:] > 0
+            _bkg = sep.Background(_sci, mask=_mask)
+            _cat, _seg = sep.extract(_sci - _bkg.back(), threshold,
+                                    err=_err, 
+                                    mask=_mask,
+                                    segmentation_map=True)
+
+            _segm = nd.binary_dilation(_seg > 0, iterations=dilate)
+            _sci[_segm > 0] = np.nan
     
     scim = sci*1.
     for _iter in range(clip_max):
@@ -2721,21 +2773,21 @@ def make_miri_average_flat(visit, clip_max=1, apply=True, verbose=True):
     skyfile = f"{visit['product']}_skyflat.fits"
     _hdu.writeto(skyfile, overwrite=True)
     
-    msg = f"make_miri_average_flat: {skyfile} N={len(visit['files'])}"
+    msg = f"make_visit_average_flat: {skyfile} N={len(visit['files'])}"
     msg += f" clip_max={clip_max}"
     utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
     
     if apply:
-        apply_miri_skyflat(visit, skyfile=skyfile)
+        apply_visit_skyflat(visit, skyfile=skyfile)
 
 
-def apply_miri_skyflat(visit, skyfile=None, verbose=True):
+def apply_visit_skyflat(visit, skyfile=None, verbose=True):
     """
-    Apply the MIRI skyflat
+    Apply the skyflat
     """
     
     if not os.path.exists(skyfile):
-        msg = f"apply_miri_skyflat: MIRI skyflat {skyfile} not found"
+        msg = f"apply_visit_skyflat: MIRI skyflat {skyfile} not found"
         utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
         return None
     
@@ -2744,7 +2796,7 @@ def apply_miri_skyflat(visit, skyfile=None, verbose=True):
     flat[flat_mask] = 1
     
     for file in visit['files']:
-        msg = f"make_miri_average_flat: apply {skyfile} to {file}"
+        msg = f"apply_visit_skyflat: apply {skyfile} to {file}"
         utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
         
         with pyfits.open(file, mode='update') as _imi:
@@ -3688,9 +3740,9 @@ def process_direct_grism_visit(direct={},
         
         if isJWST:
             if miri_skyflat:
-                make_miri_average_flat(direct)
+                make_visit_average_flat(direct)
             elif miri_skyfile is not None:
-                apply_miri_skyflat(direct, skyfile=miri_skyfile)
+                apply_visit_skyflat(direct, skyfile=miri_skyfile)
     
     # Initial grism processing
     skip_grism = (grism == {}) | (grism is None) | (len(grism) == 0)
