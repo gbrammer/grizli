@@ -6654,6 +6654,8 @@ class EffectivePSF(object):
         
         if psf_type == 'JWST/MIRI':
             #  IR detector
+            NDET = int(np.sqrt(epsf.shape[2]))
+            
             rx = 1+(np.clip(x, 1, 1023)-0)/512.
             ry = 1+(np.clip(y, 1, 1023)-0)/512.
 
@@ -6661,20 +6663,31 @@ class EffectivePSF(object):
             rx -= 1
             ry -= 1
 
-            nx = np.clip(int(rx), 0, 2)
-            ny = np.clip(int(ry), 0, 2)
-
+            # nx = np.clip(int(rx), 0, 2)
+            # ny = np.clip(int(ry), 0, 2)
+            nx = np.clip(int(rx), 0, NDET-1)
+            ny = np.clip(int(ry), 0, NDET-1)
+            
             # print x, y, rx, ry, nx, ny
 
             fx = rx-nx
             fy = ry-ny
 
-            psf_xy = (1-fx)*(1-fy)*epsf[:, :, nx+ny*3]
-            psf_xy += fx*(1-fy)*epsf[:, :, (nx+1)+ny*3]
-            psf_xy += (1-fx)*fy*epsf[:, :, nx+(ny+1)*3]
-            psf_xy += fx*fy*epsf[:, :, (nx+1)+(ny+1)*3]
+            # psf_xy = (1-fx)*(1-fy)*epsf[:, :, nx+ny*3]
+            # psf_xy += fx*(1-fy)*epsf[:, :, (nx+1)+ny*3]
+            # psf_xy += (1-fx)*fy*epsf[:, :, nx+(ny+1)*3]
+            # psf_xy += fx*fy*epsf[:, :, (nx+1)+(ny+1)*3]
+
+            if NDET == 1:
+                psf_xy = epsf[:,:,0]
+            else:
+                psf_xy = (1-fx)*(1-fy)*epsf[:, :, nx+ny*NDET]
+                psf_xy += fx*(1-fy)*epsf[:, :, (nx+1)+ny*NDET]
+                psf_xy += (1-fx)*fy*epsf[:, :, nx+(ny+1)*NDET]
+                psf_xy += fx*fy*epsf[:, :, (nx+1)+(ny+1)*NDET]
             
             # psf_xy = np.rot90(psf_xy.T, 2)
+            psf_xy = psf_xy.T
             
             self.eval_filter = filter
         

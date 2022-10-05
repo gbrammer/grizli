@@ -2753,7 +2753,8 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
     for gr in ['GR150R', 'GR150C']:
         for filt in ['F090W', 'F115W', 'F150W', 'F200W']:
             #key = f'{gr.lower()}-{filt.lower()}'
-            key = filt.lower()
+            # key = filt.lower()
+            key = filt.lower() + 'n-clear'
 
             if key in masks:
                 masks[key][0] |= ((info['PUPIL'] == filt) & 
@@ -2773,9 +2774,9 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
     for ig, gr in enumerate(['GRISMR','GRISMC']):
         for filt in ['F277W', 'F356W', 'F410M', 'F444W']:
             #key = f'{gr.lower()}-{filt.lower()}'
-            key = filt.lower()
+            key = filt.lower() + '-clear'
             if key in masks:
-                masks[key][0] != ((info['PUPIL'] == filt) &
+                masks[key][0] |= ((info['PUPIL'] == filt) &
                                   (info['FILTER'] == gr))
             else:
                 masks[key] = [((info['PUPIL'] == filt) & 
@@ -2800,12 +2801,12 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
 
     grp = None
 
-    for mask in masks:
-        if (masks[mask][0].sum() > 0) & (masks[mask][1] in gris_ref_filters):
-            if masks[mask][2] != '':
-                ref = masks[mask][2]
+    for key in masks:
+        if (masks[key][0].sum() > 0) & (masks[key][1] in gris_ref_filters):
+            if masks[key][2] != '':
+                ref = key #masks[mask][2]
             else:
-                for f in gris_ref_filters[masks[mask][1]]:
+                for f in gris_ref_filters[masks[key][1]]:
                     _fstr = '{0}-{1}_drz_sci.fits'
                     if os.path.exists(_fstr.format(field_root, f.lower())):
                         ref = f
@@ -2837,15 +2838,26 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
                 _fstr = '{0}-{1}_galfit.fits'
                 ref_file = _fstr.format(field_root, ref.lower())
             else:
-                _fstr = '{0}-{1}_drz_sci.fits'
-                ref_file = _fstr.format(field_root, ref.lower())
+                _fstr = '{0}-{1}_dr*_sci.fits*'
+                ref_file = _fstr.format(field_root, ref.lower())                
+                ref_file = glob.glob(ref_file)[0]
         else:
             ref_file = force_ref
         
-        _grism_files=list(info['FILE'][masks[mask][0]])
-        polyx = [0.3, 5.1]
+        _grism_files=list(info['FILE'][masks[key][0]])
+        if masks[key][1].startswith('GRISM'):
+            # NIRCAM
+            polyx = [2.1, 5.1]
+            
+        elif masks[key][1].startswith('GR150'):
+            # NIRISS
+            polyx = [0.6, 2.5]
+            
+        else:
+            # HST
+            polyx = [0.3, 1.8]
         
-        msg = f"auto_script.grism_prep: group = {mask}"
+        msg = f"auto_script.grism_prep: group = {key}"
         msg += f"\nauto_script.grism_prep: N = {len(_grism_files)}"
         for _i, _f in enumerate(_grism_files):
             msg += f'\nauto_script.grism_prep: file {_i} = {_f}'
@@ -2853,6 +2865,7 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
         msg += f'\nauto_script.grism_prep: ref_file = {ref_file}' 
         msg += f'\nauto_script.grism_prep: seg_file = {seg_file}' 
         msg += f'\nauto_script.grism_prep: catalog  = {catalog}' 
+        msg += f'\nauto_script.grism_prep: polyx  = {polyx}' 
         utils.log_comment(utils.LOGFILE, msg, verbose=True)
         
         grp_i = multifit.GroupFLT(grism_files=_grism_files,
@@ -2879,7 +2892,7 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
         return [grp]
 
 
-def grism_prep(field_root='j142724+334246', PREP_PATH='../Prep', EXTRACT_PATH='../Extractions', ds9=None, refine_niter=3, gris_ref_filters=GRIS_REF_FILTERS, files=None, split_by_grism=True, refine_poly_order=1, refine_fcontam=0.5, cpu_count=0, mask_mosaic_edges=True, prelim_mag_limit=25, refine_mag_limits=[18, 24], init_coeffs=[1.1, -0.5], grisms_to_process=None, pad=256, model_kwargs={'compute_size': True}):
+def grism_prep(field_root='j142724+334246', PREP_PATH='../Prep', EXTRACT_PATH='../Extractions', ds9=None, refine_niter=3, gris_ref_filters=GRIS_REF_FILTERS, force_ref=None, files=None, split_by_grism=True, refine_poly_order=1, refine_fcontam=0.5, cpu_count=0, mask_mosaic_edges=True, prelim_mag_limit=25, refine_mag_limits=[18, 24], init_coeffs=[1.1, -0.5], grisms_to_process=None, pad=256, model_kwargs={'compute_size': True}):
     """
     Contamination model for grism exposures
     """
@@ -2906,6 +2919,7 @@ def grism_prep(field_root='j142724+334246', PREP_PATH='../Prep', EXTRACT_PATH='.
                                 gris_ref_filters=gris_ref_filters,
                                 files=files,
                                 split_by_grism=split_by_grism, 
+                                force_ref=force_ref,
                                 pad=pad)
 
     for grp in grp_objects:
@@ -2927,15 +2941,21 @@ def grism_prep(field_root='j142724+334246', PREP_PATH='../Prep', EXTRACT_PATH='.
             try:
                 # Read footprint file created ealier
                 fp_file = '{0}-ir.yaml'.format(field_root)
-                with open(fp_file) as fp:
-                    fp_data = yaml.load(fp, Loader=yaml.Loader)
+                if os.path.exists(fp_file):
+                    with open(fp_file) as fp:
+                        fp_data = yaml.load(fp, Loader=yaml.Loader)
                     
-                det_poly = utils.SRegion(fp_data[0]['footprint']).shapely[0]
-                
-                for flt in grp.FLTs:
-                    flt.mask_mosaic_edges(sky_poly=det_poly, verbose=True,
-                                          dq_mask=False, dq_value=1024,
-                                          err_scale=10, resid_sn=-1)
+                    det_poly = utils.SRegion(fp_data[0]['footprint'])
+                    det_poly = det_poly.shapely[0]
+                    for flt in grp.FLTs:
+                        flt.mask_mosaic_edges(sky_poly=det_poly, verbose=True,
+                                              dq_mask=False, dq_value=1024,
+                                              err_scale=10, resid_sn=-1)
+                else:
+                    msg = 'auto_script.grism_prep: '
+                    msg += f'Couldn\'t find file {fp_file}'
+                    msg += 'for mask_mosaic_edges'
+                    utils.log_comment(utils.LOGFILE, msg, verbose=True)
             except:
                 utils.log_exception(utils.LOGFILE, traceback)
                 pass
