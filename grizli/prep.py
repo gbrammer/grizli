@@ -70,7 +70,7 @@ For example,
 # check_status()
 
 
-def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_badpix=True, apply_grism_skysub=True, crclean=False, mask_regions=True, oneoverf_correction=True, oneoverf_kwargs={}):
+def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_badpix=True, apply_grism_skysub=True, crclean=False, mask_regions=True, oneoverf_correction=True, oneoverf_kwargs={}, use_skyflats=True):
     """Copy "fresh" unmodified version of a data file from some central location
 
     Parameters
@@ -259,7 +259,8 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
             orig_file.writeto(local_file, overwrite=True)
             status = jwst_utils.initialize_jwst_image(local_file, 
                                       oneoverf_correction=oneoverf_correction,
-                                      oneoverf_kwargs=oneoverf_kwargs)            
+                                      oneoverf_kwargs=oneoverf_kwargs, 
+                                      use_skyflats=use_skyflats)            
             orig_file = pyfits.open(local_file)
             
     # if filter in ['GR150C', 'GR150R']: 
@@ -3652,7 +3653,8 @@ def process_direct_grism_visit(direct={},
                                oneoverf_kwargs={},
                                snowball_kwargs={},
                                miri_skyflat=True,
-                               miri_skyfile=None):
+                               miri_skyfile=None,
+                               use_skyflats=True):
     """Full processing of a direct (+grism) image visit.
     
     Notes
@@ -3725,7 +3727,8 @@ def process_direct_grism_visit(direct={},
             
             fresh_flt_file(file, crclean=crclean,
                            oneoverf_correction=(oneoverf_kwargs is not None), 
-                           oneoverf_kwargs=oneoverf_kwargs)
+                           oneoverf_kwargs=oneoverf_kwargs,
+                           use_skyflats=use_skyflats)
                            
             isJWST = check_isJWST(file)
             if isJWST:
@@ -3750,7 +3753,8 @@ def process_direct_grism_visit(direct={},
         for file in grism['files']:
             fresh_flt_file(file, 
                            oneoverf_correction=(oneoverf_kwargs is not None), 
-                           oneoverf_kwargs=oneoverf_kwargs)
+                           oneoverf_kwargs=oneoverf_kwargs,
+                           use_skyflats=use_skyflats)
 
             # Need to force F814W filter for updatewcs
             if isACS:

@@ -128,6 +128,7 @@ visit_prep_args: &prep_args
         instruments: [NIRCAM, NIRISS]
     miri_skyflat: False
     miri_skyfile: null
+    use_skyflats: True
     # use_self_catalog: *is_parallel_field
 
 # Arguments to prep.apply_persistence_mask

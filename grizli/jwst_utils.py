@@ -964,7 +964,7 @@ def exposure_oneoverf_correction(file, axis=None, thresholds=[5,4,3], erode_mask
     return fig, model
 
 
-def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_KEYS, oneoverf_correction=True, oneoverf_kwargs={'make_plot':False}):
+def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_KEYS, oneoverf_correction=True, oneoverf_kwargs={'make_plot':False}, use_skyflats=True):
     """
     Make copies of some header keywords to make the headers look like 
     and HST instrument
@@ -1143,7 +1143,7 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
                                          
         # axis=None, thresholds=[5,4,3], erode_mask=None, dilate_iterations=3, deg_pix=64, make_plot=True, init_model=0, in_place=False, skip_miri=True, verbose=True
         
-    _ = img_with_flat(filename, overwrite=True)
+    _ = img_with_flat(filename, overwrite=True, use_skyflats=use_skyflats)
 
     _ = img_with_wcs(filename, overwrite=True)
     
