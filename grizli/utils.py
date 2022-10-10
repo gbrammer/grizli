@@ -276,7 +276,8 @@ def radec_to_targname(ra=0, dec=0, round_arcsec=(4, 60), precision=2, targstr='j
     dec_scl = int(np.round(dec/scl[1]))*scl[1]
     ra_scl = int(np.round(ra/scl[0]))*scl[0]
 
-    coo = astropy.coordinates.SkyCoord(ra=ra_scl*u.deg, dec=dec_scl*u.deg)
+    coo = astropy.coordinates.SkyCoord(ra=ra_scl*u.deg, dec=dec_scl*u.deg, 
+                                       frame='icrs')
 
     cstr = re.split('[hmsd.]', coo.to_string('hmsdms', precision=precision))
     # targname = ('j{0}{1}'.format(''.join(cstr[0:3]), ''.join(cstr[4:7])))
@@ -7250,7 +7251,8 @@ class GTable(astropy.table.Table):
             print('No RA/Dec. columns found in input table.')
             return False
 
-        self_coo = SkyCoord(ra=self[rd[0]], dec=self[rd[1]])
+        self_coo = SkyCoord(ra=self[rd[0]], dec=self[rd[1]], 
+                            frame='icrs')
 
         if isinstance(other, list) | isinstance(other, tuple):
             rd = [slice(0, 1), slice(1, 2)]
@@ -7265,7 +7267,8 @@ class GTable(astropy.table.Table):
                 print('No RA/Dec. columns found in `other` table.')
                 return False
 
-        other_coo = SkyCoord(ra=other[rd[0]], dec=other[rd[1]])
+        other_coo = SkyCoord(ra=other[rd[0]], dec=other[rd[1]],
+                             frame='icrs')
 
         try:
             idx, d2d, d3d = other_coo.match_to_catalog_sky(self_coo, nthneighbor=nthneighbor)
