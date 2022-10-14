@@ -976,10 +976,12 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_pr
             _resp = mastquery.utils.download_from_mast(tab[jw], 
                                                        force_rate=force_rate)
             # update targname
-            # for _file in _resp:
-            #     if os.path.exists(_file) & (jwst_utils is not None):
-            #         jwst_utils.initialize_jwst_image(_file)
-            #         jwst_utils.set_jwst_to_hst_keywords(_file, reset=True)
+            for _file in _resp:
+                _test = os.path.exists(_file) & (jwst_utils is not None)
+                _test &= ('_nis_rate' in _file)
+                if _test:
+                    jwst_utils.initialize_jwst_image(_file)
+                    jwst_utils.set_jwst_to_hst_keywords(_file, reset=True)
                     
         tab = tab[~jw]
         
