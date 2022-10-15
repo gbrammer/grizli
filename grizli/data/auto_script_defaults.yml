@@ -118,9 +118,9 @@ visit_prep_args: &prep_args
         niter: 3
         update: True
     oneoverf_kwargs: 
-        thresholds: [10, 1.5]
-        dilate_iter: [24, 2]
-        image_sn_cut: -1
+        thresholds: [5,4,3]
+        dilate_iterations: 3
+        deg_pix: 64
     snowball_kwargs:
         snowball_erode: 4
         snowball_dilate: 18

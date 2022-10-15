@@ -7,6 +7,7 @@ Requires https://github.com/spacetelescope/jwst
 import os
 import inspect
 import logging
+import traceback
 
 import astropy.io.fits as pyfits
 import astropy.wcs as pywcs
@@ -778,7 +779,7 @@ def copy_jwst_keywords(header, orig_keys=ORIG_KEYS, verbose=True):
                 utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
 
 
-def exposure_oneoverf_correction(file, axis=None, thresholds=[5,4,3], erode_mask=None, dilate_iterations=3, deg_pix=64, make_plot=True, init_model=0, in_place=False, skip_miri=True, verbose=True):
+def exposure_oneoverf_correction(file, axis=None, thresholds=[5,4,3], erode_mask=None, dilate_iterations=3, deg_pix=64, make_plot=True, init_model=0, in_place=False, skip_miri=True, verbose=True, **kwargs):
     """
     1/f correction for individual exposure
     
@@ -1095,7 +1096,7 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
         # dq[:,:302] |= 1024
         
         # Dilate MIRI mask
-        msg = f'Dilate MIRI window mask'
+        msg = f'initialize_jwst_image: Dilate MIRI window mask'
         utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
         edge = nd.binary_dilation(((dq & 2**9) > 0), iterations=6)
         dq[edge] |= 1024
@@ -1111,9 +1112,18 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
             if dq.shape == bpdata.shape:
                 dq |= bpdata.astype(dq.dtype)
             
-                msg = f'Use extra badpix in {bpfile}'
+                msg = f'initialize_jwst_image: Use extra badpix in {bpfile}'
                 utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
         
+        if _det in ['NRCALONG','NRCBLONG']:
+            msg = 'initialize_jwst_image: Mask outer ring of 6 pixels'
+            msg += f' for {_det}'
+            utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+            dq[:6,:] |= 1024
+            dq[-6:,:] |= 1024
+            dq[:,:6] |= 1024
+            dq[:,-6:] |= 1024
+             
     img['DQ'].data = dq
     
     img[0].header['EXPTIME'] = img[0].header['EFFEXPTM']*1
@@ -1140,6 +1150,10 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
                                          **oneoverf_kwargs)
         except TypeError:
             # Should only fail for test data
+            utils.log_exception(utils.LOGFILE, traceback)
+            msg = f'exposure_oneoverf_correction: failed for {filename}'
+            utils.log_comment(utils.LOGFILE, msg)
+            
             pass
                                          
         # axis=None, thresholds=[5,4,3], erode_mask=None, dilate_iterations=3, deg_pix=64, make_plot=True, init_model=0, in_place=False, skip_miri=True, verbose=True
