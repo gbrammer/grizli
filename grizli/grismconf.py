@@ -899,11 +899,27 @@ class TransformGrismconf(object):
         #trace_dy = y - rev[1,:]
         
         # Trace offsets for NIRCam
-        if os.path.basename(self.conf_file) == 'NIRCAM_F444W_modA_R.conf':
-            trace_dy += -2.5
-        elif os.path.basename(self.conf_file) == 'NIRCAM_F444W_modA_C.conf':
-            trace_dy += -0.1
-            
+        # ----zihao modified----
+        if 'NIRCAM' in  self.conf_file:
+            pupil = self.conf_file.split('.')[0][-1]
+            filt = self.conf_file.split('NIRCAM_')[1].split('_mod')[0]
+            mod = self.conf_file.split('_mod')[1][0]
+
+            if filt == 'F356W':
+                if (mod == 'A') & (pupil == 'R'):
+                    # yoffset = -1 # for files preprocessed with unfold_jwst
+                    trace_dy += -3.2 # for files preprocessed with grizli
+                elif (mod == 'B') & (pupil == 'R'):
+                    trace_dy += -1.5 # for files preprocessed with grizli
+
+            if filt == 'F444W':
+                if (mod == 'A') & (pupil == 'R'):
+                    trace_dy += -2.5
+                if (mod == 'A') & (pupil == 'C'):
+                    trace_dy += -0.1
+        #----------------------------
+
+
         wave = self.conf.DISPL(self.order_names[beam], *x0, t)
         if self.transform.instrument != 'HST':
             wave *= 1.e4
