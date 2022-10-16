@@ -283,16 +283,15 @@ class GrismDisperser(object):
         self.PAM_value = self.get_PAM_value(verbose=False)
         #print('xxx PAM!')
 
-        self.process_config()
-
+        # ----zihao modified----
+        self.xoffset = xoffset
         self.yoffset = yoffset
-        
-        if xoffset is not None:
-            self.xoffset = xoffset
+        self.process_config()
             
-        if (yoffset != 0) | (xoffset is not None):
+        if (self.yoffset != 0) | (self.xoffset is not None):
             #print('yoffset!', yoffset)
-            self.add_ytrace_offset(yoffset)
+            self.add_ytrace_offset(self.yoffset)
+        #-----------------------
 
 
     def set_segmentation(self, seg_array):
@@ -353,6 +352,7 @@ class GrismDisperser(object):
             self.dx = np.arange(self.dx[0]*self.grow, self.dx[-1]*self.grow)
 
         xoffset = 0.
+        yoffset = 0.
 
         if ('G14' in self.conf.conf_file) & (self.beam == 'A'):
             xoffset = -0.5  # necessary for WFC3/IR G141, v4.32
@@ -361,6 +361,7 @@ class GrismDisperser(object):
         # xoffset = -2.5 # test
 
         self.xoffset = xoffset
+        self.yoffset = yoffset
         self.ytrace_beam, self.lam_beam = self.conf.get_beam_trace(
                             x=(self.xc+self.xcenter-self.pad)/self.grow,
                             y=(self.yc+self.ycenter-self.pad)/self.grow,
@@ -2982,17 +2983,24 @@ class GrismFLT(object):
                     if (size < 4):
                         return True
 
-            # Thumbnails
-            # print '!! X, Y: ', x, y, self.direct.origin, size
+            #---zihao modified---
+            dy,_ = self.conf.get_beam_trace(x=x-self.pad,y=y-self.pad,dx=0,beam='A')
+            dy = int(np.round(dy))
 
             if xcat is not None:
                 xc, yc = int(np.round(xcat))+1, int(np.round(ycat))+1
+                yc += dy
                 xcenter = -(xcat-(xc-1))
                 ycenter = -(ycat-(yc-1))
             else:
                 xc, yc = int(np.round(x))+1, int(np.round(y))+1
+                yc += dy
                 xcenter = -(x-(xc-1))
                 ycenter = -(y-(yc-1))
+            #---------------------
+
+            # Thumbnails
+            # print '!! X, Y: ', x, y, self.direct.origin, size
 
             origin = [yc-size + self.direct.origin[0],
                       xc-size + self.direct.origin[1]]
@@ -3643,11 +3651,23 @@ class GrismFLT(object):
 
         elif self.grism.instrument in ['NIRCAM', 'NIRCAMA']:
             #  Module A
+            # if self.grism.pupil == 'GRISMC':
+            #     rot = 1
+            # else:
+            #     # Do nothing, A+GRISMR disperses to +x
+            #     return True
+            #-----zihao modified-----
             if self.grism.pupil == 'GRISMC':
-                rot = 1
-            else:
-                # Do nothing, A+GRISMR disperses to +x
-                return True
+                if self.grism.module == 'A':
+                    rot = 1
+                elif self.grism.module == 'B':
+                    rot = 1
+            elif self.grism.pupil == 'GRISMR':
+                if self.grism.module == 'A':
+                    return True
+                elif self.grism.module == 'B':
+                    rot = 2
+            #-------------------------
 
         elif self.grism.instrument == 'NIRCAMB':
             if self.grism.pupil == 'GRISMC':
