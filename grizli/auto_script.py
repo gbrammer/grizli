@@ -977,9 +977,11 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_pr
                                                        force_rate=force_rate)
             # update targname
             for _file in _resp:
+
                 _test = os.path.exists(_file) & (jwst_utils is not None)
                 _test &= ('_nis_rate' in _file)
                 if _test:
+                
                     jwst_utils.initialize_jwst_image(_file)
                     jwst_utils.set_jwst_to_hst_keywords(_file, reset=True)
                     
@@ -2737,6 +2739,8 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
     if files is None:
         files = glob.glob(os.path.join(PREP_PATH, '*fl[tc].fits'))
         files += glob.glob(os.path.join(PREP_PATH, '*rate.fits'))
+        files += glob.glob(os.path.join(PREP_PATH, '*cal.fits'))
+
         files.sort()
 
     info = utils.get_flt_info(files)
@@ -2758,6 +2762,7 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
             # key = filt.lower()
             key = filt.lower() + 'n-clear'
 
+
             if key in masks:
                 masks[key][0] |= ((info['PUPIL'] == filt) & 
                                   (info['FILTER'] == gr))
@@ -2774,9 +2779,11 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
     
     # NIRCam
     for ig, gr in enumerate(['GRISMR','GRISMC']):
+
         for filt in ['F277W', 'F356W', 'F410M', 'F444W']:
             #key = f'{gr.lower()}-{filt.lower()}'
             key = filt.lower() + '-clear'
+
             if key in masks:
                 masks[key][0] |= ((info['PUPIL'] == filt) &
                                   (info['FILTER'] == gr))
@@ -2803,12 +2810,14 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
 
     grp = None
 
+
     for key in masks:
         if (masks[key][0].sum() > 0) & (masks[key][1] in gris_ref_filters):
             if masks[key][2] != '':
                 ref = key #masks[mask][2]
             else:
                 for f in gris_ref_filters[masks[key][1]]:
+
                     _fstr = '{0}-{1}_drz_sci.fits'
                     if os.path.exists(_fstr.format(field_root, f.lower())):
                         ref = f
@@ -2862,6 +2871,7 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
             polyx = [0.3, 1.8]
         
         msg = f"auto_script.grism_prep: group = {key}"
+
         msg += f"\nauto_script.grism_prep: N = {len(_grism_files)}"
         for _i, _f in enumerate(_grism_files):
             msg += f'\nauto_script.grism_prep: file {_i} = {_f}'
@@ -2870,6 +2880,7 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
         msg += f'\nauto_script.grism_prep: seg_file = {seg_file}' 
         msg += f'\nauto_script.grism_prep: catalog  = {catalog}' 
         msg += f'\nauto_script.grism_prep: polyx  = {polyx}' 
+
         utils.log_comment(utils.LOGFILE, msg, verbose=True)
         
         grp_i = multifit.GroupFLT(grism_files=_grism_files,
@@ -2897,6 +2908,7 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
 
 
 def grism_prep(field_root='j142724+334246', PREP_PATH='../Prep', EXTRACT_PATH='../Extractions', ds9=None, refine_niter=3, gris_ref_filters=GRIS_REF_FILTERS, force_ref=None, files=None, split_by_grism=True, refine_poly_order=1, refine_fcontam=0.5, cpu_count=0, mask_mosaic_edges=True, prelim_mag_limit=25, refine_mag_limits=[18, 24], init_coeffs=[1.1, -0.5], grisms_to_process=None, pad=256, model_kwargs={'compute_size': True}):
+
     """
     Contamination model for grism exposures
     """
@@ -3188,6 +3200,7 @@ def extract(field_root='j142724+334246', maglim=[13, 24], prior=None, MW_EBV=0.0
     else:
         # Polynomial templates
         wave = np.linspace(2000, 5e4, 200)
+
         poly_templ = utils.polynomial_templates(wave, order=poly_order)
         init_templates = poly_templ
 
@@ -3269,7 +3282,8 @@ def extract(field_root='j142724+334246', maglim=[13, 24], prior=None, MW_EBV=0.0
         except:
             continue
 
-        hdu, fig = mb.drizzle_grisms_and_PAs(fcontam=0.5, flambda=False, kernel='point', size=32, tfit=tfit, diff=diff)
+        hdu, fig = mb.drizzle_grisms_and_PAs(fcontam=0.5, flambda=False, kernel='point', size=size, tfit=tfit, diff=diff)
+
         fig.savefig('{0}_{1:05d}.stack.png'.format(target, id))
 
         hdu.writeto('{0}_{1:05d}.stack.fits'.format(target, id),
@@ -4101,7 +4115,9 @@ FILTER_COMBINATIONS = {'ir': IR_M_FILTERS+IR_W_FILTERS,
                        'opt': OPT_M_FILTERS+OPT_W_FILTERS}
 
 
+
 def make_filter_combinations(root, weight_fnu=True, filter_combinations=FILTER_COMBINATIONS, force_photfnu=None, min_count=1):
+
     """
     Combine ir/opt mosaics manually scaling a specific zeropoint
     """
@@ -4125,7 +4141,7 @@ def make_filter_combinations(root, weight_fnu=True, filter_combinations=FILTER_C
     if force_photfnu is not None:
         for k in ref_h:
             ref_h[k]['PHOTFNU'] = force_photfnu
-            
+
     ####
     count = {}
     num = {}
@@ -4184,7 +4200,7 @@ def make_filter_combinations(root, weight_fnu=True, filter_combinations=FILTER_C
 
             photplam = 1.0
             ref_photplam = 1.0
-            
+
         head[band] = im_i[0].header.copy()
         for k in ref_h_i:
             head[band][k] = ref_h_i[k]
