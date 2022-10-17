@@ -3269,7 +3269,7 @@ def extract(field_root='j142724+334246', maglim=[13, 24], prior=None, MW_EBV=0.0
         except:
             continue
 
-        hdu, fig = mb.drizzle_grisms_and_PAs(fcontam=0.5, flambda=False, kernel='point', size=32, tfit=tfit, diff=diff)
+        hdu, fig = mb.drizzle_grisms_and_PAs(fcontam=0.5, flambda=False, kernel='point', size=size, tfit=tfit, diff=diff)
         fig.savefig('{0}_{1:05d}.stack.png'.format(target, id))
 
         hdu.writeto('{0}_{1:05d}.stack.fits'.format(target, id),

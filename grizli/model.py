@@ -225,7 +225,7 @@ class GrismDisperser(object):
             Total f_lambda flux in the thumbail within the segmentation
             region.
         """
-        
+
         self.id = id
 
         # lower left pixel of the `direct` array in native detector
@@ -275,16 +275,13 @@ class GrismDisperser(object):
         # Config file
         if isinstance(conf, list):
             conf_f = grismconf.get_config_filename(*conf)
-            self.conf_file = conf_f
             self.conf = grismconf.load_grism_config(conf_f)
         else:
             self.conf = conf
 
-        
         # Get Pixel area map (xxx need to add test for WFC3)
         self.PAM_value = self.get_PAM_value(verbose=False)
         #print('xxx PAM!')
-
 
         # ----zihao modified----
         self.xoffset = xoffset
@@ -349,35 +346,13 @@ class GrismDisperser(object):
         """
         from .utils_c import interp
 
-
-        pupil = self.conf.conf_file.split('.')[0][-1]
-        filt = self.conf.conf_file.split('NIRCAM_')[1].split('_mod')[0]
-        mod = self.conf.conf_file.split('_mod')[1][0]
-
         # Get dispersion parameters at the reference position
         self.dx = self.conf.dxlam[self.beam]  # + xcenter #-xoffset
         if self.grow > 1:
             self.dx = np.arange(self.dx[0]*self.grow, self.dx[-1]*self.grow)
 
-
-        # ---Zihao modified---
-        xoffset = 0
-        yoffset = 0
-        if filt=='F356W':
-            if (mod=='A') & (pupil=='R'):
-                yoffset = -3
-            elif (mod=='B') & (pupil=='R'):
-                # The current tracing doesn't work properly with module B
-                yoffset = -3
-                # xoffset = 0
-
-        if filt=='F322W2':
-            if (mod=='A'):
-                yoffset = -3
-        if filt=='F444W':
-            if (mod=='A'):
-                yoffset = -1
-
+        xoffset = 0.
+        yoffset = 0.
 
         if ('G14' in self.conf.conf_file) & (self.beam == 'A'):
             xoffset = -0.5  # necessary for WFC3/IR G141, v4.32
@@ -387,12 +362,12 @@ class GrismDisperser(object):
 
         self.xoffset = xoffset
         self.yoffset = yoffset
-
         self.ytrace_beam, self.lam_beam = self.conf.get_beam_trace(
                             x=(self.xc+self.xcenter-self.pad)/self.grow,
                             y=(self.yc+self.ycenter-self.pad)/self.grow,
                         dx=(self.dx+self.xcenter*0+self.xoffset)/self.grow,
                             beam=self.beam, fwcpos=self.fwcpos)
+
         self.ytrace_beam *= self.grow
 
         # Integer trace
@@ -439,7 +414,6 @@ class GrismDisperser(object):
 
         self.dxpix = self.dx - self.dx[0] + self.x0[1]  # + 1
         try:
-            # print(dyc,self.x0[0],self.dxpix)
             self.flat_index = self.idx[dyc + self.x0[0], self.dxpix]
         except IndexError:
             #print('Index Error', id, dyc.dtype, self.dxpix.dtype, self.x0[0], self.xc, self.yc, self.beam, self.ytrace_beam.max(), self.ytrace_beam.min())
@@ -455,7 +429,7 @@ class GrismDisperser(object):
         self.ytrace, self.lam = self.conf.get_beam_trace(
                                 x=(self.xc+self.xcenter-self.pad)/self.grow,
                                 y=(self.yc+self.ycenter-self.pad)/self.grow,
-                                dx=(self.dxfull+self.xcenter+xoffset)/self.grow,
+                            dx=(self.dxfull+self.xcenter+xoffset)/self.grow,
                                 beam=self.beam, fwcpos=self.fwcpos)
 
         self.ytrace *= self.grow
@@ -2989,6 +2963,7 @@ class GrismFLT(object):
                                                    y-ymin, ymax-y])))
                     except ValueError:
                         return False
+
                     size += 4
 
                     # Enforce minimum size
@@ -3004,7 +2979,7 @@ class GrismFLT(object):
 
                     # Avoid problems at the array edges
                     size = np.min([size, int(x)-2, int(y)-2])
-                    # print('size=',size)
+
                     if (size < 4):
                         return True
 
@@ -3012,11 +2987,6 @@ class GrismFLT(object):
             dy,_ = self.conf.get_beam_trace(x=x-self.pad,y=y-self.pad,dx=0,beam='A')
             dy = int(np.round(dy))
 
-            # ---Zihao modified---
-            dy,_ = self.conf.get_beam_trace(x=x-self.pad,y=y-self.pad,dx=0,beam='A')
-            dy = int(np.round(dy))
-            # dy = 0
-            
             if xcat is not None:
                 xc, yc = int(np.round(xcat))+1, int(np.round(ycat))+1
                 yc += dy
@@ -3029,17 +2999,14 @@ class GrismFLT(object):
                 ycenter = -(y-(yc-1))
             #---------------------
 
+            # Thumbnails
+            # print '!! X, Y: ', x, y, self.direct.origin, size
 
-            # dy=0
-            
-            # print(dy)
             origin = [yc-size + self.direct.origin[0],
                       xc-size + self.direct.origin[1]]
 
-            # d = -dy
-            d = 0
-            thumb = self.direct.data[ext][yc-size+d:yc+size+d, xc-size:xc+size]
-            seg_thumb = self.seg[yc-size+d:yc+size+d, xc-size:xc+size]
+            thumb = self.direct.data[ext][yc-size:yc+size, xc-size:xc+size]
+            seg_thumb = self.seg[yc-size:yc+size, xc-size:xc+size]
 
             # Test that the id is actually in the thumbnail
             test = disperse.compute_segmentation_limits(seg_thumb, id, thumb,
@@ -3078,7 +3045,6 @@ class GrismFLT(object):
                     continue
 
                 try:
-                    # print(self.pad)
                     beam = GrismDisperser(id=id,
                                           direct=thumb, 
                                           segmentation=seg_thumb, 
@@ -3092,8 +3058,6 @@ class GrismFLT(object):
                                           fwcpos=self.grism.fwcpos,
                                           MW_EBV=self.grism.MW_EBV)
                 except: 
-                    # print(size)
-                    # print('failed')
                     utils.log_exception(utils.LOGFILE, traceback)
                     
                     continue
@@ -3126,12 +3090,10 @@ class GrismFLT(object):
                 else:
                     beam.compute_model(spectrum_1d=old_spectrum_1d,
                                        is_cgs=old_cgs)
-        # print(beams)
+
         if get_beams:
             out_beams = OrderedDict()
-            
             for b in beam_names:
-                # print(b)
                 out_beams[b] = beams[b]
             return out_beams
 
@@ -3536,7 +3498,6 @@ class GrismFLT(object):
         hdu.writeto('{0}_model.fits'.format(root), overwrite=overwrite,
                     output_verify='fix')
 
-
         fp = open('{0}_model.pkl'.format(root), 'wb')
         pickle.dump(self.object_dispersers, fp)
         fp.close()
@@ -3599,7 +3560,6 @@ class GrismFLT(object):
 
         fp = open('{0}.{1:02d}.GrismFLT.pkl'.format(root, 
                                                 self.grism.sci_extn), 'wb')
-
         pickle.dump(self, fp)
         fp.close()
 
@@ -3783,12 +3743,10 @@ class GrismFLT(object):
             print('POM only defined for NIRCam')
             return True
         
-
         pom_path = os.path.join(GRIZLI_PATH,
             f'CONF/GRISM_NIRCAM/V*/NIRCAM_LW_POM_Mod{self.grism.module}.fits')
         
         pom_files = glob.glob(pom_path)
-
         
         if len(pom_files) == 0:
             print(f'Couldn\'t find POM reference files {pom_path}')
