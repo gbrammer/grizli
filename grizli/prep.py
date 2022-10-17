@@ -3,6 +3,7 @@ Align direct images & make mosaics
 """
 import os
 import inspect
+import gc
 
 from collections import OrderedDict
 import glob
@@ -347,6 +348,13 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
 
     if mask_regions:
         apply_region_mask(local_file, dq_value=1024)
+    
+    # Flush objects
+    orig_file.close()
+    del(orig_file)
+    
+    for _iter in range(3):
+        gc.collect()
 
 
 def apply_persistence_mask(flt_file, path='../Persistence', dq_value=1024,
