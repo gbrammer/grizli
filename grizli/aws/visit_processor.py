@@ -1120,7 +1120,7 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=False,
     
     if get_wcs_guess_from_table:
         get_wcs_guess(assoc)
-      
+    
     keep = []
     for c in tab.colnames:
         if tab[c].dtype not in [object]:
@@ -1404,11 +1404,132 @@ def res_query_from_local(files=None, filters=None):
     return res
 
 
-def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-27.7910651, size=5*60, filters=['F160W'], ir_scale=0.1, ir_wcs=None, res=None, half_optical=True, kernel='point', pixfrac=0.33, make_figure=True, skip_existing=True, clean_flt=True, gzip_output=True, s3output='s3://grizli-v2/HST/Pipeline/Mosaic/', split_uvis=True, extra_query='', extra_wfc3ir_badpix=True, fix_niriss=True, scale_nanojy=10, verbose=True, niriss_ghost_kwargs={}, scale_photom=True, **kwargs):
+def query_exposures(ra=53.16, dec=-27.79, size=1., pixel_scale=0.1, theta=0,  filters=['F160W'], wcs=None, extra_columns=[], extra_query='', res=None, max_wcs=False):
+    """
+    Query exposures that overlap a WCS, either specified explicitly or 
+    generated from position parameters
+    
+    Parameters
+    ----------
+    ra : float
+        RA center, decimal degrees
+    
+    dec : float
+        Dec center, decimal degrees
+    
+    size : float
+        Point query, arcsec
+    
+    pixel_scale : float
+        Pixel scale, arcsec
+    
+    theta : float
+        WCS position angle
+        
+    filters : list, None
+        Filter list
+    
+    wcs : `~astropy.wcs.WCS`, None
+        WCS to supersede ``ra``, ``dec``, ``size``, ``pixel_scale``
+    
+    extra_columns : string
+        Additional columns to query, start with a ','
+        
+    extra_query : str
+        Extra criteria appended to SQL query
+    
+    Returns
+    -------
+    header : `~astropy.io.fits.Header`
+        WCS header
+        
+    wcs : `~astropy.wcs.WCS`
+        Query WCS
+        
+    SQL : str
+        Query string
+        
+    res : `~grizli.utils.GTable`
+        Query result
+    
+    """
+    import astropy.wcs as pywcs
+    
+    if wcs is None:
+        _hdu = utils.make_wcsheader(ra=ra, dec=dec, size=size,
+                                    pixscale=pixel_scale,
+                                    theta=theta,
+                                    get_hdu=True)
+        header = _hdu.header
+        wcs = pywcs.WCS(header)
+    else:
+        header = utils.to_header(wcs)
+        
+    fp = wcs.calc_footprint()
+        
+    x1, y1 = fp.min(axis=0)
+    x2, y2 = fp.max(axis=0)
+    
+    # Database query
+    SQL = f"""
+    SELECT dataset, extension, sciext, assoc, 
+           e.filter, e.pupil, e.exptime, e.footprint, e.detector
+           {extra_columns}
+    FROM exposure_files e, assoc_table a
+    WHERE e.assoc = a.assoc_name
+    AND a.status = 2
+    AND e.exptime > 0
+    AND polygon(e.footprint) && polygon(box '(({x1},{y1}),({x2},{y2}))') 
+    {extra_query}   
+    """
+    
+    if filters is not None:
+        filter_sql = ' OR '.join([f"e.filter = '{f}'" for f in filters])
+        SQL += f'AND ({filter_sql})'
+    
+    SQL += ' ORDER BY e.filter'
+    if res is None:
+        res = db.SQL(SQL)
+    
+    if max_wcs:
+        fp = None
+        for f in res['footprint']:
+            fp_i = utils.SRegion(f)
+
+            for fs in fp_i.shapely:
+                if fp is None:
+                    fp = fs
+                else:
+                    fp = fp.union(fs)
+
+        bx, by = fp.convex_hull.boundary.xy
+        ra = (np.max(bx) + np.min(bx))/2
+        dec = (np.max(by) + np.min(by))/2
+
+        cosd = np.cos(dec/180*np.pi)
+
+        size = (np.max(np.abs(bx-ra))*2*cosd*3600 + max_wcs*1., 
+                np.max(np.abs(by-dec))*2*3600 + max_wcs*1.)
+        
+        _hdu = utils.make_wcsheader(ra=ra, dec=dec, size=size,
+                                    pixscale=pixel_scale,
+                                    theta=theta,
+                                    get_hdu=True)
+        header = _hdu.header
+        wcs = pywcs.WCS(header)
+        
+    return header, wcs, SQL, res
+
+
+def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-27.7910651, size=5*60, theta=0., filters=['F160W'], ir_scale=0.1, ir_wcs=None, res=None, half_optical=True, kernel='point', pixfrac=0.33, make_figure=True, skip_existing=True, clean_flt=True, gzip_output=True, s3output='s3://grizli-v2/HST/Pipeline/Mosaic/', split_uvis=True, extra_query='', extra_wfc3ir_badpix=True, fix_niriss=True, scale_nanojy=10, verbose=True, niriss_ghost_kwargs={}, scale_photom=True, **kwargs):
     """
     Make mosaic from exposures defined in the exposure database
     
-        
+    Parameters
+    ----------
+    
+    Returns
+    -------
     """
     import os
     import glob
@@ -1422,8 +1543,15 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
     
     utils.set_warnings()
     
+    # out_h, ir_wcs, res = query_exposures(ra=ra, dec=dec,
+    #                                      size=size,
+    #                                      pixel_scale=pixel_scale,
+    #                                      theta=theta,
+    #                                      filters=filters,
+    #                                      wcs=ir_wcs,
+    #                                      extra_query=extra_query)
     if ir_wcs is None:
-        out_h, ir_wcs = utils.make_wcsheader(ra=ra, dec=dec, size=size, 
+        out_h, ir_wcs = utils.make_wcsheader(ra=ra, dec=dec, size=size,
                                           pixscale=ir_scale, get_hdu=False)
     
     fp = ir_wcs.calc_footprint()

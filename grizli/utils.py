@@ -74,26 +74,34 @@ GRISM_MAJOR = {'G102': 0.1, 'G141': 0.1, # WFC3/IR
                'GRISM':0.1, 'G150':0.1  # Roman
                }
 
+# ----zihao modified----
+# Change GRISM_LIMITS for NIRCam filters.
 GRISM_LIMITS = {'G800L': [0.545, 1.02, 40.],  # ACS/WFC
-          'G280': [0.2, 0.4, 14],  # WFC3/UVIS
-           'G102': [0.77, 1.18, 23.],  # WFC3/IR
-           'G141': [1.06, 1.73, 46.0],
-           'GRISM': [0.98, 1.98, 11.],  # WFIRST/Roman
-           'G150': [0.98, 1.98, 11.],  
-           'F090W': [0.76, 1.04, 45.0],  # NIRISS
-           'F115W': [0.97, 1.32, 45.0],
-           'F140M': [1.28, 1.52, 45.0],
-           'F158M': [1.28, 1.72, 45.0],
-           'F150W': [1.28, 1.72, 45.0],
-           'F200W': [1.68, 2.30, 45.0],
-           'F140M': [1.20, 1.60, 45.0],
-           'CLEARP': [0.76, 2.3, 45.0],
-           'F277W': [2.5, 3.2, 20.],  # NIRCAM
-           'F356W': [3.05, 4.1, 20.],
-           'F444W': [3.82, 5.08, 20],
-           'F410M': [3.8, 4.38, 20],
-           'BLUE': [0.8, 1.2, 10.],  # Euclid
-           'RED': [1.1, 1.9, 14.]}
+                'G280': [0.2, 0.4, 14],  # WFC3/UVIS
+                'G102': [0.77, 1.18, 23.],  # WFC3/IR
+                'G141': [1.06, 1.73, 46.0],
+                'GRISM': [0.98, 1.98, 11.],  # WFIRST/Roman
+                'G150': [0.98, 1.98, 11.],  
+                'F090W': [0.76, 1.04, 45.0],  # NIRISS
+                'F115W': [0.97, 1.32, 45.0],
+                'F140M': [1.28, 1.52, 45.0],
+                'F158M': [1.28, 1.72, 45.0],
+                'F150W': [1.28, 1.72, 45.0],
+                'F200W': [1.68, 2.30, 45.0],
+                'F140M': [1.20, 1.60, 45.0],
+                'CLEARP': [0.76, 2.3, 45.0],
+                'F277W': [2.5, 3.2, 10.], # NIRCAM
+                'F356W': [3.05, 4.1, 10.],
+                'F444W': [3.82, 5.08, 10],
+                'F410M': [3.8, 4.38, 10],
+                'F322W2':[2.4, 4.0, 10],
+                #    'F277W': [2.5, 3.2, 20.],
+                #    'F356W': [3.05, 4.1, 20.],
+                #    'F444W': [3.82, 5.08, 20],
+                #    'F410M': [3.8, 4.38, 20],
+                #    'F322W2':[2.4, 4.0, 20],
+                'BLUE': [0.8, 1.2, 10.],  # Euclid
+                'RED': [1.1, 1.9, 14.]}
 
 #DEFAULT_LINE_LIST = ['PaB', 'HeI-1083', 'SIII', 'OII-7325', 'ArIII-7138', 'SII', 'Ha+NII', 'OI-6302', 'HeI-5877', 'OIII', 'Hb', 'OIII-4363', 'Hg', 'Hd', 'H8','H9','NeIII-3867', 'OII', 'NeVI-3426', 'NeV-3346', 'MgII','CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'NIII-1750', 'NIV-1487', 'NV-1240', 'Lya']
 
@@ -276,7 +284,8 @@ def radec_to_targname(ra=0, dec=0, round_arcsec=(4, 60), precision=2, targstr='j
     dec_scl = int(np.round(dec/scl[1]))*scl[1]
     ra_scl = int(np.round(ra/scl[0]))*scl[0]
 
-    coo = astropy.coordinates.SkyCoord(ra=ra_scl*u.deg, dec=dec_scl*u.deg)
+    coo = astropy.coordinates.SkyCoord(ra=ra_scl*u.deg, dec=dec_scl*u.deg, 
+                                       frame='icrs')
 
     cstr = re.split('[hmsd.]', coo.to_string('hmsdms', precision=precision))
     # targname = ('j{0}{1}'.format(''.join(cstr[0:3]), ''.join(cstr[4:7])))
@@ -6654,6 +6663,8 @@ class EffectivePSF(object):
         
         if psf_type == 'JWST/MIRI':
             #  IR detector
+            NDET = int(np.sqrt(epsf.shape[2]))
+            
             rx = 1+(np.clip(x, 1, 1023)-0)/512.
             ry = 1+(np.clip(y, 1, 1023)-0)/512.
 
@@ -6661,20 +6672,31 @@ class EffectivePSF(object):
             rx -= 1
             ry -= 1
 
-            nx = np.clip(int(rx), 0, 2)
-            ny = np.clip(int(ry), 0, 2)
-
+            # nx = np.clip(int(rx), 0, 2)
+            # ny = np.clip(int(ry), 0, 2)
+            nx = np.clip(int(rx), 0, NDET-1)
+            ny = np.clip(int(ry), 0, NDET-1)
+            
             # print x, y, rx, ry, nx, ny
 
             fx = rx-nx
             fy = ry-ny
 
-            psf_xy = (1-fx)*(1-fy)*epsf[:, :, nx+ny*3]
-            psf_xy += fx*(1-fy)*epsf[:, :, (nx+1)+ny*3]
-            psf_xy += (1-fx)*fy*epsf[:, :, nx+(ny+1)*3]
-            psf_xy += fx*fy*epsf[:, :, (nx+1)+(ny+1)*3]
+            # psf_xy = (1-fx)*(1-fy)*epsf[:, :, nx+ny*3]
+            # psf_xy += fx*(1-fy)*epsf[:, :, (nx+1)+ny*3]
+            # psf_xy += (1-fx)*fy*epsf[:, :, nx+(ny+1)*3]
+            # psf_xy += fx*fy*epsf[:, :, (nx+1)+(ny+1)*3]
+
+            if NDET == 1:
+                psf_xy = epsf[:,:,0]
+            else:
+                psf_xy = (1-fx)*(1-fy)*epsf[:, :, nx+ny*NDET]
+                psf_xy += fx*(1-fy)*epsf[:, :, (nx+1)+ny*NDET]
+                psf_xy += (1-fx)*fy*epsf[:, :, nx+(ny+1)*NDET]
+                psf_xy += fx*fy*epsf[:, :, (nx+1)+(ny+1)*NDET]
             
             # psf_xy = np.rot90(psf_xy.T, 2)
+            psf_xy = psf_xy.T
             
             self.eval_filter = filter
         
@@ -7237,7 +7259,8 @@ class GTable(astropy.table.Table):
             print('No RA/Dec. columns found in input table.')
             return False
 
-        self_coo = SkyCoord(ra=self[rd[0]], dec=self[rd[1]])
+        self_coo = SkyCoord(ra=self[rd[0]], dec=self[rd[1]], 
+                            frame='icrs')
 
         if isinstance(other, list) | isinstance(other, tuple):
             rd = [slice(0, 1), slice(1, 2)]
@@ -7252,7 +7275,8 @@ class GTable(astropy.table.Table):
                 print('No RA/Dec. columns found in `other` table.')
                 return False
 
-        other_coo = SkyCoord(ra=other[rd[0]], dec=other[rd[1]])
+        other_coo = SkyCoord(ra=other[rd[0]], dec=other[rd[1]],
+                             frame='icrs')
 
         try:
             idx, d2d, d3d = other_coo.match_to_catalog_sky(self_coo, nthneighbor=nthneighbor)

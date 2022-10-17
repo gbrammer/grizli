@@ -93,8 +93,8 @@ def _loadFLT(grism_file, sci_extn, direct_file, pad, ref_file,
     else:
         flt.catalog = None
     
-    if flt.grism.instrument in ['NIRCAM']:
-        flt.apply_POM()
+    # if flt.grism.instrument in ['NIRCAM']:
+    #     flt.apply_POM()
         
     if flt.grism.instrument in ['NIRISS', 'NIRCAM']:
         flt.transform_JWST_WFSS()
@@ -516,7 +516,8 @@ class GroupFLT():
             if center_rd is None:
                 x = y = None
             else:
-                x, y = flt.direct.wcs.all_world2pix(np.array(center_rd)[None, :], 0).flatten()
+                _rd = np.array(center_rd)[None, :]
+                x, y = flt.direct.wcs.all_world2pix(_rd, 0).flatten()
 
             status = flt.compute_model_orders(id=id, x=x, y=y, verbose=False,
                           size=size, compute_size=(size < 0),

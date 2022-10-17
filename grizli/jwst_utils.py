@@ -7,6 +7,7 @@ Requires https://github.com/spacetelescope/jwst
 import os
 import inspect
 import logging
+import traceback
 
 import astropy.io.fits as pyfits
 import astropy.wcs as pywcs
@@ -17,7 +18,8 @@ from . import GRIZLI_PATH
 
 QUIET_LEVEL = logging.INFO
 
-CRDS_CONTEXT = 'jwst_0942.pmap' # July 29, 2022 with updated NIRCAM ZPs
+# CRDS_CONTEXT = 'jwst_0942.pmap' # July 29, 2022 with updated NIRCAM ZPs
+CRDS_CONTEXT = 'jwst_0995.pmap' # 2022-10-06 NRC ZPs and flats
 
 def set_crds_context(fits_file=None, override_environ=False, verbose=True):
     """
@@ -211,20 +213,26 @@ def get_jwst_skyflat(header, verbose=True, valid_flat=(0.7, 1.4)):
         return None, None, None
 
     skyflat = pyfits.open(skyfile)[0].data
-
-    oflat = os.path.basename(header['R_FLAT'])
-    crds_path = os.getenv('CRDS_PATH')
-    crds_path = os.path.join(crds_path, 'references/jwst', 
-                             header['instrume'].lower(), oflat)
-
-    oim = pyfits.open(crds_path)
-    try:
-        flat_corr = oim['SCI'].data / skyflat
-    except ValueError:
-        msg = f'jwst_utils.get_jwst_skyflat: flat_corr failed'
-        utils.log_comment(utils.LOGFILE, msg, verbose=True)
-        return None, None, None
-
+        
+    if 'R_FLAT' in header:
+        oflat = os.path.basename(header['R_FLAT'])
+        crds_path = os.getenv('CRDS_PATH')
+        crds_path = os.path.join(crds_path, 'references/jwst', 
+                                 header['instrume'].lower(), oflat)
+        
+        msg = f'jwst_utils.get_jwst_skyflat: pipeline flat = {crds_path}\n'
+        
+        oim = pyfits.open(crds_path)
+        try:
+            flat_corr = oim['SCI'].data / skyflat
+        except ValueError:
+            msg = f'jwst_utils.get_jwst_skyflat: flat_corr failed'
+            utils.log_comment(utils.LOGFILE, msg, verbose=True)
+            return None, None, None
+    else:
+        msg = f'jwst_utils.get_jwst_skyflat: NO pipeline flat\n'
+        flat_corr = 1./skyflat
+        
     bad = skyflat < valid_flat[0]
     bad |= skyflat > valid_flat[1]
     bad |= ~np.isfinite(flat_corr)
@@ -232,10 +240,24 @@ def get_jwst_skyflat(header, verbose=True, valid_flat=(0.7, 1.4)):
     
     dq = bad*1024
 
-    msg = f'jwst_utils.get_jwst_skyflat: pipeline flat = {crds_path}\n'
     msg += f'jwst_utils.get_jwst_skyflat: new sky flat = {skyfile}\n'
     msg += f'jwst_utils.get_jwst_skyflat: valid_flat={valid_flat}'
     msg += f' nmask={bad.sum()}'
+    
+    if 'SUBSTRT1' in header:
+        if header['SUBSIZE1'] != 2048:
+            slx = slice(header['SUBSTRT1']-1,
+                        header['SUBSTRT1']-1 + header['SUBSIZE1'])
+            sly = slice(header['SUBSTRT2']-1,
+                        header['SUBSTRT2']-1 + header['SUBSIZE2'])
+            
+            msg += f"\njwst_utils.get_jwst_skyflat: subarray "
+            msg +=  header['APERNAME']
+            msg += f' [{sly.start}:{sly.stop},{slx.start}:{slx.stop}]'
+            
+            flat_corr = flat_corr[sly, slx]
+            dq = dq[sly, slx]
+            
     utils.log_comment(utils.LOGFILE, msg, verbose=True)
 
     return skyfile, flat_corr, dq
@@ -757,7 +779,194 @@ def copy_jwst_keywords(header, orig_keys=ORIG_KEYS, verbose=True):
                 utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
 
 
-def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_KEYS):
+def exposure_oneoverf_correction(file, axis=None, thresholds=[5,4,3], erode_mask=None, dilate_iterations=3, deg_pix=64, make_plot=True, init_model=0, in_place=False, skip_miri=True, verbose=True, **kwargs):
+    """
+    1/f correction for individual exposure
+    
+    1. Create a "background" mask with `sep`
+    2. Identify sources above threshold limit in the background-subtracted
+       image
+    3. Iterate a row/column correction on threshold-masked images.  A 
+       chebyshev polynomial is fit to the correction array to try to isolate
+       just the high-frequency oscillations.
+    
+    Parameters
+    ----------
+    file : str
+        JWST raw image filename
+    
+    axis : int
+        Axis over which to calculated the correction. If `None`, then defaults 
+        to ``axis=1`` (rows) for NIRCam and ``axis=1`` (columns) for NIRISS.
+    
+    thresholds : list
+        List of source identification thresholds
+        
+    erode_mask : bool
+        Erode the source mask to try to remove individual pixels that satisfy
+        the S/N threshold.  If `None`, then set to False if the exposure is a 
+        NIRISS dispersed image to avoid clipping compact high-order spectra
+        from the mask and True otherwise (for NIRISS imaging and NIRCam
+        generally).
+    
+    dilate_iterations : int
+        Number of `binary_dilation` iterations of the source mask
+        
+    deg_pix : int
+        Scale in pixels for each degree of the smooth chebyshev polynomial
+    
+    make_plot : bool
+        Make a diagnostic plot
+    
+    init_model : scalar, array-like
+        Initial correction model, e.g., for doing both axes
+    
+    in_place : bool
+        If True, remove the model from the 'SCI' extension of ``file``
+    
+    skip_miri : bool
+        Don't run on MIRI exposures
+    
+    verbose : bool
+        Print status messages
+        
+    Returns
+    -------
+    fig : `~matplotlib.figure.Figure`, None
+        Diagnostic figure if `make_plot=True`
+    
+    model : array-like
+        The row- or column-average correction array
+    """
+    import numpy as np
+    import scipy.ndimage as nd
+    import matplotlib.pyplot as plt
+    
+    import astropy.io.fits as pyfits
+    import sep
+    
+    im = pyfits.open(file)
+    if (im[0].header['INSTRUME'] in 'MIRI') & (skip_miri):
+        msg = 'exposure_oneoverf_correction: Skip for MIRI'
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+        
+        return None, 0
+        
+    if axis is None:
+        if im[0].header['INSTRUME'] == 'NIRISS':
+            axis = 0
+        else:
+            axis = 1
+
+    msg = f'exposure_oneoverf_correction: {file} axis={axis}'
+    utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+    
+    if erode_mask is None:
+        if im[0].header['FILTER'].startswith('GR150'):
+            erode_mask = False
+        elif im[0].header['PUPIL'].startswith('GRISM'):
+            erode_mask = False
+        else:
+            erode_mask = True
+            
+    dq = utils.unset_dq_bits(im['DQ'].data, 4)
+    dqmask = dq == 0
+    mask = dqmask
+
+    err = im['ERR'].data
+    dqmask &= (err > 0) & np.isfinite(err)
+
+    sci = im['SCI'].data.astype(np.float32) - init_model
+    bkg = sep.Background(sci, mask=~dqmask, bw=deg_pix, bh=deg_pix)
+    back = bkg.back()
+
+    sn_mask = (sci - back)/err > thresholds[0]
+    if erode_mask:
+        sn_mask = nd.binary_erosion(sn_mask)
+        
+    sn_mask = nd.binary_dilation(sn_mask, iterations=dilate_iterations)
+
+    mask = dqmask & ~sn_mask
+
+    cheb = 0
+    
+    if make_plot:
+        fig, ax = plt.subplots(1,1,figsize=(6,3))
+    else:
+        fig = None
+        
+    for _iter, thresh in enumerate(thresholds):
+        sci = im['SCI'].data*1. - back - init_model
+        sci[~mask] = np.nan
+        med = np.nanmedian(sci, axis=axis)
+
+        if axis == 0:
+            model = np.zeros_like(sci) + (med - cheb)
+        else:
+            model = (np.zeros_like(sci) + (med - cheb)).T
+
+        sn_mask = ((sci-model)/err > thresh) & dqmask
+        if erode_mask:
+            sn_mask = nd.binary_erosion(sn_mask)
+        
+        sn_mask = nd.binary_dilation(sn_mask, iterations=dilate_iterations)
+        mask = dqmask & ~sn_mask
+        mask &= (sci-model)/err > -thresh
+
+        if make_plot:
+            ax.plot(med, alpha=0.5)
+
+    nx = med.size
+    xarr = np.linspace(-1,1,nx)
+    deg = nx//deg_pix
+
+    ok = np.isfinite(med)
+
+    if deg <= 1:
+        cheb = np.nanmedian(med)
+    else:
+        for _iter in range(3):
+            coeffs = np.polynomial.chebyshev.chebfit(xarr[ok], med[ok], deg)
+            cheb = np.polynomial.chebyshev.chebval(xarr, coeffs)
+            ok = np.isfinite(med) & (np.abs(med-cheb) < 0.05)
+
+        if make_plot:
+            ax.plot(np.arange(nx)[ok], cheb[ok], color='r')
+
+    if axis == 0:
+        model = np.zeros_like(sci) + (med - cheb)
+    else:
+        model = (np.zeros_like(sci) + (med - cheb)).T
+    
+    if make_plot:
+        ax.set_title(f'{file} axis={axis}')
+        ax.grid()
+        
+        fig.tight_layout(pad=0)
+    
+    im.close()
+    
+    if in_place: 
+        msg = f'exposure_oneoverf_correction: {file} apply to file'
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+        
+        im = pyfits.open(file, mode='update')
+        im[0].header['ONEFEXP'] = True, 'Exposure 1/f correction applied'
+        im[0].header['ONEFAXIS'] = axis, 'Axis for 1/f correction'
+        
+        model[~np.isfinite(model)] = 0
+        
+        im['SCI'].data -= model
+        im.flush()
+        
+        if make_plot:
+            fig.savefig(file.split('.fits')[0] + f'_onef_axis{axis}.png')
+            plt.close('all')
+            
+    return fig, model
+
+
+def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_KEYS, oneoverf_correction=True, oneoverf_kwargs={'make_plot':False}, use_skyflats=True):
     """
     Make copies of some header keywords to make the headers look like 
     and HST instrument
@@ -765,8 +974,9 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
     1) Apply gain correction [x remove]
     2) Clip DQ bits
     3) Copy header keywords
-    4) Apply flat field if necessary
-    5) Initalize WCS
+    4) Apply exposure-level 1/f correction
+    5) Apply flat field if necessary
+    6) Initalize WCS
     
     Returns
     -------
@@ -886,7 +1096,7 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
         # dq[:,:302] |= 1024
         
         # Dilate MIRI mask
-        msg = f'Dilate MIRI window mask'
+        msg = f'initialize_jwst_image: Dilate MIRI window mask'
         utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
         edge = nd.binary_dilation(((dq & 2**9) > 0), iterations=6)
         dq[edge] |= 1024
@@ -902,9 +1112,18 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
             if dq.shape == bpdata.shape:
                 dq |= bpdata.astype(dq.dtype)
             
-                msg = f'Use extra badpix in {bpfile}'
+                msg = f'initialize_jwst_image: Use extra badpix in {bpfile}'
                 utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
         
+        if _det in ['NRCALONG','NRCBLONG']:
+            msg = 'initialize_jwst_image: Mask outer ring of 6 pixels'
+            msg += f' for {_det}'
+            utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+            dq[:6,:] |= 1024
+            dq[-6:,:] |= 1024
+            dq[:,:6] |= 1024
+            dq[:,-6:] |= 1024
+             
     img['DQ'].data = dq
     
     img[0].header['EXPTIME'] = img[0].header['EFFEXPTM']*1
@@ -925,7 +1144,21 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
     img.writeto(filename, overwrite=True)
     img.close()
     
-    _ = img_with_flat(filename, overwrite=True)
+    if oneoverf_correction:
+        try:
+            _ = exposure_oneoverf_correction(filename, in_place=True, 
+                                         **oneoverf_kwargs)
+        except TypeError:
+            # Should only fail for test data
+            utils.log_exception(utils.LOGFILE, traceback)
+            msg = f'exposure_oneoverf_correction: failed for {filename}'
+            utils.log_comment(utils.LOGFILE, msg)
+            
+            pass
+                                         
+        # axis=None, thresholds=[5,4,3], erode_mask=None, dilate_iterations=3, deg_pix=64, make_plot=True, init_model=0, in_place=False, skip_miri=True, verbose=True
+        
+    _ = img_with_flat(filename, overwrite=True, use_skyflats=use_skyflats)
 
     _ = img_with_wcs(filename, overwrite=True)
     

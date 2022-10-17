@@ -2,6 +2,8 @@
 Model grism spectra in individual FLTs
 """
 import os
+import glob
+
 from collections import OrderedDict
 import copy
 import traceback
@@ -283,16 +285,16 @@ class GrismDisperser(object):
         self.PAM_value = self.get_PAM_value(verbose=False)
         #print('xxx PAM!')
 
-        self.yoffset = yoffset
-        self.xoffset = xoffset
-        
-        self.process_config()
 
+        # ----zihao modified----
+        self.xoffset = xoffset
+        self.yoffset = yoffset
+        self.process_config()
+            
         if (self.yoffset != 0) | (self.xoffset is not None):
             #print('yoffset!', yoffset)
             self.add_ytrace_offset(self.yoffset)
-        
-        
+        #-----------------------
 
 
     def set_segmentation(self, seg_array):
@@ -357,6 +359,7 @@ class GrismDisperser(object):
         if self.grow > 1:
             self.dx = np.arange(self.dx[0]*self.grow, self.dx[-1]*self.grow)
 
+
         # ---Zihao modified---
         xoffset = 0
         yoffset = 0
@@ -374,6 +377,7 @@ class GrismDisperser(object):
         if filt=='F444W':
             if (mod=='A'):
                 yoffset = -1
+
 
         if ('G14' in self.conf.conf_file) & (self.beam == 'A'):
             xoffset = -0.5  # necessary for WFC3/IR G141, v4.32
@@ -2206,9 +2210,14 @@ class ImageData(object):
             slice_header = pyfits.Header()
 
         # Generate new object
-        slice_obj = ImageData(sci=self.data['SCI'][sly, slx]/self.photflam,
-                              err=self.data['ERR'][sly, slx]/self.photflam,
-                              dq=self.data['DQ'][sly, slx]*1,
+        if (self.data['REF'] is not None) & (self.data['SCI'] is None):
+            _sci = _err = _dq = None
+        else:
+            _sci = self.data['SCI'][sly, slx]/self.photflam
+            _err = self.data['ERR'][sly, slx]/self.photflam
+            _dq = self.data['DQ'][sly, slx]*1
+            
+        slice_obj = ImageData(sci=_sci, err=_err, dq=_dq,
                               header=slice_header, wcs=slice_wcs,
                               photflam=self.photflam, photplam=self.photplam,
                               origin=slice_origin, instrument=self.instrument,
@@ -2678,9 +2687,9 @@ class GrismFLT(object):
 
         # Fill empty pixels in the reference image from the SCI image,
         # but don't do it if direct['SCI'] is just a copy from the grism
-        if not self.direct.filter.startswith('G'):
-            empty = self.direct.data['REF'] == 0
-            self.direct.data['REF'][empty] += self.direct['SCI'][empty]
+        # if not self.direct.filter.startswith('G'):
+        #     empty = self.direct.data['REF'] == 0
+        #     self.direct.data['REF'][empty] += self.direct['SCI'][empty]
 
         # self.direct.data['ERR'] *= 0.
         # self.direct.data['DQ'] *= 0
@@ -2999,8 +3008,9 @@ class GrismFLT(object):
                     if (size < 4):
                         return True
 
-            # Thumbnails
-            # print '!! X, Y: ', x, y, self.direct.origin, size
+            #---zihao modified---
+            dy,_ = self.conf.get_beam_trace(x=x-self.pad,y=y-self.pad,dx=0,beam='A')
+            dy = int(np.round(dy))
 
             # ---Zihao modified---
             dy,_ = self.conf.get_beam_trace(x=x-self.pad,y=y-self.pad,dx=0,beam='A')
@@ -3552,8 +3562,20 @@ class GrismFLT(object):
             root = self.grism_file.split('.fits')[0]
             
         hdu = pyfits.HDUList([pyfits.PrimaryHDU()])
+        
+        # Remove dummy extensions if REF found
+        skip_direct_extensions  = []
+        if 'REF' in self.direct.data:
+            if self.direct.data['REF'] is not None:
+                skip_direct_extensions = ['SCI','ERR','DQ']
+                
         for key in self.direct.data.keys():
-            hdu.append(pyfits.ImageHDU(data=self.direct.data[key],
+            if key in skip_direct_extensions:
+                hdu.append(pyfits.ImageHDU(data=None,
+                                       header=self.direct.header,
+                                       name='D'+key))
+            else:
+                hdu.append(pyfits.ImageHDU(data=self.direct.data[key],
                                        header=self.direct.header,
                                        name='D'+key))
 
@@ -3574,7 +3596,10 @@ class GrismFLT(object):
 
         # zero out large data objects
         self.direct.data = self.grism.data = self.seg = self.model = None
-        fp = open('{0}.{1:02d}.GrismFLT.pkl'.format(root, self.grism.sci_extn), 'wb')
+
+        fp = open('{0}.{1:02d}.GrismFLT.pkl'.format(root, 
+                                                self.grism.sci_extn), 'wb')
+
         pickle.dump(self, fp)
         fp.close()
 
@@ -3633,6 +3658,7 @@ class GrismFLT(object):
                     self.direct.data[key] = None
                 else:
                     self.direct.data[key] = fits[ext].data*1
+                    
             elif fits[ext].header['EXTNAME'].startswith('G'):
                 if fits[ext].data is None:
                     self.grism.data[key] = None
@@ -3665,11 +3691,23 @@ class GrismFLT(object):
 
         elif self.grism.instrument in ['NIRCAM', 'NIRCAMA']:
             #  Module A
+            # if self.grism.pupil == 'GRISMC':
+            #     rot = 1
+            # else:
+            #     # Do nothing, A+GRISMR disperses to +x
+            #     return True
+            #-----zihao modified-----
             if self.grism.pupil == 'GRISMC':
-                rot = 1
-            else:
-                # Do nothing, A+GRISMR disperses to +x
-                return True
+                if self.grism.module == 'A':
+                    rot = 1
+                elif self.grism.module == 'B':
+                    rot = 1
+            elif self.grism.pupil == 'GRISMR':
+                if self.grism.module == 'A':
+                    return True
+                elif self.grism.module == 'B':
+                    rot = 2
+            #-------------------------
 
         elif self.grism.instrument == 'NIRCAMB':
             if self.grism.pupil == 'GRISMC':
@@ -3745,12 +3783,19 @@ class GrismFLT(object):
             print('POM only defined for NIRCam')
             return True
         
-        pom_file = os.path.join(GRIZLI_PATH,
-            f'CONF/GRISM_NIRCAM/V4/NIRCAM_LW_POM_Mod{self.grism.module}.fits')
+
+        pom_path = os.path.join(GRIZLI_PATH,
+            f'CONF/GRISM_NIRCAM/V*/NIRCAM_LW_POM_Mod{self.grism.module}.fits')
         
-        if not os.path.exists(pom_file):
-            print(f'Couldn\'t find POM reference file {pom_file}')
+        pom_files = glob.glob(pom_path)
+
+        
+        if len(pom_files) == 0:
+            print(f'Couldn\'t find POM reference files {pom_path}')
             return False
+        
+        pom_files.sort()
+        pom_file = pom_files[-1]
         
         if verbose:
             print(f'NIRCam: apply POM geometry from {pom_file}')
