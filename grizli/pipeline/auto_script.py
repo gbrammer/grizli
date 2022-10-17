@@ -2841,7 +2841,9 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
                 ref_file = _fstr.format(field_root, ref.lower())
             else:
                 _fstr = '{0}-{1}_dr*_sci.fits*'
-                ref_file = _fstr.format(field_root, ref.lower())                
+                ref_file = _fstr.format(field_root, ref.lower())
+                print(ref)
+                print(ref_file)              
                 ref_file = glob.glob(ref_file)[0]
         else:
             ref_file = force_ref
@@ -3180,12 +3182,12 @@ def extract(field_root='j142724+334246', maglim=[13, 24], prior=None, MW_EBV=0.0
 
     # Use "binning" templates for standardized extraction
     if oned_R:
-        bin_steps, step_templ = utils.step_templates(wlim=[5000, 18000.0],
+        bin_steps, step_templ = utils.step_templates(wlim=[5000, 5e4],
                                                      R=oned_R, round=10)
         init_templates = step_templ
     else:
         # Polynomial templates
-        wave = np.linspace(2000, 2.5e4, 100)
+        wave = np.linspace(2000, 5e4, 200)
         poly_templ = utils.polynomial_templates(wave, order=poly_order)
         init_templates = poly_templ
 
