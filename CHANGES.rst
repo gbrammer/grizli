@@ -44,3 +44,9 @@
 1.3
 ---
 Tagged version
+
+1.6.0-68-g1096b89
+-----------
+- Increase precision on ra/dec in reference catalogs.  Before was sometimes
+  limited to 5 decimal places, which is essentially the size of a NIRCam SW
+  pixel.
