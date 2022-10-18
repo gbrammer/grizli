@@ -2379,7 +2379,7 @@ def set_column_formats(info, extra={}, convert_mtime=True, **kwargs):
     """
     # Print formats
     formats = {}
-    formats['ra'] = formats['dec'] = '.5f'
+    formats['ra'] = formats['dec'] = '.8f'
     formats['mag_auto'] = formats['delta_z'] = '.2f'
     formats['chinu'] = formats['chimin'] = formats['chimax'] = '.1f'
     formats['bic_diff'] = formats['bic_temp'] = formats['bic_spl'] = '.1f'

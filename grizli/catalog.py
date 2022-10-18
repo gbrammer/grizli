@@ -53,6 +53,9 @@ def table_to_radec(table, output='coords.radec'):
     else:
         raise ValueError("Couldn't identify sky coordinates (x_world, ra)")
     
+    table[rc].format = '.8f'
+    table[dc].format = '.8f'
+    
     table[rc, dc].write(output, format='ascii.commented_header',
                         overwrite=True)
 
