@@ -54,3 +54,8 @@ Tagged version
 1.6.0-70-g618329f
 -----------------
 - decrease binary dilation of NIRCam bad pixel mask to one pixel
+
+1.6.0-73-ge84d650
+-----------------
+- Remove writing a few temporary files to /tmp
+- Close out some dangling pyfits.open objects
