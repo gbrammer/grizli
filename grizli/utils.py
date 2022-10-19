@@ -163,7 +163,8 @@ def get_flt_info(files=[], columns=['FILE', 'FILTER', 'PUPIL', 'INSTRUME', 'DETE
         line = [os.path.basename(files[i]).split('.gz')[0]]
         if files[i].endswith('.gz'):
             im = pyfits.open(files[i])
-            h = im[0].header
+            h = im[0].header.copy()
+            im.close()
         else:
             h = pyfits.Header().fromfile(files[i])
         
@@ -940,7 +941,9 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
                     fp_i = fp_j.buffer(1./3600)
                 else:
                     fp_i = fp_i.union(fp_j.buffer(1./3600))
-
+                
+                flt_j.close()
+                
             output_list[i]['footprint'] = fp_i
 
     return output_list, filter_list
@@ -968,7 +971,10 @@ def split_visit(visit, visit_split_shift=1.5, max_dt=6./24, path='../RAW'):
     crval2 = np.array([im[1].header['CRVAL2'] for im in ims])
     expstart = np.array([im[0].header['EXPSTART'] for im in ims])
     dt = np.cast[int]((expstart-expstart[0])/max_dt)
-
+    
+    for im in ims:
+        im.close()
+        
     dx = (crval1 - crval1[0])*60*np.cos(crval2[0]/180*np.pi)
     dy = (crval2 - crval2[0])*60
 
@@ -1044,7 +1050,9 @@ def get_visit_footprints(visits):
                 fp_i = fp_j
             else:
                 fp_i = fp_i.union(fp_j)
-
+            
+            flt_j.close()
+            
         visits[i]['footprint'] = fp_i
 
     return visits
@@ -1087,10 +1095,12 @@ def parse_visit_overlaps(visits, buffer=15.):
         if 'footprint' in visits[i]:
             fp_i = visits[i]['footprint'].buffer(buffer/3600.)
         else:
-            im_i = pyfits.open(glob.glob(visits[i]['product']+'_dr?_sci.fits')[0])
+            _products = visits[i]['product']+'_dr?_sci.fits'
+            im_i = pyfits.open(glob.glob(_products)[0])
             wcs_i = pywcs.WCS(im_i[0])
             fp_i = Polygon(wcs_i.calc_footprint()).buffer(buffer/3600.)
-
+            im_i.close()
+            
         exposure_groups.append(copy.deepcopy(visits[i]))
 
         for j in range(i+1, N):
@@ -1102,14 +1112,12 @@ def parse_visit_overlaps(visits, buffer=15.):
             if 'footprint' in visits[j]:
                 fp_j = visits[j]['footprint'].buffer(buffer/3600.)
             else:
-                im_j = pyfits.open(glob.glob(visits[j]['product']+'_dr?_sci.fits')[0])
+                _products = visits[j]['product']+'_dr?_sci.fits'
+                im_j = pyfits.open(glob.glob(_products)[0])
                 wcs_j = pywcs.WCS(im_j[0])
                 fp_j = Polygon(wcs_j.calc_footprint()).buffer(buffer/3600.)
-
-            # im_j = pyfits.open(glob.glob(visits[j]['product']+'_dr?_sci.fits')[0])
-            # wcs_j = pywcs.WCS(im_j[0])
-            # fp_j = Polygon(wcs_j.calc_footprint()).buffer(buffer/3600.)
-
+                im_j.close()
+            
             olap = fp_i.intersection(fp_j)
             if olap.area > 0:
                 used[j] = True
@@ -1126,7 +1134,8 @@ def parse_visit_overlaps(visits, buffer=15.):
         f_i = exposure_groups[i]['product'].split('-')[-1]
         product += '-'+f_i
         exposure_groups[i]['product'] = product
-    
+        flt_i.close()
+        
     return exposure_groups
 
 
@@ -3000,7 +3009,8 @@ def load_phoenix_stars(logg_list=PHOENIX_LOGG, teff_list=PHOENIX_TEFF, zmet_list
         hdu = pyfits.open(os.path.join('/tmp/', file))
 
     tab = GTable.gread(hdu[1])
-
+    hdu.close()
+    
     tstars = OrderedDict()
     N = tab['flux'].shape[1]
     for i in range(N):
@@ -3062,7 +3072,9 @@ def load_sdss_pca_templates(file='spEigenQSO-55732.fits', smooth=3000):
     temp_list = OrderedDict()
     for i in range(N):
         temp_list['{0} {1}'.format(name, i+1)] = SpectrumTemplate(wave=wave, flux=data[i, :])
-
+    
+    im.close()
+    
     return temp_list
 
 
@@ -4314,6 +4326,8 @@ class WCSFootprint(object):
             self.add_naxis(hdu[ext].header)
             the_wcs = pywcs.WCS(hdu[ext].header, fobj=hdu)
             self.wcs = the_wcs
+            hdu.close()
+            
         elif isinstance(wcs, pyfits.HDUList):
             if len(wcs) == 1:
                 ext = 0
@@ -4923,7 +4937,7 @@ def get_flt_footprint(flt_file, extensions=[1, 2, 3, 4], patch_args=None):
     from shapely.geometry import Polygon
     from descartes import PolygonPatch
 
-    im = pyfits.open(flt_file, mode='update')
+    im = pyfits.open(flt_file)
     fp = None
 
     for ext in extensions:
@@ -4936,7 +4950,9 @@ def get_flt_footprint(flt_file, extensions=[1, 2, 3, 4], patch_args=None):
             fp = p_i
         else:
             fp = fp.union(p_i)
-
+    
+    im.close()
+    
     if patch_args is not None:
         patch = PolygonPatch(fp, **patch_args)
         return patch
@@ -4996,20 +5012,6 @@ def make_maximal_wcs(files, pixel_scale=0.1, get_hdu=True, pad=90, verbose=True,
                 continue
 
             with pyfits.open(file) as im:
-                #im = pyfits.open(file)
-
-                # if im[0].header['INSTRUME'] == 'ACS':
-                #     chips = 2
-                # elif im[0].header['INSTRUME'] == 'WFPC2':
-                #     chips = 4
-                # elif im[0].header['INSTRUME'] == 'WFC3':
-                #     if im[0].header['INSTRUME'] == 'IR':
-                #         chips = 1
-                #     else:
-                #         chips = 2
-                # else:
-                #     chips = 1
-
                 for ext in range(nsci_extensions):
                     if ('SCI', ext+1) not in im:
                         continue
@@ -5743,7 +5745,9 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
 
         count += 1
         header['FLT{0:05d}'.format(count)] = file
-
+        
+        flt.close()
+        
         #xfiles = glob.glob('*')
         #print('Clean: ', clean, xfiles)
         if clean:
@@ -6093,7 +6097,8 @@ def fetch_hst_calib(file='iref$uc72113oi_pfl.fits',  ftpdir='https://hst-crds.st
         os.system('curl -o {0} {1}/{2}'.format(iref_file, ftpdir, cimg))
         if 'fits' in iref_file:
             try:
-                pyfits.open(iref_file)
+                _im =  pyfits.open(iref_file)
+                _im.close()
             except:
                 msg = ('Downloaded file {0} appears to be corrupt.\n'
                        'Check that {1}/{2} exists and is a valid file')
@@ -6147,7 +6152,9 @@ def fetch_hst_calibs(flt_file, ftpdir='https://hst-crds.stsci.edu/unchecked_get/
         path = fetch_hst_calib(im[0].header[ctype], ftpdir=ftpdir,
                                verbose=verbose, ref_paths=ref_paths)
         calib_paths.append(path)
-
+    
+    im.close()
+    
     return calib_paths
 
 
@@ -6515,8 +6522,9 @@ class EffectivePSF(object):
             if not os.path.exists(file):
                 continue
 
-            data = pyfits.open(file)[0].data.T
-            data[data < 0] = 0
+            with pyfits.open(file) as _im:
+                data = _im[0].data.T*1
+                data[data < 0] = 0
 
             self.epsf[filter] = data
         
@@ -6525,8 +6533,10 @@ class EffectivePSF(object):
                             'PSFSTD_WFC3UV*.fits'))
         filter_files.sort()
         for file in filter_files:
-            data = pyfits.open(file, ignore_missing_end=True)[0].data.T
-            data[data < 0] = 0
+            with pyfits.open(file, ignore_missing_end=True) as _im:
+                data = _im[0].data.T*1
+                data[data < 0] = 0
+                
             filt = '_'.join(file.strip('.fits').split('_')[2:])
             self.epsf[filt+'U'] = data
 
@@ -6535,8 +6545,10 @@ class EffectivePSF(object):
                             'PSFSTD_ACSWFC*.fits'))
         filter_files.sort()
         for file in filter_files:
-            data = pyfits.open(file, ignore_missing_end=True)[0].data.T
-            data[data < 0] = 0
+            with pyfits.open(file, ignore_missing_end=True) as _im:
+                data = _im[0].data.T*1.
+                data[data < 0] = 0
+                
             filt = '_'.join(file.strip('.fits').split('_')[2:])
             self.epsf[filt] = data
         
@@ -6549,14 +6561,15 @@ class EffectivePSF(object):
                             'miri*.fits'))
         filter_files.sort()
         for file in filter_files:
-            im = pyfits.open(file, ignore_missing_end=True)
-            data = im[0].data*1 # [::-1,:,:]#[:,::-1,:]
-            data[data < 0] = 0
-            key = '{0}-{1}'.format(im[0].header['DETECTOR'].upper(),
-                                    im[0].header['FILTER'])
+            with pyfits.open(file, ignore_missing_end=True) as _im:
+                data = _im[0].data*1 # [::-1,:,:]#[:,::-1,:]
+                
+                data[data < 0] = 0
+                key = '{0}-{1}'.format(_im[0].header['DETECTOR'].upper(),
+                                       _im[0].header['FILTER'])
             
-            if 'LABEL' in im[0].header:
-                key += '-'+im[0].header['LABEL']
+                if 'LABEL' in _im[0].header:
+                    key += '-' + _im[0].header['LABEL']
                 
             self.epsf[key] = data
         
@@ -6587,8 +6600,9 @@ class EffectivePSF(object):
                 msg += ' and unpack in ${GRIZLI}/CONF/'
                 raise FileNotFoundError(msg)
 
-            data = pyfits.open(file)[0].data  # .T
-            data[data < 0] = 0
+            with pyfits.open(file) as _im:
+                data = _im[0].data*1
+                data[data < 0] = 0
 
             # Mask center
             NX = data.shape[0]/2-1
@@ -8086,6 +8100,7 @@ def fix_flt_nan(flt_file, bad_bit=4096, verbose=True):
             im['DQ', ext].data[mask] |= bad_bit
 
     im.flush()
+    im.close()
 
 
 def dump_flt_dq(filename, replace=('.fits', '.dq.fits.gz'), verbose=True):
@@ -8124,6 +8139,8 @@ def dump_flt_dq(filename, replace=('.fits', '.dq.fits.gz'), verbose=True):
 
     pyfits.HDUList(hdus).writeto(output_filename, overwrite=True,
                                  output_verify='fix')
+    
+    im.close()
 
 
 def apply_flt_dq(filename, replace=('.fits', '.dq.fits.gz'), verbose=True, or_combine=False):
@@ -8900,6 +8917,8 @@ class HubbleXYZ(object):
         expmid = (expstart+expend)/2.
         
         t_in = astropy.time.Time([expstart, expmid, expend], format='mjd')
+        flt.close()
+        
         return self(t_in, **kwargs)
 
 
@@ -8923,7 +8942,8 @@ class HubbleXYZ(object):
         import astropy.io.fits as pyfits
         import astropy.time
         
-        spt = pyfits.open(spt_file)[0].header
+        with pyfits.open(spt_file) as _im:
+            spt = _im[0].header.copy()
         
         param_dict = {}
         param_dict['tau'] = spt['EPCHTIME']
@@ -8946,7 +8966,7 @@ class HubbleXYZ(object):
         
         param_dict['tau_time'] = self.deltat(param_dict['tau'])
         param_dict['tstart_time'] = self.deltat(param_dict['tstart'])
-        
+                
         return param_dict
     
     @staticmethod
