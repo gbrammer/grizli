@@ -4288,7 +4288,7 @@ def process_direct_grism_visit(direct={},
                  gain=_gain, rdnoise=_rdnoise,
                  final_wht_type='IVM')
     
-    if skyfile & os.path.exists(skyfile):
+    if os.path.exists(skyfile):
         os.remove(skyfile)
         
     clean_drizzle(grism['product'])
@@ -4467,7 +4467,7 @@ def tweak_align(direct_group={}, grism_group={}, max_dist=1., n_min=10, key=' ',
                  coeffs=True, resetbits=4096, final_pixfrac=pixfrac,
                  build=False, final_wht_type='IVM')
     
-    if skyfile & os.path.exists(skyfile):
+    if os.path.exists(skyfile):
         os.remove(skyfile)
         
     clean_drizzle(grism_group['product'])
