@@ -3412,7 +3412,10 @@ def separate_chip_sky(visit, filters=['F200LP','F350LP','F600LP','F390W'], steps
                 if make_fig:
                     axes[ext-1].plot(rows, alpha=0.5)
                     fig.tight_layout(pad=0.5)
-                    fig.savefig('/tmp/rows.png')
+                    if os.path.exists('/tmp'):
+                        fig.savefig('/tmp/rows.png')
+                    
+                    fig.close()
                 
             ###############
             
@@ -3461,7 +3464,9 @@ def separate_chip_sky(visit, filters=['F200LP','F350LP','F600LP','F390W'], steps
             
             if make_fig:
                 axes[ext-1].plot(row_model[ext], color='r')
-                fig.savefig('/tmp/rows.png')
+                if os.path.exists('/tmp'):
+                    fig.savefig('/tmp/rows.png')
+                    
         
         for file in visit['files']:
             flt = pyfits.open(file, mode='update')
@@ -3481,8 +3486,9 @@ def separate_chip_sky(visit, filters=['F200LP','F350LP','F600LP','F390W'], steps
                 flt['SCI',ext].header['ROWSKY'] = (True, 
                                                    'Row-averaged sky removed')
                                                    
-        flt.flush()
-        
+            flt.flush()
+            flt.close()
+            
     return True
 
 
@@ -3766,16 +3772,14 @@ def process_direct_grism_visit(direct={},
 
             # Need to force F814W filter for updatewcs
             if isACS:
-                flc = pyfits.open(file, mode='update')
-                if flc[0].header['INSTRUME'] == 'ACS':
-                    changed_filter = True
-                    flc[0].header['FILTER1'] = 'CLEAR1L'
-                    flc[0].header['FILTER2'] = 'F814W'
-                    flc.flush()
-                    flc.close()
-                else:
-                    changed_filter = False
-                    flc.close()
+                with pyfits.open(file, mode='update') as flc:
+                    if flc[0].header['INSTRUME'] == 'ACS':
+                        changed_filter = True
+                        flc[0].header['FILTER1'] = 'CLEAR1L'
+                        flc[0].header['FILTER2'] = 'F814W'
+                        flc.flush()
+                    else:
+                        changed_filter = False
             else:
                 changed_filter = False
 
@@ -3788,11 +3792,10 @@ def process_direct_grism_visit(direct={},
                 
             # Change back
             if changed_filter:
-                flc = pyfits.open(file, mode='update')
-                flc[0].header['FILTER1'] = 'CLEAR2L'
-                flc[0].header['FILTER2'] = 'G800L'
-                flc.flush()
-                flc.close()
+                with pyfits.open(file, mode='update') as flc:
+                    flc[0].header['FILTER1'] = 'CLEAR2L'
+                    flc[0].header['FILTER2'] = 'G800L'
+                    flc.flush()
 
         # Make ASN
         # asn = asnutil.ASNTable(grism['files'], output=grism['product'])
@@ -3868,14 +3871,17 @@ def process_direct_grism_visit(direct={},
 
         # Get reference astrometry from GAIA, PS1, SDSS, WISE, etc.
         if radec is None:
-            im = pyfits.open(direct['files'][0])
-            radec, ref_catalog = get_radec_catalog(ra=im[1].header['CRVAL1'],
-                            dec=im[1].header['CRVAL2'],
-                            product=direct['product'],
-                            reference_catalogs=reference_catalogs,
-                            date=im[0].header['EXPSTART'],
-                            date_format='mjd',
-                            use_self_catalog=use_self_catalog)
+            with pyfits.open(direct['files'][0]) as im:
+                _h0 = im[0].header
+                _h1 = im[1].header
+                
+                radec, ref_catalog = get_radec_catalog(ra=_h1['CRVAL1'],
+                                        dec=_h1['CRVAL2'],
+                                        product=direct['product'],
+                                        reference_catalogs=reference_catalogs,
+                                        date=_h0['EXPSTART'],
+                                        date_format='mjd',
+                                        use_self_catalog=use_self_catalog)
 
             if ref_catalog == 'VISIT':
                 align_mag_limits = [16, 23, 0.05]
@@ -4048,9 +4054,9 @@ def process_direct_grism_visit(direct={},
 
             # Bug in astrodrizzle? Dies if the FLT files don't have MJD-OBS
             # keywords
-            im = pyfits.open(file, mode='update')
-            im[0].header['MJD-OBS'] = im[0].header['EXPSTART']
-            im.flush()
+            with pyfits.open(file, mode='update') as im:
+                im[0].header['MJD-OBS'] = im[0].header['EXPSTART']
+                im.flush()
 
         # Second drizzle with aligned wcs, refined CR-rejection params
         # tuned for WFC3/IR
@@ -4204,9 +4210,9 @@ def process_direct_grism_visit(direct={},
     driz_cr_scale = '2.5 0.7'
     
     for file in grism['files']:
-        hdu = pyfits.open(file,mode='update')
-        hdu[3].data = hdu[3].data.astype(np.int16)
-        hdu.flush()
+        with pyfits.open(file,mode='update') as hdu:
+            hdu[3].data = hdu[3].data.astype(np.int16)
+            hdu.flush()
         
         if isJWST:
             # Set HST header
@@ -4241,24 +4247,23 @@ def process_direct_grism_visit(direct={},
 
         # Add back in some pedestal or CR rejection fails for ACS
         for file in grism['files']:
-            flt = pyfits.open(file, mode='update')
-            h = flt[0].header
-            flat_sky = h['GSKY101']*h['EXPTIME']
+            with pyfits.open(file, mode='update') as flt:
+                h = flt[0].header
+                flat_sky = h['GSKY101']*h['EXPTIME']
 
-            # Use same pedestal for both chips for skysub
-            for ext in [1, 2]:
-                flt['SCI', ext].data += flat_sky
+                # Use same pedestal for both chips for skysub
+                for ext in [1, 2]:
+                    flt['SCI', ext].data += flat_sky
 
-            flt.flush()
+                flt.flush()
 
     # Redrizzle with new background subtraction
     if isACS:
         skyfile = ''
     else:
-        skyfile = '/tmp/{0}.skyfile'.format(grism['product'])
-        fp = open(skyfile, 'w')
-        fp.writelines(['{0} 0.0\n'.format(f) for f in grism['files']])
-        fp.close()
+        skyfile = '{0}.skyfile'.format(grism['product'])
+        with open(skyfile, 'w') as fp:
+            fp.writelines(['{0} 0.0\n'.format(f) for f in grism['files']])
 
     if 'par' in grism['product']:
         pixfrac = 1.0
@@ -4282,7 +4287,10 @@ def process_direct_grism_visit(direct={},
                  build=False,
                  gain=_gain, rdnoise=_rdnoise,
                  final_wht_type='IVM')
-
+    
+    if os.path.exists(skyfile):
+        os.remove(skyfile)
+        
     clean_drizzle(grism['product'])
 
     # Add direct filter to grism FLT headers
@@ -4317,11 +4325,12 @@ def set_grism_dfilter(direct, grism):
             ext = [1]
 
         print('DFILTER: {0} {1}'.format(file, direct_filter))
-        flt = pyfits.open(file, mode='update')
-        for e in ext:
-            flt['SCI', e].header['DFILTER'] = (direct_filter,
-                                              'Direct imaging filter')
-        flt.flush()
+        with pyfits.open(file, mode='update') as flt:
+            for e in ext:
+                flt['SCI', e].header['DFILTER'] = (direct_filter,
+                                                   'Direct imaging filter')
+            
+            flt.flush()
 
 
 def tweak_align(direct_group={}, grism_group={}, max_dist=1., n_min=10, key=' ', threshold=3, drizzle=False, fit_order=-1, ref_exp=0):
@@ -4446,10 +4455,9 @@ def tweak_align(direct_group={}, grism_group={}, max_dist=1., n_min=10, key=' ',
         return True
 
     # Grism
-    skyfile = '/tmp/{0}.skyfile'.format(grism_group['product'])
-    fp = open(skyfile, 'w')
-    fp.writelines(['{0} 0.0\n'.format(f) for f in grism_group['files']])
-    fp.close()
+    skyfile = '{0}.skyfile'.format(grism_group['product'])
+    with open(skyfile, 'w') as fp:
+        fp.writelines(['{0} 0.0\n'.format(f) for f in grism_group['files']])
 
     AstroDrizzle(grism_group['files'], output=grism_group['product'],
                  clean=True, context=False, preserve=False, skysub=True,
@@ -4458,7 +4466,10 @@ def tweak_align(direct_group={}, grism_group={}, max_dist=1., n_min=10, key=' ',
                  driz_combine=True, driz_sep_bits=bits, final_bits=bits,
                  coeffs=True, resetbits=4096, final_pixfrac=pixfrac,
                  build=False, final_wht_type='IVM')
-
+    
+    if os.path.exists(skyfile):
+        os.remove(skyfile)
+        
     clean_drizzle(grism_group['product'])
 
     return True
@@ -4554,6 +4565,7 @@ def drizzle_footprint(weight_image, shrink=10, ext=0, outfile=None, label=None):
 
     fp.write(pstr+'\n')
     fp.close()
+    im.close()
 
 
 def clean_drizzle(root, context=False, fix_wcs_system=False):
@@ -4629,6 +4641,8 @@ def clean_drizzle(root, context=False, fix_wcs_system=False):
             wht.flush()
 
     sci.flush()
+    sci.close()
+
 
 MATCH_KWS = dict(maxKeep=10, auto_keep=3, auto_transform=None, auto_limit=3,
                  size_limit=[5, 1800], ignore_rot=True, ignore_scale=True, 
@@ -4761,7 +4775,9 @@ def tweak_flt(files=[], max_dist=0.4, threshold=3, verbose=True, tristars_kwargs
             file = '{0}{1}.fits'.format(root, ext)
             if os.path.exists(file):
                 os.remove(file)
-
+        
+        im.close()
+        
     if ref_exp < len(cats):
         c0, wcs_0 = cats[ref_exp]
     else:
@@ -4908,9 +4924,9 @@ def apply_tweak_shifts(wcs_ref, shift_dict, grism_matches={}, verbose=True, log=
 
         # Bug in astrodrizzle? Dies if the FLT files don't have MJD-OBS
         # keywords
-        im = pyfits.open(file, mode='update')
-        im[0].header['MJD-OBS'] = im[0].header['EXPSTART']
-        im.flush()
+        with pyfits.open(file, mode='update') as im:
+            im[0].header['MJD-OBS'] = im[0].header['EXPSTART']
+            im.flush()
 
         # Update paired grism exposures
         if file in grism_matches:
@@ -4930,9 +4946,9 @@ def apply_tweak_shifts(wcs_ref, shift_dict, grism_matches={}, verbose=True, log=
                                               sciext='SCI')
 
                 # Bug in astrodrizzle?
-                im = pyfits.open(grism_file, mode='update')
-                im[0].header['MJD-OBS'] = im[0].header['EXPSTART']
-                im.flush()
+                with pyfits.open(grism_file, mode='update') as im:
+                    im[0].header['MJD-OBS'] = im[0].header['EXPSTART']
+                    im.flush()
 
     os.remove(tweak_file)
 
@@ -4993,18 +5009,21 @@ def find_direct_grism_pairs(direct={}, grism={}, check_pixel=[507, 507],
 
     for file in direct['files']:
         grism_matches[file] = []
-        im = pyfits.open(file)
-        #direct_wcs[file] = pywcs.WCS(im[1].header, relax=True, key=key)
-        #full_direct_wcs[file] = pywcs.WCS(im[1].header, relax=True)
-
-        if '_flc' in file:
-            direct_wcs[file] = pywcs.WCS(im[1].header, fobj=im, relax=True,
-                                         key=key)
-            full_direct_wcs[file] = pywcs.WCS(im[1].header, fobj=im,
-                                              relax=True)
-        else:
-            direct_wcs[file] = pywcs.WCS(im[1].header, relax=True, key=key)
-            full_direct_wcs[file] = pywcs.WCS(im[1].header, relax=True)
+        with pyfits.open(file) as im:
+            _h1 = im[1].header
+            
+            if '_flc' in file:
+                direct_wcs[file] = pywcs.WCS(_h1,
+                                             fobj=im,
+                                             relax=True,
+                                             key=key)
+                                             
+                full_direct_wcs[file] = pywcs.WCS(_h1,
+                                                  fobj=im,
+                                                  relax=True)
+            else:
+                direct_wcs[file] = pywcs.WCS(_h1, relax=True, key=key)
+                full_direct_wcs[file] = pywcs.WCS(_h1, relax=True)
 
         direct_rd[file] = direct_wcs[file].all_pix2world([check_pixel], 1)
 
@@ -5012,17 +5031,21 @@ def find_direct_grism_pairs(direct={}, grism={}, check_pixel=[507, 507],
         return grism_matches
 
     for file in grism['files']:
-        im = pyfits.open(file)
-        if '_flc' in file:
-            grism_wcs[file] = pywcs.WCS(im[1].header, relax=True, key=key,
-                                        fobj=im)
-        else:
-            grism_wcs[file] = pywcs.WCS(im[1].header, relax=True, key=key)
+        with pyfits.open(file) as im:
+            _h1 = im[1].header
+            if '_flc' in file:
+                grism_wcs[file] = pywcs.WCS(_h1, relax=True, key=key,
+                                            fobj=im)
+            else:
+                grism_wcs[file] = pywcs.WCS(_h1, relax=True, key=key)
 
         # print file
         delta_min = 10
         for d in direct['files']:
-            if (os.path.basename(d)[:6] != os.path.basename(file)[:6]) & same_visit:
+            _test = (os.path.basename(d)[:6] != os.path.basename(file)[:6])
+            _test &= same_visit
+            
+            if _test:
                 continue
 
             pix = grism_wcs[file].all_world2pix(direct_rd[d], 1)
@@ -5079,15 +5102,15 @@ def match_direct_grism_wcs(direct={}, grism={}, get_fresh_flt=True,
             except TypeError:
                 updatewcs.updatewcs(file, verbose=False)
 
-    direct_flt = pyfits.open(direct['files'][0])
-    ref_catalog = direct_flt['SCI', 1].header['WCSNAME']
+    with pyfits.open(direct['files'][0]) as _direct_flt:
+        ref_catalog = _direct_flt['SCI', 1].header['WCSNAME']
 
     # User-defined shifts
     if xyscale is not None:
         # Use user-defined shifts
         xsh, ysh, rot, scale = xyscale
 
-        tmp_wcs_file = '/tmp/{0}_tmpwcs.fits'.format(str(direct['product']))
+        tmp_wcs_file = '{0}_tmpwcs.fits'.format(str(direct['product']))
 
         try:
             # Use WCS in catalog file
@@ -5118,10 +5141,15 @@ def match_direct_grism_wcs(direct={}, grism={}, get_fresh_flt=True,
 
             # Bug in astrodrizzle? Dies if the FLT files don't have MJD-OBS
             # keywords
-            im = pyfits.open(file, mode='update')
-            im[0].header['MJD-OBS'] = im[0].header['EXPSTART']
-            im.flush()
-
+            with pyfits.open(file, mode='update') as im:
+                im[0].header['MJD-OBS'] = im[0].header['EXPSTART']
+                im.flush()
+        
+        wcs_hdu.close()
+        
+        if os.path.exists(tmp_wcs_file):
+            os.remove(tmp_wcs_file)
+            
         return True
 
     # Get from WCS log file
@@ -5131,7 +5159,7 @@ def match_direct_grism_wcs(direct={}, grism={}, get_fresh_flt=True,
     wcs_hdu = pyfits.open('{0}_wcs.fits'.format(direct['product']))
 
     for ext in wcs_log['ext']:
-        tmp_wcs_file = '/tmp/{0}_tmpwcs.fits'.format(str(direct['product']))
+        tmp_wcs_file = '{0}_tmpwcs.fits'.format(str(direct['product']))
         wcs_hdu[ext].writeto(tmp_wcs_file, overwrite=True)
         tmp_wcs = pywcs.WCS(wcs_hdu[ext].header, relax=True)
 
@@ -5160,16 +5188,21 @@ def match_direct_grism_wcs(direct={}, grism={}, get_fresh_flt=True,
 
             # Bug in astrodrizzle? Dies if the FLT files don't have MJD-OBS
             # keywords
-            im = pyfits.open(file, mode='update')
-            im[0].header['MJD-OBS'] = im[0].header['EXPSTART']
-            im.flush()
-
+            with pyfits.open(file, mode='update') as im:
+                im[0].header['MJD-OBS'] = im[0].header['EXPSTART']
+                im.flush()
+        
+        if os.path.exists(tmp_wcs_file):
+            os.remove(tmp_wcs_file)
+    
+    wcs_hdu.close()
+      
     # Bug in astrodrizzle? Dies if the FLT files don't have MJD-OBS
     # keywords
     for file in grism['files']:
-        im = pyfits.open(file, mode='update')
-        im[0].header['MJD-OBS'] = im[0].header['EXPSTART']
-        im.flush()
+        with pyfits.open(file, mode='update') as im:
+            im[0].header['MJD-OBS'] = im[0].header['EXPSTART']
+            im.flush()
 
 
 def get_jwst_wfssbkg_file(file, valid_flat=[0.6, 1.3], make_figure=False):
@@ -5200,11 +5233,11 @@ def get_jwst_wfssbkg_file(file, valid_flat=[0.6, 1.3], make_figure=False):
     if 'fits' not in bkg_file:
         return bkg_file
     
-    _im = pyfits.open(file)
-    
     # Only run for NIRISS, seems like NIRCam provides wfssbkg without
     # the flat?
+    _im = pyfits.open(file)
     if _im[0].header['INSTRUME'] != 'NIRISS':
+        _im.close()
         return bkg_file
 
     flat_file = FlatFieldStep().get_reference_file(file, 'flat')
@@ -5222,10 +5255,9 @@ def get_jwst_wfssbkg_file(file, valid_flat=[0.6, 1.3], make_figure=False):
         msg = f'Divide flat {flat_file} from wfssbkg file {bkg_file}'
         utils.log_comment(utils.LOGFILE, msg, verbose=True)
 
-    fl = pyfits.open(flat_file)
-
-    fix = (wf[1].data - 0.) / (fl[1].data**1)
-    bad = (fl[1].data < valid_flat[0]) | (fl[1].data > valid_flat[1])
+    with pyfits.open(flat_file) as fl:
+        fix = (wf[1].data - 0.) / (fl[1].data**1)
+        bad = (fl[1].data < valid_flat[0]) | (fl[1].data > valid_flat[1])
 
     fix /= np.nanmedian(fix)
     bad |= ~np.isfinite(fix)
@@ -5236,6 +5268,7 @@ def get_jwst_wfssbkg_file(file, valid_flat=[0.6, 1.3], make_figure=False):
                                 'Flat-field file divided from CRDS file')
     wf[1].data = fix
     wf.flush()
+    wf.close()
     
     if make_figure:
         fig, ax = plt.subplots(1,1,figsize=(8,8))
@@ -5275,8 +5308,8 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
     # else:
     #     pupil = ''
     
-    im = pyfits.open(grism['files'][0])
-    grism_element = utils.parse_filter_from_header(im[0].header, 
+    with pyfits.open(grism['files'][0]) as im:
+        grism_element = utils.parse_filter_from_header(im[0].header, 
                                                    jwst_detector=True)
     
     isJWST = False
@@ -5343,8 +5376,9 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
         flat_files = {'G800L': 'n6u12592j_pfl.fits'}  # F814W
         flat_file = flat_files[grism_element]
         flat_im = pyfits.open(os.path.join(os.getenv('jref'), flat_file))
-        flat = flat_im['SCI', ext].data.flatten()
-
+        flat = (flat_im['SCI', ext].data*1).flatten()
+        flat_im.close()
+        
     logstr = '# visit_grism_sky / {0}: EXTVER={1:d} / {2} / {3}'
     logstr = logstr.format(grism['product'], ext, bg_fixed, bg_vary)
     utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
@@ -5357,7 +5391,6 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
     for file in bg_fixed:
         if file.startswith('/'):
             im = pyfits.open(file)
-            
         else:
             im = pyfits.open('{0}/CONF/{1}'.format(GRIZLI_PATH, file))
             
@@ -5370,7 +5403,8 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
             data = im[0].data.flatten()/flat
             
         data_fixed.append(data)
-
+        im.close()
+        
     data_vary = []
     for file in bg_vary:
         im = pyfits.open('{0}/CONF/{1}'.format(GRIZLI_PATH, file))
@@ -5380,7 +5414,8 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
         else:
             data_vary.append(im[0].data.flatten()*1)
             sh = im[0].data.shape
-
+        im.close()
+        
     yp, xp = np.indices(sh)
 
     Npix = sh[0]*sh[1]
@@ -5437,7 +5472,9 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
             k = Nfix+j+Nvary*i
             A[i*Npix:(i+1)*Npix, k] = data_vary[j]
             mask[i*Npix:(i+1)*Npix] &= np.isfinite(data_vary[j])
-
+        
+        flt.close()
+        
     # Initial coeffs based on image medians
     coeffs = np.array([np.min(medians)])
     if Nvary > 0:
@@ -5503,12 +5540,15 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
             flt['SCI', ext].data -= sky[j, :].reshape(sh)*exptime[j]
 
             header = flt[0].header
-            header['GSKYCOL{0:d}'.format(ext)] = (False, 'Subtract column average')
-            header['GSKYN{0:d}'.format(ext)] = (Nfix+Nvary, 'Number of sky images')
+            header['GSKYCOL{0:d}'.format(ext)] = (False,
+                                                  'Subtract column average')
+            header['GSKYN{0:d}'.format(ext)] = (Nfix+Nvary,
+                                                'Number of sky images')
             header['GSKY{0:d}01'.format(ext)] = (coeffs[0],
                                 'Sky image {0} (fixed)'.format(bg_fixed[0]))
 
-            header['GSKY{0:d}01F'.format(ext)] = (bg_fixed[0], 'Sky image (fixed)')
+            header['GSKY{0:d}01F'.format(ext)] = (bg_fixed[0],
+                                                  'Sky image (fixed)')
 
             for v in range(Nvary):
                 k = Nfix + j*Nvary + v
@@ -5520,7 +5560,8 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
                                                       'Sky image (variable)')
 
             flt.flush()
-
+            flt.close()
+            
     # Don't do `column_average` for ACS
     if (not column_average) | isACS:
         return isACS
@@ -5663,8 +5704,10 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
             flt['SCI', 1].data -= gp_res
             flt[0].header['GSKYCOL'] = (True, f'Subtract {col_label} average')
             flt[0].header['GSKYCAX'] = (avg_axis, 'Array axis for average')
+            
             flt.flush()
-
+            flt.close()
+            
     # Finish plot
     ax.legend(loc='lower left', fontsize=10)
     ax.plot([-10, im_shape[0]+10], [0, 0], color='k')
@@ -5914,6 +5957,7 @@ def find_single_image_CRs(visit, simple_mask=False, with_ctx_mask=True,
         single_image = np.cast[np.float]((np.cast[int](bits) == bits) & (~mask))
         ctx_wcs = pywcs.WCS(ctx[0].header)
         ctx_wcs.pscale = utils.get_wcs_pscale(ctx_wcs)
+        ctx.close()
     else:
         simple_mask = False
         with_ctx_mask = False
@@ -5978,6 +6022,8 @@ def find_single_image_CRs(visit, simple_mask=False, with_ctx_mask=True,
                 #sci[crmask & ctx_mask] = 0
 
         flt.flush()
+        flt.close()
+
 
 def clean_amplifier_residuals(files, extensions=[1,2], minpix=5e5, max_percentile=99, seg_hdu=None, skip=10, polynomial_degree=3, verbose=True, imsh_kwargs={'vmin':-1.e-3, 'vmax':1.e-3, 'cmap':'magma'}):
     """
@@ -6134,7 +6180,8 @@ def clean_amplifier_residuals(files, extensions=[1,2], minpix=5e5, max_percentil
 
     for im in ims:
         im.flush()
-
+        im.close()
+        
     return fig
 
 
@@ -6220,8 +6267,9 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, m
                                 p_i = Polygon(fp_x)
                             else:
                                 p_i = p_i.union(fp_x)
-
-                    footprints.append()
+                    
+                    im.close()
+                    footprints.append(p_i)
 
             ref = pyfits.getheader(group['reference'])
             wcs = pywcs.WCS(ref)
@@ -6362,6 +6410,7 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, m
                                                 path=os.getenv('uref'),
                                                 use_mast=False, verbose=True,
                                                 overwrite=True)
+                        im.close()
                     elif isJWST:
                         pass
                     else:
@@ -6526,6 +6575,8 @@ def manual_alignment(visit, ds9, reference=None, reference_catalogs=['SDSS', 'PS
         dy * + -1
 
     np.savetxt('{0}.align_guess'.format(visit['product']), [[dx, dy, 0, 1].__repr__()[1:-1].replace(',', '')], fmt='%s')
+    
+    im.close()
 
 
 def extract_fits_log(file='idk106ckq_flt.fits', get_dq=True):
@@ -6570,7 +6621,8 @@ def extract_fits_log(file='idk106ckq_flt.fits', get_dq=True):
                 mask = dq > 0
                 log['DQi{0}'.format(chip)] = list(idx[mask].astype(str))
                 log['DQv{0}'.format(chip)] = list(dq[mask].astype(str))
-
+    
+    im.close()
     return log
 
 

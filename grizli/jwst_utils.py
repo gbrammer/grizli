@@ -212,7 +212,8 @@ def get_jwst_skyflat(header, verbose=True, valid_flat=(0.7, 1.4)):
         utils.log_comment(utils.LOGFILE, msg, verbose=True)
         return None, None, None
 
-    skyflat = pyfits.open(skyfile)[0].data
+    with pyfits.open(skyfile) as _im:
+        skyflat = _im[0].data*1
         
     if 'R_FLAT' in header:
         oflat = os.path.basename(header['R_FLAT'])
@@ -222,13 +223,13 @@ def get_jwst_skyflat(header, verbose=True, valid_flat=(0.7, 1.4)):
         
         msg = f'jwst_utils.get_jwst_skyflat: pipeline flat = {crds_path}\n'
         
-        oim = pyfits.open(crds_path)
-        try:
-            flat_corr = oim['SCI'].data / skyflat
-        except ValueError:
-            msg = f'jwst_utils.get_jwst_skyflat: flat_corr failed'
-            utils.log_comment(utils.LOGFILE, msg, verbose=True)
-            return None, None, None
+        with pyfits.open(crds_path) as oim:
+            try:
+                flat_corr = oim['SCI'].data / skyflat            
+            except ValueError:
+                msg = f'jwst_utils.get_jwst_skyflat: flat_corr failed'
+                utils.log_comment(utils.LOGFILE, msg, verbose=True)
+                return None, None, None
     else:
         msg = f'jwst_utils.get_jwst_skyflat: NO pipeline flat\n'
         flat_corr = 1./skyflat
@@ -507,7 +508,8 @@ def img_with_wcs(input, overwrite=True, fit_sip_header=True, skip_completed=True
                                       'Distortion reference file')
                                       
         _hdu.writeto(input, overwrite=True)
-
+        _hdu.close()
+        
     return output
 
 
@@ -847,6 +849,8 @@ def exposure_oneoverf_correction(file, axis=None, thresholds=[5,4,3], erode_mask
     
     im = pyfits.open(file)
     if (im[0].header['INSTRUME'] in 'MIRI') & (skip_miri):
+        im.close()
+        
         msg = 'exposure_oneoverf_correction: Skip for MIRI'
         utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
         
@@ -950,15 +954,15 @@ def exposure_oneoverf_correction(file, axis=None, thresholds=[5,4,3], erode_mask
         msg = f'exposure_oneoverf_correction: {file} apply to file'
         utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
         
-        im = pyfits.open(file, mode='update')
-        im[0].header['ONEFEXP'] = True, 'Exposure 1/f correction applied'
-        im[0].header['ONEFAXIS'] = axis, 'Axis for 1/f correction'
+        with pyfits.open(file, mode='update') as im:
+            im[0].header['ONEFEXP'] = True, 'Exposure 1/f correction applied'
+            im[0].header['ONEFAXIS'] = axis, 'Axis for 1/f correction'
         
-        model[~np.isfinite(model)] = 0
+            model[~np.isfinite(model)] = 0
         
-        im['SCI'].data -= model
-        im.flush()
-        
+            im['SCI'].data -= model
+            im.flush()
+
         if make_plot:
             fig.savefig(file.split('.fits')[0] + f'_onef_axis{axis}.png')
             plt.close('all')
