@@ -4099,10 +4099,11 @@ FILTER_COMBINATIONS = {'ir': IR_M_FILTERS+IR_W_FILTERS,
                        'opt': OPT_M_FILTERS+OPT_W_FILTERS}
 
 
-def make_filter_combinations(root, weight_fnu=2, filter_combinations=FILTER_COMBINATIONS, force_photfnu=1.e-8, min_count=1):
+def make_filter_combinations(root, weight_fnu=2, filter_combinations=FILTER_COMBINATIONS, force_photfnu=1.e-8, min_count=1, block_filters=[]):
     """
     Combine ir/opt mosaics manually scaling a specific zeropoint
     """
+    from astropy.nddata import block_reduce
 
     # Output normalization os F814W/F140W
     ref_h = {}
@@ -4182,10 +4183,15 @@ def make_filter_combinations(root, weight_fnu=2, filter_combinations=FILTER_COMB
 
             photplam = 1.0
             ref_photplam = 1.0
-            
-        head[band] = im_i[0].header.copy()
-        for k in ref_h_i:
-            head[band][k] = ref_h_i[k]
+        
+        if band not in head:
+            head[band] = im_i[0].header.copy()
+        else:
+            for k in im_i[0].header:
+                head[band][k] = im_i[0].header[k]
+                
+            for k in ref_h_i:
+                head[band][k] = ref_h_i[k]
             
         if num[band] is None:
             num[band] = im_i[0].data*0
@@ -4201,10 +4207,27 @@ def make_filter_combinations(root, weight_fnu=2, filter_combinations=FILTER_COMB
             head[band]['NCOMP'] += 1
         else:
             head[band]['NCOMP'] = (0, 'Number of combined images')
-                
-        print(sci_file, filt_i, band, scl, scl_weight)
-        den_i = wht_i[0].data/scl**2*scl_weight
-        num[band] += im_i[0].data*scl*den_i
+        
+        _sci = im_i[0].data.astype(np.float32)
+        _wht = wht_i[0].data.astype(np.float32)
+        
+        if filt_i in block_filters:
+            _blocked = True
+            blocked_wht = block_reduce(_wht, 2) / 4**2
+            blocked_sci = block_reduce(_sci*_wht, 2) / blocked_wht / 4
+            _sci = blocked_sci
+            _sci[blocked_wht <= 0] = 0
+            _wht = blocked_wht
+            
+        else:
+            _blocked = False
+                  
+        msg = f'{sci_file} {filt_i} {band} scl={scl:.3f} scl_wht={scl_weight}'
+        msg += f' block_reduce={_blocked}'
+        utils.log_comment(utils.LOGFILE, msg, verbose=True)
+                          
+        den_i = _wht/scl**2*scl_weight
+        num[band] += _sci*scl*den_i
         den[band] += den_i
         count[band] += 1
 
