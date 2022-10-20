@@ -4139,7 +4139,7 @@ def make_filter_combinations(root, weight_fnu=True, filter_combinations=FILTER_C
     sci_files = glob.glob('{0}-[cf]*sci.fits*'.format(root))
     sci_files.sort()
     
-    for sci_file in sci_files:
+    for _isci, sci_file in enumerate(sci_files):
         #filt_i = sci_file.split('_dr')[0].split('-')[-1]
         #filt_ix = sci_file.split('_dr')[0].split('-')[-1]
         filt_i = sci_file.split(root+'-')[1].split('_dr')[0]
@@ -4186,7 +4186,7 @@ def make_filter_combinations(root, weight_fnu=True, filter_combinations=FILTER_C
         head[band] = im_i[0].header.copy()
         for k in ref_h_i:
             head[band][k] = ref_h_i[k]
-
+            
         if num[band] is None:
             num[band] = im_i[0].data*0
             den[band] = num[band]*0
@@ -4196,7 +4196,19 @@ def make_filter_combinations(root, weight_fnu=True, filter_combinations=FILTER_C
             scl_weight = photplam**2/ref_photplam**2
         else:
             scl_weight = 1.
-
+        
+        if 'NCOMP' in head[band]:
+            head[band]['NCOMP'] += 1
+        else:
+            head[band]['NCOMP'] = (0, 'Number of combined images')
+            
+        head[band][f'CFILE{_isci+1}'] = (os.path.basename(sci_file), 
+                                         'Component file')
+        head[band][f'CSCAL{_isci+1}'] = (scl,                                                                     
+                                        'Scale factor applied in combination')
+        head[band][f'CFILT{_isci+1}'] = (filt_i,                                                                     
+                                         'Filter derived from the filename')
+        
         print(sci_file, filt_i, band, scl, scl_weight)
         den_i = wht_i[0].data/scl**2*scl_weight
         num[band] += im_i[0].data*scl*den_i
