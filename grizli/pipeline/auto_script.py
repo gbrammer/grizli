@@ -4192,11 +4192,7 @@ def make_filter_combinations(root, weight_fnu=2, filter_combinations=FILTER_COMB
                 
             for k in ref_h_i:
                 head[band][k] = ref_h_i[k]
-            
-        if num[band] is None:
-            num[band] = im_i[0].data*0
-            den[band] = num[band]*0
-
+        
         scl = photflam/ref_photflam
         if weight_fnu:
             scl_weight = photplam**2/ref_photplam**2
@@ -4225,7 +4221,11 @@ def make_filter_combinations(root, weight_fnu=2, filter_combinations=FILTER_COMB
         msg = f'{sci_file} {filt_i} {band} block_reduce={_blocked}'
         msg += f' scl={scl} scl_wht={scl_weight}'
         utils.log_comment(utils.LOGFILE, msg, verbose=True)
-                          
+        
+        if num[band] is None:
+            num[band] = np.zeros_like(_sci)
+            den[band] = np.zeros_like(_sci)
+        
         den_i = _wht/scl**2*scl_weight
         num[band] += _sci*scl*den_i
         den[band] += den_i
