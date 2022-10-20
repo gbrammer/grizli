@@ -4206,12 +4206,12 @@ def make_filter_combinations(root, weight_fnu=2, filter_combinations=FILTER_COMB
         if 'NCOMP' in head[band]:
             head[band]['NCOMP'] += 1
         else:
-            head[band]['NCOMP'] = (0, 'Number of combined images')
+            head[band]['NCOMP'] = (1, 'Number of combined images')
         
         _sci = im_i[0].data.astype(np.float32)
         _wht = wht_i[0].data.astype(np.float32)
         
-        if filt_i in block_filters:
+        if filt_i.lower() in [b.lower() for b in block_filters]:
             _blocked = True
             blocked_wht = block_reduce(_wht, 2) / 4**2
             blocked_sci = block_reduce(_sci*_wht, 2) / blocked_wht / 4
@@ -4222,8 +4222,8 @@ def make_filter_combinations(root, weight_fnu=2, filter_combinations=FILTER_COMB
         else:
             _blocked = False
                   
-        msg = f'{sci_file} {filt_i} {band} scl={scl:.3f} scl_wht={scl_weight}'
-        msg += f' block_reduce={_blocked}'
+        msg = f'{sci_file} {filt_i} {band} block_reduce={_blocked}'
+        msg += f' scl={scl} scl_wht={scl_weight}'
         utils.log_comment(utils.LOGFILE, msg, verbose=True)
                           
         den_i = _wht/scl**2*scl_weight
