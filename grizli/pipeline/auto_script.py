@@ -4099,7 +4099,7 @@ FILTER_COMBINATIONS = {'ir': IR_M_FILTERS+IR_W_FILTERS,
                        'opt': OPT_M_FILTERS+OPT_W_FILTERS}
 
 
-def make_filter_combinations(root, weight_fnu=True, filter_combinations=FILTER_COMBINATIONS, force_photfnu=None, min_count=1):
+def make_filter_combinations(root, weight_fnu=2, filter_combinations=FILTER_COMBINATIONS, force_photfnu=1.e-8, min_count=1):
     """
     Combine ir/opt mosaics manually scaling a specific zeropoint
     """
@@ -4201,19 +4201,19 @@ def make_filter_combinations(root, weight_fnu=True, filter_combinations=FILTER_C
             head[band]['NCOMP'] += 1
         else:
             head[band]['NCOMP'] = (0, 'Number of combined images')
-            
-        head[band][f'CFILE{_isci+1}'] = (os.path.basename(sci_file), 
-                                         'Component file')
-        head[band][f'CSCAL{_isci+1}'] = (scl,                                                                     
-                                        'Scale factor applied in combination')
-        head[band][f'CFILT{_isci+1}'] = (filt_i,                                                                     
-                                         'Filter derived from the filename')
-        
+                
         print(sci_file, filt_i, band, scl, scl_weight)
         den_i = wht_i[0].data/scl**2*scl_weight
         num[band] += im_i[0].data*scl*den_i
         den[band] += den_i
         count[band] += 1
+
+        head[band][f'CFILE{count[band]}'] = (os.path.basename(sci_file), 
+                                         'Component file')
+        head[band][f'CSCAL{count[band]}'] = (scl,                                                                     
+                                        'Scale factor applied in combination')
+        head[band][f'CFILT{count[band]}'] = (filt_i,                                                                     
+                                         'Filter derived from the filename')
 
     # Done, make outputs
     for band in filter_combinations:
