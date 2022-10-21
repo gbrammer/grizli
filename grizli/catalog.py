@@ -53,6 +53,9 @@ def table_to_radec(table, output='coords.radec'):
     else:
         raise ValueError("Couldn't identify sky coordinates (x_world, ra)")
     
+    table[rc].format = '.8f'
+    table[dc].format = '.8f'
+    
     table[rc, dc].write(output, format='ascii.commented_header',
                         overwrite=True)
 
@@ -93,7 +96,7 @@ def table_to_regions(table, output='ds9.reg', comment=None, header='global color
         ydata += 1
         
     if is_world:
-        fp.write('fk5\n')
+        fp.write('icrs\n')
         sec='"'
     else:
         fp.write('image\n')
@@ -326,7 +329,7 @@ def get_gaia_radec_at_time(gaia_tbl, date=2015.5, format='decimalyear'):
         # Try to use pyia
         import pyia
         g = pyia.GaiaData(gaia_tbl)
-        coord = g.get_skycoord(distance=1*u.kpc, 
+        coord = g.get_skycoord(distance=1*u.kpc, frame='icrs',
                                radial_velocity=0.*u.km/u.second)
     except:
         # From table itself
@@ -340,6 +343,7 @@ def get_gaia_radec_at_time(gaia_tbl, date=2015.5, format='decimalyear'):
                          pm_ra_cosdec=gaia_tbl['pmra'],
                          pm_dec=gaia_tbl['pmdec'],
                          obstime=ref_epoch,
+                         frame='icrs',
                          distance=1*u.kpc, radial_velocity=0.*u.km/u.second)
 
     new_obstime = Time(date, format=format)
@@ -376,14 +380,15 @@ def get_gaia_DR2_vizier_columns():
 
 
 def get_gaia_DR2_vizier(ra=165.86, dec=34.829694, radius=3., max=100000,
-                    catalog="I/350/gaiaedr3", server='vizier.u-strasbg.fr',
+                    catalog="I/355/gaiadr3", server='vizier.u-strasbg.fr',
                     use_mirror=False, keys=None, mjd=None, clean_mjd=True):
     """
     Query GAIA catalog from Vizier
     
     DR2: ``catalog="I/345/gaia2"``
-    DR3: ``catalog="I/350/gaiaedr3"``
-
+    EDR3: ``catalog="I/350/gaiaedr3"``
+    DR3: ``catalog="I/355/gaiadr3"``
+    
     """
     from astroquery.vizier import Vizier
     import astropy.units as u
