@@ -125,7 +125,7 @@ def run_all_parallel(id, get_output_data=False, args_file='fit_args.npy', protec
 DEFAULT_LINELIST = ['Lya', 'OII', 'Hb', 'OIII', 'Ha',
                      'Ha+NII', 'SII', 'SIII']
                           
-def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter=['nnls', 'bounded'], group_name='grism', fit_stacks=True, only_stacks=False, prior=None, fcontam=0.2, pline=PLINE, min_line_sn=4, mask_sn_limit=np.inf, fit_only_beams=False, fit_beams=True, root='*', fit_trace_shift=False, phot=None, use_phot_obj=True, phot_obj=None, verbose=True, scale_photometry=False, show_beams=True, scale_on_stacked_1d=True, use_cached_templates=True, loglam_1d=True, overlap_threshold=5, MW_EBV=0., sys_err=0.03, huber_delta=4, get_student_logpdf=False, get_dict=False, bad_pa_threshold=1.6, units1d='flam', redshift_only=False, line_size=1.6, use_psf=False, get_line_width=False, sed_args={'bin': 1, 'xlim': [0.3, 9]}, get_ir_psfs=True, min_mask=0.01, min_sens=0.02, mask_resid=True, save_stack=True,     full_line_list=DEFAULT_LINELIST,  get_line_deviations=True, bounded_kwargs=BOUNDED_DEFAULTS, write_fits_files=True, save_figures=True, fig_type='png', diff2d=True, **kwargs):
+def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002], fitter=['nnls', 'bounded'], group_name='grism', fit_stacks=True, only_stacks=False, prior=None, fcontam=0.2, pline=PLINE, min_line_sn=4, mask_sn_limit=np.inf, fit_only_beams=False, fit_beams=True, root='*', fit_trace_shift=False, phot=None, use_phot_obj=True, phot_obj=None, verbose=True, scale_photometry=False, show_beams=True, scale_on_stacked_1d=True, use_cached_templates=True, loglam_1d=True, overlap_threshold=5, MW_EBV=0., sys_err=0.03, huber_delta=4, get_student_logpdf=False, get_dict=False, bad_pa_threshold=1.6, units1d='flam', redshift_only=False, line_size=1.6, dscale=1./4, scale_linemap=1, use_psf=False, get_line_width=False, sed_args={'bin': 1, 'xlim': [0.3, 9]}, get_ir_psfs=True, min_mask=0.01, min_sens=0.02, mask_resid=True, save_stack=True,     full_line_list=DEFAULT_LINELIST,  get_line_deviations=True, bounded_kwargs=BOUNDED_DEFAULTS, write_fits_files=True, save_figures=True, fig_type='png', diff2d=True, **kwargs):
     """Run the full template-fitting procedure
 
     1) Load MultiBeam and stack files
@@ -819,9 +819,13 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
         s = np.clip(s, 0.25, 4)
 
         s /= (pline['pixscale']/0.1)**2
-
+        
+        if scale_linemap < 0:
+            s = -1
+            
         fig = show_drizzled_lines(line_hdu, size_arcsec=si, cmap='plasma_r',
-                                  scale=s, dscale=s,
+                                  scale=s*scale_linemap,
+                                  dscale=s*dscale*scale_linemap,
                                   full_line_list=full_line_list)
         if save_figures:
             fig.savefig('{0}_{1:05d}.line.{2}'.format(group_name, id,
