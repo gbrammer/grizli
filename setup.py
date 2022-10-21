@@ -102,23 +102,10 @@ def read(fname):
     return open(os.path.join(os.path.dirname(__file__), fname)).read()
 
 setup(
-    name = "grizli",
-    version = version,
-    author = "Gabriel Brammer",
-    author_email = "gbrammer@gmail.com",
-    description = "Grism redshift and line analysis software",
-    license = "MIT",
-    url = "https://github.com/gbrammer/grizli",
-    download_url = "https://github.com/gbrammer/grizli/tarball/{0}".format(version),
-    packages=['grizli', 'grizli/pipeline', 'grizli/utils_c', 'grizli/tests', 'grizli/galfit', 'grizli/aws'],
-    install_requires = ['numpy', 'cython', 'astropy',
-                        'sregion>=1.0', 'mastquery>=1.4'], 
-    classifiers=[
-        "Development Status :: 1 - Planning",
-        'Intended Audience :: Science/Research',
-        'Topic :: Scientific/Engineering :: Astronomy',
-    ],
+    # See below for why download_url shouldn't be used moving forward:
+    # https://github.com/pypa/packaging.python.org/issues/293
+    # download_url = "https://github.com/gbrammer/grizli/tarball/{0}".format(version),
     ext_modules = extensions,
-    package_data={'grizli': ['data/*', 'data/*fits.gz', 'data/templates/*', 'data/templates/stars/*', 'data/templates/fsps/*']},
+    # package_data={'grizli': ['data/*', 'data/*fits.gz', 'data/templates/*', 'data/templates/stars/*', 'data/templates/fsps/*']},
     # scripts=['grizli/scripts/flt_info.sh'],
 )
