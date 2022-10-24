@@ -4,8 +4,9 @@ import os
 
 import numpy as np
 
-from .. import grismconf as grizliconf
-from .. import GRIZLI_PATH
+from grizli import grismconf as grizliconf
+from grizli import GRIZLI_PATH
+
 
 def test_transform():
     """

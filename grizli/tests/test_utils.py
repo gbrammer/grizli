@@ -1,7 +1,9 @@
 import unittest
 
 import numpy as np
-from .. import utils
+
+from grizli import utils
+
 
 class UtilsTester(unittest.TestCase):
     def test_log_zgrid(self):

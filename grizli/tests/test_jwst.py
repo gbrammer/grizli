@@ -8,8 +8,9 @@ import numpy as np
 import astropy.io.fits as pyfits
 import logging
 
-from .. import prep, utils, multifit, GRIZLI_PATH, jwst_utils
-from ..pipeline import auto_script
+from grizli import prep, utils, multifit, GRIZLI_PATH, jwst_utils
+from grizli.pipeline import auto_script
+
 
 def set_crds(path='crds_cache'):
     """

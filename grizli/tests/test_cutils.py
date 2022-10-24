@@ -1,8 +1,10 @@
 import unittest
 
 import numpy as np
-from .. import utils
-from ..utils_c import interp
+
+from grizli import utils
+from grizli.utils_c import interp
+
 
 def test_cinterp():
     """
@@ -11,7 +13,7 @@ def test_cinterp():
     xarr = np.array([0.0,1.0,2.0])
     yarr = np.array([0.0,1.0,0.0])
     result = interp.interp_c(np.array([0.5]), xarr, yarr)
-    assert(np.allclose(result, 0.5))
+    assert np.allclose(result, 0.5)
 
 
 def test_cinterp_conserve():
@@ -27,8 +29,8 @@ def test_cinterp_conserve():
     
     ylr = interp.interp_conserve_c(xlr, xarr, yarr)
     
-    assert(np.allclose(np.trapz(ylr, xlr), np.trapz(yarr, xarr)))
+    assert np.allclose(np.trapz(ylr, xlr), np.trapz(yarr, xarr))
     
     ylr_slow = interp.interp_conserve(xlr, xarr, yarr)
-    assert(np.allclose(np.trapz(ylr_slow, xlr), np.trapz(yarr, xarr)))
+    assert np.allclose(np.trapz(ylr_slow, xlr), np.trapz(yarr, xarr))
     
