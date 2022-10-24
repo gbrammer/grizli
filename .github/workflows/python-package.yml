@@ -25,14 +25,14 @@ jobs:
     - name: Build check
       run: |
         pip install build twine
-        python -m build .
-        python -m twine check dist/*
+        python -m build
+        python -m twine check --strict dist/*
   
   codestyle:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        python-version: [3.8, 3.9, '3.10']
+        python-version: ['3.10']
         os: [ubuntu-latest]
     steps:
     - uses: actions/checkout@v3
