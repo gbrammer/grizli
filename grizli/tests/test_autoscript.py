@@ -5,8 +5,8 @@ import glob
 
 import numpy as np
 
-from .. import utils
-from ..pipeline import auto_script
+from grizli import utils
+from grizli.pipeline import auto_script
 
 class UtilsTester(unittest.TestCase):
     

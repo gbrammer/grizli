@@ -382,7 +382,7 @@ class GrismDisperser(object):
 
         conf_sens = self.conf.sens[self.beam]
         if self.MW_F99 is not None:
-            MWext = 10**(-0.4*(self.MW_F99(conf_sens['WAVELENGTH']*u.AA)))
+            MWext = 10**(-0.4*(self.MW_F99(conf_sens['WAVELENGTH'])))
         else:
             MWext = 1.
 
@@ -504,7 +504,7 @@ class GrismDisperser(object):
 
         conf_sens = self.conf.sens[self.beam]
         if self.MW_F99 is not None:
-            MWext = 10**(-0.4*(self.MW_F99(conf_sens['WAVELENGTH']*u.AA)))
+            MWext = 10**(-0.4*(self.MW_F99(conf_sens['WAVELENGTH'])))
         else:
             MWext = 1.
 
