@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 import os
-import subprocess
 
 import numpy
 from setuptools import setup
 from setuptools.extension import Extension
+from Cython.Build import cythonize
 
 include_dirs = [numpy.get_include()]
 if os.name == 'nt':
@@ -28,5 +28,6 @@ extensions = [
                 define_macros=define_macros,
                 ),
     ]
+extensions = cythonize(extensions, language_level=3)
 
 setup(ext_modules=extensions)
