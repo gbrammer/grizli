@@ -81,7 +81,7 @@ def niriss_header(ra=53.1592277508136, dec=-27.782056346146, pa_aper=128.589,
         Grism to use
 
     Returns
-    --------
+    -------
     h : `astropy.io.fits.Header`
         FITS header with appropriate keywords
 
@@ -162,7 +162,7 @@ def nircam_header(ra=53.1592277508136, dec=-27.782056346146, pa_aper=128.589,
         Instrument module ('A','B')
         
     Returns
-    --------
+    -------
     h : `astropy.io.fits.Header`
         FITS header with appropriate keywords
 
@@ -244,7 +244,7 @@ def wfc3ir_header(ra=53.1592277508136, dec=-27.782056346146, pa_aper=128.589,
         Grism/filter to use.
 
     Returns
-    --------
+    -------
     h : `astropy.io.fits.Header`
         FITS header with appropriate keywords
 
@@ -318,7 +318,7 @@ def roman_header(ra=53.1592277508136, dec=-27.782056346146, pa_aper=128.589, nax
         Image dimensions
     
     Returns
-    --------
+    -------
     h : `astropy.io.fits.Header`
         FITS header with appropriate keywords
 

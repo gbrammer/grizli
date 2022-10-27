@@ -135,12 +135,12 @@ def get_flt_info(files=[], columns=['FILE', 'FILTER', 'PUPIL', 'INSTRUME', 'DETE
     """Extract header information from a list of FLT files
 
     Parameters
-    -----------
+    ----------
     files : list
         List of exposure filenames.
 
     Returns
-    --------
+    -------
     tab : `~astropy.table.Table`
         Table containing header keywords
 
@@ -213,7 +213,7 @@ def radec_to_targname(ra=0, dec=0, round_arcsec=(4, 60), precision=2, targstr='j
     """Turn decimal degree coordinates into a string with rounding.
 
     Parameters
-    -----------
+    ----------
     ra, dec : float
         Sky coordinates in decimal degrees
 
@@ -234,7 +234,7 @@ def radec_to_targname(ra=0, dec=0, round_arcsec=(4, 60), precision=2, targstr='j
         `RA_TARG`, `DEC_TARG`.
 
     Returns
-    --------
+    -------
     targname : str
         Target string, see the example above.
     
@@ -702,7 +702,7 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
         PATH to search for `flt` files if ``info`` not provided
     
     Returns
-    --------
+    -------
     output_list : dict
         Dictionary split by target/filter/pa_v3. Keys are derived visit
         product names and values are lists of exposure filenames corresponding
@@ -1258,7 +1258,7 @@ def parse_filter_from_header(header, filter_only=False, jwst_detector=False, **k
         G800L
             
     Parameters
-    -----------
+    ----------
     header : `~astropy.io.fits.Header`
         Image header with FILTER or FILTER1,FILTER2,...,FILTERN keywords
     
@@ -1273,7 +1273,7 @@ def parse_filter_from_header(header, filter_only=False, jwst_detector=False, **k
         these instruments.
         
     Returns
-    --------
+    -------
     filter : str
 
     """
@@ -1712,7 +1712,7 @@ def detect_with_photutils(sci, err=None, dq=None, seg=None, detect_thresh=2.,
         sky coordinates of detected objects.
 
     Returns
-    ---------
+    -------
     catalog : `~astropy.table.Table`
         Object catalog with the default parameters.
     """
@@ -3201,7 +3201,7 @@ def split_spline_template(templ, wavelength_range=[5000, 2.4e4], Rspline=10, log
     squares.
 
     Parameters
-    ==========
+    ----------
 
     templ : `~grizli.utils.SpectrumTemplate`
         Template to split.
@@ -3217,7 +3217,7 @@ def split_spline_template(templ, wavelength_range=[5000, 2.4e4], Rspline=10, log
         Log-spaced splines
 
     Returns
-    =======
+    -------
 
     stemp : dict
 
@@ -3332,7 +3332,7 @@ def split_poly_template(templ, ref_wave=1.e4, order=3):
     squares.
 
     Parameters
-    ==========
+    ----------
     templ : `~grizli.utils.SpectrumTemplate`
         Template to split.
 
@@ -3343,7 +3343,7 @@ def split_poly_template(templ, ref_wave=1.e4, order=3):
         Polynomial order.  Returns order+1 templates.
 
     Returns
-    =======
+    -------
     ptemp : dict
 
         Dictionary of polynomial-component templates, with additional
@@ -6412,7 +6412,7 @@ def fetch_config_files(get_acs=False, get_sky=True, get_stars=True, get_epsf=Tru
         print('Templates directory: {0}/templates'.format(GRIZLI_PATH))
         os.chdir('{0}/templates'.format(GRIZLI_PATH))
 
-        url = 'http://www.stsci.edu/~brammer/Grizli/Files/'
+        url = 'https://www.stsci.edu/~brammer/Grizli/Files/'
         files = [url+'stars_pickles.npy', url+'stars_bpgs.npy']
 
         for url in files:
@@ -6490,20 +6490,13 @@ MW extinction not implemented.
             return self.F99(wave_aa, self.a_v, unit='aa')
 
 
-class EffectivePSF(object):
+class EffectivePSF:
     def __init__(self):
         """Tools for handling WFC3/IR Effective PSF
 
         See documentation at http://www.stsci.edu/hst/wfc3/analysis/PSF.
 
         PSF files stored in $GRIZLI/CONF/
-
-        Attributes
-        ----------
-
-        Methods
-        -------
-
         """
 
         self.load_PSF_data()
@@ -8217,7 +8210,7 @@ def RGBtoHex(vals, rgbtype=1):
     """Converts RGB values in a variety of formats to Hex values.
 
     Parameters
-    -----------
+    ----------
     vals : tuple
          An RGB/RGBA tuple
 
@@ -8838,7 +8831,7 @@ class HubbleXYZ(object):
         Evaluate equations to get positions
         
         Returns
-        =======
+        -------
         x, y, z, r: float
             Coordinates, in km or ``unit``.
             

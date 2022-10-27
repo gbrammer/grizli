@@ -9,21 +9,18 @@ version: 2
 build:
   os: ubuntu-20.04
   tools:
-    python: "3.9"
+    python: "3.10"
     
 # Build documentation in the docs/ directory with Sphinx
 sphinx:
   configuration: docs/conf.py
 
-# Build documentation with MkDocs
-#mkdocs:
-#  configuration: mkdocs.yml
-
 # Optionally build your docs in additional formats such as PDF and ePub
 formats: all
 
 python:
-   install:
-      - requirements: docs/rtd-pip-requirements
-      - method: setuptools
-        path: .
+  install:
+    - method: pip
+      path: .
+      extra_requirements:
+        - docs

@@ -382,7 +382,7 @@ class GrismDisperser(object):
 
         conf_sens = self.conf.sens[self.beam]
         if self.MW_F99 is not None:
-            MWext = 10**(-0.4*(self.MW_F99(conf_sens['WAVELENGTH'])))
+            MWext = 10**(-0.4*(self.MW_F99(conf_sens['WAVELENGTH']*u.AA)))
         else:
             MWext = 1.
 
@@ -504,7 +504,7 @@ class GrismDisperser(object):
 
         conf_sens = self.conf.sens[self.beam]
         if self.MW_F99 is not None:
-            MWext = 10**(-0.4*(self.MW_F99(conf_sens['WAVELENGTH'])))
+            MWext = 10**(-0.4*(self.MW_F99(conf_sens['WAVELENGTH']*u.AA)))
         else:
             MWext = 1.
 
@@ -3356,7 +3356,7 @@ class GrismFLT(object):
             that fails.
 
         Returns
-        ---------
+        -------
         status : bool
             True if completed successfully.  False if `data_ext=='REF'` but
             no reference image found.
