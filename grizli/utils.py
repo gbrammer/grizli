@@ -6412,7 +6412,7 @@ def fetch_config_files(get_acs=False, get_sky=True, get_stars=True, get_epsf=Tru
         print('Templates directory: {0}/templates'.format(GRIZLI_PATH))
         os.chdir('{0}/templates'.format(GRIZLI_PATH))
 
-        url = 'http://www.stsci.edu/~brammer/Grizli/Files/'
+        url = 'https://www.stsci.edu/~brammer/Grizli/Files/'
         files = [url+'stars_pickles.npy', url+'stars_bpgs.npy']
 
         for url in files:
