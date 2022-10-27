@@ -182,9 +182,8 @@ class JWSTFittingTools(unittest.TestCase):
             files = glob.glob(f'{conf_path}/*')
             print('Files: ', '\n'.join(files))
 
-        assert(os.path.exists(os.path.join(conf_path,
-                              'GR150C.F115W.conf')))
-        return True
+        assert os.path.exists(os.path.join(conf_path,
+                              'GR150C.F115W.conf'))
     
     def test_multibeam(self):
         """
