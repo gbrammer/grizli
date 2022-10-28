@@ -5562,7 +5562,8 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
                 
                 if os.path.exists(bpfile):
                     bpdata = pyfits.open(bpfile)[0].data
-                    bpdata = nd.binary_dilation(bpdata > 0, iterations=2)*1024
+                    #bpdata = nd.binary_dilation(bpdata > 0, iterations=2)*1024
+                    bpdata = nd.binary_dilation(bpdata > 0)*1024
                     msg = f'Use extra badpix in {bpfile}'
                     log_comment(LOGFILE, msg, verbose=verbose)
             else:
