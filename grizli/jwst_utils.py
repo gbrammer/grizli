@@ -857,7 +857,7 @@ def exposure_oneoverf_correction(file, axis=None, thresholds=[5,4,3], erode_mask
         return None, 0
         
     if axis is None:
-        if im[0].header['INSTRUME'] == 'NIRISS':
+        if im[0].header['INSTRUME'] in ('NIRISS', 'NIRSPEC'):
             axis = 0
         else:
             axis = 1
@@ -865,6 +865,9 @@ def exposure_oneoverf_correction(file, axis=None, thresholds=[5,4,3], erode_mask
     msg = f'exposure_oneoverf_correction: {file} axis={axis}'
     utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
     
+    if im[0].header['INSTRUME'] in ('NIRSPEC'):
+        erode_mask = False
+        
     if erode_mask is None:
         if im[0].header['FILTER'].startswith('GR150'):
             erode_mask = False
