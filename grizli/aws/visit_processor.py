@@ -14,6 +14,12 @@ import astropy.units as u
 from . import db
 from .. import utils
 
+ROOT_PATH = '/GrizliImaging'
+if not os.path.exists(ROOT_PATH):
+    ROOT_PATH = os.getcwd()
+    print(f'Set ROOT_PATH={ROOT_PATH}')
+
+
 def s3_object_path(dataset, product='raw', ext='fits', base_path='hst/public/'):
     """
     S3 path for an HST ``dataset``
@@ -543,7 +549,7 @@ def update_assoc_status(assoc, status=1, verbose=True):
     
     sqlstr = """UPDATE {0}
         SET status = {1}, modtime = '{2}'
-        WHERE (assoc_name = '{3}');
+        WHERE (assoc_name = '{3}' AND status != 99);
         """.format(table, status, NOW, assoc)
 
     if verbose:
@@ -596,8 +602,8 @@ def delete_all_assoc_data(assoc):
     os.system(f'aws s3 rm --recursive s3://grizli-v2/HST/Pipeline/{assoc}')
 
     res = db.execute(f"""UPDATE assoc_table
-              SET status=12
-                    WHERE assoc_name = '{assoc}'""")
+                    SET status=12
+                    WHERE assoc_name = '{assoc}' AND status != 99""")
 
 
 def clear_failed():
@@ -725,7 +731,7 @@ def get_assoc_yaml_from_s3(assoc, s_region=None, bucket='grizli-v2', prefix='HST
     from grizli.pipeline import auto_script
     from grizli import utils
     
-    LOGFILE = f'/GrizliImaging/{assoc}.auto_script.log.txt'
+    LOGFILE = f'{ROOT_PATH}/{assoc}.auto_script.log.txt'
     
     s3 = boto3.resource('s3')
     s3_client = boto3.client('s3')
@@ -765,7 +771,7 @@ def get_assoc_yaml_from_s3(assoc, s_region=None, bucket='grizli-v2', prefix='HST
             files = [obj.key for obj in
                      file_bkt.objects.filter(Prefix=file_prefix)]
             if len(files) > 0:
-                local_file = os.path.join('/GrizliImaging/', 
+                local_file = os.path.join(f'{ROOT_PATH}/', 
                                           os.path.basename(file_prefix))
                 
                 if not os.path.exists(local_file):
@@ -1099,10 +1105,12 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=False,
     from grizli.pipeline import auto_script
     from grizli import utils, prep
 
-    os.chdir('/GrizliImaging/')
+    os.chdir(f'{ROOT_PATH}/')
     
     tab = db.SQL(f"""SELECT * FROM assoc_table
-                     WHERE assoc_name='{assoc}'""")
+                     WHERE assoc_name='{assoc}'
+                     AND status != 99
+                     """)
     
     if len(tab) == 0:
         print(f"assoc_name='{assoc}' not found in assoc_table")
@@ -1211,7 +1219,7 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=False,
     os.environ['iref'] = os.environ['orig_iref']
     os.environ['jref'] = os.environ['orig_jref']
     
-    os.chdir('/GrizliImaging/')
+    os.chdir(f'{ROOT_PATH}/')
     
     if sync:
         os.system(f'aws s3 rm --recursive ' + 
@@ -1232,7 +1240,7 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=False,
         
             os.system(cmd)
             print('\n# Sync\n' + cmd.replace('     ', '') + '\n')
-            os.chdir('/GrizliImaging')
+            os.chdir(f'{ROOT_PATH}')
             
         files = glob.glob(f'{assoc}*.*')
         for file in files:
@@ -1264,7 +1272,16 @@ def set_private_iref(assoc):
     os.environ['iref'] = f'{os.getcwd()}/{assoc}/iref/'
     os.environ['jref'] = f'{os.getcwd()}/{assoc}/jref/'
     
-    utils.fetch_default_calibs()
+    is_jwst = False
+    for f in ['f090w','f115w','f150w','f200w','f277w','f356w','f444w',
+              'f182m','f140m','f210m','f410m','f430m','f460m','f300m',
+              'f250m','f480m']:
+        if f in assoc:
+            is_jwst = True
+            break
+    
+    if not is_jwst:        
+        utils.fetch_default_calibs()
 
 
 def get_wcs_guess(assoc, verbose=True):
@@ -1275,7 +1292,7 @@ def get_wcs_guess(assoc, verbose=True):
     
     wcs = db.from_sql(f"select * from wcs_log where wcs_assoc = '{assoc}'")
     
-    LOGFILE = f'/GrizliImaging/{assoc}.auto_script.log.txt'
+    LOGFILE = f'{ROOT_PATH}/{assoc}.auto_script.log.txt'
     
     if len(wcs) == 0:
         msg = f"# get_wcs_guess : No entries found in wcs_log for wcs_assoc='{assoc}'"
@@ -2012,14 +2029,14 @@ def run_one(clean=2, sync=True):
     
     assoc = get_random_visit()
     if assoc is None:
-        with open('/GrizliImaging/finished.txt','w') as fp:
+        with open(f'{ROOT_PATH}/finished.txt','w') as fp:
             fp.write(time.ctime() + '\n')
     else:
         print(f'============  Run association  ==============')
         print(f'{assoc}')
         print(f'========= {time.ctime()} ==========')
         
-        with open('/GrizliImaging/visit_history.txt','a') as fp:
+        with open(f'{ROOT_PATH}/visit_history.txt','a') as fp:
             fp.write(f'{time.ctime()} {assoc}\n')
         
         process_visit(assoc, clean=clean, sync=sync)
