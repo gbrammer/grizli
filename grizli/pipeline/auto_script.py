@@ -2417,6 +2417,11 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
             mq = '{0}-f*dr?_sci.fits*'
             mq = mq.format(field_root.replace('-100mas','-*mas'))
             mosaic_files = glob.glob(mq)
+            
+            mq = '{0}-clear*dr?_sci.fits*'
+            mq = mq.format(field_root.replace('-100mas','-*mas'))
+            mosaic_files += glob.glob(mq)
+            
             mosaic_files.sort()
             
             filters = [file.split('_')[-3][len(field_root)+1:] 
