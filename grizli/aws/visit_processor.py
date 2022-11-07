@@ -1082,6 +1082,101 @@ blue_align_params['align_min_flux_radius'] = 1.7
 blue_align_params['tweak_n_min'] = 5
 
 
+def check_jwst_assoc_guiding(assoc):
+    """
+    Check the guidestar logs that accompany a given visit
+    """
+    import os
+    import glob
+    
+    import astropy.table
+    
+    import mastquery.utils
+    import mastquery.jwst
+    
+    os.chdir(f'{ROOT_PATH}/')
+    
+    atab = db.SQL(f"""SELECT t_min, t_max, filter, proposal_id, 
+                             "dataURL", status
+                     FROM assoc_table
+                     WHERE assoc_name='{assoc}'
+                     """)
+    so = np.argsort(atab['t_min'])
+    atab = atab[so]
+    
+    gs = mastquery.jwst.query_guidestar_log(
+             mjd=(atab['t_min'].min()-0.1, atab['t_max'].max()+0.1),
+             program=atab['proposal_id'][0],
+             exp_type=['FGS_FINEGUIDE'],
+         )
+    
+    keep = (gs['expstart'] < atab['t_max'].max())
+    gs = gs[keep]
+    
+    for _iter in range(3):
+        res = mastquery.utils.download_from_mast(gs)
+    
+    tabs = []
+    for f in res:
+        if not os.path.exists(f):
+            continue
+            
+        tabs.append(utils.read_catalog(f))
+    
+    tab = astropy.table.vstack(tabs)
+    so = np.argsort(tab['time'])
+    tab = tab[so]
+    
+    fig, ax = plt.subplots(1,1,figsize=(8,5))
+    t0 = atab['t_min'].min()
+    ax.scatter((tab['time'] - t0)*24, tab['jitter'],
+               alpha=.02, marker='.', color='k')
+    
+    atab['jitter16'] = -1.
+    atab['jitter50'] = -1.
+    atab['jitter84'] = -1.
+    
+    ymax = 500
+    
+    for i, row in enumerate(atab):
+        gsx = (tab['time'] > row['t_min']) & (tab['time'] < row['t_max'])
+        gs_stats = np.percentile(tab['jitter'][gsx], [16, 50, 84])
+
+        atab['jitter16'][i] = gs_stats[0]
+        atab['jitter50'][i] = gs_stats[1]
+        atab['jitter84'][i] = gs_stats[2]
+        
+        print(f"{i} {os.path.basename(atab['dataURL'][i])} {gs_stats[1]:.2f}")
+        
+        ax.fill_between([(row['t_min']-t0)*24, (row['t_max']-t0)*24], 
+                        np.ones(2)*gs_stats[0], np.ones(2)*gs_stats[2], 
+                        color='r', alpha=0.2)
+        ax.hlines(gs_stats[1], (row['t_min']-t0)*24, (row['t_max']-t0)*24, 
+                  color='r')
+        ax.fill_between([(row['t_min']-t0)*24, (row['t_max']-t0)*24], 
+                        [0.2,0.2], np.ones(2)*(0.12/0.2*ymax), 
+                        color='0.8', alpha=0.1, zorder=-1)
+                        
+    ax.set_ylim(0.12, ymax)
+    ax.semilogy()
+    
+    ax.set_xlabel(r'$\Delta t$, hours since ' + f'{t0:.2f}')
+    ax.set_ylabel('GuideStar jitter, mas')
+    ax.set_yticklabels([1,10,100])
+    ax.set_yticks([1,10,100])
+    ax.set_title(assoc)
+    
+    ax.set_xlim(-0.2, (atab['t_max'].max() - t0)*24 +0.2)
+    ax.grid()
+    
+    fig.tight_layout(pad=0.5)
+    fig.savefig(f'{assoc}.guide.png')
+    
+    atab.write(f'{assoc}.guide.csv', overwrite=True)
+    
+    return fig, atab
+    
+
 ALL_FILTERS = ['F410M', 'F467M', 'F547M', 'F550M', 'F621M', 'F689M', 'F763M', 'F845M', 'F200LP', 'F350LP', 'F435W', 'F438W', 'F439W', 'F450W', 'F475W', 'F475X', 'F555W', 'F569W', 'F600LP', 'F606W', 'F622W', 'F625W', 'F675W', 'F702W', 'F775W', 'F791W', 'F814W', 'F850LP', 'G800L', 'F098M', 'F127M', 'F139M', 'F153M', 'F105W', 'F110W', 'F125W', 'F140W', 'F160W', 'G102', 'G141']
 
 
