@@ -1089,6 +1089,8 @@ def check_jwst_assoc_guiding(assoc):
     import os
     import glob
     
+    import matplotlib.pyplot as plt
+    
     import astropy.table
     
     import mastquery.utils
