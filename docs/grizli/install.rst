@@ -161,46 +161,11 @@ only be done once, or after updating the
 .. code-block:: bash
 
     pytest
-
-Installing ``grizli`` from source
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-If you need to install ``grizli` form a specific branch or need an editable version 
-of the library, you can do this directly from the repository.
-
-- Change into a directory where the ``grizli`` repo will live. Instead of
-  ``/usr/local/share/python``, this could even be some other location such as ``/tmp/``:
-
-.. code-block:: bash
-
-    cd /usr/local/share/python
-
-- Fetch the ``grizli`` repo and change into the newly cloned directory:
-
-.. code-block:: bash
-
-    git clone https://github.com/gbrammer/grizli.git
-    cd grizli
-
-- Compile and install the ``grizli`` module. This only needs to be done once (on initial
-  ``clone``), or after updating the repository (e.g., after a ``git pull``).
-
-.. code-block:: bash
-
-   pip install --editable .
-   
-Or to install the optional dependencies:
-
-.. code-block:: bash
-
-   pip install --editable ".[jwst,test]"
-
-
-See above for the additional dependencies that need to be installed.
-
+    
 Set up directories and fetch additional files
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-- ``grizli`` requires a few environmental variables to be set that point to the
+
+ ``grizli`` requires a several environmental variables to be set that point to the
   directory location of configuration files. The ``export`` lines below can be put into
   the ``~/.bashrc`` or ``~/.bash_profile`` setup files so that the system variables are
   set automatically when you start a new terminal/shell session.
@@ -255,29 +220,50 @@ Set up directories and fetch additional files
     pip install '.[test]'
     pytest
 
+Installing ``grizli`` from source
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+If you need to install ``grizli` form a specific branch or need an editable version 
+of the library, you can do this directly from the repository.
+
+- Change into a directory where the ``grizli`` repo will live. Instead of
+  ``/usr/local/share/python``, this could even be some other location such as ``/tmp/``:
+
+.. code-block:: bash
+
+    cd /usr/local/share/python
+
+- Fetch the ``grizli`` repo and change into the newly cloned directory:
+
+.. code-block:: bash
+
+    git clone https://github.com/gbrammer/grizli.git
+    cd grizli
+
+- Compile and install the ``grizli`` module. This only needs to be done once (on initial
+  ``clone``), or after updating the repository (e.g., after a ``git pull``).
+
+.. code-block:: bash
+
+   pip install --editable .
+   
+Or to install the optional dependencies:
+
+.. code-block:: bash
+
+   pip install --editable ".[jwst,test]"
+
+
+See above for the additional dependencies that need to be installed.
+
 Using HST Files Staged on AWS
-#############################
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 ``grizli`` can automatically pull FITS files from the public AWS S3 bucket mirror of the
 *HST* archive, which can be useful when running the full *HST* reduction pipeline. This
-requires that the AWS command line tools and the ``boto3`` module be installed:
-
-- Change directories into the location where the ``grizli`` repo was cloned:
-
-.. code-block:: bash
-
-    cd /usr/local/share/python/grizli # location from before, where grizli repo was cloned
-
-- Activate the ``conda`` environment:
-
-.. code-block:: bash
-
-    conda activate grizli39 # or whatever was chosen before
+requires that the AWS command line tools and the ``boto3`` and ``awscli`` modules be installed:
 
 .. code-block:: bash
 
     # Put your AWS credentials, etc. in ~/.aws 
-    pip install '.[aws]'
-
-
-
+    pip install grizli '.[aws]'
