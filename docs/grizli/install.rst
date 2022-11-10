@@ -85,15 +85,15 @@ libraries:
 ``lacosmicx``
 #############
 
-``lacosmicx`` is not required for running ``grizli``. If it is not installed, there will
-be no additional cosmic ray rejection performed. ``lacosmicx`` has been superseeded by 
-`astroscrappy <https://github.com/astropy/astroscrappy>`__
 `lacosmicx <https://github.com/cmccully/lacosmicx>`__ is a fast Python implementation of
 Pieter van Dokkum's `L.A.Cosmic <http://www.astro.yale.edu/dokkum/lacosmic/>`__
 (`2001PASP..113.1420V <http://adsabs.harvard.edu/abs/2001PASP..113.1420V>`__) software
 for identifying cosmic rays in single images. The image preparation wrapper scripts in
 `grizli.prep` run ``lacosmicx`` if a supplied list of direct or grism images contains
 only a single file. 
+
+``lacosmicx`` has been superseeded by 
+`astroscrappy <https://github.com/astropy/astroscrappy>`__.
 
 - Change directories to the location where the ``grizli`` repo was cloned before:
 
