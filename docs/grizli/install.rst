@@ -1,5 +1,5 @@
-Python Environment
-------------------
+Development Environment
+^^^^^^^^^^^^^^^^^^^^^^^^^
 
 `Grizli` has been developed within a `miniconda
 <https://docs.conda.io/en/latest/miniconda.html>`_ Python environment. Module
@@ -12,15 +12,12 @@ environment on a MacBook Pro running Mojave 10.14.6.  The basic build is tested 
 <https://github.com/gbrammer/grizli/actions>`_ continuous integration (CI) tools, but
 the current test suite does not yet test all of the full functionality of the code.
 
-Preferred installation with ``conda``/``pip``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-The environment can be installed with ``pip``.  The instructions below assume
-you have ``conda`` installed, e.g., with `miniconda
-<https://docs.conda.io/en/latest/miniconda.html>`_. 
-
-Set up a ``conda`` environment
+Setting up a Local Environment
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+We recommend that ``grizli`` be installed in a new vitrual environment to minimize conflicts 
+with dependencies for other packages. Possible virtual environment managers are ``conda``, ``venv``, ``pyenv``, etc.
+Here we give example with setting up a ``conda`` environment. 
 
 - Generate a ``conda`` environment named ``grizli39`` (or anything else you prefer).
   This will just provide the base Python distribution (along with ``pip``):
@@ -37,12 +34,139 @@ Set up a ``conda`` environment
     conda activate grizli39
 
 .. note::
+
    The activation needs to be done *each time* you start a new terminal. Alternatively,
    if you want it automatically done for every new terminal, you need to put the above
    command in your ``~/.bashrc`` file.
 
-Download and set up ``grizli``
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Preferred installation with pip
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The latest release of ``grizli`` can be installed with ``pip``:
+
+.. code-block:: bash
+  
+  pip install grizli
+  
+There are four available options for installing dependencies: ``jwst``, ``aws``, 
+``test`` and ``docs``. These can be installed as follows:
+
+.. code-block:: bash
+
+  pip install grizli["jwst"]
+
+or 
+
+.. code-block:: bash
+
+  pip install grizli["jwst","test"]
+
+To minimize conflict of dependencies, install only the ones that you need. 
+
+Additional dependencies
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+``pip`` will install all needed dependencies with the exception of the following which
+which need to be installed separately:
+
+.. code-block:: bash
+  
+  pip install git+https://github.com/gbrammer/tristars
+  pip install pyregion
+  
+If you will be working with HST data, you will also need the following two 
+libraries:
+
+.. code-block:: bash
+
+  conda install hstcal
+  pip install git+https://github.com/gbrammer/reprocess_wfc3.git
+
+``lacosmicx``
+#############
+
+``lacosmicx`` is not required for running ``grizli``. If it is not installed, there will
+be no additional cosmic ray rejection performed. ``lacosmicx`` has been superseeded by 
+`astroscrappy <https://github.com/astropy/astroscrappy>`__
+`lacosmicx <https://github.com/cmccully/lacosmicx>`__ is a fast Python implementation of
+Pieter van Dokkum's `L.A.Cosmic <http://www.astro.yale.edu/dokkum/lacosmic/>`__
+(`2001PASP..113.1420V <http://adsabs.harvard.edu/abs/2001PASP..113.1420V>`__) software
+for identifying cosmic rays in single images. The image preparation wrapper scripts in
+`grizli.prep` run ``lacosmicx`` if a supplied list of direct or grism images contains
+only a single file. 
+
+- Change directories to the location where the ``grizli`` repo was cloned before:
+
+.. code-block:: bash
+
+    cd /usr/local/share/python # location from before
+
+- Activate the ``conda`` environment:
+
+.. code-block:: bash
+
+    conda activate grizli39 # or whatever was chosen before
+
+- Fetch the ``lacosmicx`` repo, and change into its directory:
+
+.. code-block:: bash
+
+    git clone https://github.com/cmccully/lacosmicx.git
+    cd lacosmicx
+
+- Install the package into the current environment:
+
+.. code-block:: bash
+
+    python setup.py install
+
+.. note::
+    The `lacosmicx` dependency was removed from `environment.yml` file
+    2019.12.31 because it was breaking on OSX Mojave 10.14.6 with a
+    compilation error like `unsupported option '-fopenmp'`. The workaround
+    below with the Homebrew version of `gcc` may work after verifying the
+    correct path to the `gcc-8` executable:
+    
+    .. code-block:: bash
+
+        brew install gcc
+        CC=/usr/local/Cellar/gcc/10.2.0/bin/gcc-10 pip install git+https://github.com/cmccully/lacosmicx.git
+        
+``eazy-py``
+###########
+
+If you are planning to run simultaneous fits to grism spectra plus photometry using the
+`eazy-py <https://github.com/gbrammer/eazy-py>`_ connection, install ``eazy-py`` from
+the repository to ensure that you get *its* dependencies.
+
+- Change directories to the location where the ``grizli`` repo was cloned before:
+
+.. code-block:: bash
+
+    cd /usr/local/share/python # location from before
+    conda activate grizli39 # or whatever was chosen before
+
+- Fetch the ``eazy-py`` repo, change into its directory and install it. This needs to 
+only be done once, or after updating the
+  repository:
+
+.. code-block:: bash
+
+    git clone --recurse-submodules https://github.com/gbrammer/eazy-py.git
+    cd eazy-py
+    pip install -r requirements.txt .
+
+- Run basic tests with ``pytest``. Note that the ``pysynphot`` failure is not critical:
+
+.. code-block:: bash
+
+    pytest
+
+Installing ``grizli`` from source
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+If you need to install ``grizli` form a specific branch or need an editable version 
+of the library, you can do this directly from the repository.
 
 - Change into a directory where the ``grizli`` repo will live. Instead of
   ``/usr/local/share/python``, this could even be some other location such as ``/tmp/``:
@@ -64,16 +188,15 @@ Download and set up ``grizli``
 .. code-block:: bash
 
    pip install --editable .
-
-.. note::
-   The `--editable` flag builds the Cython extensions needed for `pytest`.
-
-- Install ``hstcal``, a dependency for the WFC3/IR pipeline ``calwf3``, that doesn't
-  install with ``pip``:
+   
+Or to install the optional dependencies:
 
 .. code-block:: bash
 
-    conda install hstcal
+   pip install --editable ".[jwst,test]"
+
+
+See above for the additional dependencies that need to be installed.
 
 Set up directories and fetch additional files
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -121,7 +244,7 @@ Set up directories and fetch additional files
 .. code-block:: python
 
     >>> import grizli.utils
-    >>> grizli.utils.symlink_templates(force=False)
+    >>> grizli.utils.symlink_templates(force=True)
     >>> # Set force=True to symlink files even if they already exist in 
     >>> # $GRIZLI/templates/.
 
@@ -132,50 +255,7 @@ Set up directories and fetch additional files
     pip install '.[test]'
     pytest
 
-Installing additional dependencies
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-``eazy-py``
-###########
-
-If you are planning to run simultaneous fits to grism spectra plus photometry using the
-`eazy-py <https://github.com/gbrammer/eazy-py>`_ connection, install ``eazy-py`` from
-the repository to ensure that you get *its* dependencies.
-
-- Change directories to the location where the ``grizli`` repo was cloned before:
-
-.. code-block:: bash
-
-    cd /usr/local/share/python # location from before
-
-- Activate the ``conda`` environment:
-
-.. code-block:: bash
-
-    conda activate grizli39 # or whatever was chosen before
-
-- Fetch the ``eazy-py`` repo, and change into its directory:
-
-.. code-block:: bash
-
-    git clone --recurse-submodules https://github.com/gbrammer/eazy-py.git
-    cd eazy-py
-  
-- Install the ``eazy-py`` module. This needs to only be done once, or after updating the
-  repository:
-
-.. code-block:: bash
-
-    pip install -r requirements.txt .
-
-- Run basic tests with ``pytest``. Note that the ``pysynphot`` failure is not critical:
-
-.. code-block:: bash
-
-    pytest
- 
-
-Full *HST* reduction pipeline
+Using HST Files Staged on AWS
 #############################
 
 ``grizli`` can automatically pull FITS files from the public AWS S3 bucket mirror of the
@@ -200,49 +280,4 @@ requires that the AWS command line tools and the ``boto3`` module be installed:
     pip install '.[aws]'
 
 
-``lacosmicx``
-#############
 
-`lacosmicx <https://github.com/cmccully/lacosmicx>`__ is a fast Python implementation of
-Pieter van Dokkum's `L.A.Cosmic <http://www.astro.yale.edu/dokkum/lacosmic/>`__
-(`2001PASP..113.1420V <http://adsabs.harvard.edu/abs/2001PASP..113.1420V>`__) software
-for identifying cosmic rays in single images. The image preparation wrapper scripts in
-`grizli.prep` run ``lacosmicx`` if a supplied list of direct or grism images contains
-only a single file.
-
-- Change directories to the location where the ``grizli`` repo was cloned before:
-
-.. code-block:: bash
-
-    cd /usr/local/share/python # location from before
-
-- Activate the ``conda`` environment:
-
-.. code-block:: bash
-
-    conda activate grizli39 # or whatever was chosen before
-
-- Fetch the ``lacosmicx`` repo, and change into its directory:
-
-.. code-block:: bash
-
-    git clone https://github.com/cmccully/lacosmicx.git
-    cd lacosmicx
-
-- Install the package into the current environment:
-
-.. code-block:: bash
-
-    python setup.py install
-
-.. note::
-    The `lacosmicx` dependency was removed from `environment.yml` file
-    2019.12.31 because it was breaking on OSX Mojave 10.14.6 with a
-    compilation error like `unsupported option '-fopenmp'`. The workaround
-    below with the Homebrew version of `gcc` may work after verifying the
-    correct path to the `gcc-8` executable:
-    
-    .. code-block:: bash
-
-        brew install gcc
-        CC=/usr/local/Cellar/gcc/10.2.0/bin/gcc-10 pip install git+https://github.com/cmccully/lacosmicx.git
