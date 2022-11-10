@@ -53,21 +53,21 @@ There are four available options for installing dependencies: ``jwst``, ``aws``,
 
 .. code-block:: bash
 
-  pip install grizli["jwst"]
+  pip install "grizli[jwst]"
 
 or 
 
 .. code-block:: bash
 
-  pip install grizli["jwst","test"]
+  pip install "grizli[jwst,test]"
 
 To minimize conflict of dependencies, install only the ones that you need. 
 
 Additional dependencies
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-``pip`` will install all needed dependencies with the exception of the following which
-which need to be installed separately:
+``pip`` will install all needed dependencies with the exception of the following which 
+need to be installed separately:
 
 .. code-block:: bash
   
@@ -81,56 +81,6 @@ libraries:
 
   conda install hstcal
   pip install git+https://github.com/gbrammer/reprocess_wfc3.git
-
-``lacosmicx``
-#############
-
-`lacosmicx <https://github.com/cmccully/lacosmicx>`__ is a fast Python implementation of
-Pieter van Dokkum's `L.A.Cosmic <http://www.astro.yale.edu/dokkum/lacosmic/>`__
-(`2001PASP..113.1420V <http://adsabs.harvard.edu/abs/2001PASP..113.1420V>`__) software
-for identifying cosmic rays in single images. The image preparation wrapper scripts in
-`grizli.prep` run ``lacosmicx`` if a supplied list of direct or grism images contains
-only a single file. 
-
-``lacosmicx`` has been superseeded by 
-`astroscrappy <https://github.com/astropy/astroscrappy>`__.
-
-- Change directories to the location where the ``grizli`` repo was cloned before:
-
-.. code-block:: bash
-
-    cd /usr/local/share/python # location from before
-
-- Activate the ``conda`` environment:
-
-.. code-block:: bash
-
-    conda activate grizli39 # or whatever was chosen before
-
-- Fetch the ``lacosmicx`` repo, and change into its directory:
-
-.. code-block:: bash
-
-    git clone https://github.com/cmccully/lacosmicx.git
-    cd lacosmicx
-
-- Install the package into the current environment:
-
-.. code-block:: bash
-
-    python setup.py install
-
-.. note::
-    The `lacosmicx` dependency was removed from `environment.yml` file
-    2019.12.31 because it was breaking on OSX Mojave 10.14.6 with a
-    compilation error like `unsupported option '-fopenmp'`. The workaround
-    below with the Homebrew version of `gcc` may work after verifying the
-    correct path to the `gcc-8` executable:
-    
-    .. code-block:: bash
-
-        brew install gcc
-        CC=/usr/local/Cellar/gcc/10.2.0/bin/gcc-10 pip install git+https://github.com/cmccully/lacosmicx.git
         
 ``eazy-py``
 ###########
@@ -139,16 +89,10 @@ If you are planning to run simultaneous fits to grism spectra plus photometry us
 `eazy-py <https://github.com/gbrammer/eazy-py>`_ connection, install ``eazy-py`` from
 the repository to ensure that you get *its* dependencies.
 
-- Change directories to the location where the ``grizli`` repo was cloned before:
-
-.. code-block:: bash
-
-    cd /usr/local/share/python # location from before
-    conda activate grizli39 # or whatever was chosen before
+- Change directories to the location where you store code locally and activate the environment.
 
 - Fetch the ``eazy-py`` repo, change into its directory and install it. This needs to 
-only be done once, or after updating the
-  repository:
+only be done once, or after updating the repository:
 
 .. code-block:: bash
 
@@ -156,7 +100,7 @@ only be done once, or after updating the
     cd eazy-py
     pip install -r requirements.txt .
 
-- Run basic tests with ``pytest``. Note that the ``pysynphot`` failure is not critical:
+- Optional: Run basic tests with ``pytest``. Note that the ``pysynphot`` failure is not critical:
 
 .. code-block:: bash
 
@@ -165,10 +109,10 @@ only be done once, or after updating the
 Set up directories and fetch additional files
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
- ``grizli`` requires a several environmental variables to be set that point to the
-  directory location of configuration files. The ``export`` lines below can be put into
-  the ``~/.bashrc`` or ``~/.bash_profile`` setup files so that the system variables are
-  set automatically when you start a new terminal/shell session.
+``grizli`` requires a several environmental variables to be set that point to the
+directory location of configuration files. The ``export`` lines below can be put into
+the ``~/.bashrc`` or ``~/.bash_profile`` setup files so that the system variables are
+set automatically when you start a new terminal/shell session.
 
 .. code-block:: bash
 
@@ -217,7 +161,7 @@ Set up directories and fetch additional files
 
 .. code-block:: bash
 
-    pip install '.[test]'
+    pip install ".[test]"
     pytest
 
 Installing ``grizli`` from source
@@ -226,13 +170,8 @@ Installing ``grizli`` from source
 If you need to install ``grizli` form a specific branch or need an editable version 
 of the library, you can do this directly from the repository.
 
-- Change into a directory where the ``grizli`` repo will live. Instead of
-  ``/usr/local/share/python``, this could even be some other location such as ``/tmp/``:
-
-.. code-block:: bash
-
-    cd /usr/local/share/python
-
+- Create a dedicated environment. See instructions above. 
+- Change into a directory where the ``grizli`` repo will live. 
 - Fetch the ``grizli`` repo and change into the newly cloned directory:
 
 .. code-block:: bash
@@ -240,18 +179,19 @@ of the library, you can do this directly from the repository.
     git clone https://github.com/gbrammer/grizli.git
     cd grizli
 
+- If you are installing from a branch, checkout the branch.
 - Compile and install the ``grizli`` module. This only needs to be done once (on initial
   ``clone``), or after updating the repository (e.g., after a ``git pull``).
 
 .. code-block:: bash
 
-   pip install --editable .
+   pip install -e .
    
-Or to install the optional dependencies:
+The ``-e`` flag stands for ``editable``. Or to install the optional dependencies:
 
 .. code-block:: bash
 
-   pip install --editable ".[jwst,test]"
+   pip install -e ".[jwst,test]"
 
 
 See above for the additional dependencies that need to be installed.
@@ -266,4 +206,4 @@ requires that the AWS command line tools and the ``boto3`` and ``awscli`` module
 .. code-block:: bash
 
     # Put your AWS credentials, etc. in ~/.aws 
-    pip install grizli '.[aws]'
+    pip install grizli ".[aws]"
