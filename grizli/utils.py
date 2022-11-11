@@ -5994,7 +5994,6 @@ def compute_output_wcs(wcs_list, pixel_scale=0.1, max_size=10000):
 
 def symlink_templates(force=False):
     """Symlink templates from module to $GRIZLI/templates as part of the initial setup
-
     Parameters
     ----------
     force : bool
@@ -6005,24 +6004,19 @@ def symlink_templates(force=False):
     #     return False
 
     module_path = os.path.dirname(__file__)
+    templates_path = os.path.join(module_path, 'data/templates')
+
     out_path = os.path.join(GRIZLI_PATH, 'templates')
 
-    files = glob.glob(os.path.join(module_path, 'data/templates/*'))
-    files.sort()
+    if (not os.path.exists(out_path)) | force:
+        if os.path.exists(out_path):  # (force)
+            os.remove(out_path)
 
-    # print(files)
-    for file in files:
-        filename = os.path.basename(file)
-        out_file = os.path.join(out_path, filename)
-        #print(filename, out_file)
-        if (not os.path.exists(out_file)) | force:
-            if os.path.exists(out_file):  # (force)
-                os.remove(out_file)
-
-            os.symlink(file, out_file)
-            print('Symlink: {0} -> {1}'.format(file, out_path))
-        else:
-            print('File exists: {0}'.format(out_file))
+            os.symlink(templates_path, out_path)
+            print('Symlink: {0} -> {1}'.format(templates_path, out_path))
+    else:
+        print('Templates directory exists: {0}'.format(out_path))
+        print('Use `force=True` to force a new symbolic link.')
 
 
 def fetch_acs_wcs_files(beams_file, bucket_name='grizli-v1'):
