@@ -67,9 +67,9 @@ GRISM_COLORS = {'G800L': (0.0, 0.4470588235294118, 0.6980392156862745),
 GRISM_MAJOR = {'G102': 0.1, 'G141': 0.1, # WFC3/IR
                'G800L': 0.1,  # ACS/WFC
                'F090W': 0.1, 'F115W': 0.1, 'F150W': 0.1, # NIRISS
-               'F140M': 0.1, 'F158M': 0.1, 'F200W': 0.1,
+               'F140M': 0.1, 'F158M': 0.1, 'F200W': 0.1, 
                'F277W': 0.2, 'F356W': 0.2, 'F444W': 0.2, # NIRCam
-               'F410M': 0.2,
+               'F410M': 0.2, 
                'BLUE': 0.1, 'RED': 0.1, # Euclid
                'GRISM':0.1, 'G150':0.1  # Roman
                }
@@ -79,7 +79,7 @@ GRISM_LIMITS = {'G800L': [0.545, 1.02, 40.],  # ACS/WFC
            'G102': [0.77, 1.18, 23.],  # WFC3/IR
            'G141': [1.06, 1.73, 46.0],
            'GRISM': [0.98, 1.98, 11.],  # WFIRST/Roman
-           'G150': [0.98, 1.98, 11.],
+           'G150': [0.98, 1.98, 11.],  
            'F090W': [0.76, 1.04, 45.0],  # NIRISS
            'F115W': [0.97, 1.32, 45.0],
            'F140M': [1.28, 1.52, 45.0],
@@ -99,10 +99,10 @@ GRISM_LIMITS = {'G800L': [0.545, 1.02, 40.],  # ACS/WFC
 
 # Line species for determining individual line fluxes.  See `load_templates`.
 DEFAULT_LINE_LIST = ['PaB', 'HeI-1083', 'SIII', 'OII-7325', 'ArIII-7138',
-                     'SII', 'Ha', 'OI-6302', 'HeI-5877', 'OIII', 'Hb',
-                     'OIII-4363', 'Hg', 'Hd', 'H7', 'H8', 'H9', 'H10',
-                     'NeIII-3867', 'OII', 'NeVI-3426', 'NeV-3346', 'MgII',
-                     'CIV-1549', 'CIII-1906', 'CIII-1908', 'OIII-1663',
+                     'SII', 'Ha', 'OI-6302', 'HeI-5877', 'OIII', 'Hb', 
+                     'OIII-4363', 'Hg', 'Hd', 'H7', 'H8', 'H9', 'H10', 
+                     'NeIII-3867', 'OII', 'NeVI-3426', 'NeV-3346', 'MgII', 
+                     'CIV-1549', 'CIII-1906', 'CIII-1908', 'OIII-1663', 
                      'HeII-1640', 'NIII-1750', 'NIV-1487', 'NV-1240', 'Lya']
 
 LSTSQ_RCOND = None
@@ -126,7 +126,7 @@ def set_warnings(numpy_level='ignore', astropy_level='ignore'):
     warnings.simplefilter(astropy_level, category=AstropyWarning)
 
 
-JWST_TRANSLATE = {'RA_TARG':'TARG_RA',
+JWST_TRANSLATE = {'RA_TARG':'TARG_RA', 
                   'DEC_TARG':'TARG_DEC',
                   'EXPTIME':'EFFEXPTM',
                   'PA_V3':'ROLL_REF'}
@@ -154,11 +154,11 @@ def get_flt_info(files=[], columns=['FILE', 'FILTER', 'PUPIL', 'INSTRUME', 'DETE
     N = len(files)
 
     data = []
-
+    
     for c in columns[2:]:
         if c not in translate:
             translate[c] = 'xxxxxxxxxxxxxx'
-
+            
     for i in range(N):
         line = [os.path.basename(files[i]).split('.gz')[0]]
         if files[i].endswith('.gz'):
@@ -167,13 +167,13 @@ def get_flt_info(files=[], columns=['FILE', 'FILTER', 'PUPIL', 'INSTRUME', 'DETE
             im.close()
         else:
             h = pyfits.Header().fromfile(files[i])
-
+        
         if os.path.basename(files[i]).startswith('jw0'):
             with pyfits.open(files[i]) as _im:
                 h1 = _im['SCI'].header
                 if 'PA_V3' in h1:
                     h['PA_V3'] = h1['PA_V3']
-
+            
         filt = parse_filter_from_header(h, jwst_detector=jwst_detector)
         line.append(filt)
         has_columns = ['FILE', 'FILTER']
@@ -189,23 +189,23 @@ def get_flt_info(files=[], columns=['FILE', 'FILTER', 'PUPIL', 'INSTRUME', 'DETE
                     line.append(defaults[key])
                 else:
                     line.append(np.nan)
-
+                    
                 continue
 
         data.append(line)
 
     tab = Table(rows=data, names=has_columns)
-
+    
     if 'TARGNAME' in tab.colnames:
         miss = tab['TARGNAME'] == ''
         targs = [t.replace(' ', '-') for t in tab['TARGNAME']]
-
+        
         if miss.sum() > 0:
             for i in np.where(miss)[0]:
                 targs[i] = 'indef'
-
+        
         tab['TARGNAME'] = targs
-
+            
     return tab
 
 
@@ -237,10 +237,10 @@ def radec_to_targname(ra=0, dec=0, round_arcsec=(4, 60), precision=2, targstr='j
     -------
     targname : str
         Target string, see the example above.
-
+    
     Examples
     --------
-
+    
     >>> # Test dec: -10d10m10.10s
     >>> dec = -10. - 10./60. - 10.1/3600
     >>> # Test ra: 02h02m02.20s
@@ -256,7 +256,7 @@ def radec_to_targname(ra=0, dec=0, round_arcsec=(4, 60), precision=2, targstr='j
     >>> print(radec_to_targname(ra, dec,round_arcsec=(0.0001, 0.0001),
                                 precision=3, targstr=targstr))
     j020202.200m101010.100
-
+    
     """
     import astropy.coordinates
     import astropy.units as u
@@ -277,7 +277,7 @@ def radec_to_targname(ra=0, dec=0, round_arcsec=(4, 60), precision=2, targstr='j
     dec_scl = int(np.round(dec/scl[1]))*scl[1]
     ra_scl = int(np.round(ra/scl[0]))*scl[0]
 
-    coo = astropy.coordinates.SkyCoord(ra=ra_scl*u.deg, dec=dec_scl*u.deg,
+    coo = astropy.coordinates.SkyCoord(ra=ra_scl*u.deg, dec=dec_scl*u.deg, 
                                        frame='icrs')
 
     cstr = re.split('[hmsd.]', coo.to_string('hmsdms', precision=precision))
@@ -340,7 +340,7 @@ def blot_nearest_exact(in_data, in_wcs, out_wcs, verbose=True, stepsize=-1,
         from .utils_c.interp import pixel_map_c
     except:
         from grizli.utils_c.interp import pixel_map_c
-
+    
     # Shapes, in numpy array convention (y, x)
     if hasattr(in_wcs, 'pixel_shape'):
         in_sh = in_wcs.pixel_shape[::-1]
@@ -432,73 +432,73 @@ def _slice_ndfilter(data, filter_func, slices, args, size, footprint, kwargs):
     """
     Helper function passing image slices to `scipy.ndimage` filters that is
     pickleable for threading with `multiprocessing`
-
+    
     Parameters
     ----------
-    data, filter_func, args, size, footprint :
+    data, filter_func, args, size, footprint : 
         See `multiprocessing_ndfilter`
-
+    
     slices : (slice, slice, slice, slice)
         Array slices for insert a cutout back into a larger parent array
-
+        
     Returns
     -------
     filtered : array-like
         Filtered data
-
+    
     slices : tuple
         `slices` as input
-
+        
     """
-    filtered = filter_func(data, *args,
+    filtered = filter_func(data, *args, 
                            size=size, footprint=footprint,
                            **kwargs)
-
+                           
     return filtered, slices
 
 
 def multiprocessing_ndfilter(data, filter_func, filter_args=(), size=None, footprint=None, cutout_size=256, n_proc=4, timeout=90, mask=None, verbose=True, **kwargs):
     """
     Cut up a large array and send slices to `scipy.ndimage` filters
-
+    
     Parameters
     ----------
-
+    
     data : array-like
         Main image array
-
+        
     filter_func : function
         Filtering function, e.g., `scipy.ndimage.median_filter`
-
+    
     filter_args : tuple
         Arguments to pass to `filter_func`
-
+    
     size, footprint : int, array-like
         Filter size or footprint, see, e.g., `scipy.ndimage.median_filter`
-
+    
     cutout_size : int
         Size of subimage cutouts
-
+    
     n_proc : int
         Number of `multiprocessing` processes to use
-
+    
     timeout : float
         `multiprocessing` timeout (seconds)
-
+    
     mask : array-like
         Array multiplied to `data` that can zero-out regions to ignore
-
+    
     verbose : bool
         Print status messages
-
+        
     kwargs : dict
         Keyword arguments passed through to `filter_func`
-
+        
     Returns
     -------
     filtered : array-like
         Filtered version of `data`
-
+    
     Examples
     --------
 
@@ -519,34 +519,34 @@ def multiprocessing_ndfilter(data, filter_func, filter_args=(), size=None, footp
         >>> print(f'parallel: {(t2-t1)*1000:.1f} ms')
           serial: 573.9 ms
         parallel: 214.8 ms
-
+                                            
     """
-
+    
     import multiprocessing as mp
-
+    
     try:
         from tqdm import tqdm
     except ImportError:
         verbose = False
-
+        
     sh = data.shape
-
+    
     msg = None
-
+    
     if cutout_size > np.max(sh):
         msg = f'cutout_size={cutout_size} greater than image dimensions, run '
         msg += f'`{filter_func}` directly'
     elif n_proc == 0:
         msg = f'n_proc = 0, run in a single command'
-
+    
     if msg is not None:
         if verbose:
             print(msg)
-
-        filtered = filter_func(data, *filter_args,
+            
+        filtered = filter_func(data, *filter_args, 
                                size=size, footprint=footprint)
         return filtered
-
+    
     # Grid size
     nx = data.shape[1]//cutout_size+1
     ny = data.shape[0]//cutout_size+1
@@ -559,7 +559,7 @@ def multiprocessing_ndfilter(data, filter_func, filter_args=(), size=None, footp
         pad = size
     else:
         raise ValueError('Either size or footprint must be specified')
-
+        
     if n_proc < 0:
         n_proc = mp.cpu_count()
 
@@ -567,17 +567,17 @@ def multiprocessing_ndfilter(data, filter_func, filter_args=(), size=None, footp
 
     pool = mp.Pool(processes=n_proc)
     jobs = []
-
+    
     if mask is not None:
         data_mask = data*mask
     else:
         data_mask = data
-
+        
     # Make image slices
     for i in range(nx):
         xmi = np.maximum(0, i*cutout_size-pad)
         xma = np.minimum(sh[1], (i+1)*cutout_size+pad)
-
+        
         #print(i, xmi, xma)
         if i == 0:
             slx = slice(0, cutout_size)
@@ -591,11 +591,11 @@ def multiprocessing_ndfilter(data, filter_func, filter_args=(), size=None, footp
 
         nxs = slx.stop - slx.start
         oslx = slice(x0, x0+nxs)
-
+        
         for j in range(ny):
             ymi = np.maximum(0, j*cutout_size - pad)
             yma = np.minimum(sh[0], (j+1)*cutout_size + pad)
-
+            
             if j == 0:
                 sly = slice(0, cutout_size)
                 y0 = 0
@@ -605,31 +605,31 @@ def multiprocessing_ndfilter(data, filter_func, filter_args=(), size=None, footp
             else:
                 sly = slice(pad, cutout_size + 1)
                 y0 = ymi+pad
-
+            
             nys = sly.stop - sly.start
             osly = slice(y0, y0+nys)
-
+        
             cut = data_mask[ymi:yma, xmi:xma]
             if cut.max() == 0:
                 #print(f'Skip {xmi} {xma} {ymi} {yma}')
                 continue
-
+                
             # Make jobs for filtering the image slices
             slices = (osly, oslx, sly, slx)
-            _args = (cut, filter_func, slices,
+            _args = (cut, filter_func, slices, 
                      filter_args, size, footprint, kwargs)
             jobs.append(pool.apply_async(_slice_ndfilter, _args))
-
+            
     # Collect results
     pool.close()
 
     filtered = np.zeros_like(data)
-
+    
     if verbose:
         _iter = tqdm(jobs)
     else:
         _iter = jobs
-
+        
     for res in _iter:
         filtered_i, slices = res.get(timeout=timeout)
         filtered[slices[:2]] += filtered_i[slices[2:]]
@@ -643,7 +643,7 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
                                  'GNGRISM': 'goodsn-',
                                  'GOODS-SOUTH-': 'goodss-',
                                  'UDS-': 'uds-'},
-                    visit_split_shift=1.5, max_dt=1e9,
+                    visit_split_shift=1.5, max_dt=1e9, 
                     path='../RAW'):
     """Read header information from a list of exposures and parse out groups based on filter/target/orientation.
 
@@ -654,7 +654,7 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
 
     info : None or `~astropy.table.Table`
         Output from `~grizli.utils.get_flt_info`.
-
+        
     uniquename : bool
         If True, then split everything by program ID and visit name.  If
         False, then just group by targname/filter/pa_v3.
@@ -672,7 +672,7 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
         pointing coordinates using `radec_to_targname`.  Use this keyword
         for dithered parallels like 3D-HST / GLASS but set to False for
         undithered parallels like WISP.  Should also generally be used with
-        ``uniquename=False`` otherwise generates names that are a bit
+        ``uniquename=False`` otherwise generates names that are a bit 
         redundant:
 
             +--------------+---------------------------+
@@ -693,14 +693,14 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
             >>>     targname = targname.replace(k, translate[k])
             >>> print(targname)
             goodss-10
-
+    
     visit_split_shift : float
-        Separation in ``arcmin`` beyond which exposures in a group are split
+        Separation in ``arcmin`` beyond which exposures in a group are split 
         into separate visits.
-
+    
     path : str
         PATH to search for `flt` files if ``info`` not provided
-
+    
     Returns
     -------
     output_list : dict
@@ -766,10 +766,10 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
             target_list.append(info['targname'][i])
 
     target_list = np.array(target_list)
-
+    
     _prog_ids = []
     visits = []
-
+    
     for file in info['file']:
         bfile = os.path.basename(file)
         if bfile.startswith('jw'):
@@ -778,9 +778,9 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
         else:
             _prog_ids.append(bfile[1:4])
             visits.append(bfile[4:6])
-
+    
     visits = np.array(visits)
-
+    
     info['progIDs'] = _prog_ids
 
     progIDs = np.unique(info['progIDs'])
@@ -832,7 +832,7 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
                 for visit in visit_match:
                     ix = (visits == visit) & (target_list == target)
                     ix &= (info['filter'] == filter)
-
+                    
                     # this_progs.append(info['progIDs'][ix][0])
                     # print visit, ix.sum(), np.unique(info['progIDs'][ix])
                     new_progs = list(np.unique(info['progIDs'][ix]))
@@ -842,9 +842,9 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
                 for visit, prog in zip(this_visits, this_progs):
                     visit_list = []
                     visit_start = []
-
+                    
                     _vstr = '{0}-{1}-{2}-{3:05.1f}-{4}'
-                    visit_product = _vstr.format(target_use, prog, visit,
+                    visit_product = _vstr.format(target_use, prog, visit, 
                                                  angle, filter)
 
                     use = (target_list == target)
@@ -852,7 +852,7 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
                     use &= (visits == visit)
                     use &= (pa_v3 == angle)
                     use &= (info['progIDs'] == prog)
-
+                    
                     if use.sum() == 0:
                         continue
 
@@ -892,10 +892,10 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
     if visit_split_shift > 0:
         split_list = []
         for o in output_list:
-            _spl = split_visit(o, path=path,
+            _spl = split_visit(o, path=path, 
                                max_dt=max_dt,
                                visit_split_shift=visit_split_shift)
-
+                               
             split_list.extend(_spl)
 
         output_list = split_list
@@ -914,7 +914,7 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
                         if os.path.exists(_flt_file):
                             flt_file = _flt_file
                             break
-
+                    
                 flt_j = pyfits.open(flt_file)
                 h = flt_j[0].header
                 _ext = 0
@@ -930,20 +930,20 @@ def parse_flt_files(files=[], info=None, uniquename=False, use_visit=False,
                 else:
                     _ext = 1
                     wcs_j = pywcs.WCS(flt_j['SCI', 1], fobj=flt_j)
-
-                if ((wcs_j.pixel_shape is None) &
+                
+                if ((wcs_j.pixel_shape is None) & 
                     ('NPIX1' in flt_j['SCI',1].header)):
                     _h = flt_j['SCI',1].header
                     wcs_j.pixel_shape = (_h['NPIX1'], _h['NPIX2'])
-
+                    
                 fp_j = Polygon(wcs_j.calc_footprint())
                 if j == 0:
                     fp_i = fp_j.buffer(1./3600)
                 else:
                     fp_i = fp_i.union(fp_j.buffer(1./3600))
-
+                
                 flt_j.close()
-
+                
             output_list[i]['footprint'] = fp_i
 
     return output_list, filter_list
@@ -957,7 +957,7 @@ def split_visit(visit, visit_split_shift=1.5, max_dt=6./24, path='../RAW'):
 
     visit_split_shift : split if shifts larger than `visit_split_shift` arcmin
     """
-
+    
     ims = []
     for file in visit['files']:
         for gzext in ['', '.gz']:
@@ -965,16 +965,16 @@ def split_visit(visit, visit_split_shift=1.5, max_dt=6./24, path='../RAW'):
             if os.path.exists(_file):
                 ims.append(pyfits.open(_file))
                 break
-
+    
     #ims = [pyfits.open(os.path.join(path, file)) for file in visit['files']]
     crval1 = np.array([im[1].header['CRVAL1'] for im in ims])
     crval2 = np.array([im[1].header['CRVAL2'] for im in ims])
     expstart = np.array([im[0].header['EXPSTART'] for im in ims])
     dt = np.cast[int]((expstart-expstart[0])/max_dt)
-
+    
     for im in ims:
         im.close()
-
+        
     dx = (crval1 - crval1[0])*60*np.cos(crval2[0]/180*np.pi)
     dy = (crval2 - crval2[0])*60
 
@@ -993,7 +993,7 @@ def split_visit(visit, visit_split_shift=1.5, max_dt=6./24, path='../RAW'):
             spl.insert(-2, '')
         else:
             spl.insert(-1, '')
-
+            
         visits = []
         for i in range(len(un)):
             ix = keys == un[i]
@@ -1001,7 +1001,7 @@ def split_visit(visit, visit_split_shift=1.5, max_dt=6./24, path='../RAW'):
                 spl[-3] = 'abcdefghijklmnopqrsuvwxyz'[i]
             else:
                 spl[-2] = 'abcdefghijklmnopqrsuvwxyz'[i]
-
+                
             new_visit = {'files': list(np.array(visit['files'])[ix]),
                          'product': '-'.join(spl)}
 
@@ -1050,9 +1050,9 @@ def get_visit_footprints(visits):
                 fp_i = fp_j
             else:
                 fp_i = fp_i.union(fp_j)
-
+            
             flt_j.close()
-
+            
         visits[i]['footprint'] = fp_i
 
     return visits
@@ -1100,7 +1100,7 @@ def parse_visit_overlaps(visits, buffer=15.):
             wcs_i = pywcs.WCS(im_i[0])
             fp_i = Polygon(wcs_i.calc_footprint()).buffer(buffer/3600.)
             im_i.close()
-
+            
         exposure_groups.append(copy.deepcopy(visits[i]))
 
         for j in range(i+1, N):
@@ -1117,7 +1117,7 @@ def parse_visit_overlaps(visits, buffer=15.):
                 wcs_j = pywcs.WCS(im_j[0])
                 fp_j = Polygon(wcs_j.calc_footprint()).buffer(buffer/3600.)
                 im_j.close()
-
+            
             olap = fp_i.intersection(fp_j)
             if olap.area > 0:
                 used[j] = True
@@ -1135,14 +1135,14 @@ def parse_visit_overlaps(visits, buffer=15.):
         product += '-'+f_i
         exposure_groups[i]['product'] = product
         flt_i.close()
-
+        
     return exposure_groups
 
 
 DIRECT_ORDER = {'G102': ['F105W', 'F110W', 'F098M', 'F125W', 'F140W', 'F160W', 'F127M', 'F139M', 'F153M', 'F132N', 'F130N', 'F128N', 'F126N', 'F164N', 'F167N'],
                 'G141': ['F140W', 'F160W', 'F125W', 'F105W', 'F110W', 'F098M', 'F127M', 'F139M', 'F153M', 'F132N', 'F130N', 'F128N', 'F126N', 'F164N', 'F167N'],
                 'G800L': ['F814W', 'F606W', 'F850LP', 'F775W', 'F435W', 'F105W', 'F110W', 'F098M', 'F125W', 'F140W', 'F160W', 'F127M', 'F139M', 'F153M', 'F132N', 'F130N', 'F128N', 'F126N', 'F164N', 'F167N'],
-                'GR150C': ['F115W', 'F150W', 'F200W'],
+                'GR150C': ['F115W', 'F150W', 'F200W'], 
                 'GR150R': ['F115W', 'F150W', 'F200W']}
 
 
@@ -1172,7 +1172,7 @@ def parse_grism_associations(exposure_groups, info,
     grism_groups = []
     for i in range(N):
         _espi = exposure_groups[i]['product'].split('-')
-
+        
         if _espi[-2][0] in 'fg':
             pupil_i = _espi[-2]
             f_i = _espi[-1]
@@ -1181,13 +1181,13 @@ def parse_grism_associations(exposure_groups, info,
             pupil_i = None
             f_i = _espi[-1]
             root_i = '-'.join(_espi[:-1])
-
+            
         if f_i.startswith('g'):
             group = OrderedDict(grism=exposure_groups[i],
                                 direct=None)
         else:
             continue
-
+        
         fp_i = exposure_groups[i]['footprint']
         olap_i = 0.
         d_i = f_i
@@ -1202,7 +1202,7 @@ def parse_grism_associations(exposure_groups, info,
                 f_j = _espj[-1]
                 root_j = '-'.join(_espj[:-1])
                 pupil_j = None
-
+                
             if f_j.startswith('g'):
                 continue
 
@@ -1234,7 +1234,7 @@ def get_hst_filter(header, **kwargs):
     """
     Deprecated: use `grizli.utils.parse_filter_from_header`
     """
-
+    
     result = parse_filter_from_header(header, **kwargs)
     return result
 
@@ -1256,33 +1256,33 @@ def parse_filter_from_header(header, filter_only=False, jwst_detector=False, **k
         >>> h['FILTER2'] = 'CLEAR2L'
         >>> print(parse_filter_from_header(h))
         G800L
-
+            
     Parameters
     ----------
     header : `~astropy.io.fits.Header`
         Image header with FILTER or FILTER1,FILTER2,...,FILTERN keywords
-
+    
     filter_only : bool
         If true, don't do any special handling with JWST but just return the
-        ``FILTER`` keyword itself. Otherwise, for JWST/NIRISS, return
+        ``FILTER`` keyword itself. Otherwise, for JWST/NIRISS, return 
         ``{PUPIL}-{FILTER}`` and for JWST/NIRCAM, return ``{FILTER}-{PUPIL}``
-
+        
     jwst_detector : bool
         If True, prepend ``DETECTOR`` to output for JWST NIRCam and NIRISS
-        to distinguish NIRCam detectors and filter names common between
+        to distinguish NIRCam detectors and filter names common between 
         these instruments.
-
+        
     Returns
     -------
     filter : str
 
     """
-
+    
     if 'INSTRUME' not in header:
         instrume = 'N/A'
     else:
         instrume = header['INSTRUME']
-
+        
     if instrume.strip() == 'ACS':
         for i in [1, 2]:
             filter_i = header['FILTER{0:d}'.format(i)]
@@ -1293,16 +1293,16 @@ def parse_filter_from_header(header, filter_only=False, jwst_detector=False, **k
 
     elif instrume == 'WFPC2':
         filter = header['FILTNAM1']
-
+        
     elif instrume == 'NIRISS':
         if filter_only:
             filter = header['FILTER']
         else:
             filter = '{0}-{1}'.format(header['PUPIL'], header['FILTER'])
-
+        
         if jwst_detector:
             filter = '{0}-{1}'.format(header['DETECTOR'], filter)
-
+            
     elif instrume == 'NIRCAM':
         if filter_only:
             filter = header['FILTER']
@@ -1311,10 +1311,10 @@ def parse_filter_from_header(header, filter_only=False, jwst_detector=False, **k
         if jwst_detector:
             filter = '{0}-{1}'.format(header['DETECTOR'], filter)
             filter = filter.replace('LONG','5')
-
+            
     elif 'FILTER' in header:
         filter = header['FILTER']
-
+        
     else:
         msg = 'Failed to parse FILTER keyword for INSTRUMEnt {0}'
         raise KeyError(msg.format(instrume))
@@ -1336,13 +1336,13 @@ def get_filter_obsmode(filter='f160w', acs_chip='wfc1', uvis_chip='uvis2', aper=
             inst = f'wfc3,{uvis_chip}'
         else:
             inst = f'acs,{acs_chip}'
-
+        
     obsmode = inst + ',' + filter.strip('u').lower()
     if np.isfinite(aper):
         obsmode += f',aper#{aper:4.2f}'
-
+        
     return case(obsmode)
-
+    
 def tabulate_encircled_energy(aper_radii=EE_RADII, norm_radius=4.0):
 
     import pysynphot as S
@@ -1359,16 +1359,16 @@ def tabulate_encircled_energy(aper_radii=EE_RADII, norm_radius=4.0):
     # IR
     for f in default_params.IR_M_FILTERS+default_params.IR_W_FILTERS:
         obsmode = 'wfc3,ir,'+f.lower()
-
+        
         print(obsmode)
         tab[obsmode] = synphot_encircled_energy(obsmode=obsmode, sp=sp, aper_radii=aper_radii, norm_radius=norm_radius)
         tab.meta['ZP_{0}'.format(obsmode)] = synphot_zeropoint(obsmode=obsmode, radius=norm_radius)
 
     # Optical.  Wrap in try/except to catch missing filters
     for inst in ['acs,wfc1,', 'wfc3,uvis2,']:
-        for f in (default_params.OPT_M_FILTERS +
-                  default_params.OPT_W_FILTERS +
-                  default_params.UV_M_FILTERS +
+        for f in (default_params.OPT_M_FILTERS + 
+                  default_params.OPT_W_FILTERS + 
+                  default_params.UV_M_FILTERS + 
                   default_params.UV_W_FILTERS):
 
             obsmode = inst+f.lower()
@@ -1392,7 +1392,7 @@ def synphot_zeropoint(obsmode='wfc3,ir,f160w', radius=4.0):
     """
     import pysynphot as S
     sp = S.FlatSpectrum(25, fluxunits='ABMag')
-
+    
     if np.isfinite(radius):
         bp = S.ObsBandpass(obsmode+',aper#{0:.2f}'.format(radius))
     else:
@@ -1490,17 +1490,17 @@ def calc_header_zeropoint(im, ext=0):
     # Get AB zeropoint
     if 'APZP' in header:
         ZP = header['ABZP']
-
+    
     elif 'PHOTFNU' in header:
         ZP = -2.5*np.log10(header['PHOTFNU'])+8.90
         ZP += 2.5*np.log10(scale_exptime)
-
+        
     elif 'PHOTFLAM' in header:
         ZP = (-2.5*np.log10(header['PHOTFLAM']) - 21.10 -
               5*np.log10(header['PHOTPLAM']) + 18.6921)
 
         ZP += 2.5*np.log10(scale_exptime)
-
+    
     elif (fi is not None):
         if fi in model.photflam_list:
             ZP = (-2.5*np.log10(model.photflam_list[fi]) - 21.10 -
@@ -1679,10 +1679,10 @@ def detect_with_photutils(sci, err=None, dq=None, seg=None, detect_thresh=2.,
                         overwrite=True, verbose=True):
     """
     Use `~photutils` to detect objects and make segmentation map
-
-    .. note::
+    
+    .. note:: 
         Deprecated in favor of sep catalogs in `~grizli.prep`.
-
+    
     Parameters
     ----------
     sci : `~numpy.ndarray`
@@ -1827,9 +1827,9 @@ def safe_invert(arr):
         _inv = inv(arr)
     except:
         _inv = np.matrix(arr).I.A
-
+    
     return _inv
-
+    
 
 def nmad(data):
     """Normalized NMAD=1.4826022 * `~.astropy.stats.median_absolute_deviation`
@@ -1957,9 +1957,9 @@ def get_line_wavelengths():
 
     line_wavelengths['Balmer 10kK + MgII Av=2.0'] = [6564.61, 4862.68, 4341.68, 4101.73, 3971.198, 2799.117, 12821.6, 10941.1]
     line_ratios['Balmer 10kK + MgII Av=2.0'] = [0.6974668768037302, 0.11454218612794999, 0.03919912269578289, 0.018469561340758073, 0.010401970393728362, 0.0703403817712615, 0.11357315292894044, 0.03701729780130422]
-
+    
     ###########
-
+    
     # Reddened with Kriek & Conroy dust, tau_V=0.5
     line_wavelengths['Balmer 10kK t0.5'] = [6564.61, 4862.68, 4341.68, 4101.73]
     line_ratios['Balmer 10kK t0.5'] = [2.86*0.68, 1.0*0.55, 0.468*0.51, 0.259*0.48]
@@ -2310,7 +2310,7 @@ class SpectrumTemplate(object):
                 plt.legend()
                 plt.xlabel(r'$\lambda$')
                 plt.xlim(6000, 7500)
-
+                
                 plt.show()
 
         """
@@ -2588,7 +2588,7 @@ class SpectrumTemplate(object):
             # Interpolate to filter wavelengths
             integrate_wave = filter.wave
 
-            integrate_templ = interp(filter.wave.astype(np.float64),
+            integrate_templ = interp(filter.wave.astype(np.float64), 
                                     self.wave, self.flux_fnu, left=0, right=0)
 
             if self.err is not None:
@@ -3010,7 +3010,7 @@ def load_phoenix_stars(logg_list=PHOENIX_LOGG, teff_list=PHOENIX_TEFF, zmet_list
 
     tab = GTable.gread(hdu[1])
     hdu.close()
-
+    
     tstars = OrderedDict()
     N = tab['flux'].shape[1]
     for i in range(N):
@@ -3072,9 +3072,9 @@ def load_sdss_pca_templates(file='spEigenQSO-55732.fits', smooth=3000):
     temp_list = OrderedDict()
     for i in range(N):
         temp_list['{0} {1}'.format(name, i+1)] = SpectrumTemplate(wave=wave, flux=data[i, :])
-
+    
     im.close()
-
+    
     return temp_list
 
 
@@ -3096,20 +3096,20 @@ def cheb_templates(wave, order=6, get_matrix=False, log=False, clip=1.e-4, minma
         ma = np.log(ma)
     else:
         xi = wave*1
-
+    
     x = (xi-mi)*2/(ma-mi)-1
 
     n_bases = order+1
-
+    
     basis = chebvander(x, order)
     # basis = np.empty((x.shape[0], n_bases), dtype=float)
-    #
+    # 
     # xr = np.arange(n_bases)
     # for i in range(n_bases):
     #     _c = (xr == i)*1
     #     #print(_c, xr, i)
     #     basis[:,i] = chebval(x, _c)
-
+        
     #for i in range(n_bases):
     out_of_range = (xi < mi) | (xi > ma)
     basis[out_of_range,:] = 0
@@ -3124,7 +3124,7 @@ def cheb_templates(wave, order=6, get_matrix=False, log=False, clip=1.e-4, minma
         temp[key].name = key
 
     return temp
-
+    
 def bspline_templates(wave, degree=3, df=6, get_matrix=False, log=False, clip=1.e-4, minmax=None):
     """
     B-spline basis functions, modeled after `~patsy.splines`
@@ -3967,19 +3967,19 @@ def log_zgrid(zr=[0.7, 3.4], dz=0.01):
 
 def trapz_dx(x):
     """
-    Return trapezoid rule coefficients, useful for numerical integration
+    Return trapezoid rule coefficients, useful for numerical integration 
     using a dot product
-
+    
     Parameters
     ----------
     x : array-like
         Independent variable
-
+    
     Returns
     -------
     dx : array_like
         Coefficients for trapezoidal rule integration.
-
+        
     """
     dx = np.zeros_like(x)
     diff = np.diff(x)/2.
@@ -4015,14 +4015,14 @@ def get_wcs_pscale(wcs, set_attribute=True):
         det = linalg.det(wcs.wcs.pc)
 
     pscale = np.sqrt(np.abs(det))*3600.
-
+    
     with warnings.catch_warnings():
-        warnings.filterwarnings('ignore',
+        warnings.filterwarnings('ignore', 
                   'cdelt will be ignored since cd is present', RuntimeWarning)
-
+        
         if hasattr(wcs.wcs, 'cdelt'):
             pscale *= wcs.wcs.cdelt[0]
-
+        
     wcs.pscale = pscale
 
     return pscale
@@ -4095,42 +4095,42 @@ def sip_rot90(input, rot, reverse=False, verbose=False, compare=False):
     """
     Rotate a SIP WCS by increments of 90 degrees using direct transformations
     between x / y coordinates
-
+    
     Parameters
     ----------
     input : `~astropy.io.fits.Header` or `~astropy.wcs.WCS`
         Header or WCS
-
+    
     rot : int
         Number of times to rotate the WCS 90 degrees *clockwise*, analogous
         to `numpy.rot90`
-
+    
     reverse : bool
-        If `input` is a header and includes a keyword ``ROT90``, then undo
+        If `input` is a header and includes a keyword ``ROT90``, then undo 
         the rotation and remove the keyword from the output header
-
+        
     Returns
     -------
     header : `~astropy.io.fits.Header`
         Rotated WCS header
-
+        
     wcs : `~astropy.wcs.WCS`
         Rotated WCS
-
+    
     desc : str
-        Description of the transform associated with ``rot``, e.g,
+        Description of the transform associated with ``rot``, e.g, 
         ``x=nx-x, y=ny-y`` for ``rot=±2``.
-
+        
     """
     import copy
     import astropy.io.fits
     import astropy.wcs
     import matplotlib.pyplot as plt
-
+    
     if isinstance(input, astropy.io.fits.Header):
         orig = copy.deepcopy(input)
         new = copy.deepcopy(input)
-
+        
         if ('ROT90' in input):
             if reverse:
                 rot = -orig['ROT90']
@@ -4148,9 +4148,9 @@ def sip_rot90(input, rot, reverse=False, verbose=False, compare=False):
     ### CD = [[dra/dx, dra/dy], [dde/dx, dde/dy]]
     ### x = a_i_j * u**i * v**j
     ### y = b_i_j * u**i * v**j
-
+    
     ix = 1
-
+    
     if compare:
         xarr = np.arange(0,2048,64)
         xp, yp = np.meshgrid(xarr, xarr)
@@ -4159,7 +4159,7 @@ def sip_rot90(input, rot, reverse=False, verbose=False, compare=False):
     if rot % 4 == 1:
         # CW 90 deg : x = y, y = (nx - x), u=v, v=-u
         desc = 'x=y, y=nx-x'
-
+        
         new['CRPIX1'] = orig['CRPIX2']
         new['CRPIX2'] = orig['NAXIS1'] - orig['CRPIX1'] + 1
 
@@ -4178,7 +4178,7 @@ def sip_rot90(input, rot, reverse=False, verbose=False, compare=False):
                 new[f'B_{i}_{j}'] = orig[f'A_{j}_{i}']*(-1)**j*-1
 
         new_wcs = astropy.wcs.WCS(new, relax=True)
-
+        
         if compare:
             xr, yr = new_wcs.all_world2pix(*rd, ix)
             xo = yp
@@ -4206,7 +4206,7 @@ def sip_rot90(input, rot, reverse=False, verbose=False, compare=False):
                 new[f'B_{i}_{j}'] = orig[f'A_{j}_{i}']*(-1)**i
 
         new_wcs = astropy.wcs.WCS(new, relax=True)
-
+        
         if compare:
             xr, yr = new_wcs.all_world2pix(*rd, ix)
             xo = orig['NAXIS2'] - yp
@@ -4235,7 +4235,7 @@ def sip_rot90(input, rot, reverse=False, verbose=False, compare=False):
                 new[f'B_{i}_{j}'] = orig[f'B_{i}_{j}']*(-1)**j*(-1)**i*-1
 
         new_wcs = astropy.wcs.WCS(new, relax=True)
-
+        
         if compare:
             xr, yr = new_wcs.all_world2pix(*rd, ix)
             xo = orig['NAXIS1'] - xp
@@ -4248,13 +4248,13 @@ def sip_rot90(input, rot, reverse=False, verbose=False, compare=False):
             xo = xp
             yo = yp
             xr, yr = new_wcs.all_world2pix(*rd, ix)
-
+        
     if verbose:
         if compare:
             xrms = nmad(xr-xo)
             yrms = nmad(yr-yo)
             print(f'Rot90: {rot} rms={xrms:.2e} {yrms:.2e}')
-
+            
     if compare:
         fig, axes = plt.subplots(1,2,figsize=(10,5), sharex=True, sharey=True)
         axes[0].scatter(xp, xr-xo)
@@ -4263,9 +4263,9 @@ def sip_rot90(input, rot, reverse=False, verbose=False, compare=False):
         axes[1].set_xlabel('dy')
         for ax in axes:
             ax.grid()
-
+        
         fig.tight_layout(pad=0.5)
-
+    
     return new, new_wcs, desc
 
 
@@ -4327,7 +4327,7 @@ class WCSFootprint(object):
             the_wcs = pywcs.WCS(hdu[ext].header, fobj=hdu)
             self.wcs = the_wcs
             hdu.close()
-
+            
         elif isinstance(wcs, pyfits.HDUList):
             if len(wcs) == 1:
                 ext = 0
@@ -4719,31 +4719,31 @@ def strip_header_keys(header, comment=True, history=True, drizzle_keys=DRIZZLE_K
 def wcs_from_header(header, relax=True, **kwargs):
     """
     Initialize `~astropy.wcs.WCS` from a `~astropy.io.fits.Header`
-
+    
     Parameters
     ----------
     header : `~astropy.io.fits.Header`
         FITS header with optional ``SIPCRPX1`` and ``SIPCRPX2`` keywords that
         define a separate reference pixel for a SIP header
-
+    
     relax, kwargs : bool, dict
         Keywords passed to `astropy.wcs.WCS`
-
+    
     Returns
     -------
     wcs : `~astropy.wcs.WCS`
         WCS object
-
+        
     """
     wcs = pywcs.WCS(header, relax=relax)
-
+    
     if ('SIPCRPX1' in header) & hasattr(wcs, 'sip'):
         wcs.sip.crpix[0] = header['SIPCRPX1']
         wcs.sip.crpix[1] = header['SIPCRPX2']
     elif ('SIAF_XREF_SCI' in header) & hasattr(wcs, 'sip'):
         wcs.sip.crpix[0] = header['SIAF_XREF_SCI']
         wcs.sip.crpix[1] = header['SIAF_YREF_SCI']
-
+        
     return wcs
 
 
@@ -4787,11 +4787,11 @@ def to_header(wcs, add_naxis=True, relax=True, key=None):
         if k.startswith('PC'):
             cd = k.replace('PC', 'CD')
             header.rename_keyword(k, cd)
-
+    
     if hasattr(wcs, 'sip'):
         if hasattr(wcs.sip, 'crpix'):
             header['SIPCRPX1'], header['SIPCRPX2'] = wcs.sip.crpix
-
+            
     return header
 
 
@@ -4950,9 +4950,9 @@ def get_flt_footprint(flt_file, extensions=[1, 2, 3, 4], patch_args=None):
             fp = p_i
         else:
             fp = fp.union(p_i)
-
+    
     im.close()
-
+    
     if patch_args is not None:
         patch = PolygonPatch(fp, **patch_args)
         return patch
@@ -5032,7 +5032,7 @@ def make_maximal_wcs(files, pixel_scale=0.1, get_hdu=True, pad=90, verbose=True,
                 group_poly = group_poly.union(p_i.buffer(1./3600))
             else:
                 group_poly = group_poly.union(p_i)
-
+                 
         x0, y0 = np.cast[float](group_poly.centroid.xy)[:, 0]
         if verbose:
             print('{0:>3d}/{1:>3d}: {2}[SCI,{3}]  {4:>6.2f}'.format(i, len(files), file, chip+1, group_poly.area*3600*np.cos(y0/180*np.pi)))
@@ -5068,51 +5068,51 @@ def make_maximal_wcs(files, pixel_scale=0.1, get_hdu=True, pad=90, verbose=True,
 
 def half_pixel_scale(wcs):
     """
-    Create a new WCS with half the pixel scale of another that can be
+    Create a new WCS with half the pixel scale of another that can be 
     block-averaged 2x2
-
+    
     Parameters
     ----------
     wcs : `~astropy.wcs.WCS`
         Input WCS
-
+    
     Returns
     -------
     half_wcs : `~astropy.wcs.WCS`
         New WCS with smaller pixels
     """
     h = to_header(wcs)
-
+    
     for k in ['NAXIS1', 'NAXIS2']: #, 'CRPIX1', 'CRPIX2']:
         h[k] *= 2
 
     for k in ['CRPIX1', 'CRPIX2']:
         h[k] = h[k]*2 - 0.5
-
+        
     for k in ['CD1_1', 'CD1_2', 'CD2_1', 'CD2_2']:
         if k in h:
             h[k] /= 2
-
+    
     if 0:
         # Test
         new = pywcs.WCS(h)
         sh = new.pixel_shape
-
-        wcorner = wcs.all_world2pix(new.all_pix2world([[-0.5, -0.5],
+        
+        wcorner = wcs.all_world2pix(new.all_pix2world([[-0.5, -0.5], 
                                              [sh[0]-0.5, sh[1]-0.5]], 0),0)
         print('small > large')
         print(', '.join([f'{w:.2f}' for w in wcorner[0]]))
         print(', '.join([f'{w:.2f}' for w in wcorner[1]]), wcs.pixel_shape)
-
+        
         sh = wcs.pixel_shape
-        wcorner = new.all_world2pix(wcs.all_pix2world([[-0.5, -0.5],
+        wcorner = new.all_world2pix(wcs.all_pix2world([[-0.5, -0.5], 
                                              [sh[0]-0.5, sh[1]-0.5]], 0),0)
         print('large > small')
         print(', '.join([f'{w:.2f}' for w in wcorner[0]]))
         print(', '.join([f'{w:.2f}' for w in wcorner[1]]), new.pixel_shape)
-
+        
     new_wcs = pywcs.WCS(h, relax=True)
-
+    
     return new_wcs
 
 
@@ -5178,30 +5178,30 @@ def header_keys_from_filelist(fits_files, keywords=[], ext=0, colname_case=str.l
 def parse_s3_url(url='s3://bucket/path/to/file.txt'):
     """
     Parse s3 path string
-
+    
     Parameters
     ----------
     url : str
         Full S3 path, e.g., ``[s3://]{bucket_name}/{s3_object}``
-
+    
     Returns
     -------
     bucket_name : str
         Bucket name
-
+    
     s3_object : str
         Full path of the S3 file object
-
+    
     filename : str
         File name of the object, e.g. ``os.path.basename(s3_object)``
-
+        
     """
     surl = url.strip('s3://')
     spl = surl.split('/')
     if len(spl) < 2:
         print(f"bucket / path not found in {url}")
         return None, None, None
-
+        
     bucket_name = spl[0]
     s3_object = '/'.join(spl[1:])
     filename = os.path.basename(s3_object)
@@ -5211,38 +5211,38 @@ def parse_s3_url(url='s3://bucket/path/to/file.txt'):
 def fetch_s3_url(url='s3://bucket/path/to/file.txt', file_func=lambda x : os.path.join('./',x), skip_existing=True, verbose=True):
     """
     Fetch file from an S3 bucket
-
+    
     Parameters
     ----------
     url : str
         S3 url of a file to download
-
+    
     file_func : function
-        Function applied to the file name extracted from `url`, e.g., to
+        Function applied to the file name extracted from `url`, e.g., to 
         set output directory, rename files, set a prefix, etc.
-
+    
     Returns
     -------
     local_file : str
         Name of local file or `None` if failed to parse `url`
-
+    
     status : int
         Bit flag of results: **1** == file found, **2** = download successful
-
+        
     """
     import traceback
     import boto3
     import botocore.exceptions
-
+    
     s3 = boto3.resource('s3')
     bucket_name, s3_object, filename = parse_s3_url(url=url)
     if bucket_name is None:
         return url, os.path.exists(url)
-
+        
     bkt = s3.Bucket(bucket_name)
     local_file = file_func(filename)
     status = os.path.exists(local_file)*1
-
+    
     if (status > 0) & skip_existing:
         print(f'{local_file} exists, skipping.')
     else:
@@ -5253,43 +5253,43 @@ def fetch_s3_url(url='s3://bucket/path/to/file.txt', file_func=lambda x : os.pat
             status += 2
             if verbose:
                 print(f'{url} > {local_file}')
-
+                
         except botocore.exceptions.ClientError:
             trace = traceback.format_exc(limit=2)
             msg = trace.split('\n')[-2].split('ClientError: ')[1]
             if verbose:
                 print(f'Failed {url}: {msg}')
-
+                
             # Download failed due to a ClientError
             # Forbidden probably means insufficient bucket access privileges
             pass
-
+            
     return local_file, status
 
 
 def niriss_ghost_mask(im, init_thresh=0.05, init_sigma=3, final_thresh=0.01, final_sigma=3, erosions=0, dilations=9, verbose=True, **kwargs):
     """
     Make a mask for NIRISS imaging ghosts
-
+    
     See also Martel. JWST-STScI-004877 and
     https://github.com/spacetelescope/niriss_ghost
-
+    
     Here
     """
     import scipy.ndimage as nd
-
+    
     if im[0].header['PUPIL'] not in ['F115W','F150W','F200W']:
         return False
-
+    
     if im[0].header['PUPIL'] == 'F115W':
         xgap, ygap = 1156, 927
     elif im[0].header['PUPIL'] == 'F115W':
         xgap, ygap = 1162, 938
     else:
         xgap, ygap = 1156, 944-2
-
+        
     yp, xp = np.indices((2048, 2048))
-
+    
     yg = 2*(ygap-1) - yp
     xg = 2*(xgap-1) - xp
 
@@ -5301,57 +5301,57 @@ def niriss_ghost_mask(im, init_thresh=0.05, init_sigma=3, final_thresh=0.01, fin
 
     in_img &= np.abs(dx) < 400
     in_img &= np.abs(dy) < 400
-
+    
     if 'MDRIZSKY' in im['SCI'].header:
         bkg = im['SCI'].header['MDRIZSKY']
     else:
         bkg = np.nanmedian(im['SCI'].data[im['DQ'].data == 0])
-
+        
     thresh = (im['SCI'].data - bkg)*init_thresh > init_sigma*im['ERR'].data
     thresh &= in_img
 
     _reflected = np.zeros_like(im['SCI'].data)
     for xpi, ypi, xgi, ygi in zip(xp[thresh], yp[thresh],
                                   xg[thresh], yg[thresh]):
-
+                                  
         _reflected[ygi, xgi] = im['SCI'].data[ypi, xpi] - bkg
 
     ghost_mask = _reflected*final_thresh > final_sigma*im['ERR'].data
-
+    
     if erosions > 0:
         ghost_mask = nd.binary_erosion(ghost_mask, iterations=erosions)
-
+        
     ghost_mask = nd.binary_dilation(ghost_mask, iterations=dilations)
-
+    
     im[0].header['GHOSTMSK'] = True, 'NIRISS ghost mask applied'
     im[0].header['GHOSTNPX'] = ghost_mask.sum(), 'Pixels in NIRISS ghost mask'
-
-    msg = 'NIRISS ghost mask {0} Npix: {1}\n'.format(im[0].header['PUPIL'],
+    
+    msg = 'NIRISS ghost mask {0} Npix: {1}\n'.format(im[0].header['PUPIL'], 
                                                     ghost_mask.sum())
     log_comment(LOGFILE, msg, verbose=verbose)
-
+    
     return ghost_mask
 
 
 def get_photom_scale(header):
     """
     Get tabulated scale factor
-
+    
     Parameters
     ----------
     header : `~astropy.io.fits.Header`
         Image header
-
+    
     Returns
     -------
     key : str
         Detector + filter key
-
+    
     scale : float
         Scale value.  If `key` not found in the ``data/photom_correction.yml``
         table or if the CTX is newer than that indicated in the correction
         table then return 1.0.
-
+        
     """
     import yaml
     if 'TELESCOP' in header:
@@ -5359,29 +5359,29 @@ def get_photom_scale(header):
             return header['TELESCOP'], 1.0
     else:
         return None, 1.0
-
-    corr_file = os.path.join(os.path.dirname(__file__),
+        
+    corr_file = os.path.join(os.path.dirname(__file__), 
                              'data/photom_correction.yml')
-
+    
     if not os.path.exists(corr_file):
         return None, 1
-
+    
     with open(corr_file) as fp:
         corr = yaml.load(fp, Loader=yaml.SafeLoader)
-
+    
     print(header['CRDS_CTX'], corr['CRDS_CTX_MAX'], corr_file)
-
+    
     if 'CRDS_CTX' in header:
         if header['CRDS_CTX'] > corr['CRDS_CTX_MAX']:
             return header['CRDS_CTX'], 1.0
-
+            
     key = '{0}-{1}'.format(header['DETECTOR'], header['FILTER'])
     if 'PUPIL' in header:
         key += '-{0}'.format(header['PUPIL'])
-
+    
     if key not in corr:
         return key, 1.0
-
+    
     else:
         return key, 1./corr[key]
 
@@ -5394,74 +5394,74 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
                        niriss_ghost_kwargs={}):
     """
     Make drizzle mosaic from exposures in a visit dictionary
-
+    
     Parameters
     ----------
     visit : dict
         Visit dictionary with 'product' and 'files' keys
-
+    
     output : `~astropy.wcs.WCS`, `~astropy.io.fits.Header`, `~astropy.io.ImageHDU`
         Output frame definition.  Can be a WCS object, header, or FITS HDU
-
+    
     pixfrac : float
         Drizzle `pixfrac`
-
+    
     kernel : str
         Drizzle `kernel` (e.g., 'point', 'square')
-
+    
     clean : bool
         Remove exposure files after adding to the mosaic
-
+    
     include_saturated : bool
         Include pixels with saturated DQ flag
-
+    
     keep_bits : int, None
         Extra DQ bits to keep as valid
-
+    
     dryrun : bool
         If True, don't actually produce the output
-
+    
     skip : int
         Slice skip to drizzle a subset of exposures
-
+    
     extra_wfc3ir_badpix : bool
         Apply extra WFC3/IR bad pix to DQ
-
+    
     verbose : bool
         Some verbose message printing
-
+    
     scale_photom : bool
-        For JWST, apply photometry scale corrections from the
+        For JWST, apply photometry scale corrections from the  
         `grizli/data/photom_correction.yml` table
-
+    
     niriss_ghost_kwargs : dict
         Keyword arguments for `~grizli.utils.niriss_ghost_mask`
-
+    
     Returns
     -------
     outsci : array-like
         SCI array
-
+    
     outwht : array-like
         Inverse variance WHT array
-
+    
     header : `~astropy.io.fits.Header`
         Image header
-
+    
     flist : list
         List of files that were drizzled to the mosaic
-
+        
     wcs_tab : `~astropy.table.Table`
         Table of WCS parameters of individual exposures
-
+    
     """
     from shapely.geometry import Polygon
     import boto3
     from botocore.exceptions import ClientError
     import scipy.ndimage as nd
-
+    
     from .version import __version__ as grizli__version
-
+    
     bucket_name = None
     s3 = boto3.resource('s3')
     s3_client = boto3.client('s3')
@@ -5496,13 +5496,13 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
         indices = indices[::skip]
 
     NTOTAL = len(indices)
-
+    
     wcs_rows = []
     wcs_colnames = None
     wcs_keys = {}
-
+    
     bpdata = 0
-
+    
     for i in indices:
 
         file = visit['files'][i]
@@ -5537,29 +5537,29 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
         except OSError:
             print(f'open({file}) failed!')
             continue
-
+            
         sci_list, wht_list, wcs_list = [], [], []
-
+        
         keys = OrderedDict()
-        for k in ['EXPTIME', 'TELESCOP', 'FILTER','FILTER1', 'FILTER2',
-                  'PUPIL', 'DETECTOR', 'INSTRUME', 'PHOTFLAM', 'PHOTPLAM',
-                  'PHOTFNU', 'PHOTZPT', 'PHOTBW', 'PHOTMODE', 'EXPSTART',
+        for k in ['EXPTIME', 'TELESCOP', 'FILTER','FILTER1', 'FILTER2', 
+                  'PUPIL', 'DETECTOR', 'INSTRUME', 'PHOTFLAM', 'PHOTPLAM', 
+                  'PHOTFNU', 'PHOTZPT', 'PHOTBW', 'PHOTMODE', 'EXPSTART', 
                   'EXPEND', 'DATE-OBS', 'TIME-OBS',
                   'UPDA_CTX', 'CRDS_CTX', 'R_DISTOR', 'R_PHOTOM', 'R_FLAT']:
             if k in flt[0].header:
                 keys[k] = flt[0].header[k]
-
+        
         if flt[0].header['TELESCOP'] in ['JWST']:
             bits = 4
             include_saturated = False
-
+            
             #bpdata = 0
             _inst = flt[0].header['INSTRUME']
             if (extra_wfc3ir_badpix) & (_inst in ['NIRCAM']):
                 _det = flt[0].header['DETECTOR']
-                bpfile = os.path.join(os.path.dirname(__file__),
+                bpfile = os.path.join(os.path.dirname(__file__), 
                            f'data/nrc_lowpix_0916_{_det}.fits.gz')
-
+                
                 if os.path.exists(bpfile):
                     bpdata = pyfits.open(bpfile)[0].data
                     bpdata = nd.binary_dilation(bpdata > 0, iterations=2)*1024
@@ -5567,57 +5567,57 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
                     log_comment(LOGFILE, msg, verbose=verbose)
             else:
                 bpdata = np.zeros(flt['SCI'].data.shape, dtype=int)
-
+                
             # NIRISS ghost mask
             if (_inst in ['NIRISS']) & (niriss_ghost_kwargs is not None):
                 if 'verbose' not in niriss_ghost_kwargs:
                     niriss_ghost_kwargs['verbose'] = verbose
-
+                
                 _ghost = niriss_ghost_mask(flt, **niriss_ghost_kwargs)
                 bpdata |= _ghost*1024
-
+            
             # Negative
             if 'MDRIZSKY' in flt['SCI'].header:
-                _low = ((flt['SCI'].data - flt['SCI'].header['MDRIZSKY']) <
+                _low = ((flt['SCI'].data - flt['SCI'].header['MDRIZSKY']) < 
                       -5*flt['ERR'].data)
                 msg = f'Extra -5 sigma low pixels: N= {_low.sum()} '
                 msg += f' ( {_low.sum()/_low.size*100:.1} %)'
                 log_comment(LOGFILE, msg, verbose=verbose)
                 bpdata |= _low*1024
-
+            
         elif flt[0].header['DETECTOR'] == 'IR':
             bits = 576
             if extra_wfc3ir_badpix:
                 if (i == indices[0]) | (not hasattr(bpdata, 'shape')):
-                    bpfile = os.path.join(os.path.dirname(__file__),
+                    bpfile = os.path.join(os.path.dirname(__file__), 
                                'data/wfc3ir_badpix_spars200_22.03.31.fits.gz')
                     bpdata = pyfits.open(bpfile)[0].data
-
+                    
                 msg = f'Use extra badpix in {bpfile}'
                 log_comment(LOGFILE, msg, verbose=verbose)
         else:
             bits = 64+32
             bpdata = 0
-
+            
         if include_saturated:
             bits |= 256
 
         if keep_bits is not None:
             bits |= keep_bits
-
+        
         if scale_photom:
             _key, _scale_photom = get_photom_scale(flt[0].header)
         else:
             _scale_photom = 1.0
-
+        
         if 'PHOTFLAM' in keys:
             msg = '  0    PHOTFLAM={0:.2e}, scale={1:.3f}'
             msg = msg.format(keys['PHOTFLAM'], _scale_photom)
             log_comment(LOGFILE, msg, verbose=verbose)
-
+            
             if ref_photflam is None:
                 ref_photflam = keys['PHOTFLAM']
-
+                    
         for ext in [1, 2, 3, 4]:
             if ('SCI', ext) in flt:
 
@@ -5626,10 +5626,10 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
                     sky = h['MDRIZSKY']
                 else:
                     sky = 0
-
+                
                 msg = '  ext (SCI,{0}), sky={1:.3f}'.format(ext, sky)
                 log_comment(LOGFILE, msg, verbose=verbose)
-
+                
                 if h['BUNIT'] == 'ELECTRONS':
                     to_per_sec = 1./keys['EXPTIME']
                 else:
@@ -5642,16 +5642,16 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
                         ref_photflam = h['PHOTFLAM']
 
                     phot_scale = h['PHOTFLAM'] / ref_photflam * _scale_photom
-
+                    
                     if 'PHOTFNU' not in h:
                         h['PHOTFNU'] = (photfnu_from_photflam(h['PHOTFLAM'],
-                                                             h['PHOTPLAM']),
+                                                             h['PHOTPLAM']), 
                                         'Inverse sensitivity, Jy/DN')
-
+                                                             
                     msg = '       PHOTFLAM={0:.2e}, scale={1:.3f}'
                     msg = msg.format(h['PHOTFLAM'], phot_scale)
                     log_comment(LOGFILE, msg, verbose=verbose)
-
+                    
                     keys['PHOTFLAM'] = h['PHOTFLAM']
                     for k in ['PHOTFLAM', 'PHOTPLAM', 'PHOTFNU',
                               'PHOTZPT', 'PHOTBW', 'PHOTMODE',
@@ -5660,24 +5660,24 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
                             keys[k] = h[k]
 
                     phot_scale *= to_per_sec
-
+                    
                 try:
-                    wcs_i = pywcs.WCS(header=flt[('SCI', ext)].header,
+                    wcs_i = pywcs.WCS(header=flt[('SCI', ext)].header, 
                                       fobj=flt)
                     wcs_i.pscale = get_wcs_pscale(wcs_i)
                 except KeyError:
                     print(f'Failed to initialize WCS on {file}[SCI,{ext}]')
                     continue
-
+                
                 wcsh = to_header(wcs_i)
                 row = [file, ext, keys['EXPTIME']]
-
+                
                 if wcs_colnames is None:
                     wcs_colnames = ['file','ext','exptime']
                     for k in wcsh:
                         wcs_colnames.append(k.lower())
                         wcs_keys[k.lower()] = wcsh[k]
-
+                        
                 for k in wcs_colnames[3:]:
                     ku = k.upper()
                     if ku not in wcsh:
@@ -5685,13 +5685,13 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
                         row.append(wcs_keys[k]*0)
                     else:
                         row.append(wcsh[ku])
-
+                        
                 for k in wcsh:
                     if k.lower() not in wcs_colnames:
                         print(f'Extra keyword {ku} found in WCS header')
-
+                
                 wcs_rows.append(row)
-
+                
                 sci_list.append((flt[('SCI', ext)].data - sky)*phot_scale)
 
                 err = flt[('ERR', ext)].data*phot_scale
@@ -5725,9 +5725,9 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
             header['KERNEL'] = kernel
             header['OKBITS'] = (bits, "FLT bits treated as valid")
             header['PHOTSCAL'] = _scale_photom, 'Scale factor applied'
-
+            
             header['GRIZLIV'] = grizli__version, 'Grizli code version'
-
+            
             for k in keys:
                 header[k] = keys[k]
 
@@ -5745,9 +5745,9 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
 
         count += 1
         header['FLT{0:05d}'.format(count)] = file
-
+        
         flt.close()
-
+        
         #xfiles = glob.glob('*')
         #print('Clean: ', clean, xfiles)
         if clean:
@@ -5766,16 +5766,16 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
 
     flist = ['{0}/{1}'.format(awspath, visit['files'][i])
                 for i in indices]
-
+    
     if dryrun:
         return flist
 
     elif count == 0:
         return None
 
-    else:
+    else:        
         wcs_tab = GTable(names=wcs_colnames, rows=wcs_rows)
-
+        
         outwht *= (wcs_i.pscale/outputwcs.pscale)**4
         return outsci, outwht, header, flist, wcs_tab
 
@@ -5994,7 +5994,6 @@ def compute_output_wcs(wcs_list, pixel_scale=0.1, max_size=10000):
 
 def symlink_templates(force=False):
     """Symlink templates from module to $GRIZLI/templates as part of the initial setup
-
     Parameters
     ----------
     force : bool
@@ -6018,7 +6017,6 @@ def symlink_templates(force=False):
     else:
         print('Templates directory exists: {0}'.format(out_path))
         print('Use `force=True` to force a new symbolic link.')
-
 
 
 def fetch_acs_wcs_files(beams_file, bucket_name='grizli-v1'):
@@ -6082,12 +6080,12 @@ def fetch_hst_calib(file='iref$uc72113oi_pfl.fits',  ftpdir='https://hst-crds.st
 
     ref_dir = file.split('$')[0]
     cimg = file.split('{0}$'.format(ref_dir))[1]
-
+    
     if ref_dir in ref_paths:
         ref_path = ref_paths[ref_dir]
     else:
         ref_path = os.getenv(ref_dir)
-
+        
     iref_file = os.path.join(ref_path, cimg)
     if not os.path.exists(iref_file):
         os.system('curl -o {0} {1}/{2}'.format(iref_file, ftpdir, cimg))
@@ -6148,9 +6146,9 @@ def fetch_hst_calibs(flt_file, ftpdir='https://hst-crds.stsci.edu/unchecked_get/
         path = fetch_hst_calib(im[0].header[ctype], ftpdir=ftpdir,
                                verbose=verbose, ref_paths=ref_paths)
         calib_paths.append(path)
-
+    
     im.close()
-
+    
     return calib_paths
 
 
@@ -6176,21 +6174,21 @@ def mast_query_from_file_list(files=[], os_open=True):
 
 def fetch_default_calibs(get_acs=False, **kwargs):
     """
-    Fetch a set of default HST calibration files
+    Fetch a set of default HST calibration files 
     """
     paths = {}
-
+    
     for ref_dir in ['iref', 'jref']:
         has_dir = True
-        if not os.getenv(ref_dir):
-            has_dir = False
+        if not os.getenv(ref_dir):    
+            has_dir = False        
             # Do directories exist in GRIZLI_PATH?
             if os.path.exists(os.path.join(GRIZLI_PATH, ref_dir)):
                 has_dir = True
                 paths[ref_dir] = os.path.join(GRIZLI_PATH, ref_dir)
         else:
             paths[ref_dir] = os.getenv(ref_dir)
-
+            
         if not has_dir:
             print("""
 No ${0} set!  Make a directory and point to it in ~/.bashrc or ~/.cshrc.
@@ -6209,10 +6207,10 @@ For example,
              'iref$u4m1335mi_pfl.fits',  # G141 flat
              'iref$w3m18525i_idc.fits',  # IDCTAB distortion table}
              ]
-
+    
     if 'ACS' in kwargs:
         get_acs = kwargs['ACS']
-
+        
     if get_acs:
         files.extend(['jref$n6u12592j_pfl.fits',  # F814 Flat
                       'jref$o841350mj_pfl.fits',  # G800L flat])
@@ -6312,10 +6310,10 @@ def fetch_nircam_skyflats():
     """
     conf_path = os.path.join(GRIZLI_PATH, 'CONF', 'NircamSkyFlat')
     os.system(f'aws s3 sync s3://grizli-v2/NircamSkyflats/ {conf_path} --exclude "*" --include "nrc*fits"')
-
+    
     _files = glob.glob(conf_path+'/*fits')
     _files.sort()
-
+    
     return _files
 
 
@@ -6344,14 +6342,14 @@ def fetch_config_files(get_acs=False, get_sky=True, get_stars=True, get_epsf=Tru
     if get_wfc3:
         tarfiles = ['{0}/WFC3.IR.G102.cal.V4.32.tar.gz'.format(ftpdir),
                     '{0}/WFC3.IR.G141.cal.V4.32.tar.gz'.format(ftpdir)]
-        tarfiles += [f'{BASEURL}/WFC3.IR.G102.WD.V4.32.tar.gz',
+        tarfiles += [f'{BASEURL}/WFC3.IR.G102.WD.V4.32.tar.gz', 
                     f'{BASEURL}/WFC3.IR.G141.WD.V4.32.tar.gz']
 
     if get_jwst:
-        tarfiles += [f'{BASEURL}/jwst-grism-conf.tar.gz',
+        tarfiles += [f'{BASEURL}/jwst-grism-conf.tar.gz', 
                      f'{BASEURL}/niriss.conf.220725.tar.gz',
                      f'{BASEURL}/nircam-wisp-aug2022.tar.gz']
-
+    
     if get_sky:
         ftpdir = BASEURL
         tarfiles.append('{0}/grism_master_sky_v0.5.tar.gz'.format(ftpdir))
@@ -6359,11 +6357,11 @@ def fetch_config_files(get_acs=False, get_sky=True, get_stars=True, get_epsf=Tru
     #gURL = 'http://www.stsci.edu/~brammer/Grizli/Files'
     #gURL = 'https://s3.amazonaws.com/grizli/CONF'
     gURL = BASEURL
-
+    
     tarfiles.append('{0}/WFC3IR_extended_PSF.v1.tar.gz'.format(gURL))
 
     if get_acs:
-        tarfiles += [f'{BASEURL}/ACS.WFC.CHIP1.Stars.conf',
+        tarfiles += [f'{BASEURL}/ACS.WFC.CHIP1.Stars.conf', 
                     f'{BASEURL}/ACS.WFC.CHIP2.Stars.conf']
         tarfiles.append('{0}/ACS.WFC.sky.tar.gz'.format(gURL))
         tarfiles.append('{0}/ACS_CONFIG.tar.gz'.format(gURL))
@@ -6386,7 +6384,7 @@ def fetch_config_files(get_acs=False, get_sky=True, get_stars=True, get_epsf=Tru
         psf_path = 'https://www.stsci.edu/~jayander/HST1PASS/LIB/'
         psf_path += 'PSFs/STDPSFs/WFC3IR/'
         psf_root = 'STDPSF'
-
+        
         ir_psf_filters = ['F105W', 'F125W', 'F140W', 'F160W']
 
         # New PSFs
@@ -6516,7 +6514,7 @@ class EffectivePSF:
                 data[data < 0] = 0
 
             self.epsf[filter] = data
-
+        
         # UVIS
         filter_files = glob.glob(os.path.join(GRIZLI_PATH, 'CONF',
                             'PSFSTD_WFC3UV*.fits'))
@@ -6525,7 +6523,7 @@ class EffectivePSF:
             with pyfits.open(file, ignore_missing_end=True) as _im:
                 data = _im[0].data.T*1
                 data[data < 0] = 0
-
+                
             filt = '_'.join(file.strip('.fits').split('_')[2:])
             self.epsf[filt+'U'] = data
 
@@ -6537,10 +6535,10 @@ class EffectivePSF:
             with pyfits.open(file, ignore_missing_end=True) as _im:
                 data = _im[0].data.T*1.
                 data[data < 0] = 0
-
+                
             filt = '_'.join(file.strip('.fits').split('_')[2:])
             self.epsf[filt] = data
-
+        
         # JWST
         filter_files = glob.glob(os.path.join(GRIZLI_PATH, 'CONF/JWSTePSF',
                             'nircam*.fits'))
@@ -6552,26 +6550,26 @@ class EffectivePSF:
         for file in filter_files:
             with pyfits.open(file, ignore_missing_end=True) as _im:
                 data = _im[0].data*1 # [::-1,:,:]#[:,::-1,:]
-
+                
                 data[data < 0] = 0
                 key = '{0}-{1}'.format(_im[0].header['DETECTOR'].upper(),
                                        _im[0].header['FILTER'])
-
+            
                 if 'LABEL' in _im[0].header:
                     key += '-' + _im[0].header['LABEL']
-
+                
             self.epsf[key] = data
-
+        
         # Dummy, use F105W ePSF for F098M and F110W
         self.epsf['F098M'] = self.epsf['F105W']
         self.epsf['F128N'] = self.epsf['F125W']
         self.epsf['F130N'] = self.epsf['F125W']
         self.epsf['F132N'] = self.epsf['F125W']
-
+        
         # Dummy filters for IR grisms
         self.epsf['G141'] = self.epsf['F140W']
         self.epsf['G102'] = self.epsf['F105W']
-
+        
         # Extended
         self.extended_epsf = {}
         for filter in ['F105W', 'F125W', 'F140W', 'F160W']:
@@ -6616,22 +6614,22 @@ class EffectivePSF:
         TBD
         """
         epsf = self.epsf[filter]
-
+        
         psf_type = 'HST/Optical'
-
+        
         if filter in ['F098M', 'F110W', 'F105W', 'F125W', 'F140W', 'F160W',
                       'G102','G141','F128N','F130N','F132N']:
             psf_type = 'WFC3/IR'
-
+            
         elif filter.startswith('NRC') | filter.startswith('NIS'):
             # NIRISS, NIRCam 2K
             psf_type = 'JWST/2K'
-
+            
         elif filter.startswith('MIRI'):
             psf_type = 'JWST/MIRI'
-
+        
         self.eval_psf_type = psf_type
-
+        
         if psf_type == 'WFC3/IR':
             #  IR detector
             rx = 1+(np.clip(x, 1, 1013)-0)/507.
@@ -6653,13 +6651,13 @@ class EffectivePSF:
             psf_xy += fx*(1-fy)*epsf[:, :, (nx+1)+ny*3]
             psf_xy += (1-fx)*fy*epsf[:, :, nx+(ny+1)*3]
             psf_xy += fx*fy*epsf[:, :, (nx+1)+(ny+1)*3]
-
+            
             self.eval_filter = filter
-
+        
         if psf_type == 'JWST/MIRI':
             #  IR detector
             NDET = int(np.sqrt(epsf.shape[2]))
-
+            
             rx = 1+(np.clip(x, 1, 1023)-0)/512.
             ry = 1+(np.clip(y, 1, 1023)-0)/512.
 
@@ -6671,7 +6669,7 @@ class EffectivePSF:
             # ny = np.clip(int(ry), 0, 2)
             nx = np.clip(int(rx), 0, NDET-1)
             ny = np.clip(int(ry), 0, NDET-1)
-
+            
             # print x, y, rx, ry, nx, ny
 
             fx = rx-nx
@@ -6689,16 +6687,16 @@ class EffectivePSF:
                 psf_xy += fx*(1-fy)*epsf[:, :, (nx+1)+ny*NDET]
                 psf_xy += (1-fx)*fy*epsf[:, :, nx+(ny+1)*NDET]
                 psf_xy += fx*fy*epsf[:, :, (nx+1)+(ny+1)*NDET]
-
+            
             # psf_xy = np.rot90(psf_xy.T, 2)
             psf_xy = psf_xy.T
-
+            
             self.eval_filter = filter
-
+        
         if psf_type == 'JWST/2K':
-
+            
             NDET = int(np.sqrt(epsf.shape[2]))
-
+            
             #  IR detector
             rx = 1+(np.clip(x, 1, 2047)-0)/1024.
             ry = 1+(np.clip(y, 1, 2047)-0)/1024.
@@ -6714,7 +6712,7 @@ class EffectivePSF:
 
             fx = rx-nx
             fy = ry-ny
-
+            
             if NDET == 1:
                 psf_xy = epsf[:,:,0]
             else:
@@ -6722,12 +6720,12 @@ class EffectivePSF:
                 psf_xy += fx*(1-fy)*epsf[:, :, (nx+1)+ny*NDET]
                 psf_xy += (1-fx)*fy*epsf[:, :, nx+(ny+1)*NDET]
                 psf_xy += fx*fy*epsf[:, :, (nx+1)+(ny+1)*NDET]
-
+            
             psf_xy = psf_xy.T
             # psf_xy = np.rot90(psf_xy.T, 2)
-
+            
             self.eval_filter = filter
-
+        
         elif psf_type == 'HST/Optical':
 
             sh = epsf.shape
@@ -6760,11 +6758,11 @@ class EffectivePSF:
             psf_xy += fx*fy*epsf[:, :, (nx+1)+(ny+1)*iX]
 
             self.eval_filter = filter
-
+        
         if rot90 != 0:
             self.psf_xy_rot90 = rot90
             psf_xy = np.rot90(psf_xy, rot90)
-
+            
         return psf_xy
 
     def eval_ePSF(self, psf_xy, dx, dy, rot90=0, extended_data=None):
@@ -6797,9 +6795,9 @@ class EffectivePSF:
 
         # Extended PSF
         if extended_data is not None:
-            ok = (np.abs(dx) < self.extended_N)
+            ok = (np.abs(dx) < self.extended_N) 
             ok &= (np.abs(dy) < self.extended_N)
-
+            
             x0 = self.extended_N
             coords = np.array([x0+dy[ok]+0, x0+dx[ok]])
             interp_map = map_coordinates(extended_data, coords, order=0)
@@ -6836,9 +6834,9 @@ class EffectivePSF:
         A = (np.array([psf_offset, np.ones_like(sci), ddx, ddy])*np.sqrt(ivar)).reshape((4, -1))
         scif = (sci*np.sqrt(ivar)).flatten()
         mask = (scif != 0)
-        coeffs, _resid, _rank, _s = lstsq(A[:, mask].T, scif[mask],
+        coeffs, _resid, _rank, _s = lstsq(A[:, mask].T, scif[mask], 
                                           rcond=LSTSQ_RCOND)
-
+                                          
         resid = (scif - np.dot(coeffs, A))
 
         if ds9:
@@ -6908,7 +6906,7 @@ class EffectivePSF:
 
     def fit_ePSF(self, sci, center=None, origin=[0, 0], ivar=1, N=7,
                  filter='F140W', tol=1.e-4, guess=None, get_extended=False,
-                 method='lm', ds9=None, psf_params=None, only_centering=True,
+                 method='lm', ds9=None, psf_params=None, only_centering=True, 
                  rot90=0):
         """Fit ePSF to input data
         TBD
@@ -7006,11 +7004,11 @@ class EffectivePSF:
             psf_params[2] -= y0
 
         # if False:
-        #
+        # 
         #     psf_fit = epsf.get_ePSF(psf_params, origin=origin,
         #                                filter=filter, shape=sh,
         #                                get_extended=get_extended)
-        #
+        # 
         #     xargs = (self, psf_xy, sci, ivar_mask, xp, yp, extended_data, 'lm', None)
         #     lm = _objfun(out.x, *xargs)
         #     cargs = (self, psf_xy, sci, ivar_mask, xp, yp, extended_data, 'chi2', None)
@@ -7254,7 +7252,7 @@ class GTable(astropy.table.Table):
             print('No RA/Dec. columns found in input table.')
             return False
 
-        self_coo = SkyCoord(ra=self[rd[0]], dec=self[rd[1]],
+        self_coo = SkyCoord(ra=self[rd[0]], dec=self[rd[1]], 
                             frame='icrs')
 
         if isinstance(other, list) | isinstance(other, tuple):
@@ -7280,7 +7278,7 @@ class GTable(astropy.table.Table):
                   'nthneighbor')
 
             idx, d2d, d3d = other_coo.match_to_catalog_sky(self_coo)
-
+        
         if get_2d_offset:
             cosd = np.cos(self_coo.dec.deg/180*np.pi)
             dra = (other_coo.ra.deg - self_coo.ra.deg[idx])*cosd[idx]
@@ -7522,24 +7520,24 @@ td {font-size: 10pt;}
                     #lines[i] = lines[i].replace(col, '{0} <br> <input type="text" id="{0}_min" name="{0}_min" style="width:30px;"> <input type="text" id="{0}_max" name="{0}_max" style="width:30px;">'.format(col))
 
                     filter_lines += '<tr> <td> <input type="text" id="{0}_min" name="{0}_min" style="width:40px;"> &#60; </td> <td> {0} </td> <td>  &#60; <input type="text" id="{0}_max" name="{0}_max" style="width:40px;">'.format(col)
-
+                    
                     descr = '\n'
                     if hasattr(self.columns[col], 'description'):
                         if self.columns[col].description is not None:
-                            descr = '{0} {1}\n'.format(descr_pad,
+                            descr = '{0} {1}\n'.format(descr_pad, 
                                             self.columns[col].description)
-
+                                                        
                     filter_lines += descr
-
+                    
         if ic_list:
             # Insert input lines
 
             for il, line in enumerate(lines):
                 if '} );  </script>' in line:
                     break
-
+            
             filter_row = '<tr> <td> <input type="text" id="{0}_min" name="{0}_min" style="width:40px;"> &#60; </td> <td style="align:center;"> <tt>{0}</tt> </td> <td>  &#60; <input type="text" id="{0}_max" name="{0}_max" style="width:40px;">'
-
+            
             filter_rows = []
             for ic in ic_list:
                 col = self.colnames[ic]
@@ -7547,11 +7545,11 @@ td {font-size: 10pt;}
                 descr = '\n'
                 if hasattr(self.columns[col], 'description'):
                     if self.columns[col].description is not None:
-                        descr = '{0} {1}\n'.format(descr_pad,
+                        descr = '{0} {1}\n'.format(descr_pad, 
                                         self.columns[col].description)
-
+                                                    
                 filter_rows.append(row_i + descr)
-
+                
             filter_input = """
 
 <div style="border:1px solid black; padding:10px; margin:10px">
@@ -7764,7 +7762,7 @@ def column_string_operation(col, test, method='contains', logical='or'):
     Parameters
     ----------
     col : iterable list of strings
-        List of strings to test.  Anything iterable, e.g., list or
+        List of strings to test.  Anything iterable, e.g., list or 
         `~astropy.table.column.Column`.
 
     test : str, list of strings, None, or slice
@@ -7773,7 +7771,7 @@ def column_string_operation(col, test, method='contains', logical='or'):
         ``method`` on each entry of ``col`` with ``test`` as the argument or
         each element of the ``test`` list as arguments.
 
-        If ``test`` is None, run `method` on each entry with no arguments,
+        If ``test`` is None, run `method` on each entry with no arguments, 
         e.g., 'upper'.
 
         If ``test`` is a ``slice``, return sliced strings for each entry.
@@ -7792,7 +7790,7 @@ def column_string_operation(col, test, method='contains', logical='or'):
     Returns
     -------
     result : list
-        List of iterated results on the entries of ``col``, e.g., list of
+        List of iterated results on the entries of ``col``, e.g., list of 
         ``bool`` or ``string``.
 
     """
@@ -7861,15 +7859,15 @@ def fill_between_steps(x, y0, y1, ax=None, *args, **kwargs):
     Make `fill_between` work like linestyle='steps-mid'.
     """
     import matplotlib.pyplot as plt
-
+    
     so = np.argsort(x)
     dx = np.diff(x[so])/2.
     mid = x[so][:-1] + dx
-
+    
     xfull = np.hstack([x[so][0]-dx[0], mid, mid+dx*2/1.e6, x[so][-1]+dx[-1]])
     y0full = np.hstack([y0[0], y0[:-1], y0[1:], y0[-1]])
     y1full = np.hstack([y1[0], y1[:-1], y1[1:], y1[-1]])
-
+    
     # xfull = np.append(np.append(x, mid), mid+np.diff(x[so])/1.e6)
     # y0full = np.append(np.append(y0, y0[:-1]), y0[1:])
     # y1full = np.append(np.append(y1, y1[:-1]), y1[1:])
@@ -8128,7 +8126,7 @@ def dump_flt_dq(filename, replace=('.fits', '.dq.fits.gz'), verbose=True):
 
     pyfits.HDUList(hdus).writeto(output_filename, overwrite=True,
                                  output_verify='fix')
-
+    
     im.close()
 
 
@@ -8179,7 +8177,7 @@ def apply_flt_dq(filename, replace=('.fits', '.dq.fits.gz'), verbose=True, or_co
                 i, j = np.unravel_index(nz, sh)
             else:
                 raise IOError('dq[{0}] shape {1} not recognized'.format(ext, sh))
-
+                
             # Apply DQ
             if or_combine:
                 im['DQ', ext].data[i, j] != dq_i
@@ -8214,7 +8212,7 @@ def RGBtoHex(vals, rgbtype=1):
         Valid valus are:
          - 1 = Inputs are in the range 0 to 1
          - 256 = Inputs are in the range 0 to 255
-
+ 
     Returns
     -------
     hextstr : str
@@ -8323,18 +8321,18 @@ def hull_edge_mask(x, y, pad=100, pad_is_absolute=True, mask=None):
 def convex_hull_wrapper(x, y):
     """
     Generate a convex hull from a list of points
-
+    
     Returns:
-
+    
     pxy : (array, array)
         Tuple of hull vertices
-
+    
     poly : `~shapely.geometry.Polygon`
         Polygon object.
-
+    
     hull : `~scipy.spatial.ConvexHull`
         The hull object.
-
+        
     """
     from scipy.spatial import ConvexHull
     from shapely.geometry import Polygon, Point
@@ -8343,7 +8341,7 @@ def convex_hull_wrapper(x, y):
     hull = ConvexHull(xy)
     pxy = xy[hull.vertices, :]
     poly = Polygon(pxy)
-
+    
     return pxy, poly, hull
 
 
@@ -8354,21 +8352,21 @@ def hull_area(x, y):
     pxy, poly, hull = convex_hull_wrapper(x, y)
 
     return poly.area
-
-
+    
+    
 def remove_text_labels(fig):
     """
     Remove all Text annotations from ``fig.axes``.
     """
     import matplotlib
-
+    
     for ax in fig.axes:
         for child in ax.get_children():
             if isinstance(child, matplotlib.text.Text):
                 if child.get_text(): # Don't remove empty labels
                     child.set_visible(False)
 
-
+    
 LOGFILE = '/tmp/grizli.log'
 
 
@@ -8415,11 +8413,11 @@ def ctime_to_iso(mtime, format='%a %b %d %H:%M:%S %Y', strip_decimal=True, verbo
     Parameters
     ----------
     mtime : str
-        Time string, generally as output from `time.ctime`, e.g.,
+        Time string, generally as output from `time.ctime`, e.g., 
         ``'Mon Sep 16 11:23:27 2019'``
 
     format : str
-        `datetime.strptime` format string, codes at
+        `datetime.strptime` format string, codes at 
         https://www.programiz.com/python-programming/datetime/strptime
 
     strip_decimal : bool
@@ -8428,7 +8426,7 @@ def ctime_to_iso(mtime, format='%a %b %d %H:%M:%S %Y', strip_decimal=True, verbo
     verbose : bool
         Print a message if conversion fails
 
-    Returns
+    Returns 
     -------
     iso : str
         String in (sortable) ISO format, e.g., ``'2019-09-16 11:23:27.000'``
@@ -8443,7 +8441,7 @@ def ctime_to_iso(mtime, format='%a %b %d %H:%M:%S %Y', strip_decimal=True, verbo
 
     else:
         try:
-            iso = Time(datetime.strptime(mtime, format),
+            iso = Time(datetime.strptime(mtime, format), 
                        format='datetime').iso
         except ValueError:
             if verbose:
@@ -8542,33 +8540,33 @@ def log_exception(LOGFILE, traceback, verbose=True, mode='a'):
 def simple_LCDM(Om0=0.3, Ode0=0.7, H0=70, Ob0=0.0463, Tcmb0=2.725, name=None):
     """
     Simple LambdaCDM cosmology
-
+    
     Parameters are defined as in `~astropy.cosmology.LambdaCDM`.
-
+    
     """
     from astropy.cosmology import LambdaCDM
     cosmology = LambdaCDM(H0, Om0, Ode0, Tcmb0=Tcmb0, name=name)
     return cosmology
-
+    
 def argv_to_dict(argv, defaults={}, dot_dict=True):
     """
     Convert a list of (simple) command-line arguments to a dictionary.
-
+    
     Parameters
     ----------
     argv : list of strings
         E.g., ``sys.argv[1:]``.
-
+    
     defaults : dict
         Default dictionary
-
+    
     dot_dict : bool
-        If true, then intepret keywords with '.' as nested dictionary keys,
+        If true, then intepret keywords with '.' as nested dictionary keys, 
         e.g., ``--d.key=val`` >> {'d': {'key': 'val'}}
-
+        
     Examples
     --------
-
+    
         # $ myfunc arg1 --p1=1 --l1=1,2,3 --pdict.k1=1 -flag
         >>> argv = 'arg1 --p1=1 --l1=1,2,3 --pdict.k1=1 -flag'.split()
         >>> args, kwargs = argv_to_dict(argv)
@@ -8576,30 +8574,30 @@ def argv_to_dict(argv, defaults={}, dot_dict=True):
         ['arg1']
         >>> print(kwargs)
         {'p1': 1, 'l1': [1, 2, 3], 'pdict': {'k1': 1}, 'flag': True}
-
+        
         # With defaults
         defaults = {'pdict':{'k2':2.0}, 'p2':2.0}
         >>> args, kwargs = argv_to_dict(argv, defaults=defaults)
         >>> print(kwargs)
         {'pdict': {'k2': 2.0, 'k1': 1}, 'p2': 2.0, 'p1': 1, 'l1': [1, 2, 3], 'flag': True}
-
+        
     """
     import copy
     import json
-
+    
     kwargs = copy.deepcopy(defaults)
     args = []
-
-    for i, arg in enumerate(argv):
+    
+    for i, arg in enumerate(argv):        
         if not arg.startswith('-'):
             # Arguments
             try:
                 args.append(json.loads(arg))
             except:
                 args.append(json.loads(f'"{arg}"'))
-
+                
             continue
-
+            
         spl = arg.strip('--').split('=')
         if len(spl) > 1:
             # Parameter values
@@ -8609,12 +8607,12 @@ def argv_to_dict(argv, defaults={}, dot_dict=True):
         else:
             # Parameters, set to true, e.g., -set_flag
             key, val = spl[0], 'true'
-
+            
             # single -
             if key.startswith('-'):
                 key = key[1:]
-
-        # List values
+        
+        # List values        
         if ',' in val:
             try:
                 # Try parsing with JSON
@@ -8629,22 +8627,22 @@ def argv_to_dict(argv, defaults={}, dot_dict=True):
             except:
                 # String
                 jval = val
-
-        # Dict keys, potentially nested
+        
+        # Dict keys, potentially nested        
         if dot_dict & ('.' in key):
             keys = key.split('.')
             d = kwargs
             for k in keys[:-1]:
                 if k not in d:
                     d[k] = {}
-
+                
                 d = d[k]
-
+                    
             d[keys[-1]] = jval
-        else:
+        else:            
             kwargs[key] = jval
-
-
+            
+    
     return args, kwargs
 
 
@@ -8652,11 +8650,11 @@ class Unique(object):
     def __init__(self, array, verbose=True):
         """
         Helper for unique items in an array
-
+        
         Parameters
         ----------
         array : array-like
-            Data to parse, generally strings but can be anything that can
+            Data to parse, generally strings but can be anything that can 
             be parsed by `numpy.unique`
 
 
@@ -8664,43 +8662,43 @@ class Unique(object):
         ----------
         dim : int
             ``size`` of input ``array``
-
+        
         values : list
             Unique elements of ``array``
-
+        
         indices : list
             Integer list length of ``array`` with the indices of ``values``
             for each element
-
+        
         counts : list
             Counts of each element of ``values``
-
+        
 
         Methods
         -------
         __get__(key)
-            Return a `bool` array where entries of ``array`` match the
+            Return a `bool` array where entries of ``array`` match the 
             specified ``key``
-
+        
         __iter__
             Iterator over ``values``
-
+        
         """
         if isinstance(array, list):
             self.array = np.array(array)
         else:
             self.array = array
-
+        
         _ = np.unique(self.array, return_counts=True, return_inverse=True)
         self.dim = self.array.size
         self.zeros = np.zeros(self.array.shape, dtype=bool)
-
+        
         self.values = [l for l in _[0]]
         self.indices = _[1]
         self.counts = _[2]
         if verbose:
             self.info(sort_counts=verbose)
-
+    
     @property
     def N(self):
         """
@@ -8719,7 +8717,7 @@ class Unique(object):
             so = np.argsort(self.counts)[::int(sort_counts)]
         else:
             so = np.arange(self.N)
-
+            
         for i in so:
             v, c = self.values[i], self.counts[i]
             print(f'{c:>4}  {v:10}')
@@ -8739,8 +8737,8 @@ class Unique(object):
     def __iter__(self):
         """
         Iterable over `values` attribute
-
-        Returns a tuple of the value and the boolean selection array for that
+        
+        Returns a tuple of the value and the boolean selection array for that 
         value.
         """
         i = 0
@@ -8774,24 +8772,24 @@ class HubbleXYZ(object):
     def __init__(self, spt_file='', param_dict={}):
         """
         Helper to compute HST geocentric coordinates from orbital parameters
-
+        
         (testing)
-
+        
         Based on http://articles.adsabs.harvard.edu//full/1995ASPC...77..464A/
         """
         if spt_file:
             self.param_dict = self.parse_from_spt(spt_file)
-
+        
         elif param_dict:
             self.param_dict = param_dict
-
+        
         else:
             self.param_dict = {}
-
+        
         self.computed = {}
 
 
-    @property
+    @property 
     def _t1985(self):
         """
         Reference time
@@ -8814,7 +8812,7 @@ class HubbleXYZ(object):
         if 'as_table' in kwargs:
             if kwargs['as_table']:
                 xyz['time'] = t_in
-
+                
         return xyz
 
 
@@ -8825,63 +8823,63 @@ class HubbleXYZ(object):
     def evaluate(self, dt, unit=None, as_table=False):
         """
         Evaluate equations to get positions
-
+        
         Returns
         -------
         x, y, z, r: float
             Coordinates, in km or ``unit``.
-
+            
         """
-
+        
         if not self.param_dict:
             raise ValueError('Orbital parameters not defined in '
                              'self.param_dict')
-
+                    
         p = self.param_dict
-
+        
         t = np.atleast_1d(dt)
-
+        
         # Eq. 1
         bracket = p['M.']*(t-p['tau']) + 0.5*p['M..']*(t-p['tau'])**2
         M = p['M0'] + 2*np.pi*bracket
-
+        
         # Eq. 2
         sinM = np.sin(M)
         cosM = np.cos(M)
         e = p['e']
-        nu = M + sinM*(2*e + 3*e**3*cosM**2 - 4./3*e**3*sinM**2
+        nu = M + sinM*(2*e + 3*e**3*cosM**2 - 4./3*e**3*sinM**2 
                        + 5./2*e**2*cosM)
-
+        
         # Eq. 3
         r = p['a(1-e**2)']/(1+e*np.cos(nu))
         # To km
         r /= 1000.
-
+        
         # Eq. 4
         Om = 2*np.pi*(p['Om0'] + p['Om.']*(t-p['tau']))
-
+        
         # Eq. 5
         w = 2*np.pi*(p['w0'] + p['w.']*(t-p['tau']))
-
-        self.calc_dict = {'M':M, 'nu':nu,
-                          'a':p['a'],
-                          'i':np.arcsin(p['sini']),
+        
+        self.calc_dict = {'M':M, 'nu':nu, 
+                          'a':p['a'], 
+                          'i':np.arcsin(p['sini']), 
                           'Om':Om,
                           'w':w}
-
+        
         # Eq. 6
         cosOm = np.cos(Om)
         sinOm = np.sin(Om)
         coswv = np.cos(w+nu)
         sinwv = np.sin(w+nu)
-
+        
         if unit is not None:
             r = (r*u.km).to(unit)
-
+            
         x = r*(cosOm*coswv - p['cosi']*sinOm*sinwv)
         y = r*(sinOm*coswv + p['cosi']*cosOm*sinwv)
         z = r*p['sini']*sinwv
-
+        
         if as_table:
             tab = GTable()
             tab['dt'] = t
@@ -8890,7 +8888,7 @@ class HubbleXYZ(object):
             tab['z'] = z
             tab['r'] = r
             return tab
-        else:
+        else: 
             return x, y, z, r
 
 
@@ -8899,27 +8897,27 @@ class HubbleXYZ(object):
         Compute positions at expstart, expmid, expend
         """
         import astropy.time
-
+        
         flt = pyfits.open(flt_file)
         expstart = flt[0].header['EXPSTART']
         expend = flt[0].header['EXPEND']
         expmid = (expstart+expend)/2.
-
+        
         t_in = astropy.time.Time([expstart, expmid, expend], format='mjd')
         flt.close()
-
+        
         return self(t_in, **kwargs)
 
 
     def deltat(self, dt):
         """
         Convert a time ``t`` in seconds from 1/1/85 to an ISO time
-        """
+        """    
         if not hasattr(dt, 'unit'):
             dtsec = dt*u.second
         else:
             dtsec = dt
-
+            
         t = self._t1985 + dtsec
         return t
 
@@ -8930,10 +8928,10 @@ class HubbleXYZ(object):
         """
         import astropy.io.fits as pyfits
         import astropy.time
-
+        
         with pyfits.open(spt_file) as _im:
             spt = _im[0].header.copy()
-
+        
         param_dict = {}
         param_dict['tau'] = spt['EPCHTIME']
         param_dict['M0'] = spt['MEANANOM']
@@ -8952,19 +8950,19 @@ class HubbleXYZ(object):
         param_dict['timeffec'] = spt['TIMEFFEC']
         param_dict['Torb'] = spt['HSTHORB']*2
         param_dict['tstart'] = spt['OBSSTRTT']
-
+        
         param_dict['tau_time'] = self.deltat(param_dict['tau'])
         param_dict['tstart_time'] = self.deltat(param_dict['tstart'])
-
+                
         return param_dict
-
+    
     @staticmethod
     def xyz_to_lonlat(self, x, y, z, radians=False):
         """
         Compute sublon, sublat, alt from xyz coords with pyproj
-
+        
         xyz must be in meters
-
+        
         """
         import pyproj
         ecef = pyproj.Proj(proj='geocent', ellps='WGS84', datum='WGS84')
@@ -8975,7 +8973,7 @@ class HubbleXYZ(object):
 
 def patch_photutils():
     """
-    Patch to fix inconsistency with drizzlepac=3.2.1 and photutils>1.0, where
+    Patch to fix inconsistency with drizzlepac=3.2.1 and photutils>1.0, where 
     The latter is needed for jwst=1.3.2
     """
     import os
@@ -8983,28 +8981,28 @@ def patch_photutils():
     try:
         import drizzlepac
     except AttributeError:
-
+    
         import photutils
         site_packages = os.path.dirname(photutils.__file__)
         # manual apply patch
         the_file = f'{site_packages}/../drizzlepac/haputils/align_utils.py'
         with open(the_file,'r') as fp:
             lines = fp.readlines()
-
+    
         print(site_packages, len(lines))
         for i, line in enumerate(lines):
             if line.startswith('NoDetectionsWarning'):
                 break
-
+    
         if 'hasattr(photutils.findstars' in lines[i+1]:
             print(f'I found the problem on lines {i}-{i+2}: ')
         else:
             msg = """
-Lines {0}-{1} in {2} importing photutils were not as expected.  I found
+Lines {0}-{1} in {2} importing photutils were not as expected.  I found 
 
 {3}
 
-but expected
+but expected 
 
    NoDetectionsWarning = photutils.findstars.NoDetectionsWarning if \\
                            hasattr(photutils.findstars, 'NoDetectionsWarning') else \\
@@ -9012,9 +9010,9 @@ but expected
 
 
     """.format(i, i+2, the_file, lines[i:i+3])
-
+        
             raise ValueError(msg)
-
+        
         bad = ['   '+lines.pop(i+2-j) for j in range(3)]
         print(''.join(bad[::-1]))
 
@@ -9023,5 +9021,5 @@ but expected
         # Rewrite the fie
         with open(f'{site_packages}/../drizzlepac/haputils/align_utils.py','w') as fp:
             fp.writelines(lines)
-
+    
         print(f'Patch applied to {the_file}!')
