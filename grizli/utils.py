@@ -6004,7 +6004,7 @@ def symlink_templates(force=False):
     #     return False
 
     module_path = os.path.dirname(__file__)
-    templates_path = os.path.join(module_path, 'data/templates')
+    templates_path = os.path.join(module_path, 'data', 'templates')
 
     out_path = os.path.join(GRIZLI_PATH, 'templates')
 
