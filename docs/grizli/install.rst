@@ -15,7 +15,7 @@ the current test suite does not yet test all of the full functionality of the co
 Setting up a Local Environment
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-We recommend that ``grizli`` be installed in a new vitrual environment to minimize conflicts 
+We recommend that ``grizli`` be installed in a new virtual environment to minimize conflicts
 with dependencies for other packages. Possible virtual environment managers are ``conda``, ``venv``, ``pyenv``, etc.
 Here we give example with setting up a ``conda`` environment. 
 
