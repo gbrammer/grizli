@@ -56,12 +56,12 @@ def _loadFLT(grism_file, sci_extn, direct_file, pad, ref_file,
     save_file = save_file.replace('_cmb.fits', new_root)
     save_file = save_file.replace('_rate.fits', new_root)
     save_file = save_file.replace('_elec.fits', new_root)
-    
+
     if (save_file == grism_file) & ('GrismFLT' not in grism_file):
         # couldn't build new filename based on the extensions
         # so just insert at the end
         save_file = grism_file.replace('.fits', new_root)
-        
+
     if (grism_file.find('_') < 0) & ('GrismFLT' not in grism_file):
         save_file = 'xxxxxxxxxxxxxxxxxxx'
 
@@ -92,10 +92,10 @@ def _loadFLT(grism_file, sci_extn, direct_file, pad, ref_file,
 
     else:
         flt.catalog = None
-    
+
     # if flt.grism.instrument in ['NIRCAM']:
     #     flt.apply_POM()
-        
+
     if flt.grism.instrument in ['NIRISS', 'NIRCAM']:
         flt.transform_JWST_WFSS()
 
@@ -134,29 +134,29 @@ def _beam_compute_model(beam, id, spectrum_1d, is_cgs, apply_sensitivity, scale,
 
 
 # def test_parallel():
-# 
+#
 #     zgrid = np.linspace(1.1, 1.3, 10)
 #     templates = mb.load_templates(fwhm=800)
 #     fitter = 'nnls'
 #     fit_background = True
 #     poly_order = 0
-# 
+#
 #     self.FLTs = []
 #     t0_pool = time.time()
-# 
+#
 #     pool = mp.Pool(processes=4)
 #     results = [pool.apply_async(_fit_at_z, (mb, zgrid, i, templates, fitter, fit_background, poly_order)) for i in range(len(zgrid))]
-# 
+#
 #     pool.close()
 #     pool.join()
-# 
+#
 #     chi = zgrid*0.
-# 
+#
 #     for res in results:
 #         data = res.get(timeout=1)
 #         A, coeffs, chi[data['i']], model_2d = data['out']
 #         #flt_i.catalog = cat_i
-# 
+#
 #     t1_pool = time.time()
 
 
@@ -266,7 +266,7 @@ class GroupFLT():
 
         # Wavelengths for polynomial fits
         self.polyx = polyx
-        
+
         # Read catalog
         if catalog:
             if isinstance(catalog, str):
@@ -296,8 +296,8 @@ class GroupFLT():
             # serial
             t0_pool = time.time()
             for i in range(N):
-                flt = _loadFLT(self.grism_files[i], sci_extn, 
-                               self.direct_files[i], pad, ref_file, ref_ext, 
+                flt = _loadFLT(self.grism_files[i], sci_extn,
+                               self.direct_files[i], pad, ref_file, ref_ext,
                                seg_file, verbose, self.catalog, i)
                 self.FLTs.append(flt)
 
@@ -327,11 +327,11 @@ class GroupFLT():
 
         if verbose:
             print('Files loaded - {0:.2f} sec.'.format(t1_pool - t0_pool))
-    
-    @property 
+
+    @property
     def N(self):
         return len(self.FLTs)
-        
+
     @property
     def Ngrism(self):
         """
@@ -347,19 +347,19 @@ class GroupFLT():
 
             if grism not in Ngrism:
                 Ngrism[grism] = 0
-                
+
             Ngrism[grism] += 1
-        
+
         return Ngrism
-    
-    @property 
+
+    @property
     def grisms(self):
         """
         Available grisms
         """
         grisms = list(self.Ngrism.keys())
         return grisms
-        
+
     @property
     def PA(self):
         """
@@ -378,9 +378,9 @@ class GroupFLT():
             PA_i = flt.get_dispersion_PA(decimals=0)
             if PA_i not in _PA[grism]:
                 _PA[grism][PA_i] = []
-            
+
             _PA[grism][PA_i].append(i)
-        
+
         return _PA
 
 
@@ -436,18 +436,18 @@ class GroupFLT():
                 # couldn't build new filename based on the extensions
                 # so just insert at the end
                 save_file = file.replace('.fits', new_root)
-            
+
             # Rotate back to detector frame if needed
             if _flt.grism.instrument in ['NIRISS', 'NIRCAM']:
                 _flt.transform_JWST_WFSS(verbose=verbose)
-            
+
             # Save the files
             print('Save {0}'.format(save_file))
             _flt.save_full_pickle()
 
             # Reload initialized data
             _flt.load_from_fits(save_file)
-            
+
             # Rotate to "GrismFLT" frame if needed
             if _flt.grism.instrument in ['NIRISS', 'NIRCAM']:
                 _flt.transform_JWST_WFSS(verbose=verbose)
@@ -537,38 +537,38 @@ class GroupFLT():
                            mag_limit=25, coeffs=[1.2, -0.5], cpu_count=0,
                            is_cgs=False, model_kwargs={'compute_size':True}):
         """Compute continuum models of all sources in an FLT
-        
+
         Parameters
         ----------
         fit_info : dict
-        
+
         verbose : bool
-        
+
         store : bool
-        
+
         mag_limit : float
             Faint limit of objects to compute
-        
+
         coeffs : list
             Polynomial coefficients of the continuum model
-        
+
         cpu_count : int
             Number of CPUs to use for parallel processing.  If 0, then get
             from `multiprocessing.cpu_count`.
-        
+
         is_cgs : bool
             Spectral models are in cgs units
-        
+
         model_kwargs : dict
-            Keywords to pass to the 
-            `~grizli.model.GrismFLT.compute_model_orders` method of the 
-            `~grizli.model.GrismFLT` objects.  
-            
+            Keywords to pass to the
+            `~grizli.model.GrismFLT.compute_model_orders` method of the
+            `~grizli.model.GrismFLT` objects.
+
         Returns
         -------
-        Sets `object_dispersers` and `model` attributes on items in 
+        Sets `object_dispersers` and `model` attributes on items in
         `self.FLTs`
-        
+
         """
         if cpu_count <= 0:
             cpu_count = np.maximum(mp.cpu_count() - 4, 1)
@@ -595,8 +595,8 @@ class GroupFLT():
         t0_pool = time.time()
 
         pool = mp.Pool(processes=cpu_count)
-        jobs = [pool.apply_async(_compute_model, 
-                                 (i, self.FLTs[i], fit_info, 
+        jobs = [pool.apply_async(_compute_model,
+                                 (i, self.FLTs[i], fit_info,
                                   is_cgs, store, model_kwargs))
                 for i in range(self.N)]
 
@@ -1047,14 +1047,14 @@ class GroupFLT():
 
                     xsl = slice(xmi, xma)
                     ysl = slice(ymi, yma)
-                    
+
                     _dy = (ysl.stop - ysl.start)
                     _dx = (xsl.stop - xsl.start)
                     sh_aspect = _dy / _dx
 
                     vmi, vma = -0.05, 0.2
 
-                    fig = plt.figure(figsize=[fig_xsize, 
+                    fig = plt.figure(figsize=[fig_xsize,
                                               fig_xsize/2*sh_aspect])
 
                     ax = fig.add_subplot(121)
@@ -1492,11 +1492,11 @@ class MultiBeam(GroupFitter):
                 beam.init_galactic_extinction(MW_EBV, R_V=R_V)
                 beam.process_config()
                 b.flat_flam = b.compute_model(in_place=False, is_cgs=True)
-    
-    @property 
+
+    @property
     def N(self):
         return len(self.beams)
-    
+
     @property
     def Ngrism(self):
         """
@@ -1512,19 +1512,19 @@ class MultiBeam(GroupFitter):
 
             if grism not in Ngrism:
                 Ngrism[grism] = 0
-                
+
             Ngrism[grism] += 1
-        
+
         return Ngrism
-    
-    @property 
+
+    @property
     def grisms(self):
         """
         Available grisms
         """
         grisms = list(self.Ngrism.keys())
         return grisms
-        
+
     @property
     def PA(self):
         """
@@ -1545,13 +1545,13 @@ class MultiBeam(GroupFitter):
                 _PA[grism][PA_i].append(i)
             else:
                 _PA[grism][PA_i] = [i]
-        
+
         return _PA
-    
-    @property 
+
+    @property
     def id(self):
         return self.beams[0].id
-           
+
     def _parse_beams(self, psf=False):
         """
         Derive properties of the beam list (grism, PA) and initialize
@@ -1581,7 +1581,7 @@ class MultiBeam(GroupFitter):
                 #beam.modelf = beam.model.flatten()
                 #beam.model = beam.modelf.reshape(beam.beam.sh_beam)
 
-                beam.flat_flam = beam.compute_model(in_place=False, 
+                beam.flat_flam = beam.compute_model(in_place=False,
                                                     is_cgs=True)
 
                 _p = beam.grism.parent_file
@@ -1847,20 +1847,20 @@ class MultiBeam(GroupFitter):
         if isinstance(ref_image, pyfits.HDUList):
             ref_data = ref_image[0].data
             ref_header = ref_image[0].header
-            
+
             ref_image_filename = ref_image.filename()
         elif (isinstance(ref_image, pyfits.ImageHDU) |
               isinstance(ref_image, pyfits.PrimaryHDU)):
-            
+
             ref_data = ref_image.data
             ref_header = ref_image.header
-            
+
             ref_image_filename = 'HDU'
         else:
             with pyfits.open(ref_image) as ref_im:
                 ref_data = ref_im[0].data*1
                 ref_header = ref_im[0].header.copy()
-                
+
             ref_image_filename = ref_image
 
         ref_wcs = pywcs.WCS(ref_header, relax=True)
@@ -1927,10 +1927,10 @@ class MultiBeam(GroupFitter):
                 ref_header = ref_im.header.copy()
 
             ref_image_filename = ref_image
-        
+
         if ref_data.dtype not in [np.float32, np.dtype('>f4')]:
             ref_data = ref_data.astype(np.float32)
-            
+
         ref_wcs = pywcs.WCS(ref_header, relax=True)
         ref_wcs.pscale = utils.get_wcs_pscale(ref_wcs)
         if not hasattr(ref_wcs, '_naxis1') & hasattr(ref_wcs, '_naxis'):
@@ -2009,7 +2009,7 @@ class MultiBeam(GroupFitter):
                 else:
                     for label in thumb_labels:
                         self.beams[ie].thumbs[label] -= bkg_value
-        
+
         ## Recompute total_flux attribute
         for b in self.beams:
             b.beam.set_segmentation(b.beam.seg)
@@ -2064,17 +2064,17 @@ class MultiBeam(GroupFitter):
         #yspec = [xspec**o*scale_coeffs[o] for o in range(self.poly_order+1)]
         yfull = np.polyval(scale_coeffs[::-1], xspec)
         return xspec, yfull
-    
-    
+
+
     def compute_model(self, id=None, spectrum_1d=None, is_cgs=False, apply_sensitivity=True, scale=None, reset=True):
         """
         Compute the dispersed 2D model for an assumed input spectrum
-        
-        This is a wrapper around the 
-        `grizli.model.GrismDisperser.compute_model` method, where the 
+
+        This is a wrapper around the
+        `grizli.model.GrismDisperser.compute_model` method, where the
         parameters are described.
 
-        Nothing returned, but the `model` and `modelf` attributes are 
+        Nothing returned, but the `model` and `modelf` attributes are
         updated on the `~grizli.model.GrismDisperser` subcomponents of the
         `beams` list.
         """
@@ -2091,14 +2091,14 @@ class MultiBeam(GroupFitter):
 
     def compute_model_psf(self, id=None, spectrum_1d=None, is_cgs=False):
         """
-        Compute the dispersed 2D model for an assumed input spectrum and for 
+        Compute the dispersed 2D model for an assumed input spectrum and for
         ePSF morphologies
-        
-        This is a wrapper around the 
-        `grizli.model.GrismDisperser.compute_model_psf` method, where the 
+
+        This is a wrapper around the
+        `grizli.model.GrismDisperser.compute_model_psf` method, where the
         parameters are described.
 
-        Nothing returned, but the `model` and `modelf` attributes are 
+        Nothing returned, but the `model` and `modelf` attributes are
         updated on the `~grizli.model.GrismDisperser` subcomponents of the
         `beams` list.
         """
@@ -2119,7 +2119,7 @@ class MultiBeam(GroupFitter):
             HAS_SKLEARN = True
         except:
             HAS_SKLEARN = False
-            
+
         import numpy.linalg
         import scipy.optimize
 
@@ -2299,7 +2299,7 @@ class MultiBeam(GroupFitter):
 
         """
         from collections import OrderedDict
-        
+
         # Covariance matrix for line flux uncertainties
         Ax = A[:, self.fit_mask]
         ok_temp = (np.sum(Ax, axis=1) > 0) & (coeffs_full != 0)
@@ -2919,7 +2919,7 @@ class MultiBeam(GroupFitter):
                 # print g, xmin, xmax
 
         ax.set_xlim(xmin, xmax)
-        ax.semilogx(subsx=[xmax])
+        ax.semilogx(subs=[xmax])
         # axc.set_xticklabels([])
         # axc.set_xlabel(r'$\lambda$')
         #axc.set_ylabel(r'$f_\lambda \times 10^{-19}$')
@@ -3460,7 +3460,7 @@ class MultiBeam(GroupFitter):
                     fwhm = 350
                 else:
                     fwhm = 700
-                    
+
         # Auto generate delta-wavelength of 2D spectrum
         if 'dlam' in pspec2:
             dlam = pspec2['dlam']
@@ -3477,7 +3477,7 @@ class MultiBeam(GroupFitter):
                     dlam = 11
                 else:
                     dlam = 25 # G102
-                    
+
         # Redshift fit
         zfit_in = copy.copy(pzfit)
         zfit_in['fwhm'] = fwhm
@@ -3734,10 +3734,10 @@ class MultiBeam(GroupFitter):
             drizzle_function = drizzle_2d_spectrum_wcs
         else:
             drizzle_function = drizzle_2d_spectrum
-        
+
         if 'zfit' in kwargs:
             tfit = kwargs['zfit']
-            
+
         NX = len(self.PA)
         NY = 0
         for g in self.PA:
@@ -4163,13 +4163,13 @@ class MultiBeam(GroupFitter):
         if get_contam:
             spc = self.optimal_extract(self.contamf_mask[:self.Nspec],
                                        **kwargs)
-        
+
         if (tfit is not None) & (get_background):
             bgm = self.get_flat_background(tfit['coeffs'], apply_mask=True)
             sp_bg = self.optimal_extract(bgm[:self.Nspec], **kwargs)
         else:
             sp_bg = None
-            
+
         # Loop through grisms, change units and add fit columns
         # NB: setting units to "count / s" to comply with FITS standard,
         #     where count / s = electron / s
@@ -4190,7 +4190,7 @@ class MultiBeam(GroupFitter):
                 sp[k]['line'].unit = u.count / u.s
                 sp[k]['cont'] = sp_cont[k]['flux']
                 sp[k]['cont'].unit = u.count / u.s
-                                    
+
             if masked_model is not None:
                 sp[k]['model'] = sp_model[k]['flux']
                 sp[k]['model'].unit = u.count / u.s
@@ -4198,7 +4198,7 @@ class MultiBeam(GroupFitter):
             if sp_bg is not None:
                 sp[k]['background'] = sp_bg[k]['flux']
                 sp[k]['background'].unit = u.count / u.s
-            
+
             sp[k].meta['GRISM'] = (k, 'Grism name')
 
             # Metadata
@@ -4213,17 +4213,17 @@ class MultiBeam(GroupFitter):
             sp[k].meta['NEXP'] = (count, 'Number of exposures')
             sp[k].meta['EXPTIME'] = (exptime, 'Total exposure time')
             sp[k].meta['NPA'] = (len(self.PA[k]), 'Number of PAs')
-            
+
             # PSCALE
             if hasattr(self, 'pscale'):
                 if (self.pscale is not None):
-                    pscale = self.compute_scale_array(self.pscale, 
+                    pscale = self.compute_scale_array(self.pscale,
                                                       sp[k]['wave'])
                     sp[k]['pscale'] = pscale
-                    sp[k].meta['PSCALEN'] = (len(self.pscale)-1, 
+                    sp[k].meta['PSCALEN'] = (len(self.pscale)-1,
                                              'PSCALE order')
                     for i, p in enumerate(self.pscale):
-                        sp[k].meta['PSCALE{0}'.format(i)] = (p, 
+                        sp[k].meta['PSCALE{0}'.format(i)] = (p,
                                              'PSCALE parameter {0}'.format(i))
 
         return sp
@@ -4954,16 +4954,16 @@ def show_drizzle_HDU(hdu, diff=True, mask_segmentation=True, average_only=False,
         grisms[g] = h0['N'+g]
 
     NY += 1
-    
+
     widths = []
     for i in range(NX):
         widths.extend([0.2, 1])
-    
+
     if average_only:
         NY = 1
         fig = plt.figure(figsize=(5*NX*scale_size, 1*NY*scale_size+0.33))
         gs = GridSpec(NY, NX*2, width_ratios=widths)
-    else:    
+    else:
         fig = plt.figure(figsize=(5*NX*scale_size, 1*NY*scale_size))
         gs = GridSpec(NY, NX*2, height_ratios=[1]*NY, width_ratios=widths)
 
@@ -5019,12 +5019,12 @@ def show_drizzle_HDU(hdu, diff=True, mask_segmentation=True, average_only=False,
         ax.set_yticklabels([])
         ax.set_xlabel(r'$\lambda$ ($\mu$m) - '+g)
         ax.xaxis.set_major_locator(MultipleLocator(GRISM_MAJOR[g]))
-        
+
         if average_only:
             iters = []
         else:
             iters = range(grisms[g])
-            
+
         for ip in iters:
             #print(ip, ig)
             pa = h0['{0}{1:02d}'.format(g, ip+1)]
@@ -5078,7 +5078,7 @@ def show_drizzle_HDU(hdu, diff=True, mask_segmentation=True, average_only=False,
         gs.tight_layout(fig, pad=0.01)
     else:
         gs.tight_layout(fig, pad=0.1)
-        
+
     return fig
 
 
