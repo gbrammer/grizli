@@ -1,3 +1,19 @@
+Installation
+~~~~~~~~~~~~~~
+
+The easiest way to install the latest ``grizli`` release into a fresh virtualenv or conda environment is:
+
+.. code-block:: bash
+
+   pip install grizli
+   pip install pyregion
+   pip install git+https://github.com/gbrammer/tristars
+
+If you are installing ``grizli`` for the first time, make sure to also set up directories and download 
+reference files: :ref:`Set up directories and fetch additional files`
+
+More detailed instructions are available below.
+
 Development Environment
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -63,6 +79,8 @@ or
 
 To minimize conflict of dependencies, install only the ones that you need. 
 
+.. additional
+
 Additional dependencies
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -71,8 +89,8 @@ need to be installed separately:
 
 .. code-block:: bash
   
-  pip install git+https://github.com/gbrammer/tristars
   pip install pyregion
+  pip install git+https://github.com/gbrammer/tristars
   
 If you will be working with HST data, you will also need the following two 
 libraries:
@@ -105,7 +123,7 @@ only be done once, or after updating the repository:
 .. code-block:: bash
 
     pytest
-    
+        
 Set up directories and fetch additional files
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -170,7 +188,7 @@ Installing ``grizli`` from source
 If you need to install ``grizli` form a specific branch or need an editable version 
 of the library, you can do this directly from the repository.
 
-- Create a dedicated environment. See instructions above. 
+- Create a dedicated environment. See instructions above.
 - Change into a directory where the ``grizli`` repo will live. 
 - Fetch the ``grizli`` repo and change into the newly cloned directory:
 
