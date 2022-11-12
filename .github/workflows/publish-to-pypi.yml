@@ -3,10 +3,10 @@ name: Build
 on:
   release:
     types: [released]
-  push:
-    branches:
-      - master
-  pull_request:
+  # push:
+  #   branches:
+  #     - master
+  # pull_request:
   workflow_dispatch:
 
 env:
