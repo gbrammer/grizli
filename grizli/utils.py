@@ -98,7 +98,8 @@ GRISM_LIMITS = {'G800L': [0.545, 1.02, 40.],  # ACS/WFC
 #DEFAULT_LINE_LIST = ['PaB', 'HeI-1083', 'SIII', 'OII-7325', 'ArIII-7138', 'SII', 'Ha+NII', 'OI-6302', 'HeI-5877', 'OIII', 'Hb', 'OIII-4363', 'Hg', 'Hd', 'H8','H9','NeIII-3867', 'OII', 'NeVI-3426', 'NeV-3346', 'MgII','CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'NIII-1750', 'NIV-1487', 'NV-1240', 'Lya']
 
 # Line species for determining individual line fluxes.  See `load_templates`.
-DEFAULT_LINE_LIST = ['PaB', 'HeI-1083', 'SIII', 'OII-7325', 'ArIII-7138',
+DEFAULT_LINE_LIST = ['BrA','BrB','PfG','PfD',
+                     'PaA','PaB', 'HeI-1083', 'SIII', 'OII-7325', 'ArIII-7138',
                      'SII', 'Ha', 'OI-6302', 'HeI-5877', 'OIII', 'Hb', 
                      'OIII-4363', 'Hg', 'Hd', 'H7', 'H8', 'H9', 'H10', 
                      'NeIII-3867', 'OII', 'NeVI-3426', 'NeV-3346', 'MgII', 
@@ -1871,6 +1872,14 @@ def get_line_wavelengths():
     line_ratios = OrderedDict()
 
     # Paschen: https://www.gemini.edu/sciops/instruments/nearir-resources/astronomical-lines/h-lines
+    line_wavelengths['BrA'] = [40522.8]
+    line_ratios['BrA'] = [1.]
+    line_wavelengths['BrB'] = [26258.7]
+    line_ratios['BrB'] = [1.]
+    line_wavelengths['PfG'] = [37405.76]
+    line_ratios['PfG'] = [1.]
+    line_wavelengths['PfD'] = [32969.8]
+    line_ratios['PfD'] = [1.]
     line_wavelengths['PaA'] = [18751.0]
     line_ratios['PaA'] = [1.]
     line_wavelengths['PaB'] = [12821.6]
