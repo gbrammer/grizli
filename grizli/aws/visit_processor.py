@@ -1142,7 +1142,11 @@ def check_jwst_assoc_guiding(assoc):
     
     for i, row in enumerate(atab):
         gsx = (tab['time'] > row['t_min']) & (tab['time'] < row['t_max'])
-        gs_stats = np.percentile(tab['jitter'][gsx], [16, 50, 84])
+        
+        if gsx.sum() == 0:
+            gs_stats = [-1,-1,-1]
+        else:
+            gs_stats = np.percentile(tab['jitter'][gsx], [16, 50, 84])
 
         atab['jitter16'][i] = gs_stats[0]
         atab['jitter50'][i] = gs_stats[1]
