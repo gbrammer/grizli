@@ -22,7 +22,7 @@ Development Environment
 dependencies, including general utilities like `numpy`, `scipy`, `matplotlib`, 
 astronomy tools like `astropy` and specific software for dealing with space-telescope
 data (`stsci.tools`, `drizzlepac`, etc.) are all installed using the standard 
-``pip install`` method (see below). Most development is done in a ``python 3.9``
+``pip install`` method (see :ref:`below <installation>`). Most development is done in a ``python 3.9``
 environment on a MacBook Pro running Mojave 10.14.6.  The basic build is tested in
 (Linux) python ``3.7``, ``3.8`` and ``3.9`` with the `GitHub actions
 <https://github.com/gbrammer/grizli/actions>`_ continuous integration (CI) tools, but
@@ -109,7 +109,7 @@ libraries:
 
 If you are planning to run simultaneous fits to grism spectra plus photometry using the
 `eazy-py <https://github.com/gbrammer/eazy-py>`_ connection, install ``eazy-py`` from
-the repository to ensure that you get *its* dependencies.
+the repository to ensure that you get *its* dependencies and templates.
 
 - Change directories to the location where you store code locally and activate the environment.
 
@@ -194,7 +194,7 @@ Installing ``grizli`` from source
 If you need to install ``grizli` form a specific branch or need an editable version 
 of the library, you can do this directly from the repository.
 
-- Create a dedicated environment. See instructions above.
+- Create a dedicated environment. See instructions :ref: `above <environment>`.
 - Change into a directory where the ``grizli`` repo will live. 
 - Fetch the ``grizli`` repo and change into the newly cloned directory:
 
@@ -218,7 +218,7 @@ The ``-e`` flag stands for ``editable``. Or to install the optional dependencies
    pip install -e ".[jwst,test]"
 
 
-See above for the additional dependencies that need to be installed.
+See :ref: `above <additional>` for the additional dependencies that need to be installed.
 
 Using HST Files Staged on AWS
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
