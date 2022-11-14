@@ -976,11 +976,19 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_pr
             _resp = mastquery.utils.download_from_mast(tab[jw], 
                                                        force_rate=force_rate)
             # update targname
-            for _file in _resp:
+            for i, _file in enumerate(_resp):
                 _test = os.path.exists(_file) & (jwst_utils is not None)
-                _test &= ('_nis_rate' in _file)
+                _jwst_grism = ('_nis_rate' in _file)
+                if 'filter' in tab.colnames:
+                    _jwst_grism |= 'GRISM' in tab[jw]['filter'][i]
+                    
+                _test &= _jwst_grism
+                
                 if _test:
-                    jwst_utils.initialize_jwst_image(_file)
+                    # Need initialization here for JWST grism exposures
+                    jwst_utils.initialize_jwst_image(_file,
+                                                     oneoverf_correction=False,
+                    )
                     jwst_utils.set_jwst_to_hst_keywords(_file, reset=True)
                     
         tab = tab[~jw]
@@ -2854,7 +2862,16 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
         _grism_files=list(info['FILE'][masks[key][0]])
         if masks[key][1].startswith('GRISM'):
             # NIRCAM
-            polyx = [2.1, 5.1]
+            if 'F444W' in masks[key][2].upper():
+                polyx = [2.1, 5.5, 4.4]
+            elif 'F410M' in masks[key][2].upper():
+                polyx = [2.1, 5.5, 4.1]
+            elif 'F356W' in masks[key][2].upper():
+                polyx = [2.1, 5.5, 3.6]
+            elif 'F277W' in masks[key][2].upper():
+                polyx = [2.1, 5.5, 2.8]
+            else:
+                polyx = [2.1, 5.5, 3.6]
             
         elif masks[key][1].startswith('GR150'):
             # NIRISS
@@ -3021,7 +3038,7 @@ def grism_prep(field_root='j142724+334246', PREP_PATH='../Prep', EXTRACT_PATH='.
                                 mag_limits=refine_mag_limits,
                                 max_coeff=5, ds9=ds9, verbose=True,
                                 fcontam=refine_i,
-                                wave=np.linspace(*grp.polyx, 100)*1.e4)
+                                wave=np.linspace(*grp.polyx[:2], 100)*1.e4)
 
         ##############
         # Save model to avoid having to recompute it again
@@ -3330,7 +3347,7 @@ def extract(field_root='j142724+334246', maglim=[13, 24], prior=None, MW_EBV=0.0
         return True
 
 
-def generate_fit_params(field_root='j142724+334246', fitter=['nnls', 'bounded'], prior=None, MW_EBV=0.00, pline=DITHERED_PLINE, fit_only_beams=True, run_fit=True, poly_order=7, fsps=True, min_sens=0.01, sys_err=0.03, fcontam=0.2, zr=[0.05, 3.6], dz=[0.004, 0.0004], fwhm=1000, lorentz=False, include_photometry=True, use_phot_obj=False, save_file='fit_args.npy', fit_trace_shift=False, **kwargs):
+def generate_fit_params(field_root='j142724+334246', fitter=['nnls', 'bounded'], prior=None, MW_EBV=0.00, pline=DITHERED_PLINE, fit_only_beams=True, run_fit=True, poly_order=7, fsps=True, min_sens=0.01, sys_err=0.03, fcontam=0.2, zr=[0.05, 3.6], dz=[0.004, 0.0004], fwhm=1000, lorentz=False, include_photometry=True, use_phot_obj=False, save_file='fit_args.npy', fit_trace_shift=False, full_line_list=['Lya', 'OII', 'Hb', 'OIII', 'Ha', 'Ha+NII', 'SII', 'SIII','PaB','He-1083','PaA'],  **kwargs):
     """
     Generate a parameter dictionary for passing to the fitting script
     """
@@ -3343,8 +3360,12 @@ def generate_fit_params(field_root='j142724+334246', fitter=['nnls', 'bounded'],
     t0 = utils.load_templates(fwhm=fwhm, line_complexes=True, stars=False, full_line_list=None, continuum_list=None, fsps_templates=fsps, alf_template=True, lorentz=lorentz)
     t1 = utils.load_templates(fwhm=fwhm, line_complexes=False, stars=False, full_line_list=None, continuum_list=None, fsps_templates=fsps, alf_template=True, lorentz=lorentz)
 
-    args = fitting.run_all(0, t0=t0, t1=t1, fwhm=1200, zr=zr, dz=dz, fitter=fitter, group_name=field_root, fit_stacks=False, prior=prior,  fcontam=fcontam, pline=pline, min_sens=min_sens, mask_sn_limit=np.inf, fit_beams=False,  root=field_root, fit_trace_shift=fit_trace_shift, phot=phot, use_phot_obj=use_phot_obj, verbose=True, scale_photometry=False, show_beams=True, overlap_threshold=10, get_ir_psfs=True, fit_only_beams=fit_only_beams, MW_EBV=MW_EBV, sys_err=sys_err, get_dict=True)
-
+    args = fitting.run_all(0, t0=t0, t1=t1, fwhm=1200, zr=zr, dz=dz, fitter=fitter, group_name=field_root, fit_stacks=False, prior=prior,  fcontam=fcontam, pline=pline, min_sens=min_sens, mask_sn_limit=np.inf, fit_beams=False,  root=field_root, fit_trace_shift=fit_trace_shift, phot=phot, use_phot_obj=use_phot_obj, verbose=True, scale_photometry=False, show_beams=True, overlap_threshold=10, get_ir_psfs=True, fit_only_beams=fit_only_beams, MW_EBV=MW_EBV, sys_err=sys_err, get_dict=True, full_line_list=full_line_list)
+    
+    for k in kwargs:
+        if k in args:
+            args[k] = kwargs[k]
+            
     # EAZY-py photometry object from HST photometry
     try:
         import eazy.photoz
