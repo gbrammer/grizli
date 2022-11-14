@@ -1573,7 +1573,10 @@ class ImageData(object):
         if (instrument == 'NIRCAM'):
             # Fallback if module not specified
             if module is None:
-                self.module = 'A'
+                if 'MODULE' not in header:
+                    self.module = 'A'
+                else:
+                    self.module = header['MODULE']
             else:
                 self.module = module
         else:
@@ -2195,6 +2198,7 @@ class ImageData(object):
                               photflam=self.photflam, photplam=self.photplam,
                               origin=slice_origin, instrument=self.instrument,
                               filter=self.filter, pupil=self.pupil, 
+                              module=self.module,
                               process_jwst_header=False)
 
         slice_obj.ref_photflam = self.ref_photflam
@@ -2259,6 +2263,8 @@ class ImageData(object):
         h['PUPIL'] = self.pupil, 'element selected from pupil wheel'
         h['INSTRUME'] = (self.instrument,
                          'identifier for instrument used to acquire data')
+        if self.module is not None:
+            h['MODULE'] = self.module, 'Instrument module'
 
         h['PHOTFLAM'] = (self.photflam,
                          'inverse sensitivity, ergs/cm2/Ang/electron')
@@ -3642,13 +3648,20 @@ class GrismFLT(object):
                 rot = -1
 
         elif self.grism.instrument in ['NIRCAM', 'NIRCAMA']:
-            #  Module A
-            if self.grism.pupil == 'GRISMC':
-                rot = 1
+            if self.grism.module == 'A':
+                #  Module A
+                if self.grism.pupil == 'GRISMC':
+                    rot = 1
+                else:
+                    # Do nothing, A+GRISMR disperses to +x
+                    return True
             else:
-                # Do nothing, A+GRISMR disperses to +x
-                return True
-
+                # Module B
+                if self.grism.pupil == 'GRISMC':
+                    rot = 1
+                else:
+                    rot = 2
+                
         elif self.grism.instrument == 'NIRCAMB':
             if self.grism.pupil == 'GRISMC':
                 rot = 1
@@ -3965,7 +3978,7 @@ class BeamCutout(object):
         #self.model = self.beam.model
         self.modelf = self.beam.modelf  # .flatten()
         self.model = self.beam.modelf.reshape(self.beam.sh_beam)
-
+        
         # Attributes
         self.size = self.modelf.size
         self.wave = self.beam.lam
@@ -3984,6 +3997,8 @@ class BeamCutout(object):
                     self.flat_flam += flat_i
 
         # OK data where the 2D model has non-zero flux
+        #print('xxxxxxx', self.mask.flatten().shape, self.flat_flam.shape)
+        
         self.fit_mask = (~self.mask.flatten()) & (self.ivar.flatten() != 0)
         self.fit_mask &= (self.flat_flam > min_mask*self.flat_flam.max())
         #self.fit_mask &= (self.flat_flam > 3*self.contam.flatten())
