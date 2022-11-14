@@ -2417,6 +2417,11 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
             mq = '{0}-f*dr?_sci.fits*'
             mq = mq.format(field_root.replace('-100mas','-*mas'))
             mosaic_files = glob.glob(mq)
+            
+            mq = '{0}-clear*dr?_sci.fits*'
+            mq = mq.format(field_root.replace('-100mas','-*mas'))
+            mosaic_files += glob.glob(mq)
+            
             mosaic_files.sort()
             
             filters = [file.split('_')[-3][len(field_root)+1:] 
@@ -4822,7 +4827,7 @@ def get_rgb_filters(filter_list, force_ir=False, pure_sort=False):
 
 TICKPARAMS = dict(axis='both', colors='w', which='both')
 
-def field_rgb(root='j010514+021532', xsize=6, output_dpi=None, HOME_PATH='./', show_ir=True, pl=1, pf=1, scl=1, scale_ab=None, rgb_scl=[1, 1, 1], ds9=None, force_ir=False, filters=None, add_labels=True, output_format='jpg', rgb_min=-0.01, xyslice=None, pure_sort=False, verbose=True, force_rgb=None, suffix='.field', mask_empty=False, tick_interval=60, timestamp=False, mw_ebv=0, use_background=False, tickparams=TICKPARAMS, fill_black=False, ref_spectrum=None, gzext='', full_dimensions=False, invert=False, get_rgb_array=False, get_images=False):
+def field_rgb(root='j010514+021532', xsize=8, output_dpi=None, HOME_PATH='./', show_ir=True, pl=1, pf=1, scl=1, scale_ab=None, rgb_scl=[1, 1, 1], ds9=None, force_ir=False, filters=None, add_labels=True, output_format='jpg', rgb_min=-0.01, xyslice=None, pure_sort=False, verbose=True, force_rgb=None, suffix='.field', mask_empty=False, tick_interval=60, timestamp=False, mw_ebv=0, use_background=False, tickparams=TICKPARAMS, fill_black=False, ref_spectrum=None, gzext='', full_dimensions=False, invert=False, get_rgb_array=False, get_images=False):
     """
     RGB image of the field mosaics
     """

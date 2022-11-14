@@ -14,6 +14,12 @@ import astropy.units as u
 from . import db
 from .. import utils
 
+ROOT_PATH = '/GrizliImaging'
+if not os.path.exists(ROOT_PATH):
+    ROOT_PATH = os.getcwd()
+    print(f'Set ROOT_PATH={ROOT_PATH}')
+
+
 def s3_object_path(dataset, product='raw', ext='fits', base_path='hst/public/'):
     """
     S3 path for an HST ``dataset``
@@ -543,7 +549,7 @@ def update_assoc_status(assoc, status=1, verbose=True):
     
     sqlstr = """UPDATE {0}
         SET status = {1}, modtime = '{2}'
-        WHERE (assoc_name = '{3}');
+        WHERE (assoc_name = '{3}' AND status != 99);
         """.format(table, status, NOW, assoc)
 
     if verbose:
@@ -596,8 +602,8 @@ def delete_all_assoc_data(assoc):
     os.system(f'aws s3 rm --recursive s3://grizli-v2/HST/Pipeline/{assoc}')
 
     res = db.execute(f"""UPDATE assoc_table
-              SET status=12
-                    WHERE assoc_name = '{assoc}'""")
+                    SET status=12
+                    WHERE assoc_name = '{assoc}' AND status != 99""")
 
 
 def clear_failed():
@@ -725,7 +731,7 @@ def get_assoc_yaml_from_s3(assoc, s_region=None, bucket='grizli-v2', prefix='HST
     from grizli.pipeline import auto_script
     from grizli import utils
     
-    LOGFILE = f'/GrizliImaging/{assoc}.auto_script.log.txt'
+    LOGFILE = f'{ROOT_PATH}/{assoc}.auto_script.log.txt'
     
     s3 = boto3.resource('s3')
     s3_client = boto3.client('s3')
@@ -765,7 +771,7 @@ def get_assoc_yaml_from_s3(assoc, s_region=None, bucket='grizli-v2', prefix='HST
             files = [obj.key for obj in
                      file_bkt.objects.filter(Prefix=file_prefix)]
             if len(files) > 0:
-                local_file = os.path.join('/GrizliImaging/', 
+                local_file = os.path.join(f'{ROOT_PATH}/', 
                                           os.path.basename(file_prefix))
                 
                 if not os.path.exists(local_file):
@@ -1076,6 +1082,103 @@ blue_align_params['align_min_flux_radius'] = 1.7
 blue_align_params['tweak_n_min'] = 5
 
 
+def check_jwst_assoc_guiding(assoc):
+    """
+    Check the guidestar logs that accompany a given visit
+    """
+    import os
+    import glob
+    
+    import matplotlib.pyplot as plt
+    
+    import astropy.table
+    
+    import mastquery.utils
+    import mastquery.jwst
+    
+    os.chdir(f'{ROOT_PATH}/')
+    
+    atab = db.SQL(f"""SELECT t_min, t_max, filter, proposal_id, 
+                             "dataURL", status
+                     FROM assoc_table
+                     WHERE assoc_name='{assoc}'
+                     """)
+    so = np.argsort(atab['t_min'])
+    atab = atab[so]
+    
+    gs = mastquery.jwst.query_guidestar_log(
+             mjd=(atab['t_min'].min()-0.1, atab['t_max'].max()+0.1),
+             program=atab['proposal_id'][0],
+             exp_type=['FGS_FINEGUIDE'],
+         )
+    
+    keep = (gs['expstart'] < atab['t_max'].max())
+    gs = gs[keep]
+    
+    for _iter in range(3):
+        res = mastquery.utils.download_from_mast(gs)
+    
+    tabs = []
+    for f in res:
+        if not os.path.exists(f):
+            continue
+            
+        tabs.append(utils.read_catalog(f))
+    
+    tab = astropy.table.vstack(tabs)
+    so = np.argsort(tab['time'])
+    tab = tab[so]
+    
+    fig, ax = plt.subplots(1,1,figsize=(8,5))
+    t0 = atab['t_min'].min()
+    ax.scatter((tab['time'] - t0)*24, tab['jitter'],
+               alpha=.02, marker='.', color='k')
+    
+    atab['jitter16'] = -1.
+    atab['jitter50'] = -1.
+    atab['jitter84'] = -1.
+    
+    ymax = 500
+    
+    for i, row in enumerate(atab):
+        gsx = (tab['time'] > row['t_min']) & (tab['time'] < row['t_max'])
+        gs_stats = np.percentile(tab['jitter'][gsx], [16, 50, 84])
+
+        atab['jitter16'][i] = gs_stats[0]
+        atab['jitter50'][i] = gs_stats[1]
+        atab['jitter84'][i] = gs_stats[2]
+        
+        print(f"{i} {os.path.basename(atab['dataURL'][i])} {gs_stats[1]:.2f}")
+        
+        ax.fill_between([(row['t_min']-t0)*24, (row['t_max']-t0)*24], 
+                        np.ones(2)*gs_stats[0], np.ones(2)*gs_stats[2], 
+                        color='r', alpha=0.2)
+        ax.hlines(gs_stats[1], (row['t_min']-t0)*24, (row['t_max']-t0)*24, 
+                  color='r')
+        ax.fill_between([(row['t_min']-t0)*24, (row['t_max']-t0)*24], 
+                        [0.2,0.2], np.ones(2)*(0.12/0.2*ymax), 
+                        color='0.8', alpha=0.1, zorder=-1)
+                        
+    ax.set_ylim(0.12, ymax)
+    ax.semilogy()
+    
+    ax.set_xlabel(r'$\Delta t$, hours since ' + f'{t0:.2f}')
+    ax.set_ylabel('GuideStar jitter, mas')
+    ax.set_yticklabels([1,10,100])
+    ax.set_yticks([1,10,100])
+    ax.set_title(assoc)
+    
+    ax.set_xlim(-0.2, (atab['t_max'].max() - t0)*24 +0.2)
+    ax.grid()
+    
+    fig.tight_layout(pad=0.5)
+    fig.savefig(f'{assoc}.guide.png')
+    
+    atab.write(f'{assoc}.guide.csv', overwrite=True)
+    
+    return fig, atab
+    
+
 ALL_FILTERS = ['F410M', 'F467M', 'F547M', 'F550M', 'F621M', 'F689M', 'F763M', 'F845M', 'F200LP', 'F350LP', 'F435W', 'F438W', 'F439W', 'F450W', 'F475W', 'F475X', 'F555W', 'F569W', 'F600LP', 'F606W', 'F622W', 'F625W', 'F675W', 'F702W', 'F775W', 'F791W', 'F814W', 'F850LP', 'G800L', 'F098M', 'F127M', 'F139M', 'F153M', 'F105W', 'F110W', 'F125W', 'F140W', 'F160W', 'G102', 'G141']
 
 
@@ -1099,10 +1202,12 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=False,
     from grizli.pipeline import auto_script
     from grizli import utils, prep
 
-    os.chdir('/GrizliImaging/')
+    os.chdir(f'{ROOT_PATH}/')
     
     tab = db.SQL(f"""SELECT * FROM assoc_table
-                     WHERE assoc_name='{assoc}'""")
+                     WHERE assoc_name='{assoc}'
+                     AND status != 99
+                     """)
     
     if len(tab) == 0:
         print(f"assoc_name='{assoc}' not found in assoc_table")
@@ -1211,7 +1316,7 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=False,
     os.environ['iref'] = os.environ['orig_iref']
     os.environ['jref'] = os.environ['orig_jref']
     
-    os.chdir('/GrizliImaging/')
+    os.chdir(f'{ROOT_PATH}/')
     
     if sync:
         os.system(f'aws s3 rm --recursive ' + 
@@ -1232,7 +1337,7 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=False,
         
             os.system(cmd)
             print('\n# Sync\n' + cmd.replace('     ', '') + '\n')
-            os.chdir('/GrizliImaging')
+            os.chdir(f'{ROOT_PATH}')
             
         files = glob.glob(f'{assoc}*.*')
         for file in files:
@@ -1264,7 +1369,16 @@ def set_private_iref(assoc):
     os.environ['iref'] = f'{os.getcwd()}/{assoc}/iref/'
     os.environ['jref'] = f'{os.getcwd()}/{assoc}/jref/'
     
-    utils.fetch_default_calibs()
+    is_jwst = False
+    for f in ['f090w','f115w','f150w','f200w','f277w','f356w','f444w',
+              'f182m','f140m','f210m','f410m','f430m','f460m','f300m',
+              'f250m','f480m']:
+        if f in assoc:
+            is_jwst = True
+            break
+    
+    if not is_jwst:        
+        utils.fetch_default_calibs()
 
 
 def get_wcs_guess(assoc, verbose=True):
@@ -1275,7 +1389,7 @@ def get_wcs_guess(assoc, verbose=True):
     
     wcs = db.from_sql(f"select * from wcs_log where wcs_assoc = '{assoc}'")
     
-    LOGFILE = f'/GrizliImaging/{assoc}.auto_script.log.txt'
+    LOGFILE = f'{ROOT_PATH}/{assoc}.auto_script.log.txt'
     
     if len(wcs) == 0:
         msg = f"# get_wcs_guess : No entries found in wcs_log for wcs_assoc='{assoc}'"
@@ -2012,14 +2126,14 @@ def run_one(clean=2, sync=True):
     
     assoc = get_random_visit()
     if assoc is None:
-        with open('/GrizliImaging/finished.txt','w') as fp:
+        with open(f'{ROOT_PATH}/finished.txt','w') as fp:
             fp.write(time.ctime() + '\n')
     else:
         print(f'============  Run association  ==============')
         print(f'{assoc}')
         print(f'========= {time.ctime()} ==========')
         
-        with open('/GrizliImaging/visit_history.txt','a') as fp:
+        with open(f'{ROOT_PATH}/visit_history.txt','a') as fp:
             fp.write(f'{time.ctime()} {assoc}\n')
         
         process_visit(assoc, clean=clean, sync=sync)

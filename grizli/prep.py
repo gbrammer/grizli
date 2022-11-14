@@ -3121,7 +3121,12 @@ def mask_snowballs(visit, snowball_erode=3, snowball_dilate=18, mask_bit=1024, i
     
     for _file in visit['files']:
         with pyfits.open(_file, mode='update') as _im:
-            if _im[0].header['OINSTRUM'] not in instruments:
+            if 'OINSTRUM' in _im[0].header:
+                _instrume = _im[0].header['OINSTRUM']
+            else:
+                _instrume = _im[0].header['INSTRUME']
+                
+            if _instrume not in instruments:
                 continue
                 
             crs = (_im['DQ'].data & 4)
