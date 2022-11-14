@@ -1,7 +1,7 @@
 Installation
 ~~~~~~~~~~~~~~
 
-The easiest way to install the latest ``grizli`` release into a fresh virtualenv or conda environment is:
+The easiest way to install the latest ``grizli`` release into a :ref:`fresh virtualenv or conda environment <environment>` is:
 
 .. code-block:: bash
 
@@ -9,10 +9,10 @@ The easiest way to install the latest ``grizli`` release into a fresh virtualenv
    pip install pyregion
    pip install git+https://github.com/gbrammer/tristars
 
-If you are installing ``grizli`` for the first time, make sure to also set up directories and download 
-reference files: :ref:`Set up directories and fetch additional files`
+If you are installing ``grizli`` for the first time, make sure to also set up :ref:`directories and download 
+reference files <directories>`. :ref:`Additional installations <additional>` are needed to work with HST data.
 
-More detailed instructions are available below.
+More detailed instructions are available :ref:`below <installation>`.
 
 Development Environment
 ^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -27,6 +27,8 @@ environment on a MacBook Pro running Mojave 10.14.6.  The basic build is tested 
 (Linux) python ``3.7``, ``3.8`` and ``3.9`` with the `GitHub actions
 <https://github.com/gbrammer/grizli/actions>`_ continuous integration (CI) tools, but
 the current test suite does not yet test all of the full functionality of the code.
+
+.. _environment:
 
 Setting up a Local Environment
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -55,6 +57,8 @@ Here we give example with setting up a ``conda`` environment.
    if you want it automatically done for every new terminal, you need to put the above
    command in your ``~/.bashrc`` file.
 
+.. _installation:
+
 Preferred installation with pip
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -79,7 +83,7 @@ or
 
 To minimize conflict of dependencies, install only the ones that you need. 
 
-.. additional
+.. _additional:
 
 Additional dependencies
 ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -124,6 +128,8 @@ only be done once, or after updating the repository:
 
     pytest
         
+.. _directories:
+
 Set up directories and fetch additional files
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
