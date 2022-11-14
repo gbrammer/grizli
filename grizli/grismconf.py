@@ -903,6 +903,8 @@ class TransformGrismconf(object):
             trace_dy += -2.5
         elif os.path.basename(self.conf_file) == 'NIRCAM_F444W_modA_C.conf':
             trace_dy += -0.1
+        elif 'V4/NIRCAM_F444W_modB_R.conf' in self.conf_file:
+            trace_dy -= 0.5
             
         wave = self.conf.DISPL(self.order_names[beam], *x0, t)
         if self.transform.instrument != 'HST':
@@ -952,7 +954,7 @@ class TransformGrismconf(object):
             #self.beams.append(beam)
             self.dxlam[beam] = np.arange(xarr[0], xarr[-1], dtype=int)
             self.nx[beam] = xarr[-1] - xarr[0]+1
-
+                        
             sens = Table()
             sens['WAVELENGTH'] = lam.astype(np.double)
             sens['SENSITIVITY'] = self.conf.SENS[order](lam).astype(np.double)
