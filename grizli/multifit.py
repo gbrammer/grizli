@@ -95,7 +95,7 @@ def _loadFLT(grism_file, sci_extn, direct_file, pad, ref_file,
     
     # if flt.grism.instrument in ['NIRCAM']:
     #     flt.apply_POM()
-        
+
     if flt.grism.instrument in ['NIRISS', 'NIRCAM']:
         flt.transform_JWST_WFSS()
 
@@ -580,10 +580,14 @@ class GroupFLT():
 
             # Polynomial component
             #xspec = np.arange(0.3, 5.35, 0.05)-1
-            xspec = np.arange(self.polyx[0], self.polyx[1], 0.05)-1
-
-            yspec = [xspec**o*coeffs[o] for o in range(len(coeffs))]
-            xspec = (xspec+1)*1.e4
+            xspec = np.arange(self.polyx[0], self.polyx[1], 0.05)
+            if len(self.polyx) > 2:
+                px0 = self.polyx[2]
+            else:
+                px0 = 1.0
+                        
+            yspec = [(xspec-px0)**o*coeffs[o] for o in range(len(coeffs))]
+            xspec = (xspec)*1.e4
             yspec = np.sum(yspec, axis=0)
 
             fit_info = OrderedDict()
@@ -854,51 +858,52 @@ class GroupFLT():
         return True
         #m2d = mb.reshape_flat(modelf)
 
-    ############
-    def old_refine(self, id, mag=-99, poly_order=1, size=30, ds9=None, verbose=True, max_coeff=2.5):
-        """TBD
-        """
-        # Extract and fit beam spectra
-        beams = self.get_beams(id, size=size, min_overlap=0.5, get_slice_header=False)
-        if len(beams) == 0:
-            return True
-
-        mb = MultiBeam(beams)
-        try:
-            A, out_coeffs, chi2, modelf = mb.fit_at_z(poly_order=poly_order, fit_background=True, fitter='lstsq')
-        except:
-            return False
-
-        # Poly template
-        scale_coeffs = out_coeffs[mb.N*mb.fit_bg:mb.N*mb.fit_bg+mb.n_poly]
-        xspec, yfull = mb.eval_poly_spec(out_coeffs)
-
-        # Check where templates inconsistent with broad-band fluxes
-        xb = [beam.direct.ref_photplam if beam.direct['REF'] is not None else beam.direct.photplam for beam in beams]
-        fb = [beam.beam.total_flux for beam in beams]
-        mb = np.polyval(scale_coeffs[::-1], np.array(xb)/1.e4-1)
-
-        if (np.abs(mb/fb).max() > max_coeff) | (~np.isfinite(mb/fb).sum() > 0) | (np.min(mb) < 0):
-            if verbose:
-                print('{0} mag={1:6.2f} {2} xx'.format(id, mag, scale_coeffs))
-
-            return True
-
-        # Put the refined model into the full-field model
-        self.compute_single_model(id, mag=mag, size=-1, store=False, spectrum_1d=[(xspec+1)*1.e4, yfull], is_cgs=True, get_beams=None, in_place=True)
-
-        # Display the result?
-        if ds9:
-            flt = self.FLTs[0]
-            mask = flt.grism['SCI'] != 0
-            ds9.view((flt.grism['SCI'] - flt.model)*mask,
-                      header=flt.grism.header)
-
-        if verbose:
-            print('{0} mag={1:6.2f} {2}'.format(id, mag, scale_coeffs))
-
-        return True
-        #m2d = mb.reshape_flat(modelf)
+    # ############
+    # def old_refine(self, id, mag=-99, poly_order=1, size=30, ds9=None, verbose=True, max_coeff=2.5):
+    #     """TBD
+    #     """
+    #     # Extract and fit beam spectra
+    #     beams = self.get_beams(id, size=size, min_overlap=0.5, get_slice_header=False)
+    #     if len(beams) == 0:
+    #         return True
+    #
+    #     mb = MultiBeam(beams)
+    #     try:
+    #         A, out_coeffs, chi2, modelf = mb.fit_at_z(poly_order=poly_order, fit_background=True, fitter='lstsq')
+    #     except:
+    #         return False
+    #
+    #     # Poly template
+    #     scale_coeffs = out_coeffs[mb.N*mb.fit_bg:mb.N*mb.fit_bg+mb.n_poly]
+    #     xspec, yfull = mb.eval_poly_spec(out_coeffs)
+    #
+    #     # Check where templates inconsistent with broad-band fluxes
+    #     xb = [beam.direct.ref_photplam if beam.direct['REF'] is not None
+    #           else beam.direct.photplam for beam in beams]
+    #     fb = [beam.beam.total_flux for beam in beams]
+    #     mb = np.polyval(scale_coeffs[::-1], np.array(xb)/1.e4-1)
+    #
+    #     if (np.abs(mb/fb).max() > max_coeff) | (~np.isfinite(mb/fb).sum() > 0) | (np.min(mb) < 0):
+    #         if verbose:
+    #             print('{0} mag={1:6.2f} {2} xx'.format(id, mag, scale_coeffs))
+    #
+    #         return True
+    #
+    #     # Put the refined model into the full-field model
+    #     self.compute_single_model(id, mag=mag, size=-1, store=False, spectrum_1d=[(xspec+1)*1.e4, yfull], is_cgs=True, get_beams=None, in_place=True)
+    #
+    #     # Display the result?
+    #     if ds9:
+    #         flt = self.FLTs[0]
+    #         mask = flt.grism['SCI'] != 0
+    #         ds9.view((flt.grism['SCI'] - flt.model)*mask,
+    #                   header=flt.grism.header)
+    #
+    #     if verbose:
+    #         print('{0} mag={1:6.2f} {2}'.format(id, mag, scale_coeffs))
+    #
+    #     return True
+    #     #m2d = mb.reshape_flat(modelf)
 
     def make_stack(self, id, size=20, target='grism', skip=True, fcontam=1., scale=1, save=True, kernel='point', pixfrac=1, diff=True):
         """Make drizzled 2D stack for a given object
@@ -2057,12 +2062,17 @@ class MultiBeam(GroupFitter):
     def eval_poly_spec(self, coeffs_full):
         """Evaluate polynomial spectrum
         """
-        xspec = np.arange(self.polyx[0], self.polyx[1], 0.05)-1
+        xspec = np.arange(self.polyx[0], self.polyx[1], 0.05)
+        if len(self.polyx) > 2:
+            px0 = self.polyx[2]
+        else:
+            px0 = 1.0
+            
         i0 = self.N*self.fit_bg
         scale_coeffs = coeffs_full[i0:i0+self.n_poly]
 
         #yspec = [xspec**o*scale_coeffs[o] for o in range(self.poly_order+1)]
-        yfull = np.polyval(scale_coeffs[::-1], xspec)
+        yfull = np.polyval(scale_coeffs[::-1], xspec - px0)
         return xspec, yfull
     
     
@@ -2337,7 +2347,7 @@ class MultiBeam(GroupFitter):
         # Polynomial component
         xspec, yspec = self.eval_poly_spec(coeffs_full)
 
-        model1d = utils.SpectrumTemplate((xspec+1)*1.e4, yspec)
+        model1d = utils.SpectrumTemplate(xspec*1.e4, yspec)
 
         cont1d = model1d*1
 
@@ -2431,7 +2441,7 @@ class MultiBeam(GroupFitter):
         #
         # yspec = [xspec**o*scale_coeffs[o] for o in range(self.poly_order+1)]
         xspec, yspec = self.eval_poly_spec(coeffs_full)
-        model1d = utils.SpectrumTemplate((xspec+1)*1.e4, yspec)
+        model1d = utils.SpectrumTemplate(xspec*1.e4, yspec)
 
         cont1d = model1d*1
 

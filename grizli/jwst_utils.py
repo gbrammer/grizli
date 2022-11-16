@@ -862,7 +862,7 @@ def exposure_oneoverf_correction(file, axis=None, thresholds=[5,4,3], erode_mask
         else:
             axis = 1
 
-    msg = f'exposure_oneoverf_correction: {file} axis={axis}'
+    msg = f'exposure_oneoverf_correction: {file} axis={axis} deg_pix={deg_pix}'
     utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
     
     if im[0].header['INSTRUME'] in ('NIRSPEC'):
@@ -884,7 +884,12 @@ def exposure_oneoverf_correction(file, axis=None, thresholds=[5,4,3], erode_mask
     dqmask &= (err > 0) & np.isfinite(err)
 
     sci = im['SCI'].data.astype(np.float32) - init_model
-    bkg = sep.Background(sci, mask=~dqmask, bw=deg_pix, bh=deg_pix)
+    if deg_pix == 0:
+        bw = sci.shape[0] // 64
+    else:
+        bw = deg_pix
+        
+    bkg = sep.Background(sci, mask=~dqmask, bw=bw, bh=bw)
     back = bkg.back()
 
     sn_mask = (sci - back)/err > thresholds[0]
@@ -903,7 +908,12 @@ def exposure_oneoverf_correction(file, axis=None, thresholds=[5,4,3], erode_mask
         fig = None
         
     for _iter, thresh in enumerate(thresholds):
-        sci = im['SCI'].data*1. - back - init_model
+        
+        if deg_pix == 0:
+            sci = im['SCI'].data*1. - init_model
+        else:
+            sci = im['SCI'].data*1. - back - init_model
+            
         sci[~mask] = np.nan
         med = np.nanmedian(sci, axis=axis)
 
@@ -925,13 +935,22 @@ def exposure_oneoverf_correction(file, axis=None, thresholds=[5,4,3], erode_mask
 
     nx = med.size
     xarr = np.linspace(-1,1,nx)
-    deg = nx//deg_pix
-
     ok = np.isfinite(med)
-
-    if deg <= 1:
+    
+    if deg_pix == 0:
+        # Don't remove anything from the median profile
+        cheb = 0.
+        deg = -1
+        
+    elif deg_pix >= nx:
+        # Remove constant component
         cheb = np.nanmedian(med)
+        deg = 0
+        
     else:
+        # Remove smooth component
+        deg = nx//deg_pix
+        
         for _iter in range(3):
             coeffs = np.polynomial.chebyshev.chebfit(xarr[ok], med[ok], deg)
             cheb = np.polynomial.chebyshev.chebval(xarr, coeffs)
@@ -960,6 +979,8 @@ def exposure_oneoverf_correction(file, axis=None, thresholds=[5,4,3], erode_mask
         with pyfits.open(file, mode='update') as im:
             im[0].header['ONEFEXP'] = True, 'Exposure 1/f correction applied'
             im[0].header['ONEFAXIS'] = axis, 'Axis for 1/f correction'
+            im[0].header['ONEFDEG'] = deg, 'Degree of smooth component'
+            im[0].header['ONEFNPIX'] = deg_pix, 'Pixels per smooth degree'
         
             model[~np.isfinite(model)] = 0
         
@@ -1152,21 +1173,59 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
     img.writeto(filename, overwrite=True)
     img.close()
     
+    _nircam_grism = False
+    
     if oneoverf_correction:
-        try:
-            _ = exposure_oneoverf_correction(filename, in_place=True, 
-                                         **oneoverf_kwargs)
-        except TypeError:
-            # Should only fail for test data
-            utils.log_exception(utils.LOGFILE, traceback)
-            msg = f'exposure_oneoverf_correction: failed for {filename}'
-            utils.log_comment(utils.LOGFILE, msg)
+        
+        # NIRCam grism
+        if (img[0].header['OINSTRUM'] == 'NIRCAM'):
+             if 'GRISM' in img[0].header['OPUPIL']:
+                _nircam_grism = True
+
+        if not _nircam_grism:
             
-            pass
+            try:
+                _ = exposure_oneoverf_correction(filename, in_place=True, 
+                                             **oneoverf_kwargs)
+            except TypeError:
+                # Should only fail for test data
+                utils.log_exception(utils.LOGFILE, traceback)
+                msg = f'exposure_oneoverf_correction: failed for {filename}'
+                utils.log_comment(utils.LOGFILE, msg)
+            
+                pass
                                          
         # axis=None, thresholds=[5,4,3], erode_mask=None, dilate_iterations=3, deg_pix=64, make_plot=True, init_model=0, in_place=False, skip_miri=True, verbose=True
         
     _ = img_with_flat(filename, overwrite=True, use_skyflats=use_skyflats)
+    
+    # Now do "1/f" correction to subtract NIRCam grism sky
+    if _nircam_grism:
+        if img[0].header['OPUPIL'] == 'GRISMR':
+            _disp_axis = 0
+        else:
+            _disp_axis = 1
+        
+        msg = f'exposure_oneoverf_correction: NIRCam grism sky {filename}'
+        utils.log_comment(utils.LOGFILE, msg)
+
+        # # Subtract simple median
+        # exposure_oneoverf_correction(filename,
+        #                              in_place=True,
+        #                              erode_mask=False,
+        #                              thresholds=[4,3],
+        #                              axis=_disp_axis,
+        #                              dilate_iterations=5,
+        #                              deg_pix=0)
+
+        # Subtract average along dispersion axis    
+        exposure_oneoverf_correction(filename,
+                                     in_place=True, 
+                                     erode_mask=False,
+                                     thresholds=[4,3],
+                                     axis=_disp_axis,
+                                     dilate_iterations=5,
+                                     deg_pix=0)
 
     _ = img_with_wcs(filename, overwrite=True)
     

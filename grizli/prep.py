@@ -5320,6 +5320,12 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
     isJWST = False
     isACS = False
     
+    # Skip NIRCam grism
+    if 'GRISM' in grism_element:
+        logstr = f'# visit_grism_sky: skip for {grism_element}'
+        utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
+        return False
+        
     flat = 1.
     if grism_element == 'G141':
         bg_fixed = ['zodi_G141_clean.fits']

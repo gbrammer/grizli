@@ -98,7 +98,9 @@ GRISM_LIMITS = {'G800L': [0.545, 1.02, 40.],  # ACS/WFC
 #DEFAULT_LINE_LIST = ['PaB', 'HeI-1083', 'SIII', 'OII-7325', 'ArIII-7138', 'SII', 'Ha+NII', 'OI-6302', 'HeI-5877', 'OIII', 'Hb', 'OIII-4363', 'Hg', 'Hd', 'H8','H9','NeIII-3867', 'OII', 'NeVI-3426', 'NeV-3346', 'MgII','CIV-1549', 'CIII-1908', 'OIII-1663', 'HeII-1640', 'NIII-1750', 'NIV-1487', 'NV-1240', 'Lya']
 
 # Line species for determining individual line fluxes.  See `load_templates`.
-DEFAULT_LINE_LIST = ['PaB', 'HeI-1083', 'SIII', 'OII-7325', 'ArIII-7138',
+DEFAULT_LINE_LIST = ['BrA','BrB','BrG','PfG','PfD',
+                     'PaA','PaB','PaG','PaD',
+                     'HeI-1083', 'SIII', 'OII-7325', 'ArIII-7138',
                      'SII', 'Ha', 'OI-6302', 'HeI-5877', 'OIII', 'Hb', 
                      'OIII-4363', 'Hg', 'Hd', 'H7', 'H8', 'H9', 'H10', 
                      'NeIII-3867', 'OII', 'NeVI-3426', 'NeV-3346', 'MgII', 
@@ -1871,6 +1873,16 @@ def get_line_wavelengths():
     line_ratios = OrderedDict()
 
     # Paschen: https://www.gemini.edu/sciops/instruments/nearir-resources/astronomical-lines/h-lines
+    line_wavelengths['BrA'] = [40522.8]
+    line_ratios['BrA'] = [1.]
+    line_wavelengths['BrB'] = [26258.7]
+    line_ratios['BrB'] = [1.]
+    line_wavelengths['BrG'] = [21661.178]
+    line_ratios['BrG'] = [1.]
+    line_wavelengths['PfG'] = [37405.76]
+    line_ratios['PfG'] = [1.]
+    line_wavelengths['PfD'] = [32969.8]
+    line_ratios['PfD'] = [1.]
     line_wavelengths['PaA'] = [18751.0]
     line_ratios['PaA'] = [1.]
     line_wavelengths['PaB'] = [12821.6]
@@ -2258,6 +2270,70 @@ def emission_line_templates():
         np.savetxt('fsps_{0}_lines.txt'.format(t), np.array([wave, neb_only]).T, fmt='%.5e', header=header)
 
         line_templates[t] = utils.SpectrumTemplate(wave=wave, flux=neb_only, name='fsps_{0}_lines'.format(t))
+
+
+def pah33(wave_grid):
+    """
+    Set of 3.3 um PAH lines from Li et al. 2020
+    
+    Returns
+    -------
+    pah_templates : list
+        List of `~grizli.utils.SpectrumTemplate` templates for three components
+        around 3.3 um
+    
+    """
+    pah_templates = {}
+    for lc, lw in zip([3.29, 3.40, 3.47], [0.043, 0.031, 0.100]):
+        ti = pah_line_template(wave_grid, center_um=lc, fwhm=lw)
+        pah_templates[ti.name] = ti
+    
+    return pah_templates
+
+
+def pah_line_template(wave_grid, center_um=3.29, fwhm=0.043):
+    """
+    Make a template for a broad PAH line with a Drude profile
+    
+    Default parameters in Lai et al. 2020
+    https://iopscience.iop.org/article/10.3847/1538-4357/abc002/pdf
+    from Tokunaga et al. 1991
+    
+    Drude equation and normalization from Yamada et al. 2013
+    
+    Parameters
+    ----------
+    wave_grid : array-like
+        Wavelength grid in angstroms
+    
+    center_um : float
+        Central wavelength in microns
+    
+    fwhm : float
+        Drude profile FWHM in microns
+    
+    Returns
+    -------
+    pah_templ : `~grizli.utils.SpectrumTemplate`
+        Template with the PAH feature
+    
+    """
+    br = 1.
+    gamma_width = fwhm/center_um
+    Iv = br*gamma_width**2
+    Iv /= ((wave_grid/1.e4/center_um - center_um*1.e4/wave_grid)**2
+           + gamma_width**2)
+
+    Inorm = np.pi*2.99e14/2.*br*gamma_width/center_um
+    Iv *= 1 / Inorm
+    
+    # Flambda
+    Ilam = Iv * 2.99e18 / (wave_grid)**2
+    
+    pah_templ = SpectrumTemplate(wave=wave_grid,
+                                 flux=Ilam, 
+                                 name=f'line PAH-{center_um:.2f}')
+    return pah_templ
 
 
 class SpectrumTemplate(object):
