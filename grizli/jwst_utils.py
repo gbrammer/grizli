@@ -1178,12 +1178,11 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
     if oneoverf_correction:
         
         # NIRCam grism
-        if ((img[0].header['OINSTRUM'] == 'NIRCAM') & 
-            ('GRISM' in img[0].header['OPUPIL'])):
+        if (img[0].header['OINSTRUM'] == 'NIRCAM'):
+             if 'GRISM' in img[0].header['OPUPIL']:
+                _nircam_grism = True
 
-            _nircam_grism = True
-
-        else:
+        if not _nircam_grism:
             
             try:
                 _ = exposure_oneoverf_correction(filename, in_place=True, 
