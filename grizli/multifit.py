@@ -963,6 +963,7 @@ class GroupFLT():
 
         return hdu, fig
 
+
     def drizzle_grism_models(self, root='grism_model', kernel='square', scale=0.1, pixfrac=1, make_figure=True, fig_xsize=10):
         """
         Make model-subtracted drizzled images of each grism / PA
@@ -993,7 +994,15 @@ class GroupFLT():
                 idx = self.PA[g][pa]
 
                 N = len(idx)
-                sci_list = [self.FLTs[i].grism['SCI'] for i in idx]
+                sci_list = []
+                for i in idx:
+                    grism = self.FLTs[i].grism
+                    if 'MED' in grism.data:
+                        sci_list.append(grism['SCI'] + grism['MED'])
+                    else:
+                        sci_list.append(grism['SCI'])
+                        
+                #sci_list = [self.FLTs[i].grism['SCI'] for i in idx]
                 clean_list = [self.FLTs[i].grism['SCI']-self.FLTs[i].model
                                  for i in idx]
 
@@ -1089,6 +1098,53 @@ class GroupFLT():
                     fig.savefig(outfile.split('_clean')[0]+'.png',
                                 transparent=True)
                     plt.close(fig)
+
+
+    def subtract_median_filter(self, filter_size=71, filter_central=10):
+        """
+        Remove a median filter calculated along the dispersion axis
+        """
+        import scipy.ndimage as nd
+        
+        filter_footprint = np.ones(filter_size, dtype=int)
+        if filter_central > 0:
+            f0 = (filter_size-1)//2
+            filter_footprint[f0-filter_central:f0+filter_central] = 0
+        
+        for flt in self.FLTs:
+            msg = f'subtract_median_filter: {flt.grism.parent_file} '
+            msg += f' filter_size={filter_size} filter_central={filter_central}'
+            utils.log_comment(utils.LOGFILE, msg, verbose=True)
+            
+            sci_i = flt.grism.data['SCI']*1
+            err_i = flt.grism.data['ERR']
+            dq_i = flt.grism.data['DQ']
+            
+            ok = (err_i > 0) & np.isfinite(err_i+sci_i)
+            ok &= ((dq_i & 1025) == 0)
+            
+            ivar = 1/err_i**2
+            ivar[~ok] = 0
+            #sci_i[~ok] = np.nan
+            
+            #filter_sci = np.zeros_like(sci_i)
+            #sh = sci_i.shape
+            
+            filter_sci = nd.median_filter(sci_i, footprint=filter_footprint[None,:])
+            
+            # valid = ok.sum(axis=1)
+            #
+            # for i in range(sh[0]):
+            #     if not valid[i]:
+            #         continue
+            #
+            #     filter_sci[i,:] = nd.median_filter(sci_i[i,:], filter_size)
+
+            flt.grism.data['SCI'] -= filter_sci*ok
+            flt.grism.data['MED'] = filter_sci*ok
+            flt.grism.header['MEDSIZE'] = filter_size, 'Median filter size'
+            flt.grism.header['MEDCLIP'] = filter_central, 'Masked central pixels of the filter'
+
 
     def drizzle_full_wavelength(self, wave=1.4e4, ref_header=None,
                      kernel='point', pixfrac=1., verbose=True,
