@@ -4,7 +4,6 @@ channels:
 dependencies:
 - pyregion
 - hstcal
-- wfc3tools
 - pip:
   - git+https://github.com/gbrammer/reprocess_wfc3.git
   - git+https://github.com/gbrammer/tristars.git
