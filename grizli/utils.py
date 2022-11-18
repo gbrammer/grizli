@@ -5895,7 +5895,12 @@ def drizzle_array_groups(sci_list, wht_list, wcs_list, outputwcs=None,
 
     # Output header / WCS
     if outputwcs is None:
-        header, outputwcs = compute_output_wcs(wcs_list, pixel_scale=scale)
+        #header, outputwcs = compute_output_wcs(wcs_list, pixel_scale=scale)
+        header, outputwcs = make_maximal_wcs(wcs_list,
+                                             pixel_scale=scale,
+                                             verbose=False,
+                                             pad=0,
+                                             get_hdu=False)
     else:
         header = to_header(outputwcs)
 
@@ -6064,7 +6069,11 @@ def compute_output_wcs(wcs_list, pixel_scale=0.1, max_size=10000):
     xsize = np.minimum(xsize, max_size*pixel_scale)
     ysize = np.minimum(ysize, max_size*pixel_scale)
 
-    header, outputwcs = make_wcsheader(ra=crval[0], dec=crval[1], size=(xsize, ysize), pixscale=pixel_scale, get_hdu=False, theta=0)
+    header, outputwcs = make_wcsheader(ra=crval[0], dec=crval[1],
+                     size=(xsize, ysize),
+                     pixscale=pixel_scale,
+                     get_hdu=False,
+                     theta=0)
 
     return header, outputwcs
 
@@ -8637,7 +8646,49 @@ def simple_LCDM(Om0=0.3, Ode0=0.7, H0=70, Ob0=0.0463, Tcmb0=2.725, name=None):
     from astropy.cosmology import LambdaCDM
     cosmology = LambdaCDM(H0, Om0, Ode0, Tcmb0=Tcmb0, name=name)
     return cosmology
+
+
+def make_filter_footprint(filter_size=71, filter_central=0, **kwargs):
+    """
+    Make a footprint for image filtering
+    """
+    filter_footprint = np.ones(filter_size, dtype=int)
     
+    if filter_central > 0:
+        f0 = (filter_size-1)//2
+        filter_footprint[f0-filter_central:f0+filter_central] = 0
+    
+    return filter_footprint
+
+
+def safe_nanmedian_row_filter(data, filter_kwargs={}, clean=True):
+    """
+    Run nanmedian filter on `data`
+    """
+    import scipy.ndimage as nd
+    
+    try:
+        from . import nbutils
+        _filter_name = 'nbutils.nanmedian'
+    except:
+        nbutils = None
+        _filter_name = 'median_filter'
+    
+    filter_footprint = make_filter_footprint(**filter_kwargs)
+    
+    # print('xxx', data.shape, filter_footprint.shape)
+    
+    if nbutils is None:
+        filter_data = nd.median_filter(data, footprint=filter_footprint[None,:])
+    else:
+        filter_data = nd.generic_filter(data, nbutils.nanmedian,
+                                       footprint=filter_footprint[None,:])
+        if clean:
+            filter_data[~np.isfinite(filter_data)] = 0
+            
+    return filter_data, _filter_name
+
+
 def argv_to_dict(argv, defaults={}, dot_dict=True):
     """
     Convert a list of (simple) command-line arguments to a dictionary.
