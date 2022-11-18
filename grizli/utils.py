@@ -6772,7 +6772,7 @@ class EffectivePSF:
         TBD
         """
         # So much faster than scipy.interpolate.griddata!
-        from scipy.ndimage.interpolation import map_coordinates
+        from scipy.ndimage import map_coordinates
 
         # ePSF only defined to 12.5 pixels
         if self.eval_psf_type in ['WFC3/IR','HST/Optical']:
