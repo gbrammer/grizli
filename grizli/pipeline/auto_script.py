@@ -3073,7 +3073,7 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
         for filt in ['F090W', 'F115W', 'F150W', 'F200W']:
             #key = f'{gr.lower()}-{filt.lower()}'
             # key = filt.lower()
-            key = filt.lower() + 'n-clear'
+            key = filt.lower() + '-clear'
 
             if key in masks:
                 masks[key][0] |= ((info['PUPIL'] == filt) & 
