@@ -2890,6 +2890,7 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
         msg += f'\nauto_script.grism_prep: seg_file = {seg_file}' 
         msg += f'\nauto_script.grism_prep: catalog  = {catalog}' 
         msg += f'\nauto_script.grism_prep: polyx  = {polyx}' 
+        msg += f'\nauto_script.grism_prep: pad  = {pad}' 
         utils.log_comment(utils.LOGFILE, msg, verbose=True)
         
         grp_i = multifit.GroupFLT(grism_files=_grism_files,
