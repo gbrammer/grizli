@@ -2916,7 +2916,7 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
         return [grp]
 
 
-def grism_prep(field_root='j142724+334246', PREP_PATH='../Prep', EXTRACT_PATH='../Extractions', ds9=None, refine_niter=3, gris_ref_filters=GRIS_REF_FILTERS, force_ref=None, files=None, split_by_grism=True, refine_poly_order=1, refine_fcontam=0.5, cpu_count=0, mask_mosaic_edges=True, prelim_mag_limit=25, refine_mag_limits=[18, 24], init_coeffs=[1.1, -0.5], grisms_to_process=None, pad=256, model_kwargs={'compute_size': True}):
+def grism_prep(field_root='j142724+334246', PREP_PATH='../Prep', EXTRACT_PATH='../Extractions', ds9=None, refine_niter=3, gris_ref_filters=GRIS_REF_FILTERS, force_ref=None, files=None, split_by_grism=True, refine_poly_order=1, refine_fcontam=0.5, cpu_count=0, mask_mosaic_edges=True, prelim_mag_limit=25, refine_mag_limits=[18, 24], init_coeffs=[1.1, -0.5], grisms_to_process=None, pad=256, model_kwargs={'compute_size': True}, subtract_median_filter=False, median_filter_size=71, median_filter_central=10):
     """
     Contamination model for grism exposures
     """
@@ -2947,13 +2947,23 @@ def grism_prep(field_root='j142724+334246', PREP_PATH='../Prep', EXTRACT_PATH='.
                                 pad=pad)
 
     for grp in grp_objects:
-
-        ################
-        # Compute preliminary model
-        grp.compute_full_model(fit_info=None, verbose=True, store=False, 
-                               mag_limit=prelim_mag_limit, coeffs=init_coeffs, 
-                               cpu_count=cpu_count,
-                               model_kwargs=model_kwargs)
+        
+        if subtract_median_filter:
+            
+            # Subtract a median along the dispersion direction
+            # and don't do any contamination modeling
+            refine_niter = 0
+            grp.subtract_median_filter(filter_size=median_filter_size, 
+                                       filter_central=median_filter_central)
+            
+        else:
+            ################
+            # Compute preliminary model
+            grp.compute_full_model(fit_info=None, verbose=True, store=False, 
+                                   mag_limit=prelim_mag_limit, 
+                                   coeffs=init_coeffs, 
+                                   cpu_count=cpu_count,
+                                   model_kwargs=model_kwargs)
 
         ##############
         # Save model to avoid having to recompute it again
