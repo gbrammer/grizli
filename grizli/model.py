@@ -285,7 +285,6 @@ class GrismDisperser(object):
 
         # Get Pixel area map (xxx need to add test for WFC3)
         self.PAM_value = self.get_PAM_value(verbose=False)
-        #print('xxx PAM!')
 
         self.process_config()
 
@@ -1000,7 +999,6 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
                                  ivar=self.psf_ivar, origin=origin,
                                  shape=self.sh, filter=psf_filter,
                                  get_extended=get_extended)
-        #print('XXX', self.psf_params[0], self.psf.sum())
 
         # self.psf_params[0] /= self.psf.sum()
         # self.psf /= self.psf.sum()
@@ -1386,6 +1384,8 @@ class ImageData(object):
         """
         import copy
         
+        med_filter = None
+        
         # Easy way, get everything from an image HDU list
         if isinstance(hdulist, pyfits.HDUList):
 
@@ -1408,6 +1408,10 @@ class ImageData(object):
                 err = np.cast[np.float32](hdulist['ERR', sci_extn].data)
                 dq = np.cast[np.int16](hdulist['DQ', sci_extn].data)
                 
+                if ('MED',sci_extn) in hdulist:
+                    mkey = ('MED',sci_extn)
+                    med_filter = np.cast[np.float32](hdulist[mkey].data)
+                    
                 base_extn = ('SCI', sci_extn)
 
             else:
@@ -1637,7 +1641,10 @@ class ImageData(object):
             self.ref_photflam = ref_photflam
             self.ref_photplam = ref_photplam
             self.ref_filter = ref_filter
-
+        
+        if med_filter is not None:
+            self.data['MED'] = med_filter
+            
         self.wcs = None
 
         # if (instrument in ['NIRISS', 'NIRCAM']) & (~self.is_slice):
@@ -1781,8 +1788,6 @@ class ImageData(object):
                         fh['NAXIS2'] = int(fh['CRPIX2']*2)
 
                     wcs = stwcs.wcsutil.hstwcs.HSTWCS(fobj=fobj, ext=0)
-
-            #print('XXX WCS',wcs)
 
             # Object is a cutout
             if self.is_slice:
@@ -2271,7 +2276,10 @@ class ImageData(object):
             slice_obj.data['REF'] = self.data['REF'][sly, slx]*1
         else:
             slice_obj.data['REF'] = None
-
+        
+        if 'MED' in self.data:
+            slice_obj.data['MED'] = self.data['MED'][sly, slx]*1
+        
         slice_obj.grow = self.grow
         slice_obj.pad = self.pad
         slice_obj.parent_file = self.parent_file
@@ -2562,8 +2570,6 @@ class GrismFLT(object):
         if self.grism is not None:
             if np.max(self.grism.pad) > 0:
                 self.pad = self.grism.pad
-        
-        print('xxx', pad, self.pad)
         
         if (self.grism is None) & (self.direct is not None):
             self.grism = ImageData(hdulist=direct_im, sci_extn=sci_extn)
@@ -3140,7 +3146,6 @@ class GrismFLT(object):
                 if psf_params is not None:
                     store = True
                     INIT_PSF_NOW = True
-                    #print('xxx Init PSF', b)
                     if self.direct.ref_filter is None:
                         psf_filter = self.direct.filter
                     else:
@@ -3158,7 +3163,6 @@ class GrismFLT(object):
                 beam = beams[b]
                 if hasattr(beam, 'psf') & (not INIT_PSF_NOW):
                     store = True
-                    #print('xxx OLD PSF')
                     beam.compute_model_psf(spectrum_1d=old_spectrum_1d,
                                        is_cgs=old_cgs)
                 else:
@@ -3907,6 +3911,14 @@ class GrismFLT(object):
 
         self.has_edge_mask = True
 
+
+    def get_trace_region_from_sky(self, ra, dec, width=2):
+        """
+        Make a region file for the trace in pixel coordinates given sky position
+        TBD
+        """
+        return None
+        
     def old_make_edge_mask(self, scale=3, force=False):
         """Make a mask for the edge of the grism FoV that isn't covered by the direct image
 
@@ -4040,6 +4052,7 @@ class BeamCutout(object):
 
         self._parse_from_data(isJWST=isJWST, **self._parse_params)
 
+
     def _parse_from_data(self, contam_sn_mask=[10, 3], min_mask=0.01,
                          seg_ids=None, min_sens=0.08, mask_resid=True, isJWST=False):
         """
@@ -4080,7 +4093,6 @@ class BeamCutout(object):
                     self.flat_flam += flat_i
 
         # OK data where the 2D model has non-zero flux
-        #print('xxxxxxx', self.mask.flatten().shape, self.flat_flam.shape)
         
         self.fit_mask = (~self.mask.flatten()) & (self.ivar.flatten() != 0)
         self.fit_mask &= (self.flat_flam > min_mask*self.flat_flam.max())
