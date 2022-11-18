@@ -31,7 +31,7 @@ jobs:
         pip install --upgrade pip
         pip install astropy-helpers
         pip install git+https://github.com/astropy/pyregion
-        pip install -e .[jwst,test]
+        pip install .[jwst,test]
     - name: Test with pytest
       run: |
-        pytest
+        pytest --pyargs grizli --import-mode importlib
