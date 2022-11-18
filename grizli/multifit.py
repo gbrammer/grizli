@@ -180,7 +180,7 @@ def _compute_model(i, flt, fit_info, is_cgs, store, model_kwargs):
 
 class GroupFLT():
     def __init__(self, grism_files=[], sci_extn=1, direct_files=[],
-                 pad=200, group_name='group',
+                 pad=(64,256), group_name='group',
                  ref_file=None, ref_ext=0, seg_file=None,
                  shrink_segimage=True, verbose=True, cpu_count=0,
                  catalog='', polyx=[0.3, 5.1],
@@ -207,11 +207,11 @@ class GroupFLT():
             and just use the `ref_file` reference image, set to an empty list
             (`[]`).
 
-        pad : int
+        pad : int, int
             Padding in pixels to apply around the edge of the detector to
             allow modeling of sources that fall off of the nominal FOV.  For
             this to work requires using a `ref_file` reference image that
-            covers this extra area.
+            covers this extra area.  Specified in array axis order (pady, padx)
 
         group_name : str
             Name to apply to products produced by this group.
@@ -307,7 +307,18 @@ class GroupFLT():
             t0_pool = time.time()
 
             pool = mp.Pool(processes=cpu_count)
-            results = [pool.apply_async(_loadFLT, (self.grism_files[i], sci_extn, self.direct_files[i], pad, ref_file, ref_ext, seg_file, verbose, self.catalog, i)) for i in range(N)]
+            results = [pool.apply_async(_loadFLT,
+                                                (self.grism_files[i],
+                                                 sci_extn,
+                                                 self.direct_files[i],
+                                                 pad,
+                                                 ref_file,
+                                                 ref_ext,
+                                                 seg_file,
+                                                 verbose,
+                                                 self.catalog,
+                                                 i)
+                                         ) for i in range(N)]
 
             pool.close()
             pool.join()
@@ -3650,13 +3661,17 @@ class MultiBeam(GroupFitter):
         fp.close()
 
         fp = open('{0}_{1:05d}.zfit.beams.dat'.format(self.group_name, self.id), 'w')
-        fp.write('# file filter origin_x origin_y size pad bg\n')
+        fp.write('# file filter origin_x origin_y size padx pady bg\n')
         for ib, beam in enumerate(self.beams):
-            data = '{0:40s} {1:s} {2:5d} {3:5d} {4:5d} {5:5d}'.format(beam.grism.parent_file, beam.grism.filter,
-                                          beam.direct.origin[0],
-                                          beam.direct.origin[1],
-                                          beam.direct.sh[0],
-                                          beam.direct.pad)
+            msg = '{0:40s} {1:s} {2:5d} {3:5d} {4:5d} {5:5d} {6:5d}'
+            data = msg.format(beam.grism.parent_file,
+                              beam.grism.filter,
+                              beam.direct.origin[0],
+                              beam.direct.origin[1],
+                              beam.direct.sh[0],
+                              beam.direct.pad[1],
+                              beam.direct.pad[0]
+                              )
             if self.fit_bg:
                 data += ' {0:8.4f}'.format(fit['coeffs_full'][ib])
             else:
