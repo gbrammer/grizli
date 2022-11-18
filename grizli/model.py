@@ -2293,7 +2293,10 @@ class ImageData(object):
         hdu.append(pyfits.ImageHDU(data=err_data, header=h,
                                    name='ERR'))
         hdu.append(pyfits.ImageHDU(data=self.data['DQ'], header=h, name='DQ'))
-
+        
+        if 'MED' in self.data:
+            hdu.append(pyfits.ImageHDU(data=self.data['MED'], header=h, name='MED'))
+            
         if self.data['REF'] is not None:
             h['PHOTFLAM'] = self.ref_photflam
             h['PHOTPLAM'] = self.ref_photplam
@@ -2307,6 +2310,7 @@ class ImageData(object):
 
         return hdul
 
+
     def __getitem__(self, ext):
         if self.data[ext] is None:
             return None
@@ -2317,6 +2321,7 @@ class ImageData(object):
             return self.data['DQ']
         else:
             return self.data[ext]/self.photflam
+
 
     def get_common_slices(self, other, verify_parent=True):
         """
@@ -2570,7 +2575,8 @@ class GrismFLT(object):
         
         if _DIRECT_OPEN:
             direct_im.close()
-            
+
+
     def process_ref_file(self, ref_file, ref_ext=0, shrink_segimage=True,
                          verbose=True):
         """Read and blot a reference image
