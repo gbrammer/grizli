@@ -1948,7 +1948,7 @@ class GroupFitter(object):
         return A_phot[:, mask]
 
 
-    def xfit_at_z(self, z=0, templates=[], fitter='nnls', fit_background=True, get_uncertainties=False, get_design_matrix=False, pscale=None, COEFF_SCALE=1.e-19, get_components=False, huber_delta=4, get_residuals=False, include_photometry=True, use_cached_templates=False, bounded_kwargs=BOUNDED_DEFAULTS, apply_sensitivity=True):
+    def xfit_at_z(self, z=0, templates=[], fitter='nnls', fit_background=True, get_uncertainties=False, get_design_matrix=False, pscale=None, COEFF_SCALE=1.e-19, get_components=False, huber_delta=4, get_residuals=False, include_photometry=True, use_cached_templates=False, bounded_kwargs=BOUNDED_DEFAULTS, apply_sensitivity=True, median_filter_kwargs=None):
         """Fit the 2D spectra with a set of templates at a specified redshift.
 
         Parameters
@@ -2099,9 +2099,28 @@ class GroupFitter(object):
                 sl = self.mslices[j]
                 if t in beam.thumbs:
                     #print('Use thumbnail!', t)
-                    A[self.N+i, sl] = beam.compute_model(thumb=beam.thumbs[t], spectrum_1d=s, in_place=False, is_cgs=True, apply_sensitivity=apply_sensitivity)[beam.fit_mask]*COEFF_SCALE
+                    _model_i = beam.compute_model(thumb=beam.thumbs[t],
+                                                  spectrum_1d=s,
+                                                  in_place=False,
+                                                  is_cgs=True,
+                                            apply_sensitivity=apply_sensitivity)
+                                            
+                    #A[self.N+i, sl] = _model_i[beam.fit_mask]*COEFF_SCALE
                 else:
-                    A[self.N+i, sl] = beam.compute_model(spectrum_1d=s, in_place=False, is_cgs=True, apply_sensitivity=apply_sensitivity)[beam.fit_mask]*COEFF_SCALE
+                    _model_i = beam.compute_model(spectrum_1d=s, 
+                                                  in_place=False,
+                                                  is_cgs=True,
+                                            apply_sensitivity=apply_sensitivity)
+                
+                if median_filter_kwargs is not None:
+                    _model_resh = _model_i.reshape(beam.sh) 
+                    _fdata, _ft = utils.safe_nanmedian_row_filter(_model_resh, 
+                                             filter_kwargs=median_filter_kwargs,
+                                             clean=True)
+                    
+                    _model_i -= _fdata.flatten()
+                    
+                A[self.N+i, sl] = _model_i[beam.fit_mask]*COEFF_SCALE
 
             # Multiply spline templates by single continuum template
             if ('spline' in t) & ('spline' in fitter):
@@ -2916,6 +2935,7 @@ class GroupFitter(object):
         fit.meta['gam_loss'] = (risk_gamma, 
                                 'Gamma factor of the risk/loss function')
         return fit
+
 
     def template_at_z(self, z=0, templates=None, fwhm=1400, get_uncertainties=2, draws=0, **kwargs):
         """
@@ -3749,7 +3769,7 @@ class GroupFitter(object):
         return fig, line, tfit
 
 
-    def oned_figure(self, bin=1, wave=None, show_beams=True, minor=0.1, tfit=None, show_rest=False, axc=None, figsize=[6, 4], fill=False, units='flam', min_sens_show=0.1, ylim_percentile=2, scale_on_stacked=False, show_individual_templates=False, apply_beam_mask=True, loglam_1d=True, trace_limits=None, show_contam=False, add_label=True, beam_models=None):
+    def oned_figure(self, bin=1, wave=None, show_beams=True, minor=0.1, tfit=None, show_rest=False, axc=None, figsize=[6, 4], fill=False, units='flam', min_sens_show=0.1, ylim_percentile=2, scale_on_stacked=False, show_individual_templates=False, apply_beam_mask=True, loglam_1d=True, trace_limits=None, show_contam=False, add_label=True, beam_models=None, median_filter_kwargs=None):
         """
         Make a figure showing the 1D spectra 
         
@@ -3864,7 +3884,9 @@ class GroupFitter(object):
                                                degree=3, df=df,
                                                get_matrix=True, log=True)
 
-                cspl, _, _, _ = np.linalg.lstsq(Aspl, tfit['cont1d'].flux[ran], rcond=-1)
+                cspl, _, _, _ = np.linalg.lstsq(Aspl,
+                                                tfit['cont1d'].flux[ran],
+                                                rcond=-1)
 
                 yspl = tfit['cont1d'].flux*0.
                 yspl[ran] = Aspl.dot(cspl)
@@ -3902,6 +3924,13 @@ class GroupFitter(object):
 
             if tfit is not None:
                 m_i = beam.compute_model(spectrum_1d=sp, is_cgs=True, in_place=False).reshape(beam.sh)
+                if median_filter_kwargs is not None:
+                    _fdata, _ft = utils.safe_nanmedian_row_filter(m_i, 
+                                             filter_kwargs=median_filter_kwargs,
+                                             clean=True)
+                    
+                    m_i -= _fdata
+                
             elif beam_models is not None:
                 m_i = beam_models[i]
             else:
