@@ -1100,12 +1100,19 @@ class GroupFLT():
                     plt.close(fig)
 
 
-    def subtract_median_filter(self, filter_size=71, filter_central=10):
+    def subtract_median_filter(self, filter_size=71, filter_central=10, revert=True):
         """
         Remove a median filter calculated along the dispersion axis
         """
         import scipy.ndimage as nd
         
+        try:
+            from . import nbutils
+            _filter_name = 'nbutils.nanmedian'
+        except:
+            nbutils = None
+            _filter_name = 'median_filter'
+            
         filter_footprint = np.ones(filter_size, dtype=int)
         if filter_central > 0:
             f0 = (filter_size-1)//2
@@ -1114,24 +1121,36 @@ class GroupFLT():
         for flt in self.FLTs:
             msg = f'subtract_median_filter: {flt.grism.parent_file} '
             msg += f' filter_size={filter_size} filter_central={filter_central}'
+            msg += f' [{_filter_name}]'
+            
             utils.log_comment(utils.LOGFILE, msg, verbose=True)
             
             sci_i = flt.grism.data['SCI']*1
+            if revert & ('MED' in flt.grism.data):
+                sci_i += flt.grism.data['MED']
+                
             err_i = flt.grism.data['ERR']
             dq_i = flt.grism.data['DQ']
             
-            ok = (err_i > 0) & np.isfinite(err_i+sci_i)
+            ok = (sci_i != 0) & (err_i > 0) & np.isfinite(err_i+sci_i)
             ok &= ((dq_i & 1025) == 0)
             
             ivar = 1/err_i**2
             ivar[~ok] = 0
-            #sci_i[~ok] = np.nan
             
             #filter_sci = np.zeros_like(sci_i)
             #sh = sci_i.shape
             
-            filter_sci = nd.median_filter(sci_i, footprint=filter_footprint[None,:])
-            
+            if nbutils is None:
+                filter_sci = nd.median_filter(sci_i, footprint=filter_footprint[None,:])
+            else:
+                sci_i[~ok] = np.nan
+                filter_sci = nd.generic_filter(sci_i,
+                                               nbutils.nanmedian,
+                                               footprint=filter_footprint[None,:])
+                
+                filter_sci[~np.isfinite(filter_sci)] = 0
+                
             # valid = ok.sum(axis=1)
             #
             # for i in range(sh[0]):
@@ -1144,6 +1163,7 @@ class GroupFLT():
             flt.grism.data['MED'] = filter_sci*ok
             flt.grism.header['MEDSIZE'] = filter_size, 'Median filter size'
             flt.grism.header['MEDCLIP'] = filter_central, 'Masked central pixels of the filter'
+            flt.grism.header['MEDFILT'] = _filter_name, 'Filter type'
 
 
     def drizzle_full_wavelength(self, wave=1.4e4, ref_header=None,
