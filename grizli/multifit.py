@@ -180,7 +180,7 @@ def _compute_model(i, flt, fit_info, is_cgs, store, model_kwargs):
 
 class GroupFLT():
     def __init__(self, grism_files=[], sci_extn=1, direct_files=[],
-                 pad=200, group_name='group',
+                 pad=(64,256), group_name='group',
                  ref_file=None, ref_ext=0, seg_file=None,
                  shrink_segimage=True, verbose=True, cpu_count=0,
                  catalog='', polyx=[0.3, 5.1],
@@ -207,11 +207,11 @@ class GroupFLT():
             and just use the `ref_file` reference image, set to an empty list
             (`[]`).
 
-        pad : int
+        pad : int, int
             Padding in pixels to apply around the edge of the detector to
             allow modeling of sources that fall off of the nominal FOV.  For
             this to work requires using a `ref_file` reference image that
-            covers this extra area.
+            covers this extra area.  Specified in array axis order (pady, padx)
 
         group_name : str
             Name to apply to products produced by this group.
@@ -307,7 +307,18 @@ class GroupFLT():
             t0_pool = time.time()
 
             pool = mp.Pool(processes=cpu_count)
-            results = [pool.apply_async(_loadFLT, (self.grism_files[i], sci_extn, self.direct_files[i], pad, ref_file, ref_ext, seg_file, verbose, self.catalog, i)) for i in range(N)]
+            results = [pool.apply_async(_loadFLT,
+                                                (self.grism_files[i],
+                                                 sci_extn,
+                                                 self.direct_files[i],
+                                                 pad,
+                                                 ref_file,
+                                                 ref_ext,
+                                                 seg_file,
+                                                 verbose,
+                                                 self.catalog,
+                                                 i)
+                                         ) for i in range(N)]
 
             pool.close()
             pool.join()
@@ -1014,7 +1025,7 @@ class GroupFLT():
                 wcs_list = [self.FLTs[i].grism.wcs for i in idx]
                 for i, ix in enumerate(idx):
                     if wcs_list[i]._naxis[0] == 0:
-                        wcs_list[i]._naxis = self.FLTs[ix].grism.sh
+                        wcs_list[i]._naxis = self.FLTs[ix].grism.sh[::-1]
 
                 # Science array
                 outfile = '{0}-{1}-{2}_grism_sci.fits'.format(root, g.lower(),
@@ -1113,10 +1124,8 @@ class GroupFLT():
             nbutils = None
             _filter_name = 'median_filter'
             
-        filter_footprint = np.ones(filter_size, dtype=int)
-        if filter_central > 0:
-            f0 = (filter_size-1)//2
-            filter_footprint[f0-filter_central:f0+filter_central] = 0
+        filter_footprint = utils.make_filter_footprint(filter_size=filter_size, 
+                                                  filter_central=filter_central)
         
         for flt in self.FLTs:
             msg = f'subtract_median_filter: {flt.grism.parent_file} '
@@ -1142,12 +1151,13 @@ class GroupFLT():
             #sh = sci_i.shape
             
             if nbutils is None:
-                filter_sci = nd.median_filter(sci_i, footprint=filter_footprint[None,:])
+                filter_sci = nd.median_filter(sci_i,
+                                             footprint=filter_footprint[None,:])
             else:
                 sci_i[~ok] = np.nan
                 filter_sci = nd.generic_filter(sci_i,
                                                nbutils.nanmedian,
-                                               footprint=filter_footprint[None,:])
+                                             footprint=filter_footprint[None,:])
                 
                 filter_sci[~np.isfinite(filter_sci)] = 0
                 
@@ -1323,7 +1333,35 @@ class GroupFLT():
 
         # Done!
         return outsci, outwht
-
+    
+    
+    def find_source_along_trace(self, line_ra, line_dec):
+        """
+        Given a sky position in the (artificial) dispersed image frame, 
+        find sources that would disperse to that position
+        """
+        
+        # Find an exposure that contains the position
+        conf = None
+        
+        for flt in self.FLTs:
+            wcs_i = flt.grism.wcs
+            xw, yw = np.squeeze(wcs_i.all_world2pix([line_ra], [line_dec], 0))
+        
+            sh = flt.grism.sh
+            if (xw > 0) & (yw > 0) & (xw < sh[1]) & (yw < sh[0]):
+                conf = flt.conf
+                break
+        
+        if conf is None:
+            msg = f'No exposures disperse to {line_ra}, {line_dec}'
+            print(msg)
+            return None
+        
+        # TBD
+        return None
+    
+    
 # def replace_direct_image_cutouts(beams_file='', ref_image='gdn-100mas-f160w_drz_sci.fits', interp='poly5', cutout=200, background_func=utils.mode_statistic):
 #     """
 #     Replace "REF" extensions in a `beams.fits` file
@@ -2043,7 +2081,6 @@ class MultiBeam(GroupFitter):
                     np.minimum(xy[1]+cutout, sh[0]))
 
         bkg_data = None
-        #print('xxx', slx, sly, ref_data[sly, slx].shape, ref_data[sly, slx].max(), ref_photflam)
 
         for ie in range(self.N):
 
@@ -2060,7 +2097,6 @@ class MultiBeam(GroupFitter):
                               wcs_copy, 1, coeffs=True, interp=interp,
                               sinscl=1.0, stepsize=10, wcsmap=None)
 
-            #print('xxx', blotted.max(), ref_data[sly, slx].max())
             if background_func is not None:
                 msk = self.beams[ie].beam.seg == 0
                 #print(msk.shape, blotted.shape, ie)
@@ -3650,13 +3686,17 @@ class MultiBeam(GroupFitter):
         fp.close()
 
         fp = open('{0}_{1:05d}.zfit.beams.dat'.format(self.group_name, self.id), 'w')
-        fp.write('# file filter origin_x origin_y size pad bg\n')
+        fp.write('# file filter origin_x origin_y size padx pady bg\n')
         for ib, beam in enumerate(self.beams):
-            data = '{0:40s} {1:s} {2:5d} {3:5d} {4:5d} {5:5d}'.format(beam.grism.parent_file, beam.grism.filter,
-                                          beam.direct.origin[0],
-                                          beam.direct.origin[1],
-                                          beam.direct.sh[0],
-                                          beam.direct.pad)
+            msg = '{0:40s} {1:s} {2:5d} {3:5d} {4:5d} {5:5d} {6:5d}'
+            data = msg.format(beam.grism.parent_file,
+                              beam.grism.filter,
+                              beam.direct.origin[0],
+                              beam.direct.origin[1],
+                              beam.direct.sh[0],
+                              beam.direct.pad[1],
+                              beam.direct.pad[0]
+                              )
             if self.fit_bg:
                 data += ' {0:8.4f}'.format(fit['coeffs_full'][ib])
             else:
@@ -3968,16 +4008,11 @@ class MultiBeam(GroupFitter):
                 # Line kernel
                 if (not usewcs):
                     h = hdu[1].header
-                    #gau = S.GaussianSource(1.e-17, h['CRVAL1'], h['CD1_1']*1)
-
                     # header keywords scaled to um
                     toA = 1.e4
-                    #toA = 1.
+                    gau = utils.SpectrumTemplate(central_wave=h['CRVAL1']*toA, 
+                                                 fwhm=h['CD1_1']*toA)
 
-                    #gau = S.GaussianSource(1., h['CRVAL1']*toA, h['CD1_1']*toA)
-                    gau = utils.SpectrumTemplate(central_wave=h['CRVAL1']*toA, fwhm=h['CD1_1']*toA)
-
-                    #print('XXX', h['CRVAL1'], h['CD1_1'], h['CRPIX1'], toA, gau.wave[np.argmax(gau.flux)])
                     if reset_model:
                         for beam in beams:
                             beam.compute_model(spectrum_1d=[gau.wave,
@@ -3998,7 +4033,7 @@ class MultiBeam(GroupFitter):
                                         mask_segmentation=mask_segmentation)
 
                     kern = h_kern[1].data[:, h['CRPIX1']-1-size:h['CRPIX1']-1+size]
-                    #print('XXX', kern.max(), h_kern[1].data.max())
+
                     hdu_kern = pyfits.ImageHDU(data=kern, header=h_kern[1].header, name='KERNEL')
                     hdu.append(hdu_kern)
                 else:
@@ -5007,7 +5042,7 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
     return pyfits.HDUList(HDUL)
 
 
-def show_drizzle_HDU(hdu, diff=True, mask_segmentation=True, average_only=False, scale_size=1, cmap='viridis_r', show_labels=True, **kwargs):
+def show_drizzle_HDU(hdu, diff=True, mask_segmentation=True, average_only=False, scale_size=1, cmap='viridis_r', show_labels=True, width_ratio=0.2, **kwargs):
     """Make a figure from the multiple extensions in the drizzled grism file.
 
     Parameters
@@ -5043,14 +5078,15 @@ def show_drizzle_HDU(hdu, diff=True, mask_segmentation=True, average_only=False,
     
     widths = []
     for i in range(NX):
-        widths.extend([0.2, 1])
+        widths.extend([width_ratio, 1])
     
     if average_only:
         NY = 1
-        fig = plt.figure(figsize=(5*NX*scale_size, 1*NY*scale_size+0.33))
+        fig = plt.figure(figsize=(NX*scale_size/width_ratio, 
+                                  NY*scale_size+0.33))
         gs = GridSpec(NY, NX*2, width_ratios=widths)
     else:    
-        fig = plt.figure(figsize=(5*NX*scale_size, 1*NY*scale_size))
+        fig = plt.figure(figsize=(NX*scale_size/width_ratio, 1*NY*scale_size))
         gs = GridSpec(NY, NX*2, height_ratios=[1]*NY, width_ratios=widths)
 
     for ig, g in enumerate(grisms):

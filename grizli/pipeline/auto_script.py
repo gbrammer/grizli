@@ -738,7 +738,7 @@ def go(root='j010311+131615',
         grp = multifit.GroupFLT(grism_files=grism_files, direct_files=[], 
                                 ref_file=None, seg_file=seg_file, 
                                 catalog=catalog, cpu_count=-1, sci_extn=1, 
-                                pad=256)
+                                pad=(64,256))
 
         # Make drizzle model images
         grp.drizzle_grism_models(root=root, kernel='point', scale=0.15)
@@ -840,7 +840,7 @@ def go(root='j010311+131615',
         grp = multifit.GroupFLT(grism_files=grism_files, direct_files=[], 
                                 ref_file=None, seg_file=seg_file, 
                                 catalog=catalog, cpu_count=-1, sci_extn=1, 
-                                pad=256)
+                                pad=(64,256))
 
         # Make drizzle model images
         grp.drizzle_grism_models(root=root, kernel='point', scale=0.15)
@@ -2711,7 +2711,7 @@ def photutils_catalog(field_root='j142724+334246', threshold=1.8, subtract_bkg=T
     return tab
 
 
-def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=None, force_seg=None, force_cat=None, galfit=False, pad=256, files=None, gris_ref_filters=GRIS_REF_FILTERS, split_by_grism=False):
+def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=None, force_seg=None, force_cat=None, galfit=False, pad=(64,256), files=None, gris_ref_filters=GRIS_REF_FILTERS, split_by_grism=False):
     """
     Initialize a GroupFLT object from exposures in a working directory.  The 
     script tries to match mosaic images with grism exposures based on the 
@@ -2890,6 +2890,7 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
         msg += f'\nauto_script.grism_prep: seg_file = {seg_file}' 
         msg += f'\nauto_script.grism_prep: catalog  = {catalog}' 
         msg += f'\nauto_script.grism_prep: polyx  = {polyx}' 
+        msg += f'\nauto_script.grism_prep: pad  = {pad}' 
         utils.log_comment(utils.LOGFILE, msg, verbose=True)
         
         grp_i = multifit.GroupFLT(grism_files=_grism_files,
@@ -2916,7 +2917,7 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
         return [grp]
 
 
-def grism_prep(field_root='j142724+334246', PREP_PATH='../Prep', EXTRACT_PATH='../Extractions', ds9=None, refine_niter=3, gris_ref_filters=GRIS_REF_FILTERS, force_ref=None, files=None, split_by_grism=True, refine_poly_order=1, refine_fcontam=0.5, cpu_count=0, mask_mosaic_edges=True, prelim_mag_limit=25, refine_mag_limits=[18, 24], init_coeffs=[1.1, -0.5], grisms_to_process=None, pad=256, model_kwargs={'compute_size': True}, subtract_median_filter=False, median_filter_size=71, median_filter_central=10):
+def grism_prep(field_root='j142724+334246', PREP_PATH='../Prep', EXTRACT_PATH='../Extractions', ds9=None, refine_niter=3, gris_ref_filters=GRIS_REF_FILTERS, force_ref=None, files=None, split_by_grism=True, refine_poly_order=1, refine_fcontam=0.5, cpu_count=0, mask_mosaic_edges=True, prelim_mag_limit=25, refine_mag_limits=[18, 24], init_coeffs=[1.1, -0.5], grisms_to_process=None, pad=(64, 256), model_kwargs={'compute_size': True}, subtract_median_filter=False, median_filter_size=71, median_filter_central=10):
     """
     Contamination model for grism exposures
     """
@@ -3093,7 +3094,14 @@ def refine_model_with_fits(field_root='j142724+334246', grp=None, master_files=N
         except:
             seg_file = None
 
-        grp = multifit.GroupFLT(grism_files=master_files, direct_files=[], ref_file=None, seg_file=seg_file, catalog=catalog, cpu_count=-1, sci_extn=1, pad=256)
+        grp = multifit.GroupFLT(grism_files=master_files,
+                                direct_files=[],
+                                ref_file=None,
+                                seg_file=seg_file,
+                                catalog=catalog,
+                                cpu_count=-1,
+                                sci_extn=1,
+                                pad=(64,256))
 
     fit_files = glob.glob('*full.fits')
     fit_files.sort()
@@ -3168,7 +3176,15 @@ def extract(field_root='j142724+334246', maglim=[13, 24], prior=None, MW_EBV=0.0
         except:
             seg_file = None
 
-        grp = multifit.GroupFLT(grism_files=master_files, direct_files=[], ref_file=None, seg_file=seg_file, catalog=catalog, cpu_count=-1, sci_extn=1, pad=256)
+        grp = multifit.GroupFLT(grism_files=master_files,
+                                direct_files=[],
+                                ref_file=None,
+                                seg_file=seg_file,
+                                catalog=catalog,
+                                cpu_count=-1,
+                                sci_extn=1,
+                                pad=(64,256)
+                                )
     else:
         init_grp = False
 

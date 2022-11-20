@@ -5895,7 +5895,12 @@ def drizzle_array_groups(sci_list, wht_list, wcs_list, outputwcs=None,
 
     # Output header / WCS
     if outputwcs is None:
-        header, outputwcs = compute_output_wcs(wcs_list, pixel_scale=scale)
+        #header, outputwcs = compute_output_wcs(wcs_list, pixel_scale=scale)
+        header, outputwcs = make_maximal_wcs(wcs_list,
+                                             pixel_scale=scale,
+                                             verbose=False,
+                                             pad=0,
+                                             get_hdu=False)
     else:
         header = to_header(outputwcs)
 
@@ -6064,7 +6069,11 @@ def compute_output_wcs(wcs_list, pixel_scale=0.1, max_size=10000):
     xsize = np.minimum(xsize, max_size*pixel_scale)
     ysize = np.minimum(ysize, max_size*pixel_scale)
 
-    header, outputwcs = make_wcsheader(ra=crval[0], dec=crval[1], size=(xsize, ysize), pixscale=pixel_scale, get_hdu=False, theta=0)
+    header, outputwcs = make_wcsheader(ra=crval[0], dec=crval[1],
+                     size=(xsize, ysize),
+                     pixscale=pixel_scale,
+                     get_hdu=False,
+                     theta=0)
 
     return header, outputwcs
 
@@ -8637,7 +8646,89 @@ def simple_LCDM(Om0=0.3, Ode0=0.7, H0=70, Ob0=0.0463, Tcmb0=2.725, name=None):
     from astropy.cosmology import LambdaCDM
     cosmology = LambdaCDM(H0, Om0, Ode0, Tcmb0=Tcmb0, name=name)
     return cosmology
+
+
+def make_filter_footprint(filter_size=71, filter_central=0, **kwargs):
+    """
+    Make a footprint for image filtering
+    """
+    filter_footprint = np.ones(filter_size, dtype=int)
     
+    if filter_central > 0:
+        f0 = (filter_size-1)//2
+        filter_footprint[f0-filter_central:f0+filter_central] = 0
+    
+    return filter_footprint
+
+
+def safe_nanmedian_filter(data, filter_kwargs={}, filter_footprint=None, axis=1, clean=True, cval=0.0):
+    """
+    Run nanmedian filter on `data`
+    
+    Parameters
+    ----------
+    data : array-like
+        The 2D data to filter
+    
+    filter_kwargs : dict
+        Arguments to `~grizli.utils.make_filter_footprint` to make a 1D filter
+    
+    filter_footprint : array-like
+        Specify the filter explicitly.  If 1D, then will apply the filter over
+        `axis=1` (i.e., `x`) of ``data``
+    
+    axis : 0 or 1
+         Axis over which to apply the filter (``axis=1`` filters on rows)
+    
+    clean, cval : bool, scalar
+        Replace `~numpy.nan` in the output with ``cval``
+    
+    Returns
+    -------
+    filter_data : array-like
+        Filtered data
+    
+    filter_name : str
+        The type of filter that was applied: `nbutils.nanmedian` if 
+        `~grizli.nbutils.nanmedian` was imported successfully and 
+        `median_filter` for the fallback to `scip.ndimage.median_filter` 
+        otherwise.
+    """
+    import scipy.ndimage as nd
+    
+    try:
+        from . import nbutils
+        _filter_name = 'nbutils.nanmedian'
+    except:
+        nbutils = None
+        _filter_name = 'median_filter'
+    
+    if filter_footprint is None:
+        _filter_footprint = make_filter_footprint(**filter_kwargs)
+        if axis == 1:
+            _filter_footprint = _filter_footprint[None,:]
+        else:
+            _filter_footprint = _filter_footprint[:,None]
+    else:
+        if filter_footprint.ndim == 1:
+            if axis == 1:
+                _filter_footprint = filter_footprint[None,:]
+            else:
+                _filter_footprint = filter_footprint[:,None]
+        else:
+            _filter_footprint = filter_footprint
+    
+    if nbutils is None:
+        filter_data = nd.median_filter(data, footprint=_filter_footprint)
+    else:
+        filter_data = nd.generic_filter(data, nbutils.nanmedian,
+                                        footprint=_filter_footprint)
+        if clean:
+            filter_data[~np.isfinite(filter_data)] = cval
+            
+    return filter_data, _filter_name
+
+
 def argv_to_dict(argv, defaults={}, dot_dict=True):
     """
     Convert a list of (simple) command-line arguments to a dictionary.
