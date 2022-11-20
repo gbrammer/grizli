@@ -8661,9 +8661,38 @@ def make_filter_footprint(filter_size=71, filter_central=0, **kwargs):
     return filter_footprint
 
 
-def safe_nanmedian_row_filter(data, filter_kwargs={}, clean=True):
+def safe_nanmedian_filter(data, filter_kwargs={}, filter_footprint=None, axis=1, clean=True, cval=0.0):
     """
     Run nanmedian filter on `data`
+    
+    Parameters
+    ----------
+    data : array-like
+        The 2D data to filter
+    
+    filter_kwargs : dict
+        Arguments to `~grizli.utils.make_filter_footprint` to make a 1D filter
+    
+    filter_footprint : array-like
+        Specify the filter explicitly.  If 1D, then will apply the filter over
+        `axis=1` (i.e., `x`) of ``data``
+    
+    axis : 0 or 1
+         Axis over which to apply the filter (``axis=1`` filters on rows)
+    
+    clean, cval : bool, scalar
+        Replace `~numpy.nan` in the output with ``cval``
+    
+    Returns
+    -------
+    filter_data : array-like
+        Filtered data
+    
+    filter_name : str
+        The type of filter that was applied: `nbutils.nanmedian` if 
+        `~grizli.nbutils.nanmedian` was imported successfully and 
+        `median_filter` for the fallback to `scip.ndimage.median_filter` 
+        otherwise.
     """
     import scipy.ndimage as nd
     
@@ -8674,17 +8703,28 @@ def safe_nanmedian_row_filter(data, filter_kwargs={}, clean=True):
         nbutils = None
         _filter_name = 'median_filter'
     
-    filter_footprint = make_filter_footprint(**filter_kwargs)
-    
-    # print('xxx', data.shape, filter_footprint.shape)
+    if filter_footprint is None:
+        _filter_footprint = make_filter_footprint(**filter_kwargs)
+        if axis == 1:
+            _filter_footprint = _filter_footprint[None,:]
+        else:
+            _filter_footprint = _filter_footprint[:,None]
+    else:
+        if filter_footprint.ndim == 1:
+            if axis == 1:
+                _filter_footprint = filter_footprint[None,:]
+            else:
+                _filter_footprint = filter_footprint[:,None]
+        else:
+            _filter_footprint = filter_footprint
     
     if nbutils is None:
-        filter_data = nd.median_filter(data, footprint=filter_footprint[None,:])
+        filter_data = nd.median_filter(data, footprint=_filter_footprint)
     else:
         filter_data = nd.generic_filter(data, nbutils.nanmedian,
-                                       footprint=filter_footprint[None,:])
+                                        footprint=_filter_footprint)
         if clean:
-            filter_data[~np.isfinite(filter_data)] = 0
+            filter_data[~np.isfinite(filter_data)] = cval
             
     return filter_data, _filter_name
 
