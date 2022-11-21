@@ -2885,6 +2885,13 @@ def nircam_wisp_correction(calibrated_file, niter=3, update=True, verbose=True, 
     
     Wisp template files at https://stsci.app.box.com/s/1bymvf1lkrqbdn9rnkluzqk30e8o2bne?sortColumn=name&sortDirection=ASC.
     
+    and 
+    
+    https://s3.amazonaws.com/grizli-v2/NircamWisp/index.html
+    
+    The ``wisps_{detector}_{FILTER}.fits`` files should be put in
+    a directory ``$GRIZLI/CONF/NircamWisp``.
+    
     Parameters
     ----------
     calibrated_file : str
@@ -2943,10 +2950,6 @@ def nircam_wisp_correction(calibrated_file, niter=3, update=True, verbose=True, 
     if _det not in wisp_ref:
         print(f'{_det} key not found in {wisp_ref_file}')
         return None
-    else:
-        Rmax = wisp_ref[_det]['Rmax']
-        xc = wisp_ref[_det]['Rmax']
-        yc = wisp_ref[_det]['Rmax']
         
     wisp = pyfits.open(wisp_file)
     
