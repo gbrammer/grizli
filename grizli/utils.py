@@ -8648,6 +8648,42 @@ def simple_LCDM(Om0=0.3, Ode0=0.7, H0=70, Ob0=0.0463, Tcmb0=2.725, name=None):
     return cosmology
 
 
+def pixel_polygon_mask(polygon, shape, wcs=None):
+    """
+    Make a mask points in a 2D array inside a polygon
+    
+    Parameters
+    ----------
+    polygon : str, (2,M) array
+        Something that `grizli.utils.SRegion` can parse as a polygon
+    
+    shape : tuple
+        2-tuple of image dimensions
+    
+    wcs : `astropy.wcs.WCS`
+        If specified, assume ``polygon`` is sky coordinates and transform to
+        image.
+    
+    Returns
+    -------
+    mask : array
+        ``bool`` array with ``shape`` that is `True` inside `polygon`
+    """
+    sr = SRegion(polygon, wrap=False)
+    
+    yp, xp = np.indices(shape)
+    pts = np.array([xp.flatten(), yp.flatten()]).T
+    
+    if wcs is not None:
+        pts = wcs.all_pix2world(pts, 0)
+        
+    mask = np.zeros(shape, dtype=bool).flatten()
+    for p in sr.path:
+        mask |= p.contains_points(pts)
+    
+    return mask.reshape(shape)
+
+
 def make_filter_footprint(filter_size=71, filter_central=0, **kwargs):
     """
     Make a footprint for image filtering
