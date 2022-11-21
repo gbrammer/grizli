@@ -9,6 +9,7 @@ from collections import OrderedDict
 import glob
 import traceback
 
+import yaml
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -2859,11 +2860,11 @@ def get_nircam_wisp_filename(header):
         msg = f'Instrument {_inst} not supported'
         return None, _filt, _inst, _det, msg
 
-    if _filt not in ['F150W','F200W']:
+    if _filt not in ['F150W','F200W','F182M','F210M']:
         msg = f'NIRCam filter {_filt} not supported'
         return None, _filt, _inst, _det, msg
 
-    if _det not in ['NRCA3','NRCB3','NRCB4']:
+    if _det not in ['NRCA3','NRCA4','NRCB3','NRCB4']:
         msg = f'NIRCam detector {_det} not supported'
         return None, _filt, _inst, _det, msg
     
@@ -2884,6 +2885,13 @@ def nircam_wisp_correction(calibrated_file, niter=3, update=True, verbose=True, 
     
     Wisp template files at https://stsci.app.box.com/s/1bymvf1lkrqbdn9rnkluzqk30e8o2bne?sortColumn=name&sortDirection=ASC.
     
+    and 
+    
+    https://s3.amazonaws.com/grizli-v2/NircamWisp/index.html
+    
+    The ``wisps_{detector}_{FILTER}.fits`` files should be put in
+    a directory ``$GRIZLI/CONF/NircamWisp``.
+    
     Parameters
     ----------
     calibrated_file : str
@@ -2902,6 +2910,8 @@ def nircam_wisp_correction(calibrated_file, niter=3, update=True, verbose=True, 
         Force wisp fit, even if 'WISPBKG' keyword already found in header
         
     """
+    import scipy.ndimage as nd
+    
     if not os.path.exists(calibrated_file):
         msg = f'nircam_wisp_correction - {calibrated_file} not found'
         utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
@@ -2930,26 +2940,41 @@ def nircam_wisp_correction(calibrated_file, niter=3, update=True, verbose=True, 
         msg += f'{wisp_file} not found'
         utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
         return None
+    
+    wisp_ref_file = os.path.join(os.path.dirname(__file__), 
+                                 'data', 'nircam_wisp.yml')
+                                 
+    with open(wisp_ref_file) as fp:
+        wisp_ref = yaml.load(fp, Loader=yaml.Loader)
+    
+    if _det not in wisp_ref:
+        print(f'{_det} key not found in {wisp_ref_file}')
+        return None
         
     wisp = pyfits.open(wisp_file)
     
-    yp, xp = np.indices((2048,2048))
-
-    if _det in ['NRCA3']:
-        xc, yc = 623, 1680
-        Rmax = 275
-    elif _det in ['NRCB4']:
-        xc, yc = 1261, 1558
-        Rmax = 480
-    elif _det in ['NRCB3']:
-        xc, yc = 1229, 204
-        Rmax = 470
-        
-    wispr = np.sqrt((xp-xc)**2+(yp-yc)**2)
-
-    wisp_msk = np.exp(-(wispr - Rmax)**2/2/80**2)
-    wisp_msk[wispr < Rmax] = 1
-
+    # yp, xp = np.indices((2048,2048))
+    #
+    # # if _det in ['NRCA3']:
+    # #     xc, yc = 623, 1680
+    # #     Rmax = 275
+    # # elif _det in ['NRCB4']:
+    # #     xc, yc = 1261, 1558
+    # #     Rmax = 500
+    # # elif _det in ['NRCB3']:
+    # #     xc, yc = 1229, 204
+    # #     Rmax = 470
+    #
+    # wispr = np.sqrt((xp-xc)**2+(yp-yc)**2)
+    #
+    # wisp_msk = np.exp(-(wispr - Rmax)**2/2/80**2)
+    # wisp_msk[wispr < Rmax] = 1
+    
+    wisp_msk = utils.pixel_polygon_mask(wisp_ref[_det]['polygon'], 
+                                        (2048,2048))
+                                        
+    wisp_msk = nd.gaussian_filter(wisp_msk*1., 50)
+    
     wisp[0].data[~np.isfinite(wisp[0].data)] = 0
     
     sci = im['SCI'].data.flatten()
