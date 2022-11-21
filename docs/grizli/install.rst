@@ -9,7 +9,22 @@ The easiest way to install the latest ``grizli`` release into a :ref:`fresh virt
    pip install pyregion
 
 If you are installing ``grizli`` for the first time, make sure to also set up :ref:`directories and download 
-reference files <directories>`. :ref:`Additional installations <additional>` are needed to work with HST data.
+reference files <directories>`. If you will be working with HST data, the following will install all 
+necessary libraries:
+
+.. code-block:: bash
+
+   pip install "grizli[hst]"
+   pip install pyregion
+   conda install hstcal
+
+If you will be working with JWST data, the following is the recommended installation process:
+
+.. code-block:: bash
+
+   pip install "grizli[jwst]"
+   pip install pyregion
+
 
 More detailed instructions are available :ref:`below <installation>`.
 
