@@ -72,10 +72,14 @@ There are five available options for installing dependencies: ``hst``, ``jwst``,
 
 .. code-block:: bash
 
-  pip install "grizli[jwst]"
+  pip install "grizli[hst]"
 
 or 
+.. code-block:: bash
 
+  pip install "grizli[jwst]"
+
+or
 .. code-block:: bash
 
   pip install "grizli[jwst,test]"
