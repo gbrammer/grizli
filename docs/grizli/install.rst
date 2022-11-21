@@ -7,7 +7,6 @@ The easiest way to install the latest ``grizli`` release into a :ref:`fresh virt
 
    pip install grizli
    pip install pyregion
-   pip install git+https://github.com/gbrammer/tristars
 
 If you are installing ``grizli`` for the first time, make sure to also set up :ref:`directories and download 
 reference files <directories>`. :ref:`Additional installations <additional>` are needed to work with HST data.
@@ -68,7 +67,7 @@ The latest release of ``grizli`` can be installed with ``pip``:
   
   pip install grizli
   
-There are four available options for installing dependencies: ``jwst``, ``aws``, 
+There are five available options for installing dependencies: ``hst``, ``jwst``, ``aws``, 
 ``test`` and ``docs``. These can be installed as follows:
 
 .. code-block:: bash
@@ -94,15 +93,13 @@ need to be installed separately:
 .. code-block:: bash
   
   pip install pyregion
-  pip install git+https://github.com/gbrammer/tristars
   
-If you will be working with HST data, you will also need the following two 
-libraries:
+If you will be working with HST data, you will also need the ``hstcal`` library 
+which is only available via ``conda``:
 
 .. code-block:: bash
 
   conda install hstcal
-  pip install git+https://github.com/gbrammer/reprocess_wfc3.git
         
 ``eazy-py``
 ###########
@@ -156,30 +153,32 @@ set automatically when you start a new terminal/shell session.
 
 - Download the calibration and configuration files not provided with the code
   repository. Helper scripts are provided to download files that are currently
-  hard-coded:
+  hard-coded. HST calibrations will be downloaded to the ``$iref`` and ``$jref``
+  directories. Set ``get_acs=True`` to get files necessary for G800L processing:
 
 .. code-block:: python
 
-    >>> import grizli.utils
-    >>> # HST calibs to $iref/$iref
-    >>> # set get_acs=True below to get files necessary for G800L processing
-    >>> grizli.utils.fetch_default_calibs(get_acs=False)
-    >>> # config files to $GRIZLI/CONF
-    >>> # set get_jwst=True to get config files for jwst processing
-    >>> grizli.utils.fetch_config_files(get_acs=False, get_jwst=False)
+    import grizli.utils
+    grizli.utils.fetch_default_calibs(get_acs=False)
+
+Configuration files will be downliaded to the ``$GRIZLI/CONF`` directory. Set 
+``get_jwst=True`` to get config files for JWST processing:
+
+.. code-block:: python
+
+    grizli.utils.fetch_config_files(get_acs=False, get_jwst=False)
 
 - The grism redshift fits require galaxy SED templates that are provided with the
   repository but that need to be in a specific directory, ``$GRIZLI/templates``. This is
   done so that users can modify/add templates in that directory without touching the
   files in the repository itself. For default processing they can by symlinked from the
-  repository:
+  repository. Set ``force=True`` to symlink files even if they already exist in 
+  ``$GRIZLI/templates/``:
 
 .. code-block:: python
 
-    >>> import grizli.utils
-    >>> grizli.utils.symlink_templates(force=True)
-    >>> # Set force=True to symlink files even if they already exist in 
-    >>> # $GRIZLI/templates/.
+    import grizli.utils
+    grizli.utils.symlink_templates(force=True)
 
 - Run basic tests with `pytest`:
 
