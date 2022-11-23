@@ -7,9 +7,11 @@ import unittest
 import numpy as np
 import astropy.io.fits as pyfits
 import logging
+import pytest
 
-from .. import prep, utils, multifit, GRIZLI_PATH, jwst_utils
-from ..pipeline import auto_script
+from grizli import prep, utils, multifit, GRIZLI_PATH, jwst_utils
+from grizli.pipeline import auto_script
+
 
 def set_crds(path='crds_cache'):
     """
@@ -33,7 +35,7 @@ def set_crds(path='crds_cache'):
             
 set_crds()
 
-class JWSTHeaders(unittest.TestCase):
+class TestJWSTHeaders:
     
     def get_test_data_path(self):
         path = os.path.dirname(utils.__file__)
@@ -46,13 +48,10 @@ class JWSTHeaders(unittest.TestCase):
         """
         pass
         
-    def test_process_headers(self, clean=True):
+    def test_process_headers(self, tmp_path):
         """
         """
-        try:
-            import jwst
-        except ImportError:
-            return True
+        pytest.importorskip('jwst')
                 
         file_path = self.get_test_data_path()
         
@@ -61,13 +60,8 @@ class JWSTHeaders(unittest.TestCase):
         
         assert(len(files) == 5)
         
-        test_dir = 'JwstHeaderTest'
         orig_dir = os.getcwd()
-        
-        if not os.path.exists(test_dir):
-            os.mkdir(test_dir)
-        
-        os.chdir(test_dir)
+        os.chdir(tmp_path)
         
         # fresh_flt_file
         gz_file = os.path.basename(files[0])
@@ -97,19 +91,10 @@ class JWSTHeaders(unittest.TestCase):
         assert(len(visits) == 5)
         assert(len(groups) == 1)
         
-        # Clean up
-        if clean:
-            files = glob.glob('*')
-            for file in files:
-                os.remove(file)
-            
-            os.chdir(orig_dir)
-            os.rmdir(test_dir)
-            
         os.chdir(orig_dir)
 
 
-class JWSTUtils(unittest.TestCase):
+class TestJWSTUtils:
     
     def test_filter_info(self):
         """
@@ -163,7 +148,7 @@ class JWSTUtils(unittest.TestCase):
         assert(np.allclose(info['pivot'], 5.632612))
 
 
-class JWSTFittingTools(unittest.TestCase):
+class TestJWSTFittingTools:
     
     def test_config(self):
         """
@@ -181,9 +166,8 @@ class JWSTFittingTools(unittest.TestCase):
             files = glob.glob(f'{conf_path}/*')
             print('Files: ', '\n'.join(files))
 
-        assert(os.path.exists(os.path.join(conf_path,
-                              'GR150C.F115W.conf')))
-        return True
+        assert os.path.exists(os.path.join(conf_path,
+                              'GR150C.F115W.conf'))
     
     def test_multibeam(self):
         """

@@ -1,0 +1,7 @@
+[build-system]
+requires = ["setuptools>=43.0.0", "setuptools_scm[toml]>=6.2", "wheel",
+            "oldest-supported-numpy", "cython"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+write_to = "grizli/version.py"

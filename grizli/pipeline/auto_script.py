@@ -3438,12 +3438,6 @@ def fine_alignment(field_root='j142724+334246', HOME_PATH='/Volumes/Pegasus/Griz
     """
     Try fine alignment from visit-based SourceExtractor catalogs
     
-    Parameters
-    ----------
-    
-    Returns
-    -------
-    
     """
     import os
     import glob

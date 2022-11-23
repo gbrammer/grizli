@@ -3442,7 +3442,7 @@ class GrismFLT(object):
             that fails.
 
         Returns
-        ---------
+        -------
         status : bool
             True if completed successfully.  False if `data_ext=='REF'` but
             no reference image found.

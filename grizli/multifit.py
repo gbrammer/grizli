@@ -3173,7 +3173,7 @@ class MultiBeam(GroupFitter):
             Print status messages.
 
         Returns
-        ----------
+        -------
         drizzled_segm: `~numpy.ndarray`, type `~numpy.int64`.
             Drizzled segmentation image, with image dimensions and
             WCS defined in `wcsobj`.

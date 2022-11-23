@@ -2,7 +2,6 @@
 Utilities for fitting stacked (drizzled) spectra
 """
 from collections import OrderedDict
-from imp import reload
 
 import astropy.io.fits as pyfits
 import astropy.units as u

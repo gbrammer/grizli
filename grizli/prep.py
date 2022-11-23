@@ -100,7 +100,7 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
         xx nothing now xxx
 
     crclean : bool
-        Run LACosmicx on the exposure
+        Run LACosmicx (astroscrappy) on the exposure
 
     mask_regions : bool
         Apply exposure region mask (like ``_flt.01.mask.reg``) if it exists.
@@ -111,14 +111,7 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
 
     """
     import shutil
-
-    try:
-        import lacosmicx
-        has_lacosmicx = True
-        if crclean:
-            print('Warning (fresh_flt_file): couldn\'t import lacosmicx')
-    except:
-        has_lacosmicx = False
+    from astroscrappy import detect_cosmics
 
     local_file = os.path.basename(file)
     if preserve_dq:
@@ -288,14 +281,14 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
     #     #orig_file['DQ'].data |= 4*flat_dq
     #     orig_file['SCI'].data = np.divide(orig_file['SCI'].data,flat,orig_file['SCI'].data,where=(flat!=0))
     
-    if crclean & has_lacosmicx:
+    if crclean:
         for ext in [1, 2]:
             print('Clean CRs with LACosmic, extension {0:d}'.format(ext))
 
             sci = orig_file['SCI', ext].data
             dq = orig_file['DQ', ext].data
 
-            crmask, clean = lacosmicx.lacosmicx(sci, inmask=None,
+            crmask, clean = detect_cosmics(sci, inmask=None,
                          sigclip=4.5, sigfrac=0.3, objlim=5.0, gain=1.0,
                          readnoise=6.5, satlevel=65536.0, pssl=0.0, niter=4,
                          sepmed=True, cleantype='meanmask', fsmode='median',
@@ -5965,16 +5958,7 @@ def find_single_image_CRs(visit, simple_mask=False, with_ctx_mask=True,
     Requires context (CTX) image `visit['product']+'_drc_ctx.fits`.
     """
     from drizzlepac import astrodrizzle
-    try:
-        import lacosmicx
-        has_lacosmicx = True
-    except:
-        if run_lacosmic:
-            print('Warning (find_single_image_CRs): couldn\'t import lacosmicx')
-
-        utils.log_exception(utils.LOGFILE, traceback)
-        utils.log_comment(utils.LOGFILE, "# ! LACosmicx requested but not found")
-        has_lacosmicx = False
+    from astroscrappy import detect_cosmics
 
     # try:
     #     import reproject
@@ -6039,8 +6023,8 @@ def find_single_image_CRs(visit, simple_mask=False, with_ctx_mask=True,
                 else:
                     inmask = dq > 0
 
-                if run_lacosmic & has_lacosmicx:
-                    crmask, clean = lacosmicx.lacosmicx(sci, inmask=inmask,
+                if run_lacosmic:
+                    crmask, clean = detect_cosmics(sci, inmask=inmask,
                              sigclip=4.5, sigfrac=0.3, objlim=5.0, gain=1.0,
                              readnoise=6.5, satlevel=65536.0, pssl=0.0,
                              niter=4, sepmed=True, cleantype='meanmask',

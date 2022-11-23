@@ -492,7 +492,7 @@ def run_nmf(np.ndarray[DTYPE_t, ndim=1] flux, np.ndarray[DTYPE_t, ndim=1] varian
             coeffs[i] = 0.
             
     itcount=0;
-    while (tol>toler) & (itcount<MAXITER):
+    while (tol>toler) & (long(itcount)<MAXITER):
         tolnum=0.
         toldenom = 0.
         tol=0

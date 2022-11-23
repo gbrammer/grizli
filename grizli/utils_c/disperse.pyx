@@ -40,8 +40,8 @@ def disperse_grism_object(np.ndarray[FTYPE_t, ndim=2] flam,
     ----------
     xxx
     """
-    cdef int i,j,k1,k2
-    cdef unsigned int nk,nl,k,shx,shy
+    cdef int i,j,k1,k2,nl
+    cdef unsigned int nk,k,shx,shy
     cdef double fl_ij
     
     nk = len(idxl)
