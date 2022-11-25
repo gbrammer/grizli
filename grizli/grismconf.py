@@ -905,29 +905,33 @@ class TransformGrismconf(object):
             trace_dy += -0.5
             
             # Shifts derived from FRESCO
-            coeffs = {'c0_0': 0.36618981647774906,
-                      'c1_0': -0.00013132585591314484,
-                      'c2_0': -8.206750396550326e-08,
-                      'c0_1': -0.00117564553430701,
-                      'c0_2': 3.9823663979511177e-07,
-                      'c1_1': 1.7829986295578124e-07}
+            coeffs = {'c0_0': 0.3723992993620532,
+                      'c1_0': -0.00011461411413576305,
+                      'c2_0': -8.575199405062535e-08,
+                      'c0_1': -0.0011862122093603026,
+                      'c0_2': 4.1403439215806165e-07,
+                      'c1_1': 1.6558275336712723e-07
+                     }
             
             poly = Polynomial2D(degree=2, **coeffs)
-            trace_dy += poly(x, y)
+            #trace_dy += poly(x, y)
+            #print(f'polynomial offset: {poly(x,y):.3f}')
             
         elif 'V4/NIRCAM_F444W_modA_R.conf' in self.conf_file:
             trace_dy += -2.5
             
             # Shifts derived from FRESCO
-            coeffs = {'c0_0': 0.2987978999803456,
-                      'c1_0': -0.0003935559363951064,
-                      'c2_0': -2.7336500327820416e-09,
-                      'c0_1': 9.535064855410146e-05,
-                      'c0_2': -7.9032763595582e-08,
-                      'c1_1': -8.394433697021146e-08}
+            coeffs = {'c0_0': 0.34191256988768415,
+                      'c1_0': -0.0003378232293429956,
+                      'c2_0': -9.238111910134196e-09,
+                      'c0_1': -7.063720696711682e-05,
+                      'c0_2': 2.5217177632321527e-08,
+                      'c1_1': -1.4345820074275903e-07
+                      }
 
             poly = Polynomial2D(degree=2, **coeffs)
-            trace_dy += poly(x, y)
+            #trace_dy += poly(x, y)
+            #print(f'polynomial offset: {poly(x,y):.3f}')
             
         elif os.path.basename(self.conf_file) == 'NIRCAM_F444W_modA_R.conf':
             trace_dy += -2.5
