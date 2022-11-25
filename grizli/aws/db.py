@@ -1336,7 +1336,7 @@ def multibeam_to_database(beams_file, engine=None, Rspline=15, force=False, **kw
                   'fwcpos', 'ccdchip', 'sci_extn', 'exptime']:
             d[a].append(getattr(beam.grism, a))
         
-        d['pad'] = beam.grism.pad[1]
+        d['pad'].append(beam.grism.pad[1])
         
         d['order'].append(beam.beam.beam)
 
