@@ -996,7 +996,7 @@ class TransformGrismconf(object):
         
         # Read updated sensitivity files
         if 'V4/NIRCAM_F444W' in self.conf_file:
-            sens_file = self.conf_file.replace('.conf', '_fw_sensitivity.fits')
+            sens_file = self.conf_file.replace('.conf', '_ext_sensitivity.fits')
             if os.path.exists(sens_file):
                 print(f'Replace sensitivity: {sens_file}')
                 new = utils.read_catalog(sens_file)
