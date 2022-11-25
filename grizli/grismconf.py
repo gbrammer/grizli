@@ -914,7 +914,7 @@ class TransformGrismconf(object):
                      }
             
             poly = Polynomial2D(degree=2, **coeffs)
-            #trace_dy += poly(x, y)
+            trace_dy += poly(x, y)
             #print(f'polynomial offset: {poly(x,y):.3f}')
             
         elif 'V4/NIRCAM_F444W_modA_R.conf' in self.conf_file:
@@ -930,7 +930,7 @@ class TransformGrismconf(object):
                       }
 
             poly = Polynomial2D(degree=2, **coeffs)
-            #trace_dy += poly(x, y)
+            trace_dy += poly(x, y)
             #print(f'polynomial offset: {poly(x,y):.3f}')
             
         elif os.path.basename(self.conf_file) == 'NIRCAM_F444W_modA_R.conf':
