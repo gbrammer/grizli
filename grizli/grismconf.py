@@ -868,6 +868,8 @@ class TransformGrismconf(object):
             Effective wavelength along the trace evaluated at `dx`.
 
         """
+        from astropy.modeling.models import Polynomial2D
+        
         x0 = np.squeeze(self.transform.reverse(x, y))
         
         if self.transform.trace_axis == '+x':
@@ -901,8 +903,32 @@ class TransformGrismconf(object):
         # Trace offsets for NIRCam
         if 'V4/NIRCAM_F444W_modB_R.conf' in self.conf_file:
             trace_dy += -0.5
+            
+            # Shifts derived from FRESCO
+            coeffs = {'c0_0': 0.36618981647774906,
+                      'c1_0': -0.00013132585591314484,
+                      'c2_0': -8.206750396550326e-08,
+                      'c0_1': -0.00117564553430701,
+                      'c0_2': 3.9823663979511177e-07,
+                      'c1_1': 1.7829986295578124e-07}
+            
+            poly = Polynomial2D(degree=2, **coeffs)
+            trace_dy += poly(x, y)
+            
         elif 'V4/NIRCAM_F444W_modA_R.conf' in self.conf_file:
             trace_dy += -2.5
+            
+            # Shifts derived from FRESCO
+            coeffs = {'c0_0': 0.2987978999803456,
+                      'c1_0': -0.0003935559363951064,
+                      'c2_0': -2.7336500327820416e-09,
+                      'c0_1': 9.535064855410146e-05,
+                      'c0_2': -7.9032763595582e-08,
+                      'c1_1': -8.394433697021146e-08}
+
+            poly = Polynomial2D(degree=2, **coeffs)
+            trace_dy += poly(x, y)
+            
         elif os.path.basename(self.conf_file) == 'NIRCAM_F444W_modA_R.conf':
             trace_dy += -2.5
         elif os.path.basename(self.conf_file) == 'NIRCAM_F444W_modA_C.conf':
@@ -967,6 +993,19 @@ class TransformGrismconf(object):
             
             self.conf_dict[f'BEAM{beam}'] = np.array([xarr[0], xarr[-1]])
             self.conf_dict[f'MMAG_EXTRACT_{beam}'] = 29
+        
+        # Read updated sensitivity files
+        if 'V4/NIRCAM_F444W' in self.conf_file:
+            sens_file = self.conf_file.replace('.conf', '_fw_sensitivity.fits')
+            if os.path.exists(sens_file):
+                print(f'Replace sensitivity: {sens_file}')
+                new = utils.read_catalog(sens_file)
+                _tab = utils.GTable()
+                _tab['WAVELENGTH'] = new['WAVELENGTH'].astype(float)
+                _tab['SENSITIVITY'] = new['SENSITIVITY'].astype(float)
+                _tab['ERROR'] = new['ERROR'].astype(float)
+                
+                self.sens['A'] = _tab
 
 
 def load_grism_config(conf_file, warnings=True):
