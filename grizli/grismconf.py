@@ -998,7 +998,7 @@ class TransformGrismconf(object):
         if 'V4/NIRCAM_F444W' in self.conf_file:
             sens_file = self.conf_file.replace('.conf', '_ext_sensitivity.fits')
             if os.path.exists(sens_file):
-                print(f'Replace sensitivity: {sens_file}')
+                # print(f'Replace sensitivity: {sens_file}')
                 new = utils.read_catalog(sens_file)
                 _tab = utils.GTable()
                 _tab['WAVELENGTH'] = new['WAVELENGTH'].astype(float)
