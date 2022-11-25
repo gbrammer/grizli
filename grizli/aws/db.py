@@ -1335,7 +1335,7 @@ def multibeam_to_database(beams_file, engine=None, Rspline=15, force=False, **kw
         for a in ['filter', 'pupil', 'instrument','pad'
                   'fwcpos', 'ccdchip', 'sci_extn', 'exptime']:
             if a == 'pad':
-                d[a].append(getattr(beam.grism, a)[0])
+                d[a].append(int(getattr(beam.grism, a)[0]))
             else:
                 d[a].append(getattr(beam.grism, a))
                 
