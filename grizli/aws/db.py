@@ -1332,10 +1332,12 @@ def multibeam_to_database(beams_file, engine=None, Rspline=15, force=False, **kw
         d['id'].append(id)
         d['objid'].append(-1)
 
-        for a in ['filter', 'pupil', 'instrument', 'pad',
+        for a in ['filter', 'pupil', 'instrument',
                   'fwcpos', 'ccdchip', 'sci_extn', 'exptime']:
             d[a].append(getattr(beam.grism, a))
-
+        
+        d['pad'] = beam.grism.pad[1]
+        
         d['order'].append(beam.beam.beam)
 
         parent = beam.grism.parent_file.replace('.fits', '').split('_')
