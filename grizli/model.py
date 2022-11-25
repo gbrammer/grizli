@@ -1385,6 +1385,7 @@ class ImageData(object):
         import copy
         
         med_filter = None
+        bkg_array = None
         
         # Easy way, get everything from an image HDU list
         if isinstance(hdulist, pyfits.HDUList):
@@ -1412,6 +1413,10 @@ class ImageData(object):
                     mkey = ('MED',sci_extn)
                     med_filter = np.cast[np.float32](hdulist[mkey].data)
                     
+                if ('BKG',sci_extn) in hdulist:
+                    mkey = ('BKG',sci_extn)
+                    bkg_array = np.cast[np.float32](hdulist[mkey].data)
+
                 base_extn = ('SCI', sci_extn)
 
             else:
@@ -1644,6 +1649,9 @@ class ImageData(object):
         
         if med_filter is not None:
             self.data['MED'] = med_filter
+
+        if bkg_array is not None:
+            self.data['BKG'] = bkg_array
             
         self.wcs = None
 
@@ -2279,6 +2287,9 @@ class ImageData(object):
         
         if 'MED' in self.data:
             slice_obj.data['MED'] = self.data['MED'][sly, slx]*1
+
+        if 'BKG' in self.data:
+            slice_obj.data['BKG'] = self.data['BKG'][sly, slx]*1
         
         slice_obj.grow = self.grow
         slice_obj.pad = self.pad
@@ -2366,8 +2377,13 @@ class ImageData(object):
         hdu.append(pyfits.ImageHDU(data=self.data['DQ'], header=h, name='DQ'))
         
         if 'MED' in self.data:
-            hdu.append(pyfits.ImageHDU(data=self.data['MED'], header=h, name='MED'))
-            
+            hdu.append(pyfits.ImageHDU(data=self.data['MED'],
+                                       header=h, name='MED'))
+        
+        if 'BKG' in self.data:
+            hdu.append(pyfits.ImageHDU(data=self.data['BKG'],
+                                       header=h, name='BKG'))
+
         if self.data['REF'] is not None:
             h['PHOTFLAM'] = self.ref_photflam
             h['PHOTPLAM'] = self.ref_photplam
@@ -2589,6 +2605,7 @@ class GrismFLT(object):
             self.direct.unset_dq()
             nbad = self.direct.flag_negative(sigma=-3)
             self.direct.data['SCI'] *= (self.direct.data['DQ'] == 0)
+            self.direct.data['SCI'] *= (self.direct.data['ERR'] > 0)
 
         if self.grism is not None:
             if np.max(self.pad) > 0:
@@ -2598,6 +2615,7 @@ class GrismFLT(object):
             self.grism.unset_dq()
             nbad = self.grism.flag_negative(sigma=-3)
             self.grism.data['SCI'] *= (self.grism.data['DQ'] == 0)
+            self.grism.data['SCI'] *= (self.grism.data['ERR'] > 0)
 
         # Load data from saved model files, if available
         # if os.path.exists('%s_model.fits' %(self.grism_file)):
@@ -3075,12 +3093,12 @@ class GrismFLT(object):
 
             if xcat is not None:
                 xc, yc = int(np.round(xcat))+1, int(np.round(ycat))+1
-                xcenter = -(xcat-(xc-1))
-                ycenter = -(ycat-(yc-1))
+                xcenter = (xcat-(xc-1))
+                ycenter = (ycat-(yc-1))
             else:
                 xc, yc = int(np.round(x))+1, int(np.round(y))+1
-                xcenter = -(x-(xc-1))
-                ycenter = -(y-(yc-1))
+                xcenter = (x-(xc-1))
+                ycenter = (y-(yc-1))
 
             origin = [yc-size + self.direct.origin[0],
                       xc-size + self.direct.origin[1]]
@@ -3841,8 +3859,18 @@ class GrismFLT(object):
         pom = pyfits.open(pom_file)[-1]
         pomh = pom.header
         
-        if (self.pad[0] < 790) & warn_if_too_small:
-            print('Warning: `pad[0]` should be > 790 for NIRCam to catch '
+        if self.grism.pupil.lower() == 'grismc':
+            _warn = self.pad[0] < 790
+            _padix = 0
+        elif self.grism.pupil.lower() == 'grismr':
+            _warn = self.pad[1] < 790
+            _padix = 1
+        else:
+            _warn = False
+            
+        if _warn & warn_if_too_small:
+            print(f'Warning: `pad[{_padix}]` should be > 790 for '
+                  f'NIRCam/{self.grism.pupil} to catch '
                   'all out-of-field sources within the POM coverage.')
                   
         # Slice geometry

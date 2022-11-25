@@ -93,8 +93,8 @@ def _loadFLT(grism_file, sci_extn, direct_file, pad, ref_file,
     else:
         flt.catalog = None
     
-    # if flt.grism.instrument in ['NIRCAM']:
-    #     flt.apply_POM()
+    if flt.grism.instrument in ['NIRCAM']:
+        flt.apply_POM()
 
     if flt.grism.instrument in ['NIRISS', 'NIRCAM']:
         flt.transform_JWST_WFSS()
@@ -1111,7 +1111,54 @@ class GroupFLT():
                     plt.close(fig)
 
 
-    def subtract_median_filter(self, filter_size=71, filter_central=10, revert=True):
+    def subtract_sep_background(self, mask_threshold=3, mask_iter=3, bw=256, bh=256, fw=3, fh=3, revert=True, **kwargs):
+        """
+        Remove a 2D background from grism exposures with `sep.Background`
+        
+        Parameters
+        ----------
+        mask_threshold : float
+            S/N threshold to mask sources
+        """
+        import sep
+        
+        for flt in self.FLTs:
+            msg = f'subtract_sep_background: {flt.grism.parent_file} '
+            msg += f' mask_threshold={mask_threshold}'
+            msg += f' fw,fh={fw},{fh} bw,bh={bw},{bh}'
+            
+            utils.log_comment(utils.LOGFILE, msg, verbose=True)
+            
+            sci_i = (flt.grism.data['SCI'] - flt.model).astype(np.float32)*1
+            if revert & ('BKG' in flt.grism.data):
+                sci_i += flt.grism.data['BKG']
+                
+            err_i = flt.grism.data['ERR']
+            dq_i = flt.grism.data['DQ']
+            
+            ok = (sci_i != 0) & (err_i > 0) & np.isfinite(err_i+sci_i)
+            ok &= ((dq_i & 1025) == 0)
+            sci_i[~ok] = 0
+            
+            ierr = 1/err_i
+            ierr[~ok] = 0
+            
+            bkg = 0
+            for _iter_i in range(mask_iter):
+                mask = ~(ok & ((sci_i - bkg)*ierr < mask_threshold))
+                back = sep.Background(sci_i, mask=mask,
+                                      bw=bw, bh=bh, fw=fw, fh=fh)
+                bkg = back.back()
+                
+            flt.grism.data['SCI'] -= bkg*ok
+            flt.grism.data['BKG'] = bkg*ok
+            flt.grism.header['BKGFW'] = fw, 'sep background fw'
+            flt.grism.header['BKGFH'] = fh, 'sep background fh'
+            flt.grism.header['BKGBW'] = bw, 'sep background bw'
+            flt.grism.header['BKGBH'] = bh, 'sep background bh'
+
+
+    def subtract_median_filter(self, filter_size=71, filter_central=10, revert=True, filter_footprint=None, subtract_model=False):
         """
         Remove a median filter calculated along the dispersion axis
         """
@@ -1124,8 +1171,11 @@ class GroupFLT():
             nbutils = None
             _filter_name = 'median_filter'
             
-        filter_footprint = utils.make_filter_footprint(filter_size=filter_size, 
-                                                  filter_central=filter_central)
+        if filter_footprint is None:
+            filter_footprint = utils.make_filter_footprint(
+                                              filter_size=filter_size, 
+                                              filter_central=filter_central
+                                              )[None,:]
         
         for flt in self.FLTs:
             msg = f'subtract_median_filter: {flt.grism.parent_file} '
@@ -1135,9 +1185,13 @@ class GroupFLT():
             utils.log_comment(utils.LOGFILE, msg, verbose=True)
             
             sci_i = flt.grism.data['SCI']*1
+            
             if revert & ('MED' in flt.grism.data):
                 sci_i += flt.grism.data['MED']
-                
+            
+            if subtract_model:
+                sci_i -= flt.model
+                    
             err_i = flt.grism.data['ERR']
             dq_i = flt.grism.data['DQ']
             
@@ -1151,28 +1205,20 @@ class GroupFLT():
             #sh = sci_i.shape
             
             if nbutils is None:
-                filter_sci = nd.median_filter(sci_i,
-                                             footprint=filter_footprint[None,:])
+                filter_sci = nd.median_filter(sci_i, footprint=filter_footprint)
             else:
                 sci_i[~ok] = np.nan
                 filter_sci = nd.generic_filter(sci_i,
                                                nbutils.nanmedian,
-                                             footprint=filter_footprint[None,:])
+                                               footprint=filter_footprint)
                 
                 filter_sci[~np.isfinite(filter_sci)] = 0
                 
-            # valid = ok.sum(axis=1)
-            #
-            # for i in range(sh[0]):
-            #     if not valid[i]:
-            #         continue
-            #
-            #     filter_sci[i,:] = nd.median_filter(sci_i[i,:], filter_size)
-
             flt.grism.data['SCI'] -= filter_sci*ok
             flt.grism.data['MED'] = filter_sci*ok
             flt.grism.header['MEDSIZE'] = filter_size, 'Median filter size'
-            flt.grism.header['MEDCLIP'] = filter_central, 'Masked central pixels of the filter'
+            flt.grism.header['MEDCLIP'] = (filter_central,
+                                          'Masked central pixels of the filter')
             flt.grism.header['MEDFILT'] = _filter_name, 'Filter type'
 
 

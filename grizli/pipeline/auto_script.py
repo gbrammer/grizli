@@ -2917,7 +2917,7 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
         return [grp]
 
 
-def grism_prep(field_root='j142724+334246', PREP_PATH='../Prep', EXTRACT_PATH='../Extractions', ds9=None, refine_niter=3, gris_ref_filters=GRIS_REF_FILTERS, force_ref=None, files=None, split_by_grism=True, refine_poly_order=1, refine_fcontam=0.5, cpu_count=0, mask_mosaic_edges=True, prelim_mag_limit=25, refine_mag_limits=[18, 24], init_coeffs=[1.1, -0.5], grisms_to_process=None, pad=(64, 256), model_kwargs={'compute_size': True}, subtract_median_filter=False, median_filter_size=71, median_filter_central=10):
+def grism_prep(field_root='j142724+334246', PREP_PATH='../Prep', EXTRACT_PATH='../Extractions', ds9=None, refine_niter=3, gris_ref_filters=GRIS_REF_FILTERS, force_ref=None, files=None, split_by_grism=True, refine_poly_order=1, refine_fcontam=0.5, cpu_count=0, mask_mosaic_edges=True, prelim_mag_limit=25, refine_mag_limits=[18, 24], init_coeffs=[1.1, -0.5], grisms_to_process=None, pad=(64, 256), model_kwargs={'compute_size': True}, sep_background_kwargs=None, subtract_median_filter=False, median_filter_size=71, median_filter_central=10):
     """
     Contamination model for grism exposures
     """
@@ -2965,7 +2965,7 @@ def grism_prep(field_root='j142724+334246', PREP_PATH='../Prep', EXTRACT_PATH='.
                                    coeffs=init_coeffs, 
                                    cpu_count=cpu_count,
                                    model_kwargs=model_kwargs)
-
+        
         ##############
         # Save model to avoid having to recompute it again
         grp.save_full_data()
@@ -2994,35 +2994,41 @@ def grism_prep(field_root='j142724+334246', PREP_PATH='../Prep', EXTRACT_PATH='.
             except:
                 utils.log_exception(utils.LOGFILE, traceback)
                 pass
-
-        ################
-        # Remove constant modal background
-        for i in range(grp.N):
-            mask = (grp.FLTs[i].model < grp.FLTs[i].grism['ERR']*0.6) 
-            mask &= (grp.FLTs[i].grism['SCI'] != 0)
-
-            # Fit Gaussian to the masked pixel distribution
-            clip = np.ones(mask.sum(), dtype=bool)
-            for iter in range(3):
-                clip_data = grp.FLTs[i].grism.data['SCI'][mask][clip]
-                n = scipy.stats.norm.fit(clip_data)
-                clip = np.abs(grp.FLTs[i].grism.data['SCI'][mask]) < 3*n[1]
+        
+        
+        # Sep background
+        if sep_background_kwargs is not None:
+            grp.subtract_sep_background(**sep_background_kwargs)
             
-            del(clip_data)
-            mode = n[0]
+        elif not subtract_median_filter:
+            ################
+            # Remove constant modal background
+            for i in range(grp.N):
+                mask = (grp.FLTs[i].model < grp.FLTs[i].grism['ERR']*0.6) 
+                mask &= (grp.FLTs[i].grism['SCI'] != 0)
 
-            logstr = '# grism_mode_bg {0} {1} {2:.4f}'
-            logstr = logstr.format(grp.FLTs[i].grism.parent_file, 
-                                   grp.FLTs[i].grism.filter, mode)
-            utils.log_comment(utils.LOGFILE, logstr, verbose=True)
+                # Fit Gaussian to the masked pixel distribution
+                clip = np.ones(mask.sum(), dtype=bool)
+                for iter in range(3):
+                    clip_data = grp.FLTs[i].grism.data['SCI'][mask][clip]
+                    n = scipy.stats.norm.fit(clip_data)
+                    clip = np.abs(grp.FLTs[i].grism.data['SCI'][mask]) < 3*n[1]
+            
+                del(clip_data)
+                mode = n[0]
 
-            try:
-                ds9.view(grp.FLTs[i].grism['SCI'] - grp.FLTs[i].model)
-            except:
-                pass
+                logstr = '# grism_mode_bg {0} {1} {2:.4f}'
+                logstr = logstr.format(grp.FLTs[i].grism.parent_file, 
+                                       grp.FLTs[i].grism.filter, mode)
+                utils.log_comment(utils.LOGFILE, logstr, verbose=True)
 
-            # Subtract
-            grp.FLTs[i].grism.data['SCI'] -= mode
+                try:
+                    ds9.view(grp.FLTs[i].grism['SCI'] - grp.FLTs[i].model)
+                except:
+                    pass
+
+                # Subtract
+                grp.FLTs[i].grism.data['SCI'] -= mode
 
         #############
         # Refine the model
@@ -3050,7 +3056,11 @@ def grism_prep(field_root='j142724+334246', PREP_PATH='../Prep', EXTRACT_PATH='.
                                 max_coeff=5, ds9=ds9, verbose=True,
                                 fcontam=refine_i,
                                 wave=np.linspace(*grp.polyx[:2], 100)*1.e4)
-
+        
+            # Do background again
+            if sep_background_kwargs is not None:
+                grp.subtract_sep_background(**sep_background_kwargs)
+        
         ##############
         # Save model to avoid having to recompute it again
         grp.save_full_data()
