@@ -761,7 +761,7 @@ def run_grizli_fit(event):
                 
                 hdu, fig2 = mb.drizzle_grisms_and_PAs(fcontam=0.0, 
                                                      flambda=False,
-                                                     kernel='point', size=32,
+                                                     kernel='point', size=16,
                                                      tfit=tfit, diff=False, 
                                                       mask_segmentation=False,
                                     fig_args=dict(mask_segmentation=False, 
