@@ -135,7 +135,7 @@ def extract_beams_from_flt(root, bucket, id, clean=True, silent=False):
 
     if not silent:
         print('Read {0} GrismFLT files'.format(len(flt_files)))
-
+    
     if os.path.exists('{0}_fit_args.npy'.format(root)):
         args_file = '{0}_fit_args.npy'.format(root)
     else:
@@ -148,6 +148,8 @@ def extract_beams_from_flt(root, bucket, id, clean=True, silent=False):
         flt, ext, _, _ = os.path.basename(file).split('.')
         if flt.startswith('i'):
             fl = 'flt'
+        elif flt.startswith('jw'):
+            fl = 'rate'
         else:
             fl = 'flc'
 
@@ -742,11 +744,38 @@ def run_grizli_fit(event):
             output_path = 'HST/Pipeline/{0}/Extractions'.format(root)
 
     else:
-
         # Normal galaxy redshift fit
-        fitting.run_all_parallel(id, fit_only_beams=True, fit_beams=False,
-                                 args_file=args_file, **event_kwargs)
-
+        res = fitting.run_all_parallel(id, get_output_data=True,
+                                       fit_only_beams=True, fit_beams=False,
+                                       args_file=args_file,
+                                       **event_kwargs)
+        
+        if root == 'fresco-gds-med':
+            try:
+                mb, tfit = res[0], res[3]
+                # 1D for FRESCO
+                fig1 = mb.oned_figure(bin=2, tfit=tfit,
+                                      show_rest=False, minor=0.1,
+                                      figsize=(9,3), median_filter_kwargs=None,
+                                      ylim_percentile=0.1)
+                
+                hdu, fig2 = mb.drizzle_grisms_and_PAs(fcontam=0.0, 
+                                                     flambda=False,
+                                                     kernel='point', size=32,
+                                                     tfit=tfit, diff=False, 
+                                                      mask_segmentation=False,
+                                    fig_args=dict(mask_segmentation=False, 
+                                                  average_only=False,
+                                                  scale_size=1, 
+                                                  cmap='viridis_r', 
+                                                  width_ratio=0.11),
+                                                    )
+            
+                fig1.savefig(f'{root}_{id:05d}.1d.png')
+                fig2.savefig(f'{root}_{id:05d}.2d.png')
+            except:
+                print('FRESCO outputs failed')
+                
         if output_path is None:
             output_path = 'HST/Pipeline/{0}/Extractions'.format(root)
 
