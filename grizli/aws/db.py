@@ -24,6 +24,27 @@ FLAGS = {'init_lambda': 1,
 
 COLUMNS = ['root', 'id', 'status', 'ra', 'dec', 'ninput', 'redshift', 'as_epsf', 't_g102', 'n_g102', 'p_g102', 't_g141', 'n_g141', 'p_g141', 't_g800l', 'n_g800l', 'p_g800l', 'numlines', 'haslines', 'chi2poly', 'chi2spl', 'splf01', 'sple01', 'splf02', 'sple02', 'splf03', 'sple03', 'splf04', 'sple04', 'huberdel', 'st_df', 'st_loc', 'st_scl', 'dof', 'chimin', 'chimax', 'bic_poly', 'bic_spl', 'bic_temp', 'z02', 'z16', 'z50', 'z84', 'z97', 'zwidth1', 'zwidth2', 'z_map', 'zrmin', 'zrmax', 'z_risk', 'min_risk', 'd4000', 'd4000_e', 'dn4000', 'dn4000_e', 'dlineid', 'dlinesn', 'flux_pab', 'err_pab', 'ew50_pab', 'ewhw_pab', 'flux_hei_1083', 'err_hei_1083', 'ew50_hei_1083', 'ewhw_hei_1083', 'flux_siii', 'err_siii', 'ew50_siii', 'ewhw_siii', 'flux_oii_7325', 'err_oii_7325', 'ew50_oii_7325', 'ewhw_oii_7325', 'flux_ariii_7138', 'err_ariii_7138', 'ew50_ariii_7138', 'ewhw_ariii_7138', 'flux_sii', 'err_sii', 'ew50_sii', 'ewhw_sii', 'flux_ha', 'err_ha', 'ew50_ha', 'ewhw_ha', 'flux_oi_6302', 'err_oi_6302', 'ew50_oi_6302', 'ewhw_oi_6302', 'flux_hei_5877', 'err_hei_5877', 'ew50_hei_5877', 'ewhw_hei_5877', 'flux_oiii', 'err_oiii', 'ew50_oiii', 'ewhw_oiii', 'flux_hb', 'err_hb', 'ew50_hb', 'ewhw_hb', 'flux_oiii_4363', 'err_oiii_4363', 'ew50_oiii_4363', 'ewhw_oiii_4363', 'flux_hg', 'err_hg', 'ew50_hg', 'ewhw_hg', 'flux_hd', 'err_hd', 'ew50_hd', 'ewhw_hd', 'flux_h7', 'err_h7', 'ew50_h7', 'ewhw_h7', 'flux_h8', 'err_h8', 'ew50_h8', 'ewhw_h8', 'flux_h9', 'err_h9', 'ew50_h9', 'ewhw_h9', 'flux_h10', 'err_h10', 'ew50_h10', 'ewhw_h10', 'flux_neiii_3867', 'err_neiii_3867', 'ew50_neiii_3867', 'ewhw_neiii_3867', 'flux_oii', 'err_oii', 'ew50_oii', 'ewhw_oii', 'flux_nevi_3426', 'err_nevi_3426', 'ew50_nevi_3426', 'ewhw_nevi_3426', 'flux_nev_3346', 'err_nev_3346', 'ew50_nev_3346', 'ewhw_nev_3346', 'flux_mgii', 'err_mgii', 'ew50_mgii', 'ewhw_mgii', 'flux_civ_1549', 'err_civ_1549', 'ew50_civ_1549', 'ewhw_civ_1549', 'flux_ciii_1908', 'err_ciii_1908', 'ew50_ciii_1908', 'ewhw_ciii_1908', 'flux_oiii_1663', 'err_oiii_1663', 'ew50_oiii_1663', 'ewhw_oiii_1663', 'flux_heii_1640', 'err_heii_1640', 'ew50_heii_1640', 'ewhw_heii_1640', 'flux_niii_1750', 'err_niii_1750', 'ew50_niii_1750', 'ewhw_niii_1750', 'flux_niv_1487', 'err_niv_1487', 'ew50_niv_1487', 'ewhw_niv_1487', 'flux_nv_1240', 'err_nv_1240', 'ew50_nv_1240', 'ewhw_nv_1240', 'flux_lya', 'err_lya', 'ew50_lya', 'ewhw_lya', 'pdf_max', 'cdf_z', 'sn_pab', 'sn_hei_1083', 'sn_siii', 'sn_oii_7325', 'sn_ariii_7138', 'sn_sii', 'sn_ha', 'sn_oi_6302', 'sn_hei_5877', 'sn_oiii', 'sn_hb', 'sn_oiii_4363', 'sn_hg', 'sn_hd', 'sn_h7', 'sn_h8', 'sn_h9', 'sn_h10', 'sn_neiii_3867', 'sn_oii', 'sn_nevi_3426', 'sn_nev_3346', 'sn_mgii', 'sn_civ_1549', 'sn_ciii_1908', 'sn_oiii_1663', 'sn_heii_1640', 'sn_niii_1750', 'sn_niv_1487', 'sn_nv_1240', 'sn_lya', 'chinu', 'bic_diff', 'log_risk', 'log_pdf_max', 'zq', 'mtime', 'vel_bl', 'vel_nl', 'vel_z', 'vel_nfev', 'vel_flag', 'grizli_version']
 
+# New columns in redshift_fit_v2
+COLUMNS += ['flux_bra', 'err_bra', 'ew50_bra', 'ewhw_bra',
+            'flux_brb', 'err_brb', 'ew50_brb', 'ewhw_brb',
+            'flux_brg', 'err_brg', 'ew50_brg', 'ewhw_brg',
+            'flux_pfg', 'err_pfg', 'ew50_pfg', 'ewhw_pfg',
+            'flux_pfd', 'err_pfd', 'ew50_pfd', 'ewhw_pfd',
+            'flux_paa', 'err_paa', 'ew50_paa', 'ewhw_paa',
+            'flux_pag', 'err_pag', 'ew50_pag', 'ewhw_pag',
+            'flux_pad', 'err_pad', 'ew50_pad', 'ewhw_pad',
+            'flux_nii', 'err_nii', 'ew50_nii', 'ewhw_nii',
+            'flux_oiii_4959', 'err_oiii_4959',
+            'ew50_oiii_4959', 'ewhw_oiii_4959',
+            'flux_oiii_5007', 'err_oiii_5007',
+            'ew50_oiii_5007', 'ewhw_oiii_5007',
+            'flux_ciii_1906', 'err_ciii_1906',
+            'ew50_ciii_1906', 'ewhw_ciii_1906',
+            'sn_bra', 'sn_brb', 'sn_brg', 'sn_pfg', 'sn_pfd',
+            'sn_paa', 'sn_pag', 'sn_pad', 'sn_nii',
+            'sn_oiii_4959', 'sn_oiii_5007',
+            'sn_ciii_1906']
+
 engine = None
 
 def get_connection_info(config_file=None):
@@ -1170,7 +1191,7 @@ def phot_to_dataframe(phot, root):
     return df
 
 
-def add_phot_to_db(root, delete=False, engine=None, nmax=500):
+def add_phot_to_db(root, delete=False, engine=None, nmax=500, add_missing_columns=False):
     """
     Read the table {root}_phot_apcorr.fits and append it to the grizli_db `photometry_apcorr` table
     """
@@ -1197,20 +1218,25 @@ def add_phot_to_db(root, delete=False, engine=None, nmax=500):
 
     # Read the catalog
     phot = Table.read('{0}_phot_apcorr.fits'.format(root), character_as_bytes=False)
+    
+    empty = SQL("SELECT * FROM photometry_apcorr WHERE false")
+    
+    # Add new filter columns if necessary
 
+    df = phot_to_dataframe(phot, root)
+    
     # remove columns
     remove = []
-    for c in phot.colnames:
+    for c in df.columns:
         if ('_corr_' in c) | ('_ecorr_' in c) | (c[-5:] in ['tot_4', 'tot_5', 'tot_6']) | ('dummy' in c):
 
             remove.append(c)
+        
+        if (not add_missing_columns) & (c not in empty.colnames):
+            remove.append(c)
+            
+    df.drop(remove, axis=1, inplace=True)
     
-    phot.remove_columns(remove)
-
-    # Add new filter columns if necessary
-    empty = pd.read_sql_query("SELECT * FROM photometry_apcorr WHERE false", engine)
-
-    df = phot_to_dataframe(phot, root)
     new_cols = []
     for c in df.columns:
         if c not in empty.columns:
@@ -1965,7 +1991,15 @@ def add_to_charge():
     df['comment'][ix] = 'Rafelski UltraDeep'
     
     df.to_sql('charge_fields', engine, index=False, if_exists='append', method='multi')
+    
+    df = pd.DataFrame()
+    df['field_root'] = ['fresco-gds-med']
+    df['comment'] = ['FRESCO-v5.1']
 
+    
+    df.to_sql('charge_fields', engine, index=False, if_exists='append', method='multi')
+    
+    
 def add_by_footprint(footprint_file='j141156p3415_footprint.fits', engine=None):
     
     import pandas as pd
