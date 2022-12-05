@@ -111,7 +111,11 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
 
     """
     import shutil
-    from astroscrappy import detect_cosmics
+    try:
+        from astroscrappy import detect_cosmics
+        has_scrappy = True
+    except ImportError:
+        has_scrappy = False
 
     local_file = os.path.basename(file)
     if preserve_dq:
@@ -275,13 +279,13 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
     #     extra_msg = ' / flat: {0}'.format(flat_file)
     # 
     #     flat_im = pyfits.open(os.path.join(os.getenv('jref'), flat_file))
-    #     flat = flat_im['SCI'].data #[5:-5, 5:-5]
+    #     flat = flat_im['SCI'].data #[5:-5, 5:-5]:
     #     flat_dq = (flat < 0.2)
     # 
     #     #orig_file['DQ'].data |= 4*flat_dq
     #     orig_file['SCI'].data = np.divide(orig_file['SCI'].data,flat,orig_file['SCI'].data,where=(flat!=0))
     
-    if crclean:
+    if crclean and has_scrappy:
         for ext in [1, 2]:
             print('Clean CRs with LACosmic, extension {0:d}'.format(ext))
 
