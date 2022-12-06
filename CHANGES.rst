@@ -59,3 +59,7 @@ Tagged version
 -----------------
 - Remove writing a few temporary files to /tmp
 - Close out some dangling pyfits.open objects
+
+1.7.1
+-----
+- Modernize setup
