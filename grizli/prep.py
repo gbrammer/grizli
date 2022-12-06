@@ -3442,7 +3442,7 @@ def separate_chip_sky(visit, filters=['F200LP','F350LP','F600LP','F390W'], steps
                     if os.path.exists('/tmp'):
                         fig.savefig('/tmp/rows.png')
                     
-                    fig.close()
+                    plt.close()
                 
             ###############
             
