@@ -23,14 +23,12 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install package
       run: |
         pip install --upgrade pip
-        pip install astropy-helpers
-        pip install git+https://github.com/astropy/pyregion
         pip install .[jwst,test]
     - name: Test with pytest
       run: |

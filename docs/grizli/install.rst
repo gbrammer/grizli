@@ -6,7 +6,6 @@ The easiest way to install the latest ``grizli`` release into a :ref:`fresh virt
 .. code-block:: bash
 
    pip install grizli
-   pip install pyregion
 
 If you are installing ``grizli`` for the first time, make sure to also set up :ref:`directories and download 
 reference files <directories>`. If you will be working with HST data, the following will install all 
@@ -15,7 +14,6 @@ necessary libraries:
 .. code-block:: bash
 
    pip install "grizli[hst]"
-   pip install pyregion
    conda install hstcal
 
 If you will be working with JWST data, the following is the recommended installation process:
@@ -23,7 +21,6 @@ If you will be working with JWST data, the following is the recommended installa
 .. code-block:: bash
 
    pip install "grizli[jwst]"
-   pip install pyregion
 
 
 More detailed instructions are available :ref:`below <installation>`.
@@ -106,15 +103,9 @@ To minimize conflict of dependencies, install only the ones that you need.
 Additional dependencies
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-``pip`` will install all needed dependencies with the exception of the following which 
-need to be installed separately:
-
-.. code-block:: bash
-  
-  pip install pyregion
-  
-If you will be working with HST data, you will also need the ``hstcal`` library 
-which is only available via ``conda``:
+``pip`` will install all needed dependencies.  If you will be working with
+HST data, you will also need the ``hstcal`` library which is only available 
+via ``conda``:
 
 .. code-block:: bash
 

@@ -2,7 +2,6 @@ channels:
 - http://ssb.stsci.edu/astroconda
 - defaults
 dependencies:
-- pyregion
 - hstcal
 - pip:
   - git+https://github.com/gbrammer/reprocess_wfc3.git
