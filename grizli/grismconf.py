@@ -462,7 +462,38 @@ class aXeConf():
         #plt.savefig('{0}.pdf'.format(self.conf_file))
         
         return fig
-        
+
+
+def coeffs_from_astropy_polynomial(p):
+    """
+    Get field-dependent coefficients in aXe format from an 
+    `astropy.modeling.polynomial.Polynomial2D` model
+    
+    Parameters
+    ----------
+    p : `astropy.modeling.polynomial.Polynomial2D`
+        Polynomial model
+    
+    Returns
+    -------
+    coeffs : array-like
+        Reordered array of coefficients
+    
+    """
+    coeffs = []
+    for _p in range(p.degree+1):
+        for _py in range(_p+1):
+            # print 'x**%d y**%d' %(_p-_py, _py)
+            _px = _p - _py
+            pname = f'c{_px}_{_py}'
+            if pname in p.param_names:
+                pix = p.param_names.index(pname)
+                coeffs.append(p.parameters[pix])
+            else:
+                coeffs.append(0.0)
+    
+    return np.array(coeffs)
+
 
 def get_config_filename(instrume='WFC3', filter='F140W',
                         grism='G141', module=None, chip=1):
@@ -535,6 +566,8 @@ def get_config_filename(instrume='WFC3', filter='F140W',
         
         conf_files = []
         conf_files.append(os.path.join(GRIZLI_PATH,
+                            'CONF/{0}.{1}.221215.conf'.format(grism, filter)))
+        conf_files.append(os.path.join(GRIZLI_PATH,
                             'CONF/{0}.{1}.220725.conf'.format(grism, filter)))
         conf_files.append(os.path.join(GRIZLI_PATH,
                             'CONF/{0}.{1}.conf'.format(grism, filter)))
@@ -545,6 +578,9 @@ def get_config_filename(instrume='WFC3', filter='F140W',
             if os.path.exists(conf_file):
                 #print(f'NIRISS: {conf_file}')
                 break
+            else:
+                #print(f'skip NIRISS: {conf_file}')
+                pass
                 
         # if not os.path.exists(conf_file):
         #     print('CONF/{0}.{1}.conf'.format(grism, filter))
@@ -1059,7 +1095,7 @@ def load_grism_config(conf_file, warnings=True):
             if 'ERROR' in conf.sens[b].colnames:
                 conf.sens[b]['ERROR'] *= hack_niriss
         
-        if 'F115W' in conf_file:
+        if ('F115W' in conf_file) | ('.2212' in conf_file):
             pass
             # msg = f""" !! Shift F115W along dispersion"""
             # utils.log_comment(utils.LOGFILE, msg, verbose=warnings)
@@ -1088,9 +1124,9 @@ def load_grism_config(conf_file, warnings=True):
         
         if ('F150W' in conf_file) & (hack_niriss > 1.01):
             conf.sens['A']['SENSITIVITY'] *= 1.08
-            
-        # Scale 0th orders in F150W,F200W
-        if ('F150W' in conf_file) | ('F200W' in conf_file):
+             
+        # Scale 0th orders in F150W
+        if ('F150W' in conf_file): # | ('F200W' in conf_file):
             msg = f""" ! Scale 0th order (B) by an additional x 1.5"""
             utils.log_comment(utils.LOGFILE, msg, verbose=warnings)
             conf.sens['B']['SENSITIVITY'] *= 1.5
