@@ -322,7 +322,7 @@ def blot_nearest_exact(in_data, in_wcs, out_wcs, verbose=True, stepsize=-1,
         scales (out**2/in**2), i.e., the pixel areas.
 
     wcs_mask : bool
-        Use fast WCS masking.  If False, use `pyregion`.
+        Use fast WCS masking.  If False, use ``regions``.
 
     fill_value : int/float
         Value in `out_data` not covered by `in_data`.
@@ -333,8 +333,8 @@ def blot_nearest_exact(in_data, in_wcs, out_wcs, verbose=True, stepsize=-1,
         Blotted data.
 
     """
+    from regions import Regions
     from shapely.geometry import Polygon
-    import pyregion
     import scipy.ndimage as nd
     from drizzlepac import cdriz
 
@@ -384,8 +384,8 @@ def blot_nearest_exact(in_data, in_wcs, out_wcs, verbose=True, stepsize=-1,
     else:
         olap_poly = np.array(olap.exterior.xy)
         poly_reg = "fk5\npolygon("+','.join(['{0}'.format(p + 1) for p in olap_poly.T.flatten()])+')\n'
-        reg = pyregion.parse(poly_reg)
-        mask = reg.get_mask(header=to_header(out_wcs), shape=out_sh)
+        reg = Regions.parse(poly_reg, format='ds9')[0]
+        mask = reg.to_mask().to_image(shape=out_sh)
 
     #yp, xp = np.indices(in_data.shape)
     #xi, yi = xp[mask], yp[mask]
