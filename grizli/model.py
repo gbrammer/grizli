@@ -3918,7 +3918,7 @@ class GrismFLT(object):
 
         xy_image[:, 0] += xedge
 
-        xy_str = 'image;polygon('+','.join(['{0:.1f}'.format(p) for p in xy_image.flatten()])+')'
+        xy_str = 'image;polygon('+','.join(['{0:.1f}'.format(p + 1) for p in xy_image.flatten()])+')'
         reg = pyregion.parse(xy_str)
         mask = reg.get_mask(shape=tuple(self.grism.sh))*1 == 0
 

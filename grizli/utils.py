@@ -383,7 +383,7 @@ def blot_nearest_exact(in_data, in_wcs, out_wcs, verbose=True, stepsize=-1,
         mask = out_xy_path.contains_points(pts).reshape(out_sh)
     else:
         olap_poly = np.array(olap.exterior.xy)
-        poly_reg = "fk5\npolygon("+','.join(['{0}'.format(p) for p in olap_poly.T.flatten()])+')\n'
+        poly_reg = "fk5\npolygon("+','.join(['{0}'.format(p + 1) for p in olap_poly.T.flatten()])+')\n'
         reg = pyregion.parse(poly_reg)
         mask = reg.get_mask(header=to_header(out_wcs), shape=out_sh)
 
