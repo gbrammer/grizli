@@ -680,14 +680,14 @@ def show_recent_assoc(limit=50):
     return last
 
 
-def launch_ec2_instances(nmax=50, count=None, templ='lt-0e8c2b8611c9029eb,Version=19'):
+def launch_ec2_instances(nmax=50, count=None, templ='lt-0e8c2b8611c9029eb,Version=24'):
     """
     Launch EC2 instances from a launch template that run through all 
     status=0 associations/tiles and then terminate
     
     Version 19 is the latest run_all_visits.sh
     Version 20 is the latest run_all_tiles.sh
-    
+    Version 24 is run_all_visits with a new python39 environment
     """
 
     if count is None:
