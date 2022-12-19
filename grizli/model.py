@@ -3893,7 +3893,7 @@ class GrismFLT(object):
         """
         Mask edges of exposures that might not have modeled spectra
         """
-        import pyregion
+        from regions import Regions
         import scipy.ndimage as nd
 
         if (self.has_edge_mask) & (force is False):
@@ -3918,9 +3918,9 @@ class GrismFLT(object):
 
         xy_image[:, 0] += xedge
 
-        xy_str = 'image;polygon('+','.join(['{0:.1f}'.format(p) for p in xy_image.flatten()])+')'
-        reg = pyregion.parse(xy_str)
-        mask = reg.get_mask(shape=tuple(self.grism.sh))*1 == 0
+        xy_str = 'image;polygon('+','.join(['{0:.1f}'.format(p + 1) for p in xy_image.flatten()])+')'
+        reg = Regions.parse(xy_str, format='ds9')[0]
+        mask = reg.to_mask().to_image(shape=self.grism.sh).astype(bool)
 
         # Only mask large residuals
         if resid_sn > 0:
