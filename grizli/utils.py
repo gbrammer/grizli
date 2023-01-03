@@ -17,7 +17,7 @@ import numpy as np
 
 import astropy.units as u
 
-from sregion import SRegion
+from sregion import SRegion, patch_from_polygon
 
 from . import GRIZLI_PATH
 
@@ -4444,10 +4444,9 @@ class WCSFootprint(object):
 
     def get_patch(self, **kwargs):
         """
-        `~descartes.PolygonPatch` object
+        `~matplotlib.pach.PathPatch` object
         """
-        from descartes import PolygonPatch
-        return PolygonPatch(self.polygon, **kwargs)
+        return patch_from_polygon(self.polygon, **kwargs)
 
 
     @property
@@ -5006,12 +5005,11 @@ def get_flt_footprint(flt_file, extensions=[1, 2, 3, 4], patch_args=None):
 
     Returns
     -------
-    fp / patch : `~shapely.geometry` object or `~descartes.PolygonPatch`
+    fp / patch : `~shapely.geometry` object or `matplotlib.patch.Patch`
         The footprint or footprint patch.
 
     """
     from shapely.geometry import Polygon
-    from descartes import PolygonPatch
 
     im = pyfits.open(flt_file)
     fp = None
@@ -5030,7 +5028,7 @@ def get_flt_footprint(flt_file, extensions=[1, 2, 3, 4], patch_args=None):
     im.close()
     
     if patch_args is not None:
-        patch = PolygonPatch(fp, **patch_args)
+        patch = patch_from_polygon(fp, **patch_args)
         return patch
     else:
         return fp
@@ -5073,7 +5071,6 @@ def make_maximal_wcs(files, pixel_scale=0.1, get_hdu=True, pad=90, verbose=True,
     """
     import numpy as np
     from shapely.geometry import Polygon
-    #from descartes import PolygonPatch
 
     import astropy.io.fits as pyfits
     import astropy.wcs as pywcs
