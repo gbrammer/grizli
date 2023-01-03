@@ -87,11 +87,13 @@ There are five available options for installing dependencies: ``hst``, ``jwst``,
   pip install "grizli[hst]"
 
 or 
+
 .. code-block:: bash
 
   pip install "grizli[jwst]"
 
 or
+
 .. code-block:: bash
 
   pip install "grizli[jwst,test]"
@@ -113,6 +115,7 @@ via ``conda``:
         
 ``eazy-py``
 ###########
+
 
 If you are planning to run simultaneous fits to grism spectra plus photometry using the
 `eazy-py <https://github.com/gbrammer/eazy-py>`_ connection, install ``eazy-py`` from
