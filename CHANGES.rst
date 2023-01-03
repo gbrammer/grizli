@@ -67,3 +67,7 @@ Tagged version
 1.7.3
 -----
 - Replace `descartes` dependency with updated `sregion`
+
+1.7.4
+-----
+- fix bug in versioning
