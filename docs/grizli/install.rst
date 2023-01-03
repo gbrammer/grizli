@@ -87,11 +87,13 @@ There are five available options for installing dependencies: ``hst``, ``jwst``,
   pip install "grizli[hst]"
 
 or 
+
 .. code-block:: bash
 
   pip install "grizli[jwst]"
 
 or
+
 .. code-block:: bash
 
   pip install "grizli[jwst,test]"
@@ -114,20 +116,24 @@ via ``conda``:
 ``eazy-py``
 ###########
 
+
 If you are planning to run simultaneous fits to grism spectra plus photometry using the
-`eazy-py <https://github.com/gbrammer/eazy-py>`_ connection, install ``eazy-py`` from
-the repository to ensure that you get *its* dependencies and templates.
-
-- Change directories to the location where you store code locally and activate the environment.
-
-- Fetch the ``eazy-py`` repo, change into its directory and install it. This needs to 
-only be done once, or after updating the repository:
+`eazy-py <https://github.com/gbrammer/eazy-py>`_ connection, install ``eazy-py`` 
+to ensure that you get *its* dependencies and templates.
 
 .. code-block:: bash
 
-    git clone --recurse-submodules https://github.com/gbrammer/eazy-py.git
+    git clone https://github.com/gbrammer/eazy-py.git
     cd eazy-py
-    pip install -r requirements.txt .
+    pip install .
+
+- Download the templates (in a Python interpreter):
+
+.. code-block:: python
+
+    import eazy
+    eazy.fetch_eazy_photoz()
+
 
 - Optional: Run basic tests with ``pytest``. Note that the ``pysynphot`` failure is not critical:
 
