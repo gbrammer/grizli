@@ -480,7 +480,7 @@ def apply_region_mask(flt_file, dq_value=1024, verbose=True):
     is found
     
     """
-    import pyregion
+    from regions import Regions
 
     mask_files = glob.glob('_'.join(flt_file.split('_')[:-1]) + '.*.mask.reg')
     if len(mask_files) == 0:
@@ -493,13 +493,17 @@ def apply_region_mask(flt_file, dq_value=1024, verbose=True):
     for mask_file in mask_files:
         ext = int(mask_file.split('.')[-3])
         try:
-            reg = pyregion.open(mask_file).as_imagecoord(flt['SCI', ext].header)
-            mask = reg.get_mask(hdu=flt['SCI', ext])
+            hdu = flt['SCI', ext]
+            reg = Regions.read(mask_file, format='ds9')[0]
+            reg_pix = reg.to_pixel(wcs=pywcs.WCS(hdu.header))
+            shape = hdu.data.shape
+            mask = reg_pix.to_mask().to_image(shape=shape).astype(bool)
         except:
             # Above fails for lookup-table distortion (ACS / UVIS)
             # Here just assume the region file is defined in image coords
-            reg = pyregion.open(mask_file)
-            mask = reg.get_mask(shape=flt['SCI', ext].data.shape)
+            reg = Regions.read(mask_file, format='ds9')[0]
+            shape = flt['SCI', ext].data.shape
+            mask = reg.to_mask().to_image(shape=shape).astype(bool)
 
         flt['DQ', ext].data[mask] |= dq_value
 
