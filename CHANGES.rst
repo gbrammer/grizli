@@ -63,3 +63,7 @@ Tagged version
 1.7.1
 -----
 - Modernize setup
+
+1.7.3
+-----
+- Replace `descartes` dependency with updated `sregion`
