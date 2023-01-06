@@ -133,7 +133,7 @@ JWST_TRANSLATE = {'RA_TARG':'TARG_RA',
                   'EXPTIME':'EFFEXPTM',
                   'PA_V3':'ROLL_REF'}
 
-def get_flt_info(files=[], columns=['FILE', 'FILTER', 'PUPIL', 'INSTRUME', 'DETECTOR', 'TARGNAME', 'DATE-OBS', 'TIME-OBS', 'EXPSTART', 'EXPTIME', 'PA_V3', 'RA_TARG', 'DEC_TARG', 'POSTARG1', 'POSTARG2'], translate=JWST_TRANSLATE, defaults={'PUPIL':'---', 'PA_V3':0.0}, jwst_detector=True):
+def get_flt_info(files=[], columns=['FILE', 'FILTER', 'PUPIL', 'INSTRUME', 'DETECTOR', 'TARGNAME', 'DATE-OBS', 'TIME-OBS', 'EXPSTART', 'EXPTIME', 'PA_V3', 'RA_TARG', 'DEC_TARG', 'POSTARG1', 'POSTARG2'], translate=JWST_TRANSLATE, defaults={'PUPIL':'---', 'TARGNAME':'indef','PA_V3':0.0}, jwst_detector=True):
     """Extract header information from a list of FLT files
 
     Parameters
