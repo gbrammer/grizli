@@ -3670,6 +3670,7 @@ def process_direct_grism_visit(direct={},
                                align_min_flux_radius=1., 
                                align_assume_close=False,
                                align_transform=None,
+                               align_guess=None,
                                max_err_percentile=99,
                                catalog_mask_pad=0.05,
                                match_catalog_density=None,
@@ -4013,7 +4014,9 @@ def process_direct_grism_visit(direct={},
             os.remove(logfile)
 
         guess_file = '{0}.align_guess'.format(direct['product'])
-        if os.path.exists(guess_file):
+        if align_guess != None:
+            guess = align_guess
+        elif os.path.exists(guess_file):
             guess = np.loadtxt(guess_file)
         else:
             guess = [0., 0., 0., 1]

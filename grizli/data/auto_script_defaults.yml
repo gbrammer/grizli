@@ -85,6 +85,7 @@ visit_prep_args: &prep_args
     align_assume_close: False
     align_transform: null
     align_ref_border: 100
+    align_guess: null
     max_err_percentile: 99
     align_min_flux_radius: 1.
     catalog_mask_pad: 0.05
