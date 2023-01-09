@@ -51,7 +51,9 @@ jobs:
     name: upload to PyPI
     needs: [build_wheels, build_sdist]
     runs-on: ubuntu-latest
-    if: github.event_name == 'release' && github.event.action == 'published'
+    if: github.event_name == 'push' &&
+        github.event.ref_type == 'tag' &&
+        github.ref == 'refs/heads/${{ github.event.repository.default_branch }}'
     steps:
       - uses: actions/download-artifact@v3
         with:
