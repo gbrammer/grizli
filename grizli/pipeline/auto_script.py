@@ -377,7 +377,11 @@ def go(root='j010311+131615',
 
     utils.log_comment(utils.LOGFILE, '### Pipeline start', show_date=True)
     
-    if 'CRDS_CONTEXT' is not None:
+    if CRDS_CONTEXT is not None:
+        utils.log_comment(utils.LOGFILE,
+                          f"# export CRDS_CONTEXT='{CRDS_CONTEXT}'",
+                          show_date=True)
+                          
         os.environ['CRDS_CONTEXT'] = CRDS_CONTEXT
         
     ######################

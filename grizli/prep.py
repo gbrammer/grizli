@@ -2677,7 +2677,7 @@ def make_drz_catalog(root='', sexpath='sex', threshold=2., get_background=True,
     return cat
 
 
-def make_visit_average_flat(visit, clip_max=0, threshold=5, dilate=3, apply=True, instruments=['MIRI'], verbose=True, bad_bits=(1024+1), bkg_kwargs={}):
+def make_visit_average_flat(visit, clip_max=0, threshold=5, dilate=3, apply=True, instruments=['MIRI'], verbose=True, bad_bits=(1024+1+2+512), bkg_kwargs={}):
     """
     Make an average "skyflat" for exposures in a visit, e.g., for MIRI
     
