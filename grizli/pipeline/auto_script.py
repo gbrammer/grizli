@@ -251,6 +251,7 @@ def create_path_dict(root='j142724+334246', home='$PWD', raw=None, prep=None, ex
 def go(root='j010311+131615', 
        HOME_PATH='$PWD',
        RAW_PATH=None, PREP_PATH=None, PERSIST_PATH=None, EXTRACT_PATH=None,
+       CRDS_CONTEXT=None,
        filters=args['filters'],
        fetch_files_args=args['fetch_files_args'],
        inspect_ramps=False,
@@ -375,7 +376,10 @@ def go(root='j010311+131615',
     utils.LOGFILE = os.path.join(PATHS['home'], f'{root}.auto_script.log.txt')
 
     utils.log_comment(utils.LOGFILE, '### Pipeline start', show_date=True)
-
+    
+    if 'CRDS_CONTEXT' is not None:
+        os.environ['CRDS_CONTEXT'] = CRDS_CONTEXT
+        
     ######################
     # Download data
     os.chdir(PATHS['home'])

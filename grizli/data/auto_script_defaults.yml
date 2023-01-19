@@ -5,6 +5,7 @@ RAW_PATH: null
 PREP_PATH: null
 PERSIST_PATH: null
 EXTRACT_PATH: null
+CRDS_CONTEXT: null
 
 filters: &filters 
     [F410M, F467M, F547M, F550M, F621M, F689M, F763M, F845M, F200LP, F350LP,
