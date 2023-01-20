@@ -8,6 +8,8 @@ grizli/data/templates/*.npy
 *notes
 PipelineTest/*
 
+*DS_Store
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
