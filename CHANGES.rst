@@ -71,3 +71,7 @@ Tagged version
 1.7.4
 -----
 - fix bug in versioning
+
+1.7.6
+-----
+- Updated NIRCam LW bad pixel masks
