@@ -5630,15 +5630,18 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
             _inst = flt[0].header['INSTRUME']
             if (extra_wfc3ir_badpix) & (_inst in ['NIRCAM']):
                 _det = flt[0].header['DETECTOR']
-                bpfile = os.path.join(os.path.dirname(__file__), 
-                           f'data/nrc_lowpix_0916_{_det}.fits.gz')
+                bpfiles = [os.path.join(os.path.dirname(__file__), 
+                           f'data/nrc_badpix_230120_{_det}.fits.gz')]
+                bpfiles += [os.path.join(os.path.dirname(__file__), 
+                           f'data/nrc_lowpix_0916_{_det}.fits.gz')]
                 
-                if os.path.exists(bpfile):
-                    bpdata = pyfits.open(bpfile)[0].data
-                    #bpdata = nd.binary_dilation(bpdata > 0, iterations=2)*1024
-                    bpdata = nd.binary_dilation(bpdata > 0)*1024
-                    msg = f'Use extra badpix in {bpfile}'
-                    log_comment(LOGFILE, msg, verbose=verbose)
+                for bpfile in bpfiles:
+                    if os.path.exists(bpfile):
+                        bpdata = pyfits.open(bpfile)[0].data
+                        bpdata = nd.binary_dilation(bpdata > 0)*1024
+                        msg = f'Use extra badpix in {bpfile}'
+                        log_comment(LOGFILE, msg, verbose=verbose)
+                        break
             else:
                 bpdata = np.zeros(flt['SCI'].data.shape, dtype=int)
                 
