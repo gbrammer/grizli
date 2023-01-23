@@ -491,7 +491,11 @@ def add_wcs_log(files=None, assoc=None, remove_old=True, verbose=True):
             
         parent = os.path.basename(file).split('_wcs.log')[0]
         if remove_old:
-            db.execute(f"DELETE FROM wcs_log WHERE wcs_parent='{parent}'")
+            cmd = f"DELETE FROM wcs_log WHERE wcs_parent='{parent}'"
+            if assoc is not None:
+                cmd += f" AND wcs_assoc='{assoc}'"
+                
+            db.execute(cmd)
             
         rows = []
         
