@@ -1190,7 +1190,7 @@ def check_jwst_assoc_guiding(assoc):
 ALL_FILTERS = ['F410M', 'F467M', 'F547M', 'F550M', 'F621M', 'F689M', 'F763M', 'F845M', 'F200LP', 'F350LP', 'F435W', 'F438W', 'F439W', 'F450W', 'F475W', 'F475X', 'F555W', 'F569W', 'F600LP', 'F606W', 'F622W', 'F625W', 'F675W', 'F702W', 'F775W', 'F791W', 'F814W', 'F850LP', 'G800L', 'F098M', 'F127M', 'F139M', 'F153M', 'F105W', 'F110W', 'F125W', 'F140W', 'F160W', 'G102', 'G141']
 
 
-def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=False, visit_split_shift=1.2, blue_align_params=blue_align_params, ref_catalogs=['LS_DR9', 'PS1', 'DES', 'NSC', 'GAIA'], filters=None, prep_args={}, get_wcs_guess_from_table=True, master_radec='astrometry_db', align_guess=None, **kwargs):
+def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=False, visit_split_shift=1.2, blue_align_params=blue_align_params, ref_catalogs=['LS_DR9', 'PS1', 'DES', 'NSC', 'GAIA'], filters=None, prep_args={}, fetch_args={}, get_wcs_guess_from_table=True, master_radec='astrometry_db', align_guess=None, **kwargs):
     """
     `assoc_table.status`
     
@@ -1268,7 +1268,10 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=False,
     
     for k in prep_args:
         kws['visit_prep_args'][k] = prep_args[k]
-                
+    
+    for k in fetch_args:
+        kws['fetch_files_args'][k] = fetch_args[k]
+        
     kws['kill'] = 'preprocess'
     
     if master_radec is not None:

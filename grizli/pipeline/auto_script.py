@@ -889,7 +889,7 @@ def make_directories(root='j142724+334246', HOME_PATH='$PWD', paths={}):
     return paths
 
 
-def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_products={'WFPC2/WFC': ['C0M', 'C1M'], 'WFPC2/PC': ['C0M', 'C1M'], 'ACS/WFC': ['FLC'], 'WFC3/IR': ['RAW'], 'WFC3/UVIS': ['FLC']}, remove_bad=True, reprocess_parallel=False, reprocess_clean_darks=True, s3_sync=False, fetch_flt_calibs=['IDCTAB', 'PFLTFILE', 'NPOLFILE'], filters=VALID_FILTERS, min_bad_expflag=2, fetch_only=False, force_rate=True):
+def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_products={'WFPC2/WFC': ['C0M', 'C1M'], 'WFPC2/PC': ['C0M', 'C1M'], 'ACS/WFC': ['FLC'], 'WFC3/IR': ['RAW'], 'WFC3/UVIS': ['FLC']}, remove_bad=True, reprocess_parallel=False, reprocess_clean_darks=True, s3_sync=False, fetch_flt_calibs=['IDCTAB', 'PFLTFILE', 'NPOLFILE'], filters=VALID_FILTERS, min_bad_expflag=2, fetch_only=False, force_rate=True, get_rateints=False):
     """
     Fully automatic script
     """
@@ -966,6 +966,23 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_pr
     
     tab = tab[use_filters]
     
+    # Files from s3
+    from_s3 = np.array([d.startswith('s3://') for d in tab['dataURL']])
+    if from_s3.sum() > 0:
+        
+        os.chdir(paths['raw'])
+        for s3path in tab['dataURL'][from_s3]:
+            _file = os.path.basename(s3path)
+            if os.path.exists(_file):
+                msg = f'{s3path} {_file} (file found)'
+                utils.log_comment(utils.LOGFILE, msg, verbose=True)
+            else:
+                msg = f'{s3path} {_file} (file found)'
+                utils.log_comment(utils.LOGFILE, msg, verbose=True)
+                os.system(f'aws s3 cp {s3path} {_file}')
+        
+        jw &= ~from_s3
+        
     # JWST
     if jw.sum() > 0:
         print(f'Fetch {jw.sum()} JWST files!')
@@ -980,15 +997,17 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_pr
                     os.system(f'aws s3 cp s3://grizli-v2/JwstDummy/{_file} .')
             
         else:
-            ## Download from MAST API when data available xxx            
-            _resp = mastquery.utils.download_from_mast(tab[jw], 
-                                                       force_rate=force_rate)
+            ## Download from MAST API when data available
+            mastquery.utils.LOGFILE = utils.LOGFILE   
+            _resp = mastquery.utils.download_from_mast(tab[jw],
+                                          force_rate=force_rate,
+                                          rate_ints=get_rateints)
             # update targname
             for i, _file in enumerate(_resp):
                 _test = os.path.exists(_file) & (jwst_utils is not None)
                 _jwst_grism = ('_nis_rate' in _file)
-                if 'filter' in tab.colnames:
-                    _jwst_grism |= 'GRISM' in tab[jw]['filter'][i]
+                with pyfits.open(_file) as im:
+                    _jwst_grism |= 'GRISM' in im[0].header['filter']
                     
                 _test &= _jwst_grism
                 
