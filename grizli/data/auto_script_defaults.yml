@@ -27,6 +27,7 @@ fetch_files_args:
     s3_sync: True
     #filters: *filters
     fetch_flt_calibs: [IDCTAB, PFLTFILE, NPOLFILE]
+    s3path: null
     force_rate: True
     get_rateints: False
     inst_products: 
