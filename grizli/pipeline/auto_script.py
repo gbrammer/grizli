@@ -969,8 +969,14 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_pr
     # Files from s3
     from_s3 = np.array([d.startswith('s3://') for d in tab['dataURL']])
     
+    jw_files = []
+    
     if s3path is not None:
         # Prepend s3 path to filenames
+        
+        msg = f'Fetch {len(tab)} files from {s3path}'
+        utils.log_comment(utils.LOGFILE, msg, verbose=True)
+        
         os.chdir(paths['raw'])
         for url in tab['dataURL']:
             s3file = os.path.join(s3path, os.path.basename(url))
@@ -982,11 +988,17 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_pr
                 msg = f'fetch_files: {s3file} {_file}'
                 utils.log_comment(utils.LOGFILE, msg, verbose=True)
                 os.system(f'aws s3 cp {s3file} {_file}')
-        
+            
+            if os.path.exists(_file) & _file.startswith('jw'):
+                jw_files.append(_file)
+                
         tab = tab[:0]
         jw &= False
     
     elif from_s3.sum() > 0:
+        
+        msg = f'Fetch {from_s3.sum()} files from S3'
+        utils.log_comment(utils.LOGFILE, msg, verbose=True)
         
         os.chdir(paths['raw'])
         for s3file in tab['dataURL'][from_s3]:
@@ -998,14 +1010,18 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_pr
                 msg = f'fetch_files: {s3file} {_file}'
                 utils.log_comment(utils.LOGFILE, msg, verbose=True)
                 os.system(f'aws s3 cp {s3file} {_file}')
-        
+            
+            if os.path.exists(_file) & _file.startswith('jw'):
+                jw_files.append(_file)
+            
         # jw &= ~from_s3
         tab = tab[~from_s3]
         jw &= ~from_s3
 
     if jw.sum() > 0:
         # JWST
-        print(f'Fetch {jw.sum()} JWST files!')
+        msg = f'Fetch {jw.sum()} JWST files!'
+        utils.log_comment(utils.LOGFILE, msg, verbose=True)
         
         os.chdir(paths['raw'])
             
@@ -1015,31 +1031,39 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_pr
                 _file = os.path.basename(f).replace('nis_cal','nis_rate')
                 if not os.path.exists(_file):
                     os.system(f'aws s3 cp s3://grizli-v2/JwstDummy/{_file} .')
-            
+                
+                if os.path.exists(_file) & _file.startswith('jw'):
+                    jw_files.append(_file)
+                
         else:
             ## Download from MAST API when data available
             mastquery.utils.LOGFILE = utils.LOGFILE   
             _resp = mastquery.utils.download_from_mast(tab[jw],
                                           force_rate=force_rate,
                                           rate_ints=get_rateints)
-            # update targname
+            
             for i, _file in enumerate(_resp):
-                _test = os.path.exists(_file) & (jwst_utils is not None)
-                _jwst_grism = ('_nis_rate' in _file)
-                with pyfits.open(_file) as im:
-                    _jwst_grism |= 'GRISM' in im[0].header['filter']
-                    
-                _test &= _jwst_grism
-                
-                if _test:
-                    # Need initialization here for JWST grism exposures
-                    jwst_utils.initialize_jwst_image(_file,
-                                                     oneoverf_correction=False,
-                    )
-                    jwst_utils.set_jwst_to_hst_keywords(_file, reset=True)
-                    
+                if os.path.exists(_file) & _file.startswith('jw'):
+                    jw_files.append(_file)
+
         tab = tab[~jw]
+    
+    # Initialize grism files
+    for _file in jw_files:
+        _test = os.path.exists(_file) & (jwst_utils is not None)
+        _jwst_grism = ('_nis_rate' in _file)
+        with pyfits.open(_file) as im:
+            _jwst_grism |= 'GRISM' in im[0].header['filter']
         
+        _test &= _jwst_grism
+    
+        if _test:
+            # Need initialization here for JWST grism exposures
+            jwst_utils.initialize_jwst_image(_file,
+                                             oneoverf_correction=False,
+                                             )
+            jwst_utils.set_jwst_to_hst_keywords(_file, reset=True)
+
     if len(tab) > 0:
         if MAST_QUERY:
             tab = query.get_products_table(tab, extensions=['RAW', 'C1M'])
