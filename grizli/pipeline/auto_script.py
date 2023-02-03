@@ -2983,7 +2983,9 @@ def grism_prep(field_root='j142724+334246', PREP_PATH='../Prep', EXTRACT_PATH='.
             refine_niter = 0
             grp.subtract_median_filter(filter_size=median_filter_size, 
                                        filter_central=median_filter_central,
-                                       second_pass_filtering=second_pass_filtering, box_filter_sn=box_filter_sn, box_filter_width=box_filter_width)
+                                       second_pass_filtering=second_pass_filtering, 
+                                       box_filter_sn=box_filter_sn, 
+                                       box_filter_width=box_filter_width)
             
         else:
             ################

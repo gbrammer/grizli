@@ -1214,7 +1214,7 @@ class GroupFLT():
                 
                 filter_sci[~np.isfinite(filter_sci)] = 0
 
-            if second_pass_filtering==True:
+            if second_pass_filtering:
                 if nbutils is None:
                     # need numba installed
                     utils.log_comment(utils.LOGFILE, 'skipping second pass filtering. Need numba library installed', verbose=True)
