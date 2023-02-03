@@ -889,7 +889,7 @@ def make_directories(root='j142724+334246', HOME_PATH='$PWD', paths={}):
     return paths
 
 
-def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_products={'WFPC2/WFC': ['C0M', 'C1M'], 'WFPC2/PC': ['C0M', 'C1M'], 'ACS/WFC': ['FLC'], 'WFC3/IR': ['RAW'], 'WFC3/UVIS': ['FLC']}, remove_bad=True, reprocess_parallel=False, reprocess_clean_darks=True, s3_sync=False, fetch_flt_calibs=['IDCTAB', 'PFLTFILE', 'NPOLFILE'], filters=VALID_FILTERS, min_bad_expflag=2, fetch_only=False, force_rate=True, get_rateints=False):
+def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_products={'WFPC2/WFC': ['C0M', 'C1M'], 'WFPC2/PC': ['C0M', 'C1M'], 'ACS/WFC': ['FLC'], 'WFC3/IR': ['RAW'], 'WFC3/UVIS': ['FLC']}, remove_bad=True, reprocess_parallel=False, reprocess_clean_darks=True, s3_sync=False, fetch_flt_calibs=['IDCTAB', 'PFLTFILE', 'NPOLFILE'], filters=VALID_FILTERS, min_bad_expflag=2, fetch_only=False, force_rate=True, get_rateints=False, s3path=None):
     """
     Fully automatic script
     """
@@ -968,23 +968,43 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_pr
     
     # Files from s3
     from_s3 = np.array([d.startswith('s3://') for d in tab['dataURL']])
-    if from_s3.sum() > 0:
-        
+    
+    if s3path is not None:
+        # Prepend s3 path to filenames
         os.chdir(paths['raw'])
-        for s3path in tab['dataURL'][from_s3]:
-            _file = os.path.basename(s3path)
+        for url in tab['dataURL']:
+            s3file = os.path.join(s3path, os.path.basename(url))
+            _file = os.path.basename(s3file)
             if os.path.exists(_file):
-                msg = f'{s3path} {_file} (file found)'
+                msg = f'fetch_files: {s3file} {_file} (file found)'
                 utils.log_comment(utils.LOGFILE, msg, verbose=True)
             else:
-                msg = f'{s3path} {_file} (file found)'
+                msg = f'fetch_files: {s3file} {_file}'
                 utils.log_comment(utils.LOGFILE, msg, verbose=True)
-                os.system(f'aws s3 cp {s3path} {_file}')
+                os.system(f'aws s3 cp {s3file} {_file}')
         
+        tab = tab[:0]
+        jw &= False
+    
+    elif from_s3.sum() > 0:
+        
+        os.chdir(paths['raw'])
+        for s3file in tab['dataURL'][from_s3]:
+            _file = os.path.basename(s3file)
+            if os.path.exists(_file):
+                msg = f'fetch_files: {s3file} {_file} (file found)'
+                utils.log_comment(utils.LOGFILE, msg, verbose=True)
+            else:
+                msg = f'fetch_files: {s3file} {_file}'
+                utils.log_comment(utils.LOGFILE, msg, verbose=True)
+                os.system(f'aws s3 cp {s3file} {_file}')
+        
+        # jw &= ~from_s3
+        tab = tab[~from_s3]
         jw &= ~from_s3
-        
-    # JWST
+
     if jw.sum() > 0:
+        # JWST
         print(f'Fetch {jw.sum()} JWST files!')
         
         os.chdir(paths['raw'])
