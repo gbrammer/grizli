@@ -1158,7 +1158,7 @@ class GroupFLT():
             flt.grism.header['BKGBH'] = bh, 'sep background bh'
 
 
-    def subtract_median_filter(self, filter_size=71, filter_central=10, revert=True, filter_footprint=None, subtract_model=False):
+    def subtract_median_filter(self, filter_size=71, filter_central=10, revert=True, filter_footprint=None, subtract_model=False, second_pass_filtering=False, box_filter_sn=3, box_filter_width=3):
         """
         Remove a median filter calculated along the dispersion axis
         """
@@ -1213,6 +1213,33 @@ class GroupFLT():
                                                footprint=filter_footprint)
                 
                 filter_sci[~np.isfinite(filter_sci)] = 0
+
+            if second_pass_filtering:
+                if nbutils is None:
+                    # need numba installed
+                    utils.log_comment(utils.LOGFILE, 'skipping second pass filtering. Need numba library installed', verbose=True)
+                else:
+                    # run filter again, but mask pixels that show significant residuals (e.g. strong emission lines)
+                    utils.log_comment(utils.LOGFILE, f'rerunning filtering and masking S/N>{box_filter_sn} pixels in residual', verbose=True)
+
+                    # first do some binning/box filtering to identify significantly detected lines in individual exposures
+                    box_filter_footprint = np.ones((box_filter_width,box_filter_width), dtype=int)
+                    box_filter_clean = nd.generic_filter(sci_i-filter_sci,
+                                                    nbutils.nansum,
+                                                    footprint=box_filter_footprint)
+                    box_filter_err = box_filter_width*nd.generic_filter(err_i,
+                                                    nbutils.nanmean,
+                                                    footprint=box_filter_footprint)                                                
+
+                    # mask pixels that have S/N>filter_sn after median filtering
+                    okmask = (ok) & ~(box_filter_clean/box_filter_err > box_filter_sn)
+                    
+                    sci_i[~okmask] = np.nan
+                    filter_sci = nd.generic_filter(sci_i,
+                                                nbutils.nanmedian,
+                                                footprint=filter_footprint[None,:])
+                    
+                    filter_sci[~np.isfinite(filter_sci)] = 0   
                 
             flt.grism.data['SCI'] -= filter_sci*ok
             flt.grism.data['MED'] = filter_sci*ok
