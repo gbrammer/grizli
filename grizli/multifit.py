@@ -1158,7 +1158,7 @@ class GroupFLT():
             flt.grism.header['BKGBH'] = bh, 'sep background bh'
 
 
-    def subtract_median_filter(self, filter_size=71, filter_central=10, revert=True, second_pass_filtering=False, box_filter_sn=3, box_filter_width=3):
+    def subtract_median_filter(self, filter_size=71, filter_central=10, revert=True, filter_footprint=None, subtract_model=False, second_pass_filtering=False, box_filter_sn=3, box_filter_width=3):
         """
         Remove a median filter calculated along the dispersion axis
         """
