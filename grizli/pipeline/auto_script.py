@@ -1053,7 +1053,8 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_pr
         _test = os.path.exists(_file) & (jwst_utils is not None)
         _jwst_grism = ('_nis_rate' in _file)
         with pyfits.open(_file) as im:
-            _jwst_grism |= 'GRISM' in im[0].header['filter']
+            if 'PUPIL' in im[0].header:
+                _jwst_grism |= 'GRISM' in im[0].header['PUPIL']
         
         _test &= _jwst_grism
     
