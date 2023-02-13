@@ -1237,7 +1237,7 @@ class GroupFLT():
                     sci_i[~okmask] = np.nan
                     filter_sci = nd.generic_filter(sci_i,
                                                 nbutils.nanmedian,
-                                                footprint=filter_footprint[None,:])
+                                                footprint=filter_footprint)
                     
                     filter_sci[~np.isfinite(filter_sci)] = 0   
                 
