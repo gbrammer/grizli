@@ -4756,7 +4756,8 @@ class BeamCutout(object):
         ra, dec = self.direct.wcs.all_pix2world(pix_center, 1)[0]
         return ra, dec
 
-    def get_dispersion_PA(self, decimals=0):
+
+    def get_dispersion_PA(self, decimals=0, local=False):
         """Compute exact PA of the dispersion axis, including tilt of the
         trace and the FLT WCS
 
@@ -4765,11 +4766,14 @@ class BeamCutout(object):
         decimals : int or None
             Number of decimal places to round to, passed to `~numpy.round`.
             If None, then don't round.
-
+        
+        local : bool
+            Compute local PA of a given beam, otherwise use global WCS
+        
         Returns
         -------
         dispersion_PA : float
-            PA (angle East of North) of the dispersion axis.
+            PA (angle East of North) of the increasing-wavelength dispersion axis.
         """
         from astropy.coordinates import Angle
         import astropy.units as u
@@ -4779,26 +4783,39 @@ class BeamCutout(object):
             x0 = self.beam.conf.conf_dict['BEAMA']
         else:
             x0 = np.array([10,30])
+    
+        if local:
+            xp = self.beam.xc - self.beam.pad[1]
+            yp = self.beam.yc - self.beam.pad[0]
+        else:
+            xp = yp = 507 # Dummy, WFC3/IR center
             
-        dy_trace, lam_trace = self.beam.conf.get_beam_trace(x=507, y=507,
-                                                         dx=x0, beam='A')
-
-        extra = np.arctan2(dy_trace[1]-dy_trace[0], x0[1]-x0[0])/np.pi*180
+        x0 = np.mean(x0) + np.array([-10,10])
+    
+        dy_trace, lam_trace = self.beam.conf.get_beam_trace(x=xp, y=yp, dx=x0, beam='A')
 
         # Distorted WCS
         crpix = self.direct.wcs.wcs.crpix
-        xref = [crpix[0], crpix[0]+1]
-        yref = [crpix[1], crpix[1]]
+        
+        if local:
+            xref = -crpix[0] + x0
+            yref = [-crpix[1]+dy_trace[0], -crpix[1]+dy_trace[1]]
+        else:
+            xref = crpix[0] + x0
+            yref = [crpix[1]+dy_trace[0], crpix[1]+dy_trace[1]]
+
         r, d = self.direct.wcs.all_pix2world(xref, yref, 1)
-        pa = Angle((extra +
-                    np.arctan2(np.diff(r)*np.cos(d[0]/180*np.pi),
-                               np.diff(d))[0]/np.pi*180)*u.deg)
+        dra = np.diff(r)*np.cos(d[0]/180*np.pi)
+        dde = np.diff(d)[0]
+
+        pa = Angle((np.arctan2(dra, dde)/np.pi*180)*u.deg)
 
         dispersion_PA = pa.wrap_at(360*u.deg).value
         if decimals is not None:
             dispersion_PA = np.round(dispersion_PA, decimals=decimals)
 
         return float(dispersion_PA)
+
 
     def init_epsf(self, center=None, tol=1.e-3, yoff=0., skip=1., flat_sensitivity=False, psf_params=None, N=4, get_extended=False, only_centering=True):
         """Initialize ePSF fitting for point sources

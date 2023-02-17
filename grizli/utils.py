@@ -1873,50 +1873,72 @@ def get_line_wavelengths():
     line_ratios = OrderedDict()
 
     # Paschen: https://www.gemini.edu/sciops/instruments/nearir-resources/astronomical-lines/h-lines
+    
+    # Rh = 0.0010967757
+    # k = Rh * (1/n0**2 - 1/n**2)
+    # wave = 1./k # Angstroms
+    
+    # Pfund n0=5
+    line_wavelengths['PfA'] = [74598.8]
+    line_ratios['PfA'] = [1.]
+    line_wavelengths['PfB'] = [46537.9]
+    line_ratios['PfB'] = [1.]
+    line_wavelengths['PfG'] = [37405.7]
+    line_ratios['PfG'] = [1.]
+    line_wavelengths['PfD'] = [32970.0]
+    line_ratios['PfD'] = [1.]
+    line_wavelengths['PfE'] = [30392.1]
+    line_ratios['PfE'] = [1.]
+    
+    # Brackett n0=4
     line_wavelengths['BrA'] = [40522.8]
     line_ratios['BrA'] = [1.]
-    line_wavelengths['BrB'] = [26258.7]
+    line_wavelengths['BrB'] = [26258.8]
     line_ratios['BrB'] = [1.]
-    line_wavelengths['BrG'] = [21661.178]
+    line_wavelengths['BrG'] = [21661.3]
     line_ratios['BrG'] = [1.]
-    line_wavelengths['PfG'] = [37405.76]
-    line_ratios['PfG'] = [1.]
-    line_wavelengths['PfD'] = [32969.8]
-    line_ratios['PfD'] = [1.]
-    line_wavelengths['PaA'] = [18751.0]
+    line_wavelengths['BrD'] = [19451.0]
+    line_ratios['BrD'] = [1.]
+    line_wavelengths['BrE'] = [18179.2]
+    line_ratios['BrE'] = [1.]
+    
+    # Paschen n0=3
+    line_wavelengths['PaA'] = [18756.3]
     line_ratios['PaA'] = [1.]
-    line_wavelengths['PaB'] = [12821.6]
+    line_wavelengths['PaB'] = [12821.7]
     line_ratios['PaB'] = [1.]
-    line_wavelengths['PaG'] = [10941.1]
+    line_wavelengths['PaG'] = [10941.2]
     line_ratios['PaG'] = [1.]
-    line_wavelengths['PaD'] = [10049.0]
+    line_wavelengths['PaD'] = [10052.2]
     line_ratios['PaD'] = [1.]
-
-    line_wavelengths['Ha'] = [6564.61]
+    line_wavelengths['Pa8'] = [9548.65]
+    line_ratios['Pa8'] = [1.]
+    line_wavelengths['Pa9'] = [9231.60]
+    line_ratios['Pa9'] = [1.]
+    line_wavelengths['Pa10'] = [9017.44]
+    line_ratios['Pa10'] = [1.]
+    
+    # Balmer n0=2
+    line_wavelengths['Ha'] = [6564.697]
     line_ratios['Ha'] = [1.]
-    line_wavelengths['Hb'] = [4862.71]
+    line_wavelengths['Hb'] = [4862.738]
     line_ratios['Hb'] = [1.]
-    line_wavelengths['Hg'] = [4341.692]
+    line_wavelengths['Hg'] = [4341.731]
     line_ratios['Hg'] = [1.]
-    line_wavelengths['Hd'] = [4102.892]
+    line_wavelengths['Hd'] = [4102.936]
     line_ratios['Hd'] = [1.]
 
-    line_wavelengths['H7'] = [3971.198]
+    line_wavelengths['H7'] = [3971.236]
     line_ratios['H7'] = [1.]
-
-    line_wavelengths['H8'] = [3890.166]
+    line_wavelengths['H8'] = [3890.191]
     line_ratios['H8'] = [1.]
-
-    line_wavelengths['H9'] = [3836.485]
+    line_wavelengths['H9'] = [3836.511]
     line_ratios['H9'] = [1.]
-
-    line_wavelengths['H10'] = [3798.987]
+    line_wavelengths['H10'] = [3799.014]
     line_ratios['H10'] = [1.]
-
-    line_wavelengths['H11'] = [3771.70]
+    line_wavelengths['H11'] = [3771.739]
     line_ratios['H11'] = [1.]
-
-    line_wavelengths['H12'] = [3751.22]
+    line_wavelengths['H12'] = [3751.255]
     line_ratios['H12'] = [1.]
 
     # Groves et al. 2011, Table 1
@@ -4863,6 +4885,11 @@ def to_header(wcs, add_naxis=True, relax=True, key=None):
             cd = k.replace('PC', 'CD')
             header.rename_keyword(k, cd)
     
+    if hasattr(wcs.wcs, 'cd'):
+        for i in [0,1]:
+            for j in [0,1]:
+                header[f'CD{i+1}_{j+1}'] = wcs.wcs.cd[i][j]
+                
     if hasattr(wcs, 'sip'):
         if hasattr(wcs.sip, 'crpix'):
             header['SIPCRPX1'], header['SIPCRPX2'] = wcs.sip.crpix
@@ -5464,6 +5491,7 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
                        dryrun=False, skip=None, extra_wfc3ir_badpix=True,
                        verbose=True,
                        scale_photom=True,
+                       calc_wcsmap=False,
                        niriss_ghost_kwargs={}):
     """
     Make drizzle mosaic from exposures in a visit dictionary
@@ -5792,7 +5820,7 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
             res = drizzle_array_groups(sci_list, wht_list, wcs_list,
                                      outputwcs=outputwcs,
                                      scale=0.1, kernel=kernel,
-                                     pixfrac=pixfrac, calc_wcsmap=False,
+                                     pixfrac=pixfrac, calc_wcsmap=calc_wcsmap,
                                      verbose=verbose, data=None)
 
             outsci, outwht, outctx, header, xoutwcs = res
@@ -5813,7 +5841,7 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
             res = drizzle_array_groups(sci_list, wht_list, wcs_list,
                                      outputwcs=outputwcs,
                                      scale=0.1, kernel=kernel,
-                                     pixfrac=pixfrac, calc_wcsmap=False,
+                                     pixfrac=pixfrac, calc_wcsmap=calc_wcsmap,
                                      verbose=verbose, data=data)
 
             outsci, outwht, outctx = res[:3]
