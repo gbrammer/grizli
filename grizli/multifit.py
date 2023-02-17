@@ -4814,9 +4814,7 @@ def drizzle_2d_spectrum(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
     return hdul
 
 
-def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
-                          pixscale=0.1, pixfrac=0.6, kernel='square',
-                          direct_extension='REF', fcontam=0.2, ds9=None):
+def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5, pixscale=0.1, pixfrac=0.6, kernel='square', theta=0., direct_extension='REF', fcontam=0.2, ds9=None):
     """Drizzle a cutout at a specific wavelength from a list of `~grizli.model.BeamCutout` objects
 
     Parameters
@@ -4841,7 +4839,10 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
 
     kernel : str, ('square' or 'point')
         Drizzle kernel to use
-
+    
+    theta : float
+        Position angle of output WCS
+    
     direct_extension : str, ('SCI' or 'REF')
         Extension of ``self.direct.data`` do drizzle for the thumbnail
 
@@ -4873,14 +4874,18 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
     adrizzle.log.setLevel('ERROR')
     drizzler = adrizzle.do_driz
     dfillval = 0
-
+        
     # Nothing to do
     if len(beams) == 0:
         return False
 
     # Get output header and WCS
     if wcs is None:
-        header, output_wcs = utils.make_wcsheader(ra=ra, dec=dec, size=size, pixscale=pixscale, get_hdu=False)
+        header, output_wcs = utils.make_wcsheader(ra=ra, dec=dec,
+                                                  size=size,
+                                                  theta=theta,
+                                                  pixscale=pixscale,
+                                                  get_hdu=False)
     else:
         output_wcs = wcs.copy()
         if not hasattr(output_wcs, 'pscale'):
@@ -5008,19 +5013,25 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
         drizzler(beam_data, beam_wcs, wht, output_wcs,
                          outsci, outwht, outctx, 1., 'cps', 1,
                          wcslin_pscale=beam.grism.wcs.pscale, uniqid=1,
-                         pixfrac=pixfrac, kernel=kernel, fillval=dfillval)
+                         pixfrac=pixfrac, kernel=kernel, fillval=dfillval,
+                         wcsmap=utils.WCSMapAll,
+                         )
 
         # Continuum
         drizzler(beam_continuum, beam_wcs, wht, output_wcs,
                          coutsci, coutwht, coutctx, 1., 'cps', 1,
                          wcslin_pscale=beam.grism.wcs.pscale, uniqid=1,
-                         pixfrac=pixfrac, kernel=kernel, fillval=dfillval)
+                         pixfrac=pixfrac, kernel=kernel, fillval=dfillval,
+                         wcsmap=utils.WCSMapAll,
+                         )
 
         # Contamination
         drizzler(beam.contam, beam_wcs, wht, output_wcs,
                          xoutsci, xoutwht, xoutctx, 1., 'cps', 1,
                          wcslin_pscale=beam.grism.wcs.pscale, uniqid=1,
-                         pixfrac=pixfrac, kernel=kernel, fillval=dfillval)
+                         pixfrac=pixfrac, kernel=kernel, fillval=dfillval,
+                         wcsmap=utils.WCSMapAll,
+                         )
 
         # Direct thumbnail
         filt_i = all_direct_filters[i]
@@ -5044,7 +5055,9 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5,
                          doutsci[filt_i], doutwht[filt_i], doutctx[filt_i],
                          1., 'cps', 1,
                          wcslin_pscale=beam.direct.wcs.pscale, uniqid=1,
-                         pixfrac=pixfrac, kernel=kernel, fillval=dfillval)
+                         pixfrac=pixfrac, kernel=kernel, fillval=dfillval,
+                         wcsmap=utils.WCSMapAll,
+                         )
 
         # Show in ds9
         if ds9 is not None:
