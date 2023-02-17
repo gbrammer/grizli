@@ -4452,7 +4452,8 @@ class BeamCutout(object):
         h2d = utils.to_header(wcs2d, key=key)
         for ext in grism_hdu:
             for k in h2d:
-                ext.header[k] = h2d[k], h2d.comments[k]
+                if k not in ext.header:
+                    ext.header[k] = h2d[k], h2d.comments[k]
         ####
 
         hdu.extend(grism_hdu)
