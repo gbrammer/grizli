@@ -14,9 +14,7 @@ abstract: >-
   properties (e.g., continuum shape, redshifts, line fluxes) of all objects 
   in a given exposure taken in the slitless spectroscopic mode.
 message: Please cite this software using these metadata.
-version: 1.5.0
-doi: 10.5281/zenodo.5012699
-date-released: 2022-06-20
+doi: 10.5281/zenodo.1146904
 url: https://github.com/gbrammer/grizli
 publisher: GitHub
 keywords: 
