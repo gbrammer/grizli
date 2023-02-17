@@ -1976,8 +1976,9 @@ class ImageData(object):
         # Sliced subimage
         slice_wcs = ref_wcs.slice((sly, slx))
         slice_header = hdu.header.copy()
-        hwcs = slice_wcs.to_header(relax=True)
-
+        #hwcs = slice_wcs.to_header(relax=True)
+        hwcs = utils.to_header(slice_wcs, relax=True)
+        
         for k in hwcs.keys():
             if not k.startswith('PC'):
                 slice_header[k] = hwcs[k]
@@ -2244,7 +2245,8 @@ class ImageData(object):
             slice_header['NAXIS2'] = NY
 
             # Sliced WCS keywords
-            hwcs = slice_wcs.to_header(relax=True)
+            hwcs = utils.to_header(slice_wcs, relax=True)
+            
             for k in hwcs:
                 if not k.startswith('PC'):
                     slice_header[k] = hwcs[k]
@@ -3792,7 +3794,7 @@ class GrismFLT(object):
         # crpix_new = np.dot(mat, crpix-center)+center
         
         # Full rotated SIP header
-        orig_header = utils.to_header(self.grism.wcs)
+        orig_header = utils.to_header(self.grism.wcs, relax=True)
         hrot, wrot, desc = utils.sip_rot90(orig_header, rot)
         
         for obj in [self.grism, self.direct]:
@@ -4446,7 +4448,8 @@ class BeamCutout(object):
                 if wcsname == 'BeamLinear2D':
                     break
 
-        h2d = wcs2d.to_header(key=key)
+        # h2d = wcs2d.to_header(key=key)
+        h2d = utils.to_header(wcs2d, key=key)
         for ext in grism_hdu:
             for k in h2d:
                 ext.header[k] = h2d[k], h2d.comments[k]
@@ -4545,16 +4548,17 @@ class BeamCutout(object):
 
         # Trace properties at desired wavelength
         dx = np.interp(wavelength, self.beam.lam_beam, xarr)
-        dy = np.interp(wavelength, self.beam.lam_beam, self.beam.ytrace_beam)
+        dy = np.interp(wavelength, self.beam.lam_beam, self.beam.ytrace_beam) + 1
 
         dl = np.interp(wavelength, self.beam.lam_beam[1:],
                                    np.diff(self.beam.lam_beam))
 
         ysens = np.interp(wavelength, self.beam.lam_beam,
                           self.beam.sensitivity_beam)
-
+                          
         # Update CRPIX
         dc = 0  # python array center to WCS pixel center
+        # dc = 1.0 # 0.5
 
         for wcs_ext in [wcs.sip, wcs.wcs]:
             if wcs_ext is None:
@@ -4585,7 +4589,7 @@ class BeamCutout(object):
                     wcs_ext.crpix[i] = wcs.wcs.crpix[i]
 
         # WCS header
-        header = wcs.to_header(relax=True)
+        header = utils.to_header(wcs, relax=True)
         for key in header:
             if key.startswith('PC'):
                 header.rename_keyword(key, key.replace('PC', 'CD'))
@@ -4600,6 +4604,7 @@ class BeamCutout(object):
         header['DLDP'] = (dl, 'delta wavelength per pixel')
 
         return header, wcs
+
 
     def get_2d_wcs(self, data=None, key=None):
         """Get simplified WCS of the 2D spectrum
