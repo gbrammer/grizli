@@ -12,6 +12,7 @@ from collections import OrderedDict
 import numpy as np
 
 import astropy.io.fits as pyfits
+import astropy.wcs as pywcs
 import astropy.units as u
 from astropy.cosmology import Planck15
 import astropy.constants as const
@@ -4801,7 +4802,9 @@ def show_drizzled_lines(line_hdu, full_line_list=['OII', 'Hb', 'OIII', 'Ha+NII',
     #print(line_hdu[0].header['HASLINES'], show_lines)
 
     # Dimensions
-    pix_size = np.abs(line_hdu['DSCI'].header['CD1_1']*3600)
+    line_wcs = pywcs.WCS(line_hdu['DSCI'].header)
+    pix_size = utils.get_wcs_pscale(line_wcs)
+    #pix_size = np.abs(line_hdu['DSCI'].header['CD1_1']*3600)
     majorLocator = MultipleLocator(1.)  # /pix_size)
     N = line_hdu['DSCI'].data.shape[0]/2
 
@@ -4811,6 +4814,7 @@ def show_drizzled_lines(line_hdu, full_line_list=['OII', 'Hb', 'OIII', 'Ha+NII',
     # Assume square
     sh = line_hdu['DSCI'].data.shape
     dp = -0.5*pix_size  # FITS reference is center of a pixel, array is edge
+    dp = 0
     extent = (-imsize_arcsec/2.-dp, imsize_arcsec/2.-dp,
               -imsize_arcsec/2.-dp, imsize_arcsec/2.-dp)
 
@@ -4837,9 +4841,24 @@ def show_drizzled_lines(line_hdu, full_line_list=['OII', 'Hb', 'OIII', 'Ha+NII',
         ax.text(0.03, 0.97, line_hdu[dext].header['FILTER'],
                 transform=ax.transAxes, ha='left', va='top', fontsize=8)
 
-    ax.set_xlabel('RA')
-    ax.set_ylabel('Decl.')
-
+    #ax.set_xlabel('RA')
+    #ax.set_ylabel('Decl.')
+    
+    # Compass
+    cosd = np.cos(line_hdu['DSCI'].header['CRVAL2']/180*np.pi)
+    dra = np.array([1.5, 1,0,0,0])/3600.*0.12*size_arcsec/cosd
+    dde = np.array([0, 0,0,1,1.5])/3600.*0.12*size_arcsec
+    cx, cy = line_wcs.all_world2pix(crv[0]+dra, crv[1]+dde, 0)
+    cx = (cx-cx.max())*pix_size
+    cy = (cy-cy.max())*pix_size
+    c0 = 0.95*size_arcsec
+    ax.plot(cx[1:-1]+c0, cy[1:-1]+c0,
+            linewidth=1, color='0.5')
+    ax.text(cx[0]+c0, cy[0]+c0, r'$E$',
+            ha='center', va='center', fontsize=7, color='0.5')
+    ax.text(cx[4]+c0, cy[4]+c0, r'$N$',
+            ha='center', va='center', fontsize=7, color='0.5')
+    
     # 1" ticks
     ax.errorbar(-0.5, -0.9*size_arcsec, yerr=0, xerr=0.5, color='k')
     ax.text(-0.5, -0.9*size_arcsec, r'$1^{\prime\prime}$', ha='center', va='bottom', color='k')
@@ -4847,7 +4866,8 @@ def show_drizzled_lines(line_hdu, full_line_list=['OII', 'Hb', 'OIII', 'Ha+NII',
     # Line maps
     for i, line in enumerate(show_lines):
         ax = fig.add_subplot(1, NL+1, 2+i)
-        ax.imshow(line_hdu['LINE', line].data*scale, vmin=-0.02, vmax=0.6, cmap=cmap, origin='lower', extent=extent)
+        ax.imshow(line_hdu['LINE', line].data*scale, vmin=-0.02,
+                  vmax=0.6, cmap=cmap, origin='lower', extent=extent)
         ax.set_title(r'%s %.3f $\mu$m' % (line, line_hdu['LINE', line].header['WAVELEN']/1.e4))
 
     # End things
