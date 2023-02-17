@@ -4975,8 +4975,8 @@ def make_wcsheader(ra=40.07293, dec=-1.6137748, size=2, pixscale=0.1, get_hdu=Fa
         npix = np.cast[int](np.round([size[0]/pixscale, size[1]/pixscale]))
 
     hout = pyfits.Header()
-    hout['CRPIX1'] = npix[0]/2+1
-    hout['CRPIX2'] = npix[1]/2+1
+    hout['CRPIX1'] = (npix[0]-1)/2+1
+    hout['CRPIX2'] = (npix[1]-1)/2+1
     hout['CRVAL1'] = ra
     hout['CRVAL2'] = dec
     hout['CD1_1'] = -cdelt[0]
@@ -6005,7 +6005,7 @@ class WCSMapAll:
         self.output = copy.deepcopy(output)
         #self.output = output
 
-        self.origin = origin
+        self.origin = 1 #origin
         self.shift = None
         self.rot = None
         self.scale = None
