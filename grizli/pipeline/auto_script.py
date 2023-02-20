@@ -5215,14 +5215,14 @@ def field_rgb(root='j010514+021532', xsize=8, output_dpi=None, HOME_PATH='./', s
     if full_dimensions:
         dpi = int(nx/xsize)
         xsize = nx/dpi
-        #print('xsize: ', xsize, ny, nx, dpi)
-        
+    
     elif (output_dpi is not None):
         xsize = nx/output_dpi
-
+        dpi = output_dpi
+    
     dim = [xsize, xsize/nx*ny]
 
-    fig, ax = plt.subplots(1,1,figsize=dim)
+    fig, ax = plt.subplots(1,1,figsize=dim, dpi=dpi)
 
     ax.imshow(image, origin='lower', extent=(-nx/2, nx/2, -ny/2, ny/2))
 
