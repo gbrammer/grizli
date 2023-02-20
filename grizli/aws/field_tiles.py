@@ -808,7 +808,7 @@ def run_one(own_directory=True, **kwargs):
             fp.write(f'{time.ctime()} {tile}\n')
         
         if own_directory:
-            path = os.path.join(HOME, '{field}-{tile}')
+            path = os.path.join(HOME, f'{field}-{tile}')
             if not os.path.exists(path):
                 os.makedirs(path)
                 
@@ -860,7 +860,7 @@ def run_one_filter_tile(own_directory=True, **kwargs):
             fp.write(f'{time.ctime()} {tile}\n')
         
         if own_directory:
-            path = os.path.join(HOME, '{field}-{tile}-{filt}')
+            path = os.path.join(HOME, f'{field}-{tile}-{filt}')
             if not os.path.exists(path):
                 os.makedirs(path)
                 
