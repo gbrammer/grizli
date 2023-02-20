@@ -882,7 +882,8 @@ def launch_ec2_instances(nmax=50, count=None, templ='lt-0e8c2b8611c9029eb,Versio
     Version 25 is run_all_tile_filters.sh with a new python39 environment
     
     """
-
+    from grizli.aws import db
+    
     if count is None:
         assoc = db.SQL("""SELECT tile, field, filter
                       FROM combined_tiles_filters
