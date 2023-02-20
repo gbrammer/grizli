@@ -23,6 +23,7 @@ def make_all_fields():
     """
     Define tile layout
     """
+    from grizli.aws.field_tiles import make_field_tiles
     
     layout = """# field ra dec dx dy
     abell370   39.9750000 -1.5752778   40 40 
@@ -62,7 +63,7 @@ def make_all_fields():
         ix = np.where(tile_defs['field'] == field)[0][0]
         tile_defs['rsize'] = tile_defs['dx']/2
         
-        tiles = field_tiles.make_field_tiles(**tile_defs[ix], tile_npix=2048+256, pscale=0.08, initial_status=90, send_to_database=True)
+        tiles = make_field_tiles(**tile_defs[ix], tile_npix=2048+256, pscale=0.08, initial_status=90, send_to_database=True)
     
     return tile_defs
     
