@@ -1021,8 +1021,12 @@ def send_all_tiles():
     import time
     import os
     import numpy as np
+    import matplotlib.pyplot as plt
+    
+    import mastquery
+    
     from grizli.aws.tile_mosaic import (drizzle_tile_subregion, reset_locked,
-                      get_lambda_client, send_event_lambda, count_locked)
+                      get_lambda_client, send_event_lambda, count_locked, tile_subregion_wcs)
     
     from grizli.aws import db
     from grizli import utils
@@ -1070,7 +1074,7 @@ def send_all_tiles():
         un = utils.Unique(keys, verbose=False)
         for v in tqdm(un.values):
             tile, subx, suby = np.cast[int](v.split())
-            _wcs = tile_mosaic.tile_subregion_wcs(tile, subx, suby)
+            _wcs = tile_subregion_wcs(tile, subx, suby)
             ra, dec = _wcs.calc_footprint().mean(axis=0)
             tiles['ra'][un[v]] = ra
             tiles['dec'][un[v]] = dec
