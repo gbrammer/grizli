@@ -612,7 +612,7 @@ def exposure_map(ra, dec, rsize, name, filt='F160W', s0=16, cmap='viridis', figs
 
 
 TILES = None
-TILE_WCS = None
+TILE_WCS = {}
 
 def coords_to_subtile(ra=189.0243001, dec=62.19669, size=0):
     """
@@ -819,14 +819,17 @@ def tile_wcs(tile):
     from grizli import utils
     from grizli.aws import db
     
-    global TILES
+    global TILES, TILE_WCS
     if TILES is None:
         TILES = db.SQL('select * from mosaic_tiles')
     
     if tile not in TILES['tile']:
         print(f'{tile} not in `mosaic_tiles`')
         return None
-        
+    
+    if tile in TILE_WCS:
+        return TILE_WCS[tile]
+            
     row = TILES[TILES['tile'] == tile]
         
     # row = db.SQL(f"""SELECT crval1, crval2, npix
@@ -843,6 +846,8 @@ def tile_wcs(tile):
     
     wcs = pywcs.WCS(h)
     wcs.pscale = 0.1
+    
+    TILE_WCS[tile] = wcs
     
     return wcs
     
@@ -1016,8 +1021,12 @@ def send_all_tiles():
     import time
     import os
     import numpy as np
+    import matplotlib.pyplot as plt
+    
+    import mastquery
+    
     from grizli.aws.tile_mosaic import (drizzle_tile_subregion, reset_locked,
-                      get_lambda_client, send_event_lambda, count_locked)
+                      get_lambda_client, send_event_lambda, count_locked, tile_subregion_wcs)
     
     from grizli.aws import db
     from grizli import utils
@@ -1032,7 +1041,112 @@ def send_all_tiles():
     progs = f'AND tile != 1183'
     progs = ''
     
-    tiles = db.SQL(f"""SELECT tile, subx, suby, filter, count(filter)
+    # Get with ra, dec
+    if 0:
+        tiles = db.SQL(f"""SELECT tile, subx, suby, count(subx),
+                           count(distinct(filter)) as nfilt
+                    FROM mosaic_tiles_exposures t, exposure_files e
+                    WHERE t.expid = e.eid
+                    {progs}
+                    AND filter LIKE '%%CLEAR'
+                    GROUP BY tile, subx, suby
+                    ORDER BY count(subx) ASC
+                    """)
+        
+        tiles = db.SQL(f"""SELECT tile, subx, suby, count(filter), filter,
+                           SUM(e.exptime) as exptime
+                    FROM mosaic_tiles_exposures t, exposure_files e
+                    WHERE t.expid = e.eid AND in_mosaic >= 0
+                    {progs}
+                    AND e.instrume in ('NIRCAM','NIRISS','MIRI')
+                    AND filter < 'G0'
+                    GROUP BY tile, subx, suby, filter
+                    ORDER BY count(subx) ASC
+                    """)
+        
+        tiles['ra'] = 0.
+        tiles['dec'] = 0.
+        tiles['footprint'] = [np.zeros((4,2))]*len(tiles)
+        
+        keys = np.array([f'{t} {sx} {sy}'
+                         for t, sx, sy in zip(tiles['tile'], tiles['subx'], tiles['suby'])])
+                         
+        un = utils.Unique(keys, verbose=False)
+        for v in tqdm(un.values):
+            tile, subx, suby = np.cast[int](v.split())
+            _wcs = tile_subregion_wcs(tile, subx, suby)
+            ra, dec = _wcs.calc_footprint().mean(axis=0)
+            tiles['ra'][un[v]] = ra
+            tiles['dec'][un[v]] = dec
+            tiles['footprint'][un[v]] = _wcs.calc_footprint()
+            
+        # Better exposure map
+        point = utils.SRegion('circle(53.1, -27.8, 0.2)', wrap=False)
+        filt = 'F210M-CLEAR'
+
+        point = utils.SRegion('circle(3.5, -30.8, 2)', wrap=False)
+        filt = 'F444W-CLEAR'
+        
+        coo = np.array([tiles['ra'], tiles['dec']]).T
+        in_point = point.path[0].contains_points(coo)
+        with_filt = in_point & (tiles['filter'] == filt)
+        
+        cosd = np.cos(np.median(tiles['dec'][in_point])/180*np.pi)
+        
+        #plt.plot(*point.xy[0].T, alpha=0.1)
+        
+        dx = tiles['ra'][in_point].max() - tiles['ra'][in_point].min()
+        dy = tiles['dec'][in_point].max() - tiles['dec'][in_point].min()
+        aspect = dy/(dx*cosd)
+        
+        fig, ax = plt.subplots(1,1,figsize=(5,5*aspect))
+        
+        ax.set_xlim(tiles['ra'][in_point].max()+0.2*dx, 
+                    tiles['ra'][in_point].min()-0.2*dx)
+        ax.set_ylim(tiles['dec'][in_point].min()-0.2*dy, 
+                    tiles['dec'][in_point].max()+0.2*dy)
+        
+        ax.set_aspect(1./cosd)
+        ax.grid()
+        ax.set_title(filt)
+        
+        for f, c in zip(tiles['footprint'][with_filt], tiles['exptime'][with_filt]):
+            sr = utils.SRegion(f)
+            ic = np.interp(np.log10(c/3600.), [np.log10(100./3600), np.log10(20)],
+                           [0, 1], left=0, right=1.)
+            for p in sr.get_patch(alpha=0.9, zorder=1000,
+                                  fc=plt.cm.magma_r(ic), ec='None'):
+                ax.add_patch(p)
+                
+        _ = mastquery.overlaps.draw_axis_labels(ax, nlabel=3)
+        fig.tight_layout(pad=1.0)
+        
+    ### Reset EGS JWST
+    if 0:
+        res = db.SQL(f"""select tile, subx, suby, in_mosaic, e.filter
+          from mosaic_tiles_exposures ti, exposure_files e
+          where ti.tile = 2430 AND ti.expid = e.eid
+          AND e.instrume in ('NIRCAM','MIRI')
+          AND e.file like 'jw01345%%'
+          """)
+
+        res = db.execute(f"""UPDATE mosaic_tiles_exposures
+         SET in_mosaic = 0
+         FROM (select tile, subx, suby, expid
+          from mosaic_tiles_exposures ti, exposure_files e
+          where ti.expid = e.eid
+          AND e.instrume in ('NIRCAM','MIRI')
+          AND e.file like 'jw01345%%' AND e.filter in ('F115W-CLEAR')
+               ) subt
+      WHERE mosaic_tiles_exposures.tile = subt.tile 
+           AND mosaic_tiles_exposures.subx = subt.subx
+           AND mosaic_tiles_exposures.suby = subt.suby 
+           AND mosaic_tiles_exposures.expid = subt.expid
+          """)
+        
+        
+    tiles = db.SQL(f"""SELECT tile, subx, suby, filter, count(filter) as count,
+                min(substr(e.file,1,7)) as file0, max(substr(e.file,1,7)) as file1
                 FROM mosaic_tiles_exposures t, exposure_files e
                 WHERE t.expid = e.eid AND in_mosaic = 0
                 {progs}

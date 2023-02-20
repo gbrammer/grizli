@@ -215,6 +215,9 @@ def get_jwst_skyflat(header, verbose=True, valid_flat=(0.7, 1.4)):
     with pyfits.open(skyfile) as _im:
         skyflat = _im[0].data*1
         
+        # flat == 1 are bad
+        skyflat[skyflat == 1] = np.nan
+        
     if 'R_FLAT' in header:
         oflat = os.path.basename(header['R_FLAT'])
         crds_path = os.getenv('CRDS_PATH')
@@ -444,6 +447,11 @@ def img_with_wcs(input, overwrite=True, fit_sip_header=True, skip_completed=True
         if _hdu[0].header['OPUPIL'].startswith('GR'):
             _hdu[0].header['PUPIL'] = 'CLEAR'
             _hdu[0].header['EXP_TYPE'] = 'NRC_IMAGE'
+    elif _hdu[0].header['OINSTRUM'] == 'NIRSPEC':
+        if _hdu[0].header['OGRATING'] not in 'MIRROR':
+            _hdu[0].header['FILTER'] = 'F140X'
+            _hdu[0].header['GRATING'] = 'MIRROR'
+            _hdu[0].header['EXP_TYPE'] = 'NRS_TACONFIRM'
     else:
         # MIRI
         pass
@@ -492,7 +500,7 @@ def img_with_wcs(input, overwrite=True, fit_sip_header=True, skip_completed=True
         # Remove WCS inverse keywords
         for _ext in [0, 'SCI']:
             for k in list(_hdu[_ext].header.keys()):
-                if k[:3] in ['AP_','BP_']:
+                if k[:3] in ['AP_','BP_','PC1','PC2']:
                     _hdu[_ext].header.remove(k)
         
         pscale = utils.get_wcs_pscale(wcs)
@@ -763,7 +771,7 @@ def get_phot_keywords(input, verbose=True):
     return info
 
 
-ORIG_KEYS = ['TELESCOP','INSTRUME','DETECTOR','FILTER','PUPIL','EXP_TYPE']
+ORIG_KEYS = ['TELESCOP','INSTRUME','DETECTOR','FILTER','PUPIL','EXP_TYPE','GRATING']
 
 def copy_jwst_keywords(header, orig_keys=ORIG_KEYS, verbose=True):
     """

@@ -3,18 +3,27 @@ Splitting fields into tiles
 """
 import os
 import glob
+import warnings
 
 import numpy as np
 import astropy.wcs as pywcs
+import astropy.time
+
 from collections import OrderedDict
 import yaml
 
 from .. import utils
 
+if os.path.exists('/GrizliImaging'):
+    HOME = '/GrizliImaging'
+else:
+    HOME = os.getcwd()
+
 def make_all_fields():
     """
     Define tile layout
     """
+    from grizli.aws.field_tiles import make_field_tiles
     
     layout = """# field ra dec dx dy
     abell370   39.9750000 -1.5752778   40 40 
@@ -44,8 +53,19 @@ def make_all_fields():
     j1235 189.025 4.948 20 20
     """
     
+    # 46 46 for tile ref 9 9
+    
     tile_defs = utils.read_catalog(layout)
     
+    if 0:
+        field = 'gdn'
+        
+        ix = np.where(tile_defs['field'] == field)[0][0]
+        tile_defs['rsize'] = tile_defs['dx']/2
+        
+        tiles = make_field_tiles(**tile_defs[ix], tile_npix=2048+256, pscale=0.08, initial_status=90, send_to_database=True)
+    
+    return tile_defs
     
 def define_tiles(ra=109.3935148, dec=37.74934031, size=(24, 24), tile_size=6, overlap=0.3, field='macs0717', pixscale=0.05, theta=0):
     """
@@ -181,6 +201,14 @@ def make_field_tiles(field='cos', ra=150.125, dec=2.2, rsize=45, tile_npix=2048+
     tiles['status'] = initial_status
     
     tiles['field'] = field
+    
+    # Offset of new WCS definition
+    tiles['crpix1'] -= 0.5
+    tiles['crpix2'] -= 0.5
+    
+    for c in ['cd1_2', 'cd2_1']:
+        if c in tiles.colnames:
+            tiles.remove_column(c)
             
     #db.send_to_database('cosmos_tiles', cos_tile, if_exists='replace')
     if send_to_database:
@@ -189,7 +217,7 @@ def make_field_tiles(field='cos', ra=150.125, dec=2.2, rsize=45, tile_npix=2048+
     
     return tiles
     
-def split_tiles(root='abell2744-080-08.08', ref_tile=(8,8), filters=['visr','f125w','h'], optical=False, suffix='.rgb', xsize=6, zoom_levels=[4,3,2,1], force=False, scl=1, invert=False, verbose=True, rgb_scl=[1,1,1], rgb_min=-0.01):
+def split_tiles(root='abell2744-080-08.08', ref_tile=(8,8), filters=['visr','f125w','h'], optical=False, suffix='.rgb', xsize=32, zoom_levels=[4,3,2,1], force=False, scl=1, invert=False, verbose=True, rgb_scl=[1,1,1], rgb_min=-0.01, make_combinations=True):
     """
     Split image into 256 pixel tiles for map display
     """
@@ -266,7 +294,7 @@ def split_tiles(root='abell2744-080-08.08', ref_tile=(8,8), filters=['visr','f12
                        plugin='pil', format_str='png')
 
 
-def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_levels=[4,3,2,1], brgb_filts=['visr','visb','uv'], rgb_filts=['visr','j','h'], blue_is_opt=True, make_opt_filters=True, make_ir_filters=True):
+def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_levels=[4,3,2,1], brgb_filts=['visr','visb','uv'], rgb_filts=['visr','j','h'], blue_is_opt=True, make_opt_filters=True, make_ir_filters=True, make_combinations=True, **kwargs):
     """
     Make tiles for map
     """
@@ -288,7 +316,8 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
                                 'uv':['F438WU','F435W','F435WU', 'F475W'], 
                                 'sw':['F070W-CLEAR','F090W-CLEAR',
                                       'F115W-CLEAR','F150W-CLEAR',
-                                      'F200W-CLEAR'], 
+                                      'F200W-CLEAR',
+                                      'F182M-CLEAR','F210M-CLEAR'], 
                                 'lw':['F277W-CLEAR','F356W-CLEAR',
                                       'F410M-CLEAR','F444W-CLEAR'],
                             }, 
@@ -299,66 +328,68 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
     else:
         rgb_scl = [1,1,1]
         
-    split_tiles(root, ref_tile=ref_tile, 
+    if make_combinations:
+        split_tiles(root, ref_tile=ref_tile, 
                 filters=rgb_filts, zoom_levels=zoom_levels,
-                optical=False, suffix='.rgb', xsize=6, scl=1,
+                optical=False, suffix='.rgb', xsize=32, scl=1,
                 force=force, rgb_scl=rgb_scl)
 
-    plt.close('all')
+        plt.close('all')
     
-    if len(glob.glob(f'{root}*.brgb.png')) == 0:
+    if (len(glob.glob(f'{root}*.brgb.png')) == 0) & make_combinations:
         split_tiles(root, ref_tile=ref_tile, 
                     filters=brgb_filts, zoom_levels=zoom_levels,
-                    optical=blue_is_opt, suffix='.brgb', xsize=6, scl=2,
+                    optical=blue_is_opt, suffix='.brgb', xsize=32, scl=2,
                     force=force, rgb_scl=[1., 1.2, 1.4], rgb_min=-0.018)
 
         plt.close('all')
     
     # JWST SW
-    if len(glob.glob(f'{root}*.swrgb.png')) == 0:
+    if (len(glob.glob(f'{root}*.swrgb.png')) == 0) & make_combinations:
         split_tiles(root, ref_tile=ref_tile, 
                     filters=[f.lower() for f in ['F070W-CLEAR','F090W-CLEAR',
                           'F115W-CLEAR','F150W-CLEAR',
-                          'F200W-CLEAR']],
+                          'F200W-CLEAR','F182M-CLEAR','F210M-CLEAR']],
                     zoom_levels=zoom_levels,
-                    optical=True, suffix='.swrgb', xsize=6, scl=4,
+                    optical=True, suffix='.swrgb', xsize=32, scl=4,
                     force=force, rgb_scl=[1,1,1], rgb_min=-0.018)
 
         plt.close('all')
     
     # JWST LW
-    if len(glob.glob(f'{root}*.lwrgb.png')) == 0:
+    if (len(glob.glob(f'{root}*.lwrgb.png')) == 0) & make_combinations:
         split_tiles(root, ref_tile=ref_tile, 
                     filters=[f.lower() for f in ['F277W-CLEAR','F356W-CLEAR',
                           'F360M-CLEAR','F410M-CLEAR','F444W-CLEAR',
                           'F480M-CLEAR']],
                     zoom_levels=zoom_levels,
-                    optical=True, suffix='.lwrgb', xsize=6, scl=4,
+                    optical=True, suffix='.lwrgb', xsize=32, scl=4,
                     force=force, rgb_scl=[1,1,1], rgb_min=-0.018)
 
         plt.close('all')
     
     # All NIRCam
-    if len(glob.glob(f'{root}*.ncrgb.png')) == 0:
+    if (len(glob.glob(f'{root}*.ncrgb.png')) == 0) & make_combinations:
         split_tiles(root, ref_tile=ref_tile, 
                     filters=[f.lower() for f in ['F070W-CLEAR','F090W-CLEAR',
                                                  'F115W-CLEAR','F150W-CLEAR',
                                                  'F200W-CLEAR',
+                                                 'F182M-CLEAR','F210M-CLEAR',
                                                  'F277W-CLEAR','F356W-CLEAR',
                                                 'F410M-CLEAR','F444W-CLEAR']],
                     zoom_levels=zoom_levels,
-                    optical=True, suffix='.ncrgb', xsize=6, scl=4,
+                    optical=True, suffix='.ncrgb', xsize=32, scl=4,
                     force=force, rgb_scl=[1,1,1], rgb_min=-0.018)
 
         plt.close('all')
     
-    if 'dracoii' in root:
+    if ('dracoii' in root) & make_combinations:
         
         split_tiles(root, ref_tile=ref_tile, 
                     filters=[f.lower() for f in ['F090W-CLEAR',
                              'F150W-CLEAR']],
                     zoom_levels=zoom_levels,
-                    optical=True, suffix='.swrgb', xsize=6, scl=4,
+                    optical=True, suffix='.swrgb', xsize=32, scl=4,
                     force=force, rgb_scl=[1,1,1], rgb_min=-0.018)
 
         plt.close('all')
@@ -367,7 +398,7 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
                     filters=[f.lower() for f in ['F360M-CLEAR',
                              'F480M-CLEAR']],
                     zoom_levels=zoom_levels,
-                    optical=True, suffix='.lwrgb', xsize=6, scl=4,
+                    optical=True, suffix='.lwrgb', xsize=32, scl=4,
                     force=force, rgb_scl=[1,1,1], rgb_min=-0.018)
 
         plt.close('all')
@@ -377,20 +408,21 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
                                                  'F480M-CLEAR',
                                                 ]],
                     zoom_levels=zoom_levels,
-                    optical=True, suffix='.ncrgb', xsize=6, scl=4,
+                    optical=True, suffix='.ncrgb', xsize=32, scl=4,
                     force=force, rgb_scl=[1.4, 0.6, 0.35], rgb_min=-0.018)
 
         plt.close('all')
         
-    if root.startswith('cos'):
+    if root.startswith('cos') & make_combinations:
         if len(glob.glob(f'{root}*.vi.png')) == 0:
             split_tiles(root, ref_tile=ref_tile, 
                         filters=['f814w','f160w'], zoom_levels=zoom_levels,
-                        optical=False, suffix='.vi', xsize=6, scl=0.8,
+                        optical=False, suffix='.vi', xsize=32, scl=0.8,
                         force=force, rgb_scl=[1, 1, 1], rgb_min=-0.018)
 
             plt.close('all')
-        
+    
+    ####### Single filters
     # IR
     if make_ir_filters:
         files = []
@@ -412,7 +444,7 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
 
             split_tiles(root, ref_tile=ref_tile, 
                     filters=[filt], zoom_levels=zoom_levels,
-                    optical=False, suffix=f'.{filt}', xsize=6, 
+                    optical=False, suffix=f'.{filt}', xsize=32, 
                     force=force, scl=2, invert=True)
 
             plt.close('all')
@@ -429,8 +461,8 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
 
             split_tiles(root, ref_tile=ref_tile, 
                 filters=[filt], zoom_levels=zoom_levels,
-                optical=True, suffix=f'.{filt}', xsize=6, 
-                force=force, scl=2, invert=True)
+                optical=True, suffix=f'.{filt}', xsize=32, 
+                force=force, scl=4, invert=True)
 
             plt.close('all')
     
@@ -457,8 +489,60 @@ TILE_FILTERS = ['F336W', 'F350LP', 'F390W', 'F435W', 'F438W', 'F475W',
                 ][1:]
 
 
-def process_tile(field='cos', tile='01.01', filters=TILE_FILTERS, fetch_existing=True, cleanup=True, make_catalog=False, clean_flt=True, pixfrac=0.75, make_tile_images=True):
+def process_tile_filter(field='cos', tile='01.01', filter='F444W-CLEAR', fetch_existing=False, make_tile_images=True, make_combinations=False, **kwargs):
     """
+    Run `process_tile` for a single filter
+    """
+    from grizli.aws import visit_processor, db
+
+    NOW = astropy.time.Time.now().mjd
+    
+    print(f'Set status=1 in `combined_tiles_filters` for {field} {tile} {filter}')
+    
+    db.execute(f"""update combined_tiles_filters
+    set status=1, modtime={NOW}
+    where tile = '{tile}' and field='{field}' and filter='{filter}'
+    """)
+    
+    try:
+        status = process_tile(field=field, tile=tile, filters=[filter], 
+                         fetch_existing=fetch_existing,
+                         make_tile_images=make_tile_images,
+                         make_combinations=make_combinations,
+                         **kwargs)
+    except:
+        status = 10
+    
+    NOW = astropy.time.Time.now().mjd
+
+    if (status == 2):
+        # Set status = 3 in parent table to indicate that it should be rerun
+        # to generate the RGB images
+        print(f'Set status=3 in `combined_tiles` for {field} {tile}')
+        
+        db.execute(f"""update combined_tiles
+        set status=3
+        where tile = '{tile}' and field='{field}'
+        """)
+    
+    # update status in filter table
+    print(f'Set status={status} in `combined_tiles_filters` for {field} {tile} {filter}')
+    
+    db.execute(f"""update combined_tiles_filters
+    set status={status}, modtime={NOW}
+    where tile = '{tile}' and field='{field}' and filter='{filter}'
+    """)
+    return status
+
+
+def process_tile(field='cos', tile='01.01', filters=TILE_FILTERS, fetch_existing=True, cleanup=True, make_catalog=False, clean_flt=True, pixfrac=0.75, make_tile_images=True, make_combinations=True, **kwargs):
+    """
+    
+    Returns
+    status : int
+        - 2 - completed successfully
+        - 4 - no images created
+        - 10 - catalog requested but failed to create
     """
     import numpy as np
     
@@ -504,12 +588,12 @@ def process_tile(field='cos', tile='01.01', filters=TILE_FILTERS, fetch_existing
                               kernel='square', s3output=None, 
                               gzip_output=False, clean_flt=clean_flt)
     
-    files = glob.glob(f'{root}*dr*fits')
+    files = glob.glob(f'{root}*_dr*fits*')
     if len(files) == 0:
         db.execute(f"update combined_tiles set status=4 where tile = '{tile}'")
         print(f'No images found, set status=4 in `combined_tiles` for {field} {tile}')
         
-        return True
+        return 4
     
     if make_catalog:
         
@@ -529,7 +613,7 @@ def process_tile(field='cos', tile='01.01', filters=TILE_FILTERS, fetch_existing
                     print(f'rm {file}')
                     os.remove(file)
         
-            return False
+            return 10
         
         for i in [4,5,6]:
             for c in phot.colnames:
@@ -629,18 +713,26 @@ def process_tile(field='cos', tile='01.01', filters=TILE_FILTERS, fetch_existing
         else:
             ref_tile = (9, 9)
         
-        make_all_tile_images(root, force=False, ref_tile=ref_tile,
-                             rgb_filts=['h','j','visr'],
-                             brgb_filts=['visr','visb','uv'],
-                             blue_is_opt=(field not in ['j013804m2156']), 
-                             make_ir_filters=True, 
-                             make_opt_filters=True)
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=UserWarning)
+            
+            make_all_tile_images(root, force=False, ref_tile=ref_tile,
+                                 rgb_filts=['h','j','visr'],
+                                 brgb_filts=['visr','visb','uv'],
+                                 blue_is_opt=(field not in ['j013804m2156']), 
+                                 make_combinations=make_combinations, 
+                                 **kwargs)
     
-    print(f'Sync ./{root}-tiles/ >> s3://grizli-v2/ClusterTiles/Map/{field}/')
+    dirs = glob.glob(f'./{root}-tiles/*')
+    dirs.sort()
     
-    os.system(f'aws s3 sync ./{root}-tiles/ ' + 
-              f' s3://grizli-v2/ClusterTiles/Map/{field}/ ' + 
-               '--acl public-read --quiet')
+    for d in dirs:
+        target = os.path.basename(d)
+        print(f'Sync {d} >> s3://grizli-v2/ClusterTiles/Map/{field}/{target}/')
+    
+        os.system(f'aws s3 sync {d}/ ' + 
+                  f' s3://grizli-v2/ClusterTiles/Map/{field}/{target} ' + 
+                  '--acl public-read --quiet')
                       
     ### Gzip products
     drz_files = glob.glob(f'{root}-*_dr*fits')
@@ -669,7 +761,8 @@ def process_tile(field='cos', tile='01.01', filters=TILE_FILTERS, fetch_existing
         for file in files:
             print(f'rm {file}')
             os.remove(file)
-        
+    
+    return 2
 
 
 
@@ -704,18 +797,18 @@ def run_one(own_directory=True, **kwargs):
     
     tile, field = get_random_tile()
     if tile is None:
-        with open('/GrizliImaging/tile_finished.txt','w') as fp:
+        with open(os.path.join(HOME, 'tile_finished.txt'),'w') as fp:
             fp.write(time.ctime() + '\n')
     else:
         print(f'============  Run tile  ==============')
         print(f'{field} {tile}')
         print(f'========= {time.ctime()} ==========')
         
-        with open('/GrizliImaging/tile_history.txt','a') as fp:
+        with open(os.path.join(HOME, 'tile_history.txt'),'a') as fp:
             fp.write(f'{time.ctime()} {tile}\n')
         
         if own_directory:
-            path = f'/GrizliImaging/{field}-{tile}'
+            path = os.path.join(HOME, '{field}-{tile}')
             if not os.path.exists(path):
                 os.makedirs(path)
                 
@@ -723,6 +816,58 @@ def run_one(own_directory=True, **kwargs):
             
         #process_visit(tile, clean=clean, sync=sync)
         process_tile(tile=tile, field=field, **kwargs)
+
+
+def get_random_tile_filter():
+    """
+    Find a visit that needs processing
+    """
+    from grizli.aws import db
+    
+    all_tiles = db.SQL(f"""SELECT tile, field, filter
+                           FROM combined_tiles_filters
+                           WHERE status=0""")
+    
+    if len(all_tiles) == 0:
+        return None, None
+    
+    tile, field, filt = all_tiles[np.random.randint(0, len(all_tiles))]
+    return tile, field, filt
+
+
+def run_one_filter_tile(own_directory=True, **kwargs):
+    """
+    Run a single random visit
+    """
+    import os
+    import time
+    from grizli.aws import db
+
+    ntile = db.SQL("""SELECT count(status)
+                       FROM combined_tiles_filters
+                       WHERE status = 0""")['count'][0] 
+    
+    tile, field, filt = get_random_tile_filter()
+    if tile is None:
+        with open(os.path.join(HOME, 'tile_finished.txt'),'w') as fp:
+            fp.write(time.ctime() + '\n')
+    else:
+        print(f'============  Run tile filter ========')
+        print(f'{field} {tile} {filt}')
+        print(f'========= {time.ctime()} ==========')
+        
+        with open(os.path.join(HOME, 'tile_history.txt'),'a') as fp:
+            fp.write(f'{time.ctime()} {tile}\n')
+        
+        if own_directory:
+            path = os.path.join(HOME, '{field}-{tile}-{filt}')
+            if not os.path.exists(path):
+                os.makedirs(path)
+                
+            os.chdir(path)
+            
+        #process_visit(tile, clean=clean, sync=sync)
+        process_tile_filter(tile=tile, field=field, filter=filt, **kwargs)
 
 
 def create_mosaic_from_tiles(assoc, filt='ir', clean=True):
