@@ -829,7 +829,7 @@ def get_random_tile_filter():
                            WHERE status=0""")
     
     if len(all_tiles) == 0:
-        return None, None
+        return None, None, None
     
     tile, field, filt = all_tiles[np.random.randint(0, len(all_tiles))]
     return tile, field, filt
@@ -869,6 +869,37 @@ def run_one_filter_tile(own_directory=True, **kwargs):
         #process_visit(tile, clean=clean, sync=sync)
         process_tile_filter(tile=tile, field=field, filter=filt, **kwargs)
 
+
+def launch_ec2_instances(nmax=50, count=None, templ='lt-0e8c2b8611c9029eb,Version=25'):
+    """
+    Launch EC2 instances from a launch template that run through all 
+    status=0 associations/tiles and then terminate
+    
+    Version 19 is the latest run_all_visits.sh
+    Version 20 is the latest run_all_tiles.sh
+    Version 24 is run_all_visits with a new python39 environment
+    
+    Version 25 is run_all_tile_filters.sh with a new python39 environment
+    
+    """
+
+    if count is None:
+        assoc = db.SQL("""SELECT tile, field, filter
+                      FROM combined_tiles_filters
+                      WHERE status = 0
+                      GROUP BY tile, field, filter""")
+    
+        count = int(np.minimum(nmax, len(assoc)/2))
+
+    if count == 0:
+        print('No associations to run, abort.')
+        return True
+    else:
+        print(f'# Launch {count} instances with LaunchTemplateId={templ}: ')
+        cmd = f'aws ec2 run-instances --count {count}'
+        cmd += f' --launch-template LaunchTemplateId={templ}'
+        print(cmd)
+        os.system(cmd)
 
 def create_mosaic_from_tiles(assoc, filt='ir', clean=True):
     """
