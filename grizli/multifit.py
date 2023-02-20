@@ -1217,13 +1217,17 @@ class GroupFLT():
             if second_pass_filtering:
                 if nbutils is None:
                     # need numba installed
-                    utils.log_comment(utils.LOGFILE, 'skipping second pass filtering. Need numba library installed', verbose=True)
+                    msg = 'subtract_median_filter: `numba` not found, skip second filter pass.'
+                    utils.log_comment(utils.LOGFILE, msg, verbose=True)
                 else:
                     # run filter again, but mask pixels that show significant residuals (e.g. strong emission lines)
-                    utils.log_comment(utils.LOGFILE, f'rerunning filtering and masking S/N>{box_filter_sn} pixels in residual', verbose=True)
+                    msg = f'subtract_median_filter: rerun filtering masking '
+                    msg += f' S/N>{box_filter_sn} pixels in residual'
+                    utils.log_comment(utils.LOGFILE, msg, verbose=True)
 
                     # first do some binning/box filtering to identify significantly detected lines in individual exposures
-                    box_filter_footprint = np.ones((box_filter_width,box_filter_width), dtype=int)
+                    box_filter_footprint = np.ones((box_filter_width, box_filter_width), 
+                                                    dtype=int)
                     box_filter_clean = nd.generic_filter(sci_i-filter_sci,
                                                     nbutils.nansum,
                                                     footprint=box_filter_footprint)
@@ -3501,7 +3505,7 @@ class MultiBeam(GroupFitter):
 
                             #print('Mask 4959!')
                             beam.extra_lines += lcontam
-
+                
                 hdu = drizzle_to_wavelength(self.beams, ra=self.ra,
                                             dec=self.dec, wave=line_wave_obs,
                                             fcontam=self.fcontam,
@@ -5008,7 +5012,7 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5, pix
             beam_continuum /= sens
 
         # Go drizzle
-
+        
         # Contamination-cleaned
         drizzler(beam_data, beam_wcs, wht, output_wcs,
                          outsci, outwht, outctx, 1., 'cps', 1,
