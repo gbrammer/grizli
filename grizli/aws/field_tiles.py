@@ -549,7 +549,6 @@ def process_tile(field='cos', tile='01.01', filters=TILE_FILTERS, fetch_existing
     import astropy.io.fits as pyfits
     import astropy.wcs as pywcs
     from grizli.aws import visit_processor, db
-    import golfir.catalog
     from grizli.pipeline import auto_script
     
     utils.LOGFILE = 'mosaic.log'
@@ -596,6 +595,7 @@ def process_tile(field='cos', tile='01.01', filters=TILE_FILTERS, fetch_existing
         return 4
     
     if make_catalog:
+        import golfir.catalog
         
         golfir.catalog.make_charge_detection(root, ext='ir')
     
