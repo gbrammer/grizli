@@ -51,6 +51,7 @@ def make_all_fields():
     uds 34.40869 -5.16299 30 30
     smacs0723 110.83403 -73.45429 20 20
     j1235 189.025 4.948 20 20
+    macsj0647 101.9482378 70.2297032 46 46
     """
     
     # 46 46 for tile ref 9 9
@@ -59,14 +60,18 @@ def make_all_fields():
     
     if 0:
         field = 'gdn'
+        field = 'macsj0647'
+        field = 'macs1423'
         
         ix = np.where(tile_defs['field'] == field)[0][0]
         tile_defs['rsize'] = tile_defs['dx']/2
         
-        tiles = make_field_tiles(**tile_defs[ix], tile_npix=2048+256, pscale=0.08, initial_status=90, send_to_database=True)
+        tiles = make_field_tiles(**tile_defs[ix], tile_npix=2048+256, pscale=0.08, 
+                                 initial_status=90, send_to_database=True)
     
     return tile_defs
-    
+
+
 def define_tiles(ra=109.3935148, dec=37.74934031, size=(24, 24), tile_size=6, overlap=0.3, field='macs0717', pixscale=0.05, theta=0):
     """
     Tile definition
@@ -706,6 +711,12 @@ def process_tile(field='cos', tile='01.01', filters=TILE_FILTERS, fetch_existing
                      'egs-v2': (10,14),
                      'j1235':(6,4),
                      'whl0137':(5,5),
+                     'macs1423':(8,8),
+                     'macs0416':(8,8),
+                     'macs0417':(8,8),
+                     'macs1423':(8,8),
+                     'abell370':(8,8),
+                     'macs1149':(8,8),
                      }
     
         if field in ref_tiles:
@@ -849,14 +860,14 @@ def run_one_filter_tile(own_directory=True, **kwargs):
     
     tile, field, filt = get_random_tile_filter()
     if tile is None:
-        with open(os.path.join(HOME, 'tile_finished.txt'),'w') as fp:
+        with open(os.path.join(HOME, 'tile_filter_finished.txt'),'w') as fp:
             fp.write(time.ctime() + '\n')
     else:
         print(f'============  Run tile filter ========')
         print(f'{field} {tile} {filt}')
         print(f'========= {time.ctime()} ==========')
         
-        with open(os.path.join(HOME, 'tile_history.txt'),'a') as fp:
+        with open(os.path.join(HOME, 'tile_filter_history.txt'),'a') as fp:
             fp.write(f'{time.ctime()} {tile}\n')
         
         if own_directory:
