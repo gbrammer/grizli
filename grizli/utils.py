@@ -2073,6 +2073,12 @@ def get_line_wavelengths():
     line_ratios['HeI-3889'] = [1.]
     line_wavelengths['HeI-1083'] = [10832.057, 10833.306]
     line_ratios['HeI-1083'] = [1., 1.]
+    line_wavelengths['HeI-6678'] = [6678.10]
+    line_ratios['HeI-6678'] = [1.]
+    line_wavelengths['HeI-7065'] = [7067.1]
+    line_ratios['HeI-7065'] = [1.]
+    line_wavelengths['HeI-8446'] = [8446.7]
+    line_ratios['HeI-8446'] = [1.]
 
     # Osterbrock Table 4.5
     # -> N=4
