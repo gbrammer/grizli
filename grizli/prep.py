@@ -2861,7 +2861,7 @@ def get_nircam_wisp_filename(header):
         msg = f'Instrument {_inst} not supported'
         return None, _filt, _inst, _det, msg
 
-    if _filt not in ['F150W','F200W','F182M','F210M']:
+    if _filt not in ['F150W','F200W','F182M','F210M','F140M',]:
         msg = f'NIRCam filter {_filt} not supported'
         return None, _filt, _inst, _det, msg
 
