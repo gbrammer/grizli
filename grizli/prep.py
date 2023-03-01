@@ -3690,6 +3690,7 @@ def process_direct_grism_visit(direct={},
                                skymethod='localmin',
                                drizzle_params={},
                                iter_atol=1.e-4,
+                               static_mask=False,
                                imaging_bkg_params=None,
                                run_separate_chip_sky=True,
                                separate_chip_kwargs={},
@@ -3956,6 +3957,7 @@ def process_direct_grism_visit(direct={},
                          resetbits=4096,
                          final_wht_type='IVM',
                          gain=_gain,
+                         static=static_mask,
                          rdnoise=_rdnoise, **drizzle_params)
         else:
             AstroDrizzle(direct['files'], output=direct['product'],
@@ -3966,6 +3968,7 @@ def process_direct_grism_visit(direct={},
                          driz_cr_corr=False, driz_combine=True,
                          build=False, final_wht_type='IVM',
                          gain=_gain,
+                         static=False,
                          rdnoise=_rdnoise,
                          **drizzle_params)
 
@@ -3986,6 +3989,7 @@ def process_direct_grism_visit(direct={},
                              final_bits=bits, coeffs=True, build=False,
                              final_wht_type='IVM',
                              gain=_gain,
+                             static=static_mask,
                              rdnoise=_rdnoise,
                              resetbits=0)
         
@@ -4108,6 +4112,7 @@ def process_direct_grism_visit(direct={},
                          driz_cr=False, driz_cr_corr=False,
                          build=False, final_wht_type='IVM',
                          gain=_gain, rdnoise=_rdnoise,
+                         static=False,
                          **drizzle_params)
         else:
             if 'par' in direct['product']:
@@ -4124,6 +4129,7 @@ def process_direct_grism_visit(direct={},
                          driz_cr_scale=driz_cr_scale, build=False,
                          final_wht_type='IVM',
                          gain=_gain, rdnoise=_rdnoise,
+                         static=static_mask,
                          **drizzle_params)
                          
         # Flag areas of ACS images covered by a single image, where
@@ -4161,6 +4167,7 @@ def process_direct_grism_visit(direct={},
                          driz_cr=False, driz_cr_corr=False,
                          build=False, final_wht_type='IVM',
                          gain=_gain, rdnoise=_rdnoise,
+                         static=static_mask,
                          **drizzle_params)
              
             clean_drizzle(direct['product'])
@@ -4261,8 +4268,12 @@ def process_direct_grism_visit(direct={},
                  driz_cr_corr=False,
                  driz_cr_snr=driz_cr_snr, driz_cr_scale=driz_cr_scale,
                  driz_combine=True, final_bits=bits, coeffs=True,
-                 resetbits=4096, build=False, final_wht_type='IVM',
-                 gain=_gain, rdnoise=_rdnoise)
+                 resetbits=4096,
+                 build=False,
+                 final_wht_type='IVM',
+                 gain=_gain,
+                 rdnoise=_rdnoise,
+                 static=static_mask)
     
     if isJWST:
         # Set keywords back
@@ -4320,7 +4331,9 @@ def process_direct_grism_visit(direct={},
                  driz_combine=True, driz_sep_bits=bits, final_bits=bits,
                  coeffs=True, resetbits=4096, final_pixfrac=pixfrac,
                  build=False,
-                 gain=_gain, rdnoise=_rdnoise,
+                 gain=_gain,
+                 rdnoise=_rdnoise,
+                 static=static_mask,
                  final_wht_type='IVM')
     
     if os.path.exists(skyfile):
@@ -4479,7 +4492,8 @@ def tweak_align(direct_group={}, grism_group={}, max_dist=1., n_min=10, key=' ',
                  resetbits=4096, final_bits=bits, driz_sep_bits=bits,
                  preserve=False, driz_cr_snr=driz_cr_snr,
                  driz_cr_scale=driz_cr_scale, build=False,
-                 final_wht_type='IVM')
+                 final_wht_type='IVM',
+                 static=False)
 
     clean_drizzle(direct_group['product'])
     #cat = make_drz_catalog(root=direct_group['product'], threshold=1.6)
@@ -4500,7 +4514,8 @@ def tweak_align(direct_group={}, grism_group={}, max_dist=1., n_min=10, key=' ',
                  median=True, blot=True, driz_cr=True, driz_cr_corr=True,
                  driz_combine=True, driz_sep_bits=bits, final_bits=bits,
                  coeffs=True, resetbits=4096, final_pixfrac=pixfrac,
-                 build=False, final_wht_type='IVM')
+                 build=False, final_wht_type='IVM',
+                 static=False)
     
     if os.path.exists(skyfile):
         os.remove(skyfile)
