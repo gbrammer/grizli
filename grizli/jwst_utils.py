@@ -1146,7 +1146,7 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
                    f'data/nrc_lowpix_0916_{_det}.fits.gz')]
         
         for bpfile in bpfiles:
-            if os.path.exists(bpfile) & True:
+            if os.path.exists(bpfile) & False:
                 bpdata = pyfits.open(bpfile)[0].data
                 bpdata = nd.binary_dilation(bpdata > 0)*1024
                 if dq.shape == bpdata.shape:
