@@ -1002,7 +1002,7 @@ def exposure_oneoverf_correction(file, axis=None, thresholds=[5,4,3], erode_mask
     return fig, model
 
 
-def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_KEYS, oneoverf_correction=True, oneoverf_kwargs={'make_plot':False}, use_skyflats=True):
+def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_KEYS, oneoverf_correction=True, oneoverf_kwargs={'make_plot':False}, use_skyflats=True, nircam_edge=8):
     """
     Make copies of some header keywords to make the headers look like 
     and HST instrument
@@ -1139,27 +1139,32 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
         
     elif img[0].header['OINSTRUM'] == 'NIRCAM':
         _det = img[0].header['DETECTOR']
-        bpfile = os.path.join(os.path.dirname(__file__), 
-                   f'data/nrc_lowpix_0916_{_det}.fits.gz')
         
-        if os.path.exists(bpfile) & False:
-            bpdata = pyfits.open(bpfile)[0].data
-            #bpdata = nd.binary_dilation(bpdata > 0, iterations=2)*1024
-            bpdata = nd.binary_dilation(bpdata > 0)*1024
-            if dq.shape == bpdata.shape:
-                dq |= bpdata.astype(dq.dtype)
-            
-                msg = f'initialize_jwst_image: Use extra badpix in {bpfile}'
-                utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+        bpfiles = [os.path.join(os.path.dirname(__file__), 
+                   f'data/nrc_badpix_230120_{_det}.fits.gz')]
+        bpfiles += [os.path.join(os.path.dirname(__file__), 
+                   f'data/nrc_lowpix_0916_{_det}.fits.gz')]
         
-        if _det in ['NRCALONG','NRCBLONG']:
-            msg = 'initialize_jwst_image: Mask outer ring of 6 pixels'
+        for bpfile in bpfiles:
+            if os.path.exists(bpfile) & True:
+                bpdata = pyfits.open(bpfile)[0].data
+                bpdata = nd.binary_dilation(bpdata > 0)*1024
+                if dq.shape == bpdata.shape:
+                    msg = f'initialize_jwst_image: Use extra badpix in {bpfile}'
+                    utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+                    dq |= bpdata.astype(dq.dtype)
+                
+                break
+        
+        #if _det in ['NRCALONG','NRCBLONG']:
+        if True:
+            msg = f'initialize_jwst_image: Mask outer ring of {nircam_edge} pixels'
             msg += f' for {_det}'
             utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
-            dq[:6,:] |= 1024
-            dq[-6:,:] |= 1024
-            dq[:,:6] |= 1024
-            dq[:,-6:] |= 1024
+            dq[:nircam_edge,:] |= 1024
+            dq[-nircam_edge:,:] |= 1024
+            dq[:,:nircam_edge] |= 1024
+            dq[:,-nircam_edge:] |= 1024
              
     img['DQ'].data = dq
     
