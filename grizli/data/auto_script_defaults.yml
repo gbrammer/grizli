@@ -125,6 +125,7 @@ visit_prep_args: &prep_args
         thresholds: [5,4,3]
         dilate_iterations: 3
         deg_pix: 64
+        other_axis: False
     snowball_kwargs:
         snowball_erode: 4
         snowball_dilate: 18
