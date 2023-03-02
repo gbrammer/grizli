@@ -73,7 +73,7 @@ def check_object_in_footprint(id, wcs_fits, cat, rd=None):
     return has_point
 
 
-def extract_beams_from_flt(root, bucket, id, clean=True, silent=False):
+def extract_beams_from_flt(root, bucket, id, size=32, clean=True, silent=False):
     """
     Download GrismFLT files and extract the beams file
     """
@@ -186,7 +186,7 @@ def extract_beams_from_flt(root, bucket, id, clean=True, silent=False):
                                       run_fit=False, poly_order=7,
                                       master_files=[os.path.basename(file)],
                                       grp=None, bad_pa_threshold=None,
-                                      fit_trace_shift=False, size=32,
+                                      fit_trace_shift=False, size=size,
                                       diff=True, min_sens=0.02,
                                       skip_complete=True, fit_args={},
                                       args_file=args_file,
@@ -310,11 +310,14 @@ def run_grizli_fit(event):
                 event_kwargs[k] = json.loads(event[k])
             except:
                 event_kwargs[k] = event[k]
-
+    
     # Defaults
     if 'skip_started' not in event_kwargs:
         event_kwargs['skip_started'] = True
-
+    
+    if 'size' not in event_kwargs:
+        event_kwargs['size'] = 32
+        
     for k in ['quasar_fit', 'extract_from_flt', 'fit_stars', 'beam_info_only']:
         if k not in event_kwargs:
             event_kwargs[k] = False
@@ -450,6 +453,7 @@ def run_grizli_fit(event):
             pass
 
         status = extract_beams_from_flt(root, event_kwargs['bucket'], id,
+                                        size=event_kwargs['size'],
                                         clean=run_clean, silent=silent)
 
         # Garbage collector
