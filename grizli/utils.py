@@ -5462,6 +5462,7 @@ def get_photom_scale(header):
     import yaml
     if 'TELESCOP' in header:
         if header['TELESCOP'] not in ['JWST']:
+            print(f"get_photom_scale: TELESCOP={header['TELESCOP']} is not 'JWST'")
             return header['TELESCOP'], 1.0
     else:
         return None, 1.0
@@ -5470,15 +5471,15 @@ def get_photom_scale(header):
                              'data/photom_correction.yml')
     
     if not os.path.exists(corr_file):
+        print(f'{corr_file} not found.')
         return None, 1
     
     with open(corr_file) as fp:
         corr = yaml.load(fp, Loader=yaml.SafeLoader)
-    
-    print(header['CRDS_CTX'], corr['CRDS_CTX_MAX'], corr_file)
-    
+        
     if 'CRDS_CTX' in header:
         if header['CRDS_CTX'] > corr['CRDS_CTX_MAX']:
+            print(f"get_photom_scale {corr_file}: {header['CRDS_CTX']} > {corr['CRDS_CTX_MAX']}")
             return header['CRDS_CTX'], 1.0
             
     key = '{0}-{1}'.format(header['DETECTOR'], header['FILTER'])
@@ -5486,9 +5487,11 @@ def get_photom_scale(header):
         key += '-{0}'.format(header['PUPIL'])
     
     if key not in corr:
+        print(f"get_photom_scale {corr_file}: {key} not found")
         return key, 1.0
     
     else:
+        print(f"get_photom_scale {corr_file}: Scale {key} by {1./corr[key]:.3f}")
         return key, 1./corr[key]
 
 

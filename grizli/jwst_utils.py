@@ -869,7 +869,14 @@ def exposure_oneoverf_correction(file, axis=None, thresholds=[5,4,3], erode_mask
             axis = 0
         else:
             axis = 1
-
+            
+    elif axis < 0:
+        # Opposite axis
+        if im[0].header['INSTRUME'] in ('NIRISS', 'NIRSPEC'):
+            axis = 1
+        else:
+            axis = 0
+        
     msg = f'exposure_oneoverf_correction: {file} axis={axis} deg_pix={deg_pix}'
     utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
     
@@ -1188,8 +1195,20 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
     
     _nircam_grism = False
     
+    ### Flat-field
+    # Flat-field first?
+    
+    
+    needs_flat = True
+    
     if oneoverf_correction:
-        
+        if 'deg_pix' in oneoverf_kwargs:
+            if oneoverf_kwargs['deg_pix'] == 2048:
+                # Do flat field now for aggressive 1/f correction, since the pixel-level
+                # 1/f correction takes out structure that should be flat-fielded
+                _ = img_with_flat(filename, overwrite=True, use_skyflats=use_skyflats)
+                needs_flat = False
+                
         # NIRCam grism
         if (img[0].header['OINSTRUM'] == 'NIRCAM'):
              if 'GRISM' in img[0].header['OPUPIL']:
@@ -1207,10 +1226,24 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
                 utils.log_comment(utils.LOGFILE, msg)
             
                 pass
-                                         
-        # axis=None, thresholds=[5,4,3], erode_mask=None, dilate_iterations=3, deg_pix=64, make_plot=True, init_model=0, in_place=False, skip_miri=True, verbose=True
-        
-    _ = img_with_flat(filename, overwrite=True, use_skyflats=use_skyflats)
+            
+            if 'other_axis' in oneoverf_kwargs:
+                if oneoverf_kwargs['other_axis']:
+                    try:
+                        _ = exposure_oneoverf_correction(filename, in_place=True, 
+                                                         axis=-1,
+                                                         **oneoverf_kwargs)
+                    except TypeError:
+                        # Should only fail for test data
+                        utils.log_exception(utils.LOGFILE, traceback)
+                        msg = f'exposure_oneoverf_correction: axis=-1 failed for {filename}'
+                        utils.log_comment(utils.LOGFILE, msg)
+            
+                        pass
+                    
+    ### Flat-field
+    if needs_flat:
+        _ = img_with_flat(filename, overwrite=True, use_skyflats=use_skyflats)
     
     # Now do "1/f" correction to subtract NIRCam grism sky
     if _nircam_grism:
