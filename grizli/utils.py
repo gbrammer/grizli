@@ -5470,15 +5470,15 @@ def get_photom_scale(header):
                              'data/photom_correction.yml')
     
     if not os.path.exists(corr_file):
+        print(f'{corr_file} not found.')
         return None, 1
     
     with open(corr_file) as fp:
         corr = yaml.load(fp, Loader=yaml.SafeLoader)
-    
-    print(header['CRDS_CTX'], corr['CRDS_CTX_MAX'], corr_file)
-    
+        
     if 'CRDS_CTX' in header:
         if header['CRDS_CTX'] > corr['CRDS_CTX_MAX']:
+            print(f"{corr_file}: {header['CRDS_CTX']} > {corr['CRDS_CTX_MAX']}")
             return header['CRDS_CTX'], 1.0
             
     key = '{0}-{1}'.format(header['DETECTOR'], header['FILTER'])
@@ -5486,9 +5486,11 @@ def get_photom_scale(header):
         key += '-{0}'.format(header['PUPIL'])
     
     if key not in corr:
+        print(f"{corr_file}: {key} not specified")
         return key, 1.0
     
     else:
+        print(f"{corr_file}: Scale {key} by {1./corr[key]:.3f}")
         return key, 1./corr[key]
 
 
