@@ -754,7 +754,7 @@ def run_grizli_fit(event):
                                        args_file=args_file,
                                        **event_kwargs)
         
-        if root == 'fresco-gds-med':
+        if root in ('fresco-gds-med', 'fresco-gdn-med'):
             try:
                 mb, tfit = res[0], res[3]
                 # 1D for FRESCO
