@@ -31,12 +31,12 @@ class aXeConf():
 
             # Global XOFF/YOFF offsets
             if 'XOFF' in self.conf.keys():
-                self.xoff = np.float(self.conf['XOFF'])
+                self.xoff = float(self.conf['XOFF'])
             else:
                 self.xoff = 0.
 
             if 'YOFF' in self.conf.keys():
-                self.yoff = np.float(self.conf['YOFF'])
+                self.yoff = float(self.conf['YOFF'])
             else:
                 self.yoff = 0.
 

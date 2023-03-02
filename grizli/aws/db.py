@@ -1320,7 +1320,7 @@ def multibeam_to_database(beams_file, engine=None, Rspline=15, force=False, **kw
 
     # multibeam dataframe
     df = pd.DataFrame()
-    float_type = np.float
+    float_type = float
 
     df['root'] = [root]
     df['id'] = [id]

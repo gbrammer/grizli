@@ -6001,7 +6001,7 @@ def find_single_image_CRs(visit, simple_mask=False, with_ctx_mask=True,
         bits = np.log2(ctx[0].data)
         mask = ctx[0].data == 0
         #single_image = np.cast[np.float32]((np.cast[int](bits) == bits) & (~mask))
-        single_image = np.cast[np.float]((np.cast[int](bits) == bits) & (~mask))
+        single_image = np.cast[float]((np.cast[int](bits) == bits) & (~mask))
         ctx_wcs = pywcs.WCS(ctx[0].header)
         ctx_wcs.pscale = utils.get_wcs_pscale(ctx_wcs)
         ctx.close()
