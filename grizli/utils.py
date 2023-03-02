@@ -5462,6 +5462,7 @@ def get_photom_scale(header):
     import yaml
     if 'TELESCOP' in header:
         if header['TELESCOP'] not in ['JWST']:
+            print(f"{corr_file}: TELESCOP={header['TELESCOP']} is not 'JWST'")
             return header['TELESCOP'], 1.0
     else:
         return None, 1.0
