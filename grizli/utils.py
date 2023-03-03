@@ -2,6 +2,7 @@
 Dumping ground for general utilities
 """
 import os
+import shutil
 import glob
 import inspect
 from collections import OrderedDict
@@ -6133,7 +6134,7 @@ def symlink_templates(force=False):
 
     if (not os.path.exists(out_path)) | force:
         if os.path.exists(out_path):  # (force)
-            os.remove(out_path)
+            shutil.rmtree(out_path)
 
             os.symlink(templates_path, out_path)
             print('Symlink: {0} -> {1}'.format(templates_path, out_path))
