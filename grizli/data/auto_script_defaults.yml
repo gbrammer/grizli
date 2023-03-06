@@ -131,6 +131,7 @@ visit_prep_args: &prep_args
         snowball_dilate: 18
         mask_bit: 1024
         instruments: [NIRCAM, NIRISS]
+        max_fraction: 0.3
     angle_background_kwargs:
         threshold: 1.8
         detection_background: True

@@ -3117,7 +3117,7 @@ def oneoverf_column_correction(visit, thresholds=[10,1.5], dilate_iter=[10,2], i
             _im.flush()
 
 
-def mask_snowballs(visit, snowball_erode=3, snowball_dilate=18, mask_bit=1024, instruments=['NIRCAM','NIRISS'], unset4=False, **kwargs):
+def mask_snowballs(visit, snowball_erode=3, snowball_dilate=18, mask_bit=1024, instruments=['NIRCAM','NIRISS'], max_fraction=0.3, unset4=False, **kwargs):
     """
     Mask JWST IR snowballs
     
@@ -3137,6 +3137,10 @@ def mask_snowballs(visit, snowball_erode=3, snowball_dilate=18, mask_bit=1024, i
     
     instruments : list
         Instruments where mask is calculated
+    
+    max_fraction : float
+        Maximum allowed fraction of pixels in identified snowballs.  If
+        exceeded, then turn off the mask.
     
     unset4 : bool
         Unset DQ=4 bit for flagged CRs
@@ -3170,7 +3174,16 @@ def mask_snowballs(visit, snowball_erode=3, snowball_dilate=18, mask_bit=1024, i
                                                iterations=snowball_dilate)
             
             label, num_labels = nd.label(snowball_mask)
+
+            _maskfrac = snowball_mask.sum() / snowball_mask.size
             
+            if _maskfrac > max_fraction:
+                msg = f"Snowball mask: {_file} problem "
+                msg += f" fraction {_maskfrac:.2f} > {max_fraction:.2f}"
+                msg += "turning off..."
+                utils.log_comment(utils.LOGFILE, msg, verbose=True)
+                snowball_mask &= False
+                
             _im['DQ'].data |= (snowball_mask*mask_bit).astype(_im['DQ'].data.dtype)
             
             if unset4:
@@ -3185,7 +3198,6 @@ def mask_snowballs(visit, snowball_erode=3, snowball_dilate=18, mask_bit=1024, i
             _im['SCI'].header['SNOWBALN'] = (num_labels,
                                 'Number of labeled features in snowball mask')
             
-            _maskfrac = snowball_mask.sum() / snowball_mask.size
             _im['SCI'].header['SNOWBALF'] = (_maskfrac,
                                  'Fraction of masked pixels in snowball mask')
             
