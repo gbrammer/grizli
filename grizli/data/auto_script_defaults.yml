@@ -131,6 +131,13 @@ visit_prep_args: &prep_args
         snowball_dilate: 18
         mask_bit: 1024
         instruments: [NIRCAM, NIRISS]
+    angle_background_kwargs:
+        threshold: 1.8
+        detection_background: True
+        angles: [30.0, -30.0, 0, 90]
+        suffix: 'angles'
+        niter: 3
+        instruments: []
     miri_skyflat: False
     miri_skyfile: null
     use_skyflats: True

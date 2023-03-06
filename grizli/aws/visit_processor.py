@@ -1343,6 +1343,7 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=False,
                   --include "Prep/*s.log" \
                   --include "Prep/*visits.*" \
                   --include "Prep/*skyflat.*" \
+                  --include "Prep/*angles.*" \
                   --include "*fail*" \
                   --include "RAW/*[nx][tg]" """
         
