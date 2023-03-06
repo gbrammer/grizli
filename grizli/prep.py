@@ -3184,6 +3184,8 @@ def mask_snowballs(visit, snowball_erode=3, snowball_dilate=18, mask_bit=1024, i
                 utils.log_comment(utils.LOGFILE, msg, verbose=True)
                 snowball_mask &= False
                 
+                unset4 = True
+                
             _im['DQ'].data |= (snowball_mask*mask_bit).astype(_im['DQ'].data.dtype)
             
             if unset4:
