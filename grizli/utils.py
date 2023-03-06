@@ -5439,7 +5439,7 @@ def niriss_ghost_mask(im, init_thresh=0.05, init_sigma=3, final_thresh=0.01, fin
     return ghost_mask
 
 
-def get_photom_scale(header):
+def get_photom_scale(header, verbose=True):
     """
     Get tabulated scale factor
     
@@ -5462,7 +5462,8 @@ def get_photom_scale(header):
     import yaml
     if 'TELESCOP' in header:
         if header['TELESCOP'] not in ['JWST']:
-            print(f"get_photom_scale: TELESCOP={header['TELESCOP']} is not 'JWST'")
+            msg = f"get_photom_scale: TELESCOP={header['TELESCOP']} is not 'JWST'"
+            log_comment(LOGFILE, msg, verbose=verbose)
             return header['TELESCOP'], 1.0
     else:
         return None, 1.0
@@ -5471,7 +5472,8 @@ def get_photom_scale(header):
                              'data/photom_correction.yml')
     
     if not os.path.exists(corr_file):
-        print(f'{corr_file} not found.')
+        msg = f'{corr_file} not found.'
+        log_comment(LOGFILE, msg, verbose=verbose)
         return None, 1
     
     with open(corr_file) as fp:
@@ -5479,7 +5481,8 @@ def get_photom_scale(header):
         
     if 'CRDS_CTX' in header:
         if header['CRDS_CTX'] > corr['CRDS_CTX_MAX']:
-            print(f"get_photom_scale {corr_file}: {header['CRDS_CTX']} > {corr['CRDS_CTX_MAX']}")
+            msg = f"get_photom_scale {corr_file}: {header['CRDS_CTX']} > {corr['CRDS_CTX_MAX']}"
+            log_comment(LOGFILE, msg, verbose=verbose)
             return header['CRDS_CTX'], 1.0
             
     key = '{0}-{1}'.format(header['DETECTOR'], header['FILTER'])
@@ -5487,11 +5490,15 @@ def get_photom_scale(header):
         key += '-{0}'.format(header['PUPIL'])
     
     if key not in corr:
-        print(f"get_photom_scale {corr_file}: {key} not found")
+        msg = f"get_photom_scale {corr_file}: {key} not found"
+        log_comment(LOGFILE, msg, verbose=verbose)
+        
         return key, 1.0
     
     else:
-        print(f"get_photom_scale {corr_file}: Scale {key} by {1./corr[key]:.3f}")
+        msg = f"get_photom_scale {corr_file}: Scale {key} by {1./corr[key]:.3f}"
+        log_comment(LOGFILE, msg, verbose=verbose)
+        
         return key, 1./corr[key]
 
 
@@ -5720,7 +5727,8 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
             bits |= keep_bits
         
         if scale_photom:
-            _key, _scale_photom = get_photom_scale(flt[0].header)
+            _key, _scale_photom = get_photom_scale(flt[0].header, 
+                                                   verbose=verbose)
         else:
             _scale_photom = 1.0
         
@@ -5737,11 +5745,19 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
 
                 h = flt[('SCI', ext)].header
                 if 'MDRIZSKY' in h:
-                    sky = h['MDRIZSKY']
+                    sky_value = h['MDRIZSKY']
                 else:
-                    sky = 0
+                    sky_value = 0
                 
-                msg = '  ext (SCI,{0}), sky={1:.3f}'.format(ext, sky)
+                if ('BKG',ext) in flt:
+                    has_bkg = True
+                    sky = flt['BKG',ext].data + sky_value
+                else:
+                    has_bkg = False
+                    sky = sky_value
+                    
+                msg = f'  ext (SCI,{ext}), sky={sky_value:.3f}'
+                msg += f' has_bkg:{has_bkg}'
                 log_comment(LOGFILE, msg, verbose=verbose)
                 
                 if h['BUNIT'] == 'ELECTRONS':
