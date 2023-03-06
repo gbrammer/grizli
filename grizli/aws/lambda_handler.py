@@ -814,13 +814,17 @@ def run_grizli_fit(event):
             grizli_db.add_redshift_fit_row(rowfile, table=dbtable,
                                            verbose=True)
 
+    except:
+        print('Update row failed')
+        pass
+    
+    try:
         # Add 1D spectra
         files = glob.glob('{0}_{1:05d}*1D.fits'.format(root, id))
         if (len(files) > 0) & (dbtable == 'redshift_fit_v2'):
             grizli_db.send_1D_to_database(files=files)
-
     except:
-        print('Update row failed')
+        print(f'send_1D_to_database {files} failed')
         pass
 
     # Remove start log now that done
