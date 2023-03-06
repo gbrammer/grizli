@@ -3308,26 +3308,312 @@ def blot_background(visit={'product': '', 'files': None},
                 tscale = 1./flt[0].header['EXPTIME']
             else:
                 tscale = 1.
-
-            flt['SCI', ext].data -= blotted*tscale
-            flt['SCI', ext].header['BLOTSKY'] = (True,
-                                                 'Sky blotted from SKYIMAGE')
-            flt['SCI', ext].header['SKYIMAGE'] = (drz_file,
-                                                  'Source image for sky')
-            flt['SCI', ext].header['SKYBW'] = (bkg_params['bw'], 
-                                               'Sky bkg_params')
-            flt['SCI', ext].header['SKYBH'] = (bkg_params['bh'],
-                                               'Sky bkg_params')
-            flt['SCI', ext].header['SKYFW'] = (bkg_params['fw'],
-                                               'Sky bkg_params')
-            flt['SCI', ext].header['SKYFH'] = (bkg_params['fh'],
-                                               'Sky bkg_params')
-            flt['SCI', ext].header['SKYPIX'] = (bkg_params['pixel_scale'], 
-                                                'Sky bkg_params, pixel_scale')
+            
+            ## Put result in "BKG" extension(s)
+            if ('BKG',ext) not in flt:
+                bhdu = pyfits.ImageHDU(data=blotted*tscale, name='BKG',
+                                       ver=ext,
+                                       header=flt['SCI',ext].header)
+                flt.append(bhdu)
+            else:
+                bhdu = flt['BKG',ext]
+                bhdu.data += blotted*tscale
+            
+            bhdu = flt['BKG',ext]
+            bhdu.header['BLOTSKY'] = (True, 'Sky blotted from SKYIMAGE')
+            bhdu.header['SKYIMAGE'] = (drz_file, 'Source image for sky')
+            bhdu.header['SKYBW'] = (bkg_params['bw'], 'Sky bkg_params')
+            bhdu.header['SKYBH'] = (bkg_params['bh'], 'Sky bkg_params')
+            bhdu.header['SKYFW'] = (bkg_params['fw'], 'Sky bkg_params')
+            bhdu.header['SKYFH'] = (bkg_params['fh'], 'Sky bkg_params')
+            bhdu.header['SKYPIX'] = (bkg_params['pixel_scale'],
+                                     'Sky bkg_params, pixel_scale')
 
         flt.flush()
 
     return True
+
+
+def get_rotated_column_average(data, mask, theta, axis=1, statfunc=np.nanmedian, order=0):
+    """
+    Get median along an image axis after rotating by and angle `theta`, e.g., for
+    long NIRcam diffraction spikes
+    
+    Parameters
+    ----------
+    data : array-like
+        Science data
+    
+    mask : array-like
+        Mask for valid data
+    
+    theta : float
+        Rotation angle passed to `scipy.ndimage.rotate` (degrees)
+    
+    axis : int
+        Image axis along which to compute `statfunc`
+    
+    statfunc : function
+        Statistic to calculate.  Should be `nan`-safe as masked pixels are filled with `~numpy.nan`
+    
+    order : int
+        Interpolation order for `scipy.ndimage.rotate`.  Default `order=0` is nearest-neighbor interpolation and fastest
+        
+    Returns
+    -------
+    back : array-like
+        Filled array of `statfunc` rotated back to the original frame
+        
+    """
+    import scipy.ndimage as nd
+    
+    # Rotate the data and mask
+    rot = nd.rotate(data, theta, order=order,
+                    reshape=True,
+                    mode='constant')
+    
+    srot = nd.rotate(mask, theta, order=order,
+                     reshape=True,
+                     mode='constant')
+    
+    msk = (srot == 1) & (rot != 0)
+    rows = rot*1.
+    rows[~msk] = np.nan
+    med = statfunc(rows, axis=axis)
+
+    if axis == 1:
+        row_model = np.zeros_like(rows) + med[:,None]
+    else:
+        row_model = np.zeros_like(rows) + med
+
+    row_model[~np.isfinite(row_model)] = 0
+    
+    # Rotate back
+    back = nd.rotate(row_model, -theta, order=order,
+                               reshape=True,
+                               mode='constant')
+    
+    # Slices if the rotated images were resized,
+    # assuming that the original image is centered in the output
+    
+    shn = back.shape
+    sho = data.shape
+    nx = shn[1]-sho[1]
+    ny = shn[0] - sho[0]
+    
+    if nx > 0:
+        slx = slice(nx//2,-nx//2)
+    else:
+        slx = slice(0,sho[1])
+        
+    if ny > 0:
+        sly = slice(ny//2,-ny//2)
+    else:
+        sly = slice(0, sho[0])
+
+    back_sl = back[sly, slx]
+    back_sl[~np.isfinite(back_sl)] = 0.
+    
+    return back_sl
+
+
+def subtract_visit_angle_averages(visit, threshold=1.8, detection_background=True, angles=[30.0, -30.0, 0, 90], suffix='angles', niter=3, instruments=['NIRCAM'], stepsize=10, verbose=True):
+    """
+    Subtract angle averages from exposures in a `visit` group
+    
+    Parameters
+    ----------
+    visit : dict
+        Visit association dictionary
+    
+    threshold : float
+        Detection threshold for source masking
+    
+    detection_background : bool
+        Run source mask detection with background estimation
+    
+    angles : list
+        List of angles relative to `PA_APER` to compute.  For JWST/NIRCam, the 
+        diffraction spikes are at approximately +/- 30 deg.
+    
+    suffix : str
+        If provided, write an output file of the drizzle-combined angle 
+        background image
+    
+    niter : int
+        Number of iterations.  A few iterations seems to help, perhaps because 
+        of imperfect mapping between the exposure frame and the drizzled frame 
+        where the correction is derived
+    
+    instruments : list
+        Only perform if exposure instrument is in this list
+    
+    stepsize : int
+        Parameter for blot
+    
+    Returns
+    -------
+    hdu : `~astropy.io.fits.HDUList`
+        FITS data with the drizzled data and angle averages
+        
+    """
+    if instruments is None:
+        return None
+    
+    frame = inspect.currentframe()
+    utils.log_function_arguments(utils.LOGFILE, frame,
+                                 'prep.subtract_visit_angle_averages')
+     
+    with pyfits.open(visit['files'][0]) as im:
+        pa_aper = im['SCI'].header['PA_APER']
+        wcs_i = pywcs.WCS(im['SCI'].header, relax=True)
+        pixel_scale = utils.get_wcs_pscale(wcs_i)*0.8
+        
+        if 'OINSTRUM' in im[0].header:
+            _instrume = im[0].header['OINSTRUM']
+        else:
+            _instrume = im[0].header['INSTRUME']
+        
+        if _instrume not in instruments:
+            msg = f"subtract_visit_angle_averages: "
+            msg += f"{_instrume} not in {instruments}"
+            utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+            return None
+        
+    if 'footprints' not in visit:
+        visit['footprints'] = []
+        for f in visit['files']:
+            with pyfits.open(f) as im:
+                wcs_i = pywcs.WCS(im['SCI'].header, relax=True)
+            
+            sr = utils.SRegion(wcs_i.calc_footprint())
+            visit['footprints'].append(sr.shapely[0])
+    
+    for _iter in range(niter):
+        
+        ##################
+        ### Visit-level mosaic
+
+        drz_h0, drz_wcs = utils.make_maximal_wcs(visit['files'],
+                                                 pixel_scale=pixel_scale,
+                                                 pad=4,
+                                                 theta=0,
+                                                 get_hdu=False,
+                                                 verbose=False,
+                                                )
+
+        msg = f"subtract_visit_angle_averages: {visit['product']}"
+        msg += f" threshold: {threshold} angles: {angles} "
+        msg += f"pa_aper: {pa_aper:.2f}  iter: {_iter}"
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+
+        drz = utils.drizzle_from_visit(visit, drz_wcs,
+                                       kernel='square',
+                                       pixfrac=1.0,
+                                       clean=False,
+                                       verbose=False,
+                                       scale_photom=False,
+                                      )
+        drz_h = drz[2]
+
+        drz_h['PA_APER'] = pa_aper, 'PA_APER used for reference'
+        drz_h['BKGANGLE'] = (','.join([f'{a:.1f}' for a in angles]), 
+                             'Background angles')
+        drz_h['NITANGLE'] = niter, 'Number of iterations for angle subtraction'
+        
+        data, wht = drz[0], drz[1]
+        err = 1/np.sqrt(wht)
+        mask = (wht > 0)
+
+        ##################
+        ### Source detection for mask
+
+        cat, seg = make_SEP_catalog_from_arrays(data, err, (~mask),
+                                                wcs=drz_wcs,
+                                                threshold=threshold,
+                                            get_background=detection_background,
+                                                segmentation_map=True,
+                                                verbose=False,
+                                                )
+
+        smask = (seg == 0) & mask
+
+        ##################
+        ### Do the angle subtraction
+
+        med_model = data*0.
+        for i, off in enumerate(angles):
+            med_model += get_rotated_column_average(data - med_model,
+                                                    smask,
+                                                    pa_aper+off)
+
+        ##################
+        ### Apply to exposure files
+
+        for i, file in enumerate(visit['files'][:]):
+            with pyfits.open(file, mode='update') as flt:
+                msg = f"subtract_visit_angle_averages: remove from {file}"
+                utils.log_comment(utils.LOGFILE, msg, verbose=True)
+
+                for ext in range(1, 5):
+                    if ('SCI', ext) not in flt:
+                        continue
+
+                    flt_wcs = pywcs.WCS(flt['SCI', ext].header,
+                                        fobj=flt,
+                                        relax=True)
+                    
+                    flt_wcs.pscale = utils.get_wcs_pscale(flt_wcs)
+
+                    blt = utils.blot_nearest_exact(med_model.astype(np.float32),
+                                                       drz_wcs, flt_wcs,
+                                                       stepsize=stepsize,
+                                                       scale_by_pixel_area=True)
+                    
+                    # TBD
+                    tscale = 1.
+                    if ('BKG',ext) not in flt:
+                        hdu = pyfits.ImageHDU(data=blt,
+                                              name='BKG', ver=ext, 
+                                              header=flt['SCI',ext].header)
+
+                        flt.append(hdu)
+                    else:
+                        flt['BKG',ext].data += blt
+                    
+                    for k in ['PA_APER','BKGANGLE','NITANGLE','GRIZLIV']:
+                        flt['BKG',ext].header[k] = drz_h[k], drz_h.comments[k]
+
+                flt.flush()
+        
+        _cleaned = data - med_model
+        
+        if _iter == 0:
+            drz_hdu = pyfits.HDUList([])
+            
+            drz_hdu.append(pyfits.PrimaryHDU(
+                                             data=med_model.astype(np.float32), 
+                                             header=drz_h,
+                                             )
+                           )
+            drz_hdu.append(pyfits.ImageHDU(data=_cleaned.astype(np.float32), 
+                                           header=drz_h,
+                                          )
+                           )
+            drz_hdu.append(pyfits.ImageHDU(data=smask*1, 
+                                           header=drz_h,
+                                          )
+                           )            
+        else:
+            drz_hdu[0].data += med_model.astype(np.float32)
+            drz_hdu[1].data = _cleaned.astype(np.float32)
+            drz_hdu[2].data = smask*1
+
+    if suffix is not None:
+        out = f"{visit['product']}_{suffix}.fits"
+        drz_hdu.writeto(out, overwrite=True, output_verify='Fix')
+        
+    return drz_hdu
 
 
 def separate_chip_sky(visit, filters=['F200LP','F350LP','F600LP','F390W'], stepsize=10, statistic=np.nanmedian, by_amp=True, only_flc=True, row_average=True, average_order=11, seg_dilate=16, **kwargs):
@@ -3700,6 +3986,7 @@ def process_direct_grism_visit(direct={},
                                nircam_wisp_kwargs={},
                                oneoverf_kwargs={},
                                snowball_kwargs={},
+                               angle_background_kwargs={},
                                miri_skyflat=True,
                                miri_skyfile=None,
                                use_skyflats=True):
@@ -4232,6 +4519,9 @@ def process_direct_grism_visit(direct={},
             for file in direct['files']:
                 _ = jwst_utils.set_jwst_to_hst_keywords(file, reset=True)
         
+        if angle_background_kwargs:
+            subtract_visit_angle_averages(direct, **angle_background_kwargs)
+    
     #################
     # Grism image processing
     #################
