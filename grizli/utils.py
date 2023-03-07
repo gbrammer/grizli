@@ -5608,7 +5608,8 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
         _hdu = make_maximal_wcs(files=visit['files'],
                                 pixel_scale=None,
                                 get_hdu=True,
-                                verbose=False)
+                                verbose=False,
+                                pad=4)
         outputwcs = pywcs.WCS(_hdu.header)
     else:
         return None
