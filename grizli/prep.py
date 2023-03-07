@@ -4492,16 +4492,39 @@ def process_direct_grism_visit(direct={},
         
         if run_separate_chip_sky & isACS:
             separate_chip_sky(direct, **separate_chip_kwargs)
-            
-        # Chip-level background for some UVIS filters
-        #  uvis_chip_background(visit=direct)
+        
+        # Reset JWST headers
+        if isJWST:
+            for file in direct['files']:
+                _ = jwst_utils.set_jwst_to_hst_keywords(file, reset=True)
+        
+        if angle_background_kwargs:
+            subtract_visit_angle_averages(direct, **angle_background_kwargs)
+        
+        # Remake final mosaic
+        _ = drizzle_from_visit(direct, output=None, pixfrac=1., kernel='point',
+                               clean=False, include_saturated=True, 
+                               keep_bits=None, dryrun=False, skip=None,
+                               extra_wfc3ir_badpix=True,
+                               verbose=False,
+                               scale_photom=False,
+                               calc_wcsmap=False)
+                       
+        _sci, _wht, _hdr, _files, _info = _
+        _drcfile = glob.glob(f"{direct['product']}_dr*sci.fits")[0]
+        _whtfile = _drcfile.replace('_sci.fits','_wht.fits')
+        pyfits.PrimaryHDU(data=_sci, header=_hdr).writeto(_drcfile,
+                                                          overwrite=True)
+        pyfits.PrimaryHDU(data=_wht, header=_hdr).writeto(_whtfile,
+                                                          overwrite=True)
         
         # Remake catalog
         #cat = make_drz_catalog(root=direct['product'], threshold=thresh)
         cat = make_SEP_catalog(root=direct['product'], threshold=thresh)
 
         # 140 brightest or mag range
-        clip = (cat['MAG_AUTO'] > align_mag_limits[0]) & (cat['MAG_AUTO'] < align_mag_limits[1])
+        clip = (cat['MAG_AUTO'] > align_mag_limits[0])
+        clip &= (cat['MAG_AUTO'] < align_mag_limits[1])
         if len(align_mag_limits) > 2:
             clip &= cat['MAGERR_AUTO'] < align_mag_limits[2]
         else:
@@ -4517,25 +4540,15 @@ def process_direct_grism_visit(direct={},
         if clip.sum() > NMAX:
             so = so[:NMAX]
 
-        table_to_regions(cat[clip][so], 
-                         '{0}.cat.reg'.format(direct['product']))
+        table_to_regions(cat[clip][so], f"{direct['product']}.cat.reg")
 
         if not ((isACS | isWFPC2) & is_single):
-            table_to_radec(cat[clip][so], 
-                           '{0}.cat.radec'.format(direct['product']))
+            table_to_radec(cat[clip][so], f"{direct['product']}.cat.radec")
 
         if (fix_stars) & (not isACS) & (not isWFPC2) & (not isJWST):
             fix_star_centers(root=direct['product'], drizzle=False, 
                              mag_lim=19.5)
         
-        # Reset JWST headers
-        if isJWST:
-            for file in direct['files']:
-                _ = jwst_utils.set_jwst_to_hst_keywords(file, reset=True)
-        
-        if angle_background_kwargs:
-            subtract_visit_angle_averages(direct, **angle_background_kwargs)
-    
     #################
     # Grism image processing
     #################
