@@ -5067,7 +5067,7 @@ def get_flt_footprint(flt_file, extensions=[1, 2, 3, 4], patch_args=None):
         return fp
 
 
-def make_maximal_wcs(files, pixel_scale=0.1, get_hdu=True, pad=90, verbose=True, theta=0, poly_buffer=1./3600, nsci_extensions=4):
+def make_maximal_wcs(files, pixel_scale=None, get_hdu=True, pad=90, verbose=True, theta=0, poly_buffer=1./3600, nsci_extensions=4):
     """
     Compute an ImageHDU with a footprint that contains all of `files`
 
@@ -5077,7 +5077,8 @@ def make_maximal_wcs(files, pixel_scale=0.1, get_hdu=True, pad=90, verbose=True,
         List of HST FITS files (e.g., FLT.) or WCS objects.
 
     pixel_scale : float
-        Pixel scale of output WCS, in `~astropy.units.arcsec`.
+        Pixel scale of output WCS, in `~astropy.units.arcsec`.  If `None`,
+        get pixel scale of first file in `files`.
 
     get_hdu : bool
         See below.
@@ -5124,7 +5125,10 @@ def make_maximal_wcs(files, pixel_scale=0.1, get_hdu=True, pad=90, verbose=True,
 
                     wcs = pywcs.WCS(im['SCI', ext+1].header, fobj=im)
                     wcs_list.append((wcs, file, ext))
-
+    
+    if pixel_scale is None:
+        pixel_scale = get_wcs_pscale(wcs_list[0])
+        
     group_poly = None
     for i, (wcs, file, chip) in enumerate(wcs_list):
         p_i = Polygon(wcs.calc_footprint())
@@ -5141,7 +5145,11 @@ def make_maximal_wcs(files, pixel_scale=0.1, get_hdu=True, pad=90, verbose=True,
                  
         x0, y0 = np.cast[float](group_poly.centroid.xy)[:, 0]
         if verbose:
-            print('{0:>3d}/{1:>3d}: {2}[SCI,{3}]  {4:>6.2f}'.format(i, len(files), file, chip+1, group_poly.area*3600*np.cos(y0/180*np.pi)))
+            msg = '{0:>3d}/{1:>3d}: {2}[SCI,{3}]  {4:>6.2f}'
+            print(msg.format(i, len(files), file, chip+1,
+                             group_poly.area*3600*np.cos(y0/180*np.pi)
+                             )
+                  )
 
     px = np.cast[float](group_poly.convex_hull.boundary.xy).T
     #x0, y0 = np.cast[float](group_poly.centroid.xy)[:,0]
@@ -5165,9 +5173,14 @@ def make_maximal_wcs(files, pixel_scale=0.1, get_hdu=True, pad=90, verbose=True,
     size = np.maximum(sx+pad, sy+pad)
 
     if verbose:
-        print('\n  Mosaic WCS: ({0:.5f},{1:.5f})  {2:.1f}\'x{3:.1f}\'  {4:.3f}"/pix\n'.format(x0[0], x0[1], (sx+pad)/60., (sy+pad)/60., pixel_scale))
+        msg = '\n  Mosaic WCS: ({0:.5f},{1:.5f}) '
+        msg += '{2:.1f}\'x{3:.1f}\'  {4:.3f}"/pix\n'
+        print(msg.format(x0[0], x0[1], (sx+pad)/60., (sy+pad)/60., pixel_scale))
 
-    out = make_wcsheader(ra=x0[0], dec=x0[1], size=(sx+pad*2, sy+pad*2), pixscale=pixel_scale, get_hdu=get_hdu, theta=theta/np.pi*180)
+    out = make_wcsheader(ra=x0[0], dec=x0[1],
+                         size=(sx+pad*2, sy+pad*2),
+                         pixscale=pixel_scale,
+                         get_hdu=get_hdu, theta=theta/np.pi*180)
 
     return out
 
@@ -5502,7 +5515,7 @@ def get_photom_scale(header, verbose=True):
         return key, 1./corr[key]
 
 
-def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
+def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
                        clean=True, include_saturated=True, keep_bits=None,
                        dryrun=False, skip=None, extra_wfc3ir_badpix=True,
                        verbose=True,
@@ -5518,7 +5531,8 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
         Visit dictionary with 'product' and 'files' keys
     
     output : `~astropy.wcs.WCS`, `~astropy.io.fits.Header`, `~astropy.io.ImageHDU`
-        Output frame definition.  Can be a WCS object, header, or FITS HDU
+        Output frame definition.  Can be a WCS object, header, or FITS HDU.  If
+        None, then generates a WCS with `grizli.utils.make_maximal_wcs`
     
     pixfrac : float
         Drizzle `pixfrac`
@@ -5576,19 +5590,25 @@ def drizzle_from_visit(visit, output, pixfrac=1., kernel='point',
     import boto3
     from botocore.exceptions import ClientError
     import scipy.ndimage as nd
-    
+    from astropy.io.fits import PrimaryHDU, ImageHDU
     from .version import __version__ as grizli__version
     
     bucket_name = None
     s3 = boto3.resource('s3')
     s3_client = boto3.client('s3')
-
+    
+    
     if isinstance(output, pywcs.WCS):
         outputwcs = output
     elif isinstance(output, pyfits.Header):
         outputwcs = pywcs.WCS(output)
-    elif isinstance(output, pyfits.PrimaryHDU) | isinstance(output, pyfits.ImageHDU):
+    elif isinstance(output, PrimaryHDU) | isinstance(output, ImageHDU):
         outputwcs = pywcs.WCS(output.header)
+    elif output is None:
+        _header, outputwcs = make_maximal_wcs(files=visit['files'],
+                                              pixel_scale=None,
+                                              get_hdu=False,
+                                              verbose=False)
     else:
         return None
 
