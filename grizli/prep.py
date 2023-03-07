@@ -4502,13 +4502,19 @@ def process_direct_grism_visit(direct={},
             subtract_visit_angle_averages(direct, **angle_background_kwargs)
         
         # Remake final mosaic
-        _ = drizzle_from_visit(direct, output=None, pixfrac=1., kernel='point',
-                               clean=False, include_saturated=True, 
-                               keep_bits=None, dryrun=False, skip=None,
-                               extra_wfc3ir_badpix=True,
-                               verbose=False,
-                               scale_photom=False,
-                               calc_wcsmap=False)
+        _ = utils.drizzle_from_visit(direct,
+                                     output=None,
+                                     pixfrac=1.,
+                                     kernel='point',
+                                     clean=False,
+                                     include_saturated=True, 
+                                     keep_bits=None,
+                                     dryrun=False,
+                                     skip=None,
+                                     extra_wfc3ir_badpix=True,
+                                     verbose=False,
+                                     scale_photom=False,
+                                     calc_wcsmap=False)
                        
         _sci, _wht, _hdr, _files, _info = _
         _drcfile = glob.glob(f"{direct['product']}_dr*sci.fits")[0]
