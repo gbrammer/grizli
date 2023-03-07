@@ -5127,7 +5127,7 @@ def make_maximal_wcs(files, pixel_scale=None, get_hdu=True, pad=90, verbose=True
                     wcs_list.append((wcs, file, ext))
     
     if pixel_scale is None:
-        pixel_scale = get_wcs_pscale(wcs_list[0])
+        pixel_scale = get_wcs_pscale(wcs_list[0][0])
         
     group_poly = None
     for i, (wcs, file, chip) in enumerate(wcs_list):
@@ -5605,10 +5605,11 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
     elif isinstance(output, PrimaryHDU) | isinstance(output, ImageHDU):
         outputwcs = pywcs.WCS(output.header)
     elif output is None:
-        _header, outputwcs = make_maximal_wcs(files=visit['files'],
-                                              pixel_scale=None,
-                                              get_hdu=False,
-                                              verbose=False)
+        _hdu = make_maximal_wcs(files=visit['files'],
+                                pixel_scale=None,
+                                get_hdu=True,
+                                verbose=False)
+        outputwcs = pywcs.WCS(_hdu.header)
     else:
         return None
 
