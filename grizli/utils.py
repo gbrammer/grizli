@@ -5622,12 +5622,14 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
     count = 0
 
     ref_photflam = None
-
+    
     indices = []
-
     for i in range(len(visit['files'])):
-        olap = visit['footprints'][i].intersection(output_poly)
-        if olap.area > 0:
+        if 'footprints' in visit:
+            olap = visit['footprints'][i].intersection(output_poly)
+            if olap.area > 0:
+                indices.append(i)
+        else:
             indices.append(i)
 
     if skip is not None:
