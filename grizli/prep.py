@@ -4,6 +4,7 @@ Align direct images & make mosaics
 import os
 import inspect
 import gc
+import warnings
 
 from collections import OrderedDict
 import glob
@@ -2954,24 +2955,7 @@ def nircam_wisp_correction(calibrated_file, niter=3, update=True, verbose=True, 
         return None
         
     wisp = pyfits.open(wisp_file)
-    
-    # yp, xp = np.indices((2048,2048))
-    #
-    # # if _det in ['NRCA3']:
-    # #     xc, yc = 623, 1680
-    # #     Rmax = 275
-    # # elif _det in ['NRCB4']:
-    # #     xc, yc = 1261, 1558
-    # #     Rmax = 500
-    # # elif _det in ['NRCB3']:
-    # #     xc, yc = 1229, 204
-    # #     Rmax = 470
-    #
-    # wispr = np.sqrt((xp-xc)**2+(yp-yc)**2)
-    #
-    # wisp_msk = np.exp(-(wispr - Rmax)**2/2/80**2)
-    # wisp_msk[wispr < Rmax] = 1
-    
+        
     wisp_msk = utils.pixel_polygon_mask(wisp_ref[_det]['polygon'], 
                                         (2048,2048))
                                         
@@ -3004,7 +2988,8 @@ def nircam_wisp_correction(calibrated_file, niter=3, update=True, verbose=True, 
     # Take background out of model
     _model -= _x[0][0]
     im.close()
-
+    wisp.close()
+    
     if update:
         with pyfits.open(calibrated_file, mode='update') as im:
             im[0].header['WISPBKG'] = _x[0][0], 'Wisp fit, background'
@@ -3393,7 +3378,10 @@ def get_rotated_column_average(data, mask, theta, axis=1, statfunc=np.nanmedian,
     msk = (srot == 1) & (rot != 0)
     rows = rot*1.
     rows[~msk] = np.nan
-    med = statfunc(rows, axis=axis)
+    
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        med = statfunc(rows, axis=axis)
 
     if axis == 1:
         row_model = np.zeros_like(rows) + med[:,None]
