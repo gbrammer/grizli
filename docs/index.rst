@@ -124,6 +124,7 @@ JWST Data Availability
    :maxdepth: 2
 
    grizli/image-release-v6.rst
+   grizli/hst-data-v6.rst
 
 API
 ~~~
