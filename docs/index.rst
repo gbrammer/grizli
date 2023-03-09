@@ -117,6 +117,13 @@ The notebooks below are deprecated and haven't been tested against the master br
   2. Simulation field taken from the Hubble WFC3/IR Ultra-Deep Field, with the WFC3 F140W image as the morphological reference and photo-z templates taken as the spectral models. 
   3. Extract spectra and fit redshifts and emission lines from the combined six exposures.
 
+JWST Data Availability
+~~~~~~~~~~~~~~~~~~~~~~
+
+.. toctree::
+   :maxdepth: 2
+
+   grizli/image-release-v6.rst
 
 API
 ~~~
