@@ -4823,13 +4823,14 @@ def get_rgb_filters(filter_list, force_ir=False, pure_sort=False):
     filter_list_lower = [f.lower() for f in filter_list]
     rpref = ['h', 'f160w', 'f140w','f444w-clear','f410m-clear',
              'f356w-clear','f277w-clear','f200w-clear','f150w-clear']
-    gpref = ['j', 'yj', 'f125w', 'f110w', 'f105w', 'f098m','f356w-clear',
-             'f410m-clear','f300m-clear','f277w-clear',
-             'f200w-clear','f150w-clear','f115w-clear',
+    gpref = ['j', 'yj', 'f125w', 'f110w', 'f105w', 'f098m','f277w-clear',
+             'f356w-clear','f200w-clear'
+             'f150w-clear','f115w-clear',
+             'f410m-clear','f300m-clear',
              ]
     bpref = ['opt', 'visr', 'visb', 'f814w', 'f814wu', 'f606w', 'f606wu',
              'f775w', 'f850lp', 'f435w',
-             'f090w-clear','f070w-clear','f115w-clear',
+             'f115w-clear','f090w-clear','f070w-clear',
              'f277w-clear','f150w-clear'
              ]
              
@@ -4968,7 +4969,7 @@ ASINH_NORM =  {'stretch': 'asinh',
                'min_cut': -0.02, 'max_cut': 1.0, 
                'clip':True, 'asinh_a':0.03}
 
-def field_rgb(root='j010514+021532', xsize=8, output_dpi=None, HOME_PATH='./', show_ir=True, pl=1, pf=1, scl=1, scale_ab=None, rgb_scl=[1, 1, 1], ds9=None, force_ir=False, filters=None, add_labels=True, output_format='jpg', rgb_min=-0.01, xyslice=None, pure_sort=False, verbose=True, force_rgb=None, suffix='.field', mask_empty=False, tick_interval=60, timestamp=False, mw_ebv=0, use_background=False, tickparams=TICKPARAMS, fill_black=False, ref_spectrum=None, gzext='', full_dimensions=False, invert=False, get_rgb_array=False, get_images=False, norm_kwargs=None):
+def field_rgb(root='j010514+021532', xsize=8, output_dpi=None, HOME_PATH='./', show_ir=True, pl=1, pf=1, scl=1, scale_ab=None, rgb_scl=[1, 1, 1], ds9=None, force_ir=False, filters=None, add_labels=True, output_format='jpg', rgb_min=-0.01, xyslice=None, pure_sort=False, verbose=True, force_rgb=None, suffix='.field', mask_empty=False, tick_interval=60, timestamp=False, mw_ebv=0, use_background=False, tickparams=TICKPARAMS, fill_black=False, ref_spectrum=None, gzext='', full_dimensions=False, use_imsave=True, invert=False, get_rgb_array=False, get_images=False, norm_kwargs=None):
     """
     RGB image of the field mosaics
     
@@ -5034,6 +5035,8 @@ def field_rgb(root='j010514+021532', xsize=8, output_dpi=None, HOME_PATH='./', s
     import matplotlib.pyplot as plt
     from matplotlib.ticker import MultipleLocator
 
+    import skimage
+
     #import montage_wrapper
     from astropy.visualization import make_lupton_rgb
     from astropy.visualization import simple_norm
@@ -5060,7 +5063,11 @@ def field_rgb(root='j010514+021532', xsize=8, output_dpi=None, HOME_PATH='./', s
     print(f'PATH: {PATH_TO}, files: {sci_files}')
 
     if filters is None:
-        filters = [file.split('_')[-3].split('-')[-1] for file in sci_files]
+        filters = [file.replace('-clear','xclear').replace('clear-','clearx').split('_')[-3].split('-')[-1]
+                   for file in sci_files]
+        
+        filters = [f.replace('xclear','-clear').replace('clearx','clear-')
+                   for f in filters]
         if show_ir:
             filters += ['ir']
 
@@ -5299,6 +5306,10 @@ def field_rgb(root='j010514+021532', xsize=8, output_dpi=None, HOME_PATH='./', s
     
     if norm_kwargs is None:
         image = make_lupton_rgb(rimg, gimg, bimg, stretch=0.1, minimum=rgb_min)
+        
+        if invert:
+            image = 255-image
+        
     else:
         msg = f'# field_rgb norm with {norm_kwargs}'
         utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
@@ -5311,10 +5322,9 @@ def field_rgb(root='j010514+021532', xsize=8, output_dpi=None, HOME_PATH='./', s
         norm = simple_norm(image, **norm_kwargs)
         
         image = norm(image).filled(0)
-        
-    if invert:
-        image = 255-image
-        
+        if invert:
+            image = 255 - np.clip(np.cast[int](image*255), 0, 255)
+                    
     if fill_black:
         image[rmsk,0] = 0
         image[gmsk,1] = 0
@@ -5341,61 +5351,70 @@ def field_rgb(root='j010514+021532', xsize=8, output_dpi=None, HOME_PATH='./', s
         dpi = output_dpi
     
     dim = [xsize, xsize/nx*ny]
-
-    fig, ax = plt.subplots(1,1,figsize=dim, dpi=dpi)
-
-    ax.imshow(image, origin='lower', extent=(-nx/2, nx/2, -ny/2, ny/2))
-
-    ax.set_xticklabels([])
-    ax.set_yticklabels([])
-
-    ax.xaxis.set_major_locator(minor)
-    ax.yaxis.set_major_locator(minor)
-
-    #ax.tick_params(axis='x', colors='w', which='both')
-    #ax.tick_params(axis='y', colors='w', which='both')
-    if tickparams:
-        ax.tick_params(**tickparams)
-
-    if add_labels:
-        ax.text(0.03, 0.97, root,
-                bbox=dict(facecolor='w', alpha=0.8),
-                size=10, ha='left', va='top', transform=ax.transAxes)
-
-        ax.text(0.06+0.08*2, 0.02, rf, color='r',
-                bbox=dict(facecolor='w', alpha=1),
-                size=8, ha='center', va='bottom',
-                transform=ax.transAxes)
-                
-        ax.text(0.06+0.08, 0.02, gf, color='g',
-                bbox=dict(facecolor='w', alpha=1),
-                size=8, ha='center', va='bottom',
-                transform=ax.transAxes)
-                
-        ax.text(0.06, 0.02, bf, color='b',
-                bbox=dict(facecolor='w', alpha=1),
-                size=8, ha='center', va='bottom',
-                transform=ax.transAxes)
     
-    if timestamp:
-        fig.text(0.97, 0.03, time.ctime(),
-                 ha='right', va='bottom', fontsize=5,
-                 transform=fig.transFigure, color='w')
+    if not use_imsave:
+        fig, ax = plt.subplots(1,1,figsize=dim, dpi=dpi)
 
+        ax.imshow(image, origin='lower', extent=(-nx/2, nx/2, -ny/2, ny/2))
+
+        ax.set_xticklabels([])
+        ax.set_yticklabels([])
+
+        ax.xaxis.set_major_locator(minor)
+        ax.yaxis.set_major_locator(minor)
+
+        #ax.tick_params(axis='x', colors='w', which='both')
+        #ax.tick_params(axis='y', colors='w', which='both')
+        if tickparams:
+            ax.tick_params(**tickparams)
+
+        if add_labels:
+            ax.text(0.03, 0.97, root,
+                    bbox=dict(facecolor='w', alpha=0.8),
+                    size=10, ha='left', va='top', transform=ax.transAxes)
+
+            ax.text(0.06+0.08*2, 0.02, rf, color='r',
+                    bbox=dict(facecolor='w', alpha=1),
+                    size=8, ha='center', va='bottom',
+                    transform=ax.transAxes)
+                
+            ax.text(0.06+0.08, 0.02, gf, color='g',
+                    bbox=dict(facecolor='w', alpha=1),
+                    size=8, ha='center', va='bottom',
+                    transform=ax.transAxes)
+                
+            ax.text(0.06, 0.02, bf, color='b',
+                    bbox=dict(facecolor='w', alpha=1),
+                    size=8, ha='center', va='bottom',
+                    transform=ax.transAxes)
+    
+        if timestamp:
+            fig.text(0.97, 0.03, time.ctime(),
+                     ha='right', va='bottom', fontsize=5,
+                     transform=fig.transFigure, color='w')
+    else:
+        fig = None
+    
     if full_dimensions:
-        ax.axis('off')
-        fig.tight_layout(pad=0)
-        dpi = int(nx/xsize/full_dimensions)
-        fig.savefig('{0}{1}.{2}'.format(root, suffix, output_format), dpi=dpi)
-        plt.close(fig)
+        if use_imsave:
+            skimage.io.imsave(f'{root}{suffix}.{output_format}',
+                       image[::-full_dimensions*1,::full_dimensions*1,:],
+                       plugin='pil', quality=95)
+        else:
+            ax.axis('off')
+            fig.tight_layout(pad=0)
+            dpi = int(nx/xsize/full_dimensions)
+        
+            fig.savefig(f'{root}{suffix}.{output_format}', dpi=dpi)
+            plt.close(fig)
+        
     else:
         fig.tight_layout(pad=0.1)
-        fig.savefig('{0}{1}.{2}'.format(root, suffix, output_format))
+        fig.savefig(f'{root}{suffix}.{output_format}')
     
     gc.collect()
     for k in ims:
         ims[k].close()
-    
 
     return xsl, ysl, (rf, gf, bf), fig
 
