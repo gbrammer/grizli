@@ -7,13 +7,13 @@ Grizli Image Release v6.0 - 8 March 2023
   :alt: CEERS 115+277+444
   
 This release provides a repository of the primary public JWST imaging datasets,
-now uniformly reprocessed with updated calibration files and `grizli==1.8`.
+now uniformly reprocessed with updated calibration files and ``grizli==1.8``.
 
 Data
 ~~~~
 
-* **S** "science" data, `sci.fits`
-* **W** inverse variance weights `wht.fits`
+* **S** "science" data, ``sci.fits``
+* **W** inverse variance weights ``wht.fits``
 * **RGB** Field image generated from F115W + F277W + F444W
 * **ir** combined LW image for source detection
 * Catalogs and photo-zs TBD
