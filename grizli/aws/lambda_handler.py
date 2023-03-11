@@ -289,6 +289,10 @@ def run_grizli_fit(event):
     if 'silent' in event:
         silent = event['silent'] in TRUE_OPTIONS
 
+    update_db = True
+    if 'update_db' in event:
+        update_db = event['update_db'] in TRUE_OPTIONS
+    
     ###
     # Parse event arguments
     ###
@@ -373,7 +377,8 @@ def run_grizli_fit(event):
         db_status = grizli_db.get_redshift_fit_status(root, id, table=dbtable)
     except:
         db_status = -1
-
+        update_db = False
+        
     # Initial log
     start_log = '{0}_{1:05d}.start.log'.format(root, id)
     full_start = 'HST/Pipeline/{0}/Extractions/{1}'.format(root, start_log)
@@ -401,13 +406,14 @@ def run_grizli_fit(event):
     if event_kwargs['skip_started']:
         res = [r.key for r in ubkt.objects.filter(Prefix=full_start)]
         if res:
-            print('Already started ({0}), aborting.'.format(start_log))
+            print(f'Already started ({start_log}), aborting.')
             return True
 
     fp = open(start_log, 'w')
     fp.write(time.ctime()+'\n')
     fp.close()
-    ubkt.upload_file(start_log, full_start)
+    if update_db:
+        ubkt.upload_file(start_log, full_start)
 
     # Download fit arguments
     if 'force_args' in event:
@@ -415,23 +421,28 @@ def run_grizli_fit(event):
     else:
         force_args = False
 
-    args_files = ['{0}_fit_args.npy'.format(root), 'fit_args.npy']
+    args_files = [f'{root}_fit_args.npy', 'fit_args.npy']
     for args_file in args_files:
         if (not os.path.exists(args_file)) | force_args:
-            aws_file = 'HST/Pipeline/{0}/Extractions/{1}'.format(root, args_file)
+            aws_file = f'HST/Pipeline/{root}/Extractions/{args_file}'
             try:
-                bkt.download_file(aws_file, './{0}'.format(args_file),
+                bkt.download_file(aws_file, f'./{args_file}',
                               ExtraArgs={"RequestPayer": "requester"})
-                print('Use args_file = {0}'.format(args_file))
+                print(f'Use args_file = {args_file}')
                 break
             except:
                 continue
-
+        else:
+            print(f'Use found args_file = {args_file}')
+            break
+    
     # If no beams file in the bucket, try to generate it
     put_beams = False
     try:
         if not os.path.exists(beams_file):
-            bkt.download_file(event['s3_object_path'], './{0}'.format(beams_file), ExtraArgs={"RequestPayer": "requester"})
+            bkt.download_file(event['s3_object_path'], 
+                              f'./{beams_file}',
+                              ExtraArgs={"RequestPayer": "requester"})
             put_beams = False
     except:
         print('Extract from GrismFLT object!')
@@ -443,14 +454,15 @@ def run_grizli_fit(event):
         else:
             run_clean = True
 
-        try:
-            # Extracting beams
-            grizli_db.update_redshift_fit_status(root, id,
+        if update_db:
+            try:
+                # Extracting beams
+                grizli_db.update_redshift_fit_status(root, id,
                                                 status=dbFLAGS['start_beams'],
-                                                table=dbtable)
-        except:
-            print('Set DB flag failed: start_beams')
-            pass
+                                                    table=dbtable)
+            except:
+                print('Set DB flag failed: start_beams')
+                pass
 
         status = extract_beams_from_flt(root, event_kwargs['bucket'], id,
                                         size=event_kwargs['size'],
@@ -463,26 +475,28 @@ def run_grizli_fit(event):
             return False
         else:
             beams_file = status[0]
-
-        try:
-            # Beams are done
-            grizli_db.update_redshift_fit_status(root, id,
-                                                 status=dbFLAGS['done_beams'],
-                                                 table=dbtable)
-        except:
-            pass
+        
+        if update_db:
+            try:
+                # Beams are done
+                grizli_db.update_redshift_fit_status(root, id,
+                                                status=dbFLAGS['done_beams'],
+                                                     table=dbtable)
+            except:
+                pass
 
         put_beams = True
 
         # upload it now
-        output_path = 'HST/Pipeline/{0}/Extractions'.format(root)
-        for outfile in status:
-            aws_file = '{0}/{1}'.format(output_path, outfile)
-            print(aws_file)
-            bkt.upload_file(outfile, aws_file, 
+        output_path = f'HST/Pipeline/{root}/Extractions'
+        if update_db:
+            for outfile in status:
+                aws_file = f'{output_path}/{outfile}'
+                print(aws_file)
+                bkt.upload_file(outfile, aws_file, 
                             ExtraArgs={'ACL': 'public-read'})
 
-    if ('run_fit' in event) & (dbtable == 'redshift_fit_v2'):
+    if ('run_fit' in event) & (dbtable == 'redshift_fit_v2') & update_db:
         if event['run_fit'] in FALSE_OPTIONS:
             res = ubkt.delete_objects(Delete={'Objects': 
                                                [{'Key': full_start}]})
@@ -499,7 +513,7 @@ def run_grizli_fit(event):
     utils.fetch_acs_wcs_files(beams_file, bucket_name=event_kwargs['bucket'])
 
     # Update the multibeam/beam_geometry tables
-    if os.path.exists(beams_file):
+    if os.path.exists(beams_file) & update_db:
         args = np.load(args_file, allow_pickle=True)[0]
         for arg in event_kwargs:
             if arg in args:
@@ -508,7 +522,7 @@ def run_grizli_fit(event):
         grizli_db.multibeam_to_database(beams_file, Rspline=15, force=False,
                                         **args)
 
-    if dbtable == 'multibeam_v2':
+    if (dbtable == 'multibeam_v2') & update_db:
         # Done
         res = ubkt.delete_objects(Delete={'Objects': [{'Key': full_start}]})
         return True
@@ -540,10 +554,10 @@ def run_grizli_fit(event):
 
     if not silent:
         for i, file in enumerate(files):
-            print('File ({0}): {1}'.format(i+1, file))
+            print(f'File ({i+1}): {file}')
 
     try:
-        files = glob.glob('{0}_{1:05d}*R30.fits'.format(root, id))
+        files = glob.glob(f'{root}_{id:05d}*R30.fits')
         if (len(files) > 0) & (dbtable == 'redshift_fit_v2'):
             grizli_db.send_1D_to_database(files=files)
     except:
@@ -552,12 +566,13 @@ def run_grizli_fit(event):
 
     ###
     # Run the fit
-    try:
-        grizli_db.update_redshift_fit_status(root, id, table=dbtable,
+    if update_db:
+        try:
+            grizli_db.update_redshift_fit_status(root, id, table=dbtable,
                                         status=dbFLAGS['start_redshift_fit'])
-    except:
-        print('Set DB flag failed: start_redshift_fit')
-        pass
+        except:
+            print('Set DB flag failed: start_redshift_fit')
+            pass
     
     # Extra args from numpy file on s3
     if 's3_argsfile' in event_kwargs:
@@ -629,9 +644,16 @@ def run_grizli_fit(event):
         q0, q1 = utils.load_quasar_templates(**templ_args)
 
         if use_simple_templates:
-            x0 = utils.load_templates(full_line_list=['highO32'], continuum_list=['quasar_lines.txt', 'red_blue_continuum_noLya.txt'], line_complexes=False, fwhm=1000)
+            x0 = utils.load_templates(full_line_list=['highO32'], 
+                                      continuum_list=['quasar_lines.txt', 
+                                          'red_blue_continuum_noLya.txt'],
+                                      line_complexes=False, fwhm=1000)
 
-            x0 = utils.load_templates(full_line_list=[], continuum_list=['quasar_lines.txt', 'red_blue_continuum_noLya.txt', 'fsps_starburst_lines.txt'], line_complexes=False, fwhm=1000)
+            x0 = utils.load_templates(full_line_list=[], 
+                                      continuum_list=['quasar_lines.txt',
+                                            'red_blue_continuum_noLya.txt',
+                                            'fsps_starburst_lines.txt'], 
+                                      line_complexes=False, fwhm=1000)
 
             # for t in q0:
             #     if 'bspl' in t:
@@ -784,11 +806,11 @@ def run_grizli_fit(event):
             output_path = 'HST/Pipeline/{0}/Extractions'.format(root)
 
     # Output files
-    files = glob.glob('{0}_{1:05d}*'.format(root, id))
+    files = glob.glob(f'{root}_{id:05d}*')
     
     for file in files:
         if ('beams.fits' not in file) | put_beams:
-            aws_file = '{0}/{1}'.format(output_path, file)
+            aws_file = f'{output_path}/{file}'
 
             if event_kwargs['quasar_fit'] in TRUE_OPTIONS:
                 # Don't copy stack
@@ -796,21 +818,23 @@ def run_grizli_fit(event):
                     continue
 
                 # Add qso extension on outputs
-                aws_file = aws_file.replace('_{0:05d}.'.format(id),
-                                            '_{0:05d}.qso.'.format(id))
+                aws_file = aws_file.replace(f'_{id:05d}.', f'_{id:05d}.qso.')
 
-            print('Upload {0} -> {1}'.format(file, aws_file))
-
-            bkt.upload_file(file, aws_file, ExtraArgs={'ACL': 'public-read'})
-
+            if update_db:
+                print(f'Upload {file} -> {aws_file}')
+                bkt.upload_file(file, aws_file,
+                                ExtraArgs={'ACL': 'public-read'})
+            else:
+                print(f'Product {file}')
+                
     # Put data in the redshift_fit database table
     try:
         if dbtable == 'stellar_fit':
-            rowfile = '{0}_{1:05d}.star.log'.format(root, id)
+            rowfile = f'{root}_{id:05d}.star.log'
         else:
-            rowfile = '{0}_{1:05d}.row.fits'.format(root, id)
+            rowfile = f'{root}_{id:05d}.row.fits'
 
-        if os.path.exists(rowfile):
+        if os.path.exists(rowfile) & update_db:
             grizli_db.add_redshift_fit_row(rowfile, table=dbtable,
                                            verbose=True)
 
@@ -821,14 +845,15 @@ def run_grizli_fit(event):
     try:
         # Add 1D spectra
         files = glob.glob('{0}_{1:05d}*1D.fits'.format(root, id))
-        if (len(files) > 0) & (dbtable == 'redshift_fit_v2'):
+        if (len(files) > 0) & (dbtable == 'redshift_fit_v2') & update_db:
             grizli_db.send_1D_to_database(files=files)
     except:
         print(f'send_1D_to_database {files} failed')
         pass
 
     # Remove start log now that done
-    res = ubkt.delete_objects(Delete={'Objects': [{'Key': full_start}]})
+    if update_db:
+        res = ubkt.delete_objects(Delete={'Objects': [{'Key': full_start}]})
 
     # Garbage collector
     gc.collect()
