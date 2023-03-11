@@ -3462,14 +3462,14 @@ def subtract_visit_angle_averages(visit, threshold=1.8, detection_background=Tru
     if instruments is None:
         return None
     
+    if len(instruments) == 0:
+        return None
+        
     frame = inspect.currentframe()
     utils.log_function_arguments(utils.LOGFILE, frame,
                                  'prep.subtract_visit_angle_averages')
      
     with pyfits.open(visit['files'][0]) as im:
-        pa_aper = im['SCI'].header['PA_APER']
-        wcs_i = pywcs.WCS(im['SCI'].header, relax=True)
-        pixel_scale = utils.get_wcs_pscale(wcs_i)*0.8
         
         if 'OINSTRUM' in im[0].header:
             _instrume = im[0].header['OINSTRUM']
@@ -3481,6 +3481,10 @@ def subtract_visit_angle_averages(visit, threshold=1.8, detection_background=Tru
             msg += f"{_instrume} not in {instruments}"
             utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
             return None
+
+        pa_aper = im['SCI'].header['PA_APER']
+        wcs_i = pywcs.WCS(im['SCI'].header, relax=True, fobj=im)
+        pixel_scale = utils.get_wcs_pscale(wcs_i)*0.8
         
     if 'footprints' not in visit:
         visit['footprints'] = []
