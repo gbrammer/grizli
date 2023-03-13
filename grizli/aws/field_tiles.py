@@ -356,7 +356,7 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
     if (len(glob.glob(f'{root}*.brgb.png')) == 0) & make_combinations:
         split_tiles(root, ref_tile=ref_tile, 
                     filters=brgb_filts, zoom_levels=zoom_levels,
-                    optical=blue_is_opt, suffix='.brgb', xsize=32, scl=2,
+                    optical=blue_is_opt, suffix='.brgb', xsize=32, scl=4,
                     force=force, rgb_scl=[1., 1.2, 1.4], rgb_min=-0.018)
 
         plt.close('all')
@@ -368,7 +368,7 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
                           'F115W-CLEAR','F150W-CLEAR',
                           'F200W-CLEAR','F182M-CLEAR','F210M-CLEAR']],
                     zoom_levels=zoom_levels,
-                    optical=True, suffix='.swrgb', xsize=32, scl=4,
+                    optical=True, suffix='.swrgb', xsize=32, scl=2,
                     force=force, rgb_scl=[1,1,1], rgb_min=-0.018)
 
         plt.close('all')
@@ -393,7 +393,7 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
                     zoom_levels=zoom_levels,
                     optical=True, suffix='.ncrgb', xsize=32, scl=4,
                     force=force, rgb_min=-0.018,
-                    rgb_scl=[1.5, 1.0, 1],
+                    rgb_scl=[1.8, 0.95, 1],
                     norm_kwargs={'stretch': 'asinh', 'min_cut': -0.01, 
                                  'max_cut': 1.0, 'clip':True, 
                                  'asinh_a':0.03},
