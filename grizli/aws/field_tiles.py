@@ -323,7 +323,11 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
 
     files = glob.glob(f'{root}-[hvu]*')
     files += glob.glob(f'{root}*.rgb.png')
-
+    
+    files = glob.glob(f'{root}-f*_sci.fits*')
+    files += glob.glob(f'{root}-clea*_sci.fits*')
+    all_filters = [f.split(f'{root}-')[1].split('_dr')[0] for f in files]
+    
     if len(files) == 0:
         auto_script.make_filter_combinations(root, 
                           filter_combinations={'h':['F140W','F160W'], 
@@ -363,10 +367,14 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
     
     # JWST SW
     if (len(glob.glob(f'{root}*.swrgb.png')) == 0) & make_combinations:
+        filters = []
+        for f in ['f090w-clear','f115w-clear','f150w-clear','f200w-clear',
+                  'f182m-clear','f210m-clear']:
+            if f in all_filters:
+                filters.append(f)
+
         split_tiles(root, ref_tile=ref_tile, 
-                    filters=[f.lower() for f in ['F070W-CLEAR','F090W-CLEAR',
-                          'F115W-CLEAR','F150W-CLEAR',
-                          'F200W-CLEAR','F182M-CLEAR','F210M-CLEAR']],
+                    filters=filters,
                     zoom_levels=zoom_levels,
                     optical=True, suffix='.swrgb', xsize=32, scl=2,
                     force=force, rgb_scl=[1,1,1], rgb_min=-0.018)
@@ -375,10 +383,15 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
     
     # JWST LW
     if (len(glob.glob(f'{root}*.lwrgb.png')) == 0) & make_combinations:
+        filters = []
+        for f in ['f277w-clear','f356w-clear','f444w-clear',
+                  'f410m-clear','f365m-clear','f460m-clear',
+                  'f480m-clear']:
+            if f in all_filters:
+                filters.append(f)
+                
         split_tiles(root, ref_tile=ref_tile, 
-                    filters=[f.lower() for f in ['F277W-CLEAR','F356W-CLEAR',
-                          'F360M-CLEAR','F410M-CLEAR','F444W-CLEAR',
-                          'F480M-CLEAR']],
+                    filters=filters,
                     zoom_levels=zoom_levels,
                     optical=True, suffix='.lwrgb', xsize=32, scl=4,
                     force=force, rgb_scl=[1,1,1], rgb_min=-0.018)
@@ -388,10 +401,10 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
     # All NIRCam
     if (len(glob.glob(f'{root}*.ncrgb.png')) == 0) & make_combinations:
         filters = ['f444w-clear','f277w-clear']
-        if len(glob.glob(f'{root}*f090w-clear*sci.fits*')) > 0:
-            filters.append('f090w-clear')
-        else:
-            filters.append('f115w-clear')
+        for f in ['f090w-clear','f115w-clear','f150w-clear']:
+            if f in all_filters:
+                filters.append(f)
+                break
             
         split_tiles(root, ref_tile=ref_tile, 
                     filters=filters,
