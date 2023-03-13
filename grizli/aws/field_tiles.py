@@ -345,9 +345,9 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
                                             weight_fnu=False)
 
     if 'j' in rgb_filts:
-        rgb_scl = [1.1, 0.8, 4]
+        rgb_scl = [1.1, 0.8, 8]
     else:
-        rgb_scl = [1,1,4.]
+        rgb_scl = [1,1,8.]
         
     if make_combinations:
         split_tiles(root, ref_tile=ref_tile, 
@@ -355,7 +355,7 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
                 optical=False, suffix='.rgb', xsize=32, scl=1,
                 force=force,
                 rgb_scl=rgb_scl,
-                pl=1, pf=1)
+                pl=1., pf=1)
 
         plt.close('all')
     
