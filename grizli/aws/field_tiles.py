@@ -262,7 +262,8 @@ def split_tiles(root='abell2744-080-08.08', ref_tile=(8,8), filters=['visr','f12
     for iz, zoom in enumerate(zoom_levels):
         if iz > 0:
             zoom_img = f'{root}{suffix}.{2**iz:d}.png'
-            fig.savefig(zoom_img, dpi=dpi/2**iz)
+            # fig.savefig(zoom_img, dpi=dpi/2**iz)
+            os.system(f'convert {root}{suffix}.png -scale {1/2**iz*100:.0f}% {root}{suffix}.{2**iz:d}.png')
             img = plt.imread(zoom_img)
         else:
             img = plt.imread(f'{root}{suffix}.png')
