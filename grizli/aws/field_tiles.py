@@ -345,9 +345,9 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
                                             weight_fnu=False)
 
     if 'j' in rgb_filts:
-        rgb_scl = [1.1, 0.8, 1]
+        rgb_scl = [1.1, 0.8, 4]
     else:
-        rgb_scl = [1,1,1]
+        rgb_scl = [1,1,4.]
         
     if make_combinations:
         split_tiles(root, ref_tile=ref_tile, 
@@ -383,9 +383,9 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
                     optical=True, suffix='.swrgb', xsize=32, scl=2,
                     force=force, rgb_scl=[1,1.01,1.01], rgb_min=-0.018,
                     pl=2, pf=1,
-                    norm_kwargs={'stretch': 'asinh', 'min_cut': -0.01, 
-                                 'max_cut': 1.0, 'clip':True, 
-                                 'asinh_a':0.03},
+                    # norm_kwargs={'stretch': 'asinh', 'min_cut': -0.01,
+                    #              'max_cut': 1.0, 'clip':True,
+                    #              'asinh_a':0.03},
                     )
 
         plt.close('all')
@@ -404,9 +404,9 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
                     zoom_levels=zoom_levels,
                     optical=True, suffix='.lwrgb', xsize=32, scl=4,
                     force=force, rgb_scl=[1.01,1.01,1.01],
-                    norm_kwargs={'stretch': 'asinh', 'min_cut': -0.01, 
-                                 'max_cut': 1.0, 'clip':True, 
-                                 'asinh_a':0.03},
+                    # norm_kwargs={'stretch': 'asinh', 'min_cut': -0.01,
+                    #              'max_cut': 1.0, 'clip':True,
+                    #              'asinh_a':0.03},
                     pl=2, pf=1,
                     rgb_min=-0.018)
 
