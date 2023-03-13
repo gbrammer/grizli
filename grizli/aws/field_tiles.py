@@ -362,7 +362,7 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
     if (len(glob.glob(f'{root}*.brgb.png')) == 0) & make_combinations:
         split_tiles(root, ref_tile=ref_tile, 
                     filters=brgb_filts, zoom_levels=zoom_levels,
-                    optical=blue_is_opt, suffix='.brgb', xsize=32, scl=4,
+                    optical=blue_is_opt, suffix='.brgb', xsize=32, scl=8,
                     force=force, rgb_scl=[1., 1.2, 1.4],
                     rgb_min=-0.018,
                     pl=2, pf=1)
