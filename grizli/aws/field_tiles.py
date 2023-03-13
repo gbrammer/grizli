@@ -387,9 +387,14 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
     
     # All NIRCam
     if (len(glob.glob(f'{root}*.ncrgb.png')) == 0) & make_combinations:
+        filters = ['f444w-clear','f277w-clear']
+        if len(glob.glob(f'{root}*f090w-clear*sci.fits*')) > 0:
+            filters.append('f090w-clear')
+        else:
+            filters.append('f115w-clear')
+            
         split_tiles(root, ref_tile=ref_tile, 
-                    filters=[f.lower() for f in ['F444W-CLEAR', 'F277W-CLEAR', 
-                                                 'F115W-CLEAR','F090W-CLEAR']],
+                    filters=filters,
                     zoom_levels=zoom_levels,
                     optical=True, suffix='.ncrgb', xsize=32, scl=4,
                     force=force, rgb_min=-0.018,
