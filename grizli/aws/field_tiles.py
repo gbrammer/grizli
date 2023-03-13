@@ -222,7 +222,7 @@ def make_field_tiles(field='cos', ra=150.125, dec=2.2, rsize=45, tile_npix=2048+
     
     return tiles
     
-def split_tiles(root='abell2744-080-08.08', ref_tile=(8,8), filters=['visr','f125w','h'], optical=False, suffix='.rgb', xsize=32, zoom_levels=[4,3,2,1], force=False, scl=1, invert=False, verbose=True, rgb_scl=[1,1,1], rgb_min=-0.01, make_combinations=True):
+def split_tiles(root='abell2744-080-08.08', ref_tile=(8,8), filters=['visr','f125w','h'], optical=False, suffix='.rgb', xsize=32, zoom_levels=[4,3,2,1], force=False, scl=1, invert=False, verbose=True, rgb_scl=[1,1,1], rgb_min=-0.01, make_combinations=True, norm_kwargs=None, pl=2, pf=1):
     """
     Split image into 256 pixel tiles for map display
     """
@@ -245,7 +245,11 @@ def split_tiles(root='abell2744-080-08.08', ref_tile=(8,8), filters=['visr','f12
                                   gzext='*', suffix=suffix, 
                                   output_format='png',
                                   scl=scl, invert=invert, 
-                                  rgb_scl=rgb_scl, rgb_min=rgb_min)
+                                  rgb_scl=rgb_scl,
+                                  rgb_min=rgb_min,
+                                  pl=pl,
+                                  pf=pf,
+                                  norm_kwargs=norm_kwargs)
     except IndexError:
         return False
     
@@ -376,15 +380,28 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
     # All NIRCam
     if (len(glob.glob(f'{root}*.ncrgb.png')) == 0) & make_combinations:
         split_tiles(root, ref_tile=ref_tile, 
-                    filters=[f.lower() for f in ['F070W-CLEAR','F090W-CLEAR',
-                                                 'F115W-CLEAR','F150W-CLEAR',
-                                                 'F200W-CLEAR',
-                                                 'F182M-CLEAR','F210M-CLEAR',
-                                                 'F277W-CLEAR','F356W-CLEAR',
-                                                'F410M-CLEAR','F444W-CLEAR']],
+                    filters=[f.lower() for f in ['F444W-CLEAR', 'F277W-CLEAR', 
+                                                 'F115W-CLEAR','F090W-CLEAR']],
                     zoom_levels=zoom_levels,
                     optical=True, suffix='.ncrgb', xsize=32, scl=4,
-                    force=force, rgb_scl=[1,1,1], rgb_min=-0.018)
+                    force=force, rgb_min=-0.018,
+                    rgb_scl=[1.5, 1.0, 1],
+                    norm_kwargs={'stretch': 'asinh', 'min_cut': -0.01, 
+                                 'max_cut': 1.0, 'clip':True, 
+                                 'asinh_a':0.03},
+                    pl=1.5, pf=1)
+                    
+
+        # split_tiles(root, ref_tile=ref_tile,
+        #             filters=[f.lower() for f in ['F070W-CLEAR','F090W-CLEAR',
+        #                                          'F115W-CLEAR','F150W-CLEAR',
+        #                                          'F200W-CLEAR',
+        #                                          'F182M-CLEAR','F210M-CLEAR',
+        #                                          'F277W-CLEAR','F356W-CLEAR',
+        #                                         'F410M-CLEAR','F444W-CLEAR']],
+        #             zoom_levels=zoom_levels,
+        #             optical=True, suffix='.ncrgb', xsize=32, scl=4,
+        #             force=force, rgb_scl=[1,1,1], rgb_min=-0.018)
 
         plt.close('all')
     
