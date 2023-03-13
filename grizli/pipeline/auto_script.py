@@ -4964,6 +4964,8 @@ def get_rgb_filters(filter_list, force_ir=False, pure_sort=False):
 
 TICKPARAMS = dict(axis='both', colors='w', which='both')
 
+IMSAVE_QUALITY = 95
+
 # Good options for asinh norm_kwargs 
 ASINH_NORM =  {'stretch': 'asinh',
                'min_cut': -0.02, 'max_cut': 1.0, 
@@ -5399,7 +5401,7 @@ def field_rgb(root='j010514+021532', xsize=8, output_dpi=None, HOME_PATH='./', s
         if use_imsave:
             skimage.io.imsave(f'{root}{suffix}.{output_format}',
                        image[::-full_dimensions*1,::full_dimensions*1,:],
-                       plugin='pil', quality=95)
+                       plugin='pil', quality=IMSAVE_QUALITY)
         else:
             ax.axis('off')
             fig.tight_layout(pad=0)
