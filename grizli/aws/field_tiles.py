@@ -393,7 +393,7 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
                     zoom_levels=zoom_levels,
                     optical=True, suffix='.ncrgb', xsize=32, scl=4,
                     force=force, rgb_min=-0.018,
-                    rgb_scl=[1.8, 0.95, 1],
+                    rgb_scl=[1.5, 1.0, 1],
                     norm_kwargs={'stretch': 'asinh', 'min_cut': -0.01, 
                                  'max_cut': 1.0, 'clip':True, 
                                  'asinh_a':0.03},
