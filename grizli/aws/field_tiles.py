@@ -271,7 +271,10 @@ def split_tiles(root='abell2744-080-08.08', ref_tile=(8,8), filters=['visr','f12
         if verbose:
             print(f'zoom: {zoom} {img.shape}')
         
-        img = img[::-1,:,:]
+        if img.ndim == 3:
+            img = img[::-1,:,:]
+        else:
+            img = img[::-1,:]
         
         ntile = int(2048/2**(4-zoom)/256)
         left = (tx - ref_tile[0])*ntile
@@ -300,7 +303,11 @@ def split_tiles(root='abell2744-080-08.08', ref_tile=(8,8), filters=['visr','f12
                     if not os.path.exists(dpath):
                         os.mkdir(dpath)
                                      
-                imsave(tile_file, img[sly, slx, :][::-1,:,:],
+                if img.ndim == 3:
+                    imsave(tile_file, img[sly, slx, :][::-1,:,:],
+                       plugin='pil', format_str='png')
+                else:
+                    imsave(tile_file, img[sly, slx, :][::-1,:],
                        plugin='pil', format_str='png')
 
 
