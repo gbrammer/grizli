@@ -307,7 +307,7 @@ def split_tiles(root='abell2744-080-08.08', ref_tile=(8,8), filters=['visr','f12
                     imsave(tile_file, img[sly, slx, :][::-1,:,:],
                        plugin='pil', format_str='png')
                 else:
-                    imsave(tile_file, img[sly, slx, :][::-1,:],
+                    imsave(tile_file, img[sly, slx][::-1,:],
                        plugin='pil', format_str='png')
 
 
