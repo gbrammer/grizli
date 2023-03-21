@@ -41,6 +41,7 @@ HST Imaging Data
 ~~~~~~~~~~~~~~~~
 
 * All mosaics drizzled to the same 40mas pixel grid as the JWST LW images above
+* Some HST fields have earlier version numbers, generally when the pixel grids have not changed since previous runs of the mosaic creation
 
 
 .. csv-table ::
