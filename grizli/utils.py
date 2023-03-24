@@ -8534,7 +8534,7 @@ def remove_text_labels(fig):
 LOGFILE = '/tmp/grizli.log'
 
 
-def log_function_arguments(LOGFILE, frame, func='func', verbose=True):
+def log_function_arguments(LOGFILE, frame, func='func', ignore=[], verbose=True):
     """
     Log local variables, e.g., parameter arguements to a file
 
@@ -8548,7 +8548,10 @@ def log_function_arguments(LOGFILE, frame, func='func', verbose=True):
 
     func : str
         Function name to use
-
+    
+    ignore : list
+        Variable names to ignore
+    
     verbose : bool
         Print messaage to stdout.
 
@@ -8558,7 +8561,11 @@ def log_function_arguments(LOGFILE, frame, func='func', verbose=True):
     for k in list(args.keys()):
         if hasattr(args[k], '__builtins__'):
             args.pop(k)
-
+    
+    for k in ignore:
+        if k in args:
+            args.pop(k)
+            
     if func is not None:
         logstr = '\n{0}(**{1})\n'
     else:
