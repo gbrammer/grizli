@@ -2990,7 +2990,7 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
         return [grp]
 
 
-def grism_prep(field_root='j142724+334246', PREP_PATH='../Prep', EXTRACT_PATH='../Extractions', ds9=None, refine_niter=3, gris_ref_filters=GRIS_REF_FILTERS, force_ref=None, files=None, split_by_grism=True, refine_poly_order=1, refine_fcontam=0.5, cpu_count=0, mask_mosaic_edges=True, prelim_mag_limit=25, refine_mag_limits=[18, 24], init_coeffs=[1.1, -0.5], grisms_to_process=None, pad=(64, 256), model_kwargs={'compute_size': True}, sep_background_kwargs=None, subtract_median_filter=False, median_filter_size=71, median_filter_central=10, second_pass_filtering=False, box_filter_sn=3, box_filter_width=3):
+def grism_prep(field_root='j142724+334246', PREP_PATH='../Prep', EXTRACT_PATH='../Extractions', ds9=None, refine_niter=3, gris_ref_filters=GRIS_REF_FILTERS, force_ref=None, files=None, split_by_grism=True, refine_poly_order=1, refine_fcontam=0.5, cpu_count=0, mask_mosaic_edges=False, prelim_mag_limit=25, refine_mag_limits=[18, 24], init_coeffs=[1.1, -0.5], grisms_to_process=None, pad=(64, 256), model_kwargs={'compute_size': True}, sep_background_kwargs=None, subtract_median_filter=False, median_filter_size=71, median_filter_central=10, second_pass_filtering=False, box_filter_sn=3, box_filter_width=3):
     """
     Contamination model for grism exposures
     """
@@ -3070,7 +3070,6 @@ def grism_prep(field_root='j142724+334246', PREP_PATH='../Prep', EXTRACT_PATH='.
             except:
                 utils.log_exception(utils.LOGFILE, traceback)
                 pass
-        
         
         # Sep background
         if sep_background_kwargs is not None:
@@ -4971,7 +4970,7 @@ ASINH_NORM =  {'stretch': 'asinh',
                'min_cut': -0.02, 'max_cut': 1.0, 
                'clip':True, 'asinh_a':0.03}
 
-def field_rgb(root='j010514+021532', xsize=8, output_dpi=None, HOME_PATH='./', show_ir=True, pl=1, pf=1, scl=1, scale_ab=None, rgb_scl=[1, 1, 1], ds9=None, force_ir=False, filters=None, add_labels=True, output_format='jpg', rgb_min=-0.01, xyslice=None, pure_sort=False, verbose=True, force_rgb=None, suffix='.field', mask_empty=False, tick_interval=60, timestamp=False, mw_ebv=0, use_background=False, tickparams=TICKPARAMS, fill_black=False, ref_spectrum=None, gzext='', full_dimensions=False, use_imsave=True, invert=False, get_rgb_array=False, get_images=False, norm_kwargs=None):
+def field_rgb(root='j010514+021532', xsize=8, output_dpi=None, HOME_PATH='./', show_ir=True, pl=1, pf=1, scl=1, scale_ab=None, rgb_scl=[1, 1, 1], ds9=None, force_ir=False, filters=None, add_labels=True, output_format='jpg', rgb_min=-0.01, xyslice=None, pure_sort=False, verbose=True, force_rgb=None, suffix='.field', mask_empty=False, tick_interval=60, timestamp=False, mw_ebv=0, use_background=False, tickparams=TICKPARAMS, fill_black=False, ref_spectrum=None, gzext='', full_dimensions=False, use_imsave=False, invert=False, get_rgb_array=False, get_images=False, norm_kwargs=None):
     """
     RGB image of the field mosaics
     
@@ -5351,11 +5350,13 @@ def field_rgb(root='j010514+021532', xsize=8, output_dpi=None, HOME_PATH='./', s
     elif (output_dpi is not None):
         xsize = nx/output_dpi
         dpi = output_dpi
-    
+    else:
+        dpi = output_dpi
+        
     dim = [xsize, xsize/nx*ny]
     
     if not use_imsave:
-        fig, ax = plt.subplots(1,1,figsize=dim, dpi=dpi)
+        fig, ax = plt.subplots(1,1, figsize=dim, dpi=dpi)
 
         ax.imshow(image, origin='lower', extent=(-nx/2, nx/2, -ny/2, ny/2))
 

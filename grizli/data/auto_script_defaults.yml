@@ -115,7 +115,7 @@ visit_prep_args: &prep_args
         pixel_scale: 0.10
         get_median: False
     run_separate_chip_sky: True
-    fix_stars: True
+    fix_stars: False
     reference_catalogs: [LS_DR9, PS1, DES, DSC, SDSS, GAIA, WISE]
     outlier_threshold: 4
     nircam_wisp_kwargs:
@@ -273,7 +273,7 @@ grism_prep_args:
     refine_fcontam: 0.5
     refine_mag_limits: [18, 24]
     ds9: null
-    mask_mosaic_edges: True
+    mask_mosaic_edges: False
 
 refine_with_fits: False
 run_extractions: False 
