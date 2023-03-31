@@ -4971,7 +4971,7 @@ ASINH_NORM =  {'stretch': 'asinh',
                'min_cut': -0.02, 'max_cut': 1.0, 
                'clip':True, 'asinh_a':0.03}
 
-def field_rgb(root='j010514+021532', xsize=8, output_dpi=None, HOME_PATH='./', show_ir=True, pl=1, pf=1, scl=1, scale_ab=None, rgb_scl=[1, 1, 1], ds9=None, force_ir=False, filters=None, add_labels=True, output_format='jpg', rgb_min=-0.01, xyslice=None, pure_sort=False, verbose=True, force_rgb=None, suffix='.field', mask_empty=False, tick_interval=60, timestamp=False, mw_ebv=0, use_background=False, tickparams=TICKPARAMS, fill_black=False, ref_spectrum=None, gzext='', full_dimensions=False, use_imsave=True, invert=False, get_rgb_array=False, get_images=False, norm_kwargs=None):
+def field_rgb(root='j010514+021532', xsize=8, output_dpi=None, HOME_PATH='./', show_ir=True, pl=1, pf=1, scl=1, scale_ab=None, rgb_scl=[1, 1, 1], ds9=None, force_ir=False, filters=None, add_labels=True, output_format='jpg', rgb_min=-0.01, xyslice=None, pure_sort=False, verbose=True, force_rgb=None, suffix='.field', mask_empty=False, tick_interval=60, timestamp=False, mw_ebv=0, use_background=False, tickparams=TICKPARAMS, fill_black=False, ref_spectrum=None, gzext='', full_dimensions=False, use_imsave=False, invert=False, get_rgb_array=False, get_images=False, norm_kwargs=None):
     """
     RGB image of the field mosaics
     
@@ -5351,11 +5351,13 @@ def field_rgb(root='j010514+021532', xsize=8, output_dpi=None, HOME_PATH='./', s
     elif (output_dpi is not None):
         xsize = nx/output_dpi
         dpi = output_dpi
-    
+    else:
+        dpi = output_dpi
+        
     dim = [xsize, xsize/nx*ny]
     
     if not use_imsave:
-        fig, ax = plt.subplots(1,1,figsize=dim, dpi=dpi)
+        fig, ax = plt.subplots(1,1, figsize=dim, dpi=dpi)
 
         ax.imshow(image, origin='lower', extent=(-nx/2, nx/2, -ny/2, ny/2))
 
