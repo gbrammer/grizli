@@ -115,7 +115,7 @@ visit_prep_args: &prep_args
         pixel_scale: 0.10
         get_median: False
     run_separate_chip_sky: True
-    fix_stars: True
+    fix_stars: False
     reference_catalogs: [LS_DR9, PS1, DES, DSC, SDSS, GAIA, WISE]
     outlier_threshold: 4
     nircam_wisp_kwargs:
