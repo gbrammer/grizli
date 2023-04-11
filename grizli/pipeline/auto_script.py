@@ -16,6 +16,8 @@ import astropy.io.fits as pyfits
 import astropy.wcs as pywcs
 
 from .. import prep, utils
+from .. import catalog as grizli_catalog
+
 from .default_params import UV_N_FILTERS, UV_M_FILTERS, UV_W_FILTERS
 from .default_params import OPT_N_FILTERS, OPT_M_FILTERS, OPT_W_FILTERS
 from .default_params import IR_N_FILTERS, IR_M_FILTERS, IR_W_FILTERS
@@ -262,6 +264,8 @@ def go(root='j010311+131615',
        parse_visits_args=args['parse_visits_args'],
        manual_alignment=False,
        manual_alignment_args=args['manual_alignment_args'],
+       min_gaia_count=128,
+       gaia_mag_limits=[16,20.5,0.05],
        preprocess_args=args['preprocess_args'],
        visit_prep_args=args['visit_prep_args'],
        persistence_args=args['persistence_args'],
@@ -384,10 +388,39 @@ def go(root='j010311+131615',
                           show_date=True)
                           
         os.environ['CRDS_CONTEXT'] = CRDS_CONTEXT
+    
+    # Working directory
+    os.chdir(PATHS['home'])
+    
+    ######################
+    # Preliminary gaia catalog
+    # Get gaia catalog
+    try:
+        gaia = grizli_catalog.gaia_catalog_for_assoc(assoc_name=root)
+        msg = f"{root} : found {gaia['valid'].sum()} GAIA sources"
+        utils.log_comment(utils.LOGFILE, msg, show_date=False,
+                          verbose=True)
+        gaia.write(f'{root}.gaia.fits', overwrite=True)
+        prep.table_to_radec(gaia[gaia['valid']], f'{root}.gaia.radec')
+        prep.table_to_regions(gaia[gaia['valid']], f'{root}.gaia.reg')
         
+        if gaia['valid'].sum() > min_gaia_count:
+            preprocess_args['master_radec'] = os.path.join(PATHS['home'],
+                                                  f'{root}.gaia.radec')
+            
+            preprocess_args['align_mag_limits'] = gaia_mag_limits
+            
+            msg = f"{root} : Use {root}.gaia.radec as master_radec"
+            msg += f"\n{root} : Set align_mag_limits={gaia_mag_limits}"
+            utils.log_comment(utils.LOGFILE, msg, show_date=False,
+                              verbose=True)
+        
+    except:
+        utils.log_exception(utils.LOGFILE, traceback)
+        pass
+    
     ######################
     # Download data
-    os.chdir(PATHS['home'])
     if fetch_files_args is not None:
         fetch_files_args['reprocess_clean_darks'] &= (not is_dash)
         auto_script.fetch_files(field_root=root, HOME_PATH=HOME_PATH,
@@ -890,7 +923,7 @@ def make_directories(root='j142724+334246', HOME_PATH='$PWD', paths={}):
     return paths
 
 
-def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_products={'WFPC2/WFC': ['C0M', 'C1M'], 'WFPC2/PC': ['C0M', 'C1M'], 'ACS/WFC': ['FLC'], 'WFC3/IR': ['RAW'], 'WFC3/UVIS': ['FLC']}, remove_bad=True, reprocess_parallel=False, reprocess_clean_darks=True, s3_sync=False, fetch_flt_calibs=['IDCTAB', 'PFLTFILE', 'NPOLFILE'], filters=VALID_FILTERS, min_bad_expflag=2, fetch_only=False, force_rate=True, get_rateints=False, s3path=None):
+def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_products={'WFPC2/WFC': ['C0M', 'C1M'], 'WFPC2/PC': ['C0M', 'C1M'], 'ACS/WFC': ['FLC'], 'WFC3/IR': ['RAW'], 'WFC3/UVIS': ['FLC']}, remove_bad=True, reprocess_parallel=False, reprocess_clean_darks=True, s3_sync=False, fetch_flt_calibs=['IDCTAB', 'PFLTFILE', 'NPOLFILE'], filters=VALID_FILTERS, min_bad_expflag=2, fetch_only=False, force_rate=True, get_rateints=False, recalibrate_jwst=False, s3path=None):
     """
     Fully automatic script
     """
@@ -906,7 +939,7 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_pr
         from grizli import utils
     
     try:
-        from .. import jwst_utils
+        from .. import jwst_utils, jwst_level1
     except ImportError:
         jwst_utils = None
         
@@ -1038,14 +1071,34 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_pr
                 
         else:
             ## Download from MAST API when data available
-            mastquery.utils.LOGFILE = utils.LOGFILE   
-            _resp = mastquery.utils.download_from_mast(tab[jw],
-                                          force_rate=force_rate,
-                                          rate_ints=get_rateints)
+            if recalibrate_jwst:
+                
+                for file in tab[jw]['dataURL']:
+                    if os.path.exists(os.path.basename(file)):
+                        jw_files.append(os.path.basename(file))
+                        continue
+                        
+                    uncal = file.replace('_rate','_uncal')
+                    uncal = uncal.replace('_cal.fits','_uncal.fits')
+                    uncal = os.path.basename(uncal)
+                    
+                    _ = jwst_level1.pipeline_level1(uncal,
+                                                    output_extension='_rate')
+                    
+                    if os.path.exists(uncal):
+                        os.remove(uncal)
+                        
+                    jw_files.append(uncal.replace('_uncal.fits','_rate.fits'))
+                    
+            else:
+                mastquery.utils.LOGFILE = utils.LOGFILE
+                _resp = mastquery.utils.download_from_mast(tab[jw],
+                                              force_rate=force_rate,
+                                              rate_ints=get_rateints)
             
-            for i, _file in enumerate(_resp):
-                if os.path.exists(_file) & _file.startswith('jw'):
-                    jw_files.append(_file)
+                for i, _file in enumerate(_resp):
+                    if os.path.exists(_file) & _file.startswith('jw'):
+                        jw_files.append(_file)
 
         tab = tab[~jw]
     

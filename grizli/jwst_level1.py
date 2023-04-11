@@ -21,6 +21,8 @@ except ImportError:
 import mastquery.utils
 from grizli import utils
 
+DET1PIPE = None
+
 DQ_ANY = 1
 DQ_NAN = 8
 DQ_NJUMP = 16
@@ -54,6 +56,58 @@ for d in ['LONG']:
 for d in [1,2,3,4]:
     for m in 'AB':
         HOT_THRESHOLDS[f'NRC{m}{d}'] = [1000,20000]
+
+
+def get_pipeline_object():
+    """
+    Initialize `jwst.pipeline.Detector1Pipeline`
+    """
+    from jwst.pipeline import Detector1Pipeline
+
+    global DET1PIPE
+    
+    if DET1PIPE is None:
+        DET1PIPE = Detector1Pipeline()
+    
+    return DET1PIPE
+
+
+def download_files(file):
+    """
+    Download uncal and rate files
+    """
+
+    if not os.path.exists(file):
+        _ = mastquery.utils.download_from_mast([file])
+    if not os.path.exists(file.replace('_uncal','_rate')):
+        _ = mastquery.utils.download_from_mast([file.replace('_uncal','_rate')])
+    
+
+def process_level1_to_dark(file, CRDS_CONTEXT='jwst_1069.pmap'):
+    """
+    Run `jwst.pipeline.Detector1Pipeline` up through `dark_current`
+    
+    https://jwst-pipeline.readthedocs.io/en/latest/jwst/pipeline/calwebb_detector1.html
+    
+    """
+    
+    pipe = get_pipeline_object()
+    
+    download_files(file)
+    
+    if CRDS_CONTEXT:
+        os.environ["CRDS_CONTEXT"] = CRDS_CONTEXT
+        
+    grp = pipe.group_scale.process(file)
+    dqi = pipe.dq_init.process(grp)
+    sat = pipe.saturation.process(dqi)
+    bias = pipe.superbias.process(sat)
+    refpix = pipe.refpix.process(bias)
+    lin = pipe.linearity.process(refpix)
+    pers = pipe.persistence.process(lin)
+    dark = pipe.dark_current.process(pers)
+    
+    return dark
 
 
 def process_uncal_level1(file='jw01208048001_03101_00001_nrs1_uncal.fits', output_extension='_xrate', CRDS_CONTEXT='jwst_1069.pmap', jump_threshold=4, jump_ndilate=1, erode_snowballs=5, grow_snowballs=5, resid_thresh=4, hot_thresh='auto', hot_type='diff', max_njump=6, groups_for_rnoise=np.inf, flag_for_persistence=True, outlier_min_nints=3, integration_sigmas=[5,4,3], rescale_uncertainty=True, rescale_with_background=True, bkg_kwargs=BKG_KWARGS, dark=None, verbose=True, debug=None, **kwargs):
@@ -158,17 +212,7 @@ def process_uncal_level1(file='jw01208048001_03101_00001_nrs1_uncal.fits', outpu
                                  ignore=['dark','debug','_LOGFILE'],
                                  )
     
-    from jwst.pipeline import Detector1Pipeline
-    
-    if CRDS_CONTEXT:
-        os.environ["CRDS_CONTEXT"] = CRDS_CONTEXT
-        
-    if not os.path.exists(file):
-        _ = mastquery.utils.download_from_mast([file])
-    if not os.path.exists(file.replace('_uncal','_rate')):
-        _ = mastquery.utils.download_from_mast([file.replace('_uncal','_rate')])
-
-    pipe = Detector1Pipeline()
+    pipe = get_pipeline_object()
     
     if debug is not None:
         if debug['file'] == file:
@@ -178,14 +222,16 @@ def process_uncal_level1(file='jw01208048001_03101_00001_nrs1_uncal.fits', outpu
     if dark is None:
         # Detector1 through dark_current
         # https://jwst-pipeline.readthedocs.io/en/latest/jwst/pipeline/calwebb_detector1.html
-        grp = pipe.group_scale.process(file)
-        dqi = pipe.dq_init.process(grp)
-        sat = pipe.saturation.process(dqi)
-        bias = pipe.superbias.process(sat)
-        refpix = pipe.refpix.process(bias)
-        lin = pipe.linearity.process(refpix)
-        pers = pipe.persistence.process(lin)
-        dark = pipe.dark_current.process(pers)
+        # grp = pipe.group_scale.process(file)
+        # dqi = pipe.dq_init.process(grp)
+        # sat = pipe.saturation.process(dqi)
+        # bias = pipe.superbias.process(sat)
+        # refpix = pipe.refpix.process(bias)
+        # lin = pipe.linearity.process(refpix)
+        # pers = pipe.persistence.process(lin)
+        # dark = pipe.dark_current.process(pers)
+        
+        dark = process_level1_to_dark(file)
     
     NINTS, NGROUPS, NYPIX, NXPIX = dark.data.shape
     
@@ -284,6 +330,7 @@ def process_uncal_level1(file='jw01208048001_03101_00001_nrs1_uncal.fits', outpu
     slope_err_list = []
     nsamp_list = []
     rn_list = []
+    jump_list = []
     
     for integ in range(NINTS):
         msg = f'\nprocess_uncal: {file} run for int {integ+1} / {NINTS}'
@@ -357,19 +404,23 @@ def process_uncal_level1(file='jw01208048001_03101_00001_nrs1_uncal.fits', outpu
             yp, xp = np.indices((NYPIX, NXPIX))
 
             lmask = np.zeros_like(js)
+            smask = np.zeros_like(js)
 
             for (yyi, xxi), ri in zip(xy_label, R_label):
                 R = np.sqrt((xp-xxi)**2 + (yp-yyi)**2)
                 lmask |= R < grow_snowballs*np.maximum(ri, 2)
+                smask |= R < grow_snowballs/2*np.maximum(ri, 2)
     
             jump[ij,:,:] |= lmask
             
             ## Mask for saturated pixels
-            blob_sat = (groupdq[integ,ij,:,:] > 0)
-            blob_sat = nd.binary_erosion(blob_sat, iterations=2)
-            blob_sat = nd.binary_dilation(blob_sat, iterations=4)*4
+            blob_sat = (groupdq[integ,ij,:,:] > 0) | smask
+            # blob_sat = nd.binary_erosion(blob_sat, iterations=1)
+            blob_sat = nd.binary_dilation(blob_sat, iterations=2)*2
+            #blob_sat = smask*2
             
             jump_saturated |= blob_sat.astype(jump_saturated.dtype)
+            
             msg = f'process_uncal: {integ+1} snowball read {ij+1:>2} '
             msg += f' n={num_labels:>2}  '
             msg += f'nsat={int(jump_saturated.sum())//4:>6}'
@@ -565,7 +616,12 @@ def process_uncal_level1(file='jw01208048001_03101_00001_nrs1_uncal.fits', outpu
         dq_list.append(dq)
         nsamp_list.append(nsamp)
         rn_list.append(rn_i)
-    
+        jump_list.append(jump)
+        
+        # Set DQ=4 jump flag in groupdq
+        for ij in range(NGROUPS-1):
+            groupdq[integ,ij+1,:,:] |= (jump[ij,:,:]*4).astype(groupdq.dtype)
+            
     ## Combine iterations
     for iter in range(3):
         #print(f'iter combine {iter}')
@@ -705,7 +761,10 @@ def process_uncal_level1(file='jw01208048001_03101_00001_nrs1_uncal.fits', outpu
     debug = {'file':file,
              'sci':sci, 'err':err, 'dq':dq,
              'nsamp':nsamp, 'rn':rn_meas,
-             'times':times, 'dark':dark, 'jump':jump,
+             'times':times, 'dark':dark,
+             'jump':jump,
+             'jump_list':jump_list,
+             'groupdq':groupdq,
              'njump':njump, 'resid':resid,
              'smodel':smodel, 'slope':slope, 'ahat':ahat,
              'slope_err':slope_err,
@@ -727,4 +786,183 @@ def process_uncal_level1(file='jw01208048001_03101_00001_nrs1_uncal.fits', outpu
     warnings.filterwarnings('default', category=RuntimeWarning)
     
     return debug
+
+
+def grow_snowball_jumps(dark, jump, erode_snowballs=3, grow_snowballs=5, verbose=True, **kwargs):
+    """
+    Grow masks around large groups of pixels identified in the jump step that
+    are likely "snowballs"
     
+    Parameters
+    ----------
+    dark : 
+    
+    jump : 
+    
+    erode_snowballs : int
+        Number of `scipy.ndimage.binary_erosion` iterations run on the jump
+        mask of each read before identifying snowballs.  This removes small
+        clumps of pixels that probably aren't big snowballs
+    
+    grow_snowballs : float
+        Once snowballs are identified as big clumps of jump pixels, compute
+        the pixel area of each smowball clump and make a circular mask with
+        radius ``grow_snowballs * np.sqrt(area/pi)``
+    
+    Returns
+    -------
+    group_dq :array-like
+        DQ mask array with dimensions ``NINT, NGROUP, NY, NX`` with the ``4``
+        bit set for identified jumps
+    
+    """
+    nint, ngroup, NYPIX, NXPIX = jump.groupdq.shape
+    
+    groupdq = (jump.groupdq*1).astype(jump.groupdq.dtype)
+    
+    jump_saturated = np.zeros((NYPIX, NXPIX), dtype=bool)
+    
+    for ii in range(nint):
+        for ig in range(1,ngroup):
+            ji = groupdq[ii,ig,:,:] & 4 > 0
+            sat = dark.groupdq[ii,ig:,:,:].max(axis=0) > 0
+            ji |= sat
+            
+            js = nd.binary_erosion(ji, iterations=erode_snowballs)
+            
+            jump_saturated |= js # | sat
+            
+            groupdq[ii,ig,:,:] |= (jump_saturated*2).astype(groupdq.dtype)
+            
+            label, num_labels = nd.label(js)
+            if num_labels > 0:
+                
+                msg = f'process_uncal: {ii+1} snowball read {ig:>2} '
+                msg += f' n={num_labels:>2}  '
+                msg += f'nsat={int(jump_saturated.sum())//4:>6}'
+                utils.log_comment(utils.LOGFILE, msg, show_date=False, 
+                                  verbose=verbose)
+                
+                xy_label = nd.center_of_mass(label, labels=label, 
+                                             index=np.unique(label)[1:])
+                area = nd.sum(label > 0, labels=label, 
+                              index=np.unique(label)[1:])
+
+                R_label = np.sqrt(area/np.pi)
+                yp, xp = np.indices((NYPIX, NXPIX))
+
+                blob = np.zeros_like(js)
+                #smask = np.zeros_like(js)
+
+                for (yyi, xxi), ri in zip(xy_label, R_label):
+                    R = np.sqrt((xp-xxi)**2 + (yp-yyi)**2)
+                    blob |= R < grow_snowballs*np.maximum(ri, 2)
+                    #smask |= R < grow_snowballs/2*np.maximum(ri, 2)
+                
+                groupdq[ii,ig,:,:] |= (blob*4).astype(groupdq.dtype)
+    
+    return groupdq
+
+
+def pipeline_level1(file, output_extension='_rate', maximum_cores='half', use_pipe_jumps=True, unset_jump_dq=True, force_uncal=True, debug=None, **kwargs):
+    """
+    Use the pipeline for the ramp fits with manual jump detections
+    
+    Parameters
+    ----------
+    file : str
+        JWST raw "uncal" filename
+    
+    output_extension : str
+        The script puts the derived ramp and uncertainty into a ``rate``-like 
+        file with filename ``file.replace('_uncal', output_extension)``.
+    
+    maximum_cores : 'none', 'quarter', 'half', 'all'
+        Number of processes for `jwst` jump and ramp pipeline steps
+    
+    unset_jump_dq : bool
+        Unset the ``DQ=4`` pixels from the final product
+    
+    force_uncal : bool
+        Require that ``file`` endswith "_uncal.fits"
+    
+    debug : dict, bool
+        Previous output
+    
+    kwargs : dict
+        Keyword arguments passed to `grizli.jwst_level1.process_uncal_level1`
+    
+    Returns
+    -------
+    debug : dict
+        Full output from `grizli.jwst_level1.process_uncal_level1`
+    
+    gain : `jwst.datamodels.ImageModel`
+        Result of the final `gain_scale` level 1 step
+    
+    """    
+    #from jwst.pipeline import Detector1Pipeline
+    frame = inspect.currentframe()
+    _LOGFILE = utils.LOGFILE
+    warnings.filterwarnings('ignore', category=RuntimeWarning)
+
+    utils.LOGFILE = file.split('.fits')[0] + '.log'
+    utils.log_function_arguments(utils.LOGFILE, frame, 'process_uncal',
+                                 ignore=['debug','_LOGFILE'],
+                                 )
+    
+    if (not file.endswith('_uncal.fits')) & (force_uncal):
+        utils.LOGFILE = _LOGFILE
+        warnings.filterwarnings('default', category=RuntimeWarning)
+        
+        raise ValueError(f'{file} does not have _uncal extension')
+        
+        
+    #pipe = Detector1Pipeline()
+    pipe = get_pipeline_object()
+    
+    dark = process_level1_to_dark(file)
+    pipe.jump.maximum_cores = maximum_cores
+    jump = pipe.jump.process(dark)
+    
+    jumpdq = grow_snowball_jumps(dark, jump, **kwargs)
+    jump.groupdq |= jumpdq
+    
+    # Unset some DQ flags    
+    orig_dq = jump.pixeldq*1
+    
+    dq = np.zeros_like(jump.pixeldq)
+    for i in range(1,20):
+        #for i in PIXELDQ_BITS[dark.meta.instrument.detector]:
+        if i in [15,]:
+            continue
+            
+        dqi = 2**i & jump.pixeldq
+        dq |= dqi
+        
+    jump.pixeldq = dq
+    
+    # Run Ramp_fit
+    pipe.ramp_fit.maximum_cores = maximum_cores
+    myramp = pipe.ramp_fit.process(jump)
+    
+    # Run Gain
+    gain = pipe.gain_scale.process(myramp[0])
+    
+    bad = ~np.isfinite(gain.data + gain.err)
+    bad |= dq > 0
+    #bad |= (gain.dq & 1) == 1
+    gain.dq[bad] |= 1
+    gain.data[bad] = 0.
+    gain.err[bad] = 0
+    
+    if unset_jump_dq:
+        gain.dq -= (gain.dq & 4)
+        
+    gain.write(file.replace('_uncal', output_extension),
+               overwrite=True)
+    
+    utils.LOGFILE = _LOGFILE
+    warnings.filterwarnings('default', category=RuntimeWarning)
+    
+    return debug, gain
