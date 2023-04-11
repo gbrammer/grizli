@@ -7,6 +7,9 @@ PERSIST_PATH: null
 EXTRACT_PATH: null
 CRDS_CONTEXT: null
 
+min_gaia_count: 128
+gaia_mag_limits: [16,20.5,0.05]
+
 filters: &filters 
     [F410M, F467M, F547M, F550M, F621M, F689M, F763M, F845M, F200LP, F350LP,
      F435W, F438W, F439W, F450W, F475W, F475X, F555W, F569W, F600LP, F606W,
@@ -30,6 +33,7 @@ fetch_files_args:
     s3path: null
     force_rate: True
     get_rateints: False
+    recalibrate_jwst: False
     inst_products: 
         ACS/WFC: [FLC]
         WFC3/IR: [RAW]

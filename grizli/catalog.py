@@ -438,6 +438,43 @@ def get_gaia_DR2_vizier(ra=165.86, dec=34.829694, radius=3., max=100000,
     return result
 
 
+def gaia_catalog_for_assoc(assoc_name='j191132p1652_hen-2-427-f335m_00007'):
+    """
+    Get GAIA catalog
+    """
+    from grizli.aws import db
+    from grizli import utils
+    
+    res = db.SQL(f"""select t_min, t_max, filter, footprint
+    from assoc_table where assoc_name = '{assoc_name}'
+    """)
+    
+    sr = utils.SRegion(res['footprint'][0])
+    for fp in res['footprint'][1:]:
+        sri = utils.SRegion(fp)
+        sr.xy.extend(sri.xy)
+        
+    un = sr.union()
+    radius =  np.sqrt(un.sky_area()[0]).value
+    
+    gaia = get_gaia_DR2_vizier(*un.centroid[0], radius=radius)
+    
+    rd = get_gaia_radec_at_time(gaia, np.mean(res['t_min']), format='mjd')
+    
+    gaia['ra_orig'] = gaia['ra']
+    gaia['ra_dec'] = gaia['dec']
+    gaia['ra'] = rd.ra.deg
+    gaia['dec'] = rd.dec.deg
+    
+    coo = np.array([gaia['ra'], gaia['dec']])
+    in_footprint = un.path[0].contains_points(coo.T)
+    gaia['in_assoc'] = in_footprint
+    gaia.meta['assocnam'] = assoc_name
+    gaia['valid'] = np.isfinite(gaia['ra'] + gaia['dec'])
+    
+    return gaia
+    
+    
 def gaia_dr2_conesearch_query(ra=165.86, dec=34.829694, radius=3., max=100000):
     """
     Generate a query string for the TAP servers
