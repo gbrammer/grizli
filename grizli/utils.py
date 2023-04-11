@@ -161,7 +161,9 @@ def get_flt_info(files=[], columns=['FILE', 'FILTER', 'PUPIL', 'INSTRUME', 'DETE
     for c in columns[2:]:
         if c not in translate:
             translate[c] = 'xxxxxxxxxxxxxx'
-            
+    
+    targprop = []
+    
     for i in range(N):
         line = [os.path.basename(files[i]).split('.gz')[0]]
         if files[i].endswith('.gz'):
@@ -176,7 +178,14 @@ def get_flt_info(files=[], columns=['FILE', 'FILTER', 'PUPIL', 'INSTRUME', 'DETE
                 h1 = _im['SCI'].header
                 if 'PA_V3' in h1:
                     h['PA_V3'] = h1['PA_V3']
-            
+                
+                if 'TARGPROP' in h:
+                    targprop.append(h['TARGPROP'].lower())
+                else:
+                    targprop.append('indef')
+        else:
+            targprop.append('indef')
+        
         filt = parse_filter_from_header(h, jwst_detector=jwst_detector)
         line.append(filt)
         has_columns = ['FILE', 'FILTER']
@@ -205,7 +214,7 @@ def get_flt_info(files=[], columns=['FILE', 'FILTER', 'PUPIL', 'INSTRUME', 'DETE
         
         if miss.sum() > 0:
             for i in np.where(miss)[0]:
-                targs[i] = 'indef'
+                targs[i] = targprop[i] #'indef'
         
         tab['TARGNAME'] = targs
             
