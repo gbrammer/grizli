@@ -13,6 +13,8 @@ import numpy as np
 
 from . import db
 
+PIXEL_SCALE = 0.1
+
 def define_tile_grid(a=4., phase=0.6):
     """
     Define the tile grid following the PS1 tesselation algorithm from 
@@ -157,16 +159,16 @@ def define_tile_grid(a=4., phase=0.6):
     for j in tqdm(range(len(dn))):
                     
         ai = 2*np.tan(tn[j]/2)*180/np.pi
-        npix = ai*3600/0.1
+        npix = ai*3600/PIXEL_SCALE
         npixr = int(npix // 512 + 1)*512
-        ai = npixr*0.1/3600
+        ai = npixr*PIXEL_SCALE/3600
         da.append(ai)
         dpix.append(npixr)
         
         ddeg = dn[j]/np.pi*180
         
         h, w = utils.make_wcsheader(ra=0, dec=ddeg, size=ai*3600, 
-                                    pixscale=0.1)
+                                    pixscale=PIXEL_SCALE)
         h['CRPIX1'] += 0.5
         h['CRPIX2'] += 0.5
         
@@ -651,7 +653,7 @@ def coords_to_subtile(ra=189.0243001, dec=62.19669, size=0):
     subt['subx'] = subt['fsubx'].astype(int)
     subt['suby'] = subt['fsuby'].astype(int)
     
-    ds = size/0.1/256
+    ds = size/PIXEL_SCALE/256
     subt['xmin'] = np.clip(subt['fsubx'] - ds, 0, subt['npix']).astype(int)
     subt['xmax'] = np.clip(subt['fsubx'] + ds, 0, subt['npix']).astype(int)
     subt['ymin'] = np.clip(subt['fsuby'] - ds, 0, subt['npix']).astype(int)
@@ -747,8 +749,8 @@ def add_exposure_to_tile_db(dataset='ibev8xubq', sciext=1, tiles=None, row=None)
         
         h, w = utils.make_wcsheader(ra=tiles['crval1'][t], 
                                     dec=tiles['crval2'][t],
-                                    size=tiles['npix'][t]*0.1, 
-                                    pixscale=0.1)
+                                    size=tiles['npix'][t]*PIXEL_SCALE, 
+                                    pixscale=PIXEL_SCALE)
         
         h['CRPIX1'] += 0.5
         h['CRPIX2'] += 0.5
@@ -838,14 +840,15 @@ def tile_wcs(tile):
 
     t = 0
     h, w = utils.make_wcsheader(ra=row['crval1'][t], dec=row['crval2'][t],
-                                size=row['npix'][t]*0.1, pixscale=0.1)
+                                size=row['npix'][t]*PIXEL_SCALE,
+                                pixscale=PIXEL_SCALE)
     
     h['CRPIX1'] += 0.5
     h['CRPIX2'] += 0.5
     h['LATPOLE'] = 0.
     
     wcs = pywcs.WCS(h)
-    wcs.pscale = 0.1
+    wcs.pscale = PIXEL_SCALE
     
     TILE_WCS[tile] = wcs
     
@@ -861,7 +864,7 @@ def tile_subregion_wcs(tile, subx, suby):
     
     sub_wcs = twcs.slice((slice(suby*256, (suby+1)*256), 
                           slice(subx*256, (subx+1)*256)))
-    sub_wcs.pscale = 0.1
+    sub_wcs.pscale = PIXEL_SCALE
     return sub_wcs
 
 
@@ -1442,7 +1445,7 @@ def query_cutout(output='mos-{tile}-{filter}_{drz}', ra=189.0243001, dec=62.1966
     
     cosd = np.cos(dec/180*np.pi)
     rc = size/3600*np.sqrt(2)
-    rtile = np.sqrt(2)*128*0.1/3600
+    rtile = np.sqrt(2)*128*PIXEL_SCALE/3600
     
     SQL = f"""SELECT tile, subx, suby, subra, subdec, filter
             FROM mosaic_tiles_exposures t, exposure_files e
@@ -1474,9 +1477,12 @@ def query_cutout(output='mos-{tile}-{filter}_{drz}', ra=189.0243001, dec=62.1966
         ax.scatter(res['subra'], res['subdec'], marker='x', alpha=0.)
     
     oh, ow = utils.make_wcsheader(ra=ra, dec=dec, size=size*2, 
-                                  pixscale=0.1, theta=theta)
+                                  pixscale=PIXEL_SCALE,
+                                  theta=theta)
     
     sh = utils.SRegion(ow)
+    shu = sh.union().shapely
+    
     if make_figure:
         ax.add_patch(sh.get_patch(alpha=0.2, color='r')[0])
     
@@ -1493,7 +1499,7 @@ def query_cutout(output='mos-{tile}-{filter}_{drz}', ra=189.0243001, dec=62.1966
         rk = res[unk][0]
         tw = tile_subregion_wcs(rk['tile'], rk['subx'], rk['suby'])
         sr = utils.SRegion(tw)
-        isect = sr.intersects(sh.union())
+        isect = sr.shapely[0].intersects(shu)
         res['keep'][unk] = isect
         
         if make_figure:
