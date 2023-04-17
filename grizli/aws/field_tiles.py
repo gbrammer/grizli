@@ -311,7 +311,7 @@ def split_tiles(root='abell2744-080-08.08', ref_tile=(8,8), filters=['visr','f12
                        plugin='pil', format_str='png')
 
 
-def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_levels=[4,3,2,1], brgb_filts=['visr','visb','uv'], rgb_filts=['visr','j','h'], blue_is_opt=True, make_opt_filters=True, make_ir_filters=True, make_combinations=True, **kwargs):
+def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_levels=[4,3,2,1], brgb_filts=['visr','visb','uv'], rgb_filts=['visr','j','h'], blue_is_opt=True, make_opt_filters=True, make_ir_filters=True, make_combinations=True, rgb_only=False, **kwargs):
     """
     Make tiles for map
     """
@@ -484,6 +484,9 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
 
             plt.close('all')
     
+    if rgb_only:
+        make_ir_filters = make_opt_filters = False
+        
     ####### Single filters
     # IR
     if make_ir_filters:
@@ -597,7 +600,7 @@ def process_tile_filter(field='cos', tile='01.01', filter='F444W-CLEAR', fetch_e
     return status
 
 
-def process_tile(field='cos', tile='01.01', filters=TILE_FILTERS, fetch_existing=True, cleanup=True, make_catalog=False, clean_flt=True, pixfrac=0.75, make_tile_images=True, make_combinations=True, **kwargs):
+def process_tile(field='cos', tile='01.01', filters=TILE_FILTERS, fetch_existing=True, cleanup=True, make_catalog=False, clean_flt=True, pixfrac=0.75, make_tile_images=True, make_combinations=True, rgb_only=False, **kwargs):
     """
     
     Returns
@@ -641,7 +644,8 @@ def process_tile(field='cos', tile='01.01', filters=TILE_FILTERS, fetch_existing
         for file in files:
             os.system(f'gunzip --force {file}')
             
-    visit_processor.cutout_mosaic(rootname=root, 
+    if not rgb_only:
+        visit_processor.cutout_mosaic(rootname=root, 
                               skip_existing=True,
                               ir_wcs=ir_wcs,
                               filters=filters, 
@@ -788,7 +792,8 @@ def process_tile(field='cos', tile='01.01', filters=TILE_FILTERS, fetch_existing
                                  rgb_filts=['h','j','visr'],
                                  brgb_filts=['visr','visb','uv'],
                                  blue_is_opt=(field not in ['j013804m2156']), 
-                                 make_combinations=make_combinations, 
+                                 make_combinations=make_combinations,
+                                 rgb_only=rgb_only,
                                  **kwargs)
     
     dirs = glob.glob(f'./{root}-tiles/*')
@@ -802,20 +807,21 @@ def process_tile(field='cos', tile='01.01', filters=TILE_FILTERS, fetch_existing
                   f' s3://grizli-v2/ClusterTiles/Map/{field}/{target} ' + 
                   '--acl public-read --quiet')
                       
-    ### Gzip products
-    drz_files = glob.glob(f'{root}-*_dr*fits')
-    drz_files += glob.glob(f'{root}*seg.fits')
-    drz_files.sort()
+    if not rgb_only:
+        ### Gzip products
+        drz_files = glob.glob(f'{root}-*_dr*fits')
+        drz_files += glob.glob(f'{root}*seg.fits')
+        drz_files.sort()
         
-    for file in drz_files:
-        cmd = f'gzip --force {file}'
-        print(cmd)
-        os.system(cmd)
+        for file in drz_files:
+            cmd = f'gzip --force {file}'
+            print(cmd)
+            os.system(cmd)
         
-    os.system(f'aws s3 sync ./ s3://grizli-v2/ClusterTiles/{field}/' + 
-              f' --exclude "*" --include "{root}*gz"' +
-              f' --include "{root}*wcs.csv"' +
-              f' --include "{root}*fp.png" --acl public-read')
+        os.system(f'aws s3 sync ./ s3://grizli-v2/ClusterTiles/{field}/' + 
+                  f' --exclude "*" --include "{root}*gz"' +
+                  f' --include "{root}*wcs.csv"' +
+                  f' --include "{root}*fp.png" --acl public-read')
     
     db.execute(f"update combined_tiles set status=2 where tile = '{tile}' AND field = '{field}'")
     print(f'Set status=2 in `combined_tiles` for {field} {tile}')
