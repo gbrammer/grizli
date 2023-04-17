@@ -257,6 +257,7 @@ def go(root='j010311+131615',
        CRDS_CONTEXT=None,
        filters=args['filters'],
        fetch_files_args=args['fetch_files_args'],
+       global_miri_skyflat=False,
        inspect_ramps=False,
        is_dash=False, run_prepare_dash=True,
        run_parse_visits=True,
@@ -428,7 +429,31 @@ def go(root='j010311+131615',
                                 filters=filters, **fetch_files_args)
     else:
         os.chdir(PATHS['prep'])
+    
+    if global_miri_skyflat:
+        os.chdir(PATHS['raw'])
+        files = glob.glob('*mirimage*rate.fits')
 
+        if len(files) > 0:
+            files.sort()
+            
+            msg = f"{root} : global_miri_skyflat N={len(files)}"
+            utils.log_comment(utils.LOGFILE, msg, show_date=False,
+                              verbose=True)
+            
+            os.chdir(PATHS['prep'])
+            for file in files:
+                prep.fresh_flt_file(file, use_skyflats=False)
+            
+            prep.make_visit_average_flat({'product':root,
+                                          'files':files},
+                                          dilate=1, apply=False)
+            
+            visit_prep_args['miri_skyflat'] = False
+            visit_prep_args['use_skyflats'] = False
+            visit_prep_args['miri_skyfile'] = os.path.join(PATHS['prep'],
+                                                      f'{root}_skyflat.fits')
+            
     if is_dash & run_prepare_dash:
         from wfc3dash import process_raw
         os.chdir(PATHS['raw'])

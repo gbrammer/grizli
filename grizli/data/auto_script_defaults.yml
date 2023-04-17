@@ -9,6 +9,7 @@ CRDS_CONTEXT: null
 
 min_gaia_count: 128
 gaia_mag_limits: [16,20.5,0.05]
+global_miri_skyflat: False
 
 filters: &filters 
     [F410M, F467M, F547M, F550M, F621M, F689M, F763M, F845M, F200LP, F350LP,
