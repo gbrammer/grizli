@@ -2033,12 +2033,19 @@ def get_line_wavelengths():
 
     # Auroral OII
     # lines roughly taken from https://arxiv.org/pdf/1610.06939.pdf
-    line_wavelengths['OII-7325'] = [7322.0, 7332.]
+    line_wavelengths['OII-7325'] = [7321.9, 7332.21]
     line_ratios['OII-7325'] = [1.2, 1.]
+
+    line_wavelengths['OII-7323'] = [7321.9]
+    line_ratios['OII-7323'] = [1.]
+    line_wavelengths['OII-7332'] = [7332.21]
+    line_ratios['OII-7332'] = [1.]
 
     # Weak Ar III in SF galaxies
     line_wavelengths['ArIII-7138'] = [7137.77]
     line_ratios['ArIII-7138'] = [1.]
+    line_wavelengths['ArIII-7753'] = [7753.19]
+    line_ratios['ArIII-7753'] = [1.]
 
     line_wavelengths['NeIII-3867'] = [3869.87]
     line_ratios['NeIII-3867'] = [1.]
@@ -2057,7 +2064,10 @@ def get_line_wavelengths():
     line_ratios['SIII-9068'] = [1]
     line_wavelengths['SIII-9531'] = [9533.2]
     line_ratios['SIII-9531'] = [1]
-
+    
+    line_wavelengths['SIII-6314'] = [6313.81]
+    line_ratios['SIII-6314'] = [1.]
+    
     line_wavelengths['SII'] = [6718.29, 6732.67]
     line_ratios['SII'] = [1., 1.]
 
@@ -2072,7 +2082,7 @@ def get_line_wavelengths():
     line_ratios['SII-4075'] = [1.]
     line_wavelengths['SII-4078'] = [4077.5]
     line_ratios['SII-4078'] = [1.]
-
+    
     line_wavelengths['HeII-4687'] = [4687.5]
     line_ratios['HeII-4687'] = [1.]
     line_wavelengths['HeII-5412'] = [5412.5]
@@ -2083,8 +2093,8 @@ def get_line_wavelengths():
     line_ratios['HeI-3889'] = [1.]
     line_wavelengths['HeI-1083'] = [10832.057, 10833.306]
     line_ratios['HeI-1083'] = [1., 1.]
-    line_wavelengths['HeI-6678'] = [6678.10]
-    line_ratios['HeI-6678'] = [1.]
+    line_wavelengths['HeI-6680'] = [6679.995]
+    line_ratios['HeI-6680'] = [1.]
     line_wavelengths['HeI-7065'] = [7067.1]
     line_ratios['HeI-7065'] = [1.]
     line_wavelengths['HeI-8446'] = [8446.7]
