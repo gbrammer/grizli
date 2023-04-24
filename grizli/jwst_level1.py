@@ -11,6 +11,7 @@ import astropy.units as u
 
 from jwst import datamodels
 from jwst.ramp_fitting.ramp_fit_step import get_reference_file_subarrays
+from jwst import __version__ as CAL_VER
 
 try:
     import sep
@@ -57,6 +58,13 @@ for d in [1,2,3,4]:
     for m in 'AB':
         HOT_THRESHOLDS[f'NRC{m}{d}'] = [1000,20000]
 
+# Global CRDS_CONTEXT
+
+if 'CRDS_CONTEXT' in os.environ:
+    CRDS_CONTEXT = os.getenv('CRDS_CONTEXT')
+else:
+    CRDS_CONTEXT = 'jwst_1069.pmap'
+
 
 def get_pipeline_object():
     """
@@ -83,13 +91,14 @@ def download_files(file):
         _ = mastquery.utils.download_from_mast([file.replace('_uncal','_rate')])
     
 
-def process_level1_to_dark(file, CRDS_CONTEXT='jwst_1069.pmap'):
+def process_level1_to_dark(file):
     """
     Run `jwst.pipeline.Detector1Pipeline` up through `dark_current`
     
     https://jwst-pipeline.readthedocs.io/en/latest/jwst/pipeline/calwebb_detector1.html
     
     """
+    global CRDS_CONTEXT
     
     pipe = get_pipeline_object()
     
@@ -110,7 +119,7 @@ def process_level1_to_dark(file, CRDS_CONTEXT='jwst_1069.pmap'):
     return dark
 
 
-def process_uncal_level1(file='jw01208048001_03101_00001_nrs1_uncal.fits', output_extension='_xrate', CRDS_CONTEXT='jwst_1069.pmap', jump_threshold=4, jump_ndilate=1, erode_snowballs=5, grow_snowballs=5, resid_thresh=4, hot_thresh='auto', hot_type='diff', max_njump=6, groups_for_rnoise=np.inf, flag_for_persistence=True, outlier_min_nints=3, integration_sigmas=[5,4,3], rescale_uncertainty=True, rescale_with_background=True, bkg_kwargs=BKG_KWARGS, dark=None, verbose=True, debug=None, **kwargs):
+def process_uncal_level1(file='jw01208048001_03101_00001_nrs1_uncal.fits', output_extension='_xrate', jump_threshold=4, jump_ndilate=1, erode_snowballs=5, grow_snowballs=5, resid_thresh=4, hot_thresh='auto', hot_type='diff', max_njump=6, groups_for_rnoise=np.inf, flag_for_persistence=True, outlier_min_nints=3, integration_sigmas=[5,4,3], rescale_uncertainty=True, rescale_with_background=True, bkg_kwargs=BKG_KWARGS, dark=None, verbose=True, debug=None, **kwargs):
     """
     Custom ramp-fit scripts for JWST uncal images.
 
@@ -128,11 +137,7 @@ def process_uncal_level1(file='jw01208048001_03101_00001_nrs1_uncal.fits', outpu
     output_extension : str
         The script puts the derived ramp and uncertainty into a ``rate``-like 
         file with filename ``file.replace('_uncal', output_extension)``.
-    
-    CRDS_CONTEXT : str, None
-        If specified, set the `CRDS_CONTEXT` to define the reference files
-        to use for the level1 pipeline steps.
-    
+        
     jump_threshold : float
         Jump identification threshold, sigma
     
@@ -200,6 +205,8 @@ def process_uncal_level1(file='jw01208048001_03101_00001_nrs1_uncal.fits', outpu
         Dictionary with a bunch of stuff computed by the script
         
     """
+    global CRDS_CONTEXT
+    
     frame = inspect.currentframe()
     _LOGFILE = utils.LOGFILE
     warnings.filterwarnings('ignore', category=RuntimeWarning)
@@ -209,7 +216,8 @@ def process_uncal_level1(file='jw01208048001_03101_00001_nrs1_uncal.fits', outpu
         
     utils.LOGFILE = file.split('.fits')[0] + '.log'
     utils.log_function_arguments(utils.LOGFILE, frame, 'process_uncal',
-                                 ignore=['dark','debug','_LOGFILE'],
+                                 ignore=['dark','debug','_LOGFILE',
+                                         'CRDS_CONTEXT'],
                                  )
     
     pipe = get_pipeline_object()
@@ -864,6 +872,52 @@ def grow_snowball_jumps(dark, jump, erode_snowballs=3, grow_snowballs=5, verbose
     return groupdq
 
 
+def get_level1_references(model):
+    """
+    Get CRDS metadata for reference files
+    
+    Parameters
+    ----------
+    model : `jwst.datamodels.ImageModel`
+        Datamodel created by the pipeline steps, e.g., ``gain_step``
+    
+    Returns
+    -------
+    ref_file : list
+        List of tuples of ``(step, reference_filename)``
+    
+    """    
+    pipe = get_pipeline_object()
+    
+    steps = [pipe.group_scale,
+             pipe.dq_init ,
+             pipe.saturation,
+             pipe.superbias,
+             pipe.refpix,
+             pipe.linearity,
+             pipe.persistence,
+             pipe.dark_current,
+             pipe.jump,
+             pipe.ramp_fit,
+             pipe.gain_scale]
+    
+    ref_files = []
+    keys = []
+    for step in steps:
+        for reftype in step.reference_file_types:
+            _file = pipe.get_reference_file(model, reftype)
+            #print(reftype, files)
+            if _file == 'N/A':
+                continue
+            else:
+                row = (reftype, 'crds://' + os.path.basename(_file))
+                if reftype not in keys:
+                    ref_files.append(row)
+                    keys.append(reftype)
+    
+    return ref_files
+
+
 def pipeline_level1(file, output_extension='_rate', maximum_cores='half', use_pipe_jumps=True, unset_jump_dq=True, force_uncal=True, debug=None, **kwargs):
     """
     Use the pipeline for the ramp fits with manual jump detections
@@ -898,7 +952,8 @@ def pipeline_level1(file, output_extension='_rate', maximum_cores='half', use_pi
         Full output from `grizli.jwst_level1.process_uncal_level1`
     
     gain : `jwst.datamodels.ImageModel`
-        Result of the final `gain_scale` level 1 step
+        Result of the final `gain_scale` level 1 step, after the others
+        have been run (dark, jump, etc.).
     
     """    
     #from jwst.pipeline import Detector1Pipeline
@@ -958,9 +1013,15 @@ def pipeline_level1(file, output_extension='_rate', maximum_cores='half', use_pi
     
     if unset_jump_dq:
         gain.dq -= (gain.dq & 4)
-        
+    
+    # Update metadata with reference files since this doesn't seem to
+    # be run automatically?
+    ref_files = get_level1_references(gain)
+    pipe.gain_scale.finalize_result(gain, ref_files)
+    
     gain.write(file.replace('_uncal', output_extension),
                overwrite=True)
+    
     
     utils.LOGFILE = _LOGFILE
     warnings.filterwarnings('default', category=RuntimeWarning)
