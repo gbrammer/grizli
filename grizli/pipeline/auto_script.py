@@ -409,7 +409,7 @@ def go(root='j010311+131615',
             preprocess_args['master_radec'] = os.path.join(PATHS['home'],
                                                   f'{root}.gaia.radec')
             
-            preprocess_args['align_mag_limits'] = gaia_mag_limits
+            visit_prep_args['align_mag_limits'] = gaia_mag_limits
             
             msg = f"{root} : Use {root}.gaia.radec as master_radec"
             msg += f"\n{root} : Set align_mag_limits={gaia_mag_limits}"
