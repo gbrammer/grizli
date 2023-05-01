@@ -761,7 +761,20 @@ def process_tile(field='cos', tile='01.01', filters=TILE_FILTERS, fetch_existing
         golfir.catalog.switch_segments(seg[0].data, phot, ids['id'][idx])
         pyfits.writeto(f'{root}-ir_seg.fits', data=seg[0].data, 
                        header=seg[0].header, overwrite=True)
-    
+        
+        # zip and copy
+        drz_files = glob.glob(f'{root}-ir_dr*fits')
+        drz_files += glob.glob(f'{root}*seg.fits')
+        drz_files.sort()
+        
+        for file in drz_files:
+            cmd = f'gzip --force {file}'
+            print(cmd)
+            os.system(cmd)
+        
+        os.system(f'aws s3 sync ./ s3://grizli-v2/ClusterTiles/{field}/' + 
+                  f' --exclude "*" --include "{root}*gz" --acl public-read')
+        
     if make_tile_images:
         ### Make subtiles
         ref_tiles = {'cos': (16,16), 
