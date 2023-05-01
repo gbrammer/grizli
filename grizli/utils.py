@@ -9007,6 +9007,7 @@ class Unique(object):
         if verbose:
             self.info(sort_counts=verbose)
     
+    
     @property
     def N(self):
         """
@@ -9040,8 +9041,42 @@ class Unique(object):
             return self.counts[ix]
         else:
             return 0
-
-
+    
+    
+    @property
+    def list_indices(self):
+        """
+        Build list of lists of indices that each unique value
+        """
+    
+        inds = [[] for i in range(self.N)]    
+        so = np.argsort(self.indices)
+    
+        for i, ii in zip(so, self.indices[so]):
+            inds[ii].append(i)
+        
+        # Sort the sublists
+        for i in range(self.N):
+            if self.counts[i] > 1:
+                inds[i].sort()
+    
+        return inds
+    
+    
+    def unique_index(self, index=0):
+        """
+        Return array of indices of the parent array that makes a unique output array
+        
+        Returns
+        -------
+        uix : list
+            List of unique indices
+        """
+        uix = [ind[index] for ind in self.list_indices]
+                    
+        return uix
+    
+    
     def __iter__(self):
         """
         Iterable over `values` attribute
@@ -9064,13 +9099,6 @@ class Unique(object):
         else:
             return self.zeros
 
-
-    # def __iter__(self):
-    #     for idx in itertools.count():
-    #         try:
-    #             yield self.values[idx]
-    #         except IndexError:
-    #             break
 
     def __len__(self):
         return self.N
