@@ -663,7 +663,12 @@ def process_tile(field='cos', tile='01.01', filters=TILE_FILTERS, fetch_existing
     if make_catalog:
         import golfir.catalog
         
-        golfir.catalog.make_charge_detection(root, ext='ir')
+        golfir.catalog.make_charge_detection(root, ext='ir',
+                        filters=['f160w', 'f140w', 'f125w', 'f110w', 'f105w',
+                                 'f814w', 'f850lp',
+                                 'f277w-clear','f356w-clear','f444w-clear'],
+                                 use_hst_kernel=False,
+                                 subtract_background=True)
     
         phot = auto_script.multiband_catalog(field_root=root) #, **phot_kwargs)
     
