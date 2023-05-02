@@ -876,7 +876,7 @@ def get_random_tile():
     return tile, field
 
 
-def run_one(own_directory=True, rgb_only=True, **kwargs):
+def run_one(own_directory=True, rgb_only=True, make_catalog=True, **kwargs):
     """
     Run a single random visit
     """
@@ -908,7 +908,9 @@ def run_one(own_directory=True, rgb_only=True, **kwargs):
             os.chdir(path)
             
         #process_visit(tile, clean=clean, sync=sync)
-        process_tile(tile=tile, field=field, rgb_only=rgb_only, **kwargs)
+        process_tile(tile=tile, field=field, rgb_only=rgb_only, 
+                     make_catalog=make_catalog,
+                     **kwargs)
 
 
 def get_random_tile_filter():
