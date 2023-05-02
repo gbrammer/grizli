@@ -773,7 +773,8 @@ def process_tile(field='cos', tile='01.01', filters=TILE_FILTERS, fetch_existing
             os.system(cmd)
         
         os.system(f'aws s3 sync ./ s3://grizli-v2/ClusterTiles/{field}/' + 
-                  f' --exclude "*" --include "{root}*gz" --acl public-read')
+                  f' --exclude "*" --include "{root}*gz" --include "{root}_phot.fits"'
+                  ' --acl public-read')
         
     if make_tile_images:
         ### Make subtiles
