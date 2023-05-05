@@ -280,6 +280,35 @@ def get_jwst_skyflat(header, verbose=True, valid_flat=(0.7, 1.4)):
 def img_with_flat(input, verbose=True, overwrite=True, apply_photom=True, use_skyflats=True, mask_percentiles=[1,99], mask_dq_plus=True):
     """
     Apply flat-field and photom corrections if nessary
+    
+    Parameters
+    ----------
+    verbose : bool
+        Message printing
+    
+    overwrite : bool
+        If `input` is a string filename, overwrite the file with the flat-corrected
+        result
+    
+    apply_photom : bool
+        Run the photometry step
+    
+    use_skyflats : bool
+        Try to use the grizli skyflats
+    
+    mask_percentiles : None, [lo, hi]
+        Percentiles of the *flat-field* reference image to consider valid.  Flat 
+        values outside of this range will have `DQ=1` set in the output product.
+    
+    mask_dq_plus : bool
+        Apply a "+" mask to masked pixels from the "mask" reference files.  That is,
+        pixels above and below, and to the left and right of individual masked pixels.
+    
+    Returns
+    -------
+    output : data model
+        Data model with the flat and photom corrections applied
+    
     """
     import gc
     import scipy.ndimage as nd
