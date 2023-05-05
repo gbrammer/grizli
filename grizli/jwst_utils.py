@@ -19,7 +19,8 @@ from . import GRIZLI_PATH
 QUIET_LEVEL = logging.INFO
 
 # CRDS_CONTEXT = 'jwst_0942.pmap' # July 29, 2022 with updated NIRCAM ZPs
-CRDS_CONTEXT = 'jwst_0995.pmap' # 2022-10-06 NRC ZPs and flats
+# CRDS_CONTEXT = 'jwst_0995.pmap' # 2022-10-06 NRC ZPs and flats
+CRDS_CONTEXT = 'jwst_1084.pmap' # 2023-05-05 flats
 
 def set_crds_context(fits_file=None, override_environ=False, verbose=True):
     """
@@ -40,6 +41,11 @@ def set_crds_context(fits_file=None, override_environ=False, verbose=True):
         The value of the CRDS_CONTEXT environment variable
         
     """
+    import crds
+    from importlib import reload
+
+    # Reset cached CRDS functions to use the updated CRDS_CONTEXT
+    reload(crds.heavy_client)
     
     _CTX = CRDS_CONTEXT
     
@@ -55,6 +61,10 @@ def set_crds_context(fits_file=None, override_environ=False, verbose=True):
         
     msg = f"ENV CRDS_CONTEXT = {os.environ['CRDS_CONTEXT']}"
     utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+    
+    # Reset cached CRDS functions to use the updated CRDS_CONTEXT
+    reload(crds.heavy_client)
+    
     return os.environ['CRDS_CONTEXT']
 
 
@@ -267,11 +277,12 @@ def get_jwst_skyflat(header, verbose=True, valid_flat=(0.7, 1.4)):
     return skyfile, flat_corr, dq
 
 
-def img_with_flat(input, verbose=True, overwrite=True, apply_photom=True, use_skyflats=True):
+def img_with_flat(input, verbose=True, overwrite=True, apply_photom=True, use_skyflats=True, mask_percentiles=[1,99], mask_dq_plus=True):
     """
     Apply flat-field and photom corrections if nessary
     """
     import gc
+    import scipy.ndimage as nd
     
     import astropy.io.fits as pyfits
     
@@ -327,6 +338,40 @@ def img_with_flat(input, verbose=True, overwrite=True, apply_photom=True, use_sk
 
         with_flat = flat_step.process(img)
         
+        if mask_percentiles is not None:
+            with pyfits.open(_flatfile) as fim:
+                perc = np.nanpercentile(fim['SCI'].data, mask_percentiles)
+                pok = (fim['SCI'].data > perc[0]) & (fim['SCI'].data < perc[1])
+                
+                # # Plus mask around the most extreme flat outliers
+                # xperc = np.nanpercentile(fim['SCI'].data, [0.25, 97.5])
+                # msk = (fim['SCI'].data < perc[0]) | (fim['SCI'].data > perc[1])
+                # plus = np.array([[0,1,0],[1,1,1],[0,1,0]])
+                # msk = nd.binary_dilation(msk, structure=plus)
+                # pok &= ~msk
+                
+                with_flat.dq |= (~pok*1).astype(with_flat.dq.dtype)
+                
+                msg = f'img_with_flat: mask {_flatfile} percentiles '
+                msg += f'{mask_percentiles} = {perc[0]:.2f}, {perc[1]:.2f}'
+                
+                utils.log_comment(utils.LOGFILE, msg, verbose=verbose, show_date=False)
+        
+        if mask_dq_plus:
+            _maskfile = flat_step.get_reference_file(img, 'mask')
+            
+            with pyfits.open(_maskfile) as mim:
+                msk = mim['DQ'].data & 1 > 0
+                
+                plus = np.array([[0,1,0],[1,1,1],[0,1,0]])
+                msk = nd.binary_dilation(msk, structure=plus)
+                
+                with_flat.dq |= (msk*1).astype(with_flat.dq.dtype)
+                
+                msg = f'img_with_flat: "plus" mask from {_maskfile}: '
+                msg += f' {msk.sum()} pixels ({msk.sum()/msk.size*100:.1f} %)'
+                utils.log_comment(utils.LOGFILE, msg, verbose=verbose, show_date=False)
+            
         # Photom
         if 'OPUPIL' in _hdu[0].header:
             _opup = _hdu[0].header['OPUPIL']
