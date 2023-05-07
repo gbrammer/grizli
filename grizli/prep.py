@@ -741,7 +741,7 @@ def match_lists(input, output, transform=None, scl=3600., simple=True,
                                    residual_threshold=3, max_trials=100)
             if in_i.sum() > 2:
                 model = m_i
-                inliers[np.arange(len(inliers), dtype=np.int)[inliers][in_i]] = False
+                inliers[np.arange(len(inliers), dtype=np.int32)[inliers][in_i]] = False
 
         outliers = ~inliers
         mout = model(input[input_ix, :])
