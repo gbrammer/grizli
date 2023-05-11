@@ -2374,7 +2374,7 @@ mag_lim=17, cat=None, cols=['mag_auto', 'ra', 'dec'], minR=8, dy=5, selection=No
             im.flush()
 
 
-def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_background=True, photometry_background=True, get_all_filters=False, filters=None, det_err_scale=-np.inf, phot_err_scale=-np.inf, rescale_weight=True, run_detection=True, detection_filter='ir', detection_root=None, output_root=None, use_psf_filter=True, detection_params=prep.SEP_DETECT_PARAMS,  phot_apertures=prep.SEXTRACTOR_PHOT_APERTURES_ARCSEC, master_catalog=None, bkg_mask=None, bkg_params={'bw': 64, 'bh': 64, 'fw': 3, 'fh': 3, 'pixel_scale': 0.06}, use_bkg_err=False, aper_segmask=True, sci_image=None):
+def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_background=True, photometry_background=True, get_all_filters=False, filters=None, det_err_scale=-np.inf, phot_err_scale=-np.inf, rescale_weight=True, run_detection=True, detection_filter='ir', detection_root=None, output_root=None, use_psf_filter=True, detection_params=prep.SEP_DETECT_PARAMS,  phot_apertures=prep.SEXTRACTOR_PHOT_APERTURES_ARCSEC, master_catalog=None, bkg_mask=None, bkg_params={'bw': 64, 'bh': 64, 'fw': 3, 'fh': 3, 'pixel_scale': 0.06}, use_bkg_err=False, aper_segmask=True, sci_image=None, clean_bkg=True):
     """
     Make a detection catalog and run aperture photometry on all available
     filter images with the SourceExtractor clone `~sep`.
@@ -2685,7 +2685,13 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
 
             #ee_corr = prep.get_kron_tot_corr(tab, filter=filt.lower())
             tab['{0}_tot_corr'.format(filt.upper())] = tot_corr
-
+            
+            if clean_bkg:
+                bkg_files = glob.glob(f'{root}*{filt}*bkg.fits')
+                for bfile in bkg_files:
+                    print('# rm {bfile}')
+                    os.remove(bfile)
+        
         else:
             continue
 
