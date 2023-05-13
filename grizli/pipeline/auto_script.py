@@ -1121,7 +1121,7 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_pr
                 # Iterative because download script seems to skip some files?
                 jw_i = []
                 iter_i = 0
-                while (len(jw_i) < len(tab[jw])) & (iter_i < 5):
+                while (len(jw_i) < len(tab[jw])) & (iter_i < 10):
                     print(f'Download iteration: {iter_i}')
                     iter_i += 1
                     
