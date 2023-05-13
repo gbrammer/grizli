@@ -1117,14 +1117,25 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_pr
                     
             else:
                 mastquery.utils.LOGFILE = utils.LOGFILE
-                _resp = mastquery.utils.download_from_mast(tab[jw],
-                                              force_rate=force_rate,
-                                              rate_ints=get_rateints)
+                
+                # Iterative because download script seems to skip some files?
+                jw_i = []
+                iter_i = 0
+                while (len(jw_i) < len(tab[jw])) & (iter_i < 5):
+                    print(f'Download iteration: {iter_i}')
+                    iter_i += 1
+                    
+                    jw_i = []
+                    _resp = mastquery.utils.download_from_mast(tab[jw],
+                                                  force_rate=force_rate,
+                                                  rate_ints=get_rateints)
             
-                for i, _file in enumerate(_resp):
-                    if os.path.exists(_file) & _file.startswith('jw'):
-                        jw_files.append(_file)
-
+                    for i, _file in enumerate(_resp):
+                        if os.path.exists(_file) & _file.startswith('jw'):
+                            jw_i.append(_file)
+                
+                jw_files += jw_i
+                
         tab = tab[~jw]
     
     # Initialize grism files
