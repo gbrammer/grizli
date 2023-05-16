@@ -843,8 +843,8 @@ def tile_wcs(tile):
                                 size=row['npix'][t]*PIXEL_SCALE,
                                 pixscale=PIXEL_SCALE)
     
-    h['CRPIX1'] += 0.5
-    h['CRPIX2'] += 0.5
+    # h['CRPIX1'] += 0.5
+    # h['CRPIX2'] += 0.5
     h['LATPOLE'] = 0.
     
     wcs = pywcs.WCS(h)
