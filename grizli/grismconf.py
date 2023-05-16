@@ -601,8 +601,11 @@ def get_config_filename(instrume='WFC3', filter='F140W',
         #
         # conf_file = os.path.join(GRIZLI_PATH,
         #             f'CONF/GRISM_NIRCAM/V2/NIRCAM_{fi}_mod{module}_{gr}.conf')
-
         conf_file = os.path.join(GRIZLI_PATH,
+                    f'CONF/GRISM_NIRCAM/V6/NIRCAM_{fi}_mod{module}_{gr}.conf')
+        
+        if not os.path.exists(conf_file):
+            conf_file = os.path.join(GRIZLI_PATH,
                     f'CONF/GRISM_NIRCAM/V4/NIRCAM_{fi}_mod{module}_{gr}.conf')
         
     elif instrume == 'NIRCAMA':
@@ -659,7 +662,7 @@ class JwstDispersionTransform(object):
             self.base = os.path.basename(conf_file.split('.conf')[0])
         else:
             self.base = None
-            
+        
         if conf_file is not None:
             if 'NIRISS' in conf_file:
                 # NIRISS_F200W_GR150R.conf
@@ -676,6 +679,7 @@ class JwstDispersionTransform(object):
                 self.instrument = 'HST'
                 self.grism = 'G141'
                 self.module = 'A'
+        
         elif header is not None:
             if 'INSTRUME' in header:
                 self.instrument = header['INSTRUME']
@@ -951,7 +955,7 @@ class TransformGrismconf(object):
             
             poly = Polynomial2D(degree=2, **coeffs)
             trace_dy += poly(x, y)
-            #print(f'polynomial offset: {poly(x,y):.3f}')
+            # print(f'polynomial offset: {poly(x,y):.3f}')
             
         elif 'V4/NIRCAM_F444W_modA_R.conf' in self.conf_file:
             trace_dy += -2.5
@@ -967,11 +971,11 @@ class TransformGrismconf(object):
 
             poly = Polynomial2D(degree=2, **coeffs)
             trace_dy += poly(x, y)
-            #print(f'polynomial offset: {poly(x,y):.3f}')
+            # print(f'polynomial offset: {poly(x,y):.3f}')
             
-        elif os.path.basename(self.conf_file) == 'NIRCAM_F444W_modA_R.conf':
+        elif os.path.basename(self.conf_file) == 'xxNIRCAM_F444W_modA_R.conf':
             trace_dy += -2.5
-        elif os.path.basename(self.conf_file) == 'NIRCAM_F444W_modA_C.conf':
+        elif os.path.basename(self.conf_file) == 'xxNIRCAM_F444W_modA_C.conf':
             trace_dy += -0.1
             
         wave = self.conf.DISPL(self.order_names[beam], *x0, t)
@@ -1069,6 +1073,9 @@ def load_grism_config(conf_file, warnings=True):
         conf = TransformGrismconf(conf_file)
         conf.get_beams()
     elif 'V4/NIRCAM' in conf_file:
+        conf = TransformGrismconf(conf_file)
+        conf.get_beams()
+    elif 'V6/NIRCAM' in conf_file:
         conf = TransformGrismconf(conf_file)
         conf.get_beams()
     else:
