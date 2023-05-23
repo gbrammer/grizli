@@ -15,7 +15,7 @@ import numpy as np
 import astropy.io.fits as pyfits
 import astropy.wcs as pywcs
 
-from .. import prep, utils
+from .. import prep, utils, GRIZLI_PATH
 from .. import catalog as grizli_catalog
 
 from .default_params import UV_N_FILTERS, UV_M_FILTERS, UV_W_FILTERS
@@ -251,6 +251,60 @@ def create_path_dict(root='j142724+334246', home='$PWD', raw=None, prep=None, ex
     return xpaths
 
 
+MIRI_FLAT_ROUND = {'F560W' : 8,
+    'F770W':4,
+    'F1000W': 5,
+    'F1280W': 5,
+    'F1500W': 8,
+    'F1800W': 5,
+    'F2100W': 4,}
+
+def get_miri_flat_by_date(file, tsplit=MIRI_FLAT_ROUND, verbose=True):
+    """
+    MIRI flats computed by date
+    
+    Flat-files defined by
+        >>> tkey = np.round(t_min/tsplit[FILTER])
+        >>> file = f'miri-{FILTER}-{tkey}_skyflat.fits'
+    
+    """
+    # try:
+    #     from .. import GRIZLI_PATH
+    # except ImportError:
+    #     from grizli import utils, GRIZLI_PATH
+
+    tsplit = {'F770W':4,
+              'F1800W': 5,
+              'F560W' : 8,
+              'F1280W': 5,
+              'F1500W': 8,
+              'F1000W': 5,
+              'F2100W': 4,
+              }
+    
+    with pyfits.open(file) as im:
+        t_min = im[0].header['EXPSTART']
+        filt = im[0].header['FILTER']
+    
+    tkey = '{0:.0f}'.format(np.round(t_min/tsplit[filt]))
+    flat_key = f'miri-{filt.lower()}-{tkey}_skyflat.fits'
+    
+    flat_file = None
+    
+    for path in [os.path.join(GRIZLI_PATH,'CONF'),
+                 '/mnt/efs/fs1/telescopes/MiriDateFlats']:
+        flat_file_i = os.path.join(path, flat_key)
+        if os.path.exists(flat_file_i):
+            flat_file = flat_file_i
+            break
+    
+    msg = f'get_miri_flat_by_date: {file}  {flat_key}  - {flat_file}'
+    utils.log_comment(utils.LOGFILE, msg, show_date=False,
+                          verbose=verbose)
+        
+    return flat_file
+
+
 def go(root='j010311+131615', 
        HOME_PATH='$PWD',
        RAW_PATH=None, PREP_PATH=None, PERSIST_PATH=None, EXTRACT_PATH=None,
@@ -433,26 +487,32 @@ def go(root='j010311+131615',
     if global_miri_skyflat:
         os.chdir(PATHS['raw'])
         files = glob.glob('*mirimage*rate.fits')
-
+                
         if len(files) > 0:
+            
             files.sort()
             
-            msg = f"{root} : global_miri_skyflat N={len(files)}"
-            utils.log_comment(utils.LOGFILE, msg, show_date=False,
-                              verbose=True)
+            skyfile = get_miri_flat_by_date(files[0])
             
-            os.chdir(PATHS['prep'])
-            for file in files:
-                prep.fresh_flt_file(file, use_skyflats=False)
+            if skyfile is None:
+                
+                msg = f"{root} : global_miri_skyflat N={len(files)}"
+                utils.log_comment(utils.LOGFILE, msg, show_date=False,
+                                  verbose=True)
             
-            prep.make_visit_average_flat({'product':root,
-                                          'files':files},
-                                          dilate=1, apply=False)
+                os.chdir(PATHS['prep'])
+                for file in files:
+                    prep.fresh_flt_file(file, use_skyflats=False)
+            
+                prep.make_visit_average_flat({'product':root,
+                                              'files':files},
+                                              dilate=1, apply=False)
+                
+                skyfile = os.path.join(PATHS['prep'], f'{root}_skyflat.fits')
             
             visit_prep_args['miri_skyflat'] = False
             visit_prep_args['use_skyflats'] = False
-            visit_prep_args['miri_skyfile'] = os.path.join(PATHS['prep'],
-                                                      f'{root}_skyflat.fits')
+            visit_prep_args['miri_skyfile'] = skyfile
             
     if is_dash & run_prepare_dash:
         from wfc3dash import process_raw
