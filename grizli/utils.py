@@ -2763,6 +2763,16 @@ class SpectrumTemplate(object):
                 return temp_flux, temp_err
             else:
                 return temp_flux
+    
+    @property
+    def eazy(self):
+        """
+        Convert to `eazy.template.Template` object
+        """
+        import eazy.templates
+        templ = eazy.templates.Template(arrays=(self.wave, self.flux),
+                                        name=self.name)
+        return templ
 
 
 def load_templates(fwhm=400, line_complexes=True, stars=False,
