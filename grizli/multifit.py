@@ -3,6 +3,7 @@
 
 import os
 import time
+import traceback
 import glob
 from collections import OrderedDict
 import multiprocessing as mp
@@ -629,7 +630,8 @@ class GroupFLT():
 
     def get_beams(self, id, size=10, center_rd=None, beam_id='A',
                   min_overlap=0.1, min_valid_pix=10, min_mask=0.01,
-                  min_sens=0.08, mask_resid=True, get_slice_header=True):
+                  min_sens=0.08, mask_resid=True, get_slice_header=True,
+                  show_exception=False):
         """Extract 2D spectra "beams" from the GroupFLT exposures.
 
         Parameters
@@ -688,6 +690,9 @@ class GroupFLT():
                                         get_slice_header=get_slice_header)
             except:
                 #print('Except: get_beams')
+                if show_exception:
+                    utils.log_exception(utils.LOGFILE, traceback)
+                    
                 continue
 
             valid = (out_beam.grism['SCI'] != 0)
