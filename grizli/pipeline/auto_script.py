@@ -1802,12 +1802,26 @@ def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, com
         print('** Combine Singles: **')
         for i, visit in enumerate(visits):
             print('{0} {1} {2}'.format(i, visit['product'], len(visit['files'])))
+    
     all_groups = utils.parse_grism_associations(visits, info)
+    
+    # JWST PASSAGE    
+    if (len(all_groups) > 0) & ('jw01571' in files[0]):
+        for v in visits:
+            if 'clear' in v['product']:
+                print('PASSAGE direct: ', v['product'])
+                direct = v
+        
+        for g in all_groups:
+            if g['direct'] is None:
+                g['direct'] = direct
+    
     print('\n == Grism groups ==\n')
     valid_groups = []
     for g in all_groups:
         try:
-            print(g['direct']['product'], len(g['direct']['files']), g['grism']['product'], len(g['grism']['files']))
+            print(g['direct']['product'], len(g['direct']['files']), 
+                  g['grism']['product'], len(g['grism']['files']))
             valid_groups.append(g)
         except:
             pass
