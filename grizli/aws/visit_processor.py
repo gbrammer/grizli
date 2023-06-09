@@ -1314,10 +1314,13 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=False,
     else:
         kws['filters'] = filters
     
-    if True:
+    # Negative values of visit_split_shift override keyword args
+    if kws['parse_visits_args']['visit_split_shift'] > 0:
         kws['parse_visits_args']['max_dt'] = max_dt
         kws['parse_visits_args']['visit_split_shift'] = visit_split_shift
         kws['parse_visits_args']['combine_same_pa'] = combine_same_pa
+    else:
+        kws['parse_visits_args']['visit_split_shift'] *= -1
         
     if ('_f4' in assoc) | ('_f3' in assoc) | ('_f2' in assoc) & (blue_align_params is not None):        
         for k in blue_align_params:
