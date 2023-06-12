@@ -1355,7 +1355,10 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=False,
                     kws['visit_prep_args'][k] = miri_prep[k]
                     
             break
-               
+    
+    ## Full parameter file as executed
+    auto_script.write_params_to_yml(kws, output_file=f'{assoc}.run.yaml')
+    
     ######## 
     auto_script.go(assoc, **kws)
     ########
