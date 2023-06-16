@@ -1981,9 +1981,14 @@ def show_epochs_filter(ra, dec, size=4, filter='F444W-CLEAR', cleanup=True, vmax
                                         skip_existing=False,
                                        )
                                     
-    files = np.unique([f'{d}_rate.fits' for d in cut['dataset']])
+    files = []
+    for d in cut['dataset']:
+        files += glob.glob(f'{d}*fits')
+
+    files = np.unique(files).tolist()
     
-    info = utils.get_flt_info(files=files.tolist())
+    info = utils.get_flt_info(files=files)
+    
     so = np.argsort(info['EXPSTART'])
     
     ys = 2
@@ -2003,8 +2008,11 @@ def show_epochs_filter(ra, dec, size=4, filter='F444W-CLEAR', cleanup=True, vmax
     # Set a pixel in detector space that will show up in the stack
     xp, yp = np.squeeze(np.cast[int](wcs_list[0].all_world2pix([ra], [dec], 0)
                                      + size/5/pscale))
-    for i in range(N):
-        sci_list[i][yp, xp] = 10000
+    try:
+        for i in range(N):
+            sci_list[i][yp, xp] = 10000
+    except IndexError:
+        pass
     
     # Undersample so can drizzle with point kernel
     pscale *= 1.3
