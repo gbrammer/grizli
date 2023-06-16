@@ -1958,7 +1958,129 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
             db.upload_file(file, bucket, object_name=object_name)
     
     return res
+
+
+def show_epochs_filter(ra, dec, size=4, filter='F444W-CLEAR', cleanup=True, vmax=0.2, cmap='magma_r'):
+    """
+    Make a figure showing cutouts around a particular position for all exposures 
+    covering that point
+    """
+    import glob
+    import numpy as np
     
+    import matplotlib.pyplot as plt
+    import astropy.io.fits as pyfits
+    import astropy.wcs as pywcs
+    
+    cut = cutout_mosaic('tmp-epoch', ra=ra, dec=dec, ir_scale=0.065,
+                                        size=size,
+                                        s3output=None,
+                                        gzip_output=False,
+                                        filters=[filter],
+                                        clean_flt=False,
+                                        skip_existing=False,
+                                       )
+                                    
+    files = np.unique([f'{d}_rate.fits' for d in cut['dataset']])
+    
+    info = utils.get_flt_info(files=files.tolist())
+    so = np.argsort(info['EXPSTART'])
+    
+    ys = 2
+    N = len(info)
+    
+    sci_list = []
+    wht_list = []
+    wcs_list = []
+    for file in files:
+        with pyfits.open(file) as im:
+            sci_list.append(im['SCI'].data - im['SCI'].header['MDRIZSKY'])
+            wht_list.append(1./im['ERR'].data**2)
+            wcs_list.append(pywcs.WCS(im['SCI'].header, relax=True))
+            
+    pscale = utils.get_wcs_pscale(wcs_list[0])
+    
+    # Set a pixel in detector space that will show up in the stack
+    xp, yp = np.squeeze(np.cast[int](wcs_list[0].all_world2pix([ra], [dec], 0)
+                                     + size/5/pscale))
+    for i in range(N):
+        sci_list[i][yp, xp] = 10000
+    
+    # Undersample so can drizzle with point kernel
+    pscale *= 1.3
+    outh, outw = utils.make_wcsheader(ra=ra, dec=dec,
+                                      size=size, pixscale=pscale,
+                                      get_hdu=False)
+
+    for w in wcs_list:
+        w.pscale = utils.get_wcs_pscale(w)
+    
+    # Separate drizzle
+    thumbs = [utils.drizzle_array_groups(sci_list[i:i+1], wht_list[i:i+1],
+                                        wcs_list[i:i+1], outputwcs=outw,
+                                        kernel='point', pixfrac=1,
+                                       )[0]
+              for i in range(len(files))]
+    
+    # Mask bad pixels
+    for i in range(N):
+        msk = ~np.isfinite(sci_list[i] + wht_list[i])
+        sci_list[i][msk] = -100
+        wht_list[i][msk] = 0
+    
+    # Full drizzle
+    full = utils.drizzle_array_groups(sci_list,
+                                      wht_list,
+                                        wcs_list, outputwcs=outw,
+                                        kernel='point', pixfrac=1,
+                                       )[0]
+    
+    plt.rcParams['xtick.direction'] = 'in'
+    plt.rcParams['ytick.direction'] = 'in'
+    
+    fig, axes = plt.subplots(1,N+1, figsize=(2.5*(N+1), 2.5),
+                             sharex=True, sharey=True)
+    
+    kws = dict(vmin=-0.1*vmax, vmax=vmax, cmap=cmap, origin='lower')
+    
+    fs = 7
+    
+    for i in range(N):
+        axes[i].imshow(thumbs[i], **kws)
+        label = f"{info['DATE-OBS'][i]}   {info['TIME-OBS'][i][:-4]}"
+        label += '\n' + f"{files[i].split('_rate')[0]}"
+        axes[i].text(0.5, 0.05, label,
+                     ha='center', va='bottom', transform=axes[i].transAxes,
+                     fontsize=fs, color='k', bbox=dict(fc='w', alpha=0.8, ec='None'),
+                    )
+        
+    axes[N].imshow(full, **kws)
+    axes[N].text(0.5, 0.05, filter,
+                     ha='center', va='bottom', transform=axes[N].transAxes,
+                     fontsize=fs, color='k', bbox=dict(fc='w', alpha=0.8, ec='None'),
+                )
+    
+    sh = full.shape
+    for ax in axes:
+        ax.set_xticks((-0.5, sh[0]-0.5))
+        ax.set_yticks(ax.get_xticks())
+        ax.set_xticklabels([])
+        ax.set_yticklabels([])
+        
+    fig.tight_layout(pad=0)
+    fig.tight_layout(pad=0.5)
+
+    if cleanup:
+        for file in files:
+            if os.path.exists(file):
+                os.remove(file)
+
+        xfiles = glob.glob('tmp-epoch*')
+        for file in xfiles:
+            os.remove(file)
+            
+    return fig
+
 
 def make_mosaic(jname='', ds9=None, skip_existing=True, ir_scale=0.1, half_optical=False, pad=16, kernel='point', pixfrac=0.33, sync=True, ir_wcs=None):
     """
