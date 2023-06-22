@@ -603,7 +603,10 @@ def get_config_filename(instrume='WFC3', filter='F140W',
         #             f'CONF/GRISM_NIRCAM/V2/NIRCAM_{fi}_mod{module}_{gr}.conf')
 
         conf_file = os.path.join(GRIZLI_PATH,
-                    f'CONF/GRISM_NIRCAM/V4/NIRCAM_{fi}_mod{module}_{gr}.conf')
+                    f'CONF/GRISM_NIRCAM/V8/NIRCAM_{fi}_mod{module}_{gr}.conf')
+        
+        if not os.path.exists(conf_file):
+            conf_file = conf_file.replace('V8/', 'V4/')        
         
     elif instrume == 'NIRCAMA':
         fi = grism
@@ -951,7 +954,7 @@ class TransformGrismconf(object):
             
             poly = Polynomial2D(degree=2, **coeffs)
             trace_dy += poly(x, y)
-            #print(f'polynomial offset: {poly(x,y):.3f}')
+            # print(f'polynomial offset: {poly(x,y):.3f}')
             
         elif 'V4/NIRCAM_F444W_modA_R.conf' in self.conf_file:
             trace_dy += -2.5
@@ -967,7 +970,11 @@ class TransformGrismconf(object):
 
             poly = Polynomial2D(degree=2, **coeffs)
             trace_dy += poly(x, y)
-            #print(f'polynomial offset: {poly(x,y):.3f}')
+            # print(f'polynomial offset: {poly(x,y):.3f}')
+            
+        elif 'V8/NIRCAM' in self.conf_file:
+            #print('V8: do nothing')
+            pass
             
         elif os.path.basename(self.conf_file) == 'NIRCAM_F444W_modA_R.conf':
             trace_dy += -2.5
@@ -1069,6 +1076,9 @@ def load_grism_config(conf_file, warnings=True):
         conf = TransformGrismconf(conf_file)
         conf.get_beams()
     elif 'V4/NIRCAM' in conf_file:
+        conf = TransformGrismconf(conf_file)
+        conf.get_beams()
+    elif 'V8/NIRCAM' in conf_file:
         conf = TransformGrismconf(conf_file)
         conf.get_beams()
     else:
