@@ -1716,15 +1716,99 @@ def query_exposures(ra=53.16, dec=-27.79, size=1., pixel_scale=0.1, theta=0,  fi
     return header, wcs, SQL, res
 
 
-def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-27.7910651, size=5*60, theta=0., filters=['F160W'], ir_scale=0.1, ir_wcs=None, res=None, half_optical=True, kernel='point', pixfrac=0.33, make_figure=True, skip_existing=True, clean_flt=True, gzip_output=True, s3output='s3://grizli-v2/HST/Pipeline/Mosaic/', split_uvis=True, extra_query='', extra_wfc3ir_badpix=True, fix_niriss=True, scale_nanojy=10, verbose=True, niriss_ghost_kwargs={}, scale_photom=True, calc_wcsmap=False, **kwargs):
+def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-27.7910651, size=5*60, theta=0., filters=['F160W'], ir_scale=0.1, ir_wcs=None, res=None, half_optical=True, kernel='point', pixfrac=0.33, make_figure=True, skip_existing=True, clean_flt=True, gzip_output=True, s3output='s3://grizli-v2/HST/Pipeline/Mosaic/', split_uvis=True, extra_query='', extra_wfc3ir_badpix=True, fix_niriss=True, scale_nanojy=10, verbose=True, weight_type='err', niriss_ghost_kwargs={}, scale_photom=True, calc_wcsmap=False, **kwargs):
     """
     Make mosaic from exposures defined in the exposure database
     
     Parameters
     ----------
+    rootname : str
+        Output file rootname
+    
+    product : str
+        File name structure that will be parsed with ``product.format(rootname, f)``,
+        where ``f`` is the filter name
+    
+    ra, dec : float
+        Cutout center in decimal degrees
+    
+    size : float
+        Cutout size in arcsec
+    
+    theta : float
+        Position angle of the output WCS
+    
+    filters : list
+        List of filter names to use for the mosaic.
+    
+    ir_scale : float
+        Pixel scale in arcsec
+    
+    ir_wcs : `~astropy.wcs.WCS`
+        Specify the output WCS explicitly rather than deriving from
+        ``ra, dec, size, theta``.
+    
+    res : None, `~astropy.table.Table`
+        Explicit list of exposure file metadata, e.g., from 
+        `~grizli.aws.visit_processor.res_query_from_local`.  If not specified, the 
+        grizli-processed exposures that overlap with the requested cutout WCS will be
+        determined by querying the `grizli` database (`~grizli.aws.db`).
+    
+    half_optical : bool
+        Use WCS with pixels 2x smaller than defined in `ir_wcs` for ACS/WFC, WFC3/UVIS,
+        NIRCam and NIRISS filters.
+    
+    kernel, pixfrac : str, float
+        Drizzle parameters
+    
+    skip_existing : bool
+        Skip `product` combinations already found in the working directory
+    
+    clean_flt : bool
+        Remove exposures one-by-one after they have been added to the cutout / mosaic.
+    
+    gzip_output : bool
+        Compress the output files after completion
+    
+    s3output : str
+        Path name of an AWS S3 bucket where products will be sent upon completion
+    
+    split_uvis : bool
+        Make separate mosaics for ACS/WFC and WFC3/UVIS filters with the same name
+    
+    extra_query : str
+        Extra SQL query criteria added to the DB query if ``res`` not provided
+    
+    extra_wfc3ir_badpix : str
+        Add additional bad pixel mask for WFC3/IR and NIRCam from the bad pixel files 
+        provided in `grizli.data`.
+    
+    fix_niriss : bool
+        Separate filter names for NIRISS
+    
+    scale_nanojy : bool
+        Photometric scale of the output image, i.e., a pixel value of one corresponds
+        to a flux density of `scale_nanojy` nJy per pix.
+    
+    verbose : bool
+        Verbose messaging
+    
+    weight_type : 'median_err', 'err'
+        Drizzle weight strategy (see `~grizli.utils.drizzle_from_visit`)
+    
+    niriss_ghost_kwargs : dict
+        Parameters of the NIRISS ghost flagging
+    
+    scale_photom : bool
+        See `~grizli.utils.drizzle_from_visit`
+    
+    calc_wcsmap : bool
+        See `~grizli.utils.drizzle_from_visit`
     
     Returns
     -------
+    Image mosaic files with the requested WCS and filters
+    
     """
     import os
     import glob
@@ -1895,6 +1979,7 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
                                      verbose=verbose,
                                      scale_photom=scale_photom,
                                      niriss_ghost_kwargs=niriss_ghost_kwargs,
+                                     weight_type=weight_type,
                                      calc_wcsmap=calc_wcsmap)
                              
         outsci, outwht, header, flist, wcs_tab = _
@@ -2090,7 +2175,7 @@ def show_epochs_filter(ra, dec, size=4, filter='F444W-CLEAR', cleanup=True, vmax
     return fig
 
 
-def make_mosaic(jname='', ds9=None, skip_existing=True, ir_scale=0.1, half_optical=False, pad=16, kernel='point', pixfrac=0.33, sync=True, ir_wcs=None):
+def make_mosaic(jname='', ds9=None, skip_existing=True, ir_scale=0.1, half_optical=False, pad=16, kernel='point', pixfrac=0.33, sync=True, ir_wcs=None, weight_type='median_err'):
     """
     Make mosaics from all exposures in a group of associations
     """
@@ -2267,7 +2352,9 @@ def make_mosaic(jname='', ds9=None, skip_existing=True, ir_scale=0.1, half_optic
             
         _ = utils.drizzle_from_visit(groups[f], groups[f]['reference'], 
                                      pixfrac=pixfrac, 
-                                     kernel=kernel, clean=False)
+                                     kernel=kernel, clean=False,
+                                     weight_type=weight_type,
+                                     )
                              
         outsci, outwht, header, flist, wcs_tab = _
     

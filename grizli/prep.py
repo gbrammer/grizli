@@ -3519,6 +3519,7 @@ def subtract_visit_angle_averages(visit, threshold=1.8, detection_background=Tru
                                        clean=False,
                                        verbose=False,
                                        scale_photom=False,
+                                       weight_type='median_err',
                                       )
         drz_h = drz[2]
 
@@ -4506,7 +4507,9 @@ def process_direct_grism_visit(direct={},
                                      extra_wfc3ir_badpix=True,
                                      verbose=False,
                                      scale_photom=False,
-                                     calc_wcsmap=False)
+                                     weight_type='median_err',
+                                     calc_wcsmap=False,
+                                     )
                        
         _sci, _wht, _hdr, _files, _info = _
         _drcfile = glob.glob(f"{direct['product']}_dr*sci.fits")[0]
