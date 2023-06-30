@@ -5550,6 +5550,7 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
                        dryrun=False, skip=None, extra_wfc3ir_badpix=True,
                        verbose=True,
                        scale_photom=True,
+                       weight_type='err',
                        calc_wcsmap=False,
                        niriss_ghost_kwargs={}):
     """
@@ -5595,6 +5596,11 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
         For JWST, apply photometry scale corrections from the  
         `grizli/data/photom_correction.yml` table
     
+    weight_type : 'err', 'median_err'
+        Exposure weighting strategy.  The default 'err' strategy uses the full 
+        uncertainty array defined in the `ERR` image extensions.  The alternative
+        'median_err' strategy uses the median of the `ERR` image.
+    
     niriss_ghost_kwargs : dict
         Keyword arguments for `~grizli.utils.niriss_ghost_mask`
     
@@ -5627,7 +5633,11 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
     s3 = boto3.resource('s3')
     s3_client = boto3.client('s3')
     
-    
+    if weight_type not in ['err', 'median_err']:
+        print(f"WARNING: weight_type '{weight_type}' must be 'err' or 'median_err',")
+        print(f"         falling back to 'err'.")
+        weight_type = 'err'
+        
     if isinstance(output, pywcs.WCS):
         outputwcs = output
     elif isinstance(output, pyfits.Header):
@@ -5643,7 +5653,7 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
         outputwcs = pywcs.WCS(_hdu.header)
     else:
         return None
-
+    
     if not hasattr(outputwcs, '_naxis1'):
         outputwcs._naxis1, outputwcs._naxis2 = outputwcs._naxis
 
@@ -5678,8 +5688,8 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
 
         file = visit['files'][i]
 
-        msg = '\n({0:4d}/{1:4d}) Add exposure {2}\n'
-        msg = msg.format(count+1, NTOTAL, file)
+        msg = '\n({0:4d}/{1:4d}) Add exposure {2} (weight_type=\'{3}\')\n'
+        msg = msg.format(count+1, NTOTAL, file, weight_type)
         log_comment(LOGFILE, msg, verbose=verbose)
 
         if dryrun:
@@ -5793,7 +5803,9 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
             
             if ref_photflam is None:
                 ref_photflam = keys['PHOTFLAM']
-                    
+        
+        median_weight = None
+        
         for ext in [1, 2, 3, 4]:
             if ('SCI', ext) in flt:
 
@@ -5809,11 +5821,7 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
                 else:
                     has_bkg = False
                     sky = sky_value
-                    
-                msg = f'  ext (SCI,{ext}), sky={sky_value:.3f}'
-                msg += f' has_bkg:{has_bkg}'
-                log_comment(LOGFILE, msg, verbose=verbose)
-                
+
                 if h['BUNIT'] == 'ELECTRONS':
                     to_per_sec = 1./keys['EXPTIME']
                 else:
@@ -5881,8 +5889,21 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
                 err = flt[('ERR', ext)].data*phot_scale
                 dq = unset_dq_bits(flt[('DQ', ext)].data, bits) | bpdata
                 wht = 1/err**2
-                wht[(err == 0) | (dq > 0)] = 0
+                _msk = (err == 0) | (dq > 0)
+                wht[_msk] = 0
 
+                median_weight = np.nanmedian(wht[~_msk])
+                
+                msg = f'  ext (SCI,{ext}), sky={sky_value:.3f}'
+                msg += f' has_bkg:{has_bkg}'
+                msg += f' median_weight:{median_weight:.2e}'
+                
+                log_comment(LOGFILE, msg, verbose=verbose)
+                
+                # Use median_weight as the full image weight
+                if weight_type == 'median_err':
+                    wht[~_msk] = median_weight
+                
                 wht_list.append(wht)
 
                 # wcs_i = HSTWCS(fobj=flt, ext=('SCI',ext), minerr=0.0,
@@ -5912,6 +5933,8 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
             
             header['GRIZLIV'] = grizli__version, 'Grizli code version'
             
+            header['WHTTYPE'] = weight_type, 'Exposure weighting strategy'
+            
             for k in keys:
                 header[k] = keys[k]
 
@@ -5930,6 +5953,10 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
         count += 1
         header['FLT{0:05d}'.format(count)] = file
         
+        if median_weight is not None:
+            header['WHT{0:05d}'.format(count)] = (median_weight, 
+                                                  f'Median weight of exposure {count}')
+            
         flt.close()
         
         #xfiles = glob.glob('*')

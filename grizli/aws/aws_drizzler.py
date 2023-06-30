@@ -782,7 +782,14 @@ def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixsca
         else:
             clean_i = remove
 
-        status = utils.drizzle_from_visit(visits[0], h, pixfrac=pixfrac, kernel=kernel, clean=clean_i, include_saturated=include_saturated, skip=skip, dryrun=dryrun)
+        status = utils.drizzle_from_visit(visits[0],
+                                          h,
+                                          pixfrac=pixfrac, kernel=kernel, 
+                                          clean=clean_i, 
+                                          include_saturated=include_saturated,
+                                          weight_type='median_err',
+                                          skip=skip,
+                                          dryrun=dryrun)
 
         if dryrun:
             filt_dict[filt] = status
