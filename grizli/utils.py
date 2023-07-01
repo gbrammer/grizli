@@ -5749,6 +5749,8 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
             if (extra_wfc3ir_badpix) & (_inst in ['NIRCAM']):
                 _det = flt[0].header['DETECTOR']
                 bpfiles = [os.path.join(os.path.dirname(__file__), 
+                           f'data/nrc_badpix_230701_{_det}.fits.gz')]
+                bpfiles += [os.path.join(os.path.dirname(__file__),
                            f'data/nrc_badpix_230120_{_det}.fits.gz')]
                 bpfiles += [os.path.join(os.path.dirname(__file__), 
                            f'data/nrc_lowpix_0916_{_det}.fits.gz')]
@@ -5756,7 +5758,11 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
                 for bpfile in bpfiles:
                     if os.path.exists(bpfile):
                         bpdata = pyfits.open(bpfile)[0].data
-                        bpdata = nd.binary_dilation(bpdata > 0)*1024
+                        if True:
+                            bpdata = nd.binary_dilation(bpdata > 0)*1024
+                        else:
+                            bpdata = (bpdata > 0)*1024
+                            
                         msg = f'Use extra badpix in {bpfile}'
                         log_comment(LOGFILE, msg, verbose=verbose)
                         break
@@ -5897,7 +5903,19 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
                 sci_list.append((flt[('SCI', ext)].data - sky)*phot_scale)
 
                 err = flt[('ERR', ext)].data*phot_scale
-                dq = unset_dq_bits(flt[('DQ', ext)].data, bits) | bpdata
+                
+                # JWST: just 1,1024,4096 bits
+                if flt[0].header['TELESCOP'] in ['JWST']:
+                    dq = flt[('DQ', ext)].data & (1+1024+4096)
+                    dq |= bpdata
+                    
+                    # dq0 = unset_dq_bits(flt[('DQ', ext)].data, bits) | bpdata
+                    # print('xxx', (dq > 0).sum(), (dq0 > 0).sum())
+                    
+                else:
+                    dq = unset_dq_bits(flt[('DQ', ext)].data, bits) | bpdata
+                    
+                    
                 wht = 1/err**2
                 _msk = (err == 0) | (dq > 0)
                 wht[_msk] = 0
@@ -5909,6 +5927,8 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
                             _var_data = flt[('VAR_POISSON',ext)].data[~_msk]
                             med_poisson = np.nanmedian(_var_data)
                             var = flt['VAR_RNOISE',ext].data + med_poisson
+                            var *= phot_scale**2
+                            
                             wht = 1./var
                             wht[_msk | (var <= 0)] = 0
                     else:
