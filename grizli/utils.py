@@ -5596,10 +5596,16 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
         For JWST, apply photometry scale corrections from the  
         `grizli/data/photom_correction.yml` table
     
-    weight_type : 'err', 'median_err'
-        Exposure weighting strategy.  The default 'err' strategy uses the full 
-        uncertainty array defined in the `ERR` image extensions.  The alternative
-        'median_err' strategy uses the median of the `ERR` image.
+    weight_type : 'err', 'median_err', 'time'
+        Exposure weighting strategy.
+        
+        - The default 'err' strategy uses the full uncertainty array defined in the 
+          `ERR` image extensions.  The alternative
+        
+        - The 'median_err' strategy uses the median of the `ERR` extension
+                       
+        - The 'time' strategy weights 'median_err' by the `TIME` extension, if
+          available
     
     niriss_ghost_kwargs : dict
         Keyword arguments for `~grizli.utils.niriss_ghost_mask`
@@ -5633,9 +5639,9 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
     s3 = boto3.resource('s3')
     s3_client = boto3.client('s3')
     
-    if weight_type not in ['err', 'median_err']:
-        print(f"WARNING: weight_type '{weight_type}' must be 'err' or 'median_err',")
-        print(f"         falling back to 'err'.")
+    if weight_type not in ['err', 'median_err', 'time']:
+        print(f"WARNING: weight_type '{weight_type}' must be 'err', 'median_err', ")
+        print(f"         or 'time'; falling back to 'err'.")
         weight_type = 'err'
         
     if isinstance(output, pywcs.WCS):
@@ -5893,17 +5899,33 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
                 wht[_msk] = 0
 
                 median_weight = np.nanmedian(wht[~_msk])
-                
+                if (not np.isfinite(median_weight)) | ((~_msk).sum() == 0):
+                    median_weight = 0
+                    
                 msg = f'  ext (SCI,{ext}), sky={sky_value:.3f}'
                 msg += f' has_bkg:{has_bkg}'
                 msg += f' median_weight:{median_weight:.2e}'
                 
                 log_comment(LOGFILE, msg, verbose=verbose)
                 
-                # Use median_weight as the full image weight
-                if weight_type == 'median_err':
+                # Use median(ERR) as the full image weight, 
+                # optionally scaling by the TIME array
+                if weight_type in ['median_err', 'time']:
                     wht[~_msk] = median_weight
-                
+                    if weight_type == 'time':
+                        if ('TIME',ext) in flt:
+                            try:
+                                _time = flt[('TIME',ext)].data*1
+                                tmax = np.nanmax(_time)
+                                _time /= tmax
+                                wht[~_msk] *= _time[~_msk]
+                                
+                                msg = f'scale weight by (TIME,{ext})/{tmax:.1f}'
+                                log_comment(LOGFILE, msg, verbose=verbose)
+                                
+                            except:
+                                pass
+                                
                 wht_list.append(wht)
 
                 # wcs_i = HSTWCS(fobj=flt, ext=('SCI',ext), minerr=0.0,
