@@ -5596,7 +5596,7 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
         For JWST, apply photometry scale corrections from the  
         `grizli/data/photom_correction.yml` table
     
-    weight_type : 'err', 'median_err', 'time'
+    weight_type : 'err', 'median_err', 'time', 'jwst'
         Exposure weighting strategy.
         
         - The default 'err' strategy uses the full uncertainty array defined in the 
@@ -5607,6 +5607,10 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
         - The 'time' strategy weights 'median_err' by the `TIME` extension, if
           available
     
+        - For the 'jwst' strategy, if 'VAR_POISSON' and 'VAR_RNOISE' extensions found,
+          weight by VAR_RNOISE + median(VAR_POISSON).  Fall back to 'median_err'
+          otherwise.
+                       
     niriss_ghost_kwargs : dict
         Keyword arguments for `~grizli.utils.niriss_ghost_mask`
     
@@ -5639,9 +5643,9 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
     s3 = boto3.resource('s3')
     s3_client = boto3.client('s3')
     
-    if weight_type not in ['err', 'median_err', 'time']:
+    if weight_type not in ['err', 'median_err', 'time', 'jwst']:
         print(f"WARNING: weight_type '{weight_type}' must be 'err', 'median_err', ")
-        print(f"         or 'time'; falling back to 'err'.")
+        print(f"         'jwst', or 'time'; falling back to 'err'.")
         weight_type = 'err'
         
     if isinstance(output, pywcs.WCS):
@@ -5897,7 +5901,24 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
                 wht = 1/err**2
                 _msk = (err == 0) | (dq > 0)
                 wht[_msk] = 0
-
+                
+                if (weight_type == 'jwst'):
+                    if ('VAR_POISSON',ext) in flt:
+                        # Weight by VAR_RNOISE + median(VAR_POISSON)
+                        if (~_msk).sum() > 0:
+                            _var_data = flt[('VAR_POISSON',ext)].data[~_msk]
+                            med_poisson = np.nanmedian(_var_data)
+                            var = flt['VAR_RNOISE',ext].data + med_poisson
+                            wht = 1./var
+                            wht[_msk | (var <= 0)] = 0
+                    else:
+                        # Fall back to median_err
+                        median_weight = np.nanmedian(wht[~_msk])
+                        if (not np.isfinite(median_weight)) | ((~_msk).sum() == 0):
+                            median_weight = 0
+                        
+                        wht[~_msk] = median_weight
+                        
                 median_weight = np.nanmedian(wht[~_msk])
                 if (not np.isfinite(median_weight)) | ((~_msk).sum() == 0):
                     median_weight = 0
@@ -5912,20 +5933,18 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
                 # optionally scaling by the TIME array
                 if weight_type in ['median_err', 'time']:
                     wht[~_msk] = median_weight
+                    
                     if weight_type == 'time':
                         if ('TIME',ext) in flt:
-                            try:
+                            if flt[('TIME',ext)].data is not None:
                                 _time = flt[('TIME',ext)].data*1
-                                tmax = np.nanmax(_time)
+                                tmax = np.nanmax(_time[~_msk])
                                 _time /= tmax
                                 wht[~_msk] *= _time[~_msk]
                                 
                                 msg = f'scale weight by (TIME,{ext})/{tmax:.1f}'
                                 log_comment(LOGFILE, msg, verbose=verbose)
-                                
-                            except:
-                                pass
-                                
+                
                 wht_list.append(wht)
 
                 # wcs_i = HSTWCS(fobj=flt, ext=('SCI',ext), minerr=0.0,
