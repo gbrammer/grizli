@@ -1716,7 +1716,7 @@ def query_exposures(ra=53.16, dec=-27.79, size=1., pixel_scale=0.1, theta=0,  fi
     return header, wcs, SQL, res
 
 
-def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-27.7910651, size=5*60, theta=0., filters=['F160W'], ir_scale=0.1, ir_wcs=None, res=None, half_optical=True, kernel='point', pixfrac=0.33, make_figure=True, skip_existing=True, clean_flt=True, gzip_output=True, s3output='s3://grizli-v2/HST/Pipeline/Mosaic/', split_uvis=True, extra_query='', extra_wfc3ir_badpix=True, fix_niriss=True, scale_nanojy=10, verbose=True, weight_type='err', niriss_ghost_kwargs={}, scale_photom=True, calc_wcsmap=False, **kwargs):
+def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-27.7910651, size=5*60, theta=0., filters=['F160W'], ir_scale=0.1, ir_wcs=None, res=None, half_optical=True, kernel='point', pixfrac=0.33, make_figure=True, skip_existing=True, clean_flt=True, gzip_output=True, s3output='s3://grizli-v2/HST/Pipeline/Mosaic/', split_uvis=True, extra_query='', extra_wfc3ir_badpix=True, fix_niriss=True, scale_nanojy=10, verbose=True, weight_type='err', niriss_ghost_kwargs={}, scale_photom=True, calc_wcsmap=False, make_exptime_map=False, expmap_sample_factor=4, keep_expmap_small=True, **kwargs):
     """
     Make mosaic from exposures defined in the exposure database
     
@@ -2002,6 +2002,7 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
             msg = f'Scale PHOTFNU x {to_njy:.3f} to {scale_nanojy:.1f} nJy'
             utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
             
+            header['OPHOTFNU'] = header['PHOTFNU'], 'Original PHOTFNU before scaling'
             header['PHOTFNU'] *= to_njy
             header['PHOTFLAM'] *= to_njy
             header['BUNIT'] = f'{scale_nanojy:.1f}*nanoJansky'
@@ -2011,15 +2012,21 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
             #pass
             to_njy = header['PHOTFNU']*1.e9
             header['BUNIT'] = f'{to_njy:.3f}*nanoJansky'
-            
-        pyfits.writeto('{0}_{1}_sci.fits'.format(visit['product'], drz),
+        
+        sci_file = '{0}_{1}_sci.fits'.format(visit['product'], drz)
+        pyfits.writeto(sci_file,
                        data=outsci, header=header, 
                        overwrite=True)
     
         pyfits.writeto('{0}_{1}_wht.fits'.format(visit['product'], drz),
                       data=outwht, header=header, 
                       overwrite=True)
-
+        
+        if make_exptime_map:
+            matched_exptime_map(sci_file, sample_factor=expmap_sample_factor,
+                                keep_small=keep_expmap_small,
+                                output_type='file', verbose=True)
+    
     if s3output:
         files = []
         for f in uniq_filts.values:
@@ -2043,6 +2050,184 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
             db.upload_file(file, bucket, object_name=object_name)
     
     return res
+
+
+def matched_exptime_map(ref_file, sample_factor=4, keep_small=True, output_type='file', verbose=True):
+    """
+    Make an exposure time map by querying footprints from the exposure database
+    
+    Parameters
+    ----------
+    ref_file : str
+        Reference mosaic file.  Needs a valid WCS and header keywords that can be
+        parsed with `~grizli.utils.parse_filter_from_header`.
+    
+    sample_factor : int
+        Undersampling factor
+    
+    keep_small : bool
+        Store the output on the undersampled grid
+    
+    output_type : str
+        Output behavior:
+        
+        - ``file`` write a file `ref_file.replace('sci.fits','exp.fits')` if 
+          `ref_file.endswith('sci.fits*')`
+        
+        - ``hdu``: get a `~astropy.io.fits.ImageHDU` object
+        
+        - ``array``: return a 2D array
+    
+    Returns
+    -------
+    output : see ``output_type``
+    
+    """
+    import astropy.io.fits as pyfits
+    import astropy.wcs as pywcs
+    import astropy.units as u
+    
+    from tqdm import tqdm
+    import scipy.ndimage as nd
+
+    with pyfits.open(ref_file) as im:
+
+        filter_key = utils.parse_filter_from_header(im[0].header)
+        wcs = pywcs.WCS(im[0].header)
+        header = im[0].header.copy()
+        
+        if ('FLT00001' in header) & ('NDRIZIM' in header):
+            added_files = []
+            for i in range(header['NDRIZIM']):
+                k = f'FLT{i+1:05d}'
+                if k in header:
+                    added_files.append('_'.join(header[k].split('_')[:-1]))
+                    
+            if len(added_files) == 0:
+                added_files = None
+                
+    wsr = utils.SRegion(wcs.calc_footprint())
+
+    exp = db.SQL(f"""SELECT dataset, footprint, exptime, filter, sciext
+    FROM exposure_files
+    WHERE filter = '{filter_key}'
+    AND polygon(footprint) && polygon('{wsr.polystr()[0]}')
+    """)
+        
+    NX = header['NAXIS1']
+    NY = header['NAXIS2']
+    yp, xp = np.indices((NY//sample_factor, NX//sample_factor))*sample_factor
+    sh = xp.shape
+
+    msg = f'matched_exptime_map: {ref_file}, sample_factor={sample_factor}\n'
+    msg += f'matched_exptime_map: ({NY},{NX}) > ({sh[0]}, {sh[1]})\n'
+    msg += f'matched_exptime_map: {len(exp)} exposures in {filter_key}'
+    
+    utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+
+    rr, dd = wcs.all_pix2world(xp.flatten(), yp.flatten(), 0)
+    coo = np.array([rr, dd]).T
+
+    expm = np.zeros(coo.shape[0], dtype=np.uint32)
+    
+    added = []
+    
+    for footprint, exptime, ds, ext in tqdm(zip(exp['footprint'], exp['exptime'], 
+                                                exp['dataset'], exp['sciext'])):
+        if added_files is not None:
+            if (ds not in added_files) | ((ds,ext) in added):
+                continue
+        
+        added.append((ds,ext))
+        
+        sr = utils.SRegion(footprint)
+        in_fp = sr.path[0].contains_points(coo) #.reshape(sh)
+
+            
+        expm[in_fp] += np.uint32(exptime) # *in_fp
+        
+    ### Put back in original scale
+    if keep_small:
+        full_expm = expm.reshape(sh)
+        
+        header['CRPIX1'] /= sample_factor
+        header['CRPIX2'] /= sample_factor
+        for i in [1,2]:
+            for j in [1,2]:
+                k = f'CD{i}_{j}'
+                if k in header:
+                    header[k] *= sample_factor
+        
+    else:
+        
+        full_expm = np.zeros((NY, NX), dtype=np.uint32)
+
+        for i, (xi, yi) in enumerate(zip(xp.flatten(), yp.flatten())):
+            full_expm[yi, xi] = expm[i]
+
+        if sample_factor > 1:
+            full_expm = nd.maximum_filter(full_expm, sample_factor)
+    
+    header['BUNIT'] = 'second'
+    header['SAMPLE'] = sample_factor, 'Sampling factor'
+    header['NXORIG'] = NX
+    header['NYORIG'] = NY
+        
+    mosaic_pscale = utils.get_wcs_pscale(wcs)
+    
+    if 'PIXAR_SR' in header:
+        orig_pscale = np.sqrt((header['PIXAR_SR']*u.steradian).to(u.arcsec**2)).value
+    else:
+        # ToDo: HST pixel scales
+        if 'DETECTOR' in header:
+            if header['DETECTOR'] == 'IR':
+                orig_pscale = 0.128
+            elif header['DETECTOR'] == 'WFC':
+                orig_pscale = 0.05
+            elif header['DETECTOR'] == 'UVIS':
+                orig_pscale = 0.04
+            else:
+                orig_pscale = 0.128
+        else:
+            orig_pscale = 0.128
+            
+    #pscale_ratio = orig_pscale/mosaic_pscale
+    
+    header['MOSPSCL'] = mosaic_pscale, 'Mosaic pixel scale arcsec'
+    header['ORIGPSCL'] = orig_pscale, 'Original detector pixel scale arcsec'
+    
+    phot_scale = 1.
+    
+    if 'PHOTMJSR' in header:
+        phot_scale /= header['PHOTMJSR']
+    
+    if 'PHOTSCAL' in header:
+        phot_scale /= header['PHOTSCAL']
+    
+    if 'OPHOTFNU' in header:
+        phot_scale *= header['OPHOTFNU'] / header['PHOTFNU']
+        
+    header['DNTOEPS'] = ((orig_pscale/mosaic_pscale)**2 * phot_scale,
+                         'Inverse flux conversion back to e per second')
+    
+    if output_type == 'array':
+        return full_expm
+    
+    hdu = pyfits.ImageHDU(header=header, data=full_expm)
+    
+    if '_sci.fits' in ref_file:
+        output_file = ref_file.replace('_sci.fits','_exp.fits')
+    else:
+        output_type = 'hdu'
+        
+    if output_type == 'hdu':
+        return hdu
+    else:
+        msg = f'matched_exptime_map: write to {output_file}'
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+        
+        pyfits.writeto(output_file, data=full_expm, header=header, overwrite=True)
+        return output_file
 
 
 def show_epochs_filter(ra, dec, size=4, filter='F444W-CLEAR', cleanup=True, vmax=0.2, cmap='magma_r'):
