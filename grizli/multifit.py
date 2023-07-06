@@ -4823,7 +4823,7 @@ def drizzle_2d_spectrum(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
     return hdul
 
 
-def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5, pixscale=0.1, pixfrac=0.6, kernel='square', theta=0., direct_extension='REF', fcontam=0.2, ds9=None):
+def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5, pixscale=0.1, pixfrac=0.6, kernel='square', theta=0., direct_extension='REF', fcontam=0.2, custom_key=None, ds9=None):
     """Drizzle a cutout at a specific wavelength from a list of `~grizli.model.BeamCutout` objects
 
     Parameters
@@ -4858,7 +4858,11 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5, pix
     fcontam: float
         Factor by which to scale the contamination arrays and add to the
         pixel variances.
-
+    
+    custom_key : str
+        Key of `beam.grism.data` dictionary to use as the science array for the 
+        drizzled output
+    
     ds9 : `~grizli.ds9.DS9`, optional
         Display each step of the drizzling to an open DS9 window
 
@@ -4970,22 +4974,27 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5, pix
         ACS_CRPIX = [4096/2, 2048/2]
         dx_crpix = beam_wcs.wcs.crpix[0] - ACS_CRPIX[0]
         dy_crpix = beam_wcs.wcs.crpix[1] - ACS_CRPIX[1]
-        for wcs_ext in [beam_wcs.cpdis1, beam_wcs.cpdis2, beam_wcs.det2im1, beam_wcs.det2im2]:
+        for wcs_ext in [beam_wcs.cpdis1, beam_wcs.cpdis2,
+                        beam_wcs.det2im1, beam_wcs.det2im2]:
             if wcs_ext is not None:
                 wcs_ext.crval[0] += dx_crpix
                 wcs_ext.crval[1] += dy_crpix
 
-        beam_data = beam.grism.data['SCI'] - beam.contam
-        if hasattr(beam, 'background'):
-            beam_data -= beam.background
+        if custom_key is None:
+            beam_data = beam.grism.data['SCI'] - beam.contam
+            if hasattr(beam, 'background'):
+                beam_data -= beam.background
+        
+            if hasattr(beam, 'extra_lines'):
+                beam_data -= beam.extra_lines
 
-        if hasattr(beam, 'extra_lines'):
-            beam_data -= beam.extra_lines
-
-        beam_continuum = beam.beam.model*1
-        if hasattr(beam.beam, 'pscale_array'):
-            beam_continuum *= beam.beam.pscale_array
-
+            beam_continuum = beam.beam.model*1
+            if hasattr(beam.beam, 'pscale_array'):
+                beam_continuum *= beam.beam.pscale_array
+        else:
+            beam_data = beam.grism.data[custom_key]*1
+            beam_continuum = beam_data * 0
+        
         # Downweight contamination
         if fcontam > 0:
             # wht = 1/beam.ivar + (fcontam*beam.contam)**2
