@@ -613,6 +613,8 @@ def get_config_filename(instrume='WFC3', filter='F140W',
         if not os.path.exists(conf_file):
             conf_file = conf_file.replace('V8/', 'V4/')        
         
+        print(f'xxx conf_file: {conf_file}')
+        
     elif instrume == 'NIRCAMA':
         fi = grism
         gr = filter[-1] # R, C
