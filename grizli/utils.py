@@ -6008,6 +6008,7 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
             header['GRIZLIV'] = grizli__version, 'Grizli code version'
             
             header['WHTTYPE'] = weight_type, 'Exposure weighting strategy'
+            header['RNPERC'] = rnoise_percentile, 'VAR_RNOISE clip percentile for JWST'
             
             for k in keys:
                 header[k] = keys[k]
