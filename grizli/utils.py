@@ -5755,6 +5755,8 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
             if (extra_wfc3ir_badpix) & (_inst in ['NIRCAM']):
                 _det = flt[0].header['DETECTOR']
                 bpfiles = [os.path.join(os.path.dirname(__file__), 
+                           f'data/nrc_badpix_20230710_{_det}.fits.gz')]
+                bpfiles += [os.path.join(os.path.dirname(__file__), 
                            f'data/nrc_badpix_230701_{_det}.fits.gz')]
                 bpfiles += [os.path.join(os.path.dirname(__file__),
                            f'data/nrc_badpix_230120_{_det}.fits.gz')]
