@@ -5703,8 +5703,9 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
 
         file = visit['files'][i]
 
-        msg = '\n({0:4d}/{1:4d}) Add exposure {2} (weight_type=\'{3}\')\n'
-        msg = msg.format(count+1, NTOTAL, file, weight_type)
+        msg = '\n({0:4d}/{1:4d}) Add exposure {2} '
+        msg += '(weight_type=\'{3}\', rnoise_percentile={4})\n'
+        msg = msg.format(count+1, NTOTAL, file, weight_type, rnoise_percentile)
         log_comment(LOGFILE, msg, verbose=verbose)
 
         if dryrun:
