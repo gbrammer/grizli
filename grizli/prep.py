@@ -5,6 +5,7 @@ import os
 import inspect
 import gc
 import warnings
+import shutil
 
 from collections import OrderedDict
 import glob
@@ -111,7 +112,6 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
     Nothing, but copies the file from ``path`` to ``./``.
 
     """
-    import shutil
     try:
         from astroscrappy import detect_cosmics
         has_scrappy = True
@@ -252,16 +252,23 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
     logstr = logstr.format(orig_file.filename(), local_file, extra_msg)
     utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
     
+    isACS = head['DETECTOR'] in ['UVIS','WFC']
+    
     ####
     # JWST
+    isJWST = False
+    
     if 'TELESCOP' in orig_file[0].header:
         if orig_file[0].header['TELESCOP'] == 'JWST':
+            isJWST = True
+            
             orig_file.writeto(local_file, overwrite=True)
             status = jwst_utils.initialize_jwst_image(local_file, 
                                       oneoverf_correction=oneoverf_correction,
                                       oneoverf_kwargs=oneoverf_kwargs, 
                                       use_skyflats=use_skyflats)            
             orig_file = pyfits.open(local_file)
+            
             
     # if filter in ['GR150C', 'GR150R']: 
     #     if (head['FILTER'] == 'GR150C') & (head['PUPIL'] == 'F115W'):        
@@ -344,9 +351,10 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
         c1m.flush()
 
     orig_file.writeto(local_file, overwrite=True)
-
+    
     if mask_regions:
         apply_region_mask(local_file, dq_value=1024)
+        apply_region_mask_from_db(local_file, dq_value=1024)
     
     # Flush objects
     orig_file.close()
@@ -456,6 +464,101 @@ def apply_persistence_mask(flt_file, path='../Persistence', dq_value=1024,
 
     flt.flush()
     flt.close()
+
+
+def region_mask_from_ds9(ext=1):
+    """
+    Get a region masks from a local DS9 window and make a table that can be sent to the
+    `exposure_region_mask` database table.
+    """
+    import time
+    
+    from .aws import db
+    from .ds9 import DS9
+    
+    d = DS9()
+    rows = []
+
+    dataset = os.path.basename(d.get('file'))
+    dataset = dataset.split('[')[0]
+    
+    regs = d.get('regions').split()
+    for reg in regs:
+        if reg.startswith('polygon'):
+            sr = utils.SRegion(reg, wrap=False)
+            rows.append([dataset, ext, sr.polystr()[0], time.time()])
+    
+    tab = utils.GTable(rows=rows, names=['dataset','ext','region','time'])
+    
+    if False:
+        db.send_to_database('exposure_region_mask', tab,
+                            if_exists='append')
+                            
+    return tab
+
+
+def apply_region_mask_from_db(flt_file, dq_value=1024, verbose=True, in_place=True):
+    """
+    Query the `exposure_region_mask` table and apply masks 
+    
+    Parameters
+    ----------
+    flt_file : str
+        Image filename
+    
+    dq_value : int
+        Value to "OR" into the DQ extension
+    
+    verbose : bool
+        Messaging
+    
+    in_place : bool
+        Apply to DQ extension and resave `flt_file`
+    
+    Returns
+    -------
+    region_mask : array-like
+        If a region mask for `flt_file` is found in the database, return a mask array
+        derived from the database footprint.  Otherwise, return ``None``.
+    
+    """
+    try:
+        from .aws import db
+    except ImportError:
+        return False
+    
+    try:
+        masks = db.SQL(f"""select * from exposure_region_mask
+    where dataset = '{os.path.basename(flt_file)}'
+    """)
+    except:
+        logstr = f'# prep.apply_region_mask_from_db: query failed'
+        utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
+        
+        return None
+    
+    if len(masks) == 0:
+        return None
+        
+    with pyfits.open(flt_file, mode='update') as im:
+        sh = im['DQ'].data.shape
+        yp, xp = np.indices(sh)
+        coo = np.array([xp.flatten(), yp.flatten()]).T
+        region_mask = np.zeros(sh, dtype=bool)
+        
+        for reg, ext in zip(masks['region'], masks['ext']):
+            logstr = f'# prep.apply_region_mask_from_db: {flt_file}[{ext}] mask {reg}'
+            utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
+            
+            sr = utils.SRegion(reg, wrap=False)
+            region_mask |= sr.path[0].contains_points(coo).reshape(sh)
+        
+        if in_place:
+            
+            im['DQ',ext].data |= (region_mask*dq_value).astype(im['DQ',ext].data.dtype)
+            im.flush()
+    
+    return region_mask
 
 
 def apply_region_mask(flt_file, dq_value=1024, verbose=True):
@@ -3978,6 +4081,7 @@ def process_direct_grism_visit(direct={},
                                tweak_n_min=10,
                                tweak_threshold=1.5,
                                tweak_ref_exp=0,
+                               tweak_mosaic_iters=0,
                                align_simple=True,
                                single_image_CRs=True,
                                skymethod='localmin',
@@ -4054,7 +4158,8 @@ def process_direct_grism_visit(direct={},
     from stwcs import updatewcs
     from drizzlepac import updatehdr
     from drizzlepac.astrodrizzle import AstroDrizzle
-
+    from .aws import visit_processor
+    
     #################
     # Direct image processing
     #################
@@ -4192,10 +4297,48 @@ def process_direct_grism_visit(direct={},
                         key=' ',
                         drizzle=False,
                         ref_exp=tweak_ref_exp,
-                        threshold=tweak_threshold, fit_order=tweak_fit_order)
+                        threshold=tweak_threshold,
+                        fit_order=tweak_fit_order)
+            
+            ## Iterate the tweak correction
+            if tweak_mosaic_iters > 0:
+                tweak_kwargs = dict(max_dist=tweak_max_dist,
+                        n_min=tweak_n_min,
+                        key=' ',
+                        drizzle=False,
+                        ref_exp=tweak_ref_exp,
+                        threshold=tweak_threshold,
+                        fit_order=tweak_fit_order
+                        )
+                
+                # Reset JWST headers
+                if isJWST:
+                    for file in direct['files']:
+                        _ = jwst_utils.set_jwst_to_hst_keywords(file, reset=True)
+                    if 'files' in grism:
+                        for file in grism['files']:
+                            _ = jwst_utils.set_jwst_to_hst_keywords(file, reset=True)
+
+                iterate_tweak_align(direct, grism,
+                                    cat_threshold=7,
+                                    cleanup=True,
+                                    niter=tweak_mosaic_iters, 
+                                    tweak_kwargs=tweak_kwargs,
+                                    verbose=True)
+                
+                # Set back to pseudo-HST headers
+                if isJWST:
+                    for file in direct['files']:
+                        _ = jwst_utils.set_jwst_to_hst_keywords(file)
+                    if 'files' in grism:
+                        for file in grism['files']:
+                            _ = jwst_utils.set_jwst_to_hst_keywords(file)
 
         if (isACS) & (len(direct['files']) == 1) & single_image_CRs:
-            find_single_image_CRs(direct, simple_mask=False, with_ctx_mask=False, run_lacosmic=True)
+            find_single_image_CRs(direct,
+                                  simple_mask=False,
+                                  with_ctx_mask=False, 
+                                  run_lacosmic=True)
 
         # Get reference astrometry from GAIA, PS1, SDSS, WISE, etc.
         if radec is None:
@@ -4507,7 +4650,7 @@ def process_direct_grism_visit(direct={},
                                      extra_wfc3ir_badpix=True,
                                      verbose=False,
                                      scale_photom=False,
-                                     weight_type='median_err',
+                                     weight_type='jwst',
                                      calc_wcsmap=False,
                                      )
                        
@@ -4699,7 +4842,7 @@ def set_grism_dfilter(direct, grism):
             flt.flush()
 
 
-def tweak_align(direct_group={}, grism_group={}, max_dist=1., n_min=10, key=' ', threshold=3, drizzle=False, fit_order=-1, ref_exp=0):
+def tweak_align(direct_group={}, grism_group={}, max_dist=1., n_min=10, key=' ', threshold=3, drizzle=False, fit_order=-1, ref_exp=0, flux_radius=[0.5, 5], master_radec=None, make_figures=True):
     """Intra-visit shift alignment
     
     Parameters
@@ -4724,8 +4867,12 @@ def tweak_align(direct_group={}, grism_group={}, max_dist=1., n_min=10, key=' ',
         using the shifts themselves, e.g., for DASH imaging
     
     ref_exp : int
-        Index of the exposure to use as the reference for the tweak shifts
-        
+        Index of the exposure to use as the reference for the tweak shifts.  If < 0,
+        then use the exposure with the longest exposure time.
+    
+    flux_radius, master_radec, make_figures : float, str, bool
+        See `~grizli.prep.tweak_flt`
+    
     Returns
     -------
     Nothing, but updates WCS of direct and (optionally) grism exposures
@@ -4745,11 +4892,27 @@ def tweak_align(direct_group={}, grism_group={}, max_dist=1., n_min=10, key=' ',
         utils.log_comment(utils.LOGFILE, logstr, verbose=True)
         return True
 
-    wcs_ref, shift_dict = tweak_flt(files=direct_group['files'],
-                                    max_dist=max_dist, threshold=threshold,
-                                    verbose=True, ref_exp=ref_exp)
-
-    grism_matches = find_direct_grism_pairs(direct=direct_group, grism=grism_group, check_pixel=[507, 507], toler=0.1, key=key)
+    wcs_ref, shift_dict, cats, fig = tweak_flt(files=direct_group['files'],
+                                               max_dist=max_dist,
+                                               threshold=threshold,
+                                               verbose=True,
+                                               ref_exp=ref_exp,
+                                               master_radec=master_radec,
+                                               min_flux_radius=flux_radius[0],
+                                               max_flux_radius=flux_radius[1],
+                                               make_figures=make_figures,
+                                          )
+    
+    if fig is not None:
+        ax = fig.axes[0]
+        ax.set_title(direct_group['product'])
+        fig.savefig('{0}_shifts.png'.format(direct_group['product']))
+        
+    grism_matches = find_direct_grism_pairs(direct=direct_group,
+                                            grism=grism_group, check_pixel=[507, 507], 
+                                            toler=0.1,
+                                            key=key)
+    
     logstr = '\ngrism_matches = {0}\n'.format(grism_matches)
     utils.log_comment(utils.LOGFILE, logstr, verbose=True)
 
@@ -4841,6 +5004,102 @@ def tweak_align(direct_group={}, grism_group={}, max_dist=1., n_min=10, key=' ',
     clean_drizzle(grism_group['product'])
 
     return True
+
+
+def iterate_tweak_align(direct, grism, cat_threshold=7, cleanup=True, niter=3, tweak_kwargs={}, max_ref_sources=150, verbose=True):
+    """
+    Iterate `~grizli.prep.tweak_align` aligning exposures to a mosaic created from 
+    those exposures
+    
+    Parameters
+    ----------
+    direct : dict
+        Visit dictionary
+    
+    Returns
+    -------
+    Nothing
+    """
+    from .aws import visit_processor
+    
+    if False:
+        tweak_kwargs = dict(max_dist=tweak_max_dist,
+                n_min=tweak_n_min,
+                key=' ',
+                drizzle=False,
+                ref_exp=tweak_ref_exp,
+                threshold=tweak_threshold,
+                fit_order=tweak_fit_order
+                )
+    
+    # Copies
+    if not os.path.exists('TweakBackup'):
+        print('# iterate_tweak_align: make copies to ./TweakBackup')
+        
+        os.mkdir('TweakBackup')
+
+    for file in direct['files']:
+        shutil.copy(file, './TweakBackup')
+
+    # Mosaic parameters
+    _res = visit_processor.res_query_from_local(files=direct['files'])
+    _hdu = utils.make_maximal_wcs(direct['files'], pixel_scale=None,
+                                  get_hdu=True, pad=4, verbose=False)
+    _wcs = pywcs.WCS(_hdu.header)
+    
+    tmp_root = f"tweak_{direct['product']}"
+    
+    for iter_i in range(niter):
+        
+        logstr = f'# prep.iterate_tweak_align: iteration {iter_i}'
+        utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
+        
+        tmp_root_i = f"{tmp_root}_{iter_i}"
+        
+        _ = visit_processor.cutout_mosaic(rootname=tmp_root_i, 
+                                      product='{rootname}',
+                                      ir_wcs=_wcs, half_optical=False,
+                                      kernel='square', pixfrac=0.8,
+                                      res=_res,
+                                      clean_flt=False,
+                                      gzip_output=False,
+                                      skip_existing=False,
+                                      s3output=None,
+                                      verbose=False)
+        
+        cat = make_SEP_catalog(tmp_root_i,
+                               threshold=cat_threshold,
+                               verbose=False)
+        ok = cat['MASK_APER_0'] == 0
+
+        print(ok.sum())
+        so = np.argsort(cat['MAG_AUTO'][ok])[:max_ref_sources]
+
+        table_to_radec(cat[ok][so], f"{tmp_root_i}.radec")
+        
+        # Derive shifts from original files
+        for file in direct['files']:
+            shutil.copy(f'./TweakBackup/{file}', './')
+        
+        # Do alignment and update exposure WCS
+        tweak_align(direct_group=direct,
+                    grism_group=grism,
+                    master_radec=f"{tmp_root_i}.radec",
+                    **tweak_kwargs)
+    
+    if cleanup:
+        
+        print('# iterate_tweak_align: remove ./TweakBackup')
+        
+        for file in direct['files']:
+            os.remove(f'./TweakBackup/{file}')
+            
+        os.rmdir('./TweakBackup')
+
+        files = glob.glob(f'{tmp_root}*')
+        for file in files:
+            print(f'# remove {file}')
+            os.remove(file)
 
 
 def get_visit_radec_from_database(visit, nmax=200):
@@ -5016,7 +5275,7 @@ MATCH_KWS = dict(maxKeep=10, auto_keep=3, auto_transform=None, auto_limit=3,
                  size_limit=[5, 1800], ignore_rot=True, ignore_scale=True, 
                  ba_max=0.9)
                                 
-def tweak_flt(files=[], max_dist=0.4, threshold=3, verbose=True, tristars_kwargs=MATCH_KWS, ref_exp=0, use_sewpy=False):
+def tweak_flt(files=[], max_dist=0.4, threshold=3, min_flux_radius=0.5, max_flux_radius=5, max_pixels=1.0, max_nmask=0, verbose=True, tristars_kwargs=MATCH_KWS, ref_exp=0, use_sewpy=False, master_radec=None, make_figures=False):
     """Refine shifts of FLT files
     
     Parameters
@@ -5030,6 +5289,17 @@ def tweak_flt(files=[], max_dist=0.4, threshold=3, verbose=True, tristars_kwargs
     threshold : float
         Source detection threshold for `sep.extract`
     
+    min_flux_radius, max_flux_radius : float
+        Range of ``FLUX_RADIUS`` values to allow
+    
+    max_pixels : float
+        Maximum pixel offset relative to median to allow for sources in each 
+        exposure catalog
+    
+    max_nmask : float
+        Maximum value of ``MASK_APER_0`` to allow, i.e., to remove sources with central
+        saturated pixels
+    
     verbose : bool
         Status messages
     
@@ -5037,10 +5307,19 @@ def tweak_flt(files=[], max_dist=0.4, threshold=3, verbose=True, tristars_kwargs
         Keyword arguments for `tristars.match.match_catalog_tri`
     
     ref_exp : int
-        Index of the exposure to use as the reference for the tweak shifts
+        Index of the exposure to use as the reference for the tweak shifts.  If < 0, 
+        then use the exposure with the longest integration time.
     
     use_sewpy : bool
         Use `sewpy` for source detection (deprecated)
+    
+    master_radec : str
+        Filename of a list of reference ``(ra,dec)`` positions to match.  If not
+        provided, then align to the first exposure of the list
+    
+    make_figures : int, bool
+        If True, then make a diagnostic figure with the shift residuals.
+        If 2, then make individual `tristars` match figures as well.
     
     Returns
     -------
@@ -5053,6 +5332,12 @@ def tweak_flt(files=[], max_dist=0.4, threshold=3, verbose=True, tristars_kwargs
         fit, so `rot = 0.` and `scale = 1.`.  ``N`` is the number of sources
         used for the fit.
         
+    cats : list
+        List of tuples of the catalog and WCS derived from each exposure
+    
+    fig : None, Figure
+        Returns the figure object if ``make_figures`` tests True
+    
     """
     import scipy.spatial
 
@@ -5075,7 +5360,9 @@ def tweak_flt(files=[], max_dist=0.4, threshold=3, verbose=True, tristars_kwargs
     cats = []
     logstr = '### Tweak alignment (use_sewpy={0}) '.format(use_sewpy)
     utils.log_comment(utils.LOGFILE, logstr, verbose=True)
-
+    
+    exptime = np.zeros(len(files))
+    
     for i, file in enumerate(files):
         root = file.split('.fits')[0]
 
@@ -5084,7 +5371,10 @@ def tweak_flt(files=[], max_dist=0.4, threshold=3, verbose=True, tristars_kwargs
             ok = im['DQ', 1].data == 0
         except:
             ok = np.isfinite(im['SCI', 1].data)
-
+        
+        if 'EXPTIME' in im[0].header:
+            exptime[i] = im[0].header['EXPTIME']
+            
         sci = im['SCI', 1].data*ok - np.nanmedian(im['SCI', 1].data[ok])
 
         header = im['SCI', 1].header.copy()
@@ -5092,7 +5382,7 @@ def tweak_flt(files=[], max_dist=0.4, threshold=3, verbose=True, tristars_kwargs
         for k in ['PHOTFNU', 'PHOTFLAM', 'PHOTPLAM', 'FILTER']:
             if k in im[0].header:
                 header[k] = im[0].header[k]
-
+        
         hst_filter = utils.parse_filter_from_header(im[0].header)
         header['FILTER'] = hst_filter
 
@@ -5145,32 +5435,60 @@ def tweak_flt(files=[], max_dist=0.4, threshold=3, verbose=True, tristars_kwargs
                 os.remove(file)
         
         im.close()
+    
+    if ref_exp < 0:
+        if exptime.max() > 0:
+            ref_exp = np.argmax(exptime)
+        else:
+            ref_exp = 0
         
-    if ref_exp < len(cats):
+        c0, wcs_0 = cats[ref_exp]
+        
+    elif ref_exp < len(cats):
         c0, wcs_0 = cats[ref_exp]
     else:
         c0, wcs_0 = cats[0]
     
-    not_CR = c0['FLUX_RADIUS'] > 1.5
+    not_CR = c0['FLUX_RADIUS'] > min_flux_radius
+    not_CR &= c0['FLUX_RADIUS'] < max_flux_radius
+    not_CR &= c0['MASK_APER_0'] <= max_nmask
+    
     c0 = c0[not_CR]
 
-    xy_0 = np.array([c0['X_IMAGE'], c0['Y_IMAGE']]).T
+    if master_radec is None:
+        xy_0 = np.array([c0['X_IMAGE'], c0['Y_IMAGE']]).T
+    else:
+        logstr = f'### reference sources from {master_radec}'
+        utils.log_comment(utils.LOGFILE, logstr, verbose=True)
+        
+        rd_ref = np.loadtxt(master_radec)
+        xy_0 = np.array(wcs_0.all_world2pix(rd_ref[:,0], rd_ref[:,1], 1)).T
+        
     tree = scipy.spatial.cKDTree(xy_0, 10)
-
+    
+    if make_figures:
+        fig, ax = plt.subplots(1,1,figsize=(5,5))
+    else:
+        fig = None
+        
     try:
         # Use Tristars for matching
 
         # First 100
         NMAX = 100
         if len(xy_0) > NMAX:
-            so = np.argsort(c0['MAG_AUTO'])
-            xy_0 = xy_0[so[:NMAX], :]
-
+            if master_radec is None:
+                so = np.argsort(c0['MAG_AUTO'])
+                xy_0 = xy_0[so[:NMAX], :]
+        
         shift_dict = OrderedDict()
         for i in range(0, len(files)):
             c_ii, wcs_i = cats[i]
 
-            not_CR = c_ii['FLUX_RADIUS'] > 1.5
+            not_CR = c_ii['FLUX_RADIUS'] > min_flux_radius
+            not_CR &= c_ii['FLUX_RADIUS'] < max_flux_radius
+            not_CR &= c_ii['MASK_APER_0'] <= max_nmask
+            
             c_i = c_ii[not_CR]
 
             # SExtractor doesn't do SIP WCS?
@@ -5183,20 +5501,32 @@ def tweak_flt(files=[], max_dist=0.4, threshold=3, verbose=True, tristars_kwargs
 
             pair_ix = match_catalog_tri(xy, xy_0, **tristars_kwargs)
 
-            # if False:
-            #     match_diagnostic_plot(xy, xy_0, pair_ix, tf=None, 
-            #                           new_figure=False)
-
+            if make_figures > 1:
+                match_diagnostic_plot(xy, xy_0, pair_ix, tf=None,
+                                      new_figure=True)
+                
             dr = xy[pair_ix[:, 0], :] - xy_0[pair_ix[:, 1], :]
+            
             ok = dr.max(axis=1) < 1000
+            
+            dx = np.median(dr[ok, :], axis=0)
+            
+            ok &= np.sqrt(((dr-dx)**2).sum(axis=1)) < max_pixels
+            
             dx = np.median(dr[ok, :], axis=0)
             rms = np.std(dr[ok, :], axis=0)/np.sqrt(ok.sum())
-
+            
+            if make_figures:
+                ax.scatter(*(dr[ok,:] - dx).T, alpha=0.5, label=files[i])
+                
             shift_dict[files[i]] = [dx[0], dx[1], 0.0, 1.0, ok.sum(), rms]
-
+            
             lstr = "# tw {0} [{1:6.3f}, {2:6.3f}]  [{3:6.3f}, {4:6.3f}] N={5}"
             lstr = lstr.format(files[i], dx[0], dx[1], rms[0], rms[1],
                                    ok.sum())
+            
+            lstr += f' Ntot={len(c_i)}'
+            
             utils.log_comment(utils.LOGFILE, lstr, verbose=verbose)
 
     except:
@@ -5232,9 +5562,19 @@ def tweak_flt(files=[], max_dist=0.4, threshold=3, verbose=True, tristars_kwargs
             lstr = '# tw {0} {1} {2} N={3}'
             lstr = logstr.format(files[i], dx, rms, ok.sum())
             utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
-
+    
+    if make_figures:
+        ax.set_xlim(-1.5*max_pixels,1.5*max_pixels)
+        ax.set_ylim(-1.5*max_pixels,1.5*max_pixels)
+        ax.set_xlabel(r'$\Delta x$, pixels')
+        ax.set_xlabel(r'$\Delta y$, pixels')
+        fig.tight_layout(pad=1)
+        
+        ax.grid()
+        
     wcs_ref = cats[0][1]
-    return wcs_ref, shift_dict
+    
+    return wcs_ref, shift_dict, cats, fig
 
 
 def apply_tweak_shifts(wcs_ref, shift_dict, grism_matches={}, verbose=True, log=True):
@@ -5276,7 +5616,11 @@ def apply_tweak_shifts(wcs_ref, shift_dict, grism_matches={}, verbose=True, log=
     file0 = list(shift_dict.keys())[0].split('.fits')[0]
     tweak_file = '{0}_tweak_wcs.fits'.format(file0)
     hdu.writeto(tweak_file, overwrite=True)
+    
     for file in shift_dict:
+        if not os.path.exists(file):
+            continue
+        
         xyscale = shift_dict[file][:2]+[0., 1]
         update_wcs_fits_log(file, wcs_ref, xyscale=xyscale, initialize=True,
                             replace=('.fits', '.wcslog.fits'),
