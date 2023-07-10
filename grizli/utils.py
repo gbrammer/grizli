@@ -5551,6 +5551,7 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
                        verbose=True,
                        scale_photom=True,
                        weight_type='err',
+                       rnoise_percentile=99,
                        calc_wcsmap=False,
                        niriss_ghost_kwargs={}):
     """
@@ -5610,7 +5611,11 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
         - For the 'jwst' strategy, if 'VAR_POISSON' and 'VAR_RNOISE' extensions found,
           weight by VAR_RNOISE + median(VAR_POISSON).  Fall back to 'median_err'
           otherwise.
-                       
+    
+    rnoise_percentile : float
+        Percentile defining the upper limit of valid `VAR_RNOISE` values, if that 
+        extension is found in the exposure files(e.g., for JWST)
+    
     niriss_ghost_kwargs : dict
         Keyword arguments for `~grizli.utils.niriss_ghost_mask`
     
@@ -5921,6 +5926,13 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
                 wht[_msk] = 0
                 
                 if (weight_type == 'jwst'):
+                    
+                    if (('VAR_RNOISE', ext) in flt) & (rnoise_percentile is not None):
+                        _rn_data = flt[('VAR_RNOISE',ext)].data
+                        rnoise_value = np.nanpercentile(_rn_data[~_msk], 
+                                                        rnoise_percentile)
+                        _msk |= _rn_data >= rnoise_value
+                        
                     if ('VAR_POISSON',ext) in flt:
                         # Weight by VAR_RNOISE + median(VAR_POISSON)
                         if (~_msk).sum() > 0:
