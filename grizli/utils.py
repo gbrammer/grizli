@@ -5907,7 +5907,7 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
                 # JWST: just 1,1024,4096 bits
                 if flt[0].header['TELESCOP'] in ['JWST']:
                     dq = flt[('DQ', ext)].data & (1+1024+4096)
-                    dq |= bpdata
+                    dq |= bpdata.astype(dq.dtype)
                     
                     # dq0 = unset_dq_bits(flt[('DQ', ext)].data, bits) | bpdata
                     # print('xxx', (dq > 0).sum(), (dq0 > 0).sum())
