@@ -5553,7 +5553,8 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
                        weight_type='err',
                        rnoise_percentile=99,
                        calc_wcsmap=False,
-                       niriss_ghost_kwargs={}):
+                       niriss_ghost_kwargs={},
+                       get_dbmask=True):
     """
     Make drizzle mosaic from exposures in a visit dictionary
     
@@ -5642,8 +5643,10 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
     from botocore.exceptions import ClientError
     import scipy.ndimage as nd
     from astropy.io.fits import PrimaryHDU, ImageHDU
-    from .version import __version__ as grizli__version
     
+    from .prep import apply_region_mask_from_db
+    from .version import __version__ as grizli__version
+
     bucket_name = None
     s3 = boto3.resource('s3')
     s3_client = boto3.client('s3')
@@ -5776,7 +5779,13 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
                         break
             else:
                 bpdata = np.zeros(flt['SCI'].data.shape, dtype=int)
-                
+            
+            if get_dbmask:
+                dbmask = apply_region_mask_from_db(os.path.basename(file), 
+                                                   in_place=False, verbose=True)
+                if dbmask is not None:
+                    bpdata |= dbmask*1
+                    
             # NIRISS ghost mask
             if (_inst in ['NIRISS']) & (niriss_ghost_kwargs is not None):
                 if 'verbose' not in niriss_ghost_kwargs:

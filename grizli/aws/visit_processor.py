@@ -1716,7 +1716,7 @@ def query_exposures(ra=53.16, dec=-27.79, size=1., pixel_scale=0.1, theta=0,  fi
     return header, wcs, SQL, res
 
 
-def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-27.7910651, size=5*60, theta=0., filters=['F160W'], ir_scale=0.1, ir_wcs=None, res=None, half_optical=True, kernel='point', pixfrac=0.33, make_figure=True, skip_existing=True, clean_flt=True, gzip_output=True, s3output='s3://grizli-v2/HST/Pipeline/Mosaic/', split_uvis=True, extra_query='', extra_wfc3ir_badpix=True, fix_niriss=True, scale_nanojy=10, verbose=True, weight_type='err', rnoise_percentile=99, niriss_ghost_kwargs={}, scale_photom=True, calc_wcsmap=False, make_exptime_map=False, expmap_sample_factor=4, keep_expmap_small=True, **kwargs):
+def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-27.7910651, size=5*60, theta=0., filters=['F160W'], ir_scale=0.1, ir_wcs=None, res=None, half_optical=True, kernel='point', pixfrac=0.33, make_figure=True, skip_existing=True, clean_flt=True, gzip_output=True, s3output='s3://grizli-v2/HST/Pipeline/Mosaic/', split_uvis=True, extra_query='', extra_wfc3ir_badpix=True, fix_niriss=True, scale_nanojy=10, verbose=True, weight_type='err', rnoise_percentile=99, get_dbmask=True, niriss_ghost_kwargs={}, scale_photom=True, calc_wcsmap=False, make_exptime_map=False, expmap_sample_factor=4, keep_expmap_small=True, **kwargs):
     """
     Make mosaic from exposures defined in the exposure database
     
@@ -1823,6 +1823,8 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
     from grizli import utils
     from mastquery import overlaps
     
+    ORIG_LOGFILE = utils.LOGFILE
+    
     utils.set_warnings()
     
     # out_h, ir_wcs, res = query_exposures(ra=ra, dec=dec,
@@ -1893,11 +1895,14 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
         
         visit = {'product':product.format(rootname=rootname, f=f).lower()}
         
+        utils.LOGFILE = f"{visit['product']}.log.txt"
+        
         if (len(glob.glob(visit['product'] + '*fits*')) > 0) & skip_existing:
             print('Skip ' + visit['product'])
             continue
             
-        print('============', visit['product'], '============')
+        msg = '============', visit['product'], '============'
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
         
         if 'clear' in f:
             ftest = f.lower().replace('clear-','').replace('-clear','')
@@ -1932,6 +1937,7 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
         assoc = res[fi]['assoc']
         ffp = res[fi]['footprint']
         expt = res[fi]['exptime'].sum()
+        
         
         if make_figure:
             fig, ax = plt.subplots(1,1,figsize=(6,6))
@@ -1981,6 +1987,7 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
                                      extra_wfc3ir_badpix=extra_wfc3ir_badpix,
                                      verbose=verbose,
                                      scale_photom=scale_photom,
+                                     get_dbmask=get_dbmask,
                                      niriss_ghost_kwargs=niriss_ghost_kwargs,
                                      weight_type=weight_type,
                                      calc_wcsmap=calc_wcsmap)
