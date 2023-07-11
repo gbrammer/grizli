@@ -5749,16 +5749,20 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
             if k in flt[0].header:
                 keys[k] = flt[0].header[k]
         
+        bpdata = None
+        
         if flt[0].header['TELESCOP'] in ['JWST']:
             bits = 4
             include_saturated = False
             
             #bpdata = 0
             _inst = flt[0].header['INSTRUME']
-            if (extra_wfc3ir_badpix) & (_inst in ['NIRCAM']):
+            if (extra_wfc3ir_badpix) & (_inst in ['NIRCAM','NIRISS']):
                 _det = flt[0].header['DETECTOR']
                 bpfiles = [os.path.join(os.path.dirname(__file__), 
                            f'data/nrc_badpix_20230710_{_det}.fits.gz')]
+                bpfiles += [os.path.join(os.path.dirname(__file__), 
+                           f'data/{_det.lower()}_badpix_20230710.fits.gz')] # NIRISS
                 bpfiles += [os.path.join(os.path.dirname(__file__), 
                            f'data/nrc_badpix_230701_{_det}.fits.gz')]
                 bpfiles += [os.path.join(os.path.dirname(__file__),
@@ -5777,7 +5781,8 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
                         msg = f'Use extra badpix in {bpfile}'
                         log_comment(LOGFILE, msg, verbose=verbose)
                         break
-            else:
+                        
+            if bpdata is None:
                 bpdata = np.zeros(flt['SCI'].data.shape, dtype=int)
             
             if get_dbmask:

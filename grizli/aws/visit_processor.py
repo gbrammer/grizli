@@ -1901,7 +1901,7 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
             print('Skip ' + visit['product'])
             continue
             
-        msg = '============', visit['product'], '============'
+        msg = '============ ' + visit['product'] + '============'
         utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
         
         if 'clear' in f:
