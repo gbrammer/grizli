@@ -7700,7 +7700,7 @@ class GTable(astropy.table.Table):
 
         self['aladin'] = ala
 
-    def write_sortable_html(self, output, replace_braces=True, localhost=True, max_lines=50, table_id=None, table_class="display compact", css=None, filter_columns=[], buttons=['csv'], toggle=True, use_json=False):
+    def write_sortable_html(self, output, replace_braces=True, localhost=True, max_lines=50, table_id=None, table_class="display compact", css=None, filter_columns=[], buttons=['csv'], toggle=True, use_json=False, with_dja_css=False, timestamp=True):
         """Wrapper around `~astropy.table.Table.write(format='jsviewer')`.
 
         Parameters
@@ -7736,6 +7736,8 @@ class GTable(astropy.table.Table):
         etc : ...
             Additional parameters passed through to `write`.
         """
+        import time
+        
         #from astropy.table.jsviewer import DEFAULT_CSS
         DEFAULT_CSS = """
 body {font-family: sans-serif;}
@@ -7745,7 +7747,13 @@ td {font-size: 10pt;}
         """
         if css is not None:
             DEFAULT_CSS += css
-
+        
+        if with_dja_css:
+            DEFAULT_CSS += """
+select {display: inline; width:100px;}
+input[type="search"] {display: inline; width:400px;}
+        """
+        
         if os.path.exists(output):
             os.remove(output)
 
@@ -7768,6 +7776,14 @@ td {font-size: 10pt;}
         # Read all lines
         lines = open(output).readlines()
 
+        if with_dja_css:
+            for i, line in enumerate(lines):
+                if '<style>' in line:
+                    lines.insert(i, """
+    <link rel="stylesheet" href="https://dawn-cph.github.io/dja/assets/css/main.css" />
+        """)
+                    break
+
         if 'aladin' in self.colnames:
             # Insert Aladin CSS
             aladin_css = '<link rel="stylesheet" href="https://aladin.u-strasbg.fr/AladinLite/api/v2/latest/aladin.min.css" />\n'
@@ -7777,7 +7793,7 @@ td {font-size: 10pt;}
                     break
 
             lines.insert(il+1, aladin_css)
-
+        
         # Export buttons
         if buttons:
             # CSS
@@ -7798,7 +7814,7 @@ td {font-size: 10pt;}
             <script type="text/javascript" language="javascript" src="https://cdn.datatables.net/buttons/1.5.1/js/buttons.html5.min.js"></script>
             <script type="text/javascript" language="javascript" src="https://cdn.datatables.net/buttons/1.5.1/js/buttons.print.min.js"></script>
             """
-
+                        
             for il, line in enumerate(lines):
                 if 'js/jquery.dataTable' in line:
                     break
@@ -7807,8 +7823,9 @@ td {font-size: 10pt;}
             for il, line in enumerate(lines):
                 if 'pageLength' in line:
                     break
-
-            button_option = '{spacer}dom: \'Blfrtip\',\n{spacer}buttons: {bstr},\n'.format(spacer=' '*8, bstr=buttons.__repr__())
+            
+            button_str = '{spacer}dom: \'Blfrtip\',\n{spacer}buttons: {bstr},\n'
+            button_option = button_str.format(spacer=' '*8, bstr=buttons.__repr__())
             lines.insert(il+1, button_option)
 
         # Range columns
@@ -7817,6 +7834,17 @@ td {font-size: 10pt;}
         filter_lines = ["<table>\n"]
         descr_pad = ' <span style="display:inline-block; width:10;"></span> '
 
+        filter_input = """
+    <tr>
+        <td style="width:100px">
+            <input type="text" id="{0}_min" name="{0}_min"  
+                   style="width:60px;display:inline"> &#60;
+        </td> 
+        <td style="width:100px"> {0} </td> 
+        <td>  &#60; <input type="text" id="{0}_max" name="{0}_max" 
+                    style="width:60px;display:inline">
+    </tr>"""
+        
         for ic, col in enumerate(self.colnames):
             if col in filter_columns:
                 found = False
@@ -7828,9 +7856,8 @@ td {font-size: 10pt;}
                 if found:
                     # print(col)
                     ic_list.append(ic)
-                    #lines[i] = lines[i].replace(col, '{0} <br> <input type="text" id="{0}_min" name="{0}_min" style="width:30px;"> <input type="text" id="{0}_max" name="{0}_max" style="width:30px;">'.format(col))
 
-                    filter_lines += '<tr> <td> <input type="text" id="{0}_min" name="{0}_min" style="width:40px;"> &#60; </td> <td> {0} </td> <td>  &#60; <input type="text" id="{0}_max" name="{0}_max" style="width:40px;">'.format(col)
+                    filter_lines += filter_input.format(col)
                     
                     descr = '\n'
                     if hasattr(self.columns[col], 'description'):
@@ -7847,12 +7874,12 @@ td {font-size: 10pt;}
                 if '} );  </script>' in line:
                     break
             
-            filter_row = '<tr> <td> <input type="text" id="{0}_min" name="{0}_min" style="width:40px;"> &#60; </td> <td style="align:center;"> <tt>{0}</tt> </td> <td>  &#60; <input type="text" id="{0}_max" name="{0}_max" style="width:40px;">'
+            # filter_row = '<tr> <td> <input type="text" id="{0}_min" name="{0}_min" style="width:40px;"> &#60; </td> <td style="align:center;"> <tt>{0}</tt> </td> <td>  &#60; <input type="text" id="{0}_max" name="{0}_max" style="width:40px;">'
             
             filter_rows = []
             for ic in ic_list:
                 col = self.colnames[ic]
-                row_i = filter_row.format(col)
+                row_i = filter_input.format(col)
                 descr = '\n'
                 if hasattr(self.columns[col], 'description'):
                     if self.columns[col].description is not None:
@@ -7966,9 +7993,9 @@ $.UpdateFilterURL = function () {{
 
             lines.insert(il, listener)
 
-            fp = open(output, 'w')
-            fp.writelines(lines)
-            fp.close()
+        fp = open(output, 'w')
+        fp.writelines(lines)
+        fp.close()
 
         if toggle:
             lines = open(output).readlines()
@@ -8007,10 +8034,19 @@ $.UpdateFilterURL = function () {{
             """.format(' <b>/</b> '.join(['<a class="toggle-vis" data-column="{0}"> <tt>{1}</tt> </a>'.format(ic, col) for ic, col in enumerate(self.colnames)]))
 
             lines.insert(il+2, toggle_div)
-
-            fp = open(output, 'w')
-            fp.writelines(lines)
-            fp.close()
+            
+        # Insert timestamp
+        if timestamp:
+            for i, line in enumerate(lines[::-1]):
+                if '</body>' in line:
+                    # print('timestamp!',i)
+                    lines.insert(-(i+1),
+            f'<span style="font-size:x-small;"> Created: {time.ctime()} </span>\n')
+                    break
+        
+        fp = open(output, 'w')
+        fp.writelines(lines)
+        fp.close()
 
         if use_json:
             # Write as json
@@ -8050,7 +8086,7 @@ $.UpdateFilterURL = function () {{
 
             ajax_call = '{spacer}"ajax": "{json}",\n{spacer}"deferRender": true,\n'.format(spacer=' '*8, json=output.replace('.html', '.json'))
             lines.insert(il+1, ajax_call)
-
+            
             # Strip out table body
             for ihead, line in enumerate(lines):
                 if '</thead>' in line:
