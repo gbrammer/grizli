@@ -4992,7 +4992,7 @@ def get_rgb_filters(filter_list, force_ir=False, pure_sort=False):
     rpref = ['h', 'f160w', 'f140w','f444w-clear','f410m-clear',
              'f356w-clear','f277w-clear','f200w-clear','f150w-clear']
     gpref = ['j', 'yj', 'f125w', 'f110w', 'f105w', 'f098m','f277w-clear',
-             'f356w-clear','f200w-clear'
+             'f356w-clear','f200w-clear',
              'f150w-clear','f115w-clear',
              'f410m-clear','f300m-clear',
              ]
