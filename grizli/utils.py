@@ -8833,6 +8833,47 @@ def nowtime(iso=True):
         return tnow
 
 
+def figure_timestamp(fig, x=0.97, y=0.02, iso=True, ha='right', va='bottom', fontsize=5, color='k', alpha=1.):
+    """
+    Add a timestamp to a figure output
+    
+    Parameters
+    ----------
+    fig : `matplotlib` Figure
+        Figure object
+    
+    x, y : float
+        Label position in `fig.transFigure` coordinates (i.e., 0 < x,y < 1)
+    
+    iso : bool
+        Use ISO-formatted time from `~grizli.utils.ctime_to_iso`, otherwise use
+        `time.ctime()`
+    
+    ha, va : str
+        Horizontal and vertical alignment
+    
+    fontsize, color, alpha: int, str, float
+        Label properties (in `matplotlib.Figure.text`)
+    
+    Returns
+    -------
+    Adds a timestamp to the `fig` object
+    
+    """
+    import time
+    
+    time_str = time.ctime()
+    
+    if iso:
+        time_str = ctime_to_iso(time_str, verbose=False)
+        
+    fig.text(x, y, time_str,
+             ha=ha, va=va,
+             fontsize=fontsize,
+             transform=fig.transFigure,
+             color=color, alpha=alpha)
+
+
 def log_comment(LOGFILE, comment, verbose=False, show_date=False, mode='a'):
     """
     Log a message to a file, optionally including a date tag
