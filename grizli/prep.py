@@ -5367,16 +5367,24 @@ def tweak_flt(files=[], max_dist=0.4, threshold=3, min_flux_radius=0.5, max_flux
         root = file.split('.fits')[0]
 
         im = pyfits.open(file)
-        try:
-            ok = im['DQ', 1].data == 0
-        except:
-            ok = np.isfinite(im['SCI', 1].data)
+        
+        if os.path.basename(file).startswith('jw0'):
+            ok = im['DQ'].data & 1 == 0
+        else:
+            try:
+                ok = im['DQ', 1].data == 0
+            except:
+                ok &= np.isfinite(im['SCI', 1].data)
+                pass
+                
+        ok &= np.isfinite(im['SCI', 1].data)
         
         if 'EXPTIME' in im[0].header:
             exptime[i] = im[0].header['EXPTIME']
             
         sci = im['SCI', 1].data*ok - np.nanmedian(im['SCI', 1].data[ok])
-
+        sci[~ok] = 0
+        
         header = im['SCI', 1].header.copy()
 
         for k in ['PHOTFNU', 'PHOTFLAM', 'PHOTPLAM', 'FILTER']:
@@ -5409,6 +5417,8 @@ def tweak_flt(files=[], max_dist=0.4, threshold=3, min_flux_radius=0.5, max_flux
             # SEP
             wht = 1/im['ERR', 1].data**2
             wht[~(np.isfinite(wht))] = 0
+            wht[sci == 0] == 0
+            
             pyfits.writeto('{0}_xwht.fits'.format(root), data=wht,
                            header=im['ERR', 1].header, overwrite=True)
 
