@@ -7843,7 +7843,7 @@ input[type="search"] {display: inline; width:400px;}
         <td style="width:100px"> {0} </td> 
         <td>  &#60; <input type="text" id="{0}_max" name="{0}_max" 
                     style="width:60px;display:inline">
-    </tr>"""
+    """
         
         for ic, col in enumerate(self.colnames):
             if col in filter_columns:
@@ -7865,7 +7865,7 @@ input[type="search"] {display: inline; width:400px;}
                             descr = '{0} {1}\n'.format(descr_pad, 
                                             self.columns[col].description)
                                                         
-                    filter_lines += descr
+                    filter_lines += descr + "  </tr>"
                     
         if ic_list:
             # Insert input lines
