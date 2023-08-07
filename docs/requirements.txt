@@ -1,0 +1,11 @@
+Cython
+numpy
+matplotlib
+scikit-image
+scipy
+astropy
+sphinx_astropy
+pyyaml
+# fix to RtD 2021.11.04
+docutils<0.18
+sregion
