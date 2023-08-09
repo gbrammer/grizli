@@ -2093,6 +2093,12 @@ def get_line_wavelengths():
     line_ratios['HeI-3889'] = [1.]
     line_wavelengths['HeI-1083'] = [10832.057, 10833.306]
     line_ratios['HeI-1083'] = [1., 1.]
+    line_wavelengths['HeI-3820'] = [3820.7]
+    line_ratios['HeI-3820'] = [1.]
+    line_wavelengths['HeI-4027'] = [4027.3]
+    line_ratios['HeI-4027'] = [1.]
+    line_wavelengths['HeI-4472'] = [4472.7]
+    line_ratios['HeI-4472'] = [1.]
     line_wavelengths['HeI-6680'] = [6679.995]
     line_ratios['HeI-6680'] = [1.]
     line_wavelengths['HeI-7065'] = [7067.1]
@@ -2114,6 +2120,11 @@ def get_line_wavelengths():
     line_ratios['CIII-1906'] = [1.]
     line_wavelengths['CIII-1908'] = [1908.734]
     line_ratios['CIII-1908'] = [1.]
+    # Hutchinson 
+    # https://iopscience.iop.org/article/10.3847/1538-4357/ab22a2
+    line_wavelengths['CIII-1906x'] = [1906.683, 1908.734]
+    line_ratios['CIII-1906x'] = [1.5, 1.]
+    
     line_wavelengths['OIII-1663'] = [1665.85]
     line_ratios['OIII-1663'] = [1.]
     line_wavelengths['HeII-1640'] = [1640.4]
