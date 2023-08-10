@@ -8,7 +8,7 @@ EXTRACT_PATH: null
 CRDS_CONTEXT: null
 
 min_gaia_count: 128
-gaia_mag_limits: [16,20.5,0.05]
+gaia_mag_limits: [16,22.5,0.05]
 global_miri_skyflat: False
 
 filters: &filters 
