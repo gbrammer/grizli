@@ -638,6 +638,9 @@ def process_tile(field='cos', tile='01.01', filters=TILE_FILTERS, fetch_existing
         os.system(f"""aws s3 sync s3://grizli-v2/ClusterTiles/{field}/ ./
                           --exclude "*"
                           --include "{root}*_dr?*fits.gz"
+                          --exclude "{root}*-f770w*"
+                          --exclude "{root}*-f1???w*"
+                          --exclude "{root}*-f2???w*"
                           """.replace('\n', ' '))
         
         files = glob.glob(f'{root}*gz')
