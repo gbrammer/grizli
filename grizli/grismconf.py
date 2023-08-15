@@ -12,6 +12,32 @@ import numpy as np
 
 from . import GRIZLI_PATH, utils
 
+NIRCAM_CONF_VERSION = 'V8.5'
+
+if os.getenv('NIRCAM_CONF_VERSION') is not None:
+    NIRCAM_CONF_VERSION = os.getenv('NIRCAM_CONF_VERSION')
+    print('Use NIRCAM_CONF_VERSION={NIRCAM_CONF_VERSION}')
+    
+def show_available_nircam_versions(filter='F444W', module='B', grism='R', verbose=True):
+    """
+    Show all available versions of the NIRCAM Grism config files
+    """
+    import glob
+    
+    files = glob.glob(os.path.join(GRIZLI_PATH,
+                f'CONF/GRISM_NIRCAM/*/NIRCAM_{filter}_mod{module}_{grism}.conf'))
+    
+    files.sort()
+    
+    versions = []
+    
+    for file in files:
+        versions.append(file.split('/')[-2])
+        if verbose:
+            print(f'{versions[-1]:>8}   {file}')
+    
+    return versions
+
 
 class aXeConf():
     def __init__(self, conf_file='WFC3.IR.G141.V2.5.conf'):
@@ -604,16 +630,19 @@ def get_config_filename(instrume='WFC3', filter='F140W',
         
         # NIRCam preference: 8.5 > 8 > 4
         
-        conf_file = os.path.join(GRIZLI_PATH,
-                    f'CONF/GRISM_NIRCAM/V8.5/NIRCAM_{fi}_mod{module}_{gr}.conf')
+        conf_file_base = os.path.join(GRIZLI_PATH,
+        f'CONF/GRISM_NIRCAM/[[NIRCAM_VERSION]]/NIRCAM_{fi}_mod{module}_{gr}.conf')
         
-        if not os.path.exists(conf_file):
-            conf_file = conf_file.replace('V8.5/', 'V8/')        
-
-        if not os.path.exists(conf_file):
-            conf_file = conf_file.replace('V8/', 'V4/')        
+        _conf_versions = [NIRCAM_CONF_VERSION, 'V8.5', 'V8', 'V4', 'V6']
         
-        print(f'xxx conf_file: {conf_file}')
+        conf_file = None
+        for NIRCAM_VERSION in _conf_versions:
+            conf_file = conf_file_base.replace('[[NIRCAM_VERSION]]', NIRCAM_VERSION)
+            if os.path.exists(conf_file):
+                break
+        
+        if conf_file is None:
+            raise ValueError
         
     elif instrume == 'NIRCAMA':
         fi = grism
