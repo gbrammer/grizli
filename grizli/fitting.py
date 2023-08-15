@@ -17,7 +17,7 @@ import astropy.units as u
 from astropy.cosmology import Planck15
 import astropy.constants as const
 
-from . import utils, model
+from . import utils, model, grismconf
 
 #from .model import BeamCutout
 from .utils import GRISM_COLORS
@@ -98,7 +98,13 @@ def run_all_parallel(id, get_output_data=False, args_file='fit_args.npy', protec
     fp = open('{0}_{1:05d}.log_par'.format(args['group_name'], id), 'w')
     fp.write('{0}_{1:05d}: {2}\n'.format(args['group_name'], id, time.ctime()))
     fp.close()
-
+    
+    # Force NIRCAM config version for FRESCO
+    if args['group_name'] in ['fresco-gds-med', 'fresco-gdn-med']:
+        if grismconf.NIRCAM_CONF_VERSION != 'V4':
+            print('FRESCO: set NIRCAM V4')
+            grismconf.NIRCAM_CONF_VERSION = 'V4'
+        
     if protect:
         try:
             #args['zr'] = [0.7, 1.0]
@@ -2673,9 +2679,23 @@ class GroupFitter(object):
                     c = polyfit(zgrid[ix-1:ix+2], chi2[ix-1:ix+2], 2)
                     zi = -c[1]/(2*c[0])
                     chi_i = polyval(c, zi)
-                    zgrid_zoom.extend(np.arange(zi-2*dz[0],
+                    
+                    # Just use grid value
+                    zi = zgrid[ix]
+                                        
+                    if 0:
+                        zgrid_zoom.extend(np.arange(zi-2*dz[0],
                                       zi+2*dz[0]+dz[1]/10., dz[1]))
-
+                    else:
+                        # Use log_zgrid around local minima
+                        _zgi = utils.log_zgrid(zi + np.array([-1.1,1.1])*dz[0]*(1+zi),
+                                              dz=dz[1])                                              
+                        zgrid_zoom.extend(_zgi)
+                        if verbose:
+                            msg = f'zgrid_zoom: {zi:.4f} '
+                            msg += f'[{_zgi[0]:.4f}, {_zgi[-1]:.4f}] N={len(_zgi)}'
+                            print(msg)
+                        
             NZOOM = len(zgrid_zoom)
 
             chi2_zoom = np.zeros(NZOOM)
