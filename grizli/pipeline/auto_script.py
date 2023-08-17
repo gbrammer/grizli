@@ -1216,6 +1216,7 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_pr
             jwst_utils.set_jwst_to_hst_keywords(_file, reset=True)
 
     if len(tab) > 0:
+        # Hubble
         if MAST_QUERY:
             tab = query.get_products_table(tab, extensions=['RAW', 'C1M'])
 
@@ -1241,17 +1242,31 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_pr
                                   filters, method='startswith', logical='or')
 
         fetch_selection = (~badexp) & (~is_wfpc2) & use_filters
-        curl = fetch.make_curl_script(tab[fetch_selection], level=None,
-                        script_name='fetch_{0}.sh'.format(field_root),
-                        inst_products=inst_products, skip_existing=True,
-                        output_path='./', s3_sync=s3_sync)
-
-        msg = 'Fetch {0} files (s3_sync={1})'.format(fetch_selection.sum(),
-                                                     s3_sync)
+        
+        #### The curl script is deprecated now in favor of the 
+        #### more general mastquery.utils.download_from_mast function
+        #### that works with MAST_TOKEN authorization
+        
+        # curl = fetch.make_curl_script(tab[fetch_selection], level=None,
+        #                 script_name='fetch_{0}.sh'.format(field_root),
+        #                 inst_products=inst_products, skip_existing=True,
+        #                 output_path='./', s3_sync=s3_sync)
+        #msg = 'Fetch {0} files (s3_sync={1})'.format(fetch_selection.sum(),
+        #                                             s3_sync)
+        
+        msg = 'Fetch {0} files with mastquery.utils.download_From_mast'
+        msg = msg.format(fetch_selection.sum())
+        
         utils.log_comment(utils.LOGFILE, msg, verbose=True)
+        
+        # Use mastquery.utils.fetch_from_mast
+        _resp = mastquery.utils.download_from_mast(tab[fetch_selection],
+                                                   force_rate=False,
+                                                   rate_ints=False)
+        
 
         # Ugly callout to shell
-        os.system('sh fetch_{0}.sh'.format(field_root))
+        # os.system('sh fetch_{0}.sh'.format(field_root))
 
         if (is_wfpc2 & use_filters).sum() > 0:
             # Have to get WFPC2 from ESA
@@ -4714,7 +4729,11 @@ def make_combined_mosaics(root, fix_stars=False, mask_spikes=False, skip_single_
     if fill_mosaics:
         if fill_mosaics == 'grism':
             # Only fill mosaics if grism filters exist
-            has_grism = info.meta['HAS_GRISM']
+            if 'HAS_GRISM' in info.meta:
+                has_grism = info.meta['HAS_GRISM']
+            else:
+                has_grism = False
+                
             if has_grism:
                 fill_filter_mosaics(root)
         else:
