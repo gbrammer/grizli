@@ -1259,8 +1259,20 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_pr
         
         utils.log_comment(utils.LOGFILE, msg, verbose=True)
         
+        # Products
+        
+        file_list = []
+        un = utils.Unique(tab['instrument_name'], verbose=False)
+        for inst in inst_products:
+            inst_i = un[inst] & fetch_selection
+            if inst_i.sum() > 0:
+                for ext in inst_products[inst]:
+                    file_list.extend([uri.replace('_raw','_'+ext.lower())
+                                      for uri in tab['dataURI']]
+                                      )
+                
         # Use mastquery.utils.fetch_from_mast
-        _resp = mastquery.utils.download_from_mast(tab[fetch_selection],
+        _resp = mastquery.utils.download_from_mast(file_list,
                                                    force_rate=False,
                                                    rate_ints=False)
         
