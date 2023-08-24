@@ -124,6 +124,7 @@ visit_prep_args: &prep_args
     fix_stars: False
     reference_catalogs: [LS_DR9, PS1, DES, DSC, SDSS, GAIA, WISE]
     outlier_threshold: 4
+    skip_nircam_grism_sky: True
     nircam_wisp_kwargs:
         niter: 3
         update: True

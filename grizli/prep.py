@@ -4095,6 +4095,7 @@ def process_direct_grism_visit(direct={},
                                                    'SDSS', 'WISE'],
                                use_self_catalog=False,
                                nircam_wisp_kwargs={},
+                               skip_nircam_grism_sky=True,
                                oneoverf_kwargs={},
                                snowball_kwargs={},
                                angle_background_kwargs={},
@@ -4743,8 +4744,10 @@ def process_direct_grism_visit(direct={},
     
     # Subtract grism sky
     status = visit_grism_sky(grism=grism, apply=True, sky_iter=sky_iter,
-                          column_average=column_average, verbose=True, ext=1,
-                          iter_atol=iter_atol)
+                             column_average=column_average, verbose=True, ext=1,
+                             iter_atol=iter_atol,
+                             skip_nircam=skip_nircam_grism_sky, 
+                            )
 
     # Run on second chip (also for UVIS/G280)
     if isACS:
@@ -6001,7 +6004,7 @@ def get_jwst_wfssbkg_file(file, valid_flat=[0.6, 1.3], make_figure=False):
     return bkg_file
 
 
-def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext=1, sky_iter=10, iter_atol=1.e-4, use_spline=True, NXSPL=50):
+def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext=1, sky_iter=10, iter_atol=1.e-4, use_spline=True, NXSPL=50, skip_nircam=True):
     """Subtract sky background from grism exposures
 
     Implementation of the multi-component grism sky subtraction from 
@@ -6038,7 +6041,7 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
     isACS = False
     
     # Skip NIRCam grism
-    if 'GRISM' in grism_element:
+    if ('GRISM' in grism_element) & (skip_nircam):
         logstr = f'# visit_grism_sky: skip for {grism_element}'
         utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
         return False
@@ -6070,22 +6073,22 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
         # Get the background file, perhaps after correcting it for the flat
         wfss_ref = get_jwst_wfssbkg_file(grism['files'][0])
         
-        # GRISM_NIRCAM
-        if 'GRISM' in grism_element:
-            # Grism background files in GRISM_NIRCAM
-            
-            _bgpath = os.path.join(GRIZLI_PATH, 'CONF/GRISM_NIRCAM/V2')
-            # 'NRCA5-F356W-GRISMR'
-            gr = grism_element[-1]
-            mod = grism_element[3]
-            fi = grism_element.split('-')[-2]
-            _bgfile = os.path.join(_bgpath, 
-                                   f'{fi}_mod{mod}_{gr}_back.norm.fits.gz')
-                        
-            if os.path.exists(_bgfile):
-                wfss_ref = _bgfile
-                
-            # TBD
+        # # GRISM_NIRCAM
+        # if 'GRISM' in grism_element:
+        #     # Grism background files in GRISM_NIRCAM
+        #
+        #     _bgpath = os.path.join(GRIZLI_PATH, 'CONF/GRISM_NIRCAM/V2')
+        #     # 'NRCA5-F356W-GRISMR'
+        #     gr = grism_element[-1]
+        #     mod = grism_element[3]
+        #     fi = grism_element.split('-')[-2]
+        #     _bgfile = os.path.join(_bgpath,
+        #                            f'{fi}_mod{mod}_{gr}_back.norm.fits.gz')
+        #
+        #     if os.path.exists(_bgfile):
+        #         wfss_ref = _bgfile
+        #
+        #     # TBD
                 
         bg_fixed = [wfss_ref]
                                                         
@@ -6266,7 +6269,11 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
 
             flt = pyfits.open(file, mode='update')
             flt['SCI', ext].data -= sky[j, :].reshape(sh)*exptime[j]
-
+            
+            if isJWST:
+                _msk = (sky[j,:].reshape(sh) == 0)*1024
+                flt['DQ', ext].data |= (_msk).astype(flt['DQ',ext].data.dtype)
+            
             header = flt[0].header
             header['GSKYCOL{0:d}'.format(ext)] = (False,
                                                   'Subtract column average')
