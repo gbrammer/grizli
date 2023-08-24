@@ -845,7 +845,11 @@ def cdfs_hsc_catalog():
     sel &= (hsc['coord_dec'] > pat['demin']-dx) & (hsc['coord_dec'] < pat['demax']+dx)
     
     imag = 23.9-2.5*np.log10(hsc['i_modelfit_CModel_flux'])
-    sel &= (~hsc['i_modelfit_CModel_flux'].mask) & (imag < 24)
+    
+    MAG_LIMIT = 24
+    MAG_LIMIT = 24.5
+    
+    sel &= (~hsc['i_modelfit_CModel_flux'].mask) & (imag < MAG_LIMIT)
     sel &= hsc['i_modelfit_CModel_flag'] == 'False'
     #sel &= hsc['base_Blendedness_flag'] == 'False'
     #sel &= hsc['base_SdssCentroid_flag'] == 'False'
@@ -859,9 +863,32 @@ def cdfs_hsc_catalog():
     hsc['ra'] = hsc['coord_ra'] + 0.013/3600/cosd
     hsc['dec'] = hsc['coord_dec'] - 0.002/3600.
     
-    prep.table_to_radec(hsc, 'Ni2009_WCDFS_i24.radec')
+    prep.table_to_radec(hsc, f'Ni2009_WCDFS_i{MAG_LIMIT:.1f}.radec')
     
-    os.system('aws s3 cp Ni2009_WCDFS_i24.radec s3://grizli-v2/HST/Pipeline/Astrometry/')
+    os.system(f'aws s3 cp Ni2009_WCDFS_i{MAG_LIMIT:.1f}.radec s3://grizli-v2/HST/Pipeline/Astrometry/')
+    
+    # os.system('aws s3 cp Ni2009_WCDFS_i24.radec s3://grizli-v2/HST/Pipeline/Astrometry/')
+    
+    hsc['src'] = f'Ni2009_WCDFS_i{MAG_LIMIT:.1f}'
+    hsc['mag'] = 23.9-2.5*np.log10(hsc['i_modelfit_CModel_flux'])
+    
+    db.send_to_database('astrometry_reference',
+                        hsc['ra','dec','src','mag'],
+                        if_exists='append')
+    
+    # Compare Cosmic-Dawn catalog
+    hsc = db.SQL("""select * from astrometry_reference
+    where src like 'Ni2009%%'
+    """)
+    
+    edf = utils.read_catalog('H20_EDFF_v1.2_release.fits')
+    sub = (edf['HSC_i_MAG'] < 24.5)
+    idx, dr, dx, dy = edf[sub].match_to_catalog_sky(hsc, get_2d_offset=True)
+    
+    idx, dr, dx, dy = hsc.match_to_catalog_sky(edf, get_2d_offset=True)
+    ecdfs = dr.value < 30
+    
+    hasm = dr.value < 0.6
 
 
 def get_master_radec(s_region, nmax=200):
