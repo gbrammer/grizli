@@ -3,6 +3,7 @@ AWS utilities
 """
 import os
 import numpy as np
+from .. import utils
 
 def create_s3_index(path, output_file="index.html", extra_html="", upload=True, as_table=True, with_dja_css=True, show_images=True):
     """
@@ -92,3 +93,119 @@ def create_s3_index(path, output_file="index.html", extra_html="", upload=True, 
         print(path.replace('s3://', 'https://s3.amazonaws.com/') + output_file)
     else:
         print(output_file)
+
+
+def generate_program_codes():
+    """
+    Generate program codes tables
+    """
+    from . import db
+    
+    hst = db.SQL("""select proposal_id, max(proposal_pi) as PI, count(proposal_id), max(substr("dataURL", 19, 3)) as prog_code
+    from assoc_table
+    where instrument_name in ('WFC3/IR','ACS/WFC','WFC3/UVIS')
+    group by proposal_id
+    order by CAST(proposal_id as INT)
+    """)
+
+    jw = db.SQL("""select proposal_id, min(proposal_pi) as PI, count(proposal_id)
+    from assoc_table
+    where instrument_name in ('NIRISS','NIRCAM','MIRI')
+    group by proposal_id
+    order by CAST(proposal_id as INT)
+    """)
+    
+    jw['pi'][jw['proposal_id'] == '2514'] = 'Williams, Christina'
+    
+    hst.write('/tmp/hst_program_codes.csv', overwrite=True)
+    
+    jw.write('/tmp/jwst_program_codes.csv', overwrite=True)
+
+
+def program_ids_in_mosaic(wcs_file='https://s3.amazonaws.com/grizli-v2/JwstMosaics/v7/gds-grizli-v7.0-f850lp_wcs.csv', progs_list=None, return_raw_list=False):
+    """
+    Generate a summary of observing programs that contribute to a particular grizli mosaic
+    
+    Parameters
+    ----------
+    wcs_file : str
+        Filename or URL of a wcs summary file produced by `~grizli.aws.visit_processor.cutout_mosaic`
+    
+    progs_list : list
+        List of parsed programs from ``return_raw_list=True``, e.g., for concatenating
+        multiple lists into a single table
+    
+    return_raw_list : bool
+        Just return the list of parsed programs for each exposure
+    
+    Returns
+    -------
+    tab : list, `~astropy.table.Table`
+        List of parsed programs or a full table with program summary
+    
+    """
+    # Read summary tables
+    #--------------------
+    data_path = os.path.join(os.path.dirname(__file__), '../data')
+    
+    # HST
+    #-------------
+    hst_file = os.path.join(data_path, 'hst_program_codes.csv')
+    if not os.path.exists(hst_file):
+        hst_file = 'https://dawn-cph.github.io/dja/data/hst_program_codes.csv'
+        
+    hst = utils.read_catalog(hst_file)
+    hst_programs = {}
+    hst_pi = {}
+    for row in hst:
+        hst_programs[row['prog_code']] = row['proposal_id']
+        hst_pi[str(row['proposal_id'])] = row['pi']
+    
+    # JWST
+    #--------------
+    jw_file = os.path.join(data_path, 'jwst_program_codes.csv')
+    if not os.path.exists(jw_file):
+        jw_file = 'https://dawn-cph.github.io/dja/data/jwst_program_codes.csv'
+    
+    jw = utils.read_catalog(jw_file)
+    jwst_pi = {}
+    for row in jw:
+        jwst_pi[str(row['proposal_id'])] = row['pi']
+
+    # Loop through file names and calculate program IDs
+    #--------------------------------------------------
+    if progs_list is None:
+        
+        # grizli WCS summary file, remote or local
+        #------------------------------------------
+        exp = utils.read_catalog(wcs_file)
+        
+        progs_list = []
+        for file in np.unique(exp['file']):
+            if file.startswith('jw'):
+                progs_list.append(f'JWST-{file[3:7]}')
+            else:
+                progs_list.append(f'HST-{hst_programs[file[1:4]]}')
+    
+    if return_raw_list:
+        return progs_list
+        
+    # Print a summary
+    #----------------
+    un = utils.Unique(progs_list, verbose=False)
+    
+    url = 'https://www.stsci.edu/cgi-bin/get-proposal-info?id={0}&observatory={1}'
+    rows = []
+    for v in un.values:
+        obs, prog = v.split('-')
+        pi = hst_pi[prog] if obs == 'HST' else jwst_pi[prog]
+        rows.append([int(prog), obs, un[v].sum(), pi, url.format(prog, obs)])
+    
+    tab = utils.GTable(rows=rows,
+                       names=['program_id', 'observatory', 'count', 'pi', 'url'])
+    
+    so = np.argsort(tab['program_id'])
+    tab = tab[so]
+    tab.meta['wcs_file'] = wcs_file
+    
+    return tab

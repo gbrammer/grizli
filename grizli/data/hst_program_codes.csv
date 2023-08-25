@@ -1,0 +1,2442 @@
+proposal_id,pi,count,prog_code
+8183,"Miley, George K.",1,59l
+8992,"Ford, Holland",42,8cw
+8993,"Fruchter, Andrew S.",1,8c4
+9018,"De Marchi, Guido",13,8c0
+9023,"Hartig, George",1,8c6
+9028,"Meurer, Gerhardt R.",2,8cd
+9029,"Pasquali, Anna",3,8ca
+9033,"Ebeling, Harald",12,6fy
+9075,"Perlmutter, Saul",117,6fl
+9087,"Garcia, Michael R.",15,6d5
+9118,"Schmidt, Brian",5,6ec
+9270,"Allen, Steven W.",3,8d1
+9274,"Gregg, Michael D.",4,6jf
+9281,"Grindlay, Jonathan E.",6,8fw
+9288,"Ford, Holland",8,8dr
+9289,"Ford, Holland",23,8e9
+9290,"Ford, Holland",64,8eh
+9291,"Ford, Holland",32,8du
+9292,"Ford, Holland",16,8e1
+9293,"Ford, Holland",10,6jt
+9294,"Ford, Holland",4,8ea
+9295,"Ford, Holland",8,8e7
+9299,"Ford, Holland",2,8e8
+9301,"Ford, Holland",14,8eb
+9351,"Riess, Adam",17,8d2
+9352,"Riess, Adam",57,8g6
+9353,"Smartt, Stephen J.",20,8dt
+9361,"Aloisi, Alessandra",4,8d5
+9363,"Caldwell, Nelson",18,8d8
+9367,"Hazard, Cyril",5,8ds
+9370,"Bregman, Joel N.",1,8dq
+9373,"Rejkuba, Marina",8,6la
+9376,"Keel, William Clifford",3,8e3
+9381,"Walter, Fabian",4,8fu
+9392,"Mateo, Mario L.",12,8f1
+9395,"Carollo, Marcella",23,8f0
+9399,"Carter, David",14,8fk
+9400,"Thuan, Trinh Xuan",9,6kx
+9401,"Cote, Patrick",200,8fs
+9403,"Grogin, Norman",6,8fp
+9404,"Thompson, David John",1,8fq
+9405,"Fruchter, Andrew S.",120,8iy
+9409,"Goudfrooij, Paul",15,6n2
+9411,"Malhotra, Sangeeta",10,8dl
+9414,"de Grijs, Richard",18,8eo
+9418,"Jenkins, Edward B.",1,8d9
+9419,"Maiz Apellaniz, Jesus",21,8dj
+9424,"Stapelfeldt, Karl",6,8ee
+9425,"Giavalisco, Mauro",247,8e6
+9427,"Harris, William Edgar",34,6m6
+9428,"Kirshner, Robert P.",13,6mi
+9433,"Bernstein, Gary",52,6mf
+9438,"West, Michael J.",16,6me
+9442,"Cool, Adrienne",18,6lp
+9443,"King, Ivan R.",5,6ll
+9444,"King, Ivan R.",3,6lk
+9445,"Bennett, David P.",28,6m9
+9448,"Ferrarese, Laura",1,8d3
+9450,"Jackson, Neal J.",36,8d4
+9452,"Ellis, Richard S.",5,6lq
+9453,"Brown, Thomas M.",66,8f8
+9454,"Maoz, Dan",2,8ff
+9458,"Ferguson, Annette",26,8db
+9463,"Sahai, Raghvendra",44,8di
+9468,"Yan, Lin",663,8hq
+9471,"Mignani, Roberto",3,8fg
+9472,"Strauss, Michael A.",4,8f3
+9473,"Vacca, William D.",1,8fh
+9476,"Dalcanton, Julianne",60,8f6
+9477,"Madore, Barry F.",2,8fm
+9479,"Sarajedini, Ata",6,8g8
+9480,"Rhodes, Jason D.",1575,8ho
+9482,"Rhoads, James",616,8hp
+9483,"Yun, Min S.",12,8ej
+9488,"Ratnatunga, Kavan",838,8i0
+9490,"Kuntz, Kip",30,8d6
+9492,"Bresolin, Fabio",50,8d7
+9498,"Junkkarinen, Vesa T.",2,8dd
+9500,"Rix, Hans-Walter R",125,8de
+9502,"Ziegler, Bodo",4,8dk
+9503,"Nagar, Neil",4,8dm
+9560,"Gilliland, Ronald L",2,6ko
+9575,"Sparks, William B.",560,8fn
+9578,"Rhodes, Jason D.",6,8fe
+9583,"Giavalisco, Mauro",253,8dn
+9584,"Sparks, William B.",152,8g9
+9586,"Sparks, William B.",2,8gh
+9648,"Riess, Adam",25,8hm
+9656,"De Marchi, Guido",11,8hw
+9660,"Sparks, William B.",16,8l5
+9663,"Gilliland, Ronald L",2,8hr
+9665,"Gilliland, Ronald L",18,8i2
+9666,"Gilliland, Ronald L",8,8io
+9667,"Krist, John",1,8j8
+9671,"ODea, Christopher P.",3,8iv
+9682,"Sambruna, Rita M.",6,8ki
+9683,"Bauer, Franz",3,8jg
+9684,"Kaaret, Philip",1,8k9
+9689,"Gregg, Michael D.",4,8kk
+9690,"Grindlay, Jonathan E.",12,8kc
+9694,"Bond, Howard E.",11,8jy
+9696,"Noll, Keith S.",2,8kd
+9697,"Gilliland, Ronald L",4,8kh
+9698,"Noll, Keith S.",3,8ko
+9701,"Sparks, William B.",18,8kt
+9714,"Noll, Keith S.",18,8lw
+9717,"Ford, Holland",13,8ow
+9719,"Bridges, Terry",3,8pz
+9722,"Ebeling, Harald",23,8qu
+9727,"Perlmutter, Saul",87,8wq
+9728,"Riess, Adam",113,8n1
+9729,"Ruiz-Lapuente, Pilar",2,8s9
+9731,"Sankrit, Ravi",2,8pt
+9733,"Smartt, Stephen J.",6,8nv
+9735,"Whitmore, Brad C.",7,8st
+9741,"Gordon, Karl D.",6,8mw
+9742,"Herbst, William",1,8oh
+9744,"Kochanek, Chris S.",97,8oi
+9750,"Sahu, Kailash C.",207,8q6
+9751,"Sahu, Kailash C.",2,8ps
+9753,"Storrie-Lombardi, L. J.",50,8t8
+9755,"Walter, Fabian",3,8qw
+9756,"Walter, Frederick M.",6,8nq
+9760,"Abraham, Roberto G.",16,8qc
+9761,"Almaini, Omar",8,8qx
+9763,"Barth, Aaron J.",8,8nt
+9764,"Best, Philip N.",16,8nu
+9765,"de Jong, Roelof S.",36,8r3
+9766,"Forbes, Duncan A.",16,8o3
+9767,"Gebhardt, Karl",17,8o4
+9770,"Jorgensen, Inger",26,8pi
+9771,"Karachentsev, Igor Dmitrievich",68,8mq
+9772,"Kelson, Daniel D.",16,8pf
+9773,"Kenney, Jeff D.",3,8r1
+9774,"Larsen, Soeren S.",33,8ph
+9776,"Richstone, Douglas O.",3,8pp
+9777,"Stiavelli, Massimo",30,8pj
+9781,"Yang, Yujin",30,8pc
+9787,"Hester, Jeff J.",1,8q4
+9788,"Ho, Luis C.",44,8mx
+9789,"Johns-Krull, Christopher Michael",6,8pm
+9793,"Malhotra, Sangeeta",48,8qq
+9794,"Massey, Philip Louis",16,8mg
+9796,"Miller, Jon Matthew",17,8ol
+9799,"Rich, R. Michael",10,8qe
+9803,"Thompson, Rodger I.",163,8mt
+9810,"Greenhill, Lincoln J.",72,8r0
+9811,"Harris, William Edgar",33,8n9
+9815,"King, Ivan R.",2,8ny
+9816,"Kuijken, Konrad",18,8oz
+9820,"Momany, Yazan",3,8mp
+9822,"Scoville, Nicholas Z.",270,8pu
+9827,"Bianchi, Luciana C.",3,8qz
+9830,"Bothun, Gregory D.",3,8qi
+9836,"Ellis, Richard S.",43,8rq
+9837,"Ferguson, Annette",10,8q8
+9842,"Gizis, John Evangelos",7,8rw
+9847,"Perlman, Eric S.",2,8o8
+9856,"Chapman, Scott C.",9,8s0
+9857,"De Marco, Orsola",6,8rh
+9860,"Garnavich, Peter M.",120,8rc
+9861,"Kalas, Paul George",17,8sk
+9863,"Krist, John",1,8mv
+9864,"Madore, Barry F.",2,8m9
+9872,"Sanwal, Divas",9,8rz
+9873,"Sarajedini, Ata",24,8re
+9877,"Williger, Gerard",47,8sb
+9884,"Armandroff, Taft E.",15,8qh
+9890,"Fesen, Robert A.",28,8oo
+9891,"Gilmore, Gerard F.",67,8ne
+9892,"Jansen, Rolf A.",20,8og
+9895,"Mulchaey, John S.",20,8n2
+9896,"Munoz, Jose A.",1,8nw
+9897,"ODea, Christopher P.",2,8rt
+9898,"ODell, Charles Robert",1,8mf
+9899,"Piotto, Giampaolo",2,8n3
+9902,"Ridgway, Susan",11,8pr
+9905,"Strauss, Michael A.",16,8np
+9908,"Ziegler, Bodo",4,8n6
+9919,"Ford, Holland",16,8pv
+9974,"Peterson, Ruth C.",1,8qy
+9977,"Bennett, David P.",32,8nr
+9978,"Beckwith, Steven",190,8m8
+9983,"Noll, Keith S.",13,8my
+9984,"Rhodes, Jason D.",1767,8mb
+9986,"Ford, Holland",1,8ot
+9987,"Ford, Holland",17,8qj
+9992,"Kirshner, Robert P.",1,8t7
+10001,"Kaaret, Philip",4,8vo
+10002,"Perlman, Eric S.",11,8w1
+10003,"Sarazin, Craig L.",2,8vg
+10004,"Tavecchio, F.",6,8v3
+10005,"Lewin, Walter H. G.",6,8vv
+10006,"Garcia, Michael R.",10,8vp
+10008,"Grindlay, Jonathan E.",3,8vx
+10009,"Grindlay, Jonathan E.",11,8vz
+10043,"Riess, Adam",30,8ux
+10048,"Mack, Jennifer",4,8ur
+10056,"Gilliland, Ronald L",7,8ui
+10058,"Walsh, Jeremy Richard",13,8uz
+10086,"Beckwith, Steven",12,8wc
+10089,"Noll, Keith S.",9,8wt
+10092,"Scoville, Nicholas Z.",321,8xi
+10094,"Peterson, Ruth C.",2,92t
+10098,"Ruiz-Lapuente, Pilar",7,8yw
+10099,"Walter, Frederick M.",6,90e
+10101,"King, Ivan R.",3,91c
+10105,"Sahu, Kailash C.",1,93h
+10118,"Fesen, Robert A.",1,8zs
+10119,"Fox, Derek",12,9c0
+10120,"Anderson, Scott F.",13,921
+10121,"Bailyn, Charles David",2,90c
+10126,"Olszewski, Edward W.",18,906
+10127,"Miley, George K.",30,8za
+10128,"Ferguson, Annette",6,91m
+10129,"Puzia, Thomas H.",9,8zq
+10131,"Ciardullo, Robin",18,8zd
+10134,"Davis, Marc",126,90r
+10135,"Kulkarni, Shrinivas R.",78,93y
+10136,"Bond, Howard E.",8,92p
+10138,"Luhman, Kevin",40,8xs
+10146,"Bedin, Luigi R.",6,90a
+10152,"Donahue, Megan",23,90i
+10154,"Pello, Roser",2,8yi
+10158,"Fassnacht, Christopher",22,935
+10159,"Ellis, Richard S.",9,8ze
+10166,"Borucki, William J.",6,91s
+10172,"de Grijs, Richard",1,8z2
+10174,"Koopmans, Leon",78,93i
+10181,"Bentz, Misty C.",6,902
+10182,"Filippenko, Alex V.",12,90z
+10185,"Sahai, Raghvendra",13,92k
+10187,"Smartt, Stephen J.",5,90n
+10188,"Whitmore, Brad C.",16,91k
+10189,"Riess, Adam",222,94s
+10190,"Garnett, Donald R",94,90o
+10195,"Rhoads, James",32,924
+10196,"Franx, Marijn",54,90t
+10200,"Jones, Christine",4,907
+10201,"Conselice, Christopher",10,916
+10207,"Prochaska, Jason X.",6,91z
+10210,"Tully, R. Brent",42,8yy
+10213,"Zane, Silvia",4,92v
+10214,"Soria, Roberto",4,92w
+10216,"Treu, Tommaso L.",20,8zb
+10217,"Jordan, Andres",86,90x
+10227,"Goudfrooij, Paul",34,92y
+10228,"Kalas, Paul George",9,93m
+10229,"Piatek, Slawomir Stanislaw",5,934
+10235,"Karachentsev, Igor Dmitrievich",33,8xz
+10237,"Fan, Xiaohui",4,90k
+10242,"Cole, Andrew A.",12,938
+10246,"Robberto, Massimo",419,93k
+10248,"Nota, Antonella",28,92f
+10250,"Huchra, John P.",24,90l
+10252,"Anderson, Jay",2,923
+10257,"Anderson, Jay",10,928
+10258,"Kretchmer, Claudia",80,91h
+10260,"Harris, William Edgar",24,8z0
+10263,"Kirshner, Robert P.",27,91o
+10265,"Brown, Thomas M.",56,92c
+10267,"Clayton, Geoffrey C.",11,8zv
+10273,"Crotts, Arlin P. S.",62,92g
+10277,"West, Michael J.",14,90q
+10286,"Fesen, Robert A.",24,8zm
+10287,"Ford, Holland",3,90v
+10325,"Ford, Holland",36,91j
+10326,"Ford, Holland",16,90y
+10327,"Ford, Holland",19,914
+10330,"Ford, Holland",29,917
+10334,"Ford, Holland",16,911
+10339,"Riess, Adam",197,91w
+10340,"Riess, Adam",182,92q
+10342,"Noll, Keith S.",6,93s
+10343,"Sambruna, Rita M.",1,94e
+10349,"Lewin, Walter H. G.",8,954
+10352,"Marshall, Herman L.",15,974
+10353,"Grindlay, Jonathan E.",8,95a
+10354,"Jenkins, Leigh",3,958
+10368,"Riess, Adam",30,94f
+10374,"Giavalisco, Mauro",10,97e
+10375,"Mack, Jennifer",4,94r
+10392,"Noll, Keith S.",12,955
+10393,"Noll, Keith S.",12,95d
+10394,"Tanvir, Nial Rahil",41,96g
+10395,"Gray, Meghan",80,96e
+10396,"Gallagher, John S.",28,961
+10397,"West, Michael J.",9,96f
+10399,"Greenhill, Lincoln J.",76,96h
+10400,"Chandar, Rupali",1,969
+10402,"Chandar, Rupali",100,96r
+10404,"Zirm, Andrew",32,962
+10405,"Chapman, Scott C.",10,96v
+10407,"Morrison, Heather",14,96q
+10409,"Olofsson, Hans",8,96a
+10411,"Ferraro, Francesco R.",6,973
+10412,"Lacy, Mark D.",48,95w
+10413,"Gregg, Michael D.",72,964
+10416,"Rossa, Joern",4,95x
+10417,"Fan, Xiaohui",7,96x
+10418,"Stockton, Alan N.",6,95s
+10420,"Ebeling, Harald",35,970
+10421,"Canalizo, Gabriela",27,95y
+10424,"Richer, Harvey B.",72,971
+10425,"Meixner, Margaret",12,96k
+10429,"Blakeslee, John P.",125,95t
+10430,"Armandroff, Taft E.",6,963
+10433,"Madore, Barry F.",10,95o
+10436,"Mathur, Smita",3,96i
+10437,"Bunker, Andrew",8,96w
+10438,"Putman, Mary E.",8,96l
+10443,"Biretta, John A.",9,990
+10444,"Pavlovsky, Cheryl",9,991
+10452,"Beckwith, Steven",75,97c
+10455,"Biretta, John A.",1,97s
+10458,"Biretta, John A.",7,99c
+10459,"Biretta, John A.",8,99d
+10466,"Sahu, Kailash C.",1,9ev
+10471,"King, Ivan R.",1,9ag
+10472,"Momany, Yazan",1,9cj
+10476,"Sahu, Kailash C.",5,9fo
+10486,"Agol, Eric",2,9cq
+10487,"Ardila, David R.",33,9bc
+10490,"Donahue, Megan",2,9cn
+10491,"Ebeling, Harald",24,9fc
+10492,"Erben, Thomas",3,9c9
+10493,"Gal-Yam, Avishay",14,9dd
+10494,"Koopmans, Leon",30,9c7
+10495,"McNamara, Brian R.",1,9bo
+10496,"Perlmutter, Saul",336,9ep
+10497,"Riess, Adam",34,9cb
+10498,"Smartt, Stephen J.",6,9ar
+10499,"Tran, Kim-Vy",10,9bn
+10500,"Bedin, Luigi R.",4,9cx
+10503,"Da Costa, Gary Stewart",38,9bd
+10504,"Ellis, Richard S.",47,9g9
+10505,"Gallart, Carme",95,9fz
+10509,"Kochanek, Chris S.",4,9e3
+10515,"Peng, Eric W.",36,9et
+10518,"Schechter, Paul",2,9dz
+10520,"Smecker-Hane, Tammy A.",6,9gz
+10521,"Surace, Jason A.",25,9aj
+10522,"Calzetti, Daniela",3,9dr
+10523,"de Jong, Roelof S.",70,9ec
+10524,"Ferraro, Francesco R.",13,9bm
+10526,"Hester, Jeff J.",12,9fx
+10528,"Kenney, Jeff D.",3,9dj
+10529,"Kundu, Arunav",2,9eb
+10530,"Malhotra, Sangeeta",262,9fa
+10531,"Mullis, Christopher",8,9b8
+10532,"Noeske, Kai G.",25,9db
+10533,"Oliveira, Joana M.",2,9cs
+10536,"Sahai, Raghvendra",30,9fj
+10539,"Stapelfeldt, Karl",71,9f9
+10541,"Georganopoulos, Markos",2,9g6
+10543,"Baltz, Edward A.",120,9e0
+10546,"Fabian, Andrew C.",16,9bb
+10549,"Kirshner, Robert P.",2,9e8
+10550,"Kissler-Patig, Markus",12,9cr
+10551,"Kulkarni, Shrinivas R.",125,9e7
+10552,"Robberto, Massimo",6,9dv
+10554,"Sharples, Ray M.",20,9cz
+10558,"West, Michael J.",10,9bq
+10562,"Disney, Michael J.",3,9do
+10563,"Dye, Simon",7,9c5
+10565,"Galleti, Silvia",2,9an
+10566,"Gouliermis, Dimitrios",6,9aa
+10567,"Jerjen, Helmut",2,9cw
+10569,"Keeton, Charles R.",26,9dw
+10570,"Kishimoto, Makoto",3,9co
+10572,"Lauer, Tod R.",16,9h9
+10573,"Mateo, Mario L.",11,9d6
+10574,"Mei, Simona",40,9dt
+10575,"Oestlin, Goeran",14,9fv
+10576,"Prochter, Gabriel E.",10,9ci
+10579,"Roberts, Timothy Paul",12,9h8
+10580,"Saviane, Ivo",2,9ek
+10581,"Shapley, Alice E.",20,9bt
+10582,"Sivakoff, Gregory R.",26,9by
+10583,"Stubbs, Christopher W.",3,9e5
+10584,"Zezas, Andreas",79,9el
+10585,"Aloisi, Alessandra",7,9cd
+10586,"Aloisi, Alessandra",25,9ej
+10587,"Bolton, Adam S.",72,9em
+10588,"Brotherton, Michael S.",29,9bk
+10590,"Cole, Andrew A.",16,9ck
+10591,"Dey, Arjun",2,9ax
+10592,"Evans, Aaron S.",178,9cv
+10594,"Goudfrooij, Paul",17,9ew
+10595,"Goudfrooij, Paul",25,9es
+10596,"Ho, Luis C.",36,9ex
+10597,"Jordan, Andres",9,9b4
+10599,"Kalas, Paul George",3,9gh
+10602,"Maiz Apellaniz, Jesus",36,9eu
+10603,"Padgett, Deborah",9,9f5
+10604,"Sarajedini, Ata",5,9b6
+10605,"Skillman, Evan D.",24,9cm
+10608,"Thilker, David",14,9ez
+10615,"Anderson, Scott F.",42,9dx
+10616,"Berger, Edo",2,9ix
+10618,"Bond, Howard E.",18,9bs
+10622,"Dolphin, Andrew Eugene",18,9bg
+10624,"Fox, Derek",48,9h5
+10626,"Loh, Yeong-Shang",56,9en
+10630,"Pasquali, Anna",20,9b3
+10631,"Puzia, Thomas H.",8,9df
+10632,"Stiavelli, Massimo",271,9cu
+10633,"Tanvir, Nial Rahil",5,9ln
+10634,"von Hippel, Theodore",6,9dm
+10635,"Ziegler, Bodo",16,9bh
+10695,"Ford, Holland",28,9bw
+10696,"Ford, Holland",12,9e1
+10697,"Ford, Holland",3,9c4
+10698,"Ford, Holland",2,9ba
+10703,"Ebeling, Harald",2,9ay
+10705,"Noll, Keith S.",3,9fl
+10710,"Noll, Keith S.",4,9ed
+10711,"Noll, Keith S.",2,9ee
+10713,"Noll, Keith S.",3,9fn
+10715,"Capaccioli, Massimo",2,9gq
+10730,"Chiaberge, Marco",9,9i9
+10737,"Mack, Jennifer",41,9ir
+10740,"Bohlin, Ralph C.",16,9j9
+10753,"Diaz-Miller, Rosa",42,9it
+10760,"Garcia, Michael R.",8,9ju
+10762,"Harris, Daniel E.",4,9k3
+10765,"Zezas, Andreas",6,9k5
+10766,"Zezas, Andreas",4,9k6
+10768,"Kaaret, Philip",7,9jn
+10769,"Kaaret, Philip",2,9jq
+10771,"Sirianni, Marco",23,9kk
+10775,"Sarajedini, Ata",138,9l9
+10776,"Mountain, Matt",76,9l0
+10780,"Fruchter, Andrew S.",1,9m8
+10787,"Charlton, Jane C.",18,9q7
+10793,"Gal-Yam, Avishay",9,9oi
+10794,"Geha, Marla C.",2,9t6
+10795,"Heckman, Timothy M.",4,9pg
+10798,"Koopmans, Leon",4,9qc
+10802,"Riess, Adam",206,9r7
+10803,"Smartt, Stephen J.",2,9ox
+10809,"van Dokkum, Pieter",20,9r0
+10812,"Piatek, Slawomir Stanislaw",1,9qv
+10813,"Bowen, David V.",30,9p0
+10815,"Brown, Thomas M.",1,9ou
+10816,"Brown, Thomas M.",50,9p4
+10817,"Chen, Hsiao-Wen",3,9p9
+10820,"Dressler, Alan",2,9qi
+10824,"Gnedin, Oleg Y.",5,9o2
+10825,"Holden, Bradford",12,9si
+10829,"Martini, Paul",15,9np
+10831,"Moustakas, Leonidas A",2,9qj
+10835,"Sivakoff, Gregory R.",8,9nm
+10842,"Cook, Kem",75,9p1
+10846,"Gladders, Michael D.",6,9q8
+10848,"Lacy, Mark D.",12,9om
+10851,"Sahai, Raghvendra",1,9qo
+10856,"Thompson, Rodger I.",16,9ni
+10858,"Yan, Lin",1,9nd
+10861,"Carter, David",60,9ty
+10863,"Gonzalez, Anthony Hernan",3,9pt
+10867,"Kirshner, Robert P.",2,9ot
+10874,"Zheng, Wei",8,9qt
+10875,"Ebeling, Harald",6,9s6
+10876,"Kneib, Jean-Paul Richard",15,9s8
+10880,"Schmitt, Henrique R.",12,9s9
+10881,"Smith, Graham",17,9sa
+10885,"Aloisi, Alessandra",9,9qw
+10886,"Bolton, Adam S.",38,9op
+10889,"de Jong, Roelof S.",48,9on
+10890,"Dey, Arjun",17,9qg
+10892,"Garnavich, Peter M.",2,9ow
+10895,"Kalas, Paul George",26,9qb
+10896,"Kalas, Paul George",51,9ps
+10904,"Thilker, David",3,9qx
+10905,"Tully, R. Brent",17,9ov
+10909,"Bersier, David",10,9te
+10911,"Blakeslee, John P.",12,9p3
+10913,"Bond, Howard E.",2,9sf
+10915,"Dalcanton, Julianne",117,9ra
+10917,"Fox, Derek",24,9r9
+10918,"Freedman, Wendy L.",48,9o4
+10920,"Heckman, Timothy M.",7,9pj
+10921,"ODell, Charles Robert",1,9nj
+10922,"Piotto, Giampaolo",4,9oy
+10994,"Ford, Holland",4,9q1
+10996,"Ford, Holland",8,9r2
+10997,"Ford, Holland",2,9po
+11003,"Lubin, Lori M.",30,9sw
+11013,"Garcia, Michael R.",1,9ud
+11099,"Bradac, Marusa",4,a0m
+11108,"Hu, Esther M.",8,a2g
+11142,"Yan, Lin",82,a2s
+11143,"Baker, Andrew",2,a28
+11144,"Bouwens, Rychard",2,a1d
+11148,"Debes, John Henry",4,a0k
+11149,"Egami, Eiichi",26,a2k
+11150,"Graham, James R.",8,a1s
+11153,"Malhotra, Sangeeta",30,a2t
+11166,"Woo, Jong-Hak",4,9zg
+11189,"Tanvir, Nial Rahil",22,a21
+11202,"Koopmans, Leon",29,a1l
+11205,"Muzerolle, James",14,a2a
+11208,"Treu, Tommaso L.",9,9zf
+11219,"Capetti, Alessandro",12,9zl
+11233,"Piotto, Giampaolo",7,a2l
+11235,"Surace, Jason A.",15,a1e
+11338,"Garcia, Michael R.",2,a5p
+11340,"Grindlay, Jonathan E.",2,a5y
+11343,"Levan, Andrew James",3,a4t
+11359,"OConnell, Robert W.",79,b6o
+11360,"OConnell, Robert W.",175,b6w
+11371,"Sirianni, Marco",14,a7z
+11379,"Fruchter, Andrew S.",1,a8z
+11397,"Mack, Jennifer",3,a9b
+11421,"Bushouse, Howard A.",3,ab5
+11424,"Hartig, George",18,aal
+11434,"Hartig, George",44,aat
+11436,"Hartig, George",5,ab7
+11437,"Hartig, George",1,ab6
+11438,"Hartig, George",20,abk
+11439,"Hartig, George",10,abl
+11442,"Dressel, Linda L.",3,ab0
+11444,"Dressel, Linda L.",43,abj
+11445,"Dressel, Linda L.",22,abi
+11447,"McCullough, Peter",12,abz
+11452,"Kim Quijano, Jessica",76,aby
+11453,"Hilbert, Bryan",84,abf
+11495,"Haswell, Carole A.",2,b00
+11502,"Noll, Keith S.",54,acr
+11505,"Noll, Keith S.",12,acd
+11507,"Noll, Keith S.",3,abu
+11515,"Biagetti, Carl",16,acs
+11519,"Green, James Carswell",8,b4l
+11520,"Green, James Carswell",20,b4r
+11523,"Green, James Carswell",7,b6l
+11524,"Green, James Carswell",8,b4q
+11528,"Green, James Carswell",11,b6d
+11530,"Green, James Carswell",5,b3y
+11531,"Green, James Carswell",4,b4p
+11533,"Green, James Carswell",9,b3q
+11534,"Green, James Carswell",10,b4m
+11541,"Green, James Carswell",15,b68
+11548,"Megeath, Tom",126,b0l
+11549,"Brown, Thomas M.",84,aax
+11552,"Bushouse, Howard A.",38,ab9
+11554,"Bastian, Nate",4,b1t
+11557,"Canalizo, Gabriela",46,b5t
+11560,"Ebeling, Harald",2,b1y
+11563,"Illingworth, Garth D.",229,b5x
+11564,"Kaplan, David L.",9,b28
+11565,"Lepine, Sebastien",54,b3w
+11570,"Riess, Adam",160,b1f
+11575,"Van Dyk, Schuyler D.",5,b4u
+11577,"Whitmore, Brad C.",26,b5u
+11578,"Aloisi, Alessandra",10,b4z
+11580,"Balick, Bruce",20,b1m
+11581,"Bildsten, Lars",12,b20
+11582,"Blain, Andrew",3,b34
+11583,"Bregman, Joel N.",16,b6g
+11584,"Chiboucas, Kristin",40,b3c
+11586,"Dotter, Aaron L.",12,b16
+11587,"Fan, Xiaohui",2,b21
+11588,"Gavazzi, Raphael",22,b4a
+11589,"Gnedin, Oleg Y.",11,b7g
+11590,"Jha, Saurabh W.",8,b1i
+11591,"Kneib, Jean-Paul Richard",35,b5m
+11593,"Liu, Michael C.",9,b1r
+11594,"OMeara, John M.",54,b3d
+11595,"OMeara, John M.",15,b4x
+11597,"Stanford, Spencer Adam",81,b5l
+11598,"Tumlinson, Jason",2,b5n
+11599,"Wade, Richard A.",31,b57
+11600,"Weiner, Benjamin",214,b37
+11602,"Allam, Sahar S.",15,b48
+11603,"Andrews, Jennifer",48,b2t
+11604,"Robinson, Andrew",19,b6e
+11605,"Barman, Travis Stuart",31,b52
+11609,"Chaname, Julio",1,b4j
+11610,"Cody, Ann Marie",112,b5s
+11613,"de Jong, Roelof S.",96,b2p
+11615,"Ferraro, Francesco R.",26,b5r
+11618,"Huard, Tracy L.",32,b63
+11620,"Keel, William Clifford",3,b56
+11622,"Knutson, Heather A.",1,bwk
+11624,"Komossa, Stefanie",7,b3o
+11627,"Nelemans, Gijs",3,b49
+11628,"Noyola, Eva",20,b2y
+11629,"Pavlov, George G.",1,b43
+11631,"Reid, I. Neill",20,b0v
+11632,"Rich, R. Michael",15,b2f
+11633,"Rich, R. Michael",21,b39
+11636,"Siana, Brian",40,b61
+11638,"Steidel, Charles C.",18,b3t
+11643,"Zabludoff, Ann",25,b3v
+11646,"Crotts, Arlin P. S.",6,b2q
+11647,"Crotts, Arlin P. S.",47,b3h
+11648,"Daddi, Emanuele",7,b3a
+11653,"Kirshner, Robert P.",22,b7i
+11655,"Kuijken, Konrad",18,b53
+11657,"Stanghellini, Letizia",48,b1b
+11658,"Turnshek, David A.",23,b6f
+11661,"Bentz, Misty C.",9,b5e
+11662,"Bentz, Misty C.",13,b5f
+11663,"Brodwin, Mark",61,b2u
+11664,"Brown, Thomas M.",96,b3m
+11665,"Brown, Thomas M.",15,b46
+11666,"Burgasser, Adam J.",53,b1n
+11669,"Fruchter, Andrew S.",10,b2r
+11670,"Garnavich, Peter M.",86,b51
+11671,"Ghez, Andrea M.",18,b41
+11675,"Maund, Justyn Robert",18,b4t
+11676,"Morris, Mark R.",2,b5p
+11677,"Richer, Harvey B.",242,b6v
+11678,"Rigby, Jane R.",1,b3l
+11679,"Sarazin, Craig L.",12,b1l
+11680,"Smith, Graeme H.",4,b2d
+11683,"Sun, Ming",3,b9g
+11684,"van der Marel, Roeland P.",12,b44
+11685,"van Kerkwijk, Marten Henric",5,b1k
+11688,"Bedin, Luigi R.",17,b2o
+11689,"Dupke, Renato A.",12,b5g
+11691,"Goudfrooij, Paul",34,b3n
+11694,"Law, David R.",15,b2v
+11695,"Luhman, Kevin",20,b1d
+11696,"Malkan, Matthew A.",802,b8c
+11697,"Piatek, Slawomir Stanislaw",16,b5i
+11700,"Trenti, Michele",275,b8d
+11701,"Treu, Tommaso L.",2,b19
+11702,"Yan, Haojing",104,b8e
+11707,"Sahu, Kailash C.",16,bcw
+11708,"Andersen, Morten",15,b5w
+11709,"Bersier, David",20,b3b
+11710,"Blakeslee, John P.",14,b2g
+11711,"Blakeslee, John P.",9,b2i
+11712,"Blakeslee, John P.",45,b1h
+11713,"Bond, Howard E.",2,b6z
+11714,"Bond, Howard E.",33,b77
+11715,"Bond, Howard E.",2,b73
+11716,"Bond, Howard E.",2,b6y
+11717,"Cenko, Stephen Bradley",2,b4e
+11718,"Dalcanton, Julianne",24,b2w
+11719,"Dalcanton, Julianne",52,b2x
+11723,"Fesen, Robert A.",2,b31
+11724,"Geha, Marla C.",54,b5d
+11729,"Holtzman, Jon A.",25,b2j
+11730,"Kallivayalil, Nitya",15,b5y
+11731,"Kochanek, Chris S.",42,b6k
+11732,"Kochanek, Chris S.",25,b13
+11734,"Levan, Andrew James",12,b5v
+11735,"Mannucci, Filippo",16,b4d
+11738,"Miley, George K.",33,b32
+11739,"Piotto, Giampaolo",21,b6r
+11782,"Gnedin, Oleg Y.",5,b6u
+11786,"Bond, Howard E.",2,b7j
+11791,"Kochanek, Chris S.",1,b0r
+11798,"Sabbi, Elena",4,abv
+11801,"Ford, Holland",3,b1p
+11802,"Ford, Holland",16,b5q
+11803,"Ford, Holland",26,b3g
+11818,"Kalas, Paul George",4,b79
+11830,"Sambruna, Rita M.",3,b8o
+11831,"Kharb, Preeti",2,b95
+11832,"Perlman, Eric S.",3,b8t
+11833,"Garcia, Michael R.",2,b9d
+11835,"Birkinshaw, Mark",11,b8q
+11836,"Prestwich, Andrea H.",1,b8p
+11838,"Marshall, Herman L.",28,b94
+11840,"Levan, Andrew James",14,b93
+11841,"Mulchaey, John S.",2,b92
+11877,"Lallo, Matthew D.",8,bcy
+11880,"Chiaberge, Marco",7,bb5
+11887,"Mack, Jennifer",6,bbf
+11889,"Bohlin, Ralph C.",4,bbc
+11903,"Kalirai, Jason",32,bcd
+11904,"Kalirai, Jason",9,bcc
+11911,"Sabbi, Elena",115,bc3
+11913,"MacKenty, John W.",1,bcg
+11916,"Wong, Michael H.",3,bc2
+11918,"Dressel, Linda L.",12,bc7
+11919,"Dressel, Linda L.",20,bci
+11920,"Dressel, Linda L.",3,bck
+11921,"Dressel, Linda L.",10,bbp
+11923,"MacKenty, John W.",1,bch
+11924,"Kozhurina-Platais, Vera",9,bc6
+11925,"Deustua, Susana E.",6,bc5
+11926,"Deustua, Susana E.",9,bcf
+11928,"Kozhurina-Platais, Vera",135,bcj
+11931,"Hilbert, Bryan",24,bbw
+11933,"Riess, Adam",87,baq
+11936,"Bushouse, Howard A.",48,bbt
+11937,"Bushouse, Howard A.",25,bbu
+12001,"Green, James Carswell",8,8r8
+12005,"Chen, Hsiao-Wen",3,bd8
+12006,"Pirzkal, Norbert",8,bda
+12007,"Illingworth, Garth D.",2,bdb
+12008,"Kong, Albert",6,bdj
+12009,"von der Linden, Anja",3,bdx
+12012,"Sivakoff, Gregory R.",2,bdr
+12014,"Garcia, Michael R.",2,bdl
+12015,"Gezari, Suvi",2,bds
+12016,"Grady, Carol A.",1,bdf
+12017,"Hughes, John P.",2,bdq
+12018,"Prestwich, Andrea H.",62,bdp
+12019,"Tremonti, Christy A.",12,bdm
+12020,"Clarkson, Will I.",10,bdk
+12021,"Kaaret, Philip",24,bde
+12024,"Green, James Carswell",13,bg7
+12025,"Green, James Carswell",59,bg8
+12028,"Green, James Carswell",3,bgc
+12033,"Green, James Carswell",11,bgg
+12036,"Green, James Carswell",18,bgj
+12044,"Eisenhardt, Peter",5,bdu
+12051,"Perlmutter, Saul",16,be0
+12055,"Dalcanton, Julianne",118,bex
+12056,"Dalcanton, Julianne",117,bf0
+12057,"Dalcanton, Julianne",117,bf1
+12058,"Dalcanton, Julianne",120,bf3
+12059,"Dalcanton, Julianne",118,bf4
+12060,"Faber, Sandra M.",110,bet
+12061,"Faber, Sandra M.",460,beu
+12062,"Faber, Sandra M.",398,bev
+12063,"Faber, Sandra M.",346,beo
+12064,"Faber, Sandra M.",379,bew
+12065,"Postman, Marc",93,bey
+12066,"Postman, Marc",89,bez
+12067,"Postman, Marc",69,bf2
+12068,"Postman, Marc",81,bf5
+12069,"Postman, Marc",87,bf6
+12070,"Dalcanton, Julianne",130,bf7
+12071,"Dalcanton, Julianne",117,bf8
+12072,"Dalcanton, Julianne",117,bf9
+12073,"Dalcanton, Julianne",122,bfa
+12074,"Dalcanton, Julianne",117,bfb
+12075,"Dalcanton, Julianne",117,bfd
+12076,"Dalcanton, Julianne",117,bfe
+12099,"Riess, Adam",199,bfu
+12100,"Postman, Marc",73,bfc
+12101,"Postman, Marc",75,bff
+12102,"Postman, Marc",77,bfk
+12103,"Postman, Marc",70,bfl
+12104,"Postman, Marc",57,bfm
+12105,"Dalcanton, Julianne",118,bfg
+12106,"Dalcanton, Julianne",128,bfh
+12107,"Dalcanton, Julianne",117,bfi
+12108,"Dalcanton, Julianne",117,bfj
+12109,"Dalcanton, Julianne",125,bfn
+12110,"Dalcanton, Julianne",118,bfo
+12111,"Dalcanton, Julianne",126,bfp
+12112,"Dalcanton, Julianne",118,bfq
+12113,"Dalcanton, Julianne",120,bfr
+12114,"Dalcanton, Julianne",117,bfs
+12115,"Dalcanton, Julianne",97,bft
+12116,"Dalcanton, Julianne",9,bxg
+12117,"Drake, Andrew",3,bfw
+12118,"Kasliwal, Mansi",3,bfx
+12163,"Barth, Aaron J.",66,biq
+12166,"Ebeling, Harald",110,bkz
+12167,"Franx, Marijn",13,bhg
+12170,"Gal-Yam, Avishay",3,bhq
+12174,"Li, Zhiyuan",4,bir
+12177,"van Dokkum, Pieter",276,bhj
+12180,"Cannon, John Michael",20,bin
+12181,"Deming, Drake",10,bh7
+12182,"Do, Tuan",38,bij
+12183,"Durant, Martin",2,bh1
+12184,"Fan, Xiaohui",30,bje
+12185,"Greene, Jenny Emma",45,big
+12190,"Koekemoer, Anton M.",48,bl0
+12193,"Lee, Jae-Woo",21,bkh
+12194,"Negrello, Mattia",15,bjj
+12195,"Oguri, Masamune",5,bgz
+12196,"Radburn-Smith, David J.",32,bkl
+12197,"Richard, Johan Pierre",4,bio
+12201,"Siana, Brian",17,bja
+12202,"Sivakoff, Gregory R.",16,bhc
+12203,"Stanford, Spencer Adam",40,bkn
+12205,"Ueta, Toshiya",2,bi9
+12206,"Westmoquette, Mark S.",11,bjf
+12208,"Bochanski, John J.",3,bjr
+12209,"Bolton, Adam S.",45,biv
+12210,"Bolton, Adam S.",121,bjh
+12212,"Crenshaw, D. Michael",6,bgu
+12213,"de Jong, Roelof S.",52,bit
+12215,"Evans, Nancy Remage",1,bg4
+12217,"Lucas, Philip",12,bk9
+12219,"Milone, Antonino Paolo",6,bjt
+12220,"Mittal, Rupal",2,bhv
+12224,"Reddy, Naveen A.",24,bi2
+12225,"Reiners, Ansgar",5,bj6
+12226,"Rich, R. Michael",12,bis
+12229,"Smith, Linda J.",11,bgt
+12232,"Bennett, David P.",6,bgx
+12233,"Courbin, Frederic",10,bhn
+12238,"Harris, William Edgar",40,bhr
+12240,"Kargaltsev, Oleg Y.",1,bj9
+12241,"Kirshner, Robert P.",18,bkf
+12246,"Stubbs, Christopher W.",35,bke
+12247,"Tanvir, Nial Rahil",4,bkd
+12251,"Berta-Thompson, Zach K.",12,bip
+12253,"Clowe, Douglas",32,bh9
+12254,"Cool, Adrienne",24,bhf
+12256,"Farrell, Sean A.",4,bix
+12257,"Girardi, Leo",66,bhy
+12261,"Marshall, Herman L.",3,bjx
+12262,"Maund, Justyn Robert",11,bhh
+12265,"Ouchi, Masami",32,bhi
+12266,"Quider, Anna M.",6,bhw
+12267,"Rigby, Jane R.",6,bhe
+12269,"Scarlata, Claudia",50,bk3
+12270,"Sohn, Sangmo Tony",9,bjm
+12272,"Tremonti, Christy A.",17,bi7
+12273,"van der Marel, Roeland P.",27,bjl
+12274,"van der Marel, Roeland P.",1,bj7
+12282,"Leonard, Douglas C.",2,bks
+12283,"Malkan, Matthew A.",740,bl9
+12284,"Muzerolle, James",7,bkt
+12285,"Soria, Roberto",5,bku
+12286,"Yan, Haojing",764,bl7
+12292,"Treu, Tommaso L.",40,bgq
+12295,"Bond, Howard E.",3,bfz
+12296,"Bond, Howard E.",2,bk7
+12297,"Bond, Howard E.",1,bka
+12298,"Ellis, Richard S.",9,bnd
+12300,"Fesen, Robert A.",10,bid
+12301,"Gallagher, Sarah",3,bhp
+12304,"Holtzman, Jon A.",45,bgr
+12306,"Levan, Andrew James",1,bjo
+12307,"Levan, Andrew James",43,bjv
+12309,"ODell, Charles Robert",3,bh6
+12310,"Oestlin, Goeran",45,bjc
+12311,"Piotto, Giampaolo",53,bj2
+12313,"Ebeling, Harald",3,bgy
+12314,"Apai, Daniel",26,bkp
+12317,"Liu, Michael C.",8,bg3
+12318,"Ghez, Andrea M.",3,bia
+12319,"Piatek, Slawomir Stanislaw",4,bl5
+12322,"Sahu, Kailash C.",18,bnc
+12323,"Bersier, David",13,bif
+12324,"Kochanek, Chris S.",25,bgw
+12326,"Noll, Keith S.",25,bkx
+12328,"van Dokkum, Pieter",224,bhm
+12329,"Jiang, Linhua",10,bl1
+12330,"Kirkpatrick, J. Davy",24,bl4
+12331,"Kochanek, Chris S.",8,bky
+12332,"Windhorst, Rogier A.",24,bnb
+12333,"Baggett, Sylvia M.",25,bll
+12334,"Kalirai, Jason",17,bnx
+12336,"MacKenty, John W.",11,btw
+12339,"Sabbi, Elena",39,bla
+12340,"Dahlen, Tomas",71,blq
+12351,"Long, Knox S.",4,bmf
+12352,"Hilbert, Bryan",6,bmg
+12353,"Kozhurina-Platais, Vera",38,bm5
+12355,"Pirzkal, Norbert",16,bmp
+12356,"Pirzkal, Norbert",66,bmq
+12357,"Bushouse, Howard A.",28,blf
+12360,"Perlmutter, Saul",22,bo1
+12362,"Ebeling, Harald",3,blp
+12363,"Shen, Yue",8,bln
+12365,"Wang, Junfeng",9,bly
+12367,"Garcia, Michael R.",2,bm1
+12368,"Morris, R. Glenn",8,bm0
+12369,"Fabbiano, Giuseppina",15,blr
+12370,"Fruchter, Andrew S.",3,bmb
+12371,"Rigby, Jane R.",2,bma
+12372,"Sun, Ming",5,blw
+12373,"Sun, Ming",2,blx
+12375,"Feng, Hua",3,blm
+12377,"Dawson, William Anthony",12,blz
+12378,"Levan, Andrew James",8,bph
+12379,"Noeske, Kai G.",49,bnh
+12381,"Caraveo, Patrizia A.",1,blu
+12385,"Chiaberge, Marco",9,bn5
+12389,"Grogin, Norman",7,bms
+12392,"Bohlin, Ralph C.",1,bnf
+12434,"Lobanov, Andrei",1,bo3
+12438,"Tanvir, Nial Rahil",2,bo6
+12440,"Faber, Sandra M.",436,boa
+12442,"Faber, Sandra M.",80,boh
+12443,"Faber, Sandra M.",422,boe
+12444,"Faber, Sandra M.",377,boi
+12445,"Faber, Sandra M.",394,btm
+12447,"Fruchter, Andrew S.",4,bof
+12448,"Crotts, Arlin P. S.",14,boj
+12450,"Kochanek, Chris S.",18,bok
+12451,"Postman, Marc",87,bta
+12452,"Postman, Marc",91,bt9
+12453,"Postman, Marc",87,bt7
+12454,"Postman, Marc",87,bt5
+12455,"Postman, Marc",88,bsy
+12456,"Postman, Marc",88,bt2
+12457,"Postman, Marc",93,bsv
+12458,"Postman, Marc",88,bsu
+12459,"Postman, Marc",87,bst
+12460,"Postman, Marc",74,bs5
+12461,"Riess, Adam",179,bwj
+12469,"Ruiz-Lapuente, Pilar",1,boy
+12470,"Tran, Kim-Vy",29,brg
+12471,"Erb, Dawn K.",60,br9
+12473,"Sing, David K.",2,bri
+12476,"Cook, Kem",76,brv
+12477,"High, Fredrick W.",35,bqz
+12479,"Hu, Esther M.",48,brl
+12480,"Carilli, Chris",1,bpm
+12481,"Bridge, Carrie",8,brk
+12482,"Desert, Jean-Michel",22,brw
+12487,"Fan, Xiaohui",2,bs2
+12488,"Negrello, Mattia",149,bs4
+12490,"Koda, Jin",10,bsa
+12492,"Mathieu, Robert D.",2,bpg
+12493,"McGreer, Ian",4,bsc
+12496,"Wang, Ran",4,bsd
+12497,"Hong, Sungryong",4,bse
+12498,"Ellis, Richard S.",128,bp3
+12499,"Lennon, Daniel J.",31,bsf
+12500,"Kaviraj, Sugata",25,bpl
+12502,"Fruchter, Andrew S.",14,bsh
+12503,"Gnedin, Oleg Y.",8,bsi
+12504,"Liu, Michael C.",25,bsj
+12506,"Kraus, Adam L.",18,bsl
+12507,"Kraus, Adam L.",48,bsm
+12513,"Blair, William P.",40,bqc
+12514,"Stapelfeldt, Karl",40,bpj
+12515,"Mackey, Dougal",52,bpk
+12516,"Ferraro, Francesco R.",19,bqp
+12517,"Ferraro, Francesco R.",47,bqs
+12518,"Parker, Quentin",4,bp7
+12519,"Sahai, Raghvendra",26,btc
+12521,"Liu, Xin",81,bq5
+12523,"Conroy, Charlie",2,btj
+12524,"Quimby, Robert M.",4,br5
+12525,"Keel, William Clifford",14,bqv
+12526,"Alatalo, Katherine Anne",7,br7
+12527,"Siana, Brian",27,bru
+12529,"Soderberg, Alicia M.",10,brs
+12531,"Filippenko, Alex V.",11,bq9
+12532,"Harris, William Edgar",20,bqg
+12533,"Martin, Crystal Linn",4,brm
+12534,"Teplitz, Harry",91,box
+12541,"Bennett, David P.",14,bqt
+12543,"Rubin, Robert H.",1,brd
+12544,"Cushing, Michael C.",8,bql
+12546,"Tully, R. Brent",88,bt1
+12547,"Cooper, Michael",74,bt3
+12549,"Brown, Thomas M.",160,bpb
+12550,"Apai, Daniel",22,bt6
+12552,"Kewley, Lisa",4,bsx
+12553,"Fynbo, Johan P. U.",8,bpp
+12555,"Prochaska, Jason X.",20,bsz
+12557,"Gultekin, Kayhan",10,bqk
+12558,"Tanvir, Nial Rahil",26,bss
+12559,"Maund, Justyn Robert",6,bq7
+12563,"Dupuy, Trent J.",26,bt0
+12564,"van der Marel, Roeland P.",28,bsr
+12568,"Malkan, Matthew A.",404,btt
+12572,"Trenti, Michele",298,bug
+12574,"Leonard, Douglas C.",2,bs8
+12575,"Gonzalez, Anthony Hernan",28,bs9
+12576,"Kalas, Paul George",10,bsq
+12577,"Rest, Armin",13,bqo
+12578,"Forster Schreiber, N. M.",55,bra
+12580,"Renzini, Alvio",20,bqf
+12581,"Roman-Duval, Julia Christine",46,bp5
+12582,"Goobar, Ariel",40,bxb
+12585,"Petty, Sara Michelle",12,bqy
+12586,"Sahu, Kailash C.",248,bts
+12587,"Garcia, Miriam",21,bq4
+12588,"Sahu, Kailash C.",8,brf
+12590,"Papovich, Casey",16,brh
+12591,"Gallo, Elena",34,bq1
+12599,"Bond, Howard E.",1,bqa
+12602,"Dieball, Andrea",14,bqj
+12603,"Heckman, Timothy M.",120,bs3
+12605,"Piotto, Giampaolo",71,bpd
+12606,"Barstow, Martin",5,bt8
+12608,"Prescott, Moire",22,brb
+12609,"Fesen, Robert A.",4,br8
+12611,"Seth, Anil C.",4,bqi
+12613,"Jahnke, Knud",19,bqw
+12616,"Jiang, Linhua",24,bpu
+12658,"Cannon, John Michael",22,bsn
+12659,"Vieira, Joaquin",36,br2
+12661,"Liu, Michael C.",9,bso
+12662,"Gnedin, Oleg Y.",15,bsp
+12663,"Do, Tuan",15,bpe
+12666,"Brown, Thomas M.",3,bom
+12667,"Ghez, Andrea M.",3,btb
+12668,"Piatek, Slawomir Stanislaw",16,bq8
+12669,"Bedin, Luigi R.",8,bop
+12670,"Sahu, Kailash C.",14,btk
+12672,"Levan, Andrew James",1,bq3
+12673,"Bond, Howard E.",2,bti
+12674,"Fesen, Robert A.",10,bqh
+12675,"Noll, Keith S.",3,bol
+12679,"Riess, Adam",17,btq
+12680,"Dalcanton, Julianne",3,bp6
+12683,"Winkler, P. Frank",4,btf
+12685,"Hines, Dean C.",22,bwl
+12686,"Cenko, Stephen Bradley",4,btu
+12692,"Noeske, Kai G.",20,bwb
+12693,"Noeske, Kai G.",4,bwf
+12694,"Long, Knox S.",17,bvd
+12696,"Hilbert, Bryan",6,bvl
+12698,"Baggett, Sylvia M.",20,buc
+12699,"Deustua, Susana E.",59,bwi
+12700,"Riess, Adam",4,bvc
+12701,"Dressel, Linda L.",16,bty
+12702,"Lee, Janice",48,bwq
+12703,"Pirzkal, Norbert",49,bwt
+12706,"Mack, Jennifer",4,bvk
+12713,"McCullough, Peter",30,bvt
+12714,"Kozhurina-Platais, Vera",3,bvj
+12726,"Rigby, Jane R.",4,bwg
+12730,"Chiaberge, Marco",6,bw8
+12734,"Grogin, Norman",22,bva
+12737,"Bohlin, Ralph C.",2,bvp
+12746,"Kong, Albert",4,bw7
+12747,"Grise, Fabien",22,bvz
+12748,"Weisskopf, Martin C.",6,bvo
+12749,"Fruchter, Andrew S.",3,bwc
+12751,"Heinke, Craig",3,bv4
+12753,"Garcia, Michael R.",2,bv9
+12754,"Comerford, Julia",30,bwe
+12755,"Hughes, John P.",6,bwd
+12756,"Sun, Ming",6,bub
+12757,"Mazzotta, Pasquale",4,bvs
+12759,"Irwin, Jimmy A.",12,bvb
+12760,"Lehmer, Bret",6,bvu
+12761,"Karovska, Margarita",1,bum
+12762,"Kuntz, Kip",4,bvx
+12763,"Mulchaey, John S.",2,bul
+12764,"Levan, Andrew James",8,bvw
+12786,"Levan, Andrew James",7,bwx
+12787,"Postman, Marc",87,bzo
+12788,"Postman, Marc",88,bzq
+12789,"Postman, Marc",87,bzr
+12790,"Postman, Marc",71,bzt
+12791,"Postman, Marc",75,bxf
+12794,"MacKenty, John W.",10,bx2
+12802,"MacKenty, John W.",8,bxd
+12812,"Levay, Zolt",23,bxl
+12813,"Schmidt, Brian",30,c3i
+12815,"Luhman, Kevin",3,bz7
+12817,"Massey, Richard J.",5,c0a
+12858,"Madore, Barry F.",1,bxr
+12859,"Schombert, James M.",9,c0k
+12861,"Fan, Xiaohui",18,c0s
+12862,"Boyer, Martha L.",4,c09
+12866,"Swinbank, Mark",30,by2
+12871,"King, Lindsay J.",8,c2x
+12872,"Da Rio, Nicola",3,c1t
+12873,"Biller, Beth",26,c1o
+12874,"Floyd, David",35,byh
+12877,"Karachentsev, Igor Dmitrievich",12,bzb
+12878,"Karachentsev, Igor Dmitrievich",36,bz2
+12879,"Riess, Adam",110,bzc
+12880,"Riess, Adam",238,c13
+12884,"Ebeling, Harald",78,c39
+12885,"Sankrit, Ravi",4,bzs
+12888,"Van Dyk, Schuyler D.",6,bzv
+12889,"Suyu, Sherry H.",10,byg
+12892,"Shen, Yue",25,bzf
+12893,"Gilliland, Ronald L",111,c1r
+12896,"Tran, Kim-Vy",14,c14
+12898,"Koopmans, Leon",30,bzi
+12902,"Malkan, Matthew A.",695,c3t
+12903,"Ho, Luis C.",133,by8
+12905,"Trenti, Michele",30,c2v
+12908,"Goudfrooij, Paul",12,byl
+12909,"Debes, John Henry",17,c2u
+12911,"Bedin, Luigi R.",251,c05
+12912,"De Luca, Andrea",1,c1n
+12913,"Jha, Saurabh W.",3,bzy
+12914,"Do, Tuan",16,c08
+12915,"Lennon, Daniel J.",36,c0g
+12918,"Chiboucas, Kristin",12,c1g
+12925,"Cole, Andrew A.",48,byq
+12927,"Newman, Andrew B.",14,bzu
+12930,"Bridge, Carrie",21,bxu
+12931,"Siana, Brian",9,c19
+12932,"Ferraro, Francesco R.",14,c37
+12933,"Ferraro, Francesco R.",12,c38
+12934,"Tadhunter, Clive N.",1,bzw
+12937,"Zaritsky, Dennis",30,c2p
+12939,"Sabbi, Elena",144,by0
+12941,"Stephens, Ian William",50,c2o
+12942,"Glikman, Eilat",30,byu
+12943,"Yang, Yujin",24,c1h
+12944,"Allers, Katelyn",97,c11
+12945,"Rudnick, Gregory Howard",60,c1b
+12949,"Perley, Daniel",37,bzj
+12950,"Heinke, Craig",6,c2r
+12951,"Wofford, Aida",3,c30
+12955,"Swain, Mark Raboin",20,bz6
+12957,"Kuepper, Andreas H.W.",10,byd
+12959,"Shapley, Alice E.",28,c17
+12960,"Ono, Yoshiaki",26,c16
+12961,"Bentz, Misty C.",20,by1
+12964,"Rejkuba, Marina",20,byp
+12966,"van der Marel, Roeland P.",20,c2z
+12967,"Saha, Abhijit",63,byn
+12968,"Maund, Justyn Robert",4,c0h
+12969,"Garnavich, Peter M.",36,c2w
+12970,"Cushing, Michael C.",172,c2j
+12971,"Richer, Harvey B.",38,by4
+12972,"Gelino, Christopher R.",30,bzz
+12974,"Mechtley, Matthew",23,c0z
+12975,"Lilly, Simon J.",13,c0r
+12979,"Maccarone, Thomas J.",14,c18
+12983,"Yaron, Ofer",2,c00
+12985,"Sahu, Kailash C.",6,c3j
+12986,"Sahu, Kailash C.",12,c3l
+12987,"Rappaport, Saul A",8,byf
+12989,"Renzini, Alvio",15,c06
+12990,"Muzzin, Adam",29,c2g
+12991,"Strazzullo, Veronica",4,c2e
+12993,"Prieto, Jose Luis",3,c03
+12994,"Gonzalez, Anthony Hernan",7,c3b
+12997,"Williams, Benjamin F.",4,c2f
+12999,"Foley, Ryan",16,c2l
+13000,"Hong, Sungryong",56,c0i
+13001,"Ofek, Eran O.",4,c0w
+13002,"Williams, Rik",12,c0c
+13003,"Gladders, Michael D.",147,c2i
+13007,"Armus, Lee",33,c28
+13009,"De Marchi, Guido",19,byy
+13010,"Bresolin, Fabio",1,bzg
+13011,"Puzia, Thomas H.",5,c1y
+13014,"Strauss, Michael A.",23,c20
+13018,"Ferguson, Annette",32,c3a
+13021,"Bean, Jacob L.",763,bxy
+13022,"Berger, Edo",10,byz
+13023,"Chiaberge, Marco",45,byt
+13024,"Mulchaey, John S.",41,bz0
+13025,"Levan, Andrew James",44,c27
+13026,"Levan, Andrew James",10,c35
+13027,"Oestlin, Goeran",3,bz9
+13028,"Skillman, Evan D.",56,c1d
+13029,"Filippenko, Alex V.",18,byb
+13036,"Mushotzky, Richard",4,by9
+13038,"Nota, Antonella",10,bya
+13039,"Simpson, Chris",21,byj
+13041,"James, Bethan Lesley",8,c0q
+13042,"Dobbie, Paul Denholm",12,byw
+13043,"Kargaltsev, Oleg Y.",2,bzd
+13044,"Lu, Jessica Ryan",4,byv
+13045,"Cooray, Asantha R",11,byi
+13046,"Kirshner, Robert P.",260,c1x
+13048,"Strader, Jay",16,byr
+13049,"Do, Tuan",15,c0d
+13050,"van den Bosch, Remco",61,c0b
+13057,"Sahu, Kailash C.",256,c3f
+13058,"Sahu, Kailash C.",17,c3k
+13062,"Bond, Howard E.",2,c1k
+13063,"Riess, Adam",130,c6h
+13065,"Baum, Stefi A.",3,c0p
+13066,"Smith, Linda J.",10,c3c
+13079,"Hilbert, Bryan",2,c5n
+13088,"Baggett, Sylvia M.",18,c5z
+13089,"Deustua, Susana E.",10,c5s
+13092,"Lee, Janice",16,c46
+13093,"Lee, Janice",12,c5v
+13094,"Deustua, Susana E.",36,c69
+13095,"McCullough, Peter",20,c5h
+13100,"Kozhurina-Platais, Vera",12,c4j
+13101,"Riess, Adam",47,c40
+13102,"McDonald, Michael A.",5,c3o
+13106,"Gosnell, Natalie",1,c63
+13109,"Weisskopf, Martin C.",4,c68
+13110,"Fruchter, Andrew S.",10,c5f
+13111,"Barnard, Robin",2,c6b
+13112,"Liu, Xin",6,c5o
+13113,"Kochanek, Chris S.",14,c3u
+13114,"Perlman, Eric S.",3,c5c
+13116,"Kharb, Preeti",6,c67
+13117,"Levan, Andrew James",12,chb
+13155,"Chiaberge, Marco",6,c61
+13159,"Grogin, Norman",21,c50
+13162,"Bohlin, Ralph C.",4,c55
+13173,"Nelan, Edmund",15,c5x
+13176,"Apai, Daniel",28,c6g
+13177,"Bradac, Marusa",22,c6i
+13178,"Kirkpatrick, J. Davy",25,c6f
+13181,"Kirshner, Robert P.",2,c6t
+13196,"De Luca, Andrea",1,c72
+13229,"Levay, Zolt",2,c7i
+13230,"Levan, Andrew James",7,c7k
+13280,"Buenzli, Esther",15,ca7
+13281,"Cantalupo, Sebastiano",8,c91
+13282,"Chu, You-Hua",26,cco
+13285,"Edelson, Rick",6,cck
+13286,"Foley, Ryan",22,cb1
+13291,"Hayashi, Masao",5,c9n
+13292,"Indebetouw, Remy",24,cbn
+13294,"Karim, Alexander",9,ccb
+13297,"Piotto, Giampaolo",611,cau
+13299,"Radigan, Jacqueline",12,car
+13300,"Rubin, Kate",9,cbo
+13303,"Simcoe, Robert Andrew",9,ccy
+13305,"Villforth, Carolin",20,ccj
+13306,"Wilson, Gillian",16,cca
+13307,"Zakamska, Nadia L",11,c9j
+13308,"Zhao, Ming",10,ccu
+13309,"Guo, Yicheng",56,cas
+13316,"Bushouse, Howard A.",44,cba
+13317,"Coe, Dan",15,cc9
+13324,"Krajnovic, Davor",48,c8a
+13326,"Lunnan, Ragnhild",6,c9y
+13327,"Meyer, Eileen T",3,ca2
+13331,"Pueyo, Laurent",16,ccq
+13333,"Rich, Jeffrey Austin Sterling",2,cah
+13334,"Riess, Adam",61,c8k
+13337,"Sharon, Keren",8,cac
+13340,"Van Dyk, Schuyler D.",2,cd4
+13341,"Van Dyk, Schuyler D.",2,cd7
+13343,"Wittman, David",32,cbr
+13344,"Riess, Adam",106,c8z
+13348,"De Luca, Andrea",2,cce
+13349,"Fan, Xiaohui",6,cb9
+13350,"Fruchter, Andrew S.",15,ccx
+13352,"Malkan, Matthew A.",785,cdx
+13356,"McGreer, Ian",3,cbg
+13357,"Radburn-Smith, David J.",32,cc3
+13359,"Lennon, Daniel J.",30,c9r
+13360,"Jha, Saurabh W.",3,cb4
+13361,"Blair, William P.",4,cae
+13364,"Calzetti, Daniela",375,cdm
+13366,"de Jong, Roelof S.",40,c9l
+13370,"Georgiev, Iskren Y.",7,c8q
+13371,"Gezari, Suvi",2,c8g
+13374,"Mackey, Dougal",16,c7y
+13375,"Mackey, Dougal",56,c97
+13376,"McQuinn, Kristen B W",16,c9z
+13378,"Milisavljevic, Dan",1,cbq
+13379,"Milone, Antonino Paolo",16,cb7
+13384,"Riechers, Dominik A.",3,cbs
+13386,"Rodney, Steve",84,ca9
+13389,"Siana, Brian",36,cda
+13392,"Sugerman, Ben E. K.",6,c8s
+13393,"Zaritsky, Dennis",60,c8h
+13399,"Cooray, Asantha R",10,c86
+13401,"Fransson, Claes",38,cd6
+13403,"Grosso, Nicolas",12,c8j
+13405,"Kirshner, Robert P.",2,cd5
+13407,"Martin, Crystal Linn",2,c8t
+13409,"Mushotzky, Richard",16,c9g
+13410,"Pallanca, Cristina",52,caj
+13411,"Rujopakarn, Wiphu",5,c98
+13412,"Schrabback, Tim",46,ccd
+13413,"Sheth, Kartik",8,cc5
+13416,"van den Bosch, Remco",3,c7z
+13417,"Bennett, David P.",9,c9i
+13418,"Apai, Daniel",95,cdg
+13419,"Bally, John",15,caz
+13420,"Barro, Guillermo",112,cat
+13422,"Canning, Rebecca E. A.",8,cbf
+13425,"Feng, Hua",5,c8e
+13428,"Gelino, Christopher R.",4,cal
+13433,"Maund, Justyn Robert",5,c7s
+13435,"Monelli, Matteo",57,cb0
+13437,"Rigby, Jane R.",6,c9q
+13441,"Tomasino, Rachael",1,c9d
+13442,"Tully, R. Brent",90,c9v
+13443,"van der Marel, Roeland P.",28,c7v
+13445,"Bloom, Joshua S.",24,caq
+13446,"de Mink, Selma E.",4,cct
+13449,"Geha, Marla C.",40,ccs
+13457,"Sahu, Kailash C.",11,cdl
+13458,"Sahu, Kailash C.",14,c7m
+13459,"Treu, Tommaso L.",228,ca5
+13461,"Williams, Benjamin F.",8,c8d
+13463,"Sahu, Kailash C.",256,c8x
+13464,"Sahu, Kailash C.",3,cdk
+13466,"Sahu, Kailash C.",2,cdc
+13467,"Bean, Jacob L.",2541,ccz
+13468,"Bond, Howard E.",2,ca1
+13470,"Chaname, Julio",80,ccn
+13476,"Kallivayalil, Nitya",120,cc2
+13477,"Kochanek, Chris S.",13,c85
+13479,"Levan, Andrew James",2,cbl
+13480,"Levan, Andrew James",6,cbm
+13482,"Lundgren, Britt Fisher",36,cbw
+13483,"Oestlin, Goeran",82,cdb
+13490,"Surace, Jason A.",26,c9h
+13493,"Schrabback, Tim",22,cb8
+13495,"Lotz, Jennifer",192,c8n
+13496,"Lotz, Jennifer",190,c8o
+13497,"Tanvir, Nial Rahil",4,c81
+13498,"Lotz, Jennifer",141,c8m
+13504,"Lotz, Jennifer",142,cdu
+13505,"Milisavljevic, Dan",4,cdt
+13506,"Wilkes, Belinda J.",3,cfr
+13507,"Worrall, Diana M.",2,cfq
+13510,"Weisskopf, Martin C.",4,cgt
+13511,"Heida, Marianne",1,cef
+13513,"Comerford, Julia",24,cdw
+13514,"Pacaud, Florian",4,cfn
+13515,"Binder, Breanna",13,cfp
+13517,"Malkan, Matthew A.",423,cdy
+13563,"Hilbert, Bryan",2,cfh
+13570,"Kozhurina-Platais, Vera",9,ch8
+13571,"Riess, Adam",28,cgz
+13572,"Long, Knox S.",6,cgk
+13573,"Long, Knox S.",2,cfs
+13574,"Baggett, Sylvia M.",1,chd
+13575,"Deustua, Susana E.",13,ch3
+13576,"Deustua, Susana E.",4,chg
+13579,"Brammer, Gabriel",32,ch4
+13580,"Brammer, Gabriel",24,ch5
+13582,"Pirzkal, Norbert",12,ch9
+13583,"McCullough, Peter",10,cgu
+13592,"Chiaberge, Marco",6,cfm
+13596,"Coe, Dan",21,ce5
+13599,"Bohlin, Ralph C.",1,cga
+13603,"Chiaberge, Marco",3,ch0
+13606,"Anderson, Jay",36,chi
+13611,"Tanvir, Nial Rahil",9,cgj
+13613,"Kochanek, Chris S.",12,chm
+13614,"Vieira, Joaquin",6,chq
+13621,"Goobar, Ariel",17,chy
+13623,"Levay, Zolt",18,chx
+13626,"Lawrence, Stephen S.",30,ci2
+13639,"Bayliss, Matthew",2,coo
+13640,"Buenzli, Esther",5,cje
+13641,"Capak, Peter Lawrence",56,cow
+13642,"Miller, Jon Matthew",3,ckq
+13643,"Duchene, Gaspard",12,cjg
+13644,"Fan, Xiaohui",2,con
+13645,"Fan, Xiaohui",14,cnn
+13646,"Foley, Ryan",28,ck4
+13647,"Foley, Ryan",24,cjf
+13648,"Fox, Ori Dosovitz",3,cnj
+13653,"Griffith, Caitlin Ann",85,cov
+13655,"Hayes, Matthew James",5,cmc
+13656,"Hayes, Matthew James",3,cme
+13657,"Kartaltepe, Jeyhan",60,cor
+13659,"Sandstrom, Karin Marie",162,cnl
+13661,"Auger, Matthew",28,cjo
+13662,"Barth, Aaron J.",4,coe
+13665,"Benneke, Bjorn",771,co5
+13666,"Bradac, Marusa",3,ckd
+13669,"Carollo, Marcella",43,cjl
+13671,"Ebeling, Harald",55,coz
+13673,"Kalirai, Jason",8,ck3
+13674,"Kaplan, David L.",15,clk
+13676,"Meyer, Eileen T",17,ckz
+13677,"Perlmutter, Saul",263,cn1
+13678,"Riess, Adam",43,cir
+13680,"Sabbi, Elena",6,ckk
+13681,"van Dokkum, Pieter",4,cjb
+13682,"van Dokkum, Pieter",30,cjr
+13683,"Van Dyk, Schuyler D.",6,ciw
+13684,"Van Dyk, Schuyler D.",4,civ
+13686,"Riess, Adam",53,ciu
+13687,"Beifiori, Alessandra",6,cmj
+13688,"Castellano, Marco",14,cms
+13689,"Diamond-Stanic, Aleksandar M.",24,cnp
+13690,"Diaz-Santos, Tanio",26,com
+13691,"Freedman, Wendy L.",358,cnw
+13695,"Holwerda, Benne Willem",110,clt
+13696,"Holwerda, Benne Willem",12,cnc
+13698,"Lyman, Joseph",10,clg
+13699,"Martin, Nicolas",67,cn8
+13701,"Mihos, Chris",26,ck8
+13702,"Oey, Sally",4,clm
+13705,"Patience, Jenny",2,cjz
+13710,"Rosenfield, Philip A.",18,cj2
+13711,"Saha, Abhijit",332,cmd
+13717,"Wang, Lifan",1,cnf
+13718,"Wardlow, Julie",11,cjj
+13723,"Elmegreen, Bruce",6,cof
+13724,"Henry, Todd J.",36,cp5
+13727,"Kalirai, Jason",8,ck0
+13729,"Lawrence, Andy",12,ck5
+13731,"Meyer, Eileen T",4,cl4
+13732,"Nierenberg, Anna",12,co2
+13733,"Peroux, Celine",10,cop
+13735,"Sand, David J.",4,cmo
+13737,"Shappee, Benjamin John",24,coy
+13738,"Shaya, Edward J.",12,cng
+13739,"Skillman, Evan D.",160,cnb
+13740,"Stern, Daniel K",82,cou
+13741,"Storchi-Bergmann, Thaisa",5,cln
+13742,"Tan, Jonathan Charles",20,cni
+13743,"Thilker, David",22,co4
+13745,"Tollerud, Erik",4,clj
+13746,"Walker, Matthew G.",9,cna
+13747,"Webb, Tracy",12,clq
+13748,"Bedin, Luigi R.",67,cmw
+13750,"Cannon, John Michael",36,cnm
+13751,"De Luca, Andrea",1,cn9
+13755,"Greene, Jenny Emma",50,cml
+13756,"Jha, Saurabh W.",6,cmt
+13757,"Jha, Saurabh W.",14,cmu
+13758,"Koch, Andreas",35,cp0
+13762,"McGreer, Ian",3,cmq
+13763,"Megeath, Tom",20,ckw
+13765,"Peterson, Bradley M",24,cjs
+13767,"Trenti, Michele",1574,cph
+13768,"Weisz, Daniel R.",110,cm9
+13770,"Do, Tuan",16,cm7
+13771,"Lennon, Daniel J.",37,cm4
+13772,"Weisskopf, Martin C.",4,cp3
+13773,"Chandar, Rupali",32,cnk
+13777,"Gregg, Michael D.",20,cnv
+13779,"Malhotra, Sangeeta",325,coi
+13782,"Milisavljevic, Dan",6,cju
+13785,"Reddy, Naveen A.",16,ckl
+13787,"Smith, Nathan",5,ckj
+13790,"Rodney, Steve",87,cl3
+13792,"Bouwens, Rychard",32,cnq
+13793,"Bowler, Rebecca A A",17,clo
+13799,"Modjaz, Maryam",4,co0
+13802,"Luhman, Kevin",4,cit
+13804,"McQuinn, Kristen B W",28,cmx
+13808,"Nota, Antonella",1,ckn
+13809,"Lu, Jessica Ryan",4,cmz
+13810,"Kirshner, Robert P.",2,clf
+13813,"Farrell, Sean A.",2,cn3
+13816,"Bentz, Misty C.",14,cno
+13817,"Brown, Thomas M.",9,ckb
+13819,"Dupuy, Trent J.",6,cj7
+13821,"Fabian, Andrew C.",3,cle
+13822,"Folatelli, Gaston",2,cly
+13823,"Gobat, Raphael",9,cmm
+13824,"Kerzendorf, Wolfgang E",16,cl0
+13825,"Maund, Justyn Robert",2,cj6
+13826,"Robberto, Massimo",104,col
+13830,"Tanvir, Nial Rahil",21,cn2
+13831,"Tanvir, Nial Rahil",20,cm5
+13834,"van der Marel, Roeland P.",32,cmk
+13839,"Farina, Emanuele Paolo",4,clh
+13842,"Hamann, Fred",10,cl9
+13844,"Lehmer, Bret",6,cl8
+13845,"Muzzin, Adam",40,ckt
+13847,"Sahu, Kailash C.",8,cpc
+13848,"de Mink, Selma E.",2,cog
+13850,"Sahu, Kailash C.",2,cp6
+13851,"Bond, Howard E.",5,cj4
+13853,"Cenko, Stephen Bradley",5,csg
+13856,"Crnojevic, Denija",60,cnu
+13857,"Dalcanton, Julianne",14,cnh
+13858,"De Cia, Annalisa",8,cm2
+13860,"Gennaro, Mario",13,ckh
+13867,"Kasliwal, Mansi",4,cny
+13868,"Kocevski, Dale D.",25,cp9
+13869,"Levan, Andrew James",2,cl5
+13871,"Oesch, Pascal",18,cka
+13872,"Oesch, Pascal",120,cn6
+13876,"Bond, Howard E.",2,cjx
+13926,"Levay, Zolt",8,ck9
+13929,"Riess, Adam",36,cmp
+13935,"Bond, Howard E.",6,cpd
+13939,"Miller, Jon Matthew",4,cry
+13940,"Brorby, Matt",4,crd
+13941,"Troja, Eleonora",2,cs2
+13942,"Peacock, Mark B.",4,cpy
+13943,"Reines, Amy E.",24,crv
+13944,"Greene, Jenny Emma",1,crt
+13945,"Meyer, Eileen T",8,crg
+13946,"Ojha, Roopesh",1,cs1
+13949,"Levan, Andrew James",9,cs8
+13950,"Fruchter, Andrew S.",4,csb
+13951,"Fruchter, Andrew S.",5,csd
+13955,"Chiaberge, Marco",6,cqp
+13959,"Coe, Dan",32,cr5
+13962,"Bohlin, Ralph C.",2,cr6
+14012,"Gosmeyer, Catherine",1,cqu
+14015,"Long, Knox S.",9,crq
+14016,"Long, Knox S.",3,crr
+14018,"Baggett, Sylvia M.",2,cr3
+14021,"Deustua, Susana E.",8,crw
+14022,"Deustua, Susana E.",6,csf
+14023,"Pirzkal, Norbert",24,cqv
+14024,"Pirzkal, Norbert",24,cqw
+14031,"Kozhurina-Platais, Vera",32,cqx
+14037,"Lotz, Jennifer",144,cqt
+14038,"Lotz, Jennifer",146,csz
+14039,"Levay, Zolt",16,cs7
+14041,"Kelly, Patrick",64,csc
+14043,"Bauer, Franz",1,csi
+14047,"Reines, Amy E.",2,csu
+14049,"Kochanek, Chris S.",12,csp
+14050,"Kreidberg, Laura",538,cso
+14051,"Radigan, Jacqueline",4,csm
+14052,"Cushing, Michael C.",14,csq
+14055,"Levan, Andrew James",2,cst
+14056,"Levay, Zolt",12,csv
+14057,"Grise, Fabien",12,ct0
+14059,"Soria, Roberto",4,ct4
+14060,"Soria, Roberto",4,ct3
+14061,"Ferraro, Francesco R.",4,ct2
+14062,"Riess, Adam",26,ct7
+14063,"Proffitt, Charles R.",5,ct8
+14066,"Adamo, Angela",16,cx1
+14067,"Ahn, Chris",2,ctv
+14068,"Barrows, Robert Scott",30,cw2
+14069,"Bastian, Nate",13,cz6
+14072,"Boyer, Martha L.",80,cyx
+14073,"Boyer, Martha L.",62,cyj
+14074,"Cohen, Roger",80,cx3
+14075,"Fox, Ori Dosovitz",9,cuo
+14078,"Hargis, Jonathan",12,cuz
+14079,"Hayes, Matthew James",12,ctd
+14083,"Perez-Fournon, Ismael",12,cu4
+14088,"Vanzella, Eros",7,cxk
+14091,"Barth, Aaron J.",3,cuk
+14093,"Berg, Danielle",4,cyu
+14095,"Brammer, Gabriel",33,cvz
+14096,"Coe, Dan",648,czg
+14098,"Ebeling, Harald",93,czp
+14108,"Salzer, John J.",2,cxs
+14109,"Shen, Yue",21,cva
+14110,"Sing, David K.",89,cwc
+14114,"van Dokkum, Pieter",57,cxe
+14115,"Van Dyk, Schuyler D.",4,cvy
+14116,"Van Dyk, Schuyler D.",5,cw7
+14118,"Bedin, Luigi R.",186,ctj
+14119,"Bianchi, Luciana C.",45,cyr
+14122,"Christensen, Lise",20,cx0
+14124,"Correnti, Matteo",2,cy9
+14125,"Darnley, Matthew James",20,cz0
+14126,"Edwards, Zachary",1,cxh
+14127,"Fumagalli, Michele",55,cwz
+14131,"Orlitova, Ivana",12,czm
+14142,"Albert, Loic",102,cz5
+14146,"Lawrence, Stephen S.",14,cu0
+14147,"Dong, Hui",2,cvm
+14148,"Egami, Eiichi",6,czk
+14149,"Filippenko, Alex V.",26,cuq
+14150,"Fraser, Morgan",4,cy1
+14153,"Hughes, John P.",8,cz1
+14155,"Kalirai, Jason",4,cyf
+14156,"Leroy, Adam",11,cyq
+14157,"Luhman, Kevin",9,ctz
+14158,"Meyer, Eileen T",7,cw5
+14159,"Meyer, Eileen T",3,cw6
+14160,"OMeara, John M.",21,cwa
+14162,"Poppenhaeger, Katja",3,cv1
+14163,"Rigault, Mickael",72,cua
+14164,"Sarajedini, Ata",132,cw8
+14165,"Seitz, Stella",8,cz7
+14166,"Shappee, Benjamin John",16,czj
+14167,"Shaya, Edward J.",6,cuh
+14169,"Wakeford, Hannah",84,cyd
+14170,"Wuyts, Eva",10,cvf
+14172,"Bowler, Brendan",12,cvn
+14174,"Goudfrooij, Paul",4,cza
+14175,"Goudfrooij, Paul",40,cz9
+14178,"Malkan, Matthew A.",1050,d1k
+14181,"Megeath, Tom",115,czc
+14182,"Puzia, Thomas H.",107,cwr
+14183,"Rangelov, Blagoy",4,cws
+14185,"Wang, Ran",12,cyp
+14186,"Arab, Heddy",8,cxc
+14187,"Baldassare, Vivienne",4,cyv
+14188,"Biller, Beth",7,cv3
+14189,"Bolton, Adam S.",21,cv2
+14191,"Cole, Andrew A.",16,cto
+14197,"Johnson, Christian",4,czd
+14199,"Kelly, Patrick",102,cur
+14200,"Ma, Jingzhe",6,cwu
+14202,"Milisavljevic, Dan",3,cvc
+14204,"Milone, Antonino Paolo",32,cu8
+14205,"Newman, Andrew B.",6,cvx
+14206,"Riess, Adam",70,ctn
+14208,"Rodney, Steve",16,cxz
+14209,"Siana, Brian",36,cu1
+14210,"Smith, Russell Julian",4,cvt
+14212,"Stapelfeldt, Karl",75,czf
+14213,"Tremblay, Pier-Emmanuel",2,cwg
+14215,"Trujillo, Ignacio",2,ctt
+14216,"Kirshner, Robert P.",116,cxo
+14218,"Berta-Thompson, Zach K.",41,cz4
+14219,"Blakeslee, John P.",68,cv4
+14220,"Dupuy, Trent J.",16,cvo
+14223,"Frye, Brenda Louise",12,cv7
+14224,"Gallart, Carme",16,cy2
+14226,"Maund, Justyn Robert",3,cuc
+14227,"Papovich, Casey",132,cxt
+14230,"Rigby, Jane R.",18,cwx
+14233,"Schneider, Adam",26,cv6
+14234,"Simon, Joshua D.",14,cxu
+14235,"Sohn, Sangmo Tony",61,cx6
+14236,"Sohn, Sangmo Tony",8,cwl
+14237,"Tanvir, Nial Rahil",13,cy3
+14239,"Tremonti, Christy A.",6,cxm
+14241,"Apai, Daniel",347,cyt
+14244,"Foley, Ryan",5,cz8
+14249,"Mignani, Roberto",12,cx5
+14251,"Reines, Amy E.",33,cuu
+14252,"Strazzullo, Veronica",9,cvg
+14253,"Takats, Katalin",4,cxd
+14254,"Treu, Tommaso L.",16,cud
+14256,"Biretta, John A.",3,cxy
+14258,"Bond, Howard E.",23,d28
+14259,"Crnojevic, Denija",44,cwk
+14260,"Deming, Drake",1083,cy0
+14262,"Jahnke, Knud",21,cw4
+14266,"Kochanek, Chris S.",5,cu6
+14268,"Lehner, Nicolas",68,cxv
+14269,"Lehner, Nicolas",14,cwi
+14270,"Levan, Andrew James",5,dff
+14276,"Stanway, Elizabeth R.",3,cxf
+14327,"Perlmutter, Saul",244,cwb
+14329,"Weisskopf, Martin C.",4,czl
+14330,"Bedin, Luigi R.",12,cte
+14333,"Kirshner, Robert P.",2,cxg
+14335,"Kuepper, Andreas H.W.",6,cu3
+14336,"Brown, Thomas M.",9,cu5
+14337,"Dupuy, Trent J.",6,cvp
+14343,"Kallivayalil, Nitya",64,cxx
+14346,"Kochanek, Chris S.",3,cwn
+14351,"Chomiuk, Laura",3,d02
+14352,"Hlavacek-Larrondo, Julie",8,czw
+14353,"Fruchter, Andrew S.",8,d2t
+14356,"Plotkin, Richard M.",5,d1o
+14357,"Troja, Eleonora",6,d1u
+14358,"Assef, Roberto",6,d1j
+14359,"Williams, Brian",2,d21
+14361,"Sun, Ming",7,d22
+14362,"Johnson, Lucas",12,d1w
+14364,"Romani, Roger",1,d1z
+14381,"Long, Knox S.",16,d1s
+14384,"Deustua, Susana E.",2,d24
+14385,"Pirzkal, Norbert",24,d2p
+14386,"Pirzkal, Norbert",24,d2q
+14388,"Deustua, Susana E.",7,d2i
+14393,"Kozhurina-Platais, Vera",55,d1x
+14394,"Riess, Adam",20,d1m
+14398,"Chiaberge, Marco",6,d1y
+14402,"Coe, Dan",24,d0q
+14425,"Proffitt, Charles R.",4,d23
+14448,"Sahu, Kailash C.",1,d07
+14455,"Petigura, Erik",187,d34
+14456,"Brodwin, Mark",48,d39
+14459,"Bouwens, Rychard",4,d2x
+14463,"McCollum, Bruce",6,d2y
+14465,"Tan, Jonathan Charles",10,d31
+14466,"Orlitova, Ivana",3,d32
+14468,"Mikal-Evans, Thomas",84,d2w
+14483,"Levan, Andrew James",6,dnw
+14484,"Chambers, Kenneth",3,d3i
+14487,"Sugerman, Ben E. K.",10,d3q
+14494,"Tan, Jonathan Charles",16,d40
+14495,"Sobral, David",4,d3y
+14496,"Newman, Andrew B.",3,d3w
+14497,"Smit, Renske",3,d41
+14500,"de Wit, Julien",74,d43
+14501,"Kim, Hyosun",2,d44
+14502,"Levan, Andrew James",1,d48
+14507,"Chiaberge, Marco",6,d4e
+14511,"Coe, Dan",22,d57
+14528,"Kelly, Patrick",10,d4q
+14543,"Pirzkal, Norbert",24,dcn
+14544,"Pirzkal, Norbert",26,dco
+14550,"Kozhurina-Platais, Vera",10,dcm
+14593,"Bastian, Nate",3,d78
+14594,"Bielby, Rich",144,d7h
+14595,"Da Rio, Nicola",9,d7c
+14596,"Fan, Xiaohui",4,d7a
+14606,"Simmons, Brooke Devlin",100,d95
+14607,"Troja, Eleonora",3,d7d
+14608,"Zakamska, Nadia L",22,d9y
+14610,"Dalcanton, Julianne",351,db6
+14611,"Graur, Or",39,d69
+14613,"Lu, Jessica Ryan",2,d8h
+14614,"Mauerhan, Jon",4,d6u
+14618,"Shara, Michael",106,d5o
+14620,"Trainor, Ryan F",20,d7l
+14622,"Whitaker, Katherine E.",24,d66
+14624,"Arce, Hector G.",8,da7
+14626,"Barsony, Mary",18,d8y
+14630,"Collett, Thomas E.",7,d8o
+14632,"Erb, Dawn K.",1,d8w
+14636,"Karachentsev, Igor Dmitrievich",40,d89
+14638,"Long, Knox S.",9,d6o
+14642,"Stevenson, Kevin",167,d8v
+14643,"van Dokkum, Pieter",16,d5g
+14644,"van Dokkum, Pieter",44,d5h
+14645,"Van Dyk, Schuyler D.",9,d97
+14648,"Riess, Adam",71,d5d
+14649,"Alatalo, Katherine Anne",53,das
+14652,"Holwerda, Benne Willem",8,d8d
+14653,"Lowenthal, James",44,d85
+14654,"Milne, Peter",23,d92
+14656,"Orlitova, Ivana",4,dac
+14658,"Peng, Eric W.",32,d9r
+14660,"Straka, Lorrie",5,d8e
+14662,"Bedin, Luigi R.",195,d80
+14663,"Wang, Lifan",6,d8b
+14664,"Beatty, Thomas G.",763,da3
+14666,"Casertano, Stefano",32,daz
+14667,"Chen, Hsiao-Wen",5,d6a
+14668,"Filippenko, Alex V.",56,d96
+14669,"Hlavacek-Larrondo, Julie",2,d77
+14671,"Meyer, Eileen T",2,d7w
+14675,"Roman-Duval, Julia Christine",223,da9
+14676,"Sand, David J.",4,d6d
+14677,"Schrabback, Tim",63,d81
+14678,"Shappee, Benjamin John",8,d6v
+14680,"Tan, Jonathan Charles",18,d6l
+14682,"Benneke, Bjorn",1308,dax
+14685,"Fong, Wen-fai",6,dav
+14686,"Fontanive, Clemence",4,dau
+14688,"Goudfrooij, Paul",4,d6f
+14689,"Gouliermis, Dimitrios",108,d73
+14695,"Megeath, Tom",4,d7z
+14696,"Perlman, Eric S.",1,d7x
+14697,"Pogge, Richard W.",24,d8m
+14699,"Sobral, David",17,d8l
+14700,"Sugerman, Ben E. K.",18,d6h
+14701,"Trenti, Michele",1,d7u
+14704,"Conroy, Charlie",136,d8f
+14706,"Glikman, Eilat",42,d5k
+14707,"Massey, Philip Louis",31,d58
+14709,"Mazur, Brian",12,dae
+14710,"Milone, Antonino Paolo",32,d6i
+14711,"Rich, R. Michael",8,d7n
+14715,"Alatalo, Katherine Anne",9,d8n
+14716,"Annibali, Francesca",6,da1
+14717,"Arcavi, Iair",13,dah
+14718,"Becker, George D.",8,d5r
+14719,"Best, Philip N.",18,d5i
+14720,"Chelouche, Doron",4,da4
+14721,"Conselice, Christopher",11,d6p
+14722,"Croft, Steve",5,d5s
+14723,"Dalessandro, Emanuele",3,d6q
+14724,"Degenaar, Nathalie",3,d6r
+14725,"Dieball, Andrea",2,d7j
+14726,"Dotter, Aaron L.",10,d8s
+14727,"Duc, Pierre-Alain",16,d6s
+14728,"Gallagher, John S.",13,da6
+14730,"Goulding, Andrew",3,d6t
+14732,"Hogg, James Andrew",6,da8
+14734,"Kallivayalil, Nitya",164,dan
+14739,"Liu, Guilin",2,dag
+14740,"Marrone, Daniel",6,d6w
+14742,"Nguyen, Dieu D.",3,d7k
+14743,"Nicholl, Matt",3,d5t
+14745,"Posselt, Bettina",1,d75
+14747,"Robertson, Brant",20,d6y
+14748,"Romanowsky, Aaron",5,db4
+14750,"Wang, Tao",4,d8q
+14753,"Fransson, Claes",2,dad
+14754,"Martin, Crystal Linn",20,d98
+14758,"Berta-Thompson, Zach K.",430,dap
+14759,"Brown, Thomas M.",9,d6e
+14760,"Cai, Zheng",18,d93
+14763,"Maund, Justyn Robert",3,d5p
+14766,"Simon, Joshua D.",48,d9w
+14767,"Sing, David K.",490,d9m
+14769,"Sohn, Sangmo Tony",8,d68
+14770,"Sohn, Sangmo Tony",8,d6m
+14771,"Tanvir, Nial Rahil",15,d8c
+14773,"Brown, Thomas M.",4,d88
+14774,"Dupuy, Trent J.",8,d6b
+14775,"van der Marel, Roeland P.",11,d70
+14776,"Dupuy, Trent J.",18,d8a
+14779,"Graham, Melissa Lynn",72,d76
+14783,"Sahu, Kailash C.",12,daj
+14785,"van Velzen, Sjoert",22,d8r
+14786,"Williams, Benjamin F.",36,d9g
+14792,"Bean, Jacob L.",208,d83
+14794,"Bond, Howard E.",4,d5w
+14796,"Crnojevic, Denija",81,d7e
+14800,"Fesen, Robert A.",5,d7o
+14801,"Fesen, Robert A.",2,d6g
+14804,"Levan, Andrew James",8,dp7
+14805,"Levan, Andrew James",2,df8
+14807,"Sabbi, Elena",20,d5e
+14808,"Suzuki, Nao",78,ddq
+14814,"Tendulkar, Shriharsh",6,d4v
+14830,"Proffitt, Charles R.",4,dd6
+14840,"Bellini, Andrea",151,dba
+14844,"Kochanek, Chris S.",6,dc2
+14845,"Boyer, Martha L.",4,dc6
+14846,"Romanowsky, Aaron",6,dcs
+14847,"Karovska, Margarita",2,dc5
+14849,"Perlman, Eric S.",7,dcr
+14850,"Troja, Eleonora",6,dd0
+14852,"Lehmer, Bret",4,dch
+14862,"Goobar, Ariel",36,dd4
+14868,"Riess, Adam",17,ddh
+14870,"Deustua, Susana E.",6,ddi
+14872,"Kelly, Patrick",11,ddd
+14873,"de Wit, Julien",360,dde
+14876,"Banados, Eduardo",6,ddx
+14881,"Anderson, Jay",8,ddk
+14883,"Deustua, Susana E.",2,ddn
+14886,"Smith, Russell Julian",2,de0
+14887,"Benneke, Bjorn",95,de7
+14888,"Dittmann, Jason A.",149,de4
+14890,"Tendulkar, Shriharsh",4,de6
+14892,"McCollum, Bruce",3,de5
+14895,"Bouwens, Rychard",15,ddu
+14896,"Bayliss, Matthew",9,de1
+14898,"Greene, Jenny Emma",30,de2
+14899,"DAndrea, Chris",2,ddp
+14901,"Levan, Andrew James",2,dec
+14905,"Lin, Dacheng",2,dee
+14908,"Zappacosta, Luca",1,ded
+14911,"Fall, Michael",40,dem
+14913,"Mutchler, Max",18,ddt
+14915,"Kreidberg, Laura",94,dey
+14916,"Spake, Jessica",84,dex
+14918,"Wakeford, Hannah",210,deu
+14920,"Boizelle, Benjamin",2,deo
+14922,"Kelly, Patrick",10,det
+14923,"Oestlin, Goeran",3,dew
+14924,"Seth, Anil C.",12,des
+14925,"Foley, Ryan",12,der
+14926,"Buie, Marc W.",3,df0
+14927,"Hu, Renyu",125,df6
+14937,"Rodruck, Michael",4,dgv
+14938,"Gowardhan, Avani",3,dfx
+14949,"Chiaberge, Marco",6,dg3
+14953,"Coe, Dan",22,dfw
+14992,"Deustua, Susana E.",2,dor
+14993,"Pirzkal, Norbert",6,dpn
+14994,"Pirzkal, Norbert",6,dpo
+15000,"Kozhurina-Platais, Vera",9,do7
+15061,"Bastian, Nate",4,dio
+15062,"Bastian, Nate",16,dj9
+15063,"Bernard, Edouard",32,dkf
+15064,"Casey, Caitlin M.",26,djb
+15065,"Cohen, Roger",36,dig
+15069,"Fisher, Deanne B",24,dlh
+15074,"Heida, Marianne",1,dgw
+15077,"Jones, Tucker",32,diu
+15078,"Larsen, Soeren S.",1,djv
+15079,"Manara, Carlo F.",2,dli
+15081,"Robinson, Andrew",8,dlr
+15082,"Robinson, Andrew",10,dlj
+15083,"Rodruck, Michael",14,dle
+15085,"Simcoe, Robert Andrew",18,dll
+15086,"Soria, Roberto",7,djn
+15087,"Stierwalt, Sabrina",30,dml
+15089,"Troja, Eleonora",8,dlk
+15096,"Bedin, Luigi R.",136,dho
+15100,"Cooke, Jeff",24,dnb
+15101,"Dahle, Haakon",15,dl9
+15103,"De Barros, Stephane",30,dhr
+15105,"Holwerda, Benne Willem",35,dj0
+15106,"Holwerda, Benne Willem",4,din
+15107,"Holwerda, Benne Willem",24,dne
+15109,"Kreidberg, Laura",64,dge
+15113,"Saha, Abhijit",304,dgq
+15114,"Sanchez-Janssen, Ruben",6,dnk
+15115,"Silverman, John David",32,dnl
+15117,"Steinhardt, Charles Louis",480,dm9
+15118,"Trakhtenbrot, Benny",12,dhq
+15121,"Zaritsky, Dennis",8,dha
+15123,"Barth, Aaron J.",2,dk8
+15129,"Burke, Christopher J.",204,dme
+15132,"Ebeling, Harald",96,dkl
+15133,"Erwin, Peter",168,dkv
+15134,"Mikal-Evans, Thomas",830,dm0
+15135,"Mikal-Evans, Thomas",156,di8
+15137,"Jiang, Linhua",12,dix
+15138,"Jontof-Hutter, Daniel",182,dj2
+15140,"Lunnan, Ragnhild",22,dh1
+15141,"Megeath, Tom",14,dmc
+15145,"Riess, Adam",288,dgg
+15146,"Riess, Adam",6,di5
+15148,"Stapelfeldt, Karl",5,dkk
+15149,"Teachey, Alex",27,dm8
+15150,"Tully, R. Brent",16,djj
+15151,"Van Dyk, Schuyler D.",10,dm1
+15152,"Van Dyk, Schuyler D.",3,dmf
+15160,"Baker, Andrew",4,dl1
+15162,"Blanchard, Peter",6,dkc
+15163,"Chen, Hsiao-Wen",240,dnc
+15166,"Filippenko, Alex V.",76,di1
+15169,"Gregg, Michael D.",22,dl3
+15170,"Gregg, Michael D.",162,dl8
+15173,"Kalirai, Jason",4,dk9
+15175,"Meyer, Eileen T",6,dj4
+15177,"Nierenberg, Anna",21,dly
+15181,"Rosario, David J. V.",36,djs
+15182,"Sand, David J.",45,dhd
+15183,"Sand, David J.",10,dhe
+15186,"Thilker, David",15,dj5
+15187,"Tilvi, Vithal",17,dn6
+15191,"Meyer, Eileen T",6,dgl
+15192,"Shappee, Benjamin John",9,dhc
+15194,"Aloisi, Alessandra",17,dnd
+15196,"Bowen, David V.",7,dgp
+15197,"Bowler, Brendan",18,dky
+15199,"Do, Tuan",3,dmo
+15200,"Farrah, Duncan",8,djm
+15201,"Fontanive, Clemence",72,dl2
+15205,"Jha, Saurabh W.",14,djx
+15208,"Sahai, Raghvendra",24,dnn
+15212,"Trenti, Michele",1356,dq2
+15213,"Trilling, David E.",142,dq3
+15214,"Perlman, Eric S.",3,dlb
+15215,"Bennert, Vardha N.",67,dh2
+15216,"Blair, William P.",29,dk4
+15222,"Arcavi, Iair",2,dii
+15223,"Auger, Matthew",1,dg5
+15224,"Banados, Eduardo",19,dhn
+15226,"Boizelle, Benjamin",24,djq
+15228,"Carlin, Jeffrey L",8,djw
+15229,"Daddi, Emanuele",28,dk1
+15230,"de Jong, Roelof S.",41,dlp
+15231,"Ferraro, Francesco R.",10,dln
+15232,"Ferraro, Francesco R.",16,dla
+15235,"Harris, William Edgar",45,dkb
+15236,"Hosseinzadeh, Griffin",1,dhi
+15238,"Kraus, Adam L.",685,dnm
+15241,"Larson, Kirsten L.",40,dod
+15242,"Marchetti, Lucia",117,dmh
+15243,"McQuinn, Kristen B W",12,dmn
+15244,"Monelli, Matteo",56,djt
+15245,"ODea, Christopher P.",28,dfq
+15252,"Nicholl, Matt",3,dgy
+15253,"Canameras, Raoul",8,dki
+15254,"Chiaberge, Marco",12,dfs
+15256,"Fransson, Claes",2,djd
+15257,"Hartigan, Patrick",1,dgi
+15258,"Mihos, Chris",10,dkj
+15260,"Trump, Jonathan R",165,diy
+15263,"Bentz, Misty C.",5,dgo
+15265,"Blakeslee, John P.",28,dfr
+15266,"Cai, Zheng",32,dgr
+15267,"Canning, Rebecca E. A.",37,diz
+15270,"Dupuy, Trent J.",8,dil
+15271,"Ferguson, Harry C.",4,dmy
+15272,"Folatelli, Gaston",3,dkr
+15275,"Gilbert, Karoline",95,dn0
+15276,"Goobar, Ariel",7,dfp
+15277,"Greco, Johnny P",18,dhk
+15278,"Jansen, Rolf A.",27,dkq
+15279,"Johnson, Sean",61,dga
+15282,"Lilly, Simon J.",12,dfo
+15283,"Mackenzie, Ruari",2,dk0
+15287,"Shapley, Alice E.",87,dia
+15288,"Sing, David K.",10,dps
+15290,"Sun, Ming",1,dh5
+15294,"Wilson, Gillian",13,dmz
+15296,"Dupuy, Trent J.",18,dib
+15301,"Carone, Ludmila",201,dfn
+15302,"Collins, Michelle L.M.",32,djy
+15303,"DAndrea, Chris",17,diq
+15304,"de Wit, Julien",232,dhs
+15307,"Gladders, Michael D.",244,dgb
+15308,"Gonzalez, Anthony Hernan",12,dgs
+15311,"Kochanek, Chris S.",2,djc
+15315,"McDonald, Michael A.",6,dh9
+15317,"Platais, Imants",50,dir
+15318,"Sahu, Kailash C.",19,dju
+15319,"Secrest, Nathan",4,dip
+15320,"Treu, Tommaso L.",39,dgc
+15323,"Walsh, Jonelle L.",56,dja
+15324,"Wiklind, Tommy",1,dj7
+15325,"Wong, Kenneth",2,di0
+15329,"Berger, Edo",13,dpm
+15330,"Calzetti, Daniela",19,dny
+15332,"Crnojevic, Denija",4,dm2
+15333,"Crossfield, Ian",930,dmi
+15334,"Da Rio, Nicola",40,dje
+15336,"Ferguson, Annette",82,djf
+15337,"Fesen, Robert A.",11,dg8
+15346,"Kasliwal, Mansi",5,dp9
+15347,"Levan, Andrew James",3,e6j
+15348,"Levan, Andrew James",24,dma
+15349,"Levan, Andrew James",11,dnx
+15354,"Sabbi, Elena",2,di6
+15355,"Suzuki, Nao",55,do2
+15361,"Fesen, Robert A.",2,dgm
+15362,"Sabbi, Elena",15,dhb
+15363,"Suzuki, Nao",137,dpq
+15364,"Bellini, Andrea",11,dkg
+15375,"Zappacosta, Luca",2,dpr
+15376,"Worrall, Diana",2,dpt
+15377,"Bayliss, Matthew",10,dpv
+15378,"Bayliss, Matthew",8,dpw
+15399,"Calamida, Annalisa",11,dr0
+15400,"Stevenson, Kevin",48,dqm
+15403,"Pallanca, Cristina",2,dqe
+15408,"MacKenty, John W.",7,drs
+15410,"Neeleman, Marcel",4,drn
+15414,"Naidu, Rohan",5,dr9
+15415,"Graur, Or",2,dqu
+15416,"Rafelski, Marc",2,dqy
+15417,"Peng, Eric W.",2,dre
+15418,"Dahle, Haakon",2,dri
+15420,"Spiniello, Chiara",2,drh
+15426,"Crnojevic, Denija",4,drg
+15427,"Schombert, James M.",16,dr5
+15428,"Hedges, Christina Louise",80,drd
+15435,"Chisholm, John",4,dr8
+15436,"Suess, Katherine",6,dro
+15441,"Lin, Dacheng",1,dru
+15443,"Dupke, Renato A.",3,drt
+15444,"Barth, Aaron J.",198,drw
+15445,"Keel, William Clifford",166,ds4
+15446,"Dalcanton, Julianne",203,drz
+15449,"Mutchler, Max",16,dry
+15450,"Buie, Marc W.",4,ds6
+15455,"Bennett, David P.",6,dsa
+15464,"Long, Arianna",10,dt1
+15466,"Ebeling, Harald",4,dss
+15467,"Erb, Dawn K.",5,dt8
+15468,"Faherty, Jacqueline Kelly",12,dt7
+15469,"Nikolov, Nikolay",167,dt0
+15470,"Scarlata, Claudia",7,dsw
+15472,"Evans, Aaron S.",10,dsy
+15475,"Nayyeri, Hooshang",1,dt2
+15476,"Weisz, Daniel R.",8,dt3
+15477,"Smith, Russell Julian",2,dsl
+15480,"Husemann, Bernd",10,dsn
+15482,"Lyman, Joseph",4,dsm
+15491,"Bedin, Luigi R.",124,dtg
+15495,"Meyer, Eileen T",1,dvv
+15496,"Blanchard, Peter",3,dw2
+15498,"Do, Tuan",3,dvu
+15499,"Fruchter, Andrew S.",5,duf
+15503,"Fransson, Claes",2,dvt
+15507,"Sohn, Sangmo Tony",8,due
+15508,"Dupuy, Trent J.",8,dw7
+15510,"Tanvir, Nial Rahil",14,dwb
+15513,"Sahu, Kailash C.",13,dzi
+15514,"Sabbi, Elena",12,dvn
+15515,"Fesen, Robert A.",9,dwn
+15518,"Suzuki, Nao",57,dxx
+15522,"Chiaberge, Marco",7,dw0
+15526,"Bellini, Andrea",15,duo
+15561,"Carlberg, Joleen",4,dvi
+15582,"Deustua, Susana E.",2,dw1
+15585,"Dressel, Linda L.",30,dvp
+15586,"Pirzkal, Norbert",6,dvo
+15587,"Pirzkal, Norbert",6,dvj
+15593,"Kozhurina-Platais, Vera",9,dv7
+15594,"Kozhurina-Platais, Vera",40,dva
+15596,"Smith, Nathan",1,dtl
+15597,"Mutchler, Max",1,dth
+15600,"Foley, Ryan",12,du3
+15603,"Debes, John Henry",4,dw9
+15606,"Margutti, Raffaella",2,dwv
+15607,"Reines, Amy E.",21,dwm
+15608,"Ebeling, Harald",10,dx4
+15609,"Fabbiano, Giuseppina",1,dwj
+15610,"Randall, Scott",4,dwt
+15613,"Fruchter, Andrew S.",2,dwe
+15615,"Sell, Paul H",5,dwx
+15616,"Homan, Jeroen",2,dww
+15628,"Biller, Beth",124,dxq
+15630,"Bastian, Nate",13,dxz
+15637,"Rafelski, Marc",183,dxj
+15640,"Riess, Adam",188,dxb
+15642,"Freedman, Wendy L.",32,dy0
+15643,"Hayes, Matthew James",21,dxv
+15644,"Perley, Daniel",20,dxm
+15645,"Sand, David J.",42,dxk
+15647,"Teplitz, Harry",240,dxf
+15649,"Chandar, Rupali",39,dy4
+15650,"Homayouni, Yasaman",113,dxp
+15652,"Treu, Tommaso L.",57,dxo
+15654,"Lee, Janice",324,dxr
+15658,"Sohn, Sangmo Tony",20,dxd
+15661,"McDonald, Michael A.",8,dxh
+15663,"Akhshik, Mohammad",66,dxu
+15664,"Levan, Andrew James",1,e4k
+15667,"Yusef-Zadeh, Farhad",3,dyl
+15670,"Boehringer, Hans",6,dyb
+15671,"Dupke, Renato A.",9,dyg
+15675,"Fruchter, Andrew S.",9,dyq
+15676,"Posselt, Bettina",2,dyu
+15683,"Trilling, David E.",32,dyn
+15684,"Levan, Andrew James",10,dyo
+15685,"Vanderburg, Andrew",342,dyp
+15686,"Graur, Or",2,dys
+15690,"Bhattacharya, Aparna",6,dzh
+15691,"Kilpatrick, Charles",4,dz8
+15692,"Faisst, Andreas L",12,dzd
+15693,"Graur, Or",8,dz0
+15695,"van Dokkum, Pieter",10,dz5
+15696,"Carton, David",4,dz4
+15697,"Finkelstein, Steven L.",2,dzg
+15698,"Beatty, Thomas G.",210,dz2
+15701,"Chapman, Scott C.",6,dz6
+15702,"Morishita, Takahiro",4,dzf
+15705,"Sahu, Kailash C.",5,dz3
+15707,"Jahnke, Knud",2,dz7
+15708,"Levan, Andrew James",5,dz9
+15709,"Nicholl, Matt",2,dyy
+15727,"Pirzkal, Norbert",6,e0w
+15728,"Pirzkal, Norbert",6,e0v
+15733,"Kozhurina-Platais, Vera",6,e88
+15750,"Carlberg, Joleen",10,e5c
+15756,"Grogin, Norman",1,dzu
+15760,"Chiaberge, Marco",6,e5v
+15764,"Hathi, Nimish P.",38,e64
+15811,"Casey, Caitlin M.",19,e39
+15814,"Mikal-Evans, Thomas",233,e53
+15816,"Maiz Apellaniz, Jesus",1,e3f
+15818,"Milisavljevic, Dan",1,e3q
+15819,"Patience, Jenny",14,e42
+15823,"Smith, Nathan",1,e2w
+15829,"Yang, Jinyi",24,e38
+15830,"Zhou, Yifan",36,e2v
+15831,"Bayliss, Matthew",16,e23
+15832,"Bianchi, Luciana C.",25,e1u
+15838,"Spake, Jessica",12,e4a
+15842,"Coe, Dan",18,e4y
+15843,"Ebeling, Harald",117,e28
+15844,"Ebeling, Harald",51,e4q
+15849,"Shen, Yue",100,e2k
+15850,"van Dokkum, Pieter",3,e57
+15851,"van Dokkum, Pieter",38,e56
+15853,"Van Dyk, Schuyler D.",1,e26
+15855,"Andrews, Jennifer",5,e31
+15857,"Bellini, Andrea",127,e0o
+15858,"Bennet, Paul",16,e2y
+15860,"Elmegreen, Bruce",12,e05
+15862,"Finkelstein, Steven L.",14,e3d
+15863,"Gomez, Sebastian",4,e2s
+15867,"Huang, Xiaosheng",53,e50
+15872,"Steinhardt, Charles Louis",2,e30
+15874,"Spekkens, Kristine",8,e3e
+15875,"Beaton, Rachael Lynn",26,e9n
+15877,"Levesque, Emily",60,e3y
+15878,"Prochaska, Jason X.",3,e0c
+15879,"Riess, Adam",40,e37
+15882,"Kanekar, Nissim",4,e0b
+15883,"Schrabback, Tim",8,dzw
+15884,"Bedin, Luigi R.",12,e1m
+15886,"Fong, Wen-fai",10,e55
+15888,"Guenther, Hans Moritz",16,e6z
+15889,"Jha, Saurabh W.",110,e54
+15891,"Murray, Claire E.",235,e9m
+15894,"Do, Tuan",1,e3r
+15900,"Hwang, Hsiang-Chih",166,e3b
+15901,"Weisz, Daniel R.",56,e4l
+15902,"Weisz, Daniel R.",512,e4n
+15903,"Wood, Brian Erland",2,e2d
+15909,"Boizelle, Benjamin",65,e41
+15910,"Daddi, Emanuele",5,e02
+15911,"del Pino Molina, Andres",6,e0i
+15912,"Johnson, Lent Clifton",80,e4t
+15917,"McQuinn, Kristen B W",44,e5i
+15919,"Riechers, Dominik A.",3,e1r
+15920,"Salmon, Brett",4,e5a
+15922,"Tully, R. Brent",164,e0y
+15923,"Vegetti, Simona",27,e5h
+15924,"Vos, Johanna",25,e2m
+15928,"Fransson, Claes",2,e22
+15930,"Conroy, Charlie",36,e2r
+15931,"Bowler, Rebecca A A",2,e2h
+15932,"Boyer, Martha L.",118,e0x
+15933,"Brown, Thomas M.",14,e0n
+15936,"Kelly, Patrick",96,e4m
+15937,"Mahler, Guillaume",13,e2z
+15938,"Mutlu-Pakdil, Burcin",20,e3w
+15939,"Peroux, Celine",47,e4i
+15940,"Ribeiro, Bruno",20,e3u
+15944,"Dupuy, Trent J.",8,e4o
+15945,"Cordoni, Giacomo",4,e21
+15947,"Apai, Daniel",31,e2x
+15949,"Gladders, Michael D.",31,e2u
+15950,"Gonzalez, Anthony Hernan",3,e0g
+15952,"Jones, Olivia",16,e35
+15953,"Kastner, Joel H.",4,e3o
+15956,"Sahu, Kailash C.",10,e34
+15958,"Vergani, Susanna",2,e06
+15959,"Zitrin, Adi",11,e3n
+15960,"Sahu, Kailash C.",11,e4f
+15961,"Sahu, Kailash C.",4,e4d
+15964,"Berger, Edo",12,e01
+15966,"Chisholm, John",6,e4r
+15968,"Fossati, Matteo",2,e08
+15969,"Fu, Guangwei",71,e2g
+15970,"Grier, Catherine J",52,e1n
+15974,"Levan, Andrew James",4,e45
+15975,"Liu, Xin",13,e47
+15977,"Oesch, Pascal",12,e0z
+15979,"Levan, Andrew James",5,e46
+15980,"Levan, Andrew James",16,e4j
+15982,"Reinhart, Merle",7,dzv
+15990,"Antoniou, Vallia",8,e6w
+15994,"Blanton, Elizabeth",4,e6n
+15995,"Kharb, Preeti",8,e6s
+15996,"Pooley, David A.",4,e6t
+15997,"Canning, Rebecca E. A.",8,e6q
+16001,"Gitti, Myriam",1,e6v
+16002,"Sell, Paul H",14,e6r
+16004,"Do, Tuan",3,e6e
+16005,"Trenti, Michele",35,e7v
+16014,"Bennert, Vardha N.",3,e70
+16015,"Marchetti, Lucia",27,e78
+16016,"Johnson, Sean",10,e72
+16017,"Gladders, Michael D.",42,e75
+16019,"Levan, Andrew James",14,e77
+16021,"Shanahan, Clare",8,e7l
+16024,"Filippenko, Alex V.",14,e74
+16025,"Gregg, Michael D.",71,e76
+16030,"Calamida, Annalisa",8,e7h
+16031,"Bajaj, Varun",6,e7r
+16036,"Zhou, Yifan",15,e82
+16037,"Stefanon, Mauro",8,e81
+16038,"McDonald, Michael A.",2,e7n
+16039,"Sing, David K.",6,e8b
+16042,"Levan, Andrew James",10,e8a
+16047,"Bregman, Joel N.",4,e7w
+16048,"McQuinn, Kristen B W",12,e84
+16051,"Levan, Andrew James",4,e7k
+16055,"Karovska, Margarita",1,e87
+16062,"Miniutti, Giovanni",1,e8k
+16063,"Koss, Michael J",4,e95
+16064,"Pavlov, George G.",2,e8n
+16067,"Bennett, David P.",6,e8j
+16068,"Maccarone, Thomas J.",9,eh7
+16072,"Tendulkar, Shriharsh",2,e8q
+16075,"Jacobson-Galan, Wynn Vicente",4,e98
+16076,"Oates, Samantha",1,e99
+16078,"Sand, David J.",6,e90
+16080,"Mannings, Alexandra",3,e8u
+16081,"Rhoads, James",6,e9b
+16082,"Mueller, Oliver",2,e8w
+16086,"Lothringer, Joshua D.",5,e91
+16104,"Roman-Duval, Julia Christine",15,egx
+16117,"Reinhart, Merle",1,e9q
+16162,"Boyer, Martha L.",151,ed3
+16165,"Fox, Ori Dosovitz",14,edu
+16172,"Smith, Nathan",7,ed0
+16173,"Tremblay, Grant R.",66,edn
+16177,"Calamida, Annalisa",10,eaa
+16179,"Filippenko, Alex V.",74,eb3
+16181,"Kreidberg, Laura",56,ee8
+16184,"Seymour, Nicholas",9,ebt
+16185,"Smercina, Adam",33,ee9
+16186,"van der Burg, Remco",3,ea3
+16187,"Wang, Feige",29,ebe
+16191,"Smercina, Adam",93,eea
+16194,"Desert, Jean-Michel",276,ed1
+16198,"Riess, Adam",80,ebi
+16200,"Sahu, Kailash C.",13,ed2
+16201,"Spilker, Justin",4,ebq
+16206,"Sahu, Kailash C.",1,eaw
+16209,"Hayes, Matthew James",4,edi
+16215,"Gomez, Sebastian",3,e9w
+16220,"Beatty, Thomas G.",5,e9v
+16222,"Clark, Christopher",4,ean
+16223,"Gullieuszik, Marco",26,edv
+16226,"Fu, Sal Wanying",12,ebl
+16229,"Fontanive, Clemence",41,eay
+16232,"Sahai, Raghvendra",5,eev
+16234,"Jha, Saurabh W.",53,eel
+16235,"Murray, Claire E.",156,ehs
+16237,"Chapman, Scott C.",3,eew
+16239,"Foley, Ryan",114,eec
+16241,"Koss, Michael J",66,eag
+16243,"Marocco, Federico",17,eer
+16244,"Mathieu, Robert D.",1,ees
+16245,"Oestlin, Goeran",14,eet
+16246,"Revalski, Mitchell",13,ebn
+16247,"Scalco, Michele",3,ebd
+16248,"Spilker, Justin",8,ebr
+16249,"Tremblay, Pier-Emmanuel",99,ebo
+16250,"Yuan, Wenlong",24,ebs
+16251,"Sahu, Kailash C.",1,edb
+16252,"Jansen, Rolf A.",23,eex
+16255,"Dalessandro, Emanuele",2,ecc
+16257,"Marleau, Francine",72,ece
+16258,"Mazzucchelli, Chiara Giulia",8,ecj
+16259,"Momcheva, Ivelina G",192,edw
+16262,"Tully, R. Brent",69,edy
+16264,"Pierel, Justin",16,ebc
+16265,"Larsson, Josefin",2,eb9
+16268,"Dupuy, Trent J.",22,ee1
+16269,"Jones, David",114,edh
+16273,"Sohn, Sangmo Tony",17,ea6
+16274,"Sohn, Sangmo Tony",14,e9t
+16275,"Tanvir, Nial Rahil",5,ed9
+16276,"Wang, Xin",70,ecu
+16277,"Brown, Thomas M.",9,e9y
+16278,"Kelly, Patrick",108,ecd
+16281,"Chiaberge, Marco",86,ecs
+16282,"Correnti, Matteo",2,ecg
+16283,"DAntona, Francesca",70,eav
+16284,"Danieli, Shany",2,edd
+16287,"Lyman, Joseph",105,ebj
+16289,"Milone, Antonino Paolo",84,eau
+16291,"Tremonti, Christy A.",8,ef2
+16292,"Choi, Yumi",14,ed4
+16293,"Choi, Yumi",18,ecl
+16294,"Eggen, Nathan",4,edt
+16295,"Harikane, Yuichi",8,ec9
+16298,"Libralato, Mattia",30,eaz
+16300,"Noble, Allison",5,eco
+16302,"Wu, Ya-Lin",72,ec3
+16303,"Berger, Edo",10,es0
+16307,"Fu, Guangwei",70,eap
+16312,"Karovska, Margarita",1,eao
+16316,"Sabbi, Elena",27,ec0
+16320,"Levan, Andrew James",6,ecx
+16352,"Carlberg, Joleen",8,efs
+16358,"Beaton, Rachael Lynn",22,eha
+16359,"Guenther, Hans Moritz",104,ehc
+16361,"Ferraro, Francesco R.",18,edx
+16380,"Chiaberge, Marco",6,eg0
+16384,"Cohen, Yotam",38,ee3
+16392,"Green, Paul J.",1,eh5
+16407,"Som, Debopam",12,egh
+16408,"Som, Debopam",22,egi
+16413,"Kozhurina-Platais, Vera",12,eg9
+16415,"Calamida, Annalisa",7,ege
+16416,"Calamida, Annalisa",8,egg
+16420,"Homan, Jeroen",2,eh6
+16423,"Baldassare, Vivienne",18,eh3
+16424,"Sun, Ming",3,egq
+16425,"Mahler, Guillaume",16,eh4
+16426,"Romani, Roger",1,egt
+16427,"Levan, Andrew James",22,eh8
+16428,"Ebeling, Harald",1,egr
+16429,"Rossetti, Mariachiara",5,eh9
+16434,"Britt, Christopher",7,ehh
+16435,"Britt, Christopher",5,ehe
+16441,"Anderson, Jay",8,ehr
+16443,"Momcheva, Ivelina G",281,ehn
+16444,"Dahle, Haakon",4,eie
+16450,"Lothringer, Joshua D.",148,ei6
+16453,"McQuinn, Kristen B W",16,ehz
+16457,"Edwards, Billy",68,ei7
+16458,"Levan, Andrew James",2,eho
+16459,"Larsen, Soeren S.",2,ehx
+16460,"Yue, Minghao",2,ei3
+16461,"Somalwar, Jean",8,ehy
+16464,"Chisholm, John",8,ei5
+16473,"Kozhurina-Platais, Vera",10,eio
+16483,"Breiding, Peter",7,eix
+16484,"Stark, Antony A.",4,ej0
+16485,"Yoon, Ilsang",1,ej1
+16488,"Zohren, Hannah",20,eiu
+16497,"Graur, Or",26,eje
+16500,"Jacobson-Galan, Wynn Vicente",3,ejn
+16504,"Rosenthal, Michael Jacob",2,ejo
+16505,"Levan, Andrew James",1,ejb
+16506,"Witstok, Joris",4,ejm
+16507,"Yue, Minghao",1,ejd
+16508,"Jencson, Jacob",6,ejk
+16509,"Terry, Sean",4,ejc
+16512,"Bajaj, Varun",8,ejw
+16513,"Roman-Duval, Julia Christine",4,ejz
+16514,"Bohlin, Ralph C.",21,ejt
+16518,"Dressel, Linda L.",4,ek9
+16520,"Hathi, Nimish P.",15,elq
+16559,"Hernandez, Svea S",2,elc
+16579,"Calamida, Annalisa",7,emg
+16580,"Calamida, Annalisa",4,elz
+16583,"Som, Debopam",22,ele
+16588,"Kozhurina-Platais, Vera",6,em4
+16641,"Egami, Eiichi",15,eq7
+16649,"Smith, Nathan",4,eqe
+16653,"Bedin, Luigi R.",5,eml
+16657,"Fremling, Christoffer",48,ep3
+16660,"Quinn, Samuel",143,eqo
+16661,"Reines, Amy E.",4,enj
+16662,"Seymour, Nicholas",8,enk
+16664,"Tendulkar, Shriharsh",3,em7
+16667,"Bradac, Marusa",107,eou
+16668,"Coe, Dan",4,eov
+16670,"Ebeling, Harald",135,enq
+16671,"Elias-Rosa, Nancy",12,enp
+16681,"Do, Tuan",1,eop
+16684,"Lemaux, Brian",157,enn
+16688,"Anderson, Richard I",4,eoc
+16691,"Foley, Ryan",66,erg
+16693,"Overzier, Roderik A.",3,eo4
+16702,"Appleton, Philip N.",4,epb
+16706,"Gezari, Suvi",68,ep7
+16711,"Marleau, Francine",40,enm
+16716,"Sahu, Kailash C.",17,epz
+16725,"Dupuy, Trent J.",3,emo
+16729,"Kelly, Patrick",248,epl
+16730,"Lehner, Nicolas",61,eq4
+16733,"Rigby, Jane R.",2,eo2
+16734,"Scarlata, Claudia",14,ep2
+16735,"Schneider, Adam",11,em9
+16736,"Sing, David K.",5,epf
+16740,"Farina, Emanuele Paolo",5,eqb
+16741,"Galbany, Lluis",74,epo
+16742,"Ho, Stephanie H.",14,eoa
+16743,"Hoyt, Taylor",8,eq9
+16744,"Huang, Caroline",6,eq6
+16746,"Mackey, Dougal",2,epn
+16748,"Niederhofer, Florian",17,epp
+16749,"Nielsen, Nikki",2,eq0
+16756,"Eilers, Anna-Christina",10,emm
+16757,"Gonzalez, Anthony Hernan",44,eny
+16758,"Jones, Michael Gordon",20,emf
+16760,"Lam, Casey",2,eos
+16761,"Meyer, Eileen T",29,epx
+16762,"Mihos, Chris",12,eog
+16766,"Schulze, Steve",8,env
+16768,"Tinyanont, Samaporn",7,eon
+16773,"Glazebrook, Karl",139,enh
+16782,"Sahu, Kailash C.",2,eoj
+16792,"Brown, Thomas M.",5,eni
+16793,"Jansen, Rolf A.",18,emn
+16797,"Williams, Benjamin F.",85,eps
+16798,"Williams, Benjamin F.",76,ept
+16799,"Williams, Benjamin F.",75,epu
+16800,"Williams, Benjamin F.",72,epv
+16836,"Buote, David",2,er9
+16838,"Fruchter, Andrew S.",2,erj
+16843,"Reines, Amy E.",16,erc
+16845,"Sun, Ming",3,era
+16846,"Troja, Eleonora",1,erb
+16848,"Britt, Christopher",5,eqx
+16863,"Anderson, Jay",5,esi
+16864,"Bajaj, Varun",8,es1
+16870,"Chiaberge, Marco",3,eru
+16871,"Anderson, Jay",10,ert
+16872,"Grogin, Norman",40,erw
+16876,"Erb, Dawn K.",8,esh
+16879,"Stefanon, Mauro",8,es4
+16882,"Taylor, Matthew",10,es6
+16883,"Lyman, Joseph",4,esb
+16884,"Graur, Or",8,es2
+16885,"Graur, Or",4,esl
+16889,"Kanekar, Nissim",1,ese
+16892,"Liu, Xin",11,es8
+16894,"Neilsen, Joseph",4,et4
+16903,"Graur, Or",3,esq
+16911,"Cenko, Stephen Bradley",2,etg
+16927,"Volk, Kevin",2,etl
+17065,"Cantalupo, Sebastiano",12,f0w
+17091,"Faisst, Andreas L",33,f0z
+17110,"Setton, David",52,ezd
+17117,"Koyama, Yusei",21,f15
+17143,"Ding, Xuheng",12,exo
+17147,"Scarlata, Claudia",163,f2g
+17159,"Wang, Xin",12,exi
+17172,"Canning, Rebecca E. A.",27,eyu
+17231,"Treu, Tommaso L.",7,f1g
+17253,"Kelly, Patrick",4,f2e
+17301,"van Dokkum, Pieter",12,f3x
