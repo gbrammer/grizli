@@ -41,6 +41,7 @@ primer_uds_north
 primer_uds_south
 primer_cosmos_east
 primer_cosmos_west
+snh0pe
 """.split()
 
 __all__ = ['AVAILABLE_FIELDS', 'make_wcs', 'show_field_footprint']
@@ -1077,6 +1078,25 @@ END""")
         print(root, hdu.data.shape, w.pixel_shape)
 
         ref_file = w
+    
+    elif (mosaic_field in ['snh0pe', 'j112716p4228']):
+        
+        NX, NY, ra, dec = 4, 4, 171.816, 42.4622
+
+        hdu = utils.make_wcsheader(ra=ra,  dec=dec,
+                                   size=(NX*2048*0.04, NY*2048*0.04),
+                                   pixscale=0.04, theta=0., get_hdu=True)
+        
+        hdu.header['CRPIX1'] = NX*2048//2
+        hdu.header['CRPIX2'] = NY*2048//2
+        w = pywcs.WCS(hdu.header)
+        
+        root = f'j112716p4228-grizli-{version}'
+
+        print(root, hdu.data.shape, w.pixel_shape)
+
+        ref_file = w
+        
     else:
         raise ValueError(f'Field {mosaic_field} not defined')
     
@@ -1094,7 +1114,7 @@ END""")
     return root, half_sw, s3output, ref_wcs
 
 
-def show_field_footprint(mosaic_field='primer_uds', extra="", output_path='./'):
+def show_field_footprint(mosaic_field='primer_uds', filters="'F444W-CLEAR','F770W'", extra="", output_path='./'):
     """
     Make a figure showing the a field footprint and exposure overlaps
     
@@ -1102,6 +1122,9 @@ def show_field_footprint(mosaic_field='primer_uds', extra="", output_path='./'):
     ----------
     mosaic_field : str
         Field name
+    
+    filters : str
+        List of filter names 
     
     extra : str
         Extra SQL query parameters on the `exposure_files` table
@@ -1148,9 +1171,9 @@ def show_field_footprint(mosaic_field='primer_uds', extra="", output_path='./'):
         pt = f'point({ref_file.wcs.crval[0]}, {ref_file.wcs.crval[1]})'
         ivo_orig = ref_file
     
-    filters = """'F430M-CLEAR','F444W-CLEAR','F480M-CLEAR','F200W','F770W',
-                      'CLEARP-F444W','F356W-CLEAR','CLEARP-F430M','CLEARP-F480M'"""
-    filters = """'F444W-CLEAR','F770W'"""
+    # filters = """'F430M-CLEAR','F444W-CLEAR','F480M-CLEAR','F200W','F770W',
+    #                   'CLEARP-F444W','F356W-CLEAR','CLEARP-F430M','CLEARP-F480M'"""
+    # filters = """'F444W-CLEAR','F770W'"""
 
     #extra = "AND dataset like 'jw01837%%'"
     #extra = ""
