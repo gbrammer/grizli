@@ -95,9 +95,9 @@ def create_s3_index(path, output_file="index.html", extra_html="", upload=True, 
         print(output_file)
 
 
-def generate_program_codes():
+def generate_program_codes(write=True):
     """
-    Generate program codes tables
+    Generate program codes tables from DB query
     """
     from . import db
     
@@ -117,10 +117,11 @@ def generate_program_codes():
     
     jw['pi'][jw['proposal_id'] == '2514'] = 'Williams, Christina'
     
-    hst.write('/tmp/hst_program_codes.csv', overwrite=True)
+    if write:
+        hst.write('/tmp/hst_program_codes.csv', overwrite=True)
+        jw.write('/tmp/jwst_program_codes.csv', overwrite=True)
     
-    jw.write('/tmp/jwst_program_codes.csv', overwrite=True)
-
+    return hst, jw
 
 def program_ids_in_mosaic(wcs_file='https://s3.amazonaws.com/grizli-v2/JwstMosaics/v7/gds-grizli-v7.0-f850lp_wcs.csv', progs_list=None, return_raw_list=False):
     """
@@ -190,8 +191,8 @@ def program_ids_in_mosaic(wcs_file='https://s3.amazonaws.com/grizli-v2/JwstMosai
     if return_raw_list:
         return progs_list
         
-    # Print a summary
-    #----------------
+    # Generate output table
+    #----------------------
     un = utils.Unique(progs_list, verbose=False)
     
     url = 'https://www.stsci.edu/cgi-bin/get-proposal-info?id={0}&observatory={1}'
