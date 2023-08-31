@@ -887,8 +887,7 @@ def align_drizzled_image(root='',
                          assume_close=False,
                          ref_border=100, 
                          transform=None,
-                         refine_final_pix=1,
-                         refine_final_iters=5):
+                         refine_final_niter=5):
     """Pipeline for astrometric alignment of drizzled image products
     
     1. Generate source catalog from image mosaics
@@ -971,8 +970,13 @@ def align_drizzled_image(root='',
         target image, as calculated from the original image WCS
     
     transform : None, `skimage.transform` object
-            Coordinate transformation model.  If None, use
-            `skimage.transform.EuclideanTransform`, i.e., shift & rotation
+        Coordinate transformation model.  If None, use
+        `skimage.transform.EuclideanTransform`, i.e., shift & rotation
+                         
+    refine_final_niter : int
+        Number of final alignment iterations to derive the transform from simple
+        nearest neighbor matches after the initial `tristars` pattern matching
+    
     Returns
     -------
     orig_wcs : `~astropy.wcs.WCS`
@@ -1277,17 +1281,17 @@ def align_drizzled_image(root='',
 
         log = False
     
-    elif refine_final_iters > 0:
+    elif refine_final_niter > 0:
         # Refine from full match
         cref = utils.GTable()
         cref['ra'], cref['dec'] = rd_ref.T
         
-        logstr = "\n# align_drizzled_image: final refinement {0} iters, {1} pix\n"
+        logstr = "\n# align_drizzled_image: final refinement {0} iters\n"
         utils.log_comment(utils.LOGFILE,
-                          logstr.format(refine_final_iters, refine_final_pix), 
+                          logstr.format(refine_final_niter), 
                           verbose=verbose)
         
-        for _iter in range(refine_final_iters):
+        for _iter in range(refine_final_niter):
             ra_new, dec_new = drz_wcs.all_pix2world(cat['X_IMAGE'],
                                                 cat['Y_IMAGE'], 1)
             cnew = utils.GTable()
@@ -4226,6 +4230,7 @@ def process_direct_grism_visit(direct={},
                                align_assume_close=False,
                                align_transform=None,
                                align_guess=None,
+                               align_final_niter=5,
                                max_err_percentile=99,
                                catalog_mask_pad=0.05,
                                match_catalog_density=None,
@@ -4667,7 +4672,9 @@ def process_direct_grism_visit(direct={},
                                       min_flux_radius=align_min_flux_radius,
                                       min_nexp=align_min_nexp,
                                       assume_close=align_assume_close,
-                                      transform=align_transform)
+                                      transform=align_transform,
+                                      refine_final_niter=align_final_niter,
+                                      )
         except:
 
             utils.log_exception(utils.LOGFILE, traceback)
@@ -4691,7 +4698,9 @@ def process_direct_grism_visit(direct={},
                                       ref_border=align_ref_border,
                                       min_flux_radius=align_min_flux_radius,
                                       min_nexp=align_min_nexp,
-                                      transform=align_transform)
+                                      transform=align_transform,
+                                      refine_final_niter=align_final_niter,
+                                      )
 
         orig_wcs, drz_wcs, out_shift, out_rot, out_scale = result
 
