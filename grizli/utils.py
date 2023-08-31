@@ -5696,8 +5696,18 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
     indices = []
     for i in range(len(visit['files'])):
         if 'footprints' in visit:
-            olap = visit['footprints'][i].intersection(output_poly)
-            if olap.area > 0:
+            if hasattr(visit['footprints'][i], 'intersection'):
+                olap = visit['footprints'][i].intersection(output_poly)
+                if olap.area > 0:
+                    indices.append(i)
+                    
+            elif hasattr(visit['footprints'][i], '__len__'):
+                for _fp in visit['footprints'][i]:
+                    olap = _fp.intersection(output_poly)
+                    if olap.area > 0:
+                        indices.append(i)
+                        break
+            else:
                 indices.append(i)
         else:
             indices.append(i)
@@ -8597,7 +8607,7 @@ def RGBtoHex(vals, rgbtype=1):
     return '#' + ''.join(['{:02X}'.format(int(round(x))) for x in vals])
 
 
-def catalog_mask(cat, ecol='FLUXERR_APER_0', max_err_percentile=90, pad=0.05, pad_is_absolute=False, min_flux_radius=1.):
+def catalog_mask(cat, ecol='FLUXERR_APER_0', max_err_percentile=90, pad=0.05, pad_is_absolute=False, min_flux_radius=1., min_nexp=2):
     """
     Compute a catalog mask for
       1) Objects within `pad` of the edge of the catalog convex hull
@@ -8620,7 +8630,14 @@ def catalog_mask(cat, ecol='FLUXERR_APER_0', max_err_percentile=90, pad=0.05, pa
         if max_err_percentile < 100:
             test &= cat[ecol] < np.percentile(cat[ecol][(~not_edge) & valid],
                                           max_err_percentile)
-
+    
+    if 'NEXP' in cat.colnames:
+        if cat['NEXP'].max() >= min_nexp:
+            test_nexp = (cat['NEXP'] >= min_nexp)
+            # print('xxx catalog_mask with nexp', len(cat), test_nexp.sum())
+            if test_nexp.sum() > 0:
+                test &= test_nexp
+    
     return test
 
 
