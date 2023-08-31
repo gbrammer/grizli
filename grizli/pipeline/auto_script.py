@@ -588,7 +588,14 @@ def go(root='j010311+131615',
     if kill == 'manual_alignment':
         print('kill=\'manual_alignment\'')
         return True
-
+    
+    #####################
+    # Initial visit footprints
+    visit_file = find_visit_file(root=root)
+    print(f'Initial exposure footprints in {visit_file}')
+    check_paths = ['./', PATHS['raw'], '../RAW']
+    get_visit_exposure_footprints(root=root, check_paths=check_paths)
+    
     #####################
     # Alignment & mosaics
     os.chdir(PATHS['prep'])
@@ -599,7 +606,7 @@ def go(root='j010311+131615',
 
     if 'use_self_catalog' not in visit_prep_args:
         visit_prep_args['use_self_catalog'] = is_parallel_field
-
+        
     auto_script.preprocess(field_root=root, HOME_PATH=PATHS['home'], 
                            PERSIST_PATH=PATHS['persist'],
                            visit_prep_args=visit_prep_args,
@@ -1490,7 +1497,7 @@ def visit_dict_from_strings(v):
         newv['footprint'] = utils.SRegion(v['footprint']).shapely[0]
     
     if 'footprints' in v:
-        newv['footprints'] = [utils.SRegion(fp).shapely[0]
+        newv['footprints'] = [utils.SRegion(fp).shapely
                               for fp in v['footprints']]
     
     for k in v:
@@ -1912,6 +1919,7 @@ def get_visit_exposure_footprints(root='j1000p0210', check_paths=['./', '../RAW'
                     break
 
             visit['footprints'].append(fp_i)
+            
             if visit_fp is not None:
                 if simplify > 0:
                     visit['footprint'] = visit_fp.simplify(simplify)

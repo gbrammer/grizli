@@ -882,10 +882,12 @@ def align_drizzled_image(root='',
                          max_err_percentile=99,
                          catalog_mask_pad=0.05,
                          min_flux_radius=1.,
+                         min_nexp=2,
                          match_catalog_density=None,
                          assume_close=False,
                          ref_border=100, 
-                         transform=None):
+                         transform=None,
+                         refine_final_niter=5):
     """Pipeline for astrometric alignment of drizzled image products
     
     1. Generate source catalog from image mosaics
@@ -968,8 +970,13 @@ def align_drizzled_image(root='',
         target image, as calculated from the original image WCS
     
     transform : None, `skimage.transform` object
-            Coordinate transformation model.  If None, use
-            `skimage.transform.EuclideanTransform`, i.e., shift & rotation
+        Coordinate transformation model.  If None, use
+        `skimage.transform.EuclideanTransform`, i.e., shift & rotation
+                         
+    refine_final_niter : int
+        Number of final alignment iterations to derive the transform from simple
+        nearest neighbor matches after the initial `tristars` pattern matching
+    
     Returns
     -------
     orig_wcs : `~astropy.wcs.WCS`
@@ -988,6 +995,9 @@ def align_drizzled_image(root='',
         Scale 
         
     """
+    import skimage.transform
+    from skimage.measure import ransac
+                         
     frame = inspect.currentframe()
     utils.log_function_arguments(utils.LOGFILE, frame,
                                  'prep.align_drizzled_image')
@@ -1028,11 +1038,15 @@ def align_drizzled_image(root='',
     #
     # rd_ref = rd_ref[dr < 1.1*dr_cat.max(),:]
 
-    ok = (cat['MAG_AUTO'] > mag_limits[0]) & (cat['MAG_AUTO'] < mag_limits[1])
-    if len(mag_limits) > 2:
-        ok &= cat['MAGERR_AUTO'] < mag_limits[2]
+    if len(mag_limits) == 1:
+        ok = (cat['MAGERR_AUTO'] < 0.1)
     else:
-        ok &= cat['MAGERR_AUTO'] < 0.05
+        ok = (cat['MAG_AUTO'] > mag_limits[0]) & (cat['MAG_AUTO'] < mag_limits[1])
+            
+        if len(mag_limits) > 2:
+            ok &= cat['MAGERR_AUTO'] < mag_limits[2]        
+        else:
+            ok &= cat['MAGERR_AUTO'] < 0.05
 
     if ok.sum() == 0:
         print('{0}.cat: no objects found in magnitude range {1}'.format(root,
@@ -1040,10 +1054,20 @@ def align_drizzled_image(root='',
         return False
 
     # Edge and error mask
-    ok &= utils.catalog_mask(cat, max_err_percentile=max_err_percentile,
+    ok_mask = utils.catalog_mask(cat, max_err_percentile=max_err_percentile,
                              pad=catalog_mask_pad, pad_is_absolute=False, 
-                             min_flux_radius=min_flux_radius)
-
+                             min_flux_radius=min_flux_radius,
+                             min_nexp=min_nexp)
+    
+    if len(mag_limits) == 1:
+        # First 100 valid sources
+        _mag = cat['MAG_AUTO']*1
+        _mag[~ok_mask] = np.inf
+        so = np.argsort(_mag)
+        ok = ok_mask & (so > 2) & (so < 102)    
+    else:
+        ok &= ok_mask
+        
     if max_err_percentile >= 200:
         med_err = np.median(cat['FLUXERR_APER_0'][ok])
         max_err = med_err*np.sqrt(2)
@@ -1227,9 +1251,9 @@ def align_drizzled_image(root='',
             _tfscale = 1.0
         
         NGOOD = (~outliers).sum()
-        logstr = '# wcs {0} ({1:d}) {2:d}: {3:6.2f} {4:6.2f} {5:7.3f} {6:7.3f}'
+        logstr = '# wcs {0} ({1:d}) {2:d}: {3:6.2f} {4:6.2f} {5:7.3f} {6:7.3f} {7:.2f}'
         logstr = logstr.format(root, iter, NGOOD, shift[0], shift[1],
-                               tf.rotation/np.pi*180, 1./_tfscale)
+                               tf.rotation/np.pi*180, 1./_tfscale, rms)
 
         utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
 
@@ -1256,10 +1280,66 @@ def align_drizzled_image(root='',
         out_scale = 1.
 
         log = False
+    
+    elif refine_final_niter > 0:
+        # Refine from full match
+        cref = utils.GTable()
+        cref['ra'], cref['dec'] = rd_ref.T
+        
+        logstr = "\n# align_drizzled_image: final refinement {0} iters\n"
+        utils.log_comment(utils.LOGFILE,
+                          logstr.format(refine_final_niter), 
+                          verbose=verbose)
+        
+        for _iter in range(refine_final_niter):
+            ra_new, dec_new = drz_wcs.all_pix2world(cat['X_IMAGE'],
+                                                cat['Y_IMAGE'], 1)
+            cnew = utils.GTable()
+            cnew['ra'], cnew['dec'] = ra_new, dec_new
+    
+            idx, dr = cref.match_to_catalog_sky(cnew)
+    
+            transform = skimage.transform.EuclideanTransform
+            tf = transform()
+            
+            input_pix = np.array([cat['X_IMAGE'], cat['Y_IMAGE']]).T
+            
+            output_pix = drz_wcs.all_world2pix(cref['ra'], cref['dec'], 1)
+            output_pix = np.array(output_pix)[:,idx].T
+    
+            dx = input_pix - output_pix
+            hasm = np.sqrt((dx**2).sum(axis=1)) < np.clip(3*rms, 1, 3)
+            dx = dx[hasm]
+            
+            rms = utils.nmad(np.sqrt((dx**2).sum(axis=1)))
+        
+            tf.estimate(output_pix[hasm] - drz_crpix, input_pix[hasm] - drz_crpix)
+    
+            shift = tf.translation
+            if hasattr(tf, 'scale'):
+                _tfscale = tf.scale
+            else:
+                _tfscale = 1.0
+    
+            NGOOD = hasm.sum()
+            logstr = '# wcs {0} ({1:d}) {2:d}: {3:6.2f} {4:6.2f} {5:7.3f} {6:7.3f} {7:.2f}'
+            logstr = logstr.format(root, _iter, NGOOD, shift[0], shift[1],
+                                   tf.rotation/np.pi*180, 1./_tfscale, rms)
 
-    if log:
+            utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
+
+            out_shift += tf.translation
+        
+            out_rot -= tf.rotation
+            out_scale *= _tfscale
+
+            drz_wcs = utils.transform_wcs(drz_wcs, tf.translation, tf.rotation,
+                                          _tfscale)
+    else:
         tf_out = tf(output[output_ix][~outliers])
         dx = input[input_ix][~outliers] - tf_out
+        
+    if log:
         rms = utils.nmad(np.sqrt((dx**2).sum(axis=1)))
 
         interactive_status = plt.rcParams['interactive']
@@ -1421,7 +1501,7 @@ def make_SEP_FLT_catalog(flt_file, ext=1, column_case=str.upper, **kwargs):
     return tab, seg
 
 
-def make_SEP_catalog_from_arrays(sci, err, mask, wcs=None, threshold=2., ZP=25, get_background=True, detection_params=SEP_DETECT_PARAMS, segmentation_map=False, verbose=True):
+def make_SEP_catalog_from_arrays(sci, err, mask, wcs=None, threshold=2., ZP=25, get_background=True, detection_params=SEP_DETECT_PARAMS, segmentation_map=False, exposure_footprints=None, verbose=True):
     """
     Make a catalog from arrays using `sep`
     
@@ -1453,6 +1533,11 @@ def make_SEP_catalog_from_arrays(sci, err, mask, wcs=None, threshold=2., ZP=25, 
     
     segmentation_map : bool
         Also create a segmentation map
+    
+    exposure_footprints : list, None
+        An optional list of objects that can be parsed with `sregion.SRegion`.  If 
+        specified, add a column ``nexp`` to the catalog corresponding to the number
+        of entries in the list that overlap with a particular source position
     
     verbose : bool
         Print status messages
@@ -1514,10 +1599,67 @@ def make_SEP_catalog_from_arrays(sci, err, mask, wcs=None, threshold=2., ZP=25, 
         tab['ra'].unit = u.deg
         tab['dec'].unit = u.deg
         tab['x_world'], tab['y_world'] = tab['ra'], tab['dec']
-
+    
+    
+    # Exposure footprints
+    #--------------------
+    if (exposure_footprints is not None) & ('ra' in tab.colnames):        
+        tab['nexp'] =  catalog_exposure_overlaps(tab['ra'], tab['dec'],
+                                          exposure_footprints=exposure_footprints)
+                                          
+        tab['nexp'].description = 'Number of overlapping exposures'
+    
     return tab, seg
 
 
+def catalog_exposure_overlaps(ra, dec, exposure_footprints=[]):
+    """
+    Count number of items in a list of footprints overlap with catalog positions
+    
+    Parameters
+    ----------
+    ra, dec : array-like
+        Celestial coordinates
+    
+    exposure_footprints : list, None
+        An optional list of objects that can be parsed with `sregion.SRegion`.  If 
+        specified, add a column ``nexp`` to the catalog corresponding to the number
+        of entries in the list that overlap with a particular source position
+    
+    Returns
+    -------
+    nexp : array-like
+        Count of elements in ``exposure_footprints`` that overlap with entries in 
+        ``ra``, ``dec``
+    
+    """
+    
+    _coo = np.array([ra, dec]).T
+    nexp = np.zeros(len(ra), dtype=int)
+    for fp in exposure_footprints:
+        try:
+            if isinstance(fp, str):
+                # string
+                _fpiter = [fp]
+                
+            elif hasattr(fp, '__len__'):
+                # List of shapely polygons
+                _fpiter = fp
+                
+            else:
+                # Single polygon
+                _fpiter = [fp]
+                            
+            for _fp in _fpiter:
+                sr = utils.SRegion(_fp)
+                for pa in sr.path:
+                    nexp += pa.contains_points(_coo)
+        except:
+            continue
+    
+    return nexp
+    
+    
 def get_SEP_flag_dict():
     """Get dictionary of SEP integer flags
     
@@ -1574,6 +1716,8 @@ def make_SEP_catalog(root='',
                      log=False,
                      gain=2000., 
                      extract_pixstack=int(3e7),
+                     sub_object_limit=4096,
+                     exposure_footprints=None,
                      **kwargs):
     """Make a catalog from drizzle products using the SEP implementation of SourceExtractor
     
@@ -1702,6 +1846,14 @@ def make_SEP_catalog(root='',
     extract_pixstack : int
         See `sep.set_extract_pixstack`
     
+    sub_object_limit : int
+        See `sep.set_sub_object_limit`
+    
+    exposure_footprints : list, None
+        An optional list of objects that can be parsed with `sregion.SRegion`.  If 
+        specified, add a column ``nexp`` to the catalog corresponding to the number
+        of entries in the list that overlap with a particular source position
+    
     Returns
     -------
     tab : `~astropy.table.Table`
@@ -1726,7 +1878,8 @@ def make_SEP_catalog(root='',
     """)
 
     sep.set_extract_pixstack(extract_pixstack)
-
+    sep.set_sub_object_limit(sub_object_limit)
+    
     logstr = 'make_SEP_catalog: sep version = {0}'.format(sep.__version__)
     utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
     if sep.__version__ < '1.1':
@@ -2060,7 +2213,15 @@ def make_SEP_catalog(root='',
 
         tab = utils.GTable()
         tab.meta['VERSION'] = (sep.__version__, 'SEP version')
-
+    
+    # Exposure footprints
+    #--------------------
+    if (exposure_footprints is not None) & ('ra' in tab.colnames):        
+        tab['nexp'] =  catalog_exposure_overlaps(tab['ra'], tab['dec'],
+                                          exposure_footprints=exposure_footprints)
+                                          
+        tab['nexp'].description = 'Number of overlapping exposures'
+    
     # Info
     tab.meta['ZP'] = (ZP, 'AB zeropoint')
     if 'PHOTPLAM' in im[0].header:
@@ -4064,10 +4225,12 @@ def process_direct_grism_visit(direct={},
                                align_rms_limit=2,
                                align_triangle_ba_max=0.9,
                                align_ref_border=100,
-                               align_min_flux_radius=1., 
+                               align_min_flux_radius=1.,
+                               align_min_nexp=2,
                                align_assume_close=False,
                                align_transform=None,
                                align_guess=None,
+                               align_final_niter=5,
                                max_err_percentile=99,
                                catalog_mask_pad=0.05,
                                match_catalog_density=None,
@@ -4417,6 +4580,23 @@ def process_direct_grism_visit(direct={},
                     key=' ', drizzle=False,
                     threshold=tweak_threshold)
 
+            if tweak_mosaic_iters > 0:
+                tweak_kwargs = dict(max_dist=tweak_max_dist,
+                        n_min=tweak_n_min,
+                        key=' ',
+                        drizzle=False,
+                        ref_exp=tweak_ref_exp,
+                        threshold=tweak_threshold,
+                        fit_order=tweak_fit_order
+                        )
+                
+                iterate_tweak_align(direct, grism,
+                                    cat_threshold=7,
+                                    cleanup=True,
+                                    niter=tweak_mosaic_iters, 
+                                    tweak_kwargs=tweak_kwargs,
+                                    verbose=True)
+
             # Redrizzle with no CR rejection
             AstroDrizzle(direct['files'], output=direct['product'],
                              clean=True, context=False, preserve=False,
@@ -4441,8 +4621,15 @@ def process_direct_grism_visit(direct={},
             thresh = align_thresh
 
         #cat = make_drz_catalog(root=direct['product'], threshold=thresh)
-        cat = make_SEP_catalog(root=direct['product'], threshold=thresh)
-
+        if 'footprints' in direct:
+            # print('xxx with footprints')
+            cat = make_SEP_catalog(root=direct['product'], threshold=thresh,
+                                   exposure_footprints=direct['footprints'])
+        else:
+            # print('xxx no footprints')
+            cat = make_SEP_catalog(root=direct['product'], threshold=thresh,
+                                   exposure_footprints=None)
+        
         if radec == 'self':
             okmag = ((cat['MAG_AUTO'] > align_mag_limits[0]) &
                     (cat['MAG_AUTO'] < align_mag_limits[1]))
@@ -4482,9 +4669,12 @@ def process_direct_grism_visit(direct={},
                                       triangle_ba_max=align_triangle_ba_max,
                                 match_catalog_density=match_catalog_density,
                                       ref_border=align_ref_border, 
-                                      min_flux_radius=align_min_flux_radius, 
+                                      min_flux_radius=align_min_flux_radius,
+                                      min_nexp=align_min_nexp,
                                       assume_close=align_assume_close,
-                                      transform=align_transform)
+                                      transform=align_transform,
+                                      refine_final_niter=align_final_niter,
+                                      )
         except:
 
             utils.log_exception(utils.LOGFILE, traceback)
@@ -4507,7 +4697,10 @@ def process_direct_grism_visit(direct={},
                                 match_catalog_density=match_catalog_density,
                                       ref_border=align_ref_border,
                                       min_flux_radius=align_min_flux_radius,
-                                      transform=align_transform)
+                                      min_nexp=align_min_nexp,
+                                      transform=align_transform,
+                                      refine_final_niter=align_final_niter,
+                                      )
 
         orig_wcs, drz_wcs, out_shift, out_rot, out_scale = result
 
@@ -4665,7 +4858,14 @@ def process_direct_grism_visit(direct={},
         
         # Remake catalog
         #cat = make_drz_catalog(root=direct['product'], threshold=thresh)
-        cat = make_SEP_catalog(root=direct['product'], threshold=thresh)
+        if 'footprints' in direct:
+            # print('xxxx with footprints')
+            cat = make_SEP_catalog(root=direct['product'], threshold=thresh,
+                                   exposure_footprints=direct['footprints'])
+        else:
+            # print('xxx no footprints')
+            cat = make_SEP_catalog(root=direct['product'], threshold=thresh,
+                                   exposure_footprints=None)
 
         # 140 brightest or mag range
         clip = (cat['MAG_AUTO'] > align_mag_limits[0])
@@ -4678,7 +4878,8 @@ def process_direct_grism_visit(direct={},
         clip &= utils.catalog_mask(cat, max_err_percentile=max_err_percentile, 
                                    pad=catalog_mask_pad, 
                                    pad_is_absolute=False, 
-                                   min_flux_radius=align_min_flux_radius)
+                                   min_flux_radius=align_min_flux_radius,
+                                   min_nexp=align_min_nexp)
 
         NMAX = 140
         so = np.argsort(cat['MAG_AUTO'][clip])
@@ -4845,7 +5046,7 @@ def set_grism_dfilter(direct, grism):
             flt.flush()
 
 
-def tweak_align(direct_group={}, grism_group={}, max_dist=1., n_min=10, key=' ', threshold=3, drizzle=False, fit_order=-1, ref_exp=0, flux_radius=[0.5, 5], master_radec=None, make_figures=True):
+def tweak_align(direct_group={}, grism_group={}, max_dist=1., n_min=10, key=' ', threshold=3, drizzle=False, fit_order=-1, ref_exp=0, flux_radius=[0.5, 5], min_nexp=2, master_radec=None, make_figures=True):
     """Intra-visit shift alignment
     
     Parameters
@@ -4903,6 +5104,7 @@ def tweak_align(direct_group={}, grism_group={}, max_dist=1., n_min=10, key=' ',
                                                master_radec=master_radec,
                                                min_flux_radius=flux_radius[0],
                                                max_flux_radius=flux_radius[1],
+                                               min_nexp=min_nexp,
                                                make_figures=make_figures,
                                           )
     
@@ -5052,6 +5254,11 @@ def iterate_tweak_align(direct, grism, cat_threshold=7, cleanup=True, niter=3, t
     
     tmp_root = f"tweak_{direct['product']}"
     
+    if 'footprints' in direct:
+        footprints = direct['footprints']
+    else:
+        footprints = None
+        
     for iter_i in range(niter):
         
         logstr = f'# prep.iterate_tweak_align: iteration {iter_i}'
@@ -5072,10 +5279,15 @@ def iterate_tweak_align(direct, grism, cat_threshold=7, cleanup=True, niter=3, t
         
         cat = make_SEP_catalog(tmp_root_i,
                                threshold=cat_threshold,
-                               verbose=False)
+                               verbose=False,
+                               exposure_footprints=footprints)
+                               
         ok = cat['MASK_APER_0'] == 0
-
-        print(ok.sum())
+        if footprints is not None:
+            if cat['NEXP'].max() >= 2:
+                ok &= cat['NEXP'] >= 2
+            
+        # print(ok.sum())
         so = np.argsort(cat['MAG_AUTO'][ok])[:max_ref_sources]
 
         table_to_radec(cat[ok][so], f"{tmp_root_i}.radec")
@@ -5278,7 +5490,7 @@ MATCH_KWS = dict(maxKeep=10, auto_keep=3, auto_transform=None, auto_limit=3,
                  size_limit=[5, 1800], ignore_rot=True, ignore_scale=True, 
                  ba_max=0.9)
                                 
-def tweak_flt(files=[], max_dist=0.4, threshold=3, min_flux_radius=0.5, max_flux_radius=5, max_pixels=1.0, max_nmask=0, verbose=True, tristars_kwargs=MATCH_KWS, ref_exp=0, use_sewpy=False, master_radec=None, make_figures=False):
+def tweak_flt(files=[], max_dist=0.4, threshold=3, min_flux_radius=0.5, max_flux_radius=5, min_nexp=2, max_pixels=1.0, max_nmask=0, verbose=True, tristars_kwargs=MATCH_KWS, ref_exp=0, use_sewpy=False, master_radec=None, make_figures=False):
     """Refine shifts of FLT files
     
     Parameters
@@ -5294,6 +5506,9 @@ def tweak_flt(files=[], max_dist=0.4, threshold=3, min_flux_radius=0.5, max_flux
     
     min_flux_radius, max_flux_radius : float
         Range of ``FLUX_RADIUS`` values to allow
+    
+    min_nexp : int
+        Minimum number of exposures contributing to a source
     
     max_pixels : float
         Maximum pixel offset relative to median to allow for sources in each 
@@ -5449,6 +5664,23 @@ def tweak_flt(files=[], max_dist=0.4, threshold=3, min_flux_radius=0.5, max_flux
         
         im.close()
     
+    # Compute overlaps for min_nexp
+    #-----------------
+    _all_wcs = []
+    for (_c, _w) in cats:
+        _all_wcs.append(_w)
+
+    for i, (_c, _w) in enumerate(cats):
+        _ra, _dec = _w.all_pix2world(_c['X_IMAGE'], _c['Y_IMAGE'], 1)
+        nexp = catalog_exposure_overlaps(_ra, _dec, exposure_footprints=_all_wcs)
+        
+        # print('xxx nexp'); utils.Unique(nexp)
+        
+        if nexp.max() >= min_nexp:
+            cats[i][0] = _c[nexp >= min_nexp]
+        
+    # Which is reference?
+    #--------------------
     if ref_exp < 0:
         if exptime.max() > 0:
             ref_exp = np.argmax(exptime)
@@ -5501,7 +5733,7 @@ def tweak_flt(files=[], max_dist=0.4, threshold=3, min_flux_radius=0.5, max_flux
             not_CR = c_ii['FLUX_RADIUS'] > min_flux_radius
             not_CR &= c_ii['FLUX_RADIUS'] < max_flux_radius
             not_CR &= c_ii['MASK_APER_0'] <= max_nmask
-            
+                        
             c_i = c_ii[not_CR]
 
             # SExtractor doesn't do SIP WCS?

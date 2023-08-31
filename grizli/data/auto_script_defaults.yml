@@ -96,6 +96,8 @@ visit_prep_args: &prep_args
     align_guess: null
     max_err_percentile: 99
     align_min_flux_radius: 1.
+    align_min_nexp: 2
+    align_final_niter: 5
     catalog_mask_pad: 0.05
     match_catalog_density: False
     skymethod: localmin
