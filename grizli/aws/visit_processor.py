@@ -941,6 +941,24 @@ def old_get_master_radec(s_region, bucket='grizli-v2', prefix='HST/Pipeline/Astr
     
     
     precomputed_radec = {}
+    
+    # New HSC UDS query
+    _query = """
+    --
+    -- put your SQL here
+    -- uds_hsc_dr3_i24_428556
+    --
+    SELECT object_id,ra,dec,g_cmodel_flux,g_cmodel_fluxerr,r_cmodel_flux,r_cmodel_fluxerr,i_cmodel_mag,i_cmodel_magerr,i_cmodel_fluxerr,
+    z_cmodel_flux,z_cmodel_fluxerr,y_cmodel_flux,y_cmodel_fluxerr,i_extendedness_value,i_extendedness_flag,nchild
+    FROM pdr3_dud.forced
+    WHERE isprimary
+    AND ra > 33 AND ra < 36 AND dec > -7 AND dec < -3
+    AND i_cmodel_mag < 24
+    AND NOT i_cmodel_flag_badcentroid 
+    AND NOT i_cmodel_flag
+    
+    """
+    
     precomputed_radec['uds_hsc_hst_21457.i24.radec'] = np.array([
                                      [34.06742, -5.36379],
                                      [34.20736, -5.3638 ],
@@ -1108,7 +1126,7 @@ def old_get_master_radec(s_region, bucket='grizli-v2', prefix='HST/Pipeline/Astr
 
 
 blue_align_params={}
-blue_align_params['align_mag_limits'] = [18,25,0.15]
+blue_align_params['align_mag_limits'] = [18,26,0.15]
 blue_align_params['align_simple'] = False
 blue_align_params['max_err_percentile'] = 80
 blue_align_params['catalog_mask_pad'] = 0.05
@@ -1116,7 +1134,6 @@ blue_align_params['match_catalog_density'] = False
 blue_align_params['align_ref_border'] = 8
 blue_align_params['align_min_flux_radius'] = 1.7
 blue_align_params['tweak_n_min'] = 5
-
 
 def check_jwst_assoc_guiding(assoc):
     """
@@ -1348,8 +1365,20 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=False,
         kws['parse_visits_args']['combine_same_pa'] = combine_same_pa
     else:
         kws['parse_visits_args']['visit_split_shift'] *= -1
-        
-    if ('_f4' in assoc) | ('_f3' in assoc) | ('_f2' in assoc) & (blue_align_params is not None):        
+    
+    if len(kws['visit_prep_args']['align_mag_limits']) != 3:
+        align_kws_are_default = False
+    else:
+        align_kws_are_default = np.allclose(kws['visit_prep_args']['align_mag_limits'],
+                                        [14, 24, 0.05])
+    
+    is_blue_optical = False
+    for filt in ['f218w','f225w','f275w','f336w','f390w','f435w','f475w']:
+        if filt in assoc:
+            is_blue_optical = True
+            break
+            
+    if (is_blue_optical) & (blue_align_params is not None) & (align_kws_are_default):
         for k in blue_align_params:
             kws['visit_prep_args'][k] = blue_align_params[k]
     
@@ -1589,33 +1618,33 @@ def res_query_from_local(files=None, filters=None):
 
     rows = []
     for file in files:
-        im = pyfits.open(file)
+        with pyfits.open(file) as im:
         
-        filt = utils.parse_filter_from_header(im[0].header)
-        if filters is not None:
-            if filt not in filters:
-                continue
+            filt = utils.parse_filter_from_header(im[0].header)
+            if filters is not None:
+                if filt not in filters:
+                    continue
         
-        ds = '_'.join(os.path.basename(file).split('_')[:-1])
-        ext = file.split('_')[-1].split('.fits')[0]
-        if 'EXPTIME' in im[0].header:
-            expt = im[0].header['EXPTIME']
-        elif 'EFFEXPTM' in im[0].header:
-            expt = im[0].header['EFFEXPTM']
-        else:
-            expt = 0.
+            ds = '_'.join(os.path.basename(file).split('_')[:-1])
+            ext = file.split('_')[-1].split('.fits')[0]
+            if 'EXPTIME' in im[0].header:
+                expt = im[0].header['EXPTIME']
+            elif 'EFFEXPTM' in im[0].header:
+                expt = im[0].header['EFFEXPTM']
+            else:
+                expt = 0.
         
-        assoc = 'manual'
+            assoc = 'manual'
 
-        if 'PUPIL' in im[0].header:
-            pup = im[0].header['PUPIL']
-        else:
-            pup = '-'
+            if 'PUPIL' in im[0].header:
+                pup = im[0].header['PUPIL']
+            else:
+                pup = '-'
                         
-        det = im[0].header['DETECTOR']
-        wcs = pywcs.WCS(im['SCI',1].header)
-        sr = utils.SRegion(wcs)
-        fp = sr.polystr()[0]
+            det = im[0].header['DETECTOR']
+            wcs = pywcs.WCS(im['SCI',1].header, fobj=im)
+            sr = utils.SRegion(wcs)
+            fp = sr.polystr()[0]
         
         rows.append([ds, ext, 1, assoc, filt, pup, expt, fp, det])
     
