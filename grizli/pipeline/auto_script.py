@@ -1465,7 +1465,10 @@ def visit_dict_to_strings(v):
         newv['files'] = [str(f) for f in v['files']]
         
     if 'footprint' in v:
-        newv['footprint'] = utils.SRegion(v['footprint']).s_region
+        try:
+            newv['footprint'] = utils.SRegion(v['footprint']).s_region
+        except NotImplementedError:
+            newv['footprint'] = utils.SRegion(v['footprint'].buffer(2./3600)).s_region
     
     if 'footprints' in v:
         newv['footprints'] = []
