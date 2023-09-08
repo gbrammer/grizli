@@ -1376,6 +1376,7 @@ class CRDSGrismConf():
         import numpy as np
         
         if hasattr(model, 'n_inputs'):
+            # model is a Polynomial
             if model.n_inputs == 1:
                 if get_coeffs:
                     value = model.parameters[::-1]
@@ -1385,6 +1386,7 @@ class CRDSGrismConf():
                 value = model(x0, y0)
         
         elif len(model) == 1:
+            # model is a single-element list, probably Polynomial1D
             if model[0].n_inputs == 1:
                 if get_coeffs:
                     value = model[0].parameters[::-1]
@@ -1394,6 +1396,7 @@ class CRDSGrismConf():
                 value = model[0](x0, y0)
             
         else:
+            # model is a list
             _c = []
             for m in model:
                 if m.n_inputs == 1:
