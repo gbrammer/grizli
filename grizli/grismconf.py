@@ -1571,7 +1571,11 @@ class CRDSGrismConf():
             msg = f"Read photometry reference {refs['photom']} (date = '{date}')"
             print(msg)
             
-        ph = jwst.datamodels.NrcWfssPhotomModel(refs['photom'])
+        if self.instrument == 'NIRCAM':
+            ph = jwst.datamodels.NrcWfssPhotomModel(refs['photom'])
+        else:
+            ph = jwst.datamodels.NisWfssPhotomModel(refs['photom'])
+        
         phot = astropy.table.Table(ph.phot_table)
 
         pixel_area = ph.meta.photometry.pixelarea_steradians
