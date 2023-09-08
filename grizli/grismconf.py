@@ -1225,11 +1225,17 @@ def load_grism_config(conf_file, warnings=True):
     return conf
 
 
-def crds_wfss_reffiles(instrument='NIRCAM', filter='F444W', pupil='GRISMR', module='A', date=None, reftypes=('photom', 'specwcs'), header=None):
+def crds_wfss_reffiles(instrument='NIRCAM', filter='F444W', pupil='GRISMR', module='A', date=None, reftypes=('photom', 'specwcs'), header=None, context='jwst_1123.pmap'):
     """
+    Get WFSS reffiles from CRDS
     """
     import astropy.time
     import crds
+    from . import jwst_utils
+    
+    if context is not None:
+        jwst_utils.CRDS_CONTEXT = context
+        jwst_utils.set_crds_context(verbose=False, override_environ=True)
     
     if header is not None:
         instrument = header['INSTRUME']
@@ -1270,11 +1276,37 @@ def crds_wfss_reffiles(instrument='NIRCAM', filter='F444W', pupil='GRISMR', modu
 
 
 class CRDSGrismConf():
-    def __init__(self, file='references/jwst/nircam/jwst_nircam_specwcs_0136.asdf', get_photom=True, **kwargs):
+    def __init__(self, file='references/jwst/nircam/jwst_nircam_specwcs_0136.asdf', get_photom=True, context='jwst_1123.pmap', **kwargs):
         """
         Helper object to replicate `grismconf` config files from CRDS products
+        
+        Parameters
+        ----------
+        file : str
+            Filename of a CRDS ``specwcs`` file
+        
+        get_photom : bool
+            Get sensitivity curves from the ``photom`` reference file
+        
+        context : str
+            Explicit CRDS_CONTEXT
+        
+        Attributes
+        ----------
+        dm : `jwst.datamodels.NIRCAMGrismModel`
+            DataModel of the ``specwcs`` reference
+        
+        SENS_data : dict
+            Sensitivity data like ``{order: (wave_microns, sensitity)}``
+        
         """
         import jwst.datamodels
+        from . import jwst_utils
+    
+        if context is not None:
+            jwst_utils.CRDS_CONTEXT = context
+            jwst_utils.set_crds_context(verbose=False, override_environ=True)
+
         self.file = file
         if file.startswith('references'):
             full_path = os.path.join(os.environ['CRDS_PATH'], file)
