@@ -262,4 +262,28 @@ class TestJWSTFittingTools:
     #    if os.path.exists('wfc3-parse-test'):
     #        os.system('rm -rf wfc3-parse-test')
         
+class TestGrismConf:
     
+    def test_grismconf(self):
+        """
+        Test initializing ``grizli.grismconf.CRDSGrismConf``
+        """
+        import grizli.grismconf
+        
+        pytest.importorskip('jwst')
+        
+        refs = grizli.grismconf.crds_wfss_reffiles(instrument='NIRCAM',
+                                                   filter='F444W',
+                                                   pupil='GRISMR',
+                                                   module='A',
+                                                   date='2023-09-07 00:00:00',
+                                                   reftypes=('photom', 'specwcs'), 
+                                                   header=None, 
+                                                   context='jwst_1123.pmap')
+                                                   
+        assert('jwst_nircam_specwcs_0190' in refs['specwcs'])
+        
+        conf = grizli.grismconf.CRDSGrismConf(file=refs['specwcs'], get_photom=False)
+        
+        conf = grizli.grismconf.CRDSGrismConf(file=refs['specwcs'], get_photom=True)
+        
