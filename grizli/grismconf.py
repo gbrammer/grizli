@@ -691,7 +691,7 @@ class JwstDispersionTransform(object):
     def __init__(self, instrument='NIRCAM', module='A', grism='R', conf_file=None, header=None):
         
         self.instrument = instrument
-        self.module = module
+        self.module = 'A' if module is None else module
         self.grism = grism
         
         if conf_file is not None:
@@ -872,9 +872,18 @@ class TransformGrismconf(object):
         import grismconf
         
         self.conf_file = conf_file
-        self.conf = grismconf.Config(conf_file)
         
-        self.transform = JwstDispersionTransform(conf_file=conf_file)
+        if 'specwcs' in conf_file:
+            self.conf = CRDSGrismConf(conf_file, get_photom=True)
+            kws = {'instrument': self.conf.instrument,
+                   'module': self.conf.module,
+                   'grism': self.conf.grism[-1],
+                  }
+            self.transform = JwstDispersionTransform(**kws)
+                
+        else:
+            self.conf = grismconf.Config(conf_file)
+            self.transform = JwstDispersionTransform(conf_file=conf_file)
 
         self.order_names = {'A':'+1',
                            'B':'0',
@@ -1068,7 +1077,13 @@ class TransformGrismconf(object):
                         
             sens = Table()
             sens['WAVELENGTH'] = lam.astype(np.double)
-            sens['SENSITIVITY'] = self.conf.SENS[order](lam).astype(np.double)
+            if self.conf.SENS is None:
+                # specwcs
+                _sens = np.interp(lam, *self.conf.SENS_data[order], left=0., right=0.)
+                sens['SENSITIVITY'] = _sens.astype(np.double)
+            else:
+                sens['SENSITIVITY'] = self.conf.SENS[order](lam).astype(np.double)
+                
             if lam.max() < 100:
                 sens['WAVELENGTH'] *= 1.e4
 
@@ -1120,6 +1135,9 @@ def load_grism_config(conf_file, warnings=True):
     elif 'V8.5/NIRCAM' in conf_file:
         conf = TransformGrismconf(conf_file)
         conf.get_beams()
+    elif 'specwcs' in conf_file:
+        conf = TransformGrismconf(conf_file)
+        conf.get_beams()        
     else:
         conf = aXeConf(conf_file)
         conf.get_beams()
@@ -1153,7 +1171,7 @@ def load_grism_config(conf_file, warnings=True):
             #     conf.conf[f'DLDP_{b}_0'] -= conf.conf[f'DLDP_{b}_1']*0.5
         if isinstance(conf, TransformGrismconf):
             # Don't shift new format files
-            continue
+            pass
         else:
             msg = f""" !! Shift {os.path.basename(conf_file)} along dispersion"""
             utils.log_comment(utils.LOGFILE, msg, verbose=warnings)
@@ -1204,14 +1222,65 @@ def load_grism_config(conf_file, warnings=True):
     return conf
 
 
+def crds_wfss_reffiles(instrument='NIRCAM', filter='F444W', pupil='GRISMR', module='A', date=None, reftypes=('photom', 'specwcs'), header=None):
+    """
+    """
+    import astropy.time
+    import crds
+    
+    if header is not None:
+        instrument = header['INSTRUME']
+        if 'FILTER' in header:
+            filter = header['FILTER']
+        if 'PUPIL' in header:
+            pupil = header['PUPIL']
+        if 'MODULE' in header:
+            module = header['MODULE']
+            
+    cpars = {}
+    
+    if instrument in ('NIRISS', 'NIRCAM'):
+        observatory = 'jwst'
+        cpars['meta.instrument.pupil'] = pupil
+    else:
+        observatory = 'hst'
+        
+    if instrument == 'NIRISS':
+        cpars['meta.instrument.detector'] = 'NIS'
+        cpars['meta.exposure.type'] = 'NIS_WFSS'
+    elif instrument == 'NIRCAM':
+        cpars['meta.instrument.detector'] = f'NRC{module}LONG'
+        cpars['meta.instrument.module'] = module
+        cpars['meta.exposure.type'] = 'NRC_WFSS'
+
+    if date is None:
+        date = astropy.time.Time.now().iso
+        
+    cpars['meta.observation.date'] = date.split()[0]
+    cpars['meta.observation.time'] = date.split()[1]
+    
+    cpars['meta.instrument.name'] = instrument
+    cpars['meta.instrument.filter'] = filter
+    
+    refs = crds.getreferences(cpars, reftypes=reftypes, observatory=observatory)
+    return refs
+
+
 class CRDSGrismConf():
-    def __init__(self, file='/Users/gbrammer/Research/grizli/crds_cache/references/jwst/nircam/jwst_nircam_specwcs_0136.asdf', get_photom=True, **kwargs):
+    def __init__(self, file='references/jwst/nircam/jwst_nircam_specwcs_0136.asdf', get_photom=True, **kwargs):
         """
         Helper object to replicate `grismconf` config files from CRDS products
         """
         import jwst.datamodels
         self.file = file
-        self.dm = jwst.datamodels.NIRCAMGrismModel(file)
+        if file.startswith('references'):
+            full_path = os.path.join(os.environ['CRDS_PATH'], file)
+        else:
+            full_path = file
+        
+        self.full_path = full_path
+        
+        self.dm = jwst.datamodels.NIRCAMGrismModel(full_path)
         self.SENS = None
         self.SENS_data = None
         
@@ -1237,6 +1306,21 @@ class CRDSGrismConf():
     @property
     def pupil(self):
         return self.dm.meta.instrument.pupil
+
+
+    @property
+    def grism(self):
+        """
+        Return filter for NIRISS, pupil for NIRCAM, filter for HST
+        """
+        if self.instrument in ('NIRCAM','NIRISS'):
+            if self.instrument == 'NIRCAM':
+                return self.pupil
+            else:
+                return self.filter
+        else:
+            # e.g., HST
+            return self.filter
 
 
     @property
@@ -1461,13 +1545,16 @@ class CRDSGrismConf():
         import astropy.table
         import astropy.units as u
         import crds
+        import jwst.datamodels
         
         cpars = self.dm.get_crds_parameters()
         if self.instrument == 'NIRISS':
             cpars['meta.instrument.detector'] = 'NIS'
+            cpars['meta.exposure.type'] = 'NIS_WFSS'
         else:
             cpars['meta.instrument.detector'] = f'NRC{self.module}LONG'
-
+            cpars['meta.exposure.type'] = 'NRC_WFSS'
+        
         if date is None:
             date = astropy.time.Time.now().iso
             
