@@ -1599,8 +1599,8 @@ class CRDSGrismConf():
             ix &= phot['pupil'] == self.pupil
             ix &= phot['order'] == self.dm.orders[i]
             if ix.sum() == 0:
-                msg = f"Order {order} = {dm.orders[i]} not found in {refs['photom']}"
-                msg += f" for {self.filter} {self.pupil}"
+                msg = f"Order {order} = {self.dm.orders[i]} not found in "
+                msg += f"{refs['photom']} for {self.filter} {self.pupil}"
                 print(msg)
                 continue
                 
