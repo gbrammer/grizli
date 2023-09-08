@@ -1280,7 +1280,11 @@ class CRDSGrismConf():
         
         self.full_path = full_path
         
-        self.dm = jwst.datamodels.NIRCAMGrismModel(full_path)
+        if 'nircam' in file:
+            self.dm = jwst.datamodels.NIRCAMGrismModel(full_path)
+        else:
+            self.dm = jwst.datamodels.NIRISSGrismModel(full_path)
+            
         self.SENS = None
         self.SENS_data = None
         
