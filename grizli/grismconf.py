@@ -1017,7 +1017,7 @@ class TransformGrismconf(object):
             trace_dy += poly(x, y)
             # print(f'polynomial offset: {poly(x,y):.3f}')
             
-        elif ('V8/NIRCAM' in self.conf_file) | ('V8.5/NIRCAM' in self.conf_file):
+        elif ('V8/NIRCAM' in self.conf_file) | ('V8.5/NIRCAM' in self.conf_file) | ('V9/NIRCAM' in self.conf_file):
             #print('V8: do nothing')
             pass
             
@@ -1133,6 +1133,9 @@ def load_grism_config(conf_file, warnings=True):
         conf = TransformGrismconf(conf_file)
         conf.get_beams()
     elif 'V8.5/NIRCAM' in conf_file:
+        conf = TransformGrismconf(conf_file)
+        conf.get_beams()
+    elif 'V9/NIRCAM' in conf_file:
         conf = TransformGrismconf(conf_file)
         conf.get_beams()
     elif 'specwcs' in conf_file:
