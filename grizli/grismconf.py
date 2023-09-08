@@ -1525,7 +1525,7 @@ class CRDSGrismConf():
             return np.interp(dx, values, t0)
 
 
-    def get_photom(self, xyt=(1024, 1024, 0.5), date=None, verbose=False, **kwargs):
+    def get_photom(self, xyt=(1024, 1024, 0.5), date=None, photom_file=None, verbose=False, **kwargs):
         """
         Load photom reference from CRDS and scale to grismconf / aXe convention
         
@@ -1537,6 +1537,9 @@ class CRDSGrismConf():
         date : str, None
             Observation date in ISO format, e.g., '2023-01-01 00:00:00'.  If not
             specified, defaults to "now"
+        
+        photom_file : str
+            Explicit filename of a CRDS ``photom`` reference file
         
         verbose : bool
             Print status message
@@ -1554,30 +1557,33 @@ class CRDSGrismConf():
         import crds
         import jwst.datamodels
         
-        cpars = self.dm.get_crds_parameters()
-        if self.instrument == 'NIRISS':
-            cpars['meta.instrument.detector'] = 'NIS'
-            cpars['meta.exposure.type'] = 'NIS_WFSS'
-        else:
-            cpars['meta.instrument.detector'] = f'NRC{self.module}LONG'
-            cpars['meta.exposure.type'] = 'NRC_WFSS'
+        if photom_file is None:
+            cpars = self.dm.get_crds_parameters()
+            if self.instrument == 'NIRISS':
+                cpars['meta.instrument.detector'] = 'NIS'
+                cpars['meta.exposure.type'] = 'NIS_WFSS'
+            else:
+                cpars['meta.instrument.detector'] = f'NRC{self.module}LONG'
+                cpars['meta.exposure.type'] = 'NRC_WFSS'
         
-        if date is None:
-            date = astropy.time.Time.now().iso
+            if date is None:
+                date = astropy.time.Time.now().iso
             
-        cpars['meta.observation.date'] = date.split()[0]
-        cpars['meta.observation.time'] = date.split()[1]
+            cpars['meta.observation.date'] = date.split()[0]
+            cpars['meta.observation.time'] = date.split()[1]
         
-        refs = crds.getreferences(cpars, reftypes=('photom',))
+            refs = crds.getreferences(cpars, reftypes=('photom',))
 
-        if verbose:
-            msg = f"Read photometry reference {refs['photom']} (date = '{date}')"
-            print(msg)
+            if verbose:
+                msg = f"Read photometry reference {refs['photom']} (date = '{date}')"
+                print(msg)
             
+            photom_file = refs['photom']
+        
         if self.instrument == 'NIRCAM':
-            ph = jwst.datamodels.NrcWfssPhotomModel(refs['photom'])
+            ph = jwst.datamodels.NrcWfssPhotomModel(photom_file)
         else:
-            ph = jwst.datamodels.NisWfssPhotomModel(refs['photom'])
+            ph = jwst.datamodels.NisWfssPhotomModel(photom_file)
         
         phot = astropy.table.Table(ph.phot_table)
 
