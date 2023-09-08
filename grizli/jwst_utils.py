@@ -19,7 +19,8 @@ from . import GRIZLI_PATH
 QUIET_LEVEL = logging.INFO
 
 # CRDS_CONTEXT = 'jwst_0942.pmap' # July 29, 2022 with updated NIRCAM ZPs
-CRDS_CONTEXT = 'jwst_0995.pmap' # 2022-10-06 NRC ZPs and flats
+# CRDS_CONTEXT = 'jwst_0995.pmap' # 2022-10-06 NRC ZPs and flats
+CRDS_CONTEXT = 'jwst_1123.pmap' # 2023-09-08 NRC specwcs, etc.
 
 def set_crds_context(fits_file=None, override_environ=False, verbose=True):
     """
@@ -40,6 +41,10 @@ def set_crds_context(fits_file=None, override_environ=False, verbose=True):
         The value of the CRDS_CONTEXT environment variable
         
     """
+    from importlib import reload
+    import crds
+    import crds.core
+    import crds.core.heavy_client
     
     _CTX = CRDS_CONTEXT
     
@@ -55,6 +60,10 @@ def set_crds_context(fits_file=None, override_environ=False, verbose=True):
         
     msg = f"ENV CRDS_CONTEXT = {os.environ['CRDS_CONTEXT']}"
     utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+    
+    # Need to reload CRDS modules to catch new CONTEXT
+    reload(crds.core); reload(crds); reload(crds.core.heavy_client)
+    
     return os.environ['CRDS_CONTEXT']
 
 
