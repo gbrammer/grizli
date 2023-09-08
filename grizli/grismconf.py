@@ -1299,7 +1299,10 @@ class CRDSGrismConf():
 
     @property
     def module(self):
-        return self.dm.meta.instrument.module
+        if self.instrument == 'NIRCAM':
+            return self.dm.meta.instrument.module
+        else:
+            return None
 
 
     @property
@@ -1610,12 +1613,13 @@ class CRDSGrismConf():
             
             self.SENS_dldp[order] = dldp
             
-            sens_flam = (sens_fnu*dldp*u.megaJansky).to(u.erg/u.second/u.cm**2/u.micron,
-                            equivalencies=u.spectral_density(wave*u.micron))
+            mask = (wave > 0) & (sens_fnu > 0)
             
-            mask = (wave > 0) & (sens_flam > 0)
-            
-            self.SENS_data[order] = [wave[mask], 1./sens_flam[mask].value]
+            _flam_unit = u.erg/u.second/u.cm**2/u.micron
+            sens_flam = (sens_fnu[mask]*dldp*u.megaJansky).to(_flam_unit,
+                            equivalencies=u.spectral_density(wave[mask]*u.micron))
+                        
+            self.SENS_data[order] = [wave[mask], 1./sens_flam.value]
         
         return self.SENS_data
 
