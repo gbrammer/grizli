@@ -1270,12 +1270,10 @@ class CRDSGrismConf():
         
         orders = []
         for o in self.dm.orders:
-            if o == 0:
-                orders.append('0')
-            elif o > 0:
+            if o > 0:
                 orders.append(f'+{o}')
-            elif o < 0:
-                orders.append(f'-{o}')
+            else:
+                orders.append(f'{o}')
         
         return orders
 
@@ -1358,7 +1356,9 @@ class CRDSGrismConf():
 
 
     def INVDISPL(self, order, x0, y0, dx, t0=np.linspace(-1, 2, 128), from_root=False):
-        """ Inverse DISPL """
+        """
+        Inverse DISPL
+        """
         if from_root:
             func = self._root_inverse_model
         else:
@@ -1368,12 +1368,23 @@ class CRDSGrismConf():
         t = func(self.dm.displ[io], x0, y0, dx, t0=t0)
         return t
 
-    
+
     def _eval_model(self, model, x0, y0, t, get_coeffs=False):
-        """General function for evaluating model polynomials"""
+        """
+        General function for evaluating model polynomials
+        """
         import numpy as np
         
-        if len(model) == 1:
+        if hasattr(model, 'n_inputs'):
+            if model.n_inputs == 1:
+                if get_coeffs:
+                    value = model.parameters[::-1]
+                else:
+                    value = model(t)
+            else:
+                value = model(x0, y0)
+        
+        elif len(model) == 1:
             if model[0].n_inputs == 1:
                 if get_coeffs:
                     value = model[0].parameters[::-1]
