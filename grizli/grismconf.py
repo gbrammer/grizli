@@ -17,7 +17,7 @@ NIRCAM_CONF_VERSION = 'V8.5'
 if os.getenv('NIRCAM_CONF_VERSION') is not None:
     NIRCAM_CONF_VERSION = os.getenv('NIRCAM_CONF_VERSION')
     print('Use NIRCAM_CONF_VERSION={NIRCAM_CONF_VERSION}')
-    
+
 def show_available_nircam_versions(filter='F444W', module='B', grism='R', verbose=True):
     """
     Show all available versions of the NIRCAM Grism config files
@@ -1151,6 +1151,9 @@ def load_grism_config(conf_file, warnings=True):
             # for b in conf.beams:
             #     #conf.conf[f'DYDX_{b}_0'][0] += 0.25
             #     conf.conf[f'DLDP_{b}_0'] -= conf.conf[f'DLDP_{b}_1']*0.5
+        if isinstance(conf, TransformGrismconf):
+            # Don't shift new format files
+            continue
         else:
             msg = f""" !! Shift {os.path.basename(conf_file)} along dispersion"""
             utils.log_comment(utils.LOGFILE, msg, verbose=warnings)
@@ -1199,3 +1202,311 @@ def load_grism_config(conf_file, warnings=True):
         #     conf.conf[f'DLDP_{b}_0'] -= conf.conf[f'DLDP_{b}_1']*0.5
                 
     return conf
+
+
+class CRDSGrismConf():
+    def __init__(self, file='/Users/gbrammer/Research/grizli/crds_cache/references/jwst/nircam/jwst_nircam_specwcs_0136.asdf', get_photom=True, **kwargs):
+        """
+        Helper object to replicate `grismconf` config files from CRDS products
+        """
+        import jwst.datamodels
+        self.file = file
+        self.dm = jwst.datamodels.NIRCAMGrismModel(file)
+        self.SENS = None
+        self.SENS_data = None
+        
+        if get_photom:
+            self.get_photom(**kwargs)
+            
+    @property
+    def meta(self):
+        """metadata dictionary"""
+        return self.dm.meta.instance
+
+
+    @property
+    def module(self):
+        return self.dm.meta.instrument.module
+
+
+    @property
+    def filter(self):
+        return self.dm.meta.instrument.filter
+
+
+    @property
+    def pupil(self):
+        return self.dm.meta.instrument.pupil
+
+
+    @property
+    def instrument(self):
+        return self.dm.meta.instrument.name
+
+
+    @property
+    def filter_grism(self):
+        """Return combination of blocking filter + dispering element"""
+
+        if self.instrument == 'NIRISS':
+            return (self.pupil, self.filter)
+        else:
+            return (self.filter, self.pupil)
+
+
+    @property
+    def instrument_setup(self):
+        """Return combination of blocking filter, dispering element, (module)"""
+
+        if self.instrument == 'NIRISS':
+            return (self.pupil, self.filter, None)
+        else:
+            return (self.filter, self.pupil, self.module)
+
+
+    @property
+    def orders(self):
+        """String version of orders, like '+1', '+2', '0', '-1'"""
+        
+        orders = []
+        for o in self.dm.orders:
+            if o == 0:
+                orders.append('0')
+            elif o > 0:
+                orders.append(f'+{o}')
+            elif o < 0:
+                orders.append(f'-{o}')
+        
+        return orders
+
+
+    def DISPX(self, order, x0, y0, t):
+        """Replicate grismconf.DISPX"""
+        io = self.orders.index(order)
+        dispx = self._eval_model(self.dm.dispx[io], x0, y0, t)
+        return dispx
+
+
+    def DDISPX(self, order, x0, y0, t, dt=0.01):
+        """Replicate grismconf.DDISPX"""
+        io = self.orders.index(order)
+        v0 = self._eval_model(self.dm.dispx[io], x0, y0, t)
+        v1 = self._eval_model(self.dm.dispx[io], x0, y0, t+dt)
+        return (v1-v0)/dt
+
+
+    def DISPY(self, order, x0, y0, t):
+        """Replicate grismconf.DISPY"""
+        io = self.orders.index(order)
+        dispy = self._eval_model(self.dm.dispy[io], x0, y0, t)
+        return dispy
+
+
+    def DDISPY(self, order, x0, y0, t, dt=0.01):
+        """Replicate grismconf.DDISPY"""
+        io = self.orders.index(order)
+        v0 = self._eval_model(self.dm.dispy[io], x0, y0, t)
+        v1 = self._eval_model(self.dm.dispy[io], x0, y0, t+dt)
+        return (v1-v0)/dt
+
+
+    def DISPXY(self, order, x0, y0, t):
+        """Replicate grismconf.DISPXY (combination of DISPX, DISPY)"""
+        io = self.orders.index(order)
+        dispx = self._eval_model(self.dm.dispx[io], x0, y0, t)
+        dispy = self._eval_model(self.dm.dispy[io], x0, y0, t)
+        return dispx, dispy
+
+
+    def DISPL(self, order, x0, y0, t):
+        """Replicate grismconf.DISPL"""
+        io = self.orders.index(order)
+        displ = self._eval_model(self.dm.displ[io], x0, y0, t)
+        return displ
+
+
+    def DDISPL(self, order, x0, y0, t, dt=0.01):
+        """Replicate grismconf.DDISPL"""
+        io = self.orders.index(order)
+        v0 = self._eval_model(self.dm.displ[io], x0, y0, t)
+        v1 = self._eval_model(self.dm.displ[io], x0, y0, t+dt)
+        return (v1-v0)/dt
+
+
+    def INVDISPX(self, order, x0, y0, dx, t0=np.linspace(-1, 2, 128), from_root=False):
+        """ Inverse DISPX """
+        if from_root:
+            func = self._root_inverse_model
+        else:
+            func = self._inverse_model
+
+        io = self.orders.index(order)
+        t = func(self.dm.dispx[io], x0, y0, dx, t0=t0)
+        return t
+
+
+    def INVDISPY(self, order, x0, y0, dx, t0=np.linspace(-1, 2, 128), from_root=False):
+        """ Inverse DISPY """
+        if from_root:
+            func = self._root_inverse_model
+        else:
+            func = self._inverse_model
+
+        io = self.orders.index(order)
+        t = func(self.dm.dispy[io], x0, y0, dx, t0=t0)
+        return t
+
+
+    def INVDISPL(self, order, x0, y0, dx, t0=np.linspace(-1, 2, 128), from_root=False):
+        """ Inverse DISPL """
+        if from_root:
+            func = self._root_inverse_model
+        else:
+            func = self._inverse_model
+
+        io = self.orders.index(order)
+        t = func(self.dm.displ[io], x0, y0, dx, t0=t0)
+        return t
+
+    
+    def _eval_model(self, model, x0, y0, t, get_coeffs=False):
+        """General function for evaluating model polynomials"""
+        import numpy as np
+        
+        if len(model) == 1:
+            if model[0].n_inputs == 1:
+                if get_coeffs:
+                    value = model[0].parameters[::-1]
+                else:
+                    value = model[0](t)
+            else:
+                value = model[0](x0, y0)
+            
+        else:
+            _c = []
+            for m in model:
+                if m.n_inputs == 1:
+                    _c.append(m(t))
+                else:
+                    _c.append(m(x0, y0))
+
+            if get_coeffs:
+                value = _c[::-1]
+            else:
+                value = np.polyval(_c[::-1], t)
+        
+        return value
+
+
+    def _root_inverse_model(self, model, x0, y0, dx, **kwargs):
+        """Inverse values interpolated from the forward model using polynomial roots"""
+        coeffs = self._eval_model(model, x0, y0, 0, get_coeffs=True)
+        if hasattr(coeffs, '__len__'):
+            coeffs[-1] -= dx
+            value = np.roots(coeffs)[-1]
+        else:
+            value = coeffs
+            
+        return value
+
+
+    def _inverse_model(self, model, x0, y0, dx, t0=np.linspace(-1, 2, 128)):
+        """Inverse values interpolated from the forward model """
+        values = self._eval_model(model, x0, y0, t0)
+        
+        if values[0] > values[1]:
+            return np.interp(dx, values[::-1], t0[::-1])
+        else:
+            return np.interp(dx, values, t0)
+
+
+    def get_photom(self, xyt=(1024, 1024, 0.5), date=None, verbose=False, **kwargs):
+        """
+        Load photom reference from CRDS and scale to grismconf / aXe convention
+        
+        Parameters
+        ----------
+        xyt : (float, float, float)
+            Coordinate (x0, y0, t) where to evaluate the grism dispersion DLDP
+        
+        date : str, None
+            Observation date in ISO format, e.g., '2023-01-01 00:00:00'.  If not
+            specified, defaults to "now"
+        
+        verbose : bool
+            Print status message
+        
+        Returns
+        -------
+        SENS_data : dict
+            Dict of ``{'order': (wave, sens)}``.  Also sets ``SENS_data``,
+            ``SENS_dldp`` and ``SENS_xyt`` attributes.
+        
+        """
+        import astropy.time
+        import astropy.table
+        import astropy.units as u
+        import crds
+        
+        cpars = self.dm.get_crds_parameters()
+        if self.instrument == 'NIRISS':
+            cpars['meta.instrument.detector'] = 'NIS'
+        else:
+            cpars['meta.instrument.detector'] = f'NRC{self.module}LONG'
+
+        if date is None:
+            date = astropy.time.Time.now().iso
+            
+        cpars['meta.observation.date'] = date.split()[0]
+        cpars['meta.observation.time'] = date.split()[1]
+        
+        refs = crds.getreferences(cpars, reftypes=('photom',))
+
+        if verbose:
+            msg = f"Read photometry reference {refs['photom']} (date = '{date}')"
+            print(msg)
+            
+        ph = jwst.datamodels.NrcWfssPhotomModel(refs['photom'])
+        phot = astropy.table.Table(ph.phot_table)
+
+        pixel_area = ph.meta.photometry.pixelarea_steradians
+        
+        self.sens_ref_file = refs['photom']
+        self.SENS_xyt = xyt
+        self.SENS_dldp = {}
+        self.SENS_data = {}
+        
+        for i, order in enumerate(self.orders):
+            ix = phot['filter'] == self.filter
+            ix &= phot['pupil'] == self.pupil
+            ix &= phot['order'] == self.dm.orders[i]
+            if ix.sum() == 0:
+                msg = f"Order {order} = {dm.orders[i]} not found in {refs['photom']}"
+                msg += f" for {self.filter} {self.pupil}"
+                print(msg)
+                continue
+                
+            row = phot[ix]
+            
+            wave = np.squeeze(row['wavelength'].data)
+            sens_fnu = np.squeeze(row['relresponse'].data)
+            
+            sens_fnu *= pixel_area*row['photmjsr']
+            
+            # Dispersion, DLAM/DPIX
+            dl = self.DDISPL(order, *xyt)
+            dx = self.DDISPX(order, *xyt)
+            dy = self.DDISPY(order, *xyt)
+            dldp = dl/np.sqrt(dx**2+dy**2)
+            
+            self.SENS_dldp[order] = dldp
+            
+            sens_flam = (sens_fnu*dldp*u.megaJansky).to(u.erg/u.second/u.cm**2/u.micron,
+                            equivalencies=u.spectral_density(wave*u.micron))
+            
+            mask = (wave > 0) & (sens_flam > 0)
+            
+            self.SENS_data[order] = [wave[mask], 1./sens_flam[mask].value]
+        
+        return self.SENS_data
+
