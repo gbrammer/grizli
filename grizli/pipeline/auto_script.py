@@ -347,6 +347,7 @@ def go(root='j010311+131615',
        make_final_report=True,
        get_dict=False,
        kill='',
+       use_jwst_crds=False,
        **kwargs
        ):
     """
@@ -872,7 +873,8 @@ def go(root='j010311+131615',
         grp = multifit.GroupFLT(grism_files=grism_files, direct_files=[], 
                                 ref_file=None, seg_file=seg_file, 
                                 catalog=catalog, cpu_count=-1, sci_extn=1, 
-                                pad=(64,256))
+                                pad=(64,256),
+                                use_jwst_crds=use_jwst_crds)
 
         # Make drizzle model images
         grp.drizzle_grism_models(root=root, kernel='point', scale=0.15)
@@ -974,7 +976,8 @@ def go(root='j010311+131615',
         grp = multifit.GroupFLT(grism_files=grism_files, direct_files=[], 
                                 ref_file=None, seg_file=seg_file, 
                                 catalog=catalog, cpu_count=-1, sci_extn=1, 
-                                pad=(64,256))
+                                pad=(64,256),
+                                use_jwst_crds=use_jwst_crds)
 
         # Make drizzle model images
         grp.drizzle_grism_models(root=root, kernel='point', scale=0.15)
@@ -2991,7 +2994,7 @@ def photutils_catalog(field_root='j142724+334246', threshold=1.8, subtract_bkg=T
     return tab
 
 
-def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=None, force_seg=None, force_cat=None, galfit=False, pad=(64,256), files=None, gris_ref_filters=GRIS_REF_FILTERS, split_by_grism=False):
+def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=None, force_seg=None, force_cat=None, galfit=False, pad=(64,256), files=None, gris_ref_filters=GRIS_REF_FILTERS, split_by_grism=False, use_jwst_crds=False):
     """
     Initialize a GroupFLT object from exposures in a working directory.  The 
     script tries to match mosaic images with grism exposures based on the 
@@ -3181,7 +3184,8 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
                                   cpu_count=-1,
                                   sci_extn=1,
                                   pad=pad, 
-                                  polyx=polyx)
+                                  polyx=polyx,
+                                  use_jwst_crds=use_jwst_crds)
                                   
         grp_objects.append(grp_i)
 
@@ -3197,7 +3201,7 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
         return [grp]
 
 
-def grism_prep(field_root='j142724+334246', PREP_PATH='../Prep', EXTRACT_PATH='../Extractions', ds9=None, refine_niter=3, gris_ref_filters=GRIS_REF_FILTERS, force_ref=None, files=None, split_by_grism=True, refine_poly_order=1, refine_fcontam=0.5, cpu_count=0, mask_mosaic_edges=False, prelim_mag_limit=25, refine_mag_limits=[18, 24], init_coeffs=[1.1, -0.5], grisms_to_process=None, pad=(64, 256), model_kwargs={'compute_size': True}, sep_background_kwargs=None, subtract_median_filter=False, median_filter_size=71, median_filter_central=10, second_pass_filtering=False, box_filter_sn=3, box_filter_width=3):
+def grism_prep(field_root='j142724+334246', PREP_PATH='../Prep', EXTRACT_PATH='../Extractions', ds9=None, refine_niter=3, gris_ref_filters=GRIS_REF_FILTERS, force_ref=None, files=None, split_by_grism=True, refine_poly_order=1, refine_fcontam=0.5, cpu_count=0, mask_mosaic_edges=False, prelim_mag_limit=25, refine_mag_limits=[18, 24], init_coeffs=[1.1, -0.5], grisms_to_process=None, pad=(64, 256), model_kwargs={'compute_size': True}, sep_background_kwargs=None, subtract_median_filter=False, median_filter_size=71, median_filter_central=10, second_pass_filtering=False, box_filter_sn=3, box_filter_width=3, use_jwst_crds=False):
     """
     Contamination model for grism exposures
     """
@@ -3225,7 +3229,8 @@ def grism_prep(field_root='j142724+334246', PREP_PATH='../Prep', EXTRACT_PATH='.
                                 files=files,
                                 split_by_grism=split_by_grism, 
                                 force_ref=force_ref,
-                                pad=pad)
+                                pad=pad,
+                                use_jwst_crds=use_jwst_crds)
 
     for grp in grp_objects:
         
@@ -3362,7 +3367,7 @@ DITHERED_PLINE = {'kernel': 'point', 'pixfrac': 0.2, 'pixscale': 0.1, 'size': 8,
 PARALLEL_PLINE = {'kernel': 'square', 'pixfrac': 1.0, 'pixscale': 0.1, 'size': 8, 'wcs': None}
 
 
-def refine_model_with_fits(field_root='j142724+334246', grp=None, master_files=None, spectrum='continuum', clean=True, max_chinu=5):
+def refine_model_with_fits(field_root='j142724+334246', grp=None, master_files=None, spectrum='continuum', clean=True, max_chinu=5, use_jwst_crds=False):
     """
     Refine the full-field grism models with the best fit spectra from 
     individual extractions.
@@ -3393,7 +3398,8 @@ def refine_model_with_fits(field_root='j142724+334246', grp=None, master_files=N
                                 catalog=catalog,
                                 cpu_count=-1,
                                 sci_extn=1,
-                                pad=(64,256))
+                                pad=(64,256),
+                                use_jwst_crds=use_jwst_crds)
 
     fit_files = glob.glob('*full.fits')
     fit_files.sort()
@@ -3441,7 +3447,7 @@ def refine_model_with_fits(field_root='j142724+334246', grp=None, master_files=N
     del(grp)
 
 
-def extract(field_root='j142724+334246', maglim=[13, 24], prior=None, MW_EBV=0.00, ids=[], pline=DITHERED_PLINE, fit_only_beams=True, run_fit=True, poly_order=7, oned_R=30, master_files=None, grp=None, bad_pa_threshold=None, fit_trace_shift=False, size=32, diff=True, min_sens=0.02, fcontam=0.2, min_mask=0.01, sys_err=0.03, skip_complete=True, fit_args={}, args_file='fit_args.npy', get_only_beams=False):
+def extract(field_root='j142724+334246', maglim=[13, 24], prior=None, MW_EBV=0.00, ids=[], pline=DITHERED_PLINE, fit_only_beams=True, run_fit=True, poly_order=7, oned_R=30, master_files=None, grp=None, bad_pa_threshold=None, fit_trace_shift=False, size=32, diff=True, min_sens=0.02, fcontam=0.2, min_mask=0.01, sys_err=0.03, skip_complete=True, fit_args={}, args_file='fit_args.npy', get_only_beams=False, use_jwst_crds=False):
     import glob
     import os
 
@@ -3475,8 +3481,8 @@ def extract(field_root='j142724+334246', maglim=[13, 24], prior=None, MW_EBV=0.0
                                 catalog=catalog,
                                 cpu_count=-1,
                                 sci_extn=1,
-                                pad=(64,256)
-                                )
+                                pad=(64,256),
+                                use_jwst_crds=use_jwst_crds)
     else:
         init_grp = False
 

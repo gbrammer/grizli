@@ -12,12 +12,14 @@ import numpy as np
 
 from . import GRIZLI_PATH, utils
 
+DEFAULT_CRDS_CONTEXT = 'jwst_1123.pmap'
+
 NIRCAM_CONF_VERSION = 'V8.5'
 
 if os.getenv('NIRCAM_CONF_VERSION') is not None:
     NIRCAM_CONF_VERSION = os.getenv('NIRCAM_CONF_VERSION')
     print('Use NIRCAM_CONF_VERSION={NIRCAM_CONF_VERSION}')
-    
+
 def show_available_nircam_versions(filter='F444W', module='B', grism='R', verbose=True):
     """
     Show all available versions of the NIRCAM Grism config files
@@ -522,7 +524,8 @@ def coeffs_from_astropy_polynomial(p):
 
 
 def get_config_filename(instrume='WFC3', filter='F140W',
-                        grism='G141', module=None, chip=1):
+                        grism='G141', pupil=None, module=None, chip=1,
+                        use_jwst_crds=False, crds_context=DEFAULT_CRDS_CONTEXT):
     """Generate a config filename based on the instrument, filter & grism combination.
 
     Config files assumed to be found the directory specified by the `$GRIZLI`
@@ -559,7 +562,10 @@ def get_config_filename(instrume='WFC3', filter='F140W',
 
             EXTVER = 2 is extension 4 / (SCI,2) of the flt/flc files but
             corresponds to CCDCHIP = 1 and the ACS.WFC3.CHIP1 config files.
-
+    
+    use_jwst_crds : bool
+        Use CRDS ``specwcs`` reference files for JWST instruments
+    
     Returns
     -------
     conf_file : str
@@ -661,7 +667,27 @@ def get_config_filename(instrume='WFC3', filter='F140W',
 
         #conf_file = os.path.join(GRIZLI_PATH,
         #                         f'CONF/NIRCam.B.{filter}.{grism}.conf')
-
+    
+    if (instrume in ['NIRCAM','NIRISS']) & use_jwst_crds:
+        if instrume == 'NIRCAM':
+            _pupil = filter
+            _filter = grism
+        else:
+            _pupil = grism
+            _filter = filter
+            
+        refs = crds_wfss_reffiles(instrument=instrume,
+                                  filter=_filter,
+                                  pupil=_pupil,
+                                  module=module,
+                                  date=None,
+                                  reftypes=('photom', 'specwcs'),
+                                  header=None,
+                                  context=crds_context)
+        
+        conf_file = refs['specwcs']
+        print('get_conf: xxx', conf_file, grism, filter, pupil, module, instrume)
+        
     if instrume == 'WFIRST':
         conf_file = os.path.join(GRIZLI_PATH, 'CONF/WFIRST.conf')
 
@@ -691,7 +717,7 @@ class JwstDispersionTransform(object):
     def __init__(self, instrument='NIRCAM', module='A', grism='R', conf_file=None, header=None):
         
         self.instrument = instrument
-        self.module = module
+        self.module = 'A' if module is None else module
         self.grism = grism
         
         if conf_file is not None:
@@ -872,9 +898,18 @@ class TransformGrismconf(object):
         import grismconf
         
         self.conf_file = conf_file
-        self.conf = grismconf.Config(conf_file)
         
-        self.transform = JwstDispersionTransform(conf_file=conf_file)
+        if 'specwcs' in conf_file:
+            self.conf = CRDSGrismConf(conf_file, get_photom=True)
+            kws = {'instrument': self.conf.instrument,
+                   'module': self.conf.module,
+                   'grism': self.conf.grism[-1],
+                  }
+            self.transform = JwstDispersionTransform(**kws)
+                
+        else:
+            self.conf = grismconf.Config(conf_file)
+            self.transform = JwstDispersionTransform(conf_file=conf_file)
 
         self.order_names = {'A':'+1',
                            'B':'0',
@@ -1008,7 +1043,7 @@ class TransformGrismconf(object):
             trace_dy += poly(x, y)
             # print(f'polynomial offset: {poly(x,y):.3f}')
             
-        elif ('V8/NIRCAM' in self.conf_file) | ('V8.5/NIRCAM' in self.conf_file):
+        elif ('V8/NIRCAM' in self.conf_file) | ('V8.5/NIRCAM' in self.conf_file) | ('V9/NIRCAM' in self.conf_file):
             #print('V8: do nothing')
             pass
             
@@ -1068,7 +1103,13 @@ class TransformGrismconf(object):
                         
             sens = Table()
             sens['WAVELENGTH'] = lam.astype(np.double)
-            sens['SENSITIVITY'] = self.conf.SENS[order](lam).astype(np.double)
+            if self.conf.SENS is None:
+                # specwcs
+                _sens = np.interp(lam, *self.conf.SENS_data[order], left=0., right=0.)
+                sens['SENSITIVITY'] = _sens.astype(np.double)
+            else:
+                sens['SENSITIVITY'] = self.conf.SENS[order](lam).astype(np.double)
+                
             if lam.max() < 100:
                 sens['WAVELENGTH'] *= 1.e4
 
@@ -1104,7 +1145,7 @@ def load_grism_config(conf_file, warnings=True):
     conf : `~grizli.grismconf.aXeConf`
         Configuration file object.  Runs `conf.get_beams()` to read the
         sensitivity curves.
-    """
+    """    
     if 'V3/NIRCAM' in conf_file:
         conf = TransformGrismconf(conf_file)
         conf.get_beams()
@@ -1120,6 +1161,12 @@ def load_grism_config(conf_file, warnings=True):
     elif 'V8.5/NIRCAM' in conf_file:
         conf = TransformGrismconf(conf_file)
         conf.get_beams()
+    elif 'V9/NIRCAM' in conf_file:
+        conf = TransformGrismconf(conf_file)
+        conf.get_beams()
+    elif 'specwcs' in conf_file:
+        conf = TransformGrismconf(conf_file)
+        conf.get_beams()        
     else:
         conf = aXeConf(conf_file)
         conf.get_beams()
@@ -1151,6 +1198,9 @@ def load_grism_config(conf_file, warnings=True):
             # for b in conf.beams:
             #     #conf.conf[f'DYDX_{b}_0'][0] += 0.25
             #     conf.conf[f'DLDP_{b}_0'] -= conf.conf[f'DLDP_{b}_1']*0.5
+        if isinstance(conf, TransformGrismconf):
+            # Don't shift new format files
+            pass
         else:
             msg = f""" !! Shift {os.path.basename(conf_file)} along dispersion"""
             utils.log_comment(utils.LOGFILE, msg, verbose=warnings)
@@ -1199,3 +1249,474 @@ def load_grism_config(conf_file, warnings=True):
         #     conf.conf[f'DLDP_{b}_0'] -= conf.conf[f'DLDP_{b}_1']*0.5
                 
     return conf
+
+
+def crds_wfss_reffiles(instrument='NIRCAM', filter='F444W', pupil='GRISMR', module='A', date=None, reftypes=('photom', 'specwcs'), header=None, context=DEFAULT_CRDS_CONTEXT):
+    """
+    Get WFSS reffiles from CRDS
+    """
+    import astropy.time
+    import crds
+    from . import jwst_utils
+    
+    if context is not None:
+        jwst_utils.CRDS_CONTEXT = context
+        jwst_utils.set_crds_context(verbose=False, override_environ=True)
+    
+    if header is not None:
+        instrument = header['INSTRUME']
+        if 'FILTER' in header:
+            filter = header['FILTER']
+        if 'PUPIL' in header:
+            pupil = header['PUPIL']
+        if 'MODULE' in header:
+            module = header['MODULE']
+            
+    cpars = {}
+    
+    if instrument in ('NIRISS', 'NIRCAM'):
+        observatory = 'jwst'
+        cpars['meta.instrument.pupil'] = pupil
+    else:
+        observatory = 'hst'
+        
+    if instrument == 'NIRISS':
+        cpars['meta.instrument.detector'] = 'NIS'
+        cpars['meta.exposure.type'] = 'NIS_WFSS'
+    elif instrument == 'NIRCAM':
+        cpars['meta.instrument.detector'] = f'NRC{module}LONG'
+        cpars['meta.instrument.module'] = module
+        cpars['meta.exposure.type'] = 'NRC_WFSS'
+
+    if date is None:
+        date = astropy.time.Time.now().iso
+        
+    cpars['meta.observation.date'] = date.split()[0]
+    cpars['meta.observation.time'] = date.split()[1]
+    
+    cpars['meta.instrument.name'] = instrument
+    cpars['meta.instrument.filter'] = filter
+    
+    refs = crds.getreferences(cpars, reftypes=reftypes, observatory=observatory)
+    return refs
+
+
+class CRDSGrismConf():
+    def __init__(self, file='references/jwst/nircam/jwst_nircam_specwcs_0136.asdf', get_photom=True, context=DEFAULT_CRDS_CONTEXT, **kwargs):
+        """
+        Helper object to replicate `grismconf` config files from CRDS products
+        
+        Parameters
+        ----------
+        file : str
+            Filename of a CRDS ``specwcs`` file
+        
+        get_photom : bool
+            Get sensitivity curves from the ``photom`` reference file
+        
+        context : str
+            Explicit CRDS_CONTEXT
+        
+        Attributes
+        ----------
+        dm : `jwst.datamodels.NIRCAMGrismModel`
+            DataModel of the ``specwcs`` reference
+        
+        meta : dict
+            Metadata dictionary from `jwst.datamodels.NIRCAMGrismModel.meta.instance`
+        
+        dm_orders : list
+            List of orders from `dm.orders`
+        
+        crds_parameters : dict
+            CRDS parameter dictionary from `dm.get_crds_parameters()`
+        
+        dispx, dispy, displ : list, list, list
+            Parameter polynomials from the reference datamodel
+        
+        SENS_data : dict
+            Sensitivity data like ``{order: (wave_microns, sensitity)}``
+        
+        """
+        from . import jwst_utils
+    
+        if context is not None:
+            jwst_utils.CRDS_CONTEXT = context
+            jwst_utils.set_crds_context(verbose=False, override_environ=True)
+
+        self.file = file
+        if file.startswith('references'):
+            full_path = os.path.join(os.environ['CRDS_PATH'], file)
+        else:
+            full_path = file
+        
+        self.full_path = full_path
+        
+        self.initialize_from_datamodel()
+        self.SENS = None
+        self.SENS_data = None
+        
+        if get_photom:
+            self.get_photom(**kwargs)
+    
+    
+    def initialize_from_datamodel(self):
+        """
+        Initialize polynomial objects from a `jwst.datamodel`
+        """
+        import copy
+        import jwst.datamodels
+        
+        full_path = self.full_path
+        
+        if 'nircam' in full_path:
+            dm = jwst.datamodels.NIRCAMGrismModel(full_path)
+        else:
+            dm = jwst.datamodels.NIRISSGrismModel(full_path)
+        
+        self.meta = copy.deepcopy(dm.meta.instance)
+        self.dm_orders = copy.deepcopy(dm.orders)
+        self.crds_parameters = dm.get_crds_parameters()
+        self.dispx = copy.deepcopy(dm.dispx)
+        self.dispy = copy.deepcopy(dm.dispy)
+        self.displ = copy.deepcopy(dm.displ)
+        
+    # @property
+    # def meta(self):
+    #     """metadata dictionary"""
+    #     return self.dm.meta.instance
+
+
+    @property
+    def module(self):
+        if self.instrument == 'NIRCAM':
+            return self.meta['instrument']['module']
+        else:
+            return None
+
+
+    @property
+    def filter(self):
+        return self.meta['instrument']['filter']
+
+
+    @property
+    def pupil(self):
+        return self.meta['instrument']['pupil']
+
+
+    @property
+    def grism(self):
+        """
+        Return filter for NIRISS, pupil for NIRCAM, filter for HST
+        """
+        if self.instrument in ('NIRCAM','NIRISS'):
+            if self.instrument == 'NIRCAM':
+                return self.pupil
+            else:
+                return self.filter
+        else:
+            # e.g., HST
+            return self.filter
+
+
+    @property
+    def instrument(self):
+        return self.meta['instrument']['name']
+
+
+    @property
+    def filter_grism(self):
+        """Return combination of blocking filter + dispering element"""
+
+        if self.instrument == 'NIRISS':
+            return (self.pupil, self.filter)
+        else:
+            return (self.filter, self.pupil)
+
+
+    @property
+    def instrument_setup(self):
+        """Return combination of blocking filter, dispering element, (module)"""
+
+        if self.instrument == 'NIRISS':
+            return (self.pupil, self.filter, None)
+        else:
+            return (self.filter, self.pupil, self.module)
+
+
+    @property
+    def orders(self):
+        """String version of orders, like '+1', '+2', '0', '-1'"""
+        
+        orders = []
+        for o in self.dm_orders:
+            if o > 0:
+                orders.append(f'+{o}')
+            else:
+                orders.append(f'{o}')
+        
+        return orders
+
+
+    def DISPX(self, order, x0, y0, t):
+        """Replicate grismconf.DISPX"""
+        io = self.orders.index(order)
+        dispx = self._eval_model(self.dispx[io], x0, y0, t)
+        return dispx
+
+
+    def DDISPX(self, order, x0, y0, t, dt=0.01):
+        """Replicate grismconf.DDISPX"""
+        io = self.orders.index(order)
+        v0 = self._eval_model(self.dispx[io], x0, y0, t)
+        v1 = self._eval_model(self.dispx[io], x0, y0, t+dt)
+        return (v1-v0)/dt
+
+
+    def DISPY(self, order, x0, y0, t):
+        """Replicate grismconf.DISPY"""
+        io = self.orders.index(order)
+        dispy = self._eval_model(self.dispy[io], x0, y0, t)
+        return dispy
+
+
+    def DDISPY(self, order, x0, y0, t, dt=0.01):
+        """Replicate grismconf.DDISPY"""
+        io = self.orders.index(order)
+        v0 = self._eval_model(self.dispy[io], x0, y0, t)
+        v1 = self._eval_model(self.dispy[io], x0, y0, t+dt)
+        return (v1-v0)/dt
+
+
+    def DISPXY(self, order, x0, y0, t):
+        """Replicate grismconf.DISPXY (combination of DISPX, DISPY)"""
+        io = self.orders.index(order)
+        dispx = self._eval_model(self.dispx[io], x0, y0, t)
+        dispy = self._eval_model(self.dispy[io], x0, y0, t)
+        return dispx, dispy
+
+
+    def DISPL(self, order, x0, y0, t):
+        """Replicate grismconf.DISPL"""
+        io = self.orders.index(order)
+        displ = self._eval_model(self.displ[io], x0, y0, t)
+        return displ
+
+
+    def DDISPL(self, order, x0, y0, t, dt=0.01):
+        """Replicate grismconf.DDISPL"""
+        io = self.orders.index(order)
+        v0 = self._eval_model(self.displ[io], x0, y0, t)
+        v1 = self._eval_model(self.displ[io], x0, y0, t+dt)
+        return (v1-v0)/dt
+
+
+    def INVDISPX(self, order, x0, y0, dx, t0=np.linspace(-1, 2, 128), from_root=False):
+        """ Inverse DISPX """
+        if from_root:
+            func = self._root_inverse_model
+        else:
+            func = self._inverse_model
+
+        io = self.orders.index(order)
+        t = func(self.dispx[io], x0, y0, dx, t0=t0)
+        return t
+
+
+    def INVDISPY(self, order, x0, y0, dx, t0=np.linspace(-1, 2, 128), from_root=False):
+        """ Inverse DISPY """
+        if from_root:
+            func = self._root_inverse_model
+        else:
+            func = self._inverse_model
+
+        io = self.orders.index(order)
+        t = func(self.dispy[io], x0, y0, dx, t0=t0)
+        return t
+
+
+    def INVDISPL(self, order, x0, y0, dx, t0=np.linspace(-1, 2, 128), from_root=False):
+        """
+        Inverse DISPL
+        """
+        if from_root:
+            func = self._root_inverse_model
+        else:
+            func = self._inverse_model
+
+        io = self.orders.index(order)
+        t = func(self.displ[io], x0, y0, dx, t0=t0)
+        return t
+
+
+    def _eval_model(self, model, x0, y0, t, get_coeffs=False):
+        """
+        General function for evaluating model polynomials
+        """
+        import numpy as np
+        
+        if hasattr(model, 'n_inputs'):
+            # model is a Polynomial
+            if model.n_inputs == 1:
+                if get_coeffs:
+                    value = model.parameters[::-1]
+                else:
+                    value = model(t)
+            else:
+                value = model(x0, y0)
+        
+        elif len(model) == 1:
+            # model is a single-element list, probably Polynomial1D
+            if model[0].n_inputs == 1:
+                if get_coeffs:
+                    value = model[0].parameters[::-1]
+                else:
+                    value = model[0](t)
+            else:
+                value = model[0](x0, y0)
+            
+        else:
+            # model is a list
+            _c = []
+            for m in model:
+                if m.n_inputs == 1:
+                    _c.append(m(t))
+                else:
+                    _c.append(m(x0, y0))
+
+            if get_coeffs:
+                value = _c[::-1]
+            else:
+                value = np.polyval(_c[::-1], t)
+        
+        return value
+
+
+    def _root_inverse_model(self, model, x0, y0, dx, **kwargs):
+        """Inverse values interpolated from the forward model using polynomial roots"""
+        coeffs = self._eval_model(model, x0, y0, 0, get_coeffs=True)
+        if hasattr(coeffs, '__len__'):
+            coeffs[-1] -= dx
+            value = np.roots(coeffs)[-1]
+        else:
+            value = coeffs
+            
+        return value
+
+
+    def _inverse_model(self, model, x0, y0, dx, t0=np.linspace(-1, 2, 128)):
+        """Inverse values interpolated from the forward model """
+        values = self._eval_model(model, x0, y0, t0)
+        
+        if values[0] > values[1]:
+            return np.interp(dx, values[::-1], t0[::-1])
+        else:
+            return np.interp(dx, values, t0)
+
+
+    def get_photom(self, xyt=(1024, 1024, 0.5), date=None, photom_file=None, verbose=False, **kwargs):
+        """
+        Load photom reference from CRDS and scale to grismconf / aXe convention
+        
+        Parameters
+        ----------
+        xyt : (float, float, float)
+            Coordinate (x0, y0, t) where to evaluate the grism dispersion DLDP
+        
+        date : str, None
+            Observation date in ISO format, e.g., '2023-01-01 00:00:00'.  If not
+            specified, defaults to "now"
+        
+        photom_file : str
+            Explicit filename of a CRDS ``photom`` reference file
+        
+        verbose : bool
+            Print status message
+        
+        Returns
+        -------
+        SENS_data : dict
+            Dict of ``{'order': (wave, sens)}``.  Also sets ``SENS_data``,
+            ``SENS_dldp`` and ``SENS_xyt`` attributes.
+        
+        """
+        import astropy.time
+        import astropy.table
+        import astropy.units as u
+        import crds
+        import jwst.datamodels
+        
+        if photom_file is None:
+            cpars = self.crds_parameters
+            
+            if self.instrument == 'NIRISS':
+                cpars['meta.instrument.detector'] = 'NIS'
+                cpars['meta.exposure.type'] = 'NIS_WFSS'
+            else:
+                cpars['meta.instrument.detector'] = f'NRC{self.module}LONG'
+                cpars['meta.exposure.type'] = 'NRC_WFSS'
+        
+            if date is None:
+                date = astropy.time.Time.now().iso
+            
+            cpars['meta.observation.date'] = date.split()[0]
+            cpars['meta.observation.time'] = date.split()[1]
+        
+            refs = crds.getreferences(cpars, reftypes=('photom',))
+
+            if verbose:
+                msg = f"Read photometry reference {refs['photom']} (date = '{date}')"
+                print(msg)
+            
+            photom_file = refs['photom']
+        
+        if self.instrument == 'NIRCAM':
+            ph = jwst.datamodels.NrcWfssPhotomModel(photom_file)
+        else:
+            ph = jwst.datamodels.NisWfssPhotomModel(photom_file)
+        
+        phot = astropy.table.Table(ph.phot_table)
+
+        pixel_area = ph.meta.photometry.pixelarea_steradians
+        
+        self.sens_ref_file = refs['photom']
+        self.SENS_xyt = xyt
+        self.SENS_dldp = {}
+        self.SENS_data = {}
+        
+        for i, order in enumerate(self.orders):
+            ix = phot['filter'] == self.filter
+            ix &= phot['pupil'] == self.pupil
+            ix &= phot['order'] == self.dm_orders[i]
+            if ix.sum() == 0:
+                msg = f"Order {order} = {self.dm_orders[i]} not found in "
+                msg += f"{refs['photom']} for {self.filter} {self.pupil}"
+                print(msg)
+                continue
+                
+            row = phot[ix]
+            
+            wave = np.squeeze(row['wavelength'].data)
+            sens_fnu = np.squeeze(row['relresponse'].data)
+            
+            sens_fnu *= pixel_area*row['photmjsr']
+            
+            # Dispersion, DLAM/DPIX
+            dl = self.DDISPL(order, *xyt)
+            dx = self.DDISPX(order, *xyt)
+            dy = self.DDISPY(order, *xyt)
+            dldp = dl/np.sqrt(dx**2+dy**2)
+            
+            self.SENS_dldp[order] = dldp
+            
+            mask = (wave > 0) & (sens_fnu > 0)
+            
+            _flam_unit = u.erg/u.second/u.cm**2/u.micron
+            sens_flam = (sens_fnu[mask]*dldp*u.megaJansky).to(_flam_unit,
+                            equivalencies=u.spectral_density(wave[mask]*u.micron))
+                        
+            self.SENS_data[order] = [wave[mask], 1./sens_flam.value]
+        
+        return self.SENS_data
+
