@@ -4363,11 +4363,17 @@ def drizzle_overlaps(field_root, filters=['F098M', 'F105W', 'F110W', 'F115W', 'F
         # Add polygon
         if 'footprints' in visit:
             for fp in visit['footprints']:
-                if 'footprint' in filter_groups[filt]:
-                    fpun = filter_groups[filt]['footprint'].union(fp)
-                    filter_groups[filt]['footprint'] = fpun
+                if isinstance(fp, list):
+                    fps = fp
                 else:
-                    filter_groups[filt]['footprint'] = fp.buffer(0)
+                    fps = [fp]
+                    
+                for fp_i in fps:
+                    if 'footprint' in filter_groups[filt]:
+                        fpun = filter_groups[filt]['footprint'].union(fp_i)
+                        filter_groups[filt]['footprint'] = fpun
+                    else:
+                        filter_groups[filt]['footprint'] = fp.buffer(0)
 
         if (filt.upper() in filters) | (is_uvis & (filt.upper()[:-1] in filters)):
             wfc3ir['files'].extend(visit['files'])
