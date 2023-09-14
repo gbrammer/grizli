@@ -3615,7 +3615,8 @@ class GrismFLT(object):
 
         if verbose:
             print('Saved {0}_model.fits and {0}_model.pkl'.format(root))
-
+    
+    
     def save_full_pickle(self, verbose=True):
         """Save entire `GrismFLT` object to a pickle
         """
@@ -3664,17 +3665,24 @@ class GrismFLT(object):
                                    header=self.grism.header,
                                    name='MODEL'))
 
-        hdu.writeto('{0}.{1:02d}.GrismFLT.fits'.format(root, self.grism.sci_extn), overwrite=True, output_verify='fix')
+        hdu.writeto('{0}.{1:02d}.GrismFLT.fits'.format(root, self.grism.sci_extn), 
+                    overwrite=True,
+                    output_verify='fix')
 
         # zero out large data objects
         self.direct.data = self.grism.data = self.seg = self.model = None
-
+        
+        # Remove conf 
+        if hasattr(self, 'conf'):
+            delattr(self, 'conf')
+        
         fp = open('{0}.{1:02d}.GrismFLT.pkl'.format(root, 
                                                 self.grism.sci_extn), 'wb')
         pickle.dump(self, fp)
         fp.close()
 
         self.save_wcs(overwrite=True, verbose=False)
+
 
     def save_wcs(self, overwrite=True, verbose=True):
         """TBD
@@ -3703,6 +3711,7 @@ class GrismFLT(object):
 
             if verbose:
                 print(wcsfile)
+
 
     def load_from_fits(self, save_file):
         """Load saved data from a FITS file
@@ -3743,6 +3752,7 @@ class GrismFLT(object):
         del(fits)
 
         return True
+
 
     def transform_JWST_WFSS(self, verbose=True):
         """
