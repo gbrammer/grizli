@@ -1251,7 +1251,40 @@ def load_grism_config(conf_file, warnings=True):
     return conf
 
 
-def crds_wfss_reffiles(instrument='NIRCAM', filter='F444W', pupil='GRISMR', module='A', date=None, reftypes=('photom', 'specwcs'), header=None, context=DEFAULT_CRDS_CONTEXT):
+def download_jwst_crds_references(instruments=['NIRCAM','NIRISS'], filters=['F090W','F115W','F150W','F200W','F277W','F356W','F410M','F444W','F460M','F480M'], grisms=['GRISMR','GRISMC','GR150R','GR150C'], modules=['A','B'], context=DEFAULT_CRDS_CONTEXT, verbose=True):
+    """
+    Run `grizli.grismconf.crds_wfss_reffiles` with filter and grism combinations to 
+    prefetch a bunch of reference files
+    """
+    for instrument in instruments:
+        for f in filters:
+            for g in grisms:
+                if instrument == 'NIRCAM':
+                    if (f < 'F270') | g.startswith('GR150'):
+                        continue
+                    
+                    for m in modules:
+                        _ = crds_wfss_reffiles(instrument='NIRCAM',
+                                               filter=f, pupil=g,
+                                               module=m,
+                                               reftypes=('photom', 'specwcs'), 
+                                               header=None,
+                                               context=context,
+                                               verbose=verbose)
+                else:
+                    if (f > 'F270') | g.startswith('GRISM'):
+                        continue
+                    
+                    _ = crds_wfss_reffiles(instrument='NIRISS',
+                                               filter=g, pupil=f,
+                                               module='A',
+                                               reftypes=('photom', 'specwcs'), 
+                                               header=None,
+                                               context=context,
+                                               verbose=verbose)
+
+
+def crds_wfss_reffiles(instrument='NIRCAM', filter='F444W', pupil='GRISMR', module='A', date=None, reftypes=('photom', 'specwcs'), header=None, context=DEFAULT_CRDS_CONTEXT, verbose=False):
     """
     Get WFSS reffiles from CRDS
     """
@@ -1298,6 +1331,13 @@ def crds_wfss_reffiles(instrument='NIRCAM', filter='F444W', pupil='GRISMR', modu
     cpars['meta.instrument.filter'] = filter
     
     refs = crds.getreferences(cpars, reftypes=reftypes, observatory=observatory)
+    
+    if verbose:
+        msg = f'crds_wfss_reffiles: {instrument} {filter} {pupil} {module} ({context})'
+        ref_files = ' '.join([os.path.basename(refs[k]) for k in refs])
+        msg += '\n' + f'crds_wfss_reffiles: {ref_files}'
+        print(msg)
+    
     return refs
 
 
@@ -1347,9 +1387,17 @@ class CRDSGrismConf():
         self.file = file
         if file.startswith('references'):
             full_path = os.path.join(os.environ['CRDS_PATH'], file)
-        else:
+        elif os.path.exists(file):
             full_path = file
+        elif '/references' in file:
+            # Replace CRDS_PATH in absolute path
+            full_path = os.path.join(os.environ['CRDS_PATH'], 'references',
+                                     file.split('references/')[1])
         
+        if not os.path.exists(full_path):
+            # Try to download all of the JWST references
+            download_jwst_crds_references(context=context)
+            
         self.full_path = full_path
         
         self.initialize_from_datamodel()
