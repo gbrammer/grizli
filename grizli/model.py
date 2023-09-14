@@ -3672,7 +3672,7 @@ class GrismFLT(object):
         # zero out large data objects
         self.direct.data = self.grism.data = self.seg = self.model = None
         
-        # Remove conf 
+        # Don't store conf in pickle
         if hasattr(self, 'conf'):
             delattr(self, 'conf')
         
@@ -3682,8 +3682,11 @@ class GrismFLT(object):
         fp.close()
 
         self.save_wcs(overwrite=True, verbose=False)
-
-
+        
+        # Reload conf
+        self.conf = grismconf.load_grism_config(self.conf_file)
+    
+    
     def save_wcs(self, overwrite=True, verbose=True):
         """TBD
         """
