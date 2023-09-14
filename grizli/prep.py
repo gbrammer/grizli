@@ -887,7 +887,7 @@ def align_drizzled_image(root='',
                          assume_close=False,
                          ref_border=100, 
                          transform=None,
-                         refine_final_niter=5):
+                         refine_final_niter=8):
     """Pipeline for astrometric alignment of drizzled image products
     
     1. Generate source catalog from image mosaics
@@ -1308,7 +1308,19 @@ def align_drizzled_image(root='',
             output_pix = np.array(output_pix)[:,idx].T
     
             dx = input_pix - output_pix
-            hasm = np.sqrt((dx**2).sum(axis=1)) < np.clip(3*rms, 1, 3)
+            dx1 = np.sqrt((dx**2).sum(axis=1))
+            rms_clip = [1,5]
+            if hasattr(radec, 'upper'):
+                # Larger clipping tolerance for ground-based reference catalogs
+                if ('ls_dr9' in radec) | ('_ps1' in radec):
+                    rms_clip = [3, 8]
+                    
+            hasm = dx1 < np.clip(3*rms, *rms_clip)
+            
+            if hasm.sum() < 10:
+                so = np.argsort(dx1)
+                hasm = dx1 < dx1[so][10]
+                
             dx = dx[hasm]
             
             rms = utils.nmad(np.sqrt((dx**2).sum(axis=1)))
@@ -4230,7 +4242,7 @@ def process_direct_grism_visit(direct={},
                                align_assume_close=False,
                                align_transform=None,
                                align_guess=None,
-                               align_final_niter=5,
+                               align_final_niter=8,
                                max_err_percentile=99,
                                catalog_mask_pad=0.05,
                                match_catalog_density=None,
@@ -6183,9 +6195,22 @@ def get_jwst_wfssbkg_file(file, valid_flat=[0.6, 1.3], make_figure=False):
     """
     from jwst.wfss_contam import WfssContamStep
     from jwst.flatfield import FlatFieldStep
+
     
+    with pyfits.open(file) as im:
+        if im[0].header['INSTRUME'] == 'NIRISS':
+            # Test local file
+            bkg_file = "nis-{0}-{1}_skyflat.fits"
+            bkg_file = os.path.join(GRIZLI_PATH, 'CONF',
+                                    bkg_file.format(im[0].header['PUPIL'],
+                                                    im[0].header['FILTER']))
+            bkg_file = bkg_file.lower()
+            
+            if os.path.exists(bkg_file):
+                return bkg_file
+                    
     bkg_file = WfssContamStep().get_reference_file(file, 'wfssbkg')
-    
+
     # Not a FITS file?  e.g., N/A for imaging exposures
     if 'fits' not in bkg_file:
         return bkg_file
@@ -6358,8 +6383,13 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
             im = pyfits.open('{0}/CONF/{1}'.format(GRIZLI_PATH, file))
             
         if isJWST:
-            sh = im[1].data.shape
-            data = im[1].data.flatten()/flat
+            if len(im) > 1:
+                _ext = 1
+            else:
+                _ext = 0
+                
+            sh = im[_ext].data.shape
+            data = im[_ext].data.flatten()/flat
             data /= np.nanmedian(data)
         else:
             sh = im[0].data.shape
