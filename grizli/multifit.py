@@ -1186,7 +1186,7 @@ class GroupFLT():
             flt.grism.header['BKGBH'] = bh, 'sep background bh'
 
 
-    def subtract_median_filter(self, filter_size=71, filter_central=10, revert=True, filter_footprint=None, subtract_model=False, second_pass_filtering=False, box_filter_sn=3, box_filter_width=3):
+    def subtract_median_filter(self, filter_size=71, filter_central=10, revert=True, filter_footprint=None, subtract_model=False, second_pass_filtering=False, box_filter_sn=3, box_filter_width=3, put_model_in_median=False, verbose=True, mask_sn_threshold=None, mask_sn_dilate_iters=5):
         """
         Remove a median filter calculated along the dispersion axis
         """
@@ -1210,16 +1210,13 @@ class GroupFLT():
             msg += f' filter_size={filter_size} filter_central={filter_central}'
             msg += f' [{_filter_name}]'
             
-            utils.log_comment(utils.LOGFILE, msg, verbose=True)
+            utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
             
             sci_i = flt.grism.data['SCI']*1
             
             if revert & ('MED' in flt.grism.data):
                 sci_i += flt.grism.data['MED']
-            
-            if subtract_model:
-                sci_i -= flt.model
-                    
+                                
             err_i = flt.grism.data['ERR']
             dq_i = flt.grism.data['DQ']
             
@@ -1228,6 +1225,12 @@ class GroupFLT():
             
             ivar = 1/err_i**2
             ivar[~ok] = 0
+            
+            if subtract_model:
+                msg = 'subtract_median_filter: subtract model before median'
+                utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+                
+                sci_i -= flt.model
             
             #filter_sci = np.zeros_like(sci_i)
             #sh = sci_i.shape
@@ -1245,16 +1248,18 @@ class GroupFLT():
             if second_pass_filtering:
                 if nbutils is None:
                     # need numba installed
-                    msg = 'subtract_median_filter: `numba` not found, skip second filter pass.'
-                    utils.log_comment(utils.LOGFILE, msg, verbose=True)
+                    msg = 'subtract_median_filter: `numba` not found, '
+                    msg += 'skip second filter pass.'
+                    utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
                 else:
                     # run filter again, but mask pixels that show significant residuals (e.g. strong emission lines)
                     msg = f'subtract_median_filter: rerun filtering masking '
                     msg += f' S/N>{box_filter_sn} pixels in residual'
-                    utils.log_comment(utils.LOGFILE, msg, verbose=True)
+                    utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
 
                     # first do some binning/box filtering to identify significantly detected lines in individual exposures
-                    box_filter_footprint = np.ones((box_filter_width, box_filter_width), 
+                    box_filter_footprint = np.ones((box_filter_width, 
+                                                    box_filter_width), 
                                                     dtype=int)
                     box_filter_clean = nd.generic_filter(sci_i-filter_sci,
                                                     nbutils.nansum,
@@ -1272,9 +1277,35 @@ class GroupFLT():
                                                 footprint=filter_footprint)
                     
                     filter_sci[~np.isfinite(filter_sci)] = 0   
+            
+            if mask_sn_threshold:
+                flt.grism.header['MEDSNTH'] = (mask_sn_threshold,
+                                               'Median mask threshold')
+                flt.grism.header['MEDSNIT'] = (mask_sn_dilate_iters,
+                                               'Median mask threshold dilations')
+                                               
+                _msk = np.abs(filter_sci) > mask_sn_threshold*err_i
+                _msk = nd.binary_dilation(_msk, iterations=mask_sn_dilate_iters)
+                filter_sci[~_msk] = 0
+            
+            if put_model_in_median & subtract_model:
+                msg = 'subtract_median_filter: put model in median and reset '
+                msg += '`object_dispersers`'
+                utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
                 
-            flt.grism.data['SCI'] -= filter_sci*ok
-            flt.grism.data['MED'] = filter_sci*ok
+                flt.grism.data['MED'] = (filter_sci + flt.model)*ok
+                
+                # Reset model and object_dispersers
+                flt.object_dispersers = OrderedDict()
+                flt.model *= 0
+            else:
+                flt.grism.data['MED'] = filter_sci*ok
+
+            flt.grism.data['SCI'] -= flt.grism.data['MED']
+            
+            flt.grism.header['MEDSMOD'] = subtract_model, 'Model subtracted first'
+            flt.grism.header['MEDWMOD'] = (put_model_in_median,
+                                           'Model included in MED')
             flt.grism.header['MEDSIZE'] = filter_size, 'Median filter size'
             flt.grism.header['MEDCLIP'] = (filter_central,
                                           'Masked central pixels of the filter')

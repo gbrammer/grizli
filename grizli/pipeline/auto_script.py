@@ -3201,7 +3201,7 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
         return [grp]
 
 
-def grism_prep(field_root='j142724+334246', PREP_PATH='../Prep', EXTRACT_PATH='../Extractions', ds9=None, refine_niter=3, gris_ref_filters=GRIS_REF_FILTERS, force_ref=None, files=None, split_by_grism=True, refine_poly_order=1, refine_fcontam=0.5, cpu_count=0, mask_mosaic_edges=False, prelim_mag_limit=25, refine_mag_limits=[18, 24], init_coeffs=[1.1, -0.5], grisms_to_process=None, pad=(64, 256), model_kwargs={'compute_size': True}, sep_background_kwargs=None, subtract_median_filter=False, median_filter_size=71, median_filter_central=10, second_pass_filtering=False, box_filter_sn=3, box_filter_width=3, use_jwst_crds=False):
+def grism_prep(field_root='j142724+334246', PREP_PATH='../Prep', EXTRACT_PATH='../Extractions', ds9=None, refine_niter=3, gris_ref_filters=GRIS_REF_FILTERS, force_ref=None, files=None, split_by_grism=True, refine_poly_order=1, refine_fcontam=0.5, cpu_count=0, mask_mosaic_edges=False, prelim_mag_limit=25, refine_mag_limits=[18, 24], init_coeffs=[1.1, -0.5], grisms_to_process=None, pad=(64, 256), model_kwargs={'compute_size': True}, sep_background_kwargs=None, subtract_median_filter=False, median_filter_size=71, median_filter_central=10, second_pass_filtering=False, box_filter_sn=3, box_filter_width=3, median_mask_sn_threshold=None, median_mask_dilate=8, prelim_model_for_median=False, use_jwst_crds=False):
     """
     Contamination model for grism exposures
     """
@@ -3236,14 +3236,26 @@ def grism_prep(field_root='j142724+334246', PREP_PATH='../Prep', EXTRACT_PATH='.
         
         if subtract_median_filter:
             
+            ################
+            # Compute preliminary model before median?
+            if prelim_model_for_median:
+                grp.compute_full_model(fit_info=None, verbose=True, store=False, 
+                                       mag_limit=prelim_mag_limit, 
+                                       coeffs=init_coeffs, 
+                                       cpu_count=cpu_count,
+                                       model_kwargs=model_kwargs)
+                                   
             # Subtract a median along the dispersion direction
-            # and don't do any contamination modeling
             refine_niter = 0
             grp.subtract_median_filter(filter_size=median_filter_size, 
                                        filter_central=median_filter_central,
                                        second_pass_filtering=second_pass_filtering, 
                                        box_filter_sn=box_filter_sn, 
-                                       box_filter_width=box_filter_width)
+                                       box_filter_width=box_filter_width,
+                                       mask_sn_threshold=median_mask_sn_threshold,
+                                       mask_sn_dilate_iters=median_mask_dilate,
+                                       subtract_model=prelim_model_for_median,
+                                       put_model_in_median=prelim_model_for_median)
             
         else:
             ################
