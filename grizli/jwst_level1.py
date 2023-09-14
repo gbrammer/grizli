@@ -64,6 +64,7 @@ if 'CRDS_CONTEXT' in os.environ:
     CRDS_CONTEXT = os.getenv('CRDS_CONTEXT')
 else:
     CRDS_CONTEXT = 'jwst_1069.pmap'
+    # CRDS_CONTEXT = 'jwst_1123.pmap'
 
 
 def get_pipeline_object():
