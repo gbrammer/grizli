@@ -858,6 +858,9 @@ END""")
     elif mosaic_field == 'abell370':
         # CANUCS Abell 370
         NX, NY = 12,8
+        
+        # Bigger for making slices
+        NX, NY = 30, 30
     
         hdu = utils.make_wcsheader(ra=39.9863750, dec=-1.5969444,
                                    size=(NX*2048*0.04, NY*2048*0.04),
@@ -875,6 +878,9 @@ END""")
             r0, d0, nnx, nny, fi = 39.90, -1.55, 1.5, 1.5, 'nsf'
         else:
             r0, d0, nnx, nny, fi = 39.98, -1.594, 2, 2.5, 'clu'
+
+        if canucs_subfield == 'full':
+            r0, d0, nnx, nny, fi = 40.022500, -1.643395, 3.5, 4.5, 'full'
 
         #nsf = 39.90, -1.540
         #clu = 39.9863750, -1.5969444
@@ -898,7 +904,8 @@ END""")
     
         # CANUCS MACS 0416
         NX, NY = 12,10
-    
+        NX, NY = 20, 20
+        
         hdu = utils.make_wcsheader(ra=64.0566667, dec=-24.0897222,
                                    size=(NX*2048*0.04, NY*2048*0.04),
                                    pixscale=0.04, theta=0., get_hdu=True)
@@ -915,6 +922,9 @@ END""")
             r0, d0, nnx, nny, fi = 64.144, -24.096, 2, 2.5, 'ncf'
         else:
             r0, d0, nnx, nny, fi = 64.046, -24.084, 2.5, 2.5, 'clu'
+        
+        if canucs_subfield == 'full':
+            r0, d0, nnx, nny, fi =  64.098600,  -24.135550, 4, 4.5, 'full'
     
         root = f'macs0416-{fi}-grizli-v5.0'
         root = f'macs0416-{fi}-grizli-v6.0'
@@ -1114,7 +1124,7 @@ END""")
     return root, half_sw, s3output, ref_wcs
 
 
-def show_field_footprint(mosaic_field='primer_uds', filters="'F444W-CLEAR','F770W'", extra="", output_path='./'):
+def show_field_footprint(mosaic_field='primer_uds', filters="'F444W-CLEAR','F770W'", extra="", output_path='./', version='v7.0', canucs_subfield='clu'):
     """
     Make a figure showing the a field footprint and exposure overlaps
     
@@ -1143,7 +1153,10 @@ def show_field_footprint(mosaic_field='primer_uds', filters="'F444W-CLEAR','F770
     from grizli_aws import field_tiles
     from grizli.aws import db
     
-    root, half_sw, s3output, ref_wcs = make_wcs(mosaic_field=mosaic_field)
+    root, half_sw, s3output, ref_wcs = make_wcs(mosaic_field=mosaic_field,
+                                                version=version,
+                                                canucs_subfield=canucs_subfield,
+                                                )
     ref_file = ref_wcs
     #output_path = os.getcwd()
     
