@@ -22,6 +22,7 @@ import astropy.units as u
 # local imports
 from . import utils
 from . import model
+from . import grismconf
 #from . import stack
 from .fitting import GroupFitter
 #from .utils_c import disperse
@@ -29,9 +30,8 @@ from .utils_c import interp
 
 from .utils import GRISM_COLORS, GRISM_MAJOR, GRISM_LIMITS, DEFAULT_LINE_LIST
 
-
 def _loadFLT(grism_file, sci_extn, direct_file, pad, ref_file,
-               ref_ext, seg_file, verbose, catalog, ix):
+               ref_ext, seg_file, verbose, catalog, ix, use_jwst_crds):
     """Helper function for loading `.model.GrismFLT` objects with `multiprocessing`.
 
     TBD
@@ -42,7 +42,7 @@ def _loadFLT(grism_file, sci_extn, direct_file, pad, ref_file,
     except:
         # Python 3
         import pickle
-
+    
     # slight random delay to avoid synchronization problems
     # np.random.seed(ix)
     # sleeptime = ix*1
@@ -75,12 +75,12 @@ def _loadFLT(grism_file, sci_extn, direct_file, pad, ref_file,
 
         status = flt.load_from_fits(save_file)
 
-    else:
+    else:        
         flt = model.GrismFLT(grism_file=grism_file, sci_extn=sci_extn,
                          direct_file=direct_file, pad=pad,
                          ref_file=ref_file, ref_ext=ref_ext,
                          seg_file=seg_file, shrink_segimage=True,
-                         verbose=verbose)
+                         verbose=verbose, use_jwst_crds=use_jwst_crds)
 
     if flt.direct.wcs.wcs.has_pc():
         for obj in [flt.grism, flt.direct]:
@@ -99,7 +99,10 @@ def _loadFLT(grism_file, sci_extn, direct_file, pad, ref_file,
 
     if flt.grism.instrument in ['NIRISS', 'NIRCAM']:
         flt.transform_JWST_WFSS()
-
+    
+    if hasattr(flt, 'conf'):
+        delattr(flt, 'conf')
+    
     return flt  # , out_cat
 
 
@@ -164,6 +167,9 @@ def _beam_compute_model(beam, id, spectrum_1d, is_cgs, apply_sensitivity, scale,
 def _compute_model(i, flt, fit_info, is_cgs, store, model_kwargs):
     """Helper function for computing model orders.
     """
+    if not hasattr(flt, 'conf'):
+        flt.conf = grismconf.load_grism_config(flt.conf_file)
+    
     for id in fit_info:
         try:
             status = flt.compute_model_orders(id=id,
@@ -173,7 +179,7 @@ def _compute_model(i, flt, fit_info, is_cgs, store, model_kwargs):
         except:
             print('Failed: {0} {1}'.format(flt.grism.parent_file, id))
             continue
-
+    
     print('{0}: _compute_model Done'.format(flt.grism.parent_file))
 
     return i, flt.model, flt.object_dispersers
@@ -184,8 +190,8 @@ class GroupFLT():
                  pad=(64,256), group_name='group',
                  ref_file=None, ref_ext=0, seg_file=None,
                  shrink_segimage=True, verbose=True, cpu_count=0,
-                 catalog='', polyx=[0.3, 5.1],
-                 MW_EBV=0., bits=None):
+                 catalog='', polyx=[0.3, 5.3],
+                 MW_EBV=0., bits=None, use_jwst_crds=False):
         """Main container for handling multiple grism exposures together
 
         Parameters
@@ -299,7 +305,8 @@ class GroupFLT():
             for i in range(N):
                 flt = _loadFLT(self.grism_files[i], sci_extn, 
                                self.direct_files[i], pad, ref_file, ref_ext, 
-                               seg_file, verbose, self.catalog, i)
+                               seg_file, verbose, self.catalog, i,
+                               use_jwst_crds)
                 self.FLTs.append(flt)
 
             t1_pool = time.time()
@@ -318,7 +325,8 @@ class GroupFLT():
                                                  seg_file,
                                                  verbose,
                                                  self.catalog,
-                                                 i)
+                                                 i,
+                                                 use_jwst_crds)
                                          ) for i in range(N)]
 
             pool.close()
@@ -327,7 +335,7 @@ class GroupFLT():
             for res in results:
                 flt_i = res.get(timeout=1)
                 #flt_i.catalog = cat_i
-
+                
                 # somehow WCS getting flipped from cd to pc in res.get()???
                 if flt_i.direct.wcs.wcs.has_pc():
                     for obj in [flt_i.grism, flt_i.direct]:
@@ -336,7 +344,12 @@ class GroupFLT():
                 self.FLTs.append(flt_i)
 
             t1_pool = time.time()
-
+        
+        # Set conf
+        for flt_i in self.FLTs:
+            if not hasattr(flt_i, 'conf'):
+                flt_i.conf = grismconf.load_grism_config(flt_i.conf_file)
+            
         if verbose:
             print('Files loaded - {0:.2f} sec.'.format(t1_pool - t0_pool))
     
@@ -609,7 +622,12 @@ class GroupFLT():
             is_cgs = False
 
         t0_pool = time.time()
-
+        
+        # Remove conf
+        for flt_i in self.FLTs:
+            if hasattr(flt_i, 'conf'):
+                delattr(flt_i, 'conf')
+                
         pool = mp.Pool(processes=cpu_count)
         jobs = [pool.apply_async(_compute_model, 
                                  (i, self.FLTs[i], fit_info, 
@@ -623,7 +641,12 @@ class GroupFLT():
             i, model, dispersers = res.get(timeout=1)
             self.FLTs[i].object_dispersers = dispersers
             self.FLTs[i].model = model
-
+        
+        # Reload conf
+        for flt_i in self.FLTs:
+            if not hasattr(flt_i, 'conf'):
+                flt_i.conf = grismconf.load_grism_config(flt_i.conf_file)
+                
         t1_pool = time.time()
         if verbose:
             print('Models computed - {0:.2f} sec.'.format(t1_pool - t0_pool))

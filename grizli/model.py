@@ -2445,7 +2445,7 @@ class GrismFLT(object):
     def __init__(self, grism_file='', sci_extn=1, direct_file='',
                  pad=(64,256), ref_file=None, ref_ext=0, seg_file=None,
                  shrink_segimage=True, force_grism='G141', verbose=True,
-                 process_jwst_header=True):
+                 process_jwst_header=True, use_jwst_crds=False):
         """Read FLT files and, optionally, reference/segmentation images.
 
         Parameters
@@ -2638,10 +2638,17 @@ class GrismFLT(object):
         conf_args = dict(instrume=self.grism.instrument, 
                          filter=direct_filter, 
                          grism=self.grism.filter,
+                         pupil=self.grism.pupil,
                          module=self.grism.module,
-                         chip=self.grism.ccdchip)
+                         chip=self.grism.ccdchip,
+                         use_jwst_crds=use_jwst_crds)
         
-        self.conf_file = grismconf.get_config_filename(**conf_args)
+        if 'CONFFILE' in self.grism.header:
+            self.conf_file = self.grism.header['CONFFILE']
+        else:
+            self.conf_file = grismconf.get_config_filename(**conf_args)
+            self.grism.header['CONFFILE'] = self.conf_file
+            
         self.conf = grismconf.load_grism_config(self.conf_file)
 
         self.object_dispersers = OrderedDict()
@@ -4294,7 +4301,12 @@ class BeamCutout(object):
                              module=self.grism.module,
                              chip=self.grism.ccdchip)
             
-            self.conf_file = grismconf.get_config_filename(**conf_args)
+            if 'CONFFILE' in self.grism.header:
+                self.conf_file = self.grism.header['CONFFILE']
+            else:
+                self.conf_file = grismconf.get_config_filename(**conf_args)
+                self.grism.header['CONFFILE'] = self.conf_file
+            
             conf = grismconf.load_grism_config(self.conf_file)
 
         if 'GROW' in self.grism.header:
