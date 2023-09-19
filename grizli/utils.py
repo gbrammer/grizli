@@ -5650,17 +5650,25 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
     
     """
     from shapely.geometry import Polygon
-    import boto3
-    from botocore.exceptions import ClientError
+    
     import scipy.ndimage as nd
     from astropy.io.fits import PrimaryHDU, ImageHDU
     
     from .prep import apply_region_mask_from_db
     from .version import __version__ as grizli__version
-
+    
     bucket_name = None
-    s3 = boto3.resource('s3')
-    s3_client = boto3.client('s3')
+    
+    try:
+        import boto3
+        from botocore.exceptions import ClientError
+        s3 = boto3.resource('s3')
+        s3_client = boto3.client('s3')
+        
+    except ImportError:
+        s3 = None
+        ClientError = None
+        s3_client = None
     
     if weight_type not in ['err', 'median_err', 'time', 'jwst']:
         print(f"WARNING: weight_type '{weight_type}' must be 'err', 'median_err', ")
@@ -5735,9 +5743,9 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
         if dryrun:
             continue
 
-        if not os.path.exists(file):
+        if (not os.path.exists(file)) & (s3 is not None):
             bucket_i = visit['awspath'][i].split('/')[0]
-            if bucket_name != bucket_i:
+            if (bucket_name != bucket_i):
                 bucket_name = bucket_i
                 bkt = s3.Bucket(bucket_name)
 
