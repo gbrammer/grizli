@@ -5600,7 +5600,7 @@ def jwst_crds_photom_scale(hdul, context='jwst_1130.pmap', update=True, verbose=
         if k in hdul[0].header:
             mode[k.lower()] = hdul[0].header[k]
     
-    ref_ctx, ref_file, ref_photmjsr = get_crds_zeropoint(**mode)
+    ref_ctx, r_photom, ref_photmjsr = get_crds_zeropoint(**mode)
     if ref_photmjsr is None:
         return 1.0
     
@@ -5620,10 +5620,11 @@ def jwst_crds_photom_scale(hdul, context='jwst_1130.pmap', update=True, verbose=
                     hdul[e].header[k] *= scale
             
             if 'ZP' in hdul[e].header:
-                hdul[e].header -= 2.5*np.log10(scale)
+                hdul[e].header['ZP'] -= 2.5*np.log10(scale)
             
             hdul[e].header['CRDS_CTX'] = context
-    
+            hdul[e].header['R_PHOTOM'] = os.path.basename(r_photom)
+            
     log_comment(LOGFILE, msg, verbose=verbose)
     
     return scale
@@ -5931,6 +5932,11 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
                                                         context=context,
                                                         verbose=verbose)
             
+            # These might have changed
+            for k in ['PHOTFLAM', 'PHOTFNU', 'PHOTMJSR', 'ZP', 'R_PHOTOM', 'CRDS_CTX']:
+                if k in flt[0].header:
+                    keys[k] = flt[0].header[k]
+
             # Additional scaling
             _key, _scale_photom = get_photom_scale(flt[0].header, 
                                                    verbose=verbose)
