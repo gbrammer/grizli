@@ -5556,11 +5556,85 @@ def get_photom_scale(header, verbose=True):
         return key, 1./corr[key]
 
 
+def jwst_crds_photom_scale(hdul, context='jwst_1130.pmap', update=True, verbose=False):
+    """
+    Scale factors between different JWST CRDS_CONTEXT
+    
+    Parameters
+    ----------
+    hdul : `astropy.io.fits.HDUList`
+        Exposure file HDUList, which has header keywords like CRDS_CTX, PHOTMJSR, etc.
+    
+    context : str
+        Target CRDS context version
+    
+    update : bool
+        Scale photometry header keywords by the ratio of NEW_PHOTMJSR / OLD_PHOTMJSR
+    
+    verbose: bool
+        Messaging
+    
+    Returns
+    -------
+    scale : float
+        Relative photometry scaling factor NEW_PHOTMJSR / OLD_PHOTMJSR.  Defaults to 
+        1.0 if not a JWST instrument or if certain necessary header keywords not found
+    
+    """
+    try:
+        from .jwst_utils import get_crds_zeropoint
+    except ImportError:
+        print('jwst_crds_photom_scale: failed to import grizli.jwst.get_crds_zeropoint')
+        return 1.0
+    
+    if 'INSTRUME' not in hdul[0].header:
+        return 1.0
+    
+    instrument = hdul[0].header['INSTRUME']
+    
+    if instrument not in ['NIRCAM','MIRI','NIRISS']:
+        return 1.0
+    
+    mode = {'context': context, 'verbose': False, 'instrument': instrument}
+    for k in ['FILTER','PUPIL','DETECTOR']:
+        if k in hdul[0].header:
+            mode[k.lower()] = hdul[0].header[k]
+    
+    ref_ctx, ref_file, ref_photmjsr = get_crds_zeropoint(**mode)
+    if ref_photmjsr is None:
+        return 1.0
+    
+    if 'PHOTMJSR' not in hdul['SCI'].header:
+        return 1.0
+    
+    old_photmjsr = hdul['SCI'].header['PHOTMJSR']
+    scale = ref_photmjsr / old_photmjsr
+    
+    msg = f'jwst_crds_photom_scale: {context} photmjsr old, new = '
+    msg += f'{old_photmjsr:.3f}  {ref_photmjsr:.3f}  scale = {scale:.3f}'
+    
+    if update:
+        for e in [0, 'SCI']:
+            for k in ['PHOTFNU','PHOTFLAM','TO_MJYSR','PHOTMJSR']:
+                if k in hdul[e].header:
+                    hdul[e].header[k] *= scale
+            
+            if 'ZP' in hdul[e].header:
+                hdul[e].header -= 2.5*np.log10(scale)
+            
+            hdul[e].header['CRDS_CTX'] = context
+    
+    log_comment(LOGFILE, msg, verbose=verbose)
+    
+    return scale
+
+
 def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
                        clean=True, include_saturated=True, keep_bits=None,
                        dryrun=False, skip=None, extra_wfc3ir_badpix=True,
                        verbose=True,
                        scale_photom=True,
+                       context='jwst_1130.pmap',
                        weight_type='jwst',
                        rnoise_percentile=99,
                        calc_wcsmap=False,
@@ -5850,11 +5924,20 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
             bits |= keep_bits
         
         if scale_photom:
+            # Scale to a particular JWST context and update header keywords
+            # like PHOTFLAM, PHOTFNU
+            _scale_jwst_photom = jwst_crds_photom_scale(flt,
+                                                        update=True,
+                                                        context=context,
+                                                        verbose=verbose)
+            
+            # Additional scaling
             _key, _scale_photom = get_photom_scale(flt[0].header, 
                                                    verbose=verbose)
+            
         else:
             _scale_photom = 1.0
-        
+                
         if 'PHOTFLAM' in keys:
             msg = '  0    PHOTFLAM={0:.2e}, scale={1:.3f}'
             msg = msg.format(keys['PHOTFLAM'], _scale_photom)
@@ -5867,7 +5950,7 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
         
         for ext in [1, 2, 3, 4]:
             if ('SCI', ext) in flt:
-
+                                
                 h = flt[('SCI', ext)].header
                 if 'MDRIZSKY' in h:
                     sky_value = h['MDRIZSKY']
