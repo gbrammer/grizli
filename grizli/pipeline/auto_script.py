@@ -1917,7 +1917,7 @@ def get_visit_exposure_footprints(root='j1000p0210', check_paths=['./', '../RAW'
                     
                 if os.path.exists(pfile):
                     fp_i = utils.get_flt_footprint(flt_file=pfile)
-
+                    
                     if visit_fp is None:
                         visit_fp = fp_i.buffer(1./3600)
                     else:
@@ -4385,7 +4385,7 @@ def drizzle_overlaps(field_root, filters=['F098M', 'F105W', 'F110W', 'F115W', 'F
                         fpun = filter_groups[filt]['footprint'].union(fp_i)
                         filter_groups[filt]['footprint'] = fpun
                     else:
-                        filter_groups[filt]['footprint'] = fp.buffer(0)
+                        filter_groups[filt]['footprint'] = fp_i.buffer(0)
 
         if (filt.upper() in filters) | (is_uvis & (filt.upper()[:-1] in filters)):
             wfc3ir['files'].extend(visit['files'])
