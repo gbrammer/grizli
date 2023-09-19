@@ -167,7 +167,7 @@
 CRDS_CTX: jwst_0995.pmap
 
 # Max context where corrections apply
-CRDS_CTX_MAX: jwst_9999.pmap
+CRDS_CTX_MAX: jwst_1125.pmap
 
 NRCBLONG-F277W-CLEAR: 1.0000
 NRCALONG-F277W-CLEAR: 1.0618
