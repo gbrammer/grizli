@@ -2415,7 +2415,7 @@ def calc_jwst_filter_info():
     return bp
 
 
-def get_crds_zeropoint(instrument='NIRCAM', detector='NRCALONG', filter='F444W', pupil='CLEAR', date=None, context='jwst_1126.pmap', verbose=False, **kwargs):
+def get_crds_zeropoint(instrument='NIRCAM', detector='NRCALONG', filter='F444W', pupil='CLEAR', date=None, context='jwst_0989.pmap', verbose=False, **kwargs):
     """
     Get ``photmjsr`` photometric zeropoint for a partiular JWST instrument imaging
     mode
