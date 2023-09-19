@@ -2413,4 +2413,105 @@ def calc_jwst_filter_info():
         yaml.dump(bp, fp)
         
     return bp
+
+
+def get_crds_zeropoint(instrument='NIRCAM', detector='NRCALONG', filter='F444W', pupil='CLEAR', date=None, context='jwst_1126.pmap', verbose=False, **kwargs):
+    """
+    Get ``photmjsr`` photometric zeropoint for a partiular JWST instrument imaging
+    mode
     
+    Parameters
+    ----------
+    instrument : str
+        ``NIRCAM, NIRISS, MIRI``
+    
+    detector : str
+        Different detectors for NIRCAM.  Set to ``NIS`` and ``MIRIMAGE`` for 
+        NIRISS and MIRI, respectively.
+    
+    filter, pupil : str
+        Bandpass filters.  ``pupil=None`` for MIRI.
+    
+    date : `astropy.time.Time`
+        Optional observation date
+    
+    context : str
+        CRDS_CTX context to use
+    
+    verbose : bool
+        Messaging
+    
+    Returns
+    -------
+    context : str
+        Copy of the input ``context``
+    
+    ref_file : str
+        Path to the ``photom`` reference file
+    
+    photmjsr : float
+        Photometric zeropoint ``photmjsr``
+    
+    """
+    from crds import CrdsLookupError
+    
+    from . import grismconf
+    
+    if instrument == 'NIRCAM':
+        module = detector[3]
+        exp_type = 'NRC_IMAGE'
+    elif instrument == 'NIRISS':
+        exp_type = 'NIS_IMAGE'
+        detector = 'NIS'
+        module = None
+    elif instrument == 'MIRI':
+        exp_type = 'MIR_IMAGE'
+        detector = 'MIRIMAGE'
+        pupil = None
+        module = None
+    else:
+        return context, None, None
+    
+    mode = dict(instrument=instrument,
+                filter=filter,
+                pupil=pupil,
+                module=module,
+                date=date,
+                exp_type=exp_type,
+                detector=detector,
+                context=context)
+                
+    try:
+        refs = grismconf.crds_wfss_reffiles(reftypes=('photom',),
+                                            header=None,
+                                            verbose=verbose,
+                                            **mode,
+                                            )
+    except CrdsLookupError:
+        return None, None
+    
+    ph = utils.read_catalog(refs['photom'])
+    ph['fstr'] = [f.strip() for f in ph['filter']]
+    
+    if instrument in ['NIRISS','NIRCAM']:
+        ph['pstr'] = [p.strip() for p in ph['pupil']]
+        row = (ph['fstr'] == filter) & (ph['pstr'] == pupil)
+        if row.sum() == 0:
+            print(f"get_crds_zeropoint: {mode} not found in {refs['photom']}")
+            mjsr = None
+        else:
+            mjsr = ph['photmjsr'][row][0]
+    else:
+        row = (ph['fstr'] == filter)
+        if row.sum() == 0:
+            print(f"get_crds_zeropoint: {mode} not found in {refs['photom']}")
+            mjsr = None
+        else:
+            mjsr = ph['photmjsr'][row][0]
+    
+    if verbose:
+        print(f'crds_wfss_reffiles: photmjsr = {mjsr:.4f}')
+        
+    return context, refs['photom'], mjsr
+
+
