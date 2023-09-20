@@ -1284,7 +1284,7 @@ def download_jwst_crds_references(instruments=['NIRCAM','NIRISS'], filters=['F09
                                                verbose=verbose)
 
 
-def crds_wfss_reffiles(instrument='NIRCAM', filter='F444W', pupil='GRISMR', module='A', date=None, reftypes=('photom', 'specwcs'), header=None, context=DEFAULT_CRDS_CONTEXT, verbose=False):
+def crds_wfss_reffiles(instrument='NIRCAM', filter='F444W', pupil='GRISMR', module='A', date=None, reftypes=('photom', 'specwcs'), header=None, exp_type='NRC_WFSS', detector=None, context=DEFAULT_CRDS_CONTEXT, verbose=False):
     """
     Get WFSS reffiles from CRDS
     """
@@ -1307,20 +1307,27 @@ def crds_wfss_reffiles(instrument='NIRCAM', filter='F444W', pupil='GRISMR', modu
             
     cpars = {}
     
-    if instrument in ('NIRISS', 'NIRCAM'):
+    if instrument in ('NIRISS', 'NIRCAM', 'MIRI'):
         observatory = 'jwst'
-        cpars['meta.instrument.pupil'] = pupil
+        if instrument not in ['MIRI']:
+            cpars['meta.instrument.pupil'] = pupil
     else:
         observatory = 'hst'
         
     if instrument == 'NIRISS':
         cpars['meta.instrument.detector'] = 'NIS'
-        cpars['meta.exposure.type'] = 'NIS_WFSS'
+        cpars['meta.exposure.type'] = exp_type
     elif instrument == 'NIRCAM':
         cpars['meta.instrument.detector'] = f'NRC{module}LONG'
         cpars['meta.instrument.module'] = module
-        cpars['meta.exposure.type'] = 'NRC_WFSS'
-
+        cpars['meta.exposure.type'] = exp_type
+    elif instrument == 'MIRI':
+        cpars['meta.instrument.detector'] = 'MIR'
+        cpars['meta.exposure.type'] = exp_type
+        
+    if detector is not None:
+        cpars['meta.instrument.detector'] = detector
+    
     if date is None:
         date = astropy.time.Time.now().iso
         
