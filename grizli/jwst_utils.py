@@ -2592,8 +2592,11 @@ def get_crds_zeropoint(instrument='NIRCAM', detector='NRCALONG', filter='F444W',
     ref_file : str
         Path to the ``photom`` reference file
     
-    photmjsr : float
-        Photometric zeropoint ``photmjsr``
+    mjsr : float
+        Photometric zeropoint ``mjsr`` in units of MJy / Sr
+    
+    pixar_sr : float
+        Pixel area in Sr from primary header of ``photom`` file
     
     """
     from crds import CrdsLookupError
@@ -2633,6 +2636,13 @@ def get_crds_zeropoint(instrument='NIRCAM', detector='NRCALONG', filter='F444W',
     except CrdsLookupError:
         return None, None
     
+    # Pixel area
+    pixar_sr = None
+    
+    with pyfits.open(refs['photom']) as im:
+        if 'PIXAR_SR' in im[0].header:
+            pixar_sr = im[0].header['PIXAR_SR']
+
     ph = utils.read_catalog(refs['photom'])
     ph['fstr'] = [f.strip() for f in ph['filter']]
     
@@ -2653,8 +2663,11 @@ def get_crds_zeropoint(instrument='NIRCAM', detector='NRCALONG', filter='F444W',
             mjsr = ph['photmjsr'][row][0]
     
     if verbose:
-        print(f'crds_reffiles: photmjsr = {mjsr:.4f}')
-        
-    return context, refs['photom'], mjsr
+        if mjsr is not None:
+            print(f'crds_reffiles: photmjsr = {mjsr:.4f}  pixar_sr = {pixar_sr:.3e}')
+        else:
+            print(f'crds_reffiles: photmjsr = {mjsr}  pixar_sr = {pixar_sr:.3e}')
+
+    return context, refs['photom'], mjsr, pixar_sr
 
 
