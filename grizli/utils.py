@@ -5615,7 +5615,13 @@ def jwst_crds_photom_scale(hdul, context='jwst_1130.pmap', update=True, verbose=
     
     if update:
         
-        if hdul['SCI'].header['BUNIT'].upper() == 'MJy/sr'.upper():
+        # Check image units
+        if 'OBUNIT' in hdul['SCI'].header:
+            unit_key = 'OBUNIT'
+        else:
+            unit_key = 'BUNIT'
+        
+        if hdul['SCI'].header[unit_key].upper() == 'MJy/sr'.upper():
             # Image was already scaled (cal), so use scale factor
             to_mjysr = scale
         else:
