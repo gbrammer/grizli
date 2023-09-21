@@ -67,6 +67,120 @@ def set_crds_context(fits_file=None, override_environ=False, verbose=True):
     return os.environ['CRDS_CONTEXT']
 
 
+def crds_reffiles(instrument='NIRCAM', filter='F444W', pupil='GRISMR', module='A', detector=None, exp_type=None, date=None, reftypes=('photom', 'specwcs'), header=None, context=CRDS_CONTEXT, verbose=False, **kwargs):
+    """
+    Get WFSS reffiles from CRDS
+    
+    Parameters
+    ----------
+    instrument, filter, pupil, module : str
+        Observation mode parameters
+    
+    detector, exp_type : str, None
+        If not specified, try to set automatically based on the filter / module
+    
+    date : `astropy.time.Time`, None
+        Observation epoch.  If `None`, use "now".
+    
+    reftypes : list
+        Reference types to query
+    
+    header : `~astropy.io.fits.Header`
+        FITS header with keywords that define the mode and supersede the string
+        parameters
+    
+    context : str
+        CRDS_CONTEXT specification
+    
+    verbose : bool
+        Messaging
+    
+    Returns
+    -------
+    refs : dict
+        Result from `crds.getreferences` with keys of ``reftypes`` and values of paths
+        to the reference files, which will be downloaded if they're not already found.
+    
+    """
+    import astropy.time
+    import crds
+    from . import jwst_utils
+    
+    if context is not None:
+        jwst_utils.CRDS_CONTEXT = context
+        jwst_utils.set_crds_context(verbose=False, override_environ=True)
+    
+    if header is not None:
+        if 'INSTRUME' in header:
+            instrument = header['INSTRUME']
+        if 'FILTER' in header:
+            filter = header['FILTER']
+        if 'PUPIL' in header:
+            pupil = header['PUPIL']
+        if 'MODULE' in header:
+            module = header['MODULE']
+        if 'EXP_TYPE' in header:
+            exp_type = header['EXP_TYPE']
+        
+    cpars = {}
+    
+    if instrument in ('NIRISS', 'NIRCAM', 'MIRI'):
+        observatory = 'jwst'
+        if instrument not in ['MIRI']:
+            cpars['meta.instrument.pupil'] = pupil
+    else:
+        observatory = 'hst'
+        
+    if instrument == 'NIRISS':
+        
+        cpars['meta.instrument.detector'] = 'NIS'
+        if 'GR150' in filter:
+            cpars['meta.exposure.type'] = 'NIS_WFSS'
+        else:
+            cpars['meta.exposure.type'] = 'NIS_IMAGE'
+            
+    elif instrument == 'NIRCAM':
+        
+        cpars['meta.instrument.detector'] = f'NRC{module}LONG'
+        cpars['meta.instrument.module'] = module
+        cpars['meta.exposure.type'] = exp_type
+        
+        if 'GRISM' in pupil:
+            cpars['meta.exposure.type'] = 'NRC_WFSS'
+        else:
+            cpars['meta.exposure.type'] = 'NRC_IMAGE'
+            
+    elif instrument == 'MIRI':
+        
+        cpars['meta.instrument.detector'] = 'MIR'
+        cpars['meta.exposure.type'] = 'MIR_IMAGE'
+        
+    if exp_type is not None:
+        cpars['meta.exposure.type'] = exp_type
+        
+    if detector is not None:
+        cpars['meta.instrument.detector'] = detector
+    
+    if date is None:
+        date = astropy.time.Time.now().iso
+        
+    cpars['meta.observation.date'] = date.split()[0]
+    cpars['meta.observation.time'] = date.split()[1]
+    
+    cpars['meta.instrument.name'] = instrument
+    cpars['meta.instrument.filter'] = filter
+    
+    refs = crds.getreferences(cpars, reftypes=reftypes, observatory=observatory)
+    
+    if verbose:
+        msg = f'crds_reffiles: {instrument} {filter} {pupil} {module} ({context})'
+        ref_files = ' '.join([os.path.basename(refs[k]) for k in refs])
+        msg += '\n' + f'crds_reffiles: {ref_files}'
+        print(msg)
+    
+    return refs
+
+
 def set_quiet_logging(level=QUIET_LEVEL):
     """
     Silence the verbose logs set by `stpipe`
@@ -2292,7 +2406,7 @@ def get_jwst_filter_info(header):
     return info
 
 
-def calc_jwst_filter_info():
+def calc_jwst_filter_info(context='jwst_1130.pmap'):
     """
     Calculate JWST filter properties from tabulated `eazy` filter file and 
     photom reference files
@@ -2312,9 +2426,12 @@ def calc_jwst_filter_info():
     import eazy.filters
     import astropy.time
     
+    from . import grismconf
+    
     res = eazy.filters.FilterFile(path=None)
     
     bp = {'meta':{'created':astropy.time.Time.now().iso.split()[0], 
+                  'crds_context': context,
                   'wave_unit':'micron', 
                   'description': {
                      'pivot':'Filter pivot wavelength', 
@@ -2328,13 +2445,39 @@ def calc_jwst_filter_info():
                   }
          }
     
+    detectors = {'NIRCAM': {('F200W','CLEAR'): ['NRCA1', 'NRCA2', 'NRCA3', 'NRCA4',
+                                                'NRCA1', 'NRCA2', 'NRCA3', 'NRCA4'],
+                            ('F444W','CLEAR'): ['NRCALONG','NRCBLONG'],
+                            },
+                 'NIRISS': {('CLEAR','F200W'): ['NIS']},
+                 'MIRI': {('F770W',None): ['MIRIMAGE']},
+                 }
+    
+    exp_type = {'NIRCAM': 'NRC_IMAGE',
+                'NIRISS': 'NIS_IMAGE',
+                'MIRI': 'MIRI_IMAGE',
+                }
+    
     for inst in ['NIRCAM','NIRISS','MIRI']:
         bp[inst] = {}
         fn = res.search(f'jwst_{inst}', verbose=False)
         print(f'\n{inst}\n=====')
         
-        # photometry calib
-        phot_files = glob.glob(f"{os.getenv('CRDS_PATH')}/references/"+
+        if context is not None:
+            phot_files = []
+            for key in detectors[inst]:
+                for d in detectors[inst][key]:
+                    kws = dict(instrument=inst,
+                               filter=key[0], pupil=key[1],
+                               detector=d,
+                               reftypes=('photom',),
+                               exp_type=exp_type[inst]
+                               )
+                    refs = crds_reffiles(**kws)
+                    phot_files.append(refs['photom'])
+        else:
+            # photometry calib
+            phot_files = glob.glob(f"{os.getenv('CRDS_PATH')}/references/"+
                               f"jwst/{inst.lower()}/*photom*fits")
         
         if len(phot_files) > 0:
@@ -2354,7 +2497,7 @@ def calc_jwst_filter_info():
                     
             bp[inst][key] = {'pivot':float(fi.pivot/1.e4), 
                              'ab_vega':float(fi.ABVega), 
-                            'ebv0.1':float(fi.extinction_correction(EBV=0.1)), 
+                             'ebv0.1':float(fi.extinction_correction(EBV=0.1)), 
                              'rectwidth':float(fi.rectwidth/1.e4), 
                              'eazy_fnumber':int(j+1)}
             
@@ -2482,11 +2625,11 @@ def get_crds_zeropoint(instrument='NIRCAM', detector='NRCALONG', filter='F444W',
                 context=context)
                 
     try:
-        refs = grismconf.crds_wfss_reffiles(reftypes=('photom',),
-                                            header=None,
-                                            verbose=verbose,
-                                            **mode,
-                                            )
+        refs = grismconf.crds_reffiles(reftypes=('photom',),
+                                       header=None,
+                                       verbose=verbose,
+                                       **mode,
+                                       )
     except CrdsLookupError:
         return None, None
     
@@ -2510,7 +2653,7 @@ def get_crds_zeropoint(instrument='NIRCAM', detector='NRCALONG', filter='F444W',
             mjsr = ph['photmjsr'][row][0]
     
     if verbose:
-        print(f'crds_wfss_reffiles: photmjsr = {mjsr:.4f}')
+        print(f'crds_reffiles: photmjsr = {mjsr:.4f}')
         
     return context, refs['photom'], mjsr
 

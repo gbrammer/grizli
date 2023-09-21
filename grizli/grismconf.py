@@ -11,6 +11,7 @@ from collections import OrderedDict
 import numpy as np
 
 from . import GRIZLI_PATH, utils
+from .jwst_utils import crds_reffiles
 
 DEFAULT_CRDS_CONTEXT = 'jwst_1123.pmap'
 
@@ -676,7 +677,7 @@ def get_config_filename(instrume='WFC3', filter='F140W',
             _pupil = grism
             _filter = filter
             
-        refs = crds_wfss_reffiles(instrument=instrume,
+        refs = crds_reffiles(instrument=instrume,
                                   filter=_filter,
                                   pupil=_pupil,
                                   module=module,
@@ -1253,7 +1254,7 @@ def load_grism_config(conf_file, warnings=True):
 
 def download_jwst_crds_references(instruments=['NIRCAM','NIRISS'], filters=['F090W','F115W','F150W','F200W','F277W','F356W','F410M','F444W','F460M','F480M'], grisms=['GRISMR','GRISMC','GR150R','GR150C'], modules=['A','B'], context=DEFAULT_CRDS_CONTEXT, verbose=True):
     """
-    Run `grizli.grismconf.crds_wfss_reffiles` with filter and grism combinations to 
+    Run `~grizli.jwst_utils.crds_reffiles` with filter and grism combinations to 
     prefetch a bunch of reference files
     """
     for instrument in instruments:
@@ -1264,7 +1265,7 @@ def download_jwst_crds_references(instruments=['NIRCAM','NIRISS'], filters=['F09
                         continue
                     
                     for m in modules:
-                        _ = crds_wfss_reffiles(instrument='NIRCAM',
+                        _ = crds_reffiles(instrument='NIRCAM',
                                                filter=f, pupil=g,
                                                module=m,
                                                reftypes=('photom', 'specwcs'), 
@@ -1275,77 +1276,13 @@ def download_jwst_crds_references(instruments=['NIRCAM','NIRISS'], filters=['F09
                     if (f > 'F270') | g.startswith('GRISM'):
                         continue
                     
-                    _ = crds_wfss_reffiles(instrument='NIRISS',
+                    _ = crds_reffiles(instrument='NIRISS',
                                                filter=g, pupil=f,
                                                module='A',
                                                reftypes=('photom', 'specwcs'), 
                                                header=None,
                                                context=context,
                                                verbose=verbose)
-
-
-def crds_wfss_reffiles(instrument='NIRCAM', filter='F444W', pupil='GRISMR', module='A', date=None, reftypes=('photom', 'specwcs'), header=None, exp_type='NRC_WFSS', detector=None, context=DEFAULT_CRDS_CONTEXT, verbose=False):
-    """
-    Get WFSS reffiles from CRDS
-    """
-    import astropy.time
-    import crds
-    from . import jwst_utils
-    
-    if context is not None:
-        jwst_utils.CRDS_CONTEXT = context
-        jwst_utils.set_crds_context(verbose=False, override_environ=True)
-    
-    if header is not None:
-        instrument = header['INSTRUME']
-        if 'FILTER' in header:
-            filter = header['FILTER']
-        if 'PUPIL' in header:
-            pupil = header['PUPIL']
-        if 'MODULE' in header:
-            module = header['MODULE']
-            
-    cpars = {}
-    
-    if instrument in ('NIRISS', 'NIRCAM', 'MIRI'):
-        observatory = 'jwst'
-        if instrument not in ['MIRI']:
-            cpars['meta.instrument.pupil'] = pupil
-    else:
-        observatory = 'hst'
-        
-    if instrument == 'NIRISS':
-        cpars['meta.instrument.detector'] = 'NIS'
-        cpars['meta.exposure.type'] = exp_type
-    elif instrument == 'NIRCAM':
-        cpars['meta.instrument.detector'] = f'NRC{module}LONG'
-        cpars['meta.instrument.module'] = module
-        cpars['meta.exposure.type'] = exp_type
-    elif instrument == 'MIRI':
-        cpars['meta.instrument.detector'] = 'MIR'
-        cpars['meta.exposure.type'] = exp_type
-        
-    if detector is not None:
-        cpars['meta.instrument.detector'] = detector
-    
-    if date is None:
-        date = astropy.time.Time.now().iso
-        
-    cpars['meta.observation.date'] = date.split()[0]
-    cpars['meta.observation.time'] = date.split()[1]
-    
-    cpars['meta.instrument.name'] = instrument
-    cpars['meta.instrument.filter'] = filter
-    
-    refs = crds.getreferences(cpars, reftypes=reftypes, observatory=observatory)
-    
-    if verbose:
-        msg = f'crds_wfss_reffiles: {instrument} {filter} {pupil} {module} ({context})'
-        ref_files = ' '.join([os.path.basename(refs[k]) for k in refs])
-        msg += '\n' + f'crds_wfss_reffiles: {ref_files}'
-        print(msg)
-    
-    return refs
 
 
 class CRDSGrismConf():

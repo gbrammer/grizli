@@ -272,7 +272,7 @@ class TestGrismConf:
         
         pytest.importorskip('jwst')
         
-        refs = grizli.grismconf.crds_wfss_reffiles(instrument='NIRCAM',
+        refs = jwst_utils.crds_reffiles(instrument='NIRCAM',
                                                    filter='F444W',
                                                    pupil='GRISMR',
                                                    module='A',
