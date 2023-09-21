@@ -5582,9 +5582,9 @@ def jwst_crds_photom_scale(hdul, context='jwst_1130.pmap', update=True, verbose=
     
     """
     try:
-        from .jwst_utils import get_crds_zeropoint
+        from .jwst_utils import get_crds_zeropoint, get_jwst_filter_info
     except ImportError:
-        print('jwst_crds_photom_scale: failed to import grizli.jwst.get_crds_zeropoint')
+        print('jwst_crds_photom_scale: failed to import grizli.jwst_utils.get_crds_zeropoint')
         return 1.0
     
     if 'INSTRUME' not in hdul[0].header:
@@ -5600,7 +5600,7 @@ def jwst_crds_photom_scale(hdul, context='jwst_1130.pmap', update=True, verbose=
         if k in hdul[0].header:
             mode[k.lower()] = hdul[0].header[k]
     
-    ref_ctx, r_photom, ref_photmjsr = get_crds_zeropoint(**mode)
+    ref_ctx, r_photom, ref_photmjsr, ref_pixar_sr = get_crds_zeropoint(**mode)
     if ref_photmjsr is None:
         return 1.0
     
@@ -5614,8 +5614,35 @@ def jwst_crds_photom_scale(hdul, context='jwst_1130.pmap', update=True, verbose=
     msg += f'{old_photmjsr:.3f}  {ref_photmjsr:.3f}  scale = {scale:.3f}'
     
     if update:
+        
+        if hdul['SCI'].header['BUNIT'].upper() == 'MJy/sr'.upper():
+            # Image was already scaled (cal), so use scale factor
+            to_mjysr = scale
+        else:
+            # Image wasn't scaled, so just use mjsr
+            to_mjysr = ref_photmjsr
+        
+        # Recalculate PHOTFNU, PHOTFLAM from PIXAR_SR, which could also change
+        if ref_pixar_sr is None:
+            ref_pixar_sr = hdul['SCI'].header['PIXAR_SR']
+        
+        photfnu = to_mjysr * ref_pixar_sr * 1.e6
+        
+        filter_info = get_jwst_filter_info(hdul[0].header)
+        if filter_info is not None:
+            plam = filter_info['pivot']*1.e4
+        else:
+            plam = 5.0e4
+        
+        photflam = photfnu*2.99e-5/plam**2
+        
         for e in [0, 'SCI']:
-            for k in ['PHOTFNU','PHOTFLAM','TO_MJYSR','PHOTMJSR']:
+            
+            hdul[e].header['PIXAR_SR'] = ref_pixar_sr
+            hdul[e].header['PHOTFLAM'] = photflam
+            hdul[e].header['PHOTFNU'] = photfnu
+            
+            for k in ['TO_MJYSR','PHOTMJSR']:
                 if k in hdul[e].header:
                     hdul[e].header[k] *= scale
             
