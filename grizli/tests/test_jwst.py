@@ -41,13 +41,15 @@ class TestJWSTHeaders:
         path = os.path.dirname(utils.__file__)
         path_to_files = os.path.join(path, 'tests/data/jwst-headers/')
         return path_to_files
-        
+    
+    
     def fetch_test_data(self):
         """
         Fetch test data from MAST
         """
         pass
-        
+    
+    
     def test_process_headers(self, tmp_path):
         """
         """
@@ -92,6 +94,38 @@ class TestJWSTHeaders:
         assert(len(groups) == 1)
         
         os.chdir(orig_dir)
+    
+    
+    def test_crds_scale(self, context='jwst_1130.pmap'):
+        """
+        Test CRDS photometry scaling
+        """
+        
+        pytest.importorskip('jwst')
+                
+        file_path = self.get_test_data_path()
+        
+        files = glob.glob(os.path.join(file_path, '*fits.gz'))
+        files.sort()
+        
+        for file in files:
+            with pyfits.open(file) as hdul:
+                
+                mode = {'context': context,
+                        'verbose': False,
+                        'instrument': hdul[0].header['INSTRUME'],
+                        }
+                
+                for k in ['FILTER','PUPIL','DETECTOR']:
+                    if k in hdul[0].header:
+                        mode[k.lower()] = hdul[0].header[k]
+    
+                _ = jwst_utils.get_crds_zeropoint(**mode)
+                
+                _ = utils.jwst_crds_photom_scale(hdul,
+                                                 context=context,
+                                                 update=True,
+                                                 verbose=True)
 
 
 class TestJWSTUtils:
