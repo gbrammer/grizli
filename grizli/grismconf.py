@@ -674,8 +674,8 @@ def get_config_filename(instrume='WFC3', filter='F140W',
             _pupil = filter
             _filter = grism
         else:
-            _pupil = grism
-            _filter = filter
+            _pupil = filter
+            _filter = grism
             
         refs = crds_reffiles(instrument=instrume,
                                   filter=_filter,
