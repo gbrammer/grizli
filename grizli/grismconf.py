@@ -158,7 +158,26 @@ class aXeConf():
                 # self.sens[beam]['SENSITIVITY'] = )
 
         self.beams.sort()
-
+    
+    
+    def remove_beam(self, beam):
+        """
+        Remove a beam definition
+        """
+        if beam in self.beams:
+            ix = self.beams.index(beam)
+            _ = self.beams.pop(ix)
+    
+    
+    def reset_beam_list(self):
+        """
+        Reset full beam list, perhaps after removing some with ``remove_beam``
+        """
+        for beam in self.orders:
+            if self.orders[beam] > 0:
+                self.beams.append(beam)
+    
+    
     def field_dependent(self, xi, yi, coeffs):
         """aXe field-dependent coefficients
 
@@ -948,6 +967,34 @@ class TransformGrismconf(object):
         """
         beams = [self.beam_names[k] for k in self.orders]
         return beams
+
+
+    def remove_beam(self, beam, verbose=True):
+        """
+        Remove a beam from the orders list
+        """
+        order_name = None
+        for k in self.beam_names:
+            if self.beam_names[k] == beam:
+                order_name = k
+        
+        if order_name is None:
+            return False
+        
+        if hasattr(self.conf, 'dm_orders'):
+            olist = self.conf.dm_orders
+            order_name = int(order_name)
+        else:
+            olist = self.conf.orders
+        
+        if order_name in olist:
+            ix = olist.index(order_name)
+            _ = olist.pop(ix)
+        
+            return True
+
+        else:
+            return False
 
 
     def get_beam_trace(self, x=1024, y=1024, dx=0., beam='A', fwcpos=None):
