@@ -784,7 +784,7 @@ def match_gwcs_to_sip(input, step=64, transform=None, verbose=True, overwrite=Tr
     
     if overwrite:
         img.writeto(img.filename(), overwrite=True)
-        
+    
     return obj
 
 
@@ -1595,7 +1595,7 @@ LSQ_ARGS = dict(jac='2-point',
                 verbose=0,
                 kwargs={})
 
-def model_wcs_header(datamodel, get_sip=True, degree=4, fit_crval=True, fit_rot=True, fit_scale=True, step=32, crpix=None,  lsq_args=LSQ_ARGS, get_guess=True, set_diff_step=True, initial_header=None, fast_coeffs=True, **kwargs):
+def model_wcs_header(datamodel, get_sip=True, degree=4, fit_crval=True, fit_rot=True, fit_scale=True, step=32, crpix=None,  lsq_args=LSQ_ARGS, get_guess=True, set_diff_step=True, initial_header=None, fast_coeffs=True, uvxy=None, **kwargs):
     """
     Make a header with approximate WCS for use in DS9.
 
@@ -1624,7 +1624,12 @@ def model_wcs_header(datamodel, get_sip=True, degree=4, fit_crval=True, fit_rot=
     
     fit_crval, fit_rot, fit_scale : bool
         tbd
-        
+    
+    uvxy : None or (array, array, array, array)
+        Manually specify detector and target coordinates for positions to use
+        for the SIP fit, where ``uvxy = (x, y, ra, dec)`` and the detector
+        coordinates are zero-index.  If not specified, make a grid with ``step``
+    
     Returns
     -------
     header : '~astropy.io.fits.Header`
@@ -1707,9 +1712,12 @@ def model_wcs_header(datamodel, get_sip=True, degree=4, fit_crval=True, fit_rot=
         xmin = step
         ymin = step
         
-    u, v = np.meshgrid(np.arange(xmin, sh[1]-1, step), 
+    if uvxy is None:
+        u, v = np.meshgrid(np.arange(xmin, sh[1]-1, step), 
                        np.arange(ymin, sh[0]-1, step))
-    x, y = datamodel.meta.wcs.forward_transform(u, v)
+        x, y = datamodel.meta.wcs.forward_transform(u, v)
+    else:
+        u, v, x, y = uvxy
     
     a_names = []
     b_names = []
