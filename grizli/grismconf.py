@@ -88,7 +88,7 @@ class aXeConf():
             # empty / commented lines
             if (line.startswith('#')) | (line.strip() == '') | ('"' in line):
                 continue
-
+            
             # split the line, taking out ; and # comments
             spl = line.split(';')[0].split('#')[0].split()
             param = spl[0]
@@ -1060,7 +1060,7 @@ class TransformGrismconf(object):
         return trace_dy, wave
 
 
-    def get_beams(self, nt=512):
+    def get_beams(self, nt=512, min_sens=1.e-3):
         """
         Get beam parameters and read sensitivity curves
         
@@ -1081,6 +1081,16 @@ class TransformGrismconf(object):
 
         for beam in self.beams:
             order = self.order_names[beam]
+            
+            # Define t from sensitivity
+            if self.conf.SENS is None:
+                _swave, _ssens = self.conf.SENS_data[order]
+                _swave = _swave[_ssens > min_sens*np.nanmax(_ssens)]  
+                _ssens = _ssens[_ssens > min_sens*np.nanmax(_ssens)]  
+                _dw = _swave.max() - _swave.min()
+                _wgrid = np.linspace(_swave.min()-0.02*_dw, _swave.max()+_dw*0.02, nt)
+                t = self.conf.INVDISPL(order, *self.transform.array_center, _wgrid)
+                
             dx = self.conf.DISPX(order, *self.transform.array_center, t)
             dy = self.conf.DISPY(order, *self.transform.array_center, t)
             lam = self.conf.DISPL(order, *self.transform.array_center, t)
@@ -1099,9 +1109,20 @@ class TransformGrismconf(object):
             xarr = np.cast[int](np.round(xarr))
 
             #self.beams.append(beam)
-            self.dxlam[beam] = np.arange(xarr[0], xarr[-1], dtype=int)
-            self.nx[beam] = xarr[-1] - xarr[0]+1
-                        
+            self.dxlam[beam] = np.arange(xarr.min(), xarr.max(), dtype=int)
+            self.nx[beam] = xarr.max() - xarr.min() +1
+            
+            # Do we need to force zeroth order to be between first and second?
+            if beam == 'B':
+                bm1 = self.beam_names['-1']
+                bp1 = self.beam_names['+1']
+                
+                if (self.nx[beam] > 500) & (bm1 in self.nx) & (bp1 in self.nx):
+                     _xmin = self.dxlam[bm1].max()
+                     _xmax = self.dxlam[bp1].min()
+                     self.dxlam[beam] = np.arange(_xmin, _xmax, dtype=int)
+                     self.nx[beam] = _xmax - _xmin +1
+            
             sens = Table()
             sens['WAVELENGTH'] = lam.astype(np.double)
             if self.conf.SENS is None:
@@ -1116,7 +1137,7 @@ class TransformGrismconf(object):
 
             self.sens[beam] = sens
             
-            self.conf_dict[f'BEAM{beam}'] = np.array([xarr[0], xarr[-1]])
+            self.conf_dict[f'BEAM{beam}'] = np.array([xarr.min(), xarr.max()])
             self.conf_dict[f'MMAG_EXTRACT_{beam}'] = 29
         
         # Read updated sensitivity files
@@ -1199,7 +1220,7 @@ def load_grism_config(conf_file, warnings=True):
             # for b in conf.beams:
             #     #conf.conf[f'DYDX_{b}_0'][0] += 0.25
             #     conf.conf[f'DLDP_{b}_0'] -= conf.conf[f'DLDP_{b}_1']*0.5
-        if isinstance(conf, TransformGrismconf):
+        elif isinstance(conf, TransformGrismconf):
             # Don't shift new format files
             pass
         else:
