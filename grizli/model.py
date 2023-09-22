@@ -3262,7 +3262,7 @@ class GrismFLT(object):
             return beams, output
 
 
-    def compute_full_model(self, ids=None, mags=None, mag_limit=22, store=True, verbose=False, size=10, min_size=26, compute_size=True, get_beams=None):
+    def compute_full_model(self, ids=None, mags=None, mag_limit=22, store=True, verbose=False, size=10, min_size=26, compute_size=True):
         """Compute flat-spectrum model for multiple objects.
 
         Parameters
@@ -3279,10 +3279,6 @@ class GrismFLT(object):
         size, compute_size : int, bool
             Sizes of individual cutouts, see 
             `~grizli.model.GrismFLT.compute_model_orders`.
-        
-        get_beams : None, list
-            List of order names to compute.  If not specified, do all of them
-            specified in the config file.
         
         Returns
         -------
@@ -3333,11 +3329,14 @@ class GrismFLT(object):
             iterator = zip(ids, mags)
             
         for id_i, mag_i in iterator:
-            self.compute_model_orders(id=id_i, compute_size=compute_size,
-                                      mag=mag_i, size=size,
-                                      in_place=True, store=store,
-                                      get_beams=get_beams,
-                                      min_size=min_size)
+            self.compute_model_orders(id=id_i,
+                                      compute_size=compute_size,
+                                      mag=mag_i,
+                                      size=size,
+                                      in_place=True,
+                                      store=store,
+                                      min_size=min_size,
+                                      )
 
 
     def smooth_mask(self, gaussian_width=4, threshold=2.5):
