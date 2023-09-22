@@ -1937,7 +1937,7 @@ def model_wcs_header(datamodel, get_sip=True, degree=4, fit_crval=True, fit_rot=
     return header
 
 
-def pipeline_model_wcs_header(datamodel, step=64, degrees=[3,4,5,5], lsq_args=LSQ_ARGS, crpix=None, verbose=True, initial_header=None, max_rms=1.e-4, set_diff_step=False, get_guess=False, fast_coeffs=True):
+def pipeline_model_wcs_header(datamodel, step=64, degrees=[3,4,5,5], lsq_args=LSQ_ARGS, crpix=None, verbose=True, initial_header=None, max_rms=1.e-4, set_diff_step=False, get_guess=False, fast_coeffs=True, uvxy=None):
     """
     Iterative pipeline to refine the SIP headers
     """
@@ -1984,7 +1984,8 @@ def pipeline_model_wcs_header(datamodel, step=64, degrees=[3,4,5,5], lsq_args=LS
                              get_sip=True,
                              get_guess=get_guess, 
                              crpix=crpix,
-                             set_diff_step=set_diff_step)
+                             set_diff_step=set_diff_step,
+                             uvxy=uvxy)
         
         xrms = h['SIPRAMAD']
         yrms = h['SIPDEMAD']
