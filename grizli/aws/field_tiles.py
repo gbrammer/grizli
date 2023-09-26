@@ -52,6 +52,7 @@ def make_all_fields():
     smacs0723 110.83403 -73.45429 20 20
     j1235 189.025 4.948 20 20
     macsj0647 101.9482378 70.2297032 46 46
+    abells1063   342.1839985 -44.5308919 46 46  
     """
     
     # 46 46 for tile ref 9 9
@@ -62,6 +63,7 @@ def make_all_fields():
         field = 'gdn'
         field = 'macsj0647'
         field = 'macs1423'
+        field = 'abells1063'
         
         ix = np.where(tile_defs['field'] == field)[0][0]
         tile_defs['rsize'] = tile_defs['dx']/2
@@ -395,7 +397,7 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
         filters = []
         for f in ['f277w-clear','f356w-clear','f444w-clear',
                   'f410m-clear','f365m-clear','f460m-clear',
-                  'f480m-clear']:
+                  'f480m-clear', 'f300m-clear',]:
             if f in all_filters:
                 filters.append(f)
                 
@@ -412,10 +414,19 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
 
         plt.close('all')
     
-    # All NIRCam
+    # All NIRCam - prefer r, g, b = F444W, F277W, F115W
+    # but look for other combinations if that not available
     if (len(glob.glob(f'{root}*.ncrgb.png')) == 0) & make_combinations:
-        filters = ['f444w-clear','f277w-clear']
-        for f in ['f115w-clear','f090w-clear','f150w-clear']:
+        filters = []
+        for f in ['f444w-clear','f410m-clear']:
+            if f in all_filters:
+                filters.append(f)
+                break
+        for f in ['f277w-clear','f356w-clear','f300m-clear']:
+            if f in all_filters:
+                filters.append(f)
+                break
+        for f in ['f115w-clear','f090w-clear','f150w-clear','f200w-clear']:
             if f in all_filters:
                 filters.append(f)
                 break
