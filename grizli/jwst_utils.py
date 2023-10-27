@@ -2895,13 +2895,14 @@ def update_pure_parallel_wcs(file, fix_vtype='PARALLEL_PURE', verbose=True):
             msg += f" VISITYPE not found in header {file}"
             utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
             return None
-        
-        vtype = im[0].header['VISITYPE']
-        if vtype != fix_vtype:
-            msg = "jwst_utils.update_pure_parallel_wcs: "
-            msg += f" VISITYPE ({vtype}) != {fix_vtype}"
-            utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
-            return None
+    
+    # Is this a PARALLEL_PURE exposure?
+    vtype = h0.header['VISITYPE']
+    if vtype != fix_vtype:
+        msg = "jwst_utils.update_pure_parallel_wcs: "
+        msg += f" VISITYPE ({vtype}) != {fix_vtype}, skip"
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+        return None
     
     # Find a match in the db
     try:
@@ -2919,7 +2920,7 @@ def update_pure_parallel_wcs(file, fix_vtype='PARALLEL_PURE', verbose=True):
         utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
         return None
     
-    # OK, we have a row, now compute the pysiaf pointing
+    # OK, we have a row, now compute the pysiaf pointing for the prime
     row = prime[0]
     
     prime_aper = pysiaf.Siaf(row['instrument_name'])[row['apername']]
@@ -2927,7 +2928,8 @@ def update_pure_parallel_wcs(file, fix_vtype='PARALLEL_PURE', verbose=True):
     pa_v3 = h1['PA_V3']
     pos = (row['ra'], row['dec'], pa_v3)
     att = rotations.attitude(prime_aper.V2Ref, prime_aper.V3Ref, *pos)
-
+    
+    # And apply the pointing to the parallel aperture and reference pixel
     par_aper = pysiaf.Siaf(h0['INSTRUME'])[h0['APERNAME']]
     par_aper.set_attitude_matrix(att)
 
