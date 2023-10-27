@@ -264,6 +264,13 @@ def get_miri_flat_by_date(file, tsplit=MIRI_FLAT_ROUND, verbose=True):
     MIRI flats computed by date
     
     Flat-files defined by
+        >>> tsplit = {'F560W' : 8,
+                      'F770W':4,
+                      'F1000W': 5,
+                      'F1280W': 5,
+                      'F1500W': 8,
+                      'F1800W': 5,
+                      'F2100W': 4 }
         >>> tkey = np.round(t_min/tsplit[FILTER])
         >>> file = f'miri-{FILTER}-{tkey}_skyflat.fits'
     
@@ -507,7 +514,10 @@ def go(root='j010311+131615',
             
                 prep.make_visit_average_flat({'product':root,
                                               'files':files},
-                                              dilate=1, apply=False)
+                                              dilate=1,
+                                              threshold=5,
+                                              clip_max=4,
+                                              apply=False)
                 
                 skyfile = os.path.join(PATHS['prep'], f'{root}_skyflat.fits')
             
@@ -1757,7 +1767,18 @@ def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, com
                                   uniquename=True, get_footprint=True,
                                   use_visit=use_visit, max_dt=max_dt,
                                   visit_split_shift=visit_split_shift)
+    
+    # Remove visit number from NIRISS parallel visits
+    for v in visits:
+        IS_NIS_PARALLEL = v['product'].startswith('indef-03383')
+        IS_NIS_PARALLEL |= v['product'].startswith('indef-01471')
 
+        ks = v['product'].split('-')
+        
+        if IS_NIS_PARALLEL & (len(ks) == 7):
+            vkey = ks.pop(2)
+            v['product'] = '-'.join(ks)
+            
     # Don't run combine_minexp if have grism exposures
     grisms = ['G141', 'G102', 'G800L', 'G280', 'GR150C', 'GR150R']
     has_grism = np.in1d(info['FILTER'], grisms).sum() > 0
