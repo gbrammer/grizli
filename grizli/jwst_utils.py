@@ -2721,6 +2721,7 @@ def query_pure_parallel_wcs(assoc, pad_hours=1.0, verbose=True, products=['1b','
     """
     import astropy.units as u
     from mastquery import jwst
+    
     from .aws import db
     
     times = db.SQL(f"""select "dataURL", t_min, t_max, instrument_name,
@@ -2867,8 +2868,8 @@ def query_pure_parallel_wcs_to_database():
     from .aws import db
     
     pp = db.SQL("""select assoc_name, max(proposal_id) as proposal_id, 
-count(assoc_name), max(filter) as filter,
-from assoc_table where proposal_id in ('1571','2514','3383','3990')
+count(assoc_name), max(filter) as filter
+from assoc_table where proposal_id in ('1571','3383','4861','2514','3990')
 group by assoc_name order by max(t_min)
 """)
     
@@ -2890,9 +2891,15 @@ group by assoc_name order by max(t_min)
         db.execute('CREATE INDEX on pure_parallel_exposures (assoc_name)')
     
     # Add all
-    exist = db.SQL("""select assoc_name, count(assoc_name), max(targname) as targname,
-    min(par_dt) as min_dt, max(par_dt) as max_dt,
-    min(par_file) as par_file, min(apername) as apername, max(apername) as max_apername
+    exist = db.SQL("""select assoc_name, count(assoc_name),
+    min(proposal_id) as primary_program, min(filename) as primary_file,
+    max(targname) as targname,
+    min(apername) as apername,
+    max(apername) as max_apername,
+    max(substr(par_file, 4,4)) as purepar_program,
+    min(par_file) as purepar_file,
+    min(t_min) as t_min, max(t_max) as t_max, 
+    min(par_dt) as min_dt, max(par_dt) as max_dt
     from pure_parallel_exposures group by assoc_name order by min(t_min)
     """)
     
@@ -2913,7 +2920,29 @@ group by assoc_name order by max(t_min)
         db.send_to_database('pure_parallel_exposures', prime[columns],
                             index=False, if_exists='append')
 
-
+    
+    desc = {'t_min': 'Visit start, mjd',
+            't_max': 'Visit end, mjd',
+            'count': 'Exposure count',
+            'primary_program': 'Primary program ID',
+            'purepar_program': 'Parallel program ID',
+            'min_dt': 'Minimum dt between primary and par exposures, sec',
+            'max_dt': 'Maximum dt between primary and par exposures, sec'
+            }
+    
+    for k in desc:
+        exist[k].description = desc[k]
+    
+    exist['t_min'].format = '.3f'
+    exist['t_max'].format = '.3f'
+    exist['min_dt'].format = '.1f'
+    exist['max_dt'].format = '.1f'
+    
+    exist.write_sortable_html('/tmp/jwst_pure_parallels.html', use_json=False, 
+                              localhost=False, max_lines=10000,
+                              filter_columns=list(desc.keys()))
+                              
+    
 def update_pure_parallel_wcs(file, fix_vtype='PARALLEL_PURE', recenter_footprint=True, verbose=True, fit_kwargs={'method':'powell', 'tol':1.e-5}):
     """
     Update pointing information of pure parallel exposures using the pointing 
@@ -2978,6 +3007,7 @@ def update_pure_parallel_wcs(file, fix_vtype='PARALLEL_PURE', recenter_footprint
     try:
         prime = db.SQL(f"""select * from pure_parallel_exposures
         where par_file = '{os.path.basename(file)}'
+        AND apername != 'NRS_FULL_MSA'
         """)
     except:
         msg = "jwst_utils.update_pure_parallel_wcs: db query failed"
