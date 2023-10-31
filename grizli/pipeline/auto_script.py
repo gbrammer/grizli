@@ -1867,10 +1867,10 @@ def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, com
     all_groups = utils.parse_grism_associations(visits, info)
     
     # JWST PASSAGE    
-    if (len(all_groups) > 0) & ('jw01571' in files[0]):
+    if (len(all_groups) > 0) & ('jw01571' in files[0]) | ('jw03383' in files[0]):
         for v in visits:
             if 'clear' in v['product']:
-                print('PASSAGE direct: ', v['product'])
+                print('NIRISS pure parallel direct: ', v['product'])
                 direct = v
         
         for g in all_groups:
