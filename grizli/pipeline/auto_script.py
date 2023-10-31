@@ -3091,7 +3091,8 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
     
     # NIRCam
     for ig, gr in enumerate(['GRISMR','GRISMC']):
-        for filt in ['F277W', 'F356W', 'F410M', 'F444W']:
+        for filt in ['F277W', 'F356W', 'F444W',
+                     'F300M','F335M','F360M','F410M','F430M','F460M']:
             #key = f'{gr.lower()}-{filt.lower()}'
             key = filt.lower() + '-clear'
             if key in masks:
