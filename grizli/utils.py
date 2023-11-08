@@ -52,7 +52,14 @@ GRISM_COLORS = {'G800L': (0.0, 0.4470588235294118, 0.6980392156862745),
       'F277W': (0.0, 0.6196078431372549, 0.45098039215686275),
       'F356W': (0.8352941176470589, 0.3686274509803922, 0.0),
       'F444W': (0.8, 0.4745098039215686, 0.6549019607843137),
+      'F250M': 'lightblue',
+      'F300M': 'steelblue',
+      'F335M': 'cornflowerblue',
+      'F360M': 'royalblue',
       'F410M': (0.0, 0.4470588235294118, 0.6980392156862745),
+      'F430M': 'sandybrown',
+      'F460M': 'lightsalmon',
+      'F480M': 'coral',
       'G280': 'purple',
       'F090W': (0.0, 0.4470588235294118, 0.6980392156862745),
       'F115W': (0.0, 0.6196078431372549, 0.45098039215686275),
@@ -70,7 +77,8 @@ GRISM_MAJOR = {'G102': 0.1, 'G141': 0.1, # WFC3/IR
                'F090W': 0.1, 'F115W': 0.1, 'F150W': 0.1, # NIRISS
                'F140M': 0.1, 'F158M': 0.1, 'F200W': 0.1, 
                'F277W': 0.2, 'F356W': 0.2, 'F444W': 0.2, # NIRCam
-               'F410M': 0.2, 
+               'F250M':0.1,'F300M': 0.1, 'F335M':0.1, 'F360M':0.1,
+               'F410M': 0.1,'F430M': 0.1,'F460M': 0.1,'F480M': 0.1,
                'BLUE': 0.1, 'RED': 0.1, # Euclid
                'GRISM':0.1, 'G150':0.1  # Roman
                }
@@ -92,7 +100,14 @@ GRISM_LIMITS = {'G800L': [0.545, 1.02, 40.],  # ACS/WFC
            'F277W': [2.5, 3.2, 20.],  # NIRCAM
            'F356W': [3.05, 4.1, 20.],
            'F444W': [3.82, 5.08, 20],
+           'F250M': [2.4, 2.65, 20],
+           'F300M': [2.77, 3.23, 20],
+           'F335M': [3.1, 3.6, 20],
+           'F360M': [3.4, 3.85, 20],
            'F410M': [3.8, 4.38, 20],
+           'F430M': [4.1, 4.45, 20],
+           'F460M': [4.5, 4.8, 20],          
+           'F480M': [4.6, 5.05, 20],          
            'BLUE': [0.8, 1.2, 10.],  # Euclid
            'RED': [1.1, 1.9, 14.]}
 
@@ -5150,9 +5165,14 @@ def make_maximal_wcs(files, pixel_scale=None, get_hdu=True, pad=90, verbose=True
     import astropy.io.fits as pyfits
     import astropy.wcs as pywcs
 
+    group_poly = None
+
     if isinstance(files[0], pywcs.WCS):
         # Already wcs_list
         wcs_list = [(wcs, 'WCS', -1) for wcs in files]
+    elif hasattr(files, 'buffer'):
+        # Input is a shapely object
+        group_poly = files
     else:
         wcs_list = []
         for i, file in enumerate(files):
@@ -5170,27 +5190,27 @@ def make_maximal_wcs(files, pixel_scale=None, get_hdu=True, pad=90, verbose=True
     if pixel_scale is None:
         pixel_scale = get_wcs_pscale(wcs_list[0][0])
         
-    group_poly = None
-    for i, (wcs, file, chip) in enumerate(wcs_list):
-        p_i = Polygon(wcs.calc_footprint())
-        if group_poly is None:
-            if poly_buffer > 0:
-                group_poly = p_i.buffer(1./3600)
+    if group_poly is None:
+        for i, (wcs, file, chip) in enumerate(wcs_list):
+            p_i = Polygon(wcs.calc_footprint())
+            if group_poly is None:
+                if poly_buffer > 0:
+                    group_poly = p_i.buffer(1./3600)
+                else:
+                    group_poly = p_i
             else:
-                group_poly = p_i
-        else:
-            if poly_buffer > 0:
-                group_poly = group_poly.union(p_i.buffer(1./3600))
-            else:
-                group_poly = group_poly.union(p_i)
+                if poly_buffer > 0:
+                    group_poly = group_poly.union(p_i.buffer(1./3600))
+                else:
+                    group_poly = group_poly.union(p_i)
                  
-        x0, y0 = np.cast[float](group_poly.centroid.xy)[:, 0]
-        if verbose:
-            msg = '{0:>3d}/{1:>3d}: {2}[SCI,{3}]  {4:>6.2f}'
-            print(msg.format(i, len(files), file, chip+1,
-                             group_poly.area*3600*np.cos(y0/180*np.pi)
-                             )
-                  )
+            x0, y0 = np.cast[float](group_poly.centroid.xy)[:, 0]
+            if verbose:
+                msg = '{0:>3d}/{1:>3d}: {2}[SCI,{3}]  {4:>6.2f}'
+                print(msg.format(i, len(files), file, chip+1,
+                                 group_poly.area*3600*np.cos(y0/180*np.pi)
+                                 )
+                      )
 
     px = np.cast[float](group_poly.convex_hull.boundary.xy).T
     #x0, y0 = np.cast[float](group_poly.centroid.xy)[:,0]

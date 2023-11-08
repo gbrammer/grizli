@@ -641,6 +641,12 @@ def img_with_wcs(input, overwrite=True, fit_sip_header=True, skip_completed=True
         _hdu.writeto(input, overwrite=True)
         _hdu.close()
         
+        try:
+            # Update pointing of pure-parallel exposures
+            status = update_pure_parallel_wcs(input)
+        except:
+            pass
+        
     return output
 
 
@@ -2680,3 +2686,478 @@ def get_crds_zeropoint(instrument='NIRCAM', detector='NRCALONG', filter='F444W',
     return context, refs['photom'], mjsr, pixar_sr
 
 
+def query_pure_parallel_wcs(assoc, pad_hours=1.0, verbose=True, products=['1b','2','2a','2b']):
+    """
+    Query the archive for the *prime* exposures associated with pure-parallel 
+    observations, since the header WCS for the latter aren't correct
+    
+    ToDo: NIRSpec MSA cal files are for extractions
+    
+    Parameters
+    ----------
+    assoc : str
+        Association name in the grizli database `assoc_table` table
+    
+    pad_hours : float
+        Time padding for the MAST query, hours
+    
+    verbose : bool
+        Messaging
+    
+    products : list, None
+        List of archive ``productLevel`` values to include in the MAST query
+    
+    Returns
+    -------
+    prime : `~astropy.table.Table`
+        Matched table of computed Prime exposures
+    
+    res : `~astropy.table.Table`
+        Full MAST query table
+    
+    times : `~astropy.table.Table`
+        Exposure query from the grizli database
+    
+    """
+    import astropy.units as u
+    from mastquery import jwst
+    
+    from .aws import db
+    
+    times = db.SQL(f"""select "dataURL", t_min, t_max, instrument_name,
+    proposal_id, filter
+    from assoc_table where assoc_name = '{assoc}'
+    order by t_min
+    """)
+    
+    trange = [times['t_min'].min() - pad_hours/24.,
+              times['t_min'].max() + pad_hours/24.]
+
+    msg = "jwst_utils.get_pure_parallel_wcs: "
+    msg += f"Found {len(times)} exposures for {assoc}"
+    utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+    
+    msg = "jwst_utils.get_pure_parallel_wcs: "
+    msg += f"expstart = [{trange[0]:.3f}, {trange[1]:.3f}]"
+    utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+    
+    filters = []
+    filters += jwst.make_query_filter('expstart',
+                    range=trange)
+    
+    if products is not None:
+        filters += jwst.make_query_filter('productLevel', values=products)
+    
+    inst = times['instrument_name'][0]
+    inst_keys = {'NIRISS':'NIS', 'NIRCAM':'NRC', 'MIRI':'MIR', 'NIRSPEC':'NRS'}
+    key = inst_keys[inst]
+    instruments = []
+    for k in ['NRC', 'NIS', 'NRS', 'MIR']:
+        if k != key:
+            instruments.append(k)
+            
+    #try:
+    res = jwst.query_all_jwst(recent_days=None, filters=filters, columns='*',
+                          instruments=instruments, 
+                          fix=False)
+    # except KeyError:
+    #     # Some missing wcs
+    #     filters += jwst.make_query_filter('cd1_1',
+    #                     range=[-1,1])
+    #
+    #     res = jwst.query_all_jwst(recent_days=None, filters=filters, columns='*',
+    #                           instruments=instruments,
+    #                           fix=True)
+    
+    if 't_min' not in res.colnames:
+        res['t_min'] = res['expstart']
+        res['t_max'] = res['expend']
+        res['targname'] = res['targprop']
+        res['proposal_id'] = res['program']
+        res['instrument_name'] = res['instrume']
+        res['dataURL'] = res['dataURI']
+        #ok = np.array([len(s) > 5 for s in res['s_region']])
+        if hasattr(res['s_region'], 'mask'):
+            res = res[~res['s_region'].mask]
+        
+        jwst.set_footprint_centroids(res)
+    
+    so = np.argsort(res['expstart'])
+    res = res[so]
+    
+    msg = "jwst_utils.get_pure_parallel_wcs: "
+    msg += f"Found {len(res)} MAST entries for "
+    msg += f"expstart = [{trange[0]:.3f}, {trange[1]:.3f}]"
+    utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+    
+    if len(res) <= len(times):
+        msg = "jwst_utils.get_pure_parallel_wcs: "
+        msg += f"Didn't find prime exposures for {assoc}"
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+        
+        return None, None, None
+        
+    res['par_dt'] = 0.
+    res['par_dt'].description = 'Time offset to parallel exposure'
+    res['par_dt'].unit = u.second
+    res['par_dt'].format = '.1f'
+    res['t_min'].format = '.3f'
+    
+    res['par_file'] = res['dataURL']
+        
+    res['all_dt'] = 1e4
+    
+    for j, t in enumerate(times):
+
+        test = res['instrument_name'] != t['instrument_name']
+
+        delta_time = t['t_min'] - res['expstart'][test]
+        
+        res['all_dt'][test] = np.minimum(res['all_dt'][test], np.abs(delta_time)*86400)
+    
+    # Group by detector
+    mat = res['all_dt'] < res['effexptm']
+    und = utils.Unique(res[mat]['detector'], verbose=False)
+    
+    ind = und.counts == len(times)
+    if ind.sum() > 0:
+        det = und.values[np.where(ind)[0][0]]
+        print(f'Use detector {det}')
+        res = res[(res['detector'] == det) & mat]
+    
+    rowix = []
+    for j, t in enumerate(times):
+
+        test = res['instrument_name'] != t['instrument_name']
+
+        delta_time = t['t_min'] - res['expstart'][test]
+        
+        res['all_dt'][test] = np.minimum(res['all_dt'][test], np.abs(delta_time)*86400)
+    
+        ix = np.argmin(np.abs(delta_time))
+    
+        rowix.append(np.where(test)[0][ix])
+        
+        res['par_dt'][rowix[-1]] = delta_time[ix]*86400
+        res['par_file'][rowix[-1]] = os.path.basename(t['dataURL'])
+    
+    prime = res[rowix]
+    prime['assoc_name'] = assoc
+    
+    # polygon strings
+    if 's_region' in prime.colnames:
+        poly = []
+        for s in prime['s_region']:
+            sr = utils.SRegion(s)
+            poly += sr.polystr()
+        
+        prime['footprint'] = poly
+    
+    return prime, res, times
+
+
+def query_pure_parallel_wcs_to_database():
+    """
+    Run pure parallel wcs query for all associations from PP proposals
+    - 1571: PASSAGE
+    - 2514: PANORAMIC
+    - 3383: OutThere
+    - 3990: Morishita+Mason
+    
+    """
+    from .aws import db
+    
+    pp = db.SQL("""select assoc_name, max(proposal_id) as proposal_id, 
+count(assoc_name), max(filter) as filter
+from assoc_table where proposal_id in ('1571','3383','4861','2514','3990')
+group by assoc_name order by max(t_min)
+""")
+    
+    columns = ['assoc_name', 'filename', 'apername',
+               'ra', 'dec', 'gs_v3_pa', 'par_dt', 'par_file',
+               't_min', 't_max',
+               'proposal_id','instrument_name','targname',
+               'footprint']
+    
+    if 0:
+        # Initialize table
+        prime, res, times = query_pure_parallel_wcs(pp['assoc_name'][0])
+        db.send_to_database('pure_parallel_exposures', prime[columns],
+                            index=False, if_exists='append')
+
+        db.execute(f"delete from pure_parallel_exposures where True")
+        
+        db.execute('CREATE INDEX on pure_parallel_exposures (assoc_name, par_file)')
+        db.execute('CREATE INDEX on pure_parallel_exposures (assoc_name)')
+    
+    # Add all
+    exist = db.SQL("""select assoc_name, count(assoc_name),
+    min(proposal_id) as primary_program, min(filename) as primary_file,
+    max(targname) as targname,
+    min(apername) as apername,
+    max(apername) as max_apername,
+    max(substr(par_file, 4,4)) as purepar_program,
+    min(par_file) as purepar_file,
+    min(t_min) as t_min, max(t_max) as t_max, 
+    min(par_dt) as min_dt, max(par_dt) as max_dt
+    from pure_parallel_exposures group by assoc_name order by min(t_min)
+    """)
+    
+    for i, assoc in enumerate(pp['assoc_name']):
+        if assoc in exist['assoc_name']:
+            print(f'Skip: {assoc}')
+            continue
+        
+        try:
+            prime, res, times = query_pure_parallel_wcs(assoc)
+        except ValueError:
+            print(f'Failed: {assoc}')
+            continue
+        
+        if 0:
+            db.execute(f"delete from pure_parallel_exposures where assoc_name = '{assoc}'")
+        
+        db.send_to_database('pure_parallel_exposures', prime[columns],
+                            index=False, if_exists='append')
+
+    
+    desc = {'t_min': 'Visit start, mjd',
+            't_max': 'Visit end, mjd',
+            'count': 'Exposure count',
+            'primary_program': 'Primary program ID',
+            'purepar_program': 'Parallel program ID',
+            'min_dt': 'Minimum dt between primary and par exposures, sec',
+            'max_dt': 'Maximum dt between primary and par exposures, sec'
+            }
+    
+    for k in desc:
+        exist[k].description = desc[k]
+    
+    exist['t_min'].format = '.3f'
+    exist['t_max'].format = '.3f'
+    exist['min_dt'].format = '.1f'
+    exist['max_dt'].format = '.1f'
+    
+    exist.write_sortable_html('/tmp/jwst_pure_parallels.html', use_json=False, 
+                              localhost=False, max_lines=10000,
+                              filter_columns=list(desc.keys()))
+                              
+    
+def update_pure_parallel_wcs(file, fix_vtype='PARALLEL_PURE', recenter_footprint=True, verbose=True, fit_kwargs={'method':'powell', 'tol':1.e-5}):
+    """
+    Update pointing information of pure parallel exposures using the pointing 
+    information of the prime exposures from the MAST database and `pysiaf`
+    
+    1. Find the prime exposure from the MAST query that is closest in ``EXPSTART``
+       to ``file``
+    2. Use the ``apername, ra, dec`` values of the prime exposure from the MAST query
+       and ``PA_V3`` from the ``file`` header to set the the pointing attitude with 
+       `pysiaf`
+    3. Compute the sky position of the ``CRPIX`` reference pixel of ``file`` with 
+       `pysiaf` and put that position in the ``CRVAL`` keywords
+    
+    Parameters
+    ----------
+    file : str
+        Filename of a pure-parallel exposure (rate.fits)
+    
+    fix_vtype : str
+        Run if ``file[0].header['VISITYPE'] == fix_vtype``
+    
+    verbose : bool
+        Status messaging
+    
+    Returns
+    -------
+    status : None, True
+        Returns None if some problem is found 
+    
+    """
+    from scipy.optimize import minimize
+    import pysiaf
+    from pysiaf.utils import rotations
+    
+    from .aws import db
+    
+    if not os.path.exists(file):
+        msg = "jwst_utils.update_pure_parallel_wcs: "
+        msg += f" {file} not found"
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+        return None
+    
+    with pyfits.open(file) as im:
+        h0 = im[0].header.copy()
+        h1 = im[1].header.copy()
+        if 'VISITYPE' not in im[0].header:
+            msg = "jwst_utils.update_pure_parallel_wcs: "
+            msg += f" VISITYPE not found in header {file}"
+            utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+            return None
+    
+    # Is this a PARALLEL_PURE exposure?
+    vtype = h0['VISITYPE']
+    
+    if vtype != fix_vtype:
+        msg = "jwst_utils.update_pure_parallel_wcs: "
+        msg += f" VISITYPE ({vtype}) != {fix_vtype}, skip"
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+        return None
+    
+    # Find a match in the db
+    try:
+        prime = db.SQL(f"""select * from pure_parallel_exposures
+        where par_file = '{os.path.basename(file)}'
+        AND apername != 'NRS_FULL_MSA'
+        """)
+    except:
+        msg = "jwst_utils.update_pure_parallel_wcs: db query failed"
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+        return None
+        
+    if len(prime) == 0:
+        msg = f"jwst_utils.update_pure_parallel_wcs: par_file='{file}'"
+        msg += " not found in db.pure_parallel_exposures"
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+        return None
+        
+    crval_init = h1['CRVAL1'], h1['CRVAL2']
+    
+    # OK, we have a row, now compute the pysiaf pointing for the prime
+    row = prime[0]
+    
+    #pa_v3 = h1['PA_V3']
+    #pa_v3 = h1['ROLL_REF']
+    pa_v3 = row['gs_v3_pa']
+    
+    pos = np.array([row['ra'], row['dec'], pa_v3])
+    
+    prime_aper = pysiaf.Siaf(row['instrument_name'])[row['apername']]
+    
+    if recenter_footprint:
+        xy = utils.SRegion(row['footprint']).xy[0].T
+        
+        if recenter_footprint > 1:
+            x0 = pos*1. #(row['ra'], row['dec'], row['gs_v3_pa'])
+        else:
+            x0 = pos[:2]
+        
+        _fit = minimize(objfun_pysiaf_pointing, x0,
+                        args=(prime_aper, xy, pa_v3, 0),
+                        **fit_kwargs)
+        
+        if recenter_footprint > 1:
+            dPA = _fit.x[2] - pa_v3
+        else:
+            dPA = 0.0
+            
+        att = objfun_pysiaf_pointing(_fit.x, prime_aper, xy, pa_v3, 1)
+        prime_aper.set_attitude_matrix(att)
+        
+        tv2, tv3 = prime_aper.sky_to_tel(row['ra'], row['dec'])
+        
+        msg = f"jwst_utils.update_pure_parallel_wcs: {prime_aper.AperName} offset"
+        msg += f" v2,v3 = {tv2 - prime_aper.V2Ref:6.3f}, {tv3 - prime_aper.V3Ref:6.3f}"
+        msg += f"  dPA = {dPA:.2f} "
+        msg += f"(dx**2 = {_fit.fun:.2e}, nfev = {_fit.nfev})"
+        
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+        
+        if _fit.fun > 1:
+            att = rotations.attitude(prime_aper.V2Ref, prime_aper.V3Ref, *pos)
+            prime_aper.set_attitude_matrix(att)
+            
+    else:
+        att = rotations.attitude(prime_aper.V2Ref, prime_aper.V3Ref, *pos)
+        prime_aper.set_attitude_matrix(att)
+        
+    # And apply the pointing to the parallel aperture and reference pixel
+    par_aper = pysiaf.Siaf(h0['INSTRUME'])[h0['APERNAME']]
+    if 0:
+        par_pos = (h1['RA_REF'], h1['DEC_REF'], pa_v3) #h1['ROLL_REF'])
+        apos = rotations.attitude(par_aper.V2Ref, par_aper.V3Ref, *par_pos)
+        par_aper.set_attitude_matrix(apos)
+        
+    par_aper.set_attitude_matrix(att)
+
+    crpix = h1['CRPIX1'], h1['CRPIX2']
+    crpix_init = par_aper.sky_to_sci(*crval_init)
+    
+    crval_fix = par_aper.sci_to_sky(*crpix)
+    
+    msg = f"jwst_utils.update_pure_parallel_wcs: {file}"
+    msg += '\n' + f"jwst_utils.update_pure_parallel_wcs: prime {row['filename']} "
+    msg += f"{row['apername']}"
+    msg += '\n' + f"jwst_utils.update_pure_parallel_wcs: original crval "
+    msg += f"{crval_init[0]:.6f} {crval_init[1]:.6f}"
+    msg += '\n' + f"jwst_utils.update_pure_parallel_wcs:      new crval "
+    msg += f"{crval_fix[0]:.6f} {crval_fix[1]:.6f}"
+    msg += '\n' + f"jwst_utils.update_pure_parallel_wcs:           dpix "
+    msg += f"{crpix[0] - crpix_init[0]:6.3f} {crpix[1] - crpix_init[1]:6.3f}"
+    
+    _ = utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+    
+    with pyfits.open(file, mode='update') as im:
+        im[1].header['CRVAL1'] = crval_fix[0]
+        im[1].header['CRVAL2'] = crval_fix[1]
+        im[1].header['PUREPWCS'] = True, 'WCS updated from PP query'
+        im[1].header['PUREPEXP'] = row['filename'], 'Prime exposure file'
+        
+        im.flush()
+    
+    return True
+
+
+def objfun_pysiaf_pointing(theta, ap, xy, pa, ret):
+    """
+    Objective function for fitting a `pysiaf` attitude based on a MAST database
+    footprint
+    
+    Parameters
+    ----------
+    theta : (float, float, float)
+        ``ra``, ``dec`` and ``pa_v3`` at the aperture reference position
+    
+    ap : `pysiaf.Aperture`
+        Aperture
+    
+    xy : array-like, (2,4)
+        Footprint from the MAST query, e.g., ``xy = SRegion(footprint).xy[0].T``.
+    
+    ret : int
+        Return type: 0=resid, 1=attitude matrix
+    
+    Returns
+    -------
+    resid : float
+        Sum of squared differences ``ap.corners - xy``
+    
+    """
+    from pysiaf.utils import rotations
+    
+    if len(theta) == 3:
+        pos = theta
+    else:
+        pos = [theta[0], theta[1], pa]
+    
+    att = rotations.attitude(ap.V2Ref, ap.V3Ref, *pos)
+    ap.set_attitude_matrix(att)
+
+    if ret == 1:
+        return att
+    
+    tsky = np.array(ap.sky_to_tel(*xy))
+    so = np.argsort(tsky[0,:])
+    
+    try:
+        corners = np.array(ap.corners('tel'))
+    except:
+        corners = np.array(ap.corners('tel', rederive=False))
+    
+    cso = np.argsort(corners[0,:])
+    diff = tsky[:,so] - corners[:,cso]
+    
+    # print(theta, (diff**2).sum())
+    
+    return (diff**2).sum()
+    
+    
