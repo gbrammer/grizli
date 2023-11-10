@@ -1811,7 +1811,7 @@ class CRDSGrismConf():
                                      module=meta['meta.instrument.module'])
         
         sens_file = os.path.join(path, sens_file)
-        print('xx', sens_file, os.path.exists(sens_file))
+        # print('xx', sens_file, os.path.exists(sens_file))
         
         if os.path.exists(sens_file):
             msg = "grismconf.CRDSGrismConf: replace sensitivity cuve with "
