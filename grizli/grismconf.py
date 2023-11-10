@@ -1814,7 +1814,7 @@ class CRDSGrismConf():
         # print('xx', sens_file, os.path.exists(sens_file))
         
         if os.path.exists(sens_file):
-            msg = "grismconf.CRDSGrismConf: replace sensitivity cuve with "
+            msg = "grismconf.CRDSGrismConf: replace sensitivity curve with "
             msg += f"{sens_file}"
             utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
             
