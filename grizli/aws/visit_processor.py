@@ -273,6 +273,215 @@ def s3_put_exposure(flt_file, product, assoc, remove_old=True, verbose=True):
         print(f'Add {file}_{extension} ({len(rows)}) to exposure_files table')
 
 
+def make_visit_mosaic(assoc, base_path=ROOT_PATH, version='v7.0', pixscale=0.08, vmax=0.5, skip_existing=True, sync=True, clean=False, verbose=True, **kwargs):
+    """
+    Make a mosaic of the exposures from a visit with a tangent point selected
+    from the sky tile grid
+    
+    Parameters
+    ----------
+    assoc : str
+        grizli association name
+    
+    base_path : str
+        Base working directory.  Working directory will be
+        ``{base_path}/{assoc}/Prep/``
+    
+    version : str
+        version string
+    
+    pixscale : float
+        Reference pixel scale in arcsec (used for MIRI).  HST, LW, NIRISS will have 
+        ``pixscale/2`` and SW will have ``pixscale/4``
+    
+    skip_existing : bool
+        Don't overwrite existing assoc mosaics
+    
+    sync : bool
+        Update results in grizli database and copy to S3
+    
+    clean : bool
+        Remove working directory and all files in it
+    
+    """
+    import os
+    import glob
+    
+    import skimage.io
+    
+    import astropy.wcs as pywcs
+    import astropy.io.fits as pyfits
+    from astropy.visualization import (MinMaxInterval, SqrtStretch,
+                                       ImageNormalize, LogStretch
+                                   )
+
+    if sync:
+        xtab = utils.GTable()
+        xtab['assoc_name'] = [assoc]
+        xtab['version'] = version
+        xtab['status'] = 1
+        
+        msg = f'make_visit_mosaic: {assoc} set status = 1'
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+
+        db.execute(f"delete from assoc_mosaic where assoc_name = '{assoc}' and version = '{version}'")
+        db.send_to_database('assoc_mosaic', xtab, index=False, if_exists='append')
+
+    if base_path is None:
+        path = './'
+    else:
+        path = os.path.join(base_path, assoc, 'Prep')
+    
+    if not os.path.exists(path):
+        os.makedirs(path)
+        fresh_path = True
+    else:
+        fresh_path = False
+        
+    os.chdir(path)
+
+    if fresh_path:
+        cmd = f'aws s3 sync s3://grizli-v2/HST/Pipeline/{assoc}/Prep/ ./ --exclude "*"'
+        cmd += ' --include "*rate.fits" --include "*flt.fits" --include "*flc.fits"'
+        os.system(cmd)
+        
+    files = glob.glob('*rate.fits')
+    files += glob.glob('*flt.fits')
+    files += glob.glob('*flc.fits')
+
+    # info = utils.get_flt_info(files)
+    res = visit_processor.res_query_from_local(files=files)
+
+    # Get closest tile
+    sr = [utils.SRegion(fp) for fp in res['footprint']]
+    crv = np.mean([s.centroid[0] for s in sr], axis=0)
+    
+    tile = db.SQL(f"""select * from mosaic_tiles
+    order by SQRT(POWER(crval1 - {crv[0]},2)+POWER(crval2 - {crv[1]},2)) 
+    limit 1""")[0]
+    
+    htile, wtile = utils.make_wcsheader(tile['crval1'],
+                                        tile['crval2'],
+                                        size=tile['npix']*0.1*1.1,
+                                        pixscale=pixscale,
+                                        get_hdu=False)
+
+    corners = np.hstack([wtile.all_world2pix(*s.xy[0].T, 0) for s in sr])
+    
+    mi = corners.min(axis=1).astype(int) - 64
+    ma = corners.max(axis=1).astype(int) + 64
+    ma -= (ma-mi) % 4
+
+    slx, sly = slice(mi[0], ma[0]), slice(mi[1], ma[1])
+    
+    wsl = pywcs.WCS(utils.get_wcs_slice_header(wtile, slx, sly))
+
+    det = res['detector'][0]
+    if det.startswith('NRC') | ('WFC' in det) | ('UVIS' in det):
+        wsl = utils.half_pixel_scale(wsl)
+        skip = 8
+        if 'LONG' not in det:
+            wsl = utils.half_pixel_scale(wsl)
+            skip = 16
+    elif det in ['NIS','IR']:
+        wsl = utils.half_pixel_scale(wsl)
+        skip = 8
+    else:
+        skip = 4
+        # MIRI at nominal pixscale
+        pass
+
+    if det in ['WFC','UVIS','IR']:
+        weight_type = 'median_err'
+    else:
+        weight_type = 'jwst'
+
+    pixscale_mas = int(np.round(utils.get_wcs_pscale(wsl)*1000))
+
+    msg = f"make_visit_mosaic: {assoc} {version} {det} {pixscale_mas}"
+    msg += f"  tile {tile['tile']} "
+    msg += f" [{slx.start}:{slx.stop}, {sly.start}:{sly.stop}]\n"
+    utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+    
+    visit_processor.cutout_mosaic(assoc, ir_wcs=wsl, 
+                                  half_optical=False,
+                                  clean_flt=False,
+                                  s3output=False,
+                                  gzip_output=True,
+                                  make_exptime_map=True,
+                                  skip_existing=skip_existing,
+                                  kernel='square',
+                                  pixfrac=0.8,
+                                  res=res,
+                                  weight_type=weight_type,
+    )
+
+    files = glob.glob(f'{assoc}*_sci.fits*')
+    files.sort()
+
+    for file in files:
+        imgroot = file.split('.fits')[0]
+        if os.path.exists(f'{imgroot}.jpg'):
+            continue
+            
+        with pyfits.open(file) as im:
+            imsk = im[0].data[::-skip,::skip]
+            msk = imsk != 0
+    
+            vmax = 0.8/0.0625*2**(-(np.log(skip/4)/np.log(2)*2))
+            vmin = -0.1*vmax
+    
+            imsk[~msk] = np.nan
+            norm = ImageNormalize(imsk, vmin=vmin, vmax=vmax,
+                                  clip=True, stretch=LogStretch(a=1e1))
+            inorm = 1-norm(imsk)
+            inorm[~np.isfinite(inorm)] = 1
+            
+            skimage.io.imsave(f'{imgroot}.jpg', inorm,
+                              plugin='pil', quality=95, check_contrast=False)
+    
+    os.system(f'gzip --force {assoc}*_dr*fits')
+
+    files = glob.glob(f'{assoc}*_sci.fits.gz')
+    files.sort()
+
+    tab = utils.GTable()
+    tab['file'] = files
+    tab['filter'] = [f.split(assoc)[-1].split('_d')[0][1:].upper() for f in files]
+    tab['assoc_name'] = assoc
+    
+    tab['modtime'] = [os.path.getmtime(f) for f in files]
+    
+    tab['footprint'] = utils.SRegion(wsl.calc_footprint()).polystr()[0]
+    for c in ['tile','strip','nx','crpix1','crpix2']:
+        tab[c] = tile[c]
+
+    tab['xstart'], tab['xstop'] = slx.start, slx.stop
+    tab['ystart'], tab['ystop'] = slx.start, slx.stop
+
+    tab['input_pixscale'] = pixscale
+    tab['pixscale_mas'] = pixscale_mas
+
+    tab['detector'] = det
+    
+    tab['version'] = version
+    tab['status'] = 2
+
+    if sync:
+        db.execute(f"delete from assoc_mosaic where assoc_name = '{assoc}' and version = '{version}'")
+        db.send_to_database('assoc_mosaic', tab, index=False, if_exists='append')
+        os.system(f"""aws s3 sync ./ s3://grizli-v2/assoc_mosaic/{version}/ --exclude "*" --include "{assoc}-*" --acl public-read""")
+    
+    if clean & (base_path is not None):
+        msg = f"make_visit_mosaic: Remove {assoc} from {base_path}"
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+        
+        os.chdir(base_path)
+        os.system(f'rm -rf {assoc}')
+    
+    return tab
+
+
 def check_missing_files():
     """
     check for files that are in exposure_files but not on S3
@@ -1239,7 +1448,7 @@ def check_jwst_assoc_guiding(assoc):
 ALL_FILTERS = ['F410M', 'F467M', 'F547M', 'F550M', 'F621M', 'F689M', 'F763M', 'F845M', 'F200LP', 'F350LP', 'F435W', 'F438W', 'F439W', 'F450W', 'F475W', 'F475X', 'F555W', 'F569W', 'F600LP', 'F606W', 'F622W', 'F625W', 'F675W', 'F702W', 'F775W', 'F791W', 'F814W', 'F850LP', 'G800L', 'F098M', 'F127M', 'F139M', 'F153M', 'F105W', 'F110W', 'F125W', 'F140W', 'F160W', 'G102', 'G141']
 
 
-def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=False, visit_split_shift=1.2, blue_align_params=blue_align_params, ref_catalogs=['LS_DR9', 'PS1', 'DES', 'NSC', 'GAIA'], filters=None, prep_args={}, fetch_args={}, get_wcs_guess_from_table=True, master_radec='astrometry_db', align_guess=None, with_db=True, global_miri_skyflat=None, tab=None, other_args={}, **kwargs):
+def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=False, visit_split_shift=1.2, blue_align_params=blue_align_params, ref_catalogs=['LS_DR9', 'PS1', 'DES', 'NSC', 'GAIA'], filters=None, prep_args={}, fetch_args={}, get_wcs_guess_from_table=True, master_radec='astrometry_db', align_guess=None, with_db=True, global_miri_skyflat=None, tab=None, other_args={}, do_make_visit_mosaic=True, visit_mosaic_kwargs={}, **kwargs):
     """
     Run the `grizli.pipeline.auto_script.go` pipeline on an association defined
     in the `grizli` database.
@@ -1448,7 +1657,13 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=False,
     if sync:
         add_shifts_log(assoc=assoc, remove_old=True, verbose=True)
         add_wcs_log(assoc=assoc, remove_old=True, verbose=True)
-    
+        
+    if do_make_visit_mosaic:
+        make_visit_mosaic(assoc, sync=sync,
+                          base_path=ROOT_PATH,
+                          clean=False,
+                          **visit_mosaic_kwargs)
+        
     os.environ['iref'] = os.environ['orig_iref']
     os.environ['jref'] = os.environ['orig_jref']
     
@@ -1589,7 +1804,7 @@ def make_parent_mosaic(parent='j191436m5928', root=None, **kwargs):
     cutout_mosaic(rootname=root, ra=ra, dec=dec, size=size, **kwargs)
 
 
-def res_query_from_local(files=None, filters=None, extra_keywords=[]):
+def res_query_from_local(files=None, filters=None, extensions=[1], extra_keywords=[]):
     """
     Immitate a query from exposure_files for files in a local working 
     directory that can be passed to `grizli.aws.visit_processor.cuotut_mosaic`
@@ -1645,9 +1860,6 @@ def res_query_from_local(files=None, filters=None, extra_keywords=[]):
                 pup = '-'
                         
             det = im[0].header['DETECTOR']
-            wcs = pywcs.WCS(im['SCI',1].header, fobj=im)
-            sr = utils.SRegion(wcs)
-            fp = sr.polystr()[0]
             
             extra_data = []
             for k in extra_keywords:
@@ -1655,8 +1867,16 @@ def res_query_from_local(files=None, filters=None, extra_keywords=[]):
                     extra_data.append(im[0].header[k])
                 else:
                     extra_data.append(np.nan)
+            
+            for ex in extensions:
+                if ('SCI', ex) not in im:
+                    continue
                     
-        rows.append([ds, ext, 1, assoc, filt, pup, expt, fp, det] + extra_data)
+                wcs = pywcs.WCS(im['SCI', ex].header, fobj=im)
+                sr = utils.SRegion(wcs)
+                fp = sr.polystr()[0]
+            
+                rows.append([ds, ext, ex, assoc, filt, pup, expt, fp, det] + extra_data)
     
     extra_names = [k.lower() for k in extra_keywords]
     
