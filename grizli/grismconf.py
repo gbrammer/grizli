@@ -784,9 +784,9 @@ class JwstDispersionTransform(object):
         Maybe this is 1020 for NIRISS?
         """
         if self.instrument == 'HST':
-            return np.array([507, 507])
+            return np.array([507.5, 507.5])
         else:
-            return np.array([1024, 1024])
+            return np.array([1024.5, 1024.5])
 
 
     @property
@@ -1418,6 +1418,7 @@ class CRDSGrismConf():
         
         if get_photom:
             self.get_photom(**kwargs)
+            self.load_new_sensitivity_curve(**kwargs)
     
     
     def initialize_from_datamodel(self):
@@ -1779,4 +1780,44 @@ class CRDSGrismConf():
             self.SENS_data[order] = [wave[mask], 1./sens_flam.value]
         
         return self.SENS_data
-
+    
+    
+    def load_new_sensitivity_curve(self, verbose=True, **kwargs):
+        """
+        Replace +1 NIRCam sensitivity curves with Nov 10, 2023 updates
+        
+        Files generated with the calibration data of P330E from program 
+        CAL-1538 (K. Gordon)
+        
+        https://s3.amazonaws.com/grizli-v2/JWSTGrism/NircamSensitivity/index.html
+        
+        """
+        
+        path = os.path.join(GRIZLI_PATH, 'CONF', 'GRISM_NIRCAM')
+        meta = self.crds_parameters
+        if meta['meta.instrument.name'] != 'NIRCAM':
+            if verbose:
+                msg = 'load_new_sensitivity_curve: only defined for NIRCAM ({0})'
+                print(msg.format(meta['meta.instrument.name']))
+                
+            return None
+        
+        sens_base = 'nircam_wfss_sensitivity_{filter}_{pupil}_{module}.10nov23.fits'
+        sens_file = sens_base.format(filter=meta['meta.instrument.filter'],
+                                     pupil=meta['meta.instrument.pupil'],
+                                     module=meta['meta.instrument.module'])
+        
+        sens_file = os.path.join(path, sens_file)
+        print('xx', sens_file, os.path.exists(sens_file))
+        
+        if os.path.exists(sens_file):
+            msg = "grismconf.CRDSGrismConf: replace sensitivity cuve with "
+            msg += f"{sens_file}"
+            utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+            
+            si = utils.read_catalog(sens_file)
+            
+            self.SENS_data['+1'] = [si['WAVELENGTH']/1.e4, si['SENSITIVITY']]
+        
+        
+        
