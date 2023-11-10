@@ -1789,6 +1789,9 @@ class CRDSGrismConf():
         Files generated with the calibration data of P330E from program 
         CAL-1538 (K. Gordon)
         
+        Download the FITS files from the link below and put them in
+        ``$GRIZLI/CONF/GRISM_NIRCAM/``.
+        
         https://s3.amazonaws.com/grizli-v2/JWSTGrism/NircamSensitivity/index.html
         
         """
