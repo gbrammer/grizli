@@ -22,7 +22,7 @@ def test_transform():
                                             grism=grism, module=module)
                 
                 #print(instrument, grism, module, tr.forward(1024, 1024))
-                assert(np.allclose(tr.forward(1024, 1024), 1024))
+                assert(np.allclose(tr.forward(1024.5, 1024.5), 1024.5))
                 
                 # Forward, Reverse
                 x0 = np.array([125., 300])
