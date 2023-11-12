@@ -304,9 +304,6 @@ def make_visit_mosaic(assoc, base_path=ROOT_PATH, version='v7.0', pixscale=0.08,
         Remove working directory and all files in it
     
     """
-    import os
-    import glob
-    
     import skimage.io
     
     import astropy.wcs as pywcs
@@ -332,6 +329,9 @@ def make_visit_mosaic(assoc, base_path=ROOT_PATH, version='v7.0', pixscale=0.08,
     else:
         path = os.path.join(base_path, assoc, 'Prep')
     
+    msg = f"make_visit_mosaic: working directory {path}\n"
+    utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+
     if not os.path.exists(path):
         os.makedirs(path)
         fresh_path = True
@@ -341,6 +341,10 @@ def make_visit_mosaic(assoc, base_path=ROOT_PATH, version='v7.0', pixscale=0.08,
     os.chdir(path)
 
     if fresh_path:
+        msg = f"make_visit_mosaic: sync from "
+        msg += f"s3://grizli-v2/HST/Pipeline/{assoc}/Prep/"
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+
         cmd = f'aws s3 sync s3://grizli-v2/HST/Pipeline/{assoc}/Prep/ ./ --exclude "*"'
         cmd += ' --include "*rate.fits" --include "*flt.fits" --include "*flc.fits"'
         os.system(cmd)
@@ -350,7 +354,7 @@ def make_visit_mosaic(assoc, base_path=ROOT_PATH, version='v7.0', pixscale=0.08,
     files += glob.glob('*flc.fits')
 
     # info = utils.get_flt_info(files)
-    res = res_query_from_local(files=files)
+    res = res_query_from_local(files=files, extensions=[1,2])
 
     # Get closest tile
     sr = [utils.SRegion(fp) for fp in res['footprint']]
@@ -380,7 +384,7 @@ def make_visit_mosaic(assoc, base_path=ROOT_PATH, version='v7.0', pixscale=0.08,
     if det.startswith('NRC') | ('WFC' in det) | ('UVIS' in det):
         wsl = utils.half_pixel_scale(wsl)
         skip = 8
-        if 'LONG' not in det:
+        if ('NRC' in det) & ('LONG' not in det):
             wsl = utils.half_pixel_scale(wsl)
             skip = 16
     elif det in ['NIS','IR']:
@@ -403,6 +407,8 @@ def make_visit_mosaic(assoc, base_path=ROOT_PATH, version='v7.0', pixscale=0.08,
     msg += f" [{slx.start}:{slx.stop}, {sly.start}:{sly.stop}]\n"
     utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
     
+    res = res[res['sciext'] == 1]
+    
     cutout_mosaic(assoc,
                  ir_wcs=wsl, 
                  half_optical=False,
@@ -419,7 +425,8 @@ def make_visit_mosaic(assoc, base_path=ROOT_PATH, version='v7.0', pixscale=0.08,
 
     files = glob.glob(f'{assoc}*_sci.fits*')
     files.sort()
-
+    
+    # Make a figure
     for file in files:
         imgroot = file.split('.fits')[0]
         if os.path.exists(f'{imgroot}.jpg'):
