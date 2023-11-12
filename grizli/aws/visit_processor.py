@@ -350,7 +350,7 @@ def make_visit_mosaic(assoc, base_path=ROOT_PATH, version='v7.0', pixscale=0.08,
     files += glob.glob('*flc.fits')
 
     # info = utils.get_flt_info(files)
-    res = visit_processor.res_query_from_local(files=files)
+    res = res_query_from_local(files=files)
 
     # Get closest tile
     sr = [utils.SRegion(fp) for fp in res['footprint']]
@@ -403,17 +403,18 @@ def make_visit_mosaic(assoc, base_path=ROOT_PATH, version='v7.0', pixscale=0.08,
     msg += f" [{slx.start}:{slx.stop}, {sly.start}:{sly.stop}]\n"
     utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
     
-    visit_processor.cutout_mosaic(assoc, ir_wcs=wsl, 
-                                  half_optical=False,
-                                  clean_flt=False,
-                                  s3output=False,
-                                  gzip_output=True,
-                                  make_exptime_map=True,
-                                  skip_existing=skip_existing,
-                                  kernel='square',
-                                  pixfrac=0.8,
-                                  res=res,
-                                  weight_type=weight_type,
+    cutout_mosaic(assoc,
+                 ir_wcs=wsl, 
+                 half_optical=False,
+                 clean_flt=False,
+                 s3output=False,
+                 gzip_output=True,
+                 make_exptime_map=True,
+                 skip_existing=skip_existing,
+                 kernel='square',
+                 pixfrac=0.8,
+                 res=res,
+                 weight_type=weight_type,
     )
 
     files = glob.glob(f'{assoc}*_sci.fits*')
@@ -457,7 +458,7 @@ def make_visit_mosaic(assoc, base_path=ROOT_PATH, version='v7.0', pixscale=0.08,
         tab[c] = tile[c]
 
     tab['xstart'], tab['xstop'] = slx.start, slx.stop
-    tab['ystart'], tab['ystop'] = slx.start, slx.stop
+    tab['ystart'], tab['ystop'] = sly.start, sly.stop
 
     tab['input_pixscale'] = pixscale
     tab['pixscale_mas'] = pixscale_mas
