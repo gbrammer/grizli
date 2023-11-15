@@ -4444,6 +4444,73 @@ def get_wcs_slice_header(wcs, slx, sly):
     return h
 
 
+def get_fits_slices(file1, file2):
+    """
+    Get overlapping slices of FITS files
+    
+    Parameters
+    ----------
+    file1 : str, `~astropy.io.fits.Header`, or `~astropy.io.fits.HDUList`
+        First file, header or HDU
+    
+    file2 : str, `~astropy.io.fits.Header`, or `~astropy.io.fits.HDUList`
+        Second file, header or HDU
+    
+    Returns
+    -------
+    nx, ny : int
+        Size of the overlapping region
+    
+    valid : bool
+        True if there is some overlap
+    
+    sl1 : (slice, slice)
+        y and x slices of the overlap in ``file1``
+    
+    sl2 : (slice, slice)
+        y and x slices of the overlap in ``file2``
+    
+    """
+    
+    # First image
+    if isinstance(file1, pyfits.HDUList):
+        h1 = file1[0].header
+        
+    elif isinstance(file1, str):
+        im1 = pyfits.open(file1)
+        h1 = im1[0].header
+        
+    else:
+        h1 = file1
+    
+    # Second image
+    if isinstance(file2, pyfits.HDUList):
+        h2 = file2[0].header
+        
+    elif isinstance(file2, str):
+        im2 = pyfits.open(file2)
+        h2 = im2[0].header
+        
+    else:
+        h2 = file2
+        
+    # origin and shape tuples
+    o1 = np.array([-h1['CRPIX2'], -h1['CRPIX1']]).astype(int)
+    sh1 = np.array([h1['NAXIS2'],  h1['NAXIS1']])
+
+    o2 = np.array([-h2['CRPIX2'], -h2['CRPIX1']]).astype(int)
+    sh2 = np.array([h2['NAXIS2'],  h2['NAXIS1']])
+    
+    # slices
+    sl1, sl2 = get_common_slices(o1, sh1, o2, sh2)
+    
+    nx = sl1[1].stop - sl1[1].start
+    ny = sl1[0].stop - sl1[0].start
+    valid = (nx > 0) & (ny > 0)
+    
+    return nx, ny, valid, sl1, sl2
+
+
 def get_common_slices(a_origin, a_shape, b_origin, b_shape):
     """
     Get slices of overlaps between two rectangular grids
@@ -4462,6 +4529,7 @@ def get_common_slices(a_origin, a_shape, b_origin, b_shape):
 
     a_slice = (slice(lls[0], urs[0]), slice(lls[1], urs[1]))
     b_slice = (slice(llo[0], uro[0]), slice(llo[1], uro[1]))
+    
     return a_slice, b_slice
 
 
