@@ -2856,7 +2856,7 @@ def query_pure_parallel_wcs(assoc, pad_hours=1.0, verbose=True, products=['1b','
     return prime, res, times
 
 
-def query_pure_parallel_wcs_to_database():
+def query_pure_parallel_wcs_to_database(programs=[1571,3383,4861,2514,3990], output='/tmp/jwst_pure_parallels.html'):
     """
     Run pure parallel wcs query for all associations from PP proposals
     - 1571: PASSAGE
@@ -2866,10 +2866,10 @@ def query_pure_parallel_wcs_to_database():
     
     """
     from .aws import db
-    
-    pp = db.SQL("""select assoc_name, max(proposal_id) as proposal_id, 
+    pstr = ','.join([f"'{p}'" for p in programs])
+    pp = db.SQL(f"""select assoc_name, max(proposal_id) as proposal_id, 
 count(assoc_name), max(filter) as filter
-from assoc_table where proposal_id in ('1571','3383','4861','2514','3990')
+from assoc_table where proposal_id in ({pstr})
 group by assoc_name order by max(t_min)
 """)
     
@@ -2919,8 +2919,20 @@ group by assoc_name order by max(t_min)
         
         db.send_to_database('pure_parallel_exposures', prime[columns],
                             index=False, if_exists='append')
-
     
+    # Redo query
+    exist = db.SQL("""select assoc_name, count(assoc_name),
+    min(proposal_id) as primary_program, min(filename) as primary_file,
+    max(targname) as targname,
+    min(apername) as apername,
+    max(apername) as max_apername,
+    max(substr(par_file, 4,4)) as purepar_program,
+    min(par_file) as purepar_file,
+    min(t_min) as t_min, max(t_max) as t_max,
+    min(par_dt) as min_dt, max(par_dt) as max_dt
+    from pure_parallel_exposures group by assoc_name order by min(t_min)
+    """)
+
     desc = {'t_min': 'Visit start, mjd',
             't_max': 'Visit end, mjd',
             'count': 'Exposure count',
@@ -2938,11 +2950,13 @@ group by assoc_name order by max(t_min)
     exist['min_dt'].format = '.1f'
     exist['max_dt'].format = '.1f'
     
-    exist.write_sortable_html('/tmp/jwst_pure_parallels.html', use_json=False, 
-                              localhost=False, max_lines=10000,
+    exist.write_sortable_html(output,
+                              use_json=False, 
+                              localhost=False,
+                              max_lines=100000,
                               filter_columns=list(desc.keys()))
-                              
-    
+
+
 def update_pure_parallel_wcs(file, fix_vtype='PARALLEL_PURE', recenter_footprint=True, verbose=True, fit_kwargs={'method':'powell', 'tol':1.e-5}):
     """
     Update pointing information of pure parallel exposures using the pointing 
