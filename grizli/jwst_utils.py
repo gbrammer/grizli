@@ -2951,7 +2951,7 @@ group by assoc_name order by max(t_min)
     exist['max_dt'].format = '.1f'
     
     exist.write_sortable_html(output,
-                              use_json=False, 
+                              use_json=False,
                               localhost=False,
                               max_lines=100000,
                               filter_columns=list(desc.keys()))
