@@ -1293,7 +1293,7 @@ class ImageData(object):
                  header=None, wcs=None, photflam=1., photplam=1.,
                  origin=[0, 0], pad=(0,0), process_jwst_header=True,
                  instrument='WFC3', filter='G141', pupil=None, module=None, 
-                 hdulist=None,
+                 hdulist=None, restore_medfilt=False,
                  sci_extn=1, fwcpos=None):
         """
         Parameters
@@ -1413,6 +1413,10 @@ class ImageData(object):
                     mkey = ('MED',sci_extn)
                     med_filter = np.cast[np.float32](hdulist[mkey].data)
                     
+                    if restore_medfilt:
+                        print('xxx put med filter back in')
+                        sci += med_filter
+                        
                 if ('BKG',sci_extn) in hdulist:
                     mkey = ('BKG',sci_extn)
                     bkg_array = np.cast[np.float32](hdulist[mkey].data)
@@ -4017,7 +4021,7 @@ class BeamCutout(object):
     def __init__(self, flt=None, beam=None, conf=None,
                  get_slice_header=True, fits_file=None, scale=1.,
                  contam_sn_mask=[10, 3], min_mask=0.01, min_sens=0.08,
-                 mask_resid=True, isJWST=False):
+                 mask_resid=True, isJWST=False, restore_medfilt=False):
         """Cutout spectral object from the full frame.
 
         Parameters
@@ -4088,7 +4092,7 @@ class BeamCutout(object):
         self.module = None
         
         if fits_file is not None:
-            self.load_fits(fits_file, conf)
+            self.load_fits(fits_file, conf, restore_medfilt=restore_medfilt)
         else:
             self.init_from_input(flt, beam, conf, get_slice_header)
 
@@ -4264,7 +4268,7 @@ class BeamCutout(object):
             self.contam -= self.beam.model
 
 
-    def load_fits(self, file, conf=None, direct_extn=1, grism_extn=2):
+    def load_fits(self, file, conf=None, direct_extn=1, grism_extn=2, restore_medfilt=False):
         """Initialize from FITS file
 
         Parameters
@@ -4283,8 +4287,10 @@ class BeamCutout(object):
             file_is_open = False
             hdu = file
 
-        self.direct = ImageData(hdulist=hdu, sci_extn=direct_extn)
-        self.grism = ImageData(hdulist=hdu, sci_extn=grism_extn)
+        self.direct = ImageData(hdulist=hdu, sci_extn=direct_extn,
+                                restore_medfilt=restore_medfilt)
+        self.grism = ImageData(hdulist=hdu, sci_extn=grism_extn,
+                               restore_medfilt=restore_medfilt)
 
         self.contam = hdu['CONTAM'].data*1
         try:
