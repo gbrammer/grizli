@@ -42,6 +42,9 @@ primer_uds_south
 primer_cosmos_east
 primer_cosmos_west
 snh0pe
+abells1063
+j061548m5745
+spitzer_idf
 """.split()
 
 __all__ = ['AVAILABLE_FIELDS', 'make_wcs', 'show_field_footprint']
@@ -779,6 +782,28 @@ END""")
     
         ref_file = w
 
+    elif mosaic_field == 'gds-sw':    
+        # SW corner with additional GTO data
+        NX, NY, ra, dec = 7.0, 7.0, 53.093, -27.87
+
+        hdu = utils.make_wcsheader(ra=ra,  dec=dec,
+                                   size=(NX*2048*0.04, NY*2048*0.04),
+                                   pixscale=0.04, theta=0., get_hdu=True)
+
+        hdu.header['CRPIX1'] = NX*2048//2
+        hdu.header['CRPIX2'] = NY*2048//2
+    
+        root = f'gds-sw-grizli-{version}'
+
+        w = pywcs.WCS(hdu.header)
+
+        sr = utils.SRegion(w)
+        print(sr.region[0])
+        
+        print(root, hdu.data.shape, w.pixel_shape)
+    
+        ref_file = w
+
     elif mosaic_field == 'gdn':
     
         # FRESCO-N
@@ -1040,7 +1065,53 @@ END""")
         print(root, hdu.data.shape, w.pixel_shape)
     
         ref_file = w
+    
+    elif mosaic_field == 'abells1063':
 
+        root = 'abells1063'
+        
+        NX, NY, ra, dec = 3, 3, 342.1839985, -44.5308919
+
+        hdu = utils.make_wcsheader(ra=ra,  dec=dec,
+                                       size=(NX*2048*0.04, NY*2048*0.04),
+                                       pixscale=0.04, theta=0., get_hdu=True)
+
+        hdu.header['CRPIX1'] = NX*2048//2
+        hdu.header['CRPIX2'] = NY*2048//2
+        w = pywcs.WCS(hdu.header)
+
+        root = f'abells1063-grizli-{version}'
+
+        sr = utils.SRegion(w)
+        print(sr.region[0])
+        
+        print(root, hdu.data.shape, w.pixel_shape)
+    
+        ref_file = w
+
+    elif mosaic_field == 'j061548m5745':
+
+        root = 'j061548m5745'
+        
+        NX, NY, ra, dec = 4, 5, 93.955650, -57.757050
+
+        hdu = utils.make_wcsheader(ra=ra,  dec=dec,
+                                       size=(NX*2048*0.04, NY*2048*0.04),
+                                       pixscale=0.04, theta=0., get_hdu=True)
+
+        hdu.header['CRPIX1'] = NX*2048//2
+        hdu.header['CRPIX2'] = NY*2048//2
+        w = pywcs.WCS(hdu.header)
+
+        root = f'j061548m5745-grizli-{version}'
+
+        sr = utils.SRegion(w)
+        print(sr.region[0])
+        
+        print(root, hdu.data.shape, w.pixel_shape)
+    
+        ref_file = w
+    
     elif mosaic_field == 'panoramic':
     
         # PANORAMIC
@@ -1107,6 +1178,24 @@ END""")
 
         ref_file = w
         
+    elif (mosaic_field in ['spitzer_idf']):
+        
+        NX, NY, ra, dec = 5, 3.5, 265.0347875, 68.9741119
+        
+        hdu = utils.make_wcsheader(ra=ra,  dec=dec,
+                                   size=(NX*2048*0.04, NY*2048*0.04),
+                                   pixscale=0.04, theta=0., get_hdu=True)
+        
+        hdu.header['CRPIX1'] = NX*2048//2
+        hdu.header['CRPIX2'] = NY*2048//2
+        w = pywcs.WCS(hdu.header)
+        
+        root = f'spitzer_idf-grizli-{version}'
+
+        print(root, hdu.data.shape, w.pixel_shape)
+
+        ref_file = w
+
     else:
         raise ValueError(f'Field {mosaic_field} not defined')
     
