@@ -3024,9 +3024,13 @@ def update_pure_parallel_wcs(file, fix_vtype='PARALLEL_PURE', recenter_footprint
         AND apername != 'NRS_FULL_MSA'
         """)
     except:
-        msg = "jwst_utils.update_pure_parallel_wcs: db query failed"
-        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
-        return None
+        try:
+            _api = "https://grizli-cutout.herokuapp.com/pure_parallel?file={0}"
+            prime = utils.read_catalog(_api.format(os.path.basename(file)))
+        except:
+            msg = "jwst_utils.update_pure_parallel_wcs: db query failed"
+            utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+            return None
         
     if len(prime) == 0:
         msg = f"jwst_utils.update_pure_parallel_wcs: par_file='{file}'"
@@ -3047,6 +3051,10 @@ def update_pure_parallel_wcs(file, fix_vtype='PARALLEL_PURE', recenter_footprint
     
     prime_aper = pysiaf.Siaf(row['instrument_name'])[row['apername']]
     
+    if 0:
+        pos = (h1['RA_V1'], h1['DEC_V1'], h1['PA_V3'])
+        att = rotations.attitude(0.0, 0.0, *pos)
+        
     if recenter_footprint:
         xy = utils.SRegion(row['footprint']).xy[0].T
         
