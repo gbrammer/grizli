@@ -2957,10 +2957,125 @@ group by assoc_name order by max(t_min)
                               filter_columns=list(desc.keys()))
 
 
-def update_pure_parallel_wcs(file, fix_vtype='PARALLEL_PURE', recenter_footprint=True, verbose=True, fit_kwargs={'method':'powell', 'tol':1.e-5}):
+def update_pure_parallel_wcs(file, fix_vtype='PARALLEL_PURE', verbose=True):
     """
     Update pointing information of pure parallel exposures using the pointing 
     information of the prime exposures from the MAST database and `pysiaf`
+    
+    1. Find the FGS log from a MAST query that is closest in ``EXPSTART`` to ``file``
+    2. Use the ``ra_v1, dec_v1, pa_v3`` values of the FGS log to set the pointing 
+       attitude with `pysiaf`
+    3. Compute the sky position of the ``CRPIX`` reference pixel of ``file`` with 
+       `pysiaf` and put that position in the ``CRVAL`` keywords
+    
+    Parameters
+    ----------
+    file : str
+        Filename of a pure-parallel exposure (rate.fits)
+    
+    fix_vtype : str
+        Run if ``file[0].header['VISITYPE'] == fix_vtype``
+    
+    verbose : bool
+        Status messaging
+    
+    Returns
+    -------
+    status : None, True
+        Returns None if some problem is found 
+    
+    """
+    from scipy.optimize import minimize
+    import pysiaf
+    from pysiaf.utils import rotations
+    
+    import mastquery.jwst
+    from .aws import db
+    
+    if not os.path.exists(file):
+        msg = "jwst_utils.update_pure_parallel_wcs: "
+        msg += f" {file} not found"
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+        return None
+    
+    with pyfits.open(file) as im:
+        h0 = im[0].header.copy()
+        h1 = im[1].header.copy()
+        if 'VISITYPE' not in im[0].header:
+            msg = "jwst_utils.update_pure_parallel_wcs: "
+            msg += f" VISITYPE not found in header {file}"
+            utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+            return None
+    
+    # Is this a PARALLEL_PURE exposure?
+    vtype = h0['VISITYPE']
+    
+    if vtype != fix_vtype:
+        msg = "jwst_utils.update_pure_parallel_wcs: "
+        msg += f" VISITYPE ({vtype}) != {fix_vtype}, skip"
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+        return None
+    
+    crval_init = h1['CRVAL1'], h1['CRVAL2']
+    
+    # Get correct pointing from FGS logs
+    dt = 0.01
+    gs = mastquery.jwst.query_guidestar_log(
+             mjd=(h0['EXPSTART']-dt, h0['EXPEND']+dt),
+             program=None,
+             exp_type=['FGS_FINEGUIDE'],
+         )
+    
+    keep = (gs['expstart'] < h0['EXPSTART'])
+    keep &= (gs['expend'] > h0['EXPEND'])
+    
+    if keep.sum() == 0:
+        msg = f"jwst_utils.update_pure_parallel_wcs: par_file='{file}'"
+        msg += " couldn't find corresponding exposure in FGS logs"
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+        return None
+    
+    gs = gs[keep][0]
+    pos = (gs['ra_v1'], gs['dec_v1'], gs['pa_v3'])
+    att = rotations.attitude(0.0, 0.0, *pos)
+        
+    # And apply the pointing to the parallel aperture and reference pixel
+    par_aper = pysiaf.Siaf(h0['INSTRUME'])[h0['APERNAME']]
+    par_aper.set_attitude_matrix(att)
+
+    crpix = h1['CRPIX1'], h1['CRPIX2']
+    crpix_init = par_aper.sky_to_sci(*crval_init)
+    
+    crval_fix = par_aper.sci_to_sky(*crpix)
+    
+    msg = f"jwst_utils.update_pure_parallel_wcs: {file}"
+    msg += '\n' + f"jwst_utils.update_pure_parallel_wcs: FGS {gs['fileName']} "
+    msg += '\n' + f"jwst_utils.update_pure_parallel_wcs: original crval "
+    msg += f"{crval_init[0]:.6f} {crval_init[1]:.6f}"
+    msg += '\n' + f"jwst_utils.update_pure_parallel_wcs:      new crval "
+    msg += f"{crval_fix[0]:.6f} {crval_fix[1]:.6f}"
+    msg += '\n' + f"jwst_utils.update_pure_parallel_wcs:           dpix "
+    msg += f"{crpix[0] - crpix_init[0]:6.3f} {crpix[1] - crpix_init[1]:6.3f}"
+    
+    _ = utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+    
+    with pyfits.open(file, mode='update') as im:
+        im[1].header['CRVAL1'] = crval_fix[0]
+        im[1].header['CRVAL2'] = crval_fix[1]
+        im[1].header['PUREPWCS'] = True, 'WCS updated from PP query'
+        im[1].header['PUREPEXP'] = row['filename'], 'Prime exposure file'
+        
+        im.flush()
+    
+    return True
+
+
+def update_pure_parallel_wcs_old(file, fix_vtype='PARALLEL_PURE', recenter_footprint=True, verbose=True, fit_kwargs={'method':'powell', 'tol':1.e-5}, good_threshold=1.0):
+    """
+    Update pointing information of pure parallel exposures using the pointing 
+    information of the prime exposures from the MAST database and `pysiaf`
+    
+    *Deprecated*: use `grizli.jwst_utils.update_pure_parallel_wcs`
     
     1. Find the prime exposure from the MAST query that is closest in ``EXPSTART``
        to ``file``
@@ -2991,6 +3106,7 @@ def update_pure_parallel_wcs(file, fix_vtype='PARALLEL_PURE', recenter_footprint
     import pysiaf
     from pysiaf.utils import rotations
     
+    import mastquery.jwst
     from .aws import db
     
     if not os.path.exists(file):
@@ -3019,14 +3135,15 @@ def update_pure_parallel_wcs(file, fix_vtype='PARALLEL_PURE', recenter_footprint
     
     # Find a match in the db
     try:
-        prime = db.SQL(f"""select * from pure_parallel_exposures
-        where par_file = '{os.path.basename(file)}'
-        AND apername != 'NRS_FULL_MSA'
-        """)
+        _api = "https://grizli-cutout.herokuapp.com/pure_parallel?file={0}"
+        prime = utils.read_catalog(_api.format(os.path.basename(file)),
+                                   format='csv')
     except:
         try:
-            _api = "https://grizli-cutout.herokuapp.com/pure_parallel?file={0}"
-            prime = utils.read_catalog(_api.format(os.path.basename(file)))
+            prime = db.SQL(f"""select * from pure_parallel_exposures
+            where par_file = '{os.path.basename(file)}'
+            AND apername != 'NRS_FULL_MSA'
+            """)
         except:
             msg = "jwst_utils.update_pure_parallel_wcs: db query failed"
             utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
@@ -3039,6 +3156,18 @@ def update_pure_parallel_wcs(file, fix_vtype='PARALLEL_PURE', recenter_footprint
         return None
         
     crval_init = h1['CRVAL1'], h1['CRVAL2']
+    
+    # Get correct pointing from FGS logs
+    dt = 0.01
+    gs = mastquery.jwst.query_guidestar_log(
+             mjd=(h0['EXPSTART']-dt, h0['EXPEND']+dt),
+             program=None,
+             exp_type=['FGS_FINEGUIDE'],
+         )
+    
+    keep = (gs['expstart'] < h0['EXPSTART'])
+    keep &= (gs['expend'] > h0['EXPEND'])
+    gs = gs[keep]
     
     # OK, we have a row, now compute the pysiaf pointing for the prime
     row = prime[0]
@@ -3084,7 +3213,7 @@ def update_pure_parallel_wcs(file, fix_vtype='PARALLEL_PURE', recenter_footprint
         
         utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
         
-        if _fit.fun > 1:
+        if _fit.fun > good_threshold:
             att = rotations.attitude(prime_aper.V2Ref, prime_aper.V3Ref, *pos)
             prime_aper.set_attitude_matrix(att)
             
@@ -3181,5 +3310,46 @@ def objfun_pysiaf_pointing(theta, ap, xy, pa, ret):
     # print(theta, (diff**2).sum())
     
     return (diff**2).sum()
+
+
+def compute_siaf_pa_offset(c1, c2, c2_pa=202.9918, swap_coordinates=True, verbose=False):
+    """
+    Eq. 10 from Bonaventura et al. for the small PA offset based on the median catalog position
+
+    Seems to have a sign error relative to what APT calculates internally, used if `swap_coordinates=True`
     
+    """
+    from astropy.coordinates import SkyCoord
+    if not hasattr(c1, 'ra'):
+        cat_coord = SkyCoord(*c1, unit='deg')
+    else:
+        cat_coord = c1
+        
+    ac = cat_coord.ra.deg/180*np.pi
+    dc = cat_coord.dec.deg/180*np.pi
+
+    if not hasattr(c2, 'ra'):
+        apt_coord = SkyCoord(*c2, unit='deg')
+    else:
+        apt_coord = c2
+
+    dx = apt_coord.spherical_offsets_to(cat_coord)
+        
+    ap = apt_coord.ra.deg/180*np.pi
+    dp = apt_coord.dec.deg/180*np.pi
     
+    # Needs to swap to agree with APT
+    if swap_coordinates:
+        cx, cy = ac*1, dc*1
+        ac, dc = ap, dp
+        ap, dp = cx, cy
+    
+    num = np.sin(ap - ac) * (np.sin(dc) + np.sin(dp))
+    den = np.cos(dc) * np.cos(dp) + np.cos(ap - ac) * (1 + np.sin(dc)*np.sin(dp))
+    
+    dphi = np.arctan(num/den)/np.pi*180
+
+    if verbose:
+        print(f'Catalog offset: {dx[0].to(u.arcsec):5.2f} {dx[1].to(u.arcsec):5.2f} new APA: {c2_pa + dphi:.5f}')
+
+    return c2_pa + dphi, dphi
