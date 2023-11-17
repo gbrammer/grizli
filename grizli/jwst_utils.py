@@ -3063,7 +3063,7 @@ def update_pure_parallel_wcs(file, fix_vtype='PARALLEL_PURE', verbose=True):
         im[1].header['CRVAL1'] = crval_fix[0]
         im[1].header['CRVAL2'] = crval_fix[1]
         im[1].header['PUREPWCS'] = True, 'WCS updated from PP query'
-        im[1].header['PUREPEXP'] = row['filename'], 'Prime exposure file'
+        im[1].header['PUREPEXP'] = gs['fileName'], 'FGS log file'
         
         im.flush()
     
@@ -3320,6 +3320,8 @@ def compute_siaf_pa_offset(c1, c2, c2_pa=202.9918, swap_coordinates=True, verbos
     
     """
     from astropy.coordinates import SkyCoord
+    import astropy.units as u
+
     if not hasattr(c1, 'ra'):
         cat_coord = SkyCoord(*c1, unit='deg')
     else:
