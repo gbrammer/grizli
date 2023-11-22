@@ -798,11 +798,14 @@ def delete_all_assoc_data(assoc):
         else:
             obs_id.append(v[:6])
             
-    vis_root = np.unique(obs_id)
-    for r in vis_root:
-        print(f'Remove {r} from shifts_log')
-        db.execute(f"""DELETE from shifts_log
-                               WHERE shift_dataset like '{r}%%'""")
+    # vis_root = np.unique(obs_id)
+    # for r in vis_root:
+    #     print(f'Remove {r} from shifts_log')
+    #     db.execute(f"""DELETE from shifts_log
+    #                            WHERE shift_dataset like '{r}%%'""")
+
+    print('Remove from shifts_log')
+    db.execute(f"DELETE from shifts_log where shift_assoc = '{assoc}'")
     
     print('Remove from wcs_log')
     db.execute(f"DELETE from wcs_log where wcs_assoc = '{assoc}'")
@@ -819,7 +822,13 @@ def delete_all_assoc_data(assoc):
     
     res = db.execute(f"""DELETE from exposure_files
                     WHERE assoc = '{assoc}'""")
-                    
+    
+    res = db.execute(f"""DELETE from assoc_mosaic
+                     WHERE assoc_name = '{assoc}'
+                     """)
+
+    os.system(f'aws s3 rm s3://grizli-v2/assoc_mosaic/v7.0/ --recursive --exclude "*" --include "{assoc}*"')
+                     
     os.system(f'aws s3 rm --recursive s3://grizli-v2/HST/Pipeline/{assoc}')
 
     res = db.execute(f"""UPDATE assoc_table
@@ -1376,8 +1385,9 @@ def check_jwst_assoc_guiding(assoc):
     so = np.argsort(atab['t_min'])
     atab = atab[so]
     
+    dt = 0.1
     gs = mastquery.jwst.query_guidestar_log(
-             mjd=(atab['t_min'].min()-0.1, atab['t_max'].max()+0.1),
+             mjd=(atab['t_min'].min()-dt, atab['t_max'].max()+dt),
              program=atab['proposal_id'][0],
              exp_type=['FGS_FINEGUIDE'],
          )
@@ -2538,7 +2548,7 @@ def matched_exptime_map(ref_file, sample_factor=4, keep_small=True, output_type=
         return output_file
 
 
-def show_epochs_filter(ra, dec, size=4, filter='F444W-CLEAR', cleanup=True, vmax=0.2, cmap='magma_r'):
+def show_epochs_filter(ra, dec, size=4, filters=['F444W-CLEAR'], cleanup=True, vmax=0.2, cmap='magma_r'):
     """
     Make a figure showing cutouts around a particular position for all exposures 
     covering that point
@@ -2554,7 +2564,7 @@ def show_epochs_filter(ra, dec, size=4, filter='F444W-CLEAR', cleanup=True, vmax
                                         size=size,
                                         s3output=None,
                                         gzip_output=False,
-                                        filters=[filter],
+                                        filters=filters,
                                         clean_flt=False,
                                         skip_existing=False,
                                        )
