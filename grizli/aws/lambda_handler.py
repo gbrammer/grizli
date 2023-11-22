@@ -776,7 +776,7 @@ def run_grizli_fit(event):
                                        args_file=args_file,
                                        **event_kwargs)
         
-        if root.startswith('fresco-g'):
+        if root.startswith('fresco-g') | root.startswith('abell2744clu'):
             try:
                 mb, tfit = res[0], res[3]
                 # 1D for FRESCO
