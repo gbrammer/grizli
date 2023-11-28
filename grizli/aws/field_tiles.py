@@ -464,7 +464,7 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
                 filters.append(f)
 
         if len(filters) == 3:
-            rgb_scl = [1.15,1.1,0.92]
+            rgb_scl = [1.01, 1.01, 1.0]
             split_tiles(root, ref_tile=ref_tile, 
                     filters=filters,
                     zoom_levels=zoom_levels,
