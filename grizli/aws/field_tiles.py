@@ -392,7 +392,7 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
                     )
 
         plt.close('all')
-    
+
     # JWST LW
     if (len(glob.glob(f'{root}*.lwrgb.png')) == 0) & make_combinations:
         filters = []
@@ -414,6 +414,69 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
                     rgb_min=-0.018)
 
         plt.close('all')
+    
+    # JWST NIRCam MB
+    if (len(glob.glob(f'{root}*.mb1um.png')) == 0) & make_combinations:
+        filters = []
+        for f in ['f140m-clear','f182m-clear','f210m-clear']:
+            if f in all_filters:
+                filters.append(f)
+
+        if len(filters) == 3:
+            split_tiles(root, ref_tile=ref_tile, 
+                    filters=filters,
+                    zoom_levels=zoom_levels,
+                    optical=True, suffix='.mb1um', xsize=32, scl=2,
+                    force=force, rgb_scl=[1,1.01,1.01], rgb_min=-0.018,
+                    pl=1, pf=1,
+                    # norm_kwargs={'stretch': 'asinh', 'min_cut': -0.01,
+                    #              'max_cut': 1.0, 'clip':True,
+                    #              'asinh_a':0.03},
+                    )
+
+            plt.close('all')
+    
+    if (len(glob.glob(f'{root}*.mb3um.png')) == 0) & make_combinations:
+        filters = []
+        for f in ['f300m-clear','f335m-clear','f360m-clear']:
+            if f in all_filters:
+                filters.append(f)
+
+        if len(filters) == 3:
+            rgb_scl = [1.15,1.1,0.92]
+            split_tiles(root, ref_tile=ref_tile, 
+                    filters=filters,
+                    zoom_levels=zoom_levels,
+                    optical=True, suffix='.mb3um', xsize=32, scl=4,
+                    force=force, rgb_scl=rgb_scl, rgb_min=-0.018,
+                    pl=1, pf=1,
+                    # norm_kwargs={'stretch': 'asinh', 'min_cut': -0.01,
+                    #              'max_cut': 1.0, 'clip':True,
+                    #              'asinh_a':0.03},
+                    )
+
+            plt.close('all')
+
+    if (len(glob.glob(f'{root}*.mb4um.png')) == 0) & make_combinations:
+        filters = []
+        for f in ['f410m-clear','f430m-clear','f460m-clear']:
+            if f in all_filters:
+                filters.append(f)
+
+        if len(filters) == 3:
+            rgb_scl = [1.15,1.1,0.92]
+            split_tiles(root, ref_tile=ref_tile, 
+                    filters=filters,
+                    zoom_levels=zoom_levels,
+                    optical=True, suffix='.mb4um', xsize=32, scl=4,
+                    force=force, rgb_scl=rgb_scl, rgb_min=-0.018,
+                    pl=1, pf=1,
+                    # norm_kwargs={'stretch': 'asinh', 'min_cut': -0.01,
+                    #              'max_cut': 1.0, 'clip':True,
+                    #              'asinh_a':0.03},
+                    )
+
+            plt.close('all')
     
     # All NIRCam - prefer r, g, b = F444W, F277W, F115W
     # but look for other combinations if that not available
