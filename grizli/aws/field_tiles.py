@@ -690,6 +690,7 @@ def process_tile(field='cos', tile='01.01', filters=TILE_FILTERS, fetch_existing
     import astropy.wcs as pywcs
     from grizli.aws import visit_processor, db
     from grizli.pipeline import auto_script
+    from grizli import prep
     
     utils.LOGFILE = 'mosaic.log'
     
@@ -748,7 +749,8 @@ def process_tile(field='cos', tile='01.01', filters=TILE_FILTERS, fetch_existing
                                  use_hst_kernel=False,
                                  subtract_background=True)
     
-        phot = auto_script.multiband_catalog(field_root=root) #, **phot_kwargs)
+        phot = auto_script.multiband_catalog(field_root=root,
+                       phot_apertures=prep.SEXTRACTOR_PHOT_APERTURES_ARCSEC[:4]) #, **phot_kwargs)
     
         if len(phot) == 0:
             # Empty catalog
