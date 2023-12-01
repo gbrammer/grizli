@@ -4572,8 +4572,7 @@ def make_filter_combinations(root, weight_fnu=2, filter_combinations=FILTER_COMB
             head[band] = im_i[0].header.copy()
         else:
             for k in im_i[0].header:
-                #head[band][k] = im_i[0].header[k]
-                pass
+                if k == '' or k == 'HISTORY': continue
                 
             for k in ref_h_i:
                 head[band][k] = ref_h_i[k]
