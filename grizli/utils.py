@@ -5751,6 +5751,67 @@ def jwst_crds_photom_scale(hdul, context='jwst_1130.pmap', update=True, verbose=
     return scale
 
 
+def jwst_snowblind_mask(rate_file, new_jump_flag=1024, min_radius=6, growth_factor=1.5, unset_first=True, **kwargs):
+    """
+    Update JWST DQ mask with `snowblind`.  See 
+    https://github.com/mpi-astronomy/snowblind.
+    
+    Requires ``snowblind > 0.1.2``, which currently is just in the fork at 
+    https://github.com/gbrammer/snowblind.
+    
+    Parameters
+    ----------
+    rate_file : str
+        Filename of a ``rate.fits`` exposure
+    
+    new_jump_flag : int
+        Integer DQ flag of identified snowballs
+    
+    min_radius : int
+        Minimum radius of ``JUMP_DET`` flagged groups of pixels
+    
+    growth_factor : float
+        Scale factor of the DQ mask
+    
+    unset_first : bool
+        Unset the `new_jump_flag` bit of the DQ array before processing
+    
+    Returns
+    -------
+    dq : array-like
+        Image array with values ``new_jump_flag`` with identified snowballs
+    
+    """
+    import jwst.datamodels
+    try:
+        from snowblind import snowblind
+        from snowblind import __version__ as snowblind_version
+    except ImportError:
+        return None
+    
+    if snowblind_version <= '0.1.2':
+        msg = ('ImportError: snowblind > 0.1.2 required, get it from the fork at ' 
+               'https://github.com/gbrammer/snowblind if not yet available on the '
+               'main repository at https://github.com/mpi-astronomy/snowblind')
+        
+        log_comment(LOGFILE, msg, verbose=True)
+        return None
+    
+    step = snowblind.SnowblindStep
+    
+    with jwst.datamodels.open(rate_file) as dm:
+        if unset_first:
+            dm.dq -= dm.dq & new_jump_flag
+            
+        res = step.call(dm, save_results=False,
+                        new_jump_flag=new_jump_flag,
+                        min_radius=min_radius,
+                        growth_factor=growth_factor,
+                        **kwargs)
+    
+    return res.dq & new_jump_flag
+
+
 def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
                        clean=True, include_saturated=True, keep_bits=None,
                        dryrun=False, skip=None, extra_wfc3ir_badpix=True,
@@ -5761,6 +5822,7 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
                        rnoise_percentile=99,
                        calc_wcsmap=False,
                        niriss_ghost_kwargs={},
+                       snowblind_kwargs=None,
                        get_dbmask=True):
     """
     Make drizzle mosaic from exposures in a visit dictionary
@@ -5826,6 +5888,9 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
     
     niriss_ghost_kwargs : dict
         Keyword arguments for `~grizli.utils.niriss_ghost_mask`
+    
+    snowblind_kwargs : dict
+        Keyword arguments for additional DQ flagging with `snowblind`
     
     Returns
     -------
@@ -6009,6 +6074,16 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
                         
             if bpdata is None:
                 bpdata = np.zeros(flt['SCI'].data.shape, dtype=int)
+            
+            if (snowblind_kwargs is not None) & (_inst in ['NIRCAM','NIRISS']):
+                # Already processed with snowblind?
+                if 'SNOWBLND' in flt['SCI'].header:
+                    msg = 'Already processed with `snowblind`'
+                    log_comment(LOGFILE, msg, verbose=verbose)
+                else:
+                    sdq = jwst_snowblind_mask(file, **snowblind_kwargs)
+                    if sdq is not None:
+                        bpdata |= sdq
             
             if get_dbmask:
                 dbmask = apply_region_mask_from_db(os.path.basename(file), 
