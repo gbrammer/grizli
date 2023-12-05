@@ -3438,7 +3438,7 @@ def mask_snowballs(visit, snowball_erode=3, snowball_dilate=18, mask_bit=1024, i
                 if sdq is not None:
                     _im.close()
                     with pyfits.open(_file, mode='update') as _xim:
-                        _xim['DQ'].data |= sdq.astype(_im['DQ'].data.dtype)
+                        _xim['DQ'].data |= sdq.astype(_xim['DQ'].data.dtype)
                         _xim['SCI'].header['SNOWMASK'] = (True, 'Snowball mask applied')
                         _xim['SCI'].header['SNOWBLND'] = (True, 'Mask with snowblind')
                         _xim['SCI'].header['SNOWBALF'] = (sfrac,
