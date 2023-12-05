@@ -5751,7 +5751,7 @@ def jwst_crds_photom_scale(hdul, context='jwst_1130.pmap', update=True, verbose=
     return scale
 
 
-def jwst_snowblind_mask(rate_file, new_jump_flag=1024, min_radius=6, growth_factor=1.5, unset_first=True, **kwargs):
+def jwst_snowblind_mask(rate_file, require_prefix='jw', new_jump_flag=1024, min_radius=6, growth_factor=1.5, unset_first=True, **kwargs):
     """
     Update JWST DQ mask with `snowblind`.  See 
     https://github.com/mpi-astronomy/snowblind.
@@ -5763,6 +5763,9 @@ def jwst_snowblind_mask(rate_file, new_jump_flag=1024, min_radius=6, growth_fact
     ----------
     rate_file : str
         Filename of a ``rate.fits`` exposure
+    
+    require_prefix : str
+        Only run if ``rate_file.startswith(require_prefix)``
     
     new_jump_flag : int
         Integer DQ flag of identified snowballs
@@ -5783,6 +5786,11 @@ def jwst_snowblind_mask(rate_file, new_jump_flag=1024, min_radius=6, growth_fact
     
     """
     import jwst.datamodels
+    from . import jwst_utils
+    
+    if not os.path.basename(rate_file).startswith('require_prefix'):
+        return None
+    
     try:
         from snowblind import snowblind
         from snowblind import __version__ as snowblind_version
@@ -5799,6 +5807,15 @@ def jwst_snowblind_mask(rate_file, new_jump_flag=1024, min_radius=6, growth_fact
     
     step = snowblind.SnowblindStep
     
+    # Do we need to reset header keywords?
+    reset_header = False
+    with pyfits.open(rate_file) as im:
+         reset_header = ('OINSTRUME' in im[0].header)
+         reset_header &= (im[0].header['INSTRUME'] == 'WFC3')
+
+    if reset_header:
+        _ = jwst_utils.set_jwst_to_hst_keywords(rate_file, reset=True, verbose=False)
+        
     with jwst.datamodels.open(rate_file) as dm:
         if unset_first:
             dm.dq -= dm.dq & new_jump_flag
@@ -5808,6 +5825,9 @@ def jwst_snowblind_mask(rate_file, new_jump_flag=1024, min_radius=6, growth_fact
                         min_radius=min_radius,
                         growth_factor=growth_factor,
                         **kwargs)
+    
+    if reset_header:
+        _ = jwst_utils.set_jwst_to_hst_keywords(rate_file, reset=False, verbose=False)
     
     return res.dq & new_jump_flag
 
