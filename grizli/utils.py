@@ -5787,6 +5787,9 @@ def jwst_snowblind_mask(rate_file, require_prefix='jw', max_fraction=0.3, new_ju
     dq : array-like
         Image array with values ``new_jump_flag`` with identified snowballs
     
+    mask_frac : float
+        Fraction of masked pixels
+    
     """
     import jwst.datamodels
     from . import jwst_utils
@@ -5845,7 +5848,7 @@ def jwst_snowblind_mask(rate_file, require_prefix='jw', max_fraction=0.3, new_ju
         
     log_comment(LOGFILE, msg, verbose=verbose)
 
-    return res.dq & new_jump_flag
+    return (res.dq & new_jump_flag), _mask_frac
 
 
 def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
@@ -6117,7 +6120,7 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
                     msg = 'Already processed with `snowblind`'
                     log_comment(LOGFILE, msg, verbose=verbose)
                 else:
-                    sdq = jwst_snowblind_mask(file, **snowblind_kwargs)
+                    sdq, sfrac = jwst_snowblind_mask(file, **snowblind_kwargs)
                     bpdata -= bpdata & 1024
                     if sdq is not None:
                         bpdata |= sdq
