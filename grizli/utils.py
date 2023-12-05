@@ -5788,7 +5788,7 @@ def jwst_snowblind_mask(rate_file, require_prefix='jw', new_jump_flag=1024, min_
     import jwst.datamodels
     from . import jwst_utils
     
-    if not os.path.basename(rate_file).startswith('require_prefix'):
+    if not os.path.basename(rate_file).startswith(require_prefix):
         return None
     
     try:
