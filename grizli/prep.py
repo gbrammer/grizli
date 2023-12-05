@@ -3436,7 +3436,7 @@ def mask_snowballs(visit, snowball_erode=3, snowball_dilate=18, mask_bit=1024, i
             if snowblind_kwargs is not None:
                 sdq, sfrac = utils.jwst_snowblind_mask(_file, **snowblind_kwargs)
                 if sdq is not None:
-                    _im['DQ'].data |= sdq.stype(_im['DQ'].data.dtype)
+                    _im['DQ'].data |= sdq.astype(_im['DQ'].data.dtype)
                     _im['SCI'].header['SNOWMASK'] = (True, 'Snowball mask applied')
                     _im['SCI'].header['SNOWBLND'] = (True, 'Mask with snowblind')
                     _im['SCI'].header['SNOWBALF'] = (sfrac,
