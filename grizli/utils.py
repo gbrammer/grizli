@@ -5751,7 +5751,7 @@ def jwst_crds_photom_scale(hdul, context='jwst_1130.pmap', update=True, verbose=
     return scale
 
 
-def jwst_snowblind_mask(rate_file, require_prefix='jw', new_jump_flag=1024, min_radius=6, growth_factor=1.5, unset_first=True, **kwargs):
+def jwst_snowblind_mask(rate_file, require_prefix='jw', max_fraction=0.3, new_jump_flag=1024, min_radius=6, growth_factor=1.5, unset_first=True, verbose=True, **kwargs):
     """
     Update JWST DQ mask with `snowblind`.  See 
     https://github.com/mpi-astronomy/snowblind.
@@ -5766,6 +5766,9 @@ def jwst_snowblind_mask(rate_file, require_prefix='jw', new_jump_flag=1024, min_
     
     require_prefix : str
         Only run if ``rate_file.startswith(require_prefix)``
+    
+    max_fraction : float
+        Maximum allowed fraction of flagged pixels relative to the total
     
     new_jump_flag : int
         Integer DQ flag of identified snowballs
@@ -5814,7 +5817,7 @@ def jwst_snowblind_mask(rate_file, require_prefix='jw', new_jump_flag=1024, min_
          reset_header &= (im[0].header['INSTRUME'] == 'WFC3')
 
     if reset_header:
-        _ = jwst_utils.set_jwst_to_hst_keywords(rate_file, reset=True, verbose=False)
+        _ = jwst_utils.set_jwst_to_hst_keywords(rate_file, reset=True, verbose=verbose)
         
     with jwst.datamodels.open(rate_file) as dm:
         if unset_first:
@@ -5827,8 +5830,21 @@ def jwst_snowblind_mask(rate_file, require_prefix='jw', new_jump_flag=1024, min_
                         **kwargs)
     
     if reset_header:
-        _ = jwst_utils.set_jwst_to_hst_keywords(rate_file, reset=False, verbose=False)
+        _ = jwst_utils.set_jwst_to_hst_keywords(rate_file, reset=False, verbose=verbose)
     
+    _mask_frac = ((res.dq & new_jump_flag) > 0).sum() / res.dq.size
+    
+    if _mask_frac > max_fraction:
+        msg = f"grizli.utils.jwst_snowblind_mask: {rate_file} problem "
+        msg += f" fraction {_mask_frac:.2f} > {max_fraction:.2f}"
+        msg += "turning off..."
+        res.dq &= 0
+    else:
+        msg = f"grizli.utils.jwst_snowblind_mask: {rate_file} {_mask_frac:.2f}"
+        msg += f' masked with DQ={new_jump_flag}'
+        
+    log_comment(LOGFILE, msg, verbose=verbose)
+
     return res.dq & new_jump_flag
 
 
