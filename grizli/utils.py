@@ -6102,6 +6102,7 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
                     log_comment(LOGFILE, msg, verbose=verbose)
                 else:
                     sdq = jwst_snowblind_mask(file, **snowblind_kwargs)
+                    bpdata -= bpdata & 1024
                     if sdq is not None:
                         bpdata |= sdq
             
