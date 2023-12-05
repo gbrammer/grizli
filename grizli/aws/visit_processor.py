@@ -2022,7 +2022,7 @@ def query_exposures(ra=53.16, dec=-27.79, size=1., pixel_scale=0.1, theta=0,  fi
     return header, wcs, SQL, res
 
 
-def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-27.7910651, size=5*60, theta=0., filters=['F160W'], ir_scale=0.1, ir_wcs=None, res=None, half_optical=True, kernel='point', pixfrac=0.33, make_figure=True, skip_existing=True, clean_flt=True, gzip_output=True, s3output='s3://grizli-v2/HST/Pipeline/Mosaic/', split_uvis=True, extra_query='', extra_wfc3ir_badpix=True, fix_niriss=True, scale_nanojy=10, verbose=True, weight_type='err', rnoise_percentile=99, get_dbmask=True, niriss_ghost_kwargs={}, scale_photom=True, context='jwst_0989.pmap', calc_wcsmap=False, make_exptime_map=False, expmap_sample_factor=4, keep_expmap_small=True, **kwargs):
+def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-27.7910651, size=5*60, theta=0., filters=['F160W'], ir_scale=0.1, ir_wcs=None, res=None, half_optical=True, kernel='point', pixfrac=0.33, make_figure=True, skip_existing=True, clean_flt=True, gzip_output=True, s3output='s3://grizli-v2/HST/Pipeline/Mosaic/', split_uvis=True, extra_query='', extra_wfc3ir_badpix=True, fix_niriss=True, scale_nanojy=10, verbose=True, weight_type='err', rnoise_percentile=99, get_dbmask=True, niriss_ghost_kwargs={}, snowblind_kwargs=None, scale_photom=True, context='jwst_0989.pmap', calc_wcsmap=False, make_exptime_map=False, expmap_sample_factor=4, keep_expmap_small=True, **kwargs):
     """
     Make mosaic from exposures defined in the exposure database
     
@@ -2296,6 +2296,7 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
                                      context=context,
                                      get_dbmask=get_dbmask,
                                      niriss_ghost_kwargs=niriss_ghost_kwargs,
+                                     snowblind_kwargs=snowblind_kwargs,
                                      weight_type=weight_type,
                                      calc_wcsmap=calc_wcsmap)
                              
