@@ -3377,7 +3377,7 @@ def oneoverf_column_correction(visit, thresholds=[10,1.5], dilate_iter=[10,2], i
 
             _im.flush()
 
-SNOWBLIND_KWARGS = dict(new_jump_flag=1024, min_radius=6,
+SNOWBLIND_KWARGS = dict(new_jump_flag=1024, min_radius=4,
                         growth_factor=1.5, unset_first=True)
 
 def mask_snowballs(visit, snowball_erode=3, snowball_dilate=18, mask_bit=1024, instruments=['NIRCAM','NIRISS'], max_fraction=0.3, unset4=False, snowblind_kwargs=SNOWBLIND_KWARGS, **kwargs):
@@ -3436,6 +3436,7 @@ def mask_snowballs(visit, snowball_erode=3, snowball_dilate=18, mask_bit=1024, i
             if snowblind_kwargs is not None:
                 sdq, sfrac = utils.jwst_snowblind_mask(_file, **snowblind_kwargs)
                 if sdq is not None:
+                    # Close and reopen
                     _im.close()
                     with pyfits.open(_file, mode='update') as _xim:
                         _xim['DQ'].data |= sdq.astype(_xim['DQ'].data.dtype)

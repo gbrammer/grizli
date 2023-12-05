@@ -5751,7 +5751,7 @@ def jwst_crds_photom_scale(hdul, context='jwst_1130.pmap', update=True, verbose=
     return scale
 
 
-def jwst_snowblind_mask(rate_file, require_prefix='jw', max_fraction=0.3, new_jump_flag=1024, min_radius=6, growth_factor=1.5, unset_first=True, verbose=True, **kwargs):
+def jwst_snowblind_mask(rate_file, require_prefix='jw', max_fraction=0.3, new_jump_flag=1024, min_radius=4, growth_factor=1.5, unset_first=True, verbose=True, **kwargs):
     """
     Update JWST DQ mask with `snowblind`.  See 
     https://github.com/mpi-astronomy/snowblind.
