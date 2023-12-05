@@ -5810,7 +5810,7 @@ def jwst_snowblind_mask(rate_file, require_prefix='jw', new_jump_flag=1024, min_
     # Do we need to reset header keywords?
     reset_header = False
     with pyfits.open(rate_file) as im:
-         reset_header = ('OINSTRUME' in im[0].header)
+         reset_header = ('OINSTRUM' in im[0].header)
          reset_header &= (im[0].header['INSTRUME'] == 'WFC3')
 
     if reset_header:
