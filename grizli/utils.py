@@ -5795,13 +5795,13 @@ def jwst_snowblind_mask(rate_file, require_prefix='jw', max_fraction=0.3, new_ju
     from . import jwst_utils
     
     if not os.path.basename(rate_file).startswith(require_prefix):
-        return None
+        return None, None
     
     try:
         from snowblind import snowblind
         from snowblind import __version__ as snowblind_version
     except ImportError:
-        return None
+        return None, None
     
     if snowblind_version <= '0.1.2':
         msg = ('ImportError: snowblind > 0.1.2 required, get it from the fork at ' 
@@ -5809,7 +5809,7 @@ def jwst_snowblind_mask(rate_file, require_prefix='jw', max_fraction=0.3, new_ju
                'main repository at https://github.com/mpi-astronomy/snowblind')
         
         log_comment(LOGFILE, msg, verbose=True)
-        return None
+        return None, None
     
     step = snowblind.SnowblindStep
     
@@ -5820,7 +5820,7 @@ def jwst_snowblind_mask(rate_file, require_prefix='jw', max_fraction=0.3, new_ju
          reset_header &= (im[0].header['INSTRUME'] == 'WFC3')
 
     if reset_header:
-        _ = jwst_utils.set_jwst_to_hst_keywords(rate_file, reset=True, verbose=verbose)
+        _ = jwst_utils.set_jwst_to_hst_keywords(rate_file, reset=True, verbose=False)
         
     with jwst.datamodels.open(rate_file) as dm:
         if unset_first:
@@ -5833,7 +5833,7 @@ def jwst_snowblind_mask(rate_file, require_prefix='jw', max_fraction=0.3, new_ju
                         **kwargs)
     
     if reset_header:
-        _ = jwst_utils.set_jwst_to_hst_keywords(rate_file, reset=False, verbose=verbose)
+        _ = jwst_utils.set_jwst_to_hst_keywords(rate_file, reset=False, verbose=False)
     
     _mask_frac = ((res.dq & new_jump_flag) > 0).sum() / res.dq.size
     
@@ -5843,7 +5843,7 @@ def jwst_snowblind_mask(rate_file, require_prefix='jw', max_fraction=0.3, new_ju
         msg += "turning off..."
         res.dq &= 0
     else:
-        msg = f"grizli.utils.jwst_snowblind_mask: {rate_file} {_mask_frac:.2f}"
+        msg = f"grizli.utils.jwst_snowblind_mask: {rate_file} {_mask_frac*100:.2f}"
         msg += f' masked with DQ={new_jump_flag}'
         
     log_comment(LOGFILE, msg, verbose=verbose)
@@ -6121,8 +6121,8 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
                     log_comment(LOGFILE, msg, verbose=verbose)
                 else:
                     sdq, sfrac = jwst_snowblind_mask(file, **snowblind_kwargs)
-                    bpdata -= bpdata & 1024
                     if sdq is not None:
+                        bpdata -= bpdata & 1024
                         bpdata |= sdq
             
             if get_dbmask:
