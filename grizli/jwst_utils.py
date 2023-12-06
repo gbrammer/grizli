@@ -1276,7 +1276,11 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
     elif img[0].header['OINSTRUM'] == 'NIRCAM':
         _det = img[0].header['DETECTOR']
         
-        bpfiles = [os.path.join(os.path.dirname(__file__), 
+        bpfiles = [os.path.join(os.path.dirname(__file__),
+                   f'data/nrc_badpix_231206_{_det}.fits.gz')]
+        bpfiles += [os.path.join(os.path.dirname(__file__),
+                   f'data/nrc_badpix_20230710_{_det}.fits.gz')]
+        bpfiles += [os.path.join(os.path.dirname(__file__), 
                    f'data/nrc_badpix_230120_{_det}.fits.gz')]
         bpfiles += [os.path.join(os.path.dirname(__file__), 
                    f'data/nrc_lowpix_0916_{_det}.fits.gz')]
