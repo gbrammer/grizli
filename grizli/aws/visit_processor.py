@@ -273,7 +273,9 @@ def s3_put_exposure(flt_file, product, assoc, remove_old=True, verbose=True):
         print(f'Add {file}_{extension} ({len(rows)}) to exposure_files table')
 
 
-def make_visit_mosaic(assoc, base_path=ROOT_PATH, version='v7.0', pixscale=0.08, vmax=0.5, skip_existing=True, sync=True, clean=False, verbose=True, **kwargs):
+snowblind_kwargs = dict(require_prefix='jw', max_fraction=0.3, new_jump_flag=1024, min_radius=4, growth_factor=1.5, unset_first=True, verbose=True)
+
+def make_visit_mosaic(assoc, base_path=ROOT_PATH, version='v7.0', pixscale=0.08, vmax=0.5, skip_existing=True, sync=True, clean=False, verbose=True, snowblind_kwargs=snowblind_kwargs, **kwargs):
     """
     Make a mosaic of the exposures from a visit with a tangent point selected
     from the sky tile grid
@@ -421,6 +423,7 @@ def make_visit_mosaic(assoc, base_path=ROOT_PATH, version='v7.0', pixscale=0.08,
                  pixfrac=0.8,
                  res=res,
                  weight_type=weight_type,
+                 snowblind_kwargs=snowblind_kwargs,
     )
 
     files = glob.glob(f'{assoc}*_sci.fits*')
@@ -2940,7 +2943,138 @@ def run_one(clean=2, sync=True):
             fp.write(f'{time.ctime()} {assoc}\n')
         
         process_visit(assoc, clean=clean, sync=sync)
+
+
+def snowblind_exposure_mask(assoc, file, verbose=True, clean=True, new_jump_flag=1024, min_radius=4, growth_factor=1.5, unset_first=True, run_again=False, force=False):
+    """
+    Run snowblind on a previously processed exposures
+    """
+    import time
+    import boto3
+    import astropy.io.fits as pyfits
     
+    if 0:
+        db.execute("drop table exposure_snowblind")
+        db.execute("""create table exposure_snowblind as 
+        select assoc, dataset || '_' || extension || '.fits' as file, instrume 
+        from exposure_files 
+        where instrume in ('NIRCAM','NIRISS')
+        group by assoc, dataset, extension, instrume
+        """)
+        db.execute("alter table exposure_snowblind add column status int default 70")
+        db.execute("alter table exposure_snowblind add column maskfrac real default 0.")
+        db.execute("alter table exposure_snowblind add column npix int default 0")
+        db.execute("alter table exposure_snowblind add column utime double precision default 0.")
     
+    status = db.SQL(f"""select * from exposure_snowblind
+    where assoc = '{assoc}' and file = '{file}'
+    """)
+    if len(status) == 0:
+        msg = f"File {assoc} {file} not found"
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+        return False
+        
+    if (status['status'].max() != 0) & (~force):
+        msg = "{assoc}  {file}  status={status} locked".format(**status[0])
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+        return False
+    
+    # set lock status
+    db.execute(f"""update exposure_snowblind set status = 1 
+    where assoc = '{assoc}' and file = '{file}'
+    """)
+    
+    # Run the snowblind mask    
+    s3 = boto3.resource('s3')
+    s3_client = boto3.client('s3')
+    bkt = s3.Bucket('grizli-v2')
+
+    local_file = os.path.basename(file)
+    s3_prefix = f'HST/Pipeline/{assoc}/Prep/{file}'
+    
+    if os.path.exists(local_file):
+        clean = False
+    else:
+        msg = f'Fetch {s3_prefix}'
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+        bkt.download_file(s3_prefix, local_file,
+                          ExtraArgs={"RequestPayer": "requester"})
+    
+    do_run = True
+    with pyfits.open(local_file) as im:
+        dq = im['DQ'].data & new_jump_flag
+        maskfrac = (dq > 0).sum() / dq.size
+        if 'SNOWBLND' in im['SCI'].header:
+            do_run = run_again
+
+    if do_run:        
+        dq, maskfrac = utils.jwst_snowblind_mask(local_file,
+                                       new_jump_flag=new_jump_flag,
+                                       min_radius=min_radius,
+                                       growth_factor=growth_factor,
+                                       unset_first=unset_first)
+    
+    with pyfits.open(local_file, mode='update') as im:
+        if unset_first:
+            im['DQ'].data -= im['DQ'].data & new_jump_flag
+        
+        im['DQ'].data |= dq.astype(im['DQ'].data.dtype)
+        im['SCI'].header['SNOWMASK'] = (True, 'Snowball mask applied')
+        im['SCI'].header['SNOWBLND'] = (True, 'Mask with snowblind')
+        im['SCI'].header['SNOWBALF'] = (maskfrac,
+                             'Fraction of masked pixels in snowball mask')
+        
+        im.flush()
+        npix = ((im['DQ'].data & new_jump_flag) > 0).sum()
+        
+    # Upload back to s3
+    msg = f'Send {file} > s3://grizli-v2/{s3_prefix}'
+    utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+    bkt.upload_file(local_file, s3_prefix, ExtraArgs={'ACL': 'public-read'},
+                    Callback=None, Config=None)
+    
+    # Update status
+    db.execute(f"""update exposure_snowblind
+    set status = 2, maskfrac = {maskfrac}, npix = {npix}, utime = {time.time()}
+    where assoc = '{assoc}' and file = '{file}'
+    """)
+    
+    if clean:
+        os.remove(local_file)
+        
+    return True
+
+
+def snowblind_batch():
+    import os
+    os.chdir('/GrizliImaging')
+    
+    db.execute("""update exposure_snowblind set status = 70 
+    where (file not like 'jw01895%%' and assoc not like 'j03%%m27%%') and status = 0
+    """)
+    
+    db.execute("""update exposure_snowblind set status = 0 
+    where (file like 'jw01895%%' and (assoc like 'j03%%m27%%' or assoc like 'j12%%p62%%')) and status = 70
+    """)
+    
+    files = db.SQL("""select * from exposure_snowblind
+    where (file like '%%_rate.fits') and status = 0
+    order by random()
+    """)
+
+    files = db.SQL("""select * from exposure_snowblind
+    where (file like '%%_rate.fits') and status = 0 and assoc like '%%f444w%%'
+    order by random()
+    """)
+    
+    print(f'Run {len(files)} files ....\n')
+    for row in files:
+        snowblind_exposure_mask(row['assoc'], row['file'], verbose=True, clean=True, 
+                                new_jump_flag=1024,
+                                min_radius=4,
+                                growth_factor=1.5, unset_first=True, run_again=False)
+        # break
+
+
 if __name__ == '__main__':
     run_all()
