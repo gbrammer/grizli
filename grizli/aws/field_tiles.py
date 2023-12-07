@@ -495,7 +495,7 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
                 filters.append(f)
                 break
         
-        if ('cos' in root) & ('f150w2-clear' in all_filters):
+        if ('cos' in root) & ('f150w2-clear' in all_filters) & (len(filters) < 3):
             filters = ['f814w','f150w2-clear','f444w-clear']
         
         split_tiles(root, ref_tile=ref_tile, 
