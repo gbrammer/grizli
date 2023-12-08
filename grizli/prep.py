@@ -6223,6 +6223,11 @@ def get_jwst_wfssbkg_file(file, valid_flat=[0.6, 1.3], make_figure=False):
 
     flat_file = FlatFieldStep().get_reference_file(file, 'flat')
     
+    # If we have write access to file open it
+    # Otherwise copy to local file
+    if not os.access(bkg_file,os.W_OK):    
+        shutil.copy(bkg_file,local_bkg_file)
+        bkg_file = local_bkg_file
     wf = pyfits.open(bkg_file, mode='update')
     key = f"{wf[0].header['FILTER']} {wf[0].header['PUPIL']}"
         
