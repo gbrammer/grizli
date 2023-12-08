@@ -6200,14 +6200,13 @@ def get_jwst_wfssbkg_file(file, valid_flat=[0.6, 1.3], make_figure=False):
     with pyfits.open(file) as im:
         if im[0].header['INSTRUME'] == 'NIRISS':
             # Test local file
-            bkg_file = "nis-{0}-{1}_skyflat.fits"
-            bkg_file = os.path.join(GRIZLI_PATH, 'CONF',
-                                    bkg_file.format(im[0].header['PUPIL'],
-                                                    im[0].header['FILTER']))
-            bkg_file = bkg_file.lower()
+            local_bkg_file = "nis-{0}-{1}_skyflat.fits"
+            local_bkg_file = local_bkg_file.format(im[0].header['PUPIL'],im[0].header['FILTER'])
+            local_bkg_file = local_bkg_file.lower()
+            local_bkg_file = os.path.join(GRIZLI_PATH, 'CONF',local_bkg_file)
             
-            if os.path.exists(bkg_file):
-                return bkg_file
+            if os.path.exists(local_bkg_file):
+                return local_bkg_file
                     
     bkg_file = WfssContamStep().get_reference_file(file, 'wfssbkg')
 
