@@ -6209,7 +6209,7 @@ def get_jwst_wfssbkg_file(file, valid_flat=[0.6, 1.3], make_figure=False):
         _im.close()
         return bkg_file
 
-    with pyfits.getval(file,'INSTRUME',0) as h:
+    with pyfits.getheader(file,0) as h:
         if h['INSTRUME'] == 'NIRISS'
             
             # Test local file
