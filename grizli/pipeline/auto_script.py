@@ -1923,6 +1923,7 @@ def get_visit_exposure_footprints(root='j1000p0210', check_paths=['./', '../RAW'
         visits, all_groups, info = load_visit_info(root, verbose=False)
     else:
         visits = root
+        all_groups = None
 
     fps = {}
 
@@ -1955,8 +1956,28 @@ def get_visit_exposure_footprints(root='j1000p0210', check_paths=['./', '../RAW'
 
             fps[file] = fp_i
 
-    # ToDo: also update visits in all_groups with `fps`
+    # Also update visits in all_groups with `fps`
+    if all_groups is not None:
+        for g in all_groups:
+            for k in ['direct', 'grism']:
+                visit = g[k]
+                visit['footprints'] = []
+                visit_fp = None
+                for file in visit['files']:
+                    fp_i = None
+                    for path in check_paths:
+                        pfile = os.path.join(path, file)
+                        if not os.path.exists(pfile):
+                            pfile = os.path.join(path, file + '.gz')
 
+                        if os.path.exists(pfile):
+                            fp_i = utils.get_flt_footprint(flt_file=pfile)
+
+                            if visit_fp is None:
+                                visit_fp = fp_i.buffer(1./3600)
+                            else:
+                                visit_fp = visit_fp.union(fp_i.buffer(1./3600))
+                            break
     # Resave the file
     if isinstance(root, str):
         write_visit_info(visits, all_groups, info, root=root, path='./')
