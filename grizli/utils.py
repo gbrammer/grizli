@@ -6091,6 +6091,8 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
                 bpfiles = [os.path.join(os.path.dirname(__file__),
                            f'data/nrc_badpix_231206_{_det}.fits.gz')]
                 bpfiles += [os.path.join(os.path.dirname(__file__),
+                         f'data/jwst_nircam_newhot_{_det}_extra20231129.fits.gz')]
+                bpfiles += [os.path.join(os.path.dirname(__file__),
                            f'data/nrc_badpix_20230710_{_det}.fits.gz')]
                 bpfiles += [os.path.join(os.path.dirname(__file__), 
                            f'data/{_det.lower()}_badpix_20230710.fits.gz')] # NIRISS
