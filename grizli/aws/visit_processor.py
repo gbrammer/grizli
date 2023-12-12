@@ -2124,8 +2124,6 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
     import matplotlib.pyplot as plt
     import astropy.io.fits as pyfits
     
-    import boto3
-    
     from grizli import utils
     from mastquery import overlaps
     
@@ -2170,6 +2168,7 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
     
     SQL += ' ORDER BY e.filter'
     if res is None:
+        import boto3
         res = db.SQL(SQL)
     
     if len(res) == 0:

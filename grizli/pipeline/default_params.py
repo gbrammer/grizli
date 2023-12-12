@@ -81,7 +81,7 @@ def test_aws_availability():
     """
     Test if aws s3 is available
     """
-    s3_status = os.system('aws s3 ls s3://stpubdata --request-payer requester > /tmp/aws.x')
+    s3_status = os.system('aws s3 ls s3://stpubdata --request-payer requester > /tmp/aws.x 2>&1')
     if s3_status == 0:
         s3_sync = 'cp'  # As of late October 2018, 's3 sync' not working with 'stpubdata'
     else:
