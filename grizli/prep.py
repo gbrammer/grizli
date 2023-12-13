@@ -3377,8 +3377,10 @@ def oneoverf_column_correction(visit, thresholds=[10,1.5], dilate_iter=[10,2], i
 
             _im.flush()
 
+SNOWBLIND_KWARGS = dict(new_jump_flag=1024, min_radius=4,
+                        growth_factor=1.5, unset_first=True)
 
-def mask_snowballs(visit, snowball_erode=3, snowball_dilate=18, mask_bit=1024, instruments=['NIRCAM','NIRISS'], max_fraction=0.3, unset4=False, **kwargs):
+def mask_snowballs(visit, snowball_erode=3, snowball_dilate=18, mask_bit=1024, instruments=['NIRCAM','NIRISS'], max_fraction=0.3, unset4=False, snowblind_kwargs=SNOWBLIND_KWARGS, **kwargs):
     """
     Mask JWST IR snowballs
     
@@ -3405,7 +3407,10 @@ def mask_snowballs(visit, snowball_erode=3, snowball_dilate=18, mask_bit=1024, i
     
     unset4 : bool
         Unset DQ=4 bit for flagged CRs
-        
+    
+    snowblind_kwargs : dict
+        First try to use `grizli.utils.jwst_snowblind_mask` to flag snowballs
+    
     Returns
     -------
     Updates `DQ` extension of files in ``visit['files']`` and sets some
@@ -3427,7 +3432,26 @@ def mask_snowballs(visit, snowball_erode=3, snowball_dilate=18, mask_bit=1024, i
                 
             if _instrume not in instruments:
                 continue
-                
+            
+            if snowblind_kwargs is not None:
+                sdq, sfrac = utils.jwst_snowblind_mask(_file, **snowblind_kwargs)
+                if sdq is not None:
+                    # Close and reopen
+                    _im.close()
+                    with pyfits.open(_file, mode='update') as _xim:
+                        _xim['DQ'].data |= sdq.astype(_xim['DQ'].data.dtype)
+                        _xim['SCI'].header['SNOWMASK'] = (True, 'Snowball mask applied')
+                        _xim['SCI'].header['SNOWBLND'] = (True, 'Mask with snowblind')
+                        _xim['SCI'].header['SNOWBALF'] = (sfrac,
+                                          'Fraction of masked pixels in snowball mask')
+
+                        if unset4:
+                            _xim['DQ'].data -= (_xim['DQ'].data & 4)
+                    
+                        _xim.flush()
+                    
+                    continue
+            
             crs = (_im['DQ'].data & 4)
             
             _erode = nd.binary_erosion(crs > 0, iterations=snowball_erode)

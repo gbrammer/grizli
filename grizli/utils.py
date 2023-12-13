@@ -5751,6 +5751,106 @@ def jwst_crds_photom_scale(hdul, context='jwst_1130.pmap', update=True, verbose=
     return scale
 
 
+def jwst_snowblind_mask(rate_file, require_prefix='jw', max_fraction=0.3, new_jump_flag=1024, min_radius=4, growth_factor=1.5, unset_first=True, verbose=True, **kwargs):
+    """
+    Update JWST DQ mask with `snowblind`.  See 
+    https://github.com/mpi-astronomy/snowblind.
+    
+    Requires ``snowblind > 0.1.2``, which currently is just in the fork at 
+    https://github.com/gbrammer/snowblind.
+    
+    Parameters
+    ----------
+    rate_file : str
+        Filename of a ``rate.fits`` exposure
+    
+    require_prefix : str
+        Only run if ``rate_file.startswith(require_prefix)``
+    
+    max_fraction : float
+        Maximum allowed fraction of flagged pixels relative to the total
+    
+    new_jump_flag : int
+        Integer DQ flag of identified snowballs
+    
+    min_radius : int
+        Minimum radius of ``JUMP_DET`` flagged groups of pixels
+    
+    growth_factor : float
+        Scale factor of the DQ mask
+    
+    unset_first : bool
+        Unset the `new_jump_flag` bit of the DQ array before processing
+    
+    Returns
+    -------
+    dq : array-like
+        Image array with values ``new_jump_flag`` with identified snowballs
+    
+    mask_frac : float
+        Fraction of masked pixels
+    
+    """
+    import jwst.datamodels
+    from . import jwst_utils
+    
+    if not os.path.basename(rate_file).startswith(require_prefix):
+        return None, None
+    
+    try:
+        from snowblind import snowblind
+        from snowblind import __version__ as snowblind_version
+    except ImportError:
+        return None, None
+    
+    if snowblind_version <= '0.1.2':
+        msg = ('ImportError: snowblind > 0.1.2 required, get it from the fork at ' 
+               'https://github.com/gbrammer/snowblind if not yet available on the '
+               'main repository at https://github.com/mpi-astronomy/snowblind')
+        
+        log_comment(LOGFILE, msg, verbose=True)
+        return None, None
+    
+    step = snowblind.SnowblindStep
+    
+    # Do we need to reset header keywords?
+    reset_header = False
+    with pyfits.open(rate_file) as im:
+         reset_header = ('OINSTRUM' in im[0].header)
+         reset_header &= (im[0].header['INSTRUME'] == 'WFC3')
+
+    if reset_header:
+        _ = jwst_utils.set_jwst_to_hst_keywords(rate_file, reset=True, verbose=False)
+        
+    with jwst.datamodels.open(rate_file) as dm:
+        if unset_first:
+            dm.dq -= dm.dq & new_jump_flag
+            
+        res = step.call(dm, save_results=False,
+                        new_jump_flag=new_jump_flag,
+                        min_radius=min_radius,
+                        growth_factor=growth_factor,
+                        **kwargs)
+    
+    if reset_header:
+        _ = jwst_utils.set_jwst_to_hst_keywords(rate_file, reset=False, verbose=False)
+    
+    _mask_frac = ((res.dq & new_jump_flag) > 0).sum() / res.dq.size
+    
+    if _mask_frac > max_fraction:
+        msg = f"grizli.utils.jwst_snowblind_mask: {rate_file} problem "
+        msg += f" fraction {_mask_frac:.2f} > {max_fraction:.2f}"
+        msg += "turning off..."
+        res.dq &= 0
+    else:
+        msg = f"grizli.utils.jwst_snowblind_mask: {rate_file} {_mask_frac*100:.2f}"
+        msg += f' masked with DQ={new_jump_flag}'
+        
+    log_comment(LOGFILE, msg, verbose=verbose)
+
+    return (res.dq & new_jump_flag), _mask_frac
+
+
 def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
                        clean=True, include_saturated=True, keep_bits=None,
                        dryrun=False, skip=None, extra_wfc3ir_badpix=True,
@@ -5761,6 +5861,7 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
                        rnoise_percentile=99,
                        calc_wcsmap=False,
                        niriss_ghost_kwargs={},
+                       snowblind_kwargs=None,
                        get_dbmask=True):
     """
     Make drizzle mosaic from exposures in a visit dictionary
@@ -5826,6 +5927,9 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
     
     niriss_ghost_kwargs : dict
         Keyword arguments for `~grizli.utils.niriss_ghost_mask`
+    
+    snowblind_kwargs : dict
+        Keyword arguments for additional DQ flagging with `snowblind`
     
     Returns
     -------
@@ -5984,7 +6088,11 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
             _inst = flt[0].header['INSTRUME']
             if (extra_wfc3ir_badpix) & (_inst in ['NIRCAM','NIRISS']):
                 _det = flt[0].header['DETECTOR']
-                bpfiles = [os.path.join(os.path.dirname(__file__), 
+                bpfiles = [os.path.join(os.path.dirname(__file__),
+                           f'data/nrc_badpix_231206_{_det}.fits.gz')]
+                bpfiles += [os.path.join(os.path.dirname(__file__),
+                         f'data/jwst_nircam_newhot_{_det}_extra20231129.fits.gz')]
+                bpfiles += [os.path.join(os.path.dirname(__file__),
                            f'data/nrc_badpix_20230710_{_det}.fits.gz')]
                 bpfiles += [os.path.join(os.path.dirname(__file__), 
                            f'data/{_det.lower()}_badpix_20230710.fits.gz')] # NIRISS
@@ -6009,6 +6117,16 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
                         
             if bpdata is None:
                 bpdata = np.zeros(flt['SCI'].data.shape, dtype=int)
+            
+            if (snowblind_kwargs is not None) & (_inst in ['NIRCAM','NIRISS']):
+                # Already processed with snowblind?
+                if 'SNOWBLND' in flt['SCI'].header:
+                    msg = 'Already processed with `snowblind`'
+                    log_comment(LOGFILE, msg, verbose=verbose)
+                else:
+                    sdq, sfrac = jwst_snowblind_mask(file, **snowblind_kwargs)
+                    if sdq is not None:
+                        bpdata |= sdq
             
             if get_dbmask:
                 dbmask = apply_region_mask_from_db(os.path.basename(file), 

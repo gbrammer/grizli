@@ -141,6 +141,11 @@ visit_prep_args: &prep_args
         mask_bit: 1024
         instruments: [NIRCAM, NIRISS]
         max_fraction: 0.3
+        snowblind_kwargs:
+            new_jump_flag: 1024
+            min_radius: 4
+            growth_factor: 1.5
+            unset_first: True
     angle_background_kwargs:
         threshold: 1.8
         detection_background: True
