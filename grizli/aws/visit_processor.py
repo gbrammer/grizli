@@ -1679,7 +1679,7 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=False,
         add_shifts_log(assoc=assoc, remove_old=True, verbose=True)
         add_wcs_log(assoc=assoc, remove_old=True, verbose=True)
         
-    if do_make_visit_mosaic:
+    if (do_make_visit_mosaic) & (with_db):
         make_visit_mosaic(assoc, sync=sync,
                           base_path=ROOT_PATH,
                           clean=False,
