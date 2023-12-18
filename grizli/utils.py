@@ -7052,13 +7052,13 @@ def fetch_config_files(get_acs=False, get_sky=True, get_stars=True, get_epsf=Tru
         
         ### HST1PASS seems to be timing out - december 2023
         psf_path = 'https://www.stsci.edu/~jayander/HST1PASS/LIB/'
-        psf_path += 'PSFs/STDPSFs/WFC3IR/'
-        
-        # mirror of files downloaded some time ago
-        psf_path = 'https://s3.amazonaws.com/grizli-v2/HST_EPSF/'
-        
+        psf_path += 'PSFs/STDPSFs/WFC3IR'
         psf_root = 'STDPSF'
-        
+
+        # mirror of files downloaded some time ago
+        psf_path = 'https://s3.amazonaws.com/grizli-v2/HST_EPSF'
+        psf_root = 'PSFSTD'
+
         ir_psf_filters = ['F105W', 'F125W', 'F140W', 'F160W']
 
         # New PSFs
@@ -7071,7 +7071,9 @@ def fetch_config_files(get_acs=False, get_sky=True, get_stars=True, get_epsf=Tru
             file = os.path.basename(url).replace('STDPSF', 'PSFSTD')
             if not os.path.exists(file):
                 print('Get {0}'.format(file))
-                os.system('curl -o {0} {1}'.format(file, url))
+                # os.system('curl -o {0} {1}'.format(file, url))
+                with pyfits.open(url, cache=False) as _im:
+                    _im.writeto(file, overwrite=True, output_verify='fix')
             else:
                 print('File {0} exists'.format(file))
 
@@ -7183,7 +7185,7 @@ class EffectivePSF:
             if not os.path.exists(file):
                 continue
 
-            with pyfits.open(file) as _im:
+            with pyfits.open(file, ignore_missing_simple=True) as _im:
                 data = _im[0].data.T*1
                 data[data < 0] = 0
 
