@@ -7071,7 +7071,9 @@ def fetch_config_files(get_acs=False, get_sky=True, get_stars=True, get_epsf=Tru
             file = os.path.basename(url).replace('STDPSF', 'PSFSTD')
             if not os.path.exists(file):
                 print('Get {0}'.format(file))
-                os.system('curl -o {0} {1}'.format(file, url))
+                # os.system('curl -o {0} {1}'.format(file, url))
+                with pyfits.open(url, cache=False) as _im:
+                    _im.writeto(file, overwrite=True)
             else:
                 print('File {0} exists'.format(file))
 
