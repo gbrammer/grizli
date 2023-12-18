@@ -516,7 +516,7 @@ def go(root='j010311+131615',
                                               'files':files},
                                               dilate=1,
                                               threshold=5,
-                                              clip_max=4,
+                                              clip_max=np.minimum(len(files)//2,4),
                                               apply=False)
                 
                 skyfile = os.path.join(PATHS['prep'], f'{root}_skyflat.fits')
