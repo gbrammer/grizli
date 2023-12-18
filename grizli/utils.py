@@ -7183,7 +7183,7 @@ class EffectivePSF:
             if not os.path.exists(file):
                 continue
 
-            with pyfits.open(file) as _im:
+            with pyfits.open(file, ignore_missing_simple=True) as _im:
                 data = _im[0].data.T*1
                 data[data < 0] = 0
 
