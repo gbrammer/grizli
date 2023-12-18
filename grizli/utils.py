@@ -7049,8 +7049,14 @@ def fetch_config_files(get_acs=False, get_sky=True, get_stars=True, get_epsf=Tru
         #psf_path = 'https://www.stsci.edu/~jayander/STDPSFs/WFC3IR/'
         #psf_root = 'PSFSTD'
         #psf_path = 'https://www.stsci.edu/~jayander/HST1PASS/'
+        
+        ### HST1PASS seems to be timing out - december 2023
         psf_path = 'https://www.stsci.edu/~jayander/HST1PASS/LIB/'
         psf_path += 'PSFs/STDPSFs/WFC3IR/'
+        
+        # mirror of files downloaded some time ago
+        psf_path = 'https://s3.amazonaws.com/grizli-v2/HST_EPSF/'
+        
         psf_root = 'STDPSF'
         
         ir_psf_filters = ['F105W', 'F125W', 'F140W', 'F160W']
