@@ -3785,8 +3785,12 @@ def subtract_visit_angle_averages(visit, threshold=1.8, detection_background=Tru
         pa_aper = im['SCI'].header['PA_APER']
         wcs_i = pywcs.WCS(im['SCI'].header, relax=True, fobj=im)
         pixel_scale = utils.get_wcs_pscale(wcs_i)*0.8
-        
-    if 'footprints' not in visit:
+    
+    needs_footprints = 'footprints' not in visit
+    if 'footprints' in visit:
+        needs_footprints |= len(visit['footprints']) < len(visit['files'])
+    
+    if needs_footprints:
         visit['footprints'] = []
         for f in visit['files']:
             with pyfits.open(f) as im:
