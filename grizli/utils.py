@@ -7073,7 +7073,7 @@ def fetch_config_files(get_acs=False, get_sky=True, get_stars=True, get_epsf=Tru
                 print('Get {0}'.format(file))
                 # os.system('curl -o {0} {1}'.format(file, url))
                 with pyfits.open(url, cache=False) as _im:
-                    _im.writeto(file, overwrite=True)
+                    _im.writeto(file, overwrite=True, output_verify='fix')
             else:
                 print('File {0} exists'.format(file))
 
