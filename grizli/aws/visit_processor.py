@@ -1469,7 +1469,7 @@ def check_jwst_assoc_guiding(assoc):
 ALL_FILTERS = ['F410M', 'F467M', 'F547M', 'F550M', 'F621M', 'F689M', 'F763M', 'F845M', 'F200LP', 'F350LP', 'F435W', 'F438W', 'F439W', 'F450W', 'F475W', 'F475X', 'F555W', 'F569W', 'F600LP', 'F606W', 'F622W', 'F625W', 'F675W', 'F702W', 'F775W', 'F791W', 'F814W', 'F850LP', 'G800L', 'F098M', 'F127M', 'F139M', 'F153M', 'F105W', 'F110W', 'F125W', 'F140W', 'F160W', 'G102', 'G141']
 
 
-def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=False, visit_split_shift=1.2, blue_align_params=blue_align_params, ref_catalogs=['LS_DR9', 'PS1', 'DES', 'NSC', 'GAIA'], filters=None, prep_args={}, fetch_args={}, get_wcs_guess_from_table=True, master_radec='astrometry_db', align_guess=None, with_db=True, global_miri_skyflat=None, tab=None, other_args={}, do_make_visit_mosaic=True, visit_mosaic_kwargs={}, **kwargs):
+def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=False, visit_split_shift=1.2, blue_align_params=blue_align_params, ref_catalogs=['LS_DR9', 'PS1', 'DES', 'NSC', 'GAIA'], filters=None, prep_args={}, fetch_args={}, get_wcs_guess_from_table=True, master_radec='astrometry_db', align_guess=None, with_db=True, global_miri_skyflat=None, miri_tweak_align=False, tab=None, other_args={}, do_make_visit_mosaic=True, visit_mosaic_kwargs={}, **kwargs):
     """
     Run the `grizli.pipeline.auto_script.go` pipeline on an association defined
     in the `grizli` database.
@@ -1626,12 +1626,15 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=False,
     if master_radec is not None:
         kws['preprocess_args']['master_radec'] = master_radec
     
+    if 'miri_tweak_align' in kws:
+        miri_tweak_align = kws.pop('miri_tweak_align')
+        
     for fi in ['f560w','f770w','f1000w','f1130w','f1280w',
                'f1500w','f1800w','f2100w','f2550w']:
         
         if fi in assoc:
             # Don't run tweak align for MIRI long filters
-            miri_prep = dict(run_tweak_align=False,
+            miri_prep = dict(run_tweak_align=miri_tweak_align,
                              align_mag_limits=[14,28,0.2],
                              align_clip=20, 
                              align_simple=True)
