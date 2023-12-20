@@ -2042,20 +2042,35 @@ def get_visit_exposure_footprints(root='j1000p0210', check_paths=['./', '../RAW'
                 visit['footprints'] = []
                 visit_fp = None
                 for file in visit['files']:
-                    fp_i = None
-                    for path in check_paths:
-                        pfile = os.path.join(path, file)
-                        if not os.path.exists(pfile):
-                            pfile = os.path.join(path, file + '.gz')
+                    
+                    if file in fps: 
+                        fp_i = fps[file]
+                    else:
+                        fp_i = None
+                        for path in check_paths:
+                            pfile = os.path.join(path, file)
+                            if not os.path.exists(pfile):
+                                pfile = os.path.join(path, file + '.gz')
 
-                        if os.path.exists(pfile):
-                            fp_i = utils.get_flt_footprint(flt_file=pfile)
+                            if os.path.exists(pfile):
+                                fp_i = utils.get_flt_footprint(flt_file=pfile)
 
-                            if visit_fp is None:
-                                visit_fp = fp_i.buffer(1./3600)
-                            else:
-                                visit_fp = visit_fp.union(fp_i.buffer(1./3600))
-                            break
+                                break
+
+                    if fp_i is not None:
+                        if visit_fp is None:
+                            visit_fp = fp_i.buffer(1./3600)
+                        else:
+                            visit_fp = visit_fp.union(fp_i.buffer(1./3600))
+
+                    visit['footprints'].append(fp_i)
+                    
+                    if visit_fp is not None:
+                        if simplify > 0:
+                            visit['footprint'] = visit_fp.simplify(simplify)
+                        else:
+                            visit['footprint'] = visit_fp
+
     # Resave the file
     if isinstance(root, str):
         write_visit_info(visits, all_groups, info, root=root, path='./')
@@ -3152,7 +3167,7 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
                 masks[key] = [(info['PUPIL'] == filt) & 
                               (info['FILTER'] == gr), 
                               gr, filt]
-    
+
     # for gr in ['GR150R', 'GR150C']:
     #     for filt in ['F090W', 'F115W', 'F150W', 'F200W']:
     #         key = f'{gr.lower()}-{filt.lower()}'
