@@ -3155,6 +3155,20 @@ class GrismFLT(object):
                 if mag > self.conf.conf_dict['MMAG_EXTRACT_{0}'.format(b)]:
                     continue
 
+                # if 1:
+                #     beam = GrismDisperser(id=id,
+                #                           direct=thumb,
+                #                           segmentation=seg_thumb,
+                #                           xcenter=xcenter,
+                #                           ycenter=ycenter,
+                #                           origin=origin,
+                #                           pad=self.pad,
+                #                           grow=self.grism.grow,
+                #                           beam=b,
+                #                           conf=self.conf,
+                #                           fwcpos=self.grism.fwcpos,
+                #                           MW_EBV=self.grism.MW_EBV)
+
                 try:
                     beam = GrismDisperser(id=id,
                                           direct=thumb, 
@@ -4153,7 +4167,12 @@ class BeamCutout(object):
         # OK data where the 2D model has non-zero flux
         
         self.fit_mask = (~self.mask.flatten()) & (self.ivar.flatten() != 0)
-        self.fit_mask &= (self.flat_flam > min_mask*self.flat_flam.max())
+        try:
+            self.fit_mask &= (self.flat_flam > min_mask*self.flat_flam.max())
+        except ValueError:
+            print('config file: ', self.beam.conf.conf_file)
+            utils.log_exception(utils.LOGFILE, traceback)
+            
         #self.fit_mask &= (self.flat_flam > 3*self.contam.flatten())
 
         # Apply minimum sensitivity mask
