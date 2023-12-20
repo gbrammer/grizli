@@ -6232,23 +6232,19 @@ def get_jwst_wfssbkg_file(file, valid_flat=[0.6, 1.3], make_figure=False):
     
     # Only run for NIRISS, seems like NIRCam provides wfssbkg without
     # the flat?
-    _im = pyfits.open(file)
-    if _im[0].header['INSTRUME'] != 'NIRISS':
-        _im.close()
-        return bkg_file
+    with pyfits.open(file) as _im:
+        h = _im[0].header
+        if h['INSTRUME'] != 'NIRISS':
+            _im.close()
+            return bkg_file
 
-    h = pyfits.getheader(file,0)
-    if h['INSTRUME'] == 'NIRISS':
-        
-        # Test local file
-        local_bkg_file = "nis-{0}-{1}_skyflat.fits"
-        local_bkg_file = local_bkg_file.format(h['PUPIL'],h['FILTER'])
-        local_bkg_file = local_bkg_file.lower()
-        local_bkg_file = os.path.join(GRIZLI_PATH, 'CONF',local_bkg_file)
-        
-        # If local file exists and is up-to-date, use it
-        if os.path.exists(local_bkg_file) and pyfits.getval(local_bkg_file,'DATE',0) == h['DATE']:
-            return local_bkg_file
+    # Test local file
+    local_bkg_file = f"nis-{h['PUPIL']}-{h['FILTER']}_skyflat.fits".lower()
+    local_bkg_file = os.path.join(GRIZLI_PATH, 'CONF',local_bkg_file)
+    
+    # If local file exists and is up-to-date, use it
+    if os.path.exists(local_bkg_file) and pyfits.getval(local_bkg_file,'DATE',0) == pyfits.getval(bkg_file,'DATE',0):
+        return local_bkg_file
                     
     flat_file = FlatFieldStep().get_reference_file(file, 'flat')
     
