@@ -1610,7 +1610,7 @@ class GroupFLT():
 
 
 class MultiBeam(GroupFitter):
-    def __init__(self, beams, group_name=None, fcontam=0., psf=False, polyx=[0.3, 2.5], MW_EBV=0., min_mask=0.01, min_sens=0.08, sys_err=0.0, mask_resid=True, verbose=True, replace_direct=None, **kwargs):
+    def __init__(self, beams, group_name=None, fcontam=0., psf=False, polyx=[0.3, 2.5], MW_EBV=0., min_mask=0.01, min_sens=0.08, sys_err=0.0, mask_resid=True, verbose=True, replace_direct=None, restore_medfilt=False, **kwargs):
         """Tools for dealing with multiple `~.model.BeamCutout` instances
 
         Parameters
@@ -1668,7 +1668,8 @@ class MultiBeam(GroupFitter):
         self.min_sens = min_sens
         self.mask_resid = mask_resid
         self.sys_err = sys_err
-
+        self.restore_medfilt = restore_medfilt
+        
         self.Asave = {}
 
         if isinstance(beams, str):
@@ -1689,7 +1690,16 @@ class MultiBeam(GroupFitter):
                     isJWST = prep.check_isJWST(beams[0])
                     self.load_master_fits(beams[0], verbose=verbose)
                     for i in range(1, len(beams)):
-                        b_i = MultiBeam(beams[i], group_name=group_name, fcontam=fcontam, psf=psf, polyx=polyx, MW_EBV=np.maximum(MW_EBV, 0), sys_err=sys_err, verbose=verbose, min_mask=min_mask, min_sens=min_sens, mask_resid=mask_resid)
+                        b_i = MultiBeam(beams[i],
+                                        group_name=group_name,
+                                        fcontam=fcontam,
+                                        psf=psf, polyx=polyx,
+                                        MW_EBV=np.maximum(MW_EBV, 0),
+                                        sys_err=sys_err,
+                                        verbose=verbose,
+                                        min_mask=min_mask,
+                                        min_sens=min_sens,
+                                        mask_resid=mask_resid)
                         self.extend(b_i)
 
                 else:
@@ -2006,6 +2016,7 @@ class MultiBeam(GroupFitter):
 
         hdu.writeto(outfile, overwrite=True)
 
+
     def load_master_fits(self, beam_file, verbose=True):
         """
         Load a "beams.fits" file.
@@ -2045,7 +2056,8 @@ class MultiBeam(GroupFitter):
 
             beam = model.BeamCutout(fits_file=hducopy, min_mask=self.min_mask,
                                     min_sens=self.min_sens,
-                                    mask_resid=self.mask_resid)
+                                    mask_resid=self.mask_resid,
+                                    restore_medfilt=self.restore_medfilt)
 
             self.beams.append(beam)
             if verbose:
