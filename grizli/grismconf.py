@@ -409,9 +409,9 @@ class aXeConf():
                 print('Parameter fwcpos={0} supplied but no FWCPOS_REF in {1:s}'.format(fwcpos, self.conf_file))
                 return dy, lam
 
-            order = self.conf['DYDX_ORDER_{0}'.format(beam)]
-            if order != 2:
-                print('ORDER={0:d} not supported for NIRISS rotation'.format(order))
+            order = int(self.conf['DYDX_ORDER_{0}'.format(beam)])
+            if order > 2:
+                print(f'ORDER={order} > 2 not supported for NIRISS rotation')
                 return dy, lam
 
             theta = (fwcpos - self.conf['FWCPOS_REF'])/180*np.pi*1
@@ -429,7 +429,7 @@ class aXeConf():
             # Otherwise, 1./tan(theta) blows up and results in numerical
             # noise.
             xp = (dx-xoff_beam)/np.cos(theta)
-            if (1-np.cos(theta) < 5.e-8):
+            if (1-np.cos(theta) < 5.e-8) | (np.abs(dydx[2]) < 1.e-8) | (order < 2):
                 #print('Approximate!', xoff_beam, np.tan(theta))
                 dy = dy + (dx-xoff_beam)*np.tan(theta)
                 delta = 0.
@@ -510,6 +510,47 @@ class aXeConf():
         #plt.savefig('{0}.pdf'.format(self.conf_file))
         
         return fig
+
+
+    def load_nircam_sensitivity_curve(self, verbose=True, **kwargs):
+        """
+        Replace +1 NIRCam sensitivity curves with Nov 10, 2023 updates
+        
+        Files generated with the calibration data of P330E from program 
+        CAL-1538 (K. Gordon)
+        
+        Download the FITS files from the link below and put them in
+        ``$GRIZLI/CONF/GRISM_NIRCAM/``.
+        
+        https://s3.amazonaws.com/grizli-v2/JWSTGrism/NircamSensitivity/index.html
+        
+        """
+        
+        if 'NIRCAM' not in self.conf_file:
+            return None
+        
+        pars = os.path.basename(self.conf_file).split('_')
+        
+        path = os.path.join(GRIZLI_PATH, 'CONF', 'GRISM_NIRCAM')
+        
+        sens_base = 'nircam_wfss_sensitivity_{filter}_{pupil}_{module}.10nov23.fits'
+
+        sens_file = sens_base.format(filter=pars[1],
+                                     pupil='GRISM'+pars[3][0],
+                                     module=pars[2][-1])
+        
+        sens_file = os.path.join(path, sens_file)
+        # print('xx', sens_file, os.path.exists(sens_file))
+        
+        if os.path.exists(sens_file):
+            msg = "grismconf.aXeConf: replace sensitivity curve with "
+            msg += f"{sens_file}"
+            utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+            
+            si = utils.read_catalog(sens_file).copy()
+            si['ERROR'] = si['SENSITIVITY'].max()*0.01
+            
+            self.SENS['A'] = si
 
 
 def coeffs_from_astropy_polynomial(p):
@@ -1199,6 +1240,54 @@ class TransformGrismconf(object):
                 _tab['ERROR'] = new['ERROR'].astype(float)
                 
                 self.sens['A'] = _tab
+        
+        self.load_nircam_sensitivity_curve()
+
+
+    def load_nircam_sensitivity_curve(self, verbose=True, **kwargs):
+        """
+        Replace +1 NIRCam sensitivity curves with Nov 10, 2023 updates
+        
+        Files generated with the calibration data of P330E from program 
+        CAL-1538 (K. Gordon)
+        
+        Download the FITS files from the link below and put them in
+        ``$GRIZLI/CONF/GRISM_NIRCAM/``.
+        
+        https://s3.amazonaws.com/grizli-v2/JWSTGrism/NircamSensitivity/index.html
+        
+        """
+        
+        if 'NIRCAM' not in self.conf_file:
+            return None
+        
+        pars = os.path.basename(self.conf_file).split('_')
+        
+        path = os.path.join(GRIZLI_PATH, 'CONF', 'GRISM_NIRCAM')
+        
+        sens_base = 'nircam_wfss_sensitivity_{filter}_{pupil}_{module}.10nov23.fits'
+
+        sens_file = sens_base.format(filter=pars[1],
+                                     pupil='GRISM'+pars[3][0],
+                                     module=pars[2][-1])
+        
+        sens_file = os.path.join(path, sens_file)
+        # print('xx', sens_file, os.path.exists(sens_file))
+        
+        if os.path.exists(sens_file):
+            msg = "grismconf.aXeConf: replace sensitivity curve with "
+            msg += f"{sens_file}"
+            utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+            
+            si = utils.read_catalog(sens_file).copy()
+            si['ERROR'] = si['SENSITIVITY'].max()*0.01
+            
+            _tab = utils.GTable()
+            _tab['WAVELENGTH'] = si['WAVELENGTH'].astype(float)
+            _tab['SENSITIVITY'] = si['SENSITIVITY'].astype(float)
+            _tab['ERROR'] = si['ERROR'].astype(float)
+            
+            self.sens['A'] = _tab
 
 
 def load_grism_config(conf_file, warnings=True):
