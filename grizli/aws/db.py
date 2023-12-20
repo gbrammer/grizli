@@ -1049,7 +1049,7 @@ def wait_on_db_update(root, t0=60, dt=30, n_iter=60, engine=None):
         if (n == n_i) & (checksum == checksum_i) & (n6 == n6_i):
             break
 
-        now = utils.nowtime()
+        now = utils.nowtime().iso
         print('{0}, {1}: n={2:<5d} n5={5:<5d} n6={3:<5d} checksum={4}'.format(root, now, n, n6, checksum, n5))
         n_i, n6_i, checksum_i = n, n6, checksum
         if i == 0:
@@ -1820,7 +1820,7 @@ def SQL(query_text, engine=None, pd_kwargs={}, **kwargs):
     
     tab = utils.GTable.from_pandas(res)
     tab.meta['query'] = (query_text, 'SQL query text')
-    tab.meta['qtime'] = (utils.nowtime(), 'Query timestamp')
+    tab.meta['qtime'] = (utils.nowtime().iso, 'Query timestamp')
     
     set_column_formats(tab, **kwargs)
 
@@ -2657,7 +2657,7 @@ def make_html_table(engine=None, columns=['root', 'status', 'id', 'p_ra', 'p_dec
         ax.legend(loc='upper right')
 
         fig.tight_layout(pad=0.1)
-        fig.text(1-0.02, 0.02, utils.nowtime(), ha='right', va='bottom', 
+        fig.text(1-0.02, 0.02, utils.nowtime().iso, ha='right', va='bottom',
                  transform=fig.transFigure, fontsize=5)
 
         fig.savefig('{0}_zhist.png'.format(table_root))
