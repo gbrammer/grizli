@@ -9182,7 +9182,7 @@ def ctime_to_iso(mtime, format='%a %b %d %H:%M:%S %Y', strip_decimal=True, verbo
     return iso
 
 
-def nowtime(iso=True):
+def nowtime(iso=False):
     """
     Wrapper for `astropy.time.now`
 
@@ -9253,7 +9253,7 @@ def log_comment(LOGFILE, comment, verbose=False, show_date=False, mode='a'):
     import time
 
     if show_date:
-        msg = '# ({0})\n'.format(nowtime())
+        msg = '# ({0})\n'.format(nowtime().iso)
     else:
         msg = ''
 
@@ -9293,7 +9293,7 @@ def log_exception(LOGFILE, traceback, verbose=True, mode='a'):
 
     trace = traceback.format_exc(limit=2)
     log = '\n########################################## \n'
-    log += '# ! Exception ({0})\n'.format(nowtime())
+    log += '# ! Exception ({0})\n'.format(nowtime().iso)
     log += '#\n# !'+'\n# !'.join(trace.split('\n'))
     log += '\n######################################### \n\n'
     if verbose | (LOGFILE is None):

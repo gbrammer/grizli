@@ -44,6 +44,20 @@ class UtilsTester(unittest.TestCase):
         assert(iso == '2019-09-16 11:23:27.000')
 
 
+    def test_nowtime(self):
+        """
+        nowtime
+        """
+        iso = utils.nowtime(iso=True)
+        assert(iso.startswith('202'))
+
+        iso = utils.nowtime().iso
+        assert(iso.startswith('202'))
+
+        mjd = utils.nowtime().mjd
+        assert(mjd > 60000)
+
+
     def test_multiprocessing_ndfilter(self):
         """
         Test the multiprocessing filter

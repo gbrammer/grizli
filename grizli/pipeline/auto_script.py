@@ -503,23 +503,26 @@ def go(root='j010311+131615',
             skyfile = get_miri_flat_by_date(files[0])
             
             if skyfile is None:
+
+                skyfile = os.path.join(PATHS['prep'], f'{root}_skyflat.fits')
                 
                 msg = f"{root} : global_miri_skyflat N={len(files)}"
                 utils.log_comment(utils.LOGFILE, msg, show_date=False,
                                   verbose=True)
             
                 os.chdir(PATHS['prep'])
-                for file in files:
-                    prep.fresh_flt_file(file, use_skyflats=False)
-            
-                prep.make_visit_average_flat({'product':root,
-                                              'files':files},
-                                              dilate=1,
-                                              threshold=5,
-                                              clip_max=np.minimum(len(files)//2,4),
-                                              apply=False)
                 
-                skyfile = os.path.join(PATHS['prep'], f'{root}_skyflat.fits')
+                # Don't redo if file found
+                if not os.path.exists(skyfile):
+                    for file in files:
+                        prep.fresh_flt_file(file, use_skyflats=False)
+            
+                    prep.make_visit_average_flat({'product':root,
+                                                  'files':files},
+                                                  dilate=1,
+                                                  threshold=5,
+                                                  clip_max=np.minimum(len(files)//2,4),
+                                                  apply=False)
             
             visit_prep_args['miri_skyflat'] = False
             visit_prep_args['use_skyflats'] = False
