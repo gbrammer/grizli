@@ -38,7 +38,10 @@ ONLY_F814W = False
 
 
 def get_extra_data(root='j114936+222414', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic', PERSIST_PATH=None, instruments=['WFC3'], filters=['F160W', 'F140W', 'F098M', 'F105W'], radius=2, run_fetch=True, from_mast=True, reprocess_parallel=True, s3_sync=False):
-
+    """
+    Not used [2023]
+    """
+    
     import os
     import glob
 
@@ -273,6 +276,19 @@ def get_miri_flat_by_date(file, tsplit=MIRI_FLAT_ROUND, verbose=True):
                       'F2100W': 4 }
         >>> tkey = np.round(t_min/tsplit[FILTER])
         >>> file = f'miri-{FILTER}-{tkey}_skyflat.fits'
+    
+    Parameters
+    ----------
+    file : str
+        MIRI exposure filename, with header keywords EXPSTART and FILTER
+    
+    tsplit : dict
+        Date rounding factors by filter
+    
+    Returns
+    -------
+    flat_file : str
+        Path to the flat file, ``None`` if not found
     
     """
     # try:
@@ -1033,7 +1049,12 @@ def make_directories(root='j142724+334246', HOME_PATH='$PWD', paths={}):
 
 def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_products={'WFPC2/WFC': ['C0M', 'C1M'], 'WFPC2/PC': ['C0M', 'C1M'], 'ACS/WFC': ['FLC'], 'WFC3/IR': ['RAW'], 'WFC3/UVIS': ['FLC']}, remove_bad=True, reprocess_parallel=False, reprocess_clean_darks=True, s3_sync=False, fetch_flt_calibs=['IDCTAB', 'PFLTFILE', 'NPOLFILE'], filters=VALID_FILTERS, min_bad_expflag=2, fetch_only=False, force_rate=True, get_rateints=False, recalibrate_jwst=False, s3path=None):
     """
-    Fully automatic script
+    Fully automatic script for fetching exposure files
+    
+    Parameters
+    ----------
+    field_root : str
+    
     """
     import os
     import glob
@@ -1474,6 +1495,16 @@ def remove_bad_expflag(field_root='', HOME_PATH='./', min_bad=2):
 def visit_dict_to_strings(v):
     """
     Make visit dictionary cleaner for writing to YAML
+    
+    Parameters
+    ----------
+    v : dict
+        `"visit" dictionary with keys ``files``, ``product``, ``footprints``
+    
+    Returns
+    -------
+    newv : dict
+        Yaml-friendly dictionary
     """
     newv = {}
 
@@ -1505,7 +1536,18 @@ def visit_dict_to_strings(v):
 
 def visit_dict_from_strings(v):
     """
-    Make visit dictionary cleaner for writing to YAML
+    Parse footprint objects from YAML visit dictionary
+
+    Parameters
+    ----------
+    v : dict
+        `"visit" dictionary with keys ``files``, ``product``, ``footprints``
+    
+    Returns
+    -------
+    newv : dict
+        "visit" dictionary with `~grizli.utils.Sregion` footprints
+
     """
     newv = {}
     
@@ -1529,6 +1571,29 @@ def visit_dict_from_strings(v):
 def write_visit_info(visits, groups, info, root='j033216m2743', path='./'):
     """
     Write visit association files
+    
+    Parameters
+    ----------
+    visits : list
+        List of visit dictionaries
+    
+    groups : list
+        Optional ist of direct/grism visit groups
+    
+    info : `~astropy.table.Table`
+        Exposure info
+    
+    root : str
+        Output basename
+    
+    path : str
+        Output path
+    
+    Returns
+    -------
+    data : None
+        Writes objects to `{path}/{root}_visits.yaml`
+    
     """
     
     new_visits = [visit_dict_to_strings(v) for v in visits]
@@ -1552,6 +1617,7 @@ def write_visit_info(visits, groups, info, root='j033216m2743', path='./'):
 
 def convert_visits_npy_to_yaml(npy_file):
     """
+    Convert a ``visits.npy`` file to ``visits.yaml``
     """
     root = npy_file.split('_visits.npy')[0]
     visits, groups, info = np.load(npy_file, allow_pickle=True)
@@ -1576,6 +1642,11 @@ def find_visit_file(root='j033216m2743', path='./'):
 def load_visits_yaml(file):
     """
     Load a {root}_visits.yaml file
+    
+    Parameters
+    ----------
+    file : str
+        Filename of a ``visits.yaml`` file
     
     Returns
     -------
@@ -1602,6 +1673,29 @@ def load_visits_yaml(file):
 def load_visit_info(root='j033216m2743', path='./', verbose=True):
     """
     Load visit info from a visits.npy or visits.yaml file
+    
+    Parameters
+    ----------
+    root : str
+        Basename of the ``visits.yaml`` file
+    
+    path : str
+        Path to search for the file
+    
+    verbose : bool
+        messaging
+    
+    Returns
+    -------
+    visits : list
+        list of "visit" dictionaries
+    
+    groups : list
+        List of direct/grism visit pairs
+    
+    info : `~astropy.table.Table`
+        Exposure information table
+    
     """
     
     yaml_file = os.path.join(path, f'{root}_visits.yaml')
@@ -1699,33 +1793,14 @@ def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, com
             
     files.sort()
 
-    # for file in files:
-    #     # JWST files have slightly different naming conventions for the header
-    #     if os.path.basename(file).startswith('jw'):
-    #         hdu = pyfits.open(file, mode='update')
-    #         hdu[0].header['RA_TARG'] = hdu[0].header['targ_ra']
-    #         hdu[0].header['DEC_TARG'] = hdu[0].header['targ_dec']
-    #         hdu[0].header['EXPTIME'] = hdu[0].header['effexptm']
-    #         hdu[0].header['PA_V3'] = hdu[1].header['pa_v3']
-    # 
-    #         if hdu[0].header['FILTER'] != 'CLEAR':
-    #             hdu[0].header['OFILTER'] = hdu[0].header['FILTER']
-    #             hdu[0].header['OEXPTYP'] = hdu[0].header['EXP_TYPE']
-    # 
-    #         if 'NRIMDTPT' in hdu[0].header:
-    #             hdu[0].header['NRIMDTPT'] = int(hdu[0].header['NRIMDTPT'])
-    # 
-    #         if 'NDITHPTS' in hdu[0].header:
-    #             hdu[0].header['NRIMDTPT'] = int(hdu[0].header['NDITHPTS'])
-    # 
-    #         hdu.flush()
-    #         hdu.close()
-            
     info = utils.get_flt_info(files)
 
     # Only F814W on ACS
     if ONLY_F814W:
-        info = info[((info['INSTRUME'] == 'WFC3') & (info['DETECTOR'] == 'IR')) | (info['FILTER'] == 'F814W')]
+        test_f814w = ((info['INSTRUME'] == 'WFC3') & (info['DETECTOR'] == 'IR'))
+        test_f814w |= (info['FILTER'] == 'F814W')
+        info = info[test_f814w]
+        
     elif filters is not None:
         sel = utils.column_string_operation(info['FILTER'], filters, 
                                             method='count', logical='OR')
@@ -1990,7 +2065,12 @@ def get_visit_exposure_footprints(root='j1000p0210', check_paths=['./', '../RAW'
 
 
 def manual_alignment(field_root='j151850-813028', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', skip=True, radius=5., catalogs=['PS1', 'DES', 'SDSS', 'GAIA', 'WISE'], visit_list=None, radec=None):
-
+    """
+    Manual visit alignment
+    
+    Note, 2023: should still work but hasn't been tested recently
+    
+    """
     #import pyds9
     import glob
     import os
@@ -2076,19 +2156,28 @@ def clean_prep(field_root='j142724+334246'):
         print('remove '+file)
         os.remove(file)
 
-    # Do this in preprocess to avoid doing it over and over
-    # Fix NaNs
-    # flt_files = glob.glob('*_fl?.fits')
-    # for flt_file in flt_files:
-    #     utils.fix_flt_nan(flt_file, verbose=True)
-
 
 def preprocess(field_root='j142724+334246',  HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', PERSIST_PATH=None, min_overlap=0.2, make_combined=True, catalogs=['PS1', 'DES', 'NSC', 'SDSS', 'GAIA', 'WISE'], use_visit=True, master_radec=None, parent_radec=None, use_first_radec=False, skip_imaging=False, clean=True, skip_single_optical_visits=True, visit_prep_args=args['visit_prep_args'], persistence_args=args['persistence_args']):
     """
-    master_radec: force use this radec file
+    Preprocessing script
+    
+    Parameters
+    ----------
+    field_root : str
+        Basename of the exposure group processed together
+    
+    HOME_PATH : str
+        Base path for file processing
+    
+    master_radec : str
+        Force use this radec file for astrometric alignment
 
-    parent_radec: use this file if overlap < min_overlap
-
+    parent_radec : str
+        Use this file if overlap < min_overlap for associations in the group
+    
+    visit_prep_args : dict
+        Keyword arguments passed to `~grizli.prep.process_direct_grism_visit`
+    
     """
 
     try:
@@ -2111,23 +2200,11 @@ def preprocess(field_root='j142724+334246',  HOME_PATH='/Volumes/Pegasus/Grizli/
     if PERSIST_PATH is None:
         PERSIST_PATH = os.path.join(HOME_PATH, field_root, 'Persistence')
     
-    #visits, all_groups, info = np.load(f'{field_root}_visits.npy',
-    #                                   allow_pickle=True)
     visits, all_groups, info = load_visit_info(field_root, verbose=False)
-
-    # check if isJWST
-    #isJWST = prep.check_isJWST('../RAW/' + all_groups[0]['direct']['files'][0])
 
     # Grism visits
     master_footprint = None
     radec = None
-
-    # Master table
-    # visit_table = os.path.join(os.path.dirname(grizli.__file__), 'data/visit_alignment.txt')
-    # if os.path.exists(visit_table):
-    #     visit_table = utils.GTable.gread(visit_table)
-    # else:
-    #     visit_table = None
 
     for i in range(len(all_groups)):
         direct = all_groups[i]['direct']
@@ -2150,34 +2227,15 @@ def preprocess(field_root='j142724+334246',  HOME_PATH='/Volumes/Pegasus/Grizli/
                       grism['product'])
                 continue
 
-        # Make guess file
-        # if visit_table is not None:
-        #     ix = ((visit_table['visit'] == direct['product']) &
-        #           (visit_table['field'] == field_root))
-        #
-        #     if ix.sum() > 0:
-        #         guess = visit_table['xshift', 'yshift', 'rot', 'scale'][ix]
-        #         guess['rot'] = 0.
-        #         guess['scale'] = 1.
-        #         print('\nWCS: '+direct['product']+'\n', guess)
-        #         guess.write('{0}.align_guess'.format(direct['product']),
-        #                     format='ascii.commented_header')
-
         radec = None
-        
-        #print('xxxxxx', master_radec, radec)
-        
+
         if master_radec is not None:
             radec = master_radec
             best_overlap = 0.
             
             if master_radec == 'astrometry_db':
                 radec = prep.get_visit_radec_from_database(direct)
-                # if radec is None:
-                #     master_radec = None
         
-        #print('yyyyyy', master_radec, radec)
-              
         if radec is None:
             radec_files = glob.glob('*cat.radec')
             radec = parent_radec
@@ -2374,50 +2432,15 @@ def preprocess(field_root='j142724+334246',  HOME_PATH='/Volumes/Pegasus/Grizli/
     # Clean up
     if clean:
         clean_prep(field_root=field_root)
-    
-    ###################################
-    # Drizzle by filter
-    # failed = [f.split('.failed')[0] for f in glob.glob('*failed')]
-    # keep_visits = []
-    # for visit in visits:
-    #     if visit['product'] not in failed:
-    #         keep_visits.append(visit)
-    #
-    # overlaps = utils.parse_visit_overlaps(keep_visits, buffer=15.0)
-    # np.save('{0}_overlaps.npy'.format(field_root), [overlaps])
-    #
-    # keep = []
-    # wfc3ir = {'product':'{0}-ir'.format(field_root), 'files':[]}
-
-    # if not make_combined:
-    #     return True
-    #
-    # for overlap in overlaps:
-    #     filt = overlap['product'].split('-')[-1]
-    #     overlap['product'] = '{0}-{1}'.format(field_root, filt)
-    #
-    #     overlap['reference'] = '{0}-ir_drz_sci.fits'.format(field_root)
-    #
-    #     if False:
-    #         if 'g1' not in filt:
-    #             keep.append(overlap)
-    #     else:
-    #         keep.append(overlap)
-    #
-    #     if filt.upper() in ['F098M','F105W','F110W', 'F125W','F140W','F160W']:
-    #         wfc3ir['files'].extend(overlap['files'])
-    #
-    # prep.drizzle_overlaps([wfc3ir], parse_visits=False, pixfrac=0.6, scale=0.06, skysub=False, bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False)
-    #
-    # prep.drizzle_overlaps(keep, parse_visits=False, pixfrac=0.6, scale=0.06, skysub=False, bits=None, final_wcs=True, final_rot=0, final_outnx=None, final_outny=None, final_ra=None, final_dec=None, final_wht_type='IVM', final_wt_scl='exptime', check_overlaps=False)
 
 
-def mask_IR_psf_spikes(visit={},
-mag_lim=17, cat=None, cols=['mag_auto', 'ra', 'dec'], minR=8, dy=5, selection=None, length_scale=1, dq_bit=2048):
+def mask_IR_psf_spikes(visit={}, mag_lim=17, cat=None, cols=['mag_auto', 'ra', 'dec'], minR=8, dy=5, selection=None, length_scale=1, dq_bit=2048):
     """
-    Mask 45-degree diffraction spikes around bright stars
-
-    minR: float
+    Mask 45-degree diffraction spikes around bright stars for WFC3/IR
+    
+    Parameters
+    ----------
+    minR : float
         Mask spike pixels > minR from the star centers
 
     dy : int
@@ -2433,8 +2456,12 @@ mag_lim=17, cat=None, cols=['mag_auto', 'ra', 'dec'], minR=8, dy=5, selection=No
 
         >>> # m = star AB magnitude
         >>> mask_len = 4*np.sqrt(10**(-0.4*(np.minimum(m,17)-17)))/0.06
-
-
+    
+    Returns
+    -------
+    None : None
+        Updates exposure files in place
+    
     """
     from scipy.interpolate import griddata
 
@@ -3060,14 +3087,33 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
     force_seg : str
         Force filename of segmentation image
     
+    force_cat : str
+        Force filename of photometric catalog
+    
     galfit : bool
         Not used recently
-        
+    
+    pad : (int, int)
+        zero padding to catch spectra that partially fall of the edges of the detector
+    
+    files : list, None
+        Explicit list of grism exposures.  Otherwise will be all ``flt, flc, rate``
+        files in working directory
+
+    gris_ref_filters : dict
+        Associated reference images for particular grism elements
+    
+    split_by_grism : bool
+        Separate models by grism element
+    
+    use_jwst_crds : bool
+        Use CRDS `specwcs` files for JWST grism trace configuration
+    
     Returns
     -------
     grp : `~grizli.multifit.GroupFLT` or a list of them
         `~grizli.multifit.GroupFLT` object[s]
-        
+    
     """
     import glob
     import os
@@ -3249,7 +3295,110 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
 
 def grism_prep(field_root='j142724+334246', PREP_PATH='../Prep', EXTRACT_PATH='../Extractions', ds9=None, refine_niter=3, gris_ref_filters=GRIS_REF_FILTERS, force_ref=None, files=None, split_by_grism=True, refine_poly_order=1, refine_fcontam=0.5, cpu_count=0, mask_mosaic_edges=False, prelim_mag_limit=25, refine_mag_limits=[18, 24], init_coeffs=[1.1, -0.5], grisms_to_process=None, pad=(64, 256), model_kwargs={'compute_size': True}, sep_background_kwargs=None, subtract_median_filter=False, median_filter_size=71, median_filter_central=10, second_pass_filtering=False, box_filter_sn=3, box_filter_width=3, median_mask_sn_threshold=None, median_mask_dilate=8, prelim_model_for_median=False, use_jwst_crds=False):
     """
-    Contamination model for grism exposures
+    Contamination model pipeline for grism exposures
+    
+    Parameters
+    ----------
+    field_root : str
+        Rootname of the associated data, used to define the direct image, catalog
+        filenames
+    
+    PREP_PATH : str
+        Relative path to the "Prep" directory containing the grism exposures
+    
+    EXTRACT_PATH : str
+        Relative path to the "Extractions" directory where the outputs will be copied
+    
+    ds9 : `~grizli.ds9.DS9`, None
+        If an open `DS9` window, will display contamination model as it's calcluated
+    
+    refine_niter : int
+        Number of refinement iterations with the polynomial continuum models
+    
+    gris_ref_filters : dict
+        Associated reference images for particular grism elements
+    
+    force_ref : str, None
+        Explicitly specify the direct image reference.  Otherwise will be calculated
+        with ``field_root``, ``gris_ref_filters``.
+    
+    files : list, None
+        Explicit list of grism exposures.  Otherwise will be all ``flt, flc, rate`` 
+        files in the working directory.
+    
+    split_by_grism : bool
+        Separate models by grism element
+    
+    refine_poly_order : int
+        Polynomial order fit to the refined spectra
+    
+    refine_fcontam : float
+        Factor multiplying the contamination model that is added to the variance of
+        and extracted spectrum.
+    cpu_count : int
+        Multiprocessing, see `~grizli.multifit.GroupFLT.compute_full_model`.
+    
+    mask_mosaic_edges : bool
+        Apply a mask where the specified direct image might not contribute to the 
+        dispersed image and therefore could have unmodeled first-order contamination
+        spectra
+    
+    prelim_mag_limit : float
+        Faint magnitude limit for sources in the simple contamination model
+    
+    refine_mag_limits : [float, float]
+        Range of magnitudes for objects in the refined contamination model
+    
+    init_coeffs : [float, float]
+        Polynomial coefficients for the first simple model
+    
+    grisms_to_process : list, None
+        Explicit list of grisms to process, otherwise will do all that are found
+    
+    pad : (int, int)
+        Zero padding size for spectra that fall off the edge of the detector
+    
+    model_kwargs : dict
+        Keyword arguments to pass to `~grizli.multifit.GroupFLT.compute_full_model`
+    
+    sep_background_kwargs=None
+    
+    subtract_median_filter : bool
+        Row-based median filter for NIRCam grisms
+    
+    median_filter_size : int
+        Median filter size, pixels
+    
+    median_filter_central : int
+        Gap in middle of median filter to avoid self-subtraction of lines
+    
+    second_pass_filtering : bool
+        Two passes of median filter to further remove self subtraction
+    
+    box_filter_sn : float
+        S/N threshold for second-pass median filter
+    
+    box_filter_width : int
+        Size of spatial filter for second-pass median filter
+    
+    median_mask_sn_threshold : float
+        S/N threshold for median filter
+    
+    median_mask_dilate : int
+        Dilation factor for median filter
+    
+    prelim_model_for_median : bool
+        Compute a contamination model of bright sources before calculating the median
+        fitler
+    
+    use_jwst_crds : bool
+        Use CRDS `specwcs` files for JWST grism trace configuration
+    
+    Returns
+    -------
+    grp : `~grizli.multifit.GroupFLT`
+        Group object with information for all separate exposures
+    
     """
     import glob
     import os
