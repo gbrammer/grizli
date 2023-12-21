@@ -961,7 +961,7 @@ def get_assoc_yaml_from_s3(assoc, s_region=None, bucket='grizli-v2', prefix='HST
     """
     Get presets from yaml file on s3, if found
     """
-    import boto3
+    
     from grizli.pipeline import auto_script
     from grizli import utils
     
@@ -970,6 +970,7 @@ def get_assoc_yaml_from_s3(assoc, s_region=None, bucket='grizli-v2', prefix='HST
     s3_prefix = os.path.join(prefix, assoc + '.yaml')
     
     if fetch:
+        import boto3
         s3 = boto3.resource('s3')
         s3_client = boto3.client('s3')
         bkt = s3.Bucket(bucket)
