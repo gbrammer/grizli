@@ -496,15 +496,20 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
                 filters.append(f)
                 break
         
+        rgb_scl = [1.5, 0.8, 1]
+        
         if ('cos' in root) & ('f150w2-clear' in all_filters) & (len(filters) < 3):
             filters = ['f814w','f150w2-clear','f444w-clear']
-        
+        elif ('sextans' in root):
+            filters = ['f115w-clear','f200w-clear','f360m-clear']
+            rgb_scl = [1.3, 0.8, 1.02]
+            
         split_tiles(root, ref_tile=ref_tile, 
                     filters=filters,
                     zoom_levels=zoom_levels,
                     optical=True, suffix='.ncrgb', xsize=32, scl=4,
                     force=force, rgb_min=-0.018,
-                    rgb_scl=[1.5, 0.8, 1],
+                    rgb_scl=rgb_scl,
                     norm_kwargs={'stretch': 'asinh', 'min_cut': -0.01, 
                                  'max_cut': 1.0, 'clip':True, 
                                  'asinh_a':0.03},
@@ -695,6 +700,9 @@ def process_tile(field='cos', tile='01.01', filters=TILE_FILTERS, fetch_existing
     from grizli.aws import visit_processor, db
     from grizli.pipeline import auto_script
     from grizli import prep
+    
+    if field == 'sextansa':
+        make_catalog = False
     
     utils.LOGFILE = 'mosaic.log'
     
@@ -960,7 +968,7 @@ def get_random_tile():
     return tile, field
 
 
-def run_one(own_directory=True, rgb_only=True, make_catalog=False, **kwargs):
+def run_one(own_directory=True, rgb_only=True, make_catalog=True, **kwargs):
     """
     Run a single random visit
     """
