@@ -53,7 +53,8 @@ def make_all_fields():
     j1235 189.025 4.948 20 20
     macsj0647 101.9482378 70.2297032 46 46
     abells1063   342.1839985 -44.5308919 46 46  
-    spitzer_idf 265.0347875 68.9741119 46 46 
+    spitzer_idf 265.0347875 68.9741119 46 46
+    sextansa 152.7749473 -4.7061916 46 46
     """
     
     # 46 46 for tile ref 9 9
@@ -959,7 +960,7 @@ def get_random_tile():
     return tile, field
 
 
-def run_one(own_directory=True, rgb_only=True, make_catalog=True, **kwargs):
+def run_one(own_directory=True, rgb_only=True, make_catalog=False, **kwargs):
     """
     Run a single random visit
     """
