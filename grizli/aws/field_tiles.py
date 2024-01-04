@@ -53,7 +53,8 @@ def make_all_fields():
     j1235 189.025 4.948 20 20
     macsj0647 101.9482378 70.2297032 46 46
     abells1063   342.1839985 -44.5308919 46 46  
-    spitzer_idf 265.0347875 68.9741119 46 46 
+    spitzer_idf 265.0347875 68.9741119 46 46
+    sextansa 152.7749473 -4.7061916 46 46
     """
     
     # 46 46 for tile ref 9 9
@@ -495,15 +496,20 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
                 filters.append(f)
                 break
         
+        rgb_scl = [1.5, 0.8, 1]
+        
         if ('cos' in root) & ('f150w2-clear' in all_filters) & (len(filters) < 3):
             filters = ['f814w','f150w2-clear','f444w-clear']
-        
+        elif ('sextans' in root):
+            filters = ['f115w-clear','f200w-clear','f360m-clear']
+            rgb_scl = [1.3, 0.8, 1.02]
+            
         split_tiles(root, ref_tile=ref_tile, 
                     filters=filters,
                     zoom_levels=zoom_levels,
                     optical=True, suffix='.ncrgb', xsize=32, scl=4,
                     force=force, rgb_min=-0.018,
-                    rgb_scl=[1.5, 0.8, 1],
+                    rgb_scl=rgb_scl,
                     norm_kwargs={'stretch': 'asinh', 'min_cut': -0.01, 
                                  'max_cut': 1.0, 'clip':True, 
                                  'asinh_a':0.03},
@@ -694,6 +700,9 @@ def process_tile(field='cos', tile='01.01', filters=TILE_FILTERS, fetch_existing
     from grizli.aws import visit_processor, db
     from grizli.pipeline import auto_script
     from grizli import prep
+    
+    if field == 'sextansa':
+        make_catalog = False
     
     utils.LOGFILE = 'mosaic.log'
     
