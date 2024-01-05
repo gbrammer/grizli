@@ -6238,18 +6238,32 @@ def get_jwst_wfssbkg_file(file, valid_flat=[0.6, 1.3], make_figure=False):
             _im.close()
             return bkg_file
 
-    # Test local file
+    # Get local background file location
     local_bkg_file = f"nis-{h['PUPIL']}-{h['FILTER']}_skyflat.fits".lower()
     local_bkg_file = os.path.join(GRIZLI_PATH, 'CONF',local_bkg_file)
     
-    # If local file exists and is up-to-date, use it
-    if os.path.exists(local_bkg_file) and pyfits.getval(local_bkg_file,'DATE',0) == pyfits.getval(bkg_file,'DATE',0):
-        return local_bkg_file
+    # Inspect local background file if it exists
+    if os.path.exists(local_bkg_file):
+        
+        h = pyfits.getheader(local_bkg_file,0)
+        if 'DATE' not in h:
+            msg = f'Use local wfssbkg file {local_bkg_file} (Warning: no DATE keyword)'
+            utils.log_comment(utils.LOGFILE, msg, verbose=True)
+            return local_bkg_file
+        elif h['DATE'] == pyfits.getval(bkg_file,'DATE',0):
+            msg = f'Use local wfssbkg file {local_bkg_file}'
+            utils.log_comment(utils.LOGFILE, msg, verbose=True)
+            return local_bkg_file
+        else:
+            msg = f'Local wfssbkg file {local_bkg_file} is out of date, updating'
+            utils.log_comment(utils.LOGFILE, msg, verbose=True)
                     
     flat_file = FlatFieldStep().get_reference_file(file, 'flat')
     
     # If we don't have write access copy to local file
     if (not os.access(bkg_file,os.W_OK)) or (('CRDS_READONLY_CACHE' in os.environ) and (os.environ['CRDS_READONLY_CACHE'] == '1')):
+        msg = f'Copy wfssbkg file {bkg_file} to {local_bkg_file}'
+        utils.log_comment(utils.LOGFILE, msg, verbose=True)
         shutil.copy(bkg_file,local_bkg_file)
         bkg_file = local_bkg_file
     wf = pyfits.open(bkg_file, mode='update')
