@@ -4494,6 +4494,11 @@ def process_direct_grism_visit(direct={},
             
         if (not isACS) & (not isWFPC2) & run_tweak_align:
             # if run_tweak_align:
+            if (tweak_mosaic_iters == -1) & (radec is not None):
+                tweak_radec = radec
+            else:
+                tweak_radec = None
+            
             tweak_align(direct_group=direct,
                         grism_group=grism,
                         max_dist=tweak_max_dist,
@@ -4502,7 +4507,9 @@ def process_direct_grism_visit(direct={},
                         drizzle=False,
                         ref_exp=tweak_ref_exp,
                         threshold=tweak_threshold,
-                        fit_order=tweak_fit_order)
+                        fit_order=tweak_fit_order,
+                        master_radec=tweak_radec,
+                        )
             
             ## Iterate the tweak correction
             if tweak_mosaic_iters > 0:
@@ -4615,10 +4622,20 @@ def process_direct_grism_visit(direct={},
 
         # Now do tweak_align for ACS
         if (isACS) & run_tweak_align & (len(direct['files']) > 1):
-            tweak_align(direct_group=direct, grism_group=grism,
-                    max_dist=tweak_max_dist, n_min=tweak_n_min,
-                    key=' ', drizzle=False,
-                    threshold=tweak_threshold)
+            if (tweak_mosaic_iters == -1) & (radec is not None):
+                tweak_radec = radec
+            else:
+                tweak_radec = None
+            
+            tweak_align(direct_group=direct,
+                        grism_group=grism,
+                        max_dist=tweak_max_dist,
+                        n_min=tweak_n_min,
+                        key=' ',
+                        drizzle=False,
+                        threshold=tweak_threshold,
+                        master_radec=tweak_radec,
+                        )
 
             if tweak_mosaic_iters > 0:
                 tweak_kwargs = dict(max_dist=tweak_max_dist,
