@@ -399,7 +399,7 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
         filters = []
         for f in ['f277w-clear','f356w-clear','f444w-clear',
                   'f410m-clear','f365m-clear','f460m-clear',
-                  'f480m-clear', 'f300m-clear',]:
+                  'f480m-clear', 'f335m-clear','f300m-clear',]:
             if f in all_filters:
                 filters.append(f)
                 
@@ -704,7 +704,9 @@ def process_tile(field='cos', tile='01.01', filters=TILE_FILTERS, fetch_existing
     from grizli.pipeline import auto_script
     from grizli import prep
     
-    if field == 'sextansa':
+    if field in ('sextansa','cos','abell370','abell2744',
+                 'macs0416','macs1149','macs1423','macs0417',
+                 'egs','uds','gds','gdn',):
         make_catalog = False
     
     utils.LOGFILE = 'mosaic.log'
