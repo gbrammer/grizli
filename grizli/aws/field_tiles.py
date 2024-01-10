@@ -706,7 +706,7 @@ def process_tile(field='cos', tile='01.01', filters=TILE_FILTERS, fetch_existing
     
     if field in ('sextansa','cos','abell370','abell2744',
                  'macs0416','macs1149','macs1423','macs0417',
-                 'egs','uds','gds','gdn',):
+                 'egs','uds','gds','gdn','egs-v2'):
         make_catalog = False
     
     utils.LOGFILE = 'mosaic.log'
