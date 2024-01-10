@@ -43,15 +43,17 @@ def get_random_reprocess_file():
         nothing found
     
     """
-    all_tiles = db.SQL(f"""SELECT *
+    from grizli.aws import db
+    
+    rows = db.SQL(f"""SELECT *
                            FROM reprocess_rates
                            WHERE status = 0 order by random() limit 1
                            """)
     
-    if len(all_tiles) == 0:
+    if len(rows) == 0:
         return None
     else:
-        return all_tiles
+        return rows
 
 
 def run_one(verbose=True):
