@@ -5839,8 +5839,8 @@ def jwst_snowblind_mask(rate_file, require_prefix='jw', max_fraction=0.3, new_ju
     
     if _mask_frac > max_fraction:
         msg = f"grizli.utils.jwst_snowblind_mask: {rate_file} problem "
-        msg += f" fraction {_mask_frac:.2f} > {max_fraction:.2f}"
-        msg += "turning off..."
+        msg += f" fraction {_mask_frac*100:.2f} > {max_fraction*100:.2f}"
+        msg += " turning off..."
         res.dq &= 0
     else:
         msg = f"grizli.utils.jwst_snowblind_mask: {rate_file} {_mask_frac*100:.2f}"

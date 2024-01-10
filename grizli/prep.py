@@ -3445,7 +3445,7 @@ def mask_snowballs(visit, snowball_erode=3, snowball_dilate=18, mask_bit=1024, i
                         _xim['SCI'].header['SNOWBALF'] = (sfrac,
                                           'Fraction of masked pixels in snowball mask')
 
-                        if unset4:
+                        if unset4 | (sfrac > max_fraction):
                             _xim['DQ'].data -= (_xim['DQ'].data & 4)
                     
                         _xim.flush()
@@ -3464,8 +3464,8 @@ def mask_snowballs(visit, snowball_erode=3, snowball_dilate=18, mask_bit=1024, i
             
             if _maskfrac > max_fraction:
                 msg = f"Snowball mask: {_file} problem "
-                msg += f" fraction {_maskfrac:.2f} > {max_fraction:.2f}"
-                msg += "turning off..."
+                msg += f" fraction {_maskfrac*100:.2f} > {max_fraction*100:.2f}"
+                msg += " turning off..."
                 utils.log_comment(utils.LOGFILE, msg, verbose=True)
                 snowball_mask &= False
                 
@@ -5633,7 +5633,7 @@ def tweak_flt(files=[], max_dist=0.4, threshold=3, min_flux_radius=0.5, max_flux
 
     # Make FLT catalogs
     cats = []
-    logstr = '### Tweak alignment (use_sewpy={0}) '.format(use_sewpy)
+    logstr = f'### Tweak alignment: use_sewpy={use_sewpy}  master_radec={master_radec}'
     utils.log_comment(utils.LOGFILE, logstr, verbose=True)
     
     exptime = np.zeros(len(files))
