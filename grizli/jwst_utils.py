@@ -1277,6 +1277,8 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
         _det = img[0].header['DETECTOR']
         
         bpfiles = [os.path.join(os.path.dirname(__file__),
+                   f'data/nrc_badpix_240112_{_det}.fits.gz')]
+        bpfiles += [os.path.join(os.path.dirname(__file__),
                    f'data/nrc_badpix_231206_{_det}.fits.gz')]
         bpfiles += [os.path.join(os.path.dirname(__file__),
                    f'data/nrc_badpix_20230710_{_det}.fits.gz')]
