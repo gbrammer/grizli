@@ -56,7 +56,7 @@ def get_random_reprocess_file():
         return rows
 
 
-def run_one(verbose=True):
+def run_one(verbose=True, remove_result=True):
     """
     Run a single random file from `reprocess_rates` with ``status == 0``
     """
@@ -138,7 +138,14 @@ def run_one(verbose=True):
                    AND prefix = '{row['prefix'][0]}'
                    AND bucket = '{row['bucket'][0]}';
                    """)
-    
+        
+        # Remove result
+        if remove_result:
+            msg = f"rm {row['rate_file'][0]}"
+            utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+            
+            os.remove(row['rate_file'][0])
+            
     else:
         ###############
         # Problem
