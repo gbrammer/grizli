@@ -2115,6 +2115,10 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
     niriss_ghost_kwargs : dict
         Parameters of the NIRISS ghost flagging
     
+    snowblind_kwargs : dict
+        Arguments to pass to `~grizli.utils.jwst_snowblind_mask` if `snowblind` hasn't
+        already been run on JWST exposures
+    
     scale_photom : bool
         See `~grizli.utils.drizzle_from_visit`
     

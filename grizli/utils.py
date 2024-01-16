@@ -5750,6 +5750,12 @@ def jwst_crds_photom_scale(hdul, context='jwst_1130.pmap', update=True, verbose=
     
     return scale
 
+DEFAULT_SNOWBLIND_KWARGS = dict(require_prefix='jw',
+                                max_fraction=0.3,
+                                new_jump_flag=1024,
+                                min_radius=4,
+                                growth_factor=1.5,
+                                unset_first=True)
 
 def jwst_snowblind_mask(rate_file, require_prefix='jw', max_fraction=0.3, new_jump_flag=1024, min_radius=4, growth_factor=1.5, unset_first=True, verbose=True, **kwargs):
     """
@@ -5929,7 +5935,8 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
         Keyword arguments for `~grizli.utils.niriss_ghost_mask`
     
     snowblind_kwargs : dict
-        Keyword arguments for additional DQ flagging with `snowblind`
+        Arguments to pass to `~grizli.utils.jwst_snowblind_mask` if `snowblind` hasn't
+        already been run on JWST exposures
     
     Returns
     -------
