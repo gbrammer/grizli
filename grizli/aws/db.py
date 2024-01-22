@@ -1829,7 +1829,7 @@ def SQL(query_text, engine=None, pd_kwargs={}, **kwargs):
 
 def execute(sql_text):
     """
-    Wrapper around engine.execute()
+    Wrapper around `sqlalchemy.engine.Engine.execute()`
     """
     global _ENGINE
     
@@ -1838,7 +1838,14 @@ def execute(sql_text):
     else:
         refresh_engine()
     
-    resp = _ENGINE.execute(sql_text)
+    if hasattr(_ENGINE, 'execute'):
+        resp = _ENGINE.execute(sql_text)
+    else:
+        conn = _ENGINE.connect()
+        resp = conn.exec_driver_sql(sql_text)
+        conn.commit()
+        conn.close()
+        
     return resp
 
 
