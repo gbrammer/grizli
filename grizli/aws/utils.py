@@ -70,6 +70,8 @@ def create_s3_index(path, output_file="index.html", extra_html="", upload=True, 
                                 buttons=['csv'],
                                 )
         
+        tab.write(output_file.replace('.html', '.csv'), overwrite=True)
+        
         if extra_html:
             with open(output_file) as fp:
                 lines = fp.readlines()
@@ -90,6 +92,8 @@ def create_s3_index(path, output_file="index.html", extra_html="", upload=True, 
     
     if upload:
         os.system(f'aws s3 cp {output_file} {path} --acl public-read')
+        os.system(f'aws s3 cp {output_file.replace(".html", ".csv")} {path} ' + 
+                  ' --acl public-read')
         print(path.replace('s3://', 'https://s3.amazonaws.com/') + output_file)
     else:
         print(output_file)
