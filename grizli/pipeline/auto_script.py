@@ -21,6 +21,7 @@ from .. import catalog as grizli_catalog
 from .default_params import UV_N_FILTERS, UV_M_FILTERS, UV_W_FILTERS
 from .default_params import OPT_N_FILTERS, OPT_M_FILTERS, OPT_W_FILTERS
 from .default_params import IR_N_FILTERS, IR_M_FILTERS, IR_W_FILTERS
+from .default_params import NIRISS_FILTERS, NIRCAM_SW_FILTERS, NIRCAM_LW_FILTERS
 from .default_params import ALL_IMAGING_FILTERS, VALID_FILTERS
 from .default_params import UV_GRISMS, OPT_GRISMS, IR_GRISMS, GRIS_REF_FILTERS
 
@@ -4667,9 +4668,9 @@ def drizzle_overlaps(field_root, filters=['F098M', 'F105W', 'F110W', 'F115W', 'F
                               run_driz_cr=filter_driz_cr, **kwargs)
 
 
-FILTER_COMBINATIONS = {'ir': IR_M_FILTERS+IR_W_FILTERS,
-                       'opt': OPT_M_FILTERS+OPT_W_FILTERS}
-
+FILTER_COMBINATIONS = {'ir': (IR_M_FILTERS + IR_W_FILTERS + 
+                              NIRISS_FILTERS + NIRCAM_LW_FILTERS),
+                       'opt': OPT_M_FILTERS + OPT_W_FILTERS}
 
 def make_filter_combinations(root, weight_fnu=2, filter_combinations=FILTER_COMBINATIONS, force_photfnu=1.e-8, min_count=1, block_filters=[]):
     """
