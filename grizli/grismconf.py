@@ -1341,6 +1341,9 @@ def load_grism_config(conf_file, warnings=True):
      """
             msg = f' ! Scale NIRISS sensitivity by {hack_niriss:.3f} prelim flux correction'
             utils.log_comment(utils.LOGFILE, msg, verbose=warnings)
+        elif 'F090W' in conf_file:
+            # hack_niriss = 0.8
+            hack_niriss = 1.0
         else:
             hack_niriss = 1.0
             
@@ -1356,6 +1359,8 @@ def load_grism_config(conf_file, warnings=True):
             # for b in conf.beams:
             #     #conf.conf[f'DYDX_{b}_0'][0] += 0.25
             #     conf.conf[f'DLDP_{b}_0'] -= conf.conf[f'DLDP_{b}_1']*0.5
+        elif ('F090W' in conf_file) | ('.2212' in conf_file):
+            pass
         elif isinstance(conf, TransformGrismconf):
             # Don't shift new format files
             pass
