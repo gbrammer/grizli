@@ -76,10 +76,16 @@ GRIS_REF_FILTERS = {'G141': ['F140W', 'F160W', 'F125W', 'F105W', 'F110W',
                               'F555W', 'opt'], 
                     'GR150C': ['F115W', 'F150W', 'F200W',
                                'F090W', 'CLEAR-F090W',
-                               'CLEAR-F115W', 'CLEAR-F150W', 'CLEAR-F200W'], 
+                               'CLEAR-F115W', 'CLEAR-F150W', 'CLEAR-F200W',
+                               'F090WN-CLEAR', 'F115WN-CLEAR', 'F150WN-CLEAR',
+                               'F200WN-CLEAR'
+                              ],
                     'GR150R': ['F115W', 'F150W', 'F200W',
                                'F090W', 'CLEAR-F090W',
-                               'CLEAR-F115W', 'CLEAR-F150W', 'CLEAR-F200W'],
+                               'CLEAR-F115W', 'CLEAR-F150W', 'CLEAR-F200W'
+                               'F090WN-CLEAR', 'F115WN-CLEAR', 'F150WN-CLEAR',
+                               'F200WN-CLEAR'
+                               ],
                     'GRISMR': ['F277W-CLEAR','F356W-CLEAR','F410M-CLEAR',
                                'F444W-CLEAR','F277W','F356W','F410M','F444W'],
                     'GRISMC': ['F277W-CLEAR','F356W-CLEAR','F410M-CLEAR',
