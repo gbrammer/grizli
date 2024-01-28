@@ -1048,7 +1048,7 @@ def make_directories(root='j142724+334246', HOME_PATH='$PWD', paths={}):
     return paths
 
 
-def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_products={'WFPC2/WFC': ['C0M', 'C1M'], 'WFPC2/PC': ['C0M', 'C1M'], 'ACS/WFC': ['FLC'], 'WFC3/IR': ['RAW'], 'WFC3/UVIS': ['FLC']}, remove_bad=True, reprocess_parallel=False, reprocess_clean_darks=True, s3_sync=False, fetch_flt_calibs=['IDCTAB', 'PFLTFILE', 'NPOLFILE'], filters=VALID_FILTERS, min_bad_expflag=2, fetch_only=False, force_rate=True, get_rateints=False, recalibrate_jwst=False, s3path=None):
+def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_products={'WFPC2/WFC': ['C0M', 'C1M'], 'WFPC2/PC': ['C0M', 'C1M'], 'ACS/WFC': ['FLC'], 'WFC3/IR': ['RAW'], 'WFC3/UVIS': ['FLC']}, remove_bad=True, reprocess_parallel=False, reprocess_clean_darks=True, s3_sync=False, fetch_flt_calibs=['IDCTAB', 'PFLTFILE', 'NPOLFILE'], filters=VALID_FILTERS, min_bad_expflag=2, fetch_only=False, force_rate=True, get_rateints=False, get_recalibrated_rate=True, recalibrate_jwst=False, s3path=None):
     """
     Fully automatic script for fetching exposure files
     
@@ -1233,6 +1233,7 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_pr
                     jw_i = []
                     _resp = mastquery.utils.download_from_mast(tab[jw],
                                                   force_rate=force_rate,
+                                        get_recalibrated_rate=get_recalibrated_rate,
                                                   rate_ints=get_rateints)
             
                     for i, _file in enumerate(_resp):

@@ -35,6 +35,7 @@ fetch_files_args:
     force_rate: True
     get_rateints: False
     recalibrate_jwst: False
+    get_recalibrated_rate: True
     inst_products: 
         ACS/WFC: [FLC]
         WFC3/IR: [RAW]
