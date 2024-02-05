@@ -2135,6 +2135,9 @@ def get_line_wavelengths():
     line_ratios['CIII-1906'] = [1.]
     line_wavelengths['CIII-1908'] = [1908.734]
     line_ratios['CIII-1908'] = [1.]
+    line_wavelengths['CI-9580'] = [9850.26]
+    line_ratios['CI-9580'] = [1.]
+    
     # Hutchinson 
     # https://iopscience.iop.org/article/10.3847/1538-4357/ab22a2
     line_wavelengths['CIII-1906x'] = [1906.683, 1908.734]
