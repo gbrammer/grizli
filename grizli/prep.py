@@ -6256,7 +6256,7 @@ def get_jwst_wfssbkg_file(file, valid_flat=[0.6, 1.3], make_figure=False):
             return bkg_file
 
     # Get local background file location
-    local_bkg_file = f"nis-{h['PUPIL']}-{h['FILTER']}_skyflat.fits".lower()
+    local_bkg_file = f"nis-{h['PUPIL']}-{h['FILTER']}_wfssback.fits".lower()
     local_bkg_file = os.path.join(GRIZLI_PATH, 'CONF',local_bkg_file)
     
     # Inspect local background file if it exists
