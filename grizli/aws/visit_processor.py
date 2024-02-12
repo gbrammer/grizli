@@ -2308,6 +2308,7 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
                                      niriss_ghost_kwargs=niriss_ghost_kwargs,
                                      snowblind_kwargs=snowblind_kwargs,
                                      weight_type=weight_type,
+                                     rnoise_percentile=rnoise_percentile,
                                      calc_wcsmap=calc_wcsmap)
                              
         outsci, outwht, header, flist, wcs_tab = _
