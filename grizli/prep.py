@@ -5144,7 +5144,7 @@ def tweak_align(direct_group={}, grism_group={}, max_dist=1., n_min=10, key=' ',
                                  'prep.tweak_align')
 
     from drizzlepac.astrodrizzle import AstroDrizzle
-    from numpy import polyfit, polyval
+    from numpy.polynomial.polynomial import polyfit, polyval
 
     if len(direct_group['files']) < 2:
         logstr = '# ! {0}: Only one direct image found, can\'t compute shifts'

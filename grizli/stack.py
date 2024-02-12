@@ -561,7 +561,7 @@ class StackFitter(GroupFitter):
         """
         Scale spectrum templates by polynomial function
         """
-        from numpy import polyval
+        from numpy.polynomial.polynomial import polyval
 
         scale = np.ones(Ax.shape[1])
         scale[:-Nphot] = polyval(p[::-1]/10., (spec_wave-1.e4)/1000.)
@@ -578,7 +578,7 @@ class StackFitter(GroupFitter):
         spectra
         """
         import scipy.optimize
-        from numpy import polyval
+        from numpy.polynomial.polynomial import polyval
 
         scale = np.ones(Ax.shape[1])
         scale[:-Nphot] = polyval(p[::-1]/10., (spec_wave-1.e4)/1000.)
