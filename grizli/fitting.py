@@ -2513,7 +2513,7 @@ class GroupFitter(object):
             
             
         """
-        from numpy import polyfit, polyval
+        from numpy.polynomial.polynomial import polyfit, polyval
         from scipy.stats import t as student_t
         from scipy.special import huber
         import peakutils
@@ -3480,7 +3480,7 @@ class GroupFitter(object):
         spectra
         """
         import scipy.optimize
-        from numpy import polyval
+        from numpy.polynomial.polynomial import polyval
 
         scale = self.compute_scale_array(pscale, self.wavef[self.fit_mask])
         scale[-self.Nphot:] = 1.

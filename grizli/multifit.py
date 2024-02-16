@@ -2751,7 +2751,7 @@ class MultiBeam(GroupFitter):
                      fsps_templates=False):
         """TBD
         """
-        from scipy import polyfit, polyval
+        from numpy.polynomial.polynomial import polyfit, polyval
 
         if zr is None:
             zr = [0.65, 1.6]
