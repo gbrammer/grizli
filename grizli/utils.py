@@ -2138,6 +2138,12 @@ def get_line_wavelengths():
     line_wavelengths['CI-9580'] = [9850.26]
     line_ratios['CI-9580'] = [1.]
     
+    
+    # Sodium D I lines from Davies 2023
+    # https://arxiv.org/abs/2310.17939v2
+    line_wavelengths['NaDI']=[5891.,5897.]
+    line_ratios['NaDI']=[1.,1.]
+    
     # Hutchinson 
     # https://iopscience.iop.org/article/10.3847/1538-4357/ab22a2
     line_wavelengths['CIII-1906x'] = [1906.683, 1908.734]
