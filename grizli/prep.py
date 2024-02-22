@@ -74,7 +74,8 @@ For example,
 # check_status()
 
 
-def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_badpix=True, apply_grism_skysub=True, crclean=False, mask_regions=True, oneoverf_correction=True, oneoverf_kwargs={}, use_skyflats=True):
+def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_badpix=True, apply_grism_skysub=True, crclean=False, mask_regions=True, oneoverf_correction=True, oneoverf_kwargs={}, use_skyflats=True, do_pure_parallel_wcs=True
+):
     """Copy "fresh" unmodified version of a data file from some central location
 
     Parameters
@@ -106,7 +107,11 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
 
     mask_regions : bool
         Apply exposure region mask (like ``_flt.01.mask.reg``) if it exists.
-
+    
+    do_pure_parallel_wcs : bool
+        Update the WCS for JWST pure-parallel exposures from the FGS logs to fix
+        a MAST bug.
+    
     Returns
     -------
     Nothing, but copies the file from ``path`` to ``./``.
@@ -262,36 +267,16 @@ def fresh_flt_file(file, preserve_dq=False, path='../RAW/', verbose=True, extra_
         if orig_file[0].header['TELESCOP'] == 'JWST':
             isJWST = True
             
+            jwst_utils.DO_PURE_PARALLEL_WCS = do_pure_parallel_wcs
+            
             orig_file.writeto(local_file, overwrite=True)
+            
             status = jwst_utils.initialize_jwst_image(local_file, 
                                       oneoverf_correction=oneoverf_correction,
                                       oneoverf_kwargs=oneoverf_kwargs, 
                                       use_skyflats=use_skyflats)            
+            
             orig_file = pyfits.open(local_file)
-            
-            
-    # if filter in ['GR150C', 'GR150R']: 
-    #     if (head['FILTER'] == 'GR150C') & (head['PUPIL'] == 'F115W'):        
-    #         flat_file = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0202.fits')
-    #     if (head['FILTER'] == 'GR150C') & (head['PUPIL'] == 'F150W'):        
-    #         flat_file = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0187.fits')
-    #     if (head['FILTER'] == 'GR150C') & (head['PUPIL'] == 'F200W'):        
-    #         flat_file = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0204.fits')
-    #     if (head['FILTER'] == 'GR150R') & (head['PUPIL'] == 'F115W'):        
-    #         flat_file = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0200.fits')
-    #     if (head['FILTER'] == 'GR150R') & (head['PUPIL'] == 'F150W'):        
-    #         flat_file = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0188.fits')
-    #     if (head['FILTER'] == 'GR150R') & (head['PUPIL'] == 'F200W'):        
-    #         flat_file = os.path.join(os.getenv('jref'), 'jwst_niriss_flat_0195.fits')
-    # 
-    #     extra_msg = ' / flat: {0}'.format(flat_file)
-    # 
-    #     flat_im = pyfits.open(os.path.join(os.getenv('jref'), flat_file))
-    #     flat = flat_im['SCI'].data #[5:-5, 5:-5]:
-    #     flat_dq = (flat < 0.2)
-    # 
-    #     #orig_file['DQ'].data |= 4*flat_dq
-    #     orig_file['SCI'].data = np.divide(orig_file['SCI'].data,flat,orig_file['SCI'].data,where=(flat!=0))
     
     if crclean and has_scrappy:
         for ext in [1, 2]:
@@ -4304,7 +4289,9 @@ def process_direct_grism_visit(direct={},
                                angle_background_kwargs={},
                                miri_skyflat=True,
                                miri_skyfile=None,
-                               use_skyflats=True):
+                               use_skyflats=True,
+                               do_pure_parallel_wcs=True,
+                               ):
     """Full processing of a direct (+grism) image visit.
     
     Notes
@@ -4379,7 +4366,8 @@ def process_direct_grism_visit(direct={},
             fresh_flt_file(file, crclean=crclean,
                            oneoverf_correction=(oneoverf_kwargs is not None), 
                            oneoverf_kwargs=oneoverf_kwargs,
-                           use_skyflats=use_skyflats)
+                           use_skyflats=use_skyflats,
+                           do_pure_parallel_wcs=do_pure_parallel_wcs)
                            
             isJWST = check_isJWST(file)
             if isJWST:

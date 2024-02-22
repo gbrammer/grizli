@@ -113,6 +113,7 @@ visit_prep_args: &prep_args
     tweak_mosaic_iters: 2
     align_simple: False
     align_clip: 120
+    do_pure_parallel_wcs: True
     column_average: True
     sky_iter: 10
     iter_atol: 0.0001

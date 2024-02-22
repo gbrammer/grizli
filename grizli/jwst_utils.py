@@ -651,7 +651,7 @@ def img_with_wcs(input, overwrite=True, fit_sip_header=True, skip_completed=True
                 status = update_pure_parallel_wcs(input, fix_vtype='PARALLEL_PURE')
             except:
                 pass
-        
+
     return output
 
 
