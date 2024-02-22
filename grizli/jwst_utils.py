@@ -22,6 +22,10 @@ QUIET_LEVEL = logging.INFO
 # CRDS_CONTEXT = 'jwst_0995.pmap' # 2022-10-06 NRC ZPs and flats
 CRDS_CONTEXT = 'jwst_1123.pmap' # 2023-09-08 NRC specwcs, etc.
 
+# Global variable to control whether or not to try to update
+# PP file WCS
+DO_PURE_PARALLEL_WCS = True
+
 def set_crds_context(fits_file=None, override_environ=False, verbose=True):
     """
     Set CRDS_CONTEXT
@@ -641,11 +645,12 @@ def img_with_wcs(input, overwrite=True, fit_sip_header=True, skip_completed=True
         _hdu.writeto(input, overwrite=True)
         _hdu.close()
         
-        try:
-            # Update pointing of pure-parallel exposures
-            status = update_pure_parallel_wcs(input)
-        except:
-            pass
+        if DO_PURE_PARALLEL_WCS:
+            try:
+                # Update pointing of pure-parallel exposures
+                status = update_pure_parallel_wcs(input, fix_vtype='PARALLEL_PURE')
+            except:
+                pass
         
     return output
 
