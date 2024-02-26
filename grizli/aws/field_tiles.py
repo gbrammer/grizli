@@ -399,9 +399,11 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
     # JWST LW
     if (len(glob.glob(f'{root}*.lwrgb.png')) == 0) & make_combinations:
         filters = []
-        for f in ['f277w-clear','f356w-clear','f444w-clear',
-                  'f410m-clear','f365m-clear','f460m-clear',
-                  'f480m-clear', 'f335m-clear','f300m-clear',]:
+        for f in ['f277w-clear', 'f356w-clear', 'f444w-clear',
+                  'f410m-clear', 'f365m-clear', 'f460m-clear',
+                  'f480m-clear', 'f335m-clear', 'f300m-clear',
+                  'f250m-clear', 'f360m-clear', 'f430m-clear',
+                  ]:
             if f in all_filters:
                 filters.append(f)
                 
