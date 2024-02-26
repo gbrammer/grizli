@@ -56,6 +56,7 @@ def make_all_fields():
     spitzer_idf 265.0347875 68.9741119 46 46
     sextansa 152.7749473 -4.7061916 46 46
     rxcj0600 90.04 -20.145 46 46
+    ulasj1342 205.555 9.462 46 46
     """
     
     # 46 46 for tile ref 9 9
@@ -707,7 +708,8 @@ def process_tile(field='cos', tile='01.01', filters=TILE_FILTERS, fetch_existing
     
     if field in ('sextansa','cos','abell370','abell2744',
                  'macs0416','macs1149','macs1423','macs0417',
-                 'egs','uds','gds','gdn','egs-v2'):
+                 'egs','uds','gds','gdn','egs-v2',
+                 'ulasj1342'):
         make_catalog = False
     
     utils.LOGFILE = 'mosaic.log'
@@ -974,7 +976,7 @@ def get_random_tile():
     return tile, field
 
 
-def run_one(own_directory=True, rgb_only=True, make_catalog=True, **kwargs):
+def run_one(own_directory=True, rgb_only=True, make_catalog=False, **kwargs):
     """
     Run a single random visit
     """
