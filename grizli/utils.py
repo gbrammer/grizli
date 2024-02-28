@@ -2041,11 +2041,17 @@ def get_line_wavelengths():
     line_wavelengths['OII'] = [3727.092, 3729.875]
     line_ratios['OII'] = [1, 1.]
 
-    line_wavelengths['OI-6302'] = [6302.046, 6365.535]
-    line_ratios['OI-6302'] = [1, 0.33]
     line_wavelengths['OI-5578'] = [5578.89]
     line_ratios['OI-5578'] = [1]
-
+    line_wavelengths['OI-6302'] = [6302.046, 6365.535]
+    line_ratios['OI-6302'] = [1, 0.33]
+    line_wavelengths['OI-7776'] = [ 7776.3]
+    line_ratios['OI-7776'] = [1]
+    line_wavelengths['OI-8448'] = [ 8448.7]
+    line_ratios['OI-8448'] = [1]
+    line_wavelengths['OI-11290'] = [ 11290.]
+    line_ratios['OI-11290'] = [1]
+    
     # Auroral OII
     # lines roughly taken from https://arxiv.org/pdf/1610.06939.pdf
     line_wavelengths['OII-7325'] = [7321.9, 7332.21]
@@ -2135,8 +2141,10 @@ def get_line_wavelengths():
     line_ratios['CIII-1906'] = [1.]
     line_wavelengths['CIII-1908'] = [1908.734]
     line_ratios['CIII-1908'] = [1.]
-    line_wavelengths['CI-9580'] = [9850.26]
+    line_wavelengths['CI-9580'] = [9850.26] # leave typo for back compatibility
     line_ratios['CI-9580'] = [1.]
+    line_wavelengths['CI-9850'] = [9850.26]
+    line_ratios['CI-9850'] = [1.]
     
     
     # Sodium D I lines from Davies 2023
