@@ -1456,7 +1456,7 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
 #                  'F480M': [1.879639e-21, 1.453752e-30, 4.8152]}
 # 
 
-def set_jwst_to_hst_keywords(input, reset=False, verbose=True, orig_keys=ORIG_KEYS):
+def set_jwst_to_hst_keywords(input, reset=False, verbose=True, orig_keys=ORIG_KEYS, oneoverf_correction=True):
     """
     Make primary header look like an HST instrument
     """
@@ -1476,7 +1476,7 @@ def set_jwst_to_hst_keywords(input, reset=False, verbose=True, orig_keys=ORIG_KE
            'DETECTOR':'IR'}
     
     if 'OTELESCO' not in img[0].header:
-        _status = initialize_jwst_image(input, verbose=verbose)
+        _status = initialize_jwst_image(input, oneoverf_correction=oneoverf_correction, verbose=verbose)
         
         # Reopen
         if isinstance(input, str):
