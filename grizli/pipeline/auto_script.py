@@ -3236,7 +3236,7 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
                 # Log that no file is found
                 if len(seg_files) == 0:
                     msg = f"auto_script.grism_prep: no segmentation image found for {key}"
-                    msgs += "\nThis can be set manually with `force_seg`"
+                    msg += "\nThis can be set manually with `force_seg`"
                     utils.log_comment(utils.LOGFILE, msg, verbose=True)
 
                 seg_file = seg_files[0]
@@ -3258,7 +3258,7 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
                 # Log that no file is found
                 if len(ref_files) == 0:
                     msg = f"auto_script.grism_prep: no reference image found for {key}"
-                    msgs += "\nThis can be set manually with `force_ref`"
+                    msg += "\nThis can be set manually with `force_ref`"
                     utils.log_comment(utils.LOGFILE, msg, verbose=True)
 
                 ref_file = ref_files[0]
