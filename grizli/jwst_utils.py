@@ -461,7 +461,7 @@ def img_with_flat(input, verbose=True, overwrite=True, apply_photom=True, use_sk
             _opup = ''
             
         _ofilt = _hdu[0].header['OFILTER']
-        if _opup.startswith('GR') | _ofilt.startswith('GR'):
+        if _opup.startswith('GR') | _ofilt.startswith('GR') | (not apply_photom):
             output = with_flat
             _photfile = None
         else:
