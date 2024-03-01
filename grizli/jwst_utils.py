@@ -1001,7 +1001,7 @@ def exposure_oneoverf_correction(file, axis=None, thresholds=[5,4,3], erode_mask
         
         return None, 0
 
-    if (ONEFEXP in im[0].header) & im[0].header['ONEFEXP'] & (not force):
+    if ('ONEFEXP' in im[0].header) & im[0].header['ONEFEXP'] & (not force):
         im.close()
         
         msg = 'exposure_oneoverf_correction: Skip, already corrected'
