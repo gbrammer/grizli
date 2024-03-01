@@ -1851,7 +1851,7 @@ def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, com
     # Remove visit number from NIRISS parallel visits
     for v in visits:
         IS_NIS_PARALLEL = v['product'].startswith('indef-03383')
-        IS_NIS_PARALLEL |= v['product'].startswith('indef-01471')
+        IS_NIS_PARALLEL |= v['product'].startswith('indef-01571')
 
         ks = v['product'].split('-')
         
