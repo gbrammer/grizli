@@ -923,7 +923,7 @@ def copy_jwst_keywords(header, orig_keys=ORIG_KEYS, verbose=True):
                 utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
 
 
-def exposure_oneoverf_correction(file, axis=None, thresholds=[5,4,3], erode_mask=None, dilate_iterations=3, deg_pix=64, make_plot=True, init_model=0, in_place=False, skip_miri=True, verbose=True, **kwargs):
+def exposure_oneoverf_correction(file, axis=None, thresholds=[5,4,3], erode_mask=None, dilate_iterations=3, deg_pix=64, make_plot=True, init_model=0, in_place=False, skip_miri=True, force_oneoverf=False, verbose=True, **kwargs):
     """
     1/f correction for individual exposure
     
@@ -971,6 +971,9 @@ def exposure_oneoverf_correction(file, axis=None, thresholds=[5,4,3], erode_mask
     skip_miri : bool
         Don't run on MIRI exposures
     
+    force_oneoverf : bool
+        Force the correction even if the `ONEFEXP` keyword is already set
+    
     verbose : bool
         Print status messages
         
@@ -994,6 +997,14 @@ def exposure_oneoverf_correction(file, axis=None, thresholds=[5,4,3], erode_mask
         im.close()
         
         msg = 'exposure_oneoverf_correction: Skip for MIRI'
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+        
+        return None, 0
+
+    if (ONEFEXP in im[0].header) & im[0].header['ONEFEXP'] & (not force):
+        im.close()
+        
+        msg = 'exposure_oneoverf_correction: Skip, already corrected'
         utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
         
         return None, 0
