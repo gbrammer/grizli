@@ -3256,9 +3256,9 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
                 ref_files = glob.glob(_fstr.format(field_root, ref.lower()))
 
                 # Log that no file is found
-                if len(seg_files) == 0:
+                if len(ref_files) == 0:
                     msg = f"auto_script.grism_prep: no reference image found for {key}"
-                    msgs += "\nThis can be set manually with `force_seg`"
+                    msgs += "\nThis can be set manually with `force_ref`"
                     utils.log_comment(utils.LOGFILE, msg, verbose=True)
 
                 ref_file = ref_files[0]
