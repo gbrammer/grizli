@@ -5252,12 +5252,12 @@ def make_maximal_wcs(files, pixel_scale=None, get_hdu=True, pad=90, verbose=True
 
     group_poly = None
 
-    if isinstance(files[0], pywcs.WCS):
-        # Already wcs_list
-        wcs_list = [(wcs, 'WCS', -1) for wcs in files]
-    elif hasattr(files, 'buffer'):
+    if hasattr(files, 'buffer'):
         # Input is a shapely object
         group_poly = files
+    elif isinstance(files[0], pywcs.WCS):
+        # Already wcs_list
+        wcs_list = [(wcs, 'WCS', -1) for wcs in files]
     else:
         wcs_list = []
         for i, file in enumerate(files):
