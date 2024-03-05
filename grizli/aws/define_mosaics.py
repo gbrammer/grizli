@@ -33,7 +33,6 @@ abell370
 macs0416
 macs1423
 macs1149
-elgordo
 #panoramic
 #primer_uds
 #primer_cosmos
@@ -45,6 +44,9 @@ snh0pe
 abells1063
 j061548m5745
 spitzer_idf
+elgordo
+mrg0138
+miri-gto
 """.split()
 
 __all__ = ['AVAILABLE_FIELDS', 'make_wcs', 'show_field_footprint']
@@ -821,7 +823,23 @@ END""")
 
         root = 'gdn-grizli-v6.0' # uniform processing, flats, etc.
         root = 'gdn-grizli-v6.5' # new weighting, bit of panoramic
+        
         root = f'gdn-grizli-{version}' # new weighting, bit of panoramic
+
+        # Shift to include GTO data
+        NX, NY = 10, 14
+        hdu = utils.make_wcsheader(ra=ra,  dec=dec,
+                                   size=(NX*2048*0.04, NY*2048*0.04),
+                                   pixscale=0.04, theta=0., get_hdu=True)
+
+        hdu.header['CRPIX1'] = NX*2048//2
+        hdu.header['CRPIX2'] = NY*2048//2    
+        w = pywcs.WCS(hdu.header)
+
+        h = utils.get_wcs_slice_header(w, slice(1024, NX*2048),
+                                       slice(1*2048, int((NY-2.8)*2048)))
+        
+        w = pywcs.WCS(h)
 
         sr = utils.SRegion(w)
         print(sr.region[0])
@@ -842,6 +860,20 @@ END""")
         hdu.header['CRPIX1'] = NX*2048//2
         hdu.header['CRPIX2'] = NY*2048//2
     
+        # Include GTO data
+        NX, NY = 7, 7
+        hdu = utils.make_wcsheader(ra=53.2526057, dec=-27.8393697,
+                                   size=(NX*2048*0.04, NY*2048*0.04),
+                                   pixscale=0.04, theta=0., get_hdu=True)
+
+        hdu.header['CRPIX1'] = NX*2048//2
+        hdu.header['CRPIX2'] = NY*2048//2
+
+        w = pywcs.WCS(hdu.header)
+
+        h = utils.get_wcs_slice_header(w, slice(400,NX*2048-2048-1024-512-200 - 300), slice(64,NY*2048-2048+512+256 - 100 - 1024))
+    
+        w = pywcs.WCS(h)
     
         w = pywcs.WCS(hdu.header)
         root = 'ngdeep-grizli-v5.1'
@@ -854,6 +886,58 @@ END""")
     
         ref_file = w
 
+    elif mosaic_field == 'miri-gto':
+
+        # WCS from Steven Gillman
+        
+        import astropy.io.fits as pyfits
+        head = pyfits.Header.fromstring("""WCSAXES =                    2 / Number of coordinate axes                      
+CRPIX1  =           2271.35596 / Pixel coordinate of reference point            
+CRPIX2  =           2028.36145 / Pixel coordinate of reference point            
+CD1_1   =    -0.88429963653668 / Coordinate transformation matrix element       
+CD1_2   =     0.46691985695738 / Coordinate transformation matrix element       
+CD2_1   =     0.46691985695738 / Coordinate transformation matrix element       
+CD2_2   =     0.88429963653668 / Coordinate transformation matrix element       
+CDELT1  =  1.1111111111111E-05 / [deg] Coordinate increment at reference point  
+CDELT2  =  1.1111111111111E-05 / [deg] Coordinate increment at reference point  
+CUNIT1  = 'deg'                / Units of coordinate increment and value        
+CUNIT2  = 'deg'                / Units of coordinate increment and value        
+CTYPE1  = 'RA---TAN'           / Right ascension, gnomonic projection           
+CTYPE2  = 'DEC--TAN'           / Declination, gnomonic projection               
+CRVAL1  =           53.1682472 / [deg] Coordinate value at reference point      
+CRVAL2  =          -27.7826748 / [deg] Coordinate value at reference point      
+LONPOLE =                180.0 / [deg] Native longitude of celestial pole       
+LATPOLE =          -27.7826748 / [deg] Native latitude of celestial pole        
+MJDREF  =                  0.0 / [d] MJD of fiducial time                       
+DATE-BEG= '2022-12-02T11:57:26.247' / ISO-8601 time at start of observation     
+MJD-BEG =      59915.498220451 / [d] MJD at start of observation                
+DATE-AVG= '2022-12-05T13:08:53.193' / ISO-8601 time at midpoint of observation  
+MJD-AVG =      59918.547837878 / [d] MJD at midpoint of observation             
+DATE-END= '2022-12-20T14:25:55.148' / ISO-8601 time at end of observation       
+MJD-END =      59933.601332731 / [d] MJD at end of observation                  
+XPOSURE =           148842.028 / [s] Exposure (integration) time                
+TELAPSE =           148842.028 / [s] Elapsed time (start to stop)               
+OBSGEO-X=     -136146536.01846 / [m] observatory X-coordinate                   
+OBSGEO-Y=      1593184880.7529 / [m] observatory Y-coordinate                   
+OBSGEO-Z=      397800097.00595 / [m] observatory Z-coordinate                   
+RADESYS = 'ICRS'               / Equatorial coordinate system                   
+VELOSYS =             11393.68 / [m/s] Velocity towards source                  
+NAXIS   =                    2                                                  
+NAXIS1  =                 3841                                                  
+NAXIS2  =                 4049                                                  """, sep='\n')
+
+        for i in [1,2]:
+            for j in [1,2]:
+                head[f'CD{i}_{j}'] *= head['CDELT1']
+
+        head['CDELT1'] = 1.
+        head['CDELT2'] = 1.
+        
+        w = ref_file = pywcs.WCS(head)
+        root = f'gds-miri-hudf-grizli-{version}'
+        print(root, w.pixel_shape)
+        half_sw = False
+    
     elif mosaic_field == 'smacs0723':
         # SMACS0723
         ra, dec = 110.75, -73.47
@@ -1191,6 +1275,25 @@ END""")
         w = pywcs.WCS(hdu.header)
         
         root = f'spitzer_idf-grizli-{version}'
+
+        print(root, hdu.data.shape, w.pixel_shape)
+
+        ref_file = w
+
+    elif mosaic_field == 'mrg0138':
+
+        # MRG0138 Newman et al.
+        NX, NY, ra, dec = 3, 3, 24.522, -21.93
+
+        hdu = utils.make_wcsheader(ra=ra,  dec=dec,
+                                   size=(NX*2048*0.04, NY*2048*0.04),
+                                   pixscale=0.04, theta=0., get_hdu=True)
+    
+        hdu.header['CRPIX1'] = NX*2048//2
+        hdu.header['CRPIX2'] = NY*2048//2
+        w = pywcs.WCS(hdu.header)
+        
+        root = f'mrg0138-grizli-{version}'
 
         print(root, hdu.data.shape, w.pixel_shape)
 
