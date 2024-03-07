@@ -2513,7 +2513,7 @@ class GroupFitter(object):
             
             
         """
-        from numpy.polynomial.polynomial import polyfit, polyval
+        from numpy.polynomial import Polynomial
         from scipy.stats import t as student_t
         from scipy.special import huber
         import peakutils
@@ -2676,9 +2676,9 @@ class GroupFitter(object):
             zgrid_zoom = []
             for ix in indexes[:max_peaks]:
                 if (ix > 0) & (ix < len(chi2)-1):
-                    c = polyfit(zgrid[ix-1:ix+2], chi2[ix-1:ix+2], 2)
-                    zi = -c[1]/(2*c[0])
-                    chi_i = polyval(c, zi)
+                    p = Polynomial.fit(zgrid[ix-1:ix+2], chi2[ix-1:ix+2], deg=2)
+                    zi = p.deriv().roots()[0]
+                    chi_i = p(zi)
                     
                     # Just use grid value
                     zi = zgrid[ix]
@@ -2857,6 +2857,7 @@ class GroupFitter(object):
         Adds metadata and `pdf` and `risk` columns to `fit` table
         
         """
+        from numpy.polynomial import Polynomial
         import scipy.interpolate
         from scipy.interpolate import Akima1DInterpolator
         from scipy.integrate import cumtrapz
@@ -2912,8 +2913,8 @@ class GroupFitter(object):
             # Fit a parabola around min(risk)
             zi = np.argmin(risk)
             if (zi < len(risk)-1) & (zi > 0):
-                c = np.polyfit(fit['zgrid'][zi-1:zi+2], risk[zi-1:zi+2], 2)
-                z_risk = -c[1]/(2*c[0])
+                p = Polynomial.fit(fit['zgrid'][zi-1:zi+2], risk[zi-1:zi+2],deg=2)
+                z_risk = p.deriv().roots()[0]
             else:
                 z_risk = fit['zgrid'][zi]
 
@@ -2924,8 +2925,8 @@ class GroupFitter(object):
             # MAP, maximum p(z) from parabola fit around tabulated maximum
             zi = np.argmax(pdf)
             if (zi < len(pdf)-1) & (zi > 0):
-                c = np.polyfit(fit['zgrid'][zi-1:zi+2], pdf[zi-1:zi+2], 2)
-                z_map = -c[1]/(2*c[0])
+                p = Polynomial.fit(fit['zgrid'][zi-1:zi+2], pdf[zi-1:zi+2],deg=2)
+                z_map = p.deriv().roots()[0]
             else:
                 z_map = fit['zgrid'][zi]
         else:
@@ -3449,8 +3450,7 @@ class GroupFitter(object):
         pscale : array-like
             Coefficients of the linear model normalized by factors of 10 per 
             order, i.e, ``pscale = [10]`` is a constant unit scaling.  Note 
-            that parameter order is reverse that expected by 
-            `numpy.polyval`.
+            that parameter is what is expected by `numpy.polynomial.Polynomial`.
         
         wave : array-like
             Wavelength grid in Angstroms.  Scaling is normalized to 
@@ -3464,12 +3464,12 @@ class GroupFitter(object):
             >>> pscale = [10]
             >>> N = len(pscale)
             >>> rescale = 10**(np.arange(N)+1)
-            >>> wscale = np.polyval((pscale/rescale)[::-1], (wave-1.e4)/1000.)
+            >>> wscale = np.polynomial.Polynomial(pscale/rescale)((wave-1.e4)/1000.)
 
         """
         N = len(pscale)
         rescale = 10**(np.arange(N)+1)
-        wscale = np.polyval((pscale/rescale)[::-1], (wave-1.e4)/1000.)
+        wscale = np.polynomial.Polynomial(pscale/rescale)((wave-1.e4)/1000.)
         return wscale
 
 
@@ -3480,7 +3480,7 @@ class GroupFitter(object):
         spectra
         """
         import scipy.optimize
-        from numpy.polynomial.polynomial import polyval
+        from numpy.polynomial import Polynomial
 
         scale = self.compute_scale_array(pscale, self.wavef[self.fit_mask])
         scale[-self.Nphot:] = 1.
