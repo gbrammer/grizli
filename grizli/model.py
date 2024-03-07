@@ -4758,10 +4758,10 @@ class BeamCutout(object):
         #wcs_header = grizli.utils.to_header(self.grism.wcs)
 
         x = np.arange(len(self.beam.lam_beam))
-        c = np.polyfit(x, self.beam.lam_beam/1.e4, 2)
-        #c = np.polyfit((self.beam.lam_beam-self.beam.lam_beam[0])/1.e4, x/h['CD1_1'], 2)
+        c = np.polynomial.Polynomial.fit(x,self.beam.lam_beam/1.e4,deg=2).convert().coef[::-1]
+        #c = np.polynomial.Polynomial.fit((self.beam.lam_beam-self.beam.lam_beam[0])/1.e4, x/h['CD1_1'],deg=2).convert().coef[::-1]
 
-        ct = np.polyfit(x, self.beam.ytrace_beam, 2)
+        ct = np.polynomial.Polynomial.fit(x,self.beam.ytrace_beam,deg=2).convert().coef[::-1]
 
         h['A_ORDER'] = 2
         h['B_ORDER'] = 2
