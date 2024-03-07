@@ -2887,6 +2887,7 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
 
             for c in filter_tab.colnames:
                 newc = '{0}_{1}'.format(filt.upper(), c)
+                newc = newc.replace('-CLEAR','')
                 tab[newc] = filter_tab[c]
 
             # Kron total correction from EE
@@ -2899,7 +2900,7 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
                                                 photplam=filt_plam)
 
             #ee_corr = prep.get_kron_tot_corr(tab, filter=filt.lower())
-            tab['{0}_tot_corr'.format(filt.upper())] = tot_corr
+            tab['{0}_tot_corr'.format(filt.upper().replace('-CLEAR',''))] = tot_corr
             
             if clean_bkg:
                 bkg_files = glob.glob(f'{root}*{filt}*bkg.fits')
@@ -3223,16 +3224,23 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
         
         # Segmentation image
         if force_seg is None:
-            if force_seg is None:
-                if galfit == 'clean':
-                    _fstr = '{0}-{1}_galfit_orig_seg.fits'
-                    seg_file = _fstr.format(field_root,ref.lower())
-                elif galfit == 'model':
-                    _fstr = '{0}-{1}_galfit_seg.fits'
-                    seg_file = _fstr.format(field_root, ref.lower())
-                else:
-                    _fstr = '{0}-*_seg.fits'
-                    seg_file = glob.glob(_fstr.format(field_root))[0]
+            if galfit == 'clean':
+                _fstr = '{0}-{1}_galfit_orig_seg.fits'
+                seg_file = _fstr.format(field_root,ref.lower())
+            elif galfit == 'model':
+                _fstr = '{0}-{1}_galfit_seg.fits'
+                seg_file = _fstr.format(field_root, ref.lower())
+            else:
+                _fstr = '{0}-*_seg.fits'
+                seg_files = glob.glob(_fstr.format(field_root))
+
+                # Log that no file is found
+                if len(seg_files) == 0:
+                    msg = f"auto_script.grism_prep: no segmentation image found for {key}"
+                    msg += "\nThis can be set manually with `force_seg`"
+                    utils.log_comment(utils.LOGFILE, msg, verbose=True)
+
+                seg_file = seg_files[0]
         else:
             seg_file = force_seg
             
@@ -3246,8 +3254,15 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
                 ref_file = _fstr.format(field_root, ref.lower())
             else:
                 _fstr = '{0}-{1}_dr*_sci.fits*'
-                ref_file = _fstr.format(field_root, ref.lower())                
-                ref_file = glob.glob(ref_file)[0]
+                ref_files = glob.glob(_fstr.format(field_root, ref.lower()))
+
+                # Log that no file is found
+                if len(ref_files) == 0:
+                    msg = f"auto_script.grism_prep: no reference image found for {key}"
+                    msg += "\nThis can be set manually with `force_ref`"
+                    utils.log_comment(utils.LOGFILE, msg, verbose=True)
+
+                ref_file = ref_files[0]
         else:
             ref_file = force_ref
         
