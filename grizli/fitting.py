@@ -4645,7 +4645,7 @@ class GroupFitter(object):
         """
         mfull = []
         for ib, beam in enumerate(self.beams):
-            if spectrum_1d is -1:
+            if spectrum_1d == -1:
                 model_i = beam.model*1
             else:
                 model_i = beam.compute_model(id=id, spectrum_1d=spectrum_1d,
