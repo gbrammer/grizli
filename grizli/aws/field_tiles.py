@@ -513,6 +513,9 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
         elif ('j031124m5823' in root):
             filters = ['f200w-clear','f300m-clear','f444w-clear']
             rgb_scl = [1.2, 1.05, 1.0]
+        elif 'aspire' in root:
+            filters = ['f115w-clear','f200w-clear','f356w-clear']
+            rgb_scl = [1.3, 0.8, 1.02]
             
         split_tiles(root, ref_tile=ref_tile, 
                     filters=filters,
@@ -715,6 +718,9 @@ def process_tile(field='cos', tile='01.01', filters=TILE_FILTERS, fetch_existing
                  'macs0416','macs1149','macs1423','macs0417',
                  'egs','uds','gds','gdn','egs-v2',
                  'ulasj1342'):
+        make_catalog = False
+    
+    if field.startswith('aspire'):
         make_catalog = False
     
     utils.LOGFILE = 'mosaic.log'
