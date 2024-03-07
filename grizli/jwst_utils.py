@@ -923,7 +923,7 @@ def copy_jwst_keywords(header, orig_keys=ORIG_KEYS, verbose=True):
                 utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
 
 
-def exposure_oneoverf_correction(file, axis=None, thresholds=[5,4,3], erode_mask=None, dilate_iterations=3, deg_pix=64, make_plot=True, init_model=0, in_place=False, skip_miri=True, verbose=True, **kwargs):
+def exposure_oneoverf_correction(file, axis=None, thresholds=[5,4,3], erode_mask=None, dilate_iterations=3, deg_pix=64, make_plot=True, init_model=0, in_place=False, skip_miri=True, force_oneoverf=False, verbose=True, **kwargs):
     """
     1/f correction for individual exposure
     
@@ -971,6 +971,9 @@ def exposure_oneoverf_correction(file, axis=None, thresholds=[5,4,3], erode_mask
     skip_miri : bool
         Don't run on MIRI exposures
     
+    force_oneoverf : bool
+        Force the correction even if the `ONEFEXP` keyword is already set
+    
     verbose : bool
         Print status messages
         
@@ -994,6 +997,14 @@ def exposure_oneoverf_correction(file, axis=None, thresholds=[5,4,3], erode_mask
         im.close()
         
         msg = 'exposure_oneoverf_correction: Skip for MIRI'
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+        
+        return None, 0
+
+    if ('ONEFEXP' in im[0].header) and im[0].header['ONEFEXP'] and (not force_oneoverf):
+        im.close()
+        
+        msg = 'exposure_oneoverf_correction: Skip, already corrected'
         utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
         
         return None, 0
@@ -1456,7 +1467,7 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
 #                  'F480M': [1.879639e-21, 1.453752e-30, 4.8152]}
 # 
 
-def set_jwst_to_hst_keywords(input, reset=False, verbose=True, orig_keys=ORIG_KEYS):
+def set_jwst_to_hst_keywords(input, reset=False, verbose=True, orig_keys=ORIG_KEYS, oneoverf_correction=True):
     """
     Make primary header look like an HST instrument
     """
@@ -1476,7 +1487,7 @@ def set_jwst_to_hst_keywords(input, reset=False, verbose=True, orig_keys=ORIG_KE
            'DETECTOR':'IR'}
     
     if 'OTELESCO' not in img[0].header:
-        _status = initialize_jwst_image(input, verbose=verbose)
+        _status = initialize_jwst_image(input, oneoverf_correction=oneoverf_correction, verbose=verbose)
         
         # Reopen
         if isinstance(input, str):
