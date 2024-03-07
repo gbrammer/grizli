@@ -1024,6 +1024,7 @@ def exposure_oneoverf_correction(file, axis=None, thresholds=[5,4,3], erode_mask
         The row- or column-average correction array
     """
     import numpy as np
+    from numpy.polynomial import Chebyshev
     import scipy.ndimage as nd
     import matplotlib.pyplot as plt
     
@@ -1150,8 +1151,8 @@ def exposure_oneoverf_correction(file, axis=None, thresholds=[5,4,3], erode_mask
         deg = nx//deg_pix
         
         for _iter in range(3):
-            coeffs = np.polynomial.chebyshev.chebfit(xarr[ok], med[ok], deg)
-            cheb = np.polynomial.chebyshev.chebval(xarr, coeffs)
+            cfit = Chebyshev.fit(xarr[ok], med[ok], deg=deg)
+            cheb = cfit(xarr)
             ok = np.isfinite(med) & (np.abs(med-cheb) < 0.05)
 
         if make_plot:

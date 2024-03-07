@@ -4066,13 +4066,13 @@ def separate_chip_sky(visit, filters=['F200LP','F350LP','F600LP','F390W'], steps
             #deg = 11
             
             for _iter in range(5):
-                cc = np.polynomial.chebyshev.chebfit(xi[msk],
-                                                     row_avg[ext][msk],
-                                                     average_order, 
-                                                     rcond=None,
-                                                     full=False, w=None)
-                                                     
-                row_model[ext] = np.polynomial.chebyshev.chebval(xi, cc)
+                cfit = Chebyshev.fit(xi[msk],
+                                    row_avg[ext][msk],
+                                    deg=average_order,
+                                    rcond=None,
+                                    full=False,
+                                    w=None)
+                row_model[ext] = cfit(xi)            
                 msk = np.isfinite(row_avg[ext]) 
                 msk &= np.abs(row_avg[ext] - row_model[ext]) < 3*utils.nmad(row_avg[ext][msk])
             
@@ -5156,7 +5156,7 @@ def tweak_align(direct_group={}, grism_group={}, max_dist=1., n_min=10, key=' ',
                                  'prep.tweak_align')
 
     from drizzlepac.astrodrizzle import AstroDrizzle
-    from numpy.polynomial.polynomial import polyfit, polyval
+    from numpy.polynomial import Polynomial
 
     if len(direct_group['files']) < 2:
         logstr = '# ! {0}: Only one direct image found, can\'t compute shifts'
@@ -5217,10 +5217,10 @@ def tweak_align(direct_group={}, grism_group={}, max_dist=1., n_min=10, key=' ',
 
         shifts = np.array([shift_dict[k][:2] for k in sorted(shift_dict)])
         t = np.arange(shifts.shape[0])
-        cx = polyfit(t, shifts[:, 0], fit_order)
-        sx = polyval(cx, t)
-        cy = polyfit(t, shifts[:, 1], fit_order)
-        sy = polyval(cy, t)
+        px = Polynomial.fit(t, shifts[:, 0], deg=fit_order)
+        sx = px(t)
+        py = Polynomial.fit(t, shifts[:, 1], deg=fit_order)
+        sy = py(t)
         fit_shift = np.array([sx, sy]).T
 
         for ik, k in enumerate(sorted(shift_dict)):
