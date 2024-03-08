@@ -1687,7 +1687,7 @@ class ImageData(object):
             self.MW_EBV = 0.
 
     def unset_dq(self):
-        """Flip OK data quality bits using utils.unset_dq_bits
+        """Flip OK data quality bits using utils.mod_dq_bits
 
         OK bits are defined as
 
@@ -1709,7 +1709,7 @@ class ImageData(object):
         else:
             okbits = okbits_instrument[self.instrument]
 
-        self.data['DQ'] = utils.unset_dq_bits(self.data['DQ'], okbits=okbits)
+        self.data['DQ'] = utils.mod_dq_bits(self.data['DQ'], okbits=okbits)
 
 
     def flag_negative(self, sigma=-3):
