@@ -561,10 +561,10 @@ class StackFitter(GroupFitter):
         """
         Scale spectrum templates by polynomial function
         """
-        from numpy.polynomial.polynomial import polyval
+        from np.polynomial import Polynomial
 
         scale = np.ones(Ax.shape[1])
-        scale[:-Nphot] = polyval(p[::-1]/10., (spec_wave-1.e4)/1000.)
+        scale[:-Nphot] = Polynomial(p/10.)((spec_wave-1.e4)/1000.)
         AxT = Ax*scale
         for i in range(Next):
             AxT[i, :] /= scale
@@ -578,10 +578,10 @@ class StackFitter(GroupFitter):
         spectra
         """
         import scipy.optimize
-        from numpy.polynomial.polynomial import polyval
+        from np.polynomial import Polynomial
 
         scale = np.ones(Ax.shape[1])
-        scale[:-Nphot] = polyval(p[::-1]/10., (spec_wave-1.e4)/1000.)
+        scale[:-Nphot] = Polynomial(p/10.)((spec_wave-1.e4)/1000.)
         AxT = Ax*scale
 
         # Remove scaling from background component
@@ -1422,9 +1422,9 @@ class StackedSpectrum(object):
                 # Linear fit to differential G800L dispersion
                 # y = np.diff(beam.wave)/np.diff(beam.wave)[0]
                 # x = beam.wave[1:]
-                # c_i = np.polyfit(x/1.e4, y, 1)
-                c_i = np.array([0.07498747,  0.98928126])
-                scale = np.polyval(c_i, self.wave/1.e4)
+                # c_i = np.polynomial.Polynomial.fit(x/1.e4, y, deg=1)
+                c_i = np.array([0.98928126, 0.07498747])
+                scale = np.polynomial.Polynomial(c_i)(self.wave/1.e4)
                 sens *= scale
 
             self.sens = sens*dlam  # *1.e-17
