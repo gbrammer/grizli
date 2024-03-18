@@ -227,11 +227,16 @@ def do_recalibrate(rate_file='jw06541001001_03101_00001_nrs1_rate.fits', cores='
     
     output_path, base_file = os.path.split(rate_file)
     mastquery.utils.download_from_mast([base_file.replace('_rate.fits','_uncal.fits')])
-
+    
+    try:
+        ncores = int(cores)
+    except ValueError:
+        ncores = cores
+        
     steps = {
         "jump": {
             "save_results": True,
-            "maximum_cores": cores
+            "maximum_cores": ncores
         },
         "ramp_fit": {
             "skip": True,
@@ -248,9 +253,9 @@ def do_recalibrate(rate_file='jw06541001001_03101_00001_nrs1_rate.fits', cores='
                        after_jumps=int(after_jumps),
                        save_results=True,
                        suffix="snowblind")
-
+    
     rate, rateints = RampFitStep.call(base_file.replace('_rate','_snowblind'),
-                                      maximum_cores=cores)
+                                      maximum_cores=ncores)
 
     rate = GainScaleStep.call(rate)
     
