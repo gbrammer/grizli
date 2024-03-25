@@ -6475,7 +6475,7 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
     if isACS:
         bits = 64+32
     elif isJWST:
-        bits = 1+4+6+32768 #+16777200+1049600+26232800+9438210+9438220
+        bits = 2+4+32768 #+16777200+1049600+26232800+9438210+9438220
     else:
         bits = 576
 
