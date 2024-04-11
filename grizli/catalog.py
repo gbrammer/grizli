@@ -1128,7 +1128,7 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, ref
         Order in which to query reference catalogs.  Options are 'GAIA',
         'PS1' (STScI PanSTARRS), 'SDSS', 'WISE', 'NSC' (NOAO Source Catalog),
         'DES' (Dark Energy Survey DR1), 'Hubble' (Hubble Source Catalog v3), 
-        'LS_DR9' (LegacySurveys DR9).
+        'LS_DR9', 'LS_DR10' (LegacySurveys DR9, DR10).
 
     Returns
     -------
@@ -1139,6 +1139,10 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, ref
         Provenance of the `radec` list.
 
     """
+    query_kwargs = {'LS_DR9': {'db':'ls_dr9.tractor'},
+                    'LS_DR10': {'db':'ls_dr10.tractor'},
+                   }
+    
     query_functions = {'SDSS': get_sdss_catalog,
                        'GAIA_TAP': get_gaia_DR2_catalog,
                        'PS1': get_panstarrs_catalog,
@@ -1151,7 +1155,9 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, ref
                        'Hubble': get_hubble_source_catalog,
                        'Skymapper': get_skymapper_catalog, 
                        'VEXAS': get_vexas_catalog, 
-                       'LS_DR9': get_legacysurveys_catalog}
+                       'LS_DR9': get_legacysurveys_catalog,
+                       'LS_DR10': get_legacysurveys_catalog,
+                   }
 
     # Try queries
     has_catalog = False
@@ -1176,8 +1182,13 @@ def get_radec_catalog(ra=0., dec=0., radius=3., product='cat', verbose=True, ref
                     ref_cat = query_functions[ref_src](ra=ra, dec=dec,
                                               radius=radius, use_mirror=True)
             else:
+                if ref_src in query_kwargs:
+                    _kws = query_kwargs[ref_src]
+                else:
+                    _kws = {}
+                
                 ref_cat = query_functions[ref_src](ra=ra, dec=dec,
-                                                   radius=radius)
+                                                   radius=radius, **_kws)
             # #
             # ref_cat = query_functions[ref_src](ra=ra, dec=dec,
             #                                    radius=radius)
