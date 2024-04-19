@@ -2589,6 +2589,8 @@ def get_crds_zeropoint(instrument='NIRCAM', detector='NRCALONG', filter='F444W',
     Get ``photmjsr`` photometric zeropoint for a partiular JWST instrument imaging
     mode
     
+    To-do: add MIRI time-dependence
+    
     Parameters
     ----------
     instrument : str
@@ -3366,3 +3368,117 @@ def compute_siaf_pa_offset(c1, c2, c2_pa=202.9918, swap_coordinates=True, verbos
         print(f'Catalog offset: {dx[0].to(u.arcsec):5.2f} {dx[1].to(u.arcsec):5.2f} new APA: {c2_pa + dphi:.5f}')
 
     return c2_pa + dphi, dphi
+
+
+def get_miri_photmjsr(file=None, filter='F770W', subarray='FULL', mjd=60153.23, photom_file='jwst_miri_photom_0201.fits', verbose=True):
+    """
+    Get time-dependent MIRI photometry values
+    
+    Parameters
+    ----------
+    file : str
+        Image filename
+    
+    filter : str
+        MIRI filter name
+    
+    subarray : str
+        Detector subarray used
+    
+    mjd : float
+        Observation epoch
+    
+    photom_file : str
+        CRDS ``photom`` reference file name
+    
+    verbose : bool
+        messaging
+    
+    Returns
+    -------
+    photmjsr : float
+        Photometric scaling
+    
+    photom_corr : float
+        Time-dependent correction for the filter and observation epoch
+    
+    """
+    import astropy.io.fits as pyfits
+    import jwst.datamodels
+    
+    if file is not None:
+        with pyfits.open(file) as im:
+            h = im[0].header
+            filter = h['FILTER']
+            mjd = h['EXPSTART']
+            try:
+                subarray = h['SUBARRAY']
+            except KeyError:
+                pass
+    
+    try:
+        from jwst.photom.miri_imager import time_corr_photom
+    except ImportError:
+        # msg = 'Failed to import `jwst.photom.miri_imager` to include time-dependence'
+        # utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+        
+        time_corr_photom = time_corr_photom_copy
+    
+    PATH = os.path.join(os.getenv('CRDS_PATH'), 'references', 'jwst', 'miri')
+    local_file = os.path.join(PATH, photom_file)
+    remote_file = 'https://jwst-crds.stsci.edu/unchecked_get/references/jwst/'
+    remote_file += 'jwst_miri_photom_0201.fits'
+    
+    use_path = local_file if os.path.exists(local_file) else remote_file
+    
+    with jwst.datamodels.open(use_path) as ref:
+        
+        test = ref.phot_table['filter'] == filter
+        test &= ref.phot_table['subarray'] == subarray
+        if test.sum() == 0:
+            msg = f'Row not found in {photom_file} for {filter} / {subarray}'
+            utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+            
+            return np.nan, None
+
+        row = np.where(test)[0][0]
+        photmjsr = ref.phot_table['photmjsr'][row]
+        
+        try:
+            photom_corr = time_corr_photom(ref.timecoeff[row], mjd)
+        except:
+            photom_corr = 0.
+    
+    
+    return (photmjsr, photom_corr)
+
+
+def time_corr_photom_copy(param, t):
+    """
+    Short Summary
+    --------------
+    Time dependent PHOTOM function.
+
+    The model parameters are amplitude, tau, t0. t0 is the reference day 
+    from which the time-dependent parameters were derived. This function will return 
+    a correction to apply to the PHOTOM value at a given MJD.
+    
+    N.B.: copied from [jwst.photom.miri_imager](https://github.com/spacetelescope/jwst/blob/master/jwst/photom/miri_imager.py#L9)
+    
+    Parameters
+    ----------
+    param : numpy array
+        Set of parameters for the PHOTOM value
+    t : int
+        Modified Julian Day (MJD) of the observation
+
+    Returns
+    -------
+    corr: float
+        The time-dependent correction to the photmjsr term.
+    """
+    
+    amplitude, tau, t0 = param["amplitude"], param["tau"], param["t0"]
+    corr = amplitude * np.exp(-(t - t0)/tau)
+
+    return corr

@@ -36,14 +36,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Build sdist
         run: |
           pip install build
           python -m build --sdist
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           path: dist/*.tar.gz
 
@@ -56,7 +56,7 @@ jobs:
         github.event.ref_type == 'tag' &&
         github.ref == 'refs/heads/${{ github.event.repository.default_branch }}'
     steps:
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: artifact
           path: dist

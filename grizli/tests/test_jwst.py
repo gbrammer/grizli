@@ -180,6 +180,38 @@ class TestJWSTUtils:
         info = jwst_utils.get_jwst_filter_info(header)
         assert(info['name'] == 'F560W')
         assert(np.allclose(info['pivot'], 5.632612))
+    
+    
+    def test_miri_photom(self):
+        
+        try:
+            import jwst
+        except ImportError:
+            return None
+        
+        photmjsr, corr = jwst_utils.get_miri_photmjsr(
+                                        file=None,
+                                        filter='F770W',
+                                        subarray='FULL',
+                                        mjd=60153.23,
+                                        photom_file='jwst_miri_photom_0201.fits',
+                                        verbose=True,
+                                    )
+        
+        assert np.allclose([photmjsr], 0.25890106)
+        assert np.allclose([corr], 0.)
+        
+        # Missing filter
+        photmjsr, corr = jwst_utils.get_miri_photmjsr(
+                                        file=None,
+                                        filter='xF770W',
+                                        subarray='FULL',
+                                        mjd=60153.23,
+                                        photom_file='jwst_miri_photom_0201.fits',
+                                        verbose=True,
+                                    )
+        
+        assert np.isnan(photmjsr)
 
 
 class TestJWSTFittingTools:
