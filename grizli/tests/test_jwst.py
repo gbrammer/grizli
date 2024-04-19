@@ -184,6 +184,11 @@ class TestJWSTUtils:
     
     def test_miri_photom(self):
         
+        try:
+            import jwst
+        except ImportError:
+            return None
+        
         photmjsr, corr = jwst_utils.get_miri_photmjsr(
                                         file=None,
                                         filter='F770W',
