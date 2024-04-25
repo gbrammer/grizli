@@ -1621,46 +1621,9 @@ def flt_to_dict(fobj, primary_keys=DEFAULT_PRIMARY_KEYS, extensions=[('SCI', i+1
 
     return flt_dict
 
-
-def get_set_bits(value):
+def mod_dq_bits(value, okbits=32+64+512, badbits=0, verbose=False):
     """
-    Compute which binary bits are set for an integer
-    """
-
-    if hasattr(value, '__iter__'):
-        values = value
-        single = False
-    else:
-        values = [value]
-        single = True
-
-    result = []
-
-    for v in values:
-        try:
-            bitstr = np.binary_repr(v)[::-1]
-        except:
-            result.append([])
-
-        nset = bitstr.count('1')
-        setbits = []
-
-        j = -1
-        for i in range(nset):
-            j = bitstr.index('1', j+1)
-            setbits.append(j)
-
-        result.append(setbits)
-
-    if single:
-        return result[0]
-    else:
-        return result
-
-
-def unset_dq_bits(value, okbits=32+64+512, verbose=False):
-    """
-    Unset bit flags from a DQ array
+    Modify bit flags from a DQ array
 
     For WFC3/IR, the following DQ bits can usually be unset:
 
@@ -1675,6 +1638,9 @@ def unset_dq_bits(value, okbits=32+64+512, verbose=False):
     okbits : int
         Bits to unset
 
+    badbits : int
+        Bits to set
+
     verbose : bool
         Print some information
 
@@ -1683,16 +1649,12 @@ def unset_dq_bits(value, okbits=32+64+512, verbose=False):
     new_value : int, `~numpy.ndarray`
 
     """
-    bin_bits = np.binary_repr(okbits)
-    n = len(bin_bits)
-    for i in range(n):
-        if bin_bits[-(i+1)] == '1':
-            if verbose:
-                print(2**i)
 
-            value -= (value & 2**i)
+    if verbose:
+         print(f'Unset bits: {np.binary_repr(okbits)}')
+         print(f'Set bits: {np.binary_repr(badbits)}')
 
-    return value
+    return (value & ~okbits) | badbits
 
 
 def detect_with_photutils(sci, err=None, dq=None, seg=None, detect_thresh=2.,
@@ -6312,11 +6274,11 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
                     dq = flt[('DQ', ext)].data & (1+1024+4096)
                     dq |= bpdata.astype(dq.dtype)
                     
-                    # dq0 = unset_dq_bits(flt[('DQ', ext)].data, bits) | bpdata
+                    # dq0 = mod_dq_bits(flt[('DQ', ext)].data, okbits=bits) | bpdata
                     # print('xxx', (dq > 0).sum(), (dq0 > 0).sum())
                     
                 else:
-                    dq = unset_dq_bits(flt[('DQ', ext)].data, bits) | bpdata
+                    dq = mod_dq_bits(flt[('DQ', ext)].data, okbits=bits) | bpdata
                     
                     
                 wht = 1/err**2

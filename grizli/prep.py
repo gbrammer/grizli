@@ -6499,13 +6499,13 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
     if isACS:
         bits = 64+32
     elif isJWST:
-        bits = 1+4+6+32768 #+16777200+1049600+26232800+9438210+9438220
+        bits = 2+4+32768 #+16777200+1049600+26232800+9438210+9438220
     else:
         bits = 576
 
     for i in range(Nexp):
         flt = pyfits.open(grism['files'][i])
-        dq = utils.unset_dq_bits(flt['DQ', ext].data, okbits=bits)
+        dq = utils.mod_dq_bits(flt['DQ', ext].data, okbits=bits)
         dq_mask = dq == 0
 
         # Data
@@ -6895,7 +6895,7 @@ def fix_star_centers(root='macs1149.6+2223-rot-ca5-22-032.0-f105w',
 
                 sci = images[i]['SCI'].data[sly, slx]
                 dq = images[i]['DQ'].data[sly, slx]
-                dqm = dq - (dq & 2048)
+                dqm = utils.mod_dq_bits(dq,okbits=2048)
                 err = images[i]['ERR'].data[sly, slx]
                 mask = satpix[sly, slx]
 

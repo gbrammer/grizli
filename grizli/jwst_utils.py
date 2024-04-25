@@ -1036,7 +1036,7 @@ def exposure_oneoverf_correction(file, axis=None, thresholds=[5,4,3], erode_mask
         else:
             erode_mask = True
             
-    dq = utils.unset_dq_bits(im['DQ'].data, 4)
+    dq = utils.mod_dq_bits(im['DQ'].data, okbits=4)
     dqmask = dq == 0
     mask = dqmask
 

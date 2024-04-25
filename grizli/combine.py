@@ -173,7 +173,7 @@ def combine_flt(files=[], output='exposures_cmb.fits', grow=1,
             print('{0:3d} {1:s} {2:6.1f} {3:6.1f} {4:10.2f}'.format(i+1, file,
                                 x0[i], y0[i], im[0].header['EXPTIME']))
 
-        dq = utils.unset_dq_bits(im['DQ'].data, okbits=608,
+        dq = utils.mod_dq_bits(im['DQ'].data, okbits=608,
                                            verbose=False)
         wht = 1./im['ERR'].data**2
         wht[(im['ERR'].data == 0) | (dq > 0) | (~np.isfinite(wht))] = 0
