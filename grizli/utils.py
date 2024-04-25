@@ -6305,8 +6305,6 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
                 
                 wcs_rows.append(row)
                 
-                sci_list.append((flt[('SCI', ext)].data - sky)*phot_scale)
-
                 err = flt[('ERR', ext)].data*phot_scale
                 
                 # JWST: just 1,1024,4096 bits
@@ -6378,9 +6376,10 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
                                 log_comment(LOGFILE, msg, verbose=verbose)
                 
                 wht_list.append(wht)
+                sci_i = (flt[('SCI', ext)].data - sky)*phot_scale
+                sci_i[wht <= 0] = 0
+                sci_list.append(sci_i)
 
-                # wcs_i = HSTWCS(fobj=flt, ext=('SCI',ext), minerr=0.0,
-                #                wcskey=' ')
                 if not hasattr(wcs_i, 'pixel_shape'):
                     wcs_i.pixel_shape = wcs_i._naxis1, wcs_i._naxis2
 
@@ -9155,7 +9154,7 @@ def log_function_arguments(LOGFILE, frame, func='func', ignore=[], verbose=True)
     logstr = logstr.format(func, args)
     msg = log_comment(LOGFILE, logstr, verbose=verbose, show_date=True)
 
-    return msg
+    return args
 
 
 def ctime_to_iso(mtime, format='%a %b %d %H:%M:%S %Y', strip_decimal=True, verbose=True):
@@ -9619,7 +9618,7 @@ class Unique(object):
         return len(self.values)
 
 
-    def info(self, sort_counts=-1):
+    def info(self, sort_counts=0):
         """
         Print a summary
         """
