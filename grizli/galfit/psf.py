@@ -367,7 +367,10 @@ class DrizzlePSF(object):
         print(params, chi2)
         return chi2
 
-    def get_psf(self, ra=53.06967306, dec=-27.72333015, filter='F140W', pixfrac=0.1, kernel='point', verbose=True, wcs_slice=None, get_extended=True, get_weight=False, ds9=None, npix=13, renormalize=True):
+    def get_psf(self, ra=53.06967306, dec=-27.72333015, filter='F140W', pixfrac=0.1, kernel='point', verbose=True, wcs_slice=None, get_extended=True, get_weight=False, ds9=None, npix=13, renormalize=True, xphase=0, yphase=0):
+        """
+        """
+        
         from drizzlepac import adrizzle
         from shapely.geometry import Polygon, Point
 
@@ -388,8 +391,10 @@ class DrizzlePSF(object):
 
                 xy = self.wcs[key].all_world2pix(np.array([[ra, dec]]), 0)[0]
                 xyp = np.cast[int](xy) #np.round(xy))  # +1
-                dx = xy[0]-int(xy[0])#-0.5
-                dy = xy[1]-int(xy[1])#-0.5
+                dx = xy[0] - int(xy[0]) + xphase
+                dy = xy[1] - int(xy[1]) + yphase
+                # dx = xy[0]-int(xy[0]) + 0.5
+                # dy = xy[1]-int(xy[1]) + 0.5
 
                 if ext == 2:
                     # UVIS

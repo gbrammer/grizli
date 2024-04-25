@@ -228,11 +228,12 @@ def do_recalibrate(rate_file='jw06541001001_03101_00001_nrs1_rate.fits', cores='
     output_path, base_file = os.path.split(rate_file)
     mastquery.utils.download_from_mast([base_file.replace('_rate.fits','_uncal.fits')])
     
-    try:
-        ncores = int(cores)
-    except ValueError:
-        ncores = cores
-        
+    # try:
+    #     ncores = int(cores)
+    # except ValueError:
+    #     ncores = cores
+    ncores = cores
+    
     steps = {
         "jump": {
             "save_results": True,

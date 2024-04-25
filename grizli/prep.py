@@ -4452,11 +4452,16 @@ def process_direct_grism_visit(direct={},
     if 'driz_cr_snr' in drizzle_params:
         driz_cr_snr = drizzle_params['driz_cr_snr']
         drizzle_params.pop('driz_cr_snr')
-
+        
     if 'bits' in drizzle_params:
         bits = drizzle_params['bits']
         drizzle_params.pop('bits')
-                                
+    
+    if 'driz_cr_grow' in drizzle_params:
+        driz_cr_grow = drizzle_params.pop('driz_cr_grow')
+    else:
+        driz_cr_grow = 1
+    
     # Relax CR rejection for first-pass ACS
     if isACS:
         driz_cr_snr_first = '15. 10.0'
@@ -4779,15 +4784,27 @@ def process_direct_grism_visit(direct={},
         utils.log_comment(utils.LOGFILE, logstr, verbose=True, show_date=True)
 
         if len(direct['files']) == 1:
-            AstroDrizzle(direct['files'], output=direct['product'],
-                         clean=True, final_pixfrac=0.8, context=False,
-                         resetbits=4096, final_bits=bits, driz_sep_bits=bits,
-                         preserve=False, driz_cr_snr=driz_cr_snr,
-                         driz_cr_scale=driz_cr_scale, driz_separate=False,
-                         driz_sep_wcs=False, median=False, blot=False,
-                         driz_cr=False, driz_cr_corr=False,
-                         build=False, final_wht_type='IVM',
-                         gain=_gain, rdnoise=_rdnoise,
+            AstroDrizzle(direct['files'],
+                         output=direct['product'],
+                         clean=True,
+                         final_pixfrac=0.8,
+                         context=False,
+                         resetbits=4096,
+                         final_bits=bits,
+                         driz_sep_bits=bits,
+                         preserve=False,
+                         driz_cr_snr=driz_cr_snr,
+                         driz_cr_scale=driz_cr_scale,
+                         driz_separate=False,
+                         driz_sep_wcs=False,
+                         median=False,
+                         blot=False,
+                         driz_cr=False,
+                         driz_cr_corr=False,
+                         build=False,
+                         final_wht_type='IVM',
+                         gain=_gain,
+                         rdnoise=_rdnoise,
                          static=False,
                          **drizzle_params)
         else:
@@ -4799,12 +4816,19 @@ def process_direct_grism_visit(direct={},
             AstroDrizzle(direct['files'], output=direct['product'],
                          clean=True, final_pixfrac=pixfrac,
                          context=(isACS | isWFPC2),
-                         skysub=True, skymethod=skymethod,
-                         resetbits=4096, final_bits=bits, driz_sep_bits=bits,
-                         preserve=False, driz_cr_snr=driz_cr_snr,
-                         driz_cr_scale=driz_cr_scale, build=False,
+                         skysub=True,
+                         skymethod=skymethod,
+                         resetbits=4096,
+                         final_bits=bits,
+                         driz_sep_bits=bits,
+                         preserve=False,
+                         driz_cr_snr=driz_cr_snr,
+                         driz_cr_scale=driz_cr_scale,
+                         driz_cr_grow=driz_cr_grow,
+                         build=False,
                          final_wht_type='IVM',
-                         gain=_gain, rdnoise=_rdnoise,
+                         gain=_gain,
+                         rdnoise=_rdnoise,
                          static=static_mask,
                          **drizzle_params)
                          
