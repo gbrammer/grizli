@@ -6281,11 +6281,14 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
                     # Clipping threshold for BKG extensions, global at top
                     # BKG_CLIP = [scale, percentile_lo, percentile_hi]
                     if has_bkg & (BKG_CLIP is not None):
-                        _bkg_clip = np.nanpercentile(
+                        bkg_lo, bkg_hi = np.nanpercentile(
                             flt['BKG'].data[dq == 0], BKG_CLIP[1:3]
                         )
-                        _bad_bkg = flt['BKG'].data < BKG_CLIP[0]*_bkg_clip[0]
-                        _bad_bkg |= flt['BKG'].data > BKG_CLIP[0]*_bkg_clip[1]
+                        # make sure lower (upper) limit is negative (positive)
+                        clip_lo = -np.abs(bkg_lo)
+                        clip_hi = np.abs(bkg_hi)
+                        _bad_bkg = flt['BKG'].data < BKG_CLIP[0]*bkg_lo
+                        _bad_bkg |= flt['BKG'].data > BKG_CLIP[0]*bkg_hi
                         
                         msg = f'Bad bkg pixels: N= {_bad_bkg.sum()} '
                         msg += f' ( {_bad_bkg.sum()/_bad_bkg.size*100:.1} %)'
