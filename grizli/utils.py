@@ -125,6 +125,10 @@ DEFAULT_LINE_LIST = ['BrA','BrB','BrG','PfG','PfD',
 
 LSTSQ_RCOND = None
 
+# Clipping threshold for BKG extensions in drizzle_from_visit
+# BKG_CLIP = [scale, percentile_lo, percentile_hi]
+BKG_CLIP = [2, 1, 99]
+
 def set_warnings(numpy_level='ignore', astropy_level='ignore'):
     """
     Set global numpy and astropy warnings
@@ -6273,21 +6277,35 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
                 if flt[0].header['TELESCOP'] in ['JWST']:
                     dq = flt[('DQ', ext)].data & (1+1024+4096)
                     dq |= bpdata.astype(dq.dtype)
-                    
-                    # dq0 = mod_dq_bits(flt[('DQ', ext)].data, okbits=bits) | bpdata
-                    # print('xxx', (dq > 0).sum(), (dq0 > 0).sum())
-                    
+
+                    # Clipping threshold for BKG extensions, global at top
+                    # BKG_CLIP = [scale, percentile_lo, percentile_hi]
+                    if has_bkg & (BKG_CLIP is not None):
+                        _bkg_clip = np.nanpercentile(
+                            flt['BKG'].data[dq == 0], BKG_CLIP[1:3]
+                        )
+                        _bad_bkg = flt['BKG'].data < BKG_CLIP[0]*_bkg_clip[0]
+                        _bad_bkg |= flt['BKG'].data > BKG_CLIP[0]*_bkg_clip[1]
+                        
+                        msg = f'Bad bkg pixels: N= {_bad_bkg.sum()} '
+                        msg += f' ( {_bad_bkg.sum()/_bad_bkg.size*100:.1} %)'
+                        log_comment(LOGFILE, msg, verbose=verbose)
+                        dq |= _bad_bkg*1024
+                        
                 else:
-                    dq = mod_dq_bits(flt[('DQ', ext)].data, okbits=bits) | bpdata
-                    
-                    
+                    dq = (mod_dq_bits(flt[('DQ', ext)].data, okbits=bits)
+                          | bpdata)
+
                 wht = 1/err**2
                 _msk = (err == 0) | (dq > 0)
                 wht[_msk] = 0
                 
                 if (weight_type == 'jwst'):
                     
-                    if (('VAR_RNOISE', ext) in flt) & (rnoise_percentile is not None):
+                    if (
+                        (('VAR_RNOISE', ext) in flt)
+                        & (rnoise_percentile is not None)
+                    ):
                         _rn_data = flt[('VAR_RNOISE',ext)].data
                         rnoise_value = np.nanpercentile(_rn_data[~_msk], 
                                                         rnoise_percentile)
