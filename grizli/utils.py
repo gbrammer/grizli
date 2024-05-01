@@ -127,7 +127,8 @@ LSTSQ_RCOND = None
 
 # Clipping threshold for BKG extensions in drizzle_from_visit
 # BKG_CLIP = [scale, percentile_lo, percentile_hi]
-BKG_CLIP = [2, 1, 99]
+# BKG_CLIP = [2, 1, 99]
+BKG_CLIP = None
 
 def set_warnings(numpy_level='ignore', astropy_level='ignore'):
     """
