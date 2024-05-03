@@ -957,7 +957,7 @@ def update_visit_results():
     pass
 
 
-def get_assoc_yaml_from_s3(assoc, s_region=None, bucket='grizli-v2', prefix='HST/Pipeline/Input', write_file=True, fetch=True):
+def get_assoc_yaml_from_s3(assoc, s_region=None, bucket='grizli-v2', prefix='HST/Pipeline/Input', write_file=True, fetch=True, ROOT_PATH=ROOT_PATH):
     """
     Get presets from yaml file on s3, if found
     """
@@ -1365,7 +1365,7 @@ blue_align_params['align_ref_border'] = 8
 blue_align_params['align_min_flux_radius'] = 1.7
 blue_align_params['tweak_n_min'] = 5
 
-def check_jwst_assoc_guiding(assoc):
+def check_jwst_assoc_guiding(assoc,ROOT_PATH=ROOT_PATH):
     """
     Check the guidestar logs that accompany a given visit
     """
@@ -1470,7 +1470,7 @@ def check_jwst_assoc_guiding(assoc):
 ALL_FILTERS = ['F410M', 'F467M', 'F547M', 'F550M', 'F621M', 'F689M', 'F763M', 'F845M', 'F200LP', 'F350LP', 'F435W', 'F438W', 'F439W', 'F450W', 'F475W', 'F475X', 'F555W', 'F569W', 'F600LP', 'F606W', 'F622W', 'F625W', 'F675W', 'F702W', 'F775W', 'F791W', 'F814W', 'F850LP', 'G800L', 'F098M', 'F127M', 'F139M', 'F153M', 'F105W', 'F110W', 'F125W', 'F140W', 'F160W', 'G102', 'G141']
 
 
-def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=False, visit_split_shift=1.2, blue_align_params=blue_align_params, ref_catalogs=['LS_DR9', 'PS1', 'DES', 'NSC', 'GAIA'], filters=None, prep_args={}, fetch_args={}, get_wcs_guess_from_table=True, master_radec='astrometry_db', align_guess=None, with_db=True, global_miri_skyflat=None, miri_tweak_align=False, tab=None, other_args={}, do_make_visit_mosaic=True, visit_mosaic_kwargs={}, **kwargs):
+def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=False, visit_split_shift=1.2, blue_align_params=blue_align_params, ref_catalogs=['LS_DR9', 'PS1', 'DES', 'NSC', 'GAIA'], filters=None, prep_args={}, fetch_args={}, get_wcs_guess_from_table=True, master_radec='astrometry_db', align_guess=None, with_db=True, global_miri_skyflat=None, miri_tweak_align=False, tab=None, other_args={}, do_make_visit_mosaic=True, visit_mosaic_kwargs={}, ROOT_PATH=ROOT_PATH,**kwargs):
     """
     Run the `grizli.pipeline.auto_script.go` pipeline on an association defined
     in the `grizli` database.
@@ -1563,7 +1563,7 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=False,
         update_assoc_status(assoc, status=1)
     
     if get_wcs_guess_from_table:
-        get_wcs_guess(assoc)
+        get_wcs_guess(assoc, ROOT_PATH=ROOT_PATH)
     
     keep = []
     for c in tab.colnames:
@@ -1580,7 +1580,7 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=False,
     kws = get_assoc_yaml_from_s3(assoc, bucket='grizli-v2', 
                                  prefix='HST/Pipeline/Input', 
                                  s_region=tab['footprint'][0],
-                                 fetch=with_db)
+                                 fetch=with_db,ROOT_PATH=ROOT_PATH)
            
     kws['visit_prep_args']['reference_catalogs'] = ref_catalogs
     if filters is None:
@@ -1761,7 +1761,7 @@ def set_private_iref(assoc):
         utils.fetch_default_calibs()
 
 
-def get_wcs_guess(assoc, guess=None, verbose=True):
+def get_wcs_guess(assoc, guess=None, verbose=True, ROOT_PATH=ROOT_PATH):
     """
     Get visit wcs alignment from the database and use it as a "guess"
     """
@@ -2930,7 +2930,7 @@ def run_all():
             process_visit(assoc, clean=2)
 
 
-def run_one(clean=2, sync=True):
+def run_one(clean=2, sync=True, ROOT_PATH=ROOT_PATH):
     """
     Run a single random visit
     """
