@@ -9,10 +9,11 @@ import inspect
 import logging
 import traceback
 
+import numpy as np
+
 import astropy.io.fits as pyfits
 import astropy.wcs as pywcs
 
-import numpy as np
 from . import utils
 from . import GRIZLI_PATH
 
@@ -26,7 +27,7 @@ CRDS_CONTEXT = 'jwst_1123.pmap' # 2023-09-08 NRC specwcs, etc.
 # PP file WCS
 DO_PURE_PARALLEL_WCS = True
 
-from .constants import JWST_DQ_FLAGS
+from .constants import JWST_DQ_FLAGS, PLUS_FOOTPRINT, CORNER_FOOTPRINT
 
 def set_crds_context(fits_file=None, override_environ=False, verbose=True):
     """
@@ -3751,26 +3752,22 @@ def flag_nircam_hot_pixels(data='jw01837039001_02201_00001_nrcblong_rate.fits', 
         hot = hi & (snmax < hot_filter_sn_max)
     
     ###########
-    # Plus mask
-    plus = np.array([[0,1,0], [1,0,1], [0,1,0]]) > 0
-    corner = (~plus)
-    corner[1,1] = False
-    
+    # Plus mask    
     sn_up = sn*1
     sn_up[mask] = 1000
     
-    dplus = nd.minimum_filter(sn, footprint=plus)
+    dplus = nd.minimum_filter(sn, footprint=PLUS_FOOTPRINT)
     
-    dcorner = nd.maximum_filter(sn, footprint=corner)
+    dcorner = nd.maximum_filter(sn, footprint=CORNER_FOOTPRINT)
     
     if corner_sn_max < 0:
         plusses = (dplus > plus_sn_min) & (dcorner < dplus * -1 / corner_sn_max)
     else:
         plusses = (dplus > plus_sn_min) & (dcorner < corner_sn_max)
         
-    plusses &= (rate['DQ'].data & bits > 0)
+    plusses &= (rate['DQ'].data & bits > 0) | hot
     
-    plus_mask = nd.binary_dilation(plusses, structure=plus)
+    plus_mask = nd.binary_dilation(plusses, structure=PLUS_FOOTPRINT)
     
     dq = (hot * pixel_codes['HOT']) | (plus_mask * pixel_codes['WARM'])
     
