@@ -26,6 +26,21 @@ CRDS_CONTEXT = 'jwst_1123.pmap' # 2023-09-08 NRC specwcs, etc.
 # PP file WCS
 DO_PURE_PARALLEL_WCS = True
 
+JWST_DQ_FLAGS = [
+    "DO_NOT_USE",
+    "OTHER_BAD_PIXEL",
+    "UNRELIABLE_SLOPE",
+    "UNRELIABLE_BIAS",
+    "NO_SAT_CHECK",
+    "NO_GAIN_VALUE",
+    "HOT",
+    "WARM",
+    "DEAD",
+    "RC",
+    "LOW_QE",
+]
+
+
 def set_crds_context(fits_file=None, override_environ=False, verbose=True):
     """
     Set CRDS_CONTEXT
@@ -194,6 +209,41 @@ def set_quiet_logging(level=QUIET_LEVEL):
         logging.disable(level)
     except ImportError:
         pass
+
+
+def get_jwst_dq_bit(dq_flags=JWST_DQ_FLAGS, verbose=False):
+    """
+    Get a combined bit from JWST DQ flags
+    
+    Parameters
+    ----------
+    dq_flags : list
+        List of flag names
+    
+    verbose : bool
+        Messaging
+    
+    Returns
+    -------
+    dq_flag : int
+        Combined bit flag
+
+    """
+    try:
+        import jwst.datamodels
+    except:
+        msg = f"get_jwst_dq_bits: import jwst.datamodels failed"
+        log_comment(LOGFILE, msg, verbose=verbose)
+        return 1
+        
+    dq_flag = 1
+    for _bp in dq_flags:
+        dq_flag |= jwst.datamodels.dqflags.pixel[_bp]
+    
+    msg = f"get_jwst_dq_bits: {'+'.join(dq_flags)} = {dq_flag}"
+    utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+    
+    return dq_flag
 
 
 def hdu_to_imagemodel(in_hdu):
@@ -3493,3 +3543,168 @@ def time_corr_photom_copy(param, t):
     corr = amplitude * np.exp(-(t - t0)/tau)
 
     return corr
+
+
+def flag_nircam_hot_pixels(data='jw01837039001_02201_00001_nrcblong_rate.fits', hot_threshold=7, max_filter_size=3, hot_filter_sn_max=5, plus_sn_min=4, corner_sn_max=3, jwst_dq_flags=JWST_DQ_FLAGS, verbose=True):
+    """
+    Flag isolated hot pixels and "plusses" around known bad pixels
+    
+    Parameters
+    ----------
+    data : str, `~astropy.io.fits.HDUList`
+        NIRCam image filename or open HDU
+    
+    hot_threshold : float
+        S/N threshold for central hot pixel
+    
+    max_filter_size : int
+        Size of the local maximum filter where the central pixel is zeroed out
+    
+    hot_filter_sn_max : float
+        Maximum allowed S/N of the local maximum excluding the central pixel
+    
+    plus_sn_min : float
+        Minimum S/N of the pixels in a "plus" around known bad pixels
+    
+    corner_sn_max : float
+        Maximum S/N of the corners around known bad pixels
+    
+    jwst_dq_flags : list
+        List of JWST flag names
+    
+    verbose : bool
+        Messaging
+    
+    Returns
+    -------
+    sn : array-like
+        S/N array derived from ``file``
+    
+    dq : array-like, int
+        Flagged pixels where ``hot = HOT`` and ``plus = WARM``
+    
+    count : int
+        Number of flagged pixels
+    
+    Examples
+    --------
+
+        .. plot::
+            :include-source:
+
+            import numpy as np
+            import matplotlib.pyplot as plt
+            import astropy.io.fits as pyfits
+            
+            from grizli.jwst_utils import flag_nircam_hot_pixels
+
+            signal = np.zeros((48,48), dtype=np.float32)
+            
+            # hot
+            signal[16,16] = 10
+            
+            # plus
+            for off in [-1,1]:
+                signal[32+off, 32] = 10
+                signal[32, 32+off] = 7
+            
+            err = np.ones_like(signal)
+            np.random.seed(1)
+            noise = np.random.normal(size=signal.shape)*err
+
+            dq = np.zeros(signal.shape, dtype=int)
+            dq[32,32] = 2048 # HOT
+    
+            header = pyfits.Header()
+            header['MDRIZSKY'] = 0.
+
+            hdul = pyfits.HDUList([
+                pyfits.ImageHDU(data=signal+noise, name='SCI', header=header),
+                pyfits.ImageHDU(data=err, name='ERR'),
+                pyfits.ImageHDU(data=dq, name='DQ'),
+            ])
+            
+            sn, dq_flag, count = flag_nircam_hot_pixels(hdul)
+            
+            fig, axes = plt.subplots(1,2,figsize=(8,4), sharex=True, sharey=True)
+    
+            axes[0].imshow(signal + noise, vmin=-2, vmax=9, cmap='gray')
+            axes[0].set_xlabel('Simulated data')
+            axes[1].imshow(dq_flag, cmap='magma')
+            axes[1].set_xlabel('Flagged pixels')
+            
+            for ax in axes:
+                ax.set_xticklabels([])
+                ax.set_yticklabels([])
+    
+            fig.tight_layout(pad=1)
+    
+            plt.show()
+    
+    """
+    import scipy.ndimage as nd
+    from jwst.datamodels.mask import pixel as pixel_codes
+    
+    if isinstance(data, str):
+        is_open = True
+        rate = pyfits.open(data)
+    else:
+        rate = data
+        is_open = False
+
+    bits = get_jwst_dq_bit(jwst_dq_flags)
+    
+    mask = (rate['DQ'].data & bits > 0) | (rate['ERR'].data <= 0)
+    mask |= (rate['SCI'].data < -3*rate['ERR'].data) | (~np.isfinite(rate['SCI'].data))
+    
+    if 'MDRIZSKY' in rate['SCI'].header:
+        bkg = rate['SCI'].header['MDRIZSKY']
+    else:
+        bkg = np.nanmedian(rate['SCI'].data[~mask])
+        
+    indat = rate['SCI'].data - bkg
+    
+    if 'BKG' in rate:
+        indat -= rate['BKG'].data
+    
+    indat[mask] = 0.    
+    sn = indat / rate['ERR'].data
+    sn[mask] = 0
+    
+    ##########
+    # Isolated hot pixels
+    footprint = np.ones((max_filter_size, max_filter_size), dtype=bool)
+    footprint[(max_filter_size - 1) //2, (max_filter_size - 1) //2] = False
+    
+    snmax = nd.maximum_filter(sn, footprint=footprint)
+    
+    hi = sn > hot_threshold
+    hot = hi & (snmax < hot_filter_sn_max)
+    
+    ###########
+    # Plus mask
+    plus = np.array([[0,1,0], [1,0,1], [0,1,0]]) > 0
+    corner = (~plus)
+    corner[1,1] = False
+    
+    sn_up = sn*1
+    sn_up[mask] = 1000
+    
+    dplus = nd.minimum_filter(sn, footprint=plus)
+    
+    dcorner = nd.maximum_filter(sn, footprint=corner)
+    
+    plusses = (dplus > plus_sn_min) & (dcorner < corner_sn_max)
+    plusses &= (rate['DQ'].data & bits > 0)
+    
+    plus_mask = nd.binary_dilation(plusses, structure=plus)
+    
+    dq = (hot * pixel_codes['HOT']) | (plus_mask * pixel_codes['WARM'])
+    
+    msg = f'flag_nircam_hot_pixels : hot={hot.sum()} plus={plus_mask.sum()}'
+    utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+    
+    if is_open:
+        rate.close()
+    
+    return sn, dq, (dq > 0).sum()
