@@ -21,6 +21,7 @@ import astropy.units as u
 from sregion import SRegion, patch_from_polygon
 
 from . import GRIZLI_PATH
+from .jwst_utils import JWST_DQ_FLAGS
 
 KMS = u.km/u.s
 FLAMBDA_CGS = u.erg/u.s/u.cm**2/u.angstrom
@@ -5852,7 +5853,10 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
                        calc_wcsmap=False,
                        niriss_ghost_kwargs={},
                        snowblind_kwargs=None,
-                       get_dbmask=True):
+                       jwst_dq_flags=JWST_DQ_FLAGS,
+                       nircam_hot_pixel_kwargs={},
+                       get_dbmask=True,
+                       **kwargs):
     """
     Make drizzle mosaic from exposures in a visit dictionary
     
@@ -5921,7 +5925,15 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
     snowblind_kwargs : dict
         Arguments to pass to `~grizli.utils.jwst_snowblind_mask` if `snowblind` hasn't
         already been run on JWST exposures
-    
+
+    jwst_dq_flags : list
+        List of JWST flag names to include in the bad pixel mask.  To ignore, set to
+        ``None``
+
+    nircam_hot_pixel_kwargs : dict
+        Keyword arguments for `grizli.jwst_utils.flag_nircam_hot_pixels`.  Set to
+        ``None`` to disable and use the static bad pixel tables.
+
     Returns
     -------
     outsci : array-like
@@ -5947,6 +5959,7 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
     
     from .prep import apply_region_mask_from_db
     from .version import __version__ as grizli__version
+    from .jwst_utils import get_jwst_dq_bit, flag_nircam_hot_pixels
     
     bucket_name = None
     
@@ -6077,6 +6090,20 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
             
             #bpdata = 0
             _inst = flt[0].header['INSTRUME']
+            
+            # Directly flag hot pixels rather than use mask
+            if (_inst in ['NIRCAM']) & (nircam_hot_pixel_kwargs is not None):
+                _sn, dq_flag, _count = flag_nircam_hot_pixels(
+                    flt,
+                    **nircam_hot_pixel_kwargs
+                )
+                if (_count > 0) & (_count < 8192):
+                    bpdata = (dq_flag > 0)*1024
+                    extra_wfc3ir_badpix = False
+                else:
+                    msg = f' flag_nircam_hot_pixels: {_count} out of range'
+                    log_comment(LOGFILE, msg, verbose=verbose)
+                    
             if (extra_wfc3ir_badpix) & (_inst in ['NIRCAM','NIRISS']):
                 _det = flt[0].header['DETECTOR']
                 bpfiles = [os.path.join(os.path.dirname(__file__),
@@ -6276,7 +6303,11 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
                 
                 # JWST: just 1,1024,4096 bits
                 if flt[0].header['TELESCOP'] in ['JWST']:
-                    dq = flt[('DQ', ext)].data & (1+1024+4096)
+                    bad_bits = (1 | 1024 | 4096)
+                    if jwst_dq_flags is not None:
+                        bad_bits |= get_jwst_dq_bit(jwst_dq_flags, verbose=verbose)
+                    
+                    dq = flt[('DQ', ext)].data & bad_bits
                     dq |= bpdata.astype(dq.dtype)
 
                     # Clipping threshold for BKG extensions, global at top
