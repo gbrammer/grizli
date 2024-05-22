@@ -26,20 +26,7 @@ CRDS_CONTEXT = 'jwst_1123.pmap' # 2023-09-08 NRC specwcs, etc.
 # PP file WCS
 DO_PURE_PARALLEL_WCS = True
 
-JWST_DQ_FLAGS = [
-    "DO_NOT_USE",
-    "OTHER_BAD_PIXEL",
-    "UNRELIABLE_SLOPE",
-    "UNRELIABLE_BIAS",
-    "NO_SAT_CHECK",
-    "NO_GAIN_VALUE",
-    "HOT",
-    "WARM",
-    "DEAD",
-    "RC",
-    "LOW_QE",
-]
-
+from .constants import JWST_DQ_FLAGS
 
 def set_crds_context(fits_file=None, override_environ=False, verbose=True):
     """
