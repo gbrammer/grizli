@@ -233,7 +233,7 @@ def get_jwst_dq_bit(dq_flags=JWST_DQ_FLAGS, verbose=False):
         import jwst.datamodels
     except:
         msg = f"get_jwst_dq_bits: import jwst.datamodels failed"
-        log_comment(LOGFILE, msg, verbose=verbose)
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
         return 1
         
     dq_flag = 1
