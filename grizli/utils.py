@@ -21,11 +21,7 @@ import astropy.units as u
 from sregion import SRegion, patch_from_polygon
 
 from . import GRIZLI_PATH
-from .jwst_utils import JWST_DQ_FLAGS
-
-KMS = u.km/u.s
-FLAMBDA_CGS = u.erg/u.s/u.cm**2/u.angstrom
-FNU_CGS = u.erg/u.s/u.cm**2/u.Hz
+from .constants import JWST_DQ_FLAGS, KMS, FLAMBDA_CGS, FNU_CGS
 
 # character to skip clearing line on STDOUT printing
 NO_NEWLINE = '\x1b[1A\x1b[1M'
