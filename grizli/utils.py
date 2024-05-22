@@ -5925,7 +5925,15 @@ def drizzle_from_visit(visit, output=None, pixfrac=1., kernel='point',
     snowblind_kwargs : dict
         Arguments to pass to `~grizli.utils.jwst_snowblind_mask` if `snowblind` hasn't
         already been run on JWST exposures
-    
+
+    jwst_dq_flags : list
+        List of JWST flag names to include in the bad pixel mask.  To ignore, set to
+        ``None``
+
+    nircam_hot_pixel_kwargs : dict
+        Keyword arguments for `grizli.jwst_utils.flag_nircam_hot_pixels`.  Set to
+        ``None`` to disable and use the static bad pixel tables.
+
     Returns
     -------
     outsci : array-like
