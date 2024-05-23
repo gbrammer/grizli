@@ -3533,7 +3533,7 @@ def time_corr_photom_copy(param, t):
     return corr
 
 
-def flag_nirspec_hot_pixels(data='jw02073008001_03101_00002_nrs2_rate.fits', rnoise_percentile=90, rnoise_threshold=16, max_filter_size=3, hot_filter_sn_max=-3, corner_sn_max = -2, jwst_dq_flags=JWST_DQ_FLAGS, dilate_footprint=np.ones((3,3))):
+def flag_nirspec_hot_pixels(data='jw02073008001_03101_00002_nrs2_rate.fits', rnoise_percentile=90, rnoise_threshold=16, hot_filter_sn_max=-3, corner_sn_max = -2, jwst_dq_flags=JWST_DQ_FLAGS, dilate_footprint=PLUS_FOOTPRINT, **kwargs):
     """
     Flag NIRSpec MOS hot pixels
     
@@ -3586,11 +3586,11 @@ def flag_nirspec_hot_pixels(data='jw02073008001_03101_00002_nrs2_rate.fits', rno
         data=rate,
         err_extension='DATA',
         hot_threshold=hot_threshold,
-        max_filter_size=max_filter_size,
         hot_filter_sn_max=hot_filter_sn_max,
         plus_sn_min=hot_threshold,
         corner_sn_max=corner_sn_max,
         jwst_dq_flags=jwst_dq_flags,
+        **kwargs,
     )
         
     if dilate_footprint is not None:
@@ -3606,7 +3606,7 @@ def flag_nirspec_hot_pixels(data='jw02073008001_03101_00002_nrs2_rate.fits', rno
     return sn, dq_flag, count
 
 
-def flag_nircam_hot_pixels(data='jw01837039001_02201_00001_nrcblong_rate.fits', err_extension='ERR', hot_threshold=7, max_filter_size=3, hot_filter_sn_max=5, plus_sn_min=4, corner_sn_max=3, jwst_dq_flags=JWST_DQ_FLAGS, verbose=True):
+def flag_nircam_hot_pixels(data='jw01837039001_02201_00001_nrcblong_rate.fits', err_extension='ERR', hot_threshold=7, max_filter_size=3, hot_filter_sn_max=5, plus_sn_min=4, corner_sn_max=3, jwst_dq_flags=JWST_DQ_FLAGS, verbose=True, **kwargs):
     """
     Flag isolated hot pixels and "plusses" around known bad pixels
     
