@@ -1409,7 +1409,7 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
             try:
                 _ = exposure_oneoverf_correction(filename, in_place=True, 
                                              **oneoverf_kwargs)
-            except TypeError:
+            except ValueError:
                 # Should only fail for test data
                 utils.log_exception(utils.LOGFILE, traceback)
                 msg = f'exposure_oneoverf_correction: failed for {filename}'
@@ -1423,7 +1423,7 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
                         _ = exposure_oneoverf_correction(filename, in_place=True, 
                                                          axis=-1,
                                                          **oneoverf_kwargs)
-                    except TypeError:
+                    except ValueError:
                         # Should only fail for test data
                         utils.log_exception(utils.LOGFILE, traceback)
                         msg = f'exposure_oneoverf_correction: axis=-1 failed for {filename}'
