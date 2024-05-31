@@ -3260,7 +3260,7 @@ class GrismFLT(object):
             # if psf_params is not None:
             #     skip_init_psf = False
             #     if hasattr(beam, 'psf_params'):
-            #         skip_init_psf |= np.product(np.isclose(beam.psf_params, psf_params)) > 0
+            #         skip_init_psf |= np.prod(np.isclose(beam.psf_params, psf_params)) > 0
             #
             #     if not skip_init_psf:
             #         beam.x_init_epsf(flat_sensitivity=False, psf_params=psf_params, psf_filter=psf_filter, yoff=0.06)

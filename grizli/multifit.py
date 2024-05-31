@@ -1860,7 +1860,7 @@ class MultiBeam(GroupFitter):
         self.poly_order = None
 
         self.shapes = [beam.model.shape for beam in self.beams]
-        self.Nflat = [np.product(shape) for shape in self.shapes]
+        self.Nflat = [np.prod(shape) for shape in self.shapes]
         self.Ntot = np.sum(self.Nflat)
 
         for b in self.beams:
