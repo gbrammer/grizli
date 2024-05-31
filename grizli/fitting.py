@@ -1172,7 +1172,7 @@ def compute_cdf_percentiles(fit, cdf_sigmas=CDF_SIGMAS):
                         
     """
     from scipy.interpolate import Akima1DInterpolator
-    from scipy.integrate import cumtrapz
+    from scipy.integrate import cumulative_trapezoid
     import scipy.stats
 
     if cdf_sigmas is None:
@@ -1190,7 +1190,7 @@ def compute_cdf_percentiles(fit, cdf_sigmas=CDF_SIGMAS):
     pz_fine = np.exp(spl(zfine))
     pz_fine[~ok] = 0
 
-    cdf_fine = cumtrapz(pz_fine, x=zfine)
+    cdf_fine = cumulative_trapezoid(pz_fine, x=zfine)
     cdf_x = np.interp(cdf_y, cdf_fine/cdf_fine[-1], zfine[1:])
 
     return cdf_x, cdf_y
@@ -2860,7 +2860,7 @@ class GroupFitter(object):
         from numpy.polynomial import Polynomial
         import scipy.interpolate
         from scipy.interpolate import Akima1DInterpolator
-        from scipy.integrate import cumtrapz
+        from scipy.integrate import cumulative_trapezoid
 
         # Normalize to min(chi2)/DoF = 1.
         scl_nu = fit['chi2'].min()/self.DoF
@@ -2897,7 +2897,7 @@ class GroupFitter(object):
             # Compute CDF and probability intervals
             #dz = np.gradient(zfine[ok])
             #cdf = np.cumsum(np.exp(spl(zfine[ok]))*dz/norm)
-            cdf = cumtrapz(pz_fine, x=zfine)
+            cdf = cumulative_trapezoid(pz_fine, x=zfine)
             percentiles = np.array([2.5, 16, 50, 84, 97.5])/100.
             pz_percentiles = np.interp(percentiles, cdf/cdf[-1], zfine[1:])
 

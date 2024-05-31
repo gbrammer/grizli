@@ -405,7 +405,7 @@ class GrismDisperser(object):
         self.NX = len(self.dx)
         self.sh_beam = (self.sh[0], self.sh[1]+self.NX)
 
-        self.modelf = np.zeros(np.product(self.sh_beam), dtype=np.float32)
+        self.modelf = np.zeros(np.prod(self.sh_beam), dtype=np.float32)
         self.model = self.modelf.reshape(self.sh_beam)
         self.idx = np.arange(self.modelf.size,
                              dtype=np.int64).reshape(self.sh_beam)
