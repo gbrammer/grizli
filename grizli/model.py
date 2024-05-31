@@ -4874,7 +4874,7 @@ class BeamCutout(object):
         if decimals is not None:
             dispersion_PA = np.round(dispersion_PA, decimals=decimals)
 
-        return float(dispersion_PA)
+        return dispersion_PA[0]
 
 
     def init_epsf(self, center=None, tol=1.e-3, yoff=0., skip=1., flat_sensitivity=False, psf_params=None, N=4, get_extended=False, only_centering=True):
