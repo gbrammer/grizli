@@ -1668,7 +1668,7 @@ def detect_with_photutils(sci, err=None, dq=None, seg=None, detect_thresh=2.,
                                           'ra_icrs_centroid': 'ra',
                                           'dec_icrs_centroid': 'dec'},
                         overwrite=True, verbose=True):
-    """
+    r"""
     Use `~photutils` to detect objects and make segmentation map
     
     .. note:: 
@@ -2393,7 +2393,7 @@ def pah_line_template(wave_grid, center_um=3.29, fwhm=0.043):
 
 class SpectrumTemplate(object):
     def __init__(self, wave=None, flux=None, central_wave=None, fwhm=None, velocity=False, fluxunits=FLAMBDA_CGS, waveunits=u.angstrom, name='template', lorentz=False, err=None):
-        """Container for template spectra.
+        r"""Container for template spectra.
 
         Parameters
         ----------
@@ -8320,7 +8320,7 @@ input[type="search"] {display: inline; width:400px;}
                 tester.append("""( ( isNaN( min_{0} ) && isNaN( max_{0} ) ) || ( isNaN( min_{0} ) && data_{0} <= max_{0} ) || ( min_{0} <= data_{0}  && isNaN( max_{0} ) ) || ( min_{0} <= data_{0}  && data_{0} <= max_{0} ) )""".format(self.colnames[ic]))
 
             # Javascript filter function
-            filter_function = """
+            filter_function = r"""
 
 //// Parser
 // https://stackoverflow.com/questions/19491336/get-url-parameter-jquery-or-how-to-get-query-string-values-in-js @ Reza Baradaran
