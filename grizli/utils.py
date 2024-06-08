@@ -212,7 +212,8 @@ def get_flt_info(
     jwst_detector=True,
 ):
      #TODO: Probably overkill, but maybe good to have for the API? (K.V.)
-    """Extract header information from a list of FLT files
+    """
+    Extract header information from a list of FLT files
 
     Parameters
     ----------
@@ -344,7 +345,8 @@ def radec_to_targname(
     targstr="j{rah}{ram}{ras}{sign}{ded}{dem}",
     header=None,
 ):
-    """Turn decimal degree coordinates into a string with rounding.
+    """
+    Turn decimal degree coordinates into a string with rounding.
 
     Parameters
     ----------
@@ -1378,9 +1380,10 @@ DIRECT_ORDER = {
 }
 
 
-def parse_grism_associations(exposure_groups, best_direct=DIRECT_ORDER):
-    """
-    Get associated lists of grism and direct exposures
+def parse_grism_associations(exposure_groups, info,
+                             best_direct=DIRECT_ORDER,
+                             get_max_overlap=True):
+    """Get associated lists of grism and direct exposures
 
     Parameters
     ----------
@@ -1397,54 +1400,54 @@ def parse_grism_associations(exposure_groups, best_direct=DIRECT_ORDER):
     grism_groups : list
         List of dictionaries with associated 'direct' and 'grism' entries.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     N = len(exposure_groups)
 
     grism_groups = []
     for i in range(N):
-        _espi = exposure_groups[i]["product"].split("-")
-
-        if _espi[-2][0] in "fg":
+        _espi = exposure_groups[i]['product'].split('-')
+        
+        if _espi[-2][0] in 'fg':
             pupil_i = _espi[-2]
             f_i = _espi[-1]
-            root_i = "-".join(_espi[:-2])
+            root_i = '-'.join(_espi[:-2])
         else:
             pupil_i = None
             f_i = _espi[-1]
-            root_i = "-".join(_espi[:-1])
-
-        if f_i.startswith("g"):
-            group = OrderedDict(grism=exposure_groups[i], direct=None)
+            root_i = '-'.join(_espi[:-1])
+            
+        if f_i.startswith('g'):
+            group = OrderedDict(grism=exposure_groups[i],
+                                direct=None)
         else:
             continue
-
-        fp_i = exposure_groups[i]["footprint"]
-        olap_i = 0.0
+        
+        fp_i = exposure_groups[i]['footprint']
+        olap_i = 0.
         d_i = f_i
         d_idx = 10
         for j in range(N):
-            _espj = exposure_groups[j]["product"].split("-")
-            if _espj[-2][0] in "fg":
+            _espj = exposure_groups[j]['product'].split('-')
+            if _espj[-2][0] in 'fg':
                 pupil_j = _espj[-2]
                 f_j = _espj[-1]
-                root_j = "-".join(_espj[:-2])
+                root_j = '-'.join(_espj[:-2])
             else:
                 f_j = _espj[-1]
-                root_j = "-".join(_espj[:-1])
+                root_j = '-'.join(_espj[:-1])
                 pupil_j = None
-
-            if f_j.startswith("g"):
+                
+            if f_j.startswith('g'):
                 continue
 
-            fp_j = exposure_groups[j]["footprint"]
+            fp_j = exposure_groups[j]['footprint']
             olap = fp_i.intersection(fp_j)
 
-            if root_j == root_i:
+            if (root_j == root_i):
 
                 if pupil_i is not None:
                     if pupil_j == pupil_i:
-                        group["direct"] = exposure_groups[j]
+                        group['direct'] = exposure_groups[j]
                     else:
                         continue
                 else:
@@ -1452,7 +1455,7 @@ def parse_grism_associations(exposure_groups, best_direct=DIRECT_ORDER):
                         continue
                     if best_direct[f_i.upper()].index(f_j.upper()) < d_idx:
                         d_idx = best_direct[f_i.upper()].index(f_j.upper())
-                        group["direct"] = exposure_groups[j]
+                        group['direct'] = exposure_groups[j]
                         olap_i = olap.area
                         d_i = f_j
 
