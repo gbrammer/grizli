@@ -7805,31 +7805,12 @@ def drizzle_from_visit(
         sci_list, wht_list, wcs_list = [], [], []
 
         keys = OrderedDict()
-        for k in [
-            "EXPTIME",
-            "TELESCOP",
-            "FILTER",
-            "FILTER1",
-            "FILTER2",
-            "PUPIL",
-            "DETECTOR",
-            "INSTRUME",
-            "PHOTFLAM",
-            "PHOTPLAM",
-            "PHOTFNU",
-            "PHOTZPT",
-            "PHOTBW",
-            "PHOTMODE",
-            "EXPSTART",
-            "EXPEND",
-            "DATE-OBS",
-            "TIME-OBS",
-            "UPDA_CTX",
-            "CRDS_CTX",
-            "R_DISTOR",
-            "R_PHOTOM",
-            "R_FLAT",
-        ]:
+        for k in ['EXPTIME', 'TELESCOP', 'FILTER','FILTER1', 'FILTER2', 
+                  'PUPIL', 'DETECTOR', 'INSTRUME', 'PHOTFLAM', 'PHOTPLAM', 
+                  'PHOTFNU', 'PHOTZPT', 'PHOTBW', 'PHOTMODE', 'EXPSTART', 
+                  'EXPEND', 'DATE-OBS', 'TIME-OBS',
+                  'UPDA_CTX', 'CRDS_CTX', 'R_DISTOR', 'R_PHOTOM', 'R_FLAT']:
+            
             if k in flt[0].header:
                 keys[k] = flt[0].header[k]
 
@@ -7854,56 +7835,24 @@ def drizzle_from_visit(
                     msg = f" flag_nircam_hot_pixels: {_count} out of range"
                     log_comment(LOGFILE, msg, verbose=verbose)
 
-            if (extra_wfc3ir_badpix) & (_inst in ["NIRCAM", "NIRISS"]):
-                _det = flt[0].header["DETECTOR"]
-                bpfiles = [
-                    os.path.join(
-                        os.path.dirname(__file__),
-                        f"data/nrc_badpix_240112_{_det}.fits.gz",
-                    )
-                ]
-                bpfiles += [
-                    os.path.join(
-                        os.path.dirname(__file__),
-                        f"data/nrc_badpix_231206_{_det}.fits.gz",
-                    )
-                ]
-                bpfiles += [
-                    os.path.join(
-                        os.path.dirname(__file__),
-                        f"data/jwst_nircam_newhot_{_det}_extra20231129.fits.gz",
-                    )
-                ]
-                bpfiles += [
-                    os.path.join(
-                        os.path.dirname(__file__),
-                        f"data/nrc_badpix_20230710_{_det}.fits.gz",
-                    )
-                ]
-                bpfiles += [
-                    os.path.join(
-                        os.path.dirname(__file__),
-                        f"data/{_det.lower()}_badpix_20230710.fits.gz",
-                    )
-                ]  # NIRISS
-                bpfiles += [
-                    os.path.join(
-                        os.path.dirname(__file__),
-                        f"data/nrc_badpix_230701_{_det}.fits.gz",
-                    )
-                ]
-                bpfiles += [
-                    os.path.join(
-                        os.path.dirname(__file__),
-                        f"data/nrc_badpix_230120_{_det}.fits.gz",
-                    )
-                ]
-                bpfiles += [
-                    os.path.join(
-                        os.path.dirname(__file__),
-                        f"data/nrc_lowpix_0916_{_det}.fits.gz",
-                    )
-                ]
+            if (extra_wfc3ir_badpix) & (_inst in ['NIRCAM','NIRISS']):
+                _det = flt[0].header['DETECTOR']
+                bpfiles = [os.path.join(os.path.dirname(__file__),
+                           f'data/nrc_badpix_240112_{_det}.fits.gz')]
+                bpfiles += [os.path.join(os.path.dirname(__file__),
+                           f'data/nrc_badpix_231206_{_det}.fits.gz')]
+                bpfiles += [os.path.join(os.path.dirname(__file__),
+                         f'data/jwst_nircam_newhot_{_det}_extra20231129.fits.gz')]
+                bpfiles += [os.path.join(os.path.dirname(__file__),
+                           f'data/nrc_badpix_20230710_{_det}.fits.gz')]
+                bpfiles += [os.path.join(os.path.dirname(__file__), 
+                           f'data/{_det.lower()}_badpix_20230710.fits.gz')] # NIRISS
+                bpfiles += [os.path.join(os.path.dirname(__file__), 
+                           f'data/nrc_badpix_230701_{_det}.fits.gz')]
+                bpfiles += [os.path.join(os.path.dirname(__file__),
+                           f'data/nrc_badpix_230120_{_det}.fits.gz')]
+                bpfiles += [os.path.join(os.path.dirname(__file__), 
+                           f'data/nrc_lowpix_0916_{_det}.fits.gz')]
 
                 for bpfile in bpfiles:
                     if os.path.exists(bpfile):
@@ -12297,6 +12246,8 @@ def log_exception(LOGFILE, traceback, verbose=True, mode="a"):
 def simple_LCDM(Om0=0.3, Ode0=0.7, H0=70, Ob0=0.0463, Tcmb0=2.725, name=None):
     """
     Simple LambdaCDM cosmology
+
+    Parameters are defined as in `~astropy.cosmology.LambdaCDM`.
 
     Parameters
     ----------
