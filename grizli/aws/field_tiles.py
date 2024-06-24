@@ -313,7 +313,7 @@ def split_tiles(root='abell2744-080-08.08', ref_tile=(8,8), filters=['visr','f12
         
         ntile = int(nsub/2**(4-zoom)/256)
         left = (tx - ref_tile[0])*ntile
-        bot = -(ty - ref_tile[1])*ntile+2*ntile
+        bot = -(ty - ref_tile[1])*ntile + (4096 / nsub) * ntile
         # print(zoom, ntile, left, bot)
 
         #axes[iz].set_xlim(-ntile*0.1, ntile*(1.1)-1)
