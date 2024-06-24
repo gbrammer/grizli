@@ -69,8 +69,8 @@ def make_all_fields():
     plck-g191p62 161.16195126 33.83078874 46 46
     tn-j1338m1942 204.61036521 -19.67247443 46 46
     nep-tdf 260.6987363 65.8226460 46 46
-    spiderweb 175.205 -26.489 30.72 30.72
-    udsxl 34.29 -5.18 64.512 64.512
+    spiderweb 175.205 -26.489 35.4987 35.4987
+    udsxl 34.29 -5.18 57.344 57.344
     """
     
     # 46 46 for tile ref 9 9
@@ -94,7 +94,6 @@ def make_all_fields():
         
         if (field in ['spiderweb']) | (1):
             npix = 4096 + 512
-            npix = (512 + 64) * 9 # Big enough for a single NIRCam A+B pointing
             
         tiles = make_field_tiles(**tile_defs[ix], tile_npix=npix, pscale=pscale, 
                                  initial_status=90, send_to_database=True)
@@ -263,9 +262,9 @@ def split_tiles(root='abell2744-080-08.08', ref_tile=(8,8), filters=['visr','f12
     
     # nx = (2048+256)
     nx = pix_per_tile
-    if nx > 2048:
-        nsub = 2048
-    if nx > 4096:
+    nsub = 2048
+
+    if pix_per_tile >= 4096:
         nsub = 4096
         
     dpi = int(nx/xsize)
@@ -550,6 +549,9 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
         elif ('j031124m5823' in root):
             filters = ['f200w-clear','f300m-clear','f444w-clear']
             rgb_scl = [1.2, 1.05, 1.0]
+        elif 'spiderweb' in root:
+            filters = ['f115w-clear','f182m-clear','f444w-clear']
+            rgb_scl = [1.3, 0.8, 1.02]
         elif 'aspire' in root:
             filters = ['f115w-clear','f200w-clear','f356w-clear']
             rgb_scl = [1.3, 0.8, 1.02]
@@ -565,18 +567,6 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
                                  'asinh_a':0.03},
                     pix_per_tile=pix_per_tile,
                     pl=1.5, pf=1)
-                    
-
-        # split_tiles(root, ref_tile=ref_tile,
-        #             filters=[f.lower() for f in ['F070W-CLEAR','F090W-CLEAR',
-        #                                          'F115W-CLEAR','F150W-CLEAR',
-        #                                          'F200W-CLEAR',
-        #                                          'F182M-CLEAR','F210M-CLEAR',
-        #                                          'F277W-CLEAR','F356W-CLEAR',
-        #                                         'F410M-CLEAR','F444W-CLEAR']],
-        #             zoom_levels=zoom_levels,
-        #             optical=True, suffix='.ncrgb', xsize=32, scl=4,
-        #             force=force, rgb_scl=[1,1,1], rgb_min=-0.018)
 
         plt.close('all')
     
@@ -968,7 +958,9 @@ def process_tile(field='cos', tile='01.01', filters=TILE_FILTERS, fetch_existing
                 ref_tile = tuple(np.cast[int](ref_tileq['tile'][0].split('.')))
             else:
                 ref_tile = (9, 9)
-            
+        
+        print(f'field {field}, ref_tile: {ref_tile}')
+        
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=UserWarning)
             
