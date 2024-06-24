@@ -550,7 +550,7 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
             filters = ['f200w-clear','f300m-clear','f444w-clear']
             rgb_scl = [1.2, 1.05, 1.0]
         elif 'spiderweb' in root:
-            filters = ['f115w-clear','f182m-clear','f444w-clear']
+            filters = ['f115w-clear','f182m-clear','f410m-clear']
             rgb_scl = [1.3, 0.8, 1.02]
         elif 'aspire' in root:
             filters = ['f115w-clear','f200w-clear','f356w-clear']
