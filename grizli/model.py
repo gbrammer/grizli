@@ -588,7 +588,7 @@ class GrismDisperser(object):
 
         if spectrum_1d is not None:
             xspec, yspec = spectrum_1d
-            scale_spec = self.sensitivity_beam*0.
+            scale_spec = np.zeros_like(self.sensitivity_beam)
             int_func = interp.interp_conserve_c
             scale_spec[self.lam_sort] = int_func(self.lam_beam[self.lam_sort],
                                                 xspec, yspec)*scale
