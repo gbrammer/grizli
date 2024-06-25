@@ -47,6 +47,15 @@ spitzer_idf
 elgordo
 mrg0138
 miri-gto
+ulasj1342
+sunburst
+#PEARLS
+gama100033
+clg-1212p2733
+plck-g165p67
+plck-g191p62
+tn-j1338m1942
+abell1689
 """.split()
 
 __all__ = ['AVAILABLE_FIELDS', 'make_wcs', 'show_field_footprint']
@@ -1298,6 +1307,164 @@ NAXIS2  =                 4049                                                  
         print(root, hdu.data.shape, w.pixel_shape)
 
         ref_file = w
+
+    elif mosaic_field == 'ulasj1342':
+
+        # ULAS-J1342
+        NX, NY, ra, dec = 4.5, 7.5, 205.555, 9.462
+
+        hdu = utils.make_wcsheader(ra=ra,  dec=dec,
+                                   size=(NX*2048*0.04, NY*2048*0.04),
+                                   pixscale=0.04, theta=0., get_hdu=True)
+    
+        hdu.header['CRPIX1'] = NX*2048//2
+        hdu.header['CRPIX2'] = NY*2048//2
+        w = pywcs.WCS(hdu.header)
+        
+        root = f'ulasj1342-grizli-{version}'
+
+        print(root, hdu.data.shape, w.pixel_shape)
+
+        ref_file = w
+
+    elif mosaic_field == 'sunburst':
+
+        # ULAS-J1342
+        NX, NY, ra, dec = 4, 4, 237.5297488, -78.1917476
+
+        hdu = utils.make_wcsheader(ra=ra,  dec=dec,
+                                   size=(NX*2048*0.04, NY*2048*0.04),
+                                   pixscale=0.04, theta=0., get_hdu=True)
+    
+        hdu.header['CRPIX1'] = NX*2048//2
+        hdu.header['CRPIX2'] = NY*2048//2
+        w = pywcs.WCS(hdu.header)
+        
+        root = f'sunburst-grizli-{version}'
+
+        print(root, hdu.data.shape, w.pixel_shape)
+
+        ref_file = w
+
+    elif mosaic_field == 'cosmos-transients':
+        NX, NY, ra, dec = 5, 5, 150.1250419, 2.3661324
+        
+        hdu = utils.make_wcsheader(ra=ra,  dec=dec,
+                                   size=(NX*2048*0.04, NY*2048*0.04),
+                                   pixscale=0.04, theta=0., get_hdu=True)
+    
+        hdu.header['CRPIX1'] = NX*2048//2
+        hdu.header['CRPIX2'] = NY*2048//2
+        w = pywcs.WCS(hdu.header)
+        
+        root = f'cosmos-transients-{version}'
+
+        print(root, hdu.data.shape, w.pixel_shape)
+
+        ref_file = w
+
+    ## PEARLS fields
+    elif mosaic_field == 'gama100033':
+        NX, NY, ra, dec = 3, 5, 130.58659471, 1.61764667
+        
+        hdu = utils.make_wcsheader(ra=ra,  dec=dec,
+                                   size=(NX*2048*0.04, NY*2048*0.04),
+                                   pixscale=0.04, theta=0., get_hdu=True)
+    
+        hdu.header['CRPIX1'] = NX*2048//2
+        hdu.header['CRPIX2'] = NY*2048//2
+        w = pywcs.WCS(hdu.header)
+        
+        root = f'gama100033-{version}'
+
+        print(root, hdu.data.shape, w.pixel_shape)
+
+        ref_file = w
+
+    elif mosaic_field == 'clg-1212p2733':
+        NX, NY, ra, dec = 3, 5, 183.08573496, 27.57669020
+        
+        hdu = utils.make_wcsheader(ra=ra,  dec=dec,
+                                   size=(NX*2048*0.04, NY*2048*0.04),
+                                   pixscale=0.04, theta=0., get_hdu=True)
+    
+        hdu.header['CRPIX1'] = NX*2048//2
+        hdu.header['CRPIX2'] = NY*2048//2
+        w = pywcs.WCS(hdu.header)
+        
+        root = f'clg-1212p2733-{version}'
+
+        print(root, hdu.data.shape, w.pixel_shape)
+
+        ref_file = w
+
+    elif mosaic_field == 'plck-g165p67':
+        NX, NY, ra, dec = 5, 4, 171.78782682, 42.47523529
+        
+        hdu = utils.make_wcsheader(ra=ra,  dec=dec,
+                                   size=(NX*2048*0.04, NY*2048*0.04),
+                                   pixscale=0.04, theta=0., get_hdu=True)
+    
+        hdu.header['CRPIX1'] = NX*2048//2
+        hdu.header['CRPIX2'] = NY*2048//2
+        w = pywcs.WCS(hdu.header)
+        
+        root = f'plck-g165p67-{version}'
+
+        print(root, hdu.data.shape, w.pixel_shape)
+
+        ref_file = w
+
+    elif mosaic_field == 'plck-g191p62':
+        NX, NY, ra, dec = 5, 5, 161.16195126, 33.83078874
+        
+        hdu = utils.make_wcsheader(ra=ra,  dec=dec,
+                                   size=(NX*2048*0.04, NY*2048*0.04),
+                                   pixscale=0.04, theta=0., get_hdu=True)
+    
+        hdu.header['CRPIX1'] = NX*2048//2
+        hdu.header['CRPIX2'] = NY*2048//2
+        w = pywcs.WCS(hdu.header)
+        
+        root = f'plck-g191p62-{version}'
+
+        print(root, hdu.data.shape, w.pixel_shape)
+
+        ref_file = w    
+
+    elif mosaic_field == 'tn-j1338m1942':
+        NX, NY, ra, dec = 4, 5, 204.61036521, -19.67247443
+        
+        hdu = utils.make_wcsheader(ra=ra,  dec=dec,
+                                   size=(NX*2048*0.04, NY*2048*0.04),
+                                   pixscale=0.04, theta=0., get_hdu=True)
+    
+        hdu.header['CRPIX1'] = NX*2048//2
+        hdu.header['CRPIX2'] = NY*2048//2
+        w = pywcs.WCS(hdu.header)
+        
+        root = f'tn-j1338m1942-{version}'
+
+        print(root, hdu.data.shape, w.pixel_shape)
+
+        ref_file = w    
+
+    elif mosaic_field == 'abell1689':
+        NX, NY, ra, dec = 4, 4, 197.8765, -1.33
+        
+        hdu = utils.make_wcsheader(ra=ra,  dec=dec,
+                                   size=(NX*2048*0.04, NY*2048*0.04),
+                                   pixscale=0.04, theta=0., get_hdu=True)
+    
+        hdu.header['CRPIX1'] = NX*2048//2
+        hdu.header['CRPIX2'] = NY*2048//2
+        w = pywcs.WCS(hdu.header)
+        
+        root = f'abell1689-grizli-{version}'
+
+        print(root, hdu.data.shape, w.pixel_shape)
+
+        ref_file = w    
 
     else:
         raise ValueError(f'Field {mosaic_field} not defined')
