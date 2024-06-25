@@ -267,9 +267,9 @@ def rebin_weighted_c(x, xp, yp, ye, left=0, right=0, integrate=0, remove_missing
 
         #### Template points between master grid points
         while (xp[i] <= x[k + 1]) & (i < nxp):
-            xnumsum += xp[i] / te[i] ** 2
-            numsum += yp[i] / te[i] ** 2
-            densum += 1.0 / te[i] ** 2
+            xnumsum += xp[i] / ye[i] ** 2
+            numsum += yp[i] / ye[i] ** 2
+            densum += 1.0 / ye[i] ** 2
             # count[i] += 1
             if i == nxp - 1:
                 break
