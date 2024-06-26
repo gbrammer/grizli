@@ -1142,7 +1142,7 @@ def split_visit(visit, visit_split_shift=1.5, max_dt=6.0 / 24, path="../RAW"):
     """
     Check if files in a visit have large shifts and split them otherwise
 
-    Parameters:
+    Parameters
     ----------
     visit : dict
         The visit dictionary containing information about the visit.
@@ -1159,7 +1159,7 @@ def split_visit(visit, visit_split_shift=1.5, max_dt=6.0 / 24, path="../RAW"):
         The path to the directory containing the visit files.
         Default is "../RAW".
 
-    Returns:
+    Returns
     -------
     list of dict
         A list of visit dictionaries, each representing a split visit.
@@ -1559,7 +1559,7 @@ def get_filter_obsmode(
     Derive `~pysynphot` obsmode keyword from a filter name, where UVIS filters
     end in 'u'
 
-    Parameters:
+    Parameters
     ----------
     filter : str, optional
         The name of the filter. Default is "f160w".
@@ -1572,7 +1572,7 @@ def get_filter_obsmode(
     case : function, optional
         The case conversion function. Default is str.lower.
 
-    Returns:
+    Returns
     -------
     str
         The `~pysynphot` obsmode keyword derived from the filter name.
@@ -1598,8 +1598,8 @@ def tabulate_encircled_energy(aper_radii=EE_RADII, norm_radius=4.0):
     Tabulated encircled energy for different aperture radii 
     and normalization radius.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     aper_radii : list, optional
         List of aperture radii in arcseconds. 
         Default is [0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.8, 1.0, 1.5, 2.0].
@@ -1666,14 +1666,14 @@ def synphot_zeropoint(obsmode="wfc3,ir,f160w", radius=4.0):
     """
     Compute synphot for a specific aperture.
 
-    Parameters:
+    Parameters
     ----------
     obsmode : str, optional
         The observation mode string. Default is "wfc3,ir,f160w".
     radius : float, optional
         The radius of the aperture in arcseconds. Default is 4.0.
 
-    Returns:
+    Returns
     -------
     ZP : float
         The zero point magnitude calculated using synphot.
@@ -1699,7 +1699,7 @@ def synphot_encircled_energy(
     """
     Compute encircled energy curves with pysynphot
 
-    Parameters:
+    Parameters
     ----------
     obsmode : str
         The observation mode string specifying the
@@ -1720,7 +1720,7 @@ def synphot_encircled_energy(
         the encircled energy curve. If set to np.inf, the normalization 
         will be performed using the full aperture. Default is 4.0.
 
-    Returns:
+    Returns
     -------
     counts : array-like
         The array of encircled energy counts normalized to the counts
@@ -1940,8 +1940,6 @@ def flt_to_dict(
     """
     Parse basic elements from a FLT/FLC header to a dictionary
 
-    TBD
-
     Parameters
     ----------
     fobj : `~astropy.io.fits.HDUList`
@@ -2069,7 +2067,6 @@ def detect_with_photutils(
     Parameters
     ----------
     sci : `~numpy.ndarray`
-        TBD
 
     err, dq, seg : TBD
 
@@ -2221,19 +2218,18 @@ def detect_with_photutils(
 
 def safe_invert(arr):
     """
-    Version-safe matrix inversion using np.linalg or np.matrix.I
+    Version-safe matrix inversion using `numpy.linalg` or `numpy.matrix.I`
     
-    Parameters:
-    -----------
+    Parameters
+    ----------
     arr : array_like
         The input array to be inverted.
         
-    Returns:
-    --------
+    Returns
+    -------
     _inv : ndarray
         The inverted array.
     
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     try:
         from numpy.linalg import inv
@@ -2246,19 +2242,18 @@ def safe_invert(arr):
 
 def nmad(data):
     """
-    Normalized NMAD=1.4826022 * `~.astropy.stats.median_absolute_deviation`
+    Normalized NMAD = 1.4826022 * `~.astropy.stats.median_absolute_deviation`
 
-    Parameters:
+    Parameters
     ----------
     data: array-like
         The input data array.
 
-    Returns:
-    ----------
+    Returns
+    -------
     nmad: float
         The normalized median absolute deviation of the input data.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     import astropy.stats
 
@@ -3034,7 +3029,7 @@ def emission_line_templates():
 
 def pah33(wave_grid):
     """
-    Set of 3.3 um PAH lines from Li et al. 2020
+    Set of 3.3 micron PAH lines from Li et al. 2020
 
     Parameters
     ----------
@@ -3045,9 +3040,8 @@ def pah33(wave_grid):
     -------
     pah_templates : list
         List of `~grizli.utils.SpectrumTemplate` templates for three components
-        around 3.3 um
+        around 3.3 microns
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     pah_templates = {}
     for lc, lw in zip([3.29, 3.40, 3.47], [0.043, 0.031, 0.100]):
@@ -3813,15 +3807,15 @@ def load_beta_templates(wave=np.arange(400, 2.5e4), betas=[-2, -1, 0]):
     """
     Step-function templates with f_lambda ~ (wave/1216.)**beta
     
-    Parameters:
+    Parameters
     ----------
     wave: array_like
         The wavelength grid.
     beta: float
         The power-law index.
     
-    Returns:
-    ----------
+    Returns
+    -------
     t0: dict
         A dictionary containing the step-function templates.
 
@@ -3879,7 +3873,7 @@ def load_quasar_templates(
     """
     Make templates suitable for fitting broad-line quasars
     
-    Parameters:
+    Parameters
     ----------
     broad_fwhm : float, optional
         Full width at half maximum of the broad lines. Default is 2500.
@@ -3920,7 +3914,7 @@ def load_quasar_templates(
     include_reddened_balmer_lines : bool, optional
         Whether to include reddened Balmer lines. Default is False.
         
-    Returns:
+    Returns
     -------
     t0 : OrderedDict
         Dictionary of templates for t0.
@@ -4109,7 +4103,7 @@ def load_phoenix_stars(
     """
     Load Phoenix stellar templates
     
-    Parameters:
+    Parameters
     ----------
     logg_list : list, optional
         List of log(g) values for the templates to load.
@@ -4127,7 +4121,7 @@ def load_phoenix_stars(
         Name of the FITS file containing the templates. 
         Default is "bt-settl_t400-7000_g4.5.fits".
     
-    Returns:
+    Returns
     -------
     tstars : OrderedDict
         Dictionary of SpectrumTemplate objects, with the template names as keys.
@@ -4203,7 +4197,7 @@ def load_sdss_pca_templates(file="spEigenQSO-55732.fits", smooth=3000):
     """
     Load SDSS eigen PCA templates
     
-    Parameters:
+    Parameters
     ----------
     file : str, optional
         The name of the FITS file containing the templates. 
@@ -4212,7 +4206,7 @@ def load_sdss_pca_templates(file="spEigenQSO-55732.fits", smooth=3000):
     smooth : float, optional
         The smoothing parameter for the templates. Default is 3000.
     
-    Returns:
+    Returns
     -------
     temp_list : OrderedDict
         A dictionary of SpectrumTemplate objects representing the SDSS eigen templates.
@@ -4256,7 +4250,7 @@ def cheb_templates(
     """
     Chebyshev polynomial basis functions
     
-    Parameters:
+    Parameters
     ----------
     wave : array-like
         The wavelength array.
@@ -4280,7 +4274,7 @@ def cheb_templates(
         If not provided, the minimum and maximum values of 
         the input wavelength array are used.
         
-    Returns:
+    Returns
     -------
     templates : OrderedDict
         The Chebyshev polynomial templates.
@@ -4329,7 +4323,7 @@ def bspline_templates(
     """
     B-spline basis functions, modeled after `~patsy.splines`
 
-    Parameters:
+    Parameters
     ----------
     wave : array-like 
         The wavelength array.
@@ -4346,8 +4340,8 @@ def bspline_templates(
     minmax : tuple 
         The minimum and maximum values for the wavelength array.
 
-    Returns:
-    ----------
+    Returns
+    -------
     basis : array-like 
         The B-spline basis functions.
     temp : OrderedDict 
@@ -4414,7 +4408,7 @@ def eval_bspline_templates(wave, bspl, coefs):
     """
     Evaluate B-spline templates at given wavelengths.
 
-    Parameters:
+    Parameters
     ----------
     wave : array-like 
         The wavelengths at which to evaluate the B-spline templates.
@@ -4423,8 +4417,8 @@ def eval_bspline_templates(wave, bspl, coefs):
     coefs : array-like 
         The coefficients of the B-spline basis functions.
 
-    Returns:
-    ----------
+    Returns
+    -------
     array-like: 
         The evaluated B-spline templates at the given wavelengths.
     
@@ -4517,7 +4511,7 @@ def step_templates(
     """
     Step-function templates for easy binning
     
-    Parameters:
+    Parameters
     ----------    
     wlim : list 
         The wavelength range for the templates.
@@ -4540,8 +4534,8 @@ def step_templates(
     order : int 
         The order of the step function templates.
     
-    Returns:
-    ----------
+    Returns
+    -------
     bin_steps : ndarray 
         The array of bin steps for the templates.
     step_templ : dict 
@@ -4613,7 +4607,7 @@ def polynomial_templates(wave, ref_wave=1.0e4, order=0, line=False):
     Each template is stored in the returned dictionary with a key in the format
     "poly {i}", where i is the polynomial order.
 
-    Parameters:
+    Parameters
     ----------   
     wave : array-like 
         The wavelength array.
@@ -4627,8 +4621,8 @@ def polynomial_templates(wave, ref_wave=1.0e4, order=0, line=False):
     line : bool, optional 
         Whether to generate line templates. Default is False.
 
-    Returns:
-    ----------   
+    Returns
+    -------
     temp: OrderedDict 
         A dictionary of SpectrumTemplate objects
         representing the polynomial templates.
@@ -5357,7 +5351,6 @@ def generate_tempfilt(templates, filters, zgrid=None, MW_EBV=0):
     tempfilt : `eazy.photoz.TemplateGrid`
         Template grid for photometric redshift fitting.
     
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     from eazy.templates import Template
     from eazy.photoz import TemplateGrid
@@ -5404,7 +5397,6 @@ def combine_phot_dict(phots, templates=None, MW_EBV=0):
     dict
         Combined photometry dictionary.
     
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     phot = {}
     phot["flam"] = []
@@ -9683,8 +9675,6 @@ class EffectivePSF:
         """
         Objective function for fitting ePSFs
 
-        TBD
-
         Parameters
         ----------
         params : list
@@ -11762,15 +11752,15 @@ def convex_hull_wrapper(x, y):
     """
     Generate a convex hull from a list of points
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     x : array-like
         x-coordinates of the points.
     y : array-like
         y-coordinates of the points.
 
-    Returns:
-    --------
+    Returns
+    -------
     pxy : tuple
         Tuple of hull vertices.
     poly : `~shapely.geometry.Polygon`
@@ -12122,7 +12112,6 @@ def simple_LCDM(Om0=0.3, Ode0=0.7, H0=70, Ob0=0.0463, Tcmb0=2.725, name=None):
     cosmology : `~astropy.cosmology.LambdaCDM`
         LambdaCDM cosmology object.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.    
     """
     from astropy.cosmology import LambdaCDM
 
@@ -12186,7 +12175,6 @@ def make_filter_footprint(filter_size=71, filter_central=0, **kwargs):
     filter_footprint : numpy.ndarray
         The filter footprint as a numpy array.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     filter_footprint = np.ones(filter_size, dtype=int)
 
@@ -12439,7 +12427,6 @@ class Unique(object):
             Sort the counts in ascending order if `sort_counts` is non-zero.
             Default is 0.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         print(f'{"N":>4}  {"value":10}')
         print("====  ==========")
@@ -12466,7 +12453,6 @@ class Unique(object):
         count : int
             The number of occurrences of the specified value.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         if key in self.values:
             ix = self.values.index(key)
@@ -12510,7 +12496,6 @@ class Unique(object):
         uix : list
             List of unique indices
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         uix = [ind[index] for ind in self.list_indices]
 
@@ -12565,7 +12550,6 @@ class HubbleXYZ(object):
         computed : dict 
             Dictionary to store computed values.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         if spt_file:
             self.param_dict = self.parse_from_spt(spt_file)
@@ -12587,7 +12571,6 @@ class HubbleXYZ(object):
         return t0
 
     def __call__(self, t_in, **kwargs):
-        #TODO: Is the return correct here? (K.V.)
         """
         Convert input time ``t_in`` to seconds since 1/1/85 and ``evaluate``.
 
@@ -12604,7 +12587,6 @@ class HubbleXYZ(object):
         xyz : dict
             Dictionary containing the x, y, z, and r values.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         import astropy.time
 
@@ -12653,7 +12635,6 @@ class HubbleXYZ(object):
         r : float or `~astropy.table.Table`
             Distance(s) from the origin in the specified unit.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
 
         if not self.param_dict:
@@ -12739,7 +12720,6 @@ class HubbleXYZ(object):
         xyz : dict
             Dictionary containing the x, y, z, and r values.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         import astropy.time
 
@@ -12767,7 +12747,6 @@ class HubbleXYZ(object):
         iso_time : str
             ISO formatted time string.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         if not hasattr(dt, "unit"):
             dtsec = dt * u.second
@@ -12792,7 +12771,6 @@ class HubbleXYZ(object):
             Dictionary containing the orbital parameters parsed 
             from the SPT header.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         import astropy.io.fits as pyfits
         import astropy.time
@@ -12858,7 +12836,6 @@ class HubbleXYZ(object):
         alt : float or array-like
             Altitude(s) in meters.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         import pyproj
 
