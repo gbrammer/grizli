@@ -179,7 +179,7 @@ def combine_flt(files=[], output='exposures_cmb.fits', grow=1,
         wht[(im['ERR'].data == 0) | (dq > 0) | (~np.isfinite(wht))] = 0
         wht[im['SCI'].data < -3*im['ERR'].data] = 0
 
-        wht = np.cast[np.float32](wht)
+        wht = np.asarray(wht,dtype=np.float32)
 
         exp_wcs = pywcs.WCS(im[1].header, relax=True)
         exp_wcs.pscale = utils.get_wcs_pscale(exp_wcs)
@@ -380,8 +380,8 @@ def split_pixel_quadrant(dx, dy, figure='quadrants.png', show=False):
     """
     from matplotlib.ticker import MultipleLocator
 
-    xq = np.cast[int](np.round((dx - np.floor(dx))*2)) % 2
-    yq = np.cast[int](np.round((dy - np.floor(dy))*2)) % 2
+    xq = np.asarray(np.round((dx - np.floor(dx))*2),dtype=int) % 2
+    yq = np.asarray(np.round((dy - np.floor(dy))*2),dtype=int) % 2
 
     # Test, show sub-pixel centers in a figure
     if figure:

@@ -719,7 +719,7 @@ def run_all(id, t0=None, t1=None, fwhm=1200, zr=[0.65, 1.6], dz=[0.004, 0.0002],
         lz = np.log(1+fit['zgrid'])
         axz.plot(lz, np.log10(fit['pdf']), color='0.5', alpha=0.5)
         axz.set_xticks(np.log(1+ticks))
-        axz.set_xticklabels(np.cast[int](ticks))
+        axz.set_xticklabels(np.asarray(ticks,dtype=int))
         axz.set_xlim(lz.min(), lz.max())
     else:
         axz.plot(fit['zgrid'], np.log10(fit['pdf']), color='0.5', alpha=0.5)
@@ -2333,7 +2333,7 @@ class GroupFitter(object):
                      use_cached_templates=True,
                      get_uncertainties=True,
                      Rspline=30, huber_delta=4, get_student_logpdf=False):
-        """
+        r"""
         Two-step procedure for fitting redshifts
         
         1. polynomial, spline template fits
@@ -2819,10 +2819,10 @@ class GroupFitter(object):
 
         dtype = np.float64
 
-        fit['zgrid'] = np.cast[dtype](zgrid)
-        fit['chi2'] = np.cast[dtype](chi2)
+        fit['zgrid'] = np.asarray(zgrid,dtype=dtype)
+        fit['chi2'] = np.asarray(chi2,dtype=dtype)
         if get_student_logpdf:
-            fit['student_logpdf'] = np.cast[dtype](logpdf)
+            fit['student_logpdf'] = np.asarray(logpdf,dtype=dtype)
 
         fit.meta['st_df'] = student_t_pars[0], 'Student-t df of spline fit'
         fit.meta['st_loc'] = student_t_pars[1], 'Student-t loc of spline fit'
@@ -2830,8 +2830,8 @@ class GroupFitter(object):
                               'Student-t scale of spline fit')
 
         #fit['chi2poly'] = chi2_poly
-        fit['coeffs'] = np.cast[dtype](coeffs)
-        fit['covar'] = np.cast[dtype](covar)
+        fit['coeffs'] = np.asarray(coeffs,dtype=dtype)
+        fit['covar'] = np.asarray(covar,dtype=dtype)
 
         fit = self._parse_zfit_output(fit, prior=prior)
 
@@ -3319,7 +3319,7 @@ class GroupFitter(object):
             lz = np.log(1+fit['zgrid'])
             axz.plot(lz, np.log10(fit['pdf']), color='k')
             axz.set_xticks(np.log(1+ticks))
-            axz.set_xticklabels(np.cast[int](ticks))
+            axz.set_xticklabels(np.asarray(ticks,dtype=int))
             axz.set_xlim(lz.min(), lz.max())
         else:
             axz.plot(fit['zgrid'], np.log10(fit['pdf']), color='k')
@@ -4524,7 +4524,7 @@ class GroupFitter(object):
             binned_spectrum['wave'] = w_g
             binned_spectrum['flux'] = flux_bin*(u.electron/u.second)
             binned_spectrum['err'] = np.sqrt(var_bin)*(u.electron/u.second)
-            binned_spectrum['npix'] = np.cast[int](n_bin)
+            binned_spectrum['npix'] = np.asarray(n_bin,int)
 
             binned_spectrum.meta['GRISM'] = (grism, 'Grism name')
             binned_spectrum.meta['BIN'] = (bin, 'Spectrum binning factor')

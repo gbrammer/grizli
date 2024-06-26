@@ -565,13 +565,13 @@ def blot_nearest_exact(
         mapping = cdriz.DefaultWCSMapping(blot_wcs, source_wcs, nx, ny, stepsize)
         xf, yf = mapping(xo, yo)
 
-    xi, yi = np.cast[int](np.round(xf)), np.cast[int](np.round(yf))
+    xi, yi = np.asarray(np.round(xf),dtype=int), np.asarray(np.round(yf),dtype=int)
 
     m2 = (xi >= 0) & (yi >= 0) & (xi < in_sh[1]) & (yi < in_sh[0])
     xi, yi, xf, yf, xo, yo = xi[m2], yi[m2], xf[m2], yf[m2], xo[m2], yo[m2]
 
-    out_data = np.ones(out_sh, dtype=np.float64) * fill_value
-    status = pixel_map_c(np.cast[np.float64](in_data), xi, yi, out_data, xo, yo)
+    out_data = np.ones(out_sh, dtype=np.float64)*fill_value
+    status = pixel_map_c(np.asarray(in_data,dtype=np.float64), xi, yi, out_data, xo, yo)
 
     # Fill empty
     func = nd.maximum_filter
@@ -1172,22 +1172,24 @@ def split_visit(visit, visit_split_shift=1.5, max_dt=6.0 / 24, path="../RAW"):
             if os.path.exists(_file):
                 ims.append(pyfits.open(_file))
                 break
-
-    # ims = [pyfits.open(os.path.join(path, file)) for file in visit['files']]
-    crval1 = np.array([im[1].header["CRVAL1"] for im in ims])
-    crval2 = np.array([im[1].header["CRVAL2"] for im in ims])
-    expstart = np.array([im[0].header["EXPSTART"] for im in ims])
-    dt = np.cast[int]((expstart - expstart[0]) / max_dt)
-
+    
+    #ims = [pyfits.open(os.path.join(path, file)) for file in visit['files']]
+    crval1 = np.array([im[1].header['CRVAL1'] for im in ims])
+    crval2 = np.array([im[1].header['CRVAL2'] for im in ims])
+    expstart = np.array([im[0].header['EXPSTART'] for im in ims])
+    dt = np.asarray((expstart-expstart[0])/max_dt,dtype=int)
+    
     for im in ims:
         im.close()
 
     dx = (crval1 - crval1[0]) * 60 * np.cos(crval2[0] / 180 * np.pi)
     dy = (crval2 - crval2[0]) * 60
+    
 
-    dxi = np.cast[int](np.round(dx / visit_split_shift))
-    dyi = np.cast[int](np.round(dy / visit_split_shift))
-    keys = dxi * 100 + dyi + 1000 * dt
+    dxi = np.asarray(np.round(dx/visit_split_shift),dtype=int)
+    dyi = np.asarray(np.round(dy/visit_split_shift),dtype=int)
+    keys = dxi*100+dyi+1000*dt
+
 
     un = np.unique(keys)
     if len(un) == 1:
@@ -2033,32 +2035,17 @@ def mod_dq_bits(value, okbits=32 + 64 + 512, badbits=0, verbose=False):
     return (value & ~okbits) | badbits
 
 
-def detect_with_photutils(
-    sci,
-    err=None,
-    dq=None,
-    seg=None,
-    detect_thresh=2.0,
-    npixels=8,
-    grow_seg=5,
-    gauss_fwhm=2.0,
-    gsize=3,
-    wcs=None,
-    save_detection=False,
-    root="mycat",
-    background=None,
-    gain=None,
-    AB_zeropoint=0.0,
-    rename_columns={
-        "xcentroid": "x_flt",
-        "ycentroid": "y_flt",
-        "ra_icrs_centroid": "ra",
-        "dec_icrs_centroid": "dec",
-    },
-    overwrite=True,
-    verbose=True,
-):
-    """
+
+def detect_with_photutils(sci, err=None, dq=None, seg=None, detect_thresh=2.,
+                        npixels=8, grow_seg=5, gauss_fwhm=2., gsize=3,
+                        wcs=None, save_detection=False, root='mycat',
+                        background=None, gain=None, AB_zeropoint=0.,
+                        rename_columns={'xcentroid': 'x_flt',
+                                          'ycentroid': 'y_flt',
+                                          'ra_icrs_centroid': 'ra',
+                                          'dec_icrs_centroid': 'dec'},
+                        overwrite=True, verbose=True):
+    r"""
     Use `~photutils` to detect objects and make segmentation map
 
     .. note::
@@ -2140,7 +2127,7 @@ def detect_with_photutils(
         )
 
         grow = nd.maximum_filter(segm.data, grow_seg)
-        seg = np.cast[np.float32](grow)
+        seg = np.asarray(grow,dtype=np.float32)
     else:
         # Use the supplied segmentation image
         segm = SegmentationImage(seg)
@@ -3098,6 +3085,7 @@ def pah_line_template(wave_grid, center_um=3.29, fwhm=0.043):
 
 
 class SpectrumTemplate(object):
+
     def __init__(
         self,
         wave=None,
@@ -3113,6 +3101,7 @@ class SpectrumTemplate(object):
     ):
         """
         Container for template spectra.
+
 
         Parameters
         ----------
@@ -3181,14 +3170,14 @@ class SpectrumTemplate(object):
         """
         self.wave = wave
         if wave is not None:
-            self.wave = np.cast[np.float64](wave)
+            self.wave = np.asarray(wave,dtype=np.float64)
 
         self.flux = flux
         if flux is not None:
-            self.flux = np.cast[np.float64](flux)
+            self.flux = np.asarray(flux,dtype=np.float64)
 
         if err is not None:
-            self.err = np.cast[np.float64](err)
+            self.err = np.asarray(err,dtype=np.float64)
         else:
             self.err = None
 
@@ -6584,9 +6573,9 @@ def make_wcsheader(
         cdelt = [pixscale[0] / 3600.0, pixscale[1] / 3600.0]
 
     if np.isscalar(size):
-        npix = np.cast[int](np.round([size / pixscale, size / pixscale]))
+        npix = np.asarray(np.round([size/pixscale, size/pixscale]),dtype=int)
     else:
-        npix = np.cast[int](np.round([size[0] / pixscale, size[1] / pixscale]))
+        npix = np.asarray(np.round([size[0]/pixscale, size[1]/pixscale]),dtype=int)
 
     hout = pyfits.Header()
     hout["CRPIX1"] = (npix[0] - 1) / 2 + 1
@@ -6778,7 +6767,9 @@ def make_maximal_wcs(
                 else:
                     group_poly = group_poly.union(p_i)
 
-            x0, y0 = np.cast[float](group_poly.centroid.xy)[:, 0]
+                 
+            x0, y0 = np.asarray(group_poly.centroid.xy,dtype=float)[:, 0]
+            
             if verbose:
                 msg = "{0:>3d}/{1:>3d}: {2}[SCI,{3}]  {4:>6.2f}"
                 print(
@@ -6791,7 +6782,9 @@ def make_maximal_wcs(
                     )
                 )
 
-    px = np.cast[float](group_poly.convex_hull.boundary.xy).T
+
+    px = np.asarray(group_poly.convex_hull.boundary.xy,dtype=float).T
+    #x0, y0 = np.asarray(group_poly.centroid.xy,dtype=float)[:,0]
 
     x0 = (px.max(axis=0) + px.min(axis=0)) / 2.0
 
@@ -9591,8 +9584,8 @@ class EffectivePSF:
             rx -= 1
             ry -= 1
 
-            nx = np.clip(np.cast[int](rx), 0, iX - 1)
-            ny = np.clip(np.cast[int](ry), 0, iY - 1)
+            nx = np.clip(np.asarray(rx,dtype=int), 0, iX-1)
+            ny = np.clip(np.asarray(ry,dtype=int), 0, iY-1)
 
             # print x, y, rx, ry, nx, ny
 
@@ -10803,7 +10796,7 @@ input[type="search"] {display: inline; width:400px;}
                 )
 
             # Javascript filter function
-            filter_function = """
+            filter_function = r"""
 
 //// Parser
 // https://stackoverflow.com/questions/19491336/get-url-parameter-jquery-or-how-to-get-query-string-values-in-js @ Reza Baradaran
@@ -11375,7 +11368,9 @@ def catalog_area(ra=[], dec=[], make_plot=True, NMAX=5000, buff=0.8, verbose=Tru
     # pbuff = 1
 
     if len(ra) > NMAX:
-        rnd_idx = np.unique(np.cast[int](np.round(np.random.rand(NMAX) * len(ra))))
+
+        rnd_idx = np.unique(np.asarray(np.round(np.random.rand(NMAX)*len(ra)),dtype=int))
+
     else:
         rnd_idx = np.arange(len(ra))
 

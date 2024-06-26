@@ -36,7 +36,7 @@ def make_all_fields():
     sgas1226    186.69  21.88  10 10
     dracoii    238.1983333 64.56528 20 20
     whl0137    24.355  -8.457 22 22
-    abell1689   197.8765  -1.328 22 22
+    abell1689   197.8765  -1.328 46 46
     cos      150.125 2.2 90 90
     j013804m2156   24.51616  -21.93046 40 40 
     j015020m1006   27.58366  -10.09244 40 40 
@@ -61,11 +61,24 @@ def make_all_fields():
     q2343p12 356.60847 12.80712 46 46
     abell1703 198.76667958333334 51.821752 46 46
     sunburst 237.5295615 -78.1917929 46 46
+    abell2764 5.713566 -49.24966 90 90
+    abell2390 328.397307 17.709771 90 90
+    gama100033 130.58659471 1.61764667 46 46
+    clg-j1212p2733 183.08573496 27.57669020 46 46
+    plck-g165p67 171.78782682 42.47523529 46 46
+    plck-g191p62 161.16195126 33.83078874 46 46
+    tn-j1338m1942 204.61036521 -19.67247443 46 46
+    nep-tdf 260.6987363 65.8226460 46 46
+    spiderweb 175.205 -26.489 35.4987 35.4987
+    udsxl 34.29 -5.18 57.344 57.344
     """
     
     # 46 46 for tile ref 9 9
     
     tile_defs = utils.read_catalog(layout)
+    
+    # size: (npix // 9 * 8) * pscale/60 * 10.5 # for even number
+    # size: (npix // 9 * 8) * pscale/60 * 5 # for odd number
     
     if 0:
         field = 'gdn'
@@ -73,10 +86,16 @@ def make_all_fields():
         field = 'macs1423'
         field = 'abells1063'
         
+        # abell2764, 2390: pscale=0.3 Euclid ERO
+        npix = 2048+256
+        pscale = 0.08
         ix = np.where(tile_defs['field'] == field)[0][0]
         tile_defs['rsize'] = tile_defs['dx']/2
         
-        tiles = make_field_tiles(**tile_defs[ix], tile_npix=2048+256, pscale=0.08, 
+        if (field in ['spiderweb']) | (1):
+            npix = 4096 + 512
+            
+        tiles = make_field_tiles(**tile_defs[ix], tile_npix=npix, pscale=pscale, 
                                  initial_status=90, send_to_database=True)
     
     return tile_defs
@@ -232,7 +251,7 @@ def make_field_tiles(field='cos', ra=150.125, dec=2.2, rsize=45, tile_npix=2048+
     
     return tiles
     
-def split_tiles(root='abell2744-080-08.08', ref_tile=(8,8), filters=['visr','f125w','h'], optical=False, suffix='.rgb', xsize=32, zoom_levels=[4,3,2,1], force=False, scl=1, invert=False, verbose=True, rgb_scl=[1,1,1], rgb_min=-0.01, make_combinations=True, norm_kwargs=None, pl=2, pf=1):
+def split_tiles(root='abell2744-080-08.08', ref_tile=(8,8), filters=['visr','f125w','h'], optical=False, suffix='.rgb', xsize=32, zoom_levels=[4,3,2,1], force=False, scl=1, invert=False, verbose=True, rgb_scl=[1,1,1], rgb_min=-0.01, make_combinations=True, norm_kwargs=None, pix_per_tile=2304, pl=2, pf=1):
     """
     Split image into 256 pixel tiles for map display
     """
@@ -241,7 +260,13 @@ def split_tiles(root='abell2744-080-08.08', ref_tile=(8,8), filters=['visr','f12
     
     from grizli.pipeline import auto_script
     
-    nx = (2048+256)
+    # nx = (2048+256)
+    nx = pix_per_tile
+    nsub = 2048
+
+    if pix_per_tile >= 4096:
+        nsub = 4096
+        
     dpi = int(nx/xsize)
     
     if os.path.exists(f'{root}{suffix}.png') & (~force):
@@ -267,7 +292,7 @@ def split_tiles(root='abell2744-080-08.08', ref_tile=(8,8), filters=['visr','f12
     
     base = '_'.join(root.split('-')[:-1]).replace('+','_') + '_' + suffix[1:]
     
-    tx, ty = np.cast[int](root.split('-')[-1].split('.'))
+    tx, ty = np.asarray(root.split('-')[-1].split('.'),dtype=int)
 
     for iz, zoom in enumerate(zoom_levels):
         if iz > 0:
@@ -286,9 +311,9 @@ def split_tiles(root='abell2744-080-08.08', ref_tile=(8,8), filters=['visr','f12
         else:
             img = img[::-1,:]
         
-        ntile = int(2048/2**(4-zoom)/256)
+        ntile = int(nsub/2**(4-zoom)/256)
         left = (tx - ref_tile[0])*ntile
-        bot = -(ty - ref_tile[1])*ntile+2*ntile
+        bot = -(ty - ref_tile[1])*ntile + (4096 // nsub) * ntile
         # print(zoom, ntile, left, bot)
 
         #axes[iz].set_xlim(-ntile*0.1, ntile*(1.1)-1)
@@ -321,7 +346,7 @@ def split_tiles(root='abell2744-080-08.08', ref_tile=(8,8), filters=['visr','f12
                        plugin='pil', format_str='png')
 
 
-def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_levels=[4,3,2,1], brgb_filts=['visr','visb','uv'], rgb_filts=['visr','j','h'], blue_is_opt=True, make_opt_filters=True, make_ir_filters=True, make_combinations=True, rgb_only=False, **kwargs):
+def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_levels=[4,3,2,1], brgb_filts=['visr','visb','uv'], rgb_filts=['visr','j','h'], blue_is_opt=True, make_opt_filters=True, make_ir_filters=True, make_combinations=True, rgb_only=False, pix_per_tile=2304, **kwargs):
     """
     Make tiles for map
     """
@@ -365,6 +390,7 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
                 optical=False, suffix='.rgb', xsize=32, scl=1,
                 force=force,
                 rgb_scl=rgb_scl,
+                pix_per_tile=pix_per_tile,
                 pl=1., pf=1)
 
         plt.close('all')
@@ -375,6 +401,7 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
                     optical=blue_is_opt, suffix='.brgb', xsize=32, scl=8,
                     force=force, rgb_scl=[1., 1.2, 1.4],
                     rgb_min=-0.018,
+                    pix_per_tile=pix_per_tile,
                     pl=2, pf=1)
 
         plt.close('all')
@@ -392,6 +419,7 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
                     zoom_levels=zoom_levels,
                     optical=True, suffix='.swrgb', xsize=32, scl=2,
                     force=force, rgb_scl=[1,1.01,1.01], rgb_min=-0.018,
+                    pix_per_tile=pix_per_tile,
                     pl=1, pf=1,
                     # norm_kwargs={'stretch': 'asinh', 'min_cut': -0.01,
                     #              'max_cut': 1.0, 'clip':True,
@@ -420,6 +448,7 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
                     #              'max_cut': 1.0, 'clip':True,
                     #              'asinh_a':0.03},
                     pl=2, pf=1,
+                    pix_per_tile=pix_per_tile,
                     rgb_min=-0.018)
 
         plt.close('all')
@@ -437,6 +466,7 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
                     zoom_levels=zoom_levels,
                     optical=True, suffix='.mb1um', xsize=32, scl=2,
                     force=force, rgb_scl=[1,1.01,1.01], rgb_min=-0.018,
+                    pix_per_tile=pix_per_tile,
                     pl=1, pf=1,
                     # norm_kwargs={'stretch': 'asinh', 'min_cut': -0.01,
                     #              'max_cut': 1.0, 'clip':True,
@@ -458,6 +488,7 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
                     zoom_levels=zoom_levels,
                     optical=True, suffix='.mb3um', xsize=32, scl=4,
                     force=force, rgb_scl=rgb_scl, rgb_min=-0.018,
+                    pix_per_tile=pix_per_tile,
                     pl=1, pf=1,
                     # norm_kwargs={'stretch': 'asinh', 'min_cut': -0.01,
                     #              'max_cut': 1.0, 'clip':True,
@@ -480,6 +511,7 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
                     optical=True, suffix='.mb4um', xsize=32, scl=4,
                     force=force, rgb_scl=rgb_scl, rgb_min=-0.018,
                     pl=1, pf=1,
+                    pix_per_tile=pix_per_tile,
                     # norm_kwargs={'stretch': 'asinh', 'min_cut': -0.01,
                     #              'max_cut': 1.0, 'clip':True,
                     #              'asinh_a':0.03},
@@ -517,6 +549,9 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
         elif ('j031124m5823' in root):
             filters = ['f200w-clear','f300m-clear','f444w-clear']
             rgb_scl = [1.2, 1.05, 1.0]
+        elif 'spiderweb' in root:
+            filters = ['f115w-clear','f182m-clear','f410m-clear']
+            rgb_scl = [1.3, 0.8, 1.02]
         elif 'aspire' in root:
             filters = ['f115w-clear','f200w-clear','f356w-clear']
             rgb_scl = [1.3, 0.8, 1.02]
@@ -530,19 +565,8 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
                     norm_kwargs={'stretch': 'asinh', 'min_cut': -0.01, 
                                  'max_cut': 1.0, 'clip':True, 
                                  'asinh_a':0.03},
+                    pix_per_tile=pix_per_tile,
                     pl=1.5, pf=1)
-                    
-
-        # split_tiles(root, ref_tile=ref_tile,
-        #             filters=[f.lower() for f in ['F070W-CLEAR','F090W-CLEAR',
-        #                                          'F115W-CLEAR','F150W-CLEAR',
-        #                                          'F200W-CLEAR',
-        #                                          'F182M-CLEAR','F210M-CLEAR',
-        #                                          'F277W-CLEAR','F356W-CLEAR',
-        #                                         'F410M-CLEAR','F444W-CLEAR']],
-        #             zoom_levels=zoom_levels,
-        #             optical=True, suffix='.ncrgb', xsize=32, scl=4,
-        #             force=force, rgb_scl=[1,1,1], rgb_min=-0.018)
 
         plt.close('all')
     
@@ -553,6 +577,7 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
                              'F150W-CLEAR']],
                     zoom_levels=zoom_levels,
                     optical=True, suffix='.swrgb', xsize=32, scl=4,
+                    pix_per_tile=pix_per_tile,
                     force=force, rgb_scl=[1,1,1], rgb_min=-0.018)
 
         plt.close('all')
@@ -562,6 +587,7 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
                              'F480M-CLEAR']],
                     zoom_levels=zoom_levels,
                     optical=True, suffix='.lwrgb', xsize=32, scl=4,
+                    pix_per_tile=pix_per_tile,
                     force=force, rgb_scl=[1,1,1], rgb_min=-0.018)
 
         plt.close('all')
@@ -572,6 +598,7 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
                                                 ]],
                     zoom_levels=zoom_levels,
                     optical=True, suffix='.ncrgb', xsize=32, scl=4,
+                    pix_per_tile=pix_per_tile,
                     force=force, rgb_scl=[1.4, 0.6, 0.35], rgb_min=-0.018)
 
         plt.close('all')
@@ -581,6 +608,7 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
             split_tiles(root, ref_tile=ref_tile, 
                         filters=['f814w','f160w'], zoom_levels=zoom_levels,
                         optical=False, suffix='.vi', xsize=32, scl=0.8,
+                        pix_per_tile=pix_per_tile,
                         force=force, rgb_scl=[1, 1, 1], rgb_min=-0.018)
 
             plt.close('all')
@@ -611,6 +639,7 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
             split_tiles(root, ref_tile=ref_tile, 
                     filters=[filt], zoom_levels=zoom_levels,
                     optical=False, suffix=f'.{filt}', xsize=32, 
+                    pix_per_tile=pix_per_tile,
                     force=force, scl=2, invert=True)
 
             plt.close('all')
@@ -628,6 +657,7 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
             split_tiles(root, ref_tile=ref_tile, 
                 filters=[filt], zoom_levels=zoom_levels,
                 optical=True, suffix=f'.{filt}', xsize=32, 
+                pix_per_tile=pix_per_tile,
                 force=force, scl=4, invert=True)
 
             plt.close('all')
@@ -914,10 +944,22 @@ def process_tile(field='cos', tile='01.01', filters=TILE_FILTERS, fetch_existing
                      'macs1149':(8,8),
                      }
     
+        ref_tileq = db.SQL(f"""select * from combined_tiles where field = '{field}'
+                AND crpix1 > 0 AND crpix2 > 0
+                order by (POW(crpix1,2) + POW(crpix2,2)) limit 1""")
+        
+        pix_per_tile = ref_tileq['naxis1'][0]
+        
         if field in ref_tiles:
             ref_tile = ref_tiles[field]
         else:
-            ref_tile = (9, 9)
+            # ref_tile = (9, 9)
+            if len(ref_tileq) == 1:
+                ref_tile = tuple(np.cast[int](ref_tileq['tile'][0].split('.')))
+            else:
+                ref_tile = (9, 9)
+        
+        print(f'field {field}, ref_tile: {ref_tile}')
         
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=UserWarning)
@@ -928,6 +970,7 @@ def process_tile(field='cos', tile='01.01', filters=TILE_FILTERS, fetch_existing
                                  blue_is_opt=(field not in ['j013804m2156']), 
                                  make_combinations=make_combinations,
                                  rgb_only=rgb_only,
+                                 pix_per_tile=pix_per_tile,
                                  **kwargs)
     
     dirs = glob.glob(f'./{root}-tiles/*')

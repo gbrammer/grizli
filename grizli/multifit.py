@@ -1545,7 +1545,7 @@ class GroupFLT():
 #     beam_ra = beams_image[0].header['RA']
 #     beam_dec = beams_image[0].header['DEC']
 #
-#     xy = np.cast[int](np.round(ref_wcs.all_world2pix([beam_ra], [beam_dec], 0))).flatten()
+#     xy = np.asarray(np.round(ref_wcs.all_world2pix([beam_ra], [beam_dec], 0)),dtype=int).flatten()
 #
 #     slx = slice(xy[0]-cutout, xy[0]+cutout)
 #     sly = slice(xy[1]-cutout, xy[1]+cutout)
@@ -1896,7 +1896,7 @@ class MultiBeam(GroupFitter):
 
         self.scif = np.hstack([b.scif for b in self.beams])
         self.idf = np.hstack([b.scif*0+ib for ib, b in enumerate(self.beams)])
-        self.idf = np.cast[int](self.idf)
+        self.idf = np.asarray(self.idf,dtype=int)
 
         #self.ivarf = 1./(1/self.ivarf + (self.sys_err*self.scif)**2)
         self.ivarf[~np.isfinite(self.ivarf)] = 0
@@ -2036,7 +2036,7 @@ class MultiBeam(GroupFitter):
 
         hdu = pyfits.open(beam_file, lazy_load_hdus=False)
         N = hdu[0].header['COUNT']
-        Next = np.cast[int](hdu[0].header.comments['COUNT'].split())
+        Next = np.asarray(hdu[0].header.comments['COUNT'].split(),dtype=int)
 
         i0 = 1
         self.beams = []
@@ -2220,7 +2220,7 @@ class MultiBeam(GroupFitter):
 
         beam_ra, beam_dec = self.ra, self.dec
 
-        xy = np.cast[int](np.round(ref_wcs.all_world2pix([beam_ra], [beam_dec], 0))).flatten()
+        xy = np.asarray(np.round(ref_wcs.all_world2pix([beam_ra], [beam_dec], 0)),dtype=int).flatten()
 
         sh = ref_data.shape
         slx = slice(np.maximum(xy[0]-cutout, 0),
@@ -4765,7 +4765,7 @@ def drizzle_2d_spectrum(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
 
         # Downweight contamination
         # wht = 1/beam.ivar + (fcontam*beam.contam)**2
-        # wht = np.cast[np.float32](1/wht)
+        # wht = np.asarray(1/wht,dtype=np.float32)
         # wht[~np.isfinite(wht)] = 0.
 
         contam_weight = np.exp(-(fcontam*np.abs(beam.contam)*np.sqrt(beam.ivar)))
@@ -5064,7 +5064,7 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5, pix
         # Downweight contamination
         if fcontam > 0:
             # wht = 1/beam.ivar + (fcontam*beam.contam)**2
-            # wht = np.cast[np.float32](1/wht)
+            # wht = np.asarray(1/wht,dtype=np.float32)
             # wht[~np.isfinite(wht)] = 0.
 
             contam_weight = np.exp(-(fcontam*np.abs(beam.contam)*np.sqrt(beam.ivar)))
@@ -5122,7 +5122,7 @@ def drizzle_to_wavelength(beams, wcs=None, ra=0., dec=0., wave=1.e4, size=5, pix
 
         if direct_extension == 'REF':
             thumb = beam.direct['REF']
-            thumb_wht = np.cast[np.float32]((thumb != 0)*1)
+            thumb_wht = np.asarray((thumb != 0)*1,dtype=np.float32)
         else:
             thumb = beam.direct[direct_extension]  # /beam.direct.photflam
             thumb_wht = 1./(beam.direct.data['ERR']/beam.direct.photflam)**2
@@ -5581,7 +5581,7 @@ def drizzle_2d_spectrum_wcs(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
 
         # Downweight contamination
         # wht = 1/beam.ivar + (fcontam*beam.contam)**2
-        # wht = np.cast[np.float32](1/wht)
+        # wht = np.asarray(1/wht,dtype=np.float32)
         # wht[~np.isfinite(wht)] = 0.
 
         contam_weight = np.exp(-(fcontam*np.abs(beam.contam)*np.sqrt(beam.ivar)))

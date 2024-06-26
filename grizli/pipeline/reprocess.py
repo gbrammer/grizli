@@ -151,7 +151,7 @@ def inspect(root='grizli', force=False):
 
         ramp_file = tab['images'][i].replace('_ramp.png', '_ramp.dat')
         #sn_pop = mywfc3.inspect.check_background_SN(ramp_file=ramp_file, show=False)
-        #pop_reads = np.cast[int](np.unique(np.hstack((pop_reads, sn_pop))))
+        #pop_reads = np.asarray(np.unique(np.hstack((pop_reads, sn_pop))),dtype=int)
         #pop_reads = list(pop_reads)
 
         flt = raw.replace('_raw', '_flt')

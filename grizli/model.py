@@ -252,7 +252,7 @@ class GrismDisperser(object):
         self.direct = direct
         self.sh = self.direct.shape
         if self.direct.dtype is not np.float32:
-            self.direct = np.cast[np.float32](self.direct)
+            self.direct = np.asarray(self.direct,dtype=np.float32)
 
         # Segmentation image, defaults to all zeros
         if segmentation is None:
@@ -374,7 +374,7 @@ class GrismDisperser(object):
 
         # Integer trace
         # Add/subtract 20 for handling int of small negative numbers
-        dyc = np.cast[int](self.ytrace_beam+20)-20+1
+        dyc = np.asarray(self.ytrace_beam+20,dtype=int)-20+1
 
         # Account for pixel centering of the trace
         self.yfrac_beam = self.ytrace_beam - np.floor(self.ytrace_beam)
@@ -480,7 +480,7 @@ class GrismDisperser(object):
 
         # Integer trace
         # Add/subtract 20 for handling int of small negative numbers
-        dyc = np.cast[int](self.ytrace_beam+20)-20+1
+        dyc = np.asarray(self.ytrace_beam+20,dtype=int)-20+1
 
         # Account for pixel centering of the trace
         self.yfrac_beam = self.ytrace_beam - np.floor(self.ytrace_beam)
@@ -588,7 +588,7 @@ class GrismDisperser(object):
 
         if spectrum_1d is not None:
             xspec, yspec = spectrum_1d
-            scale_spec = self.sensitivity_beam*0.
+            scale_spec = np.zeros_like(self.sensitivity_beam)
             int_func = interp.interp_conserve_c
             scale_spec[self.lam_sort] = int_func(self.lam_beam[self.lam_sort],
                                                 xspec, yspec)*scale
@@ -771,7 +771,7 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
 
         All are optionally binned in wavelength if `bin` > 1.
         """
-        dy = np.cast[int](np.round(self.ytrace+dy0))
+        dy = np.asarray(np.round(self.ytrace+dy0),dtype=int)
         aper = np.zeros_like(self.model)
         y0 = self.sh_beam[0] // 2
         for d in range(-r, r+1):
@@ -929,7 +929,7 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
             xlam = np.arange(limits[0], limits[1], limits[2])
             xpix = np.interp(xlam, self.lam/wscale, xarr)
         else:
-            xlam = np.unique(np.cast[int](self.lam / 1.e4*10)/10.)
+            xlam = np.unique(np.asarray(self.lam / 1.e4*10,dtype=int)/10.)
             xpix = np.interp(xlam, self.lam/wscale, xarr)
 
         if mpl_axis is None:
@@ -1393,7 +1393,7 @@ class ImageData(object):
             if ('REF', sci_extn) in hdulist:
                 ref_h = hdulist['REF', sci_extn].header
                 ref_data = hdulist['REF', sci_extn].data/ref_h['PHOTFLAM']
-                ref_data = np.cast[np.float32](ref_data)
+                ref_data = np.asarray(ref_data,dtype=np.float32)
 
                 ref_file = ref_h['REF_FILE']
                 ref_photflam = 1.
@@ -1405,13 +1405,13 @@ class ImageData(object):
                 ref_data = None
 
             if ('SCI', sci_extn) in hdulist:
-                sci = np.cast[np.float32](hdulist['SCI', sci_extn].data)
-                err = np.cast[np.float32](hdulist['ERR', sci_extn].data)
-                dq = np.cast[np.int16](hdulist['DQ', sci_extn].data)
+                sci = np.asarray(hdulist['SCI', sci_extn].data,dtype=np.float32)
+                err = np.asarray(hdulist['ERR', sci_extn].data,dtype=np.float32)
+                dq = np.asarray(hdulist['DQ', sci_extn].data,dtype=np.int16)
                 
                 if ('MED',sci_extn) in hdulist:
                     mkey = ('MED',sci_extn)
-                    med_filter = np.cast[np.float32](hdulist[mkey].data)
+                    med_filter = np.asarray(hdulist[mkey].data,dtype=np.float32)
                     
                     if restore_medfilt:
                         print('xxx put med filter back in')
@@ -1419,7 +1419,7 @@ class ImageData(object):
                         
                 if ('BKG',sci_extn) in hdulist:
                     mkey = ('BKG',sci_extn)
-                    bkg_array = np.cast[np.float32](hdulist[mkey].data)
+                    bkg_array = np.asarray(hdulist[mkey].data,dtype=np.float32)
 
                 base_extn = ('SCI', sci_extn)
 
@@ -1955,7 +1955,7 @@ class ImageData(object):
         yflt = [-extra, -extra, naxis[1]+extra, naxis[1]+extra]
 
         raflt, deflt = self.wcs.all_pix2world(xflt, yflt, 0)
-        xref, yref = np.cast[int](ref_wcs.all_world2pix(raflt, deflt, 0))
+        xref, yref = np.asarray(ref_wcs.all_world2pix(raflt, deflt, 0),dtype=int)
         ref_naxis = [hdu.header['NAXIS1'], hdu.header['NAXIS2']]
 
         # Slices of the reference image
@@ -2005,7 +2005,7 @@ class ImageData(object):
                 naxis[1]+self.pad[0], naxis[1]+self.pad[0]]
 
         raflt, deflt = self.wcs.all_pix2world(xflt, yflt, 0)
-        xref, yref = np.cast[int](ref_wcs.all_world2pix(raflt, deflt, 0))
+        xref, yref = np.asarray(ref_wcs.all_world2pix(raflt, deflt, 0),dtype=int)
         ref_naxis = [hdu.header['NAXIS1'], hdu.header['NAXIS2']]
 
         pad_min = np.minimum(xref.min(), yref.min())
@@ -2077,8 +2077,8 @@ class ImageData(object):
 
         #ref = pyfits.open(refimage)
         if hdu.data.dtype.type != np.float32:
-            #hdu.data = np.cast[np.float32](hdu.data)
-            refdata = np.cast[np.float32](hdu.data)
+            #hdu.data = np.asarray(hdu.data,dtype=np.float32)
+            refdata = np.asarray(hdu.data,dtype=np.float32)
         else:
             refdata = hdu.data
 
@@ -2086,7 +2086,7 @@ class ImageData(object):
             hdu.header.remove('ORIENTAT')
 
         if segmentation:
-            seg_ones = np.cast[np.float32](refdata > 0)-1
+            seg_ones = np.asarray(refdata > 0,dtype=np.float32)-1
 
         ref_wcs = pywcs.WCS(hdu.header, relax=True)
         flt_wcs = self.wcs.copy()
@@ -2772,7 +2772,7 @@ class GrismFLT(object):
 
         # TBD: compute something like a cross-correlation offset
         # between blotted reference and the direct image itself
-        self.direct.data['REF'] = np.cast[np.float32](blotted_ref)
+        self.direct.data['REF'] = np.asarray(blotted_ref,dtype=np.float32)
         # print self.direct.data['REF'].shape, self.direct.ref_photflam
 
         self.direct.data['REF'] *= self.direct.ref_photflam
@@ -4410,11 +4410,11 @@ class BeamCutout(object):
         tab = utils.GTable()
         tab.meta['CONFFILE'] = os.path.basename(self.beam.conf.conf_file)
 
-        tab['wavelength'] = np.cast[dtype](self.beam.lam*u.Angstrom)
-        tab['trace'] = np.cast[dtype](self.beam.ytrace + self.beam.sh_beam[0]/2 - self.beam.ycenter)
+        tab['wavelength'] = np.asarray(self.beam.lam*u.Angstrom,dtype=dtype)
+        tab['trace'] = np.asarray(self.beam.ytrace + self.beam.sh_beam[0]/2 - self.beam.ycenter,dtype=dtype)
 
         sens_units = u.erg/u.second/u.cm**2/u.Angstrom/(u.electron/u.second)
-        tab['sensitivity'] = np.cast[dtype](self.beam.sensitivity*sens_units)
+        tab['sensitivity'] = np.asarray(self.beam.sensitivity*sens_units,dtype=dtype)
 
         return tab
 
@@ -4483,7 +4483,7 @@ class BeamCutout(object):
 
         hdu = pyfits.HDUList([pyfits.PrimaryHDU(header=h0)])
         hdu.extend(self.direct.get_HDUList(extver=1))
-        hdu.append(pyfits.ImageHDU(data=np.cast[np.int32](self.beam.seg),
+        hdu.append(pyfits.ImageHDU(data=np.asarray(self.beam.seg,dtype=np.int32),
                                    header=hdu[-1].header, name='SEG'))
 
         # 2D grism spectra
@@ -4515,7 +4515,7 @@ class BeamCutout(object):
                                    name='CONTAM'))
 
         if include_model:
-            hdu.append(pyfits.ImageHDU(data=np.cast[np.float32](self.model),
+            hdu.append(pyfits.ImageHDU(data=np.asarray(self.model,dtype=np.float32),
                                        header=hdu[-1].header, name='MODEL'))
 
         if get_trace_table:

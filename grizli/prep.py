@@ -1127,7 +1127,7 @@ def align_drizzled_image(root='',
     for iter in range(NITER):
         #print('xx iter {0} {1}'.format(iter, NITER))
         xy = np.array(drz_wcs.all_world2pix(rd_ref, pix_origin))
-        pix = np.cast[int](np.round(xy)).T
+        pix = np.asarray(np.round(xy),dtype=int).T
 
         # Find objects where drz pixels are non-zero
         okp = (pix[0, :] > 0) & (pix[1, :] > 0)
@@ -1941,7 +1941,7 @@ def make_SEP_catalog(root='',
             wcs_header[k] = drz_im[0].header[k]
 
     if isinstance(phot_apertures, str):
-        apertures = np.cast[float](phot_apertures.replace(',', '').split())
+        apertures = np.asarray(phot_apertures.replace(',', '').split(),dtype=float)
     else:
         apertures = []
         for ap in phot_apertures:
@@ -1977,7 +1977,7 @@ def make_SEP_catalog(root='',
     except:
         pass
 
-    data_mask = np.cast[data.dtype](mask)
+    data_mask = np.asarray(mask,dtype=data.dtype)
 
     if get_background | (err_scale < 0) | (use_bkg_err):
 
@@ -2401,7 +2401,7 @@ def get_seg_iso_flux(data, seg, tab, err=None, fill=None, verbose=0):
 
     iso_flux = ids*0.
     iso_err = ids*0.
-    iso_area = np.cast[int](ids*0)
+    iso_area = np.asarray(ids*0,dtype=int)
 
     xmin = np.clip(tab['xmin'], 0, sh[1])
     xmax = np.clip(tab['xmax'], 0, sh[1])
@@ -2409,7 +2409,7 @@ def get_seg_iso_flux(data, seg, tab, err=None, fill=None, verbose=0):
     ymax = np.clip(tab['ymax'], 0, sh[0])
 
     if fill is not None:
-        filled_data = np.cast[fill.dtype](seg*0)
+        filled_data = np.asarray(seg*0,dtype=fill.dtype)
 
     for ii, id in enumerate(ids):
 
@@ -6231,7 +6231,7 @@ def match_direct_grism_wcs(direct={}, grism={}, get_fresh_flt=True,
             im.flush()
 
 
-def get_jwst_wfssbkg_file(file, valid_flat=[0.6, 1.3], make_figure=False):
+def get_jwst_wfssbkg_file(file, valid_flat=[0.6, 1.3], make_figure=False, verbose=True):
     """
     Divide flat-field from NIRISS wfssbkg file
     
@@ -6277,22 +6277,22 @@ def get_jwst_wfssbkg_file(file, valid_flat=[0.6, 1.3], make_figure=False):
         h = pyfits.getheader(local_bkg_file,0)
         if 'DATE' not in h:
             msg = f'Use local wfssbkg file {local_bkg_file} (Warning: no DATE keyword)'
-            utils.log_comment(utils.LOGFILE, msg, verbose=True)
+            utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
             return local_bkg_file
         elif h['DATE'] == pyfits.getval(bkg_file,'DATE',0):
             msg = f'Use local wfssbkg file {local_bkg_file}'
-            utils.log_comment(utils.LOGFILE, msg, verbose=True)
+            utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
             return local_bkg_file
         else:
             msg = f'Local wfssbkg file {local_bkg_file} is out of date, updating'
-            utils.log_comment(utils.LOGFILE, msg, verbose=True)
+            utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
                     
     flat_file = FlatFieldStep().get_reference_file(file, 'flat')
     
     # If we don't have write access copy to local file
     if (not os.access(bkg_file,os.W_OK)) or (('CRDS_READONLY_CACHE' in os.environ) and (os.environ['CRDS_READONLY_CACHE'] == '1')):
         msg = f'Copy wfssbkg file {bkg_file} to {local_bkg_file}'
-        utils.log_comment(utils.LOGFILE, msg, verbose=True)
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
         shutil.copy(bkg_file,local_bkg_file)
         bkg_file = local_bkg_file
     wf = pyfits.open(bkg_file, mode='update')
@@ -6301,12 +6301,12 @@ def get_jwst_wfssbkg_file(file, valid_flat=[0.6, 1.3], make_figure=False):
     if 'FIXFLAT' in wf[0].header:
         msg = f'Flat {flat_file} already removed from wfssbkg file'
         msg += f' {bkg_file}'
-        utils.log_comment(utils.LOGFILE, msg, verbose=True)
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
         wf.close()
         return bkg_file
     else:
         msg = f'Divide flat {flat_file} from wfssbkg file {bkg_file}'
-        utils.log_comment(utils.LOGFILE, msg, verbose=True)
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
 
     with pyfits.open(flat_file) as fl:
         fix = (wf[1].data - 0.) / (fl[1].data**1)
@@ -6344,8 +6344,7 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
     import scipy.ndimage as nd
 
     frame = inspect.currentframe()
-    utils.log_function_arguments(utils.LOGFILE, frame,
-                                 'prep.visit_grism_sky')
+    utils.log_function_arguments(utils.LOGFILE, frame,'prep.visit_grism_sky',verbose=verbose)
 
     #from sklearn.gaussian_process import GaussianProcess
     from sklearn.gaussian_process import GaussianProcessRegressor
@@ -6399,7 +6398,7 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
         #                                                 'wfssbkg')
         
         # Get the background file, perhaps after correcting it for the flat
-        wfss_ref = get_jwst_wfssbkg_file(grism['files'][0])
+        wfss_ref = get_jwst_wfssbkg_file(grism['files'][0],verbose=verbose)
         
         # # GRISM_NIRCAM
         # if 'GRISM' in grism_element:
@@ -7012,8 +7011,8 @@ def find_single_image_CRs(visit, simple_mask=False, with_ctx_mask=True,
         ctx = pyfits.open(ctx_files[0])
         bits = np.log2(ctx[0].data)
         mask = ctx[0].data == 0
-        #single_image = np.cast[np.float32]((np.cast[int](bits) == bits) & (~mask))
-        single_image = np.cast[float]((np.cast[int](bits) == bits) & (~mask))
+        #single_image = np.asarray((np.asarray(bits,dtype=int) == bits) & (~mask),dtype=np.float32)
+        single_image = np.asarray((np.asarray(bits,dtype=int) == bits) & (~mask),dtype=float)
         ctx_wcs = pywcs.WCS(ctx[0].header)
         ctx_wcs.pscale = utils.get_wcs_pscale(ctx_wcs)
         ctx.close()
@@ -7427,12 +7426,12 @@ def drizzle_overlaps(exposure_groups, parse_visits=False, check_overlaps=True, m
             
             if driz_cr_snr_grow != 1:
                 spl = driz_cr_snr.split()
-                new_snr = np.cast[float](spl)*driz_cr_snr_grow
+                new_snr = np.asarray(spl,dtype=float)*driz_cr_snr_grow
                 driz_cr_snr = ' '.join([f'{val:.2f}' for val in new_snr])
             
             if driz_cr_scale_grow != 1:
                 spl = driz_cr_scale.split()
-                new_scale = np.cast[float](spl)*driz_cr_scale_grow
+                new_scale = np.asarray(spl,dtype=float)*driz_cr_scale_grow
                 driz_cr_scale = ' '.join([f'{val:.2f}' for val in new_scale])
             
         if bits is None:
@@ -7620,9 +7619,9 @@ def manual_alignment(visit, ds9, reference=None, reference_catalogs=['SDSS', 'PS
         print('Input detected ({0}).  Abort.'.format(x))
         return False
 
-    x0 = np.cast[float](ds9.get('pan image').split())
+    x0 = np.asarray(ds9.get('pan image').split(),dtype=float)
     x = input('pan to object in region: ')
-    x1 = np.cast[float](ds9.get('pan image').split())
+    x1 = np.asarray(ds9.get('pan image').split(),dtype=float)
 
     print('Saved {0}.align_guess'.format(visit['product']))
 
