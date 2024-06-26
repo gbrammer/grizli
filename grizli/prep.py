@@ -6231,7 +6231,7 @@ def match_direct_grism_wcs(direct={}, grism={}, get_fresh_flt=True,
             im.flush()
 
 
-def get_jwst_wfssbkg_file(file, valid_flat=[0.6, 1.3], make_figure=False):
+def get_jwst_wfssbkg_file(file, valid_flat=[0.6, 1.3], make_figure=False, verbose=True):
     """
     Divide flat-field from NIRISS wfssbkg file
     
@@ -6277,22 +6277,22 @@ def get_jwst_wfssbkg_file(file, valid_flat=[0.6, 1.3], make_figure=False):
         h = pyfits.getheader(local_bkg_file,0)
         if 'DATE' not in h:
             msg = f'Use local wfssbkg file {local_bkg_file} (Warning: no DATE keyword)'
-            utils.log_comment(utils.LOGFILE, msg, verbose=True)
+            utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
             return local_bkg_file
         elif h['DATE'] == pyfits.getval(bkg_file,'DATE',0):
             msg = f'Use local wfssbkg file {local_bkg_file}'
-            utils.log_comment(utils.LOGFILE, msg, verbose=True)
+            utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
             return local_bkg_file
         else:
             msg = f'Local wfssbkg file {local_bkg_file} is out of date, updating'
-            utils.log_comment(utils.LOGFILE, msg, verbose=True)
+            utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
                     
     flat_file = FlatFieldStep().get_reference_file(file, 'flat')
     
     # If we don't have write access copy to local file
     if (not os.access(bkg_file,os.W_OK)) or (('CRDS_READONLY_CACHE' in os.environ) and (os.environ['CRDS_READONLY_CACHE'] == '1')):
         msg = f'Copy wfssbkg file {bkg_file} to {local_bkg_file}'
-        utils.log_comment(utils.LOGFILE, msg, verbose=True)
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
         shutil.copy(bkg_file,local_bkg_file)
         bkg_file = local_bkg_file
     wf = pyfits.open(bkg_file, mode='update')
@@ -6301,12 +6301,12 @@ def get_jwst_wfssbkg_file(file, valid_flat=[0.6, 1.3], make_figure=False):
     if 'FIXFLAT' in wf[0].header:
         msg = f'Flat {flat_file} already removed from wfssbkg file'
         msg += f' {bkg_file}'
-        utils.log_comment(utils.LOGFILE, msg, verbose=True)
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
         wf.close()
         return bkg_file
     else:
         msg = f'Divide flat {flat_file} from wfssbkg file {bkg_file}'
-        utils.log_comment(utils.LOGFILE, msg, verbose=True)
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
 
     with pyfits.open(flat_file) as fl:
         fix = (wf[1].data - 0.) / (fl[1].data**1)
@@ -6344,8 +6344,7 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
     import scipy.ndimage as nd
 
     frame = inspect.currentframe()
-    utils.log_function_arguments(utils.LOGFILE, frame,
-                                 'prep.visit_grism_sky')
+    utils.log_function_arguments(utils.LOGFILE, frame,'prep.visit_grism_sky',verbose=verbose)
 
     #from sklearn.gaussian_process import GaussianProcess
     from sklearn.gaussian_process import GaussianProcessRegressor
@@ -6399,7 +6398,7 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
         #                                                 'wfssbkg')
         
         # Get the background file, perhaps after correcting it for the flat
-        wfss_ref = get_jwst_wfssbkg_file(grism['files'][0])
+        wfss_ref = get_jwst_wfssbkg_file(grism['files'][0],verbose=verbose)
         
         # # GRISM_NIRCAM
         # if 'GRISM' in grism_element:
