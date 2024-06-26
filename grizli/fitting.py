@@ -2333,7 +2333,7 @@ class GroupFitter(object):
                      use_cached_templates=True,
                      get_uncertainties=True,
                      Rspline=30, huber_delta=4, get_student_logpdf=False):
-        """
+        r"""
         Two-step procedure for fitting redshifts
         
         1. polynomial, spline template fits

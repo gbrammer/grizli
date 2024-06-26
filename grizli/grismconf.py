@@ -219,7 +219,7 @@ class aXeConf():
         return a
 
     def evaluate_dp(self, dx, dydx):
-        """Evalate arc length along the trace given trace polynomial coefficients
+        r"""Evalate arc length along the trace given trace polynomial coefficients
 
         Parameters
         ----------
