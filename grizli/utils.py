@@ -211,7 +211,6 @@ def get_flt_info(
     defaults={"PUPIL": "---", "TARGNAME": "indef", "PA_V3": 0.0},
     jwst_detector=True,
 ):
-     #TODO: Probably overkill, but maybe good to have for the API? (K.V.)
     """
     Extract header information from a list of FLT files
 
@@ -261,7 +260,6 @@ def get_flt_info(
     tab : `~astropy.table.Table`
         Table containing header keywords extracted from the FITS files.
     
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     
     import astropy.io.fits as pyfits
@@ -453,9 +451,7 @@ def blot_nearest_exact(
     """
     Own blot function for blotting exact pixels without rescaling for input
     and output pixel size
-
-    test
-
+    
     Parameters
     ----------
     in_data : `~numpy.ndarray`
@@ -482,14 +478,13 @@ def blot_nearest_exact(
         Use fast WCS masking.  If False, use ``regions``.
 
     fill_value : int/float
-        Value in `out_data` not covered by `in_data`.
+        Value in ``out_data`` not covered by ``in_data``.
 
     Returns
     -------
     out_data : `~numpy.ndarray`
         Blotted data.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     from regions import Regions
     from shapely.geometry import Polygon
@@ -916,7 +911,6 @@ def parse_flt_files(
         be used if exposures from completely disjoint pointings are stored
         in the same working directory.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
 
     if info is None:
@@ -1155,7 +1149,7 @@ def split_visit(visit, visit_split_shift=1.5, max_dt=6.0 / 24, path="../RAW"):
 
     visit_split_shift : float, optional
         The threshold for splitting the visit if shifts are larger than
-        `visit_split_shift` arcmin. Default is 1.5.
+        ``visit_split_shift`` arcmin. Default is 1.5.
 
     max_dt : float, optional
         The maximum time difference between exposures in days.
@@ -1170,7 +1164,6 @@ def split_visit(visit, visit_split_shift=1.5, max_dt=6.0 / 24, path="../RAW"):
     list of dict
         A list of visit dictionaries, each representing a split visit.
     
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     ims = []
     for file in visit["files"]:
@@ -1231,7 +1224,7 @@ def split_visit(visit, visit_split_shift=1.5, max_dt=6.0 / 24, path="../RAW"):
 
 def get_visit_footprints(visits):
     """
-    Add `~shapely.geometry.Polygon` 'footprint' attributes to visit dict.
+    Add `~shapely.geometry.Polygon` ``footprint`` attributes to visit dict.
 
     Parameters
     ----------
@@ -1241,9 +1234,8 @@ def get_visit_footprints(visits):
     Returns
     -------
     list
-        List of visit dictionaries with 'footprint' attribute added.
+        List of visit dictionaries with ``footprint`` attribute added.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
 
     import os
@@ -1585,7 +1577,6 @@ def get_filter_obsmode(
     str
         The `~pysynphot` obsmode keyword derived from the filter name.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     if filter.lower()[:2] in ["f0", "f1", "g1"]:
         inst = "wfc3,ir"
@@ -1604,7 +1595,7 @@ def get_filter_obsmode(
 
 def tabulate_encircled_energy(aper_radii=EE_RADII, norm_radius=4.0):
     """
-    Tabulates the encircled energy for different aperture radii 
+    Tabulated encircled energy for different aperture radii 
     and normalization radius.
 
     Parameters:
@@ -1616,7 +1607,6 @@ def tabulate_encircled_energy(aper_radii=EE_RADII, norm_radius=4.0):
     norm_radius : float, optional
         Normalization radius in arcseconds. Default is 4.0.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
 
     import pysynphot as S
@@ -1688,7 +1678,6 @@ def synphot_zeropoint(obsmode="wfc3,ir,f160w", radius=4.0):
     ZP : float
         The zero point magnitude calculated using synphot.
     
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
 
     sp = S.FlatSpectrum(25, fluxunits="ABMag")
@@ -1737,7 +1726,6 @@ def synphot_encircled_energy(
         The array of encircled energy counts normalized to the counts
         at the normalization radius.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     import pysynphot as S
 
@@ -1765,9 +1753,9 @@ def synphot_encircled_energy(
 
 def photfnu_from_photflam(photflam, photplam):
     """
-    Compute PHOTFNU from PHOTFLAM+PHOTPLAM, e.g., for ACS/WFC
+    Compute PHOTFNU from PHOTFLAM and PHOTPLAM, e.g., for ACS/WFC
 
-    Parameters:
+    Parameters
     ----------
     photflam : float
         The PHOTFLAM value from the FITS header.
@@ -1775,12 +1763,16 @@ def photfnu_from_photflam(photflam, photplam):
     photplam : float
         The PHOTPLAM value from the FITS header.
 
-    Returns:
+    Returns
     -------
     photfnu : float
         The computed PHOTFNU value.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
+    Examples
+    --------
+    >>> ZP = -2.5 * np.log10(photflam) - 21.10 - 5 * np.log10(photplam) + 18.6921
+    >>> photfnu = 10 ** (-0.4 * (ZP - 23.9)) * 1.0e-6
+    
     """
     ZP = -2.5 * np.log10(photflam) - 21.10 - 5 * np.log10(photplam) + 18.6921
     photfnu = 10 ** (-0.4 * (ZP - 23.9)) * 1.0e-6
@@ -1804,7 +1796,6 @@ def calc_header_zeropoint(im, ext=0):
     ZP : float
         AB zeropoint
     
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     from . import model
 
@@ -3146,7 +3137,7 @@ class SpectrumTemplate(object):
             `velocity=True`.
 
         velocity : bool
-            `fwhm` is a velocity in `km/s`.
+            ``fwhm`` is a velocity in `km/s`.
 
         fluxunits : astropy.units.Unit
             Units of the flux. 
@@ -3193,7 +3184,6 @@ class SpectrumTemplate(object):
 
             plt.show()
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         self.wave = wave
         if wave is not None:
@@ -3329,7 +3319,7 @@ class SpectrumTemplate(object):
             Redshift to use.
 
         scalar : float
-            Multiplicative factor.  Additional factor of 1./(1+z) is implicit.
+            Multiplicative factor.  Additional factor of 1/(1+z) is implicit.
 
         apply_igm : bool
             Apply the intergalactic medium (IGM) attenuation correction.
@@ -3339,7 +3329,6 @@ class SpectrumTemplate(object):
         new_spectrum : `~grizli.utils.SpectrumTemplate`
             Redshifted and scaled spectrum.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         if apply_igm:
             try:
@@ -3474,7 +3463,6 @@ class SpectrumTemplate(object):
         >>> print('AB mag = {0:.3f}'.format(-2.5*np.log10(fnu)-48.6))
         AB mag = 26.619
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         INTEGRATOR = np.trapz
 
@@ -3648,7 +3636,6 @@ def load_templates(
     temp_list : dictionary of `~grizli.utils.SpectrumTemplate` objects
         Output template list
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
 
     if stars:
@@ -3823,7 +3810,6 @@ def load_templates(
 
 
 def load_beta_templates(wave=np.arange(400, 2.5e4), betas=[-2, -1, 0]):
-    #TODO: wave is never used here? (K.V.)
     """
     Step-function templates with f_lambda ~ (wave/1216.)**beta
     
@@ -3839,13 +3825,11 @@ def load_beta_templates(wave=np.arange(400, 2.5e4), betas=[-2, -1, 0]):
     t0: dict
         A dictionary containing the step-function templates.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
-    cont_wave = np.arange(400, 2.5e4)
     t0 = {}
     for beta in betas:
         key = "beta {0}".format(beta)
-        t0[key] = SpectrumTemplate(wave=cont_wave, flux=(cont_wave / 1216.0) ** beta)
+        t0[key] = SpectrumTemplate(wave=wave, flux=(wave / 1216.0) ** beta)
     return t0
 
 
@@ -3944,7 +3928,6 @@ def load_quasar_templates(
     t1 : OrderedDict
         Dictionary of templates for t1.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
 
     from collections import OrderedDict
@@ -4004,10 +3987,8 @@ def load_quasar_templates(
     else:
         if uv_line_complex:
             full_line_list = ["Balmer 10kK + MgII Av=0.5", "QSO-UV-lines"]
-            # broad0 = load_templates(fwhm=broad_fwhm, line_complexes=False, stars=False, full_line_list=['Balmer 10kK + MgII', 'QSO-UV-lines'], continuum_list=[], fsps_templates=False, alf_template=False, lorentz=True)
         else:
             full_line_list = ["Balmer 10kK + MgII Av=0.5"]
-            # broad0 = load_templates(fwhm=broad_fwhm, line_complexes=False, stars=False, full_line_list=['Balmer 10kK'] + broad_lines, continuum_list=[], fsps_templates=False, alf_template=False, lorentz=True)
 
         if include_reddened_balmer_lines:
             line_wavelengths, line_ratios = get_line_wavelengths()
@@ -4151,7 +4132,6 @@ def load_phoenix_stars(
     tstars : OrderedDict
         Dictionary of SpectrumTemplate objects, with the template names as keys.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     from collections import OrderedDict
 
@@ -4221,7 +4201,7 @@ def load_phoenix_stars(
 
 def load_sdss_pca_templates(file="spEigenQSO-55732.fits", smooth=3000):
     """
-    Load SDSS eigen templates
+    Load SDSS eigen PCA templates
     
     Parameters:
     ----------
@@ -4237,7 +4217,6 @@ def load_sdss_pca_templates(file="spEigenQSO-55732.fits", smooth=3000):
     temp_list : OrderedDict
         A dictionary of SpectrumTemplate objects representing the SDSS eigen templates.
     
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     from collections import OrderedDict
     import scipy.ndimage as nd
@@ -4286,7 +4265,7 @@ def cheb_templates(
         The order of the Chebyshev polynomial.
 
     get_matrix : bool, optional
-        If True, return the basis matrix instead of the templates.
+        If True, return array data rather than template objects.
         Default is False.
 
     log : bool, optional
@@ -4306,7 +4285,6 @@ def cheb_templates(
     templates : OrderedDict
         The Chebyshev polynomial templates.
     
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     from numpy.polynomial.chebyshev import chebval, chebvander
 
@@ -4328,13 +4306,6 @@ def cheb_templates(
     n_bases = order + 1
 
     basis = chebvander(x, order)
-    # basis = np.empty((x.shape[0], n_bases), dtype=float)
-    #
-    # xr = np.arange(n_bases)
-    # for i in range(n_bases):
-    #     _c = (xr == i)*1
-    #     #print(_c, xr, i)
-    #     basis[:,i] = chebval(x, _c)
 
     # for i in range(n_bases):
     out_of_range = (xi < mi) | (xi > ma)
@@ -4382,7 +4353,6 @@ def bspline_templates(
     temp : OrderedDict 
         The B-spline templates.
     
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     from scipy.interpolate import splev
 
@@ -4458,7 +4428,6 @@ def eval_bspline_templates(wave, bspl, coefs):
     array-like: 
         The evaluated B-spline templates at the given wavelengths.
     
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     from scipy.interpolate import splev
 
@@ -4578,7 +4547,6 @@ def step_templates(
     step_templ : dict 
         Dictionary of step function templates.
     
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     if special == "Dn4000":
         rest = True
@@ -4665,7 +4633,6 @@ def polynomial_templates(wave, ref_wave=1.0e4, order=0, line=False):
         A dictionary of SpectrumTemplate objects
         representing the polynomial templates.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     temp = OrderedDict()
     if line:
@@ -4761,7 +4728,6 @@ def dot_templates(coeffs, templates, z=0, max_R=5000, apply_igm=True):
     tl : `~grizli.utils.SpectrumTemplate`
         Full template (including lines).
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
 
     if len(coeffs) != len(templates):
@@ -4771,46 +4737,9 @@ def dot_templates(coeffs, templates, z=0, max_R=5000, apply_igm=True):
             )
         )
 
-    # for i, te in enumerate(templates):
-    #     if i == 0:
-    #         tc = templates[te].zscale(z, scalar=coeffs[i])
-    #         tl = templates[te].zscale(z, scalar=coeffs[i])
-    #     else:
-    #         if te.startswith('line'):
-    #             tc += templates[te].zscale(z, scalar=0.)
-    #         else:
-    #             tc += templates[te].zscale(z, scalar=coeffs[i])
-    #
-    #         tl += templates[te].zscale(z, scalar=coeffs[i])
     wave, flux_arr, is_line = array_templates(
         templates, max_R=max_R, z=z, apply_igm=apply_igm
     )
-
-    # # IGM
-    # if apply_igm:
-    #     try:
-    #         import eazy.igm
-    #         IGM = eazy.igm.Inoue14()
-    #
-    #         lylim = wave < 1250
-    #         igmz = np.ones_like(wave)
-    #         igmz[lylim] = IGM.full_IGM(z, wave[lylim]*(1+z))
-    #     except:
-    #         igmz = 1.
-    # else:
-    #     igmz = 1.
-    #
-    # is_obsframe = np.array([t.split()[0] in ['bspl', 'step'] for t in templates])
-    #
-    # flux_arr[~is_obsframe,:] *= igmz
-    #
-    # # Multiply spline?
-    # for i, t in enumerate(templates):
-    #     if 'spline' in t:
-    #         for j, tj in enumerate(templates):
-    #             if is_obsframe[j]:
-    #                 print('scale spline: {0} x {1}'.format(tj, t))
-    #                 flux_arr[j,:] *= flux_arr[i,:]
 
     # Continuum
     cont = np.dot(coeffs * (~is_line), flux_arr)
@@ -4866,7 +4795,6 @@ def array_templates(templates, wave=None, max_R=5000, z=0, apply_igm=False):
         Boolean array indicating emission line templates (the key in the
         template dictionary starts with "line ").
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     from grizli.utils_c.interp import interp_conserve_c
 
@@ -5232,7 +5160,6 @@ def get_Vizier_photometry(
     phot : OrderedDict
         Dictionary containing the retrieved photometry and related information.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
 
     from collections import OrderedDict
@@ -5717,7 +5644,6 @@ def sip_rot90(input, rot, reverse=False, verbose=False, compare=False):
         Description of the transform associated with ``rot``, e.g,
         ``x=nx-x, y=ny-y`` for ``rot=±2``.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     import copy
     import astropy.io.fits
@@ -5867,9 +5793,7 @@ def sip_rot90(input, rot, reverse=False, verbose=False, compare=False):
 
 def get_wcs_slice_header(wcs, slx, sly):
     """
-    TBD
-
-    Get the header for a sliced WCS object.
+    Generate a `~astropy.io.fits.Header` for a sliced WCS object.
 
     Parameters
     ----------
@@ -5885,7 +5809,6 @@ def get_wcs_slice_header(wcs, slx, sly):
     h : `~astropy.io.fits.Header`
         The header for the sliced WCS object.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     h = wcs.slice((sly, slx)).to_header(relax=True)
     h["NAXIS"] = 2
@@ -5987,7 +5910,6 @@ def get_common_slices(a_origin, a_shape, b_origin, b_shape):
     b_slice : tuple
         The slices of grid B that overlap with grid A.
     
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
 
     ll = np.min([a_origin, b_origin], axis=0)
@@ -6050,7 +5972,6 @@ class WCSFootprint(object):
             add_naxis(header)
                 Add the NAXIS information from the FITS header to the WCS object.
 
-            Note: Some of this documentation is AI-generated and will be reviewed.
             """
 
             if isinstance(wcs, pywcs.WCS):
@@ -6133,7 +6054,6 @@ class WCSFootprint(object):
         header : `~astropy.io.fits.Header`
             FITS header object.
         
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         for i in [1, 2]:
             if "NAXIS{0}".format(i) not in header:
@@ -6746,7 +6666,6 @@ def get_flt_footprint(flt_file, extensions=[1, 2, 3, 4], patch_args=None):
     fp / patch : `~shapely.geometry` object or `matplotlib.patch.Patch`
         The footprint or footprint patch.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     from shapely.geometry import Polygon
 
@@ -6784,7 +6703,7 @@ def make_maximal_wcs(
     nsci_extensions=4,
 ):
     """
-    Compute an ImageHDU with a footprint that contains all of `files`
+    Compute an ImageHDU with a footprint that covers all of ``files``
 
     Parameters
     ----------
@@ -6821,7 +6740,6 @@ def make_maximal_wcs(
     header, wcs : `~astropy.io.fits.Header`, `~astropy.wcs.WCS`
         If `get_hdu` is False.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     import numpy as np
     from shapely.geometry import Polygon
@@ -6882,7 +6800,6 @@ def make_maximal_wcs(
                 )
 
     px = np.cast[float](group_poly.convex_hull.boundary.xy).T
-    # x0, y0 = np.cast[float](group_poly.centroid.xy)[:,0]
 
     x0 = (px.max(axis=0) + px.min(axis=0)) / 2.0
 
@@ -7099,7 +7016,6 @@ def fetch_s3_url(
     status : int
         Bit flag of results: **1** == file found, **2** = download successful
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     import traceback
     import boto3
@@ -7187,7 +7103,6 @@ def niriss_ghost_mask(
     ghost_mask : `~numpy.ndarray`
         Boolean array indicating the positions of the ghost pixels.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     import scipy.ndimage as nd
 
@@ -7268,7 +7183,6 @@ def get_photom_scale(header, verbose=True):
         table or if the CTX is newer than that indicated in the correction
         table then return 1.0.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     import yaml
 
@@ -7487,7 +7401,6 @@ def jwst_snowblind_mask(
     mask_frac : float
         Fraction of masked pixels
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     import jwst.datamodels
     from . import jwst_utils
@@ -7681,7 +7594,6 @@ def drizzle_from_visit(
     wcs_tab : `~astropy.table.Table`
         Table of WCS parameters of individual exposures
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     from shapely.geometry import Polygon
 
@@ -8291,7 +8203,6 @@ def drizzle_array_groups(
     outputwcs : `~astropy.wcs.WCS`
         Drizzled image WCS.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     from drizzlepac import adrizzle
     from drizzlepac import cdriz
@@ -8415,7 +8326,6 @@ class WCSMapAll:
         scale : None
             Scale attribute.
 
-        #Note: Some of this documentation is AI-generated and will be reviewed.
         """
         import copy
         self.checkWCS(input, "Input")
@@ -8439,7 +8349,6 @@ class WCSMapAll:
         name : str
             The name of the object.
         
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         try:
             assert isinstance(obj, pywcs.WCS)
@@ -8466,7 +8375,6 @@ class WCSMapAll:
         result : tuple
             The transformed pixel positions in the output frame.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         # This matches WTRAXY results to better than 1e-4 pixels.
         skyx, skyy = self.input.all_pix2world(pixx, pixy, self.origin)
@@ -8491,7 +8399,6 @@ class WCSMapAll:
         result : tuple
             The transformed pixel positions in the input frame.
         
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         skyx, skyy = self.output.all_pix2world(pixx, pixy, self.origin)
         result = self.input.all_world2pix(skyx, skyy, self.origin)
@@ -8527,7 +8434,6 @@ class WCSMapAll:
         dec : array-like
             The declination (Dec) values in degrees.
         
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         return wcs.all_pix2world(pixx, pixy, 1)
 
@@ -8554,7 +8460,6 @@ class WCSMapAll:
         pixy : array-like
             The y-coordinates of the transformed pixel positions.
 
-        # Note: Some of this documentation is AI-generated and will be reviewed.
         """
         return wcs.all_world2pix(ra, dec, 1)
 
@@ -8657,7 +8562,6 @@ def fetch_acs_wcs_files(beams_file, bucket_name="grizli-v1"):
     bucket_name : str, optional
         Name of the S3 bucket to fetch the files from. Default is "grizli-v1".
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     from urllib import request
 
@@ -8720,8 +8624,6 @@ def fetch_hst_calib(
     remove_corrupt=True,
 ):
     """
-    TBD
-
     Fetches the HST calibration file from the given FTP directory or local reference path.
 
     Parameters
@@ -8748,7 +8650,6 @@ def fetch_hst_calib(
         The path to the downloaded calibration file if it exists and is valid.
         False if the file is corrupt or cannot be downloaded.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     import os
 
@@ -8805,8 +8706,6 @@ def fetch_hst_calibs(
     ref_paths={},
 ):
     """
-    TBD
-
     Fetch necessary calibration files needed for running calwf3 from STScI FTP
 
     Parameters
@@ -8834,7 +8733,6 @@ def fetch_hst_calibs(
     calib_paths : list
         List of paths to the fetched calibration files.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     import os
 
@@ -8894,7 +8792,6 @@ def mast_query_from_file_list(files=[], os_open=True):
         The MAST query URL if `os_open` is False. False if no `files` are
         specified or found.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     if len(files) == 0:
         files = glob.glob("*raw.fits")
@@ -8930,7 +8827,6 @@ def fetch_default_calibs(get_acs=False, **kwargs):
         True if the calibration files were successfully fetched,
         False otherwise.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     paths = {}
 
@@ -9049,7 +8945,6 @@ def fetch_wfpc2_calib(
         True if the file was successfully fetched and converted, 
         False otherwise.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     from stsci.tools import convertwaiveredfits
 
@@ -9165,7 +9060,6 @@ def fetch_config_files(
     get_wfc3 : bool, optional
         Whether to fetch WFC3 configuration files. Default is True.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     if "ACS" in kwargs:
         get_acs = kwargs["ACS"]
@@ -9327,7 +9221,6 @@ class MW_F99(object):
                 Flag indicating if either the specutils.extinction or extinction.
                 Fitzpatrick99 module is available.
             
-            Note: Some of this documentation is AI-generated and will be reviewed.
             """
             
             self.a_v = a_v
@@ -9373,9 +9266,8 @@ class MW_F99(object):
             Returns
             -------
             array-like
-                Wavelength array after applying the extinction correction.
+                Extinction correction.
 
-            Note: Some of this documentation is AI-generated and will be reviewed.
             """
             
             import astropy.units as u
@@ -9412,7 +9304,7 @@ class EffectivePSF:
 
         See documentation at http://www.stsci.edu/hst/wfc3/analysis/PSF.
 
-        PSF files stored in $GRIZLI/CONF/
+        PSF files stored in ``$GRIZLI/CONF/``
         """
 
         self.load_PSF_data()
@@ -9545,8 +9437,6 @@ class EffectivePSF:
         """
         Evaluate ePSF at detector coordinates
 
-        TBD
-
         Parameters
         ----------
         x : int
@@ -9566,7 +9456,6 @@ class EffectivePSF:
         psf_xy : numpy.ndarray
             The evaluated ePSF values at the given coordinates.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         epsf = self.epsf[filter]
 
@@ -9734,8 +9623,6 @@ class EffectivePSF:
     def eval_ePSF(self, psf_xy, dx, dy, extended_data=None):
         """
         Evaluate PSF at dx,dy coordinates
-
-        TBD
         
         Parameters
         ----------
@@ -9759,7 +9646,6 @@ class EffectivePSF:
         numpy.ndarray
             The evaluated PSF values at the given coordinates.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         # So much faster than scipy.interpolate.griddata!
         from scipy.ndimage import map_coordinates
@@ -9924,7 +9810,7 @@ class EffectivePSF:
             The fitting method to use. Default is "lm".
 
         ds9 : str, optional
-            The name of the DS9 window to display the fitting process. 
+            Optional name of the DS9 instance to display the fitting process. 
             Default is None.
 
         psf_params : numpy.ndarray, optional
@@ -9953,7 +9839,6 @@ class EffectivePSF:
         coeffs : numpy.ndarray
             The coefficients of the ePSF.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         from scipy.optimize import minimize, least_squares
 
@@ -10056,24 +9941,7 @@ class EffectivePSF:
             psf_params[1] -= x0
             psf_params[2] -= y0
 
-        # if False:
-        #
-        #     psf_fit = epsf.get_ePSF(psf_params, origin=origin,
-        #                                filter=filter, shape=sh,
-        #                                get_extended=get_extended)
-        #
-        #     xargs = (self, psf_xy, sci, ivar_mask, xp, yp, extended_data, 'lm', None)
-        #     lm = _objfun(out.x, *xargs)
-        #     cargs = (self, psf_xy, sci, ivar_mask, xp, yp, extended_data, 'chi2', None)
-        #     chi2 = _objfun(out.x, *cargs)
-
         return psf_params
-
-        # dx = xp-psf_params[1]
-        # dy = yp-psf_params[2]
-        # output_psf = self.eval_ePSF(psf_xy, dx, dy)*psf_params[0]
-        #
-        # return output_psf, psf_params
 
     def get_ePSF(
         self,
@@ -10127,7 +9995,6 @@ class EffectivePSF:
         bkg : numpy.ndarray or None
             Background image if get_background is True, else None.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         sh = shape
         y0, x0 = np.array(sh) / 2.0 - 1
@@ -10178,8 +10045,6 @@ class EffectivePSF:
         )
         output_psf, bkg, _a, _b = _objfun(psf_params, *args)
 
-        # output_psf = self.eval_ePSF(psf_xy, dx, dy, extended_data=extended_data)*psf_params[0]
-
         if get_background:
             return output_psf, bkg
         else:
@@ -10208,7 +10073,6 @@ def read_catalog(file, sextractor=False, format=None):
     table : `~astropy.table.Table`
         The catalog table.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     return GTable.gread(file, sextractor=sextractor, format=format)
 
@@ -10386,7 +10250,6 @@ class GTable(astropy.table.Table):
             >>> ref_match = ref[idx][close]
             >>> gaia_match = gaia[close]
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         from astropy.coordinates import SkyCoord
 
@@ -10546,7 +10409,6 @@ class GTable(astropy.table.Table):
             The diagnostic plot showing the matched sources. Only returned if
             `show_diagnostic` is True.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         from tristars import match
 
@@ -10658,7 +10520,6 @@ class GTable(astropy.table.Table):
         default_view : str, optional
             The default view of the AladinLite image. Default is "P/DSS2/color".
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         # <!-- include Aladin Lite CSS file in the head section of your page -->
         # <link rel="stylesheet" href="//aladin.u-strasbg.fr/AladinLite/api/v2/latest/aladin.min.css" />
@@ -10754,10 +10615,6 @@ class GTable(astropy.table.Table):
         timestamp : bool, optional
             Add a timestamp to the output file.
 
-        etc : ...
-            Additional parameters passed through to `write`.
-
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         import time
 
@@ -11310,7 +11167,6 @@ def fill_between_steps(x, y0, y1, ax=None, *args, **kwargs):
     **kwargs : keyword arguments
         Additional keyword arguments to be passed to `fill_between`.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     import matplotlib.pyplot as plt
 
@@ -11386,7 +11242,6 @@ def log_scale_ds9(im, lexp=1.0e12, cmap=[7.97917, 0.8780493], scale=[-0.1, 10]):
     numpy.ndarray
         Scaled array using ds9 log scaling.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     import numpy as np
 
@@ -11425,7 +11280,6 @@ def mode_statistic(data, percentiles=range(10, 91, 10)):
     ----------
     Connor, T., et al. 2017, ApJ, 848, 37
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     from scipy.interpolate import UnivariateSpline, LSQUnivariateSpline
 
@@ -11601,7 +11455,6 @@ def fix_flt_nan(flt_file, bad_bit=4096, verbose=True):
         If True, print information about the number of NaN pixels fixed. 
         Default is True.
     
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     im = pyfits.open(flt_file, mode="update")
     for ext in range(1, 5):
@@ -11823,7 +11676,6 @@ def catalog_mask(
     mask : `~numpy.ndarray`
         Boolean mask indicating which objects in the catalog pass the criteria.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     test = np.isfinite(cat["FLUX_AUTO"])
     if "FLUX_RADIUS" in cat.colnames:
@@ -11926,7 +11778,6 @@ def convex_hull_wrapper(x, y):
     hull : `~scipy.spatial.ConvexHull`
         The hull object.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     from scipy.spatial import ConvexHull
     from shapely.geometry import Polygon, Point
@@ -11955,7 +11806,6 @@ def hull_area(x, y):
     float
         The area of the convex hull.
     
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     pxy, poly, hull = convex_hull_wrapper(x, y)
 
@@ -11971,7 +11821,6 @@ def remove_text_labels(fig):
     fig : `matplotlib.figure.Figure`
         The figure object from which to remove text labels.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     import matplotlib
 
@@ -12186,7 +12035,6 @@ def log_comment(LOGFILE, comment, verbose=False, show_date=False, mode="a"):
     msg : str
         The logged message.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     import time
 
