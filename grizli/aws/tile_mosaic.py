@@ -1076,7 +1076,7 @@ def send_all_tiles():
                          
         un = utils.Unique(keys, verbose=False)
         for v in tqdm(un.values):
-            tile, subx, suby = np.cast[int](v.split())
+            tile, subx, suby = np.asarray(v.split(),dtype=int)
             _wcs = tile_subregion_wcs(tile, subx, suby)
             ra, dec = _wcs.calc_footprint().mean(axis=0)
             tiles['ra'][un[v]] = ra

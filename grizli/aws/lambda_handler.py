@@ -304,7 +304,7 @@ def run_grizli_fit(event):
             # Split lists
             if ',' in event[k]:
                 try:
-                    event_kwargs[k] = np.cast[float](event[k].split(','))
+                    event_kwargs[k] = np.asarray(event[k].split(','),dtype=float)
                 except:
                     event_kwargs[k] = event[k].split(',')
             else:
@@ -541,7 +541,7 @@ def run_grizli_fit(event):
 
     # Is zr in the event dict?
     # if 'zr' in event:
-    #     zr = list(np.cast[float](event['zr']))
+    #     zr = list(np.asarray(event['zr'],dtype=float))
     # else:
     #     try:
     #         zr = np.load('fit_args.npy')[0]['zr']

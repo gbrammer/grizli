@@ -484,7 +484,7 @@ def segmentation_figure(label, cat, segfile):
     blot_seg = utils.blot_nearest_exact(seg_data, seg_wcs, th_wcs,
                                stepsize=-1, scale_by_pixel_area=False)
 
-    rnd_seg = rnd_ids[np.cast[int](blot_seg)]*1.
+    rnd_seg = rnd_ids[np.asarray(blot_seg,dtype=int)]*1.
     th_ids = np.unique(blot_seg)
 
     sh = th[0].data.shape
@@ -521,7 +521,7 @@ def segmentation_figure(label, cat, segfile):
     plt.close(fig)
 
     # Append to thumbs file
-    seg_hdu = pyfits.ImageHDU(data=np.cast[int](blot_seg), name='SEG')
+    seg_hdu = pyfits.ImageHDU(data=np.asarray(blot_seg,dtype=int), name='SEG')
     if 'SEG' in th:
         th.pop('SEG')
 

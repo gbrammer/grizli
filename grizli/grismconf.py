@@ -93,7 +93,7 @@ class aXeConf():
             spl = line.split(';')[0].split('#')[0].split()
             param = spl[0]
             if len(spl) > 2:
-                value = np.cast[float](spl[1:])
+                value = np.asarray(spl[1:],dtype=float)
             else:
                 try:
                     value = float(spl[1])
@@ -135,12 +135,12 @@ class aXeConf():
                 self.dxlam[beam] = np.arange(self.conf['BEAM{0}'.format(beam)].min(), self.conf['BEAM{0}'.format(beam)].max(), dtype=int)
                 self.nx[beam] = int(self.dxlam[beam].max()-self.dxlam[beam].min())+1
                 self.sens[beam] = Table.read('{0}/{1}'.format(os.path.dirname(self.conf_file), self.conf['SENSITIVITY_{0}'.format(beam)]))
-                #self.sens[beam].wave = np.cast[np.double](self.sens[beam]['WAVELENGTH'])
-                #self.sens[beam].sens = np.cast[np.double](self.sens[beam]['SENSITIVITY'])
+                #self.sens[beam].wave = np.asarray(self.sens[beam]['WAVELENGTH'],dtype=np.double)
+                #self.sens[beam].sens = np.asarray(self.sens[beam]['SENSITIVITY'],dtype=np.double)
 
                 # Need doubles for interpolating functions
                 for col in self.sens[beam].colnames:
-                    data = np.cast[np.double](self.sens[beam][col])
+                    data = np.asarray(self.sens[beam][col],dtype=np.double)
                     self.sens[beam].remove_column(col)
                     self.sens[beam].add_column(Column(data=data, name=col))
 
@@ -152,9 +152,9 @@ class aXeConf():
                     if self.conf['SENSITIVITY_B'] == 'WFC3.IR.G141.0th.sens.1.fits':
                         self.sens[beam]['SENSITIVITY'] *= 2
 
-                # wave = np.cast[np.double](self.sens[beam]['WAVELENGTH'])
-                # sens = np.cast[np.double](self.sens[beam]['SENSITIVITY']
-                # self.sens[beam]['WAVELENGTH'] = np.cast[np.double](self.sens[beam]['WAVELENGTH'])
+                # wave = np.asarray(self.sens[beam]['WAVELENGTH'],dtype=np.double)
+                # sens = np.asarray(self.sens[beam]['SENSITIVITY'],dtype=np.double)
+                # self.sens[beam]['WAVELENGTH'] = np.asarray(self.sens[beam]['WAVELENGTH'],dtype=np.double)
                 # self.sens[beam]['SENSITIVITY'] = )
 
         self.beams.sort()
@@ -1194,7 +1194,7 @@ class TransformGrismconf(object):
             elif trace_axis == '-y':
                 xarr = -1*dy
 
-            xarr = np.cast[int](np.round(xarr))
+            xarr = np.asarray(np.round(xarr),dtype=int)
 
             #self.beams.append(beam)
             self.dxlam[beam] = np.arange(xarr.min(), xarr.max(), dtype=int)
