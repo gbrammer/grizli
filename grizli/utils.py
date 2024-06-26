@@ -1679,6 +1679,7 @@ def synphot_zeropoint(obsmode="wfc3,ir,f160w", radius=4.0):
         The zero point magnitude calculated using synphot.
     
     """
+    import pysynphot as S
 
     sp = S.FlatSpectrum(25, fluxunits="ABMag")
 
@@ -1687,7 +1688,6 @@ def synphot_zeropoint(obsmode="wfc3,ir,f160w", radius=4.0):
     else:
         bp = S.ObsBandpass(obsmode)
 
-    # bp = S.ObsBandpass(obsmode+',aper#{0:.2f}'.format(radius))
     obs = S.Observation(sp, bp)
     ZP = 25 + 2.5 * np.log10(obs.countrate())
     return ZP
