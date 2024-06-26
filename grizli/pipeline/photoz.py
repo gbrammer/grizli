@@ -432,13 +432,13 @@ def show_from_ds9(ds9, self, zout, use_sky=True, **kwargs):
     import numpy as np
 
     if use_sky:
-        xy = np.cast[float](ds9.get('pan fk5').split())
+        xy = np.asarray(ds9.get('pan fk5').split(),dtype=float)
         cosd = np.cos(xy[1]/180*np.pi)
         r = np.sqrt((self.cat['ra']-xy[0])**2*cosd**2 + (self.cat['dec']-xy[1])**2)*3600
         runit = 'arcsec'
 
     if (not use_sky) | (xy.sum() == 0):
-        xy = np.cast[float](ds9.get('pan image').split())
+        xy = np.asarray(ds9.get('pan image').split(),dtype=float)
         r = np.sqrt((self.cat['x_image']-xy[0])**2 + (self.cat['y_image']-xy[1])**2)
         runit = 'pix'
 

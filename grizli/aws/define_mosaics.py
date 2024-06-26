@@ -274,7 +274,7 @@ END""")
             # Centered
             rc, dc = 3.4573691, -30.3660376
         
-            xc, yc = np.cast[int](np.round(np.squeeze(xivo_wcs.all_world2pix([rc], [dc], 0))))
+            xc, yc = np.asarray(np.round(np.squeeze(xivo_wcs.all_world2pix([rc], [dc], 0))),dtype=int)
             #print('xxx', xc, yc, NP)
         
             NX = 5*2048
@@ -288,7 +288,7 @@ END""")
             # New pointing fully including GLASS + UNCOVER/NIS
             rc, dc = 3.4793842, -30.3562169
         
-            xc, yc = np.cast[int](np.round(np.squeeze(xivo_wcs.all_world2pix([rc], [dc], 0))))
+            xc, yc = np.asarray(np.round(np.squeeze(xivo_wcs.all_world2pix([rc], [dc], 0))),dtype=int)
             #print('xxx', xc, yc, NP)
         
             NX = 6*2048
@@ -689,7 +689,7 @@ END""")
         # Slices
         llr, lld = w.all_pix2world([0],[0], 0)
         ll = np.squeeze(full_wcs.all_world2pix(llr, lld, 0))
-        llx, lly = np.cast[int](np.floor(ll))
+        llx, lly = np.asarray(np.floor(ll),dtype=int)
     
         wh = utils.get_wcs_slice_header(full_wcs,
                                         slice(llx, llx+NX*2048),
@@ -998,7 +998,7 @@ NAXIS2  =                 4049                                                  
         root = f'abell370-{fi}-grizli-v6.0'
         root = f'abell370-{fi}-grizli-{version}' 
 
-        xi, yi = np.cast[int](np.squeeze(full_wcs.all_world2pix([r0], [d0], 0)))
+        xi, yi = np.asarray(np.squeeze(full_wcs.all_world2pix([r0], [d0], 0)),dtype=int)
     
         wh = utils.get_wcs_slice_header(full_wcs,
                                         slice(xi-int(nnx*2048), xi+int(nnx*2048)),
@@ -1039,7 +1039,7 @@ NAXIS2  =                 4049                                                  
         root = f'macs0416-{fi}-grizli-v6.0'
         root = f'macs0416-{fi}-grizli-{version}'
 
-        xi, yi = np.cast[int](np.squeeze(full_wcs.all_world2pix([r0], [d0], 0)))
+        xi, yi = np.asarray(np.squeeze(full_wcs.all_world2pix([r0], [d0], 0)),dtype=int)
     
         wh = utils.get_wcs_slice_header(full_wcs,
                                         slice(xi-int(nnx*2048), xi+int(nnx*2048)),
@@ -1084,7 +1084,7 @@ NAXIS2  =                 4049                                                  
         root = f'macs1423-{fi}-grizli-v6.0' # stripe fixes, etc.
         root = f'macs1423-{fi}-grizli-{version}'
 
-        xi, yi = np.cast[int](np.squeeze(full_wcs.all_world2pix([r0], [d0], 0)))
+        xi, yi = np.asarray(np.squeeze(full_wcs.all_world2pix([r0], [d0], 0)),dtype=int)
     
         wh = utils.get_wcs_slice_header(full_wcs,
                                         slice(xi-int(nnx*2048), xi+int(nnx*2048)),
@@ -1137,7 +1137,7 @@ NAXIS2  =                 4049                                                  
         root = f'macs1149-{fi}-grizli-v6.1' # Chris level 1
         root = f'macs1149-{fi}-grizli-{version}'
 
-        xi, yi = np.cast[int](np.squeeze(full_wcs.all_world2pix([r0], [d0], 0)))
+        xi, yi = np.asarray(np.squeeze(full_wcs.all_world2pix([r0], [d0], 0)),dtype=int)
     
         wh = utils.get_wcs_slice_header(full_wcs,
                                         slice(xi-int(nnx*2048), xi+int(nnx*2048)),

@@ -235,7 +235,7 @@ class DrizzlePSF(object):
         TBD
         """
         xy = self.driz_wcs.all_world2pix(np.array([[ra, dec]]), 0)[0]
-        xyp = np.cast[int](np.round(xy))
+        xyp = np.asarray(np.round(xy),dtype=int)
         if N is None:
             N = int(np.round(size*self.wcs[self.flt_keys[0]].pscale/self.driz_pscale))
 
@@ -390,7 +390,7 @@ class DrizzlePSF(object):
                     print('{0}[SCI,{1}]'.format(file, ext))
 
                 xy = self.wcs[key].all_world2pix(np.array([[ra, dec]]), 0)[0]
-                xyp = np.cast[int](xy) #np.round(xy))  # +1
+                xyp = np.asarray(xy,dtype=int) #np.round(xy))  # +1
                 dx = xy[0] - int(xy[0]) + xphase
                 dy = xy[1] - int(xy[1]) + yphase
                 # dx = xy[0]-int(xy[0]) + 0.5

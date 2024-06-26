@@ -2608,8 +2608,8 @@ def show_epochs_filter(ra, dec, size=4, filters=['F444W-CLEAR'], cleanup=True, v
     pscale = utils.get_wcs_pscale(wcs_list[0])
     
     # Set a pixel in detector space that will show up in the stack
-    xp, yp = np.squeeze(np.cast[int](wcs_list[0].all_world2pix([ra], [dec], 0)
-                                     + size/5/pscale))
+    xp, yp = np.squeeze(np.asarray(wcs_list[0].all_world2pix([ra], [dec], 0)
+                                     + size/5/pscale,dtype=int))
     try:
         for i in range(N):
             sci_list[i][yp, xp] = 10000
