@@ -1850,8 +1850,9 @@ def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, com
     
     # Remove visit number from NIRISS parallel visits
     for v in visits:
-        IS_NIS_PARALLEL = v['product'].startswith('indef-03383')
-        IS_NIS_PARALLEL |= v['product'].startswith('indef-01571')
+        IS_NIS_PARALLEL  = v['product'].startswith('indef-01571')
+        IS_NIS_PARALLEL |= v['product'].startswith('indef-03383')
+        IS_NIS_PARALLEL |= v['product'].startswith('indef-04681')
 
         ks = v['product'].split('-')
         
@@ -1947,7 +1948,7 @@ def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, com
     all_groups = utils.parse_grism_associations(visits, info)
     
     # JWST PASSAGE    
-    if (len(all_groups) > 0) & ('jw01571' in files[0]) | ('jw03383' in files[0]):
+    if (len(all_groups) > 0) and ( ('jw01571' in files[0]) or ('jw03383' in files[0]) or ('jw04681' in files[0]) ):
         for v in visits:
             if 'clear' in v['product']:
                 print('NIRISS pure parallel direct: ', v['product'])
