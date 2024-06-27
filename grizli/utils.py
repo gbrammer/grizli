@@ -7720,21 +7720,11 @@ def drizzle_from_visit(
             # bpdata = 0
             _inst = flt[0].header["INSTRUME"]
 
-            # Directly flag hot pixels rather than use mask
-            if (_inst in ["NIRCAM"]) & (nircam_hot_pixel_kwargs is not None):
-                _sn, dq_flag, _count = flag_nircam_hot_pixels(
-                    flt, **nircam_hot_pixel_kwargs
-                )
-                if (_count > 0) & (_count < 8192):
-                    bpdata = (dq_flag > 0) * 1024
-                    extra_wfc3ir_badpix = False
-                else:
-                    msg = f" flag_nircam_hot_pixels: {_count} out of range"
-                    log_comment(LOGFILE, msg, verbose=verbose)
-
             if (extra_wfc3ir_badpix) & (_inst in ['NIRCAM','NIRISS']):
                 _det = flt[0].header['DETECTOR']
                 bpfiles = [os.path.join(os.path.dirname(__file__),
+                           f'data/nrc_badpix_240627_{_det}.fits.gz')]
+                bpfiles += [os.path.join(os.path.dirname(__file__),
                            f'data/nrc_badpix_240112_{_det}.fits.gz')]
                 bpfiles += [os.path.join(os.path.dirname(__file__),
                            f'data/nrc_badpix_231206_{_det}.fits.gz')]
@@ -7765,6 +7755,18 @@ def drizzle_from_visit(
 
             if bpdata is None:
                 bpdata = np.zeros(flt["SCI"].data.shape, dtype=int)
+
+            # Directly flag hot pixels rather than use mask
+            if (_inst in ["NIRCAM"]) & (nircam_hot_pixel_kwargs is not None):
+                _sn, dq_flag, _count = flag_nircam_hot_pixels(
+                    flt, **nircam_hot_pixel_kwargs
+                )
+                if (_count > 0) & (_count < 8192):
+                    bpdata |= ((dq_flag > 0) * 1024).astype(bpdata.dtype)
+                    # extra_wfc3ir_badpix = False
+                else:
+                    msg = f" flag_nircam_hot_pixels: {_count} out of range"
+                    log_comment(LOGFILE, msg, verbose=verbose)
 
             if (snowblind_kwargs is not None) & (_inst in ["NIRCAM", "NIRISS"]):
                 # Already processed with snowblind?
