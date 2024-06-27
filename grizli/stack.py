@@ -208,7 +208,7 @@ class StackFitter(GroupFitter):
                     self.extend(extra)
 
         self.idf = np.hstack([b.scif*0+ib for ib, b in enumerate(self.beams)])
-        self.idf = np.cast[int](self.idf)
+        self.idf = np.asarray(self.idf,dtype=int)
 
         # if eazyp is not None:
         #     self.eazyp = eazyp

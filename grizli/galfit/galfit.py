@@ -615,7 +615,7 @@ class Galfitter(object):
 
         xy = self.wcs.all_world2pix([radec[0]], [radec[1]], 0)
         xy = np.array(xy).flatten()
-        xp = np.cast[int](np.round(xy))
+        xp = np.asarray(np.round(xy),dtype=int)
 
         slx, sly, wcs_slice = self.DPSF.get_driz_cutout(ra=radec[0], dec=radec[1], get_cutout=False, size=size)
         #drz_cutout = self.get_driz_cutout(ra=ra, dec=dec, get_cutout=True)
@@ -693,7 +693,7 @@ class Galfitter(object):
                 lines[il] = "H) 1    {0}   1    {1}   # Image region to fit (xmin xmax ymin ymax)\n".format(out_sh[1], out_sh[0])
 
             if line.startswith(' 1)'):
-                xy = np.cast[float](line.split()[1:3])
+                xy = np.asarray(line.split()[1:3],dtype=float)
                 lines[il] = ' 1) {0}  {1}  1 1  #  Position x, y\n'.format(xy[0]+slx.start, xy[1]+sly.start)
 
         fp = open('galfit.{0}.{1:05d}'.format(self.filter, id), 'w')

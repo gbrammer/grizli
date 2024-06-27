@@ -757,7 +757,7 @@ def add_oned_spectra(root='j214224m4420gr01', bucket='grizli-v2', engine=None):
 
         resp = fresp[sel]
 
-        norm_ix = np.cast[int](np.round(np.interp(wnorm*(1+resp['z_map']), wave, np.arange(len(wave)), left=np.nan, right=np.nan)))
+        norm_ix = np.asarray(np.round(np.interp(wnorm*(1+resp['z_map']), wave, np.arange(len(wave)), left=np.nan, right=np.nan)),dtype=int)
 
         resp.sort_values(sort_column, inplace=True)
 
@@ -781,8 +781,8 @@ def add_oned_spectra(root='j214224m4420gr01', bucket='grizli-v2', engine=None):
 
         # Rest-frame
         dz = np.diff(wave)[10]/wave[10]
-        max_zshift = np.cast[int](np.log(1+resp['z_map'].max())/dz)
-        zshift = np.cast[int]((np.log(1+resp['z_map']) - np.log(1+zref))/dz)
+        max_zshift = np.asarray(np.log(1+resp['z_map'].max())/dz,dtype=int)
+        zshift = np.asarray((np.log(1+resp['z_map']) - np.log(1+zref))/dz,dtype=int)
 
         err_max = 5
 
@@ -1410,7 +1410,7 @@ def multibeam_to_database(beams_file, engine=None, Rspline=15, force=False, **kw
 
                 dtype[c[:-1]+'_p'] = types.ARRAY(types.FLOAT)
 
-                data[c[:-1]+'_p'] = [list(np.cast[float](line.strip()[1:-1].split(','))) for line in df[c]]
+                data[c[:-1]+'_p'] = [list(np.asarray(line.strip()[1:-1].split(','),dtype=float)) for line in df[c]]
 
         data.to_sql('multibeam_tmp', engine, index=False, if_exists='append', method='multi')
 
@@ -2491,7 +2491,7 @@ def query_from_ds9(ds9, radius=5, engine=None, extra_cols=['mag_auto', 'z_map', 
     if engine is None:
         engine = get_db_engine(echo=False)
 
-    ra, dec = np.cast[float](ds9.get('pan fk5').split())
+    ra, dec = np.asarray(ds9.get('pan fk5').split(),dtype=float)
     dd = radius/3600.
     dr = dd/np.cos(dec/180*np.pi)
 
@@ -2731,9 +2731,9 @@ def get_exposure_info():
         print(file)
         _q = Table.read(file, character_as_bytes=False)
 
-        _q['proposal_id'] = np.cast[np.int16](_q['proposal_id'])
-        _q['obsid'] = np.cast[np.int64](_q['obsid'])
-        _q['objID'] = np.cast[np.int64](_q['objID'])
+        _q['proposal_id'] = np.asarray(_q['proposal_id'],dtype=np.int16)
+        _q['obsid'] = np.asarray(_q['obsid'],dtype=np.int64)
+        _q['objID'] = np.asarray(_q['objID'],dtype=np.int64)
         _q.rename_column('ra','target_ra')
         _q.rename_column('dec','target_dec')
         _q.rename_column('footprint', 'sregion')
@@ -2750,7 +2750,7 @@ def get_exposure_info():
         print(i, file)
         _p = Table.read(file, character_as_bytes=False)
 
-        _p['obsid'] = np.cast[np.int64](_p['obsid'])
+        _p['obsid'] = np.asarray(_p['obsid'],dtype=np.int64)
         _p['dataset'] = [d[:-1] for d in _p['observation_id']]
 
         df = _p[cols].to_pandas()

@@ -2918,12 +2918,12 @@ def query_pure_parallel_wcs(assoc, pad_hours=1.0, verbose=True, products=['1b','
     return prime, res, times
 
 
-def query_pure_parallel_wcs_to_database(programs=[1571,3383,4861,2514,3990], output='/tmp/jwst_pure_parallels.html'):
+def query_pure_parallel_wcs_to_database(programs=[1571,3383,4681,2514,3990], output='/tmp/jwst_pure_parallels.html'):
     """
     Run pure parallel wcs query for all associations from PP proposals
     - 1571: PASSAGE
     - 2514: PANORAMIC
-    - 3383: OutThere
+    - 3383 & 4681: OutThere
     - 3990: Morishita+Mason
     
     """

@@ -1850,8 +1850,9 @@ def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, com
     
     # Remove visit number from NIRISS parallel visits
     for v in visits:
-        IS_NIS_PARALLEL = v['product'].startswith('indef-03383')
-        IS_NIS_PARALLEL |= v['product'].startswith('indef-01571')
+        IS_NIS_PARALLEL  = v['product'].startswith('indef-01571')
+        IS_NIS_PARALLEL |= v['product'].startswith('indef-03383')
+        IS_NIS_PARALLEL |= v['product'].startswith('indef-04681')
 
         ks = v['product'].split('-')
         
@@ -1947,7 +1948,7 @@ def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, com
     all_groups = utils.parse_grism_associations(visits, info)
     
     # JWST PASSAGE    
-    if (len(all_groups) > 0) & ('jw01571' in files[0]) | ('jw03383' in files[0]):
+    if (len(all_groups) > 0) and ( ('jw01571' in files[0]) or ('jw03383' in files[0]) or ('jw04681' in files[0]) ):
         for v in visits:
             if 'clear' in v['product']:
                 print('NIRISS pure parallel direct: ', v['product'])
@@ -2331,13 +2332,13 @@ def preprocess(field_root='j142724+334246',  HOME_PATH='/Volumes/Pegasus/Grizli/
         else:
             filters.append(vspl[-1])
 
-    fwave = np.cast[float]([f.replace('f1', 'f10'). \
+    fwave = np.asarray([f.replace('f1', 'f10'). \
                               replace('f098m', 'f0980m'). \
                               replace('lp', 'w'). \
                               replace('gr','g'). \
                               replace('grism','g410'). \
                               replace('fq', 'f')[1:-1] 
-                            for f in filters])
+                            for f in filters],dtype=float)
     
     if len(np.unique(fwave)) > 1:
         sort_idx = np.argsort(fwave)[::-1]
@@ -2574,7 +2575,7 @@ def mask_IR_psf_spikes(visit={}, mag_lim=17, cat=None, cols=['mag_auto', 'ra', '
                     xr = _mat.dot(xx).T
 
                     x = xr+xy[i, :]
-                    xp = np.cast[int](np.round(x))
+                    xp = np.asarray(np.round(x),dtype=int)
                     #plt.plot(xp[:,0], xp[:,1], color='pink', alpha=0.3, linewidth=5)
 
                     for j in range(-dy, dy+1):
@@ -2772,7 +2773,7 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
     #source_xy = tab['X_IMAGE'], tab['Y_IMAGE']
     if aper_segmask:
         seg_data = pyfits.open('{0}_seg.fits'.format(detection_root))[0].data
-        seg_data = np.cast[np.int32](seg_data)
+        seg_data = np.asarray(seg_data,dtype=np.int32)
 
         aseg, aseg_id = seg_data, tab['NUMBER']
 
@@ -3662,8 +3663,8 @@ def refine_model_with_fits(field_root='j142724+334246', grp=None, master_files=N
             sp = utils.GTable(hdu['TEMPL'].data)
 
             dt = np.float
-            wave = np.cast[dt](sp['wave'])  # .byteswap()
-            flux = np.cast[dt](sp[spectrum])  # .byteswap()
+            wave = np.asarray(sp['wave'],dtype=dt)  # .byteswap()
+            flux = np.asarray(sp[spectrum],dtype=dt)  # .byteswap()
             grp.compute_single_model(int(id), mag=19, size=-1, store=False,
                                      spectrum_1d=[wave, flux], is_cgs=True,
                                      get_beams=None, in_place=True)
@@ -5405,7 +5406,7 @@ def get_rgb_filters(filter_list, force_ir=False, pure_sort=False):
                 p = for_sort.pop(k)
 
     so = np.argsort(list(for_sort.values()))
-    waves = np.cast[float]([for_sort[f][1:] for f in for_sort])
+    waves = np.asarray([for_sort[f][1:] for f in for_sort],dtype=float)
 
     # Reddest
     rfilt = use_filters[so[-1]]
@@ -5788,7 +5789,7 @@ def field_rgb(root='j010514+021532', xsize=8, output_dpi=None, HOME_PATH='./', s
         
         image = norm(image).filled(0)
         if invert:
-            image = 255 - np.clip(np.cast[int](image*255), 0, 255)
+            image = 255 - np.clip(np.asarray(image*255,dtype=int), 0, 255)
                     
     if fill_black:
         image[rmsk,0] = 0
@@ -6069,7 +6070,7 @@ def make_rgb_thumbnails(root='j140814+565638', ids=None, maglim=21,
             blot_seg = utils.blot_nearest_exact(seg_data, seg_wcs, th_wcs,
                                        stepsize=-1, scale_by_pixel_area=False)
 
-            rnd_seg = rnd_ids[np.cast[int](blot_seg)]*1.
+            rnd_seg = rnd_ids[np.asarray(blot_seg,dtype=int)]*1.
             th_ids = np.unique(blot_seg)
 
             sh = th[0].data.shape
@@ -6106,7 +6107,7 @@ def make_rgb_thumbnails(root='j140814+565638', ids=None, maglim=21,
             plt.close(fig)
 
             # Append to thumbs file
-            seg_hdu = pyfits.ImageHDU(data=np.cast[int](blot_seg), name='SEG')
+            seg_hdu = pyfits.ImageHDU(data=np.asarray(blot_seg,dtype=int), name='SEG')
             th.append(seg_hdu)
             th.writeto('{0}.thumb.fits'.format(label), overwrite=True,
                          output_verify='fix')

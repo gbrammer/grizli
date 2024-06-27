@@ -292,7 +292,7 @@ def split_tiles(root='abell2744-080-08.08', ref_tile=(8,8), filters=['visr','f12
     
     base = '_'.join(root.split('-')[:-1]).replace('+','_') + '_' + suffix[1:]
     
-    tx, ty = np.cast[int](root.split('-')[-1].split('.'))
+    tx, ty = np.asarray(root.split('-')[-1].split('.'),dtype=int)
 
     for iz, zoom in enumerate(zoom_levels):
         if iz > 0:

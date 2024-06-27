@@ -43,12 +43,12 @@ def create_s3_index(path, output_file="index.html", extra_html="", upload=True, 
     if as_table:
         names = ['date', 'time', 'size', 'file']
         tab = grizli_utils.GTable(rows=rows, names=names)
-        size = np.cast[float](tab['size'])
+        size = np.asarray(tab['size'],dtype=float)
         tab['size'] = [f'{s/1.e6:.2f}' for s in size]
         tab['date'] = ['{date} {time}'.format(**row) for row in tab]
         tab.remove_column('time')
         
-        tab['size'] = np.cast[float](tab['size'])
+        tab['size'] = np.asarray(tab['size'],dtype=float)
         
         dl = []
         for file in tab['file']:

@@ -24,8 +24,8 @@ def show_open_targets():
     for i, target in enumerate(targets):
         targ = target.split()[-1]
         ds9 = DS9(target=targ)
-        ra, dec = np.cast[float](ds9.get('pan fk5').split())
-        xi, yi = np.cast[float](ds9.get('pan image').split())
+        ra, dec = np.asarray(ds9.get('pan fk5').split(),dtype=float)
+        xi, yi = np.asarray(ds9.get('pan image').split(),dtype=float)
         
         frame = ds9.get('frame')
         print(f'{i} {targ:14} {frame:>5} {ra:8.4f} {dec:8.4f} ({xi:5.0f} {yi:5.0f})')
