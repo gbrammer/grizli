@@ -2657,7 +2657,9 @@ class GroupFitter(object):
 
         if len(zgrid) > 1:
             chi2_rev[chi2_rev < 0] = 0
-            indexes,_ = find_peaks(chi2_rev,height=0.4*(chi2_rev.max()-chi2_rev.min())+chi2_rev.min(),distance=9)
+            peak_threshold = 0.4 # Threshold for peak finding
+            peak_height = peak_threshold*(chi2_rev.max()-chi2_rev.min())+chi2_rev.min() # Get absolute height 
+            indexes,_ = find_peaks(chi2_rev,height=peak_height,distance=9)
             num_peaks = len(indexes)
             so = np.argsort(chi2_rev[indexes])
             indexes = indexes[so[::-1]]

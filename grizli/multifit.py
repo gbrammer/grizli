@@ -2815,14 +2815,18 @@ class MultiBeam(GroupFitter):
         from scipy.signal import find_peaks
         # chi2nu = (chi2.min()-chi2)/self.DoF
         # chi2nu_mask = (chi2nu+delta_chi2_threshold)*(chi2nu > -delta_chi2_threshold)
-        # indexes,_ = find_peaks(chi2nu_mask, height=0.3*(chi2nu_mask.max()-chi2nu_mask.min())+chi2nu_mask.min(), distance=21)
+        # peak_threshold = 0.3 # Threshold for peak finding
+        # height = peak_threshold*(chi2nu_mask.max()-chi2nu_mask.min())+chi2nu_mask.min() # Get absolute height 
+        # indexes,_ = find_peaks(chi2nu_mask, height=peak_height, distance=21)
 
         chi2_rev = (chi2_poly - chi2)/self.DoF
         if chi2_poly < (chi2.min() + 9):
             chi2_rev = (chi2.min() + 16 - chi2)/self.DoF
 
         chi2_rev[chi2_rev < 0] = 0
-        indexes,_ = find_peaks(chi2_rev, height=0.4*(chi2_rev.max()-chi2_rev.min())+chi2_rev.min(), distance=9)
+        peak_threshold = 0.4 # Threshold for peak finding
+        peak_height = peak_threshold*(chi2_rev.max()-chi2_rev.min())+chi2_rev.min() # Get absolute height 
+        indexes,_ = find_peaks(chi2_rev, height=peak_height, distance=9)
         num_peaks = len(indexes)
 
         if False:

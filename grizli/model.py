@@ -5257,8 +5257,10 @@ class BeamCutout(object):
     #     # peaks
     #     from scipy.signal import find_peaks
     #     chi2nu = (chi2.min()-chi2)/self.DoF
-    #     chi2nu_mask = (chi2nu+0.01)*(chi2nu > -0.004)
-    #     indexes,_ = find_peaks(chi2nu_mask, height=0.003*(chi2nu_mask.max()-chi2nu_mask.min())+chi2nu_mask.min(), distance=21)
+    #     chi2nu_mask = (chi2nu+0.01)*(chi2nu > -0.004) 
+    #     peak_threshold = 0.003 # Threshold for peak finding
+    #     peak_height = peak_threshold*(chi2nu_mask.max()-chi2nu_mask.min())+chi2nu_mask.min() # Get absolute height 
+    #     indexes,_ = find_peaks(chi2nu_mask, height=peak_height, distance=21)
     #     num_peaks = len(indexes)
     #     # plt.plot(zgrid, (chi2-chi2.min())/ self.DoF)
     #     # plt.scatter(zgrid[indexes], (chi2-chi2.min())[indexes]/ self.DoF, color='r')
