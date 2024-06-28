@@ -2812,16 +2812,17 @@ class MultiBeam(GroupFitter):
         print('First iteration: z_best={0:.4f}\n'.format(zgrid[iz]))
 
         # peaks
-        import peakutils
+        from scipy.signal import find_peaks
         # chi2nu = (chi2.min()-chi2)/self.DoF
-        # indexes = peakutils.indexes((chi2nu+delta_chi2_threshold)*(chi2nu > -delta_chi2_threshold), thres=0.3, min_dist=20)
+        # chi2nu_mask = (chi2nu+delta_chi2_threshold)*(chi2nu > -delta_chi2_threshold)
+        # indexes,_ = find_peaks(chi2nu_mask, height=0.3*(chi2nu_mask.max()-chi2nu_mask.min())+chi2nu_mask.min(), distance=21)
 
         chi2_rev = (chi2_poly - chi2)/self.DoF
         if chi2_poly < (chi2.min() + 9):
             chi2_rev = (chi2.min() + 16 - chi2)/self.DoF
 
         chi2_rev[chi2_rev < 0] = 0
-        indexes = peakutils.indexes(chi2_rev, thres=0.4, min_dist=8)
+        indexes,_ = scipy.signal.find_peaks(chi2_rev, height=0.4*(chi2_rev.max()-chi2_rev.min())+chi2_rev.min(), distance=9)
         num_peaks = len(indexes)
 
         if False:

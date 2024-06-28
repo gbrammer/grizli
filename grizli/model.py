@@ -5255,9 +5255,10 @@ class BeamCutout(object):
     #             print(utils.NO_NEWLINE + '{0:.4f} {1:9.1f}'.format(zgrid[i], chi2[i]))
     #
     #     # peaks
-    #     import peakutils
+    #     from scipy.signal import find_peaks
     #     chi2nu = (chi2.min()-chi2)/self.DoF
-    #     indexes = peakutils.indexes((chi2nu+0.01)*(chi2nu > -0.004), thres=0.003, min_dist=20)
+    #     chi2nu_mask = (chi2nu+0.01)*(chi2nu > -0.004)
+    #     indexes,_ = find_peaks(chi2nu_mask, height=0.003*(chi2nu_mask.max()-chi2nu_mask.min())+chi2nu_mask.min(), distance=21)
     #     num_peaks = len(indexes)
     #     # plt.plot(zgrid, (chi2-chi2.min())/ self.DoF)
     #     # plt.scatter(zgrid[indexes], (chi2-chi2.min())[indexes]/ self.DoF, color='r')
