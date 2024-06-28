@@ -870,7 +870,7 @@ class GroupFLT():
         # Check where templates inconsistent with broad-band fluxes
         xb = [beam.direct.ref_photplam if beam.direct['REF'] is not None else beam.direct.photplam for beam in beams]
         obs_flux = np.array([beam.beam.total_flux for beam in beams])
-        mod_flux = np.polyval(scale_coeffs[::-1], np.array(xb)/1.e4-1)
+        mod_flux = np.polynomial.Polynomial(scale_coeffs)(np.array(xb)/1.e4-1)
         nonz = obs_flux != 0
 
         if (np.abs(mod_flux/obs_flux)[nonz].max() > max_coeff) | ((~np.isfinite(mod_flux/obs_flux)[nonz]).sum() > 0) | (np.min(mod_flux[nonz]) < 0) | ((~np.isfinite(ypoly)).sum() > 0):
@@ -920,7 +920,7 @@ class GroupFLT():
     #     xb = [beam.direct.ref_photplam if beam.direct['REF'] is not None
     #           else beam.direct.photplam for beam in beams]
     #     fb = [beam.beam.total_flux for beam in beams]
-    #     mb = np.polyval(scale_coeffs[::-1], np.array(xb)/1.e4-1)
+    #     mb = np.polynomial.Polynomial(scale_coeffs)(np.array(xb)/1.e4-1)
     #
     #     if (np.abs(mb/fb).max() > max_coeff) | (~np.isfinite(mb/fb).sum() > 0) | (np.min(mb) < 0):
     #         if verbose:
@@ -1860,7 +1860,7 @@ class MultiBeam(GroupFitter):
         self.poly_order = None
 
         self.shapes = [beam.model.shape for beam in self.beams]
-        self.Nflat = [np.product(shape) for shape in self.shapes]
+        self.Nflat = [np.prod(shape) for shape in self.shapes]
         self.Ntot = np.sum(self.Nflat)
 
         for b in self.beams:
@@ -2332,7 +2332,7 @@ class MultiBeam(GroupFitter):
         scale_coeffs = coeffs_full[i0:i0+self.n_poly]
 
         #yspec = [xspec**o*scale_coeffs[o] for o in range(self.poly_order+1)]
-        yfull = np.polyval(scale_coeffs[::-1], xspec - px0)
+        yfull = np.polynomial.Polynomial(scale_coeffs)(xspec - px0)
         return xspec, yfull
     
     
@@ -2751,7 +2751,7 @@ class MultiBeam(GroupFitter):
                      fsps_templates=False):
         """TBD
         """
-        from numpy.polynomial.polynomial import polyfit, polyval
+        from numpy.polynomial import Polynomial
 
         if zr is None:
             zr = [0.65, 1.6]
@@ -2834,9 +2834,9 @@ class MultiBeam(GroupFitter):
             zgrid_zoom = []
             for ix in indexes:
                 if (ix > 0) & (ix < len(chi2)-1):
-                    c = polyfit(zgrid[ix-1:ix+2], chi2[ix-1:ix+2], 2)
-                    zi = -c[1]/(2*c[0])
-                    chi_i = polyval(c, zi)
+                    p = Polynomial.fit(zgrid[ix-1:ix+2], chi2[ix-1:ix+2], deg=2)
+                    zi = p.deriv().roots()[0]
+                    chi_i = p(zi)
                     zgrid_zoom.extend(np.arange(zi-2*dz[0],
                                       zi+2*dz[0]+dz[1]/10., dz[1]))
 
@@ -2891,9 +2891,9 @@ class MultiBeam(GroupFitter):
 
         # Fit parabola
         if (ix > 0) & (ix < len(chi2)-1):
-            c = polyfit(zgrid[ix-1:ix+2], chi2[ix-1:ix+2], 2)
-            zbest = -c[1]/(2*c[0])
-            chibest = polyval(c, zbest)
+            p = Polynomial.fit(zgrid[ix-1:ix+2], chi2[ix-1:ix+2], deg=2)
+            zbest = p.deriv().roots()[0]
+            chibest = p(zbest)
 
         out = self.fit_at_z(z=zbest, templates=templates,
                             fitter=fitter, poly_order=poly_order,

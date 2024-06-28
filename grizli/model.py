@@ -405,7 +405,7 @@ class GrismDisperser(object):
         self.NX = len(self.dx)
         self.sh_beam = (self.sh[0], self.sh[1]+self.NX)
 
-        self.modelf = np.zeros(np.product(self.sh_beam), dtype=np.float32)
+        self.modelf = np.zeros(np.prod(self.sh_beam), dtype=np.float32)
         self.model = self.modelf.reshape(self.sh_beam)
         self.idx = np.arange(self.modelf.size,
                              dtype=np.int64).reshape(self.sh_beam)
@@ -3260,7 +3260,7 @@ class GrismFLT(object):
             # if psf_params is not None:
             #     skip_init_psf = False
             #     if hasattr(beam, 'psf_params'):
-            #         skip_init_psf |= np.product(np.isclose(beam.psf_params, psf_params)) > 0
+            #         skip_init_psf |= np.prod(np.isclose(beam.psf_params, psf_params)) > 0
             #
             #     if not skip_init_psf:
             #         beam.x_init_epsf(flat_sensitivity=False, psf_params=psf_params, psf_filter=psf_filter, yoff=0.06)
@@ -4758,10 +4758,10 @@ class BeamCutout(object):
         #wcs_header = grizli.utils.to_header(self.grism.wcs)
 
         x = np.arange(len(self.beam.lam_beam))
-        c = np.polyfit(x, self.beam.lam_beam/1.e4, 2)
-        #c = np.polyfit((self.beam.lam_beam-self.beam.lam_beam[0])/1.e4, x/h['CD1_1'], 2)
+        c = np.polynomial.Polynomial.fit(x,self.beam.lam_beam/1.e4,deg=2).convert().coef[::-1]
+        #c = np.polynomial.Polynomial.fit((self.beam.lam_beam-self.beam.lam_beam[0])/1.e4, x/h['CD1_1'],deg=2).convert().coef[::-1]
 
-        ct = np.polyfit(x, self.beam.ytrace_beam, 2)
+        ct = np.polynomial.Polynomial.fit(x,self.beam.ytrace_beam,deg=2).convert().coef[::-1]
 
         h['A_ORDER'] = 2
         h['B_ORDER'] = 2
@@ -4874,7 +4874,7 @@ class BeamCutout(object):
         if decimals is not None:
             dispersion_PA = np.round(dispersion_PA, decimals=decimals)
 
-        return float(dispersion_PA)
+        return dispersion_PA[0]
 
 
     def init_epsf(self, center=None, tol=1.e-3, yoff=0., skip=1., flat_sensitivity=False, psf_params=None, N=4, get_extended=False, only_centering=True):
