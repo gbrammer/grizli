@@ -10845,7 +10845,9 @@ $.UpdateFilterURL = function () {{
         var filtered_url = window.location.href.split('?')[0] + '?' + filter_url;
         window.history.pushState('', '', filtered_url);
     }}
-}}\n\n""".format(
+}}
+
+""".format(
                 header_lines,
                 "\n && ".join(tester),
                 [self.colnames[ic] for ic in ic_list].__repr__(),
