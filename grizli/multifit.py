@@ -2822,7 +2822,7 @@ class MultiBeam(GroupFitter):
             chi2_rev = (chi2.min() + 16 - chi2)/self.DoF
 
         chi2_rev[chi2_rev < 0] = 0
-        indexes,_ = scipy.signal.find_peaks(chi2_rev, height=0.4*(chi2_rev.max()-chi2_rev.min())+chi2_rev.min(), distance=9)
+        indexes,_ = find_peaks(chi2_rev, height=0.4*(chi2_rev.max()-chi2_rev.min())+chi2_rev.min(), distance=9)
         num_peaks = len(indexes)
 
         if False:
