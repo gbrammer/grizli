@@ -12898,3 +12898,38 @@ but expected
             fp.writelines(lines)
 
         print(f"Patch applied to {the_file}!")
+
+def find_peaks(signal,threshold=0.5,min_dist=1):
+    """
+    Find peaks in a signal using `scipy.signal.find_peaks`
+    Rescales input based on PeakUtils implementation
+
+    Parameters
+    ----------
+    signal : array-like
+        The input signal
+    threshold : float
+        The relative threshold for peak detection
+    min_dist : int
+        The minimum distance between peaks
+        e.g. a distance of 1 are adjacent peaks
+        differs from the PeakUtils implementation where adjacent peaks are seperated by 0
+    
+
+    Returns
+    -------
+    peaks : array-like
+        The indices of the peaks in the signal
+    """
+
+    # Import required packages
+    import scipy.signal
+
+    # Calculate absolute height
+    smin = signal.min() # Only calculate this once
+    height = threshold*(signal.max()-smin)+smin
+
+    # Find peaks
+    peaks,_ = scipy.signal.find_peaks(signal,height=height,distance=min_dist)
+
+    return peaks
