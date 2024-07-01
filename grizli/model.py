@@ -5255,9 +5255,8 @@ class BeamCutout(object):
     #             print(utils.NO_NEWLINE + '{0:.4f} {1:9.1f}'.format(zgrid[i], chi2[i]))
     #
     #     # peaks
-    #     import peakutils
     #     chi2nu = (chi2.min()-chi2)/self.DoF
-    #     indexes = peakutils.indexes((chi2nu+0.01)*(chi2nu > -0.004), thres=0.003, min_dist=20)
+    #     indexes = utils.find_peaks((chi2nu+0.01)*(chi2nu > -0.004), threshold=0.003, min_dist=21)
     #     num_peaks = len(indexes)
     #     # plt.plot(zgrid, (chi2-chi2.min())/ self.DoF)
     #     # plt.scatter(zgrid[indexes], (chi2-chi2.min())[indexes]/ self.DoF, color='r')

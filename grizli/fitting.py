@@ -2516,7 +2516,6 @@ class GroupFitter(object):
         from numpy.polynomial import Polynomial
         from scipy.stats import t as student_t
         from scipy.special import huber
-        import peakutils
 
         if isinstance(zr, int):
             if zr == 0:
@@ -2657,7 +2656,7 @@ class GroupFitter(object):
 
         if len(zgrid) > 1:
             chi2_rev[chi2_rev < 0] = 0
-            indexes = peakutils.indexes(chi2_rev, thres=0.4, min_dist=8)
+            indexes = utils.find_peaks(chi2_rev,threshold=0.4,min_dist=9)
             num_peaks = len(indexes)
             so = np.argsort(chi2_rev[indexes])
             indexes = indexes[so[::-1]]
