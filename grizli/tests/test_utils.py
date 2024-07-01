@@ -262,3 +262,11 @@ class UtilsTester(unittest.TestCase):
         print('sip_rot90 tests passed')
         
         plt.close('all')
+
+    def test_find_peaks(self):
+
+        "Test Find-Peaks function in utils"
+        
+        signal = np.array([0, 1, 0, 2, 1, 0, 3, 0])
+        expected_peaks = np.array([3, 6])
+        np.testing.assert_array_equal(utils.find_peaks(signal), expected_peaks)

@@ -3099,7 +3099,7 @@ class SpectrumTemplate(object):
         lorentz=False,
         err=None,
     ):
-        """
+        r"""
         Container for template spectra.
 
 
