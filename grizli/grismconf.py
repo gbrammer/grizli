@@ -1741,9 +1741,9 @@ class CRDSGrismConf():
                     _c.append(m(x0, y0))
 
             if get_coeffs:
-                value = _c[::-1]
+                value = _c
             else:
-                value = np.polyval(_c[::-1], t)
+                value = np.polynomial.Polynomial(_c)(t)
         
         return value
 
@@ -1752,8 +1752,8 @@ class CRDSGrismConf():
         """Inverse values interpolated from the forward model using polynomial roots"""
         coeffs = self._eval_model(model, x0, y0, 0, get_coeffs=True)
         if hasattr(coeffs, '__len__'):
-            coeffs[-1] -= dx
-            value = np.roots(coeffs)[-1]
+            coeffs[0] -= dx
+            value = np.polynomial.Polynomial(coeffs).roots()[-1]
         else:
             value = coeffs
             

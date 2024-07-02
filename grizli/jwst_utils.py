@@ -1024,6 +1024,7 @@ def exposure_oneoverf_correction(file, axis=None, thresholds=[5,4,3], erode_mask
         The row- or column-average correction array
     """
     import numpy as np
+    from numpy.polynomial import Chebyshev
     import scipy.ndimage as nd
     import matplotlib.pyplot as plt
     
@@ -1150,8 +1151,8 @@ def exposure_oneoverf_correction(file, axis=None, thresholds=[5,4,3], erode_mask
         deg = nx//deg_pix
         
         for _iter in range(3):
-            coeffs = np.polynomial.chebyshev.chebfit(xarr[ok], med[ok], deg)
-            cheb = np.polynomial.chebyshev.chebval(xarr, coeffs)
+            cfit = Chebyshev.fit(xarr[ok], med[ok], deg=deg)
+            cheb = cfit(xarr)
             ok = np.isfinite(med) & (np.abs(med-cheb) < 0.05)
 
         if make_plot:
@@ -1408,7 +1409,7 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
             try:
                 _ = exposure_oneoverf_correction(filename, in_place=True, 
                                              **oneoverf_kwargs)
-            except TypeError:
+            except ValueError:
                 # Should only fail for test data
                 utils.log_exception(utils.LOGFILE, traceback)
                 msg = f'exposure_oneoverf_correction: failed for {filename}'
@@ -1422,7 +1423,7 @@ def initialize_jwst_image(filename, verbose=True, max_dq_bit=14, orig_keys=ORIG_
                         _ = exposure_oneoverf_correction(filename, in_place=True, 
                                                          axis=-1,
                                                          **oneoverf_kwargs)
-                    except TypeError:
+                    except ValueError:
                         # Should only fail for test data
                         utils.log_exception(utils.LOGFILE, traceback)
                         msg = f'exposure_oneoverf_correction: axis=-1 failed for {filename}'
