@@ -3810,14 +3810,13 @@ def subtract_visit_angle_averages(visit, threshold=1.8, detection_background=Tru
                                        scale_photom=False,
                                        weight_type='median_err',
                                       )
-        drz_h = drz[2]
+        data, wht, ctx, drz_h, files, info = drz
 
         drz_h['PA_APER'] = pa_aper, 'PA_APER used for reference'
         drz_h['BKGANGLE'] = (','.join([f'{a:.1f}' for a in angles]), 
                              'Background angles')
         drz_h['NITANGLE'] = niter, 'Number of iterations for angle subtraction'
         
-        data, wht = drz[0], drz[1]
         err = 1/np.sqrt(wht)
         mask = (wht > 0)
 
@@ -3899,7 +3898,7 @@ def subtract_visit_angle_averages(visit, threshold=1.8, detection_background=Tru
             drz_hdu.append(pyfits.ImageHDU(data=smask*1, 
                                            header=drz_h,
                                           )
-                           )            
+                           )
         else:
             drz_hdu[0].data += med_model.astype(np.float32)
             drz_hdu[1].data = _cleaned.astype(np.float32)
@@ -4917,14 +4916,17 @@ def process_direct_grism_visit(direct={},
                                      calc_wcsmap=False,
                                      )
                        
-        _sci, _wht, _hdr, _files, _info = _
+        _sci, _wht, _ctx, _hdr, _files, _info = _
         _drcfile = glob.glob(f"{direct['product']}_dr*sci.fits")[0]
         _whtfile = _drcfile.replace('_sci.fits','_wht.fits')
+        _ctxfile = _drcfile.replace('_sci.fits','_ctx.fits')
         pyfits.PrimaryHDU(data=_sci, header=_hdr).writeto(_drcfile,
                                                           overwrite=True)
         pyfits.PrimaryHDU(data=_wht, header=_hdr).writeto(_whtfile,
                                                           overwrite=True)
-        
+        # pyfits.PrimaryHDU(data=_ctx, header=_hdr).writeto(_ctxfile,
+        #                                                   overwrite=True)
+                                                          
         # Remake catalog
         #cat = make_drz_catalog(root=direct['product'], threshold=thresh)
         if 'footprints' in direct:
