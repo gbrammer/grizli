@@ -1003,7 +1003,7 @@ class GroupFLT():
         return hdu, fig
 
 
-    def drizzle_grism_models(self, root='grism_model', kernel='square', scale=0.1, pixfrac=1, make_figure=True, fig_xsize=10, outctx=False):
+    def drizzle_grism_models(self, root='grism_model', kernel='square', scale=0.1, pixfrac=1, make_figure=True, fig_xsize=10, ctx_out=False):
         """
         Make model-subtracted drizzled images of each grism / PA
 
@@ -1021,7 +1021,7 @@ class GroupFLT():
         pixfrac : float
             Drizzle "pixfrac".
 
-        outctx : bool
+        ctx_out : bool
             Save context image as well.
 
         """
