@@ -1077,7 +1077,7 @@ class GroupFLT():
                 pyfits.writeto(outfile, data=outsci, header=header,
                                overwrite=True, output_verify='fix')
                 
-                if outctx:
+                if ctx_out:
                     pyfits.writeto(outfile.replace('sci', 'ctx'), data=outctx,
                                 header=header, overwrite=True, output_verify='fix')
 
