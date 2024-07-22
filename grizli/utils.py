@@ -8248,7 +8248,7 @@ def drizzle_array_groups(
     # Number of input arrays
     N = len(sci_list)
 
-    # Cast outctx depending on number of inputs
+    # Drizzlepac cannot support >31 input images
     docontext = N + first_uniqid < 32
     if not docontext:
         print("Warning: Too many input images to store in outctx")
