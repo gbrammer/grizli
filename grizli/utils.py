@@ -8243,10 +8243,27 @@ def drizzle_array_groups(
     else:
         outsci = np.zeros(shape, dtype=np.float32)
         outwht = np.zeros(shape, dtype=np.float32)
-        outctx = np.zeros(shape, dtype=np.int32)
+        outctx = np.zeros(shape, dtype=np.uint8)
+
+    # Number of input arrays
+    N = len(sci_list)
+
+    # Cast outctx depending on number of inputs
+    Nbits = N + first_uniqid # Number of bits needed to store uniqid
+    docontext = True
+    if Nbits <= 8:
+        outctx = outctx.astype(np.uint8)
+    elif Nbits <= 16:
+        outctx = outctx.astype(np.uint16)
+    elif Nbits <= 32:
+        outctx = outctx.astype(np.uint32)
+    elif Nbits <= 64:
+        outctx = outctx.astype(np.uint64)
+    else:
+        docontext = False
+        print("Warning: Too many input images to store in outctx")
 
     # Do drizzle
-    N = len(sci_list)
     for i in range(N):
         if verbose:
             # log.info('Drizzle array {0}/{1}'.format(i+1, N))
@@ -8271,7 +8288,7 @@ def drizzle_array_groups(
             "cps",
             1,
             wcslin_pscale=wcs_list[i].pscale,
-            uniqid=first_uniqid + i,
+            uniqid=first_uniqid + i if docontext else 1,
             pixfrac=pixfrac,
             kernel=kernel,
             fillval="0",
