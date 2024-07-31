@@ -1,0 +1,5 @@
+#Notes when setting up for Roman
+
+#on top of the installation instructions, the following two packages were need before pip install ".[test]" and pytest worked:
+conda install hdf5
+conda install setuptools
