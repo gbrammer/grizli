@@ -3362,10 +3362,14 @@ def oneoverf_column_correction(visit, thresholds=[10,1.5], dilate_iter=[10,2], i
 
             _im.flush()
 
-SNOWBLIND_KWARGS = dict(new_jump_flag=1024, min_radius=4,
-                        growth_factor=1.5, unset_first=True)
+SNOWBLIND_KWARGS = dict(
+    new_jump_flag=1024,
+    min_radius=4,
+    growth_factor=1.5,
+    unset_first=True
+)
 
-def mask_snowballs(visit, snowball_erode=3, snowball_dilate=18, mask_bit=1024, instruments=['NIRCAM','NIRISS'], max_fraction=0.3, unset4=False, snowblind_kwargs=SNOWBLIND_KWARGS, **kwargs):
+def mask_snowballs(visit, snowball_erode=3, snowball_dilate=18, mask_bit=1024, instruments=['NIRCAM','NIRISS'], max_fraction=0.3, unset4=False, skip_after_cal_version='1.14', snowblind_kwargs=SNOWBLIND_KWARGS, **kwargs):
     """
     Mask JWST IR snowballs
     
@@ -3392,7 +3396,11 @@ def mask_snowballs(visit, snowball_erode=3, snowball_dilate=18, mask_bit=1024, i
     
     unset4 : bool
         Unset DQ=4 bit for flagged CRs
-    
+
+    skip_after_cal_version : str
+        Only run if JWST pipeline version ``CAL_VER`` is less than this.  The snowball
+        routine was significantly improved in ``jwst==1.14``.
+
     snowblind_kwargs : dict
         First try to use `grizli.utils.jwst_snowblind_mask` to flag snowballs
     
@@ -3407,15 +3415,26 @@ def mask_snowballs(visit, snowball_erode=3, snowball_dilate=18, mask_bit=1024, i
                                  'prep.mask_snowballs')
     
     import scipy.ndimage as nd
+    from packaging.version import Version
     
     for _file in visit['files']:
         with pyfits.open(_file, mode='update') as _im:
+            if 'CAL_VER' in _im[0].header:
+                _im_cal_ver = _im[0].header['CAL_VER']
+                if Version(_im_cal_ver) > Version(skip_after_cal_version):
+                    msg = f'mask_snowballs: {_file}  '
+                    msg += f'{_im_cal_ver} > {skip_after_cal_version}, skip'
+                    utils.log_comment(utils.LOGFILE, msg, verbose=True)
+                    continue
+                    
             if 'OINSTRUM' in _im[0].header:
                 _instrume = _im[0].header['OINSTRUM']
             else:
                 _instrume = _im[0].header['INSTRUME']
                 
             if _instrume not in instruments:
+                msg = f'mask_snowballs: {_file}  {_instrume} not in {instruments}'
+                utils.log_comment(utils.LOGFILE, msg, verbose=True)
                 continue
             
             if snowblind_kwargs is not None:
