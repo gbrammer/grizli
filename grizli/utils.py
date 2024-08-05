@@ -8117,6 +8117,7 @@ def drizzle_from_visit(
                 calc_wcsmap=calc_wcsmap,
                 verbose=verbose,
                 data=data,
+                first_uniqid=count + 1,
             )
 
             outsci, outwht, outctx = res[:3]
@@ -8162,7 +8163,7 @@ def drizzle_from_visit(
         wcs_tab = GTable(names=wcs_colnames, rows=wcs_rows)
 
         outwht *= (wcs_i.pscale / outputwcs.pscale) ** 4
-        return outsci, outwht, header, flist, wcs_tab
+        return outsci, outwht, outctx, header, flist, wcs_tab
 
 
 def drizzle_array_groups(
@@ -8176,6 +8177,7 @@ def drizzle_array_groups(
     calc_wcsmap=False,
     verbose=True,
     data=None,
+    first_uniqid=1,
 ):
     """
     Drizzle array data with associated wcs
@@ -8209,6 +8211,9 @@ def drizzle_array_groups(
     data : tuple, optional
         Tuple containing the output drizzled science, weight, and context images.
         If not provided, new arrays will be created.
+
+    first_uniqid : int, optional
+        First `uniqid` value to use for the drizzle for contex maps
 
     Returns
     -------
@@ -8271,8 +8276,15 @@ def drizzle_array_groups(
         outwht = np.zeros(shape, dtype=np.float32)
         outctx = np.zeros(shape, dtype=np.int32)
 
-    # Do drizzle
+    # Number of input arrays
     N = len(sci_list)
+
+    # Drizzlepac cannot support >31 input images
+    docontext = N + first_uniqid < 32
+    if not docontext:
+        print("Warning: Too many input images to store in outctx")
+
+    # Do drizzle
     for i in range(N):
         if verbose:
             # log.info('Drizzle array {0}/{1}'.format(i+1, N))
@@ -8297,7 +8309,7 @@ def drizzle_array_groups(
             "cps",
             1,
             wcslin_pscale=wcs_list[i].pscale,
-            uniqid=1,
+            uniqid=first_uniqid + i if docontext else 1,
             pixfrac=pixfrac,
             kernel=kernel,
             fillval="0",
