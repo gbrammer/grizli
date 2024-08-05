@@ -2308,6 +2308,8 @@ def get_line_wavelengths():
     line_ratios["BrD"] = [1.0]
     line_wavelengths["BrE"] = [18179.2]
     line_ratios["BrE"] = [1.0]
+    line_wavelengths["BrF"] = [17366.9]
+    line_ratios["BrF"] = [1.0]
 
     # Paschen n0=3
     line_wavelengths["PaA"] = [18756.3]
@@ -2573,6 +2575,9 @@ def get_line_wavelengths():
     line_ratios["HeII-4687"] = [1.0]
     line_wavelengths["HeII-5412"] = [5412.5]
     line_ratios["HeII-5412"] = [1.0]
+    line_wavelengths["HeII-16923"] = [1.69230e4]
+    line_ratios["HeII-16923"] = [1.0]
+    
     line_wavelengths["HeI-5877"] = [5877.249]
     line_ratios["HeI-5877"] = [1.0]
     line_wavelengths["HeI-3889"] = [3889.75]
@@ -2591,7 +2596,33 @@ def get_line_wavelengths():
     line_ratios["HeI-7065"] = [1.0]
     line_wavelengths["HeI-8446"] = [8446.7]
     line_ratios["HeI-8446"] = [1.0]
-
+    
+    # From CAFE
+    # https://github.com/GOALS-survey/CAFE/blob/master/CAFE/tables/
+    
+    line_wavelengths["FeII-11128"] = [1.11286e4]
+    line_ratios["FeII-11128"] = [1.0]
+    line_wavelengths["FeII-12570"] = [1.25702e4]
+    line_ratios["FeII-12570"] = [1.0]
+    line_wavelengths["FeII-16440"] = [1.64400e4]
+    line_ratios["FeII-16440"] = [1.0]
+    line_wavelengths["FeII-16877"] = [1.68778e4]
+    line_ratios["FeII-16877"] = [1.0]
+    line_wavelengths["FeII-17418"] = [1.74188e4]
+    line_ratios["FeII-17418"] = [1.0]
+    line_wavelengths["FeII-17418"] = [1.74188e4]
+    line_ratios["FeII-17418"] = [1.0]
+    line_wavelengths["FeII-18362"] = [1.83624e4]
+    line_ratios["FeII-18362"] = [1.0]
+    
+    line_wavelengths["SiVI-19634"] = [1.9634e4]
+    line_ratios["SiVI-19634"] = [1.0]
+    
+    # AGN line?
+    # https://academic.oup.com/pasj/article/63/1/L7/1460068#431992120
+    line_wavelengths["PII-11886"] = [1.188610e4]
+    line_ratios["PII-11886"] = [1.0]
+    
     # Osterbrock Table 4.5
     # -> N=4
     line_wavelengths["HeI-series"] = [
@@ -11945,6 +11976,8 @@ def figure_timestamp(
     x=0.97,
     y=0.02,
     iso=True,
+    text_prefix='',
+    manual_text=None,
     ha="right",
     va="bottom",
     fontsize=5,
@@ -11966,6 +11999,12 @@ def figure_timestamp(
         Use ISO-formatted time from `~grizli.utils.ctime_to_iso`, otherwise use
         `time.ctime()`
 
+    text_prefix : str
+        String to prepend to date
+
+    manual_text : str
+        Force string to use
+
     ha, va : str
         Horizontal and vertical alignment
 
@@ -11984,10 +12023,15 @@ def figure_timestamp(
     if iso:
         time_str = ctime_to_iso(time_str, verbose=False)
 
+    if manual_text is not None:
+        text = manual_text
+    else:
+        text = text_prefix + time_str
+
     fig.text(
         x,
         y,
-        time_str,
+        text,
         ha=ha,
         va=va,
         fontsize=fontsize,
