@@ -16,10 +16,19 @@ from . import utils
 from . import GRIZLI_PATH
 
 
-def combine_flt(files=[], output='exposures_cmb.fits', grow=1,
-                add_padding=True, pixfrac=0.5, kernel='point',
-                verbose=True, overwrite=True, ds9=None):
-    """Drizzle distorted FLT frames to an "interlaced" image
+def combine_flt(
+    files=[],
+    output="exposures_cmb.fits",
+    grow=1,
+    add_padding=True,
+    pixfrac=0.5,
+    kernel="point",
+    verbose=True,
+    overwrite=True,
+    ds9=None,
+):
+    """
+    Drizzle distorted FLT frames to an "interlaced" image
 
     Parameters
     ----------
@@ -47,14 +56,14 @@ def combine_flt(files=[], output='exposures_cmb.fits', grow=1,
         However, can result in empty pixels given the camera distortions
         depending on the dithering of the input exposures.
 
-    ds9 : `~grizli.ds9.DS9`
-        Display the progress of the script to a DS9 window.
-
     verbose : bool
         Print logging information
 
     overwrite : bool
         Overwrite existing files
+
+    ds9 : `~grizli.ds9.DS9`
+        Display the progress of the script to a DS9 window.
 
     Returns
     -------
@@ -66,16 +75,16 @@ def combine_flt(files=[], output='exposures_cmb.fits', grow=1,
     from drizzlepac import astrodrizzle
 
     # `files` is an ASN filename, not  a list of exposures
-    if '_asn.fits' in files:
+    if "_asn.fits" in files:
         asn = asnutil.readASNTable(files)
-        files = ['{0}_flt.fits'.format(flt) for flt in asn['order']]
-        if output == 'combined_flt.fits':
-            output = '{0}_cmb.fits'.format(asn['output'])
+        files = ["{0}_flt.fits".format(flt) for flt in asn["order"]]
+        if output == "combined_flt.fits":
+            output = "{0}_cmb.fits".format(asn["output"])
 
     f0 = pyfits.open(files[0])
     h0 = f0[0].header.copy()
-    h0['EXPTIME'] = 0.
-    h0['NFILES'] = (len(files), 'Number of combined files')
+    h0["EXPTIME"] = 0.0
+    h0["NFILES"] = (len(files), "Number of combined files")
 
     out_wcs = pywcs.WCS(f0[1].header, relax=True)
     out_wcs.pscale = utils.get_wcs_pscale(out_wcs)
@@ -91,9 +100,8 @@ def combine_flt(files=[], output='exposures_cmb.fits', grow=1,
 
         for i, file in enumerate(files):
             hx = pyfits.getheader(file, 0)
-            h0['EXPTIME'] += hx['EXPTIME']
-            h0['FILE{0:04d}'.format(i)] = (file,
-                                        'Included file #{0:d}'.format(i))
+            h0["EXPTIME"] += hx["EXPTIME"]
+            h0["FILE{0:04d}".format(i)] = (file, "Included file #{0:d}".format(i))
 
             h = pyfits.getheader(file, 1)
             flt_wcs = pywcs.WCS(h, relax=True)
@@ -101,27 +109,31 @@ def combine_flt(files=[], output='exposures_cmb.fits', grow=1,
 
         xmax = np.abs(x0).max()
         ymax = np.abs(y0).max()
-        padx = 50*int(np.ceil(xmax/50.))
-        pady = 50*int(np.ceil(ymax/50.))
-        pad = np.maximum(padx, pady)*grow
+        padx = 50 * int(np.ceil(xmax / 50.0))
+        pady = 50 * int(np.ceil(ymax / 50.0))
+        pad = np.maximum(padx, pady) * grow
 
         if verbose:
-            print('Maximum shift (x, y) = ({0:6.1f}, {1:6.1f}), pad={2:d}'.format(xmax, ymax, pad))
+            print(
+                "Maximum shift (x, y) = ({0:6.1f}, {1:6.1f}), pad={2:d}".format(
+                    xmax, ymax, pad
+                )
+            )
     else:
         pad = 0
 
     inter_wcs = out_wcs.deepcopy()
     if grow > 1:
         inter_wcs.wcs.cd /= grow
-        for i in range(inter_wcs.sip.a_order+1):
-            for j in range(inter_wcs.sip.a_order+1):
-                inter_wcs.sip.a[i, j] /= grow**(i+j-1)
+        for i in range(inter_wcs.sip.a_order + 1):
+            for j in range(inter_wcs.sip.a_order + 1):
+                inter_wcs.sip.a[i, j] /= grow ** (i + j - 1)
 
-        for i in range(inter_wcs.sip.b_order+1):
-            for j in range(inter_wcs.sip.b_order+1):
-                inter_wcs.sip.b[i, j] /= grow**(i+j-1)
+        for i in range(inter_wcs.sip.b_order + 1):
+            for j in range(inter_wcs.sip.b_order + 1):
+                inter_wcs.sip.b[i, j] /= grow ** (i + j - 1)
 
-        if hasattr(inter_wcs, '_naxis1'):
+        if hasattr(inter_wcs, "_naxis1"):
             inter_wcs._naxis1 *= grow
             inter_wcs._naxis2 *= grow
         else:
@@ -133,11 +145,11 @@ def combine_flt(files=[], output='exposures_cmb.fits', grow=1,
         inter_wcs.sip.crpix[1] *= grow
 
         if grow > 1:
-            inter_wcs.wcs.crpix += grow/2.
-            inter_wcs.sip.crpix[0] += grow/2.
-            inter_wcs.sip.crpix[1] += grow/2.
+            inter_wcs.wcs.crpix += grow / 2.0
+            inter_wcs.sip.crpix[0] += grow / 2.0
+            inter_wcs.sip.crpix[1] += grow / 2.0
 
-    if hasattr(inter_wcs, '_naxis1'):
+    if hasattr(inter_wcs, "_naxis1"):
         inter_wcs._naxis1 += pad
         inter_wcs._naxis2 += pad
     else:
@@ -150,14 +162,14 @@ def combine_flt(files=[], output='exposures_cmb.fits', grow=1,
 
     outh = inter_wcs.to_header(relax=True)
     for key in outh:
-        if key.startswith('PC'):
-            outh.rename_keyword(key, key.replace('PC', 'CD'))
+        if key.startswith("PC"):
+            outh.rename_keyword(key, key.replace("PC", "CD"))
 
-    outh['GROW'] = grow, 'Grow factor'
-    outh['PAD'] = pad, 'Image padding'
-    outh['BUNIT'] = h['BUNIT']
+    outh["GROW"] = grow, "Grow factor"
+    outh["PAD"] = pad, "Image padding"
+    outh["BUNIT"] = h["BUNIT"]
 
-    sh = (1014*grow + 2*pad, 1014*grow + 2*pad)
+    sh = (1014 * grow + 2 * pad, 1014 * grow + 2 * pad)
     outsci = np.zeros(sh, dtype=np.float32)
     outwht = np.zeros(sh, dtype=np.float32)
     outctx = np.zeros(sh, dtype=np.int32)
@@ -170,73 +182,86 @@ def combine_flt(files=[], output='exposures_cmb.fits', grow=1,
         im = pyfits.open(file)
 
         if verbose:
-            print('{0:3d} {1:s} {2:6.1f} {3:6.1f} {4:10.2f}'.format(i+1, file,
-                                x0[i], y0[i], im[0].header['EXPTIME']))
+            print(
+                "{0:3d} {1:s} {2:6.1f} {3:6.1f} {4:10.2f}".format(
+                    i + 1, file, x0[i], y0[i], im[0].header["EXPTIME"]
+                )
+            )
 
-        dq = utils.mod_dq_bits(im['DQ'].data, okbits=608,
-                                           verbose=False)
-        wht = 1./im['ERR'].data**2
-        wht[(im['ERR'].data == 0) | (dq > 0) | (~np.isfinite(wht))] = 0
-        wht[im['SCI'].data < -3*im['ERR'].data] = 0
+        dq = utils.mod_dq_bits(im["DQ"].data, okbits=608, verbose=False)
+        wht = 1.0 / im["ERR"].data ** 2
+        wht[(im["ERR"].data == 0) | (dq > 0) | (~np.isfinite(wht))] = 0
+        wht[im["SCI"].data < -3 * im["ERR"].data] = 0
 
-        wht = np.asarray(wht,dtype=np.float32)
+        wht = np.asarray(wht, dtype=np.float32)
 
         exp_wcs = pywcs.WCS(im[1].header, relax=True)
         exp_wcs.pscale = utils.get_wcs_pscale(exp_wcs)
 
-        #pf = 0.5
+        # pf = 0.5
         # import drizzlepac.wcs_functions as dwcs
         # xx = out_wcs.deepcopy()
         # #xx.all_pix2world = xx.wcs_world2pix
         # map = dwcs.WCSMap(exp_wcs, xx)
 
-        astrodrizzle.adrizzle.do_driz(im['SCI'].data, exp_wcs, wht,
-                                      inter_wcs, outsci, outwht, outctx,
-                                      1., 'cps', 1,
-                                      wcslin_pscale=exp_wcs.pscale,
-                                      uniqid=1,
-                                      pixfrac=pixfrac, kernel=kernel,
-                                      fillval=0, stepsize=10,
-                                      wcsmap=SIP_WCSMap)
+        astrodrizzle.adrizzle.do_driz(
+            im["SCI"].data,
+            exp_wcs,
+            wht,
+            inter_wcs,
+            outsci,
+            outwht,
+            outctx,
+            1.0,
+            "cps",
+            1,
+            wcslin_pscale=exp_wcs.pscale,
+            uniqid=1,
+            pixfrac=pixfrac,
+            kernel=kernel,
+            fillval=0,
+            stepsize=10,
+            wcsmap=SIP_WCSMap,
+        )
 
         if ds9 is not None:
             ds9.view(outsci, header=outh)
 
-    #outsci /= out_wcs.pscale**2
-    rms = 1/np.sqrt(outwht)
+    # outsci /= out_wcs.pscale**2
+    rms = 1 / np.sqrt(outwht)
     mask = (outwht == 0) | (rms > 100)
     rms[mask] = 0
-    outsci[mask] = 0.
+    outsci[mask] = 0.0
 
     hdu = [pyfits.PrimaryHDU(header=h0)]
-    hdu.append(pyfits.ImageHDU(data=outsci/grow**2, header=outh, name='SCI'))
-    hdu.append(pyfits.ImageHDU(data=rms/grow**2, header=outh, name='ERR'))
-    hdu.append(pyfits.ImageHDU(data=mask*1024, header=outh, name='DQ'))
+    hdu.append(pyfits.ImageHDU(data=outsci / grow ** 2, header=outh, name="SCI"))
+    hdu.append(pyfits.ImageHDU(data=rms / grow ** 2, header=outh, name="ERR"))
+    hdu.append(pyfits.ImageHDU(data=mask * 1024, header=outh, name="DQ"))
 
-    pyfits.HDUList(hdu).writeto(output, overwrite=overwrite, output_verify='fix')
+    pyfits.HDUList(hdu).writeto(output, overwrite=overwrite, output_verify="fix")
 
 
-def combine_visits_and_filters(grow=1, pixfrac=0.5, kernel='point',
-                               filters=['G102', 'G141'], skip=None,
-                               split_visit=False, split_quadrants=True,
-                               overwrite=True, ds9=None, verbose=True):
-    """Make combined FLT files for all FLT files in the working directory separated by targname/visit/filter
+def combine_visits_and_filters(
+    grow=1,
+    pixfrac=0.5,
+    kernel="point",
+    filters=["G102", "G141"],
+    skip=None,
+    split_visit=False,
+    split_quadrants=True,
+    overwrite=True,
+    ds9=None,
+    verbose=True,
+):
+    """
+    Make combined FLT files for all FLT files in the working directory
+    separated by targname/visit/filter
 
     Parameters
     ----------
     grow : int
         Factor by which to `grow` the FLT frames to interlaced outputs.  For
         example, `grow=2` results in 2x2 interlacing.
-
-    split_visit : bool
-        If `True`, then separate by all TARGNAME/visit otherwise group by
-        TARGNAME and combine visits.
-
-    split_quadrants : bool
-        Split by 2x2 sub-pixel dither positions
-
-    filters : list of strings
-        Only make products for exposures that use these filters
 
     pixfrac : float
         Drizzle pixfrac (for kernels other than 'point')
@@ -246,9 +271,22 @@ def combine_visits_and_filters(grow=1, pixfrac=0.5, kernel='point',
         best for preserving the noise properties of the final combined image.
         However, can result in empty pixels given the camera distortions
         depending on the dithering of the input exposures.
-
+    
+    filters : list of strings
+        Only make products for exposures that use these filters
+    
     skip : `slice` or None
         Slice of the overall list of visits to process a subset
+
+    split_visit : bool
+        If `True`, then separate by all TARGNAME/visit otherwise group by
+        TARGNAME and combine visits.
+
+    split_quadrants : bool
+        Split by 2x2 sub-pixel dither positions
+
+    overwrite : bool
+        Overwrite existing files
 
     ds9 : `pyds9.DS9`
         Display the progress of the script to a DS9 window.
@@ -256,44 +294,55 @@ def combine_visits_and_filters(grow=1, pixfrac=0.5, kernel='point',
     verbose : bool
         Print logging information
 
-    overwrite : bool
-        Overwrite existing files
-
     Returns
     -------
     nothing but creates "cmb" combined files
     """
-    files = glob.glob('i*flt.fits')
+    
+    files = glob.glob("i*flt.fits")
     output_list, xx = utils.parse_flt_files(files, uniquename=split_visit)
 
     if skip is None:
         skip = slice(0, len(output_list))
 
     for i in range(len(output_list))[skip]:
-        key = output_list[i]['product']
-        filter = key.split('-')[-1].upper()
+        key = output_list[i]["product"]
+        filter = key.split("-")[-1].upper()
         if filter not in filters:
             continue
 
-        output = '{0}_cmb.fits'.format(key)
+        output = "{0}_cmb.fits".format(key)
 
         if verbose:
-            print('\n -- Combine: {0} -- \n'.format(output))
+            print("\n -- Combine: {0} -- \n".format(output))
 
         if split_quadrants:
-            combine_quadrants(files=output_list[i]['files'], output=output,
-                              ref_pixel=[507, 507],
-                              pixfrac=pixfrac, kernel=kernel,
-                              overwrite=overwrite,
-                              ds9=ds9, verbose=verbose)
+            combine_quadrants(
+                files=output_list[i]["files"],
+                output=output,
+                ref_pixel=[507, 507],
+                pixfrac=pixfrac,
+                kernel=kernel,
+                overwrite=overwrite,
+                ds9=ds9,
+                verbose=verbose,
+            )
         else:
-            combine_flt(files=output_list[i]['files'], output=output,
-                    grow=grow, ds9=ds9, verbose=verbose,
-                    overwrite=overwrite, pixfrac=pixfrac, kernel=kernel)
+            combine_flt(
+                files=output_list[i]["files"],
+                output=output,
+                grow=grow,
+                ds9=ds9,
+                verbose=verbose,
+                overwrite=overwrite,
+                pixfrac=pixfrac,
+                kernel=kernel,
+            )
 
 
 def get_shifts(files, ref_pixel=[507, 507]):
-    """Compute relative pixel shifts based on header WCS
+    """
+    Compute relative pixel shifts based on header WCS
 
     Parameters
     ----------
@@ -314,7 +363,7 @@ def get_shifts(files, ref_pixel=[507, 507]):
     """
     f0 = pyfits.open(files[0])
     h0 = f0[0].header.copy()
-    h0['EXPTIME'] = 0.
+    h0["EXPTIME"] = 0.0
 
     out_wcs = pywcs.WCS(f0[1].header, relax=True)
     out_wcs.pscale = utils.get_wcs_pscale(out_wcs)
@@ -327,18 +376,19 @@ def get_shifts(files, ref_pixel=[507, 507]):
 
     for i, file in enumerate(files):
         hx = pyfits.getheader(file, 0)
-        h0['EXPTIME'] += hx['EXPTIME']
-        h0['FILE{0:04d}'.format(i)] = file, 'Included file #{0:d}'.format(i)
+        h0["EXPTIME"] += hx["EXPTIME"]
+        h0["FILE{0:04d}".format(i)] = file, "Included file #{0:d}".format(i)
 
         h = pyfits.getheader(file, 1)
         flt_wcs = pywcs.WCS(h, relax=True)
         x0[i], y0[i] = flt_wcs.all_world2pix(ra0, de0, 0)
 
-    return h0, x0-ref_pixel[0], y0-ref_pixel[1]
+    return h0, x0 - ref_pixel[0], y0 - ref_pixel[1]
 
 
-def split_pixel_quadrant(dx, dy, figure='quadrants.png', show=False):
-    """Group offsets by their sub-pixel quadrant
+def split_pixel_quadrant(dx, dy, figure="quadrants.png", show=False):
+    """
+    Group offsets by their sub-pixel quadrant
 
     Parameters
     ----------
@@ -380,38 +430,58 @@ def split_pixel_quadrant(dx, dy, figure='quadrants.png', show=False):
     """
     from matplotlib.ticker import MultipleLocator
 
-    xq = np.asarray(np.round((dx - np.floor(dx))*2),dtype=int) % 2
-    yq = np.asarray(np.round((dy - np.floor(dy))*2),dtype=int) % 2
+    xq = np.asarray(np.round((dx - np.floor(dx)) * 2), dtype=int) % 2
+    yq = np.asarray(np.round((dy - np.floor(dy)) * 2), dtype=int) % 2
 
     # Test, show sub-pixel centers in a figure
     if figure:
-        xf = ((dx - np.floor(dx)))
-        yf = ((dy - np.floor(dy)))
+        xf = dx - np.floor(dx)
+        yf = dy - np.floor(dy)
 
-        colors = np.array([['r', 'g'], ['b', 'k']])
+        colors = np.array([["r", "g"], ["b", "k"]])
 
         fig = plt.figure(figsize=[6, 6])
         ax = fig.add_subplot(111)
 
-        ax.scatter(xf, yf, c=colors[xq, yq], marker='o', alpha=0.8)
+        ax.scatter(xf, yf, c=colors[xq, yq], marker="o", alpha=0.8)
 
         box = np.array([-0.25, 0.25])
         for i in range(2):
             for j in range(2):
-                ax.fill_between(j*0.5 + box, i*0.5 + 0.25, i*0.5 - 0.25,
-                                color=colors[j, i], alpha=0.05)
+                ax.fill_between(
+                    j * 0.5 + box,
+                    i * 0.5 + 0.25,
+                    i * 0.5 - 0.25,
+                    color=colors[j, i],
+                    alpha=0.05,
+                )
 
-                ax.fill_between(j*0.5 + box+1, i*0.5 + 0.25+1, i*0.5 - 0.25+1,
-                                color=colors[j, i], alpha=0.05)
+                ax.fill_between(
+                    j * 0.5 + box + 1,
+                    i * 0.5 + 0.25 + 1,
+                    i * 0.5 - 0.25 + 1,
+                    color=colors[j, i],
+                    alpha=0.05,
+                )
 
-                ax.fill_between(j*0.5 + box, i*0.5 + 0.25+1, i*0.5 - 0.25+1,
-                                color=colors[j, i], alpha=0.05)
+                ax.fill_between(
+                    j * 0.5 + box,
+                    i * 0.5 + 0.25 + 1,
+                    i * 0.5 - 0.25 + 1,
+                    color=colors[j, i],
+                    alpha=0.05,
+                )
 
-                ax.fill_between(j*0.5 + box+1, i*0.5 + 0.25, i*0.5 - 0.25,
-                                color=colors[j, i], alpha=0.05)
+                ax.fill_between(
+                    j * 0.5 + box + 1,
+                    i * 0.5 + 0.25,
+                    i * 0.5 - 0.25,
+                    color=colors[j, i],
+                    alpha=0.05,
+                )
 
-        ax.set_xlabel(r'Sub-pixel $x$')
-        ax.set_ylabel(r'Sub-pixel $y$')
+        ax.set_xlabel(r"Sub-pixel $x$")
+        ax.set_ylabel(r"Sub-pixel $y$")
         ax.set_xlim(-0.1, 1.1)
         ax.set_ylim(-0.1, 1.1)
         majorLocator = MultipleLocator(0.25)
@@ -420,7 +490,7 @@ def split_pixel_quadrant(dx, dy, figure='quadrants.png', show=False):
 
         ax.grid()
 
-        if not plt.rcParams['interactive']:
+        if not plt.rcParams["interactive"]:
             if not show:
                 fig.savefig(figure)
                 plt.close(fig)
@@ -428,11 +498,12 @@ def split_pixel_quadrant(dx, dy, figure='quadrants.png', show=False):
     index = np.arange(len(dx))
     out = {}
     for i in range(4):
-        match = xq+2*yq == i
+        match = xq + 2 * yq == i
         if match.sum() > 0:
             out[i] = index[match]
 
     return out
+
 
 # Superceded by `combine_visits_and_filters`
 # def combine_figs():
@@ -468,10 +539,19 @@ def split_pixel_quadrant(dx, dy, figure='quadrants.png', show=False):
 #             combine_quadrants(files=grism_files, output='%s-%s-%s_cmb.fits' %(root, angle, grism))
 
 
-def combine_quadrants(files=[], output='images_cmb.fits', grow=1,
-                 pixfrac=0.5, kernel='point', ref_pixel=[507, 507],
-                 ds9=None, verbose=True, overwrite=True):
-    """Wrapper to split a list of exposures based on their shift sub-pixel quadrants
+def combine_quadrants(
+    files=[],
+    output="images_cmb.fits",
+    grow=1,
+    pixfrac=0.5,
+    kernel="point",
+    ref_pixel=[507, 507],
+    ds9=None,
+    verbose=True,
+    overwrite=True,
+):
+    """
+    Wrapper to split a list of exposures based on their shift sub-pixel quadrants
 
     Parameters are all passed directly to `~grizli.combine.combine_flt` but
     separated by shift quadrant with `~grizli.combine.get_shifts` and
@@ -488,40 +568,85 @@ def combine_quadrants(files=[], output='images_cmb.fits', grow=1,
 
         >>> quad_output = output.replace('_cmb.fits',
                                          '_q{0:d}_cmb.fits'.format(q))
+
+    grow : int
+        Factor by which to `grow` the FLT frames to interlaced outputs.  For
+        example, `grow=2` results in 2x2 interlacing.
+
+    pixfrac : float
+        Drizzle pixfrac (for kernels other than 'point')
+    
+    kernel : {'point', 'square'}
+        Drizzle kernel. The 'point' kernel is effectively interlacing and is
+        best for preserving the noise properties of the final combined image.
+        However, can result in empty pixels given the camera distortions
+        depending on the dithering of the input exposures.
+
+    ref_pixel : [int, int] or [float, float]
+        Reference pixel for the computed shifts
+    
+    ds9 : `~grizli.ds9.DS9`
+        Display the progress of the script to a DS9 window.
+
+    verbose : bool
+        Print logging information
+
+    overwrite : bool
+        Overwrite existing files
     """
     h, dx, dy = get_shifts(files, ref_pixel=ref_pixel)
-    out = split_pixel_quadrant(dx, dy,
-                               figure=output.replace('.fits', '_quad.png'))
+    out = split_pixel_quadrant(dx, dy, figure=output.replace(".fits", "_quad.png"))
 
     for q in out:
-        print('Quadrant {0:d}, {1:d} files'.format(q, len(out[q])))
-        quad_output = output.replace('_cmb.fits',
-                                     '_q{0:d}_cmb.fits'.format(q))
-        combine_flt(files=np.array(files)[out[q]], output=quad_output,
-                    grow=grow, pixfrac=pixfrac, kernel=kernel,
-                    ds9=ds9, verbose=verbose, overwrite=overwrite)
+        print("Quadrant {0:d}, {1:d} files".format(q, len(out[q])))
+        quad_output = output.replace("_cmb.fits", "_q{0:d}_cmb.fits".format(q))
+        combine_flt(
+            files=np.array(files)[out[q]],
+            output=quad_output,
+            grow=grow,
+            pixfrac=pixfrac,
+            kernel=kernel,
+            ds9=ds9,
+            verbose=verbose,
+            overwrite=overwrite,
+        )
+
 
 # Default mapping function based on PyWCS
 
 
 class SIP_WCSMap:
     def __init__(self, input, output, origin=1):
-        """Sample class to demonstrate how to define a coordinate transformation
+        """
+        Sample class to demonstrate how to define a coordinate transformation
 
         Modified from `drizzlepac.wcs_functions.WCSMap` to use full SIP header
         in the `forward` and `backward` methods. Use this class to drizzle to
         an output distorted WCS, e.g.,
 
             >>> drizzlepac.astrodrizzle.do_driz(..., wcsmap=SIP_WCSMap)
+
+        Parameters
+        ----------
+        input : pywcs.WCS
+            Input WCS object.
+
+        output : pywcs.WCS
+            Output WCS object.
+
+        origin : int
+            Origin of the pixel coordinates (default is 1).
+        
+        Note: Some of this documentation is AI-generated and will be reviewed.
         """
 
         # Verify that we have valid WCS input objects
-        self.checkWCS(input, 'Input')
-        self.checkWCS(output, 'Output')
+        self.checkWCS(input, "Input")
+        self.checkWCS(output, "Output")
 
         self.input = input
         self.output = copy.deepcopy(output)
-        #self.output = output
+        # self.output = output
 
         self.origin = origin
         self.shift = None
@@ -529,45 +654,131 @@ class SIP_WCSMap:
         self.scale = None
 
     def checkWCS(self, obj, name):
+        """
+        Check that the input object is a valid PyWCS object.
+        
+        Parameters
+        ----------
+        obj : object
+            Object to be checked.
+
+        name : str
+            Name of the object to be checked.
+
+        Note: Some of this documentation is AI-generated and will be reviewed.
+        """
         try:
             assert isinstance(obj, pywcs.WCS)
         except AssertionError:
-            print(name + ' object needs to be an instance or subclass of a PyWCS object.')
+            print(
+                name + " object needs to be an instance or subclass of a PyWCS object."
+            )
             raise
 
     def forward(self, pixx, pixy):
-        """ Transform the input pixx,pixy positions in the input frame
-            to pixel positions in the output frame.
+        """
+        Transform the input pixx,pixy positions in the input frame
+        to pixel positions in the output frame.
 
-            This method gets passed to the drizzle algorithm.
+        This method gets passed to the drizzle algorithm.
+
+        Parameters
+        ----------
+        pixx : array-like
+            X pixel positions in the input frame.
+
+        pixy : array-like
+            Y pixel positions in the input frame.
+
+        Returns
+        -------
+        result : tuple
+            Tuple of transformed pixel positions in the output frame.
+
+        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         # This matches WTRAXY results to better than 1e-4 pixels.
         skyx, skyy = self.input.all_pix2world(pixx, pixy, self.origin)
-        #result= self.output.wcs_world2pix(skyx,skyy,self.origin)
+        # result= self.output.wcs_world2pix(skyx,skyy,self.origin)
         result = self.output.all_world2pix(skyx, skyy, self.origin)
         return result
 
     def backward(self, pixx, pixy):
-        """ Transform pixx,pixy positions from the output frame back onto their
-            original positions in the input frame.
         """
-        #skyx,skyy = self.output.wcs_pix2world(pixx,pixy,self.origin)
+        Transform pixx,pixy positions from the output frame back onto their
+        original positions in the input frame.
+
+        Parameters
+        ----------
+        pixx : array-like
+            X pixel positions in the output frame.
+        
+        pixy : array-like
+            Y pixel positions in the output frame.
+
+        Returns
+        -------
+        result : tuple
+            Tuple of transformed pixel positions in the input frame.
+
+        Note: Some of this documentation is AI-generated and will be reviewed.
+        """
+        # skyx,skyy = self.output.wcs_pix2world(pixx,pixy,self.origin)
         skyx, skyy = self.output.all_pix2world(pixx, pixy, self.origin)
         result = self.input.all_world2pix(skyx, skyy, self.origin)
         return result
 
     def get_pix_ratio(self):
-        """ Return the ratio of plate scales between the input and output WCS.
-            This is used to properly distribute the flux in each pixel in 'tdriz'.
+        """
+        Return the ratio of plate scales between the input and output WCS.
+        This is used to properly distribute the flux in each pixel in 'tdriz'.
         """
         return self.output.pscale / self.input.pscale
 
     def xy2rd(self, wcs, pixx, pixy):
-        """ Transform input pixel positions into sky positions in the WCS provided.
+        """
+        Transform input pixel positions into sky positions in the WCS provided.
+        
+        Parameters
+        ----------
+        wcs : pywcs.WCS
+            WCS object representing the coordinate transformation.
+
+        pixx : array-like
+            X pixel positions in the input frame.
+
+        pixy : array-like
+            Y pixel positions in the input frame.
+
+        Returns
+        -------
+        result : tuple
+            Tuple of transformed sky positions in the output frame.
+
+        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         return wcs.all_pix2world(pixx, pixy, 1)
 
     def rd2xy(self, wcs, ra, dec):
-        """ Transform input sky positions into pixel positions in the WCS provided.
+        """
+        Transform input sky positions into pixel positions in the WCS provided.
+        
+        Parameters
+        ----------
+        wcs : pywcs.WCS
+            WCS object representing the coordinate transformation.
+
+        ra : array-like
+            Right ascension positions in degrees.
+
+        dec : array-like
+            Declination positions in degrees.
+
+        Returns
+        -------
+        result : tuple
+            Tuple of transformed pixel positions in the output frame.
+
+        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         return wcs.wcs_world2pix(ra, dec, 1)
