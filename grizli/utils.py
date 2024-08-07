@@ -7453,7 +7453,7 @@ def jwst_snowblind_mask(
 
         if "CAL_VER" in im[0].header:
             im_cal_ver = im[0].header["CAL_VER"]
-            if Version(_im_cal_ver) >= Version(skip_after_cal_version):
+            if Version(im_cal_ver) >= Version(skip_after_cal_version):
                 msg = f"mask_snowballs: {rate_file}  "
                 msg += f"{im_cal_ver} > {skip_after_cal_version}, skip"
                 log_comment(LOGFILE, msg, verbose=True)
