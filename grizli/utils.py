@@ -7371,6 +7371,7 @@ def jwst_snowblind_mask(
     growth_factor=1.5,
     unset_first=True,
     verbose=True,
+    skip_after_cal_version='1.14',
     **kwargs,
 ):
     """
@@ -7419,6 +7420,8 @@ def jwst_snowblind_mask(
 
     """
     import jwst.datamodels
+    from packaging.version import Version
+
     from . import jwst_utils
 
     if not os.path.basename(rate_file).startswith(require_prefix):
@@ -7447,6 +7450,14 @@ def jwst_snowblind_mask(
     with pyfits.open(rate_file) as im:
         reset_header = "OINSTRUM" in im[0].header
         reset_header &= im[0].header["INSTRUME"] == "WFC3"
+
+        if "CAL_VER" in im[0].header:
+            im_cal_ver = im[0].header["CAL_VER"]
+            if Version(_im_cal_ver) >= Version(skip_after_cal_version):
+                msg = f"mask_snowballs: {rate_file}  "
+                msg += f"{im_cal_ver} > {skip_after_cal_version}, skip"
+                log_comment(LOGFILE, msg, verbose=True)
+                return np.zeros(im["SCI"].data.shape, dtype=int), 0.0
 
     if reset_header:
         _ = jwst_utils.set_jwst_to_hst_keywords(rate_file, reset=True, verbose=False)
