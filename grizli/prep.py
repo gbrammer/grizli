@@ -3421,7 +3421,7 @@ def mask_snowballs(visit, snowball_erode=3, snowball_dilate=18, mask_bit=1024, i
         with pyfits.open(_file, mode='update') as _im:
             if 'CAL_VER' in _im[0].header:
                 _im_cal_ver = _im[0].header['CAL_VER']
-                if Version(_im_cal_ver) > Version(skip_after_cal_version):
+                if Version(_im_cal_ver) >= Version(skip_after_cal_version):
                     msg = f'mask_snowballs: {_file}  '
                     msg += f'{_im_cal_ver} > {skip_after_cal_version}, skip'
                     utils.log_comment(utils.LOGFILE, msg, verbose=True)
