@@ -3,3 +3,29 @@
 #on top of the installation instructions, the following two packages were need before pip install ".[test]" and pytest worked:
 conda install hdf5
 conda install setuptools
+
+#needed to install wget on my computer before notebook would work
+
+#following Keith's notebook
+conda install pysynphot
+export PYSYN_CDBS="${HOME}/pysyn_cdbs"
+mkdir $PYSYN_CDBS
+#mkdir $PYSYN_CDBS/grid
+#mkdir $PYSYN_CDBS/grid/phoenix
+wget http://ssb.stsci.edu/trds/tarfiles/synphot5.tar.gz -O $PYSYN_CDBS/grid/phoenix/synphot5.tar.gz #this is a large file that takes a long time to download, ~30 minutes
+cd $PYSYN_CDBS
+tar xzvf synphot5.tar.gz
+
+pip install webbpsf
+export WEBBPSF_PATH="${HOME}/webbpsf-data" 
+mkdir $WEBBPSF_PATH 
+
+conda install synphot -c conda-forge #not sure this was necessary
+pip install stsynphot
+
+#download webpsf-data-LATEST.tar.gz and move it to ../$WEBBPSF_PATH 
+cd ../$WEBBPSF_PATH
+tar xzvf webbpsf-data-LATEST.tar.gz
+
+#Roman data to use is here:
+https://irsa.ipac.caltech.edu/data/theory/Roman/Wang2022a/products/configuration/
