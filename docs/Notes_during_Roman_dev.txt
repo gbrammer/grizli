@@ -10,8 +10,6 @@ conda install setuptools
 conda install pysynphot
 export PYSYN_CDBS="${HOME}/pysyn_cdbs"
 mkdir $PYSYN_CDBS
-#mkdir $PYSYN_CDBS/grid
-#mkdir $PYSYN_CDBS/grid/phoenix
 wget http://ssb.stsci.edu/trds/tarfiles/synphot5.tar.gz -O $PYSYN_CDBS/grid/phoenix/synphot5.tar.gz #this is a large file that takes a long time to download, ~30 minutes
 cd $PYSYN_CDBS
 tar xzvf synphot5.tar.gz
