@@ -9781,6 +9781,88 @@ class EffectivePSF:
             # print(params, chi2)
             return chi2
 
+    @staticmethod
+    def objective_epsf_center(
+        params, self, psf_xy, sci, ivar, xp, yp, extended_data, ret, ds9
+    ):
+        """
+        Objective function for fitting ePSF centers
+
+        Parameters
+        ----------
+        params : list
+            List of fitting parameters [xc, yc].
+        self : object
+            The object instance.
+        psf_xy : array-like
+            Array of PSF coordinates.
+        sci : array-like
+            Science image.
+        ivar : array-like
+            Inverse variance image.
+        xp : array-like
+            X positions.
+        yp : array-like
+            Y positions.
+        extended_data : bool
+            Flag indicating whether extended data is used.
+        ret : str
+            Return type. Possible values are 'resid', 'lm', 'model', or 'chi2'.
+        ds9 : bool
+            Flag indicating whether to display the result in DS9.
+        Returns
+        -------
+        resid : array-like
+            Residuals.
+        lm_resid : array-like
+            Masked residuals for LM optimization.
+        model : tuple
+            Tuple containing the PSF model, background, Ax, and coeffs.
+        chi2 : float
+            Chi-squared value.
+        """
+        from numpy.linalg import lstsq
+
+        dx = xp - params[0]
+        dy = yp - params[1]
+
+        ddx = xp
+        ddy = yp
+
+        ddx = ddx / ddx.max()
+        ddy = ddy / ddy.max()
+
+        psf_offset = (
+            self.eval_ePSF(psf_xy, dx, dy, extended_data=extended_data)
+        )
+
+        A = (np.array([psf_offset, np.ones_like(sci), ddx, ddy]) * np.sqrt(ivar)).reshape((4, -1))
+        scif = (sci * np.sqrt(ivar)).flatten()
+        mask = (scif != 0)
+        coeffs, _resid, _rank, _s = lstsq(A[:, mask].T, scif[mask], rcond=LSTSQ_RCOND)
+
+        resid = (scif - np.dot(coeffs, A))
+
+        if ds9:
+            Ax = (np.array([psf_offset, np.ones_like(sci), ddx, ddy])).reshape((4, -1))
+            psf_model = np.dot(coeffs[:1], Ax[:1, :]).reshape(sci.shape)
+            bkg = np.dot(coeffs[1:], Ax[1:, :]).reshape(sci.shape)
+            ds9.view((sci - psf_model-bkg)*mask.reshape(sci.shape))
+        
+        if ret == "resid":
+            return resid
+        elif ret == "lm":
+            # masked residuals for LM optimization
+            return resid[resid != 0]
+        elif ret == "model":
+            Ax = (np.array([psf_offset, np.ones_like(sci), ddx, ddy])).reshape((4, -1))
+            psf_model = np.dot(coeffs[:1], Ax[:1, :]).reshape(sci.shape)
+            bkg = np.dot(coeffs[1:], Ax[1:, :]).reshape(sci.shape)
+            return psf_model, bkg, Ax, coeffs
+        else:
+            chi2 = (resid ** 2).sum()
+            return chi2
+
     def fit_ePSF(
         self,
         sci,
