@@ -163,7 +163,7 @@ def run_one(verbose=True, remove_result=True):
     return row
 
 
-def do_recalibrate(rate_file='jw06541001001_03101_00001_nrs1_rate.fits', cores='half', min_radius=3, after_jumps=20, context=None, clean=True, **kwargs):
+def do_recalibrate(rate_file='jw06541001001_03101_00001_nrs1_rate.fits', cores='half', min_radius=3, after_jumps=20, context=None, clean=True, skip_snowblind_after='1.14', **kwargs):
     """
     Recalibrate JWST uncal exposures with `snowblind` snowball masking
     
@@ -194,8 +194,9 @@ def do_recalibrate(rate_file='jw06541001001_03101_00001_nrs1_rate.fits', cores='
         expected ``rate.fits`` suffix.  The ``rate_file`` product will be left in the 
         working directory.
     """
-    
+    from packaging.version import Version
     from snowblind import SnowblindStep
+    import jwst
     from jwst.pipeline import Detector1Pipeline
     from jwst.step import RampFitStep
     from jwst.step import GainScaleStep
@@ -247,15 +248,22 @@ def do_recalibrate(rate_file='jw06541001001_03101_00001_nrs1_rate.fits', cores='
         },
     }
 
-    Detector1Pipeline.call(base_file.replace('_rate','_uncal'), steps=steps)
+    Detector1Pipeline.call(base_file.replace('_rate', '_uncal'), steps=steps)
 
-    SnowblindStep.call(base_file.replace('_rate','_jump'),
+    if Version(jwst.__version__) < Version(skip_snowblind_after):
+        SnowblindStep.call(base_file.replace('_rate','_jump'),
                        min_radius=int(min_radius),
                        after_jumps=int(after_jumps),
                        save_results=True,
                        suffix="snowblind")
-    
-    rate, rateints = RampFitStep.call(base_file.replace('_rate','_snowblind'),
+        next_exten = '_snowblind'
+    else:
+        msg = f'jwst {jwst.__version__} > {skip_snowblind_after}, skip snowblind'
+        utils.log_comment(utils.LOGFILE, msg, verbose=True)
+        
+        next_exten = '_jump'
+        
+    rate, rateints = RampFitStep.call(base_file.replace('_rate', next_exten),
                                       maximum_cores=ncores)
 
     rate = GainScaleStep.call(rate)

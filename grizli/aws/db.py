@@ -177,6 +177,91 @@ def refresh_engine():
         _ENGINE._init_kws = kws
 
 
+def SQL(query_text, engine=None, pd_kwargs={}, **kwargs):
+    """
+    Send a query to a database through `pandas.read_sql_query`
+    
+    Parameters
+    ----------
+    query_text : str
+        Query text, e.g., 'SELECT count(*) FROM table;'.
+    
+    engine : `sqlalchemy.engine.Engine`
+        DB connection engine initialized with `~grizli.aws.db.get_db_engine`.  
+        The query is sent through 
+        ``pandas.read_sql_query(query_text, engine)``.
+    
+    kwargs : dict
+        Column formatting keywords passed to 
+        `~grizli.aws.db.set_column_formats`
+    
+    Returns
+    -------
+    tab : `~grizli.utils.GTable`
+        Table object
+        
+    """
+    import pandas as pd
+    
+    global _ENGINE
+    if engine is not None:
+        _ENGINE = engine
+    
+    if _ENGINE is None:
+        _ENGINE = get_db_engine()
+    
+    refresh_engine()
+    
+    res = pd.read_sql_query(query_text, _ENGINE)
+    _ENGINE.dispose()
+    
+    tab = utils.GTable.from_pandas(res)
+    tab.meta['query'] = (query_text, 'SQL query text')
+    tab.meta['qtime'] = (utils.nowtime().iso, 'Query timestamp')
+    
+    set_column_formats(tab, **kwargs)
+
+    return tab
+
+
+def execute_helper(sqlstr, engine):
+    """
+    Different behaviour for psycopg2.connection and sqlalchemy.engine
+    """
+    if hasattr(engine, 'cursor'):
+        with engine.cursor() as cur:
+            cur.execute(sqlstr)
+    else:
+        engine.execute(sqlstr)
+
+
+def execute(sql_text):
+    """
+    Wrapper around `sqlalchemy.engine.Engine.execute()`
+    """
+    global _ENGINE
+
+    if _ENGINE is None:
+        _ENGINE = get_db_engine()
+    else:
+        refresh_engine()
+
+    if hasattr(_ENGINE, 'cursor'):
+        with engine.cursor() as cur:
+            cur.execute(sql_text)
+
+    elif hasattr(_ENGINE, 'execute'):
+        resp = _ENGINE.execute(sql_text)
+        
+    else:
+        conn = _ENGINE.connect()
+        resp = conn.exec_driver_sql(sql_text)
+        conn.commit()
+        conn.close()
+        
+    return resp
+
+
 def upload_file(file_name, bucket, object_name=None):
     """Upload a file to an S3 bucket
 
@@ -352,17 +437,6 @@ def update_redshift_fit_status(root, id, status=0, table='redshift_fit_v2', engi
                 cur.execute(sqlstr)
         else:
             engine.execute(sqlstr)
-
-
-def execute_helper(sqlstr, engine):
-    """
-    Different behaviour for psycopg2.connection and sqlalchemy.engine
-    """
-    if hasattr(engine, 'cursor'):
-        with engine.cursor() as cur:
-            cur.execute(sqlstr)
-    else:
-        engine.execute(sqlstr)
 
 
 def get_row_data(rowfile='gds-g800l-j033236m2748_21181.row.fits', status_flag=FLAGS['fit_complete']):
@@ -1270,14 +1344,15 @@ def multibeam_to_database(beams_file, engine=None, Rspline=15, force=False, **kw
 
     from .. import multifit
 
-    if engine is None:
-        engine = get_db_engine(echo=False)
+    # if engine is None:
+    #     engine = get_db_engine(echo=False)
 
     mtime = Time(os.stat(beams_file).st_mtime, format='unix').iso
     root = '_'.join(beams_file.split('_')[:-1])
     id = int(beams_file.split('_')[-1].split('.')[0])
 
-    res = pd.read_sql_query("SELECT mtime from multibeam_v2 WHERE (root = '{0}' AND id = {1})".format(root, id), engine)
+    # res = pd.read_sql_query("SELECT mtime from multibeam_v2 WHERE (root = '{0}' AND id = {1})".format(root, id), engine)
+    res = SQL("SELECT mtime from multibeam_v2 WHERE (root = '{0}' AND id = {1})".format(root, id))
     if len(res) == 1:
         if (res['mtime'][0] == mtime) & (not force):
             print('{0} already in multibeam_v2 table'.format(beams_file))
@@ -1345,7 +1420,9 @@ def multibeam_to_database(beams_file, engine=None, Rspline=15, force=False, **kw
         df[a] = [getattr(mb, a)]
 
     # Send to DB
-    res = engine.execute("DELETE from multibeam_v2 WHERE (root = '{0}' AND id = {1})".format(mb.group_name, mb.id), engine)
+    # res = engine.execute("DELETE from multibeam_v2 WHERE (root = '{0}' AND id = {1})".format(mb.group_name, mb.id), engine)
+    res = execute("DELETE from multibeam_v2 WHERE (root = '{0}' AND id = {1})".format(mb.group_name, mb.id))
+    
     df.to_sql('multibeam_v2', engine, index=False, if_exists='append', method='multi')
 
     # beams dataframe
@@ -1385,7 +1462,9 @@ def multibeam_to_database(beams_file, engine=None, Rspline=15, force=False, **kw
     df = pd.DataFrame.from_dict(d)
 
     # Send to database
-    res = engine.execute("DELETE from beam_geometry_v2 WHERE (root = '{0}' AND id = {1})".format(mb.group_name, mb.id), engine)
+    # res = engine.execute("DELETE from beam_geometry_v2 WHERE (root = '{0}' AND id = {1})".format(mb.group_name, mb.id), engine)
+    res = execute("DELETE from beam_geometry_v2 WHERE (root = '{0}' AND id = {1})".format(mb.group_name, mb.id))
+    
     df.to_sql('beam_geometry_v2', engine, index=False, if_exists='append', method='multi')
 
     if False:
@@ -1778,75 +1857,6 @@ def from_sql(query_text, engine=None, **kwargs):
     """
     tab = SQL(query_text, engine=engine, **kwargs)
     return tab
-
-
-def SQL(query_text, engine=None, pd_kwargs={}, **kwargs):
-    """
-    Send a query to a database through `pandas.read_sql_query`
-    
-    Parameters
-    ----------
-    query_text : str
-        Query text, e.g., 'SELECT count(*) FROM table;'.
-    
-    engine : `sqlalchemy.engine.Engine`
-        DB connection engine initialized with `~grizli.aws.db.get_db_engine`.  
-        The query is sent through 
-        ``pandas.read_sql_query(query_text, engine)``.
-    
-    kwargs : dict
-        Column formatting keywords passed to 
-        `~grizli.aws.db.set_column_formats`
-    
-    Returns
-    -------
-    tab : `~grizli.utils.GTable`
-        Table object
-        
-    """
-    import pandas as pd
-    
-    global _ENGINE
-    if engine is not None:
-        _ENGINE = engine
-    
-    if _ENGINE is None:
-        _ENGINE = get_db_engine()
-    
-    refresh_engine()
-    
-    res = pd.read_sql_query(query_text, _ENGINE)
-    _ENGINE.dispose()
-    
-    tab = utils.GTable.from_pandas(res)
-    tab.meta['query'] = (query_text, 'SQL query text')
-    tab.meta['qtime'] = (utils.nowtime().iso, 'Query timestamp')
-    
-    set_column_formats(tab, **kwargs)
-
-    return tab
-
-
-def execute(sql_text):
-    """
-    Wrapper around `sqlalchemy.engine.Engine.execute()`
-    """
-    global _ENGINE
-    
-    if _ENGINE is None:
-        _ENGINE = get_db_engine()
-    else:
-        refresh_engine()
-    
-    if hasattr(_ENGINE, 'execute'):
-        resp = _ENGINE.execute(sql_text)
-    else:
-        conn = _ENGINE.connect()
-        resp = conn.exec_driver_sql(sql_text)
-        conn.commit()
-        conn.close()
-        
-    return resp
 
 
 def send_to_database(table_name, tab, index=False, if_exists='append', method='multi', **kwargs):
