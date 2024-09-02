@@ -115,6 +115,33 @@ def compute_segmentation_limits(segm, seg_id, flam, shd):
 
     shd: [int, int]
         Shape of segm
+
+    Returns
+    -------
+    imin : int
+        Minimium index of first array axis (y)
+
+    imax : int
+        Maximum index of first array axis (y)
+
+    ic : float
+        Weighted centroid along first array axis (y)
+
+    jmin : int
+        Minimium index of second array axis (x)
+
+    jmax : int
+        Maximum index of second array axis (x)
+
+    jc : float
+        Weighted centroid along second array axis (x)
+
+    area : int
+        Area of the segment
+
+    flam_total : float
+        Sum of ``flam`` within the segment
+
     """
     area = 0
 
@@ -125,7 +152,7 @@ def compute_segmentation_limits(segm, seg_id, flam, shd):
 
     inumer = 0.0
     jnumer = 0.0
-    denom = 0.0
+    flam_total = 0.0
 
     for i in range(shd[0]):
         for j in range(shd[1]):
@@ -136,7 +163,7 @@ def compute_segmentation_limits(segm, seg_id, flam, shd):
             wht_ij = flam[i, j]
             inumer += i * wht_ij
             jnumer += j * wht_ij
-            denom += wht_ij
+            flam_total += wht_ij
 
             if i < imin:
                 imin = i
@@ -149,10 +176,19 @@ def compute_segmentation_limits(segm, seg_id, flam, shd):
                 jmax = j
 
     ### No matched pixels
-    if denom == 0:
-        denom = -99
+    if flam_total == 0:
+        flam_total = -99
 
-    return imin, imax, inumer / denom, jmin, jmax, jnumer / denom, area, denom
+    return (
+        imin,
+        imax,
+        inumer / flam_total,
+        jmin,
+        jmax,
+        jnumer / flam_total,
+        area,
+        flam_total,
+    )
 
 
 @jit(nopython=True, fastmath=True, error_model="numpy")
