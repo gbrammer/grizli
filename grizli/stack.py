@@ -44,7 +44,6 @@ def make_templates(
         If `return` then return two lists of templates.  Otherwise,
         store them to a `~numpy` save file "templates_{fwhm}.npy".
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
 
     from .multifit import MultiBeam
@@ -171,7 +170,6 @@ class StackFitter(GroupFitter):
             Minimum degrees of freedom threshold for identifying bad PAs.
             Default = 200.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         if isinstance(files, list):
             file = files[0]
@@ -338,7 +336,6 @@ class StackFitter(GroupFitter):
         Parses the `self.beams` list and extracts various information such 
         as the number of beams, the extension versions and other attributes.
         
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
 
         self.N = len(self.beams)
@@ -410,7 +407,6 @@ class StackFitter(GroupFitter):
         st : StackFitter
             The StackFitter object to be appended.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
 
         self.beams.extend(st.beams)
@@ -503,7 +499,6 @@ class StackFitter(GroupFitter):
         has_bad : bool
             A flag indicating if there are bad PAs.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
 
         wave = np.linspace(2000, 2.5e4, 100)
@@ -662,7 +657,6 @@ class StackFitter(GroupFitter):
         scale_fit : `~scipy.optimize.OptimizeResult`
             Object containing the result of the optimization process.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         import scipy.optimize
 
@@ -826,7 +820,6 @@ class StackFitter(GroupFitter):
         AxT : array_like
             The scaled template matrix.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         from np.polynomial import Polynomial
 
@@ -899,7 +892,6 @@ class StackFitter(GroupFitter):
             chi2 : float
                 The chi-squared value of the fit.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         import scipy.optimize
         from np.polynomial import Polynomial
@@ -1103,7 +1095,6 @@ class StackFitter(GroupFitter):
         hdu : `~astropy.io.fits.HDUList`
             Multi-extension FITS file with the result of the redshift fits.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         import os
 
@@ -1331,12 +1322,11 @@ class StackFitter(GroupFitter):
         Returns
         -------
         tc : ndarray
-            The generated 1D template for the complex component.
+            The generated 1D template for the continuum component.
 
         tl : ndarray
             The generated 1D template for the line component.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
 
         t_complex, t_i = np.load(templates_file, allow_pickle=True)
@@ -1371,7 +1361,6 @@ class StackFitter(GroupFitter):
         verbose : bool
             Print the number of pixels masked. Default is True.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         min_grism = {}
         for grism in self.grisms:
@@ -1423,7 +1412,6 @@ class StackFitter(GroupFitter):
         fig : `~matplotlib.figure.Figure`
             The figure object.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         import matplotlib.pyplot as plt
         import matplotlib.gridspec
@@ -1674,7 +1662,6 @@ class StackedSpectrum(object):
         MW_EBV : float
             The Milky Way extinction value. Default is 0.0.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.    
         """
         
         import os
@@ -1812,15 +1799,14 @@ class StackedSpectrum(object):
 
         Parameters
         ----------
-        h : astropy.io.fits.Header
+        h : `astropy.io.fits.Header`
             The FITS header containing the WCS keywords.
 
         Returns
         -------
-        w : `~np.ndarray`
+        w : `~np.array`
             The generated wavelength array.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         w = (np.arange(h["NAXIS1"]) + 1 - h["CRPIX1"]) * h["CD1_1"] + h["CRVAL1"]
 
@@ -1837,11 +1823,7 @@ class StackedSpectrum(object):
         m[m < 0] = 0
         self.optimal_profile = m / m.sum(axis=0)
 
-    def optimal_extract(self, data, bin=0, ivar=None, weight=None, loglam=False):
-        #TODO: ivar is described as dummy in previous docs, but it is 
-        # actively used in several calculations - just making sure this
-        # is intended? I described it as dummy to comply with previous 
-        # documentation. (K.V.) 
+    def optimal_extract(self, data, bin=0, ivar=None, **kwargs):
         """
         Optimally-weighted 1D extraction
 
@@ -1853,26 +1835,23 @@ class StackedSpectrum(object):
         bin : int
             Binning factor. Default is 0.
 
-        ivar, weight, loglam : dummy parameters
+        ivar : array-like
+            Inverse variance to replace `self.ivar`
 
         Returns
         -------
-        wave : `~np.ndarray`
+        wave : `~np.array`
             Wavelength array
         
-        opt_flux : `~np.ndarray`
+        opt_flux : `~np.array`
             Optimal flux array
 
-        opt_rms : `~np.ndarray`
+        opt_rms : `~np.array`
             Optimal RMS array
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         import scipy.ndimage as nd
 
-        # flatf = self.flat.reshape(self.sh).sum(axis=0)
-        # prof = self.flat.reshape(self.sh)/flatf
-        #
         if not hasattr(self, "optimal_profile"):
             self.init_optimal_profile()
 
@@ -1920,7 +1899,6 @@ class StackedSpectrum(object):
             data[j, :, -NY // 2 + j :] += self.kernel[:, : self.sh[1] - j + NY // 2]
 
         for j in range(NY // 2, self.sh[1] - NY // 2):
-            # print(j)
             data[j, :, j - NY // 2 : j + NY // 2] += self.kernel
 
         self.fit_data = data.reshape(self.sh[1], -1)
@@ -1975,7 +1953,6 @@ class StackedSpectrum(object):
         model : `~np.ndarray`
             The generated model spectrum.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         from .utils_c.interp import interp_conserve_c
 
@@ -1985,5 +1962,4 @@ class StackedSpectrum(object):
             fl = interp_conserve_c(self.wave, spectrum_1d[0], spectrum_1d[1])
 
         model = np.dot(fl, self.fit_data)  # .reshape(self.sh)
-        # self.model = model
         return model
