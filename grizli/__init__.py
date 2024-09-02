@@ -12,13 +12,6 @@ import os
 # where the code repository was cloned and compiled!
 # """)
 
-# Module imports
-# from . import utils_c
-# from . import utils
-# from . import grismconf
-# from . import model
-# from . import multifit
-
 # Test that GRIZLI system variable is set
 if os.getenv('GRIZLI') is None:
     GRIZLI_PATH = os.path.join(os.path.dirname(__file__), 'data/')

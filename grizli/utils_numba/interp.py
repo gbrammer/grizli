@@ -14,9 +14,25 @@ __all__ = [
 @jit(nopython=True, fastmath=True, error_model="numpy")
 def pixel_map_c(in_data, xi, yi, out_data, xo, yo):
     """
-    Fast pixel mapping from one image to another:
+    Fast pixel mapping from one image to another
 
-        in_data[yi, xi] -> out_data[yo, xo]
+    Parameters
+    ----------
+    in_data : 2D array
+        Input data array
+
+    xi, yi : 1D arrays
+        Pixel indices of the second (x) and first (y) array indices
+
+    out_data : 2D array
+        Output array will be updated in place ``out_data[yo, xo] = in_data[yi, xi]``
+
+    xo, yo : 1D arrays
+        Pixel indices of the second (x) and first (y) array indices
+
+    Returns
+    -------
+    status : bool
 
     """
     N = len(xi)
@@ -29,12 +45,28 @@ def pixel_map_c(in_data, xi, yi, out_data, xo, yo):
 @jit(nopython=True, fastmath=True, error_model="numpy")
 def interp_c(x, xp, fp, extrapolate=0.0, assume_sorted=1):
     """
-    Fast interpolation: [`xp`, `fp`] interpolated at `x`.
+    Fast linear interpolation: ``f(x) ~ fp(xp)``
 
-    Extrapolated values are set to `extrapolate`.
+    Parameters
+    ----------
+    x : array-like
+        Desired interpolant
 
-    The default `assume_sorted`=1 assumes that the `x` array is sorted and single-
-    valued, providing a significant gain in speed. (xp is always assumed to be sorted)
+    xp, fp : array-like
+        Arrays to interpolate
+
+    extrapolate : float
+        Value to use where ``x < xp.min()`` or ``x > xp.max()``.
+
+    assume_sorted : int, bool
+        The default value of True assumes that the ``x`` array is sorted and
+        single-valued, providing a gain in speed.
+        ``xp`` is always assumed to be sorted.
+
+    Returns
+    -------
+    f : array-like
+        Interpolated values, same dimensions as ``x``
 
     """
     N, Np = len(x), len(xp)
@@ -115,26 +147,26 @@ def integral_cumsum_c(xp, fp, extrapolate=0.0):
 def interp_conserve_c(x, xp, yp, left=0, right=0, integrate=0):
     """
     Interpolate spectrum conserving flux
-    
+
     Parameters
     ----------
     x : array-like
         Coarse ordinal axis (e.g., wavelength)
-    
+
     xp, yp : array-like, array-like
         High resolution arrays, (e.g., wavelength and flux density)
-    
+
     left, right : float, float
         Values to use for extrapolating off the edges of ``xp``
-    
+
     integrate : bool
         Result is integrated across ``dx``
-    
+
     Returns
     -------
     outy : array-like
         Interpolated array
-    
+
     """
     NTEMPL = len(x)
     nxp = len(xp)
@@ -294,17 +326,17 @@ def rebin_weighted_c(x, xp, yp, ye, left=0, right=0, integrate=0, remove_missing
 def midpoint_c(x):
     """
     Simple midpoints of array
-    
+
     Parameters
     ----------
     x : array-like, N
         Target array
-    
+
     Returns
     -------
     midpoint : array-like, N+1
         Midpoints of ``x``
-    
+
     """
     N = len(x)
     midpoint = np.zeros(N + 1, dtype=x.dtype)
