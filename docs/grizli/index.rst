@@ -2,10 +2,6 @@
 Spectrum Analysis
 =================
 
-.. automodapi:: grizli.utils
-    :no-inheritance-diagram:
-    :skip: OrderedDict
-
 .. automodapi:: grizli.grismconf
     :no-inheritance-diagram:
 
@@ -20,6 +16,18 @@ Spectrum Analysis
 .. automodapi:: grizli.fitting
     :no-inheritance-diagram:
     :skip: OrderedDict, Planck15
+
+Utilities
+=========
+.. automodapi:: grizli.utils
+    :no-inheritance-diagram:
+    :skip: OrderedDict
+
+.. automodapi:: grizli.utils_numba.interp
+    :no-inheritance-diagram:
+
+.. automodapi:: grizli.utils_numba.disperse
+    :no-inheritance-diagram:
 
 Catalog tools
 =============

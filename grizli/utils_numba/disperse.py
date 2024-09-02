@@ -6,6 +6,11 @@ from numba import jit
 DTYPE = float
 ITYPE = int
 
+__all__ = [
+    "disperse_grism_object",
+    "compute_segmentation_limits",
+]
+
 
 @jit(parallel=False, nopython=True, fastmath=True, error_model="numpy")
 def disperse_grism_object(
@@ -193,4 +198,7 @@ def compute_segmentation_limits(segm, seg_id, flam, shd):
 
 @jit(nopython=True, fastmath=True, error_model="numpy")
 def seg_flux(flam, idxl, yfrac, ysens, full, x0, shd, shg):
+    """
+    Not used
+    """
     pass
