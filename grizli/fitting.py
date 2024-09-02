@@ -32,6 +32,9 @@ PLINE = {"kernel": "point", "pixfrac": 0.2, "pixscale": 0.1, "size": 8, "wcs": N
 BOUNDED_DEFAULTS = {"method": "bvls", "tol": 1.0e-8, "verbose": 0}
 LINE_BOUNDS = [-1.0e-16, 1.0e-13]  # erg/s/cm2
 
+# Array to evaluate CDF
+CDF_SIGMAS = np.linspace(-5, 5, 51)
+
 # IGM from eazy-py
 try:
     import eazy.igm
@@ -192,15 +195,14 @@ def run_all(
     diff2d=True,
     **kwargs,
 ):
-    #TODO: used_cached_templates param was not used, and all 
-    # used_cached_templates params passed to `~grizli.fitting.GroupFitter.xfit_at_z`
-    # were defaulted to true. I inserted the param to all calls to 
-    # `~grizli.fitting.GroupFitter.xfit_at_z` - at review, please check if this is the
-    # wanted behavior. (K.V.)
+
     """Run the full template-fitting procedure
 
     1) Load MultiBeam and stack files
-    2) ... tbd
+    2) Optionally set photometry data and, optionally scale spectrum to photometry
+    3) Fit redshift in two-passes on coarse and fine grids
+    4) Compute emission line fluxes at best-fit redshift
+    5) Make diagnostic figures
 
     Parameters
     ----------
@@ -427,7 +429,6 @@ def run_all(
     line_hdu : `~astropy.io.fits.HDUList`
         Drizzled line maps
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     import glob
     import matplotlib.pyplot as plt
@@ -1513,8 +1514,6 @@ def full_sed_plot(
     return fig
 
 
-CDF_SIGMAS = np.linspace(-5, 5, 51)
-
 def compute_cdf_percentiles(fit, cdf_sigmas=CDF_SIGMAS):
     """
     Compute tabulated percentiles of the CDF for a (lossy) compressed version
@@ -1620,9 +1619,6 @@ def make_summary_catalog(
     write_table=True,
     cdf_sigmas=CDF_SIGMAS,
 ):
-    # TODO: For review: verbose param removed as never used, 
-    # cdf_sigmas passed to compute_cdf_percentiles instead of 
-    # hardcoded linspace that had same value as CDF_SIGMAS (K.V.)
     """
     Make a summary table of redshift and other parameters from a set of
     `~grizli.fitting.GroupFitter` output files.
@@ -1658,7 +1654,6 @@ def make_summary_catalog(
         Summary table with columns for each object in `files` and rows for
         each parameter in `keys`.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
 
     import glob
@@ -2022,7 +2017,6 @@ def compute_sps_params(full="j021820-051015_01276.full.fits", cosmology=Planck15
         key is a `~grizli.utils.SpectrumTemplate` object with the best-fit
         template.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     import numpy as np
 
@@ -2374,7 +2368,6 @@ class GroupFitter(object):
             uncertainties in f-lambda units, `filters` are the `FilterDefinition`
             objects, and `tempfilt` is a `TemplateGrid` object.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         # from astroquery.sdss import SDSS
         # from astropy import coordinates as coords
@@ -2459,15 +2452,12 @@ class GroupFitter(object):
         phot = {"flam": flam, "eflam": eflam, "filters": filters, "tempfilt": tempfilt}
         return phot
 
-        # Vizier
-
     def set_photometry(
         self,
         flam=[],
         eflam=[],
         filters=[],
         ext_corr=1,
-        lc=None,
         force=False,
         tempfilt=None,
         min_err=0.02,
@@ -2476,10 +2466,6 @@ class GroupFitter(object):
         source="unknown",
         **kwargs,
     ):
-        # TODO: lc is never used, but I suspect it is related to photom_pivot
-        # attribute, which is at the moment set from the filters by default.
-        # pz is never used and I can't figure where it is intended. (K.V.)
-
         """
         Set photometry attributes
 
@@ -2512,7 +2498,7 @@ class GroupFitter(object):
             Template error function
 
         pz : None, (array, array)
-            Precomputed (z, pz) pdf from, e.g., `eazy`
+            Precomputed (z, pz) pdf from, e.g., `eazy` (not used)
 
         source : str
             String to indicate the provenance of the photometry
@@ -2646,7 +2632,6 @@ class GroupFitter(object):
             Array with dimensions (``N``, ``Nphot``) with interpolated flux 
             densities through the photometric filters.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         NTEMP = len(templates)
         A_phot = np.zeros((NTEMP + self.N, len(self.photom_flam)))
@@ -2687,9 +2672,6 @@ class GroupFitter(object):
         apply_sensitivity=True,
         median_filter_kwargs=None,
     ):
-        # TODO: pscale is not used, but looks like the relevant value is 
-        # computed in the 'if hasattr(self, "pscale")' clause. 
-        # Also, the returns have been tricky for me to understand. (K.V.)
         """Fit the 2D spectra with a set of templates at a specified redshift.
 
         Parameters
@@ -2724,9 +2706,9 @@ class GroupFitter(object):
         get_design_matrix : bool
             Return design matrix and data, rather than nominal outputs.
 
-        pscale : float
-            Scale factor for the photometry uncertainties.  If None, then
-            use the nominal values.
+        pscale : float, array-like
+            Scale parameters passed to `~grizli.fitting.GroupFitter.compute_scale_array`.
+            If None, then try to use from `self.pscale`.
 
         COEFF_SCALE : float
             Scale factor for the template coefficients.  The coefficients
@@ -2761,33 +2743,36 @@ class GroupFitter(object):
 
         Returns
         -------
-        if get_design_matrix  == True:
-            AxT : numpy.ndarray
-                Transposed design matrix, weighted by 1/sigma.
-            data : numpy.ndarray
-                Masked data array, including background pedestal.
+        AxT : numpy.ndarray
+            Transposed design matrix, weighted by 1/sigma.
+            (If ``get_design_matrix  == True``).
 
-        if get_components == True:
-            model : numpy.ndarray
-                Full model array, including the contributions from all templates.
-            background : numpy.ndarray
-                Background array computed from the fit.
+        data : numpy.ndarray
+            Masked data array, including background pedestal.
+            (If ``get_design_matrix  == True``)
 
-        else:
-            chi2 : float
-                Chi-squared of the fit, computed using the Huber loss function if `huber_delta` > 0.
-            coeffs : numpy.ndarray
-                Template coefficients from the fit.
-            coeffs_err : numpy.ndarray
-                Uncertainties of the template coefficients.
-            covariance : numpy.ndarray
-                Full covariance matrix of the fit parameters.
+        model : numpy.ndarray
+            Full model array, including the contributions from all templates.
+            (If ``get_components  == True``)
+        background : numpy.ndarray
+            Background array computed from the fit.
+            (If ``get_components  == True``)
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
+        chi2 : float
+            Chi-squared of the fit, computed using the Huber loss function if `huber_delta` > 0.
+
+        coeffs : numpy.ndarray
+            Template coefficients from the fit.
+        
+        coeffs_err : numpy.ndarray
+            Uncertainties of the template coefficients.
+        
+        covariance : numpy.ndarray
+            Full covariance matrix of the fit parameters.
+
         """
         import scipy.optimize
 
-        # import scipy.sparse
         from scipy.special import huber
 
         NTEMP = len(templates)
@@ -2956,7 +2941,6 @@ class GroupFitter(object):
         else:
             pedestal = 0
 
-        # oktemp = (A*self.fit_mask).sum(axis=1) != 0
         oktemp = A.sum(axis=1) != 0
 
         # Photometry
@@ -2971,24 +2955,25 @@ class GroupFitter(object):
             full_fit_mask = self.fit_mask
 
         # Weight design matrix and data by 1/sigma
-        # Ax = A[oktemp,:]*self.sivarf[full_fit_mask]
-
         # Include `weight` variable to account for contamination
         sivarf = self.sivarf * np.sqrt(self.weightf)
         Ax = A[oktemp, :] * sivarf[full_fit_mask]
-        # AxT = Ax[:,full_fit_mask].T
 
         # Scale photometry
-        if hasattr(self, "pscale"):
-            if self.pscale is not None:
-                scale = self.compute_scale_array(self.pscale, self.wavef[full_fit_mask])
-                if self.Nphot > 0:
-                    scale[-self.Nphot :] = 1.0
+        if pscale is None:
+            if hasattr(self, "pscale"):
+                if self.pscale is not None:
+                    pscale = self.pscale            
 
-                Ax *= scale
-                if fit_background:
-                    for i in range(self.N):
-                        Ax[i, :] /= scale
+        if pscale is not None:
+            scale = self.compute_scale_array(pscale, self.wavef[full_fit_mask])
+            if self.Nphot > 0:
+                scale[-self.Nphot :] = 1.0
+
+            Ax *= scale
+            if fit_background:
+                for i in range(self.N):
+                    Ax[i, :] /= scale
 
         # Need transpose
         AxT = Ax.T
@@ -3123,17 +3108,14 @@ class GroupFitter(object):
         bounded_kwargs=BOUNDED_DEFAULTS,
         delta_chi2_threshold=0.004,
         poly_order=3,
-        make_figure=True,
-        figsize=[8, 5],
         use_cached_templates=True,
         get_uncertainties=True,
         Rspline=30,
         huber_delta=4,
         get_student_logpdf=False,
     ):
-        #TODO: make_figure and figsize are not used, can't find 
-        # any reference to them. (K.V.)
-        r"""
+
+        """
         Two-step procedure for fitting redshifts
 
         1. polynomial, spline template fits
@@ -3182,9 +3164,6 @@ class GroupFitter(object):
             The parameters of the polynomial and full template fits are
             computed to evaluate the extent to which the galaxy / stellar
             templates improve the fit
-
-        make_figure, fig_size : bool, (float, float)
-            Make the diagnostic figure with dimensions `fig_size`
 
         use_cached_templates : bool
             Try to used cached versions of dispersed template models for
@@ -3814,8 +3793,6 @@ class GroupFitter(object):
     def template_at_z(
         self, z=0, templates=None, fwhm=1400, get_uncertainties=2, draws=0, **kwargs
     ):
-        # TODO: for review: initiated kwargs["get_uncertainties"] = get_uncertainties
-        # instead of hardcoded value of 2. (K.V.)
         """
         Get the best-fit template at a specified redshift
 
@@ -3831,7 +3808,8 @@ class GroupFitter(object):
             FWHM of line templates if `templates` generated in-place
 
         get_uncertainties : int
-            Get coefficient uncertainties from covariance matrix
+            Get coefficient uncertainties from covariance matrix.
+            See `~grizli.fitting.GroupFitter.xfit_at_z`.
 
         draws : int
             Number of random draws from covariance matrix
@@ -3886,27 +3864,6 @@ class GroupFitter(object):
         cont1d, line1d = utils.dot_templates(
             coeffs[self.N :], templates, z=z, apply_igm=(z > IGM_MINZ)
         )
-
-        # if False:
-        #     # Test draws from covariance matrix
-        #     NDRAW = 100
-        #     nonzero = coeffs[self.N:] != 0
-        #     covarx = covar[self.N:, self.N:][nonzero, :][:, nonzero]
-        #     draws = np.random.multivariate_normal(coeffs[self.N:][nonzero],
-        #                                           covarx, NDRAW)
-        #
-        #     contarr = np.zeros((NDRAW, len(cont1d.flux)))
-        #     linearr = np.zeros((NDRAW, len(line1d.flux)))
-        #     for i in range(NDRAW):
-        #         print(i)
-        #         coeffs_i = np.zeros(len(nonzero))
-        #         coeffs_i[nonzero] = draws[i, :]
-        #         _out = utils.dot_templates(coeffs_i, templates, z=z,
-        #                                              apply_igm=(z > IGM_MINZ))
-        #         contarr[i, :], linearr[i, :] = _out[0].flux, _out[1].flux
-        #
-        #     contrms = np.std(contarr, axis=0)
-        #     linerms = np.std(linearr, axis=0)
 
         # Parse template coeffs
         cfit = OrderedDict()
@@ -3994,7 +3951,6 @@ class GroupFitter(object):
         compare : dict
             The full comparison dictionary
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         from . import multifit
 
@@ -4503,7 +4459,6 @@ class GroupFitter(object):
             chi2: float
                 Chi-squared of the fit.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         import scipy.optimize
         from numpy.polynomial import Polynomial
@@ -4555,7 +4510,6 @@ class GroupFitter(object):
         chi2 : float
             Chi-squared of the fit.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         from eazy.filters import FilterDefinition
 
@@ -5026,7 +4980,6 @@ class GroupFitter(object):
         fig : `~matplotlib.figure.Figure`
             Figure object
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         import matplotlib.pyplot as plt
         from scipy.interpolate import UnivariateSpline
@@ -5727,7 +5680,6 @@ class GroupFitter(object):
         seg_ids : list
             List of segmentation IDs to use for the optimal profile.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
 
         if isinstance(self.beams[0], model.BeamCutout):
@@ -5908,7 +5860,6 @@ class GroupFitter(object):
 
             Flattened, masked background array.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         from astropy.modeling.models import Polynomial2D
 
@@ -5985,7 +5936,6 @@ class GroupFitter(object):
         chi2 : float
             Chi-squared value.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         bl, nl, z = params
 
@@ -6050,7 +6000,6 @@ class GroupFitter(object):
             max_nfev_reached : bool
                 True if the maximum number of function evaluations was reached.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         from scipy.optimize import least_squares
 
