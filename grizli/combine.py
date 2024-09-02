@@ -1,6 +1,8 @@
 """
 Scripts to combine FLT exposures at a single orientation / sub-pixel position
 to speed up the spectral processing.
+
+2024-09-92 (GBr): hasn't been used / tested for many years
 """
 import copy
 import glob
@@ -628,16 +630,15 @@ class SIP_WCSMap:
 
         Parameters
         ----------
-        input : pywcs.WCS
+        input : `astropy.wcs.WCS`
             Input WCS object.
 
-        output : pywcs.WCS
+        output : `astropy.wcs.WCS`
             Output WCS object.
 
         origin : int
             Origin of the pixel coordinates (default is 1).
         
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
 
         # Verify that we have valid WCS input objects
@@ -665,7 +666,6 @@ class SIP_WCSMap:
         name : str
             Name of the object to be checked.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         try:
             assert isinstance(obj, pywcs.WCS)
@@ -695,7 +695,6 @@ class SIP_WCSMap:
         result : tuple
             Tuple of transformed pixel positions in the output frame.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         # This matches WTRAXY results to better than 1e-4 pixels.
         skyx, skyy = self.input.all_pix2world(pixx, pixy, self.origin)
@@ -721,7 +720,6 @@ class SIP_WCSMap:
         result : tuple
             Tuple of transformed pixel positions in the input frame.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         # skyx,skyy = self.output.wcs_pix2world(pixx,pixy,self.origin)
         skyx, skyy = self.output.all_pix2world(pixx, pixy, self.origin)
@@ -741,7 +739,7 @@ class SIP_WCSMap:
         
         Parameters
         ----------
-        wcs : pywcs.WCS
+        wcs : `astropy.wcs.WCS`
             WCS object representing the coordinate transformation.
 
         pixx : array-like
@@ -755,7 +753,6 @@ class SIP_WCSMap:
         result : tuple
             Tuple of transformed sky positions in the output frame.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         return wcs.all_pix2world(pixx, pixy, 1)
 
@@ -765,7 +762,7 @@ class SIP_WCSMap:
         
         Parameters
         ----------
-        wcs : pywcs.WCS
+        wcs : `astropy.wcs.WCS`
             WCS object representing the coordinate transformation.
 
         ra : array-like
@@ -779,6 +776,5 @@ class SIP_WCSMap:
         result : tuple
             Tuple of transformed pixel positions in the output frame.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         return wcs.wcs_world2pix(ra, dec, 1)
