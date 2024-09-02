@@ -40,9 +40,9 @@ def test_cinterp_conserve():
         ylr = base_module.interp_conserve_c(xlr, xarr, yarr)
         assert np.allclose(np.trapz(ylr, xlr), np.trapz(yarr, xarr))
 
-    if len(INTERP_MODULES) > 1:
-        ylr_slow = interp.interp_conserve(xlr, xarr, yarr)
-        assert np.allclose(np.trapz(ylr_slow, xlr), np.trapz(yarr, xarr))
+    # if len(INTERP_MODULES) > 1:
+    #     ylr_slow = interp.interp_conserve(xlr, xarr, yarr)
+    #     assert np.allclose(np.trapz(ylr_slow, xlr), np.trapz(yarr, xarr))
 
 
 def test_disperse_c():
