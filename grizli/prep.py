@@ -6250,7 +6250,7 @@ def match_direct_grism_wcs(direct={}, grism={}, get_fresh_flt=True,
             im.flush()
 
 
-def get_jwst_wfssbkg_file(file, valid_flat=[0.6, 1.3], make_figure=False, verbose=True):
+def get_jwst_wfssbkg_file(file, valid_flat=[0.6, 1.3], make_figure=False, verbose=True, ignoreNA=False):
     """
     Divide flat-field from NIRISS wfssbkg file
     
@@ -6261,6 +6261,9 @@ def get_jwst_wfssbkg_file(file, valid_flat=[0.6, 1.3], make_figure=False, verbos
     
     valid_flat : [float,float]
         Range of valid files in the flat-field reference
+        
+    ignoreNA : bool
+        If True, don't check for "N/A" reference files
         
     Returns
     -------
@@ -6275,7 +6278,7 @@ def get_jwst_wfssbkg_file(file, valid_flat=[0.6, 1.3], make_figure=False, verbos
     bkg_file = WfssContamStep().get_reference_file(file, 'wfssbkg')
 
     # Not a FITS file?  e.g., N/A for imaging exposures
-    if 'fits' not in bkg_file:
+    if ('fits' not in bkg_file) and (not ignoreNA):
         return bkg_file
     
     # Only run for NIRISS, seems like NIRCam provides wfssbkg without
@@ -6351,7 +6354,7 @@ def get_jwst_wfssbkg_file(file, valid_flat=[0.6, 1.3], make_figure=False, verbos
     return bkg_file
 
 
-def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext=1, sky_iter=10, iter_atol=1.e-4, use_spline=True, NXSPL=50, skip_nircam=True):
+def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext=1, sky_iter=10, iter_atol=1.e-4, use_spline=True, NXSPL=50, skip_nircam=True, ignoreNA=False):
     """Subtract sky background from grism exposures
 
     Implementation of the multi-component grism sky subtraction from 
@@ -6417,7 +6420,7 @@ def visit_grism_sky(grism={}, apply=True, column_average=True, verbose=True, ext
         #                                                 'wfssbkg')
         
         # Get the background file, perhaps after correcting it for the flat
-        wfss_ref = get_jwst_wfssbkg_file(grism['files'][0],verbose=verbose)
+        wfss_ref = get_jwst_wfssbkg_file(grism['files'][0],verbose=verbose, ignoreNA=ignoreNA)
         
         # # GRISM_NIRCAM
         # if 'GRISM' in grism_element:
