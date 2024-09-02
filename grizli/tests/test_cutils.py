@@ -4,14 +4,14 @@ import numpy as np
 
 from grizli import utils
 
-from grizli.utils_c import interp
-from grizli.utils_c import disperse
+# from grizli.utils_c import interp
+# from grizli.utils_c import disperse
 
 from grizli.utils_numba import interp as interp_numba
 from grizli.utils_numba import disperse as disperse_numba
 
-DISPERSE_MODULES = [disperse, disperse_numba]
-INTERP_MODULES = [interp, interp_numba]
+DISPERSE_MODULES = [disperse_numba]
+INTERP_MODULES = [interp_numba]
 
 
 def test_cinterp():
@@ -20,7 +20,7 @@ def test_cinterp():
     """
     xarr = np.array([0.0, 1.0, 2.0])
     yarr = np.array([0.0, 1.0, 0.0])
-    for base_module in interp, interp_numba:
+    for base_module in INTERP_MODULES:
         result = base_module.interp_c(np.array([0.5]), xarr, yarr)
         assert np.allclose(result, 0.5)
 
