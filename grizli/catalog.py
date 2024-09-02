@@ -55,7 +55,6 @@ def table_to_radec(table, output="coords.radec"):
     output : str
         Output filename. Default is `coords.radec`.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.        
     """
 
     if "X_WORLD" in table.colnames:
@@ -125,7 +124,6 @@ def table_to_regions(
     extra : list of str
         Extra text to add to each region line. Default is None.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     fp = open(output, "w")
     fp.write(header + "\n")
@@ -288,7 +286,6 @@ def get_ukidss_catalog(
     table : `~astropy.table.Table`
         Result of the query
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
 
     from astroquery.ukidss import Ukidss
@@ -335,11 +332,9 @@ def get_sdss_catalog(ra=165.86, dec=34.829694, radius=3):
     return table
 
 
-def get_twomass_catalog(ra=165.86, dec=34.829694, radius=3, catalog="allwise_p3as_psd"):
-    #TODO: Should catalog param be passed to get_irsa_catalog? Right now
-    # it is defaulted to a value that is not used. (K.V.)
+def get_twomass_catalog(ra=165.86, dec=34.829694, radius=3, catalog="fp_psc"):
     """
-    Query for objects in the 2MASS catalog
+    Query for objects in the IRSA 2MASS catalog
 
     Wrapper for `astroquery.irsa.Irsa.query_region`
 
@@ -352,10 +347,9 @@ def get_twomass_catalog(ra=165.86, dec=34.829694, radius=3, catalog="allwise_p3a
     radius : float
         Radius of the query, in arcmin
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     return get_irsa_catalog(
-        ra=ra, dec=dec, radius=radius, catalog="fp_psc", wise=False, twomass=True
+        ra=ra, dec=dec, radius=radius, catalog=catalog, wise=False, twomass=True
     )
 
 
@@ -381,7 +375,7 @@ def get_irsa_catalog(
         Radius of the query, in arcmin
 
     catalog : str
-        Catalog to query.  Default is `allwise_p3as_psd`.
+        Catalog to query.  Default is `allwise_p3as_psd`.  2MASS is `fp_psc`.
 
     wise : bool
         Query the WISE catalog.  Default is False.
@@ -400,7 +394,6 @@ def get_irsa_catalog(
     table : `~astropy.table.Table`
         Result of the query
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     from astroquery.irsa import Irsa
 
@@ -427,7 +420,6 @@ def get_irsa_catalog(
     return table
 
 
-#
 def get_gaia_radec_at_time(gaia_tbl, date=2015.5, format="decimalyear"):
     """
     Use `~astropy.coordinates.SkyCoord.apply_space_motion` to compute 
@@ -536,13 +528,10 @@ def get_gaia_DR2_vizier(
     max=100000,
     catalog="I/355/gaiadr3",
     server="vizier.u-strasbg.fr",
-    use_mirror=False,
     keys=None,
     mjd=None,
     clean_mjd=True,
 ):
-    #TODO: I am assuming the "use_mirror" param is to switch between mirror servers,
-    # but it is never used. Should it be deleted? (K.V.)
     """
     Query GAIA catalog from Vizier`
 
@@ -582,7 +571,6 @@ def get_gaia_DR2_vizier(
     table : `~astropy.table.Table`
         Result of the query
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     from astroquery.vizier import Vizier
     import astropy.units as u
@@ -644,7 +632,6 @@ def gaia_catalog_for_assoc(assoc_name="j191132p1652_hen-2-427-f335m_00007"):
     gaia : `~astropy.table.Table`
         Result of the query.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     from grizli.aws import db
     from grizli import utils
@@ -684,7 +671,6 @@ def gaia_catalog_for_assoc(assoc_name="j191132p1652_hen-2-427-f335m_00007"):
 def gaia_dr2_conesearch_query(ra=165.86, dec=34.829694, radius=3.0, max=100000):
     """
     Generate a query string for the TAP servers
-    TBD
 
     Parameters
     ----------
@@ -702,7 +688,6 @@ def gaia_dr2_conesearch_query(ra=165.86, dec=34.829694, radius=3.0, max=100000):
     query : str
         Query string
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     query = "SELECT TOP {3} * FROM gaiadr2.gaia_source  WHERE CONTAINS(POINT('ICRS',gaiadr2.gaia_source.ra,gaiadr2.gaia_source.dec),CIRCLE('ICRS',{0},{1},{2:.2f}))=1".format(
         ra, dec, radius / 60.0, max
@@ -749,7 +734,6 @@ def get_gaia_DR2_catalog(
     table : `~astropy.table.Table`
         Result of the query
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     try:
         import httplib
@@ -929,7 +913,6 @@ def gen_tap_box_query(
     query : str
         Query string
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
 
     rmi = radius / 60 / 2
@@ -996,7 +979,6 @@ def query_tap_catalog(
     dec=34.829694,
     radius=3.0,
     corners=None,
-    max_wait=20,
     db="ls_dr9.tractor",
     columns=["*"],
     extra="",
@@ -1014,7 +996,6 @@ def query_tap_catalog(
     tap_kwargs={},
     **kwargs,
 ):
-    #TODO: max_wait is not used. Should it be deleted? (K.V.)
     """Query NOAO Catalog holdings
 
     Parameters
@@ -1072,7 +1053,6 @@ def query_tap_catalog(
     table : `~astropy.table.Table`
         Result of the query
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     from astroquery.utils.tap.core import TapPlus
 
@@ -1254,7 +1234,6 @@ def get_hubble_source_catalog(
         `radius`.  Or if a `WCS` object, get limits from the
         `~astropy.wcs.WCS.calc_footprint` method
 
-
     max : int 
         Maximum number of rows to return. Default is 100000.
     
@@ -1284,7 +1263,6 @@ def get_hubble_source_catalog(
     tab : `~astropy.table.Table`
         Result of the query.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     import astropy.table
 
@@ -1382,7 +1360,6 @@ def get_nsc_catalog(
     tab : `~astropy.table.Table`
         Result of the query.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     msg = "Query NOAO Source Catalog ({ra:.5f},{dec:.5f},{radius:.1f}')"
     print(msg.format(ra=ra, dec=dec, radius=radius))
@@ -1447,7 +1424,6 @@ def get_desdr1_catalog(
     tab : `~astropy.table.Table`
         Result of the query
     
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     msg = "Query DES Source Catalog ({ra:.5f},{dec:.5f},{radius:.1f}')"
     print(msg.format(ra=ra, dec=dec, radius=radius))
@@ -1513,7 +1489,6 @@ def get_desdr1_catalog_old(
     tab : `~astropy.table.Table`
         Result of the query.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     msg = "Query DES Source Catalog ({ra:.5f},{dec:.5f},{radius:.1f}')"
     print(msg.format(ra=ra, dec=dec, radius=radius))
@@ -1541,12 +1516,8 @@ def get_vhs_catalog(
     extra="",
     table="vhs_dr4",
 ):
-    #TODO: For the table param, I could not find the correct options.
-    # earlier docstring said "table: 'vexasds', 'vexasps', 'vexassm'" 
-    # I tried calling the method with these options, but it resulted in 
-    # a 400 Bad Request Error. The default parameter works. (K.V.)
     """
-    VEXAS DR2 from vizier
+    VISTA Hemisphere Survey (VHS) DR4.1 from vizier
 
     https://vizier.cds.unistra.fr/viz-bin/VizieR?-source=II/369
 
@@ -1586,7 +1557,6 @@ def get_vhs_catalog(
     tab : `~astropy.table.Table`
         Result of the query.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     msg = "Query VHS DR4 {table} catalog ({ra},{dec},{radius})"
     print(msg.format(table=table, ra=ra, dec=dec, radius=radius))
@@ -1614,10 +1584,6 @@ def get_vexas_catalog(
     extra="",
     table="vexasdes",
 ):
-    #TODO: For the table param, I could not find the correct options.
-    # earlier docstring said "table: 'vexasds', 'vexasps', 'vexassm'" 
-    # I tried calling the method with these options, but it resulted in 
-    # a 400 Bad Request Error. The default parameter works. (K.V.)
     """
     VEXAS DR2 from vizier
 
@@ -1659,7 +1625,6 @@ def get_vexas_catalog(
     tab : `~astropy.table.Table`
         Result of the query.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     msg = "Query VEXAS DR2 {table} catalog ({ra},{dec},{radius})"
     print(msg.format(table=table, ra=ra, dec=dec, radius=radius))
@@ -1720,7 +1685,6 @@ def get_skymapper_catalog(
     tab : `~astropy.table.Table`
         Result of the query.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     msg = "Query Skymapper DR1 catalog ({ra},{dec},{radius})"
     print(msg.format(ra=ra, dec=dec, radius=radius))
@@ -1777,7 +1741,6 @@ def get_legacysurveys_catalog(
     tab : `~astropy.table.Table`
         Result of the query
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     if verbose:
         msg = "Query LegacySurveys ({db}) catalog ({ra},{dec},{radius:.2f})"
@@ -1847,7 +1810,6 @@ def get_panstarrs_catalog(
     tab : `~astropy.table.Table`
         Result of the query.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     msg = "Query PanSTARRS catalog ({ra},{dec},{radius})"
     print(msg.format(ra=ra, dec=dec, radius=radius))
