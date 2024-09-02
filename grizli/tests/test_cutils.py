@@ -4,12 +4,10 @@ import numpy as np
 
 from grizli import utils
 
-# from grizli.utils_c import interp
-# from grizli.utils_c import disperse
-
 from grizli.utils_numba import interp as interp_numba
 from grizli.utils_numba import disperse as disperse_numba
 
+# Used to test both utils_numba and utils_c
 DISPERSE_MODULES = [disperse_numba]
 INTERP_MODULES = [interp_numba]
 

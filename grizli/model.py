@@ -346,7 +346,6 @@ class GrismDisperser(object):
         Sets attributes that define how the dispersion is computed.  See the
         attributes list for `~grizli.model.GrismDisperser`.
         """
-        # from .utils_c import interp
         from .utils_numba import interp
 
         # Get dispersion parameters at the reference position
@@ -464,7 +463,6 @@ class GrismDisperser(object):
             Y-offset to apply
 
         """
-        # from .utils_c.interp import interp_conserve_c
         from .utils_numba.interp import interp_conserve_c
 
         self.ytrace_beam, self.lam_beam = self.conf.get_beam_trace(
@@ -567,8 +565,6 @@ class GrismDisperser(object):
             If `in_place` is False, returns the 2D model spectrum.  Otherwise
             the result is stored in `self.model` and `self.modelf`.
         """
-        # from .utils_c import disperse
-        # from .utils_c import interp
         from .utils_numba import disperse
         from .utils_numba import interp
 
@@ -1127,7 +1123,6 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         Integrate the sensitivity curve to the wavelengths for the
         PSF model
         """
-        # from .utils_c import interp
         from .utils_numba import interp
 
         so = np.argsort(self.lam_psf)
@@ -1140,7 +1135,6 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         """
         Ensure normalization correct
         """
-        #from .utils_c import interp
         from .utils_numba import interp
 
         if not hasattr(self, 'A_psf'):
@@ -1247,7 +1241,6 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         """
         Compute model with PSF morphology template
         """
-        # from .utils_c import interp
         from .utils_numba import interp
 
         if spectrum_1d is None:
@@ -3000,7 +2993,6 @@ class GrismFLT(object):
             If `in_place` is False, return a full array including the model
             for the single object.
         """
-        # from .utils_c import disperse
         from .utils_numba import disperse
 
         if id in self.object_dispersers:
@@ -3315,7 +3307,6 @@ class GrismFLT(object):
             has_tqdm = False
             print('(`pip install tqdm` for a better verbose iterator)')
             
-        # from .utils_c import disperse
         from .utils_numba import disperse
 
         if ids is None:

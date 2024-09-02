@@ -492,10 +492,8 @@ def blot_nearest_exact(
     from drizzlepac import cdriz
 
     try:
-        # from .utils_c.interp import pixel_map_c
         from .utils_numba.interp import pixel_map_c
     except ImportError:
-        # from grizli.utils_c.interp import pixel_map_c
         from grizli.utils_numba.interp import pixel_map_c
 
     # Shapes, in numpy array convention (y, x)
@@ -3483,9 +3481,6 @@ class SpectrumTemplate(object):
         INTEGRATOR = np.trapz
 
         try:
-            # import grizli.utils_c
-            # interp = grizli.utils_c.interp.interp_conserve_c
-            # from .utils_c.interp import interp_conserve_c
             from .utils_numba.interp import interp_conserve_c
             interp = interp_conserve_c
         except ImportError:
@@ -4812,7 +4807,6 @@ def array_templates(templates, wave=None, max_R=5000, z=0, apply_igm=False):
         template dictionary starts with "line ").
 
     """
-    # from grizli.utils_c.interp import interp_conserve_c
     from grizli.utils_numba.interp import interp_conserve_c
 
     if wave is None:

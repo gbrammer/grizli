@@ -1885,7 +1885,6 @@ class StackedSpectrum(object):
         """
         Initiazize components for generating 2D model
         """
-        # from .utils_c.interp import interp_conserve_c
         from .utils_numba.interp import interp_conserve_c
 
         NY = self.sh[0]
@@ -1955,7 +1954,6 @@ class StackedSpectrum(object):
             The generated model spectrum.
 
         """
-        # from .utils_c.interp import interp_conserve_c
         from .utils_numba.interp import interp_conserve_c
 
         if spectrum_1d is None:
