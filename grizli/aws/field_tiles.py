@@ -373,9 +373,13 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
                                 'sw':['F070W-CLEAR','F090W-CLEAR',
                                       'F115W-CLEAR','F150W-CLEAR',
                                       'F200W-CLEAR',
-                                      'F182M-CLEAR','F210M-CLEAR'], 
+                                      'F182M-CLEAR','F210M-CLEAR',
+                                      'F150W2-CLEAR',
+                                  ],
                                 'lw':['F277W-CLEAR','F356W-CLEAR',
-                                      'F410M-CLEAR','F444W-CLEAR'],
+                                      'F410M-CLEAR','F444W-CLEAR',
+                                      'F322W2-CLEAR',
+                                  ],
                             }, 
                                             weight_fnu=False)
 
@@ -523,7 +527,7 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
     # but look for other combinations if that not available
     if (len(glob.glob(f'{root}*.ncrgb.png')) == 0) & make_combinations:
         filters = []
-        for f in ['f444w-clear','f410m-clear']:
+        for f in ['f444w-clear','f410m-clear','f322w2-clear']:
             if f in all_filters:
                 filters.append(f)
                 break
@@ -531,7 +535,7 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
             if f in all_filters:
                 filters.append(f)
                 break
-        for f in ['f115w-clear','f090w-clear','f150w-clear','f200w-clear']:
+        for f in ['f115w-clear','f090w-clear','f150w-clear','f200w-clear','f150w2-clear']:
             if f in all_filters:
                 filters.append(f)
                 break
