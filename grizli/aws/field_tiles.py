@@ -563,9 +563,11 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
             filters = ['f115w-clear','f200w-clear','f356w-clear']
             rgb_scl = [1.3, 0.8, 1.02]
 
-        if root.startswith('cluster-'):
+        if root.split('-')[0] in ['cluster','eiger','aspire']:
             norm_kwargs=None
+            scl = 2
         else:
+            scl = 4
             norm_kwargs={'stretch': 'asinh', 'min_cut': -0.01,
                          'max_cut': 1.0, 'clip':True,
                          'asinh_a':0.03}
@@ -573,7 +575,7 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
         split_tiles(root, ref_tile=ref_tile, 
                     filters=filters,
                     zoom_levels=zoom_levels,
-                    optical=True, suffix='.ncrgb', xsize=32, scl=4,
+                    optical=True, suffix='.ncrgb', xsize=32, scl=scl,
                     force=force, rgb_min=-0.018,
                     rgb_scl=rgb_scl,
                     norm_kwargs=norm_kwargs,
