@@ -562,6 +562,9 @@ def make_all_tile_images(root, force=False, ref_tile=(8,8), cleanup=True, zoom_l
         elif 'eiger' in root:
             filters = ['f115w-clear','f200w-clear','f356w-clear']
             rgb_scl = [1.3, 0.8, 1.02]
+        elif 'nexus-j1753' in root:
+            filters = ['f115w-clear','f200w-clear','f444w-clear']
+            rgb_scl = [1.0, 0.9, 1.01]
 
         if root.split('-')[0] in ['cluster','eiger','aspire']:
             norm_kwargs=None
