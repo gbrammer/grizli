@@ -1953,11 +1953,22 @@ def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, com
             if 'clear' in v['product']:
                 print('NIRISS pure parallel direct: ', v['product'])
                 direct = v
-        
+
         for g in all_groups:
             if g['direct'] is None:
                 g['direct'] = direct
     
+    # NEXUS GO-5105 mixes F356W direct and F322W2 grism
+    if (len(all_groups) > 0) and ( ('jw05105' in files[0]) ):
+        for v in visits:
+            if 'clear' in v['product']:
+                print('NEXUS direct: ', v['product'])
+                direct = v
+
+        for g in all_groups:
+            if g['direct'] is None:
+                g['direct'] = direct
+
     print('\n == Grism groups ==\n')
     valid_groups = []
     for g in all_groups:
