@@ -7512,6 +7512,7 @@ def drizzle_from_visit(
     snowblind_kwargs=None,
     jwst_dq_flags=JWST_DQ_FLAGS,
     nircam_hot_pixel_kwargs={},
+    niriss_hot_pixel_kwargs=None, # {'hot_threshold': 7, 'plus_sn_min': 3},
     get_dbmask=True,
     **kwargs,
 ):
@@ -7600,6 +7601,12 @@ def drizzle_from_visit(
     nircam_hot_pixel_kwargs : dict
         Keyword arguments for `grizli.jwst_utils.flag_nircam_hot_pixels`.  Set to
         ``None`` to disable and use the static bad pixel tables.
+
+    niriss_hot_pixel_kwargs : dict
+        Keyword arguments for `grizli.jwst_utils.flag_nircam_hot_pixels` when running
+        on NIRISS exposures. Set to ``None`` to disable and use the static bad pixel
+        tables.
+
 
     Returns
     -------
@@ -7807,6 +7814,17 @@ def drizzle_from_visit(
                     # extra_wfc3ir_badpix = False
                 else:
                     msg = f" flag_nircam_hot_pixels: {_count} out of range"
+                    log_comment(LOGFILE, msg, verbose=verbose)
+
+            elif (_inst in ["NIRISS"]) & (niriss_hot_pixel_kwargs is not None):
+                _sn, dq_flag, _count = flag_nircam_hot_pixels(
+                    flt, **niriss_hot_pixel_kwargs
+                )
+                if (_count > 0) & (_count < 8192):
+                    bpdata |= ((dq_flag > 0) * 1024).astype(bpdata.dtype)
+                    # extra_wfc3ir_badpix = False
+                else:
+                    msg = f" flag_nircam_hot_pixels: {_count} out of range (NIRISS)"
                     log_comment(LOGFILE, msg, verbose=verbose)
 
             if (snowblind_kwargs is not None) & (_inst in ["NIRCAM", "NIRISS"]):
