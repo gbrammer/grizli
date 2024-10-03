@@ -3092,7 +3092,9 @@ def get_nircam_wisp_filename(header, prefer_stsci_file=True, **kwargs):
         Primary header
 
     prefer_stsci_file : bool
-        Prefer STScI WISP files with names like ``WISP_NRCB4_F182M_CLEAR.fits``
+        Prefer STScI WISP files made by Ben Sunnquist with names like 
+        ``WISP_NRCB4_F182M_CLEAR.fits``.  See `here <https://spacetelescope.github.io/jdat_notebooks/notebooks/NIRCam/NIRCam_wisp_subtraction/nircam_wisp_subtraction.html>`_
+        for more information on how they were generated.
 
     Returns
     -------
