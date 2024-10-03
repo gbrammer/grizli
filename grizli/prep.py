@@ -3253,7 +3253,7 @@ def nircam_wisp_correction(calibrated_file, niter=3, update=True, verbose=True, 
 
         msg = f'nircam_wisp_correction - {calibrated_file}: '
         msg += f'iter {_iter} Npix={ok.sum()} '
-        msg += f'bg={_x[0][0]:.2f} wisp={_x[0][1]:.2f}'
+        msg += f'bg={_x[0][0]:.2f} wisp={_x[0][1]:.2f} {wisp_file}'
         utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
 
         #print(ok.sum(), _x[0])
