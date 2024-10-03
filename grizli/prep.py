@@ -3081,7 +3081,7 @@ def apply_visit_skyflat(visit, skyfile=None, verbose=True):
             _imi.flush()
 
 
-def get_nircam_wisp_filename(header):
+def get_nircam_wisp_filename(header, prefer_stsci_file=True, **kwargs):
     """
     Get the path to an appropriate NIRCam wisp template file, assuming the 
     templates are stored in `[GRIZLI_PATH]/CONF/NircamWisp`
@@ -3090,7 +3090,12 @@ def get_nircam_wisp_filename(header):
     ----------
     header : `astropy.io.fits.Header`
         Primary header
-    
+
+    prefer_stsci_file : bool
+        Prefer STScI WISP files made by Ben Sunnquist with names like 
+        ``WISP_NRCB4_F182M_CLEAR.fits``.  See `here <https://spacetelescope.github.io/jdat_notebooks/notebooks/NIRCam/NIRCam_wisp_subtraction/nircam_wisp_subtraction.html>`_
+        for more information on how they were generated.
+
     Returns
     -------
     wisp_file : str
@@ -3108,14 +3113,16 @@ def get_nircam_wisp_filename(header):
     
     msg : str
         Status message
-        
+
     """
     if 'OFILTER' in header:
         _filt = header['OFILTER']
+        _pupil = header['OPUPIL']
         _inst = header['OINSTRUM']
         _det = header['ODETECTO']
     else:
         _filt = header['FILTER']
+        _pupil = header['PUPIL']
         _inst = header['INSTRUME']
         _det = header['DETECTOR']
 
@@ -3124,7 +3131,7 @@ def get_nircam_wisp_filename(header):
         return None, _filt, _inst, _det, msg
         
     # F150W2 is F160M for now
-    if _filt not in ['F115W','F150W','F200W','F182M','F210M','F140M','F150W2']:
+    if _filt not in ['F115W','F150W','F200W','F182M','F210M','F140M','F162M','F150W2']:
         msg = f'NIRCam filter {_filt} not supported'
         return None, _filt, _inst, _det, msg
 
@@ -3138,10 +3145,15 @@ def get_nircam_wisp_filename(header):
     wisp_file = f"wisps_{_det.lower()}_{_filt.upper()}.fits"
     wisp_file = os.path.join(_path, wisp_file)
     
+    stsci_file = f"WISP_{_det.upper()}_{_filt.upper()}_{_pupil.upper()}.fits"
+    stsci_file = os.path.join(_path, stsci_file)
+    if os.path.exists(stsci_file) & prefer_stsci_file:
+        wisp_file = stsci_file
+
     return wisp_file, _filt, _inst, _det, msg
 
 
-def nircam_wisp_correction(calibrated_file, niter=3, update=True, verbose=True, force=False, **kwargs):
+def nircam_wisp_correction(calibrated_file, niter=3, update=True, verbose=True, force=False, prefer_stsci_file=True, **kwargs):
     """
     Fit the NIRCam wisp template and subtract
     
@@ -3191,7 +3203,10 @@ def nircam_wisp_correction(calibrated_file, niter=3, update=True, verbose=True, 
         utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
         return _bkg
 
-    _ = get_nircam_wisp_filename(im[0].header)
+    _ = get_nircam_wisp_filename(
+        im[0].header,
+        prefer_stsci_file=prefer_stsci_file
+    )
     wisp_file, _filt, _inst, _det, _msg = _
     
     if wisp_file is None:
@@ -3240,7 +3255,7 @@ def nircam_wisp_correction(calibrated_file, niter=3, update=True, verbose=True, 
 
         msg = f'nircam_wisp_correction - {calibrated_file}: '
         msg += f'iter {_iter} Npix={ok.sum()} '
-        msg += f'bg={_x[0][0]:.2f} wisp={_x[0][1]:.2f}'
+        msg += f'bg={_x[0][0]:.2f} wisp={_x[0][1]:.2f} {wisp_file}'
         utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
 
         #print(ok.sum(), _x[0])
@@ -3255,6 +3270,7 @@ def nircam_wisp_correction(calibrated_file, niter=3, update=True, verbose=True, 
         with pyfits.open(calibrated_file, mode='update') as im:
             im[0].header['WISPBKG'] = _x[0][0], 'Wisp fit, background'
             im[0].header['WISPNORM'] = _x[0][1], 'Wisp fit, model norm'
+            im[0].header['WISPFILE'] = os.path.basename(wisp_file), 'Wisp template file'
             im['SCI'].data -= _model.reshape(im['SCI'].data.shape)
             im.flush()
             
@@ -4866,12 +4882,12 @@ def process_direct_grism_visit(direct={},
 
         # Make DRZ catalog again with updated DRZWCS
         clean_drizzle(direct['product'])
-        
+
         if isJWST:
             if nircam_wisp_kwargs is not None:
                 for _file in direct['files']:
                     nircam_wisp_correction(_file, **nircam_wisp_kwargs)
-                
+
             # if oneoverf_kwargs is not None:
             #     oneoverf_column_correction(direct, **oneoverf_kwargs)
                         

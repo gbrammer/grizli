@@ -9059,13 +9059,34 @@ def fetch_wfpc2_calib(
             return True
 
 
-def fetch_nircam_skyflats():
+def fetch_nircam_skyflats(dryrun=False):
     """
     Download skyflat files
     """
     conf_path = os.path.join(GRIZLI_PATH, "CONF", "NircamSkyFlat")
+
+    dry = " --dryrun" if dryrun else ""
+
     os.system(
-        f'aws s3 sync s3://grizli-v2/NircamSkyflats/ {conf_path} --exclude "*" --include "nrc*fits"'
+        f'aws s3 sync s3://grizli-v2/NircamSkyflats/ {conf_path} --exclude "*" --include "nrc*fits"' + dry
+    )
+
+    _files = glob.glob(conf_path + "/*fits")
+    _files.sort()
+
+    return _files
+
+
+def fetch_nircam_wisp_templates(dryrun=False):
+    """
+    Download STScI wisp templates from s3 mirror
+    """
+    conf_path = os.path.join(GRIZLI_PATH, "CONF", "NircamWisp")
+    
+    dry = " --dryrun" if dryrun else ""
+    
+    os.system(
+        f'aws s3 sync s3://grizli-v2/NircamWisp/stsci-v3/ {conf_path} --exclude "*" --include "WISP*fits"' + dry
     )
 
     _files = glob.glob(conf_path + "/*fits")
@@ -9138,7 +9159,7 @@ def fetch_config_files(
         tarfiles += [
             f"{BASEURL}/jwst-grism-conf.tar.gz",
             f"{BASEURL}/niriss.conf.220725.tar.gz",
-            f"{BASEURL}/nircam-wisp-aug2022.tar.gz",
+            # f"{BASEURL}/nircam-wisp-aug2022.tar.gz",
         ]
 
     if get_sky:
