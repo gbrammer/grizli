@@ -3268,6 +3268,7 @@ def nircam_wisp_correction(calibrated_file, niter=3, update=True, verbose=True, 
         with pyfits.open(calibrated_file, mode='update') as im:
             im[0].header['WISPBKG'] = _x[0][0], 'Wisp fit, background'
             im[0].header['WISPNORM'] = _x[0][1], 'Wisp fit, model norm'
+            im[0].header['WISPFILE'] = os.path.basename(wisp_file), 'Wisp template file'
             im['SCI'].data -= _model.reshape(im['SCI'].data.shape)
             im.flush()
             
@@ -4879,12 +4880,12 @@ def process_direct_grism_visit(direct={},
 
         # Make DRZ catalog again with updated DRZWCS
         clean_drizzle(direct['product'])
-        
+
         if isJWST:
             if nircam_wisp_kwargs is not None:
                 for _file in direct['files']:
                     nircam_wisp_correction(_file, **nircam_wisp_kwargs)
-                
+
             # if oneoverf_kwargs is not None:
             #     oneoverf_column_correction(direct, **oneoverf_kwargs)
                         
