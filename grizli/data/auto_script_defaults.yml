@@ -132,6 +132,7 @@ visit_prep_args: &prep_args
     nircam_wisp_kwargs:
         niter: 3
         update: True
+        prefer_stsci_file: True
     oneoverf_kwargs: 
         thresholds: [5,4,3]
         dilate_iterations: 3
