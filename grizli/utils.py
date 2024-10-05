@@ -467,8 +467,10 @@ def blot_nearest_exact(
         If True, print information about the overlap. Default is True.
 
     stepsize : int, optional
-        Step size for interpolation. If set to -1, the function will use a
-        default step size. Default is -1.
+        Step size for interpolation. If set to <=1, the function will use the explicit
+        wcs mapping ``out_wcs.all_pix2world > in_wcs.all_world2pix``.  If > 1,
+        will use
+        ``astrodrizzle.DefaultWCSMapping(out_wcs, in_wcs, nx, ny, stepsize)``.
 
     scale_by_pixel_area : bool
         If True, then scale the output image by the square of the image pixel
