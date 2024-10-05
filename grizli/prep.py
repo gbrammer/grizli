@@ -3330,7 +3330,13 @@ def oneoverf_column_correction(visit, thresholds=[10,1.5], dilate_iter=[10,2], i
             _sci = _im['SCI'].data
             _wcs = pywcs.WCS(_im['SCI'].header, relax=True)
 
-            _blotted = utils.blot_nearest_exact((seg_mask*1), seg_wcs, _wcs)
+            _blotted = utils.blot_nearest_exact(
+                seg_mask*1,
+                seg_wcs,
+                _wcs,
+                stepsize=-1,
+            )
+
             msk = _blotted > 0
             msk |= _im['ERR'].data <= 0
             _sn = (_sci - _im['SCI'].header['MDRIZSKY']) / _im['ERR'].data
@@ -3527,7 +3533,7 @@ BLOT_BACKGROUND_PARAMS = {'bw': 64, 'bh': 64, 'fw': 3, 'fh': 3,
 def blot_background(visit={'product': '', 'files': None},
                     bkg_params=BLOT_BACKGROUND_PARAMS,
                     verbose=True, skip_existing=True, get_median=False,
-                    log=True, stepsize=10, **kwargs):
+                    log=True, stepsize=-1, **kwargs):
     """
     Blot SEP background of drizzled image back to component FLT images
     
@@ -3615,10 +3621,12 @@ def blot_background(visit={'product': '', 'files': None},
             flt_wcs = pywcs.WCS(flt['SCI', ext].header, fobj=flt, relax=True)
             flt_wcs.pscale = utils.get_wcs_pscale(flt_wcs)
 
-            blotted = utils.blot_nearest_exact(bkg_data.astype(np.float32),
-                                               drz_wcs, flt_wcs,
-                                               stepsize=stepsize,
-                                               scale_by_pixel_area=True)
+            blotted = utils.blot_nearest_exact(
+                bkg_data.astype(np.float32),
+                drz_wcs, flt_wcs,
+                stepsize=stepsize,
+                scale_by_pixel_area=True
+            )
 
             flt_unit = flt['SCI', ext].header['BUNIT']
             if flt_unit+'/S' == drz_unit:
@@ -3739,7 +3747,7 @@ def get_rotated_column_average(data, mask, theta, axis=1, statfunc=np.nanmedian,
     return back_sl
 
 
-def subtract_visit_angle_averages(visit, threshold=1.8, detection_background=True, angles=[30.0, -30.0, 0, 90], suffix='angles', niter=3, instruments=['NIRCAM'], stepsize=10, verbose=True):
+def subtract_visit_angle_averages(visit, threshold=1.8, detection_background=True, angles=[30.0, -30.0, 0, 90], suffix='angles', niter=3, weight_type="median_err", instruments=['NIRCAM'], stepsize=-1, verbose=True):
     """
     Subtract angle averages from exposures in a `visit` group
     
@@ -3843,7 +3851,7 @@ def subtract_visit_angle_averages(visit, threshold=1.8, detection_background=Tru
                                        clean=False,
                                        verbose=False,
                                        scale_photom=False,
-                                       weight_type='median_err',
+                                       weight_type=weight_type,
                                       )
         drz_h = drz[2]
 
@@ -3896,11 +3904,14 @@ def subtract_visit_angle_averages(visit, threshold=1.8, detection_background=Tru
                     
                     flt_wcs.pscale = utils.get_wcs_pscale(flt_wcs)
 
-                    blt = utils.blot_nearest_exact(med_model.astype(np.float32),
-                                                       drz_wcs, flt_wcs,
-                                                       stepsize=stepsize,
-                                                       scale_by_pixel_area=True)
-                    
+                    blt = utils.blot_nearest_exact(
+                        med_model.astype(np.float32),
+                        drz_wcs,
+                        flt_wcs,
+                        stepsize=stepsize,
+                        scale_by_pixel_area=True
+                    )
+
                     # TBD
                     tscale = 1.
                     if ('BKG',ext) not in flt:
@@ -3947,7 +3958,7 @@ def subtract_visit_angle_averages(visit, threshold=1.8, detection_background=Tru
     return drz_hdu
 
 
-def separate_chip_sky(visit, filters=['F200LP','F350LP','F600LP','F390W'], stepsize=10, statistic=np.nanmedian, by_amp=True, only_flc=True, row_average=True, average_order=11, seg_dilate=16, **kwargs):
+def separate_chip_sky(visit, filters=['F200LP','F350LP','F600LP','F390W'], stepsize=-1, statistic=np.nanmedian, by_amp=True, only_flc=True, row_average=True, average_order=11, seg_dilate=16, **kwargs):
     """
     Get separate background values for each chip.  Updates 'CHIPSKY' header
     keyword for each SCI extension of the visit exposure files.
@@ -4030,10 +4041,13 @@ def separate_chip_sky(visit, filters=['F200LP','F350LP','F600LP','F390W'], steps
             flt_wcs = pywcs.WCS(flt['SCI', ext].header, fobj=flt, relax=True)
             flt_wcs.pscale = utils.get_wcs_pscale(flt_wcs)
 
-            blotted = utils.blot_nearest_exact(seg_mask,
-                                               seg_wcs, flt_wcs,
-                                               stepsize=stepsize,
-                                               scale_by_pixel_area=False)    
+            blotted = utils.blot_nearest_exact(
+                seg_mask,
+                seg_wcs,
+                flt_wcs,
+                stepsize=stepsize,
+                scale_by_pixel_area=False
+            )
             
             nonzero = flt['SCI',ext].data != 0
             ok = (flt['DQ',ext].data == 0) & (blotted <= 0)
@@ -7078,8 +7092,12 @@ def find_single_image_CRs(visit, simple_mask=False, with_ctx_mask=True,
             flt_wcs.pscale = utils.get_wcs_pscale(flt_wcs)
 
             if has_ctx:
-                blotted = utils.blot_nearest_exact(single_image, ctx_wcs,
-                                                   flt_wcs)
+                blotted = utils.blot_nearest_exact(
+                    single_image,
+                    ctx_wcs,
+                    flt_wcs,
+                    stepsize=-1,
+                )
 
                 ctx_mask = blotted > 0
             else:
@@ -7195,11 +7213,16 @@ def clean_amplifier_residuals(files, extensions=[1,2], minpix=5e5, max_percentil
 
             if seg_hdu is not None:
                 flc_wcs = pywcs.WCS(im['SCI',ext].header, fobj=im)
-                _blt = utils.blot_nearest_exact(seg_hdu.data, seg_wcs, 
-                                                flc_wcs, verbose=False, 
-                                                stepsize=-1, 
-                                                scale_by_pixel_area=False, 
-                                                wcs_mask=True, fill_value=0)
+                _blt = utils.blot_nearest_exact(
+                    seg_hdu.data,
+                    seg_wcs,
+                    flc_wcs,
+                    verbose=False,
+                    stepsize=-1,
+                    scale_by_pixel_area=False,
+                    wcs_mask=True,
+                    fill_value=0
+                )
 
                 valid &= (_blt == 0)
 
