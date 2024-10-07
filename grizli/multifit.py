@@ -1002,7 +1002,7 @@ class GroupFLT():
         return hdu, fig
 
 
-    def drizzle_grism_models(self, root='grism_model', kernel='square', scale=0.1, pixfrac=1, make_figure=True, fig_xsize=10):
+    def drizzle_grism_models(self, root='grism_model', kernel='square', scale=0.1, pixfrac=1, make_figure=True, fig_xsize=10, write_ctx=False):
         """
         Make model-subtracted drizzled images of each grism / PA
 
@@ -1019,6 +1019,9 @@ class GroupFLT():
 
         pixfrac : float
             Drizzle "pixfrac".
+
+        write_ctx : bool
+            Save context image as well.
 
         """
         try:
@@ -1071,11 +1074,20 @@ class GroupFLT():
                     pixfrac=pixfrac
                 )
 
-                outsci, _, _, _, header, outputwcs = out
+                outsci, _, _, outctx, header, outputwcs = out
                 header['FILTER'] = g
                 header['PA'] = pa
+
+                # Add invidual FLTs to header
+                for i, ix in enumerate(idx):
+                    header[f'FLT{str(i+1).zfill(5)}'] = self.FLTs[ix].grism_file
+
                 pyfits.writeto(outfile, data=outsci, header=header,
                                overwrite=True, output_verify='fix')
+
+                if write_ctx:
+                    pyfits.writeto(outfile.replace('sci', 'ctx'), data=outctx,
+                                header=header, overwrite=True, output_verify='fix')
 
                 # Model-subtracted
                 outfile = '{0}-{1}-{2}_grism_clean.fits'.format(root, g.lower(),

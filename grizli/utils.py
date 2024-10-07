@@ -8235,7 +8235,7 @@ def drizzle_from_visit(
             # outvar = varnum / outwht
             outvar *= pscale_ratio**-2
 
-        return outsci, outwht, outvar, header, flist, wcs_tab
+        return outsci, outwht, outvar, outctx, header, flist, wcs_tab
 
 
 def drizzle_array_groups(
@@ -8251,6 +8251,7 @@ def drizzle_array_groups(
     calc_wcsmap=False,
     verbose=True,
     data=None,
+    first_uniqid=1,
 ):
     """
     Drizzle array data with associated wcs
@@ -8298,6 +8299,9 @@ def drizzle_array_groups(
         ``data = outsci, outwht, outctx, varnum``, where ``varnum = outvar * outwht``
 
         If not provided, new arrays will be created.
+
+    first_uniqid : int, optional
+        First `uniqid` value to use for the drizzle for contex maps
 
     Returns
     -------
@@ -8399,8 +8403,13 @@ def drizzle_array_groups(
 
     needs_var = (outvar is not None) & (var_list is not None)
 
-    # Do drizzle
+    # Number of input arrays
     N = len(sci_list)
+
+    # Drizzlepac cannot support >31 input images
+    if first_uniqid + N > 31 and verbose:
+        msg = "Warning: Too many input images for context map, will wrap around"
+        log_comment(LOGFILE, msg, verbose=verbose, show_date=True)
     for i in range(N):
         if verbose:
             # log.info('Drizzle array {0}/{1}'.format(i+1, N))
@@ -8425,7 +8434,7 @@ def drizzle_array_groups(
             "cps",
             1,
             wcslin_pscale=wcs_list[i].pscale,
-            uniqid=1,
+            uniqid=((first_uniqid - 1 + i) % 32) + 1,
             pixfrac=pixfrac,
             kernel=kernel,
             fillval="0",

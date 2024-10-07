@@ -3901,14 +3901,13 @@ def subtract_visit_angle_averages(visit, threshold=1.8, detection_background=Tru
             weight_type=weight_type,
         )
 
-        drz_h = drz[3]
+        data, wht, ctx, var, drz_h, files, info = drz
 
         drz_h['PA_APER'] = pa_aper, 'PA_APER used for reference'
         drz_h['BKGANGLE'] = (','.join([f'{a:.1f}' for a in angles]), 
                              'Background angles')
         drz_h['NITANGLE'] = niter, 'Number of iterations for angle subtraction'
         
-        data, wht = drz[0], drz[1]
         err = 1/np.sqrt(wht)
         mask = (wht > 0)
 
@@ -4001,7 +4000,7 @@ def subtract_visit_angle_averages(visit, threshold=1.8, detection_background=Tru
             drz_hdu.append(pyfits.ImageHDU(data=smask*1, 
                                            header=drz_h,
                                           )
-                           )            
+                           )
         else:
             drz_hdu[0].data += med_model.astype(np.float32)
             drz_hdu[1].data = _cleaned.astype(np.float32)
@@ -4396,6 +4395,7 @@ def process_direct_grism_visit(direct={},
                                miri_skyfile=None,
                                use_skyflats=True,
                                do_pure_parallel_wcs=True,
+                               write_ctx=False,
                                ):
     """Full processing of a direct (+grism) image visit.
     
@@ -5023,14 +5023,17 @@ def process_direct_grism_visit(direct={},
             calc_wcsmap=False,
         )
 
-        _sci, _wht, _var, _hdr, _files, _info = _
+        _sci, _wht, _var, _ctx, _hdr, _files, _info = _
         _drcfile = glob.glob(f"{direct['product']}_dr*sci.fits")[0]
         _whtfile = _drcfile.replace('_sci.fits','_wht.fits')
+        _ctxfile = _drcfile.replace('_sci.fits','_ctx.fits')
         pyfits.PrimaryHDU(data=_sci, header=_hdr).writeto(_drcfile,
                                                           overwrite=True)
         pyfits.PrimaryHDU(data=_wht, header=_hdr).writeto(_whtfile,
                                                           overwrite=True)
-        
+        if write_ctx:
+            pyfits.PrimaryHDU(data=_ctx, header=_hdr).writeto(_ctxfile,
+                                                            overwrite=True)
         # Remake catalog
         #cat = make_drz_catalog(root=direct['product'], threshold=thresh)
         if 'footprints' in direct:
