@@ -467,8 +467,10 @@ def blot_nearest_exact(
         If True, print information about the overlap. Default is True.
 
     stepsize : int, optional
-        Step size for interpolation. If set to -1, the function will use a
-        default step size. Default is -1.
+        Step size for interpolation. If set to <=1, the function will use the explicit
+        wcs mapping ``out_wcs.all_pix2world > in_wcs.all_world2pix``.  If > 1,
+        will use
+        ``astrodrizzle.DefaultWCSMapping(out_wcs, in_wcs, nx, ny, stepsize)``.
 
     scale_by_pixel_area : bool
         If True, then scale the output image by the square of the image pixel
@@ -7512,6 +7514,7 @@ def drizzle_from_visit(
     snowblind_kwargs=None,
     jwst_dq_flags=JWST_DQ_FLAGS,
     nircam_hot_pixel_kwargs={},
+    niriss_hot_pixel_kwargs=None, # {'hot_threshold': 7, 'plus_sn_min': 3},
     get_dbmask=True,
     **kwargs,
 ):
@@ -7600,6 +7603,12 @@ def drizzle_from_visit(
     nircam_hot_pixel_kwargs : dict
         Keyword arguments for `grizli.jwst_utils.flag_nircam_hot_pixels`.  Set to
         ``None`` to disable and use the static bad pixel tables.
+
+    niriss_hot_pixel_kwargs : dict
+        Keyword arguments for `grizli.jwst_utils.flag_nircam_hot_pixels` when running
+        on NIRISS exposures. Set to ``None`` to disable and use the static bad pixel
+        tables.
+
 
     Returns
     -------
@@ -7772,6 +7781,8 @@ def drizzle_from_visit(
                 bpfiles += [os.path.join(os.path.dirname(__file__),
                            f'data/nrc_badpix_20230710_{_det}.fits.gz')]
                 bpfiles += [os.path.join(os.path.dirname(__file__), 
+                           f'data/{_det.lower()}_badpix_20241001.fits.gz')] # NIRISS
+                bpfiles += [os.path.join(os.path.dirname(__file__), 
                            f'data/{_det.lower()}_badpix_20230710.fits.gz')] # NIRISS
                 bpfiles += [os.path.join(os.path.dirname(__file__), 
                            f'data/nrc_badpix_230701_{_det}.fits.gz')]
@@ -7805,6 +7816,17 @@ def drizzle_from_visit(
                     # extra_wfc3ir_badpix = False
                 else:
                     msg = f" flag_nircam_hot_pixels: {_count} out of range"
+                    log_comment(LOGFILE, msg, verbose=verbose)
+
+            elif (_inst in ["NIRISS"]) & (niriss_hot_pixel_kwargs is not None):
+                _sn, dq_flag, _count = flag_nircam_hot_pixels(
+                    flt, **niriss_hot_pixel_kwargs
+                )
+                if (_count > 0) & (_count < 8192):
+                    bpdata |= ((dq_flag > 0) * 1024).astype(bpdata.dtype)
+                    # extra_wfc3ir_badpix = False
+                else:
+                    msg = f" flag_nircam_hot_pixels: {_count} out of range (NIRISS)"
                     log_comment(LOGFILE, msg, verbose=verbose)
 
             if (snowblind_kwargs is not None) & (_inst in ["NIRCAM", "NIRISS"]):
@@ -9039,13 +9061,34 @@ def fetch_wfpc2_calib(
             return True
 
 
-def fetch_nircam_skyflats():
+def fetch_nircam_skyflats(dryrun=False):
     """
     Download skyflat files
     """
     conf_path = os.path.join(GRIZLI_PATH, "CONF", "NircamSkyFlat")
+
+    dry = " --dryrun" if dryrun else ""
+
     os.system(
-        f'aws s3 sync s3://grizli-v2/NircamSkyflats/ {conf_path} --exclude "*" --include "nrc*fits"'
+        f'aws s3 sync s3://grizli-v2/NircamSkyflats/ {conf_path} --exclude "*" --include "nrc*fits"' + dry
+    )
+
+    _files = glob.glob(conf_path + "/*fits")
+    _files.sort()
+
+    return _files
+
+
+def fetch_nircam_wisp_templates(dryrun=False):
+    """
+    Download STScI wisp templates from s3 mirror
+    """
+    conf_path = os.path.join(GRIZLI_PATH, "CONF", "NircamWisp")
+    
+    dry = " --dryrun" if dryrun else ""
+    
+    os.system(
+        f'aws s3 sync s3://grizli-v2/NircamWisp/stsci-v3/ {conf_path} --exclude "*" --include "WISP*fits"' + dry
     )
 
     _files = glob.glob(conf_path + "/*fits")
@@ -9118,7 +9161,7 @@ def fetch_config_files(
         tarfiles += [
             f"{BASEURL}/jwst-grism-conf.tar.gz",
             f"{BASEURL}/niriss.conf.220725.tar.gz",
-            f"{BASEURL}/nircam-wisp-aug2022.tar.gz",
+            # f"{BASEURL}/nircam-wisp-aug2022.tar.gz",
         ]
 
     if get_sky:

@@ -3081,7 +3081,7 @@ def apply_visit_skyflat(visit, skyfile=None, verbose=True):
             _imi.flush()
 
 
-def get_nircam_wisp_filename(header):
+def get_nircam_wisp_filename(header, prefer_stsci_file=True, **kwargs):
     """
     Get the path to an appropriate NIRCam wisp template file, assuming the 
     templates are stored in `[GRIZLI_PATH]/CONF/NircamWisp`
@@ -3090,7 +3090,12 @@ def get_nircam_wisp_filename(header):
     ----------
     header : `astropy.io.fits.Header`
         Primary header
-    
+
+    prefer_stsci_file : bool
+        Prefer STScI WISP files made by Ben Sunnquist with names like 
+        ``WISP_NRCB4_F182M_CLEAR.fits``.  See `here <https://spacetelescope.github.io/jdat_notebooks/notebooks/NIRCam/NIRCam_wisp_subtraction/nircam_wisp_subtraction.html>`_
+        for more information on how they were generated.
+
     Returns
     -------
     wisp_file : str
@@ -3108,14 +3113,16 @@ def get_nircam_wisp_filename(header):
     
     msg : str
         Status message
-        
+
     """
     if 'OFILTER' in header:
         _filt = header['OFILTER']
+        _pupil = header['OPUPIL']
         _inst = header['OINSTRUM']
         _det = header['ODETECTO']
     else:
         _filt = header['FILTER']
+        _pupil = header['PUPIL']
         _inst = header['INSTRUME']
         _det = header['DETECTOR']
 
@@ -3124,7 +3131,7 @@ def get_nircam_wisp_filename(header):
         return None, _filt, _inst, _det, msg
         
     # F150W2 is F160M for now
-    if _filt not in ['F115W','F150W','F200W','F182M','F210M','F140M','F150W2']:
+    if _filt not in ['F115W','F150W','F200W','F182M','F210M','F140M','F162M','F150W2']:
         msg = f'NIRCam filter {_filt} not supported'
         return None, _filt, _inst, _det, msg
 
@@ -3138,10 +3145,15 @@ def get_nircam_wisp_filename(header):
     wisp_file = f"wisps_{_det.lower()}_{_filt.upper()}.fits"
     wisp_file = os.path.join(_path, wisp_file)
     
+    stsci_file = f"WISP_{_det.upper()}_{_filt.upper()}_{_pupil.upper()}.fits"
+    stsci_file = os.path.join(_path, stsci_file)
+    if os.path.exists(stsci_file) & prefer_stsci_file:
+        wisp_file = stsci_file
+
     return wisp_file, _filt, _inst, _det, msg
 
 
-def nircam_wisp_correction(calibrated_file, niter=3, update=True, verbose=True, force=False, **kwargs):
+def nircam_wisp_correction(calibrated_file, niter=3, update=True, verbose=True, force=False, prefer_stsci_file=True, **kwargs):
     """
     Fit the NIRCam wisp template and subtract
     
@@ -3191,7 +3203,10 @@ def nircam_wisp_correction(calibrated_file, niter=3, update=True, verbose=True, 
         utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
         return _bkg
 
-    _ = get_nircam_wisp_filename(im[0].header)
+    _ = get_nircam_wisp_filename(
+        im[0].header,
+        prefer_stsci_file=prefer_stsci_file
+    )
     wisp_file, _filt, _inst, _det, _msg = _
     
     if wisp_file is None:
@@ -3240,7 +3255,7 @@ def nircam_wisp_correction(calibrated_file, niter=3, update=True, verbose=True, 
 
         msg = f'nircam_wisp_correction - {calibrated_file}: '
         msg += f'iter {_iter} Npix={ok.sum()} '
-        msg += f'bg={_x[0][0]:.2f} wisp={_x[0][1]:.2f}'
+        msg += f'bg={_x[0][0]:.2f} wisp={_x[0][1]:.2f} {wisp_file}'
         utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
 
         #print(ok.sum(), _x[0])
@@ -3255,6 +3270,7 @@ def nircam_wisp_correction(calibrated_file, niter=3, update=True, verbose=True, 
         with pyfits.open(calibrated_file, mode='update') as im:
             im[0].header['WISPBKG'] = _x[0][0], 'Wisp fit, background'
             im[0].header['WISPNORM'] = _x[0][1], 'Wisp fit, model norm'
+            im[0].header['WISPFILE'] = os.path.basename(wisp_file), 'Wisp template file'
             im['SCI'].data -= _model.reshape(im['SCI'].data.shape)
             im.flush()
             
@@ -3314,7 +3330,13 @@ def oneoverf_column_correction(visit, thresholds=[10,1.5], dilate_iter=[10,2], i
             _sci = _im['SCI'].data
             _wcs = pywcs.WCS(_im['SCI'].header, relax=True)
 
-            _blotted = utils.blot_nearest_exact((seg_mask*1), seg_wcs, _wcs)
+            _blotted = utils.blot_nearest_exact(
+                seg_mask*1,
+                seg_wcs,
+                _wcs,
+                stepsize=-1,
+            )
+
             msk = _blotted > 0
             msk |= _im['ERR'].data <= 0
             _sn = (_sci - _im['SCI'].header['MDRIZSKY']) / _im['ERR'].data
@@ -3511,7 +3533,7 @@ BLOT_BACKGROUND_PARAMS = {'bw': 64, 'bh': 64, 'fw': 3, 'fh': 3,
 def blot_background(visit={'product': '', 'files': None},
                     bkg_params=BLOT_BACKGROUND_PARAMS,
                     verbose=True, skip_existing=True, get_median=False,
-                    log=True, stepsize=10, **kwargs):
+                    log=True, stepsize=-1, **kwargs):
     """
     Blot SEP background of drizzled image back to component FLT images
     
@@ -3599,10 +3621,12 @@ def blot_background(visit={'product': '', 'files': None},
             flt_wcs = pywcs.WCS(flt['SCI', ext].header, fobj=flt, relax=True)
             flt_wcs.pscale = utils.get_wcs_pscale(flt_wcs)
 
-            blotted = utils.blot_nearest_exact(bkg_data.astype(np.float32),
-                                               drz_wcs, flt_wcs,
-                                               stepsize=stepsize,
-                                               scale_by_pixel_area=True)
+            blotted = utils.blot_nearest_exact(
+                bkg_data.astype(np.float32),
+                drz_wcs, flt_wcs,
+                stepsize=stepsize,
+                scale_by_pixel_area=True
+            )
 
             flt_unit = flt['SCI', ext].header['BUNIT']
             if flt_unit+'/S' == drz_unit:
@@ -3723,7 +3747,7 @@ def get_rotated_column_average(data, mask, theta, axis=1, statfunc=np.nanmedian,
     return back_sl
 
 
-def subtract_visit_angle_averages(visit, threshold=1.8, detection_background=True, angles=[30.0, -30.0, 0, 90], suffix='angles', niter=3, instruments=['NIRCAM'], stepsize=10, verbose=True):
+def subtract_visit_angle_averages(visit, threshold=1.8, detection_background=True, angles=[30.0, -30.0, 0, 90], suffix='angles', niter=3, weight_type="median_err", instruments=['NIRCAM'], stepsize=-1, verbose=True):
     """
     Subtract angle averages from exposures in a `visit` group
     
@@ -3827,7 +3851,7 @@ def subtract_visit_angle_averages(visit, threshold=1.8, detection_background=Tru
                                        clean=False,
                                        verbose=False,
                                        scale_photom=False,
-                                       weight_type='median_err',
+                                       weight_type=weight_type,
                                       )
         drz_h = drz[2]
 
@@ -3880,11 +3904,14 @@ def subtract_visit_angle_averages(visit, threshold=1.8, detection_background=Tru
                     
                     flt_wcs.pscale = utils.get_wcs_pscale(flt_wcs)
 
-                    blt = utils.blot_nearest_exact(med_model.astype(np.float32),
-                                                       drz_wcs, flt_wcs,
-                                                       stepsize=stepsize,
-                                                       scale_by_pixel_area=True)
-                    
+                    blt = utils.blot_nearest_exact(
+                        med_model.astype(np.float32),
+                        drz_wcs,
+                        flt_wcs,
+                        stepsize=stepsize,
+                        scale_by_pixel_area=True
+                    )
+
                     # TBD
                     tscale = 1.
                     if ('BKG',ext) not in flt:
@@ -3931,7 +3958,7 @@ def subtract_visit_angle_averages(visit, threshold=1.8, detection_background=Tru
     return drz_hdu
 
 
-def separate_chip_sky(visit, filters=['F200LP','F350LP','F600LP','F390W'], stepsize=10, statistic=np.nanmedian, by_amp=True, only_flc=True, row_average=True, average_order=11, seg_dilate=16, **kwargs):
+def separate_chip_sky(visit, filters=['F200LP','F350LP','F600LP','F390W'], stepsize=-1, statistic=np.nanmedian, by_amp=True, only_flc=True, row_average=True, average_order=11, seg_dilate=16, **kwargs):
     """
     Get separate background values for each chip.  Updates 'CHIPSKY' header
     keyword for each SCI extension of the visit exposure files.
@@ -4014,10 +4041,13 @@ def separate_chip_sky(visit, filters=['F200LP','F350LP','F600LP','F390W'], steps
             flt_wcs = pywcs.WCS(flt['SCI', ext].header, fobj=flt, relax=True)
             flt_wcs.pscale = utils.get_wcs_pscale(flt_wcs)
 
-            blotted = utils.blot_nearest_exact(seg_mask,
-                                               seg_wcs, flt_wcs,
-                                               stepsize=stepsize,
-                                               scale_by_pixel_area=False)    
+            blotted = utils.blot_nearest_exact(
+                seg_mask,
+                seg_wcs,
+                flt_wcs,
+                stepsize=stepsize,
+                scale_by_pixel_area=False
+            )
             
             nonzero = flt['SCI',ext].data != 0
             ok = (flt['DQ',ext].data == 0) & (blotted <= 0)
@@ -4866,12 +4896,12 @@ def process_direct_grism_visit(direct={},
 
         # Make DRZ catalog again with updated DRZWCS
         clean_drizzle(direct['product'])
-        
+
         if isJWST:
             if nircam_wisp_kwargs is not None:
                 for _file in direct['files']:
                     nircam_wisp_correction(_file, **nircam_wisp_kwargs)
-                
+
             # if oneoverf_kwargs is not None:
             #     oneoverf_column_correction(direct, **oneoverf_kwargs)
                         
@@ -7062,8 +7092,12 @@ def find_single_image_CRs(visit, simple_mask=False, with_ctx_mask=True,
             flt_wcs.pscale = utils.get_wcs_pscale(flt_wcs)
 
             if has_ctx:
-                blotted = utils.blot_nearest_exact(single_image, ctx_wcs,
-                                                   flt_wcs)
+                blotted = utils.blot_nearest_exact(
+                    single_image,
+                    ctx_wcs,
+                    flt_wcs,
+                    stepsize=-1,
+                )
 
                 ctx_mask = blotted > 0
             else:
@@ -7179,11 +7213,16 @@ def clean_amplifier_residuals(files, extensions=[1,2], minpix=5e5, max_percentil
 
             if seg_hdu is not None:
                 flc_wcs = pywcs.WCS(im['SCI',ext].header, fobj=im)
-                _blt = utils.blot_nearest_exact(seg_hdu.data, seg_wcs, 
-                                                flc_wcs, verbose=False, 
-                                                stepsize=-1, 
-                                                scale_by_pixel_area=False, 
-                                                wcs_mask=True, fill_value=0)
+                _blt = utils.blot_nearest_exact(
+                    seg_hdu.data,
+                    seg_wcs,
+                    flc_wcs,
+                    verbose=False,
+                    stepsize=-1,
+                    scale_by_pixel_area=False,
+                    wcs_mask=True,
+                    fill_value=0
+                )
 
                 valid &= (_blt == 0)
 
