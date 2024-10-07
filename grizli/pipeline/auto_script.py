@@ -813,8 +813,10 @@ def go(root='j010311+131615',
     has_phot_file = os.path.exists(f'{root}_phot.fits')
     if (not has_phot_file) & make_phot & (len(mosaic_files) > 0):
         try:
-            tab = auto_script.multiband_catalog(field_root=root,
-                                                **multiband_catalog_args)
+            tab = auto_script.multiband_catalog(
+                field_root=root,
+                **multiband_catalog_args
+            )
 
             try:
                 # Add columns indicating objects that fall in grism exposures
@@ -2601,7 +2603,7 @@ def mask_IR_psf_spikes(visit={}, mag_lim=17, cat=None, cols=['mag_auto', 'ra', '
             im.flush()
 
 
-def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_background=True, photometry_background=True, get_all_filters=False, filters=None, det_err_scale=-np.inf, phot_err_scale=-np.inf, rescale_weight=True, run_detection=True, detection_filter='ir', detection_root=None, output_root=None, use_psf_filter=True, detection_params=prep.SEP_DETECT_PARAMS,  phot_apertures=prep.SEXTRACTOR_PHOT_APERTURES_ARCSEC, master_catalog=None, bkg_mask=None, bkg_params={'bw': 64, 'bh': 64, 'fw': 3, 'fh': 3, 'pixel_scale': 0.06}, use_bkg_err=False, aper_segmask=True, sci_image=None, clean_bkg=True):
+def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_background=True, photometry_background=True, get_all_filters=False, filters=None, det_err_scale=-np.inf, phot_err_scale=-np.inf, rescale_weight=True, run_detection=True, detection_filter='ir', detection_root=None, output_root=None, use_psf_filter=True, detection_params=prep.SEP_DETECT_PARAMS,  phot_apertures=prep.SEXTRACTOR_PHOT_APERTURES_ARCSEC, master_catalog=None, bkg_mask=None, bkg_params={'bw': 64, 'bh': 64, 'fw': 3, 'fh': 3, 'pixel_scale': 0.06}, use_bkg_err=False, aper_segmask=True, sci_image=None, prefer_var_image=True, clean_bkg=True):
     """
     Make a detection catalog and run aperture photometry on all available
     filter images with the SourceExtractor clone `~sep`.
@@ -2702,7 +2704,11 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
     sci_image : array-like, None
         Array itself to use for source detection, see
         `~grizli.prep.make_SEP_catalog`.
-        
+
+    prefer_var_image : bool
+        If found, use ``_var.fits`` image for the full variance that includes the
+        Poisson component
+
     Returns
     -------
     tab : `~astropy.table.Table`
@@ -2760,19 +2766,22 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
 
                 detection_params['filter_kernel'] = psf_kernel
 
-        tab = prep.make_SEP_catalog(sci=sci_image, 
-                                    root=detection_root,
-                                    threshold=threshold,
-                                    get_background=detection_background,
-                                    save_to_fits=True,
-                                    rescale_weight=rescale_weight,
-                                    err_scale=det_err_scale,
-                                    phot_apertures=phot_apertures,
-                                    detection_params=detection_params,
-                                    bkg_mask=bkg_mask,
-                                    bkg_params=bkg_params,
-                                    use_bkg_err=use_bkg_err,
-                                    aper_segmask=aper_segmask)
+        tab = prep.make_SEP_catalog(
+            sci=sci_image,
+            root=detection_root,
+            threshold=threshold,
+            get_background=detection_background,
+            save_to_fits=True,
+            rescale_weight=rescale_weight,
+            err_scale=det_err_scale,
+            phot_apertures=phot_apertures,
+            detection_params=detection_params,
+            bkg_mask=bkg_mask,
+            bkg_params=bkg_params,
+            use_bkg_err=use_bkg_err,
+            aper_segmask=aper_segmask,
+            prefer_var_image=prefer_var_image,
+        )
         
         cat_pixel_scale = tab.meta['asec_0'][0]/tab.meta['aper_0'][0]
         
@@ -2813,10 +2822,11 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
             filters = [file.split('_')[-3][len(field_root)+1:] 
                        for file in mosaic_files]
         else:
-            #vfile = '{0}_visits.npy'.format(field_root)
-            #visits, all_groups, info = np.load(vfile, allow_pickle=True)
-            visits, all_groups, info = load_visit_info(field_root, 
-                                                       verbose=False)
+
+            visits, all_groups, info = load_visit_info(
+                field_root,
+                verbose=False
+            )
 
             if ONLY_F814W:
                 info = info[((info['INSTRUME'] == 'WFC3') & 
@@ -2878,18 +2888,21 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
                     source_xy = (tab['X_WORLD'], tab['Y_WORLD'],
                                  aseg, aseg_id)
 
-            filter_tab = prep.make_SEP_catalog(root=root,
-                                    threshold=threshold,
-                                    rescale_weight=rescale_weight,
-                                    err_scale=phot_err_scale,
-                                    get_background=photometry_background,
-                                    save_to_fits=False,
-                                    source_xy=source_xy,
-                                    phot_apertures=phot_apertures,
-                                    bkg_mask=bkg_mask,
-                                    bkg_params=bkg_params,
-                                    use_bkg_err=use_bkg_err,
-                                    sci=sci_image)
+            filter_tab = prep.make_SEP_catalog(
+                root=root,
+                threshold=threshold,
+                rescale_weight=rescale_weight,
+                err_scale=phot_err_scale,
+                get_background=photometry_background,
+                save_to_fits=False,
+                source_xy=source_xy,
+                phot_apertures=phot_apertures,
+                bkg_mask=bkg_mask,
+                bkg_params=bkg_params,
+                use_bkg_err=use_bkg_err,
+                sci=sci_image,
+                prefer_var_image=prefer_var_image,
+            )
 
             for k in filter_tab.meta:
                 
@@ -2907,9 +2920,12 @@ def multiband_catalog(field_root='j142724+334246', threshold=1.8, detection_back
             newk = newk.replace('-CLEAR','')
             filt_plam = tab.meta[newk]
 
-            tot_corr = prep.get_kron_tot_corr(tab, filt.lower(), 
-                                                pixel_scale=cat_pixel_scale, 
-                                                photplam=filt_plam)
+            tot_corr = prep.get_kron_tot_corr(
+                tab,
+                filt.lower(),
+                pixel_scale=cat_pixel_scale,
+                photplam=filt_plam
+            )
 
             #ee_corr = prep.get_kron_tot_corr(tab, filter=filt.lower())
             tab['{0}_tot_corr'.format(filt.upper().replace('-CLEAR',''))] = tot_corr

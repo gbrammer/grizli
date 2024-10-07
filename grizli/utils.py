@@ -7507,7 +7507,7 @@ def drizzle_from_visit(
     verbose=True,
     scale_photom=True,
     context="jwst_1130.pmap",
-    weight_type="jwst",
+    weight_type="jwst_var",
     rnoise_percentile=99,
     calc_wcsmap=False,
     niriss_ghost_kwargs={},
@@ -7564,7 +7564,7 @@ def drizzle_from_visit(
     context : str
         JWST calibration context to use for photometric scaling
 
-    weight_type : 'err', 'median_err', 'time', 'jwst'
+    weight_type : 'err', 'median_err', 'time', 'jwst', 'jwst_var', 'median_variance'
         Exposure weighting strategy.
 
         - The default 'err' strategy uses the full uncertainty array defined in the
@@ -7578,6 +7578,9 @@ def drizzle_from_visit(
         - For the 'jwst' strategy, if 'VAR_POISSON' and 'VAR_RNOISE' extensions found,
           weight by VAR_RNOISE + median(VAR_POISSON).  Fall back to 'median_err'
           otherwise.
+
+        - For 'jwst_var', use the *weight* as in ``weight_type='jwst'`` but also
+          make a full variance map propagated from the ``ERR`` noise model.
 
     rnoise_percentile : float
         Percentile defining the upper limit of valid `VAR_RNOISE` values, if that
@@ -7618,6 +7621,10 @@ def drizzle_from_visit(
     outwht : array-like
         Inverse variance WHT array
 
+    outvar : array-like
+        Optional variance array, if the input weights are not explicitly inverse
+        variance
+
     header : `~astropy.io.fits.Header`
         Image header
 
@@ -7651,9 +7658,12 @@ def drizzle_from_visit(
         ClientError = None
         s3_client = None
 
-    if weight_type not in ["err", "median_err", "time", "jwst"]:
+    _valid_weight_type = [
+        "err", "median_err", "time", "jwst", "jwst_var", "median_variance",
+    ]
+    if weight_type not in _valid_weight_type:
         print(f"WARNING: weight_type '{weight_type}' must be 'err', 'median_err', ")
-        print(f"         'jwst', or 'time'; falling back to 'err'.")
+        print(f"         'jwst', 'median_variance', or 'time'; falling back to 'err'.")
         weight_type = "err"
 
     if isinstance(output, pywcs.WCS):
@@ -7676,6 +7686,7 @@ def drizzle_from_visit(
     outputwcs.pscale = get_wcs_pscale(outputwcs)
 
     output_poly = Polygon(outputwcs.calc_footprint())
+
     count = 0
 
     ref_photflam = None
@@ -7748,6 +7759,11 @@ def drizzle_from_visit(
             continue
 
         sci_list, wht_list, wcs_list = [], [], []
+
+        if weight_type == "jwst_var":
+            var_list = []
+        else:
+            var_list = None
 
         keys = OrderedDict()
         for k in ['EXPTIME', 'TELESCOP', 'FILTER','FILTER1', 'FILTER2', 
@@ -7999,7 +8015,7 @@ def drizzle_from_visit(
 
                 wcs_rows.append(row)
 
-                err = flt[("ERR", ext)].data * phot_scale
+                err_data = flt[("ERR", ext)].data * phot_scale
 
                 # JWST: just 1,1024,4096 bits
                 if flt[0].header["TELESCOP"] in ["JWST"]:
@@ -8034,11 +8050,16 @@ def drizzle_from_visit(
                 else:
                     dq = mod_dq_bits(flt[("DQ", ext)].data, okbits=bits) | bpdata
 
-                wht = 1 / err ** 2
-                _msk = (err == 0) | (dq > 0)
+                wht = 1 / err_data ** 2
+                _msk = (err_data <= 0) | (dq > 0)
                 wht[_msk] = 0
 
-                if weight_type == "jwst":
+                if weight_type == "jwst_var":
+                    _var = err_data**2
+                    _var[_msk] = 0
+                    var_list.append(_var)
+
+                if weight_type.startswith("jwst"):
 
                     if (("VAR_RNOISE", ext) in flt) & (rnoise_percentile is not None):
                         _rn_data = flt[("VAR_RNOISE", ext)].data
@@ -8104,11 +8125,15 @@ def drizzle_from_visit(
 
                 wcs_list.append(wcs_i)
 
+        pscale_ratio = (wcs_i.pscale / outputwcs.pscale)
+
         if count == 0:
             res = drizzle_array_groups(
                 sci_list,
                 wht_list,
                 wcs_list,
+                var_list=var_list,
+                median_weight=(weight_type == 'median_variance'),
                 outputwcs=outputwcs,
                 scale=0.1,
                 kernel=kernel,
@@ -8118,7 +8143,8 @@ def drizzle_from_visit(
                 data=None,
             )
 
-            outsci, outwht, outctx, header, xoutwcs = res
+            outsci, outwht, outctx, outvar, header, xoutwcs = res
+
             header["EXPTIME"] = flt[0].header["EXPTIME"]
             header["NDRIZIM"] = 1
             header["PIXFRAC"] = pixfrac
@@ -8130,16 +8156,28 @@ def drizzle_from_visit(
 
             header["WHTTYPE"] = weight_type, "Exposure weighting strategy"
             header["RNPERC"] = rnoise_percentile, "VAR_RNOISE clip percentile for JWST"
+            header["PSCALER"] = pscale_ratio, "Ratio of input to output pixel scales"
 
             for k in keys:
                 header[k] = keys[k]
 
         else:
-            data = outsci, outwht, outctx
+
+            # outvar = Sum(wht**2 * var) / Sum(wht)**2, so
+            # need to accumulate updates to Sum(wht * (wht * var)) / Sum(wht)
+            if outvar is None:
+                varnum = None
+            else:
+                varnum = outvar * outwht
+
+            data = outsci, outwht, outctx, varnum
+
             res = drizzle_array_groups(
                 sci_list,
                 wht_list,
                 wcs_list,
+                median_weight=(weight_type == 'median_variance'),
+                var_list=var_list,
                 outputwcs=outputwcs,
                 scale=0.1,
                 kernel=kernel,
@@ -8149,7 +8187,7 @@ def drizzle_from_visit(
                 data=data,
             )
 
-            outsci, outwht, outctx = res[:3]
+            outsci, outwht, outctx, outvar = res[:4]
             header["EXPTIME"] += flt[0].header["EXPTIME"]
             header["NDRIZIM"] += 1
 
@@ -8191,14 +8229,21 @@ def drizzle_from_visit(
     else:
         wcs_tab = GTable(names=wcs_colnames, rows=wcs_rows)
 
-        outwht *= (wcs_i.pscale / outputwcs.pscale) ** 4
-        return outsci, outwht, header, flist, wcs_tab
+        outwht *= pscale_ratio**4 # (wcs_i.pscale / outputwcs.pscale) ** 4
+        if outvar is not None:
+            # Extra factors of the pixel area ratio in variance, which comes from
+            # outvar = varnum / outwht
+            outvar *= pscale_ratio**-2
+
+        return outsci, outwht, outvar, header, flist, wcs_tab
 
 
 def drizzle_array_groups(
     sci_list,
     wht_list,
     wcs_list,
+    var_list=None,
+    median_weight=False,
     outputwcs=None,
     scale=0.1,
     kernel="point",
@@ -8216,6 +8261,17 @@ def drizzle_array_groups(
         List of science and weight `~numpy.ndarray` objects.
 
     wcs_list : list
+        List of `~astropy.wcs.WCS` objects for each input array
+
+    var_list : list
+        List of separate variance arrays, if distinct from `wht_list`.  The variance
+        images are combined as ``Vfinal = Sum(wht_i**2 * var_i) / Sum(wht_i)**2``,
+        which reduces to ``Vfinal = 1 / Sum(wht_i)`` for inverse-variance weights
+        ``wht_i = 1 / var_i`` typically used with drizzle.
+
+    median_weight : bool
+        Use median of ``wht_list`` for weights and ``var_list = [1 / wht_list_i]``,
+        e.g., for appropriate Poisson weighting
 
     scale : float
         Output pixel scale in arcsec.
@@ -8237,13 +8293,19 @@ def drizzle_array_groups(
         the internal WCS map is required and the output WCS requires `calc_wcsmap=2`.
 
     data : tuple, optional
-        Tuple containing the output drizzled science, weight, and context images.
+        Tuple containing the previously-drizzled images.  Either
+        ``data = outsci, outwht, outctx`` *or*
+        ``data = outsci, outwht, outctx, varnum``, where ``varnum = outvar * outwht``
+
         If not provided, new arrays will be created.
 
     Returns
     -------
     outsci, outwht, outctx : `~numpy.ndarray`
         Output drizzled science, weight, and context images
+
+    outvar : `~numpy.ndarray`, None
+        Output variance if ``var_list`` provided or if ``median_weight``
 
     header : `~astropy.fits.io.Header`
         Drizzled image header.
@@ -8293,13 +8355,49 @@ def drizzle_array_groups(
 
     shape = (header["NAXIS2"], header["NAXIS1"])
 
+    # Use median for weight and propagate variance
+    if (median_weight) & (var_list is None):
+        var_list = []
+        use_weights = []
+        for wht_i in wht_list:
+            ok_wht = (wht_i > 0) & np.isfinite(wht_i)
+            var_i = 1. / wht_i
+            var_i[~ok_wht] = 0
+            var_list.append(var_i)
+            use_weights.append(
+                (np.nanmedian(wht_i[ok_wht]) * ok_wht).astype(np.float32)
+            )
+    else:
+        use_weights = wht_list
+
     # Output arrays
     if data is not None:
-        outsci, outwht, outctx = data
+        if len(data) == 3:
+            outsci, outwht, outctx = data
+        else:
+            outsci, outwht, outctx, outvar = data
+            if outvar is not None:
+                _varwht = outwht * 1
+                _varctx = outctx * 1
+
+            if (outvar is not None) & (var_list is None):
+                msg = (
+                    'drizzle_array_groups: WARNING outvar provided in ``data``'
+                    ' but var_list not provided'
+                )
+                log_comment(LOGFILE, msg, verbose=verbose, show_date=True)
     else:
         outsci = np.zeros(shape, dtype=np.float32)
         outwht = np.zeros(shape, dtype=np.float32)
         outctx = np.zeros(shape, dtype=np.int32)
+        if var_list is None:
+            outvar = None
+        else:
+            outvar = np.zeros(shape, dtype=np.float32)
+            _varwht = np.zeros(shape, dtype=np.float32)
+            _varctx = np.zeros(shape, dtype=np.int32)
+
+    needs_var = (outvar is not None) & (var_list is not None)
 
     # Do drizzle
     N = len(sci_list)
@@ -8318,7 +8416,7 @@ def drizzle_array_groups(
         adrizzle.do_driz(
             sci_list[i].astype(np.float32, copy=False),
             wcs_list[i],
-            wht_list[i].astype(np.float32, copy=False),
+            use_weights[i].astype(np.float32, copy=False),
             outputwcs,
             outsci,
             outwht,
@@ -8334,7 +8432,31 @@ def drizzle_array_groups(
             wcsmap=wcsmap,
         )
 
-    return outsci, outwht, outctx, header, outputwcs
+        if needs_var:
+            adrizzle.do_driz(
+                (var_list[i] * use_weights[i]).astype(np.float32, copy=False),
+                wcs_list[i],
+                use_weights[i].astype(np.float32, copy=False),
+                outputwcs,
+                outvar,
+                _varwht,
+                _varctx,
+                1.0,
+                "cps",
+                1,
+                wcslin_pscale=wcs_list[i].pscale,
+                uniqid=1,
+                pixfrac=pixfrac,
+                kernel=kernel,
+                fillval="0",
+                wcsmap=wcsmap,
+            )
+
+    if needs_var:
+        # extra factor of Sum(w_i) for var = Sum(w_i**2 * var_i) / Sum(w_i)**2
+        outvar /= outwht
+
+    return outsci, outwht, outctx, outvar, header, outputwcs
 
 
 class WCSMapAll:

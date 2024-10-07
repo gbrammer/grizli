@@ -808,13 +808,17 @@ def process_tile(field='cos', tile='01.01', filters=TILE_FILTERS, fetch_existing
             os.system(f'gunzip --force {file}')
             
     if not rgb_only:
-        visit_processor.cutout_mosaic(rootname=root, 
-                              skip_existing=True,
-                              ir_wcs=ir_wcs,
-                              filters=filters, 
-                              pixfrac=pixfrac,
-                              kernel='square', s3output=None, 
-                              gzip_output=False, clean_flt=clean_flt)
+        visit_processor.cutout_mosaic(
+            rootname=root,
+            skip_existing=True,
+            ir_wcs=ir_wcs,
+            filters=filters,
+            pixfrac=pixfrac,
+            kernel='square',
+            s3output=None,
+            gzip_output=False,
+            clean_flt=clean_flt
+        )
     
     files = glob.glob(f'{root}*_dr*fits*')
     if len(files) == 0:
@@ -826,19 +830,29 @@ def process_tile(field='cos', tile='01.01', filters=TILE_FILTERS, fetch_existing
     if make_catalog:
         import golfir.catalog
         
-        golfir.catalog.make_charge_detection(root, ext='ir',
-                        filters=['f160w', 'f140w', 'f125w', 'f110w', 'f105w',
-                                 'f814w', 'f850lp',
-                                 'f277w-clear','f356w-clear','f444w-clear'],
-                                 use_hst_kernel=False,
-                                 subtract_background=True)
-    
-        phot = auto_script.multiband_catalog(field_root=root,
-                       phot_apertures=prep.SEXTRACTOR_PHOT_APERTURES_ARCSEC[:4]) #, **phot_kwargs)
-    
+        golfir.catalog.make_charge_detection(
+            root,
+            ext='ir',
+            filters=[
+                'f160w', 'f140w', 'f125w', 'f110w', 'f105w',
+                'f814w', 'f850lp',
+                'f277w-clear','f356w-clear','f444w-clear'
+            ],
+            use_hst_kernel=False,
+            subtract_background=True
+        )
+
+        phot = auto_script.multiband_catalog(
+            field_root=root,
+            phot_apertures=prep.SEXTRACTOR_PHOT_APERTURES_ARCSEC[:4]
+        ) #, **phot_kwargs)
+
         if len(phot) == 0:
             # Empty catalog
-            db.execute(f"update combined_tiles set status=10 where tile = '{tile}' AND field = '{field}'")
+            db.execute(
+                "update combined_tiles set status=10 "
+                + f"where tile = '{tile}' AND field = '{field}'"
+            )
         
             if cleanup:
 

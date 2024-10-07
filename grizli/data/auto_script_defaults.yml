@@ -266,6 +266,7 @@ multiband_catalog_args:
     use_bkg_err: False
     aper_segmask: True
     rescale_weight: False
+    prefer_var_image: True
 
 # Stop after image preparation even if grism exists    
 only_preprocess: False 

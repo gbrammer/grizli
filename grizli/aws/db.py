@@ -335,6 +335,48 @@ def download_s3_file(path='s3://grizli-v2/HST/Pipeline/Tiles/2529/tile.2529.010.
     #     return None
 
 
+STATUS_QUERY = f"""select status, count(distinct(assoc_name)) from assoc_table
+where instrument_name in ('NIRISS','NIRCAM','MIRI')
+group by status
+"""
+
+class DatabaseStatusCheck():
+    """
+    Helper for checking ``status`` counts in various db tables
+    """
+    def __init__(self, query=STATUS_QUERY):
+        """
+        Parameters
+        ----------
+        query : str
+            SQL query
+        """
+        self.query = query
+        self.first = SQL(self.query)
+        # self.check_status()
+
+    def update(self):
+        """
+        Return the query and print counts and differences
+        """
+        new = SQL(self.query)
+        diffs = []
+        for i, s in enumerate(new['status']):
+            ix = self.first['status'] == s
+            if ix.sum() == 0:
+                self.first.add_row({'status': s, 'count': 0})
+                diffs.append('')
+            else:
+                diff = new['count'][i] - self.first['count'][ix][0]
+                if diff != 0:
+                    diffs.append(f'{diff}')
+                else:
+                    diffs.append('')
+
+        new['change'] = diffs
+        return new
+
+
 def get_redshift_fit_status(root, id, table='redshift_fit_v2', engine=None):
     """
     Get status value from the database for root_id object
