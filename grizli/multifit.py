@@ -1044,7 +1044,11 @@ class GroupFLT():
                 clean_list = [self.FLTs[i].grism['SCI']-self.FLTs[i].model
                                  for i in idx]
 
-                wht_list = [(self.FLTs[i].grism['DQ'] == 0)/self.FLTs[i].grism['ERR']**2 for i in idx]
+                wht_list = [
+                    (self.FLTs[i].grism['DQ'] == 0) / self.FLTs[i].grism['ERR']**2
+                    for i in idx
+                ]
+
                 for i in range(N):
                     mask = ~np.isfinite(wht_list[i])
                     wht_list[i][mask] = 0
@@ -1058,11 +1062,16 @@ class GroupFLT():
                 outfile = '{0}-{1}-{2}_grism_sci.fits'.format(root, g.lower(),
                                                             pa)
                 print(outfile)
-                out = drizzle_array_groups(sci_list, wht_list, wcs_list,
-                                           scale=scale, kernel=kernel,
-                                           pixfrac=pixfrac)
+                out = drizzle_array_groups(
+                    sci_list,
+                    wht_list,
+                    wcs_list,
+                    scale=scale,
+                    kernel=kernel,
+                    pixfrac=pixfrac
+                )
 
-                outsci, _, _, header, outputwcs = out
+                outsci, _, _, _, header, outputwcs = out
                 header['FILTER'] = g
                 header['PA'] = pa
                 pyfits.writeto(outfile, data=outsci, header=header,
@@ -1072,11 +1081,16 @@ class GroupFLT():
                 outfile = '{0}-{1}-{2}_grism_clean.fits'.format(root, g.lower(),
                                                               pa)
                 print(outfile)
-                out = drizzle_array_groups(clean_list, wht_list, wcs_list,
-                                           scale=scale, kernel=kernel,
-                                           pixfrac=pixfrac)
+                out = drizzle_array_groups(
+                    clean_list,
+                    wht_list,
+                    wcs_list,
+                    scale=scale,
+                    kernel=kernel,
+                    pixfrac=pixfrac
+                )
 
-                outsci, _, _, header, outputwcs = out
+                outsci, _, _, _, header, outputwcs = out
                 header['FILTER'] = g
                 header['PA'] = pa
                 pyfits.writeto(outfile, data=outsci, header=header,
@@ -3396,7 +3410,16 @@ class MultiBeam(GroupFitter):
         wht_list = [np.isfinite(beam.beam.seg)*1. for beam in self.beams]
         wcs_list = [beam.direct.wcs for beam in self.beams]
 
-        out = utils.drizzle_array_groups(sci_list, wht_list, wcs_list, outputwcs=wcs, scale=0.1, kernel=kernel, pixfrac=pixfrac, verbose=verbose)
+        out = utils.drizzle_array_groups(
+            sci_list,
+            wht_list,
+            wcs_list,
+            outputwcs=wcs,
+            scale=0.1,
+            kernel=kernel,
+            pixfrac=pixfrac,
+            verbose=verbose
+        )
         drizzled_segm = (out[0] > 0)*id
 
         return drizzled_segm

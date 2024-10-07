@@ -1694,6 +1694,7 @@ def make_SEP_catalog(root='',
                      verbose=True,
                      phot_apertures=SEXTRACTOR_PHOT_APERTURES,
                      aper_segmask=False,
+                     prefer_var_image=True,
                      rescale_weight=True,
                      err_scale=-np.inf,
                      use_bkg_err=False,
@@ -1768,7 +1769,10 @@ def make_SEP_catalog(root='',
         If true, then run SEP photometry with segmentation masking.  This
         requires the sep fork at https://github.com/gbrammer/sep.git, 
         or `sep >= 1.10.0`.
-    
+
+    prefer_var_image : bool
+        Use a variance image ``_wht.fits > _var.fits`` if found
+
     rescale_weight : bool
         If true, then a scale factor is calculated from the ratio of the 
         weight image to the variance estimated by `sep.Background`.  
@@ -1904,9 +1908,6 @@ def make_SEP_catalog(root='',
     # Get AB zeropoint
     ZP = utils.calc_header_zeropoint(im, ext=0)
 
-    logstr = 'sep: Image AB zeropoint =  {0:.3f}'.format(ZP)
-    utils.log_comment(utils.LOGFILE, logstr, verbose=verbose, show_date=True)
-
     # Scale fluxes to mico-Jy
     uJy_to_dn = 1/(3631*1e6*10**(-0.4*ZP))
 
@@ -1922,8 +1923,21 @@ def make_SEP_catalog(root='',
     else:
         WEIGHT_TYPE = "MAP_WEIGHT"
 
+    if (WEIGHT_TYPE == "MAP_WEIGHT") & (prefer_var_image):
+        var_file = weight_file.replace('_wht.fits', '_var.fits')
+        if os.path.exists(var_file):
+            weight_file = var_file
+            WEIGHT_TYPE = "VARIANCE"
+
     drz_im = pyfits.open(drz_file)
     data = drz_im[0].data.byteswap().newbyteorder()
+
+    logstr = f'make_SEP_catalog: {drz_file} weight={weight_file} ({WEIGHT_TYPE})'
+    utils.log_comment(utils.LOGFILE, logstr, verbose=verbose, show_date=True)
+
+    logstr = 'make_SEP_catalog: Image AB zeropoint =  {0:.3f}'.format(ZP)
+    utils.log_comment(utils.LOGFILE, logstr, verbose=verbose, show_date=False)
+
 
     try:
         wcs = pywcs.WCS(drz_im[0].header)
@@ -1956,12 +1970,16 @@ def make_SEP_catalog(root='',
         wht_im = pyfits.open(weight_file)
         wht_data = wht_im[0].data.byteswap().newbyteorder()
 
-        err = 1/np.sqrt(wht_data)
+        if WEIGHT_TYPE == "VARIANCE":
+            err_data = np.sqrt(wht_data)
+        else:
+            err_data = 1/np.sqrt(wht_data)
+
         del(wht_data)
 
         # True mask pixels are masked with sep
-        mask = (~np.isfinite(err)) | (err == 0) | (~np.isfinite(data))
-        err[mask] = 0
+        mask = (~np.isfinite(err_data)) | (err_data == 0) | (~np.isfinite(data))
+        err_data[mask] = 0
 
         wht_im.close()
         del(wht_im)
@@ -1969,7 +1987,7 @@ def make_SEP_catalog(root='',
     else:
         # True mask pixels are masked with sep
         mask = (data == 0) | (~np.isfinite(data))
-        err = None
+        err_data = None
 
     try:
         drz_im.close()
@@ -2023,20 +2041,20 @@ def make_SEP_catalog(root='',
             pyfits.writeto('{0}_bkg.fits'.format(root), data=bkg_data,
                     header=wcs_header, overwrite=True)
 
-        if (err is None) | use_bkg_err:
+        if (err_data is None) | use_bkg_err:
             logstr = 'sep: Use bkg.rms() for error array'
             utils.log_comment(utils.LOGFILE, logstr, verbose=verbose,
                               show_date=True)
 
-            err = bkg.rms()
+            err_data = bkg.rms()
 
         if err_scale == -np.inf:
-            ratio = bkg.rms()/err
+            ratio = bkg.rms() / err_data
             err_scale = np.median(ratio[(~mask) & np.isfinite(ratio)])
         else:
             # Just return the error scale
             if err_scale < 0:
-                ratio = bkg.rms()/err
+                ratio = bkg.rms() / err_data
                 xerr_scale = np.median(ratio[(~mask) & np.isfinite(ratio)])
                 del(bkg)
                 return xerr_scale
@@ -2057,16 +2075,21 @@ def make_SEP_catalog(root='',
         if verbose:
             print('SEP: err_scale={:.3f}'.format(err_scale))
 
-        err *= err_scale
+        err_data *= err_scale
 
     if source_xy is None:
         # Run the detection
         if verbose:
             print('   SEP: Extract...')
 
-        objects, seg = sep.extract(data_bkg, threshold, err=err,
-                       mask=mask, segmentation_map=True,
-                       **detection_params)
+        objects, seg = sep.extract(
+            data_bkg,
+            threshold,
+            err=err_data,
+            mask=mask,
+            segmentation_map=True,
+            **detection_params
+        )
 
         if verbose:
             print('    Done.')
@@ -2131,21 +2154,34 @@ def make_SEP_catalog(root='',
         tab.meta['THRESHOLD'] = (threshold, 'Detection threshold')
 
         # ISO fluxes (flux within segments)
-        iso_flux, iso_fluxerr, iso_area = get_seg_iso_flux(data_bkg, seg, tab,
-                                                 err=err, verbose=1)
+        iso_flux, iso_fluxerr, iso_area = get_seg_iso_flux(
+            data_bkg,
+            seg,
+            tab,
+            err=err_data,
+            verbose=1
+        )
 
-        tab['flux_iso'] = iso_flux/uJy_to_dn*u.uJy
-        tab['fluxerr_iso'] = iso_fluxerr/uJy_to_dn*u.uJy
+        tab['flux_iso'] = iso_flux /uJy_to_dn * u.uJy
+        tab['fluxerr_iso'] = iso_fluxerr / uJy_to_dn * u.uJy
         tab['area_iso'] = iso_area
         tab['mag_iso'] = 23.9-2.5*np.log10(tab['flux_iso'])
 
         # Compute FLUX_AUTO, FLUX_RADIUS
         if compute_auto_quantities:
-            auto = compute_SEP_auto_params(data, data_bkg, mask,
-                                pixel_scale=pixel_scale,
-                                err=err, segmap=seg, tab=tab,
-                                autoparams=autoparams, flux_radii=flux_radii,
-                                subpix=subpix, verbose=verbose)
+            auto = compute_SEP_auto_params(
+                data,
+                data_bkg,
+                mask,
+                pixel_scale=pixel_scale,
+                err=err_data,
+                segmap=seg,
+                tab=tab,
+                autoparams=autoparams,
+                flux_radii=flux_radii,
+                subpix=subpix,
+                verbose=verbose
+            )
 
             for k in auto.meta:
                 tab.meta[k] = auto.meta[k]
@@ -2238,7 +2274,9 @@ def make_SEP_catalog(root='',
         tab.meta[f'BACK_{k.upper()}'] = (bkg_params[k],
                                          f'Background param {k}')
         
-    tab.meta['ERR_SCALE'] = (err_scale, 'Scale factor applied to weight image (like MAP_WEIGHT)')
+    tab.meta['ERR_SCALE'] = (
+        err_scale, 'Scale factor applied to weight image (like MAP_WEIGHT)'
+    )
     tab.meta['RESCALEW'] = (rescale_weight, 'Was the weight applied?')
 
     tab.meta['APERMASK'] = (aper_segmask, 'Mask apertures with seg image')
@@ -2247,81 +2285,88 @@ def make_SEP_catalog(root='',
     for iap, aper in enumerate(apertures):
         if sep.__version__ > '1.03':
             # Should work with the sep fork at gbrammer/sep and latest sep
-            flux, fluxerr, flag = sep.sum_circle(data_bkg,
-                                                 source_x, source_y,
-                                                 aper/2, err=err,
-                                                 gain=gain, subpix=subpix,
-                                                 segmap=aseg, seg_id=aseg_id,
-                                                 mask=mask)
+            flux, fluxerr, flag = sep.sum_circle(
+                data_bkg,
+                source_x,
+                source_y,
+                aper/2,
+                err=err_data,
+                gain=gain,
+                subpix=subpix,
+                segmap=aseg,
+                seg_id=aseg_id,
+                mask=mask
+            )
         else:
             tab.meta['APERMASK'] = (False, 'Mask apertures with seg image - Failed')
-            flux, fluxerr, flag = sep.sum_circle(data_bkg,
-                                                 source_x, source_y,
-                                                 aper/2, err=err,
-                                                 gain=gain, subpix=subpix,
-                                                 mask=mask)
+            flux, fluxerr, flag = sep.sum_circle(
+                data_bkg,
+                source_x,
+                source_y,
+                aper/2,
+                err=err_data,
+                gain=gain,
+                subpix=subpix,
+                mask=mask
+            )
 
         tab.meta['GAIN'] = gain
 
-        tab['flux_aper_{0}'.format(iap)] = flux/uJy_to_dn*u.uJy
-        tab['fluxerr_aper_{0}'.format(iap)] = fluxerr/uJy_to_dn*u.uJy
+        tab['flux_aper_{0}'.format(iap)] = flux /uJy_to_dn * u.uJy
+        tab['fluxerr_aper_{0}'.format(iap)] = fluxerr / uJy_to_dn * u.uJy
         tab['flag_aper_{0}'.format(iap)] = flag
 
         if get_background:
             try:
-                flux, fluxerr, flag = sep.sum_circle(bkg_data,
-                                          source_x, source_y,
-                                          aper/2, err=None, gain=1.0,
-                                          segmap=aseg, seg_id=aseg_id,
-                                          mask=mask)
+                flux, fluxerr, flag = sep.sum_circle(
+                    bkg_data,
+                    source_x,
+                    source_y,
+                    aper/2,
+                    err=None,
+                    gain=1.0,
+                    segmap=aseg,
+                    seg_id=aseg_id,
+                    mask=mask
+                )
             except:
-                flux, fluxerr, flag = sep.sum_circle(bkg_data,
-                                          source_x, source_y,
-                                          aper/2, err=None, gain=1.0,
-                                          mask=mask)
+                flux, fluxerr, flag = sep.sum_circle(
+                    bkg_data,
+                    source_x,
+                    source_y,
+                    aper/2,
+                    err=None,
+                    gain=1.0,
+                    mask=mask
+                )
 
             tab['bkg_aper_{0}'.format(iap)] = flux/uJy_to_dn*u.uJy
         else:
             tab['bkg_aper_{0}'.format(iap)] = 0.*u.uJy
 
         # Count masked pixels in the aperture, not including segmask
-        flux, fluxerr, flag = sep.sum_circle(data_mask,
-                                      source_x, source_y,
-                                      aper/2, err=err,
-                                      gain=gain, subpix=subpix)
+        flux, fluxerr, flag = sep.sum_circle(
+            data_mask,
+            source_x,
+            source_y,
+            aper/2,
+            err=err_data,
+            gain=gain,
+            subpix=subpix
+        )
 
         tab['mask_aper_{0}'.format(iap)] = flux
 
         tab.meta['aper_{0}'.format(iap)] = (aper, 'Aperture diameter, pix')
-        tab.meta['asec_{0}'.format(iap)] = (aper*pixel_scale,
-                                            'Aperture diameter, arcsec')
-
-    # # If blended, use largest aperture magnitude
-    # if 'flag' in tab.colnames:
-    #     last_flux = tab['flux_aper_{0}'.format(iap)]
-    #     last_fluxerr = tab['fluxerr_aper_{0}'.format(iap)]
-    #
-    #     blended = (tab['flag'] & 1) > 0
-    #
-    #     total_corr = tab['flux_auto']/last_flux
-    #     blended |= total_corr > max_total_corr
-    #
-    #     tab['flag'][blended] |= 1024
-    #
-    #     aper_mag = 23.9 - 2.5*np.log10(last_flux)
-    #     aper_magerr = 2.5/np.log(10)*last_fluxerr/last_flux
-    #
-    #     tab['mag_auto'][blended] = aper_mag[blended]
-    #     tab['magerr_auto'][blended] = aper_magerr[blended]
-    #
-    #     # "ISO" mag, integrated within the segment
-    #     tab['mag_iso'] = 23.9-2.5*np.log10(tab['flux'])
+        tab.meta['asec_{0}'.format(iap)] = (
+            aper * pixel_scale, 'Aperture diameter, arcsec'
+        )
 
     try:
         # Free memory objects explicitly
         del(data_mask)
         del(data)
-        del(err)
+        del(err_data)
     except:
         pass
 
@@ -3747,7 +3792,7 @@ def get_rotated_column_average(data, mask, theta, axis=1, statfunc=np.nanmedian,
     return back_sl
 
 
-def subtract_visit_angle_averages(visit, threshold=1.8, detection_background=True, angles=[30.0, -30.0, 0, 90], suffix='angles', niter=3, weight_type="median_err", instruments=['NIRCAM'], stepsize=-1, verbose=True):
+def subtract_visit_angle_averages(visit, threshold=1.8, detection_background=True, angles=[30.0, -30.0, 0, 90], suffix='angles', niter=3, weight_type="jwst_var", instruments=['NIRCAM'], stepsize=-1, verbose=True):
     """
     Subtract angle averages from exposures in a `visit` group
     
@@ -3845,14 +3890,17 @@ def subtract_visit_angle_averages(visit, threshold=1.8, detection_background=Tru
         msg += f"pa_aper: {pa_aper:.2f}  iter: {_iter}"
         utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
 
-        drz = utils.drizzle_from_visit(visit, drz_wcs,
-                                       kernel='square',
-                                       pixfrac=1.0,
-                                       clean=False,
-                                       verbose=False,
-                                       scale_photom=False,
-                                       weight_type=weight_type,
-                                      )
+        drz = utils.drizzle_from_visit(
+            visit,
+            drz_wcs,
+            kernel='square',
+            pixfrac=1.0,
+            clean=False,
+            verbose=False,
+            scale_photom=False,
+            weight_type=weight_type,
+        )
+
         drz_h = drz[2]
 
         drz_h['PA_APER'] = pa_aper, 'PA_APER used for reference'
@@ -3867,13 +3915,16 @@ def subtract_visit_angle_averages(visit, threshold=1.8, detection_background=Tru
         ##################
         ### Source detection for mask
 
-        cat, seg = make_SEP_catalog_from_arrays(data, err, (~mask),
-                                                wcs=drz_wcs,
-                                                threshold=threshold,
-                                            get_background=detection_background,
-                                                segmentation_map=True,
-                                                verbose=False,
-                                                )
+        cat, seg = make_SEP_catalog_from_arrays(
+            data,
+            err,
+            (~mask),
+            wcs=drz_wcs,
+            threshold=threshold,
+            get_background=detection_background,
+            segmentation_map=True,
+            verbose=False,
+        )
 
         smask = (seg == 0) & mask
 
@@ -3882,9 +3933,11 @@ def subtract_visit_angle_averages(visit, threshold=1.8, detection_background=Tru
 
         med_model = data*0.
         for i, off in enumerate(angles):
-            med_model += get_rotated_column_average(data - med_model,
-                                                    smask,
-                                                    pa_aper+off)
+            med_model += get_rotated_column_average(
+                data - med_model,
+                smask,
+                pa_aper+off
+            )
 
         ##################
         ### Apply to exposure files
@@ -3915,9 +3968,12 @@ def subtract_visit_angle_averages(visit, threshold=1.8, detection_background=Tru
                     # TBD
                     tscale = 1.
                     if ('BKG',ext) not in flt:
-                        hdu = pyfits.ImageHDU(data=blt,
-                                              name='BKG', ver=ext, 
-                                              header=flt['SCI',ext].header)
+                        hdu = pyfits.ImageHDU(
+                            data=blt,
+                            name='BKG',
+                            ver=ext,
+                            header=flt['SCI',ext].header
+                        )
 
                         flt.append(hdu)
                     else:
@@ -4950,22 +5006,23 @@ def process_direct_grism_visit(direct={},
             subtract_visit_angle_averages(direct, **angle_background_kwargs)
         
         # Remake final mosaic
-        _ = utils.drizzle_from_visit(direct,
-                                     output=None,
-                                     pixfrac=1.,
-                                     kernel='square',
-                                     clean=False,
-                                     include_saturated=True, 
-                                     keep_bits=None,
-                                     dryrun=False,
-                                     skip=None,
-                                     extra_wfc3ir_badpix=True,
-                                     verbose=False,
-                                     scale_photom=False,
-                                     weight_type='jwst',
-                                     calc_wcsmap=False,
-                                     )
-                       
+        _ = utils.drizzle_from_visit(
+            direct,
+            output=None,
+            pixfrac=1.,
+            kernel='square',
+            clean=False,
+            include_saturated=True,
+            keep_bits=None,
+            dryrun=False,
+            skip=None,
+            extra_wfc3ir_badpix=True,
+            verbose=False,
+            scale_photom=False,
+            weight_type='jwst_var',
+            calc_wcsmap=False,
+        )
+
         _sci, _wht, _hdr, _files, _info = _
         _drcfile = glob.glob(f"{direct['product']}_dr*sci.fits")[0]
         _whtfile = _drcfile.replace('_sci.fits','_wht.fits')
@@ -5384,16 +5441,21 @@ def iterate_tweak_align(direct, grism, cat_threshold=7, cleanup=True, niter=3, t
         
         tmp_root_i = f"{tmp_root}_{iter_i}"
         
-        _ = visit_processor.cutout_mosaic(rootname=tmp_root_i, 
-                                      product='{rootname}',
-                                      ir_wcs=_wcs, half_optical=False,
-                                      kernel='square', pixfrac=0.8,
-                                      res=_res,
-                                      clean_flt=False,
-                                      gzip_output=False,
-                                      skip_existing=False,
-                                      s3output=None,
-                                      verbose=False)
+        _ = visit_processor.cutout_mosaic(
+            rootname=tmp_root_i,
+            product='{rootname}',
+            ir_wcs=_wcs,
+            half_optical=False,
+            kernel='square',
+            pixfrac=0.8,
+            weight_type='jwst_var',
+            res=_res,
+            clean_flt=False,
+            gzip_output=False,
+            skip_existing=False,
+            s3output=None,
+            verbose=False
+        )
         
         cat = make_SEP_catalog(tmp_root_i,
                                threshold=cat_threshold,

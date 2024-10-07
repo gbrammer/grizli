@@ -1402,18 +1402,20 @@ def drizzle_tile_subregion(tile=2530, subx=522, suby=461, filter='F160W', s3outp
         
     if s3output is None:
         s3output = f's3://grizli-mosaic-tiles/Tiles/{tile}/'
-    
+
     try:
-        visit_processor.cutout_mosaic(rootname=root,
-                                  product='{rootname}.{f}',
-                                  ir_wcs=ir_wcs,
-                                  res=exp, 
-                                  s3output=s3output, 
-                                  make_figure=make_figure,
-                                  skip_existing=skip_existing,
-                                  gzip_output=gzip_output,
-                                  **kwargs)
-    
+        visit_processor.cutout_mosaic(
+            rootname=root,
+            product='{rootname}.{f}',
+            ir_wcs=ir_wcs,
+            res=exp,
+            s3output=s3output,
+            make_figure=make_figure,
+            skip_existing=skip_existing,
+            gzip_output=gzip_output,
+            **kwargs
+        )
+
         # Update subtile status
         db.execute(f"""UPDATE mosaic_tiles_exposures t
               SET in_mosaic = 1
@@ -1422,6 +1424,7 @@ def drizzle_tile_subregion(tile=2530, subx=522, suby=461, filter='F160W', s3outp
               AND w.filter='{filter}' AND tile={tile}
               AND subx={subx} AND suby={suby}
                """)
+
     except TypeError:
         db.execute(f"""UPDATE mosaic_tiles_exposures t
               SET in_mosaic = 8
@@ -1430,7 +1433,7 @@ def drizzle_tile_subregion(tile=2530, subx=522, suby=461, filter='F160W', s3outp
               AND w.filter='{filter}' AND tile={tile}
               AND subx={subx} AND suby={suby}
                """)
-        
+
     status = '{root}.{f}'
     return status
 

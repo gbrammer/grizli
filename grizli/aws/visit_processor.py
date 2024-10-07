@@ -397,10 +397,11 @@ def make_visit_mosaic(assoc, base_path=ROOT_PATH, version='v7.0', pixscale=0.08,
         # MIRI at nominal pixscale
         pass
 
-    if det in ['WFC','UVIS','IR']:
-        weight_type = 'median_err'
-    else:
-        weight_type = 'jwst'
+    # if det in ['WFC','UVIS','IR']:
+    #     weight_type = 'median_err'
+    # else:
+    #     weight_type = 'jwst'
+    weight_type = "jwst_var"
 
     pixscale_mas = int(np.round(utils.get_wcs_pscale(wsl)*1000))
 
@@ -411,19 +412,20 @@ def make_visit_mosaic(assoc, base_path=ROOT_PATH, version='v7.0', pixscale=0.08,
     
     res = res[res['sciext'] == 1]
     
-    cutout_mosaic(assoc,
-                 ir_wcs=wsl, 
-                 half_optical=False,
-                 clean_flt=False,
-                 s3output=False,
-                 gzip_output=True,
-                 make_exptime_map=True,
-                 skip_existing=skip_existing,
-                 kernel='square',
-                 pixfrac=0.8,
-                 res=res,
-                 weight_type=weight_type,
-                 snowblind_kwargs=snowblind_kwargs,
+    cutout_mosaic(
+        assoc,
+        ir_wcs=wsl,
+        half_optical=False,
+        clean_flt=False,
+        s3output=False,
+        gzip_output=True,
+        make_exptime_map=True,
+        skip_existing=skip_existing,
+        kernel='square',
+        pixfrac=0.8,
+        res=res,
+        weight_type=weight_type,
+        snowblind_kwargs=snowblind_kwargs,
     )
 
     files = glob.glob(f'{assoc}*_sci.fits*')
@@ -2029,7 +2031,7 @@ def query_exposures(ra=53.16, dec=-27.79, size=1., pixel_scale=0.1, theta=0,  fi
     return header, wcs, SQL, res
 
 
-def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-27.7910651, size=5*60, theta=0., filters=['F160W'], ir_scale=0.1, ir_wcs=None, res=None, half_optical=True, kernel='point', pixfrac=0.33, make_figure=True, skip_existing=True, clean_flt=True, gzip_output=True, s3output='s3://grizli-v2/HST/Pipeline/Mosaic/', split_uvis=True, extra_query='', extra_wfc3ir_badpix=True, fix_niriss=True, scale_nanojy=10, verbose=True, weight_type='err', rnoise_percentile=99, get_dbmask=True, niriss_ghost_kwargs={}, snowblind_kwargs=None, scale_photom=True, context='jwst_0989.pmap', calc_wcsmap=False, make_exptime_map=False, expmap_sample_factor=4, keep_expmap_small=True, **kwargs):
+def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-27.7910651, size=5*60, theta=0., filters=['F160W'], ir_scale=0.1, ir_wcs=None, res=None, half_optical=True, kernel='point', pixfrac=0.33, make_figure=True, skip_existing=True, clean_flt=True, gzip_output=True, s3output='s3://grizli-v2/HST/Pipeline/Mosaic/', split_uvis=True, extra_query='', extra_wfc3ir_badpix=True, fix_niriss=True, scale_nanojy=10, verbose=True, weight_type='jwst_var', rnoise_percentile=99, get_dbmask=True, niriss_ghost_kwargs={}, snowblind_kwargs=None, scale_photom=True, context='jwst_0989.pmap', calc_wcsmap=False, make_exptime_map=False, expmap_sample_factor=4, keep_expmap_small=True, **kwargs):
     """
     Make mosaic from exposures defined in the exposure database
     
@@ -2106,7 +2108,7 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
     verbose : bool
         Verbose messaging
     
-    weight_type : 'jwst', 'median_err', 'err'
+    weight_type : 'jwst', 'median_err', 'err', 'median_variance', 'jwst_var'
         Drizzle weight strategy (see `~grizli.utils.drizzle_from_visit`)
     
     rnoise_percentile : float
@@ -2297,23 +2299,26 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
             
             visit['footprints'].append(fp_i)
                            
-        _ = utils.drizzle_from_visit(visit, visit['reference'], 
-                                     pixfrac=pixfrac, 
-                                     kernel=kernel, clean=clean_flt, 
-                                     extra_wfc3ir_badpix=extra_wfc3ir_badpix,
-                                     verbose=verbose,
-                                     scale_photom=scale_photom,
-                                     context=context,
-                                     get_dbmask=get_dbmask,
-                                     niriss_ghost_kwargs=niriss_ghost_kwargs,
-                                     snowblind_kwargs=snowblind_kwargs,
-                                     weight_type=weight_type,
-                                     rnoise_percentile=rnoise_percentile,
-                                     calc_wcsmap=calc_wcsmap,
-                                     **kwargs,
-                                     )
-                             
-        outsci, outwht, header, flist, wcs_tab = _
+        _ = utils.drizzle_from_visit(
+            visit,
+            visit['reference'],
+            pixfrac=pixfrac,
+            kernel=kernel,
+            clean=clean_flt,
+            extra_wfc3ir_badpix=extra_wfc3ir_badpix,
+            verbose=verbose,
+            scale_photom=scale_photom,
+            context=context,
+            get_dbmask=get_dbmask,
+            niriss_ghost_kwargs=niriss_ghost_kwargs,
+            snowblind_kwargs=snowblind_kwargs,
+            weight_type=weight_type,
+            rnoise_percentile=rnoise_percentile,
+            calc_wcsmap=calc_wcsmap,
+            **kwargs,
+        )
+
+        outsci, outwht, outvar, header, flist, wcs_tab = _
         
         wcs_tab.write('{0}_wcs.csv'.format(visit['product']), overwrite=True)
         
@@ -2321,13 +2326,13 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
             drz = 'drc'
         else:
             drz = 'drz'
-        
+
         # if ('PHOTFNU' not in header) & ('PHOTFLAM' in header):
         #     photfnu = utils.photfnu_from_photflam(header['photflam'],
         #                                           header['photplam'])
         #     header['PHOTFNU'] = (photfnu,
         #                          'Inverse sensitivity from PHOTFLAM, Jy/DN')
-            
+
         if scale_nanojy is not None:
             to_njy = scale_nanojy/(header['PHOTFNU']*1.e9)
             msg = f'Scale PHOTFNU x {to_njy:.3f} to {scale_nanojy:.1f} nJy'
@@ -2339,25 +2344,48 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
             header['BUNIT'] = f'{scale_nanojy:.1f}*nanoJansky'
             outsci *= 1./to_njy
             outwht *= to_njy**2
+            if outvar is not None:
+                outvar *= 1./to_njy**2
         else:
             #pass
             to_njy = header['PHOTFNU']*1.e9
             header['BUNIT'] = f'{to_njy:.3f}*nanoJansky'
-        
+
         sci_file = '{0}_{1}_sci.fits'.format(visit['product'], drz)
-        pyfits.writeto(sci_file,
-                       data=outsci, header=header, 
-                       overwrite=True)
-    
-        pyfits.writeto('{0}_{1}_wht.fits'.format(visit['product'], drz),
-                      data=outwht, header=header, 
-                      overwrite=True)
-        
+
+        pyfits.writeto(
+            sci_file,
+            data=outsci,
+            header=header,
+            overwrite=True
+        )
+
+        # Weight
+        pyfits.writeto(
+            '{0}_{1}_wht.fits'.format(visit['product'], drz),
+            data=outwht,
+            header=header,
+            overwrite=True
+        )
+
+        # Variance
+        if outvar is not None:
+            pyfits.writeto(
+                '{0}_{1}_var.fits'.format(visit['product'], drz),
+                data=outvar,
+                header=header,
+                overwrite=True
+            )
+
         if make_exptime_map:
-            matched_exptime_map(sci_file, sample_factor=expmap_sample_factor,
-                                keep_small=keep_expmap_small,
-                                output_type='file', verbose=True)
-    
+            matched_exptime_map(
+                sci_file,
+                sample_factor=expmap_sample_factor,
+                keep_small=keep_expmap_small,
+                output_type='file',
+                verbose=True
+            )
+
     if s3output:
         files = []
         for f in uniq_filts.values:
@@ -2626,10 +2654,14 @@ def show_epochs_filter(ra, dec, size=4, filters=['F444W-CLEAR'], cleanup=True, v
         w.pscale = utils.get_wcs_pscale(w)
     
     # Separate drizzle
-    thumbs = [utils.drizzle_array_groups(sci_list[i:i+1], wht_list[i:i+1],
-                                        wcs_list[i:i+1], outputwcs=outw,
-                                        kernel='point', pixfrac=1,
-                                       )[0]
+    thumbs = [utils.drizzle_array_groups(
+                  sci_list[i:i+1],
+                  wht_list[i:i+1],
+                  wcs_list[i:i+1],
+                  outputwcs=outw,
+                  kernel='point',
+                  pixfrac=1,
+              )[0]
               for i in range(len(files))]
     
     # Mask bad pixels
@@ -2639,11 +2671,14 @@ def show_epochs_filter(ra, dec, size=4, filters=['F444W-CLEAR'], cleanup=True, v
         wht_list[i][msk] = 0
     
     # Full drizzle
-    full = utils.drizzle_array_groups(sci_list,
-                                      wht_list,
-                                        wcs_list, outputwcs=outw,
-                                        kernel='point', pixfrac=1,
-                                       )[0]
+    full = utils.drizzle_array_groups(
+        sci_list,
+        wht_list,
+        wcs_list,
+        outputwcs=outw,
+        kernel='point',
+        pixfrac=1,
+    )[0]
     
     plt.rcParams['xtick.direction'] = 'in'
     plt.rcParams['ytick.direction'] = 'in'
@@ -2692,7 +2727,7 @@ def show_epochs_filter(ra, dec, size=4, filters=['F444W-CLEAR'], cleanup=True, v
     return fig
 
 
-def make_mosaic(jname='', ds9=None, skip_existing=True, ir_scale=0.1, half_optical=False, pad=16, kernel='point', pixfrac=0.33, sync=True, ir_wcs=None, weight_type='median_err'):
+def make_mosaic(jname='', ds9=None, skip_existing=True, ir_scale=0.1, half_optical=False, pad=16, kernel='point', pixfrac=0.33, sync=True, ir_wcs=None, weight_type='jwst_var', **kwargs):
     """
     Make mosaics from all exposures in a group of associations
     """
@@ -2867,22 +2902,40 @@ def make_mosaic(jname='', ds9=None, skip_existing=True, ir_scale=0.1, half_optic
         else:
             groups[f]['reference'] = ir_wcs
             
-        _ = utils.drizzle_from_visit(groups[f], groups[f]['reference'], 
-                                     pixfrac=pixfrac, 
-                                     kernel=kernel, clean=False,
-                                     weight_type=weight_type,
-                                     )
+        _ = utils.drizzle_from_visit(
+            groups[f],
+            groups[f]['reference'],
+            pixfrac=pixfrac,
+            kernel=kernel,
+            clean=False,
+            weight_type=weight_type,
+            **kwargs
+        )
                              
-        outsci, outwht, header, flist, wcs_tab = _
+        outsci, outwht, outvar, header, flist, wcs_tab = _
     
-        pyfits.writeto(groups[f]['product']+'_drz_sci.fits',
-                       data=outsci, header=header, 
-                       overwrite=True)
+        pyfits.writeto(
+            groups[f]['product']+'_drz_sci.fits',
+            data=outsci,
+            header=header,
+            overwrite=True
+        )
     
-        pyfits.writeto(groups[f]['product']+'_drz_wht.fits',
-                      data=outwht, header=header, 
-                      overwrite=True)
-    
+        pyfits.writeto(
+            groups[f]['product']+'_drz_wht.fits',
+            data=outwht,
+            header=header,
+            overwrite=True
+        )
+
+        if outvar is not None:
+            pyfits.writeto(
+                groups[f]['product']+'_drz_var.fits',
+                data=outvar,
+                header=header,
+                overwrite=True
+            )
+            
     if ds9 is not None:
         auto_script.field_rgb(base, HOME_PATH=None, xsize=12, output_dpi=300, 
               ds9=ds9, scl=2, suffix='.rgb', timestamp=True, mw_ebv=0)
