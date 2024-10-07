@@ -1924,8 +1924,8 @@ def make_SEP_catalog(root='',
         WEIGHT_TYPE = "MAP_WEIGHT"
 
     if (WEIGHT_TYPE == "MAP_WEIGHT") & (prefer_var_image):
-        var_file = weight_file.replace('_wht.fits', '_var.fits')
-        if os.path.exists(var_file):
+        var_file = weight_file.replace('wht.fits', 'var.fits')
+        if os.path.exists(var_file) & (var_file != weight_file):
             weight_file = var_file
             WEIGHT_TYPE = "VARIANCE"
 
