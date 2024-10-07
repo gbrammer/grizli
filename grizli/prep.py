@@ -3901,7 +3901,7 @@ def subtract_visit_angle_averages(visit, threshold=1.8, detection_background=Tru
             weight_type=weight_type,
         )
 
-        drz_h = drz[2]
+        drz_h = drz[3]
 
         drz_h['PA_APER'] = pa_aper, 'PA_APER used for reference'
         drz_h['BKGANGLE'] = (','.join([f'{a:.1f}' for a in angles]), 
@@ -5023,7 +5023,7 @@ def process_direct_grism_visit(direct={},
             calc_wcsmap=False,
         )
 
-        _sci, _wht, _hdr, _files, _info = _
+        _sci, _wht, _var, _hdr, _files, _info = _
         _drcfile = glob.glob(f"{direct['product']}_dr*sci.fits")[0]
         _whtfile = _drcfile.replace('_sci.fits','_wht.fits')
         pyfits.PrimaryHDU(data=_sci, header=_hdr).writeto(_drcfile,
