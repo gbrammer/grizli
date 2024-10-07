@@ -1924,8 +1924,8 @@ def make_SEP_catalog(root='',
         WEIGHT_TYPE = "MAP_WEIGHT"
 
     if (WEIGHT_TYPE == "MAP_WEIGHT") & (prefer_var_image):
-        var_file = weight_file.replace('_wht.fits', '_var.fits')
-        if os.path.exists(var_file):
+        var_file = weight_file.replace('wht.fits', 'var.fits')
+        if os.path.exists(var_file) & (var_file != weight_file):
             weight_file = var_file
             WEIGHT_TYPE = "VARIANCE"
 
@@ -3792,7 +3792,7 @@ def get_rotated_column_average(data, mask, theta, axis=1, statfunc=np.nanmedian,
     return back_sl
 
 
-def subtract_visit_angle_averages(visit, threshold=1.8, detection_background=True, angles=[30.0, -30.0, 0, 90], suffix='angles', niter=3, weight_type="jwst_var", instruments=['NIRCAM'], stepsize=-1, verbose=True):
+def subtract_visit_angle_averages(visit, threshold=1.8, detection_background=True, angles=[30.0, -30.0, 0, 90], suffix='angles', niter=3, weight_type="jwst", instruments=['NIRCAM'], stepsize=-1, verbose=True):
     """
     Subtract angle averages from exposures in a `visit` group
     
@@ -3901,7 +3901,7 @@ def subtract_visit_angle_averages(visit, threshold=1.8, detection_background=Tru
             weight_type=weight_type,
         )
 
-        drz_h = drz[2]
+        drz_h = drz[3]
 
         drz_h['PA_APER'] = pa_aper, 'PA_APER used for reference'
         drz_h['BKGANGLE'] = (','.join([f'{a:.1f}' for a in angles]), 
@@ -5019,11 +5019,11 @@ def process_direct_grism_visit(direct={},
             extra_wfc3ir_badpix=True,
             verbose=False,
             scale_photom=False,
-            weight_type='jwst_var',
+            weight_type='jwst',
             calc_wcsmap=False,
         )
 
-        _sci, _wht, _hdr, _files, _info = _
+        _sci, _wht, _var, _hdr, _files, _info = _
         _drcfile = glob.glob(f"{direct['product']}_dr*sci.fits")[0]
         _whtfile = _drcfile.replace('_sci.fits','_wht.fits')
         pyfits.PrimaryHDU(data=_sci, header=_hdr).writeto(_drcfile,
@@ -5440,7 +5440,9 @@ def iterate_tweak_align(direct, grism, cat_threshold=7, cleanup=True, niter=3, t
         utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
         
         tmp_root_i = f"{tmp_root}_{iter_i}"
-        
+
+        OLOGFILE = utils.LOGFILE
+
         _ = visit_processor.cutout_mosaic(
             rootname=tmp_root_i,
             product='{rootname}',
@@ -5448,7 +5450,7 @@ def iterate_tweak_align(direct, grism, cat_threshold=7, cleanup=True, niter=3, t
             half_optical=False,
             kernel='square',
             pixfrac=0.8,
-            weight_type='jwst_var',
+            weight_type='jwst',
             res=_res,
             clean_flt=False,
             gzip_output=False,
@@ -5456,7 +5458,9 @@ def iterate_tweak_align(direct, grism, cat_threshold=7, cleanup=True, niter=3, t
             s3output=None,
             verbose=False
         )
-        
+
+        utils.LOGFILE = OLOGFILE
+
         cat = make_SEP_catalog(tmp_root_i,
                                threshold=cat_threshold,
                                verbose=False,
