@@ -489,7 +489,10 @@ def img_with_flat(
     use_skyflats : bool
         Apply sky flat corrections if True.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
+    Returns
+    -------
+    output : `jwst.datamodels.ImageModel`
+        Updated data model
     """
     import gc
 
@@ -663,7 +666,6 @@ def img_with_wcs(
     with_wcs : `jwst.datamodels.ImageModel`
         Image model with full `~gwcs` in `with_wcs.meta.wcs`.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     from jwst.datamodels import util
     from jwst.assign_wcs import AssignWcsStep
@@ -783,8 +785,6 @@ def img_with_wcs(
 
 
 def match_gwcs_to_sip(input, step=64, transform=None, verbose=True, overwrite=True):
-    # TODO: (docs review) `img` was not a param so docs removed for it.
-    # It seems to be set in the method directly. (K.V.)
     """
     Calculate transformation of gwcs to match SIP header, which may have been
     realigned (shift, rotation, scale)
@@ -1063,7 +1063,6 @@ def copy_jwst_keywords(header, orig_keys=ORIG_KEYS, verbose=True):
     verbose : bool
         Print status messages.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     for k in orig_keys:
         newk = "O" + k[:7]
@@ -1334,7 +1333,7 @@ def initialize_jwst_image(
     Make copies of some header keywords to make the headers look like
     and HST instrument
 
-    1) Apply gain correction [x remove]
+    1) Apply gain correction [*NOT PERFORMED*]
     2) Clip DQ bits
     3) Copy header keywords
     4) Apply exposure-level 1/f correction
@@ -1372,7 +1371,6 @@ def initialize_jwst_image(
     status : bool
         True if finished successfully
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     frame = inspect.currentframe()
     utils.log_function_arguments(
@@ -1623,15 +1621,6 @@ def initialize_jwst_image(
         msg = f"exposure_oneoverf_correction: NIRCam grism sky {filename}"
         utils.log_comment(utils.LOGFILE, msg)
 
-        # # Subtract simple median
-        # exposure_oneoverf_correction(filename,
-        #                              in_place=True,
-        #                              erode_mask=False,
-        #                              thresholds=[4,3],
-        #                              axis=_disp_axis,
-        #                              dilate_iterations=5,
-        #                              deg_pix=0)
-
         # Subtract average along dispersion axis
         exposure_oneoverf_correction(
             filename,
@@ -1647,7 +1636,7 @@ def initialize_jwst_image(
 
     get_phot_keywords(filename)
 
-    # Add TIME
+    # Add TIME extension
     if "TIME" not in img:
         img = pyfits.open(filename)
 
@@ -1715,7 +1704,6 @@ def set_jwst_to_hst_keywords(
     img : `~astropy.io.fits.HDUList`
         Modified FITS HDUList object.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     frame = inspect.currentframe()
     utils.log_function_arguments(
@@ -1764,19 +1752,6 @@ def set_jwst_to_hst_keywords(
     #     img[0].header[f'ATODGN{x}'] = gain
     #     img[0].header[f'READNSE{x}'] = 12.9
 
-    ##### This now done in get_phot_keywords
-    # if img[0].header['OINSTRUM'] == 'NIRISS':
-    #     _filter = img[0].header['OPUPIL']
-    #     if _filter in NIS_PHOT_KEYS:
-    #         img[0].header['PHOTFLAM'] = NIS_PHOT_KEYS[_filter][0]
-    #         img[0].header['PHOTFNU'] = NIS_PHOT_KEYS[_filter][1]
-    #         img[0].header['PHOTPLAM'] = NIS_PHOT_KEYS[_filter][2] * 1.e4
-    #
-    # elif 'PHOTFNU' not in img[0].header:
-    #     img[0].header['PHOTFLAM'] = 1.e-21
-    #     img[0].header['PHOTFNU'] = 1.e-31
-    #     img[0].header['PHOTPLAM'] = 1.5e4
-
     # TIME keyword seems to get corrupted?
     if "TIME" in img:
         img["TIME"].header["PIXVALUE"] = img[0].header["EXPTIME"]
@@ -1804,7 +1779,6 @@ def strip_telescope_header(header, simplify_wcs=True):
     new_header : `~astropy.io.fits.Header`
         Modified FITS header.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     new_header = header.copy()
 
@@ -1900,7 +1874,7 @@ def model_wcs_header(
     **kwargs,
 ):
     """
-    Make a header with approximate WCS for use in DS9.
+    Make a header with a better SIP WCS derived from the JWST `gwcs` object
 
     Parameters
     ----------
@@ -1950,7 +1924,6 @@ def model_wcs_header(
     header : '~astropy.io.fits.Header`
         Header with simple WCS definition: CD rotation but no distortion.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     from astropy.io.fits import Header
     from scipy.optimize import least_squares
@@ -1967,22 +1940,6 @@ def model_wcs_header(
         degree = kwargs["order"]
 
     if crpix is None:
-        # try:
-        #     pipe = datamodel.meta.wcs.pipeline[0][1]
-        #     if 'offset_2' in pipe.param_names:
-        #         # NIRISS WCS
-        #         c_x = pipe.offset_2.value + pipe.offset_0.value
-        #         c_y = pipe.offset_3.value + pipe.offset_1.value
-        #
-        #     else:
-        #         # Simple WCS
-        #         c_x = pipe.offset_0.value
-        #         c_y = pipe.offset_1.value
-        #
-        #     crpix = np.array([-c_x+1, -c_y+1])
-        #     #print('xxx ', crpix)
-        #
-        # except:
         crpix = np.array(sh)[::-1] / 2.0 + 0.5
     else:
         crpix = np.array(crpix)
@@ -2302,7 +2259,6 @@ def pipeline_model_wcs_header(
     fast_coeffs=True,
     uvxy=None,
 ):
-    # TODO (docs review) fast_coeffs passed to model_wcs_header as it was not used.
     """
     Iterative pipeline to refine the SIP headers
 
@@ -2349,9 +2305,8 @@ def pipeline_model_wcs_header(
     Returns
     -------
     header : '~astropy.io.fits.Header`
-        Header with simple WCS definition: CD rotation but no distortion.
+        Header with SIP WCS
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
 
     frame = inspect.currentframe()
@@ -2438,10 +2393,10 @@ def _objective_sip(
         List of SIP coefficients.
 
     u, v, ra, dec : array
-        Detector and sky coordinates.
+        Grid of detector and sky coordinates.
 
     crval, crpix : array
-        Reference pixel and sky coordinates.
+        Reference pixel
 
     a_names, b_names : list
         List of SIP coefficient names.
@@ -2453,16 +2408,16 @@ def _objective_sip(
         Bitmask for fitting rotation, scale, and CRVAL offsets.
 
     ret : int
-        Return status.
+        Return behavior
 
     Returns
     -------
     if ret == 1:
-        pp, cd_i, crval_i, a_coeff, b_coeff, ra_nmad, dec_nmad
+        pp, cd_i, crval_i, a_coeff, b_coeff, ra_nmad, dec_nmad : values derived from the input ``params``
     else:
-        dr
+        dr : array-like
+            Residuals for fit optimization
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     from astropy.modeling import models, fitting
 
@@ -2557,8 +2512,7 @@ def _objective_lstsq_sip(
     params, u, v, ra, dec, crval, crpix, a_names, b_names, cd, fit_type, ret
 ):
     """
-    Objective function for fitting SIP header with coefficients determined
-    with lst squares
+    Objective function for fitting SIP header
 
     Parameters
     ----------
@@ -2586,11 +2540,11 @@ def _objective_lstsq_sip(
     Returns
     -------
     if ret == 1:
-        pp, cd_i, crval_i, a_coeff, b_coeff, ra_nmad, dec_nmad
+        pp, cd_i, crval_i, a_coeff, b_coeff, ra_nmad, dec_nmad : values derived from input ``params``
     else:
-        dr
+        dr : array-like
+            Residuals for fit optimization
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     from astropy.modeling.fitting import LinearLSQFitter
     from astropy.modeling.polynomial import Polynomial2D
@@ -2712,7 +2666,6 @@ def _objective_lstsq_sip(
 
 
 def _xobjective_sip(params, u, v, x, y, crpix, a_names, b_names, ret):
-    # TODO (docs review) crval and cd not used in this method, removed (K.V.)
     """
     Objective function for fitting SIP coefficients
 
@@ -2721,11 +2674,11 @@ def _xobjective_sip(params, u, v, x, y, crpix, a_names, b_names, ret):
     params : list
         List of SIP coefficients.
 
-    u, v, x, y : array
+    u, v, x, y : array-like
         Detector and sky coordinates.
 
-    crpix : array
-        Reference pixel coordinates.
+    crpix : array-like
+        Reference pixel
 
     a_names, b_names : list
         List of SIP coefficient names.
@@ -2736,11 +2689,18 @@ def _xobjective_sip(params, u, v, x, y, crpix, a_names, b_names, ret):
     Returns
     -------
     if ret == 1:
-        cdx, a_coeff, b_coeff
+        cdx : (2,2) array
+            CD matrix
+        
+        a_coeff : array-like
+            SIP "A" coefficients
+        
+        b_coeff : array-like
+            SIP "B" coefficients
     else:
-        dr
+        dr : array-like
+            Residuals for fit optimization
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     from astropy.modeling import models, fitting
 
@@ -2769,10 +2729,7 @@ def _xobjective_sip(params, u, v, x, y, crpix, a_names, b_names, ret):
 
     fuv, guv = sip(u, v)
     xo, yo = np.dot(cdx, np.array([u + fuv - crpix[0], v + guv - crpix[1]]))
-    # dr = np.sqrt((x-xo)**2+(y-yo)**2)*3600.
     dr = np.append(x - xo, y - yo) * 3600.0 / 0.065
-
-    # print(params, np.abs(dr).max())
 
     return dr
 
@@ -2811,7 +2768,6 @@ def compare_gwcs_sip(
     fig : `matplotlib.figure.Figure`
         Figure object
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     import matplotlib.pyplot as plt
 
@@ -2970,7 +2926,6 @@ def calc_jwst_filter_info(context="jwst_1130.pmap"):
         Filter information dictionary for JWST instruments with the above
         attributes for each filter in each instrument configuration.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     import yaml
     import glob
@@ -3454,9 +3409,8 @@ def query_pure_parallel_wcs_to_database(
         - 3990: Morishita+Mason
 
     output : str
-        Output HTML file (default: /tmp/jwst_pure_parallels.html)
+        Output HTML table (default: /tmp/jwst_pure_parallels.html)
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     from .aws import db
 
@@ -3735,7 +3689,6 @@ def update_pure_parallel_wcs_old(
     status : None, True
         Returns None if some problem is found
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     from scipy.optimize import minimize
     import pysiaf
@@ -3914,19 +3867,17 @@ def objfun_pysiaf_pointing(theta, ap, xy, pa, ret):
         Position angle of the prime exposure.
 
     ret : int
-        Return type: 0=resid, 1=attitude matrix
+        Return behavior
 
     Returns
     -------
     if ret == 1:
         att : array-like
-            Attitude matrix
-
+            Attitude matrix derived from the inputs
     else:
         resid : float
-            Sum of squared differences ``ap.corners - xy``
+            Sum of squared differences ``ap.corners - xy`` for optimization
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     from pysiaf.utils import rotations
 
@@ -3980,7 +3931,7 @@ def compute_siaf_pa_offset(
         Swap the coordinates to agree with APT.
 
     verbose : bool
-        Messaging to the terminal.
+        Print messaging to the terminal.
 
     Returns
     -------
@@ -3990,7 +3941,6 @@ def compute_siaf_pa_offset(
     dphi : float
         Delta position angle.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     from astropy.coordinates import SkyCoord
     import astropy.units as u
@@ -4168,7 +4118,7 @@ def flag_nirspec_hot_pixels(
     Parameters
     ----------
     data : str, `~astropy.io.fits.HDUList`
-        NIRSpec image filename or open HDU with SCI, ERR, DQ extensions.
+        NIRSpec image filename or open HDU object with SCI, ERR, DQ extensions.
 
     rnoise_percentile : float
         Percentile of rnoise array for the absolute threshold
@@ -4189,12 +4139,13 @@ def flag_nirspec_hot_pixels(
         S/N array derived from ``file``
 
     dq : array-like, int
-        Flagged pixels where ``hot = HOT`` and ``plus = WARM``
+        Flagged pixels where
+        ``hot = jwst.datamodels.mask.pixel["HOT"]`` and
+        ``plus = jwst.datamodels.mask.pixel["WARM"]``
 
     count : int
         Number of flagged pixels
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     import scipy.ndimage as nd
     from jwst.datamodels.mask import pixel as pixel_codes
