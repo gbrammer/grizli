@@ -38,9 +38,8 @@ def show_available_nircam_versions(filter="F444W", module="B", grism="R", verbos
     Returns
     -------
     versions : list
-        List of available versions.
+        List of available config files
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     import glob
 
@@ -513,7 +512,7 @@ class aXeConf:
         Parameters
         ----------
         xy : tuple
-            Reference pixel to evaluate the beams.
+            Reference pixel in direct image to evaluate the beams.
 
         beams : list
             List of beams to plot. 
@@ -524,7 +523,6 @@ class aXeConf:
         fig : `matplotlib.figure.Figure`
             Figure object.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         import matplotlib.pyplot as plt
 
@@ -731,7 +729,6 @@ def get_config_filename(
     conf_file : str
         String path of the configuration file.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     if instrume == "ACS":
         conf_file = os.path.join(
@@ -896,12 +893,11 @@ class JwstDispersionTransform(object):
     def __init__(
         self, instrument="NIRCAM", module="A", grism="R", conf_file=None, header=None
     ):
-        # TODO: I am unsure about possible values for instrument, module and grism (K.V.).
         """
         Parameters
         ----------
         instrument : str
-            Instrument name. E.g., 'NIRCAM', 'NIRISS', 'HST'.
+            Instrument name. E.g., 'NIRCAM', 'NIRISS', 'WFC3'.
 
         module : str
             NIRCAM module.  Can be 'A' or 'B'.
@@ -918,7 +914,6 @@ class JwstDispersionTransform(object):
             Header object to read instrument/grism from.
             If not provided, will try to infer from the `conf_file`.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
 
         self.instrument = instrument
@@ -1050,12 +1045,12 @@ class JwstDispersionTransform(object):
     def rotate_coordinates(x, y, theta, center):
         """
         Rotate cartesian coordinates ``x`` and ``y`` by angle ``theta``
-        (radians) about ``center``
+        about ``center``
 
         Parameters
         ----------
         x, y : float or array-like
-            Input coordinates.
+            Original detector coordinates
 
         theta : float
             Rotation angle in radians.
@@ -1066,9 +1061,8 @@ class JwstDispersionTransform(object):
         Returns
         -------
         x, y : array-like
-            Rotated coordinates.
+            Coordinates in rotated frame
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         _mat = np.array(
             [[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]]
@@ -1089,14 +1083,13 @@ class JwstDispersionTransform(object):
         Parameters
         ----------
         x, y : float or array-like
-            Input coordinates
+            Original detector coordinates
 
         Returns
         -------
         x, y : array-like
-            Rotated coordinates
+            Coordinates in rotated frame
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         theta = self.rotation / 180 * np.pi
         return self.rotate_coordinates(x, y, theta, self.array_center)
@@ -1110,14 +1103,13 @@ class JwstDispersionTransform(object):
         Parameters
         ----------
         x, y : float or array-like
-            Input coordinates
+            Coordinates in rotated frame
 
         Returns
         -------
         x, y : array-like
-            Rotated coordinates
+            Original detector coordinates
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         theta = -self.rotation / 180 * np.pi
         return self.rotate_coordinates(x, y, theta, self.array_center)
@@ -1209,7 +1201,6 @@ class TransformGrismconf(object):
         removed : bool
             True if the beam was removed, False if it was not in the list.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         order_name = None
         for k in self.beam_names:
@@ -1365,7 +1356,6 @@ class TransformGrismconf(object):
         -------
         sets `dxlam`, `nx`, `sens`, attributes
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         import os
         from astropy.table import Table, Column
@@ -1673,7 +1663,6 @@ def download_jwst_crds_references(
     verbose : bool
         Print messages to the terminal.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.s
     """
     for instrument in instruments:
         for f in filters:
@@ -1886,17 +1875,16 @@ class CRDSGrismConf:
             Order name like '+1', '0', '-1'
 
         x0, y0 : float or array-like
-            Evaluation point(s). Used for 2D models.
+            Detector coordinates in the direct image
 
         t : float or array-like
-            Evaluation point(s). Used for 1D models.
+            Evaluation point(s) of the independent trace variable
 
         Returns
         -------
         dispx : float or array-like
-            Value(s) of the evaluated dispersion polynomial.
+            x pixel along the trace
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         io = self.orders.index(order)
         dispx = self._eval_model(self.dispx[io], x0, y0, t)
@@ -1915,10 +1903,10 @@ class CRDSGrismConf:
             Order name like '+1', '0', '-1'
 
         x0, y0 : float or array-like
-            Evaluation point(s). Used for 2D models.
+            Detector coordinates in the direct image
 
         t : float or array-like
-            Evaluation point(s). Used for 1D models.
+            Evaluation point(s) of the independent trace variable
 
         dt : float
             Delta t for finite difference.
@@ -1926,9 +1914,8 @@ class CRDSGrismConf:
         Returns
         -------
         ddispx : float or array-like
-            Value(s) of the derivative of the dispersion polynomial.
+            Derivative of the x pixel along the trace
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         io = self.orders.index(order)
         v0 = self._eval_model(self.dispx[io], x0, y0, t)
@@ -1948,17 +1935,16 @@ class CRDSGrismConf:
             Order name like '+1', '0', '-1'
 
         x0, y0 : float or array-like
-            Evaluation point(s). Used for 2D models.
+            Detector coordinates in the direct image
 
         t : float or array-like
-            Evaluation point(s). Used for 1D models.
+            Evaluation point(s) of the independent trace variable
 
         Returns
         -------
         dispy : float or array-like
-            Value(s) of the evaluated dispersion polynomial.
+            y pixel along the trace
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         io = self.orders.index(order)
         dispy = self._eval_model(self.dispy[io], x0, y0, t)
@@ -1977,10 +1963,10 @@ class CRDSGrismConf:
             Order name like '+1', '0', '-1'
 
         x0, y0 : float or array-like
-            Evaluation point(s). Used for 2D models.
+            Detector coordinates in the direct image
 
         t : float or array-like
-            Evaluation point(s). Used for 1D models.
+            Evaluation point(s) of the independent trace variable
 
         dt : float
             Delta t for finite difference.
@@ -1988,9 +1974,8 @@ class CRDSGrismConf:
         Returns
         -------
         ddispy : float or array-like
-            Value(s) of the derivative of the dispersion polynomial.
+            Value(s) of the derivative of the y pixel along the trace.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         io = self.orders.index(order)
         v0 = self._eval_model(self.dispy[io], x0, y0, t)
@@ -2010,17 +1995,16 @@ class CRDSGrismConf:
             Order name like '+1', '0', '-1'
 
         x0, y0 : float or array-like
-            Evaluation point(s). Used for 2D models.
+            Detector coordinates in the direct image
 
         t : float or array-like
-            Evaluation point(s). Used for 1D models.
+            Evaluation point(s) of the independent trace variable
 
         Returns
         -------
         dispx, dispy : float or array-like, float or array-like
-            Values of the evaluated dispersion polynomials in x and y directions.
+            x and y pixels along the trace
             
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         io = self.orders.index(order)
         dispx = self._eval_model(self.dispx[io], x0, y0, t)
@@ -2040,17 +2024,16 @@ class CRDSGrismConf:
             Order name like '+1', '0', '-1'
 
         x0, y0 : float or array-like
-            Evaluation point(s). Used for 2D models.
+            Detector coordinates in the direct image
 
         t : float or array-like
-            Evaluation point(s). Used for 1D models.
+            Evaluation point(s) of the independent trace variable
 
         Returns
         -------
         displ : float or array-like
-            Value(s) of the evaluated dispersion polynomial.
+            Wavelength value(s) along the trace, microns
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         io = self.orders.index(order)
         displ = self._eval_model(self.displ[io], x0, y0, t)
@@ -2069,10 +2052,10 @@ class CRDSGrismConf:
             Order name like '+1', '0', '-1'
 
         x0, y0 : float or array-like
-            Evaluation point(s). Used for 2D models.
+            Detector coordinates in the direct image
 
         t : float or array-like
-            Evaluation point(s). Used for 1D models.
+            Evaluation point(s) of the independent trace variable
 
         dt : float
             Delta t for finite difference.
@@ -2082,7 +2065,6 @@ class CRDSGrismConf:
         ddispl : float or array-like
             Value(s) of the derivative of the dispersion polynomial.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         io = self.orders.index(order)
         v0 = self._eval_model(self.displ[io], x0, y0, t)
@@ -2090,8 +2072,6 @@ class CRDSGrismConf:
         return (v1 - v0) / dt
 
     def INVDISPX(self, order, x0, y0, dx, t0=np.linspace(-1, 2, 128), from_root=False):
-        # TODO: I could not clearly determine the roles of dx and t0. See
-        # the comments by _root_inverse_model method and _inverse_model methods. (K.V.)
         """
         Inverse DISPX
 
@@ -2104,13 +2084,11 @@ class CRDSGrismConf:
             Order name like '+1', '0', '-1'
 
         x0, y0 : float or array-like
-            Evaluation point(s).
+            Detector coordinates in the direct image
 
         dx : float
-            If from_root is True, this is the value to shift the constant term
-            of the polynomial model by. If from_root is False, this is the
-            grid to interpolate the inverse on.
-            
+            X coordinate where to interpolate the trace
+
         t0 : array-like
             1D evaluation grid for the inverse.
 
@@ -2120,9 +2098,8 @@ class CRDSGrismConf:
         Returns
         -------
         t : float
-            Parameter along the trace.
+            Independent variable value along the trace.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         if from_root:
             func = self._root_inverse_model
@@ -2134,8 +2111,6 @@ class CRDSGrismConf:
         return t
 
     def INVDISPY(self, order, x0, y0, dx, t0=np.linspace(-1, 2, 128), from_root=False):
-        # TODO: I could not clearly determine the roles of dx and t0. See
-        # the comments by _root_inverse_model method and _inverse_model methods. (K.V.)
         """
         Inverse DISPY
 
@@ -2148,25 +2123,22 @@ class CRDSGrismConf:
             Order name like '+1', '0', '-1'
 
         x0, y0 : float or array-like
-            Evaluation point(s).
+            Detector coordinates in the direct image
 
-        dx : float
-            If from_root is True, this is the value to shift the constant term
-            of the polynomial model by. If from_root is False, this is the
-            grid to interpolate the inverse on.
+        dx : float, array-like
+            Y coordinate where to interpolate the trace
             
         t0 : array-like
-            1D evaluation grid for the inverse.
+            1D evaluation grid for the inverse interpolation.
 
         from_root : bool
             Use polynomial roots to find the inverse.
 
         Returns
         -------
-        t : float
-            Parameter along the trace.
+        t : like ``dx``
+            Independent variable value along the trace.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         if from_root:
             func = self._root_inverse_model
@@ -2178,12 +2150,10 @@ class CRDSGrismConf:
         return t
 
     def INVDISPL(self, order, x0, y0, dx, t0=np.linspace(-1, 2, 128), from_root=False):
-        # TODO: I could not clearly determine the roles of dx and t0. See
-        # the comments by _root_inverse_model method and _inverse_model methods. (K.V.)
         """
         Inverse DISPL
 
-        Evaluates the inverse of the parameter polynomial from the reference
+        Evaluates the inverse of the wavelength polynomial from the reference
         datamodel for a given order, reference position, and dispersed position
         along the dispersion axis.
 
@@ -2193,25 +2163,22 @@ class CRDSGrismConf:
             Order name like '+1', '0', '-1'
 
         x0, y0 : float
-            Evaluation point. Used for 2D models.
+            Detector coordinates in the direct image
 
-        dx : float
-            If from_root is True, this is the value to shift the constant term
-            of the polynomial model by. If from_root is False, this is the
-            grid to interpolate the inverse on.
+        dx : float, array-like
+            Wavelengths where to interpolate the trace
             
         t0 : array-like
-            1D evaluation grid for the inverse.
+            1D evaluation grid for the inverse interpolation.
 
         from_root : bool
             Use polynomial roots to find the inverse.
 
         Returns
         -------
-        t : float
-            Parameter along the trace.
+        t : like ``dx``
+            Independent variable value along the trace.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         if from_root:
             func = self._root_inverse_model
@@ -2223,9 +2190,6 @@ class CRDSGrismConf:
         return t
 
     def _eval_model(self, model, x0, y0, t, get_coeffs=False):
-        #TODO; I had a hard time determining the role of get_coeffs. To my 
-        # understanding, it forces return of coefficients in the first two
-        # if statements, but for the last one it returns the evaluated values. (K.V.)
         """
         General function for evaluating model polynomials.
 
@@ -2235,10 +2199,10 @@ class CRDSGrismConf:
             Example `astropy.modeling.Polynomial2D`.
 
         x0, y0 : float or array-like
-            Evaluation point(s). Used for 2D models.
+            Detector coordinates in the direct image
 
         t : float or array-like
-            Evaluation point(s). Used for 1D models.
+            Independent variable along the trace
 
         get_coeffs : bool
             Return polynomial coefficients instead of the evaluated value.
@@ -2250,9 +2214,8 @@ class CRDSGrismConf:
                 Polynomial coefficients
         else:
             value : float
-                Evaluated value of the polynomial model.
+                Evaluated value(s) of the polynomial model.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         import numpy as np
 
@@ -2293,10 +2256,8 @@ class CRDSGrismConf:
         return value
 
     def _root_inverse_model(self, model, x0, y0, dx, **kwargs):
-        # TODO: I had issues with understanding the functionality behind this
-        # method - the docs might be off by a lot. (K.V.)
         """
-        Inverse values interpolated from the forward model using polynomial roots
+        Calculate roots of the polynomial model
 
         Parameters
         ----------
@@ -2304,7 +2265,7 @@ class CRDSGrismConf:
             Example `astropy.modeling.Polynomial2D`.
 
         x0, y0 : float or array-like
-            Evaluation point(s)
+            Detector coordinates in the direct image
 
         dx : float
             Value to shift the constant term of the polynomial model by.
@@ -2314,7 +2275,6 @@ class CRDSGrismConf:
         value : float
             Coefficients of the inverse polynomial model.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         coeffs = self._eval_model(model, x0, y0, 0, get_coeffs=True)
         if hasattr(coeffs, "__len__"):
@@ -2326,8 +2286,6 @@ class CRDSGrismConf:
         return value
 
     def _inverse_model(self, model, x0, y0, dx, t0=np.linspace(-1, 2, 128)):
-        # TODO: I had issues with understanding the functionality behind this
-        # method - the docs might be off by a lot. (K.V.)
         """
         Inverse values interpolated from the forward model
 
@@ -2337,25 +2295,25 @@ class CRDSGrismConf:
             Example `astropy.modeling.Polynomial2D`.
 
         x0, y0 : float or array-like
-            Evaluation point(s).
+            Detector coordinates in the direct image
 
-        dx : float
-            Interpoaltion grid for the polynomial model.
+        dx : float, array-like
+            Parameter value of the model
 
         t0 : array-like
             Evaluation grid for the polynomial model. Used for 1D models.
 
         Returns
         -------
-        value : float
-            Inverse values of
+        t : float
+            Independent variable along the trace where ``t = model(x0, y0, t0)``
+            
         """
         values = self._eval_model(model, x0, y0, t0)
 
-        if values[0] > values[1]:
-            return np.interp(dx, values[::-1], t0[::-1])
-        else:
-            return np.interp(dx, values, t0)
+        so = np.argsort(values)
+        t = np.interp(dx, values[so], t0[so])
+        return t
 
     def get_photom(
         self,
@@ -2486,17 +2444,17 @@ class CRDSGrismConf:
         ----------
         verbose : bool
             Print messages to the terminal.
-
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
 
         path = os.path.join(GRIZLI_PATH, "CONF", "GRISM_NIRCAM")
         meta = self.crds_parameters
         if meta["meta.instrument.name"] != "NIRCAM":
-            if verbose:
-                msg = "load_new_sensitivity_curve: only defined for NIRCAM ({0})"
-                print(msg.format(meta["meta.instrument.name"]))
-
+            msg = "load_new_sensitivity_curve: only defined for NIRCAM ({0})"
+            utils.log_comment(
+                utils.LOGFILE,
+                msg.format(meta["meta.instrument.name"]),
+                verbose=verbose
+            )
             return None
 
         sens_base = "nircam_wfss_sensitivity_{filter}_{pupil}_{module}.10nov23.fits"
@@ -2507,7 +2465,6 @@ class CRDSGrismConf:
         )
 
         sens_file = os.path.join(path, sens_file)
-        # print('xx', sens_file, os.path.exists(sens_file))
 
         if os.path.exists(sens_file):
             msg = "grismconf.CRDSGrismConf: replace sensitivity curve with "
