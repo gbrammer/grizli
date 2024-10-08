@@ -345,7 +345,7 @@ def s3_put_exposure(flt_file, product, assoc, remove_old=True, verbose=True, get
 
 snowblind_kwargs = dict(require_prefix='jw', max_fraction=0.3, new_jump_flag=1024, min_radius=4, growth_factor=1.5, unset_first=True, verbose=True)
 
-def make_visit_mosaic(assoc, base_path=ROOT_PATH, version='v7.0', pixscale=0.08, vmax=0.5, skip_existing=True, sync=True, clean=False, verbose=True, snowblind_kwargs=snowblind_kwargs, **kwargs):
+def make_visit_mosaic(assoc, base_path=ROOT_PATH, version='v7.0', pixscale=0.08, vmax=0.5, skip_existing=True, sync=True, clean=False, verbose=True, snowblind_kwargs=snowblind_kwargs, sat_kwargs={}, **kwargs):
     """
     Make a mosaic of the exposures from a visit with a tangent point selected
     from the sky tile grid
