@@ -179,7 +179,7 @@ def s3_put_exposure(flt_file, product, assoc, remove_old=True, verbose=True, get
     from tqdm import tqdm
     import pandas as pd
     import astropy.time
-    from .aws import db
+    from . import db
     from .. import utils
     import astropy.io.fits as pyfits
     import astropy.wcs as pywcs
