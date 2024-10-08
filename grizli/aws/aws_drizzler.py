@@ -531,7 +531,7 @@ def segmentation_figure(label, cat, segfile):
     th.close()
 
 
-def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixscale=0.1, size=10, wcs=None, pixfrac=0.33, kernel='square', theta=0, half_optical_pixscale=True, filters=['f160w', 'f140w', 'f125w', 'f105w', 'f110w', 'f098m', 'f850lp', 'f814w', 'f775w', 'f606w', 'f475w', 'f555w', 'f600lp', 'f390w', 'f350lp'], skip=None, remove=True, rgb_params=RGB_PARAMS, master='grizli-v1-19.12.04', aws_bucket='s3://grizli/CutoutProducts/', scale_ab=21, thumb_height=2.0, sync_fits=True, subtract_median=True, include_saturated=True, include_ir_psf=False, oversample_psf=False, show_filters=['visb', 'visr', 'y', 'j', 'h'], combine_similar_filters=True, single_output=True, aws_prep_dir=None, make_segmentation_figure=False, get_dict=False, dryrun=False, thumbnail_ext='png', **kwargs):
+def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixscale=0.1, size=10, wcs=None, pixfrac=0.33, kernel='square', theta=0, half_optical_pixscale=True, filters=['f160w', 'f140w', 'f125w', 'f105w', 'f110w', 'f098m', 'f850lp', 'f814w', 'f775w', 'f606w', 'f475w', 'f555w', 'f600lp', 'f390w', 'f350lp'], skip=None, remove=True, rgb_params=RGB_PARAMS, master='grizli-v1-19.12.04', aws_bucket='s3://grizli/CutoutProducts/', scale_ab=21, thumb_height=2.0, sync_fits=True, subtract_median=True, include_saturated=True, include_ir_psf=False, oversample_psf=False, show_filters=['visb', 'visr', 'y', 'j', 'h'], combine_similar_filters=True, single_output=True, aws_prep_dir=None, make_segmentation_figure=False, get_dict=False, dryrun=False, thumbnail_ext='png', write_ctx=False, **kwargs):
     """
     label='cp561356'; ra=150.208875; dec=1.850241667; size=40; filters=['f160w','f814w', 'f140w','f125w','f105w','f606w','f475w']
 
@@ -799,7 +799,7 @@ def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixsca
             continue
 
         elif status is not None:
-            sci, wht, var, outh, filt_dict[filt], wcs_tab = status
+            sci, wht, var, ctx, outh, filt_dict[filt], wcs_tab = status
 
             if subtract_median:
                 #med = np.median(sci[sci != 0])
@@ -825,6 +825,10 @@ def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixsca
             pyfits.writeto('{0}-{1}_drz_wht.fits'.format(label, filt),
                            data=wht, header=outh, overwrite=True,
                            output_verify='fix')
+            if write_ctx:
+                pyfits.writeto('{0}-{1}_drz_ctx.fits'.format(label, filt),
+                            data=ctx, header=outh, overwrite=True,
+                            output_verify='fix')
 
             has_filts.append(filt)
 
