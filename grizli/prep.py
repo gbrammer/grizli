@@ -3162,18 +3162,21 @@ def get_nircam_wisp_filename(header, prefer_stsci_file=True, **kwargs):
     """
     if 'OFILTER' in header:
         _filt = header['OFILTER']
-        _pupil = header['OPUPIL']
         _inst = header['OINSTRUM']
         _det = header['ODETECTO']
     else:
         _filt = header['FILTER']
-        _pupil = header['PUPIL']
         _inst = header['INSTRUME']
         _det = header['DETECTOR']
 
     if _inst not in ['NIRCAM']:
         msg = f'Instrument {_inst} not supported'
         return None, _filt, _inst, _det, msg
+
+    if 'OPUPIL' in header:
+        _pupil = header['OPUPIL']
+    else:
+        _pupil = header['PUPIL']
         
     # F150W2 is F160M for now
     if _filt not in ['F115W','F150W','F200W','F182M','F210M','F140M','F162M','F150W2']:
