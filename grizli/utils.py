@@ -8214,7 +8214,7 @@ def drizzle_from_visit(
                 data=None,
             )
 
-            outsci, outwht, outctx, outvar, header, xoutwcs = res
+            outsci, outwht, outvar, outctx, header, xoutwcs = res
 
             header["EXPTIME"] = flt[0].header["EXPTIME"]
             header["NDRIZIM"] = 1
@@ -8258,7 +8258,7 @@ def drizzle_from_visit(
                 data=data,
             )
 
-            outsci, outwht, outctx, outvar = res[:4]
+            outsci, outwht, outvar, outctx = res[:4]
             header["EXPTIME"] += flt[0].header["EXPTIME"]
             header["NDRIZIM"] += 1
 
@@ -8541,7 +8541,7 @@ def drizzle_array_groups(
         # extra factor of Sum(w_i) for var = Sum(w_i**2 * var_i) / Sum(w_i)**2
         outvar /= outwht
 
-    return outsci, outwht, outctx, outvar, header, outputwcs
+    return outsci, outwht, outvar, outctx, header, outputwcs
 
 
 class WCSMapAll:

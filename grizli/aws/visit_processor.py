@@ -3012,7 +3012,7 @@ def make_mosaic(jname='', ds9=None, skip_existing=True, ir_scale=0.1, half_optic
             **kwargs
         )
                              
-        outsci, outwht, outvar,outctx, header, flist, wcs_tab = _
+        outsci, outwht, outvar, outctx, header, flist, wcs_tab = _
     
         pyfits.writeto(
             groups[f]['product']+'_drz_sci.fits',
