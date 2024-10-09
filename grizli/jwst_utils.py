@@ -4160,7 +4160,81 @@ def get_saturated_pixels(
     return flagged
 
 
-def get_saturated_pixel_table(output="table", **kwargs):
+def get_nirspec_persistence_mask(
+    file="jw01180136001_11101_00002_nrs1_rate.fits",
+    ok_bits=4,
+    rnoise_threshold=10,
+    closing_iterations=2,
+    erosion_iterations=4,
+    dilation_iterations=1,
+    verbose=True,
+    **kwargs,
+    ):
+    """
+    Make a mask for NIRSpec pixels likely to cause persistence.
+
+    Parameters
+    ----------
+    file : str
+        Filename of a NIRSPec exposure file with a minimum of ``'DQ'`` and
+        ``'VAR_RNOISE'`` extensions.
+
+    ok_bits : int
+        DQ bits to ignore when making the mask
+
+    rnoise_threshold : float
+        Threshold for masking pixels relative to ``median(VAR_RNOISE)``
+
+    closing_iterations : int
+        Number of `~scipy.ndimage.binary_closing` iterations on initial mask
+        ``initial = valid_dq & VAR_RNOISE > rnoise_threshold * median_rnoise``
+
+    erosion_iterations : int
+        Number of `~scipy.ndimage.binary_erosion` iterations
+
+    dilation_iterations : int
+        Number of `~skimage.morphology.isotropic_dilation` iterations
+
+    Returns
+    -------
+    flagged : bool array
+        Final mask defined by
+
+        .. code-block:: python
+            :dedent:
+
+            initial = valid_dq & (VAR_RNOISE > rnoise_threshold * median_rnoise)
+            closed = scipy.ndimage.binary_closing(initial, closing_iterations)
+            eroded = scipy.ndimage.binary_erosion(closed, erosion_iterations)
+            flagged = skimage.morphology.isotropic_dilation(eroded, dilation_iterations)
+
+    """
+    import scipy.ndimage as nd
+    import skimage.morphology
+
+    with pyfits.open(file) as im:
+        # DQ mask
+        valid_dq = utils.mod_dq_bits(im['DQ'].data, ok_bits) == 0
+
+        # Median RNOISE
+        med_rnoise = np.nanmedian(im['VAR_RNOISE'].data[valid_dq])
+
+        mask = nd.binary_closing(
+            valid_dq & (im['VAR_RNOISE'].data > rnoise_threshold * med_rnoise),
+            iterations=closing_iterations
+        )
+
+    eroded = nd.binary_erosion(mask, iterations=erosion_iterations)
+
+    flagged = skimage.morphology.isotropic_dilation(eroded, dilation_iterations)
+
+    msg = f'get_nirspec_persistence_mask: {file} N={flagged.sum()}'
+    utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+
+    return flagged
+
+
+def get_saturated_pixel_table(output="table", use_nirspec='auto', **kwargs):
     """
     Get table of pixel indices from `~grizli.jwst_utils.get_saturated_pixels`
 
@@ -4169,8 +4243,16 @@ def get_saturated_pixel_table(output="table", **kwargs):
     output : ["array", "table", "df", "file"]
         Output type
 
+    use_nirspec : bool, 'auto'
+        - ``True`` and ``file`` keyword provided: use
+          `~grizli.jwst_utils.get_nirspec_persistence_mask`
+        - ``'auto'`` and ``'_nrs[12]'`` in ``kwargs[file]``: use
+          `~grizli.jwst_utils.get_nirspec_persistence_mask`
+        - else use `~grizli.jwst_utils.get_saturated_pixels`
+
     kwargs : dict
-        Keyword args passed to `~grizli.jwst_utils.get_saturated_pixels`
+        Keyword args passed to `~grizli.jwst_utils.get_saturated_pixels` or
+        `~grizli.jwst_utils.get_nirspec_persistence_mask`.
 
     Returns
     -------
@@ -4180,7 +4262,17 @@ def get_saturated_pixel_table(output="table", **kwargs):
       - ``output="df"``: `pandas.DataFrame` with ``i`` and ``j`` columns
 
     """
-    flagged = get_saturated_pixels(**kwargs)
+
+    if ('file' in kwargs) & (use_nirspec in ['auto']):
+        use_nirspec = ('_nrs1' in kwargs['file']) | ('_nrs2' in kwargs['file'])
+    elif 'file' not in kwargs:
+        use_nirspec = False
+
+    if use_nirspec:
+        flagged = get_nirspec_persistence_mask(**kwargs)
+    else:
+        flagged = get_saturated_pixels(**kwargs)
+
     i, j = np.unravel_index(np.where(flagged.flatten())[0], flagged.shape)
     if output == "array":
         return (i, j)
