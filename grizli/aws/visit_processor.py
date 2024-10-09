@@ -345,7 +345,7 @@ def s3_put_exposure(flt_file, product, assoc, remove_old=True, verbose=True, get
 
 snowblind_kwargs = dict(require_prefix='jw', max_fraction=0.3, new_jump_flag=1024, min_radius=4, growth_factor=1.5, unset_first=True, verbose=True)
 
-def make_visit_mosaic(assoc, base_path=ROOT_PATH, version='v7.0', pixscale=0.08, vmax=0.5, skip_existing=True, sync=True, clean=False, verbose=True, snowblind_kwargs=snowblind_kwargs, sat_kwargs={}, **kwargs):
+def make_visit_mosaic(assoc, base_path=ROOT_PATH, version='v7.0', pixscale=0.08, vmax=0.5, skip_existing=True, sync=True, clean=False, verbose=True, snowblind_kwargs=snowblind_kwargs, sat_kwargs={}, max_pixel_dim=20000, **kwargs):
     """
     Make a mosaic of the exposures from a visit with a tangent point selected
     from the sky tile grid
@@ -425,10 +425,27 @@ def make_visit_mosaic(assoc, base_path=ROOT_PATH, version='v7.0', pixscale=0.08,
     files += glob.glob('*flt.fits')
     files += glob.glob('*flc.fits')
 
+    # Check output pixel dimensions
+    _htile, _wtile = utils.make_maximal_wcs(
+        files,
+        pixel_scale=pixscale,
+        pad=1,
+        verbose=True,
+        get_hdu=False,
+    )
+
+    if np.maximum(_htile['NAXIS1'], _htile['NAXIS2']) > max_pixel_dim:
+        msg = (
+            "make_visit_mosaic: calculated WCS too large "
+            + f"({_htile['NAXIS1']}, {_htile['NAXIS2']}) max_size={max_pixel_dim}"
+        )
+        utils.log_comment(utils.LOGFILE, msg, verbose=True)
+        return False
+
     # info = utils.get_flt_info(files)
     res = res_query_from_local(files=files, extensions=[1,2])
 
-    # Get closest tile
+    # Get closest sky tile
     sr = [utils.SRegion(fp) for fp in res['footprint']]
     crv = np.mean([s.centroid[0] for s in sr], axis=0)
     
@@ -444,6 +461,7 @@ def make_visit_mosaic(assoc, base_path=ROOT_PATH, version='v7.0', pixscale=0.08,
 
     corners = np.hstack([wtile.all_world2pix(*s.xy[0].T, 0) for s in sr])
     
+    # Cutout from sky tile
     mi = corners.min(axis=1).astype(int) - 64
     ma = corners.max(axis=1).astype(int) + 64
     ma -= (ma-mi) % 4
