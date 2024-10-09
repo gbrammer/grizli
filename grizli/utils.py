@@ -7516,6 +7516,10 @@ def drizzle_from_visit(
     nircam_hot_pixel_kwargs={},
     niriss_hot_pixel_kwargs=None, # {'hot_threshold': 7, 'plus_sn_min': 3},
     get_dbmask=True,
+    saturated_lookback=1e4,
+    write_sat_file=False,
+    sat_kwargs={},
+    query_persistence_pixels=True,
     **kwargs,
 ):
     """
@@ -7612,6 +7616,19 @@ def drizzle_from_visit(
         on NIRISS exposures. Set to ``None`` to disable and use the static bad pixel
         tables.
 
+    saturated_lookback : float
+        Time, in seconds, to look for saturated pixels in previous exposures
+        that can cause persistence.  Skip if ``saturated_lookback <= 0``.
+
+    write_sat_file : bool
+        Write persistence saturation tables
+
+    sat_kwargs : dict
+        keyword arguments to `~grizli.jwst_utils.get_saturated_pixels`
+
+    query_persistence_pixels : bool
+        Also try to query the full saturated pixel history from the DB with
+        ``saturated_lookback``
 
     Returns
     -------
@@ -7643,6 +7660,7 @@ def drizzle_from_visit(
     from .prep import apply_region_mask_from_db
     from .version import __version__ as grizli__version
     from .jwst_utils import get_jwst_dq_bit, flag_nircam_hot_pixels
+    from .jwst_utils import get_saturated_pixel_table, query_persistence
 
     bucket_name = None
 
@@ -7721,6 +7739,8 @@ def drizzle_from_visit(
 
     bpdata = 0
 
+    saturated_tables = {}
+
     for i in indices:
 
         file = visit["files"][i]
@@ -7776,6 +7796,7 @@ def drizzle_from_visit(
                 keys[k] = flt[0].header[k]
 
         bpdata = None
+        _nsat = None
 
         if flt[0].header["TELESCOP"] in ["JWST"]:
             bits = 4
@@ -7783,9 +7804,9 @@ def drizzle_from_visit(
 
             # bpdata = 0
             _inst = flt[0].header["INSTRUME"]
+            _det = flt[0].header['DETECTOR']
 
             if (extra_wfc3ir_badpix) & (_inst in ['NIRCAM','NIRISS']):
-                _det = flt[0].header['DETECTOR']
                 bpfiles = [os.path.join(os.path.dirname(__file__),
                            f'data/nrc_badpix_240627_{_det}.fits.gz')]
                 bpfiles += [os.path.join(os.path.dirname(__file__),
@@ -7879,6 +7900,56 @@ def drizzle_from_visit(
                 msg += f" ( {_low.sum()/_low.size*100:.1} %)"
                 log_comment(LOGFILE, msg, verbose=verbose)
                 bpdata |= _low * 1024
+
+            # History of saturated pixels for persistence
+            if saturated_lookback > 0:
+
+                if _det not in saturated_tables:
+                    saturated_tables[_det] = {'expstart':[], 'ij':[]}
+
+                _start = flt[0].header['EXPSTART']
+                _df = get_saturated_pixel_table(
+                    file=file,
+                    output="df",
+                    **sat_kwargs,
+                )
+
+                _sat_tab = saturated_tables[_det]
+                _sat_tab["expstart"].append(_start)
+                _sat_tab["ij"].append(_df)
+
+                if write_sat_file:
+                    sat_file = file.replace(".fits", ".sat.csv.gz")
+                    _df.to_csv(sat_file, index=False)
+
+                _sat_history = np.zeros_like(bpdata, dtype=bool)
+                _sat_count = 0
+                for _starti, _df in zip(_sat_tab["expstart"], _sat_tab["ij"]):
+                    if (
+                        (_starti < _start)
+                        & ((_start - _starti)*86400 < saturated_lookback)
+                    ):
+                        _sat_history[_df.i, _df.j] |= True
+                        _sat_count += 1
+
+                _nsat = _sat_history.sum()
+                bpdata |= _sat_history * 1024
+                msg = (
+                    f"Found {_nsat} saturated pixels in {_sat_count} "
+                    f" previous {_det} exposures within {saturated_lookback:.0f} sec"
+                )
+                log_comment(LOGFILE, msg, verbose=verbose)
+
+            if query_persistence_pixels & (saturated_lookback > 0):
+                try:
+                    _pers = query_persistence(
+                                file,
+                                saturated_lookback=saturated_lookback
+                    )
+                    if len(_pers) > 0:
+                        bpdata[_pers["i"], _pers["j"]] |= 1024
+                except:
+                    pass
 
         elif flt[0].header["DETECTOR"] == "IR":
             bits = 576
@@ -8198,6 +8269,11 @@ def drizzle_from_visit(
             header["WHT{0:05d}".format(count)] = (
                 median_weight,
                 f"Median weight of exposure {count}",
+            )
+
+        if _nsat is not None:
+            header["SAT{0:05d}".format(count)] = (
+                _nsat, f"Number of pixels flagged for persistence"
             )
 
         flt.close()

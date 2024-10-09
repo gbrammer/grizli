@@ -4,6 +4,7 @@ Utilities for handling JWST file/data formats.
 Requires https://github.com/spacetelescope/jwst
 
 """
+
 import os
 import inspect
 import logging
@@ -990,7 +991,7 @@ def get_phot_keywords(input, verbose=True):
     else:
         plam = 5.0e4
 
-    photflam = tojy * 2.99e-5 / plam ** 2
+    photflam = tojy * 2.99e-5 / plam**2
     _ZP = -2.5 * np.log10(tojy) + 8.9
 
     if verbose:
@@ -1462,13 +1463,13 @@ def initialize_jwst_image(
     utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
 
     dq = np.zeros_like(img["DQ"].data)
-    dq[img["DQ"].data >= 2 ** (max_dq_bit + 1)] = 2 ** max_dq_bit
+    dq[img["DQ"].data >= 2 ** (max_dq_bit + 1)] = 2**max_dq_bit
     dqm = img["DQ"].data > 0
 
     for bit in range(max_dq_bit + 1):
-        dq[dqm] |= img["DQ"].data[dqm] & 2 ** bit
+        dq[dqm] |= img["DQ"].data[dqm] & 2**bit
 
-    dq[img["DQ"].data < 0] = 2 ** bit
+    dq[img["DQ"].data < 0] = 2**bit
 
     if img[0].header["OINSTRUM"] == "MIRI":
         for b in [2, 4]:
@@ -1486,7 +1487,7 @@ def initialize_jwst_image(
         # Dilate MIRI mask
         msg = f"initialize_jwst_image: Dilate MIRI window mask"
         utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
-        edge = nd.binary_dilation(((dq & 2 ** 9) > 0), iterations=6)
+        edge = nd.binary_dilation(((dq & 2**9) > 0), iterations=6)
         dq[edge] |= 1024
 
     elif img[0].header["OINSTRUM"] == "NIRCAM":
@@ -2691,10 +2692,10 @@ def _xobjective_sip(params, u, v, x, y, crpix, a_names, b_names, ret):
     if ret == 1:
         cdx : (2,2) array
             CD matrix
-        
+
         a_coeff : array-like
             SIP "A" coefficients
-        
+
         b_coeff : array-like
             SIP "B" coefficients
     else:
@@ -3905,7 +3906,7 @@ def objfun_pysiaf_pointing(theta, ap, xy, pa, ret):
 
     # print(theta, (diff**2).sum())
 
-    return (diff ** 2).sum()
+    return (diff**2).sum()
 
 
 def compute_siaf_pa_offset(
@@ -4100,6 +4101,142 @@ def time_corr_photom_copy(param, t):
     corr = amplitude * np.exp(-(t - t0) / tau)
 
     return corr
+
+
+def get_saturated_pixels(
+    file="jw02561001002_06101_00001_nrca3_rate.fits",
+    dq_array=None,
+    saturated_flag="SATURATED",
+    erode_dilate=(2, 5),
+    rc_flag="RC",
+    rc_iterations=2,
+    **kwargs,
+):
+    """
+    Get list of saturated pixels, e.g., for use in persistence masking
+
+    Parameters
+    ----------
+    file : str
+        Exposure filename with "DQ" extension
+
+    dq_array : array-like
+
+    saturated_flag : str
+        Flag name in `jwst.datamodels.mask.pixel` to treat as "saturated"
+
+    rc_flag : str
+        Flag name in `jwst.datamodels.mask.pixel` for the "RC" pixels to exclude
+
+    rc_iterations : int
+        If > 0, make a mask of pixels flagged with the "RC" bit, dilate it and
+        exclude them from the saturated list
+
+    Returns
+    -------
+    flagged : array-like
+        Boolean mask of flagged pixels
+    """
+    import scipy.ndimage as nd
+    from skimage import morphology
+    from jwst.datamodels.mask import pixel
+
+    if dq_array is None:
+        with pyfits.open(file) as im:
+            dq_array = im["DQ"].data * 1
+
+    flagged = (dq_array & pixel[saturated_flag]) > 0
+
+    if rc_iterations > 0:
+        rc = (dq_array & pixel[rc_flag]) > 0
+        rc = nd.binary_dilation(rc, iterations=rc_iterations)
+        flagged &= ~rc
+
+    if erode_dilate is not None:
+        extra = nd.binary_erosion(flagged, iterations=erode_dilate[0])
+        extra = morphology.isotropic_dilation(extra, erode_dilate[1])
+        flagged |= extra
+
+    return flagged
+
+
+def get_saturated_pixel_table(output="table", **kwargs):
+    """
+    Get table of pixel indices from `~grizli.jwst_utils.get_saturated_pixels`
+
+    Parameters
+    ----------
+    output : ["array", "table", "df", "file"]
+        Output type
+
+    kwargs : dict
+        Keyword args passed to `~grizli.jwst_utils.get_saturated_pixels`
+
+    Returns
+    -------
+    tab : (array, array), `~grizli.utils.GTable`, `pandas.DataFrame`
+      - ``output="array"``: (i, j) array indices
+      - ``output="table"``: Table with ``i`` and ``j`` columns
+      - ``output="df"``: `pandas.DataFrame` with ``i`` and ``j`` columns
+
+    """
+    flagged = get_saturated_pixels(**kwargs)
+    i, j = np.unravel_index(np.where(flagged.flatten())[0], flagged.shape)
+    if output == "array":
+        return (i, j)
+
+    tab = utils.GTable()
+    if "file" in kwargs:
+        tab.meta["file"] = kwargs["file"]
+
+    tab["i"] = i.astype(np.int32)
+    tab["j"] = j.astype(np.int32)
+
+    if output == "table":
+        return tab
+
+    elif output == "file":
+
+        if "file" in kwargs:
+            output_file = kwargs["file"].replace(".fits", ".sat.csv.gz")
+            output_file = output_file.replace(".gz.gz", ".gz")
+        else:
+            output_file = "sat.csv.gz"
+
+        df = tab.to_pandas()
+        df.to_csv(output_file, index=False)
+
+        return output_file, df
+
+    else:
+        return tab.to_pandas()
+
+
+def query_persistence(flt_file, saturated_lookback=1.0e4, verbose=True):
+    """
+    Query ``exposure_saturated`` table for possible persistence
+    """
+    from .aws import db
+
+    froot = os.path.basename(flt_file).split("_rate.fits")[0]
+
+    res = db.SQL(
+        f"""SELECT i, j
+    FROM exposure_files e1, (exposure_files NATURAL JOIN exposure_saturated) e2
+    WHERE
+        e1.file = '{froot}'
+        AND e2.expstart > e1.expstart - {saturated_lookback/86400}
+        AND e2.expstart < e1.expstart
+        AND e1.detector = e2.detector
+    GROUP BY i,j
+    """
+    )
+
+    msg = "query_persistence: "
+    msg += f"Found {len(res)} flagged pixels for {flt_file} in `exposure_saturated`"
+    utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+
+    return res
 
 
 def flag_nirspec_hot_pixels(

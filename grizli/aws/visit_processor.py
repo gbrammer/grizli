@@ -102,24 +102,85 @@ def all_visit_exp_info(all_visits):
         exposure_info_from_visit(v, assoc=assoc)
 
 
-def exposure_info_from_visit(visit, assoc=''):
+def exposure_info_from_visit(visit, assoc='', **kwargs):
     """
     Run `s3_put_exposure` for each file in visit['files']
     """
 
     for file in visit['files']:
-        s3_put_exposure(file, visit['product'], assoc, remove_old=True)
+        s3_put_exposure(file, visit['product'], assoc, remove_old=True, **kwargs)
 
 
-def s3_put_exposure(flt_file, product, assoc, remove_old=True, verbose=True):
+def send_saturated_log(flt_file, sat_kwargs={}, remove_old=True, verbose=True, **kwargs):
     """
+    Get saturated pixels from DQ extension and send to exposure_saturated DB table
+    """
+    from .. import jwst_utils
+
+    #  if False:
+    #      # Initialize table
+    #      db.execute("""CREATE TABLE exposure_saturated (
+    # eid int references exposure_files(eid),
+    # i smallint,
+    # j smallint
+    #      )""")
+    #
+    #      db.execute("CREATE INDEX ON exposure_saturated (eid)")
+    #      db.execute("CREATE INDEX ON exposure_files (eid, detector, expstart)")
+
+    if not flt_file.endswith("_rate.fits"):
+        return False
+
+    froot = flt_file.split("_rate.fits")[0]
+    row = db.SQL(f"""select eid from exposure_files where file = '{froot}'""")
+
+    if len(row) == 0:
+        msg = f"send_saturated_log: {froot} not found in exposure_files table"
+        utils.log_comment(utils.LOGFILE, msg, verbose=True)
+        return False
+
+    sat_file, df = jwst_utils.get_saturated_pixel_table(
+        file=flt_file,
+        output="file",
+        **sat_kwargs,
+    )
+
+    if len(df) == 0:
+        msg = f"send_saturated_log: {froot} no flagged pixels found"
+        utils.log_comment(utils.LOGFILE, msg, verbose=True)
+        return False
+
+    _eid = row["eid"][0]
+    df.insert(0, "eid", _eid)
+
+    if remove_old:
+        db.execute(f"delete from exposure_saturated where eid = {_eid}")
+
+    msg = 'send_saturated_log: '
+    msg += f'Add {flt_file} (eid={_eid}) N={len(df)} to exposure_saturated table'
+    utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+
+    df.to_sql(
+        'exposure_saturated',
+        db._ENGINE,
+        index=False,
+        if_exists='append',
+        method='multi'
+    )
+
+    return df
+
+
+def s3_put_exposure(flt_file, product, assoc, remove_old=True, verbose=True, get_saturated=True, **kwargs):
+    """
+    Send exposure information to S3 and DB
     """
     import os
     from tqdm import tqdm
     import pandas as pd
     import astropy.time
-    from grizli.aws import db
-    from grizli import utils
+    from . import db
+    from .. import utils
     import astropy.io.fits as pyfits
     import astropy.wcs as pywcs
     
@@ -216,7 +277,7 @@ def s3_put_exposure(flt_file, product, assoc, remove_old=True, verbose=True):
     
     if remove_old:
         db.execute(f"""DELETE FROM mosaic_tiles_exposures t
-                             USING exposure_files e 
+                             USING exposure_files e
                              WHERE t.expid = e.eid
                              AND file='{file}'
                              AND extension='{extension}'""")
@@ -268,14 +329,23 @@ def s3_put_exposure(flt_file, product, assoc, remove_old=True, verbose=True):
         df = tab.to_pandas()
         df.to_sql('mosaic_tiles_exposures', db._ENGINE, index=False, 
                   if_exists='append', method='multi')
-                             
-    if verbose:
-        print(f'Add {file}_{extension} ({len(rows)}) to exposure_files table')
+
+    msg = f'Add {file}_{extension} ({len(rows)}) to exposure_files table'
+    utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+
+    # Saturated pixels for persistence masking
+    if get_saturated:
+        _status = send_saturated_log(
+            flt_file,
+            remove_old=remove_old,
+            verbose=verbose,
+            **kwargs
+        )
 
 
 snowblind_kwargs = dict(require_prefix='jw', max_fraction=0.3, new_jump_flag=1024, min_radius=4, growth_factor=1.5, unset_first=True, verbose=True)
 
-def make_visit_mosaic(assoc, base_path=ROOT_PATH, version='v7.0', pixscale=0.08, vmax=0.5, skip_existing=True, sync=True, clean=False, verbose=True, snowblind_kwargs=snowblind_kwargs, **kwargs):
+def make_visit_mosaic(assoc, base_path=ROOT_PATH, version='v7.0', pixscale=0.08, vmax=0.5, skip_existing=True, sync=True, clean=False, verbose=True, snowblind_kwargs=snowblind_kwargs, sat_kwargs={}, **kwargs):
     """
     Make a mosaic of the exposures from a visit with a tangent point selected
     from the sky tile grid
@@ -426,6 +496,9 @@ def make_visit_mosaic(assoc, base_path=ROOT_PATH, version='v7.0', pixscale=0.08,
         res=res,
         weight_type=weight_type,
         snowblind_kwargs=snowblind_kwargs,
+        saturated_lookback=1e4,
+        write_sat_file=True,
+        sat_kwargs=sat_kwargs,
     )
 
     files = glob.glob(f'{assoc}*_sci.fits*')
@@ -1472,7 +1545,7 @@ def check_jwst_assoc_guiding(assoc):
 ALL_FILTERS = ['F410M', 'F467M', 'F547M', 'F550M', 'F621M', 'F689M', 'F763M', 'F845M', 'F200LP', 'F350LP', 'F435W', 'F438W', 'F439W', 'F450W', 'F475W', 'F475X', 'F555W', 'F569W', 'F600LP', 'F606W', 'F622W', 'F625W', 'F675W', 'F702W', 'F775W', 'F791W', 'F814W', 'F850LP', 'G800L', 'F098M', 'F127M', 'F139M', 'F153M', 'F105W', 'F110W', 'F125W', 'F140W', 'F160W', 'G102', 'G141']
 
 
-def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=False, visit_split_shift=1.2, blue_align_params=blue_align_params, ref_catalogs=['LS_DR9', 'PS1', 'DES', 'NSC', 'GAIA'], filters=None, prep_args={}, fetch_args={}, get_wcs_guess_from_table=True, master_radec='astrometry_db', align_guess=None, with_db=True, global_miri_skyflat=None, miri_tweak_align=False, tab=None, other_args={}, do_make_visit_mosaic=True, visit_mosaic_kwargs={}, **kwargs):
+def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=False, visit_split_shift=1.2, blue_align_params=blue_align_params, ref_catalogs=['LS_DR9', 'PS1', 'DES', 'NSC', 'GAIA'], filters=None, prep_args={}, fetch_args={}, get_wcs_guess_from_table=True, master_radec='astrometry_db', align_guess=None, with_db=True, global_miri_skyflat=None, miri_tweak_align=False, tab=None, other_args={}, do_make_visit_mosaic=True, visit_mosaic_kwargs={}, expinfo_kwargs={}, **kwargs):
     """
     Run the `grizli.pipeline.auto_script.go` pipeline on an association defined
     in the `grizli` database.
@@ -1679,7 +1752,7 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=False,
             for i, v in enumerate(visits):
                 if sync:
                     print('File exposure info: ', v['files'][0], assoc)
-                    exposure_info_from_visit(v, assoc=assoc)
+                    exposure_info_from_visit(v, assoc=assoc, **expinfo_kwargs)
     
     if sync:
         add_shifts_log(assoc=assoc, remove_old=True, verbose=True)
@@ -1707,6 +1780,7 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=False,
                   --include "Prep/*_fl*fits" \
                   --include "Prep/*_cal.fits" \
                   --include "Prep/*_rate.fits" \
+                  --include "Prep/*sat.csv.gz" \
                   --include "Prep/*s.log" \
                   --include "Prep/*visits.*" \
                   --include "Prep/*skyflat.*" \
