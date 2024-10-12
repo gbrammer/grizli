@@ -3904,7 +3904,7 @@ def subtract_visit_angle_averages(visit, threshold=1.8, detection_background=Tru
             weight_type=weight_type,
         )
 
-        data, wht, ctx, var, drz_h, files, info = drz
+        data, wht, var, ctx, drz_h, files, info = drz
 
         drz_h['PA_APER'] = pa_aper, 'PA_APER used for reference'
         drz_h['BKGANGLE'] = (','.join([f'{a:.1f}' for a in angles]), 
