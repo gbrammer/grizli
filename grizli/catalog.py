@@ -565,6 +565,9 @@ def get_gaia_vizier(
     keys : list of str
         List of column keys to query.  Default is None.
 
+    extra_query : str
+        Additional query criteria, e.g., magnitude limits
+
     mjd : float
         MJD to compute proper motions.  Default is None.
 
