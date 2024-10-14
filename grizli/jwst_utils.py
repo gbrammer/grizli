@@ -192,6 +192,10 @@ def crds_reffiles(
 
     if detector is not None:
         cpars["meta.instrument.detector"] = detector
+        if instrument == "NIRCAM":
+            cpars["meta.instrument.channel"] = (
+                "LONG" if "LONG" in detector else "SHORT"
+            )
 
     if date is None:
         date = astropy.time.Time.now().iso
