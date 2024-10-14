@@ -2123,7 +2123,7 @@ def query_exposures(ra=53.16, dec=-27.79, size=1., pixel_scale=0.1, theta=0,  fi
     return header, wcs, SQL, res
 
 
-def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-27.7910651, size=5*60, theta=0., filters=['F160W'], ir_scale=0.1, ir_wcs=None, res=None, half_optical=True, kernel='point', pixfrac=0.33, make_figure=True, skip_existing=True, clean_flt=True, gzip_output=True, s3output='s3://grizli-v2/HST/Pipeline/Mosaic/', split_uvis=True, extra_query='', extra_wfc3ir_badpix=True, fix_niriss=True, scale_nanojy=10, verbose=True, weight_type='jwst_var', rnoise_percentile=99, get_dbmask=True, niriss_ghost_kwargs={}, snowblind_kwargs=None, scale_photom=True, context='jwst_0989.pmap', calc_wcsmap=False, make_exptime_map=False, expmap_sample_factor=4, keep_expmap_small=True, write_ctx=False, **kwargs):
+def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-27.7910651, size=5*60, theta=0., filters=['F160W'], ir_scale=0.1, ir_wcs=None, res=None, half_optical=True, kernel='point', pixfrac=0.33, make_figure=True, skip_existing=True, clean_flt=True, gzip_output=True, s3output='s3://grizli-v2/HST/Pipeline/Mosaic/', split_uvis=True, extra_query='', extra_wfc3ir_badpix=True, fix_niriss=True, scale_nanojy=10, verbose=True, weight_type='jwst_var', rnoise_percentile=99, get_dbmask=True, niriss_ghost_kwargs={}, snowblind_kwargs=None, scale_photom=True, context=None, calc_wcsmap=False, make_exptime_map=False, expmap_sample_factor=4, keep_expmap_small=True, write_ctx=False, **kwargs):
     """
     Make mosaic from exposures defined in the exposure database
     
@@ -2218,7 +2218,12 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
     
     calc_wcsmap : bool
         See `~grizli.utils.drizzle_from_visit`
-    
+
+    context : str, None
+        ``CRDS_CONTEXT`` to use for optionally controlling JWST zeropoints.  If ``None``
+        then first try to get from ``os.getenv('CRDS_CONTEXT')`` and then fall back to
+        ``grizli.jwst_utils.CRDS_CONTEXT``.
+
     write_ctx : bool
         Optionally output context map
     
@@ -2232,13 +2237,23 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
     import matplotlib.pyplot as plt
     import astropy.io.fits as pyfits
     
-    from grizli import utils
     from mastquery import overlaps
+    try:
+        from .. import jwst_utils
+    except ImportError:
+        jwst_utils = None
     
     ORIG_LOGFILE = utils.LOGFILE
-    
+
+    if context is None:
+        if jwst_utils is not None:
+            _env_context = os.getenv("CRDS_CONTEXT")
+            context = jwst_utils.CRDS_CONTEXT if _env_context is None else _env_context
+        else:
+            context = "jwst_0989.pmap"
+
     utils.set_warnings()
-    
+
     # out_h, ir_wcs, res = query_exposures(ra=ra, dec=dec,
     #                                      size=size,
     #                                      pixel_scale=pixel_scale,
