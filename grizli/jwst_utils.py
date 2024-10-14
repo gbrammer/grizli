@@ -664,7 +664,23 @@ def img_with_flat(
                     utils.log_comment(
                         utils.LOGFILE, msg, verbose=verbose, show_date=False
                     )
+        else:
+            # Mask flat
+            with pyfits.open(_flatfile) as _flat_im:
+                _flat_dq = _flat_im['DQ'].data*1
+                _flat_data = _flat_im['SCI'].data*1
+            
+            _bad_flat = _flat_data == 1
+            _bad_flat |= _flat_data < 0.6
+            _bad_flat |= _flat_data > 1.8
+            
+            _flat_dq |= (5 * (_bad_flat)).astype(_flat_dq.dtype)
 
+            with pyfits.open(input, mode="update") as _hdu:
+                _hdu["DQ"].data |= _flat_dq.astype(_hdu["DQ"].data)
+                _hdu.flush()
+
+                
     gc.collect()
 
     return output
