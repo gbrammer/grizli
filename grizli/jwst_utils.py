@@ -22,8 +22,8 @@ QUIET_LEVEL = logging.INFO
 
 # CRDS_CONTEXT = 'jwst_0942.pmap' # July 29, 2022 with updated NIRCAM ZPs
 # CRDS_CONTEXT = 'jwst_0995.pmap' # 2022-10-06 NRC ZPs and flats
-CRDS_CONTEXT = "jwst_1123.pmap"  # 2023-09-08 NRC specwcs, etc.
-# CRDS_CONTEXT = "jwst_1293.pmap"  # 2024-09-25
+# CRDS_CONTEXT = "jwst_1123.pmap"  # 2023-09-08 NRC specwcs, etc.
+CRDS_CONTEXT = "jwst_1293.pmap"  # 2024-09-25
 
 MAX_CTX_FOR_SKYFLATS = "jwst_1130.pmap"
 
