@@ -1,0 +1,165 @@
+# JWST NIRCam zeropoints with a relative adjustment derived from the
+# background levels of exposures processed in the DJA
+
+# [DETECTOR]-[FILTER]-[PUPIL]  [mjsr, scale, pixar_sr]
+
+NRCA1-F070W-CLEAR: [ 4.4000, 1.0339, 2.24e-14]  #  jwst_1293.pmap std_err = 0.0097
+NRCA2-F070W-CLEAR: [ 4.4940, 0.9953, 2.23e-14]  #  jwst_1293.pmap std_err = 0.0063
+NRCA3-F070W-CLEAR: [ 4.3650, 1.0084, 2.26e-14]  #  jwst_1293.pmap std_err = 0.0051
+NRCA4-F070W-CLEAR: [ 3.9970, 1.0359, 2.25e-14]  #  jwst_1293.pmap std_err = 0.0057
+NRCB1-F070W-CLEAR: [ 4.6080, 1.0000, 2.23e-14]  #  jwst_1293.pmap (fixed)
+NRCB2-F070W-CLEAR: [ 4.5550, 1.0159, 2.29e-14]  #  jwst_1293.pmap std_err = 0.0057
+NRCB3-F070W-CLEAR: [ 4.5730, 0.9928, 2.25e-14]  #  jwst_1293.pmap std_err = 0.0053
+NRCB4-F070W-CLEAR: [ 3.9200, 1.0694, 2.31e-14]  #  jwst_1293.pmap std_err = 0.0073
+
+NRCA1-F090W-CLEAR: [ 3.1790, 1.0467, 2.24e-14]  #  jwst_1293.pmap std_err = 0.0036
+NRCA2-F090W-CLEAR: [ 3.4050, 1.0061, 2.23e-14]  #  jwst_1293.pmap std_err = 0.0024
+NRCA3-F090W-CLEAR: [ 3.1320, 1.0293, 2.26e-14]  #  jwst_1293.pmap std_err = 0.0018
+NRCA4-F090W-CLEAR: [ 3.0080, 1.0263, 2.25e-14]  #  jwst_1293.pmap std_err = 0.0019
+NRCB1-F090W-CLEAR: [ 3.6370, 1.0000, 2.23e-14]  #  jwst_1293.pmap (fixed)
+NRCB2-F090W-CLEAR: [ 3.5340, 1.0271, 2.29e-14]  #  jwst_1293.pmap std_err = 0.0017
+NRCB3-F090W-CLEAR: [ 3.5010, 1.0048, 2.25e-14]  #  jwst_1293.pmap std_err = 0.0017
+NRCB4-F090W-CLEAR: [ 3.1380, 1.0514, 2.31e-14]  #  jwst_1293.pmap std_err = 0.0023
+
+NRCA1-F115W-CLEAR: [ 3.1060, 1.0409, 2.24e-14]  #  jwst_1293.pmap std_err = 0.0022
+NRCA2-F115W-CLEAR: [ 3.1900, 1.0133, 2.23e-14]  #  jwst_1293.pmap std_err = 0.0017
+NRCA3-F115W-CLEAR: [ 3.1130, 1.0244, 2.26e-14]  #  jwst_1293.pmap std_err = 0.0011
+NRCA4-F115W-CLEAR: [ 2.8460, 1.0219, 2.25e-14]  #  jwst_1293.pmap std_err = 0.0012
+NRCB1-F115W-CLEAR: [ 3.3600, 1.0000, 2.23e-14]  #  jwst_1293.pmap (fixed)
+NRCB2-F115W-CLEAR: [ 3.1940, 1.0541, 2.29e-14]  #  jwst_1293.pmap std_err = 0.0011
+NRCB3-F115W-CLEAR: [ 3.2390, 1.0230, 2.25e-14]  #  jwst_1293.pmap std_err = 0.0013
+NRCB4-F115W-CLEAR: [ 2.7690, 1.0639, 2.31e-14]  #  jwst_1293.pmap std_err = 0.0014
+
+NRCA1-F140M-CLEAR: [ 5.2540, 1.0584, 2.24e-14]  #  jwst_1293.pmap std_err = 0.0331
+NRCA2-F140M-CLEAR: [ 5.4390, 1.0041, 2.23e-14]  #  jwst_1293.pmap std_err = 0.0132
+NRCA3-F140M-CLEAR: [ 5.2150, 1.0362, 2.26e-14]  #  jwst_1293.pmap std_err = 0.0116
+NRCA4-F140M-CLEAR: [ 4.8000, 0.9942, 2.25e-14]  #  jwst_1293.pmap std_err = 0.0149
+NRCB1-F140M-CLEAR: [ 5.5100, 1.0000, 2.23e-14]  #  jwst_1293.pmap (fixed)
+NRCB2-F140M-CLEAR: [ 5.2720, 1.0461, 2.29e-14]  #  jwst_1293.pmap std_err = 0.0106
+NRCB3-F140M-CLEAR: [ 5.3550, 1.0154, 2.25e-14]  #  jwst_1293.pmap std_err = 0.0091
+NRCB4-F140M-CLEAR: [ 4.6110, 1.0637, 2.31e-14]  #  jwst_1293.pmap std_err = 0.0162
+
+NRCA1-F150W-CLEAR: [ 2.3330, 1.0333, 2.24e-14]  #  jwst_1293.pmap std_err = 0.0016
+NRCA2-F150W-CLEAR: [ 2.4120, 1.0062, 2.23e-14]  #  jwst_1293.pmap std_err = 0.0015
+NRCA3-F150W-CLEAR: [ 2.2960, 1.0308, 2.26e-14]  #  jwst_1293.pmap std_err = 0.0011
+NRCA4-F150W-CLEAR: [ 2.1370, 1.0179, 2.25e-14]  #  jwst_1293.pmap std_err = 0.0019
+NRCB1-F150W-CLEAR: [ 2.4470, 1.0000, 2.23e-14]  #  jwst_1293.pmap (fixed)
+NRCB2-F150W-CLEAR: [ 2.3380, 1.0581, 2.29e-14]  #  jwst_1293.pmap std_err = 0.0010
+NRCB3-F150W-CLEAR: [ 2.3700, 1.0192, 2.25e-14]  #  jwst_1293.pmap std_err = 0.0015
+NRCB4-F150W-CLEAR: [ 2.0560, 1.0688, 2.31e-14]  #  jwst_1293.pmap std_err = 0.0013
+
+NRCA1-F150W2-CLEAR: [ 0.6470, 1.0280, 2.24e-14]  #  jwst_1293.pmap std_err = 0.0019
+NRCA2-F150W2-CLEAR: [ 0.6770, 0.9913, 2.23e-14]  #  jwst_1293.pmap std_err = 0.0019
+NRCA3-F150W2-CLEAR: [ 0.6300, 1.0489, 2.26e-14]  #  jwst_1293.pmap std_err = 0.0017
+NRCA4-F150W2-CLEAR: [ 0.5820, 1.0409, 2.25e-14]  #  jwst_1293.pmap std_err = 0.0021
+# NRCB1-F150W2-CLEAR: [ 0.6770, 1.0000, 2.23e-14]  #  jwst_1293.pmap (fixed)
+# NRCB2-F150W2-CLEAR: [ 0.6380, 1.0776, 2.29e-14]  #  jwst_1293.pmap std_err = 0.0019
+# NRCB3-F150W2-CLEAR: [ 0.6660, 0.9972, 2.25e-14]  #  jwst_1293.pmap std_err = 0.0034
+# NRCB4-F150W2-CLEAR: [ 0.5850, 1.0488, 2.31e-14]  #  jwst_1293.pmap std_err = 0.0024
+
+# From just Module B, which includes more observations from GO-5594
+NRCB1-F150W2-CLEAR: [ 0.6770, 1.0000, 2.23e-14]  #  jwst_1293.pmap (fixed)
+NRCB2-F150W2-CLEAR: [ 0.6380, 1.0667, 2.29e-14]  #  jwst_1293.pmap std_err = 0.0022
+NRCB3-F150W2-CLEAR: [ 0.6660, 0.9906, 2.25e-14]  #  jwst_1293.pmap std_err = 0.0017
+NRCB4-F150W2-CLEAR: [ 0.5850, 1.0433, 2.31e-14]  #  jwst_1293.pmap std_err = 0.0021
+
+NRCA1-F150W2-F162M: [ 4.8470, 1.0464, 2.24e-14]  #  jwst_1293.pmap std_err = 0.0068
+NRCA2-F150W2-F162M: [ 5.0610, 1.0011, 2.23e-14]  #  jwst_1293.pmap std_err = 0.0054
+NRCA3-F150W2-F162M: [ 4.6880, 1.0366, 2.26e-14]  #  jwst_1293.pmap std_err = 0.0043
+NRCA4-F150W2-F162M: [ 4.4390, 1.0188, 2.25e-14]  #  jwst_1293.pmap std_err = 0.0043
+NRCB1-F150W2-F162M: [ 5.0990, 1.0000, 2.23e-14]  #  jwst_1293.pmap (fixed)
+NRCB2-F150W2-F162M: [ 4.8370, 1.0553, 2.29e-14]  #  jwst_1293.pmap std_err = 0.0037
+NRCB3-F150W2-F162M: [ 4.9250, 1.0073, 2.25e-14]  #  jwst_1293.pmap std_err = 0.0047
+NRCB4-F150W2-F162M: [ 4.2950, 1.0753, 2.31e-14]  #  jwst_1293.pmap std_err = 0.0058
+
+NRCA1-F150W2-F164N: [48.2510, 1.0521, 2.24e-14]  # interpolated
+NRCA2-F150W2-F164N: [51.0820, 1.0054, 2.23e-14]  # interpolated
+NRCA3-F150W2-F164N: [46.3670, 1.0473, 2.26e-14]  # interpolated
+NRCA4-F150W2-F164N: [44.5350, 1.0247, 2.25e-14]  # interpolated
+NRCB1-F150W2-F164N: [51.3540, 1.0000, 2.23e-14]  # interpolated
+NRCB2-F150W2-F164N: [47.6340, 1.0833, 2.29e-14]  # interpolated
+NRCB3-F150W2-F164N: [49.4570, 1.0073, 2.25e-14]  # interpolated
+NRCB4-F150W2-F164N: [42.4170, 1.1010, 2.31e-14]  # interpolated
+
+NRCA1-F182M-CLEAR: [ 3.6230, 1.0358, 2.24e-14]  #  jwst_1293.pmap std_err = 0.0047
+NRCA2-F182M-CLEAR: [ 3.8470, 0.9994, 2.23e-14]  #  jwst_1293.pmap std_err = 0.0041
+NRCA3-F182M-CLEAR: [ 3.5170, 1.0190, 2.26e-14]  #  jwst_1293.pmap std_err = 0.0025
+NRCA4-F182M-CLEAR: [ 3.3810, 1.0059, 2.25e-14]  #  jwst_1293.pmap std_err = 0.0033
+NRCB1-F182M-CLEAR: [ 3.8200, 1.0000, 2.23e-14]  #  jwst_1293.pmap (fixed)
+NRCB2-F182M-CLEAR: [ 3.6750, 1.0484, 2.29e-14]  #  jwst_1293.pmap std_err = 0.0029
+NRCB3-F182M-CLEAR: [ 3.6640, 1.0085, 2.25e-14]  #  jwst_1293.pmap std_err = 0.0024
+NRCB4-F182M-CLEAR: [ 3.3090, 1.0540, 2.31e-14]  #  jwst_1293.pmap std_err = 0.0030
+
+NRCA1-F187N-CLEAR : [43.1340, 1.0374, 2.24e-14]  # interpolated
+NRCA2-F187N-CLEAR : [45.8980, 1.0009, 2.23e-14]  # interpolated
+NRCA3-F187N-CLEAR : [41.5010, 1.0353, 2.26e-14]  # interpolated
+NRCA4-F187N-CLEAR : [40.0000, 1.0202, 2.25e-14]  # interpolated
+NRCB1-F187N-CLEAR : [45.4530, 1.0000, 2.23e-14]  # interpolated
+NRCB2-F187N-CLEAR : [43.6570, 1.0537, 2.29e-14]  # interpolated
+NRCB3-F187N-CLEAR : [43.9720, 1.0051, 2.25e-14]  # interpolated
+NRCB4-F187N-CLEAR : [39.7760, 1.0533, 2.31e-14]  # interpolated
+
+NRCA1-F200W-CLEAR: [ 1.9640, 1.0328, 2.24e-14]  #  jwst_1293.pmap std_err = 0.0018
+NRCA2-F200W-CLEAR: [ 2.1000, 0.9937, 2.23e-14]  #  jwst_1293.pmap std_err = 0.0017
+NRCA3-F200W-CLEAR: [ 1.8960, 1.0328, 2.26e-14]  #  jwst_1293.pmap std_err = 0.0012
+NRCA4-F200W-CLEAR: [ 1.8290, 1.0177, 2.25e-14]  #  jwst_1293.pmap std_err = 0.0013
+NRCB1-F200W-CLEAR: [ 2.0560, 1.0000, 2.23e-14]  #  jwst_1293.pmap (fixed)
+NRCB2-F200W-CLEAR: [ 1.9690, 1.0603, 2.29e-14]  #  jwst_1293.pmap std_err = 0.0012
+NRCB3-F200W-CLEAR: [ 1.9580, 1.0263, 2.25e-14]  #  jwst_1293.pmap std_err = 0.0012
+NRCB4-F200W-CLEAR: [ 1.7970, 1.0645, 2.31e-14]  #  jwst_1293.pmap std_err = 0.0012
+
+NRCA1-F210M-CLEAR: [ 4.5850, 1.0451, 2.24e-14]  #  jwst_1293.pmap std_err = 0.0079
+NRCA2-F210M-CLEAR: [ 4.9190, 1.0127, 2.23e-14]  #  jwst_1293.pmap std_err = 0.0046
+NRCA3-F210M-CLEAR: [ 4.4050, 1.0284, 2.26e-14]  #  jwst_1293.pmap std_err = 0.0030
+NRCA4-F210M-CLEAR: [ 4.3020, 1.0107, 2.25e-14]  #  jwst_1293.pmap std_err = 0.0039
+NRCB1-F210M-CLEAR: [ 4.8220, 1.0000, 2.23e-14]  #  jwst_1293.pmap (fixed)
+NRCB2-F210M-CLEAR: [ 4.5990, 1.0635, 2.29e-14]  #  jwst_1293.pmap std_err = 0.0035
+NRCB3-F210M-CLEAR: [ 4.5830, 1.0270, 2.25e-14]  #  jwst_1293.pmap std_err = 0.0030
+NRCB4-F210M-CLEAR: [ 4.2210, 1.0614, 2.31e-14]  #  jwst_1293.pmap std_err = 0.0036
+
+####### LW
+
+NRCALONG-F250M-CLEAR: [ 1.7750, 1.0113, 9.21e-14]  #  jwst_1293.pmap std_err = 0.0023
+NRCBLONG-F250M-CLEAR: [ 1.6880, 1.0000, 9.24e-14]  #  jwst_1293.pmap (fixed)
+
+NRCALONG-F277W-CLEAR: [ 0.4910, 0.9783, 9.21e-14]  #  jwst_1293.pmap std_err = 0.0006
+NRCBLONG-F277W-CLEAR: [ 0.4200, 1.0000, 9.24e-14]  #  jwst_1293.pmap (fixed)
+
+NRCALONG-F300M-CLEAR: [ 1.0650, 1.0015, 9.21e-14]  #  jwst_1293.pmap std_err = 0.0029
+NRCBLONG-F300M-CLEAR: [ 0.9630, 1.0000, 9.24e-14]  #  jwst_1293.pmap (fixed)
+
+NRCALONG-F322W2-CLEAR: [0.2100, 1.0000, 9.21e-14]  #  jwst_1293.pmap (fixed) [no data]
+NRCBLONG-F322W2-CLEAR: [0.2020, 1.0000, 9.24e-14]  #  jwst_1293.pmap (fixed) [no data]
+
+NRCALONG-F335M-CLEAR: [ 0.9770, 1.0188, 9.21e-14]  #  jwst_1293.pmap std_err = 0.0016
+NRCBLONG-F335M-CLEAR: [ 0.8480, 1.0000, 9.24e-14]  #  jwst_1293.pmap (fixed)
+
+NRCALONG-F356W-CLEAR: [ 0.4210, 1.0135, 9.21e-14]  #  jwst_1293.pmap std_err = 0.0005
+NRCBLONG-F356W-CLEAR: [ 0.3790, 1.0000, 9.24e-14]  #  jwst_1293.pmap (fixed)
+
+NRCALONG-F360M-CLEAR: [ 0.9530, 1.0000, 9.21e-14]  #  jwst_1293.pmap (fixed) [no data]
+NRCBLONG-F360M-CLEAR: [ 0.8770, 1.0000, 9.24e-14]  #  jwst_1293.pmap (fixed) [no data]
+
+NRCALONG-F410M-CLEAR: [ 0.9020, 1.0166, 9.21e-14]  #  jwst_1293.pmap std_err = 0.0006
+NRCBLONG-F410M-CLEAR: [ 0.8670, 1.0000, 9.24e-14]  #  jwst_1293.pmap (fixed)
+
+NRCALONG-F430M-CLEAR: [ 1.9080, 0.9965, 9.21e-14]  #  jwst_1293.pmap std_err = 0.0025
+NRCBLONG-F430M-CLEAR: [ 1.7050, 1.0000, 9.24e-14]  #  jwst_1293.pmap (fixed)
+
+NRCALONG-F444W-CLEAR: [ 0.4020, 0.9645, 9.21e-14]  #  jwst_1293.pmap std_err = 0.0002
+NRCBLONG-F444W-CLEAR: [ 0.3710, 1.0000, 9.24e-14]  #  jwst_1293.pmap (fixed)
+
+NRCALONG-F444W-F405N: [11.5270, 1.0000, 9.21e-14]  #  jwst_1293.pmap (fixed) [no data]
+NRCBLONG-F444W-F405N: [ 9.7120, 1.0000, 9.24e-14]  #  jwst_1293.pmap (fixed)
+
+NRCALONG-F444W-F466N: [12.4340, 1.0000, 9.21e-14]  #  jwst_1293.pmap (fixed) [no data]
+NRCBLONG-F444W-F466N: [12.4660, 1.0000, 9.24e-14]  #  jwst_1293.pmap (fixed)
+
+NRCALONG-F444W-F470N: [14.0800, 0.9725, 9.21e-14]  #  jwst_1293.pmap std_err = 0.0076
+NRCBLONG-F444W-F470N: [13.7350, 1.0000, 9.24e-14]  #  jwst_1293.pmap (fixed)
+
+NRCALONG-F460M-CLEAR: [ 2.2740, 1.0522, 9.21e-14]  #  jwst_1293.pmap std_err = 0.0017
+NRCBLONG-F460M-CLEAR: [ 2.1030, 1.0000, 9.24e-14]  #  jwst_1293.pmap (fixed)
+
+NRCALONG-F480M-CLEAR: [ 2.0230, 1.0476, 9.21e-14]  #  jwst_1293.pmap std_err = 0.0010
+NRCBLONG-F480M-CLEAR: [ 1.4560, 1.0000, 9.24e-14]  #  jwst_1293.pmap (fixed)
