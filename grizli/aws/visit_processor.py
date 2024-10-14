@@ -108,7 +108,8 @@ def exposure_info_from_visit(visit, assoc='', **kwargs):
     """
 
     for file in visit['files']:
-        s3_put_exposure(file, visit['product'], assoc, remove_old=True, **kwargs)
+        if os.path.exists(file):
+            s3_put_exposure(file, visit['product'], assoc, remove_old=True, **kwargs)
 
 
 def send_saturated_log(flt_file, sat_kwargs={}, remove_old=True, verbose=True, **kwargs):
