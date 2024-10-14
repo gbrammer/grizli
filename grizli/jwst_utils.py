@@ -681,7 +681,7 @@ def img_with_flat(
                 _flat_dq |= (5 * (_bad_flat)).astype(_flat_dq.dtype)
 
                 with pyfits.open(input, mode="update") as _hdu:
-                    _hdu["DQ"].data |= _flat_dq.astype(_hdu["DQ"].data)
+                    _hdu["DQ"].data |= _flat_dq.astype(_hdu["DQ"].data.dtype)
                     _hdu.flush()
 
                 
