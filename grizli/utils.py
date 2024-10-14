@@ -7242,7 +7242,7 @@ def get_photom_scale(header, verbose=True):
         return key, 1.0 / corr[key]
 
 
-def jwst_crds_photom_scale(hdul, context="jwst_1130.pmap", update=True, verbose=False):
+def jwst_crds_photom_scale(hdul, context="jwst_1293.pmap", scale_internal=True, update=True, verbose=False):
     """
     Scale factors between different JWST CRDS_CONTEXT
 
@@ -7253,6 +7253,9 @@ def jwst_crds_photom_scale(hdul, context="jwst_1130.pmap", update=True, verbose=
 
     context : str
         Target CRDS context version
+
+    scale_internal : bool
+        Include internal correction from ``data/jwst_zeropoints.yml``
 
     update : bool
         Scale photometry header keywords by the ratio of NEW_PHOTMJSR / OLD_PHOTMJSR
@@ -7269,6 +7272,7 @@ def jwst_crds_photom_scale(hdul, context="jwst_1130.pmap", update=True, verbose=
     """
     try:
         from .jwst_utils import get_crds_zeropoint, get_jwst_filter_info
+        from .jwst_utils import get_nircam_zeropoint_update
     except ImportError:
         print(
             "jwst_crds_photom_scale: failed to import grizli.jwst_utils.get_crds_zeropoint"
@@ -7294,6 +7298,14 @@ def jwst_crds_photom_scale(hdul, context="jwst_1130.pmap", update=True, verbose=
 
     if "PHOTMJSR" not in hdul["SCI"].header:
         return 1.0
+
+    if scale_internal:
+        key, _mjsr, _scale, _pixar_sr = get_nircam_zeropoint_update(
+            header=hdul[0].header,
+            verbose=verbose
+        )
+        if _mjsr is not None:
+            ref_photmjsr = _mjsr * _scale
 
     old_photmjsr = hdul["SCI"].header["PHOTMJSR"]
     scale = ref_photmjsr / old_photmjsr
@@ -7506,11 +7518,13 @@ def drizzle_from_visit(
     extra_wfc3ir_badpix=True,
     verbose=True,
     scale_photom=True,
-    context="jwst_1130.pmap",
+    internal_nircam_zeropoints=True,
+    context="jwst_1293.pmap",
     weight_type="jwst_var",
     rnoise_percentile=99,
     calc_wcsmap=False,
     niriss_ghost_kwargs={},
+    use_background_extension=True,
     snowblind_kwargs=None,
     jwst_dq_flags=JWST_DQ_FLAGS,
     nircam_hot_pixel_kwargs={},
@@ -7977,7 +7991,11 @@ def drizzle_from_visit(
             # Scale to a particular JWST context and update header keywords
             # like PHOTFLAM, PHOTFNU
             _scale_jwst_photom = jwst_crds_photom_scale(
-                flt, update=True, context=context, verbose=verbose
+                flt,
+                update=True,
+                context=context,
+                scale_internal=internal_nircam_zeropoints,
+                verbose=verbose
             )
 
             # These might have changed
@@ -8010,7 +8028,7 @@ def drizzle_from_visit(
                 else:
                     sky_value = 0
 
-                if ("BKG", ext) in flt:
+                if (("BKG", ext) in flt) & use_background_extension:
                     has_bkg = True
                     sky = flt["BKG", ext].data + sky_value
                 else:
