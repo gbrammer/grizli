@@ -283,6 +283,11 @@ def s3_put_exposure(flt_file, product, assoc, remove_old=True, verbose=True, get
                              AND file='{file}'
                              AND extension='{extension}'""")
 
+        db.execute(f"""DELETE FROM exposure_saturated sat
+                       USING exposure_files e
+                       WHERE sat.eid = e.eid
+                       AND e.file='{file}' AND e.extension='{extension}'""")
+
         db.execute(f"""DELETE FROM exposure_files
                        WHERE file='{file}' AND extension='{extension}'""")
     
@@ -916,6 +921,11 @@ def delete_all_assoc_data(assoc):
     res = db.execute(f"""DELETE from mosaic_tiles_exposures t
                  USING exposure_files e
                 WHERE t.expid = e.eid AND e.assoc = '{assoc}'""")
+    
+    res = db.execute(f"""DELETE FROM exposure_saturated sat
+                   USING exposure_files e
+                   WHERE sat.eid = e.eid
+                   AND e.assoc='{assoc}'""")
     
     res = db.execute(f"""DELETE from exposure_files
                     WHERE assoc = '{assoc}'""")
