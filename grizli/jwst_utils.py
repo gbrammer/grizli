@@ -25,7 +25,7 @@ QUIET_LEVEL = logging.INFO
 CRDS_CONTEXT = "jwst_1123.pmap"  # 2023-09-08 NRC specwcs, etc.
 # CRDS_CONTEXT = "jwst_1293.pmap"  # 2024-09-25
 
-MAX_CTX_FOR_SKYFLATS = "jwst_9999.pmap"
+MAX_CTX_FOR_SKYFLATS = "jwst_1130.pmap"
 
 # Global variable to control whether or not to try to update
 # PP file WCS
@@ -483,9 +483,14 @@ def check_context_for_skyflats(verbose=True):
 
     """
     global CRDS_CONTEXT, MAX_CTX_FOR_SKYFLATS
-    res = CRDS_CONTEXT <= MAX_CTX_FOR_SKYFLATS
 
-    msg = f'check_context_for_skyflats: {CRDS_CONTEXT} < {MAX_CTX_FOR_SKYFLATS}: {res}'
+    context = os.getenv('CRDS_CONTEXT')
+    if context is None:
+        context = CRDS_CONTEXT
+
+    res = context <= MAX_CTX_FOR_SKYFLATS
+
+    msg = f'check_context_for_skyflats: {context} < {MAX_CTX_FOR_SKYFLATS}: {res}'
     utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
 
     return res
