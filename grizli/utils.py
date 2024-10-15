@@ -12756,7 +12756,7 @@ def argv_to_dict(argv, defaults={}, dot_dict=True):
 
 
 class Unique(object):
-    def __init__(self, array, verbose=True):
+    def __init__(self, array, verbose=True, **kwargs):
         """
         Helper for unique items in an array
 
@@ -12766,9 +12766,8 @@ class Unique(object):
             Data to parse, generally strings but can be anything that can
             be parsed by `numpy.unique`
 
-        verbose : bool, optional
-            If True, print a summary of the unique values and their counts.
-            Default is False.
+        verbose : bool
+            Print info on initialization
 
         Attributes
         ----------
@@ -12808,9 +12807,10 @@ class Unique(object):
         self.values = [l for l in _[0]]
         self.indices = _[1]
         self.counts = _[2]
+
         if verbose:
-            self.info(sort_counts=verbose)
-    
+            self.info(**kwargs)
+
     @property
     def N(self):
         """
@@ -12818,7 +12818,7 @@ class Unique(object):
         """
         return len(self.values)
 
-    def info(self, sort_counts=0):
+    def info(self, sort_counts=0, **kwargs):
         """
         Print a summary
 
