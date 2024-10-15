@@ -27,6 +27,10 @@ CRDS_CONTEXT = "jwst_1293.pmap"  # 2024-09-25
 
 MAX_CTX_FOR_SKYFLATS = "jwst_1130.pmap"
 
+FORCE_SKYFLATS = [
+    "F250M", "F250M-CLEAR",
+]
+
 # Global variable to control whether or not to try to update
 # PP file WCS
 DO_PURE_PARALLEL_WCS = True
@@ -643,7 +647,11 @@ def img_with_flat(
 
                 _hdu.flush()
 
-        if use_skyflats & check_context_for_skyflats():
+        _needs_skyflat = (
+            check_context_for_skyflats() | (_hdu[0].header['OFILTER'] in FORCE_SKYFLATS)
+        )
+
+        if use_skyflats & _needs_skyflat:
             with pyfits.open(input, mode="update") as _hdu:
                 if "FIXFLAT" not in _hdu[0].header:
                     _sky = get_jwst_skyflat(_hdu[0].header)
