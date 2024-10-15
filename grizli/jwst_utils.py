@@ -27,9 +27,11 @@ CRDS_CONTEXT = "jwst_1293.pmap"  # 2024-09-25
 
 MAX_CTX_FOR_SKYFLATS = "jwst_1130.pmap"
 
+## Some filters are still better with the grizli skyflats
 FORCE_SKYFLATS = [
     "F250M", "F250M-CLEAR",
     "F300M", "F300M-CLEAR",
+    "F460M", "F460M-CLEAR",
 ]
 
 # Global variable to control whether or not to try to update
