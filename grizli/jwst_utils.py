@@ -29,6 +29,7 @@ MAX_CTX_FOR_SKYFLATS = "jwst_1130.pmap"
 
 FORCE_SKYFLATS = [
     "F250M", "F250M-CLEAR",
+    "F300M", "F300M-CLEAR",
 ]
 
 # Global variable to control whether or not to try to update
