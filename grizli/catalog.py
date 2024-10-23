@@ -27,6 +27,7 @@ __all__ = [
     "get_irsa_catalog",
     "get_gaia_radec_at_time",
     "get_gaia_DR2_vizier_columns",
+    "get_gaia_vizier",
     "get_gaia_DR2_vizier",
     "gaia_dr2_conesearch_query",
     "get_gaia_DR2_catalog",
@@ -463,16 +464,21 @@ def get_gaia_radec_at_time(gaia_tbl, date=2015.5, format="decimalyear"):
         else:
             ref_epoch = Time(2015.5, format="decimalyear")
 
+        pm_de_column = "pmde" if "pmde" in gaia_tbl.colnames else "pmdec"
+
         coord = SkyCoord(
             ra=gaia_tbl["ra"],
             dec=gaia_tbl["dec"],
             pm_ra_cosdec=gaia_tbl["pmra"],
-            pm_dec=gaia_tbl["pmdec"],
+            pm_dec=gaia_tbl[pm_de_column],
             obstime=ref_epoch,
             frame="icrs",
             distance=1 * u.kpc,
             radial_velocity=0.0 * u.km / u.second,
         )
+    
+    if date > 50000:
+        format = 'mjd'
 
     new_obstime = Time(date, format=format)
     coord_at_time = coord.apply_space_motion(new_obstime=new_obstime)
@@ -490,11 +496,12 @@ GAIA_DR2_COLUMNS = [
     "e_pmRA",
     "pmDE",
     "e_pmDE",
-    "NAL",
-    "NAC",
-    "Solved",
-    "APF",
-    "WAL",
+    # "NAL",
+    # "NAC",
+    # "Solved",
+    # "APF",
+    # "WAL",
+    "RPmag",
 ]
 
 
@@ -521,6 +528,113 @@ def get_gaia_DR2_vizier_columns():
     return gdict
 
 
+def get_gaia_vizier(
+    ra=165.86,
+    dec=34.829694,
+    radius=3.0,
+    max=100000,
+    catalog="I/355/gaiadr3",
+    keys=None,
+    extra_query=" AND RPmag < 21",
+    mjd=None,
+    clean_mjd=True,
+    lowercase=True,
+    **kwargs,
+):
+    """
+    Query GAIA catalogs from Vizier TAP
+
+    Parameters
+    ----------
+
+    ra, dec : float
+        Center of the query region, decimal degrees
+
+    radius : float
+        Radius of the query, in arcmin
+
+    max : int
+        Maximum number of rows to return.  Default is 100000.
+
+    catalog : str
+        Vizier catalog name.  Default is `I/345/gaia2`.
+            DR2: ``catalog="I/345/gaia2"``
+            EDR3: ``catalog="I/350/gaiaedr3"``
+            DR3: ``catalog="I/355/gaiadr3"`
+
+    keys : list of str
+        List of column keys to query.  Default is None.
+
+    extra_query : str
+        Additional query criteria, e.g., magnitude limits
+
+    mjd : float
+        MJD to compute proper motions.  Default is None.
+
+    clean_mjd : bool
+        Remove rows with NaN proper motions.  Default is True.
+
+    Returns
+    -------
+
+    table : `~astropy.table.Table`
+        Result of the query
+
+    """
+    gdict = get_gaia_DR2_vizier_columns()
+    if keys is None:
+        keys = list(gdict.keys())
+
+    if "dr3" in catalog:
+        for k in ["Epoch","WAL"]:
+            if k in keys:
+                keys.pop(keys.index(k))
+
+    try:
+        result = query_tap_catalog(
+            ra,
+            dec,
+            radius=radius,
+            db=f"\"{catalog}\"",
+            columns=[f'"{k}"' for k in keys],
+            extra=extra_query,
+            max=max,
+            vizier=True,
+            circle=True,
+        )
+    except:
+        utils.log_exception(utils.LOGFILE, traceback)
+        return False
+
+    if ("dr3" in catalog) & (len(result) > 0):
+        result["ref_epoch"] = 2016.0
+    else:
+        result["ref_epoch"] = 2015.5
+
+    result["ra"] = result["RA_ICRS"]
+    result["dec"] = result["DE_ICRS"]
+
+    if lowercase:
+        cols = result.colnames
+        for c in cols:
+            if c != c.lower():
+                result.rename_column(c, c.lower())
+
+    if mjd is not None:
+        rd = get_gaia_radec_at_time(result, date=mjd, format="mjd")
+
+        result["ra_time"] = rd.ra.deg
+        result["dec_time"] = rd.dec.deg
+
+        result.meta["cootime"] = (mjd, "Specified MJD for ra/dec_time")
+
+        if clean_mjd:
+            ok = np.isfinite(rd.ra.deg + rd.dec.deg)
+            result = result[ok]
+
+    return result
+
+
 def get_gaia_DR2_vizier(
     ra=165.86,
     dec=34.829694,
@@ -533,7 +647,9 @@ def get_gaia_DR2_vizier(
     clean_mjd=True,
 ):
     """
-    Query GAIA catalog from Vizier`
+    Query GAIA catalog from Vizier
+
+    *Deprecated:* use `~grizli.catalog.get_gaia_vizier`
 
     Parameters
     ----------
@@ -617,7 +733,7 @@ def get_gaia_DR2_vizier(
     return result
 
 
-def gaia_catalog_for_assoc(assoc_name="j191132p1652_hen-2-427-f335m_00007"):
+def gaia_catalog_for_assoc(assoc_name="j191132p1652_hen-2-427-f335m_00007", min_radius=3, **kwargs):
     """
     Get GAIA catalog
 
@@ -626,6 +742,9 @@ def gaia_catalog_for_assoc(assoc_name="j191132p1652_hen-2-427-f335m_00007"):
     assoc_name : str
         Name of the association. 
         Dedfault is `j191132p1652_hen-2-427-f335m_00007`.
+
+    min_radius : float
+        Minimum query radius, arcmin
 
     Returns
     -------
@@ -648,22 +767,30 @@ def gaia_catalog_for_assoc(assoc_name="j191132p1652_hen-2-427-f335m_00007"):
         sr.xy.extend(sri.xy)
 
     un = sr.union()
-    radius = np.sqrt(un.sky_area()[0]).value
+    radius = np.maximum(np.sqrt(un.sky_area()[0]).value, min_radius)
 
-    gaia = get_gaia_DR2_vizier(*un.centroid[0], radius=radius)
+    ra_center, de_center = un.centroid[0]
+
+    gaia = get_gaia_vizier(ra_center, de_center, radius=radius, **kwargs)
 
     rd = get_gaia_radec_at_time(gaia, np.mean(res["t_min"]), format="mjd")
 
     gaia["ra_orig"] = gaia["ra"]
-    gaia["ra_dec"] = gaia["dec"]
+    gaia["de_orig"] = gaia["dec"]
     gaia["ra"] = rd.ra.deg
     gaia["dec"] = rd.dec.deg
 
     coo = np.array([gaia["ra"], gaia["dec"]])
     in_footprint = un.path[0].contains_points(coo.T)
     gaia["in_assoc"] = in_footprint
+
     gaia.meta["assocnam"] = assoc_name
     gaia["valid"] = np.isfinite(gaia["ra"] + gaia["dec"])
+
+    # # Calculate PA relative to pointing center for potential spike contamination
+    # dra = (gaia["ra_orig"] - ra_center)*np.cos(dec_center/180*np.pi)
+    # dde = (gaia["de_orig"] - de_center)
+    # gaia["pa"] = np.arctan2(-dra, dde)/np.pi*180
 
     return gaia
 
@@ -875,6 +1002,7 @@ def gen_tap_box_query(
     columns=["*"],
     rd_colnames=["ra", "dec"],
     wcs_pad=0.5,
+    circle=False,
 ):
     """
     Generate a query string for the NOAO Legacy Survey TAP server
@@ -907,6 +1035,9 @@ def gen_tap_box_query(
 
     wcs_pad : float
         Padding to add to WCS box queries.  Default is 0.5.
+
+    circle : bool
+        Use a circle and point spatial query rather than a box
 
     Returns
     -------
@@ -951,6 +1082,9 @@ def gen_tap_box_query(
         top = dec + rmi
 
     fmt = dict(
+        ra=ra,
+        dec=dec,
+        radius_deg=radius/60.,
         rc=rd_colnames[0],
         dc=rd_colnames[1],
         left=left,
@@ -962,7 +1096,13 @@ def gen_tap_box_query(
         output_columns=", ".join(columns),
     )
 
-    if not np.isfinite(ra + dec):
+    if circle:
+        query = (
+            "SELECT {maxsel} {output_columns} FROM {db}"
+            + " WHERE 1=CONTAINS(POINT('ICRS',{db}.RAJ2000, {db}.DEJ2000),"
+            +  "CIRCLE('ICRS', {ra}, {dec}, {radius_deg:.3f}))"
+        )
+    elif not np.isfinite(ra + dec):
         query = "SELECT {maxsel} {output_columns} FROM {db} "
     else:
         query = (
@@ -992,6 +1132,7 @@ def query_tap_catalog(
     nsc=False,
     vizier=False,
     skymapper=False,
+    circle='auto',
     hubble_source_catalog=False,
     tap_kwargs={},
     **kwargs,
@@ -1038,6 +1179,10 @@ def query_tap_catalog(
 
     vizier : bool
         Use the VizieR TAP server at  http://tapvizier.u-strasbg.fr/TAPVizieR/tap, see http://tapvizier.u-strasbg.fr/adql/about.html.
+
+    circle : bool, 'auto'
+        Use a circle query rather than a box, which seems to be faster on Vizier.  If
+        'auto' and ``vizier=True``, will default to ``circle=True``
 
     hubble_source_catalog : bool
         Query the Hubble Source Catalog (v3).  If no 'NumImages' criteria is
@@ -1088,6 +1233,11 @@ def query_tap_catalog(
 
         tap_url = "http://tapvizier.u-strasbg.fr/TAPVizieR/tap"
         rd_colnames = ["RAJ2000", "DEJ2000"]
+        if circle in ['auto']:
+            circle = True
+    else:
+        if circle in ['auto']:
+            circle = False
 
     if skymapper:
         if verbose:
@@ -1118,6 +1268,7 @@ def query_tap_catalog(
         columns=columns,
         rd_colnames=rd_colnames,
         corners=corners,
+        circle=circle,
     )
 
     job = tap.launch_job(query + extra, dump_to_file=True, verbose=verbose)
@@ -1894,8 +2045,9 @@ def get_radec_catalog(
         "PS1": get_panstarrs_catalog,
         "WISE": get_irsa_catalog,
         "2MASS": get_twomass_catalog,
-        "GAIA_Vizier": get_gaia_DR2_vizier,
-        "GAIA": get_gaia_DR2_vizier,
+        "GAIA_Vizier": get_gaia_vizier,
+        # "GAIA": get_gaia_DR2_vizier,
+        "GAIA": get_gaia_vizier,
         "NSC": get_nsc_catalog,
         "DES": get_desdr1_catalog,
         "Hubble": get_hubble_source_catalog,
