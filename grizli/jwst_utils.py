@@ -706,7 +706,7 @@ def img_with_flat(
                 dq4 = _hdu['DQ'].data & 4
                 dq4_frac = (dq4 > 0).sum() / dq4.size
 
-                if dq4_fraction > mask_dq4_fraction:
+                if dq4_frac > mask_dq4_fraction:
 
                     msg = f"jwst_utils.img_with_flat: {dq4_frac * 100:.1f}%"
                     msg += f" DQ=4 pixels > {mask_dq4_fraction * 100:.1f}"
