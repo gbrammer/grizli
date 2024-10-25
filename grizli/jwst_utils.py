@@ -504,7 +504,7 @@ def check_context_for_skyflats(verbose=True):
 
 
 def img_with_flat(
-    input, verbose=True, overwrite=True, apply_photom=True, use_skyflats=True,
+    input, verbose=True, overwrite=True, apply_photom=True, use_skyflats=True, mask_dq4_fraction=0.25
 ):
     """
     Apply flat-field and photom corrections if nessary
@@ -528,6 +528,11 @@ def img_with_flat(
 
     use_skyflats : bool
         Apply sky flat corrections if True and ``CRDS_CONTEXT > MAX_CTX_FOR_SKYFLATS``.
+
+    mask_dq4_fraction : float
+        Add an additional check for the fraction of pixels with the DQ=4 bit set.  If
+        the fraction is found to be greater than this value, unset them in the DQ
+        extension.
 
     Returns
     -------
@@ -695,7 +700,26 @@ def img_with_flat(
                     _hdu["DQ"].data |= _flat_dq.astype(_hdu["DQ"].data.dtype)
                     _hdu.flush()
 
-                
+        if mask_dq4_fraction is not None:
+            with pyfits.open(input, mode="update") as _hdu:
+
+                dq4 = _hdu['DQ'].data & 4
+                dq4_frac = (dq4 > 0).sum() / dq4.size
+
+                if dq4_fraction > mask_dq4_fraction:
+
+                    msg = f"jwst_utils.img_with_flat: {dq4_frac * 100:.1f}%"
+                    msg += f" DQ=4 pixels > {mask_dq4_fraction * 100:.1f}"
+                    utils.log_comment(
+                        utils.LOGFILE, msg, verbose=verbose, show_date=False
+                    )
+
+                    _hdu['DQ'].header['UNSET4'] = True
+
+                    _hdu['DQ'].data -= dq4.astype(_hdu['DQ'].data.dtype)
+
+                    _hdu.flush()
+
     gc.collect()
 
     return output
