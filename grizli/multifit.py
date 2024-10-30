@@ -916,22 +916,27 @@ class GroupFLT:
         for flt_i in self.FLTs:
             if hasattr(flt_i, "conf"):
                 delattr(flt_i, "conf")
+        
+        if cpu_count > 1:
+            with mp.Pool(processes=cpu_count) as pool:
+                # Submit individual tasks to the pool
+                jobs = [
+                    pool.apply_async(
+                        _compute_model, (i, self.FLTs[i], fit_info, is_cgs, store, model_kwargs)
+                    )
+                    for i in range(self.N)
+                ]
 
-        pool = mp.Pool(processes=cpu_count)
-        jobs = [
-            pool.apply_async(
-                _compute_model, (i, self.FLTs[i], fit_info, is_cgs, store, model_kwargs)
-            )
-            for i in range(self.N)
-        ]
-
-        pool.close()
-        pool.join()
-
-        for res in jobs:
-            i, model, dispersers = res.get(timeout=1)
-            self.FLTs[i].object_dispersers = dispersers
-            self.FLTs[i].model = model
+                # Process each job with a timeout
+                for job in jobs:
+                    i, model, dispersers = job.get(timeout=1)
+                    self.FLTs[i].object_dispersers = dispersers
+                    self.FLTs[i].model = model
+        else:
+            for i in range(self.N):
+                _, model, dispersers = _compute_model(i, self.FLTs[i], fit_info, is_cgs, store, model_kwargs)
+                self.FLTs[i].object_dispersers = dispersers
+                self.FLTs[i].model = model
 
         # Reload conf
         for flt_i in self.FLTs:
@@ -1056,6 +1061,7 @@ class GroupFLT:
         verbose=True,
         fcontam=0.5,
         wave=np.linspace(0.2, 2.5e4, 100),
+        thread_count=1
     ):
         """
         Refine contamination model for list of objects.  Loops over `refine`.
@@ -1092,6 +1098,9 @@ class GroupFLT:
         wave : `~numpy.array`
             Wavelength array for the polynomial fit.
 
+        thread_count : int
+            Number of Threads to use for parallel processing (multithreaded)
+
         Returns
         -------
         Updates `self.model` in place.
@@ -1111,8 +1120,144 @@ class GroupFLT:
         # wave = np.linspace(0.2,5.4e4,100)
         poly_templates = utils.polynomial_templates(wave, order=poly_order, line=False)
 
-        for id, mag in zip(ids, mags):
-            self.refine(
+        # Multi-threading
+        if thread_count > 1:
+
+            # Create rtree and DAG
+            from rtree import index
+            import networkx as nx
+            from networkx import DiGraph
+            rtree_idx = index.Index()
+            dag = DiGraph()
+
+            # Iterate over sources from bright to faint
+            msg = 'Creating DAG of Refinements'
+            utils.log_comment(utils.LOGFILE, msg, verbose=True)
+            import tqdm
+            for id in tqdm.tqdm(ids):
+
+                # Get beams
+                beams = self.get_beams(id, size=30, min_overlap=0.1,
+                                       get_slice_header=False, min_mask=0.01,
+                                       min_sens=0.01, mask_resid=True)
+
+                bounds = []
+                for beam in beams:
+
+                    # Compute beam boundaries
+                    slx,sly = beam.beam.slx_parent, beam.beam.sly_parent
+                    bound = (slx.start, sly.start, slx.stop, sly.stop)
+                    bounds.append(bound)
+
+                    # Check if there are any overlaps in RTree
+                    overlap_ids = list(rtree_idx.intersection(bound))
+
+                    # Current object must be fainter, so direction is from bright to faint
+                    for overlap_id in overlap_ids:
+                        dag.add_edge(overlap_id,id)
+
+                # Add current object to RTree
+                for bound in bounds:
+                    rtree_idx.insert(id, bound)
+            
+            # Create topological layers
+            topological_order = list(nx.topological_sort(dag))
+            
+            # Initialize layers dictionary
+            layers = {}
+            
+            # Initialize the first layer
+            current_layer = 0
+            layers[current_layer] = []
+            
+            # Initialize a set to keep track of visited nodes
+            visited = set()
+            
+            # Iterate through the topological order
+            for node in topological_order:
+                # If the node has no incoming edges, it starts a new layer
+                if dag.in_degree(node) == 0:
+                    layers[current_layer].append(node)
+                else:
+                    # Check if this node belongs to a previous layer
+                    for predecessor in dag.predecessors(node):
+                        if predecessor in visited:
+                            layers[current_layer].append(node)
+                            break
+                    else:
+                        # If none of the predecessors are in the current layer, increment the layer
+                        current_layer += 1
+                        layers[current_layer] = [node]
+
+                # Mark the node as visited
+                visited.add(node)
+
+            # Print Graph summary
+            msg = ''
+            utils.log_comment(utils.LOGFILE, msg, verbose=True)
+
+            # Create topological layers
+            layers = []
+            node_layers = {}
+
+            # Iterate through the topological order
+            msg = 'Creating Topological Layers'
+            utils.log_comment(utils.LOGFILE, msg, verbose=True)
+            for node in nx.topological_sort(dag):
+                # If the node has no incoming edges, it starts a new layer
+                if dag.in_degree(node) == 0:
+                    # Top Layer nodes in layer 0
+                    node_layers[node] = 0
+                else:
+                    node_layers[node] = (
+                        max(node_layers[pred] for pred in dag.predecessors(node)) + 1
+                    )
+
+                # Ensure all necessary layers exist
+                while len(layers) <= node_layers[node]:
+                    layers.append([])
+
+                # Add node to layer
+                layers[node_layers[node]].append(node)
+
+            # # Record layer summary
+            # lens = [len(l) for l in layers]
+            # msg = f'{len(layers)} found, with a min/max size of {min(lens)}/{max(lens)}'
+            # utils.log_comment(utils.LOGFILE, msg, verbose=True)
+
+            # Iterate over layers and multi-thread
+            for i,layer in enumerate(layers):
+
+                msg = f'Refining layer {i} with size {len(layer)} (multi-threaded)'
+                utils.log_comment(utils.LOGFILE, msg, verbose=True)
+                
+                # Get magnitudes
+                layer_mags = np.array([mags[id == ids] for id in layer]).flatten()
+
+                # Arguements
+                args = [
+                    dict(
+                        id = id, 
+                        mag = mag, 
+                        poly_order = poly_order,
+                        max_coeff = max_coeff,
+                        size = 30,
+                        ds9 = ds9,
+                        verbose = verbose,
+                        fcontam = fcontam,
+                        templates = poly_templates
+                    )
+                    for id,mag in zip(layer,layer_mags)
+                ]
+
+                # Multithread Layer
+                from concurrent.futures import ThreadPoolExecutor
+                with ThreadPoolExecutor(max_workers=thread_count) as executor:
+                    executor.map(self.refine_wrapper, args)
+
+        else:
+            for id, mag in zip(ids, mags):
+                self.refine(
                 id,
                 mag=mag,
                 poly_order=poly_order,
@@ -1123,6 +1268,9 @@ class GroupFLT:
                 fcontam=fcontam,
                 templates=poly_templates,
             )
+
+    def refine_wrapper(self,args):
+        return self.refine(**args)
 
     def refine(
         self,
