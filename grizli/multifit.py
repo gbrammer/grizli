@@ -1125,8 +1125,7 @@ class GroupFLT:
 
             # Create rtree and DAG
             from rtree import index
-            import networkx as nx
-            from networkx import DiGraph
+            from networkx import DiGraph, topological_sort
             rtree_idx = index.Index()
             dag = DiGraph()
 
@@ -1159,41 +1158,9 @@ class GroupFLT:
                 # Add current object to RTree
                 for bound in bounds:
                     rtree_idx.insert(id, bound)
-            
-            # Create topological layers
-            topological_order = list(nx.topological_sort(dag))
-            
-            # Initialize layers dictionary
-            layers = {}
-            
-            # Initialize the first layer
-            current_layer = 0
-            layers[current_layer] = []
-            
-            # Initialize a set to keep track of visited nodes
-            visited = set()
-            
-            # Iterate through the topological order
-            for node in topological_order:
-                # If the node has no incoming edges, it starts a new layer
-                if dag.in_degree(node) == 0:
-                    layers[current_layer].append(node)
-                else:
-                    # Check if this node belongs to a previous layer
-                    for predecessor in dag.predecessors(node):
-                        if predecessor in visited:
-                            layers[current_layer].append(node)
-                            break
-                    else:
-                        # If none of the predecessors are in the current layer, increment the layer
-                        current_layer += 1
-                        layers[current_layer] = [node]
-
-                # Mark the node as visited
-                visited.add(node)
 
             # Print Graph summary
-            msg = ''
+            msg = f'{len(dag)} nodes and {dag.number_of_edges()} edges found'
             utils.log_comment(utils.LOGFILE, msg, verbose=True)
 
             # Create topological layers
@@ -1203,7 +1170,7 @@ class GroupFLT:
             # Iterate through the topological order
             msg = 'Creating Topological Layers'
             utils.log_comment(utils.LOGFILE, msg, verbose=True)
-            for node in nx.topological_sort(dag):
+            for node in topological_sort(dag):
                 # If the node has no incoming edges, it starts a new layer
                 if dag.in_degree(node) == 0:
                     # Top Layer nodes in layer 0
@@ -1219,11 +1186,6 @@ class GroupFLT:
 
                 # Add node to layer
                 layers[node_layers[node]].append(node)
-
-            # # Record layer summary
-            # lens = [len(l) for l in layers]
-            # msg = f'{len(layers)} found, with a min/max size of {min(lens)}/{max(lens)}'
-            # utils.log_comment(utils.LOGFILE, msg, verbose=True)
 
             # Iterate over layers and multi-thread
             for i,layer in enumerate(layers):
