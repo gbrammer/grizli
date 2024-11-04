@@ -8356,7 +8356,6 @@ def drizzle_array_groups(
     calc_wcsmap=False,
     verbose=True,
     data=None,
-    first_uniqid=1,
 ):
     """
     Drizzle array data with associated wcs
@@ -8404,9 +8403,6 @@ def drizzle_array_groups(
         ``data = outsci, outwht, outctx, varnum``, where ``varnum = outvar * outwht``
 
         If not provided, new arrays will be created.
-
-    first_uniqid : int, optional
-        First `uniqid` value to use for the drizzle for contex maps
 
     Returns
     -------
@@ -8479,10 +8475,14 @@ def drizzle_array_groups(
     else:
         use_weights = wht_list
 
+    # Number of input arrays
+    N = len(sci_list)
+
     # Output arrays
     if data is not None:
         if len(data) == 3:
             outsci, outwht, outctx = data
+            outvar = None
         else:
             outsci, outwht, outctx, outvar = data
             if outvar is not None:
@@ -8495,26 +8495,56 @@ def drizzle_array_groups(
                     ' but var_list not provided'
                 )
                 log_comment(LOGFILE, msg, verbose=verbose, show_date=True)
+
+        # Compute maximum bit number in existing ctx array
+        lastctx = outctx[-1] if outctx.ndim == 3 else outctx
+        if np.any(lastctx < 0):
+            Nbit = 32
+        elif np.all(lastctx == 0):
+            Nbit = 0
+        else:
+            Nbit = np.ceil(np.log2(lastctx.max())).astype(int)
+
+        # Compute number of planes needed for new ctx array
+        Np = (N + Nbit + 31) // 32
+
+        # Add additional planes if ncessary
+        if Np > 1:
+            if outctx.ndim == 2:  # Stack if 2D Array
+                outctx = np.stack([outctx] + [np.zeros_like(outctx) for i in range(Np - 1)])
+                if outvar is not None:
+                    _varctx = np.stack(
+                        [_varctx] + [np.zeros_like(_varctx) for i in range(Np - 1)]
+                    )
+            elif len(outctx) < Np:  # Append if 3D Array with fewer planes
+                outctx = np.append(
+                    outctx,
+                    [np.zeros_like(outctx[0]) for i in range(Np - len(outctx))],
+                    axis=0,
+                )
+                if outvar is not None:
+                    _varctx = np.append(
+                        _varctx,
+                        [np.zeros_like(_varctx[0]) for i in range(Np - len(_varctx))],
+                        axis=0,
+                    )
+
     else:
+        # Number of 32-bit drizzle plans needed
+        Np = (N + 31) // 32
+
         outsci = np.zeros(shape, dtype=np.float32)
         outwht = np.zeros(shape, dtype=np.float32)
-        outctx = np.zeros(shape, dtype=np.int32)
+        outctx = np.zeros(shape, dtype=np.int32) if Np == 1 else np.zeros((Np,) + shape, dtype=np.int32) 
         if var_list is None:
             outvar = None
         else:
             outvar = np.zeros(shape, dtype=np.float32)
             _varwht = np.zeros(shape, dtype=np.float32)
-            _varctx = np.zeros(shape, dtype=np.int32)
+            _varctx = np.zeros(shape, dtype=np.int32) if Np == 1 else np.zeros((Np,) + shape, dtype=np.int32)
 
     needs_var = (outvar is not None) & (var_list is not None)
 
-    # Number of input arrays
-    N = len(sci_list)
-
-    # Drizzlepac cannot support >31 input images
-    if first_uniqid + N > 31 and verbose:
-        msg = "Warning: Too many input images for context map, will wrap around"
-        log_comment(LOGFILE, msg, verbose=verbose, show_date=True)
     for i in range(N):
         if verbose:
             # log.info('Drizzle array {0}/{1}'.format(i+1, N))
@@ -8539,7 +8569,7 @@ def drizzle_array_groups(
             "cps",
             1,
             wcslin_pscale=wcs_list[i].pscale,
-            uniqid=((first_uniqid - 1 + i) % 32) + 1,
+            uniqid=i+1,
             pixfrac=pixfrac,
             kernel=kernel,
             fillval="0",
@@ -8559,7 +8589,7 @@ def drizzle_array_groups(
                 "cps",
                 1,
                 wcslin_pscale=wcs_list[i].pscale,
-                uniqid=1,
+                uniqid=i,
                 pixfrac=pixfrac,
                 kernel=kernel,
                 fillval="0",
