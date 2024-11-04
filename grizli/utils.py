@@ -8589,7 +8589,7 @@ def drizzle_array_groups(
                 "cps",
                 1,
                 wcslin_pscale=wcs_list[i].pscale,
-                uniqid=i,
+                uniqid=i+1,
                 pixfrac=pixfrac,
                 kernel=kernel,
                 fillval="0",
