@@ -3642,8 +3642,10 @@ def make_visit_average_flat(
         ma = np.nanmax(scim, axis=0)
         scim[scim >= ma] = np.nan
 
-    bkg = np.array([np.nanmedian(s[q == 0]) for s, q in zip(scim, dq)])
-
+    
+    bkg = np.array([np.nanmedian(s[(q & bad_bits) == 0])
+                    for s, q in zip(scim, dq)])
+    
     N = sci.shape[0]
     scif = scim * 1.0
     for i in range(N):
