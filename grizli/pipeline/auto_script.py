@@ -1856,12 +1856,16 @@ def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, com
         IS_NIS_PARALLEL |= v['product'].startswith('indef-03383')
         IS_NIS_PARALLEL |= v['product'].startswith('indef-04681')
 
+        # Add NIRCam WFSS programs
+        IS_NIS_PARALLEL |= v['product'].startswith('indef-06434')
+        IS_NIS_PARALLEL |= v['product'].startswith('indef-05398')
+
         ks = v['product'].split('-')
         
         if IS_NIS_PARALLEL & (len(ks) == 7):
             vkey = ks.pop(2)
             v['product'] = '-'.join(ks)
-            
+
     # Don't run combine_minexp if have grism exposures
     grisms = ['G141', 'G102', 'G800L', 'G280', 'GR150C', 'GR150R']
     has_grism = np.in1d(info['FILTER'], grisms).sum() > 0
@@ -1948,28 +1952,40 @@ def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, com
             print('{0} {1} {2}'.format(i, visit['product'], len(visit['files'])))
     
     all_groups = utils.parse_grism_associations(visits, info)
-    
-    # JWST PASSAGE    
-    if (len(all_groups) > 0) and ( ('jw01571' in files[0]) or ('jw03383' in files[0]) or ('jw04681' in files[0]) ):
+
+    # JWST PASSAGE
+    pure_par_progs = [
+        'jw01571', 'jw03383', 'jw04681', # NIRISS
+        'jw06434', 'jw05398', # JWST
+        'jw05105', # NEXUS GO-5105 mixes F356W direct and F322W2 grism
+        'jw05893', # COSMOS-3D mixes F356W direct + F444W grism
+    ]
+
+    if (len(all_groups) > 0) and (os.path.basename(files[0])[:7] in pure_par_progs):
+        #  ('jw01571' in files[0]) or ('jw03383' in files[0]) or ('jw04681' in files[0]) or ('jw06434' in files[0])):
         for v in visits:
             if 'clear' in v['product']:
-                print('NIRISS pure parallel direct: ', v['product'])
+                # print('NIRISS pure parallel direct: ', v['product'])
                 direct = v
 
         for g in all_groups:
             if g['direct'] is None:
-                g['direct'] = direct
-    
-    # NEXUS GO-5105 mixes F356W direct and F322W2 grism
-    if (len(all_groups) > 0) and ( ('jw05105' in files[0]) ):
-        for v in visits:
-            if 'clear' in v['product']:
-                print('NEXUS direct: ', v['product'])
-                direct = v
+                msg = f"Set direct association {direct['product']} for grism "
+                msg += f"{g['grism']['product']}"
+                utils.log_comment(utils.LOGFILE, msg, verbose=True)
 
-        for g in all_groups:
-            if g['direct'] is None:
                 g['direct'] = direct
+
+    # # NEXUS GO-5105 mixes F356W direct and F322W2 grism
+    # if (len(all_groups) > 0) and ( ('jw05105' in files[0]) ):
+    #     for v in visits:
+    #         if 'clear' in v['product']:
+    #             print('NEXUS direct: ', v['product'])
+    #             direct = v
+    #
+    #     for g in all_groups:
+    #         if g['direct'] is None:
+    #             g['direct'] = direct
 
     print('\n == Grism groups ==\n')
     valid_groups = []
