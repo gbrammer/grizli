@@ -4467,6 +4467,7 @@ def process_direct_grism_visit(direct={},
     isACS = '_flc' in direct['files'][0]  # Also UVIS
     isWFPC2 = '_c0' in direct['files'][0]
         
+    NGROUPS = 1000
     if not skip_direct:
         for file in direct['files']:
             crclean = isACS & (len(direct['files']) == 1)
@@ -4481,6 +4482,10 @@ def process_direct_grism_visit(direct={},
             if isJWST:
                 isACS = isWFPC2 = False
                 _ = jwst_utils.set_jwst_to_hst_keywords(file, reset=False)
+                # Check if few NGROUPS
+                with pyfits.open(file) as im:
+                    if "NGROUPS" in im[0].header:
+                        NGROUPS = np.minimum(NGROUPS, im[0].header["NGROUPS"])
             
             if not isJWST:
                 try:
@@ -4552,6 +4557,9 @@ def process_direct_grism_visit(direct={},
         bits = 576+256
         driz_cr_snr = '8.0 5.0'
         driz_cr_scale = '2.5 0.7'
+
+    if isJWST & (NGROUPS <= 4):
+        drizzle_params = {'driz_cr_snr':'1.0 0.5', 'driz_cr_scale':'1.0 0.6'}
 
     if 'driz_cr_scale' in drizzle_params:
         driz_cr_scale = drizzle_params['driz_cr_scale']
