@@ -22,7 +22,17 @@ QUIET_LEVEL = logging.INFO
 
 # CRDS_CONTEXT = 'jwst_0942.pmap' # July 29, 2022 with updated NIRCAM ZPs
 # CRDS_CONTEXT = 'jwst_0995.pmap' # 2022-10-06 NRC ZPs and flats
-CRDS_CONTEXT = "jwst_1123.pmap"  # 2023-09-08 NRC specwcs, etc.
+# CRDS_CONTEXT = "jwst_1123.pmap"  # 2023-09-08 NRC specwcs, etc.
+CRDS_CONTEXT = "jwst_1293.pmap"  # 2024-09-25
+
+MAX_CTX_FOR_SKYFLATS = "jwst_1130.pmap"
+
+## Some filters are still better with the grizli skyflats
+FORCE_SKYFLATS = [
+    "F250M", "F250M-CLEAR",
+    "F300M", "F300M-CLEAR",
+    "F460M", "F460M-CLEAR",
+]
 
 # Global variable to control whether or not to try to update
 # PP file WCS
@@ -57,6 +67,8 @@ def set_crds_context(fits_file=None, override_environ=False, verbose=True):
     import crds
     import crds.core
     import crds.core.heavy_client
+
+    global CRDS_CONTEXT
 
     _CTX = CRDS_CONTEXT
 
@@ -187,6 +199,10 @@ def crds_reffiles(
 
     if detector is not None:
         cpars["meta.instrument.detector"] = detector
+        if instrument == "NIRCAM":
+            cpars["meta.instrument.channel"] = (
+                "LONG" if "LONG" in detector else "SHORT"
+            )
 
     if date is None:
         date = astropy.time.Time.now().iso
@@ -464,8 +480,31 @@ def get_jwst_skyflat(header, verbose=True, valid_flat=(0.7, 1.4)):
     return skyfile, flat_corr, dq
 
 
+def check_context_for_skyflats(verbose=True):
+    """
+    Check that global variables ``CRDS_CONTEXT <= MAX_CTX_FOR_SKYFLATS``
+
+    Returns
+    -------
+    result : bool
+
+    """
+    global CRDS_CONTEXT, MAX_CTX_FOR_SKYFLATS
+
+    context = os.getenv('CRDS_CONTEXT')
+    if context is None:
+        context = CRDS_CONTEXT
+
+    res = context <= MAX_CTX_FOR_SKYFLATS
+
+    msg = f'check_context_for_skyflats: {context} < {MAX_CTX_FOR_SKYFLATS}: {res}'
+    utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+
+    return res
+
+
 def img_with_flat(
-    input, verbose=True, overwrite=True, apply_photom=True, use_skyflats=True
+    input, verbose=True, overwrite=True, apply_photom=True, use_skyflats=True, mask_dq4_fraction=0.25
 ):
     """
     Apply flat-field and photom corrections if nessary
@@ -488,7 +527,12 @@ def img_with_flat(
         or the `apply_photom` parameter is set to False.
 
     use_skyflats : bool
-        Apply sky flat corrections if True.
+        Apply sky flat corrections if True and ``CRDS_CONTEXT > MAX_CTX_FOR_SKYFLATS``.
+
+    mask_dq4_fraction : float
+        Add an additional check for the fraction of pixels with the DQ=4 bit set.  If
+        the fraction is found to be greater than this value, unset them in the DQ
+        extension.
 
     Returns
     -------
@@ -577,6 +621,9 @@ def img_with_flat(
             )
 
     else:
+
+        _flatfile = None
+
         utils.log_comment(
             utils.LOGFILE,
             f"jwst_utils.img_with_flat: Flat already applied",
@@ -608,7 +655,11 @@ def img_with_flat(
 
                 _hdu.flush()
 
-        if use_skyflats:
+        _needs_skyflat = (
+            check_context_for_skyflats() | (_hdu[0].header['OFILTER'] in FORCE_SKYFLATS)
+        )
+
+        if use_skyflats & _needs_skyflat:
             with pyfits.open(input, mode="update") as _hdu:
                 if "FIXFLAT" not in _hdu[0].header:
                     _sky = get_jwst_skyflat(_hdu[0].header)
@@ -632,6 +683,42 @@ def img_with_flat(
                     utils.log_comment(
                         utils.LOGFILE, msg, verbose=verbose, show_date=False
                     )
+        else:
+            # Mask flat
+            if _flatfile is not None:
+                with pyfits.open(_flatfile) as _flat_im:
+                    _flat_dq = _flat_im['DQ'].data*1
+                    _flat_data = _flat_im['SCI'].data*1
+            
+                _bad_flat = _flat_data == 1
+                _bad_flat |= _flat_data < 0.6
+                _bad_flat |= _flat_data > 1.8
+            
+                _flat_dq |= (5 * (_bad_flat)).astype(_flat_dq.dtype)
+
+                with pyfits.open(input, mode="update") as _hdu:
+                    _hdu["DQ"].data |= _flat_dq.astype(_hdu["DQ"].data.dtype)
+                    _hdu.flush()
+
+        if mask_dq4_fraction is not None:
+            with pyfits.open(input, mode="update") as _hdu:
+
+                dq4 = _hdu['DQ'].data & 4
+                dq4_frac = (dq4 > 0).sum() / dq4.size
+
+                if dq4_frac > mask_dq4_fraction:
+
+                    msg = f"jwst_utils.img_with_flat: {dq4_frac * 100:.1f}%"
+                    msg += f" DQ=4 pixels > {mask_dq4_fraction * 100:.1f}"
+                    utils.log_comment(
+                        utils.LOGFILE, msg, verbose=verbose, show_date=False
+                    )
+
+                    _hdu['DQ'].header['UNSET4'] = True
+
+                    _hdu['DQ'].data -= dq4.astype(_hdu['DQ'].data.dtype)
+
+                    _hdu.flush()
 
     gc.collect()
 
@@ -3209,6 +3296,96 @@ def get_crds_zeropoint(
             print(f"crds_reffiles: photmjsr = {mjsr}  pixar_sr = {pixar_sr:.3e}")
 
     return context, refs["photom"], mjsr, pixar_sr
+
+
+def get_nircam_zeropoint_update(
+    detector="NRCALONG",
+    filter="F444W",
+    pupil="CLEAR",
+    header=None,
+    verbose=False,
+    **kwargs,
+    ):
+    """
+    Get latest correction factors for NIRCAM zeropoints
+
+    Parameters
+    ----------
+    detector : str
+        Detector name
+
+    filter, pupil : str
+        Element name in filter and pupil wheels
+
+    verbose : bool
+        Messaging
+
+    Returns
+    -------
+    key : str
+        String key for the detector + filter combination
+
+    mjysr : float, None
+        Zerpoint from CRDS, None if ``key`` not found
+
+    scale : float, None
+        Scale factor to multiply to ``mjysr``
+
+    pixar_sr : float
+        Pixel area in steradians
+
+    """
+    import yaml
+
+    zeropoint_file = os.path.join(
+        os.path.dirname(__file__),
+        "data",
+        "jwst_zeropoints.yml"
+    )
+
+    if header is not None:
+        if 'DETECTOR' in header:
+            detector = header['DETECTOR']
+
+        if 'OFILTER' in header:
+            filter = header['OFILTER']
+        elif 'FILTER' in header:
+            filter = header['FILTER']
+
+        if 'OPUPIL' in header:
+            pupil = header['OPUPIL']
+        elif 'PUPIL' in header:
+            pupil = header['PUPIL']
+        else:
+            pupil = None
+
+    if pupil is not None:
+        key = f"{detector}-{filter}-{pupil}".upper()
+    else:
+        key = f"{detector}-{filter}".upper()
+
+    if not os.path.exists(zeropoint_file):
+        msg = "get_nircam_zeropoint_update: "
+        msg += f"{zeropoint_file} not found"
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+        return key, None, None, None
+
+    with open(zeropoint_file) as _fp:
+        zp_data = yaml.load(_fp, Loader=yaml.Loader)
+
+    if key not in zp_data:
+        msg = "get_nircam_zeropoint_update: "
+        msg += f"{key} not found in {zeropoint_file}"
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+        return key, None, None, None
+
+    _mjsr, _scale, _pixar_sr = zp_data[key]
+
+    msg = "get_nircam_zeropoint_update: "
+    msg += f"{key} mjsr={_mjsr:.4f} scale={_scale:.4f} pixar_sr={_pixar_sr:.2e}"
+    utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+
+    return (key, _mjsr, _scale, _pixar_sr)
 
 
 def query_pure_parallel_wcs(
