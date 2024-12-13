@@ -4560,7 +4560,7 @@ def process_direct_grism_visit(direct={},
 
     if isJWST & (NGROUPS <= 4):
         drizzle_params = {'driz_cr_snr':'1.0 0.5', 'driz_cr_scale':'1.0 0.6'}
-        logstr = '#  {0}: JWST NGROUPS={NGROUPS}, force drizzle_params'
+        logstr = "#  {direct['product']}: JWST NGROUPS={NGROUPS}, force drizzle_params"
         utils.log_comment(utils.LOGFILE, logstr, verbose=True, show_date=True)
 
     if 'driz_cr_scale' in drizzle_params:
