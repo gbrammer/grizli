@@ -1918,7 +1918,8 @@ class MultiBeam(GroupFitter):
         self.ivarf = np.hstack([b.ivarf for b in self.beams])
 
         self.fit_mask &= (self.ivarf >= 0)
-
+        # zihao: add condition self.sivarf > 0 to avoid error in fitting: Except: covar!
+        self.fit_mask &= self.sivarf > 0
         self.scif = np.hstack([b.scif for b in self.beams])
         self.idf = np.hstack([b.scif*0+ib for ib, b in enumerate(self.beams)])
         self.idf = np.asarray(self.idf,dtype=int)
@@ -5566,7 +5567,8 @@ def drizzle_2d_spectrum_wcs(beams, data=None, wlimit=[1.05, 1.75], dlam=50,
 
     for i, beam in enumerate(beams):
         # Get specific WCS for each beam
-        beam_header, beam_wcs = beam.get_2d_wcs()
+        # zihao
+        beam_header, beam_wcs = beam.full_2d_wcs()
         beam_wcs = beam.grism.wcs.deepcopy()
 
         # Shift SIP reference

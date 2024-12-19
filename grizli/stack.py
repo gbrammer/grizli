@@ -1811,8 +1811,8 @@ class StackedSpectrum(object):
         w = (np.arange(h["NAXIS1"]) + 1 - h["CRPIX1"]) * h["CD1_1"] + h["CRVAL1"]
 
         # Now header keywords scaled to microns
-        if w.max() < 3:
-            w *= 1.0e4
+        if w.max() < 5.5:
+            w *= 1.e4
 
         return w
 
