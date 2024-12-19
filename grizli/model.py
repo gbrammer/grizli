@@ -369,7 +369,10 @@ class GrismDisperser(object):
                             beam=self.beam, fwcpos=self.fwcpos)
 
         self.ytrace_beam *= self.grow
-
+        # print('----------')
+        # print('ytrace_beam')
+        # print(self.ytrace_beam)
+        # print('----------')
         # Integer trace
         # Add/subtract 20 for handling int of small negative numbers
         dyc = np.asarray(self.ytrace_beam+20,dtype=int)-20+1
@@ -433,7 +436,10 @@ class GrismDisperser(object):
                                 beam=self.beam, fwcpos=self.fwcpos)
 
         self.ytrace *= self.grow
-
+        # print('----------')
+        # print('ytrace')
+        # print(self.ytrace)
+        # print('----------')
         ysens = self.lam*0
         so = np.argsort(self.lam)
         ysens[so] = interp.interp_conserve_c(self.lam[so],
@@ -3101,15 +3107,19 @@ class GrismFLT(object):
 
             # Thumbnails
             # print '!! X, Y: ', x, y, self.direct.origin, size
-
             if xcat is not None:
-                xc, yc = int(np.round(xcat))+1, int(np.round(ycat))+1
-                xcenter = (xcat-(xc-1))
-                ycenter = (ycat-(yc-1))
+                #zihao: 
+                xc, yc = int(np.round(xcat)), int(np.round(ycat))
+                xcenter = xcat-xc
+                ycenter = ycat-yc
+                # print(f'xc+xcenter={xc+xcenter:.5f},xc+xcenter={yc+ycenter:.5f}')
+                # print(f'xcat={xcat},ycat={ycat}')
+                # print('---------')
             else:
-                xc, yc = int(np.round(x))+1, int(np.round(y))+1
-                xcenter = (x-(xc-1))
-                ycenter = (y-(yc-1))
+                #zihao:
+                xc, yc = int(np.round(x)), int(np.round(y))
+                xcenter = xcat-xc
+                ycenter = ycat-yc
 
             origin = [yc-size + self.direct.origin[0],
                       xc-size + self.direct.origin[1]]
@@ -4409,7 +4419,8 @@ class BeamCutout(object):
         tab.meta['CONFFILE'] = os.path.basename(self.beam.conf.conf_file)
 
         tab['wavelength'] = np.asarray(self.beam.lam*u.Angstrom,dtype=dtype)
-        tab['trace'] = np.asarray(self.beam.ytrace + self.beam.sh_beam[0]/2 - self.beam.ycenter,dtype=dtype)
+        # Zihao: change to + ycenter
+        tab['trace'] = np.asarray(self.beam.ytrace + self.beam.sh_beam[0]/2 + self.beam.ycenter,dtype=dtype)
 
         sens_units = u.erg/u.second/u.cm**2/u.Angstrom/(u.electron/u.second)
         tab['sensitivity'] = np.asarray(self.beam.sensitivity*sens_units,dtype=dtype)
@@ -4489,7 +4500,10 @@ class BeamCutout(object):
 
         #######
         # 2D Spectroscopic WCS
-        hdu2d, wcs2d = self.get_2d_wcs()
+        # zihao: use full_2d_wcs
+        hdu2d, wcs2d = self.full_2d_wcs()
+        # hdu2d, wcs2d = self.get_2d_wcs()
+
 
         # Get available 'WCSNAME'+key
         for key in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ':
@@ -4687,8 +4701,9 @@ class BeamCutout(object):
 
         h['WCSNAME'] = 'BeamLinear2D'
 
-        h['CRPIX1'] = self.beam.sh_beam[0]/2 - self.beam.xcenter
-        h['CRPIX2'] = self.beam.sh_beam[0]/2 - self.beam.ycenter
+        # zihao: change to +
+        h['CRPIX1'] = self.beam.sh_beam[0]/2 + self.beam.xcenter
+        h['CRPIX2'] = self.beam.sh_beam[0]/2 + self.beam.ycenter
 
         # Wavelength, A
         h['CNAME1'] = 'Wave-Angstrom'
@@ -4738,15 +4753,12 @@ class BeamCutout(object):
 
         """
         h = pyfits.Header()
-        h['CRPIX1'] = self.beam.sh_beam[0]/2 - self.beam.xcenter
-        h['CRPIX2'] = self.beam.sh_beam[0]/2 - self.beam.ycenter
-        h['CRVAL1'] = self.beam.lam_beam[0]/1.e4
-        h['CD1_1'] = (self.beam.lam_beam[1] - self.beam.lam_beam[0])/1.e4
-        h['CD1_2'] = 0.
+        # zihao: change to +
+        h['CRPIX1'] = self.beam.sh_beam[0]/2 + self.beam.xcenter
+        h['CRPIX2'] = self.beam.sh_beam[0]/2 + self.beam.ycenter
 
+        h['CRVAL1'] = self.beam.lam_beam[0]/1.e4
         h['CRVAL2'] = -1*self.beam.ytrace_beam[0]
-        h['CD2_2'] = 1.
-        h['CD2_1'] = -(self.beam.ytrace_beam[1] - self.beam.ytrace_beam[0])
 
         h['CTYPE1'] = 'RA---TAN-SIP'
         h['CUNIT1'] = 'mas'
@@ -4756,31 +4768,28 @@ class BeamCutout(object):
         #wcs_header = grizli.utils.to_header(self.grism.wcs)
 
         x = np.arange(len(self.beam.lam_beam))
-        c = np.polynomial.Polynomial.fit(x,self.beam.lam_beam/1.e4,deg=2).convert().coef[::-1]
-        #c = np.polynomial.Polynomial.fit((self.beam.lam_beam-self.beam.lam_beam[0])/1.e4, x/h['CD1_1'],deg=2).convert().coef[::-1]
+        c = np.polynomial.Polynomial.fit(x,self.beam.lam_beam/1.e4,deg=3).convert().coef[::-1]
 
-        ct = np.polynomial.Polynomial.fit(x,self.beam.ytrace_beam,deg=2).convert().coef[::-1]
+        ct = np.polynomial.Polynomial.fit(x,self.beam.ytrace_beam[0]-self.beam.ytrace_beam,deg=3).convert().coef[::-1]
+        # plt.plot(x,self.beam.ytrace_beam)
+        # plt.plot(x,np.polynomial.Polynomial(ct[::-1])(x),label='Model')
+        # plt.legend()
+        # plt.show()
 
-        h['A_ORDER'] = 2
-        h['B_ORDER'] = 2
+        # zihao:
+        h['A_ORDER'] = 3
+        h['B_ORDER'] = 3
 
-        h['A_0_2'] = 0.
-        h['A_1_2'] = 0.
-        h['A_2_2'] = 0.
-        h['A_2_1'] = 0.
-        h['A_2_0'] = c[0]  # /c[1]
-        h['CD1_1'] = c[1]
+        h['CD1_2'] = 0.
+        h['CD1_1'] = c[2]
+        h['A_2_0'] = c[1]/c[2]
+        h['A_3_0'] = c[0]/c[2]
 
-        h['B_0_2'] = 0.
-        h['B_1_2'] = 0.
-        h['B_2_2'] = 0.
-        h['B_2_1'] = 0.
-        if ct[1] != 0:
-            h['B_2_0'] = ct[0]  # /ct[1]
-        else:
-            h['B_2_0'] = 0
-
-        #h['B_2_0'] = 0
+        h['CD2_2'] = 1
+        h['CD2_1'] = 0
+        h['B_1_0'] = ct[2]
+        h['B_2_0'] = ct[1]
+        h['B_3_0'] = ct[0]
 
         if data is None:
             data = np.zeros(self.beam.sh_beam, dtype=np.float32)
@@ -4806,7 +4815,11 @@ class BeamCutout(object):
             Center coordinates of the beam thumbnail in decimal degrees
         """
         pix_center = np.array([self.beam.sh][::-1])/2.
-        pix_center -= np.array([self.beam.xcenter, self.beam.ycenter])
+
+        # zihao: change to +
+        pix_center += np.array([self.beam.xcenter, self.beam.ycenter])
+        # pix_center -= np.array([self.beam.xcenter, self.beam.ycenter])
+
         if self.direct.wcs.sip is not None:
             for i in range(2):
                 self.direct.wcs.sip.crpix[i] = self.direct.wcs.wcs.crpix[i]
