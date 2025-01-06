@@ -2620,6 +2620,12 @@ def get_line_wavelengths():
     line_wavelengths["SiVI-19634"] = [1.9634e4]
     line_ratios["SiVI-19634"] = [1.0]
     
+    # Ca triplet
+    # Wavelengths from https://classic.sdss.org/dr5/algorithms/linestable.php
+    # ratio https://iopscience.iop.org/article/10.3847/1538-4365/ad33bc#apjsad33bcf1
+    line_wavelengths["CaII-8600"] = [8500.36, 8544.44, 8664.52]
+    line_ratios["CaII-8600"] = [0.2, 0.35, 0.3]
+
     # AGN line?
     # https://academic.oup.com/pasj/article/63/1/L7/1460068#431992120
     line_wavelengths["PII-11886"] = [1.188610e4]
@@ -11219,6 +11225,12 @@ var filter_params = {2};
 $.UpdateFilterURL = function () {{
     var i;
     var filter_url = "";
+    // Search text
+    if ($('input[type="search"]').val() != "") {{
+        filter_url += '&search=' + $('input[type="search"]').val();
+    }}
+
+    // Table columns
     for (i = 0; i < filter_params.length; i++) {{
         if ($('#'+filter_params[i]+'_min').val() != "") {{
             filter_url += '&'+filter_params[i]+'_min='+
@@ -11251,6 +11263,7 @@ $.UpdateFilterURL = function () {{
 
             # Parse address bar
             lines.insert(istart + 2, "\n")
+
             for ic in ic_list:
                 lines.insert(
                     istart + 2,
@@ -11268,6 +11281,16 @@ $.UpdateFilterURL = function () {{
 
             # Input listener
             listener = """
+    // Initialize search from address bar
+    if ($.urlParam('search') != "") {{
+        table.search($.urlParam('search')).draw();
+    }}
+
+    // Update address bar on search text
+    $('input[type="search"]').keyup( function() {{
+        $.UpdateFilterURL();
+    }} );
+
     // Event listener to the two range filtering inputs to redraw on input
     $('{0}').keyup( function() {{
         table.draw();
