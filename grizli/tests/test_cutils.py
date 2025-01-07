@@ -67,7 +67,7 @@ def test_disperse_c():
         dxpix = np.arange(nx, dtype=int) + sh[0] // 2 - 1
         ytrace_beam = (np.arange(nx) - nx / 2) * 0.5 / 200
         yfrac_beam = ytrace_beam - np.floor(ytrace_beam)
-        dyc = np.cast[int](ytrace_beam + 20) - 20 + 1
+        dyc = (ytrace_beam + 20).astype(int) - 20 + 1
         idx = np.arange(modelf.size, dtype=np.int64).reshape(sh_beam)
         flat_index = idx[dyc + x0[0], dxpix]
         sens_curve = yfrac_beam**0

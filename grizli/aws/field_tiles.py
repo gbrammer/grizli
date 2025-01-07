@@ -988,7 +988,7 @@ def process_tile(field='cos', tile='01.01', filters=TILE_FILTERS, fetch_existing
         else:
             # ref_tile = (9, 9)
             if len(ref_tileq) == 1:
-                ref_tile = tuple(np.cast[int](ref_tileq['tile'][0].split('.')))
+                ref_tile = tuple(np.array(ref_tileq['tile'][0].split('.')).astype(int))
             else:
                 ref_tile = (9, 9)
         
