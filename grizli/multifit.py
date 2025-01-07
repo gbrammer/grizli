@@ -45,9 +45,6 @@ def _loadFLT(
     ix,
     use_jwst_crds,
 ):
-    #TODO (docs review) ix param not used but is used in commented out code.
-    # It is not a kw arg so I let it be, else code will break where this
-    # method is called (K.V.).
     """
     Helper function for loading `.model.GrismFLT` objects.
 
@@ -88,7 +85,7 @@ def _loadFLT(
         The table read in with from the above file specified in `catalog`.
 
     ix : int
-        Index of the grism exposure.
+        Index of the grism exposure (not used).
 
     use_jwst_crds : bool
         Use the JWST CRDS system to get the WCS information.
@@ -98,7 +95,6 @@ def _loadFLT(
     flt : `~grizli.model.GrismFLT`
         The grism exposure object.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     import time
 
@@ -208,7 +204,6 @@ def _fit_at_z(self, zgrid, i, templates, fitter, fit_background, poly_order):
     data : dict
         Dictionary of the fitting results.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     # self, z=0., templates={}, fitter='nnls',
     #              fit_background=True, poly_order=0
@@ -258,7 +253,6 @@ def _beam_compute_model(beam, id, spectrum_1d, is_cgs, apply_sensitivity, scale,
     status : bool
         True if the model was computed successfully.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     beam.beam.compute_model(
         id=id,
@@ -338,7 +332,6 @@ def _compute_model(i, flt, fit_info, is_cgs, store, model_kwargs):
     flt.object_dispersers : dict
         Dictionary of the object dispersers.
     
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     if not hasattr(flt, "conf"):
         flt.conf = grismconf.load_grism_config(flt.conf_file)
@@ -384,9 +377,6 @@ class GroupFLT:
         bits=None,
         use_jwst_crds=False,
     ):
-        #TODO (docs review) shrink_segimage, MW_EBV and bits params are never used
-        # , but I grep'ed the class and it is used in other modules -
-        # I leave them in fear of breaking something. (K.V.)
         """
         Main container for handling multiple grism exposures together
 
@@ -473,7 +463,6 @@ class GroupFLT:
         grp.N : int
             Number of grism files (i.e., `len(FLTs)`.)
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         N = len(grism_files)
         if len(direct_files) != len(grism_files):
@@ -725,7 +714,6 @@ class GroupFLT:
         verbose : bool
             Print verbose information to the terminal.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         import copy
 
@@ -809,7 +797,6 @@ class GroupFLT:
             status : bool
                 True if the model was computed successfully
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         out_beams = []
         for flt in self.FLTs:
@@ -896,7 +883,6 @@ class GroupFLT:
         Sets `object_dispersers` and `model` attributes on items in
         `self.FLTs`
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         if cpu_count <= 0:
             cpu_count = np.maximum(mp.cpu_count() - 4, 1)
@@ -1018,7 +1004,6 @@ class GroupFLT:
         beams : list
             List of `~grizli.model.BeamCutout` objects.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         beams = self.compute_single_model(
             id, center_rd=center_rd, size=size, store=False, get_beams=[beam_id]
@@ -1395,7 +1380,6 @@ class GroupFLT:
         fig : `~matplotlib.figure.Figure`
             Stack figure object.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         print(target, id)
         if os.path.exists("{0}_{1:05d}.stack.png".format(target, id)) & skip:
@@ -1460,7 +1444,6 @@ class GroupFLT:
         write_ctx : bool
             Write the context image to the FITS header.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         try:
             from .utils import drizzle_array_groups
@@ -1648,7 +1631,6 @@ class GroupFLT:
         revert : bool
             Add the background back to the science array.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         import sep
 
@@ -1743,7 +1725,6 @@ class GroupFLT:
         mask_sn_dilate_iters : int
             Number of iterations to dilate the mask.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         import scipy.ndimage as nd
 
@@ -1920,7 +1901,6 @@ class GroupFLT:
             Drizzle science and weight arrays with dimensions set in
             `ref_header`.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         from astropy.modeling import models, fitting
         import astropy.wcs as pywcs
@@ -2079,7 +2059,6 @@ class GroupFLT:
         -------
         None : TBD
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
 
         # Find an exposure that contains the position
@@ -2232,8 +2211,6 @@ class MultiBeam(GroupFitter):
         restore_medfilt=False,
         **kwargs,
     ):
-        # TODO: (docs review) some attributes were 1:1 with parameters,
-        # only documented unique ones to make docs consistent with GroupFLT (K.V.).
         """
         Tools for dealing with multiple `~.model.BeamCutout` instances
 
@@ -2298,7 +2275,6 @@ class MultiBeam(GroupFitter):
         Asave : dict
             Dictionary to store the results of the fit.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         if group_name is None:
             self.group_name = "group"
@@ -2674,7 +2650,6 @@ class MultiBeam(GroupFitter):
         hdu : `~astropy.io.fits.HDUList`
             Output HDUList object if `get_hdu=True`.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         hdu = pyfits.HDUList([pyfits.PrimaryHDU()])
         rd = self.beams[0].get_sky_coords()
@@ -2743,7 +2718,6 @@ class MultiBeam(GroupFitter):
         verbose : bool
             Print the name of the file being loaded.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         import copy
 
@@ -2821,7 +2795,6 @@ class MultiBeam(GroupFitter):
         outfiles : list
             List of output filenames.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         outfiles = []
         for beam in self.beams:
@@ -2849,7 +2822,6 @@ class MultiBeam(GroupFitter):
         verbose : bool
             Print the name of the file being loaded.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         self.beams = []
         for file in beam_list:
@@ -2966,7 +2938,6 @@ class MultiBeam(GroupFitter):
             Image object with the "REF" extensions filled with the new blotted
             image cutouts.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         from drizzlepac.astrodrizzle import ablot
 
@@ -3117,7 +3088,6 @@ class MultiBeam(GroupFitter):
         -------
         None (updates `self.A_poly`, `self.n_poly`, `self.x_poly`).
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         # Already done?
         if poly_order < 0:
@@ -3162,7 +3132,6 @@ class MultiBeam(GroupFitter):
         xspec, yfull : array-like
             Arrays of wavelength and polynomial spectrum.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         xspec = np.arange(self.polyx[0], self.polyx[1], 0.05)
         if len(self.polyx) > 2:
@@ -3216,7 +3185,6 @@ class MultiBeam(GroupFitter):
         reset : bool
             Reset the model to zero before computing the new model.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
 
         for beam in self.beams:
@@ -3289,7 +3257,6 @@ class MultiBeam(GroupFitter):
         out_coeffs : array-like
             Output coefficients of the fit.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         try:
             import sklearn.linear_model
@@ -3550,19 +3517,9 @@ class MultiBeam(GroupFitter):
         fit_background=True,
         verbose=True,
         make_figure=True,
-        zoom=None,
-        delta_chi2_threshold=0.004,
-        zr=0,
-        dz=0,
         fwhm=0,
-        prior=None,
-        templates={},
-        figsize=[8, 5],
-        fsps_templates=False,
+        **kwargs
     ):
-        #TODO (docs review) zoom, delta_chi2_threshold, zr, dz, prior, figsize, fsps_templates
-        # are all detected as unsused parameters. I'm guessing this is un pupose 
-        # to have the same interface as other fitters,so I leave the params as they are. (K.V.)
         """
         Fit stellar templates to the data.
 
@@ -3618,7 +3575,6 @@ class MultiBeam(GroupFitter):
         fig : `~matplotlib.figure.Figure`
             Figure object.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
 
         # Polynomial fit
@@ -3695,14 +3651,7 @@ class MultiBeam(GroupFitter):
 
         model_continuum = np.dot(coeffs_full * mask, A)
         self.model_continuum = self.reshape_flat(model_continuum)
-        # model_continuum.reshape(self.beam.sh_beam)
 
-        # 1D spectrum
-        # xspec = np.arange(0.3, 2.35, 0.05)-1
-        # scale_coeffs = coeffs_full[self.N*self.fit_bg:
-        #                           self.N*self.fit_bg+self.n_poly]
-        #
-        # yspec = [xspec**o*scale_coeffs[o] for o in range(self.poly_order+1)]
         xspec, yspec = self.eval_poly_spec(coeffs_full)
         model1d = utils.SpectrumTemplate(xspec * 1.0e4, yspec)
 
@@ -3827,7 +3776,6 @@ class MultiBeam(GroupFitter):
         fig : `~matplotlib.figure.Figure`
             Figure object.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         from numpy.polynomial import Polynomial
 
@@ -4160,7 +4108,6 @@ class MultiBeam(GroupFitter):
         fig : `~matplotlib.figure.Figure`
             Figure object.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
 
         import matplotlib.gridspec
@@ -4455,7 +4402,6 @@ class MultiBeam(GroupFitter):
         hdu_sci : `~astropy.io.fits.HDUList`
             Drizzled 2D spectrum.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         # xlimits
         xmin, xmax = 1.0e5, 0
@@ -4688,7 +4634,6 @@ class MultiBeam(GroupFitter):
             Drizzled segmentation image, with image dimensions and
             WCS defined in `wcsobj`.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         import numpy as np
 
@@ -4788,7 +4733,6 @@ class MultiBeam(GroupFitter):
         hdu_full : list
             List of `~astropy.io.fits.HDUList` objects with the drizzled line maps.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         line_wavelengths, line_ratios = utils.get_line_wavelengths()
         hdu_full = []
@@ -5111,13 +5055,8 @@ class MultiBeam(GroupFitter):
         zoom=True,
         verbose=True,
     ):
-        #TODO: (docs review) I am not sure about the meaning
-        # of the below note (size=20,...) (K.V.)
         """
         Run full redshift fit and diagnostics on a `GroupFLT` object.
-
-        size=20, pixscale=0.1,
-        pixfrac=0.2, kernel='square'
 
         Parameters
         ----------
@@ -5156,7 +5095,6 @@ class MultiBeam(GroupFitter):
         hdu_full : `~astropy.io.fits.HDUList`
             Drizzled line maps.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         import copy
 
@@ -5351,7 +5289,6 @@ class MultiBeam(GroupFitter):
         set_to_zero : bool
             Set beam.yoffset to zero
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         indices = [[i] for i in range(self.N)]
         if set_to_zero:
@@ -5416,7 +5353,6 @@ class MultiBeam(GroupFitter):
         out : `~numpy.ndarray`
             Output from the optimization routine.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
 
         from scipy.optimize import leastsq, minimize
@@ -5518,7 +5454,6 @@ class MultiBeam(GroupFitter):
         chi2 : float
             Chi-squared value.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         
         import scipy.ndimage as nd
@@ -5680,7 +5615,6 @@ class MultiBeam(GroupFitter):
         fig : `~matplotlib.figure.Figure`
             Figure object.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         from matplotlib.ticker import MultipleLocator
 
@@ -6148,8 +6082,6 @@ class MultiBeam(GroupFitter):
         masked_model=None,
         **kwargs,
     ):  
-        #TODO (docs review) docs for a bin param removed as no parameter 
-        # with this name is present in the method. (K.V.)
         """
         Compute full 1D spectrum with optional best-fit model
 
@@ -6173,7 +6105,6 @@ class MultiBeam(GroupFitter):
             Dictionary of the extracted 1D spectra.  Keys are the grism
             names and the values are `~astropy.table.Table` objects.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         import astropy.units as u
 
@@ -6270,7 +6201,6 @@ class MultiBeam(GroupFitter):
         return sp
 
     def oned_spectrum_to_hdu(self, sp=None, outputfile=None, **kwargs):
-        #TODO: (docs review) units param removed as never used. (K.V.)
         """
         Generate 1D spectra fits HDUList
 
@@ -6392,7 +6322,6 @@ class MultiBeam(GroupFitter):
         has_bad : bool
             True if any PAs are flagged as bad.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
 
         wave = np.linspace(2000, 2.5e4, 100)
@@ -6502,10 +6431,8 @@ def drizzle_2d_spectrum(
     fcontam=0.2,
     fill_wht=False,
     ds9=None,
-    mask_segmentation=False
+    **kwargs,
 ):
-    #TODO: (docs review) mask_segmentation param not used but is passed by 
-    # other code, I therefore leaving it for now. (K.V.)
     """
     Drizzle 2D spectrum from a list of beams
 
@@ -6561,17 +6488,6 @@ def drizzle_2d_spectrum(
     """
     from astropy import log
 
-    # try:
-    #     import drizzle
-    #     if drizzle.__version__ != '1.12.99':
-    #         # Not the fork that works for all input/output arrays
-    #         raise(ImportError)
-    #
-    #     #print('drizzle!!')
-    #     from drizzle.dodrizzle import dodrizzle
-    #     drizzler = dodrizzle
-    #     dfillval = '0'
-    # except:
     from drizzlepac import adrizzle
 
     adrizzle.log.setLevel("ERROR")
@@ -7183,9 +7099,6 @@ def show_drizzle_HDU(
     width_ratio=0.2,
     **kwargs,
 ):  
-    #TODO: (docs review) mask_segmentation param not used, but leaving
-    # it as drizzle_grisms_and_PAs method masks kwargs, so can't 
-    # determine if it is ever passed. (K.V.)
     """
     Make a figure from the multiple extensions in the drizzled grism file.
 
