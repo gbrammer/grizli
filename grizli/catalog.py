@@ -1142,7 +1142,8 @@ def query_tap_catalog(
     Parameters
     ----------
     ra, dec : float
-        Center of the query region, decimal degrees
+        Center of the query region, decimal degrees.  If ``ra is None``, ignore the
+        spatial query and query ``TOP {max} * from {db} {extra}``.
 
     radius : float
         Radius of the query, in arcmin
@@ -1259,17 +1260,20 @@ def query_tap_catalog(
 
     tap = TapPlus(url=tap_url, **tap_kwargs)
 
-    query = gen_tap_box_query(
-        ra=ra,
-        dec=dec,
-        radius=radius,
-        max=max,
-        db=db,
-        columns=columns,
-        rd_colnames=rd_colnames,
-        corners=corners,
-        circle=circle,
-    )
+    if ra is not None:
+        query = gen_tap_box_query(
+            ra=ra,
+            dec=dec,
+            radius=radius,
+            max=max,
+            db=db,
+            columns=columns,
+            rd_colnames=rd_colnames,
+            corners=corners,
+            circle=circle,
+        )
+    else:
+        query = f'SELECT TOP {max} * FROM {db} '
 
     job = tap.launch_job(query + extra, dump_to_file=True, verbose=verbose)
     try:

@@ -2620,6 +2620,12 @@ def get_line_wavelengths():
     line_wavelengths["SiVI-19634"] = [1.9634e4]
     line_ratios["SiVI-19634"] = [1.0]
     
+    # Ca triplet
+    # Wavelengths from https://classic.sdss.org/dr5/algorithms/linestable.php
+    # ratio https://iopscience.iop.org/article/10.3847/1538-4365/ad33bc#apjsad33bcf1
+    line_wavelengths["CaII-8600"] = [8500.36, 8544.44, 8664.52]
+    line_ratios["CaII-8600"] = [0.2, 0.35, 0.3]
+
     # AGN line?
     # https://academic.oup.com/pasj/article/63/1/L7/1460068#431992120
     line_wavelengths["PII-11886"] = [1.188610e4]
@@ -7242,7 +7248,7 @@ def get_photom_scale(header, verbose=True):
         return key, 1.0 / corr[key]
 
 
-def jwst_crds_photom_scale(hdul, context="jwst_1130.pmap", update=True, verbose=False):
+def jwst_crds_photom_scale(hdul, context="jwst_1293.pmap", scale_internal=True, update=True, verbose=False):
     """
     Scale factors between different JWST CRDS_CONTEXT
 
@@ -7253,6 +7259,9 @@ def jwst_crds_photom_scale(hdul, context="jwst_1130.pmap", update=True, verbose=
 
     context : str
         Target CRDS context version
+
+    scale_internal : bool
+        Include internal correction from ``data/jwst_zeropoints.yml``
 
     update : bool
         Scale photometry header keywords by the ratio of NEW_PHOTMJSR / OLD_PHOTMJSR
@@ -7269,6 +7278,7 @@ def jwst_crds_photom_scale(hdul, context="jwst_1130.pmap", update=True, verbose=
     """
     try:
         from .jwst_utils import get_crds_zeropoint, get_jwst_filter_info
+        from .jwst_utils import get_nircam_zeropoint_update
     except ImportError:
         print(
             "jwst_crds_photom_scale: failed to import grizli.jwst_utils.get_crds_zeropoint"
@@ -7294,6 +7304,14 @@ def jwst_crds_photom_scale(hdul, context="jwst_1130.pmap", update=True, verbose=
 
     if "PHOTMJSR" not in hdul["SCI"].header:
         return 1.0
+
+    if scale_internal:
+        key, _mjsr, _scale, _pixar_sr = get_nircam_zeropoint_update(
+            header=hdul[0].header,
+            verbose=verbose
+        )
+        if _mjsr is not None:
+            ref_photmjsr = _mjsr * _scale
 
     old_photmjsr = hdul["SCI"].header["PHOTMJSR"]
     scale = ref_photmjsr / old_photmjsr
@@ -7506,11 +7524,13 @@ def drizzle_from_visit(
     extra_wfc3ir_badpix=True,
     verbose=True,
     scale_photom=True,
-    context="jwst_1130.pmap",
+    internal_nircam_zeropoints=True,
+    context="jwst_1293.pmap",
     weight_type="jwst_var",
     rnoise_percentile=99,
     calc_wcsmap=False,
     niriss_ghost_kwargs={},
+    use_background_extension=True,
     snowblind_kwargs=None,
     jwst_dq_flags=JWST_DQ_FLAGS,
     nircam_hot_pixel_kwargs={},
@@ -7977,7 +7997,11 @@ def drizzle_from_visit(
             # Scale to a particular JWST context and update header keywords
             # like PHOTFLAM, PHOTFNU
             _scale_jwst_photom = jwst_crds_photom_scale(
-                flt, update=True, context=context, verbose=verbose
+                flt,
+                update=True,
+                context=context,
+                scale_internal=internal_nircam_zeropoints,
+                verbose=verbose
             )
 
             # These might have changed
@@ -8010,7 +8034,7 @@ def drizzle_from_visit(
                 else:
                     sky_value = 0
 
-                if ("BKG", ext) in flt:
+                if (("BKG", ext) in flt) & use_background_extension:
                     has_bkg = True
                     sky = flt["BKG", ext].data + sky_value
                 else:
@@ -11201,6 +11225,12 @@ var filter_params = {2};
 $.UpdateFilterURL = function () {{
     var i;
     var filter_url = "";
+    // Search text
+    if ($('input[type="search"]').val() != "") {{
+        filter_url += '&search=' + $('input[type="search"]').val();
+    }}
+
+    // Table columns
     for (i = 0; i < filter_params.length; i++) {{
         if ($('#'+filter_params[i]+'_min').val() != "") {{
             filter_url += '&'+filter_params[i]+'_min='+
@@ -11233,6 +11263,7 @@ $.UpdateFilterURL = function () {{
 
             # Parse address bar
             lines.insert(istart + 2, "\n")
+
             for ic in ic_list:
                 lines.insert(
                     istart + 2,
@@ -11250,6 +11281,16 @@ $.UpdateFilterURL = function () {{
 
             # Input listener
             listener = """
+    // Initialize search from address bar
+    if ($.urlParam('search') != "") {{
+        table.search($.urlParam('search')).draw();
+    }}
+
+    // Update address bar on search text
+    $('input[type="search"]').keyup( function() {{
+        $.UpdateFilterURL();
+    }} );
+
     // Event listener to the two range filtering inputs to redraw on input
     $('{0}').keyup( function() {{
         table.draw();
@@ -12738,7 +12779,7 @@ def argv_to_dict(argv, defaults={}, dot_dict=True):
 
 
 class Unique(object):
-    def __init__(self, array, verbose=True):
+    def __init__(self, array, verbose=True, **kwargs):
         """
         Helper for unique items in an array
 
@@ -12748,9 +12789,8 @@ class Unique(object):
             Data to parse, generally strings but can be anything that can
             be parsed by `numpy.unique`
 
-        verbose : bool, optional
-            If True, print a summary of the unique values and their counts.
-            Default is False.
+        verbose : bool
+            Print info on initialization
 
         Attributes
         ----------
@@ -12790,9 +12830,10 @@ class Unique(object):
         self.values = [l for l in _[0]]
         self.indices = _[1]
         self.counts = _[2]
+
         if verbose:
-            self.info(sort_counts=verbose)
-    
+            self.info(**kwargs)
+
     @property
     def N(self):
         """
@@ -12800,7 +12841,7 @@ class Unique(object):
         """
         return len(self.values)
 
-    def info(self, sort_counts=0):
+    def info(self, sort_counts=0, **kwargs):
         """
         Print a summary
 

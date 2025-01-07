@@ -5337,8 +5337,10 @@ def process_direct_grism_visit(
     #################
 
     # Copy FLT files from ../RAW
-    isACS = "_flc" in direct["files"][0]  # Also UVIS
-    isWFPC2 = "_c0" in direct["files"][0]
+    isACS = '_flc' in direct['files'][0]  # Also UVIS
+    isWFPC2 = '_c0' in direct['files'][0]
+        
+    NGROUPS = 1000
 
     if not skip_direct:
         for file in direct["files"]:
@@ -5358,6 +5360,11 @@ def process_direct_grism_visit(
                 isACS = isWFPC2 = False
                 _ = jwst_utils.set_jwst_to_hst_keywords(file, reset=False)
 
+                # Check if few NGROUPS
+                with pyfits.open(file) as im:
+                    if "NGROUPS" in im[0].header:
+                        NGROUPS = np.minimum(NGROUPS, im[0].header["NGROUPS"])
+            
             if not isJWST:
                 try:
                     updatewcs.updatewcs(file, verbose=False, use_db=False)
@@ -5427,24 +5434,30 @@ def process_direct_grism_visit(
         driz_cr_snr = "8.0 5.0"
         driz_cr_scale = "2.5 0.7"
     else:
-        bits = 576 + 256
-        driz_cr_snr = "8.0 5.0"
-        driz_cr_scale = "2.5 0.7"
+        bits = 576+256
+        driz_cr_snr = '8.0 5.0'
+        driz_cr_scale = '2.5 0.7'
 
-    if "driz_cr_scale" in drizzle_params:
-        driz_cr_scale = drizzle_params["driz_cr_scale"]
-        drizzle_params.pop("driz_cr_scale")
+    if isJWST & (NGROUPS <= 4):
+        drizzle_params = {'driz_cr_snr':'1.0 0.5', 'driz_cr_scale':'1.0 0.6'}
+        logstr = "#  {direct['product']}: JWST NGROUPS={NGROUPS}, force drizzle_params"
+        utils.log_comment(utils.LOGFILE, logstr, verbose=True, show_date=True)
 
-    if "driz_cr_snr" in drizzle_params:
-        driz_cr_snr = drizzle_params["driz_cr_snr"]
-        drizzle_params.pop("driz_cr_snr")
+    if 'driz_cr_scale' in drizzle_params:
+        driz_cr_scale = drizzle_params['driz_cr_scale']
+        drizzle_params.pop('driz_cr_scale')
 
-    if "bits" in drizzle_params:
-        bits = drizzle_params["bits"]
-        drizzle_params.pop("bits")
+    if 'driz_cr_snr' in drizzle_params:
+        driz_cr_snr = drizzle_params['driz_cr_snr']
+        drizzle_params.pop('driz_cr_snr')
+        
+    if 'bits' in drizzle_params:
+        bits = drizzle_params['bits']
+        drizzle_params.pop('bits')
+    
+    if 'driz_cr_grow' in drizzle_params:
+        driz_cr_grow = drizzle_params.pop('driz_cr_grow')
 
-    if "driz_cr_grow" in drizzle_params:
-        driz_cr_grow = drizzle_params.pop("driz_cr_grow")
     else:
         driz_cr_grow = 1
 

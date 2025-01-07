@@ -108,7 +108,8 @@ def exposure_info_from_visit(visit, assoc='', **kwargs):
     """
 
     for file in visit['files']:
-        s3_put_exposure(file, visit['product'], assoc, remove_old=True, **kwargs)
+        if os.path.exists(file):
+            s3_put_exposure(file, visit['product'], assoc, remove_old=True, **kwargs)
 
 
 def send_saturated_log(flt_file, sat_kwargs={}, remove_old=True, verbose=True, **kwargs):
@@ -281,6 +282,11 @@ def s3_put_exposure(flt_file, product, assoc, remove_old=True, verbose=True, get
                              WHERE t.expid = e.eid
                              AND file='{file}'
                              AND extension='{extension}'""")
+
+        db.execute(f"""DELETE FROM exposure_saturated sat
+                       USING exposure_files e
+                       WHERE sat.eid = e.eid
+                       AND e.file='{file}' AND e.extension='{extension}'""")
 
         db.execute(f"""DELETE FROM exposure_files
                        WHERE file='{file}' AND extension='{extension}'""")
@@ -915,6 +921,11 @@ def delete_all_assoc_data(assoc):
     res = db.execute(f"""DELETE from mosaic_tiles_exposures t
                  USING exposure_files e
                 WHERE t.expid = e.eid AND e.assoc = '{assoc}'""")
+    
+    res = db.execute(f"""DELETE FROM exposure_saturated sat
+                   USING exposure_files e
+                   WHERE sat.eid = e.eid
+                   AND e.assoc='{assoc}'""")
     
     res = db.execute(f"""DELETE from exposure_files
                     WHERE assoc = '{assoc}'""")
@@ -1563,7 +1574,7 @@ def check_jwst_assoc_guiding(assoc):
 ALL_FILTERS = ['F410M', 'F467M', 'F547M', 'F550M', 'F621M', 'F689M', 'F763M', 'F845M', 'F200LP', 'F350LP', 'F435W', 'F438W', 'F439W', 'F450W', 'F475W', 'F475X', 'F555W', 'F569W', 'F600LP', 'F606W', 'F622W', 'F625W', 'F675W', 'F702W', 'F775W', 'F791W', 'F814W', 'F850LP', 'G800L', 'F098M', 'F127M', 'F139M', 'F153M', 'F105W', 'F110W', 'F125W', 'F140W', 'F160W', 'G102', 'G141']
 
 
-def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=False, visit_split_shift=1.2, blue_align_params=blue_align_params, ref_catalogs=['LS_DR9', 'PS1', 'DES', 'NSC', 'GAIA'], filters=None, prep_args={}, fetch_args={}, get_wcs_guess_from_table=True, master_radec='astrometry_db', align_guess=None, with_db=True, global_miri_skyflat=None, miri_tweak_align=False, tab=None, other_args={}, do_make_visit_mosaic=True, visit_mosaic_kwargs={}, expinfo_kwargs={}, **kwargs):
+def process_visit(assoc, clean=True, sync=True, s3_acl="public-read", max_dt=4, combine_same_pa=False, visit_split_shift=1.2, blue_align_params=blue_align_params, ref_catalogs=['LS_DR9', 'PS1', 'DES', 'NSC', 'GAIA'], filters=None, prep_args={}, fetch_args={}, get_wcs_guess_from_table=True, master_radec='astrometry_db', align_guess=None, with_db=True, global_miri_skyflat=None, miri_tweak_align=False, tab=None, other_args={}, do_make_visit_mosaic=True, visit_mosaic_kwargs={}, expinfo_kwargs={}, **kwargs):
     """
     Run the `grizli.pipeline.auto_script.go` pipeline on an association defined
     in the `grizli` database.
@@ -1579,7 +1590,11 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=False,
     sync : bool
         Sync results to `grizli` S3 buckets and database (requires write 
         permissions).
-    
+
+    s3_acl : str
+        S3 access control list (ACL) type for synced files (e.g., "public-read",
+        "private")
+
     prep_args : dict
         Keyword arguments to pass in `visit_prep_args`
     
@@ -1804,7 +1819,7 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=False,
                   --include "Prep/*skyflat.*" \
                   --include "Prep/*angles.*" \
                   --include "*fail*" \
-                  --include "RAW/*[nx][tg]" """
+                  --include "RAW/*[nx][tg]" --acl {s3_acl}"""
         
             os.system(cmd)
             print('\n# Sync\n' + cmd.replace('     ', '') + '\n')
@@ -1813,7 +1828,7 @@ def process_visit(assoc, clean=True, sync=True, max_dt=4, combine_same_pa=False,
         files = glob.glob(f'{assoc}*.*')
         for file in files:
             os.system(f'aws s3 cp {file} ' + 
-                      f' s3://grizli-v2/HST/Pipeline/{assoc}/')
+                      f' s3://grizli-v2/HST/Pipeline/{assoc}/ --acl {s3_acl}')
     
     if (clean & 2) > 0:
         print(f'rm -rf {assoc}*')
@@ -2123,7 +2138,7 @@ def query_exposures(ra=53.16, dec=-27.79, size=1., pixel_scale=0.1, theta=0,  fi
     return header, wcs, SQL, res
 
 
-def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-27.7910651, size=5*60, theta=0., filters=['F160W'], ir_scale=0.1, ir_wcs=None, res=None, half_optical=True, kernel='point', pixfrac=0.33, make_figure=True, skip_existing=True, clean_flt=True, gzip_output=True, s3output='s3://grizli-v2/HST/Pipeline/Mosaic/', split_uvis=True, extra_query='', extra_wfc3ir_badpix=True, fix_niriss=True, scale_nanojy=10, verbose=True, weight_type='jwst_var', rnoise_percentile=99, get_dbmask=True, niriss_ghost_kwargs={}, snowblind_kwargs=None, scale_photom=True, context='jwst_0989.pmap', calc_wcsmap=False, make_exptime_map=False, expmap_sample_factor=4, keep_expmap_small=True, write_ctx=False, **kwargs):
+def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-27.7910651, size=5*60, theta=0., filters=['F160W'], ir_scale=0.1, ir_wcs=None, res=None, half_optical=True, kernel='point', pixfrac=0.33, make_figure=True, skip_existing=True, clean_flt=True, gzip_output=True, s3output='s3://grizli-v2/HST/Pipeline/Mosaic/', split_uvis=True, extra_query='', extra_wfc3ir_badpix=True, fix_niriss=True, scale_nanojy=10, verbose=True, weight_type='jwst_var', rnoise_percentile=99, get_dbmask=True, niriss_ghost_kwargs={}, snowblind_kwargs=None, scale_photom=True, context=None, calc_wcsmap=False, make_exptime_map=False, expmap_sample_factor=4, keep_expmap_small=True, write_ctx=False, **kwargs):
     """
     Make mosaic from exposures defined in the exposure database
     
@@ -2218,7 +2233,12 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
     
     calc_wcsmap : bool
         See `~grizli.utils.drizzle_from_visit`
-    
+
+    context : str, None
+        ``CRDS_CONTEXT`` to use for optionally controlling JWST zeropoints.  If ``None``
+        then first try to get from ``os.getenv('CRDS_CONTEXT')`` and then fall back to
+        ``grizli.jwst_utils.CRDS_CONTEXT``.
+
     write_ctx : bool
         Optionally output context map
     
@@ -2232,13 +2252,23 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
     import matplotlib.pyplot as plt
     import astropy.io.fits as pyfits
     
-    from grizli import utils
     from mastquery import overlaps
+    try:
+        from .. import jwst_utils
+    except ImportError:
+        jwst_utils = None
     
     ORIG_LOGFILE = utils.LOGFILE
-    
+
+    if context is None:
+        if jwst_utils is not None:
+            _env_context = os.getenv("CRDS_CONTEXT")
+            context = jwst_utils.CRDS_CONTEXT if _env_context is None else _env_context
+        else:
+            context = "jwst_0989.pmap"
+
     utils.set_warnings()
-    
+
     # out_h, ir_wcs, res = query_exposures(ra=ra, dec=dec,
     #                                      size=size,
     #                                      pixel_scale=pixel_scale,
