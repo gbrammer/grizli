@@ -153,7 +153,6 @@ def fresh_flt_file(
     -------
     Nothing, but copies the file from ``path`` to ``./``.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     try:
         from astroscrappy import detect_cosmics
@@ -429,7 +428,6 @@ def apply_persistence_mask(
     verbose=True,
     reset=False,
 ):
-    #TODO: Docs review: sci_threshold param not used (K.V.)
     """
     Make a mask for pixels flagged as being affected by persistence
 
@@ -471,7 +469,6 @@ def apply_persistence_mask(
     -------
     Nothing, updates the DQ extension of `flt_file`.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     import scipy.ndimage as nd
 
@@ -557,7 +554,6 @@ def region_mask_from_ds9(ext=1):
         Table with columns ['dataset', 'ext', 'region', 'time'] that can be 
         sent to the `exposure_region_mask` database table.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     import time
 
@@ -862,7 +858,6 @@ def match_lists(
     model : transform
         Instance of the `transform` object based on the matches
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     import copy
     from astropy.table import Table
@@ -1131,7 +1126,6 @@ def align_drizzled_image(
     out_scale : float
         Scale
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     import skimage.transform
     from skimage.measure import ransac
@@ -1591,7 +1585,6 @@ def update_wcs_fits_log(
     wcsname : str
         WCS name to use in the FITS header.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     new_hdu = wcs_ref.to_fits(relax=True)[0]
     new_hdu.header["XSHIFT"] = xyscale[0]
@@ -1650,7 +1643,6 @@ def log_wcs(
     comment : list
         List of comments to include in the log file.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     if (not os.path.exists("{0}_wcs.log".format(root))) | initialize:
         print("Initialize {0}_wcs.log".format(root))
@@ -3209,7 +3201,6 @@ def get_filter_ee_ratio(tab, filter, ref_filter="f160w"):
         Input table with additional columns ``{filter}_ee_{aper}`` for each
         aperture in the catalog.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     pixel_scale = tab.meta["ASEC_0"] / tab.meta["APER_0"]
     min_kron = tab.meta["MINKRON"] * pixel_scale
@@ -3284,7 +3275,6 @@ def get_hst_aperture_correction(filter, raper=0.35, rmax=5.0):
     ee_interp : float
         Interpolated encircled energy at `raper`.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     ee = utils.read_catalog(
         (os.path.join(os.path.dirname(__file__), "data", "hst_encircled_energy.fits"))
@@ -3303,7 +3293,6 @@ def get_hst_aperture_correction(filter, raper=0.35, rmax=5.0):
 def get_kron_tot_corr(
     tab, filter, inst=None, pixel_scale=0.06, photplam=None, rmax=5.0
 ):
-    #TODO: (docs review) inst and photplam params are not used (K.V.)
     """
     Compute total correction from tabulated EE curves
 
@@ -3332,7 +3321,6 @@ def get_kron_tot_corr(
     tot_corr : array
         Total correction factor for each source in the catalog.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     ee = utils.read_catalog(
         (os.path.join(os.path.dirname(__file__), "data", "hst_encircled_energy.fits"))
@@ -3582,7 +3570,6 @@ def make_visit_average_flat(
     bkg_kwargs : dict
         Keyword arguments for `sep.Background` initialization.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     from tqdm import tqdm
     import scipy.ndimage as nd
@@ -3706,7 +3693,6 @@ def apply_visit_skyflat(visit, skyfile=None, verbose=True):
     None if the skyflat file is not found. Else the skyflat is applied to the
     input files.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
 
     if not os.path.exists(skyfile):
@@ -3867,7 +3853,6 @@ def nircam_wisp_correction(
     model : `~numpy.ndarray`
         WISP model array.   
 
-    Note: Some of this documentation is AI-generated and will be reviewed.    
     """
     import scipy.ndimage as nd
 
@@ -3978,7 +3963,6 @@ def oneoverf_column_correction(
     -------
     Updates exposures in `visit['files']` in place
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     frame = inspect.currentframe()
     utils.log_function_arguments(
@@ -4522,7 +4506,6 @@ def subtract_visit_angle_averages(
     hdu : `~astropy.io.fits.HDUList`
         FITS data with the drizzled data and angle averages
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     if instruments is None:
         return None
@@ -4758,7 +4741,6 @@ def separate_chip_sky(
     status : bool
         Runtime status, True if executed
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     frame = inspect.currentframe()
     utils.log_function_arguments(utils.LOGFILE, frame, "prep.separate_chip_sky")
@@ -4943,7 +4925,6 @@ def add_external_sources(root="", maglim=20, fwhm=0.2, catalog="2mass"):
     -------
     Updates the drizzled image with the added sources.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     from astropy.modeling import models
 
@@ -5130,9 +5111,6 @@ def process_direct_grism_visit(
     do_pure_parallel_wcs=True,
     write_ctx=False,
 ):
-    #TODO: (docs review) I have added the params and returns for this method, 
-    # but I am not sure they give more information than the param names 
-    # themselves. I leave it for review if this should kept or deleted. (K.V.) 
     """
     Full processing of a direct (+grism) image visit.
 
@@ -5295,8 +5273,6 @@ def process_direct_grism_visit(
     -------
     status : bool
         Runtime status. True if successful.
-
-    Note: Some of this documentation is AI-generated and will be reviewed.
 
     Notes
     -----
@@ -6326,7 +6302,6 @@ def tweak_align(
     -------
     Nothing, but updates WCS of direct and (optionally) grism exposures
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     frame = inspect.currentframe()
     utils.log_function_arguments(utils.LOGFILE, frame, "prep.tweak_align")
@@ -6536,7 +6511,6 @@ def iterate_tweak_align(
     -------
     Nothing, but updates WCS of direct and (optionally) grism exposures.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     from .aws import visit_processor
 
@@ -6761,7 +6735,6 @@ def clean_drizzle(root, context=False, fix_wcs_system=False):
     -------
     Nothing, but updates the input drizzle mosaics in place.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
 
     try:
@@ -7624,7 +7597,6 @@ def get_jwst_wfssbkg_file(
         Path to ``wfssbkg`` file, which may have been corrected by dividing by
         the flat for the given CTX
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     from jwst.wfss_contam import WfssContamStep
     from jwst.flatfield import FlatFieldStep
@@ -7767,7 +7739,6 @@ def visit_grism_sky(
     -------
     Nothing, sky background subtracted from the grism exposures in place.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     import numpy.ma
     import scipy.ndimage as nd
@@ -8514,7 +8485,6 @@ def find_single_image_CRs(
 
     Requires context (CTX) image `visit['product']+'_drc_ctx.fits`.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     from drizzlepac import astrodrizzle
     from astroscrappy import detect_cosmics
@@ -8957,7 +8927,6 @@ def drizzle_overlaps(
     -------
     Produces drizzled images.
 
-    Note: Some of this documentation is AI-generated and will be reviewed.
     """
     if log:
         frame = inspect.currentframe()
