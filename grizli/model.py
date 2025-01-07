@@ -641,7 +641,6 @@ class GrismDisperser(object):
             function returns `True`. If the input `id` is not in the
             segmentation image, returns `False`.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         from .utils_numba import disperse
         from .utils_numba import interp
@@ -742,7 +741,6 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
             List of segmentation IDs to include in the optimal extraction
             profile.  If None, use `self.id`.
         
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         if seg_ids is None:
             ids = [self.id]
@@ -793,7 +791,6 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
 
             All are optionally binned in wavelength if `bin` > 1.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         import scipy.ndimage as nd
 
@@ -915,7 +912,6 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         False if the subimage slice is not fully contained within the larger
         array, otherwise True.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.        
         """
         sh = full_array.shape
         if (self.sly_parent.start < 0) | (self.slx_parent.start < 0):
@@ -1046,7 +1042,6 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         xpix, xlam : `~numpy.array`
             Pixel and wavelength for the tick marks.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         xarr = np.arange(len(self.lam))
         if limits:
@@ -1088,7 +1083,6 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         xpix : `~numpy.array`
             Pixels for the desired limits.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         if isinstance(x0, list) | isinstance(x0, tuple):
             x0, x1 = x0[0], x0[1]
@@ -1141,7 +1135,6 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         -------
         Nothing, sets `self.psf` and `self.psf_params` attributes.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         import scipy.sparse
         import scipy.ndimage
@@ -1322,7 +1315,6 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         psf_sensitivity : `~numpy.array`
             Sensitivity curve for the PSF model.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         from .utils_numba import interp
 
@@ -1350,7 +1342,6 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         False if the ePSF model is not initialized, else sets the `self.A_psf`
         attribute to the renormalized model.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         from .utils_numba import interp
 
@@ -1416,7 +1407,6 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         pam_value : float
             Pixel area map correction factor.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         confp = self.conf.conf_dict
         if ("INSTRUMENT" in confp) & ("CAMERA" in confp):
@@ -1507,7 +1497,6 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
         modelf : `~numpy.array`
             Flattened model array.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         from .utils_numba import interp
 
@@ -1593,16 +1582,15 @@ class ImageData(object):
 
         photflam : float
             Multiplicative conversion factor to scale `data` to set units
-            to f_lambda flux density.  If data is grism spectra, then use
-            photflam=1
+            to f_lambda flux density.
 
         photplam : float
             Pivot wavelength for the photflam conversion factor.
 
-        origin : [int, int]
+        origin : (int, int)
             Origin of lower left pixel in detector coordinates
 
-        pad : int,int
+        pad : (int, int)
             Padding to apply to the image dimensions in numpy axis order
 
         process_jwst_header : bool
@@ -1665,7 +1653,6 @@ class ImageData(object):
         ref_file, ref_photlam, ref_photplam, ref_filter : str, float
             Corresponding parameters for the reference image, if necessary.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         import copy
 
@@ -2182,7 +2169,6 @@ class ImageData(object):
         pad : int, int
             Number of pixels to pad, in array order (axis2, axis1).
         
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
 
         if isinstance(pad, int):
@@ -2316,7 +2302,6 @@ class ImageData(object):
         new_hdu : `~astropy.io.fits.ImageHDU`
             Image padded to encompass `self.data['SCI']`.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         ref_wcs = pywcs.WCS(hdu.header)
 
@@ -2533,7 +2518,6 @@ class ImageData(object):
         slice_wcs : `~astropy.wcs.WCS`
             Sliced WCS object.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         NX = slx.stop - slx.start
         NY = sly.stop - sly.start
@@ -2810,7 +2794,6 @@ class ImageData(object):
             If `verify_parent` is True and the parent files of `self` and
             `other` are not the same.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         if verify_parent:
             if self.parent_file != other.parent_file:
@@ -2952,7 +2935,6 @@ class GrismFLT(object):
         catalog : `~astropy.table.Table`
             Associated photometric catalog.  Not required.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         import stwcs.wcsutil
 
@@ -3138,7 +3120,6 @@ class GrismFLT(object):
         `ref_photflam` scaling is taken either from the header if possible, or
         the global `photflam` variable defined at the top of this file.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.  
         """
         if ref_file is None:
             return False
@@ -3446,7 +3427,6 @@ class GrismFLT(object):
             If `in_place` is False, return a full array including the model
             for the single object.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         from .utils_numba import disperse
 
@@ -3790,7 +3770,6 @@ class GrismFLT(object):
         -------
         Updated model stored in `self.model` attribute.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         try:
             from tqdm import tqdm
@@ -3915,7 +3894,6 @@ class GrismFLT(object):
             names 'id','ra', and 'dec' if necessary, e.g., for SExtractor
             catalogs.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         from astropy.table import Column
 
@@ -4024,7 +4002,6 @@ class GrismFLT(object):
         Stores an astropy.table.Table object to `self.catalog` and a
         segmentation array to `self.seg`.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         if ZP is None:
             if (self.direct.filter in photflam_list.keys()) & (
@@ -4106,7 +4083,6 @@ class GrismFLT(object):
         catalog_format : str
             Format of the catalog file.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         root = self.direct_file.split(".fits")[0]
 
@@ -4142,7 +4118,6 @@ class GrismFLT(object):
         verbose : bool
             Print status messages to the terminal.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         try:
             import cPickle as pickle
@@ -4293,7 +4268,6 @@ class GrismFLT(object):
         -------
         Nothing, but writes WCS to files like `j123456m123456.01.FLT.wcs.fits`.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         if self.direct.parent_file == self.grism.parent_file:
             base_list = [self.grism]
@@ -4461,7 +4435,7 @@ class GrismFLT(object):
 
     def apply_POM(self, warn_if_too_small=True, verbose=True):
         """
-        Apply pickoff mask to segmentation map to control sources that are dispersed onto the detector
+        Apply pickoff mirror mask to segmentation map to control sources that are dispersed onto the detector
 
         Parameters
         ----------
@@ -4476,7 +4450,6 @@ class GrismFLT(object):
         -------
         True if completed successfully.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         if not self.grism.instrument.startswith("NIRCAM"):
             print("POM only defined for NIRCam")
@@ -4571,7 +4544,6 @@ class GrismFLT(object):
             Mask pixels where the residual is greater than this value times
             the error array.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         from regions import Regions
         import scipy.ndimage as nd
@@ -4782,7 +4754,6 @@ class BeamCutout(object):
         poly_order : int
             Order of the polynomial model
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         self.background = 0.0
         self.module = None
@@ -5021,7 +4992,6 @@ class BeamCutout(object):
         -------
         Loads attributes to `self`.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         if isinstance(file, str):
             hdu = pyfits.open(file)
@@ -5201,7 +5171,6 @@ class BeamCutout(object):
         outfile : str
             If `get_hdu` is False, return the output filename.
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         h0 = pyfits.Header()
         h0["ID"] = self.beam.id, "Object ID"
@@ -5327,7 +5296,6 @@ class BeamCutout(object):
         result : bool
             Result of `self.beam.compute_model`
         
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         if use_psf & hasattr(self.beam, "psf"):
             result = self.beam.compute_model_psf(**kwargs)
@@ -5706,7 +5674,6 @@ class BeamCutout(object):
         -------
         None
 
-        Note: Some of this documentation is AI-generated and will be reviewed.
         """
         import scipy.sparse
 
