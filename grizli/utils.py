@@ -11226,8 +11226,9 @@ $.UpdateFilterURL = function () {{
     var i;
     var filter_url = "";
     // Search text
-    if ($('input[type="search"]').val() != "") {{
-        filter_url += '&search=' + $('input[type="search"]').val();
+    var search_text = $('input[type="search"]').val();
+    if ((search_text != "") & (search_text != null)) {{
+        filter_url += '&search=' + search_text;
     }}
 
     // Table columns
@@ -11245,6 +11246,8 @@ $.UpdateFilterURL = function () {{
     if (filter_url != "") {{
         var filtered_url = window.location.href.split('?')[0] + '?' + filter_url;
         window.history.pushState('', '', filtered_url);
+    }} else {{
+        window.history.pushState('', '', window.location.href.split('?')[0]);
     }}
 }}
 
@@ -11303,7 +11306,11 @@ $.UpdateFilterURL = function () {{
             )
 
             for il, line in enumerate(lines):
-                if "} );  </script>" in line:
+                if "dataTable(" in line:
+                    lines[il] = "   var table = {0}\n".format(
+                        lines[il].strip().replace("dataTable", "DataTable")
+                    )
+                elif "} );  </script>" in line:
                     break
 
             lines.insert(il, listener)
@@ -11315,14 +11322,14 @@ $.UpdateFilterURL = function () {{
         if toggle:
             lines = open(output).readlines()
 
-            # Change call to DataTable
-            for il, line in enumerate(lines):
-                if "dataTable(" in line:
-                    break
-
-            lines[il] = "   var table = {0}\n".format(
-                lines[il].strip().replace("dataTable", "DataTable")
-            )
+            # # Change call to DataTable
+            # for il, line in enumerate(lines):
+            #     if "dataTable(" in line:
+            #         break
+            #
+            # lines[il] = "   var table = {0}\n".format(
+            #     lines[il].strip().replace("dataTable", "DataTable")
+            # )
 
             # Add function
             for il, line in enumerate(lines):
@@ -11360,6 +11367,50 @@ $.UpdateFilterURL = function () {{
             )
 
             lines.insert(il + 2, toggle_div)
+        else:
+            # Without filter columns
+            # Input listener
+            listener = """
+    // Parse location bar
+    $.urlParam = function(name){
+        var results = new RegExp('[\?&]' + name + '=([^&#]*)').exec(window.location.href);
+        if (results==null){
+           return null;
+        }
+        else{
+           return decodeURI(results[1]) || 0;
+        }
+    };
+
+    // Initialize search from address bar
+    var url_search = $.urlParam('search');
+    if ((url_search != "") & (url_search != null)) {
+        table.search(url_search).draw();
+    };
+
+    // Listener to update address bar on search text
+    $('input[type="search"]').keyup( function() {
+        // Search text
+        var search_text = $('input[type="search"]').val();
+        if ((search_text != "") & (search_text != null)) {
+            window.history.pushState(
+                '',
+                '',
+                window.location.href.split('?')[0] + '?search=' + search_text
+            );
+        } else {
+            window.history.pushState('', '', window.location.href.split('?')[0]);
+        }
+    } );\n"""
+
+            for il, line in enumerate(lines):
+                if "dataTable(" in line:
+                    lines[il] = "    var table = {0}\n".format(
+                        lines[il].strip().replace("dataTable", "DataTable")
+                    )
+                elif "} );  </script>" in line:
+                    lines.insert(il, listener)
+                    break
 
         # Insert timestamp
         if timestamp:
