@@ -11285,8 +11285,9 @@ $.UpdateFilterURL = function () {{
             # Input listener
             listener = """
     // Initialize search from address bar
-    if ($.urlParam('search') != "") {{
-        table.search($.urlParam('search')).draw();
+    var url_search = $.urlParam('search');
+    if ((url_search != "") & (url_search != null)) {{
+        table.search(url_search).draw();
     }}
 
     // Update address bar on search text
