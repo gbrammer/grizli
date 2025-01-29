@@ -2926,6 +2926,11 @@ def show_epochs_filter(ra=150.1, dec=2.2, outroot=None, size=4, pixel_scale=0.04
                     )
         
     axes[-1].imshow(full_sci, **kws)
+    axes[-1].text(0.5, 0.95, f'{ra:.6f}, {dec:.6f}',
+        ha='center', va='bottom', transform=axes[-1].transAxes,
+        fontsize=fs, color='k', bbox=dict(fc='w', alpha=0.8, ec='None'),
+    )
+
     axes[-1].text(0.5, 0.05, filter,
                      ha='center', va='bottom', transform=axes[-1].transAxes,
                      fontsize=fs, color='k', bbox=dict(fc='w', alpha=0.8, ec='None'),
@@ -2967,6 +2972,8 @@ def plot_epochs_differences(hdul, outroot=None, vmax=1, cmap='magma_r'):
     Make a figure plotting the epoch difference images
     """
     import matplotlib.animation as animation
+    import matplotlib.pyplot as plt
+
     import astropy.time
 
     thumbs = hdul['STACK_SCI'].data
@@ -3008,6 +3015,13 @@ def plot_epochs_differences(hdul, outroot=None, vmax=1, cmap='magma_r'):
         axes[1][i].imshow(diff, **kws)
 
     axes[0][-1].imshow(hdul['SCI'].data, **kws)
+    axes[0][-1].text(
+        0.5, 0.95,
+        '{CRVAL1:.6f}, {CRVAL2:.6f}'.format(**hdul['SCI'].header), 
+        ha='center', va='top', transform=axes[0][-1].transAxes,
+        fontsize=fs, color='k', bbox=dict(fc='w', alpha=0.8, ec='None'),
+    )
+
     axes[0][-1].text(0.5, 0.05, hdul['SCI'].header['FILTER'],
                      ha='center', va='bottom', transform=axes[0][-1].transAxes,
                      fontsize=fs, color='k', bbox=dict(fc='w', alpha=0.8, ec='None'),
@@ -3025,6 +3039,7 @@ def plot_epochs_differences(hdul, outroot=None, vmax=1, cmap='magma_r'):
     fig.tight_layout(pad=0)
     fig.tight_layout(pad=0.5)
     # fig.savefig('epoch_diffs.png')
+    fig.savefig(f'{outroot}_diffs.png')
 
     # panel for animated diffs
     im = axes[1][-1].imshow(diffs[0], animated=True, **kws)
@@ -3048,7 +3063,7 @@ def plot_epochs_differences(hdul, outroot=None, vmax=1, cmap='magma_r'):
     )
 
     if outroot is not None:
-        animation_fig.savefig(f'{outroot}.gif')
+        animation_fig.save(f'{outroot}_diffs.gif')
 
     return fig, animation_fig
 
