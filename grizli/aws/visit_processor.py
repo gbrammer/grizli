@@ -127,7 +127,10 @@ def send_saturated_log(flt_file, sat_kwargs={}, remove_old=True, verbose=True, *
     #      )""")
     #
     #      db.execute("CREATE INDEX ON exposure_saturated (eid)")
+    #      db.execute("CREATE INDEX ON exposure_saturated (eid, i, j)")
     #      db.execute("CREATE INDEX ON exposure_files (eid, detector, expstart)")
+    #      db.execute("CREATE INDEX ON exposure_files (eid, file, expstart, detector)")
+    #      db.execute("CREATE INDEX ON exposure_files (eid)")
 
     if not flt_file.endswith("_rate.fits"):
         return False
@@ -2720,7 +2723,7 @@ def matched_exptime_map(ref_file, sample_factor=4, keep_small=True, output_type=
         return output_file
 
 
-def show_epochs_filter(ra, dec, size=4, filters=['F444W-CLEAR'], cleanup=True, vmax=0.2, cmap='magma_r'):
+def show_epochs_filter(ra, dec, size=4, filters=['F444W-CLEAR'], cleanup=True, vmax=0.2, cmap='magma_r', **kwargs):
     """
     Make a figure showing cutouts around a particular position for all exposures 
     covering that point
@@ -2739,6 +2742,7 @@ def show_epochs_filter(ra, dec, size=4, filters=['F444W-CLEAR'], cleanup=True, v
                                         filters=filters,
                                         clean_flt=False,
                                         skip_existing=False,
+                                        **kwargs,
                                        )
                                     
     files = []
