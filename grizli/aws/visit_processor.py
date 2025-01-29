@@ -13,6 +13,7 @@ import astropy.units as u
 
 from . import db
 from .. import utils
+from ..constants import JWST_DQ_FLAGS
 
 ROOT_PATH = '/GrizliImaging'
 if not os.path.exists(ROOT_PATH):
@@ -2723,28 +2724,50 @@ def matched_exptime_map(ref_file, sample_factor=4, keep_small=True, output_type=
         return output_file
 
 
-def show_epochs_filter(ra, dec, size=4, filters=['F444W-CLEAR'], cleanup=True, vmax=0.2, cmap='magma_r', **kwargs):
+def show_epochs_filter(ra=150.1, dec=2.2, outroot=None, size=4, pixel_scale=0.04, filter='F444W-CLEAR', kernel='point', pixfrac=1., use_cutout=True, scale_native=1.0, dq_flags=1+1024+4096, round_days=4, jwst_dq_flags=JWST_DQ_FLAGS, cleanup=True, vmax=1.0, cmap='magma_r', **kwargs):
     """
     Make a figure showing cutouts around a particular position for all exposures 
     covering that point
     """
     import glob
+    import secrets
+
     import numpy as np
     
     import matplotlib.pyplot as plt
     import astropy.io.fits as pyfits
     import astropy.wcs as pywcs
     
-    cut = cutout_mosaic('tmp-epoch', ra=ra, dec=dec, ir_scale=0.065,
-                                        size=size,
-                                        s3output=None,
-                                        gzip_output=False,
-                                        filters=filters,
-                                        clean_flt=False,
-                                        skip_existing=False,
-                                        **kwargs,
-                                       )
-                                    
+    from ..jwst_utils import get_jwst_dq_bit
+    
+    tmp_hash = secrets.token_urlsafe(16)[:5]
+    tmp_name = f'epoch-{tmp_hash}'
+
+    cut = cutout_mosaic(
+        tmp_name,
+        ra=ra,
+        dec=dec,
+        ir_scale=pixel_scale,
+        kernel=kernel,
+        pixfrac=pixfrac,
+        half_optical=False,
+        size=size,
+        s3output=None,
+        gzip_output=False,
+        filters=[filter],
+        clean_flt=False,
+        skip_existing=False,
+        **kwargs,
+    )
+
+    cut_file = glob.glob(f'{tmp_name}*{filter}*sci.fits'.lower())
+    with pyfits.open(cut_file[0]) as im:
+        outh = im[0].header
+        full_sci = im[0].data*1
+
+    with pyfits.open(cut_file[0].replace('_sci', '_wht')) as im:
+        full_wht = im[0].data*1
+
     files = []
     for d in cut['dataset']:
         files += glob.glob(f'{d}*fits')
@@ -2754,92 +2777,161 @@ def show_epochs_filter(ra, dec, size=4, filters=['F444W-CLEAR'], cleanup=True, v
     info = utils.get_flt_info(files=files)
     
     so = np.argsort(info['EXPSTART'])
-    
-    ys = 2
+    info = info[so]
     N = len(info)
-    
-    sci_list = []
-    wht_list = []
-    wcs_list = []
-    for file in files:
-        with pyfits.open(file) as im:
-            sci_list.append(im['SCI'].data - im['SCI'].header['MDRIZSKY'])
-            wht_list.append(1./im['ERR'].data**2)
-            wcs_list.append(pywcs.WCS(im['SCI'].header, relax=True))
-            
-    pscale = utils.get_wcs_pscale(wcs_list[0])
-    
-    # Set a pixel in detector space that will show up in the stack
-    xp, yp = np.squeeze(np.asarray(wcs_list[0].all_world2pix([ra], [dec], 0)
-                                     + size/5/pscale,dtype=int))
-    try:
-        for i in range(N):
-            sci_list[i][yp, xp] = 10000
-    except IndexError:
-        pass
-    
-    # Undersample so can drizzle with point kernel
-    pscale *= 1.3
-    outh, outw = utils.make_wcsheader(ra=ra, dec=dec,
-                                      size=size, pixscale=pscale,
-                                      get_hdu=False)
 
-    for w in wcs_list:
-        w.pscale = utils.get_wcs_pscale(w)
+    res = res_query_from_local(files=info['FILE'])
     
-    # Separate drizzle
-    thumbs = [utils.drizzle_array_groups(
-                  sci_list[i:i+1],
-                  wht_list[i:i+1],
-                  wcs_list[i:i+1],
-                  outputwcs=outw,
-                  kernel='point',
-                  pixfrac=1,
-              )[0]
-              for i in range(len(files))]
+    # Loop over files
+    thumbs = []
     
-    # Mask bad pixels
     for i in range(N):
-        msk = ~np.isfinite(sci_list[i] + wht_list[i])
-        sci_list[i][msk] = -100
-        wht_list[i][msk] = 0
+        cut = cutout_mosaic(
+            tmp_name,
+            ra=ra,
+            dec=dec,
+            res=res[i:i+1],
+            ir_scale=pixel_scale,
+            kernel=kernel,
+            pixfrac=pixfrac,
+            half_optical=False,
+            size=size,
+            s3output=None,
+            gzip_output=False,
+            filters=[filter],
+            clean_flt=False,
+            skip_existing=False,
+            **kwargs,
+        )
+        
+        with pyfits.open(cut_file[0]) as im:
+            thumb_sci = im[0].data*1
+
+        with pyfits.open(cut_file[0].replace('_sci', '_wht')) as im:
+            thumb_wht = im[0].data*1
+        
+        thumbs.append([thumb_sci, thumb_wht])
+
+    if round_days is not None:
+        info['DAY'] = (np.round(info['EXPSTART'] / round_days) * round_days).astype(int)
+        une = utils.Unique(info['DAY'], verbose=False)
+        
+        stack_thumbs = []
+        labels = []
+        
+        outh['NEPOCH'] = (une.N, 'Number of epochs')
+        
+        for k, d in enumerate(une.values):
+            ix = une[d]
+            ni = ix.sum()
+
+            cut = cutout_mosaic(
+                tmp_name,
+                ra=ra,
+                dec=dec,
+                res=res[ix],
+                ir_scale=pixel_scale,
+                kernel=kernel,
+                pixfrac=pixfrac,
+                half_optical=False,
+                size=size,
+                s3output=None,
+                gzip_output=False,
+                filters=[filter],
+                clean_flt=False,
+                skip_existing=False,
+                **kwargs,
+            )
+        
+            with pyfits.open(cut_file[0]) as im:
+                thumb_sci = im[0].data*1
+
+            with pyfits.open(cut_file[0].replace('_sci', '_wht')) as im:
+                thumb_wht = im[0].data*1
+        
+            stack_thumbs.append([thumb_sci, thumb_wht])
+
+            outh[f'EPOCH{k}'] = (info['EXPSTART'][ix].mean(), 'Combined epoch')
+            outh[f'EPCHN{k}'] = (ni, 'Files combined at this epoch')
+            
+            ii = np.where(ix)[0]
+            label = f"{1:<3}  {info['DATE-OBS'][ii[0]]}  {info['TIME-OBS'][ii[0]][:-4]}"
+            label += f"\n{ni:<3}"
+            label += f"  {info['DATE-OBS'][ii[-1]]}  {info['TIME-OBS'][ii[-1]][:-4]}"
+            labels.append(label)
+
+    else:
+        labels = []
+        for i in range(len(info)):
+            label = f"{info['DATE-OBS'][i]}   {info['TIME-OBS'][i][:-4]}"
+            label += '\n' + f"{files[i].split('_rate')[0]}"
+            labels.append(label)
+        
+        outh['NEPOCH'] = (len(info), 'Number of files')
+        for k in range(len(info)):
+            outh[f'EPOCH{k}'] = (info['EXPSTART'][k], 'File epoch')
+        
+    # Build FITS HDU
+    outh['FILTER'] = filter
+    outh['KERNEL'] = (kernel, 'Drizzle kernel')
+    outh['PIXFRAC'] = (pixfrac, 'Drizzle pixfrac')
+    outh['NFILES'] = len(info)
+    for i, row in enumerate(info):
+        outh[f'FILE{i}'] = row['FILE']
+        outh[f'START{i}'] = row['EXPSTART'], 'EXPSTART MJD'
+        outh[f'EXPT{i}'] = row['EXPTIME'], 'EXPTIME s'
+        
+    cube_sci = np.array([thumb[0] for thumb in thumbs])
+    cube_wht = np.array([thumb[1] for thumb in thumbs])
     
-    # Full drizzle
-    full = utils.drizzle_array_groups(
-        sci_list,
-        wht_list,
-        wcs_list,
-        outputwcs=outw,
-        kernel='point',
-        pixfrac=1,
-    )[0]
-    
+    hdul = pyfits.HDUList([
+        pyfits.PrimaryHDU(header=outh),
+        pyfits.ImageHDU(data=full_sci, name='SCI', header=outh),
+        pyfits.ImageHDU(data=full_wht, name='WHT', header=outh),
+        pyfits.ImageHDU(data=cube_sci, name='EXP_SCI', header=outh),
+        pyfits.ImageHDU(data=cube_wht, name='EXP_WHT', header=outh),
+    ])
+
+    if round_days is not None:
+        stack_sci = np.array([thumb[0] for thumb in stack_thumbs])
+        stack_wht = np.array([thumb[1] for thumb in stack_thumbs])
+        hdul.append(pyfits.ImageHDU(data=stack_sci, name='STACK_SCI', header=outh))
+        hdul.append(pyfits.ImageHDU(data=stack_wht, name='STACK_WHT', header=outh))
+        
+    # Make the figure
     plt.rcParams['xtick.direction'] = 'in'
     plt.rcParams['ytick.direction'] = 'in'
     
-    fig, axes = plt.subplots(1,N+1, figsize=(2.5*(N+1), 2.5),
+    if round_days is not None:
+        NX = len(stack_thumbs)
+    else:
+        NX = len(thumbs)
+
+    fig, axes = plt.subplots(1, NX+1, figsize=(2.5 * (NX+1), 2.5),
                              sharex=True, sharey=True)
     
     kws = dict(vmin=-0.1*vmax, vmax=vmax, cmap=cmap, origin='lower')
     
     fs = 7
     
-    for i in range(N):
-        axes[i].imshow(thumbs[i], **kws)
-        label = f"{info['DATE-OBS'][i]}   {info['TIME-OBS'][i][:-4]}"
-        label += '\n' + f"{files[i].split('_rate')[0]}"
-        axes[i].text(0.5, 0.05, label,
+    for i in range(len(labels)):
+        if round_days is not None:
+            axes[i].imshow(stack_thumbs[i][0], **kws)
+        else:
+            axes[i].imshow(thumbs[i][0], **kws)
+
+        axes[i].text(0.5, 0.05, labels[i],
                      ha='center', va='bottom', transform=axes[i].transAxes,
                      fontsize=fs, color='k', bbox=dict(fc='w', alpha=0.8, ec='None'),
                     )
         
-    axes[N].imshow(full, **kws)
-    axes[N].text(0.5, 0.05, filter,
-                     ha='center', va='bottom', transform=axes[N].transAxes,
+    axes[-1].imshow(full_sci, **kws)
+    axes[-1].text(0.5, 0.05, filter,
+                     ha='center', va='bottom', transform=axes[-1].transAxes,
                      fontsize=fs, color='k', bbox=dict(fc='w', alpha=0.8, ec='None'),
                 )
     
-    sh = full.shape
+    sh = full_sci.shape
     for ax in axes:
         ax.set_xticks((-0.5, sh[0]-0.5))
         ax.set_yticks(ax.get_xticks())
@@ -2854,11 +2946,111 @@ def show_epochs_filter(ra, dec, size=4, filters=['F444W-CLEAR'], cleanup=True, v
             if os.path.exists(file):
                 os.remove(file)
 
-        xfiles = glob.glob('tmp-epoch*')
+        xfiles = glob.glob('{tmp_name}*')
         for file in xfiles:
             os.remove(file)
-            
-    return fig
+
+    if outroot is not None:
+        fig.savefig(f'{outroot}.png')
+        hdul.writeto(f'{outroot}.fits', overwrite=True, output_verify='fix')
+
+    if round_days is not None:
+        anim = plot_epochs_differences(hdul, outroot=outroot, vmax=vmax, cmap=cmap)
+    else:
+        anim = None
+    
+    return info, fig, hdul, anim
+
+
+def plot_epochs_differences(hdul, outroot=None, vmax=1, cmap='magma_r'):
+    """
+    Make a figure plotting the epoch difference images
+    """
+    import matplotlib.animation as animation
+    import astropy.time
+
+    thumbs = hdul['STACK_SCI'].data
+    
+    NX = thumbs.shape[0]
+
+    fig, axes = plt.subplots(2, NX+1, figsize=(2.5 * (NX+1), 2.5 * 2),
+                             sharex=True, sharey=True)
+    
+    kws = dict(vmin=-0.1*vmax, vmax=vmax, cmap=cmap, origin='lower')
+    
+    fs = 7
+    
+    diffs = []
+    text_labels = []
+    
+    for i in range(NX):
+        axes[0][i].imshow(thumbs[i,:,:], **kws)
+
+        ep = astropy.time.Time(hdul[0].header[f'EPOCH{i}'], format='mjd').iso
+        txt = axes[0][i].text(
+            0.5, 0.05, ep[:-4],
+            ha='center', va='bottom', transform=axes[0][i].transAxes,
+            fontsize=fs, color='k',
+            bbox=dict(fc='w', alpha=0.8, ec='None'),
+            animated=True,
+        )
+        
+        whts = np.ones(NX, dtype=bool)
+        whts[i] = False
+        num_ = (hdul['STACK_SCI'].data[whts,:,:] * hdul['STACK_WHT'].data[whts,:,:])
+        den_ = hdul['STACK_WHT'].data[whts,:,:].sum(axis=0)
+        other = num_.sum(axis=0) / den_
+        diff = thumbs[i,:,:] - other
+        
+        diffs.append(diff)
+        text_labels.append(txt)
+
+        axes[1][i].imshow(diff, **kws)
+
+    axes[0][-1].imshow(hdul['SCI'].data, **kws)
+    axes[0][-1].text(0.5, 0.05, hdul['SCI'].header['FILTER'],
+                     ha='center', va='bottom', transform=axes[0][-1].transAxes,
+                     fontsize=fs, color='k', bbox=dict(fc='w', alpha=0.8, ec='None'),
+                )
+    
+    sh = hdul['SCI'].data.shape
+    for i in [0,1]:
+        for j in range(NX):
+            ax = axes[i,j]
+            ax.set_xticks((-0.5, sh[0]-0.5))
+            ax.set_yticks(ax.get_xticks())
+            ax.set_xticklabels([])
+            ax.set_yticklabels([])
+        
+    fig.tight_layout(pad=0)
+    fig.tight_layout(pad=0.5)
+    # fig.savefig('epoch_diffs.png')
+
+    # panel for animated diffs
+    im = axes[1][-1].imshow(diffs[0], animated=True, **kws)
+    def update(i):
+        im.set_array(diffs[i])
+        for j in range(len(diffs)):
+            if i == j:
+                text_labels[j].set_bbox(dict(fc='w', alpha=0.8, ec='magenta'))
+            else:
+                text_labels[j].set_bbox(dict(fc='w', alpha=0.8, ec='None'))
+                
+        return [im] + text_labels
+
+    animation_fig = animation.FuncAnimation(
+        fig,
+        update,
+        frames=len(diffs),
+        interval=400,
+        blit=True,
+        repeat_delay=10,
+    )
+
+    if outroot is not None:
+        animation_fig.savefig(f'{outroot}.gif')
+
+    return fig, animation_fig
 
 
 def make_mosaic(jname='', ds9=None, skip_existing=True, ir_scale=0.1, half_optical=False, pad=16, kernel='point', pixfrac=0.33, sync=True, ir_wcs=None, weight_type='jwst_var', write_ctx=False, **kwargs):
