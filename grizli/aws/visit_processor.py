@@ -2724,7 +2724,7 @@ def matched_exptime_map(ref_file, sample_factor=4, keep_small=True, output_type=
         return output_file
 
 
-def show_epochs_filter(ra=150.1, dec=2.2, outroot=None, size=4, pixel_scale=0.04, filter='F444W-CLEAR', kernel='point', pixfrac=1., use_cutout=True, scale_native=1.0, dq_flags=1+1024+4096, round_days=4, jwst_dq_flags=JWST_DQ_FLAGS, cleanup=True, vmax=1.0, cmap='magma_r', **kwargs):
+def show_epochs_filter(ra=150.1, dec=2.2, outroot=None, size=4, pixel_scale=0.04, filter='F444W-CLEAR', kernel='point', pixfrac=1., use_cutout=True, scale_native=1.0, dq_flags=1+1024+4096, round_days=4, jwst_dq_flags=JWST_DQ_FLAGS, cleanup=True, vmax=1.0, cmap='magma_r', panel_size=2.5, **kwargs):
     """
     Make a figure showing cutouts around a particular position for all exposures 
     covering that point
@@ -2814,7 +2814,7 @@ def show_epochs_filter(ra=150.1, dec=2.2, outroot=None, size=4, pixel_scale=0.04
 
     if round_days is not None:
         info['DAY'] = (np.round(info['EXPSTART'] / round_days) * round_days).astype(int)
-        une = utils.Unique(info['DAY'], verbose=False)
+        une = utils.Unique(info['DAY'], verbose=True)
         
         stack_thumbs = []
         labels = []
@@ -2907,7 +2907,7 @@ def show_epochs_filter(ra=150.1, dec=2.2, outroot=None, size=4, pixel_scale=0.04
     else:
         NX = len(thumbs)
 
-    fig, axes = plt.subplots(1, NX+1, figsize=(2.5 * (NX+1), 2.5),
+    fig, axes = plt.subplots(1, NX+1, figsize=(panel_size * (NX+1), panel_size),
                              sharex=True, sharey=True)
     
     kws = dict(vmin=-0.1*vmax, vmax=vmax, cmap=cmap, origin='lower')
@@ -2960,14 +2960,16 @@ def show_epochs_filter(ra=150.1, dec=2.2, outroot=None, size=4, pixel_scale=0.04
         hdul.writeto(f'{outroot}.fits', overwrite=True, output_verify='fix')
 
     if round_days is not None:
-        anim = plot_epochs_differences(hdul, outroot=outroot, vmax=vmax, cmap=cmap)
+        anim = plot_epochs_differences(
+            hdul, outroot=outroot, vmax=vmax, cmap=cmap, panel_size=panel_size
+        )
     else:
         anim = None
     
     return info, fig, hdul, anim
 
 
-def plot_epochs_differences(hdul, outroot=None, vmax=1, cmap='magma_r'):
+def plot_epochs_differences(hdul, outroot=None, vmax=1, cmap='magma_r', panel_size=2.5):
     """
     Make a figure plotting the epoch difference images
     """
@@ -2980,7 +2982,7 @@ def plot_epochs_differences(hdul, outroot=None, vmax=1, cmap='magma_r'):
     
     NX = thumbs.shape[0]
 
-    fig, axes = plt.subplots(2, NX+1, figsize=(2.5 * (NX+1), 2.5 * 2),
+    fig, axes = plt.subplots(2, NX+1, figsize=(panel_size * (NX+1), panel_size * 2),
                              sharex=True, sharey=True)
     
     kws = dict(vmin=-0.1*vmax, vmax=vmax, cmap=cmap, origin='lower')
