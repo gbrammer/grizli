@@ -1959,6 +1959,7 @@ def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, com
         'jw06434', 'jw05398', # JWST
         'jw05105', # NEXUS GO-5105 mixes F356W direct and F322W2 grism
         'jw05893', # COSMOS-3D mixes F356W direct + F444W grism
+        'jw04762', # Fujimoto GNz7q  F444W direct + F410M grism
     ]
 
     if (len(all_groups) > 0) and (os.path.basename(files[0])[:7] in pure_par_progs):
