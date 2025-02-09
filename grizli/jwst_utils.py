@@ -37,6 +37,7 @@ FORCE_SKYFLATS = [
 # Global variable to control whether or not to try to update
 # PP file WCS
 DO_PURE_PARALLEL_WCS = True
+FIXED_PURE_PARALLEL_WCS_CAL_VER = '1.16'
 
 from .constants import JWST_DQ_FLAGS, PLUS_FOOTPRINT, CORNER_FOOTPRINT
 
@@ -755,8 +756,11 @@ def img_with_wcs(
         Image model with full `~gwcs` in `with_wcs.meta.wcs`.
 
     """
+    from packaging.version import Version
     from jwst.datamodels import util
     from jwst.assign_wcs import AssignWcsStep
+
+    global DO_PURE_PARALLEL_WCS, FIXED_PURE_PARALLEL_WCS_CAL_VER
 
     set_quiet_logging(QUIET_LEVEL)
 
@@ -862,7 +866,13 @@ def img_with_wcs(
         _hdu.writeto(input, overwrite=True)
         _hdu.close()
 
-        if DO_PURE_PARALLEL_WCS:
+        if 'CAL_VER' in _hdu[0].header:
+            _cal_ver = _hdu[0].header['CAL_VER']
+            _needs_fix = Version(_cal_ver) < Version(FIXED_PURE_PARALLEL_WCS_CAL_VER)
+        else:
+            _needs_fix = True
+
+        if DO_PURE_PARALLEL_WCS & _needs_fix:
             try:
                 # Update pointing of pure-parallel exposures
                 status = update_pure_parallel_wcs(input, fix_vtype="PARALLEL_PURE")
