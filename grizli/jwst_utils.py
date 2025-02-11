@@ -882,6 +882,75 @@ def img_with_wcs(
     return output
 
 
+def convert_cal_to_rate(cal_file, write=True, overwrite=True, verbose=True):
+    """
+    Undo ``photom`` and ``flat_field`` pipeline steps in a CAL file to make
+    it consistent with a Level2 RATE product
+
+    Parameters
+    ----------
+    cal_file : str
+        FITS filename of a cal product
+
+    write : bool
+        Write output to ``cal_file.replace("_cal", "_rate")``
+
+    Returns
+    -------
+    dm : `stdatamodels.jwst.datamodels.image.ImageModel`
+        Data model with the inverse photom and flat_field steps applied
+
+    """
+    from jwst.photom import PhotomStep
+    from jwst.flatfield import FlatFieldStep
+    import jwst.datamodels
+
+    OLD_CONTEXT = os.getenv("CRDS_CONTEXT")
+
+    dm = jwst.datamodels.open(cal_file)
+
+    os.environ["CRDS_CONTEXT"] = dm.meta.ref_file.crds.context_used
+    set_crds_context()
+
+    msg = f"convert_cal_to_rate: {cal_file}    use {os.environ['CRDS_CONTEXT']}"
+    utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+
+    cal_step = dm.meta.cal_step.instance
+
+    pipeline_steps = {
+        "photom": PhotomStep(),
+        "flat_field": FlatFieldStep()
+    }
+
+    for step in pipeline_steps:
+        if step not in cal_step:
+            continue
+
+        if cal_step[step] == "COMPLETE":
+            msg = f"convert_cal_to_rate: {cal_file}   undo {step}"
+            utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+
+            dm = pipeline_steps[step].call(dm, inverse=True)
+            dm.meta.cal_step.instance.pop(step)
+
+    if write:
+        rate_file = cal_file.replace("_cal", "_rate")
+        msg = f"convert_cal_to_rate: {cal_file}  write {rate_file}"
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+        dm.write(rate_file, overwrite=overwrite)
+
+    # Reset CRDS_CONTEXT
+    if OLD_CONTEXT is None:
+        os.environ.pop("CRDS_CONTEXT")
+    else:
+        msg = f"convert_cal_to_rate: {cal_file} reset CRDS_CONTEXT = {OLD_CONTEXT}"
+        utils.log_comment(utils.LOGFILE, msg)
+
+        os.environ["CRDS_CONTEXT"] = OLD_CONTEXT
+
+    return dm
+
+
 def match_gwcs_to_sip(input, step=64, transform=None, verbose=True, overwrite=True):
     """
     Calculate transformation of gwcs to match SIP header, which may have been
