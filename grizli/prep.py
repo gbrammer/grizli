@@ -39,7 +39,31 @@ from . import model
 from . import GRIZLI_PATH
 
 # Catalog table tools now put elsewhere
-from .catalog import *
+from .catalog import (
+    table_to_radec,
+    table_to_regions,
+    randomize_segmentation_labels,
+    get_ukidss_catalog,
+    get_sdss_catalog,
+    get_twomass_catalog,
+    get_irsa_catalog,
+    get_gaia_radec_at_time,
+    get_gaia_DR2_vizier_columns,
+    get_gaia_vizier,
+    get_gaia_DR2_vizier,
+    gaia_dr2_conesearch_query,
+    get_gaia_DR2_catalog,
+    gen_tap_box_query,
+    query_tap_catalog,
+    get_hubble_source_catalog,
+    get_nsc_catalog,
+    get_desdr1_catalog,
+    get_skymapper_catalog,
+    get_vexas_catalog,
+    get_vhs_catalog,
+    get_panstarrs_catalog,
+    get_radec_catalog,
+)
 
 
 def check_status():
@@ -3429,7 +3453,7 @@ def make_drz_catalog(
 
     im = pyfits.open(drz_file)
 
-    ZP = calc_header_zeropoint(im[0].header)
+    ZP = utils.calc_header_zeropoint(im[0].header)
 
     # if 'PHOTFNU' in im[0].header:
     #     ZP = -2.5*np.log10(im[0].header['PHOTFNU'])+8.90
@@ -4744,6 +4768,8 @@ def separate_chip_sky(
     """
     frame = inspect.currentframe()
     utils.log_function_arguments(utils.LOGFILE, frame, "prep.separate_chip_sky")
+
+    from numpy.polynomial import Chebyshev
 
     import astropy.io.fits as pyfits
     import astropy.wcs as pywcs
@@ -6527,16 +6553,16 @@ def iterate_tweak_align(
     """
     from .aws import visit_processor
 
-    if False:
-        tweak_kwargs = dict(
-            max_dist=tweak_max_dist,
-            n_min=tweak_n_min,
-            key=" ",
-            drizzle=False,
-            ref_exp=tweak_ref_exp,
-            threshold=tweak_threshold,
-            fit_order=tweak_fit_order,
-        )
+    # if False:
+    #     tweak_kwargs = dict(
+    #         max_dist=tweak_max_dist,
+    #         n_min=tweak_n_min,
+    #         key=" ",
+    #         drizzle=False,
+    #         ref_exp=tweak_ref_exp,
+    #         threshold=tweak_threshold,
+    #         fit_order=tweak_fit_order,
+    #     )
 
     # Copies
     if not os.path.exists("TweakBackup"):
