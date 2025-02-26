@@ -21,6 +21,9 @@ if os.getenv("NIRCAM_CONF_VERSION") is not None:
     NIRCAM_CONF_VERSION = os.getenv("NIRCAM_CONF_VERSION")
     print("Use NIRCAM_CONF_VERSION={NIRCAM_CONF_VERSION}")
 
+if os.getenv("CRDS_CONTEXT") is not None:
+    DEFAULT_CRDS_CONTEXT = os.getenv("CRDS_CONTEXT")
+
 
 def show_available_nircam_versions(filter="F444W", module="B", grism="R", verbose=True):
     """
