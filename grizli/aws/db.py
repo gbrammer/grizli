@@ -465,7 +465,7 @@ def update_redshift_fit_status(root, id, status=0, table='redshift_fit_v2', engi
                              verbose=verbose)
 
     else:
-        sqlstr = """UPDATE {0}
+        SQL_COMMAND = """UPDATE {0}
             SET status = {1}, mtime = '{2}'
             WHERE (root = '{3}' AND id = {4});
             """.format(table, status, NOW, root, id)
@@ -474,12 +474,12 @@ def update_redshift_fit_status(root, id, status=0, table='redshift_fit_v2', engi
             msg = 'Update status for {0} {1}: {2} -> {3} on `{4}` ({5})'
             print(msg.format(root, id, old_status, status, table, NOW))
 
-        if hasattr(engine, 'cursor'):
-            with engine.cursor() as cur:
-                cur.execute(sqlstr)
-        else:
-            engine.execute(sqlstr)
-
+        # if hasattr(engine, 'cursor'):
+        #     with engine.cursor() as cur:
+        #         cur.execute(sqlstr)
+        # else:
+        #     engine.execute(sqlstr)
+        execute(SQL_COMMAND)
 
 def get_row_data(rowfile='gds-g800l-j033236m2748_21181.row.fits', status_flag=FLAGS['fit_complete']):
     """
@@ -562,7 +562,8 @@ def delete_redshift_fit_row(root, id, table='redshift_fit_v2', engine=None):
     if engine is None:
         engine = get_db_engine(echo=False)
 
-    res = engine.execute("DELETE from {2} WHERE (root = '{0}' AND id = {1})".format(root, id, table))
+    SQL_COMMAND = "DELETE from {2} WHERE (root = '{0}' AND id = {1})"
+    res = execute(SQL_COMMAND.format(root, id, table))
 
 
 def add_redshift_fit_row(row_df, table='redshift_fit_v2', engine=None, verbose=True):
@@ -591,7 +592,7 @@ def add_redshift_fit_row(row_df, table='redshift_fit_v2', engine=None, verbose=T
         print('Add row for {0}/{1} on `{2}`'.format(root, id, table))
 
     # Add the new data
-    row_df.to_sql(table, engine, index=False, if_exists='append', method='multi')
+    send_to_database(table, row_df, index=False, if_exists='append', method='multi')
 
 ###########
 
@@ -733,7 +734,7 @@ def send_1D_to_database(files=[], engine=None):
             wdf = pd.DataFrame(data=tables[gr][wave_table][0],
                                columns=[wave_table])
 
-            wdf.to_sql(wave_table, engine, if_exists='replace',
+            send_to_database(wave_table, wdf, if_exists='replace',
                        index=True, index_label=tablename+'_idx')
 
         # drop wave from spectra tables
@@ -751,10 +752,11 @@ def send_1D_to_database(files=[], engine=None):
                 if isinstance(item, list):
                     SQL += '    {0} real[{1}],\n'.format(c, len(item))
 
-            engine.execute(SQL[:-2]+')')
+            execute(SQL[:-2]+')')
 
             try:
-                engine.execute("CREATE INDEX {0}_idx ON {0} ({0}_root, {0}_id);".format(tablename))
+                SQL = "CREATE INDEX {0}_idx ON {0} ({0}_root, {0}_id);"
+                execute(SQL.format(tablename))
             except:
                 pass
 
@@ -766,12 +768,11 @@ def send_1D_to_database(files=[], engine=None):
                    for r, i in zip(df[tablepref+'_root'], 
                                    df[tablepref+'_id'])]
             SQL += 'OR '.join(mat)
-            rsp = engine.execute(SQL)
+            rsp = execute(SQL)
 
         # Send the table
         print('Send {0} rows to {1}'.format(len(df), tablename))
-        df.to_sql(tablename, engine, index=False, if_exists='append',
-                  method='multi')
+        send_to_database(tablename, df, index=False, if_exists='append', method='multi')
 
 
 def add_all_spectra():
@@ -1094,27 +1095,27 @@ def set_phot_root(root, phot_root, engine):
     WHERE (root = '{root}');
     """
 
-    engine.execute(SQL)
+    execute(SQL)
 
     if False:
         # Check where phot_root not equal to root
         res = pd.read_sql_query("SELECT root, id, status, phot_root FROM redshift_fit_v2 WHERE (phot_root != root)".format(root), engine)
 
         # update the one pointing where it should change in photometry_apcorr
-        engine.execute("UPDATE photometry_apcorr SET p_root = 'j214224m4420' WHERE root = 'j214224m4420gr01';")
-        engine.execute("UPDATE redshift_fit_v2 SET phot_root = 'j214224m4420' WHERE root LIKE 'j214224m4420g%%';")
-        engine.execute("UPDATE redshift_fit_v2_quasar SET phot_root = 'j214224m4420' WHERE root LIKE 'j214224m4420g%%';")
+        execute("UPDATE photometry_apcorr SET p_root = 'j214224m4420' WHERE root = 'j214224m4420gr01';")
+        execute("UPDATE redshift_fit_v2 SET phot_root = 'j214224m4420' WHERE root LIKE 'j214224m4420g%%';")
+        execute("UPDATE redshift_fit_v2_quasar SET phot_root = 'j214224m4420' WHERE root LIKE 'j214224m4420g%%';")
 
     if False:
         # Replace in-place
         from grizli.aws import db as grizli_db
         
-        engine.execute("update redshift_fit_v2 set phot_root = replace(root, 'g800l', 'grism') WHERE root not like 'j214224m4420%%' AND root LIKE '%%-grism%%")
+        execute("update redshift_fit_v2 set phot_root = replace(root, 'g800l', 'grism') WHERE root not like 'j214224m4420%%' AND root LIKE '%%-grism%%")
 
-        engine.execute("update redshift_fit_v2 set phot_root = replace(root, 'g800l', 'grism') WHERE root not like 'j214224m4420%%'")
-        engine.execute("update redshift_fit_v2 set phot_root = 'j214224m4420' WHERE root like 'j214224m4420gr%%'")
+        execute("update redshift_fit_v2 set phot_root = replace(root, 'g800l', 'grism') WHERE root not like 'j214224m4420%%'")
+        execute("update redshift_fit_v2 set phot_root = 'j214224m4420' WHERE root like 'j214224m4420gr%%'")
 
-        engine.execute("update redshift_fit_v2_quasar set phot_root = replace(root, 'g800l', 'grism') where root like '%%g800l%%'")
+        execute("update redshift_fit_v2_quasar set phot_root = replace(root, 'g800l', 'grism') where root like '%%g800l%%'")
 
         # Set 3D-HST fields
         res = grizli_db.from_sql("select distinct root from redshift_fit_v2 where root like '%%-grism%%'", engine)
@@ -1136,9 +1137,9 @@ SET objid = p_objid
 FROM sub
 WHERE phot_root = p_root AND id = p_id;
         """
-        grizli_db.from_sql(SQL, engine)
+        grizli_db.SQL(SQL)
 
-        engine.execute(SQL)
+        execute(SQL)
 
 
 def wait_on_db_update(root, t0=60, dt=30, n_iter=60, engine=None):
@@ -1323,10 +1324,10 @@ def add_phot_to_db(root, delete=False, engine=None, nmax=500, add_missing_column
     if len(res) > 0:
         if delete:
             print('Delete rows where root={0}'.format(root))
-            res = engine.execute("DELETE from photometry_apcorr WHERE (p_root = '{0}')".format(root))
+            res = execute("DELETE from photometry_apcorr WHERE (p_root = '{0}')".format(root))
 
             if False:
-                res = engine.execute("DELETE from redshift_fit_v2 WHERE (root = '{0}')".format(root))
+                res = execute("DELETE from redshift_fit_v2 WHERE (root = '{0}')".format(root))
 
         else:
             print('Data found for root={0}, delete them if necessary'.format(root))
@@ -1361,8 +1362,8 @@ def add_phot_to_db(root, delete=False, engine=None, nmax=500, add_missing_column
     if len(new_cols) > 0:
         for c in new_cols:
             print('Add column {0} to `photometry_apcorr` table'.format(c))
-            sql = "ALTER TABLE photometry_apcorr ADD COLUMN {0} real;".format(c)
-            res = engine.execute(sql)
+            SQL_COMMAND = "ALTER TABLE photometry_apcorr ADD COLUMN {0} real;"
+            res = execute(SQL_COMMAND.format(c))
 
     # Add new table
     print('Send {0}_phot_apcorr.fits to `photometry_apcorr`.'.format(root))
@@ -1463,9 +1464,16 @@ def multibeam_to_database(beams_file, engine=None, Rspline=15, force=False, **kw
 
     # Send to DB
     # res = engine.execute("DELETE from multibeam_v2 WHERE (root = '{0}' AND id = {1})".format(mb.group_name, mb.id), engine)
-    res = execute("DELETE from multibeam_v2 WHERE (root = '{0}' AND id = {1})".format(mb.group_name, mb.id))
+    SQL_COMMAND = "DELETE from multibeam_v2 WHERE (root = '{0}' AND id = {1})"
+    res = execute(SQL_COMMAND.format(mb.group_name, mb.id))
     
-    df.to_sql('multibeam_v2', engine, index=False, if_exists='append', method='multi')
+    send_to_database(
+        'multibeam_v2',
+        df,
+        index=False,
+        if_exists='append',
+        method='multi'
+    )
 
     # beams dataframe
     d = {}
@@ -1507,7 +1515,13 @@ def multibeam_to_database(beams_file, engine=None, Rspline=15, force=False, **kw
     # res = engine.execute("DELETE from beam_geometry_v2 WHERE (root = '{0}' AND id = {1})".format(mb.group_name, mb.id), engine)
     res = execute("DELETE from beam_geometry_v2 WHERE (root = '{0}' AND id = {1})".format(mb.group_name, mb.id))
     
-    df.to_sql('beam_geometry_v2', engine, index=False, if_exists='append', method='multi')
+    send_to_database(
+        'beam_geometry_v2',
+        df,
+        index=False,
+        if_exists='append',
+        method='multi'
+    )
 
     if False:
         # Fix multibeam arrays
@@ -1533,9 +1547,14 @@ def multibeam_to_database(beams_file, engine=None, Rspline=15, force=False, **kw
 
                 data[c[:-1]+'_p'] = [list(np.asarray(line.strip()[1:-1].split(','),dtype=float)) for line in df[c]]
 
-        data.to_sql('multibeam_tmp', engine, index=False, if_exists='append', method='multi')
+        send_to_database(
+            'multibeam_tmp',
+            data,
+            index=False,
+            if_exists='append',
+            method='multi'
+        )
 
-        from sqlalchemy import types
         for c in df.columns:
             if c.endswith('p'):
                 pass
@@ -1651,7 +1670,7 @@ def add_spectroscopic_redshifts(xtab, rmatch=1, engine=None, db=None):
     print('Send zspec to photometry_apcorr (N={0})'.format(hasm.sum()))
 
     df = tabm.to_pandas()
-    df.to_sql('z_spec_tmp', engine, index=False, if_exists='replace', method='multi')
+    send_to_database('z_spec_tmp', df, index=False, if_exists='replace', method='multi')
 
     SQL = """UPDATE photometry_apcorr
        SET z_spec = zt.z_spec,
@@ -1665,7 +1684,7 @@ def add_spectroscopic_redshifts(xtab, rmatch=1, engine=None, db=None):
      WHERE (zt.db_root = p_root AND zt.db_id = p_id);
      """
 
-    engine.execute(SQL)
+    execute(SQL)
 
     if False:
         # Update redshift_fit_v2 ra/dec with photometry_table double prec.
@@ -2049,16 +2068,27 @@ def add_to_charge():
     ix = df['field_root'] == 'j214224m4420'
     df['comment'][ix] = 'Rafelski UltraDeep'
     
-    df.to_sql('charge_fields', engine, index=False, if_exists='append', method='multi')
+    send_to_database(
+        'charge_fields',
+        df,
+        index=False,
+        if_exists='append',
+        method='multi'
+    )
     
     df = pd.DataFrame()
     df['field_root'] = ['fresco-gds-med']
     df['comment'] = ['FRESCO-v5.1']
 
-    
-    df.to_sql('charge_fields', engine, index=False, if_exists='append', method='multi')
-    
-    
+    send_to_database(
+        'charge_fields',
+        df,
+        index=False,
+        if_exists='append',
+        method='multi'
+    )
+
+
 def add_by_footprint(footprint_file='j141156p3415_footprint.fits', engine=None):
     
     import pandas as pd
@@ -2097,8 +2127,15 @@ def add_by_footprint(footprint_file='j141156p3415_footprint.fits', engine=None):
     
     #df['proposal_id'] = ' '.join([t for t in np.unique(fp['target'])])
     print(f'Send {root} to db.charge_fields')
-    df.to_sql('charge_fields', engine, index=False, if_exists='append', method='multi')
-    
+    send_to_database(
+        'charge_fields',
+        df,
+        index=False,
+        if_exists='append',
+        method='multi'
+    )
+
+
 def update_charge_fields():
     """
     """
@@ -2127,11 +2164,11 @@ def update_charge_fields():
     
     # update the table
     df = gtab[~gtab['log'].mask].to_pandas()
-    df.to_sql('log_tmp', engine, index=False, if_exists='replace', method='multi')
+    send_to_database('log_tmp', df, index=False, if_exists='replace', method='multi')
     
     sql = "UPDATE charge_fields ch SET log = tmp.log FROM log_tmp tmp WHERE tmp.field_root = ch.field_root"
 
-    engine.execute(sql)
+    execute(sql)
 
 
 def overview_table():
@@ -2218,14 +2255,14 @@ def run_all_redshift_fits():
     #     print(root)
     #
     res = engine.execute("DELETE from redshift_fit_v2 WHERE (root = '{0}')".format(root), engine)
-    res = engine.execute("DELETE from redshift_fit_v2_quasar WHERE (root = '{0}')".format(root), engine)
-    res = engine.execute("DELETE from stellar_fit WHERE (root = '{0}')".format(root), engine)
-    res = engine.execute("DELETE from photometry_apcorr WHERE (p_root = '{0}')".format(root), engine)
+    res = execute("DELETE from redshift_fit_v2_quasar WHERE (root = '{0}')".format(root), engine)
+    res = execute("DELETE from stellar_fit WHERE (root = '{0}')".format(root), engine)
+    res = execute("DELETE from photometry_apcorr WHERE (p_root = '{0}')".format(root), engine)
 
     if False:
         # Remove the whole thing
-        res = engine.execute("DELETE from exposure_log WHERE (parent = '{0}')".format(root), engine)
-        res = engine.execute("DELETE from charge_fields WHERE (field_root = '{0}')".format(root), engine)
+        res = execute("DELETE from exposure_log WHERE (parent = '{0}')".format(root), engine)
+        res = execute("DELETE from charge_fields WHERE (field_root = '{0}')".format(root), engine)
 
     grizli_db.run_lambda_fits(root, phot_root=root, min_status=2, zr=[0.01, zmax], mag_limits=[15, 26], engine=engine)
 
@@ -2791,7 +2828,14 @@ def get_exposure_info():
         _q.rename_column('footprint', 'sregion')
         
         df = _q[cols].to_pandas()
-        df.to_sql('mast_query', engine, index=False, if_exists='append', method='multi')
+
+        send_to_database(
+            'mast_query',
+            df,
+            index=False,
+            if_exists='append',
+            method='multi'
+        )
 
     files = glob.glob('*_prod.fits')
     files.sort()
@@ -2806,7 +2850,13 @@ def get_exposure_info():
         _p['dataset'] = [d[:-1] for d in _p['observation_id']]
 
         df = _p[cols].to_pandas()
-        df.to_sql('mast_products', engine, index=False, if_exists='append', method='multi')
+        send_to_database(
+            'mast_products',
+            df,
+            index=False,
+            if_exists='append',
+            method='multi'
+        )
 
     ##########
     # Exposure log
@@ -2830,23 +2880,30 @@ def get_exposure_info():
     df['area'] = [fp.area*np.cos(df['dec'][i]/180*np.pi)*3600 for i, fp in enumerate(v['footprints'])]
 
     # Make table
-    engine.execute('drop table exposure_log;')
-    df.to_sql('exposure_log', engine, index=False, if_exists='append', method='multi')
-    engine.execute('alter table exposure_log add column footprint float [];')
-    engine.execute('delete from exposure_log where True;')
-    
-    engine.execute('ALTER TABLE exposure_log ADD COLUMN mdrizsky float;')
-    engine.execute('ALTER TABLE exposure_log ADD COLUMN exptime float;')
-    engine.execute('ALTER TABLE exposure_log ADD COLUMN expstart float;')
-    engine.execute('ALTER TABLE exposure_log ADD COLUMN ndq int;')
-    engine.execute('ALTER TABLE exposure_log ADD COLUMN expflag VARCHAR;')
-    engine.execute('ALTER TABLE exposure_log ADD COLUMN sunangle float;')
+    execute('drop table exposure_log;')
+    send_to_database(
+        'exposure_log',
+        df,
+        index=False,
+        if_exists='append',
+        method='multi'
+    )
 
-    engine.execute('ALTER TABLE exposure_log ADD COLUMN gsky101 real;')
-    engine.execute('ALTER TABLE exposure_log ADD COLUMN gsky102 real;')
-    engine.execute('ALTER TABLE exposure_log ADD COLUMN gsky103 real;')
-    engine.execute('ALTER TABLE exposure_log ADD COLUMN persnpix integer;')
-    engine.execute('ALTER TABLE exposure_log ADD COLUMN perslevl real;')
+    execute('alter table exposure_log add column footprint float [];')
+    execute('delete from exposure_log where True;')
+    
+    execute('ALTER TABLE exposure_log ADD COLUMN mdrizsky float;')
+    execute('ALTER TABLE exposure_log ADD COLUMN exptime float;')
+    execute('ALTER TABLE exposure_log ADD COLUMN expstart float;')
+    execute('ALTER TABLE exposure_log ADD COLUMN ndq int;')
+    execute('ALTER TABLE exposure_log ADD COLUMN expflag VARCHAR;')
+    execute('ALTER TABLE exposure_log ADD COLUMN sunangle float;')
+
+    execute('ALTER TABLE exposure_log ADD COLUMN gsky101 real;')
+    execute('ALTER TABLE exposure_log ADD COLUMN gsky102 real;')
+    execute('ALTER TABLE exposure_log ADD COLUMN gsky103 real;')
+    execute('ALTER TABLE exposure_log ADD COLUMN persnpix integer;')
+    execute('ALTER TABLE exposure_log ADD COLUMN perslevl real;')
     
     _exp = db.from_sql("select distinct(file) from exposure_log", engine)
     db_files = np.unique(_exp['file'])
@@ -2894,7 +2951,13 @@ def get_exposure_info():
         if len(df0) > SKIP:
             # Send to DB and reset append table
             print('>>> to DB >>> ({0}, {1})'.format(i, len(df0)))
-            df0.to_sql('exposure_log', engine, index=False, if_exists='append', method='multi')
+            send_to_database(
+                'exposure_log',
+                df0,
+                index=False,
+                if_exists='append',
+                method='multi'
+            )
             df0 = df[:0]
 
 
@@ -3065,7 +3128,7 @@ def update_exposure_log(event, context):
               " WHERE file LIKE '{0}'".format(event['file']))
 
     print(sqlstr.format(**kwvals))
-    engine.execute(sqlstr.format(**kwvals))
+    execute(sqlstr.format(**kwvals))
     im.close()
 
     ######### Compact DQ file
@@ -3256,7 +3319,13 @@ def add_irac_table():
     #
     import pandas as pd
     df = pd.DataFrame(aor_data)
-    df.to_sql('spitzer_aors', engine, index=False, if_exists='append', method='multi')
+    send_to_database(
+        'spitzer_aors',
+        df,
+        index=False,
+        if_exists='append',
+        method='multi'
+    )
 
     df = pd.DataFrame(data)
 
@@ -3265,14 +3334,21 @@ def add_irac_table():
     for k in bkey:
         first.pop('fp_'+k)
 
-    engine.execute('drop table spitzer_log;')
-    first.to_sql('spitzer_log', engine, index=False, if_exists='append', method='multi')
+    execute('drop table spitzer_log;')
+    send_to_database(
+        'spitzer_log',
+        first,
+        index=False,
+        if_exists='append',
+        method='multi'
+    )
+
     for k in bkey:
         cmd = 'alter table spitzer_log add column fp_{0} float [];'.format(k)
-        engine.execute(cmd)
+        execute(cmd)
 
-    engine.execute('delete from spitzer_log where True;')
-    df.to_sql('spitzer_log', engine, index=False, if_exists='append', method='multi')
+    execute('delete from spitzer_log where True;')
+    send_to_database('spitzer_log', df, index=False, if_exists='append', method='multi')
 
 
 def show_all_fields():
@@ -3294,3 +3370,26 @@ def show_all_fields():
             continue
 
         os.system('aws s3 cp s3://grizli-v2/HST/Pipeline/{0}/Extractions/{0}_zhist.png s3://grizli-v2/tables/'.format(root))
+
+def quoted_strings(string_list, quote="'"):
+    """
+    Create a list of quoted strings for use with, e.g., 
+    ```SELECT * from table where column in ({','.join(string_list)})```
+
+    Parameters
+    ----------
+    string_list : list-like
+        List of strings
+
+    quote : str
+        Quote mark
+
+    Returns
+    -------
+    quoted : list
+        List of strings enclosed with quote marks
+
+    """
+
+    quoted = [f"{quote}{item}{quote}" for item in string_list]
+    return quoted
