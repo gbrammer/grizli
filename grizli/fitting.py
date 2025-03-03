@@ -100,8 +100,8 @@ def run_all_parallel(
     for k in kwargs:
         args[k] = kwargs[k]
 
-    fp = open("{0}_{1:05d}.log_par".format(args["group_name"], id), "w")
-    fp.write("{0}_{1:05d}: {2}\n".format(args["group_name"], id, time.ctime()))
+    fp = open("{0}_{1:05}.log_par".format(args["group_name"], id), "w")
+    fp.write("{0}_{1:05}: {2}\n".format(args["group_name"], id, time.ctime()))
     fp.close()
 
     # Force NIRCAM config version for FRESCO
@@ -146,6 +146,8 @@ def run_all(
     dz=[0.004, 0.0002],
     fitter=["nnls", "bounded"],
     group_name="grism",
+    root="*",
+    file_pattern="{root}_{id:05d}",
     fit_stacks=True,
     only_stacks=False,
     prior=None,
@@ -158,7 +160,6 @@ def run_all(
     mask_sn_limit=np.inf,
     fit_only_beams=False,
     fit_beams=True,
-    root="*",
     fit_trace_shift=False,
     phot=None,
     use_phot_obj=True,
@@ -181,6 +182,7 @@ def run_all(
     line_size=1.6,
     dscale=1.0 / 4,
     scale_linemap=1,
+    line_cmap="plasma_r",
     use_psf=False,
     get_line_width=False,
     sed_args={"bin": 1, "xlim": [0.3, 9]},
@@ -304,7 +306,12 @@ def run_all(
         filenames to search for, e.g., to concatenate separate G141 and G102
         files of a single object:
 
-        >>> mb_files = glob.glob(f'{root}_{id:05d}.beams.fits')
+    file_pattern : str
+        Pattern for finding beams files
+
+        >>> # default file_pattern = '{root}_{id:05d}'
+        >>> filename_base = file_pattern.format(root=root, id=id, group_name=group_name)
+        >>> mb_files = glob.glob(f'{file_pattern}.beams.fits')
 
     fit_trace_shift : bool
         Fit for shifts of the traces fo each group oof beams.
@@ -459,8 +466,11 @@ def run_all(
 
         return args
 
-    mb_files = glob.glob("{0}_{1:05d}.beams.fits".format(root, id))
-    st_files = glob.glob("{0}_{1:05d}.stack.fits".format(root, id))
+    # mb_files = glob.glob("{0}_{1:05d}.beams.fits".format(root, id))
+    # st_files = glob.glob("{0}_{1:05d}.stack.fits".format(root, id))
+    filename_base = file_pattern.format(root=root, id=id, group_name=group_name)
+    mb_files = glob.glob(f'{filename_base}.beams.fits')
+    st_files = glob.glob(f'{filename_base}.stack.fits')
 
     # Allow for fitter to be a string, or a 2-list with different
     # values for the redshift and final fits
@@ -503,7 +513,7 @@ def run_all(
                 )
                 if save_figures:
                     fig.savefig(
-                        "{0}_{1:05d}.fix.stack.{2}".format(group_name, id, fig_type)
+                        "{0}_{1:05}.fix.stack.{2}".format(group_name, id, fig_type)
                     )
                 else:
                     plt.close(fig)
@@ -947,7 +957,7 @@ def run_all(
 
     # Save the figure
     if save_figures:
-        fig.savefig("{0}_{1:05d}.full.{2}".format(group_name, id, fig_type))
+        fig.savefig("{0}_{1:05}.full.{2}".format(group_name, id, fig_type))
 
     if only_stacks:
         # Need to make output with just the stack results
@@ -960,7 +970,7 @@ def run_all(
 
         if write_fits_files:
             line_hdu.writeto(
-                "{0}_{1:05d}.sfull.fits".format(group_name, id),
+                "{0}_{1:05}.sfull.fits".format(group_name, id),
                 overwrite=True,
                 output_verify="fix",
             )
@@ -1010,7 +1020,7 @@ def run_all(
     line_hdu.insert(3, tfit_hdu)
 
     if write_fits_files:
-        full_file = "{0}_{1:05d}.full.fits".format(group_name, id)
+        full_file = "{0}_{1:05}.full.fits".format(group_name, id)
         line_hdu.writeto(full_file, overwrite=True, output_verify="fix")
 
         # Row for summary table
@@ -1019,14 +1029,14 @@ def run_all(
         )
 
         info["grizli_version"] = grizli__version
-        row_file = "{0}_{1:05d}.row.fits".format(group_name, id)
+        row_file = "{0}_{1:05}.row.fits".format(group_name, id)
         info.write(row_file, overwrite=True)
 
     # 1D spectrum
     oned_hdul = mb.oned_spectrum_to_hdu(
         tfit=tfit,
         bin=1,
-        outputfile="{0}_{1:05d}.1D.fits".format(group_name, id),
+        outputfile="{0}_{1:05}.1D.fits".format(group_name, id),
         loglam=loglam_1d,
     )  # , units=units1d)
     oned_hdul[0].header["GRIZLIV"] = (grizli__version, "Grizli version")
@@ -1044,10 +1054,10 @@ def run_all(
         hdu[0].header["GRIZLIV"] = (grizli__version, "Grizli version")
 
         if save_figures:
-            fig.savefig("{0}_{1:05d}.stack.{2}".format(group_name, id, fig_type))
+            fig.savefig("{0}_{1:05}.stack.{2}".format(group_name, id, fig_type))
 
         if write_fits_files:
-            hdu.writeto("{0}_{1:05d}.stack.fits".format(group_name, id), overwrite=True)
+            hdu.writeto("{0}_{1:05}.stack.fits".format(group_name, id), overwrite=True)
 
         hdu_stack = hdu
     else:
@@ -1069,13 +1079,13 @@ def run_all(
         fig = show_drizzled_lines(
             line_hdu,
             size_arcsec=si,
-            cmap="plasma_r",
+            cmap=line_cmap,
             scale=s * scale_linemap,
             dscale=s * dscale * scale_linemap,
             full_line_list=full_line_list,
         )
         if save_figures:
-            fig.savefig("{0}_{1:05d}.line.{2}".format(group_name, id, fig_type))
+            fig.savefig("{0}_{1:05}.line.{2}".format(group_name, id, fig_type))
 
     if phot is not None:
         out = mb, st, fit, tfit, line_hdu
@@ -1509,7 +1519,7 @@ def full_sed_plot(
             fig.tight_layout(pad=0.5)
 
     if save:
-        fig.savefig("{0}_{1:05d}.sed.{2}".format(mb.group_name, mb.id, save))
+        fig.savefig("{0}_{1:05}.sed.{2}".format(mb.group_name, mb.id, save))
 
     return fig
 
@@ -1921,7 +1931,7 @@ def make_summary_catalog(
 
     # ID with link to CDS
     idx = [
-        '<a href="http://vizier.u-strasbg.fr/viz-bin/VizieR?-c={0:.6f}+{1:.6f}&-c.rs=2">#{2:05d}</a>'.format(
+        '<a href="http://vizier.u-strasbg.fr/viz-bin/VizieR?-c={0:.6f}+{1:.6f}&-c.rs=2">#{2:05}</a>'.format(
             info["ra"][i], info["dec"][i], info["id"][i]
         )
         for i in range(len(info))
@@ -1931,7 +1941,7 @@ def make_summary_catalog(
     # PNG columns
     for ext in ["stack", "full", "line"]:
         png = [
-            "{0}_{1:05d}.{2}.png".format(root, id, ext)
+            "{0}_{1:05}.{2}.png".format(root, id, ext)
             for root, id in zip(info["root"], info["id"])
         ]
         info["png_{0}".format(ext)] = [
@@ -1940,7 +1950,7 @@ def make_summary_catalog(
 
     # Thumbnails
     png = [
-        "../Thumbnails/{0}_{1:05d}.{2}.png".format(root, id, "rgb")
+        "../Thumbnails/{0}_{1:05}.{2}.png".format(root, id, "rgb")
         for root, id in zip(info["root"], info["id"])
     ]
     # info['png_{0}'.format('rgb')] = ['<a href={1}><img src={0} height=200></a>'.format(p, p.replace('.rgb.png', '.thumb.fits')) for p in png]
@@ -2200,7 +2210,7 @@ def refit_beams(
 
     MultiBeam = multifit.MultiBeam
 
-    mb = MultiBeam("{0}_{1:05d}.beams.fits".format(root, id), group_name=root)
+    mb = MultiBeam("{0}_{1:05}.beams.fits".format(root, id), group_name=root)
 
     keep_beams = []
     for g in keep_dict:
@@ -2230,14 +2240,14 @@ def refit_beams(
 
     try:
         fig1 = mb.oned_figure(figsize=[5, 3], tfit=pfit, loglam_1d=True)
-        fig1.savefig("{0}_{1:05d}.1D.png".format(root + append, id))
+        fig1.savefig("{0}_{1:05}.1D.png".format(root + append, id))
     except:
         pass
 
     hdu, fig = mb.drizzle_grisms_and_PAs(
         fcontam=0.5, flambda=False, kernel="point", size=32, zfit=pfit
     )
-    fig.savefig("{0}_{1:05d}.stack.png".format(root + append, id))
+    fig.savefig("{0}_{1:05}.stack.png".format(root + append, id))
 
     if run_fit:
         fitting.run_all_parallel(
