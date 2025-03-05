@@ -645,7 +645,9 @@ def coords_to_subtile(ra=189.0243001, dec=62.19669, size=0):
     tp = np.array([np.squeeze(tile_wcs(t).all_world2pix([ra], [dec], 
                                                         0)).flatten() 
                    for t in xTILES['tile']]).T
-                   
+    
+    # tp = np.round(tp)
+    
     in_tile = ((tp > 0) & (tp < xTILES['npix'])).sum(axis=0) == 2
     subt = xTILES[in_tile]
     
@@ -654,10 +656,10 @@ def coords_to_subtile(ra=189.0243001, dec=62.19669, size=0):
     subt['suby'] = subt['fsuby'].astype(int)
     
     ds = size/PIXEL_SCALE/256
-    subt['xmin'] = np.clip(subt['fsubx'] - ds, 0, subt['npix']).astype(int)
-    subt['xmax'] = np.clip(subt['fsubx'] + ds, 0, subt['npix']).astype(int)
-    subt['ymin'] = np.clip(subt['fsuby'] - ds, 0, subt['npix']).astype(int)
-    subt['ymax'] = np.clip(subt['fsuby'] + ds, 0, subt['npix']).astype(int)
+    subt['xmin'] = np.clip((subt['fsubx'] - ds), 0, subt['npix']).astype(int)
+    subt['xmax'] = np.clip((subt['fsubx'] + ds), 0, subt['npix']).astype(int)
+    subt['ymin'] = np.clip((subt['fsuby'] - ds), 0, subt['npix']).astype(int)
+    subt['ymax'] = np.clip((subt['fsuby'] + ds), 0, subt['npix']).astype(int)
     
     subt['ncut'] = (subt['xmax'] - subt['xmin'] + 1)
     subt['ncut'] *= (subt['ymax'] - subt['ymin'] + 1)

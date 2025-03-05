@@ -2262,13 +2262,13 @@ class ImageData(object):
             | (xref.max() > ref_naxis[0])
             | (yref.max() > ref_naxis[1])
         ):
-            if verbose:
-                msg = "Image cutout: x={0}, y={1} [Out of range]"
-                print(msg.format(slx, sly))
+            msg = "Image cutout: x={0}, y={1} [Out of range]".format(slx, sly)
+            utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+
             return hdu
         else:
-            if verbose:
-                print("Image cutout: x={0}, y={1}".format(slx, sly))
+            msg = "Image cutout: x={0}, y={1}".format(slx, sly)
+            utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
 
         # Sliced subimage
         slice_wcs = ref_wcs.slice((sly, slx))
@@ -3144,7 +3144,7 @@ class GrismFLT(object):
 
         if shrink_segimage:
             ref_hdu = self.direct.shrink_large_hdu(
-                ref_hdu, extra=np.max(self.pad), verbose=True
+                ref_hdu, extra=np.max(self.pad), verbose=verbose
             )
 
         if verbose:
@@ -3251,15 +3251,14 @@ class GrismFLT(object):
 
             if shrink_segimage:
                 seg_hdu = self.direct.shrink_large_hdu(
-                    seg_hdu, extra=np.max(self.pad), verbose=True
+                    seg_hdu, extra=np.max(self.pad), verbose=verbose
                 )
 
                 # Make sure image big enough
                 seg_hdu = self.direct.expand_hdu(seg_hdu)
 
-            if verbose:
-                msg = "{0} / blot segmentation {1}"
-                print(msg.format(self.direct_file, seg_str))
+            msg = "{0} / blot segmentation {1}".format(self.direct_file, seg_str)
+            utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
 
             blotted_seg = self.grism.blot_from_hdu(
                 hdu=seg_hdu, segmentation=True, grow=3, interp="poly5"
@@ -4463,14 +4462,17 @@ class GrismFLT(object):
         pom_files = glob.glob(pom_path)
 
         if len(pom_files) == 0:
-            print(f"Couldn't find POM reference files {pom_path}")
+            msg = f"Couldn't find POM reference files {pom_path}"
+            utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+            
             return False
 
         pom_files.sort()
         pom_file = pom_files[-1]
 
         if verbose:
-            print(f"NIRCam: apply POM geometry from {pom_file}")
+            msg = f"NIRCam: apply POM geometry from {pom_file}"
+            utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
 
         pom = pyfits.open(pom_file)[-1]
         pomh = pom.header
@@ -4485,11 +4487,12 @@ class GrismFLT(object):
             _warn = False
 
         if _warn & warn_if_too_small:
-            print(
+            msg = (
                 f"Warning: `pad[{_padix}]` should be > 790 for "
                 f"NIRCam/{self.grism.pupil} to catch "
                 "all out-of-field sources within the POM coverage."
             )
+            utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
 
         # Slice geometry
         a_origin = np.array([-self.pad[0], -self.pad[1]])
@@ -4504,6 +4507,7 @@ class GrismFLT(object):
         pom_data[self_sl] += pom.data[pom_sl]
         self.pom_data = pom_data
         self.seg *= pom_data > 0
+
         return True
 
     def mask_mosaic_edges(

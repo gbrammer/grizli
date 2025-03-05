@@ -12474,7 +12474,7 @@ def figure_timestamp(
     )
 
 
-def log_comment(LOGFILE, comment, verbose=False, show_date=False, mode="a"):
+def log_comment(LOGFILE, comment, verbose=False, show_date=False, mode="a", **kwargs):
     """
     Log a message to a file, optionally including a date tag
 

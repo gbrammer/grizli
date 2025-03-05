@@ -19,7 +19,7 @@ NIRCAM_CONF_VERSION = "V8.5"
 
 if os.getenv("NIRCAM_CONF_VERSION") is not None:
     NIRCAM_CONF_VERSION = os.getenv("NIRCAM_CONF_VERSION")
-    print("Use NIRCAM_CONF_VERSION={NIRCAM_CONF_VERSION}")
+    print(f"Use NIRCAM_CONF_VERSION = {NIRCAM_CONF_VERSION}")
 
 if os.getenv("CRDS_CONTEXT") is not None:
     DEFAULT_CRDS_CONTEXT = os.getenv("CRDS_CONTEXT")
@@ -1443,7 +1443,7 @@ class TransformGrismconf(object):
 
         self.load_nircam_sensitivity_curve()
 
-    def load_nircam_sensitivity_curve(self, verbose=True, **kwargs):
+    def load_nircam_sensitivity_curve(self, verbose=False, **kwargs):
         """
         Replace +1 NIRCam sensitivity curves with Nov 10, 2023 updates
 
