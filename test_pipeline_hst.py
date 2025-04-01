@@ -115,7 +115,7 @@ def test_parse_visits():
 def test_preprocess():
     """
     """
-    global kwargs, visit_prep_args
+    global visit_prep_args
     
     visit_prep_args = kwargs['visit_prep_args']
     preprocess_args = kwargs['preprocess_args']
@@ -169,7 +169,7 @@ def test_preprocess():
 def test_make_mosaics():
     """
     """
-    global visits, groups, info
+    # global visits, groups, info
     
     # Drizzle mosaics in each filter and combine all IR filters
     
@@ -328,7 +328,7 @@ def test_make_field_psf():
 def test_extract_and_fit():
     """
     """
-    global grp
+    # global grp
     
     import astropy.units as u
     from grizli import fitting
