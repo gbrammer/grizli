@@ -9598,7 +9598,7 @@ class MW_F99(object):
 
 
 class EffectivePSF:
-    def __init__(self):
+    def __init__(self, **kwargs):
         """
         Tools for handling WFC3/IR Effective PSF
 
@@ -9607,9 +9607,9 @@ class EffectivePSF:
         PSF files stored in ``$GRIZLI/CONF/``
         """
 
-        self.load_PSF_data()
+        self.load_PSF_data(**kwargs)
 
-    def load_PSF_data(self):
+    def load_PSF_data(self, jwst_stdpsf=True, **kwargs):
         """
         Load data from PSFSTD files
 
@@ -9732,6 +9732,9 @@ class EffectivePSF:
         self.extended_epsf["F132N"] = self.extended_epsf["F125W"]
         self.extended_epsf["G102"] = self.extended_epsf["F105W"]
         self.extended_epsf["G141"] = self.extended_epsf["F140W"]
+
+        if jwst_stdpsf:
+            self.load_jwst_stdpsf(**kwargs)
 
 
     def load_jwst_stdpsf(self, miri_filters=["F560W", "F770W", "F1000W", "F1130W", "F1280W", "F1500W", "F1800W", "F2100W", "F2550W"], miri_extended=True, nircam_sw_filters=["F200W"], nircam_sw_detectors=["A1","A2","A3","A4","B1","B2","B3","B4"], nircam_lw_filters=["F444W"], nircam_lw_detectors=["AL", "BL"], clip_negative=False, use_astropy_cache=True):
