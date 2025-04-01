@@ -164,10 +164,10 @@ def _loadFLT(
         flt.catalog = None
 
     if flt.grism.instrument in ["NIRCAM"]:
-        flt.apply_POM()
+        flt.apply_POM(verbose=verbose)
 
     if flt.grism.instrument in ["NIRISS", "NIRCAM"]:
-        flt.transform_JWST_WFSS()
+        flt.transform_JWST_WFSS(verbose=verbose)
 
     if hasattr(flt, "conf"):
         delattr(flt, "conf")
