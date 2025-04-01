@@ -9783,6 +9783,10 @@ class EffectivePSF:
         elif filter.startswith("MIRI"):
             psf_type = "JWST/MIRI"
 
+        elif filter.startswith("STDPSF_MIRI"):
+            # Libralato et al. (2024)
+            psf_type = "STDPSF_MIRI"
+
         self.eval_psf_type = psf_type
 
         if psf_type == "WFC3/IR":
@@ -9809,7 +9813,7 @@ class EffectivePSF:
 
             self.eval_filter = filter
 
-        if psf_type == "JWST/MIRI":
+        elif psf_type == "JWST/MIRI":
             #  IR detector
             NDET = int(np.sqrt(epsf.shape[2]))
 
@@ -9848,7 +9852,41 @@ class EffectivePSF:
 
             self.eval_filter = filter
 
-        if psf_type == "JWST/2K":
+        elif psf_type == "STDPSF_MIRI":
+            #  IR detector
+            NDET = int(np.sqrt(epsf.shape[2]))
+
+            rx = np.interp(x, [1, 358, 1032], [1, 2, 3])
+            ry = np.interp(y, [1, 512, 1024], [1, 2, 3])
+
+            # zero index
+            rx -= 1
+            ry -= 1
+
+            nx = np.clip(int(rx), 0, 2)
+            ny = np.clip(int(ry), 0, 2)
+            # nx = np.clip(int(rx), 0, NDET - 1)
+            # ny = np.clip(int(ry), 0, NDET - 1)
+
+            # print x, y, rx, ry, nx, ny
+
+            fx = rx - nx
+            fy = ry - ny
+
+            if NDET == 1:
+                psf_xy = epsf[:, :, 0]
+            else:
+                psf_xy = (1 - fx) * (1 - fy) * epsf[:, :, nx + ny * NDET]
+                psf_xy += fx * (1 - fy) * epsf[:, :, (nx + 1) + ny * NDET]
+                psf_xy += (1 - fx) * fy * epsf[:, :, nx + (ny + 1) * NDET]
+                psf_xy += fx * fy * epsf[:, :, (nx + 1) + (ny + 1) * NDET]
+
+            # psf_xy = np.rot90(psf_xy.T, 2)
+            psf_xy = psf_xy.T
+
+            self.eval_filter = filter
+
+        elif psf_type == "JWST/2K":
 
             NDET = int(np.sqrt(epsf.shape[2]))
 
@@ -12474,7 +12512,7 @@ def figure_timestamp(
     )
 
 
-def log_comment(LOGFILE, comment, verbose=False, show_date=False, mode="a"):
+def log_comment(LOGFILE, comment, verbose=False, show_date=False, mode="a", **kwargs):
     """
     Log a message to a file, optionally including a date tag
 
