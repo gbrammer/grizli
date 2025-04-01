@@ -9733,6 +9733,95 @@ class EffectivePSF:
         self.extended_epsf["G102"] = self.extended_epsf["F105W"]
         self.extended_epsf["G141"] = self.extended_epsf["F140W"]
 
+
+    def load_jwst_stdpsf(self, miri_filters=["F560W", "F770W", "F1000W", "F1130W", "F1280W", "F1500W", "F1800W", "F2100W", "F2550W"], miri_extended=True, nircam_sw_filters=["F200W"], nircam_sw_detectors=["A1","A2","A3","A4","B1","B2","B3","B4"], nircam_lw_filters=["F444W"], nircam_lw_detectors=["AL", "BL"], use_astropy_cache=True):
+        """
+        Load ePSF models from https://www.stsci.edu/~jayander/JWST1PASS/LIB/PSFs/STDPSFs
+
+        Parameters
+        ----------
+        miri_filters : list
+            MIRI filters to load
+
+        miri_extended : bool
+            Use extended versions of the MIRI ePSFs
+
+        nircam_sw_filters, nircam_sw_detectors : list, list
+            NIRCam SW filters to load
+
+        nircam_lw_filters, nircam_lw_detectors : list, list
+            NIRCam LW filters to load
+
+        use_astropy_cache : bool
+            Download the ePSF files with the astropy cache
+
+        """
+        from astropy.utils.data import download_file
+        try:
+            from urllib.request import HTTPError
+        except ImportError:
+            from urllib3.exceptions import HTTPError
+
+        stdpsf_url = "https://www.stsci.edu/~jayander/JWST1PASS/LIB/PSFs/STDPSFs/"
+
+        if miri_extended:
+            miri_path = "MIRI/EXTENDED/STDPSF_MIRI_{filter}_EXTENDED.fits"
+        else:
+            miri_path = "MIRI/STDPSF_MIRI_{filter}.fits"
+
+        for filter in miri_filters:
+            full_url = stdpsf_url + miri_path.format(filter=filter)
+
+            try:
+                file_obj = download_file(full_url, cache=use_astropy_cache)
+            except HTTPError:
+                msg = f"Failed to download ePSF from {full_url}"
+                log_comment(LOGFILE, msg, verbose=True, show_date=True)
+                continue
+
+            with pyfits.open(file_obj) as im:
+                data = np.array([d.T for d in im[0].data]).T * 1.0
+                key = os.path.basename(full_url.split('.fits')[0])
+                self.epsf[key] = data
+
+        sw_path = "NIRCam/SWC/{filter}/STDPSF_NRC{detector}_{filter}.fits"
+
+        for filter in nircam_sw_filters:
+            for detector in nircam_sw_detectors:
+                full_url = stdpsf_url + sw_path.format(filter=filter, detector=detector)
+
+                try:
+                    file_obj = download_file(full_url, cache=use_astropy_cache)
+                except HTTPError:
+                    msg = f"Failed to download ePSF from {full_url}"
+                    log_comment(LOGFILE, msg, verbose=True, show_date=True)
+                    continue
+
+                with pyfits.open(file_obj) as im:
+                    data = np.array([d.T for d in im[0].data]).T * 1.0
+                    key = os.path.basename(full_url.split('.fits')[0])
+                    self.epsf[key] = data
+
+        lw_path = "NIRCam/LWC/STDPSF_NRC{detector}_{filter}.fits"
+
+        for filter in nircam_lw_filters:
+            for detector in nircam_lw_detectors:
+                full_url = stdpsf_url + lw_path.format(filter=filter, detector=detector)
+
+                try:
+                    file_obj = download_file(full_url, cache=use_astropy_cache)
+                except HTTPError:
+                    msg = f"Failed to download ePSF from {full_url}"
+                    log_comment(LOGFILE, msg, verbose=True, show_date=True)
+                    continue
+
+                with pyfits.open(file_obj) as im:
+                    data = np.array([d.T for d in im[0].data]).T * 1.0
+                    key = os.path.basename(full_url.split('.fits')[0])
+                    key = key.replace(f"{detector}_", f"{detector}ONG_")
+                    self.epsf[key] = data
+
+
     def get_at_position(self, x=507, y=507, filter="F140W", rot90=0):
         """
         Evaluate ePSF at detector coordinates
