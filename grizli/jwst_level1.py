@@ -99,7 +99,6 @@ def process_level1_to_dark(file):
     https://jwst-pipeline.readthedocs.io/en/latest/jwst/pipeline/calwebb_detector1.html
     
     """
-    global CRDS_CONTEXT
     
     pipe = get_pipeline_object()
     
@@ -206,7 +205,6 @@ def process_uncal_level1(file='jw01208048001_03101_00001_nrs1_uncal.fits', outpu
         Dictionary with a bunch of stuff computed by the script
         
     """
-    global CRDS_CONTEXT
     
     frame = inspect.currentframe()
     _LOGFILE = utils.LOGFILE

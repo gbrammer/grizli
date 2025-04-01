@@ -71,17 +71,15 @@ def set_crds_context(fits_file=None, override_environ=False, verbose=True):
 
     global CRDS_CONTEXT
 
-    _CTX = CRDS_CONTEXT
-
     if fits_file is not None:
         with pyfits.open(fits_file) as im:
             if "CRDS_CONTEXT" in im[0].header:
-                _CTX = im[0].header["CRDS_CTX"]
+                CRDS_CONTEXT = im[0].header["CRDS_CTX"]
 
     if os.getenv("CRDS_CONTEXT") is None:
-        os.environ["CRDS_CONTEXT"] = _CTX
+        os.environ["CRDS_CONTEXT"] = CRDS_CONTEXT
     elif override_environ:
-        os.environ["CRDS_CONTEXT"] = _CTX
+        os.environ["CRDS_CONTEXT"] = CRDS_CONTEXT
 
     msg = f"ENV CRDS_CONTEXT = {os.environ['CRDS_CONTEXT']}"
     utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
@@ -490,8 +488,6 @@ def check_context_for_skyflats(verbose=True):
     result : bool
 
     """
-    global CRDS_CONTEXT, MAX_CTX_FOR_SKYFLATS
-
     context = os.getenv('CRDS_CONTEXT')
     if context is None:
         context = CRDS_CONTEXT
@@ -760,7 +756,7 @@ def img_with_wcs(
     from jwst.datamodels import util
     from jwst.assign_wcs import AssignWcsStep
 
-    global DO_PURE_PARALLEL_WCS, FIXED_PURE_PARALLEL_WCS_CAL_VER
+    # global DO_PURE_PARALLEL_WCS, FIXED_PURE_PARALLEL_WCS_CAL_VER
 
     set_quiet_logging(QUIET_LEVEL)
 

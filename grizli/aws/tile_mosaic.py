@@ -624,7 +624,7 @@ def coords_to_subtile(ra=189.0243001, dec=62.19669, size=0):
     from astropy.coordinates import SkyCoord
     import astropy.units as u
     
-    global TILES, TILE_WCS
+    global TILES
     
     if TILES is None:
         print('Initialize TILES')
@@ -823,7 +823,7 @@ def tile_wcs(tile):
     from grizli import utils
     from grizli.aws import db
     
-    global TILES, TILE_WCS
+    global TILES
     if TILES is None:
         TILES = db.SQL('select * from mosaic_tiles')
     
