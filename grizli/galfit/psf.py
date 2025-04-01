@@ -22,7 +22,10 @@ except:
 
 
 class DrizzlePSF(object):
-    def __init__(self, flt_files=DEMO_LIST, info=None, driz_image=DEMO_IMAGE, driz_hdu=None, beams=None, full_flt_weight=True):
+    epsf_obj = None
+    driz_image = None
+
+    def __init__(self, flt_files=DEMO_LIST, info=None, driz_image=DEMO_IMAGE, driz_hdu=None, beams=None, full_flt_weight=True, csv_file=None, epsf_obj=None):
         """
         Object for making drizzled PSFs
 
@@ -42,15 +45,24 @@ class DrizzlePSF(object):
                 if flt_files is None:
                     info = self._get_wcs_from_hdrtab(driz_image)
                     if info is None:
-                        info = self._get_wcs_from_csv(driz_image)
+                        info = self._get_wcs_from_csv(
+                            driz_image,
+                            csv_file=csv_file
+                        )
                 else:
-                    info = self._get_flt_wcs(flt_files, 
-                                             full_flt_weight=full_flt_weight)
+                    info = self._get_flt_wcs(
+                        flt_files,
+                        full_flt_weight=full_flt_weight
+                    )
 
         self.flt_keys, self.wcs, self.footprint = info
         self.flt_files = list(np.unique([key[0] for key in self.flt_keys]))
 
-        self.ePSF = utils.EffectivePSF()
+        if epsf_obj is None:
+            self.epsf_obj = utils.EffectivePSF()
+            self.epsf_obj.load_jwst_stdpsf()
+        else:
+            self.epsf_obj = epsf_obj
 
         if driz_hdu is None:
             self.driz_image = driz_image
@@ -65,6 +77,13 @@ class DrizzlePSF(object):
 
         self.driz_wcs.pscale = self.driz_pscale
 
+
+    @property
+    def ePSF(self):
+        """
+        For back compatibility, `ePSF` attribute renamed to `epsf_obj`
+        """
+        return self.epsf_obj
 
     @staticmethod
     def _get_flt_wcs(flt_files, full_flt_weight=True):
@@ -141,22 +160,23 @@ class DrizzlePSF(object):
 
 
     @staticmethod
-    def _get_wcs_from_csv(drz_file):
+    def _get_wcs_from_csv(drz_file, csv_file=None):
         """
         Read the attached CSV file that contains exposure WCS info
         """
         import glob
 
-        csv_file = drz_file.split('_drz_sci')[0].split('_drc_sci')[0]
-        csv_file += '_wcs.csv'
+        if csv_file is None:
+            csv_file = drz_file.split('_drz_sci')[0].split('_drc_sci')[0]
+            csv_file += '_wcs.csv'
         
-        if  not os.path.exists(csv_file):
-            print(f'No WCS CSV file {csv_file} found for {drz_file}')
-            return None
-        else:
-            print(f'Get exposure WCS from {csv_file}')
+            if  not os.path.exists(csv_file):
+                print(f'No WCS CSV file {csv_file} found for {drz_file}')
+                return None
+            else:
+                print(f'Get exposure WCS from {csv_file}')
             
-        csv = utils.read_catalog(csv_file)
+        csv = utils.read_catalog(csv_file, format="csv")
         flt_keys = []
         wcs = {}
         footprint = {}
@@ -403,26 +423,28 @@ class DrizzlePSF(object):
                 else:
                     chip_offset = 0
 
-                psf_xy = self.ePSF.get_at_position(xy[0], xy[1]+chip_offset,
-                                                   filter=filter)
+                psf_xy = self.epsf_obj.get_at_position(
+                    xy[0],
+                    xy[1]+chip_offset,
+                    filter=filter
+                )
+
                 yp, xp = np.meshgrid(pix-dy, pix-dx, sparse=False, 
                                      indexing='ij')
                 if get_extended:
-                    if filter in self.ePSF.extended_epsf:
-                        extended_data = self.ePSF.extended_epsf[filter]
+                    if filter in self.epsf_obj.extended_epsf:
+                        extended_data = self.epsf_obj.extended_epsf[filter]
                     else:
                         extended_data = None
                 else:
                     extended_data = None
 
-                psf = self.ePSF.eval_ePSF(psf_xy, xp, yp, 
-                                          extended_data=extended_data)
+                psf = self.epsf_obj.eval_ePSF(
+                    psf_xy,
+                    xp, yp,
+                    extended_data=extended_data
+                )
 
-                # if get_weight:
-                #     fltim = pyfits.open(file)
-                #     flt_weight = fltim[0].header['EXPTIME']
-                # else:
-                #     flt_weight = 1
                 flt_weight = self.wcs[key].expweight
 
                 N = npix
