@@ -1954,16 +1954,16 @@ def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, com
     all_groups = utils.parse_grism_associations(visits, info)
 
     # JWST PASSAGE
-    pure_par_progs = [
+    mixed_wfss_progs = [
         'jw01571', 'jw03383', 'jw04681', # NIRISS
-        'jw06434', 'jw05398', # JWST
+        'jw06434', 'jw05398', #  NIRCam PP
         'jw05105', # NEXUS GO-5105 mixes F356W direct and F322W2 grism
         'jw05893', # COSMOS-3D mixes F356W direct + F444W grism
         'jw04762', # Fujimoto GNz7q  F444W direct + F410M grism
+        'jw06480', # Schouws, mixes F444W direct and F410M / F356W grism
     ]
 
-    if (len(all_groups) > 0) and (os.path.basename(files[0])[:7] in pure_par_progs):
-        #  ('jw01571' in files[0]) or ('jw03383' in files[0]) or ('jw04681' in files[0]) or ('jw06434' in files[0])):
+    if (len(all_groups) > 0) and (os.path.basename(files[0])[:7] in mixed_wfss_progs):
         for v in visits:
             if 'clear' in v['product']:
                 # print('NIRISS pure parallel direct: ', v['product'])
@@ -1976,17 +1976,6 @@ def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, com
                 utils.log_comment(utils.LOGFILE, msg, verbose=True)
 
                 g['direct'] = direct
-
-    # # NEXUS GO-5105 mixes F356W direct and F322W2 grism
-    # if (len(all_groups) > 0) and ( ('jw05105' in files[0]) ):
-    #     for v in visits:
-    #         if 'clear' in v['product']:
-    #             print('NEXUS direct: ', v['product'])
-    #             direct = v
-    #
-    #     for g in all_groups:
-    #         if g['direct'] is None:
-    #             g['direct'] = direct
 
     print('\n == Grism groups ==\n')
     valid_groups = []
