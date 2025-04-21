@@ -6864,6 +6864,8 @@ def tweak_flt(
     ref_exp=0,
     use_sewpy=False,
     master_radec=None,
+    trim_master_radec=True,
+    buffer_master_radec=0.1/60.,
     make_figures=False,
 ):
     """
@@ -6910,6 +6912,14 @@ def tweak_flt(
     master_radec : str
         Filename of a list of reference ``(ra,dec)`` positions to match.  If not
         provided, then align to the first exposure of the list
+
+    trim_master_radec : bool
+        Trim sources from ``master_radec`` to those that fall within the exposure
+        footprints.
+
+    buffer_master_radec : float
+        Rough buffer in arcmin around each exposure when calculating overlaps for
+        ``trim_master_radec``.
 
     make_figures : int, bool
         If True, then make a diagnostic figure with the shift residuals.
@@ -7102,11 +7112,28 @@ def tweak_flt(
 
     if master_radec is None:
         xy_0 = np.array([c0["X_IMAGE"], c0["Y_IMAGE"]]).T
+
     else:
-        logstr = f"### reference sources from {master_radec}"
+        rd_ref = np.loadtxt(master_radec)
+
+        logstr = f"### N={len(rd_ref)} reference sources from {master_radec}"
         utils.log_comment(utils.LOGFILE, logstr, verbose=True)
 
-        rd_ref = np.loadtxt(master_radec)
+        if trim_master_radec:
+            in_wcs_i = np.zeros(len(rd_ref), dtype=bool)
+
+            for (ci_, wcs_i) in cats:
+                sr = utils.SRegion(wcs_i)
+                if buffer_master_radec > 0:
+                    sr = utils.SRegion(sr.shapely[0].buffer(buffer_master_radec))
+
+                in_wcs_i |= sr.path[0].contains_points(rd_ref)
+
+            rd_ref = rd_ref[in_wcs_i, :]
+
+            logstr = f"### trimmed to N={in_wcs_i.sum()} reference sources in exposures"
+            utils.log_comment(utils.LOGFILE, logstr, verbose=True)
+
         xy_0 = np.array(wcs_0.all_world2pix(rd_ref[:, 0], rd_ref[:, 1], 1)).T
 
     tree = scipy.spatial.cKDTree(xy_0, 10)
