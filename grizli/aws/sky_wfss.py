@@ -540,7 +540,7 @@ def combine_beams_2d(mb, step=0.5, pixfrac=0.75, ymax=12.5, bkg_percentile=None,
             s1d = opt_num / opt_den
             e1d = np.sqrt(1./opt_den)
             
-            if 1:
+            if cont_spline > 0:
                 A = utils.bspline_templates(
                     wgrid,
                     minmax=(wgrid.min(), wgrid.max()),
