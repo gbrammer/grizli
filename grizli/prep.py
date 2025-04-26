@@ -1246,6 +1246,29 @@ def align_drizzled_image(
 
     if use_guess:
         drz_wcs = utils.transform_wcs(drz_wcs, guess[:2], guess[2], guess[3])
+
+        logstr = "# wcs {0} (guess)   : {1:6.2f} {2:6.2f} {3:7.3f} {4:7.3f}"
+        logstr = logstr.format(
+            root, guess[0], guess[1], guess[2] / np.pi * 180, 1.0 / guess[3]
+        )
+        utils.log_comment(utils.LOGFILE, logstr, verbose=True)
+
+        out_shift, out_rot, out_scale = guess[:2], guess[2], guess[3]
+        rms_ = 0.0
+        NGOOD_ = 999
+
+        log_wcs(
+            root,
+            orig_wcs,
+            out_shift,
+            out_rot / np.pi * 180,
+            out_scale,
+            rms_,
+            n=NGOOD_,
+            initialize=False,
+            comment=["radec: {0}".format(radec_comment)],
+        )
+
         return orig_wcs, drz_wcs, guess[:2], guess[2] / np.pi * 180, guess[3]
 
     ##########
@@ -5097,6 +5120,7 @@ def process_direct_grism_visit(
     align_ref_border=100,
     align_min_flux_radius=1.0,
     align_min_nexp=2,
+    align_use_guess=False,
     align_assume_close=False,
     align_transform=None,
     align_guess=None,
@@ -5790,6 +5814,7 @@ def process_direct_grism_visit(
                 clip=align_clip,
                 log=True,
                 guess=guess,
+                use_guess=align_use_guess,
                 outlier_threshold=outlier_threshold,
                 simple=align_simple,
                 rms_limit=align_rms_limit,
