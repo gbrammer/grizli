@@ -474,6 +474,7 @@ def combine_beams_2d(mb, step=0.5, pixfrac=0.75, ymax=12.5, bkg_percentile=None,
             height_ratios=[1,1]*NPA + [2]
         )        
         
+        # ok = (b2d[gr]["wht"] > 0) & np.isfinite(b2d[gr]["sci"])
         vmax = np.nanpercentile(np.array(b2d[gr]["sci"]), 80)
         avg_wht = np.nanmedian(np.array(b2d[gr]["wht"]))
         vmax = np.maximum(vmax, 3 / np.sqrt(avg_wht))
@@ -653,7 +654,7 @@ def combine_beams_2d(mb, step=0.5, pixfrac=0.75, ymax=12.5, bkg_percentile=None,
             np.nansum(np.array(data['contam']) * wht, axis=0) / np.nansum(wht, axis=0) 
         ) * u.microJansky
         
-        sp['err'] = 1./np.sqrt(wht.sum(axis=0)) * u.microJansky 
+        sp['err'] = 1./np.sqrt(np.nansum(wht, axis=0)) * u.microJansky
         
         sp['bkg'] = (
             np.nansum(np.array(data['c1d']) * wht, axis=0) / np.nansum(wht, axis=0)
