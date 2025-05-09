@@ -11292,6 +11292,8 @@ input[type="search"] {display: inline; width:400px;}
                     style="width:60px;display:inline">
     """
 
+        coord_box = None
+
         for ic, col in enumerate(self.colnames):
             if col in filter_columns:
                 found = False
@@ -11337,17 +11339,27 @@ input[type="search"] {display: inline; width:400px;}
 
                 filter_rows.append(row_i + descr)
 
+            if ('ra' in filter_columns) & ('dec' in filter_columns):
+                coord_box = (
+                    ' <tr> <td> Cone search </td>'
+                    ' <td colspan="2"> <input type="text" id="cone_search" name="cone_search" '
+                    ' style="width:175px;display:inline"> </td> </tr>\n'
+                )
+                filter_rows.insert(0, coord_box)
+            else:
+                coord_box = None
+
             filter_input = """
 
 <div style="border:1px solid black; padding:10px; margin:10px">
-<b> Filter: </b>
+<b> Filter:</b>
     <table>
       {0}
     </table>
 </div>
 
 """.format(
-                "\n".join(filter_rows)
+                "\n".join(filter_rows),
             )
 
             lines.insert(il + 1, filter_input)
@@ -11410,6 +11422,11 @@ $.UpdateFilterURL = function () {{
         filter_url += '&search=' + search_text;
     }}
 
+    var cone_text = $('#cone_search').val();
+    if ((cone_text != "") & (cone_text != null)) {{
+        filter_url += '&cone_search=' + cone_text;
+    }}
+
     // Table columns
     for (i = 0; i < filter_params.length; i++) {{
         if ($('#'+filter_params[i]+'_min').val() != "") {{
@@ -11429,12 +11446,65 @@ $.UpdateFilterURL = function () {{
         window.history.pushState('', '', window.location.href.split('?')[0]);
     }}
 }}
-
 """.format(
                 header_lines,
                 "\n && ".join(tester),
                 [self.colnames[ic] for ic in ic_list].__repr__(),
             )
+
+            if coord_box is not None:
+                filter_function += """
+// Parse coordinates for cone search
+$.parseCoord = function(rd, hours) {
+    // Parse sexagesimal coordinates if ':' found in rd
+    if (rd.includes(':')){
+        var dms = rd.split(':')
+        var deg = dms[0]*1;
+        if (deg < 0) {
+            var sign = -1;
+        } else {
+            var sign = 1;
+        }
+        deg += sign*dms[1]/60. + sign*dms[2]/3600.;
+        if (hours > 0) {
+            deg *= 360/24.
+        }
+    } else {
+        var deg = rd;
+    }
+    return deg
+}
+
+$.updateConeSearch = function(){
+    // Update ra dec filters using cone search
+    var coord = $('#cone_search').val().trim();
+    var rd = coord.split(',');
+    if ((rd.length == 1)) {
+        rd = coord.split(' ');
+    }
+
+    if ((rd.length > 1)) {
+        var ra_deg = parseFloat($.parseCoord(rd[0], 1));
+        var dec_deg = parseFloat($.parseCoord(rd[1], 0));
+        if ((rd.length < 3)) {
+            var cone_deg = 1. / 3600;
+        } else {
+            var cone_deg = parseFloat(rd[2]) / 3600;
+        };
+
+        var cosd = Math.cos(dec_deg / 180 * 3.14159);
+        var ra_min_ = ra_deg - cone_deg / cosd;
+        var ra_max_ = ra_deg + cone_deg / cosd;
+        var dec_min_ = dec_deg - cone_deg;
+        var dec_max_ = dec_deg + cone_deg;
+        $('#ra_min').val(ra_min_.toFixed(6));
+        $('#ra_max').val(ra_max_.toFixed(6));
+        $('#dec_min').val(dec_min_.toFixed(6));
+        $('#dec_max').val(dec_max_.toFixed(6));
+    }
+}
+
+"""
 
             for i, line in enumerate(lines):
                 if "$(document).ready(function()" in line:
@@ -11445,6 +11515,12 @@ $.UpdateFilterURL = function () {{
 
             # Parse address bar
             lines.insert(istart + 2, "\n")
+
+            if coord_box is not None:
+                lines.insert(
+                    istart + 2,
+                    "   $('#cone_search').val($.urlParam('cone_search'));\n"
+                )
 
             for ic in ic_list:
                 lines.insert(
@@ -11471,6 +11547,13 @@ $.UpdateFilterURL = function () {{
 
     // Update address bar on search text
     $('input[type="search"]').keyup( function() {{
+        $.UpdateFilterURL();
+    }} );
+
+    // Listener on cone search box
+    $('#cone_search').keyup( function() {{
+        $.updateConeSearch();
+        table.draw();
         $.UpdateFilterURL();
     }} );
 
