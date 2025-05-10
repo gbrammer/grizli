@@ -11117,6 +11117,7 @@ class GTable(astropy.table.Table):
         table_class="display compact",
         css=None,
         filter_columns=[],
+        add_cone_search=True,
         buttons=["csv"],
         toggle=True,
         use_json=False,
@@ -11339,7 +11340,7 @@ input[type="search"] {display: inline; width:400px;}
 
                 filter_rows.append(row_i + descr)
 
-            if ('ra' in filter_columns) & ('dec' in filter_columns):
+            if ('ra' in filter_columns) & ('dec' in filter_columns) & add_cone_search:
                 coord_box = (
                     ' <tr> <td> Cone search </td>'
                     ' <td colspan="2"> <input type="text" id="cone_search" name="cone_search" '
