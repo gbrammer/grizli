@@ -289,7 +289,7 @@ def upload_file(file_name, bucket, object_name=None):
     return True
 
 
-def download_s3_file(path='s3://grizli-v2/HST/Pipeline/Tiles/2529/tile.2529.010.492.f160w_drz_sci.fits', output_dir='./', ExtraArgs={"RequestPayer": "requester"}, overwrite=True, verbose=True):
+def download_s3_file(path='s3://grizli-v2/HST/Pipeline/Tiles/2529/tile.2529.010.492.f160w_drz_sci.fits', output_dir='./', ExtraArgs={"RequestPayer": "requester"}, overwrite=True, verbose=True, **kwargs):
     """
     """
     import boto3
