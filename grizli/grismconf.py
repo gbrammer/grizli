@@ -1187,7 +1187,12 @@ class TransformGrismconf(object):
         """
         aXe beam names like 'A','B','C', etc.
         """
-        beams = [self.beam_names[k] for k in self.orders]
+        # beams = [self.beam_names[k] for k in self.orders]
+        beams = []
+        for k in self.orders:
+            if k in self.beam_names:
+                beams.append(self.beam_names[k])
+
         return beams
 
     def remove_beam(self, beam):
@@ -2402,7 +2407,7 @@ class CRDSGrismConf:
             if ix.sum() == 0:
                 msg = f"Order {order} = {self.dm_orders[i]} not found in "
                 msg += f"{refs['photom']} for {self.filter} {self.pupil}"
-                print(msg)
+                utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
                 continue
 
             row = phot[ix]
