@@ -263,6 +263,39 @@ def query_exposures_db(
     return exp
 
 
+def id_from_segmentation(segmentation_image, ra, dec, verbose=True):
+    """
+    Get ID from segmentation image
+
+    Parameters
+    ----------
+    segmentation_image : str
+        Filename of segmentation image
+
+    ra, dec : float
+        Coordinates in decimal degrees
+
+    Returns
+    -------
+    segment_id : int
+        Value of `segmentation_image` at specified coordinates
+
+    """
+    with pyfits.open(segmentation_image) as im:
+        wcs = pywcs.WCS(im[0].header)
+        xp, yp = np.squeeze(wcs.all_world2pix([ra], [dec], 0)).astype(int)
+        try:
+            segment_id = im[0].data[yp, xp]
+            msg = f"{segmentation_image} @ ({ra:.5f},{dec:.5f}) = {segment_id}"
+        except IndexError:
+            segment_id = 0
+            msg = f"({ra:.5f},{dec:.5f}) not in {segmentation_image}"
+
+    utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+
+    return segment_id
+
+
 def extract_from_coords(
     ra=189.0706488,
     dec=62.2089502,
@@ -273,6 +306,8 @@ def extract_from_coords(
     clean=False,
     get_cutout=True,
     cutout_filter="F444W-CLEAR",
+    segmentation_image=None,
+    source_id=0,
     prefix="gdn-grism",
     verbose=True,
     mb_kwargs={},
@@ -333,6 +368,10 @@ def extract_from_coords(
     msg = f"extract_from_coords: direct image = {cutout_file}"
     utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
 
+    if (segmentation_image is not None) & (source_id == 0):
+        # Get source from segmentation ID
+        source_id = id_from_segmentation(segmentation_image, ra, dec, verbose=verbose)
+
     if grp is None:
         beams = []
         for j, file in enumerate(rate_files):
@@ -346,14 +385,17 @@ def extract_from_coords(
                 ref_file=cutout_file,
                 verbose=((verbose & 2) > 0),
                 cpu_count=-1,
+                seg_file=segmentation_image,
             )
 
             if filter_kwargs is not None:
                 grp.subtract_median_filter(**filter_kwargs)
 
-            beams += grp.get_beams(0, center_rd=(ra, dec), size=size, **mb_kwargs)
+            beams += grp.get_beams(
+                source_id, center_rd=(ra, dec), size=size, **mb_kwargs
+            )
     else:
-        beams = grp.get_beams(0, center_rd=(ra, dec), size=size, **mb_kwargs)
+        beams = grp.get_beams(source_id, center_rd=(ra, dec), size=size, **mb_kwargs)
 
     msg = f"extract_from_coords: {group_name} {len(beams)} beam cutouts"
     utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
@@ -416,7 +458,10 @@ def combine_beams_2d(
     savefig=True,
     verbose=True,
     sys_err=0.03,
+    auto_niriss=False,
     zfit_kwargs={},
+    ylim=(-3, 10),
+    yticks=[0, 3, 5, 7],
     **kwargs,
 ):
     """
@@ -465,6 +510,19 @@ def combine_beams_2d(
     import msaexp.resample_numba
 
     mb.compute_model()
+
+    if mb.beams[0].grism.filter.startswith("GR") & auto_niriss:
+        if zfit_kwargs is not None:
+            if "velocity_sigma" not in zfit_kwargs:
+                dv = 800
+            else:
+                dv = zfit_kwargs["velocity_sigma"]
+
+            zfit_kwargs["velocity_sigma"] = dv
+            zfit_kwargs["dz"] = dv / 3.0e5 / 2
+
+        cont_spline = 0
+        zfit_nspline = 11
 
     b2d = {}
     for gr in mb.PA:
@@ -809,8 +867,8 @@ def combine_beams_2d(
                 axes[j * 2 + k].set_yticklabels([])
 
         scl = 2
-        axes[-1].set_ylim(-3, 10)
-        axes[-1].set_yticks([0, 3, 5, 7])
+        axes[-1].set_ylim(*ylim)
+        axes[-1].set_yticks(yticks)
         axes[-1].set_ylabel(r"$\sigma$")
         axes[-1].grid()
         axes[-1].set_xlabel(r"$\lambda$ - " + f"{gr}")
@@ -866,57 +924,62 @@ def combine_beams_2d(
         for gr in b2d:
             axes = b2d[gr]["fig"].axes
 
-        for ax in axes:
-            yl = ax.get_ylim()
-            xl = ax.get_xlim()
-            lw, lr = utils.get_line_wavelengths()
-            lines = [
-                "OIII-4363",
-                "NeIII-3968",
-                "NeIII-3867",
-                "OII",
-                "OIII",
-                "Hb",
-                "Hg",
-                "Hd",
-                "Ha+NII",
-                "SII",
-                "SIII",
-                "PaB",
-                "PaG",
-                "PaD",
-                "HeI-1083",
-            ]
-            rest_wave = []
-            for li in lines:
-                rest_wave += lw[li]
+            for ax in axes:
+                yl = ax.get_ylim()
+                xl = ax.get_xlim()
+                lw, lr = utils.get_line_wavelengths()
+                lines = [
+                    "OIII-4363",
+                    "NeIII-3968",
+                    "NeIII-3867",
+                    "OII",
+                    "OIII",
+                    "Hb",
+                    "Hg",
+                    "Hd",
+                    "Ha+NII",
+                    "SII",
+                    "SIII",
+                    "PaB",
+                    "PaG",
+                    "PaD",
+                    "HeI-1083",
+                ]
+                rest_wave = []
+                for li in lines:
+                    rest_wave += lw[li]
 
-            ax.vlines(
-                np.array(rest_wave) * (1 + z) / 1.0e4,
-                *yl,
+                ax.vlines(
+                    np.array(rest_wave) * (1 + z) / 1.0e4,
+                    *yl,
+                    color="magenta",
+                    linestyle=":",
+                    alpha=0.3,
+                )
+                ax.set_ylim(*yl)
+                ax.set_xlim(*xl)
+
+            ax.text(
+                0.98,
+                0.9,
+                f"z = {z:.4f}",
+                ha="right",
+                va="top",
+                fontsize=8,
                 color="magenta",
-                linestyle=":",
-                alpha=0.3,
+                transform=ax.transAxes,
+                bbox={"ec": "None", "fc": "w", "alpha": 1.0},
             )
-            ax.set_ylim(*yl)
-            ax.set_xlim(*xl)
-
-        ax.text(
-            0.98,
-            0.9,
-            f"z = {z:.4f}",
-            ha="right",
-            va="top",
-            fontsize=8,
-            color="magenta",
-            transform=ax.transAxes,
-            bbox={"ec": "None", "fc": "w", "alpha": 1.0},
-        )
 
     for gr in b2d:
         fig = b2d[gr]["fig"]
         fig.tight_layout(pad=0.5)
-        utils.figure_timestamp(fig, text_prefix=mb.group_name + "\n")
+        if mb.id > 0:
+            label = f"{mb.id}\n{mb.group_name}"
+        else:
+            label = mb.group_name
+
+        utils.figure_timestamp(fig, text_prefix=label + "\n")
 
         if savefig:
             fig.savefig(f"{mb.group_name}.{gr.lower()}.png")
@@ -1044,10 +1107,27 @@ def redshift_fit_1d(
         )
 
         b2d[gi]["fig"].axes[-1].plot(
-            spec["wave"], tfit["model"] / spec["err"], color="magenta", alpha=0.5
+            spec["wave"], tfit["model"] / spec["full_err"], color="magenta", alpha=0.5
         )
         spec.spec["model"] = tfit["model"]
         spec.spec.meta["REDSHIFT"] = (zbest, "Best redshift")
+
+        if (splines[gi] is not None) & (spline_type == "add"):
+            spline_continuum = tfit["A"].T[:, 1:].dot(tfit["coeffs"][1:])
+            spec.spec["continuum"] = spline_continuum
+            b2d[gi]["fig"].axes[-1].plot(
+                spec["wave"],
+                (spec["flux"] - spline_continuum) / spec["full_err"],
+                color="0.5",
+                alpha=0.5,
+            )
+
+            b2d[gi]["fig"].axes[-1].plot(
+                spec["wave"],
+                (spec["model"] - spline_continuum) / spec["full_err"],
+                color="tomato",
+                alpha=0.5,
+            )
 
         loss_i = loss[gi].logpdf((spec["flux"] - tfit["model"])[spec.valid]).sum()
 
