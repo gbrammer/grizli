@@ -346,12 +346,12 @@ def simple_zeroth_mask(grp, dilation=None, erosion=8, verbose=True, **kwargs):
         mask = flt.seg > 0
         if dilation is not None:
             if morphology is None:
-                mask = nd.binary_dilation(mask, iterations=dilate)
+                mask = nd.binary_dilation(mask, iterations=dilation)
             else:
                 mask = morphology.isotropic_dilation(mask, dilation)
         if erosion is not None:
             if morphology is None:
-                mask = nd.binary_erosion(mask, iterations=dilate)
+                mask = nd.binary_erosion(mask, iterations=erosion)
             else:
                 mask = morphology.isotropic_erosion(mask, erosion)
 
