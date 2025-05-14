@@ -302,7 +302,7 @@ def id_from_segmentation(segmentation_image, ra, dec, verbose=True):
     return segment_id
 
 
-def simple_zeroth_mask(grp, dilation=None, erosion=8, verbose=True, **kwargs):
+def simple_zeroth_mask(grp, dilation=None, erosion=8, update=True, verbose=True, **kwargs):
     """
     Compute a simplified mask for zeroth orders shifting the segmentation image
 
@@ -316,6 +316,9 @@ def simple_zeroth_mask(grp, dilation=None, erosion=8, verbose=True, **kwargs):
 
     erosion : int, None
         Number of mask erosion iterations
+
+    update : bool
+        Apply mask to DQ, SCI, ERR arrays
 
     Returns
     -------
@@ -334,14 +337,14 @@ def simple_zeroth_mask(grp, dilation=None, erosion=8, verbose=True, **kwargs):
             utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
             return None
 
-        msg = f"simple_zeroth_mask: erosion={erosion} dilation={dilation}"
-        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
-
         dx = flt.conf.dxlam["B"]
         dy, lam = flt.conf.get_beam_trace(1024, 1024, dx=dx, beam="B")
         N = len(dx)
         dxp = int(dx[N // 2])
         dyp = int(dy[N // 2])
+
+        msg = f"simple_zeroth_mask: dx={dxp} dy={dyp}   erosion={erosion} dilation={dilation}"
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
 
         mask = flt.seg > 0
         if dilation is not None:
@@ -357,9 +360,10 @@ def simple_zeroth_mask(grp, dilation=None, erosion=8, verbose=True, **kwargs):
 
         mask = np.roll(np.roll(mask, dxp, axis=1), dyp, axis=0)
 
-        flt.grism.data["DQ"][mask] |= 1
-        flt.grism.data["ERR"][mask] = 0
-        flt.grism.data["SCI"][mask] = 0
+        if update:
+            flt.grism.data["DQ"][mask] |= 4096
+            flt.grism.data["ERR"][mask] *= 0
+            flt.grism.data["SCI"][mask] *= 0
 
     return mask
 
@@ -384,6 +388,7 @@ def extract_from_coords(
     savefig=True,
     savefits=True,
     zeroth_mask_kwargs={"erosion": 8},
+    use_jwst_crds=False,
     **kwargs,
 ):
     """
@@ -455,10 +460,13 @@ def extract_from_coords(
                 verbose=((verbose & 2) > 0),
                 cpu_count=-1,
                 seg_file=segmentation_image,
+                use_jwst_crds=use_jwst_crds,
             )
 
             if (zeroth_mask_kwargs is not None) & (segmentation_image is not None):
+                # print('x before mask', (grp.FLTs[0].grism['DQ'] > 0).sum())
                 _ = simple_zeroth_mask(grp, **zeroth_mask_kwargs)
+                # print('x  after mask', (grp.FLTs[0].grism['DQ'] > 0).sum())
 
             if filter_kwargs is not None:
                 grp.subtract_median_filter(**filter_kwargs)
@@ -466,6 +474,9 @@ def extract_from_coords(
             beams += grp.get_beams(
                 source_id, center_rd=(ra, dec), size=size, **mb_kwargs
             )
+
+            del(grp)
+
     else:
         beams = grp.get_beams(source_id, center_rd=(ra, dec), size=size, **mb_kwargs)
 
