@@ -14,7 +14,13 @@ import astropy.io.fits as pyfits
 import astropy.wcs as pywcs
 import astropy.units as u
 from astropy.coordinates import SkyCoord
+
 import scipy.ndimage as nd
+
+try:
+    from skimage import morphology
+except ImportError:
+    morphology = None
 
 from .. import utils, grismconf, multifit
 from . import db, api_cutout
@@ -296,6 +302,68 @@ def id_from_segmentation(segmentation_image, ra, dec, verbose=True):
     return segment_id
 
 
+def simple_zeroth_mask(grp, dilation=None, erosion=8, verbose=True, **kwargs):
+    """
+    Compute a simplified mask for zeroth orders shifting the segmentation image
+
+    Parameters
+    ----------
+    grp : `~grizli.multifit.GroupFLT`
+        Exposure group object
+
+    dilation : int, None
+        Number of mask dilation iterations
+
+    erosion : int, None
+        Number of mask erosion iterations
+
+    Returns
+    -------
+    mask : array-like
+        Boolean zeroth order mask calculated by shifting the non-zero segmentation mask
+        by the expected zeroth order location as defined in the center of the detector
+
+    """
+    for flt in grp.FLTs:
+        if flt.seg.max() == 0:
+            msg = "simple_zeroth_mask: no non-zero segmentation pixels"
+            utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+            return None
+        elif "B" not in flt.conf.beams:
+            msg = "zeroth order (B) not found in config"
+            utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+            return None
+
+        msg = f"simple_zeroth_mask: erosion={erosion} dilation={dilation}"
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+
+        dx = flt.conf.dxlam["B"]
+        dy, lam = flt.conf.get_beam_trace(1024, 1024, dx=dx, beam="B")
+        N = len(dx)
+        dxp = int(dx[N // 2])
+        dyp = int(dy[N // 2])
+
+        mask = flt.seg > 0
+        if dilation is not None:
+            if morphology is None:
+                mask = nd.binary_dilation(mask, iterations=dilate)
+            else:
+                mask = morphology.isotropic_dilation(mask, dilation)
+        if erosion is not None:
+            if morphology is None:
+                mask = nd.binary_erosion(mask, iterations=dilate)
+            else:
+                mask = morphology.isotropic_erosion(mask, erosion)
+
+        mask = np.roll(np.roll(mask, dxp, axis=1), dyp, axis=0)
+
+        flt.grism.data["DQ"][mask] |= 1
+        flt.grism.data["ERR"][mask] = 0
+        flt.grism.data["SCI"][mask] = 0
+
+    return mask
+
+
 def extract_from_coords(
     ra=189.0706488,
     dec=62.2089502,
@@ -315,6 +383,7 @@ def extract_from_coords(
     filter_kwargs=None,
     savefig=True,
     savefits=True,
+    zeroth_mask_kwargs={"erosion": 8},
     **kwargs,
 ):
     """
@@ -387,6 +456,9 @@ def extract_from_coords(
                 cpu_count=-1,
                 seg_file=segmentation_image,
             )
+
+            if (zeroth_mask_kwargs is not None) & (segmentation_image is not None):
+                _ = simple_zeroth_mask(grp, **zeroth_mask_kwargs)
 
             if filter_kwargs is not None:
                 grp.subtract_median_filter(**filter_kwargs)
