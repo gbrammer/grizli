@@ -1636,6 +1636,7 @@ def download_jwst_crds_references(
         "F356W",
         "F410M",
         "F444W",
+        "F322W2",
         "F460M",
         "F480M",
     ],
