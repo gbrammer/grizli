@@ -389,6 +389,7 @@ def extract_from_coords(
     savefits=True,
     zeroth_mask_kwargs={"erosion": 8},
     use_jwst_crds=False,
+    pad_exposure=[800, 800],
     **kwargs,
 ):
     """
@@ -455,7 +456,7 @@ def extract_from_coords(
 
             grp = multifit.GroupFLT(
                 grism_files=[file],
-                pad=[800, 800],
+                pad=pad_exposure,
                 ref_file=cutout_file,
                 verbose=((verbose & 2) > 0),
                 cpu_count=-1,
@@ -621,6 +622,7 @@ def combine_beams_2d(
             "c1d": [],
             "contam": [],
             "cont_model": [],
+            "sensitivity": None
         }
 
         for j, pa in enumerate(mb.PA[gr]):
@@ -632,6 +634,9 @@ def combine_beams_2d(
             sdata = []
             vdata = []
             mdata = []
+
+            if j == 0:
+                b2d[gr]["sensitivity"] = (beams[0].beam.lam, beams[0].beam.sensitivity)
 
             for beam in beams:
                 size = mb.beams[0].sh[0] // 2
@@ -921,6 +926,7 @@ def combine_beams_2d(
                 vmin=-0.1 * vmax,
                 vmax=2 * vmax,
                 cmap="bone_r",
+                origin="lower",
             )
             ax.grid()
             ax.text(
@@ -943,6 +949,7 @@ def combine_beams_2d(
                 vmin=-0.1 * vmax,
                 vmax=2 * vmax,
                 cmap="bone_r",
+                origin="lower",
             )
             ax.grid()
             for k in [0, 1]:
@@ -973,6 +980,11 @@ def combine_beams_2d(
         sp["bkg"] = (
             np.nansum(np.array(data["c1d"]) * wht, axis=0) / np.nansum(wht, axis=0)
         ) * u.microJansky
+
+        if data["sensitivity"] is not None:
+            sp["sensitivity"] = np.interp(
+                sp["wave"]*1.e4, *data["sensitivity"], left=0, right=0.
+            )
 
         sp.meta["GRATING"] = "GRISMR"
         sp.meta["FILTER"] = gr
@@ -1103,6 +1115,15 @@ def redshift_fit_1d(
     for gi in b2d:
         spec = SpectrumSampler(b2d[gi]["spec_file"])
         group_name = b2d[gi]["group_name"]
+
+        if "sensitivity" in spec.spec.colnames:
+            sens = spec["sensitivity"] * 1.e-20
+
+            spec.spec["flux"] /= sens
+            spec.spec["err"] /= sens
+            spec.spec["full_err"] /= sens
+            spec.spec["valid"] &= sens > 0
+            spec.valid &= sens > 0
 
         loss[gi] = norm(loc=0, scale=spec["full_err"][spec.valid])
         if nspline <= 0:
