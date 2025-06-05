@@ -71,6 +71,7 @@ GRISM_COLORS = {
     "F430M": "sandybrown",
     "F460M": "lightsalmon",
     "F480M": "coral",
+    "F322W2": "olive",
     "G280": "purple",
     "F090W": (0.0, 0.4470588235294118, 0.6980392156862745),
     "F115W": (0.0, 0.6196078431372549, 0.45098039215686275),
@@ -105,6 +106,7 @@ GRISM_MAJOR = {
     "F430M": 0.1,
     "F460M": 0.1,
     "F480M": 0.1,
+    "F322W2": 0.1,
     "BLUE": 0.1,
     "RED": 0.1,  # Euclid
     "GRISM": 0.1,
@@ -137,6 +139,7 @@ GRISM_LIMITS = {
     "F430M": [4.1, 4.45, 20],
     "F460M": [4.5, 4.8, 20],
     "F480M": [4.6, 5.05, 20],
+    "F322W2": [2.3, 4.15, 20],
     "BLUE": [0.8, 1.2, 10.0],  # Euclid
     "RED": [1.1, 1.9, 14.0],
 }
@@ -2645,8 +2648,10 @@ def get_line_wavelengths():
     ]
     line_ratios["HeI-series"] = [1.0, 2.75, 0.474, 0.264, 0.330, 4.42, 2.26, 0.916]
 
-    line_wavelengths["MgII"] = [2799.117]
-    line_ratios["MgII"] = [1.0]
+    # line_wavelengths["MgII"] = [2799.117]
+    # line_ratios["MgII"] = [1.0]
+    line_wavelengths["MgII"] = [2796.352, 2803.531]
+    line_ratios["MgII"] = [1.0, 1.0]
 
     line_wavelengths["CIV-1549"] = [1549.480]
     line_ratios["CIV-1549"] = [1.0]
