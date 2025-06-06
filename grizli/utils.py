@@ -8001,6 +8001,8 @@ def drizzle_from_visit(
         if scale_photom:
             # Scale to a particular JWST context and update header keywords
             # like PHOTFLAM, PHOTFNU
+            if 'CRDS_CONTEXT' in os.environ:
+                context = os.environ['CRDS_CONTEXT']
             _scale_jwst_photom = jwst_crds_photom_scale(
                 flt,
                 update=True,
