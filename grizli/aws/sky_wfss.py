@@ -329,7 +329,7 @@ def query_exposures(with_api=False, trim_exposures=True, **kwargs):
 def query_exposures_api(
     ra=189.0706488,
     dec=62.2089502,
-    radius=15.0,
+    radius=120.0,
     filters=["F356W-GRISMR", "F410M-GRISMR", "F444W-GRISMR"],
     verbose=False,
     **kwargs,
@@ -360,7 +360,7 @@ def query_exposures_api(
 def query_exposures_db(
     ra=189.0706488,
     dec=62.2089502,
-    radius=15.0,
+    radius=120.0,
     filters=["F356W-GRISMR", "F410M-GRISMR", "F444W-GRISMR"],
     verbose=False,
     **kwargs,
