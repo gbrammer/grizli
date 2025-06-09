@@ -191,14 +191,130 @@ def s3_cutout(
     return cutout_file
 
 
-def query_exposures(with_api=False, **kwargs):
+def wfss_exposure_footprint(header, ypad=32, xpad=8, use_jwst_crds=True, verbose=False, **kwargs):
+    """
+    Calculate sky footprint that should disperse onto the detector
+
+    Parameters
+    ----------
+    header : `astropy.io.fits.Header` or `astropy.table.Row`
+        Information for generating an exposure header with astrometry and filter 
+        keywords or columns
+
+    use_jwst_crds : bool
+        Use CRDS trace files
+
+    Returns
+    -------
+    conf_params : dict
+        Parameters used to define the configuration and derived wfss offsets
+                
+    """
+    import astropy.table
+    import grizli.grismconf
+    try:
+        _ = grizli.grismconf.LoadedConfig
+    except:
+        grizli.grismconf.LoadedConfig = {}
+
+    if isinstance(header, astropy.table.Row):
+        row = {}
+        rowd = header
+        for c in rowd.colnames:
+            if hasattr(rowd[c], 'mask'):
+                continue
+            elif c in ['footprint']:
+                continue
+            else:
+                row[c] = rowd[c]
+                
+        for i in [1,2]:
+            for j in [1,2]:
+                row[f'cd{i}_{j}'] = row[f'cd{i}{j}']
+        
+        header = pyfits.Header(row)
+
+    wcs = pywcs.WCS(header)
+    conf_params = dict(
+        instrume=rowd['instrume'],
+        grism = rowd['filter'].split('-')[0],
+        filter = rowd['pupil'],
+        module = rowd['detector'][3],
+        use_jwst_crds=use_jwst_crds,
+    )
+    pkey = ' '.join([f'{conf_params[k]}' for k in conf_params])
+    
+    if pkey in grizli.grismconf.LoadedConfig:
+        conf = grizli.grismconf.LoadedConfig[pkey]
+    else:
+        conf_file = grizli.grismconf.get_config_filename(**conf_params)
+        conf = grizli.grismconf.TransformGrismconf(conf_file)
+        conf.get_beams()
+        grizli.grismconf.LoadedConfig[pkey] = conf
+        
+    # Calculate footprint
+    xc = 1024.5
+    dy = [xc - ypad, xc + ypad]
+    dx = [xc + conf.dxlam['A'][0] - xpad, xc + conf.dxlam['A'][-1] + xpad]
+    dxr, dyr = xc - conf.transform.reverse(dx, dy)
+    xwfss = np.array([dxr[1], 2047+dxr[0], 2047+dxr[0], dxr[1]])
+    ywfss = np.array([dyr[1], dyr[1], 2047 + dyr[0], 2047 + dyr[0]])
+    gsky = wcs.all_pix2world(np.array([xwfss, ywfss]).T, 0)
+    wfss_footprint = utils.SRegion(gsky)
+
+    conf_params['corners'] = gsky
+    conf_params['xwfss'] = xwfss
+    conf_params['ywfss'] = ywfss
+    conf_params['footprint'] = wfss_footprint
+
+    return conf_params
+
+
+def trim_wfss_exposure_overlaps(ra=189.0706488, dec=62.2089502, exp={}, verbose=True, **kwargs):
+    """
+    Trim exposure list to those that should have dispersed spectra
+    """
+    exp['has_grism'] = False
+
+    for i, row in enumerate(exp):
+        config = wfss_exposure_footprint(row)
+        wfss_footprint = config['footprint']
+        exp['has_grism'][i] = wfss_footprint.path[0].contains_point((ra, dec))
+
+    msg = (
+        f"trim_wfss_exposure_overlaps ({ra:.5f},{dec:.5f}): "
+        + f" kept {exp['has_grism'].sum()} / {len(exp)} exposures"
+    )
+    utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+        
+    return exp[exp['has_grism']]
+
+
+def query_exposures(with_api=False, trim_exposures=True, **kwargs):
     """
     Wrapper around query_exposures_api / db
+    
+    Parameters
+    ----------
+    with_api : bool
+        Use API search (vs. direct DB query)
+
+    trim_exposures : bool
+        Calculate grism spectrum overlaps with 
+        `grizli.aws.sky_wfss.trim_wfss_exposure_overlaps`
+
+    Returns
+    -------
+    exp : `~astropy.table.Table`
+        Exposure list
     """
     if with_api:
         exp = query_exposures_api(**kwargs)
     else:
         exp = query_exposures_db(**kwargs)
+
+    if trim_exposures:
+        exp = trim_wfss_exposure_overlaps(exp=exp, **kwargs)
 
     return exp
 
@@ -389,6 +505,7 @@ def extract_from_coords(
     savefits=True,
     zeroth_mask_kwargs={"erosion": 8},
     use_jwst_crds=False,
+    trim_exposures=True,
     pad_exposure=[800, 800],
     **kwargs,
 ):
@@ -399,6 +516,7 @@ def extract_from_coords(
     center_coord, coostr = coordinate_string(ra=ra, dec=dec, precision=2)
 
     group_name = f"{prefix}_{coostr}"
+    utils.LOGFILE = f"{group_name}.log.txt"
 
     exp = query_exposures(
         ra=ra,
@@ -409,9 +527,11 @@ def extract_from_coords(
         **kwargs,
     )
 
+    if len(exp) > 0:
+        _ = utils.Unique(exp['filter'], verbose=verbose)
+
     rate_files = []
 
-    utils.LOGFILE = f"{group_name}.log.txt"
     msg = f"extract_from_coords: {group_name} {len(exp)} exposures"
     utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
 
