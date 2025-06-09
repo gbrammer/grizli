@@ -531,6 +531,7 @@ def extract_from_coords(
         filters=grisms,
         with_api=query_with_api,
         verbose=verbose,
+        trim_exposures=trim_exposures,
         **kwargs,
     )
 
