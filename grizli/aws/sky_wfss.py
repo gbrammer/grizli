@@ -260,8 +260,10 @@ def wfss_exposure_footprint(
     dy = [xc - ypad, xc + ypad]
     dx = [xc + conf.dxlam["A"][0] - xpad, xc + conf.dxlam["A"][-1] + xpad]
     dxr, dyr = xc - conf.transform.reverse(dx, dy)
-    xwfss = np.array([dxr[1], 2047 + dxr[0], 2047 + dxr[0], dxr[1]])
-    ywfss = np.array([dyr[1], dyr[1], 2047 + dyr[0], 2047 + dyr[0]])
+
+    xwfss = np.array([dxr.min(), 2047 + dxr.max(), 2047 + dxr.max(), dxr.min()])
+    ywfss = np.array([dyr.min(), dyr.min(), 2047 + dyr.max(), 2047 + dyr.max()])
+
     gsky = wcs.all_pix2world(np.array([xwfss, ywfss]).T, 0)
     wfss_footprint = utils.SRegion(gsky)
 
