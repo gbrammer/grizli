@@ -191,14 +191,16 @@ def s3_cutout(
     return cutout_file
 
 
-def wfss_exposure_footprint(header, ypad=32, xpad=8, use_jwst_crds=True, verbose=False, **kwargs):
+def wfss_exposure_footprint(
+    header, ypad=32, xpad=8, use_jwst_crds=True, verbose=False, **kwargs
+):
     """
     Calculate sky footprint that should disperse onto the detector
 
     Parameters
     ----------
     header : `astropy.io.fits.Header` or `astropy.table.Row`
-        Information for generating an exposure header with astrometry and filter 
+        Information for generating an exposure header with astrometry and filter
         keywords or columns
 
     use_jwst_crds : bool
@@ -208,10 +210,11 @@ def wfss_exposure_footprint(header, ypad=32, xpad=8, use_jwst_crds=True, verbose
     -------
     conf_params : dict
         Parameters used to define the configuration and derived wfss offsets
-                
+
     """
     import astropy.table
     import grizli.grismconf
+
     try:
         _ = grizli.grismconf.LoadedConfig
     except:
@@ -221,29 +224,29 @@ def wfss_exposure_footprint(header, ypad=32, xpad=8, use_jwst_crds=True, verbose
         row = {}
         rowd = header
         for c in rowd.colnames:
-            if hasattr(rowd[c], 'mask'):
+            if hasattr(rowd[c], "mask"):
                 continue
-            elif c in ['footprint']:
+            elif c in ["footprint"]:
                 continue
             else:
                 row[c] = rowd[c]
-                
-        for i in [1,2]:
-            for j in [1,2]:
-                row[f'cd{i}_{j}'] = row[f'cd{i}{j}']
-        
+
+        for i in [1, 2]:
+            for j in [1, 2]:
+                row[f"cd{i}_{j}"] = row[f"cd{i}{j}"]
+
         header = pyfits.Header(row)
 
     wcs = pywcs.WCS(header)
     conf_params = dict(
-        instrume=rowd['instrume'],
-        grism = rowd['filter'].split('-')[0],
-        filter = rowd['pupil'],
-        module = rowd['detector'][3],
+        instrume=rowd["instrume"],
+        grism=rowd["filter"].split("-")[0],
+        filter=rowd["pupil"],
+        module=rowd["detector"][3],
         use_jwst_crds=use_jwst_crds,
     )
-    pkey = ' '.join([f'{conf_params[k]}' for k in conf_params])
-    
+    pkey = " ".join([f"{conf_params[k]}" for k in conf_params])
+
     if pkey in grizli.grismconf.LoadedConfig:
         conf = grizli.grismconf.LoadedConfig[pkey]
     else:
@@ -251,56 +254,58 @@ def wfss_exposure_footprint(header, ypad=32, xpad=8, use_jwst_crds=True, verbose
         conf = grizli.grismconf.TransformGrismconf(conf_file)
         conf.get_beams()
         grizli.grismconf.LoadedConfig[pkey] = conf
-        
+
     # Calculate footprint
     xc = 1024.5
     dy = [xc - ypad, xc + ypad]
-    dx = [xc + conf.dxlam['A'][0] - xpad, xc + conf.dxlam['A'][-1] + xpad]
+    dx = [xc + conf.dxlam["A"][0] - xpad, xc + conf.dxlam["A"][-1] + xpad]
     dxr, dyr = xc - conf.transform.reverse(dx, dy)
-    xwfss = np.array([dxr[1], 2047+dxr[0], 2047+dxr[0], dxr[1]])
+    xwfss = np.array([dxr[1], 2047 + dxr[0], 2047 + dxr[0], dxr[1]])
     ywfss = np.array([dyr[1], dyr[1], 2047 + dyr[0], 2047 + dyr[0]])
     gsky = wcs.all_pix2world(np.array([xwfss, ywfss]).T, 0)
     wfss_footprint = utils.SRegion(gsky)
 
-    conf_params['corners'] = gsky
-    conf_params['xwfss'] = xwfss
-    conf_params['ywfss'] = ywfss
-    conf_params['footprint'] = wfss_footprint
+    conf_params["corners"] = gsky
+    conf_params["xwfss"] = xwfss
+    conf_params["ywfss"] = ywfss
+    conf_params["footprint"] = wfss_footprint
 
     return conf_params
 
 
-def trim_wfss_exposure_overlaps(ra=189.0706488, dec=62.2089502, exp={}, verbose=True, **kwargs):
+def trim_wfss_exposure_overlaps(
+    ra=189.0706488, dec=62.2089502, exp={}, verbose=True, **kwargs
+):
     """
     Trim exposure list to those that should have dispersed spectra
     """
-    exp['has_grism'] = False
+    exp["has_grism"] = False
 
     for i, row in enumerate(exp):
         config = wfss_exposure_footprint(row)
-        wfss_footprint = config['footprint']
-        exp['has_grism'][i] = wfss_footprint.path[0].contains_point((ra, dec))
+        wfss_footprint = config["footprint"]
+        exp["has_grism"][i] = wfss_footprint.path[0].contains_point((ra, dec))
 
     msg = (
         f"trim_wfss_exposure_overlaps ({ra:.5f},{dec:.5f}): "
         + f" kept {exp['has_grism'].sum()} / {len(exp)} exposures"
     )
     utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
-        
-    return exp[exp['has_grism']]
+
+    return exp[exp["has_grism"]]
 
 
 def query_exposures(with_api=False, trim_exposures=True, **kwargs):
     """
     Wrapper around query_exposures_api / db
-    
+
     Parameters
     ----------
     with_api : bool
         Use API search (vs. direct DB query)
 
     trim_exposures : bool
-        Calculate grism spectrum overlaps with 
+        Calculate grism spectrum overlaps with
         `grizli.aws.sky_wfss.trim_wfss_exposure_overlaps`
 
     Returns
@@ -418,7 +423,9 @@ def id_from_segmentation(segmentation_image, ra, dec, verbose=True):
     return segment_id
 
 
-def simple_zeroth_mask(grp, dilation=None, erosion=8, update=True, verbose=True, **kwargs):
+def simple_zeroth_mask(
+    grp, dilation=None, erosion=8, update=True, verbose=True, **kwargs
+):
     """
     Compute a simplified mask for zeroth orders shifting the segmentation image
 
@@ -528,7 +535,7 @@ def extract_from_coords(
     )
 
     if len(exp) > 0:
-        _ = utils.Unique(exp['filter'], verbose=verbose)
+        _ = utils.Unique(exp["filter"], verbose=verbose)
 
     rate_files = []
 
@@ -596,7 +603,7 @@ def extract_from_coords(
                 source_id, center_rd=(ra, dec), size=size, **mb_kwargs
             )
 
-            del(grp)
+            del grp
 
     else:
         beams = grp.get_beams(source_id, center_rd=(ra, dec), size=size, **mb_kwargs)
@@ -742,7 +749,7 @@ def combine_beams_2d(
             "c1d": [],
             "contam": [],
             "cont_model": [],
-            "sensitivity": None
+            "sensitivity": None,
         }
 
         for j, pa in enumerate(mb.PA[gr]):
@@ -1103,7 +1110,7 @@ def combine_beams_2d(
 
         if data["sensitivity"] is not None:
             sp["sensitivity"] = np.interp(
-                sp["wave"]*1.e4, *data["sensitivity"], left=0, right=0.
+                sp["wave"] * 1.0e4, *data["sensitivity"], left=0, right=0.0
             )
 
         sp.meta["GRATING"] = "GRISMR"
@@ -1237,7 +1244,7 @@ def redshift_fit_1d(
         group_name = b2d[gi]["group_name"]
 
         if "sensitivity" in spec.spec.colnames:
-            sens = spec["sensitivity"] * 1.e-20
+            sens = spec["sensitivity"] * 1.0e-20
 
             spec.spec["flux"] /= sens
             spec.spec["err"] /= sens
