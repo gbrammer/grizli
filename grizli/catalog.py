@@ -601,6 +601,7 @@ def get_gaia_vizier(
             max=max,
             vizier=True,
             circle=True,
+            **kwargs,
         )
     except:
         utils.log_exception(utils.LOGFILE, traceback)
@@ -1131,6 +1132,7 @@ def query_tap_catalog(
     gaia=False,
     nsc=False,
     vizier=False,
+    vizier_tap_url="http://tapvizier.u-strasbg.fr/TAPVizieR/tap",
     skymapper=False,
     circle='auto',
     hubble_source_catalog=False,
@@ -1232,7 +1234,7 @@ def query_tap_catalog(
         if verbose:
             print("Query {0} from VizieR TAP server".format(db))
 
-        tap_url = "http://tapvizier.u-strasbg.fr/TAPVizieR/tap"
+        tap_url = vizier_tap_url
         rd_colnames = ["RAJ2000", "DEJ2000"]
         if circle in ['auto']:
             circle = True
