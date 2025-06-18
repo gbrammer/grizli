@@ -213,6 +213,17 @@ class TestJWSTUtils:
         
         assert np.isnan(photmjsr)
 
+    def test_siaf_queries(self):
+        """
+        """
+        try:
+            import pysiaf
+        except ImportError:
+            return None
+
+        for output in ["list", "sregion", "reg"]:
+            _ = jwst_utils.mast_exposure_apertures(output=output)
+
 
 class TestJWSTFittingTools:
     

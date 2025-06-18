@@ -4878,3 +4878,160 @@ def flag_nircam_hot_pixels(
         rate.close()
 
     return sn, dq, (dq > 0).sum()
+
+
+def mast_exposure_attitude(filename="jw06640052001_0310h_00001_nrs1_rate.fits", row=None, gs_pa_offset=-0.1124, verbose=True, **kwargs):
+    """
+    Generate JWST spacecraft attitude matrix relevant for a particular exposure from
+    MAST query columns
+
+    Parameters
+    ----------
+    filename : str
+        JWST exposure filename
+
+    gs_pa_offset : float
+        Empirical offset added to ``gs_v3_pa`` from the MAST query to match
+        ``ROLL_REF`` in the science headers, since ``ROLL_REF`` doesn't seem to be
+        available directly from queries to the MAST db.  The default value was
+        derived from an MSA exposure.
+
+    Returns
+    -------
+    att : (3, 3) array-like
+        Attitude matrix for use with `pysiaf`
+
+    """
+    from mastquery.jwst import make_query_filter, query_jwst
+    import pysiaf
+    from pysiaf import rotations
+
+    file_split = filename.split("_")
+    filters = make_query_filter(
+        "fileSetName", values=["_".join(file_split[:3])]
+    )
+
+    instrument_short = file_split[3][:3].upper()
+    instrument = {
+        "NRS": "NIRSPEC",
+        "NRC": "NIRCAM",
+        "MIR": "MIRI",
+        "NIS": "NIRISS",
+    }[instrument_short]
+
+    if row is None:
+        mast = query_jwst(
+            instrument=instrument_short,
+            filters=filters,
+            columns="*",
+            rates_and_cals=True,
+            extensions=["rate", "cal"],
+        )
+
+        if len(mast) == 0:
+            msg = f"No MAST exposures found for {file}"
+            utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+
+            return None
+
+        row = mast[0]
+
+    siaf = pysiaf.siaf.Siaf(instrument)
+
+    ap = siaf[row["apername"]]
+
+    roll = row["gs_v3_pa"] + gs_pa_offset
+    idl_v2, idl_v3 = ap.idl_to_tel(row["xoffset"], row["yoffset"])
+    att = rotations.attitude(
+        idl_v2,
+        idl_v3,
+        row["targ_ra"],
+        row["targ_dec"],
+        roll
+    )
+
+    return att
+
+
+MAST_APERTURES = {
+    "NIRSPEC": [
+        "NRS_S200A1_SLIT",
+        "NRS_S200A2_SLIT",
+        "NRS_S400A1_SLIT",
+        "NRS_S1600A1_SLIT",
+        "NRS_S200B1_SLIT",
+        "NRS_FULL_IFU",
+        "NRS_VIGNETTED_MSA1",
+        "NRS_VIGNETTED_MSA2",
+        "NRS_VIGNETTED_MSA3",
+        "NRS_VIGNETTED_MSA4",
+    ],
+    "NIRCAM": [
+        "NRCA1_FULL",
+        "NRCA2_FULL",
+        "NRCA3_FULL",
+        "NRCA4_FULL",
+        "NRCA5_FULL",
+        "NRCB1_FULL",
+        "NRCB2_FULL",
+        "NRCB3_FULL",
+        "NRCB4_FULL",
+        "NRCB5_FULL",
+    ],
+    "MIRI": ["MIRIM_ILLUM", "MIRIM_TALRS", "MIRIM_SLIT"],
+    "NIRISS": ["NIS_CEN"],
+}
+
+def mast_exposure_apertures(filename="jw06640052001_0310h_00001_nrs1_rate.fits", mast_apertures=MAST_APERTURES, output="list", siaf_frame="sky", **kwargs):
+    """
+    Generate `pysiaf` apertures associated with a particular telescope pointing
+
+    Parameters
+    ----------
+    filename : str
+        JWST exposure filename
+
+    mast_apertures : dict
+        List of apertures to generate with keys of the instrument name
+
+    output : string
+    """
+    import pysiaf
+
+    # Get attitude matrix
+    att = mast_exposure_attitude(filename=filename, **kwargs)
+
+    apertures = []
+    for instrument in mast_apertures:
+        siaf = pysiaf.Siaf(instrument)
+        for aper_name in mast_apertures[instrument]:
+            ap = siaf[aper_name]
+            ap.set_attitude_matrix(att)
+            apertures.append(ap)
+
+    if output == "list":
+        return apertures
+    elif output in ["sregion", "reg"]:
+        sregions = []
+        for ap in apertures:
+            try:
+                sr = utils.SRegion(
+                    np.array(ap.corners(siaf_frame)), wrap=False
+                )
+            except TypeError:
+                sr = utils.SRegion(
+                    np.array(ap.corners(siaf_frame, rederive=False)), wrap=False
+                )
+            sregions.append(sr)
+
+        for sr, ap in zip(sregions, apertures):
+            sr.label = ap.AperName
+
+        if output == "sregion":
+            return sregions
+        else:
+            regs = [sr.region[0] for sr in sregions]
+            return regs
+    else:
+        msg = "mast_exposure_apertures: output must be 'list', 'sregion', 'reg'"
+        raise ValueError(msg)
