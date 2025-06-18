@@ -4929,7 +4929,7 @@ def mast_exposure_attitude(filename="jw06640052001_0310h_00001_nrs1_rate.fits", 
         )
 
         if len(mast) == 0:
-            msg = f"No MAST exposures found for {file}"
+            msg = f"No MAST exposures found for {filename}"
             utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
 
             return None
@@ -4995,11 +4995,23 @@ def mast_exposure_apertures(filename="jw06640052001_0310h_00001_nrs1_rate.fits",
         List of apertures to generate with keys of the instrument name
 
     output : string
+        Output type:
+          - ``list``: list of `pysiaf.Aperture` objects
+          - ``sregion``: list of `sregion.SRegion` objects
+          - ``reg``: list of DS9 region strings
+
+    Returns
+    -------
+    result : list
+        List of aperture information based on ``output``
     """
     import pysiaf
 
     # Get attitude matrix
     att = mast_exposure_attitude(filename=filename, **kwargs)
+
+    if att is None:
+        return None
 
     apertures = []
     for instrument in mast_apertures:
