@@ -343,7 +343,8 @@ def fresh_flt_file(
 
     if crclean and has_scrappy:
         for ext in [1, 2]:
-            print("Clean CRs with LACosmic, extension {0:d}".format(ext))
+            msg = f"Clean CRs with LACosmic, extension {ext:d}"
+            utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
 
             sci = orig_file["SCI", ext].data
             dq = orig_file["DQ", ext].data
@@ -409,7 +410,9 @@ def fresh_flt_file(
 
         # Copy WFPC2 DQ file (c1m)
         dqfile = os.path.join(path, file.replace("_c0", "_c1"))
-        print("Copy WFPC2 DQ file: {0}".format(dqfile))
+        msg = f"Copy WFPC2 DQ file: {dqfile}"
+        utils.log_comment(utils.LOGFILE, msg, verbose=True)
+
         if os.path.exists(os.path.basename(dqfile)):
             os.remove(os.path.basename(dqfile))
 
@@ -801,7 +804,8 @@ def clip_lists(input, output, clip=20):
     ok = dist < clip
     out_clip = output[ok]
     if ok.sum() == 0:
-        print("No matches within `clip={0:f}`".format(clip))
+        msg = f"No matches within `clip={clip:f}`"
+        utils.log_comment(utils.LOGFILE, msg, verbose=True)
         return False
 
     # Backward
@@ -906,7 +910,8 @@ def match_lists(
 
     # print 'xyxymatch'
     if (len(output) == 0) | (len(input) == 0):
-        print("No entries!")
+        msg = "match_lists: No entries!"
+        utils.log_comment(utils.LOGFILE, msg, verbose=True)
         return input, output, None, transform()
 
     try:
@@ -927,14 +932,8 @@ def match_lists(
         output_ix = pair_ix[:, 1]
 
         msg = "  tristars.match: Nin={0}, Nout={1}, match={2}"
-        print(msg.format(len(input), len(output), len(output_ix)))
-
-        # if False:
-        #     fig = match.match_diagnostic_plot(input, output, pair_ix, tf=None, new_figure=True)
-        #     fig.savefig('/tmp/xtristars.png')
-        #     plt.close(fig)
-        #
-        #     tform = get_transform(input, output, pair_ix, transform=transform, use_ransac=True)
+        msg = msg.format(len(input), len(output), len(output_ix))
+        utils.log_comment(utils.LOGFILE, msg, verbose=True)
 
     except:
 
@@ -961,11 +960,12 @@ def match_lists(
         output_ix = m["ref_idx"].data
         input_ix = m["input_idx"].data
 
-        print(
+        msg = (
             "  xyxymatch.match: Nin={0}, Nout={1}, match={2}".format(
                 len(input), len(output), len(output_ix)
             )
         )
+        utils.log_comment(utils.LOGFILE, msg, verbose=True)
 
     tf = transform()
     tf.estimate(input[input_ix, :], output[output_ix])
@@ -1181,18 +1181,6 @@ def align_drizzled_image(
         if match_catalog_density is None:
             match_catalog_density = False
 
-    # Clip obviously distant files to speed up match
-    # rd_cat = np.array([cat['X_WORLD'], cat['Y_WORLD']])
-    # rd_cat_center = np.median(rd_cat, axis=1)
-    # cosdec = np.array([np.cos(rd_cat_center[1]/180*np.pi),1])
-    # dr_cat = np.sqrt(np.sum((rd_cat.T-rd_cat_center)**2*cosdec**2, axis=1))
-    #
-    # #print('xxx', rd_ref.shape, rd_cat_center.shape, cosdec.shape)
-    #
-    # dr = np.sqrt(np.sum((rd_ref-rd_cat_center)**2*cosdec**2, axis=1))
-    #
-    # rd_ref = rd_ref[dr < 1.1*dr_cat.max(),:]
-
     if len(mag_limits) == 1:
         ok = cat["MAGERR_AUTO"] < 0.1
     else:
@@ -1204,9 +1192,9 @@ def align_drizzled_image(
             ok &= cat["MAGERR_AUTO"] < 0.05
 
     if ok.sum() == 0:
-        print(
-            "{0}.cat: no objects found in magnitude range {1}".format(root, mag_limits)
-        )
+        msg = f"{root}.cat: no objects found in magnitude range {mag_limits}"
+        utils.log_comment(utils.LOGFILE, msg, verbose=True)
+
         return False
 
     # Edge and error mask
@@ -1284,7 +1272,8 @@ def align_drizzled_image(
     ref_cut &= (ref_y > -ref_border) & (ref_y < nx2 + ref_border)
 
     if ref_cut.sum() == 0:
-        print(f"{root}: no reference objects found in the DRZ footprint")
+        msg = f"{root}: no reference objects found in the DRZ footprint"
+        utils.log_comment(utils.LOGFILE, msg, verbose=True)
         return False
 
     rd_ref = rd_ref[ref_cut, :]
@@ -1322,7 +1311,6 @@ def align_drizzled_image(
 
     NGOOD, rms = 0, 0
     for iter in range(NITER):
-        # print('xx iter {0} {1}'.format(iter, NITER))
         xy = np.array(drz_wcs.all_world2pix(rd_ref, pix_origin))
         pix = np.asarray(np.round(xy), dtype=int).T
 
@@ -1343,13 +1331,17 @@ def align_drizzled_image(
 
         if len(input) > max_sources:
             msg = "Clip input list ({0}) to {1} objects"
-            print(msg.format(len(input), max_sources))
+            msg = msg.format(len(input), max_sources)
+            utils.log_comment(utils.LOGFILE, msg, verbose=True)
+
             ix = np.argsort(np.arange(len(input)))[:max_sources]
             input = input[ix, :]
 
         if len(output) > max_sources:
             msg = "Clip output list ({0}) to {1} objects"
-            print(msg.format(len(input), max_sources))
+            msg = msg.format(len(input), max_sources)
+            utils.log_comment(utils.LOGFILE, msg, verbose=True)
+
             ix = np.argsort(np.arange(len(output)))[:max_sources]
             output = output[ix, :]
 
@@ -1376,8 +1368,6 @@ def align_drizzled_image(
                 toler += 5
                 titer += 1
 
-        # print(output.shape, output_ix.shape, output_ix.min(), output_ix.max(), titer, toler, input_ix.shape, input.shape)
-
         titer = 0
         while (len(input_ix) * 1.0 / len(input) < 0.1) & (titer < 3):
             titer += 1
@@ -1399,8 +1389,6 @@ def align_drizzled_image(
                 pass
 
             output_ix, input_ix, outliers, tf = res
-
-        # print(output.shape, output_ix.shape, output_ix.min(), output_ix.max(), titer, toler, input_ix.shape, input.shape)
 
         tf_out = tf(output[output_ix])
         dx = input[input_ix] - tf_out
@@ -1425,16 +1413,6 @@ def align_drizzled_image(
             )
 
             output_ix2, input_ix2, outliers2, tf = res2
-
-        # print('xxx')
-        # import tristars.match
-        # pair_ix = np.zeros((len(output_ix), 2), dtype=int)
-        # pair_ix[:,0] = output_ix
-        # pair_ix[:,1] = input_ix
-        # print(output_ix, input_ix, len(output), len(input))
-        #
-        # fig = tristars.match.match_diagnostic_plot(output, input, pair_ix, tf=tf, new_figure=True)
-        # fig.savefig('xxx.png')
 
         # Log
         shift = tf.translation
@@ -1691,8 +1669,10 @@ def log_wcs(
         List of comments to include in the log file.
 
     """
-    if (not os.path.exists("{0}_wcs.log".format(root))) | initialize:
-        print("Initialize {0}_wcs.log".format(root))
+    if (not os.path.exists(f"{root}_wcs.log")) | initialize:
+        msg = f"Initialize {root}_wcs.log"
+        utils.log_comment(utils.LOGFILE, msg, verbose=True)
+
         orig_hdul = pyfits.HDUList()
         fp = open("{0}_wcs.log".format(root), "w")
         fp.write("# ext xshift yshift rot scale rms N\n")
@@ -5141,6 +5121,8 @@ def process_direct_grism_visit(
     tweak_mosaic_iters=0,
     align_simple=True,
     single_image_CRs=True,
+    with_ctx_mask=True,
+    erode_ctx_single=3,
     skymethod="localmin",
     drizzle_params={},
     iter_atol=1.0e-4,
@@ -5471,7 +5453,7 @@ def process_direct_grism_visit(
         # asn.write()
 
     if isACS:
-        bits = 64 + 32 + 256
+        bits = 64 + 32 + 128 + 256
         driz_cr_snr = "3.5 3.0"
         driz_cr_scale = "1.2 0.7"
     elif isWFPC2:
@@ -5767,14 +5749,12 @@ def process_direct_grism_visit(
 
         # cat = make_drz_catalog(root=direct['product'], threshold=thresh)
         if "footprints" in direct:
-            # print('xxx with footprints')
             cat = make_SEP_catalog(
                 root=direct["product"],
                 threshold=thresh,
                 exposure_footprints=direct["footprints"],
             )
         else:
-            # print('xxx no footprints')
             cat = make_SEP_catalog(
                 root=direct["product"], threshold=thresh, exposure_footprints=None
             )
@@ -5967,8 +5947,9 @@ def process_direct_grism_visit(
                 find_single_image_CRs(
                     direct,
                     simple_mask=(not is_single),
-                    with_ctx_mask=(not is_single),
+                    with_ctx_mask=(not is_single) & with_ctx_mask,
                     run_lacosmic=is_single,
+                    erode_ctx_single=erode_ctx_single,
                 )
             except:
                 utils.log_exception(utils.LOGFILE, traceback)
@@ -6077,14 +6058,12 @@ def process_direct_grism_visit(
         # Remake catalog
         # cat = make_drz_catalog(root=direct['product'], threshold=thresh)
         if "footprints" in direct:
-            # print('xxxx with footprints')
             cat = make_SEP_catalog(
                 root=direct["product"],
                 threshold=thresh,
                 exposure_footprints=direct["footprints"],
             )
         else:
-            # print('xxx no footprints')
             cat = make_SEP_catalog(
                 root=direct["product"], threshold=thresh, exposure_footprints=None
             )
@@ -6591,7 +6570,8 @@ def iterate_tweak_align(
 
     # Copies
     if not os.path.exists("TweakBackup"):
-        print("# iterate_tweak_align: make copies to ./TweakBackup")
+        msg = "# iterate_tweak_align: make copies to ./TweakBackup"
+        utils.log_comment(utils.LOGFILE, msg, verbose=True)
 
         os.mkdir("TweakBackup")
 
@@ -6651,7 +6631,6 @@ def iterate_tweak_align(
             if cat["NEXP"].max() >= 2:
                 ok &= cat["NEXP"] >= 2
 
-        # print(ok.sum())
         so = np.argsort(cat["MAG_AUTO"][ok])[:max_ref_sources]
 
         table_to_radec(cat[ok][so], f"{tmp_root_i}.radec")
@@ -6670,7 +6649,8 @@ def iterate_tweak_align(
 
     if cleanup:
 
-        print("# iterate_tweak_align: remove ./TweakBackup")
+        msg = "# iterate_tweak_align: remove ./TweakBackup"
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
 
         for file in direct["files"]:
             os.remove(f"./TweakBackup/{file}")
@@ -6679,7 +6659,8 @@ def iterate_tweak_align(
 
         files = glob.glob(f"{tmp_root}*")
         for file in files:
-            print(f"# remove {file}")
+            msg = f"# remove {file}"
+            utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
             os.remove(file)
 
 
@@ -7108,8 +7089,6 @@ def tweak_flt(
     for i, (_c, _w) in enumerate(cats):
         _ra, _dec = _w.all_pix2world(_c["X_IMAGE"], _c["Y_IMAGE"], 1)
         nexp = catalog_exposure_overlaps(_ra, _dec, exposure_footprints=_all_wcs)
-
-        # print('xxx nexp'); utils.Unique(nexp)
 
         if nexp.max() >= min_nexp:
             cats[i][0] = _c[nexp >= min_nexp]
@@ -8180,29 +8159,9 @@ def visit_grism_sky(
         yok = (~yrms.mask) & np.isfinite(yrms) & np.isfinite(xmsk) & np.isfinite(yres)
 
         if yok.sum() == 0:
-            print("ERROR: No valid pixels found!")
+            msg = "visit_grism_sky: ERROR No valid pixels found!"
+            utils.log_comment(utils.LOGFILE, msg, verbose=True)
             continue
-
-        # Fit column average with smoothed Gaussian Process model
-        # if False:
-        #     #### xxx old GaussianProcess implementation
-        #     gp = GaussianProcess(regr='constant', corr='squared_exponential',
-        #                          theta0=8, thetaL=5, thetaU=12,
-        #                          nugget=(yrms/bg_sky)[yok][::1]**2,
-        #                          random_start=10, verbose=True, normalize=True)
-        #
-        #     try:
-        #         gp.fit(np.atleast_2d(xmsk[yok][::1]).T, yres[yok][::1]+bg_sky)
-        #     except:
-        #         warn = '# visit_grism_sky / GaussianProces failed!\n# visit_grism_sky / Check that this exposure wasn\'t fried by variable backgrounds.'
-        #         print(warn)
-        #         utils.log_exception(utils.LOGFILE, traceback)
-        #         utils.log_comment(utils.LOGFILE, warn)
-        #
-        #         continue
-        #
-        #     y_pred, MSE = gp.predict(np.atleast_2d(xmsk).T, eval_MSE=True)
-        #     gp_sigma = np.sqrt(MSE)
 
         if use_spline:
             # Fit with Spline basis functions
@@ -8551,7 +8510,7 @@ def fix_star_centers(
 
 
 def find_single_image_CRs(
-    visit, simple_mask=False, with_ctx_mask=True, run_lacosmic=True
+    visit, simple_mask=False, with_ctx_mask=True, erode_ctx_single=3, run_lacosmic=True, verbose=True, **kwargs,
 ):
     """
     Use LACosmic to find CRs in parts of an ACS mosaic where only one
@@ -8571,14 +8530,22 @@ def find_single_image_CRs(
         If True, use the context image to mask out regions where the
         context image is blank.
 
+    erode_ctx_single : int
+        Number of binary erosion iterations to apply to the single-image mask derived
+        from drizzled context image
+
     run_lacosmic : bool
         Run LA Cosmic.
 
     Requires context (CTX) image `visit['product']+'_drc_ctx.fits`.
 
     """
+    import scipy.ndimage as nd
     from drizzlepac import astrodrizzle
-    from astroscrappy import detect_cosmics
+    try:
+        from astroscrappy import detect_cosmics
+    except ImportError:
+        detect_cosmics = None
 
     # try:
     #     import reproject
@@ -8593,10 +8560,35 @@ def find_single_image_CRs(
         ctx = pyfits.open(ctx_files[0])
         bits = np.log2(ctx[0].data)
         mask = ctx[0].data == 0
-        # single_image = np.asarray((np.asarray(bits,dtype=int) == bits) & (~mask),dtype=np.float32)
-        single_image = np.asarray(
-            (np.asarray(bits, dtype=int) == bits) & (~mask), dtype=float
-        )
+
+        single_image = (np.asarray(bits, dtype=int) == bits) & (~mask)
+        msg = f"find_single_image_CRs: make single_image mask from {ctx_files[0]}"
+
+        if erode_ctx_single > 0:
+            msg += f"  erode_ctx_single={erode_ctx_single}"
+
+            # Fill holes
+            single_image = nd.binary_closing(
+                single_image,
+                iterations=int(1)
+            )
+
+            # Erode
+            single_image = nd.binary_erosion(
+                single_image,
+                iterations=int(erode_ctx_single)
+            )
+
+            # Dilate
+            single_image = nd.binary_dilation(
+                single_image,
+                iterations=int(erode_ctx_single)
+            )
+
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+
+        single_image = np.asarray(single_image, dtype=float)
+
         ctx_wcs = pywcs.WCS(ctx[0].header)
         ctx_wcs.pscale = utils.get_wcs_pscale(ctx_wcs)
         ctx.close()
@@ -8639,21 +8631,20 @@ def find_single_image_CRs(
             dq = dq_hdu[dq_extname, ext].data
 
             if simple_mask:
-                print(
-                    "{0}: Mask image without overlaps, extension {1:d}".format(
-                        file, ext
-                    )
-                )
+                msg = f"{file}: Mask image without overlaps, extension {ext:d}"
+                utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+
                 dq[ctx_mask] |= 1024
             else:
-                print("{0}: Clean CRs with LACosmic, extension {1:d}".format(file, ext))
+                msg = f"{file}: Clean CRs with LACosmic, extension {ext:d}"
+                utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
 
                 if with_ctx_mask:
                     inmask = blotted == 0
                 else:
                     inmask = dq > 0
 
-                if run_lacosmic:
+                if run_lacosmic & (detect_cosmics is not None):
                     crmask, clean = detect_cosmics(
                         sci,
                         inmask=inmask,
