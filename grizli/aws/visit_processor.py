@@ -2951,7 +2951,7 @@ def show_epochs_filter(ra=150.1, dec=2.2, outroot=None, size=4, pixel_scale=0.04
             if os.path.exists(file):
                 os.remove(file)
 
-        xfiles = glob.glob('{tmp_name}*')
+        xfiles = glob.glob(f'{tmp_name}*')
         for file in xfiles:
             os.remove(file)
 
@@ -3315,9 +3315,13 @@ def run_all():
     import time
     from grizli.aws import db
 
-    nassoc = db.SQL('select count(distinct(assoc_name)) '
-                         ' from assoc_table')['count'][0]
-                         
+    # nassoc = db.SQL('select count(distinct(assoc_name)) '
+    #                      ' from assoc_table')['count'][0]
+    nassoc = db.SQL("""
+        SELECT count(distinct(assoc_name))
+        FROM assoc_table WHERE status = 0
+    """)['count'][0]
+
     assoc = -1
     j = 0
     while (assoc is not None) & (j < nassoc):
