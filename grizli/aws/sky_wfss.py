@@ -346,6 +346,10 @@ def query_exposures(with_api=False, trim_exposures=True, **kwargs):
     else:
         exp = query_exposures_db(**kwargs)
 
+    if len(exp) > 0:
+        so = np.argsort(exp["file"])
+        exp = exp[so]
+
     if trim_exposures:
         exp = trim_wfss_exposure_overlaps(exp=exp, **kwargs)
 
@@ -765,7 +769,10 @@ def combine_beams_2d(
         zfit_nspline = 11
 
     b2d = {}
-    for gr in mb.PA:
+    PA_keys = list(mb.PA.keys())
+    PA_keys.sort()
+
+    for gr in PA_keys:
         b2d[gr] = {
             "group_name": mb.group_name,
             "sci": [],
@@ -929,7 +936,7 @@ def combine_beams_2d(
             b2d[gr]["wht"].append(drz[2])
             b2d[gr]["prof"].append(p2d)
 
-    for gr in mb.PA:
+    for gr in PA_keys:
 
         NPA = len(mb.PA[gr])
         fig, axes = plt.subplots(
