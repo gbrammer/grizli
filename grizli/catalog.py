@@ -1,6 +1,7 @@
 """
 Catalog table tools
 """
+
 import os
 import inspect
 
@@ -14,6 +15,7 @@ import astropy.io.fits as pyfits
 import astropy.units as u
 import astropy.coordinates as coord
 from astropy.table import Table
+from astropy.coordinates import SkyCoord
 
 from . import utils
 
@@ -88,7 +90,7 @@ def table_to_regions(
 ):
     """
     Make a DS9 region file from a table object
-    
+
     Parameters
     ----------
 
@@ -101,12 +103,12 @@ def table_to_regions(
     comment : list of str
         Comment for each region. Default is None.
 
-    header : str 
+    header : str
         DS9 region file header. Default `global color=green width=1`.
-    
+
     size : float
         Default size for circles. Default is 0.5 arcsec.
-    
+
     use_ellipse : bool
         Use ellipse regions if available. Default is False.
 
@@ -380,7 +382,7 @@ def get_irsa_catalog(
 
     wise : bool
         Query the WISE catalog.  Default is False.
-    
+
     twomass : bool
         Query the 2MASS catalog.  Default is False.
 
@@ -423,7 +425,7 @@ def get_irsa_catalog(
 
 def get_gaia_radec_at_time(gaia_tbl, date=2015.5, format="decimalyear"):
     """
-    Use `~astropy.coordinates.SkyCoord.apply_space_motion` to compute 
+    Use `~astropy.coordinates.SkyCoord.apply_space_motion` to compute
     GAIA positions at a specific observation date
 
     Parameters
@@ -476,9 +478,9 @@ def get_gaia_radec_at_time(gaia_tbl, date=2015.5, format="decimalyear"):
             distance=1 * u.kpc,
             radial_velocity=0.0 * u.km / u.second,
         )
-    
+
     if date > 50000:
-        format = 'mjd'
+        format = "mjd"
 
     new_obstime = Time(date, format=format)
     coord_at_time = coord.apply_space_motion(new_obstime=new_obstime)
@@ -586,7 +588,7 @@ def get_gaia_vizier(
         keys = list(gdict.keys())
 
     if "dr3" in catalog:
-        for k in ["Epoch","WAL"]:
+        for k in ["Epoch", "WAL"]:
             if k in keys:
                 keys.pop(keys.index(k))
 
@@ -595,7 +597,7 @@ def get_gaia_vizier(
             ra,
             dec,
             radius=radius,
-            db=f"\"{catalog}\"",
+            db=f'"{catalog}"',
             columns=[f'"{k}"' for k in keys],
             extra=extra_query,
             max=max,
@@ -734,14 +736,16 @@ def get_gaia_DR2_vizier(
     return result
 
 
-def gaia_catalog_for_assoc(assoc_name="j191132p1652_hen-2-427-f335m_00007", min_radius=3, **kwargs):
+def gaia_catalog_for_assoc(
+    assoc_name="j191132p1652_hen-2-427-f335m_00007", min_radius=3, **kwargs
+):
     """
     Get GAIA catalog
 
     Parameters
     ----------
     assoc_name : str
-        Name of the association. 
+        Name of the association.
         Dedfault is `j191132p1652_hen-2-427-f335m_00007`.
 
     min_radius : float
@@ -850,7 +854,7 @@ def get_gaia_DR2_catalog(
     max_wait : int
         Maximum number of seconds to wait for the query to complete.
         Default is 20.
-    
+
     max : int
         Maximum number of rows to return.  Default is 100000.
 
@@ -1026,7 +1030,7 @@ def gen_tap_box_query(
 
     db : str
         Database to query.  Default is `ls_dr7.tractor_primary`.
-    
+
     columns : list of str
         List of columns to output.  Default ['*'] returns all columns.
 
@@ -1085,7 +1089,7 @@ def gen_tap_box_query(
     fmt = dict(
         ra=ra,
         dec=dec,
-        radius_deg=radius/60.,
+        radius_deg=radius / 60.0,
         rc=rd_colnames[0],
         dc=rd_colnames[1],
         left=left,
@@ -1101,7 +1105,7 @@ def gen_tap_box_query(
         query = (
             "SELECT {maxsel} {output_columns} FROM {db}"
             + " WHERE 1=CONTAINS(POINT('ICRS',{db}.RAJ2000, {db}.DEJ2000),"
-            +  "CIRCLE('ICRS', {ra}, {dec}, {radius_deg:.3f}))"
+            + "CIRCLE('ICRS', {ra}, {dec}, {radius_deg:.3f}))"
         )
     elif not np.isfinite(ra + dec):
         query = "SELECT {maxsel} {output_columns} FROM {db} "
@@ -1134,7 +1138,7 @@ def query_tap_catalog(
     vizier=False,
     vizier_tap_url="http://tapvizier.u-strasbg.fr/TAPVizieR/tap",
     skymapper=False,
-    circle='auto',
+    circle="auto",
     hubble_source_catalog=False,
     tap_kwargs={},
     **kwargs,
@@ -1236,10 +1240,10 @@ def query_tap_catalog(
 
         tap_url = vizier_tap_url
         rd_colnames = ["RAJ2000", "DEJ2000"]
-        if circle in ['auto']:
+        if circle in ["auto"]:
             circle = True
     else:
-        if circle in ['auto']:
+        if circle in ["auto"]:
             circle = False
 
     if skymapper:
@@ -1275,7 +1279,7 @@ def query_tap_catalog(
             circle=circle,
         )
     else:
-        query = f'SELECT TOP {max} * FROM {db} '
+        query = f"SELECT TOP {max} * FROM {db} "
 
     job = tap.launch_job(query + extra, dump_to_file=True, verbose=verbose)
     try:
@@ -1391,9 +1395,9 @@ def get_hubble_source_catalog(
         `radius`.  Or if a `WCS` object, get limits from the
         `~astropy.wcs.WCS.calc_footprint` method
 
-    max : int 
+    max : int
         Maximum number of rows to return. Default is 100000.
-    
+
     extra : str
         Additional query string. Default is " AND NumImages > 0".
 
@@ -1580,7 +1584,7 @@ def get_desdr1_catalog(
     -------
     tab : `~astropy.table.Table`
         Result of the query
-    
+
     """
     msg = "Query DES Source Catalog ({ra:.5f},{dec:.5f},{radius:.1f}')"
     print(msg.format(ra=ra, dec=dec, radius=radius))
@@ -1877,7 +1881,7 @@ def get_legacysurveys_catalog(
     ----------
     ra, dec : float
         Center of the query region, decimal degrees
-    
+
     radius : float
         Radius of the query, in arcmin
 
@@ -1889,7 +1893,7 @@ def get_legacysurveys_catalog(
 
     sn_lim : tuple
         Signal-to-noise limit. Default is ("r", 10).
-    
+
     kwargs : dict
         Additional keyword arguments to pass to `query_tap_catalog`.
 
@@ -1984,6 +1988,81 @@ def get_panstarrs_catalog(
     return tab
 
 
+def get_euclid_q1_catalog(
+    ra=0.0,
+    dec=0.0,
+    radius=3.0,
+    max_records=500000,
+    verbose=True,
+    table="euclid_q1_mer_catalogue",
+    columns=[
+        "ra",
+        "dec",
+        "fwhm",
+        "flux_vis_1fwhm_aper",
+        "flux_nir_stack_1fwhm_aper",
+        "flag_vis",
+        "flag_nir_stack",
+    ],
+    trim_flag=15,
+):
+    """
+    Get PS1 from Vizier
+
+    Wrapper for `query_tap_catalog`.
+
+    Parameters
+    ----------
+    ra, dec : float
+        Center of the query region, decimal degrees.
+        Default is 0.0, 0.0.
+
+    radius : float
+        Radius of the query, in arcmin.
+        Default is 3.0.
+
+    max_records : int
+        Maximum number of rows to return. Default is 500000.
+
+    verbose : bool
+        Print information. Default is True.
+
+    extra : str
+        Additional query string.
+
+    Returns
+    -------
+    tab : `~astropy.table.Table`
+        Result of the query.
+
+    """
+    msg = "Query Euclid Q1 catalog ({ra},{dec},{radius}) from astroquery.ipac.irsa"
+    print(msg.format(ra=ra, dec=dec, radius=radius))
+
+    from astroquery.ipac.irsa import Irsa
+
+    coo = SkyCoord(ra, dec, unit="deg")
+    tab = Irsa.query_region(
+        coordinates=coo,
+        spatial="Cone",
+        catalog=table,
+        radius=radius * u.arcmin,
+        columns=",".join(columns),
+    )
+
+    if trim_flag is not None:
+        trim = np.zeros(len(tab), dtype=bool)
+        for c in ["flag_vis", "flag_nir_stack"]:
+            if c in tab.colnames:
+                trim |= tab[c] & trim_flag > 0
+
+        msg = f"get_euclid_q1_catalog: trim {trim.sum()} sources with flag {trim_flag}"
+        print(msg)
+        tab = tab[~trim]
+
+    return tab
+
+
 def get_radec_catalog(
     ra=0.0,
     dec=0.0,
@@ -1992,6 +2071,8 @@ def get_radec_catalog(
     verbose=True,
     reference_catalogs=[
         "GAIA",
+        "EUCLID_Q1",
+        "LS_DR10",
         "LS_DR9",
         "PS1",
         "Hubble",
@@ -2061,6 +2142,7 @@ def get_radec_catalog(
         "VEXAS": get_vexas_catalog,
         "LS_DR9": get_legacysurveys_catalog,
         "LS_DR10": get_legacysurveys_catalog,
+        "EUCLID_Q1": get_euclid_q1_catalog,
     }
 
     # Try queries
