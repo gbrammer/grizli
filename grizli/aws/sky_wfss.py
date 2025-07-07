@@ -235,6 +235,10 @@ def wfss_exposure_footprint(
             for j in [1, 2]:
                 row[f"cd{i}_{j}"] = row[f"cd{i}{j}"]
 
+        # Distortion ?
+        row["cd1_2"] *= 4.641 / 3.279
+        row["cd2_2"] *= 4.641 / 3.279
+
         header = pyfits.Header(row)
 
     wcs = pywcs.WCS(header)
@@ -271,8 +275,30 @@ def wfss_exposure_footprint(
     conf_params["xwfss"] = xwfss
     conf_params["ywfss"] = ywfss
     conf_params["footprint"] = wfss_footprint
+    conf_params["orig_wcs"] = wcs
+    conf_params["conf"] = conf
 
     return conf_params
+
+
+def config_trace_sky(ra, dec, conf_params, xpad=12, ypad=12, **kwargs):
+    """
+    Estimate sky coordinates of a dispersed trace given exposure WCS
+    """
+    wcs = conf_params["orig_wcs"]
+    conf = conf_params["conf"]
+
+    xpix, ypix = np.squeeze(wcs.all_world2pix([ra], [dec], 0))
+    xtr, ytr = np.squeeze(conf.transform.forward(xpix, ypix))
+    dy, lam = conf.get_beam_trace(xtr, ytr, dx=conf.dxlam["A"], beam="A")
+
+    xdet, ydet = conf.transform.reverse(xtr + conf.dxlam["A"], ytr + dy)
+    tra, tdec = wcs.all_pix2world(xdet, ydet, 0)
+    valid = (
+        (xdet > -xpad) & (xdet < 2048 + xpad) & (ydet > -ypad) & (ydet < 2048 + ypad)
+    )
+
+    return tra, tdec, valid
 
 
 def trim_wfss_exposure_overlaps(
@@ -284,7 +310,7 @@ def trim_wfss_exposure_overlaps(
     exp["has_grism"] = False
 
     for i, row in enumerate(exp):
-        config = wfss_exposure_footprint(row)
+        config = wfss_exposure_footprint(row, **kwargs)
         wfss_footprint = config["footprint"]
         exp["has_grism"][i] = wfss_footprint.path[0].contains_point((ra, dec))
 
