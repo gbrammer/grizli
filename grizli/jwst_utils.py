@@ -29,15 +29,18 @@ MAX_CTX_FOR_SKYFLATS = "jwst_1130.pmap"
 
 ## Some filters are still better with the grizli skyflats
 FORCE_SKYFLATS = [
-    "F250M", "F250M-CLEAR",
-    "F300M", "F300M-CLEAR",
-    "F460M", "F460M-CLEAR",
+    "F250M",
+    "F250M-CLEAR",
+    "F300M",
+    "F300M-CLEAR",
+    "F460M",
+    "F460M-CLEAR",
 ]
 
 # Global variable to control whether or not to try to update
 # PP file WCS
 DO_PURE_PARALLEL_WCS = True
-FIXED_PURE_PARALLEL_WCS_CAL_VER = '1.16'
+FIXED_PURE_PARALLEL_WCS_CAL_VER = "1.16"
 
 from .constants import JWST_DQ_FLAGS, PLUS_FOOTPRINT, CORNER_FOOTPRINT
 
@@ -199,9 +202,7 @@ def crds_reffiles(
     if detector is not None:
         cpars["meta.instrument.detector"] = detector
         if instrument == "NIRCAM":
-            cpars["meta.instrument.channel"] = (
-                "LONG" if "LONG" in detector else "SHORT"
-            )
+            cpars["meta.instrument.channel"] = "LONG" if "LONG" in detector else "SHORT"
 
     if date is None:
         date = astropy.time.Time.now().iso
@@ -488,20 +489,25 @@ def check_context_for_skyflats(verbose=True):
     result : bool
 
     """
-    context = os.getenv('CRDS_CONTEXT')
+    context = os.getenv("CRDS_CONTEXT")
     if context is None:
         context = CRDS_CONTEXT
 
     res = context <= MAX_CTX_FOR_SKYFLATS
 
-    msg = f'check_context_for_skyflats: {context} < {MAX_CTX_FOR_SKYFLATS}: {res}'
+    msg = f"check_context_for_skyflats: {context} < {MAX_CTX_FOR_SKYFLATS}: {res}"
     utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
 
     return res
 
 
 def img_with_flat(
-    input, verbose=True, overwrite=True, apply_photom=True, use_skyflats=True, mask_dq4_fraction=0.25
+    input,
+    verbose=True,
+    overwrite=True,
+    apply_photom=True,
+    use_skyflats=True,
+    mask_dq4_fraction=0.25,
 ):
     """
     Apply flat-field and photom corrections if nessary
@@ -652,8 +658,8 @@ def img_with_flat(
 
                 _hdu.flush()
 
-        _needs_skyflat = (
-            check_context_for_skyflats() | (_hdu[0].header['OFILTER'] in FORCE_SKYFLATS)
+        _needs_skyflat = check_context_for_skyflats() | (
+            _hdu[0].header["OFILTER"] in FORCE_SKYFLATS
         )
 
         if use_skyflats & _needs_skyflat:
@@ -684,13 +690,13 @@ def img_with_flat(
             # Mask flat
             if _flatfile is not None:
                 with pyfits.open(_flatfile) as _flat_im:
-                    _flat_dq = _flat_im['DQ'].data*1
-                    _flat_data = _flat_im['SCI'].data*1
-            
+                    _flat_dq = _flat_im["DQ"].data * 1
+                    _flat_data = _flat_im["SCI"].data * 1
+
                 _bad_flat = _flat_data == 1
                 _bad_flat |= _flat_data < 0.6
                 _bad_flat |= _flat_data > 1.8
-            
+
                 _flat_dq |= (5 * (_bad_flat)).astype(_flat_dq.dtype)
 
                 with pyfits.open(input, mode="update") as _hdu:
@@ -700,7 +706,7 @@ def img_with_flat(
         if mask_dq4_fraction is not None:
             with pyfits.open(input, mode="update") as _hdu:
 
-                dq4 = _hdu['DQ'].data & 4
+                dq4 = _hdu["DQ"].data & 4
                 dq4_frac = (dq4 > 0).sum() / dq4.size
 
                 if dq4_frac > mask_dq4_fraction:
@@ -711,9 +717,9 @@ def img_with_flat(
                         utils.LOGFILE, msg, verbose=verbose, show_date=False
                     )
 
-                    _hdu['DQ'].header['UNSET4'] = True
+                    _hdu["DQ"].header["UNSET4"] = True
 
-                    _hdu['DQ'].data -= dq4.astype(_hdu['DQ'].data.dtype)
+                    _hdu["DQ"].data -= dq4.astype(_hdu["DQ"].data.dtype)
 
                     _hdu.flush()
 
@@ -862,8 +868,8 @@ def img_with_wcs(
         _hdu.writeto(input, overwrite=True)
         _hdu.close()
 
-        if 'CAL_VER' in _hdu[0].header:
-            _cal_ver = _hdu[0].header['CAL_VER']
+        if "CAL_VER" in _hdu[0].header:
+            _cal_ver = _hdu[0].header["CAL_VER"]
             _needs_fix = Version(_cal_ver) < Version(FIXED_PURE_PARALLEL_WCS_CAL_VER)
         else:
             _needs_fix = True
@@ -913,10 +919,7 @@ def convert_cal_to_rate(cal_file, write=True, overwrite=True, verbose=True):
 
     cal_step = dm.meta.cal_step.instance
 
-    pipeline_steps = {
-        "photom": PhotomStep(),
-        "flat_field": FlatFieldStep()
-    }
+    pipeline_steps = {"photom": PhotomStep(), "flat_field": FlatFieldStep()}
 
     for step in pipeline_steps:
         if step not in cal_step:
@@ -1241,6 +1244,8 @@ def exposure_oneoverf_correction(
     axis=None,
     thresholds=[5, 4, 3],
     erode_mask=None,
+    manual_mask=None,
+    nirspec_prism_mask=False,
     dilate_iterations=3,
     deg_pix=64,
     make_plot=True,
@@ -1279,6 +1284,14 @@ def exposure_oneoverf_correction(
         NIRISS dispersed image to avoid clipping compact high-order spectra
         from the mask and True otherwise (for NIRISS imaging and NIRCam
         generally).
+
+    manual_mask : array-like, None
+        Manually-defined mask with valid pixels set to True.  Should have the same
+        dimensions as the exposure data, i.e., (2048, 2048).
+
+    nirspec_prism_mask : bool
+        Make an automatic mask for NIRSpec PRISM exposures for axis=1 mask using only
+        pixels that won't have PRISM spectra.
 
     dilate_iterations : int
         Number of `binary_dilation` iterations of the source mask
@@ -1353,6 +1366,35 @@ def exposure_oneoverf_correction(
     msg = f"exposure_oneoverf_correction: {file} axis={axis} deg_pix={deg_pix}"
     utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
 
+    prism_mask = None
+    if nirspec_prism_mask & (axis == 1):
+        if im[0].header["INSTRUME"] == "NIRSPEC":
+            if im[0].header["GRATING"] == "PRISM":
+                if im[0].header["EXP_TYPE"] == "NRS_IFU":
+                    sflat_file = "sflat_{GRATING}-{FILTER}_{DETECTOR}.fits".format(
+                        im[0].header
+                    ).lower()
+                    if os.path.exists(sflat_file):
+                        with pyfits.open(sflat_file) as sflat_:
+                            has_sflat = np.isfinite(sflat_[0].data)
+                            prism_mask = ~nd.binary_dilation(has_sflat, iterations=4)
+
+                        msg = f"exposure_oneoverf_correction: PRISM mask from {sflat_file}"
+                        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+
+                if prism_mask is None:
+                    if im[0].header["DETECTOR"] == "NRS1":
+                        empty_slice = (4, 570)
+                    else:
+                        empty_slice = (1160, 2040)
+
+                    prism_mask = np.zeros(im["SCI"].data.shape, dtype=bool)
+                    prism_mask[:, slice(*empty_slice)] = True
+                    msg = (
+                        f"exposure_oneoverf_correction: PRISM empty mask {empty_slice}"
+                    )
+                    utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+
     if im[0].header["INSTRUME"] in ("NIRSPEC"):
         erode_mask = False
 
@@ -1387,6 +1429,13 @@ def exposure_oneoverf_correction(
     sn_mask = nd.binary_dilation(sn_mask, iterations=dilate_iterations)
 
     mask = dqmask & ~sn_mask
+    if prism_mask is not None:
+        mask = dqmask & prism_mask
+
+    if manual_mask is not None:
+        msg = f"exposure_oneoverf_correction: manual_mask {manual_mask.sum()}"
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+        mask &= manual_mask
 
     cheb = 0
 
@@ -1417,6 +1466,12 @@ def exposure_oneoverf_correction(
         sn_mask = nd.binary_dilation(sn_mask, iterations=dilate_iterations)
         mask = dqmask & ~sn_mask
         mask &= (sci - model) / err > -thresh
+
+        if prism_mask is not None:
+            mask = dqmask & prism_mask
+
+        if manual_mask is not None:
+            mask &= manual_mask
 
         if make_plot:
             ax.plot(med, alpha=0.5)
@@ -3380,7 +3435,7 @@ def get_nircam_zeropoint_update(
     header=None,
     verbose=False,
     **kwargs,
-    ):
+):
     """
     Get latest correction factors for NIRCAM zeropoints
 
@@ -3413,24 +3468,22 @@ def get_nircam_zeropoint_update(
     import yaml
 
     zeropoint_file = os.path.join(
-        os.path.dirname(__file__),
-        "data",
-        "jwst_zeropoints.yml"
+        os.path.dirname(__file__), "data", "jwst_zeropoints.yml"
     )
 
     if header is not None:
-        if 'DETECTOR' in header:
-            detector = header['DETECTOR']
+        if "DETECTOR" in header:
+            detector = header["DETECTOR"]
 
-        if 'OFILTER' in header:
-            filter = header['OFILTER']
-        elif 'FILTER' in header:
-            filter = header['FILTER']
+        if "OFILTER" in header:
+            filter = header["OFILTER"]
+        elif "FILTER" in header:
+            filter = header["FILTER"]
 
-        if 'OPUPIL' in header:
-            pupil = header['OPUPIL']
-        elif 'PUPIL' in header:
-            pupil = header['PUPIL']
+        if "OPUPIL" in header:
+            pupil = header["OPUPIL"]
+        elif "PUPIL" in header:
+            pupil = header["PUPIL"]
         else:
             pupil = None
 
@@ -4421,7 +4474,7 @@ def get_nirspec_persistence_mask(
     dilation_iterations=1,
     verbose=True,
     **kwargs,
-    ):
+):
     """
     Make a mask for NIRSpec pixels likely to cause persistence.
 
@@ -4466,27 +4519,27 @@ def get_nirspec_persistence_mask(
 
     with pyfits.open(file) as im:
         # DQ mask
-        valid_dq = utils.mod_dq_bits(im['DQ'].data, ok_bits) == 0
+        valid_dq = utils.mod_dq_bits(im["DQ"].data, ok_bits) == 0
 
         # Median RNOISE
-        med_rnoise = np.nanmedian(im['VAR_RNOISE'].data[valid_dq])
+        med_rnoise = np.nanmedian(im["VAR_RNOISE"].data[valid_dq])
 
         mask = nd.binary_closing(
-            valid_dq & (im['VAR_RNOISE'].data > rnoise_threshold * med_rnoise),
-            iterations=closing_iterations
+            valid_dq & (im["VAR_RNOISE"].data > rnoise_threshold * med_rnoise),
+            iterations=closing_iterations,
         )
 
     eroded = nd.binary_erosion(mask, iterations=erosion_iterations)
 
     flagged = skimage.morphology.isotropic_dilation(eroded, dilation_iterations)
 
-    msg = f'get_nirspec_persistence_mask: {file} N={flagged.sum()}'
+    msg = f"get_nirspec_persistence_mask: {file} N={flagged.sum()}"
     utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
 
     return flagged
 
 
-def get_saturated_pixel_table(output="table", use_nirspec='auto', **kwargs):
+def get_saturated_pixel_table(output="table", use_nirspec="auto", **kwargs):
     """
     Get table of pixel indices from `~grizli.jwst_utils.get_saturated_pixels`
 
@@ -4515,9 +4568,9 @@ def get_saturated_pixel_table(output="table", use_nirspec='auto', **kwargs):
 
     """
 
-    if ('file' in kwargs) & (use_nirspec in ['auto']):
-        use_nirspec = ('_nrs1' in kwargs['file']) | ('_nrs2' in kwargs['file'])
-    elif 'file' not in kwargs:
+    if ("file" in kwargs) & (use_nirspec in ["auto"]):
+        use_nirspec = ("_nrs1" in kwargs["file"]) | ("_nrs2" in kwargs["file"])
+    elif "file" not in kwargs:
         use_nirspec = False
 
     if use_nirspec:
@@ -4565,13 +4618,15 @@ def query_persistence(flt_file, saturated_lookback=1.0e4, verbose=True):
     froot = os.path.basename(flt_file).split("_rate.fits")[0]
 
     # Get exposure start
-    t0 = db.SQL(f"""
+    t0 = db.SQL(
+        f"""
         SELECT expstart, detector from exposure_files
         WHERE file = '{froot}'
-    """)
+    """
+    )
 
     # Bad pixels from other exposures within dt interval
-    tstart = t0['expstart'][0] - saturated_lookback/86400
+    tstart = t0["expstart"][0] - saturated_lookback / 86400
 
     bpix_command = f"""
         SELECT i,j FROM exposure_files NATURAL JOIN exposure_saturated
@@ -4880,7 +4935,13 @@ def flag_nircam_hot_pixels(
     return sn, dq, (dq > 0).sum()
 
 
-def mast_exposure_attitude(filename="jw06640052001_0310h_00001_nrs1_rate.fits", row=None, gs_pa_offset=-0.1124, verbose=True, **kwargs):
+def mast_exposure_attitude(
+    filename="jw06640052001_0310h_00001_nrs1_rate.fits",
+    row=None,
+    gs_pa_offset=-0.1124,
+    verbose=True,
+    **kwargs,
+):
     """
     Generate JWST spacecraft attitude matrix relevant for a particular exposure from
     MAST query columns
@@ -4907,9 +4968,7 @@ def mast_exposure_attitude(filename="jw06640052001_0310h_00001_nrs1_rate.fits", 
     from pysiaf import rotations
 
     file_split = filename.split("_")
-    filters = make_query_filter(
-        "fileSetName", values=["_".join(file_split[:3])]
-    )
+    filters = make_query_filter("fileSetName", values=["_".join(file_split[:3])])
 
     instrument_short = file_split[3][:3].upper()
     instrument = {
@@ -4942,13 +5001,7 @@ def mast_exposure_attitude(filename="jw06640052001_0310h_00001_nrs1_rate.fits", 
 
     roll = row["gs_v3_pa"] + gs_pa_offset
     idl_v2, idl_v3 = ap.idl_to_tel(row["xoffset"], row["yoffset"])
-    att = rotations.attitude(
-        idl_v2,
-        idl_v3,
-        row["targ_ra"],
-        row["targ_dec"],
-        roll
-    )
+    att = rotations.attitude(idl_v2, idl_v3, row["targ_ra"], row["targ_dec"], roll)
 
     return att
 
@@ -4982,7 +5035,15 @@ MAST_APERTURES = {
     "NIRISS": ["NIS_CEN"],
 }
 
-def mast_exposure_apertures(filename="jw06640052001_0310h_00001_nrs1_rate.fits", mast_apertures=MAST_APERTURES, output="list", siaf_frame="sky", **kwargs):
+
+def mast_exposure_apertures(
+    filename="jw06640052001_0310h_00001_nrs1_rate.fits",
+    mast_apertures=MAST_APERTURES,
+    attitude=None,
+    output="list",
+    siaf_frame="sky",
+    **kwargs,
+):
     """
     Generate `pysiaf` apertures associated with a particular telescope pointing
 
@@ -4993,6 +5054,10 @@ def mast_exposure_apertures(filename="jw06640052001_0310h_00001_nrs1_rate.fits",
 
     mast_apertures : dict
         List of apertures to generate with keys of the instrument name
+
+    attitude : array-like
+        `pysiaf` attitude matrix.  If not provided, try to generate from ``filename``
+        and other inputs
 
     output : string
         Output type:
@@ -5008,17 +5073,17 @@ def mast_exposure_apertures(filename="jw06640052001_0310h_00001_nrs1_rate.fits",
     import pysiaf
 
     # Get attitude matrix
-    att = mast_exposure_attitude(filename=filename, **kwargs)
-
-    if att is None:
-        return None
+    if attitude is None:
+        attitude = mast_exposure_attitude(filename=filename, **kwargs)
+        if attitude is None:
+            return None
 
     apertures = []
     for instrument in mast_apertures:
         siaf = pysiaf.Siaf(instrument)
         for aper_name in mast_apertures[instrument]:
             ap = siaf[aper_name]
-            ap.set_attitude_matrix(att)
+            ap.set_attitude_matrix(attitude)
             apertures.append(ap)
 
     if output == "list":
@@ -5027,9 +5092,7 @@ def mast_exposure_apertures(filename="jw06640052001_0310h_00001_nrs1_rate.fits",
         sregions = []
         for ap in apertures:
             try:
-                sr = utils.SRegion(
-                    np.array(ap.corners(siaf_frame)), wrap=False
-                )
+                sr = utils.SRegion(np.array(ap.corners(siaf_frame)), wrap=False)
             except TypeError:
                 sr = utils.SRegion(
                     np.array(ap.corners(siaf_frame, rederive=False)), wrap=False
