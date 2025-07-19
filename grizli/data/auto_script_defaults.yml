@@ -129,7 +129,7 @@ visit_prep_args: &prep_args
         get_median: False
     run_separate_chip_sky: True
     fix_stars: False
-    reference_catalogs: [LS_DR9, PS1, DES, DSC, SDSS, GAIA, WISE]
+    reference_catalogs: [LS_DR10, LS_DR9, PS1, DES, DSC, SDSS, GAIA, WISE]
     outlier_threshold: 4
     skip_nircam_grism_sky: True
     nircam_wisp_kwargs:
@@ -158,7 +158,7 @@ visit_prep_args: &prep_args
         angles: [30.0, -30.0, 0, 90]
         suffix: 'angles'
         niter: 3
-        instruments: []
+        instruments: ['NIRCAM']
     miri_skyflat: False
     miri_skyfile: null
     use_skyflats: True
