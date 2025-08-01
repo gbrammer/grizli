@@ -1233,6 +1233,60 @@ class TransformGrismconf(object):
         else:
             return False
 
+    def get_beam_trace_original(self, x=1024, y=1024, dx=0.0, beam="A", fwcpos=None):
+        """
+        Function analogous to `grizli.grismconf.aXeConf.get_beam_trace` but
+        that accounts for the different dispersion axes of JWST grisms
+
+        Parameters
+        ----------
+        x, y : float
+            Reference position in the rotated frame
+
+        dx : array-like
+            Offset in pixels along the trace
+
+        beam : str
+            Grism order, translated from +1, 0, +2, +3, -1 = A, B, C, D, E
+
+        fwcpos : float
+            NIRISS rotation *(not implemented)*
+
+        Returns
+        -------
+        dy : float or array-like
+            Center of the trace in y pixels offset from `(x,y)` evaluated at
+            `dx`.
+
+        lam : float or array-like
+            Effective wavelength along the trace evaluated at `dx`.
+
+        """
+        x0 = np.squeeze((x,y))
+
+        if self.transform.trace_axis == "+x":
+            t_func = self.conf.INVDISPX
+            delta = 1 * dx
+        elif self.transform.trace_axis == "-x":
+            t_func = self.conf.INVDISPX
+            delta = -1 * dx
+        elif self.transform.trace_axis == "+y":
+            t_func = self.conf.INVDISPY
+            delta = 1 * dx
+        else:  # -y
+            t_func = self.conf.INVDISPY
+            delta = -1 * dx
+
+        t = t_func(self.order_names[beam], *x0, delta) # using *x0 and delta, calculate t 
+        tdx = self.conf.DISPX(self.order_names[beam], *x0, t)
+        tdy = self.conf.DISPY(self.order_names[beam], *x0, t)
+
+        wave = self.conf.DISPL(self.order_names[beam], *x0, t)
+
+        # print(f"t: {t}, delta: {delta}, tdx: {tdx}, tdy: {tdy}, x0[0] + tdx: {x0[0] + tdx}, x0[1] + tdy: {x0[1] + tdy}")
+
+        return tdx, tdy, wave
+
     def get_beam_trace(self, x=1024, y=1024, dx=0.0, beam="A", fwcpos=None):
         """
         Function analogous to `grizli.grismconf.aXeConf.get_beam_trace` but
@@ -1264,35 +1318,16 @@ class TransformGrismconf(object):
         """
         from astropy.modeling.models import Polynomial2D
 
-        x0 = np.squeeze(self.transform.reverse(x, y))
+        x0 = np.squeeze(self.transform.reverse(x, y)) # +x to detector transformation, x0 is an array of (x,y)
 
-        if self.transform.trace_axis == "+x":
-            t_func = self.conf.INVDISPX
-            trace_func = self.conf.DISPY
-            delta = 1 * dx
-        elif self.transform.trace_axis == "-x":
-            t_func = self.conf.INVDISPX
-            trace_func = self.conf.DISPY
-            delta = -1 * dx
-        elif self.transform.trace_axis == "+y":
-            t_func = self.conf.INVDISPY
-            trace_func = self.conf.DISPX
-            delta = 1 * dx
-        else:  # -y
-            t_func = self.conf.INVDISPY
-            trace_func = self.conf.DISPX
-            delta = -1 * dx
-
-        # print('xref: ', self.conf_file, self.transform.trace_axis)
-        # print(x0, t_func)
-
-        t = t_func(self.order_names[beam], *x0, delta)
-        tdx = self.conf.DISPX(self.order_names[beam], *x0, t)
-        tdy = self.conf.DISPY(self.order_names[beam], *x0, t)
-
+        # calculate the trace in the detector frame
+        tdx, tdy, wave = self.get_beam_trace_original(x=x, y=y, dx=dx, beam=beam)
+ 
+        # rotate the trace back to the +x direction
         rev = self.transform.forward(x0[0] + tdx, x0[1] + tdy)
+        
+        # the position of the trace is x+dx, y+dy
         trace_dy = rev[1, :] - y
-        # trace_dy = y - rev[1,:]
 
         # Trace offsets for NIRCam
         if "V4/NIRCAM_F444W_modB_R.conf" in self.conf_file:
