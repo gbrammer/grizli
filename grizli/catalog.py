@@ -1935,6 +1935,7 @@ def get_panstarrs_catalog(
     corners=None,
     max_records=500000,
     verbose=True,
+    dr2=False,
     extra='AND "II/349/ps1".e_imag < 0.2 AND "II/349/ps1".e_RAJ2000 < 0.15 AND "II/349/ps1".e_DEJ2000 < 0.15',
 ):
     """
@@ -1963,6 +1964,10 @@ def get_panstarrs_catalog(
     verbose : bool
         Print information. Default is True.
 
+    dr2 : bool
+        Query PanSTARRS PS1 DR2 (Vizier II/389/ps1_dr2; Magnier+2025).  Doesn't
+        seem to be available yet in Vizier TAP.
+
     extra : str
         Additional query string. Default is 'AND "II/349/ps1".e_imag < 0.2 AND "II/349/ps1".e_RAJ2000 < 0.15 AND "II/349/ps1".e_DEJ2000 < 0.15'.
 
@@ -1972,8 +1977,16 @@ def get_panstarrs_catalog(
         Result of the query.
 
     """
-    msg = "Query PanSTARRS catalog ({ra},{dec},{radius})"
-    print(msg.format(ra=ra, dec=dec, radius=radius))
+
+    if dr2:
+        db = '"II/389/ps1_dr2"'
+        extra = extra.replace('II/349/ps1', 'II/389/ps1_dr2')
+    else:
+        db = '"II/349/ps1"'
+
+    msg = "Query PanSTARRS catalog {db} ({ra},{dec},{radius})"
+    print(msg.format(db=db, ra=ra, dec=dec, radius=radius))
+
     tab = query_tap_catalog(
         ra=ra,
         dec=dec,
@@ -1981,7 +1994,7 @@ def get_panstarrs_catalog(
         corners=corners,
         extra=extra,
         vizier=True,
-        db='"II/349/ps1"',
+        db=db,
         verbose=verbose,
         max=max_records,
     )
