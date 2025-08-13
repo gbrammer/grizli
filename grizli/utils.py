@@ -2659,9 +2659,9 @@ def get_line_wavelengths():
     line_ratios["CIII-1906"] = [1.0]
     line_wavelengths["CIII-1908"] = [1908.734]
     line_ratios["CIII-1908"] = [1.0]
-    line_wavelengths["CI-9580"] = [9850.26]  # leave typo for back compatibility
+    line_wavelengths["CI-9580"] = [9852.96]  # leave typo for back compatibility
     line_ratios["CI-9580"] = [1.0]
-    line_wavelengths["CI-9850"] = [9850.26]
+    line_wavelengths["CI-9850"] = [9852.96]
     line_ratios["CI-9850"] = [1.0]
 
     # Sodium D I lines from Davies 2023

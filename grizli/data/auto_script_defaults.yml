@@ -127,6 +127,13 @@ visit_prep_args: &prep_args
         fw: 3
         pixel_scale: 0.10
         get_median: False
+    bkg_detection_threshold: null
+    imaging_masked_bkg_params:
+        bh: 32
+        bw: 32
+        fh: 5
+        fw: 5
+        pixel_scale: 0.10
     run_separate_chip_sky: True
     fix_stars: False
     reference_catalogs: [LS_DR10, LS_DR9, PS1, DES, DSC, SDSS, GAIA, WISE]

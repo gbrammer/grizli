@@ -2045,6 +2045,8 @@ def make_SEP_catalog(
     get_background=True,
     bkg_only=False,
     bkg_params={"bw": 32, "bh": 32, "fw": 3, "fh": 3},
+    write_bkg=True,
+    seg_only=False,
     verbose=True,
     phot_apertures=SEXTRACTOR_PHOT_APERTURES,
     aper_segmask=False,
@@ -2112,6 +2114,13 @@ def make_SEP_catalog(
         background sizes `bw`, `bh` are set for a paraticular pixel size.
         They will be scaled to the pixel dimensions of the target images using
         the pixel scale derived from the image WCS.
+
+    write_bkg : bool
+        Write a ``_bkg.fits`` image if the background was generated
+
+    seg_only : bool
+        If `True`, then just return the derived segmentation image and don't actually generate
+        the catalog
 
     verbose : bool
         Print status messages
@@ -2397,7 +2406,8 @@ def make_SEP_catalog(
 
                 bkg_im = pyfits.open("{0}_bkg.fits".format(root))
                 bkg_data = bkg_im[0].data * 1
-        else:
+
+        elif write_bkg & (not seg_only):
             pyfits.writeto(
                 "{0}_bkg.fits".format(root),
                 data=bkg_data,
@@ -2453,6 +2463,9 @@ def make_SEP_catalog(
             segmentation_map=True,
             **detection_params,
         )
+
+        if seg_only:
+            return seg
 
         if verbose:
             print("    Done.")
@@ -4246,14 +4259,16 @@ def mask_snowballs(
 
     return True
 
+# Bkg bin widths defined in pixels with scale `pixel_scale
+BLOT_BACKGROUND_PARAMS = {"bw": 256, "bh": 256, "fw": 3, "fh": 3, "pixel_scale": 0.1}
 
-# bin widths defined in pixels with scale `pixel_scale
-BLOT_BACKGROUND_PARAMS = {"bw": 64, "bh": 64, "fw": 3, "fh": 3, "pixel_scale": 0.06}
-
+MASKED_BLOT_BACKGROUND_PARAMS = {"bw": 32, "bh": 32, "fw": 5, "fh": 5, "pixel_scale": 0.1}
 
 def blot_background(
     visit={"product": "", "files": None},
     bkg_params=BLOT_BACKGROUND_PARAMS,
+    detection_threshold=None,
+    masked_bkg_params=MASKED_BLOT_BACKGROUND_PARAMS,
     verbose=True,
     skip_existing=True,
     get_median=False,
@@ -4273,6 +4288,13 @@ def blot_background(
 
     bkg_params : dict
         Parameters for `sep.Background`
+
+    detection_threshold : float, None
+        If provided, run a preliminary source catalog with ``bkg_params`` to generate a segmentation
+        map.  Then run `sep.Background` with ``masked_bkg_params`` and the segmentation mask.
+
+    masked_bkg_params : dict
+        Background parameters for the masked background
 
     verbose : bool
         Status messages
@@ -4320,13 +4342,51 @@ def blot_background(
     drz_wcs = pywcs.WCS(drz_im[0].header)
     drz_wcs.pscale = utils.get_wcs_pscale(drz_wcs)
 
-    # Get SEP background
-    bkg_data = make_SEP_catalog(
-        root=visit["product"], bkg_only=True, bkg_params=bkg_params, verbose=False
-    )
-    if get_median:
-        mask = drz_im[0].data != 0
-        bkg_data = bkg_data * 0.0 + np.median(np.median(bkg_data[mask]))
+    if detection_threshold is None:
+        # Get SEP background without mask
+        bkg_data = make_SEP_catalog(
+            root=visit["product"],
+            bkg_only=True,
+            bkg_params=bkg_params,
+            verbose=False
+        )
+
+        # Median of estimated background
+        if get_median:
+            mask = drz_im[0].data != 0
+            bkg_data = np.zeros_like(drz_im[0].data) + np.nanmedian(bkg_data[mask])
+
+    else:
+        # Generate segmentation image to use a mask
+        logstr = (
+            f"# blot_background: Generate segmentation mask with threshold={detection_threshold}"
+            f" and bkg_params={bkg_params}"
+        )
+        utils.log_comment(utils.LOGFILE, logstr, verbose=True)
+        
+        seg = make_SEP_catalog(
+            root=visit["product"],
+            threshold=detection_threshold,
+            bkg_only=False,
+            seg_only=True,
+            bkg_params=bkg_params,
+            verbose=False
+        )        
+
+        logstr = (
+            f"# blot_background: Generate masked background with threshold={detection_threshold}"
+            f" and bkg_params={masked_bkg_params}"
+        )
+        utils.log_comment(utils.LOGFILE, logstr, verbose=True)
+
+        # Now compute SEP background with mask
+        bkg_data = make_SEP_catalog(
+            root=visit["product"],
+            bkg_only=True,
+            bkg_params=masked_bkg_params,
+            bkg_mask = (seg > 0),
+            verbose=False
+        )
 
     logstr = "#   Blot background from {0}".format(drz_file)
     utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
@@ -5086,7 +5146,6 @@ SEPARATE_CHIP_KWARGS = {
     "only_flc": True,
 }
 
-
 def process_direct_grism_visit(
     direct={},
     grism={},
@@ -5128,6 +5187,8 @@ def process_direct_grism_visit(
     iter_atol=1.0e-4,
     static_mask=False,
     imaging_bkg_params=None,
+    bkg_detection_threshold=None,
+    imaging_masked_bkg_params=MASKED_BLOT_BACKGROUND_PARAMS,
     run_separate_chip_sky=True,
     separate_chip_kwargs={},
     reference_catalogs=["GAIA", "PS1", "SDSS", "WISE"],
@@ -6003,16 +6064,21 @@ def process_direct_grism_visit(
             utils.log_comment(utils.LOGFILE, logstr, verbose=True)
 
             bkg_params = imaging_bkg_params.copy()
+            masked_bkg_params = imaging_masked_bkg_params.copy()
 
             if "get_median" in bkg_params:
                 get_median = bkg_params.pop("get_median")
-
             else:
                 get_median = False
+
+            if "get_median" in masked_bkg_params:
+                _ = masked_bkg_params.pop("get_median")
 
             blot_background(
                 visit=direct,
                 bkg_params=bkg_params,
+                detection_threshold=bkg_detection_threshold,
+                masked_bkg_params=masked_bkg_params,
                 verbose=True,
                 skip_existing=True,
                 get_median=get_median,
@@ -8629,6 +8695,10 @@ def find_single_image_CRs(
 
             sci = flt["SCI", ext].data
             dq = dq_hdu[dq_extname, ext].data
+            if dq_extname == "DQ":
+                invar = flt["ERR",ext].data**2
+            else:
+                invar = None
 
             if simple_mask:
                 msg = f"{file}: Mask image without overlaps, extension {ext:d}"
@@ -8644,17 +8714,27 @@ def find_single_image_CRs(
                 else:
                     inmask = dq > 0
 
+                if invar is not None:
+                    nmad = utils.nmad((sci/np.sqrt(invar))[dq == 0])
+                    invar *= nmad**2
+                    
                 if run_lacosmic & (detect_cosmics is not None):
+                    det_params = {'ATODGNA': 1.0, 'READNSA':6.5}
+                    for k in ['ATODGNA','READNSA']:
+                        if k in flt[0].header:
+                             det_params[k] = flt[0].header[k]
+
                     crmask, clean = detect_cosmics(
                         sci,
                         inmask=inmask,
+                        invar=invar,
                         sigclip=4.5,
                         sigfrac=0.3,
                         objlim=5.0,
-                        gain=1.0,
-                        readnoise=6.5,
+                        gain=det_params['ATODGNA'],
+                        readnoise=det_params['READNSA'],
                         satlevel=65536.0,
-                        pssl=0.0,
+                        # pssl=0.0,
                         niter=4,
                         sepmed=True,
                         cleantype="meanmask",
