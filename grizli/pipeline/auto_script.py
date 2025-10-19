@@ -1961,6 +1961,7 @@ def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, com
         'jw05893', # COSMOS-3D mixes F356W direct + F444W grism
         'jw04762', # Fujimoto GNz7q  F444W direct + F410M grism
         'jw06480', # Schouws, mixes F444W direct and F410M / F356W grism
+        'jw07336', # Sun HUDF F250M direct + F277W grism
     ]
 
     if (len(all_groups) > 0) and (os.path.basename(files[0])[:7] in mixed_wfss_progs):
