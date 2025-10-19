@@ -6760,7 +6760,7 @@ def get_visit_radec_from_database(visit, nmax=200):
     try:
         srcs = db.SQL(
             f"""select src, count(src) from astrometry_reference
-    where polygon('{sr.polystr()[0]}') @> point(ra, dec)
+    where polygon('{sr.polystr()[0]}') @> point(ra, dec) and active
     group by src
     """
         )
