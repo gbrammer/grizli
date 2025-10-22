@@ -2142,7 +2142,7 @@ def query_exposures(ra=53.16, dec=-27.79, size=1., pixel_scale=0.1, theta=0,  fi
     return header, wcs, SQL, res
 
 
-def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-27.7910651, size=5*60, theta=0., filters=['F160W'], ir_scale=0.1, ir_wcs=None, res=None, half_optical=True, kernel='point', pixfrac=0.33, make_figure=True, skip_existing=True, clean_flt=True, gzip_output=True, s3output='s3://grizli-v2/HST/Pipeline/Mosaic/', split_uvis=True, extra_query='', extra_wfc3ir_badpix=True, fix_niriss=True, scale_nanojy=10, verbose=True, weight_type='jwst_var', rnoise_percentile=99, get_dbmask=True, niriss_ghost_kwargs={}, snowblind_kwargs=None, scale_photom=True, context=None, calc_wcsmap=False, make_exptime_map=False, expmap_sample_factor=4, keep_expmap_small=True, write_ctx=False, **kwargs):
+def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-27.7910651, size=5*60, theta=0., filters=['F160W'], ir_scale=0.1, ir_wcs=None, res=None, half_optical=True, kernel='point', pixfrac=0.33, make_figure=True, skip_existing=True, clean_flt=True, gzip_output=True, s3output='s3://grizli-v2/HST/Pipeline/Mosaic/', split_uvis=True, extra_query='', query_order=' ORDER BY e.filter, e.dataset', just_query=False, extra_wfc3ir_badpix=True, fix_niriss=True, scale_nanojy=10, verbose=True, weight_type='jwst_var', rnoise_percentile=99, get_dbmask=True, niriss_ghost_kwargs={}, snowblind_kwargs=None, scale_photom=True, context=None, calc_wcsmap=False, make_exptime_map=False, expmap_sample_factor=4, keep_expmap_small=True, write_ctx=False, **kwargs):
     """
     Make mosaic from exposures defined in the exposure database
     
@@ -2205,6 +2205,12 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
     extra_query : str
         Extra SQL query criteria added to the DB query if ``res`` not provided
     
+    query_order : str
+        Query sorting in SQL syntax
+
+    just_query : bool
+        If True, return the result of the DB query
+
     extra_wfc3ir_badpix : str
         Add additional bad pixel mask for WFC3/IR and NIRCam from the bad pixel files 
         provided in `grizli.data`.
@@ -2308,11 +2314,15 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
         filter_sql = ' OR '.join([f"e.filter = '{f}'" for f in filters])
         SQL += f'AND ({filter_sql})'
     
-    SQL += ' ORDER BY e.filter'
+    SQL += query_order
+
     if res is None:
         import boto3
         res = db.SQL(SQL)
-    
+
+    if just_query:
+        return res
+
     if len(res) == 0:
         print('No exposures found overlapping output wcs with '+
               f'corners = ({x1:.6f},{y1:.6f}), ({x2:.6f},{y2:.6f})')
@@ -2377,15 +2387,24 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
             #is_optical = False
         
         fi = uniq_filts[f] # res['filter'] == f
-        un = utils.Unique(res['dataset'][fi], verbose=False)
+        # un = utils.Unique(res['dataset'][fi], verbose=False)
+        unique_idx = []
+        unique_files = []
+        for i, dataset_i in enumerate(res['dataset'][fi]):
+            if dataset_i in unique_files:
+                continue
+            else:
+                unique_files.append(dataset_i)
+                unique_idx.append(i)
         
-        ds = res[fi]['dataset']
-        ex = res[fi]['extension']
-        assoc = res[fi]['assoc']
-        ffp = res[fi]['footprint']
-        expt = res[fi]['exptime'].sum()
+        unique_idx = np.array(unique_idx)
         
-        
+        # ds = res[fi]['dataset'][unique_idx]
+        # ex = res[fi]['extension'][unique_idx]
+        # assoc = res[fi]['assoc'][unique_idx]
+        ffp = res[fi]['footprint'][unique_idx]
+        expt = res[fi]['exptime'][unique_idx].sum()
+
         if make_figure:
             fig, ax = plt.subplots(1,1,figsize=(6,6))
             ax.scatter(*fp.T, marker='.', color='r')
@@ -2402,29 +2421,50 @@ def cutout_mosaic(rootname='gds', product='{rootname}-{f}', ra=53.1615666, dec=-
             ax.set_xlim(ax.get_xlim()[::-1])
             ax.set_title(visit['product'])
             overlaps.draw_axis_labels(ax=ax)
-            ax.text(0.95, 0.95, f'N={un.N}\nexpt = {expt:.1f}', 
-                    ha='right', va='top', transform=ax.transAxes)
-            
+            ax.text(
+                0.95, 0.95,
+                f'N={len(unique_idx)}\nexpt = {expt:.1f}',
+                ha='right', va='top', transform=ax.transAxes
+            )
+
             fig.savefig(visit['product']+'_fp.png')
             plt.close('all')
-            
-        visit['files'] = [f"{ds[un[v]][0]}_{ex[un[v]][0]}.fits"
-                          for v in un.values]
-        
-        visit['awspath'] = [f"grizli-v2/HST/Pipeline/{assoc[un[v]][0]}/Prep"
-                          for v in un.values]
+
+        visit['files'] = [
+            "{dataset}_{extension}.fits".format(**row)
+            for row in res['dataset','extension','assoc'][fi][unique_idx]
+        ]
+
+        visit['awspath'] = [
+            "grizli-v2/HST/Pipeline/{assoc}/Prep".format(**row)
+            for row in res['dataset','extension','assoc'][fi][unique_idx]
+        ]
+
+        # visit['files'] = [f"{ds[un[v]][0]}_{ex[un[v]][0]}.fits"
+        #                   for v in un.values]
+        #
+        # visit['awspath'] = [f"grizli-v2/HST/Pipeline/{assoc[un[v]][0]}/Prep"
+        #                   for v in un.values]
         
         visit['footprints'] = []
-        for v in un.values:
-            fps = ffp[un[v]]
+        # for v in un.values:
+        #     fps = ffp[un[v]]
+        #     fp_i = None
+        #     for fpi in fps:
+        #         sr = utils.SRegion(fpi)
+        #         for p in sr.shapely:
+        #             if fp_i is None:
+        #                 fp_i = p
+        #             else:
+        #                 fp_i = fp_i.union(p)
+        for fpi in ffp:
             fp_i = None
-            for fpi in fps:
-                sr = utils.SRegion(fpi)
-                for p in sr.shapely:
-                    if fp_i is None:
-                        fp_i = p
-                    else:
-                        fp_i = fp_i.union(p)
+            sr = utils.SRegion(fpi)
+            for p in sr.shapely:
+                if fp_i is None:
+                    fp_i = p
+                else:
+                    fp_i = fp_i.union(p)
             
             visit['footprints'].append(fp_i)
                            
