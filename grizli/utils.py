@@ -54,36 +54,67 @@ SNS_HUSL = {
     "pink": (0.9603888539940703, 0.3814317878772117, 0.8683117650835491),
 }
 
+# GRISM_COLORS = {
+#     "G800L": (0.0, 0.4470588235294118, 0.6980392156862745),
+#     "G102": (0.0, 0.6196078431372549, 0.45098039215686275),
+#     "G141": (0.8352941176470589, 0.3686274509803922, 0.0),
+#     "none": (0.8, 0.4745098039215686, 0.6549019607843137),
+#     "G150": "k",
+#     "F277W": (0.0, 0.6196078431372549, 0.45098039215686275),
+#     "F356W": (0.8352941176470589, 0.3686274509803922, 0.0),
+#     "F444W": (0.8, 0.4745098039215686, 0.6549019607843137),
+#     "F250M": "lightblue",
+#     "F300M": "steelblue",
+#     "F335M": "cornflowerblue",
+#     "F360M": "royalblue",
+#     "F410M": (0.0, 0.4470588235294118, 0.6980392156862745),
+#     "F430M": "sandybrown",
+#     "F460M": "lightsalmon",
+#     "F480M": "coral",
+#     "F322W2": "olive",
+#     "G280": "purple",
+#     "F090W": (0.0, 0.4470588235294118, 0.6980392156862745),
+#     "F115W": (0.0, 0.6196078431372549, 0.45098039215686275),
+#     "F150W": (0.8352941176470589, 0.3686274509803922, 0.0),
+#     "F140M": (0.8352941176470589, 0.3686274509803922, 0.0),
+#     "F158M": (0.8352941176470589, 0.3686274509803922, 0.0),
+#     "F200W": (0.8, 0.4745098039215686, 0.6549019607843137),
+#     "F140M": "orange",
+#     "BLUE": "#1f77b4",  # Euclid
+#     "RED": "#d62728",
+#     "CLEARP": "b",
+# }
+
 GRISM_COLORS = {
-    "G800L": (0.0, 0.4470588235294118, 0.6980392156862745),
-    "G102": (0.0, 0.6196078431372549, 0.45098039215686275),
-    "G141": (0.8352941176470589, 0.3686274509803922, 0.0),
-    "none": (0.8, 0.4745098039215686, 0.6549019607843137),
-    "G150": "k",
-    "F277W": (0.0, 0.6196078431372549, 0.45098039215686275),
-    "F356W": (0.8352941176470589, 0.3686274509803922, 0.0),
-    "F444W": (0.8, 0.4745098039215686, 0.6549019607843137),
-    "F250M": "lightblue",
-    "F300M": "steelblue",
-    "F335M": "cornflowerblue",
-    "F360M": "royalblue",
-    "F410M": (0.0, 0.4470588235294118, 0.6980392156862745),
-    "F430M": "sandybrown",
-    "F460M": "lightsalmon",
-    "F480M": "coral",
-    "F322W2": "olive",
-    "G280": "purple",
-    "F090W": (0.0, 0.4470588235294118, 0.6980392156862745),
-    "F115W": (0.0, 0.6196078431372549, 0.45098039215686275),
-    "F150W": (0.8352941176470589, 0.3686274509803922, 0.0),
-    "F140M": (0.8352941176470589, 0.3686274509803922, 0.0),
-    "F158M": (0.8352941176470589, 0.3686274509803922, 0.0),
-    "F200W": (0.8, 0.4745098039215686, 0.6549019607843137),
-    "F140M": "orange",
-    "BLUE": "#1f77b4",  # Euclid
-    "RED": "#d62728",
-    "CLEARP": "b",
+ 'G800L': 'cornflowerblue',
+  'G102': 'mediumseagreen',
+  'G141': 'chocolate',
+  'none': 'pink',
+  'G150': 'grey',
+ 'F277W': 'lightseagreen',
+ 'F356W': 'sandybrown',
+ 'F444W': 'violet',
+ 'F250M': 'lightblue',
+ 'F300M': 'skyblue',
+ 'F335M': 'steelblue',
+ 'F360M': 'cornflowerblue',
+ 'F410M': 'lightcoral',
+ 'F430M': 'tomato',
+ 'F460M': 'indianred',
+ 'F480M': 'maroon',
+'F322W2': 'olive',
+  'G280': 'blueviolet',
+ 'F090W': 'lightsteelblue',
+ 'F115W': 'forestgreen',
+ 'F150W': 'goldenrod',
+ 'F140M': 'peachpuff',
+ 'F158M': 'lightsalmon',
+ 'F200W': 'palevioletred',
+  'BLUE': 'dodgerblue',
+   'RED': 'crimson',
+'CLEARP': 'silver',
 }
+
 
 GRISM_MAJOR = {
     "G102": 0.1,
@@ -7534,6 +7565,7 @@ def drizzle_from_visit(
     weight_type="jwst_var",
     rnoise_percentile=99,
     calc_wcsmap=False,
+    with_slices=False,
     niriss_ghost_kwargs={},
     use_background_extension=True,
     snowblind_kwargs=None,
@@ -8241,6 +8273,7 @@ def drizzle_from_visit(
                 calc_wcsmap=calc_wcsmap,
                 verbose=verbose,
                 data=None,
+                with_slices=with_slices,
             )
 
             outsci, outwht, outvar, outctx, header, xoutwcs = res
@@ -8285,6 +8318,7 @@ def drizzle_from_visit(
                 calc_wcsmap=calc_wcsmap,
                 verbose=verbose,
                 data=data,
+                with_slices=with_slices,
             )
 
             outsci, outwht, outvar, outctx = res[:4]
@@ -8357,6 +8391,8 @@ def drizzle_array_groups(
     verbose=True,
     data=None,
     first_uniqid=1,
+    with_slices=False,
+    **kwargs,
 ):
     """
     Drizzle array data with associated wcs
@@ -8407,6 +8443,9 @@ def drizzle_array_groups(
 
     first_uniqid : int, optional
         First `uniqid` value to use for the drizzle for contex maps
+
+    with_slices : bool
+        Compute slices of the overlap with each exposure before drizzling to the output array
 
     Returns
     -------
@@ -8515,11 +8554,12 @@ def drizzle_array_groups(
     if first_uniqid + N > 31 and verbose:
         msg = "Warning: Too many input images for context map, will wrap around"
         log_comment(LOGFILE, msg, verbose=verbose, show_date=True)
+
+    with_slices &= calc_wcsmap == 0
+
     for i in range(N):
-        if verbose:
-            # log.info('Drizzle array {0}/{1}'.format(i+1, N))
-            msg = "Drizzle array {0}/{1}".format(i + 1, N)
-            log_comment(LOGFILE, msg, verbose=verbose, show_date=True)
+        # log.info('Drizzle array {0}/{1}'.format(i+1, N))
+        msg = "Drizzle array {0}/{1}".format(i + 1, N)
 
         if calc_wcsmap > 1:
             wcsmap = WCSMapAll  # (wcs_list[i], outputwcs)
@@ -8527,14 +8567,66 @@ def drizzle_array_groups(
         else:
             wcsmap = None
 
+        # if (outwht > 0).sum() > 0:
+        #     print(f"xxx owht {np.nanmax(outwht[outwht > 0])}  {(outwht > 0).sum()}")
+        #
+        if with_slices:
+            # lower-left / upper-right corner in the output frame
+            sr_i = SRegion(wcs_list[i], pad=1.1)
+            xy = np.round(outputwcs.all_world2pix(sr_i.xy[0], 0)).astype(int)
+
+            ll = xy.min(axis=0)
+            ur = xy.max(axis=0)
+
+            # Does the exposure not overlap with the target at all?
+            if (ur[0] <= 0) | (ur[1] <= 0) | (ll[0] >= shape[1]) | (ll[1] >= shape[0]):
+                msg += " slice (skip)"
+                log_comment(LOGFILE, msg, verbose=verbose, show_date=True)
+
+                continue
+
+            slx = slice(np.maximum(ll[0], 0), np.minimum(ur[0], shape[1]))
+            sly = slice(np.maximum(ll[1], 0), np.minimum(ur[1], shape[0]))
+
+            msg += f"  slice [{sly.start}:{sly.stop}, {slx.start}:{slx.stop}]"
+
+            outputwcs_i = outputwcs.slice((sly, slx))
+            outputwcs_i.pscale = get_wcs_pscale(outputwcs_i)
+
+            osci = outsci[sly, slx] * 1
+            owht = outwht[sly, slx] * 1
+            octx = outctx[sly, slx] * 1
+
+            if outvar is not None:
+                ovar = outvar[sly, slx] * 1
+                ovarw = _varwht[sly, slx] * 1
+                ovarc = _varctx[sly, slx] * 1
+
+        else:
+            outputwcs_i = outputwcs
+
+            osci = outsci
+            owht = outwht
+            octx = outctx
+
+            if outvar is not None:
+                ovar = outvar
+                ovarw = _varwht
+                ovarc = _varctx
+
+        log_comment(LOGFILE, msg, verbose=verbose, show_date=True)
+
+        # if (owht > 0).sum() > 0:
+        #     print(f"yyy owht {np.nanmax(owht[owht > 0])}  {(owht > 0).sum()}")
+        #
         adrizzle.do_driz(
             sci_list[i].astype(np.float32, copy=False),
             wcs_list[i],
             use_weights[i].astype(np.float32, copy=False),
-            outputwcs,
-            outsci,
-            outwht,
-            outctx,
+            outputwcs_i,
+            osci,
+            owht,
+            octx,
             1.0,
             "cps",
             1,
@@ -8551,10 +8643,10 @@ def drizzle_array_groups(
                 (var_list[i] * use_weights[i]).astype(np.float32, copy=False),
                 wcs_list[i],
                 use_weights[i].astype(np.float32, copy=False),
-                outputwcs,
-                outvar,
-                _varwht,
-                _varctx,
+                outputwcs_i,
+                ovar,
+                ovarw,
+                ovarc,
                 1.0,
                 "cps",
                 1,
@@ -8565,6 +8657,22 @@ def drizzle_array_groups(
                 fillval="0",
                 wcsmap=wcsmap,
             )
+
+        if with_slices:
+            # Put slice back in full image
+            outsci[sly, slx] = osci
+            outwht[sly, slx] = owht
+            outctx[sly, slx] = octx
+
+            if outvar is not None:
+                outvar[sly, slx]  =  ovar
+                _varwht[sly, slx] =  ovarw
+                _varctx[sly, slx] =  ovarc
+
+        #     print(f"yyy owht {np.nanmax(owht[owht > 0])}  {(owht > 0).sum()}")
+        #
+        # if (outwht > 0).sum() > 0:
+        #     print(f"xxx owht {np.nanmax(outwht[outwht > 0])}  {(outwht > 0).sum()}")
 
     if needs_var:
         # extra factor of Sum(w_i) for var = Sum(w_i**2 * var_i) / Sum(w_i)**2
@@ -13096,7 +13204,6 @@ def argv_to_dict(argv, defaults={}, dot_dict=True):
             kwargs[key] = jval
             
     return args, kwargs
-
 
 class Unique(object):
     def __init__(self, array, verbose=True, **kwargs):

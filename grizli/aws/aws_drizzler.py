@@ -791,7 +791,8 @@ def drizzle_images(label='macs0647-jd1', ra=101.9822125, dec=70.24326667, pixsca
             include_saturated=include_saturated,
             weight_type=weight_type,
             skip=skip,
-            dryrun=dryrun
+            dryrun=dryrun,
+            **kwargs,
         )
 
         if dryrun:
