@@ -335,6 +335,38 @@ def get_sdss_catalog(ra=165.86, dec=34.829694, radius=3):
     return table
 
 
+def get_sdss_catalog_vizier(ra=165.86, dec=34.829694, radius=3, db='"V/154/sdss16"', extra=' AND {db}.zsp > 0', **kwargs):
+    """
+    Query for objects in the SDSS photometric catalog
+
+    Parameters
+    ----------
+    ra, dec : float
+        Center of the query region, decimal degrees
+
+    radius : float
+        Radius of the query, in arcmin
+
+    Returns
+    -------
+    table : `~astropy.table.Table`
+        Result of the query
+
+    """
+
+    table = query_tap_catalog(
+        ra=ra, dec=dec,
+        radius=radius,
+        db=db,
+        vizier=True,
+        vizier_rd_colnames=("RA_ICRS","DE_ICRS"),
+        extra=extra.format(db=db),
+        **kwargs,
+    )
+
+    return table
+
+
 def get_twomass_catalog(ra=165.86, dec=34.829694, radius=3, catalog="fp_psc"):
     """
     Query for objects in the IRSA 2MASS catalog
@@ -1002,12 +1034,14 @@ def gen_tap_box_query(
     dec=34.829694,
     radius=3.0,
     corners=None,
+    sregion=None,
     max=100000,
     db="ls_dr7.tractor_primary",
     columns=["*"],
     rd_colnames=["ra", "dec"],
     wcs_pad=0.5,
     circle=False,
+    **kwargs,
 ):
     """
     Generate a query string for the NOAO Legacy Survey TAP server
@@ -1101,14 +1135,31 @@ def gen_tap_box_query(
         output_columns=", ".join(columns),
     )
 
-    if circle:
+    if sregion is not None:
+        polygon_test = []
+        for polystr in sregion.polystr(precision=5):
+            strip_polygon = polystr.replace('(','').replace('),',', ')
+            strip_polygon = strip_polygon.replace(')','')
+            polygon_test.append(
+                "1=CONTAINS(POINT('ICRS',{db}.{rc}, {db}.{dc}), "
+                + f"POLYGON('ICRS', {strip_polygon}))"
+            )
+
         query = (
             "SELECT {maxsel} {output_columns} FROM {db}"
-            + " WHERE 1=CONTAINS(POINT('ICRS',{db}.RAJ2000, {db}.DEJ2000),"
+            + " WHERE (" + " OR ".join(polygon_test) + ")"
+        )
+
+    elif circle & np.isfinite(ra + dec):
+        query = (
+            "SELECT {maxsel} {output_columns} FROM {db}"
+            + " WHERE 1=CONTAINS(POINT('ICRS',{db}.{rc}, {db}.{dc}),"
             + "CIRCLE('ICRS', {ra}, {dec}, {radius_deg:.3f}))"
         )
+
     elif not np.isfinite(ra + dec):
         query = "SELECT {maxsel} {output_columns} FROM {db} "
+
     else:
         query = (
             "SELECT {maxsel} {output_columns} FROM {db} WHERE "
@@ -1124,6 +1175,7 @@ def query_tap_catalog(
     dec=34.829694,
     radius=3.0,
     corners=None,
+    sregion=None,
     db="ls_dr9.tractor",
     columns=["*"],
     extra="",
@@ -1137,6 +1189,7 @@ def query_tap_catalog(
     nsc=False,
     vizier=False,
     vizier_tap_url="http://tapvizier.u-strasbg.fr/TAPVizieR/tap",
+    vizier_rd_colnames=["RAJ2000", "DEJ2000"],
     skymapper=False,
     circle="auto",
     hubble_source_catalog=False,
@@ -1239,7 +1292,7 @@ def query_tap_catalog(
             print("Query {0} from VizieR TAP server".format(db))
 
         tap_url = vizier_tap_url
-        rd_colnames = ["RAJ2000", "DEJ2000"]
+        rd_colnames = vizier_rd_colnames
         if circle in ["auto"]:
             circle = True
     else:
@@ -1266,7 +1319,7 @@ def query_tap_catalog(
 
     tap = TapPlus(url=tap_url, **tap_kwargs)
 
-    if ra is not None:
+    if (ra is not None) | (sregion is not None) | (corners is not None):
         query = gen_tap_box_query(
             ra=ra,
             dec=dec,
@@ -1277,6 +1330,7 @@ def query_tap_catalog(
             rd_colnames=rd_colnames,
             corners=corners,
             circle=circle,
+            sregion=sregion,
         )
     else:
         query = f"SELECT TOP {max} * FROM {db} "
@@ -1320,7 +1374,7 @@ def query_tap_catalog(
         print("Query failed, check {0} for error messages".format(jobFile))
         table = None
 
-    return table
+    return utils.GTable(table)
 
 
 # Limit Hubble Source Catalog query to brighter sources in limited bands
