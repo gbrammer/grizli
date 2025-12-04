@@ -12268,6 +12268,132 @@ def catalog_area(ra=[], dec=[], make_plot=True, NMAX=5000, buff=0.8, verbose=Tru
         return pjoin.area
 
 
+def bounding_polygon(x, y, nsteps=16, use_percentiles=True, closed=True, **kwargs):
+    """
+    Compute a bounding polygon of min(y), max(y) as a function of ``x``
+
+    Parameters
+    ----------
+    steps : int
+        Number of steps sampling from min(x) to max(x)
+
+    use_percentiles : bool
+        If true, use steps in evenly spaced percentiles of x, otherwise use
+        evenly spaced steps
+
+    closed : bool
+        Close the polygon by duplicating the first point at the last
+
+    Returns
+    -------
+    px, py : array-like
+        Coordinates of the bounding polygon
+
+    """
+
+    if use_percentiles:
+        xs = np.nanpercentile(x, np.linspace(0, 100, nsteps+1))
+    else:
+        xs = np.linspace(x.min(), x.max(), nsteps+1)
+
+    xi = []
+    yhi = []
+    ylo = []
+    for i in range(nsteps):
+        sub = (x >= xs[i]) & (x <= xs[i+1])
+        xi += [xs[i], xs[i+1]]
+        yhi += [y[sub].max()]*2
+        ylo += [y[sub].min()]*2
+
+    px = xi + xi[::-1]
+    py = yhi + ylo[::-1]
+    if closed:
+        px.append(xi[0])
+        py.append(yhi[0])
+
+    return np.array(px), np.array(py)
+
+
+def catalog_bounding_polygon(ra, dec, cosd=True, scale=3600., nsteps=128, buffer=(25, -19), simplify=5., as_sregion=True, **kwargs):
+    """
+    Compute a bounding polygon for a list of catalog positions using the
+    intersection of ``bounding_polygon(ra, dec)`` and
+    ``bounding_polygon(dec, ra)``.
+
+    Parameters
+    ----------
+    ra, dec : array-like
+        Catalog positions.  These are assumed to be decimal degrees given the
+        other parameter defaults, but they can be other values
+
+    cosd : bool
+        Rescale dx = (ra - median(ra)) by cos(dec)
+
+    scale : float
+        Additional scale factor of relative coordinates.  Default of 3600 scales
+        sky coordinates in decimal degrees to offset arcsec
+
+    nsteps : int
+        Number of steps for the bounding polygons
+
+    buffer : (float, float)
+        Shapely buffers to apply to the intersection of the ``y(x)`` and ``x(y)``
+        polygons.
+
+    simplify : float
+        Simplify tolerance on the intersection polygon.
+
+        The combination of ``buffer`` and ``simplify`` reduce the complexity of
+        the output.   For sky coordinates and ``scale=3600``, ``buffer``
+        and ``simplify`` have units of arcsec.
+
+        If ``simplify < buffer[0] + buffer[1]``, then the simplified shape should
+        still contain all of the input points.
+
+    as_region, kwargs : bool, **dict
+        Return as `sregion.SRegion(**dict)` object
+
+    Returns
+    -------
+    ro, do : array-like
+        Coordinates of the bounding polygon, if ``as_sregion=False``
+
+    olap : `sregion.SRegion`
+        Region object if requested
+
+    """
+    from shapely.geometry import Polygon
+
+    r0 = np.median(ra)
+    d0 = np.median(dec)
+
+    dr = (ra - r0) * scale * np.cos(d0/180*np.pi)**cosd
+    dd = (dec - d0) * scale
+
+    px, py = bounding_polygon(dr, dd, nsteps=nsteps, **kwargs)
+    pxy = Polygon(np.array([px, py]).T)
+
+    py, px = bounding_polygon(dd, dr, nsteps=nsteps, **kwargs)
+    pyx = Polygon(np.array([px, py]).T)
+
+    olap = pxy.intersection(pyx)
+    if buffer is not None:
+        olap = olap.buffer(buffer[0]).buffer(buffer[1])
+
+    if simplify is not None:
+        olap = olap.simplify(simplify)
+
+    ro, do = np.array(olap.boundary.xy)
+
+    ro = ro / scale / np.cos(d0/180*np.pi)**cosd + r0
+    do = do / scale + d0
+
+    if as_sregion:
+        return SRegion(np.array([ro, do]), **kwargs)
+    else:
+        return ro, do
+
+
 def fix_flt_nan(flt_file, bad_bit=4096, verbose=True):
     """
     Fix NaN values in FLT files
