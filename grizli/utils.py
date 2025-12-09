@@ -7866,7 +7866,7 @@ def drizzle_from_visit(
 
             if (extra_wfc3ir_badpix) & (_inst in ['NIRCAM','NIRISS']):
                 bpfiles = [os.path.join(os.path.dirname(__file__),
-                           f'data/nrc_badpix_10162025_{_det}.fits.gz')]
+                           f'data/nrc_badpix_251016_{_det}.fits.gz')]
                 bpfiles += [os.path.join(os.path.dirname(__file__),
                            f'data/nrc_badpix_240627_{_det}.fits.gz')]
                 bpfiles += [os.path.join(os.path.dirname(__file__),
