@@ -591,7 +591,7 @@ def img_with_flat(
     if not skip:
 
         flat_step = FlatFieldStep()
-        _flatfile = flat_step.get_reference_file(img, "flat")
+        _flatfile = flat_step.get_reference_file(input, "flat")
         utils.log_comment(
             utils.LOGFILE,
             f"jwst.flatfield.FlatFieldStep: {_flatfile}",
@@ -615,7 +615,7 @@ def img_with_flat(
             photom_step = PhotomStep()
             with_phot = photom_step.process(with_flat)
             output = with_phot
-            _photfile = photom_step.get_reference_file(img, "photom")
+            _photfile = photom_step.get_reference_file(input, "photom")
             utils.log_comment(
                 utils.LOGFILE,
                 f"jwst.flatfield.PhotomStep: {_photfile}",
@@ -801,7 +801,7 @@ def img_with_wcs(
 
     # AssignWcs to pupulate img.meta.wcsinfo
     step = AssignWcsStep()
-    _distor_file = step.get_reference_file(img, "distortion")
+    _distor_file = step.get_reference_file(input, "distortion")
     utils.log_comment(
         utils.LOGFILE,
         f"jwst.assign_wcs.AssignWcsStep: {_distor_file}",
@@ -1669,7 +1669,7 @@ def initialize_jwst_image(
             img[0].header[k] = targ
 
     # Get flat field ref file
-    _flatfile = FlatFieldStep().get_reference_file(img, "flat")
+    _flatfile = FlatFieldStep().get_reference_file(filename, "flat")
     img[0].header["PFLTFILE"] = os.path.basename(_flatfile)
     msg = f"PFLTFILE = {_flatfile}"
     utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
