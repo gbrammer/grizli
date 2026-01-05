@@ -1050,7 +1050,7 @@ def make_directories(root='j142724+334246', HOME_PATH='$PWD', paths={}):
     return paths
 
 
-def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_products={'WFPC2/WFC': ['C0M', 'C1M'], 'WFPC2/PC': ['C0M', 'C1M'], 'ACS/WFC': ['FLC'], 'WFC3/IR': ['RAW'], 'WFC3/UVIS': ['FLC']}, remove_bad=True, reprocess_parallel=False, reprocess_clean_darks=True, s3_sync=False, fetch_flt_calibs=['IDCTAB', 'PFLTFILE', 'NPOLFILE'], filters=VALID_FILTERS, min_bad_expflag=2, fetch_only=False, force_rate=True, get_rateints=False, get_recalibrated_rate=True, recalibrate_jwst=False, s3path=None):
+def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_products={'WFPC2/WFC': ['C0M', 'C1M'], 'WFPC2/PC': ['C0M', 'C1M'], 'ACS/WFC': ['FLC'], 'WFC3/IR': ['RAW'], 'WFC3/UVIS': ['FLC']}, remove_bad=True, reprocess_parallel=False, reprocess_clean_darks=True, s3_sync=False, fetch_flt_calibs=['IDCTAB', 'PFLTFILE', 'NPOLFILE'], filters=VALID_FILTERS, min_bad_expflag=2, fetch_only=False, force_rate=True, get_rateints=False, get_recalibrated_rate=True, recalibrate_jwst=False, s3path=None, **kwargs):
     """
     Fully automatic script for fetching exposure files
     
@@ -1245,7 +1245,11 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_pr
                 jw_files += jw_i
                 
         tab = tab[~jw]
-    
+
+    # Validate header astrometry keywords
+    for _file in jw_files:
+        _ = check_mast_pointing_header(_file, **kwargs)
+
     # Initialize grism files
     for _file in jw_files:
         _test = os.path.exists(_file) & (jwst_utils is not None)
@@ -1432,6 +1436,116 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_pr
         os.system('tar xzvf {0}.tar.gz'.format(root))
         os.system('rm {0}/*extper.fits {0}/*flt_cor.fits'.format(root))
         os.system('ln -sf {0}/*persist.fits ./'.format(root))
+
+
+def check_mast_pointing_header(file, do_update=True, overwrite=True, output_path=None, check_mast_token=True, **kwargs):
+    """
+    Check ENGQLPTG keyword to see if exposure file needs updated WCS from
+    STScI engineering database.
+
+    This function can fix issues with large apparent astrometric offsets as
+    described at https://jwst-docs.stsci.edu/known-issues-with-jwst-data/nircam-known-issues/nircam-imaging-known-issues?utm_source=chatgpt.com#NIRCamImagingKnownIssues-LargeWCSoffsets(arcminutes).
+
+    Parameters
+    ----------
+    file : str
+        Filename of an ``uncal.fits`` or ``rate.fits`` file
+
+    do_update : bool
+        Perform the update if needed.  If False, just does the check
+
+    overwrite : bool
+        Overwrite ``file`` if updated
+
+    output_path : str, None
+        If specified, write the updated ``file`` to a different path
+
+    check_mast_token : bool
+        Check that either MAST_TOKEN or MAST_API_TOKEN environment variables
+        are set, required for access to STScI engineering database queries.
+
+    Returns
+    -------
+    dm : `jwst.datamodel.DataModel`, None
+        Open datamodel, updated if necessary.  If the result was written to a
+        file the datamodel is closed and this function returns ``dm=None``.
+
+    visit : dict
+        Metadata from ``dm.meta.visit``
+
+    t_pars, transforms : None, None
+        Output from `jwst.lib.set_telescope_pointing.update_wcs` if the update
+        was performed.
+
+    """
+    import jwst.datamodels
+    import jwst.lib.set_telescope_pointing
+
+    dm = jwst.datamodels.open(file)
+
+    t_pars, transforms = None, None
+
+    msg = f"check_mast_pointing_header: {file}"
+    msg += f" ENGQLPTG={dm.meta.visit.engdb_pointing_quality}"
+    utils.log_comment(utils.LOGFILE, msg, verbose=True)
+
+    dm_changed = False
+
+    if dm.meta.visit.engdb_pointing_quality == "PLANNED":
+        if do_update:
+            msg = (
+                f"check_mast_pointing_header: {file} run"
+                + " jwst.lib.set_telescope_pointing.update_wcs"
+            )
+            utils.log_comment(utils.LOGFILE, msg, verbose=True)
+
+            if check_mast_token:
+                if os.getenv('MAST_API_TOKEN') is None:
+                    if os.getenv('MAST_TOKEN') is not None:
+                        msg = (
+                            "check_mast_pointing_header: "
+                            + "set MAST_API_TOKEN = $MAST_TOKEN"
+                        )
+                        utils.log_comment(utils.LOGFILE, msg, verbose=True)
+                        os.environ['MAST_API_TOKEN'] = os.environ['MAST_TOKEN']
+                    else:
+                        msg = (
+                            "MAST_API_TOKEN and/or MAST_TOKEN environment"
+                            " variables needed for access to the STScI"
+                            " engineering database query"
+                        )
+                        raise ValueError(msg)
+
+            t_pars, transforms = jwst.lib.set_telescope_pointing.update_wcs(dm)
+
+            dm_changed = True
+
+        else:
+            msg = (
+                f"check_mast_pointing_header: {file} SKIPPED"
+                + " jwst.lib.set_telescope_pointing.update_wcs"
+            )
+            utils.log_comment(utils.LOGFILE, msg, verbose=True)
+
+    visit = dm.meta.visit.instance
+
+    if dm_changed & (overwrite | (output_path is not None)):
+        if output_path is None:
+            output_file = file
+        else:
+            if not os.path.exists(output_path):
+                os.makedirs(output_path)
+
+            output_file = os.path.join(output_path, os.path.basename(file))
+
+        msg = f"check_eng_pointing: write to {output_file}"
+        utils.log_comment(utils.LOGFILE, msg, verbose=True)
+
+        dm.write(output_file, overwrite=True)
+        dm.close()
+        dm = None
+
+    return dm, visit, t_pars, transforms
 
 
 def remove_bad_expflag(field_root='', HOME_PATH='./', min_bad=2):
