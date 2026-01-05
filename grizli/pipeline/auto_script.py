@@ -1463,6 +1463,9 @@ def check_mast_pointing_header(file, do_update=True, overwrite=True, output_path
     check_mast_token : bool
         Check that either MAST_TOKEN or MAST_API_TOKEN environment variables
         are set, required for access to STScI engineering database queries.
+        See
+        https://jwst-pipeline.readthedocs.io/en/stable/jwst/lib/engdb.html#engdb
+        for more information on accessing the engineering database.
 
     Returns
     -------
