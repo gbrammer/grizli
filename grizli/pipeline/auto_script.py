@@ -1050,7 +1050,7 @@ def make_directories(root='j142724+334246', HOME_PATH='$PWD', paths={}):
     return paths
 
 
-def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_products={'WFPC2/WFC': ['C0M', 'C1M'], 'WFPC2/PC': ['C0M', 'C1M'], 'ACS/WFC': ['FLC'], 'WFC3/IR': ['RAW'], 'WFC3/UVIS': ['FLC']}, remove_bad=True, reprocess_parallel=False, reprocess_clean_darks=True, s3_sync=False, fetch_flt_calibs=['IDCTAB', 'PFLTFILE', 'NPOLFILE'], filters=VALID_FILTERS, min_bad_expflag=2, fetch_only=False, force_rate=True, get_rateints=False, get_recalibrated_rate=True, recalibrate_jwst=False, s3path=None, **kwargs):
+def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_products={'WFPC2/WFC': ['C0M', 'C1M'], 'WFPC2/PC': ['C0M', 'C1M'], 'ACS/WFC': ['FLC'], 'WFC3/IR': ['RAW'], 'WFC3/UVIS': ['FLC']}, remove_bad=True, reprocess_parallel=False, reprocess_clean_darks=True, s3_sync=False, fetch_flt_calibs=['IDCTAB', 'PFLTFILE', 'NPOLFILE','D2IMFILE'], filters=VALID_FILTERS, min_bad_expflag=2, fetch_only=False, force_rate=True, get_rateints=False, get_recalibrated_rate=True, recalibrate_jwst=False, s3path=None, **kwargs):
     """
     Fully automatic script for fetching exposure files
     
@@ -2079,6 +2079,7 @@ def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, com
         'jw04762', # Fujimoto GNz7q  F444W direct + F410M grism
         'jw06480', # Schouws, mixes F444W direct and F410M / F356W grism
         'jw07336', # Sun HUDF F250M direct + F277W grism
+        'jw07404', # Naidu TWINKLE F410M direct, F444W grism
     ]
 
     if (len(all_groups) > 0) and (os.path.basename(files[0])[:7] in mixed_wfss_progs):
@@ -2219,7 +2220,7 @@ def get_visit_exposure_footprints(root='j1000p0210', check_paths=['./', '../RAW'
     return visits
 
 
-def manual_alignment(field_root='j151850-813028', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', skip=True, radius=5., catalogs=['PS1', 'DES', 'SDSS', 'GAIA', 'WISE'], visit_list=None, radec=None):
+def manual_alignment(field_root='j151850-813028', HOME_PATH='/Volumes/Pegasus/Grizli/Automatic/', skip=True, radius=5., catalogs=['PS1', 'DES', 'SDSS', 'GAIA', 'WISE'], visit_list=None, radec=None, shutdown_ds9=True, **kwargs):
     """
     Manual visit alignment
     
@@ -2285,7 +2286,8 @@ def manual_alignment(field_root='j151850-813028', HOME_PATH='/Volumes/Pegasus/Gr
         if (not filt.startswith('g')):
             prep.manual_alignment(visit, reference=reference, ds9=ds9)
 
-    ds9.set('quit')
+    if shutdown_ds9:
+        ds9.set('quit')
 
 
 def clean_prep(field_root='j142724+334246'):
