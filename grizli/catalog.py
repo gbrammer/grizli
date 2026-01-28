@@ -2130,6 +2130,44 @@ def get_euclid_q1_catalog(
     return tab
 
 
+def get_desi_spec_catalog(ra=0.0, dec=0.0, radius=3.0, desi_dr='dr1', **kwargs):
+    """
+    Query DESI EDR and DR1 catalogs from NOIRLab TAP
+
+    Parameters
+    ----------
+    ra, dec, radius : float, float, float
+        Center coordinates and query radius in arcmin
+
+    desi_dr : str
+        DESI release name (``edr``, ``dr1``)
+
+    Returns
+    -------
+    desi : table
+        Query result from https://datalab.noirlab.edu/tap/desi_{desi_dr}.zpix
+    """
+    desi = query_tap_catalog(
+        ra=ra,
+        dec=dec,
+        radius=radius,
+        tap_url='https://datalab.noirlab.edu/tap',
+        db=f'desi_{desi_dr}.zpix',
+        rd_colnames=['mean_fiber_ra', 'mean_fiber_dec'],
+        verbose=False,
+    )
+
+    preview_url = (
+        "https://www.legacysurvey.org/viewer/desi-spectrum/"
+        + "{desi_dr}/targetid{targetid}"
+    )
+
+    desi['preview'] = [
+        preview_url.format(desi_dr=desi_dr, **row)
+        for row in desi["mean_fiber_ra","mean_fiber_dec","targetid"]
+    ]
+    return desi
+
 def get_radec_catalog(
     ra=0.0,
     dec=0.0,
