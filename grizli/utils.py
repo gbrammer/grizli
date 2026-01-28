@@ -9010,10 +9010,12 @@ def fetch_acs_wcs_files(beams_file, bucket_name="grizli-v1"):
 
     im.close()
 
+# HST_REF_URL = "https://hst-crds.stsci.edu/unchecked_get/references/hst/"
+HST_REF_URL = "https://s3.amazonaws.com/stpubdata/hst/public/references"
 
 def fetch_hst_calib(
     file="iref$uc72113oi_pfl.fits",
-    ftpdir="https://hst-crds.stsci.edu/unchecked_get/references/hst/",
+    ftpdir=HST_REF_URL,
     verbose=True,
     ref_paths={},
     remove_corrupt=True,
@@ -9028,7 +9030,6 @@ def fetch_hst_calib(
 
     ftpdir : str, optional
         The FTP directory where the calibration file is located.
-        Default is "https://hst-crds.stsci.edu/unchecked_get/references/hst/".
 
     verbose : bool, optional
         If True, print status messages. Default is True.
@@ -9083,7 +9084,7 @@ def fetch_hst_calib(
 
 def fetch_hst_calibs(
     flt_file,
-    ftpdir="https://hst-crds.stsci.edu/unchecked_get/references/hst/",
+    ftpdir=HST_REF_URL,
     calib_types=[
         "BPIXTAB",
         "CCDTAB",
@@ -9110,7 +9111,6 @@ def fetch_hst_calibs(
 
     ftpdir : str, optional
         FTP directory to fetch the calibration files from. 
-        Default is "https://hst-crds.stsci.edu/unchecked_get/references/hst/".
 
     calib_types : list, optional
         List of calibration types to fetch. Default is 

@@ -30,7 +30,7 @@ fetch_files_args:
     min_bad_expflag: 2 
     s3_sync: True
     #filters: *filters
-    fetch_flt_calibs: [IDCTAB, PFLTFILE, NPOLFILE]
+    fetch_flt_calibs: [IDCTAB, PFLTFILE, NPOLFILE, D2IMFILE]
     s3path: null
     force_rate: True
     get_rateints: False
