@@ -16,16 +16,58 @@ import urllib.request
 import json
 import matplotlib.pyplot as plt
 
+JWST_MPC = "500@-170" # JWST
+JWST_BODY_CODE = "2021-130A" # JWST
 
-def query_horizons_small_bodies(assoc, plot_all_tracks=False):
+SPACECRAFT_MPC = JWST_MPC
+SPACECRAFT_BODY_CODE = JWST_BODY_CODE
+
+def query_horizons_small_bodies(assoc="j100028p0218_cosmos-1-f1800w_00157", coords=None, mjd_range=None, prefix="user", with_db=True, sb_ident_params="&two-pass=true&suppress-first-pass=true", ephem_steps=256, make_plot=True, plot_all_tracks=False):
     """
     Query the Horizons Small Body Identification tool at the epoch and pointing
-    location of the exposures in a grizli/dja association
-    
+    location of the exposures in a grizli/dja association.
+
+    The script first queries Horizons to "observe" the spacecraft from the Earth
+    geocenter to get its time-dependent position, then queries the sb_ident API.
+    Note that the sb_ident query can take minutes to complete.
+
+    The spacecraft is specified in the ``SPACECRAFT_BODY_CODE`` and
+    ``SPACECRAFT_MPC`` global variables, where the first is used to
+    retrieve the spacecraft geocentric coordinates and the latter is used to
+    generate the SB ephemerides as observed by the spacecraft.  The defaults
+    are set for JWST: ``JWST_MPC = "500@-170"`` and
+    ``JWST_BODY_CODE = "2021-130A"``.
+
     Parameters
     ----------
     assoc : str
         Association name
+
+    coords : (float, float), None
+        Coordinates to query.  Both ``coords`` and ``mjd_range`` must be
+        specified for manual input
+
+    mjd_range : [float, float]
+        Begginning and end MJD times to query.  The spacecraft location is
+        computed at ``mean(mjd_range)``.
+
+    prefix : str
+        File prefix for output when ``coords`` and ``mjd_range`` provided
+
+    with_db : bool
+        Get assoc data with a DB query, otherwise use the API at
+        https://grizli-cutout.herokuapp.com/assoc_json?name={assoc}
+
+    sb_ident_params : str
+        Parameters for the horizons sb_ident API
+
+    ephem_steps : int
+        Number of steps requested in the body ephemeris.  If ``ephem_steps < 0``
+        interpret as a step size in seconds and calculate from
+        ``nsteps = (mjd_range[1] - mjd_range[0]) * 86400 / abs(ephem_steps)``.
+
+    make_plot : bool
+        Make a simple diagnostic plot
 
     plot_all_tracks : bool
         Plot all nearby tracks, or only those that intersect with the exposure
@@ -44,33 +86,66 @@ def query_horizons_small_bodies(assoc, plot_all_tracks=False):
         footprints
 
     """
+    import urllib.request
+    import json
 
-    assoc_data = db.SQL(
-        f"select * from assoc_table where assoc_name = '{assoc}'"
-    )
+    if (coords is None) | (mjd_range is None):
 
-    print(f"{assoc}  N={len(assoc_data)}")
+        if with_db:
+            assoc_data = db.SQL(
+                f"select * from assoc_table where assoc_name = '{assoc}'"
+            )
+        else:
+            API_URL = (
+                f"https://grizli-cutout.herokuapp.com/assoc_json?name={assoc}"
+            )
 
-    ra = assoc_data["ra"].mean()
-    dec = assoc_data["dec"].mean()
+            with urllib.request.urlopen(API_URL) as url:
+                data = json.loads(url.read().decode())
+            for k in data:
+                data[k] = [data[k][i] for i in data[k]]
+
+            assoc_data = utils.GTable(data)
+
+        print(f"{assoc}  N={len(assoc_data)}")
+
+        ra = assoc_data["ra"].mean()
+        dec = assoc_data["dec"].mean()
+
+        mjd_range = [assoc_data["t_min"].min(), assoc_data["t_max"].max()]
+
+        prefix = assoc
+
+    else:
+        ra, dec = coords
+        make_plot = False
+
+    if ephem_steps < 0:
+        nsteps = int(
+            np.maximum(
+                4,
+                (mjd_range[1] - mjd_range[0]) * 86400 / np.abs(ephem_steps)
+            )
+        )
+    else:
+        nsteps = ephem_steps
+
+    epoch = astropy.time.Time(np.mean(mjd_range), format="mjd")  # .iso
+
     coo = SkyCoord(ra, dec, unit="deg")
     coo_str = (
         coo.to_string(style="hmsdms", precision=2, sep=":")
         .replace("-", "M")
         .replace(":", "-")
     )
+
     coo_str = coo_str.replace("+", "")
 
     clean_str = coo.to_string(
         style="hmsdms", precision=2, sep=":"
     ).replace(":", " ")
 
-    epoch = astropy.time.Time(assoc_data["t_min"].mean(), format="mjd")  # .iso
-
-    sb_json = f"{assoc}_sb.json"
-
-    JWST_MPC = "500@-170"
-    JWST_BODY = "2021-130A"
+    sb_json = f"{prefix}_sb.json"
 
     if os.path.exists(sb_json):
         print(f"Load from {sb_json}.  Epoch: {epoch.iso}  Coords: {clean_str}")
@@ -85,7 +160,7 @@ def query_horizons_small_bodies(assoc, plot_all_tracks=False):
 
         pos_url = (
             f"https://ssd.jpl.nasa.gov/api/horizons.api?format=json"
-            f"&COMMAND='{JWST_BODY}'"
+            f"&COMMAND='{SPACECRAFT_BODY_CODE}'"
             "&OBJ_DATA='NO'&MAKE_EPHEM='YES'&EPHEM_TYPE='VECTORS'"
             "&OUT_UNITS='KM-S'"
             f"&CENTER='500'"
@@ -96,7 +171,7 @@ def query_horizons_small_bodies(assoc, plot_all_tracks=False):
         with urllib.request.urlopen(pos_url) as url:
             response = json.loads(url.read().decode())
 
-        with open(f"{assoc}_jwst_xyz.json", "w") as fp:
+        with open(f"{prefix}_jwst_xyz.json", "w") as fp:
             json.dump(response, fp)
 
         rows = response["result"].split("\n")
@@ -109,26 +184,25 @@ def query_horizons_small_bodies(assoc, plot_all_tracks=False):
 
         #########
         # Query for small bodies
-        JWST_MPC = "500@-170"
+        # JWST_MPC = "500@-170"
         # JWST_MPC = "@jwst"
 
         radius = 15 / 60
 
         url = (
             f"https://ssd-api.jpl.nasa.gov/sb_ident.api?"  # sb-kind=a"
-            # "&center={JWST_MPC}"
-            "xobs="
+            + "xobs="
             + ",".join([f"{float(x):.16f}" for x in xyz])
             + ","
             + ",".join([f"{float(x):.16f}" for x in v_xyz])
             +
-            # "&obs-time=2021-02-09_00:00:00&"
-            # "mag-required=true&"
-            "&two-pass=true&suppress-first-pass=true"  # &req-elem=false"
-            # "&vmag-lim=20"
-            f"&obs-time={epoch.iso.replace(' ', '_').split('.')[0]}"
-            f"&fov-ra-center={coo_str.split()[0]}&fov-ra-hwidth={radius:.3f}"
-            f"&fov-dec-center={coo_str.split()[1]}&fov-dec-hwidth={radius:.3f}"
+            # "&two-pass=true&suppress-first-pass=true"  # &req-elem=false"
+            + sb_ident_params
+            + f"&obs-time={epoch.iso.replace(' ', '_').split('.')[0]}"
+            + f"&fov-ra-center={coo_str.split()[0]}"
+            + f"&fov-ra-hwidth={radius:.3f}"
+            + f"&fov-dec-center={coo_str.split()[1]}"
+            + f"&fov-dec-hwidth={radius:.3f}"
         )
 
         # else:
@@ -143,8 +217,8 @@ def query_horizons_small_bodies(assoc, plot_all_tracks=False):
 
     #########
     # Get ephemerides
-    start_time = astropy.time.Time(assoc_data["t_min"].min(), format="mjd")
-    stop_time = astropy.time.Time(assoc_data["t_max"].max(), format="mjd")
+    start_time = astropy.time.Time(mjd_range[0], format="mjd")
+    stop_time = astropy.time.Time(mjd_range[1], format="mjd")
 
     ephem = {}
     fephem = {}
@@ -161,7 +235,7 @@ def query_horizons_small_bodies(assoc, plot_all_tracks=False):
 
             key_str = body_name.replace(" ", "_")
 
-            track_file = f"{assoc}_sb_{key_str}.csv"
+            track_file = f"{prefix}_sb_{key_str}.csv"
             if os.path.exists(track_file):
                 print(f"Read {track_file}")
                 fephem[body_name] = utils.read_catalog(track_file)
@@ -175,9 +249,9 @@ def query_horizons_small_bodies(assoc, plot_all_tracks=False):
                 "&OBJ_DATA='NO'&MAKE_EPHEM='YES'&EPHEM_TYPE='OBSERVER'"
                 "&OUT_UNITS='KM-S'"
                 "&ANG_FORMAT='DEG'&CAL_FORMAT=JD"
-                f"&CENTER='{JWST_MPC}'"
+                f"&CENTER='{SPACECRAFT_MPC}'"
                 f"&START_TIME='{start_time.iso}'"
-                f"&STOP_TIME='{stop_time.iso}'&STEP_SIZE='256'"
+                f"&STOP_TIME='{stop_time.iso}'&STEP_SIZE='{nsteps}'"
             ).replace(" ", "%20")
 
             print(pos_url)
@@ -185,9 +259,6 @@ def query_horizons_small_bodies(assoc, plot_all_tracks=False):
             with urllib.request.urlopen(pos_url) as url:
                 ephem[body_name] = json.loads(url.read().decode())
 
-            # keys = list(ephem.keys())
-            # for key in keys:
-            # key = keys[0]
             eph = ephem[body_name]["result"]
             ind = []
             first = last = None
@@ -219,33 +290,41 @@ def query_horizons_small_bodies(assoc, plot_all_tracks=False):
 
     #############
     # Make a figure
-    fig, ax = plt.subplots(1, 1, figsize=(8, 8))
 
-    ax.scatter(assoc_data["ra"], assoc_data["dec"], alpha=0.0)
-    footprints = []
-    for row in assoc_data:
-        sr = utils.SRegion(row["footprint"])
-        sr.add_patch_to_axis(ax, fc="tomato", alpha=0.1, ec="tomato")
-        footprints.append(sr)
+    if make_plot:
+        fig, ax = plt.subplots(1, 1, figsize=(8, 8))
+        ax.scatter([ra], [dec], alpha=0.0)
 
-    keep = []
+        footprints = []
+        for row in assoc_data:
+            sr = utils.SRegion(row["footprint"])
+            sr.add_patch_to_axis(ax, fc="tomato", alpha=0.1, ec="tomato")
+            footprints.append(sr)
 
-    for key in fephem:
-        coo = np.array([fephem[key]["ra"], fephem[key]["dec"]]).T
-        in_fp = False
-        for sr in footprints:
-            in_fp |= sr.path[0].contains_points(coo).sum() > 0
+        keep = []
+        for key in fephem:
+            coo = np.array([fephem[key]["ra"], fephem[key]["dec"]]).T
+            in_fp = False
+            for sr in footprints:
+                in_fp |= sr.path[0].contains_points(coo).sum() > 0
 
-        if in_fp | (plot_all_tracks):
-            keep.append(key)
-            ax.plot(fephem[key]["ra"], fephem[key]["dec"], label=key, alpha=0.5)
+            if in_fp | (plot_all_tracks):
+                keep.append(key)
+                ax.plot(
+                    fephem[key]["ra"], fephem[key]["dec"], label=key, alpha=0.5
+                )
 
-    leg = ax.legend()
-    leg.set_title(assoc)
-    ax.set_xlim(*ax.get_xlim()[::-1])
-    ax.set_aspect(1.0 / np.cos(assoc_data["dec"][0] / 180 * np.pi))
+        leg = ax.legend()
+        leg.set_title(assoc)
+        ax.set_xlim(*ax.get_xlim()[::-1])
+        ax.set_aspect(1.0 / np.cos(dec / 180 * np.pi))
 
-    fig.savefig(f"{assoc}_sb.png")
+        fig.savefig(f"{prefix}_sb.png")
+
+    else:
+        fig = None
+        keep = None
+
     return fig, fephem, keep
 
 
