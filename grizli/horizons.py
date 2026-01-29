@@ -221,7 +221,6 @@ def query_horizons_small_bodies(assoc="j100028p0218_cosmos-1-f1800w_00157", coor
             + ",".join([f"{float(x):.16f}" for x in xyz])
             + ","
             + ",".join([f"{float(x):.16f}" for x in v_xyz])
-            +
             # "&two-pass=true&suppress-first-pass=true"  # &req-elem=false"
             + sb_ident_params
             + f"&obs-time={epoch.iso.replace(' ', '_').split('.')[0]}"
