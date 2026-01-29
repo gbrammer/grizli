@@ -1,6 +1,11 @@
 """
-Query the NASA Horizons Small Bodies database for Solar System objects that
-could pass through JWST images
+Query the NASA Horizons Small Body Identification API for Solar System objects
+that could pass through JWST images
+
+See `grizli.horizons.demo`:
+
+.. image:: ../_static/j100028p0218_cosmos-1-f1800w_00157_small_bodies.png
+
 """
 import glob
 import os
@@ -128,7 +133,7 @@ def query_horizons_small_bodies(assoc="j100028p0218_cosmos-1-f1800w_00157", coor
 
         prefix = assoc
 
-        if assoc_data["instrument_name"].upper() in [
+        if assoc_data["instrument_name"][0].upper() in [
             "NIRCAM", "MIRI", "NIRISS", "NIRSPEC"
         ]:
             BODY_CODE = JWST_BODY_CODE
@@ -576,6 +581,94 @@ def run_all(
         res = query_horizons_small_bodies(assoc)
         print("\n")
 
+
+def demo():
+    """
+    Generate a demonstration figure
+    """
+    import astropy.io.fits as pyfits
+    import astropy.wcs as pywcs
+
+    from grizli import horizons, utils
+
+    assoc = "j100028p0218_cosmos-1-f1800w_00157"
+
+    sb = horizons.query_horizons_small_bodies(
+        assoc=assoc,
+        coords=None,
+        mjd_range=None,
+        prefix="user",
+        with_db=True,
+        sb_ident_params="&two-pass=true&suppress-first-pass=true",
+        query_arcmin=15,
+        ephem_steps=256,
+        make_plot=False,
+        plot_all_tracks=False
+    )
+
+    msk = horizons.get_sb_mask(
+        assoc,
+        mask_size={"MIRI": '3"', "NIRCAM": '0.5"'},
+        region_colors={"MIRI": "pink", "NIRCAM": "lightblue"},
+        parallels=True,
+        t_pad=90.0,
+    )
+
+    with_sb = np.isin(msk[0]['dataset'], msk[1]['dataset'])
+    row = msk[0][with_sb][0]
+    
+    assoc_mosaic = (
+    "https://s3.amazonaws.com/grizli-v2/assoc_mosaic/v7.0/"
+        + "{assoc}-{filter}_drc_sci.fits.gz".format(**row)
+    ).lower()
+    
+    if row['instrume'] == 'MIRI':
+        assoc_mosaic = assoc_mosaic.replace('_drc', '_drz')
+        
+    with pyfits.open(assoc_mosaic) as im:
+        data = im[0].data * 1
+        wcs = pywcs.WCS(im[0].header)
+
+    rms = utils.nmad(data[(data != 0) & np.isfinite(data)])
+
+    sh = data.shape
+
+    fig, ax = plt.subplots(1, 1, figsize=(6, 6 * sh[0] / sh[1]))
+
+    ax.imshow(
+        data / rms * np.nan**(data == 0),
+        vmin=-2, vmax=10,
+        cmap='bone_r',
+    )
+
+    ax.axis('off')
+
+    colors = {}
+
+    for row in msk[1]:
+        sr = utils.SRegion(row['mask'])
+        xy = wcs.all_world2pix(*sr.xy[0].T, 0)
+        key = row['key']
+        if key in colors:
+            label = None
+            color = colors[key]
+        else:
+            label = key.replace('_', ' ')
+            color = None
+
+        pl = ax.plot(*xy, color=color, label=label)
+        if key not in colors:
+            colors[key] = pl[0].get_color()
+
+    leg = ax.legend(loc='upper right', fontsize=9)
+    ax.text(
+        0.05, 0.98, assoc, ha='left', va='top',
+        transform=ax.transAxes, fontsize=10
+    )
+
+    fig.tight_layout(pad=1)
+
+    fig.savefig(f"{assoc}_small_bodies.png")
 
 if __name__ == "__main__":
 
