@@ -359,32 +359,32 @@ def make_visit_mosaic(assoc, base_path=ROOT_PATH, version='v7.0', pixscale=0.08,
     """
     Make a mosaic of the exposures from a visit with a tangent point selected
     from the sky tile grid
-    
+
     Parameters
     ----------
     assoc : str
         grizli association name
-    
+
     base_path : str
         Base working directory.  Working directory will be
         ``{base_path}/{assoc}/Prep/``
-    
+
     version : str
         version string
-    
+
     pixscale : float
-        Reference pixel scale in arcsec (used for MIRI).  HST, LW, NIRISS will have 
-        ``pixscale/2`` and SW will have ``pixscale/4``
-    
+        Reference pixel scale in arcsec (used for MIRI).  HST, LW, NIRISS will
+        have ``pixscale/2`` and SW will have ``pixscale/4``
+
     skip_existing : bool
         Don't overwrite existing assoc mosaics
-    
+
     sync : bool
         Update results in grizli database and copy to S3
-    
+
     clean : bool
         Remove working directory and all files in it
-    
+
     """
     import skimage.io
     
@@ -582,17 +582,40 @@ def make_visit_mosaic(assoc, base_path=ROOT_PATH, version='v7.0', pixscale=0.08,
     tab['status'] = 2
 
     if sync:
-        db.execute(f"delete from assoc_mosaic where assoc_name = '{assoc}' and version = '{version}'")
-        db.send_to_database('assoc_mosaic', tab, index=False, if_exists='append')
-        os.system(f"""aws s3 sync ./ s3://grizli-v2/assoc_mosaic/{version}/ --exclude "*" --include "{assoc}-*" --acl public-read""")
-    
+        db.execute(
+            f"DELETE FROM assoc_mosaic WHERE assoc_name = '{assoc}' "
+            + f"AND version = '{version}'"
+        )
+
+        db.send_to_database(
+            'assoc_mosaic',
+            tab,
+            index=False,
+            if_exists='append'
+        )
+
+        # os.system(
+        #    f"aws s3 sync ./ s3://grizli-v2/assoc_mosaic/{version}/ "
+        #    + f"--exclude "*" --include "{assoc}-*" --acl public-read"
+        # )
+        ## cp rather than sync because so many files in that directory!
+
+        files_ = glob.glob(f"{assoc}-*")
+        files_.sort()
+
+        for file in files_:
+            os.system(
+                f"aws s3 cp {file} s3://grizli-v2/assoc_mosaic/{version}/ "
+                + " --acl public-read"
+            )
+
     if clean & (base_path is not None):
         msg = f"make_visit_mosaic: Remove {assoc} from {base_path}"
         utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
-        
+
         os.chdir(base_path)
         os.system(f'rm -rf {assoc}')
-    
+
     return tab
 
 
@@ -1769,28 +1792,39 @@ def process_visit(assoc, clean=True, sync=True, s3_acl="public-read", max_dt=4, 
     ########
     
     failed = glob.glob('*failed')
-    
+
+    PROCESS_STATUS = -1
+
     if len(failed) > 0:
+        # Probably alignment failed
+        PROCESS_STATUS = 9
         if sync:
             update_assoc_status(assoc, status=9)
+
     elif len(glob.glob('*wcs.log')) == 0:
+        # Probably no data found to process, e.g., for failed HST
+        # or no access rights
+        PROCESS_STATUS = 10
         if sync:
             update_assoc_status(assoc, status=10)
     else:
+        # Success! (but not yet synced)
+        PROCESS_STATUS = 22
+
         if sync:
-            update_assoc_status(assoc, status=2)
-        
+            update_assoc_status(assoc, status=22)
+
         # Exposure info database table
         vis_files = glob.glob('*visits.yaml')
         if len(vis_files) > 0:
             #visits, groups, info = np.load(visits_file[0], allow_pickle=True)
             visits, groups, info = auto_script.load_visits_yaml(vis_files[0])
-            
+
             for i, v in enumerate(visits):
                 if sync:
                     print('File exposure info: ', v['files'][0], assoc)
                     exposure_info_from_visit(v, assoc=assoc, **expinfo_kwargs)
-    
+
     if sync:
         add_shifts_log(assoc=assoc, remove_old=True, verbose=True)
         add_wcs_log(assoc=assoc, remove_old=True, verbose=True)
@@ -1800,16 +1834,16 @@ def process_visit(assoc, clean=True, sync=True, s3_acl="public-read", max_dt=4, 
                           base_path=ROOT_PATH,
                           clean=False,
                           **visit_mosaic_kwargs)
-        
+
     os.environ['iref'] = os.environ['orig_iref']
     os.environ['jref'] = os.environ['orig_jref']
-    
+
     os.chdir(f'{ROOT_PATH}/')
-    
+
     if sync:
         os.system(f'aws s3 rm --recursive ' + 
                   f' s3://grizli-v2/HST/Pipeline/{assoc}')
-        
+
         if os.path.exists(assoc):
             os.chdir(assoc)
             cmd = f"""aws s3 sync ./ s3://grizli-v2/HST/Pipeline/{assoc}/ \
@@ -1824,16 +1858,20 @@ def process_visit(assoc, clean=True, sync=True, s3_acl="public-read", max_dt=4, 
                   --include "Prep/*angles.*" \
                   --include "*fail*" \
                   --include "RAW/*[nx][tg]" --acl {s3_acl}"""
-        
+
             os.system(cmd)
             print('\n# Sync\n' + cmd.replace('     ', '') + '\n')
             os.chdir(f'{ROOT_PATH}')
-            
+
         files = glob.glob(f'{assoc}*.*')
         for file in files:
             os.system(f'aws s3 cp {file} ' + 
                       f' s3://grizli-v2/HST/Pipeline/{assoc}/ --acl {s3_acl}')
-    
+
+        if PROCESS_STATUS == 22:
+            # Now set status = 2
+            update_assoc_status(assoc, status=2)
+
     if (clean & 2) > 0:
         print(f'rm -rf {assoc}*')
         os.system(f'rm -rf {assoc}*')
