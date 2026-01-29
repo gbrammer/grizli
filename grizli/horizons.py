@@ -17,14 +17,19 @@ import astropy.units as u
 from . import utils
 from .aws import db
 
-## Spacecraft codes
-JWST_MPC = "500@-170" # JWST
-JWST_BODY_CODE = "2021-130A" # JWST
+## Spacecraft codes:
+## BODY_CODE is for calculating the time-specific geocentric VECTORS of the
+## spacecraft and MPC is the code used when observing "from" the spacecraft
+JWST_BODY_CODE = "2021-130A"
+JWST_MPC = "500@-170"
 
-SPACECRAFT_MPC = JWST_MPC
+HST_BODY_CODE = "1990-037B"
+HST_MPC = "500@-48"
+
 SPACECRAFT_BODY_CODE = JWST_BODY_CODE
+SPACECRAFT_MPC = JWST_MPC
 
-def query_horizons_small_bodies(assoc="j100028p0218_cosmos-1-f1800w_00157", coords=None, mjd_range=None, prefix="user", with_db=True, sb_ident_params="&two-pass=true&suppress-first-pass=true", ephem_steps=256, make_plot=True, plot_all_tracks=False):
+def query_horizons_small_bodies(assoc="j100028p0218_cosmos-1-f1800w_00157", coords=None, mjd_range=None, prefix="user", with_db=True, sb_ident_params="&two-pass=true&suppress-first-pass=true", query_arcmin=15, ephem_steps=256, make_plot=True, plot_all_tracks=False):
     """
     Query the Horizons Small Body Identification tool at the epoch and pointing
     location of the exposures in a grizli/dja association.
@@ -33,11 +38,11 @@ def query_horizons_small_bodies(assoc="j100028p0218_cosmos-1-f1800w_00157", coor
     geocenter to get its time-dependent position, then queries the sb_ident API.
 
     The spacecraft is specified in the ``SPACECRAFT_BODY_CODE`` and
-    ``SPACECRAFT_MPC`` global variables, where the first is used to
-    retrieve the spacecraft geocentric coordinates and the latter is used to
-    generate the SB ephemerides as observed by the spacecraft.  The defaults
-    are set for JWST: ``JWST_MPC = "500@-170"`` and
-    ``JWST_BODY_CODE = "2021-130A"``.
+    ``SPACECRAFT_MPC`` global variables, where the first is used to retrieve
+    the spacecraft geocentric position and velocity vectors and the latter is
+    used to generate the SB ephemerides as observed by the spacecraft. The
+    defaults are set for JWST: ``JWST_MPC = "500@-170"`` and ``JWST_BODY_CODE =
+    "2021-130A"``.
 
     .. note::
         Note that the sb_ident query can take several minutes to complete.  It
@@ -66,6 +71,10 @@ def query_horizons_small_bodies(assoc="j100028p0218_cosmos-1-f1800w_00157", coor
     sb_ident_params : str
         Parameters for the horizons sb_ident API
 
+    query_arcmin : float
+        Radius of the query from the pointing center.  Probably set this
+        a bit larger than the expected instrumental FoV.
+
     ephem_steps : int
         Number of steps requested in the body ephemeris.  If ``ephem_steps < 0``
         interpret as a step size in seconds and calculate from
@@ -91,6 +100,7 @@ def query_horizons_small_bodies(assoc="j100028p0218_cosmos-1-f1800w_00157", coor
         footprints
 
     """
+
     if (coords is None) | (mjd_range is None):
 
         if with_db:
@@ -118,7 +128,19 @@ def query_horizons_small_bodies(assoc="j100028p0218_cosmos-1-f1800w_00157", coor
 
         prefix = assoc
 
+        if assoc_data["instrument_name"].upper() in [
+            "NIRCAM", "MIRI", "NIRISS", "NIRSPEC"
+        ]:
+            BODY_CODE = JWST_BODY_CODE
+            MPC_CODE = JWST_MPC
+        else:
+            BODY_CODE = HST_BODY_CODE
+            MPC_CODE = HST_MPC
+
     else:
+        BODY_CODE = SPACECRAFT_BODY_CODE
+        MPC_CODE = SPACECRAFT_MPC
+
         ra, dec = coords
         make_plot = False
 
@@ -162,7 +184,7 @@ def query_horizons_small_bodies(assoc="j100028p0218_cosmos-1-f1800w_00157", coor
 
         pos_url = (
             f"https://ssd.jpl.nasa.gov/api/horizons.api?format=json"
-            f"&COMMAND='{SPACECRAFT_BODY_CODE}'"
+            f"&COMMAND='{BODY_CODE}'"
             "&OBJ_DATA='NO'&MAKE_EPHEM='YES'&EPHEM_TYPE='VECTORS'"
             "&OUT_UNITS='KM-S'"
             f"&CENTER='500'"
@@ -186,10 +208,7 @@ def query_horizons_small_bodies(assoc="j100028p0218_cosmos-1-f1800w_00157", coor
 
         #########
         # Query for small bodies
-        # JWST_MPC = "500@-170"
-        # JWST_MPC = "@jwst"
-
-        radius = 15 / 60
+        radius = query_arcmin / 60
 
         url = (
             f"https://ssd-api.jpl.nasa.gov/sb_ident.api?"  # sb-kind=a"
@@ -251,7 +270,7 @@ def query_horizons_small_bodies(assoc="j100028p0218_cosmos-1-f1800w_00157", coor
                 "&OBJ_DATA='NO'&MAKE_EPHEM='YES'&EPHEM_TYPE='OBSERVER'"
                 "&OUT_UNITS='KM-S'"
                 "&ANG_FORMAT='DEG'&CAL_FORMAT=JD"
-                f"&CENTER='{SPACECRAFT_MPC}'"
+                f"&CENTER='{MPC_CODE}'"
                 f"&START_TIME='{start_time.iso}'"
                 f"&STOP_TIME='{stop_time.iso}'&STEP_SIZE='{nsteps}'"
             ).replace(" ", "%20")
