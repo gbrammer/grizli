@@ -31,6 +31,9 @@ Utilities
 
 Catalog tools
 =============
+.. automodapi:: grizli.horizons
+    :no-inheritance-diagram:
+
 .. automodapi:: grizli.catalog
     :no-inheritance-diagram:
 
