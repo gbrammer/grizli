@@ -5,17 +5,19 @@ could pass through JWST images
 import glob
 import os
 
-from grizli.aws import db
 import numpy as np
-from grizli import utils
-from astropy.coordinates import SkyCoord, Angle
-import astropy.time
-
-import astropy.units as u
 import urllib.request
 import json
 import matplotlib.pyplot as plt
 
+from astropy.coordinates import SkyCoord, Angle
+import astropy.time
+import astropy.units as u
+
+from . import utils
+from .aws import db
+
+## Spacecraft codes
 JWST_MPC = "500@-170" # JWST
 JWST_BODY_CODE = "2021-130A" # JWST
 
@@ -29,7 +31,6 @@ def query_horizons_small_bodies(assoc="j100028p0218_cosmos-1-f1800w_00157", coor
 
     The script first queries Horizons to "observe" the spacecraft from the Earth
     geocenter to get its time-dependent position, then queries the sb_ident API.
-    Note that the sb_ident query can take minutes to complete.
 
     The spacecraft is specified in the ``SPACECRAFT_BODY_CODE`` and
     ``SPACECRAFT_MPC`` global variables, where the first is used to
@@ -37,6 +38,10 @@ def query_horizons_small_bodies(assoc="j100028p0218_cosmos-1-f1800w_00157", coor
     generate the SB ephemerides as observed by the spacecraft.  The defaults
     are set for JWST: ``JWST_MPC = "500@-170"`` and
     ``JWST_BODY_CODE = "2021-130A"``.
+
+    .. note::
+        Note that the sb_ident query can take several minutes to complete.  It
+        also seems to timeout if more than ~2 queries are sent simultaneously.
 
     Parameters
     ----------
@@ -86,9 +91,6 @@ def query_horizons_small_bodies(assoc="j100028p0218_cosmos-1-f1800w_00157", coor
         footprints
 
     """
-    import urllib.request
-    import json
-
     if (coords is None) | (mjd_range is None):
 
         if with_db:
@@ -342,7 +344,7 @@ def get_sb_mask(
     ----------
     assoc : str
         Association name, already processed with
-        `~grizli.aws.horizons.query_horizons_small_bodies`
+        `~grizli.horizons.query_horizons_small_bodies`
 
     mask_size : dict
         Mask size along the ephemeris track
@@ -498,7 +500,7 @@ def run_all(
     **kwargs,
 ):
     """
-    Run `grizli.aws.horizons.query_horizons_small_bodies` on all associations
+    Run `grizli.horizons.query_horizons_small_bodies` on all associations
     found in list from a query to the ``assoc_table`` db table
 
     Parameters
