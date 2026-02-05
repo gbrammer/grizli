@@ -7765,6 +7765,11 @@ def drizzle_from_visit(
 
     count = 0
 
+    # Running uniqid counter for drizzle context images.  This must be
+    # monotonically increasing across successive calls to `drizzle_array_groups`
+    # or else the same context bits will be reused.
+    uniqid_counter = 1
+
     ref_photflam = None
 
     indices = []
@@ -8276,6 +8281,7 @@ def drizzle_from_visit(
                 calc_wcsmap=calc_wcsmap,
                 verbose=verbose,
                 data=None,
+                first_uniqid=uniqid_counter,
                 with_slices=with_slices,
             )
 
@@ -8296,6 +8302,8 @@ def drizzle_from_visit(
 
             for k in keys:
                 header[k] = keys[k]
+
+            uniqid_counter += len(sci_list)
 
         else:
 
@@ -8321,12 +8329,15 @@ def drizzle_from_visit(
                 calc_wcsmap=calc_wcsmap,
                 verbose=verbose,
                 data=data,
+                first_uniqid=uniqid_counter,
                 with_slices=with_slices,
             )
 
             outsci, outwht, outvar, outctx = res[:4]
             header["EXPTIME"] += flt[0].header["EXPTIME"]
             header["NDRIZIM"] += 1
+
+            uniqid_counter += len(sci_list)
 
         count += 1
         header["FLT{0:05d}".format(count)] = file
@@ -8521,10 +8532,20 @@ def drizzle_array_groups(
     else:
         use_weights = wht_list
 
+    # Number of input arrays
+    N = len(sci_list)
+
+    # Maximum uniqid that will be passed to drizzlepac
+    uniqid_max = first_uniqid + N - 1
+
+    # Number of 32-bit drizzle context planes needed
+    Np = (uniqid_max + 31) // 32
+
     # Output arrays
     if data is not None:
         if len(data) == 3:
             outsci, outwht, outctx = data
+            outvar = None
         else:
             outsci, outwht, outctx, outvar = data
             if outvar is not None:
@@ -8537,26 +8558,45 @@ def drizzle_array_groups(
                     ' but var_list not provided'
                 )
                 log_comment(LOGFILE, msg, verbose=verbose, show_date=True)
+
+        # Add additional planes if necessary
+        if Np > 1:
+            if outctx.ndim == 2:  # Stack if 2D Array
+                outctx = np.stack([outctx] + [np.zeros_like(outctx) for _i in range(Np - 1)])
+                if outvar is not None:
+                    _varctx = np.stack([_varctx] + [np.zeros_like(_varctx) for _i in range(Np - 1)])
+            elif outctx.shape[0] < Np:  # Append if 3D Array with fewer planes
+                outctx = np.append(
+                    outctx,
+                    [np.zeros_like(outctx[0]) for _ in range(Np - outctx.shape[0])],
+                    axis=0,
+                )
+                if outvar is not None:
+                    _varctx = np.append(
+                        _varctx,
+                        [np.zeros_like(_varctx[0]) for _ in range(Np - _varctx.shape[0])],
+                        axis=0,
+                    )
     else:
         outsci = np.zeros(shape, dtype=np.float32)
         outwht = np.zeros(shape, dtype=np.float32)
-        outctx = np.zeros(shape, dtype=np.int32)
+
+        if Np == 1:
+            outctx = np.zeros(shape, dtype=np.int32)
+        else:
+            outctx = np.zeros((Np,) + shape, dtype=np.int32)
+
         if var_list is None:
             outvar = None
         else:
             outvar = np.zeros(shape, dtype=np.float32)
             _varwht = np.zeros(shape, dtype=np.float32)
-            _varctx = np.zeros(shape, dtype=np.int32)
+            if Np == 1:
+                _varctx = np.zeros(shape, dtype=np.int32)
+            else:
+                _varctx = np.zeros((Np,) + shape, dtype=np.int32)
 
     needs_var = (outvar is not None) & (var_list is not None)
-
-    # Number of input arrays
-    N = len(sci_list)
-
-    # Drizzlepac cannot support >31 input images
-    if first_uniqid + N > 31 and verbose:
-        msg = "Warning: Too many input images for context map, will wrap around"
-        log_comment(LOGFILE, msg, verbose=verbose, show_date=True)
 
     with_slices &= calc_wcsmap == 0
 
@@ -8598,12 +8638,18 @@ def drizzle_array_groups(
 
             osci = outsci[sly, slx] * 1
             owht = outwht[sly, slx] * 1
-            octx = outctx[sly, slx] * 1
+            if outctx.ndim == 2:
+                octx = outctx[sly, slx] * 1
+            else:
+                octx = outctx[:, sly, slx] * 1
 
             if outvar is not None:
                 ovar = outvar[sly, slx] * 1
                 ovarw = _varwht[sly, slx] * 1
-                ovarc = _varctx[sly, slx] * 1
+                if _varctx.ndim == 2:
+                    ovarc = _varctx[sly, slx] * 1
+                else:
+                    ovarc = _varctx[:, sly, slx] * 1
 
         else:
             outputwcs_i = outputwcs
@@ -8634,7 +8680,7 @@ def drizzle_array_groups(
             "cps",
             1,
             wcslin_pscale=wcs_list[i].pscale,
-            uniqid=((first_uniqid - 1 + i) % 32) + 1,
+            uniqid=first_uniqid + i,
             pixfrac=pixfrac,
             kernel=kernel,
             fillval="0",
@@ -8654,7 +8700,7 @@ def drizzle_array_groups(
                 "cps",
                 1,
                 wcslin_pscale=wcs_list[i].pscale,
-                uniqid=1,
+                uniqid=first_uniqid + i,
                 pixfrac=pixfrac,
                 kernel=kernel,
                 fillval="0",
@@ -8665,12 +8711,18 @@ def drizzle_array_groups(
             # Put slice back in full image
             outsci[sly, slx] = osci
             outwht[sly, slx] = owht
-            outctx[sly, slx] = octx
+            if outctx.ndim == 2:
+                outctx[sly, slx] = octx
+            else:
+                outctx[:, sly, slx] = octx
 
             if outvar is not None:
                 outvar[sly, slx]  =  ovar
                 _varwht[sly, slx] =  ovarw
-                _varctx[sly, slx] =  ovarc
+                if _varctx.ndim == 2:
+                    _varctx[sly, slx] =  ovarc
+                else:
+                    _varctx[:, sly, slx] =  ovarc
 
         #     print(f"yyy owht {np.nanmax(owht[owht > 0])}  {(owht > 0).sum()}")
         #
