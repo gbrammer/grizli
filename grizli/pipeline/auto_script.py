@@ -2075,6 +2075,7 @@ def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, com
         'jw01571', 'jw03383', 'jw04681', # NIRISS
         'jw06434', 'jw05398', #  NIRCam PP
         'jw05105', # NEXUS GO-5105 mixes F356W direct and F322W2 grism
+        'jw09263', # NEXUS GO-9263 Cy4 mixes F356W direct and F322W2+F444W grism
         'jw05893', # COSMOS-3D mixes F356W direct + F444W grism
         'jw04762', # Fujimoto GNz7q  F444W direct + F410M grism
         'jw06480', # Schouws, mixes F444W direct and F410M / F356W grism
