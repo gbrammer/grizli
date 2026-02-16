@@ -1839,7 +1839,7 @@ def load_visit_info(root='j033216m2743', path='./', verbose=True):
     return visits, groups, info
 
 
-def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, combine_same_pa=True, combine_minexp=2, is_dash=False, filters=VALID_FILTERS, max_dt=1e9, visit_split_shift=1.5, file_query='*'):
+def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, combine_same_pa=True, combine_minexp=2, is_dash=False, filters=VALID_FILTERS, max_dt=1e9, visit_split_shift=1.5, file_query='*', merge_nircam_grism=True, **kwargs):
 
     """
     Organize exposures into "visits" by filter / position / PA / epoch
@@ -1985,9 +1985,11 @@ def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, com
 
     # Don't run combine_minexp if have grism exposures
     grisms = ['G141', 'G102', 'G800L', 'G280', 'GR150C', 'GR150R']
-    has_grism = np.in1d(info['FILTER'], grisms).sum() > 0
+    has_grism = np.isin(info['FILTER'], grisms).sum() > 0
     # is PUPIL in info?
-    has_grism |= np.in1d(info['PUPIL'], ['GRISMR', 'GRISMC']).sum() > 0
+    has_nrc_grism = np.isin(info['PUPIL'], ['GRISMR', 'GRISMC']).sum() > 0
+
+    has_grism |= has_nrc_grism
     info.meta['HAS_GRISM'] = has_grism
 
     if combine_same_pa:
@@ -2036,7 +2038,10 @@ def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, com
 
         print('** Combine same PA: **')
         for i, visit in enumerate(visits):
-            print('{0} {1} {2}'.format(i, visit['product'], len(visit['files'])))
+            msg = '{0} {1} {2}'.format(
+                i, visit['product'], len(visit['files'])
+            )
+            print(msg)
 
     elif (combine_minexp > 0) & (not has_grism):
         combined = []
@@ -2066,11 +2071,14 @@ def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, com
         visits = combined
         print('** Combine Singles: **')
         for i, visit in enumerate(visits):
-            print('{0} {1} {2}'.format(i, visit['product'], len(visit['files'])))
+            msg = '{0} {1} {2}'.format(
+                i, visit['product'], len(visit['files'])
+            )
+            print(msg)
     
     all_groups = utils.parse_grism_associations(visits, info)
 
-    # JWST PASSAGE
+    # JWST grism
     mixed_wfss_progs = [
         'jw01571', 'jw03383', 'jw04681', # NIRISS
         'jw06434', 'jw05398', #  NIRCam PP
@@ -2083,7 +2091,13 @@ def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, com
         'jw07404', # Naidu TWINKLE F410M direct, F444W grism
     ]
 
-    if (len(all_groups) > 0) and (os.path.basename(files[0])[:7] in mixed_wfss_progs):
+    split_jwst_grism = len(all_groups) > 0
+    split_jwst_grism &= (
+        (os.path.basename(files[0])[:7] in mixed_wfss_progs)
+        | (has_nrc_grism & merge_nircam_grism)
+    )
+
+    if split_jwst_grism:
         for v in visits:
             if 'clear' in v['product']:
                 # print('NIRISS pure parallel direct: ', v['product'])
