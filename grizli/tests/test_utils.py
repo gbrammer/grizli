@@ -1,3 +1,4 @@
+import os
 import unittest
 
 import numpy as np
@@ -270,3 +271,46 @@ class UtilsTester(unittest.TestCase):
         signal = np.array([0, 1, 0, 2, 1, 0, 3, 0])
         expected_peaks = np.array([3, 6])
         np.testing.assert_array_equal(utils.find_peaks(signal), expected_peaks)
+
+
+    def test_downloader(self):
+        """
+        Test download utilities
+        """
+        import json
+        from astropy.utils.data import clear_download_cache
+        url_path = "grizli-v2/scratch/simple.json"
+
+        for local_path in ["./", "/tmp/testdir"]:
+            for url_prefix in ["https://s3.amazonaws.com/", "s3://"]:
+                local_file, status = utils.general_fetch_file(
+                    url_prefix + url_path,
+                    cache=True,
+                    path=local_path,
+                    makedirs=True,
+                    show_progress=False
+                )
+                assert os.path.exists(local_file)
+
+                with open(local_file) as fp:
+                    data = json.load(fp)
+
+                assert data["test"] == 1.0
+
+                # do it again, status should be 1 "file found"
+                local_file, status = utils.general_fetch_file(
+                    url_prefix + url_path,
+                    cache=True,
+                    path=local_path,
+                    makedirs=True,
+                    show_progress=False,
+                )
+                assert status == 1
+
+                os.remove(local_file)
+                if local_path == "/tmp/testdir":
+                    os.rmdir(local_path)
+
+                if "https" in url_prefix:
+                    clear_download_cache(url_prefix + url_path)
+
