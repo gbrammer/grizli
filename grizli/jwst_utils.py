@@ -372,7 +372,50 @@ def change_header_pointing(header, ra_ref=0.0, dec_ref=0.0, pa_v3=0.0):
     return new_header
 
 
-def get_jwst_skyflat(header, verbose=True, valid_flat=(0.7, 1.4)):
+def download_skyflat_file(skyfile, bucket_prefix='grizli-v2/NircamSkyflats/', **kwargs):
+    """
+    Download an individual skyflat file
+    
+    Parameters
+    ----------
+    skyfile : str
+        Path + filename of a flat file
+
+    bucket_prefix : str
+        Directory prefix of the remote file
+
+    Returns
+    -------
+    local_file : str, None
+        Path to the local file if the download was successful
+
+    """
+    local_file = None
+
+    path = os.path.dirname(skyfile)
+
+    for url_prefix in ["s3://", "https://s3.amazonaws.com/"]:
+        if "s3://" in url_prefix:
+            try:
+                import boto3
+            except ImportError:
+                continue
+
+        download_file, status = utils.general_fetch_file(
+            os.path.join(
+                url_prefix, bucket_prefix, os.path.basename(skyfile)
+            ),
+            path=path,
+            cache=True
+        )
+        if status > 0:
+            local_file = download_file
+            break
+    
+    return local_file
+
+
+def get_jwst_skyflat(header, verbose=True, valid_flat=(0.7, 1.4), conf_path=None, download=True, **kwargs):
     """
     Get sky flat for JWST instruments
 
@@ -387,6 +430,15 @@ def get_jwst_skyflat(header, verbose=True, valid_flat=(0.7, 1.4)):
     valid_flat : (float, float)
         Range of values to define where the flat is valid to avoid corrections
         that are too large
+
+    conf_path : str, None
+        Optional path to search for the skyflat files.  If not specified,
+        defaults to ``os.path.join(GRIZLI_PATH, "CONF", "NircamSkyFlat")``.
+
+    download : bool
+        Try to download from the remote bucket with 
+        `grizli.utils.download_skyflat_file` if the specified file not found
+        locally.
 
     Returns
     -------
@@ -406,7 +458,10 @@ def get_jwst_skyflat(header, verbose=True, valid_flat=(0.7, 1.4)):
     filt = utils.parse_filter_from_header(header)
 
     key = ("{0}-{1}".format(header["detector"], filt)).lower()
-    conf_path = os.path.join(GRIZLI_PATH, "CONF", "NircamSkyFlat")
+    
+    if conf_path is None:
+        conf_path = os.path.join(GRIZLI_PATH, "CONF", "NircamSkyFlat")
+
     if "nrcb4" in key:
         skyfile = os.path.join(conf_path, f"{key}_skyflat.fits")
     elif key.startswith("nis-"):
@@ -416,6 +471,11 @@ def get_jwst_skyflat(header, verbose=True, valid_flat=(0.7, 1.4)):
         skyfile = os.path.join(conf_path, f"{key}_skyflat.fits")
     else:
         skyfile = os.path.join(conf_path, f"{key}_skyflat_smooth.fits")
+
+    if (not os.path.exists(skyfile)) & download:
+        local_file = download_skyflat_file(
+            skyfile, verbose=verbose, **kwargs
+    )
 
     if not os.path.exists(skyfile):
         msg = f"jwst_utils.get_jwst_skyflat: {skyfile} not found"
@@ -4719,7 +4779,11 @@ def flag_nirspec_hot_pixels(
         ~np.isfinite(rate["SCI"].data)
     )
 
-    pval = np.nanpercentile(np.sqrt(rate["VAR_RNOISE"].data[mask]), rnoise_percentile)
+    pval = np.nanpercentile(
+        np.sqrt(rate["VAR_RNOISE"].data[~mask]),
+        rnoise_percentile
+    )
+
     hot_threshold = pval * rnoise_threshold
 
     sn, dq_flag, count = flag_nircam_hot_pixels(

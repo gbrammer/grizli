@@ -7028,7 +7028,7 @@ def parse_s3_url(url="s3://bucket/path/to/file.txt"):
         File name of the object, e.g. ``os.path.basename(s3_object)``
 
     """
-    surl = url.strip("s3://")
+    surl = url.split("s3://")[-1]
     spl = surl.split("/")
     if len(spl) < 2:
         print(f"bucket / path not found in {url}")
@@ -7045,6 +7045,7 @@ def fetch_s3_url(
     file_func=lambda x: os.path.join("./", x),
     skip_existing=True,
     verbose=True,
+    **kwargs,
 ):
     """
     Fetch file from an S3 bucket
@@ -7109,6 +7110,67 @@ def fetch_s3_url(
             # Download failed due to a ClientError
             # Forbidden probably means insufficient bucket access privileges
             pass
+
+    return local_file, status
+
+
+def general_fetch_file(url, path='./', makedirs=True, skip_existing=True, cache=True, verbose=True, **kwargs):
+    """
+    General utility for downloading either from s3:// or https://
+
+    Parameters
+    ----------
+    url : str
+        URL of a file to download
+    
+    path : str
+        Path of downloaded file.
+
+    skip_existing:
+        Don't re-download if the local file is found in ``path``
+
+    Returns
+    -------
+    local_file : str
+        Path to the local file
+
+    status : int
+        Download status: 0 if file not found, 1 if local_file found, 2 if
+        downloaded successfully.
+    
+    """
+    import shutil
+    from astropy.utils.data import download_file
+    from urllib.error import HTTPError
+
+    base = os.path.basename(url)
+    local_file = os.path.join(path, base)
+    if os.path.exists(local_file) & skip_existing:
+        return local_file, 1
+
+    if (not os.path.exists(path)) & makedirs:
+        os.makedirs(path)
+
+    log_comment(
+        LOGFILE,
+        f"utils.general_fetch_file: {url} > {local_file}",
+        verbose=verbose
+    )
+
+    if url.startswith("s3://"):
+        local_file, status = fetch_s3_url(
+            url,
+            file_func=lambda x: os.path.join(path, x),
+            verbose=False,
+        )
+    else:
+        try:
+            astropy_file = download_file(url, cache=cache, **kwargs)
+            shutil.copy(astropy_file, local_file)
+            status = 2
+        except HTTPError:
+            local_file = None
+            status = 0
 
     return local_file, status
 
