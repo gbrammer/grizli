@@ -183,7 +183,7 @@ class TestExtraReferences:
 
             skyfile, flat_corr, dq = _
             assert "nrcb4-f150w-clear_skyflat.fits" in skyfile
-            assert np.allclose(dq, np.array([0, 1024]))
+            assert np.allclose(np.unique(dq), np.array([0, 1024]))
 
 
 class TestJWSTUtils:
