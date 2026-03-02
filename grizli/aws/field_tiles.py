@@ -907,7 +907,7 @@ def process_tile(field='cos', tile='01.01', filters=TILE_FILTERS, fetch_existing
         edge = np.append(edge, np.unique(seg[0].data[:, 16:19]))
         edge = np.append(edge, np.unique(seg[0].data[:, -19:-16]))
         edge = np.unique(edge)
-        phot['edge'] = np.in1d(phot['number'], edge)*1
+        phot['edge'] = np.isin(phot['number'], edge) * 1
     
         ### Add missing columns
         cols = db.SQL('select * from combined_tile_phot limit 2').colnames
