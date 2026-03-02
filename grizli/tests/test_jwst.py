@@ -127,6 +127,8 @@ class TestJWSTHeaders:
                                                  update=True,
                                                  verbose=True)
 
+class TestExtraReferences:
+
     def test_wisp_references(self):
         """
         Test find/download wisp reference files

@@ -283,6 +283,13 @@ class UtilsTester(unittest.TestCase):
 
         for local_path in ["./", "/tmp/testdir"]:
             for url_prefix in ["https://s3.amazonaws.com/", "s3://"]:
+
+                if "s3://" in url_prefix:
+                    try:
+                        import boto3
+                    except ImportError:
+                        continue
+
                 local_file, status = utils.general_fetch_file(
                     url_prefix + url_path,
                     cache=True,
