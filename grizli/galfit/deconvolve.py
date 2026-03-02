@@ -14,6 +14,7 @@ import astropy.io.fits as pyfits
 import astropy.stats
 import astropy.table
 
+from .. import utils
 
 def test():
 
@@ -147,7 +148,6 @@ def galfit_deconvolve(model_hdu, residuals, rms=None, mask=None, oversample=8, c
         # Scale
         yscl = 1.
 
-        #yscl = prof[msk].sum()/np.trapz(2*np.pi*yprof*xpix, xpix)
         yprof *= yscl
         ydeconv *= yscl
         yrms *= yscl
@@ -485,7 +485,7 @@ def running_median(xi, yi, NBIN=10, use_median=True, use_nmad=True, reverse=Fals
             mi = xi[in_bin].min()
             xm[i] = (ma+mi)/2.
             dx = (ma-mi)
-            ym[i] = np.trapz(yi[in_bin][xso], xi[in_bin][xso])/dx
+            ym[i] = utils.trapz(yi[in_bin][xso], xi[in_bin][xso]) / dx
         else:
             xm[i] = x_func(xi[in_bin])
             ym[i] = y_func(yi[in_bin])

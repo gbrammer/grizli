@@ -15,6 +15,10 @@ import astropy.wcs as pywcs
 import astropy.table
 
 import numpy as np
+try:
+    from numpy import trapz as trapz
+except ImportError:
+    from numpy import trapezoid as trapz
 
 import astropy.units as u
 
@@ -2069,7 +2073,7 @@ def mod_dq_bits(value, okbits=32 + 64 + 512, badbits=0, verbose=False):
         print(f"Unset bits: {np.binary_repr(okbits)}")
         print(f"Set bits: {np.binary_repr(badbits)}")
 
-    return (value & ~okbits) | badbits
+    return (value - (value & okbits)) | badbits
 
 
 
@@ -3353,7 +3357,7 @@ class SpectrumTemplate(object):
             line = lmodel(wave_grid)
             line[0:2] = 0
             line[-2:] = 0
-            line /= np.trapz(line, wave_grid)
+            line /= trapz(line, wave_grid)
             peak = line.max()
         else:
             # Gaussian
@@ -3523,7 +3527,7 @@ class SpectrumTemplate(object):
         AB mag = 26.619
 
         """
-        INTEGRATOR = np.trapz
+        INTEGRATOR = trapz
 
         try:
             from .utils_numba.interp import interp_conserve_c
@@ -5005,8 +5009,9 @@ def compute_equivalent_widths(
 
         # Where line template non-zero
         mask = flux_arr[clip, :][ix, :] > 0
-        ew_i = np.trapz(
-            (line / continuum)[:, mask], wave[mask] * (1 + z * observed_frame), axis=1
+        ew_i = trapz(
+            (line / continuum)[:, mask], wave[mask] * (1 + z * observed_frame),
+            axis=1
         )
 
         EWdict[key] = np.percentile(ew_i, [16.0, 50.0, 84.0])

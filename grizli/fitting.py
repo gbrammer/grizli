@@ -3452,7 +3452,7 @@ class GroupFitter(object):
         # Find peaks including the prior, if specified
         if prior is not None:
             pzi = np.interp(zgrid, prior[0], prior[1], left=0, right=0)
-            pzi /= np.maximum(np.trapz(pzi, zgrid), 1.0e-10)
+            pzi /= np.maximum(utils.trapz(pzi, zgrid), 1.0e-10)
             logpz = np.log(pzi)
             chi2_i = chi2 - 2 * logpz
         else:
@@ -3713,7 +3713,7 @@ class GroupFitter(object):
 
         # Normalize PDF
         if len(pdf) > 1:
-            pdf /= np.trapz(pdf, fit["zgrid"])
+            pdf /= utils.trapz(pdf, fit["zgrid"])
 
             pdf = np.maximum(pdf, 1.0e-40)
 
@@ -3726,11 +3726,7 @@ class GroupFitter(object):
             pz_fine = np.exp(splz)
             pz_fine[~ok] = 0
 
-            # norm = np.trapz(pzfine, zfine)
-
             # Compute CDF and probability intervals
-            # dz = np.gradient(zfine[ok])
-            # cdf = np.cumsum(np.exp(spl(zfine[ok]))*dz/norm)
             cdf = cumulative_trapezoid(pz_fine, x=zfine)
             percentiles = np.array([2.5, 16, 50, 84, 97.5]) / 100.0
             pz_percentiles = np.interp(percentiles, cdf / cdf[-1], zfine[1:])
@@ -3756,7 +3752,7 @@ class GroupFitter(object):
             risk_loss = _loss(
                 (z_risk - fit["zgrid"]) / (1 + fit["zgrid"]), gamma=risk_gamma
             )
-            min_risk = np.trapz(pdf * risk_loss, fit["zgrid"])
+            min_risk = utils.trapz(pdf * risk_loss, fit["zgrid"])
 
             # MAP, maximum p(z) from parabola fit around tabulated maximum
             zi = np.argmax(pdf)

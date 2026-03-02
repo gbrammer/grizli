@@ -1200,8 +1200,8 @@ class StackFitter(GroupFitter):
             t["prior"] = pz
 
         # "area" parameter for redshift quality.
-        num = np.trapz(np.clip(chi2 - chi2.min(), 0, 25), z)
-        denom = np.trapz(z * 0 + 25, z)
+        num = utils.trapz(np.clip(chi2 - chi2.min(), 0, 25), z)
+        denom = utils.trapz(z * 0 + 25, z)
         area25 = 1 - num / denom
 
         # "best" redshift
@@ -1250,7 +1250,10 @@ class StackFitter(GroupFitter):
                     clip = td.wave <= t_i[te].wave.max()
                     clip &= td.wave >= t_i[te].wave.min()
 
-                    EW = np.trapz((tn.flux / td.flux)[clip] - 1, td.wave[clip])
+                    EW = utils.trapz(
+                        (tn.flux / td.flux)[clip] - 1,
+                        td.wave[clip]
+                    )
                     if not np.isfinite(EW):
                         EW = -1000.0
 

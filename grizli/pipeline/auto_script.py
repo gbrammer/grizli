@@ -602,9 +602,12 @@ def go(root='j010311+131615',
         return True
 
     visits, all_groups, info = parsed
-    run_has_grism = np.in1d(info['FILTER'], ['G141', 'G102', 'G800L', 'GR150C', 'GR150R']).sum() > 0
+    run_has_grism = np.isin(
+        info['FILTER'], ['G141', 'G102', 'G800L', 'GR150C', 'GR150R']
+    ).sum() > 0
+
     # is PUPIL in info?
-    run_has_grism |= np.in1d(info['PUPIL'], ['GRISMR', 'GRISMC']).sum() > 0
+    run_has_grism |= np.isin(info['PUPIL'], ['GRISMR', 'GRISMC']).sum() > 0
 
     # Alignment catalogs
     #catalogs = ['PS1','SDSS','GAIA','WISE']
@@ -1127,7 +1130,7 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_pr
     
     # Allow all JWST for now xxx
     instr = [str(inst) for inst in tab['instrument_name']]
-    jw = np.in1d(instr, ['NIRISS','NIRCAM','MIRI','NIRSPEC','FGS'])
+    jw = np.isin(instr, ['NIRISS','NIRCAM','MIRI','NIRSPEC','FGS'])
     use_filters |= jw
     
     tab = tab[use_filters]

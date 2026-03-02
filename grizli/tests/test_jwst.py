@@ -84,9 +84,11 @@ class TestJWSTHeaders:
             assert(im['SCI'].header['SIPDEMAD'] < 1.e-2)
             
         # Parse visits
-        visits, groups, info = auto_script.parse_visits(field_root='jwst', 
-                                                        RAW_PATH=file_path, 
-                                                        visit_split_shift=1.2)
+        visits, groups, info = auto_script.parse_visits(
+            field_root='jwst',
+            RAW_PATH=file_path,
+            visit_split_shift=1.2
+        )
         
         assert(os.path.exists('jwst_visits.yaml'))
         

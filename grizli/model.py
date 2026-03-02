@@ -1369,8 +1369,9 @@ Error: `thumb` must have the same dimensions as the direct image! ({0:d},{1:d})
             left=0,
             right=0,
         )
-        total_sens = np.trapz(
-            spectrum_1d[1] * sens_i / np.gradient(spectrum_1d[0]), spectrum_1d[0]
+        total_sens = utils.trapz(
+            spectrum_1d[1] * sens_i / np.gradient(spectrum_1d[0]),
+            spectrum_1d[0]
         )
 
         m = self.compute_model_psf(

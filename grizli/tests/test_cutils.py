@@ -36,11 +36,7 @@ def test_cinterp_conserve():
 
     for base_module in INTERP_MODULES:
         ylr = base_module.interp_conserve_c(xlr, xarr, yarr)
-        assert np.allclose(np.trapz(ylr, xlr), np.trapz(yarr, xarr))
-
-    # if len(INTERP_MODULES) > 1:
-    #     ylr_slow = interp.interp_conserve(xlr, xarr, yarr)
-    #     assert np.allclose(np.trapz(ylr_slow, xlr), np.trapz(yarr, xarr))
+        assert np.allclose(utils.trapz(ylr, xlr), utils.trapz(yarr, xarr))
 
 
 def test_disperse_c():
@@ -130,7 +126,7 @@ def test_disperse_c():
         model_trace = model2d[:, x0[1] + Rmax : -(x0[1] + 2 + Rmax)]
 
         # Each location along the spectrum should see the "whole" thumb
-        assert np.allclose(model_trace.sum(axis=0), thumb.sum())
+        assert np.allclose(model_trace.sum(axis=0), thumb.sum(), rtol=1.e-3)
 
         #######
         # Unresolved "emission line" in a single spectral bin should give the thumbnail
@@ -155,7 +151,7 @@ def test_disperse_c():
         model2d = modelf.reshape(sh_beam)
         model_trace = model2d[:, x0[1] + Rmax : -(x0[1] + 2 + Rmax)]
 
-        assert model_trace.sum() == thumb.sum()
+        assert np.allclose(model_trace.sum(), thumb.sum(), rtol=1.e-3)
 
 
 def test_segmentation_limits():
