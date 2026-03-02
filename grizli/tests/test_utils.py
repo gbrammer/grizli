@@ -321,3 +321,25 @@ class UtilsTester(unittest.TestCase):
                 if "https" in url_prefix:
                     clear_download_cache(url_prefix + url_path)
 
+    def test_mod_bit(self):
+        """
+        Test bit modifier for different int types
+        """
+        value_bit = 6
+        okbits = 2
+
+        int_types = [
+            np.uint8, np.uint16, np.uint32, np.int8, np.int16, np.int32
+        ]
+
+        for dtype in int_types:
+            value_typed = dtype(value_bit)
+
+            for bad in [0, 1]:
+                mod_bit = utils.mod_dq_bits(
+                    value_typed, okbits=okbits, badbits=bad, verbose=False
+                )
+
+                assert mod_bit == (4 | bad)
+
+

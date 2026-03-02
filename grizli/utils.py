@@ -2073,7 +2073,7 @@ def mod_dq_bits(value, okbits=32 + 64 + 512, badbits=0, verbose=False):
         print(f"Unset bits: {np.binary_repr(okbits)}")
         print(f"Set bits: {np.binary_repr(badbits)}")
 
-    return (value ^ okbits) | badbits
+    return (value - (value & okbits)) | badbits
 
 
 
