@@ -544,7 +544,7 @@ def apply_persistence_mask(
     flt[0].header["PERSGROW"] = (grow_mask, "Perristence mask dilation grow_mask")
 
     if reset:
-        flt["DQ"].data -= flt["DQ"].data & dq_value
+        flt["DQ"].data -= flt["DQ"].data.astype(np.int32) & dq_value
 
     if NPERS > 0:
         flt["DQ"].data[pers_mask > 0] |= dq_value
@@ -1903,12 +1903,14 @@ def make_SEP_catalog_from_arrays(
     uJy_to_dn = 1 / (3631 * 1e6 * 10 ** (-0.4 * ZP))
 
     if sci.dtype != np.float32:
-        sci_data = sci.byteswap().newbyteorder()
+        # sci_data = sci.byteswap().newbyteorder()
+        sci_data = sci.astype(np.float32)
     else:
         sci_data = sci
 
     if err.dtype != np.float32:
-        err_data = err.byteswap().newbyteorder()
+        # err_data = err.byteswap().newbyteorder()
+        err_data = err.astype(np.float32)
     else:
         err_data = err
 
@@ -2300,7 +2302,8 @@ def make_SEP_catalog(
             WEIGHT_TYPE = "VARIANCE"
 
     drz_im = pyfits.open(drz_file)
-    data = drz_im[0].data.byteswap().newbyteorder()
+    # data = drz_im[0].data.byteswap().newbyteorder()
+    data = drz_im[0].data.astype(np.float32)
 
     logstr = f"make_SEP_catalog: {drz_file} weight={weight_file} ({WEIGHT_TYPE})"
     utils.log_comment(utils.LOGFILE, logstr, verbose=verbose, show_date=True)
@@ -2337,7 +2340,8 @@ def make_SEP_catalog(
     need_err = (not use_bkg_err) | (not get_background)
     if (weight_file is not None) & need_err:
         wht_im = pyfits.open(weight_file)
-        wht_data = wht_im[0].data.byteswap().newbyteorder()
+        # wht_data = wht_im[0].data.byteswap().newbyteorder()
+        wht_data = wht_im[0].data.astype(np.float32)
 
         if WEIGHT_TYPE == "VARIANCE":
             err_data = np.sqrt(wht_data)
@@ -2982,7 +2986,8 @@ def compute_SEP_auto_params(
     segb = segmap
     if segmap is not None:
         if segmap.dtype == np.dtype(">i4"):
-            segb = segmap.byteswap().newbyteorder()
+            # segb = segmap.byteswap().newbyteorder()
+            segb = segmap.astype(np.int32)
 
     if "a_image" in tab.colnames:
         x, y = tab["x_image"] - 1, tab["y_image"] - 1
