@@ -126,6 +126,9 @@ def fresh_flt_file(
     oneoverf_kwargs={},
     use_skyflats=True,
     do_pure_parallel_wcs=True,
+    clean_nan=True,
+    dq_nan=(1 + 1024),
+    **kwargs,
 ):
     """
     Copy "fresh" unmodified version of a data file from some central location
@@ -172,6 +175,12 @@ def fresh_flt_file(
     do_pure_parallel_wcs : bool
         Update the WCS for JWST pure-parallel exposures from the FGS logs to fix
         a MAST bug.
+
+    clean_nan : bool
+        Set NaN pixels in the SCI extensions to zero and update the DQ arrays
+
+    dq_nan : int
+        DQ value to OR into the DQ extension
 
     Returns
     -------
@@ -429,6 +438,29 @@ def fresh_flt_file(
             c1m[ext].data[mask] |= 2
 
         c1m.flush()
+
+    # Set NaN pixels
+    if clean_nan:
+        for ext in [1,2,3,4]:
+            if ('SCI',ext) not in orig_file:
+                break
+
+            fix = ~np.isfinite(orig_file['SCI',ext].data)
+            if ('ERR',ext) in orig_file:
+                fix |= ~np.isfinite(orig_file['ERR',ext].data)
+
+            nfix = fix.sum()
+
+            if nfix > 0:
+                msg = (
+                    f"Fix {nfix} NaN pixels in extension {ext}, set DQ={dq_nan}"
+                )
+                utils.log_comment(utils.LOGFILE, msg, verbose=True)
+                orig_file['SCI', ext].data[fix] = 0.0
+                if ('ERR',ext) in orig_file:
+                    orig_file['ERR', ext].data[fix] = 1.e5
+
+                orig_file['DQ', ext].data[fix] |= dq_nan
 
     orig_file.writeto(local_file, overwrite=True)
 
