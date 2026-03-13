@@ -27,7 +27,8 @@ fetch_files_args:
     reprocess_parallel: False 
     reprocess_clean_darks: True
     remove_bad: True
-    min_bad_expflag: 2 
+    min_bad_expflag: 2
+    keep_valid_expflag: False
     s3_sync: True
     #filters: *filters
     fetch_flt_calibs: [IDCTAB, PFLTFILE, NPOLFILE, D2IMFILE]

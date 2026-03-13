@@ -1053,7 +1053,7 @@ def make_directories(root='j142724+334246', HOME_PATH='$PWD', paths={}):
     return paths
 
 
-def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_products={'WFPC2/WFC': ['C0M', 'C1M'], 'WFPC2/PC': ['C0M', 'C1M'], 'ACS/WFC': ['FLC'], 'WFC3/IR': ['RAW'], 'WFC3/UVIS': ['FLC']}, remove_bad=True, reprocess_parallel=False, reprocess_clean_darks=True, s3_sync=False, fetch_flt_calibs=['IDCTAB', 'PFLTFILE', 'NPOLFILE','D2IMFILE'], filters=VALID_FILTERS, min_bad_expflag=2, fetch_only=False, force_rate=True, get_rateints=False, get_recalibrated_rate=True, recalibrate_jwst=False, s3path=None, **kwargs):
+def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_products={'WFPC2/WFC': ['C0M', 'C1M'], 'WFPC2/PC': ['C0M', 'C1M'], 'ACS/WFC': ['FLC'], 'WFC3/IR': ['RAW'], 'WFC3/UVIS': ['FLC']}, remove_bad=True, reprocess_parallel=False, reprocess_clean_darks=True, s3_sync=False, fetch_flt_calibs=['IDCTAB', 'PFLTFILE', 'NPOLFILE','D2IMFILE'], filters=VALID_FILTERS, min_bad_expflag=2, keep_valid_expflag=False, fetch_only=False, force_rate=True, get_rateints=False, get_recalibrated_rate=True, recalibrate_jwst=False, s3path=None, **kwargs):
     """
     Fully automatic script for fetching exposure files
     
@@ -1369,8 +1369,12 @@ def fetch_files(field_root='j142724+334246', HOME_PATH='$PWD', paths={}, inst_pr
         
     # Remove exposures with bad EXPFLAG
     if remove_bad:
-        remove_bad_expflag(field_root=field_root, HOME_PATH=paths['home'],
-                           min_bad=min_bad_expflag)
+        remove_bad_expflag(
+            field_root=field_root,
+            HOME_PATH=paths['home'],
+            min_bad=min_bad_expflag,
+            keep_valid_expflag=keep_valid_expflag,
+        )
     
     # EXPTIME = 0
     files = glob.glob('*raw.fits')
@@ -1554,7 +1558,7 @@ def check_mast_pointing_header(file, do_update=True, overwrite=True, output_path
     return dm, visit, t_pars, transforms
 
 
-def remove_bad_expflag(field_root='', HOME_PATH='./', min_bad=2):
+def remove_bad_expflag(field_root='', HOME_PATH='./', min_bad=2, keep_valid_expflag=False, **kwargs):
     """
     Remove FLT files in RAW directory with bad EXPFLAG values, which
     usually corresponds to failed guide stars.
@@ -1613,7 +1617,11 @@ def remove_bad_expflag(field_root='', HOME_PATH='./', min_bad=2):
             if not os.path.exists('Expflag'):
                 os.mkdir('Expflag')
 
-            os.system('mv {0}* Expflag/'.format(visit))
+            if keep_valid_expflag:
+                for bad_file in expf['FILE'][bad]:
+                    os.system('mv {0} Expflag/'.format(bad_file))
+            else:
+                os.system('mv {0}* Expflag/'.format(visit))
 
 
 def visit_dict_to_strings(v):
