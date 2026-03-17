@@ -1321,7 +1321,7 @@ class TransformGrismconf(object):
         x0 = np.squeeze(self.transform.reverse(x, y)) # +x to detector transformation, x0 is an array of (x,y)
 
         # calculate the trace in the detector frame
-        tdx, tdy, wave = self.get_beam_trace_original(x=x, y=y, dx=dx, beam=beam)
+        tdx, tdy, wave = self.get_beam_trace_original(x=x0[0], y=x0[1], dx=dx, beam=beam)
  
         # rotate the trace back to the +x direction
         rev = self.transform.forward(x0[0] + tdx, x0[1] + tdy)
