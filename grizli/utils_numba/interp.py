@@ -11,7 +11,7 @@ __all__ = [
 ]
 
 
-@jit(nopython=True, fastmath=True, error_model="numpy")
+@jit(nopython=True, fastmath=True, error_model="numpy", cache=True)
 def pixel_map_c(in_data, xi, yi, out_data, xo, yo):
     """
     Fast pixel mapping from one image to another
@@ -42,7 +42,7 @@ def pixel_map_c(in_data, xi, yi, out_data, xo, yo):
     return True
 
 
-@jit(nopython=True, fastmath=True, error_model="numpy")
+@jit(nopython=True, fastmath=True, error_model="numpy", cache=True)
 def interp_c(x, xp, fp, extrapolate=0.0, assume_sorted=1):
     """
     Fast linear interpolation: ``f(x) ~ fp(xp)``
@@ -118,7 +118,7 @@ def interp_c(x, xp, fp, extrapolate=0.0, assume_sorted=1):
     return f
 
 
-@jit(nopython=True, fastmath=True, error_model="numpy")
+@jit(nopython=True, fastmath=True, error_model="numpy", cache=True)
 def integral_cumsum_c(xp, fp, extrapolate=0.0):
     """
     integral_cumsum_c(xp, fp, extrapolate=True)
@@ -143,7 +143,7 @@ def integral_cumsum_c(xp, fp, extrapolate=0.0):
     return ycumsum
 
 
-@jit(nopython=True, fastmath=True, error_model="numpy")
+@jit(nopython=True, fastmath=True, error_model="numpy", cache=True)
 def interp_conserve_c(x, xp, yp, left=0, right=0, integrate=0):
     """
     Interpolate spectrum conserving flux
@@ -259,7 +259,7 @@ def interp_conserve_c(x, xp, yp, left=0, right=0, integrate=0):
     return outy
 
 
-@jit(nopython=True, fastmath=True, error_model="numpy")
+@jit(nopython=True, fastmath=True, error_model="numpy", cache=True)
 def rebin_weighted_c(x, xp, yp, ye, left=0, right=0, integrate=0, remove_missing=1):
     """
     rebin_weighted_c(x, xp, fp, ep, left=0, right=0, integrate=0)
@@ -322,7 +322,7 @@ def rebin_weighted_c(x, xp, yp, ye, left=0, right=0, integrate=0, remove_missing
         return outx, outy, oute
 
 
-@jit(nopython=True, fastmath=True, error_model="numpy")
+@jit(nopython=True, fastmath=True, error_model="numpy", cache=True)
 def midpoint_c(x):
     """
     Simple midpoints of array

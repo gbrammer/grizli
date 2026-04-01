@@ -12,7 +12,7 @@ __all__ = [
 ]
 
 
-@jit(parallel=False, nopython=True, fastmath=True, error_model="numpy")
+@jit(parallel=False, nopython=True, fastmath=True, error_model="numpy", cache=True)
 def disperse_grism_object(
     flam, segm, seg_id, idxl, yfrac, ysens, modelf, x0, shd, sh_thumb, shg
 ):
@@ -103,7 +103,7 @@ def disperse_grism_object(
     return True
 
 
-@jit(nopython=True, fastmath=True, error_model="numpy")
+@jit(nopython=True, fastmath=True, error_model="numpy", cache=True)
 def compute_segmentation_limits(segm, seg_id, flam, shd):
     """Find pixel limits of a segmentation region
 
