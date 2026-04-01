@@ -2597,9 +2597,14 @@ class CustomGrismconf(TransformGrismconf):
 
         """
 
-        self.conf_file = conf_file
+        try:
+            self.conf_file = conf_file
 
-        self.conf_readlines = open(conf_file).readlines()
+            self.conf_readlines = open(self.conf_file).readlines()
+        except:
+            self.conf_file = os.path.join(GRIZLI_PATH, conf_file[conf_file.index("CONF/"):])
+
+            self.conf_readlines = open(self.conf_file).readlines()
 
         self.order_names = {
             "A": "+1",
