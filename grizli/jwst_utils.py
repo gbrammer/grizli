@@ -242,8 +242,11 @@ def set_quiet_logging(level=QUIET_LEVEL, remove_handler_names=['stpipe']):
     pops = []
 
     for i, handler in enumerate(logging.root.handlers):
-        if handler.log.name in remove_handler_names:
-            pops.append(i)
+        try:
+            if handler.log.name in remove_handler_names:
+                pops.append(i)
+        except AttributeError:
+            continue
 
     for i in pops[::-1]:
         logging.root.handlers.pop(i)
