@@ -1788,11 +1788,14 @@ class ImageData(object):
                 self.mdrizsky = header["MDRIZSKY"]
 
             # ACS bunit
-            # self.exptime = 1.
+            self.exptime = 1.
             if "EXPTIME" in hdulist[0].header:
                 self.exptime = hdulist[0].header["EXPTIME"]
             else:
-                self.exptime = hdulist[0].header["EFFEXPTM"]
+                for hdu_i in hdulist:
+                    if "EFFEXPTM" in hdu_i.header:
+                        self.exptime = hdu_i.header["EFFEXPTM"]
+                        break
 
             # if 'BUNIT' in header:
             #     if header['BUNIT'] == 'ELECTRONS':
@@ -3128,7 +3131,11 @@ class GrismFLT(object):
         if isinstance(ref_file, pyfits.ImageHDU) | isinstance(
             ref_file, pyfits.PrimaryHDU
         ):
-            self.ref_file = ref_file.fileinfo()["file"].name
+            try:
+                self.ref_file = ref_file.fileinfo()["file"].name
+            except TypeError:
+                self.ref_file = "empty"
+
             ref_str = ""
             ref_hdu = ref_file
 

@@ -62,6 +62,65 @@ def coordinate_string(ra=189.0706488, dec=62.2089502, precision=2):
     return center_coord, coostr
 
 
+def empty_thumbnail_cutout(
+    ra=189.0706488,
+    dec=62.2089502,
+    cutout_size=(60 * 0.05 * u.arcsec),
+    pixel_scale=0.05 * u.arcsec,
+    footprint_size=0.10 * u.arcsec,
+    **kwargs,
+):
+    """
+    Make an empty cutout HDU
+
+    Parameters
+    ----------
+    ra, dec : float
+        Sky coordinates at center of cutout
+
+    cutout_size : float
+        Cutout size
+
+    pixel_scale : float
+        Pixel scale
+
+    footprint_size : float
+        Size of dummy footprint at center of cutout
+
+    Returns
+    -------
+    empty : `astropy.io.fits.ImageHDU`
+        Empty FITS HDU with a valid WCS header
+
+    """
+    empty = utils.make_wcsheader(
+        ra,
+        dec,
+        size=cutout_size.to(u.arcsec).value,
+        pixscale=pixel_scale.to(u.arcsec).value,
+        get_hdu=True
+    )
+
+    empty.header['INSTRUME'] = 'NIRCAM'
+    empty.header['FILTER'] = 'F444W'
+    empty.header['PUPIL'] = 'CLEAR'
+    empty.header['PHOTFNU'] = 1.0
+    empty.header['PHOTFLAM'] = 1.0
+    empty.header['PHOTPLAM'] = 4.e4
+    empty.header['EFFEXPTM'] = 1.0
+
+    sh = empty.data.shape
+    yp, xp = np.indices(sh)
+    x0 = (footprint_size / pixel_scale) / 2.0
+
+    empty.data = (
+        np.sqrt((xp - x0)**2 + (yp - x0)**2) <= footprint_size / pixel_scale
+    ) * 1.0
+    empty.data /= empty.data.sum()
+
+    return empty
+
+
 def thumbnail_cutout(
     ra=189.0706488,
     dec=62.2089502,
@@ -687,6 +746,61 @@ def extract_from_coords(
     return mb
 
 
+def extract_beam_from_file(file, ra, dec, assoc=None, source_id=0, pad_exposure=[800, 800], cutout_file=None, verbose=2, segmentation_image=None, use_jwst_crds=False, zeroth_mask_kwargs={"erosion": 8}, filter_kwargs=None, size=48, mb_kwargs={}, keep_grp_object=False, clean=False, **kwargs):
+    """
+    """
+    if (not os.path.exists(file)) & (assoc is not None):
+        file_ = db.download_s3_file(
+            S3PATH.format(
+                dataset=os.path.basename(file).split('_rate')[0],
+                assoc=assoc,
+            ),
+            output_dir=os.path.dirname(file),
+            overwrite=False, verbose=verbose, **kwargs,
+        )
+
+    if not os.path.exists(file):
+        return None, []
+
+    if (segmentation_image is not None) & (source_id == 0):
+        # Get source from segmentation ID
+        source_id = id_from_segmentation(
+            segmentation_image, ra, dec, verbose=verbose
+        )
+
+    grp = multifit.GroupFLT(
+        grism_files=[file],
+        pad=pad_exposure,
+        ref_file=cutout_file,
+        verbose=((verbose & 2) > 0),
+        cpu_count=-1,
+        seg_file=segmentation_image,
+        use_jwst_crds=use_jwst_crds,
+    )
+
+
+    if (zeroth_mask_kwargs is not None) & (segmentation_image is not None):
+        # print('x before mask', (grp.FLTs[0].grism['DQ'] > 0).sum())
+        _ = simple_zeroth_mask(grp, **zeroth_mask_kwargs)
+        # print('x  after mask', (grp.FLTs[0].grism['DQ'] > 0).sum())
+
+    if filter_kwargs is not None:
+        grp.subtract_median_filter(**filter_kwargs)
+
+    beams = grp.get_beams(
+        source_id, center_rd=(ra, dec), size=size, **mb_kwargs
+    )
+
+    if not keep_grp_object:
+        del(grp)
+        grp = None
+
+    if clean:
+        os.remove(file)
+
+    return grp, beams
+
+
 def combine_beams_2d(
     mb,
     step=0.5,
@@ -1265,7 +1379,17 @@ def redshift_fit_1d(
     from msaexp.spectrum import SpectrumSampler
     import eazy.templates
 
-    templ = eazy.templates.Template("fsps_line_templ.fits")
+    if os.path.exists("fsps_line_templ.fits"):
+        templ_path="fsp_line_templ.fits"
+    else:
+        templ_path = (
+            "https://s3.amazonaws.com/grizli-v2/junk/fsps_line_templ.fits"
+        )
+
+    templ = eazy.templates.Template(
+        templ_path,
+    )
+
     null_template = eazy.templates.Template(
         arrays=(templ.wave, np.ones_like(templ.flux_flam()))
     )
