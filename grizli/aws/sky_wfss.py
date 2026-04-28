@@ -673,30 +673,45 @@ def extract_from_coords(
                 msg = f"{j+1:>2} / {len(rate_files)} GroupFLT {os.path.basename(file)}"
                 utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
 
-            grp = multifit.GroupFLT(
-                grism_files=[file],
-                pad=pad_exposure,
-                ref_file=cutout_file,
-                verbose=((verbose & 2) > 0),
-                cpu_count=-1,
-                seg_file=segmentation_image,
+            # grp = multifit.GroupFLT(
+            #     grism_files=[file],
+            #     pad=pad_exposure,
+            #     ref_file=cutout_file,
+            #     verbose=((verbose & 2) > 0),
+            #     cpu_count=-1,
+            #     seg_file=segmentation_image,
+            #     use_jwst_crds=use_jwst_crds,
+            # )
+            #
+            # if (zeroth_mask_kwargs is not None) & (segmentation_image is not None):
+            #     # print('x before mask', (grp.FLTs[0].grism['DQ'] > 0).sum())
+            #     _ = simple_zeroth_mask(grp, **zeroth_mask_kwargs)
+            #     # print('x  after mask', (grp.FLTs[0].grism['DQ'] > 0).sum())
+            #
+            # if filter_kwargs is not None:
+            #     grp.subtract_median_filter(**filter_kwargs)
+            #
+            # beams += grp.get_beams(
+            #     source_id, center_rd=(ra, dec), size=size, **mb_kwargs
+            # )
+            #
+            # del grp
+            grp, beams_j = extract_beam_from_file(
+                file, ra, dec,
+                pad_exposure=pad_exposure,
+                cutout_file=cutout_file,
+                verbose=verbose,
+                segmentation_image=segmentation_image,
                 use_jwst_crds=use_jwst_crds,
+                zeroth_mask_kwargs=zeroth_mask_kwargs,
+                filter_kwargs=filter_kwargs,
+                size=size,
+                mb_kwargs=mb_kwargs,
+                keep_grp_object=False,
+                **kwargs,
             )
-
-            if (zeroth_mask_kwargs is not None) & (segmentation_image is not None):
-                # print('x before mask', (grp.FLTs[0].grism['DQ'] > 0).sum())
-                _ = simple_zeroth_mask(grp, **zeroth_mask_kwargs)
-                # print('x  after mask', (grp.FLTs[0].grism['DQ'] > 0).sum())
-
-            if filter_kwargs is not None:
-                grp.subtract_median_filter(**filter_kwargs)
-
-            beams += grp.get_beams(
-                source_id, center_rd=(ra, dec), size=size, **mb_kwargs
-            )
-
-            del grp
-
+            if len(beams_j) > 0:
+                beams += beams_j
     else:
         beams = grp.get_beams(source_id, center_rd=(ra, dec), size=size, **mb_kwargs)
 
@@ -748,6 +763,42 @@ def extract_from_coords(
 
 def extract_beam_from_file(file, ra, dec, assoc=None, source_id=0, pad_exposure=[800, 800], cutout_file=None, verbose=2, segmentation_image=None, use_jwst_crds=False, zeroth_mask_kwargs={"erosion": 8}, filter_kwargs=None, size=48, mb_kwargs={}, keep_grp_object=False, clean=False, **kwargs):
     """
+    Force extract a single spectrum from a specified file
+
+    Parameters
+    ----------
+    file : str
+        Exposure filename
+
+    ra, dec : float
+        Reference coordinates of the extraction
+
+    assoc : str, None
+        ``DJA`` association that includes ``file``, needed if ``file`` is not
+        found and must be downloaded from the remote DJA object storage.
+
+    source_id : int
+
+    keep_grp_object : bool
+        Return the `~grizli.multifit.GroupFLT` object along with extracted
+        ``beams``
+
+    clean : bool
+        Remove ``file`` from the working directory
+
+    Returns
+    -------
+    grp : `~grizli.multifit.GroupFLT`, None
+        Grism group object
+
+    beams : list
+        List of `~grizli.model.BeamCutout` objects extracted from ``file`` at
+        ``(ra, dec)``.  This list will have length zero if the exposure does
+        contain a spectrum at the requested position or length unity if a
+        spectrum is successfully extracted.  Note that if ``file`` is not found
+        and can not be downloaded, then the function returns
+        ``grp = None`` and ``beams = []``.
+
     """
     if (not os.path.exists(file)) & (assoc is not None):
         file_ = db.download_s3_file(
