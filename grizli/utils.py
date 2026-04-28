@@ -199,6 +199,26 @@ LSTSQ_RCOND = None
 # BKG_CLIP = [2, 1, 99]
 BKG_CLIP = None
 
+LOGFILE = "/tmp/grizli.log"
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+log_formatter = logging.Formatter(
+    "%(asctime)s: %(name)s - %(levelname)s -  %(message)s"
+)
+
+ch = logging.StreamHandler()
+ch.setLevel(logging.DEBUG)
+ch.setFormatter(log_formatter)
+logger.addHandler(ch)
+
+# fh = logging.FileHandler(
+#     LOGFILE, mode='a', encoding=None, delay=False, errors=None
+# )
+# fh.setLevel(logging.DEBUG)
+# fh.setFormatter(log_formatter)
+# logger.addHandler(fh)
 
 def set_warnings(numpy_level="ignore", astropy_level="ignore"):
     """
@@ -12908,9 +12928,6 @@ def remove_text_labels(fig):
             if isinstance(child, matplotlib.text.Text):
                 if child.get_text():  # Don't remove empty labels
                     child.set_visible(False)
-
-
-LOGFILE = "/tmp/grizli.log"
 
 
 def log_function_arguments(LOGFILE, frame, func="func", ignore=[], verbose=True):
