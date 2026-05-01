@@ -301,6 +301,7 @@ def get_miri_flat_by_date(file, tsplit=MIRI_FLAT_ROUND, verbose=True):
     tsplit = {'F770W':4,
               'F1800W': 5,
               'F560W' : 8,
+              'F1130W': 5,
               'F1280W': 5,
               'F1500W': 8,
               'F1000W': 5,
