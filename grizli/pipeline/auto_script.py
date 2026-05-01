@@ -258,6 +258,7 @@ def create_path_dict(root='j142724+334246', home='$PWD', raw=None, prep=None, ex
 MIRI_FLAT_ROUND = {'F560W' : 8,
     'F770W':4,
     'F1000W': 5,
+    'F1130W': 5,
     'F1280W': 5,
     'F1500W': 8,
     'F1800W': 5,
