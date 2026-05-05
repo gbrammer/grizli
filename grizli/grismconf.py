@@ -21,10 +21,39 @@ if os.getenv("NIRCAM_CONF_VERSION") is not None:
     NIRCAM_CONF_VERSION = os.getenv("NIRCAM_CONF_VERSION")
     print(f"Use NIRCAM_CONF_VERSION = {NIRCAM_CONF_VERSION}")
 
-if os.getenv("CRDS_CONTEXT") is not None:
-    DEFAULT_CRDS_CONTEXT = os.getenv("CRDS_CONTEXT")
+# if os.getenv("CRDS_CONTEXT") is not None:
+#     DEFAULT_CRDS_CONTEXT = os.getenv("CRDS_CONTEXT")
 
 VERBOSITY = 3
+
+def get_current_context(context=None):
+    """
+    Get CRDS_CONTEXT from environment or
+    `~grizli.grismconf.DEFAULT_CRDS_CONTEXT`
+
+    Parameters
+    ----------
+    context : str, None
+        If ``context`` ends with ".pmap", use that context explicitly, else
+        get from environment variable or DEFAULT_CRDS_CONTEXT.
+
+    Returns
+    -------
+    context : str
+        CRDS context, like ``"jwst_1123.pmap"``.
+
+    """
+    if isinstance(context, str):
+        if context.endswith(".pmap"):
+            return context
+
+    context = os.getenv("CRDS_CONTEXT")
+
+    if context is None:
+        context = DEFAULT_CRDS_CONTEXT
+
+    return context
+
 
 def show_available_nircam_versions(filter="F444W", module="B", grism="R", verbose=True):
     """
@@ -66,7 +95,7 @@ def show_available_nircam_versions(filter="F444W", module="B", grism="R", verbos
 
 
 class aXeConf:
-    def __init__(self, conf_file="WFC3.IR.G141.V2.5.conf"):
+    def __init__(self, conf_file="WFC3.IR.G141.V2.5.conf", **kwargs):
         """
         Read an aXe-compatible configuration file
 
@@ -676,7 +705,7 @@ def get_config_filename(
     module=None,
     chip=1,
     use_jwst_crds=False,
-    crds_context=DEFAULT_CRDS_CONTEXT,
+    context=None,
 ):
     """
     Generate a config filename based on the instrument, filter & grism combination.
@@ -725,8 +754,9 @@ def get_config_filename(
     use_jwst_crds : bool
         Use CRDS ``specwcs`` reference files for JWST instruments
 
-    crds_context : str
-        CRDS context to use for JWST reference files.
+    context : None, str
+        CRDS context to use for JWST reference files, parsed through
+        `~grizli.grismconf.get_current_context`.
 
     Returns
     -------
@@ -861,7 +891,7 @@ def get_config_filename(
             date=None,
             reftypes=("photom", "specwcs"),
             header=None,
-            context=crds_context,
+            context=get_current_context(context=context),
         )
 
         conf_file = refs["specwcs"]
@@ -1130,7 +1160,7 @@ class TransformGrismconf(object):
 
     """
 
-    def __init__(self, conf_file="", **kwargs):
+    def __init__(self, conf_file="", get_photom=True, **kwargs):
         """
         Parameters
         ----------
@@ -1143,7 +1173,10 @@ class TransformGrismconf(object):
         self.conf_file = conf_file
 
         if "specwcs" in conf_file:
-            self.conf = CRDSGrismConf(conf_file, get_photom=True, **kwargs)
+            self.conf = CRDSGrismConf(
+                conf_file, get_photom=get_photom, **kwargs
+            )
+
             kws = {
                 "instrument": self.conf.instrument,
                 "module": self.conf.module,
@@ -1422,7 +1455,9 @@ class TransformGrismconf(object):
             sens["WAVELENGTH"] = lam.astype(np.double)
             if self.conf.SENS is None:
                 # specwcs
-                _sens = np.interp(lam, *self.conf.SENS_data[order], left=0.0, right=0.0)
+                _sens = np.interp(
+                    lam, *self.conf.SENS_data[order], left=0.0, right=0.0
+                )
                 sens["SENSITIVITY"] = _sens.astype(np.double)
             else:
                 sens["SENSITIVITY"] = self.conf.SENS[order](lam).astype(np.double)
@@ -1500,7 +1535,7 @@ class TransformGrismconf(object):
             self.sens["A"] = _tab
 
 
-def load_grism_config(conf_file, warnings=True):
+def load_grism_config(conf_file, warnings=True, **kwargs):
     """
     Load parameters from an aXe configuration file
 
@@ -1534,10 +1569,10 @@ def load_grism_config(conf_file, warnings=True):
         conf = TransformGrismconf(conf_file)
         conf.get_beams()
     elif "V9/NIRCAM" in conf_file:
-        conf = TransformGrismconf(conf_file)
+        conf = TransformGrismconf(conf_file, **kwargs)
         conf.get_beams()
     elif "specwcs" in conf_file:
-        conf = TransformGrismconf(conf_file)
+        conf = TransformGrismconf(conf_file, **kwargs)
         conf.get_beams()
     else:
         conf = aXeConf(conf_file)
@@ -1644,7 +1679,7 @@ def download_jwst_crds_references(
     ],
     grisms=["GRISMR", "GRISMC", "GR150R", "GR150C"],
     modules=["A", "B"],
-    context=DEFAULT_CRDS_CONTEXT,
+    context=None,
     verbose=True,
 ):
     """
@@ -1669,12 +1704,15 @@ def download_jwst_crds_references(
         List of modules to download references for. Default: ["A", "B"].
 
     context : str
-        CRDS context.
+        CRDS context to use for JWST reference files, parsed through
+        `~grizli.grismconf.get_current_context`.
 
     verbose : bool
         Print messages to the terminal.
 
     """
+    context = get_current_context(context=context)
+
     for instrument in instruments:
         for f in filters:
             for g in grisms:
@@ -1714,7 +1752,8 @@ class CRDSGrismConf:
         self,
         file="references/jwst/nircam/jwst_nircam_specwcs_0136.asdf",
         get_photom=True,
-        context=DEFAULT_CRDS_CONTEXT,
+        internal_sensitivity_curve=True,
+        context=None,
         **kwargs,
     ):
         """
@@ -1729,7 +1768,8 @@ class CRDSGrismConf:
             Get sensitivity curves from the ``photom`` reference file
 
         context : str
-            Explicit CRDS_CONTEXT
+            CRDS context to use for JWST reference files, parsed through
+            `~grizli.grismconf.get_current_context`.
 
         Attributes
         ----------
@@ -1754,11 +1794,13 @@ class CRDSGrismConf:
         """
         from . import jwst_utils
 
-        if context is not None:
-            jwst_utils.CRDS_CONTEXT = context
-            jwst_utils.set_crds_context(verbose=False, override_environ=True)
+        context = get_current_context(context=context)
+
+        jwst_utils.CRDS_CONTEXT = context
+        jwst_utils.set_crds_context(verbose=False, override_environ=True)
 
         self.file = file
+
         if file.startswith("references"):
             full_path = os.path.join(os.environ["CRDS_PATH"], file)
         elif os.path.exists(file):
@@ -1780,8 +1822,9 @@ class CRDSGrismConf:
         self.SENS_data = None
 
         if get_photom:
-            self.get_photom(**kwargs)
-            self.load_new_sensitivity_curve(**kwargs)
+            self.get_photom(context=context, **kwargs)
+            if internal_sensitivity_curve:
+                self.load_new_sensitivity_curve(**kwargs)
 
     def initialize_from_datamodel(self):
         """
@@ -2332,6 +2375,7 @@ class CRDSGrismConf:
         date=None,
         photom_file=None,
         verbose=False,
+        context=None,
         **kwargs,
     ):
         """
@@ -2381,7 +2425,13 @@ class CRDSGrismConf:
             cpars["meta.observation.date"] = date.split()[0]
             cpars["meta.observation.time"] = date.split()[1]
 
-            refs = crds.getreferences(cpars, reftypes=("photom",))
+            context = get_current_context(context=context)
+
+            refs = crds.getreferences(
+                cpars,
+                reftypes=("photom",),
+                context=context,
+            )
 
             if verbose:
                 msg = f"Read photometry reference {refs['photom']} (date = '{date}')"
@@ -2396,12 +2446,13 @@ class CRDSGrismConf:
 
         phot = astropy.table.Table(ph.phot_table)
 
-        pixel_area = ph.meta.photometry.pixelarea_steradians
+        pixel_area_sr = ph.meta.photometry.pixelarea_steradians
 
-        self.sens_ref_file = refs["photom"]
+        self.sens_ref_file = photom_file
         self.SENS_xyt = xyt
         self.SENS_dldp = {}
         self.SENS_data = {}
+        self.SENS_components = {}
 
         for i, order in enumerate(self.orders):
             ix = phot["filter"] == self.filter
@@ -2413,12 +2464,42 @@ class CRDSGrismConf:
                 utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
                 continue
 
+            ix = np.where(ix)[0][0]
             row = phot[ix]
 
             wave = np.squeeze(row["wavelength"].data)
             sens_fnu = np.squeeze(row["relresponse"].data)
 
-            sens_fnu *= pixel_area * row["photmjsr"]
+            sens_fnu *= pixel_area_sr * row["photmjsr"]
+            # New units of CRDS reference files
+            wave_unit = None
+            phot_unit = None
+
+            if hasattr(ph, 'extra_fits'):
+                extra_ = ph.extra_fits.instance
+                if "PHOTOM" in extra_:
+                    if 'header' in extra_["PHOTOM"]:
+                        hrows = extra_["PHOTOM"]["header"]
+                        for hrow in hrows:
+                            if hrow[0] == "WAVEUNIT":
+                                wave_unit = hrow[1]
+                            elif hrow[0] == "PHOTUNIT":
+                                phot_unit = hrow[1]
+
+            elif hasattr(ph, 'wave_unit') & hasattr(ph, 'phot_unit'):
+                wave_unit = ph.wave_unit
+                phot_unit = ph.phot_unit
+
+            if wave_unit is not None:
+                from_unit = (1.0 * u.micron).to(wave_unit)
+                wave /= from_unit.value
+                msg = (
+                    f"Scale wavelengths {wave_unit} / "
+                    + f"{from_unit.value:.2f} -> micron"
+                )
+                utils.log_comment(
+                    utils.LOGFILE, msg, verbose=verbose
+                )
 
             # Dispersion, DLAM/DPIX
             dl = self.DDISPL(order, *xyt)
@@ -2431,8 +2512,36 @@ class CRDSGrismConf:
             mask = (wave > 0) & (sens_fnu > 0)
 
             _flam_unit = u.erg / u.second / u.cm ** 2 / u.micron
-            sens_flam = (sens_fnu[mask] * dldp * u.megaJansky).to(
-                _flam_unit, equivalencies=u.spectral_density(wave[mask] * u.micron)
+
+            unit_corr = 1.0
+
+            if phot_unit is not None:
+                try:
+                    unit_corr = (
+                        dldp * u.micron * u.Unit('MJy s / (DN sr)')
+                    ).to(phot_unit).value
+                except u.UnitConversionError:
+                    pass
+
+            elif (self.instrument == "NIRCAM"):
+                if phot["photmjsr"].max() > 1.e6:
+                    # e.g., jwst_1464.pmap where the units
+                    # changed but the header keywords not yet added
+                    unit_corr = dldp * 1.e4
+
+            self.SENS_components[order] = {
+                "phot_table_row": ix,
+                "pixel_area_sr": pixel_area_sr,
+                "photmjsr": row["photmjsr"],
+                "wave_unit": wave_unit,
+                "phot_unit": phot_unit,
+                "dldp": dldp,
+                "unit_corr": unit_corr
+            }
+
+            sens_flam = (sens_fnu[mask] * dldp / unit_corr * u.megaJansky).to(
+                _flam_unit,
+                equivalencies=u.spectral_density(wave[mask] * u.micron)
             )
 
             self.SENS_data[order] = [wave[mask], 1.0 / sens_flam.value]
@@ -2485,3 +2594,4 @@ class CRDSGrismConf:
             si = utils.read_catalog(sens_file)
 
             self.SENS_data["+1"] = [si["WAVELENGTH"] / 1.0e4, si["SENSITIVITY"]]
+            self.sens_ref_file = sens_file
