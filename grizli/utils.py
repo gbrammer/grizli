@@ -12952,7 +12952,7 @@ def log_function_arguments(LOGFILE, frame, func="func", ignore=[], verbose=True)
         Print messaage to stdout.
 
     """
-    args = inspect.getargvalues(frame).locals
+    args = dict(inspect.getargvalues(frame).locals)
     args.pop("frame")
     for k in list(args.keys()):
         if hasattr(args[k], "__builtins__"):

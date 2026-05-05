@@ -571,6 +571,36 @@ def check_context_for_skyflats(verbose=True):
     return res
 
 
+def datamodel_write(model, path, overwrite=True):
+    """
+    Wrapper to handle change between ``write`` and ``save`` methods on
+    `jwst.datamodels` objects.
+
+    Parameters
+    ----------
+    model : `~jwst.datamodels.ImageModel`
+        Datamodel
+
+    path : str
+        Output filename
+
+    overwrite : bool
+        Overwrite ``output``
+
+    """
+
+    if hasattr(model, 'write'):
+        method = model.write
+
+    elif hasattr(model, 'save'):
+        method = model.save
+
+    else:
+        raise ValueError("'model' does not have 'write' or 'save' methods")
+
+    return method(path, overwrite=overwrite)
+
+
 def img_with_flat(
     input,
     verbose=True,
@@ -707,7 +737,8 @@ def img_with_flat(
         output = img
 
     if isinstance(input, str) & overwrite:
-        output.write(input, overwrite=overwrite)
+        # output.write(input, overwrite=overwrite)
+        datamodel_write(output, input, overwrite=True)
         _hdu.close()
 
         # Add reference files
@@ -885,7 +916,8 @@ def img_with_wcs(
 
     # Write to a file
     if isinstance(input, str) & overwrite:
-        output.write(input, overwrite=overwrite)
+        # output.write(input, overwrite=overwrite)
+        datamodel_write(output, input, overwrite=True)
 
         _hdu = pyfits.open(input)
 
@@ -1006,7 +1038,8 @@ def convert_cal_to_rate(cal_file, write=True, overwrite=True, verbose=True):
         rate_file = cal_file.replace("_cal", "_rate")
         msg = f"convert_cal_to_rate: {cal_file}  write {rate_file}"
         utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
-        dm.write(rate_file, overwrite=overwrite)
+        # dm.write(rate_file, overwrite=overwrite)
+        datamodel_write(dm, rate_file, overwrite=True)
 
     # Reset CRDS_CONTEXT
     if OLD_CONTEXT is None:
