@@ -1,5 +1,6 @@
 import os
 import unittest
+import inspect
 
 import numpy as np
 
@@ -32,6 +33,24 @@ class UtilsTester(unittest.TestCase):
         # Test that dictionaries are the same using __repr__ method
         assert(kwargs.__repr__() == result.__repr__())
 
+
+    def test_logging(self):
+        """
+        Test logging functions
+        """
+
+        msg = "Test log message"
+        utils.log_comment(utils.LOGFILE, msg, verbose=False)
+        utils.log_comment(utils.LOGFILE, msg, verbose=True)
+
+        def func_with_args(param="test"):
+            frame = inspect.currentframe()
+            utils.log_function_arguments(
+                utils.LOGFILE, frame, "test_utils.func_with_args"
+            )
+            return True
+
+        _ = func_with_args()
 
     def test_ctime(self):
         """
