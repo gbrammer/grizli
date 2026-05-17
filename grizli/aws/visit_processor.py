@@ -1872,7 +1872,7 @@ def process_visit(assoc, clean=True, sync=True, s3_acl="public-read", max_dt=4, 
             # Now set status = 2
             update_assoc_status(assoc, status=2)
 
-    if (clean & 2) > 0:
+    if (clean) > 0:
         print(f'rm -rf {assoc}*')
         os.system(f'rm -rf {assoc}*')
 

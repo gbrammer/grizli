@@ -45,6 +45,7 @@ FIXED_PURE_PARALLEL_WCS_CAL_VER = "1.16"
 
 from .constants import JWST_DQ_FLAGS, PLUS_FOOTPRINT, CORNER_FOOTPRINT
 
+logger = logging.getLogger(__name__)
 
 def set_crds_context(fits_file=None, override_environ=False, verbose=True):
     """
@@ -225,22 +226,31 @@ def crds_reffiles(
     return refs
 
 
-def set_quiet_logging(level=QUIET_LEVEL):
+def set_quiet_logging(level=QUIET_LEVEL, remove_handler_names=['stpipe']):
     """
-    Silence the verbose logs set by `stpipe`
+    Remove root logging set by `stpipe`
 
     Parameters
     ----------
-    level : int, optional
-        Logging level to be passed to `logging.disable`.
+    level : int
+        Logging level to be passed to `logging.root.setLevel`.
+
+    remove_handler_names : list of strings
+        Hander names to remove from `logging.root`
 
     """
-    try:
-        import jwst
+    logging.root.setLevel(level)
+    pops = []
 
-        logging.disable(level)
-    except ImportError:
-        pass
+    for i, handler in enumerate(logging.root.handlers):
+        try:
+            if handler.log.name in remove_handler_names:
+                pops.append(i)
+        except AttributeError:
+            continue
+
+    for i in pops[::-1]:
+        logging.root.handlers.pop(i)
 
 
 def get_jwst_dq_bit(dq_flags=JWST_DQ_FLAGS, verbose=False):
@@ -562,6 +572,36 @@ def check_context_for_skyflats(verbose=True):
     return res
 
 
+def datamodel_write(model, path, overwrite=True):
+    """
+    Wrapper to handle change between ``write`` and ``save`` methods on
+    `jwst.datamodels` objects.
+
+    Parameters
+    ----------
+    model : `~jwst.datamodels.ImageModel`
+        Datamodel
+
+    path : str
+        Output filename
+
+    overwrite : bool
+        Overwrite ``output``
+
+    """
+
+    if hasattr(model, 'write'):
+        method = model.write
+
+    elif hasattr(model, 'save'):
+        method = model.save
+
+    else:
+        raise ValueError("'model' does not have 'write' or 'save' methods")
+
+    return method(path, overwrite=overwrite)
+
+
 def img_with_flat(
     input_file,
     verbose=True,
@@ -698,7 +738,7 @@ def img_with_flat(
         output = img
 
     if isinstance(input_file, str) & overwrite:
-        output.write(input_file, overwrite=overwrite)
+        datamodel_write(output, input_file, overwrite=True)
         _hdu.close()
 
         # Add reference files
@@ -876,7 +916,7 @@ def img_with_wcs(
 
     # Write to a file
     if isinstance(input_file, str) & overwrite:
-        output.write(input_file, overwrite=overwrite)
+        datamodel_write(output, input_file, overwrite=True)
 
         _hdu = pyfits.open(input_file)
 
@@ -997,7 +1037,8 @@ def convert_cal_to_rate(cal_file, write=True, overwrite=True, verbose=True):
         rate_file = cal_file.replace("_cal", "_rate")
         msg = f"convert_cal_to_rate: {cal_file}  write {rate_file}"
         utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
-        dm.write(rate_file, overwrite=overwrite)
+        # dm.write(rate_file, overwrite=overwrite)
+        datamodel_write(dm, rate_file, overwrite=True)
 
     # Reset CRDS_CONTEXT
     if OLD_CONTEXT is None:

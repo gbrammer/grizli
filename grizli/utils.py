@@ -199,6 +199,26 @@ LSTSQ_RCOND = None
 # BKG_CLIP = [2, 1, 99]
 BKG_CLIP = None
 
+LOGFILE = "/tmp/grizli.log"
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+log_formatter = logging.Formatter(
+    "%(asctime)s: %(name)s - %(levelname)s -  %(message)s"
+)
+
+ch = logging.StreamHandler()
+ch.setLevel(logging.DEBUG)
+ch.setFormatter(log_formatter)
+logger.addHandler(ch)
+
+# fh = logging.FileHandler(
+#     LOGFILE, mode='a', encoding=None, delay=False, errors=None
+# )
+# fh.setLevel(logging.DEBUG)
+# fh.setFormatter(log_formatter)
+# logger.addHandler(fh)
 
 def set_warnings(numpy_level="ignore", astropy_level="ignore"):
     """
@@ -12910,9 +12930,6 @@ def remove_text_labels(fig):
                     child.set_visible(False)
 
 
-LOGFILE = "/tmp/grizli.log"
-
-
 def log_function_arguments(LOGFILE, frame, func="func", ignore=[], verbose=True):
     """
     Log local variables, e.g., parameter arguements to a file
@@ -12935,8 +12952,8 @@ def log_function_arguments(LOGFILE, frame, func="func", ignore=[], verbose=True)
         Print messaage to stdout.
 
     """
-    args = inspect.getargvalues(frame).locals
-    # args.pop("frame")
+    args = dict(inspect.getargvalues(frame).locals)
+    args.pop("frame")
     for k in list(args.keys()):
         if hasattr(args[k], "__builtins__"):
             # args.pop(k)
