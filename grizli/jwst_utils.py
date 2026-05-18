@@ -4531,10 +4531,10 @@ def get_saturated_pixels(
     dq_array : array-like
 
     saturated_flag : str
-        Flag name in `jwst.datamodels.mask.pixel` to treat as "saturated"
+        Flag name in `jwst.datamodels.dqflags.pixel` to treat as "saturated"
 
     rc_flag : str
-        Flag name in `jwst.datamodels.mask.pixel` for the "RC" pixels to exclude
+        Flag name in `jwst.datamodels.dqflags.pixel` for the "RC" pixels to exclude
 
     rc_iterations : int
         If > 0, make a mask of pixels flagged with the "RC" bit, dilate it and
@@ -4547,7 +4547,7 @@ def get_saturated_pixels(
     """
     import scipy.ndimage as nd
     from skimage import morphology
-    from jwst.datamodels.mask import pixel
+    from jwst.datamodels.dqflags import pixel
 
     if dq_array is None:
         with pyfits.open(file) as im:
@@ -4798,15 +4798,15 @@ def flag_nirspec_hot_pixels(
 
     dq : array-like, int
         Flagged pixels where
-        ``hot = jwst.datamodels.mask.pixel["HOT"]`` and
-        ``plus = jwst.datamodels.mask.pixel["WARM"]``
+        ``hot = jwst.datamodels.dqflags.pixel["HOT"]`` and
+        ``plus = jwst.datamodels.dqflags.pixel["WARM"]``
 
     count : int
         Number of flagged pixels
 
     """
     import scipy.ndimage as nd
-    from jwst.datamodels.mask import pixel as pixel_codes
+    from jwst.datamodels.dqflags import pixel as pixel_codes
 
     if isinstance(data, str):
         is_open = True
@@ -4965,7 +4965,7 @@ def flag_nircam_hot_pixels(
 
     """
     import scipy.ndimage as nd
-    from jwst.datamodels.mask import pixel as pixel_codes
+    from jwst.datamodels.dqflags import pixel as pixel_codes
 
     if isinstance(data, str):
         is_open = True
