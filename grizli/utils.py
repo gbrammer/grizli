@@ -7646,6 +7646,7 @@ def drizzle_from_visit(
     dryrun=False,
     skip=None,
     extra_wfc3ir_badpix=True,
+    low_threshold=-5,
     verbose=True,
     scale_photom=True,
     internal_nircam_zeropoints=True,
@@ -8044,8 +8045,8 @@ def drizzle_from_visit(
                 bpdata |= _ghost * 1024
 
             # Negative
-            if "MDRIZSKY" in flt["SCI"].header:
-                _low = (flt["SCI"].data - flt["SCI"].header["MDRIZSKY"]) < -5 * flt[
+            if ("MDRIZSKY" in flt["SCI"].header) & (low_threshold is not None):
+                _low = (flt["SCI"].data - flt["SCI"].header["MDRIZSKY"]) < low_threshold * flt[
                     "ERR"
                 ].data
                 msg = f"Extra -5 sigma low pixels: N= {_low.sum()} "

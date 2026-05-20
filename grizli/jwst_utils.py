@@ -1444,7 +1444,10 @@ def exposure_oneoverf_correction(
 
         return None, 0
 
-    if ("ONEFEXP" in im[0].header) and im[0].header["ONEFEXP"] and (not force_oneoverf):
+    if (
+        (("ONEFEXP" in im[0].header) and im[0].header["ONEFEXP"])
+        or (("S_CLNFNS" in im[0].header) and (im[0].header["S_CLNFNS"] == "COMPLETE"))
+    ) and (not force_oneoverf):
         im.close()
 
         msg = "exposure_oneoverf_correction: Skip, already corrected"
