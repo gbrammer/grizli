@@ -7819,7 +7819,7 @@ def get_jwst_wfssbkg_file(
     from jwst.wfss_contam import WfssContamStep
     from jwst.flatfield import FlatFieldStep
 
-    bkg_file = WfssContamStep().get_reference_file(file, "wfssbkg")
+    bkg_file = WfssContamStep().get_reference_file(file, "bkg")
 
     # Not a FITS file?  e.g., N/A for imaging exposures
     if ("fits" not in bkg_file) and (not ignoreNA):
