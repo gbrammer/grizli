@@ -4728,33 +4728,48 @@ def query_persistence(flt_file, saturated_lookback=1.0e4, verbose=True):
         f"""
         SELECT expstart, detector from exposure_files
         WHERE file = '{froot}'
-    """
+        """
     )
 
     # Bad pixels from other exposures within dt interval
-    tstart = t0["expstart"][0] - saturated_lookback / 86400
+    mjd_expstart = t0["expstart"][0]
+    mjd_lookback = mjd_expstart - saturated_lookback / 86400
+    this_detector = t0["detector"][0]
 
+    # bpix_command = f"""
+    #     SELECT i,j FROM exposure_files NATURAL JOIN exposure_saturated
+    #     WHERE expstart > {tstart} AND expstart < {t0['expstart'][0]}
+    #           AND detector = '{t0['detector'][0]}'
+    #     GROUP BY i,j
+    # """
+
+    # Faster than join
     bpix_command = f"""
-        SELECT i,j FROM exposure_files NATURAL JOIN exposure_saturated
-        WHERE expstart > {tstart} AND expstart < {t0['expstart'][0]}
-              AND detector = '{t0['detector'][0]}'
+        SELECT i,j,count(i) FROM exposure_saturated sat,
+        (SELECT eid from exposure_files
+         WHERE expstart > {mjd_lookback}
+         AND expstart < {mjd_expstart}
+         AND detector = '{this_detector}'
+        ) exp
+        WHERE sat.eid = exp.eid
         GROUP BY i,j
     """
+
     res = db.SQL(bpix_command)
 
-    # Single merged query is factors slower....
-    if 0:
-        res = db.SQL(
-            f"""SELECT i, j
-        FROM exposure_files e1, (exposure_files NATURAL JOIN exposure_saturated) e2
-        WHERE
-            e1.file = '{froot}'
-            AND e2.expstart > e1.expstart - {saturated_lookback/86400}
-            AND e2.expstart < e1.expstart
-            AND e1.detector = e2.detector
-        GROUP BY i,j
-        """
-        )
+    # # Single merged query is factors slower....
+    # if 0:
+    #     res = db.SQL(
+    #         f"""SELECT i, j
+    #     FROM exposure_files e1, (exposure_files NATURAL JOIN exposure_saturated) e2
+    #     WHERE
+    #         e1.file = '{froot}'
+    #         AND e2.expstart > e1.expstart - {saturated_lookback/86400}
+    #         AND e2.expstart < e1.expstart
+    #         AND e1.detector = e2.detector
+    #     GROUP BY i,j
+    #     """
+    #     )
 
     msg = "query_persistence: "
     msg += f"Found {len(res)} flagged pixels for {flt_file} in `exposure_saturated`"
