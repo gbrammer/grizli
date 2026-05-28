@@ -4555,8 +4555,14 @@ def get_saturated_pixels(
     if dq_array is None:
         with pyfits.open(file) as im:
             dq_array = im["DQ"].data * 1
+            detector = im[0].header["DETECTOR"]
 
     flagged = (dq_array & pixel[saturated_flag]) > 0
+    if (flagged.sum() > 10000) & (detector in ['MIRIMAGE']):
+        if "NON_SCIENCE" in pixel:
+            flagged &= ~((dq_array & pixel["NON_SCIENCE"]) > 0)
+        else:
+            flagged &= ~((dq_array & 512) > 0)
 
     if rc_iterations > 0:
         rc = (dq_array & pixel[rc_flag]) > 0
