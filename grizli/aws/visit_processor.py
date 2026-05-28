@@ -940,34 +940,42 @@ def delete_all_assoc_data(assoc):
     db.execute(f"DELETE from wcs_log where wcs_assoc = '{assoc}'")
     
     print('Remove from tile_exposures')
-    
+
     # Reset tiles of deleted exposures potentially from other exposures
     tile_mosaic.reset_tiles_in_assoc(assoc)
-    
+
     # Remove deleted exposure from mosaic_tiles_exposures
-    res = db.execute(f"""DELETE from mosaic_tiles_exposures t
-                 USING exposure_files e
-                WHERE t.expid = e.eid AND e.assoc = '{assoc}'""")
+    res = db.execute(f"""
+        DELETE from mosaic_tiles_exposures t
+        USING (SELECT eid from exposure_files WHERE assoc = '{assoc}') e
+        WHERE t.expid = e.eid
+    """)
+
+    res = db.execute(f"""
+        DELETE FROM exposure_saturated sat
+        USING (SELECT eid from exposure_files WHERE assoc = '{assoc}') e
+        WHERE sat.eid = e.eid
+    """)
+
+    res = db.execute(f"""
+        DELETE from exposure_files
+        WHERE assoc = '{assoc}'
+    """)
     
-    res = db.execute(f"""DELETE FROM exposure_saturated sat
-                   USING exposure_files e
-                   WHERE sat.eid = e.eid
-                   AND e.assoc='{assoc}'""")
-    
-    res = db.execute(f"""DELETE from exposure_files
-                    WHERE assoc = '{assoc}'""")
-    
-    res = db.execute(f"""DELETE from assoc_mosaic
-                     WHERE assoc_name = '{assoc}'
-                     """)
+    res = db.execute(f"""
+        DELETE from assoc_mosaic
+        WHERE assoc_name = '{assoc}'
+    """)
 
     os.system(f'aws s3 rm s3://grizli-v2/assoc_mosaic/v7.0/ --recursive --exclude "*" --include "{assoc}*"')
                      
     os.system(f'aws s3 rm --recursive s3://grizli-v2/HST/Pipeline/{assoc}')
 
-    res = db.execute(f"""UPDATE assoc_table
-                    SET status=12
-                    WHERE assoc_name = '{assoc}' AND status != 99""")
+    res = db.execute(f"""
+        UPDATE assoc_table
+        SET status=12
+        WHERE assoc_name = '{assoc}' AND status != 99
+    """)
 
 
 def clear_failed():
