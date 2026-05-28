@@ -1044,8 +1044,13 @@ def show_recent_assoc(limit=50):
     """
     import astropy.time
 
-    last = db.SQL(f"""SELECT assoc_name, status, modtime 
-                      FROM assoc_table ORDER BY modtime DESC LIMIT {limit}""")
+    last = db.SQL(f"""
+        SELECT assoc_name, status, modtime
+        FROM assoc_table
+        WHERE modtime > 0
+        ORDER BY modtime DESC
+        LIMIT {limit}
+    """)
     
     time = astropy.time.Time(last['modtime'], format='mjd')
     last['iso'] = time.iso
@@ -1064,9 +1069,11 @@ def launch_ec2_instances(nmax=50, count=None, templ='lt-0e8c2b8611c9029eb,Versio
     """
 
     if count is None:
-        assoc = db.SQL("""SELECT distinct(assoc_name)
-                      FROM assoc_table
-                      WHERE status = 0""")
+        assoc = db.SQL("""
+            SELECT distinct(assoc_name)
+            FROM assoc_table
+            WHERE status = 0
+        """)
     
         count = int(np.minimum(nmax, len(assoc)/2))
 
