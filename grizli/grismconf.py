@@ -1322,6 +1322,9 @@ class TransformGrismconf(object):
 
         # calculate the trace in the detector frame
         tdx, tdy, wave = self.get_beam_trace_original(x=x0[0], y=x0[1], dx=dx, beam=beam)
+
+        if self.transform.instrument != "HST":
+            wave *= 1.0e4
  
         # rotate the trace back to the +x direction
         rev = self.transform.forward(x0[0] + tdx, x0[1] + tdy)
@@ -1376,10 +1379,6 @@ class TransformGrismconf(object):
             trace_dy += -2.5
         elif os.path.basename(self.conf_file) == "NIRCAM_F444W_modA_C.conf":
             trace_dy += -0.1
-
-        wave = self.conf.DISPL(self.order_names[beam], *x0, t)
-        if self.transform.instrument != "HST":
-            wave *= 1.0e4
 
         return trace_dy, wave
 
