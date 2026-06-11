@@ -13048,6 +13048,54 @@ def nowtime(iso=False):
         return tnow
 
 
+def string_chunks(text, length=70, join="\n"):
+    """
+    Break a (long) string into chunks
+
+    Parameters
+    ----------
+    text : str
+        Text string
+
+    length : int
+        chunk length
+
+    join : str, None
+        Optional character to join split chunks and return string
+
+    Returns
+    -------
+    split : str, list
+        Result of ``text`` broken into chunks, list of chunks or string
+        joined on ``join``
+
+    Examples
+    --------
+
+        >>> from grizli import utils
+        >>> full_string = '-' * 20
+        >>> print(utils.string_chunks(full_string, length=8, join=None))
+        ['--------', '--------', '----']
+        >>> print(utils.string_chunks(full_string, length=8, join="x"))
+        --------x--------x----
+        >>> print(utils.string_chunks(full_string, length=8)) # default newline
+        --------
+        --------
+        ----
+
+    """
+
+    split = [
+        text[i:i+length]
+        for i in range(0, len(text), length)
+    ]
+
+    if join is not None:
+        return join.join(split)
+    else:
+        return split
+
+
 def figure_timestamp(
     fig,
     x=0.97,
