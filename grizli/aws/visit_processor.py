@@ -355,7 +355,199 @@ def s3_put_exposure(flt_file, product, assoc, remove_old=True, verbose=True, get
 
 snowblind_kwargs = dict(require_prefix='jw', max_fraction=0.3, new_jump_flag=1024, min_radius=4, growth_factor=1.5, unset_first=True, verbose=True)
 
-def make_visit_mosaic(assoc, base_path=ROOT_PATH, version='v7.0', pixscale=0.08, vmax=0.5, skip_existing=True, sync=True, clean=False, verbose=True, snowblind_kwargs=snowblind_kwargs, sat_kwargs={}, max_pixel_dim=20000, **kwargs):
+def visit_astrometry_diagnostic(assoc, threshold=2.0, force_catalog=False, savefig=True, cat_kwargs={}, **kwargs):
+    """
+    Make a diagnostic figure of the astrometry residuals for the visit
+    mosaic
+    """
+    import glob
+    import numpy as np
+    import matplotlib.pyplot as plt
+
+    from matplotlib.ticker import MultipleLocator
+
+    import astropy.table
+    from grizli import prep, utils
+
+    mosaic_file = glob.glob(f"{assoc}*sci.fits*")
+    if len(mosaic_file) == 0:
+        return None
+
+    prefix = None
+    for file in mosaic_file:
+        if ("grism" not in file) & ("g102" not in file) & ("g141" not in file) & ("gr150" not in file):
+            prefix = file.split("_drc")[0].split("_drz")[0]
+            break
+
+    if prefix is None:
+        return None
+
+    if (not os.path.exists(prefix + ".cat.fits")) | force_catalog:
+        cat = prep.make_SEP_catalog(prefix, threshold=2.0, **cat_kwargs)
+    else:
+        cat = utils.read_catalog(prefix + ".cat.fits")
+
+    # radec_files = glob.glob("*radec")
+    wcs_log_files = glob.glob("*wcs.log")
+    radec_files = []
+    for file in wcs_log_files:
+        with open(file) as fp:
+            lines = fp.readlines()
+
+        for line in lines:
+            if "radec:" in line:
+                radec_files.append(line.strip().split()[2])
+                break
+
+    radec = astropy.table.vstack([
+        utils.read_catalog(file) for file in radec_files
+    ])
+
+    fig, ax = plt.subplots(1,1,figsize=(5, 5))
+    axes = [ax]
+
+    if ".gaia." in radec_files[0]:
+        color = 'magenta'
+    else:
+        color = 'k'
+
+    label = os.path.basename(
+        radec_files[0]
+        # .replace(f"{assoc}.", "")
+        .replace(".radec", "")
+        # .split('_')[-1]
+    )
+
+    labels = [label]
+    colors = [color]
+    refs = [radec]
+    alphas = [0.2]
+
+    if "gaia" not in radec_files[0]:
+        gaia_file = f"../../{assoc}.gaia.radec"
+        if os.path.exists(gaia_file):
+            gaia = utils.read_catalog(gaia_file)
+            labels.append("gaia")
+            colors.append("magenta")
+            refs.append(gaia)
+            alphas.append(0.6)
+
+    for (ref, label, color, alpha) in zip(refs, labels, colors, alphas):
+        idx, dr, dx, dy = ref.match_to_catalog_sky(cat, get_2d_offset=True)
+
+        hasm = dr.value < 0.14
+        hasm &= cat["MASK_APER_1"] == 0
+
+        if hasm.sum() == 0:
+            continue
+
+        if hasm.sum() > 5:
+            hasm_sig = hasm & True
+            for iter_ in range(1):
+                sx = utils.nmad(dx[hasm & hasm_sig].value)
+                sy = utils.nmad(dy[hasm & hasm_sig].value)
+
+                # sx = np.diff(np.percentile(dx[hasm & hasm_sig].value, [16, 84]))[0] / 2.
+                # sy = np.diff(np.percentile(dy[hasm & hasm_sig].value, [16, 84]))[0] / 2.
+
+                hasm_sig = (np.abs(dx.value) < sx * 5)
+                hasm_sig &= (np.abs(dy.value) < sy * 5)
+
+            slabel = (
+                "\n" + r"$\sigma_\mathrm{NMAD}$ = "
+                + f"({sx*1000:.0f}, {sy*1000:.0f}) mas"
+            )
+
+            if np.maximum(sx, sy) > 0.005:
+                theta = np.linspace(0, 2 * np.pi, 32)
+                for ax in axes:
+                    ax.plot(
+                        sx * np.cos(theta) * 1000, sy * np.sin(theta) * 1000,
+                        color="w",
+                        alpha=0.8, lw=4, zorder=10
+                    )
+                    ax.plot(
+                        sx * np.cos(theta) * 1000, sy * np.sin(theta) * 1000,
+                        color=color,
+                        alpha=0.5, lw=2, zorder=11
+                    )
+
+        else:
+            hasm_sig = hasm & True
+            slabel = ""
+
+        xlabel = (
+            label
+            + r"  $N=x$".replace("x", f" {(hasm & hasm_sig).sum()}")
+            + slabel
+        )
+
+        for ax in axes:
+            ax.scatter(
+                dx[hasm & ~hasm_sig].value * 1000,
+                dy[hasm & ~hasm_sig].value * 1000,
+                alpha=alpha,
+                ec=color,
+                fc="None",
+                zorder=1,
+            )
+
+            ax.scatter(
+                dx[hasm & hasm_sig].value * 1000,
+                dy[hasm & hasm_sig].value * 1000,
+                alpha=alpha,
+                color=color,
+                label=xlabel,
+                zorder=2,
+            )
+
+    ax.set_xlim(-140, 140)
+    ax.set_ylim(-140, 140)
+
+    # ax = axes[0]
+    #
+    # xl = np.maximum(np.abs(ax.get_xlim()).max(), 0.12)
+    # yl = np.maximum(np.abs(ax.get_ylim()).max(), 0.12)
+    # xl = np.maximum(xl, yl)
+    #
+    # ax.set_xlim(-xl, xl)
+    # ax.set_ylim(-xl, xl)
+
+    for ax in axes:
+        ax.xaxis.set_major_locator(MultipleLocator(50))
+        ax.yaxis.set_major_locator(MultipleLocator(50))
+
+        ax.xaxis.set_minor_locator(MultipleLocator(25))
+        ax.yaxis.set_minor_locator(MultipleLocator(25))
+
+        ax.grid(which='both')
+
+        ax.set_xlabel(r"$\Delta$RA [mas]")
+
+    axes[0].set_ylabel(r"$\Delta$Dec [mas]")
+
+    leg = axes[0].legend(fontsize=7, loc='lower right')
+
+    axes[0].text(
+        0.5, 0.98,
+        utils.string_chunks(assoc, length=70, join=" \\\n"),
+        ha="center",
+        va="top",
+        transform=ax.transAxes,
+        fontsize=7,
+        bbox={"fc": "w", "ec": "None", "alpha": 0.5}
+    )
+
+    fig.tight_layout(pad=0.2)
+    # print(prefix)
+
+    if savefig:
+        fig.savefig(f"{prefix}.astrometry.png")
+
+    return prefix, fig
+
+
+def make_visit_mosaic(assoc, base_path=ROOT_PATH, version='v7.0', pixscale=0.08, vmax=0.5, skip_existing=True, sync=True, clean=False, verbose=True, snowblind_kwargs=snowblind_kwargs, sat_kwargs={}, max_pixel_dim=20000, make_astrometry_diagnostic=True, **kwargs):
     """
     Make a mosaic of the exposures from a visit with a tangent point selected
     from the sky tile grid
@@ -387,12 +579,13 @@ def make_visit_mosaic(assoc, base_path=ROOT_PATH, version='v7.0', pixscale=0.08,
 
     """
     import skimage.io
-    
+    import matplotlib.pyplot as plt
+
     import astropy.wcs as pywcs
     import astropy.io.fits as pyfits
-    from astropy.visualization import (MinMaxInterval, SqrtStretch,
-                                       ImageNormalize, LogStretch
-                                   )
+    from astropy.visualization import (
+        MinMaxInterval, SqrtStretch, ImageNormalize, LogStretch
+    )
 
     if sync:
         xtab = utils.GTable()
@@ -463,11 +656,13 @@ def make_visit_mosaic(assoc, base_path=ROOT_PATH, version='v7.0', pixscale=0.08,
     order by SQRT(POWER(crval1 - {crv[0]},2)+POWER(crval2 - {crv[1]},2)) 
     limit 1""")[0]
     
-    htile, wtile = utils.make_wcsheader(tile['crval1'],
-                                        tile['crval2'],
-                                        size=tile['npix']*0.1*1.1,
-                                        pixscale=pixscale,
-                                        get_hdu=False)
+    htile, wtile = utils.make_wcsheader(
+        tile['crval1'],
+        tile['crval2'],
+        size=tile['npix']*0.1*1.1,
+        pixscale=pixscale,
+        get_hdu=False
+    )
 
     corners = np.hstack([wtile.all_world2pix(*s.xy[0].T, 0) for s in sr])
     
@@ -553,7 +748,16 @@ def make_visit_mosaic(assoc, base_path=ROOT_PATH, version='v7.0', pixscale=0.08,
             
             skimage.io.imsave(f'{imgroot}.jpg', inorm,
                               plugin='pil', quality=95, check_contrast=False)
-    
+
+    if make_astrometry_diagnostic:
+        try:
+            diag = visit_astrometry_diagnostic(assoc, **kwargs)
+            if diag is not None:
+                prefix_, fig_ = diag
+                plt.close(fig_)
+        except:
+            pass
+
     os.system(f'gzip --force {assoc}*_dr*fits')
 
     files = glob.glob(f'{assoc}*_sci.fits.gz')
@@ -1845,10 +2049,13 @@ def process_visit(assoc, clean=True, sync=True, s3_acl="public-read", max_dt=4, 
         add_wcs_log(assoc=assoc, remove_old=True, verbose=True)
         
     if (do_make_visit_mosaic) & (with_db):
-        make_visit_mosaic(assoc, sync=sync,
-                          base_path=ROOT_PATH,
-                          clean=False,
-                          **visit_mosaic_kwargs)
+        make_visit_mosaic(
+            assoc,
+            sync=sync,
+            base_path=ROOT_PATH,
+            clean=False,
+            **visit_mosaic_kwargs
+        )
 
     os.environ['iref'] = os.environ['orig_iref']
     os.environ['jref'] = os.environ['orig_jref']
