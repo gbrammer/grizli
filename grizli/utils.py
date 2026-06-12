@@ -1117,7 +1117,10 @@ def parse_flt_files(
                     filter_list[filter][angle].extend(visit_list)
 
                     if uniquename:
-                        print(visit_product, len(visit_list))
+                        # print(visit_product, len(visit_list))
+                        msg = f"{visit_product} {len(visit_list)}"
+                        log_comment(LOGFILE, msg, verbose=True)
+
                         so = np.argsort(visit_start)
                         exposure_list = np.array(visit_list)[so]
                         # output_list[visit_product.lower()] = visit_list
@@ -1129,7 +1132,10 @@ def parse_flt_files(
                         output_list.append(d)
 
                 if not uniquename:
-                    print(product, len(exposure_list))
+                    # print(product, len(exposure_list))
+                    msg = f"{visit_product} {len(exposure_list)}"
+                    log_comment(LOGFILE, msg, verbose=True)
+
                     so = np.argsort(exposure_start)
                     exposure_list = np.array(exposure_list)[so]
                     # output_list[product.lower()] = exposure_list
