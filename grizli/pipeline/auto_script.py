@@ -3590,6 +3590,7 @@ def grism_prep(
     refine_fcontam : float
         Factor multiplying the contamination model that is added to the variance of
         and extracted spectrum.
+
     cpu_count : int
         Multiprocessing, see `~grizli.multifit.GroupFLT.compute_full_model`.
     
@@ -3608,8 +3609,9 @@ def grism_prep(
         Polynomial coefficients for the first simple model
 
     max_coeff : float
-            Fit is considered bad when one of the coefficients is greater
-            than this value.  See `~grizli.multifit.GroupFLT.refine`.
+        Fit is considered bad when the polynomial contamination model returns a total
+        flux greater than `max_coeff` times the *observed* flux in the
+        direct image. See `~grizli.multifit.GroupFLT.refine`.
     
     grisms_to_process : list, None
         Explicit list of grisms to process, otherwise will do all that are found
