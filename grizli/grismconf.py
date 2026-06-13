@@ -1297,7 +1297,7 @@ class TransformGrismconf(object):
             Effective wavelength along the trace evaluated at `dx`.
 
         """
-        from astropy.modeling.models import Polynomial2D
+        from astropy.modeling.models import Polynomial2D, Rotation2D
 
         x0 = np.squeeze(self.transform.reverse(x, y))
 
@@ -1324,6 +1324,29 @@ class TransformGrismconf(object):
         t = t_func(self.order_names[beam], *x0, delta)
         tdx = self.conf.DISPX(self.order_names[beam], *x0, t)
         tdy = self.conf.DISPY(self.order_names[beam], *x0, t)
+
+        # Implement trace rotation due to NIRISS filter wheel position.
+        # Already included in `~grismconf.Config.rotate_trace`, this
+        # uses the grizli sign convention
+        if (fwcpos is not None) and (self.conf.FWCPOS_REF is not None):
+
+            # Follow aXeconf convention, but keep theta in degrees for
+            # `~astropy.modeling.rotations.Rotation2D`
+            theta = (self.conf.FWCPOS_REF - fwcpos)
+
+            if theta != 0.0:
+                # Rotate current trace around the 1st order spectrum,
+                # at a wavelength of 1.047um (Willott+22). Currently
+                # hardcoded, unclear if there are any circumstances
+                # where this is not the correct value
+                origin_t = self.conf.INVDISPL(self.order_names["A"], *x0, 1.047)
+                origin_x = self.conf.DISPX(self.order_names["A"], *x0, origin_t)
+                origin_y = self.conf.DISPY(self.order_names["A"], *x0, origin_t)
+
+                rotation = Rotation2D(theta)
+                tdx_r, tdy_r = rotation(tdx - origin_x, tdy - origin_y)
+                tdx = origin_x + tdx_r
+                tdy = origin_y + tdy_r
 
         rev = self.transform.forward(x0[0] + tdx, x0[1] + tdy)
         trace_dy = rev[1, :] - y
@@ -2486,7 +2509,12 @@ class CRDSGrismConf:
                             elif hrow[0] == "PHOTUNIT":
                                 phot_unit = hrow[1]
 
-            elif hasattr(ph, 'wave_unit') & hasattr(ph, 'phot_unit'):
+            if (
+                hasattr(ph, "wave_unit")
+                & hasattr(ph, "phot_unit")
+                & (wave_unit is None)
+                & (phot_unit is None)
+            ):
                 wave_unit = ph.wave_unit
                 phot_unit = ph.phot_unit
 
