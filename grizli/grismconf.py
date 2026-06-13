@@ -1284,8 +1284,9 @@ class TransformGrismconf(object):
         beam : str
             Grism order, translated from +1, 0, +2, +3, -1 = A, B, C, D, E
 
-        fwcpos : float
-            NIRISS rotation *(not implemented)*
+        fwcpos : float or None
+            For NIRISS, specify the filter wheel position to compute the
+            trace rotation.
 
         Returns
         -------
