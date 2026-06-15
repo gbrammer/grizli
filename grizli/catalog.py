@@ -511,7 +511,7 @@ def get_gaia_radec_at_time(gaia_tbl, date=2015.5, format="decimalyear"):
             radial_velocity=0.0 * u.km / u.second,
         )
 
-    if date > 50000:
+    if np.atleast_1d(date).max() > 50000:
         format = "mjd"
 
     new_obstime = Time(date, format=format)

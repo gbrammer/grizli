@@ -4,7 +4,7 @@ matplotlib
 scikit-image
 scipy
 astropy
-sphinx_astropy
+sphinx_astropy<1.11
 pyyaml
 docutils<0.18
 sregion

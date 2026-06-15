@@ -1975,10 +1975,15 @@ def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, com
                 
         return visits, all_groups, info
 
-    visits, filters = utils.parse_flt_files(info=info, path=RAW_PATH,
-                                  uniquename=True, get_footprint=True,
-                                  use_visit=use_visit, max_dt=max_dt,
-                                  visit_split_shift=visit_split_shift)
+    visits, filters = utils.parse_flt_files(
+        info=info,
+        path=RAW_PATH,
+        uniquename=True,
+        get_footprint=True,
+        use_visit=use_visit,
+        max_dt=max_dt,
+        visit_split_shift=visit_split_shift
+    )
     
     # Remove visit number from NIRISS parallel visits
     for v in visits:
@@ -2049,12 +2054,14 @@ def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, com
         get_visit_exposure_footprints(visits, 
                                       check_paths=['./', '../RAW', RAW_PATH])
 
-        print('** Combine same PA: **')
+        msg = '** Combine same PA: **'
+        utils.log_comment(utils.LOGFILE, msg, verbose=True)
+
         for i, visit in enumerate(visits):
             msg = '{0} {1} {2}'.format(
                 i, visit['product'], len(visit['files'])
             )
-            print(msg)
+            utils.log_comment(utils.LOGFILE, msg, verbose=True)
 
     elif (combine_minexp > 0) & (not has_grism):
         combined = []
@@ -2082,13 +2089,15 @@ def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, com
                     combined.append(copy.deepcopy(visit))
 
         visits = combined
-        print('** Combine Singles: **')
+        msg = '** Combine Singles: **'
+        utils.log_comment(utils.LOGFILE, msg, verbose=True)
+
         for i, visit in enumerate(visits):
             msg = '{0} {1} {2}'.format(
                 i, visit['product'], len(visit['files'])
             )
-            print(msg)
-    
+            utils.log_comment(utils.LOGFILE, msg, verbose=True)
+
     all_groups = utils.parse_grism_associations(visits, info)
 
     # JWST grism

@@ -361,4 +361,51 @@ class UtilsTester(unittest.TestCase):
 
                 assert mod_bit == (4 | bad)
 
+    def test_string_chunks(self):
+        """
+        Test string splitting
+        """
+
+        full_length = 20
+
+        for sub_length in range(3, 24, 3):
+
+            nsubs = full_length // sub_length
+
+            full_string = '-' * full_length
+
+            result = utils.string_chunks(
+                full_string, length=sub_length, join=None
+            )
+
+            sresult = utils.string_chunks(
+                full_string, length=sub_length, join="x"
+            )
+
+            if sub_length == 8:
+                assert(sresult == "--------x--------x----")
+
+            print(full_string, sresult)
+
+            if full_length >= sub_length:
+                assert(len(result[0]) == sub_length)
+            else:
+                # Sub longer than full length
+                assert(len(result[0]) == full_length)
+
+            if full_length % sub_length > 0:
+                # Last chunk remainder
+                assert(len(result[-1]) == full_length % sub_length)
+                assert(len(result) == nsubs + 1)
+                assert(len(sresult) == len(full_string) + nsubs)
+                assert(sresult.count('x') == nsubs)
+            else:
+                # No remainder
+                assert(len(result[-1]) == sub_length)
+                assert(len(result) == nsubs)
+                assert(len(sresult) == len(full_string) + nsubs - 1)
+                assert(sresult.count('x') == nsubs - 1)
+
+            assert(sresult.count('-') == full_length)
+
 

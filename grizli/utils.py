@@ -1117,7 +1117,10 @@ def parse_flt_files(
                     filter_list[filter][angle].extend(visit_list)
 
                     if uniquename:
-                        print(visit_product, len(visit_list))
+                        # print(visit_product, len(visit_list))
+                        msg = f"{visit_product} {len(visit_list)}"
+                        log_comment(LOGFILE, msg, verbose=True)
+
                         so = np.argsort(visit_start)
                         exposure_list = np.array(visit_list)[so]
                         # output_list[visit_product.lower()] = visit_list
@@ -1129,7 +1132,10 @@ def parse_flt_files(
                         output_list.append(d)
 
                 if not uniquename:
-                    print(product, len(exposure_list))
+                    # print(product, len(exposure_list))
+                    msg = f"{visit_product} {len(exposure_list)}"
+                    log_comment(LOGFILE, msg, verbose=True)
+
                     so = np.argsort(exposure_start)
                     exposure_list = np.array(exposure_list)[so]
                     # output_list[product.lower()] = exposure_list
@@ -13047,6 +13053,54 @@ def nowtime(iso=False):
         return tnow.iso
     else:
         return tnow
+
+
+def string_chunks(text, length=70, join="\n"):
+    """
+    Break a (long) string into chunks
+
+    Parameters
+    ----------
+    text : str
+        Text string
+
+    length : int
+        chunk length
+
+    join : str, None
+        Optional character to join split chunks and return string
+
+    Returns
+    -------
+    split : str, list
+        Result of ``text`` broken into chunks, list of chunks or string
+        joined on ``join``
+
+    Examples
+    --------
+
+        >>> from grizli import utils
+        >>> full_string = '-' * 20
+        >>> print(utils.string_chunks(full_string, length=8, join=None))
+        ['--------', '--------', '----']
+        >>> print(utils.string_chunks(full_string, length=8, join="x"))
+        --------x--------x----
+        >>> print(utils.string_chunks(full_string, length=8)) # default newline
+        --------
+        --------
+        ----
+
+    """
+
+    split = [
+        text[i:i+length]
+        for i in range(0, len(text), length)
+    ]
+
+    if join is not None:
+        return join.join(split)
+    else:
+        return split
 
 
 def figure_timestamp(

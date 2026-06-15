@@ -909,12 +909,14 @@ def count_locked():
     Count number of distinct locked tiles that could still be runing
     on aws lambda
     """
-    tiles = db.SQL("""SELECT tile, subx, suby, filter, count(filter)
-                      FROM mosaic_tiles_exposures t, exposure_files e
-                               WHERE t.expid = e.eid AND tile != 1183
-                               AND in_mosaic=9
-                               GROUP BY tile, subx, suby, filter
-                               ORDER BY count(filter) DESC""")
+    tiles = db.SQL("""
+        SELECT tile, subx, suby, filter, count(filter)
+        FROM mosaic_tiles_exposures t, exposure_files e
+        WHERE t.expid = e.eid AND tile != 1183
+        AND in_mosaic=9
+        GROUP BY tile, subx, suby, filter
+        ORDER BY count(filter) DESC
+    """)
     
     return len(tiles), tiles
 
@@ -923,8 +925,10 @@ def reset_locked():
     """
     Reset in_mosaic 9 > 0 for tiles that may have timed out
     """
-    cmd = """UPDATE mosaic_tiles_exposures
-             SET in_mosaic = 0 WHERE in_mosaic = 9"""
+    cmd = """
+        UPDATE mosaic_tiles_exposures
+        SET in_mosaic = 0 WHERE in_mosaic = 9
+    """
              
     db.execute(cmd)
 
@@ -933,31 +937,79 @@ def get_subtile_status(tile=2530, subx=522, suby=461, **kwargs):
     """
     `in_mosaic` status of all entries of a subtile
     """
-    resp = db.SQL(f"""SELECT tile, subx, suby, filter, 
-                             in_mosaic, count(filter)
-                FROM mosaic_tiles_exposures t, exposure_files e
-                WHERE t.expid = e.eid
-                AND tile={tile} AND subx={subx} AND suby={suby}
-                GROUP BY tile, subx, suby, filter, in_mosaic
-                ORDER BY (filter, in_mosaic)
-                """)
+    resp = db.SQL(f"""
+        SELECT tile, subx, suby, filter, in_mosaic, count(filter)
+        FROM mosaic_tiles_exposures t, exposure_files e
+        WHERE t.expid = e.eid
+        AND tile={tile} AND subx={subx} AND suby={suby}
+        GROUP BY tile, subx, suby, filter, in_mosaic
+        ORDER BY (filter, in_mosaic)
+    """)
+
     return resp
 
 
-def reset_tiles_in_assoc(assoc):
+def reset_tiles_in_assoc(assoc, by_filter=True):
     """
     Set in_mosaic status to all subtiles overlapping with an assoc
     """
-    res = db.execute(f"""UPDATE mosaic_tiles_exposures
-     SET in_mosaic = 0
-     FROM (select tile, subx, suby
-      from mosaic_tiles_exposures ti, exposure_files e
-      where ti.expid = e.eid AND e.assoc = '{assoc}'
-      group by tile, subx, suby) subt
-     WHERE mosaic_tiles_exposures.tile = subt.tile 
-          AND mosaic_tiles_exposures.subx = subt.subx
-          AND mosaic_tiles_exposures.suby = subt.suby
-    """)
+    if by_filter:
+        if 0:
+            # check
+            ti = db.SQL(f"""
+                SELECT ti.expid, ti.in_mosaic, ti.tile, ti.subx, ti.suby
+                FROM mosaic_tiles_exposures ti, exposure_files e,
+                (
+                    SELECT tile, subx, suby, e.filter
+                    FROM mosaic_tiles_exposures ti, exposure_files e
+                    WHERE ti.expid = e.eid AND e.assoc = '{assoc}'
+                    GROUP BY tile, subx, suby, e.filter
+                ) ta
+                WHERE ti.expid = e.eid
+                    AND  e.filter = ta.filter
+                    AND ti.tile = ta.tile
+                    AND ti.subx = ta.subx
+                    AND ti.suby = ta.suby
+            """)
+
+        res = db.execute(f"""
+            UPDATE mosaic_tiles_exposures texp
+            SET in_mosaic = 0
+            FROM (
+                SELECT ti.expid, ti.in_mosaic, ti.tile, ti.subx, ti.suby
+                FROM mosaic_tiles_exposures ti, exposure_files e,
+                (
+                    SELECT tile, subx, suby, e.filter
+                    FROM mosaic_tiles_exposures ti, exposure_files e
+                    WHERE ti.expid = e.eid AND e.assoc = '{assoc}'
+                    GROUP BY tile, subx, suby, e.filter
+                ) ta
+                WHERE ti.expid = e.eid
+                    AND  e.filter = ta.filter
+                    AND ti.tile = ta.tile
+                    AND ti.subx = ta.subx
+                    AND ti.suby = ta.suby
+            ) subt
+            WHERE texp.expid = subt.expid
+                AND texp.tile = subt.tile
+                AND texp.subx = subt.subx
+                AND texp.suby = subt.suby
+        """)
+
+    else:
+        res = db.execute(f"""
+            UPDATE mosaic_tiles_exposures texp
+            SET in_mosaic = 0
+            FROM (
+                SELECT tile, subx, suby
+                FROM mosaic_tiles_exposures ti, exposure_files e
+                WHERE ti.expid = e.eid AND e.assoc = '{assoc}'
+                GROUP BY tile, subx, suby
+            ) subt
+            WHERE texp.tile = subt.tile
+                AND texp.subx = subt.subx
+                AND texp.suby = subt.suby
+        """)
 
 
 def get_tiles_containing_point(point=(150.24727,2.04512), radius=0.01):
@@ -967,11 +1019,12 @@ def get_tiles_containing_point(point=(150.24727,2.04512), radius=0.01):
     
     circle = f"circle '<({point[0]}, {point[1]}), {radius}>'"
     
-    res = db.SQL(f"""SELECT tile, subx, suby, filter, count(filter) as nexp
-      from mosaic_tiles_exposures ti, exposure_files e
-      where ti.expid = e.eid
-      AND polygon(e.footprint) && polygon({circle})    
-      group by tile, subx, suby, filter
+    res = db.SQL(f"""
+        SELECT tile, subx, suby, filter, count(filter) AS nexp
+        FROM mosaic_tiles_exposures ti, exposure_files e
+        WHERE ti.expid = e.eid
+            AND polygon(e.footprint) && polygon({circle})
+        GROUP BY tile, subx, suby, filter
       """)
 
     return res
@@ -984,17 +1037,20 @@ def reset_tiles_containing_point(point=(150.24727,2.04512), radius=0.01):
     
     circle = f"circle '<({point[0]}, {point[1]}), {radius}>'"
     
-    res = db.execute(f"""UPDATE mosaic_tiles_exposures
-     SET in_mosaic = 0
-     FROM (select tile, subx, suby
-      from mosaic_tiles_exposures ti, exposure_files e
-      where ti.expid = e.eid
-      AND polygon(e.footprint) && polygon({circle})    
-      group by tile, subx, suby) subt
-      WHERE mosaic_tiles_exposures.tile = subt.tile 
-           AND mosaic_tiles_exposures.subx = subt.subx
-           AND mosaic_tiles_exposures.suby = subt.suby      
-      """)
+    res = db.execute(f"""
+        UPDATE mosaic_tiles_exposures texp
+        SET in_mosaic = 0
+        FROM (
+            SELECT tile, subx, suby
+            FROM mosaic_tiles_exposures ti, exposure_files e
+            WHERE ti.expid = e.eid
+            AND polygon(e.footprint) && polygon({circle})
+            GROUP BY tile, subx, suby
+        ) subt
+        WHERE texp.tile = subt.tile
+            AND texp.subx = subt.subx
+            AND texp.suby = subt.suby
+    """)
 
     return res
 
@@ -1003,21 +1059,21 @@ def delete_empty_exposures():
     """
     Delete exposures from tiles where exptime = 0
     """
-    SQL = f"""SELECT tile, subx, suby, filter, in_mosaic
-                FROM mosaic_tiles_exposures t, exposure_files e
-                WHERE t.expid = e.eid
-                AND e.exptime < 1.
-                """
+    SQL = f"""
+        SELECT tile, subx, suby, filter, in_mosaic
+        FROM mosaic_tiles_exposures t, exposure_files e
+        WHERE t.expid = e.eid
+            AND e.exptime < 1.
+    """
     res = db.SQL(SQL)
     
     if len(res) > 0:
-        SQL = f"""DELETE
-                    FROM mosaic_tiles_exposures t
-                    USING exposure_files e
-                    WHERE t.expid = e.eid
-                    AND e.exptime < 1.
-                    """
-    
+        SQL = f"""
+            DELETE FROM mosaic_tiles_exposures t
+            USING exposure_files e
+            WHERE t.expid = e.eid
+                AND e.exptime < 1.
+        """
         db.execute(SQL)
 
 
@@ -1048,15 +1104,15 @@ def send_all_tiles():
     
     # Get with ra, dec
     if 0:
-        tiles = db.SQL(f"""SELECT tile, subx, suby, count(subx),
-                           count(distinct(filter)) as nfilt
-                    FROM mosaic_tiles_exposures t, exposure_files e
-                    WHERE t.expid = e.eid
-                    {progs}
-                    AND filter LIKE '%%CLEAR'
-                    GROUP BY tile, subx, suby
-                    ORDER BY count(subx) ASC
-                    """)
+        tiles = db.SQL(f"""
+            SELECT tile, subx, suby, count(subx), count(distinct(filter)) as nfilt
+            FROM mosaic_tiles_exposures t, exposure_files e
+            WHERE t.expid = e.eid
+            {progs}
+            AND filter LIKE '%%CLEAR'
+            GROUP BY tile, subx, suby
+            ORDER BY count(subx) ASC
+        """)
         
         tiles = db.SQL(f"""SELECT tile, subx, suby, count(filter), filter,
                            SUM(e.exptime) as exptime
@@ -1295,12 +1351,16 @@ def get_tile_status(tile, subx, suby, filter):
     Is a tile "locked" with all exposures set with in_mosaic = 9?
     """
 
-    exp = db.SQL(f"""SELECT dataset, extension, assoc, filter, 
-                            exptime, footprint, in_mosaic, detector
-                      FROM mosaic_tiles_exposures t, exposure_files e
-                      WHERE t.expid = e.eid
-                      AND filter='{filter}' AND tile={tile}
-                      AND subx={subx} AND suby={suby}""")
+    exp = db.SQL(f"""
+        SELECT dataset, extension, assoc, filter,
+               exptime, footprint, in_mosaic, detector
+        FROM mosaic_tiles_exposures t, exposure_files e
+        WHERE t.expid = e.eid
+            AND filter='{filter}'
+            AND tile={tile}
+            AND subx={subx}
+            AND suby={suby}
+    """)
     
     if len(exp) == 0:
         status = 'empty'
@@ -1389,12 +1449,14 @@ def drizzle_tile_subregion(tile=2530, subx=522, suby=461, filter='F160W', s3outp
         return 'skip local'
     
     # Lock
-    db.execute(f"""UPDATE mosaic_tiles_exposures t
-          SET in_mosaic = 9
-          FROM exposure_files w
-          WHERE t.expid = w.eid
-          AND w.filter='{filter}' AND tile={tile}
-          AND subx={subx} AND suby={suby}""")
+    db.execute(f"""
+        UPDATE mosaic_tiles_exposures t
+        SET in_mosaic = 9
+        FROM exposure_files w
+        WHERE t.expid = w.eid
+            AND w.filter='{filter}' AND tile={tile}
+            AND subx={subx} AND suby={suby}
+    """)
         
     if ir_wcs is None:
         ir_wcs = tile_subregion_wcs(tile, subx, suby)
@@ -1455,7 +1517,7 @@ def query_cutout(output='mos-{tile}-{filter}_{drz}', ra=189.0243001, dec=62.1966
     SQL = f"""SELECT tile, subx, suby, subra, subdec, filter
             FROM mosaic_tiles_exposures t, exposure_files e
             WHERE in_mosaic = 1
-            AND t.expid = e.eid 
+            AND t.expid = e.eid
             AND ('((' || (subra - {ra})*{cosd} || 
                     ', ' || subdec - {dec} || '),
                     {rtile})')::circle
