@@ -1160,12 +1160,26 @@ class TransformGrismconf(object):
 
     """
 
-    def __init__(self, conf_file="", get_photom=True, **kwargs):
+    def __init__(
+        self,
+        conf_file: str = "",
+        get_photom: bool = True,
+        pivot_wavelength: float = 1.047,
+        **kwargs,
+    ):
         """
         Parameters
         ----------
         conf_file : str
             Configuration filename
+
+        get_photom : bool
+            Get sensitivity curves from the ``photom`` reference file
+
+        pivot_wavelength : float
+            The wavelength (in microns) in the 1st order spectrum which is not deviated
+            by the grism. Only used to correct for the NIRISS filter wheel rotation, by
+            default `1.047um` (Willott+22).
 
         """
         import grismconf
@@ -1174,7 +1188,7 @@ class TransformGrismconf(object):
 
         if "specwcs" in conf_file:
             self.conf = CRDSGrismConf(
-                conf_file, get_photom=get_photom, **kwargs
+                conf_file, get_photom=get_photom, pivot_wavelength=pivot_wavelength, **kwargs
             )
 
             kws = {
@@ -1187,6 +1201,8 @@ class TransformGrismconf(object):
         else:
             self.conf = grismconf.Config(conf_file)
             self.transform = JwstDispersionTransform(conf_file=conf_file)
+            self.conf.fwcpos_ref = getattr(self.conf, "FWCPOS_REF", None)
+            self.conf.pivot_wavelength = getattr(self.conf, "pivot_wavelength", pivot_wavelength)
 
         self.order_names = {
             "A": "+1",
@@ -1329,18 +1345,22 @@ class TransformGrismconf(object):
         # Implement trace rotation due to NIRISS filter wheel position.
         # Already included in `~grismconf.Config.rotate_trace`, this
         # uses the grizli sign convention
-        if (fwcpos is not None) and (self.conf.FWCPOS_REF is not None):
+        if (fwcpos is not None) and (self.conf.fwcpos_ref is not None):
 
             # Follow aXeconf convention, but keep theta in degrees for
             # `~astropy.modeling.rotations.Rotation2D`
-            theta = (self.conf.FWCPOS_REF - fwcpos)
+            theta = (self.conf.fwcpos_ref - fwcpos)
 
             if theta != 0.0:
                 # Rotate current trace around the 1st order spectrum,
                 # at a wavelength of 1.047um (Willott+22). Currently
                 # hardcoded, unclear if there are any circumstances
                 # where this is not the correct value
-                origin_t = self.conf.INVDISPL(self.order_names["A"], *x0, 1.047)
+                origin_t = self.conf.INVDISPL(
+                    self.order_names["A"],
+                    *x0,
+                    self.conf.pivot_wavelength,
+                )
                 origin_x = self.conf.DISPX(self.order_names["A"], *x0, origin_t)
                 origin_y = self.conf.DISPY(self.order_names["A"], *x0, origin_t)
 
@@ -1778,6 +1798,7 @@ class CRDSGrismConf:
         get_photom=True,
         internal_sensitivity_curve=True,
         context=None,
+        pivot_wavelength=1.047,
         **kwargs,
     ):
         """
@@ -1794,6 +1815,11 @@ class CRDSGrismConf:
         context : str
             CRDS context to use for JWST reference files, parsed through
             `~grizli.grismconf.get_current_context`.
+
+        pivot_wavelength : float
+            The wavelength (in microns) in the 1st order spectrum which is not deviated
+            by the grism. Only used to correct for the NIRISS filter wheel rotation, by
+            default `1.047um` (Willott+22).
 
         Attributes
         ----------
@@ -1840,6 +1866,7 @@ class CRDSGrismConf:
             download_jwst_crds_references(context=context)
 
         self.full_path = full_path
+        self.pivot_wavelength = pivot_wavelength
 
         self.initialize_from_datamodel()
         self.SENS = None
@@ -1863,6 +1890,8 @@ class CRDSGrismConf:
             dm = jwst.datamodels.NIRCAMGrismModel(full_path)
         else:
             dm = jwst.datamodels.NIRISSGrismModel(full_path)
+            # Update pivot wavelength from datamodel
+            self.pivot_wavelength = getattr(dm, 'pivot_wavelength', self.pivot_wavelength)
 
         self.meta = copy.deepcopy(dm.meta.instance)
         self.dm_orders = copy.deepcopy(dm.orders)
@@ -1870,6 +1899,7 @@ class CRDSGrismConf:
         self.dispx = copy.deepcopy(dm.dispx)
         self.dispy = copy.deepcopy(dm.dispy)
         self.displ = copy.deepcopy(dm.displ)
+        self.fwcpos_ref = getattr(dm, 'fwcpos_ref', None)
 
     # @property
     # def meta(self):
