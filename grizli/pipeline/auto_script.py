@@ -264,7 +264,7 @@ MIRI_FLAT_ROUND = {'F560W' : 8,
     'F1800W': 5,
     'F2100W': 4,}
 
-def get_miri_flat_by_date(file, tsplit=MIRI_FLAT_ROUND, verbose=True):
+def get_miri_flat_by_date(file, tsplit=MIRI_FLAT_ROUND, verbose=True, **kwargs):
     """
     MIRI flats computed by date
     
@@ -293,10 +293,7 @@ def get_miri_flat_by_date(file, tsplit=MIRI_FLAT_ROUND, verbose=True):
         Path to the flat file, ``None`` if not found
     
     """
-    # try:
-    #     from .. import GRIZLI_PATH
-    # except ImportError:
-    #     from grizli import utils, GRIZLI_PATH
+    from .. import jwst_utils
 
     tsplit = {'F770W':4,
               'F1800W': 5,
@@ -323,7 +320,15 @@ def get_miri_flat_by_date(file, tsplit=MIRI_FLAT_ROUND, verbose=True):
         if os.path.exists(flat_file_i):
             flat_file = flat_file_i
             break
-    
+
+    if flat_file is None:
+        downloaded_file = jwst_utils.download_skyflat_file(
+            os.path.join(os.getcwd(), flat_key),
+            bucket_prefix='grizli-v2/MiriDateFlats'
+        )
+        if downloaded_file is not None:
+            flat_file = downloaded_file
+
     msg = f'get_miri_flat_by_date: {file}  {flat_key}  - {flat_file}'
     utils.log_comment(utils.LOGFILE, msg, show_date=False,
                           verbose=verbose)
