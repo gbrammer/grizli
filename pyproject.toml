@@ -4,4 +4,4 @@ requires = ["setuptools==67.8.0", "setuptools_scm[toml]>=6.2", "wheel",
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools_scm]
-write_to = "grizli/version.py"
+version_file = "grizli/version.py"

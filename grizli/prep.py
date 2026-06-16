@@ -8132,7 +8132,7 @@ def visit_grism_sky(
 
     for i in range(Nexp):
         flt = pyfits.open(grism["files"][i])
-        dq = utils.mod_dq_bits(flt["DQ", ext].data, okbits=bits)
+        dq = utils.mod_dq_bits(flt["DQ", ext].data.astype(int), okbits=bits)
         dq_mask = dq == 0
 
         # Data
