@@ -251,7 +251,7 @@ def run_all(
         Logarithmic step size (1+z) of redshift grid.  See
         `~grizli.utils.log_zgrid`.
 
-    fitter : [str, str]
+    fitter : [str, str] or callable
         Least squares optimization method ('nnls','lstsq','bounded').
         The first option is used for the redshift fit with the `t0` templates
         and the second is used for the final fit with the `t1` templates.
@@ -266,6 +266,9 @@ def run_all(
         - lstsq: Fit with regular least squares, e.g., for PCA templates that
           can have negative coefficients (e.g.,
           `~grizli.utils.load_sdss_pca_templates`).
+
+        Any function can also be passed directly, which must take two
+        positional parameters (see `~grizli.fitting.GroupFitter.xfit_at_z`).
 
     group_name : str
         Passed to `~grizli.multifit.MultiBeam` on initialization
@@ -474,7 +477,7 @@ def run_all(
 
     # Allow for fitter to be a string, or a 2-list with different
     # values for the redshift and final fits
-    if isinstance(fitter, str):
+    if isinstance(fitter, str) or callable(fitter):
         fitter = [fitter, fitter]
 
     if not only_stacks:
@@ -2692,7 +2695,7 @@ class GroupFitter(object):
         templates : list
             List of templates to fit.
 
-        fitter : str
+        fitter : str or callable
             Minimization algorithm to compute template coefficients.
 
             Available options are:
@@ -2704,6 +2707,12 @@ class GroupFitter(object):
             For the last option, the line flux limits are set by the limits in
             the global `grizli.fitting.LINE_BOUNDS` list and `bounded_kwargs`
             are passed to `~scipy.optimize.lsq_linear`.
+
+            Alternatively, a function can be passed directly. This must take
+            two positional parameters, in the form `fitter(A, b)`, and return
+            the solution `x` which minimises the function:
+
+            .. math:: f(x) = ||Ax - b||^2
 
         fit_background : bool
             Fit additive pedestal background offset.
@@ -2812,7 +2821,7 @@ class GroupFitter(object):
             obj_IGM_MINZ = np.maximum(IGM_MINZ, (self.wavef.min() - 200) / 1216.0 - 1)
 
         # compute IGM directly for spectrum wavelengths
-        if use_cached_templates & ("spline" not in fitter):
+        if use_cached_templates & ("spline" != fitter):
             if z > obj_IGM_MINZ:
                 if IGM is None:
                     wigmz = 1.0
@@ -2911,7 +2920,7 @@ class GroupFitter(object):
                 A[self.N + i, sl] = _model_i[beam.fit_mask] * COEFF_SCALE
 
             # Multiply spline templates by single continuum template
-            if ("spline" in t) & ("spline" in fitter):
+            if ("spline" in t) & ("spline" == fitter):
                 ma = None
                 for k, t_i in enumerate(templates):
                     if t_i in self.Asave:
@@ -2944,7 +2953,7 @@ class GroupFitter(object):
                 #     ds9.view(m.reshape(beam.sh))
 
         if fit_background:
-            if fitter.split()[0] in ["nnls", "lstsq"]:
+            if (fitter in ["nnls", "lstsq"]) or (callable(fitter)):
                 pedestal = 0.04
             else:
                 pedestal = 0.0
@@ -2995,7 +3004,9 @@ class GroupFitter(object):
             return AxT, data
 
         # Run the minimization
-        if fitter.split()[0] == "nnls":
+        if callable(fitter):
+            coeffs_i = fitter(AxT, data)
+        elif fitter.split()[0] == "nnls":
             coeffs_i, rnorm = scipy.optimize.nnls(AxT, data)
         elif fitter.split()[0] == "lstsq":
             coeffs_i, residuals, rank, s = np.linalg.lstsq(
@@ -3616,7 +3627,7 @@ class GroupFitter(object):
         fit.meta["ktempl"] = (ktempl, "Parameters, k, of template fit")
         fit.meta["chimin"] = (chi2.min(), "Minimum chi2 of template fit")
         fit.meta["chimax"] = (chi2.max(), "Maximum chi2 of template fit")
-        fit.meta["fitter"] = (fitter, "Minimization algorithm")
+        fit.meta["fitter"] = (str(fitter), "Minimization algorithm")
 
         fit.meta["as_epsf"] = (
             (self.psf_param_dict is not None) * 1,
