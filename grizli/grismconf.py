@@ -1286,8 +1286,9 @@ class TransformGrismconf(object):
 
     def get_beam_trace_original(self, x=1024, y=1024, dx=0.0, beam="A", fwcpos=None):
         """
-        Function analogous to `grizli.grismconf.aXeConf.get_beam_trace` but
-        that accounts for the different dispersion axes of JWST grisms
+        Function analogous to `grizli.grismconf.aXeConf.get_beam_trace`.
+
+        Calculates the trace in the original (detector) frame of the images.
 
         Parameters
         ----------
@@ -1306,6 +1307,9 @@ class TransformGrismconf(object):
 
         Returns
         -------
+        dx : float or array-like
+            Offset in x pixels from `(x,y)`.
+
         dy : float or array-like
             Center of the trace in y pixels offset from `(x,y)` evaluated at
             `dx`.
@@ -1335,7 +1339,38 @@ class TransformGrismconf(object):
 
         wave = self.conf.DISPL(self.order_names[beam], *x0, t)
 
-        # print(f"t: {t}, delta: {delta}, tdx: {tdx}, tdy: {tdy}, x0[0] + tdx: {x0[0] + tdx}, x0[1] + tdy: {x0[1] + tdy}")
+        # Implement trace rotation due to NIRISS filter wheel position.
+        # Already included in `~grismconf.Config.rotate_trace`, this
+        # uses the grizli sign convention
+        if (fwcpos is not None) and (self.conf.fwcpos_ref is not None):
+
+            # Follow aXeconf convention
+            theta = (fwcpos-self.conf.fwcpos_ref) * np.pi / 180
+
+            if theta != 0.0:
+                # Rotate current trace around the 1st order spectrum,
+                # at a wavelength of 1.047um (Willott+22). Currently
+                # hardcoded, unclear if there are any circumstances
+                # where this is not the correct value
+                origin_t = self.conf.INVDISPL(
+                    self.order_names["A"],
+                    *x0,
+                    self.conf.pivot_wavelength,
+                )
+                origin_x = self.conf.DISPX(self.order_names["A"], *x0, origin_t)
+                origin_y = self.conf.DISPY(self.order_names["A"], *x0, origin_t)
+
+                # rotation = Rotation2D(theta)
+                # tdx_r, tdy_r = rotation(tdx - origin_x, tdy - origin_y)
+                # tdx = origin_x + tdx_r
+                # tdy = origin_y + tdy_r
+
+                tdx, tdy = self.transform.rotate_coordinates(
+                    tdx,
+                    tdy,
+                    theta,
+                    np.squeeze((origin_x, origin_y)),
+                )
 
         return tdx, tdy, wave
 
@@ -1355,8 +1390,9 @@ class TransformGrismconf(object):
         beam : str
             Grism order, translated from +1, 0, +2, +3, -1 = A, B, C, D, E
 
-        fwcpos : float
-            NIRISS rotation *(not implemented)*
+        fwcpos : float or None
+            For NIRISS, specify the filter wheel position to compute the
+            trace rotation.
 
         Returns
         -------
@@ -1379,33 +1415,6 @@ class TransformGrismconf(object):
             wave *= 1.0e4
  
         # rotate the trace back to the +x direction
-        # Implement trace rotation due to NIRISS filter wheel position.
-        # Already included in `~grismconf.Config.rotate_trace`, this
-        # uses the grizli sign convention
-        if (fwcpos is not None) and (self.conf.fwcpos_ref is not None):
-
-            # Follow aXeconf convention, but keep theta in degrees for
-            # `~astropy.modeling.rotations.Rotation2D`
-            theta = (self.conf.fwcpos_ref - fwcpos)
-
-            if theta != 0.0:
-                # Rotate current trace around the 1st order spectrum,
-                # at a wavelength of 1.047um (Willott+22). Currently
-                # hardcoded, unclear if there are any circumstances
-                # where this is not the correct value
-                origin_t = self.conf.INVDISPL(
-                    self.order_names["A"],
-                    *x0,
-                    self.conf.pivot_wavelength,
-                )
-                origin_x = self.conf.DISPX(self.order_names["A"], *x0, origin_t)
-                origin_y = self.conf.DISPY(self.order_names["A"], *x0, origin_t)
-
-                rotation = Rotation2D(theta)
-                tdx_r, tdy_r = rotation(tdx - origin_x, tdy - origin_y)
-                tdx = origin_x + tdx_r
-                tdy = origin_y + tdy_r
-
         rev = self.transform.forward(x0[0] + tdx, x0[1] + tdy)
         
         # the position of the trace is x+dx, y+dy
