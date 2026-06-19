@@ -264,7 +264,7 @@ MIRI_FLAT_ROUND = {'F560W' : 8,
     'F1800W': 5,
     'F2100W': 4,}
 
-def get_miri_flat_by_date(file, tsplit=MIRI_FLAT_ROUND, verbose=True):
+def get_miri_flat_by_date(file, tsplit=MIRI_FLAT_ROUND, verbose=True, **kwargs):
     """
     MIRI flats computed by date
     
@@ -293,10 +293,7 @@ def get_miri_flat_by_date(file, tsplit=MIRI_FLAT_ROUND, verbose=True):
         Path to the flat file, ``None`` if not found
     
     """
-    # try:
-    #     from .. import GRIZLI_PATH
-    # except ImportError:
-    #     from grizli import utils, GRIZLI_PATH
+    from .. import jwst_utils
 
     tsplit = {'F770W':4,
               'F1800W': 5,
@@ -323,7 +320,15 @@ def get_miri_flat_by_date(file, tsplit=MIRI_FLAT_ROUND, verbose=True):
         if os.path.exists(flat_file_i):
             flat_file = flat_file_i
             break
-    
+
+    if flat_file is None:
+        downloaded_file = jwst_utils.download_skyflat_file(
+            os.path.join(os.getcwd(), flat_key),
+            bucket_prefix='grizli-v2/MiriDateFlats'
+        )
+        if downloaded_file is not None:
+            flat_file = downloaded_file
+
     msg = f'get_miri_flat_by_date: {file}  {flat_key}  - {flat_file}'
     utils.log_comment(utils.LOGFILE, msg, show_date=False,
                           verbose=verbose)
@@ -3523,7 +3528,39 @@ def load_GroupFLT(field_root='j142724+334246', PREP_PATH='../Prep', force_ref=No
         return [grp]
 
 
-def grism_prep(field_root='j142724+334246', PREP_PATH='../Prep', EXTRACT_PATH='../Extractions', ds9=None, refine_niter=3, gris_ref_filters=GRIS_REF_FILTERS, force_ref=None, files=None, split_by_grism=True, refine_poly_order=1, refine_fcontam=0.5, cpu_count=0, mask_mosaic_edges=False, prelim_mag_limit=25, refine_mag_limits=[18, 24], init_coeffs=[1.1, -0.5], grisms_to_process=None, pad=(64, 256), model_kwargs={'compute_size': True}, sep_background_kwargs=None, subtract_median_filter=False, median_filter_size=71, median_filter_central=10, second_pass_filtering=False, box_filter_sn=3, box_filter_width=3, median_mask_sn_threshold=None, median_mask_dilate=8, prelim_model_for_median=False, use_jwst_crds=False):
+def grism_prep(
+    field_root="j142724+334246",
+    PREP_PATH="../Prep",
+    EXTRACT_PATH="../Extractions",
+    ds9=None,
+    refine_niter=3,
+    gris_ref_filters=GRIS_REF_FILTERS,
+    force_ref=None,
+    files=None,
+    split_by_grism=True,
+    refine_poly_order=1,
+    refine_fcontam=0.5,
+    cpu_count=0,
+    mask_mosaic_edges=False,
+    prelim_mag_limit=25,
+    refine_mag_limits=[18, 24],
+    init_coeffs=[1.1, -0.5],
+    max_coeff=5.0,
+    grisms_to_process=None,
+    pad=(64, 256),
+    model_kwargs={"compute_size": True},
+    sep_background_kwargs=None,
+    subtract_median_filter=False,
+    median_filter_size=71,
+    median_filter_central=10,
+    second_pass_filtering=False,
+    box_filter_sn=3,
+    box_filter_width=3,
+    median_mask_sn_threshold=None,
+    median_mask_dilate=8,
+    prelim_model_for_median=False,
+    use_jwst_crds=False,
+):
     """
     Contamination model pipeline for grism exposures
     
@@ -3565,6 +3602,7 @@ def grism_prep(field_root='j142724+334246', PREP_PATH='../Prep', EXTRACT_PATH='.
     refine_fcontam : float
         Factor multiplying the contamination model that is added to the variance of
         and extracted spectrum.
+
     cpu_count : int
         Multiprocessing, see `~grizli.multifit.GroupFLT.compute_full_model`.
     
@@ -3581,6 +3619,11 @@ def grism_prep(field_root='j142724+334246', PREP_PATH='../Prep', EXTRACT_PATH='.
     
     init_coeffs : [float, float]
         Polynomial coefficients for the first simple model
+
+    max_coeff : float
+        Fit is considered bad when the polynomial contamination model returns a total
+        flux greater than `max_coeff` times the *observed* flux in the
+        direct image. See `~grizli.multifit.GroupFLT.refine`.
     
     grisms_to_process : list, None
         Explicit list of grisms to process, otherwise will do all that are found
@@ -3777,7 +3820,7 @@ def grism_prep(field_root='j142724+334246', PREP_PATH='../Prep', EXTRACT_PATH='.
 
                 grp.refine_list(poly_order=refine_poly_order, 
                                 mag_limits=refine_mag_limits,
-                                max_coeff=5, ds9=ds9, verbose=True,
+                                max_coeff=max_coeff, ds9=ds9, verbose=True,
                                 fcontam=refine_i,
                                 wave=np.linspace(*grp.polyx[:2], 100)*1.e4)
         

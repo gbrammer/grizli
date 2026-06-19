@@ -25,7 +25,7 @@ except ImportError:
 from .. import utils, grismconf, multifit
 from . import db, api_cutout
 
-S3PATH = "s3://grizli-v2/HST/Pipeline/{assoc}/Prep/{dataset}_rate.fits"
+S3PATH = "s3://grizli-v2/HST/Pipeline/{assoc}/Prep/{dataset}_{extension}.fits"
 
 THUMB = "https://grizli-cutout.herokuapp.com/thumb?all_filters=False&filters={filter}&ra={ra}&dec={dec}&size={size}&output=fits_weight"
 
@@ -242,31 +242,77 @@ def wfss_exposure_footprint(
         header = pyfits.Header(row)
 
     wcs = pywcs.WCS(header)
-    conf_params = dict(
-        instrume=rowd["instrume"],
-        grism=rowd["filter"].split("-")[0],
-        filter=rowd["pupil"],
-        module=rowd["detector"][3],
-        use_jwst_crds=use_jwst_crds,
-    )
+
+    if rowd["instrume"] in ['NIRISS']:
+
+        conf_params = dict(
+            instrume=rowd["instrume"],
+            grism=rowd["filter"].split("-")[1],
+            filter=rowd["pupil"],
+            module="NIS",
+            use_jwst_crds=use_jwst_crds,
+        )
+
+    else:
+
+        conf_params = dict(
+            instrume=rowd["instrume"],
+            grism=rowd["filter"].split("-")[0],
+            filter=rowd["pupil"],
+            module=rowd["detector"].replace("NRC","")[0],
+            use_jwst_crds=use_jwst_crds,
+        )
+
     pkey = " ".join([f"{conf_params[k]}" for k in conf_params])
 
     if pkey in grizli.grismconf.LoadedConfig:
         conf = grizli.grismconf.LoadedConfig[pkey]
     else:
         conf_file = grizli.grismconf.get_config_filename(**conf_params)
-        conf = grizli.grismconf.TransformGrismconf(conf_file)
-        conf.get_beams()
+        # print(f"xxx pkey: {pkey}")
+        # print(f"xxx conf_file: {conf_file}")
+
+        if conf_file.endswith("V4.32.conf"):
+            # HST
+            conf = grizli.grismconf.aXeConf(conf_file)
+            conf.get_beams()
+        else:
+            conf = grizli.grismconf.TransformGrismconf(conf_file)
+            conf.get_beams()
+
         grizli.grismconf.LoadedConfig[pkey] = conf
 
     # Calculate footprint
-    xc = 1024.5
-    dy = [xc - ypad, xc + ypad]
-    dx = [xc + conf.dxlam["A"][0] - xpad, xc + conf.dxlam["A"][-1] + xpad]
-    dxr, dyr = xc - conf.transform.reverse(dx, dy)
+    if 'WFC3' in pkey:
+        xc = 507
 
-    xwfss = np.array([dxr.min(), 2047 + dxr.max(), 2047 + dxr.max(), dxr.min()])
-    ywfss = np.array([dyr.min(), dyr.min(), 2047 + dyr.max(), 2047 + dyr.max()])
+        dy = [xc - ypad, xc + ypad]
+        dx = [xc + conf.dxlam["A"][0] - xpad, xc + conf.dxlam["A"][-1] + xpad]
+        # dxr, dyr = xc - conf.transform.reverse(dx, dy)
+        dyr = np.array(dy)
+        dxr = np.array(dx)
+
+        xwfss = np.array([
+            dxr.min(), 1014 + dxr.max(), 1014 + dxr.max(), dxr.min()
+        ])
+
+        ywfss = np.array([
+            dyr.min(), dyr.min(), 1014 + dyr.max(), 1014 + dyr.max()
+        ])
+    else:
+        xc = 1024.5
+
+        dy = [xc - ypad, xc + ypad]
+        dx = [xc + conf.dxlam["A"][0] - xpad, xc + conf.dxlam["A"][-1] + xpad]
+        dxr, dyr = xc - conf.transform.reverse(dx, dy)
+
+        xwfss = np.array([
+            dxr.min(), 2047 + dxr.max(), 2047 + dxr.max(), dxr.min()
+        ])
+
+        ywfss = np.array([
+            dyr.min(), dyr.min(), 2047 + dyr.max(), 2047 + dyr.max()
+        ])
 
     gsky = wcs.all_pix2world(np.array([xwfss, ywfss]).T, 0)
     wfss_footprint = utils.SRegion(gsky)

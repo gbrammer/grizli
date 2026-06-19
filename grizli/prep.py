@@ -3776,7 +3776,7 @@ def apply_visit_skyflat(visit, skyfile=None, verbose=True):
 
     """
 
-    if not os.path.exists(skyfile):
+    if (not os.path.exists(skyfile)) & (~skyfile.startswith("http")):
         msg = f"apply_visit_skyflat: MIRI skyflat {skyfile} not found"
         utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
         return None
