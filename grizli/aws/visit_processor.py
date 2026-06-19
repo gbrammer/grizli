@@ -369,12 +369,12 @@ def visit_astrometry_diagnostic(assoc, threshold=2.0, force_catalog=False, savef
     import astropy.table
     from grizli import prep, utils
 
-    mosaic_file = glob.glob(f"{assoc}*sci.fits*")
-    if len(mosaic_file) == 0:
+    mosaic_files = glob.glob(f"{assoc}*sci.fits*")
+    if len(mosaic_files) == 0:
         return None
 
     prefix = None
-    for file in mosaic_file:
+    for file in mosaic_files:
         if ("grism" not in file) & ("g102" not in file) & ("g141" not in file) & ("gr150" not in file):
             prefix = file.split("_drc")[0].split("_drz")[0]
             break
@@ -425,6 +425,7 @@ def visit_astrometry_diagnostic(assoc, threshold=2.0, force_catalog=False, savef
 
     if "gaia" not in radec_files[0]:
         gaia_file = f"../../{assoc}.gaia.radec"
+
         if os.path.exists(gaia_file):
             gaia = utils.read_catalog(gaia_file)
             labels.append("gaia")
