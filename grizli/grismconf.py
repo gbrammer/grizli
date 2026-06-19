@@ -1162,9 +1162,9 @@ class TransformGrismconf(object):
 
     def __init__(
         self,
-        conf_file: str = "",
-        get_photom: bool = True,
-        pivot_wavelength: float = 1.047,
+        conf_file="",
+        get_photom=True,
+        pivot_wavelength=1.047,
         **kwargs,
     ):
         """
@@ -1348,10 +1348,6 @@ class TransformGrismconf(object):
             theta = (fwcpos-self.conf.fwcpos_ref) * np.pi / 180
 
             if theta != 0.0:
-                # Rotate current trace around the 1st order spectrum,
-                # at a wavelength of 1.047um (Willott+22). Currently
-                # hardcoded, unclear if there are any circumstances
-                # where this is not the correct value
                 origin_t = self.conf.INVDISPL(
                     self.order_names["A"],
                     *x0,
@@ -1359,11 +1355,6 @@ class TransformGrismconf(object):
                 )
                 origin_x = self.conf.DISPX(self.order_names["A"], *x0, origin_t)
                 origin_y = self.conf.DISPY(self.order_names["A"], *x0, origin_t)
-
-                # rotation = Rotation2D(theta)
-                # tdx_r, tdy_r = rotation(tdx - origin_x, tdy - origin_y)
-                # tdx = origin_x + tdx_r
-                # tdy = origin_y + tdy_r
 
                 tdx, tdy = self.transform.rotate_coordinates(
                     tdx,
@@ -1409,7 +1400,7 @@ class TransformGrismconf(object):
         x0 = np.squeeze(self.transform.reverse(x, y)) # +x to detector transformation, x0 is an array of (x,y)
 
         # calculate the trace in the detector frame
-        tdx, tdy, wave = self.get_beam_trace_original(x=x0[0], y=x0[1], dx=dx, beam=beam)
+        tdx, tdy, wave = self.get_beam_trace_original(x=x0[0], y=x0[1], dx=dx, beam=beam, fwcpos=fwcpos)
 
         if self.transform.instrument != "HST":
             wave *= 1.0e4
