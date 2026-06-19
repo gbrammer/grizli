@@ -25,6 +25,12 @@ QUIET_LEVEL = logging.INFO
 # CRDS_CONTEXT = "jwst_1123.pmap"  # 2023-09-08 NRC specwcs, etc.
 CRDS_CONTEXT = "jwst_1293.pmap"  # 2024-09-25
 
+# CRDS_CONTEXT = "jwst_1330.pmap"  # NIRCam flats updated 2025-02-18
+# CRDS_CONTEXT = "jwst_1401.pmap"
+
+# jwst_1489.pmap -  2026-03-13 updated NIRCam photom
+# jwst_1577.pmap -  2026-06-19
+
 MAX_CTX_FOR_SKYFLATS = "jwst_1130.pmap"
 
 ## Some filters are still better with the grizli skyflats
@@ -36,6 +42,9 @@ FORCE_SKYFLATS = [
     "F460M",
     "F460M-CLEAR",
 ]
+
+if CRDS_CONTEXT > "jwst_1329.pmap":
+    FORCE_SKYFLATS = []
 
 # Global variable to control whether or not to try to update
 # PP file WCS
