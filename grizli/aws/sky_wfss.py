@@ -282,7 +282,7 @@ def wfss_exposure_footprint(
 
         grizli.grismconf.LoadedConfig[pkey] = conf
 
-    # Calculate footprint
+    # Calculate footprint that disperses onto the detector
     if 'WFC3' in pkey:
         xc = 507
 
