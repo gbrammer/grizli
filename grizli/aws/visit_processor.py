@@ -785,6 +785,8 @@ def make_visit_mosaic(assoc, base_path=ROOT_PATH, version='v7.0', pixscale=0.08,
             if diag is not None:
                 prefix_, fig_ = diag
                 plt.close(fig_)
+        except:
+            pass
 
     os.system(f'gzip --force {assoc}*_dr*fits')
 
