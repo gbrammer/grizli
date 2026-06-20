@@ -3430,6 +3430,25 @@ def compare_filter_info(bp1, bp2):
     -------
     fig : figure
         Plot figure
+
+    Examples
+    --------
+
+        .. plot::
+            :include-source:
+
+            import grizli.jwst_utils
+
+            bp1 = grizli.jwst_utils.calc_jwst_filter_info(
+                context="jwst_1293.pmap", lw=["NRCALONG"], sw=["NRCA3"]
+            )
+
+            bp2 = grizli.jwst_utils.calc_jwst_filter_info(
+                context="jwst_1489.pmap", lw=["NRCALONG"], sw=["NRCA3"]
+            )
+
+            fig = grizli.jwst_utils.compare_filter_info(bp1, bp2)
+
     """
     import matplotlib.pyplot as plt
 

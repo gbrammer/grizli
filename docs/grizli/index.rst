@@ -23,6 +23,9 @@ Utilities
     :no-inheritance-diagram:
     :skip: OrderedDict
 
+.. automodapi:: grizli.jwst_utils
+    :no-inheritance-diagram:
+
 .. automodapi:: grizli.utils_numba.interp
     :no-inheritance-diagram:
 
