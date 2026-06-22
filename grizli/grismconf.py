@@ -2902,6 +2902,47 @@ class CustomGrismconf(TransformGrismconf):
                 f"MMAG_EXTRACT_{beam}"
             ]
 
+    def get_beam_trace_original(self, x=1024, y=1024, dx=0.0, beam="A", fwcpos=None):
+        """
+        Function analogous to `grizli.grismconf.aXeConf.get_beam_trace`.
+
+        Calculates the trace in the original (detector) frame of the images.
+
+        Parameters
+        ----------
+        x, y : float
+            Reference position in the rotated frame
+
+        dx : array-like
+            Offset in pixels along the trace
+
+        beam : str
+            Grism order, translated from +1, 0, +2, +3, -1 = A, B, C, D, E
+
+        fwcpos : float or None
+            For NIRISS, specify the filter wheel position to compute the
+            trace rotation.
+
+        Returns
+        -------
+        dx : float or array-like
+            Offset in x pixels from `(x,y)`.
+
+        dy : float or array-like
+            Center of the trace in y pixels offset from `(x,y)` evaluated at
+            `dx`.
+
+        lam : float or array-like
+            Effective wavelength along the trace evaluated at `dx`.
+
+        """
+
+        conf_obj = self.conf_name_to_obj[
+            self.beam_name_to_conf_name[self.order_names[beam]]
+        ]
+
+        return conf_obj.get_beam_trace_original(x=x, y=y, dx=dx, beam=beam, fwcpos=fwcpos)
+
     def get_beam_trace(self, x=1024, y=1024, dx=0.0, beam="A", fwcpos=None):
         """
         Function analogous to `grizli.grismconf.aXeConf.get_beam_trace` but
@@ -2918,8 +2959,9 @@ class CustomGrismconf(TransformGrismconf):
         beam : str
             Grism order, translated from +1, 0, +2, +3, -1 = A, B, C, D, E
 
-        fwcpos : float
-            NIRISS rotation *(not implemented)*
+        fwcpos : float or None
+            For NIRISS, specify the filter wheel position to compute the
+            trace rotation.
 
         Returns
         -------
@@ -2949,25 +2991,15 @@ class CustomGrismconf(TransformGrismconf):
         elif isinstance(conf_obj, TransformGrismconf):
             return conf_obj.eval_dxlam(x=x, y=y, beam=beam, nt=nt, min_sens=min_sens)
 
-    def _get_value(self, string, type=None):
+    def _get_value(self, string, return_type=str):
         """Helper function to simply return the value for a simple keyword parameters
         in the config file."""
 
         for l in self.conf_readlines:
             ws = l.split()
-            if len(ws) > 0 and ws[0] == string:
+            if len(ws) >= 2 and ws[0] == string:
                 if len(ws) == 2:
-                    if type == None:
-                        return ws[1]
-                    elif type == float:
-                        return float(ws[1])
-                    elif type == int:
-                        return int(ws[1])
+                    return return_type(ws[1])
                 else:
-                    if type == None:
-                        return ws[1:]
-                    elif type == float:
-                        return [float(x) for x in ws[1:]]
-                    elif type == int:
-                        return [int(x) for x in ws[1:]]
+                    return [return_type(w) for w in ws[1:]]
         return None
