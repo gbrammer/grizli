@@ -1182,12 +1182,26 @@ class TransformGrismconf(object):
 
     """
 
-    def __init__(self, conf_file="", get_photom=True, **kwargs):
+    def __init__(
+        self,
+        conf_file="",
+        get_photom=True,
+        pivot_wavelength=1.047,
+        **kwargs,
+    ):
         """
         Parameters
         ----------
         conf_file : str
             Configuration filename
+
+        get_photom : bool
+            Get sensitivity curves from the ``photom`` reference file
+
+        pivot_wavelength : float
+            The wavelength (in microns) in the 1st order spectrum which is not deviated
+            by the grism. Only used to correct for the NIRISS filter wheel rotation, by
+            default `1.047um` (Willott+22).
 
         """
         import grismconf
@@ -1196,7 +1210,7 @@ class TransformGrismconf(object):
 
         if "specwcs" in conf_file:
             self.conf = CRDSGrismConf(
-                conf_file, get_photom=get_photom, **kwargs
+                conf_file, get_photom=get_photom, pivot_wavelength=pivot_wavelength, **kwargs
             )
 
             kws = {
@@ -1209,6 +1223,8 @@ class TransformGrismconf(object):
         else:
             self.conf = grismconf.Config(conf_file)
             self.transform = JwstDispersionTransform(conf_file=conf_file)
+            self.conf.fwcpos_ref = getattr(self.conf, "FWCPOS_REF", None)
+            self.conf.pivot_wavelength = getattr(self.conf, "pivot_wavelength", pivot_wavelength)
 
         self.order_names = {
             "A": "+1",
@@ -1292,8 +1308,9 @@ class TransformGrismconf(object):
 
     def get_beam_trace_original(self, x=1024, y=1024, dx=0.0, beam="A", fwcpos=None):
         """
-        Function analogous to `grizli.grismconf.aXeConf.get_beam_trace` but
-        that accounts for the different dispersion axes of JWST grisms
+        Function analogous to `grizli.grismconf.aXeConf.get_beam_trace`.
+
+        Calculates the trace in the original (detector) frame of the images.
 
         Parameters
         ----------
@@ -1306,11 +1323,15 @@ class TransformGrismconf(object):
         beam : str
             Grism order, translated from +1, 0, +2, +3, -1 = A, B, C, D, E
 
-        fwcpos : float
-            NIRISS rotation *(not implemented)*
+        fwcpos : float or None
+            For NIRISS, specify the filter wheel position to compute the
+            trace rotation.
 
         Returns
         -------
+        dx : float or array-like
+            Offset in x pixels from `(x,y)`.
+
         dy : float or array-like
             Center of the trace in y pixels offset from `(x,y)` evaluated at
             `dx`.
@@ -1340,7 +1361,29 @@ class TransformGrismconf(object):
 
         wave = self.conf.DISPL(self.order_names[beam], *x0, t)
 
-        # print(f"t: {t}, delta: {delta}, tdx: {tdx}, tdy: {tdy}, x0[0] + tdx: {x0[0] + tdx}, x0[1] + tdy: {x0[1] + tdy}")
+        # Implement trace rotation due to NIRISS filter wheel position.
+        # Already included in `~grismconf.Config.rotate_trace`, this
+        # uses the grizli sign convention
+        if (fwcpos is not None) and (self.conf.fwcpos_ref is not None):
+
+            # Follow aXeconf convention
+            theta = (fwcpos-self.conf.fwcpos_ref) * np.pi / 180
+
+            if theta != 0.0:
+                origin_t = self.conf.INVDISPL(
+                    self.order_names["A"],
+                    *x0,
+                    self.conf.pivot_wavelength,
+                )
+                origin_x = self.conf.DISPX(self.order_names["A"], *x0, origin_t)
+                origin_y = self.conf.DISPY(self.order_names["A"], *x0, origin_t)
+
+                tdx, tdy = self.transform.rotate_coordinates(
+                    tdx,
+                    tdy,
+                    theta,
+                    np.squeeze((origin_x, origin_y)),
+                )
 
         return tdx, tdy, wave
 
@@ -1360,8 +1403,9 @@ class TransformGrismconf(object):
         beam : str
             Grism order, translated from +1, 0, +2, +3, -1 = A, B, C, D, E
 
-        fwcpos : float
-            NIRISS rotation *(not implemented)*
+        fwcpos : float or None
+            For NIRISS, specify the filter wheel position to compute the
+            trace rotation.
 
         Returns
         -------
@@ -1378,7 +1422,7 @@ class TransformGrismconf(object):
         x0 = np.squeeze(self.transform.reverse(x, y)) # +x to detector transformation, x0 is an array of (x,y)
 
         # calculate the trace in the detector frame
-        tdx, tdy, wave = self.get_beam_trace_original(x=x0[0], y=x0[1], dx=dx, beam=beam)
+        tdx, tdy, wave = self.get_beam_trace_original(x=x0[0], y=x0[1], dx=dx, beam=beam, fwcpos=fwcpos)
 
         if self.transform.instrument != "HST":
             wave *= 1.0e4
@@ -1884,6 +1928,7 @@ class CRDSGrismConf:
         get_photom=True,
         internal_sensitivity_curve=True,
         context=None,
+        pivot_wavelength=1.047,
         **kwargs,
     ):
         """
@@ -1900,6 +1945,11 @@ class CRDSGrismConf:
         context : str
             CRDS context to use for JWST reference files, parsed through
             `~grizli.grismconf.get_current_context`.
+
+        pivot_wavelength : float
+            The wavelength (in microns) in the 1st order spectrum which is not deviated
+            by the grism. Only used to correct for the NIRISS filter wheel rotation, by
+            default `1.047um` (Willott+22).
 
         Attributes
         ----------
@@ -1946,6 +1996,7 @@ class CRDSGrismConf:
             download_jwst_crds_references(context=context)
 
         self.full_path = full_path
+        self.pivot_wavelength = pivot_wavelength
 
         self.initialize_from_datamodel()
         self.SENS = None
@@ -1969,6 +2020,8 @@ class CRDSGrismConf:
             dm = jwst.datamodels.NIRCAMGrismModel(full_path)
         else:
             dm = jwst.datamodels.NIRISSGrismModel(full_path)
+            # Update pivot wavelength from datamodel
+            self.pivot_wavelength = getattr(dm, 'pivot_wavelength', self.pivot_wavelength)
 
         self.meta = copy.deepcopy(dm.meta.instance)
         self.dm_orders = copy.deepcopy(dm.orders)
@@ -1976,6 +2029,7 @@ class CRDSGrismConf:
         self.dispx = copy.deepcopy(dm.dispx)
         self.dispy = copy.deepcopy(dm.dispy)
         self.displ = copy.deepcopy(dm.displ)
+        self.fwcpos_ref = getattr(dm, 'fwcpos_ref', None)
 
     # @property
     # def meta(self):
@@ -2616,7 +2670,12 @@ class CRDSGrismConf:
                             elif hrow[0] == "PHOTUNIT":
                                 phot_unit = hrow[1]
 
-            elif hasattr(ph, 'wave_unit') & hasattr(ph, 'phot_unit'):
+            if (
+                hasattr(ph, "wave_unit")
+                & hasattr(ph, "phot_unit")
+                & (wave_unit is None)
+                & (phot_unit is None)
+            ):
                 wave_unit = ph.wave_unit
                 phot_unit = ph.phot_unit
 

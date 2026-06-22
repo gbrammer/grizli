@@ -24,7 +24,15 @@ QUIET_LEVEL = logging.INFO
 # CRDS_CONTEXT = 'jwst_0995.pmap' # 2022-10-06 NRC ZPs and flats
 # CRDS_CONTEXT = "jwst_1123.pmap"  # 2023-09-08 NRC specwcs, etc.
 # CRDS_CONTEXT = "jwst_1293.pmap"  # 2024-09-25
-CRDS_CONTEXT = "jwst_1413.pmap" # 2025-07-30 PJW
+
+# CRDS_CONTEXT = "jwst_1330.pmap"  # NIRCam flats updated 2025-02-18
+# CRDS_CONTEXT = "jwst_1401.pmap"
+
+# jwst_1489.pmap -  2026-03-13 updated NIRCam photom
+# jwst_1577.pmap -  2026-06-19
+
+# CRDS_CONTEXT = "jwst_1413.pmap" # 2025-07-30 PJW
+CRDS_CONTEXT = "jwst_1535.pmap" # 2026-06-22 PJW
 
 MAX_CTX_FOR_SKYFLATS = "jwst_1130.pmap"
 
@@ -37,6 +45,9 @@ FORCE_SKYFLATS = [
     "F460M",
     "F460M-CLEAR",
 ]
+
+if CRDS_CONTEXT > "jwst_1329.pmap":
+    FORCE_SKYFLATS = []
 
 # Global variable to control whether or not to try to update
 # PP file WCS
@@ -3224,7 +3235,7 @@ def get_jwst_filter_info(header):
     return info
 
 
-def calc_jwst_filter_info(context=CRDS_CONTEXT):
+def calc_jwst_filter_info(context=CRDS_CONTEXT, sw=["NRCA1","NRCA2","NRCA3","NRCA4","NRCA1","NRCA2","NRCA3","NRCA4"], lw=["NRCALONG","NRCBLONG"]):
     """
     Calculate JWST filter properties from tabulated `eazy` filter file and
     photom reference files
@@ -3273,22 +3284,14 @@ def calc_jwst_filter_info(context=CRDS_CONTEXT):
                 "photmjsr": "Photometric conversion if ref files available",
                 "photfile": "Photom reference file",
             },
+            "detectors": {},
         }
     }
 
     detectors = {
         "NIRCAM": {
-            ("F200W", "CLEAR"): [
-                "NRCA1",
-                "NRCA2",
-                "NRCA3",
-                "NRCA4",
-                "NRCA1",
-                "NRCA2",
-                "NRCA3",
-                "NRCA4",
-            ],
-            ("F444W", "CLEAR"): ["NRCALONG", "NRCBLONG"],
+            ("F200W", "CLEAR"): sw,
+            ("F444W", "CLEAR"): lw,
         },
         "NIRISS": {("CLEAR", "F200W"): ["NIS"]},
         "MIRI": {("F770W", None): ["MIRIMAGE"]},
@@ -3297,7 +3300,7 @@ def calc_jwst_filter_info(context=CRDS_CONTEXT):
     exp_type = {
         "NIRCAM": "NRC_IMAGE",
         "NIRISS": "NIS_IMAGE",
-        "MIRI": "MIRI_IMAGE",
+        "MIRI": "MIR_IMAGE",
     }
 
     for inst in ["NIRCAM", "NIRISS", "MIRI"]:
@@ -3305,10 +3308,14 @@ def calc_jwst_filter_info(context=CRDS_CONTEXT):
         fn = res.search(f"jwst_{inst}", verbose=False)
         print(f"\n{inst}\n=====")
 
+        bp["meta"]["detectors"][inst] = []
+
         if context is not None:
             phot_files = []
             for key in detectors[inst]:
-                for d in detectors[inst][key]:
+                for d in detectors[inst][key][:1]:
+                    bp["meta"]["detectors"][inst].append(d)
+
                     kws = dict(
                         instrument=inst,
                         filter=key[0],
@@ -3316,6 +3323,7 @@ def calc_jwst_filter_info(context=CRDS_CONTEXT):
                         detector=d,
                         reftypes=("photom",),
                         exp_type=exp_type[inst],
+                        context=context,
                     )
                     refs = crds_reffiles(**kws)
                     phot_files.append(refs["photom"])
@@ -3326,12 +3334,16 @@ def calc_jwst_filter_info(context=CRDS_CONTEXT):
                 + f"jwst/{inst.lower()}/*photom*fits"
             )
 
+            if len(phot_files) > 0:
+                phot_files.sort()
+                phot_files = phot_files[::-1]
+
         if len(phot_files) > 0:
-            phot_files.sort()
-            phot_files = phot_files[::-1]
             phots = [utils.read_catalog(file) for file in phot_files]
         else:
             phots = None
+
+        # print(inst, phots[0].colnames, phots[0].meta)
 
         for j in fn:
             fi = res[j + 1]
@@ -3398,12 +3410,98 @@ def calc_jwst_filter_info(context=CRDS_CONTEXT):
                 _d["photmjsr"] = None
                 _d["photfile"] = None
 
-            print(f"{key} {_d['pivot']:.3f} {_d['photmjsr']}")
+            print(f"{key:>8} {_d['pivot']:7.3f} {_d['photmjsr']:6.3f}")
 
     with open("jwst_bp_info.yml", "w") as fp:
         yaml.dump(bp, fp)
 
     return bp
+
+
+def compare_filter_info(bp1, bp2):
+    """
+    Make a figure comparing zeropoints in two tables
+
+    Parameters
+    ----------
+    bp1, bp2 : dict
+        Output from `grizli.jwst_utils.grizli.jwst_utils.calc_jwst_filter_info`
+
+    Returns
+    -------
+    fig : figure
+        Plot figure
+
+    Examples
+    --------
+
+        .. plot::
+            :include-source:
+
+            import grizli.jwst_utils
+
+            bp1 = grizli.jwst_utils.calc_jwst_filter_info(
+                context="jwst_1293.pmap", lw=["NRCALONG"], sw=["NRCA3"]
+            )
+
+            bp2 = grizli.jwst_utils.calc_jwst_filter_info(
+                context="jwst_1489.pmap", lw=["NRCALONG"], sw=["NRCA3"]
+            )
+
+            fig = grizli.jwst_utils.compare_filter_info(bp1, bp2)
+
+    """
+    import matplotlib.pyplot as plt
+
+    fig, axes = plt.subplots(3, 1, figsize=(10, 5))
+
+    colors = {
+        "W": "k",
+        "2": "olive",
+        "M": "tomato",
+        "N": "steelblue",
+    }
+
+    offsets = {
+        "W": 0.0,
+        "2": -0.25,
+        "M": -0,
+        "N": -0.0,
+    }
+
+    for i, k in enumerate(bp1):
+        if k == "meta":
+            continue
+        ax = axes[i-1]
+        for filter_ in bp1[k]:
+            ax.scatter(
+                bp1[k][filter_]["pivot"],
+                bp2[k][filter_]["photmjsr"] / bp1[k][filter_]["photmjsr"],
+                label=filter_,
+                c=colors[filter_[-1]],
+            )
+
+            ax.text(
+                bp1[k][filter_]["pivot"],
+                1.17 + offsets[filter_[-1]],
+                filter_,
+                rotation=90, fontsize=5,
+                color=colors[filter_[-1]],
+                ha="center", va="top",
+            )
+            # print(filter_, filter_[-1])
+
+        ax.set_ylabel(k)
+        ax.grid()
+        # ax.legend()
+
+        ax.set_ylim(0.6, 1.19)
+
+    ax.set_xlabel(f"{bp2['meta']['crds_context']} / {bp1['meta']['crds_context']}")
+
+    fig.tight_layout(pad=1)
+
+    return fig
 
 
 def get_crds_zeropoint(

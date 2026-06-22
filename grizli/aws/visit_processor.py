@@ -367,6 +367,8 @@ def visit_astrometry_diagnostic(assoc, threshold=2.0, force_catalog=False, savef
     from matplotlib.ticker import MultipleLocator
 
     import astropy.table
+    import astropy.io.fits as pyfits
+
     from grizli import prep, utils
 
     mosaic_files = glob.glob(f"{assoc}*sci.fits*")
@@ -375,15 +377,31 @@ def visit_astrometry_diagnostic(assoc, threshold=2.0, force_catalog=False, savef
 
     prefix = None
     for file in mosaic_files:
-        if ("grism" not in file) & ("g102" not in file) & ("g141" not in file) & ("gr150" not in file):
-            prefix = file.split("_drc")[0].split("_drz")[0]
+        with pyfits.open(file) as im:
+            filter_ = im[0].header["FILTER"]
+            if "PUPIL" in im[0].header:
+                filter_ += "-" + im[0].header["PUPIL"]
+
+        prefix = file.split("_drc")[0].split("_drz")[0]
+
+        for gr in ["GRISM", "GR150", "G102", "G141", "G850"]:
+            if gr in filter_:
+                msg = f"visit_astrometry_diagnostic: skip filter {filter_}"
+                utils.log_comment(utils.LOGFILE, msg, verbose=True)
+                prefix = None
+                break
+
+        if prefix is not None:
             break
 
     if prefix is None:
         return None
 
+    msg = f"visit_astrometry_diagnostic: use image {prefix}"
+    utils.log_comment(utils.LOGFILE, msg, verbose=True)
+
     if (not os.path.exists(prefix + ".cat.fits")) | force_catalog:
-        cat = prep.make_SEP_catalog(prefix, threshold=2.0, **cat_kwargs)
+        cat = prep.make_SEP_catalog(prefix, threshold=threshold, **cat_kwargs)
     else:
         cat = utils.read_catalog(prefix + ".cat.fits")
 
@@ -396,7 +414,18 @@ def visit_astrometry_diagnostic(assoc, threshold=2.0, force_catalog=False, savef
 
         for line in lines:
             if "radec:" in line:
-                radec_files.append(line.strip().split()[2])
+                radec_i = line.strip().split()[2]
+                if radec_i.endswith("clear.cat.radec"):
+                    # Self-catalog for some grism visits, use original
+                    radec_orig = glob.glob(
+                        radec_i.split('.cat.radec')[0] + "_*radec"
+                    )
+                    if len(radec_orig) > 0:
+                        msg = f"visit_astrometry_diagnostic: {radec_i} > {radec_orig[0]}"
+                        utils.log_comment(utils.LOGFILE, msg, verbose=True)
+                        radec_i = radec_orig[0]
+
+                radec_files.append(radec_i)
                 break
 
     radec = astropy.table.vstack([
