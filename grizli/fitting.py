@@ -3136,7 +3136,7 @@ class GroupFitter(object):
         get_student_logpdf=False,
     ):
 
-        """
+        r"""
         Two-step procedure for fitting redshifts
 
         1. polynomial, spline template fits

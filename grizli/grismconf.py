@@ -708,6 +708,7 @@ def get_config_filename(
     chip=1,
     use_jwst_crds=False,
     context=None,
+    header=None,
 ):
     """
     Generate a config filename based on the instrument, filter & grism combination.
@@ -760,12 +761,31 @@ def get_config_filename(
         CRDS context to use for JWST reference files, parsed through
         `~grizli.grismconf.get_current_context`.
 
+    header : `~astropy.io.fits.Header`
+        Header with instrument keywords.
+
     Returns
     -------
     conf_file : str
         String path of the configuration file.
 
     """
+
+    if header is not None:
+        instrume = header["INSTRUME"]
+
+        if instrume == "NIRCAM":
+            module = header["MODULE"]
+            filter = pupil = header["PUPIL"]
+            grism = header["FILTER"]
+
+        if instrume == "NIRISS":
+            filter = header["FILTER"]
+            grism = header["PUPIL"]
+
+        elif instrume in ["WFC3"]:
+            filter = header["FILTER"]
+
     if instrume == "ACS":
         conf_file = os.path.join(
             GRIZLI_PATH, "CONF/ACS.WFC.CHIP{0:d}.Stars.conf".format(chip)
