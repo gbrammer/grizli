@@ -2117,16 +2117,173 @@ def process_visit(assoc, clean=True, sync=True, s3_acl="public-read", max_dt=4, 
 
         files = glob.glob(f'{assoc}*.*')
         for file in files:
-            os.system(f'aws s3 cp {file} ' + 
-                      f' s3://grizli-v2/HST/Pipeline/{assoc}/ --acl {s3_acl}')
+            os.system(
+                f'aws s3 cp {file} '
+                + f' s3://grizli-v2/HST/Pipeline/{assoc}/ --acl {s3_acl}'
+            )
 
         if PROCESS_STATUS == 22:
             # Now set status = 2
             update_assoc_status(assoc, status=2)
 
+        try:
+            meta = utils.GTable([extract_log_info(assoc, verbose=True)])
+            db.execute(f"delete from assoc_meta where assoc_name = '{assoc}'")
+            db.send_to_database("assoc_meta", meta, if_exists="append")
+        except:
+            pass
+
     if (clean) > 0:
         print(f'rm -rf {assoc}*')
         os.system(f'rm -rf {assoc}*')
+
+
+def extract_log_info(assoc, verbose=False):
+    """
+    Extract reference file information from log file
+    """
+    import requests
+    import astropy.time
+
+    from . import db
+
+    log_file = f"{assoc}.auto_script.log.txt"
+
+    if os.path.exists(log_file):
+        if verbose:
+            print(f"extract_log_info: {log_file}")
+
+        with open(log_file) as fp:
+            log_lines = fp.readlines()
+    else:
+        log_url = "/".join([
+            "https://s3.amazonaws.com/grizli-v2/HST/Pipeline",
+            assoc,
+            log_file
+        ])
+        
+        if not os.path.exists("/tmp/" + log_file):
+            s3_log_url = log_url.replace("https://s3.amazonaws.com/", "s3://")
+            
+            print(f"extract_log_info: {s3_log_url}")
+            
+            db.download_s3_file(
+                s3_log_url,
+                output_dir="/tmp",
+                verbose=False,
+            )
+
+        if not os.path.exists("/tmp/" + log_file):
+            return {"assoc_name": assoc}
+        else:
+            with open("/tmp/" + log_file) as fp:
+                log_lines = fp.readlines()
+            
+        #response = requests.get(log_url)
+        #log_lines = response.text.split("\n")
+
+    meta = {
+        "assoc_name": assoc,
+        "skyflat": None,
+        "wisp_file": None,
+        "wisp_min": None,
+        "wisp_max": None,
+    }
+
+    for i, line in enumerate(log_lines):
+        if (" : found" in line) & ("GAIA sources" in line):
+            meta["ngaia"] = int(line.split()[-3])
+
+        elif line.startswith("auto_script.fetch_files(**"):
+            if "base" not in line:
+                continue
+
+            lspl = line.replace("'","").replace(",", " ").split()
+            base_path = lspl[lspl.index("base:") + 1].split("/")
+
+            if base_path[1] in ["home", "Users"]:
+                meta["user"] = base_path[2]
+            elif base_path[1] in ["GrizliImaging"]:
+                meta["user"] = "cloudvm"
+            else:
+                meta["user"] = "indef"
+
+        elif "jwst.flatfield.FlatFieldStep:" in line:
+            meta["rflat"] = os.path.basename(line.split()[-1])
+
+        elif "jwst.flatfield.PhotomStep:" in line:
+            meta["rphotom"] = os.path.basename(line.split()[-1])
+
+        elif "jwst.assign_wcs.AssignWcsStep:" in line:
+            meta["rdistortion"] = os.path.basename(line.split()[-1])
+
+        elif line.startswith("ENV CRDS_CONTEXT ="):
+            meta["context"] = line.split()[-1]
+
+        elif line.startswith("master_radec for"):
+            meta["radec_file"] = line.split()[-2]
+            meta["radec_nquery"] = int(line.split()[-1].strip().split("=")[-1])
+
+        elif line.startswith("# wcs ") & ("Ncat" in line):
+            lspl = line.strip().replace(";", "").split()
+            meta["radec_ncat"] = int(lspl[-2].split("=")[-1])
+            meta["radec_nref"] = int(lspl[-1].split("=")[-1])
+            
+        elif line.startswith("ODETECTO = DETECTOR"):
+            meta["detector"] = line.strip().split()[-1]
+
+        elif line.startswith("OFILTER = FILTER"):
+            meta["filter"] = line.strip().split()[-1]
+
+        elif line.startswith("OPUPIL = PUPIL"):
+            meta["pupil"] = line.strip().split()[-1]
+
+        elif line.startswith("apply_visit_skyflat: "):
+            meta["skyflat"] = os.path.basename(line.split()[2])
+
+        elif line.startswith("nircam_wisp_correction -"):
+            if "not supported" in line:
+                meta["wisp_file"] = "n/a"
+                continue
+
+            meta["wisp_file"] = os.path.basename(line.strip().split()[-1])
+            if "wisp_level" not in meta:
+                meta["wisp_level"] = []
+            meta["wisp_level"].append(
+                float(line.split()[-2].split("=")[-1])
+            )
+        
+        elif line.startswith("# (202"):
+            meta["ctime_last"] = astropy.time.Time(line.strip()[3:-1]).unix
+            if "ctime_start" not in meta:
+                meta["ctime_start"] = meta["ctime_last"] * 1
+
+    if "wisp_level" in meta:
+        meta["wisp_min"] = float(np.min(meta["wisp_level"]))
+        meta["wisp_max"] = float(np.max(meta["wisp_level"]))
+        _ = meta.pop("wisp_level")
+
+    return meta
+
+
+def batch_log_info():
+    """
+    """
+    from tqdm import tqdm
+    
+    from . import db
+
+    res = db.SQL(f"""
+    SELECT assoc_name, count(*) FROM assoc_table
+        WHERE modtime > {utils.nowtime().mjd - 90}
+        AND status in (2,9)
+        GROUP BY assoc_name
+    """)
+
+    rows = [extract_log_info(row["assoc_name"]) for row in tqdm(res)]
+    meta = utils.GTable(rows)
+
+    db.send_to_database("assoc_meta", meta, if_exists="append")
 
 
 def set_private_iref(assoc):
