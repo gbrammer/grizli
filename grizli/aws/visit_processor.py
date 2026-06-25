@@ -2138,7 +2138,7 @@ def process_visit(assoc, clean=True, sync=True, s3_acl="public-read", max_dt=4, 
         os.system(f'rm -rf {assoc}*')
 
 
-def extract_log_info(assoc, verbose=False):
+def extract_log_info(assoc, fulltext=False, verbose=False):
     """
     Extract reference file information from log file
     """
@@ -2262,6 +2262,9 @@ def extract_log_info(assoc, verbose=False):
         meta["wisp_min"] = float(np.min(meta["wisp_level"]))
         meta["wisp_max"] = float(np.max(meta["wisp_level"]))
         _ = meta.pop("wisp_level")
+
+    if fulltext:
+        meta["text"] = "".join(log_lines)
 
     return meta
 
