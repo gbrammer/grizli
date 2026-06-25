@@ -11898,7 +11898,7 @@ $.updateConeSearch = function(){
         else:
             # Without filter columns
             # Input listener
-            listener = """
+            listener = r"""
     // Parse location bar
     $.urlParam = function(name){
         var results = new RegExp('[\?&]' + name + '=([^&#]*)').exec(window.location.href);
