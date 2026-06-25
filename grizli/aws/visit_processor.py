@@ -1145,7 +1145,7 @@ def update_assoc_status(assoc, status=1, verbose=True):
 
 def delete_all_assoc_data(assoc):
     """
-    Remove files from S3 and database
+    Remove files from S3 and database and set status=12 in assoc_table
     """
     import os
     from grizli.aws import db, tile_mosaic
@@ -1207,7 +1207,7 @@ def delete_all_assoc_data(assoc):
 
     res = db.execute(f"""
         UPDATE assoc_table
-        SET status=12
+        SET status=12, modtime={utils.nowtime().mjd}
         WHERE assoc_name = '{assoc}' AND status != 99
     """)
 
