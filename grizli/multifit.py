@@ -6305,7 +6305,7 @@ class MultiBeam(GroupFitter):
         return pyfits.HDUList(p)
 
     def check_for_bad_PAs(
-        self, poly_order=1, chi2_threshold=1.5, fit_background=True, reinit=True
+        self, poly_order=1, chi2_threshold=1.5, fit_background=True, reinit=True, min_valid_pix=1,
     ):
         """
         Check for bad PAs based on chi-squared values
@@ -6324,6 +6324,10 @@ class MultiBeam(GroupFitter):
         reinit : bool
             Reinitialize the `~grizli.multifit.MultiBeam` object with thes
             beams that pass the threshold.
+
+        min_valid_pix : int
+            Minimum number of valid pixels (`beam.fit_mask == True`) in 2D
+            spectrum.
 
         Returns
         -------
@@ -6352,7 +6356,21 @@ class MultiBeam(GroupFitter):
             keep_dict[g] = []
 
             for pa in self.PA[g]:
-                beams = [self.beams[i] for i in self.PA[g][pa]]
+
+                beams = [
+                    self.beams[i]
+                    for i in self.PA[g][pa]
+                    if self.fit_mask[self.slices[i]].sum() > min_valid_pix
+                ]
+
+                if len(beams)==0:
+                    fit_log[g][pa] = {
+                        "chi2": 1e31,
+                        "DoF": 1,
+                        "chi_nu": 1e31,
+                    }
+                    continue
+
                 mb_i = MultiBeam(
                     beams,
                     fcontam=self.fcontam,
@@ -6368,7 +6386,7 @@ class MultiBeam(GroupFitter):
                         z=0, templates=poly_templates, fit_background=fit_background
                     )
                 except:
-                    chi2 = 1e30
+                    chi2 = 1e31
 
                 if False:
                     p_i = mb_i.template_at_z(
@@ -6397,11 +6415,23 @@ class MultiBeam(GroupFitter):
 
                 if fit_log[g][pa]["chinu_ratio"] < chi2_threshold:
                     keep_dict[g].append(pa)
-                    keep_beams.extend([self.beams[i] for i in self.PA[g][pa]])
+                    keep_beams.extend(
+                        [
+                            self.beams[i]
+                            for i in self.PA[g][pa]
+                            if self.fit_mask[self.slices[i]].sum() > min_valid_pix
+                        ]
+                    )
                 else:
                     has_bad = True
 
         if reinit:
+            if len(keep_beams)==0:
+                raise ValueError(
+                    f"No beams found with >{min_valid_pix} unmasked pixels. "
+                    "Ensure that `min_mask`, `min_sens`, `fcontam`, and `mask_resid` "
+                    "are all set to the correct values."
+                )
             self.beams = keep_beams
             self._parse_beams(psf=self.psf_param_dict is not None)
 
