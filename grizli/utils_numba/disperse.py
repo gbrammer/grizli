@@ -158,6 +158,9 @@ def compute_segmentation_limits(segm, seg_id, flam, shd):
     inumer = 0.0
     jnumer = 0.0
     flam_total = 0.0
+    denom = 0.0
+    ic = 0.0
+    jc = 0.0
 
     for i in range(shd[0]):
         for j in range(shd[1]):
@@ -165,10 +168,11 @@ def compute_segmentation_limits(segm, seg_id, flam, shd):
                 continue
 
             area += 1
-            wht_ij = flam[i, j]
+            wht_ij = np.max([flam[i, j], 0.0])
             inumer += i * wht_ij
             jnumer += j * wht_ij
-            flam_total += wht_ij
+            denom += wht_ij
+            flam_total += flam[i, j]
 
             if i < imin:
                 imin = i
@@ -182,15 +186,24 @@ def compute_segmentation_limits(segm, seg_id, flam, shd):
 
     ### No matched pixels
     if flam_total == 0:
+        denom = -1
         flam_total = -99
+
+    if denom <= 0.0:
+        ### No positive flux to calculate weighted centroid
+        ic = np.nan
+        jc = np.nan
+    else:
+        ic = inumer / denom
+        jc = jnumer / denom
 
     return (
         imin,
         imax,
-        inumer / flam_total,
+        ic,
         jmin,
         jmax,
-        jnumer / flam_total,
+        jc,
         area,
         flam_total,
     )
