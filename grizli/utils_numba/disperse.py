@@ -168,7 +168,7 @@ def compute_segmentation_limits(segm, seg_id, flam, shd):
                 continue
 
             area += 1
-            wht_ij = np.max([flam[i, j], 0.0])
+            wht_ij = max(flam[i, j], 0.0)
             inumer += i * wht_ij
             jnumer += j * wht_ij
             denom += wht_ij
