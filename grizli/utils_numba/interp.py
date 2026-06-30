@@ -182,7 +182,7 @@ def interp_conserve_c(x, xp, yp, left=0, right=0, integrate=0):
     k = 0
 
     tl0 = xp[0]
-    while xmid[k] < tl0:
+    while (xmid[k] < tl0) & (k < NTEMPL - 1):
         outy[k] = left
         k += 1
 
