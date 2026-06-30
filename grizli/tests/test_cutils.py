@@ -25,18 +25,24 @@ def test_cinterp():
 
 def test_cinterp_conserve():
     """
-    Linear interpolation conserving the integral
+    Linear interpolation conserving the integral.
+
+    Tests for both interpolation to lower and higher resolution arrays.
     """
-    xarr = np.arange(1.0, 3.0, 0.0001)
-    yarr = (np.abs(xarr - 2.0) <= 0.1) * 1.0
 
-    np.random.seed(1)
-    xlr = np.random.rand(10) * 2 + 1
-    xlr.sort()
+    # assert False, f"{os.getenv("NUMBA_BOUNDSCHECK")=}"
+    rng = np.random.default_rng(1)
 
-    for base_module in INTERP_MODULES:
-        ylr = base_module.interp_conserve_c(xlr, xarr, yarr)
-        assert np.allclose(utils.trapz(ylr, xlr), utils.trapz(yarr, xarr))
+    for orig_len, new_len in zip([20000, 100],[10,101]):
+        xarr = np.linspace(1.0, 3.0, orig_len)
+        yarr = (np.abs(xarr - 2.0) <= 0.1) * 1.0
+
+        xlr = rng.random(new_len) * 2 + 1
+        xlr.sort()
+
+        for base_module in INTERP_MODULES:
+            ylr = base_module.interp_conserve_c(xlr, xarr, yarr)
+            assert np.allclose(utils.trapz(ylr, xlr), utils.trapz(yarr, xarr))
 
 
 def test_disperse_c():
