@@ -14,13 +14,17 @@ INTERP_MODULES = [interp_numba]
 
 def test_cinterp():
     """
-    Simple interpolation
+    Simple interpolation.
+
+    Tests for correct extrapolation if arrays do not overlap.
     """
     xarr = np.array([0.0, 1.0, 2.0])
     yarr = np.array([0.0, 1.0, 0.0])
-    for base_module in INTERP_MODULES:
-        result = base_module.interp_c(np.array([0.5]), xarr, yarr)
-        assert np.allclose(result, 0.5)
+
+    for xp, expected in zip([-1.0, 0.5, 3.0],[0.0, 0.5, 0.0]):
+        for base_module in INTERP_MODULES:
+            result = base_module.interp_c(np.array([xp]), xarr, yarr)
+            assert np.allclose(result, expected)
 
 
 def test_cinterp_conserve():

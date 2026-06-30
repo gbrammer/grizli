@@ -78,7 +78,7 @@ def interp_c(x, xp, fp, extrapolate=0.0, assume_sorted=1):
     ### Handle left extrapolation
     xmin = xp[0]
     if assume_sorted == 1:
-        while x[j] < xmin:
+        while (x[j] < xmin) & (j < N - 1):
             f[j] = extrapolate
             j += 1
 
@@ -192,7 +192,7 @@ def interp_conserve_c(x, xp, yp, left=0, right=0, integrate=0):
         ymk = ymid[k]
         ymk1 = ymid[k + 1]
 
-        if (xmk > xp[nxp - 1]) or (xmk1 > xp[nxp - 1]):
+        if (xmk > xp[nxp - 1]) | (xmk1 > xp[nxp - 1]):
             break
 
         numsum = 0.0
