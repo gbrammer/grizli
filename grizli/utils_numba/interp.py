@@ -188,12 +188,12 @@ def interp_conserve_c(x, xp, yp, left=0, right=0, integrate=0):
 
     for k in range(k, NTEMPL):
         xmk = xmid[k]
-        if xmk > xp[nxp - 1]:
-            break
-
         xmk1 = xmid[k + 1]
         ymk = ymid[k]
         ymk1 = ymid[k + 1]
+
+        if (xmk > xp[nxp - 1]) or (xmk1 > xp[nxp - 1]):
+            break
 
         numsum = 0.0
 
