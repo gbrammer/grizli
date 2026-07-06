@@ -1,19 +1,8 @@
 import numpy as np
-import copy
-import traceback
 from collections import defaultdict
 from pathlib import Path
-import os
-import shutil
-from astropy import coordinates as coord
-from astropy import units as u
+
 from astropy.io import fits
-from astropy.modeling import custom_model, models as amodels
-from astropy.wcs import WCS as FitsWCS
-from gwcs import coordinate_frames as cf
-from gwcs import wcs as gwcs_wcs
-from stdatamodels.jwst import datamodels
-from stdatamodels.jwst.datamodels import dqflags
 from grizli import utils
 from grizli import jwst_utils
 
