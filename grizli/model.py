@@ -3494,7 +3494,7 @@ class GrismFLT(object):
                 )
 
                 ymin, ymax, y, xmin, xmax, x, area, segm_flux = out
-                if (area == 0) | ~np.isfinite(x) | ~np.isfinite(y):
+                if (area <= 0) | ~np.isfinite(x) | ~np.isfinite(y):
                     if verbose:
                         print("ID {0:d} not found in segmentation image".format(id))
                     return False

@@ -14,29 +14,39 @@ INTERP_MODULES = [interp_numba]
 
 def test_cinterp():
     """
-    Simple interpolation
+    Simple interpolation.
+
+    Tests for correct extrapolation if arrays do not overlap.
     """
     xarr = np.array([0.0, 1.0, 2.0])
     yarr = np.array([0.0, 1.0, 0.0])
-    for base_module in INTERP_MODULES:
-        result = base_module.interp_c(np.array([0.5]), xarr, yarr)
-        assert np.allclose(result, 0.5)
+
+    for xp, expected in zip([-1.0, 0.5, 3.0],[0.0, 0.5, 0.0]):
+        for base_module in INTERP_MODULES:
+            result = base_module.interp_c(np.array([xp]), xarr, yarr)
+            assert np.allclose(result, expected)
 
 
 def test_cinterp_conserve():
     """
-    Linear interpolation conserving the integral
+    Linear interpolation conserving the integral.
+
+    Tests for both interpolation to lower and higher resolution arrays.
     """
-    xarr = np.arange(1.0, 3.0, 0.0001)
-    yarr = (np.abs(xarr - 2.0) <= 0.1) * 1.0
 
-    np.random.seed(1)
-    xlr = np.random.rand(10) * 2 + 1
-    xlr.sort()
+    # assert False, f"{os.getenv("NUMBA_BOUNDSCHECK")=}"
+    rng = np.random.default_rng(1)
 
-    for base_module in INTERP_MODULES:
-        ylr = base_module.interp_conserve_c(xlr, xarr, yarr)
-        assert np.allclose(utils.trapz(ylr, xlr), utils.trapz(yarr, xarr))
+    for orig_len, new_len in zip([20000, 100],[10,101]):
+        xarr = np.linspace(1.0, 3.0, orig_len)
+        yarr = (np.abs(xarr - 2.0) <= 0.1) * 1.0
+
+        xlr = rng.random(new_len) * 2 + 1
+        xlr.sort()
+
+        for base_module in INTERP_MODULES:
+            ylr = base_module.interp_conserve_c(xlr, xarr, yarr)
+            assert np.allclose(utils.trapz(ylr, xlr), utils.trapz(yarr, xarr))
 
 
 def test_disperse_c():
@@ -156,7 +166,11 @@ def test_disperse_c():
 
 def test_segmentation_limits():
     """
-    Accelerator function to calculate segmentation cutouts
+    Accelerator function to calculate segmentation cutouts.
+
+    Test for correct centre, area, flux with regular flux map, zero area
+    if object not in seg map, and finite area but negative flux if the
+    flux map is negative.
     """
     sh = (128, 128)
     x0 = (32, 38)
@@ -164,6 +178,8 @@ def test_segmentation_limits():
     yp, xp = np.indices(sh)
     
     flam = np.sqrt((xp - x0[0]) ** 2 + (yp - x0[1]) ** 2).astype(np.float32)
+    flam_all_neg = flam.copy() - 5.0
+    flam_part_neg = flam.copy() - 4.0
     
     Rsize = 5
     segm = (flam < Rsize).astype(np.float32)
@@ -172,6 +188,7 @@ def test_segmentation_limits():
 
     for disperse_module in DISPERSE_MODULES:
 
+        # Finite flux map: all values finite
         _ = disperse_module.compute_segmentation_limits(
             segm, 1.0, flam, np.array(sh, dtype=int)
         )
@@ -185,6 +202,7 @@ def test_segmentation_limits():
         assert area == int(segm.sum())
         assert np.allclose(tot_i, total_flux, rtol=1.0e-5)
 
+        # Not in seg_map: zero area, negative (error) flux
         _ = disperse_module.compute_segmentation_limits(
             segm, 2.0, flam, np.array(sh, dtype=int)
         )
@@ -192,3 +210,26 @@ def test_segmentation_limits():
         imin, imax, ic, jmin, jmax, jc, area, tot_i = _
         assert area == 0
         assert np.allclose(tot_i, -99.0, rtol=1.0e-5)
+
+        # All negative flux map: finite area, negative flux, nan centre
+        _ = disperse_module.compute_segmentation_limits(
+            segm, 1.0, flam_all_neg, np.array(sh, dtype=int)
+        )
+        imin, imax, ic, jmin, jmax, jc, area, tot_i = _
+
+        assert area == int(segm.sum())
+        assert np.allclose(tot_i, flam_all_neg[segm > 0].sum(), rtol=1.0e-5)
+        assert np.isnan(ic)
+        assert np.isnan(jc)
+
+        # Partially negative flux map: finite area, negative flux, finite centre
+        _ = disperse_module.compute_segmentation_limits(
+            segm, 1.0, flam_part_neg, np.array(sh, dtype=int)
+        )
+        imin, imax, ic, jmin, jmax, jc, area, tot_i = _
+
+        assert area == int(segm.sum())
+        assert np.allclose(tot_i, flam_part_neg[segm > 0].sum(), rtol=1.0e-5)
+
+        assert imin <= ic <= imax
+        assert jmin <= jc <= jmax
