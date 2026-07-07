@@ -2634,6 +2634,7 @@ class ImageData(object):
             pupil=self.pupil,
             module=self.module,
             process_jwst_header=False,
+            fwcpos=self.fwcpos
         )
 
         slice_obj.ref_photflam = self.ref_photflam
