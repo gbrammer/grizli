@@ -5285,6 +5285,7 @@ def process_direct_grism_visit(
     use_skyflats=True,
     do_pure_parallel_wcs=True,
     write_ctx=False,
+    run_jwst_outliers=False,
 ):
     """
     Full processing of a direct (+grism) image visit.
@@ -6018,6 +6019,21 @@ def process_direct_grism_visit(
             with pyfits.open(file, mode="update") as im:
                 im[0].header["MJD-OBS"] = im[0].header["EXPSTART"]
                 im.flush()
+
+        #Option to run outliers for JWST using `jwst.outlier_detection.OutlierDetectionStep()`
+        if (isJWST) and (run_jwst_outliers):
+            try:
+                from grizli import jwst_outliers
+                jwst_outliers.run_nircam_rate_outliers(
+                        direct,
+                        driz_cr_snr=driz_cr_snr, #same ones defined above seem to work best w. jwst-pipeline too?
+                        driz_cr_scale=driz_cr_scale,
+                        min_files=2,
+                        verbose=True,
+                        )
+            except:
+                logstr = "JWST Outlier Detection Failed. Skipping..."
+                utils.log_comment(utils.LOGFILE, logstr, verbose=True, show_date=True)
 
         # Second drizzle with aligned wcs, refined CR-rejection params
         # tuned for WFC3/IR
