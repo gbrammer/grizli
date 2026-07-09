@@ -26,6 +26,9 @@ Utilities
 .. automodapi:: grizli.jwst_utils
     :no-inheritance-diagram:
 
+.. automodapi:: grizli.jwst_outliers
+    :no-inheritance-diagram:
+
 .. automodapi:: grizli.utils_numba.interp
     :no-inheritance-diagram:
 
