@@ -5292,6 +5292,7 @@ def process_direct_grism_visit(
     do_pure_parallel_wcs=True,
     write_ctx=False,
     run_jwst_outliers=False,
+    jwst_outliers_kwargs={},
 ):
     """
     Full processing of a direct (+grism) image visit.
@@ -6026,20 +6027,31 @@ def process_direct_grism_visit(
                 im[0].header["MJD-OBS"] = im[0].header["EXPSTART"]
                 im.flush()
 
-        #Option to run outliers for JWST using `jwst.outlier_detection.OutlierDetectionStep()`
-        if (isJWST) and (run_jwst_outliers):
+        #run outliers for JWST using `jwst.outlier_detection.OutlierDetectionStep()` - ALR added
+        if (isJWST) and (run_jwst_outliers) and (jwst_outliers is not None):
+
+            # set defaults here too just in case
+            if "snr" not in jwst_outliers_kwargs:
+                jwst_outliers_kwargs["snr"] = driz_cr_snr
+
+            if "scale" not in jwst_outliers_kwargs:
+                jwst_outliers_kwargs["scale"] = driz_cr_scale
+
+            if "in_memory" not in jwst_outliers_kwargs:
+                jwst_outliers_kwargs["in_memory"] = True
+
+            if "save_intermediate_results" not in jwst_outliers_kwargs:
+                jwst_outliers_kwargs["save_intermediate_results"] = False
+
             try:
-                from grizli import jwst_outliers
                 jwst_outliers.run_nircam_rate_outliers(
                         direct,
-                        driz_cr_snr=driz_cr_snr, #same ones defined above seem to work best w. jwst-pipeline too?
-                        driz_cr_scale=driz_cr_scale,
-                        min_files=2,
-                        verbose=True,
+                        **jwst_outliers_kwargs
                         )
             except:
                 logstr = "JWST Outlier Detection Failed. Skipping..."
                 utils.log_comment(utils.LOGFILE, logstr, verbose=True, show_date=True)
+                utils.log_exception(utils.LOGFILE, traceback)
 
         # Second drizzle with aligned wcs, refined CR-rejection params
         # tuned for WFC3/IR
