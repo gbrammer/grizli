@@ -34,6 +34,12 @@ except ImportError:
     jwst = None
     print("`import jwst` failed so JWST processing will not work!")
 
+try:
+    from . import jwst_outliers
+except ImportError:
+    print("`import jwst_outliers` failed so JWST outlier rejection will not work!")
+    jwst_outliers = None
+
 from . import utils
 from . import model
 from . import GRIZLI_PATH
