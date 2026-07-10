@@ -315,7 +315,7 @@ def run_rate_file_group(
     rate_files,
     min_files=2,
     verbose=True,
-    jwst_outlier_kwargs=None,
+    jwst_outliers_kwargs=None,
 ):
     """
     Run JWST outlier detection for one group of rate files.
@@ -458,7 +458,7 @@ def do_jwst_outliers_step(
     group_by=("detector", "filter", "pupil", "shape"),
     clean=True,
     verbose=True,
-    jwst_outlier_kwargs=None,
+    jwst_outliers_kwargs=None,
 ):
     """
     Run JWST outlier detection for grouped files in a visit.
@@ -516,7 +516,7 @@ def do_jwst_outliers_step(
             groups[key],
             min_files=min_files,
             verbose=verbose,
-            jwst_outlier_kwargs=jwst_outlier_kwargs,
+            jwst_outliers_kwargs=jwst_outliers_kwargs,
         )
 
     if clean:
