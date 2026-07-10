@@ -407,7 +407,7 @@ def run_rate_file_group(
 
                 # clear any existing DQ=16 and 4096 bits in file...
                 # like we did in dq model before
-                dq_data = dq_data & CLEAR_BITS
+                dq_data = dq_data & JWST_OUTLIER_CLEAR_MASK
 
                 # set grizli bit where bit=16 was set by this step
                 dq_data |= (
