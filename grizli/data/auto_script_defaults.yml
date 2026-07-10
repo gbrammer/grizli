@@ -107,7 +107,7 @@ visit_prep_args: &prep_args
     drizzle_params: {}
     single_image_CRs: True
     run_jwst_outliers: False
-    jwst_outliers_kwargs: 
+    jwst_outlier_kwargs: 
         snr: "8.0 5.0"
         scale: "2.5 0.7"
         save_intermediate_results: False
