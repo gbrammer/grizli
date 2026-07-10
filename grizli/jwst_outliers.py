@@ -17,8 +17,10 @@ DQ = "DQ"
 
 JWST_OUTLIER_BIT = 16
 GRIZLI_OUTLIER_BIT = 4096
-#pre-make a mask to unset DQ=16 to save linespace...
-JWST_OUTLIER_CLEAR_MASK = np.bitwise_not(np.uint32(JWST_OUTLIER_BIT))
+
+CLEAR_BITS = JWST_OUTLIER_BIT + GRIZLI_OUTLIER_BIT
+#pre-make a mask to unset DQ=16+4096 to save linespace...
+JWST_OUTLIER_CLEAR_MASK = np.bitwise_not(np.uint32(CLEAR_BITS))
 
 #grizli modifies key names so shold check for both
 ORIGINAL_KEYS = {
@@ -245,7 +247,7 @@ def make_model(path, index):
     # Keep the input DQ array before letting the JWST step add DQ=16.
     old_dq = model.dq.copy()
 
-    # Clear any existing JWST OUTLIER bit before the step runs.  The step can
+    # Clear any existing 16+4096 bits before the step runs.  The step can
     # set bit 16 again, and this module maps that mask to Grizli DQ=4096.
     model.dq[...] = (
         np.asarray(model.dq, dtype=np.uint32) & JWST_OUTLIER_CLEAR_MASK
@@ -399,31 +401,17 @@ def run_rate_file_group(
             # get boolean where bit was set
             step_outliers = (result_dq & JWST_OUTLIER_BIT) > 0
 
-            # Find pixels that already had JWST DQ=16 before the step.
-            # returns boolean where bit was set
-            old_step_outliers = (old_dq[i] & JWST_OUTLIER_BIT) > 0
-
-            # Keep every pixel flagged by either the old or new DQ=16 mask.
-            # this gives true where bit=16 was set (before or after)
-            grizli_outliers = step_outliers | old_step_outliers
-
-            # Find pixels that already had Grizli DQ=4096 before the step.
-            old_grizli_outliers = (old_dq[i] & GRIZLI_OUTLIER_BIT) > 0
-
-            # Find pixels that are newly getting Grizli DQ=4096 here.
-            # grab ones that are new for accounting in log
-            new_grizli_outliers = grizli_outliers & ~old_grizli_outliers
-
-
             with fits.open(cal_path, mode="update", memmap=False) as hdul:
                 #pull out DQ array that is in rate file...
                 dq_data = np.asarray(hdul[DQ].data, dtype=np.uint32)
-                # clear any existing DQ=16 bits in file...
-                dq_data = dq_data & JWST_OUTLIER_CLEAR_MASK
 
-                # set grizli bit where bit=16 was set (before or after)
+                # clear any existing DQ=16 and 4096 bits in file...
+                # like we did in dq model before
+                dq_data = dq_data & CLEAR_BITS
+
+                # set grizli bit where bit=16 was set by this step
                 dq_data |= (
-                    grizli_outliers.astype(np.uint32) * GRIZLI_OUTLIER_BIT
+                    step_outliers.astype(np.uint32) * GRIZLI_OUTLIER_BIT
                 )
                 # update dq array in rate file
                 hdul[DQ].data[...] = dq_data.astype(
@@ -434,7 +422,7 @@ def run_rate_file_group(
                 hdul.flush()
 
             log(
-                "updated %s: mapped DQ=%d to DQ=%d; %d outlier pixels detected. (%.3f%%)"
+                "updated %s: mapped DQ=%d to DQ=%d; %d outlier pixels flagged. (%.3f%%)"
                 % (
                     paths[i].name,
                     JWST_OUTLIER_BIT,
@@ -535,3 +523,4 @@ def do_jwst_outliers_step(
         cleanup_files(prep_dir, verbose=verbose)
 
     return 1
+
