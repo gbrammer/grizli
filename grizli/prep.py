@@ -5292,7 +5292,7 @@ def process_direct_grism_visit(
     do_pure_parallel_wcs=True,
     write_ctx=False,
     run_jwst_outliers=False,
-    jwst_outlier_kwargs={},
+    jwst_outliers_kwargs={},
 ):
     """
     Full processing of a direct (+grism) image visit.
@@ -6033,22 +6033,22 @@ def process_direct_grism_visit(
 
         if run_jwst_outliers_:
             # make sure important defualts are set.
-            if "snr" not in jwst_outlier_kwargs:
+            if "snr" not in jwst_outliers_kwargs:
                 jwst_outliers_kwargs["snr"] = driz_cr_snr
 
-            if "scale" not in jwst_outlier_kwargs:
+            if "scale" not in jwst_outliers_kwargs:
                 jwst_outliers_kwargs["scale"] = driz_cr_scale
 
-            if "in_memory" not in jwst_outlier_kwargs:
+            if "in_memory" not in jwst_outliers_kwargs:
                 jwst_outliers_kwargs["in_memory"] = True
 
-            if "save_intermediate_results" not in jwst_outlier_kwargs:
+            if "save_intermediate_results" not in jwst_outliers_kwargs:
                 jwst_outliers_kwargs["save_intermediate_results"] = False
 
             try:
                 jwst_outliers.do_jwst_outliers_step(
                         direct,
-                        jwst_outliers_kwargs=jwst_outlier_kwargs,
+                        jwst_outliers_kwargs=jwst_outliers_kwargs,
                         )
             except:
                 utils.log_exception(utils.LOGFILE, traceback)
