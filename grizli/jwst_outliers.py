@@ -3,6 +3,7 @@
 import traceback
 from collections import defaultdict
 from pathlib import Path
+import inspect
 
 import numpy as np
 from astropy.io import fits
@@ -258,7 +259,10 @@ def make_model(path, index):
     return model, old_dq
 
 
-def run_jwst_outliers(models, **kwargs):
+def run_jwst_outliers(models, step_kwargs={"snr": "8.0 5.0", 
+                        "scale": "2.5 0.7",
+                        "save_intermediate_results": False, 
+                        "in_memory": False}):
     """
     Run JWST ``OutlierDetectionStep`` on a list of data models.
 
@@ -284,7 +288,7 @@ def run_jwst_outliers(models, **kwargs):
     for model in models:
         container.append(model)
 
-    step = OutlierDetectionStep(**kwargs)
+    step = OutlierDetectionStep(**step_kwargs)
     result = step.process(container)
 
     # make list of output dq arrays that have the new bits set.
@@ -305,10 +309,8 @@ def run_jwst_outliers(models, **kwargs):
     return outlier_dq_arrays
 
 
-def run_rate_file_group_outlier_dq(
+def run_rate_file_group(
     rate_files,
-    driz_cr_snr="8.0 5.0",
-    driz_cr_scale="2.5 0.7",
     min_files=2,
     verbose=True,
     jwst_outliers_kwargs=None,
@@ -348,12 +350,6 @@ def run_rate_file_group_outlier_dq(
     else:
         step_kwargs = dict(jwst_outliers_kwargs)
 
-    if "snr" not in step_kwargs:
-        step_kwargs["snr"] = driz_cr_snr
-
-    if "scale" not in step_kwargs:
-        step_kwargs["scale"] = driz_cr_scale
-
     paths = [pathfix(rate_file) for rate_file in rate_files]
 
     if len(paths) < min_files:
@@ -389,12 +385,15 @@ def run_rate_file_group_outlier_dq(
             old_dq.append(dq)
 
         # Run OutlierDetectionStep and return one updated DQ array per model.
-        result_dq_arrays = run_jwst_outliers(models, **step_kwargs)
+        result_dq_arrays = run_jwst_outliers(models, step_kwargs=step_kwargs)
 
         # Loop over each file and map JWST DQ=16 to Grizli DQ=4096.
         for i, cal_path in enumerate(cal_paths):
             # Select the updated DQ array for this file.
             result_dq = result_dq_arrays[i]
+
+            npixx, npixy = result_dq.shape[0], result_dq.shape[1]
+            npix = npixx * npixy
 
             # Find pixels where OutlierDetectionStep set JWST DQ=16.
             # get boolean where bit was set
@@ -415,6 +414,7 @@ def run_rate_file_group_outlier_dq(
             # grab ones that are new for accounting in log
             new_grizli_outliers = grizli_outliers & ~old_grizli_outliers
 
+
             with fits.open(cal_path, mode="update", memmap=False) as hdul:
                 #pull out DQ array that is in rate file...
                 dq_data = np.asarray(hdul[DQ].data, dtype=np.uint32)
@@ -434,12 +434,13 @@ def run_rate_file_group_outlier_dq(
                 hdul.flush()
 
             log(
-                "updated %s: mapped DQ=%d to DQ=%d; %d new pixels."
+                "updated %s: mapped DQ=%d to DQ=%d; %d outlier pixels detected. (%.3f%%)"
                 % (
                     paths[i].name,
                     JWST_OUTLIER_BIT,
                     GRIZLI_OUTLIER_BIT,
-                    int(np.count_nonzero(new_grizli_outliers)),
+                    int(np.count_nonzero(step_outliers)),
+                    float(np.round(100*np.count_nonzero(step_outliers) / npix, 3))
                 ),
                 verbose,
             )
@@ -463,10 +464,8 @@ def run_rate_file_group_outlier_dq(
     return 1
 
 
-def run_nircam_rate_outliers(
+def do_jwst_outliers_step(
     visit,
-    driz_cr_snr="8.0 5.0",
-    driz_cr_scale="2.5 0.7",
     min_files=2,
     group_by=("detector", "filter", "pupil", "shape"),
     clean=True,
@@ -507,6 +506,12 @@ def run_nircam_rate_outliers(
     status : int
         ``1`` after processing all groups.
     """
+
+    frame = inspect.currentframe()
+    utils.log_function_arguments(
+                    utils.LOGFILE, frame, "jwst_outliers.do_jwst_outliers_step"
+                    )
+    
     prep_dir = pathfix(visit["files"][0]).parent
 
     groups = defaultdict(list)
@@ -519,10 +524,8 @@ def run_nircam_rate_outliers(
     for key in sorted(groups, key=str):
         log("group %s: %d files" % (key, len(groups[key])), verbose)
 
-        run_rate_file_group_outlier_dq(
+        run_rate_file_group(
             groups[key],
-            driz_cr_snr=driz_cr_snr,
-            driz_cr_scale=driz_cr_scale,
             min_files=min_files,
             verbose=verbose,
             jwst_outliers_kwargs=jwst_outliers_kwargs,
