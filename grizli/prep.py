@@ -6030,7 +6030,7 @@ def process_direct_grism_visit(
         #run outliers for JWST using `jwst.outlier_detection.OutlierDetectionStep()` - ALR added
         if (isJWST) and (run_jwst_outliers) and (jwst_outliers is not None):
 
-            # set defaults here too just in case
+            # set !! important !! defaults here too just in case
             if "snr" not in jwst_outliers_kwargs:
                 jwst_outliers_kwargs["snr"] = driz_cr_snr
 
@@ -6044,9 +6044,9 @@ def process_direct_grism_visit(
                 jwst_outliers_kwargs["save_intermediate_results"] = False
 
             try:
-                jwst_outliers.run_nircam_rate_outliers(
+                jwst_outliers.do_jwst_outliers_step(
                         direct,
-                        **jwst_outliers_kwargs
+                        jwst_outliers_kwargs=jwst_outliers_kwargs,
                         )
             except:
                 logstr = "JWST Outlier Detection Failed. Skipping..."
