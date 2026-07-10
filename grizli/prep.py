@@ -5292,7 +5292,7 @@ def process_direct_grism_visit(
     do_pure_parallel_wcs=True,
     write_ctx=False,
     run_jwst_outliers=False,
-    jwst_outliers_kwargs={},
+    jwst_outlier_kwargs={},
 ):
     """
     Full processing of a direct (+grism) image visit.
