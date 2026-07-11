@@ -9691,4 +9691,3 @@ def check_isJWST(infile=""):
             isJWST = False
 
     return isJWST
-
