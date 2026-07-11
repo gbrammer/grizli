@@ -7,9 +7,15 @@ import inspect
 
 import numpy as np
 from astropy.io import fits
+from astropy.stats import sigma_clipped_stats
 
 from grizli import jwst_utils
 from grizli import utils
+
+from jwst.datamodels import ModelContainer
+from jwst.outlier_detection.outlier_detection_step import (
+        OutlierDetectionStep,
+    )
 
 SCI = "SCI"
 ERR = "ERR"
@@ -135,46 +141,40 @@ def file_info(path):
     return info
 
 
-def get_mdrizsky(path):
-    """
-    Get the ``MDRIZSKY`` value from the science extension.
-
+def bkg_fallback_estimate(path):
+    """Scalar background estimate from the SCI extension.
+    
     Parameters
     ----------
-    path : str or pathlib.Path
-        Input FITS rate file.
+    prep_dir : str or pathlib.Path
+        Directory to clean.
 
     Returns
     -------
-    mdrizsky : float
-        Sky level recorded in the ``SCI`` header.
+    bkg_ : float
+        Estimate of background level using 
+        sigma-clipped median. 
     """
+
     with fits.open(path, memmap=False) as hdul:
-        header = hdul[SCI].header
-        mdrizsky = float(header["MDRIZSKY"])
+        data = hdul["SCI"].data
+        #no nans
+        mask = ~np.isfinite(data)
 
-    return mdrizsky
+        #only consider "good" pixels
+        if "DQ" in hdul:
+            mask |= hdul["DQ"].data != 0
 
+        _, background, _ = sigma_clipped_stats(
+            data,
+            mask=mask,
+            sigma=3,
+            maxiters=5,
+        )
 
-def rate_to_cal_path(path):
-    """
-    Convert a ``*_rate.fits`` filename to the temporary ``*_cal.fits`` name.
+    bkg_ = float(background)
 
-    Parameters
-    ----------
-    path : str or pathlib.Path
-        Input rate filename.
-
-    Returns
-    -------
-    cal_path : pathlib.Path
-        Temporary cal filename.
-    """
-    path = Path(path)
-    cal_path = path.with_name(path.name.replace("_rate.fits", "_cal.fits"))
-
-    return cal_path
-
+    return bkg_
 
 def cleanup_files(prep_dir=".", verbose=True):
     """
@@ -237,7 +237,7 @@ def make_model(path, index):
     # only want to make new DQ flags and write them explicitly below.
     model = jwst_utils.match_gwcs_to_sip(
         str(path),
-        overwrite=False,
+        overwrite=False, 
     )
 
     # Name the files for the JWST pipeline.
@@ -253,10 +253,28 @@ def make_model(path, index):
         np.asarray(model.dq, dtype=np.uint32) & JWST_OUTLIER_CLEAR_MASK
     ).astype(model.dq.dtype, copy=False)
 
-    # The science extension should still have sky level in it.  Set the
-    # background metadata from the prior AstroDrizzle MDRIZSKY value.
+    try: 
+        # The science extension should still have sky level in it.  Set the
+        # background metadata from the prior AstroDrizzle MDRIZSKY value.
+
+        #fail loudly if not in header.
+        mdrizsky = float(fits.getheader(path, "SCI")["MDRIZSKY"])
+
+        log(f"MDRIZSKY keyword found in header, " \
+            f"using {mdrizsky:.2f} for background level.")
+        
+        sky_ = mdrizsky
+
+    except:
+        sky_ = bkg_fallback_estimate(path)
+
+        log(f"No MDRIZSKY keyword in header, " \
+            f"falling back to sigma-clipped median" \
+            f" value of {sky_:.2f}" \
+            f" from ``SCI`` extension.")
+
     model.meta.background.subtracted = False
-    model.meta.background.level = get_mdrizsky(path)
+    model.meta.background.level = sky_
 
     return model, old_dq
 
@@ -281,10 +299,6 @@ def run_jwst_outliers(models, step_kwargs={"snr": "8.0 5.0",
     outlier_dq_arrays : list
         Updated DQ arrays from the outlier step, converted to ``uint32``.
     """
-    from jwst.datamodels import ModelContainer
-    from jwst.outlier_detection.outlier_detection_step import (
-        OutlierDetectionStep,
-    )
 
     container = ModelContainer(open_models=False)
     for model in models:
@@ -338,7 +352,7 @@ def run_rate_file_group(
         Print log messages if ``True``.
 
     jwst_outliers_kwargs : dict or None
-        Extra keyword arguments passed to ``OutlierDetectionStep``.  Explicit
+        Extra keyword arguments passed to ``OutlierDetectionStep``.  
         ``snr`` and ``scale`` values override ``driz_cr_snr`` and
         ``driz_cr_scale``.
 
@@ -360,7 +374,11 @@ def run_rate_file_group(
 
     log("running JWST outlier DQ on %d rate files." % len(paths), verbose)
 
-    cal_paths = [rate_to_cal_path(path) for path in paths]
+    cal_paths = []
+    for p in paths:
+        p = Path(p)
+        cp_ = p.with_name(p.name.replace("_rate.fits", "_cal.fits"))
+        cal_paths.append(cp_)
 
     models = []
     old_dq = []
@@ -413,25 +431,20 @@ def run_rate_file_group(
                 dq_data |= (
                     step_outliers.astype(np.uint32) * GRIZLI_OUTLIER_BIT
                 )
-                # update dq array in rate file
+                # in-place update dq array in rate file
                 hdul[DQ].data[...] = dq_data.astype(
                     hdul[DQ].data.dtype,
-                    copy=False,
+                    copy=False, 
                 )
                 # save
                 hdul.flush()
 
-            log(
-                "updated %s: mapped DQ=%d to DQ=%d; %d outlier pixels flagged. (%.3f%%)"
-                % (
-                    paths[i].name,
-                    JWST_OUTLIER_BIT,
-                    GRIZLI_OUTLIER_BIT,
-                    int(np.count_nonzero(step_outliers)),
-                    float(np.round(100*np.count_nonzero(step_outliers) / npix, 3))
-                ),
-                verbose,
-            )
+            log(f"updated {paths[i].name}: "
+                f"mapped DQ={JWST_OUTLIER_BIT} to DQ={GRIZLI_OUTLIER_BIT}; "
+                f"{int(np.count_nonzero(step_outliers))} "
+                f"outlier pixels flagged. "
+                f"({np.count_nonzero(step_outliers) / npix:.3%})"
+                )
 
     except Exception:
         log("JWST outlier DQ failed; traceback follows.", verbose)
@@ -497,8 +510,8 @@ def do_jwst_outliers_step(
 
     frame = inspect.currentframe()
     utils.log_function_arguments(
-                    utils.LOGFILE, frame, "jwst_outliers.do_jwst_outliers_step"
-                    )
+        utils.LOGFILE, frame, "jwst_outliers.do_jwst_outliers_step"
+        )
     
     prep_dir = pathfix(visit["files"][0]).parent
 
