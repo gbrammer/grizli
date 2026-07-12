@@ -5293,6 +5293,7 @@ def process_direct_grism_visit(
     write_ctx=False,
     run_jwst_outliers=False,
     jwst_outliers_kwargs={},
+    run_dual_outliers=False,
 ):
     """
     Full processing of a direct (+grism) image visit.
@@ -6107,6 +6108,76 @@ def process_direct_grism_visit(
                     skysub=True,
                     skymethod=skymethod,
                     resetbits=4096,
+                    final_bits=bits,
+                    driz_sep_bits=bits,
+                    preserve=False,
+                    driz_cr_snr=driz_cr_snr,
+                    driz_cr_scale=driz_cr_scale,
+                    driz_cr_grow=driz_cr_grow,
+                    build=False,
+                    final_wht_type="IVM",
+                    gain=_gain,
+                    rdnoise=_rdnoise,
+                    static=static_mask,
+                    **drizzle_params,
+                )
+        if (run_dual_outliers) and (run_jwst_outliers_):
+            # Second drizzle with aligned wcs, refined CR-rejection params
+            # tuned for WFC3/IR
+            logstr = "# {0}: Dual Outliers -- " \
+                "Running AstroDrizzle() Secondary Step.".format(direct["product"])
+            utils.log_comment(utils.LOGFILE, logstr, verbose=True, show_date=False)
+        
+            logstr = "# {0}: Second Drizzle".format(direct["product"])
+            utils.log_comment(utils.LOGFILE, logstr, verbose=True, show_date=True)
+
+            if len(direct["files"]) == 1:
+                #don't reset, just add new DQ bits. 
+                #not efficient, but is
+                #useful for assocs w. really big dithers?
+                AstroDrizzle(
+                    direct["files"],
+                    output=direct["product"],
+                    clean=True,
+                    final_pixfrac=0.8,
+                    context=False,
+                    resetbits=0, 
+                    final_bits=bits,
+                    driz_sep_bits=bits,
+                    preserve=False,
+                    driz_cr_snr=driz_cr_snr,
+                    driz_cr_scale=driz_cr_scale,
+                    driz_separate=False,
+                    driz_sep_wcs=False,
+                    median=False,
+                    blot=False,
+                    driz_cr=False,
+                    driz_cr_corr=False,
+                    build=False,
+                    final_wht_type="IVM",
+                    gain=_gain,
+                    rdnoise=_rdnoise,
+                    static=False,
+                    **drizzle_params,
+                )
+            else:
+                if "par" in direct["product"]:
+                    pixfrac = 1.0
+                else:
+                    pixfrac = 0.8
+
+                #don't reset, just add new
+                #not efficient, but is
+                #useful for assocs w. really big dithers?
+                AstroDrizzle(
+                    direct["files"],
+                    output=direct["product"],
+                    clean=True,
+                    final_pixfrac=pixfrac,
+                    context=(isACS | isWFPC2),
+                    skysub=True,
+                    skymethod=skymethod,
+                    resetbits=0, 
                     final_bits=bits,
                     driz_sep_bits=bits,
                     preserve=False,
