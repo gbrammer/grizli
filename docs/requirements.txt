@@ -8,3 +8,4 @@ sphinx_astropy<1.11
 pyyaml
 docutils<0.18
 sregion
+jwst
