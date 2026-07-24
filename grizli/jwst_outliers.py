@@ -9,13 +9,13 @@ import numpy as np
 from astropy.io import fits
 from astropy.stats import sigma_clipped_stats
 
-from . import jwst_utils
-from . import utils
-
 from jwst.datamodels import ModelContainer
 from jwst.outlier_detection.outlier_detection_step import (
         OutlierDetectionStep,
     )
+
+from . import jwst_utils
+from . import utils
 
 SCI = "SCI"
 ERR = "ERR"
