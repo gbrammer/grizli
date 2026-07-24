@@ -1,113 +1,372 @@
-import numpy as np
+"""Run JWST outlier detection on Grizli-prepped rate files."""
+
+import traceback
 from collections import defaultdict
 from pathlib import Path
+import inspect
 
+import numpy as np
 from astropy.io import fits
-from grizli import utils
-from grizli import jwst_utils
+from astropy.stats import sigma_clipped_stats
+
+from jwst.datamodels import ModelContainer
+from jwst.outlier_detection.outlier_detection_step import (
+        OutlierDetectionStep,
+    )
+
+from . import jwst_utils
+from . import utils
 
 SCI = "SCI"
 ERR = "ERR"
 DQ = "DQ"
-ORIGINAL_KEYS = {"TELESCOP": "OTELESCO", "INSTRUME": "OINSTRUM", "DETECTOR": "ODETECTO", "EXP_TYPE": "OEXP_TYP"}
+
+JWST_OUTLIER_BIT = 16
+GRIZLI_OUTLIER_BIT = 4096
+
+CLEAR_BITS = JWST_OUTLIER_BIT + GRIZLI_OUTLIER_BIT
+#pre-make a mask to unset DQ=16+4096 to save linespace...
+JWST_OUTLIER_CLEAR_MASK = np.bitwise_not(np.uint32(CLEAR_BITS))
+
+#grizli modifies key names so shold check for both
+ORIGINAL_KEYS = {
+    "TELESCOP": "OTELESCO",
+    "INSTRUME": "OINSTRUM",
+    "DETECTOR": "ODETECTO",
+    "EXP_TYPE": "OEXP_TYP",
+}
+
 
 def log(msg, verbose=True):
-    utils.log_comment(utils.LOGFILE, "# jwst_rate_outliers: " + str(msg), verbose=verbose, show_date=True)
+    """
+    Write a JWST outlier message to the Grizli log.
+
+    Parameters
+    ----------
+    msg : object
+        Message to write to the log.
+
+    verbose : bool
+        Print the message if ``True``.
+
+    Returns
+    -------
+    None
+    """
+    utils.log_comment(
+        utils.LOGFILE,
+        "# jwst_rate_outliers: " + str(msg),
+        verbose=verbose,
+        show_date=True,
+    )
+
 
 def pathfix(path):
+    """
+    Return an absolute ``Path`` with user expansion applied.
+
+    Parameters
+    ----------
+    path : str or pathlib.Path
+        Input path.
+
+    Returns
+    -------
+    path : pathlib.Path
+        Absolute path.
+    """
     path = Path(path).expanduser()
     if not path.is_absolute():
         path = Path.cwd() / path
+
     return path
 
+
 def hval(header, key, default=""):
+    """
+    Get a FITS header value, checking Grizli original-key aliases first.
+
+    Parameters
+    ----------
+    header : astropy.io.fits.Header
+        FITS header to query.
+
+    key : str
+        Header keyword.
+
+    default : object
+        Default value returned if ``key`` is not found.
+
+    Returns
+    -------
+    value : object
+        Header value.
+    """
     key = key.upper()
-    return header.get(ORIGINAL_KEYS.get(key, "O" + key[:7]), header.get(key, default))
+    original_key = ORIGINAL_KEYS.get(key, "O" + key[:7])
+    fallback = header.get(key, default)
+    value = header.get(original_key, fallback)
+
+    return value
+
 
 def file_info(path):
+    """
+    Read grouping metadata from a rate file.
+
+    Parameters
+    ----------
+    path : str or pathlib.Path
+        Input FITS rate file.
+
+    Returns
+    -------
+    info : dict
+        Dictionary with instrument, detector, filter, pupil, exposure type,
+        and science-array shape.
+    """
     with fits.open(path, memmap=False) as hdul:
-        h = hdul[0].header
-        return {
-            "instrument": str(hval(h, "INSTRUME")).strip().upper(),
-            "detector": str(hval(h, "DETECTOR")).strip().upper(),
-            "filter": str(hval(h, "FILTER")).strip().upper(),
-            "pupil": str(hval(h, "PUPIL")).strip().upper(),
-            "exp_type": str(hval(h, "EXP_TYPE", "NRC_IMAGE")).strip().upper(),
+        header = hdul[0].header
+        info = {
+            "instrument": str(hval(header, "INSTRUME")).strip().upper(),
+            "detector": str(hval(header, "DETECTOR")).strip().upper(),
+            "filter": str(hval(header, "FILTER")).strip().upper(),
+            "pupil": str(hval(header, "PUPIL")).strip().upper(),
+            "exp_type": str(
+                hval(header, "EXP_TYPE", "NRC_IMAGE")
+            ).strip().upper(),
             "shape": tuple(hdul[SCI].data.shape),
         }
+
+    return info
+
+
+def bkg_fallback_estimate(path):
+    """Scalar background estimate from the SCI extension.
     
-def get_mdrizsky(path):
+    Parameters
+    ----------
+    prep_dir : str or pathlib.Path
+        Directory to clean.
+
+    Returns
+    -------
+    bkg_ : float
+        Estimate of background level using 
+        sigma-clipped median. 
+    """
+
     with fits.open(path, memmap=False) as hdul:
-        h = hdul["SCI"].header
-        return float(h["MDRIZSKY"])
+        data = hdul["SCI"].data
+        #no nans
+        mask = ~np.isfinite(data)
 
-def rate_to_cal_path(path):
-    path = Path(path)
-    return path.with_name(path.name.replace("_rate.fits", "_cal.fits"))
+        #only consider "good" pixels
+        if "DQ" in hdul:
+            mask |= hdul["DQ"].data != 0
 
-def cleanup_files(prep_dir=".", verbose=True): #delete *blot.fits and *median.fits files which seem to not be getting removed...
+        _, background, _ = sigma_clipped_stats(
+            data,
+            mask=mask,
+            sigma=3,
+            maxiters=5,
+        )
+
+    bkg_ = float(background)
+
+    return bkg_
+
+def cleanup_files(prep_dir=".", verbose=True):
+    """
+    Delete JWST outlier intermediate files from a prep directory.
+
+    Parameters
+    ----------
+    prep_dir : str or pathlib.Path
+        Directory to clean.
+
+    verbose : bool
+        Print log messages if ``True``.
+
+    Returns
+    -------
+    removed : int
+        Number of files removed.
+    """
     prep_dir = pathfix(prep_dir)
     removed = 0
+
     for pattern in ("*blot.fits", "*median.fits"):
         for path in prep_dir.glob(pattern):
             if path.is_file():
                 log(f"removing intermediate file {path.name}", verbose)
-                path.unlink() #.unlink() is same as delete 
+                path.unlink()
                 removed += 1
 
-    log(f"removed {removed} JWST outlier intermediate files from {prep_dir}", verbose)
+    log(
+        f"removed {removed} JWST outlier intermediate files from {prep_dir}",
+        verbose,
+    )
 
     return removed
 
+
 def make_model(path, index):
     """
-    Make ImageModel from grizli-prepped rate file w/ dither naming /bkg stuff for outlier rejection. 
+    Make an ImageModel from a Grizli-prepped rate file.
+
+    Parameters
+    ----------
+    path : str or pathlib.Path
+        Input FITS rate file.
+
+    index : int
+        One-indexed dither number used to set ``meta.group_id``.
+
+    Returns
+    -------
+    model : jwst.datamodels.ImageModel
+        Data model passed to ``OutlierDetectionStep``.
+
+    old_dq : ndarray
+        Copy of the input DQ array before clearing JWST outlier bit 16.
     """
     path = Path(path)
 
+    # Do not rewrite the Grizli-prepped rate file here.  At this stage we
+    # only want to make new DQ flags and write them explicitly below.
     model = jwst_utils.match_gwcs_to_sip(
         str(path),
-        overwrite=False)   # do not rewrite the Grizli-prepped rate file here, we only want to make new DQ flags at this stage and flush those
+        overwrite=False, 
+    )
 
-    # name the files for jwst-pipeline (still needs this?)
+    # Name the files for the JWST pipeline.
     model.meta.filename = path.name
     model.meta.group_id = f"dither{index:03d}"
 
-    # bkg stuff - not sure is used/matters but set it just in case. 
-    model.meta.background.subtracted = False #sci extension still has sky-level in it I think
-    model.meta.background.level = get_mdrizsky(path) #use mdrizsky value from prior astrodrizzle run, shoudl be in SCI header
+    # Keep the input DQ array before letting the JWST step add DQ=16.
+    old_dq = model.dq.copy()
 
-    return model, model.dq.copy()
+    # Clear any existing 16+4096 bits before the step runs.  The step can
+    # set bit 16 again, and this module maps that mask to Grizli DQ=4096.
+    model.dq[...] = (
+        np.asarray(model.dq, dtype=np.uint32) & JWST_OUTLIER_CLEAR_MASK
+    ).astype(model.dq.dtype, copy=False)
 
-def run_jwst_outliers(models, driz_cr_snr, driz_cr_scale):
-    from jwst.datamodels import ModelContainer
-    from jwst.outlier_detection.outlier_detection_step import OutlierDetectionStep
+    try: 
+        # The science extension should still have sky level in it.  Set the
+        # background metadata from the prior AstroDrizzle MDRIZSKY value.
 
-    container = ModelContainer(open_models=False) #make "container" object
-    for m in models:
-        container.append(m) #add the DataModels made from the grizli-processed rate files into the container.
+        #fail loudly if not in header.
+        mdrizsky = float(fits.getheader(path, "SCI")["MDRIZSKY"])
 
-    result = OutlierDetectionStep( #run the rejection step w/ all defualt params except for the snr and scale param
-        snr=driz_cr_snr,
-        scale=driz_cr_scale, 
-        save_intermediate_results=False,       
-        in_memory=True).process(container)
-    
-    output_list_of_updated_dq_arrays = [ #make list of output dq arrays that have the new bits set. 
-        np.asarray(result[i].dq, dtype=np.uint32).copy()
-        for i in range(len(models))
-    ]
+        log(f"MDRIZSKY keyword found in header, " \
+            f"using {mdrizsky:.2f} for background level.")
+        
+        sky_ = mdrizsky
 
-    return output_list_of_updated_dq_arrays
+    except:
+        sky_ = bkg_fallback_estimate(path)
 
-def run_rate_file_group_outlier_dq(
+        log(f"No MDRIZSKY keyword in header, " \
+            f"falling back to sigma-clipped median" \
+            f" value of {sky_:.2f}" \
+            f" from ``SCI`` extension.")
+
+    model.meta.background.subtracted = False
+    model.meta.background.level = sky_
+
+    return model, old_dq
+
+
+def run_jwst_outliers(models, step_kwargs={"snr": "8.0 5.0", 
+                        "scale": "2.5 0.7",
+                        "save_intermediate_results": False, 
+                        "in_memory": False}):
+    """
+    Run JWST ``OutlierDetectionStep`` on a list of data models.
+
+    Parameters
+    ----------
+    models : list
+        JWST data models made from Grizli-prepped rate files.
+
+    **kwargs : dict
+        Keyword arguments passed directly to ``OutlierDetectionStep``.
+
+    Returns
+    -------
+    outlier_dq_arrays : list
+        Updated DQ arrays from the outlier step, converted to ``uint32``.
+    """
+
+    container = ModelContainer(open_models=False)
+    for model in models:
+        container.append(model)
+
+    step = OutlierDetectionStep(**step_kwargs)
+    result = step.process(container)
+
+    # make list of output dq arrays that have the new bits set.
+    try:
+        # jwst=1.13
+        outlier_dq_arrays = [ 
+            np.asarray(result[i].dq, dtype=np.uint32).copy()
+            for i in range(len(models))
+        ]
+    except TypeError:
+        # jwst=1.16
+        # datamodel orig. dq attr should be updated too?
+        outlier_dq_arrays = [ 
+            np.asarray(m.dq, dtype=np.uint32).copy()
+            for m in models
+        ]
+
+    return outlier_dq_arrays
+
+
+def run_rate_file_group(
     rate_files,
-    driz_cr_snr="8.0 5.0",
-    driz_cr_scale="2.5 0.7",
     min_files=2,
-    verbose=True):
-    
-    paths = [pathfix(f) for f in rate_files]
+    verbose=True,
+    jwst_outliers_kwargs=None,
+):
+    """
+    Run JWST outlier detection for one group of rate files.
+
+    Parameters
+    ----------
+    rate_files : list
+        Rate files to process together.
+
+    driz_cr_snr : str
+        Default ``snr`` value passed to ``OutlierDetectionStep``.
+
+    driz_cr_scale : str
+        Default ``scale`` value passed to ``OutlierDetectionStep``.
+
+    min_files : int
+        Minimum number of files needed to run the outlier step.
+
+    verbose : bool
+        Print log messages if ``True``.
+
+    jwst_outliers_kwargs : dict or None
+        Extra keyword arguments passed to ``OutlierDetectionStep``.  
+        ``snr`` and ``scale`` values override ``driz_cr_snr`` and
+        ``driz_cr_scale``.
+
+    Returns
+    -------
+    status : int
+        ``1`` if the group was processed and ``0`` if it was skipped.
+    """
+    if jwst_outliers_kwargs is None:
+        step_kwargs = {}
+    else:
+        step_kwargs = dict(jwst_outliers_kwargs)
+
+    paths = [pathfix(rate_file) for rate_file in rate_files]
 
     if len(paths) < min_files:
         log("only %d file(s); skipping" % len(paths), verbose)
@@ -115,90 +374,166 @@ def run_rate_file_group_outlier_dq(
 
     log("running JWST outlier DQ on %d rate files." % len(paths), verbose)
 
-    cal_paths = [rate_to_cal_path(p) for p in paths]
+    cal_paths = []
+    for p in paths:
+        p = Path(p)
+        cp_ = p.with_name(p.name.replace("_rate.fits", "_cal.fits"))
+        cal_paths.append(cp_)
 
     models = []
     old_dq = []
     renamed = []
 
     try:
-        #Rename *_rate.fits -> *_cal.fits (gets around weird bug where jwst pipeline deletes rate files at the end?)
+        # Rename *_rate.fits to *_cal.fits so the JWST pipeline 
+        # doesnt delete the *rate files when done w. O.R. step ...
         for rate_path, cal_path in zip(paths, cal_paths):
             log(f"rename {rate_path.name} -> {cal_path.name}", verbose)
             rate_path.rename(cal_path)
             renamed.append((rate_path, cal_path))
 
-        # Run outlier detection on the temporary "_cal".fits files...
+        # Run outlier detection on the temporary *_cal.fits files.
+        # Loop over each temporary *_cal.fits file.
         for i, cal_path in enumerate(cal_paths, 1):
+            # Make the JWST data model and copy the starting DQ array.
             model, dq = make_model(cal_path, i)
 
-            model.meta.filename = cal_path.name
-            model.meta.group_id = f"dither{i:03d}"
-
+            # Add this model to the list passed to OutlierDetectionStep.
             models.append(model)
+
+            # Add the starting DQ array to the list used for comparisons.
             old_dq.append(dq)
 
-        result_dq_arrays = run_jwst_outliers(
-            models,
-            driz_cr_snr,
-            driz_cr_scale,
-        )
+        # Run OutlierDetectionStep and return one updated DQ array per model.
+        result_dq_arrays = run_jwst_outliers(models, step_kwargs=step_kwargs)
 
-        #write new dq bits... (might already be done but just to make sure)
+        # Loop over each file and map JWST DQ=16 to Grizli DQ=4096.
         for i, cal_path in enumerate(cal_paths):
+            # Select the updated DQ array for this file.
             result_dq = result_dq_arrays[i]
-            added = result_dq & ~old_dq[i]
+
+            npixx, npixy = result_dq.shape[0], result_dq.shape[1]
+            npix = npixx * npixy
+
+            # Find pixels where OutlierDetectionStep set JWST DQ=16.
+            # get boolean where bit was set
+            step_outliers = (result_dq & JWST_OUTLIER_BIT) > 0
 
             with fits.open(cal_path, mode="update", memmap=False) as hdul:
-                new_dq = np.asarray(hdul[DQ].data, dtype=np.uint32) | added #use "or" operator to keep old bits too...
-                hdul[DQ].data[...] = new_dq.astype(
-                    hdul[DQ].data.dtype,
-                    copy=False,
-                )
-                hdul.flush() #save
+                #pull out DQ array that is in rate file...
+                dq_data = np.asarray(hdul[DQ].data, dtype=np.uint32)
 
-            log("updated %s: added %d new bits to DQ-array." % (paths[i].name, int(np.count_nonzero(added != 0))), verbose)
+                # clear any existing DQ=16 and 4096 bits in file...
+                # like we did in dq model before
+                dq_data = dq_data & JWST_OUTLIER_CLEAR_MASK
+
+                # set grizli bit where bit=16 was set by this step
+                dq_data |= (
+                    step_outliers.astype(np.uint32) * GRIZLI_OUTLIER_BIT
+                )
+                # in-place update dq array in rate file
+                hdul[DQ].data[...] = dq_data.astype(
+                    hdul[DQ].data.dtype,
+                    copy=False, 
+                )
+                # save
+                hdul.flush()
+
+            log(f"updated {paths[i].name}: "
+                f"mapped DQ={JWST_OUTLIER_BIT} to DQ={GRIZLI_OUTLIER_BIT}; "
+                f"{int(np.count_nonzero(step_outliers))} "
+                f"outlier pixels flagged. "
+                f"({np.count_nonzero(step_outliers) / npix:.3%})"
+                )
+
+    except Exception:
+        log("JWST outlier DQ failed; traceback follows.", verbose)
+        # throw error msg to grizli log if needed...
+        utils.log_exception(utils.LOGFILE, traceback)
+        raise
 
     finally:
-        # Close sll the models before renaming files back...
+        # Close all models before renaming files back.
         for model in models:
             model.close()
 
-        #Rename back at end
+        # Rename files back at the end.
         for rate_path, cal_path in reversed(renamed):
-                cal_path.rename(rate_path)
+            log(f"rename back {cal_path.name} -> {rate_path.name}", verbose)
+            cal_path.rename(rate_path)
 
     return 1
 
-def run_nircam_rate_outliers(
+
+def do_jwst_outliers_step(
     visit,
-    driz_cr_snr="8.0 5.0",
-    driz_cr_scale="2.5 0.7",
     min_files=2,
     group_by=("detector", "filter", "pupil", "shape"),
     clean=True,
-    verbose=True): 
+    verbose=True,
+    jwst_outliers_kwargs=None,
+):
+    """
+    Run JWST outlier detection for grouped files in a visit.
 
+    Parameters
+    ----------
+    visit : dict
+        Visit dictionary with a ``files`` entry containing rate filenames.
+
+    driz_cr_snr : str
+        Default ``snr`` value passed to ``OutlierDetectionStep``.
+
+    driz_cr_scale : str
+        Default ``scale`` value passed to ``OutlierDetectionStep``.
+
+    min_files : int
+        Minimum number of files needed in a group to run the outlier step.
+
+    group_by : tuple
+        Metadata keys used to group files before running the outlier step.
+
+    clean : bool
+        Delete JWST intermediate files after processing if ``True``.
+
+    verbose : bool
+        Print log messages if ``True``.
+
+    jwst_outliers_kwargs : dict or None
+        Extra keyword arguments passed to ``OutlierDetectionStep``.
+
+    Returns
+    -------
+    status : int
+        ``1`` after processing all groups.
+    """
+
+    frame = inspect.currentframe()
+    utils.log_function_arguments(
+        utils.LOGFILE, frame, "jwst_outliers.do_jwst_outliers_step"
+        )
+    
     prep_dir = pathfix(visit["files"][0]).parent
 
     groups = defaultdict(list)
     for filename in visit["files"]:
         path = pathfix(filename)
         info = file_info(path)
-        key = tuple(info[k] for k in group_by)
+        key = tuple(info[item] for item in group_by)
         groups[key].append(path)
 
     for key in sorted(groups, key=str):
         log("group %s: %d files" % (key, len(groups[key])), verbose)
 
-        _ = run_rate_file_group_outlier_dq( #run the main-processing function
+        run_rate_file_group(
             groups[key],
-            driz_cr_snr=driz_cr_snr,
-            driz_cr_scale=driz_cr_scale,
             min_files=min_files,
-            verbose=verbose)
-        
+            verbose=verbose,
+            jwst_outliers_kwargs=jwst_outliers_kwargs,
+        )
+
     if clean:
-        cleanup_files(prep_dir, verbose=verbose) #delete stuff we dont need
+        cleanup_files(prep_dir, verbose=verbose)
 
     return 1
+

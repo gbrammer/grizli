@@ -106,6 +106,13 @@ visit_prep_args: &prep_args
     skymethod: localmin
     drizzle_params: {}
     single_image_CRs: True
+    run_jwst_outliers: False
+    jwst_outliers_kwargs: 
+        snr: "8.0 5.0"
+        scale: "2.5 0.7"
+        save_intermediate_results: False
+        in_memory: True
+    run_dual_outliers: False
     with_ctx_mask: True
     erode_ctx_single: 3
     run_tweak_align: True

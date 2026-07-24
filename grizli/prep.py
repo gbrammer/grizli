@@ -34,6 +34,12 @@ except ImportError:
     jwst = None
     print("`import jwst` failed so JWST processing will not work!")
 
+try:
+    from . import jwst_outliers
+except ImportError:
+    print("`import jwst_outliers` failed so JWST outlier rejection will not work!")
+    jwst_outliers = None
+
 from . import utils
 from . import model
 from . import GRIZLI_PATH
@@ -5286,6 +5292,8 @@ def process_direct_grism_visit(
     do_pure_parallel_wcs=True,
     write_ctx=False,
     run_jwst_outliers=False,
+    jwst_outliers_kwargs={},
+    run_dual_outliers=False,
 ):
     """
     Full processing of a direct (+grism) image visit.
@@ -5444,6 +5452,20 @@ def process_direct_grism_visit(
 
     write_ctx : bool
         Write context.
+
+    run_jwst_outliers: bool
+        Flag to run the `jwst_outliers` script.
+        If `True` but the step fails, falls back to 
+        AstroDrizzle
+
+    jwst_outliers_kwargs: dict
+        Arguments to pass to `jwst.OutlierDetectionStep`
+
+    run_dual_outliers: bool
+        Flag to also run `AstroDrizzle` outlier flagging 
+        after `jwst` step. Only proceeds to `AstroDrizzle`
+        upon (1) successful completion of the `jwst` step, 
+        and `run_dual_outliers=True`
 
     Returns
     -------
@@ -6020,80 +6042,169 @@ def process_direct_grism_visit(
                 im[0].header["MJD-OBS"] = im[0].header["EXPSTART"]
                 im.flush()
 
-        #Option to run outliers for JWST using `jwst.outlier_detection.OutlierDetectionStep()`
-        if (isJWST) and (run_jwst_outliers):
+        # Optionally run outliers for JWST using 
+        # `jwst.outlier_detection.OutlierDetectionStep()`
+        run_jwst_outliers_ = (isJWST) and (run_jwst_outliers) and (jwst_outliers is not None)
+
+        if run_jwst_outliers_:
+            # make sure important defualts are set.
+            if "snr" not in jwst_outliers_kwargs:
+                jwst_outliers_kwargs["snr"] = driz_cr_snr
+
+            if "scale" not in jwst_outliers_kwargs:
+                jwst_outliers_kwargs["scale"] = driz_cr_scale
+
+            if "in_memory" not in jwst_outliers_kwargs:
+                jwst_outliers_kwargs["in_memory"] = True
+
+            if "save_intermediate_results" not in jwst_outliers_kwargs:
+                jwst_outliers_kwargs["save_intermediate_results"] = False
+
             try:
-                from grizli import jwst_outliers
-                jwst_outliers.run_nircam_rate_outliers(
+                jwst_outliers.do_jwst_outliers_step(
                         direct,
-                        driz_cr_snr=driz_cr_snr, #same ones defined above seem to work best w. jwst-pipeline too?
-                        driz_cr_scale=driz_cr_scale,
-                        min_files=2,
-                        verbose=True,
+                        jwst_outliers_kwargs=jwst_outliers_kwargs,
                         )
             except:
+                utils.log_exception(utils.LOGFILE, traceback)
                 logstr = "JWST Outlier Detection Failed. Skipping..."
                 utils.log_comment(utils.LOGFILE, logstr, verbose=True, show_date=True)
 
-        # Second drizzle with aligned wcs, refined CR-rejection params
-        # tuned for WFC3/IR
-        logstr = "# {0}: Second Drizzle".format(direct["product"])
-        utils.log_comment(utils.LOGFILE, logstr, verbose=True, show_date=True)
+                # if fail, default to AstroDrizzle() below. 
+                run_jwst_outliers_ = False
 
-        if len(direct["files"]) == 1:
-            AstroDrizzle(
-                direct["files"],
-                output=direct["product"],
-                clean=True,
-                final_pixfrac=0.8,
-                context=False,
-                resetbits=4096,
-                final_bits=bits,
-                driz_sep_bits=bits,
-                preserve=False,
-                driz_cr_snr=driz_cr_snr,
-                driz_cr_scale=driz_cr_scale,
-                driz_separate=False,
-                driz_sep_wcs=False,
-                median=False,
-                blot=False,
-                driz_cr=False,
-                driz_cr_corr=False,
-                build=False,
-                final_wht_type="IVM",
-                gain=_gain,
-                rdnoise=_rdnoise,
-                static=False,
-                **drizzle_params,
-            )
-        else:
-            if "par" in direct["product"]:
-                pixfrac = 1.0
+        if not run_jwst_outliers_:
+            # default to normal Second drizzle step using AstroDrizzle() 
+
+            # Second drizzle with aligned wcs, refined CR-rejection params
+            # tuned for WFC3/IR
+            logstr = "# {0}: Second Drizzle".format(direct["product"])
+            utils.log_comment(utils.LOGFILE, logstr, verbose=True, show_date=True)
+
+            if len(direct["files"]) == 1:
+                AstroDrizzle(
+                    direct["files"],
+                    output=direct["product"],
+                    clean=True,
+                    final_pixfrac=0.8,
+                    context=False,
+                    resetbits=4096,
+                    final_bits=bits,
+                    driz_sep_bits=bits,
+                    preserve=False,
+                    driz_cr_snr=driz_cr_snr,
+                    driz_cr_scale=driz_cr_scale,
+                    driz_separate=False,
+                    driz_sep_wcs=False,
+                    median=False,
+                    blot=False,
+                    driz_cr=False,
+                    driz_cr_corr=False,
+                    build=False,
+                    final_wht_type="IVM",
+                    gain=_gain,
+                    rdnoise=_rdnoise,
+                    static=False,
+                    **drizzle_params,
+                )
             else:
-                pixfrac = 0.8
+                if "par" in direct["product"]:
+                    pixfrac = 1.0
+                else:
+                    pixfrac = 0.8
 
-            AstroDrizzle(
-                direct["files"],
-                output=direct["product"],
-                clean=True,
-                final_pixfrac=pixfrac,
-                context=(isACS | isWFPC2),
-                skysub=True,
-                skymethod=skymethod,
-                resetbits=4096,
-                final_bits=bits,
-                driz_sep_bits=bits,
-                preserve=False,
-                driz_cr_snr=driz_cr_snr,
-                driz_cr_scale=driz_cr_scale,
-                driz_cr_grow=driz_cr_grow,
-                build=False,
-                final_wht_type="IVM",
-                gain=_gain,
-                rdnoise=_rdnoise,
-                static=static_mask,
-                **drizzle_params,
-            )
+                AstroDrizzle(
+                    direct["files"],
+                    output=direct["product"],
+                    clean=True,
+                    final_pixfrac=pixfrac,
+                    context=(isACS | isWFPC2),
+                    skysub=True,
+                    skymethod=skymethod,
+                    resetbits=4096,
+                    final_bits=bits,
+                    driz_sep_bits=bits,
+                    preserve=False,
+                    driz_cr_snr=driz_cr_snr,
+                    driz_cr_scale=driz_cr_scale,
+                    driz_cr_grow=driz_cr_grow,
+                    build=False,
+                    final_wht_type="IVM",
+                    gain=_gain,
+                    rdnoise=_rdnoise,
+                    static=static_mask,
+                    **drizzle_params,
+                )
+        if (run_dual_outliers) and (run_jwst_outliers_):
+            # Second drizzle with aligned wcs, refined CR-rejection params
+            # tuned for WFC3/IR
+            logstr = "# {0}: Dual Outliers -- " \
+                "Running AstroDrizzle() Secondary Step.".format(direct["product"])
+            utils.log_comment(utils.LOGFILE, logstr, verbose=True, show_date=False)
+        
+            logstr = "# {0}: Second Drizzle".format(direct["product"])
+            utils.log_comment(utils.LOGFILE, logstr, verbose=True, show_date=True)
+
+            if len(direct["files"]) == 1:
+                #don't reset, just add new DQ bits. 
+                #not efficient, but is
+                #useful for assocs w. really big dithers?
+                AstroDrizzle(
+                    direct["files"],
+                    output=direct["product"],
+                    clean=True,
+                    final_pixfrac=0.8,
+                    context=False,
+                    resetbits=0, 
+                    final_bits=bits,
+                    driz_sep_bits=bits,
+                    preserve=False,
+                    driz_cr_snr=driz_cr_snr,
+                    driz_cr_scale=driz_cr_scale,
+                    driz_separate=False,
+                    driz_sep_wcs=False,
+                    median=False,
+                    blot=False,
+                    driz_cr=False,
+                    driz_cr_corr=False,
+                    build=False,
+                    final_wht_type="IVM",
+                    gain=_gain,
+                    rdnoise=_rdnoise,
+                    static=False,
+                    **drizzle_params,
+                )
+            else:
+                if "par" in direct["product"]:
+                    pixfrac = 1.0
+                else:
+                    pixfrac = 0.8
+
+                #don't reset, just add new
+                #not efficient, but is
+                #useful for assocs w. really big dithers?
+                AstroDrizzle(
+                    direct["files"],
+                    output=direct["product"],
+                    clean=True,
+                    final_pixfrac=pixfrac,
+                    context=(isACS | isWFPC2),
+                    skysub=True,
+                    skymethod=skymethod,
+                    resetbits=0, 
+                    final_bits=bits,
+                    driz_sep_bits=bits,
+                    preserve=False,
+                    driz_cr_snr=driz_cr_snr,
+                    driz_cr_scale=driz_cr_scale,
+                    driz_cr_grow=driz_cr_grow,
+                    build=False,
+                    final_wht_type="IVM",
+                    gain=_gain,
+                    rdnoise=_rdnoise,
+                    static=static_mask,
+                    **drizzle_params,
+                )
 
         # Flag areas of ACS images covered by a single image, where
         # CRs aren't appropriately masked
