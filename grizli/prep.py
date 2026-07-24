@@ -5453,6 +5453,20 @@ def process_direct_grism_visit(
     write_ctx : bool
         Write context.
 
+    run_jwst_outliers: bool
+        Flag to run the `jwst_outliers` script.
+        If `True` but the step fails, falls back to 
+        AstroDrizzle
+
+    jwst_outliers_kwargs: dict
+        Arguments to pass to `jwst.OutlierDetectionStep`
+
+    run_dual_outliers: bool
+        Flag to also run `AstroDrizzle` outlier flagging 
+        after `jwst` step. Only proceeds to `AstroDrizzle`
+        upon (1) successful completion of the `jwst` step, 
+        and `run_dual_outliers=True`
+
     Returns
     -------
     status : bool
