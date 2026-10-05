@@ -348,7 +348,7 @@ def config_trace_sky(ra, dec, conf_params, xpad=12, ypad=12, **kwargs):
 
 
 def trim_wfss_exposure_overlaps(
-    ra=189.0706488, dec=62.2089502, exp={}, verbose=True, **kwargs
+    ra=189.0706488, dec=62.2089502, exp={}, any_in_assoc=True, verbose=True, **kwargs
 ):
     """
     Trim exposure list to those that should have dispersed spectra
@@ -359,6 +359,10 @@ def trim_wfss_exposure_overlaps(
         config = wfss_exposure_footprint(row, **kwargs)
         wfss_footprint = config["footprint"]
         exp["has_grism"][i] = wfss_footprint.path[0].contains_point((ra, dec))
+
+    if any_in_assoc:
+        match_assoc = np.unique(exp["assoc"][exp["has_grism"]])
+        exp["has_grism"] |= np.isin(exp["assoc"], match_assoc)
 
     msg = (
         f"trim_wfss_exposure_overlaps ({ra:.5f},{dec:.5f}): "
