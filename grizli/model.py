@@ -5346,7 +5346,7 @@ class BeamCutout(object):
 
         # Trace properties at desired wavelength
         dx = np.interp(wavelength, self.beam.lam_beam, xarr)
-        dy = np.interp(wavelength, self.beam.lam_beam, self.beam.ytrace_beam) + 1
+        dy = np.interp(wavelength, self.beam.lam_beam, self.beam.ytrace_beam)
 
         dl = np.interp(wavelength, self.beam.lam_beam[1:], np.diff(self.beam.lam_beam))
 
