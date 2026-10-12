@@ -1051,6 +1051,7 @@ def match_lists(
 def align_drizzled_image(
     root="",
     mag_limits=[14, 23],
+    max_masked_pixels=3,
     radec=None,
     NITER=3,
     clip=20,
@@ -1089,6 +1090,9 @@ def align_drizzled_image(
     mag_limits : (float, float)
         AB magnitude limits of objects in the image catalog to use for
         the alignment
+
+    max_masked_pixels : int
+        Maximum number of masked pixels to allow (MASK_APER_0)
 
     radec : str or (array, array)
         Reference catalog positions (ra, dec).  If `str`, will read from a
@@ -1157,7 +1161,9 @@ def align_drizzled_image(
         reduce spurious triangle matches
 
     assume_close : bool
-        not used
+        Assume close exposures for alignment.  If float, then trim input and
+        reference catalogs to matches within ``assume_close`` arcsec.
+        If bool, then trim matches within 0.2 arcsec.
 
     ref_border : float
         Only include reference sources within `ref_border` pixels of the
@@ -1229,8 +1235,13 @@ def align_drizzled_image(
         else:
             ok &= cat["MAGERR_AUTO"] < 0.05
 
+    if (max_masked_pixels >= 0) & ("MASK_APER_0" in cat.colnames):
+        ok &= cat["MASK_APER_0"] <= max_masked_pixels
+
     if ok.sum() == 0:
         msg = f"{root}.cat: no objects found in magnitude range {mag_limits}"
+        msg += f" + mask_aper_0 < {max_masked_pixels}"
+
         utils.log_comment(utils.LOGFILE, msg, verbose=True)
 
         return False
@@ -1325,6 +1336,53 @@ def align_drizzled_image(
 
         cut = np.argsort(cat["MAG_AUTO"][ok])[:icut]
         xy_drz = np.array([cat["X_IMAGE"][ok][cut], cat["Y_IMAGE"][ok][cut]]).T
+
+    elif assume_close:
+        ref_ = utils.GTable()
+        ref_["ra"] = rd_ref[:, 0]
+        ref_["dec"] = rd_ref[:, 1]
+
+        idx, dr, dx_, dy_ = ref_.match_to_catalog_sky(cat, get_2d_offset=True)
+
+        if isinstance(assume_close, bool):
+            close_threshold = 0.2
+        else:
+            close_threshold = assume_close
+
+        hasm = ok & (dr.value < close_threshold)
+
+        if hasm.sum() < 32:
+            icut = 400
+            cut = np.argsort(cat["MAG_AUTO"][ok])[:icut]
+            xy_drz = np.array([
+                cat["X_IMAGE"][ok][cut], cat["Y_IMAGE"][ok][cut]]
+            ).T
+        else:
+            icut = int(np.minimum(200, hasm.sum()))
+            so = np.argsort(cat["MAG_AUTO"][hasm])
+
+            cut = so[:icut]
+
+            xy_drz = np.array([
+                cat["X_IMAGE"][hasm][cut], cat["Y_IMAGE"][hasm][cut]]
+            ).T
+
+            rd_ref = rd_ref[idx[hasm][cut], :]
+
+            med_dx = np.median(dx_[hasm][cut])
+            med_dy = np.median(dy_[hasm][cut])
+
+            msg = (
+                f"align_drizzled_image: assume_close -  matched {hasm.sum()}"
+                f" sources within {close_threshold} arcsec."
+                f"\n align_drizzled_image: assume_close (dx, dy) = "
+                f"({med_dx:.2f}, {med_dy:.2f}) arcsec"
+            )
+
+            utils.log_comment(utils.LOGFILE, msg, verbose=True)
+
+            # print("xxx", len(rd_ref), len(cat), len(xy_drz))
+
     else:
         # Limit to brightest X objects
         icut = 400
@@ -5336,8 +5394,10 @@ def process_direct_grism_visit(
     align_min_nexp : int
         Minimum number of exposures for alignment.
 
-    align_assume_close : bool
-        Assume close exposures for alignment.
+    align_assume_close : bool, float
+        Assume close exposures for alignment.  If float, then trim input and
+        reference catalogs to matches within ``align_assume_close`` arcsec.
+        If bool, then trim matches within 0.2 arcsec.
 
     align_transform : str
         Transform for alignment.
