@@ -541,12 +541,13 @@ def go(root='j010311+131615',
                     for file in files:
                         prep.fresh_flt_file(file, use_skyflats=False)
             
-                    prep.make_visit_average_flat({'product':root,
-                                                  'files':files},
-                                                  dilate=1,
-                                                  threshold=5,
-                                                  clip_max=np.minimum(len(files)//2,4),
-                                                  apply=False)
+                    prep.make_visit_average_flat(
+                        {'product':root, 'files':files},
+                        dilate=1,
+                        threshold=5,
+                        clip_max=np.minimum(len(files)//4,4),
+                        apply=False
+                    )
             
             visit_prep_args['miri_skyflat'] = False
             visit_prep_args['use_skyflats'] = False
