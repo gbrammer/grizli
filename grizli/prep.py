@@ -3671,7 +3671,8 @@ def make_visit_average_flat(
     visit,
     clip_max=0,
     threshold=5,
-    dilate=3,
+    minarea=16,
+    dilate=1,
     apply=True,
     instruments=["MIRI"],
     verbose=True,
@@ -3691,6 +3692,9 @@ def make_visit_average_flat(
 
     threshold : float
         If specified, run `sep` source detection on each exposure
+
+    minarea : int
+        See `sep.extract`.
 
     dilate : int
         Number of `scipy.ndimage.binary_dilation` iterations to run on the
@@ -3739,6 +3743,7 @@ def make_visit_average_flat(
 
         msg = f"make_visit_average_flat: Source detection on individual"
         msg += f" exposures with threshold={threshold} dilate={dilate}"
+        msg += f" minarea={minarea}"
         utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
 
         err = np.array(
@@ -3757,12 +3762,17 @@ def make_visit_average_flat(
             _cat, _seg = sep.extract(
                 _sci - _bkg.back(),
                 threshold,
+                minarea=minarea,
                 err=_err,
                 mask=_mask,
                 segmentation_map=True,
             )
 
-            _segm = nd.binary_dilation(_seg > 0, iterations=dilate)
+            if dilate > 0:
+                _segm = nd.binary_dilation(_seg > 0, iterations=dilate)
+            else:
+                _segm = _seg > 0
+
             _sci[_segm > 0] = np.nan
 
     scim = sci * 1.0
