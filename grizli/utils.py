@@ -9681,6 +9681,9 @@ def fetch_config_files(
 
     for url in tarfiles:
         file = os.path.basename(url)
+        print("curl -o {0} {1}".format(file, url))
+        print("tar xzvf {0}".format(file))
+
         if not os.path.exists(file):
             print("Get {0}".format(file))
             os.system("curl -o {0} {1}".format(file, url))
