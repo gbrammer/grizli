@@ -2117,6 +2117,12 @@ def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, com
         'jw06480', # Schouws, mixes F444W direct and F410M / F356W grism
         'jw07336', # Sun HUDF F250M direct + F277W grism
         'jw07404', # Naidu TWINKLE F410M direct, F444W grism
+        "jw01076", # Wavecal program
+        "jw01479", #   "        "
+        "jw01480", #   "        "
+        "jw04449", #   "        "
+        "jw06628", #   "        "
+        "jw08838", #   "        "
     ]
 
     split_jwst_grism = len(all_groups) > 0
@@ -2127,7 +2133,7 @@ def parse_visits(files=[], field_root='', RAW_PATH='../RAW', use_visit=True, com
 
     if split_jwst_grism:
         for v in visits:
-            if 'clear' in v['product']:
+            if ('clear' in v['product']) | ("f405n" in v["product"]) :
                 # print('NIRISS pure parallel direct: ', v['product'])
                 direct = v
 
