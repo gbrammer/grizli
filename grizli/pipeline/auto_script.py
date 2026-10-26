@@ -392,6 +392,13 @@ def go(root='j010311+131615',
     extract_maglim : [min, max]
         Magnitude limits of objects to extract and fit.
 
+    global_miri_skyflat : bool, int
+        If True / 1, first try to download the precomputed MIRI skyflats
+        from the S3 bucket with
+        `~grizli.pipeline.auto_script.get_miri_flat_by_date`.  If the file not
+        found or if `global_miri_skyflat > 1`, try to make a skyflat with
+        the exposures in the visit.
+
     """
     #isJWST = visit_prep_args['isJWST']
     # Function defaults
@@ -524,7 +531,13 @@ def go(root='j010311+131615',
             
             files.sort()
             
-            skyfile = get_miri_flat_by_date(files[0])
+            if global_miri_skyflat < 2:
+                try:
+                    skyfile = get_miri_flat_by_date(files[0])
+                except KeyError:
+                    skyfile = None
+            else:
+                skyfile = None
             
             if skyfile is None:
 
