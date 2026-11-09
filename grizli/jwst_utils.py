@@ -810,7 +810,23 @@ def img_with_flat(
                 _flat_dq |= (5 * (_bad_flat)).astype(_flat_dq.dtype)
 
                 with pyfits.open(input, mode="update") as _hdu:
-                    _hdu["DQ"].data |= _flat_dq.astype(_hdu["DQ"].data.dtype)
+                    _flat_dq = _flat_dq.astype(_hdu["DQ"].data.dtype)
+
+                    h0 = _hdu[0].header
+
+                    if h0["SUBARRAY"] in ("BRIGHTSKY",):
+                        slx = slice(
+                            h0["SUBSTRT1"] - 1,
+                            h0["SUBSTRT1"] - 1 + h0["SUBSIZE1"]
+                        )
+
+                        sly = slice(
+                            h0["SUBSTRT2"] - 1,
+                            h0["SUBSTRT2"] - 1 + h0["SUBSIZE2"]
+                        )
+                        _flat_dq = _flat_dq[sly, slx]
+
+                    _hdu["DQ"].data |= _flat_dq
                     _hdu.flush()
 
         if mask_dq4_fraction is not None:
