@@ -490,7 +490,12 @@ def go(root='j010311+131615',
     # Preliminary gaia catalog
     # Get gaia catalog
     try:
-        gaia = grizli_catalog.gaia_catalog_for_assoc(assoc_name=root)
+        #. try:
+        gaia = grizli_catalog.gaia_catalog_for_assoc(
+            assoc_name=root, use_mast=True,
+            # max=8192
+        )
+
         msg = f"{root} : found {gaia['valid'].sum()} GAIA sources"
         utils.log_comment(utils.LOGFILE, msg, show_date=False,
                           verbose=True)
