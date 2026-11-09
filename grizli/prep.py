@@ -1351,7 +1351,7 @@ def align_drizzled_image(
 
         hasm = ok & (dr.value < close_threshold)
 
-        if hasm.sum() < 32:
+        if hasm.sum() < 16:
             icut = 400
             cut = np.argsort(cat["MAG_AUTO"][ok])[:icut]
             xy_drz = np.array([
@@ -2168,7 +2168,7 @@ def make_SEP_catalog(
     log=False,
     gain=2000.0,
     extract_pixstack=int(3e7),
-    sub_object_limit=4096,
+    sub_object_limit=4096 * 16,
     exposure_footprints=None,
     **kwargs,
 ):
