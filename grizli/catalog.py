@@ -573,6 +573,7 @@ def get_gaia_vizier(
     mjd=None,
     clean_mjd=True,
     lowercase=True,
+    use_mast=False,
     **kwargs,
 ):
     """
@@ -624,16 +625,35 @@ def get_gaia_vizier(
             if k in keys:
                 keys.pop(keys.index(k))
 
+    if use_mast:
+        # Use MAST TAP catalog
+        db = "dbo.gaia_source"
+        tap_url = "https://mast.stsci.edu/vo-tap/api/v0.1/gaiadr3"
+        keys = [
+            "ra", "dec", "ra_error", "dec_error", "pmra", "pmra_error",
+            "pmdec", "pmdec_error", "phot_rp_mean_mag", "ref_epoch",
+        ]
+        extra_query = extra_query.replace("RPmag", "phot_rp_mean_mag")
+
+        if "tap_url" not in kwargs:
+            kwargs["tap_url"] = tap_url
+
+        vizier = False
+    else:
+        # Use Vizier
+        db = f'"{catalog}"'
+        vizier = True
+
     try:
         result = query_tap_catalog(
             ra,
             dec,
             radius=radius,
-            db=f'"{catalog}"',
+            db=db,
             columns=[f'"{k}"' for k in keys],
             extra=extra_query,
             max=max,
-            vizier=True,
+            vizier=vizier,
             circle=True,
             **kwargs,
         )
@@ -641,13 +661,15 @@ def get_gaia_vizier(
         utils.log_exception(utils.LOGFILE, traceback)
         return False
 
-    if ("dr3" in catalog) & (len(result) > 0):
-        result["ref_epoch"] = 2016.0
-    else:
-        result["ref_epoch"] = 2015.5
+    if "ref_epoch" not in result.colnames:
+        if ("dr3" in catalog) & (len(result) > 0):
+            result["ref_epoch"] = 2016.0
+        else:
+            result["ref_epoch"] = 2015.5
 
-    result["ra"] = result["RA_ICRS"]
-    result["dec"] = result["DE_ICRS"]
+    if "RA_ICRS" in result.colnames:
+        result["ra"] = result["RA_ICRS"]
+        result["dec"] = result["DE_ICRS"]
 
     if lowercase:
         cols = result.colnames
