@@ -23,7 +23,12 @@ QUIET_LEVEL = logging.INFO
 # CRDS_CONTEXT = 'jwst_0942.pmap' # July 29, 2022 with updated NIRCAM ZPs
 # CRDS_CONTEXT = 'jwst_0995.pmap' # 2022-10-06 NRC ZPs and flats
 # CRDS_CONTEXT = "jwst_1123.pmap"  # 2023-09-08 NRC specwcs, etc.
+
 CRDS_CONTEXT = "jwst_1293.pmap"  # 2024-09-25
+
+import jwst
+if jwst.__version__ >= "3.0":
+    CRDS_CONTEXT = "jwst_1584.pmap"   # 2026-11-23, jwst==3.0.0
 
 # CRDS_CONTEXT = "jwst_1330.pmap"  # NIRCam flats updated 2025-02-18
 # CRDS_CONTEXT = "jwst_1401.pmap"
@@ -610,6 +615,87 @@ def datamodel_write(model, path, overwrite=True):
     return method(path, overwrite=overwrite)
 
 
+def datamodel_from_hdulist(hdulist, **kwargs):
+    """
+    Initialize a datamodel from an `astropy.io.fits.HDUList`.
+    Strictly deprecated in `jwst.datamodels.utils.open`, though the
+    function itself still does it.
+
+    Parameters
+    ----------
+    hdulist : `~astropy.io.fits.HDUList`
+        HDUlist object
+
+    Returns
+    -------
+    model : `~stdatamodels.model`
+        Data model
+    """
+    from jwst.datamodels import util
+
+    # Input is an open object
+    file_to_close = None
+
+    init = hdulist
+    info = init.fileinfo(0)
+    if info is not None:
+        file_name = info.get("filename")
+    else:
+        file_name = None
+
+    try:
+        hdu = hdulist[("SCI", 1)]
+    except (KeyError, NameError):
+        shape = ()
+    else:
+        if hasattr(hdu, "shape"):
+            shape = hdu.shape
+        else:
+            shape = ()
+
+    new_class = util._class_from_model_type(hdulist)
+    has_model_type = new_class is not None
+
+    # Special handling for ramp files for backwards compatibility
+    if new_class is None:
+        new_class = util._class_from_ramp_type(hdulist, shape)
+
+    # Or get the class from the reference file type and other header keywords
+    if new_class is None:
+        new_class = util._class_from_reftype(hdulist, shape)
+
+    # Or Get the class from the shape
+    if new_class is None:
+        new_class = util._class_from_shape(hdulist, shape)
+
+    # Throw an error if these attempts were unsuccessful
+    if new_class is None:
+        raise TypeError("Can't determine datamodel class from argument to open")
+
+    # Log a message about how the model was opened
+    if file_name:
+        util.log.debug(f"Opening {file_name} as {new_class}")
+    else:
+        util.log.debug(f"Opening as {new_class}")
+
+    # Actually open the model
+    try:
+        model = new_class(init, **kwargs)
+    except Exception:
+        if file_to_close is not None:
+            file_to_close.close()
+        raise
+
+    # Close the hdulist if we opened it
+    if file_to_close is not None:
+        model._file_references.append(_FileReference(file_to_close))
+
+    if not has_model_type:
+        util._handle_missing_model_type(model, file_name)
+
+    return model
+
+
 def img_with_flat(
     input,
     verbose=True,
@@ -695,7 +781,10 @@ def img_with_flat(
         # MIRI, NIRISS
         pass
 
-    img = util.open(_hdu)
+    try:
+        img = util.open(_hdu)
+    except TypeError:
+        img = datamodel_from_hdulist(_hdu)
 
     if not skip:
 
@@ -923,11 +1012,20 @@ def img_with_wcs(
         # MIRI
         pass
 
-    img = util.open(_hdu)
+    # img = util.open(_hdu)
+    try:
+        img = util.open(_hdu)
+    except TypeError:
+        img = datamodel_from_hdulist(_hdu)
 
     # AssignWcs to pupulate img.meta.wcsinfo
     step = AssignWcsStep()
-    _distor_file = step.get_reference_file(input, "distortion")
+
+    try:
+        _distor_file = step.get_reference_file(input, "distortion")
+    except TypeError:
+        _distor_file = step.get_reference_file(img, "distortion")
+
     utils.log_comment(
         utils.LOGFILE,
         f"jwst.assign_wcs.AssignWcsStep: {_distor_file}",
@@ -1622,17 +1720,25 @@ def exposure_oneoverf_correction(
         cheb = np.nanmedian(med)
         deg = 0
 
-    else:
+    elif ok.sum() > 0:
         # Remove smooth component
         deg = nx // deg_pix
 
         for _iter in range(3):
+            if ok.sum() < 2:
+                cheb = 0.
+                deg = -1
+                break
+
             cfit = Chebyshev.fit(xarr[ok], med[ok], deg=deg)
             cheb = cfit(xarr)
             ok = np.isfinite(med) & (np.abs(med - cheb) < 0.05)
 
-        if make_plot:
+        if make_plot & (ok.sum() > 0):
             ax.plot(np.arange(nx)[ok], cheb[ok], color="r")
+    else:
+        cheb = 0.0
+        deg = -1
 
     if axis == 0:
         model = np.zeros_like(sci) + (med - cheb)
@@ -1659,7 +1765,7 @@ def exposure_oneoverf_correction(
 
             model[~np.isfinite(model)] = 0
 
-            im["SCI"].data -= model
+            im["SCI"].data -= model.astype(im["SCI"].data.dtype)
             im.flush()
 
         if make_plot:

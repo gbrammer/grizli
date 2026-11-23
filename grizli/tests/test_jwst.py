@@ -77,11 +77,11 @@ class TestJWSTHeaders:
             gz_file = os.path.basename(file)
             local_file = gz_file.split('.gz')[0]
             prep.fresh_flt_file(local_file, path=file_path)
-            im = pyfits.open(local_file)
+            with pyfits.open(local_file) as im:
             
-            assert('SIPRAMAD' in im['SCI'].header)
-            assert(im['SCI'].header['SIPRAMAD'] < 1.e-2)
-            assert(im['SCI'].header['SIPDEMAD'] < 1.e-2)
+                assert('SIPRAMAD' in im['SCI'].header)
+                assert(im['SCI'].header['SIPRAMAD'] < 1.e-2)
+                assert(im['SCI'].header['SIPDEMAD'] < 1.e-2)
             
         # Parse visits
         visits, groups, info = auto_script.parse_visits(

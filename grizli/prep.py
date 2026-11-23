@@ -211,16 +211,19 @@ def fresh_flt_file(
         dq = None
 
     if file == local_file:
-        orig_file = pyfits.open(glob.glob(os.path.join(path, file) + "*")[0])
+        path_file = glob.glob(os.path.join(path, file) + "*")[0]
     else:
-        orig_file = pyfits.open(file)
+        path_file = file
+        #orig_file = pyfits.open(file)
+
+    orig_hdu = pyfits.open(path_file)
 
     local_file = local_file.split(".gz")[0]
 
     if dq is not None:
-        orig_file["DQ"] = dq
+        orig_hdu["DQ"] = dq
 
-    head = orig_file[0].header
+    head = orig_hdu[0].header.copy()
 
     # Divide grism images by imaging flats
     # G102 -> F105W, uc72113oi_pfl.fits
@@ -236,7 +239,7 @@ def fresh_flt_file(
             calib_types.append("PFLTFILE")
 
         utils.fetch_hst_calibs(
-            orig_file.filename(), ftpdir=ftpdir, calib_types=calib_types, verbose=False
+            orig_hdu.filename(), ftpdir=ftpdir, calib_types=calib_types, verbose=False
         )
 
     if filter in ["G102", "G141"]:
@@ -250,14 +253,14 @@ def fresh_flt_file(
         flat_dq = flat < 0.2
 
         # Grism FLT from IR amplifier gain
-        pfl_file = orig_file[0].header["PFLTFILE"].replace("iref$", os.getenv("iref"))
+        pfl_file = orig_hdu[0].header["PFLTFILE"].replace("iref$", os.getenv("iref"))
         grism_pfl = pyfits.open(pfl_file)[1].data[5:-5, 5:-5]
 
-        orig_file["DQ"].data |= 4 * flat_dq
-        orig_file["SCI"].data *= grism_pfl / flat
+        orig_hdu["DQ"].data |= 4 * flat_dq
+        orig_hdu["SCI"].data *= grism_pfl / flat
 
         # if apply_grism_skysub:
-        #     if 'GSKY001' in orig_file:
+        #     if 'GSKY001' in orig_hdu:
 
     if filter == "G280":
         # Use F200LP flat
@@ -271,8 +274,8 @@ def fresh_flt_file(
             flat = flat_im["SCI", ext].data
             flat_dq = flat < 0.2
 
-            orig_file["DQ", ext].data |= 4 * flat_dq
-            orig_file["SCI", ext].data *= 1.0 / flat
+            orig_hdu["DQ", ext].data |= 4 * flat_dq
+            orig_hdu["SCI", ext].data *= 1.0 / flat
 
     if filter == "G800L":
         flat_files = {"G800L": "n6u12592j_pfl.fits"}  # F814W
@@ -280,7 +283,7 @@ def fresh_flt_file(
         extra_msg = " / flat: {0}".format(flat_file)
 
         flat_im = pyfits.open(os.path.join(os.getenv("jref"), flat_file))
-        pfl_file = orig_file[0].header["PFLTFILE"].replace("jref$", os.getenv("jref"))
+        pfl_file = orig_hdu[0].header["PFLTFILE"].replace("jref$", os.getenv("jref"))
         pfl_im = pyfits.open(pfl_file)
         for ext in [1, 2]:
             flat = flat_im["SCI", ext].data
@@ -288,12 +291,12 @@ def fresh_flt_file(
 
             grism_pfl = pfl_im["SCI", ext].data
 
-            orig_file["DQ", ext].data |= 4 * flat_dq
-            orig_file["SCI", ext].data *= grism_pfl / flat
+            orig_hdu["DQ", ext].data |= 4 * flat_dq
+            orig_hdu["SCI", ext].data *= grism_pfl / flat
 
-        if orig_file[0].header["NPOLFILE"] == "N/A":
+        if orig_hdu[0].header["NPOLFILE"] == "N/A":
             # Use an F814W file, but this should be updated
-            orig_file[0].header["NPOLFILE"] = "jref$v971826jj_npl.fits"
+            orig_hdu[0].header["NPOLFILE"] = "jref$v971826jj_npl.fits"
 
     if head["INSTRUME"] == "WFPC2":
         head["DETECTOR"] = "WFPC2"
@@ -301,8 +304,8 @@ def fresh_flt_file(
     if (head["INSTRUME"] == "WFC3") & (head["DETECTOR"] == "IR") & extra_badpix:
         bp = pyfits.open(os.path.join(os.getenv("iref"), "badpix_spars200_Nov9.fits"))
 
-        if orig_file["DQ"].data.shape == bp[0].data.shape:
-            orig_file["DQ"].data |= bp[0].data
+        if orig_hdu["DQ"].data.shape == bp[0].data.shape:
+            orig_hdu["DQ"].data |= bp[0].data
 
         extra_msg += " / bpix: $iref/badpix_spars200_Nov9.fits"
 
@@ -325,12 +328,12 @@ def fresh_flt_file(
                 )
             )
 
-            if orig_file["DQ"].data.shape == new_bp[0].data.shape:
-                orig_file["DQ"].data |= new_bp[0].data
+            if orig_hdu["DQ"].data.shape == new_bp[0].data.shape:
+                orig_hdu["DQ"].data |= new_bp[0].data
                 extra_msg += " / wfc3ir_dark_badpix_2019.01.12.fits"
 
     logstr = "# {0} -> {1} {2}"
-    logstr = logstr.format(orig_file.filename(), local_file, extra_msg)
+    logstr = logstr.format(orig_hdu.filename(), local_file, extra_msg)
     utils.log_comment(utils.LOGFILE, logstr, verbose=verbose)
 
     isACS = head["DETECTOR"] in ["UVIS", "WFC"]
@@ -338,14 +341,15 @@ def fresh_flt_file(
     ####
     # JWST
     isJWST = False
+    needs_crval = ("CRVAL1" not in orig_hdu[1].header)
 
-    if "TELESCOP" in orig_file[0].header:
-        if orig_file[0].header["TELESCOP"] == "JWST":
+    if "TELESCOP" in orig_hdu[0].header:
+        if orig_hdu[0].header["TELESCOP"] == "JWST":
             isJWST = True
 
             jwst_utils.DO_PURE_PARALLEL_WCS = do_pure_parallel_wcs
 
-            orig_file.writeto(local_file, overwrite=True)
+            orig_hdu.writeto(local_file, overwrite=True)
 
             status = jwst_utils.initialize_jwst_image(
                 local_file,
@@ -354,15 +358,15 @@ def fresh_flt_file(
                 use_skyflats=use_skyflats,
             )
 
-            orig_file = pyfits.open(local_file)
+            orig_hdu = pyfits.open(local_file)
 
     if crclean and has_scrappy:
         for ext in [1, 2]:
             msg = f"Clean CRs with LACosmic, extension {ext:d}"
             utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
 
-            sci = orig_file["SCI", ext].data
-            dq = orig_file["DQ", ext].data
+            sci = orig_hdu["SCI", ext].data
+            dq = orig_hdu["DQ", ext].data
 
             crmask, clean = detect_cosmics(
                 sci,
@@ -406,22 +410,22 @@ def fresh_flt_file(
             "SHADFILE",
         ]:
             ref_file = "_".join(head[key].split(".")) + ".fits"
-            orig_file[0].header[key] = ref_file.replace("h.fits", "f.fits")
+            orig_hdu[0].header[key] = ref_file.replace("h.fits", "f.fits")
 
-        waiv = orig_file[0].header["FLATFILE"]
-        orig_file[0].header["FLATFILE"] = waiv.replace(".fits", "_c0h.fits")
+        waiv = orig_hdu[0].header["FLATFILE"]
+        orig_hdu[0].header["FLATFILE"] = waiv.replace(".fits", "_c0h.fits")
 
         if not os.path.exists(""):
             pass
 
         #
         # ## testing
-        # orig_file[0].header['FLATFILE'] = 'm341820ju_pfl.fits'
+        # orig_hdu[0].header['FLATFILE'] = 'm341820ju_pfl.fits'
 
         # Make sure has correct header keys
         for ext in range(4):
-            if "BUNIT" not in orig_file[ext + 1].header:
-                orig_file[ext + 1].header["BUNIT"] = "COUNTS"
+            if "BUNIT" not in orig_hdu[ext + 1].header:
+                orig_hdu[ext + 1].header["BUNIT"] = "COUNTS"
 
         # Copy WFPC2 DQ file (c1m)
         dqfile = os.path.join(path, file.replace("_c0", "_c1"))
@@ -435,7 +439,7 @@ def fresh_flt_file(
 
         # Add additional masking since AstroDrizzle having trouble with flats
         flat_file = (
-            orig_file[0].header["FLATFILE"].replace("uref$", os.getenv("uref") + "/")
+            orig_hdu[0].header["FLATFILE"].replace("uref$", os.getenv("uref") + "/")
         )
         pfl = pyfits.open(flat_file)
         c1m = pyfits.open(os.path.basename(dqfile), mode="update")
@@ -448,12 +452,12 @@ def fresh_flt_file(
     # Set NaN pixels
     if clean_nan:
         for ext in [1,2,3,4]:
-            if ('SCI',ext) not in orig_file:
+            if ('SCI',ext) not in orig_hdu:
                 break
 
-            fix = ~np.isfinite(orig_file['SCI',ext].data)
-            if ('ERR',ext) in orig_file:
-                fix |= ~np.isfinite(orig_file['ERR',ext].data)
+            fix = ~np.isfinite(orig_hdu['SCI',ext].data)
+            if ('ERR',ext) in orig_hdu:
+                fix |= ~np.isfinite(orig_hdu['ERR',ext].data)
 
             nfix = fix.sum()
 
@@ -462,21 +466,38 @@ def fresh_flt_file(
                     f"Fix {nfix} NaN pixels in extension {ext}, set DQ={dq_nan}"
                 )
                 utils.log_comment(utils.LOGFILE, msg, verbose=True)
-                orig_file['SCI', ext].data[fix] = 0.0
-                if ('ERR',ext) in orig_file:
-                    orig_file['ERR', ext].data[fix] = 1.e5
+                orig_hdu['SCI', ext].data[fix] = 0.0
+                if ('ERR',ext) in orig_hdu:
+                    orig_hdu['ERR', ext].data[fix] = 1.e5
 
-                orig_file['DQ', ext].data[fix] |= dq_nan
+                orig_hdu['DQ', ext].data[fix] |= dq_nan
 
-    orig_file.writeto(local_file, overwrite=True)
+    orig_hdu.writeto(local_file, overwrite=True)
 
     if mask_regions:
         apply_region_mask(local_file, dq_value=1024)
         apply_region_mask_from_db(local_file, dq_value=1024)
 
     # Flush objects
-    orig_file.close()
-    del orig_file
+    sci_header = orig_hdu[1].header.copy()
+
+    orig_hdu.close()
+
+    # Do we need WCS keywords in orig_hdu?
+    if isJWST & needs_crval:
+        msg = (
+            f"Add WCS CRPIX/CRVAL keywords in original file {path_file}"
+        )
+        utils.log_comment(utils.LOGFILE, msg, verbose=verbose)
+
+        with pyfits.open(path_file) as orig_hdu:
+            for key in ["CRVAL1", "CRVAL2", "CRPIX1", "CRPIX2"]:
+                if key not in orig_hdu[1].header:
+                    orig_hdu[1].header[key] = sci_header[key]
+
+            orig_hdu.writeto(path_file, overwrite=True)
+
+    del orig_hdu
 
     for _iter in range(3):
         gc.collect()
