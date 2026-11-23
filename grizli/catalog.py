@@ -2089,7 +2089,9 @@ def get_euclid_q1_catalog(
         "dec",
         "fwhm",
         "flux_vis_1fwhm_aper",
+        "fluxerr_vis_1fwhm_aper",
         "flux_nir_stack_1fwhm_aper",
+        "fluxerr_nir_stack_1fwhm_aper",
         "flag_vis",
         "flag_nir_stack",
     ],
@@ -2115,6 +2117,11 @@ def get_euclid_q1_catalog(
 
     verbose : bool
         Print information. Default is True.
+
+    table : str
+        Irsa table name, e.g, ``euclid_q1_mer_catalogue``,
+        ``euclid_dr1_mer_catalogue_wide_survey``,
+        ``euclid_dr1_mer_catalogue_deep_survey``
 
     extra : str
         Additional query string.
