@@ -662,7 +662,7 @@ def img_with_flat(
 
     set_quiet_logging(QUIET_LEVEL)
 
-    _ = set_crds_context()
+    _ = set_crds_context(verbose=verbose)
 
     if not isinstance(input, pyfits.HDUList):
         _hdu = pyfits.open(input)
@@ -675,7 +675,7 @@ def img_with_flat(
             skip = True
 
     if "OINSTRUM" not in _hdu[0].header:
-        copy_jwst_keywords(_hdu[0].header)
+        copy_jwst_keywords(_hdu[0].header, verbose=verbose)
 
     # if _hdu[0].header['OINSTRUM'] == 'NIRISS':
     #     if _hdu[0].header['OFILTER'].startswith('GR'):
@@ -892,7 +892,7 @@ def img_with_wcs(
 
     set_quiet_logging(QUIET_LEVEL)
 
-    _ = set_crds_context()
+    _ = set_crds_context(verbose=verbose)
 
     # HDUList -> jwst.datamodels.ImageModel
 
@@ -903,7 +903,7 @@ def img_with_wcs(
         _hdu = input
 
     if "OINSTRUM" not in _hdu[0].header:
-        copy_jwst_keywords(_hdu[0].header)
+        copy_jwst_keywords(_hdu[0].header, verbose=verbose)
 
     if _hdu[0].header["OINSTRUM"] == "NIRISS":
         if _hdu[0].header["OFILTER"].startswith("GR"):
@@ -958,6 +958,7 @@ def img_with_wcs(
                 step=64,
                 degrees=[3, 4, 5, 5],
                 initial_header=None,
+                verbose=verbose,
             )
 
             wcs = pywcs.WCS(hsip, relax=True)
@@ -2660,7 +2661,8 @@ def pipeline_model_wcs_header(
 
     frame = inspect.currentframe()
     utils.log_function_arguments(
-        utils.LOGFILE, frame, "jwst_utils.pipeline_model_wcs_header"
+        utils.LOGFILE, frame, "jwst_utils.pipeline_model_wcs_header",
+        verbose=verbose
     )
 
     filter_offset = None
