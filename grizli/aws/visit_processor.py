@@ -685,6 +685,13 @@ def make_visit_mosaic(assoc, base_path=ROOT_PATH, version='v7.0', pixscale=0.08,
     tile = db.SQL(f"""select * from mosaic_tiles
     order by SQRT(POWER(crval1 - {crv[0]},2)+POWER(crval2 - {crv[1]},2)) 
     limit 1""")[0]
+
+    if 0:
+        tile = db.SQL(f"""select * from mosaic_tiles
+            order by SQRT(
+                POWER((crval1 - {crv[0]}) * COS({crv[1]} / 180 * 3.14159), 2)
+                + POWER(crval2 - {crv[1]},2))
+        limit 1""")[0]
     
     htile, wtile = utils.make_wcsheader(
         tile['crval1'],
