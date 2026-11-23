@@ -688,7 +688,7 @@ def datamodel_from_hdulist(hdulist, **kwargs):
 
     # Close the hdulist if we opened it
     if file_to_close is not None:
-        model._file_references.append(_FileReference(file_to_close))
+        model._file_references.append(util._FileReference(file_to_close))
 
     if not has_model_type:
         util._handle_missing_model_type(model, file_name)
