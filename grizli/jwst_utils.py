@@ -26,9 +26,12 @@ QUIET_LEVEL = logging.INFO
 
 CRDS_CONTEXT = "jwst_1293.pmap"  # 2024-09-25
 
-import jwst
-if jwst.__version__ >= "3.0":
-    CRDS_CONTEXT = "jwst_1584.pmap"   # 2026-11-23, jwst==3.0.0
+try:
+    import jwst
+    if jwst.__version__ >= "3.0":
+        CRDS_CONTEXT = "jwst_1584.pmap"   # 2026-11-23, jwst==3.0.0
+except ImportError:
+    pass
 
 # CRDS_CONTEXT = "jwst_1330.pmap"  # NIRCam flats updated 2025-02-18
 # CRDS_CONTEXT = "jwst_1401.pmap"
