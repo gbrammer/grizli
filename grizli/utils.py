@@ -7038,47 +7038,14 @@ def header_keys_from_filelist(fits_files, keywords=[], ext=0, colname_case=str.l
     return tab
 
 
-def parse_s3_url(url="s3://bucket/path/to/file.txt"):
-    """
-    Parse s3 path string
-
-    Parameters
-    ----------
-    url : str
-        Full S3 path, e.g., ``[s3://]{bucket_name}/{s3_object}``
-
-    Returns
-    -------
-    bucket_name : str
-        Bucket name
-
-    s3_object : str
-        Full path of the S3 file object
-
-    filename : str
-        File name of the object, e.g. ``os.path.basename(s3_object)``
-
-    """
-    surl = url.split("s3://")[-1]
-    spl = surl.split("/")
-    if len(spl) < 2:
-        print(f"bucket / path not found in {url}")
-        return None, None, None
-
-    bucket_name = spl[0]
-    s3_object = "/".join(spl[1:])
-    filename = os.path.basename(s3_object)
-    return bucket_name, s3_object, filename
-
-
 def safe_boto_resource(service_name, **kwargs):
     """
-    Start a boto3 session falling back to anonymous if no credentials found
+    Start a boto3 session falling back to anonymous if no credentials found.
 
     Parameters
     ----------
     service_name : str
-        `boto3` service, e.g., ``s3``.
+        `boto3` service, e.g., ``'s3'``.
 
     kwargs : dict
         Keyword arguments passed to `boto3.session.Session`
@@ -7087,6 +7054,15 @@ def safe_boto_resource(service_name, **kwargs):
     -------
     resource : e.g., `boto3.resources.factory.s3.ServiceResource`
         Resource object for the requested ``service_name``
+
+    .. note::
+        ``service_name`` is only tested / used here for 's3' with
+
+            >>> import boto3
+            >>> from botocore import UNSIGNED
+            >>> from botocore.client import Config
+            >>> config_ = Config(signature_version=UNSIGNED)
+            >>> resource = boto3.resource("s3", config=config_)
 
     """
     import boto3
@@ -7127,6 +7103,40 @@ def safe_boto_resource(service_name, **kwargs):
         )
 
         return resource
+
+
+def parse_s3_url(url="s3://bucket/path/to/file.txt"):
+    """
+    Parse s3 path string
+
+    Parameters
+    ----------
+    url : str
+        Full S3 path, e.g., ``[s3://]{bucket_name}/{s3_object}``
+
+    Returns
+    -------
+    bucket_name : str
+        Bucket name
+
+    s3_object : str
+        Full path of the S3 file object
+
+    filename : str
+        File name of the object, e.g., ``os.path.basename(s3_object)``
+
+    """
+    surl = url.split("s3://")[-1]
+    spl = surl.split("/")
+    if len(spl) < 2:
+        print(f"bucket / path not found in {url}")
+        return None, None, None
+
+    bucket_name = spl[0]
+    s3_object = "/".join(spl[1:])
+    filename = os.path.basename(s3_object)
+
+    return bucket_name, s3_object, filename
 
 
 def fetch_s3_url(
