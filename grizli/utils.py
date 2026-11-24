@@ -7254,7 +7254,11 @@ def general_fetch_file(url, path='./', makedirs=True, skip_existing=True, cache=
     """
     import shutil
     from astropy.utils.data import download_file
-    from urllib.error import HTTPError
+    try:
+        from urllib.request import HTTPError, URLError
+    except ImportError:
+        from urllib3.exceptions import HTTPError
+        URLError = TimeoutError
 
     base = os.path.basename(url)
     local_file = os.path.join(path, base)
@@ -7281,7 +7285,11 @@ def general_fetch_file(url, path='./', makedirs=True, skip_existing=True, cache=
             astropy_file = download_file(url, cache=cache, **kwargs)
             shutil.copy(astropy_file, local_file)
             status = 2
-        except HTTPError:
+
+        except (HTTPError, URLError):
+            msg = f"utils.general_fetch_file: download_file('{url}') failed"
+            log_comment(LOGFILE, msg, verbose=verbose)
+
             local_file = None
             status = 0
 
@@ -7998,29 +8006,11 @@ WARNING: weight_type '{weight_type}' not in {_valid_weight_type}.  Fall back to 
         if (not os.path.exists(file)) & (s3 is not None):
             s3_file, s3_status = fetch_s3_url(url=visit["awspath"][i])
 
-            # # x
-            # bucket_i = visit["awspath"][i].split("/")[0]
-            # if bucket_name != bucket_i:
-            #     bucket_name = bucket_i
-            #     bkt = s3.Bucket(bucket_name)
-            #
-            # s3_path = "/".join(visit["awspath"][i].split("/")[1:])
-            # remote_file = os.path.join(s3_path, file)
-            #
-            # print("  (fetch from s3://{0}/{1})".format(bucket_i, remote_file))
-            #
-            # try:
-            #     bkt.download_file(
-            #         remote_file, file, ExtraArgs={"RequestPayer": "requester"}
-            #     )
-            # except ClientError:
-            #     print("  (failed s3://{0}/{1})".format(bucket_i, remote_file))
-            #     continue
-
         try:
             flt = pyfits.open(file)
         except OSError:
-            print(f"open({file}) failed!")
+            msg = f"open({file}) failed!"
+            log_comment(LOGFILE, msg, verbose=verbose)
             continue
 
         sci_list, wht_list, wcs_list = [], [], []
@@ -9228,19 +9218,8 @@ def fetch_acs_wcs_files(beams_file, bucket_name="grizli-v1"):
             print("Fetch {0} from {1}/Pipeline/{2}".format(wcsfile, bucket_name, root))
 
             if HAS_BOTO:
-                # s3 = boto3.resource("s3")
-                # # s3_client = boto3.client("s3")
-                # bkt = s3.Bucket(bucket_name)
-
                 s3_path = "Pipeline/{0}/Extractions/{1}".format(root, wcsfile)
                 s3_file, s3_status = fetch_s3_url(url=s3_path)
-
-                # bkt.download_file(
-                #     s3_path,
-                #     "./{0}".format(wcsfile),
-                #     ExtraArgs={"RequestPayer": "requester"},
-                # )
-
             else:
                 url = "https://s3.amazonaws.com/{0}/".format(bucket_name)
                 url += "Pipeline/{0}/Extractions/{1}".format(root, wcsfile)
@@ -10096,7 +10075,7 @@ class EffectivePSF:
             self.load_jwst_stdpsf(**kwargs)
 
 
-    def load_jwst_stdpsf(self, miri_filters=["F560W", "F770W", "F1000W", "F1130W", "F1280W", "F1500W", "F1800W", "F2100W", "F2550W"], miri_extended=True, nircam_sw_filters=["F200W"], nircam_sw_detectors=["A1","A2","A3","A4","B1","B2","B3","B4"], nircam_lw_filters=["F444W"], nircam_lw_detectors=["AL", "BL"], clip_negative=False, use_astropy_cache=True):
+    def load_jwst_stdpsf(self, miri_filters=["F560W", "F770W", "F1000W", "F1130W", "F1280W", "F1500W", "F1800W", "F2100W", "F2550W"], miri_extended=True, nircam_sw_filters=["F200W"], nircam_sw_detectors=["A1","A2","A3","A4","B1","B2","B3","B4"], nircam_lw_filters=["F444W"], nircam_lw_detectors=["AL", "BL"], clip_negative=False, use_astropy_cache=True, verbose=True):
         """
         Load ePSF models from https://www.stsci.edu/~jayander/JWST1PASS/LIB/PSFs/STDPSFs
 
@@ -10123,9 +10102,9 @@ class EffectivePSF:
         """
         from astropy.utils.data import download_file
         try:
-            from urllib.request import HTTPError
+            from urllib.request import HTTPError, URLError
         except ImportError:
-            from urllib3.exceptions import HTTPError
+            from urllib3.exceptions import HTTPError, TimeoutError
 
         stdpsf_url = "https://www.stsci.edu/~jayander/JWST1PASS/LIB/PSFs/STDPSFs/"
 
@@ -10136,12 +10115,11 @@ class EffectivePSF:
 
         for filter in miri_filters:
             full_url = stdpsf_url + miri_path.format(filter=filter)
-
-            try:
-                file_obj = download_file(full_url, cache=use_astropy_cache)
-            except HTTPError:
-                msg = f"Failed to download ePSF from {full_url}"
-                log_comment(LOGFILE, msg, verbose=True, show_date=True)
+            
+            file_obj, file_status = general_fetch_file(
+                full_url, cache=use_astropy_cache, verbose=verbose
+            )
+            if file_obj  is None:
                 continue
 
             with pyfits.open(file_obj) as im:
@@ -10156,13 +10134,15 @@ class EffectivePSF:
 
         for filter in nircam_sw_filters:
             for detector in nircam_sw_detectors:
-                full_url = stdpsf_url + sw_path.format(filter=filter, detector=detector)
+                full_url = (
+                    stdpsf_url
+                    + sw_path.format(filter=filter, detector=detector)
+                )
 
-                try:
-                    file_obj = download_file(full_url, cache=use_astropy_cache)
-                except HTTPError:
-                    msg = f"Failed to download ePSF from {full_url}"
-                    log_comment(LOGFILE, msg, verbose=True, show_date=True)
+                file_obj, file_status = general_fetch_file(
+                    full_url, cache=use_astropy_cache, verbose=verbose
+                )
+                if file_obj  is None:
                     continue
 
                 with pyfits.open(file_obj) as im:
@@ -10177,13 +10157,15 @@ class EffectivePSF:
 
         for filter in nircam_lw_filters:
             for detector in nircam_lw_detectors:
-                full_url = stdpsf_url + lw_path.format(filter=filter, detector=detector)
-
-                try:
-                    file_obj = download_file(full_url, cache=use_astropy_cache)
-                except HTTPError:
-                    msg = f"Failed to download ePSF from {full_url}"
-                    log_comment(LOGFILE, msg, verbose=True, show_date=True)
+                full_url = (
+                    stdpsf_url
+                    + lw_path.format(filter=filter, detector=detector)
+                )
+                
+                file_obj, file_status = general_fetch_file(
+                    full_url, cache=use_astropy_cache, verbose=verbose
+                )
+                if file_obj  is None:
                     continue
 
                 with pyfits.open(file_obj) as im:
