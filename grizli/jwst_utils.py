@@ -1778,6 +1778,38 @@ def exposure_oneoverf_correction(
     return fig, model
 
 
+def set_time_hdu(hdulist):
+    """
+    Reset the TIME extension to force bitpix = -32
+
+    Parameters
+    ----------
+    hdulist : `astropy.io.fits.HDUList`
+        Open FITS HDUList
+
+    Returns
+    -------
+    Replaces TIME extension in ``hdulist``
+
+    """
+    time = pyfits.ImageHDU(data=None)
+
+    time._bitpix = -32
+    time.header["EXTNAME"] = "TIME"
+    time.header["EXTVER"] = 1
+    time.header["BITPIX"] = -32
+    time.header["PIXVALUE"] = hdulist[0].header["EXPTIME"] * 1.0
+    time.header["BUNIT"] = "SECONDS"
+    time.header["NPIX1"] = hdulist["SCI"].header["NAXIS1"] * 1
+    time.header["NPIX2"] = hdulist["SCI"].header["NAXIS2"] * 1
+    time.header["INHERIT"] = True
+
+    if "TIME" in hdulist:
+        old = hdulist.pop("TIME")
+
+    hdulist.append(time)
+
+
 def initialize_jwst_image(
     filename,
     verbose=True,
@@ -2095,24 +2127,9 @@ def initialize_jwst_image(
 
     get_phot_keywords(filename)
 
-    # Add TIME extension
-    if "TIME" not in img:
-        img = pyfits.open(filename)
-
-        time = pyfits.ImageHDU(data=img["SCI", 1].data)
-        # np.ones_like(img['SCI',1].data)*img[0].header['EXPTIME'])
-        time.data = None
-        time.header["EXTNAME"] = "TIME"
-        time.header["EXTVER"] = 1
-        time.header["PIXVALUE"] = img[0].header["EXPTIME"] * 1.0
-        time.header["BUNIT"] = "SECONDS"
-        time.header["NPIX1"] = img["SCI"].header["NAXIS1"] * 1
-        time.header["NPIX2"] = img["SCI"].header["NAXIS2"] * 1
-        time.header["INHERIT"] = True
-
-        img.append(time)
-        img.writeto(filename, overwrite=True)
-        img.close()
+    with pyfits.open(filename, mode="update") as hdulist:
+        set_time_hdu(hdulist)
+        hdulist.flush()
 
     gc.collect()
     return True
@@ -2213,6 +2230,7 @@ def set_jwst_to_hst_keywords(
 
     # TIME keyword seems to get corrupted?
     if "TIME" in img:
+        img["TIME"].header["BITPIX"] = -32
         img["TIME"].header["PIXVALUE"] = img[0].header["EXPTIME"]
 
     if isinstance(input, str):
