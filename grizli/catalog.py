@@ -2077,7 +2077,7 @@ def get_panstarrs_catalog(
     return tab
 
 
-def get_euclid_q1_catalog(
+def get_euclid_irsa_catalog(
     ra=0.0,
     dec=0.0,
     radius=3.0,
@@ -2096,11 +2096,10 @@ def get_euclid_q1_catalog(
         "flag_nir_stack",
     ],
     trim_flag=15,
+    **kwargs,
 ):
     """
-    Get PS1 from Vizier
-
-    Wrapper for `query_tap_catalog`.
+    Get Euclid catalogs from IRSA
 
     Parameters
     ----------
@@ -2132,12 +2131,13 @@ def get_euclid_q1_catalog(
         Result of the query.
 
     """
-    msg = "Query Euclid Q1 catalog ({ra},{dec},{radius}) from astroquery.ipac.irsa"
+    msg = "Query Euclid {table} at ({ra},{dec},{radius}) from astroquery.ipac.irsa"
     print(msg.format(ra=ra, dec=dec, radius=radius))
 
     from astroquery.ipac.irsa import Irsa
 
     coo = SkyCoord(ra, dec, unit="deg")
+
     tab = Irsa.query_region(
         coordinates=coo,
         spatial="Cone",
@@ -2152,11 +2152,53 @@ def get_euclid_q1_catalog(
             if c in tab.colnames:
                 trim |= tab[c] & trim_flag > 0
 
-        msg = f"get_euclid_q1_catalog: trim {trim.sum()} sources with flag {trim_flag}"
+        msg = f"get_euclid_irsa_catalog: trim {trim.sum()} sources with flag {trim_flag}"
         print(msg)
         tab = tab[~trim]
 
     return tab
+
+
+def get_euclid_q1_catalog(ra=0.0, dec=0.0, radius=3.0, table="euclid_q1_mer_catalogue", **kwargs):
+    """
+    Wrapper around `~grizli.catalog.get_euclid_irsa_catalog` for Q1
+    """
+
+    result = get_euclid_irsa_catalog(
+        ra=ra, dec=dec, radius=radius,
+        table=table,
+        **kwargs,
+    )
+
+    return result
+
+
+def get_euclid_dr1_deep_catalog(ra=0.0, dec=0.0, radius=3.0, table="euclid_dr1_mer_catalogue_deep_survey", **kwargs):
+    """
+    Wrapper around `~grizli.catalog.get_euclid_irsa_catalog` for DR1 DEEP
+    """
+
+    result = get_euclid_irsa_catalog(
+        ra=ra, dec=dec, radius=radius,
+        table=table,
+        **kwargs,
+    )
+
+    return result
+
+
+def get_euclid_dr1_wide_catalog(ra=0.0, dec=0.0, radius=3.0, table="euclid_dr1_mer_catalogue_wide_survey", **kwargs):
+    """
+    Wrapper around `~grizli.catalog.get_euclid_irsa_catalog` for DR1 WIDE
+    """
+
+    result = get_euclid_irsa_catalog(
+        ra=ra, dec=dec, radius=radius,
+        table=table,
+        **kwargs,
+    )
+
+    return result
 
 
 def get_desi_spec_catalog(ra=0.0, dec=0.0, radius=3.0, desi_dr='dr1', **kwargs):
@@ -2205,7 +2247,9 @@ def get_radec_catalog(
     verbose=True,
     reference_catalogs=[
         "GAIA",
-        "EUCLID_Q1",
+        "EUCLID_DR1_DEEP",
+        "EUCLID_DR1_WIDE",
+        # "EUCLID_Q1",
         "LS_DR10",
         "LS_DR9",
         "PS1",
@@ -2277,6 +2321,8 @@ def get_radec_catalog(
         "LS_DR9": get_legacysurveys_catalog,
         "LS_DR10": get_legacysurveys_catalog,
         "EUCLID_Q1": get_euclid_q1_catalog,
+        "EUCLID_DR1_DEEP": get_euclid_dr1_deep_catalog,
+        "EUCLID_DR1_WIDE": get_euclid_dr1_wide_catalog,
     }
 
     # Try queries
