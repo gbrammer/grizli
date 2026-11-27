@@ -7038,6 +7038,73 @@ def header_keys_from_filelist(fits_files, keywords=[], ext=0, colname_case=str.l
     return tab
 
 
+def safe_boto_resource(service_name, **kwargs):
+    """
+    Start a boto3 session falling back to anonymous if no credentials found.
+
+    Parameters
+    ----------
+    service_name : str
+        `boto3` service, e.g., ``'s3'``.
+
+    kwargs : dict
+        Keyword arguments passed to `boto3.session.Session`
+
+    Returns
+    -------
+    resource : e.g., `boto3.resources.factory.s3.ServiceResource`
+        Resource object for the requested ``service_name``
+
+    .. note::
+        ``service_name`` is only tested / used here for 's3' with
+
+            >>> import boto3
+            >>> from botocore import UNSIGNED
+            >>> from botocore.client import Config
+            >>> config_ = Config(signature_version=UNSIGNED)
+            >>> resource = boto3.resource("s3", config=config_)
+
+    """
+    import boto3
+    from botocore import UNSIGNED
+    from botocore.client import Config
+
+    session_kwargs = dict(
+        aws_access_key_id=None,
+        aws_secret_access_key=None,
+        aws_session_token=None,
+        region_name=None,
+        botocore_session=None,
+        profile_name=None,
+        aws_account_id=None,
+    )
+
+    for kw in kwargs:
+        if kw in session_kwargs:
+            session_kwargs[kw] = kwargs[kw]
+
+    session = boto3.session.Session(**session_kwargs)
+    sts = session.client('sts')
+
+    try:
+        # Session probably valid if below succeeds
+        sts.get_caller_identity()
+
+        resource = session.resource(service_name)
+
+        return resource
+
+    except:
+        # Default session failed, try anonymous
+
+        resource = boto3.resource(
+            service_name,
+            config=Config(signature_version=UNSIGNED),
+        )
+
+        return resource
+
+
 def parse_s3_url(url="s3://bucket/path/to/file.txt"):
     """
     Parse s3 path string
@@ -7056,7 +7123,7 @@ def parse_s3_url(url="s3://bucket/path/to/file.txt"):
         Full path of the S3 file object
 
     filename : str
-        File name of the object, e.g. ``os.path.basename(s3_object)``
+        File name of the object, e.g., ``os.path.basename(s3_object)``
 
     """
     surl = url.split("s3://")[-1]
@@ -7068,11 +7135,13 @@ def parse_s3_url(url="s3://bucket/path/to/file.txt"):
     bucket_name = spl[0]
     s3_object = "/".join(spl[1:])
     filename = os.path.basename(s3_object)
+
     return bucket_name, s3_object, filename
 
 
 def fetch_s3_url(
     url="s3://bucket/path/to/file.txt",
+    ExtraArgs={"RequestPayer": "requester"},
     file_func=lambda x: os.path.join("./", x),
     skip_existing=True,
     verbose=True,
@@ -7086,9 +7155,15 @@ def fetch_s3_url(
     url : str
         S3 url of a file to download
 
+    ExtraArgs : dict
+        Keyword arguments passed to
+        `boto3.resources.factory.s3.Bucket.download_file`
+
     file_func : function
-        Function applied to the file name extracted from `url`, e.g., to
-        set output directory, rename files, set a prefix, etc.
+        Function applied to the file name extracted from
+        `os.path.basename(url)`, e.g., to set output directory, rename files,
+        set a prefix, etc.  The default just prepends ``./`` to the filename
+        to save in the current working directory.
 
     skip_existing : bool, optional
         If True, skip downloading if the local file already exists.
@@ -7111,8 +7186,11 @@ def fetch_s3_url(
     import boto3
     import botocore.exceptions
 
-    s3 = boto3.resource("s3")
+    # s3 = boto3.resource("s3")
+    s3 = safe_boto_resource("s3", **kwargs)
+
     bucket_name, s3_object, filename = parse_s3_url(url=url)
+
     if bucket_name is None:
         return url, os.path.exists(url)
 
@@ -7121,22 +7199,26 @@ def fetch_s3_url(
     status = os.path.exists(local_file) * 1
 
     if (status > 0) & skip_existing:
-        print(f"{local_file} exists, skipping.")
+        log_comment(LOGFILE, f"{local_file} exists.", verbose=verbose)
+        # (status = 1)
     else:
 
         try:
             bkt.download_file(
-                s3_object, local_file, ExtraArgs={"RequestPayer": "requester"}
+                s3_object,
+                local_file,
+                ExtraArgs=ExtraArgs,
             )
             status += 2
-            if verbose:
-                print(f"{url} > {local_file}")
+
+            log_comment(LOGFILE, f"{url} > {local_file}", verbose=verbose)
 
         except botocore.exceptions.ClientError:
+
             trace = traceback.format_exc(limit=2)
+
             msg = trace.split("\n")[-2].split("ClientError: ")[1]
-            if verbose:
-                print(f"Failed {url}: {msg}")
+            log_comment(LOGFILE, f"Failed {url}: {msg}", verbose=verbose)
 
             # Download failed due to a ClientError
             # Forbidden probably means insufficient bucket access privileges
@@ -7172,7 +7254,11 @@ def general_fetch_file(url, path='./', makedirs=True, skip_existing=True, cache=
     """
     import shutil
     from astropy.utils.data import download_file
-    from urllib.error import HTTPError
+    try:
+        from urllib.request import HTTPError, URLError
+    except ImportError:
+        from urllib3.exceptions import HTTPError
+        URLError = TimeoutError
 
     base = os.path.basename(url)
     local_file = os.path.join(path, base)
@@ -7199,7 +7285,11 @@ def general_fetch_file(url, path='./', makedirs=True, skip_existing=True, cache=
             astropy_file = download_file(url, cache=cache, **kwargs)
             shutil.copy(astropy_file, local_file)
             status = 2
-        except HTTPError:
+
+        except (HTTPError, URLError):
+            msg = f"utils.general_fetch_file: download_file('{url}') failed"
+            log_comment(LOGFILE, msg, verbose=verbose)
+
             local_file = None
             status = 0
 
@@ -7820,20 +7910,23 @@ def drizzle_from_visit(
         import boto3
         from botocore.exceptions import ClientError
 
-        s3 = boto3.resource("s3")
-        s3_client = boto3.client("s3")
+        s3 = safe_boto_resource("s3", **kwargs)
 
     except ImportError:
+
         s3 = None
         ClientError = None
-        s3_client = None
 
     _valid_weight_type = [
         "err", "median_err", "time", "jwst", "jwst_var", "median_variance",
     ]
+
     if weight_type not in _valid_weight_type:
-        print(f"WARNING: weight_type '{weight_type}' must be 'err', 'median_err', ")
-        print(f"         'jwst', 'median_variance', or 'time'; falling back to 'err'.")
+        msg = f"""
+WARNING: weight_type '{weight_type}' not in {_valid_weight_type}.  Fall back to 'err'.
+        """
+        log_comment(LOGFILE, msg, verbose=verbose)
+
         weight_type = "err"
 
     if isinstance(output, pywcs.WCS):
@@ -7911,28 +8004,13 @@ def drizzle_from_visit(
             continue
 
         if (not os.path.exists(file)) & (s3 is not None):
-            bucket_i = visit["awspath"][i].split("/")[0]
-            if bucket_name != bucket_i:
-                bucket_name = bucket_i
-                bkt = s3.Bucket(bucket_name)
-
-            s3_path = "/".join(visit["awspath"][i].split("/")[1:])
-            remote_file = os.path.join(s3_path, file)
-
-            print("  (fetch from s3://{0}/{1})".format(bucket_i, remote_file))
-
-            try:
-                bkt.download_file(
-                    remote_file, file, ExtraArgs={"RequestPayer": "requester"}
-                )
-            except ClientError:
-                print("  (failed s3://{0}/{1})".format(bucket_i, remote_file))
-                continue
+            s3_file, s3_status = fetch_s3_url(url=visit["awspath"][i])
 
         try:
             flt = pyfits.open(file)
         except OSError:
-            print(f"open({file}) failed!")
+            msg = f"open({file}) failed!"
+            log_comment(LOGFILE, msg, verbose=verbose)
             continue
 
         sci_list, wht_list, wcs_list = [], [], []
@@ -9140,17 +9218,8 @@ def fetch_acs_wcs_files(beams_file, bucket_name="grizli-v1"):
             print("Fetch {0} from {1}/Pipeline/{2}".format(wcsfile, bucket_name, root))
 
             if HAS_BOTO:
-                s3 = boto3.resource("s3")
-                s3_client = boto3.client("s3")
-                bkt = s3.Bucket(bucket_name)
-
                 s3_path = "Pipeline/{0}/Extractions/{1}".format(root, wcsfile)
-                bkt.download_file(
-                    s3_path,
-                    "./{0}".format(wcsfile),
-                    ExtraArgs={"RequestPayer": "requester"},
-                )
-
+                s3_file, s3_status = fetch_s3_url(url=s3_path)
             else:
                 url = "https://s3.amazonaws.com/{0}/".format(bucket_name)
                 url += "Pipeline/{0}/Extractions/{1}".format(root, wcsfile)
@@ -10006,7 +10075,7 @@ class EffectivePSF:
             self.load_jwst_stdpsf(**kwargs)
 
 
-    def load_jwst_stdpsf(self, miri_filters=["F560W", "F770W", "F1000W", "F1130W", "F1280W", "F1500W", "F1800W", "F2100W", "F2550W"], miri_extended=True, nircam_sw_filters=["F200W"], nircam_sw_detectors=["A1","A2","A3","A4","B1","B2","B3","B4"], nircam_lw_filters=["F444W"], nircam_lw_detectors=["AL", "BL"], clip_negative=False, use_astropy_cache=True):
+    def load_jwst_stdpsf(self, miri_filters=["F560W", "F770W", "F1000W", "F1130W", "F1280W", "F1500W", "F1800W", "F2100W", "F2550W"], miri_extended=True, nircam_sw_filters=["F200W"], nircam_sw_detectors=["A1","A2","A3","A4","B1","B2","B3","B4"], nircam_lw_filters=["F444W"], nircam_lw_detectors=["AL", "BL"], clip_negative=False, use_astropy_cache=True, verbose=True):
         """
         Load ePSF models from https://www.stsci.edu/~jayander/JWST1PASS/LIB/PSFs/STDPSFs
 
@@ -10033,9 +10102,9 @@ class EffectivePSF:
         """
         from astropy.utils.data import download_file
         try:
-            from urllib.request import HTTPError
+            from urllib.request import HTTPError, URLError
         except ImportError:
-            from urllib3.exceptions import HTTPError
+            from urllib3.exceptions import HTTPError, TimeoutError
 
         stdpsf_url = "https://www.stsci.edu/~jayander/JWST1PASS/LIB/PSFs/STDPSFs/"
 
@@ -10046,12 +10115,11 @@ class EffectivePSF:
 
         for filter in miri_filters:
             full_url = stdpsf_url + miri_path.format(filter=filter)
-
-            try:
-                file_obj = download_file(full_url, cache=use_astropy_cache)
-            except HTTPError:
-                msg = f"Failed to download ePSF from {full_url}"
-                log_comment(LOGFILE, msg, verbose=True, show_date=True)
+            
+            file_obj, file_status = general_fetch_file(
+                full_url, cache=use_astropy_cache, verbose=verbose
+            )
+            if file_obj  is None:
                 continue
 
             with pyfits.open(file_obj) as im:
@@ -10066,13 +10134,15 @@ class EffectivePSF:
 
         for filter in nircam_sw_filters:
             for detector in nircam_sw_detectors:
-                full_url = stdpsf_url + sw_path.format(filter=filter, detector=detector)
+                full_url = (
+                    stdpsf_url
+                    + sw_path.format(filter=filter, detector=detector)
+                )
 
-                try:
-                    file_obj = download_file(full_url, cache=use_astropy_cache)
-                except HTTPError:
-                    msg = f"Failed to download ePSF from {full_url}"
-                    log_comment(LOGFILE, msg, verbose=True, show_date=True)
+                file_obj, file_status = general_fetch_file(
+                    full_url, cache=use_astropy_cache, verbose=verbose
+                )
+                if file_obj  is None:
                     continue
 
                 with pyfits.open(file_obj) as im:
@@ -10087,13 +10157,15 @@ class EffectivePSF:
 
         for filter in nircam_lw_filters:
             for detector in nircam_lw_detectors:
-                full_url = stdpsf_url + lw_path.format(filter=filter, detector=detector)
-
-                try:
-                    file_obj = download_file(full_url, cache=use_astropy_cache)
-                except HTTPError:
-                    msg = f"Failed to download ePSF from {full_url}"
-                    log_comment(LOGFILE, msg, verbose=True, show_date=True)
+                full_url = (
+                    stdpsf_url
+                    + lw_path.format(filter=filter, detector=detector)
+                )
+                
+                file_obj, file_status = general_fetch_file(
+                    full_url, cache=use_astropy_cache, verbose=verbose
+                )
+                if file_obj  is None:
                     continue
 
                 with pyfits.open(file_obj) as im:

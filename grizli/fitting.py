@@ -452,7 +452,7 @@ def run_all(
 
     if get_dict:
         frame = inspect.currentframe()
-        args = inspect.getargvalues(frame).locals
+        args = dict(inspect.getargvalues(frame).locals)
         for k in [
             "id",
             "get_dict",
